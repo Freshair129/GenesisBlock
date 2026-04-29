@@ -1,0 +1,27 @@
+{
+  "name": "msp",
+  "version": "0.1.0",
+  "type": "module",
+  "description": "MSP Query Engine — centralized retrieval and knowledge orchestration for EVA agents",
+  "main": "src/index.ts",
+  "scripts": {
+    "dev": "concurrently \"tsx watch src/index.ts\" \"npm run web:dev\"",
+    "web:dev": "vite --root web",
+    "web:build": "vite build --root web",
+    "start": "node dist/src/index.js",
+    "build": "tsc",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@freshair129/gks": "file:../GKS",
+    "dotenv": "^17.4.2",
+    "express": "^4.18.0"
+  },
+  "devDependencies": {
+    "@types/express": "^5.0.6",
+    "@types/node": "^22.19.17",
+    "concurrently": "^9.2.1",
+    "tsx": "^4.21.0",
+    "typescript": "^5.9.3"
+  }
+}
