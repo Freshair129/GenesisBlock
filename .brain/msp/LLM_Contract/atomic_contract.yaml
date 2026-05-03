@@ -40,7 +40,53 @@ forbidden_fields:
   - feature_id_override
   - incident_id
 
-# Reserved for M4: required_fields per atom type, field_constraints,
-# anti-hallucination rule overrides. The loader currently ignores these.
-required_fields: {}
+# Required frontmatter fields per atom type. Validator's required-fields
+# rule looks up `by_type[<type>]` first, falling back to `default`.
+# Missing or empty values fail with [required-fields].
+#
+# Conservative defaults: only fields that EVERY existing atom in this repo
+# already has. Per-type lists add atom-specific requirements.
+required_fields:
+  default:
+    - id
+    - phase
+    - type
+    - status
+    - title
+    - created_at
+  by_type:
+    adr:
+      - id
+      - phase
+      - type
+      - status
+      - title
+      - created_at
+      - tags
+    feat:
+      - id
+      - phase
+      - type
+      - status
+      - title
+      - created_at
+    blueprint:
+      - id
+      - phase
+      - type
+      - status
+      - title
+      - created_at
+      - linked_symbols
+    audit:
+      - id
+      - phase
+      - type
+      - status
+      - title
+      - created_at
+
+# Reserved for M6: per-field constraints (length, regex, type).
+# Currently the loader ignores this section; summary length/placeholder
+# checks live in src/validator/rules/summary-min.ts.
 field_constraints: {}

@@ -12,6 +12,7 @@ import { idFilenameMatch } from './rules/id-filename-match.js'
 import { idFormat } from './rules/id-format.js'
 import { noInventedVersions } from './rules/no-invented-versions.js'
 import { phaseStatus } from './rules/phase-status.js'
+import { requiredFields } from './rules/required-fields.js'
 import { summaryMin } from './rules/summary-min.js'
 import {
   ValidatorIOError,
@@ -21,6 +22,7 @@ import {
 } from './types.js'
 
 export const HARD_RULES: Rule[] = [
+  requiredFields,
   forbiddenFields,
   idFormat,
   idFilenameMatch,

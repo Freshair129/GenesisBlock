@@ -63,4 +63,47 @@ describe('loadContract', () => {
     expect(c.source).toBe('default')
     expect(c.warnings.some((w) => w.includes('version'))).toBe(true)
   })
+
+  it('parses required_fields with default + by_type', async () => {
+    const root = await freshRoot()
+    await writeContract(
+      root,
+      `version: 1
+forbidden_fields: [commit_hash]
+required_fields:
+  default: [id, type]
+  by_type:
+    adr: [id, type, title, tags]
+    feat: [id, type, title]
+`,
+    )
+    const c = await loadContract(root)
+    expect(c.source).toBe('yaml')
+    expect(c.requiredFields?.default).toEqual(['id', 'type'])
+    expect(c.requiredFields?.byType.get('adr')).toEqual(['id', 'type', 'title', 'tags'])
+    expect(c.requiredFields?.byType.get('feat')).toEqual(['id', 'type', 'title'])
+  })
+
+  it('skips required_fields when default is missing', async () => {
+    const root = await freshRoot()
+    await writeContract(
+      root,
+      `version: 1
+forbidden_fields: [commit_hash]
+required_fields:
+  by_type:
+    adr: [id]
+`,
+    )
+    const c = await loadContract(root)
+    expect(c.requiredFields).toBeUndefined()
+    expect(c.warnings.some((w) => w.includes('required_fields.default'))).toBe(true)
+  })
+
+  it('returns undefined requiredFields when section is absent', async () => {
+    const root = await freshRoot()
+    await writeContract(root, `version: 1\nforbidden_fields: [commit_hash]\n`)
+    const c = await loadContract(root)
+    expect(c.requiredFields).toBeUndefined()
+  })
 })

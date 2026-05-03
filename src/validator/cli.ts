@@ -110,7 +110,11 @@ async function main(): Promise<number> {
     for (const w of contract.warnings) process.stderr.write(`⚠ ${w}\n`)
   }
 
-  const ctx = { atomicIndex, forbiddenFields: contract.forbiddenFields }
+  const ctx = {
+    atomicIndex,
+    forbiddenFields: contract.forbiddenFields,
+    requiredFields: contract.requiredFields,
+  }
   let results: ValidationResult[]
 
   if (values.all) {
