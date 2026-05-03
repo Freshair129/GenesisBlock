@@ -1,5 +1,5 @@
 import { spawn, spawnSync } from 'node:child_process'
-import { copyFile, mkdir, mkdtemp, writeFile } from 'node:fs/promises'
+import { copyFile, mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -138,5 +138,47 @@ describe('pre-commit hook', () => {
     // The previous test left the bad atom staged.
     const r = run('git', ['commit', '--no-verify', '-m', 'force'], repo)
     expect(r.code).toBe(0)
+  }, 30_000)
+
+  it('hotfix gate: src/ commit allowed when no overdue HOTFIX exists', async () => {
+    // Stage a non-gks/, non-.brain/ file. With no HOTFIX-- atom, the hook should pass.
+    await mkdir(join(repo, 'src'), { recursive: true })
+    await writeFile(join(repo, 'src/foo.ts'), 'export const x = 1\n')
+    run('git', ['add', 'src/foo.ts'], repo)
+    const r = run('git', ['commit', '-m', 'add src/foo'], repo)
+    expect(r.code).toBe(0)
+  }, 30_000)
+
+  it('hotfix gate: src/ commit blocked when an overdue HOTFIX references the file', async () => {
+    // Plant an overdue HOTFIX atom referencing src/foo.ts.
+    const hotfixDir = join(repo, 'gks/hotfix')
+    await mkdir(hotfixDir, { recursive: true })
+    const overdue = `---
+id: HOTFIX--abc1234
+phase: 5
+type: hotfix
+status: stable
+title: test overdue
+created_at: 2024-01-01T00:00:00Z
+valid_from: 2024-01-01T00:00:00Z
+valid_to: 2024-01-03T00:00:00Z
+linked_symbols:
+  - {"file":"src/foo.ts"}
+meta: {"commit_sha":"deadbeef","reason":"test"}
+---
+
+# HOTFIX
+body
+`
+    await writeFile(join(hotfixDir, 'HOTFIX--abc1234.md'), overdue)
+    // Edit src/foo.ts so the hook stages it for hotfix check
+    await writeFile(join(repo, 'src/foo.ts'), 'export const x = 2\n')
+    run('git', ['add', 'src/foo.ts', 'gks/hotfix/HOTFIX--abc1234.md'], repo)
+    const r = run('git', ['commit', '-m', 'tweak src/foo'], repo)
+    expect(r.code).not.toBe(0)
+    expect(r.stdout + r.stderr).toMatch(/MSP hotfix check failed|hotfix gate/)
+    // Cleanup: remove the planted hotfix so subsequent tests aren't affected
+    run('git', ['reset', '--', 'src/foo.ts', 'gks/hotfix/HOTFIX--abc1234.md'], repo)
+    await rm(join(hotfixDir, 'HOTFIX--abc1234.md'), { force: true })
   }, 30_000)
 })
