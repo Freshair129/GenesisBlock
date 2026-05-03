@@ -1,0 +1,38 @@
+# Microtask (execution state — owned by orchestrator per ADR-015)
+
+id: RULE-DANGLING-WIKILINKS
+parent_blueprint: BLUEPRINT--MSP-VALIDATOR
+status: open
+assignee:
+created_at: 2026-05-03T06:20:11.154Z
+prompt: |
+  Implement src/validator/rules/dangling-wikilinks.ts.
+
+  Export:
+    - danglingWikilinks(atom: ParsedAtom, ctx: ValidationContext): ValidationError[]
+
+  Two pass scan against ctx.atomicIndex:
+
+  1. Body wikilinks: extract via parse.extractWikilinks(atom.body).
+     For each `[[ID]]`, if ctx.atomicIndex doesn't have ID and ID !== atom's own
+     proposed_id, emit error with line/column.
+
+  2. Crosslinks frontmatter: walk atom.fm.crosslinks if present. For every value
+     in implements / references / used_by / contradicts / supersedes /
+     partially_supersedes / partially_superseded_by / resolves arrays, if the ID
+     isn't in the atomic index, emit error (no line info — frontmatter).
+
+  Both produce rule='dangling-wikilink', severity='error'.
+
+  Edge case: an atom referencing its OWN id (proposed_id during inbound) is
+  allowed only if it's in the index — at inbound time it's not, so a self-ref
+  in inbound IS flagged. Document this in a code comment.
+acceptance:
+  - Returns empty array when all wikilinks resolve
+  - Returns 1 error for body containing `[[FEAT--GHOST]]` not in index
+  - Returns 1 error for crosslinks.references=[GHOST--ATOM] not in index
+  - Skips wikilinks inside fenced code blocks (relies on parse.extractWikilinks)
+  - vitest test under test/validator/rules/dangling-wikilinks.test.ts covers all four
+geography:
+  - "src/validator/rules/dangling-wikilinks.ts"
+  - "test/validator/rules/dangling-wikilinks.test.ts"

@@ -1,0 +1,32 @@
+# Microtask (execution state — owned by orchestrator per ADR-015)
+
+id: RULE-FORBIDDEN-FIELDS
+parent_blueprint: BLUEPRINT--MSP-VALIDATOR
+status: open
+assignee:
+created_at: 2026-05-03T06:20:11.154Z
+prompt: |
+  Implement src/validator/rules/forbidden-fields.ts.
+
+  Export:
+    - FORBIDDEN_FIELDS: ReadonlySet<string> = new Set([
+        'commit_hash', 'merge_commit', 'tenant_id', 'pr_number', 'reviewer_approved_at',
+        'promotion_level', 'validated_at', 'validated_by', 'msp_signature', 'hash',
+        'execution_count', 'last_error', 'uptime', 'latency_p50',
+        'adr_number_override', 'feature_id_override', 'incident_id',
+      ])
+    - forbiddenFields(atom: ParsedAtom, ctx: ValidationContext): ValidationError[]
+
+  The rule walks atom.fm at top level (not nested) and emits one ValidationError
+  per forbidden field present, with rule='forbidden-fields' and severity='error'.
+
+  Use ctx.forbiddenFields if provided (testing override), else FORBIDDEN_FIELDS.
+acceptance:
+  - Returns empty array when fm has no forbidden fields
+  - Returns 1 error when fm has 'commit_hash'
+  - Returns 3 errors when fm has 'commit_hash', 'validated_by', 'promotion_level'
+  - Override via ctx.forbiddenFields works (e.g. empty set → no errors)
+  - vitest test under test/validator/rules/forbidden-fields.test.ts covers all four
+geography:
+  - "src/validator/rules/forbidden-fields.ts"
+  - "test/validator/rules/forbidden-fields.test.ts"
