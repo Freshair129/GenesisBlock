@@ -17,7 +17,8 @@
     "msp:validate": "tsx src/validator/cli.ts",
     "test": "vitest run",
     "test:watch": "vitest",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "msp:backlinks": "tsx src/memory/backlinks/cli.ts"
   },
   "dependencies": {
     "@freshair129/gks": "^3.5.6",
