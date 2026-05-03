@@ -7,6 +7,21 @@
   "engines": {
     "node": ">=20"
   },
+  "bin": {
+    "msp-validate": "./dist/validator/cli.js",
+    "msp-backlinks": "./dist/memory/backlinks/cli.js",
+    "msp-run-task": "./dist/codegen/cli.js",
+    "msp-propose": "./scripts/msp/propose.mjs"
+  },
+  "files": [
+    "dist/",
+    "scripts/msp/propose.mjs",
+    "scripts/msp/re-indexer.ts",
+    ".brain/msp/LLM_Contract/atomic_contract.yaml",
+    "examples/hooks/",
+    "README.md",
+    "msp_spec.md"
+  ],
   "scripts": {
     "msp:propose": "node scripts/msp/propose.mjs",
     "msp:list": "gks inbound list",
@@ -15,11 +30,13 @@
     "msp:check-links": "gks validate --links --root=.",
     "msp:verify": "gks verify-flow",
     "msp:validate": "tsx src/validator/cli.ts",
+    "msp:backlinks": "tsx src/memory/backlinks/cli.ts",
+    "msp:run-task": "tsx src/codegen/cli.ts",
+    "build": "tsc -p tsconfig.build.json && node scripts/msp/chmod-bins.mjs",
     "test": "vitest run",
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit",
-    "msp:backlinks": "tsx src/memory/backlinks/cli.ts",
-    "msp:run-task": "tsx src/codegen/cli.ts"
+    "prepublishOnly": "npm run typecheck && npm test && npm run build"
   },
   "dependencies": {
     "@freshair129/gks": "^3.5.6",
