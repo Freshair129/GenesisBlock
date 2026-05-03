@@ -1,0 +1,17 @@
+# Microtask (execution state — owned by orchestrator per ADR-015)
+# Lives outside gks/. Update freely; close it when the code merges.
+
+id: PARSE-FAILURES
+parent_blueprint: BLUEPRINT--ACCEPTANCE-VITEST-RUNNER
+status: open                  # open | in_progress | blocked | done
+assignee:                     # MSP-AGT-... or MSP-USR-...
+created_at: 2026-05-03T09:25:19.339Z
+prompt: |
+  <≤ 400-token instruction for the agent>
+acceptance:
+  - <falsifiable criterion 1>
+  - <falsifiable criterion 2 (≥ 2 required)>
+geography:
+  - "src/codegen/acceptance/vitest.ts"
+  - "src/codegen/acceptance/sandbox.ts"
+  - "src/codegen/acceptance/types.ts"

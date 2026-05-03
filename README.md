@@ -60,8 +60,11 @@ npx gks new-feature msp-validator \
   - `src/memory/episodic/` (19 tests)
   - `src/codegen/` (36 tests, mock SLM)
 - [x] **M3d** — phase-6 propose wrapper (`scripts/msp/propose.mjs`)
+- [x] **M4a** — bin entries (`msp-validate`, `msp-backlinks`, `msp-run-task`, `msp-propose`) + GitHub Actions CI (Node 20+22 matrix)
+- [x] **M4b** — Real Ollama SLM client + factory (`src/codegen/slm/`, 14 tests, no real network in CI)
+- [x] **M4c** — Vitest acceptance runner (`src/codegen/acceptance/`, 13 tests incl. real vitest spawn)
 
-**151 tests passing across 24 files.** 58 atoms in `gks/` (validator dogfood: 58/58 pass).
+**178 tests passing across 29 files.** 69 atoms in `gks/` (validator dogfood: 69/69 pass).
 
 ## Pre-commit hook
 
@@ -71,12 +74,22 @@ bash examples/hooks/install.sh
 
 After install, `git commit` blocks if any staged `.md` under `gks/` or `.brain/msp/projects/<ns>/inbound/` fails the validator. Skip with the standard `git commit --no-verify`. Full docs: [`examples/hooks/README.md`](./examples/hooks/README.md).
 
-## Memory + codegen surfaces (M3c)
+## Memory + codegen surfaces
 
 ```sh
-npm run msp:backlinks                     # rebuild .brain/.../vector/backlinks.jsonl
-npm run msp:backlinks -- --check          # CI assertion (exit 1 on drift)
-npm run msp:run-task -- T*.task.yaml      # codegen runner with mock SLM
+# After `npm run build`, bin entries are available:
+npx msp-validate --all                    # whole-tree validator
+npx msp-backlinks --check                 # CI drift assertion
+npx msp-propose AUDIT--FOO --phase=6 ...  # phase-6 wrapper
+npx msp-run-task <T*.task.yaml>           # codegen runner
+
+# Real SLM (M4b)
+ollama pull qwen2.5-coder:7b
+MSP_SLM_PROVIDER=ollama npx msp-run-task <T*.task.yaml>
+
+# Real test gate (M4c) — programmatic
+import { createVitestAcceptance } from '@/codegen/acceptance/vitest'
+runTask(taskPath, { acceptanceRunner: createVitestAcceptance(...) })
 ```
 
 Programmatic surfaces:

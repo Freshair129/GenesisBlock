@@ -1,0 +1,56 @@
+name: test
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        node-version: [20, 22]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: npm
+
+      - run: npm ci
+
+      - name: typecheck
+        run: npm run typecheck
+
+      - name: build
+        run: npm run build
+
+      - name: vitest
+        run: npm test
+
+      - name: msp:index
+        run: npm run msp:index
+
+      - name: msp:validate (whole tree)
+        run: npm run msp:validate -- --all --root=.
+
+      - name: msp:backlinks (rebuild + determinism check)
+        run: |
+          # The .jsonl is gitignored — fresh checkout has no file to compare against.
+          # Build it once, then run --check to assert a second pass is no-op (deterministic).
+          npm run msp:backlinks
+          npm run msp:backlinks -- --check
+
+      - name: msp:check-links (gks crosslink integrity)
+        run: npm run msp:check-links
+
+      - name: verify-flow per FEAT
+        run: |
+          set -e
+          for feat in $(ls gks/feat/FEAT--*.md | xargs -I {} basename {} .md); do
+            echo "→ $feat"
+            npx gks verify-flow "$feat" --root=.
+          done

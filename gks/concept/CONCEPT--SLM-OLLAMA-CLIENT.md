@@ -1,0 +1,45 @@
+---
+id: CONCEPT--SLM-OLLAMA-CLIENT
+phase: 1
+type: concept
+status: stable
+vault_id: default
+title: Ollama SLM client — real codegen via Ollama HTTP API
+tags:
+  - msp
+  - codegen
+  - slm
+  - ollama
+  - runtime
+crosslinks: {"references":["FEAT--CODEGEN-MICROTASK-RUNNER","ADR--CODEGEN-RETRY-POLICY"]}
+created_at: 2026-05-03T09:22:30.407Z
+---
+
+# CONCEPT — Ollama SLM client
+
+## Problem
+
+`FEAT--CODEGEN-MICROTASK-RUNNER` works end to end with a mock SLM that returns either a stub or whatever the prompt's `// MOCK_OUTPUT:` hint specifies. The mock is enough for testing the pipeline mechanics but cannot produce real code for production microtasks. Until a real SLM is wired, M3c-4 is a scaffold, not a usable feature.
+
+## Hypothesis
+
+If the runner accepts a pluggable `SlmClient` and we ship one concrete implementation that talks to Ollama (`POST /api/generate` with `model` + `prompt`), then anyone with a local Ollama install + Qwen 2.5 Coder can run real microtasks end to end. No API key required. No network call in tests (mock `fetch`).
+
+## Scope
+
+In:
+- HTTP client targeting Ollama's `/api/generate` endpoint (single-turn, no chat history).
+- Honour `OLLAMA_HOST` (default `http://127.0.0.1:11434`) + `OLLAMA_MODEL` (default `qwen2.5-coder:7b`) env vars.
+- Implements the `SlmClient` interface from `src/codegen/types.ts`.
+- Surface errors clearly: connection refused, model not pulled, timeout.
+- Pluggable factory `createSlmClient(opts?)` so future Anthropic / OpenAI clients drop in next to it.
+
+Out:
+- Streaming responses (we collect the full output before returning).
+- Chat-history mode (the codegen retry policy strips previous attempts anyway).
+- Authentication / TLS — Ollama is local-by-default.
+- Anthropic / OpenAI / vLLM clients — separate atoms when needed.
+
+## Source
+
+Closes M3c-4's residual ("real Qwen 2.5 Coder integration is a future task"). P0 item #1 from production-readiness backlog.
