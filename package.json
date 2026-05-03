@@ -8,7 +8,7 @@
     "node": ">=20"
   },
   "scripts": {
-    "msp:propose": "gks propose-inbound",
+    "msp:propose": "node scripts/msp/propose.mjs",
     "msp:list": "gks inbound list",
     "msp:promote": "gks inbound promote",
     "msp:index": "tsx scripts/msp/re-indexer.ts --root=.",
@@ -17,7 +17,9 @@
     "msp:validate": "tsx src/validator/cli.ts",
     "test": "vitest run",
     "test:watch": "vitest",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "msp:backlinks": "tsx src/memory/backlinks/cli.ts",
+    "msp:run-task": "tsx src/codegen/cli.ts"
   },
   "dependencies": {
     "@freshair129/gks": "^3.5.6",

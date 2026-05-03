@@ -3,6 +3,7 @@ import { resolve } from 'node:path'
 import { parseArgs } from 'node:util'
 
 import { loadAtomicIndex, validate, validateAll } from './index.js'
+import { loadContract } from './contract.js'
 import { ValidatorIOError, type ValidationResult } from './types.js'
 
 const HELP = `msp-validate — schema/ID/wikilink/anti-hallucination gate over MSP atoms
@@ -103,7 +104,13 @@ async function main(): Promise<number> {
     throw err
   }
 
-  const ctx = { atomicIndex }
+  // Load runtime contract; falls back to defaults if YAML missing/invalid.
+  const contract = await loadContract(root)
+  if (contract.warnings.length > 0 && !values.json) {
+    for (const w of contract.warnings) process.stderr.write(`⚠ ${w}\n`)
+  }
+
+  const ctx = { atomicIndex, forbiddenFields: contract.forbiddenFields }
   let results: ValidationResult[]
 
   if (values.all) {

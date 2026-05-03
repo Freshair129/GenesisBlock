@@ -1,0 +1,46 @@
+# MSP atomic write contract — runtime-loadable schema for validator rules.
+#
+# Loaded by `src/validator/contract.ts`. If this file is missing or invalid,
+# the validator falls back to its hardcoded defaults (defined inline in each
+# rule module) and prints a warning.
+#
+# Editing this file does NOT require a code release. Edits should still go
+# through code review since they widen or narrow the validator's contract.
+#
+# Source: msp_spec.md §4. Authority: ADR--FORBIDDEN-FIELDS-LIST,
+# ADR--ANTI-HALLUCINATION-RULES.
+
+version: 1
+
+# 17 fields agents must never set in frontmatter. Validator's
+# forbidden-fields rule enforces; promote workflow strips on its way to gks/.
+forbidden_fields:
+  # Identity forgery (5)
+  - commit_hash
+  - merge_commit
+  - tenant_id
+  - pr_number
+  - reviewer_approved_at
+
+  # Authority — MSP only (5)
+  - promotion_level
+  - validated_at
+  - validated_by
+  - msp_signature
+  - hash
+
+  # Runtime metrics (4)
+  - execution_count
+  - last_error
+  - uptime
+  - latency_p50
+
+  # Fabrication risk (3)
+  - adr_number_override
+  - feature_id_override
+  - incident_id
+
+# Reserved for M4: required_fields per atom type, field_constraints,
+# anti-hallucination rule overrides. The loader currently ignores these.
+required_fields: {}
+field_constraints: {}

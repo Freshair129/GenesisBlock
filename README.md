@@ -52,9 +52,16 @@ npx gks new-feature msp-validator \
 - [x] **M0** — Bootstrap (npm + GKS install + `gks/` tree)
 - [x] **M1** — Slice `msp_spec.md` into atoms via inbound queue
 - [x] **M2** — Implement validator under `src/validator/` (49/49 tests)
-- [x] **M3a** — Pre-commit hook (`examples/hooks/`) — block bad atoms locally before they reach CI
-- [ ] **M3b** — Load forbidden-fields list from `atomic_contract.yaml` at runtime
-- [ ] **M3c** — Implement the 4 FEAT scaffolds (codegen runner + 3 memory writers)
+- [x] **M3a** — Pre-commit hook (`examples/hooks/`)
+- [x] **M3b** — Runtime contract loader (`src/validator/contract.ts` + `atomic_contract.yaml`)
+- [x] **M3c** — All 4 FEAT scaffolds implemented:
+  - `src/memory/backlinks/` (15 tests)
+  - `src/memory/sessions/` (20 tests)
+  - `src/memory/episodic/` (19 tests)
+  - `src/codegen/` (36 tests, mock SLM)
+- [x] **M3d** — phase-6 propose wrapper (`scripts/msp/propose.mjs`)
+
+**151 tests passing across 24 files.** 58 atoms in `gks/` (validator dogfood: 58/58 pass).
 
 ## Pre-commit hook
 
@@ -63,6 +70,23 @@ bash examples/hooks/install.sh
 ```
 
 After install, `git commit` blocks if any staged `.md` under `gks/` or `.brain/msp/projects/<ns>/inbound/` fails the validator. Skip with the standard `git commit --no-verify`. Full docs: [`examples/hooks/README.md`](./examples/hooks/README.md).
+
+## Memory + codegen surfaces (M3c)
+
+```sh
+npm run msp:backlinks                     # rebuild .brain/.../vector/backlinks.jsonl
+npm run msp:backlinks -- --check          # CI assertion (exit 1 on drift)
+npm run msp:run-task -- T*.task.yaml      # codegen runner with mock SLM
+```
+
+Programmatic surfaces:
+
+```ts
+import { openSession }       from '@/memory/sessions/writer'
+import { appendEpisode }     from '@/memory/episodic/writer'
+import { rebuildBacklinks }  from '@/memory/backlinks/indexer'
+import { runTask }           from '@/codegen/runner'
+```
 
 ## License
 
