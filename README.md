@@ -52,7 +52,17 @@ npx gks new-feature msp-validator \
 - [x] **M0** — Bootstrap (npm + GKS install + `gks/` tree)
 - [x] **M1** — Slice `msp_spec.md` into atoms via inbound queue
 - [x] **M2** — Implement validator under `src/validator/` (49/49 tests)
-- [ ] **M3** — Pre-commit hook + load forbidden-fields list from `atomic_contract.yaml` at runtime
+- [x] **M3a** — Pre-commit hook (`examples/hooks/`) — block bad atoms locally before they reach CI
+- [ ] **M3b** — Load forbidden-fields list from `atomic_contract.yaml` at runtime
+- [ ] **M3c** — Implement the 4 FEAT scaffolds (codegen runner + 3 memory writers)
+
+## Pre-commit hook
+
+```sh
+bash examples/hooks/install.sh
+```
+
+After install, `git commit` blocks if any staged `.md` under `gks/` or `.brain/msp/projects/<ns>/inbound/` fails the validator. Skip with the standard `git commit --no-verify`. Full docs: [`examples/hooks/README.md`](./examples/hooks/README.md).
 
 ## License
 
