@@ -33,6 +33,17 @@ describe('ID_PATTERN', () => {
     expect(ID_PATTERN.test('FEAT--foo bar')).toBe(false)
     expect(ID_PATTERN.test('FEAT--foo.bar')).toBe(false)
   })
+
+  it('accepts HOTFIX--<hex> form (lowercase hex per gks hotfix open)', () => {
+    expect(ID_PATTERN.test('HOTFIX--abc1234')).toBe(true)
+    expect(ID_PATTERN.test('HOTFIX--0000000')).toBe(true)
+    expect(ID_PATTERN.test('HOTFIX--deadbeef')).toBe(true)
+  })
+
+  it('rejects HOTFIX with non-hex chars', () => {
+    expect(ID_PATTERN.test('HOTFIX--abcXYZ1')).toBe(false)
+    expect(ID_PATTERN.test('HOTFIX--testfix')).toBe(false)
+  })
 })
 
 describe('idFormat rule', () => {

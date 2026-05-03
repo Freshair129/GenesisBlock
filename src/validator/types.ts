@@ -36,9 +36,15 @@ export interface AtomicIndexEntry {
   geography?: string[]
 }
 
+export interface RequiredFieldsConfig {
+  default: ReadonlyArray<string>
+  byType: ReadonlyMap<string, ReadonlyArray<string>>
+}
+
 export interface ValidationContext {
   atomicIndex: Map<string, AtomicIndexEntry>
   forbiddenFields?: ReadonlySet<string>
+  requiredFields?: RequiredFieldsConfig
   now?: Date
 }
 

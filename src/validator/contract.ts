@@ -5,9 +5,15 @@ import { parse as parseYaml } from 'yaml'
 
 import { FORBIDDEN_FIELDS as DEFAULT_FORBIDDEN_FIELDS } from './rules/forbidden-fields.js'
 
+export interface RequiredFieldsConfig {
+  default: ReadonlyArray<string>
+  byType: ReadonlyMap<string, ReadonlyArray<string>>
+}
+
 export interface AtomicContract {
   version: number
   forbiddenFields: ReadonlySet<string>
+  requiredFields?: RequiredFieldsConfig
   source: 'yaml' | 'default'
   warnings: string[]
 }
@@ -73,18 +79,50 @@ export async function loadContract(
     forbiddenFields = DEFAULT_FORBIDDEN_FIELDS
   }
 
+  const requiredFields = parseRequiredFields(obj.required_fields, warnings)
+
   return {
     version,
     forbiddenFields,
+    requiredFields,
     source: 'yaml',
     warnings,
   }
+}
+
+function parseRequiredFields(
+  raw: unknown,
+  warnings: string[],
+): RequiredFieldsConfig | undefined {
+  if (raw === undefined || raw === null) return undefined
+  if (typeof raw !== 'object' || Array.isArray(raw)) {
+    warnings.push('atomic_contract.yaml: required_fields must be an object — skipping')
+    return undefined
+  }
+  const obj = raw as Record<string, unknown>
+  const def = obj.default
+  if (!Array.isArray(def) || !def.every((x) => typeof x === 'string')) {
+    warnings.push('atomic_contract.yaml: required_fields.default must be a string array — skipping')
+    return undefined
+  }
+  const byTypeMap = new Map<string, ReadonlyArray<string>>()
+  if (obj.by_type && typeof obj.by_type === 'object' && !Array.isArray(obj.by_type)) {
+    for (const [type, list] of Object.entries(obj.by_type)) {
+      if (Array.isArray(list) && list.every((x) => typeof x === 'string')) {
+        byTypeMap.set(type, list as string[])
+      } else {
+        warnings.push(`atomic_contract.yaml: required_fields.by_type.${type} skipped (not a string array)`)
+      }
+    }
+  }
+  return { default: def as string[], byType: byTypeMap }
 }
 
 function defaultContract(warnings: string[]): AtomicContract {
   return {
     version: 1,
     forbiddenFields: DEFAULT_FORBIDDEN_FIELDS,
+    requiredFields: undefined,
     source: 'default',
     warnings,
   }

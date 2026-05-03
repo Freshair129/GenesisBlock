@@ -465,13 +465,9 @@ node scripts/msp/pre-commit-validator.mjs
 
 ## 12. Project Path Encoding
 
-MSP รองรับหลายโปรเจกต์ใต้ `~/.brain/msp/projects/<path-encoded>/`
+MSP รองรับหลายโปรเจกต์ใต้ `~/.brain/msp/projects/<name>/` ใช้ **bare name** (เช่น `evaAI`) เป็น canonical encoding
 
-| Convention (spec) | จริงในโปรเจกต์นี้ |
-|---|---|
-| `D--<name>` (เช่น `D--ProA`) | **`evaAI`** (bare name) |
-
-> ⚠️ Spec บอก `D--<name>` แต่ `scripts/migration/standardizer.mjs` ใช้ bare name — **ยึดตาม script** จนกว่าจะ harmonize
+> 📌 Decision recorded in `ADR--PATH-ENCODING`: ใช้ bare name ตาม `gks init` / `scripts/migration/standardizer.mjs` ไม่ใช้ `D--<name>` prefix ที่ spec ฉบับก่อนระบุไว้ — เพราะ tooling เป็น authoritative และ migration cost ของ rename ทุกโปรเจกต์สูงกว่าการแก้ spec หนึ่งย่อหน้า
 
 ---
 

@@ -1,0 +1,16 @@
+# Microtask (execution state — owned by orchestrator per ADR-015)
+# Lives outside gks/. Update freely; close it when the code merges.
+
+id: DETECT-TOUCHED-FEATS
+parent_blueprint: BLUEPRINT--MSP-PREPUSH-HOOK
+status: open                  # open | in_progress | blocked | done
+assignee:                     # MSP-AGT-... or MSP-USR-...
+created_at: 2026-05-03T10:37:26.338Z
+prompt: |
+  <≤ 400-token instruction for the agent>
+acceptance:
+  - <falsifiable criterion 1>
+  - <falsifiable criterion 2 (≥ 2 required)>
+geography:
+  - "examples/hooks/pre-push-verify.sh"
+  - "examples/hooks/install.sh"

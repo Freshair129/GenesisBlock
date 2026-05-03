@@ -63,8 +63,14 @@ npx gks new-feature msp-validator \
 - [x] **M4a** — bin entries (`msp-validate`, `msp-backlinks`, `msp-run-task`, `msp-propose`) + GitHub Actions CI (Node 20+22 matrix)
 - [x] **M4b** — Real Ollama SLM client + factory (`src/codegen/slm/`, 14 tests, no real network in CI)
 - [x] **M4c** — Vitest acceptance runner (`src/codegen/acceptance/`, 13 tests incl. real vitest spawn)
+- [x] **M5a** — Pre-push hook (`gks verify-flow` per touched FEAT)
+- [x] **M5b** — Hotfix wrapper (`msp:hotfix:*` scripts + pre-commit gate via `gks hotfix check`)
+- [x] **M5c** — 3 remaining anti-hallucination rules (no-invented-versions, evidence-for-decisions, cite-or-mark-inferred)
+- [x] **M5d** — `required_fields` enforced from `atomic_contract.yaml` runtime
+- [x] **M5e** — `ADR--HUMAN-REVIEW-GATES` + `msp_spec.md` §12 alignment
+- [x] **M5f** — shellcheck CI step
 
-**178 tests passing across 29 files.** 69 atoms in `gks/` (validator dogfood: 69/69 pass).
+**218 tests passing across 34 files.** 84 atoms in `gks/` (validator dogfood: 84/84 pass).
 
 ## Pre-commit hook
 

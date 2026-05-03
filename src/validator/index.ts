@@ -3,12 +3,16 @@ import { join } from 'node:path'
 
 import { parseFile } from './parse.js'
 import { adrMonotonic } from './rules/adr-monotonic.js'
+import { citeOrMarkInferred } from './rules/cite-or-mark-inferred.js'
 import { danglingWikilinks } from './rules/dangling-wikilinks.js'
+import { evidenceForDecisions } from './rules/evidence-for-decisions.js'
 import { forbiddenFields } from './rules/forbidden-fields.js'
 import { futureDate } from './rules/future-date.js'
 import { idFilenameMatch } from './rules/id-filename-match.js'
 import { idFormat } from './rules/id-format.js'
+import { noInventedVersions } from './rules/no-invented-versions.js'
 import { phaseStatus } from './rules/phase-status.js'
+import { requiredFields } from './rules/required-fields.js'
 import { summaryMin } from './rules/summary-min.js'
 import {
   ValidatorIOError,
@@ -18,6 +22,7 @@ import {
 } from './types.js'
 
 export const HARD_RULES: Rule[] = [
+  requiredFields,
   forbiddenFields,
   idFormat,
   idFilenameMatch,
@@ -26,7 +31,12 @@ export const HARD_RULES: Rule[] = [
   futureDate,
   summaryMin,
   phaseStatus,
+  noInventedVersions,
+  evidenceForDecisions,
 ]
+
+// Soft rules (warnings only; don't fail exit code)
+export const SOFT_RULES: Rule[] = [citeOrMarkInferred]
 
 const MAX_ERRORS_PER_FILE = 50
 
@@ -58,6 +68,12 @@ export async function validate(
       } else {
         result.warnings.push(e)
       }
+    }
+  }
+  for (const rule of SOFT_RULES) {
+    for (const e of rule(atom, ctx)) {
+      // Soft rules emit only warnings even if rule output marks 'error'.
+      result.warnings.push({ ...e, severity: 'warning' })
     }
   }
   return result

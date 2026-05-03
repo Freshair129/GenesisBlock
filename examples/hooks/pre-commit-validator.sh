@@ -36,5 +36,30 @@ if [ "$FAIL" -gt 0 ]; then
   exit 1
 fi
 
-echo "✓ MSP validator: $COUNT file(s) passed."
+if [ "$COUNT" -gt 0 ]; then
+  echo "✓ MSP validator: $COUNT file(s) passed."
+fi
+
+# 5. Hotfix gate (ADR--HOTFIX-ESCAPE-HATCH).
+# For staged paths outside gks/ + .brain/ + infra dirs, ask GKS whether any
+# overdue HOTFIX-- atom blocks them. Single invocation per commit.
+hotfix_paths=$(git diff --cached --name-only --diff-filter=ACMR \
+  | grep -v -E '^(gks/|\.brain/|\.github/|examples/|scripts/|test/|node_modules/|dist/)' \
+  || true)
+
+if [ -n "$hotfix_paths" ]; then
+  args=()
+  while IFS= read -r p; do
+    [ -z "$p" ] && continue
+    args+=(--file="$p")
+  done <<< "$hotfix_paths"
+  output=$(npx gks hotfix check "${args[@]}" 2>&1) && rc=0 || rc=$?
+  if [ "$rc" -ne 0 ]; then
+    # shellcheck disable=SC2001
+    echo "$output" | sed 's/^/  /'
+    echo "✗ MSP hotfix check failed. Backfill the HOTFIX-- atom or use --no-verify."
+    exit 1
+  fi
+fi
+
 exit 0

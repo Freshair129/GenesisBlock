@@ -22,6 +22,11 @@ jobs:
 
       - run: npm ci
 
+      - name: shellcheck examples/hooks/
+        run: |
+          # Ubuntu runners ship shellcheck.
+          shellcheck examples/hooks/*.sh
+
       - name: typecheck
         run: npm run typecheck
 
