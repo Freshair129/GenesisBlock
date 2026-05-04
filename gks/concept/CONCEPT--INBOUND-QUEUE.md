@@ -10,7 +10,7 @@ tags:
   - inbound
   - write-path
   - gatekeeper
-crosslinks: {"references":["FRAME--MSP-ARCHITECTURE"]}
+crosslinks: {"references":["FRAME--MSP-ARCHITECTURE-V2"]}
 created_at: 2026-05-03T07:01:50.297Z
 ---
 

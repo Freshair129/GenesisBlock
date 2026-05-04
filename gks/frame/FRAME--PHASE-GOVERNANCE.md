@@ -11,7 +11,7 @@ tags:
   - governance
   - doc-to-code
   - foundation
-crosslinks: {"references":["FRAME--MSP-ARCHITECTURE"]}
+crosslinks: {"references":["FRAME--MSP-ARCHITECTURE-V2"]}
 created_at: 2026-05-03T07:01:48.299Z
 ---
 

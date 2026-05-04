@@ -10,7 +10,7 @@ tags:
   - path-encoding
   - convention
   - decision
-crosslinks: {"references":["FRAME--MSP-ARCHITECTURE"]}
+crosslinks: {"references":["FRAME--MSP-ARCHITECTURE-V2"]}
 created_at: 2026-05-03T07:08:44.405Z
 ---
 

@@ -2,7 +2,7 @@
 id: FRAME--MSP-ARCHITECTURE
 phase: 0
 type: frame
-status: stable
+status: superseded
 vault_id: default
 title: MSP architecture — gatekeeper layers + write flow
 tags:
@@ -10,11 +10,16 @@ tags:
   - architecture
   - gatekeeper
   - foundation
-crosslinks: {"references":[]}
+  - superseded
+crosslinks:
+  references: []
+  superseded_by: [FRAME--MSP-ARCHITECTURE-V2]
 created_at: 2026-05-03T07:01:47.791Z
 ---
 
-# FRAME — MSP architecture
+> **Superseded by `FRAME--MSP-ARCHITECTURE-V2`** (M7-prep). v2 reframes MSP as a passport-orchestrator over Obsidian-backed GKS — gatekeeping is one capability of MSP, not its identity. Body preserved verbatim below for historical reference.
+
+# FRAME — MSP architecture (v1, superseded)
 
 MSP sits between agents (T1/T2/T3 — Claude / Gemini / SLM) and the canonical knowledge store under `gks/`. It refuses any direct write to `gks/`; the only legal path is the inbound queue.
 
