@@ -10,11 +10,13 @@ tags:
   - validator
   - anti-hallucination
   - rules
-crosslinks: {"references":["CONCEPT--ATOMIC-WRITE-CONTRACT"],"implements":["FEAT--MSP-VALIDATOR"]}
+crosslinks: {"references":["CONCEPT--ATOMIC-WRITE-CONTRACT","ADR--GRAPH-IS-GKS-DOMAIN"],"implements":["FEAT--MSP-VALIDATOR"]}
 created_at: 2026-05-03T07:08:41.252Z
 ---
 
 # ADR — anti-hallucination rules
+
+> **Updated 2026-05-04 (M7-prep follow-up)**: clarification on rule #1 (`dangling-wikilinks`) — this is a **shift-left** of `gks validate --links`, not a duplicate. MSP runs the check at inbound time (pre-promote); GKS runs the same conceptual check against the canonical store (post-promote). Both useful, different timing — see `ADR--GRAPH-IS-GKS-DOMAIN` for the boundary.
 
 ## Context
 
@@ -35,7 +37,7 @@ Six rules, each as a small pure function returning `ValidationError[]`. Hard rul
 
 | # | Rule ID | Severity | What |
 |---|---|---|---|
-| 1 | `dangling-wikilinks` | error | every `[[X]]` in body and every value in `crosslinks.*` must resolve via `atomic_index.jsonl`; self-reference allowed |
+| 1 | `dangling-wikilinks` | error | every `[[X]]` in body and every value in `crosslinks.*` must resolve via `atomic_index.jsonl`; self-reference allowed. **Shift-left of `gks validate --links`** — MSP catches at inbound time, GKS catches drift in canonical store |
 | 2 | `adr-monotonic` | error | new ADR-NNN must equal `max(existing) + 1` (or 1 if none); slug-form `ADR--NAME` skipped |
 | 3 | `no-invented-versions` | error | semver only; first draft is `0.1.0`; bumps must be one of patch/minor/major from the previous version |
 | 4 | `evidence-for-decisions` | error | `type: adr` requires headings `## Context`, `## Decision`, `## Consequences` (case-insensitive) |
@@ -70,6 +72,7 @@ Six rules, each as a small pure function returning `ValidationError[]`. Hard rul
 - Forbidden frontmatter fields → see `ADR--FORBIDDEN-FIELDS-LIST`.
 - Field shape constraints (length, regex) → see future `ADR--FIELD-CONSTRAINTS` (M3).
 - Phase-status compatibility table → see `FRAME--PHASE-GOVERNANCE`.
+- Atomic graph traversal / canonical-store integrity → **GKS** (`gks validate --links`, `gks verify-flow`); see `ADR--GRAPH-IS-GKS-DOMAIN` for the layered ownership.
 
 ## Source
 

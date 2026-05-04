@@ -11,15 +11,16 @@
 | M4 a-c | Bin entries + GitHub Actions CI + Ollama SLM + vitest acceptance | ✅ merged |
 | M5 a-f | Pre-push hook + hotfix wrapper + 3 anti-hallucination rules + required-fields contract + ADR--HUMAN-REVIEW-GATES + shellcheck CI | ✅ merged |
 | M6 | `msp-mcp-server` (6 tools over stdio MCP) | ✅ merged |
-| **M7-prep** | **Architecture v2 + spec 2.0.0** (passport over Obsidian-backed GKS) | 🟢 PR #8 open, CI green |
+| M7-prep | Architecture v2 + spec 2.0.0 (passport over Obsidian-backed GKS) | ✅ merged (PR #8) |
+| **M7-prep follow-up** | **GKS audit alignment** — graph→GKS, embedding model parity, env var rename, 4 upstream drafts | 🟢 in progress |
 
 ## Coming up
 
 ### M7 — passport core
 Make MSP actually carry memory + soul + retrieval (not just gatekeep writes).
-- M7a — Obsidian REST client + Smart Connections probe
+- M7a — Wrap GKS `RestObsidianAdapter` + Smart Connections probe (small — GKS provides the adapter)
 - M7b — Consolidator (importance + summarise)
-- M7c — Retrieval orchestration (`msp_recall` fuses Obsidian + episodic + backlinks)
+- M7c — Retrieval orchestration (`msp_recall` fuses GKS vector + episodic + backlinks via RRF)
 - M7d — Context compression (token-budget aware)
 - M7e — Identity / soul layer
 - M7f — MCP tool surface expansion

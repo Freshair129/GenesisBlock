@@ -1,7 +1,7 @@
 {
   "name": "msp",
-  "version": "0.1.0",
-  "description": "Memory & Soul Passport — gatekeeper layer over @freshair129/gks",
+  "version": "0.2.0",
+  "description": "Memory & Soul Passport — passport-orchestrator over @freshair129/gks",
   "type": "module",
   "private": true,
   "engines": {

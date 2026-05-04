@@ -11,11 +11,13 @@ tags:
   - vector
   - backlinks
   - hybrid-retrieval
-crosslinks: {"references":["CONCEPT--MEMORY-SUBSYSTEM","FRAME--CROSSLINKS-VOCABULARY"]}
+crosslinks: {"references":["CONCEPT--MEMORY-SUBSYSTEM","FRAME--CROSSLINKS-VOCABULARY","ADR--GRAPH-IS-GKS-DOMAIN"]}
 created_at: 2026-05-03T07:01:54.322Z
 ---
 
 # CONCEPT — vector / backlinks
+
+> **Updated 2026-05-04 (M7-prep follow-up)**: per `ADR--GRAPH-IS-GKS-DOMAIN`, atomic graph traversal (incl. backlinks derivation) is GKS scope per `SCOPE.md`. The MSP-side indexer (`src/memory/backlinks/`) is **temporary** — kept until GKS exposes a stable `gks backlinks` API (drafted in `upstream/gks-proposals/`). Once upstream lands, this concept evolves to "MSP consumes GKS-derived backlinks" and the writer is removed.
 
 The third memory layer is a flat edge list under `vector/backlinks.jsonl`. Each line is one directed edge `{ from, to, type }`. Used for two things: (1) reverse traversal during `gks verify-flow`, (2) hybrid retrieval fusion (RRF) when an agent asks "what depends on this?".
 
@@ -65,8 +67,21 @@ The backlinks file feeds layer 3 (graph). MSP doesn't implement RRF itself — t
 - JSONL is git-diffable (humans can review additions in PRs).
 - JSONL is grep-able (easy debugging).
 - The graph is small enough (typical project: thousands of edges) that loading the full file into memory is < 50ms.
-- A real graph DB (Kuzu, Neo4j) is an upstream optimisation — not blocked here.
+- A real graph DB (Kuzu, Neo4j) is an upstream optimisation — not blocked here. Tracked at M10b.
+
+## Planned upstream migration
+
+Per `ADR--GRAPH-IS-GKS-DOMAIN`, the indexer logic moves to GKS once the upstream patch in `upstream/gks-proposals/03-backlinks-api.md` lands. Then:
+
+| Now | After upstream |
+|---|---|
+| MSP runs `npm run msp:backlinks` to derive `vector/backlinks.jsonl` | `gks backlinks --emit=jsonl` derives + emits |
+| MSP `src/memory/backlinks/` ~200 LoC | thin caller (~20 LoC) — `import { backlinks } from '@evaai/gks'` |
+| `FEAT--MEMORY-BACKLINKS-INDEXER` status: stable | bumped → `superseded_by: GKS native API` |
+| AUDIT atom records the migration | — |
+
+Not blocking for M7 — the temporary code works correctly today.
 
 ## Source
 
-`msp_spec.md` §7.3 (Vector / Backlinks).
+`msp_spec.md` §7.3 (Vector / Backlinks). `ADR--GRAPH-IS-GKS-DOMAIN` (M7-prep follow-up).

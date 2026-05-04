@@ -1,11 +1,13 @@
 # MSP — Memory & Soul Passport — Technical Full Specification
 
-> **Version:** 2.0.0
-> **Status:** Draft (architecture v2 — passport over Obsidian-backed GKS)
+> **Version:** 2.0.1
+> **Status:** Draft (architecture v2 + GKS audit alignment)
 > **Audience:** T3 Architects, T2 Implementers, MSP maintainers
 > **Authority:** เมื่อขัดแย้งกับเอกสารนี้ ให้ยึด `gks/frame/FRAME--MSP-ARCHITECTURE-V2.md` เป็นหลัก
 
 > **เปลี่ยนจาก v1.0.0 → 2.0.0** (ดู §17): MSP ถูก reframe จาก "gatekeeper" เป็น **passport** ที่พกพา memory + soul + retrieval + identity ของ agent ไปทุกที่. Gatekeeping ยังเป็นหน้าที่หนึ่ง แต่ไม่ใช่ identity. GKS = canonical knowledge layer (atomic markdown), Obsidian = runtime, Smart Connections = embedding source
+>
+> **เปลี่ยนจาก 2.0.0 → 2.0.1** (M7-prep follow-up): GKS audit อัปเดต — GKS ตอนนี้เป็น canonical embedder (`createNomicEmbedder()` ใน 3.6.0), Smart Connections เป็น in-Obsidian browse path; ทั้งสอง lock ที่ `nomic-embed-text-v1.5`. `OBSIDIAN_HOST` → `OBSIDIAN_URL`. Atomic graph เป็น GKS scope (MSP shift-left validation only). 4 upstream proposals สำหรับ GKS
 
 ---
 
@@ -460,9 +462,11 @@ P2 ต้องแตก draft เป็น 3 atomic:
 
 ---
 
-## 7a. Obsidian as Runtime *(v2)*
+## 7a. Obsidian as Runtime *(v2 — updated 2.0.1)*
 
-อ้างอิง: `gks/concept/CONCEPT--OBSIDIAN-AS-RUNTIME.md` + `gks/adr/ADR--MSP-OBSIDIAN-INTEGRATION.md`
+อ้างอิง: `gks/concept/CONCEPT--OBSIDIAN-AS-RUNTIME.md` + `gks/adr/ADR--MSP-OBSIDIAN-INTEGRATION.md` + `gks/adr/ADR--GRAPH-IS-GKS-DOMAIN.md`
+
+> **Updated 2.0.1 (M7-prep follow-up)**: env var renamed `OBSIDIAN_HOST` → `OBSIDIAN_URL` to match GksV3 3.6.0's `RestObsidianAdapter`. M7a now wraps GKS's existing adapter rather than building fresh. Atomic graph (wikilinks/backlinks) is GKS scope per `ADR--GRAPH-IS-GKS-DOMAIN`; MSP only does shift-left validation.
 
 ### 7a.1 ทำไม Obsidian
 
@@ -478,53 +482,67 @@ Atom files ใน `gks/` คือ markdown + YAML frontmatter + `[[wikilink]]` 
 | obsidian-mcp (MCP server) | additional MCP server |
 | UI สำหรับ human browse | MSP web UI |
 
-MSP **delegate** ทุกอย่างนี้ไป Obsidian ผ่าน `ADR--MSP-OBSIDIAN-INTEGRATION`:
+MSP **delegate** ทุกอย่างนี้ไป Obsidian ผ่าน `ADR--MSP-OBSIDIAN-INTEGRATION` (wraps GKS `RestObsidianAdapter`):
 
-- **Primary**: Obsidian Local REST API (`https://127.0.0.1:27124`)
+- **Primary**: Obsidian Local REST API (`OBSIDIAN_URL` env, default `https://127.0.0.1:27124`)
 - **Fallback**: filesystem (read `gks/<type>/*.md`, `atomic_index.jsonl`, `backlinks.jsonl`)
+- **Note**: agent-facing semantic recall ใช้ GKS embedder ตรง — ไม่ผ่าน Obsidian (เปลี่ยนจาก v2.0.0)
 
 ### 7a.2 Authentication + TLS
 
 - API key อ่านจาก `OBSIDIAN_API_KEY` env หรือ `~/.config/msp/obsidian.key`
 - ถ้าไม่มี key → skip REST + ไป filesystem fallback (ไม่ error spam)
 - TLS bypass อนุญาตเฉพาะ `127.0.0.1`/`localhost` (self-signed cert ของ plugin); `OBSIDIAN_INSECURE=true` ให้ override สำหรับ local dev
+- Env vars: `OBSIDIAN_URL` (default `https://127.0.0.1:27124`), `OBSIDIAN_API_KEY`, `OBSIDIAN_INSECURE`. `OBSIDIAN_HOST` (จาก v2.0.0 draft) deprecated; M7a อ่านเป็น fallback หนึ่ง minor release พร้อม warning
 
 ### 7a.3 Detection
 
-`createObsidianClient(opts)` คืน `mode: 'rest' | 'filesystem'`. Caller เช็ค `mode === 'rest'` ก่อนขอ feature ที่ต้องการ live Obsidian (เช่น semantic search)
+`createObsidianClient(opts)` (M7a wrapper รอบ GKS adapter) คืน `mode: 'rest' | 'filesystem'`. Caller เช็ค `mode === 'rest'` ก่อนขอ feature ที่ต้องการ live Obsidian (เช่น Smart View deep links). **Semantic recall ไม่ขึ้นกับ `mode`** — GKS embedder ทำงานทั้งสอง mode
 
 ---
 
-## 7b. Embedding Strategy *(v2)*
+## 7b. Embedding Strategy *(v2 — updated 2.0.1)*
 
-อ้างอิง: `gks/concept/CONCEPT--EMBEDDING-STRATEGY.md` + `gks/adr/ADR--SEMANTIC-SEARCH-VIA-SMART-CONNECTIONS.md`
+อ้างอิง: `gks/concept/CONCEPT--EMBEDDING-STRATEGY.md` + `gks/adr/ADR--SEMANTIC-SEARCH-VIA-SMART-CONNECTIONS.md` + `gks/adr/ADR--EMBEDDING-MODEL-PARITY.md`
 
-### 7b.1 หลักการ
+> **Updated 2.0.1 (M7-prep follow-up)**: original 2.0.0 said "MSP ไม่เคย embed; Smart Connections เป็น canonical". GksV3 3.6.0 ships `createNomicEmbedder()` — GKS เป็น canonical embedder ตอนนี้. Reframed: GKS = canonical writer (agent path), Smart Connections = in-Obsidian human browse. ทั้งสอง surface ใช้ **model เดียวกัน** lock โดย `ADR--EMBEDDING-MODEL-PARITY`.
 
-**MSP ไม่เคย embed**. semantic search ทั้งหมด delegate ไป **Smart Connections plugin** (Obsidian community plugin):
+### 7b.1 หลักการ (v2 updated)
 
-- User เลือก embedding model ใน GUI dropdown
-- รันใน Obsidian process (Electron renderer)
-- Vectors **local-only by default** (ไม่ส่งออกนอกเครื่อง เว้นแต่ user เลือก API model)
-- ตัว plugin index vault อัตโนมัติ; เก็บใน `.smart-connections/`
+**Two surfaces, one model**:
+
+| Surface | Owner | Used by | Storage |
+|---|---|---|---|
+| Agent-facing semantic recall | **GKS** (`createNomicEmbedder()` + `VectorBackend`) | `msp_recall` (M7c), MCP tools, headless CI | `.brain/.../vector/atomic.jsonl` (or HNSW / pgvector) |
+| Human browse in Obsidian | **Smart Connections** plugin | Smart View pane, "find similar notes" | `.smart-connections/` (plugin-private) |
+
+Canonical model: **`nomic-ai/nomic-embed-text-v1.5`** (768-dim, Thai+English mixed-content). User ต้อง configure Smart Connections ให้ตรงกัน (Obsidian Settings → Smart Connections → Embedding Model).
 
 ### 7b.2 Constraints ที่เกิดจากการเลือกนี้
 
-1. **Live semantic recall ต้อง running Obsidian** — offline → MSP fallback ไป text search + flag `semantic: { available: false }` ใน result envelope
-2. **MSP compute query embedding ไม่ได้** — ไม่รู้ model + version + tokenizer ที่ Smart Connections ใช้
-3. **`.smart-connections/` schema ไม่ stable** — MSP ห้ามอ่าน vectors ตรง (เป็น diagnostic only)
+1. **Agent path ไม่ต้อง running Obsidian** — GKS vector store ทำงาน headless ได้ (CI, server boot, no GUI). เปลี่ยนจาก v2 ที่บอกว่าต้องการ Obsidian
+2. **MSP compute query embedding ได้** — ผ่าน GKS adapter (`createNomicEmbedder`); ไม่ผ่าน Smart Connections
+3. **`.smart-connections/` schema ยังไม่ stable** — MSP ห้ามอ่าน vectors ตรง (เป็น diagnostic only เหมือนเดิม)
+4. **2× storage cost** จนกว่า M10a "msp-bridge" plugin จะลง — ยอมรับได้ที่ vault < 5,000 atoms
 
-### 7b.3 Integration mechanism (preference order)
+### 7b.3 Integration mechanism
 
-a. **Smart Connections REST endpoint** ผ่าน Local REST API plugin's bridge (probe at startup)
-b. **Companion plugin "msp-bridge"** ที่ exposes API ตายตัว (future work)
-c. **File-based diagnostic** อ่าน `.smart-connections/` (debug only, never live query)
+**Agent path (canonical)**:
+- M7a wraps GKS's `createNomicEmbedder()` + `VectorBackend`. ไม่ network hop, ไม่ Obsidian dependency
+
+**Human path (browse)**:
+- Smart Connections plugin in Obsidian, configured ให้ใช้ canonical model
+- M7a probe REST + plugin availability; surface "open in Smart View" deep links เมื่อมี
 
 ### 7b.4 Scale-up path
 
-- โครงการเล็ก/กลาง: Smart Connections พอ
-- โครงการใหญ่: swap หรือ augment plugin ด้วย pgvector / qdrant ผ่าน companion plugin ที่ reuse Smart Connections's embedder
-- **MSP ไม่ต้องเปลี่ยน** — ยังเรียก "Obsidian endpoint" เดิม
+- โครงการเล็ก/กลาง: GKS JSONL + Smart Connections พอ
+- โครงการใหญ่: swap GKS `VectorBackend` → HNSW หรือ pgvector. MSP ไม่ต้องแก้
+- M10a: companion plugin ให้ Smart Connections อ่าน GKS vector store ตรง — single index
+
+### 7b.5 What if user picks a different model in Smart Connections
+
+Allowed but documented as deviation. Agents ยังได้ผลถูกต้อง (GKS canonical); แค่ Smart View pane ใน Obsidian จะแสดง neighbours ที่ไม่ตรงกับ agent's view. **Drift visible to humans, not destructive**.
 
 ---
 
@@ -534,8 +552,8 @@ c. **File-based diagnostic** อ่าน `.smart-connections/` (debug only, nev
 
 ```
 msp_recall(query)
-  ├── Obsidian REST text search   (keyword)
-  ├── Smart Connections           (semantic; if Obsidian + plugin live)
+  ├── GKS vector store            (semantic; canonical — works headless)
+  ├── Obsidian REST text search   (keyword; if mode === 'rest', else grep fallback)
   ├── episodic memory             (MSP-owned; matches against summary + tags)
   └── backlinks.jsonl traversal   (graph hop from query-matched atoms)
        │
@@ -546,10 +564,11 @@ msp_recall(query)
    Ranked top-K with provenance:
    {
      hits: [
-       { atom_id, source: 'obsidian-text' | 'smart-connections' | 'episodic' | 'backlinks',
+       { atom_id, source: 'gks-vector' | 'obsidian-text' | 'grep' | 'episodic' | 'backlinks',
          score, snippet }, ...
      ],
-     semantic_available: bool,
+     semantic_available: bool,                    // GKS path is always available
+     obsidian_available: bool,                    // for Smart View deep-link affordance
      fallback_reason?: string,
    }
 ```
@@ -764,3 +783,4 @@ MSP รองรับหลายโปรเจกต์ใต้ `~/.brain/ms
 |---|---|---|---|
 | 1.0.0 | 2026-05-02 | @claude-opus-4-7 | Initial extraction from `FRAMEWORK_MASTER_SPEC.md` §7 + scripts/msp + LLM_Contract |
 | 2.0.0 | 2026-05-03 | @claude-opus-4-7 | Architecture v2 — passport over Obsidian-backed GKS. Reframed §0 TL;DR + §2 Architecture; added §7a Obsidian as Runtime, §7b Embedding Strategy (Smart Connections), §7c Retrieval Orchestration (M7c), §7d Context Compression (M7d), §7e Identity / Soul (M7e). Driving atoms: `FRAME--MSP-ARCHITECTURE-V2`, `CONCEPT--OBSIDIAN-AS-RUNTIME`, `CONCEPT--EMBEDDING-STRATEGY`, `ADR--MSP-OBSIDIAN-INTEGRATION`, `ADR--SEMANTIC-SEARCH-VIA-SMART-CONNECTIONS`. v1.0.0 sections 3–6, 8–13 unchanged (gatekeeper aspects still authoritative). |
+| 2.0.1 | 2026-05-04 | @claude-opus-4-7 | M7-prep follow-up — GKS audit alignment. §7a env var rename `OBSIDIAN_HOST` → `OBSIDIAN_URL` to match GksV3 3.6.0 `RestObsidianAdapter`. §7b reframed: GKS is canonical embedder (`createNomicEmbedder()` ships in 3.6.0), Smart Connections is in-Obsidian browse path; both lock to `nomic-embed-text-v1.5`. §7c retrieval source list updated (GKS vector store primary). New atoms: `ADR--GRAPH-IS-GKS-DOMAIN`, `ADR--EMBEDDING-MODEL-PARITY`. Updated atoms: `CONCEPT--EMBEDDING-STRATEGY`, `ADR--SEMANTIC-SEARCH-VIA-SMART-CONNECTIONS`, `ADR--MSP-OBSIDIAN-INTEGRATION`, `CONCEPT--MEMORY-VECTOR-BACKLINKS`, `ADR--ANTI-HALLUCINATION-RULES` (shift-left clarification). 4 upstream proposals drafted under `upstream/gks-proposals/`. See `AUDIT--M7-PREP-FOLLOWUP`. |

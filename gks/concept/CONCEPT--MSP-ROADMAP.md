@@ -10,13 +10,15 @@ tags:
   - roadmap
   - ultraplan
   - planning
-crosslinks: {"references":["FRAME--MSP-ARCHITECTURE-V2","CONCEPT--OBSIDIAN-AS-RUNTIME","CONCEPT--EMBEDDING-STRATEGY","ADR--MSP-OBSIDIAN-INTEGRATION","ADR--SEMANTIC-SEARCH-VIA-SMART-CONNECTIONS"]}
+crosslinks: {"references":["FRAME--MSP-ARCHITECTURE-V2","CONCEPT--OBSIDIAN-AS-RUNTIME","CONCEPT--EMBEDDING-STRATEGY","ADR--MSP-OBSIDIAN-INTEGRATION","ADR--SEMANTIC-SEARCH-VIA-SMART-CONNECTIONS","ADR--GRAPH-IS-GKS-DOMAIN","ADR--EMBEDDING-MODEL-PARITY"]}
 created_at: 2026-05-04T00:06:09.872Z
 ---
 
 # CONCEPT — MSP roadmap
 
 > **valid_until**: 2026-08-01 (review quarterly). Each milestone may revise this concept via `update_atomic`.
+>
+> **Updated 2026-05-04 (M7-prep follow-up)**: post-merge audit against GksV3 3.6.0 reduced M7a effort (wraps existing GKS adapter) and M8d scope (existence checks delegated to `gks validate --links`). Added ADR--GRAPH-IS-GKS-DOMAIN + ADR--EMBEDDING-MODEL-PARITY + 4 upstream proposals. See `AUDIT--M7-PREP-FOLLOWUP`.
 
 ## 0. Where we are
 
@@ -39,9 +41,9 @@ Goal: passport actually **carries** memory + soul + retrieval. Right now writers
 
 | Sub | Scope | Atoms | Effort | Depends |
 |---|---|---|---|---|
-| M7a | Obsidian REST client + Smart Connections probe + filesystem fallback | 4 | medium | M7-prep merged |
+| M7a | Wrap GKS `RestObsidianAdapter` + Smart Connections probe + filesystem fallback | 4 | small (was medium — GKS provides adapter) | M7-prep merged |
 | M7b | Consolidator (importance scorer + episode-boundary detector + summariser) | 4 | medium | M7a |
-| M7c | Retrieval orchestration (`msp_recall` fuse Obsidian + Smart Connections + episodic + backlinks via RRF) | 4 | medium-large | M7a, M7b |
+| M7c | Retrieval orchestration (`msp_recall` fuse GKS vector + episodic + backlinks via RRF; SC deep-links optional) | 4 | medium-large | M7a, M7b, GKS `createNomicEmbedder` |
 | M7d | Context compression (token-budget aware lossy summarisation) | 4 | medium | M7b |
 | M7e | Identity / soul layer (`src/identity/` — profile, voice, preferences) | 4 | small | — |
 | M7f | MCP tool surface expansion (`msp_recall`, `msp_remember`, `msp_compress`, `msp_identity_*`) | tool atoms | small | M7c-e |
@@ -59,7 +61,7 @@ Goal: turn `FRAME--*` from descriptive docs into executable contracts via `PROTO
 | M8a | Establish `PROTO--` pattern: scaffold template + `atomic_contract.yaml` extension | 1 ADR + 1 meta-FEAT |
 | M8b | `PROTO--PHASE-GATES` — enforce P0..P6 ordering at PR-time | 4 atoms + impl + CI gate |
 | M8c | `PROTO--SCALING-LEVEL-GATE` — auto-detect L1/L2/L3 from PR diff + check required-atom set | 4 atoms + impl + CI gate |
-| M8d | `PROTO--ALGO-PARAM-COUPLING` — bi-directional `tunes` ↔ `tunable_by` + reciprocal validator + 2 sample atoms | 4 atoms + impl |
+| M8d | `PROTO--ALGO-PARAM-COUPLING` — bi-directional `tunes` ↔ `tunable_by` reciprocal validator (existence already checked by `gks validate --links`; MSP only adds the type-pairing constraint) | 4 atoms + impl (smaller scope) |
 | M8e | `PROTO--AUTHORITY-ENFORCEMENT` — git author tier ↔ touched paths | 4 atoms + impl + git ACL bridge |
 | M8f | Audit pass: which existing validator rules should be promoted to PROTO atoms? | refactor PR; no new code |
 
@@ -102,12 +104,16 @@ Triggered only when Smart Connections or markdown plateau:
 
 ## 6. Upstream contributions
 
-| Target | Item | Status |
-|---|---|---|
-| `Freshair129/GksV3` | `phase: 6` accept in CLI | drafted (`scripts/msp/propose.mjs` workaround now) |
-| `Freshair129/GksV3` | `gks verify-flow --through-superseded` flag | discovered in PR #8 |
-| Smart Connections plugin | Stable REST endpoint contract | M10a depends on this |
-| `obsidian-mcp` | `msp-bridge` companion plugin | M10a |
+Drafts live in `upstream/gks-proposals/` (informational; not enforced by MSP CI). MSP cannot push to `Freshair129/GksV3` directly — drafts are for the GKS maintainer to apply manually.
+
+| Target | Item | Draft | Status |
+|---|---|---|---|
+| `Freshair129/GksV3` | `phase: 6` accept in `propose-inbound` CLI | `upstream/gks-proposals/01-phase-6-acceptance.md` | drafted; `scripts/msp/propose.mjs` workaround in place |
+| `Freshair129/GksV3` | `gks verify-flow --through-superseded` flag | `upstream/gks-proposals/02-verify-flow-through-superseded.md` | drafted; supersede chain CI break in PR #8 motivated this |
+| `Freshair129/GksV3` | Stable backlinks API (`gks backlinks --emit=jsonl`) | `upstream/gks-proposals/03-backlinks-api.md` | drafted; obsoletes MSP `src/memory/backlinks/` |
+| `Freshair129/GksV3` | Document Smart Connections + nomic-embed-text-v1.5 compatibility | `upstream/gks-proposals/04-smart-connections-parity.md` | drafted; companion to `ADR--EMBEDDING-MODEL-PARITY` |
+| Smart Connections plugin | Stable REST endpoint contract | — | M10a depends on this |
+| `obsidian-mcp` | `msp-bridge` companion plugin | — | M10a |
 
 ## 7. Principles to preserve across the roadmap
 
