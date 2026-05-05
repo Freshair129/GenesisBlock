@@ -4,6 +4,8 @@ import { parseArgs } from 'node:util'
 
 import { loadAtomicIndex, validate, validateAll } from './index.js'
 import { loadContract } from './contract.js'
+import { discoverProtos, runProtos, shouldFailExit } from './proto/loader.js'
+import type { ProtoSummary } from './proto/types.js'
 import { ValidatorIOError, type ValidationResult } from './types.js'
 
 const HELP = `msp-validate — schema/ID/wikilink/anti-hallucination gate over MSP atoms
@@ -132,8 +134,40 @@ async function main(): Promise<number> {
 
   pretty(results, { json: values.json === true })
 
+  // Run PROTO predicates (M8a — gks/proto/PROTO--*.md + src/validator/proto/<name>.ts)
+  let protoSummary: ProtoSummary | null = null
+  if (values.all && !values.json) {
+    const metas = await discoverProtos(root)
+    const indexArray = Array.from(atomicIndex.values())
+    protoSummary = await runProtos(metas, {
+      atomicIndex: indexArray,
+      repoRoot: root,
+    })
+    prettyProtos(protoSummary)
+  }
+
   const hardFail = results.some((r) => r.errors.length > 0)
-  return hardFail ? 1 : 0
+  const protoFail = protoSummary ? shouldFailExit(protoSummary) : false
+  return hardFail || protoFail ? 1 : 0
+}
+
+function prettyProtos(summary: ProtoSummary): void {
+  if (summary.total === 0) return
+  for (const r of summary.results) {
+    if (r.meta.status === 'superseded') continue
+    const tag =
+      r.meta.status === 'draft' ? `[${r.meta.status}, ${r.meta.severity}]` : `[${r.meta.severity}]`
+    if (r.result.ok) {
+      console.log(`✓ ${r.meta.id} ${tag}`)
+    } else {
+      console.log(`✗ ${r.meta.id} ${tag}`)
+      for (const v of r.result.violations) {
+        const where = v.atomId ? ` (${v.atomId})` : ''
+        console.log(`    [${v.severity}]${where} ${v.message}`)
+      }
+    }
+  }
+  console.log(`PROTOs: ${summary.passed} passed, ${summary.failed} failed`)
 }
 
 main()
