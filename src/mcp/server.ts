@@ -2,7 +2,11 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 
 import * as backlinksRebuild from './tools/backlinks-rebuild.js'
 import * as episodeAppend from './tools/episode-append.js'
+import * as identityGet from './tools/identity-get.js'
+import * as identitySet from './tools/identity-set.js'
 import * as propose from './tools/propose.js'
+import * as recallTool from './tools/recall.js'
+import * as remember from './tools/remember.js'
 import * as runTask from './tools/run-task.js'
 import * as sessionAppend from './tools/session-append.js'
 import * as validateTool from './tools/validate.js'
@@ -13,7 +17,18 @@ export interface ServerOpts {
   root?: string
 }
 
-const TOOLS = [validateTool, propose, runTask, sessionAppend, episodeAppend, backlinksRebuild] as const
+const TOOLS = [
+  validateTool,
+  propose,
+  runTask,
+  sessionAppend,
+  episodeAppend,
+  backlinksRebuild,
+  recallTool,
+  remember,
+  identityGet,
+  identitySet,
+] as const
 
 export function createMspMcpServer(opts: ServerOpts = {}): McpServer {
   const root = opts.root ?? process.env.MSP_ROOT ?? process.cwd()
