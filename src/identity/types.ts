@@ -26,6 +26,10 @@ export type ResponseCadence = 'terse' | 'normal' | 'verbose'
  * Stable identifying facts. `createdAt` is set on first write and preserved
  * thereafter. `name`, `role`, `tier`, `originStory` are conventionally
  * append-mostly but the API does not enforce immutability — see CONCEPT.
+ *
+ * `guardrails` and `extensions` were added by `ADR--IDENTITY-GUARDRAILS-AND-EXTENSIONS`
+ * (M7e follow-up) — both default to empty, so files written by the original
+ * M7e impl remain readable without migration.
  */
 export interface Profile {
   name: string
@@ -34,6 +38,18 @@ export interface Profile {
   originStory: string
   /** ISO 8601 timestamp. Empty string = not yet initialised. */
   createdAt: string
+  /**
+   * Per-agent hard rules ("Never invent atom IDs"). Anti-hallucination
+   * personalisation; complement to project-wide validator rules. Order
+   * matters — earlier dominates. MSP injects but does NOT enforce these.
+   */
+  guardrails: string[]
+  /**
+   * Free-form bag for harness-specific data (Claude Code, Cursor, EVA).
+   * MSP itself never reads this. Convention: namespace your keys
+   * (e.g. `"claude-code/notes"`) to avoid collisions across harnesses.
+   */
+  extensions: Record<string, unknown>
 }
 
 /**
@@ -99,6 +115,8 @@ export function defaultProfile(): Profile {
     tier: 'T3',
     originStory: '',
     createdAt: '',
+    guardrails: [],
+    extensions: {},
   }
 }
 

@@ -97,4 +97,82 @@ describe('setProfile', () => {
     id = await readIdentity({ root, namespace: 'evaAI' })
     expect(id.profile.tier).toBe('T2')
   })
+
+  // Guardrails + extensions added by ADR--IDENTITY-GUARDRAILS-AND-EXTENSIONS.
+
+  it('default profile has empty guardrails and extensions', async () => {
+    const root = await freshRoot()
+    const id = await readIdentity({ root, namespace: 'evaAI' })
+    expect(id.profile.guardrails).toEqual([])
+    expect(id.profile.extensions).toEqual({})
+  })
+
+  it('persists guardrails as ordered string list', async () => {
+    const root = await freshRoot()
+    await setProfile(
+      { root, namespace: 'evaAI' },
+      {
+        name: 'EVA',
+        guardrails: [
+          'Never invent atom IDs.',
+          'Never claim a test pass without naming the runner output.',
+        ],
+      },
+    )
+    const id = await readIdentity({ root, namespace: 'evaAI' })
+    expect(id.profile.guardrails).toEqual([
+      'Never invent atom IDs.',
+      'Never claim a test pass without naming the runner output.',
+    ])
+  })
+
+  it('persists extensions as opaque key/value bag', async () => {
+    const root = await freshRoot()
+    await setProfile(
+      { root, namespace: 'evaAI' },
+      {
+        extensions: {
+          'claude-code/notes': 'starter profile',
+          'cursor/last-seen': 1735689600000,
+          'eva/affect': { ri: 'L3', valence: 0.6 },
+        },
+      },
+    )
+    const id = await readIdentity({ root, namespace: 'evaAI' })
+    expect(id.profile.extensions['claude-code/notes']).toBe('starter profile')
+    expect(id.profile.extensions['cursor/last-seen']).toBe(1735689600000)
+    expect(id.profile.extensions['eva/affect']).toEqual({
+      ri: 'L3',
+      valence: 0.6,
+    })
+  })
+
+  it('partial-merges guardrails (replace, not append)', async () => {
+    const root = await freshRoot()
+    await setProfile(
+      { root, namespace: 'evaAI' },
+      { guardrails: ['rule-1', 'rule-2'] },
+    )
+    await setProfile({ root, namespace: 'evaAI' }, { guardrails: ['rule-3'] })
+    const id = await readIdentity({ root, namespace: 'evaAI' })
+    // setProfile replaces fields it touches (consistent with rest of partial merge).
+    expect(id.profile.guardrails).toEqual(['rule-3'])
+  })
+
+  it('preserves guardrails / extensions when other fields are updated', async () => {
+    const root = await freshRoot()
+    await setProfile(
+      { root, namespace: 'evaAI' },
+      {
+        name: 'EVA',
+        guardrails: ['rule-1'],
+        extensions: { 'k/x': 1 },
+      },
+    )
+    await setProfile({ root, namespace: 'evaAI' }, { role: 'researcher' })
+    const id = await readIdentity({ root, namespace: 'evaAI' })
+    expect(id.profile.role).toBe('researcher')
+    expect(id.profile.guardrails).toEqual(['rule-1'])
+    expect(id.profile.extensions).toEqual({ 'k/x': 1 })
+  })
 })

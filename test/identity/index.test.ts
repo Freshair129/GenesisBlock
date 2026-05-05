@@ -28,6 +28,8 @@ describe('getIdentity (default values)', () => {
       tier: 'T3',
       originStory: '',
       createdAt: '',
+      guardrails: [],
+      extensions: {},
     })
     expect(id.voice).toEqual({
       tone: [],
