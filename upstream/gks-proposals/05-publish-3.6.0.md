@@ -1,4 +1,6 @@
-# 🟡 Proposal 05 — Publish `@freshair129/gks@3.6.0` to npm
+# 🔵 Proposal 05 — Publish `@freshair129/gks@3.6.0` to npm
+
+**Filed upstream**: [Freshair129/GksV3#28](https://github.com/Freshair129/GksV3/issues/28) (2026-05-07)
 
 ## Why
 

@@ -287,12 +287,14 @@ MSP M7-prep + two-repo validation audit. Reference: [05-publish-3.6.0.md](https:
 
 ## Submission tracker
 
-After filing each issue, paste the URL here and update the corresponding draft file's status:
+✅ All 5 issues filed 2026-05-07 (open, awaiting upstream review):
 
-- [ ] Issue 1 — phase: 6 acceptance: ___________
-- [ ] Issue 2 — verify-flow flag: ___________
-- [ ] Issue 3 — backlinks API: ___________
-- [ ] Issue 4 — SC compatibility doc: ___________
-- [ ] Issue 5 — publish 3.6.0: ___________
+- [x] Issue 1 — phase: 6 acceptance: https://github.com/Freshair129/GksV3/issues/32
+- [x] Issue 2 — verify-flow flag: https://github.com/Freshair129/GksV3/issues/31
+- [x] Issue 3 — backlinks API: https://github.com/Freshair129/GksV3/issues/30
+- [x] Issue 4 — SC compatibility doc: https://github.com/Freshair129/GksV3/issues/29
+- [x] Issue 5 — publish 3.6.0: https://github.com/Freshair129/GksV3/issues/28
+
+Status emojis in `upstream/gks-proposals/0X-*.md` titles bumped 🟡 → 🔵.
 
 When upstream lands one, follow [`upstream/gks-proposals/README.md`](./upstream/gks-proposals/README.md) "Workflow when an upstream lands" — bump dep, replace workaround, write `AUDIT--<topic>-UPSTREAMED` atom.

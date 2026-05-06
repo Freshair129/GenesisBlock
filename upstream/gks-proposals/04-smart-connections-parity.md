@@ -1,4 +1,6 @@
-# 🟡 Proposal 04 — Document Smart Connections + nomic-embed-text-v1.5 compatibility
+# 🔵 Proposal 04 — Document Smart Connections + nomic-embed-text-v1.5 compatibility
+
+**Filed upstream**: [Freshair129/GksV3#29](https://github.com/Freshair129/GksV3/issues/29) (2026-05-07)
 
 ## Why
 

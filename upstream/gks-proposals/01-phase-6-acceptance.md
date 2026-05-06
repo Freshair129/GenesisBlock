@@ -1,4 +1,6 @@
-# 🟡 Proposal 01 — Accept `phase: 6` in `gks propose-inbound` CLI
+# 🔵 Proposal 01 — Accept `phase: 6` in `gks propose-inbound` CLI
+
+**Filed upstream**: [Freshair129/GksV3#32](https://github.com/Freshair129/GksV3/issues/32) (2026-05-07)
 
 ## Why
 

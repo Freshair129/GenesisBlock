@@ -21,3 +21,6 @@ coverage/
 
 # Knowledge Browser local state
 brains-config.json
+
+# One-off HANDOFF helpers (issue submission, etc.)
+open-*-issues.html

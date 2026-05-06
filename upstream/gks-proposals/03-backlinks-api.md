@@ -1,4 +1,6 @@
-# 🟡 Proposal 03 — Stable backlinks derivation API (`gks backlinks`)
+# 🔵 Proposal 03 — Stable backlinks derivation API (`gks backlinks`)
+
+**Filed upstream**: [Freshair129/GksV3#30](https://github.com/Freshair129/GksV3/issues/30) (2026-05-07)
 
 ## Why
 

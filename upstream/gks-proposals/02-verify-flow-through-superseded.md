@@ -1,4 +1,6 @@
-# 🟡 Proposal 02 — `gks verify-flow --through-superseded` flag
+# 🔵 Proposal 02 — `gks verify-flow --through-superseded` flag
+
+**Filed upstream**: [Freshair129/GksV3#31](https://github.com/Freshair129/GksV3/issues/31) (2026-05-07)
 
 ## Why
 
