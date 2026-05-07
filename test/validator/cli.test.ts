@@ -84,6 +84,11 @@ describe('msp-validate CLI', () => {
 
   it('--all on the repo dogfoods successfully', async () => {
     const r = await run([`--root=${repoRoot}`, '--all'])
+    if (r.code !== 0) {
+      // CI debug: dump full output when assertion will fail
+      // eslint-disable-next-line no-console
+      console.error('=== DOGFOODS DEBUG ===\nSTDOUT:\n' + r.stdout + '\nSTDERR:\n' + r.stderr + '\n=== END ===')
+    }
     expect(r.code).toBe(0)
     expect(r.stdout).toMatch(/Total: \d+ passed, 0 failed/)
   }, 60_000)
