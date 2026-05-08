@@ -26,6 +26,22 @@ export interface RecallResult {
   tookMs: number
 }
 
+export interface CandidateSummary {
+  proposed_id: string
+  type: string
+  status: 'candidate'
+  proposed_at: string
+  proposed_by: 'agent' | 'human'
+  rationale?: string
+  confidence?: number
+  title: string
+  path: string
+}
+
+export interface CandidateRecord extends CandidateSummary {
+  body: string
+}
+
 export const api = {
   getAtoms: async (type?: string, status?: string): Promise<Atom[]> => {
     const params = new URLSearchParams()
@@ -50,7 +66,23 @@ export const api = {
     const res = await fetch('/api/inbound')
     return res.json()
   },
-  
+
+  listCandidates: async (): Promise<CandidateSummary[]> => {
+    const res = await fetch('/api/candidates')
+    return res.json()
+  },
+
+  readCandidate: async (id: string): Promise<CandidateRecord> => {
+    const res = await fetch(`/api/candidates/${encodeURIComponent(id)}`)
+    if (!res.ok) throw new Error(`Candidate not found: ${id}`)
+    return res.json()
+  },
+
+  deleteCandidate: async (id: string): Promise<void> => {
+    const res = await fetch(`/api/candidates/${encodeURIComponent(id)}`, { method: 'DELETE' })
+    if (!res.ok) throw new Error(`Failed to delete: ${id}`)
+  },
+
   getHotfixes: async (): Promise<string[]> => {
     const res = await fetch('/api/hotfixes')
     return res.json()

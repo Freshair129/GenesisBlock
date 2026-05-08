@@ -2,6 +2,8 @@ import 'dotenv/config'
 import express from 'express'
 import { retain, recall } from '@freshair129/gks/memory'
 import { getStore } from './memory.js'
+import { CandidateWriter } from './memory/candidates/writer.js'
+import { CandidateNotFoundError } from './memory/candidates/types.js'
 
 const app = express()
 app.use(express.json())
@@ -296,6 +298,44 @@ app.get('/api/inbound', async (req, res) => {
     res.json(candidates)
   } catch (error: any) {
     res.status(500).json({ error: error.message })
+  }
+})
+
+app.get('/api/candidates', async (_req, res) => {
+  try {
+    const writer = new CandidateWriter({ root: getActiveRoot() })
+    const summaries = await writer.list()
+    res.json(summaries)
+  } catch (error: any) {
+    res.status(500).json({ error: error.message })
+  }
+})
+
+app.get('/api/candidates/:id', async (req, res) => {
+  try {
+    const writer = new CandidateWriter({ root: getActiveRoot() })
+    const record = await writer.read(req.params.id)
+    res.json(record)
+  } catch (error: any) {
+    if (error instanceof CandidateNotFoundError) {
+      res.status(404).json({ error: error.message })
+      return
+    }
+    res.status(400).json({ error: error.message })
+  }
+})
+
+app.delete('/api/candidates/:id', async (req, res) => {
+  try {
+    const writer = new CandidateWriter({ root: getActiveRoot() })
+    await writer.delete(req.params.id)
+    res.json({ ok: true })
+  } catch (error: any) {
+    if (error instanceof CandidateNotFoundError) {
+      res.status(404).json({ error: error.message })
+      return
+    }
+    res.status(400).json({ error: error.message })
   }
 })
 
