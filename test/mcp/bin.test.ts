@@ -97,6 +97,7 @@ describe('msp-mcp-server bin (spawned)', () => {
     const tools = (list!.result as { tools: Array<{ name: string }> }).tools
     expect(tools.map((t) => t.name).sort()).toEqual([
       'msp_backlinks_rebuild',
+      'msp_candidate',
       'msp_compress',
       'msp_episode_append',
       'msp_identity_get',
