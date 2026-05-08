@@ -39,6 +39,20 @@ P6 AUDIT       (what shipped)        gks/audit/AUDIT--*.md
 - Pre-commit hook enforces validator
 - Pre-push hook runs `gks verify-flow` on touched FEATs
 
+## Atom contradiction policy
+
+The validator catches structural problems (schema, links, ID format, write-time anti-hallucination). It does **not** catch semantic contradiction — two atoms with valid schema can still claim opposite things about the same scope and both pass.
+
+**Rule (Layer 0 of `BLUEPRINT--CONTRADICTION-DETECTION-IMPL`):** if a new atom claims something that conflicts with an existing `status: stable` atom of the same type, the conflicting atom MUST be explicitly superseded in the same PR:
+
+1. Add the old atom's id to the new atom's `crosslinks.supersedes`
+2. Add the new atom's id to the old atom's `crosslinks.superseded_by`
+3. Flip the old atom's `status` to `superseded`
+
+The PR reviewer must verify the above before approving any PR that adds or modifies an atom in `gks/<type>/`. The PR template (`.github/pull_request_template.md`) carries an explicit checklist for this.
+
+**Why this is human-enforced first:** a few mechanical layers will follow (`PROTO--RECIPROCAL-SUPERSESSION`, `PROTO--DOMAIN-UNIQUENESS`, embedding similarity hint, opt-in LLM judge — all specified in `ADR--CONTRADICTION-DETECTION-STACK`), but the cheapest place to catch a contradiction is at the moment the author is writing it. Mechanical layers are scaffolding around this rule, not replacements for it.
+
 ## Useful commands
 
 ```bash

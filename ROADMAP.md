@@ -61,6 +61,10 @@
 
 **Killer demo**: `msp_recall("how did we decide rate limiting?")` returns ranked + provenance hits from GKS vector + Obsidian text + episodic + backlinks merged via RRF.
 
+## Post-v0.4.0 — contradiction detection
+
+Layer 0 (human rule) of `BLUEPRINT--CONTRADICTION-DETECTION-IMPL` shipped: `CLAUDE.md` § "Atom contradiction policy" + `.github/pull_request_template.md` checklist. Reviewers verify supersession discipline at PR-author time before any new mechanical layer (`PROTO--RECIPROCAL-SUPERSESSION`, `PROTO--DOMAIN-UNIQUENESS`, embedding hint, opt-in LLM judge) lands. See `ADR--CONTRADICTION-DETECTION-STACK` for the full 5-layer plan.
+
 ## Counts at v0.4.0
 
 - **159 atoms** in `gks/`
