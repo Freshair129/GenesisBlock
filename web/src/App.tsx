@@ -12,23 +12,6 @@ import SymbolsTab from './components/SymbolsTab'
 
 type LeftTab = 'atoms' | 'candidates' | 'symbols'
 
-/**
- * Symbols tab is gated for PR-5 of the Symbol Graph rollout. Visibility flips on
- * via either:
- *   - `VITE_MSP_SYMBOL_GRAPH=1` env var at build time
- *   - `?symbols=1` URL query param at runtime (for local poking)
- * PR-6 removes the flag once the graph build pipeline is wired into setup.
- */
-function symbolsTabEnabled(): boolean {
-  const env = (import.meta as { env?: Record<string, string | undefined> }).env
-  if (env && env.VITE_MSP_SYMBOL_GRAPH === '1') return true
-  if (typeof window !== 'undefined') {
-    const params = new URLSearchParams(window.location.search)
-    if (params.get('symbols') === '1') return true
-  }
-  return false
-}
-
 export default function App() {
   const [atoms, setAtoms] = useState<Atom[]>([])
   const [graphData, setGraphData] = useState<GraphData>({ nodes: [], edges: [] })
@@ -37,7 +20,6 @@ export default function App() {
   const [candidatesCount, setCandidatesCount] = useState(0)
   const [leftTab, setLeftTab] = useState<LeftTab>('atoms')
   const [reloadKey, setReloadKey] = useState(0)
-  const [showSymbols] = useState<boolean>(() => symbolsTabEnabled())
 
   useEffect(() => {
     Promise.all([
@@ -89,21 +71,19 @@ export default function App() {
                 >
                   Candidates ({candidatesCount})
                 </button>
-                {showSymbols && (
-                  <button
-                    onClick={() => setLeftTab('symbols')}
-                    style={{
-                      flex: 1,
-                      padding: 8,
-                      border: 'none',
-                      background: '#eef',
-                      cursor: 'pointer',
-                    }}
-                    aria-label="symbols-tab-button"
-                  >
-                    Symbols
-                  </button>
-                )}
+                <button
+                  onClick={() => setLeftTab('symbols')}
+                  style={{
+                    flex: 1,
+                    padding: 8,
+                    border: 'none',
+                    background: '#eef',
+                    cursor: 'pointer',
+                  }}
+                  aria-label="symbols-tab-button"
+                >
+                  Symbols
+                </button>
               </div>
               <div style={{ flex: 1, overflow: 'hidden' }}>
                 <SymbolsTab />
@@ -138,21 +118,19 @@ export default function App() {
                 >
                   Candidates ({candidatesCount})
                 </button>
-                {showSymbols && (
-                  <button
-                    onClick={() => setLeftTab('symbols')}
-                    style={{
-                      flex: 1,
-                      padding: 8,
-                      border: 'none',
-                      background: 'transparent',
-                      cursor: 'pointer',
-                    }}
-                    aria-label="symbols-tab-button"
-                  >
-                    Symbols
-                  </button>
-                )}
+                <button
+                  onClick={() => setLeftTab('symbols')}
+                  style={{
+                    flex: 1,
+                    padding: 8,
+                    border: 'none',
+                    background: 'transparent',
+                    cursor: 'pointer',
+                  }}
+                  aria-label="symbols-tab-button"
+                >
+                  Symbols
+                </button>
               </div>
               {leftTab === 'atoms' ? (
                 <AtomList
