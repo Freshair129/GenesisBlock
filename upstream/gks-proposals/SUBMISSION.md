@@ -275,6 +275,74 @@ MSP M7-prep follow-up. Happy to open a PR with the markdown drop-in.
 
 ---
 
+### Issue 6 of 6 — Update `docs/MSP_RELATIONSHIP.md` (post-MSP-cleanup)
+
+> **Drafted 2026-05-10**, not yet filed. Open this one only after the maintainer has digested issues 1–4 (or in parallel — it's purely doc-side, no code conflict).
+
+**Title**:
+```
+docs: update MSP_RELATIONSHIP.md — MSP migrated off inbound queue (Phase 3) and is now agent-agnostic
+```
+
+**Body**:
+```markdown
+Hi @<maintainer> — `docs/MSP_RELATIONSHIP.md` is now ~6 weeks behind the actual MSP repo (`Freshair129/msp`). Three concrete drift points + one architectural reframe.
+
+## Drift 1 — `/submit-memory` and inbound queue removed
+
+**Current text** (under "What MSP brings on top → Workflow"):
+> Agent → /submit-memory → inbound queue → human review → promote → gks/
+
+**Reality**: `Freshair129/msp` completed `BLUEPRINT--INBOUND-TO-CANDIDATES-MIGRATION` in Phase 3 (commit `7eff62b feat: delete msp_propose + inbound infrastructure (Phase 3)`). The inbound queue, `msp_propose` MCP tool, and `scripts/msp/propose.mjs` are all gone. The new path is:
+
+```
+Agent → msp_candidate (MCP tool) → .brain/msp/projects/<ns>/candidates/ → human PR → gks/
+```
+
+EVA's MSP-v9.1 (Python) may still use the inbound shape; the doc should mark inbound as a legacy path and the candidates pipeline as the new default for `Freshair129/msp`.
+
+## Drift 2 — `gksLayout()` defaults still mention `inbound`
+
+The "Design intent baked into GKS" table cites:
+> Default paths under `.brain/msp/projects/<path>/{inbound,session,memory,audit}/`
+
+The `inbound` subdir is no longer written by `Freshair129/msp`. `candidates/` is the new entry. Worth noting that GKS-default `gksLayout()` still includes `inbound` for backwards compat with non-MSP consumers — the doc should call out that MSP-the-consumer doesn't use it anymore.
+
+## Drift 3 — `MSP-IMP-` / `MSP-TSK-` / `MSP-WKT-` are EVA process artifacts, not MSP
+
+Current text:
+> MSP-IMP- (P3 plan) → MSP-TSK- (P4 task) → MSP-ACT- (P5 action) → MSP-WKT- (P6 walkthrough)
+
+These IDs come from EVA's `FRAMEWORK_MASTER_SPEC.md` (per GKS `SCOPE.md` line 135's own reference). The MSP repo just declared itself **agent-agnostic** and removed `CORE_FRAMEWORK_MASTER_SPEC.md` (EVA's spec) from its repo (see [Freshair129/msp#65](https://github.com/Freshair129/msp/pull/65), now merged). Suggest moving the `MSP-IMP-` etc. discussion into a separate "EVA-on-GKS" example doc, or qualifying it as "EVA's MSP-v9.1 process IDs" rather than "MSP's".
+
+## Reframe — there are now two MSPs
+
+The current doc conflates:
+
+- **MSP-v9.1** — Python, EVA's biological consolidation Memory OS (RI levels, RMS affect, Session→Core→Sphere cascade)
+- **MSP-this-repo** (`Freshair129/msp`) — TypeScript, passport-orchestrator, agent-agnostic, plugs into Claude Code / Gemini CLI / Antigravity / EVA / Hermes / openclaw
+
+The doc reads as if there's only one MSP (the v9.1 Python one). A short "Which MSP?" section near the top would help downstream readers pick the right one.
+
+## Proposed change
+
+Doc-only PR. I can draft if useful:
+
+1. Section "Which MSP?" near top with the two-MSP table
+2. Remove `/submit-memory` + inbound queue from the workflow bullet; replace with `msp_candidate` → candidates/ → PR
+3. Update the CLI bullets to current scripts (`msp:validate`, `msp:check-links`, `msp:run-task`, `msp:master`, `msp:graph`, `msp:hotfix:*`)
+4. Move `MSP-IMP-`/`MSP-TSK-`/`MSP-WKT-` into a "EVA-specific process artifacts" subsection or out to an EVA example
+5. Add a "What MSP-this-repo owns" agent-agnostic mini-table
+
+## Source
+
+Drift discovered while auditing MSP architecture docs. See [`AUDIT--ARCH-DOC-CLEANUP`](https://github.com/Freshair129/msp/blob/main/gks/audit/AUDIT--ARCH-DOC-CLEANUP.md) and the new [`CONCEPT--AGENT-AGNOSTIC`](https://github.com/Freshair129/msp/blob/main/gks/concept/CONCEPT--AGENT-AGNOSTIC.md) + [`CONCEPT--AGENT-INTEGRATION-PATTERNS`](https://github.com/Freshair129/msp/blob/main/gks/concept/CONCEPT--AGENT-INTEGRATION-PATTERNS.md).
+
+Happy to open the doc PR if you'd prefer code over discussion.
+```
+
+---
+
 ## Strategy C — Four draft PRs
 
 If the maintainer prefers code over discussion:
