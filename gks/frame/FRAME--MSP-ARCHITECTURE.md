@@ -19,7 +19,15 @@ crosslinks:
 created_at: 2026-05-03T07:01:47.791Z
 ---
 
-> **Superseded by `FRAME--MSP-ARCHITECTURE-V2`** (M7-prep). v2 reframes MSP as a passport-orchestrator over Obsidian-backed GKS — gatekeeping is one capability of MSP, not its identity. Body preserved verbatim below for historical reference.
+> ⚠️ **SUPERSEDED — DO NOT USE AS REFERENCE** ⚠️
+>
+> This v1 FRAME is preserved for crosslink-chain integrity only. Do not read its body for current behavior.
+>
+> - **Active SSOT**: [`FRAME--MSP-ARCHITECTURE-V2`](FRAME--MSP-ARCHITECTURE-V2.md) — passport-orchestrator framing
+> - **Inbound queue (mentioned below) was REMOVED in Phase 3** (2026-05-09); use `msp_candidate` MCP tool instead — see `BLUEPRINT--INBOUND-TO-CANDIDATES-MIGRATION` and `ADR--AGENT-WRITE-BOUNDARIES`
+> - **MSP is now agent-agnostic** — see `CONCEPT--AGENT-AGNOSTIC`
+>
+> Body preserved verbatim below for historical reference; treat every claim as out-of-date.
 
 # FRAME — MSP architecture (v1, superseded)
 

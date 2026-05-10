@@ -1,13 +1,15 @@
 # MSP — Memory & Soul Passport — Technical Full Specification
 
-> **Version:** 2.0.1
-> **Status:** Draft (architecture v2 + GKS audit alignment)
+> **Version:** 2.0.2
+> **Status:** Draft (architecture v2 + GKS audit alignment + agent-agnostic cleanup)
 > **Audience:** T3 Architects, T2 Implementers, MSP maintainers
 > **Authority:** เมื่อขัดแย้งกับเอกสารนี้ ให้ยึด `gks/frame/FRAME--MSP-ARCHITECTURE-V2.md` เป็นหลัก
 
 > **เปลี่ยนจาก v1.0.0 → 2.0.0** (ดู §17): MSP ถูก reframe จาก "gatekeeper" เป็น **passport** ที่พกพา memory + soul + retrieval + identity ของ agent ไปทุกที่. Gatekeeping ยังเป็นหน้าที่หนึ่ง แต่ไม่ใช่ identity. GKS = canonical knowledge layer (atomic markdown), Obsidian = runtime, Smart Connections = embedding source
 >
 > **เปลี่ยนจาก 2.0.0 → 2.0.1** (M7-prep follow-up): GKS audit อัปเดต — GKS ตอนนี้เป็น canonical embedder (`createNomicEmbedder()` ใน 3.6.0), Smart Connections เป็น in-Obsidian browse path; ทั้งสอง lock ที่ `nomic-embed-text-v1.5`. `OBSIDIAN_HOST` → `OBSIDIAN_URL`. Atomic graph เป็น GKS scope (MSP shift-left validation only). 4 upstream proposals สำหรับ GKS
+>
+> **เปลี่ยนจาก 2.0.1 → 2.0.2** (architecture-doc cleanup, 2026-05-09): MSP ประกาศตัวเป็น **agent-agnostic** (ดู `CONCEPT--AGENT-AGNOSTIC`) — EVA เป็นเพียงหนึ่งใน consumer; Claude Code / Gemini CLI / Antigravity / Hermes / openclaw plug-in ได้เท่ากัน. ลบ `CORE_FRAMEWORK_MASTER_SPEC.md` (ซึ่งเป็น EVA cognitive-layer spec ตามที่ GKS `SCOPE.md` ระบุไว้); ลบ `msp_infra_startup_architecture.md` (อธิบายระบบที่ไม่มีอยู่จริง); ลบ `SPEC--ARCHITECTURE-V2.md` (เอา idea ที่มีค่ามา cherry-pick เป็น 3 CONCEPT atoms). อ้างอิง: `AUDIT--ARCH-DOC-CLEANUP`
 
 ---
 
@@ -367,7 +369,7 @@ strip_previous_attempt_from_ctx: true   # fresh ทุก retry
 
 ## 6. Phase Governance — The Ruler of Flow
 
-อ้างอิง: `FRAMEWORK_MASTER_SPEC.md` §7.7
+อ้างอิง: `gks/frame/FRAME--PHASE-GOVERNANCE.md`
 
 MSP ไม่ใช่แค่ schema validator — มันคุม **phase gating** ด้วย ก่อน agent จะเข้า P5 (เขียนโค้ดใน `src/`) ต้องผ่าน checklist ตาม Scaling Level
 
@@ -458,7 +460,7 @@ P2 ต้องแตก draft เป็น 3 atomic:
 
 **Path:** `.brain/msp/projects/evaAI/vector/backlinks.jsonl`
 แต่ละ edge: `{ from: "ID-A", to: "ID-B", type: "implements|used_by|..." }`
-ใช้สำหรับ hybrid retrieval (RRF) ตาม `FRAMEWORK_MASTER_SPEC.md` §13
+ใช้สำหรับ hybrid retrieval (RRF) ตาม `gks/concept/CONCEPT--RETRIEVAL-ORCHESTRATION.md`
 
 ---
 
@@ -772,8 +774,10 @@ MSP รองรับหลายโปรเจกต์ใต้ `~/.brain/ms
 
 | Doc | บทบาท |
 |---|---|
-| `FRAMEWORK_MASTER_SPEC.md` §7 | authoritative source ของ MSP gatekeeper |
-| `FRAMEWORK_MASTER_SPEC.md` §13 | hybrid retrieval (4-layer RRF) |
+| `gks/frame/FRAME--MSP-ARCHITECTURE-V2.md` | architecture SSOT |
+| `gks/frame/FRAME--PHASE-GOVERNANCE.md` | phase gating rules |
+| `gks/concept/CONCEPT--RETRIEVAL-ORCHESTRATION.md` | hybrid retrieval (RRF) |
+| `gks/concept/CONCEPT--AGENT-AGNOSTIC.md` | MSP/agent boundary |
 | `.brain/msp/LLM_Contract/phase2_atomic_contract.yaml` | atomic write contract |
 | `.brain/msp/LLM_Contract/codegen_microtask_contract.yaml` | SLM codegen contract |
 | `Metadata Standard.md` | frontmatter spec |
@@ -787,6 +791,7 @@ MSP รองรับหลายโปรเจกต์ใต้ `~/.brain/ms
 
 | Version | Date | Author | Note |
 |---|---|---|---|
-| 1.0.0 | 2026-05-02 | @claude-opus-4-7 | Initial extraction from `FRAMEWORK_MASTER_SPEC.md` §7 + scripts/msp + LLM_Contract |
+| 1.0.0 | 2026-05-02 | @claude-opus-4-7 | Initial extraction from EVA's framework spec §7 + scripts/msp + LLM_Contract (the original EVA spec was deleted in v2.0.2 to enforce agent-agnosticism) |
 | 2.0.0 | 2026-05-03 | @claude-opus-4-7 | Architecture v2 — passport over Obsidian-backed GKS. Reframed §0 TL;DR + §2 Architecture; added §7a Obsidian as Runtime, §7b Embedding Strategy (Smart Connections), §7c Retrieval Orchestration (M7c), §7d Context Compression (M7d), §7e Identity / Soul (M7e). Driving atoms: `FRAME--MSP-ARCHITECTURE-V2`, `CONCEPT--OBSIDIAN-AS-RUNTIME`, `CONCEPT--EMBEDDING-STRATEGY`, `ADR--MSP-OBSIDIAN-INTEGRATION`, `ADR--SEMANTIC-SEARCH-VIA-SMART-CONNECTIONS`. v1.0.0 sections 3–6, 8–13 unchanged (gatekeeper aspects still authoritative). |
+| 2.0.2 | 2026-05-09 | @claude-opus-4-7 | Architecture-doc cleanup — declared MSP agent-agnostic. Removed `CORE_FRAMEWORK_MASTER_SPEC.md` (EVA's spec, not MSP's), `msp_infra_startup_architecture.md` (described non-existent Fastify+Postgres system), `SPEC--ARCHITECTURE-V2.md` (cherry-picked 3 ideas → `CONCEPT--AGENT-AGNOSTIC`, `CONCEPT--MSP-OBSERVE-HOT-PATH`, `CONCEPT--NAMED-PROJECT-REGISTRY`). FRAME-V2 + this spec are the SSOT. See `AUDIT--ARCH-DOC-CLEANUP`. |
 | 2.0.1 | 2026-05-04 | @claude-opus-4-7 | M7-prep follow-up — GKS audit alignment. §7a env var rename `OBSIDIAN_HOST` → `OBSIDIAN_URL` to match GksV3 3.6.0 `RestObsidianAdapter`. §7b reframed: GKS is canonical embedder (`createNomicEmbedder()` ships in 3.6.0), Smart Connections is in-Obsidian browse path; both lock to `nomic-embed-text-v1.5`. §7c retrieval source list updated (GKS vector store primary). New atoms: `ADR--GRAPH-IS-GKS-DOMAIN`, `ADR--EMBEDDING-MODEL-PARITY`. Updated atoms: `CONCEPT--EMBEDDING-STRATEGY`, `ADR--SEMANTIC-SEARCH-VIA-SMART-CONNECTIONS`, `ADR--MSP-OBSIDIAN-INTEGRATION`, `CONCEPT--MEMORY-VECTOR-BACKLINKS`, `ADR--ANTI-HALLUCINATION-RULES` (shift-left clarification). 4 upstream proposals drafted under `upstream/gks-proposals/`. See `AUDIT--M7-PREP-FOLLOWUP`. |
