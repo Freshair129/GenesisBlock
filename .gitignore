@@ -1,27 +1,10 @@
 node_modules/
 dist/
-coverage/
-.DS_Store
-*.log
-
-# local env / secrets
 .env
-.env.local
-
-# local runtime state (keep structure via .gitkeep)
-.brain/**/vector/*.jsonl
-.brain/**/vector/_manifest.json
-.brain/**/logs/
-.brain/**/session/
-.brain/**/audit/
-.brain/**/memory/*.json
-.brain/**/symbols/
-
-# Claude Code local state (subagent worktrees, transcripts, etc.)
-.claude/
-
-# Knowledge Browser local state
-brains-config.json
-
-# One-off HANDOFF helpers (issue submission, etc.)
-open-*-issues.html
+*.log
+.DS_Store
+.brain/
+packages/*/dist/
+packages/*/node_modules/
+packages/msp/gks/00_index/atomic_index.jsonl
+packages/msp/gks/00_index/backlinks.jsonl

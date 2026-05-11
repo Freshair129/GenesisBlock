@@ -1,72 +1,22 @@
 {
-  "name": "msp",
+  "name": "msp-monorepo",
   "version": "0.4.0",
-  "description": "Memory & Soul Passport — passport-orchestrator over @freshair129/gks, with Knowledge Browser web UI",
-  "type": "module",
+  "description": "Memory & Soul Passport — monorepo",
   "private": true,
-  "main": "src/index.ts",
+  "type": "module",
+  "workspaces": [
+    "packages/*"
+  ],
   "engines": {
     "node": ">=20"
   },
-  "bin": {
-    "msp-validate": "./dist/validator/cli.js",
-    "msp-backlinks": "./dist/memory/backlinks/cli.js",
-    "msp-run-task": "./dist/codegen/cli.js",
-    "msp-master": "./dist/codegen/master/cli.js",
-    "msp-mcp-server": "./dist/mcp/bin.js",
-    "msp-graph": "./dist/symbols/cli.js"
-  },
-  "files": [
-    "dist/",
-    "scripts/msp/re-indexer.ts",
-    ".brain/msp/LLM_Contract/atomic_contract.yaml",
-    "examples/hooks/",
-    "README.md",
-    "msp_spec.md"
-  ],
   "scripts": {
-    "dev": "concurrently \"tsx watch src/index.ts\" \"npm run web:dev\"",
-    "web:dev": "vite --root web",
-    "web:build": "vite build --root web",
-    "start": "node dist/src/index.js",
-    "msp:index": "tsx scripts/msp/re-indexer.ts --root=.",
-    "msp:check-links": "gks validate --links --root=.",
-    "msp:verify": "gks verify-flow",
-    "msp:validate": "tsx src/validator/cli.ts",
-    "msp:backlinks": "tsx src/memory/backlinks/cli.ts",
-    "msp:run-task": "tsx src/codegen/cli.ts",
-    "msp:master": "tsx src/codegen/master/cli.ts",
-    "msp:graph": "tsx src/symbols/cli.ts",
-    "msp:hotfix:open": "gks hotfix open",
-    "msp:hotfix:list": "gks hotfix list",
-    "msp:hotfix:close": "gks hotfix close",
-    "msp:hotfix:check": "gks hotfix check",
-    "build": "tsc -p tsconfig.build.json && node scripts/msp/chmod-bins.mjs",
-    "test": "vitest run",
-    "test:watch": "vitest",
-    "typecheck": "tsc --noEmit",
-    "prepublishOnly": "npm run typecheck && npm test && npm run build"
-  },
-  "dependencies": {
-    "@aflsolutions/graphology-communities-leiden": "^1.1.1",
-    "@freshair129/gks": "^3.6.0",
-    "@modelcontextprotocol/sdk": "^1.29.0",
-    "better-sqlite3": "^11.10.0",
-    "dotenv": "^17.4.2",
-    "express": "^4.18.0",
-    "graphology": "^0.25.4",
-    "graphology-communities-louvain": "^2.0.2",
-    "graphology-types": "^0.24.8",
-    "yaml": "^2.5.1",
-    "zod": "^3.25.76"
-  },
-  "devDependencies": {
-    "@types/better-sqlite3": "^7.6.13",
-    "@types/express": "^5.0.6",
-    "@types/node": "^22.19.17",
-    "concurrently": "^9.2.1",
-    "tsx": "^4.21.0",
-    "typescript": "^5.9.3",
-    "vitest": "^2.1.1"
+    "dev": "npm run dev --workspace=packages/msp",
+    "test": "npm test --workspaces",
+    "build": "npm run build --workspaces",
+    "typecheck": "npm run typecheck --workspaces",
+    "msp:index": "npm run msp:index --workspace=packages/msp",
+    "msp:validate": "npm run msp:validate --workspace=packages/msp",
+    "msp:check-links": "npm run msp:check-links --workspace=packages/msp"
   }
 }

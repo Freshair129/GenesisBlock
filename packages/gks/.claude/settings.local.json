@@ -1,0 +1,19 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npx tsc *)",
+      "Bash(npm test *)",
+      "Bash(node -e \"require\\('./bin/gks.ts'\\)\")",
+      "Bash(npx tsx *)",
+      "Bash(echo \"exit: $?\")",
+      "Bash(node -e ' *)",
+      "Bash(gemini --version)",
+      "Bash(gemini -p 'You are a code fixer. Fix these 2 test failure causes in this TypeScript/Node.js project: *)",
+      "Bash(node -e \"const d=require\\('./package.json'\\); console.log\\(JSON.stringify\\(d.scripts,null,2\\)\\)\")",
+      "Bash(npm run *)",
+      "PowerShell(Head -20)",
+      "PowerShell(\\(Get-ChildItem \"C:\\\\Users\\\\freshair\\\\GksV3\" -Force\\).Count; \\(Get-ChildItem \"C:\\\\Users\\\\freshair\\\\msp\" -Force\\).Count)",
+      "PowerShell(Get-ChildItem \"C:\\\\Users\\\\freshair\\\\GksV3\" -Force | ForEach-Object { $_.Name })"
+    ]
+  }
+}
