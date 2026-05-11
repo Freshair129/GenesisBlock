@@ -1,6 +1,7 @@
-# 🟡 Proposal 07 — Clarify `FRAME--` scope (canonical narrow vs Memory-OS actual broad)
+# 🟢 Proposal 07 — Clarify `FRAME--` scope (canonical narrow vs Memory-OS actual broad)
 
-**Status**: drafted 2026-05-11, not yet filed upstream.
+**Status**: merged upstream 2026-05-11.
+**Applied upstream**: GksV3 commit `22f1751`.
 
 ## Why
 

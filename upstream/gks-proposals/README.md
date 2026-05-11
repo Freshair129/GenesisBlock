@@ -23,12 +23,12 @@ Status legend in titles: 🟡 drafted, 🔵 awaiting upstream review, 🟢 merge
 | 03 | `03-backlinks-api.md` | Stable backlinks derivation API (`gks backlinks --emit=jsonl`) | 🔵 [GksV3#30](https://github.com/Freshair129/GksV3/issues/30) |
 | 04 | `04-smart-connections-parity.md` | Document Smart Connections + nomic-embed-text-v1.5 compatibility | 🔵 [GksV3#29](https://github.com/Freshair129/GksV3/issues/29) |
 | 05 | `merged/05-publish-3.6.0.md` | Publish `@freshair129/gks@3.6.0` to npm | 🟢 [GksV3#28](https://github.com/Freshair129/GksV3/issues/28) — published 2026-05-07 |
-| 06 | `06-msp-relationship-update.md` | Update `docs/MSP_RELATIONSHIP.md` — MSP migrated off inbound queue (Phase 3); agent-agnostic reframe | 🟡 drafted, awaiting relay |
-| 07 | `07-frame-broader-definition.md` | Broaden `FRAME--` definition (or add `METHODOLOGY--`) — canonical narrow vs Memory-OS practice | 🟡 drafted, awaiting relay |
+| 06 | `merged/06-msp-relationship-update.md` | Update `docs/MSP_RELATIONSHIP.md` — MSP migrated off inbound queue (Phase 3); agent-agnostic reframe | 🟢 [GksV3#22f1751](https://github.com/Freshair129/GksV3/commit/22f1751) — merged 2026-05-11 |
+| 07 | `merged/07-frame-broader-definition.md` | Broaden `FRAME--` definition (or add `METHODOLOGY--`) — canonical narrow vs Memory-OS practice | 🟢 [GksV3#22f1751](https://github.com/Freshair129/GksV3/commit/22f1751) — merged 2026-05-11 |
 
 ## How to submit upstream
 
-→ **[`SUBMISSION.md`](./SUBMISSION.md)** — copy-paste-ready issue bodies for relay to `Freshair129/GksV3`. Now covers proposals #01–#04 (filed) and #06 (drafted). ~10 min to relay #06 when ready.
+→ **[`SUBMISSION.md`](./SUBMISSION.md)** — copy-paste-ready issue bodies for relay to `Freshair129/GksV3`. Now covers proposals #01–#04 (filed) and #06–#07 (merged upstream).
 
 ## Why these live in MSP repo
 

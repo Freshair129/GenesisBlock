@@ -1,6 +1,7 @@
-# 🟡 Proposal 06 — Update `docs/MSP_RELATIONSHIP.md` (MSP migrated off inbound queue; agent-agnostic reframe)
+# 🟢 Proposal 06 — Update `docs/MSP_RELATIONSHIP.md` (MSP migrated off inbound queue; agent-agnostic reframe)
 
-**Status**: drafted 2026-05-10, not yet filed upstream.
+**Status**: merged upstream 2026-05-11.
+**Applied upstream**: GksV3 commit `22f1751`.
 
 ## Why
 
