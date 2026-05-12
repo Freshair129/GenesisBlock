@@ -25,7 +25,7 @@ linked_symbols:
   - {"file":"test/orchestrator/consolidator/summarise.test.ts"}
   - {"file":"test/orchestrator/consolidator/llm.test.ts"}
   - {"file":"test/orchestrator/consolidator/index.test.ts"}
-created_at: 2026-05-04T16:29:00.000Z
+created_at: 2026-05-05T00:29:00.000+07:00
 ---
 
 # M7b — consolidator implementation (hybrid scoring + boundary detection + summariser)

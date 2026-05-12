@@ -15,7 +15,7 @@ tags:
   - obsidian
   - decision
 crosslinks: {"references":["CONCEPT--EMBEDDING-STRATEGY","ADR--EMBEDDING-MODEL-PARITY","ADR--MSP-OBSIDIAN-INTEGRATION"]}
-created_at: 2026-05-03T16:55:06.784Z
+created_at: 2026-05-04T00:55:06.784+07:00
 ---
 
 # ADR — semantic search topology

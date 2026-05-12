@@ -14,7 +14,7 @@ tags:
   - validator
   - automation
 crosslinks: {"references":["FEAT--MSP-VALIDATOR","ADR--AGENT-WRITE-BOUNDARIES"]}
-created_at: 2026-05-03T07:39:04.340Z
+created_at: 2026-05-03T15:39:04.340+07:00
 ---
 
 # CONCEPT — MSP pre-commit hook

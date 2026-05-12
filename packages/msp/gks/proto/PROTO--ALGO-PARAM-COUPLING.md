@@ -19,7 +19,7 @@ tags:
 crosslinks: {"enforces":["FRAME--CROSSLINKS-VOCABULARY"],"references":["CONCEPT--PROTO-ALGO-PARAM-COUPLING","CONCEPT--PROTO-PATTERN","ADR--GRAPH-IS-GKS-DOMAIN"]}
 linked_symbols:
   - {"file":"src/validator/proto/algo-param-coupling.ts"}
-created_at: 2026-05-05T11:11:00.000Z
+created_at: 2026-05-05T19:11:00.000+07:00
 ---
 
 # PROTO — ALGO-PARAM-COUPLING

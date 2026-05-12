@@ -17,7 +17,7 @@ tags:
 crosslinks: {"enforces":["FRAME--KNOWLEDGE-3-TIER"],"references":["FRAME--KNOWLEDGE-3-TIER","ADR--MASTER-PROMOTION-DOC-TO-CODE","ADR--MASTER-PROMOTION-CONTRADICTION-POLICY"]}
 linked_symbols:
   - {"file":"src/validator/proto/master-body-schema.ts"}
-created_at: 2026-05-09T08:05:00.000Z
+created_at: 2026-05-09T16:05:00.000+07:00
 ---
 
 # PROTO — MASTER-BODY-SCHEMA

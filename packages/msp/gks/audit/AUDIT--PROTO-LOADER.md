@@ -22,7 +22,7 @@ linked_symbols:
   - {"file":"gks/proto/PROTO--SAMPLE-RULE.md"}
   - {"file":"test/validator/proto/loader.test.ts"}
   - {"file":"test/validator/proto/sample.test.ts"}
-created_at: 2026-05-05T11:00:00.000Z
+created_at: 2026-05-05T19:00:00.000+07:00
 ---
 
 # M8a — PROTO loader (foundation)

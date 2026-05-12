@@ -14,7 +14,7 @@ tags:
   - decision
   - m7e
 crosslinks: {"references":["CONCEPT--IDENTITY-LAYER","ADR--GRAPH-IS-GKS-DOMAIN"]}
-created_at: 2026-05-04T17:25:30.000Z
+created_at: 2026-05-05T01:25:30.000+07:00
 ---
 
 # ADR — identity storage shape

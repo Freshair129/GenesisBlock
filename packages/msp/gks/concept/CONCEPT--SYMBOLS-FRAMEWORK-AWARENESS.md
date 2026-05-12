@@ -16,7 +16,7 @@ tags:
   - prisma
   - mcp
 crosslinks: {"references":["FRAME--SYMBOL-GRAPH","CONCEPT--SYMBOL-GRAPH","CONCEPT--PARSER-CHOICE"]}
-created_at: 2026-05-11T22:35:00.000Z
+created_at: 2026-05-12T06:35:00.000+07:00
 ---
 
 # CONCEPT — Framework-aware symbol indexing

@@ -19,7 +19,7 @@ linked_symbols:
   - {"file":"examples/hooks/install.sh"}
   - {"file":"examples/hooks/README.md"}
   - {"file":"test/hooks/pre-commit.test.ts"}
-created_at: 2026-05-03T07:39:05.783Z
+created_at: 2026-05-03T15:39:05.783+07:00
 ---
 
 # BLUEPRINT — pre-commit hook

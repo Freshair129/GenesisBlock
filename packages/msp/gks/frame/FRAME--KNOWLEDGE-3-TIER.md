@@ -17,7 +17,7 @@ tags:
   - epistemic
   - provenance
 crosslinks: {"references":["FRAME--MSP-ARCHITECTURE-V2","CONCEPT--KNOWLEDGE-LAYERS-V2","ADR--AGENT-WRITE-BOUNDARIES","FRAME--AUTHORITY-MATRIX"]}
-created_at: 2026-05-09T07:30:00.000Z
+created_at: 2026-05-09T15:30:00.000+07:00
 ---
 
 # FRAME — Knowledge 3-Tier model

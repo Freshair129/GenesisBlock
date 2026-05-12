@@ -25,7 +25,7 @@ linked_symbols:
   - {"file":"test/orchestrator/consolidator/boundary.test.ts"}
   - {"file":"test/orchestrator/consolidator/summarise.test.ts"}
   - {"file":"test/orchestrator/consolidator/index.test.ts"}
-created_at: 2026-05-04T10:06:30.000Z
+created_at: 2026-05-04T18:06:30.000+07:00
 ---
 
 # BLUEPRINT — consolidator implementation plan

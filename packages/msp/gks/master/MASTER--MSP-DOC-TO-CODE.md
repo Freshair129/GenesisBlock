@@ -17,7 +17,7 @@ tags:
   - governance
   - instinct
 crosslinks: {"references":["FRAME--KNOWLEDGE-3-TIER","ADR--MASTER-PROMOTION-DOC-TO-CODE","CONCEPT--CODEGEN-MICROTASK-CONTRACT"]}
-created_at: 2026-05-09T08:00:30.000Z
+created_at: 2026-05-09T16:00:30.000+07:00
 ---
 
 # MASTER — Doc-to-code (atoms before code, every milestone)

@@ -15,7 +15,7 @@ tags:
   - msp-recall
   - m7c
 crosslinks: {"references":["FRAME--MSP-ARCHITECTURE-V2","FEAT--MSP-OBSIDIAN-CLIENT","FEAT--CONSOLIDATOR","CONCEPT--EMBEDDING-STRATEGY","CONCEPT--MEMORY-VECTOR-BACKLINKS"]}
-created_at: 2026-05-05T08:55:00.000Z
+created_at: 2026-05-05T16:55:00.000+07:00
 ---
 
 # CONCEPT — retrieval orchestration

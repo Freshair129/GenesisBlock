@@ -19,7 +19,7 @@ linked_symbols:
   - {"file":"src/validator/proto/summary-min.ts"}
   - {"file":"src/validator/proto/adr-monotonic.ts"}
   - {"file":"src/validator/proto/evidence-for-decisions.ts"}
-created_at: 2026-05-05T13:00:00.000Z
+created_at: 2026-05-05T21:00:00.000+07:00
 ---
 
 # M8f — promote 3 existing rules → PROTO atoms

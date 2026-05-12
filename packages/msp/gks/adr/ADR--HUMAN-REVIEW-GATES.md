@@ -13,7 +13,7 @@ tags:
   - governance
   - decision
 crosslinks: {"references":["ADR--AGENT-WRITE-BOUNDARIES","FRAME--AUTHORITY-MATRIX","FRAME--SCALING-LEVELS"]}
-created_at: 2026-05-03T10:36:08.623Z
+created_at: 2026-05-03T18:36:08.623+07:00
 ---
 
 # ADR — human review gates

@@ -13,7 +13,7 @@ tags:
   - structural
   - prior-art
 crosslinks: {"references":["FRAME--SYMBOL-GRAPH","FRAME--MSP-ARCHITECTURE-V2"]}
-created_at: 2026-05-09T09:31:00.000Z
+created_at: 2026-05-09T17:31:00.000+07:00
 ---
 
 # CONCEPT — Symbol Graph

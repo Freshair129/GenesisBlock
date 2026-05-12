@@ -13,7 +13,7 @@ tags:
   - proto
   - invariants
 crosslinks: {"implements":["ADR--SYMBOLS-PROCESS-TRACING"]}
-created_at: 2026-05-12T08:53:00.000Z
+created_at: 2026-05-12T15:30:00.000+07:00
 ---
 
 # PROTO — Trace Invariants

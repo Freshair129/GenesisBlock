@@ -16,7 +16,7 @@ tags:
   - msp
   - gks
 crosslinks: {"references":["FRAME--MSP-ARCHITECTURE-V2","ADR--GRAPH-IS-GKS-DOMAIN","AUDIT--TWO-REPO-VALIDATION","AUDIT--GKS-UPSTREAM-PROPOSALS-FILED","AUDIT--GKS-3-6-0-PUBLISHED"]}
-created_at: 2026-05-08T06:20:00.000Z
+created_at: 2026-05-08T14:20:00.000+07:00
 ---
 
 # CONCEPT — monorepo migration

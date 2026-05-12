@@ -19,7 +19,7 @@ linked_symbols:
   - {"file":"examples/hooks/install.sh"}
   - {"file":"examples/hooks/README.md"}
   - {"file":"test/hooks/pre-push.test.ts"}
-created_at: 2026-05-03T10:39:29.189Z
+created_at: 2026-05-03T18:39:29.189+07:00
 ---
 
 # BLUEPRINT — pre-push hook

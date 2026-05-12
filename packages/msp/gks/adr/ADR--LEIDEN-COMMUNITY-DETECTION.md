@@ -16,7 +16,7 @@ tags:
   - community-detection
   - decision
 crosslinks: {"references":["FRAME--SYMBOL-GRAPH","CONCEPT--SYMBOL-GRAPH","ADR--SYMBOL-GRAPH-PERSISTENCE"]}
-created_at: 2026-05-09T09:51:00.000Z
+created_at: 2026-05-09T17:51:00.000+07:00
 ---
 
 # ADR — Leiden community detection

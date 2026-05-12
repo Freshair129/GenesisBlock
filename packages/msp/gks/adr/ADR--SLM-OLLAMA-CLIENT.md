@@ -14,7 +14,7 @@ tags:
   - ollama
   - decision
 crosslinks: {"references":["CONCEPT--SLM-OLLAMA-CLIENT","ADR--CODEGEN-RETRY-POLICY"]}
-created_at: 2026-05-03T09:22:30.900Z
+created_at: 2026-05-03T17:22:30.900+07:00
 ---
 
 # ADR — Ollama client shape

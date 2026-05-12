@@ -14,7 +14,7 @@ tags:
   - doc-to-code
   - foundation
 crosslinks: {"references":["FRAME--MSP-ARCHITECTURE-V2"]}
-created_at: 2026-05-03T07:01:48.299Z
+created_at: 2026-05-03T15:01:48.299+07:00
 ---
 
 # FRAME — phase governance
@@ -50,7 +50,7 @@ See `ADR--P2-MANDATORY-OPENAPI` (TBD).
 
 ## Devlog tracking
 
-Every phase emits a devlog entry under `gks/14_devlog/` with `sessionId` for traceability. `MSP-WKT-` (P6 walkthrough) is the handover artifact between sessions; without it, the next agent has no audit trail.
+Every phase emits a devlog entry under `gks/devlog/` with `sessionId` for traceability. `MSP-WKT-` (P6 walkthrough) is the handover artifact between sessions; without it, the next agent has no audit trail.
 
 ## Hotfix exception
 

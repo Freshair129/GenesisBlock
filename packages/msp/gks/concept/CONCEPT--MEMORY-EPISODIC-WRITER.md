@@ -13,7 +13,7 @@ tags:
   - episodic
   - writer
 crosslinks: {"references":["CONCEPT--MEMORY-EPISODIC","CONCEPT--MEMORY-SESSIONS","FEAT--MEMORY-SESSIONS-WRITER"]}
-created_at: 2026-05-03T07:16:39.910Z
+created_at: 2026-05-03T15:16:39.910+07:00
 ---
 
 # CONCEPT — memory episodic writer

@@ -13,7 +13,7 @@ tags:
   - sessions
   - writer
 crosslinks: {"references":["CONCEPT--MEMORY-SESSIONS","CONCEPT--MEMORY-SUBSYSTEM"]}
-created_at: 2026-05-03T07:16:38.088Z
+created_at: 2026-05-03T15:16:38.088+07:00
 ---
 
 # CONCEPT — memory sessions writer

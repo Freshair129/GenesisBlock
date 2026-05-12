@@ -13,7 +13,7 @@ tags:
   - hook
   - decision
 crosslinks: {"references":["CONCEPT--MSP-PREPUSH-HOOK","FEAT--MSP-VALIDATOR","ADR--MSP-PRECOMMIT-HOOK"]}
-created_at: 2026-05-03T10:39:27.995Z
+created_at: 2026-05-03T18:39:27.995+07:00
 ---
 
 # ADR — pre-push hook scope

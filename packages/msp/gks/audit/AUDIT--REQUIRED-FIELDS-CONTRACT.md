@@ -20,7 +20,7 @@ linked_symbols:
   - {"file":"src/validator/contract.ts"}
   - {"file":"src/validator/rules/required-fields.ts"}
   - {"file":"src/validator/types.ts"}
-created_at: 2026-05-03T10:58:58.818Z
+created_at: 2026-05-03T18:58:58.818+07:00
 ---
 
 # AUDIT — required_fields contract loader

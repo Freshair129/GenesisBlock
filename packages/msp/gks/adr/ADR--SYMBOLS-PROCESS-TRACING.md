@@ -13,7 +13,7 @@ tags:
   - adr
   - decision
 crosslinks: {"references":["CONCEPT--SYMBOLS-PROCESS-TRACING"]}
-created_at: 2026-05-12T08:51:00.000Z
+created_at: 2026-05-12T16:51:00.000+07:00
 ---
 
 # ADR — Process tracing traversal strategy

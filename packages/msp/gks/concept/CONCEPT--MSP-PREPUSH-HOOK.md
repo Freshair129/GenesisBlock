@@ -14,7 +14,7 @@ tags:
   - verify-flow
   - automation
 crosslinks: {"references":["FEAT--MSP-PRECOMMIT-HOOK","FEAT--MSP-VALIDATOR"]}
-created_at: 2026-05-03T10:39:27.384Z
+created_at: 2026-05-03T18:39:27.384+07:00
 ---
 
 # CONCEPT — MSP pre-push hook

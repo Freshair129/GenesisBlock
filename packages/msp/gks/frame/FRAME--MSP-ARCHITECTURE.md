@@ -16,7 +16,7 @@ tags:
 crosslinks:
   references: []
   superseded_by: [FRAME--MSP-ARCHITECTURE-V2]
-created_at: 2026-05-03T07:01:47.791Z
+created_at: 2026-05-03T15:01:47.791+07:00
 ---
 
 > ⚠️ **SUPERSEDED — DO NOT USE AS REFERENCE** ⚠️

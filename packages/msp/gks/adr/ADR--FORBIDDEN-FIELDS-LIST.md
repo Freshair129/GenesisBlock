@@ -13,7 +13,7 @@ tags:
   - forbidden-fields
   - anti-hallucination
 crosslinks: {"references":["CONCEPT--ATOMIC-WRITE-CONTRACT"],"implements":["FEAT--MSP-VALIDATOR"]}
-created_at: 2026-05-03T07:08:40.802Z
+created_at: 2026-05-03T15:08:40.802+07:00
 ---
 
 # ADR — forbidden frontmatter fields

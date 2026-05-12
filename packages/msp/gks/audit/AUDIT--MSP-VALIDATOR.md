@@ -26,7 +26,7 @@ linked_symbols:
   - {"file":"src/validator/rules/future-date.ts"}
   - {"file":"src/validator/rules/summary-min.ts"}
   - {"file":"src/validator/rules/phase-status.ts"}
-created_at: 2026-05-03T06:34:05.276Z
+created_at: 2026-05-03T14:34:05.276+07:00
 ---
 
 # AUDIT — MSP validator M2 acceptance

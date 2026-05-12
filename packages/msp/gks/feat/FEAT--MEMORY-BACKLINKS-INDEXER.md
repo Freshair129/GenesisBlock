@@ -17,7 +17,7 @@ crosslinks: {"implements":["ADR--MEMORY-BACKLINKS-INDEXER"],"references":["CONCE
 linked_symbols:
   - {"file":"src/memory/backlinks/indexer.ts"}
   - {"file":"src/memory/backlinks/cli.ts"}
-created_at: 2026-05-03T07:16:42.851Z
+created_at: 2026-05-03T15:16:42.851+07:00
 ---
 
 # FEAT — backlinks indexer

@@ -16,7 +16,7 @@ tags:
   - ci
   - governance
 crosslinks: {"references":["CONCEPT--ATOM-CONTRADICTION-DETECTION","ADR--ANTI-HALLUCINATION-RULES","ADR--HUMAN-REVIEW-GATES","FRAME--MSP-ARCHITECTURE-V2"]}
-created_at: 2026-05-08T10:32:00.000Z
+created_at: 2026-05-08T18:32:00.000+07:00
 ---
 
 # ADR — contradiction detection stack

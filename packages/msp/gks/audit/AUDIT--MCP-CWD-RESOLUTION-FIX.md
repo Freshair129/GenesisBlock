@@ -15,7 +15,7 @@ tags:
   - claude-desktop
 crosslinks: {"references":["AUDIT--MSP-MCP-SERVER","AUDIT--MSP-MCP-TOOL-EXPANSION","AUDIT--GKS-UPSTREAM-PROPOSALS-FILED"]}
 linked_symbols: ["src/mcp/argv.ts","src/mcp/bin.ts","src/mcp/server.ts","test/mcp/argv.test.ts","test/mcp/bin.test.ts"]
-created_at: 2026-05-06T20:18:00.000Z
+created_at: 2026-05-07T04:18:00.000+07:00
 ---
 
 # AUDIT — MCP cwd resolution fix

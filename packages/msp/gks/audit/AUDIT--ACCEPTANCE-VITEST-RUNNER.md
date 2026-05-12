@@ -21,7 +21,7 @@ linked_symbols:
   - {"file":"src/codegen/acceptance/sandbox.ts"}
   - {"file":"src/codegen/acceptance/parse-results.ts"}
   - {"file":"src/codegen/acceptance/types.ts"}
-created_at: 2026-05-03T09:30:27.474Z
+created_at: 2026-05-03T17:30:27.474+07:00
 ---
 
 # AUDIT — vitest acceptance runner

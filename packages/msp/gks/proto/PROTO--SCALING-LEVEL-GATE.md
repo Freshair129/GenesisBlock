@@ -17,7 +17,7 @@ tags:
 crosslinks: {"enforces":["FRAME--SCALING-LEVELS"],"references":["CONCEPT--PROTO-SCALING-LEVEL-GATE","FEAT--PROTO-LOADER"]}
 linked_symbols:
   - {"file":"src/validator/proto/scaling-level-gate.ts"}
-created_at: 2026-05-05T11:00:00.000Z
+created_at: 2026-05-05T19:00:00.000+07:00
 ---
 
 # PROTO — SCALING-LEVEL-GATE

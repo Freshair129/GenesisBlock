@@ -15,7 +15,7 @@ tags:
   - cross-platform
   - m9f
 crosslinks: {"references":["FEAT--MEMORY-SESSIONS-WRITER","CONCEPT--MEMORY-SESSIONS"]}
-created_at: 2026-05-05T09:22:00.000Z
+created_at: 2026-05-05T17:22:00.000+07:00
 ---
 
 # CONCEPT — session lock cross-platform parity

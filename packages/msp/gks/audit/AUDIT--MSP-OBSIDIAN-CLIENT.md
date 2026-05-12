@@ -20,7 +20,7 @@ linked_symbols:
   - {"file":"src/obsidian/env.ts"}
   - {"file":"src/obsidian/types.ts"}
   - {"file":"test/obsidian/client.test.ts"}
-created_at: 2026-05-04T05:29:16.095Z
+created_at: 2026-05-04T13:29:16.095+07:00
 ---
 
 # M7a — Obsidian client wrapper (REST adapter delegate + filesystem fallback)

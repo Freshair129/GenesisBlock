@@ -13,7 +13,7 @@ tags:
   - integration
   - decision
 crosslinks: {"references":["CONCEPT--OBSIDIAN-AS-RUNTIME","CONCEPT--EMBEDDING-STRATEGY","ADR--GRAPH-IS-GKS-DOMAIN"]}
-created_at: 2026-05-03T16:55:06.326Z
+created_at: 2026-05-04T00:55:06.326+07:00
 ---
 
 # ADR — MSP↔Obsidian integration

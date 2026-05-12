@@ -16,7 +16,7 @@ tags:
   - adapter
   - decision
 crosslinks: {"implements":["FRAME--MSP-ARCHITECTURE-V2"],"references":["ADR--MONOREPO-STRUCTURE","ADR--MSP-MCP-SERVER","CONCEPT--AGENT-AGNOSTIC"]}
-created_at: 2026-05-11T20:30:00.000Z
+created_at: 2026-05-12T04:30:00.000+07:00
 ---
 
 # ADR — MSP Interface Layer (Smart Proxy Pattern)

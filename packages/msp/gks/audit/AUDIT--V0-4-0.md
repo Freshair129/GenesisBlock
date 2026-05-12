@@ -16,7 +16,7 @@ tags:
   - close-out
 crosslinks: {"references":["AUDIT--ALL-M-MILESTONES","AUDIT--PROTO-LOADER","AUDIT--RULES-PROMOTED-TO-PROTOS","CONCEPT--TIER-3-DEFERRED","CONCEPT--MSP-ROADMAP"]}
 linked_symbols: []
-created_at: 2026-05-05T13:25:00.000Z
+created_at: 2026-05-05T21:25:00.000+07:00
 ---
 
 # v0.4.0 close-out — Tier 2 PROTOs + M9a + Tier 3 defer

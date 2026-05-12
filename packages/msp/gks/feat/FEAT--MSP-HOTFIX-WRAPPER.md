@@ -17,7 +17,7 @@ linked_symbols:
   - {"file":"examples/hooks/pre-commit-validator.sh"}
   - {"file":"package.json"}
   - {"file":"test/hooks/pre-commit.test.ts"}
-created_at: 2026-05-03T10:45:50.058Z
+created_at: 2026-05-03T18:45:50.058+07:00
 ---
 
 # FEAT — hotfix wrapper

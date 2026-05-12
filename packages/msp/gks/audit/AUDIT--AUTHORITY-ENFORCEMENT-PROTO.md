@@ -18,7 +18,7 @@ linked_symbols:
   - {"file":"src/validator/proto/authority-enforcement.ts"}
   - {"file":"gks/proto/PROTO--AUTHORITY-ENFORCEMENT.md"}
   - {"file":"test/validator/proto/authority-enforcement.test.ts"}
-created_at: 2026-05-05T11:12:00.000Z
+created_at: 2026-05-05T19:12:00.000+07:00
 ---
 
 # M8e — PROTO--AUTHORITY-ENFORCEMENT

@@ -15,7 +15,7 @@ tags:
   - pre-commit
   - contract
 crosslinks: {"references":["CONCEPT--MSP-VALIDATOR"]}
-created_at: 2026-05-03T06:24:24.437Z
+created_at: 2026-05-03T14:24:24.437+07:00
 ---
 
 # ADR — MSP validator runs as a CLI gate

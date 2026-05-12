@@ -26,7 +26,7 @@ linked_symbols:
   - {"file":"test/orchestrator/compressor/trim.test.ts"}
   - {"file":"test/orchestrator/compressor/resummarise.test.ts"}
   - {"file":"test/orchestrator/compressor/index.test.ts"}
-created_at: 2026-05-05T09:32:00.000Z
+created_at: 2026-05-05T17:32:00.000+07:00
 ---
 
 # M7d — context compressor implementation (three-tier shrink-to-fit)

@@ -13,7 +13,7 @@ tags:
   - decision
   - hook
 crosslinks: {"references":["CONCEPT--MSP-HOTFIX-WRAPPER","ADR--HOTFIX-ESCAPE-HATCH","FEAT--MSP-PRECOMMIT-HOOK"]}
-created_at: 2026-05-03T10:45:49.473Z
+created_at: 2026-05-03T18:45:49.473+07:00
 ---
 
 # ADR — hotfix wrapper shape

@@ -16,7 +16,7 @@ tags:
   - leiden
   - upstream-gks
 crosslinks: {"references":["FRAME--MSP-ARCHITECTURE-V2","FRAME--KNOWLEDGE-3-TIER","CONCEPT--KNOWLEDGE-LAYERS-V2"]}
-created_at: 2026-05-09T09:30:00.000Z
+created_at: 2026-05-09T17:30:00.000+07:00
 ---
 
 # FRAME — Symbol Graph

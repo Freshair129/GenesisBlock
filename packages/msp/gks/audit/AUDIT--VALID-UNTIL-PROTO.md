@@ -20,7 +20,7 @@ linked_symbols:
   - {"file":"src/validator/proto/valid-until.ts"}
   - {"file":"gks/proto/PROTO--VALID-UNTIL.md"}
   - {"file":"test/validator/proto/valid-until.test.ts"}
-created_at: 2026-05-05T11:11:00.000Z
+created_at: 2026-05-05T19:11:00.000+07:00
 ---
 
 # M9a — PROTO--VALID-UNTIL (draft)

@@ -14,7 +14,7 @@ tags:
   - governance
   - m8c
 crosslinks: {"references":["CONCEPT--PROTO-PATTERN","FRAME--SCALING-LEVELS"]}
-created_at: 2026-05-05T09:28:00.000Z
+created_at: 2026-05-05T17:28:00.000+07:00
 ---
 
 # CONCEPT — PROTO--SCALING-LEVEL-GATE

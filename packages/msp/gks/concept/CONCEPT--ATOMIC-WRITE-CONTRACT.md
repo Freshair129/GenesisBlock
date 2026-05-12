@@ -13,7 +13,7 @@ tags:
   - schema
   - atomic
 crosslinks: {"references":["FRAME--MSP-ARCHITECTURE-V2","CONCEPT--KNOWLEDGE-LAYERS-V2","CONCEPT--CODEGEN-MICROTASK-CONTRACT"]}
-created_at: 2026-05-03T07:01:51.814Z
+created_at: 2026-05-03T15:01:51.814+07:00
 ---
 
 # CONCEPT — atomic write contract

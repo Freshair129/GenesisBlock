@@ -17,7 +17,7 @@ linked_symbols:
   - {"file":"examples/hooks/pre-commit-validator.sh"}
   - {"file":"examples/hooks/install.sh"}
   - {"file":"examples/hooks/README.md"}
-created_at: 2026-05-03T07:39:05.322Z
+created_at: 2026-05-03T15:39:05.322+07:00
 ---
 
 # FEAT — pre-commit hook

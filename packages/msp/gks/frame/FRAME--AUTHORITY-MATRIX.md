@@ -13,7 +13,7 @@ tags:
   - governance
   - foundation
 crosslinks: {"references":["FRAME--MSP-ARCHITECTURE-V2","ADR--AGENT-WRITE-BOUNDARIES","CONCEPT--KNOWLEDGE-LAYERS-V2"]}
-created_at: 2026-05-03T07:01:49.281Z
+created_at: 2026-05-03T15:01:49.281+07:00
 ---
 
 # FRAME — authority matrix

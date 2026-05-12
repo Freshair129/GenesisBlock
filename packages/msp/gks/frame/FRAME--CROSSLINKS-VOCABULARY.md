@@ -13,7 +13,7 @@ tags:
   - vocabulary
   - foundation
 crosslinks: {"references":["CONCEPT--ATOMIC-WRITE-CONTRACT"]}
-created_at: 2026-05-03T07:01:49.773Z
+created_at: 2026-05-03T15:01:49.773+07:00
 ---
 
 # FRAME — crosslinks vocabulary

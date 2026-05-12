@@ -16,7 +16,7 @@ tags:
   - 3-tier
   - decision
 crosslinks: {"references":["FRAME--KNOWLEDGE-3-TIER","BLUEPRINT--CONTRADICTION-DETECTION-IMPL","MASTER--ATOM-CONTRADICTION-POLICY","ADR--CONTRADICTION-DETECTION-STACK"]}
-created_at: 2026-05-09T08:03:00.000Z
+created_at: 2026-05-09T16:03:00.000+07:00
 ---
 
 # ADR — promote contradiction policy to Master

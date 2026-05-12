@@ -15,7 +15,7 @@ tags:
   - audit
   - supersession
 crosslinks: {"references":["BLUEPRINT--INBOUND-TO-CANDIDATES-MIGRATION","CONCEPT--KNOWLEDGE-LAYERS-V2","CONCEPT--INBOUND-QUEUE","ADR--AGENT-WRITE-BOUNDARIES","ADR--PROMOTION-WORKFLOW","ADR--PROMOTION-LEVELS","FRAME--KNOWLEDGE-3-TIER"]}
-created_at: 2026-05-09T07:45:00.000Z
+created_at: 2026-05-09T15:45:00.000+07:00
 ---
 
 # AUDIT — inbound→candidates migration complete

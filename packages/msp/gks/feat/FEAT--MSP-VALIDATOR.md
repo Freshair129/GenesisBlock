@@ -19,7 +19,7 @@ linked_symbols:
   - {"file":"src/validator/rules/dangling-wikilinks.ts"}
   - {"file":"src/validator/rules/id-uniqueness.ts"}
   - {"file":"src/validator/cli.ts"}
-created_at: 2026-05-03T06:24:25.043Z
+created_at: 2026-05-03T14:24:25.043+07:00
 ---
 
 # FEAT — msp:validate
@@ -53,7 +53,7 @@ walks every atom under `gks/` and every candidate under `.brain/msp/projects/eva
 - [ ] Single-file mode rejects an ADR file numbered `ADR-005` when atomic index has `ADR-001..ADR-007` already (must be `ADR-008`) with `[adr-monotonic]`
 - [ ] Single-file mode rejects an atom whose body contains `[[FEAT--ghost]]` not in the atomic index with `[dangling-wikilink]`
 - [ ] Single-file mode rejects an atom whose `crosslinks.references` entry doesn't resolve with `[dangling-wikilink]`
-- [ ] Single-file mode rejects an atom with `created_at: 2099-01-01T00:00:00Z` with `[future-date]`
+- [ ] Single-file mode rejects an atom with `created_at: 2099-01-01T08:00:00.000+07:00` with `[future-date]`
 - [ ] Single-file mode rejects an atom with `id: foo-bar` (wrong format) with `[id-format]`
 - [ ] Single-file mode rejects an atom whose `id` doesn't match the filename basename with `[id-filename-match]`
 - [ ] Single-file mode rejects a `summary` field of length < 10 or containing `TBD` with `[summary-min]`

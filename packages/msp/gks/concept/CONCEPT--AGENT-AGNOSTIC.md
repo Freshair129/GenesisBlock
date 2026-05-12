@@ -14,7 +14,7 @@ tags:
   - foundation
   - integration
 crosslinks: {"references":["FRAME--MSP-ARCHITECTURE-V2","CONCEPT--OBSIDIAN-AS-RUNTIME"]}
-created_at: 2026-05-09T00:00:00.000Z
+created_at: 2026-05-09T08:00:00.000+07:00
 ---
 
 # CONCEPT — MSP is agent-agnostic

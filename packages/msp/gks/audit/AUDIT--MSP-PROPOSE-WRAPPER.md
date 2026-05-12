@@ -18,7 +18,7 @@ crosslinks: {"references":["FRAME--PHASE-GOVERNANCE"]}
 linked_symbols:
   - {"file":"scripts/msp/propose.mjs"}
   - {"file":"test/scripts/propose.test.ts"}
-created_at: 2026-05-03T08:43:36.230Z
+created_at: 2026-05-03T16:43:36.230+07:00
 ---
 
 # AUDIT — msp:propose phase-6 wrapper

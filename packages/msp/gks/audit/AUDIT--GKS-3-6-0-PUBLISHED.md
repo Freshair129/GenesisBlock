@@ -16,7 +16,7 @@ tags:
   - migration
 crosslinks: {"references":["AUDIT--GKS-UPSTREAM-PROPOSALS-FILED","AUDIT--TWO-REPO-VALIDATION","ADR--EMBEDDING-MODEL-PARITY"]}
 linked_symbols: ["package.json","tsconfig.json","tsconfig.build.json","src/index.ts","src/memory.ts"]
-created_at: 2026-05-06T20:55:00.000Z
+created_at: 2026-05-07T04:55:00.000+07:00
 ---
 
 # AUDIT — GKS 3.6.0 published to npm

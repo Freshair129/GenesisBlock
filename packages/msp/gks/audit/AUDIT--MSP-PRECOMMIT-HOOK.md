@@ -20,7 +20,7 @@ linked_symbols:
   - {"file":"examples/hooks/install.sh"}
   - {"file":"examples/hooks/README.md"}
   - {"file":"test/hooks/pre-commit.test.ts"}
-created_at: 2026-05-03T07:42:57.238Z
+created_at: 2026-05-03T15:42:57.238+07:00
 ---
 
 # AUDIT — MSP pre-commit hook M3a acceptance

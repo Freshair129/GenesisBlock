@@ -14,7 +14,7 @@ tags:
   - writer
   - decision
 crosslinks: {"references":["CONCEPT--MEMORY-EPISODIC-WRITER","CONCEPT--MEMORY-EPISODIC"]}
-created_at: 2026-05-03T07:16:40.386Z
+created_at: 2026-05-03T15:16:40.386+07:00
 ---
 
 # ADR — episodic writer storage shape

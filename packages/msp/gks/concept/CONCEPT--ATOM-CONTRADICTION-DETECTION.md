@@ -16,7 +16,7 @@ tags:
   - semantic
   - governance
 crosslinks: {"references":["FRAME--MSP-ARCHITECTURE-V2","ADR--ANTI-HALLUCINATION-RULES","CONCEPT--MSP-VALIDATOR","CONCEPT--KNOWLEDGE-LAYERS-V2"]}
-created_at: 2026-05-08T10:30:00.000Z
+created_at: 2026-05-08T18:30:00.000+07:00
 ---
 
 # CONCEPT — atom contradiction detection

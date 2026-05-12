@@ -16,7 +16,7 @@ tags:
   - supersede
 crosslinks: {"references":["FRAME--MSP-ARCHITECTURE-V2","CONCEPT--OBSIDIAN-AS-RUNTIME","CONCEPT--EMBEDDING-STRATEGY","ADR--MSP-OBSIDIAN-INTEGRATION","ADR--SEMANTIC-SEARCH-VIA-SMART-CONNECTIONS"]}
 linked_symbols: []
-created_at: 2026-05-03T16:55:51.476Z
+created_at: 2026-05-04T00:55:51.476+07:00
 ---
 
 # AUDIT — M7-prep architecture v2

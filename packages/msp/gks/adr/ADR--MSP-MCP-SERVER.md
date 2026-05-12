@@ -13,7 +13,7 @@ tags:
   - decision
   - server
 crosslinks: {"references":["CONCEPT--MSP-MCP-SERVER","FEAT--MSP-VALIDATOR","FEAT--CODEGEN-MICROTASK-RUNNER"]}
-created_at: 2026-05-03T11:13:54.288Z
+created_at: 2026-05-03T19:13:54.288+07:00
 ---
 
 # ADR — MSP MCP server shape

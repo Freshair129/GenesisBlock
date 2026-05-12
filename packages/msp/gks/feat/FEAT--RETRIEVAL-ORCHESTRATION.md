@@ -23,7 +23,7 @@ linked_symbols:
   - {"file":"src/orchestrator/retrieval/sources/obsidian.ts"}
   - {"file":"src/orchestrator/retrieval/sources/episodic.ts"}
   - {"file":"src/orchestrator/retrieval/sources/backlinks.ts"}
-created_at: 2026-05-05T08:56:00.000Z
+created_at: 2026-05-05T16:56:00.000+07:00
 ---
 
 # Retrieval orchestration — `recall(query)` fans out across 4 sources, fuses via RRF

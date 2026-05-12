@@ -21,7 +21,7 @@ linked_symbols:
   - {"file":"src/mcp/tools/compress.ts"}
   - {"file":"src/mcp/tools/identity-get.ts"}
   - {"file":"src/mcp/tools/identity-set.ts"}
-created_at: 2026-05-05T09:15:00.000Z
+created_at: 2026-05-05T17:15:00.000+07:00
 ---
 
 # MSP MCP tools — passport-side surface (M7f)

@@ -18,7 +18,7 @@ linked_symbols:
   - {"file":"src/codegen/acceptance/vitest.ts"}
   - {"file":"src/codegen/acceptance/sandbox.ts"}
   - {"file":"src/codegen/acceptance/types.ts"}
-created_at: 2026-05-03T09:27:18.409Z
+created_at: 2026-05-03T17:27:18.409+07:00
 ---
 
 # FEAT — vitest acceptance runner

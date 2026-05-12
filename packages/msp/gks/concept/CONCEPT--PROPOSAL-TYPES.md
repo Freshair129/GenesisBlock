@@ -13,7 +13,7 @@ tags:
   - proposal-types
   - superseded
 crosslinks: {"references":["CONCEPT--SUBMISSION-ENVELOPE"],"superseded_by":["CONCEPT--KNOWLEDGE-LAYERS-V2"]}
-created_at: 2026-05-03T07:01:51.322Z
+created_at: 2026-05-03T15:01:51.322+07:00
 ---
 
 > ⚠️ **Superseded by [`CONCEPT--KNOWLEDGE-LAYERS-V2`](./CONCEPT--KNOWLEDGE-LAYERS-V2.md)** (Phase 4 of `BLUEPRINT--INBOUND-TO-CANDIDATES-MIGRATION`, 2026-05-09). The new candidates layer doesn't use a proposal-type discriminator — every candidate is just a `${proposed_id}.md` file in `.brain/.../candidates/`. Body preserved as historical context.

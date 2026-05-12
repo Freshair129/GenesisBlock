@@ -15,7 +15,7 @@ tags:
   - 3-tier
   - decision
 crosslinks: {"references":["FRAME--KNOWLEDGE-3-TIER","CONCEPT--CODEGEN-MICROTASK-CONTRACT","MASTER--MSP-DOC-TO-CODE"]}
-created_at: 2026-05-09T08:02:00.000Z
+created_at: 2026-05-09T16:02:00.000+07:00
 ---
 
 # ADR — promote doc-to-code to Master

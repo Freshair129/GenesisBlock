@@ -15,7 +15,7 @@ tags:
   - decision
   - decomposition
 crosslinks: {"references":["CONCEPT--SYMBOLS-FRAMEWORK-AWARENESS","FRAME--SYMBOL-GRAPH"],"supersedes":["FEAT--SYMBOLS-FRAMEWORK-AWARENESS"]}
-created_at: 2026-05-11T22:36:00.000Z
+created_at: 2026-05-12T06:36:00.000+07:00
 ---
 
 # ADR — Symbol graph framework awareness
@@ -24,7 +24,7 @@ created_at: 2026-05-11T22:36:00.000Z
 
 `CONCEPT--SYMBOLS-FRAMEWORK-AWARENESS` establishes the problem and hypothesis: extend the symbol graph beyond syntactic structure with pluggable framework recognizers.
 
-The existing `FEAT--SYMBOLS-FRAMEWORK-AWARENESS` (`status: active`, `created_at: 2026-05-11T21:48:00Z`) bundled four concerns into one atom:
+The existing `FEAT--SYMBOLS-FRAMEWORK-AWARENESS` (`status: active`, `created_at: 2026-05-12T05:48:00.000+07:00`) bundled four concerns into one atom:
 1. The motivation / scope (CONCEPT material)
 2. The decision to add framework awareness + which frameworks to support (ADR material)
 3. The recognition algorithms per framework (ALGO material)

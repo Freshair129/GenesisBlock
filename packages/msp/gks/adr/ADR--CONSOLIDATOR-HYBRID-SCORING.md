@@ -15,7 +15,7 @@ tags:
   - decision
   - m7b
 crosslinks: {"references":["CONCEPT--CONSOLIDATOR","CONCEPT--MEMORY-EPISODIC","CONCEPT--SLM-OLLAMA-CLIENT"]}
-created_at: 2026-05-04T10:05:30.000Z
+created_at: 2026-05-04T18:05:30.000+07:00
 ---
 
 # ADR — consolidator hybrid scoring

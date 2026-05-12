@@ -19,7 +19,7 @@ linked_symbols:
   - {"file":"CLAUDE.md"}
   - {"file":".github/pull_request_template.md"}
   - {"file":"ROADMAP.md"}
-created_at: 2026-05-08T11:50:00.000Z
+created_at: 2026-05-08T19:50:00.000+07:00
 ---
 
 # Contradiction detection Layer 0 — shipped

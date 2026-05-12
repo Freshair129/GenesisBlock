@@ -15,7 +15,7 @@ tags:
   - summarisation
   - m7b
 crosslinks: {"references":["FRAME--MSP-ARCHITECTURE-V2","CONCEPT--MEMORY-EPISODIC","CONCEPT--MEMORY-SESSIONS"]}
-created_at: 2026-05-04T10:05:00.000Z
+created_at: 2026-05-04T18:05:00.000+07:00
 ---
 
 # CONCEPT — consolidator

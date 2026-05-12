@@ -28,7 +28,7 @@ linked_symbols:
   - {"file":".github/workflows/contradiction-judge.yml"}
   - {"file":"scripts/msp/contradiction-judge.mjs"}
   - {"file":".github/contradiction-detection.yml"}
-created_at: 2026-05-08T10:34:00.000Z
+created_at: 2026-05-08T18:34:00.000+07:00
 ---
 
 # BLUEPRINT — contradiction detection implementation

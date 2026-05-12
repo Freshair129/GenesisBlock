@@ -14,7 +14,7 @@ tags:
   - upstream
   - documentation
 crosslinks: {"references":["AUDIT--ARCH-DOC-CLEANUP","CONCEPT--AGENT-AGNOSTIC","BLUEPRINT--INBOUND-TO-CANDIDATES-MIGRATION","ADR--AGENT-WRITE-BOUNDARIES"]}
-created_at: 2026-05-11T10:25:00.000Z
+created_at: 2026-05-11T18:25:00.000+07:00
 ---
 
 # AUDIT — MSP relationship docs upstreamed

@@ -15,7 +15,7 @@ tags:
   - decision
   - inbound-removal
 crosslinks: {"references":["CONCEPT--KNOWLEDGE-LAYERS-V2","FRAME--MSP-ARCHITECTURE-V2","ADR--HUMAN-REVIEW-GATES"],"supersedes":["ADR--PROMOTION-WORKFLOW","ADR--PROMOTION-LEVELS"]}
-created_at: 2026-05-08T10:01:00.000Z
+created_at: 2026-05-08T18:01:00.000+07:00
 ---
 
 # ADR — agent write boundaries

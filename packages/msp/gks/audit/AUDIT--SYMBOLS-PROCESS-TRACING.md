@@ -12,7 +12,7 @@ tags:
   - symbol-graph
   - audit
 crosslinks: {"references":["CONCEPT--SYMBOLS-PROCESS-TRACING","ADR--SYMBOLS-PROCESS-TRACING","ALGO--SYMBOLS-CALL-GRAPH-TRAVERSAL","PROTO--SYMBOLS-TRACE-INVARIANTS"]}
-created_at: 2026-05-12T08:55:00.000Z
+created_at: 2026-05-12T16:00:00.000+07:00
 ---
 
 # AUDIT — Process tracing implementation

@@ -22,7 +22,7 @@ crosslinks: {"implements":["ADR--SYMBOL-GRAPH-PERSISTENCE"],"references":["FRAME
 linked_symbols:
   - {"file":"packages/msp/src/symbols/parser/framework.ts"}
   - {"file":"packages/msp/src/symbols/parser/orm.ts"}
-created_at: 2026-05-11T21:48:00.000Z
+created_at: 2026-05-12T05:48:00.000+07:00
 ---
 
 # FEAT — Framework-aware symbol indexing

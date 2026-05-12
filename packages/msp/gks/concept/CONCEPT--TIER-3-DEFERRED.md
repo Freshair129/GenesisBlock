@@ -14,7 +14,7 @@ tags:
   - deferred
   - decision-log
 crosslinks: {"references":["CONCEPT--MSP-ROADMAP","AUDIT--ALL-M-MILESTONES"]}
-created_at: 2026-05-05T11:05:00.000Z
+created_at: 2026-05-05T19:05:00.000+07:00
 ---
 
 # CONCEPT — Tier 3 deferred milestones (explicit decision log)

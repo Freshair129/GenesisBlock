@@ -15,7 +15,7 @@ tags:
   - contract
   - m8a
 crosslinks: {"references":["FRAME--MSP-ARCHITECTURE-V2","FRAME--PHASE-GOVERNANCE","ADR--HUMAN-REVIEW-GATES","FEAT--MSP-VALIDATOR"]}
-created_at: 2026-05-05T09:18:00.000Z
+created_at: 2026-05-05T17:18:00.000+07:00
 ---
 
 # CONCEPT — PROTO atoms

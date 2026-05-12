@@ -14,7 +14,7 @@ tags:
   - vitest
   - decision
 crosslinks: {"references":["CONCEPT--ACCEPTANCE-VITEST-RUNNER","ADR--CODEGEN-RETRY-POLICY"]}
-created_at: 2026-05-03T09:27:17.914Z
+created_at: 2026-05-03T17:27:17.914+07:00
 ---
 
 # ADR — vitest acceptance runner shape

@@ -69,6 +69,10 @@ affected files until CONCEPT/ADR/BLUEPRINT are written and stable.
 - `git push -u origin <branch>` then open a draft PR
 - After all tests green, request merge
 
+## Environment Rules
+- **Timezone**: Use **UTC+07:00** (Indochina Time / ICT — Thailand) for human-readable timestamps in ISO 8601 offset format. Validator uses UTC absolute internally; `Date.parse()` handles offset correctly. Authoring rule: write `created_at: 2026-05-12T11:55:00.000+07:00` (TH wall-clock) — NOT `Z` suffix unless you've computed UTC yourself.
+
+
 ---
 
 ## Atom taxonomy (quick-ref)

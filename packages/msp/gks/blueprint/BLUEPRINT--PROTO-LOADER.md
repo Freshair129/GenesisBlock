@@ -23,7 +23,7 @@ linked_symbols:
   - {"file":"src/validator/cli.ts"}
   - {"file":"test/validator/proto/loader.test.ts"}
   - {"file":"test/validator/proto/sample.test.ts"}
-created_at: 2026-05-05T09:18:00.000Z
+created_at: 2026-05-05T17:18:00.000+07:00
 ---
 
 # BLUEPRINT — PROTO loader

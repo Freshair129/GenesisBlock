@@ -16,7 +16,7 @@ tags:
   - audit
   - phase-6
 crosslinks: {"references":["BLUEPRINT--GLOBAL-VS-WORKSPACE-MIGRATION","ADR--GLOBAL-VS-WORKSPACE","CONCEPT--AGENT-AGNOSTIC","CONCEPT--NAMED-PROJECT-REGISTRY","ADR--PATH-ENCODING"]}
-created_at: 2026-05-10T00:00:00.000Z
+created_at: 2026-05-10T08:00:00.000+07:00
 ---
 
 # AUDIT — Phase B impl shipped

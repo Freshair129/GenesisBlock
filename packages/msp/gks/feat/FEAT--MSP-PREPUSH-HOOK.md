@@ -17,7 +17,7 @@ linked_symbols:
   - {"file":"examples/hooks/pre-push-verify.sh"}
   - {"file":"examples/hooks/install.sh"}
   - {"file":"examples/hooks/README.md"}
-created_at: 2026-05-03T10:39:28.605Z
+created_at: 2026-05-03T18:39:28.605+07:00
 ---
 
 # FEAT — pre-push hook

@@ -26,7 +26,7 @@ linked_symbols:
   - {"file":"test/mcp/tools/identity-set.test.ts"}
   - {"file":"test/mcp/server.test.ts"}
   - {"file":"test/mcp/bin.test.ts"}
-created_at: 2026-05-05T09:35:30.812Z
+created_at: 2026-05-05T17:35:30.812+07:00
 ---
 
 # M7f — MCP tool expansion (4 of 5 passport tools shipped; msp_compress deferred)

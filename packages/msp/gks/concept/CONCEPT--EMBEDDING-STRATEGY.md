@@ -15,7 +15,7 @@ tags:
   - smart-connections
   - obsidian
 crosslinks: {"references":["CONCEPT--OBSIDIAN-AS-RUNTIME","ADR--EMBEDDING-MODEL-PARITY","ADR--GRAPH-IS-GKS-DOMAIN"]}
-created_at: 2026-05-03T16:55:05.902Z
+created_at: 2026-05-04T00:55:05.902+07:00
 ---
 
 # CONCEPT — embedding strategy

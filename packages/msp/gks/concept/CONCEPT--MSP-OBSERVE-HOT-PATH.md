@@ -14,7 +14,7 @@ tags:
   - aspirational
   - cherry-pick
 crosslinks: {"references":["FRAME--MSP-ARCHITECTURE-V2","CONCEPT--AGENT-AGNOSTIC","CONCEPT--CONSOLIDATOR"]}
-created_at: 2026-05-09T00:00:00.000Z
+created_at: 2026-05-09T08:00:00.000+07:00
 ---
 
 # CONCEPT — `msp_observe` hot-path extraction

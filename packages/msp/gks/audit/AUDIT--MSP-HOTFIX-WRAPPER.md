@@ -18,7 +18,7 @@ linked_symbols:
   - {"file":"examples/hooks/pre-commit-validator.sh"}
   - {"file":"package.json"}
   - {"file":"src/validator/rules/id-format.ts"}
-created_at: 2026-05-03T11:01:45.299Z
+created_at: 2026-05-03T19:01:45.299+07:00
 ---
 
 # AUDIT — hotfix wrapper (M5b)

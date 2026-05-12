@@ -19,7 +19,7 @@ linked_symbols:
   - {"file":"src/validator/proto/loader.ts"}
   - {"file":"src/validator/proto/types.ts"}
   - {"file":"src/validator/proto/sample.ts"}
-created_at: 2026-05-05T09:18:00.000Z
+created_at: 2026-05-05T17:18:00.000+07:00
 ---
 
 # FEAT — PROTO loader

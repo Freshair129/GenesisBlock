@@ -13,7 +13,7 @@ tags:
   - escape-hatch
   - automation
 crosslinks: {"references":["ADR--HOTFIX-ESCAPE-HATCH","FEAT--MSP-PRECOMMIT-HOOK"]}
-created_at: 2026-05-03T10:45:48.892Z
+created_at: 2026-05-03T18:45:48.892+07:00
 ---
 
 # CONCEPT — MSP hotfix wrapper

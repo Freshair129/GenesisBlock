@@ -14,7 +14,7 @@ tags:
   - lifecycle
   - superseded
 crosslinks: {"references":["ADR--PROMOTION-WORKFLOW","CONCEPT--INBOUND-QUEUE"],"superseded_by":["ADR--AGENT-WRITE-BOUNDARIES"]}
-created_at: 2026-05-03T07:08:43.030Z
+created_at: 2026-05-03T15:08:43.030+07:00
 ---
 
 > ⚠️ **Superseded by [`ADR--AGENT-WRITE-BOUNDARIES`](./ADR--AGENT-WRITE-BOUNDARIES.md)** (Phase 4 of `BLUEPRINT--INBOUND-TO-CANDIDATES-MIGRATION`, 2026-05-09). The L0/L1/L2 promotion-level model is replaced by a simple two-state model: `status: candidate` (in `.brain/.../candidates/`) → `status: stable` (in `gks/<type>/` after human PR + CI). Body preserved as historical context.

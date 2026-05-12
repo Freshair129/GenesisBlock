@@ -14,7 +14,7 @@ tags:
   - slm
   - escalation
 crosslinks: {"references":["CONCEPT--CODEGEN-MICROTASK-CONTRACT","ADR--CODEGEN-FORBIDDEN-PATTERNS"]}
-created_at: 2026-05-03T07:08:42.580Z
+created_at: 2026-05-03T15:08:42.580+07:00
 ---
 
 # ADR — codegen retry policy

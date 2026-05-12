@@ -22,7 +22,7 @@ linked_symbols:
   - {"file":"packages/msp/src/symbols/parser/index.ts"}
   - {"file":"packages/msp/test/symbols/parser-python.test.ts"}
   - {"file":"packages/msp/test/symbols/parser-cobol.test.ts"}
-created_at: 2026-05-11T22:12:00.000Z
+created_at: 2026-05-12T06:12:00.000+07:00
 ---
 
 # AUDIT — Multi-language symbol parsing

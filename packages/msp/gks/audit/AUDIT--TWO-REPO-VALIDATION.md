@@ -16,7 +16,7 @@ tags:
   - upstream
 crosslinks: {"references":["ADR--EMBEDDING-MODEL-PARITY","ADR--MSP-OBSIDIAN-INTEGRATION","ADR--GRAPH-IS-GKS-DOMAIN","CONCEPT--EMBEDDING-STRATEGY","AUDIT--M7-PREP-FOLLOWUP"]}
 linked_symbols: []
-created_at: 2026-05-04T05:55:00.000Z
+created_at: 2026-05-04T13:55:00.000+07:00
 ---
 
 # AUDIT — two-repo validation

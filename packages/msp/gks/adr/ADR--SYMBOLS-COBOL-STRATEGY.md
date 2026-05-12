@@ -14,7 +14,7 @@ tags:
   - legacy
   - adr
 crosslinks: {"implements":["FEAT--SYMBOLS-MULTI-LANG"],"references":["FRAME--SYMBOL-GRAPH","CONCEPT--SYMBOL-GRAPH"]}
-created_at: 2026-05-11T22:00:00.000Z
+created_at: 2026-05-12T06:00:00.000+07:00
 ---
 
 # ADR — Regex-based strategy for legacy COBOL parsing

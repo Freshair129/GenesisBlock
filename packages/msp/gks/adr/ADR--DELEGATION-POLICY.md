@@ -15,7 +15,7 @@ tags:
   - decision
   - m9b
 crosslinks: {"references":["FRAME--AUTHORITY-MATRIX","ADR--HUMAN-REVIEW-GATES","CONCEPT--PROTO-AUTHORITY-ENFORCEMENT"]}
-created_at: 2026-05-05T09:28:00.000Z
+created_at: 2026-05-05T17:28:00.000+07:00
 ---
 
 # ADR — delegation policy

@@ -17,7 +17,7 @@ tags:
   - msp-identity
   - m7f
 crosslinks: {"references":["FEAT--MSP-MCP-SERVER","FEAT--CONSOLIDATOR","FEAT--RETRIEVAL-ORCHESTRATION","FEAT--COMPRESSOR","FEAT--IDENTITY-LAYER"]}
-created_at: 2026-05-05T09:15:00.000Z
+created_at: 2026-05-05T17:15:00.000+07:00
 ---
 
 # CONCEPT — MSP MCP tool expansion

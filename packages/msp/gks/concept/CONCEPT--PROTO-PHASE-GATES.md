@@ -14,7 +14,7 @@ tags:
   - governance
   - m8b
 crosslinks: {"references":["CONCEPT--PROTO-PATTERN","FRAME--PHASE-GOVERNANCE","FEAT--PROTO-LOADER"]}
-created_at: 2026-05-05T09:28:00.000Z
+created_at: 2026-05-05T17:28:00.000+07:00
 ---
 
 # CONCEPT — PROTO--PHASE-GATES

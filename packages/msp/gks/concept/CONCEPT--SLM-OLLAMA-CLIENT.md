@@ -14,7 +14,7 @@ tags:
   - ollama
   - runtime
 crosslinks: {"references":["FEAT--CODEGEN-MICROTASK-RUNNER","ADR--CODEGEN-RETRY-POLICY"]}
-created_at: 2026-05-03T09:22:30.407Z
+created_at: 2026-05-03T17:22:30.407+07:00
 ---
 
 # CONCEPT — Ollama SLM client

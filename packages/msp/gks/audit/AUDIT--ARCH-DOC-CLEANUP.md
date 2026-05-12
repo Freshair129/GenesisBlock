@@ -15,7 +15,7 @@ tags:
   - ssot
 crosslinks: {"references":["FRAME--MSP-ARCHITECTURE-V2","CONCEPT--AGENT-AGNOSTIC","CONCEPT--MSP-OBSERVE-HOT-PATH","CONCEPT--NAMED-PROJECT-REGISTRY"]}
 linked_symbols: []
-created_at: 2026-05-09T00:00:00.000Z
+created_at: 2026-05-09T08:00:00.000+07:00
 ---
 
 # AUDIT — Architecture-doc cleanup (2026-05-09)

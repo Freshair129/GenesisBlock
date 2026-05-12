@@ -23,7 +23,7 @@ linked_symbols:
   - {"file":"packages/msp/src/symbols/framework/data-fetching.ts"}
   - {"file":"packages/msp/src/symbols/framework/orm.ts"}
   - {"file":"packages/msp/src/symbols/framework/mcp-tools.ts"}
-created_at: 2026-05-11T22:37:00.000Z
+created_at: 2026-05-12T06:37:00.000+07:00
 ---
 
 # ALGO — Framework recognition algorithms

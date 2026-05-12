@@ -15,7 +15,7 @@ tags:
   - docs
 crosslinks: {"references":["CONCEPT--AGENT-INTEGRATION-PATTERNS","CONCEPT--AGENT-AGNOSTIC","CONCEPT--NAMED-PROJECT-REGISTRY","ADR--GLOBAL-VS-WORKSPACE","AUDIT--ARCH-DOC-CLEANUP"]}
 linked_symbols: []
-created_at: 2026-05-10T00:00:00.000Z
+created_at: 2026-05-10T08:00:00.000+07:00
 ---
 
 # AUDIT — Phase C agent integration docs (2026-05-10)

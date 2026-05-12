@@ -13,7 +13,7 @@ tags:
   - runner
   - microtask
 crosslinks: {"references":["CONCEPT--CODEGEN-MICROTASK-CONTRACT","ADR--CODEGEN-RETRY-POLICY"]}
-created_at: 2026-05-03T07:16:36.203Z
+created_at: 2026-05-03T15:16:36.203+07:00
 ---
 
 # CONCEPT — codegen microtask runner
@@ -34,7 +34,7 @@ In:
 - Apply post-processing + forbidden-pattern checks (per the codegen ADRs).
 - Write candidate code to a sandbox path; run acceptance test.
 - Retry up to 3 with feedback; escalate to Gemini → Opus on continued failure.
-- Emit one audit row per run (`gks/14_devlog/MSP-ACT-<id>.md`).
+- Emit one audit row per run (`gks/devlog/MSP-ACT-<id>.md`).
 
 Out:
 - BLUEPRINT generation (that's a separate concern at P3).

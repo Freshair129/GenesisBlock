@@ -15,7 +15,7 @@ tags:
   - taxonomy
   - framework
 crosslinks: {"references":["AUDIT--ARCH-DOC-CLEANUP","FRAME--MSP-ARCHITECTURE-V2","FRAME--KNOWLEDGE-3-TIER","FRAME--PHASE-GOVERNANCE"]}
-created_at: 2026-05-11T10:26:00.000Z
+created_at: 2026-05-11T18:26:00.000+07:00
 ---
 
 # AUDIT — Broad FRAME-- definition upstreamed

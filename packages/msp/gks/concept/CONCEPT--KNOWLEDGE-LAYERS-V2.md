@@ -15,7 +15,7 @@ tags:
   - inbound-removal
   - architecture
 crosslinks: {"references":["FRAME--MSP-ARCHITECTURE-V2","CONCEPT--MEMORY-EPISODIC-WRITER","CONCEPT--MEMORY-SESSIONS"],"supersedes":["CONCEPT--INBOUND-QUEUE","CONCEPT--PROPOSAL-TYPES","CONCEPT--SUBMISSION-ENVELOPE"]}
-created_at: 2026-05-08T10:00:00.000Z
+created_at: 2026-05-08T18:00:00.000+07:00
 ---
 
 # CONCEPT — knowledge layers v2

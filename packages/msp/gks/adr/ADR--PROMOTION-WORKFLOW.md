@@ -14,7 +14,7 @@ tags:
   - governance
   - superseded
 crosslinks: {"references":["CONCEPT--INBOUND-QUEUE","CONCEPT--PROPOSAL-TYPES","FRAME--AUTHORITY-MATRIX"],"superseded_by":["ADR--AGENT-WRITE-BOUNDARIES"]}
-created_at: 2026-05-03T07:08:40.359Z
+created_at: 2026-05-03T15:08:40.359+07:00
 ---
 
 > ⚠️ **Superseded by [`ADR--AGENT-WRITE-BOUNDARIES`](./ADR--AGENT-WRITE-BOUNDARIES.md)** (Phase 4 of `BLUEPRINT--INBOUND-TO-CANDIDATES-MIGRATION`, 2026-05-09). The three-gate inbound workflow has been replaced with: agents write to `.brain/.../candidates/` via `msp_candidate`, promotion to `gks/<type>/` is a human PR action gated by CI. The body below is preserved as historical context.

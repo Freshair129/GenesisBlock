@@ -14,7 +14,7 @@ tags:
   - schema-enforcement
   - anti-hallucination
 crosslinks: {"references":[]}
-created_at: 2026-05-03T06:24:23.832Z
+created_at: 2026-05-03T14:24:23.832+07:00
 ---
 
 # CONCEPT — MSP validator pipeline

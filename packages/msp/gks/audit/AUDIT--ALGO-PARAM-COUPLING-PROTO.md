@@ -21,7 +21,7 @@ linked_symbols:
   - {"file":"src/validator/proto/algo-param-coupling.ts"}
   - {"file":"test/validator/proto/algo-param-coupling.test.ts"}
   - {"file":"gks/proto/PROTO--ALGO-PARAM-COUPLING.md"}
-created_at: 2026-05-05T11:11:00.000Z
+created_at: 2026-05-05T19:11:00.000+07:00
 ---
 
 # AUDIT — PROTO--ALGO-PARAM-COUPLING (M8d)

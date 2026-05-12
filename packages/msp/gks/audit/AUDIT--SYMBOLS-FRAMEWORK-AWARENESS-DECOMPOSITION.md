@@ -17,7 +17,7 @@ tags:
 crosslinks: {"references":["ADR--SYMBOLS-FRAMEWORK-AWARENESS","CONCEPT--SYMBOLS-FRAMEWORK-AWARENESS","ALGO--SYMBOLS-FRAMEWORK-RECOGNITION","PROTO--SYMBOLS-FRAMEWORK-INVARIANTS","FEAT--SYMBOLS-FRAMEWORK-AWARENESS","PROTO--SCALING-LEVEL-GATE"]}
 linked_symbols:
   - {"file":"packages/msp/src/validator/proto/scaling-level-gate.ts"}
-created_at: 2026-05-11T22:42:00.000Z
+created_at: 2026-05-12T06:42:00.000+07:00
 ---
 
 # AUDIT — FEAT decomposition + validator hardening

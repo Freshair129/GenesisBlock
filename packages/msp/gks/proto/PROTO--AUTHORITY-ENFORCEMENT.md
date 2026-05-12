@@ -18,7 +18,7 @@ tags:
 crosslinks: {"enforces":["FRAME--AUTHORITY-MATRIX"],"references":["CONCEPT--PROTO-AUTHORITY-ENFORCEMENT","ADR--DELEGATION-POLICY","FEAT--PROTO-LOADER"]}
 linked_symbols:
   - {"file":"src/validator/proto/authority-enforcement.ts"}
-created_at: 2026-05-05T11:10:00.000Z
+created_at: 2026-05-05T19:10:00.000+07:00
 ---
 
 # PROTO — AUTHORITY-ENFORCEMENT

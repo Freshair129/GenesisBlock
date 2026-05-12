@@ -14,7 +14,7 @@ tags:
   - cli
   - decision
 crosslinks: {"references":["CONCEPT--CODEGEN-MICROTASK-RUNNER","ADR--CODEGEN-RETRY-POLICY","ADR--CODEGEN-FORBIDDEN-PATTERNS","ADR--CODEGEN-POST-PROCESSING"]}
-created_at: 2026-05-03T07:16:36.663Z
+created_at: 2026-05-03T15:16:36.663+07:00
 ---
 
 # ADR — codegen runner shape

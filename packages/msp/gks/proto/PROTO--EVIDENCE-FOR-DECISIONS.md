@@ -18,7 +18,7 @@ tags:
 crosslinks: {"enforces":["FRAME--MSP-ARCHITECTURE-V2"],"references":["CONCEPT--PROTO-PATTERN","CONCEPT--PROTO-AUDIT-EXISTING-RULES","FEAT--PROTO-LOADER","ADR--ANTI-HALLUCINATION-RULES"]}
 linked_symbols:
   - {"file":"src/validator/proto/evidence-for-decisions.ts"}
-created_at: 2026-05-05T13:00:00.000Z
+created_at: 2026-05-05T21:00:00.000+07:00
 ---
 
 # PROTO — EVIDENCE-FOR-DECISIONS

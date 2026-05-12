@@ -21,7 +21,7 @@ linked_symbols:
   - {"file":"src/orchestrator/compressor/tokens.ts"}
   - {"file":"src/orchestrator/compressor/trim.ts"}
   - {"file":"src/orchestrator/compressor/resummarise.ts"}
-created_at: 2026-05-05T09:11:00.000Z
+created_at: 2026-05-05T17:11:00.000+07:00
 ---
 
 # Context compressor — three-tier shrink-to-fit for token-budgeted episodes

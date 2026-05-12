@@ -15,7 +15,7 @@ tags:
   - nextjs
   - prisma
 crosslinks: {"implements":["ADR--SYMBOLS-FRAMEWORK-AWARENESS"],"references":["CONCEPT--SYMBOLS-FRAMEWORK-AWARENESS","ALGO--SYMBOLS-FRAMEWORK-RECOGNITION"]}
-created_at: 2026-05-11T22:38:00.000Z
+created_at: 2026-05-12T06:38:00.000+07:00
 ---
 
 # PROTO — Framework-aware symbol invariants

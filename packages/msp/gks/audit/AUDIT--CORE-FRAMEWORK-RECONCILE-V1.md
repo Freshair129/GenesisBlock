@@ -14,7 +14,7 @@ tags:
   - documentation
   - reconciliation
 crosslinks: {"references":["FRAME--MSP-ARCHITECTURE-V2","FRAME--KNOWLEDGE-3-TIER","ADR--AGENT-WRITE-BOUNDARIES"]}
-created_at: 2026-05-09T09:30:00.000Z
+created_at: 2026-05-09T17:30:00.000+07:00
 ---
 
 # AUDIT — CORE_FRAMEWORK reconciliation v1
@@ -23,7 +23,7 @@ created_at: 2026-05-09T09:30:00.000Z
 
 Audit conducted 2026-05-09 (post-PR-6 merge) compared `CORE_FRAMEWORK_MASTER_SPEC.md` (the project's authoritative master spec) against the actual MSP codebase. Found **9 discrepancies**: 3 critical, 4 medium, 2 minor.
 
-The spec was originally written as a **generic boilerplate** for forking into other projects (per `License intent` line at the top). MSP itself uses only a subset of the layout the spec describes, and several items the spec mentions never existed in MSP (e.g. `gks/00_MASTER_DASHBOARD.md`, `gks/14_devlog/`, `npm run msp:check`).
+The spec was originally written as a **generic boilerplate** for forking into other projects (per `License intent` line at the top). MSP itself uses only a subset of the layout the spec describes, and several items the spec mentions never existed in MSP (e.g. `gks/00_MASTER_DASHBOARD.md`, `gks/devlog/`, `npm run msp:check`).
 
 ## Critical fixes shipped (W1 + W2)
 
@@ -38,9 +38,9 @@ The spec was originally written as a **generic boilerplate** for forking into ot
 | # | Section | Change |
 |---|---|---|
 | 4 | §15.1 | Bin entries (5 bins) added as a paragraph after the script table |
-| 5 | §4.2.1 / §4.10 / §4.4 footer | Generic-boilerplate folders (ideas/, algorithms/, entities/, flows/, modules/, parameters/, ops/, 14_devlog/) and `00_MASTER_DASHBOARD.md` flagged as aspirational with explicit notes |
+| 5 | §4.2.1 / §4.10 / §4.4 footer | Generic-boilerplate folders (ideas/, algorithms/, entities/, flows/, modules/, parameters/, ops/, devlog/) and `00_MASTER_DASHBOARD.md` flagged as aspirational with explicit notes |
 | 6 | §4.2 directory tree | Added `master/`, `proto/`, `task/`, `issues/`, `audit/` (the 3-tier-model + governance artefacts that the audit confirmed exist) |
-| 7 | §10.5 ownership table | Replaced legacy `gks/algorithms/* ฯลฯ` row with explicit "every `gks/<type>/*` goes via `msp_candidate` per `ADR--AGENT-WRITE-BOUNDARIES`"; dropped `14_devlog/` row |
+| 7 | §10.5 ownership table | Replaced legacy `gks/algorithms/* ฯลฯ` row with explicit "every `gks/<type>/*` goes via `msp_candidate` per `ADR--AGENT-WRITE-BOUNDARIES`"; dropped `devlog/` row |
 | 8 | §18 bootstrap | Rewrote `mkdir -p` command to MSP-actual layout |
 | 9 | EOF note | Updated example folder names |
 

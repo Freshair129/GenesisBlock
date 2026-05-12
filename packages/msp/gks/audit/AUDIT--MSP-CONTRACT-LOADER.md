@@ -20,7 +20,7 @@ linked_symbols:
   - {"file":"src/validator/contract.ts"}
   - {"file":"src/validator/cli.ts"}
   - {"file":"test/validator/contract.test.ts"}
-created_at: 2026-05-03T08:43:36.814Z
+created_at: 2026-05-03T16:43:36.814+07:00
 ---
 
 # AUDIT — runtime contract loader

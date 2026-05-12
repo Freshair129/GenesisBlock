@@ -15,7 +15,7 @@ tags:
   - decision
   - m9f
 crosslinks: {"references":["CONCEPT--SESSION-LOCK-CROSS-PLATFORM"],"implements":["FEAT--MEMORY-SESSIONS-WRITER"]}
-created_at: 2026-05-05T09:22:00.000Z
+created_at: 2026-05-05T17:22:00.000+07:00
 ---
 
 # ADR — session lock max-age

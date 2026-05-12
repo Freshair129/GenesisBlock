@@ -14,7 +14,7 @@ tags:
   - indexer
   - decision
 crosslinks: {"references":["CONCEPT--MEMORY-BACKLINKS-INDEXER","CONCEPT--MEMORY-VECTOR-BACKLINKS"]}
-created_at: 2026-05-03T07:16:42.336Z
+created_at: 2026-05-03T15:16:42.336+07:00
 ---
 
 # ADR — backlinks indexer rebuild strategy

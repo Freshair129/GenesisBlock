@@ -15,7 +15,7 @@ tags:
   - smart-connections
   - decision
 crosslinks: {"references":["CONCEPT--EMBEDDING-STRATEGY","ADR--SEMANTIC-SEARCH-VIA-SMART-CONNECTIONS","CONCEPT--OBSIDIAN-AS-RUNTIME"]}
-created_at: 2026-05-04T02:02:48.728Z
+created_at: 2026-05-04T10:02:48.728+07:00
 ---
 
 # ADR — embedding model parity

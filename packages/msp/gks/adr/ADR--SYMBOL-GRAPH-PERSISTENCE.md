@@ -15,7 +15,7 @@ tags:
   - jsonl
   - decision
 crosslinks: {"references":["FRAME--SYMBOL-GRAPH","CONCEPT--SYMBOL-GRAPH"]}
-created_at: 2026-05-09T09:50:00.000Z
+created_at: 2026-05-09T17:50:00.000+07:00
 ---
 
 # ADR — Symbol Graph persistence

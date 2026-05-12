@@ -14,7 +14,7 @@ tags:
   - microtask
   - contract
 crosslinks: {"references":["FRAME--PHASE-GOVERNANCE","CONCEPT--ATOMIC-WRITE-CONTRACT"]}
-created_at: 2026-05-03T07:01:52.308Z
+created_at: 2026-05-03T15:01:52.308+07:00
 ---
 
 # CONCEPT — codegen microtask contract

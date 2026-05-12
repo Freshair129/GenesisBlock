@@ -21,7 +21,7 @@ linked_symbols:
   - {"file":"src/codegen/slm/factory.ts"}
   - {"file":"src/codegen/slm/errors.ts"}
   - {"file":"src/codegen/slm/types.ts"}
-created_at: 2026-05-03T09:24:58.170Z
+created_at: 2026-05-03T17:24:58.170+07:00
 ---
 
 # AUDIT — Ollama SLM client
