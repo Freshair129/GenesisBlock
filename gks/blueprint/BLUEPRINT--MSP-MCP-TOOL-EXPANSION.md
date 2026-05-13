@@ -2,6 +2,7 @@
 id: BLUEPRINT--MSP-MCP-TOOL-EXPANSION
 phase: 3
 type: blueprint
+scale_level: L2
 status: stable
 vault_id: default
 tier: process

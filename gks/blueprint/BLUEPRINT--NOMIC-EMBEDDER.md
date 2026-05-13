@@ -2,6 +2,7 @@
 id: BLUEPRINT--NOMIC-EMBEDDER
 phase: 2
 type: blueprint
+scale_level: L2
 status: stable
 title: Implementation plan for nomic-embed-text-v1.5 embedder
 created_at: 2026-04-29T12:00:00+07:00

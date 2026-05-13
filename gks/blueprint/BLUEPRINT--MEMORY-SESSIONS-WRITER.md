@@ -2,6 +2,7 @@
 id: BLUEPRINT--MEMORY-SESSIONS-WRITER
 phase: 3
 type: blueprint
+scale_level: L2
 status: stable
 vault_id: default
 tier: process

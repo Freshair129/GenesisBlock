@@ -2,6 +2,7 @@
 id: BLUEPRINT--SYMBOLS-MULTI-LANG
 phase: 3
 type: blueprint
+scale_level: L2
 status: active
 tier: process
 source_type: axiomatic

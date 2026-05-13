@@ -19,6 +19,7 @@ import { join } from 'node:path'
 
 import type { ScaleLevel } from './types.js'
 import { ScaleLevelGateError } from './types.js'
+import type { PredicateContext, PredicateResult } from '../validator/proto/types.js'
 
 export interface ScaleGateInput {
   root: string
@@ -162,4 +163,33 @@ function tryParseJson(s: string): { references?: string[] } | null {
   } catch {
     return null
   }
+}
+
+/** Validator for PROTO--SCALE-LEVEL-GATE */
+export async function predicate(ctx: PredicateContext): Promise<PredicateResult> {
+  const violations: any[] = []
+  const blueprints = ctx.atomicIndex.filter(
+    (a) => a.type === 'blueprint' && (a.status === 'active' || a.status === 'stable'),
+  )
+
+  for (const bp of blueprints) {
+    try {
+      const raw = await readFile(join(ctx.repoRoot, bp.path), 'utf8')
+      const fmMatch = raw.match(/^---\n([\s\S]*?)\n---/)
+      if (!fmMatch) continue
+
+      const scaleLevelMatch = fmMatch[1]!.match(/^scale_level:\s*(L[123])\s*$/m)
+      if (!scaleLevelMatch) {
+        violations.push({
+          atomId: bp.id,
+          message: `BLUEPRINT ${bp.id} is missing a valid 'scale_level' field (expected L1, L2, or L3)`,
+          severity: 'warning',
+        })
+      }
+    } catch {
+      // ignore read errors
+    }
+  }
+
+  return { ok: violations.length === 0, violations }
 }

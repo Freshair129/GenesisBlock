@@ -9,10 +9,11 @@
  * target file and the only post-process step needed is the marker.
  */
 
-import { mkdir, writeFile } from 'node:fs/promises'
-import { dirname } from 'node:path'
+import { mkdir, writeFile, readdir, readFile } from 'node:fs/promises'
+import { dirname, join, relative } from 'node:path'
 
 import type { PROTO_AUTO_GENERATED_MARKER } from './marker-constants.js'
+import type { PredicateContext, PredicateResult } from '../validator/proto/types.js'
 
 export interface ComposeInput {
   /** Absolute path that will receive the file. */
@@ -50,4 +51,76 @@ export async function composeWithMarker(input: ComposeInput): Promise<void> {
 
 export function bodyContainsMarker(body: string): boolean {
   return body.includes(AUTO_GENERATED_MARKER_TAG)
+}
+
+/** Validator for PROTO--AUTO-GENERATED-MARKER */
+export async function predicate(ctx: PredicateContext): Promise<PredicateResult> {
+  const violations: any[] = []
+
+  async function* walk(dir: string): AsyncGenerator<string> {
+    let entries
+    try {
+      entries = await readdir(dir, { withFileTypes: true })
+    } catch {
+      return
+    }
+    for (const entry of entries) {
+      const p = join(dir, entry.name)
+      if (entry.isDirectory()) {
+        if (entry.name === 'node_modules' || entry.name === 'dist' || entry.name === '.git') continue
+        yield* walk(p)
+      } else if (entry.isFile()) {
+        yield p
+      }
+    }
+  }
+
+  // Scan all packages/*/src
+  const packagesDir = join(ctx.repoRoot, 'packages')
+  let packages: string[] = []
+  try {
+    packages = await readdir(packagesDir)
+  } catch {
+    // fallback or ignore
+  }
+
+  for (const pkg of packages) {
+    const srcDir = join(packagesDir, pkg, 'src')
+    for await (const file of walk(srcDir)) {
+      let body: string
+      try {
+        body = await readFile(file, 'utf8')
+      } catch {
+        continue
+      }
+
+      if (body.includes(AUTO_GENERATED_MARKER_TAG)) {
+        const lines = body.split('\n')
+        // Check if the marker is at the very beginning (ignoring potential shebang or BOM)
+        const markerLineIdx = lines.findIndex((l) => l.includes(AUTO_GENERATED_MARKER_TAG))
+        if (markerLineIdx > 5) continue // Heuristic: if it's not in the first 5 lines, it's likely a reference, not a marker
+
+        const line1 = lines[markerLineIdx]!
+        const line2 = lines[markerLineIdx + 1] ?? ''
+        const line3 = lines[markerLineIdx + 2] ?? ''
+
+        const prefix = line1.slice(0, line1.indexOf(AUTO_GENERATED_MARKER_TAG))
+
+        if (!line2.includes('Source: ')) {
+          violations.push({
+            message: `File ${relative(ctx.repoRoot, file)} has malformed marker: missing 'Source:' on line 2`,
+            severity: 'warning',
+          })
+        }
+        if (!line3.includes('Regenerate: npm run msp:run-task ')) {
+          violations.push({
+            message: `File ${relative(ctx.repoRoot, file)} has malformed marker: missing 'Regenerate: npm run msp:run-task' on line 3`,
+            severity: 'warning',
+          })
+        }
+      }
+    }
+  }
+
+  return { ok: violations.length === 0, violations }
 }

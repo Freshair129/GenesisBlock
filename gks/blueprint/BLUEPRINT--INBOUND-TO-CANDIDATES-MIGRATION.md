@@ -2,6 +2,7 @@
 id: BLUEPRINT--INBOUND-TO-CANDIDATES-MIGRATION
 phase: 3
 type: blueprint
+scale_level: L2
 status: stable
 tier: process
 source_type: axiomatic
