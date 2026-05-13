@@ -66,14 +66,16 @@ describe('tier adapter structural conformance', () => {
 })
 
 describe('qwenAdapter (T1) delegates to runCli', () => {
-  it('healthcheck spawns `qwen --version` and returns true on exit 0', async () => {
+  it('healthcheck spawns `qwen --help` and returns true on exit 0', async () => {
+    // qwen (Python Ollama-wrapper CLI) does NOT support --version. --help
+    // returning exit 0 is the binary-installed signal.
     mockedRunCli.mockResolvedValueOnce(mockResult({ ok: true, exit_code: 0 }))
     const ok = await qwenAdapter.healthcheck()
     expect(ok).toBe(true)
     expect(mockedRunCli).toHaveBeenCalledOnce()
     const [bin, args] = mockedRunCli.mock.calls[0]!
     expect(bin).toBe('qwen')
-    expect(args).toEqual(['--version'])
+    expect(args).toEqual(['--help'])
   })
 
   it('healthcheck returns false on non-zero exit', async () => {
@@ -81,14 +83,15 @@ describe('qwenAdapter (T1) delegates to runCli', () => {
     expect(await qwenAdapter.healthcheck()).toBe(false)
   })
 
-  it('run() spawns `qwen --prompt <prompt>` and forwards opts', async () => {
+  it('run() spawns `qwen <prompt>` (positional) and forwards opts', async () => {
     mockedRunCli.mockResolvedValueOnce(mockResult({ output: 'hello' }))
     const result = await qwenAdapter.run('hi there', DEFAULT_OPTS)
     expect(result.output).toBe('hello')
     expect(mockedRunCli).toHaveBeenCalledOnce()
     const [bin, args, opts] = mockedRunCli.mock.calls[0]!
     expect(bin).toBe('qwen')
-    expect(args).toEqual(['--prompt', 'hi there'])
+    // qwen takes the prompt as a positional argument; no --prompt flag.
+    expect(args).toEqual(['hi there'])
     expect(opts).toEqual(DEFAULT_OPTS)
   })
 })
