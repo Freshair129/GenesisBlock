@@ -17,7 +17,7 @@ tags:
   - rust
   - napi
   - decision
-crosslinks: {"references":["CONCEPT--GENESIS-BLOCK-ENGINE","FRAMEWORK--MSP-ARCHITECTURE-V2"]}
+crosslinks: {"references":["CONCEPT--GENESIS-BLOCK-ENGINE","FRAMEWORK--MSP-ARCHITECTURE-V2","PROTOCOL--GENESIS-BLOCK-FFI"]}
 created_at: 2026-05-12T11:57:00.000+07:00
 ---
 
@@ -63,15 +63,35 @@ Concretely:
    into `MemoryStore`, which calls the configured `GraphBackend` —
    Genesis Block sits below that line and inherits the surface for
    free.
-5. **The default `GraphBackend` does not change.** New `MemoryStore`
-   instances still use the in-memory `GraphStore` unless the caller
-   passes `graphBackend: createGenesisBlockBackend(...)`. This
-   preserves the zero-dependency quickstart promise.
-6. **OpenCypher is exposed as an opt-in extension method**, not part
+5. **The default `GraphBackend` flips to `GenesisBlockBackend` after
+   P3.5 benchmarks** (see BLUEPRINT). Until then, new `MemoryStore`
+   instances use the in-memory `GraphStore` to preserve the zero-dep
+   quickstart promise. After the benchmark gate, `GenesisBlockBackend`
+   becomes the default for persisted memory; `GraphStore` remains
+   available as an explicit opt-in for tests and ephemeral sessions.
+   The default-flip is documented in BLUEPRINT phase P3.6 and requires
+   a separate ADR amendment PR — it is **not** an automatic consequence
+   of this ADR landing.
+6. **`PgGraphBackend` is reframed as the *reference baseline* for
+   correctness testing**, not a parallel production target. During
+   P3.2–P3.5, every test in `test/memory/graph/` runs against both
+   `PgGraphBackend` (oracle) and `GenesisBlockBackend` (subject under
+   test) and asserts result equivalence. After the default-flip,
+   `PgGraphBackend` remains available for two narrow scenarios:
+   (a) multi-process / multi-machine deployments where embedded
+   single-writer semantics do not fit, (b) organisations with
+   existing Postgres infrastructure that prefer SQL-level admin
+   tooling. Deprecation is **out of scope** for this ADR.
+7. **OpenCypher is exposed as an opt-in extension method**, not part
    of the base `GraphBackend` interface. Callers that want to issue
    Cypher use a downcast: `(backend as GenesisBlockBackend).cypher(q)`.
    The MSP `verify-flow` and Impact-Analysis paths gain a Cypher
    path; everything else continues to use `neighbors()` / `query()`.
+8. **The FFI contract between the TS adapter and the Rust crate is
+   pinned by `PROTOCOL--GENESIS-BLOCK-FFI`** (companion atom). Every
+   `#[napi]` export in `packages/gks/native/genesis-block/` and every
+   TS method on `GenesisBlockBackend` must match that PROTOCOL; ABI
+   drift across the boundary is a runtime crash, not a type error.
 
 ### Reconciling with ADR-005
 
@@ -111,6 +131,23 @@ backend's `.db` file is opaque binary; that is acceptable because:
 
 A `BLUEPRINT--GENESIS-BLOCK-INTEGRATION` task tracks adding a
 `.gitignore` entry for `*.gks-graph.db` in the published templates.
+
+### PgGraphBackend → reference baseline (transition plan)
+
+`PgGraphBackend` (currently a peer production target in
+`packages/gks/src/memory/graph/pg.ts`) is repositioned in three
+stages, tied to BLUEPRINT phases:
+
+| Phase | `PgGraphBackend` role |
+|---|---|
+| Today → P3.4 | Production peer (unchanged behaviour) |
+| P3.2 → P3.5 | **Oracle** in the parametrised graph test suite — every assertion runs against PG first, then `GenesisBlockBackend`, and the two outputs must agree |
+| P3.6+ | Optional backend retained for two narrow scenarios: (a) multi-process / multi-machine deployments, (b) orgs with existing Postgres + SQL-admin requirements |
+
+Full deprecation is **out of scope**. If single-process scenarios
+dominate after one quarter of production GenesisBlock usage, a
+separate ADR may propose retiring `PgGraphBackend`; that decision
+belongs to its own ADR, not this one.
 
 ## Consequences
 

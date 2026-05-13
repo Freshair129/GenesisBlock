@@ -18,7 +18,7 @@ tags:
   - cypher
   - blueprint
   - implementation
-crosslinks: {"references":["ADR--GENESIS-BLOCK-AS-GKS-BACKEND","CONCEPT--GENESIS-BLOCK-ENGINE","FRAMEWORK--MSP-ARCHITECTURE-V2"]}
+crosslinks: {"references":["ADR--GENESIS-BLOCK-AS-GKS-BACKEND","CONCEPT--GENESIS-BLOCK-ENGINE","FRAMEWORK--MSP-ARCHITECTURE-V2","PROTOCOL--GENESIS-BLOCK-FFI"]}
 linked_symbols:
   - { file: "packages/gks/src/memory/index.ts" }
   - { file: "packages/gks/src/memory/graph/genesis-block.ts" }
