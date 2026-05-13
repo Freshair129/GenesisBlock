@@ -4,11 +4,12 @@ phase: 2
 type: algo
 status: stable
 vault_id: default
-tier: logic
+tier: genesis
 source_type: axiomatic
 title: Identity Resolution Algorithm — Global vs Project Layering
 tags: [msp, identity, resolution, merging, layering]
 crosslinks: {"references":["CONCEPT--IDENTITY-LAYER","ADR--GLOBAL-VS-WORKSPACE"]}
+created_at: 2026-05-11T10:28:00.000Z
 ---
 
 # ALGORITHM — Identity Resolution

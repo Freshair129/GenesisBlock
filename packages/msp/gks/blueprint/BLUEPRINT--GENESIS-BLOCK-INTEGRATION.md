@@ -19,6 +19,11 @@ tags:
   - blueprint
   - implementation
 crosslinks: {"references":["ADR--GENESIS-BLOCK-AS-GKS-BACKEND","CONCEPT--GENESIS-BLOCK-ENGINE","FRAMEWORK--MSP-ARCHITECTURE-V2"]}
+linked_symbols:
+  - { file: "packages/gks/src/memory/index.ts" }
+  - { file: "packages/gks/src/memory/graph/genesis-block.ts" }
+  - { file: "packages/gks/src/memory/graph/cypher-v0.ts" }
+  - { file: "packages/gks/src/memory/graph/genesis-block-errors.ts" }
 created_at: 2026-05-12T11:59:00.000+07:00
 ---
 

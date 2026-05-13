@@ -4,11 +4,12 @@ phase: 2
 type: mod
 status: stable
 vault_id: default
-tier: architecture
+tier: genesis
 source_type: axiomatic
 title: Identity Module — Genesis Block for the "Soul" Passport
 tags: [msp, identity, genesis, module, composition]
 crosslinks: {"composes":["CONCEPT--IDENTITY-LAYER","PROTOCOL--IDENTITY-API","ALGO--IDENTITY-RESOLUTION"],"implements":["FEAT--IDENTITY-LAYER"]}
+created_at: 2026-05-11T10:28:00.000Z
 ---
 
 # MODULE — Identity (Genesis Block)

@@ -16,6 +16,11 @@ tags:
   - typescript
   - blueprint
 crosslinks: {"references":["BLUEPRINT--GENESIS-BLOCK-INTEGRATION","ADR--GENESIS-BLOCK-AS-GKS-BACKEND","CONCEPT--GENESIS-BLOCK-ENGINE"]}
+linked_symbols:
+  - { file: "packages/gks/src/memory/graph/genesis-block.ts" }
+  - { file: "packages/gks/src/memory/graph/cypher-v0.ts" }
+  - { file: "packages/gks/src/memory/graph/genesis-block-errors.ts" }
+  - { file: "packages/gks/src/memory/index.ts" }
 created_at: 2026-05-12T22:49:00.000+07:00
 ---
 
