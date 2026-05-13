@@ -93,6 +93,12 @@ export interface ExecuteOptions {
 
 /**
  * Outcome of one `executeBlock()` call.
+ *
+ * `from_master` is set to `true` iff the block was found in the
+ * Promoted-Block Registry (see `CONCEPT--PROMOTED-BLOCK-REGISTRY`) at
+ * execution time. When unset, the block ran as a normal Genesis Block.
+ * The field is optional so existing serialisers / pretty-printers stay
+ * valid without updates.
  */
 export interface ExecuteResult {
   block_id: string
@@ -100,4 +106,5 @@ export interface ExecuteResult {
   members_loaded: number
   tier_used: 'T1' | 'T2' | 'T3'
   duration_ms: number
+  from_master?: boolean
 }

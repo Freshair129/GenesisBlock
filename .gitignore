@@ -10,6 +10,9 @@ packages/*/node_modules/
 gks/00_index/atomic_index.jsonl
 gks/00_index/backlinks.jsonl
 
+# Promoted-Block Registry (derived state — CONCEPT--PROMOTED-BLOCK-REGISTRY)
+gks/master/registry.jsonl
+
 # Obsidian / Excalidraw editor cruft inside gks/
 gks/.obsidian/
 gks/.smart-env/

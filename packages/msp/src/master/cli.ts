@@ -4,13 +4,23 @@
  * evaluate the 4-of-5 promotion criterion, print coverage, optionally
  * write proposal `.md` files to `gks/inbound/` for human review.
  *
+ * Phase F1 adds a second invocation:
+ *   `msp-master-propose apply <proposalPath>` — human-triggered action
+ *   that moves an inbound proposal into `gks/master/` and appends a
+ *   row to `gks/master/registry.jsonl`. Per
+ *   `ADR--MASTER-PROMOTION-DOC-TO-CODE`, this step is never auto-run;
+ *   it is invoked by a human after they have authored the evidence ADR
+ *   and trimmed the Master body to the token cap.
+ *
  * Authority: `BLUEPRINT--MASTER-PROMOTION-PIPELINE` § Deliverable 4,
+ * `BLUEPRINT--MASTER-RUNTIME-INTEGRATION` § Deliverable 3,
  * `ADR--MASTER-PROMOTION-DOC-TO-CODE` (human-in-the-loop).
  */
 import { mkdir, writeFile } from 'node:fs/promises'
-import { join, resolve } from 'node:path'
+import { isAbsolute, join, resolve } from 'node:path'
 import { parseArgs } from 'node:util'
 
+import { applyPromotion } from './promote-apply.js'
 import {
   proposePromotion,
   renderProposalDocument,
@@ -22,9 +32,15 @@ const HELP = `msp-master-propose — scan Genesis Blocks, propose Master atoms
 
 Usage:
   msp-master-propose [--root=<dir>] [--write]
+  msp-master-propose apply <proposalPath> [--root=<dir>]
   msp-master-propose --help
 
-Flags:
+Subcommands:
+  (default)       scan + report coverage (optionally write proposals)
+  apply           human-triggered: promote one inbound proposal to
+                  gks/master/ and append a registry entry
+
+Flags (default subcommand):
   --root=<dir>    project root (default: cwd)
   --write         write promotable proposals to <root>/gks/inbound/
                   as MASTER--<id>.proposal.md (human reviews + commits to
@@ -32,16 +48,18 @@ Flags:
                   ADR--MASTER-PROMOTION-DOC-TO-CODE)
   --help          this message
 
-Output:
-  Without --write, prints a table to stdout: one row per Genesis Block,
-  showing which of the 5 core dimensions are filled (yes/no) and whether
-  the block is promotable (filled_count >= 4 stable members).
+Flags (apply subcommand):
+  --root=<dir>    project root (default: cwd)
 
-  With --write, additionally drops one .proposal.md per promotable block.
+Output:
+  Default — without --write, prints a coverage table to stdout. With
+  --write, additionally drops one .proposal.md per promotable block.
+  Apply — prints "✓ applied: <master_path>" on success; renames the
+  proposal to <original>.applied.
 
 Exit codes:
-  0  success (zero or more proposals printed / written)
-  1  no GENESIS atoms found under <root> (likely wrong --root)
+  0  success
+  1  default: no GENESIS atoms found under <root> / apply: apply failed
   2  internal error (bad arguments, IO failure)
 `
 
@@ -92,6 +110,23 @@ async function run(opts: CliOptions): Promise<number> {
     }\n`,
   )
   return 0
+}
+
+async function runApply(proposalArg: string, root: string): Promise<number> {
+  const proposalPath = isAbsolute(proposalArg)
+    ? proposalArg
+    : resolve(root, proposalArg)
+  try {
+    const result = await applyPromotion(proposalPath, root)
+    process.stdout.write(`✓ applied: ${result.master_path}\n`)
+    process.stderr.write(
+      `[master-propose] registry entry written for block_id=${result.master_id.replace(/^MASTER--/, '')}\n`,
+    )
+    return 0
+  } catch (err) {
+    process.stderr.write(`✗ apply failed: ${(err as Error).message}\n`)
+    return 1
+  }
 }
 
 function formatTable(reports: readonly BlockReport[]): string {
@@ -159,13 +194,26 @@ async function main(): Promise<number> {
     process.stderr.write(`error: ${(err as Error).message}\n${HELP}`)
     return 2
   }
-  const { values } = parsed
+  const { values, positionals } = parsed
   if (values.help) {
     process.stdout.write(HELP)
     return 0
   }
+
+  const root = resolve(values.root ?? process.cwd())
+
+  // Subcommand dispatch on the first positional.
+  if (positionals.length > 0 && positionals[0] === 'apply') {
+    const proposalArg = positionals[1]
+    if (typeof proposalArg !== 'string' || proposalArg.length === 0) {
+      process.stderr.write(`error: apply requires a proposalPath\n${HELP}`)
+      return 2
+    }
+    return runApply(proposalArg, root)
+  }
+
   const opts: CliOptions = {
-    root: resolve(values.root ?? process.cwd()),
+    root,
     write: values.write === true,
   }
   return run(opts)

@@ -5,11 +5,13 @@ import type {
   GenesisManifest,
   LoadedMembers,
 } from '../../src/genesis/types.js'
+import type { MasterEntry } from '../../src/master/registry.js'
 
 const mocks = vi.hoisted(() => ({
   dispatchMock: vi.fn(),
   loadManifestMock: vi.fn(),
   loadMembersMock: vi.fn(),
+  findActiveMasterMock: vi.fn(),
 }))
 
 vi.mock('../../src/agents/dispatch.js', () => ({
@@ -21,6 +23,11 @@ vi.mock('../../src/genesis/loader.js', () => ({
     mocks.loadManifestMock(blockId, root),
   loadMembers: (manifest: GenesisManifest, root: string) =>
     mocks.loadMembersMock(manifest, root),
+}))
+
+vi.mock('../../src/master/registry.js', () => ({
+  findActiveMaster: (root: string, blockId: string) =>
+    mocks.findActiveMasterMock(root, blockId),
 }))
 
 // Import AFTER vi.mock so the mocked deps are resolved.
@@ -49,6 +56,9 @@ beforeEach(() => {
   mocks.dispatchMock.mockReset()
   mocks.loadManifestMock.mockReset()
   mocks.loadMembersMock.mockReset()
+  mocks.findActiveMasterMock.mockReset()
+  // Default: no master entry. Tests that need one override per-call.
+  mocks.findActiveMasterMock.mockResolvedValue(null)
 })
 
 describe('executeBlock', () => {
@@ -109,6 +119,7 @@ describe('executeBlock', () => {
     expect(result.tier_used).toBe('T2')
     expect(typeof result.duration_ms).toBe('number')
     expect(result.duration_ms).toBeGreaterThanOrEqual(0)
+    expect(result.from_master).toBeUndefined()
   })
 
   it('forwards opts.tier to dispatch as budget_hint', async () => {
@@ -166,5 +177,57 @@ describe('executeBlock', () => {
 
     const result = await executeBlock('FOO', { root: '/r', prompt: 'p' })
     expect(result.tier_used).toBe('T3')
+  })
+
+  it('flags from_master=true and defaults to T2 when the registry has an active entry', async () => {
+    const entry: MasterEntry = {
+      block_id: 'IDENTITY-ENGINE',
+      promoted_at: '2026-05-14T04:00:00.000Z',
+      status: 'active',
+    }
+    mocks.findActiveMasterMock.mockResolvedValueOnce(entry)
+    mocks.loadManifestMock.mockResolvedValueOnce({
+      id: 'IDENTITY-ENGINE',
+      members: {},
+    })
+    mocks.loadMembersMock.mockResolvedValueOnce(emptyMembers())
+    mocks.dispatchMock.mockResolvedValueOnce(okDispatch({ tier_used: 'T2' }))
+
+    const result = await executeBlock('IDENTITY-ENGINE', {
+      root: '/r',
+      prompt: 'p',
+    })
+
+    expect(mocks.findActiveMasterMock).toHaveBeenCalledWith(
+      '/r',
+      'IDENTITY-ENGINE',
+    )
+    const [sentTask] = mocks.dispatchMock.mock.calls[0]! as [DispatchTask]
+    expect(sentTask.budget_hint).toBe('T2')
+    expect(result.from_master).toBe(true)
+  })
+
+  it('honours an explicit opts.tier even when the block is master-promoted', async () => {
+    mocks.findActiveMasterMock.mockResolvedValueOnce({
+      block_id: 'BIG-BLOCK',
+      promoted_at: '2026-05-14T04:00:00.000Z',
+      status: 'active',
+    })
+    mocks.loadManifestMock.mockResolvedValueOnce({
+      id: 'BIG-BLOCK',
+      members: {},
+    })
+    mocks.loadMembersMock.mockResolvedValueOnce(emptyMembers())
+    mocks.dispatchMock.mockResolvedValueOnce(okDispatch({ tier_used: 'T3' }))
+
+    const result = await executeBlock('BIG-BLOCK', {
+      root: '/r',
+      prompt: 'p',
+      tier: 'T3',
+    })
+
+    const [sentTask] = mocks.dispatchMock.mock.calls[0]! as [DispatchTask]
+    expect(sentTask.budget_hint).toBe('T3')
+    expect(result.from_master).toBe(true)
   })
 })
