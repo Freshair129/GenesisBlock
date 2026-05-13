@@ -17,7 +17,8 @@
     "msp-graph": "./dist/symbols/cli.js",
     "msp-dispatch": "./dist/agents/cli.js",
     "msp-genesis-exec": "./dist/genesis/cli.js",
-    "msp-master-propose": "./dist/master/cli.js"
+    "msp-master-propose": "./dist/master/cli.js",
+    "msp-usage": "./dist/usage/cli.js"
   },
   "files": [
     "dist/",
