@@ -16,15 +16,15 @@ tags:
   - m7d
 crosslinks: {"implements":["FEAT--COMPRESSOR"],"references":["ADR--COMPRESSOR-THREE-TIER","CONCEPT--CONTEXT-COMPRESSION"]}
 linked_symbols:
-  - {"file":"src/orchestrator/compressor/index.ts"}
-  - {"file":"src/orchestrator/compressor/types.ts"}
-  - {"file":"src/orchestrator/compressor/tokens.ts"}
-  - {"file":"src/orchestrator/compressor/trim.ts"}
-  - {"file":"src/orchestrator/compressor/resummarise.ts"}
-  - {"file":"test/orchestrator/compressor/tokens.test.ts"}
-  - {"file":"test/orchestrator/compressor/trim.test.ts"}
-  - {"file":"test/orchestrator/compressor/resummarise.test.ts"}
-  - {"file":"test/orchestrator/compressor/index.test.ts"}
+  - {"file":"packages/msp/src/orchestrator/compressor/index.ts"}
+  - {"file":"packages/msp/src/orchestrator/compressor/types.ts"}
+  - {"file":"packages/msp/src/orchestrator/compressor/tokens.ts"}
+  - {"file":"packages/msp/src/orchestrator/compressor/trim.ts"}
+  - {"file":"packages/msp/src/orchestrator/compressor/resummarise.ts"}
+  - {"file":"packages/msp/test/orchestrator/compressor/tokens.test.ts"}
+  - {"file":"packages/msp/test/orchestrator/compressor/trim.test.ts"}
+  - {"file":"packages/msp/test/orchestrator/compressor/resummarise.test.ts"}
+  - {"file":"packages/msp/test/orchestrator/compressor/index.test.ts"}
 created_at: 2026-05-05T16:11:00.000+07:00
 ---
 

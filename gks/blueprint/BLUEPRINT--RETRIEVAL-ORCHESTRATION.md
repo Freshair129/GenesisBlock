@@ -16,13 +16,13 @@ tags:
   - m7c
 crosslinks: {"implements":["FEAT--RETRIEVAL-ORCHESTRATION"],"references":["ADR--RETRIEVAL-RRF-FUSION","CONCEPT--RETRIEVAL-ORCHESTRATION"]}
 linked_symbols:
-  - {"file":"src/orchestrator/retrieval/index.ts"}
-  - {"file":"src/orchestrator/retrieval/types.ts"}
-  - {"file":"src/orchestrator/retrieval/fusion.ts"}
-  - {"file":"src/orchestrator/retrieval/sources/vector.ts"}
-  - {"file":"src/orchestrator/retrieval/sources/obsidian.ts"}
-  - {"file":"src/orchestrator/retrieval/sources/episodic.ts"}
-  - {"file":"src/orchestrator/retrieval/sources/backlinks.ts"}
+  - {"file":"packages/msp/src/orchestrator/retrieval/index.ts"}
+  - {"file":"packages/msp/src/orchestrator/retrieval/types.ts"}
+  - {"file":"packages/msp/src/orchestrator/retrieval/fusion.ts"}
+  - {"file":"packages/msp/src/orchestrator/retrieval/sources/vector.ts"}
+  - {"file":"packages/msp/src/orchestrator/retrieval/sources/obsidian.ts"}
+  - {"file":"packages/msp/src/orchestrator/retrieval/sources/episodic.ts"}
+  - {"file":"packages/msp/src/orchestrator/retrieval/sources/backlinks.ts"}
 created_at: 2026-05-05T15:56:30.000+07:00
 ---
 

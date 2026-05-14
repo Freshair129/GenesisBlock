@@ -15,9 +15,9 @@ tags:
   - m8e
 crosslinks: {"references":["PROTO--AUTHORITY-ENFORCEMENT","CONCEPT--PROTO-AUTHORITY-ENFORCEMENT","ADR--DELEGATION-POLICY","FRAMEWORK--AUTHORITY-MATRIX","FEAT--PROTO-LOADER","AUDIT--PROTO-LOADER"]}
 linked_symbols:
-  - {"file":"src/validator/proto/authority-enforcement.ts"}
+  - {"file":"packages/msp/src/validator/proto/authority-enforcement.ts"}
   - {"file":"gks/proto/PROTO--AUTHORITY-ENFORCEMENT.md"}
-  - {"file":"test/validator/proto/authority-enforcement.test.ts"}
+  - {"file":"packages/msp/test/validator/proto/authority-enforcement.test.ts"}
 phase_override:
   skip_blueprint: true
   reason: "Incremental PROTO rule plugged into the already-blueprinted loader scaffold (BLUEPRINT--PROTO-LOADER). Doc-to-code chain: CONCEPT--PROTO-AUTHORITY-ENFORCEMENT -> PROTO--AUTHORITY-ENFORCEMENT -> predicate -> this audit; per-rule predicates do not each warrant a separate phase-3 blueprint."

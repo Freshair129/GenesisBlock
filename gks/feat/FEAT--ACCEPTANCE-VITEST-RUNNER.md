@@ -15,9 +15,9 @@ tags:
   - user-facing
 crosslinks: {"implements":["ADR--ACCEPTANCE-VITEST-RUNNER"],"references":["CONCEPT--ACCEPTANCE-VITEST-RUNNER","FEAT--CODEGEN-MICROTASK-RUNNER"]}
 linked_symbols:
-  - {"file":"src/codegen/acceptance/vitest.ts"}
-  - {"file":"src/codegen/acceptance/sandbox.ts"}
-  - {"file":"src/codegen/acceptance/types.ts"}
+  - {"file":"packages/msp/src/codegen/acceptance/vitest.ts"}
+  - {"file":"packages/msp/src/codegen/acceptance/sandbox.ts"}
+  - {"file":"packages/msp/src/codegen/acceptance/types.ts"}
 created_at: 2026-05-03T16:27:18.409+07:00
 ---
 

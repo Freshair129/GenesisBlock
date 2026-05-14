@@ -21,7 +21,7 @@ linked_symbols:
   - {"file":"web/src/components/SymbolGraphView.tsx"}
   - {"file":"web/src/components/SymbolDetail.tsx"}
   - {"file":"web/src/api.ts"}
-  - {"file":"src/index.ts"}
+  - {"file":"packages/msp/src/index.ts"}
 created_at: 2026-05-09T16:54:00.000+07:00
 ---
 

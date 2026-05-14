@@ -15,12 +15,12 @@ tags:
   - tool
 crosslinks: {"implements":["ADR--SYMBOL-GRAPH-PERSISTENCE"],"references":["FRAMEWORK--SYMBOL-GRAPH","CONCEPT--SYMBOL-GRAPH","FEAT--MSP-MCP-SERVER"]}
 linked_symbols:
-  - {"file":"src/mcp/tools/symbol-lookup.ts"}
-  - {"file":"src/mcp/tools/symbol-neighbors.ts"}
-  - {"file":"src/mcp/tools/symbol-impact.ts"}
-  - {"file":"src/mcp/tools/symbol-community.ts"}
-  - {"file":"src/mcp/tools/symbol-search.ts"}
-  - {"file":"src/mcp/server.ts"}
+  - {"file":"packages/msp/src/mcp/tools/symbol-lookup.ts"}
+  - {"file":"packages/msp/src/mcp/tools/symbol-neighbors.ts"}
+  - {"file":"packages/msp/src/mcp/tools/symbol-impact.ts"}
+  - {"file":"packages/msp/src/mcp/tools/symbol-community.ts"}
+  - {"file":"packages/msp/src/mcp/tools/symbol-search.ts"}
+  - {"file":"packages/msp/src/mcp/server.ts"}
 created_at: 2026-05-09T16:52:00.000+07:00
 ---
 

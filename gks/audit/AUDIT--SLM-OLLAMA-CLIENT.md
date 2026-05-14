@@ -17,10 +17,10 @@ tags:
   - ollama
 crosslinks: {"references":["FEAT--SLM-OLLAMA-CLIENT","BLUEPRINT--SLM-OLLAMA-CLIENT","ADR--SLM-OLLAMA-CLIENT","FEAT--CODEGEN-MICROTASK-RUNNER"]}
 linked_symbols:
-  - {"file":"src/codegen/slm/ollama.ts"}
-  - {"file":"src/codegen/slm/factory.ts"}
-  - {"file":"src/codegen/slm/errors.ts"}
-  - {"file":"src/codegen/slm/types.ts"}
+  - {"file":"packages/msp/src/codegen/slm/ollama.ts"}
+  - {"file":"packages/msp/src/codegen/slm/factory.ts"}
+  - {"file":"packages/msp/src/codegen/slm/errors.ts"}
+  - {"file":"packages/msp/src/codegen/slm/types.ts"}
 created_at: 2026-05-03T16:24:58.170+07:00
 ---
 

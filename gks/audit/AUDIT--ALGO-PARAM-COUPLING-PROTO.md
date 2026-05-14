@@ -18,8 +18,8 @@ tags:
   - governance
 crosslinks: {"references":["PROTO--ALGO-PARAM-COUPLING","CONCEPT--PROTO-ALGO-PARAM-COUPLING","ADR--GRAPH-IS-GKS-DOMAIN","FRAMEWORK--CROSSLINKS-VOCABULARY","CONCEPT--PROTO-PATTERN"]}
 linked_symbols:
-  - {"file":"src/validator/proto/algo-param-coupling.ts"}
-  - {"file":"test/validator/proto/algo-param-coupling.test.ts"}
+  - {"file":"packages/msp/src/validator/proto/algo-param-coupling.ts"}
+  - {"file":"packages/msp/test/validator/proto/algo-param-coupling.test.ts"}
   - {"file":"gks/proto/PROTO--ALGO-PARAM-COUPLING.md"}
 phase_override:
   skip_blueprint: true

@@ -15,17 +15,17 @@ tags:
   - audit
 crosslinks: {"references":["FEAT--MSP-MCP-TOOL-EXPANSION","BLUEPRINT--MSP-MCP-TOOL-EXPANSION","CONCEPT--MSP-MCP-TOOL-EXPANSION","FEAT--MSP-MCP-SERVER","FEAT--CONSOLIDATOR","FEAT--RETRIEVAL-ORCHESTRATION","FEAT--IDENTITY-LAYER","FEAT--COMPRESSOR"]}
 linked_symbols:
-  - {"file":"src/mcp/server.ts"}
-  - {"file":"src/mcp/tools/recall.ts"}
-  - {"file":"src/mcp/tools/remember.ts"}
-  - {"file":"src/mcp/tools/identity-get.ts"}
-  - {"file":"src/mcp/tools/identity-set.ts"}
-  - {"file":"test/mcp/tools/recall.test.ts"}
-  - {"file":"test/mcp/tools/remember.test.ts"}
-  - {"file":"test/mcp/tools/identity-get.test.ts"}
-  - {"file":"test/mcp/tools/identity-set.test.ts"}
-  - {"file":"test/mcp/server.test.ts"}
-  - {"file":"test/mcp/bin.test.ts"}
+  - {"file":"packages/msp/src/mcp/server.ts"}
+  - {"file":"packages/msp/src/mcp/tools/recall.ts"}
+  - {"file":"packages/msp/src/mcp/tools/remember.ts"}
+  - {"file":"packages/msp/src/mcp/tools/identity-get.ts"}
+  - {"file":"packages/msp/src/mcp/tools/identity-set.ts"}
+  - {"file":"packages/msp/test/mcp/tools/recall.test.ts"}
+  - {"file":"packages/msp/test/mcp/tools/remember.test.ts"}
+  - {"file":"packages/msp/test/mcp/tools/identity-get.test.ts"}
+  - {"file":"packages/msp/test/mcp/tools/identity-set.test.ts"}
+  - {"file":"packages/msp/test/mcp/server.test.ts"}
+  - {"file":"packages/msp/test/mcp/bin.test.ts"}
 created_at: 2026-05-05T16:35:30.812+07:00
 ---
 

@@ -15,10 +15,10 @@ tags:
   - m8f
 crosslinks: {"references":["CONCEPT--PROTO-AUDIT-EXISTING-RULES","ADR--ANTI-HALLUCINATION-RULES","FEAT--PROTO-LOADER","CONCEPT--PROTO-PATTERN"]}
 linked_symbols:
-  - {"file":"src/validator/proto/rule-adapter.ts"}
-  - {"file":"src/validator/proto/summary-min.ts"}
-  - {"file":"src/validator/proto/adr-monotonic.ts"}
-  - {"file":"src/validator/proto/evidence-for-decisions.ts"}
+  - {"file":"packages/msp/src/validator/proto/rule-adapter.ts"}
+  - {"file":"packages/msp/src/validator/proto/summary-min.ts"}
+  - {"file":"packages/msp/src/validator/proto/adr-monotonic.ts"}
+  - {"file":"packages/msp/src/validator/proto/evidence-for-decisions.ts"}
 phase_override:
   skip_blueprint: true
   reason: "Incremental PROTO rule predicates plugged into the already-blueprinted loader scaffold (BLUEPRINT--PROTO-LOADER); planned via CONCEPT--PROTO-AUDIT-EXISTING-RULES — per-rule predicates do not each warrant a separate phase-3 blueprint."

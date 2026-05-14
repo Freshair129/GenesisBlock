@@ -18,17 +18,17 @@ tags:
   - audit
 crosslinks: {"references":["FEAT--IDENTITY-LAYER","BLUEPRINT--IDENTITY-LAYER","ADR--IDENTITY-STORAGE-SHAPE","CONCEPT--IDENTITY-LAYER","FRAMEWORK--MSP-ARCHITECTURE-V2","MOD--IDENTITY","PROTOCOL--IDENTITY-API","ALGO--IDENTITY-RESOLUTION"]}
 linked_symbols:
-  - {"file":"src/identity/index.ts"}
-  - {"file":"src/identity/types.ts"}
-  - {"file":"src/identity/store.ts"}
-  - {"file":"src/identity/profile.ts"}
-  - {"file":"src/identity/voice.ts"}
-  - {"file":"src/identity/preferences.ts"}
-  - {"file":"test/identity/store.test.ts"}
-  - {"file":"test/identity/profile.test.ts"}
-  - {"file":"test/identity/voice.test.ts"}
-  - {"file":"test/identity/preferences.test.ts"}
-  - {"file":"test/identity/index.test.ts"}
+  - {"file":"packages/msp/src/identity/index.ts"}
+  - {"file":"packages/msp/src/identity/types.ts"}
+  - {"file":"packages/msp/src/identity/store.ts"}
+  - {"file":"packages/msp/src/identity/profile.ts"}
+  - {"file":"packages/msp/src/identity/voice.ts"}
+  - {"file":"packages/msp/src/identity/preferences.ts"}
+  - {"file":"packages/msp/test/identity/store.test.ts"}
+  - {"file":"packages/msp/test/identity/profile.test.ts"}
+  - {"file":"packages/msp/test/identity/voice.test.ts"}
+  - {"file":"packages/msp/test/identity/preferences.test.ts"}
+  - {"file":"packages/msp/test/identity/index.test.ts"}
 created_at: 2026-05-05T12:00:00.000+07:00
 ---
 

@@ -14,13 +14,13 @@ tags:
   - user-facing
 crosslinks: {"implements":["ADR--MSP-MCP-SERVER"],"references":["CONCEPT--MSP-MCP-SERVER","FEAT--MSP-VALIDATOR","FEAT--CODEGEN-MICROTASK-RUNNER","FEAT--MEMORY-SESSIONS-WRITER","FEAT--MEMORY-EPISODIC-WRITER","FEAT--MEMORY-BACKLINKS-INDEXER"]}
 linked_symbols:
-  - {"file":"src/mcp/server.ts"}
-  - {"file":"src/mcp/tools/validate.ts"}
+  - {"file":"packages/msp/src/mcp/server.ts"}
+  - {"file":"packages/msp/src/mcp/tools/validate.ts"}
   - {"file":"src/mcp/tools/propose.ts"}
-  - {"file":"src/mcp/tools/run-task.ts"}
-  - {"file":"src/mcp/tools/session-append.ts"}
-  - {"file":"src/mcp/tools/episode-append.ts"}
-  - {"file":"src/mcp/tools/backlinks-rebuild.ts"}
+  - {"file":"packages/msp/src/mcp/tools/run-task.ts"}
+  - {"file":"packages/msp/src/mcp/tools/session-append.ts"}
+  - {"file":"packages/msp/src/mcp/tools/episode-append.ts"}
+  - {"file":"packages/msp/src/mcp/tools/backlinks-rebuild.ts"}
 created_at: 2026-05-03T18:13:54.737+07:00
 ---
 

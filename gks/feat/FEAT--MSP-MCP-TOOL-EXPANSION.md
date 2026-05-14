@@ -15,12 +15,12 @@ tags:
   - user-facing
 crosslinks: {"references":["CONCEPT--MSP-MCP-TOOL-EXPANSION","FEAT--MSP-MCP-SERVER","FEAT--CONSOLIDATOR","FEAT--RETRIEVAL-ORCHESTRATION","FEAT--COMPRESSOR","FEAT--IDENTITY-LAYER"]}
 linked_symbols:
-  - {"file":"src/mcp/server.ts"}
-  - {"file":"src/mcp/tools/recall.ts"}
-  - {"file":"src/mcp/tools/remember.ts"}
-  - {"file":"src/mcp/tools/compress.ts"}
-  - {"file":"src/mcp/tools/identity-get.ts"}
-  - {"file":"src/mcp/tools/identity-set.ts"}
+  - {"file":"packages/msp/src/mcp/server.ts"}
+  - {"file":"packages/msp/src/mcp/tools/recall.ts"}
+  - {"file":"packages/msp/src/mcp/tools/remember.ts"}
+  - {"file":"packages/msp/src/mcp/tools/compress.ts"}
+  - {"file":"packages/msp/src/mcp/tools/identity-get.ts"}
+  - {"file":"packages/msp/src/mcp/tools/identity-set.ts"}
 created_at: 2026-05-05T16:15:00.000+07:00
 ---
 

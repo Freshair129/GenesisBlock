@@ -17,10 +17,10 @@ tags:
   - implementation
 crosslinks: {"implements":["FEAT--SLM-OLLAMA-CLIENT"],"references":["ADR--SLM-OLLAMA-CLIENT"]}
 linked_symbols:
-  - {"file":"src/codegen/slm/ollama.ts"}
-  - {"file":"src/codegen/slm/factory.ts"}
-  - {"file":"src/codegen/slm/types.ts"}
-  - {"file":"src/codegen/slm/errors.ts"}
+  - {"file":"packages/msp/src/codegen/slm/ollama.ts"}
+  - {"file":"packages/msp/src/codegen/slm/factory.ts"}
+  - {"file":"packages/msp/src/codegen/slm/types.ts"}
+  - {"file":"packages/msp/src/codegen/slm/errors.ts"}
 created_at: 2026-05-03T16:22:31.964+07:00
 ---
 

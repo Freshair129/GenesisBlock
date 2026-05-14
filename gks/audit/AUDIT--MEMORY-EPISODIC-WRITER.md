@@ -16,11 +16,11 @@ tags:
   - episodic
 crosslinks: {"references":["FEAT--MEMORY-EPISODIC-WRITER","BLUEPRINT--MEMORY-EPISODIC-WRITER","ADR--MEMORY-EPISODIC-WRITER"]}
 linked_symbols:
-  - {"file":"src/memory/episodic/writer.ts"}
-  - {"file":"src/memory/episodic/schema.ts"}
-  - {"file":"src/memory/episodic/atomic-write.ts"}
-  - {"file":"src/memory/episodic/summarisers/heuristic.ts"}
-  - {"file":"src/memory/episodic/types.ts"}
+  - {"file":"packages/msp/src/memory/episodic/writer.ts"}
+  - {"file":"packages/msp/src/memory/episodic/schema.ts"}
+  - {"file":"packages/msp/src/memory/episodic/atomic-write.ts"}
+  - {"file":"packages/msp/src/memory/episodic/summarisers/heuristic.ts"}
+  - {"file":"packages/msp/src/memory/episodic/types.ts"}
 created_at: 2026-05-03T15:43:38.623+07:00
 ---
 

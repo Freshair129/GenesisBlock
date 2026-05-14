@@ -18,12 +18,12 @@ tags:
   - user-facing
 crosslinks: {"implements":["ADR--IDENTITY-STORAGE-SHAPE"],"references":["CONCEPT--IDENTITY-LAYER"]}
 linked_symbols:
-  - {"file":"src/identity/index.ts"}
-  - {"file":"src/identity/types.ts"}
-  - {"file":"src/identity/profile.ts"}
-  - {"file":"src/identity/voice.ts"}
-  - {"file":"src/identity/preferences.ts"}
-  - {"file":"src/identity/store.ts"}
+  - {"file":"packages/msp/src/identity/index.ts"}
+  - {"file":"packages/msp/src/identity/types.ts"}
+  - {"file":"packages/msp/src/identity/profile.ts"}
+  - {"file":"packages/msp/src/identity/voice.ts"}
+  - {"file":"packages/msp/src/identity/preferences.ts"}
+  - {"file":"packages/msp/src/identity/store.ts"}
 created_at: 2026-05-05T00:26:00.000+07:00
 ---
 

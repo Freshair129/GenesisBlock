@@ -17,9 +17,9 @@ tags:
   - m9a
 crosslinks: {"references":["PROTO--VALID-UNTIL","CONCEPT--DECISION-ATROPHY-GUARDS","FEAT--PROTO-LOADER","FRAMEWORK--MSP-ARCHITECTURE-V2"]}
 linked_symbols:
-  - {"file":"src/validator/proto/valid-until.ts"}
+  - {"file":"packages/msp/src/validator/proto/valid-until.ts"}
   - {"file":"gks/proto/PROTO--VALID-UNTIL.md"}
-  - {"file":"test/validator/proto/valid-until.test.ts"}
+  - {"file":"packages/msp/test/validator/proto/valid-until.test.ts"}
 phase_override:
   skip_blueprint: true
   reason: "Incremental PROTO rule plugged into the already-blueprinted loader scaffold (BLUEPRINT--PROTO-LOADER). Doc-to-code chain: CONCEPT--DECISION-ATROPHY-GUARDS -> PROTO--VALID-UNTIL -> predicate -> this audit; per-rule predicates do not each warrant a separate phase-3 blueprint."

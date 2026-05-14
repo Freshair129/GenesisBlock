@@ -16,14 +16,14 @@ tags:
   - implementation
 crosslinks: {"implements":["FEAT--MSP-MCP-SERVER"],"references":["ADR--MSP-MCP-SERVER"]}
 linked_symbols:
-  - {"file":"src/mcp/server.ts"}
-  - {"file":"src/mcp/types.ts"}
-  - {"file":"src/mcp/tools/validate.ts"}
+  - {"file":"packages/msp/src/mcp/server.ts"}
+  - {"file":"packages/msp/src/mcp/types.ts"}
+  - {"file":"packages/msp/src/mcp/tools/validate.ts"}
   - {"file":"src/mcp/tools/propose.ts"}
-  - {"file":"src/mcp/tools/run-task.ts"}
-  - {"file":"src/mcp/tools/session-append.ts"}
-  - {"file":"src/mcp/tools/episode-append.ts"}
-  - {"file":"src/mcp/tools/backlinks-rebuild.ts"}
+  - {"file":"packages/msp/src/mcp/tools/run-task.ts"}
+  - {"file":"packages/msp/src/mcp/tools/session-append.ts"}
+  - {"file":"packages/msp/src/mcp/tools/episode-append.ts"}
+  - {"file":"packages/msp/src/mcp/tools/backlinks-rebuild.ts"}
 created_at: 2026-05-03T18:13:55.210+07:00
 ---
 

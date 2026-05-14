@@ -15,15 +15,15 @@ tags:
   - server
 crosslinks: {"references":["FEAT--MSP-MCP-SERVER","BLUEPRINT--MSP-MCP-SERVER","ADR--MSP-MCP-SERVER","FEAT--MSP-VALIDATOR","FEAT--CODEGEN-MICROTASK-RUNNER"]}
 linked_symbols:
-  - {"file":"src/mcp/server.ts"}
-  - {"file":"src/mcp/types.ts"}
-  - {"file":"src/mcp/bin.ts"}
-  - {"file":"src/mcp/tools/validate.ts"}
+  - {"file":"packages/msp/src/mcp/server.ts"}
+  - {"file":"packages/msp/src/mcp/types.ts"}
+  - {"file":"packages/msp/src/mcp/bin.ts"}
+  - {"file":"packages/msp/src/mcp/tools/validate.ts"}
   - {"file":"src/mcp/tools/propose.ts"}
-  - {"file":"src/mcp/tools/run-task.ts"}
-  - {"file":"src/mcp/tools/session-append.ts"}
-  - {"file":"src/mcp/tools/episode-append.ts"}
-  - {"file":"src/mcp/tools/backlinks-rebuild.ts"}
+  - {"file":"packages/msp/src/mcp/tools/run-task.ts"}
+  - {"file":"packages/msp/src/mcp/tools/session-append.ts"}
+  - {"file":"packages/msp/src/mcp/tools/episode-append.ts"}
+  - {"file":"packages/msp/src/mcp/tools/backlinks-rebuild.ts"}
 created_at: 2026-05-03T18:20:24.061+07:00
 ---
 

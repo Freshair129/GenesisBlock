@@ -18,20 +18,20 @@ tags:
   - implementation
 crosslinks: {"references":["ADR--GLOBAL-VS-WORKSPACE","CONCEPT--AGENT-AGNOSTIC","CONCEPT--NAMED-PROJECT-REGISTRY","ADR--PATH-ENCODING"]}
 linked_symbols:
-  - {"file":"src/identity/store.ts"}
-  - {"file":"src/identity/types.ts"}
-  - {"file":"src/identity/migrate.ts"}
-  - {"file":"src/identity/index.ts"}
-  - {"file":"src/projects/registry.ts"}
-  - {"file":"src/projects/resolve.ts"}
-  - {"file":"src/projects/types.ts"}
-  - {"file":"src/lib/msp-home.ts"}
-  - {"file":"src/mcp/tools/identity-get.ts"}
-  - {"file":"src/mcp/tools/identity-set.ts"}
-  - {"file":"test/identity/store.test.ts"}
-  - {"file":"test/identity/migrate.test.ts"}
-  - {"file":"test/projects/registry.test.ts"}
-  - {"file":"test/projects/resolve.test.ts"}
+  - {"file":"packages/msp/src/identity/store.ts"}
+  - {"file":"packages/msp/src/identity/types.ts"}
+  - {"file":"packages/msp/src/identity/migrate.ts"}
+  - {"file":"packages/msp/src/identity/index.ts"}
+  - {"file":"packages/msp/src/projects/registry.ts"}
+  - {"file":"packages/msp/src/projects/resolve.ts"}
+  - {"file":"packages/msp/src/projects/types.ts"}
+  - {"file":"packages/msp/src/lib/msp-home.ts"}
+  - {"file":"packages/msp/src/mcp/tools/identity-get.ts"}
+  - {"file":"packages/msp/src/mcp/tools/identity-set.ts"}
+  - {"file":"packages/msp/test/identity/store.test.ts"}
+  - {"file":"packages/msp/test/identity/migrate.test.ts"}
+  - {"file":"packages/msp/test/projects/registry.test.ts"}
+  - {"file":"packages/msp/test/projects/resolve.test.ts"}
 created_at: 2026-05-09T07:00:00.000+07:00
 ---
 

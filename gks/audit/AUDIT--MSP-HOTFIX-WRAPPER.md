@@ -17,7 +17,7 @@ crosslinks: {"references":["FEAT--MSP-HOTFIX-WRAPPER","BLUEPRINT--MSP-HOTFIX-WRA
 linked_symbols:
   - {"file":"examples/hooks/pre-commit-validator.sh"}
   - {"file":"package.json"}
-  - {"file":"src/validator/rules/id-format.ts"}
+  - {"file":"packages/msp/src/validator/rules/id-format.ts"}
 created_at: 2026-05-03T18:01:45.299+07:00
 ---
 

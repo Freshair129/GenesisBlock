@@ -15,9 +15,9 @@ tags:
   - m8b
 crosslinks: {"references":["PROTO--PHASE-GATES","CONCEPT--PROTO-PHASE-GATES","FRAMEWORK--PHASE-GOVERNANCE","FEAT--PROTO-LOADER","BLUEPRINT--PROTO-LOADER","CONCEPT--PROTO-PATTERN"]}
 linked_symbols:
-  - {"file":"src/validator/proto/phase-gates.ts"}
+  - {"file":"packages/msp/src/validator/proto/phase-gates.ts"}
   - {"file":"gks/proto/PROTO--PHASE-GATES.md"}
-  - {"file":"test/validator/proto/phase-gates.test.ts"}
+  - {"file":"packages/msp/test/validator/proto/phase-gates.test.ts"}
 phase_override:
   skip_blueprint: true
   reason: "PROTO atom + its predicate are M8a self-similar; the M8a BLUEPRINT--PROTO-LOADER covers the loader contract this predicate plugs into"

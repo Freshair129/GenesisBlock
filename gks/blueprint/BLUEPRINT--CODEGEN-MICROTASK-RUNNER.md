@@ -16,15 +16,15 @@ tags:
   - implementation
 crosslinks: {"implements":["FEAT--CODEGEN-MICROTASK-RUNNER"],"references":["ADR--CODEGEN-MICROTASK-RUNNER"]}
 linked_symbols:
-  - {"file":"src/codegen/runner.ts"}
-  - {"file":"src/codegen/load-task.ts"}
-  - {"file":"src/codegen/prompt-builder.ts"}
+  - {"file":"packages/msp/src/codegen/runner.ts"}
+  - {"file":"packages/msp/src/codegen/load-task.ts"}
+  - {"file":"packages/msp/src/codegen/prompt-builder.ts"}
   - {"file":"src/codegen/slm-client.ts"}
-  - {"file":"src/codegen/post-process.ts"}
-  - {"file":"src/codegen/forbidden-patterns.ts"}
+  - {"file":"packages/msp/src/codegen/post-process.ts"}
+  - {"file":"packages/msp/src/codegen/forbidden-patterns.ts"}
   - {"file":"src/codegen/acceptance.ts"}
   - {"file":"src/codegen/escalate.ts"}
-  - {"file":"src/codegen/cli.ts"}
+  - {"file":"packages/msp/src/codegen/cli.ts"}
 created_at: 2026-05-03T14:16:37.606+07:00
 ---
 

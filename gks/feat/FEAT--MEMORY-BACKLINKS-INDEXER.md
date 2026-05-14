@@ -15,8 +15,8 @@ tags:
   - user-facing
 crosslinks: {"implements":["ADR--MEMORY-BACKLINKS-INDEXER"],"references":["CONCEPT--MEMORY-BACKLINKS-INDEXER","CONCEPT--MEMORY-VECTOR-BACKLINKS"]}
 linked_symbols:
-  - {"file":"src/memory/backlinks/indexer.ts"}
-  - {"file":"src/memory/backlinks/cli.ts"}
+  - {"file":"packages/msp/src/memory/backlinks/indexer.ts"}
+  - {"file":"packages/msp/src/memory/backlinks/cli.ts"}
 created_at: 2026-05-03T14:16:42.851+07:00
 ---
 

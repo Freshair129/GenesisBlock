@@ -16,11 +16,11 @@ tags:
   - user-facing
 crosslinks: {"implements":["ADR--CONSOLIDATOR-HYBRID-SCORING"],"references":["CONCEPT--CONSOLIDATOR","FEAT--MEMORY-EPISODIC-WRITER","FEAT--MEMORY-SESSIONS-WRITER"]}
 linked_symbols:
-  - {"file":"src/orchestrator/consolidator/index.ts"}
-  - {"file":"src/orchestrator/consolidator/types.ts"}
-  - {"file":"src/orchestrator/consolidator/score.ts"}
-  - {"file":"src/orchestrator/consolidator/boundary.ts"}
-  - {"file":"src/orchestrator/consolidator/summarise.ts"}
+  - {"file":"packages/msp/src/orchestrator/consolidator/index.ts"}
+  - {"file":"packages/msp/src/orchestrator/consolidator/types.ts"}
+  - {"file":"packages/msp/src/orchestrator/consolidator/score.ts"}
+  - {"file":"packages/msp/src/orchestrator/consolidator/boundary.ts"}
+  - {"file":"packages/msp/src/orchestrator/consolidator/summarise.ts"}
 created_at: 2026-05-04T17:06:00.000+07:00
 ---
 

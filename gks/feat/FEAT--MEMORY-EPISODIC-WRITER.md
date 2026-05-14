@@ -15,9 +15,9 @@ tags:
   - user-facing
 crosslinks: {"implements":["ADR--MEMORY-EPISODIC-WRITER"],"references":["CONCEPT--MEMORY-EPISODIC-WRITER","CONCEPT--MEMORY-EPISODIC"]}
 linked_symbols:
-  - {"file":"src/memory/episodic/writer.ts"}
-  - {"file":"src/memory/episodic/types.ts"}
-  - {"file":"src/memory/episodic/summarisers/heuristic.ts"}
+  - {"file":"packages/msp/src/memory/episodic/writer.ts"}
+  - {"file":"packages/msp/src/memory/episodic/types.ts"}
+  - {"file":"packages/msp/src/memory/episodic/summarisers/heuristic.ts"}
 created_at: 2026-05-03T14:16:40.829+07:00
 ---
 

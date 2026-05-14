@@ -14,17 +14,17 @@ tags:
   - audit
 crosslinks: {"references":["FEAT--CONSOLIDATOR","BLUEPRINT--CONSOLIDATOR","ADR--CONSOLIDATOR-HYBRID-SCORING","CONCEPT--CONSOLIDATOR","FRAMEWORK--MSP-ARCHITECTURE-V2"]}
 linked_symbols:
-  - {"file":"src/orchestrator/consolidator/index.ts"}
-  - {"file":"src/orchestrator/consolidator/types.ts"}
-  - {"file":"src/orchestrator/consolidator/score.ts"}
-  - {"file":"src/orchestrator/consolidator/boundary.ts"}
-  - {"file":"src/orchestrator/consolidator/summarise.ts"}
-  - {"file":"src/orchestrator/consolidator/llm.ts"}
-  - {"file":"test/orchestrator/consolidator/score.test.ts"}
-  - {"file":"test/orchestrator/consolidator/boundary.test.ts"}
-  - {"file":"test/orchestrator/consolidator/summarise.test.ts"}
-  - {"file":"test/orchestrator/consolidator/llm.test.ts"}
-  - {"file":"test/orchestrator/consolidator/index.test.ts"}
+  - {"file":"packages/msp/src/orchestrator/consolidator/index.ts"}
+  - {"file":"packages/msp/src/orchestrator/consolidator/types.ts"}
+  - {"file":"packages/msp/src/orchestrator/consolidator/score.ts"}
+  - {"file":"packages/msp/src/orchestrator/consolidator/boundary.ts"}
+  - {"file":"packages/msp/src/orchestrator/consolidator/summarise.ts"}
+  - {"file":"packages/msp/src/orchestrator/consolidator/llm.ts"}
+  - {"file":"packages/msp/test/orchestrator/consolidator/score.test.ts"}
+  - {"file":"packages/msp/test/orchestrator/consolidator/boundary.test.ts"}
+  - {"file":"packages/msp/test/orchestrator/consolidator/summarise.test.ts"}
+  - {"file":"packages/msp/test/orchestrator/consolidator/llm.test.ts"}
+  - {"file":"packages/msp/test/orchestrator/consolidator/index.test.ts"}
 created_at: 2026-05-04T23:29:00.000+07:00
 ---
 

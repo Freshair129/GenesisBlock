@@ -15,9 +15,9 @@ tags:
   - user-facing
 crosslinks: {"implements":["ADR--SLM-OLLAMA-CLIENT"],"references":["CONCEPT--SLM-OLLAMA-CLIENT","FEAT--CODEGEN-MICROTASK-RUNNER"]}
 linked_symbols:
-  - {"file":"src/codegen/slm/ollama.ts"}
-  - {"file":"src/codegen/slm/factory.ts"}
-  - {"file":"src/codegen/slm/types.ts"}
+  - {"file":"packages/msp/src/codegen/slm/ollama.ts"}
+  - {"file":"packages/msp/src/codegen/slm/factory.ts"}
+  - {"file":"packages/msp/src/codegen/slm/types.ts"}
 created_at: 2026-05-03T16:22:31.444+07:00
 ---
 

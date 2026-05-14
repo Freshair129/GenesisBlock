@@ -14,12 +14,12 @@ tags:
   - audit
 crosslinks: {"references":["FEAT--MSP-OBSIDIAN-CLIENT","BLUEPRINT--MSP-OBSIDIAN-CLIENT","ADR--MSP-OBSIDIAN-INTEGRATION","FRAMEWORK--MSP-ARCHITECTURE-V2"]}
 linked_symbols:
-  - {"file":"src/obsidian/client.ts"}
-  - {"file":"src/obsidian/rest.ts"}
-  - {"file":"src/obsidian/filesystem.ts"}
-  - {"file":"src/obsidian/env.ts"}
-  - {"file":"src/obsidian/types.ts"}
-  - {"file":"test/obsidian/client.test.ts"}
+  - {"file":"packages/msp/src/obsidian/client.ts"}
+  - {"file":"packages/msp/src/obsidian/rest.ts"}
+  - {"file":"packages/msp/src/obsidian/filesystem.ts"}
+  - {"file":"packages/msp/src/obsidian/env.ts"}
+  - {"file":"packages/msp/src/obsidian/types.ts"}
+  - {"file":"packages/msp/test/obsidian/client.test.ts"}
 created_at: 2026-05-04T12:29:16.095+07:00
 ---
 

@@ -16,11 +16,11 @@ tags:
   - backlinks
 crosslinks: {"references":["FEAT--MEMORY-BACKLINKS-INDEXER","BLUEPRINT--MEMORY-BACKLINKS-INDEXER","ADR--MEMORY-BACKLINKS-INDEXER"]}
 linked_symbols:
-  - {"file":"src/memory/backlinks/indexer.ts"}
-  - {"file":"src/memory/backlinks/edges.ts"}
-  - {"file":"src/memory/backlinks/walk.ts"}
-  - {"file":"src/memory/backlinks/atomic-write.ts"}
-  - {"file":"src/memory/backlinks/cli.ts"}
+  - {"file":"packages/msp/src/memory/backlinks/indexer.ts"}
+  - {"file":"packages/msp/src/memory/backlinks/edges.ts"}
+  - {"file":"packages/msp/src/memory/backlinks/walk.ts"}
+  - {"file":"packages/msp/src/memory/backlinks/atomic-write.ts"}
+  - {"file":"packages/msp/src/memory/backlinks/cli.ts"}
 created_at: 2026-05-03T15:43:37.417+07:00
 ---
 

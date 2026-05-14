@@ -18,16 +18,16 @@ tags:
 crosslinks: {"references":["CONCEPT--KNOWLEDGE-LAYERS-V2","ADR--AGENT-WRITE-BOUNDARIES","FRAMEWORK--MSP-ARCHITECTURE-V2"]}
 linked_symbols:
   - {"file":"src/mcp/tools/propose.ts"}
-  - {"file":"src/mcp/tools/candidate.ts"}
-  - {"file":"src/memory/candidates/writer.ts"}
+  - {"file":"packages/msp/src/mcp/tools/candidate.ts"}
+  - {"file":"packages/msp/src/memory/candidates/writer.ts"}
   - {"file":"scripts/msp/propose.mjs"}
   - {"file":"test/scripts/propose.test.ts"}
   - {"file":"test/mcp/tools/propose.test.ts"}
-  - {"file":"test/mcp/tools/candidate.test.ts"}
-  - {"file":"test/memory/candidates/writer.test.ts"}
+  - {"file":"packages/msp/test/mcp/tools/candidate.test.ts"}
+  - {"file":"packages/msp/test/memory/candidates/writer.test.ts"}
   - {"file":"web/src/components/CandidatesList.tsx"}
   - {"file":"web/src/api.ts"}
-  - {"file":"src/mcp/server.ts"}
+  - {"file":"packages/msp/src/mcp/server.ts"}
   - {"file":"package.json"}
   - {"file":"msp_spec.md"}
   - {"file":"CLAUDE.md"}

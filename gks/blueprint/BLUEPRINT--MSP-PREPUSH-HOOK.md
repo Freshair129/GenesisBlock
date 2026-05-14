@@ -19,7 +19,7 @@ linked_symbols:
   - {"file":"examples/hooks/pre-push-verify.sh"}
   - {"file":"examples/hooks/install.sh"}
   - {"file":"examples/hooks/README.md"}
-  - {"file":"test/hooks/pre-push.test.ts"}
+  - {"file":"packages/msp/test/hooks/pre-push.test.ts"}
 created_at: 2026-05-03T17:39:29.189+07:00
 ---
 

@@ -16,19 +16,19 @@ tags:
   - audit
 crosslinks: {"references":["FEAT--RETRIEVAL-ORCHESTRATION","BLUEPRINT--RETRIEVAL-ORCHESTRATION","ADR--RETRIEVAL-RRF-FUSION","CONCEPT--RETRIEVAL-ORCHESTRATION","FRAMEWORK--MSP-ARCHITECTURE-V2"]}
 linked_symbols:
-  - {"file":"src/orchestrator/retrieval/index.ts"}
-  - {"file":"src/orchestrator/retrieval/types.ts"}
-  - {"file":"src/orchestrator/retrieval/fusion.ts"}
-  - {"file":"src/orchestrator/retrieval/sources/vector.ts"}
-  - {"file":"src/orchestrator/retrieval/sources/obsidian.ts"}
-  - {"file":"src/orchestrator/retrieval/sources/episodic.ts"}
-  - {"file":"src/orchestrator/retrieval/sources/backlinks.ts"}
-  - {"file":"test/orchestrator/retrieval/fusion.test.ts"}
-  - {"file":"test/orchestrator/retrieval/sources/vector.test.ts"}
-  - {"file":"test/orchestrator/retrieval/sources/obsidian.test.ts"}
-  - {"file":"test/orchestrator/retrieval/sources/episodic.test.ts"}
-  - {"file":"test/orchestrator/retrieval/sources/backlinks.test.ts"}
-  - {"file":"test/orchestrator/retrieval/index.test.ts"}
+  - {"file":"packages/msp/src/orchestrator/retrieval/index.ts"}
+  - {"file":"packages/msp/src/orchestrator/retrieval/types.ts"}
+  - {"file":"packages/msp/src/orchestrator/retrieval/fusion.ts"}
+  - {"file":"packages/msp/src/orchestrator/retrieval/sources/vector.ts"}
+  - {"file":"packages/msp/src/orchestrator/retrieval/sources/obsidian.ts"}
+  - {"file":"packages/msp/src/orchestrator/retrieval/sources/episodic.ts"}
+  - {"file":"packages/msp/src/orchestrator/retrieval/sources/backlinks.ts"}
+  - {"file":"packages/msp/test/orchestrator/retrieval/fusion.test.ts"}
+  - {"file":"packages/msp/test/orchestrator/retrieval/sources/vector.test.ts"}
+  - {"file":"packages/msp/test/orchestrator/retrieval/sources/obsidian.test.ts"}
+  - {"file":"packages/msp/test/orchestrator/retrieval/sources/episodic.test.ts"}
+  - {"file":"packages/msp/test/orchestrator/retrieval/sources/backlinks.test.ts"}
+  - {"file":"packages/msp/test/orchestrator/retrieval/index.test.ts"}
 created_at: 2026-05-05T16:18:00.000+07:00
 ---
 

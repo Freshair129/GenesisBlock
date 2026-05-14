@@ -17,9 +17,9 @@ tags:
 crosslinks: {"references":["ADR--FORBIDDEN-FIELDS-LIST","FEAT--MSP-VALIDATOR"]}
 linked_symbols:
   - {"file":".brain/msp/LLM_Contract/atomic_contract.yaml"}
-  - {"file":"src/validator/contract.ts"}
-  - {"file":"src/validator/rules/required-fields.ts"}
-  - {"file":"src/validator/types.ts"}
+  - {"file":"packages/msp/src/validator/contract.ts"}
+  - {"file":"packages/msp/src/validator/rules/required-fields.ts"}
+  - {"file":"packages/msp/src/validator/types.ts"}
 created_at: 2026-05-03T17:58:58.818+07:00
 ---
 

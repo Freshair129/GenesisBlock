@@ -25,7 +25,7 @@ linked_symbols:
   - {"file":"eslint.config.js"}
   - {"file":"upstream/gks-proposals/"}
   - {"file":"scripts/msp/propose.mjs"}
-  - {"file":"src/memory/backlinks/"}
+  - {"file":"packages/msp/src/memory/backlinks/"}
 created_at: 2026-05-08T13:22:00.000+07:00
 ---
 
