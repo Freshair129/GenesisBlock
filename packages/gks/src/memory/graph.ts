@@ -103,7 +103,7 @@ export interface GraphStoreOptions {
   path?: string
 }
 
-export class GraphStore {
+export class GraphStore implements GraphBackend {
   private readonly path: string | null
   private readonly nodes = new Map<string, GraphNode>()
   private readonly edges = new Map<string, GraphEdge>()
@@ -374,6 +374,7 @@ function isEdgeValidAt(edge: GraphEdge, asOfMs?: number): boolean {
  */
 export interface GraphBackend {
   load(): Promise<void>
+  size(): Promise<{ nodes: number; edges: number }> | { nodes: number; edges: number }
   addNode(args: AddNodeArgs): Promise<GraphNode>
   addEdge(args: AddEdgeArgs): Promise<GraphEdge>
   retractEdge(id: string, at?: string): Promise<GraphEdge | null>

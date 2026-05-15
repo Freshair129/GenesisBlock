@@ -50,10 +50,10 @@ describe.each(backends)('$name', ({ create }) => {
     const alice = await g.addNode({ id: 'u:alice', labels: ['User'], props: { name: 'Alice' } })
     const bob = await g.addNode({ id: 'u:bob', labels: ['User'], props: { name: 'Bob' } })
     const e = await g.addEdge({ from: alice.id, to: bob.id, rel: 'KNOWS' })
-    expect(g.size()).toEqual({ nodes: 2, edges: 1 })
-    expect(g.query({ from: alice.id })).toHaveLength(1)
-    expect(g.query({ to: bob.id })).toHaveLength(1)
-    expect(g.query({ rel: 'FOLLOWS' })).toHaveLength(0)
+    expect(await g.size()).toEqual({ nodes: 2, edges: 1 })
+    expect(await g.query({ from: alice.id })).toHaveLength(1)
+    expect(await g.query({ to: bob.id })).toHaveLength(1)
+    expect(await g.query({ rel: 'FOLLOWS' })).toHaveLength(0)
     void e
   })
 
@@ -71,13 +71,13 @@ describe.each(backends)('$name', ({ create }) => {
     const second = await g.addEdge({ from: 'u', to: 'city:paris', rel: 'LIVES_IN', valid_from: '2024-06-01T00:00:00Z', supersede: true })
 
     // Default query hides retired edges.
-    const current = g.query({ from: 'u', rel: 'LIVES_IN' })
+    const current = await g.query({ from: 'u', rel: 'LIVES_IN' })
     expect(current.map((e) => e.to)).toEqual(['city:paris']) // just the new one
     expect(current).toHaveLength(1)
     expect(current[0]!.id).toBe(second.id)
 
     // Verify history if the backend supports it (all current ones do)
-    const retired = g.query({ from: 'u', rel: 'LIVES_IN', includeInvalid: true }).find(e => e.id === first.id)!
+    const retired = (await g.query({ from: 'u', rel: 'LIVES_IN', includeInvalid: true })).find(e => e.id === first.id)!
     expect(retired.valid_to).toBe(second.valid_from)
     expect(retired.superseded_by).toBe(second.id)
   })
@@ -89,7 +89,7 @@ describe.each(backends)('$name', ({ create }) => {
     const a = await g.addEdge({ from: 'u', to: 'p', rel: 'LIVES_IN' })
     await g.addEdge({ from: 'u', to: 'b', rel: 'VISITED', supersede: true }) // different to+rel
     
-    const edge = g.query({ from: 'u', to: 'p', rel: 'LIVES_IN' })[0]!
+    const edge = (await g.query({ from: 'u', to: 'p', rel: 'LIVES_IN' }))[0]!
     expect(edge.valid_to).toBeNull()
   })
 
@@ -100,10 +100,10 @@ describe.each(backends)('$name', ({ create }) => {
     await g.addEdge({ from: 'u', to: 'p', rel: 'LIVES_IN', valid_from: '2022-01-01T00:00:00Z' })
     await g.addEdge({ from: 'u', to: 'b', rel: 'LIVES_IN', valid_from: '2024-06-01T00:00:00Z', supersede: true })
 
-    const in2023 = g.query({ from: 'u', rel: 'LIVES_IN', asOf: '2023-06-01T00:00:00Z' })
+    const in2023 = await g.query({ from: 'u', rel: 'LIVES_IN', asOf: '2023-06-01T00:00:00Z' })
     expect(in2023.map((e) => e.to)).toEqual(['p'])
 
-    const in2025 = g.query({ from: 'u', rel: 'LIVES_IN', asOf: '2025-01-01T00:00:00Z' })
+    const in2025 = await g.query({ from: 'u', rel: 'LIVES_IN', asOf: '2025-01-01T00:00:00Z' })
     expect(in2025.map((e) => e.to)).toEqual(['b'])
   })
 
@@ -114,8 +114,8 @@ describe.each(backends)('$name', ({ create }) => {
     const retracted = await g.retractEdge(e.id, '2025-01-01T00:00:00Z')
     expect(retracted?.valid_to).toBe('2025-01-01T00:00:00Z')
 
-    expect(g.query({ from: 'a' })).toHaveLength(0) // hidden
-    expect(g.query({ from: 'a', includeInvalid: true })).toHaveLength(1)
+    expect(await g.query({ from: 'a' })).toHaveLength(0) // hidden
+    expect(await g.query({ from: 'a', includeInvalid: true })).toHaveLength(1)
   })
 
   it('neighbors() BFS respects depth + relation + direction', async () => {
@@ -124,17 +124,17 @@ describe.each(backends)('$name', ({ create }) => {
     await g.addEdge({ from: 'b', to: 'c', rel: 'R' })
     await g.addEdge({ from: 'c', to: 'd', rel: 'R' })
 
-    const depth1 = g.neighbors('a', { depth: 1 })
+    const depth1 = await g.neighbors('a', { depth: 1 })
     expect(depth1.map((n) => n.node.id)).toEqual(['b'])
 
-    const depth2 = g.neighbors('a', { depth: 2 })
+    const depth2 = await g.neighbors('a', { depth: 2 })
     expect(depth2.map((n) => n.node.id).sort()).toEqual(['b', 'c'])
 
-    const depth3 = g.neighbors('a', { depth: 3 })
+    const depth3 = await g.neighbors('a', { depth: 3 })
     expect(depth3.map((n) => n.node.id).sort()).toEqual(['b', 'c', 'd'])
 
     // 'in' direction from 'd'
-    const inbound = g.neighbors('d', { depth: 3, direction: 'in' })
+    const inbound = await g.neighbors('d', { depth: 3, direction: 'in' })
     expect(inbound.map((n) => n.node.id)).toEqual(['c', 'b', 'a'])
   })
 
@@ -142,7 +142,7 @@ describe.each(backends)('$name', ({ create }) => {
     for (const id of ['a', 'b', 'c']) await g.addNode({ id, labels: ['X'] })
     const e1 = await g.addEdge({ from: 'a', to: 'b', rel: 'R' })
     const e2 = await g.addEdge({ from: 'b', to: 'c', rel: 'R' })
-    const depth2 = g.neighbors('a', { depth: 2 })
+    const depth2 = await g.neighbors('a', { depth: 2 })
     const c = depth2.find((n) => n.node.id === 'c')!
     expect(c.path.map((e) => e.id)).toEqual([e1.id, e2.id])
   })

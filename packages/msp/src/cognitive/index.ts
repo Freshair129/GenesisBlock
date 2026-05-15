@@ -162,7 +162,7 @@ export async function createCognitiveLayer(
         throw new Error(`expand: atom not found: ${req.id}`)
       }
 
-      const resource = makeResource('atom', req.id, {}, atom.attributes ?? {})
+      const resource = makeResource('atom', req.id, {}, (atom.attributes as any) ?? {})
       const { permitted, decision } = await enforcePolicy(resource, { root, subject, action, context })
 
       if (!permitted) {

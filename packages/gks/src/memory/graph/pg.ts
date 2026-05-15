@@ -70,6 +70,16 @@ class PgGraphBackend implements GraphBackend {
     log.info('pg graph backend loaded', { node_table: this.nodeTable, edge_table: this.edgeTable })
   }
 
+  async size(): Promise<{ nodes: number; edges: number }> {
+    await this.ensureLoaded()
+    const n = await this.pool.query(`SELECT count(*) FROM ${quoteIdent(this.nodeTable)}`)
+    const e = await this.pool.query(`SELECT count(*) FROM ${quoteIdent(this.edgeTable)}`)
+    return {
+      nodes: parseInt(n.rows[0].count, 10),
+      edges: parseInt(e.rows[0].count, 10),
+    }
+  }
+
   async addNode(args: AddNodeArgs): Promise<GraphNode> {
     await this.ensureLoaded()
     const id = args.id ?? stableId('N', args.labels.join(':'), JSON.stringify(args.props ?? {}))
