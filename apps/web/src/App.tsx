@@ -51,6 +51,8 @@ function App() {
   const [sbMode, setSbMode] = useState<'files' | 'tags' | 'daily'>("files");
   const [graphMode, setGraphMode] = useState<'2d' | '3d' | 'galaxy'>('2d');
   const [activeTags, setActiveTags] = useState<string[]>([]);
+  const [mobileNav, setMobileNav] = useState(false);
+  const [mobileRail, setMobileRail] = useState(false);
   const toggleTag = (t: string) => setActiveTags(arr => arr.includes(t) ? arr.filter(x => x !== t) : [...arr, t]);
 
   const filteredNotes = useMemo(() => {
@@ -115,8 +117,11 @@ function App() {
   const focusNoteId = active?.kind === "note" ? active.id : null;
 
   return (
-    <div className="app">
+    <div className={`app${mobileNav ? ' nav-open' : ''}${mobileRail ? ' rail-open' : ''}`}>
       <div className="topbar">
+        <button className="tb-hamburger" onClick={() => setMobileNav(v => !v)}>
+          <Icon name="menu"/>
+        </button>
         <div className="tb-brand">
           <span className="tb-logo"/>
           Genesis <small>v0.4.2</small>
@@ -141,12 +146,14 @@ function App() {
           <button className="tb-iconbtn" title="Open embedding map" onClick={() => openId("__embed__")}><Icon name="embed"/></button>
           <button className="tb-iconbtn" title="Ask Genesis" onClick={() => openId("__chat__")}><Icon name="chat"/></button>
           <button className="tb-iconbtn" title="Command Palette (⌘K)" onClick={() => setPaletteOpen(true)}><Icon name="search"/></button>
+          <button className="tb-iconbtn tb-rail-toggle" title="Toggle info panel" onClick={() => setMobileRail(v => !v)}><Icon name="info"/></button>
         </div>
       </div>
 
+      {mobileNav && <div className="mobile-backdrop" onClick={() => setMobileNav(false)} />}
       <Sidebar 
         activeId={focusNoteId}
-        onOpen={openId}
+        onOpen={(id) => { openId(id); setMobileNav(false); }}
         activeTags={activeTags}
         toggleTag={toggleTag}
         mode={sbMode}
@@ -210,9 +217,10 @@ function App() {
         </div>
       </main>
 
+      {mobileRail && <div className="mobile-backdrop" onClick={() => setMobileRail(false)} />}
       <RightRail 
         activeId={focusNoteId} 
-        onOpen={openId}
+        onOpen={(id) => { openId(id); setMobileRail(false); }}
         semanticHits={semantic.hits} 
         semanticState={semantic.state} 
         semanticQuery={semantic.query}
