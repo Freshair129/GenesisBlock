@@ -45,7 +45,7 @@ If you want the full file as it would look after the merge, here it is:
 {
   "preferences": {
     "localAgentModeTrustedFolders": [
-      "G:\\zuri"
+      "G:\\cognitive_system"
     ],
     "allowAllBrowserActions": true,
     "coworkScheduledTasksEnabled": true,

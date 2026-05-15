@@ -103,8 +103,8 @@ GKS index path (hardcoded in sync-gks.mjs):
 
 Full spec: **`apps/web/DESIGN-SYSTEM.md`** — read before touching CSS or components.
 
-Genesis UI uses a **VS Code dark dev-tool theme** (NOT the Zuri amber theme).
-Do NOT use Zuri tokens (`--brand`, `--surface`, IBM Plex Sans Thai, Amber Citrus palette).
+Genesis UI uses a **VS Code dark dev-tool theme**.
+Do NOT use branding tokens or soft-app aesthetics (rounded corners, warm gradients).
 
 ---
 
@@ -126,6 +126,8 @@ timeRef.current += dt;
 ---
 
 ## Deployment
+
+Full guide: **`apps/web/DEPLOY.md`**
 
 Vercel project: `genesis-ui` (ID: `prj_aELlyAqrhvnGBAPxl70HpE24DLrR`)
 Deploy from `apps/web/` directory:

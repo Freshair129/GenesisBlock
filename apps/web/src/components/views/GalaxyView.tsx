@@ -290,20 +290,7 @@ export const GalaxyView: React.FC<GalaxyViewProps> = ({ notes, edges, focusId: _
       ctx.beginPath(); ctx.arc(sx, sy, sr, 0, Math.PI * 2); ctx.fill();
     }
 
-    // Galaxy core glow
-    const corePrj = project(0, 0, 0);
-    if (corePrj) {
-      const px = CX + corePrj.sx, py = CY + corePrj.sy;
-      const gr = ctx.createRadialGradient(px, py, 0, px, py, 160 * corePrj.scale);
-      gr.addColorStop(0,    'rgba(255,215,120,0.40)');
-      gr.addColorStop(0.25, 'rgba(255,100, 60,0.15)');
-      gr.addColorStop(0.6,  'rgba(120, 40,160,0.06)');
-      gr.addColorStop(1,    'rgba(0,0,0,0)');
-      ctx.fillStyle = gr;
-      ctx.beginPath();
-      ctx.arc(px, py, 160 * Math.max(0.5, corePrj.scale), 0, Math.PI * 2);
-      ctx.fill();
-    }
+    // Core is now just empty or a simple point if desired, but we'll leave it clean.
 
     // Background particles
     if (params.showParticles) {
@@ -385,45 +372,15 @@ export const GalaxyView: React.FC<GalaxyViewProps> = ({ notes, edges, focusId: _
       const pulse   = 1 + Math.sin(time * 2.2 + n.radius * 0.012) * 0.13;
       const r       = Math.max(3, (3.5 + Math.sqrt(n.deg) * 1.6) * Math.max(0.3, p.scale));
 
-      // Star halo
-      const haloR = r * (isFocus ? 8 : 5) * pulse;
-      const halo  = ctx.createRadialGradient(x, y, 0, x, y, haloR);
-      halo.addColorStop(0,   gxHexA(meta.raw, 0.75 * al));
-      halo.addColorStop(0.4, gxHexA(meta.raw, 0.18 * al));
-      halo.addColorStop(1,   gxHexA(meta.raw, 0));
-      ctx.fillStyle = halo;
-      ctx.beginPath(); ctx.arc(x, y, haloR, 0, Math.PI * 2); ctx.fill();
-
-      // Diffraction spikes
-      if ((isFocus || n.deg >= 4) && p.scale > 0.45) {
-        ctx.save(); ctx.translate(x, y);
-        ctx.strokeStyle = gxHexA(meta.raw, 0.55 * al);
-        ctx.lineWidth = 0.9;
-        const spikeLen = r * (isFocus ? 22 : 11) * pulse;
-        for (let k = 0; k < 4; k++) {
-          const ang = (k / 4) * Math.PI + time * 0.08;
-          ctx.beginPath();
-          ctx.moveTo(Math.cos(ang) * r,        Math.sin(ang) * r);
-          ctx.lineTo(Math.cos(ang) * spikeLen, Math.sin(ang) * spikeLen);
-          ctx.stroke();
-          ctx.beginPath();
-          ctx.moveTo(Math.cos(ang + Math.PI) * r,        Math.sin(ang + Math.PI) * r);
-          ctx.lineTo(Math.cos(ang + Math.PI) * spikeLen, Math.sin(ang + Math.PI) * spikeLen);
-          ctx.stroke();
-        }
-        ctx.restore();
-      }
+      // Halos and spikes removed for 'Dev Tool' sharpness
 
       // Star core
-      ctx.shadowColor = meta.raw;
-      ctx.shadowBlur  = isFocus ? 28 : (isNbr ? 14 : 8);
       ctx.beginPath(); ctx.arc(x, y, r * pulse, 0, Math.PI * 2);
       ctx.fillStyle = gxHexA(meta.raw, al);
       ctx.fill();
       ctx.beginPath(); ctx.arc(x, y, r * 0.38, 0, Math.PI * 2);
       ctx.fillStyle = `rgba(255,255,255,${(0.92 * al).toFixed(3)})`;
       ctx.fill();
-      ctx.shadowBlur = 0;
 
       // Focus ring
       if (isFocus) {
@@ -434,14 +391,16 @@ export const GalaxyView: React.FC<GalaxyViewProps> = ({ notes, edges, focusId: _
         ctx.stroke();
       }
 
-      // Label
-      const showLabel = params.showLabels && p.scale > 0.45 &&
-        (isFocus || isNbr || n.deg >= 5 || p.scale > 1.1);
+      // Label (Clutter-reduction logic)
+      const isHovered = hover?.id === n.id;
+      const showLabel = params.showLabels && 
+        (isFocus || isNbr || isHovered || (n.deg >= 12 && p.scale > 1.1));
+      
       if (showLabel) {
-        ctx.font = `${isFocus ? '600 ' : ''}11px "Space Grotesk", system-ui, sans-serif`;
+        ctx.font = `${(isFocus || isHovered) ? '600 ' : ''}11px var(--font-sans)`;
         ctx.textAlign = 'center'; ctx.textBaseline = 'top';
-        ctx.fillStyle = `rgba(230,232,240,${Math.min(1, al * 1.5).toFixed(3)})`;
-        ctx.fillText(n.title, x, y + r * pulse + 4);
+        ctx.fillStyle = `rgba(230,232,240,${Math.min(1, al * (isFocus || isHovered ? 2 : 1)).toFixed(3)})`;
+        ctx.fillText(n.title, x, y + r * pulse + 5);
       }
     }
   };

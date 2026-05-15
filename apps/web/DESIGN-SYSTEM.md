@@ -4,7 +4,7 @@
 > **PURPOSE — READ FIRST**
 > This document is the machine-readable design standard for Genesis UI (`packages/ui/`).
 > Every value is taken directly from `src/index.css` and `src/App.tsx`.
-> Do NOT invent tokens. Do NOT use values from the Zuri design system — Genesis UI is a
+> Do NOT invent tokens. Genesis UI is a
 > separate product with a completely different visual language.
 >
 > **Philosophy: "Dev Tool, not App"**
@@ -94,7 +94,7 @@ component logic. The mapping lives in `src/types/gks.ts`.
 --radius-sm: 1px;    /* tighter elements, rarely needed */
 ```
 
-**Sharp corners are intentional.** Do not round corners to 8px+ — that belongs to Zuri, not Genesis UI.
+**Sharp corners are intentional.** Do not round corners to 8px+.
 Exception: pill shapes (kbd, chips, badges) use `border-radius: 999px`.
 
 ### 1.7 Shadows
@@ -587,7 +587,7 @@ Use `TYPE_META[n.type as keyof typeof TYPE_META]?.raw ?? '#888'` — never hardc
 8. **DO** access node type colors via `TYPE_META[type]?.raw` — never use `--c-entity` etc. in canvas draw code directly.
 
 ### DON'T
-1. **DON'T** use any Zuri tokens — no `--brand`, `--surface`, `--rest-blue`, Amber Citrus palette, IBM Plex Sans Thai, or `cubic-bezier(0.25,0.8,0.25,1)`.
+1. **DON'T** use external branding tokens or soft curves (e.g. `cubic-bezier(0.25,0.8,0.25,1)`).
 2. **DON'T** round corners beyond 8px on non-pill elements.
 3. **DON'T** use soft/warm shadows — only `--shadow-pop: 0 4px 12px rgba(0,0,0,0.5)`.
 4. **DON'T** apply backdrop-filter blur outside of graph overlays and modals.
@@ -612,7 +612,7 @@ Transitions: 0.1s background/color — no scale, no translateY.
 
 Props: [LIST]
 Rules:
-- No Zuri tokens
+- No external branding tokens
 - No hardcoded hex except when explicitly mapping GKS type colors via TYPE_META
 - Canvas views: use useRef for time, cancel RAF in cleanup
 ```
