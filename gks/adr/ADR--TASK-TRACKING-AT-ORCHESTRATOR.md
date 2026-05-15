@@ -9,7 +9,7 @@ tier: genesis
 title: Task tracking belongs to the orchestrator, not GKS
 tags: [scope, taxonomy, lifecycle, msp, supersedes]
 crosslinks:
-  references: [ADR--EXTENDED-TAXONOMY]
+  references: [ADR--EXTENDED-TAXONOMY, CONCEPT--MSP-ROADMAP]
   partially_supersedes: [ADR--DOC-TO-CODE-ENFORCEMENT]
 linked_symbols:
   - { file: "src/memory/types.ts", fn: AtomicType }

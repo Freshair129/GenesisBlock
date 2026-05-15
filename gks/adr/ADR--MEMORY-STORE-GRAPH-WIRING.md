@@ -12,7 +12,7 @@ tags:
   - memory
   - graph
   - decision
-crosslinks: {"references":["FRAMEWORK--MSP-ARCHITECTURE-V2"]}
+crosslinks: {"references":["FRAMEWORK--MSP-ARCHITECTURE-V2","CONCEPT--MEMORY-STORE"]}
 created_at: 2026-05-12T22:48:00.000+07:00
 ---
 
