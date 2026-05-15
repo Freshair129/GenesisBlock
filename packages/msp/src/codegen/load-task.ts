@@ -3,6 +3,7 @@ import { readFile } from 'node:fs/promises'
 import { parse as parseYaml } from 'yaml'
 
 import { CodegenError, type Task } from './types.js'
+import { parseBudget, parseScope } from '../policy/task-scope.js'
 
 export async function loadTask(path: string): Promise<Task> {
   let raw: string
@@ -50,5 +51,7 @@ export async function loadTask(path: string): Promise<Task> {
     geography: (obj.geography as unknown[]).filter((x): x is string => typeof x === 'string'),
     assignee: typeof obj.assignee === 'string' ? obj.assignee : undefined,
     created_at: typeof obj.created_at === 'string' ? obj.created_at : undefined,
+    scope: parseScope(obj.scope),
+    budget: parseBudget(obj.budget),
   }
 }

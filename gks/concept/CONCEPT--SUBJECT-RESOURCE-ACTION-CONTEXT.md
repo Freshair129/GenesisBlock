@@ -7,6 +7,8 @@ tier: process
 source_type: axiomatic
 vault_id: default
 title: Subject / Resource / Action / Context — the universal request 4-tuple
+attributes:
+  domain: [ucf, msp]
 tags:
   - msp
   - ucf

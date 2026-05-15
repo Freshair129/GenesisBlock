@@ -83,7 +83,23 @@ export function createNomicEmbedder(): Embedder {
     const pipe = await getPipeline()
     const prefixed = texts.map((t) => (isQuery ? QUERY_PREFIX : DOC_PREFIX) + t)
     const output = await pipe(prefixed, { pooling: 'mean', normalize: true })
-    return output.map((o) => Array.from(o.data))
+    
+    // transformers.js feature-extraction with pooling: 'mean' and normalize: true 
+    // returns a Tensor if multiple inputs are given, or an array if we are lucky.
+    // Let's handle both.
+    if (Array.isArray(output)) {
+      return output.map((o) => Array.from(o.data as Float32Array))
+    } else {
+      // It's a single Tensor with dims [batch, dim]
+      const tensor = output as any
+      const data = tensor.data as Float32Array
+      const dim = DIMENSION
+      const results: number[][] = []
+      for (let i = 0; i < texts.length; i++) {
+        results.push(Array.from(data.subarray(i * dim, (i + 1) * dim)))
+      }
+      return results
+    }
   }
 
   return {

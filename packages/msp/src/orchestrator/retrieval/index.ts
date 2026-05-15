@@ -12,11 +12,13 @@ import {
   DEFAULT_TOP_K,
   DEFAULT_TOTAL_TIMEOUT_MS,
   type RecallOptions,
+  type RetrievalHit,
   type RetrievalResult,
   type SourceName,
   type SourceResult,
 } from './types.js'
-import { makeContext, makeSubject } from '../../policy/types.js'
+import { makeContext, makeResource, makeSubject, type Action } from '../../policy/types.js'
+import { enforcePolicy } from '../../policy/pep.js'
 
 export type {
   RecallOptions,
@@ -145,7 +147,7 @@ export async function recall(opts: RecallOptions): Promise<RetrievalResult> {
 
   // UCF 4-tuple defaults and logging
   const subject = opts.subject ?? makeSubject('user', 'anonymous')
-  const action = 'recall'
+  const action: Action = 'recall'
   const context = opts.context ?? makeContext('internal', 'orchestrator-recall')
 
   console.debug(
@@ -219,6 +221,19 @@ export async function recall(opts: RecallOptions): Promise<RetrievalResult> {
   const fuseStart = performance.now()
   const allResults: SourceResult[] = [vectorRes, obsidianRes, episodicRes, backlinksRes]
   const fusedHits = rrfFuse(allResults, { k: rrfK, weights, topK })
+
+  // Phase D: Enforce Policy (PEP)
+  const filteredHits: RetrievalHit[] = []
+  const pepOpts = { root, subject, action, context }
+
+  for (const hit of fusedHits) {
+    const resource = makeResource('atom', hit.atomId, {}, hit.attributes ?? {})
+    const { permitted } = await enforcePolicy(resource, pepOpts)
+    if (permitted) {
+      filteredHits.push(hit)
+    }
+  }
+
   const fusionMs = performance.now() - fuseStart
 
   // Compute output flags + diagnostics.
@@ -226,7 +241,7 @@ export async function recall(opts: RecallOptions): Promise<RetrievalResult> {
   const obsidianAvailable = opts.obsidian?.mode === 'rest'
 
   const result: RetrievalResult = {
-    hits: fusedHits,
+    hits: filteredHits,
     semantic_available: semanticAvailable,
     obsidian_available: obsidianAvailable,
     fallback_reasons: collectFallbackReasons(allResults),

@@ -19,40 +19,55 @@ export type Operator =
   | 'matches' // regex match (right must be string)
   | 'intersect' // set intersection non-empty (both must be arrays)
 
-export function evaluateOperator(op: Operator, left: any, right: any): boolean {
+export function evaluateOperator(op: Operator, left: any, right: any, data?: any): boolean {
+  // Resolve right-side if it's a variable reference
+  let resolvedRight = right
+  if (typeof right === 'string' && data) {
+    if (right.startsWith('subject.') || right.startsWith('resource.') || right.startsWith('context.')) {
+      resolvedRight = getValueAtPath(data, right)
+    }
+  }
+
   switch (op) {
     case 'eq':
-      return left === right
+      return left === resolvedRight
     case 'ne':
-      return left !== right
+      return left !== resolvedRight
     case 'in':
-      return Array.isArray(right) && right.includes(left)
+      return Array.isArray(resolvedRight) && resolvedRight.includes(left)
     case 'ni':
-      return Array.isArray(right) && !right.includes(left)
+      return Array.isArray(resolvedRight) && !resolvedRight.includes(left)
     case 'contains':
-      return Array.isArray(left) && left.includes(right)
+      return Array.isArray(left) && left.includes(resolvedRight)
     case 'gt':
-      return typeof left === typeof right && left > right
+      return typeof left === typeof resolvedRight && left > resolvedRight
     case 'ge':
-      return typeof left === typeof right && left >= right
+      return typeof left === typeof resolvedRight && left >= resolvedRight
     case 'lt':
-      return typeof left === typeof right && left < right
+      return typeof left === typeof resolvedRight && left < resolvedRight
     case 'le':
-      return typeof left === typeof right && left <= right
+      return typeof left === typeof resolvedRight && left <= resolvedRight
     case 'exists':
       return left !== undefined && left !== null
     case 'not_exists':
       return left === undefined || left === null
     case 'matches':
-      if (typeof left !== 'string' || typeof right !== 'string') return false
+      if (typeof left !== 'string' || typeof resolvedRight !== 'string') return false
       try {
-        return new RegExp(right).test(left)
+        return new RegExp(resolvedRight).test(left)
       } catch {
         return false
       }
-    case 'intersect':
-      if (!Array.isArray(left) || !Array.isArray(right)) return false
-      return left.some((item) => right.includes(item))
+    case 'intersect': {
+      const leftArr = Array.isArray(left) ? left : left !== undefined && left !== null ? [left] : []
+      const rightArr = Array.isArray(resolvedRight)
+        ? resolvedRight
+        : resolvedRight !== undefined && resolvedRight !== null
+          ? [resolvedRight]
+          : []
+      if (leftArr.length === 0 || rightArr.length === 0) return false
+      return leftArr.some((item) => rightArr.includes(item))
+    }
     default:
       return false
   }
@@ -85,7 +100,7 @@ export function evaluateCondition(condition: Condition, data: Record<string, any
     if (path === 'all_of' || path === 'any_of' || path === 'none_of') continue
     const value = getValueAtPath(data, path)
     for (const [op, right] of Object.entries(ops as Record<Operator, any>)) {
-      if (!evaluateOperator(op as Operator, value, right)) {
+      if (!evaluateOperator(op as Operator, value, right, data)) {
         return false
       }
     }

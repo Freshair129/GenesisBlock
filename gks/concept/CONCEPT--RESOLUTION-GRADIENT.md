@@ -7,6 +7,8 @@ tier: process
 source_type: axiomatic
 vault_id: default
 title: Resolution gradient — graded retrieval with FULL / MENTION + expand-on-demand
+attributes:
+  domain: [ucf, msp]
 tags:
   - msp
   - ucf

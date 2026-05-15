@@ -2,7 +2,7 @@
 id: PROTO--PHASE-GATES
 phase: 2
 type: proto
-status: draft
+status: stable
 severity: error
 vault_id: default
 tier: safety

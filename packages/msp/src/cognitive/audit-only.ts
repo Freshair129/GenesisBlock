@@ -11,7 +11,7 @@
 import type { RetrievalHit } from '@freshair129/gks'
 import type { CognitiveRecallHit } from './types.js'
 
-export function markAuditOnly(hit: RetrievalHit): CognitiveRecallHit {
+export function markAuditOnly(hit: CognitiveRecallHit): CognitiveRecallHit {
   if (hit.source === 'episodic') {
     return { ...hit, audit_only: true }
   }

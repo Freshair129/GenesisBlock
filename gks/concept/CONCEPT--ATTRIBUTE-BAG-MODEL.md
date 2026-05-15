@@ -7,6 +7,8 @@ tier: process
 source_type: axiomatic
 vault_id: default
 title: Attribute bag — bring-your-own open-schema metadata
+attributes:
+  domain: [ucf, msp]
 tags:
   - msp
   - ucf

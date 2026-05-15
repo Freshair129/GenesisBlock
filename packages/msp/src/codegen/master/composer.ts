@@ -2,6 +2,8 @@ import { readFile, readdir, stat } from 'node:fs/promises'
 import { join, resolve } from 'node:path'
 
 import { parse as parseYaml } from 'yaml'
+import { enforcePolicy, type PepOptions } from '../../policy/pep.js'
+import { makeResource } from '../../policy/types.js'
 
 /**
  * One Master atom successfully composed: id, body (everything after the
@@ -11,6 +13,8 @@ export interface ComposedMaster {
   id: string
   body: string
   tokenCount: number
+  /** §4 — Domain-specific attributes for policy checks. */
+  attributes?: Record<string, any>
 }
 
 /**
@@ -22,11 +26,13 @@ export interface ComposedMaster {
  * - `missing` lists the requested ids that either don't exist on disk or
  *   exist but are not `tier: master`. Order is best-effort (matches the
  *   order ids were resolved).
+ * - `dropped` lists ids that were found but rejected by policy (PEP).
  */
 export interface ComposeResult {
   composed: ComposedMaster[]
   totalTokens: number
   missing: string[]
+  dropped?: string[]
 }
 
 interface ParsedAtom {
@@ -123,6 +129,7 @@ async function scanForId(dir: string, filename: string): Promise<string | null> 
  * - looks up `gks/master/<id>.md` (or scans `gks/` if not at canonical path)
  * - parses frontmatter; if `tier !== 'master'`, the id is added to `missing`
  *   instead of `composed`
+ * - evaluates policy via PEP; if rejected, the id is added to `dropped`
  * - extracts body (everything after the closing `---`)
  * - estimates token count via {@link estimateTokens}
  *
@@ -132,9 +139,11 @@ async function scanForId(dir: string, filename: string): Promise<string | null> 
 export async function composeMasterAtoms(
   ids: string[],
   root: string,
+  pep?: PepOptions,
 ): Promise<ComposeResult> {
   const composed: ComposedMaster[] = []
   const missing: string[] = []
+  const dropped: string[] = []
   let totalTokens = 0
 
   for (const id of ids) {
@@ -159,13 +168,26 @@ export async function composeMasterAtoms(
       missing.push(id)
       continue
     }
+
+    const attributes = (parsed.fm.attributes as Record<string, any>) ?? {}
+
+    // PEP enforcement
+    if (pep) {
+      const resource = makeResource('atom', id, {}, attributes)
+      const { permitted } = await enforcePolicy(resource, pep)
+      if (!permitted) {
+        dropped.push(id)
+        continue
+      }
+    }
+
     const body = parsed.body.replace(/\s+$/, '')
     const tokenCount = estimateTokens(body)
-    composed.push({ id, body, tokenCount })
+    composed.push({ id, body, tokenCount, attributes })
     totalTokens += tokenCount
   }
 
-  return { composed, totalTokens, missing }
+  return { composed, totalTokens, missing, dropped }
 }
 
 /**

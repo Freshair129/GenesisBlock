@@ -2,7 +2,7 @@
 id: ADR--GENESIS-GRAPH-AS-GKS-BACKEND
 phase: 2
 type: adr
-status: draft
+status: stable
 vault_id: default
 tier: genesis
 source_type: axiomatic

@@ -7,6 +7,8 @@ tier: process
 source_type: axiomatic
 vault_id: default
 title: Namespace, Vault, and Brain — three layers of isolation and composition
+attributes:
+  domain: [ucf, msp]
 tags:
   - msp
   - ucf

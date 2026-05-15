@@ -7,6 +7,8 @@ tier: process
 source_type: axiomatic
 vault_id: default
 title: ABAC policy engine — PDP / PEP separation, policy as data
+attributes:
+  domain: [ucf, msp]
 tags:
   - msp
   - ucf

@@ -34,6 +34,10 @@ export function buildPrompt({ task, blueprint, attempt, lastFailure }: BuildOpts
     sections.push('Address the failure above. Output code only — no commentary, no fenced wrapping.')
     sections.push('')
   }
+  sections.push('## System Instructions')
+  sections.push('- Output code only. No commentary, no fenced wrapping.')
+  sections.push('- If your task requires information outside your current context domains (e.g. missing atoms, denied access), use the `escalate()` tool to request a scope extension rather than guessing.')
+  sections.push('')
   sections.push('## Prompt')
   sections.push(task.prompt)
   return sections.join('\n')

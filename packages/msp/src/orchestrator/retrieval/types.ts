@@ -42,6 +42,8 @@ export interface SourceHit {
   rank: number
   snippet?: string
   source: SourceName
+  /** §4 — Domain-specific attributes for policy checks (UCF). */
+  attributes?: Record<string, any>
 }
 
 /**
@@ -69,6 +71,8 @@ export interface RetrievalHit {
   rank: number
   snippet?: string
   perSourceRanks: Partial<Record<SourceName, number>>
+  /** §4 — Domain-specific attributes for policy checks (UCF). */
+  attributes?: Record<string, any>
 }
 
 /**

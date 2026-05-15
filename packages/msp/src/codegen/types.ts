@@ -1,3 +1,5 @@
+import type { SubagentBudget, SubagentScope } from '../policy/task-scope.js'
+
 export interface Task {
   id: string
   parent_blueprint: string
@@ -7,6 +9,10 @@ export interface Task {
   geography: string[]
   assignee?: string
   created_at?: string
+  /** §9 — Task-level scope filtering (UCF Phase 2). */
+  scope?: SubagentScope
+  /** §11.3 — Context resolution budget (UCF Phase 3). */
+  budget?: SubagentBudget
 }
 
 export interface Blueprint {

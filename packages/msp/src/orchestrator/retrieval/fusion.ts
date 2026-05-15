@@ -19,6 +19,8 @@ interface AtomScore {
   /** First source seen (used for the per-hit `source` field on the fused hit). */
   primarySource: SourceName
   perSourceRanks: Partial<Record<SourceName, number>>
+  /** Attributes from the first source seen. */
+  attributes?: Record<string, any>
 }
 
 export interface RrfFuseOptions {
@@ -39,10 +41,7 @@ export interface RrfFuseOptions {
  *
  * Slice top-K, assign final ranks 1..topK.
  */
-export function rrfFuse(
-  perSource: SourceResult[],
-  opts: RrfFuseOptions = {},
-): RetrievalHit[] {
+export function rrfFuse(perSource: SourceResult[], opts: RrfFuseOptions = {}): RetrievalHit[] {
   const k = opts.k ?? DEFAULT_RRF_K
   const topK = opts.topK ?? DEFAULT_TOP_K
   const weights = opts.weights ?? {}
@@ -51,8 +50,7 @@ export function rrfFuse(
 
   for (const sourceResult of perSource) {
     const sourceName = sourceResult.source
-    const weight =
-      weights[sourceName] ?? DEFAULT_WEIGHTS[sourceName] ?? 1.0
+    const weight = weights[sourceName] ?? DEFAULT_WEIGHTS[sourceName] ?? 1.0
 
     for (const hit of sourceResult.hits) {
       const rank = hit.rank
@@ -68,6 +66,9 @@ export function rrfFuse(
         if (!existing.snippet && hit.snippet) {
           existing.snippet = hit.snippet
         }
+        if (!existing.attributes && hit.attributes) {
+          existing.attributes = hit.attributes
+        }
       } else {
         const entry: AtomScore = {
           atomId: hit.atomId,
@@ -75,9 +76,8 @@ export function rrfFuse(
           contributions: [{ source: sourceName, rank }],
           snippet: hit.snippet,
           primarySource: sourceName,
-          perSourceRanks: { [sourceName]: rank } as Partial<
-            Record<SourceName, number>
-          >,
+          perSourceRanks: { [sourceName]: rank } as Partial<Record<SourceName, number>>,
+          attributes: hit.attributes,
         }
         acc.set(hit.atomId, entry)
       }
@@ -110,5 +110,6 @@ export function rrfFuse(
     rank: i + 1,
     snippet: entry.snippet,
     perSourceRanks: entry.perSourceRanks,
+    attributes: entry.attributes,
   }))
 }

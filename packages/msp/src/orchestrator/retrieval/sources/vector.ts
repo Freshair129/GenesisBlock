@@ -87,10 +87,11 @@ export async function vectorSource(
     )
 
     const hits: SourceHit[] = results.slice(0, opts.topK).map((r, i) => ({
-      atomId: r.doc.id,
+      atomId: (r.doc.metadata?.atom_id as string) ?? r.doc.id,
       rank: i + 1,
       snippet: snippetFromMetadata(r.doc),
       source: 'gks-vector',
+      attributes: (r.doc.metadata?.attributes as Record<string, any>) ?? {},
     }))
 
     return {

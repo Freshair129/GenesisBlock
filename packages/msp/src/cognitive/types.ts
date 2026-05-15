@@ -22,6 +22,7 @@ import type {
 import type { SlmFactoryOpts } from '../codegen/slm/types.js'
 import type { RunOptions, RunResult } from '../codegen/types.js'
 import type { Action, RequestContext, Subject } from '../policy/types.js'
+import type { SubagentScope } from '../policy/task-scope.js'
 
 /** §17.3 — 3-tier agent mapping (T1 = Ollama+qwen2.5-coder, T2 = mid LLM, T3 = large LLM). */
 export type CognitiveTier = 'T1' | 'T2' | 'T3'
@@ -65,6 +66,7 @@ export interface CognitiveRunTaskOptions extends RunOptions, PolicyContext {
 }
 
 export type CognitiveRecallHit = RetrievalHit & {
+  atomId: string
   /**
    * §7.5 — Memory-for-Audit guardrail. Stamped on hits from episodic /
    * session sources so callers know the content is for traceability /
@@ -75,6 +77,18 @@ export type CognitiveRecallHit = RetrievalHit & {
 
 export interface CognitiveRecallResult extends Omit<RetrievalResult, 'hits'> {
   hits: CognitiveRecallHit[]
+  tookMs: number
+  fallback_reasons?: string[]
+}
+
+export interface EscalationRequest {
+  request_scope_extension?: string[]
+  reason: string
+}
+
+export interface EscalationResult {
+  approved: boolean
+  updated_scope?: SubagentScope
 }
 
 export interface CognitiveLayer {
@@ -82,6 +96,8 @@ export interface CognitiveLayer {
   recall(query: string, opts?: RetrievalOptions & PolicyContext): Promise<CognitiveRecallResult>
   /** Write path — wraps `retain(store, …)`. */
   remember(content: string, opts?: RememberOptions & PolicyContext): Promise<{ id: string }>
+  /** §9.3 — Subagent context expansion request. */
+  escalate(req: EscalationRequest): Promise<EscalationResult>
   /** Session-end consolidation. */
   consolidate(sessionId: string): Promise<void>
   /** Codegen runner with tier routing + §7.7.2 gate. */

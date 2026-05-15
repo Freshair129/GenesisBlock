@@ -2,7 +2,7 @@
 id: BLUEPRINT--GENESIS-GRAPH-TS-FIRST
 phase: 3
 type: blueprint
-status: draft
+status: stable
 vault_id: default
 tier: process
 source_type: axiomatic

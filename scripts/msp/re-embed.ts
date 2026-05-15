@@ -30,12 +30,14 @@ import { readFile, readdir } from 'node:fs/promises'
 import { join, relative, resolve } from 'node:path'
 import { parseArgs } from 'node:util'
 
-import { MemoryStore } from '../../src/memory/index.js'
-import { chunkMarkdown } from '../../src/memory/vector/chunker.js'
-import { createEmbedder } from '../../src/memory/vector/embedder.js'
-import { manifestCompatible, readManifest } from '../../src/memory/vector/manifest.js'
-import type { VectorDoc, VectorMetadata } from '../../src/memory/types.js'
-import { createLogger } from '../../src/lib/logger.js'
+import { parse as parseYaml } from 'yaml'
+
+import { MemoryStore } from '../../packages/gks/src/memory/index.js'
+import { chunkMarkdown } from '../../packages/gks/src/memory/vector/chunker.js'
+import { createEmbedder } from '../../packages/gks/src/memory/vector/embedder.js'
+import { manifestCompatible, readManifest } from '../../packages/gks/src/memory/vector/manifest.js'
+import type { VectorDoc, VectorMetadata } from '../../packages/gks/src/memory/types.js'
+import { createLogger } from '../../packages/gks/src/lib/logger.js'
 
 const log = createLogger('script:re-embed')
 
@@ -153,9 +155,28 @@ async function main(): Promise<void> {
   // Embed the changed files.
   const changedFiles = opts.full ? [...currentHashes.keys()] : changed
   const newDocs: Array<{ text: string; metadata: VectorMetadata; id: string; source: string }> = []
+
   for (const relPath of changedFiles) {
     const abs = resolve(opts.sourceDir, relPath)
     const source = await readFile(abs, 'utf8')
+    
+    // Parse frontmatter
+    let atomId = relPath.split(/[\\/]/).pop()?.replace(/\.md$/, '') ?? ''
+    let attributes: Record<string, any> = {}
+    if (source.startsWith('---')) {
+      const end = source.indexOf('\n---', 3)
+      if (end !== -1) {
+        const fmText = source.slice(3, end).trim()
+        try {
+          const fm = parseYaml(fmText) as any
+          if (fm.id) atomId = fm.id
+          if (fm.attributes) attributes = fm.attributes
+        } catch {
+          // ignore parse errors
+        }
+      }
+    }
+
     const { chunks } = chunkMarkdown(source, {
       maxTokens: opts.maxTokens,
       overlap: opts.overlap,
@@ -167,6 +188,8 @@ async function main(): Promise<void> {
         text: chunk.text,
         metadata: {
           path: relPath,
+          atom_id: atomId,
+          attributes,
           heading: chunk.heading,
           tokens: chunk.tokenCount,
           hash: currentHashes.get(relPath)!,
@@ -177,12 +200,24 @@ async function main(): Promise<void> {
   }
 
   if (newDocs.length > 0) {
-    log.info('embedding batch', {
-      chunks: newDocs.length,
+    const batchSize = 1 // Sequential for safety on memory-constrained systems
+    log.info('embedding batch starting (sequential)', {
+      total_chunks: newDocs.length,
       provider: embedder.provider,
       model: embedder.model,
     })
-    await vStore.addBatch(newDocs)
+
+    for (let i = 0; i < newDocs.length; i += batchSize) {
+      const batch = newDocs.slice(i, i + batchSize)
+      const doc = batch[0]!
+      if (doc.text.length > 5000) {
+        log.warn(`embedding large chunk (${doc.text.length} chars): ${doc.source}`)
+      }
+      if (i % 10 === 0) {
+        log.info(`embedding batch ${Math.floor(i / batchSize) + 1}/${Math.ceil(newDocs.length / batchSize)}`)
+      }
+      await vStore.addBatch(batch)
+    }
   }
 
   // Update file_hashes in the manifest; delete entries for removed paths.
