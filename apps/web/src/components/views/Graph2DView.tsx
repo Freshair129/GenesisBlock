@@ -1,4 +1,4 @@
-import React, { useRef, useState, useEffect, useMemo } from 'react';
+import React, { useRef, useState, useEffect } from 'react';
 import type { Note, Edge, NoteType } from '../../types/gks';
 import { GKS_SERVICE } from '../../services/gksService';
 
@@ -93,13 +93,7 @@ export const Graph2DView: React.FC<Graph2DViewProps> = ({ notes, edges, focusId,
         const centerForce = 0.008 * alpha;
         const friction = 0.82;
 
-        // Repulsion (optimized O(N^2) or simple for small N)
-        for (let i = 0; i < nodes.length; i++) {
-          const a = nodes[i];
-          for (let j = i + 1; j < nodes[j] ? j < nodes.length : 0; j++) { } // Wait, loop fix
-        }
-        
-        // Corrected Repulsion loop
+        // Repulsion
         for (let i = 0; i < nodes.length; i++) {
           const a = nodes[i];
           for (let j = i + 1; j < nodes.length; j++) {
