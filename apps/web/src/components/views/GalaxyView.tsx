@@ -119,8 +119,8 @@ export const GalaxyView: React.FC<GalaxyViewProps> = ({ notes, edges, focusId: _
 
     const klinks: GalaxyLink[] = edges.filter(e => nodeMap[e.source] && nodeMap[e.target]);
 
-    // Background galaxy particles
-    const PART_N = 11000;
+    // Background galaxy particles - reduced for performance
+    const PART_N = 3500;
     const particles: Particle[] = [];
     let s = 0x9e3779b9;
     const rng = () => { s ^= s << 13; s ^= s >> 17; s ^= s << 5; return (s >>> 0) / 4294967296; };
@@ -160,7 +160,7 @@ export const GalaxyView: React.FC<GalaxyViewProps> = ({ notes, edges, focusId: _
   }, []);
 
   // ── Projection ───────────────────────────────────────────────────────────────
-  const project = (x: number, y: number, z: number): Projected | null => {
+  const project = (x: number, y: number, z: number, w: number, h: number): Projected | null => {
     const c = cam.current, la = lookAt.current;
     x -= la.x; y -= la.y; z -= la.z;
     const cy_ = Math.cos(c.yaw), sy_ = Math.sin(c.yaw);
@@ -171,8 +171,11 @@ export const GalaxyView: React.FC<GalaxyViewProps> = ({ notes, edges, focusId: _
     const z2  = sp * y + cp * z1;
     const zEye = z2 + c.dist;
     if (zEye <= 1) return null;
-    const scale = 700 / zEye;
-    return { sx: x1 * scale, sy: y2 * scale, depth: zEye, scale };
+    
+    // Scale relative to viewport to fix aspect ratio issues on different screens
+    const baseScale = Math.min(w, h) * 1.1;
+    const scale = baseScale / zEye;
+    return { sx: x1 * scale, sy: y2 * scale, depth: zEye, scale: scale / (baseScale / 700) };
   };
 
   // ── Pick ─────────────────────────────────────────────────────────────────────
@@ -181,7 +184,7 @@ export const GalaxyView: React.FC<GalaxyViewProps> = ({ notes, edges, focusId: _
     const cx = size.w / 2, cy_ = size.h / 2;
     let best: GalaxyNode | null = null, bestD = Infinity;
     for (const n of data.knodes) {
-      const p = project(n.x, n.y, n.z); if (!p) continue;
+      const p = project(n.x, n.y, n.z, size.w, size.h); if (!p) continue;
       const x = cx + p.sx, y = cy_ + p.sy;
       const r = Math.max(5, (4 + Math.sqrt(n.deg) * 1.5) * p.scale);
       const dx = mx - x, dy = my - y;
@@ -280,6 +283,8 @@ export const GalaxyView: React.FC<GalaxyViewProps> = ({ notes, edges, focusId: _
     ctx.fillStyle = bg;
     ctx.fillRect(0, 0, W, H);
 
+    const labelRects: { x1: number, y1: number, x2: number, y2: number }[] = [];
+
     // Distant star-field
     for (let i = 0; i < 220; i++) {
       const sx  = (i * 1297 + 511) % W;
@@ -292,19 +297,19 @@ export const GalaxyView: React.FC<GalaxyViewProps> = ({ notes, edges, focusId: _
 
     // Core is now just empty or a simple point if desired, but we'll leave it clean.
 
-    // Background particles
+    // Background particles - using fillRect for speed
     if (params.showParticles) {
       for (const p of data.particles) {
-        const prj = project(p.x, p.y, p.z); if (!prj) continue;
+        const prj = project(p.x, p.y, p.z, W, H); if (!prj) continue;
         if (prj.depth > cam.current.dist + 600) continue;
         const px  = CX + prj.sx, py = CY + prj.sy;
         const df     = Math.max(0, Math.min(1, 1 - (prj.depth - 350) / 1400));
         const twinkle = 0.75 + Math.sin(time * 2.1 + p.x * 0.07 + p.z * 0.05) * 0.25;
         const al  = p.alpha * df * twinkle;
         if (al < 0.015) continue;
-        const sz  = Math.max(0.3, p.sz * prj.scale * 0.75 * (0.9 + twinkle * 0.1));
+        const sz  = Math.max(0.4, p.sz * prj.scale * 0.65);
         ctx.fillStyle = `rgba(${p.r},${p.g},${p.b},${al.toFixed(3)})`;
-        ctx.beginPath(); ctx.arc(px, py, sz, 0, Math.PI * 2); ctx.fill();
+        ctx.fillRect(px - sz, py - sz, sz * 2, sz * 2);
       }
     }
 
@@ -321,7 +326,7 @@ export const GalaxyView: React.FC<GalaxyViewProps> = ({ notes, edges, focusId: _
     // Project all knowledge nodes
     const prjMap = new Map<string, Projected>();
     for (const n of data.knodes) {
-      const p = project(n.x, n.y, n.z);
+      const p = project(n.x, n.y, n.z, W, H);
       if (p) prjMap.set(n.id, p);
     }
 
@@ -391,16 +396,37 @@ export const GalaxyView: React.FC<GalaxyViewProps> = ({ notes, edges, focusId: _
         ctx.stroke();
       }
 
-      // Label (Clutter-reduction logic)
+      // Label collision detection
       const isHovered = hover?.id === n.id;
       const showLabel = params.showLabels && 
         (isFocus || isNbr || isHovered || (n.deg >= 12 && p.scale > 1.1));
       
       if (showLabel) {
-        ctx.font = `${(isFocus || isHovered) ? '600 ' : ''}11px var(--font-sans)`;
-        ctx.textAlign = 'center'; ctx.textBaseline = 'top';
-        ctx.fillStyle = `rgba(230,232,240,${Math.min(1, al * (isFocus || isHovered ? 2 : 1)).toFixed(3)})`;
-        ctx.fillText(n.title, x, y + r * pulse + 5);
+        const txt = n.title;
+        const fontSize = (isFocus || isHovered) ? 12 : 11;
+        ctx.font = `${(isFocus || isHovered) ? '600 ' : ''}${fontSize}px var(--font-sans)`;
+        const tw = ctx.measureText(txt).width;
+        const th = fontSize;
+        const tx = x - tw / 2;
+        const ty = y + r * pulse + 5;
+
+        // Check for collision with existing labels
+        const rect = { x1: tx - 4, y1: ty - 2, x2: tx + tw + 4, y2: ty + th + 2 };
+        let collision = false;
+        if (!isFocus && !isHovered) {
+          for (const other of labelRects) {
+            if (!(rect.x2 < other.x1 || rect.x1 > other.x2 || rect.y2 < other.y1 || rect.y1 > other.y2)) {
+              collision = true; break;
+            }
+          }
+        }
+
+        if (!collision || isFocus || isHovered) {
+          ctx.textAlign = 'center'; ctx.textBaseline = 'top';
+          ctx.fillStyle = `rgba(230,232,240,${Math.min(1, al * (isFocus || isHovered ? 2 : 1)).toFixed(3)})`;
+          ctx.fillText(txt, x, ty);
+          labelRects.push(rect);
+        }
       }
     }
   };

@@ -3,45 +3,53 @@ import type {
   PredicateContext,
   PredicateResult,
   PredicateViolation,
-  Severity,
 } from './types.js'
+import type { AtomicIndexEntry } from '../types.js'
 
 /**
  * PROTO--SYMBOLS-TRACE-INVARIANTS validator.
  *
- * - Rule 2: Acyclic Constraint (Atom Graph)
- * - Rule 4b: Atom Referential Integrity (Atom Graph)
- * - Rule 1: Termination Guard (Symbol Graph traces)
- * - Rule 3: Entry Point Origin (Symbol Graph traces)
- * - Rule 4a: Symbol Referential Integrity (Symbol Graph)
+ * Statically enforced sub-rules:
+ *   Rule 2  — Acyclic Constraint on the atom graph
+ *             (edges: supersedes, implements, parent_blueprint)
+ *   Rule 4b — Atom Referential Integrity
+ *   Rule 4a — Symbol Referential Integrity (requires symbol graph DB)
+ *
+ * Deferred to runtime (not enforced here):
+ *   Rule 1  — Termination Guard
+ *             By construction, the symbol-trace MCP tool uses a visited-set
+ *             plus depth cap, so traces cannot diverge. There is no static
+ *             violation case; this rule exists as a runtime invariant the
+ *             tracer must uphold.
+ *   Rule 3  — Entry Point Origin
+ *             Applies when an architectural tool (e.g. `symbol_trace`) is
+ *             invoked at runtime; it validates the trace's first edge src
+ *             belongs to a framework-entry kind. The static graph contains
+ *             no "trace" entity to inspect, so this is checked at the call
+ *             site of the tracer, not here.
  */
+
+const ATOM_GRAPH_EDGES = ['supersedes', 'implements', 'parent_blueprint'] as const
+const ATOM_REF_INTEGRITY_HALT = 50
+const SYMBOL_REF_INTEGRITY_WARN_THRESHOLD = 100
+
+const RULE_ACYCLIC = 'acyclic-constraint'
+const RULE_ATOM_REF_INTEGRITY = 'atom-ref-integrity'
+const RULE_SYMBOL_REF_INTEGRITY = 'symbol-ref-integrity'
+
 const predicate: Predicate = async (ctx: PredicateContext): Promise<PredicateResult> => {
   const violations: PredicateViolation[] = []
 
-  // Rule 2: Acyclic Constraint
-  violations.push(...checkAcyclicConstraint(ctx))
+  violations.push(...checkAcyclicConstraint(ctx.atomicIndex))
+  violations.push(...checkAtomReferentialIntegrity(ctx.atomicIndex))
 
-  // Rule 4b: Atom Referential Integrity
-  // Note: we stop if we hit > 50 violations to avoid noise/infinite loops in logic
-  const integrityViolations = checkReferentialIntegrity(ctx)
-  if (integrityViolations.length > 50) {
-    violations.push(...integrityViolations)
+  if (!ctx.symbolGraph) {
     violations.push({
-      message: `Referential integrity check halted: found ${integrityViolations.length} violations (threshold: 50). Existing vault may have widespread drift or rule is too strict.`,
-      severity: 'error',
-    })
-  } else {
-    violations.push(...integrityViolations)
-  }
-
-  if (ctx.symbolGraph === null) {
-    violations.push({
-      message:
-        'Symbol graph DB unavailable; skipping symbol-graph trace invariant rules (Rule 1, 3, 4a).',
+      message: 'Symbol graph DB unavailable; Rule 4a (symbol referential integrity) skipped.',
       severity: 'info',
     })
-  } else if (ctx.symbolGraph) {
-    violations.push(...checkSymbolGraphRules(ctx))
+  } else {
+    violations.push(...checkSymbolReferentialIntegrity(ctx.symbolGraph))
   }
 
   const ok = !violations.some((v) => v.severity === 'error')
@@ -49,100 +57,117 @@ const predicate: Predicate = async (ctx: PredicateContext): Promise<PredicateRes
 }
 
 /**
- * Rule 2: Acyclic Constraint (Atom Graph)
- * Relationship chains for directed edges (supersedes, implements, parent_blueprint)
- * MUST NOT form cycles.
+ * Rule 2 — Acyclic Constraint on the atom graph.
+ *
+ * Iterative DFS with white/gray/black coloring. Reports the first cycle
+ * found per connected component (not every cycle in dense SCCs). A
+ * violation lists the cycle as `A → B → C → A` with the edge type that
+ * closed it.
  */
-function checkAcyclicConstraint(ctx: PredicateContext): PredicateViolation[] {
+function checkAcyclicConstraint(index: AtomicIndexEntry[]): PredicateViolation[] {
   const violations: PredicateViolation[] = []
-  const edges = ['supersedes', 'implements', 'parent_blueprint']
-  const index = ctx.atomicIndex
   const idMap = new Map(index.map((a) => [a.id, a]))
+  const colors = new Map<string, number>() // 0 white, 1 gray, 2 black
+  const parent = new Map<string, { from: string; edge: string }>()
 
-  // 0: White (unvisited), 1: Gray (visiting), 2: Black (visited)
-  const colors = new Map<string, number>()
-  const parentMap = new Map<string, { id: string; type: string }>()
+  const dfs = (start: string): { cycle: string[]; edge: string } | null => {
+    const stack: Array<{ node: string; iter: Iterator<{ to: string; edge: string }> }> = []
+    colors.set(start, 1)
+    stack.push({ node: start, iter: outgoingEdges(idMap.get(start)) })
 
-  const dfs = (u: string): string[] | null => {
-    colors.set(u, 1)
-    const atom = idMap.get(u)
-    if (atom?.crosslinks) {
-      for (const edgeType of edges) {
-        const targets = atom.crosslinks[edgeType]
-        if (!targets) continue
-
-        for (const v of targets) {
-          parentMap.set(v, { id: u, type: edgeType })
-          const colorV = colors.get(v) ?? 0
-          if (colorV === 1) {
-            // Cycle detected!
-            const cycle = [v]
-            let curr = u
-            while (curr !== v && curr) {
-              cycle.push(curr)
-              curr = parentMap.get(curr)?.id ?? ''
-            }
-            cycle.push(v)
-            return cycle.reverse()
-          }
-          if (colorV === 0) {
-            const cycle = dfs(v)
-            if (cycle) return cycle
-          }
+    while (stack.length > 0) {
+      const top = stack[stack.length - 1]!
+      const next = top.iter.next()
+      if (next.done) {
+        colors.set(top.node, 2)
+        stack.pop()
+        continue
+      }
+      const { to, edge } = next.value
+      const color = colors.get(to) ?? 0
+      if (color === 1) {
+        const cycle: string[] = []
+        let curr = top.node
+        while (curr !== to) {
+          cycle.push(curr)
+          const p = parent.get(curr)
+          if (!p) break
+          curr = p.from
         }
+        cycle.push(to)
+        cycle.reverse()
+        cycle.push(to)
+        return { cycle, edge }
+      }
+      if (color === 0) {
+        parent.set(to, { from: top.node, edge })
+        colors.set(to, 1)
+        stack.push({ node: to, iter: outgoingEdges(idMap.get(to)) })
       }
     }
-    colors.set(u, 2)
     return null
   }
 
   for (const atom of index) {
-    if ((colors.get(atom.id) ?? 0) === 0) {
-      const cycle = dfs(atom.id)
-      if (cycle) {
-        // Find the edge type that closed the cycle for the message
-        const lastNode = cycle[cycle.length - 1]!
-        const prevNode = cycle[cycle.length - 2]!
-        const edgeType = parentMap.get(lastNode)?.type ?? 'unknown'
-
-        violations.push({
-          atomId: cycle[0],
-          message: `Cycle in atom graph (${edgeType}): ${cycle.join(' → ')}`,
-          severity: 'error',
-        })
-        // We report one violation per disjoint cycle found. 
-        // To find all cycles, we'd need to continue, but Rule 2 says "emit ONE violation listing the cycle nodes" 
-        // per cycle. Since DFS stops at first cycle in its path, we continue the outer loop.
-      }
+    if ((colors.get(atom.id) ?? 0) !== 0) continue
+    const found = dfs(atom.id)
+    if (found) {
+      violations.push({
+        atomId: found.cycle[0],
+        message: `Cycle in atom graph (${found.edge}): ${found.cycle.join(' → ')}`,
+        severity: 'error',
+        rule: RULE_ACYCLIC,
+      })
     }
   }
 
   return violations
 }
 
+function* outgoingEdges(
+  atom: AtomicIndexEntry | undefined,
+): Generator<{ to: string; edge: string }> {
+  if (!atom?.crosslinks) return
+  for (const edge of ATOM_GRAPH_EDGES) {
+    const targets = atom.crosslinks[edge]
+    if (!Array.isArray(targets)) continue
+    for (const to of targets) yield { to, edge }
+  }
+}
+
 /**
- * Rule 4b: Atom Referential Integrity (Atom Graph)
- * Every crosslink target must exist in atomicIndex or be marked external.
- * Note: Indexer currently strips 'external: true' objects, so we flag missing targets.
+ * Rule 4b — Atom Referential Integrity.
+ *
+ * Every string ID in any `crosslinks.*` array must resolve to an atom in
+ * the index. The indexer strips `external: true` markers today (see
+ * AUDIT--TRACE-INVARIANTS-ATOM-GRAPH-RULES), so missing targets are
+ * unconditionally flagged. We halt after `ATOM_REF_INTEGRITY_HALT`
+ * violations to avoid log floods during vault drift.
  */
-function checkReferentialIntegrity(ctx: PredicateContext): PredicateViolation[] {
+function checkAtomReferentialIntegrity(index: AtomicIndexEntry[]): PredicateViolation[] {
   const violations: PredicateViolation[] = []
-  const ids = new Set(ctx.atomicIndex.map((a) => a.id))
+  const ids = new Set(index.map((a) => a.id))
 
-  for (const atom of ctx.atomicIndex) {
+  for (const atom of index) {
     if (!atom.crosslinks) continue
-
     for (const [field, targets] of Object.entries(atom.crosslinks)) {
       if (!Array.isArray(targets)) continue
-
-      for (const targetId of targets) {
-        if (!ids.has(targetId)) {
+      for (const target of targets) {
+        if (typeof target !== 'string') continue
+        if (ids.has(target)) continue
+        violations.push({
+          atomId: atom.id,
+          message: `Atom ${atom.id} references missing target ${target} via crosslinks.${field}`,
+          severity: 'error',
+          rule: RULE_ATOM_REF_INTEGRITY,
+        })
+        if (violations.length >= ATOM_REF_INTEGRITY_HALT) {
           violations.push({
-            atomId: atom.id,
-            message: `Atom ${atom.id} references missing target ${targetId} via crosslinks.${field}`,
+            message: `Atom referential integrity halted after ${ATOM_REF_INTEGRITY_HALT} violations (likely widespread drift; fix the first batch then re-run).`,
             severity: 'error',
+            rule: RULE_ATOM_REF_INTEGRITY,
           })
-          if (violations.length > 50) return violations
+          return violations
         }
       }
     }
@@ -152,83 +177,37 @@ function checkReferentialIntegrity(ctx: PredicateContext): PredicateViolation[] 
 }
 
 /**
- * Symbol Graph Rules (1, 3, 4a)
+ * Rule 4a — Symbol Referential Integrity.
+ *
+ * Every `resolved: true` edge in the symbol graph must point to a symbol
+ * that exists in the symbols table. If the violation count exceeds
+ * `SYMBOL_REF_INTEGRITY_WARN_THRESHOLD`, all 4a violations are downgraded
+ * to `warning` so we surface the drift without blocking CI on graph
+ * extraction lag.
  */
-function checkSymbolGraphRules(ctx: PredicateContext): PredicateViolation[] {
+function checkSymbolReferentialIntegrity(
+  graph: NonNullable<PredicateContext['symbolGraph']>,
+): PredicateViolation[] {
   const violations: PredicateViolation[] = []
-  const graph = ctx.symbolGraph!
-
-  // Rule 4a: Symbol Referential Integrity
-  // For every edge with resolved=true: dst_id MUST exist in the symbols table.
-  const edges = graph.allEdges()
-  let rule4aViolations = 0
-  for (const edge of edges) {
-    if (edge.resolved) {
-      if (!graph.getSymbol(edge.dst_id)) {
-        rule4aViolations++
-        if (rule4aViolations <= 100) {
-          violations.push({
-            message: `Symbol Referential Integrity violation: Edge ${edge.src_id} -> ${edge.dst_id} (${edge.type}) points to missing symbol.`,
-            severity: 'error',
-          })
-        }
-      }
-    }
-  }
-  
-  if (rule4aViolations > 100) {
-    // If real graph in repo has >100 Rule 4a violations — downgrade to warning
+  for (const edge of graph.allEdges()) {
+    if (!edge.resolved) continue
+    if (graph.getSymbol(edge.dst_id)) continue
     violations.push({
-      message: `Found ${rule4aViolations} Rule 4a violations. Over 100 threshold reached, downgrading severity to warning for this rule to avoid pipeline blocking.`,
-      severity: 'warning',
+      message: `Symbol edge ${edge.src_id} → ${edge.dst_id} (${edge.type}) points to a missing symbol.`,
+      severity: 'error',
+      rule: RULE_SYMBOL_REF_INTEGRITY,
     })
-    // Convert all previous 4a errors to warnings
-    for (const v of violations) {
-      if (v.severity === 'error' && v.message.startsWith('Symbol Referential Integrity')) {
-        v.severity = 'warning'
-      }
-    }
   }
 
-  // Rule 1 & 3: Trace invariants from Entry Points
-  // Find entry points: we sample symbols that represent frameworks kinds (page, route, tool)
-  const entryPoints = graph.allSymbols().filter(s => ['page', 'route', 'tool'].includes(s.kind))
-  
-  for (const ep of entryPoints) {
-    // Rule 3: Entry Point Origin
-    // The node's kind is already validated as an entry point kind by the filter.
-    // However, if we were tracing from arbitrary traces, we would verify here.
-    // We implicitly satisfy Rule 3 by initiating our check traces from verified entry points.
-    
-    // Rule 1: Termination Guard
-    // Depth-first search to ensure termination within max-depth 8
-    const maxDepth = 8
-    
-    const visit = (currentId: string, depth: number, path: Set<string>): void => {
-      if (depth >= maxDepth) {
-        // Graceful termination at depth cap
-        return
-      }
-      
-      const outgoing = graph.getOutgoingEdges(currentId).filter(e => e.resolved)
-      if (outgoing.length === 0) {
-        // Terminates at leaf
-        return
-      }
-
-      for (const edge of outgoing) {
-        if (path.has(edge.dst_id)) {
-          // Detected cycle (revisited node) - valid termination, just log/skip
-          continue
-        }
-        const nextPath = new Set(path)
-        nextPath.add(edge.dst_id)
-        visit(edge.dst_id, depth + 1, nextPath)
-      }
+  if (violations.length > SYMBOL_REF_INTEGRITY_WARN_THRESHOLD) {
+    for (const v of violations) {
+      if (v.rule === RULE_SYMBOL_REF_INTEGRITY) v.severity = 'warning'
     }
-    
-    const path = new Set<string>([ep.id])
-    visit(ep.id, 0, path)
+    violations.push({
+      message: `Symbol referential integrity found ${violations.length} violations (> ${SYMBOL_REF_INTEGRITY_WARN_THRESHOLD}); severities downgraded to warning. Likely a graph extraction lag — investigate the extractor before promoting back to error.`,
+      severity: 'warning',
+      rule: RULE_SYMBOL_REF_INTEGRITY,
+    })
   }
 
   return violations

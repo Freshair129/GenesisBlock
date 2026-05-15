@@ -3,11 +3,24 @@ import type { Symbol as SymbolNode, Edge, EdgeType } from '../../symbols/types.j
 import { dbPath, graphExists } from '../../symbols/util.js'
 
 /**
+ * Read-only structural shape that predicates depend on. The concrete
+ * `SymbolGraphReader` class below implements it; tests can provide a
+ * plain object with the same surface without instantiating better-sqlite3.
+ */
+export interface SymbolGraphReaderLike {
+  getSymbol(id: string): SymbolNode | null
+  getOutgoingEdges(srcId: string, types?: EdgeType[]): Edge[]
+  getNeighbors(id: string, depth: number, types?: EdgeType[]): { nodes: SymbolNode[]; edges: Edge[] }
+  allSymbols(): SymbolNode[]
+  allEdges(): Edge[]
+}
+
+/**
  * A read-only typed interface to the underlying symbol-graph database.
  * Used by PROTO validators to ensure they cannot mutate the graph,
  * and allows easy mocking in tests without bringing in better-sqlite3.
  */
-export class SymbolGraphReader {
+export class SymbolGraphReader implements SymbolGraphReaderLike {
   private store: SymbolStore | null = null
 
   /** 

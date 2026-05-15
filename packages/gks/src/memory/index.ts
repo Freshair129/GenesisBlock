@@ -932,6 +932,7 @@ export type {
 } from './obsidian-mcp.js'
 export * from './types.js'
 export { deriveBacklinksFromEntries, emitBacklinksJsonl } from './backlinks.js'
+export { forEachJsonl, readJsonl, appendJsonl, writeJsonl, readJson, writeJson } from '../lib/jsonl.js'
 export type { BacklinkEdge, BacklinksOptions } from './backlinks.js'
 export { verifyFlow, formatVerifyFlowResult } from './verify-flow.js'
 export type { VerifyFlowOptions, VerifyFlowResult, VerifyError, WalkedEdge } from './verify-flow.js'

@@ -15,7 +15,7 @@
  */
 
 import type { AtomicIndexEntry } from '../types.js'
-import type { SymbolGraphReader } from './symbol-graph-reader.js'
+import type { SymbolGraphReaderLike } from './symbol-graph-reader.js'
 
 export type Severity = 'error' | 'warning' | 'info'
 
@@ -43,10 +43,11 @@ export interface PredicateContext {
   atomicIndex: AtomicIndexEntry[]
   /** Repo root, useful for predicates that need to read other files. */
   repoRoot: string
-  /** Open handle to the project's symbol-graph DB, or null if unavailable
-   *  in this validator run (e.g. fresh checkout without an indexed graph).
-   *  Predicates that need it must gracefully no-op when null. */
-  symbolGraph: SymbolGraphReader | null
+  /** Open handle to the project's symbol-graph DB, or null/undefined if
+   *  unavailable in this validator run (e.g. fresh checkout without an
+   *  indexed graph, or a unit test that doesn't exercise symbol rules).
+   *  Predicates that need it must gracefully no-op when falsy. */
+  symbolGraph?: SymbolGraphReaderLike | null
 }
 
 /** A single rule violation reported by a predicate. */
@@ -57,6 +58,10 @@ export interface PredicateViolation {
   message: string
   /** Severity of THIS violation; usually matches the PROTO's declared severity. */
   severity: Severity
+  /** Optional stable tag identifying the sub-rule that produced the
+   *  violation. Predicates enforcing multiple sub-rules mark each violation
+   *  so consumers can filter without parsing `message`. */
+  rule?: string
 }
 
 /** Return shape from any predicate. */

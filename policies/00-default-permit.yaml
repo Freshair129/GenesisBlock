@@ -1,0 +1,7 @@
+id: default-policy
+description: Default policy set for Cognitive System UCF.
+rules:
+  - id: log-everything-permit-everything
+    description: Baseline posture during Phase 1 (Shadow Mode).
+    effect: permit
+    priority: 0

@@ -19,7 +19,8 @@
     "msp-episode-gc": "./dist/agents/episode-gc-cli.js",
     "msp-genesis-exec": "./dist/genesis/cli.js",
     "msp-master-propose": "./dist/master/cli.js",
-    "msp-usage": "./dist/usage/cli.js"
+    "msp-usage": "./dist/usage/cli.js",
+    "msp-policy": "./dist/policy/cli.js"
   },
   "files": [
     "dist/",
@@ -43,6 +44,7 @@
     "msp:master": "tsx src/codegen/master/cli.ts",
     "msp:graph": "tsx src/symbols/cli.ts",
     "msp:dispatch": "tsx src/agents/cli.ts",
+    "msp:policy": "tsx src/policy/cli.ts",
     "msp:hotfix:open": "gks hotfix open",
     "msp:hotfix:list": "gks hotfix list",
     "msp:hotfix:close": "gks hotfix close",

@@ -65,7 +65,7 @@ function raceTimeout<T>(
         if (done) return
         done = true
         clearTimeout(t)
-        resolve({ value, timedOut: false })
+        resolve({ value: fallback, timedOut: false })
       },
     )
   })

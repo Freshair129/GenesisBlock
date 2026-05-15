@@ -40,7 +40,10 @@ import {
 import { runTask as runCodegenTask } from '../codegen/runner.js'
 import { createSlmClient } from '../codegen/slm/factory.js'
 import { createMspMcpServer } from '../mcp/server.js'
-import { makeContext, makeSubject } from '../policy/types.js'
+import { makeContext, makeResource, makeSubject } from '../policy/types.js'
+import { loadPolicies } from '../policy/loader.js'
+import { evaluatePolicy } from '../policy/pdp.js'
+import { logShadowDecision } from '../policy/shadow-log.js'
 
 import { ftsSearch } from './fts.js'
 import { markAuditOnly } from './audit-only.js'
@@ -82,6 +85,9 @@ export async function createCognitiveLayer(
   await store.init()
 
   const hotfixStore = new HotfixStore({ root })
+
+  const policiesDir = join(root, 'policies')
+  const policySet = await loadPolicies(policiesDir)
 
   return {
     store,
@@ -168,7 +174,31 @@ export async function createCognitiveLayer(
       const action = runOpts.action ?? 'expose-to-llm'
       const context = runOpts.context ?? makeContext('internal', 'system-run-task')
 
-      console.debug(`[ucf] 4-tuple: runTask | sub:${subject.id} | act:${action} | trace:${context.trace_id}`)
+      console.debug(
+        `[ucf] 4-tuple: runTask | sub:${subject.id} | act:${action} | trace:${context.trace_id}`,
+      )
+
+      // Phase 1: Shadow PEP
+      const resource = makeResource('context-slot', 'run-task-execution')
+      const decision = evaluatePolicy(subject, resource, action, context, policySet)
+
+      const logPath = join(root, '.brain', 'msp', 'audit', 'shadow-policy.jsonl')
+      await logShadowDecision(
+        {
+          trace_id: context.trace_id,
+          subject,
+          resource,
+          action,
+          context,
+          decision,
+          policy_version: policySet.version,
+        },
+        logPath,
+      )
+
+      if (decision.effect === 'deny') {
+        console.warn(`[ucf] shadow-deny: runTask would have been denied for ${subject.id}`)
+      }
 
       const scale = runOpts.scale ?? 'L2'
 
@@ -216,11 +246,11 @@ export async function createCognitiveLayer(
       open(args) {
         return hotfixStore.open({ commitSha: args.sha, title: args.reason, reason: args.reason })
       },
-      list() {
-        return hotfixStore.list()
-      },
       close(sha: string) {
         return hotfixStore.close(`HOTFIX--${sha.toUpperCase().slice(0, 7)}`, [])
+      },
+      list() {
+        return hotfixStore.list()
       },
       check() {
         return hotfixStore.listOverdue()

@@ -3,23 +3,20 @@ id: AUDIT--PHASE-0-PLUMBING
 phase: 6
 type: audit
 status: stable
+vault_id: default
 tier: process
 source_type: axiomatic
-title: AUDIT — UCF Phase 0: propagation plumbing & attribute bag
+title: "AUDIT - UCF Phase 0: propagation plumbing and attribute bag"
 tags:
   - msp
   - ucf
   - plumbing
   - audit
-crosslinks:
-  references:
-    - BLUEPRINT--PHASE-0-PLUMBING
-    - CONCEPT--SUBJECT-RESOURCE-ACTION-CONTEXT
-    - CONCEPT--ATTRIBUTE-BAG-MODEL
-created_at: 2026-05-14T21:00:00+07:00
+crosslinks: { "references": ["BLUEPRINT--PHASE-0-PLUMBING", "CONCEPT--SUBJECT-RESOURCE-ACTION-CONTEXT", "CONCEPT--ATTRIBUTE-BAG-MODEL"] }
+created_at: 2026-05-14T21:00:00.000+07:00
 ---
 
-# AUDIT — UCF Phase 0: Propagation Plumbing
+# AUDIT - UCF Phase 0: Propagation Plumbing
 
 ## Scope
 

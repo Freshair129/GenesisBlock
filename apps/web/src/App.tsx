@@ -8,6 +8,7 @@ import { RightRail } from './components/layout/RightRail';
 import { TopbarSearch } from './components/layout/TopbarSearch';
 import { Editor } from './components/views/Editor';
 import { Graph3DView } from './components/views/Graph3DView';
+import { Graph2DView } from './components/views/Graph2DView';
 import { GalaxyView } from './components/views/GalaxyView';
 import { EmbeddingView } from './components/views/EmbeddingView';
 import { Daily } from './components/views/Daily';
@@ -48,7 +49,7 @@ function App() {
   const active = tabs[activeTabIdx];
 
   const [sbMode, setSbMode] = useState<'files' | 'tags' | 'daily'>("files");
-  const [graphMode, setGraphMode] = useState<'3d' | 'galaxy'>('3d');
+  const [graphMode, setGraphMode] = useState<'2d' | '3d' | 'galaxy'>('2d');
   const [activeTags, setActiveTags] = useState<string[]>([]);
   const toggleTag = (t: string) => setActiveTags(arr => arr.includes(t) ? arr.filter(x => x !== t) : [...arr, t]);
 
@@ -183,6 +184,8 @@ function App() {
               <>
                 <span>VIEW</span><span style={{ margin:"0 6px" }}>/</span><b>Knowledge Graph</b>
                 <div style={{ marginLeft: 14, display:"flex", gap: 2, background:"var(--bg-2)", border:"1px solid var(--border)", borderRadius: 7, padding: 2 }}>
+                  <button style={{ height: 22, padding: "0 9px", borderRadius: 5, fontSize: 11, color: graphMode==="2d" ? "var(--accent)" : "var(--text-mute)", background: graphMode==="2d" ? "var(--accent-soft)" : "transparent", fontFamily: "var(--font-mono)", cursor: "pointer" }}
+                          onClick={() => setGraphMode("2d")}>2D · classic</button>
                   <button style={{ height: 22, padding: "0 9px", borderRadius: 5, fontSize: 11, color: graphMode==="3d" ? "var(--accent)" : "var(--text-mute)", background: graphMode==="3d" ? "var(--accent-soft)" : "transparent", fontFamily: "var(--font-mono)", cursor: "pointer" }}
                           onClick={() => setGraphMode("3d")}>3D · neural</button>
                   <button style={{ height: 22, padding: "0 9px", borderRadius: 5, fontSize: 11, color: graphMode==="galaxy" ? "var(--accent)" : "var(--text-mute)", background: graphMode==="galaxy" ? "var(--accent-soft)" : "transparent", fontFamily: "var(--font-mono)", cursor: "pointer" }}
@@ -214,6 +217,7 @@ function App() {
         </div>
         <div className="main-body">
           {active?.kind === "note"  && <Editor note={GKS_SERVICE.NOTE_BY_ID[active.id]} onOpen={openId}/>}
+          {active?.kind === "graph" && graphMode === "2d"     && <Graph2DView notes={filteredNotes} edges={GKS_SERVICE.D.edges} focusId={null} onOpen={openId}/>}
           {active?.kind === "graph" && graphMode === "3d"     && <Graph3DView notes={filteredNotes} edges={GKS_SERVICE.D.edges} focusId={null} onOpen={openId}/>}
           {active?.kind === "graph" && graphMode === "galaxy" && <GalaxyView   notes={filteredNotes} edges={GKS_SERVICE.D.edges} focusId={null} onOpen={openId}/>}
           {active?.kind === "embed" && <EmbeddingView notes={filteredNotes} focusId={focusNoteId} onOpen={openId}/>}
