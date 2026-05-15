@@ -9,7 +9,7 @@ tier: genesis
 title: Extended atomic taxonomy + ISSUE-- as self-hosted tracker
 tags: [taxonomy, governance, issue-tracking, scope]
 crosslinks:
-  references: [FRAMEWORK--FOUR-LAYERS, ADR--FLAT-ATOM-LAYOUT]
+  references: [FRAMEWORK--FOUR-LAYERS, ADR--FLAT-ATOM-LAYOUT, CONCEPT--TAXONOMY-V2-3]
   resolves: []
 ---
 

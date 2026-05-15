@@ -9,7 +9,7 @@ tier: genesis
 title: Doc-to-code enforcement model (master-spec §6 → GKS primitives)
 tags: [workflow, enforcement, agent-rule, hotfix, msp-gatekeeper]
 crosslinks:
-  references: [ADR--EXTENDED-TAXONOMY, ADR--FLAT-ATOM-LAYOUT, ADR--REVERSE-CITATION-LOOKUP]
+  references: [ADR--EXTENDED-TAXONOMY, ADR--FLAT-ATOM-LAYOUT, ADR--REVERSE-CITATION-LOOKUP, CONCEPT--MASTER-PROMOTION]
   partially_superseded_by: [ADR--TASK-TRACKING-AT-ORCHESTRATOR]
 linked_symbols:
   - { file: "src/memory/types.ts", fn: normaliseStatus }

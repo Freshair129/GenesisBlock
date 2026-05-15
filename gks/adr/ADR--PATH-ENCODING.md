@@ -12,7 +12,7 @@ tags:
   - path-encoding
   - convention
   - decision
-crosslinks: {"references":["FRAMEWORK--MSP-ARCHITECTURE-V2"]}
+crosslinks: {"references":["FRAMEWORK--MSP-ARCHITECTURE-V2","CONCEPT--TAXONOMY-V2-3"]}
 created_at: 2026-05-03T14:08:44.405+07:00
 ---
 

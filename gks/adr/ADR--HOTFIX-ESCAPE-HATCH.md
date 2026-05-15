@@ -12,7 +12,7 @@ tags:
   - hotfix
   - escape-hatch
   - escalation
-crosslinks: {"references":["ADR--AGENT-WRITE-BOUNDARIES","FRAMEWORK--PHASE-GOVERNANCE"]}
+crosslinks: {"references":["ADR--AGENT-WRITE-BOUNDARIES","FRAMEWORK--PHASE-GOVERNANCE","CONCEPT--MSP-HOTFIX-WRAPPER"]}
 created_at: 2026-05-03T14:08:43.472+07:00
 ---
 
