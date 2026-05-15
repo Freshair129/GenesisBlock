@@ -4,6 +4,8 @@ import { join, resolve } from 'node:path'
 import { parse as parseYaml } from 'yaml'
 import { enforcePolicy, type PepOptions } from '../../policy/pep.js'
 import { makeResource } from '../../policy/types.js'
+import { assignResolutionTiers, type ResolutionTier } from '../../orchestrator/resolution/tier.js'
+import { enforceResolutionBudget } from '../../orchestrator/resolution/budget.js'
 
 /**
  * One Master atom successfully composed: id, body (everything after the
@@ -13,6 +15,7 @@ export interface ComposedMaster {
   id: string
   body: string
   tokenCount: number
+  tier: ResolutionTier
   /** §4 — Domain-specific attributes for policy checks. */
   attributes?: Record<string, any>
 }
@@ -65,11 +68,6 @@ function parseAtom(source: string): ParsedAtom | null {
 
 /**
  * Heuristic token count: whitespace-split word count * 1.3, rounded.
- *
- * Intentionally simple — tiktoken-grade accuracy is unnecessary for v1; the
- * Master token cap (warn 400 / error 600 per `FRAME--KNOWLEDGE-3-TIER`) is
- * itself a soft budget, not a hard one. Empty / whitespace-only bodies
- * return 0.
  */
 export function estimateTokens(text: string): number {
   const trimmed = text.trim()
@@ -87,13 +85,6 @@ async function pathExists(p: string): Promise<boolean> {
   }
 }
 
-/**
- * Locate the Markdown file for a given atom id. Tries `gks/master/<id>.md`
- * first (the canonical home for Master atoms). If that misses, scans `gks/`
- * recursively as a fallback so atoms living elsewhere (e.g. promoted but
- * not yet relocated) are still discoverable. Returns `null` if no file is
- * found.
- */
 async function findAtomFile(id: string, root: string): Promise<string | null> {
   const canonical = resolve(root, 'gks/master', `${id}.md`)
   if (await pathExists(canonical)) return canonical
@@ -123,28 +114,24 @@ async function scanForId(dir: string, filename: string): Promise<string | null> 
 }
 
 /**
- * Compose a list of Master atom bodies for prompt injection.
+ * Compose a list of Master atom bodies for prompt injection with Resolution Gradient (Phase 3).
  *
  * For each requested id:
- * - looks up `gks/master/<id>.md` (or scans `gks/` if not at canonical path)
- * - parses frontmatter; if `tier !== 'master'`, the id is added to `missing`
- *   instead of `composed`
- * - evaluates policy via PEP; if rejected, the id is added to `dropped`
- * - extracts body (everything after the closing `---`)
- * - estimates token count via {@link estimateTokens}
- *
- * The output preserves the input order. Ids not found on disk are also
- * placed in `missing`. This function is pure: no caching, no side effects.
+ * - looks up atom on disk.
+ * - parses frontmatter and extract attributes.
+ * - evaluates policy via PEP; if rejected, the id is added to `dropped`.
+ * - assigns tier (FULL / MENTION).
+ * - enforces token budget (Layer 5).
+ * - extracts body iff tier === FULL.
  */
 export async function composeMasterAtoms(
   ids: string[],
   root: string,
-  pep?: PepOptions,
+  opts: { pep?: PepOptions; maxTokens?: number } = {},
 ): Promise<ComposeResult> {
-  const composed: ComposedMaster[] = []
+  const candidates: Array<{ id: string; body: string; attributes: Record<string, any> }> = []
   const missing: string[] = []
   const dropped: string[] = []
-  let totalTokens = 0
 
   for (const id of ids) {
     const filepath = await findAtomFile(id, root)
@@ -160,30 +147,54 @@ export async function composeMasterAtoms(
       continue
     }
     const parsed = parseAtom(raw)
-    if (parsed === null) {
-      missing.push(id)
-      continue
-    }
-    if (parsed.fm.tier !== 'master') {
+    if (parsed === null || parsed.fm.tier !== 'master') {
       missing.push(id)
       continue
     }
 
     const attributes = (parsed.fm.attributes as Record<string, any>) ?? {}
 
-    // PEP enforcement
-    if (pep) {
+    // 1. PEP enforcement (Phase 2)
+    if (opts.pep) {
       const resource = makeResource('atom', id, {}, attributes)
-      const { permitted } = await enforcePolicy(resource, pep)
+      const { permitted } = await enforcePolicy(resource, opts.pep)
       if (!permitted) {
         dropped.push(id)
         continue
       }
     }
 
-    const body = parsed.body.replace(/\s+$/, '')
+    candidates.push({ id, body: parsed.body.replace(/\s+$/, ''), attributes })
+  }
+
+  // 2. Assign Tiers (Phase 3 - Layer 4)
+  const hitsWithTiers = assignResolutionTiers(
+    candidates.map((c) => ({ atomId: c.id, attributes: c.attributes } as any)),
+  )
+
+  // 3. Enforce Budget (Phase 3 - Layer 5)
+  const budgetedHits = enforceResolutionBudget(
+    hitsWithTiers.map((h, i) => ({
+      ...h,
+      body: candidates[i]!.body,
+    })),
+    { maxTokens: opts.maxTokens },
+  )
+
+  const composed: ComposedMaster[] = []
+  let totalTokens = 0
+
+  for (const hit of budgetedHits) {
+    const candidate = candidates.find((c) => c.id === hit.atomId)!
+    const body = hit.tier === 'FULL' ? candidate.body : `[MENTION: ${hit.atomId}]`
     const tokenCount = estimateTokens(body)
-    composed.push({ id, body, tokenCount, attributes })
+    composed.push({
+      id: hit.atomId,
+      body,
+      tokenCount,
+      tier: hit.tier,
+      attributes: candidate.attributes,
+    })
     totalTokens += tokenCount
   }
 
@@ -192,15 +203,10 @@ export async function composeMasterAtoms(
 
 /**
  * Format a {@link ComposeResult} as a single prompt fragment string.
- *
- * Each atom's body is preceded by an HTML comment marker (`<!-- {id} -->`)
- * so downstream consumers can locate / strip individual atoms; atoms are
- * separated by `\n\n---\n\n`. Returns the empty string when nothing was
- * composed.
  */
 export function formatAsPromptFragment(result: ComposeResult): string {
   if (result.composed.length === 0) return ''
   return result.composed
-    .map((atom) => `<!-- ${atom.id} -->\n${atom.body}`)
+    .map((atom) => `<!-- ${atom.id} [${atom.tier}] -->\n${atom.body}`)
     .join('\n\n---\n\n')
 }

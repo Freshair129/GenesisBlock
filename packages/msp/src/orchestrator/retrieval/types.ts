@@ -96,11 +96,13 @@ export interface RetrievalResult {
   fallback_reasons: string[]
   timings: RetrievalTimings
 }
-
 export interface RecallOptions {
   query: string
   root?: string
   namespace?: string
+  /** §5 — Vault ID for multi-namespace retrieval. If set, 'namespace' is ignored. */
+  vaultId?: string
+...
   /**
    * Optional Obsidian client (M7a). If absent, the obsidian source is
    * skipped (recorded in `fallback_reasons`). Caller owns the lifecycle

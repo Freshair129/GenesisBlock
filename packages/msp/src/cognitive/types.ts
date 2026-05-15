@@ -23,6 +23,7 @@ import type { SlmFactoryOpts } from '../codegen/slm/types.js'
 import type { RunOptions, RunResult } from '../codegen/types.js'
 import type { Action, RequestContext, Subject } from '../policy/types.js'
 import type { SubagentScope } from '../policy/task-scope.js'
+import type { ResolutionTier } from '../orchestrator/resolution/tier.js'
 
 /** §17.3 — 3-tier agent mapping (T1 = Ollama+qwen2.5-coder, T2 = mid LLM, T3 = large LLM). */
 export type CognitiveTier = 'T1' | 'T2' | 'T3'
@@ -91,6 +92,18 @@ export interface EscalationResult {
   updated_scope?: SubagentScope
 }
 
+export interface ExpandRequest {
+  id: string
+  to?: ResolutionTier
+}
+
+export interface ExpandResult {
+  id: string
+  body?: string
+  tier: ResolutionTier
+  denied_reason?: string
+}
+
 export interface CognitiveLayer {
   /** Read path — §13 hybrid retrieval (atomic → FTS → vector → graph + RRF). */
   recall(query: string, opts?: RetrievalOptions & PolicyContext): Promise<CognitiveRecallResult>
@@ -98,6 +111,8 @@ export interface CognitiveLayer {
   remember(content: string, opts?: RememberOptions & PolicyContext): Promise<{ id: string }>
   /** §9.3 — Subagent context expansion request. */
   escalate(req: EscalationRequest): Promise<EscalationResult>
+  /** §10 — Resolution expansion (e.g. MENTION → FULL). */
+  expand(req: ExpandRequest, opts?: PolicyContext): Promise<ExpandResult>
   /** Session-end consolidation. */
   consolidate(sessionId: string): Promise<void>
   /** Codegen runner with tier routing + §7.7.2 gate. */

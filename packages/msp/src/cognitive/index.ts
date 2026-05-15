@@ -1,15 +1,9 @@
 /**
  * Cognitive Layer — one-line memoryOS entry point.
- *
- * Sandwich diagram (FRAME--MSP-ARCHITECTURE-V2):
- *
- *   COGNITIVE LAYER (EVA / Claude Code / Hermes / openclaw / Gemini CLI / …)
- *     └─►  this facade
- *            ├─► MSP passport (identity, candidates, codegen runner, MCP server)
- *            └─► GKS (atomic / vector / episodic / obsidian + GraphBackend)
  */
 
 import { join, resolve } from 'node:path'
+import { readFile } from 'node:fs/promises'
 
 import {
   MemoryStore,
@@ -28,6 +22,7 @@ import { loadPolicies } from '../policy/loader.js'
 import { evaluatePolicy } from '../policy/pdp.js'
 import { logShadowDecision } from '../policy/shadow-log.js'
 import { handleEscalation } from '../policy/escalation.js'
+import { enforcePolicy } from '../policy/pep.js'
 import { recall as mspRecall } from '../orchestrator/retrieval/index.js'
 
 import { ftsSearch } from './fts.js'
@@ -46,6 +41,8 @@ import {
   type RememberOptions,
   type EscalationRequest,
   type EscalationResult,
+  type ExpandRequest,
+  type ExpandResult,
 } from './types.js'
 
 export async function createCognitiveLayer(
@@ -90,21 +87,17 @@ export async function createCognitiveLayer(
 
       console.debug(`[ucf] 4-tuple: facade.recall | sub:${subject.id} | act:${action} | trace:${context.trace_id}`)
 
-      // Delegate to MSP orchestrator instead of calling GKS directly.
-      // The orchestrator handles hybrid search (Vector, Obsidian, Episodic, Backlinks) + PEP.
       const result = await mspRecall({
         query,
         root,
-        namespace: opts.defaultNamespace?.tenant_id, // Simplified mapping
+        namespace: opts.defaultNamespace?.tenant_id,
         topK: retrievalOpts.topK,
         subject,
         context,
-        // Optional: pass embedder/backend if facade owns them
         embedder: await store.embedder(),
         vectorBackend: await store.getVectorStore('atomic'),
       })
 
-      // Map MSP RetrievalHit to CognitiveRecallHit (adding audit_only check)
       const hits = result.hits.map((h) => {
         const hit: CognitiveRecallHit = {
           id: h.atomId,
@@ -124,7 +117,7 @@ export async function createCognitiveLayer(
         query,
         hits,
         strategy: 'multi',
-        tookMs: result.timings.fusion, // Approximate
+        tookMs: result.timings.fusion,
         fallback_reasons: result.fallback_reasons,
       }
     },
@@ -144,7 +137,6 @@ export async function createCognitiveLayer(
         metadata: {
           ...(rOpts.metadata ?? {}),
           ...(rOpts.tags ? { tags: rOpts.tags } : {}),
-          // Threading attributes into metadata for Phase 0
           attributes: subject.attributes,
         },
       })
@@ -154,9 +146,43 @@ export async function createCognitiveLayer(
     async escalate(req: EscalationRequest): Promise<EscalationResult> {
       return handleEscalation(req, {
         root,
-        currentScope: { needs: [], nice_to_have: [], excludes: [] }, // Placeholder
+        currentScope: { needs: [], nice_to_have: [], excludes: [] },
         subjectId: 'anonymous-subagent',
       })
+    },
+
+    async expand(req: ExpandRequest, pOpts?: PolicyContext): Promise<ExpandResult> {
+      const subject = pOpts?.subject ?? makeSubject('user', 'anonymous')
+      const action = pOpts?.action ?? 'read'
+      const context = pOpts?.context ?? makeContext('internal', 'system-expand')
+      const targetTier = req.to ?? 'FULL'
+
+      const atom = await store.lookup(req.id)
+      if (!atom) {
+        throw new Error(`expand: atom not found: ${req.id}`)
+      }
+
+      const resource = makeResource('atom', req.id, {}, atom.attributes ?? {})
+      const { permitted, decision } = await enforcePolicy(resource, { root, subject, action, context })
+
+      if (!permitted) {
+        return {
+          id: req.id,
+          tier: 'MENTION',
+          denied_reason: decision.reasoning[0]?.description ?? 'Denied by policy',
+        }
+      }
+
+      // Read full body
+      const absPath = resolve(root, 'gks', atom.path)
+      const raw = await readFile(absPath, 'utf8')
+      const body = raw.split('\n---').pop()?.trim() ?? ''
+
+      return {
+        id: req.id,
+        body,
+        tier: targetTier,
+      }
     },
 
     async consolidate(sessionId: string): Promise<void> {

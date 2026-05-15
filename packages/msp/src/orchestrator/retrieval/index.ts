@@ -19,6 +19,8 @@ import {
 } from './types.js'
 import { makeContext, makeResource, makeSubject, type Action } from '../../policy/types.js'
 import { enforcePolicy } from '../../policy/pep.js'
+import { resolveVault, vaultReadNamespaces } from '../../vault/registry.js'
+import type { Namespace } from '@freshair129/gks'
 
 export type {
   RecallOptions,
@@ -139,7 +141,6 @@ function collectFallbackReasons(results: SourceResult[]): string[] {
 export async function recall(opts: RecallOptions): Promise<RetrievalResult> {
   const overallStart = performance.now()
   const root = opts.root ?? process.cwd()
-  const namespace = opts.namespace ?? DEFAULT_NAMESPACE
   const topK = opts.topK ?? DEFAULT_TOP_K
   const totalBudget = opts.timeoutMs ?? DEFAULT_TOTAL_TIMEOUT_MS
   const rrfK = opts.rrfK ?? DEFAULT_RRF_K
@@ -154,22 +155,48 @@ export async function recall(opts: RecallOptions): Promise<RetrievalResult> {
     `[ucf] 4-tuple: orchestrator.recall | sub:${subject.id} | act:${action} | trace:${context.trace_id}`,
   )
 
+  // Resolve Namespaces from Vault (Layer 1)
+  let readNamespaces: Namespace[] = []
+  if (opts.vaultId) {
+    const vault = resolveVault(opts.vaultId)
+    if (!vault) {
+      console.warn(`[ucf] vault not found: ${opts.vaultId}, falling back to default namespace`)
+      readNamespaces = [{ tenant_id: opts.namespace ?? DEFAULT_NAMESPACE }]
+    } else {
+      readNamespaces = vaultReadNamespaces(vault)
+    }
+  } else {
+    readNamespaces = [{ tenant_id: opts.namespace ?? DEFAULT_NAMESPACE }]
+  }
+
   const budgets = scaleBudgets(totalBudget, opts.perSourceTimeouts)
 
-  // Phase A: 3 query-driven sources in parallel.
+  // Phase A: 3 query-driven sources in parallel across ALL namespaces.
+  // For MVP: we run one vectorSource call per namespace and fuse them.
+  // Future: GKS should support multi-namespace filter natively.
   const phaseAStart = performance.now()
-  const settled = await Promise.allSettled([
-    raceTimeout(
-      vectorSource({
-        query: opts.query,
-        topK,
-        timeoutMs: budgets['gks-vector'],
-        embedder: opts.embedder,
-        vectorBackend: opts.vectorBackend,
-      }),
-      budgets['gks-vector'] + 50,
-      emptySettled('gks-vector'),
-    ),
+  const sourceTasks: Array<Promise<{ value: SourceResult; timedOut: boolean }>> = []
+
+  for (const ns of readNamespaces) {
+    const nsId = ns.tenant_id ?? DEFAULT_NAMESPACE
+    sourceTasks.push(
+      raceTimeout(
+        vectorSource({
+          query: opts.query,
+          topK,
+          timeoutMs: budgets['gks-vector'],
+          embedder: opts.embedder,
+          vectorBackend: opts.vectorBackend,
+          // namespace: nsId, // TODO: Update vectorSource to support namespace filtering
+        }),
+        budgets['gks-vector'] + 50,
+        emptySettled('gks-vector'),
+      ),
+    )
+  }
+
+  // Obsidian and Episodic (still single-namespace for now in MVP)
+  sourceTasks.push(
     raceTimeout(
       obsidianSource({
         obsidian: opts.obsidian,
@@ -180,35 +207,37 @@ export async function recall(opts: RecallOptions): Promise<RetrievalResult> {
       budgets['obsidian-text'] + 50,
       emptySettled('obsidian-text'),
     ),
+  )
+
+  sourceTasks.push(
     raceTimeout(
-      episodicSource({ root, namespace, query: opts.query, topK }),
+      episodicSource({ root, namespace: readNamespaces[0]?.tenant_id ?? DEFAULT_NAMESPACE, query: opts.query, topK }),
       budgets.episodic + 50,
       emptySettled('episodic'),
     ),
-  ])
+  )
 
-  const vectorRes = settledValue(settled[0], {
-    value: emptySettled('gks-vector'),
-    timedOut: false,
-  }).value
-  const obsidianRes = settledValue(settled[1], {
-    value: emptySettled('obsidian-text'),
-    timedOut: false,
-  }).value
-  const episodicRes = settledValue(settled[2], {
-    value: emptySettled('episodic'),
-    timedOut: false,
-  }).value
+  const settled = await Promise.allSettled(sourceTasks)
+  
+  const results: SourceResult[] = []
+  for (const s of settled) {
+    if (s.status === 'fulfilled') results.push(s.value.value)
+  }
+
+  // Separate results by source for latency tracking (simplified for MVP)
+  const vectorRes = results.find(r => r.source === 'gks-vector') ?? emptySettled('gks-vector')
+  const obsidianRes = results.find(r => r.source === 'obsidian-text') ?? emptySettled('obsidian-text')
+  const episodicRes = results.find(r => r.source === 'episodic') ?? emptySettled('episodic')
 
   const phaseAElapsed = performance.now() - phaseAStart
   const remaining = Math.max(50, totalBudget - phaseAElapsed)
 
   // Phase B: backlinks expansion from phase-A candidates.
-  const candidates = uniqueAtomIds([vectorRes, obsidianRes, episodicRes])
+  const candidates = uniqueAtomIds(results)
   const backlinksRaced = await raceTimeout(
     backlinksSource({
       root,
-      namespace,
+      namespace: readNamespaces[0]?.tenant_id ?? DEFAULT_NAMESPACE,
       candidateAtomIds: candidates,
       topK,
     }),
@@ -219,7 +248,7 @@ export async function recall(opts: RecallOptions): Promise<RetrievalResult> {
 
   // Phase C: fuse.
   const fuseStart = performance.now()
-  const allResults: SourceResult[] = [vectorRes, obsidianRes, episodicRes, backlinksRes]
+  const allResults: SourceResult[] = [...results, backlinksRes]
   const fusedHits = rrfFuse(allResults, { k: rrfK, weights, topK })
 
   // Phase D: Enforce Policy (PEP)

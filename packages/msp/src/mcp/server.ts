@@ -23,6 +23,7 @@ import * as symbolSearch from './tools/symbol-search.js'
 import * as symbolTrace from './tools/symbol-trace.js'
 import * as validateTool from './tools/validate.js'
 import * as escalateTool from './tools/escalate.js'
+import * as expandTool from './tools/expand.js'
 import type { ToolHandlerCtx } from './types.js'
 
 export interface ServerOpts {
@@ -54,6 +55,7 @@ const TOOLS = [
   symbolSearch,
   symbolTrace,
   escalateTool,
+  expandTool,
 ] as const
 
 export function createMspMcpServer(opts: ServerOpts = {}): McpServer {
