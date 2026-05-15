@@ -13,7 +13,8 @@
     "msp-master-propose": "./dist/master/cli.js",
     "msp-usage": "./dist/usage/cli.js",
     "msp-policy": "./dist/policy/cli.js",
-    "msp-vault": "./dist/vault/cli.js"
+    "msp-vault": "./dist/vault/cli.js",
+    "msp-genesis-exec": "./dist/genesis/cli.js"
   },
   "scripts": {
     "dev": "concurrently \"npm run build:watch\" \"npm run test:watch\"",
@@ -27,6 +28,7 @@
     "msp:dispatch": "tsx src/agents/cli.ts",
     "msp:policy": "tsx src/policy/cli.ts",
     "msp:vault": "tsx src/vault/cli.ts",
+    "msp:genesis": "tsx src/genesis/cli.ts",
     "msp:hotfix:open": "gks hotfix open",
     "msp:hotfix:close": "gks hotfix close"
   },

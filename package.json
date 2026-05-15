@@ -18,6 +18,9 @@
     "typecheck": "npm run typecheck --workspaces",
     "msp:index": "tsx scripts/msp/re-indexer.ts --root=.",
     "msp:validate": "tsx packages/msp/src/validator/cli.ts --all --root=.",
+    "msp:policy": "npm run msp:policy --workspace=packages/msp --",
+    "msp:vault": "npm run msp:vault --workspace=packages/msp --",
+    "msp:genesis": "npm run msp:genesis --workspace=packages/msp --",
     "msp:check-links": "gks validate --links --root=."
   }
 }
