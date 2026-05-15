@@ -53,9 +53,8 @@ input, textarea { font: inherit; color: inherit; }
 .app {
   display: grid;
   grid-template-columns: 240px 1fr 300px;
-  grid-template-rows: 28px 36px 1fr 22px;
+  grid-template-rows: 36px 1fr 22px;
   grid-template-areas:
-    "chrome chrome chrome"
     "topbar topbar topbar"
     "left main right"
     "status status status";

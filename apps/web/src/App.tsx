@@ -116,22 +116,6 @@ function App() {
 
   return (
     <div className="app">
-      <div className="chrome">
-        <div className="tl">
-          <span className="tl-dot red"/>
-          <span className="tl-dot yellow"/>
-          <span className="tl-dot green"/>
-        </div>
-        <div className="chrome-title">
-          <b>Genesis</b> &nbsp;—&nbsp; gks · {active?.title || "Knowledge"}
-        </div>
-        <div className="chrome-right">
-          <span className="chrome-pill"><span className="pulse"/>3 MCP</span>
-          <span>{model}</span>
-          <span>v0.4.2</span>
-        </div>
-      </div>
-
       <div className="topbar">
         <div className="tb-brand">
           <span className="tb-logo"/>
