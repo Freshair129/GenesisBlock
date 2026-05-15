@@ -24,6 +24,8 @@
     "prepublishOnly": "npm run typecheck && npm test && npm run build",
     "msp:index": "tsx ../../scripts/msp/re-indexer.ts --root=../..",
     "msp:validate": "tsx src/validator/cli.ts --all --root=../..",
+    "msp:backlinks": "tsx src/memory/backlinks/cli.ts",
+    "msp:check-links": "gks validate --links --root=../..",
     "msp:dispatch": "tsx src/agents/cli.ts",
     "msp:policy": "tsx src/policy/cli.ts",
     "msp:vault": "tsx src/vault/cli.ts",
@@ -31,12 +33,18 @@
     "msp:hotfix:close": "gks hotfix close"
   },
   "dependencies": {
-    "@freshair129/gks": "workspace:*",
+    "@aflsolutions/graphology-communities-leiden": "^1.1.1",
+    "@freshair129/gks": "*",
     "@modelcontextprotocol/sdk": "^1.6.0",
     "better-sqlite3": "^11.9.1",
     "chalk": "^5.4.1",
     "express": "^4.21.2",
+    "graphology": "^0.25.4",
+    "graphology-communities-louvain": "^2.0.2",
+    "graphology-types": "^0.24.8",
     "node-fetch": "^3.3.2",
+    "tree-sitter-python": "^0.25.0",
+    "web-tree-sitter": "^0.26.8",
     "yaml": "^2.7.0",
     "zod": "^3.24.2"
   },

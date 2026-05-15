@@ -2,7 +2,7 @@
 id: MASTER--ATOM-CONTRADICTION-POLICY
 phase: 0
 type: master
-status: draft
+status: stable
 tier: master
 source_type: axiomatic
 promoted_from: BLUEPRINT--CONTRADICTION-DETECTION-IMPL

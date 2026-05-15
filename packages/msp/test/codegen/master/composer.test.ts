@@ -162,14 +162,14 @@ describe('formatAsPromptFragment', () => {
 
     const result = await composeMasterAtoms(['MASTER--A', 'MASTER--B'], root)
     const fragment = formatAsPromptFragment(result)
-    expect(fragment).toContain('<!-- MASTER--A -->')
-    expect(fragment).toContain('<!-- MASTER--B -->')
+    expect(fragment).toContain('<!-- MASTER--A [FULL] -->')
+    expect(fragment).toContain('<!-- MASTER--B [FULL] -->')
     expect(fragment).toContain('body A')
     expect(fragment).toContain('body B')
     expect(fragment).toContain('\n\n---\n\n')
     // Marker for A appears before marker for B.
-    expect(fragment.indexOf('<!-- MASTER--A -->')).toBeLessThan(
-      fragment.indexOf('<!-- MASTER--B -->'),
+    expect(fragment.indexOf('<!-- MASTER--A [FULL] -->')).toBeLessThan(
+      fragment.indexOf('<!-- MASTER--B [FULL] -->'),
     )
   })
 

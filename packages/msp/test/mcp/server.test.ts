@@ -8,7 +8,7 @@ describe('createMspMcpServer', () => {
     expect(server).toBeDefined()
   })
 
-  it('registers exactly the 22 MSP-specific tools, no more no less', () => {
+  it('registers exactly the 24 MSP-specific tools, no more no less', () => {
     expect([...REGISTERED_TOOL_NAMES].sort()).toEqual([
       'msp_backlinks_rebuild',
       'msp_brain_resolve',
@@ -16,6 +16,8 @@ describe('createMspMcpServer', () => {
       'msp_compress',
       'msp_dispatch',
       'msp_episode_append',
+      'msp_escalate',
+      'msp_expand',
       'msp_identity_get',
       'msp_identity_set',
       'msp_project_list',

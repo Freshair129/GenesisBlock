@@ -27,12 +27,19 @@ export function normaliseStatus(s: string | undefined | null): string | undefine
 /**
  * The chain-walker (`gks verify-flow`) treats these statuses as "the gate
  * is open" — i.e. the atom is promoted, citable, and downstream code may
- * depend on it. Anything else is either pending (draft, raw) or terminal
+ * depend on it. Anything else is either pending (raw, draft) or terminal
  * (deprecated, invalid).
+ *
+ * `active` is accepted alongside `stable`: the MSP validator's
+ * phase-status rule lists `active` as a valid published status (between
+ * `draft` and `stable` in STATUS_ORDER — "shipped and in use, not yet
+ * blessed as stable"). Stable FEATs routinely cite `active` supporting
+ * atoms (ADRs, CONCEPTs) for shipped subsystems; refusing those edges
+ * would diverge from the rest of the authoring system.
  */
 export function isApprovedStatus(s: string | undefined | null): boolean {
   const n = normaliseStatus(s)
-  return n === 'stable'
+  return n === 'stable' || n === 'active'
 }
 
 export type AtomicType =

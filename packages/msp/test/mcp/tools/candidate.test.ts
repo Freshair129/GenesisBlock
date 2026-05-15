@@ -25,9 +25,9 @@ describe('msp_candidate tool', () => {
     expect(name).toBe('msp_candidate')
   })
 
-  it('is registered in createMspMcpServer alongside the other 21 tools', () => {
+  it('is registered in createMspMcpServer alongside the other 23 tools', () => {
     expect(REGISTERED_TOOL_NAMES).toContain('msp_candidate')
-    expect(REGISTERED_TOOL_NAMES).toHaveLength(22)
+    expect(REGISTERED_TOOL_NAMES).toHaveLength(24)
   })
 
   it('writes a candidate file under .brain/.../candidates/ inside ctx.root', async () => {

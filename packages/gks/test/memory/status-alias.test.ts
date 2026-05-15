@@ -31,6 +31,11 @@ describe('isApprovedStatus', () => {
     expect(isApprovedStatus('Accepted')).toBe(true)
   })
 
+  it('accepts active as a published status', () => {
+    expect(isApprovedStatus('active')).toBe(true)
+    expect(isApprovedStatus('ACTIVE')).toBe(true)
+  })
+
   it('rejects every other status', () => {
     for (const s of ['raw', 'draft', 'deprecated', 'invalid', 'proposed', 'rejected', '', 'APPROVE']) {
       expect(isApprovedStatus(s)).toBe(false)

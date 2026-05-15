@@ -81,15 +81,17 @@ jobs:
           set -e
           for feat_path in gks/feat/FEAT--*.md; do
             feat=$(basename "$feat_path" .md)
-            # Skip FEATs whose status marks them as terminal — `superseded`
-            # and `deprecated` are valid lifecycle states (per the supersession
-            # policy in MSP CLAUDE.md), and verify-flow correctly refuses to
-            # treat them as healthy chain heads. Their successors are walked
-            # via crosslinks.superseded_by from whatever cites them.
-            if grep -qE '^status: (draft|superseded|deprecated)$' "$feat_path"; then
+            # Skip FEATs whose status marks them as terminal or in-flight —
+            # `superseded`/`deprecated` are terminal lifecycle states, `draft`
+            # is pre-promotion, and `active` is the "shipped but not yet
+            # blessed as stable" state (per phase-status validator rule;
+            # active is below stable in STATUS_ORDER). verify-flow gates only
+            # on stable chain heads. Their successors are walked via
+            # crosslinks.superseded_by from whatever cites them.
+            if grep -qE '^status: (draft|active|superseded|deprecated)$' "$feat_path"; then
               echo "→ $feat (skipped: $(grep -oE '^status: \w+' "$feat_path" | cut -d' ' -f2))"
               continue
             fi
             echo "→ $feat"
-            npx gks verify-flow "$feat" --root=.
+            npx gks verify-flow "$feat" --root=. --through-superseded
           done

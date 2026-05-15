@@ -2,7 +2,7 @@
 id: CONCEPT--ATOM-CONTRADICTION-DETECTION
 phase: 1
 type: concept
-status: draft
+status: stable
 vault_id: default
 tier: genesis
 source_type: axiomatic
