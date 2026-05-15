@@ -2,7 +2,7 @@
 id: FEAT--VAULT-COMPOSITION
 phase: 2
 type: feat
-status: draft
+status: active
 tier: process
 source_type: axiomatic
 vault_id: default

@@ -16,6 +16,7 @@ import {
   type SourceName,
   type SourceResult,
 } from './types.js'
+import { makeContext, makeSubject } from '../../policy/types.js'
 
 export type {
   RecallOptions,
@@ -64,7 +65,7 @@ function raceTimeout<T>(
         if (done) return
         done = true
         clearTimeout(t)
-        resolve({ value: fallback, timedOut: false })
+        resolve({ value, timedOut: false })
       },
     )
   })
@@ -81,10 +82,7 @@ function scaleBudgets(
   overrides: Partial<Record<SourceName, number>> | undefined,
 ): Record<SourceName, number> {
   const baseline = { ...DEFAULT_PER_SOURCE_TIMEOUTS, ...(overrides ?? {}) }
-  const referenceSum = Object.values(DEFAULT_PER_SOURCE_TIMEOUTS).reduce(
-    (a, b) => a + b,
-    0,
-  )
+  const referenceSum = Object.values(DEFAULT_PER_SOURCE_TIMEOUTS).reduce((a, b) => a + b, 0)
   if (totalBudget >= referenceSum) {
     return baseline as Record<SourceName, number>
   }
@@ -101,10 +99,7 @@ function emptySettled(source: SourceName): SourceResult {
   return { source, hits: [], latencyMs: 0, error: 'timeout' }
 }
 
-function settledValue<T>(
-  result: PromiseSettledResult<T>,
-  fallback: T,
-): T {
+function settledValue<T>(result: PromiseSettledResult<T>, fallback: T): T {
   if (result.status === 'fulfilled') return result.value
   return fallback
 }
@@ -147,6 +142,15 @@ export async function recall(opts: RecallOptions): Promise<RetrievalResult> {
   const totalBudget = opts.timeoutMs ?? DEFAULT_TOTAL_TIMEOUT_MS
   const rrfK = opts.rrfK ?? DEFAULT_RRF_K
   const weights = opts.weights ?? {}
+
+  // UCF 4-tuple defaults and logging
+  const subject = opts.subject ?? makeSubject('user', 'anonymous')
+  const action = 'recall'
+  const context = opts.context ?? makeContext('internal', 'orchestrator-recall')
+
+  console.debug(
+    `[ucf] 4-tuple: orchestrator.recall | sub:${subject.id} | act:${action} | trace:${context.trace_id}`,
+  )
 
   const budgets = scaleBudgets(totalBudget, opts.perSourceTimeouts)
 
@@ -213,20 +217,12 @@ export async function recall(opts: RecallOptions): Promise<RetrievalResult> {
 
   // Phase C: fuse.
   const fuseStart = performance.now()
-  const allResults: SourceResult[] = [
-    vectorRes,
-    obsidianRes,
-    episodicRes,
-    backlinksRes,
-  ]
+  const allResults: SourceResult[] = [vectorRes, obsidianRes, episodicRes, backlinksRes]
   const fusedHits = rrfFuse(allResults, { k: rrfK, weights, topK })
   const fusionMs = performance.now() - fuseStart
 
   // Compute output flags + diagnostics.
-  const semanticAvailable =
-    !!opts.embedder &&
-    !!opts.vectorBackend &&
-    !vectorRes.error
+  const semanticAvailable = !!opts.embedder && !!opts.vectorBackend && !vectorRes.error
   const obsidianAvailable = opts.obsidian?.mode === 'rest'
 
   const result: RetrievalResult = {

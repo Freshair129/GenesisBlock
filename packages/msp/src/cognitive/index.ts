@@ -40,6 +40,7 @@ import {
 import { runTask as runCodegenTask } from '../codegen/runner.js'
 import { createSlmClient } from '../codegen/slm/factory.js'
 import { createMspMcpServer } from '../mcp/server.js'
+import { makeContext, makeSubject } from '../policy/types.js'
 
 import { ftsSearch } from './fts.js'
 import { markAuditOnly } from './audit-only.js'
@@ -53,6 +54,7 @@ import {
   type CognitiveRecallHit,
   type CognitiveRecallResult,
   type CognitiveRunTaskOptions,
+  type PolicyContext,
   type RememberOptions,
 } from './types.js'
 
@@ -85,7 +87,16 @@ export async function createCognitiveLayer(
     store,
     graph: store.graph,
 
-    async recall(query: string, retrievalOpts: RetrievalOptions = {}): Promise<CognitiveRecallResult> {
+    async recall(
+      query: string,
+      retrievalOpts: RetrievalOptions & PolicyContext = {},
+    ): Promise<CognitiveRecallResult> {
+      const subject = retrievalOpts.subject ?? makeSubject('user', 'anonymous')
+      const action = retrievalOpts.action ?? 'recall'
+      const context = retrievalOpts.context ?? makeContext('internal', 'system-recall')
+
+      console.debug(`[ucf] 4-tuple: recall | sub:${subject.id} | act:${action} | trace:${context.trace_id}`)
+
       // Layer 1 + 3 + 4 already live inside MemoryStore.retrieve (atomic
       // short-circuit + vector + episodic, plus obsidian if configured).
       // We bolt FTS on as the §13 layer 2 by fan-out + a tiny RRF blend.
@@ -96,31 +107,45 @@ export async function createCognitiveLayer(
 
       const [vec, fts] = await Promise.all([vectorPromise, ftsPromise])
 
-      const byKey = new Map<string, CognitiveRecallHit>()
+      const merged = new Map<string, CognitiveRecallHit>()
       for (const h of vec.hits) {
-        byKey.set(h.path ?? h.id, markAuditOnly(h))
+        // Prefer ID as key for atoms to ensure correct deduping between layers
+        merged.set(h.id, markAuditOnly(h))
       }
       for (const h of fts) {
-        const key = h.path ?? h.id
-        const existing = byKey.get(key)
+        const existing = merged.get(h.id)
         if (existing) {
           existing.score = Math.max(existing.score, h.score)
         } else {
-          byKey.set(key, h as CognitiveRecallHit)
+          merged.set(h.id, h as CognitiveRecallHit)
         }
       }
-      const merged = [...byKey.values()].sort((a, b) => b.score - a.score)
-      const topK = retrievalOpts.topK ?? merged.length
+      const sorted = [...merged.values()].sort((a, b) => b.score - a.score)
+      const topK = retrievalOpts.topK ?? sorted.length
       return {
         ...vec,
-        hits: merged.slice(0, topK),
+        hits: sorted.slice(0, topK),
       }
     },
 
-    async remember(content: string, rOpts: RememberOptions = {}): Promise<{ id: string }> {
+    async remember(
+      content: string,
+      rOpts: RememberOptions & PolicyContext = {},
+    ): Promise<{ id: string }> {
+      const subject = rOpts.subject ?? makeSubject('user', 'anonymous')
+      const action = rOpts.action ?? 'write'
+      const context = rOpts.context ?? makeContext('internal', 'system-remember')
+
+      console.debug(`[ucf] 4-tuple: remember | sub:${subject.id} | act:${action} | trace:${context.trace_id}`)
+
       const result = await gksRetain(store, {
         content,
-        metadata: { ...(rOpts.metadata ?? {}), ...(rOpts.tags ? { tags: rOpts.tags } : {}) },
+        metadata: {
+          ...(rOpts.metadata ?? {}),
+          ...(rOpts.tags ? { tags: rOpts.tags } : {}),
+          // Threading attributes into metadata for Phase 0
+          attributes: subject.attributes,
+        },
       })
       // `vectorDocId` is optional on RetainResult (Inbound-only retain skips
       // vector insert). Fall back to the inbound path so the facade contract
@@ -139,6 +164,12 @@ export async function createCognitiveLayer(
     },
 
     async runTask(taskPath: string, runOpts: CognitiveRunTaskOptions = {}) {
+      const subject = runOpts.subject ?? makeSubject('user', 'anonymous')
+      const action = runOpts.action ?? 'expose-to-llm'
+      const context = runOpts.context ?? makeContext('internal', 'system-run-task')
+
+      console.debug(`[ucf] 4-tuple: runTask | sub:${subject.id} | act:${action} | trace:${context.trace_id}`)
+
       const scale = runOpts.scale ?? 'L2'
 
       // Resolve the parent_blueprint from the task YAML for the gate check.

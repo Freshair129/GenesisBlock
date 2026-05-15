@@ -14,6 +14,7 @@ import type {
   ProtoSummary,
   Severity,
 } from './types.js'
+import { SymbolGraphReader } from './symbol-graph-reader.js'
 
 const PROTO_ID_PATTERN = /^PROTO--[A-Z][A-Z0-9-]*$/
 
@@ -161,7 +162,7 @@ async function loadPredicate(
  */
 export async function runProtos(
   metas: ProtoMeta[],
-  ctx: PredicateContext,
+  baseCtx: Omit<PredicateContext, 'symbolGraph'>,
 ): Promise<ProtoSummary> {
   const results: ProtoRunResult[] = []
   let passed = 0
@@ -171,6 +172,17 @@ export async function runProtos(
     stable: 0,
     active: 0,
     superseded: 0,
+  }
+
+  const symbolGraph = new SymbolGraphReader()
+  const dbOpened = symbolGraph.open(baseCtx.repoRoot)
+  if (!dbOpened) {
+    console.warn(`! Symbol graph DB unavailable at root: ${baseCtx.repoRoot}. Symbol-graph rules will gracefully no-op.`)
+  }
+
+  const ctx: PredicateContext = {
+    ...baseCtx,
+    symbolGraph: dbOpened ? symbolGraph : null,
   }
 
   for (const meta of metas) {
@@ -208,6 +220,8 @@ export async function runProtos(
     if (result.ok) passed += 1
     else failed += 1
   }
+
+  symbolGraph.close()
 
   return { total: metas.length, passed, failed, byStatus, results }
 }

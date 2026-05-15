@@ -2,7 +2,7 @@
 id: ADR--BRING-YOUR-OWN-ATTRIBUTES
 phase: 2
 type: adr
-status: draft
+status: stable
 tier: process
 source_type: axiomatic
 vault_id: default

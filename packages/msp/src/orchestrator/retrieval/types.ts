@@ -1,15 +1,11 @@
 import type { ObsidianClient } from '../../obsidian/client.js'
+import type { RequestContext, Subject } from '../../policy/types.js'
 
 /**
  * Logical retrieval source name. Each source produces ranked hits which
  * RRF fuses into a single result list.
  */
-export type SourceName =
-  | 'gks-vector'
-  | 'obsidian-text'
-  | 'grep'
-  | 'episodic'
-  | 'backlinks'
+export type SourceName = 'gks-vector' | 'obsidian-text' | 'grep' | 'episodic' | 'backlinks'
 
 /**
  * Minimal embedder shape accepted by the vector source. Compatible with the
@@ -131,6 +127,11 @@ export interface RecallOptions {
   weights?: Partial<Record<SourceName, number>>
   /** RRF k constant. Default 60. */
   rrfK?: number
+
+  /** §3 — UCF Subject (identity / clearance). */
+  subject?: Subject
+  /** §3 — UCF Request Context (trace id / time). */
+  context?: RequestContext
 }
 
 /**

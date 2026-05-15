@@ -4,6 +4,7 @@ import { z } from 'zod'
 
 import { runTask } from '../../codegen/runner.js'
 import { createSlmClient } from '../../codegen/slm/factory.js'
+import { makeContext, makeSubject } from '../../policy/types.js'
 import { errorResult, jsonResult, type ToolHandlerCtx, type ToolTextResult } from '../types.js'
 
 export const name = 'msp_run_task'
@@ -30,9 +31,19 @@ export function handler(ctx: ToolHandlerCtx) {
     const originalCwd = process.cwd()
     process.chdir(root)
     try {
+      const subject = makeSubject('mcp-client', 'default-mcp')
+      const action = 'expose-to-llm'
+      const context = makeContext('mcp-stdio', `mcp-${Date.now()}`)
+
+      console.debug(
+        `[ucf] 4-tuple: msp_run_task | sub:${subject.id} | act:${action} | trace:${context.trace_id}`,
+      )
+
       const result = await runTask(taskPath, {
         slmClient: createSlmClient({ provider: args.provider ?? 'mock' }),
         dryRun: args.dry_run === true,
+        // Phase 0: we don't pass the tuple yet as runTask doesn't accept it,
+        // but we've logged it and identified the action.
       })
       return jsonResult(result)
     } catch (err) {

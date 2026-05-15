@@ -764,6 +764,7 @@ function atomicHitToRetrieval(h: AtomicHit): RetrievalHit {
       type: note.type,
       status: note.status,
       matchedBy: h.matchedBy,
+      ...(note.attributes !== undefined ? { attributes: note.attributes } : {}),
     },
   }
 }

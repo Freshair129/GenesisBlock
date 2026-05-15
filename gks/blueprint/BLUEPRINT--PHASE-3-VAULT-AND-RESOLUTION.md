@@ -2,7 +2,7 @@
 id: BLUEPRINT--PHASE-3-VAULT-AND-RESOLUTION
 phase: 3
 type: blueprint
-status: draft
+status: active
 tier: process
 source_type: axiomatic
 vault_id: default

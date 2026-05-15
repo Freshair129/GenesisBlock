@@ -2,7 +2,7 @@
 id: FEAT--RESOLUTION-EXPAND-ON-DEMAND
 phase: 2
 type: feat
-status: draft
+status: active
 tier: process
 source_type: axiomatic
 vault_id: default

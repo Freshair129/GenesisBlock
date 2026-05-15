@@ -7,6 +7,7 @@ import { loadContract } from './contract.js'
 import { discoverProtos, runProtos, shouldFailExit } from './proto/loader.js'
 import type { ProtoSummary } from './proto/types.js'
 import { ValidatorIOError, type ValidationResult } from './types.js'
+import { makeContext, makeSubject } from '../policy/types.js'
 
 const HELP = `msp-validate — schema/ID/wikilink/anti-hallucination gate over MSP atoms
 
@@ -47,12 +48,14 @@ function pretty(results: ValidationResult[], opts: PrettyOpts): void {
     } else {
       fail++
       for (const e of r.errors) {
-        const loc = e.line !== undefined ? `:${e.line}${e.column !== undefined ? `:${e.column}` : ''}` : ''
+        const loc =
+          e.line !== undefined ? `:${e.line}${e.column !== undefined ? `:${e.column}` : ''}` : ''
         console.log(`✗ ${r.filepath}${loc} [${e.rule}] ${e.message}`)
       }
     }
     for (const w of r.warnings) {
-      const loc = w.line !== undefined ? `:${w.line}${w.column !== undefined ? `:${w.column}` : ''}` : ''
+      const loc =
+        w.line !== undefined ? `:${w.line}${w.column !== undefined ? `:${w.column}` : ''}` : ''
       console.log(`! ${r.filepath}${loc} [${w.rule}] ${w.message}`)
     }
   }
@@ -88,6 +91,14 @@ async function main(): Promise<number> {
 
   const root = resolve(values.root ?? process.cwd())
   const indexPath = resolve(values.index ?? `${root}/gks/00_index/atomic_index.jsonl`)
+
+  const subject = makeSubject('scheduled-job', 'validator-cli')
+  const context = makeContext('cli', `val-${Date.now()}`)
+  if (!values.json) {
+    process.stderr.write(
+      `[ucf] 4-tuple: validator | sub:${subject.id} | act:read | trace:${context.trace_id}\n`,
+    )
+  }
 
   let atomicIndex
   try {

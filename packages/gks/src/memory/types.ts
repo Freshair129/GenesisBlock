@@ -75,6 +75,8 @@ export interface AtomicEntry {
    * Treated as file-level citations by reverse lookup (ADR-010).
    */
   geography?: string[]
+  /** §4 — Domain-specific attribute bag (UCF). */
+  attributes?: Record<string, unknown>
 }
 
 /** Full atomic note (frontmatter + body). */

@@ -1,0 +1,48 @@
+---
+id: AUDIT--PHASE-0-PLUMBING
+phase: 6
+type: audit
+status: stable
+tier: process
+source_type: axiomatic
+title: AUDIT — UCF Phase 0: propagation plumbing & attribute bag
+tags:
+  - msp
+  - ucf
+  - plumbing
+  - audit
+crosslinks:
+  references:
+    - BLUEPRINT--PHASE-0-PLUMBING
+    - CONCEPT--SUBJECT-RESOURCE-ACTION-CONTEXT
+    - CONCEPT--ATTRIBUTE-BAG-MODEL
+created_at: 2026-05-14T21:00:00+07:00
+---
+
+# AUDIT — UCF Phase 0: Propagation Plumbing
+
+## Scope
+
+This audit covers Phase 0 of the Universal Context Framework (UCF) implementation.
+The goal was to thread the 4-tuple (`Subject`, `Resource`, `Action`, `Context`)
+through the retrieval and codegen pipeline and enable the `attributes` bag in atoms.
+
+## What shipped
+
+- **Core Types:** Defined `Subject`, `Resource`, `Action`, `RequestContext`, `Decision` in `packages/msp/src/policy/types.ts`.
+- **Attribute Bag:** Updated re-indexer and GKS `MemoryStore` to support the `attributes` field in atom frontmatter and retrieval hits.
+- **Threading:** Updated Cognitive Facade (`recall`, `remember`, `runTask`), Recall Orchestrator, and MCP tool handlers to log and propagate the UCF 4-tuple.
+- **CI/CLI Integration:** Updated `msp-validate` to construct a `scheduled-job` subject for CI runs.
+- **Atom Promotion:** Promoted 17 UCF-related CONCEPT, ADR, and FEAT atoms to `stable`/`active`.
+
+## Verification
+
+- **Unit Tests:** Added tests for policy types and verified round-trip of attributes through the memory stack.
+- **Workspace Validation:** `npm run msp:validate` passes with 325 atoms.
+- **Traceability:** Verified `[ucf]` debug logs in stderr across entry points.
+
+## Sign-off
+
+- Implemented by: Gemini CLI
+- Verified by: `msp:validate` + unit tests
+- Date: 2026-05-14

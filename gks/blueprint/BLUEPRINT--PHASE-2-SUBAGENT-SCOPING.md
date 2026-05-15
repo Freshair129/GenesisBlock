@@ -2,7 +2,7 @@
 id: BLUEPRINT--PHASE-2-SUBAGENT-SCOPING
 phase: 3
 type: blueprint
-status: draft
+status: active
 tier: process
 source_type: axiomatic
 vault_id: default

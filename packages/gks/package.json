@@ -29,45 +29,18 @@
     "multi-tenant",
     "knowledge-graph"
   ],
-  "main": "./dist/src/memory/index.js",
-  "types": "./dist/src/memory/index.d.ts",
+  "main": "./src/memory/index.ts",
+  "types": "./src/memory/index.ts",
   "exports": {
-    ".": {
-      "types": "./dist/src/memory/index.d.ts",
-      "import": "./dist/src/memory/index.js"
-    },
-    "./memory": {
-      "types": "./dist/src/memory/index.d.ts",
-      "import": "./dist/src/memory/index.js"
-    },
-    "./mcp-server": {
-      "types": "./dist/src/mcp-server/index.d.ts",
-      "import": "./dist/src/mcp-server/index.js"
-    },
-    "./telemetry": {
-      "types": "./dist/src/lib/telemetry.d.ts",
-      "import": "./dist/src/lib/telemetry.js"
-    },
-    "./telemetry-setup": {
-      "types": "./dist/src/lib/telemetry-setup.d.ts",
-      "import": "./dist/src/lib/telemetry-setup.js"
-    },
-    "./retry": {
-      "types": "./dist/src/lib/retry.d.ts",
-      "import": "./dist/src/lib/retry.js"
-    },
-    "./circuit-breaker": {
-      "types": "./dist/src/lib/circuit-breaker.d.ts",
-      "import": "./dist/src/lib/circuit-breaker.js"
-    },
-    "./cost": {
-      "types": "./dist/src/lib/cost-tracker.d.ts",
-      "import": "./dist/src/lib/cost-tracker.js"
-    },
-    "./schema-version": {
-      "types": "./dist/src/lib/schema-version.d.ts",
-      "import": "./dist/src/lib/schema-version.js"
-    }
+    ".": "./src/memory/index.ts",
+    "./memory": "./src/memory/index.ts",
+    "./mcp-server": "./src/mcp-server/index.ts",
+    "./telemetry": "./src/lib/telemetry.ts",
+    "./telemetry-setup": "./src/lib/telemetry-setup.ts",
+    "./retry": "./src/lib/retry.ts",
+    "./circuit-breaker": "./src/lib/circuit-breaker.ts",
+    "./cost": "./src/lib/cost-tracker.ts",
+    "./schema-version": "./src/lib/schema-version.ts"
   },
   "bin": {
     "gks": "./dist/bin/gks.js",

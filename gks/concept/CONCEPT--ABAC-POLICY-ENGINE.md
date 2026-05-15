@@ -2,7 +2,7 @@
 id: CONCEPT--ABAC-POLICY-ENGINE
 phase: 1
 type: concept
-status: draft
+status: stable
 tier: process
 source_type: axiomatic
 vault_id: default

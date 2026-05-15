@@ -15,6 +15,7 @@
  */
 
 import type { AtomicIndexEntry } from '../types.js'
+import type { SymbolGraphReader } from './symbol-graph-reader.js'
 
 export type Severity = 'error' | 'warning' | 'info'
 
@@ -42,6 +43,10 @@ export interface PredicateContext {
   atomicIndex: AtomicIndexEntry[]
   /** Repo root, useful for predicates that need to read other files. */
   repoRoot: string
+  /** Open handle to the project's symbol-graph DB, or null if unavailable
+   *  in this validator run (e.g. fresh checkout without an indexed graph).
+   *  Predicates that need it must gracefully no-op when null. */
+  symbolGraph: SymbolGraphReader | null
 }
 
 /** A single rule violation reported by a predicate. */

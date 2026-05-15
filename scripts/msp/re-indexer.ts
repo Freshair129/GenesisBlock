@@ -37,6 +37,7 @@ interface IndexRow {
   valid_to?: string | null
   linked_symbols?: unknown[]
   geography?: string[]
+  attributes?: Record<string, unknown>
 }
 
 async function* walkMarkdown(dir: string): AsyncGenerator<string> {
@@ -145,6 +146,10 @@ function rowFromFrontmatter(
 
   const geography = asStringArray(fm['geography'])
   if (geography) row.geography = geography
+
+  if (fm['attributes'] && typeof fm['attributes'] === 'object' && !Array.isArray(fm['attributes'])) {
+    row.attributes = fm['attributes'] as Record<string, unknown>
+  }
 
   return { row }
 }

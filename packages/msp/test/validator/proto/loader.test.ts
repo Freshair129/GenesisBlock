@@ -196,6 +196,26 @@ describe('runProtos', () => {
     expect(summary.byStatus.stable).toBe(1)
   })
 
+  it('injects symbolGraph into context', async () => {
+    const root = await freshRoot()
+    const implRel = await writeImpl(
+      root,
+      'src/validator/proto/check-ctx.mjs',
+      `export default function (ctx) { return { ok: ctx.symbolGraph === null, violations: [] } }`,
+    )
+    await writeProtoAtom(
+      root,
+      'PROTO--CHECK-CTX.md',
+      `---\nid: PROTO--CHECK-CTX\nphase: 2\ntype: proto\nstatus: stable\nseverity: error\ncrosslinks:\n  enforces: [FRAME--TEST]\nlinked_symbols:\n  - {"file":"${implRel}"}\n---\n`,
+    )
+    const metas = await discoverProtos(root)
+    const summary = await runProtos(metas, {
+      atomicIndex: stubAtomicIndex,
+      repoRoot: root,
+    })
+    expect(summary.passed).toBe(1) // Passes if ctx.symbolGraph === null as expected in this mock env
+  })
+
   it('records load error when impl has no predicate export', async () => {
     const root = await freshRoot()
     const implRel = await writeImpl(

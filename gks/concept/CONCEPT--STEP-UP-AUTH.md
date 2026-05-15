@@ -2,7 +2,7 @@
 id: CONCEPT--STEP-UP-AUTH
 phase: 1
 type: concept
-status: draft
+status: stable
 tier: process
 source_type: axiomatic
 vault_id: default
