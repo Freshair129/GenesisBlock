@@ -5,6 +5,16 @@
 
 ---
 
+# ⚠️ MASTER BLOCK: ROOT CAUSE ANALYSIS MANDATE ⚠️
+
+**When encountering a problem, NEVER attempt a fix without first identifying and confirming its root cause.**
+
+**Action:** Always find the root cause of the problem before proposing or implementing any solution. Document your root cause analysis (RCA) clearly.
+
+**Rationale:** This prevents reactive, superficial patches that can introduce new bugs, mask underlying issues, or lead to cascading failures (as observed in recent attempts to resolve ambiguous requests). A deep understanding of the problem's origin ensures robust and sustainable solutions.
+
+---
+
 ## 1. Role in This Repo
 
 Gemini CLI is the **T2 agent** — broad-context investigation, multi-file analysis, and
