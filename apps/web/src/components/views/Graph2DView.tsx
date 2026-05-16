@@ -32,8 +32,9 @@ export const Graph2DView: React.FC<Graph2DViewProps> = ({ notes, edges, focusId,
   // Simulation state
   const simRef = useRef<{ nodes: SimNode[]; links: SimLink[] }>({ nodes: [], links: [] });
   const transform = useRef({ x: 0, y: 0, k: 1 });
-  const drag = useRef({ lx: 0, ly: 0 });
+  const drag = useRef<{ lx: number; ly: number; node: SimNode | null }>({ lx: 0, ly: 0, node: null });
   const [isDragging, setIsDragging] = useState(false);
+  const alphaRef = useRef(1.0); // Simulation energy level
 
   // Initialize simulation
   useEffect(() => {
@@ -81,17 +82,17 @@ export const Graph2DView: React.FC<Graph2DViewProps> = ({ notes, edges, focusId,
   // Animation Loop
   useEffect(() => {
     let raf: number;
-    let alpha = 1.0; // Simulation energy
+    alphaRef.current = 1.0; // Reset simulation energy on data change
 
     const tick = () => {
       const { nodes, links } = simRef.current;
       if (!nodes.length) return;
 
       // ── Simulation Physics ──────────────────────────────────────────────────
-      if (alpha > 0.01) {
-        const repulsion = -150 * alpha;
-        const linkForce = 0.045 * alpha;
-        const centerForce = 0.008 * alpha;
+      if (alphaRef.current > 0.01) {
+        const repulsion = -150 * alphaRef.current;
+        const linkForce = 0.045 * alphaRef.current;
+        const centerForce = 0.008 * alphaRef.current;
         const friction = 0.82;
 
         // Repulsion
@@ -131,7 +132,7 @@ export const Graph2DView: React.FC<Graph2DViewProps> = ({ notes, edges, focusId,
           n.y += n.vy;
         }
 
-        alpha *= 0.992; // Cool down
+        alphaRef.current *= 0.992; // Cool down
       }
 
       draw();
@@ -164,17 +165,32 @@ export const Graph2DView: React.FC<Graph2DViewProps> = ({ notes, edges, focusId,
     ctx.strokeStyle = 'rgba(255, 255, 255, 0.08)';
     ctx.lineWidth = 0.5 * k;
     for (const l of links) {
-      const isHot = focusId && (l.source.id === focusId || l.target.id === focusId);
-      if (isHot) continue; // Draw hot later
+      const isFocus = focusId && (l.source.id === focusId || l.target.id === focusId);
+      const isHover = hover && (l.source.id === hover.id || l.target.id === hover.id);
+      if (isFocus || isHover) continue; // Draw highlighted later
       ctx.moveTo(CX + l.source.x * k, CY + l.source.y * k);
       ctx.lineTo(CX + l.target.x * k, CY + l.target.y * k);
     }
     ctx.stroke();
 
-    // Hot Edges
+    // Hover Edges (Accent links)
+    if (hover) {
+      ctx.beginPath();
+      ctx.strokeStyle = 'rgba(0, 220, 255, 0.45)'; // Cyan accent for hover
+      ctx.lineWidth = 1.0 * k;
+      for (const l of links) {
+        if (l.source.id === hover.id || l.target.id === hover.id) {
+          ctx.moveTo(CX + l.source.x * k, CY + l.source.y * k);
+          ctx.lineTo(CX + l.target.x * k, CY + l.target.y * k);
+        }
+      }
+      ctx.stroke();
+    }
+
+    // Hot Edges (Focus links)
     if (focusId) {
       ctx.beginPath();
-      ctx.strokeStyle = 'rgba(124, 92, 255, 0.6)';
+      ctx.strokeStyle = 'rgba(124, 92, 255, 0.6)'; // Purple for focus
       ctx.lineWidth = 1.2 * k;
       for (const l of links) {
         if (l.source.id === focusId || l.target.id === focusId) {
@@ -214,12 +230,17 @@ export const Graph2DView: React.FC<Graph2DViewProps> = ({ notes, edges, focusId,
         ctx.strokeStyle = '#fff';
         ctx.lineWidth = 2;
         ctx.stroke();
+      } else if (hover && n.id === hover.id) {
+        ctx.strokeStyle = 'rgba(0, 220, 255, 0.8)';
+        ctx.lineWidth = 1.5;
+        ctx.stroke();
       }
 
       // Labels
-      if (k > 0.6 && (isFocus || isNbr || (k > 1.2 && n.deg > 5))) {
-        ctx.fillStyle = isFocus ? '#fff' : 'rgba(230, 232, 240, 0.7)';
-        ctx.font = `${isFocus ? '600 ' : ''}10px var(--font-sans)`;
+      const isHovered = hover && n.id === hover.id;
+      if (k > 0.6 && (isFocus || isNbr || isHovered || (k > 1.2 && n.deg > 5))) {
+        ctx.fillStyle = isFocus || isHovered ? '#fff' : 'rgba(230, 232, 240, 0.7)';
+        ctx.font = `${isFocus || isHovered ? '600 ' : ''}10px var(--font-sans)`;
         ctx.textAlign = 'center';
         ctx.fillText(n.title, nx, ny + r + 12);
       }
@@ -228,7 +249,24 @@ export const Graph2DView: React.FC<Graph2DViewProps> = ({ notes, edges, focusId,
 
   // Interaction handlers
   const handleMouseDown = (e: React.MouseEvent) => {
-    drag.current = { lx: e.clientX, ly: e.clientY };
+    const canvas = canvasRef.current; if (!canvas) return;
+    const rect = canvas.getBoundingClientRect();
+    const mx = e.clientX - rect.left, my = e.clientY - rect.top;
+    const { x, y, k } = transform.current;
+    const CX = size.w / 2 + x, CY = size.h / 2 + y;
+
+    // Hit detection for nodes
+    let hit: SimNode | null = null;
+    for (const n of simRef.current.nodes) {
+      const nx = CX + n.x * k, ny = CY + n.y * k;
+      const r = Math.max(5, (3 + Math.sqrt(n.deg) * 1.5) * k);
+      const dx = mx - nx, dy = my - ny;
+      if (dx * dx + dy * dy < r * r) {
+        hit = n; break;
+      }
+    }
+
+    drag.current = { lx: e.clientX, ly: e.clientY, node: hit };
     setIsDragging(true);
   };
 
@@ -236,8 +274,21 @@ export const Graph2DView: React.FC<Graph2DViewProps> = ({ notes, edges, focusId,
     if (isDragging) {
       const dx = e.clientX - drag.current.lx;
       const dy = e.clientY - drag.current.ly;
-      transform.current.x += dx;
-      transform.current.y += dy;
+      const { k } = transform.current;
+
+      if (drag.current.node) {
+        // Drag individual node
+        drag.current.node.x += dx / k;
+        drag.current.node.y += dy / k;
+        drag.current.node.vx = 0;
+        drag.current.node.vy = 0;
+        alphaRef.current = 1.0; // Wake up simulation
+      } else {
+        // Pan the whole view
+        transform.current.x += dx;
+        transform.current.y += dy;
+      }
+      
       drag.current.lx = e.clientX;
       drag.current.ly = e.clientY;
     } else {
@@ -267,9 +318,14 @@ export const Graph2DView: React.FC<Graph2DViewProps> = ({ notes, edges, focusId,
       const dy = Math.abs(e.clientY - drag.current.ly);
       if (dx < 3 && dy < 3) {
         // Was a click
-        if (hover) onOpen?.(hover.id);
+        if (drag.current.node) {
+          onOpen?.(drag.current.node.id);
+        } else if (hover) {
+          onOpen?.(hover.id);
+        }
       }
     }
+    drag.current.node = null;
     setIsDragging(false);
   };
 
