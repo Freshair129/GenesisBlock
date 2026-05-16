@@ -8,15 +8,36 @@ This file documents specific rules and context for Qwen models (qwen-cli) operat
 - **Working directory**: The monorepo root is `C:\Users\freshair\cognitive_system`.
 
 ## 🤖 Calling Qwen CLI as a subagent
-The Qwen CLI is a Python-based tool located in `apps/qwen/`.
+The Qwen CLI is a Python-based tool located in `apps/qwen/`. It talks to a local Ollama server (`http://localhost:11434`) — start it with `ollama serve` if it is not already running. Default model: `qwen2.5-coder:14b`.
 
-Invocation pattern:
+Invocation patterns (prompt is **positional**, not a flag):
 ```bash
-python apps/qwen/qwen.py --prompt "<prompt>"
+# inline prompt
+python apps/qwen/qwen.py "write a unit test for foo"
+
+# piped prompt (preferred for multi-line)
+cat prompt.txt | python apps/qwen/qwen.py --code --no-stream
+
+# convenience system-prompt presets
+python apps/qwen/qwen.py --code   "..."   # code-only output
+python apps/qwen/qwen.py --review "..."   # bullet-point review
+python apps/qwen/qwen.py --test   "..."   # test author
+python apps/qwen/qwen.py --doc    "..."   # markdown docs
+
+# inspect available local models
+python apps/qwen/qwen.py --list
 ```
 
+Other useful flags: `--model <name>`, `--temp <float>` (default 0.1), `--system "<custom system prompt>"`, `--no-stream` (return single response — required if the caller captures stdout to a file).
+
+**Helper scripts in the same directory:**
+- `apps/qwen/strip_fence.py` — pipe Qwen stdout through this to strip surrounding ```ts / ```python markdown fences (Qwen tends to add them even when told not to).
+- `apps/qwen/run_microtask.sh <prompt-file> <output-file>` — convenience wrapper: pipes prompt-file to Qwen, strips fences, writes to output-file. Handy when batching N micro-prompts in a single shell loop.
+
 **Known caveats:**
-- **Python-based**: Ensure the environment has the necessary dependencies installed (see `apps/qwen/setup.py`).
+- **120s read timeout** is hard-coded in `qwen.py`. Very large prompts or long generations may time out — split the work or stream.
+- **Single-shot only**: no tool use, no follow-up turns. The prompt must embed all required context (type signatures, existing helpers, style examples).
+- **Python deps**: see `apps/qwen/setup.py` / `package.json`. Requires `requests`.
 - **SLM Provider**: Qwen is not yet wired as a pluggable `MSP_SLM_PROVIDER` alternative.
 
 ## 🏗️ Monorepo Workflow
