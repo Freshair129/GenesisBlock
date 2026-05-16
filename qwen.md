@@ -1,5 +1,35 @@
 # qwen.md — Guidance for Qwen Agents (T1 Tier)
 
+---
+
+# 🎯 MASTER BLOCKS
+
+> Stable cross-cutting directives. Body in `gks/master/<ID>.md`.
+> P0 always loaded. P1–P3 indexed; body fetched on trigger match.
+> P0/P1 assignment requires explicit user permission — agents must not self-promote.
+
+## P0 — Always loaded (foundation)
+
+### MASTER--ROOT-CAUSE-ANALYSIS
+- **Apply when:** bug, error, ambiguous request, failed previous attempt
+- **Directive:** identify and confirm root cause before any fix
+- → `gks/master/MASTER--ROOT-CAUSE-ANALYSIS.md`
+
+### MASTER--MSP-DOC-TO-CODE
+- **Apply when:** new branch, PR, file in `src/|test/|scripts/|web/`
+- **Directive:** atoms before code (FRAME→CONCEPT→ADR→BP→CODE→AUDIT)
+- → `gks/master/MASTER--MSP-DOC-TO-CODE.md`
+
+### MASTER--ATOM-CONTRADICTION-POLICY
+- **Apply when:** PR adds/edits atom in `gks/<type>/`
+- **Directive:** reciprocal supersession in same PR
+- → `gks/master/MASTER--ATOM-CONTRADICTION-POLICY.md`
+
+## P1–P4
+See `CLAUDE.md` § MASTER BLOCKS for the full sector layout. Gemini-relevant Masters are listed here when promoted.
+
+---
+
 This file documents specific rules and context for Qwen models (qwen-cli) operating as the T1 (fast codegen) agent tier in this repository.
 
 ## 🌍 Environment Rules
@@ -39,6 +69,21 @@ Other useful flags: `--model <name>`, `--temp <float>` (default 0.1), `--system 
 - **Single-shot only**: no tool use, no follow-up turns. The prompt must embed all required context (type signatures, existing helpers, style examples).
 - **Python deps**: see `apps/qwen/setup.py` / `package.json`. Requires `requests`.
 - **SLM Provider**: Qwen is not yet wired as a pluggable `MSP_SLM_PROVIDER` alternative.
+
+## 🪶 Atom proposal via MSP (non-MCP path)
+
+Qwen CLI does not have MCP support. For proposing candidate atoms, use `msp-candidate` CLI:
+
+```bash
+msp-candidate propose \
+  --id=FEAT--MY-FEATURE \
+  --type=feat \
+  --title="..." \
+  --body="..." \
+  --root=.
+```
+
+Never write directly to `gks/<type>/` — see `[[ADR--AGENT-WRITE-BOUNDARIES]]` and `[[ADR--MSP-CANDIDATE-CLI]]`.
 
 ## 🏗️ Monorepo Workflow
 Follow the strict phase order documented in `GEMINI.md`:

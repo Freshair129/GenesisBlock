@@ -15,7 +15,8 @@
     "msp-policy": "./dist/policy/cli.js",
     "msp-vault": "./dist/vault/cli.js",
     "msp-genesis-exec": "./dist/genesis/cli.js",
-    "msp-consolidate": "./dist/orchestrator/consolidator/cli.js"
+    "msp-consolidate": "./dist/orchestrator/consolidator/cli.js",
+    "msp-candidate": "./dist/memory/candidates/cli.js"
   },
   "scripts": {
     "dev": "concurrently \"npm run build:watch\" \"npm run test:watch\"",

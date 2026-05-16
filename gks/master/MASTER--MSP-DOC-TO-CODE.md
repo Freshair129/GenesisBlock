@@ -9,6 +9,13 @@ promoted_from: CONCEPT--CODEGEN-MICROTASK-CONTRACT
 promoted_at: 2026-05-09T08:00:00.000Z
 promotion_adr: ADR--MASTER-PROMOTION-DOC-TO-CODE
 vault_id: default
+priority: P0
+constituents:
+  required:
+    framework: [FRAMEWORK--KNOWLEDGE-3-TIER]
+    concept: [CONCEPT--CODEGEN-MICROTASK-CONTRACT]
+    adr: [ADR--MASTER-PROMOTION-DOC-TO-CODE]
+  optional: {}
 title: Doc-to-code — atoms before code, every milestone, no exceptions
 tags:
   - msp

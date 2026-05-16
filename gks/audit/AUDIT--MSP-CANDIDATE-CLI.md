@@ -1,0 +1,57 @@
+---
+id: AUDIT--MSP-CANDIDATE-CLI
+phase: 6
+type: audit
+status: stable
+vault_id: default
+tier: process
+source_type: axiomatic
+title: msp-candidate CLI — non-MCP agent path to MSP candidates queue
+tags:
+  - msp
+  - audit
+  - cli
+  - candidates
+  - gemini
+  - qwen
+crosslinks: {"references":["ADR--MSP-CANDIDATE-CLI","ADR--AGENT-WRITE-BOUNDARIES"]}
+linked_symbols:
+  - {"file":"packages/msp/src/memory/candidates/cli.ts"}
+  - {"file":"packages/msp/package.json"}
+  - {"file":"scripts/msp/chmod-bins.mjs"}
+  - {"file":"scripts/create_atom.cjs"}
+  - {"file":"atom-creator/SKILL.md"}
+  - {"file":"atom-creator/references/taxonomy.md"}
+  - {"file":"gks/feat/FEAT--ATOM-CREATOR-SKILL.md"}
+  - {"file":"gks/blueprint/BLUEPRINT--ATOM-CREATOR-SKILL.md"}
+  - {"file":"gks/adr/ADR--MSP-CANDIDATE-CLI.md"}
+created_at: 2026-05-17T03:00:00.000+07:00
+---
+
+## Scope
+Adds a CLI entry point (`msp-candidate`) for non-MCP agents (Gemini CLI, Qwen CLI) to propose candidate atoms via MSP. Closes the gap where non-MCP agents had no compliant write path. Authority: `[[ADR--MSP-CANDIDATE-CLI]]`.
+
+## Changes
+
+### CLI implementation
+- New: `packages/msp/src/memory/candidates/cli.ts` — wraps `CandidateWriter` with 4 subcommands: `propose`, `list`, `read`, `delete`
+- Updated: `packages/msp/package.json` — new bin entry `msp-candidate` → `./dist/memory/candidates/cli.js`
+- Updated: `scripts/msp/chmod-bins.mjs` — adds `dist/memory/candidates/cli.js` to chmod target list
+
+### Cleanup
+- Deleted: `atom-creator/` directory (SKILL.md, scripts/create_atom.cjs, references/taxonomy.md) — superseded by `msp-candidate` CLI
+- Updated: `gks/feat/FEAT--ATOM-CREATOR-SKILL.md` status: superseded
+- Updated: `gks/blueprint/BLUEPRINT--ATOM-CREATOR-SKILL.md` status: superseded
+
+### ADR chain
+- New: `gks/adr/ADR--MSP-CANDIDATE-CLI.md` — agent interface decision
+
+## Verification
+- TypeScript typecheck passed (`npm run typecheck --workspace=packages/msp`)
+- Build succeeded (`npm run build --workspace=packages/msp`)
+- Smoke test: `msp-candidate propose --id=FEAT--TEST-CANDIDATE --type=FEAT --title="Test Candidate" --body="test"` → created candidate, listed, deleted successfully
+- Validator: `npm run msp:validate` — new atoms pass green
+
+## Notes
+- `gks propose-inbound` is deprecated; non-MCP agents must use `msp-candidate` instead
+- MCP-capable agents (Claude) continue using the `msp_candidate` MCP tool — same `CandidateWriter` backend, two interfaces

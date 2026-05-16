@@ -13,6 +13,7 @@ const targets = [
   'dist/mcp/bin.js',
   'dist/symbols/cli.js',
   'dist/agents/cli.js',
+  'dist/memory/candidates/cli.js',
 ]
 
 for (const path of targets) {

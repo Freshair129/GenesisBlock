@@ -9,6 +9,13 @@ promoted_from: BLUEPRINT--CONTRADICTION-DETECTION-IMPL
 promoted_at: 2026-05-09T08:01:00.000Z
 promotion_adr: ADR--MASTER-PROMOTION-CONTRADICTION-POLICY
 vault_id: default
+priority: P0
+constituents:
+  required:
+    framework: [FRAMEWORK--KNOWLEDGE-3-TIER]
+    adr: [ADR--MASTER-PROMOTION-CONTRADICTION-POLICY]
+    blueprint: [BLUEPRINT--CONTRADICTION-DETECTION-IMPL]
+  optional: {}
 title: Atom contradiction policy — supersession is explicit, reciprocal, in the same PR
 tags:
   - msp
