@@ -54,3 +54,9 @@ shouldn't be CI-blocked just by this demo.
 `draft` — this is the bootstrap demo for the M8a loader. It will not be
 promoted to `stable`. Real PROTOs (M8b–f) follow this shape but enforce
 real governance.
+
+## Connections
+- [[FRAMEWORK--MSP-ARCHITECTURE-V2]]
+- [[CONCEPT--PROTO-PATTERN]]
+- [[FEAT--PROTO-LOADER]]
+

@@ -107,4 +107,8 @@ For now, the runner accepts an explicit `verificationFiles` array. The M4c integ
 
 ## Source
 
-`CONCEPT--ACCEPTANCE-VITEST-RUNNER` + vitest JSON reporter docs.
+`[[CONCEPT--ACCEPTANCE-VITEST-RUNNER]]` + vitest JSON reporter docs.
+
+## Connections
+- [[ADR--CODEGEN-RETRY-POLICY]]
+

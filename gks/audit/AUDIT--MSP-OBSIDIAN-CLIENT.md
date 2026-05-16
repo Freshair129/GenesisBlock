@@ -27,7 +27,7 @@ created_at: 2026-05-04T12:29:16.095+07:00
 
 ## Scope
 
-M7a deliverable: `createObsidianClient(opts)` factory that wraps GksV3's REST adapter and adds a filesystem fallback for headless / no-Obsidian scenarios. Implements `FEAT--MSP-OBSIDIAN-CLIENT` per `BLUEPRINT--MSP-OBSIDIAN-CLIENT`.
+M7a deliverable: `createObsidianClient(opts)` factory that wraps GksV3's REST adapter and adds a filesystem fallback for headless / no-Obsidian scenarios. Implements `[[FEAT--MSP-OBSIDIAN-CLIENT]]` per `[[BLUEPRINT--MSP-OBSIDIAN-CLIENT]]`.
 
 ## What shipped
 
@@ -50,9 +50,9 @@ M7a deliverable: `createObsidianClient(opts)` factory that wraps GksV3's REST ad
 
 | Atom | Phase | Type |
 |---|---|---|
-| `FEAT--MSP-OBSIDIAN-CLIENT` | 2 | feat |
-| `BLUEPRINT--MSP-OBSIDIAN-CLIENT` | 3 | blueprint |
-| `AUDIT--MSP-OBSIDIAN-CLIENT` | 6 | audit |
+| `[[FEAT--MSP-OBSIDIAN-CLIENT]]` | 2 | feat |
+| `[[BLUEPRINT--MSP-OBSIDIAN-CLIENT]]` | 3 | blueprint |
+| `[[AUDIT--MSP-OBSIDIAN-CLIENT]]` | 6 | audit |
 
 ## Verification
 
@@ -94,3 +94,8 @@ npm run typecheck                   → clean
 - Implemented by: @claude-opus-4-7
 - Verified by: 248/248 tests + validator (98/98) + check-links OK + typecheck clean
 - Branch: `claude/msp-m7a-obsidian-client-C4dBJ`
+
+## Connections
+- [[ADR--MSP-OBSIDIAN-INTEGRATION]]
+- [[FRAMEWORK--MSP-ARCHITECTURE-V2]]
+

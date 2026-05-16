@@ -27,7 +27,7 @@ Records the upstreaming of Proposal #07 into `Freshair129/GksV3`. This update br
 ## Pre-state (violation)
 
 - GksV3 `docs/KNOWLEDGE-TYPES.md` defined `FRAME--` narrowly as "code standards / framework rules".
-- MSP had 7+ atoms (e.g., `FRAMEWORK--MSP-ARCHITECTURE-V2`, `FRAMEWORK--AUTHORITY-MATRIX`) that violated this narrow definition.
+- MSP had 7+ atoms (e.g., `[[FRAMEWORK--MSP-ARCHITECTURE-V2]]`, `[[FRAMEWORK--AUTHORITY-MATRIX]]`) that violated this narrow definition.
 - There was no canonical home for business methodology frameworks (JTBD, Design Thinking, etc.).
 
 ## What was done
@@ -49,5 +49,11 @@ Records the upstreaming of Proposal #07 into `Freshair129/GksV3`. This update br
 
 ## Source
 
-- Handover Report: `WALKTHROUGH--KNOWLEDGE-ARCHITECTURE-STANDARDIZATION.md` (2026-05-11).
+- Handover Report: `[[WALKTHROUGH--KNOWLEDGE-ARCHITECTURE-STANDARDIZATION]].md` (2026-05-11).
 - GksV3 Commit: `22f1751`.
+
+## Connections
+- [[AUDIT--ARCH-DOC-CLEANUP]]
+- [[FRAMEWORK--KNOWLEDGE-3-TIER]]
+- [[FRAMEWORK--PHASE-GOVERNANCE]]
+

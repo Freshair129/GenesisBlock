@@ -23,7 +23,7 @@ created_at: 2026-05-13T12:21:49+07:00
 
 The atomic-knowledge prefix taxonomy expanded organically through ADR-012 (`extended-taxonomy`) and several follow-ups. Two pressures forced a refit:
 
-1. **Genesis Block** introduces a *composite* unit — an executable knowledge engine assembled from atoms. (The term is pinned down in `SPEC--GENESIS-BLOCK-MANIFEST` to disambiguate from the storage-engine `CONCEPT--GENESIS-GRAPH-BACKEND`.) The composite needs a manifest atom (one entry-point file listing its members). Before v2.3 the `FRAME--` prefix was overloaded with "architectural framework" content (now-renamed `FRAMEWORK--MSP-ARCHITECTURE-V2`, `FRAMEWORK--PHASE-GOVERNANCE`, …). v2.3 first reserved `FRAME--` for the Block Manifest role; a follow-up rename retired `FRAME--` in favour of `GENESIS--` because `FRAME--` collided visually with `FRAMEWORK--`.
+1. **Genesis Block** introduces a *composite* unit — an executable knowledge engine assembled from atoms. (The term is pinned down in `[[SPEC--GENESIS-BLOCK-MANIFEST]]` to disambiguate from the storage-engine `[[CONCEPT--GENESIS-GRAPH-BACKEND]]`.) The composite needs a manifest atom (one entry-point file listing its members). Before v2.3 the `FRAME--` prefix was overloaded with "architectural framework" content (now-renamed `[[FRAMEWORK--MSP-ARCHITECTURE-V2]]`, `[[FRAMEWORK--PHASE-GOVERNANCE]]`, …). v2.3 first reserved `FRAME--` for the Block Manifest role; a follow-up rename retired `FRAME--` in favour of `GENESIS--` because `FRAME--` collided visually with `FRAMEWORK--`.
 2. **Vocabulary drift**: `GUARDRAIL--` is verbose relative to the four-letter peers (`GUARD`, `STACK`, `SAFETY`). New prefixes proposed for the engine layer (`STACK`, `SPEC`, `MOD`, `COGNITIVE`, `SAFETY`) had no home.
 
 v2.3 reorganises into six layers, **resolves the `FRAME--` overload by carving out `FRAMEWORK--`**, and adds the engine-layer prefixes.
@@ -34,10 +34,10 @@ v2.3 reorganises into six layers, **resolves the `FRAME--` overload by carving o
 
 | Prefix | Role |
 |---|---|
-| `GENESIS--` | **Block Manifest** — the index file that aggregates atoms into a Genesis Block (composite knowledge engine). One `GENESIS--<NAME>.md` per block. Frontmatter contract: `SPEC--GENESIS-BLOCK-MANIFEST`. (Replaces the v2.3 placeholder prefix `FRAME--`, which was retired due to visual collision with `FRAMEWORK--`.) |
+| `GENESIS--` | **Block Manifest** — the index file that aggregates atoms into a Genesis Block (composite knowledge engine). One `GENESIS--<NAME>.md` per block. Frontmatter contract: `[[SPEC--GENESIS-BLOCK-MANIFEST]]`. (Replaces the v2.3 placeholder prefix `FRAME--`, which was retired due to visual collision with `FRAMEWORK--`.) |
 | `STACK--` | Technology stack — language/runtime/library inventory for a subsystem |
 | `SPEC--` | Specification — JSON Schema, API data shape, wire format |
-| `MOD--` | Module definition — scope + public API of a module (e.g. `MOD--IDENTITY`) |
+| `MOD--` | Module definition — scope + public API of a module (e.g. `[[MOD--IDENTITY]]`) |
 
 ### 2. Governance & Rules
 
@@ -90,9 +90,9 @@ Authors may keep using them; v2.3 makes no breaking demand on the legacy set.
 |---|---|---|
 | Meaning | "Architectural framework / methodology / code standards" | "Block Manifest" — runtime entry-point for a Genesis Block |
 | Examples (before) | `FRAME-`​`-MSP-ARCHITECTURE-V2`, `FRAME-`​`-PHASE-GOVERNANCE` (since renamed to `FRAMEWORK--`) | — |
-| Examples (after) | `GENESIS--IDENTITY-ENGINE` (proposed), future engine manifests | — |
+| Examples (after) | `[[GENESIS--IDENTITY-ENGINE]]` (proposed), future engine manifests | — |
 
-Migration: all 9 existing `FRAME--*` atoms are renamed to `FRAMEWORK--*` (see `ADR--TAXONOMY-V2-3-MIGRATION`).
+Migration: all 9 existing `FRAME--*` atoms are renamed to `FRAMEWORK--*` (see `[[ADR--TAXONOMY-V2-3-MIGRATION]]`).
 
 ### `GUARDRAIL--` → `GUARD--`
 
@@ -104,6 +104,12 @@ After the migration, any wikilink that still says `[[FRAME--X]]` where `X` was r
 
 ## Out of scope for this concept
 
-- **Block Manifest schema**: the frontmatter shape of a `GENESIS--<NAME>` Block Manifest (which atoms it lists, in what order, with what authority) is specified by the follow-up `SPEC--GENESIS-BLOCK-MANIFEST` atom, not here.
+- **Block Manifest schema**: the frontmatter shape of a `GENESIS--<NAME>` Block Manifest (which atoms it lists, in what order, with what authority) is specified by the follow-up `[[SPEC--GENESIS-BLOCK-MANIFEST]]` atom, not here.
 - **Source code refactor for new prefix recognition**: the validator + scale-gate + SSOT priority list updates are part of the migration ADR's scope, not the taxonomy spec itself.
-- **Atom contradiction across prefixes**: handled by the existing contradiction policy (`MASTER--ATOM-CONTRADICTION-POLICY`).
+- **Atom contradiction across prefixes**: handled by the existing contradiction policy (`[[MASTER--ATOM-CONTRADICTION-POLICY]]`).
+
+## Connections
+- [[CONCEPT--KNOWLEDGE-LAYERS-V2]]
+- [[CONCEPT--ATOMIC-WRITE-CONTRACT]]
+- [[FRAMEWORK--CROSSLINKS-VOCABULARY]]
+

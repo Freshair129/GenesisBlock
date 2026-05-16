@@ -20,7 +20,7 @@ created_at: 2026-05-03T23:55:06.784+07:00
 
 # ADR — semantic search topology
 
-> **Updated 2026-05-04 (M7-prep follow-up)**: original decision said "MSP never embeds; Smart Connections is canonical". GksV3 3.6.0 audit found GKS now ships `createNomicEmbedder()` and a built-in vector store. Reframed: **GKS** is the canonical embedder + writer for agent-facing recall; **Smart Connections** remains for in-Obsidian human browse. Both pinned to the same model by `ADR--EMBEDDING-MODEL-PARITY`. Original alternatives still useful for context — preserved below.
+> **Updated 2026-05-04 (M7-prep follow-up)**: original decision said "MSP never embeds; Smart Connections is canonical". GksV3 3.6.0 audit found GKS now ships `createNomicEmbedder()` and a built-in vector store. Reframed: **GKS** is the canonical embedder + writer for agent-facing recall; **Smart Connections** remains for in-Obsidian human browse. Both pinned to the same model by `[[ADR--EMBEDDING-MODEL-PARITY]]`. Original alternatives still useful for context — preserved below.
 
 ## Context
 
@@ -45,7 +45,7 @@ Cost matters: option 1 doubles model memory if user runs Obsidian + SC. Option 3
 
 ### Constraints this creates
 
-1. **Both surfaces must use the same embedding model.** Locked by `ADR--EMBEDDING-MODEL-PARITY` to `nomic-ai/nomic-embed-text-v1.5`. User configures Smart Connections via plugin settings; GKS uses it by default in 3.6.0.
+1. **Both surfaces must use the same embedding model.** Locked by `[[ADR--EMBEDDING-MODEL-PARITY]]` to `nomic-ai/nomic-embed-text-v1.5`. User configures Smart Connections via plugin settings; GKS uses it by default in 3.6.0.
 
 2. **Agent-facing recall does NOT require Obsidian.** GKS vector store is independent. MSP works headless (CI, server, no GUI).
 
@@ -98,4 +98,8 @@ When the project outgrows JSONL (large vault, batch queries, sub-100ms latency r
 
 ## Source
 
-`CONCEPT--EMBEDDING-STRATEGY` + GksV3 3.6.0 CHANGELOG (`createNomicEmbedder`) + `ADR--EMBEDDING-MODEL-PARITY` + audit during M7-prep follow-up.
+`[[CONCEPT--EMBEDDING-STRATEGY]]` + GksV3 3.6.0 CHANGELOG (`createNomicEmbedder`) + `[[ADR--EMBEDDING-MODEL-PARITY]]` + audit during M7-prep follow-up.
+
+## Connections
+- [[ADR--MSP-OBSIDIAN-INTEGRATION]]
+

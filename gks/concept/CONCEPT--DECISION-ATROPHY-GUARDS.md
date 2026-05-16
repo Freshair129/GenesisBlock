@@ -21,7 +21,7 @@ created_at: 2026-05-05T16:28:00.000+07:00
 
 ## Problem
 
-ADRs have `valid_until` semantics in some atoms (e.g. `CONCEPT--MSP-ROADMAP` has `valid_until: 2026-08-01`). When that date passes:
+ADRs have `valid_until` semantics in some atoms (e.g. `[[CONCEPT--MSP-ROADMAP]]` has `valid_until: 2026-08-01`). When that date passes:
 
 - The atom is **silently stale** — nothing alerts the team
 - Agents continue citing it as authoritative
@@ -74,4 +74,8 @@ The CONCEPT captures the lifecycle aspect; specific PROTOs follow.
 
 ## Source
 
-`CONCEPT--MSP-ROADMAP` §3 M9a.
+`[[CONCEPT--MSP-ROADMAP]]` §3 M9a.
+
+## Connections
+- [[CONCEPT--PROTO-PATTERN]]
+

@@ -97,3 +97,12 @@ created_at: 2026-05-05T16:15:00.000+07:00
 - Streaming tool outputs — out of MCP-stdio scope
 - Tool versioning beyond what MCP spec offers
 - Per-tool auth — orchestrator concern (M9)
+
+## Connections
+- [[CONCEPT--MSP-MCP-TOOL-EXPANSION]]
+- [[FEAT--MSP-MCP-SERVER]]
+- [[FEAT--CONSOLIDATOR]]
+- [[FEAT--RETRIEVAL-ORCHESTRATION]]
+- [[FEAT--COMPRESSOR]]
+- [[FEAT--IDENTITY-LAYER]]
+

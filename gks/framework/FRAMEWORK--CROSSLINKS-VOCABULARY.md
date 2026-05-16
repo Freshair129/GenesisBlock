@@ -48,3 +48,7 @@ Atoms relate through a small fixed vocabulary of predicates under `crosslinks.*`
 ## Source
 
 `msp_spec.md` §4.6 (Epistemic & Crosslinks Block).
+
+## Connections
+- [[CONCEPT--ATOMIC-WRITE-CONTRACT]]
+

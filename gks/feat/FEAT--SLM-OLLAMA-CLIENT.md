@@ -78,3 +78,9 @@ MSP_SLM_PROVIDER=ollama npm run msp:run-task -- T1.task.yaml
 - Anthropic / OpenAI clients — separate FEATs when needed.
 - Streaming responses.
 - Model-pull automation (user runs `ollama pull` themselves).
+
+## Connections
+- [[ADR--SLM-OLLAMA-CLIENT]]
+- [[CONCEPT--SLM-OLLAMA-CLIENT]]
+- [[FEAT--CODEGEN-MICROTASK-RUNNER]]
+

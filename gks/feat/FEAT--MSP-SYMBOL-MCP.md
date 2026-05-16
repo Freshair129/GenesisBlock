@@ -42,7 +42,7 @@ Registered in `src/mcp/server.ts` `TOOLS` array alongside the existing 11 → to
 
 ## Why these 5 (and not more)
 
-These cover the four common queries from `CONCEPT--SYMBOL-GRAPH`:
+These cover the four common queries from `[[CONCEPT--SYMBOL-GRAPH]]`:
 
 | Question | Tool |
 |---|---|
@@ -62,11 +62,16 @@ A 6th tool `msp_symbol_subgraph(community_id)` was considered but deferred — `
 ## Out of scope
 
 - Write tools — symbol graph is read-only knowledge, never mutated by agents
-- Embeddings or semantic search over symbols — covered by `ADR--SEMANTIC-SEARCH-VIA-SMART-CONNECTIONS` boundary
+- Embeddings or semantic search over symbols — covered by `[[ADR--SEMANTIC-SEARCH-VIA-SMART-CONNECTIONS]]` boundary
 - Cross-repo symbol queries — Phase 2 (after upstream to GKS)
 
 ## Source
 
-- `FRAMEWORK--SYMBOL-GRAPH`, `CONCEPT--SYMBOL-GRAPH`
+- `[[FRAMEWORK--SYMBOL-GRAPH]]`, `[[CONCEPT--SYMBOL-GRAPH]]`
 - Existing tool shape: `src/mcp/tools/recall.ts` (zod inputSchema, `handler(ctx)` returning `ToolTextResult`)
 - Tool registration pattern: `src/mcp/server.ts:TOOLS` array (currently 11 entries)
+
+## Connections
+- [[ADR--SYMBOL-GRAPH-PERSISTENCE]]
+- [[FEAT--MSP-MCP-SERVER]]
+

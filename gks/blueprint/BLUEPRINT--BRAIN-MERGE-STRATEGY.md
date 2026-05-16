@@ -24,7 +24,7 @@ created_at: 2026-05-14T02:00:00.000+07:00
 
 # BLUEPRINT — Brain Merge Strategy
 
-Concrete implementation plan for the resolver mandated by `ADR--BRAIN-PATH-RESOLUTION`.
+Concrete implementation plan for the resolver mandated by `[[ADR--BRAIN-PATH-RESOLUTION]]`.
 
 ## File layout
 
@@ -150,3 +150,7 @@ P5 depends on Stream C (Agent Dispatcher) reaching P4. P1–P4 are independent.
 - Should the global brain support multiple users on a shared machine? (Multi-tenant via `~/.brain/<user>/` — defer until use case appears.)
 - Encrypted-at-rest for global? Threat-model ADR first.
 - Cross-machine sync via Tailscale / Syncthing / Git annex — out of scope; recommend users handle externally.
+
+## Connections
+- [[CONCEPT--TWO-BRAIN-ARCHITECTURE]]
+

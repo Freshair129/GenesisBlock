@@ -28,7 +28,7 @@ An agentic system has two distinct **knowledge gravity wells**, and conflating t
 | **Global** | `~/.brain/` | Cross-project skills, agent identity, learned routing preferences, generic patterns | Across all projects, machine-local |
 | **Project** | `<repo>/gks/` | Project-specific atoms (ADRs, FEATs, BLUEPRINTs, AUDITs), code references, episodes tied to this codebase | Committed to git, scoped to one repo |
 
-This evolves the prior pattern in `ADR--GLOBAL-VS-WORKSPACE` (`~/.msp/` + `.brain/msp/projects/<ns>/`) — the new naming aligns with `FRAMEWORK_MASTER_SPEC §4.2` and removes the redundant `msp/projects/<ns>` nesting.
+This evolves the prior pattern in `[[ADR--GLOBAL-VS-WORKSPACE]]` (`~/.msp/` + `.brain/msp/projects/<ns>/`) — the new naming aligns with `FRAMEWORK_MASTER_SPEC §4.2` and removes the redundant `msp/projects/<ns>` nesting.
 
 ## What goes where
 
@@ -47,7 +47,7 @@ This evolves the prior pattern in `ADR--GLOBAL-VS-WORKSPACE` (`~/.msp/` + `.brai
 
 ## Why two, not one?
 
-A single global brain (every project's atoms in `~/.brain/`) breaks `vault_id` isolation — `FEAT--LOGIN` in project A would collide with `FEAT--LOGIN` in project B.
+A single global brain (every project's atoms in `~/.brain/`) breaks `vault_id` isolation — `[[FEAT--LOGIN]]` in project A would collide with `[[FEAT--LOGIN]]` in project B.
 
 A single project brain (everything in `<repo>/gks/`, no global) means each new project starts from zero — the agent forgets every routing lesson, every retry policy, every cost preference learned elsewhere.
 
@@ -63,7 +63,7 @@ type ∈ {SKILL, ALGO, PROTO}                    → global first, project fallb
 type ∈ {EPISODE, IDENTITY, REGISTRY}           → global ONLY
 ```
 
-See `ADR--BRAIN-PATH-RESOLUTION` for the precise rules.
+See `[[ADR--BRAIN-PATH-RESOLUTION]]` for the precise rules.
 
 ## What this concept is NOT
 
@@ -73,7 +73,12 @@ See `ADR--BRAIN-PATH-RESOLUTION` for the precise rules.
 
 ## Related
 
-- `ADR--BRAIN-PATH-RESOLUTION` — concrete path rules + lookup order
-- `BLUEPRINT--BRAIN-MERGE-STRATEGY` — implementation plan
-- `ADR--GLOBAL-VS-WORKSPACE` — prior version of this idea (kept for history)
-- `CONCEPT--NAMESPACE-VAULT-BRAIN` — sibling concept on how vaults map to brains
+- `[[ADR--BRAIN-PATH-RESOLUTION]]` — concrete path rules + lookup order
+- `[[BLUEPRINT--BRAIN-MERGE-STRATEGY]]` — implementation plan
+- `[[ADR--GLOBAL-VS-WORKSPACE]]` — prior version of this idea (kept for history)
+- `[[CONCEPT--NAMESPACE-VAULT-BRAIN]]` — sibling concept on how vaults map to brains
+
+## Connections
+- [[FRAMEWORK--MSP-ARCHITECTURE-V2]]
+- [[CONCEPT--AGENT-AGNOSTIC]]
+

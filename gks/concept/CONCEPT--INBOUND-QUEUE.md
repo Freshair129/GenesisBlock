@@ -17,7 +17,7 @@ crosslinks: {"references":["FRAMEWORK--MSP-ARCHITECTURE-V2"],"superseded_by":["C
 created_at: 2026-05-03T14:01:50.297+07:00
 ---
 
-> ⚠️ **Superseded by [`CONCEPT--KNOWLEDGE-LAYERS-V2`](./CONCEPT--KNOWLEDGE-LAYERS-V2.md)** (Phase 4 of `BLUEPRINT--INBOUND-TO-CANDIDATES-MIGRATION`, 2026-05-09). The inbound queue has been removed; runtime atom proposals now write to `.brain/msp/projects/<ns>/candidates/` via the `msp_candidate` MCP tool. The body below is preserved as historical context.
+> ⚠️ **Superseded by [`[[CONCEPT--KNOWLEDGE-LAYERS-V2]]`](./[[CONCEPT--KNOWLEDGE-LAYERS-V2]].md)** (Phase 4 of `[[BLUEPRINT--INBOUND-TO-CANDIDATES-MIGRATION]]`, 2026-05-09). The inbound queue has been removed; runtime atom proposals now write to `.brain/msp/projects/<ns>/candidates/` via the `msp_candidate` MCP tool. The body below is preserved as historical context.
 
 # CONCEPT — inbound queue
 
@@ -57,10 +57,14 @@ The current `@freshair129/gks` package uses the `rev-` form; MSP accepts either 
 
 ## What this concept does NOT describe
 
-- The exact frontmatter envelope → see `CONCEPT--SUBMISSION-ENVELOPE`
-- The proposal types (new/update/supersede/deprecate) → see `CONCEPT--PROPOSAL-TYPES`
-- The promote command + level transitions → see `ADR--PROMOTION-LEVELS`
+- The exact frontmatter envelope → see `[[CONCEPT--SUBMISSION-ENVELOPE]]`
+- The proposal types (new/update/supersede/deprecate) → see `[[CONCEPT--PROPOSAL-TYPES]]`
+- The promote command + level transitions → see `[[ADR--PROMOTION-LEVELS]]`
 
 ## Source
 
 `msp_spec.md` §3 (Inbound Flow).
+
+## Connections
+- [[FRAMEWORK--MSP-ARCHITECTURE-V2]]
+

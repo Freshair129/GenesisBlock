@@ -116,8 +116,8 @@ Read at session start; written via `setProfile` / `setVoice` / `setPreference`. 
 - **Multi-agent identity sync** — orchestrator concern (out of MSP scope)
 - **Identity validation rules** (forbidden voice combos, name conventions) — over-engineering for now
 - **Per-tenant identity scoping** — namespace already provides isolation; cross-tenant auth is M9
-- **Persistence to GKS atoms** — identity doesn't belong in `gks/` (per `ADR--GRAPH-IS-GKS-DOMAIN` spirit; identity is execution state, not durable knowledge)
+- **Persistence to GKS atoms** — identity doesn't belong in `gks/` (per `[[ADR--GRAPH-IS-GKS-DOMAIN]]` spirit; identity is execution state, not durable knowledge)
 
 ## Source
 
-`msp_spec.md` §7e (Identity / Soul), `FRAMEWORK--MSP-ARCHITECTURE-V2` (passport metaphor — identity is the fourth pillar).
+`msp_spec.md` §7e (Identity / Soul), `[[FRAMEWORK--MSP-ARCHITECTURE-V2]]` (passport metaphor — identity is the fourth pillar).

@@ -38,3 +38,8 @@ By walking the `CALLS` and `HANDLES` edges from recognized architectural entry p
 ## Verification
 - Existence of valid paths from a known entry point to a known leaf.
 - Cycle detection prevents infinite loops in recursive code.
+
+## Connections
+- [[FRAMEWORK--SYMBOL-GRAPH]]
+- [[CONCEPT--SYMBOL-GRAPH]]
+

@@ -72,4 +72,4 @@ Default plugin is **heuristic** (first non-trivial assistant message + last deci
 
 ## Source
 
-`CONCEPT--MEMORY-EPISODIC-WRITER` + `CONCEPT--MEMORY-EPISODIC`.
+`[[CONCEPT--MEMORY-EPISODIC-WRITER]]` + `[[CONCEPT--MEMORY-EPISODIC]]`.

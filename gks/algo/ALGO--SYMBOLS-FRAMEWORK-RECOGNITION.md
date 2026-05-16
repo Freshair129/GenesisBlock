@@ -30,7 +30,7 @@ created_at: 2026-05-12T05:37:00.000+07:00
 
 Concrete recognition logic per framework. Each subsection is one recognizer; implementation goes in `packages/msp/src/symbols/framework/<name>.ts` per the geography declared in `linked_symbols`.
 
-All recognizers conform to the interface in `ADR--SYMBOLS-FRAMEWORK-AWARENESS` §3:
+All recognizers conform to the interface in `[[ADR--SYMBOLS-FRAMEWORK-AWARENESS]]` §3:
 
 ```ts
 interface FrameworkRecognizer {
@@ -220,12 +220,16 @@ Order matters for `routes` → `nextjs` chain (refinement). Other pairs are inde
 
 ## Verification
 
-Each recognizer ships with ≥ 2 test fixtures (happy path + edge case) in `test/symbols/framework/<name>.test.ts`. Integration test on a fixture Next.js + Prisma project verifies the cross-recognizer composition produces a coherent graph (see `BLUEPRINT--SYMBOLS-FRAMEWORK-AWARENESS` for the fixture spec).
+Each recognizer ships with ≥ 2 test fixtures (happy path + edge case) in `test/symbols/framework/<name>.test.ts`. Integration test on a fixture Next.js + Prisma project verifies the cross-recognizer composition produces a coherent graph (see `[[BLUEPRINT--SYMBOLS-FRAMEWORK-AWARENESS]]` for the fixture spec).
 
 ## Source
 
-- `ADR--SYMBOLS-FRAMEWORK-AWARENESS` (decisions backing this algorithm set)
-- `CONCEPT--SYMBOLS-FRAMEWORK-AWARENESS` (motivation)
+- `[[ADR--SYMBOLS-FRAMEWORK-AWARENESS]]` (decisions backing this algorithm set)
+- `[[CONCEPT--SYMBOLS-FRAMEWORK-AWARENESS]]` (motivation)
 - Next.js App Router file conventions (https://nextjs.org/docs/app/building-your-application/routing)
 - Prisma schema reference (https://www.prisma.io/docs/orm/reference/prisma-schema-reference)
 - Model Context Protocol specification
+
+## Connections
+- [[FRAMEWORK--SYMBOL-GRAPH]]
+

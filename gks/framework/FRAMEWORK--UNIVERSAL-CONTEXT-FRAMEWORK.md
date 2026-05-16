@@ -21,7 +21,7 @@ created_at: 2026-05-13T08:59:37.161+07:00
 
 # FRAME — Universal Context Framework
 
-> Complements `FRAME--MSP-ARCHITECTURE-V2`. v2 defined the **three-layer** stack (cognitive layer / Memory OS / knowledge base). This FRAME defines how, within that stack, every retrieval and tool-call decision is shaped by **three orthogonal axes** — WHO, WHERE, and HOW MUCH — and how those axes compose into a single pipeline.
+> Complements `[[FRAME--MSP-ARCHITECTURE-V2]]`. v2 defined the **three-layer** stack (cognitive layer / Memory OS / knowledge base). This FRAME defines how, within that stack, every retrieval and tool-call decision is shaped by **three orthogonal axes** — WHO, WHERE, and HOW MUCH — and how those axes compose into a single pipeline.
 >
 > Full narrative: [`docs/msp/UNIVERSAL-CONTEXT-FRAMEWORK_spec.md`](../../docs/UNIVERSAL-CONTEXT-FRAMEWORK_spec.md).
 
@@ -70,29 +70,36 @@ It does **not** apply to:
 
 ## Out of scope
 
-- The four-tuple model **does not** prescribe a specific policy language. ADR-level decisions (e.g. YAML v1, Cedar later) live in `ADR--POLICY-AS-DATA-NOT-CODE` and siblings.
+- The four-tuple model **does not** prescribe a specific policy language. ADR-level decisions (e.g. YAML v1, Cedar later) live in `[[ADR--POLICY-AS-DATA-NOT-CODE]]` and siblings.
 - This FRAME **does not** introduce domain-specific knowledge (medical, finance, legal). Domain knowledge enters via classifier plugins and policy packs; the core stays domain-agnostic.
-- This FRAME **does not** replace `FRAME--MSP-ARCHITECTURE-V2`. The two coexist: v2 defines the three-layer stack; UCF defines how decisions flow inside it.
+- This FRAME **does not** replace `[[FRAME--MSP-ARCHITECTURE-V2]]`. The two coexist: v2 defines the three-layer stack; UCF defines how decisions flow inside it.
 
 ## Composition with existing MSP frames
 
 - **MSP architecture v2** continues to own the cognitive ↔ Memory OS ↔ knowledge boundary. UCF inserts itself at the **Memory OS** layer: every entry point in MSP (Express, MCP, facade) becomes a Policy Enforcement Point (PEP).
-- **Cognitive Layer facade** (`CONCEPT--COGNITIVE-LAYER-FACADE`) is the public entry. Its `recall`, `remember`, `runTask`, etc. accept Subject + Action — the four-tuple flows through unchanged.
-- **Knowledge layers v2** (`CONCEPT--KNOWLEDGE-LAYERS-V2`) — atomic / vector / episodic / obsidian — remain the storage substrate. UCF adds attribute-bag metadata on top; it does not change the layer count.
+- **Cognitive Layer facade** (`[[CONCEPT--COGNITIVE-LAYER-FACADE]]`) is the public entry. Its `recall`, `remember`, `runTask`, etc. accept Subject + Action — the four-tuple flows through unchanged.
+- **Knowledge layers v2** (`[[CONCEPT--KNOWLEDGE-LAYERS-V2]]`) — atomic / vector / episodic / obsidian — remain the storage substrate. UCF adds attribute-bag metadata on top; it does not change the layer count.
 
 ## Decisions tracked in §0 of the spec
 
 | Decision id | Topic | Result |
 |---|---|---|
-| D-1 | Policy language v1 | YAML + minimal operators (~200 LOC) — see `ADR--POLICY-AS-DATA-NOT-CODE` |
-| D-2 | Resolution tier count (MVP) | 2-tier: FULL + MENTION + `expand()`; 4-tier deferred to Phase 4 — see `ADR--RESOLUTION-TIER-COUNT` |
-| D-7 | Default policy posture | `default-permit` + shadow log in Phase 1; tighten per-endpoint from Phase 3 — see `ADR--DEFAULT-POLICY-POSTURE` |
-| D-8 | AttributeBag storage | Atom metadata / frontmatter; GKS `Namespace` untouched — see `ADR--BRING-YOUR-OWN-ATTRIBUTES` |
+| D-1 | Policy language v1 | YAML + minimal operators (~200 LOC) — see `[[ADR--POLICY-AS-DATA-NOT-CODE]]` |
+| D-2 | Resolution tier count (MVP) | 2-tier: FULL + MENTION + `expand()`; 4-tier deferred to Phase 4 — see `[[ADR--RESOLUTION-TIER-COUNT]]` |
+| D-7 | Default policy posture | `default-permit` + shadow log in Phase 1; tighten per-endpoint from Phase 3 — see `[[ADR--DEFAULT-POLICY-POSTURE]]` |
+| D-8 | AttributeBag storage | Atom metadata / frontmatter; GKS `Namespace` untouched — see `[[ADR--BRING-YOUR-OWN-ATTRIBUTES]]` |
 
 Open questions remaining are tracked in spec §14 with working assumptions so atom extraction is unblocked.
 
 ## Source
 
 - `docs/msp/UNIVERSAL-CONTEXT-FRAMEWORK_spec.md` §0–§2, §10 — narrative SSOT.
-- `gks/frame/FRAME--MSP-ARCHITECTURE-V2.md` — parent architecture.
-- `gks/concept/CONCEPT--COGNITIVE-LAYER-FACADE.md` — the entry point that surfaces this FRAME.
+- `gks/frame/[[FRAME--MSP-ARCHITECTURE-V2]].md` — parent architecture.
+- `gks/concept/[[CONCEPT--COGNITIVE-LAYER-FACADE]].md` — the entry point that surfaces this FRAME.
+
+## Connections
+- [[FRAMEWORK--MSP-ARCHITECTURE-V2]]
+- [[CONCEPT--SUBJECT-RESOURCE-ACTION-CONTEXT]]
+- [[CONCEPT--ATTRIBUTE-BAG-MODEL]]
+- [[CONCEPT--NAMESPACE-VAULT-BRAIN]]
+

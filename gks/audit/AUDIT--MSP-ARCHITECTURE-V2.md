@@ -34,18 +34,18 @@ Doc-only PR. No source code changes. Records the architectural shift discovered 
 
 | Atom | Phase | Type | Purpose |
 |---|---|---|---|
-| `CONCEPT--OBSIDIAN-AS-RUNTIME` | 1 | concept | What Obsidian provides for free; what MSP still owns |
-| `CONCEPT--EMBEDDING-STRATEGY` | 1 | concept | Smart Connections is the embedder; MSP delegates |
-| `ADR--MSP-OBSIDIAN-INTEGRATION` | 2 | adr | REST primary, file fallback, TLS scope, auth |
-| `ADR--SEMANTIC-SEARCH-VIA-SMART-CONNECTIONS` | 2 | adr | No MSP embedder ever; runtime dep on Obsidian for semantic |
-| `FRAMEWORK--MSP-ARCHITECTURE-V2` | 0 | frame | Supersedes v1; new two-layer mental model |
-| `AUDIT--MSP-ARCHITECTURE-V2` | 6 | audit | This file |
+| `[[CONCEPT--OBSIDIAN-AS-RUNTIME]]` | 1 | concept | What Obsidian provides for free; what MSP still owns |
+| `[[CONCEPT--EMBEDDING-STRATEGY]]` | 1 | concept | Smart Connections is the embedder; MSP delegates |
+| `[[ADR--MSP-OBSIDIAN-INTEGRATION]]` | 2 | adr | REST primary, file fallback, TLS scope, auth |
+| `[[ADR--SEMANTIC-SEARCH-VIA-SMART-CONNECTIONS]]` | 2 | adr | No MSP embedder ever; runtime dep on Obsidian for semantic |
+| `[[FRAMEWORK--MSP-ARCHITECTURE-V2]]` | 0 | frame | Supersedes v1; new two-layer mental model |
+| `[[AUDIT--MSP-ARCHITECTURE-V2]]` | 6 | audit | This file |
 
 ## V1 supersede
 
-`FRAMEWORK--MSP-ARCHITECTURE` (v1):
+`[[FRAMEWORK--MSP-ARCHITECTURE]]` (v1):
 - `status: stable` → `status: superseded`
-- `crosslinks.superseded_by: [FRAMEWORK--MSP-ARCHITECTURE-V2]`
+- `crosslinks.superseded_by: [[[FRAMEWORK--MSP-ARCHITECTURE-V2]]]`
 - Body preserved verbatim with a header note pointing at v2
 
 V1 stays in `gks/frame/` for historical reference; readers see the supersede note immediately.
@@ -60,7 +60,7 @@ npx gks validate --links      → status: OK (94 atoms scanned)
 
 ## Why doc-only first
 
-Per `CONCEPT--PROPOSAL-TYPES`, a `supersede` is a governance event that should be recorded before the implementation work it enables. Locking the v2 frame + ADRs in the atom graph **first** means M7 implementation PRs (consolidator, retrieval, etc.) can crosslink back to a stable, promoted authority.
+Per `[[CONCEPT--PROPOSAL-TYPES]]`, a `supersede` is a governance event that should be recorded before the implementation work it enables. Locking the v2 frame + ADRs in the atom graph **first** means M7 implementation PRs (consolidator, retrieval, etc.) can crosslink back to a stable, promoted authority.
 
 ## What this AUDIT does NOT do
 

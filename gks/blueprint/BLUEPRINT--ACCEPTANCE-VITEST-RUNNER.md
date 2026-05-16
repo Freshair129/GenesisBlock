@@ -105,3 +105,8 @@ verification_plan:
 T1 WRITE-SANDBOX (scaffoldSandbox + writeCandidate)
 T2 SPAWN-VITEST (vitest.ts top-level façade — reuses T1 + T3)
 T3 PARSE-FAILURES (parseVitestJson + stderr fallback)
+
+## Connections
+- [[FEAT--ACCEPTANCE-VITEST-RUNNER]]
+- [[ADR--ACCEPTANCE-VITEST-RUNNER]]
+

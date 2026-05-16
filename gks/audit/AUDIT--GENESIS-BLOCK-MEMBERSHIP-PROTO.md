@@ -22,11 +22,11 @@ crosslinks:
 created_at: 2026-05-14T18:35:00.000+07:00
 ---
 
-# AUDIT — PROTO--GENESIS-BLOCK-MEMBERSHIP
+# AUDIT — [[PROTO--GENESIS-BLOCK-MEMBERSHIP]]
 
 ## Scope
 
-Closes the follow-up `SPEC--GENESIS-BLOCK-MANIFEST` §5 explicitly deferred:
+Closes the follow-up `[[SPEC--GENESIS-BLOCK-MANIFEST]]` §5 explicitly deferred:
 a PROTO that machine-enforces the Block Manifest membership + status
 contract. Until now §2.2 / §3 / §4.2 of the SPEC were descriptive only —
 authors and reviewers obeyed them by convention.
@@ -35,7 +35,7 @@ authors and reviewers obeyed them by convention.
 
 | File | What |
 |---|---|
-| `gks/proto/PROTO--GENESIS-BLOCK-MEMBERSHIP.md` | The rule atom. `status: draft`, `severity: error`, `crosslinks.enforces: [SPEC--GENESIS-BLOCK-MANIFEST]`. |
+| `gks/proto/[[PROTO--GENESIS-BLOCK-MEMBERSHIP]].md` | The rule atom. `status: draft`, `severity: error`, `crosslinks.enforces: [[[SPEC--GENESIS-BLOCK-MANIFEST]]]`. |
 | `packages/msp/src/validator/proto/genesis-block-membership.ts` | The predicate + exported helpers (`checkManifest`, `collectMembers`, `parseFrontmatter`, `statusRank`, `CORE_ROLES`, `ROLE_TYPE`, `STATUS_ORDER`, `ID_PATTERN`). |
 | `packages/msp/test/validator/proto/genesis-block-membership.test.ts` | 22 tests — helpers, `checkManifest` across all four checks, and the disk-reading predicate. |
 
@@ -55,7 +55,7 @@ For every atom with `type: genesis`, reads the manifest frontmatter and checks:
 ## Known follow-ups
 
 - **Promotion to `stable`** is gated on the first real `GENESIS--<NAME>`
-  Block Manifest being authored (e.g. `GENESIS--IDENTITY-ENGINE`, itself
+  Block Manifest being authored (e.g. `[[GENESIS--IDENTITY-ENGINE]]`, itself
   blocked on several unauthored member atoms). Until then the predicate
   passes trivially on `--all` — there are zero `type: genesis` atoms.
 - **The 4-of-5 promotion criterion** (SPEC §5: ≥4 core dimensions filled
@@ -77,3 +77,8 @@ For every atom with `type: genesis`, reads the manifest frontmatter and checks:
 - `npm run msp:validate` — the PROTO + AUDIT atoms validate; the predicate
   loads (correct `linked_symbols` path) and passes (no `type: genesis`
   atoms to check).
+
+## Connections
+- [[CONCEPT--PROTO-PATTERN]]
+- [[CONCEPT--TAXONOMY-V2-3]]
+

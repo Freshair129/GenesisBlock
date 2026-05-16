@@ -26,7 +26,7 @@ created_at: 2026-05-08T18:50:00.000+07:00
 
 ## Scope
 
-Records implementation of Layer 0 (the human rule) of `BLUEPRINT--CONTRADICTION-DETECTION-IMPL`. Phase 0 is doc-only by design — `CLAUDE.md` policy section + PR template checklist + ROADMAP note. No code. No tests. Mechanical layers (1–4) follow in subsequent PRs.
+Records implementation of Layer 0 (the human rule) of `[[BLUEPRINT--CONTRADICTION-DETECTION-IMPL]]`. Phase 0 is doc-only by design — `CLAUDE.md` policy section + PR template checklist + ROADMAP note. No code. No tests. Mechanical layers (1–4) follow in subsequent PRs.
 
 ## What shipped
 
@@ -40,7 +40,7 @@ Inserted between `## Doc-to-code workflow` (gates between phases) and `## Useful
 > 2. Add the new atom's id to the old atom's `crosslinks.superseded_by`
 > 3. Flip the old atom's `status` to `superseded`
 
-References `BLUEPRINT--CONTRADICTION-DETECTION-IMPL` (forthcoming mechanical layers) and `ADR--CONTRADICTION-DETECTION-STACK` (full 5-layer plan).
+References `[[BLUEPRINT--CONTRADICTION-DETECTION-IMPL]]` (forthcoming mechanical layers) and `[[ADR--CONTRADICTION-DETECTION-STACK]]` (full 5-layer plan).
 
 ### `.github/pull_request_template.md` (NEW)
 
@@ -56,8 +56,8 @@ One-paragraph note marking Layer 0 as shipped + pointer to the ADR for the full 
 
 ## What this AUDIT does NOT cover
 
-- Layer 1 (`PROTO--RECIPROCAL-SUPERSESSION`) — its own AUDIT atom when shipped
-- Layer 2 (`domain:` field + `PROTO--DOMAIN-UNIQUENESS`) — its own AUDIT atom when shipped
+- Layer 1 (`[[PROTO--RECIPROCAL-SUPERSESSION]]`) — its own AUDIT atom when shipped
+- Layer 2 (`domain:` field + `[[PROTO--DOMAIN-UNIQUENESS]]`) — its own AUDIT atom when shipped
 - Layer 3 (embedding similarity PR-comment bot) — its own AUDIT atom when shipped
 - Layer 4 (LLM judge, opt-in) — its own AUDIT atom when shipped
 
@@ -67,7 +67,7 @@ One-paragraph note marking Layer 0 as shipped + pointer to the ADR for the full 
 - `npm run msp:check-links` — all crosslinks resolve
 - `npm test` — existing tests pass (no code change)
 - Manual: render `.github/pull_request_template.md` in a sandbox PR (verified before merge)
-- Manual: read `CLAUDE.md` § "Atom contradiction policy" — content matches `ADR--CONTRADICTION-DETECTION-STACK` § "Layer 0"
+- Manual: read `CLAUDE.md` § "Atom contradiction policy" — content matches `[[ADR--CONTRADICTION-DETECTION-STACK]]` § "Layer 0"
 
 ## Counts
 
@@ -79,6 +79,6 @@ One-paragraph note marking Layer 0 as shipped + pointer to the ADR for the full 
 
 ## Source
 
-- `BLUEPRINT--CONTRADICTION-DETECTION-IMPL` § "phase_0_human_rule"
-- `ADR--CONTRADICTION-DETECTION-STACK` § "Layer 0 — Human rule"
-- `CONCEPT--ATOM-CONTRADICTION-DETECTION` § "Why detection alone isn't enough"
+- `[[BLUEPRINT--CONTRADICTION-DETECTION-IMPL]]` § "phase_0_human_rule"
+- `[[ADR--CONTRADICTION-DETECTION-STACK]]` § "Layer 0 — Human rule"
+- `[[CONCEPT--ATOM-CONTRADICTION-DETECTION]]` § "Why detection alone isn't enough"

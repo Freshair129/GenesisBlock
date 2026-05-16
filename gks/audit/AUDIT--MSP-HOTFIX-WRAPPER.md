@@ -25,7 +25,7 @@ created_at: 2026-05-03T18:01:45.299+07:00
 
 ## Scope
 
-Closes FEAT--MSP-HOTFIX-WRAPPER. Closes P1 #6 from M3 backlog.
+Closes [[FEAT--MSP-HOTFIX-WRAPPER]]. Closes P1 #6 from M3 backlog.
 
 ## Acceptance criteria from FEAT
 
@@ -60,3 +60,10 @@ Same precedent as M2 + M4a: bug recorded in audit + new test cases added.
 - Implemented by: @claude-opus-4-7
 - Verified by: 6/6 hook tests + 11/11 id-format tests + manual gks hotfix end-to-end
 - Date: 2026-05-03
+
+## Connections
+- [[BLUEPRINT--MSP-HOTFIX-WRAPPER]]
+- [[ADR--MSP-HOTFIX-WRAPPER]]
+- [[ADR--HOTFIX-ESCAPE-HATCH]]
+- [[FEAT--MSP-PRECOMMIT-HOOK]]
+

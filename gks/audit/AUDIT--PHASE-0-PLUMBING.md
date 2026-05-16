@@ -43,3 +43,9 @@ through the retrieval and codegen pipeline and enable the `attributes` bag in at
 - Implemented by: Gemini CLI
 - Verified by: `msp:validate` + unit tests
 - Date: 2026-05-14
+
+## Connections
+- [[BLUEPRINT--PHASE-0-PLUMBING]]
+- [[CONCEPT--SUBJECT-RESOURCE-ACTION-CONTEXT]]
+- [[CONCEPT--ATTRIBUTE-BAG-MODEL]]
+

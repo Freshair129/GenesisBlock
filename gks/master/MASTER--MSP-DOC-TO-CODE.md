@@ -35,7 +35,7 @@ The atom chain is the durable record of why a change exists. Code without atoms 
 1. Open a new branch only after identifying which atom layer the change starts at. If unsure, write a CONCEPT first.
 2. Land FRAME / CONCEPT / ADR / FEAT / BLUEPRINT atoms in `gks/<type>/` before any code under `src/`, `test/`, `scripts/`, or `web/` that implements them.
 3. Validate atoms (`npx tsx src/validator/cli.ts --all`) and resolve crosslinks (`npm run msp:check-links`) before staging code changes — pre-commit hook enforces this.
-4. Skip Phase 4 (TASK) only for single-developer slices; bigger handoffs require it (see `ADR--PROMOTION-LEVELS`).
+4. Skip Phase 4 (TASK) only for single-developer slices; bigger handoffs require it (see `[[ADR--PROMOTION-LEVELS]]`).
 5. Close every milestone with an AUDIT atom describing what shipped vs. the BLUEPRINT — including any deviations.
 
 ## Apply when
@@ -45,3 +45,9 @@ A new branch is opened, a PR is drafted, or any file under `src/`, `test/`, `scr
 ## Conflicts with
 
 (none currently — flag any future Master that contradicts this directive.)
+
+## Connections
+- [[CONCEPT--CODEGEN-MICROTASK-CONTRACT]]
+- [[ADR--MASTER-PROMOTION-DOC-TO-CODE]]
+- [[FRAMEWORK--KNOWLEDGE-3-TIER]]
+

@@ -38,3 +38,9 @@ Files modified/created:
 2. **Extend Types**: In `packages/msp/src/validator/proto/types.ts`, import the interface and add `symbolGraph` to `PredicateContext`.
 3. **Update Loader**: In `packages/msp/src/validator/proto/loader.ts`, add the logic to instantiate the reader, handle potential missing DB, and inject it into the context before calling `runProtos`. Make sure to close the DB after execution.
 4. **Update Tests**: Adjust loader test cases to mock or gracefully ignore the missing `symbolGraph`.
+
+## Connections
+- [[PROTO--SYMBOLS-TRACE-INVARIANTS]]
+- [[FRAMEWORK--MSP-ARCHITECTURE-V2]]
+- [[BLUEPRINT--PROTO-LOADER]]
+

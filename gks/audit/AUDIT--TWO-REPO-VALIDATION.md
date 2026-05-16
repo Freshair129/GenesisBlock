@@ -66,7 +66,7 @@ The aspirational claims in PR #9 atoms only affect documentation accuracy, not r
 
 ## Corrections applied (this PR)
 
-1. **`ADR--EMBEDDING-MODEL-PARITY`**: prepended a Status note explaining 3.6.0 is unreleased; added a "Fallback while unpublished" section showing how MSP works on 3.5.6 today (Ollama BGE-M3 / mock). The architectural decision (lock to nomic) stays valid as the **target** state.
+1. **`[[ADR--EMBEDDING-MODEL-PARITY]]`**: prepended a Status note explaining 3.6.0 is unreleased; added a "Fallback while unpublished" section showing how MSP works on 3.5.6 today (Ollama BGE-M3 / mock). The architectural decision (lock to nomic) stays valid as the **target** state.
 
 2. **New upstream proposal**: `upstream/gks-proposals/05-publish-3.6.0.md` — asks GKS maintainer to publish 3.6.0 to npm. Blocks removing the Status note above.
 
@@ -74,7 +74,7 @@ The aspirational claims in PR #9 atoms only affect documentation accuracy, not r
 
 ## NOT corrected (intentional)
 
-- **`ADR--MSP-OBSIDIAN-INTEGRATION`** mentions `OBSIDIAN_URL` as the canonical env name — kept as-is. The 3.5.6 adapter takes `baseUrl` constructor arg, but MSP's `src/obsidian/env.ts` reads `OBSIDIAN_URL` from env independently. This is MSP's own convention layered on top; it works regardless of GKS env conventions. Forward-compatible with 3.6.0's `.env.example`.
+- **`[[ADR--MSP-OBSIDIAN-INTEGRATION]]`** mentions `OBSIDIAN_URL` as the canonical env name — kept as-is. The 3.5.6 adapter takes `baseUrl` constructor arg, but MSP's `src/obsidian/env.ts` reads `OBSIDIAN_URL` from env independently. This is MSP's own convention layered on top; it works regardless of GKS env conventions. Forward-compatible with 3.6.0's `.env.example`.
 
 - **GKS upstream proposals 01–04** not retrofitted with version notes — they target features that don't exist in either 3.5.6 OR 3.6.0 source (phase: 6 acceptance, verify-flow flag, backlinks API, SC parity docs). They're future work either way.
 
@@ -109,9 +109,15 @@ npm run msp:index                       →  100 atoms indexed
 | Task | When | Owner |
 |---|---|---|
 | Submit proposal 05 to GKS maintainer along with 01–04 (see `upstream/gks-proposals/SUBMISSION.md`) | post-merge | human |
-| Once GKS 3.6.0 publishes → bump installed version, remove Status note from ADR--EMBEDDING-MODEL-PARITY, remove fallback section | post-publish | next milestone |
+| Once GKS 3.6.0 publishes → bump installed version, remove Status note from [[ADR--EMBEDDING-MODEL-PARITY]], remove fallback section | post-publish | next milestone |
 | Consider adding `gks-symbol-resolves` validator rule | M8 | M8 backlog |
 
 ## Source
 
 User direction "validate ทั้ง 2 repo ให้ตรงกัน + ทำ version control" during PR #9 + PR #12 merge prep. Cross-checked installed `@freshair129/gks@3.5.6` against `/tmp/GksV3/` (3.6.0 dev checkout) on 2026-05-04.
+
+## Connections
+- [[ADR--GRAPH-IS-GKS-DOMAIN]]
+- [[CONCEPT--EMBEDDING-STRATEGY]]
+- [[AUDIT--M7-PREP-FOLLOWUP]]
+

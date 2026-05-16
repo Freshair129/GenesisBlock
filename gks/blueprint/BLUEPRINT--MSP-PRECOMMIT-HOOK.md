@@ -96,3 +96,8 @@ T1 DETECT-STAGED-MD (the regex + git diff --cached invocation)
 T2 RUN-VALIDATOR (the loop calling `npm run msp:validate`)
 T3 SUMMARISE-FAILURES (re-run without --silent + count + exit code)
 T4 INSTALL-HELPER (idempotent installer with marker comment)
+
+## Connections
+- [[FEAT--MSP-PRECOMMIT-HOOK]]
+- [[ADR--MSP-PRECOMMIT-HOOK]]
+

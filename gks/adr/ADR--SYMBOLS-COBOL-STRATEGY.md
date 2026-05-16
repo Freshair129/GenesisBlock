@@ -21,7 +21,7 @@ created_at: 2026-05-12T05:00:00.000+07:00
 
 ## Context
 
-ความต้องการรองรับภาษา COBOL (ตาม `FEAT--SYMBOLS-MULTI-LANG`) มีวัตถุประสงค์หลักเพื่อการสืบค้นความสัมพันธ์เชิงสถาปัตยกรรม (High-level call mapping) ในระบบ Legacy
+ความต้องการรองรับภาษา COBOL (ตาม `[[FEAT--SYMBOLS-MULTI-LANG]]`) มีวัตถุประสงค์หลักเพื่อการสืบค้นความสัมพันธ์เชิงสถาปัตยกรรม (High-level call mapping) ในระบบ Legacy
 
 ตัวเลือกที่พิจารณา:
 1. **Tree-sitter-cobol:** ใช้ grammar ที่สมบูรณ์
@@ -51,3 +51,8 @@ created_at: 2026-05-12T05:00:00.000+07:00
 
 - **Positive:** เริ่มต้นใช้งานได้ทันที, โค้ดเบาและไม่มี dependencies เพิ่ม
 - **Negative:** ไม่สามารถวิเคราะห์ Data Flow เชิงลึกหรือโครงสร้างข้อมูลที่ซับซ้อนได้ หากในอนาคตต้องการรายละเอียดมากขึ้น จะพิจารณาเปลี่ยนไปใช้ Tree-sitter ในเฟสถัดไป
+
+## Connections
+- [[FRAMEWORK--SYMBOL-GRAPH]]
+- [[CONCEPT--SYMBOL-GRAPH]]
+

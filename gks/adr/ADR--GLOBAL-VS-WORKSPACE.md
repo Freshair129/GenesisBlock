@@ -22,7 +22,7 @@ created_at: 2026-05-09T07:00:00.000+07:00
 
 ## Context
 
-`CONCEPT--AGENT-AGNOSTIC` declares MSP must be pluggable into any cognitive-layer client (Claude Code, Gemini CLI, Antigravity, Hermes, openclaw, EVA). Each of those clients already follows a **global root + per-project workspace** pattern:
+`[[CONCEPT--AGENT-AGNOSTIC]]` declares MSP must be pluggable into any cognitive-layer client (Claude Code, Gemini CLI, Antigravity, Hermes, openclaw, EVA). Each of those clients already follows a **global root + per-project workspace** pattern:
 
 | Client | Global root | Per-project |
 |---|---|---|
@@ -31,10 +31,10 @@ created_at: 2026-05-09T07:00:00.000+07:00
 | EVA | `~/.eva/` | per-project workspace |
 | git (analogous) | `~/.gitconfig` | `./.git/config` |
 
-Today, MSP has **no global root**. All state lives in workspace under `.brain/msp/projects/<namespace>/` (per `ADR--PATH-ENCODING`). That layout works for a single-project agent, but breaks the moment a user runs MSP from two cwd's with the same identity:
+Today, MSP has **no global root**. All state lives in workspace under `.brain/msp/projects/<namespace>/` (per `[[ADR--PATH-ENCODING]]`). That layout works for a single-project agent, but breaks the moment a user runs MSP from two cwd's with the same identity:
 
 - Identity (`name`, `role`, `voice`, `preferences`) is duplicated per-project — change in one workspace doesn't reach the other.
-- No place to register multiple projects (`CONCEPT--NAMED-PROJECT-REGISTRY` needs `~/.msp/projects.yaml`).
+- No place to register multiple projects (`[[CONCEPT--NAMED-PROJECT-REGISTRY]]` needs `~/.msp/projects.yaml`).
 - Cross-project audit / search has nowhere to live.
 
 We need to decide what's global, what's workspace, and how the resolver merges them.
@@ -47,7 +47,7 @@ We need to decide what's global, what's workspace, and how the resolver merges t
 |---|---|---|
 | **Identity (profile, voice)** | Global `~/.msp/identity.json` | User identity is user-level, not project-level. Same human across projects. |
 | **Preferences** (default model, embedder choice, retrieval defaults) | Global `~/.msp/preferences.json` | Apply across projects; per-project override allowed. |
-| **Projects registry** | Global `~/.msp/projects.yaml` | Per `CONCEPT--NAMED-PROJECT-REGISTRY`. |
+| **Projects registry** | Global `~/.msp/projects.yaml` | Per `[[CONCEPT--NAMED-PROJECT-REGISTRY]]`. |
 | **Cross-project audit** | Global `~/.msp/audit/<date>.jsonl` | Records cross-project recall, identity edits, registry changes. |
 | **Sessions** (per-turn JSONL) | Workspace `./.brain/msp/projects/<ns>/sessions/*.jsonl` | Conversation is per-project by definition. |
 | **Episodic memory** | Workspace `./.brain/msp/projects/<ns>/memory/episodic_memory.json` | Project-specific context. |
@@ -69,7 +69,7 @@ We need to decide what's global, what's workspace, and how the resolver merges t
 
 **Projects registry**:
 
-- Resolved per `CONCEPT--NAMED-PROJECT-REGISTRY` (CLI flag → env → `.mspconfig` → fallback `default`).
+- Resolved per `[[CONCEPT--NAMED-PROJECT-REGISTRY]]` (CLI flag → env → `.mspconfig` → fallback `default`).
 - Registry path is fixed at `~/.msp/projects.yaml` (or `$MSP_HOME/projects.yaml` if `MSP_HOME` env is set, for testing / sandbox).
 
 ### `MSP_HOME` env
@@ -97,7 +97,7 @@ Existing workspaces have `./.brain/msp/projects/<ns>/identity.json`. After this 
 2. **Old workspace `identity.json`** is preserved (not deleted) but marked deprecated; a future major version may remove the migration shim.
 3. **Existing `evaAI` namespace** — registered as `default` project in `~/.msp/projects.yaml` automatically on first run if registry is empty.
 
-Migration code lives in `src/identity/migrate.ts` (to be written per `BLUEPRINT--GLOBAL-VS-WORKSPACE-MIGRATION`); runs idempotently on every `readIdentity` until both sides agree.
+Migration code lives in `src/identity/migrate.ts` (to be written per `[[BLUEPRINT--GLOBAL-VS-WORKSPACE-MIGRATION]]`); runs idempotently on every `readIdentity` until both sides agree.
 
 ## Consequences
 
@@ -114,11 +114,15 @@ Migration code lives in `src/identity/migrate.ts` (to be written per `BLUEPRINT-
 
 ## Alternatives considered
 
-1. **Identity per-project always** — what we have today. Rejected: doesn't scale to multi-project users; defeats `CONCEPT--AGENT-AGNOSTIC`.
+1. **Identity per-project always** — what we have today. Rejected: doesn't scale to multi-project users; defeats `[[CONCEPT--AGENT-AGNOSTIC]]`.
 2. **Identity global only, no override** — simpler. Rejected: a user might want different voice ("formal Thai") for clinic-project vs casual for self-project. Override is opt-in (only created if user calls `msp_identity_set --scope=project`).
 3. **XDG-only paths** — Linux-correct. Rejected: cross-platform inconsistency; doesn't match peer clients (`~/.claude`, `~/.gemini`).
 4. **Sessions in global too** (cross-project session log) — Rejected: conversations are project-scoped; merging them creates noise. Cross-project audit (which does live globally) is the right primitive for "what did I do across projects".
 
 ## Source
 
-Phase B of architecture-doc cleanup (2026-05-09). Driven by `CONCEPT--AGENT-AGNOSTIC` requirement that MSP plug into any cognitive-layer client. `~/.claude` / `~/.gemini` / `~/.eva` patterns are direct references. Path resolution mirrors `git`'s global-vs-local config model.
+Phase B of architecture-doc cleanup (2026-05-09). Driven by `[[CONCEPT--AGENT-AGNOSTIC]]` requirement that MSP plug into any cognitive-layer client. `~/.claude` / `~/.gemini` / `~/.eva` patterns are direct references. Path resolution mirrors `git`'s global-vs-local config model.
+
+## Connections
+- [[FRAMEWORK--MSP-ARCHITECTURE-V2]]
+

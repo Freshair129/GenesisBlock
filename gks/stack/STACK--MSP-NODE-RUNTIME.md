@@ -37,3 +37,7 @@ created_at: 2026-05-14T20:20:00+07:00
 - `better-sqlite3`: Native bindings for high-performance symbol storage.
 - `yaml`: Parser for atomic frontmatter.
 - `zod`: Type-safe schema validation.
+
+## Connections
+- [[FRAMEWORK--MSP-ARCHITECTURE-V2]]
+

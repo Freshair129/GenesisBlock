@@ -98,4 +98,8 @@ Default 120 s via `AbortSignal.timeout(120_000)`. Tunable via `opts.timeoutMs`. 
 
 ## Source
 
-`CONCEPT--SLM-OLLAMA-CLIENT` + Ollama HTTP API docs (`/api/generate` endpoint).
+`[[CONCEPT--SLM-OLLAMA-CLIENT]]` + Ollama HTTP API docs (`/api/generate` endpoint).
+
+## Connections
+- [[ADR--CODEGEN-RETRY-POLICY]]
+

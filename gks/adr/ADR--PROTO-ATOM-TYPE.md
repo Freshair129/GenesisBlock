@@ -21,7 +21,7 @@ created_at: 2026-05-05T16:18:00.000+07:00
 
 ## Context
 
-We need a way to encode governance rules as machine-checkable contracts (per `CONCEPT--PROTO-PATTERN`). Three placement options:
+We need a way to encode governance rules as machine-checkable contracts (per `[[CONCEPT--PROTO-PATTERN]]`). Three placement options:
 
 1. **Inside FRAME atoms** — extend FRAME with `## Predicate` section + linked TS file. FRAMEs become both descriptive and prescriptive.
 2. **As ADRs with a special tag** — `ADR-- + tag: governance-rule` plus a convention for the implementation file.
@@ -116,4 +116,9 @@ Same as other atoms: `draft | stable | superseded`. A draft PROTO does NOT block
 
 ## Source
 
-`CONCEPT--PROTO-PATTERN`, `msp_spec.md` §10, user direction during all-M planning (M8 governance protocol layer).
+`[[CONCEPT--PROTO-PATTERN]]`, `msp_spec.md` §10, user direction during all-M planning (M8 governance protocol layer).
+
+## Connections
+- [[CONCEPT--ATOMIC-WRITE-CONTRACT]]
+- [[ADR--FORBIDDEN-FIELDS-LIST]]
+

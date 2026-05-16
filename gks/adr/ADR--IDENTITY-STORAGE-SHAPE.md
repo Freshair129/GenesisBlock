@@ -89,8 +89,8 @@ A separate `prunePreferences()` helper does eager cleanup, called optionally by 
 Three reasons:
 
 1. **Lifecycle mismatch** — atoms have `valid_until` semantics + supersede chains; identity doesn't supersede, it mutates in place
-2. **Churn** — preferences could change per-session; atoms have settling time per `ADR--GRAPH-IS-GKS-DOMAIN`
-3. **Scope** — `ADR--GRAPH-IS-GKS-DOMAIN` already establishes that execution state lives outside `gks/`. Identity is execution state
+2. **Churn** — preferences could change per-session; atoms have settling time per `[[ADR--GRAPH-IS-GKS-DOMAIN]]`
+3. **Scope** — `[[ADR--GRAPH-IS-GKS-DOMAIN]]` already establishes that execution state lives outside `gks/`. Identity is execution state
 
 Same reason TASK-- left the atomic taxonomy (per ADR-015 referenced in `MSP_RELATIONSHIP.md`).
 
@@ -132,4 +132,4 @@ Identity isn't human-edited often. JSON's unambiguous parsing + native Node supp
 
 ## Source
 
-`msp_spec.md` §7e, `CONCEPT--IDENTITY-LAYER`, `ADR--GRAPH-IS-GKS-DOMAIN` (execution state vs durable knowledge boundary).
+`msp_spec.md` §7e, `[[CONCEPT--IDENTITY-LAYER]]`, `[[ADR--GRAPH-IS-GKS-DOMAIN]]` (execution state vs durable knowledge boundary).

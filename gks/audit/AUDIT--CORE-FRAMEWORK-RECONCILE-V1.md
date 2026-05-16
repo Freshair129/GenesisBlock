@@ -40,15 +40,15 @@ The spec was originally written as a **generic boilerplate** for forking into ot
 | 4 | §15.1 | Bin entries (5 bins) added as a paragraph after the script table |
 | 5 | §4.2.1 / §4.10 / §4.4 footer | Generic-boilerplate folders (ideas/, algorithms/, entities/, flows/, modules/, parameters/, ops/, devlog/) and `00_MASTER_DASHBOARD.md` flagged as aspirational with explicit notes |
 | 6 | §4.2 directory tree | Added `master/`, `proto/`, `task/`, `issues/`, `audit/` (the 3-tier-model + governance artefacts that the audit confirmed exist) |
-| 7 | §10.5 ownership table | Replaced legacy `gks/algorithms/* ฯลฯ` row with explicit "every `gks/<type>/*` goes via `msp_candidate` per `ADR--AGENT-WRITE-BOUNDARIES`"; dropped `devlog/` row |
+| 7 | §10.5 ownership table | Replaced legacy `gks/algorithms/* ฯลฯ` row with explicit "every `gks/<type>/*` goes via `msp_candidate` per `[[ADR--AGENT-WRITE-BOUNDARIES]]`"; dropped `devlog/` row |
 | 8 | §18 bootstrap | Rewrote `mkdir -p` command to MSP-actual layout |
 | 9 | EOF note | Updated example folder names |
 
 ## Deferred (separate PRs)
 
-- **W3 — phase/status vocab** (§4.1, §7.3): spec uses P0–P7 + `stub/raw/verified`; reality uses `draft/stable/superseded/deprecated`. Not done in this PR — needs a thoughtful rewrite of §4.1 to align with `FRAMEWORK--PHASE-GOVERNANCE` semantics.
+- **W3 — phase/status vocab** (§4.1, §7.3): spec uses P0–P7 + `stub/raw/verified`; reality uses `draft/stable/superseded/deprecated`. Not done in this PR — needs a thoughtful rewrite of §4.1 to align with `[[FRAMEWORK--PHASE-GOVERNANCE]]` semantics.
 - **W3 — forbidden/required fields** (§7.3): point to `.brain/msp/LLM_Contract/atomic_contract.yaml` as SSOT and update example to show actual 17 forbidden fields. Not urgent — the example values shown happen to be a valid (if incomplete) subset.
-- **W4 — `FRAMEWORK--AUTHORITY-MATRIX.md` atom edit**: still references inbound legacy `/submit-memory → inbound queue`. Atom edit is out-of-scope for spec audit but is the next reconciliation target.
+- **W4 — `[[FRAMEWORK--AUTHORITY-MATRIX]].md` atom edit**: still references inbound legacy `/submit-memory → inbound queue`. Atom edit is out-of-scope for spec audit but is the next reconciliation target.
 
 ## Verification
 
@@ -61,12 +61,12 @@ The spec was originally written as a **generic boilerplate** for forking into ot
 ## Atom contradiction checklist
 
 - ✅ This AUDIT atom is additive; no supersession
-- ✅ References `FRAMEWORK--MSP-ARCHITECTURE-V2`, `FRAMEWORK--KNOWLEDGE-3-TIER`, `ADR--AGENT-WRITE-BOUNDARIES` — all stable
+- ✅ References `[[FRAMEWORK--MSP-ARCHITECTURE-V2]]`, `[[FRAMEWORK--KNOWLEDGE-3-TIER]]`, `[[ADR--AGENT-WRITE-BOUNDARIES]]` — all stable
 - ✅ No claims about anything that contradicts another stable atom
 
 ## Lesson
 
-The "boilerplate-vs-actual" gap accumulates silently when the spec gets editorial touchups (e.g. §3.6 added in PR-6) without revisiting earlier sections. A future task: add a `PROTO--CORE-FRAMEWORK-DRIFT-CHECK` predicate that grep's the spec for path strings and verifies they exist in the repo. Logged for later — not blocking.
+The "boilerplate-vs-actual" gap accumulates silently when the spec gets editorial touchups (e.g. §3.6 added in PR-6) without revisiting earlier sections. A future task: add a `[[PROTO--CORE-FRAMEWORK-DRIFT-CHECK]]` predicate that grep's the spec for path strings and verifies they exist in the repo. Logged for later — not blocking.
 
 ## Source
 

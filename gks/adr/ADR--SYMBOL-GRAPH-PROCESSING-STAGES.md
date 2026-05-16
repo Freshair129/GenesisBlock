@@ -18,7 +18,7 @@ created_at: 2026-05-13T19:46:00.000+07:00
 
 # ADR — Symbol Graph Processing Stages
 
-> Alias: this ADR formalises the stage breakdown of **Block Decomposition** — the top-down half of the Genesis Block Cycle. See `docs/gks/PRD--GENESIS-BLOCK-CYCLE.md` for the unified vocabulary.
+> Alias: this ADR formalises the stage breakdown of **Block Decomposition** — the top-down half of the Genesis Block Cycle. See `docs/gks/[[PRD--GENESIS-BLOCK-CYCLE]].md` for the unified vocabulary.
 
 ## Context
 ในการสร้าง Symbol Graph ที่มีความหมายเชิงสถาปัตยกรรม (Architectural Meaning) การสกัดเพียงแค่ AST (Abstract Syntax Tree) ไม่เพียงพอต่อการทำความเข้าใจความสัมพันธ์ที่ซับซ้อน เช่น ลำดับชั้นการสืบทอด, ระบบ Routing ของ Framework, และการไหลของข้อมูลระหว่างไฟล์
@@ -39,3 +39,8 @@ created_at: 2026-05-13T19:46:00.000+07:00
 - **Negative:** ใช้ทรัพยากรในการประมวลผลครั้งแรกสูง (Initial Indexing Cost) แต่จะคุ้มค่าในการ Query ครั้งต่อๆ ไป
 - **Positive:** ข้อมูลจาก Stage 12 (Processes) เป็นปัจจัยหลักที่ป้อนเข้าสู่ **MLL (Meta Learning Loop)** เพื่อใช้ในการสร้าง Skill อัตโนมัติและตรวจจับ Tension
 - **Constraint:** ต้องรันผ่าน `GenesisGraphBackend` เพื่อประสิทธิภาพในการจัดการความสัมพันธ์เชิงลึก
+
+## Connections
+- [[CONCEPT--SYMBOL-GRAPH-PIPELINE]]
+- [[FRAMEWORK--SYMBOL-GRAPH]]
+

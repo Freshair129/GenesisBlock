@@ -106,7 +106,7 @@ If `opts.timeoutMs` is set, it overrides the sum and per-source budgets are scal
 
 **Negative**
 - RRF discards score magnitude — a vector hit at cosine 0.99 vs 0.71 contributes the same if both rank #1 in vector. Acceptable trade-off given heterogeneous sources.
-- Default weights are gut-feel. Tuning needs real query data (M9 work via `PARAM--RETRIEVAL-WEIGHTS`).
+- Default weights are gut-feel. Tuning needs real query data (M9 work via `[[PARAM--RETRIEVAL-WEIGHTS]]`).
 - `k=60` is also gut-feel from literature. Same caveat.
 
 ## Alternatives considered
@@ -118,7 +118,7 @@ If `opts.timeoutMs` is set, it overrides the sum and per-source budgets are scal
 
 ## What this ADR does NOT decide
 
-- **Source list / source names** — see `CONCEPT--RETRIEVAL-ORCHESTRATION`
+- **Source list / source names** — see `[[CONCEPT--RETRIEVAL-ORCHESTRATION]]`
 - **Cancel-on-budget vs run-to-completion** — see BLUEPRINT (decision: cancel-on-budget per source, total budget is the floor)
 - **Default `topK`** — 10 unless `opts.topK` overrides; caller's choice
 - **Snippet selection** — see BLUEPRINT (decision: source-provided snippet preserved; no re-extraction)
@@ -126,4 +126,9 @@ If `opts.timeoutMs` is set, it overrides the sum and per-source budgets are scal
 
 ## Source
 
-`msp_spec.md` §7c, `CONCEPT--RETRIEVAL-ORCHESTRATION`, classic Cormack et al. 2009 (Reciprocal Rank Fusion) + practical IR experience.
+`msp_spec.md` §7c, `[[CONCEPT--RETRIEVAL-ORCHESTRATION]]`, classic Cormack et al. 2009 (Reciprocal Rank Fusion) + practical IR experience.
+
+## Connections
+- [[CONCEPT--EMBEDDING-STRATEGY]]
+- [[ADR--EMBEDDING-MODEL-PARITY]]
+

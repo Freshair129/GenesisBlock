@@ -61,3 +61,8 @@ We have to pick one and harmonise.
 ## Source
 
 `msp_spec.md` §12 (Project Path Encoding) — explicitly flagged as an open issue in §15.
+
+## Connections
+- [[FRAMEWORK--MSP-ARCHITECTURE-V2]]
+- [[CONCEPT--TAXONOMY-V2-3]]
+

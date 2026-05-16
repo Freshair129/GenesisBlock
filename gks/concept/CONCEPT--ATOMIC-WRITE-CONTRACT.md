@@ -24,12 +24,12 @@ Every file in `gks/<type>/` obeys a single schema: required frontmatter fields, 
 
 | Part | Source | Atom |
 |---|---|---|
-| Required fields | §4.1 | `ADR--ATOMIC-CONTRACT-SCHEMA` (TBD M3) |
+| Required fields | §4.1 | `[[ADR--ATOMIC-CONTRACT-SCHEMA]]` (TBD M3) |
 | Conditional fields | §4.2 | same |
-| Forbidden fields | §4.3 | `ADR--FORBIDDEN-FIELDS-LIST` |
+| Forbidden fields | §4.3 | `[[ADR--FORBIDDEN-FIELDS-LIST]]` |
 | Field constraints | §4.4 | same |
-| Anti-hallucination rules | §4.5 | `ADR--ANTI-HALLUCINATION-RULES` |
-| Epistemic + crosslinks block | §4.6 | `CONCEPT--EPISTEMIC-METADATA` + `FRAMEWORK--CROSSLINKS-VOCABULARY` |
+| Anti-hallucination rules | §4.5 | `[[ADR--ANTI-HALLUCINATION-RULES]]` |
+| Epistemic + crosslinks block | §4.6 | `[[CONCEPT--EPISTEMIC-METADATA]]` + `[[FRAMEWORK--CROSSLINKS-VOCABULARY]]` |
 | **Codegen Contract** | §5 | [[CONCEPT--CODEGEN-MICROTASK-CONTRACT]] (Sibling contract) |
 
 ## What "atomic" means here
@@ -38,7 +38,7 @@ An *atom* in MSP terminology is a single markdown file under `gks/<type>/<ID>.md
 
 1. **A frontmatter block** between two `---` delimiters with declarative metadata (id, phase, type, status, vault_id, summary, created_at/by, optional crosslinks/linked_symbols/geography).
 2. **A body** in markdown that humans can read.
-3. **A unique ID** that matches the filename and the canonical pattern (`TYPE--SLUG` uppercase, or `ADR-NNN` numeric).
+3. **A unique ID** that matches the filename and the canonical pattern (`[[TYPE--SLUG]]` uppercase, or `ADR-NNN` numeric).
 
 Atoms are **content-addressable through the index** — `gks/00_index/atomic_index.jsonl` is a derived flat list of every atom's frontmatter (rebuilt by `npm run msp:index`).
 
@@ -55,3 +55,7 @@ Without one, four predictable failure modes appear (see [[CONCEPT--KNOWLEDGE-LAY
 ## Source
 
 `msp_spec.md` §4 (Atomic Write Contract).
+
+## Connections
+- [[FRAMEWORK--MSP-ARCHITECTURE-V2]]
+

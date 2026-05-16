@@ -74,7 +74,7 @@ binary `.db` file with columnar indexing and Cypher query support.
 
 The Parser (Markdown / YAML / Wikilinks) and the MCP surface stay
 **outside** the engine — MSP already owns those. Bundling them inside
-the engine would re-create the layer violation `ADR--GRAPH-IS-GKS-DOMAIN`
+the engine would re-create the layer violation `[[ADR--GRAPH-IS-GKS-DOMAIN]]`
 warns against.
 
 ## Why fork LadybugDB rather than wrap an existing graph DB
@@ -144,4 +144,8 @@ This atom records intent. It does **not** decide:
 4. **Where does `genesis-block-node` live in the monorepo?** Sub-package
    inside `packages/gks/native/`, or peer at `packages/genesis-block/`?
 
-These are decided in `ADR--GENESIS-GRAPH-AS-GKS-BACKEND`.
+These are decided in `[[ADR--GENESIS-GRAPH-AS-GKS-BACKEND]]`.
+
+## Connections
+- [[FRAMEWORK--MSP-ARCHITECTURE-V2]]
+

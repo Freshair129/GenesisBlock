@@ -25,24 +25,24 @@ phase_override:
 created_at: 2026-05-05T18:00:00.000+07:00
 ---
 
-# M8b — PROTO--PHASE-GATES (draft)
+# M8b — [[PROTO--PHASE-GATES]] (draft)
 
 ## Scope
 
-Implements `CONCEPT--PROTO-PHASE-GATES` as a PROTO predicate plugged into
+Implements `[[CONCEPT--PROTO-PHASE-GATES]]` as a PROTO predicate plugged into
 the M8a loader. Mechanises the doc-to-code phase order from
-`FRAMEWORK--PHASE-GOVERNANCE`.
+`[[FRAMEWORK--PHASE-GOVERNANCE]]`.
 
 ## What shipped
 
 | File | Purpose |
 |---|---|
 | `src/validator/proto/phase-gates.ts` | Predicate impl (default export) |
-| `gks/proto/PROTO--PHASE-GATES.md` | PROTO atom — `status: draft`, `severity: error`, enforces FRAMEWORK--PHASE-GOVERNANCE |
+| `gks/proto/[[PROTO--PHASE-GATES]].md` | PROTO atom — `status: draft`, `severity: error`, enforces [[FRAMEWORK--PHASE-GOVERNANCE]] |
 | `test/validator/proto/phase-gates.test.ts` | 9 tests covering the predicate |
-| `gks/audit/AUDIT--PHASE-GATES-PROTO.md` | This file |
+| `gks/audit/[[AUDIT--PHASE-GATES-PROTO]].md` | This file |
 
-## Rule (per CONCEPT--PROTO-PHASE-GATES)
+## Rule (per [[CONCEPT--PROTO-PHASE-GATES]])
 
 1. **Hard error** — every phase-5 / phase-6 atom (FEAT or AUDIT) that
    writes code via `linked_symbols` must be preceded by a phase-3
@@ -87,7 +87,7 @@ opting out via `phase_override.skip_blueprint`.
    acceptable cost (only the violators are read; healthy atoms never
    trigger disk I/O).
 
-2. **Phase 5 OR 6 + type FEAT or AUDIT** — `CONCEPT--PROTO-PHASE-GATES`
+2. **Phase 5 OR 6 + type FEAT or AUDIT** — `[[CONCEPT--PROTO-PHASE-GATES]]`
    says "phase-5 atom (FEAT/AUDIT writing code)"; the prompt explicitly
    includes phase-6 AUDITs. In this repo FEATs sit at phase 2 and AUDITs
    at 5/6 — the predicate handles both.
@@ -95,7 +95,7 @@ opting out via `phase_override.skip_blueprint`.
 3. **Coverage = "≥1 file in common"** — a BLUEPRINT can cover an AUDIT
    even if the AUDIT lists more `linked_symbols` (e.g. tests added
    later). The AUDIT just needs *some* overlap with a BLUEPRINT. This
-   matches the spirit of CONCEPT--PROTO-PHASE-GATES ("a phase-3
+   matches the spirit of [[CONCEPT--PROTO-PHASE-GATES]] ("a phase-3
    BLUEPRINT atom whose linked_symbols includes X").
 
 4. **Soft-warning ADR check** — only inspects `crosslinks.references`,
@@ -124,7 +124,7 @@ opting out via `phase_override.skip_blueprint`.
 
 ## Counts
 
-- Atoms 144 → 145 (+1: PROTO--PHASE-GATES) → 146 (+1: this AUDIT)
+- Atoms 144 → 145 (+1: [[PROTO--PHASE-GATES]]) → 146 (+1: this AUDIT)
 - Tests 498 → 507 (+9)
 
 ## Hard constraints honoured
@@ -139,4 +139,4 @@ opting out via `phase_override.skip_blueprint`.
 
 ## Source
 
-`CONCEPT--PROTO-PHASE-GATES`, `FRAMEWORK--PHASE-GOVERNANCE`, `FEAT--PROTO-LOADER`, `BLUEPRINT--PROTO-LOADER`, `CONCEPT--PROTO-PATTERN`.
+`[[CONCEPT--PROTO-PHASE-GATES]]`, `[[FRAMEWORK--PHASE-GOVERNANCE]]`, `[[FEAT--PROTO-LOADER]]`, `[[BLUEPRINT--PROTO-LOADER]]`, `[[CONCEPT--PROTO-PATTERN]]`.

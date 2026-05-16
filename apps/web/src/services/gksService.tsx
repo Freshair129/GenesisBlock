@@ -108,6 +108,44 @@ export function renderBody(body: string, onOpen?: (id: string) => void): React.J
     return out;
   }
 
+export function getGraphWithTags(notes: Note[], edges: Edge[], showTags: boolean, showOrphans: boolean) {
+  let resultNotes = [...notes];
+  let resultEdges = [...edges];
+
+  if (showTags) {
+    const tagSet = new Set<string>();
+    notes.forEach(n => n.tags?.forEach(t => tagSet.add(t)));
+    
+    tagSet.forEach(tagName => {
+      const tagId = `tag:${tagName}`;
+      resultNotes.push({
+        id: tagId,
+        title: `#${tagName}`,
+        type: 'concept' as any, // Virtual type
+        tags: [],
+        body: `Virtual tag node for ${tagName}`
+      });
+      
+      notes.forEach(n => {
+        if (n.tags?.includes(tagName)) {
+          resultEdges.push({ source: tagId, target: n.id });
+        }
+      });
+    });
+  }
+
+  if (!showOrphans) {
+    const connected = new Set<string>();
+    resultEdges.forEach(e => {
+      connected.add(e.source);
+      connected.add(e.target);
+    });
+    resultNotes = resultNotes.filter(n => connected.has(n.id));
+  }
+
+  return { notes: resultNotes, edges: resultEdges };
+}
+
 export const GKS_SERVICE = {
   TYPE_META,
   D: GKS_DATA,
@@ -119,5 +157,6 @@ export const GKS_SERVICE = {
   bagFor,
   bagCosine,
   renderInline,
-  renderBody
+  renderBody,
+  getGraphWithTags
 };

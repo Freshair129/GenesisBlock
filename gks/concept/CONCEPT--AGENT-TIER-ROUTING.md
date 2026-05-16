@@ -52,7 +52,7 @@ else                          → T2 (default cloud tier)
 
 ## Escalation
 
-A task that fails T1 escalates **once** to T2 (and once more to T3 if `severity≥regular`). After escalation, the result is persisted as a "lesson" atom so the next equivalent task starts at the higher tier — see `ADR--AGENT-TIER-COST-POLICY`.
+A task that fails T1 escalates **once** to T2 (and once more to T3 if `severity≥regular`). After escalation, the result is persisted as a "lesson" atom so the next equivalent task starts at the higher tier — see `[[ADR--AGENT-TIER-COST-POLICY]]`.
 
 ## What this concept is NOT
 
@@ -62,6 +62,10 @@ A task that fails T1 escalates **once** to T2 (and once more to T3 if `severity�
 
 ## Related
 
-- `ADR--AGENT-TIER-COST-POLICY` — concrete escalation + budget rules
-- `BLUEPRINT--AGENT-DISPATCHER` — implementation plan
-- `CONCEPT--AGENT-AGNOSTIC` — sibling principle: MSP must work with any agent CLI
+- `[[ADR--AGENT-TIER-COST-POLICY]]` — concrete escalation + budget rules
+- `[[BLUEPRINT--AGENT-DISPATCHER]]` — implementation plan
+- `[[CONCEPT--AGENT-AGNOSTIC]]` — sibling principle: MSP must work with any agent CLI
+
+## Connections
+- [[FRAMEWORK--MSP-ARCHITECTURE-V2]]
+

@@ -27,13 +27,13 @@ phase_override:
 created_at: 2026-05-05T18:11:00.000+07:00
 ---
 
-# AUDIT — PROTO--ALGO-PARAM-COUPLING (M8d)
+# AUDIT — [[PROTO--ALGO-PARAM-COUPLING]] (M8d)
 
 ## Scope
 
 Closes M8d Tier 2 governance PROTO. Implements the bi-directional
 `tunes` ↔ `tunable_by` reciprocal validator declared in
-`CONCEPT--PROTO-ALGO-PARAM-COUPLING`. Built atop the M8a PROTO loader
+`[[CONCEPT--PROTO-ALGO-PARAM-COUPLING]]`. Built atop the M8a PROTO loader
 foundation; no shared infrastructure modified.
 
 ## Acceptance criteria from CONCEPT
@@ -43,7 +43,7 @@ foundation; no shared infrastructure modified.
 | 1 | `tunable_by` values are `PARAM--*` ids (type-pairing) | done — predicate flags non-PARAM refs as severity:error |
 | 2 | `tunes` values are `ALGO--*` ids (type-pairing) | done — predicate flags non-ALGO refs as severity:error |
 | 3 | Reciprocal back-link present in partner atom | done — emits an error when partner is in index but lacks the reciprocal |
-| 4 | Existence checks delegated to GKS (per `ADR--GRAPH-IS-GKS-DOMAIN`) | done — predicate skips reciprocal check when partner missing from index |
+| 4 | Existence checks delegated to GKS (per `[[ADR--GRAPH-IS-GKS-DOMAIN]]`) | done — predicate skips reciprocal check when partner missing from index |
 | 5 | Vacuous-pass on repos with zero ALGO/PARAM atoms | done — covered by test |
 | 6 | Multi-PARAM ALGO has every reciprocal independently checked | done — covered by test |
 
@@ -52,7 +52,7 @@ foundation; no shared infrastructure modified.
 | File | Purpose |
 |---|---|
 | `src/validator/proto/algo-param-coupling.ts` | Predicate impl; default-exports `Predicate` |
-| `gks/proto/PROTO--ALGO-PARAM-COUPLING.md` | PROTO atom; `status: draft`, `severity: error`, enforces `FRAMEWORK--CROSSLINKS-VOCABULARY` |
+| `gks/proto/[[PROTO--ALGO-PARAM-COUPLING]].md` | PROTO atom; `status: draft`, `severity: error`, enforces `[[FRAMEWORK--CROSSLINKS-VOCABULARY]]` |
 | `test/validator/proto/algo-param-coupling.test.ts` | 7 tests (vacuous, ok, wrong-reciprocal, type-mismatch ×2, missing-partner, multi-PARAM) |
 
 ## Test summary
@@ -84,9 +84,9 @@ as `draft` to:
 
 `shouldFailExit()` skips draft PROTOs, so this cannot regress CI.
 
-## Boundary check (per ADR--GRAPH-IS-GKS-DOMAIN)
+## Boundary check (per [[ADR--GRAPH-IS-GKS-DOMAIN]])
 
-Existence (does `PARAM--X` actually exist?) is **NOT** checked here —
+Existence (does `[[PARAM--X]]` actually exist?) is **NOT** checked here —
 deliberately. `gks validate --links` runs against the canonical store
 and catches missing crosslink targets. This PROTO only enforces the
 type/reciprocal invariant when both ends are visible in the index.
@@ -104,7 +104,12 @@ accidentally double-enforce.
 
 ## Source
 
-- `CONCEPT--PROTO-ALGO-PARAM-COUPLING` (rule + scope)
-- `ADR--GRAPH-IS-GKS-DOMAIN` (boundary)
-- `FRAMEWORK--CROSSLINKS-VOCABULARY` (the FRAME this PROTO mechanises)
+- `[[CONCEPT--PROTO-ALGO-PARAM-COUPLING]]` (rule + scope)
+- `[[ADR--GRAPH-IS-GKS-DOMAIN]]` (boundary)
+- `[[FRAMEWORK--CROSSLINKS-VOCABULARY]]` (the FRAME this PROTO mechanises)
 - M8a PROTO loader (`src/validator/proto/loader.ts`) — unchanged
+
+## Connections
+- [[CONCEPT--PROTO-PATTERN]]
+- [[BLUEPRINT--PROTO-LOADER]]
+

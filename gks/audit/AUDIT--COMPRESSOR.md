@@ -33,7 +33,7 @@ created_at: 2026-05-05T16:32:00.000+07:00
 
 ## Scope
 
-M7d deliverable: `compress(opts)` orchestrator implementing the three-tier (keep / trim / resummarise) shrink-to-fit pipeline per `FEAT--COMPRESSOR`, `BLUEPRINT--COMPRESSOR`, and `ADR--COMPRESSOR-THREE-TIER`. Consumes importance-scored episodes (with their turns), iterates importance-descending, and emits `CompressedEpisode[]` whose total token cost is bounded by `budgetTokens`. Pure read + transform — no persistence, no mutation.
+M7d deliverable: `compress(opts)` orchestrator implementing the three-tier (keep / trim / resummarise) shrink-to-fit pipeline per `[[FEAT--COMPRESSOR]]`, `[[BLUEPRINT--COMPRESSOR]]`, and `[[ADR--COMPRESSOR-THREE-TIER]]`. Consumes importance-scored episodes (with their turns), iterates importance-descending, and emits `CompressedEpisode[]` whose total token cost is bounded by `budgetTokens`. Pure read + transform — no persistence, no mutation.
 
 ## What shipped
 
@@ -65,11 +65,11 @@ M7d deliverable: `compress(opts)` orchestrator implementing the three-tier (keep
 
 | Atom | Phase | Type |
 |---|---|---|
-| `CONCEPT--CONTEXT-COMPRESSION` | 1 | concept (existed) |
-| `ADR--COMPRESSOR-THREE-TIER` | 2 | adr (existed) |
-| `FEAT--COMPRESSOR` | 2 | feat (existed) |
-| `BLUEPRINT--COMPRESSOR` | 3 | blueprint (existed) |
-| `AUDIT--COMPRESSOR` | 6 | audit (this atom) |
+| `[[CONCEPT--CONTEXT-COMPRESSION]]` | 1 | concept (existed) |
+| `[[ADR--COMPRESSOR-THREE-TIER]]` | 2 | adr (existed) |
+| `[[FEAT--COMPRESSOR]]` | 2 | feat (existed) |
+| `[[BLUEPRINT--COMPRESSOR]]` | 3 | blueprint (existed) |
+| `[[AUDIT--COMPRESSOR]]` | 6 | audit (this atom) |
 
 ## Verification
 
@@ -88,12 +88,12 @@ Test count delta: 397 → 435 (+38; target was +35, exceeded). Per-file breakdow
   - `resummarise.test.ts`: 12 tests (target 10 — exceeded; truncate path needed extra coverage)
   - `index.test.ts`: 13 tests (target 13)
 
-## Acceptance criteria from `FEAT--COMPRESSOR`
+## Acceptance criteria from `[[FEAT--COMPRESSOR]]`
 
 - [x] `compress(opts)` returns `CompressResult` with `compressed[]`, `totalTokensUsed`, `tierCounts`
 - [x] Total tokens ≤ `budgetTokens` — enforced; selection drops episodes when even the summary won't fit
 - [x] Importance-descending iteration — high-importance gets keep/trim, low gets resummarise/truncate/drop (verified by `index.test.ts` "iterates in importance-descending order")
-- [x] Tier choice per `ADR--COMPRESSOR-THREE-TIER`:
+- [x] Tier choice per `[[ADR--COMPRESSOR-THREE-TIER]]`:
   - whole-fits → keep
   - ≥ 30% droppable + trimmed-fits → trim
   - has llm → resummarise (target 0.6 × original, capped at remaining)
@@ -166,3 +166,7 @@ Lower-level entry points re-exported from `index.ts`: `DEFAULT_TOKENISER`, `esti
 - Implemented by: @claude-opus-4-7
 - Verified by: 38 new tests + typecheck clean + 130 atoms validate + linkcheck OK
 - Branch: `claude/msp-m7d-compressor-impl`
+
+## Connections
+- [[FRAMEWORK--MSP-ARCHITECTURE-V2]]
+

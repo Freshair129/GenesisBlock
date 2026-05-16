@@ -19,11 +19,11 @@ created_at: 2026-05-14T19:42:04.304+07:00
 
 # FEAT — Step-up auth: PIN provider
 
-> The minimal concrete `StepUpProvider` from `CONCEPT--STEP-UP-AUTH` — PIN re-entry, the homelab / single-user tier. Establishes the provider interface that Passkey and signed-token providers will later implement.
+> The minimal concrete `StepUpProvider` from `[[CONCEPT--STEP-UP-AUTH]]` — PIN re-entry, the homelab / single-user tier. Establishes the provider interface that Passkey and signed-token providers will later implement.
 
 ## User-facing behaviour
 
-The PDP (`FEAT--POLICY-DECISION-POINT`) emits `advice: ['request-step-up-auth']` on a deny. The PEP intercepts that advice and drives a `StepUpProvider`. This FEAT ships the interface plus the PIN implementation:
+The PDP (`[[FEAT--POLICY-DECISION-POINT]]`) emits `advice: ['request-step-up-auth']` on a deny. The PEP intercepts that advice and drives a `StepUpProvider`. This FEAT ships the interface plus the PIN implementation:
 
 ```ts
 interface StepUpProvider {
@@ -46,7 +46,7 @@ Behaviour contract:
 
 - **Triggered by policy, not hardcoded**: the PEP calls `challenge()` only when a `Decision` carries `advice: ['request-step-up-auth']`.
 - **Action-bound**: `challenge()` takes an `action_hash` (hash of the action payload + nonce + timestamp). `verify()` rejects a response whose `action_hash` does not match — a captured PIN proof cannot be replayed on a different action.
-- **TTL-bounded**: challenges expire (default 300s for high-sensitivity, per `CONCEPT--STEP-UP-AUTH`). Expired challenges fail `verify()`.
+- **TTL-bounded**: challenges expire (default 300s for high-sensitivity, per `[[CONCEPT--STEP-UP-AUTH]]`). Expired challenges fail `verify()`.
 - **Replay-defended**: nonces are stored server-side; a verified nonce cannot be reused.
 - **On success**: the Subject's `last_step_up_at` and `last_step_up_method` attributes update; the caller retries the original action and the PDP now permits it (a policy rule tests `last_step_up_at` against the action's TTL).
 - **PIN storage**: hashed (Argon2id), never plaintext; configured per `MSP_HOME` identity.
@@ -75,11 +75,11 @@ The HTTP PEP prompts via the web UI; the MCP PEP — for `risk: high` tools — 
 - Primary authentication (login) — spec §14 OQ-3; this FEAT is step-up only.
 - The MCP out-of-band confirmation channel implementation — spec §14 OQ-2; this FEAT assumes it exists for `risk: high` tools.
 - Risk scoring (device fingerprint, anomaly detection) — future.
-- The PDP and the policy that triggers step-up — `FEAT--POLICY-DECISION-POINT` and policy content.
+- The PDP and the policy that triggers step-up — `[[FEAT--POLICY-DECISION-POINT]]` and policy content.
 
 ## Source
 
 - `docs/msp/UNIVERSAL-CONTEXT-FRAMEWORK_spec.md` §8 — step-up mechanism table, flow, TTL guidance.
-- `CONCEPT--STEP-UP-AUTH` — the concept this FEAT partially implements (PIN tier).
-- `CONCEPT--ABAC-POLICY-ENGINE` — emits the `request-step-up-auth` advice.
-- `FEAT--POLICY-DECISION-POINT` — the PDP whose advice drives this provider.
+- `[[CONCEPT--STEP-UP-AUTH]]` — the concept this FEAT partially implements (PIN tier).
+- `[[CONCEPT--ABAC-POLICY-ENGINE]]` — emits the `request-step-up-auth` advice.
+- `[[FEAT--POLICY-DECISION-POINT]]` — the PDP whose advice drives this provider.

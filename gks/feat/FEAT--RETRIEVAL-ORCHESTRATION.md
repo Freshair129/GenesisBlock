@@ -61,7 +61,7 @@ result.timings                      // { vector: 142, episodic: 3, ... }
 - [ ] **Per-source try/catch** — one failing source doesn't break the call
 - [ ] **Per-source timeouts** — each source has its own budget (defaults from ADR); on timeout, omit that source + append to `fallback_reasons`
 - [ ] **Total budget enforced** — `opts.timeoutMs` overrides sum of per-source; orchestration cancels remaining sources at budget
-- [ ] **RRF fusion** per `ADR--RETRIEVAL-RRF-FUSION` — `weight_s / (k + rank)`, summed across sources, sorted desc
+- [ ] **RRF fusion** per `[[ADR--RETRIEVAL-RRF-FUSION]]` — `weight_s / (k + rank)`, summed across sources, sorted desc
 - [ ] **Tie-breaking** — more sources > lower min rank > lexicographic atomId
 - [ ] **No mutation** — read-only on all sources
 - [ ] **Headless-safe** — works without Obsidian (filesystem fallback in `createObsidianClient` mode='filesystem' or `obsidian: undefined`)
@@ -85,3 +85,9 @@ result.timings                      // { vector: 142, episodic: 3, ... }
 - Cache layer → only if perf demands (M9+)
 - Cross-encoder re-rank → M10c
 - Query rewriting / HyDE → out of M7
+
+## Connections
+- [[CONCEPT--RETRIEVAL-ORCHESTRATION]]
+- [[FEAT--MSP-OBSIDIAN-CLIENT]]
+- [[FEAT--CONSOLIDATOR]]
+

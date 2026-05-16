@@ -27,7 +27,7 @@ created_at: 2026-05-14T05:05:00.000+07:00
 
 ## Context
 
-`CONCEPT--EPISODE-RETENTION` motivates the need for bounded growth of `<root>/gks/episode/`. This ADR locks the **numeric defaults** and the **archive directory layout** so multiple consumers (CLI, future cron job, future consolidator loop) agree on one policy. Implementation: `packages/msp/src/agents/episode-gc.ts` + CLI `packages/msp/src/agents/episode-gc-cli.ts`.
+`[[CONCEPT--EPISODE-RETENTION]]` motivates the need for bounded growth of `<root>/gks/episode/`. This ADR locks the **numeric defaults** and the **archive directory layout** so multiple consumers (CLI, future cron job, future consolidator loop) agree on one policy. Implementation: `packages/msp/src/agents/episode-gc.ts` + CLI `packages/msp/src/agents/episode-gc-cli.ts`.
 
 ## Decision
 
@@ -124,3 +124,8 @@ interface GcReport {
 - Frontmatter parsing: `yaml` package.
 - Filesystem ops: `node:fs/promises` (`readdir`, `readFile`, `mkdir`, `rename`, `unlink`).
 - Tests: `packages/msp/test/agents/episode-gc.test.ts` (+ CLI smoke).
+
+## Connections
+- [[SPEC--EPISODE-ATOM]]
+- [[AUDIT--PHASE-F4-EPISODE-GC]]
+

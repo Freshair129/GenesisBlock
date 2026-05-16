@@ -23,7 +23,7 @@ created_at: 2026-05-14T05:00:00.000+07:00
 
 ## Why this concept exists
 
-Phase E4 (`BLUEPRINT--MASTER-PROMOTION-PIPELINE`) shipped the *proposal* side of Master Block promotion: `msp-master-propose` writes a `MASTER--<id>.proposal.md` into `gks/inbound/` when a Genesis Block fills 4-of-5 dimensions. Phase E5 (`BLUEPRINT--GENESIS-BLOCK-RUNTIME`) shipped the *executor* side: `msp-genesis-exec <blockId>` loads the manifest, composes the prompt, and dispatches it.
+Phase E4 (`[[BLUEPRINT--MASTER-PROMOTION-PIPELINE]]`) shipped the *proposal* side of Master Block promotion: `msp-master-propose` writes a `MASTER--<id>.proposal.md` into `gks/inbound/` when a Genesis Block fills 4-of-5 dimensions. Phase E5 (`[[BLUEPRINT--GENESIS-BLOCK-RUNTIME]]`) shipped the *executor* side: `msp-genesis-exec <blockId>` loads the manifest, composes the prompt, and dispatches it.
 
 What's missing is the **glue between promotion and runtime**. A `MASTER--<id>.md` file that a human has accepted and committed is, by itself, just a markdown file. The executor has no way to know "this block has graduated to Master tier" — there's no signal that the block deserves a different runtime treatment (e.g. a more capable model, a different logging tier, audit emission).
 
@@ -51,7 +51,7 @@ The registry is **gitignored** (added to `.gitignore` in this PR). Two reasons:
 
 ## Why decouple promotion from runtime
 
-`CONCEPT--MASTER-PROMOTION` already enforces the human-in-the-loop gate (`ADR--MASTER-PROMOTION-DOC-TO-CODE`): `msp-master-propose` never writes to `gks/master/`. F1 preserves that — the proposal still lands in `gks/inbound/`, and a human still has to write the evidence ADR and the body of the Master atom.
+`[[CONCEPT--MASTER-PROMOTION]]` already enforces the human-in-the-loop gate (`[[ADR--MASTER-PROMOTION-DOC-TO-CODE]]`): `msp-master-propose` never writes to `gks/master/`. F1 preserves that — the proposal still lands in `gks/inbound/`, and a human still has to write the evidence ADR and the body of the Master atom.
 
 What F1 changes is the *follow-through*. The previously implicit "and then I move the proposal to `gks/master/`" step becomes an explicit, scripted action: `msp-master-propose apply <proposalPath>`. That subcommand:
 
@@ -69,7 +69,7 @@ The apply step is still human-triggered — there's no auto-promotion. But once 
 
 ## What this CONCEPT is not
 
-- **Not a contradiction detector.** F1 does not check whether two Master atoms conflict. That lives in `BLUEPRINT--CONTRADICTION-DETECTION-IMPL` Layer 1+.
+- **Not a contradiction detector.** F1 does not check whether two Master atoms conflict. That lives in `[[BLUEPRINT--CONTRADICTION-DETECTION-IMPL]]` Layer 1+.
 - **Not a publishing pipeline.** The registry is a local file. There is no remote sync, no "registry server", no cross-machine consensus.
 - **Not a replacement for the atom.** Deleting the registry never destroys data — the runtime degrades to "this block is treated as a normal Genesis Block", but `gks/master/MASTER--<id>.md` remains the canonical record.
 - **Not a status field.** The `status: 'active' | 'archived'` value lives only in the registry; the Master atom's frontmatter `status:` is the standard atom lifecycle (`draft / stable / deprecated / superseded`) and is unaffected.
@@ -78,7 +78,14 @@ The apply step is still human-triggered — there's no auto-promotion. But once 
 
 After F1 ships, the following should be true:
 
-1. A human can run `msp-master-propose apply gks/inbound/MASTER--FOO.proposal.md` and end up with `gks/master/MASTER--FOO.md` + an entry in `gks/master/registry.jsonl`.
+1. A human can run `msp-master-propose apply gks/inbound/[[MASTER--FOO]].proposal.md` and end up with `gks/master/[[MASTER--FOO]].md` + an entry in `gks/master/registry.jsonl`.
 2. `msp-genesis-exec FOO --prompt="…"` invoked against a Genesis Block whose Master has been applied produces an `ExecuteResult` with `from_master: true`.
 3. The same command against a block with no Master in the registry produces `from_master` undefined (or absent), and the runtime behaves exactly as it did before F1.
 4. The registry file is gitignored and never appears in `git status`.
+
+## Connections
+- [[SPEC--GENESIS-BLOCK-MANIFEST]]
+- [[CONCEPT--GENESIS-BLOCK-RUNTIME]]
+- [[FRAMEWORK--KNOWLEDGE-3-TIER]]
+- [[ADR--HUMAN-REVIEW-GATES]]
+

@@ -29,7 +29,7 @@ created_at: 2026-05-12T22:30:00.000+08:00
   - `OrmRecognizer`: Prisma/Drizzle entity extraction.
   - `McpToolRecognizer`: MCP tool registration discovery.
 - Integration via `FrameworkRegistry`.
-- Structural validation via `PROTO--SYMBOLS-FRAMEWORK-INVARIANTS`.
+- Structural validation via `[[PROTO--SYMBOLS-FRAMEWORK-INVARIANTS]]`.
 
 ## Test results
 - **Total Tests**: 21 cases across 8 test files.
@@ -52,3 +52,9 @@ created_at: 2026-05-12T22:30:00.000+08:00
 ## Follow-ups
 - Refine line-number extraction for ORM entities (currently defaults to 1).
 - Add support for Remix/SvelteKit routers in Phase 3.
+
+## Connections
+- [[CONCEPT--SYMBOLS-FRAMEWORK-AWARENESS]]
+- [[ADR--SYMBOLS-FRAMEWORK-AWARENESS]]
+- [[ALGO--SYMBOLS-FRAMEWORK-RECOGNITION]]
+

@@ -54,7 +54,16 @@ created_at: 2026-05-12T04:48:00.000+07:00
 
 ## Source
 
-- `FEAT--SYMBOLS-FRAMEWORK-AWARENESS`
+- `[[FEAT--SYMBOLS-FRAMEWORK-AWARENESS]]`
 - `packages/msp/src/symbols/communities/leiden.ts` (ใช้โครงสร้าง Graph ที่ผ่านการจัดกลุ่มแล้วมาช่วยในการวิเคราะห์ Flow)
-- `ADR--SYMBOL-GRAPH-PERSISTENCE`
+- `[[ADR--SYMBOL-GRAPH-PERSISTENCE]]`
 - Concept of "Neural Mapping" for code intelligence
+
+## Connections
+- [[FRAMEWORK--SYMBOL-GRAPH]]
+- [[CONCEPT--SYMBOL-GRAPH]]
+- [[CONCEPT--SYMBOLS-PROCESS-TRACING]]
+- [[ADR--SYMBOLS-PROCESS-TRACING]]
+- [[ALGO--SYMBOLS-CALL-GRAPH-TRAVERSAL]]
+- [[PROTO--SYMBOLS-TRACE-INVARIANTS]]
+

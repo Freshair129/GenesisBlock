@@ -51,10 +51,10 @@ Touched:
 
 ## Dependencies
 
-- `BLUEPRINT--PHASE-1-PDP-SHADOW` — the PDP + composer-as-PEP must exist in shadow mode first.
-- `FEAT--SUBAGENT-SCOPE-FILTERING` — the API contract implemented.
-- `CONCEPT--SUBAGENT-CONTEXT-SCOPING` — scope model + escalation pattern.
-- `ADR--TRANSPORT-AGNOSTIC-ENFORCEMENT` — the composer is a registered PEP.
+- `[[BLUEPRINT--PHASE-1-PDP-SHADOW]]` — the PDP + composer-as-PEP must exist in shadow mode first.
+- `[[FEAT--SUBAGENT-SCOPE-FILTERING]]` — the API contract implemented.
+- `[[CONCEPT--SUBAGENT-CONTEXT-SCOPING]]` — scope model + escalation pattern.
+- `[[ADR--TRANSPORT-AGNOSTIC-ENFORCEMENT]]` — the composer is a registered PEP.
 - Manually-tagged `domain` attributes on the test-bed atoms (classifiers are Phase 6).
 
 ## Tasks
@@ -70,7 +70,7 @@ Touched:
 ## Source
 
 - `docs/msp/UNIVERSAL-CONTEXT-FRAMEWORK_spec.md` §11 Phase 2, §9.
-- `FEAT--SUBAGENT-SCOPE-FILTERING` — the contract implemented.
-- `CONCEPT--SUBAGENT-CONTEXT-SCOPING` — scope + escalation model.
-- `ADR--TRANSPORT-AGNOSTIC-ENFORCEMENT` — composer as PEP.
-- `BLUEPRINT--PHASE-1-PDP-SHADOW` — predecessor phase.
+- `[[FEAT--SUBAGENT-SCOPE-FILTERING]]` — the contract implemented.
+- `[[CONCEPT--SUBAGENT-CONTEXT-SCOPING]]` — scope + escalation model.
+- `[[ADR--TRANSPORT-AGNOSTIC-ENFORCEMENT]]` — composer as PEP.
+- `[[BLUEPRINT--PHASE-1-PDP-SHADOW]]` — predecessor phase.

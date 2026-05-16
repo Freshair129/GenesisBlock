@@ -27,7 +27,7 @@ created_at: 2026-05-13T12:00:00.000+07:00
 - **Metadata:** บันทึก `community_id` (Stage 11) และ `process_id` (Stage 12)
 
 ## 2. Invariants (Enforced)
-- **No Cycles:** ต้องไม่มีวงจรในความสัมพันธ์เชิงสืบทอด (MRO) และการสืบทอดอะตอม (Supersession) ตามกฎ `PROTO--TRACE-INVARIANTS`
+- **No Cycles:** ต้องไม่มีวงจรในความสัมพันธ์เชิงสืบทอด (MRO) และการสืบทอดอะตอม (Supersession) ตามกฎ `[[PROTO--TRACE-INVARIANTS]]`
 - **Referential Integrity:** ห้ามมี Edges ที่ชี้ไปยัง Node ที่ไม่มีจริง
 
 ## 3. Storage Architecture
@@ -39,3 +39,8 @@ created_at: 2026-05-13T12:00:00.000+07:00
 - รองรับ **OpenCypher** ในการ Query ความสัมพันธ์แบบ Graph
 - รองรับการทำ **Deep Traversal** เพื่อติดตาม Execution Flow จาก Entry Point ไปยัง Leaf Node
 - รองรับ **Bi-temporal time-travel** เพื่อดูสถานะของ Graph ณ เวลาใดเวลาหนึ่งในอดีต
+
+## Connections
+- [[CONCEPT--GENESIS-GRAPH-BACKEND]]
+- [[ADR--SYMBOL-GRAPH-PROCESSING-STAGES]]
+

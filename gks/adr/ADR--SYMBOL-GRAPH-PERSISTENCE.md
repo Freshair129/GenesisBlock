@@ -22,7 +22,7 @@ created_at: 2026-05-09T16:50:00.000+07:00
 
 ## Context
 
-`CONCEPT--SYMBOL-GRAPH` describes a directed graph over source-code symbols (~5000 nodes + ~20000 edges at MSP's current size). The graph needs a storage layer that is:
+`[[CONCEPT--SYMBOL-GRAPH]]` describes a directed graph over source-code symbols (~5000 nodes + ~20000 edges at MSP's current size). The graph needs a storage layer that is:
 
 1. **Fast for graph queries** — k-hop neighbors, reverse closure, community membership lookups
 2. **Git-friendly** — diff-readable so reviewers can see what changed
@@ -61,7 +61,7 @@ Rationale per dimension:
 - Two write paths must stay consistent. Mitigation: `dump-jsonl` CLI subcommand that re-emits JSONL from current SQLite — used both as a build step and as a "fix drift" tool. Tested by round-trip assertion in `test/symbols/store.test.ts` (write JSONL, load to fresh SQLite, dump JSONL, compare).
 - One additional native module. Mitigation: `better-sqlite3` is the standard Node SQLite binding; CI-tested across Node 20+22 by upstream.
 
-## Schema sketch (full schema in `BLUEPRINT--SYMBOL-GRAPH-CORE`, PR-3)
+## Schema sketch (full schema in `[[BLUEPRINT--SYMBOL-GRAPH-CORE]]`, PR-3)
 
 ```sql
 CREATE TABLE symbols (
@@ -120,6 +120,6 @@ JSONL exports are flattened views of the same data, sorted by primary key:
 
 ## Source
 
-- `CONCEPT--SYMBOL-GRAPH`, `FRAMEWORK--SYMBOL-GRAPH`
+- `[[CONCEPT--SYMBOL-GRAPH]]`, `[[FRAMEWORK--SYMBOL-GRAPH]]`
 - npm registry inspection 2026-05-09: `better-sqlite3` ships prebuilds for Node 20/22
 - Existing GKS patterns: `gks/00_index/atomic_index.jsonl` + `.brain/.../vector/backlinks.jsonl` (sorted JSONL)

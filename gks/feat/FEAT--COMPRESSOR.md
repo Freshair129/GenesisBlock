@@ -62,7 +62,7 @@ interface CompressedEpisode {
 - [ ] `compress(opts)` returns `CompressResult` with `compressed[]`, `totalTokensUsed`, `tierCounts`
 - [ ] **Total tokens ≤ budgetTokens** — enforced; selection drops episodes if even summaries don't fit
 - [ ] **Importance-descending iteration** — high-importance gets keep/trim, low gets resummarise/truncate/drop
-- [ ] **Tier choice** per `ADR--COMPRESSOR-THREE-TIER`:
+- [ ] **Tier choice** per `[[ADR--COMPRESSOR-THREE-TIER]]`:
   - whole-fits → keep
   - ≥ 30% droppable + trimmed-fits → trim
   - has llm → resummarise (target 0.6 × original)
@@ -89,3 +89,8 @@ interface CompressedEpisode {
 - Cross-episode dedup
 - Hierarchical summary-of-summaries
 - Vector-similarity-based filtering before compression
+
+## Connections
+- [[CONCEPT--CONTEXT-COMPRESSION]]
+- [[FEAT--CONSOLIDATOR]]
+

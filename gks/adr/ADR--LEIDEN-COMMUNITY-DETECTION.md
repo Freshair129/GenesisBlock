@@ -23,7 +23,7 @@ created_at: 2026-05-09T16:51:00.000+07:00
 
 ## Context
 
-`CONCEPT--SYMBOL-GRAPH` requires assigning each symbol a `community_id` that approximates "logical module" — clusters of densely-connected symbols. Two well-known modularity-optimization algorithms fit:
+`[[CONCEPT--SYMBOL-GRAPH]]` requires assigning each symbol a `community_id` that approximates "logical module" — clusters of densely-connected symbols. Two well-known modularity-optimization algorithms fit:
 
 - **Louvain** (2008) — fast, widely-implemented, but produces poorly-connected communities under certain edge distributions
 - **Leiden** (2019) — improves Louvain by guaranteeing connected communities, faster convergence, and better modularity scores. User asked for Leiden specifically.
@@ -85,4 +85,8 @@ Parameters:
   - `@aflsolutions/graphology-communities-leiden@1.1.1` (2026-04-26 publish)
   - `graphology-communities-louvain@2.0.2` (2024-12-17 publish, `yomguithereal`)
 - Traag, Waltman, van Eck (2019) — "From Louvain to Leiden: guaranteeing well-connected communities" (Sci. Rep.)
-- `ADR--SYMBOL-GRAPH-PERSISTENCE` — `meta.algorithm` field added to schema
+- `[[ADR--SYMBOL-GRAPH-PERSISTENCE]]` — `meta.algorithm` field added to schema
+
+## Connections
+- [[FRAMEWORK--SYMBOL-GRAPH]]
+

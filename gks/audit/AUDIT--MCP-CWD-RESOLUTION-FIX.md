@@ -20,7 +20,7 @@ created_at: 2026-05-07T03:18:00.000+07:00
 
 # AUDIT — MCP cwd resolution fix
 
-## Problem (surfaced 2026-05-07 via `AUDIT--GKS-UPSTREAM-PROPOSALS-FILED`)
+## Problem (surfaced 2026-05-07 via `[[AUDIT--GKS-UPSTREAM-PROPOSALS-FILED]]`)
 
 When Claude Desktop launches the MSP MCP server with the canonical config —
 
@@ -116,8 +116,13 @@ The bin.test.ts refactor (prefer dist over npx) means the existing `tools/list` 
 
 ## Why no separate CONCEPT/ADR/FEAT/BLUEPRINT chain
 
-This is a P5 bug fix on existing implementation, not a new design decision. CLAUDE.md's doc-to-code workflow says "Phase 4 (TASK) is for orchestrator handoff — usually skipped for single-developer slices" — same logic applies for one-line bug fixes. The implemented behaviour was already specified in `BLUEPRINT--MSP-MCP-SERVER` (server reads root from configured options); we just made the wiring honour it.
+This is a P5 bug fix on existing implementation, not a new design decision. CLAUDE.md's doc-to-code workflow says "Phase 4 (TASK) is for orchestrator handoff — usually skipped for single-developer slices" — same logic applies for one-line bug fixes. The implemented behaviour was already specified in `[[BLUEPRINT--MSP-MCP-SERVER]]` (server reads root from configured options); we just made the wiring honour it.
 
 ## Source
 
-User direction "Fix MSP MCP cwd bug" (2026-05-07) immediately after the bug was surfaced in `AUDIT--GKS-UPSTREAM-PROPOSALS-FILED`. Claude Code session on `claude/msp-fix-mcp-cwd-bug` branch.
+User direction "Fix MSP MCP cwd bug" (2026-05-07) immediately after the bug was surfaced in `[[AUDIT--GKS-UPSTREAM-PROPOSALS-FILED]]`. Claude Code session on `claude/msp-fix-mcp-cwd-bug` branch.
+
+## Connections
+- [[AUDIT--MSP-MCP-SERVER]]
+- [[AUDIT--MSP-MCP-TOOL-EXPANSION]]
+

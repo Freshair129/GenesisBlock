@@ -36,7 +36,7 @@ descriptive prose on the heading line):
 ## Conflicts with
 ```
 
-The order is canonical (per `FRAMEWORK--KNOWLEDGE-3-TIER`), but the predicate
+The order is canonical (per `[[FRAMEWORK--KNOWLEDGE-3-TIER]]`), but the predicate
 checks presence only, not order. The `## Conflicts with` section MAY be
 empty (e.g. "(none currently)"), but its heading MUST be present so that
 future atoms have a stable hook to register conflicts against.
@@ -83,5 +83,10 @@ PROTO loader's draft policy.
 
 ## Source
 
-`FRAMEWORK--KNOWLEDGE-3-TIER` (Master Block § "Body contract"); PR-5 of the
+`[[FRAMEWORK--KNOWLEDGE-3-TIER]]` (Master Block § "Body contract"); PR-5 of the
 3-tier rollout plan.
+
+## Connections
+- [[ADR--MASTER-PROMOTION-DOC-TO-CODE]]
+- [[ADR--MASTER-PROMOTION-CONTRADICTION-POLICY]]
+

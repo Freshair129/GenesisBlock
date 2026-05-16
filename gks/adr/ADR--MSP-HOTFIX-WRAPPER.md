@@ -25,7 +25,7 @@ Two surfaces to design:
 1. **CLI surface**: how do users invoke `gks hotfix` from MSP-namespace scripts?
 2. **Hook integration**: when does the pre-commit hook invoke `gks hotfix check`?
 
-For (1) the trade-off is between adding logic on top of `gks hotfix` (e.g. auto-derive SHA, format output, integrate with reviewer per `ADR--HUMAN-REVIEW-GATES`) versus thin passthrough.
+For (1) the trade-off is between adding logic on top of `gks hotfix` (e.g. auto-derive SHA, format output, integrate with reviewer per `[[ADR--HUMAN-REVIEW-GATES]]`) versus thin passthrough.
 
 For (2) the trade-off is between checking every staged file (cheap but noisy) versus only files known to have associated HOTFIX-- atoms (cleaner but requires lookup).
 
@@ -87,10 +87,15 @@ Standard `git commit --no-verify`. No new flag.
 
 ## Alternatives considered
 
-1. **Wrap with auto-SHA / reviewer enforcement.** Considered. Adds value but couples MSP to git internals (auto-SHA) and to `ADR--HUMAN-REVIEW-GATES` (reviewer). Defer to M6 if needed.
+1. **Wrap with auto-SHA / reviewer enforcement.** Considered. Adds value but couples MSP to git internals (auto-SHA) and to `[[ADR--HUMAN-REVIEW-GATES]]` (reviewer). Defer to M6 if needed.
 2. **Hook walks atom index for HOTFIX-- atoms first; only checks files those atoms reference.** Considered. More targeted but doubles the hook latency (parse + filter atoms) for marginal gain. The bulk path-exclusion is good enough.
 3. **No hook integration; just expose CLI.** Rejected — the whole point is closing the contract decay loop locally.
 
 ## Source
 
-`CONCEPT--MSP-HOTFIX-WRAPPER` + GksV3 `gks hotfix` CLI surface.
+`[[CONCEPT--MSP-HOTFIX-WRAPPER]]` + GksV3 `gks hotfix` CLI surface.
+
+## Connections
+- [[ADR--HOTFIX-ESCAPE-HATCH]]
+- [[FEAT--MSP-PRECOMMIT-HOOK]]
+

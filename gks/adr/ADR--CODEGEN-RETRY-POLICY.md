@@ -84,3 +84,8 @@ Escalation is invoked via `scripts/msp/escalate-to-gemini.mjs <task_id>` (script
 ## Source
 
 `msp_spec.md` §5.5 (Retry Policy).
+
+## Connections
+- [[CONCEPT--CODEGEN-MICROTASK-CONTRACT]]
+- [[ADR--CODEGEN-FORBIDDEN-PATTERNS]]
+

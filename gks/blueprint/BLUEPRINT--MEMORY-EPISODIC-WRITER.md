@@ -108,3 +108,9 @@ verification_plan:
 T1 COLLECT-RANGE (read JSONL by turn range)
 T2 SUMMARISE (heuristic plugin)
 T3 APPEND-EPISODE (schema + atomic-write + idempotency)
+
+## Connections
+- [[FEAT--MEMORY-EPISODIC-WRITER]]
+- [[ADR--MEMORY-EPISODIC-WRITER]]
+- [[CONCEPT--MEMORY-EPISODIC]]
+

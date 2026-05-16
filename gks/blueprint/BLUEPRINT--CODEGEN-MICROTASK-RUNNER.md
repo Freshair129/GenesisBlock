@@ -119,3 +119,8 @@ T2 INVOKE-SLM (with mock client first; real Qwen integration last)
 T3 APPLY-CHECKS (post-process + forbidden-patterns)
 T4 RUN-ACCEPTANCE
 T5 ESCALATE
+
+## Connections
+- [[FEAT--CODEGEN-MICROTASK-RUNNER]]
+- [[ADR--CODEGEN-MICROTASK-RUNNER]]
+

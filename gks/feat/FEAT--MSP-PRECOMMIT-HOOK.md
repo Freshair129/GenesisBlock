@@ -79,5 +79,11 @@ If no relevant `.md` files are staged, the hook exits silently with code 0 (zero
 ## Out of scope
 
 - Pre-push hook for chain integrity (`gks verify-flow`). Separate FEAT in M3+.
-- Hotfix gate (48h backfill check). Belongs to `ADR--HOTFIX-ESCAPE-HATCH` implementation.
+- Hotfix gate (48h backfill check). Belongs to `[[ADR--HOTFIX-ESCAPE-HATCH]]` implementation.
 - Cross-platform Windows install without Git Bash. Defer.
+
+## Connections
+- [[ADR--MSP-PRECOMMIT-HOOK]]
+- [[CONCEPT--MSP-PRECOMMIT-HOOK]]
+- [[FEAT--MSP-VALIDATOR]]
+

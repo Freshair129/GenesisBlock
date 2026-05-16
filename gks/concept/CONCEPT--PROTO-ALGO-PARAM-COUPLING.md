@@ -19,23 +19,23 @@ crosslinks: {"references":["CONCEPT--PROTO-PATTERN","ADR--GRAPH-IS-GKS-DOMAIN"]}
 created_at: 2026-05-05T16:28:00.000+07:00
 ---
 
-# CONCEPT — PROTO--ALGO-PARAM-COUPLING
+# CONCEPT — [[PROTO--ALGO-PARAM-COUPLING]]
 
 ## Problem
 
 Algorithms (`ALGO--*`) have tunable parameters (`PARAM--*`). The atom taxonomy currently lacks a way to ensure these stay paired:
 
-- An ALGO atom claiming `tunable_by: [PARAM--FOO]` should have a matching `tunes: ALGO--BAR` on `PARAM--FOO`
+- An ALGO atom claiming `tunable_by: [[[PARAM--FOO]]]` should have a matching `tunes: [[ALGO--BAR]]` on `[[PARAM--FOO]]`
 - Drift creates orphan ALGOs (claim params that don't exist) or orphan PARAMs (tune nothing)
 
-Per `ADR--GRAPH-IS-GKS-DOMAIN`, **existence checks** belong in `gks validate --links`. The MSP-side rule is **type-pairing**: `tunable_by` must reference PARAM--, `tunes` must reference ALGO--, and the reciprocal link must exist.
+Per `[[ADR--GRAPH-IS-GKS-DOMAIN]]`, **existence checks** belong in `gks validate --links`. The MSP-side rule is **type-pairing**: `tunable_by` must reference PARAM--, `tunes` must reference ALGO--, and the reciprocal link must exist.
 
 ## Rule
 
-For every ALGO--X atom with `tunable_by: [PARAM--Y, ...]`:
-- Each PARAM--Y must have `tunes: [..., ALGO--X, ...]`
+For every [[ALGO--X]] atom with `tunable_by: [[[PARAM--Y]], ...]`:
+- Each [[PARAM--Y]] must have `tunes: [..., [[ALGO--X]], ...]`
 
-And vice versa for every PARAM--Y with `tunes: [ALGO--X, ...]`.
+And vice versa for every [[PARAM--Y]] with `tunes: [[[ALGO--X]], ...]`.
 
 ## Trigger
 
@@ -47,7 +47,7 @@ And vice versa for every PARAM--Y with `tunes: [ALGO--X, ...]`.
 
 ## Scope after audit (M7-prep follow-up)
 
-This PROTO is **smaller than originally scoped**: existence checks delegated to `gks validate --links` per `ADR--GRAPH-IS-GKS-DOMAIN`. MSP only enforces:
+This PROTO is **smaller than originally scoped**: existence checks delegated to `gks validate --links` per `[[ADR--GRAPH-IS-GKS-DOMAIN]]`. MSP only enforces:
 
 1. `tunable_by` values are PARAM-- IDs (not other types)
 2. `tunes` values are ALGO-- IDs (not other types)
@@ -61,4 +61,4 @@ This PROTO is **smaller than originally scoped**: existence checks delegated to 
 
 ## Source
 
-`CONCEPT--MSP-ROADMAP` §2 M8d (post-audit scope), `CONCEPT--PROTO-PATTERN`, `ADR--GRAPH-IS-GKS-DOMAIN`.
+`[[CONCEPT--MSP-ROADMAP]]` §2 M8d (post-audit scope), `[[CONCEPT--PROTO-PATTERN]]`, `[[ADR--GRAPH-IS-GKS-DOMAIN]]`.

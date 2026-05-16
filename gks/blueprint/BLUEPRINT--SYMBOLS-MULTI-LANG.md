@@ -93,3 +93,10 @@ function getParserForFile(filePath: string): SymbolParser {
 ### Manual Verification
 - รัน `npm run msp:graph build` บนโฟลเดอร์ที่มีไฟล์หลายภาษา
 - ตรวจสอบ `symbols.jsonl` ว่ามีสัญลักษณ์จากทั้ง Python และ COBOL ครบถ้วน
+
+## Connections
+- [[FEAT--SYMBOLS-MULTI-LANG]]
+- [[BLUEPRINT--SYMBOL-GRAPH-CORE]]
+- [[ADR--SYMBOLS-PYTHON-PARSER]]
+- [[ADR--SYMBOLS-COBOL-STRATEGY]]
+

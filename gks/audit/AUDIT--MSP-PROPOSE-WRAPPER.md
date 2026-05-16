@@ -25,7 +25,7 @@ created_at: 2026-05-03T15:43:36.230+07:00
 
 ## Scope
 
-Closes M3d from the AUDIT--MSP-VALIDATOR / AUDIT--KNOWLEDGE-BASE backlog. GKS 3.5.6 caps `--phase` at 5 in propose-inbound, but the master spec uses P6 for AUDIT atoms.
+Closes M3d from the [[AUDIT--MSP-VALIDATOR]] / [[AUDIT--KNOWLEDGE-BASE]] backlog. GKS 3.5.6 caps `--phase` at 5 in propose-inbound, but the master spec uses P6 for AUDIT atoms.
 
 ## Investigation
 
@@ -66,10 +66,14 @@ test/scripts/propose.test.ts: 3/3 passing
 
 ## Dogfood
 
-This very AUDIT atom was filed at phase 6 via `npm run msp:propose -- ... --phase=6`. The wrapper printed `✓ patched AUDIT--MSP-PROPOSE-WRAPPER to phase: 6 (per ADR--PATH-ENCODING M3d)`. The file landed in inbound at phase 6.
+This very AUDIT atom was filed at phase 6 via `npm run msp:propose -- ... --phase=6`. The wrapper printed `✓ patched [[AUDIT--MSP-PROPOSE-WRAPPER]] to phase: 6 (per [[ADR--PATH-ENCODING]] M3d)`. The file landed in inbound at phase 6.
 
 ## Sign-off
 
 - Implemented by: @claude-opus-4-7
 - Verified by: 3/3 tests + dogfood (this audit + 5 sibling M3 audits)
 - Date: 2026-05-03
+
+## Connections
+- [[FRAMEWORK--PHASE-GOVERNANCE]]
+

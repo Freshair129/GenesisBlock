@@ -23,7 +23,7 @@ created_at: 2026-05-10T07:00:00.000+07:00
 
 ## Summary
 
-Phase B of the architecture-doc cleanup landed on 2026-05-10. The TypeScript implementation now matches `ADR--GLOBAL-VS-WORKSPACE`: identity, preferences, projects registry, and cross-project audit live globally under `~/.msp/` (or `MSP_HOME`); sessions / episodic / candidates / vector remain in the workspace under `./.brain/msp/projects/<namespace>/`.
+Phase B of the architecture-doc cleanup landed on 2026-05-10. The TypeScript implementation now matches `[[ADR--GLOBAL-VS-WORKSPACE]]`: identity, preferences, projects registry, and cross-project audit live globally under `~/.msp/` (or `MSP_HOME`); sessions / episodic / candidates / vector remain in the workspace under `./.brain/msp/projects/<namespace>/`.
 
 A one-time, idempotent migration moves any existing workspace `identity.json` to the global location on first read; the workspace file is preserved (per ADR), so rollback is a matter of deleting `~/.msp/identity.json`.
 
@@ -67,8 +67,8 @@ Updated to use `MSP_HOME` per-test isolation (legacy workspace identity tests no
 
 ### Documentation atoms
 
-- `gks/audit/AUDIT--PHASE-B-IMPL-COMPLETE.md` (this atom)
-- `gks/blueprint/BLUEPRINT--GLOBAL-VS-WORKSPACE-MIGRATION.md` flipped from `draft` → `stable`
+- `gks/audit/[[AUDIT--PHASE-B-IMPL-COMPLETE]].md` (this atom)
+- `gks/blueprint/[[BLUEPRINT--GLOBAL-VS-WORKSPACE-MIGRATION]].md` flipped from `draft` → `stable`
 - `msp_spec.md` 2.0.3 changelog entry
 
 ## MCP tool surface — 16 → 19
@@ -122,4 +122,10 @@ After the copy, every subsequent `readIdentity` fast-paths on `stat` of the glob
 
 ## Source
 
-`BLUEPRINT--GLOBAL-VS-WORKSPACE-MIGRATION` (Phase B impl, 2026-05-10). Atoms PR was `claude/architecture-ssot-selection-D76og` (2026-05-09); this impl PR is `claude/msp-global-workspace-impl-D76og`.
+`[[BLUEPRINT--GLOBAL-VS-WORKSPACE-MIGRATION]]` (Phase B impl, 2026-05-10). Atoms PR was `claude/architecture-ssot-selection-D76og` (2026-05-09); this impl PR is `claude/msp-global-workspace-impl-D76og`.
+
+## Connections
+- [[CONCEPT--AGENT-AGNOSTIC]]
+- [[CONCEPT--NAMED-PROJECT-REGISTRY]]
+- [[ADR--PATH-ENCODING]]
+

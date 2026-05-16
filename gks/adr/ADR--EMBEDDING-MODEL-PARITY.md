@@ -20,7 +20,7 @@ created_at: 2026-05-04T09:02:48.728+07:00
 
 # ADR — embedding model parity
 
-> **Status (updated 2026-05-07)**: ✅ GKS 3.6.0 published to npm. `npm view @freshair129/gks dist-tags` → `{ latest: '3.6.0' }`. MSP `package.json` bumped to `^3.6.0`. `createNomicEmbedder()` is now usable directly. Migration tracked in `AUDIT--GKS-3.6.0-PUBLISHED`. The "Fallback while GKS 3.6.0 is unpublished" section below is now historical — kept for traceability of the workaround period (2026-05-04 to 2026-05-07).
+> **Status (updated 2026-05-07)**: ✅ GKS 3.6.0 published to npm. `npm view @freshair129/gks dist-tags` → `{ latest: '3.6.0' }`. MSP `package.json` bumped to `^3.6.0`. `createNomicEmbedder()` is now usable directly. Migration tracked in `[[AUDIT--GKS-3]].6.0-PUBLISHED`. The "Fallback while GKS 3.6.0 is unpublished" section below is now historical — kept for traceability of the workaround period (2026-05-04 to 2026-05-07).
 
 ## Context
 
@@ -32,7 +32,7 @@ If GKS embeds with model A and Smart Connections embeds with model B, the **same
 
 Worse: a query embedded by GKS cannot be used to search Smart Connections's index (and vice versa), so cross-surface retrieval is impossible without re-embedding queries through both.
 
-`ADR--SEMANTIC-SEARCH-VIA-SMART-CONNECTIONS` (M7-prep) said "MSP delegates semantic to Smart Connections; never embeds". That's incomplete — GKS DOES embed, and we should treat its embedder as the canonical Node-side path. Smart Connections becomes the in-Obsidian browse surface.
+`[[ADR--SEMANTIC-SEARCH-VIA-SMART-CONNECTIONS]]` (M7-prep) said "MSP delegates semantic to Smart Connections; never embeds". That's incomplete — GKS DOES embed, and we should treat its embedder as the canonical Node-side path. Smart Connections becomes the in-Obsidian browse surface.
 
 This ADR locks the canonical model so all surfaces stay compatible.
 
@@ -114,10 +114,15 @@ When 3.6.0 publishes:
 
 ## What this ADR does NOT change
 
-- `ADR--SEMANTIC-SEARCH-VIA-SMART-CONNECTIONS` framing about Smart Connections being the in-Obsidian path remains valid — but **Smart Connections is no longer the canonical writer** (once 3.6.0 ships). That ADR gets clarified in this PR.
+- `[[ADR--SEMANTIC-SEARCH-VIA-SMART-CONNECTIONS]]` framing about Smart Connections being the in-Obsidian path remains valid — but **Smart Connections is no longer the canonical writer** (once 3.6.0 ships). That ADR gets clarified in this PR.
 - GKS upstream patch for backlinks API / phase 6 — separate concerns.
 - M7c retrieval orchestration design — primary semantic source switches to GKS vector store; Smart Connections probe becomes secondary.
 
 ## Source
 
 GksV3 3.6.0 CHANGELOG (introduces `createNomicEmbedder`); audit during M7-prep follow-up; user direction for model parity to avoid re-embedding cost. Validation against published `@freshair129/gks@3.5.6` performed 2026-05-04 (M7-prep follow-up review).
+
+## Connections
+- [[CONCEPT--EMBEDDING-STRATEGY]]
+- [[CONCEPT--OBSIDIAN-AS-RUNTIME]]
+

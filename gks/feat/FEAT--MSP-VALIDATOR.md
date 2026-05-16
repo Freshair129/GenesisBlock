@@ -34,7 +34,7 @@ npm run msp:validate -- <file.md>
 npx msp-validate <file.md>
 ```
 
-the validator parses the frontmatter + body, applies every hard rule from `ADR--MSP-VALIDATOR`, and either:
+the validator parses the frontmatter + body, applies every hard rule from `[[ADR--MSP-VALIDATOR]]`, and either:
 
 - prints `✓ <file>` and exits 0, or
 - prints one or more `✗ <file>:<line> [rule-id] <reason>` lines and exits 1.
@@ -77,3 +77,7 @@ walks every atom under `gks/` and every candidate under `.brain/msp/projects/eva
 - LLM-assisted suggestions for rejections
 - Loading the rule set from `atomic_contract.yaml` at runtime — for M2, rules are TypeScript constants
 - Vector / semantic similarity checks
+
+## Connections
+- [[CONCEPT--MSP-VALIDATOR]]
+

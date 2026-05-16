@@ -20,11 +20,11 @@ created_at: 2026-05-14T18:37:54.239+07:00
 
 # ADR — Vault / Namespace / Brain layering
 
-> Architecture decision derived from `CONCEPT--NAMESPACE-VAULT-BRAIN` (spec §5). No spec decision id.
+> Architecture decision derived from `[[CONCEPT--NAMESPACE-VAULT-BRAIN]]` (spec §5). No spec decision id.
 
 ## Context
 
-`CONCEPT--NAMESPACE-VAULT-BRAIN` establishes three concepts that all touch "isolation" but operate at different layers: `Namespace` (storage partition), `Vault` (composition view), `Brain` (whole agent envelope). The concept atom argues they must stay distinct. This ADR commits to the **concrete structural decision** that makes them distinct: **where each lives and how Vault is represented**.
+`[[CONCEPT--NAMESPACE-VAULT-BRAIN]]` establishes three concepts that all touch "isolation" but operate at different layers: `Namespace` (storage partition), `Vault` (composition view), `Brain` (whole agent envelope). The concept atom argues they must stay distinct. This ADR commits to the **concrete structural decision** that makes them distinct: **where each lives and how Vault is represented**.
 
 The temptation — repeatedly seen in similar systems — is to make `Vault` a stored entity that *is* a kind of Namespace ("a vault is just a tenant"). That collapse is what this ADR forbids.
 
@@ -34,7 +34,7 @@ The temptation — repeatedly seen in similar systems — is to make `Vault` a s
 
 1. **`Namespace`** — owned by GKS. Stored, immutable, indexed. Stamped on every Resource at creation. The only thing that physically partitions storage.
 2. **`Vault`** — owned by MSP. A **view**: `{ id, name, read_from: Namespace[], write_to: Namespace, default_filter?, resolution_policy? }`. A Vault is configuration, not data. It is resolved at query time into an OR-union of Namespace filters. It is **never** stamped on a Resource.
-3. **`Brain`** — owned by MSP. The session envelope: `{ soul, active_vaults, cognitive_policy, current_session }`. Contains Vaults by reference; contains Soul (`CONCEPT--IDENTITY-LAYER`) directly.
+3. **`Brain`** — owned by MSP. The session envelope: `{ soul, active_vaults, cognitive_policy, current_session }`. Contains Vaults by reference; contains Soul (`[[CONCEPT--IDENTITY-LAYER]]`) directly.
 
 Structural rules enforced:
 
@@ -57,7 +57,7 @@ Negative / accepted costs:
 
 - Vault resolution happens on every query (config → Namespace OR-union). Cheap, and cacheable per session.
 - Vault membership versioning becomes a real question (if a Namespace is removed from a Vault, what happens to in-flight sessions?). Deliberately left to spec §14 OQ-4; working assumption is session-snapshot with explicit `refresh`.
-- Three concepts to teach instead of one. Accepted — `CONCEPT--NAMESPACE-VAULT-BRAIN` exists precisely to carry that teaching cost, and the analogies (filing cabinet / saved query / OS session) make it tractable.
+- Three concepts to teach instead of one. Accepted — `[[CONCEPT--NAMESPACE-VAULT-BRAIN]]` exists precisely to carry that teaching cost, and the analogies (filing cabinet / saved query / OS session) make it tractable.
 
 ## Alternatives considered
 
@@ -70,6 +70,10 @@ Negative / accepted costs:
 ## Source
 
 - `docs/msp/UNIVERSAL-CONTEXT-FRAMEWORK_spec.md` §5 — Namespace / Vault / Brain definitions and anti-patterns.
-- `CONCEPT--NAMESPACE-VAULT-BRAIN` — the concept this ADR structurally commits.
-- `CONCEPT--IDENTITY-LAYER` — Soul, which Brain contains.
+- `[[CONCEPT--NAMESPACE-VAULT-BRAIN]]` — the concept this ADR structurally commits.
+- `[[CONCEPT--IDENTITY-LAYER]]` — Soul, which Brain contains.
 - `packages/gks/src/memory/types.ts` — `Namespace`, owned by GKS, unchanged.
+
+## Connections
+- [[FRAMEWORK--UNIVERSAL-CONTEXT-FRAMEWORK]]
+

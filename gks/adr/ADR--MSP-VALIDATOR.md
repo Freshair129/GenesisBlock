@@ -22,7 +22,7 @@ created_at: 2026-05-03T13:24:24.437+07:00
 
 ## Context
 
-`CONCEPT--MSP-VALIDATOR` motivates the gatekeeper. This ADR records *how* it runs and *what rules* it enforces. The master spec (`msp_spec.md` §4) defines required, conditional, and forbidden fields plus six anti-hallucination rules. We need to decide:
+`[[CONCEPT--MSP-VALIDATOR]]` motivates the gatekeeper. This ADR records *how* it runs and *what rules* it enforces. The master spec (`msp_spec.md` §4) defines required, conditional, and forbidden fields plus six anti-hallucination rules. We need to decide:
 
 1. Where the validator runs (library / CLI / pre-commit / CI / all)
 2. Which rules are hard (reject) vs soft (warn)

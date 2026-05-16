@@ -46,3 +46,8 @@ Out:
 ## Source
 
 P1 item #7 from the M3 production-readiness backlog.
+
+## Connections
+- [[FEAT--MSP-PRECOMMIT-HOOK]]
+- [[FEAT--MSP-VALIDATOR]]
+

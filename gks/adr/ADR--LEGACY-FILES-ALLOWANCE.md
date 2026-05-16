@@ -74,3 +74,9 @@ To "legacify-then-clean":
 ## Source
 
 `msp_spec.md` §10.2 (Legacy Files).
+
+## Connections
+- [[ADR--ANTI-HALLUCINATION-RULES]]
+- [[ADR--FORBIDDEN-FIELDS-LIST]]
+- [[CONCEPT--MSP-VALIDATOR]]
+

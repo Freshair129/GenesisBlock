@@ -23,8 +23,8 @@ created_at: 2026-05-03T18:01:43.397+07:00
 ## Scope
 
 Two changes:
-1. Wrote `ADR--HUMAN-REVIEW-GATES` — fills the dangling reference in `ADR--PROMOTION-WORKFLOW` ("see ADR--HUMAN-REVIEW-GATES (TBD)"). Maps every atom type to a reviewer (Boss vs T3 self-review).
-2. Updated `msp_spec.md` §12 to reflect `ADR--PATH-ENCODING` (bare name like `evaAI`, not `D--<name>`). Removes the "open issue" framing.
+1. Wrote `[[ADR--HUMAN-REVIEW-GATES]]` — fills the dangling reference in `[[ADR--PROMOTION-WORKFLOW]]` ("see [[ADR--HUMAN-REVIEW-GATES]] (TBD)"). Maps every atom type to a reviewer (Boss vs T3 self-review).
+2. Updated `msp_spec.md` §12 to reflect `[[ADR--PATH-ENCODING]]` (bare name like `evaAI`, not `D--<name>`). Removes the "open issue" framing.
 
 ## Verification
 
@@ -37,3 +37,7 @@ Two changes:
 - Implemented by: @claude-opus-4-7
 - Verified by: validator + verify-flow + manual diff review
 - Date: 2026-05-03
+
+## Connections
+- [[ADR--AGENT-WRITE-BOUNDARIES]]
+

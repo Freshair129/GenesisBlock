@@ -120,4 +120,8 @@ Pure read + transform; no persistence. Episodic store unchanged.
 
 ## Source
 
-`msp_spec.md` §7d, `CONCEPT--CONSOLIDATOR` (compressor's input shape comes from M7b episodes), `FRAMEWORK--MSP-ARCHITECTURE-V2`.
+`msp_spec.md` §7d, `[[CONCEPT--CONSOLIDATOR]]` (compressor's input shape comes from M7b episodes), `[[FRAMEWORK--MSP-ARCHITECTURE-V2]]`.
+
+## Connections
+- [[FEAT--CONSOLIDATOR]]
+

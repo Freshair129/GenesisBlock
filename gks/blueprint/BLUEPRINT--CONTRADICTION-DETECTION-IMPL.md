@@ -424,7 +424,7 @@ implementation_order:
 - **PR template interaction** — note that the existing draft-PR convention (CLAUDE.md "Branching + PR conventions") still applies; the contradiction checklist is additive.
 - **Worktree caveat (CLAUDE.md)** — subagents executing any phase must `npm ci` in the worktree.
 - **Race condition lesson** — none of these phases write to `.brain/msp/projects/<ns>/inbound/` or `candidates/`; they write only to `gks/`, `src/`, `scripts/`, `test/`, `.github/`. No race risk.
-- **Coordination with `BLUEPRINT--INBOUND-TO-CANDIDATES-MIGRATION`** — Phase 4 of that BLUEPRINT marks `CONCEPT--INBOUND-QUEUE` as `superseded`. After both BLUEPRINTs ship through their respective Phase 1 (this one) and Phase 4 (inbound deprecation), Layer 1 PROTO must pass on that supersession pair; verify in the AUDIT.
+- **Coordination with `[[BLUEPRINT--INBOUND-TO-CANDIDATES-MIGRATION]]`** — Phase 4 of that BLUEPRINT marks `[[CONCEPT--INBOUND-QUEUE]]` as `superseded`. After both BLUEPRINTs ship through their respective Phase 1 (this one) and Phase 4 (inbound deprecation), Layer 1 PROTO must pass on that supersession pair; verify in the AUDIT.
 
 ## Implementer: do NOT do
 
@@ -438,10 +438,15 @@ implementation_order:
 
 ## Source
 
-- `CONCEPT--ATOM-CONTRADICTION-DETECTION` — motivation
-- `ADR--CONTRADICTION-DETECTION-STACK` — decisions
-- `PROTO--ALGO-PARAM-COUPLING` — template for Layer 1 PROTO
-- `PROTO--PHASE-GATES` — template for Layer 2 PROTO
+- `[[CONCEPT--ATOM-CONTRADICTION-DETECTION]]` — motivation
+- `[[ADR--CONTRADICTION-DETECTION-STACK]]` — decisions
+- `[[PROTO--ALGO-PARAM-COUPLING]]` — template for Layer 1 PROTO
+- `[[PROTO--PHASE-GATES]]` — template for Layer 2 PROTO
 - `src/validator/proto/loader.ts` — registration pattern
 - `@freshair129/gks` `createEmbedder` (3.6.0) — Layer 3 dependency
 - Anthropic Messages API docs — Layer 4 dependency
+
+## Connections
+- [[PROTO--RECIPROCAL-SUPERSESSION]]
+- [[PROTO--DOMAIN-UNIQUENESS]]
+

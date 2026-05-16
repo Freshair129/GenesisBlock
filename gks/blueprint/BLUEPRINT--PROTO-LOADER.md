@@ -186,7 +186,7 @@ dependency_for: M8b PROTO--PHASE-GATES, M8c PROTO--SCALING-LEVEL-GATE, M8d PROTO
 - **Predicate path resolution** — `linked_symbols[0].file` is relative to repo root; convert to file URL for dynamic import.
 - **Re-use atomicIndex loader** — `src/validator/atomic-index.ts` already loads `gks/00_index/atomic_index.jsonl`. Pass to the predicate context.
 - **No new deps**.
-- **PROTO--SAMPLE-RULE** ships at `status: draft` so it does NOT cause exit 1 even though it's loaded.
+- **[[PROTO--SAMPLE-RULE]]** ships at `status: draft` so it does NOT cause exit 1 even though it's loaded.
 
 ## Implementer: do NOT do
 
@@ -195,3 +195,9 @@ dependency_for: M8b PROTO--PHASE-GATES, M8c PROTO--SCALING-LEVEL-GATE, M8d PROTO
 - Add sandboxing for predicate exec
 - Modify the existing validator rules
 - Add PROTO discovery via Obsidian
+
+## Connections
+- [[FEAT--PROTO-LOADER]]
+- [[ADR--PROTO-ATOM-TYPE]]
+- [[CONCEPT--PROTO-PATTERN]]
+

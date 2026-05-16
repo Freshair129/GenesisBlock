@@ -113,3 +113,8 @@ which will pick up the new nomic embedder automatically.
 - [x] **fp32** — full precision, no quality trade-off
 - [x] **Show progress on first download** — log to stderr with percentage
 - [x] **Model fixed** — `nomic-ai/nomic-embed-text-v1.5` not configurable, keeps API simple
+
+## Connections
+- [[CONCEPT--EMBEDDING-STRATEGY]]
+- [[ADR--NOMIC-EMBEDDER]]
+

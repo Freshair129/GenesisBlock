@@ -27,7 +27,7 @@ created_at: 2026-05-03T18:01:44.663+07:00
 
 ## Scope
 
-Closes FEAT--MSP-PREPUSH-HOOK. Closes P1 #7 from M3 backlog.
+Closes [[FEAT--MSP-PREPUSH-HOOK]]. Closes P1 #7 from M3 backlog.
 
 ## Acceptance criteria from FEAT
 
@@ -62,3 +62,8 @@ Same precedent as M2 + M4a: bug recorded in audit, not as a separate INCIDENT/IS
 - Implemented by: @claude-opus-4-7
 - Verified by: 4/4 tests + dogfood (this audit + sibling M5 audits push through the hook)
 - Date: 2026-05-03
+
+## Connections
+- [[BLUEPRINT--MSP-PREPUSH-HOOK]]
+- [[ADR--MSP-PREPUSH-HOOK]]
+

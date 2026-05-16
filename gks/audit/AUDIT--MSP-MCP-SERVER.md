@@ -31,7 +31,7 @@ created_at: 2026-05-03T18:20:24.061+07:00
 
 ## Scope
 
-Closes FEAT--MSP-MCP-SERVER. Closes P1 #5 from M3 production-readiness backlog. Last large item from the post-M3 TODO list.
+Closes [[FEAT--MSP-MCP-SERVER]]. Closes P1 #5 from M3 production-readiness backlog. Last large item from the post-M3 TODO list.
 
 ## Acceptance criteria from FEAT
 
@@ -109,3 +109,10 @@ Same precedent as previous AUDITs: bug recorded in audit, not as separate INCIDE
 - Implemented by: @claude-opus-4-7
 - Verified by: 15/15 MCP tests + 233/233 total tests + manual stdio JSON-RPC smoke
 - Date: 2026-05-03
+
+## Connections
+- [[BLUEPRINT--MSP-MCP-SERVER]]
+- [[ADR--MSP-MCP-SERVER]]
+- [[FEAT--MSP-VALIDATOR]]
+- [[FEAT--CODEGEN-MICROTASK-RUNNER]]
+

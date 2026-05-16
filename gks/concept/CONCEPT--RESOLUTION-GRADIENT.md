@@ -106,15 +106,19 @@ This is policy-author responsibility, enforced by `pack-pii` and similar packs t
 ## Out of scope
 
 - Concrete hop-metric tuning (`w1` / `w2`) — see spec §14 OQ-1; working assumption `0.7 · sim + 0.3 · 1/(1+hops)`.
-- Cross-vault resolution policy (e.g. "atoms from `archive-vault` max out at SKELETON") — covered by Vault config, deferred to `FEAT--VAULT-COMPOSITION`.
-- LLM-side compression (re-summarising a FULL atom) — see `CONCEPT--CONTEXT-COMPRESSION`.
+- Cross-vault resolution policy (e.g. "atoms from `archive-vault` max out at SKELETON") — covered by Vault config, deferred to `[[FEAT--VAULT-COMPOSITION]]`.
+- LLM-side compression (re-summarising a FULL atom) — see `[[CONCEPT--CONTEXT-COMPRESSION]]`.
 - Skeleton title redaction implementation — domain-pack scope.
 
 ## Source
 
 - `packages/msp/docs/UNIVERSAL-CONTEXT-FRAMEWORK_spec.md` §6 — tier shapes, scoring, budget allocation, expand-on-demand.
 - Decision §0 D-2 — 2-tier MVP, 4-tier gated on Phase 3 telemetry.
-- `FRAMEWORK--UNIVERSAL-CONTEXT-FRAMEWORK` §10 Layer 4 — where this concept sits in the pipeline.
-- `CONCEPT--NAMESPACE-VAULT-BRAIN` — Vaults carry `resolution_policy`.
+- `[[FRAMEWORK--UNIVERSAL-CONTEXT-FRAMEWORK]]` §10 Layer 4 — where this concept sits in the pipeline.
+- `[[CONCEPT--NAMESPACE-VAULT-BRAIN]]` — Vaults carry `resolution_policy`.
 - Self-RAG (Asai et al., 2023) — prior art for agent-directed retrieval.
 - HippoRAG (Gutiérrez et al., 2024) — multi-hop retrieval over knowledge graphs.
+
+## Connections
+- [[CONCEPT--KNOWLEDGE-LAYERS-V2]]
+

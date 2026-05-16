@@ -26,8 +26,10 @@ export const Graph2DView: React.FC<Graph2DViewProps> = ({ notes, edges, focusId,
   const wrapRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [size, setSize] = useState({ w: 800, h: 600 });
-  const [hover, setHover] = useState<{ id: string; x: number; y: number } | null>(null);
   const [nodeSize, setNodeSize] = useState(1.0);
+  const [showTags, setShowTags] = useState(false);
+  const [showOrphans, setShowOrphans] = useState(true);
+  const [showFilters, setShowFilters] = useState(false);
 
   // Simulation state
   const simRef = useRef<{ nodes: SimNode[]; links: SimLink[] }>({ nodes: [], links: [] });
@@ -38,8 +40,10 @@ export const Graph2DView: React.FC<Graph2DViewProps> = ({ notes, edges, focusId,
 
   // Initialize simulation
   useEffect(() => {
+    const { notes: processedNotes, edges: processedEdges } = GKS_SERVICE.getGraphWithTags(notes, edges, showTags, showOrphans);
+
     const nodeMap = new Map<string, SimNode>();
-    const simNodes: SimNode[] = notes.map(n => {
+    const simNodes: SimNode[] = processedNotes.map(n => {
       const sn: SimNode = {
         ...n,
         x: (Math.random() - 0.5) * 600,
@@ -52,7 +56,7 @@ export const Graph2DView: React.FC<Graph2DViewProps> = ({ notes, edges, focusId,
       return sn;
     });
 
-    const simLinks: SimLink[] = edges
+    const simLinks: SimLink[] = processedEdges
       .map(e => {
         const s = nodeMap.get(e.source);
         const t = nodeMap.get(e.target);
@@ -63,10 +67,11 @@ export const Graph2DView: React.FC<Graph2DViewProps> = ({ notes, edges, focusId,
         }
         return null;
       })
-      .filter((l): l is SimLink => !!l);
+      .filter((l): l is SimLink[] => !!l)
+      .flat();
 
     simRef.current = { nodes: simNodes, links: simLinks };
-  }, [notes, edges]);
+  }, [notes, edges, showTags, showOrphans]);
 
   // Resize handler
   useEffect(() => {
@@ -219,11 +224,16 @@ export const Graph2DView: React.FC<Graph2DViewProps> = ({ notes, edges, focusId,
       const isDim = focusId && !isFocus && !isNbr;
       const r = Math.max(2, (3 + Math.sqrt(n.deg) * 1.5) * k * nodeSize);
 
-      const meta = GKS_SERVICE.TYPE_META[n.type as NoteType] || { raw: '#6b7390' };
+      const isTag = n.id.startsWith('tag:');
+      const meta = isTag ? { raw: 'rgba(124, 92, 255, 0.9)' } : (GKS_SERVICE.TYPE_META[n.type as NoteType] || { raw: '#6b7390' });
       
       ctx.fillStyle = isDim ? 'rgba(60, 60, 70, 0.3)' : meta.raw;
       ctx.beginPath();
-      ctx.arc(nx, ny, r, 0, Math.PI * 2);
+      if (isTag) {
+        ctx.rect(nx - 3*k, ny - 3*k, 6*k, 6*k); // Square for tags
+      } else {
+        ctx.arc(nx, ny, r, 0, Math.PI * 2);
+      }
       ctx.fill();
 
       if (isFocus) {
@@ -350,16 +360,32 @@ export const Graph2DView: React.FC<Graph2DViewProps> = ({ notes, edges, focusId,
           drag to pan · scroll to zoom · click to focus
         </div>
       </div>
-      <div className="graph-controls">
-        <div className="row">
-          <label>Node size</label>
-          <input type="range" min="0.3" max="3" step="0.1" value={nodeSize}
-                 onChange={e => setNodeSize(+e.target.value)} />
-        </div>
+      <div className="graph-controls" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+        <button className="filter-toggle" onClick={() => setShowFilters(!showFilters)}
+                style={{ background: 'var(--bg-3)', border: '1px solid var(--border)', borderRadius: 6, padding: '4px 8px', color: 'var(--text)', cursor: 'pointer', fontSize: 12 }}>
+          Filters {showFilters ? '▼' : '▶'}
+        </button>
+        {showFilters && (
+          <div className="filter-panel" style={{ background: 'var(--bg-3)', border: '1px solid var(--border)', borderRadius: 8, padding: 12, display: 'flex', flexDirection: 'column', gap: 10, minWidth: 160, boxShadow: '0 8px 24px rgba(0,0,0,0.3)' }}>
+            <div className="row" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <label style={{ fontSize: 11, color: 'var(--text-mute)' }}>Tags</label>
+              <input type="checkbox" checked={showTags} onChange={e => setShowTags(e.target.checked)} />
+            </div>
+            <div className="row" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <label style={{ fontSize: 11, color: 'var(--text-mute)' }}>Orphans</label>
+              <input type="checkbox" checked={showOrphans} onChange={e => setShowOrphans(e.target.checked)} />
+            </div>
+            <div className="row" style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+              <label style={{ fontSize: 11, color: 'var(--text-mute)' }}>Node size</label>
+              <input type="range" min="0.3" max="3" step="0.1" value={nodeSize}
+                     onChange={e => setNodeSize(+e.target.value)} style={{ width: '100%' }} />
+            </div>
+          </div>
+        )}
       </div>
       {hover && (
-        <div className="node-hover" style={{ left: hover.x, top: hover.y }}>
-          <b>{hover.id}</b>
+        <div className="node-hover" style={{ left: hover.x, top: hover.y, pointerEvents: 'none' }}>
+          <b>{hover.title || hover.id}</b>
         </div>
       )}
     </div>

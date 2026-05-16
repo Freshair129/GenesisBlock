@@ -69,3 +69,8 @@ The GKS embedder must handle this internally — callers do not prepend prefixes
 3. OpenAI (cloud, if OPENAI_API_KEY set)
 4. Mock (random vectors, tests only)
 ```
+
+## Connections
+- [[CONCEPT--EMBEDDING-STRATEGY]]
+- [[BLUEPRINT--NOMIC-EMBEDDER]]
+

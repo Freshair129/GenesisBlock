@@ -21,7 +21,7 @@ created_at: 2026-05-10T07:00:00.000+07:00
 
 ## Problem
 
-`CONCEPT--AGENT-AGNOSTIC` declared MSP must plug into any cognitive-layer client. That declaration is necessary but not sufficient — without a single, predictable wire-in pattern, every client team reinvents the integration: different env vars, different config file shapes, different project-resolution heuristics, different identity merge order.
+`[[CONCEPT--AGENT-AGNOSTIC]]` declared MSP must plug into any cognitive-layer client. That declaration is necessary but not sufficient — without a single, predictable wire-in pattern, every client team reinvents the integration: different env vars, different config file shapes, different project-resolution heuristics, different identity merge order.
 
 The result is fragmentation that defeats the agent-agnostic intent. A user moving from Claude Code to Gemini CLI shouldn't have to relearn MSP. A clinic project shared across Antigravity (human-supervised) and a headless CI bot shouldn't fork its config.
 
@@ -33,7 +33,7 @@ Every MSP-integrated client must:
 
 1. **Launch `msp-mcp-server` as an MCP stdio server.** The bin is the only supported surface. No client should re-implement MSP tools by parsing `.brain/msp/projects/<ns>/` directly. The bin is published from this repo's `package.json` (see `bin.msp-mcp-server`); installation is via `npm install -g msp` or vendored.
 
-2. **Honor the project-resolution chain** from `CONCEPT--NAMED-PROJECT-REGISTRY`:
+2. **Honor the project-resolution chain** from `[[CONCEPT--NAMED-PROJECT-REGISTRY]]`:
    - `--project=<name>` CLI flag / MCP tool argument (highest priority)
    - `MSP_PROJECT=<name>` env var
    - `.mspconfig` in cwd or any ancestor
@@ -41,7 +41,7 @@ Every MSP-integrated client must:
 
    Clients pass through whichever of these the user supplies; they do not inject their own override.
 
-3. **Merge global identity + workspace override** per `ADR--GLOBAL-VS-WORKSPACE`:
+3. **Merge global identity + workspace override** per `[[ADR--GLOBAL-VS-WORKSPACE]]`:
    - Read `~/.msp/identity.json` (or `$MSP_HOME/identity.json` if set) as the base.
    - Shallow-merge `./.brain/msp/projects/<ns>/identity.override.json` if present.
    - Result is the resolved `Identity` object the agent sees.
@@ -122,4 +122,8 @@ Two reasons:
 
 ## Source
 
-Phase C of the architecture-doc cleanup (2026-05-10). Operationalises `CONCEPT--AGENT-AGNOSTIC` by enumerating the contract every cognitive-layer client honors and the three shapes that contract takes. Concrete wiring snippets live in `docs/AGENT-INTEGRATION.md`. See `AUDIT--PHASE-C-AGENT-INTEGRATION-DOCS`.
+Phase C of the architecture-doc cleanup (2026-05-10). Operationalises `[[CONCEPT--AGENT-AGNOSTIC]]` by enumerating the contract every cognitive-layer client honors and the three shapes that contract takes. Concrete wiring snippets live in `docs/AGENT-INTEGRATION.md`. See `[[AUDIT--PHASE-C-AGENT-INTEGRATION-DOCS]]`.
+
+## Connections
+- [[FRAMEWORK--MSP-ARCHITECTURE-V2]]
+

@@ -20,7 +20,7 @@ created_at: 2026-05-14T18:37:52.572+07:00
 
 # ADR — Transport-agnostic enforcement
 
-> Implements the PEP side of `CONCEPT--ABAC-POLICY-ENGINE`. No spec decision id — this is an architecture decision derived from spec §7.
+> Implements the PEP side of `[[CONCEPT--ABAC-POLICY-ENGINE]]`. No spec decision id — this is an architecture decision derived from spec §7.
 
 ## Context
 
@@ -31,7 +31,7 @@ MSP exposes the same logical operations (recall, retain, expose-to-llm, runTask,
 - **In-process facade** — `createCognitiveLayer(...)` methods called directly by embedding code.
 - **Scheduled / internal** — re-indexers, consolidators, background jobs.
 
-`CONCEPT--ABAC-POLICY-ENGINE` mandates that **every** entry point consult the PDP. The question is **how** enforcement is wired: one check shared across transports, or one per transport, and where in each transport's request path it sits.
+`[[CONCEPT--ABAC-POLICY-ENGINE]]` mandates that **every** entry point consult the PDP. The question is **how** enforcement is wired: one check shared across transports, or one per transport, and where in each transport's request path it sits.
 
 Getting this wrong produces either gaps (a transport with no PEP — silent bypass) or duplication (each transport re-implements decision logic — drift).
 
@@ -60,9 +60,9 @@ Positive:
 
 Negative / accepted costs:
 
-- Every transport pays a PDP call on the hot path. Mitigated by decision caching (per `CONCEPT--ABAC-POLICY-ENGINE`) keyed on the 4-tuple hash.
+- Every transport pays a PDP call on the hot path. Mitigated by decision caching (per `[[CONCEPT--ABAC-POLICY-ENGINE]]`) keyed on the 4-tuple hash.
 - Four PEPs to maintain. Bounded — they are thin by construction, and the registry test prevents silent omission.
-- The 4-tuple must be constructible from every transport. For transports with weak identity (MCP stdio is local-trust), the PEP constructs a best-effort Subject; this is a known limitation addressed by `CONCEPT--STEP-UP-AUTH` for high-risk MCP tools.
+- The 4-tuple must be constructible from every transport. For transports with weak identity (MCP stdio is local-trust), the PEP constructs a best-effort Subject; this is a known limitation addressed by `[[CONCEPT--STEP-UP-AUTH]]` for high-risk MCP tools.
 
 ## Alternatives considered
 
@@ -75,6 +75,10 @@ Negative / accepted costs:
 ## Source
 
 - `docs/msp/UNIVERSAL-CONTEXT-FRAMEWORK_spec.md` §7 (PDP/PEP), §7.6 (PEP integration points), §10 (five-layer pipeline).
-- `CONCEPT--ABAC-POLICY-ENGINE` — the PDP these PEPs consult.
-- `CONCEPT--SUBJECT-RESOURCE-ACTION-CONTEXT` — the 4-tuple each PEP constructs.
-- `CONCEPT--STEP-UP-AUTH` — handles the weak-identity case for MCP stdio.
+- `[[CONCEPT--ABAC-POLICY-ENGINE]]` — the PDP these PEPs consult.
+- `[[CONCEPT--SUBJECT-RESOURCE-ACTION-CONTEXT]]` — the 4-tuple each PEP constructs.
+- `[[CONCEPT--STEP-UP-AUTH]]` — handles the weak-identity case for MCP stdio.
+
+## Connections
+- [[FRAMEWORK--UNIVERSAL-CONTEXT-FRAMEWORK]]
+

@@ -52,6 +52,11 @@ Every `Tool` node MUST have a `name` attribute matching the string identifier us
 A `Page` node in `app/dashboard/page.tsx` that lacks a `RENDERS_AT` edge to `/dashboard` violates Rule 1.
 
 ## Source
-- `FEAT--SYMBOLS-FRAMEWORK-AWARENESS`
-- `ALGO--SYMBOLS-FRAMEWORK-RECOGNITION`
+- `[[FEAT--SYMBOLS-FRAMEWORK-AWARENESS]]`
+- `[[ALGO--SYMBOLS-FRAMEWORK-RECOGNITION]]`
 - Next.js routing documentation
+
+## Connections
+- [[ADR--SYMBOLS-FRAMEWORK-AWARENESS]]
+- [[CONCEPT--SYMBOLS-FRAMEWORK-AWARENESS]]
+

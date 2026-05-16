@@ -36,7 +36,7 @@ created_at: 2026-05-05T16:18:00.000+07:00
 
 ## Scope
 
-M7c deliverable: `recall(opts)` orchestrator implementing the read-side fan-out + Reciprocal Rank Fusion pipeline per `FEAT--RETRIEVAL-ORCHESTRATION`, `BLUEPRINT--RETRIEVAL-ORCHESTRATION`, and `ADR--RETRIEVAL-RRF-FUSION`. Fans out across four sources (GKS vector / Obsidian text / episodic / backlinks), races each against per-source budgets, fuses surviving results via RRF with per-source weights, and returns ranked hits with provenance + timings + fallback reasons.
+M7c deliverable: `recall(opts)` orchestrator implementing the read-side fan-out + Reciprocal Rank Fusion pipeline per `[[FEAT--RETRIEVAL-ORCHESTRATION]]`, `[[BLUEPRINT--RETRIEVAL-ORCHESTRATION]]`, and `[[ADR--RETRIEVAL-RRF-FUSION]]`. Fans out across four sources (GKS vector / Obsidian text / episodic / backlinks), races each against per-source budgets, fuses surviving results via RRF with per-source weights, and returns ranked hits with provenance + timings + fallback reasons.
 
 ## What shipped
 
@@ -71,11 +71,11 @@ M7c deliverable: `recall(opts)` orchestrator implementing the read-side fan-out 
 
 | Atom | Phase | Type |
 |---|---|---|
-| `CONCEPT--RETRIEVAL-ORCHESTRATION` | 1 | concept (existed) |
-| `ADR--RETRIEVAL-RRF-FUSION` | 2 | adr (existed) |
-| `FEAT--RETRIEVAL-ORCHESTRATION` | 2 | feat (existed) |
-| `BLUEPRINT--RETRIEVAL-ORCHESTRATION` | 3 | blueprint (existed) |
-| `AUDIT--RETRIEVAL-ORCHESTRATION` | 6 | audit (this atom) |
+| `[[CONCEPT--RETRIEVAL-ORCHESTRATION]]` | 1 | concept (existed) |
+| `[[ADR--RETRIEVAL-RRF-FUSION]]` | 2 | adr (existed) |
+| `[[FEAT--RETRIEVAL-ORCHESTRATION]]` | 2 | feat (existed) |
+| `[[BLUEPRINT--RETRIEVAL-ORCHESTRATION]]` | 3 | blueprint (existed) |
+| `[[AUDIT--RETRIEVAL-ORCHESTRATION]]` | 6 | audit (this atom) |
 
 ## Verification
 
@@ -95,7 +95,7 @@ Test count delta: 350 → 397 (+47; target was +45, exceeded). Per-file breakdow
   - `sources/backlinks.test.ts`: 6 tests (target 6)
   - `index.test.ts`: 10 tests (target 10)
 
-## Acceptance criteria from `FEAT--RETRIEVAL-ORCHESTRATION`
+## Acceptance criteria from `[[FEAT--RETRIEVAL-ORCHESTRATION]]`
 
 - [x] `recall(opts)` returns `RetrievalResult` with `hits`, `semantic_available`, `obsidian_available`, `fallback_reasons`, `timings`
 - [x] Parallel fan-out — phase-A's 3 sources run concurrently via `Promise.allSettled`
@@ -125,7 +125,7 @@ These choices were not pre-specified by the BLUEPRINT and are recorded for futur
 
 5. **Backlinks neighbours exclude the candidate set itself** — preventing a candidate atom from earning extra RRF points just because it's in its own 1-hop closure. Tested directly via the dedup/score tests.
 
-6. **Obsidian source `atomIdFromPath` accepts atom-id basenames AND non-atom basenames.** Real Obsidian vaults contain free-form notes; we don't want to drop them just because they don't match `TYPE--SLUG`. The basename-without-extension serves as a stable identifier that other sources will rarely collide with (atom IDs match `[A-Z][A-Z0-9-]+--[A-Z0-9-]+`).
+6. **Obsidian source `atomIdFromPath` accepts atom-id basenames AND non-atom basenames.** Real Obsidian vaults contain free-form notes; we don't want to drop them just because they don't match `[[TYPE--SLUG]]`. The basename-without-extension serves as a stable identifier that other sources will rarely collide with (atom IDs match `[A-Z][A-Z0-9-]+--[A-Z0-9-]+`).
 
 7. **Episodic source ties on score break by recency (timestamp DESC).** ADR weights episodic at 1.2 with rationale "recent context is high-signal"; the secondary tie-break inside the episodic source itself (before fusion) honours that intent. atomId lex is the tertiary tie-break for determinism.
 
@@ -172,7 +172,7 @@ Lower-level entry points are also re-exported from `index.ts` for advanced use: 
 
 - M7f — MCP tool wrapper (`msp_recall`)
 - M9 — Cross-namespace recall + tenant auth
-- M9 — `PARAM--RETRIEVAL-WEIGHTS` atom for traceable default-weight tuning
+- M9 — `[[PARAM--RETRIEVAL-WEIGHTS]]` atom for traceable default-weight tuning
 - M10c — Cross-encoder re-rank top-50
 - Cache layer — only if real-traffic measurements show retrieval > 500ms
 - Query rewriting / HyDE — out of M7
@@ -182,3 +182,7 @@ Lower-level entry points are also re-exported from `index.ts` for advanced use: 
 - Implemented by: @claude-opus-4-7
 - Verified by: 47 new tests + typecheck clean + npm ci clean
 - Branch: `claude/msp-m7c-retrieval-impl`
+
+## Connections
+- [[FRAMEWORK--MSP-ARCHITECTURE-V2]]
+

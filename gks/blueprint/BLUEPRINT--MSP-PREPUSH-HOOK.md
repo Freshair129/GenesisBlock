@@ -106,3 +106,8 @@ T1 READ-STDIN (parse git pre-push protocol)
 T2 DETECT-TOUCHED-FEATS (git diff filter)
 T3 RUN-VERIFY-FLOW (loop + aggregate)
 + extend install.sh + README + smoke test
+
+## Connections
+- [[FEAT--MSP-PREPUSH-HOOK]]
+- [[ADR--MSP-PREPUSH-HOOK]]
+

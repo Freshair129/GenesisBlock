@@ -71,4 +71,4 @@ Running the indexer twice with no atom changes produces byte-identical output. I
 
 ## Source
 
-`CONCEPT--MEMORY-BACKLINKS-INDEXER` + `CONCEPT--MEMORY-VECTOR-BACKLINKS`.
+`[[CONCEPT--MEMORY-BACKLINKS-INDEXER]]` + `[[CONCEPT--MEMORY-VECTOR-BACKLINKS]]`.

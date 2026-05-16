@@ -23,7 +23,7 @@ created_at: 2026-05-14T18:37:51.127+07:00
 
 ## Context
 
-`CONCEPT--ABAC-POLICY-ENGINE` requires a Policy Decision Point (PDP) consulted at every entry point. The rules the PDP evaluates can be expressed three ways:
+`[[CONCEPT--ABAC-POLICY-ENGINE]]` requires a Policy Decision Point (PDP) consulted at every entry point. The rules the PDP evaluates can be expressed three ways:
 
 1. **As code** — TypeScript functions, one per rule, compiled into MSP.
 2. **As a custom DSL** — a small YAML / JSON dialect with a bounded operator set, interpreted at runtime.
@@ -56,7 +56,7 @@ Positive:
 - Domain teams author policy in YAML — no TypeScript, no deploy, no engineer in the loop.
 - The PDP stays a pure function: parse YAML once, evaluate against the 4-tuple.
 - Rules are fixture-testable — a policy file plus a set of `(subject, resource, action, context) → expected decision` cases.
-- Hot reload makes shadow-mode iteration (per `ADR--DEFAULT-POLICY-POSTURE`) fast.
+- Hot reload makes shadow-mode iteration (per `[[ADR--DEFAULT-POLICY-POSTURE]]`) fast.
 - ~200 LOC is small enough to audit fully.
 
 Negative / accepted costs:
@@ -76,6 +76,10 @@ Negative / accepted costs:
 ## Source
 
 - `docs/msp/UNIVERSAL-CONTEXT-FRAMEWORK_spec.md` §0 (D-1), §7.3 — policy file format and migration trigger.
-- `CONCEPT--ABAC-POLICY-ENGINE` — the PDP this policy format feeds.
+- `[[CONCEPT--ABAC-POLICY-ENGINE]]` — the PDP this policy format feeds.
 - Cedar (AWS) — designated v2 migration target.
 - Open Policy Agent / Rego — alternative v2 backend.
+
+## Connections
+- [[FRAMEWORK--UNIVERSAL-CONTEXT-FRAMEWORK]]
+

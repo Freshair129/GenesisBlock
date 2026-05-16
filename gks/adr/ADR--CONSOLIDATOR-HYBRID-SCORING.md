@@ -136,11 +136,16 @@ LLM calls are non-deterministic by default (`temperature > 0`). Two strategies:
 
 ## What this ADR does NOT decide
 
-- **Episode-boundary detection algorithm** — that's a separate concern in `CONCEPT--CONSOLIDATOR`. Default impl: keyword-overlap with previous chunk; below threshold = boundary.
-- **Summariser prompt shape** — see `BLUEPRINT--CONSOLIDATOR`.
+- **Episode-boundary detection algorithm** — that's a separate concern in `[[CONCEPT--CONSOLIDATOR]]`. Default impl: keyword-overlap with previous chunk; below threshold = boundary.
+- **Summariser prompt shape** — see `[[BLUEPRINT--CONSOLIDATOR]]`.
 - **Where the consolidator runs** — caller's choice (session-end hook, MCP `msp_remember` tool, manual CLI).
 - **Tier-1 thresholds finalisation** — defaults in this ADR are starting points; tuning belongs in a `PARAM--` atom (M9).
 
 ## Source
 
-`msp_spec.md` §7c (passport consolidator), `CONCEPT--CONSOLIDATOR`, user direction (M7-prep follow-up cleanup).
+`msp_spec.md` §7c (passport consolidator), `[[CONCEPT--CONSOLIDATOR]]`, user direction (M7-prep follow-up cleanup).
+
+## Connections
+- [[CONCEPT--MEMORY-EPISODIC]]
+- [[CONCEPT--SLM-OLLAMA-CLIENT]]
+

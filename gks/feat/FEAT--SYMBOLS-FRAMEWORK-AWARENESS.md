@@ -29,12 +29,12 @@ created_at: 2026-05-12T04:48:00.000+07:00
 
 > ⚠️ **Superseded on 2026-05-11.** This FEAT bundled four concerns (motivation, decision, algorithms, invariants) which violates atom-type semantics per `KNOWLEDGE-TYPES.md`. It has been decomposed into:
 >
-> - `CONCEPT--SYMBOLS-FRAMEWORK-AWARENESS` (motivation, scope)
-> - `ADR--SYMBOLS-FRAMEWORK-AWARENESS` (decision + decomposition rationale)
-> - `ALGO--SYMBOLS-FRAMEWORK-RECOGNITION` (algorithms per recognizer)
-> - `PROTO--SYMBOLS-FRAMEWORK-INVARIANTS` (validator-enforced graph invariants)
+> - `[[CONCEPT--SYMBOLS-FRAMEWORK-AWARENESS]]` (motivation, scope)
+> - `[[ADR--SYMBOLS-FRAMEWORK-AWARENESS]]` (decision + decomposition rationale)
+> - `[[ALGO--SYMBOLS-FRAMEWORK-RECOGNITION]]` (algorithms per recognizer)
+> - `[[PROTO--SYMBOLS-FRAMEWORK-INVARIANTS]]` (validator-enforced graph invariants)
 >
-> See `ADR--SYMBOLS-FRAMEWORK-AWARENESS` for rationale. Implementation work continues per `HANDOFF-SYMBOLS-EXPANSION-PHASE-2.md`.
+> See `[[ADR--SYMBOLS-FRAMEWORK-AWARENESS]]` for rationale. Implementation work continues per `HANDOFF-SYMBOLS-EXPANSION-PHASE-2.md`.
 >
 > The original content below is preserved verbatim for historical reference.
 
@@ -103,7 +103,14 @@ created_at: 2026-05-12T04:48:00.000+07:00
 
 ## Source
 
-- `FEAT--SYMBOLS-MULTI-LANG`
+- `[[FEAT--SYMBOLS-MULTI-LANG]]`
 - `packages/msp/src/symbols/parser/typescript.ts`
 - Next.js File-based routing documentation
 - Prisma Schema reference
+
+## Connections
+- [[ADR--SYMBOL-GRAPH-PERSISTENCE]]
+- [[FRAMEWORK--SYMBOL-GRAPH]]
+- [[CONCEPT--SYMBOL-GRAPH]]
+- [[FEAT--MSP-SYMBOL-MCP]]
+

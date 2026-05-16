@@ -29,7 +29,7 @@ created_at: 2026-05-12T05:12:00.000+07:00
 
 ## Scope verified
 
-The implementation of `FEAT--SYMBOLS-MULTI-LANG` per `BLUEPRINT--SYMBOLS-MULTI-LANG`:
+The implementation of `[[FEAT--SYMBOLS-MULTI-LANG]]` per `[[BLUEPRINT--SYMBOLS-MULTI-LANG]]`:
 - TypeScript parser kept as-is (existing baseline, refactored to async)
 - Python parser added via `web-tree-sitter` (WASM-loaded grammar)
 - COBOL parser added as regex-based (PROGRAM-ID, SECTION/DIVISION, PERFORM/CALL)
@@ -66,8 +66,8 @@ Duration: 3.36s (transform 174ms, setup 0ms, collect 646ms, tests 2.52s, prepare
 
 | Plan item | Deviation | Reason |
 |---|---|---|
-| `ADR--SYMBOLS-PYTHON-PARSER` `tier: architecture` | warning (validator wants `safety \| master \| genesis \| process`) | Kept `architecture` to match the convention of existing ADRs in `gks/adr/`; warning-only, not blocking |
-| `ADR--SYMBOLS-COBOL-STRATEGY` `tier: architecture` | same | same |
+| `[[ADR--SYMBOLS-PYTHON-PARSER]]` `tier: architecture` | warning (validator wants `safety \| master \| genesis \| process`) | Kept `architecture` to match the convention of existing ADRs in `gks/adr/`; warning-only, not blocking |
+| `[[ADR--SYMBOLS-COBOL-STRATEGY]]` `tier: architecture` | same | same |
 | `created_at` in 3 new atoms | initially set to local TH+7 time → tripped `future-date` validator | Corrected to UTC during this audit; root cause: handoff §4.1 warned but Antigravity agent didn't apply. Improvement for future handoffs: have agents echo `date -u` before authoring atoms |
 
 ## Anti-hallucination check
@@ -77,14 +77,18 @@ Duration: 3.36s (transform 174ms, setup 0ms, collect 646ms, tests 2.52s, prepare
 
 ## Follow-ups (handled in next PRs)
 
-- **PR 2** (`FEAT--SYMBOLS-FRAMEWORK-AWARENESS`): Next.js routing/server-client/data-fetching awareness — FEAT already extended with §1b detail
-- **PR 3** (`FEAT--SYMBOLS-PROCESS-TRACING`): cross-file CALL resolution + entry-point-to-leaf tracer + new `symbol_trace` MCP tool
-- **Closed by future ADR**: tree-sitter-cobol upgrade decision (deferred per `ADR--SYMBOLS-COBOL-STRATEGY`)
+- **PR 2** (`[[FEAT--SYMBOLS-FRAMEWORK-AWARENESS]]`): Next.js routing/server-client/data-fetching awareness — FEAT already extended with §1b detail
+- **PR 3** (`[[FEAT--SYMBOLS-PROCESS-TRACING]]`): cross-file CALL resolution + entry-point-to-leaf tracer + new `symbol_trace` MCP tool
+- **Closed by future ADR**: tree-sitter-cobol upgrade decision (deferred per `[[ADR--SYMBOLS-COBOL-STRATEGY]]`)
 
 ## Source
 
-- `FEAT--SYMBOLS-MULTI-LANG` (intent + acceptance)
-- `BLUEPRINT--SYMBOLS-MULTI-LANG` (impl plan)
-- `ADR--SYMBOLS-PYTHON-PARSER`, `ADR--SYMBOLS-COBOL-STRATEGY` (decisions)
+- `[[FEAT--SYMBOLS-MULTI-LANG]]` (intent + acceptance)
+- `[[BLUEPRINT--SYMBOLS-MULTI-LANG]]` (impl plan)
+- `[[ADR--SYMBOLS-PYTHON-PARSER]]`, `[[ADR--SYMBOLS-COBOL-STRATEGY]]` (decisions)
 - `HANDOFF-SYMBOLS-EXPANSION.md` (process contract followed for this PR)
 - Implementation by Antigravity agent (2026-05-11); PR-closure + AUDIT authored by Claude in MSP main repo
+
+## Connections
+- [[FRAMEWORK--SYMBOL-GRAPH]]
+

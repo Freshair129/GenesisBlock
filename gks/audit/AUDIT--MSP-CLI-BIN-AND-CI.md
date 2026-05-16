@@ -28,7 +28,7 @@ created_at: 2026-05-03T16:20:06.903+07:00
 
 ## Scope
 
-L1 infrastructure work — no FEAT chain ceremony per `FRAMEWORK--SCALING-LEVELS`. Closes P0 items #3 and #4 from the production-readiness TODO.
+L1 infrastructure work — no FEAT chain ceremony per `[[FRAMEWORK--SCALING-LEVELS]]`. Closes P0 items #3 and #4 from the production-readiness TODO.
 
 ## Changes
 
@@ -83,7 +83,7 @@ npm run build
 
 **Symptom**: First CI run on PR #5 — Node 20 job failed in 35 s, Node 22 cancelled in cascade because `fail-fast` was at its default `true`.
 
-**Root cause**: `.brain/msp/projects/<ns>/vector/backlinks.jsonl` is gitignored (it's a derived artifact, per `ADR--MEMORY-BACKLINKS-INDEXER`). On a fresh checkout the file doesn't exist. My `--check` semantics treated "no existing file" as "drift from empty" → exit 1, every CI run forever.
+**Root cause**: `.brain/msp/projects/<ns>/vector/backlinks.jsonl` is gitignored (it's a derived artifact, per `[[ADR--MEMORY-BACKLINKS-INDEXER]]`). On a fresh checkout the file doesn't exist. My `--check` semantics treated "no existing file" as "drift from empty" → exit 1, every CI run forever.
 
 **Fix** (commit `985684b`):
 
@@ -99,7 +99,7 @@ npm run msp:backlinks                # exit 0 (creates)
 npm run msp:backlinks -- --check     # exit 0 (no-op)
 ```
 
-**Classification (per discussion in chat)**: not an INCIDENT (no prod impact), not a HOTFIX (no chain bypass), not worth a standalone ISSUE-- (caught + fixed in the same PR before merge). Recorded here following the precedent in `AUDIT--MSP-VALIDATOR` "Bugs found during M2 dogfood".
+**Classification (per discussion in chat)**: not an INCIDENT (no prod impact), not a HOTFIX (no chain bypass), not worth a standalone ISSUE-- (caught + fixed in the same PR before merge). Recorded here following the precedent in `[[AUDIT--MSP-VALIDATOR]]` "Bugs found during M2 dogfood".
 
 **Re-verification after fix**: PR #5 second CI run — Node 20 ✅, Node 22 ✅.
 
@@ -108,3 +108,9 @@ npm run msp:backlinks -- --check     # exit 0 (no-op)
 - Implemented by: @claude-opus-4-7
 - Verified by: build runs clean; bin executes; PR #5 CI green on Node 20 + 22 after the bug-fix commit
 - Date: 2026-05-03
+
+## Connections
+- [[FEAT--MSP-VALIDATOR]]
+- [[FEAT--MEMORY-BACKLINKS-INDEXER]]
+- [[FEAT--CODEGEN-MICROTASK-RUNNER]]
+

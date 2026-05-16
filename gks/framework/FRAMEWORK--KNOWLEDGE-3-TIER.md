@@ -24,7 +24,7 @@ created_at: 2026-05-09T14:30:00.000+07:00
 
 ## Why this frame exists
 
-`CONCEPT--KNOWLEDGE-LAYERS-V2` settled the **storage** question (sessions / episodes / candidates / canon). This frame settles the **knowledge-class** question on top: of all atoms in `gks/`, which are stable cross-cutting anchors agents need at session start, which are everyday knowledge fetched on demand, and which are the rails outside reasoning that prevent unsafe writes?
+`[[CONCEPT--KNOWLEDGE-LAYERS-V2]]` settled the **storage** question (sessions / episodes / candidates / canon). This frame settles the **knowledge-class** question on top: of all atoms in `gks/`, which are stable cross-cutting anchors agents need at session start, which are everyday knowledge fetched on demand, and which are the rails outside reasoning that prevent unsafe writes?
 
 Without this distinction the codebase has 181 atoms flat — every session re-discovers `CLAUDE.md` rules, doc-to-code order, supersession discipline, tech-stack decisions. Putting an explicit tier on each atom turns that re-discovery into a stable preamble.
 
@@ -36,13 +36,13 @@ Without this distinction the codebase has 181 atoms flat — every session re-di
 
 **Storage:** `src/validator/`, `gks/proto/`, `.github/workflows/`, `examples/hooks/`. Atom representations of these rules carry `tier: safety`.
 
-**Examples:** `PROTO--AUTHORITY-ENFORCEMENT`, `PROTO--SUMMARY-MIN`, `PROTO--MASTER-TOKEN-CAP` (future), validator forbidden-fields rule, pre-commit validator gate.
+**Examples:** `[[PROTO--AUTHORITY-ENFORCEMENT]]`, `[[PROTO--SUMMARY-MIN]]`, `[[PROTO--MASTER-TOKEN-CAP]]` (future), validator forbidden-fields rule, pre-commit validator gate.
 
 ### Master Block
 
 **Definition:** stable, cross-cutting knowledge with **absolute meaning** — true regardless of session, project, or context. Like instinct passed down generation to generation: even when the origin is forgotten, the directive holds.
 
-**How they get created:** Master atoms are **promoted from Genesis**, not authored directly. A Genesis atom that proves cross-context stability over time becomes a candidate for promotion via a `ADR--MASTER-PROMOTION-<SLUG>` evidence ADR. See PR-5 of the rollout plan and `PROTO--MASTER-BODY-SCHEMA` (future) for the body contract.
+**How they get created:** Master atoms are **promoted from Genesis**, not authored directly. A Genesis atom that proves cross-context stability over time becomes a candidate for promotion via a `[[ADR--MASTER-PROMOTION]]-<SLUG>` evidence ADR. See PR-5 of the rollout plan and `[[PROTO--MASTER-BODY-SCHEMA]]` (future) for the body contract.
 
 **Frontmatter contract:**
 
@@ -56,7 +56,7 @@ promotion_adr: ADR--MASTER-PROMOTION-<SLUG>
 # absolute and origin-less.
 ```
 
-**Body contract** (enforced by future `PROTO--MASTER-BODY-SCHEMA`):
+**Body contract** (enforced by future `[[PROTO--MASTER-BODY-SCHEMA]]`):
 
 ```
 ## Intent (1–2 sentences — what behavior this Master enforces)
@@ -66,7 +66,7 @@ promotion_adr: ADR--MASTER-PROMOTION-<SLUG>
 ## Conflicts with (atom IDs that may contradict — for resolution)
 ```
 
-**Token cap:** body ≤ 400 tokens warn / ≤ 600 error (future `PROTO--MASTER-TOKEN-CAP`). Master atoms must stay prompt-injectable.
+**Token cap:** body ≤ 400 tokens warn / ≤ 600 error (future `[[PROTO--MASTER-TOKEN-CAP]]`). Master atoms must stay prompt-injectable.
 
 **Loader:** `npm run msp:master compose <ID1> <ID2> ...` (future PR-6) returns concatenated bodies as a system-prompt fragment.
 
@@ -121,12 +121,16 @@ These fields are added to the runtime contract (`atomic_contract.yaml`) as permi
 - **Master atom auto-injection** into MCP clients (Claude Code / Gemini CLI / Codex). PR-6 ships a CLI loader; downstream auto-inject hook is post-roadmap.
 - **Conflict resolution between Master atoms.** When two Masters loaded together contradict, no rule yet. Defer; flag in `MASTER--*` body §"Conflicts with".
 - **Cross-project Master portability.** Whether a Master tagged in MSP can be loaded in `gitnexus`, `eva`, or other projects. Test post-roadmap.
-- **CLAUDE.md migration.** CLAUDE.md remains the human contract; Master atoms describe rules that overlap with it. Drift is mitigated by `MASTER--ATOM-CONTRADICTION-POLICY` (PR-5) declaring Master atoms SSOT for the rules they distill.
+- **CLAUDE.md migration.** CLAUDE.md remains the human contract; Master atoms describe rules that overlap with it. Drift is mitigated by `[[MASTER--ATOM-CONTRADICTION-POLICY]]` (PR-5) declaring Master atoms SSOT for the rules they distill.
 
 ## Source
 
-- `CONCEPT--KNOWLEDGE-LAYERS-V2` — storage layer model (sibling)
-- `ADR--AGENT-WRITE-BOUNDARIES` — write boundary that 3-tier sits on top of
-- `FRAMEWORK--AUTHORITY-MATRIX` — tier mapping (T1/T2/T3 agent authority — different "tier" axis; not to be confused with this frame's Safety / Master / Genesis)
-- `BLUEPRINT--INBOUND-TO-CANDIDATES-MIGRATION` — migration that closed the gap that 3-tier exists to fill
+- `[[CONCEPT--KNOWLEDGE-LAYERS-V2]]` — storage layer model (sibling)
+- `[[ADR--AGENT-WRITE-BOUNDARIES]]` — write boundary that 3-tier sits on top of
+- `[[FRAMEWORK--AUTHORITY-MATRIX]]` — tier mapping (T1/T2/T3 agent authority — different "tier" axis; not to be confused with this frame's Safety / Master / Genesis)
+- `[[BLUEPRINT--INBOUND-TO-CANDIDATES-MIGRATION]]` — migration that closed the gap that 3-tier exists to fill
 - User design dialogue (2026-05-09 session) — the polymorphism + axiomatic + manual+ADR-evidence promotion + instinct framing decisions
+
+## Connections
+- [[FRAMEWORK--MSP-ARCHITECTURE-V2]]
+

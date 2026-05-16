@@ -28,7 +28,7 @@ created_at: 2026-05-03T15:43:37.417+07:00
 
 ## Scope
 
-Closes FEAT--MEMORY-BACKLINKS-INDEXER. Implementation follows BLUEPRINT geography exactly.
+Closes [[FEAT--MEMORY-BACKLINKS-INDEXER]]. Implementation follows BLUEPRINT geography exactly.
 
 ## Acceptance criteria from FEAT
 
@@ -63,3 +63,8 @@ total: 15/15
 - Implemented by: @claude-opus-4-7
 - Verified by: 15/15 unit/integration tests + dogfood on this repo
 - Date: 2026-05-03
+
+## Connections
+- [[BLUEPRINT--MEMORY-BACKLINKS-INDEXER]]
+- [[ADR--MEMORY-BACKLINKS-INDEXER]]
+

@@ -50,15 +50,15 @@ Touched:
 - `runTask` output is **byte-identical** to Phase 0 for a fixture task — shadow mode changes nothing observable.
 - The shadow log accumulates one entry per `runTask` invocation; `msp-policy shadow-report` summarises would-have-denied counts (zero, with the permit-everything starter policy).
 - `msp-policy lint` flags an unknown attribute and a trivially contradictory rule in a fixture policy file.
-- Default posture is `default-permit` per `ADR--DEFAULT-POLICY-POSTURE`.
+- Default posture is `default-permit` per `[[ADR--DEFAULT-POLICY-POSTURE]]`.
 
 ## Dependencies
 
-- `BLUEPRINT--PHASE-0-PLUMBING` — the 4-tuple must already be threaded to `runTask`.
-- `FEAT--POLICY-DECISION-POINT` — the API contract this phase implements.
-- `ADR--POLICY-AS-DATA-NOT-CODE` — YAML format + operator set.
-- `ADR--DEFAULT-POLICY-POSTURE` — shadow mode + default-permit.
-- `CONCEPT--ABAC-POLICY-ENGINE` — PDP/PEP architecture.
+- `[[BLUEPRINT--PHASE-0-PLUMBING]]` — the 4-tuple must already be threaded to `runTask`.
+- `[[FEAT--POLICY-DECISION-POINT]]` — the API contract this phase implements.
+- `[[ADR--POLICY-AS-DATA-NOT-CODE]]` — YAML format + operator set.
+- `[[ADR--DEFAULT-POLICY-POSTURE]]` — shadow mode + default-permit.
+- `[[CONCEPT--ABAC-POLICY-ENGINE]]` — PDP/PEP architecture.
 
 ## Tasks
 
@@ -74,6 +74,6 @@ Touched:
 ## Source
 
 - `docs/msp/UNIVERSAL-CONTEXT-FRAMEWORK_spec.md` §11 Phase 1, §7.
-- `FEAT--POLICY-DECISION-POINT` — the contract implemented.
-- `ADR--POLICY-AS-DATA-NOT-CODE`, `ADR--DEFAULT-POLICY-POSTURE` — governing decisions.
-- `BLUEPRINT--PHASE-0-PLUMBING` — predecessor phase.
+- `[[FEAT--POLICY-DECISION-POINT]]` — the contract implemented.
+- `[[ADR--POLICY-AS-DATA-NOT-CODE]]`, `[[ADR--DEFAULT-POLICY-POSTURE]]` — governing decisions.
+- `[[BLUEPRINT--PHASE-0-PLUMBING]]` — predecessor phase.

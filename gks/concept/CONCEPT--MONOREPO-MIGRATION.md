@@ -32,9 +32,9 @@ MSP and GKS live in two GitHub repos (`Freshair129/msp`, `Freshair129/GksV3`) wi
 The repo already documents the friction:
 
 - `CLAUDE.md` "Two-repo sync rule": "Before claiming a GKS API exists: check `node_modules/@freshair129/gks/dist/...`" — a manual gate that exists because the boundary is *physical* (two npm-disjoint package versions), not just logical.
-- `AUDIT--TWO-REPO-VALIDATION` (2026-05-04): an entire audit dedicated to drift detection between MSP atomic claims and what GKS actually shipped.
+- `[[AUDIT--TWO-REPO-VALIDATION]]` (2026-05-04): an entire audit dedicated to drift detection between MSP atomic claims and what GKS actually shipped.
 - `scripts/msp/propose.mjs`: phase-6 patching hack tracked at `upstream/gks-proposals/01` — exists *only* because GKS 3.5.6's CLI capped phase at 5.
-- `src/memory/backlinks/`: ~200 LoC duplicating GKS scope per `ADR--GRAPH-IS-GKS-DOMAIN`, kept until upstream proposal #03 lands.
+- `src/memory/backlinks/`: ~200 LoC duplicating GKS scope per `[[ADR--GRAPH-IS-GKS-DOMAIN]]`, kept until upstream proposal #03 lands.
 
 ## Intent
 
@@ -46,7 +46,7 @@ Move both packages into a single npm/pnpm workspace monorepo while **preserving 
 | MSP-side workarounds (`scripts/msp/propose.mjs` phase-6, `src/memory/backlinks/`) | Land features directly in GKS in same PR |
 | `upstream/gks-proposals/` queue | Gone — handled inline |
 | "aspirational pending GKS X.Y" markers in atoms | Gone — atomic landings |
-| `AUDIT--TWO-REPO-VALIDATION` two-repo drift checks | Replaced by single CI run validating both packages |
+| `[[AUDIT--TWO-REPO-VALIDATION]]` two-repo drift checks | Replaced by single CI run validating both packages |
 
 ## Why this preserves reusability
 
@@ -84,9 +84,9 @@ These constraints are stronger inside a monorepo because they're machine-checked
 ## Source
 
 - `CLAUDE.md` "Two-repo sync rule"
-- `FRAMEWORK--MSP-ARCHITECTURE-V2` — MSP↔GKS boundary table
-- `ADR--GRAPH-IS-GKS-DOMAIN` — example of MSP carrying GKS-domain code as workaround
-- `AUDIT--TWO-REPO-VALIDATION` — drift audit motivated by the split
-- `AUDIT--GKS-UPSTREAM-PROPOSALS-FILED` — the proposal queue
-- `AUDIT--GKS-3-6-0-PUBLISHED` — the most recent publish-lag pain point (~6 days from proposal to MSP unblock)
+- `[[FRAMEWORK--MSP-ARCHITECTURE-V2]]` — MSP↔GKS boundary table
+- `[[ADR--GRAPH-IS-GKS-DOMAIN]]` — example of MSP carrying GKS-domain code as workaround
+- `[[AUDIT--TWO-REPO-VALIDATION]]` — drift audit motivated by the split
+- `[[AUDIT--GKS-UPSTREAM-PROPOSALS-FILED]]` — the proposal queue
+- `[[AUDIT--GKS-3-6-0-PUBLISHED]]` — the most recent publish-lag pain point (~6 days from proposal to MSP unblock)
 - `upstream/gks-proposals/README.md` — workflow that this migration would obsolete

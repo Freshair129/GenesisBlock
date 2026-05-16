@@ -37,5 +37,9 @@ We need to implement a tracer that follows `CALLS` edges in the Symbol Graph. Th
 - Abstract interpretation (too complex for v1).
 
 ## Source
-- `FEAT--SYMBOLS-PROCESS-TRACING`
-- `ALGO--SYMBOLS-CALL-GRAPH-TRAVERSAL`
+- `[[FEAT--SYMBOLS-PROCESS-TRACING]]`
+- `[[ALGO--SYMBOLS-CALL-GRAPH-TRAVERSAL]]`
+
+## Connections
+- [[CONCEPT--SYMBOLS-PROCESS-TRACING]]
+

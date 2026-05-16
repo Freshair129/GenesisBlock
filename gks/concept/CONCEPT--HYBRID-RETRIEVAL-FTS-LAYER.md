@@ -56,3 +56,8 @@ Out:
 ## Why
 
 Without FTS the hybrid pipeline is mis-named: it's only 3 layers. Closing the gap to the documented 4 makes the recall path consistent across consumers (EVA, Claude Code, Hermes, openclaw, custom). The cost is ~70 lines of TS and one new test file.
+
+## Connections
+- [[CONCEPT--COGNITIVE-LAYER-FACADE]]
+- [[CONCEPT--MEMORY-SUBSYSTEM]]
+

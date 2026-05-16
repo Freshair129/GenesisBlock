@@ -50,7 +50,7 @@ Linear, append-only record of every turn in a session. One JSONL row per turn. U
 | `msgId` | yes | unique per turn; used to anchor episodic summaries |
 | `speakerId` | yes | `user`, `MSP-AGT-CLAUDE-OPUS-4-7`, `MSP-AGT-GEMINI-2`, etc. |
 | `content` | yes | raw turn content; can be long |
-| `learnId` | no | atomic ID this turn produced or referenced (e.g. `FEAT--MSP-VALIDATOR`) |
+| `learnId` | no | atomic ID this turn produced or referenced (e.g. `[[FEAT--MSP-VALIDATOR]]`) |
 
 ## Append semantics
 
@@ -65,3 +65,7 @@ Spec doesn't mandate; orchestrators typically keep 30–90 days then archive to 
 ## Source
 
 `msp_spec.md` §7.1 (Linear Session History).
+
+## Connections
+- [[CONCEPT--MEMORY-SUBSYSTEM]]
+

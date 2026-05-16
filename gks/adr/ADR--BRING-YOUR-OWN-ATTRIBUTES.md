@@ -23,7 +23,7 @@ created_at: 2026-05-14T18:37:51.890+07:00
 
 ## Context
 
-`CONCEPT--ATTRIBUTE-BAG-MODEL` requires that domain-specific metadata (PHI tags, PCI tags, internal-only flags) flow through the domain-agnostic core without the core hardcoding any domain enumeration. The open question is **where the attribute bag physically lives**:
+`[[CONCEPT--ATTRIBUTE-BAG-MODEL]]` requires that domain-specific metadata (PHI tags, PCI tags, internal-only flags) flow through the domain-agnostic core without the core hardcoding any domain enumeration. The open question is **where the attribute bag physically lives**:
 
 1. **Extend GKS `Namespace`** — add an `attributes?: AttributeBag` field to the existing `Namespace` interface.
 2. **Atom metadata** — carry attributes in atom frontmatter (`attributes:` key) and the corresponding JSON column in the pgvector / storage backends.
@@ -38,7 +38,7 @@ This matters because `Namespace` in GKS is a **partition key** — immutable, in
 - `Namespace` stays the 4-field composite key (`tenant_id | user_id | session_id | agent_id`), immutable, indexed.
 - `AttributeBag = Record<string, JsonValue>` is stored as atom metadata — in frontmatter for `.md` atoms, in a JSON column for the vector backend.
 - Composite queries combine both layers: `WHERE namespace.tenant_id = $1 AND attributes->>'classification' = $2`.
-- The atom validator does **not** constrain `attributes:` contents — validation is delegated to per-domain schema files (per `CONCEPT--ATTRIBUTE-BAG-MODEL`).
+- The atom validator does **not** constrain `attributes:` contents — validation is delegated to per-domain schema files (per `[[CONCEPT--ATTRIBUTE-BAG-MODEL]]`).
 
 ## Consequences
 
@@ -47,7 +47,7 @@ Positive:
 - GKS invariants preserved: `Namespace` stays immutable, indexed, coarse. No pgvector schema migration for the partition key.
 - The two filter layers stay cleanly separated: Namespace = coarse + indexed (Layer 1), attributes = fine + queryable-but-not-indexed-by-default (Layer 2).
 - Attributes are mutable (re-classification, re-tagging by classifiers) without violating the "Namespace is immutable" rule.
-- GKS remains publishable as a standalone library — UCF adds metadata conventions, not GKS schema changes. Respects the GKS↔MSP boundary (`ADR--MONOREPO-STRUCTURE`).
+- GKS remains publishable as a standalone library — UCF adds metadata conventions, not GKS schema changes. Respects the GKS↔MSP boundary (`[[ADR--MONOREPO-STRUCTURE]]`).
 
 Negative / accepted costs:
 
@@ -63,6 +63,10 @@ Negative / accepted costs:
 ## Source
 
 - `docs/msp/UNIVERSAL-CONTEXT-FRAMEWORK_spec.md` §0 (D-8), §4 — attribute bag storage rationale.
-- `CONCEPT--ATTRIBUTE-BAG-MODEL` — the bag model this ADR places.
-- `CONCEPT--NAMESPACE-VAULT-BRAIN` — why Namespace must stay a pure partition key.
+- `[[CONCEPT--ATTRIBUTE-BAG-MODEL]]` — the bag model this ADR places.
+- `[[CONCEPT--NAMESPACE-VAULT-BRAIN]]` — why Namespace must stay a pure partition key.
 - `packages/gks/src/memory/types.ts` — the `Namespace` interface left unchanged.
+
+## Connections
+- [[FRAMEWORK--UNIVERSAL-CONTEXT-FRAMEWORK]]
+

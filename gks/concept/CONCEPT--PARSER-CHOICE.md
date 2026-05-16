@@ -81,7 +81,7 @@ The interface design absorbs this cost; we're not painting into a corner.
 
 ## What this concept does NOT decide
 
-- Specific symbol kinds extracted (function vs method vs arrow-const vs class member) — see `BLUEPRINT--SYMBOL-GRAPH-CORE` (PR-3)
+- Specific symbol kinds extracted (function vs method vs arrow-const vs class member) — see `[[BLUEPRINT--SYMBOL-GRAPH-CORE]]` (PR-3)
 - Which AST nodes count as a `calls` edge vs `references` — see same blueprint
 - File include/exclude globs — exposed as a CLI flag with a sensible default
 
@@ -90,3 +90,8 @@ The interface design absorbs this cost; we're not painting into a corner.
 - User design dialogue 2026-05-09 — Tree-sitter proposed; trade-off analysis is this concept
 - npm registry inspection 2026-05-09: `tree-sitter@0.25.0` (native), `tree-sitter-typescript@0.23.2` (native)
 - Existing `typescript` dependency in `package.json` `devDependencies`
+
+## Connections
+- [[FRAMEWORK--SYMBOL-GRAPH]]
+- [[CONCEPT--SYMBOL-GRAPH]]
+

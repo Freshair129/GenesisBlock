@@ -30,7 +30,7 @@ created_at: 2026-05-14T03:46:00.000+07:00
 
 # BLUEPRINT — Cost Tracking
 
-Concrete plan to ship the cost-tracking layer described in `CONCEPT--COST-TRACKING` and the `USAGE--DAILY-*` atom contract from `SPEC--USAGE-ATOM`. Phase E3 of the MSP roadmap.
+Concrete plan to ship the cost-tracking layer described in `[[CONCEPT--COST-TRACKING]]` and the `[[USAGE--DAILY]]-*` atom contract from `[[SPEC--USAGE-ATOM]]`. Phase E3 of the MSP roadmap.
 
 ## File layout
 
@@ -80,11 +80,11 @@ export async function recordUsage(
 Implementation outline:
 
 1. Compute today's ISO date in UTC (`new Date().toISOString().slice(0, 10)`).
-2. Target path: `<root>/gks/usage/USAGE--DAILY-<isoDate>.md`.
+2. Target path: `<root>/gks/usage/[[USAGE--DAILY]]-<isoDate>.md`.
 3. If file does not exist:
    - `mkdir -p` the parent.
-   - Build frontmatter per `SPEC--USAGE-ATOM` §3.
-   - Build body with summary block (markers + initial JSON) per `SPEC--USAGE-ATOM` §4.
+   - Build frontmatter per `[[SPEC--USAGE-ATOM]]` §3.
+   - Build body with summary block (markers + initial JSON) per `[[SPEC--USAGE-ATOM]]` §4.
    - Write file.
 4. If file exists:
    - Read it.
@@ -144,3 +144,9 @@ usage:
 - Real tokenizers per tier.
 - Cost-based escalation policy (that would belong in `cost-policy.ts`, not here).
 - Cross-vault aggregation.
+
+## Connections
+- [[SPEC--EPISODE-ATOM]]
+- [[BLUEPRINT--AGENT-DISPATCHER]]
+- [[ADR--AGENT-TIER-COST-POLICY]]
+

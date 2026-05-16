@@ -88,7 +88,7 @@ await prunePreferences({ root, namespace: 'evaAI' })
 - [ ] `setPreference(opts, key, value, opts?)` writes one key with optional TTL; either `expiresAt` (ISO string) or `expiresInMs` (computed). Both unset → no expiry
 - [ ] `getPreference(opts, key)` returns the value if present + non-expired, `null` otherwise. Does NOT mutate the file (lazy expiry)
 - [ ] `prunePreferences(opts)` rewrites the file with expired entries removed; returns count of pruned entries
-- [ ] All writes are **atomic** (tmp file + rename per `ADR--IDENTITY-STORAGE-SHAPE`)
+- [ ] All writes are **atomic** (tmp file + rename per `[[ADR--IDENTITY-STORAGE-SHAPE]]`)
 - [ ] Reading a file with `schemaVersion > 1` throws (refuse to clobber newer format)
 - [ ] **Namespace isolation** — operations on namespace A never touch namespace B
 - [ ] No `gks/` writes
@@ -119,3 +119,7 @@ await prunePreferences({ root, namespace: 'evaAI' })
 - Cross-namespace operations
 - Multi-process write safety (M9)
 - Schema migration / version bump beyond v1
+
+## Connections
+- [[CONCEPT--IDENTITY-LAYER]]
+

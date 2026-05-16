@@ -42,13 +42,13 @@ carries a `from_master` flag so callers can branch behaviour.
 ## What shipped
 
 ### Atoms (3)
-- `gks/concept/CONCEPT--PROMOTED-BLOCK-REGISTRY.md` — what + why; positions
+- `gks/concept/[[CONCEPT--PROMOTED-BLOCK-REGISTRY]].md` — what + why; positions
   the registry as derived state over the canonical `gks/master/*.md` atoms
   and explains why it's gitignored.
-- `gks/blueprint/BLUEPRINT--MASTER-RUNTIME-INTEGRATION.md` — implementation
+- `gks/blueprint/[[BLUEPRINT--MASTER-RUNTIME-INTEGRATION]].md` — implementation
   plan: registry API, `applyPromotion`, executor integration, CLI subcommand,
   test coverage targets.
-- `gks/audit/AUDIT--PHASE-F1-MASTER-GENESIS-WIRING.md` — this atom.
+- `gks/audit/[[AUDIT--PHASE-F1-MASTER-GENESIS-WIRING]].md` — this atom.
 
 ### Code (4 files — 2 new, 2 extended)
 - **New** `packages/msp/src/master/registry.ts` — `MasterEntry`,
@@ -75,7 +75,7 @@ carries a `from_master` flag so callers can branch behaviour.
 
 ### Infra
 - `.gitignore` entry: `gks/master/registry.jsonl` (per
-  `CONCEPT--PROMOTED-BLOCK-REGISTRY` — derived state).
+  `[[CONCEPT--PROMOTED-BLOCK-REGISTRY]]` — derived state).
 
 ### Tests
 - **New** `packages/msp/test/master/registry.test.ts` — 13 cases covering
@@ -120,16 +120,21 @@ carries a `from_master` flag so callers can branch behaviour.
 3. Cross-Master contradiction detection at apply time — currently
    apply only refuses to overwrite a file at the same path. Two
    Masters with overlapping scope under different ids still both get
-   registered. Belongs in `BLUEPRINT--CONTRADICTION-DETECTION-IMPL` L1+.
+   registered. Belongs in `[[BLUEPRINT--CONTRADICTION-DETECTION-IMPL]]` L1+.
 4. CI automation: a GitHub Action that detects a freshly-merged
    `MASTER--*.md` and auto-appends the registry entry, removing the
    manual `apply` step on the maintainer's machine.
 
 ## References
 
-- `CONCEPT--PROMOTED-BLOCK-REGISTRY` — what + why
-- `BLUEPRINT--MASTER-RUNTIME-INTEGRATION` — plan
-- `BLUEPRINT--MASTER-PROMOTION-PIPELINE` — Phase E4
-- `BLUEPRINT--GENESIS-BLOCK-RUNTIME` — Phase E5
-- `SPEC--GENESIS-BLOCK-MANIFEST` § 3.1 + § 5
-- `ADR--MASTER-PROMOTION-DOC-TO-CODE` — human gate
+- `[[CONCEPT--PROMOTED-BLOCK-REGISTRY]]` — what + why
+- `[[BLUEPRINT--MASTER-RUNTIME-INTEGRATION]]` — plan
+- `[[BLUEPRINT--MASTER-PROMOTION-PIPELINE]]` — Phase E4
+- `[[BLUEPRINT--GENESIS-BLOCK-RUNTIME]]` — Phase E5
+- `[[SPEC--GENESIS-BLOCK-MANIFEST]]` § 3.1 + § 5
+- `[[ADR--MASTER-PROMOTION-DOC-TO-CODE]]` — human gate
+
+## Connections
+- [[CONCEPT--MASTER-PROMOTION]]
+- [[CONCEPT--GENESIS-BLOCK-RUNTIME]]
+

@@ -20,7 +20,7 @@ created_at: 2026-05-14T19:42:03.565+07:00
 
 # FEAT — Subagent scope filtering
 
-> The user-facing API contract for `CONCEPT--SUBAGENT-CONTEXT-SCOPING`. The composer becomes a PEP (per `ADR--TRANSPORT-AGNOSTIC-ENFORCEMENT`) that filters subagent context by the parent-declared task scope.
+> The user-facing API contract for `[[CONCEPT--SUBAGENT-CONTEXT-SCOPING]]`. The composer becomes a PEP (per `[[ADR--TRANSPORT-AGNOSTIC-ENFORCEMENT]]`) that filters subagent context by the parent-declared task scope.
 
 ## User-facing behaviour
 
@@ -62,7 +62,7 @@ Behaviour contract:
 - **`needs` / `excludes` are domain-attribute set tests**: a Resource is eligible iff `R.domain ∩ scope.needs ≠ ∅` **and** `R.domain ∩ scope.excludes = ∅`. `excludes` wins ties.
 - **The subagent cannot set or widen its own scope.** Scope is read from the descriptor (authored by the parent). The only subagent autonomy is `escalate()`.
 - **`escalate()` round-trips to the parent**: parent approves (scope widened, subagent retries), denies (subagent proceeds without, or fails loudly), or widens differently.
-- **Effective context** = `namespace_filter ∩ user_abac ∩ task_scope ∩ resolution_tier` — scope filter runs before resolution tiering (per `CONCEPT--RESOLUTION-GRADIENT`).
+- **Effective context** = `namespace_filter ∩ user_abac ∩ task_scope ∩ resolution_tier` — scope filter runs before resolution tiering (per `[[CONCEPT--RESOLUTION-GRADIENT]]`).
 - **Every filter-drop is audit-logged** — the log is the retrospective signal for whether a scope was too narrow.
 - **`nice_to_have`** Resources are included only if budget remains after `needs`.
 
@@ -78,14 +78,14 @@ Behaviour contract:
 
 - Auto-generation of `scope` from the task `goal` text — Phase 5+; MVP parents declare scope manually.
 - Inter-subagent scope sharing / multi-subagent orchestration.
-- The PDP itself — `FEAT--POLICY-DECISION-POINT`. This FEAT only wires the composer as a PEP.
-- Resolution tiering — `FEAT--RESOLUTION-EXPAND-ON-DEMAND`. Scope filter runs *before* it; this FEAT does not own tiering.
+- The PDP itself — `[[FEAT--POLICY-DECISION-POINT]]`. This FEAT only wires the composer as a PEP.
+- Resolution tiering — `[[FEAT--RESOLUTION-EXPAND-ON-DEMAND]]`. Scope filter runs *before* it; this FEAT does not own tiering.
 - Domain tagging of atoms — classifier scope (Phase 6); MVP uses manually-tagged `domain` attributes.
 
 ## Source
 
 - `docs/msp/UNIVERSAL-CONTEXT-FRAMEWORK_spec.md` §9 — task descriptor, escalation flow, effective-context formula.
-- `CONCEPT--SUBAGENT-CONTEXT-SCOPING` — the concept this FEAT implements.
-- `CONCEPT--ABAC-POLICY-ENGINE` — same PDP enforces task scope and user ABAC.
-- `ADR--TRANSPORT-AGNOSTIC-ENFORCEMENT` — the composer is a PEP.
-- `CONCEPT--RESOLUTION-GRADIENT` — composes after the scope filter.
+- `[[CONCEPT--SUBAGENT-CONTEXT-SCOPING]]` — the concept this FEAT implements.
+- `[[CONCEPT--ABAC-POLICY-ENGINE]]` — same PDP enforces task scope and user ABAC.
+- `[[ADR--TRANSPORT-AGNOSTIC-ENFORCEMENT]]` — the composer is a PEP.
+- `[[CONCEPT--RESOLUTION-GRADIENT]]` — composes after the scope filter.

@@ -20,7 +20,7 @@ created_at: 2026-05-14T19:42:02.796+07:00
 
 # FEAT — Resolution expand-on-demand
 
-> The user-facing API contract for the MVP of `CONCEPT--RESOLUTION-GRADIENT`, scoped by `ADR--RESOLUTION-TIER-COUNT` to 2 tiers (FULL + MENTION) plus `expand()`.
+> The user-facing API contract for the MVP of `[[CONCEPT--RESOLUTION-GRADIENT]]`, scoped by `[[ADR--RESOLUTION-TIER-COUNT]]` to 2 tiers (FULL + MENTION) plus `expand()`.
 
 ## User-facing behaviour
 
@@ -53,7 +53,7 @@ Behaviour contract:
 - **`expand(id)` promotes** a `MENTION` to `FULL` and returns the full hit. Token cost is predictable and returned to the caller.
 - **`expand()` re-runs ABAC**: a Resource may be `MENTION`-only because the PDP denied `FULL`, not because it scored low. `expand()` on such a Resource returns `{ denied_reason }`, not a body.
 - **Per-vault `expand_limit`** caps expansions per task to prevent runaway loops; exceeding it returns a soft error advising the agent to narrow its query.
-- **The tier enum carries all four values** (`SUMMARY`, `SKELETON` valid but unrendered in MVP per `ADR--RESOLUTION-TIER-COUNT`) — adding renderers later is additive.
+- **The tier enum carries all four values** (`SUMMARY`, `SKELETON` valid but unrendered in MVP per `[[ADR--RESOLUTION-TIER-COUNT]]`) — adding renderers later is additive.
 - **Every `expand()` is audit-logged** with `id`, `to`, `reason`, and resulting token count — this log is the Phase 3.5 telemetry that gates SUMMARY/SKELETON renderers.
 
 ## Verification
@@ -67,14 +67,18 @@ Behaviour contract:
 
 ## Out of scope
 
-- `SUMMARY` / `SKELETON` renderers — gated on Phase 3.5 telemetry per `ADR--RESOLUTION-TIER-COUNT`.
+- `SUMMARY` / `SKELETON` renderers — gated on Phase 3.5 telemetry per `[[ADR--RESOLUTION-TIER-COUNT]]`.
 - Per-tier budget allocator (50/30/15/5 split) — only meaningful at 4 tiers; deferred with the renderers.
 - Hop-metric weight tuning (`w1` / `w2`) — spec §14 OQ-1; MVP ships the working defaults.
 - Adaptive learning ("user expanded this often → boost to FULL") — Phase 5+.
-- Cross-vault resolution caps — carried by `FEAT--VAULT-COMPOSITION`'s `resolution_policy` field, applied here but not designed here.
+- Cross-vault resolution caps — carried by `[[FEAT--VAULT-COMPOSITION]]`'s `resolution_policy` field, applied here but not designed here.
 
 ## Source
 
 - `docs/msp/UNIVERSAL-CONTEXT-FRAMEWORK_spec.md` §6 — tier shapes, scoring, expand-on-demand.
-- `CONCEPT--RESOLUTION-GRADIENT` — the concept this FEAT implements (MVP slice).
-- `ADR--RESOLUTION-TIER-COUNT` — 2-tier MVP, 4-tier data model, Phase 3.5 gate.
+- `[[CONCEPT--RESOLUTION-GRADIENT]]` — the concept this FEAT implements (MVP slice).
+- `[[ADR--RESOLUTION-TIER-COUNT]]` — 2-tier MVP, 4-tier data model, Phase 3.5 gate.
+
+## Connections
+- [[FRAMEWORK--UNIVERSAL-CONTEXT-FRAMEWORK]]
+

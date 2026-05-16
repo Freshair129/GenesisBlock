@@ -130,4 +130,8 @@ return result preserving original chronological order
 
 ## Source
 
-`msp_spec.md` §7d, `CONCEPT--CONTEXT-COMPRESSION`, M7b consolidator infrastructure (re-used for tier-1 single-turn scoring).
+`msp_spec.md` §7d, `[[CONCEPT--CONTEXT-COMPRESSION]]`, M7b consolidator infrastructure (re-used for tier-1 single-turn scoring).
+
+## Connections
+- [[ADR--CONSOLIDATOR-HYBRID-SCORING]]
+

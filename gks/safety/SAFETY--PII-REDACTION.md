@@ -29,3 +29,7 @@ Identity data and memory retrieved for a subagent MUST be redacted if it contain
 ## Enforcement
 The Policy Enforcement Point (PEP) in Phase 2+ handles the filtration of sensitive attributes based on the `SubagentScope`.
 Specific regex-based or LLM-based PII detection is a future enhancement (M11+).
+
+## Connections
+- [[FRAMEWORK--UNIVERSAL-CONTEXT-FRAMEWORK]]
+

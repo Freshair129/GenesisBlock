@@ -33,3 +33,8 @@ Describes the logic for merging global identity data with project-specific overr
 ## 3. Scope Semantics
 - **Global**: Only Global File + Defaults.
 - **Project**: Defaults + Project Override (ignores global).
+
+## Connections
+- [[CONCEPT--IDENTITY-LAYER]]
+- [[ADR--GLOBAL-VS-WORKSPACE]]
+

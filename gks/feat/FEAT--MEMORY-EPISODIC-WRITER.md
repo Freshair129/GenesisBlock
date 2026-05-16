@@ -80,3 +80,9 @@ await appendEpisode.fromTurns({
 - LLM-backed summariser (orchestrator plugin).
 - Vector embedding (orchestrator concern).
 - Reading episodes (small reader module added with the writer; not a separate FEAT).
+
+## Connections
+- [[ADR--MEMORY-EPISODIC-WRITER]]
+- [[CONCEPT--MEMORY-EPISODIC-WRITER]]
+- [[CONCEPT--MEMORY-EPISODIC]]
+

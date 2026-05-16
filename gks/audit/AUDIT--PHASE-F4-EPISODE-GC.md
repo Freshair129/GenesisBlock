@@ -28,7 +28,7 @@ created_at: 2026-05-14T05:08:00.000+07:00
 
 ## Scope
 
-Phase F4 of the post-monorepo-pivot ROADMAP. Closes the long-standing TODO in `SPEC--EPISODE-ATOM` §9 ("Retention policy / garbage collection") for the project-local episode directory `<root>/gks/episode/`.
+Phase F4 of the post-monorepo-pivot ROADMAP. Closes the long-standing TODO in `[[SPEC--EPISODE-ATOM]]` §9 ("Retention policy / garbage collection") for the project-local episode directory `<root>/gks/episode/`.
 
 The write side (`result-recorder.ts`, `dispatch.ts`) is **untouched** — GC is strictly out-of-band.
 
@@ -38,9 +38,9 @@ The write side (`result-recorder.ts`, `dispatch.ts`) is **untouched** — GC is 
 
 | Atom | Purpose |
 |---|---|
-| `gks/concept/CONCEPT--EPISODE-RETENTION.md` | Goals, default policy, inference rules for `ok` and `severity`, archive-vs-delete rationale. |
-| `gks/adr/ADR--EPISODE-GC-POLICY.md` | Locks numeric defaults (30-day window) and archive layout (`<root>/gks/episode/_archive/<YYYY-MM>/`). |
-| `gks/audit/AUDIT--PHASE-F4-EPISODE-GC.md` | This atom. |
+| `gks/concept/[[CONCEPT--EPISODE-RETENTION]].md` | Goals, default policy, inference rules for `ok` and `severity`, archive-vs-delete rationale. |
+| `gks/adr/[[ADR--EPISODE-GC-POLICY]].md` | Locks numeric defaults (30-day window) and archive layout (`<root>/gks/episode/_archive/<YYYY-MM>/`). |
+| `gks/audit/[[AUDIT--PHASE-F4-EPISODE-GC]].md` | This atom. |
 
 ### New code
 
@@ -60,7 +60,7 @@ The write side (`result-recorder.ts`, `dispatch.ts`) is **untouched** — GC is 
 
 - `packages/msp/package.json` — added bin entry: `"msp-episode-gc": "./dist/agents/episode-gc-cli.js"`.
 
-## Default policy (locked by ADR--EPISODE-GC-POLICY)
+## Default policy (locked by [[ADR--EPISODE-GC-POLICY]])
 
 - `keep_days = 30`
 - Keep recent (`created_at ≥ now − keep_days`) episodes.
@@ -70,7 +70,7 @@ The write side (`result-recorder.ts`, `dispatch.ts`) is **untouched** — GC is 
 - `opts.dry_run = true` returns the same `GcReport` without touching disk.
 - CLI requires explicit `--apply` to mutate (implicit dry-run for human safety).
 
-## Inference rules (locked by CONCEPT--EPISODE-RETENTION)
+## Inference rules (locked by [[CONCEPT--EPISODE-RETENTION]])
 
 `ok` (in priority order; first match wins):
 
@@ -92,14 +92,14 @@ The write side (`result-recorder.ts`, `dispatch.ts`) is **untouched** — GC is 
 |---|---|
 | `npm test --workspace=packages/msp -- test/agents/episode-gc` | Green (see PR for exact count). |
 | `npm run typecheck` | Green. |
-| `npm run msp:index && tsx packages/msp/src/validator/cli.ts --root=. gks/concept/CONCEPT--EPISODE-RETENTION.md gks/adr/ADR--EPISODE-GC-POLICY.md gks/audit/AUDIT--PHASE-F4-EPISODE-GC.md` | All three atoms validate. |
+| `npm run msp:index && tsx packages/msp/src/validator/cli.ts --root=. gks/concept/[[CONCEPT--EPISODE-RETENTION]].md gks/adr/[[ADR--EPISODE-GC-POLICY]].md gks/audit/[[AUDIT--PHASE-F4-EPISODE-GC]].md` | All three atoms validate. |
 
 ## What this does NOT change
 
 - `result-recorder.ts` — untouched.
 - `dispatch.ts` — untouched.
 - Validator contract (`msp/LLM_Contract/atomic_contract.yaml`) — untouched.
-- `~/.brain/episodic/` migration (still per `ADR--BRAIN-PATH-RESOLUTION` open question §7) — out of scope.
+- `~/.brain/episodic/` migration (still per `[[ADR--BRAIN-PATH-RESOLUTION]]` open question §7) — out of scope.
 
 ## Follow-ups (not blocking)
 

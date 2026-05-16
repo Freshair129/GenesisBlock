@@ -34,3 +34,10 @@ created_at: 2026-05-12T15:00:00.000+07:00
 ## Follow-ups
 - Implement sophisticated dynamic dispatch resolution in Phase 3.
 - Add visualization frontend for trace paths in the GKS Knowledge Browser.
+
+## Connections
+- [[CONCEPT--SYMBOLS-PROCESS-TRACING]]
+- [[ADR--SYMBOLS-PROCESS-TRACING]]
+- [[ALGO--SYMBOLS-CALL-GRAPH-TRAVERSAL]]
+- [[PROTO--SYMBOLS-TRACE-INVARIANTS]]
+

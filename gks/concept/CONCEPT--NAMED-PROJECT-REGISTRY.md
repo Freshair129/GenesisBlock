@@ -19,11 +19,11 @@ created_at: 2026-05-09T07:00:00.000+07:00
 
 # CONCEPT — Named-project registry
 
-> **Status: stable.** Core registry + 4-step resolver shipped in Phase B (`src/projects/{registry,resolve,types}.ts` + `msp_project_{list,register,resolve}` MCP tools — see `AUDIT--PHASE-B-IMPL-COMPLETE`). Cross-project recall (the `cross_project: true` flag described in §"Cross-project search" below) is the one remaining future extension; tracked as a small follow-up. Cherry-picked from `SPEC--ARCHITECTURE-V2.md` §4.4 during the 2026-05-09 architecture-doc cleanup.
+> **Status: stable.** Core registry + 4-step resolver shipped in Phase B (`src/projects/{registry,resolve,types}.ts` + `msp_project_{list,register,resolve}` MCP tools — see `[[AUDIT--PHASE-B-IMPL-COMPLETE]]`). Cross-project recall (the `cross_project: true` flag described in §"Cross-project search" below) is the one remaining future extension; tracked as a small follow-up. Cherry-picked from `[[SPEC--ARCHITECTURE-V2]].md` §4.4 during the 2026-05-09 architecture-doc cleanup.
 
 ## Problem
 
-Today, project namespace is effectively hardcoded — most code paths assume `evaAI` (per `ADR--PATH-ENCODING`). Agents that want to operate across multiple projects (clinic, MSP-self, EVA, custom) have no first-class way to switch. Every cognitive-layer client (Claude Code, Gemini CLI, Antigravity) needs its own ad-hoc cwd-based heuristic, and cross-project recall requires manual path juggling.
+Today, project namespace is effectively hardcoded — most code paths assume `evaAI` (per `[[ADR--PATH-ENCODING]]`). Agents that want to operate across multiple projects (clinic, MSP-self, EVA, custom) have no first-class way to switch. Every cognitive-layer client (Claude Code, Gemini CLI, Antigravity) needs its own ad-hoc cwd-based heuristic, and cross-project recall requires manual path juggling.
 
 ## Hypothesis
 
@@ -65,17 +65,17 @@ The resolved name is looked up in `~/.msp/projects.yaml` to obtain the path + se
 
 - Existing `evaAI` namespace → registered as `default` project (or `eva`, depending on naming preference).
 - Old hardcoded paths read from a compatibility shim that delegates to the registry.
-- `ADR--PATH-ENCODING` (bare-name decision) stays valid — the registry uses bare names too.
+- `[[ADR--PATH-ENCODING]]` (bare-name decision) stays valid — the registry uses bare names too.
 
 ## Open questions
 
 - Schema for `.mspconfig` — TOML, YAML, JSON, or single-line shorthand? Lean toward single-line shorthand for the common case + full file for the rare one.
-- Per-project secrets (e.g. Anthropic key for cross-project consolidation) — registry value or external? External (per `ADR--GLOBAL-VS-WORKSPACE`).
-- Identity/soul global vs per-project — **resolved** in `ADR--GLOBAL-VS-WORKSPACE`: global at `~/.msp/identity.json` with optional sparse per-project override at `.brain/msp/projects/<ns>/identity.override.json`.
+- Per-project secrets (e.g. Anthropic key for cross-project consolidation) — registry value or external? External (per `[[ADR--GLOBAL-VS-WORKSPACE]]`).
+- Identity/soul global vs per-project — **resolved** in `[[ADR--GLOBAL-VS-WORKSPACE]]`: global at `~/.msp/identity.json` with optional sparse per-project override at `.brain/msp/projects/<ns>/identity.override.json`.
 
 ## Why this fits the agent-agnostic vision
 
-Per `CONCEPT--AGENT-AGNOSTIC`, every cognitive-layer client points at the same `msp-mcp-server` bin. The registry means **"which project"** is the only thing that varies between invocations from Claude Code, Gemini CLI, Antigravity, and custom agents. Switching projects becomes an env var, not a code change.
+Per `[[CONCEPT--AGENT-AGNOSTIC]]`, every cognitive-layer client points at the same `msp-mcp-server` bin. The registry means **"which project"** is the only thing that varies between invocations from Claude Code, Gemini CLI, Antigravity, and custom agents. Switching projects becomes an env var, not a code change.
 
 ## Trade-offs
 
@@ -90,4 +90,8 @@ Per `CONCEPT--AGENT-AGNOSTIC`, every cognitive-layer client points at the same `
 
 ## Source
 
-`SPEC--ARCHITECTURE-V2.md` §4.4 (drafted 2026-05-07, cherry-picked here on 2026-05-09 before the original was deleted). Coupled with the global/workspace separation work planned for Phase B. See `AUDIT--ARCH-DOC-CLEANUP`.
+`[[SPEC--ARCHITECTURE-V2]].md` §4.4 (drafted 2026-05-07, cherry-picked here on 2026-05-09 before the original was deleted). Coupled with the global/workspace separation work planned for Phase B. See `[[AUDIT--ARCH-DOC-CLEANUP]]`.
+
+## Connections
+- [[FRAMEWORK--MSP-ARCHITECTURE-V2]]
+

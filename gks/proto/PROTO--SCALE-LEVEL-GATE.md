@@ -50,3 +50,9 @@ Severity: `warning` while Phase 0 lands; flip to `error` once L2/L3 callers have
 
 L1 (Quick Task) is a no-op — `runTask({ scale: 'L1' })` skips the gate entirely (matches `FRAMEWORK_MASTER_SPEC.md` §7.7.2 checklist).
 Hotfixes (§6.4) bypass the gate via `gks hotfix open` — 48 h backfill window applies.
+
+## Connections
+- [[FRAMEWORK--MSP-ARCHITECTURE-V2]]
+- [[CONCEPT--COGNITIVE-LAYER-FACADE]]
+- [[CONCEPT--CODEGEN-MICROTASK-RUNNER]]
+

@@ -197,3 +197,9 @@ implementation_order:
 - Add a competing LLM bundle (use `createSlmClient`)
 - Implement MCP tool wrapping (M7f)
 - Tune thresholds beyond defaults from the ADR (M9)
+
+## Connections
+- [[FEAT--CONSOLIDATOR]]
+- [[ADR--CONSOLIDATOR-HYBRID-SCORING]]
+- [[CONCEPT--CONSOLIDATOR]]
+

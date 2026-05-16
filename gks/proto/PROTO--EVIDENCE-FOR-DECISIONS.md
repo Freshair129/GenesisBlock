@@ -54,4 +54,10 @@ Wraps existing core rule `evidenceForDecisions` from `src/validator/rules/eviden
 
 ## Source
 
-`CONCEPT--PROTO-AUDIT-EXISTING-RULES`, `ADR--ANTI-HALLUCINATION-RULES`.
+`[[CONCEPT--PROTO-AUDIT-EXISTING-RULES]]`, `[[ADR--ANTI-HALLUCINATION-RULES]]`.
+
+## Connections
+- [[FRAMEWORK--MSP-ARCHITECTURE-V2]]
+- [[CONCEPT--PROTO-PATTERN]]
+- [[FEAT--PROTO-LOADER]]
+

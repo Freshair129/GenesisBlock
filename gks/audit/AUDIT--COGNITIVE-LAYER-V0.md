@@ -43,21 +43,21 @@ Stand up the cognitive-layer / memoryOS stack end-to-end so EVA, Claude Code, He
 
 ### GKS — storage primitives
 1. `packages/gks/src/memory/graph/genesis-graph.ts` — `class GenesisGraphBackend implements GraphBackend`. Event-replay JSONL store (`<dir>/genesis-block.jsonl` + `manifest.json` version byte). Mirrors `GraphStore` semantics + adds `cypher(query)`.
-2. `packages/gks/src/memory/graph/cypher-v0.ts` — hand-written recursive-descent parser covering `BLUEPRINT--GENESIS-GRAPH-INTEGRATION` §"Cypher v0 scope". Throws `GenesisGraphUnsupportedCypher` for anything outside the subset.
+2. `packages/gks/src/memory/graph/cypher-v0.ts` — hand-written recursive-descent parser covering `[[BLUEPRINT--GENESIS-GRAPH-INTEGRATION]]` §"Cypher v0 scope". Throws `GenesisGraphUnsupportedCypher` for anything outside the subset.
 3. `packages/gks/src/memory/graph/genesis-graph-errors.ts` — `GenesisGraphUnsupportedCypher` + `GenesisGraphSchemaMismatchError`.
-4. `MemoryStoreOptions.graphBackend` — new opt-in knob; default = JSONL-backed `GraphStore` at `<brain>/graph/graph.jsonl`. `store.graph` is now part of the public surface after `init()`. (ADR--MEMORY-STORE-GRAPH-WIRING)
+4. `MemoryStoreOptions.graphBackend` — new opt-in knob; default = JSONL-backed `GraphStore` at `<brain>/graph/graph.jsonl`. `store.graph` is now part of the public surface after `init()`. ([[ADR--MEMORY-STORE-GRAPH-WIRING]])
 5. `HotfixStore` + `HotfixStoreOptions` + `OpenHotfixArgs` now exported from `@freshair129/gks`.
 6. `.gitignore` extended for `*.genesis-block.jsonl` and `.brain/**/graph/*.jsonl`.
 
 ### MSP — SLM tier
-7. `packages/msp/src/codegen/runner.ts` — removed the contradictory `?? 'qwen'` provider fallback. Default microtask SLM is now Ollama + `qwen2.5-coder:7b`, matching `CONCEPT--CODEGEN-MICROTASK-RUNNER` and `FRAMEWORK_MASTER_SPEC` §17.3. (ADR--DEFAULT-SLM-OLLAMA-QWEN-CODER)
+7. `packages/msp/src/codegen/runner.ts` — removed the contradictory `?? 'qwen'` provider fallback. Default microtask SLM is now Ollama + `qwen2.5-coder:7b`, matching `[[CONCEPT--CODEGEN-MICROTASK-RUNNER]]` and `FRAMEWORK_MASTER_SPEC` §17.3. ([[ADR--DEFAULT-SLM-OLLAMA-QWEN-CODER]])
 8. `packages/msp/src/codegen/cli.ts` — help text + provider-selection block.
-9. `packages/msp/src/codegen/slm/gemini.ts` (NEW) — `createGeminiClient()` + shared `runGeminiCli()` wrapper around `gemini -p <prompt> -y`. Used by both the SLM factory and the existing escalator. (ADR--GEMINI-AS-SLM-PROVIDER)
+9. `packages/msp/src/codegen/slm/gemini.ts` (NEW) — `createGeminiClient()` + shared `runGeminiCli()` wrapper around `gemini -p <prompt> -y`. Used by both the SLM factory and the existing escalator. ([[ADR--GEMINI-AS-SLM-PROVIDER]])
 10. `packages/msp/src/codegen/slm/factory.ts` + `slm/types.ts` — `'gemini'` added to provider union with `GeminiOpts`.
 11. `packages/msp/src/codegen/escalator/gemini.ts` — refactored to consume `runGeminiCli()`; no behaviour change.
 
 ### MSP — cognitive layer facade
-12. `packages/msp/src/cognitive/index.ts` (NEW) — `createCognitiveLayer({ root, graphBackend, slm, defaultNamespace })` returns `{ recall, remember, consolidate, runTask, verifyFlow, hotfix, resolveSSOT, mcpServer, store, graph }`. (FEAT--COGNITIVE-LAYER-FACADE)
+12. `packages/msp/src/cognitive/index.ts` (NEW) — `createCognitiveLayer({ root, graphBackend, slm, defaultNamespace })` returns `{ recall, remember, consolidate, runTask, verifyFlow, hotfix, resolveSSOT, mcpServer, store, graph }`. ([[FEAT--COGNITIVE-LAYER-FACADE]])
 13. `packages/msp/src/cognitive/types.ts` — `CognitiveTier`, `ScaleLevel`, `CognitiveLayerOptions`, `CognitiveRecallHit`, `ScaleLevelGateError`.
 14. `packages/msp/src/cognitive/fts.ts` (NEW) — pure-Node FTS for §13 layer 2.
 15. `packages/msp/src/cognitive/scale-gate.ts` (NEW) — §7.7.2 L1/L2/L3 enforcement (`enforceScaleGate`).
@@ -71,16 +71,16 @@ Stand up the cognitive-layer / memoryOS stack end-to-end so EVA, Claude Code, He
 21. `packages/msp/package.json` — `"cognitive:quickstart": "tsx examples/cognitive-layer-quickstart.ts"`.
 
 ### Atoms authored
-- `CONCEPT--COGNITIVE-LAYER-FACADE`
-- `CONCEPT--HYBRID-RETRIEVAL-FTS-LAYER`
-- `ADR--DEFAULT-SLM-OLLAMA-QWEN-CODER`
-- `ADR--GEMINI-AS-SLM-PROVIDER`
-- `ADR--MEMORY-STORE-GRAPH-WIRING`
-- `BLUEPRINT--GENESIS-GRAPH-TS-FIRST`
-- `FEAT--COGNITIVE-LAYER-FACADE`
-- `PROTO--AUTO-GENERATED-MARKER`
-- `PROTO--SCALE-LEVEL-GATE`
-- (this) `AUDIT--COGNITIVE-LAYER-V0`
+- `[[CONCEPT--COGNITIVE-LAYER-FACADE]]`
+- `[[CONCEPT--HYBRID-RETRIEVAL-FTS-LAYER]]`
+- `[[ADR--DEFAULT-SLM-OLLAMA-QWEN-CODER]]`
+- `[[ADR--GEMINI-AS-SLM-PROVIDER]]`
+- `[[ADR--MEMORY-STORE-GRAPH-WIRING]]`
+- `[[BLUEPRINT--GENESIS-GRAPH-TS-FIRST]]`
+- `[[FEAT--COGNITIVE-LAYER-FACADE]]`
+- `[[PROTO--AUTO-GENERATED-MARKER]]`
+- `[[PROTO--SCALE-LEVEL-GATE]]`
+- (this) `[[AUDIT--COGNITIVE-LAYER-V0]]`
 
 ## Verification
 
@@ -104,20 +104,20 @@ Stand up the cognitive-layer / memoryOS stack end-to-end so EVA, Claude Code, He
 | §7.5 | `audit-only.ts` stamps episodic hits |
 | §7.7.2 | `scale-gate.ts` enforced in `runTask` |
 | §8.1 / §17.3 | `runTask({ tier })` T1=Ollama+qwen2.5-coder, T2=Gemini, T3=caller-supplied |
-| §9.6 | `compose.ts` AUTO-GENERATED marker; validated by `PROTO--AUTO-GENERATED-MARKER` |
+| §9.6 | `compose.ts` AUTO-GENERATED marker; validated by `[[PROTO--AUTO-GENERATED-MARKER]]` |
 | §13 | 4-layer hybrid pipeline — FTS added as layer 2 (`fts.ts`); atomic / vector / graph already shipped |
 | §14.1 | `ssot.ts::resolveSSOT` |
 | §6.4 | `cognitive.hotfix.{open,list,close,check}` re-exports |
 | §17.1 | Path encoding flows through existing `projects/resolve.ts` |
 
-## Deviations from BLUEPRINT--GENESIS-GRAPH-INTEGRATION
+## Deviations from [[BLUEPRINT--GENESIS-GRAPH-INTEGRATION]]
 
-The Rust crate at `packages/gks/native/genesis-block/` is **not** shipped in this PR (Phase 0 = TS-only). The TS-first staging is captured by `BLUEPRINT--GENESIS-GRAPH-TS-FIRST` and uses the same directory layout the Rust binary will eventually own, so the upgrade is invisible to consumers. Phases P3.1–P3.6 in the original BLUEPRINT remain as written.
+The Rust crate at `packages/gks/native/genesis-block/` is **not** shipped in this PR (Phase 0 = TS-only). The TS-first staging is captured by `[[BLUEPRINT--GENESIS-GRAPH-TS-FIRST]]` and uses the same directory layout the Rust binary will eventually own, so the upgrade is invisible to consumers. Phases P3.1–P3.6 in the original BLUEPRINT remain as written.
 
 ## Outstanding (post-PR)
 
 - Atom statuses are `draft` — promotion to `stable` happens after CI green on Node 20 + 22 (per `packages/msp/CLAUDE.md` branch convention).
-- Rust crate (BLUEPRINT--GENESIS-GRAPH-INTEGRATION P3.1–P3.6).
+- Rust crate ([[BLUEPRINT--GENESIS-GRAPH-INTEGRATION]] P3.1–P3.6).
 - Full §8.4 slot/layout grammar for the deterministic composer.
 - Pre-existing `test/mcp/bin.test.ts > uses --root=<path>` flake (environment-related; reproduces on `main`).
 

@@ -26,18 +26,18 @@ This audit certifies that `msp_spec.md` §2–§13 is now mechanically represent
 
 | Spec section | Atoms |
 |---|---|
-| §2 Architecture | `FRAMEWORK--MSP-ARCHITECTURE-V2` |
-| §3 Inbound flow | `CONCEPT--INBOUND-QUEUE`, `CONCEPT--SUBMISSION-ENVELOPE`, `CONCEPT--PROPOSAL-TYPES`, `ADR--PROMOTION-WORKFLOW` |
-| §4 Atomic write contract | `CONCEPT--ATOMIC-WRITE-CONTRACT`, `ADR--FORBIDDEN-FIELDS-LIST`, `ADR--ANTI-HALLUCINATION-RULES`, `CONCEPT--EPISTEMIC-METADATA`, `FRAMEWORK--CROSSLINKS-VOCABULARY` |
-| §5 Codegen microtask contract | `CONCEPT--CODEGEN-MICROTASK-CONTRACT`, `ADR--CODEGEN-POST-PROCESSING`, `ADR--CODEGEN-FORBIDDEN-PATTERNS`, `ADR--CODEGEN-RETRY-POLICY`, plus 4-atom scaffold for `FEAT--CODEGEN-MICROTASK-RUNNER` |
-| §6 Phase governance | `FRAMEWORK--PHASE-GOVERNANCE`, `FRAMEWORK--SCALING-LEVELS` |
-| §7 Memory subsystem | `CONCEPT--MEMORY-SUBSYSTEM`, `CONCEPT--MEMORY-SESSIONS`, `CONCEPT--MEMORY-EPISODIC`, `CONCEPT--MEMORY-VECTOR-BACKLINKS`, plus 12 atoms across the 3 memory FEAT scaffolds |
-| §8 Promotion & rollback | `ADR--PROMOTION-LEVELS` (workflow lives in `ADR--PROMOTION-WORKFLOW`) |
-| §9 Human review gates | covered inline within `ADR--PROMOTION-WORKFLOW` (a separate ADR is queued for M3) |
-| §10 Escape hatches | `ADR--HOTFIX-ESCAPE-HATCH`, `ADR--LEGACY-FILES-ALLOWANCE` |
+| §2 Architecture | `[[FRAMEWORK--MSP-ARCHITECTURE-V2]]` |
+| §3 Inbound flow | `[[CONCEPT--INBOUND-QUEUE]]`, `[[CONCEPT--SUBMISSION-ENVELOPE]]`, `[[CONCEPT--PROPOSAL-TYPES]]`, `[[ADR--PROMOTION-WORKFLOW]]` |
+| §4 Atomic write contract | `[[CONCEPT--ATOMIC-WRITE-CONTRACT]]`, `[[ADR--FORBIDDEN-FIELDS-LIST]]`, `[[ADR--ANTI-HALLUCINATION-RULES]]`, `[[CONCEPT--EPISTEMIC-METADATA]]`, `[[FRAMEWORK--CROSSLINKS-VOCABULARY]]` |
+| §5 Codegen microtask contract | `[[CONCEPT--CODEGEN-MICROTASK-CONTRACT]]`, `[[ADR--CODEGEN-POST-PROCESSING]]`, `[[ADR--CODEGEN-FORBIDDEN-PATTERNS]]`, `[[ADR--CODEGEN-RETRY-POLICY]]`, plus 4-atom scaffold for `[[FEAT--CODEGEN-MICROTASK-RUNNER]]` |
+| §6 Phase governance | `[[FRAMEWORK--PHASE-GOVERNANCE]]`, `[[FRAMEWORK--SCALING-LEVELS]]` |
+| §7 Memory subsystem | `[[CONCEPT--MEMORY-SUBSYSTEM]]`, `[[CONCEPT--MEMORY-SESSIONS]]`, `[[CONCEPT--MEMORY-EPISODIC]]`, `[[CONCEPT--MEMORY-VECTOR-BACKLINKS]]`, plus 12 atoms across the 3 memory FEAT scaffolds |
+| §8 Promotion & rollback | `[[ADR--PROMOTION-LEVELS]]` (workflow lives in `[[ADR--PROMOTION-WORKFLOW]]`) |
+| §9 Human review gates | covered inline within `[[ADR--PROMOTION-WORKFLOW]]` (a separate ADR is queued for M3) |
+| §10 Escape hatches | `[[ADR--HOTFIX-ESCAPE-HATCH]]`, `[[ADR--LEGACY-FILES-ALLOWANCE]]` |
 | §11 Tooling | implementation prep via the four FEAT scaffolds; no separate atom |
-| §12 Project path encoding | `ADR--PATH-ENCODING` (resolves the open issue from spec §15 in favour of bare-name) |
-| §13 Authority matrix | `FRAMEWORK--AUTHORITY-MATRIX` |
+| §12 Project path encoding | `[[ADR--PATH-ENCODING]]` (resolves the open issue from spec §15 in favour of bare-name) |
+| §13 Authority matrix | `[[FRAMEWORK--AUTHORITY-MATRIX]]` |
 
 ## Counts
 
@@ -57,18 +57,18 @@ verify-flow per FEAT:
 
 | FEAT | Atoms visited | Status |
 |---|---|---|
-| `FEAT--MSP-VALIDATOR` | 3 | OK |
-| `FEAT--CODEGEN-MICROTASK-RUNNER` | 11 | OK |
-| `FEAT--MEMORY-SESSIONS-WRITER` | 6 | OK |
-| `FEAT--MEMORY-EPISODIC-WRITER` | 10 | OK |
-| `FEAT--MEMORY-BACKLINKS-INDEXER` | 9 | OK |
+| `[[FEAT--MSP-VALIDATOR]]` | 3 | OK |
+| `[[FEAT--CODEGEN-MICROTASK-RUNNER]]` | 11 | OK |
+| `[[FEAT--MEMORY-SESSIONS-WRITER]]` | 6 | OK |
+| `[[FEAT--MEMORY-EPISODIC-WRITER]]` | 10 | OK |
+| `[[FEAT--MEMORY-BACKLINKS-INDEXER]]` | 9 | OK |
 
 ## What this audit does NOT certify
 
 - **Code does not exist yet** for the 4 new FEATs. They are implementation-ready scaffolds (CONCEPT/ADR/FEAT/BLUEPRINT + microtask YAMLs); writing `src/codegen/`, `src/memory/sessions/`, etc. is M3+ work.
 - **Body quality** — every atom passes structural validation, but human review still has to judge whether each ADR's "Decision" actually addresses the "Context". Reviewer: Boss.
-- **Path encoding migration** — `ADR--PATH-ENCODING` records the decision; the spec doc itself still says `D--<name>` and needs a doc-PR to update.
-- **Per-section spec drift** — atoms paraphrase the spec; the spec is still the master. If a future spec edit changes substance, atoms must be updated through the `update_atomic` proposal type (`CONCEPT--PROPOSAL-TYPES`).
+- **Path encoding migration** — `[[ADR--PATH-ENCODING]]` records the decision; the spec doc itself still says `D--<name>` and needs a doc-PR to update.
+- **Per-section spec drift** — atoms paraphrase the spec; the spec is still the master. If a future spec edit changes substance, atoms must be updated through the `update_atomic` proposal type (`[[CONCEPT--PROPOSAL-TYPES]]`).
 
 ## Residual M3 backlog (carried forward from M2)
 
@@ -87,5 +87,10 @@ verify-flow per FEAT:
 ## References
 
 - `msp_spec.md` (master spec; this branch slices it into atoms)
-- `AUDIT--MSP-VALIDATOR` (M2 audit; preceded this work)
-- `FRAMEWORK--MSP-ARCHITECTURE-V2` (root of the knowledge tree)
+- `[[AUDIT--MSP-VALIDATOR]]` (M2 audit; preceded this work)
+- `[[FRAMEWORK--MSP-ARCHITECTURE-V2]]` (root of the knowledge tree)
+
+## Connections
+- [[CONCEPT--KNOWLEDGE-LAYERS-V2]]
+- [[ADR--AGENT-WRITE-BOUNDARIES]]
+

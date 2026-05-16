@@ -23,7 +23,7 @@ created_at: 2026-05-08T13:21:00.000+07:00
 
 ## Context
 
-`CONCEPT--MONOREPO-MIGRATION` argues for collapsing two repos into one workspace. This ADR fixes the **how**: workspace tool, package layout, boundary rules, and the publish path that keeps `@freshair129/gks` standalone-installable.
+`[[CONCEPT--MONOREPO-MIGRATION]]` argues for collapsing two repos into one workspace. This ADR fixes the **how**: workspace tool, package layout, boundary rules, and the publish path that keeps `@freshair129/gks` standalone-installable.
 
 ## Decision
 
@@ -70,7 +70,7 @@ freshair129/msp/                    (this repo, renamed-or-kept; archive GksV3 s
 
 **Decision**: npm workspaces. Disk efficiency loss is negligible for a 2-package monorepo and the migration cost stays minimal.
 
-### Boundary (refined from `FRAMEWORK--MSP-ARCHITECTURE-V2` + `ADR--GRAPH-IS-GKS-DOMAIN`)
+### Boundary (refined from `[[FRAMEWORK--MSP-ARCHITECTURE-V2]]` + `[[ADR--GRAPH-IS-GKS-DOMAIN]]`)
 
 | Rule | Enforcement |
 |---|---|
@@ -99,8 +99,8 @@ GKS keeps its own semver in `packages/gks/package.json`. MSP depends on GKS via 
 - **Drift-impossible**: there is no "MSP atomic claims vs published GKS" gap — they're literally the same git tree
 - **`upstream/gks-proposals/` directory deleted**: proposals become normal PRs in this repo
 - **`scripts/msp/propose.mjs` phase-6 hack deleted**: GKS CLI fixed in same PR as MSP usage
-- **`src/memory/backlinks/` deleted**: backlinks API added to GKS package directly per `ADR--GRAPH-IS-GKS-DOMAIN`'s long-term plan
-- **`AUDIT--TWO-REPO-VALIDATION` workflow obsolete**: replaced by ESLint boundary rule
+- **`src/memory/backlinks/` deleted**: backlinks API added to GKS package directly per `[[ADR--GRAPH-IS-GKS-DOMAIN]]`'s long-term plan
+- **`[[AUDIT--TWO-REPO-VALIDATION]]` workflow obsolete**: replaced by ESLint boundary rule
 - **CI faster**: no more separate `Freshair129/GksV3` pipeline
 
 ### Negative
@@ -142,15 +142,15 @@ Slightly better disk usage and stricter dependency hoisting than npm workspaces.
 
 ## What this ADR does NOT change
 
-- **MSP↔GKS boundary semantics**: `FRAMEWORK--MSP-ARCHITECTURE-V2` and `ADR--GRAPH-IS-GKS-DOMAIN` still define what each package owns. The migration moves files; it doesn't redraw the line.
+- **MSP↔GKS boundary semantics**: `[[FRAMEWORK--MSP-ARCHITECTURE-V2]]` and `[[ADR--GRAPH-IS-GKS-DOMAIN]]` still define what each package owns. The migration moves files; it doesn't redraw the line.
 - **Public API of `@freshair129/gks`**: same exports, same CLI, same MCP server entrypoints
 - **MSP atom store layout**: `gks/concept/`, `gks/adr/`, etc. inside `packages/msp/` keep their current paths
 
 ## Source
 
-- `CONCEPT--MONOREPO-MIGRATION` — motivation
+- `[[CONCEPT--MONOREPO-MIGRATION]]` — motivation
 - npm workspaces docs (https://docs.npmjs.com/cli/v10/using-npm/workspaces)
 - Prior art: Vite (`packages/vite`, `packages/create-vite`), tRPC (`packages/server`, `packages/client`, …), Turborepo
 
 ---
-**Post-2026-05-13 amendment:** The project has pivoted to an agentic monorepo architecture per `ADR--AGENTIC-MONOREPO-PIVOT`. The canonical layout defined in `FRAMEWORK_MASTER_SPEC.md §4.2` will be materialized, centralizing knowledge, scripts, and documentation at the root level.
+**Post-2026-05-13 amendment:** The project has pivoted to an agentic monorepo architecture per `[[ADR--AGENTIC-MONOREPO-PIVOT]]`. The canonical layout defined in `FRAMEWORK_MASTER_SPEC.md §4.2` will be materialized, centralizing knowledge, scripts, and documentation at the root level.

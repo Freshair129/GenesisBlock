@@ -83,5 +83,10 @@ practice, this PROTO promotes to `stable`.
 
 ## Source
 
-`FRAMEWORK--KNOWLEDGE-3-TIER` (Master Block § "Token cap"); PR-5 of the
+`[[FRAMEWORK--KNOWLEDGE-3-TIER]]` (Master Block § "Token cap"); PR-5 of the
 3-tier rollout plan.
+
+## Connections
+- [[ADR--MASTER-PROMOTION-DOC-TO-CODE]]
+- [[ADR--MASTER-PROMOTION-CONTRADICTION-POLICY]]
+

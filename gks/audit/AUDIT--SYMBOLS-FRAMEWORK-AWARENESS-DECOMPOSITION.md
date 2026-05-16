@@ -27,14 +27,14 @@ created_at: 2026-05-12T05:42:00.000+07:00
 
 ## Scope verified
 
-This PR delivers two coupled outcomes per `ADR--SYMBOLS-FRAMEWORK-AWARENESS`:
+This PR delivers two coupled outcomes per `[[ADR--SYMBOLS-FRAMEWORK-AWARENESS]]`:
 
 ### 1. Atom decomposition (per ADR §1)
-- `CONCEPT--SYMBOLS-FRAMEWORK-AWARENESS` created (P1)
-- `ADR--SYMBOLS-FRAMEWORK-AWARENESS` created (P2)
-- `ALGO--SYMBOLS-FRAMEWORK-RECOGNITION` created (P2)
-- `PROTO--SYMBOLS-FRAMEWORK-INVARIANTS` created (P2, tier: safety, severity: error)
-- `FEAT--SYMBOLS-FRAMEWORK-AWARENESS` superseded: status → `superseded`, reciprocal `superseded_by` → 4 new atoms, deprecation banner added at top of body, original content preserved verbatim below banner
+- `[[CONCEPT--SYMBOLS-FRAMEWORK-AWARENESS]]` created (P1)
+- `[[ADR--SYMBOLS-FRAMEWORK-AWARENESS]]` created (P2)
+- `[[ALGO--SYMBOLS-FRAMEWORK-RECOGNITION]]` created (P2)
+- `[[PROTO--SYMBOLS-FRAMEWORK-INVARIANTS]]` created (P2, tier: safety, severity: error)
+- `[[FEAT--SYMBOLS-FRAMEWORK-AWARENESS]]` superseded: status → `superseded`, reciprocal `superseded_by` → 4 new atoms, deprecation banner added at top of body, original content preserved verbatim below banner
 
 ### 2. Validator hardening (per ADR §5)
 - `src/validator/proto/scaling-level-gate.ts` modified:
@@ -62,30 +62,34 @@ This PR delivers two coupled outcomes per `ADR--SYMBOLS-FRAMEWORK-AWARENESS`:
 | Plan item | Deviation | Reason |
 |---|---|---|
 | Author all 4 atoms from scratch | PROTO already existed (Antigravity created it in earlier turn); merged-into rather than overwrote | Antigravity's content was substantially correct; minor edits would have been duplicative |
-| `ADR--SYMBOLS-FRAMEWORK-AWARENESS` tier: 'architecture' | Validator warns (allowed set: `safety/master/genesis/process`) | Match convention of other ADRs in `gks/adr/` (warning-only, not blocking) |
+| `[[ADR--SYMBOLS-FRAMEWORK-AWARENESS]]` tier: 'architecture' | Validator warns (allowed set: `safety/master/genesis/process`) | Match convention of other ADRs in `gks/adr/` (warning-only, not blocking) |
 | `predicate.ok` change | Now `violations.every((v) => v.severity !== 'error')` instead of `violations.length === 0` | Required so warnings don't fail CI; preserves grandfather behavior |
 
 ## Anti-hallucination check
 
 - All 4 new atoms cross-reference each other consistently (CONCEPT ← ADR ← ALGO/PROTO)
 - Superseded FEAT's `superseded_by` lists exactly the 4 new atoms — no orphans, no extras
-- Validator predicate code references the `linked_symbols` declared in `PROTO--SCALING-LEVEL-GATE` (no fabricated file paths)
+- Validator predicate code references the `linked_symbols` declared in `[[PROTO--SCALING-LEVEL-GATE]]` (no fabricated file paths)
 - KIND_SHORTHAND fix verified: every `SymbolKind` literal in `types.ts` has a matching entry in all 3 parser maps
 
 ## Follow-ups (handled in Phase-2 handoff)
 
 - **PR-A** (`HANDOFF-SYMBOLS-EXPANSION-PHASE-2.md`): implementation of recognizers per ALGO + validator predicate per PROTO
-- **PR-B**: apply same decomposition pattern to `FEAT--SYMBOLS-PROCESS-TRACING`
+- **PR-B**: apply same decomposition pattern to `[[FEAT--SYMBOLS-PROCESS-TRACING]]`
 - **PR-C**: atom workflow scripts (`atom-date`, `scaffold-atom`, `supersede`) — prevents the date-format / reciprocal-link bugs seen in Phase 1
 - **PR-D**: retrofit existing FEATs that lack ADR (grandfather clause expires when 0 warnings remain); then remove `HARD_ENFORCE_CUTOFF`
 
 ## Source
 
-- `ADR--SYMBOLS-FRAMEWORK-AWARENESS` (decision)
-- `CONCEPT--SYMBOLS-FRAMEWORK-AWARENESS` (motivation)
-- `ALGO--SYMBOLS-FRAMEWORK-RECOGNITION` (implementation contract)
-- `PROTO--SYMBOLS-FRAMEWORK-INVARIANTS` (invariants)
-- `FEAT--SYMBOLS-FRAMEWORK-AWARENESS` (superseded)
-- `PROTO--SCALING-LEVEL-GATE` (validator rule hardened)
-- `MASTER--ATOM-CONTRADICTION-POLICY` (decomposition justification)
+- `[[ADR--SYMBOLS-FRAMEWORK-AWARENESS]]` (decision)
+- `[[CONCEPT--SYMBOLS-FRAMEWORK-AWARENESS]]` (motivation)
+- `[[ALGO--SYMBOLS-FRAMEWORK-RECOGNITION]]` (implementation contract)
+- `[[PROTO--SYMBOLS-FRAMEWORK-INVARIANTS]]` (invariants)
+- `[[FEAT--SYMBOLS-FRAMEWORK-AWARENESS]]` (superseded)
+- `[[PROTO--SCALING-LEVEL-GATE]]` (validator rule hardened)
+- `[[MASTER--ATOM-CONTRADICTION-POLICY]]` (decomposition justification)
 - `HANDOFF-SYMBOLS-EXPANSION-PHASE-2.md` (continued work routed to Antigravity)
+
+## Connections
+- [[BLUEPRINT--PROTO-LOADER]]
+

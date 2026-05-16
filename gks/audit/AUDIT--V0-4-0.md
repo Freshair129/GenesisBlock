@@ -29,7 +29,7 @@ Records the Tier 2 → impl jump from v0.3.0 to v0.4.0 driven by user direction 
 
 ### Foundation
 
-- **M8a — PROTO loader** (PR #31, merged): `src/validator/proto/{types,loader,sample}.ts` + `gks/proto/PROTO--SAMPLE-RULE.md` + 19 tests + AUDIT--PROTO-LOADER. Generic governance-rule infrastructure; PROTO atoms `crosslinks.enforces` a FRAME and link a TS predicate.
+- **M8a — PROTO loader** (PR #31, merged): `src/validator/proto/{types,loader,sample}.ts` + `gks/proto/[[PROTO--SAMPLE-RULE]].md` + 19 tests + [[AUDIT--PROTO-LOADER]]. Generic governance-rule infrastructure; PROTO atoms `crosslinks.enforces` a FRAME and link a TS predicate.
 
 ### 5 Tier 2 governance PROTOs (parallel fan-out)
 
@@ -45,15 +45,15 @@ All ship `status: draft` so even error-severity violations don't fail-exit CI. R
 
 ### M8f — promote 3 existing rules to PROTOs (this PR)
 
-- **`PROTO--SUMMARY-MIN`** wraps `summaryMin`
-- **`PROTO--ADR-MONOTONIC`** wraps `adrMonotonic`
-- **`PROTO--EVIDENCE-FOR-DECISIONS`** wraps `evidenceForDecisions`
+- **`[[PROTO--SUMMARY-MIN]]`** wraps `summaryMin`
+- **`[[PROTO--ADR-MONOTONIC]]`** wraps `adrMonotonic`
+- **`[[PROTO--EVIDENCE-FOR-DECISIONS]]`** wraps `evidenceForDecisions`
 
-Via `src/validator/proto/rule-adapter.ts` — a generic Rule→Predicate adapter. Original rules continue running in core (overlap during draft phase); cutover is M8f-2 follow-up. AUDIT--RULES-PROMOTED-TO-PROTOS records the decision.
+Via `src/validator/proto/rule-adapter.ts` — a generic Rule→Predicate adapter. Original rules continue running in core (overlap during draft phase); cutover is M8f-2 follow-up. [[AUDIT--RULES-PROMOTED-TO-PROTOS]] records the decision.
 
 ### Tier 3 explicit defer
 
-- **`CONCEPT--TIER-3-DEFERRED`** (PR #32, merged): records explicit defer rationale + revisit triggers + effort estimates for M9c (cross-repo verify-flow), M9d (Notion migration), M9e (auto-ADR generator), M10a (msp-bridge plugin), M10b (Kuzu/Neo4j backend), M10c (RRF tuning).
+- **`[[CONCEPT--TIER-3-DEFERRED]]`** (PR #32, merged): records explicit defer rationale + revisit triggers + effort estimates for M9c (cross-repo verify-flow), M9d (Notion migration), M9e (auto-ADR generator), M10a (msp-bridge plugin), M10b (Kuzu/Neo4j backend), M10c (RRF tuning).
 
 ## Counts at v0.4.0
 
@@ -121,3 +121,8 @@ Tier 3 (deferred — explicit triggers)
 ## Source
 
 User direction "วางแผนและทำให้จบ ทุก M" → "ทำที่เหลือทั้งหมด". Closes Tier 2 to draft-impl + Tier 3 to explicit defer. v0.4.0 is the mechanical-governance milestone — the framework now enforces what it documents.
+
+## Connections
+- [[AUDIT--ALL-M-MILESTONES]]
+- [[CONCEPT--MSP-ROADMAP]]
+

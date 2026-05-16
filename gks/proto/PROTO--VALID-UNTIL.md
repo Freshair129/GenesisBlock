@@ -59,7 +59,7 @@ Tests inject "now" via the `MSP_NOW` environment variable (any ISO 8601 string p
 
 ## Trigger
 
-`msp:validate --all` (alongside other PROTO predicates). Optionally a weekly CI cron — see `CONCEPT--DECISION-ATROPHY-GUARDS` Guard 1.
+`msp:validate --all` (alongside other PROTO predicates). Optionally a weekly CI cron — see `[[CONCEPT--DECISION-ATROPHY-GUARDS]]` Guard 1.
 
 ## Severity
 
@@ -67,8 +67,12 @@ Tests inject "now" via the `MSP_NOW` environment variable (any ISO 8601 string p
 
 ## Status
 
-`draft` — real atoms in this repo (e.g. `CONCEPT--MSP-ROADMAP` with `valid_until: 2026-08-01`) may already be expired or near-expiring. Shipping as draft so the loader reports them without breaking CI. Promote to `stable` after the team has reviewed and either updated or superseded the affected atoms.
+`draft` — real atoms in this repo (e.g. `[[CONCEPT--MSP-ROADMAP]]` with `valid_until: 2026-08-01`) may already be expired or near-expiring. Shipping as draft so the loader reports them without breaking CI. Promote to `stable` after the team has reviewed and either updated or superseded the affected atoms.
 
 ## Source
 
-`CONCEPT--DECISION-ATROPHY-GUARDS`, `FEAT--PROTO-LOADER`.
+`[[CONCEPT--DECISION-ATROPHY-GUARDS]]`, `[[FEAT--PROTO-LOADER]]`.
+
+## Connections
+- [[FRAMEWORK--MSP-ARCHITECTURE-V2]]
+

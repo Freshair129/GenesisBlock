@@ -60,3 +60,8 @@ freely; body has `## Description` / `## Reproduction` / `## Discussion`
 - MCP `gks_issue_*` tools — natural follow-up if there's demand
 - Cross-issue link integrity (`blocks` / `blocked_by` graph) — orchestrator
 - Issue → INC-- promotion automation — orchestrator
+
+## Connections
+- [[ADR--EXTENDED-TAXONOMY]]
+- [[CONCEPT--MEMORY-STORE]]
+

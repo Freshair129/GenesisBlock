@@ -310,3 +310,9 @@ implementation_order:
 - Mutate any source's data
 - Tune default weights beyond the ADR (M9 PARAM atom)
 - Persist anything (M7c is read-only)
+
+## Connections
+- [[FEAT--RETRIEVAL-ORCHESTRATION]]
+- [[ADR--RETRIEVAL-RRF-FUSION]]
+- [[CONCEPT--RETRIEVAL-ORCHESTRATION]]
+

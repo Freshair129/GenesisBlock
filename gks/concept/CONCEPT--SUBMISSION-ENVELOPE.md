@@ -17,7 +17,7 @@ crosslinks: {"references":[],"superseded_by":["CONCEPT--KNOWLEDGE-LAYERS-V2"]}
 created_at: 2026-05-03T14:01:50.823+07:00
 ---
 
-> ⚠️ **Superseded by [`CONCEPT--KNOWLEDGE-LAYERS-V2`](./CONCEPT--KNOWLEDGE-LAYERS-V2.md)** (Phase 4 of `BLUEPRINT--INBOUND-TO-CANDIDATES-MIGRATION`, 2026-05-09). `CandidateWriter` writes a plain atom directly to `.brain/.../candidates/${proposed_id}.md` — no envelope wrapper, no `proposal_id`, no `proposal_type`. Body preserved as historical context.
+> ⚠️ **Superseded by [`[[CONCEPT--KNOWLEDGE-LAYERS-V2]]`](./[[CONCEPT--KNOWLEDGE-LAYERS-V2]].md)** (Phase 4 of `[[BLUEPRINT--INBOUND-TO-CANDIDATES-MIGRATION]]`, 2026-05-09). `CandidateWriter` writes a plain atom directly to `.brain/.../candidates/${proposed_id}.md` — no envelope wrapper, no `proposal_id`, no `proposal_type`. Body preserved as historical context.
 
 # CONCEPT — submission envelope
 
@@ -42,7 +42,7 @@ rationale: "Document MSP technical surface for new joiners"
 | Field | Required | Purpose |
 |---|---|---|
 | `proposal_id` | yes | unique handle for this proposal (timestamp + agent + slug) |
-| `proposal_type` | yes | one of the four proposal types — see `CONCEPT--PROPOSAL-TYPES` |
+| `proposal_type` | yes | one of the four proposal types — see `[[CONCEPT--PROPOSAL-TYPES]]` |
 | `target_file` | yes | predicted destination under `gks/` (validator checks the type prefix) |
 | `submitted_by` | yes | agent handle (must match `registry.yaml`) |
 | `submitted_at` | yes | ISO-8601; future-dating is rejected by the validator |
@@ -52,7 +52,7 @@ rationale: "Document MSP technical surface for new joiners"
 
 - Verifies `submitted_by` exists in `registry.yaml`
 - Cross-checks `target_file` matches the inner atom's `type` (e.g. `gks/adrs/` requires `type: adr`)
-- Refuses `submitted_at` in the future (per `ADR--ANTI-HALLUCINATION-RULES`)
+- Refuses `submitted_at` in the future (per `[[ADR--ANTI-HALLUCINATION-RULES]]`)
 - Rejects envelope fields appearing in the inner atom's frontmatter (those are MSP-only)
 
 ## What the promote workflow does with it

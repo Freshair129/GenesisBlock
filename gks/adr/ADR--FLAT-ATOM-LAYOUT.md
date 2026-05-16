@@ -61,3 +61,9 @@ Pure filesystem-layout decision. AtomicLayer is path-agnostic.
 
 - ADR 012 — extended taxonomy (the 30+ types this folder list mirrors)
 - ADR 008 — storage scope (this is convention, not scope change)
+
+## Connections
+- [[ADR--EXTENDED-TAXONOMY]]
+- [[FRAMEWORK--FOUR-LAYERS]]
+- [[CONCEPT--TAXONOMY-V2-3]]
+

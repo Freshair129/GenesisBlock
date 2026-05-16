@@ -38,3 +38,7 @@ Using cloud LLMs (T2/T3) incurs costs. We need a clear policy for when to escala
 - Improved success rate for complex tasks.
 - Controlled cloud spend.
 - Clear path for agent self-improvement (if T1 fails, T2 fixes and T1 learns).
+
+## Connections
+- [[CONCEPT--AGENT-TIER-ROUTING]]
+

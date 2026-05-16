@@ -92,13 +92,13 @@ Cypher is exposed as a sixth, opt-in method via a downcast.
 | Phase | Output | Definition of done |
 |---|---|---|
 | **P3.1 Scaffold** | `packages/gks/native/genesis-block/Cargo.toml` builds locally; one trivial exported `napi` function returns a constant. CI matrix builds for the five target triples. | `cargo test` green; `napi build` produces a `.node` artifact loadable from Node. |
-| **⛔ HALT GATE 1** | Human reviewer signs off the **storage layout direction** before any persistent on-disk format is committed. | Reviewer comment with `gate-1: approved` label on the P3.1 PR, **OR** a new `ADR--GENESIS-BLOCK-STORAGE-LAYOUT` if the approach diverges from the LadybugDB fork. Required because storage format is the most expensive bit to migrate after data lands. |
+| **⛔ HALT GATE 1** | Human reviewer signs off the **storage layout direction** before any persistent on-disk format is committed. | Reviewer comment with `gate-1: approved` label on the P3.1 PR, **OR** a new `[[ADR--GENESIS-BLOCK-STORAGE-LAYOUT]]` if the approach diverges from the LadybugDB fork. Required because storage format is the most expensive bit to migrate after data lands. |
 | **P3.2 Storage MVP** | `addNode` / `addEdge` / `query` over a single-column page layout, no temporal awareness yet. | Existing `test/memory/graph/` suite passes with the new backend parametrised in. |
 | **P3.3 Bi-temporal** | `valid_from` / `valid_to` columns; `retractEdge`; `query({ asOf })` honoured. | The bi-temporal sub-suite in `test/memory/graph/` passes. |
 | **P3.4 Cypher v0** | Parser + executor for the minimal subset (see "Cypher v0 scope" below). | New test file `test/memory/graph/genesis-block-cypher.test.ts` covers: exact-id `MATCH`, single-hop, variable-length `[*1..N]`, `WHERE` on properties, `RETURN`. |
 | **⛔ HALT GATE 2** | Human reviewer signs off the **Cypher v0 surface** before benchmarking locks in performance assumptions. | Reviewer comment with `gate-2: approved` label on the P3.4 PR, **OR** an addendum atom extending the Cypher v0 scope. Required because adding Cypher constructs after benchmark targets are committed forces re-runs. |
 | **P3.5 Benchmarks** | `npm run bench:graph` numbers against the existing `GraphStore` baseline, on a 50k-node / 500k-edge fixture. | Report committed under `packages/gks/benchmarks/genesis-block/`; meets the <50 ms p50 success criterion from CONCEPT. |
-| **P3.6 Promote ADR** | All above green; ADR-005 / ADR-001 reconciliation re-reviewed; status flipped `draft` → `stable`. | Single follow-up PR flipping atom status + writing `AUDIT--GENESIS-BLOCK-INTEGRATION`. |
+| **P3.6 Promote ADR** | All above green; ADR-005 / ADR-001 reconciliation re-reviewed; status flipped `draft` → `stable`. | Single follow-up PR flipping atom status + writing `[[AUDIT--GENESIS-BLOCK-INTEGRATION]]`. |
 
 Phases P3.1–P3.2 are the minimum for a "drop-in" experience. P3.3 is
 needed before MSP's `verify-flow` can rely on it. P3.4 is what unlocks
@@ -198,3 +198,10 @@ Out of scope for v0 (tracked as separate atoms when needed):
 | LadybugDB upstream relicenses or stalls | Fork is hard-pinned at commit `<sha-tbd>`; we already control the patched copy. |
 | Cypher parser bugs become hard-to-diagnose recall failures | Cypher path is opt-in; default `neighbors()` / `query()` path stays as ground truth. |
 | Schema migration disasters | Version byte + read-then-migrate routine, identical pattern to existing `src/lib/schema-version.ts`. |
+
+## Connections
+- [[ADR--GENESIS-GRAPH-AS-GKS-BACKEND]]
+- [[CONCEPT--GENESIS-GRAPH-BACKEND]]
+- [[FRAMEWORK--MSP-ARCHITECTURE-V2]]
+- [[PROTOCOL--GENESIS-GRAPH-FFI]]
+

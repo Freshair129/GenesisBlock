@@ -56,6 +56,6 @@ An atom MUST NOT reference a target atom ID via `crosslinks.*` that does not exi
 - **Enforcement**: `trace-invariants` predicate (rule tag `atom-ref-integrity`). Halts after 50 violations to avoid log floods; fix the first batch and re-run. The current indexer strips `external: true` markers, so all missing targets are flagged unconditionally — fix this by upgrading the indexer if external references become a real use case.
 
 ## Source
-- `ADR--SYMBOLS-PROCESS-TRACING`
-- `ALGO--SYMBOLS-CALL-GRAPH-TRAVERSAL`
-- `PROTO--TRACE-INVARIANTS` (Merged)
+- `[[ADR--SYMBOLS-PROCESS-TRACING]]`
+- `[[ALGO--SYMBOLS-CALL-GRAPH-TRAVERSAL]]`
+- `[[PROTO--TRACE-INVARIANTS]]` (Merged)

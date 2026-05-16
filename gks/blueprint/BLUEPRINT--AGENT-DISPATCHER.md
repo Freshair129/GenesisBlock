@@ -25,7 +25,7 @@ created_at: 2026-05-14T01:35:00.000+07:00
 
 # BLUEPRINT — Agent Dispatcher
 
-Concrete implementation plan for the routing function described in `CONCEPT--AGENT-TIER-ROUTING` and the cost rules from `ADR--AGENT-TIER-COST-POLICY`.
+Concrete implementation plan for the routing function described in `[[CONCEPT--AGENT-TIER-ROUTING]]` and the cost rules from `[[ADR--AGENT-TIER-COST-POLICY]]`.
 
 ## File layout
 
@@ -95,7 +95,7 @@ Each adapter is a thin `spawn()` wrapper — no business logic. The dispatcher c
 2. Dispatcher resolves the adapter for that tier; if `healthcheck()` returns false, falls back to the next-stronger tier (one step only).
 3. Adapter runs the prompt.
 4. If `ok === false` AND `severity ≥ regular`, escalate per the ADR (T1→T2, T2→T3).
-5. Record the run via `result-recorder.ts` as an `EPISODE--AGENT-RUN-<timestamp>` atom.
+5. Record the run via `result-recorder.ts` as an `[[EPISODE--AGENT-RUN]]-<timestamp>` atom.
 6. Return the `DispatchResult`.
 
 ## Test strategy (`packages/msp/test/agents/`)
@@ -125,3 +125,7 @@ Each phase = its own PR. Stream D (Two-Brain) blocks until **P4**.
 - How to attribute spend back to the dispatcher when adapters are paid per-token? Likely needs an opt-in `cost-tracker.ts` hook per tier.
 - Should we cache outputs by (task hash, tier)? Out of scope for v1; revisit if rerun rate is non-trivial.
 - Multi-agent ensemble (run T1 + T2 in parallel, pick best)? Defer — ADR-level decision needed first.
+
+## Connections
+- [[CONCEPT--AGENT-AGNOSTIC]]
+

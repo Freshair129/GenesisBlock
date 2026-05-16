@@ -109,7 +109,7 @@ msp_recall(query, opts)
 
 Wraps:
 - **`createObsidianClient`** (M7a) for Obsidian search
-- **`@evaai/gks` `recall`** OR direct `VectorBackend.search` (depending on what 3.5.6 exposes; aspirational `createNomicEmbedder` from 3.6.0 stays consistent — see `ADR--EMBEDDING-MODEL-PARITY` Status note)
+- **`@evaai/gks` `recall`** OR direct `VectorBackend.search` (depending on what 3.5.6 exposes; aspirational `createNomicEmbedder` from 3.6.0 stays consistent — see `[[ADR--EMBEDDING-MODEL-PARITY]]` Status note)
 - **`Episode[]`** structure from M7b consolidator (read from `episodic_memory.json`)
 - **`backlinks.jsonl`** from M3c-1 indexer
 
@@ -134,4 +134,11 @@ Nothing new persists. M7c is pure read-side orchestration.
 
 ## Source
 
-`msp_spec.md` §7c, `FRAMEWORK--MSP-ARCHITECTURE-V2`, M7a/M7b/M7e completion (PRs #12, #16, #19, #20).
+`msp_spec.md` §7c, `[[FRAMEWORK--MSP-ARCHITECTURE-V2]]`, M7a/M7b/M7e completion (PRs #12, #16, #19, #20).
+
+## Connections
+- [[FEAT--MSP-OBSIDIAN-CLIENT]]
+- [[FEAT--CONSOLIDATOR]]
+- [[CONCEPT--EMBEDDING-STRATEGY]]
+- [[CONCEPT--MEMORY-VECTOR-BACKLINKS]]
+

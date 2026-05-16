@@ -46,7 +46,7 @@ Closes PR-C of `HANDOFF-SYMBOLS-EXPANSION-PHASE-2.md` — atom workflow scripts 
 | Agent types TH local wall-clock 17:35 with `Z` suffix → validator rejects as future | `msp:atom-date` outputs correctly-offset ISO |
 | Agent uses wrong status enum (`proposed`, `accepted`) → validator warns/errors | `scaffold-atom` writes `status: draft` (canonical) |
 | Agent uses wrong tier/source_type → validator warns | `scaffold-atom` writes `tier: process`, `source_type: axiomatic` (canonical) |
-| Agent forgets reciprocal supersession crosslink → `MASTER--ATOM-CONTRADICTION-POLICY` violation | `msp:supersede` updates both sides atomically; refuses partial updates |
+| Agent forgets reciprocal supersession crosslink → `[[MASTER--ATOM-CONTRADICTION-POLICY]]` violation | `msp:supersede` updates both sides atomically; refuses partial updates |
 | Agent overwrites superseded atom by mistake | `msp:supersede` refuses if target already superseded |
 
 ## Test results
@@ -94,5 +94,5 @@ Test Files  1 passed (1)
 ## Source
 
 - `packages/msp/HANDOFF-SYMBOLS-EXPANSION-PHASE-2.md` §6 (PR-C spec — non-atom doc, hence not in crosslinks)
-- `PROTO--SCALING-LEVEL-GATE` (rule the FEAT→ADR retrofit will satisfy faster with these scripts)
-- `MASTER--ATOM-CONTRADICTION-POLICY` (rule that `supersede.ts` enforces mechanically)
+- `[[PROTO--SCALING-LEVEL-GATE]]` (rule the FEAT→ADR retrofit will satisfy faster with these scripts)
+- `[[MASTER--ATOM-CONTRADICTION-POLICY]]` (rule that `supersede.ts` enforces mechanically)

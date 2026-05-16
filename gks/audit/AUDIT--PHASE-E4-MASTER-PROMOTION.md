@@ -34,23 +34,23 @@ created_at: 2026-05-13T11:00:00.000+07:00
 Phase E4 of the agentic monorepo roadmap. Shipped the deterministic
 analysis + proposal half of the Master Block promotion workflow:
 scan the vault for `GENESIS--*` manifests, count dimension coverage
-against the 4-of-5 criterion (per `SPEC--GENESIS-BLOCK-MANIFEST` § 5),
+against the 4-of-5 criterion (per `[[SPEC--GENESIS-BLOCK-MANIFEST]]` § 5),
 emit per-block tables, and — under `--write` — drop scaffolded
 `MASTER--<id>.proposal.md` files to `gks/inbound/` for human review.
 
 Out of scope (deferred):
-- `gks/master/` writes — explicit human gate per `ADR--MASTER-PROMOTION-DOC-TO-CODE`
-  and `ADR--HUMAN-REVIEW-GATES`.
-- `PROTO--GENESIS-BLOCK-MEMBERSHIP` — the validator rule that enforces the
+- `gks/master/` writes — explicit human gate per `[[ADR--MASTER-PROMOTION-DOC-TO-CODE]]`
+  and `[[ADR--HUMAN-REVIEW-GATES]]`.
+- `[[PROTO--GENESIS-BLOCK-MEMBERSHIP]]` — the validator rule that enforces the
   `members.core` shape on `type: genesis` atoms.
-- Token-cap enforcement on proposals (the existing `PROTO--MASTER-TOKEN-CAP`
+- Token-cap enforcement on proposals (the existing `[[PROTO--MASTER-TOKEN-CAP]]`
   runs against `gks/master/` only; proposals bypass by design).
 - Mechanical cross-Master contradiction detection (Layer 1+ of
-  `BLUEPRINT--CONTRADICTION-DETECTION-IMPL`).
+  `[[BLUEPRINT--CONTRADICTION-DETECTION-IMPL]]`).
 
 ## What shipped vs the BLUEPRINT
 
-`BLUEPRINT--MASTER-PROMOTION-PIPELINE` listed 4 deliverables + 1 test
+`[[BLUEPRINT--MASTER-PROMOTION-PIPELINE]]` listed 4 deliverables + 1 test
 suite; all 5 are present.
 
 | Deliverable | File | Notes |
@@ -61,7 +61,7 @@ suite; all 5 are present.
 | 4. `msp-master-propose` CLI | `packages/msp/src/master/cli.ts` | Bin entry added to `packages/msp/package.json`. (E5 adds `msp-genesis-exec` on a parallel branch — both bin entries can coexist.) |
 | 5. Tests | `packages/msp/test/master/{dimensions,scanner,promote,cli}.test.ts` | 30+ test cases total — well above the BLUEPRINT's "≥18" target. |
 
-### Role-to-prefix mapping (per `SPEC--GENESIS-BLOCK-MANIFEST` § 3.1)
+### Role-to-prefix mapping (per `[[SPEC--GENESIS-BLOCK-MANIFEST]]` § 3.1)
 
 The implementation classifies member atoms by id prefix, not by parsed
 `type:` field. The mapping is closed to the five core prefixes:
@@ -80,7 +80,7 @@ Any other prefix (e.g. `FRAMEWORK--`, `GENESIS--`, `GUARD--`, `STACK--`,
 
 `msp-master-propose --root=. --write` against the live repo produces
 zero proposals — no Genesis Block currently has 4/5 stable members
-(only `SPEC--GENESIS-BLOCK-MANIFEST` exists; no `GENESIS--*` manifests
+(only `[[SPEC--GENESIS-BLOCK-MANIFEST]]` exists; no `GENESIS--*` manifests
 have been authored yet). This is expected per the BLUEPRINT — Phase E4
 ships the machinery, not the first promotion. The pipeline becomes
 load-bearing once the first `GENESIS--<NAME>.md` lands with a populated
@@ -106,9 +106,9 @@ All green under `npm test --workspace=packages/msp -- test/master/`.
 ## Follow-ups (not in this PR)
 
 1. Author the first real `GENESIS--<NAME>.md` Block Manifest under
-   `gks/genesis/` (likely `GENESIS--IDENTITY-ENGINE` per the SPEC's
+   `gks/genesis/` (likely `[[GENESIS--IDENTITY-ENGINE]]` per the SPEC's
    worked example) so the pipeline produces a real proposal.
-2. `PROTO--GENESIS-BLOCK-MEMBERSHIP` — the validator rule that enforces
+2. `[[PROTO--GENESIS-BLOCK-MEMBERSHIP]]` — the validator rule that enforces
    `members.core` shape + the 4-of-5 status cascade at validation time.
 3. The human-review tooling: a `msp-master-review` command that reads
    `gks/inbound/MASTER--*.proposal.md`, opens it for editing, and on
@@ -116,3 +116,7 @@ All green under `npm test --workspace=packages/msp -- test/master/`.
    evidence ADR.
 4. CI: a scheduled GitHub Action that runs `msp-master-propose` on `main`
    weekly and opens a draft PR with any new proposals.
+
+## Connections
+- [[CONCEPT--MASTER-PROMOTION]]
+

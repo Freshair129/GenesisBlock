@@ -60,3 +60,9 @@ const link = client.smartViewDeepLink?.('FRAMEWORK--MSP-ARCHITECTURE-V2')
 - Smart Connections semantic-search bridge (M7c)
 - Companion plugin msp-bridge (future)
 - Any bundled embedder
+
+## Connections
+- [[ADR--MSP-OBSIDIAN-INTEGRATION]]
+- [[CONCEPT--OBSIDIAN-AS-RUNTIME]]
+- [[FRAMEWORK--MSP-ARCHITECTURE-V2]]
+

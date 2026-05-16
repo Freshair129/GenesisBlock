@@ -107,4 +107,4 @@ bash examples/hooks/install.sh
 
 ## Source
 
-`CONCEPT--MSP-PRECOMMIT-HOOK` + `FEAT--MSP-VALIDATOR` exit-code contract.
+`[[CONCEPT--MSP-PRECOMMIT-HOOK]]` + `[[FEAT--MSP-VALIDATOR]]` exit-code contract.

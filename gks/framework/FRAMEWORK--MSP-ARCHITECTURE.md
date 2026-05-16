@@ -23,9 +23,9 @@ created_at: 2026-05-03T14:01:47.791+07:00
 >
 > This v1 FRAME is preserved for crosslink-chain integrity only. Do not read its body for current behavior.
 >
-> - **Active SSOT**: [`FRAMEWORK--MSP-ARCHITECTURE-V2`](FRAMEWORK--MSP-ARCHITECTURE-V2.md) — passport-orchestrator framing
-> - **Inbound queue (mentioned below) was REMOVED in Phase 3** (2026-05-09); use `msp_candidate` MCP tool instead — see `BLUEPRINT--INBOUND-TO-CANDIDATES-MIGRATION` and `ADR--AGENT-WRITE-BOUNDARIES`
-> - **MSP is now agent-agnostic** — see `CONCEPT--AGENT-AGNOSTIC`
+> - **Active SSOT**: [`[[FRAMEWORK--MSP-ARCHITECTURE-V2]]`]([[FRAMEWORK--MSP-ARCHITECTURE-V2]].md) — passport-orchestrator framing
+> - **Inbound queue (mentioned below) was REMOVED in Phase 3** (2026-05-09); use `msp_candidate` MCP tool instead — see `[[BLUEPRINT--INBOUND-TO-CANDIDATES-MIGRATION]]` and `[[ADR--AGENT-WRITE-BOUNDARIES]]`
+> - **MSP is now agent-agnostic** — see `[[CONCEPT--AGENT-AGNOSTIC]]`
 >
 > Body preserved verbatim below for historical reference; treat every claim as out-of-date.
 
@@ -65,10 +65,10 @@ Each arrow is a hard gate. Bypass attempts are caught at:
 
 ## What this frame does NOT define
 
-- *How* atoms are validated → see `CONCEPT--ATOMIC-WRITE-CONTRACT`, `ADR--ANTI-HALLUCINATION-RULES`
-- *When* phases gate code writes → see `FRAMEWORK--PHASE-GOVERNANCE`
-- *Who* can edit which path → see `FRAMEWORK--AUTHORITY-MATRIX`
-- The exact crosslink predicates → see `FRAMEWORK--CROSSLINKS-VOCABULARY`
+- *How* atoms are validated → see `[[CONCEPT--ATOMIC-WRITE-CONTRACT]]`, `[[ADR--ANTI-HALLUCINATION-RULES]]`
+- *When* phases gate code writes → see `[[FRAMEWORK--PHASE-GOVERNANCE]]`
+- *Who* can edit which path → see `[[FRAMEWORK--AUTHORITY-MATRIX]]`
+- The exact crosslink predicates → see `[[FRAMEWORK--CROSSLINKS-VOCABULARY]]`
 
 ## Source
 

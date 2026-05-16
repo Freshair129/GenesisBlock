@@ -36,7 +36,7 @@ MEMORY OS                       MSP (this repo)
 KNOWLEDGE BASE                  GKS (@freshair129/gks)
 ```
 
-Per GKS `SCOPE.md` line 135, `FRAMEWORK_MASTER_SPEC.md` is "from the EVA project" — i.e. EVA's cognitive-layer spec. Keeping it in the MSP repo coupled MSP to EVA semantics, defeating the agent-agnostic intent. See `CONCEPT--AGENT-AGNOSTIC`.
+Per GKS `SCOPE.md` line 135, `FRAMEWORK_MASTER_SPEC.md` is "from the EVA project" — i.e. EVA's cognitive-layer spec. Keeping it in the MSP repo coupled MSP to EVA semantics, defeating the agent-agnostic intent. See `[[CONCEPT--AGENT-AGNOSTIC]]`.
 
 ## Actions taken
 
@@ -44,38 +44,38 @@ Per GKS `SCOPE.md` line 135, `FRAMEWORK_MASTER_SPEC.md` is "from the EVA project
 
 | File | Why |
 |---|---|
-| `CORE_FRAMEWORK_MASTER_SPEC.md` (1264 lines) | EVA's framework spec; not MSP's. Self-declared "boilerplate, fork and replace YourProject". Contradicted `msp_spec.md` on path encoding (`D--ProA` vs bare-name per `ADR--PATH-ENCODING`), tool count (claimed 11; codebase has 16), bin count (claimed 5; package.json has 6). |
-| `msp_infra_startup_architecture.md` (161 lines) | Described a Fastify + Postgres + Redis + pgvector + BullMQ service that does not exist in the codebase. Mutually exclusive with the Obsidian-runtime architecture in `FRAMEWORK--MSP-ARCHITECTURE-V2`. Zero crosslinks pointed back to it. |
-| `SPEC--ARCHITECTURE-V2.md` (660 lines) | Proposal for cognitive-concerns reframe + GKS-as-library, pending review since 2026-05-07. Incompatible with the 3-layer mental model (EVA / MSP / GKS) confirmed during this cleanup. Salvageable ideas extracted into 3 CONCEPT atoms (see "Cherry-picked" below). |
+| `CORE_FRAMEWORK_MASTER_SPEC.md` (1264 lines) | EVA's framework spec; not MSP's. Self-declared "boilerplate, fork and replace YourProject". Contradicted `msp_spec.md` on path encoding (`D--ProA` vs bare-name per `[[ADR--PATH-ENCODING]]`), tool count (claimed 11; codebase has 16), bin count (claimed 5; package.json has 6). |
+| `msp_infra_startup_architecture.md` (161 lines) | Described a Fastify + Postgres + Redis + pgvector + BullMQ service that does not exist in the codebase. Mutually exclusive with the Obsidian-runtime architecture in `[[FRAMEWORK--MSP-ARCHITECTURE-V2]]`. Zero crosslinks pointed back to it. |
+| `[[SPEC--ARCHITECTURE-V2]].md` (660 lines) | Proposal for cognitive-concerns reframe + GKS-as-library, pending review since 2026-05-07. Incompatible with the 3-layer mental model (EVA / MSP / GKS) confirmed during this cleanup. Salvageable ideas extracted into 3 CONCEPT atoms (see "Cherry-picked" below). |
 
 ### Cherry-picked into new atoms
 
 | Source | New atom | Status |
 |---|---|---|
-| `SPEC--ARCHITECTURE-V2.md` §4.2 (mem0-style hot-path extraction) | `CONCEPT--MSP-OBSERVE-HOT-PATH` | draft (aspirational) |
-| `SPEC--ARCHITECTURE-V2.md` §4.4 (project as first-class) | `CONCEPT--NAMED-PROJECT-REGISTRY` | draft (aspirational) |
-| `SPEC--ARCHITECTURE-V2.md` §4.5 (multi-client global install) | folded into `CONCEPT--AGENT-AGNOSTIC` | stable |
+| `[[SPEC--ARCHITECTURE-V2]].md` §4.2 (mem0-style hot-path extraction) | `[[CONCEPT--MSP-OBSERVE-HOT-PATH]]` | draft (aspirational) |
+| `[[SPEC--ARCHITECTURE-V2]].md` §4.4 (project as first-class) | `[[CONCEPT--NAMED-PROJECT-REGISTRY]]` | draft (aspirational) |
+| `[[SPEC--ARCHITECTURE-V2]].md` §4.5 (multi-client global install) | folded into `[[CONCEPT--AGENT-AGNOSTIC]]` | stable |
 
 The cognitive-concerns reframe (§2 of SPEC v2), MSP-only-MCP-layer claim (§4.1), and satellite-package split (§4.6) were rejected — they conflict with the agent-agnostic 3-layer model.
 
 ### Patched
 
-- `msp_spec.md` — version bumped 2.0.1 → 2.0.2; references to `FRAMEWORK_MASTER_SPEC.md` (4 occurrences) replaced with the actual SSOT atoms (`FRAMEWORK--MSP-ARCHITECTURE-V2`, `FRAMEWORK--PHASE-GOVERNANCE`, `CONCEPT--RETRIEVAL-ORCHESTRATION`); references table now points at the new SSOT.
-- `gks/frame/FRAMEWORK--MSP-ARCHITECTURE.md` — v1 superseded; banner strengthened with explicit "DO NOT USE AS REFERENCE" warning + note that the inbound queue described in its body was removed in Phase 3 (see `BLUEPRINT--INBOUND-TO-CANDIDATES-MIGRATION`).
+- `msp_spec.md` — version bumped 2.0.1 → 2.0.2; references to `FRAMEWORK_MASTER_SPEC.md` (4 occurrences) replaced with the actual SSOT atoms (`[[FRAMEWORK--MSP-ARCHITECTURE-V2]]`, `[[FRAMEWORK--PHASE-GOVERNANCE]]`, `[[CONCEPT--RETRIEVAL-ORCHESTRATION]]`); references table now points at the new SSOT.
+- `gks/frame/[[FRAMEWORK--MSP-ARCHITECTURE]].md` — v1 superseded; banner strengthened with explicit "DO NOT USE AS REFERENCE" warning + note that the inbound queue described in its body was removed in Phase 3 (see `[[BLUEPRINT--INBOUND-TO-CANDIDATES-MIGRATION]]`).
 
 ### Not changed (deferred)
 
-- `gks/frame/FRAMEWORK--MSP-ARCHITECTURE.md` left in `gks/frame/` (not moved to `gks/archive/`) — moving would require validator + indexer work and risks breaking the supersede chain. Banner makes intent clear.
-- Global / workspace separation (`~/.msp/` vs project) — Phase B follow-up. Tracked via `CONCEPT--NAMED-PROJECT-REGISTRY` open questions.
+- `gks/frame/[[FRAMEWORK--MSP-ARCHITECTURE]].md` left in `gks/frame/` (not moved to `gks/archive/`) — moving would require validator + indexer work and risks breaking the supersede chain. Banner makes intent clear.
+- Global / workspace separation (`~/.msp/` vs project) — Phase B follow-up. Tracked via `[[CONCEPT--NAMED-PROJECT-REGISTRY]]` open questions.
 - GKS upstream `docs/MSP_RELATIONSHIP.md` is outdated (still describes inbound queue). Phase D follow-up — file an upstream issue.
 
 ## Final SSOT shape
 
 | Doc | Role |
 |---|---|
-| `gks/frame/FRAMEWORK--MSP-ARCHITECTURE-V2.md` | Architecture SSOT (passport-orchestrator, 3-layer model) |
+| `gks/frame/[[FRAMEWORK--MSP-ARCHITECTURE-V2]].md` | Architecture SSOT (passport-orchestrator, 3-layer model) |
 | `msp_spec.md` v2.0.2 | Technical full spec |
-| `gks/concept/CONCEPT--AGENT-AGNOSTIC.md` | MSP/agent boundary contract |
+| `gks/concept/[[CONCEPT--AGENT-AGNOSTIC]].md` | MSP/agent boundary contract |
 
 All other architecture docs are atoms under `gks/<type>/` reachable via crosslinks from the above three.
 

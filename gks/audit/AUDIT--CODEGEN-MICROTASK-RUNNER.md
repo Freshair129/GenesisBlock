@@ -30,7 +30,7 @@ created_at: 2026-05-03T15:43:39.217+07:00
 
 ## Scope
 
-Closes FEAT--CODEGEN-MICROTASK-RUNNER. Largest M3 deliverable. Implementation follows BLUEPRINT geography exactly.
+Closes [[FEAT--CODEGEN-MICROTASK-RUNNER]]. Largest M3 deliverable. Implementation follows BLUEPRINT geography exactly.
 
 ## Acceptance criteria from FEAT
 
@@ -95,3 +95,11 @@ Real Qwen 2.5 Coder integration is a future task — pluggable via `opts.slmClie
 - Implemented by: @claude-opus-4-7
 - Verified by: 36/36 tests covering all 11 acceptance criteria
 - Date: 2026-05-03
+
+## Connections
+- [[BLUEPRINT--CODEGEN-MICROTASK-RUNNER]]
+- [[ADR--CODEGEN-MICROTASK-RUNNER]]
+- [[ADR--CODEGEN-POST-PROCESSING]]
+- [[ADR--CODEGEN-FORBIDDEN-PATTERNS]]
+- [[ADR--CODEGEN-RETRY-POLICY]]
+

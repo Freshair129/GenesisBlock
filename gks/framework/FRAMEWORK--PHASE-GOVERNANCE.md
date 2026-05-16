@@ -19,7 +19,7 @@ created_at: 2026-05-03T14:01:48.299+07:00
 
 # FRAME — phase governance
 
-> Alias: **Block Assembly** — the bottom-up half of the Genesis Block Cycle (the top-down `Block Decomposition` half is governed by `FRAMEWORK--SYMBOL-GRAPH` and `FRAMEWORK_MASTER_SPEC §8`). See `docs/gks/PRD--GENESIS-BLOCK-CYCLE.md` for the unified vocabulary.
+> Alias: **Block Assembly** — the bottom-up half of the Genesis Block Cycle (the top-down `Block Decomposition` half is governed by `[[FRAMEWORK--SYMBOL-GRAPH]]` and `FRAMEWORK_MASTER_SPEC §8`). See `docs/gks/[[PRD--GENESIS-BLOCK-CYCLE]].md` for the unified vocabulary.
 
 MSP enforces a six-phase flow that every feature must traverse before code merges. The phases are mechanical — `gks verify-flow FEAT--<id>` walks the chain and refuses to exit-0 unless every required atom for the chosen scaling level is `stable`.
 
@@ -39,7 +39,7 @@ MSP enforces a six-phase flow that every feature must traverse before code merge
 
 ## P1 enforcement: technical feasibility
 
-P1 `CONCEPT--` must include a **High-level API Draft** (the list of endpoints the concept implies). This prevents the failure mode where business approves a concept and P2 discovers it can't be built. See `CONCEPT--P1-TECH-FEASIBILITY` (TBD) for details.
+P1 `CONCEPT--` must include a **High-level API Draft** (the list of endpoints the concept implies). This prevents the failure mode where business approves a concept and P2 discovers it can't be built. See `[[CONCEPT--P1-TECH-FEASIBILITY]]` (TBD) for details.
 
 ## P2 enforcement: mandatory OpenAPI
 
@@ -48,7 +48,7 @@ P2 splits the high-level API draft into three atom types:
 - `ENDPOINT--` — one path/method per file
 - `ENTRYPOINT--` — auth/middleware logic
 
-See `ADR--P2-MANDATORY-OPENAPI` (TBD).
+See `[[ADR--P2-MANDATORY-OPENAPI]]` (TBD).
 
 ## Devlog tracking
 
@@ -56,8 +56,12 @@ Every phase emits a devlog entry under `gks/devlog/` with `sessionId` for tracea
 
 ## Hotfix exception
 
-P1–P3 can be skipped only with a `HOTFIX` commit tag and a 48-hour backfill window. See `ADR--HOTFIX-ESCAPE-HATCH`.
+P1–P3 can be skipped only with a `HOTFIX` commit tag and a 48-hour backfill window. See `[[ADR--HOTFIX-ESCAPE-HATCH]]`.
 
 ## Source
 
 `msp_spec.md` §6.4 (Devlog Tracking) + §6.2/§6.3 (P1/P2 enforcement) + §10.1 (Hotfix).
+
+## Connections
+- [[FRAMEWORK--MSP-ARCHITECTURE-V2]]
+

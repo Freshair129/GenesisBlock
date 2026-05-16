@@ -23,7 +23,7 @@ created_at: 2026-05-08T17:32:00.000+07:00
 
 ## Context
 
-`CONCEPT--ATOM-CONTRADICTION-DETECTION` argues for a 4-layer detection stack plus a Layer-0 human rule. This ADR fixes the **decisions**: which layers to build, in what order, with which thresholds and trade-offs, and what each one's output looks like.
+`[[CONCEPT--ATOM-CONTRADICTION-DETECTION]]` argues for a 4-layer detection stack plus a Layer-0 human rule. This ADR fixes the **decisions**: which layers to build, in what order, with which thresholds and trade-offs, and what each one's output looks like.
 
 ## Decision
 
@@ -64,7 +64,7 @@ PR template (`.github/pull_request_template.md`) adds a checklist line.
 
 ### Layer 1 — Reciprocal supersession (blocking)
 
-**Decision:** new PROTO `PROTO--RECIPROCAL-SUPERSESSION` modeled on `PROTO--ALGO-PARAM-COUPLING`.
+**Decision:** new PROTO `[[PROTO--RECIPROCAL-SUPERSESSION]]` modeled on `[[PROTO--ALGO-PARAM-COUPLING]]`.
 
 **Specification:**
 
@@ -88,7 +88,7 @@ For each B in A.crosslinks.superseded_by:
 
 ### Layer 2 — Domain-scoped uniqueness (blocking, after Phase 2 schema migration)
 
-**Decision:** add a `domain:` field to ADR / FEAT / CONCEPT frontmatter. Define the initial taxonomy. New PROTO `PROTO--DOMAIN-UNIQUENESS` enforces at most one stable atom per (type, domain) pair.
+**Decision:** add a `domain:` field to ADR / FEAT / CONCEPT frontmatter. Define the initial taxonomy. New PROTO `[[PROTO--DOMAIN-UNIQUENESS]]` enforces at most one stable atom per (type, domain) pair.
 
 **Specification:**
 
@@ -207,7 +207,7 @@ Cost guard:
 ### Neutral
 
 - **No change to atom write path** — agents and humans write atoms the same way. Detection runs at validator-time (Layers 1, 2) or PR-time (Layers 3, 4).
-- **Compatible with `CONCEPT--KNOWLEDGE-LAYERS-V2`** — candidates layer is excluded; only `gks/<type>/` atoms are checked.
+- **Compatible with `[[CONCEPT--KNOWLEDGE-LAYERS-V2]]`** — candidates layer is excluded; only `gks/<type>/` atoms are checked.
 
 ## Alternatives considered
 
@@ -233,21 +233,26 @@ Cost guard:
 
 ### F. Detect contradictions inside `.brain/candidates/` too
 
-**Rejected because:** candidates are agent-private (per `CONCEPT--KNOWLEDGE-LAYERS-V2`). Validating them imports the inbound problem with new vocabulary. Detection lives at the canon boundary; candidates are explicitly outside.
+**Rejected because:** candidates are agent-private (per `[[CONCEPT--KNOWLEDGE-LAYERS-V2]]`). Validating them imports the inbound problem with new vocabulary. Detection lives at the canon boundary; candidates are explicitly outside.
 
 ## What this ADR does NOT change
 
 - Existing structural validator rules — keep working as-is
 - Existing PROTO predicates — keep running; new PROTOs are additive
 - Atom write paths — no MCP tool changes
-- `CONCEPT--KNOWLEDGE-LAYERS-V2` candidate boundary — Layer 3/4 only scan `gks/<type>/`
+- `[[CONCEPT--KNOWLEDGE-LAYERS-V2]]` candidate boundary — Layer 3/4 only scan `gks/<type>/`
 - The supersession crosslink format — same `crosslinks.supersedes` / `superseded_by` as today
 
 ## Source
 
-- `CONCEPT--ATOM-CONTRADICTION-DETECTION` — motivation and stack design
-- `PROTO--ALGO-PARAM-COUPLING` — template for Layer 1 PROTO
-- `PROTO--PHASE-GATES` — template for Layer 2 PROTO
+- `[[CONCEPT--ATOM-CONTRADICTION-DETECTION]]` — motivation and stack design
+- `[[PROTO--ALGO-PARAM-COUPLING]]` — template for Layer 1 PROTO
+- `[[PROTO--PHASE-GATES]]` — template for Layer 2 PROTO
 - GKS `createEmbedder` (3.6.0) — Layer 3 dependency
 - Anthropic Claude Haiku — Layer 4 default LLM
-- `ADR--ANTI-HALLUCINATION-RULES` — complementary write-time rules
+- `[[ADR--ANTI-HALLUCINATION-RULES]]` — complementary write-time rules
+
+## Connections
+- [[ADR--HUMAN-REVIEW-GATES]]
+- [[FRAMEWORK--MSP-ARCHITECTURE-V2]]
+

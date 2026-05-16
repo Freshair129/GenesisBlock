@@ -25,11 +25,11 @@ phase_override:
 created_at: 2026-05-05T18:00:00.000+07:00
 ---
 
-# M8c — PROTO--SCALING-LEVEL-GATE
+# M8c — [[PROTO--SCALING-LEVEL-GATE]]
 
 ## Scope
 
-Implements `PROTO--SCALING-LEVEL-GATE` per `CONCEPT--PROTO-SCALING-LEVEL-GATE`,
+Implements `[[PROTO--SCALING-LEVEL-GATE]]` per `[[CONCEPT--PROTO-SCALING-LEVEL-GATE]]`,
 shipping as `status: draft`. This is one of four parallel governance PROTOs
 following M8a's loader foundation; it does NOT modify any shared infrastructure.
 
@@ -38,7 +38,7 @@ following M8a's loader foundation; it does NOT modify any shared infrastructure.
 | File | Purpose |
 |---|---|
 | `src/validator/proto/scaling-level-gate.ts` | Predicate impl — `default export` follows the M8a loader contract |
-| `gks/proto/PROTO--SCALING-LEVEL-GATE.md` | Atom (`status: draft`, `severity: warning`, `enforces: FRAMEWORK--SCALING-LEVELS`) |
+| `gks/proto/[[PROTO--SCALING-LEVEL-GATE]].md` | Atom (`status: draft`, `severity: warning`, `enforces: [[FRAMEWORK--SCALING-LEVELS]]`) |
 | `test/validator/proto/scaling-level-gate.test.ts` | 7 vitest cases covering full chain, missing CONCEPT/ADR, missing BLUEPRINT, `level_override` escape hatch, BLUEPRINT backlink, no-FEAT, empty index |
 
 ## Predicate domain
@@ -46,7 +46,7 @@ following M8a's loader foundation; it does NOT modify any shared infrastructure.
 PROTO predicates run via `npm run msp:validate --all`. They receive
 `atomicIndex: AtomicIndexEntry[]` + `repoRoot` and have no access to git
 diff state. The full PR-time L1/L2/L3 classifier described in
-`CONCEPT--PROTO-SCALING-LEVEL-GATE` is therefore deferred to a future CI
+`[[CONCEPT--PROTO-SCALING-LEVEL-GATE]]` is therefore deferred to a future CI
 workflow (potentially M8c-2).
 
 This PROTO instead performs the **structural** half of the rule: for each
@@ -95,7 +95,7 @@ PROTO promotes from `draft` to `stable`.
 ## Out of scope
 
 - PR-diff line/file count classification (CI workflow concern).
-- Heuristic threshold tuning (PARAM--SCALING-LEVEL-THRESHOLDS — future).
+- Heuristic threshold tuning ([[PARAM--SCALING-LEVEL-THRESHOLDS]] — future).
 - AUDIT chain coverage (separate PROTO).
 - Promoting to `stable` (gradual rollout — happens after the corpus is
   audited and any real violations are fixed).
@@ -111,5 +111,9 @@ PROTO promotes from `draft` to `stable`.
 
 ## Source
 
-`CONCEPT--PROTO-SCALING-LEVEL-GATE`, `CONCEPT--PROTO-PATTERN`,
-`FRAMEWORK--SCALING-LEVELS`, `FEAT--PROTO-LOADER`.
+`[[CONCEPT--PROTO-SCALING-LEVEL-GATE]]`, `[[CONCEPT--PROTO-PATTERN]]`,
+`[[FRAMEWORK--SCALING-LEVELS]]`, `[[FEAT--PROTO-LOADER]]`.
+
+## Connections
+- [[BLUEPRINT--PROTO-LOADER]]
+

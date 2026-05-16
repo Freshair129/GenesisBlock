@@ -21,7 +21,7 @@ created_at: 2026-05-13T12:21:49+07:00
 
 ## Context
 
-`CONCEPT--TAXONOMY-V2-3` introduces the new prefix layer for the Genesis Block era. This ADR records the **migration decisions** — what gets renamed, what gets added, what stays, and the order of operations — so the change is reviewable, reversible, and validated by tooling.
+`[[CONCEPT--TAXONOMY-V2-3]]` introduces the new prefix layer for the Genesis Block era. This ADR records the **migration decisions** — what gets renamed, what gets added, what stays, and the order of operations — so the change is reviewable, reversible, and validated by tooling.
 
 Current state (counted on `main` at session start):
 
@@ -44,22 +44,22 @@ Current state (counted on `main` at session start):
 
 | Old id (pre-migration) | New id (post-migration) | Reason |
 |---|---|---|
-| `FRAME-`​`-FOUR-LAYERS` (gks) | `FRAMEWORK--FOUR-LAYERS` | four-layer storage model — architecture |
-| `FRAME-`​`-AUTHORITY-MATRIX` | `FRAMEWORK--AUTHORITY-MATRIX` | governance — write authority per path |
-| `FRAME-`​`-CROSSLINKS-VOCABULARY` | `FRAMEWORK--CROSSLINKS-VOCABULARY` | vocabulary spec |
-| `FRAME-`​`-KNOWLEDGE-3-TIER` | `FRAMEWORK--KNOWLEDGE-3-TIER` | tier architecture |
-| `FRAME-`​`-MSP-ARCHITECTURE` | `FRAMEWORK--MSP-ARCHITECTURE` | architecture (superseded; rename for chain integrity) |
-| `FRAME-`​`-MSP-ARCHITECTURE-V2` | `FRAMEWORK--MSP-ARCHITECTURE-V2` | architecture |
-| `FRAME-`​`-PHASE-GOVERNANCE` | `FRAMEWORK--PHASE-GOVERNANCE` | P0..P6 governance |
-| `FRAME-`​`-SCALING-LEVELS` | `FRAMEWORK--SCALING-LEVELS` | L1/L2/L3 governance |
-| `FRAME-`​`-SYMBOL-GRAPH` | `FRAMEWORK--SYMBOL-GRAPH` | structural-knowledge axis |
+| `FRAME-`​`-FOUR-LAYERS` (gks) | `[[FRAMEWORK--FOUR-LAYERS]]` | four-layer storage model — architecture |
+| `FRAME-`​`-AUTHORITY-MATRIX` | `[[FRAMEWORK--AUTHORITY-MATRIX]]` | governance — write authority per path |
+| `FRAME-`​`-CROSSLINKS-VOCABULARY` | `[[FRAMEWORK--CROSSLINKS-VOCABULARY]]` | vocabulary spec |
+| `FRAME-`​`-KNOWLEDGE-3-TIER` | `[[FRAMEWORK--KNOWLEDGE-3-TIER]]` | tier architecture |
+| `FRAME-`​`-MSP-ARCHITECTURE` | `[[FRAMEWORK--MSP-ARCHITECTURE]]` | architecture (superseded; rename for chain integrity) |
+| `FRAME-`​`-MSP-ARCHITECTURE-V2` | `[[FRAMEWORK--MSP-ARCHITECTURE-V2]]` | architecture |
+| `FRAME-`​`-PHASE-GOVERNANCE` | `[[FRAMEWORK--PHASE-GOVERNANCE]]` | P0..P6 governance |
+| `FRAME-`​`-SCALING-LEVELS` | `[[FRAMEWORK--SCALING-LEVELS]]` | L1/L2/L3 governance |
+| `FRAME-`​`-SYMBOL-GRAPH` | `[[FRAMEWORK--SYMBOL-GRAPH]]` | structural-knowledge axis |
 
-> Note on rendering: the `FRAME-`​`-X` notation uses a zero-width-space between the two hyphens so future runs of `migrate-frame-to-framework.mjs` don't re-rewrite this historical reference table. Readers see plain `FRAME--X`.
+> Note on rendering: the `FRAME-`​`-X` notation uses a zero-width-space between the two hyphens so future runs of `migrate-frame-to-framework.mjs` don't re-rewrite this historical reference table. Readers see plain `[[FRAME--X]]`.
 
 Directory move: `gks/frame/` → `gks/framework/` in both `packages/gks` and `packages/msp`.
 
 Frontmatter update inside each renamed file:
-- `id:` field — old `FRAME-`​`-X` prefix becomes `FRAMEWORK--X`
+- `id:` field — old `FRAME-`​`-X` prefix becomes `[[FRAMEWORK--X]]`
 - `type: frame` → `type: framework`
 
 ### 4. Rename `GUARDRAIL--` to `GUARD--` (doc-only migration)
@@ -95,7 +95,7 @@ No deprecation is implied. A future ADR may revisit them individually.
 The migration is split into discrete commits on this branch (`claude/msp-taxonomy-v2.3-migration`) for reviewability:
 
 1. **Source-code prep** — add `'framework'` to the five enumerations (additive, non-breaking; can be reviewed in isolation)
-2. **New atoms** — write `CONCEPT--TAXONOMY-V2-3` and this ADR (no breaking change yet; the new taxonomy is documented but not enforced)
+2. **New atoms** — write `[[CONCEPT--TAXONOMY-V2-3]]` and this ADR (no breaking change yet; the new taxonomy is documented but not enforced)
 3. **Migration script** — Node.js script under `scripts/msp/migrate-frame-to-framework.mjs` that performs renames + ref updates with a `--dry-run` flag
 4. **Apply migration** — run the script; 9 file renames + 270 ref updates + frontmatter rewrites
 5. **Regen index** — `npm run msp:index` to rebuild `atomic_index.jsonl`
@@ -104,10 +104,10 @@ The migration is split into discrete commits on this branch (`claude/msp-taxonom
 
 ## Consequences
 
-- **Wikilinks that referenced old `FRAME--X` ids will need a one-time update** wherever they appear in *non-tracked* documents (issue templates, external Obsidian vaults, …). The validator catches dangling wikilinks inside the repo, but external consumers must be informed via the PR description.
-- **`PROTO--PHASE-GATES`** does not currently special-case the `frame` type, so no validator change is required for phase logic. Block Manifest atoms (the new `FRAME--` meaning) inherit the existing P0 phase semantics.
+- **Wikilinks that referenced old `[[FRAME--X]]` ids will need a one-time update** wherever they appear in *non-tracked* documents (issue templates, external Obsidian vaults, …). The validator catches dangling wikilinks inside the repo, but external consumers must be informed via the PR description.
+- **`[[PROTO--PHASE-GATES]]`** does not currently special-case the `frame` type, so no validator change is required for phase logic. Block Manifest atoms (the new `FRAME--` meaning) inherit the existing P0 phase semantics.
 - **`atomic_index.jsonl` regen is mandatory** — stale ids in the index would cause validator false-positives. The Phase-7 verify step covers this.
-- **The repo's own atom tree under `gks/` does not currently contain a `frame/` subdirectory** beyond `FRAMEWORK--FOUR-LAYERS.md`. The directory move there is a single file; in `gks/` it covers 8 files. Empty `frame/` directories are removed by the script.
+- **The repo's own atom tree under `gks/` does not currently contain a `frame/` subdirectory** beyond `[[FRAMEWORK--FOUR-LAYERS]].md`. The directory move there is a single file; in `gks/` it covers 8 files. Empty `frame/` directories are removed by the script.
 
 ## Rollback
 
@@ -115,5 +115,9 @@ The migration is mechanical and reversible: the script accepts an `--inverse` fl
 
 ## Open questions (deferred)
 
-- Authoring guide for *new* `FRAME--` (Block Manifest) atoms — what frontmatter fields, what aggregation grammar — belongs in a follow-up `SPEC--BLOCK-MANIFEST` atom
+- Authoring guide for *new* `FRAME--` (Block Manifest) atoms — what frontmatter fields, what aggregation grammar — belongs in a follow-up `[[SPEC--BLOCK-MANIFEST]]` atom
 - Whether `MASTER--`, `POLICY--`, `PERSONA--` should be folded into the v2.3 layers in a future revision; left explicit-preserve for now
+
+## Connections
+- [[CONCEPT--KNOWLEDGE-LAYERS-V2]]
+

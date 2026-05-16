@@ -22,9 +22,9 @@ created_at: 2026-05-03T23:55:06.326+07:00
 
 ## Context
 
-Per `CONCEPT--OBSIDIAN-AS-RUNTIME`, MSP delegates search/graph/file-watching to Obsidian. The integration shape needs to be specific enough to implement, with clear fallbacks for headless scenarios (CI, no-GUI, server boot).
+Per `[[CONCEPT--OBSIDIAN-AS-RUNTIME]]`, MSP delegates search/graph/file-watching to Obsidian. The integration shape needs to be specific enough to implement, with clear fallbacks for headless scenarios (CI, no-GUI, server boot).
 
-GksV3 3.6.0 already ships a working Obsidian adapter (`RestObsidianAdapter` in `src/memory/obsidian-mcp.ts`) reading `OBSIDIAN_URL` from env. M7a's job is to wrap it (with fallback + probe), not reinvent it — see `ADR--GRAPH-IS-GKS-DOMAIN`.
+GksV3 3.6.0 already ships a working Obsidian adapter (`RestObsidianAdapter` in `src/memory/obsidian-mcp.ts`) reading `OBSIDIAN_URL` from env. M7a's job is to wrap it (with fallback + probe), not reinvent it — see `[[ADR--GRAPH-IS-GKS-DOMAIN]]`.
 
 Three modes Obsidian can be in for any given MSP invocation:
 
@@ -49,9 +49,9 @@ If REST is unreachable, MSP falls back to:
 
 - Reading atoms directly from `gks/<type>/*.md`.
 - Using `gks/00_index/atomic_index.jsonl` for ID lookup.
-- Using `.brain/.../vector/backlinks.jsonl` for crosslink traversal (M3c-1 builds this; planned to move upstream — see `ADR--GRAPH-IS-GKS-DOMAIN`).
+- Using `.brain/.../vector/backlinks.jsonl` for crosslink traversal (M3c-1 builds this; planned to move upstream — see `[[ADR--GRAPH-IS-GKS-DOMAIN]]`).
 - **Text search** = grep-on-disk OR delegating to gks-mcp-server's `gks_recall`.
-- **Semantic search** = still works via GKS's local `createNomicEmbedder()` + vector store — Obsidian is **not** required for agent-facing recall (see `ADR--SEMANTIC-SEARCH-VIA-SMART-CONNECTIONS` updated framing). Only Smart Connections's human-browse pane is unavailable.
+- **Semantic search** = still works via GKS's local `createNomicEmbedder()` + vector store — Obsidian is **not** required for agent-facing recall (see `[[ADR--SEMANTIC-SEARCH-VIA-SMART-CONNECTIONS]]` updated framing). Only Smart Connections's human-browse pane is unavailable.
 
 ### Authentication
 
@@ -96,9 +96,13 @@ Old `OBSIDIAN_HOST` from M7-prep draft is **deprecated** — projects should ren
 ## Alternatives considered
 
 1. **Require Obsidian always running.** Rejected — cuts out CI / headless / first-time-setup scenarios.
-2. **Build our own search service.** Rejected — duplicates Obsidian; defeats `CONCEPT--OBSIDIAN-AS-RUNTIME`.
+2. **Build our own search service.** Rejected — duplicates Obsidian; defeats `[[CONCEPT--OBSIDIAN-AS-RUNTIME]]`.
 3. **Use only filesystem; ignore REST.** Rejected — loses live invalidation, user's open-file context, and the easy semantic-search bridge.
 
 ## Source
 
-`CONCEPT--OBSIDIAN-AS-RUNTIME` + Obsidian Local REST API plugin docs.
+`[[CONCEPT--OBSIDIAN-AS-RUNTIME]]` + Obsidian Local REST API plugin docs.
+
+## Connections
+- [[CONCEPT--EMBEDDING-STRATEGY]]
+

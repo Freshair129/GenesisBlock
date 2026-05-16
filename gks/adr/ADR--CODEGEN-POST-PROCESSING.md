@@ -68,3 +68,7 @@ function postProcess(raw: string): string {
 ## Source
 
 `msp_spec.md` §5.1 (Post-processing).
+
+## Connections
+- [[CONCEPT--CODEGEN-MICROTASK-CONTRACT]]
+

@@ -44,16 +44,16 @@ Phase F2 of the post-monorepo-pivot ROADMAP. Lands the **reader** half of the co
 
 | Atom | Purpose |
 |---|---|
-| `gks/concept/CONCEPT--USAGE-ROLLUPS.md` | What + why for weekly/monthly aggregation over the existing daily atoms. Establishes the read-only consumer model. |
-| `gks/spec/SPEC--USAGE-ROLLUP-ATOM.md` | Frontmatter contract for `USAGE--WEEKLY-<isoWeek>` and `USAGE--MONTHLY-<YYYY-MM>` atoms. Extends `SPEC--USAGE-ATOM` §2's reserved bucket name-space. |
-| `gks/audit/AUDIT--PHASE-F2-COST-DASHBOARD.md` | This atom. |
+| `gks/concept/[[CONCEPT--USAGE-ROLLUPS]].md` | What + why for weekly/monthly aggregation over the existing daily atoms. Establishes the read-only consumer model. |
+| `gks/spec/[[SPEC--USAGE-ROLLUP-ATOM]].md` | Frontmatter contract for `[[USAGE--WEEKLY]]-<isoWeek>` and `[[USAGE--MONTHLY]]-<YYYY-MM>` atoms. Extends `[[SPEC--USAGE-ATOM]]` §2's reserved bucket name-space. |
+| `gks/audit/[[AUDIT--PHASE-F2-COST-DASHBOARD]].md` | This atom. |
 
 ### Code (3 modules)
 
 | File | Lines (approx) | Purpose |
 |---|---|---|
-| `packages/msp/src/usage/aggregator.ts` | ~280 | Read-only scan of `gks/usage/USAGE--DAILY-*.md`, parses JSON summary blocks, reduces to `UsageSummary { total_cost_usd, calls_by_tier, days_covered, top_episodes }`. Exports `aggregateDaily`, `aggregateWeek`, `aggregateMonth`, `aggregateSingleDay`. Includes pure ISO-week helpers (`isoWeekOf`, `isoWeekStart`, `isoWeekEnd`, `formatIsoWeek`, `parseIsoWeek`, `parseIsoMonth`, `formatIsoMonth`) — no external date deps. |
-| `packages/msp/src/usage/rollup-writer.ts` | ~170 | Aggregates and writes `USAGE--WEEKLY-<iso>.md` / `USAGE--MONTHLY-<iso>.md` per `SPEC--USAGE-ROLLUP-ATOM`. Same body layout as the daily atom (fenced JSON between HTML comment markers); preserves frontmatter on re-runs. |
+| `packages/msp/src/usage/aggregator.ts` | ~280 | Read-only scan of `gks/usage/[[USAGE--DAILY]]-*.md`, parses JSON summary blocks, reduces to `UsageSummary { total_cost_usd, calls_by_tier, days_covered, top_episodes }`. Exports `aggregateDaily`, `aggregateWeek`, `aggregateMonth`, `aggregateSingleDay`. Includes pure ISO-week helpers (`isoWeekOf`, `isoWeekStart`, `isoWeekEnd`, `formatIsoWeek`, `parseIsoWeek`, `parseIsoMonth`, `formatIsoMonth`) — no external date deps. |
+| `packages/msp/src/usage/rollup-writer.ts` | ~170 | Aggregates and writes `[[USAGE--WEEKLY]]-<iso>.md` / `[[USAGE--MONTHLY]]-<iso>.md` per `[[SPEC--USAGE-ROLLUP-ATOM]]`. Same body layout as the daily atom (fenced JSON between HTML comment markers); preserves frontmatter on re-runs. |
 | `packages/msp/src/usage/cli.ts` | ~210 | `msp-usage` CLI with 5 subcommands: `today`, `week`, `month`, `rollup-week`, `rollup-month`. `--json` flag emits raw `UsageSummary`; `--write` is required to persist roll-ups. ANSI colours gated on `process.stdout.isTTY && !process.env.NO_COLOR`. |
 
 ### Tests (3 suites, 38 tests)
@@ -75,8 +75,8 @@ Added `"msp-usage": "./dist/usage/cli.js"` to `packages/msp/package.json`.
 | `msp-usage today` | print today's daily totals as human table | n/a | emit `UsageSummary` JSON for today |
 | `msp-usage week [--iso=YYYY-Www]` | print weekly aggregate | n/a | emit JSON |
 | `msp-usage month [--iso=YYYY-MM]` | print monthly aggregate | n/a | emit JSON |
-| `msp-usage rollup-week --iso=YYYY-Www` | dry-run (aggregate + print) | write `USAGE--WEEKLY-<iso>.md` | emit JSON |
-| `msp-usage rollup-month --iso=YYYY-MM` | dry-run (aggregate + print) | write `USAGE--MONTHLY-<iso>.md` | emit JSON |
+| `msp-usage rollup-week --iso=YYYY-Www` | dry-run (aggregate + print) | write `[[USAGE--WEEKLY]]-<iso>.md` | emit JSON |
+| `msp-usage rollup-month --iso=YYYY-MM` | dry-run (aggregate + print) | write `[[USAGE--MONTHLY]]-<iso>.md` | emit JSON |
 
 ## Verification matrix
 
@@ -88,18 +88,23 @@ Added `"msp-usage": "./dist/usage/cli.js"` to `packages/msp/package.json`.
 
 ## What this is NOT
 
-- **Not a budget enforcer.** Read-only consumer of dailies; cost capping remains the policy layer's job (`ADR--AGENT-TIER-COST-POLICY`).
+- **Not a budget enforcer.** Read-only consumer of dailies; cost capping remains the policy layer's job (`[[ADR--AGENT-TIER-COST-POLICY]]`).
 - **Not a hot-path writer.** `dispatch()` continues to call `recordUsage()` (daily atom only). Roll-ups are write-on-demand.
 - **Not an automated rollup.** No cron / scheduled job ships in this phase; CI or operators must invoke `msp-usage rollup-* --write` explicitly.
 
 ## Out of scope / follow-ups
 
-- Hourly buckets (still reserved by `SPEC--USAGE-ROLLUP-ATOM`).
+- Hourly buckets (still reserved by `[[SPEC--USAGE-ROLLUP-ATOM]]`).
 - Cross-vault aggregation.
-- Retention / GC of stale roll-up atoms (separate `SPEC--USAGE-RETENTION` proposal).
+- Retention / GC of stale roll-up atoms (separate `[[SPEC--USAGE-RETENTION]]` proposal).
 - Cost-by-tier breakdown in `UsageSummary` (currently only counts-by-tier; cost-by-tier could be added when readers actually need it).
 - Optional CI job that auto-writes the previous week's roll-up on Monday — viable future enhancement; not blocking.
 
 ## Source
 
 User direction "Phase F2 — Cost Dashboard + USAGE Roll-ups" agent task brief 2026-05-14; builds directly on Phase E3 (PR #120) `usage-recorder.ts` output contract.
+
+## Connections
+- [[CONCEPT--COST-TRACKING]]
+- [[BLUEPRINT--COST-TRACKING]]
+

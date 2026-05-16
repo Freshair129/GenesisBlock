@@ -78,3 +78,8 @@ This three-step ladder is why MSP keeps the JSONL + JSON split — the episodic 
 ## Source
 
 `msp_spec.md` §7.2 (Rich Episodic Memory).
+
+## Connections
+- [[CONCEPT--MEMORY-SUBSYSTEM]]
+- [[CONCEPT--MEMORY-SESSIONS]]
+

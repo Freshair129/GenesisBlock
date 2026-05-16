@@ -19,7 +19,7 @@ created_at: 2026-05-13T19:45:00.000+07:00
 
 # CONCEPT — Symbol Graph Processing Pipeline
 
-> Alias: **Block Decomposition** — the top-down half of the Genesis Block Cycle (the bottom-up `Block Assembly` half is governed by `FRAMEWORK--PHASE-GOVERNANCE`). See `docs/gks/PRD--GENESIS-BLOCK-CYCLE.md` for the unified vocabulary.
+> Alias: **Block Decomposition** — the top-down half of the Genesis Block Cycle (the bottom-up `Block Assembly` half is governed by `[[FRAMEWORK--PHASE-GOVERNANCE]]`). See `docs/gks/[[PRD--GENESIS-BLOCK-CYCLE]].md` for the unified vocabulary.
 
 แนวคิดหลักคือการเปลี่ยน **Source Code (Unstructured Data)** ให้กลายเป็น **Architectural Knowledge Graph (Structured Knowledge)** ผ่านกระบวนการประมวลผลที่เป็นลำดับขั้นตอน (Deterministic Pipeline) ในรูปแบบของ **Directed Acyclic Graph (DAG)**
 
@@ -43,3 +43,9 @@ created_at: 2026-05-13T19:45:00.000+07:00
 ## Destination: GenesisGraphBackend
 
 ผลลัพธ์สุดท้ายจะถูกบันทึกลงใน **GenesisGraphBackend** เพื่อให้ Agents สามารถ Query ความสัมพันธ์เชิงลึกได้ทันที โดยไม่ต้องประมวลผลใหม่ในทุกครั้งที่ใช้งาน
+
+## Connections
+- [[CONCEPT--SYMBOL-GRAPH]]
+- [[FRAMEWORK--SYMBOL-GRAPH]]
+- [[SPEC--GENESIS-GRAPH-BACKEND]]
+

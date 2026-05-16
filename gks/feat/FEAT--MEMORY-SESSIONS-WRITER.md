@@ -64,5 +64,11 @@ await session.close()
 ## Out of scope
 
 - Reading sessions (separate, trivially small).
-- Episode summarisation (`FEAT--MEMORY-EPISODIC-WRITER`).
+- Episode summarisation (`[[FEAT--MEMORY-EPISODIC-WRITER]]`).
 - Cross-platform Windows lock — M3 follow-up.
+
+## Connections
+- [[ADR--MEMORY-SESSIONS-WRITER]]
+- [[CONCEPT--MEMORY-SESSIONS-WRITER]]
+- [[CONCEPT--MEMORY-SESSIONS]]
+

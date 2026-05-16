@@ -65,3 +65,8 @@ C:\Users\freshair\cognitive_system\
 └── .brain\msp\projects\<ns>\candidates\
     └── (MLL-generated Skill/Tool candidates)
 ```
+
+## Connections
+- [[FRAMEWORK--MSP-ARCHITECTURE-V2]]
+- [[FEAT--META-LEARNING-LOOP]]
+

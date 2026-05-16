@@ -84,9 +84,13 @@ Reject in all cases regardless of `package.json`:
 
 ## What this ADR does NOT decide
 
-- The retry policy when a pattern is detected → see `ADR--CODEGEN-RETRY-POLICY`.
-- The post-processing pipeline that runs first → see `ADR--CODEGEN-POST-PROCESSING`.
+- The retry policy when a pattern is detected → see `[[ADR--CODEGEN-RETRY-POLICY]]`.
+- The post-processing pipeline that runs first → see `[[ADR--CODEGEN-POST-PROCESSING]]`.
 
 ## Source
 
 `msp_spec.md` §5.2 (Forbidden Imports), §5.3 (Forbidden Patterns), §5.4 (Required Patterns).
+
+## Connections
+- [[CONCEPT--CODEGEN-MICROTASK-CONTRACT]]
+

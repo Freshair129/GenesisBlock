@@ -49,7 +49,7 @@ When acceptance fails, the runner sees error strings like:
 test/foo/expected.test.ts > foo() returns 42: expected 41 to be 42
 ```
 
-…and feeds them into the next SLM retry per `ADR--CODEGEN-RETRY-POLICY`.
+…and feeds them into the next SLM retry per `[[ADR--CODEGEN-RETRY-POLICY]]`.
 
 ## Acceptance criteria
 
@@ -80,3 +80,9 @@ test/foo/expected.test.ts > foo() returns 42: expected 41 to be 42
 - vitest watch mode.
 - Docker isolation.
 - Caching across runs.
+
+## Connections
+- [[ADR--ACCEPTANCE-VITEST-RUNNER]]
+- [[CONCEPT--ACCEPTANCE-VITEST-RUNNER]]
+- [[FEAT--CODEGEN-MICROTASK-RUNNER]]
+

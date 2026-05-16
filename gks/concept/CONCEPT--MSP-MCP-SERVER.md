@@ -50,3 +50,11 @@ Out:
 ## Source
 
 Closes P1 #5 (MCP server) from the M3 production-readiness backlog. Last large item before MSP can be considered "feature complete" relative to the spec.
+
+## Connections
+- [[FEAT--MSP-VALIDATOR]]
+- [[FEAT--CODEGEN-MICROTASK-RUNNER]]
+- [[FEAT--MEMORY-SESSIONS-WRITER]]
+- [[FEAT--MEMORY-EPISODIC-WRITER]]
+- [[FEAT--MEMORY-BACKLINKS-INDEXER]]
+

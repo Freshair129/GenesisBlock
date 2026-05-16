@@ -50,3 +50,9 @@ retrieval model (Resolution Gradient) to optimize context window usage.
 - Implemented by: Gemini CLI
 - Verified by: Benchmark + typecheck + logic tests
 - Date: 2026-05-14
+
+## Connections
+- [[BLUEPRINT--PHASE-3-VAULT-AND-RESOLUTION]]
+- [[FEAT--VAULT-COMPOSITION]]
+- [[FEAT--RESOLUTION-EXPAND-ON-DEMAND]]
+

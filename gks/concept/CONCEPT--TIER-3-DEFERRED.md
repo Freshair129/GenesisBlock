@@ -71,7 +71,7 @@ Unlike consolidator (where mock LLM is fine for tests), an auto-ADR generator's 
 
 **What**: An Obsidian community plugin that bridges Smart Connections's embedding index to MSP's vector store, AND optionally swaps in pgvector / qdrant as the underlying backend.
 
-**Defer reason**: Explicit scale-up trigger. Per `CONCEPT--MSP-ROADMAP` §4: "Triggered when vault > 5,000 atoms or semantic latency > 500ms." Current vault: 144 atoms (50× under threshold). Latency at this scale: ~50ms. Building a plugin before the trigger fires is over-engineering — `recall()` already meets perf targets at current scale.
+**Defer reason**: Explicit scale-up trigger. Per `[[CONCEPT--MSP-ROADMAP]]` §4: "Triggered when vault > 5,000 atoms or semantic latency > 500ms." Current vault: 144 atoms (50× under threshold). Latency at this scale: ~50ms. Building a plugin before the trigger fires is over-engineering — `recall()` already meets perf targets at current scale.
 
 **Trigger to revisit**: Either (a) vault crosses 5,000 atoms in real use, or (b) semantic recall measurably slows past 500ms p95.
 
@@ -79,9 +79,9 @@ Unlike consolidator (where mock LLM is fine for tests), an auto-ADR generator's 
 
 ### M10b — Optional Kuzu / Neo4j graph backend
 
-**What**: Replace `backlinks.jsonl` with a real graph DB for multi-hop queries (e.g. "show me all atoms 2-3 hops from ADR--X").
+**What**: Replace `backlinks.jsonl` with a real graph DB for multi-hop queries (e.g. "show me all atoms 2-3 hops from [[ADR--X]]").
 
-**Defer reason**: Scale trigger not met. Per `CONCEPT--MSP-ROADMAP` §4: "Triggered when crosslinks > 50,000 or multi-hop on hot path." Current crosslinks: ~400 (125× under threshold). 1-hop queries from `backlinks.jsonl` complete in < 5ms.
+**Defer reason**: Scale trigger not met. Per `[[CONCEPT--MSP-ROADMAP]]` §4: "Triggered when crosslinks > 50,000 or multi-hop on hot path." Current crosslinks: ~400 (125× under threshold). 1-hop queries from `backlinks.jsonl` complete in < 5ms.
 
 **Trigger to revisit**: Either (a) crosslinks cross 50,000 in real use, or (b) a feature emerges that demands multi-hop traversal on the hot path.
 
@@ -119,8 +119,12 @@ Total deferred budget: ~25 working days. Not unmanageable — just needs the rig
 
 - **None of these are forgotten** — each has a re-visit trigger documented above
 - **None block v0.3.0 or M8 governance** — Tier 1 + Tier 2 are sufficient for production-ready MSP
-- **Atoms are the hand-off** — when a trigger fires, the implementer reads this CONCEPT, the per-milestone item in `CONCEPT--MSP-ROADMAP`, and proceeds with doc-to-code per CLAUDE.md
+- **Atoms are the hand-off** — when a trigger fires, the implementer reads this CONCEPT, the per-milestone item in `[[CONCEPT--MSP-ROADMAP]]`, and proceeds with doc-to-code per CLAUDE.md
 
 ## Source
 
-User direction "ทำที่เหลือทั้งหมด" (all remaining); honest assessment of what can vs cannot be built without external triggers; `CONCEPT--MSP-ROADMAP` §3-4 deferral framing.
+User direction "ทำที่เหลือทั้งหมด" (all remaining); honest assessment of what can vs cannot be built without external triggers; `[[CONCEPT--MSP-ROADMAP]]` §3-4 deferral framing.
+
+## Connections
+- [[AUDIT--ALL-M-MILESTONES]]
+

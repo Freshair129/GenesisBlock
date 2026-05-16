@@ -25,7 +25,7 @@ created_at: 2026-05-05T18:00:00.000+07:00
 ## Rule
 
 Each `FEAT--*` atom must declare an atomic chain that matches its implied
-Scaling Level (per `FRAMEWORK--SCALING-LEVELS`):
+Scaling Level (per `[[FRAMEWORK--SCALING-LEVELS]]`):
 
 - **L2** (default for FEATs): at least one `CONCEPT--*` AND one `ADR--*`
   appears in the FEAT's `crosslinks.references` or `crosslinks.implements`.
@@ -83,11 +83,15 @@ not fail-exit per the PROTO loader's draft policy.
 - PR-diff-based L1/L2/L3 auto-classification (would be a CI workflow,
   potentially M8c-2).
 - Heuristic threshold tuning (touch-count, line-count) — see
-  `CONCEPT--PROTO-SCALING-LEVEL-GATE` for thresholds and the
-  `PARAM--SCALING-LEVEL-THRESHOLDS` future hook.
+  `[[CONCEPT--PROTO-SCALING-LEVEL-GATE]]` for thresholds and the
+  `[[PARAM--SCALING-LEVEL-THRESHOLDS]]` future hook.
 - AUDIT atom presence (a separate PROTO will gate AUDIT chain coverage).
 
 ## Source
 
-`FRAMEWORK--SCALING-LEVELS`, `CONCEPT--PROTO-SCALING-LEVEL-GATE`,
-`CONCEPT--MSP-ROADMAP` §2 M8c.
+`[[FRAMEWORK--SCALING-LEVELS]]`, `[[CONCEPT--PROTO-SCALING-LEVEL-GATE]]`,
+`[[CONCEPT--MSP-ROADMAP]]` §2 M8c.
+
+## Connections
+- [[FEAT--PROTO-LOADER]]
+

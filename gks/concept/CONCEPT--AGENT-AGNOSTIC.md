@@ -57,7 +57,7 @@ Each cognitive-layer client points to the same global bin:
 command = "msp-mcp-server"
 ```
 
-Project resolution from cwd / env / `.mspconfig` — same logic regardless of which agent invokes the bin. See `CONCEPT--NAMED-PROJECT-REGISTRY` for the resolution contract.
+Project resolution from cwd / env / `.mspconfig` — same logic regardless of which agent invokes the bin. See `[[CONCEPT--NAMED-PROJECT-REGISTRY]]` for the resolution contract.
 
 ### 2. EVA-specific concerns live in EVA, not MSP
 
@@ -94,9 +94,14 @@ Everything above is independent of which agent is on top. EVA's biological conso
 - MSP can evolve without breaking EVA (and vice versa).
 
 **Negative**
-- Some current atoms reference EVA concepts and need cleanup over time (tracked via `AUDIT--ARCH-DOC-CLEANUP` and follow-up audits).
+- Some current atoms reference EVA concepts and need cleanup over time (tracked via `[[AUDIT--ARCH-DOC-CLEANUP]]` and follow-up audits).
 - "Universal" surface means we can't bake EVA-specific optimisations into MSP core; they live as plugins or in EVA itself.
 
 ## Source
 
-Architectural clarification 2026-05-09 — established that MSP is the Memory OS sandwiched between agents (cognitive layer) and GKS (knowledge base). Cherry-picked from `SPEC--ARCHITECTURE-V2.md` §2, §4.5 (multi-client global install pattern). See `AUDIT--ARCH-DOC-CLEANUP`.
+Architectural clarification 2026-05-09 — established that MSP is the Memory OS sandwiched between agents (cognitive layer) and GKS (knowledge base). Cherry-picked from `[[SPEC--ARCHITECTURE-V2]].md` §2, §4.5 (multi-client global install pattern). See `[[AUDIT--ARCH-DOC-CLEANUP]]`.
+
+## Connections
+- [[FRAMEWORK--MSP-ARCHITECTURE-V2]]
+- [[CONCEPT--OBSIDIAN-AS-RUNTIME]]
+

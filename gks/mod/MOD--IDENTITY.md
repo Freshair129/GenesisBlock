@@ -18,14 +18,14 @@ The Identity module is a **Genesis Block** that defines the "soul" half of the M
 
 ## 1. Composition
 This module is a functional knowledge unit composed of:
-- **Concept**: `CONCEPT--IDENTITY-LAYER` (The "why" — persistent persona).
-- **Protocol**: `PROTOCOL--IDENTITY-API` (The "how" — programmatic interface).
-- **Algorithm**: `ALGO--IDENTITY-RESOLUTION` (The "logic" — global vs local resolution).
+- **Concept**: `[[CONCEPT--IDENTITY-LAYER]]` (The "why" — persistent persona).
+- **Protocol**: `[[PROTOCOL--IDENTITY-API]]` (The "how" — programmatic interface).
+- **Algorithm**: `[[ALGO--IDENTITY-RESOLUTION]]` (The "logic" — global vs local resolution).
 
 ## 2. Integration
-- **Implements**: `FEAT--IDENTITY-LAYER`.
-- **Governed by**: `ADR--IDENTITY-STORAGE-SHAPE` (durable JSON storage).
-- **Observable via**: `AUDIT--IDENTITY-LAYER`.
+- **Implements**: `[[FEAT--IDENTITY-LAYER]]`.
+- **Governed by**: `[[ADR--IDENTITY-STORAGE-SHAPE]]` (durable JSON storage).
+- **Observable via**: `[[AUDIT--IDENTITY-LAYER]]`.
 
 ## 3. Canonical Location
 Source code: `src/identity/`.

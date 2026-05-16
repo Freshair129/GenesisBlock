@@ -26,11 +26,11 @@ created_at: 2026-05-14T05:00:00.000+07:00
 
 ## Why this atom exists
 
-`packages/msp/src/agents/result-recorder.ts` writes one markdown atom per `dispatch()` call to `<root>/gks/episode/EPISODE--AGENT-RUN-<isoTimestamp>.md`. Per `SPEC--EPISODE-ATOM` §5, episodes are **immutable** — once written, never edited. They are also write-only from the dispatcher's perspective: nothing in the runtime trims them.
+`packages/msp/src/agents/result-recorder.ts` writes one markdown atom per `dispatch()` call to `<root>/gks/episode/[[EPISODE--AGENT-RUN]]-<isoTimestamp>.md`. Per `[[SPEC--EPISODE-ATOM]]` §5, episodes are **immutable** — once written, never edited. They are also write-only from the dispatcher's perspective: nothing in the runtime trims them.
 
 For a busy agent (hundreds to thousands of dispatches per week), the episode directory grows linearly without bound. On developer laptops the cost is small; on long-lived CI runners and dedicated agent VMs, the directory can reach hundreds of MB within months, slowing globbing (`msp:index`), validation passes, and IDE scans.
 
-This atom defines the **retention policy**: which episodes to keep forever, which to archive, and which (optionally) to delete. The companion `ADR--EPISODE-GC-POLICY` locks the *default* numeric thresholds. The implementation lives at `packages/msp/src/agents/episode-gc.ts` with a CLI wrapper at `packages/msp/src/agents/episode-gc-cli.ts` (`msp-episode-gc`).
+This atom defines the **retention policy**: which episodes to keep forever, which to archive, and which (optionally) to delete. The companion `[[ADR--EPISODE-GC-POLICY]]` locks the *default* numeric thresholds. The implementation lives at `packages/msp/src/agents/episode-gc.ts` with a CLI wrapper at `packages/msp/src/agents/episode-gc-cli.ts` (`msp-episode-gc`).
 
 ## Goals
 
@@ -62,7 +62,7 @@ Archive target: `<root>/gks/episode/_archive/<YYYY-MM>/<original-filename>.md` w
 
 ## Inferring `ok` from episode frontmatter
 
-`SPEC--EPISODE-ATOM` §3 does **not** mandate a first-class `ok` field, and the current `result-recorder.ts` does not write one. The GC must infer it. Looking at what *is* written:
+`[[SPEC--EPISODE-ATOM]]` §3 does **not** mandate a first-class `ok` field, and the current `result-recorder.ts` does not write one. The GC must infer it. Looking at what *is* written:
 
 - **Frontmatter**: `tier_used` (in `tags`), `status: stable`, optional `cost_usd`, optional `escalated_from`. No `exit_code`, no `ok`.
 - **Body**: `## Output` fenced code block. Empty/whitespace-only output suggests the tier produced nothing.
@@ -89,13 +89,13 @@ Both rules are deliberately tolerant of frontmatter-format drift. The recorder's
 The default behaviour is *archive* because:
 
 - Episodes are **evidence**, not noise. Moving them out of the hot scan path is cheap; losing them is irreversible.
-- Future work — `SPEC--META-LEARNING-LOOP` reverse path — may want to mine archived episodes offline.
+- Future work — `[[SPEC--META-LEARNING-LOOP]]` reverse path — may want to mine archived episodes offline.
 - A developer can `rm -rf gks/episode/_archive/` at any time. The reverse (recovering a deleted episode) is impossible.
 
 `--delete` flips this to true-deletion, which is appropriate for:
 
 - High-volume agents where archive disk cost ≈ delete cost.
-- Sensitive prompts where archival is itself a leak risk (cross-reference `SPEC--EPISODE-ATOM` §9 "Encryption at rest").
+- Sensitive prompts where archival is itself a leak risk (cross-reference `[[SPEC--EPISODE-ATOM]]` §9 "Encryption at rest").
 - One-shot cleanup of historical bloat.
 
 ## CLI surface
@@ -112,17 +112,17 @@ Defaults are conservative:
 - `--apply --delete` → permanently remove eligible episodes.
 - `--json` → emit the `GcReport` shape as JSON on stdout.
 
-The "implicit dry-run unless `--apply`" pattern matches the principle in `CONCEPT--MASTER-PROMOTION` and is the standard MSP idiom for destructive maintenance commands.
+The "implicit dry-run unless `--apply`" pattern matches the principle in `[[CONCEPT--MASTER-PROMOTION]]` and is the standard MSP idiom for destructive maintenance commands.
 
 ## Out of scope
 
 - **Re-running** older episodes (replay). The format is *evidence*, not a reproducible task spec.
 - **Compressing** the archive into tarballs. Filesystem-native directory is enough for now; the developer's existing tooling (`tar`, `7z`, S3 sync) handles bulk transfer.
-- **Migrating** to `~/.brain/episodic/` per `ADR--BRAIN-PATH-RESOLUTION` §Open question. GC operates on whichever location the recorder currently writes to (`<root>/gks/episode/`); when the recorder moves, the GC can be re-pointed via `--root` or extended.
-- **Encryption at rest**. Tracked in `SPEC--EPISODE-ATOM` §9.
+- **Migrating** to `~/.brain/episodic/` per `[[ADR--BRAIN-PATH-RESOLUTION]]` §Open question. GC operates on whichever location the recorder currently writes to (`<root>/gks/episode/`); when the recorder moves, the GC can be re-pointed via `--root` or extended.
+- **Encryption at rest**. Tracked in `[[SPEC--EPISODE-ATOM]]` §9.
 
 ## See also
 
-- `ADR--EPISODE-GC-POLICY` — the decision atom locking the numeric defaults + archive layout.
-- `AUDIT--PHASE-F4-EPISODE-GC` — what shipped under this PR.
-- `SPEC--EPISODE-ATOM` — the episode atom contract this GC operates on.
+- `[[ADR--EPISODE-GC-POLICY]]` — the decision atom locking the numeric defaults + archive layout.
+- `[[AUDIT--PHASE-F4-EPISODE-GC]]` — what shipped under this PR.
+- `[[SPEC--EPISODE-ATOM]]` — the episode atom contract this GC operates on.

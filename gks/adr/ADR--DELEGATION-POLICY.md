@@ -22,7 +22,7 @@ created_at: 2026-05-05T16:28:00.000+07:00
 
 ## Context
 
-`ADR--HUMAN-REVIEW-GATES` (M5d) requires human approval for promotions. As teams grow past 5 contributors, the Boss becomes a bottleneck — every ADR / FEAT promotion stalls waiting on a single approver. Either:
+`[[ADR--HUMAN-REVIEW-GATES]]` (M5d) requires human approval for promotions. As teams grow past 5 contributors, the Boss becomes a bottleneck — every ADR / FEAT promotion stalls waiting on a single approver. Either:
 
 (a) Boss approves everything (rate-limit on team velocity)
 (b) Bypass review (defeats the framework)
@@ -40,13 +40,13 @@ A delegation policy is needed.
 | **L3** (multi-module / breaking / new framework) | **Boss only** (T3) |
 | **HOTFIX** | 1 senior; backfill within 48h |
 
-"Senior" = T2 or T3, per `FRAMEWORK--AUTHORITY-MATRIX`.
+"Senior" = T2 or T3, per `[[FRAMEWORK--AUTHORITY-MATRIX]]`.
 
 ### Auto-promote heuristic
 
 PRs labelled `level:L2` AND with 2 senior approvals AND CI green can auto-merge via existing GitHub auto-merge. PRs labelled `level:L3` always require Boss explicit merge action — no auto-merge.
 
-PR level is computed by `PROTO--SCALING-LEVEL-GATE` (M8c) from diff. Authors can override via `level_override:` in PR description; senior reviewers can over-rule the override.
+PR level is computed by `[[PROTO--SCALING-LEVEL-GATE]]` (M8c) from diff. Authors can override via `level_override:` in PR description; senior reviewers can over-rule the override.
 
 ### Boss escalation triggers
 
@@ -57,7 +57,7 @@ Even at L2, certain content escalates to Boss-required:
 - Any change to `examples/hooks/` (pre-commit / pre-push)
 - Any change touching `package.json` or `package-lock.json` (dep changes)
 
-These match `FRAMEWORK--AUTHORITY-MATRIX` "Boss-only paths".
+These match `[[FRAMEWORK--AUTHORITY-MATRIX]]` "Boss-only paths".
 
 ### Quorum override
 
@@ -92,4 +92,8 @@ If only 1 senior is available (e.g. small team starting out, vacation), Boss can
 
 ## Source
 
-`FRAMEWORK--AUTHORITY-MATRIX`, `ADR--HUMAN-REVIEW-GATES`, `CONCEPT--MSP-ROADMAP` §3 M9b, user direction (all-M planning) — needed before team scales past 5 contributors.
+`[[FRAMEWORK--AUTHORITY-MATRIX]]`, `[[ADR--HUMAN-REVIEW-GATES]]`, `[[CONCEPT--MSP-ROADMAP]]` §3 M9b, user direction (all-M planning) — needed before team scales past 5 contributors.
+
+## Connections
+- [[CONCEPT--PROTO-AUTHORITY-ENFORCEMENT]]
+

@@ -59,4 +59,4 @@ Re-entry on crash: a stale `.lock` file with a dead PID is removed on next `open
 
 ## Source
 
-`CONCEPT--MEMORY-SESSIONS-WRITER` + `CONCEPT--MEMORY-SESSIONS`.
+`[[CONCEPT--MEMORY-SESSIONS-WRITER]]` + `[[CONCEPT--MEMORY-SESSIONS]]`.

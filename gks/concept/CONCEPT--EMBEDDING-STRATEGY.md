@@ -20,7 +20,7 @@ created_at: 2026-05-03T23:55:05.902+07:00
 
 # CONCEPT — embedding strategy
 
-> **Updated 2026-05-04 (M7-prep follow-up)**: original framing said "MSP delegates to Smart Connections; never embeds". Audit against GksV3 3.6.0 found GKS now ships `createNomicEmbedder()` — Node-side local embedder. Reframed below: GKS is the canonical writer; Smart Connections is the in-Obsidian browse path. Both must use the same model — see `ADR--EMBEDDING-MODEL-PARITY`.
+> **Updated 2026-05-04 (M7-prep follow-up)**: original framing said "MSP delegates to Smart Connections; never embeds". Audit against GksV3 3.6.0 found GKS now ships `createNomicEmbedder()` — Node-side local embedder. Reframed below: GKS is the canonical writer; Smart Connections is the in-Obsidian browse path. Both must use the same model — see `[[ADR--EMBEDDING-MODEL-PARITY]]`.
 
 ## Problem
 
@@ -44,7 +44,7 @@ Two surfaces, one model:
 
 - User opens vault in Obsidian → Smart Connections plugin builds its own index in `.smart-connections/`.
 - Powers the Smart View pane, "find similar notes" UI, etc. — for humans, not agents.
-- Must be configured to use the **same model** as GKS (see `ADR--EMBEDDING-MODEL-PARITY`).
+- Must be configured to use the **same model** as GKS (see `[[ADR--EMBEDDING-MODEL-PARITY]]`).
 - MSP **does not** parse `.smart-connections/` files — schema is plugin-version-private.
 
 ### Why two indexes if model is the same
@@ -73,4 +73,9 @@ Smart Connections runs in the Obsidian Electron process the user is already payi
 
 ## Source
 
-User architectural direction in M7-prep + audit during M7-prep follow-up. GksV3 3.6.0 CHANGELOG. Smart Connections plugin docs. See `ADR--EMBEDDING-MODEL-PARITY` for the model lock decision.
+User architectural direction in M7-prep + audit during M7-prep follow-up. GksV3 3.6.0 CHANGELOG. Smart Connections plugin docs. See `[[ADR--EMBEDDING-MODEL-PARITY]]` for the model lock decision.
+
+## Connections
+- [[CONCEPT--OBSIDIAN-AS-RUNTIME]]
+- [[ADR--GRAPH-IS-GKS-DOMAIN]]
+

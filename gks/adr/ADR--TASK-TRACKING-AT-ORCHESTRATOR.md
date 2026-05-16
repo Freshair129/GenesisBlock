@@ -75,3 +75,9 @@ this ADR records that those files live outside `gks/`.
 - ADR 009 — orchestrator pattern
 - ADR 014 — partially superseded (item 1 only)
 - `docs/MSP_RELATIONSHIP.md` § task tracking — the contract
+
+## Connections
+- [[ADR--EXTENDED-TAXONOMY]]
+- [[CONCEPT--MSP-ROADMAP]]
+- [[ADR--DOC-TO-CODE-ENFORCEMENT]]
+

@@ -20,7 +20,7 @@ created_at: 2026-05-03T17:36:08.623+07:00
 
 ## Context
 
-`ADR--PROMOTION-WORKFLOW` defines the third gate as "human review" without saying *who* is the human for which atom type. `FRAMEWORK--AUTHORITY-MATRIX` covers who can write where but not who approves the promotion. We need an explicit per-type → reviewer mapping so promotions don't stall waiting for an unspecified human.
+`[[ADR--PROMOTION-WORKFLOW]]` defines the third gate as "human review" without saying *who* is the human for which atom type. `[[FRAMEWORK--AUTHORITY-MATRIX]]` covers who can write where but not who approves the promotion. We need an explicit per-type → reviewer mapping so promotions don't stall waiting for an unspecified human.
 
 ## Decision
 
@@ -38,7 +38,7 @@ created_at: 2026-05-03T17:36:08.623+07:00
 | `IDEA--`           | none required             | Capture-only; no acceptance |
 | `AUDIT--`          | none required             | Records observed reality; reviewer is the next reader |
 | `MICROTASK` / `T*.task.yaml` | Implementer self + acceptance test | Light-tier; passing tests = approval |
-| `TASK--` (orchestrator state) | none — mutable        | Live state; not in `gks/` (per `ADR--TASK-TRACKING-AT-ORCHESTRATOR`) |
+| `TASK--` (orchestrator state) | none — mutable        | Live state; not in `gks/` (per `[[ADR--TASK-TRACKING-AT-ORCHESTRATOR]]`) |
 | `HOTFIX--`         | none at open; Boss at close | 48h emergency window; close needs sign-off |
 
 ## Default routing
@@ -62,14 +62,20 @@ created_at: 2026-05-03T17:36:08.623+07:00
 
 1. **Two-tier (Boss vs anyone).** Rejected — too coarse; CONCEPT shouldn't need Boss.
 2. **N-of-M voting.** Rejected — too much process for a small team.
-3. **Auto-approve everything; rely on validator.** Rejected — validator can't judge "is this a good ADR" (per `CONCEPT--MSP-VALIDATOR`).
+3. **Auto-approve everything; rely on validator.** Rejected — validator can't judge "is this a good ADR" (per `[[CONCEPT--MSP-VALIDATOR]]`).
 
 ## What this ADR does NOT change
 
-- The validator's hard rules — see `ADR--ANTI-HALLUCINATION-RULES`.
-- The promotion levels themselves — see `ADR--PROMOTION-LEVELS`.
-- Authority over file paths — see `FRAMEWORK--AUTHORITY-MATRIX`.
+- The validator's hard rules — see `[[ADR--ANTI-HALLUCINATION-RULES]]`.
+- The promotion levels themselves — see `[[ADR--PROMOTION-LEVELS]]`.
+- Authority over file paths — see `[[FRAMEWORK--AUTHORITY-MATRIX]]`.
 
 ## Source
 
-`msp_spec.md` §9 (Human Review Gates) — referenced from `ADR--PROMOTION-WORKFLOW` but not previously written as an atom.
+`msp_spec.md` §9 (Human Review Gates) — referenced from `[[ADR--PROMOTION-WORKFLOW]]` but not previously written as an atom.
+
+## Connections
+- [[ADR--AGENT-WRITE-BOUNDARIES]]
+- [[FRAMEWORK--SCALING-LEVELS]]
+- [[CONCEPT--MASTER-PROMOTION]]
+

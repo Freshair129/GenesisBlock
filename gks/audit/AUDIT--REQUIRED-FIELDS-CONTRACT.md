@@ -76,3 +76,8 @@ Tightening these (e.g. adding `summary` per spec) is a separate atom edit; would
 - Implemented by: @claude-opus-4-7
 - Verified by: 15 new tests + 78/78 atoms validate after enabling
 - Date: 2026-05-03
+
+## Connections
+- [[ADR--FORBIDDEN-FIELDS-LIST]]
+- [[FEAT--MSP-VALIDATOR]]
+

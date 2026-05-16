@@ -24,7 +24,7 @@ created_at: 2026-05-05T16:18:00.000+07:00
 
 `FRAME--*` atoms describe governance ("authority levels", "phase order", "scaling levels", "crosslink vocabulary"). They're **descriptive** — humans read them, agents reference them, but no code automatically checks compliance.
 
-Example: `FRAMEWORK--PHASE-GOVERNANCE` says "P3 BLUEPRINT must precede P5 CODE". A new PR landing code-without-blueprint is technically a violation, but nothing fails at CI today — only a human reviewer might catch it.
+Example: `[[FRAMEWORK--PHASE-GOVERNANCE]]` says "P3 BLUEPRINT must precede P5 CODE". A new PR landing code-without-blueprint is technically a violation, but nothing fails at CI today — only a human reviewer might catch it.
 
 The result: governance docs decay into folklore. A new contributor can land a PR that violates the FRAME and nobody notices for months.
 
@@ -112,7 +112,7 @@ M8a is the **pattern foundation** — not a specific PROTO yet:
 1. **Atom-type registration** — `proto` becomes a valid `type:` in the contract
 2. **Validator scaffold** — `src/validator/proto/loader.ts` finds PROTO atoms + their TS predicates and wires them into `src/validator/cli.ts`
 3. **Required-fields contract** — every PROTO atom must have `crosslinks.enforces` to a FRAME
-4. **Sample PROTO** — `PROTO--SAMPLE-RULE` (a trivial demo) to validate the loader works end-to-end
+4. **Sample PROTO** — `[[PROTO--SAMPLE-RULE]]` (a trivial demo) to validate the loader works end-to-end
 5. **Documentation** — this concept atom + ADR + FEAT + BLUEPRINT
 
 M8b–f then implement specific PROTOs (PHASE-GATES, SCALING-LEVEL-GATE, ALGO-PARAM-COUPLING, AUTHORITY-ENFORCEMENT, plus auditing existing rules into PROTOs).
@@ -133,4 +133,9 @@ M8b–f then implement specific PROTOs (PHASE-GATES, SCALING-LEVEL-GATE, ALGO-PA
 
 ## Source
 
-`msp_spec.md` §10 (governance), `FRAMEWORK--PHASE-GOVERNANCE`, `FRAMEWORK--AUTHORITY-MATRIX`, `ADR--HUMAN-REVIEW-GATES`, user direction "วางแผนและทำให้จบ ทุก M" — M8a is the foundation enabling M8b–f.
+`msp_spec.md` §10 (governance), `[[FRAMEWORK--PHASE-GOVERNANCE]]`, `[[FRAMEWORK--AUTHORITY-MATRIX]]`, `[[ADR--HUMAN-REVIEW-GATES]]`, user direction "วางแผนและทำให้จบ ทุก M" — M8a is the foundation enabling M8b–f.
+
+## Connections
+- [[FRAMEWORK--MSP-ARCHITECTURE-V2]]
+- [[FEAT--MSP-VALIDATOR]]
+

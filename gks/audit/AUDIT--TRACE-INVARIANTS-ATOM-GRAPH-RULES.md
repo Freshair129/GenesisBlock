@@ -28,3 +28,8 @@ Mechanised Rule 2 (Acyclic Constraint) and Rule 4b (Atom Referential Integrity) 
 ## Decision Log
 - **External Markers**: Since the current indexer strips `external: true` objects, any missing reference is flagged. This ensures strictness until the indexer is upgraded.
 - **Cycle Granularity**: DFS returns the first cycle found in each component. This satisfies the "emit ONE violation listing the cycle nodes" requirement.
+
+## Connections
+- [[PROTO--SYMBOLS-TRACE-INVARIANTS]]
+- [[BLUEPRINT--PROTO-LOADER]]
+

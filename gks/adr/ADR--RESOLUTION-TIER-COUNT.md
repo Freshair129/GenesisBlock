@@ -23,7 +23,7 @@ created_at: 2026-05-14T18:37:53.303+07:00
 
 ## Context
 
-`CONCEPT--RESOLUTION-GRADIENT` defines four resolution tiers — `FULL`, `SUMMARY`, `SKELETON`, `MENTION` — at which a Resource can be rendered into context. The question is **how many of those four to ship in the MVP**.
+`[[CONCEPT--RESOLUTION-GRADIENT]]` defines four resolution tiers — `FULL`, `SUMMARY`, `SKELETON`, `MENTION` — at which a Resource can be rendered into context. The question is **how many of those four to ship in the MVP**.
 
 Each tier beyond the minimum costs implementation: a dedicated renderer, additional budget-allocator logic, more UX surface, more test coverage. But too few tiers re-creates the binary-on/off cliff the gradient is meant to eliminate.
 
@@ -63,4 +63,8 @@ Negative / accepted costs:
 ## Source
 
 - `docs/msp/UNIVERSAL-CONTEXT-FRAMEWORK_spec.md` §0 (D-2), §6 (tier shapes), §11 Phase 3 / Phase 3.5.
-- `CONCEPT--RESOLUTION-GRADIENT` — the four-tier model and `expand()` semantics.
+- `[[CONCEPT--RESOLUTION-GRADIENT]]` — the four-tier model and `expand()` semantics.
+
+## Connections
+- [[FRAMEWORK--UNIVERSAL-CONTEXT-FRAMEWORK]]
+

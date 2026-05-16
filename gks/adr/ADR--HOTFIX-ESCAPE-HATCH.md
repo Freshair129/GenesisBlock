@@ -80,3 +80,9 @@ hotfix:
 ## Source
 
 `msp_spec.md` §10.1 (Hotfix) + `FRAMEWORK_MASTER_SPEC.md` §6.4 (referenced).
+
+## Connections
+- [[ADR--AGENT-WRITE-BOUNDARIES]]
+- [[FRAMEWORK--PHASE-GOVERNANCE]]
+- [[CONCEPT--MSP-HOTFIX-WRAPPER]]
+

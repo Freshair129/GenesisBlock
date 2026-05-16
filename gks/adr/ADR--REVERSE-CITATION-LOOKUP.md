@@ -71,3 +71,8 @@ but is deferred until measured.
 - ADR 008 — query primitive scope (in scope)
 - ADR 009 — peer subsystem boundary (orchestrator combines)
 - 3.5.2 release — shipped this primitive
+
+## Connections
+- [[CONCEPT--MEMORY-STORE]]
+- [[FEAT--LOOKUP-BY-SYMBOL]]
+

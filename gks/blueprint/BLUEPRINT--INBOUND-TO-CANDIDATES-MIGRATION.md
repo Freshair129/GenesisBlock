@@ -330,9 +330,9 @@ implementation_order:
 
 ## Source
 
-- `CONCEPT--KNOWLEDGE-LAYERS-V2` — model
-- `ADR--AGENT-WRITE-BOUNDARIES` — boundary
-- `FRAMEWORK--MSP-ARCHITECTURE-V2` — base architecture
+- `[[CONCEPT--KNOWLEDGE-LAYERS-V2]]` — model
+- `[[ADR--AGENT-WRITE-BOUNDARIES]]` — boundary
+- `[[FRAMEWORK--MSP-ARCHITECTURE-V2]]` — base architecture
 - PR #41 + PR #42 CI failures — race condition that this BLUEPRINT eliminates structurally
 - Existing `src/memory/episodic/writer.ts` — pattern for CandidateWriter API shape
 - Existing `src/mcp/tools/episode-append.ts` — pattern for `msp_candidate` handler shape

@@ -16,7 +16,7 @@ crosslinks: {"references":["CONCEPT--SUBMISSION-ENVELOPE"],"superseded_by":["CON
 created_at: 2026-05-03T14:01:51.322+07:00
 ---
 
-> ⚠️ **Superseded by [`CONCEPT--KNOWLEDGE-LAYERS-V2`](./CONCEPT--KNOWLEDGE-LAYERS-V2.md)** (Phase 4 of `BLUEPRINT--INBOUND-TO-CANDIDATES-MIGRATION`, 2026-05-09). The new candidates layer doesn't use a proposal-type discriminator — every candidate is just a `${proposed_id}.md` file in `.brain/.../candidates/`. Body preserved as historical context.
+> ⚠️ **Superseded by [`[[CONCEPT--KNOWLEDGE-LAYERS-V2]]`](./[[CONCEPT--KNOWLEDGE-LAYERS-V2]].md)** (Phase 4 of `[[BLUEPRINT--INBOUND-TO-CANDIDATES-MIGRATION]]`, 2026-05-09). The new candidates layer doesn't use a proposal-type discriminator — every candidate is just a `${proposed_id}.md` file in `.brain/.../candidates/`. Body preserved as historical context.
 
 # CONCEPT — proposal types
 
@@ -43,10 +43,14 @@ Every inbound proposal declares one of four `proposal_type` values. The promote 
 
 ## What this concept does NOT cover
 
-- Specific anti-hallucination rules for each type (e.g. ADR-monotonic only applies to `new_atomic` for ADRs) → see `ADR--ANTI-HALLUCINATION-RULES`
-- Crosslink semantics for `supersede` → see `FRAMEWORK--CROSSLINKS-VOCABULARY`
-- The promotion levels (L0/L1/L2) the inbound transitions through → see `ADR--PROMOTION-LEVELS`
+- Specific anti-hallucination rules for each type (e.g. ADR-monotonic only applies to `new_atomic` for ADRs) → see `[[ADR--ANTI-HALLUCINATION-RULES]]`
+- Crosslink semantics for `supersede` → see `[[FRAMEWORK--CROSSLINKS-VOCABULARY]]`
+- The promotion levels (L0/L1/L2) the inbound transitions through → see `[[ADR--PROMOTION-LEVELS]]`
 
 ## Source
 
 `msp_spec.md` §3.2 (Proposal Types).
+
+## Connections
+- [[CONCEPT--SUBMISSION-ENVELOPE]]
+

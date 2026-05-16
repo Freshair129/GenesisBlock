@@ -27,7 +27,7 @@ created_at: 2026-05-03T15:43:36.814+07:00
 
 ## Scope
 
-Closes M3b. Removes the "forbidden-fields list is hardcoded" caveat in `ADR--FORBIDDEN-FIELDS-LIST`. The list now lives in `.brain/msp/LLM_Contract/atomic_contract.yaml` and is loaded at validator-CLI invocation time.
+Closes M3b. Removes the "forbidden-fields list is hardcoded" caveat in `[[ADR--FORBIDDEN-FIELDS-LIST]]`. The list now lives in `.brain/msp/LLM_Contract/atomic_contract.yaml` and is loaded at validator-CLI invocation time.
 
 ## What changed
 
@@ -55,7 +55,7 @@ test/validator/contract.test.ts: 5/5 passing
 
 ## Dogfood
 
-Replaced YAML's `forbidden_fields` with `[non_real_field]` and re-validated `test/fixtures/CONCEPT--TEST-FORBIDDEN.md` (which contains `commit_hash`):
+Replaced YAML's `forbidden_fields` with `[non_real_field]` and re-validated `test/fixtures/[[CONCEPT--TEST-FORBIDDEN]].md` (which contains `commit_hash`):
 - With truncated YAML → ✓ passed (because `commit_hash` no longer in list)
 - After restoring full YAML → ✗ rejected with `[forbidden-fields]`
 
@@ -71,3 +71,7 @@ Confirms the YAML actually drives runtime behaviour.
 - Implemented by: @claude-opus-4-7
 - Verified by: 5/5 unit tests + manual dogfood
 - Date: 2026-05-03
+
+## Connections
+- [[FEAT--MSP-VALIDATOR]]
+

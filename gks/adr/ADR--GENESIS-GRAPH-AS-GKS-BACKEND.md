@@ -25,7 +25,7 @@ created_at: 2026-05-12T11:57:00.000+07:00
 
 ## Context
 
-`CONCEPT--GENESIS-GRAPH-BACKEND` frames the desire for a sovereign,
+`[[CONCEPT--GENESIS-GRAPH-BACKEND]]` frames the desire for a sovereign,
 embedded, Cypher-capable graph engine forked from LadybugDB. The
 remaining question is **how it integrates with the existing stack**.
 
@@ -88,7 +88,7 @@ Concretely:
    The MSP `verify-flow` and Impact-Analysis paths gain a Cypher
    path; everything else continues to use `neighbors()` / `query()`.
 8. **The FFI contract between the TS adapter and the Rust crate is
-   pinned by `PROTOCOL--GENESIS-GRAPH-FFI`** (companion atom). Every
+   pinned by `[[PROTOCOL--GENESIS-GRAPH-FFI]]`** (companion atom). Every
    `#[napi]` export in `packages/gks/native/genesis-block/` and every
    TS method on `GenesisGraphBackend` must match that PROTOCOL; ABI
    drift across the boundary is a runtime crash, not a type error.
@@ -129,7 +129,7 @@ backend's `.db` file is opaque binary; that is acceptable because:
   file is gitignored; only the Markdown atoms it indexes are
   committed.
 
-A `BLUEPRINT--GENESIS-GRAPH-INTEGRATION` task tracks adding a
+A `[[BLUEPRINT--GENESIS-GRAPH-INTEGRATION]]` task tracks adding a
 `.gitignore` entry for `*.gks-graph.db` in the published templates.
 
 ### PgGraphBackend → reference baseline (transition plan)
@@ -190,7 +190,7 @@ belongs to its own ADR, not this one.
 ## Status
 
 **Draft.** This ADR is the artifact for the P2 decision step of
-`CONCEPT--GENESIS-GRAPH-BACKEND`. Promotion to `stable` requires:
+`[[CONCEPT--GENESIS-GRAPH-BACKEND]]`. Promotion to `stable` requires:
 
 1. A green CI run against the existing graph test suite with the
    `GenesisGraphBackend` swapped in via `parametrize`.
@@ -198,3 +198,7 @@ belongs to its own ADR, not this one.
    criteria.
 3. A reviewer sign-off on the ADR-005 / ADR-001 reconciliation
    sections above.
+
+## Connections
+- [[FRAMEWORK--MSP-ARCHITECTURE-V2]]
+

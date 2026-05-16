@@ -43,3 +43,8 @@ Pre-commit hooks shipping with bash bugs (unquoted expansions, `set -e` interact
 - Implemented by: @claude-opus-4-7
 - Verified by: local shellcheck run; CI step lands with this PR
 - Date: 2026-05-03
+
+## Connections
+- [[FEAT--MSP-PRECOMMIT-HOOK]]
+- [[FEAT--MSP-PREPUSH-HOOK]]
+

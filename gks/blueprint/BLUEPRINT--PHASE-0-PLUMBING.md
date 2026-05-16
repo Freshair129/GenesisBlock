@@ -35,9 +35,9 @@ Touched (signature additions, all with backward-compatible defaults):
 - `packages/msp/src/memory.ts` — thread the tuple into the GKS recall/retain calls (as opaque pass-through metadata for now).
 - `packages/msp/src/mcp/tools/*.ts` — each tool handler constructs a default `Subject` (`kind: 'mcp-client'`) and the appropriate `Action`.
 - `packages/msp/src/index.ts` — Express routes construct a default `Subject` (`kind: 'user'`, anonymous) + `RequestContext` from the request.
-- Atom frontmatter — `attributes:` becomes a recognised optional key; the validator already ignores unknown keys, so no validator change (per `ADR--BRING-YOUR-OWN-ATTRIBUTES`).
+- Atom frontmatter — `attributes:` becomes a recognised optional key; the validator already ignores unknown keys, so no validator change (per `[[ADR--BRING-YOUR-OWN-ATTRIBUTES]]`).
 
-Not touched: GKS. `Namespace` is unchanged (per `ADR--BRING-YOUR-OWN-ATTRIBUTES`).
+Not touched: GKS. `Namespace` is unchanged (per `[[ADR--BRING-YOUR-OWN-ATTRIBUTES]]`).
 
 ## Acceptance
 
@@ -49,9 +49,9 @@ Not touched: GKS. `Namespace` is unchanged (per `ADR--BRING-YOUR-OWN-ATTRIBUTES`
 
 ## Dependencies
 
-- `CONCEPT--SUBJECT-RESOURCE-ACTION-CONTEXT` — defines the 4-tuple types this phase creates.
-- `CONCEPT--ATTRIBUTE-BAG-MODEL` — defines `AttributeBag` and the frontmatter convention.
-- `ADR--BRING-YOUR-OWN-ATTRIBUTES` — confirms attributes live in atom metadata, GKS `Namespace` untouched.
+- `[[CONCEPT--SUBJECT-RESOURCE-ACTION-CONTEXT]]` — defines the 4-tuple types this phase creates.
+- `[[CONCEPT--ATTRIBUTE-BAG-MODEL]]` — defines `AttributeBag` and the frontmatter convention.
+- `[[ADR--BRING-YOUR-OWN-ATTRIBUTES]]` — confirms attributes live in atom metadata, GKS `Namespace` untouched.
 - No dependency on the PDP — that is Phase 1.
 
 ## Tasks
@@ -67,5 +67,9 @@ Not touched: GKS. `Namespace` is unchanged (per `ADR--BRING-YOUR-OWN-ATTRIBUTES`
 ## Source
 
 - `docs/msp/UNIVERSAL-CONTEXT-FRAMEWORK_spec.md` §11 Phase 0.
-- `CONCEPT--SUBJECT-RESOURCE-ACTION-CONTEXT`, `CONCEPT--ATTRIBUTE-BAG-MODEL` — the concepts plumbed.
-- `ADR--BRING-YOUR-OWN-ATTRIBUTES` — storage decision honoured here.
+- `[[CONCEPT--SUBJECT-RESOURCE-ACTION-CONTEXT]]`, `[[CONCEPT--ATTRIBUTE-BAG-MODEL]]` — the concepts plumbed.
+- `[[ADR--BRING-YOUR-OWN-ATTRIBUTES]]` — storage decision honoured here.
+
+## Connections
+- [[FRAMEWORK--UNIVERSAL-CONTEXT-FRAMEWORK]]
+

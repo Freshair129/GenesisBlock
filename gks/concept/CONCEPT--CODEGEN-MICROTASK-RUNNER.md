@@ -24,7 +24,7 @@ created_at: 2026-05-03T14:16:36.203+07:00
 
 ## Hypothesis
 
-A runner that loads a task YAML, calls the configured SLM, applies the codegen contract checks, runs acceptance tests, and retries (or escalates) per `ADR--CODEGEN-RETRY-POLICY` will close the gap from P4 to P5 mechanically. Same input → same output (modulo SLM nondeterminism), and every run is auditable.
+A runner that loads a task YAML, calls the configured SLM, applies the codegen contract checks, runs acceptance tests, and retries (or escalates) per `[[ADR--CODEGEN-RETRY-POLICY]]` will close the gap from P4 to P5 mechanically. Same input → same output (modulo SLM nondeterminism), and every run is auditable.
 
 ## Scope
 
@@ -43,4 +43,4 @@ Out:
 
 ## Source
 
-Implements `CONCEPT--CODEGEN-MICROTASK-CONTRACT`. Spec §5 + §11 (Tooling).
+Implements `[[CONCEPT--CODEGEN-MICROTASK-CONTRACT]]`. Spec §5 + §11 (Tooling).

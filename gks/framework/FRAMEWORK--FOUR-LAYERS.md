@@ -25,7 +25,7 @@ all four in parallel.
 
 | Layer | Question | Latency | Source of truth |
 |---|---|---|---|
-| **Atomic** | Canonical definition of `CONCEPT--X`? | < 1 ms | `gks/` curated markdown |
+| **Atomic** | Canonical definition of `[[CONCEPT--X]]`? | < 1 ms | `gks/` curated markdown |
 | **Vector** | Docs semantically near this query? | tens of ms | embedder + manifest |
 | **Episodic** | What did we discuss in this session? | tens of ms | session traces + summaries |
 | **Obsidian** | What does the external graph say? | tens-hundreds ms | external Obsidian vault |
@@ -57,3 +57,7 @@ Each layer has an interface — swap the implementation without touching
 - **Obsidian**: REST / MCP-stdio / mock
 - **Embedder**: Ollama / OpenAI / mock
 - **LLM** (consolidator): Anthropic
+
+## Connections
+- [[CONCEPT--MEMORY-STORE]]
+

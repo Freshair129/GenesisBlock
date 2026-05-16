@@ -27,13 +27,13 @@ This repo contains two distinct concepts that have been informally referred to a
 | Name | What it is | Where it lives |
 |---|---|---|
 | **Genesis Block** | A *composite knowledge unit* — a `GENESIS--<NAME>` manifest atom + the member atoms it aggregates (five-dimension core per EVA 4.0: Cognitive + Algo + Runbook + Concept + Params, plus optional Guard/Safety/Stack/Protocol/Mod/Spec). Specified by **this atom**. | `packages/{gks,msp}/gks/genesis/GENESIS--<NAME>.md` (post-v2.3) |
-| **Genesis Graph Backend** | An embedded graph **database backend** with Cypher v0, JSONL append log, bi-temporal time-travel. Pure storage; persists `manifest.json` + `genesis-block.jsonl`. Specified by `CONCEPT--GENESIS-GRAPH-BACKEND`. | `packages/gks/src/memory/graph/genesis-graph.ts` |
+| **Genesis Graph Backend** | An embedded graph **database backend** with Cypher v0, JSONL append log, bi-temporal time-travel. Pure storage; persists `manifest.json` + `genesis-block.jsonl`. Specified by `[[CONCEPT--GENESIS-GRAPH-BACKEND]]`. | `packages/gks/src/memory/graph/genesis-graph.ts` |
 
 These are orthogonal — a Genesis Block can be *stored in* a Genesis Graph Backend (or in `GraphStore`, or in `PgGraphBackend`), but the composite identity is independent of the storage layer. Where existing prose says "Genesis Block" in the v2.3 taxonomy sense (composite knowledge), read it as "Genesis Block".
 
 ## 2. The manifest atom
 
-A **Block Manifest** is a `GENESIS--<NAME>.md` atom under `packages/<pkg>/gks/genesis/` that declares the membership and authority of one Genesis Block. The taxonomy v2.3 prefix table (`CONCEPT--TAXONOMY-V2-3`) reserves `GENESIS--` for exactly this purpose. (Note: the prior placeholder prefix `FRAME--` was retired in favour of `GENESIS--` because `FRAME--` collided visually with `FRAMEWORK--` — see `ADR--TAXONOMY-V2-3-MIGRATION` §"Follow-up rename".)
+A **Block Manifest** is a `GENESIS--<NAME>.md` atom under `packages/<pkg>/gks/genesis/` that declares the membership and authority of one Genesis Block. The taxonomy v2.3 prefix table (`[[CONCEPT--TAXONOMY-V2-3]]`) reserves `GENESIS--` for exactly this purpose. (Note: the prior placeholder prefix `FRAME--` was retired in favour of `GENESIS--` because `FRAME--` collided visually with `FRAMEWORK--` — see `[[ADR--TAXONOMY-V2-3-MIGRATION]]` §"Follow-up rename".)
 
 ### 2.1 Frontmatter (validator-required, inherited from the atomic contract)
 
@@ -127,7 +127,7 @@ Each id listed under `members.*` must:
 
 ### 4.1 DACI
 
-`daci:` follows the standard four roles (Driver, Approver, Contributor, Informed). Values are atom ids (`MOD--`, `PERSONA--`, `ENTITY--`) — not free text. This aligns the Block Manifest with `FRAMEWORK--AUTHORITY-MATRIX`: write authority for any in-block atom flows through the manifest's `daci.approver` set.
+`daci:` follows the standard four roles (Driver, Approver, Contributor, Informed). Values are atom ids (`MOD--`, `PERSONA--`, `ENTITY--`) — not free text. This aligns the Block Manifest with `[[FRAMEWORK--AUTHORITY-MATRIX]]`: write authority for any in-block atom flows through the manifest's `daci.approver` set.
 
 ### 4.2 Status cascade
 
@@ -143,7 +143,7 @@ When a Genesis Block evolves materially (a member is swapped for a different ato
 
 The validator currently checks frontmatter shape via `required-fields` + the atomic contract. **Nothing in this SPEC's §2.2 / §3 is machine-checked yet.** The `members:` / `manifest_version:` / `daci:` fields are descriptive contract that authors and reviewers obey by convention.
 
-A follow-up `PROTO--GENESIS-BLOCK-MEMBERSHIP` will:
+A follow-up `[[PROTO--GENESIS-BLOCK-MEMBERSHIP]]` will:
 
 - Add `frame` Block Manifest to the validator's per-type required-fields list (require `members.core` with all 5 dimensions present)
 - Walk `members.*` and verify each id resolves and has the expected `type:`
@@ -154,7 +154,7 @@ That PROTO is **not** part of this PR (scope: SPEC only).
 
 ## 6. Worked example (mock — not authored)
 
-A future `GENESIS--IDENTITY-ENGINE` Genesis Block might look like:
+A future `[[GENESIS--IDENTITY-ENGINE]]` Genesis Block might look like:
 
 ```yaml
 ---
@@ -209,11 +209,11 @@ crosslinks:
 and points readers at the SOPs and protocols.)
 ```
 
-This atom is **not** created by this PR. Several of its members (`COGNITIVE--EGO-DEATH-PASSPORT`, `GUARD--IDENTITY-SCHEMA`, `STACK--MSP-NODE-RUNTIME`, etc.) do not exist yet and would need authoring first.
+This atom is **not** created by this PR. Several of its members (`[[COGNITIVE--EGO-DEATH-PASSPORT]]`, `[[GUARD--IDENTITY-SCHEMA]]`, `[[STACK--MSP-NODE-RUNTIME]]`, etc.) do not exist yet and would need authoring first.
 
 ## 7. What this SPEC does not cover
 
-- The runtime that *loads* a Genesis Block manifest and invokes its members in order — that's a future `BLUEPRINT--KNOWLEDGE-BLOCK-RUNTIME`.
+- The runtime that *loads* a Genesis Block manifest and invokes its members in order — that's a future `[[BLUEPRINT--KNOWLEDGE-BLOCK-RUNTIME]]`.
 - The contract for `COGNITIVE--`, `STACK--`, `SAFETY--` themselves (each is a separate frontmatter contract; one SPEC each, written when the first atom of that type is authored).
-- Resonance Index calculation (mentioned in the v1.2 draft of the user's specification) — deferred to a `SPEC--RESONANCE-INDEX` atom.
+- Resonance Index calculation (mentioned in the v1.2 draft of the user's specification) — deferred to a `[[SPEC--RESONANCE-INDEX]]` atom.
 - Storage-engine choice — whether a block's edges go into `GraphStore`, `PgGraphBackend`, or `GenesisGraphBackend` is orthogonal to the manifest shape. The manifest does not declare a backend.

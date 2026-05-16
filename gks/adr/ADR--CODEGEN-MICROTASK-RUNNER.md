@@ -44,10 +44,10 @@ The runner could be (a) a long-running daemon that watches `.brain/<ns>/tasks/` 
 2. Resolve `parent_blueprint` from `gks/blueprint/`; refuse if missing or non-stable.
 3. Build SLM prompt from: blueprint geography + task prompt + acceptance criteria.
 4. **Call Primary SLM**: Execute `python G:\qwen-cli\qwen.py --code --no-stream` with the assembled prompt.
-5. Apply `ADR--CODEGEN-POST-PROCESSING` strip pipeline.
-6. Apply `ADR--CODEGEN-FORBIDDEN-PATTERNS` checks.
+5. Apply `[[ADR--CODEGEN-POST-PROCESSING]]` strip pipeline.
+6. Apply `[[ADR--CODEGEN-FORBIDDEN-PATTERNS]]` checks.
 7. Write candidate to sandbox; run acceptance test.
-8. On fail, prepare retry prompt per `ADR--CODEGEN-RETRY-POLICY`; jump to 4.
+8. On fail, prepare retry prompt per `[[ADR--CODEGEN-RETRY-POLICY]]`; jump to 4.
 9. **Escalation (v0.4.0)**: After 3 retries, invoke **Gemini CLI Subagent** via `gemini -p "<escalation_prompt>" -y`.
     - If Gemini passes acceptance → exit 3.
     - If Gemini fails → exit 4 (requires human review / Opus layer).
@@ -72,4 +72,4 @@ The runner could be (a) a long-running daemon that watches `.brain/<ns>/tasks/` 
 
 ## Source
 
-`CONCEPT--CODEGEN-MICROTASK-RUNNER` + `msp_spec.md` §11.
+`[[CONCEPT--CODEGEN-MICROTASK-RUNNER]]` + `msp_spec.md` §11.

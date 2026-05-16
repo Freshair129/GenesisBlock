@@ -28,7 +28,7 @@ Records the upstreaming of Proposal #06 into `Freshair129/GksV3`. This update sy
 - GksV3 `docs/MSP_RELATIONSHIP.md` was ~6 weeks out of date.
 - It described a retired `/submit-memory` + inbound-queue workflow.
 - It conflated the Python MSP-v9.1 with the TypeScript MSP.
-- It lacked the "Agent-agnostic" framing established in `CONCEPT--AGENT-AGNOSTIC`.
+- It lacked the "Agent-agnostic" framing established in `[[CONCEPT--AGENT-AGNOSTIC]]`.
 
 ## What was done
 
@@ -50,5 +50,11 @@ Records the upstreaming of Proposal #06 into `Freshair129/GksV3`. This update sy
 
 ## Source
 
-- Handover Report: `WALKTHROUGH--KNOWLEDGE-ARCHITECTURE-STANDARDIZATION.md` (2026-05-11).
+- Handover Report: `[[WALKTHROUGH--KNOWLEDGE-ARCHITECTURE-STANDARDIZATION]].md` (2026-05-11).
 - GksV3 Commit: `22f1751`.
+
+## Connections
+- [[AUDIT--ARCH-DOC-CLEANUP]]
+- [[BLUEPRINT--INBOUND-TO-CANDIDATES-MIGRATION]]
+- [[ADR--AGENT-WRITE-BOUNDARIES]]
+

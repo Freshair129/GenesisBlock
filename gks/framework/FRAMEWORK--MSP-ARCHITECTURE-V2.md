@@ -19,11 +19,11 @@ created_at: 2026-05-03T23:55:07.217+07:00
 
 # FRAMEWORK — MSP architecture v2
 
-> Supersedes `FRAMEWORK--MSP-ARCHITECTURE` (v1). v1 framed MSP as a "gatekeeper" — a write-path enforcer for atoms going into `gks/`. That framing was correct for what M0–M6 implemented but **incomplete**: MSP's name (Memory & Soul Passport) implies a passport that travels with the agent, carrying memory + identity + retrieval logic. v1 captured the gatekeeping; v2 captures the passport.
+> Supersedes `[[FRAMEWORK--MSP-ARCHITECTURE]]` (v1). v1 framed MSP as a "gatekeeper" — a write-path enforcer for atoms going into `gks/`. That framing was correct for what M0–M6 implemented but **incomplete**: MSP's name (Memory & Soul Passport) implies a passport that travels with the agent, carrying memory + identity + retrieval logic. v1 captured the gatekeeping; v2 captures the passport.
 >
-> **Updated 2026-05-10 (post-Phase-A–D)**: MSP is now explicitly **agent-agnostic** (`CONCEPT--AGENT-AGNOSTIC`); the 2-layer mental model below is the MSP-internal split, sandwiched under any cognitive-layer agent (EVA / Hermes / openclaw / Claude Code / Gemini CLI / Antigravity / Cursor / custom). Storage now splits global (`~/.msp/`) vs workspace (`./.brain/msp/projects/<ns>/`) per `ADR--GLOBAL-VS-WORKSPACE`. MCP surface is **19 tools** (passport + projects + symbols + candidates).
+> **Updated 2026-05-10 (post-Phase-A–D)**: MSP is now explicitly **agent-agnostic** (`[[CONCEPT--AGENT-AGNOSTIC]]`); the 2-layer mental model below is the MSP-internal split, sandwiched under any cognitive-layer agent (EVA / Hermes / openclaw / Claude Code / Gemini CLI / Antigravity / Cursor / custom). Storage now splits global (`~/.msp/`) vs workspace (`./.brain/msp/projects/<ns>/`) per `[[ADR--GLOBAL-VS-WORKSPACE]]`. MCP surface is **19 tools** (passport + projects + symbols + candidates).
 >
-> **Updated 2026-05-13 (post-v2.3 taxonomy)**: This atom was renamed from `FRAME--MSP-ARCHITECTURE-V2` per `ADR--TAXONOMY-V2-3-MIGRATION`. The prefix `FRAME--` now means **Block Manifest** (runtime entry-point of a Genesis Block, contract: `SPEC--GENESIS-BLOCK-MANIFEST`); `FRAMEWORK--` carries the prior governance/architecture meaning. The body still uses "FRAME" historically — read as "FRAMEWORK" post-v2.3. Note: "Genesis Block" in this document, when referring to a composite knowledge unit (`CONCEPT--GENESIS-GRAPH-BACKEND` aside), means **Genesis Block** in v2.3 vocabulary. See `CONCEPT--TAXONOMY-V2-3` for the full prefix map.
+> **Updated 2026-05-13 (post-v2.3 taxonomy)**: This atom was renamed from `[[FRAME--MSP-ARCHITECTURE-V2]]` per `[[ADR--TAXONOMY-V2-3-MIGRATION]]`. The prefix `FRAME--` now means **Block Manifest** (runtime entry-point of a Genesis Block, contract: `[[SPEC--GENESIS-BLOCK-MANIFEST]]`); `FRAMEWORK--` carries the prior governance/architecture meaning. The body still uses "FRAME" historically — read as "FRAMEWORK" post-v2.3. Note: "Genesis Block" in this document, when referring to a composite knowledge unit (`[[CONCEPT--GENESIS-GRAPH-BACKEND]]` aside), means **Genesis Block** in v2.3 vocabulary. See `[[CONCEPT--TAXONOMY-V2-3]]` for the full prefix map.
 
 ## The three-layer ecosystem
 
@@ -119,7 +119,7 @@ Owns everything that **travels with the agent's identity**:
 | Symbol graph (parser + impact analysis) | `src/symbols/` | ✅ Symbol Graph PR-1..6 |
 | Candidates pipeline (writer + reviewer) | `src/memory/candidates/` | ✅ Inbound→Candidates Phase 1-3 |
 | MCP tool surface (19 tools) | `src/mcp/` | ✅ M6 + M7f + Phase B |
-| Meta Learning Loop (MLL) | `src/learning/` (proposed) | 🛠️ In-Design (FEAT--MLL) |
+| Meta Learning Loop (MLL) | `src/learning/` (proposed) | 🛠️ In-Design ([[FEAT--MLL]]) |
 | Hooks (pre-commit/pre-push) | `examples/hooks/` | ✅ M3a/M5a/M5b |
 
 ### GKS — knowledge
@@ -128,15 +128,15 @@ Markdown + wikilinks + index files. **No code at runtime** — Obsidian is the r
 
 ### Obsidian — runtime
 
-Provides file watching, text search, graph view, REST API, plugin ecosystem. MSP delegates to it via `ADR--MSP-OBSIDIAN-INTEGRATION`.
+Provides file watching, text search, graph view, REST API, plugin ecosystem. MSP delegates to it via `[[ADR--MSP-OBSIDIAN-INTEGRATION]]`.
 
 ### Smart Connections — embedding plugin
 
-Local embeddings inside Obsidian's process for the **human browse path**. The agent path uses GKS's `createNomicEmbedder()` directly (per `ADR--EMBEDDING-MODEL-PARITY`). Both surfaces lock to `nomic-embed-text-v1.5` so they share a vector space.
+Local embeddings inside Obsidian's process for the **human browse path**. The agent path uses GKS's `createNomicEmbedder()` directly (per `[[ADR--EMBEDDING-MODEL-PARITY]]`). Both surfaces lock to `nomic-embed-text-v1.5` so they share a vector space.
 
 ## Storage layout (post-Phase-B)
 
-Per `ADR--GLOBAL-VS-WORKSPACE`:
+Per `[[ADR--GLOBAL-VS-WORKSPACE]]`:
 
 | Concern | Location |
 |---|---|
@@ -144,7 +144,7 @@ Per `ADR--GLOBAL-VS-WORKSPACE`:
 | Sessions, episodic memory, candidates, vector/backlinks | `./.brain/msp/projects/<ns>/` (workspace) |
 | Per-project identity override (sparse) | `./.brain/msp/projects/<ns>/identity.override.json` |
 
-Resolution mirrors `git`'s global-vs-local config. `MSP_PROJECT` env or `.mspconfig` selects the project; default is `evaAI` until the named-project registry (`CONCEPT--NAMED-PROJECT-REGISTRY`) ships fully.
+Resolution mirrors `git`'s global-vs-local config. `MSP_PROJECT` env or `.mspconfig` selects the project; default is `evaAI` until the named-project registry (`[[CONCEPT--NAMED-PROJECT-REGISTRY]]`) ships fully.
 
 ## Data flow
 
@@ -186,10 +186,17 @@ These all stay in v2; they just live inside the passport, not as the passport it
 
 ## Migration
 
-- v1 atom (`FRAMEWORK--MSP-ARCHITECTURE`) marked `status: superseded` + `superseded_by: [FRAMEWORK--MSP-ARCHITECTURE-V2]`. Body unchanged for historical reference.
+- v1 atom (`[[FRAMEWORK--MSP-ARCHITECTURE]]`) marked `status: superseded` + `superseded_by: [[[FRAMEWORK--MSP-ARCHITECTURE-V2]]]`. Body unchanged for historical reference.
 - All atoms previously crosslinked to v1 stay valid; they reference v1 frame for context, and v2 supersedes it.
 - M7 implementation work (consolidator, retrieval, compressor, identity, Obsidian client) lands per the table above.
 
 ## Source
 
-User's M7-prep architectural clarification. Previous: `FRAMEWORK--MSP-ARCHITECTURE` (v1).
+User's M7-prep architectural clarification. Previous: `[[FRAMEWORK--MSP-ARCHITECTURE]]` (v1).
+
+## Connections
+- [[CONCEPT--OBSIDIAN-AS-RUNTIME]]
+- [[CONCEPT--EMBEDDING-STRATEGY]]
+- [[CONCEPT--AGENT-INTEGRATION-PATTERNS]]
+- [[ADR--SEMANTIC-SEARCH-VIA-SMART-CONNECTIONS]]
+

@@ -60,4 +60,20 @@ When loaded, this block instructs the agent to:
 4.  **Enforce** structural integrity of its own soul (Schema Guard).
 
 ## Governance
-Decisions regarding the Identity Engine are driven by `MOD--IDENTITY`. High-level architectural changes require approval from the `PERSONA--T3-ARCHITECT`.
+Decisions regarding the Identity Engine are driven by `[[MOD--IDENTITY]]`. High-level architectural changes require approval from the `[[PERSONA--T3-ARCHITECT]]`.
+
+## Connections
+- [[COGNITIVE--EGO-DEATH-PASSPORT]]
+- [[ALGO--IDENTITY-RESOLUTION]]
+- [[RUNBOOK--IDENTITY-MIGRATION]]
+- [[CONCEPT--IDENTITY-LAYER]]
+- [[PARAMS--IDENTITY-PROFILE-DEFAULTS]]
+- [[GUARD--IDENTITY-SCHEMA]]
+- [[GUARD--PASSPORT-NONNULL]]
+- [[PROTOCOL--IDENTITY-API]]
+- [[STACK--MSP-NODE-RUNTIME]]
+- [[SAFETY--PII-REDACTION]]
+- [[PERSONA--T2-IMPLEMENTER]]
+- [[ENTITY--MSP-USERS]]
+- [[SPEC--GENESIS-BLOCK-MANIFEST]]
+

@@ -27,14 +27,14 @@ created_at: 2026-05-14T05:01:00.000+07:00
 
 ## 1. What is a usage roll-up atom
 
-A **usage roll-up atom** is a derived artefact written by `packages/msp/src/usage/rollup-writer.ts` that aggregates one or more `USAGE--DAILY-*` daily atoms (per `SPEC--USAGE-ATOM`) into a single weekly or monthly summary. Roll-ups are:
+A **usage roll-up atom** is a derived artefact written by `packages/msp/src/usage/rollup-writer.ts` that aggregates one or more `[[USAGE--DAILY]]-*` daily atoms (per `[[SPEC--USAGE-ATOM]]`) into a single weekly or monthly summary. Roll-ups are:
 
 - **Derived** — every value is reconstructible by re-running the aggregator over the same date range.
 - **Opt-in** — never written automatically by `dispatch()`; only when explicitly requested via `msp-usage rollup-{week,month} --write`.
 - **Per-bucket-unique** — at most one weekly atom per ISO week, one monthly atom per calendar month.
 - **Best-effort immutable** — like daily atoms, the writer rewrites the JSON block in place if the file exists. No enforcement; humans editing roll-up atoms is unusual but supported.
 
-Where `USAGE--DAILY-*` is the **source of truth** for cost telemetry, roll-ups are the **readout layer** for week- and month-scale operator queries.
+Where `[[USAGE--DAILY]]-*` is the **source of truth** for cost telemetry, roll-ups are the **readout layer** for week- and month-scale operator queries.
 
 ## 2. Id pattern
 
@@ -43,7 +43,7 @@ USAGE--WEEKLY-<isoWeek>
 USAGE--MONTHLY-<YYYY-MM>
 ```
 
-This SPEC extends the bucket-namespace reserved in `SPEC--USAGE-ATOM` §2 (`HOURLY` / `DAILY` / `WEEKLY` / `MONTHLY`).
+This SPEC extends the bucket-namespace reserved in `[[SPEC--USAGE-ATOM]]` §2 (`HOURLY` / `DAILY` / `WEEKLY` / `MONTHLY`).
 
 - **`<isoWeek>`** uses ISO 8601 week date notation: `<YYYY>-W<WW>` where `WW` is the zero-padded ISO week number (`01`–`53`). ISO weeks start on Monday; week 01 is the week containing the first Thursday of the calendar year. Example: `2026-W19` = the week of 2026-05-04 to 2026-05-10.
 - **`<YYYY-MM>`** is the calendar month: 4-digit year, hyphen, zero-padded month. Example: `2026-05`.
@@ -61,8 +61,8 @@ The id is unique per (bucket, period) — exactly one atom per ISO week, one per
 
 | Field | Required | Value |
 |---|---|---|
-| `id` | yes | `USAGE--WEEKLY-<isoWeek>` or `USAGE--MONTHLY-<YYYY-MM>` |
-| `phase` | yes | `5` (runtime / code phase per `gks/concept/CONCEPT--TAXONOMY-V2-3.md`) |
+| `id` | yes | `[[USAGE--WEEKLY]]-<isoWeek>` or `[[USAGE--MONTHLY]]-<YYYY-MM>` |
+| `phase` | yes | `5` (runtime / code phase per `gks/concept/[[CONCEPT--TAXONOMY-V2-3]].md`) |
 | `type` | yes | `usage` (same type as the daily atom — distinction is in the id prefix) |
 | `status` | yes | `stable` |
 | `vault_id` | yes | `default` (or project-specific) |
@@ -84,7 +84,7 @@ The id is unique per (bucket, period) — exactly one atom per ISO week, one per
 
 ## 4. Body contract
 
-The body MUST contain a fenced `json` summary block delimited by HTML comment markers, identical to `SPEC--USAGE-ATOM` §4 but with a roll-up-specific payload shape:
+The body MUST contain a fenced `json` summary block delimited by HTML comment markers, identical to `[[SPEC--USAGE-ATOM]]` §4 but with a roll-up-specific payload shape:
 
 ```
 <!-- USAGE-SUMMARY-START -->
@@ -98,7 +98,7 @@ The body MUST contain a fenced `json` summary block delimited by HTML comment ma
   "calls_by_tier": { "T1": 120, "T2": 47, "T3": 3 },
   "days_covered": 5,
   "top_episodes": [
-    { "id": "EPISODE--AGENT-RUN-2026-05-07T14-22-00-000Z", "cost_usd": 0.045 }
+    { "id": "[[EPISODE--AGENT-RUN-2026-05-07T14-22-00-000Z]]", "cost_usd": 0.045 }
   ],
   "generated_at": "2026-05-14T08:00:00.000Z"
 }
@@ -126,7 +126,7 @@ Unlike daily atoms, roll-ups are **never** written by the dispatcher's runtime p
 <root>/gks/usage/USAGE--MONTHLY-<YYYY-MM>.md
 ```
 
-Roll-ups coexist with daily atoms in the same directory. The id-prefix distinguishes them; tooling that scans `USAGE--DAILY-*` will not accidentally pick up roll-ups, and vice versa.
+Roll-ups coexist with daily atoms in the same directory. The id-prefix distinguishes them; tooling that scans `[[USAGE--DAILY]]-*` will not accidentally pick up roll-ups, and vice versa.
 
 ## 7. Validation
 
@@ -136,6 +136,12 @@ Roll-ups coexist with daily atoms in the same directory. The id-prefix distingui
 
 - Hourly buckets (still reserved by name).
 - Cross-vault aggregation.
-- Garbage collection of stale roll-ups (deferred to a future `SPEC--USAGE-RETENTION`).
+- Garbage collection of stale roll-ups (deferred to a future `[[SPEC--USAGE-RETENTION]]`).
 - Per-vault budget alerts.
 - Streaming / push-based aggregation. The writer always re-reads dailies from disk.
+
+## Connections
+- [[CONCEPT--USAGE-ROLLUPS]]
+- [[CONCEPT--COST-TRACKING]]
+- [[ADR--AGENT-TIER-COST-POLICY]]
+

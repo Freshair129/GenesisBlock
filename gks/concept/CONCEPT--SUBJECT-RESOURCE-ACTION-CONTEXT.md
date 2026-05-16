@@ -60,8 +60,8 @@ In:
 
 Out:
 
-- The policy language itself — see `ADR--POLICY-AS-DATA-NOT-CODE`.
-- Domain-specific attribute taxonomies — see `CONCEPT--ATTRIBUTE-BAG-MODEL`.
+- The policy language itself — see `[[ADR--POLICY-AS-DATA-NOT-CODE]]`.
+- Domain-specific attribute taxonomies — see `[[CONCEPT--ATTRIBUTE-BAG-MODEL]]`.
 - Enforcement decisions (when to deny, when to redact) — see policy packs.
 
 ## Why these four and not three or five
@@ -89,10 +89,10 @@ A single `read` action would not capture this distinction.
 
 ## Out of scope
 
-- Schema for `AttributeBag` contents (see `CONCEPT--ATTRIBUTE-BAG-MODEL`).
-- PDP implementation (see `FEAT--POLICY-DECISION-POINT`).
-- Per-transport PEP wiring (see `ADR--TRANSPORT-AGNOSTIC-ENFORCEMENT`).
-- Step-up authentication (see `CONCEPT--STEP-UP-AUTH`).
+- Schema for `AttributeBag` contents (see `[[CONCEPT--ATTRIBUTE-BAG-MODEL]]`).
+- PDP implementation (see `[[FEAT--POLICY-DECISION-POINT]]`).
+- Per-transport PEP wiring (see `[[ADR--TRANSPORT-AGNOSTIC-ENFORCEMENT]]`).
+- Step-up authentication (see `[[CONCEPT--STEP-UP-AUTH]]`).
 
 ## Source
 
@@ -100,3 +100,7 @@ A single `read` action would not capture this distinction.
 - XACML core specification (OASIS) — established the four-tuple in 2003.
 - Cedar policy language (AWS, 2023) — modern ergonomic variant.
 - Open Policy Agent (OPA / Rego) — production-deployed PDP architecture.
+
+## Connections
+- [[FRAMEWORK--UNIVERSAL-CONTEXT-FRAMEWORK]]
+

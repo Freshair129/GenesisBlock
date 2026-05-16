@@ -24,7 +24,7 @@ created_at: 2026-05-14T18:37:54.914+07:00
 
 ## Context
 
-When the PDP (`CONCEPT--ABAC-POLICY-ENGINE`) goes live, every entry point starts consulting it. The question is the **default effect** when no rule explicitly matches a request:
+When the PDP (`[[CONCEPT--ABAC-POLICY-ENGINE]]`) goes live, every entry point starts consulting it. The question is the **default effect** when no rule explicitly matches a request:
 
 1. **`default-deny`** — secure by default; nothing is permitted unless a rule explicitly allows it.
 2. **`default-permit`** — permissive by default; only explicit deny rules block anything.
@@ -40,7 +40,7 @@ When the PDP (`CONCEPT--ABAC-POLICY-ENGINE`) goes live, every entry point starts
 - **Phase 3 onward — flip to `default-deny` per-endpoint.** One entry point at a time, starting with the lowest-risk surface (`runTask`), graduating each only when its shadow log is clean. The `expose-to-llm` action on `restricted`-tier Resources is an early target.
 - **End state — `default-deny` everywhere.** The permissive default is a rollout scaffold, not the destination.
 
-The posture is itself policy data (per `ADR--POLICY-AS-DATA-NOT-CODE`): a per-endpoint `default_effect` field, flippable without a deploy.
+The posture is itself policy data (per `[[ADR--POLICY-AS-DATA-NOT-CODE]]`): a per-endpoint `default_effect` field, flippable without a deploy.
 
 ## Consequences
 
@@ -68,5 +68,9 @@ Negative / accepted costs:
 ## Source
 
 - `docs/msp/UNIVERSAL-CONTEXT-FRAMEWORK_spec.md` §0 (D-7), §11 Phase 1 / Phase 3.
-- `CONCEPT--ABAC-POLICY-ENGINE` — shadow mode and the PDP this posture configures.
-- `ADR--POLICY-AS-DATA-NOT-CODE` — the posture is itself a policy-data field, flippable per endpoint.
+- `[[CONCEPT--ABAC-POLICY-ENGINE]]` — shadow mode and the PDP this posture configures.
+- `[[ADR--POLICY-AS-DATA-NOT-CODE]]` — the posture is itself a policy-data field, flippable per endpoint.
+
+## Connections
+- [[FRAMEWORK--UNIVERSAL-CONTEXT-FRAMEWORK]]
+

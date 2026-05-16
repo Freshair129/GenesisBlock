@@ -76,3 +76,9 @@ If no FEAT files were touched in the push range, the hook exits 0 silently (zero
 - Reverse traversal (find FEATs that depend on a touched ADR/CONCEPT) — `--all` flag in M6.
 - Running the validator on touched files — pre-commit already does that.
 - Pushing to multiple remotes — git calls the hook once per push regardless.
+
+## Connections
+- [[ADR--MSP-PREPUSH-HOOK]]
+- [[CONCEPT--MSP-PREPUSH-HOOK]]
+- [[FEAT--MSP-PRECOMMIT-HOOK]]
+

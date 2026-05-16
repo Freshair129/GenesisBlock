@@ -81,3 +81,8 @@ The list lives **in code, not in `atomic_contract.yaml`** for M2. Loading it fro
 ## Source
 
 `msp_spec.md` §4.3 (Forbidden Fields) — full list reproduced above.
+
+## Connections
+- [[CONCEPT--ATOMIC-WRITE-CONTRACT]]
+- [[FEAT--MSP-VALIDATOR]]
+

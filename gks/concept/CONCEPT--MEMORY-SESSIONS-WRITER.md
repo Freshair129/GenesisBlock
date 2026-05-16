@@ -20,7 +20,7 @@ created_at: 2026-05-03T14:16:38.088+07:00
 
 ## Problem
 
-`CONCEPT--MEMORY-SESSIONS` defines the on-disk JSONL shape, but nothing writes to it. Agents currently lose every turn at session end — no replay, no walkthrough handover, no audit trail.
+`[[CONCEPT--MEMORY-SESSIONS]]` defines the on-disk JSONL shape, but nothing writes to it. Agents currently lose every turn at session end — no replay, no walkthrough handover, no audit trail.
 
 ## Hypothesis
 
@@ -30,14 +30,18 @@ A small, append-only writer keyed by `episodicId` will close the loop. Agents ca
 
 In:
 - Open / append / close lifecycle on `.brain/msp/projects/<ns>/sessions/<episodicId>.jsonl`.
-- Schema validation per `CONCEPT--MEMORY-SESSIONS` (sessionId, episodicId, turnId, msgId, speakerId, content, optional learnId).
+- Schema validation per `[[CONCEPT--MEMORY-SESSIONS]]` (sessionId, episodicId, turnId, msgId, speakerId, content, optional learnId).
 - Single-writer-per-file lock (refuses concurrent open of the same episodic).
 
 Out:
 - Reading sessions (a separate reader; trivial — `readline` over the JSONL).
-- Episode summarisation (separate FEAT — `FEAT--MEMORY-EPISODIC-WRITER`).
+- Episode summarisation (separate FEAT — `[[FEAT--MEMORY-EPISODIC-WRITER]]`).
 - Vector embedding (orchestrator concern).
 
 ## Source
 
-Implements `CONCEPT--MEMORY-SESSIONS`. Spec §7.1.
+Implements `[[CONCEPT--MEMORY-SESSIONS]]`. Spec §7.1.
+
+## Connections
+- [[CONCEPT--MEMORY-SUBSYSTEM]]
+

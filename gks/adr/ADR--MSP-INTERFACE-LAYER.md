@@ -23,7 +23,7 @@ created_at: 2026-05-12T03:30:00.000+07:00
 
 ## Context
 
-`CONCEPT--AGENT-AGNOSTIC` declared MSP as a "passport-orchestrator that travels with any cognitive-layer client." Today MSP already exposes one inbound surface — the MCP server at `src/mcp/` — and one outbound surface — the GKS wrapper at `src/memory/`. The remaining concerns (codegen, validator, identity, session handling) live as flat siblings in `src/`.
+`[[CONCEPT--AGENT-AGNOSTIC]]` declared MSP as a "passport-orchestrator that travels with any cognitive-layer client." Today MSP already exposes one inbound surface — the MCP server at `src/mcp/` — and one outbound surface — the GKS wrapper at `src/memory/`. The remaining concerns (codegen, validator, identity, session handling) live as flat siblings in `src/`.
 
 As MSP starts being adopted as a Gateway by external systems (OpenClaw-style chatbots receiving Slack/Discord webhooks, REST APIs for web UIs, agent-to-agent protocols), we face a design decision: **should new interfaces (Slack, Discord, REST) live inside MSP, beside it as separate services, or somewhere else?**
 
@@ -73,7 +73,7 @@ JavaScript ecosystem reserves `adapters/` for many concepts (test adapters, db a
 
 ### Migration shape (deferred to BLUEPRINT)
 
-This ADR fixes the **shape**. Concrete file moves (e.g. `src/mcp/` → `src/interfaces/mcp/`) and the order of refactor steps belong in a follow-up `BLUEPRINT--MSP-INTERFACE-LAYER` when ready to execute. Until that blueprint lands, MSP's current flat layout stays — this ADR is `status: proposed`.
+This ADR fixes the **shape**. Concrete file moves (e.g. `src/mcp/` → `src/interfaces/mcp/`) and the order of refactor steps belong in a follow-up `[[BLUEPRINT--MSP-INTERFACE-LAYER]]` when ready to execute. Until that blueprint lands, MSP's current flat layout stays — this ADR is `status: proposed`.
 
 ### Anti-corruption boundary at `clients/`
 
@@ -137,14 +137,14 @@ These responsibilities live in `interfaces/`, not orchestrator:
 
 ## What this ADR does NOT change
 
-- **MSP↔GKS boundary** (`ADR--MONOREPO-STRUCTURE`, `FRAMEWORK--MSP-ARCHITECTURE-V2`) — GKS stays as outbound dependency; this ADR just formalizes where the wrapper lives (`clients/gks-client.ts`).
+- **MSP↔GKS boundary** (`[[ADR--MONOREPO-STRUCTURE]]`, `[[FRAMEWORK--MSP-ARCHITECTURE-V2]]`) — GKS stays as outbound dependency; this ADR just formalizes where the wrapper lives (`clients/gks-client.ts`).
 - **Public API surface** — MCP tool names, CLI commands, atom schemas — all unchanged. This is an internal refactor.
-- **Candidates workflow** — `msp_candidate` MCP tool → `.brain/.../candidates/` → human PR review unchanged (per `ADR--AGENT-WRITE-BOUNDARIES`). The tool simply moves from `src/mcp/tools/candidate.ts` to `src/interfaces/mcp/tools/candidate.ts`.
+- **Candidates workflow** — `msp_candidate` MCP tool → `.brain/.../candidates/` → human PR review unchanged (per `[[ADR--AGENT-WRITE-BOUNDARIES]]`). The tool simply moves from `src/mcp/tools/candidate.ts` to `src/interfaces/mcp/tools/candidate.ts`.
 
 ## Status note
 
 **Proposed, not implemented.** Implementation requires:
-1. A `BLUEPRINT--MSP-INTERFACE-LAYER` specifying exact file moves + the order of refactor steps
+1. A `[[BLUEPRINT--MSP-INTERFACE-LAYER]]` specifying exact file moves + the order of refactor steps
 2. ESLint config update (`no-restricted-imports` rule) to enforce the dependency direction
 3. CI guard that fails if `orchestrator/**` imports from `interfaces/**` or `@freshair129/gks` directly
 4. Migration PR (atomic — should be one PR per Smart Proxy pattern goal)
@@ -156,7 +156,7 @@ This ADR is filed as `proposed` to capture the decision; flip to `accepted` once
 - Original analysis: discussion comparing OpenClaw / Hermes / GKS+MSP roles (2026-05-12)
 - Hexagonal Architecture — Alistair Cockburn (2005), Domain-Driven Design — Eric Evans (2003)
 - Prior art: NestJS module pattern, Spring's `@Controller` / `@Service` separation, Go's `cmd/` + `internal/` layout
-- `FRAMEWORK--MSP-ARCHITECTURE-V2` — establishes that MSP is the orchestrator above GKS
-- `CONCEPT--AGENT-AGNOSTIC` — establishes that MSP must not assume any specific cognitive-layer client
-- `ADR--MSP-MCP-SERVER` — establishes the first concrete interface (MCP server)
-- `ADR--MONOREPO-STRUCTURE` — establishes the package boundary between MSP and GKS
+- `[[FRAMEWORK--MSP-ARCHITECTURE-V2]]` — establishes that MSP is the orchestrator above GKS
+- `[[CONCEPT--AGENT-AGNOSTIC]]` — establishes that MSP must not assume any specific cognitive-layer client
+- `[[ADR--MSP-MCP-SERVER]]` — establishes the first concrete interface (MCP server)
+- `[[ADR--MONOREPO-STRUCTURE]]` — establishes the package boundary between MSP and GKS

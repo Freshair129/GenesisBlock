@@ -21,7 +21,7 @@ created_at: 2026-05-12T05:00:00.000+07:00
 
 ## Context
 
-ในการขยายระบบ Symbol Graph ของ MSP ให้รองรับภาษา Python (ตาม `FEAT--SYMBOLS-MULTI-LANG`) เราจำเป็นต้องเลือกวิธีสแกนรหัสต้นฉบับเพื่อสกัดสัญลักษณ์ (Classes, Functions, Methods, Imports) และความสัมพันธ์ (Calls)
+ในการขยายระบบ Symbol Graph ของ MSP ให้รองรับภาษา Python (ตาม `[[FEAT--SYMBOLS-MULTI-LANG]]`) เราจำเป็นต้องเลือกวิธีสแกนรหัสต้นฉบับเพื่อสกัดสัญลักษณ์ (Classes, Functions, Methods, Imports) และความสัมพันธ์ (Calls)
 
 ตัวเลือกที่พิจารณา:
 1. **Python `ast` module (via spawned process):** ใช้ตัวสแกนมาตรฐานของ Python เอง
@@ -52,3 +52,8 @@ created_at: 2026-05-12T05:00:00.000+07:00
 
 - **Positive:** ประสิทธิภาพสูง, โค้ด Parser มีโครงสร้างชัดเจน, รองรับความซับซ้อนของภาษาได้ดี
 - **Negative:** เพิ่ม Native dependency (`node-gyp` หรือ prebuilt binaries) ซึ่งอาจมีปัญหาในบางสภาพแวดล้อม แต่ยอมรับได้เนื่องจาก MSP รันใน Node.js 20+ เป็นหลัก
+
+## Connections
+- [[FRAMEWORK--SYMBOL-GRAPH]]
+- [[CONCEPT--PARSER-CHOICE]]
+

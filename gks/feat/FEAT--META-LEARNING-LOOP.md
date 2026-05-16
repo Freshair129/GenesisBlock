@@ -41,6 +41,6 @@ The **Meta Learning Loop (MLL)** is the continuous self-improvement mechanism of
 
 When the MLL identifies a new skill:
 1.  The agent completes the task.
-2.  MLL analyzes the log and generates a `SKILL--NEW-PATTERN.md` in the `candidates/` folder.
+2.  MLL analyzes the log and generates a `[[SKILL--NEW-PATTERN]].md` in the `candidates/` folder.
 3.  The agent notifies the user: *"I've learned a new skill for [Task X]. Would you like to review and approve it for future use?"*
 4.  User approves the PR, and the skill moves to `gks/governance/skills/`.

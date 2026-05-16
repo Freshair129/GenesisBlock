@@ -18,11 +18,11 @@ crosslinks: {"references":["CONCEPT--PROTO-PATTERN","FRAMEWORK--AUTHORITY-MATRIX
 created_at: 2026-05-05T16:28:00.000+07:00
 ---
 
-# CONCEPT — PROTO--AUTHORITY-ENFORCEMENT
+# CONCEPT — [[PROTO--AUTHORITY-ENFORCEMENT]]
 
 ## Problem
 
-`FRAMEWORK--AUTHORITY-MATRIX` defines tiers (T1/T2/T3) with allowed write paths:
+`[[FRAMEWORK--AUTHORITY-MATRIX]]` defines tiers (T1/T2/T3) with allowed write paths:
 
 - T1: `inbound/` only
 - T2: `gks/concept/`, `gks/feat/` + inbound
@@ -32,7 +32,7 @@ Today nothing checks the git author's tier when reviewing changed paths. A T1 ag
 
 ## Rule
 
-For each PR, identify author tier (from a config map: github username → tier). For each path touched, check the tier's write-allow list per `FRAMEWORK--AUTHORITY-MATRIX`.
+For each PR, identify author tier (from a config map: github username → tier). For each path touched, check the tier's write-allow list per `[[FRAMEWORK--AUTHORITY-MATRIX]]`.
 
 Promotion path: T1 atoms always go through inbound + human review. Direct commits to `gks/<protected>/` from a T1 author → CI fail.
 
@@ -72,4 +72,8 @@ Falls back to `T1` (most restrictive) when author not in the map.
 
 ## Source
 
-`FRAMEWORK--AUTHORITY-MATRIX`, `ADR--HUMAN-REVIEW-GATES`, `CONCEPT--MSP-ROADMAP` §2 M8e.
+`[[FRAMEWORK--AUTHORITY-MATRIX]]`, `[[ADR--HUMAN-REVIEW-GATES]]`, `[[CONCEPT--MSP-ROADMAP]]` §2 M8e.
+
+## Connections
+- [[CONCEPT--PROTO-PATTERN]]
+

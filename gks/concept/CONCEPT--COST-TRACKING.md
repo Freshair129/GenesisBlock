@@ -26,10 +26,10 @@ created_at: 2026-05-14T03:44:00.000+07:00
 
 ## Problem
 
-`DispatchResult.cost_usd` is part of the dispatcher's public shape (per `BLUEPRINT--AGENT-DISPATCHER`) but nothing populates it. Tier prices differ by **two orders of magnitude** (T1 is free, T2 is sub-cent, T3 is dollars per million tokens). Without per-call cost estimation, three things break:
+`DispatchResult.cost_usd` is part of the dispatcher's public shape (per `[[BLUEPRINT--AGENT-DISPATCHER]]`) but nothing populates it. Tier prices differ by **two orders of magnitude** (T1 is free, T2 is sub-cent, T3 is dollars per million tokens). Without per-call cost estimation, three things break:
 
 1. **Budget visibility** — operators cannot answer "what did the last 24h of dispatch cost me?"
-2. **Tier-policy enforcement audit** — `ADR--AGENT-TIER-COST-POLICY` caps T3 to `critical` severity. If the cap leaks, no telemetry surfaces the waste.
+2. **Tier-policy enforcement audit** — `[[ADR--AGENT-TIER-COST-POLICY]]` caps T3 to `critical` severity. If the cap leaks, no telemetry surfaces the waste.
 3. **Meta-Learning signal** — the dispatcher's reverse-path execution traces are weaker when cost is unrecorded; future routing tweaks have no quantitative baseline to beat.
 
 ## Approach
@@ -44,19 +44,23 @@ The values are **directionally accurate, not actuarial**. The goal is "T3 is rou
 
 ### Layer 2 — USAGE-bucket atom (`usage-recorder.ts`)
 
-After each dispatch, append the call's tier + cost to today's `USAGE--DAILY-<isoDate>` atom. Bucket atoms accumulate over a day; first call of the day creates the file with proper frontmatter, subsequent calls update the body's JSON summary block.
+After each dispatch, append the call's tier + cost to today's `[[USAGE--DAILY]]-<isoDate>` atom. Bucket atoms accumulate over a day; first call of the day creates the file with proper frontmatter, subsequent calls update the body's JSON summary block.
 
 This mirrors the episode-recorder pattern (one atom per logical unit, written best-effort, never fails dispatch) but trades per-call granularity for daily aggregation — readers want "what did today cost?" not "list every call".
 
 ## What this is NOT
 
 - **Not billing.** These figures are pre-tax, pre-discount estimates from public pricing pages. They will diverge from the actual invoice.
-- **Not a budget enforcer.** Tier caps and escalation are the budget mechanism (see `ADR--AGENT-TIER-COST-POLICY`). Cost tracking is observation, not control.
+- **Not a budget enforcer.** Tier caps and escalation are the budget mechanism (see `[[ADR--AGENT-TIER-COST-POLICY]]`). Cost tracking is observation, not control.
 - **Not a tokenizer.** We estimate tokens from char-count; tier-specific tokenizers (tiktoken etc.) would be more accurate but introduce native deps and per-tier divergence.
 
 ## Related
 
-- `SPEC--USAGE-ATOM` — frontmatter contract for the daily bucket atom
-- `BLUEPRINT--COST-TRACKING` — implementation plan
-- `SPEC--EPISODE-ATOM` — sibling runtime-atom type; USAGE is its daily-aggregate complement
-- `ADR--AGENT-TIER-COST-POLICY` — the policy this concept makes observable
+- `[[SPEC--USAGE-ATOM]]` — frontmatter contract for the daily bucket atom
+- `[[BLUEPRINT--COST-TRACKING]]` — implementation plan
+- `[[SPEC--EPISODE-ATOM]]` — sibling runtime-atom type; USAGE is its daily-aggregate complement
+- `[[ADR--AGENT-TIER-COST-POLICY]]` — the policy this concept makes observable
+
+## Connections
+- [[CONCEPT--AGENT-TIER-ROUTING]]
+

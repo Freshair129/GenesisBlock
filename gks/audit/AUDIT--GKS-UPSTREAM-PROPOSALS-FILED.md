@@ -69,7 +69,7 @@ When upstream lands one of these:
 4. Write `AUDIT--<topic>-UPSTREAMED` atom recording the migration
 5. Move proposal file to `upstream/gks-proposals/merged/` for archival
 
-Most concretely — when **#28 (publish 3.6.0)** lands, `ADR--EMBEDDING-MODEL-PARITY` can drop its "Status note" and the Knowledge Browser (`src/index.ts`, `src/memory.ts`) currently excluded from `tsconfig*.json` can be re-enabled.
+Most concretely — when **#28 (publish 3.6.0)** lands, `[[ADR--EMBEDDING-MODEL-PARITY]]` can drop its "Status note" and the Knowledge Browser (`src/index.ts`, `src/memory.ts`) currently excluded from `tsconfig*.json` can be re-enabled.
 
 ## Counts
 
@@ -82,3 +82,7 @@ Most concretely — when **#28 (publish 3.6.0)** lands, `ADR--EMBEDDING-MODEL-PA
 ## Source
 
 User direction "Submit new issue แล้ว" (2026-05-07) confirming all 5 GitHub submissions completed. AUDIT written autonomously to close out HANDOFF P2.
+
+## Connections
+- [[AUDIT--TWO-REPO-VALIDATION]]
+

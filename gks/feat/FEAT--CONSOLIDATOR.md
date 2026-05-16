@@ -60,7 +60,7 @@ interface Episode {
 
 - [ ] `consolidate(opts)` reads session turns from `.brain/msp/projects/<ns>/sessions/<sessionId>.jsonl` via existing reader
 - [ ] Returns `Episode[]` — does NOT write to episodic store (caller decides persistence)
-- [ ] **Tier-1 deterministic** scoring: 7 features per `ADR--CONSOLIDATOR-HYBRID-SCORING` (decision_markers, code_artifact_mentions, numeric_specificity, length_normalised, topic_continuity, dead_end_markers, greeting_filler)
+- [ ] **Tier-1 deterministic** scoring: 7 features per `[[ADR--CONSOLIDATOR-HYBRID-SCORING]]` (decision_markers, code_artifact_mentions, numeric_specificity, length_normalised, topic_continuity, dead_end_markers, greeting_filler)
 - [ ] **Tier-1 verdicts**: `< low_thresh` → drop; `> high_thresh` → keep; otherwise → tier-2
 - [ ] **Tier-2 LLM**: only invoked for borderline; bounded by `maxLlmCallsPerSession` + `llmCallTimeoutMs`; timeout / parse-error / no-provider → default to keep
 - [ ] **Boundary detection**: chunks turns into contiguous episodes via topic-continuity threshold
@@ -87,3 +87,9 @@ interface Episode {
 - Cross-session episode dedup → M7c
 - `valid_until` decay / forgetting → M9
 - Threshold tuning (`PARAM--` atom) → M9
+
+## Connections
+- [[CONCEPT--CONSOLIDATOR]]
+- [[FEAT--MEMORY-EPISODIC-WRITER]]
+- [[FEAT--MEMORY-SESSIONS-WRITER]]
+

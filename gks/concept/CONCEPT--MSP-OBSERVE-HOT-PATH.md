@@ -19,7 +19,7 @@ created_at: 2026-05-09T07:00:00.000+07:00
 
 # CONCEPT — `msp_observe` hot-path extraction
 
-> **Status: draft (aspirational).** Not implemented. Cherry-picked from `SPEC--ARCHITECTURE-V2.md` §4.2 during the 2026-05-09 architecture-doc cleanup. Belongs in roadmap, not current scope.
+> **Status: draft (aspirational).** Not implemented. Cherry-picked from `[[SPEC--ARCHITECTURE-V2]].md` §4.2 during the 2026-05-09 architecture-doc cleanup. Belongs in roadmap, not current scope.
 
 ## Problem
 
@@ -54,7 +54,7 @@ It's the difference between "AI with good memory" (mem0 promise) and "structured
 
 ## Constraints
 
-- **Goes through `msp_candidate`, not direct write.** Per `ADR--AGENT-WRITE-BOUNDARIES`, agents never touch `gks/<type>/` directly. `msp_observe` writes to `.brain/msp/projects/<ns>/candidates/`; promotion stays a human PR action.
+- **Goes through `msp_candidate`, not direct write.** Per `[[ADR--AGENT-WRITE-BOUNDARIES]]`, agents never touch `gks/<type>/` directly. `msp_observe` writes to `.brain/msp/projects/<ns>/candidates/`; promotion stays a human PR action.
 - **Reconciliation respects the contradiction policy** in `CLAUDE.md` — supersession is reciprocal (`supersedes` + `superseded_by`).
 - **LLM extraction step is opt-in.** When no extractor configured, fall back to rule-based filtering only.
 - **Cost budget** — every `msp_observe` call records token spend in the audit log; agents can pass `max_cost_usd` hint.
@@ -69,7 +69,7 @@ It's the difference between "AI with good memory" (mem0 promise) and "structured
 
 **Positive**
 - Lowers the discipline cost of using MSP — works for "normal" agents, not just diligent ones.
-- Composes naturally with `CONCEPT--CONSOLIDATOR` (which today operates on episodic memory; `msp_observe` operates on raw turns one layer up).
+- Composes naturally with `[[CONCEPT--CONSOLIDATOR]]` (which today operates on episodic memory; `msp_observe` operates on raw turns one layer up).
 
 **Negative**
 - LLM call per turn is non-trivial cost; needs per-project budget guard.
@@ -78,4 +78,9 @@ It's the difference between "AI with good memory" (mem0 promise) and "structured
 
 ## Source
 
-`SPEC--ARCHITECTURE-V2.md` §4.2 (drafted 2026-05-07, cherry-picked here on 2026-05-09 before the original was deleted). Reference patterns: mem0 (extraction + reconciliation), langmem (procedural typology). See `AUDIT--ARCH-DOC-CLEANUP`.
+`[[SPEC--ARCHITECTURE-V2]].md` §4.2 (drafted 2026-05-07, cherry-picked here on 2026-05-09 before the original was deleted). Reference patterns: mem0 (extraction + reconciliation), langmem (procedural typology). See `[[AUDIT--ARCH-DOC-CLEANUP]]`.
+
+## Connections
+- [[FRAMEWORK--MSP-ARCHITECTURE-V2]]
+- [[CONCEPT--AGENT-AGNOSTIC]]
+

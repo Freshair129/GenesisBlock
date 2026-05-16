@@ -50,7 +50,7 @@ PROTO predicates that fail with `severity: error` cause `--all` to exit 1. `seve
 - [ ] **`status: draft` PROTOs** are loaded but their results don't fail CI (logged as info)
 - [ ] **`status: stable` PROTOs** with `severity: error` violations cause exit 1
 - [ ] **`status: stable` PROTOs** with `severity: warning` violations log a warning, exit 0
-- [ ] **`PROTO--SAMPLE-RULE`** (a trivial demo) ships and is `status: draft` — proves loader works end-to-end without fail-blocking CI
+- [ ] **`[[PROTO--SAMPLE-RULE]]`** (a trivial demo) ships and is `status: draft` — proves loader works end-to-end without fail-blocking CI
 - [ ] **CLI summary** shows `PROTOs: P passed, Q failed`
 - [ ] Test target ~470 → ~485 (+15)
 
@@ -62,7 +62,7 @@ PROTO predicates that fail with `severity: error` cause `--all` to exit 1. `seve
 | Loader | `src/validator/proto/loader.ts` |
 | Types | `src/validator/proto/types.ts` (Predicate, PredicateResult, Severity) |
 | Sample | `src/validator/proto/sample.ts` (trivial demo) |
-| Atom | `gks/proto/PROTO--SAMPLE-RULE.md` (status: draft) |
+| Atom | `gks/proto/[[PROTO--SAMPLE-RULE]].md` (status: draft) |
 | Tests | `test/validator/proto/{loader,sample}.test.ts` |
 
 ## Out of scope
@@ -71,3 +71,9 @@ PROTO predicates that fail with `severity: error` cause `--all` to exit 1. `seve
 - PROTO discovery via Obsidian — filesystem scan only
 - Async predicates — predicates are sync pure functions for M8a (async + I/O can be added later)
 - PROTO sandboxing — same Node process, no isolation
+
+## Connections
+- [[ADR--PROTO-ATOM-TYPE]]
+- [[CONCEPT--PROTO-PATTERN]]
+- [[FEAT--MSP-VALIDATOR]]
+

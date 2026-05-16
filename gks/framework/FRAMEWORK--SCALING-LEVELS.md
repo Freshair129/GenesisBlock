@@ -43,8 +43,12 @@ When in doubt, escalate. Downgrading from L3→L2 mid-PR loses an audit trail; u
 
 - **L2/L3 PRs without the required atoms are blocked at `gks verify-flow`** — chain integrity refuses exit-0 if a required atom is missing or `draft`.
 - **L1 changes still require `MSP-WKT-`** so the next agent picks up context.
-- **Hotfix tag overrides level requirements** during the 48h window (see `ADR--HOTFIX-ESCAPE-HATCH`).
+- **Hotfix tag overrides level requirements** during the 48h window (see `[[ADR--HOTFIX-ESCAPE-HATCH]]`).
 
 ## Source
 
 `msp_spec.md` §6.1 (Scaling Level → Required Artifacts).
+
+## Connections
+- [[FRAMEWORK--PHASE-GOVERNANCE]]
+

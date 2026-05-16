@@ -98,4 +98,9 @@ If real-world Windows adoption hits problems past M9f, swap-in is straightforwar
 
 ## Source
 
-`CONCEPT--MSP-ROADMAP` §3 M9f, user direction (all-M planning), existing `src/memory/sessions/lock.ts` audit.
+`[[CONCEPT--MSP-ROADMAP]]` §3 M9f, user direction (all-M planning), existing `src/memory/sessions/lock.ts` audit.
+
+## Connections
+- [[FEAT--MEMORY-SESSIONS-WRITER]]
+- [[CONCEPT--MEMORY-SESSIONS]]
+

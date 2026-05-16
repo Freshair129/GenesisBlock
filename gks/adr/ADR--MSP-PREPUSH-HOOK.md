@@ -61,7 +61,7 @@ exit $FAIL
 
 ### Bypass
 
-Standard `git push --no-verify`. We do not invent a custom flag — same precedent as `ADR--MSP-PRECOMMIT-HOOK`.
+Standard `git push --no-verify`. We do not invent a custom flag — same precedent as `[[ADR--MSP-PRECOMMIT-HOOK]]`.
 
 ### Install
 
@@ -86,4 +86,8 @@ Same shape as `pre-commit-validator.sh`: a script under `examples/hooks/pre-push
 
 ## Source
 
-`CONCEPT--MSP-PREPUSH-HOOK` + git pre-push hook docs.
+`[[CONCEPT--MSP-PREPUSH-HOOK]]` + git pre-push hook docs.
+
+## Connections
+- [[FEAT--MSP-VALIDATOR]]
+

@@ -23,7 +23,7 @@ created_at: 2026-05-07T03:55:00.000+07:00
 
 ## Scope
 
-Records the 2026-05-07 self-publish of `@freshair129/gks@3.6.0` to npm registry, closing upstream proposal #5 / `Freshair129/GksV3#28`. Unblocks MSP's Knowledge Browser code path and removes the "aspirational" caveat from `ADR--EMBEDDING-MODEL-PARITY`.
+Records the 2026-05-07 self-publish of `@freshair129/gks@3.6.0` to npm registry, closing upstream proposal #5 / `Freshair129/GksV3#28`. Unblocks MSP's Knowledge Browser code path and removes the "aspirational" caveat from `[[ADR--EMBEDDING-MODEL-PARITY]]`.
 
 ## Pre-state (problem)
 
@@ -34,7 +34,7 @@ Records the 2026-05-07 self-publish of `@freshair129/gks@3.6.0` to npm registry,
 | MSP `package.json` pin | `^3.5.6` |
 | MSP `node_modules` installed | 3.5.6 |
 | MSP Knowledge Browser (`src/index.ts`, `src/memory.ts`) | excluded from `tsconfig*.json` build because `import { retain, recall }` could not resolve in 3.5.6 |
-| `ADR--EMBEDDING-MODEL-PARITY` | had a "Status note" marking nomic claims as **aspirational pending GKS 3.6.0 publish** |
+| `[[ADR--EMBEDDING-MODEL-PARITY]]` | had a "Status note" marking nomic claims as **aspirational pending GKS 3.6.0 publish** |
 
 ## What was done
 
@@ -100,7 +100,7 @@ After 3.6.0 install + un-exclude:
   - **Moved file to** `upstream/gks-proposals/merged/05-publish-3.6.0.md` (per workflow in `upstream/gks-proposals/README.md`)
 - `upstream/gks-proposals/README.md`:
   - Table row 05 — status badge 🔵 → 🟢, path updated to `merged/`, blocking note removed
-- `gks/adr/ADR--EMBEDDING-MODEL-PARITY.md`:
+- `gks/adr/[[ADR--EMBEDDING-MODEL-PARITY]].md`:
   - "Status note (validated 2026-05-04)" → "Status (updated 2026-05-07): ✅ GKS 3.6.0 published"
   - The "Fallback while GKS 3.6.0 is unpublished" section is kept for traceability but is now historical
 - GitHub issue `Freshair129/GksV3#28` — commented + closed with reference to this audit
@@ -142,3 +142,8 @@ The other 4 proposals (`#29`–`#32`) require either upstream code review (diffe
 ## Source
 
 User direction "3" (= "do both Phase A publish 3.6.0 AND Phase B setup workspace") on 2026-05-07. Phase A executed in this audit; Phase B (workspace) is separate work.
+
+## Connections
+- [[AUDIT--GKS-UPSTREAM-PROPOSALS-FILED]]
+- [[AUDIT--TWO-REPO-VALIDATION]]
+

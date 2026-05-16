@@ -28,7 +28,7 @@ created_at: 2026-05-03T16:24:58.170+07:00
 
 ## Scope
 
-Closes FEAT--SLM-OLLAMA-CLIENT. Closes P0 item #1 (real SLM) from the M3 production-readiness backlog.
+Closes [[FEAT--SLM-OLLAMA-CLIENT]]. Closes P0 item #1 (real SLM) from the M3 production-readiness backlog.
 
 ## Acceptance criteria from FEAT
 
@@ -90,3 +90,9 @@ await runTask(taskPath, { slmClient: createOllamaClient({ model: 'qwen2.5-coder:
 - Implemented by: @claude-opus-4-7
 - Verified by: 14/14 unit tests + manual smoke (factory + mock path)
 - Date: 2026-05-03
+
+## Connections
+- [[BLUEPRINT--SLM-OLLAMA-CLIENT]]
+- [[ADR--SLM-OLLAMA-CLIENT]]
+- [[FEAT--CODEGEN-MICROTASK-RUNNER]]
+

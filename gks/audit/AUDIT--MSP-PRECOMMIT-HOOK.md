@@ -27,7 +27,7 @@ created_at: 2026-05-03T14:42:57.238+07:00
 
 ## Scope
 
-Closes the M3a item from `AUDIT--MSP-VALIDATOR` and `AUDIT--KNOWLEDGE-BASE`. Walks `FEAT--MSP-PRECOMMIT-HOOK` end to end via the doc-to-code loop:
+Closes the M3a item from `[[AUDIT--MSP-VALIDATOR]]` and `[[AUDIT--KNOWLEDGE-BASE]]`. Walks `[[FEAT--MSP-PRECOMMIT-HOOK]]` end to end via the doc-to-code loop:
 
 1. Scaffolded 4 atoms via `gks new-feature msp-precommit-hook` (CONCEPT/ADR/FEAT/BLUEPRINT)
 2. Filled and promoted them through inbound queue
@@ -35,7 +35,7 @@ Closes the M3a item from `AUDIT--MSP-VALIDATOR` and `AUDIT--KNOWLEDGE-BASE`. Wal
 4. Wrote vitest spawning real bash to assert behaviour
 5. Installed the hook on this very repo and dogfooded it (this commit's own validator runs)
 
-## Acceptance criteria from FEAT--MSP-PRECOMMIT-HOOK
+## Acceptance criteria from [[FEAT--MSP-PRECOMMIT-HOOK]]
 
 | # | Criterion | Result |
 |---|---|---|
@@ -71,7 +71,7 @@ npx gks validate --links     → status OK (52 atoms scanned)
 
 ## What this audit does NOT certify
 
-- **Cross-platform on Windows without Git Bash** — defer (acceptable per `ADR--MSP-PRECOMMIT-HOOK`).
+- **Cross-platform on Windows without Git Bash** — defer (acceptable per `[[ADR--MSP-PRECOMMIT-HOOK]]`).
 - **shellcheck clean** — shellcheck not available in the dev env at audit time. Manual review of the 50-LOC script gave no obvious issues; CI integration in M3+ should add a shellcheck step.
 - **Hook auto-install on `npm install`** — out of scope; this is opt-in by design (one-line `bash examples/hooks/install.sh`).
 
@@ -81,10 +81,10 @@ None. The implementation was small enough to land first-try; the smoke test pass
 
 ## Residual M3+ backlog
 
-- M3b: Refactor forbidden-fields list to load from `atomic_contract.yaml` at runtime (per `ADR--FORBIDDEN-FIELDS-LIST` "Negative" note).
+- M3b: Refactor forbidden-fields list to load from `atomic_contract.yaml` at runtime (per `[[ADR--FORBIDDEN-FIELDS-LIST]]` "Negative" note).
 - M3c: Implement the 4 FEAT scaffolds (codegen runner + 3 memory writers).
 - M3d: GKS upstream patch for `phase: 6` so AUDIT atoms land at canonical phase.
-- Doc-PR: align `msp_spec.md` §12 with `ADR--PATH-ENCODING`.
+- Doc-PR: align `msp_spec.md` §12 with `[[ADR--PATH-ENCODING]]`.
 - CI: add shellcheck on the hook script + `npm test` + `npm run msp:validate -- --all` matrix.
 
 ## Sign-off
@@ -95,7 +95,7 @@ None. The implementation was small enough to land first-try; the smoke test pass
 
 ## References
 
-- `FEAT--MSP-PRECOMMIT-HOOK` — acceptance criteria source
-- `BLUEPRINT--MSP-PRECOMMIT-HOOK` — geography + algorithm
-- `ADR--MSP-PRECOMMIT-HOOK` — bash-vs-husky decision
-- `FEAT--MSP-VALIDATOR` — what the hook invokes
+- `[[FEAT--MSP-PRECOMMIT-HOOK]]` — acceptance criteria source
+- `[[BLUEPRINT--MSP-PRECOMMIT-HOOK]]` — geography + algorithm
+- `[[ADR--MSP-PRECOMMIT-HOOK]]` — bash-vs-husky decision
+- `[[FEAT--MSP-VALIDATOR]]` — what the hook invokes

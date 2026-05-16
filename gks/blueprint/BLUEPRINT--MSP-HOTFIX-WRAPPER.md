@@ -90,3 +90,8 @@ verification_plan:
 T1 NPM-SCRIPTS (4 lines in package.json)
 T2 HOOK-INTEGRATION (extend pre-commit-validator.sh)
 T3 TESTS (extend pre-commit.test.ts with 2 new cases)
+
+## Connections
+- [[FEAT--MSP-HOTFIX-WRAPPER]]
+- [[ADR--MSP-HOTFIX-WRAPPER]]
+

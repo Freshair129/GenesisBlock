@@ -27,3 +27,7 @@ An active agent session MUST always carry a valid, non-null passport containing:
 ## Enforcement
 The `CognitiveLayer` facade ensures that if a passport cannot be resolved (missing or malformed `identity.json` with no fallback), the session fails to initialize.
 An anonymous user kind is provided as a safe default, but the passport structure itself remains non-null.
+
+## Connections
+- [[FRAMEWORK--MSP-ARCHITECTURE-V2]]
+

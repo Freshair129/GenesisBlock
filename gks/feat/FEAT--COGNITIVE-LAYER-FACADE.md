@@ -91,3 +91,11 @@ const server = layer.mcpServer()
 - New MCP tools (none added).
 - Atom-write paths (still through `msp_candidate` + PR).
 - Full §8.4 slot/layout grammar for the deterministic composer.
+
+## Connections
+- [[CONCEPT--COGNITIVE-LAYER-FACADE]]
+- [[CONCEPT--AGENT-AGNOSTIC]]
+- [[ADR--MEMORY-STORE-GRAPH-WIRING]]
+- [[ADR--GEMINI-AS-SLM-PROVIDER]]
+- [[ADR--DEFAULT-SLM-OLLAMA-QWEN-CODER]]
+

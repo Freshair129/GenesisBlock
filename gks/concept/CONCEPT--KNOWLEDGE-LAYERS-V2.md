@@ -101,7 +101,7 @@ Only when an agent thinks "this is a *durable, structurally-shaped, citable* cla
 - Add Knowledge Browser tab listing candidates with copy-to-canon affordance
 - Delete inbound infrastructure: `msp_propose` tool, `scripts/msp/propose.mjs`, `gks inbound list/promote` calls in `package.json`, `.brain/msp/projects/<ns>/inbound/` directory, related tests
 - Update `msp_spec.md` §13 Authority Matrix to reflect the 4-layer model
-- Supersede `CONCEPT--INBOUND-QUEUE`
+- Supersede `[[CONCEPT--INBOUND-QUEUE]]`
 
 **Out of scope (deferred):**
 
@@ -118,8 +118,13 @@ The 4-layer model puts a clean wall between `.brain/` (any agent can write anyth
 
 ## Source
 
-- `CONCEPT--INBOUND-QUEUE` (superseded)
-- `CONCEPT--MEMORY-SESSIONS`, `CONCEPT--MEMORY-EPISODIC-WRITER` (existing layers we keep)
-- `FRAMEWORK--MSP-ARCHITECTURE-V2` § "Roles" (boundary table — extended here)
+- `[[CONCEPT--INBOUND-QUEUE]]` (superseded)
+- `[[CONCEPT--MEMORY-SESSIONS]]`, `[[CONCEPT--MEMORY-EPISODIC-WRITER]]` (existing layers we keep)
+- `[[FRAMEWORK--MSP-ARCHITECTURE-V2]]` § "Roles" (boundary table — extended here)
 - PR #41 — propose.mjs cwd bug fix (becomes moot if we delete propose entirely)
 - Race condition diagnosis in PR #41/#42 CI failures — direct evidence of inbound's hidden cost
+
+## Connections
+- [[CONCEPT--PROPOSAL-TYPES]]
+- [[CONCEPT--SUBMISSION-ENVELOPE]]
+

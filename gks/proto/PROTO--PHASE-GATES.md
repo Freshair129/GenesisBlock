@@ -24,7 +24,7 @@ created_at: 2026-05-05T18:00:00.000+07:00
 
 ## Rule
 
-Per `FRAMEWORK--PHASE-GOVERNANCE`, the doc-to-code chain is
+Per `[[FRAMEWORK--PHASE-GOVERNANCE]]`, the doc-to-code chain is
 
 ```
 P0 FRAME → P1 CONCEPT → P2 ADR/FEAT → P3 BLUEPRINT → P5 CODE → P6 AUDIT
@@ -67,7 +67,7 @@ Implementation: `src/validator/proto/phase-gates.ts`.
 ## Trigger
 
 `msp:validate --all` (after the regular validator rules and the M8a
-loader's `PROTO--SAMPLE-RULE`).
+loader's `[[PROTO--SAMPLE-RULE]]`).
 
 ## Severity
 
@@ -97,4 +97,8 @@ BLUEPRINTs or opt them out via `phase_override`.
 
 ## Source
 
-`CONCEPT--PROTO-PHASE-GATES`, `FRAMEWORK--PHASE-GOVERNANCE`, `CONCEPT--PROTO-PATTERN`.
+`[[CONCEPT--PROTO-PHASE-GATES]]`, `[[FRAMEWORK--PHASE-GOVERNANCE]]`, `[[CONCEPT--PROTO-PATTERN]]`.
+
+## Connections
+- [[FEAT--PROTO-LOADER]]
+

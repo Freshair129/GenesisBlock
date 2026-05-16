@@ -34,7 +34,7 @@ This ADR records the boundary so we don't drift further and so future reviewers 
 
 ## Decision
 
-### Boundary (refined from `FRAMEWORK--MSP-ARCHITECTURE-V2`)
+### Boundary (refined from `[[FRAMEWORK--MSP-ARCHITECTURE-V2]]`)
 
 | Concern | Owner |
 |---|---|
@@ -45,7 +45,7 @@ This ADR records the boundary so we don't drift further and so future reviewers 
 | Backlinks reverse-index derivation | **GKS** (logically — currently in MSP `src/memory/backlinks/` as M3c-1; planned upstream) |
 | Pre-promote shift-left validation | **MSP** (`src/validator/rules/dangling-wikilinks.ts` runs at inbound time, before atom hits the store) |
 | Type-specific semantic relationship rules | **MSP** (e.g. ALGO ↔ PARAM reciprocal coupling, ADR-monotonic, evidence-for-decisions) |
-| Anti-hallucination rules over crosslink content | **MSP** (per `ADR--ANTI-HALLUCINATION-RULES`) |
+| Anti-hallucination rules over crosslink content | **MSP** (per `[[ADR--ANTI-HALLUCINATION-RULES]]`) |
 
 ### Why MSP keeps the dangling-wikilinks rule even though GKS has `gks validate --links`
 
@@ -64,7 +64,7 @@ GKS could expose `gks backlinks` as a CLI command + corresponding TS API (propos
 - CI uses it for drift detection
 - M7c retrieval orchestration consumes it for graph-hop expansion
 
-When GKS ships native backlinks API, MSP code becomes a thin caller; the indexer logic moves upstream. The atom (`FEAT--MEMORY-BACKLINKS-INDEXER`) gets `superseded_by: GKS-native` and the source migrates.
+When GKS ships native backlinks API, MSP code becomes a thin caller; the indexer logic moves upstream. The atom (`[[FEAT--MEMORY-BACKLINKS-INDEXER]]`) gets `superseded_by: GKS-native` and the source migrates.
 
 ## Consequences
 
@@ -88,9 +88,14 @@ When GKS ships native backlinks API, MSP code becomes a thin caller; the indexer
 ## What this ADR does NOT change
 
 - Existing M3c-1 implementation continues running.
-- Existing `gks/concept/CONCEPT--MEMORY-VECTOR-BACKLINKS` content stays valid; gets a "planned upstream" note.
+- Existing `gks/concept/[[CONCEPT--MEMORY-VECTOR-BACKLINKS]]` content stays valid; gets a "planned upstream" note.
 - GKS upstream proposals live under `upstream/gks-proposals/` — not enforced by MSP CI; informational.
 
 ## Source
 
 GksV3 `SCOPE.md` "Graph" + `MSP_RELATIONSHIP.md` compatibility checklist + audit performed during M7-prep follow-up.
+
+## Connections
+- [[FRAMEWORK--CROSSLINKS-VOCABULARY]]
+- [[CONCEPT--GENESIS-GRAPH-BACKEND]]
+

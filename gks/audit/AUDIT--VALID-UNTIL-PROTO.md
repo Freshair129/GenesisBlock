@@ -26,18 +26,18 @@ phase_override:
 created_at: 2026-05-05T18:11:00.000+07:00
 ---
 
-# M9a — PROTO--VALID-UNTIL (draft)
+# M9a — [[PROTO--VALID-UNTIL]] (draft)
 
 ## Scope
 
-Implements Guard 1 from `CONCEPT--DECISION-ATROPHY-GUARDS`: a scanning predicate that flags atoms whose `valid_until:` frontmatter date has passed (or is approaching). Layered on top of the M8a PROTO loader; no new infrastructure.
+Implements Guard 1 from `[[CONCEPT--DECISION-ATROPHY-GUARDS]]`: a scanning predicate that flags atoms whose `valid_until:` frontmatter date has passed (or is approaching). Layered on top of the M8a PROTO loader; no new infrastructure.
 
 ## What shipped
 
 | File | Purpose |
 |---|---|
 | `src/validator/proto/valid-until.ts` | Predicate impl. Reads each atom file, parses frontmatter, compares `valid_until` to `now`. Warning if expired, info if within 30 days. |
-| `gks/proto/PROTO--VALID-UNTIL.md` | PROTO atom (status: draft, severity: warning). Enforces `FRAMEWORK--MSP-ARCHITECTURE-V2`. |
+| `gks/proto/[[PROTO--VALID-UNTIL]].md` | PROTO atom (status: draft, severity: warning). Enforces `[[FRAMEWORK--MSP-ARCHITECTURE-V2]]`. |
 | `test/validator/proto/valid-until.test.ts` | 6 tests covering vacuous pass, expired, near-expiry, far-future, superseded skip, and `MSP_NOW` env override. |
 
 ## Behaviour
@@ -55,7 +55,7 @@ Implements Guard 1 from `CONCEPT--DECISION-ATROPHY-GUARDS`: a scanning predicate
 
 2. **`MSP_NOW` env var for time injection.** The `Predicate` signature is `(ctx) => PredicateResult` — no opts. To make tests deterministic, the impl reads `MSP_NOW` (any ISO 8601 string) before falling back to `new Date()`. Tests that exercise expiry / near-expiry set `MSP_NOW` and assert against a known frame of reference.
 
-3. **`status: draft` at ship.** Real atoms in this repo (notably `CONCEPT--MSP-ROADMAP`) reference a `valid_until` in their body text, and other atoms may add real `valid_until` frontmatter going forward. Shipping draft means the loader reports findings without ever fail-exiting CI — operators can review, decide, and only then promote to stable.
+3. **`status: draft` at ship.** Real atoms in this repo (notably `[[CONCEPT--MSP-ROADMAP]]`) reference a `valid_until` in their body text, and other atoms may add real `valid_until` frontmatter going forward. Shipping draft means the loader reports findings without ever fail-exiting CI — operators can review, decide, and only then promote to stable.
 
 4. **No `error` severity emitted.** Even on expiry, the violation is `warning`. The CONCEPT explicitly classifies atrophy as a process concern, not a CI fail. `result.ok` therefore stays `true` even when violations are present (the loader's `shouldFailExit` only flips on stable + error).
 
@@ -71,7 +71,7 @@ Implements Guard 1 from `CONCEPT--DECISION-ATROPHY-GUARDS`: a scanning predicate
 
 ## Counts
 
-- Atoms 144 → 145 (+1: PROTO--VALID-UNTIL; +1 audit doesn't count toward live atoms — same gks/audit pattern)
+- Atoms 144 → 145 (+1: [[PROTO--VALID-UNTIL]]; +1 audit doesn't count toward live atoms — same gks/audit pattern)
 - Tests: +6 (`valid-until.test.ts`)
 - New impl file: `src/validator/proto/valid-until.ts`
 
@@ -89,4 +89,8 @@ Implements Guard 1 from `CONCEPT--DECISION-ATROPHY-GUARDS`: a scanning predicate
 
 ## Source
 
-`CONCEPT--DECISION-ATROPHY-GUARDS` (Guard 1), `FEAT--PROTO-LOADER`, `FRAMEWORK--MSP-ARCHITECTURE-V2`.
+`[[CONCEPT--DECISION-ATROPHY-GUARDS]]` (Guard 1), `[[FEAT--PROTO-LOADER]]`, `[[FRAMEWORK--MSP-ARCHITECTURE-V2]]`.
+
+## Connections
+- [[BLUEPRINT--PROTO-LOADER]]
+

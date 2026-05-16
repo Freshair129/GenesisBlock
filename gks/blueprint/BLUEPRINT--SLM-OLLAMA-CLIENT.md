@@ -138,3 +138,8 @@ verification_plan:
 T1 OLLAMA-HTTP-CLIENT (ollama.ts + errors.ts)
 T2 FACTORY (factory.ts switch + types.ts re-exports)
 T3 ENV-CONFIG (env-var defaults; tested via process.env mocking)
+
+## Connections
+- [[FEAT--SLM-OLLAMA-CLIENT]]
+- [[ADR--SLM-OLLAMA-CLIENT]]
+

@@ -52,6 +52,13 @@ created_at: 2026-05-12T04:48:00.000+07:00
 
 ## Source
 
-- `CONCEPT--PARSER-CHOICE`
+- `[[CONCEPT--PARSER-CHOICE]]`
 - `packages/msp/src/symbols/parser/typescript.ts` (ใช้เป็นแบบอย่างในการทำ Interface)
 - `tree-sitter-python` documentation
+
+## Connections
+- [[ADR--SYMBOL-GRAPH-PERSISTENCE]]
+- [[FRAMEWORK--SYMBOL-GRAPH]]
+- [[CONCEPT--SYMBOL-GRAPH]]
+- [[FEAT--MSP-SYMBOL-MCP]]
+

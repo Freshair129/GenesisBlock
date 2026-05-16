@@ -44,4 +44,4 @@ created_at: 2026-05-12T15:52:00.000+07:00
 - **Unresolved Edges**: Stop traversal at that branch, mark target as "unresolved symbol".
 
 ## Source
-- `ADR--SYMBOLS-PROCESS-TRACING`
+- `[[ADR--SYMBOLS-PROCESS-TRACING]]`

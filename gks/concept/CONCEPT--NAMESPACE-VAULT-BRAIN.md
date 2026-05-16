@@ -98,7 +98,7 @@ In:
 Out:
 
 - Changes to GKS `Namespace` schema (rejected by D-8).
-- Implementation of Vault and Brain stores — see `FEAT--VAULT-COMPOSITION` and `FEAT--BRAIN-SESSION`.
+- Implementation of Vault and Brain stores — see `[[FEAT--VAULT-COMPOSITION]]` and `[[FEAT--BRAIN-SESSION]]`.
 - Membership versioning policy (snapshot vs query-time) — see spec §14 OQ-4.
 
 ## Why three layers, not one
@@ -117,7 +117,7 @@ The three-layer split keeps each layer's invariants enforceable:
 
 ## Relationship to existing MSP concepts
 
-- **Soul / Passport** (`CONCEPT--IDENTITY-LAYER`) — Brain contains Soul. The passport pattern (identity flowing with the agent) is unchanged.
+- **Soul / Passport** (`[[CONCEPT--IDENTITY-LAYER]]`) — Brain contains Soul. The passport pattern (identity flowing with the agent) is unchanged.
 - **Workspace state at `.brain/msp/projects/<ns>/`** — this is **Namespace storage**, not a Vault. A Vault may read from one such workspace, or compose multiple.
 - **`MSP_PROJECT` environment variable** — currently selects a single Namespace. After Vault landing, this becomes "the default Vault id for the session" — backward-compatible with a one-Namespace-one-Vault Vault.
 
@@ -137,13 +137,17 @@ The three-layer split keeps each layer's invariants enforceable:
 
 ## Out of scope
 
-- Cross-Namespace promote action (move an atom from `personal` to `team`) — see `FEAT--CROSS-NAMESPACE-PROMOTE`.
-- Vault sharing protocol (granting / revoking access) — see `FEAT--VAULT-COMPOSITION`.
+- Cross-Namespace promote action (move an atom from `personal` to `team`) — see `[[FEAT--CROSS-NAMESPACE-PROMOTE]]`.
+- Vault sharing protocol (granting / revoking access) — see `[[FEAT--VAULT-COMPOSITION]]`.
 - Membership versioning policy — see spec §14 OQ-4; working assumption is session-snapshot with explicit `refresh`.
 
 ## Source
 
 - `docs/msp/UNIVERSAL-CONTEXT-FRAMEWORK_spec.md` §5 — full Namespace / Vault / Brain definitions and anti-patterns.
 - `packages/gks/src/memory/types.ts` — existing `Namespace` interface (unchanged).
-- `CONCEPT--IDENTITY-LAYER` — Soul layer that Brain contains.
-- `FRAMEWORK--MSP-ARCHITECTURE-V2` — parent three-layer ecosystem; Vault is positioned at the Memory OS layer.
+- `[[CONCEPT--IDENTITY-LAYER]]` — Soul layer that Brain contains.
+- `[[FRAMEWORK--MSP-ARCHITECTURE-V2]]` — parent three-layer ecosystem; Vault is positioned at the Memory OS layer.
+
+## Connections
+- [[FRAMEWORK--UNIVERSAL-CONTEXT-FRAMEWORK]]
+

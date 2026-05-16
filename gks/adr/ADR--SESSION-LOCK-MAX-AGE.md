@@ -24,7 +24,7 @@ created_at: 2026-05-05T16:22:00.000+07:00
 
 `acquire(lockPath)` in `src/memory/sessions/lock.ts` uses PID-liveness probing. On Windows + edge cases (zombie PIDs, network filesystems, antivirus interference), the PID-alive probe is unreliable, leading to permanent wedged locks.
 
-Per `CONCEPT--SESSION-LOCK-CROSS-PLATFORM`, a max-age safeguard closes most of this gap without adding deps.
+Per `[[CONCEPT--SESSION-LOCK-CROSS-PLATFORM]]`, a max-age safeguard closes most of this gap without adding deps.
 
 ## Decision
 
@@ -135,4 +135,8 @@ Order matters:
 
 ## Source
 
-`CONCEPT--SESSION-LOCK-CROSS-PLATFORM`, `CONCEPT--MSP-ROADMAP` §3 M9f, audit of existing `src/memory/sessions/lock.ts`.
+`[[CONCEPT--SESSION-LOCK-CROSS-PLATFORM]]`, `[[CONCEPT--MSP-ROADMAP]]` §3 M9f, audit of existing `src/memory/sessions/lock.ts`.
+
+## Connections
+- [[FEAT--MEMORY-SESSIONS-WRITER]]
+

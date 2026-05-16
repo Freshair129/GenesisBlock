@@ -264,7 +264,7 @@ implementation_order:
 
 ## Implementer: do NOT do
 
-- **Don't merge GKS into MSP's package.** It must remain separately publishable per `ADR--MONOREPO-STRUCTURE`.
+- **Don't merge GKS into MSP's package.** It must remain separately publishable per `[[ADR--MONOREPO-STRUCTURE]]`.
 - **Don't drop `@freshair129/gks` from npm.** External-consumer compat is non-negotiable in this migration.
 - **Don't combine phases.** Each phase ships independently. A monolithic "do everything" PR fails review.
 - **Don't refactor MSP↔GKS API surface during phase A.** Move files, don't change behaviour. API refactors happen in later milestones with their own ADRs.
@@ -272,7 +272,11 @@ implementation_order:
 
 ## Source
 
-- `CONCEPT--MONOREPO-MIGRATION` — motivation
-- `ADR--MONOREPO-STRUCTURE` — decided structure
+- `[[CONCEPT--MONOREPO-MIGRATION]]` — motivation
+- `[[ADR--MONOREPO-STRUCTURE]]` — decided structure
 - `upstream/gks-proposals/0[1234]-*.md` — proposals to absorb in phase C
 - npm workspaces docs (https://docs.npmjs.com/cli/v10/using-npm/workspaces)
+
+## Connections
+- [[FRAMEWORK--MSP-ARCHITECTURE-V2]]
+

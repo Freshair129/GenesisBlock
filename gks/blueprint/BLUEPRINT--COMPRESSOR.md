@@ -234,3 +234,9 @@ implementation_order:
 - Add hierarchical summary-of-summaries
 - Use a real tokeniser library by default (heuristic only; user can inject)
 - Modify `src/orchestrator/consolidator/` or `src/memory/episodic/`
+
+## Connections
+- [[FEAT--COMPRESSOR]]
+- [[ADR--COMPRESSOR-THREE-TIER]]
+- [[CONCEPT--CONTEXT-COMPRESSION]]
+

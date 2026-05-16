@@ -21,15 +21,15 @@ created_at: 2026-05-09T19:30:00.000+07:00
 
 ## Summary
 
-The 6-PR Symbol Graph rollout completed 2026-05-09. MSP now has a queryable structural graph over its source code, orthogonal to the conceptual atom graph defined in `FRAMEWORK--KNOWLEDGE-3-TIER`.
+The 6-PR Symbol Graph rollout completed 2026-05-09. MSP now has a queryable structural graph over its source code, orthogonal to the conceptual atom graph defined in `[[FRAMEWORK--KNOWLEDGE-3-TIER]]`.
 
-Per `FRAMEWORK--SYMBOL-GRAPH`'s "path to GKS upstream": this PR also files `upstream/gks-proposals/05-symbol-graph.md` so GKS can absorb the layer and MSP can become a thin wrapper in a future major release.
+Per `[[FRAMEWORK--SYMBOL-GRAPH]]`'s "path to GKS upstream": this PR also files `upstream/gks-proposals/05-symbol-graph.md` so GKS can absorb the layer and MSP can become a thin wrapper in a future major release.
 
 ## What shipped (6 PRs)
 
 | PR | Title | What |
 |---|---|---|
-| #57 | PR-1: FRAME + 2 CONCEPTs | atoms only — `FRAMEWORK--SYMBOL-GRAPH` + `CONCEPT--SYMBOL-GRAPH` + `CONCEPT--PARSER-CHOICE` |
+| #57 | PR-1: FRAME + 2 CONCEPTs | atoms only — `[[FRAMEWORK--SYMBOL-GRAPH]]` + `[[CONCEPT--SYMBOL-GRAPH]]` + `[[CONCEPT--PARSER-CHOICE]]` |
 | #58 | PR-2: 2 ADRs + 3 FEATs | atoms only — persistence (SQLite + JSONL) + Leiden + MCP/CLI/Web contracts |
 | #59 | PR-3: BLUEPRINT + parser + SQLite + JSONL + Leiden | foundation code: TS Compiler API parser, `better-sqlite3` store, JSONL exporter, Leiden adapter (with Louvain fallback) |
 | #60 | PR-4: CLI + 5 MCP tools | `msp-graph` bin (6 subcommands) + `msp_symbol_lookup/neighbors/impact/community/search`. Tool count 11 → 16 |
@@ -61,7 +61,7 @@ $ npm run msp:graph build
 
 ## Feature flag removed
 
-Per `FEAT--SYMBOLS-WEB-TAB`, the `VITE_MSP_SYMBOL_GRAPH=1` / `?symbols=1` flag protected an empty Symbols tab from confusing first-time users. PR-6 removes it: `SymbolsTab.tsx` already has a graceful empty-state ("Run `npm run msp:graph build`" hint with copy-to-clipboard button), so the tab is now visible by default.
+Per `[[FEAT--SYMBOLS-WEB-TAB]]`, the `VITE_MSP_SYMBOL_GRAPH=1` / `?symbols=1` flag protected an empty Symbols tab from confusing first-time users. PR-6 removes it: `SymbolsTab.tsx` already has a graceful empty-state ("Run `npm run msp:graph build`" hint with copy-to-clipboard button), so the tab is now visible by default.
 
 ## Verification gates (across 6 PRs)
 
@@ -79,7 +79,7 @@ Per `FEAT--SYMBOLS-WEB-TAB`, the `VITE_MSP_SYMBOL_GRAPH=1` / `?symbols=1` flag p
 | Item | Notes |
 |---|---|
 | Cross-file symbol resolution via project-wide `ts.Program` | Would push counts toward the BLUEPRINT estimate (~5000 symbols / ~20000 edges); cost: memory + build time |
-| tree-sitter parser for Python / Go / Rust | Per `CONCEPT--PARSER-CHOICE` Phase 2; interface absorbs swap |
+| tree-sitter parser for Python / Go / Rust | Per `[[CONCEPT--PARSER-CHOICE]]` Phase 2; interface absorbs swap |
 | Hierarchical Leiden levels | `parent_community_id` column reserved in SQLite; UI surface TBD |
 | Real-time file-watch incremental rebuild | Phase 3 |
 | GKS upstream — wait for `@freshair129/gks 4.x` | This PR files the proposal; migration to thin wrapper happens once GKS ships |
@@ -92,6 +92,13 @@ The CONCEPT-stage trade-off "TS Compiler API in v1" had downstream consequences 
 ## Source
 
 - PRs #57, #58, #59, #60, #62, this PR
-- `BLUEPRINT--SYMBOL-GRAPH-CORE` (PR-3) — implementation contract
+- `[[BLUEPRINT--SYMBOL-GRAPH-CORE]]` (PR-3) — implementation contract
 - `/root/.claude/plans/symbol-graph.md` — original 6-PR plan
 - Smoke test output PR-4 subagent run, 2026-05-09
+
+## Connections
+- [[ADR--SYMBOL-GRAPH-PERSISTENCE]]
+- [[ADR--LEIDEN-COMMUNITY-DETECTION]]
+- [[FEAT--MSP-SYMBOL-MCP]]
+- [[FEAT--MSP-GRAPH-CLI]]
+

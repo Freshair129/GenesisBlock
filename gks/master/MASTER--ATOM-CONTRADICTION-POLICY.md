@@ -46,3 +46,9 @@ A PR adds or modifies any atom in `gks/<type>/` (FRAME, CONCEPT, ADR, FEAT, BLUE
 ## Conflicts with
 
 (none currently — flag any future Master that proposes a different supersession discipline.)
+
+## Connections
+- [[BLUEPRINT--CONTRADICTION-DETECTION-IMPL]]
+- [[ADR--MASTER-PROMOTION-CONTRADICTION-POLICY]]
+- [[FRAMEWORK--KNOWLEDGE-3-TIER]]
+

@@ -45,20 +45,20 @@ Doc-only PR. Performs alignment between MSP's M7-prep architecture (PR #8, merge
 
 | Atom | Phase | Type | Purpose |
 |---|---|---|---|
-| `ADR--GRAPH-IS-GKS-DOMAIN` | 2 | adr | Records F4 + F5 — atomic graph is GKS; MSP only does shift-left validation + type-specific opinions |
-| `ADR--EMBEDDING-MODEL-PARITY` | 2 | adr | Records F1 + F6 — locks `nomic-embed-text-v1.5` as canonical for both GKS and Smart Connections |
-| `AUDIT--M7-PREP-FOLLOWUP` | 6 | audit | This file |
+| `[[ADR--GRAPH-IS-GKS-DOMAIN]]` | 2 | adr | Records F4 + F5 — atomic graph is GKS; MSP only does shift-left validation + type-specific opinions |
+| `[[ADR--EMBEDDING-MODEL-PARITY]]` | 2 | adr | Records F1 + F6 — locks `nomic-embed-text-v1.5` as canonical for both GKS and Smart Connections |
+| `[[AUDIT--M7-PREP-FOLLOWUP]]` | 6 | audit | This file |
 
 ## Atoms updated (in-place; not superseded)
 
 | Atom | Change |
 |---|---|
-| `CONCEPT--EMBEDDING-STRATEGY` | Reframed to two paths: GKS canonical (agent) + Smart Connections (in-Obsidian browse) |
-| `ADR--SEMANTIC-SEARCH-VIA-SMART-CONNECTIONS` | Reframed (GKS canonical, not "MSP never embeds"); preserved original alternatives |
-| `ADR--MSP-OBSIDIAN-INTEGRATION` | Env var `OBSIDIAN_HOST` → `OBSIDIAN_URL`; M7a wraps GKS adapter |
-| `CONCEPT--MEMORY-VECTOR-BACKLINKS` | Marked as planned upstream to GKS; added migration table |
-| `ADR--ANTI-HALLUCINATION-RULES` | Clarified `dangling-wikilinks` = shift-left of `gks validate --links` |
-| `CONCEPT--MSP-ROADMAP` | M7a effort medium → small; M8d scope reduced; added 4 upstream proposals |
+| `[[CONCEPT--EMBEDDING-STRATEGY]]` | Reframed to two paths: GKS canonical (agent) + Smart Connections (in-Obsidian browse) |
+| `[[ADR--SEMANTIC-SEARCH-VIA-SMART-CONNECTIONS]]` | Reframed (GKS canonical, not "MSP never embeds"); preserved original alternatives |
+| `[[ADR--MSP-OBSIDIAN-INTEGRATION]]` | Env var `OBSIDIAN_HOST` → `OBSIDIAN_URL`; M7a wraps GKS adapter |
+| `[[CONCEPT--MEMORY-VECTOR-BACKLINKS]]` | Marked as planned upstream to GKS; added migration table |
+| `[[ADR--ANTI-HALLUCINATION-RULES]]` | Clarified `dangling-wikilinks` = shift-left of `gks validate --links` |
+| `[[CONCEPT--MSP-ROADMAP]]` | M7a effort medium → small; M8d scope reduced; added 4 upstream proposals |
 
 ## Files added (non-atomic)
 
@@ -109,10 +109,15 @@ The 5 updated atoms remain semantically valid — the original framing was a des
 |---|---|---|
 | Ship the 4 upstream proposals to GKS maintainer (issue / PR / DM) | post-merge | human |
 | When upstream `phase: 6` lands → remove `scripts/msp/propose.mjs` Phase-6 hack | post-upstream | next M-milestone |
-| When upstream backlinks API lands → replace `src/memory/backlinks/` with thin caller; supersede `FEAT--MEMORY-BACKLINKS-INDEXER` | post-upstream | post-M7 |
+| When upstream backlinks API lands → replace `src/memory/backlinks/` with thin caller; supersede `[[FEAT--MEMORY-BACKLINKS-INDEXER]]` | post-upstream | post-M7 |
 | When upstream verify-flow flag lands → opt-in via `.mspconfig.json` | post-upstream | M8 |
 | Smart Connections setup guide for users | M7a | M7 milestone |
 
 ## Source
 
-GksV3 3.6.0 audit performed during M7-prep follow-up planning. User architectural correction on graph ownership + embedding model parity. See `gks/adr/ADR--GRAPH-IS-GKS-DOMAIN` and `gks/adr/ADR--EMBEDDING-MODEL-PARITY`.
+GksV3 3.6.0 audit performed during M7-prep follow-up planning. User architectural correction on graph ownership + embedding model parity. See `gks/adr/[[ADR--GRAPH-IS-GKS-DOMAIN]]` and `gks/adr/[[ADR--EMBEDDING-MODEL-PARITY]]`.
+
+## Connections
+- [[FRAMEWORK--MSP-ARCHITECTURE-V2]]
+- [[AUDIT--MSP-ARCHITECTURE-V2]]
+

@@ -28,7 +28,7 @@ created_at: 2026-05-03T15:43:38.623+07:00
 
 ## Scope
 
-Closes FEAT--MEMORY-EPISODIC-WRITER. Implementation follows BLUEPRINT geography exactly.
+Closes [[FEAT--MEMORY-EPISODIC-WRITER]]. Implementation follows BLUEPRINT geography exactly.
 
 ## Acceptance criteria from FEAT
 
@@ -64,3 +64,8 @@ LLM-backed summarisers are pluggable via `opts.summariser`; orchestrator concern
 - Implemented by: @claude-opus-4-7
 - Verified by: 19/19 tests
 - Date: 2026-05-03
+
+## Connections
+- [[BLUEPRINT--MEMORY-EPISODIC-WRITER]]
+- [[ADR--MEMORY-EPISODIC-WRITER]]
+

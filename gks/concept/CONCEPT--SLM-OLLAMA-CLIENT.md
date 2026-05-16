@@ -21,7 +21,7 @@ created_at: 2026-05-03T16:22:30.407+07:00
 
 ## Problem
 
-`FEAT--CODEGEN-MICROTASK-RUNNER` works end to end with a mock SLM that returns either a stub or whatever the prompt's `// MOCK_OUTPUT:` hint specifies. The mock is enough for testing the pipeline mechanics but cannot produce real code for production microtasks. Until a real SLM is wired, M3c-4 is a scaffold, not a usable feature.
+`[[FEAT--CODEGEN-MICROTASK-RUNNER]]` works end to end with a mock SLM that returns either a stub or whatever the prompt's `// MOCK_OUTPUT:` hint specifies. The mock is enough for testing the pipeline mechanics but cannot produce real code for production microtasks. Until a real SLM is wired, M3c-4 is a scaffold, not a usable feature.
 
 ## Hypothesis
 
@@ -45,3 +45,7 @@ Out:
 ## Source
 
 Closes M3c-4's residual ("real Qwen 2.5 Coder integration is a future task"). P0 item #1 from production-readiness backlog.
+
+## Connections
+- [[ADR--CODEGEN-RETRY-POLICY]]
+

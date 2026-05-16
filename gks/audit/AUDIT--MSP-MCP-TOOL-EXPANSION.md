@@ -33,7 +33,7 @@ created_at: 2026-05-05T16:35:30.812+07:00
 
 ## Scope
 
-M7f deliverable per `FEAT--MSP-MCP-TOOL-EXPANSION` + `BLUEPRINT--MSP-MCP-TOOL-EXPANSION`: wrap M7b (consolidator), M7c (retrieval), M7d (compressor), M7e (identity) TS APIs as MCP tools so agents talking to MSP via stdio can reach them. The M6 server already shipped 6 gatekeeper-side tools (`msp_validate`, `msp_propose`, `msp_run_task`, `msp_session_append`, `msp_episode_append`, `msp_backlinks_rebuild`); M7f adds the **passport-side** tools.
+M7f deliverable per `[[FEAT--MSP-MCP-TOOL-EXPANSION]]` + `[[BLUEPRINT--MSP-MCP-TOOL-EXPANSION]]`: wrap M7b (consolidator), M7c (retrieval), M7d (compressor), M7e (identity) TS APIs as MCP tools so agents talking to MSP via stdio can reach them. The M6 server already shipped 6 gatekeeper-side tools (`msp_validate`, `msp_propose`, `msp_run_task`, `msp_session_append`, `msp_episode_append`, `msp_backlinks_rebuild`); M7f adds the **passport-side** tools.
 
 ## What shipped (4 of 5 planned)
 
@@ -119,7 +119,7 @@ npm run msp:check-links             → OK (130 atoms scanned)
 
 Test count delta: 397 → 429 (+32 — within blueprint target of ~32 with msp_compress omitted; full target was ~40 with all 5 tools).
 
-## Acceptance criteria from `FEAT--MSP-MCP-TOOL-EXPANSION`
+## Acceptance criteria from `[[FEAT--MSP-MCP-TOOL-EXPANSION]]`
 
 - [x] **5 tools registered** — *partial: 4 shipped, msp_compress deferred (documented above)*
 - [x] Each tool follows M6 handler pattern: `({ root, ... }) => async (args) => result`
@@ -188,3 +188,12 @@ import { handler as identitySetHandler }  from '@/mcp/tools/identity-set'
 - Verified by: 32 new tests + validator (130/130) + check-links OK + typecheck clean
 - Branch: `claude/msp-m7f-mcp-tools-impl`
 - Follow-up: file a small PR for `msp_compress` once M7d is merged to main
+
+## Connections
+- [[CONCEPT--MSP-MCP-TOOL-EXPANSION]]
+- [[FEAT--MSP-MCP-SERVER]]
+- [[FEAT--CONSOLIDATOR]]
+- [[FEAT--RETRIEVAL-ORCHESTRATION]]
+- [[FEAT--IDENTITY-LAYER]]
+- [[FEAT--COMPRESSOR]]
+

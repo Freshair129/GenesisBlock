@@ -97,4 +97,9 @@ This makes the server crash-safe and trivially parallelisable. Trade-off: per-ca
 
 ## Source
 
-`CONCEPT--MSP-MCP-SERVER` + GksV3 README's MCP-server pattern + `@modelcontextprotocol/sdk` 1.x docs.
+`[[CONCEPT--MSP-MCP-SERVER]]` + GksV3 README's MCP-server pattern + `@modelcontextprotocol/sdk` 1.x docs.
+
+## Connections
+- [[FEAT--MSP-VALIDATOR]]
+- [[FEAT--CODEGEN-MICROTASK-RUNNER]]
+

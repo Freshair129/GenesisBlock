@@ -51,4 +51,10 @@ Wraps existing core rule `summaryMin` from `src/validator/rules/summary-min.ts` 
 
 ## Source
 
-`CONCEPT--PROTO-AUDIT-EXISTING-RULES` (M8f), `ADR--ANTI-HALLUCINATION-RULES`.
+`[[CONCEPT--PROTO-AUDIT-EXISTING-RULES]]` (M8f), `[[ADR--ANTI-HALLUCINATION-RULES]]`.
+
+## Connections
+- [[FRAMEWORK--MSP-ARCHITECTURE-V2]]
+- [[CONCEPT--PROTO-PATTERN]]
+- [[FEAT--PROTO-LOADER]]
+

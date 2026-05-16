@@ -31,10 +31,10 @@ A **usage atom** is a runtime artefact written by `packages/msp/src/agents/usage
 
 - total `cost_usd` across all dispatches that day,
 - per-tier call counts and per-tier cost subtotals,
-- the top-N most-expensive episodes (by `EPISODE--AGENT-RUN-*` id reference),
+- the top-N most-expensive episodes (by `[[EPISODE--AGENT-RUN]]-*` id reference),
 - last-updated timestamp.
 
-Where `SPEC--EPISODE-ATOM` is per-call evidence, USAGE atoms are per-day aggregate. They are the readout layer for `ADR--AGENT-TIER-COST-POLICY` enforcement.
+Where `[[SPEC--EPISODE-ATOM]]` is per-call evidence, USAGE atoms are per-day aggregate. They are the readout layer for `[[ADR--AGENT-TIER-COST-POLICY]]` enforcement.
 
 ## 2. Id pattern
 
@@ -57,7 +57,7 @@ The id is unique per (bucket, date) — exactly one atom per day per vault.
 | Field | Required | Value |
 |---|---|---|
 | `id` | yes | `USAGE--<bucket>-<isoDate>` |
-| `phase` | yes | `5` (runtime / code phase per `gks/concept/CONCEPT--TAXONOMY-V2-3.md`) |
+| `phase` | yes | `5` (runtime / code phase per `gks/concept/[[CONCEPT--TAXONOMY-V2-3]].md`) |
 | `type` | yes | `usage` |
 | `status` | yes | `stable` (see §5 — body is rewritten, frontmatter is not) |
 | `vault_id` | yes | `default` (or project-specific if scoped) |
@@ -91,7 +91,7 @@ The body MUST contain a fenced `json` summary block delimited by HTML comment ma
     "T3": { "count": 1, "cost_usd": 0.02 }
   },
   "top_episodes": [
-    { "id": "EPISODE--AGENT-RUN-2026-05-14T03-00-00-000Z", "cost_usd": 0.02, "tier": "T3" }
+    { "id": "[[EPISODE--AGENT-RUN-2026-05-14T03-00-00-000Z]]", "cost_usd": 0.02, "tier": "T3" }
   ],
   "updated_at": "2026-05-14T14:00:00.000Z"
 }
@@ -116,7 +116,7 @@ USAGE atoms MAY be **purged** in bulk under a retention policy (out of scope for
 Usage atoms are project-scoped. The canonical write target is:
 
 ```
-<root>/gks/usage/USAGE--DAILY-<isoDate>.md
+<root>/gks/usage/[[USAGE--DAILY]]-<isoDate>.md
 ```
 
 Where `<root>` is the dispatcher's invocation root (typically `process.cwd()` at dispatch time). This mirrors `EPISODE--AGENT-RUN-*`'s current project-local location (see `SPEC--EPISODE-ATOM` §7 — the same ADR-vs-impl tension applies to USAGE; we follow current impl).
@@ -131,3 +131,8 @@ Where `<root>` is the dispatcher's invocation root (typically `process.cwd()` at
 - Cross-machine roll-up (a future `USAGE--MONTHLY` could aggregate dailies).
 - Real-time cost streaming (a writer of USAGE atoms is best-effort; readers must tolerate up-to-one-call lag).
 - Per-vault budget alerts — that's the cost-policy layer's job, not this SPEC's.
+
+## Connections
+- [[CONCEPT--COST-TRACKING]]
+- [[BLUEPRINT--COST-TRACKING]]
+

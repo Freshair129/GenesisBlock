@@ -42,7 +42,7 @@ MSP becomes the **passport that consumes Obsidian as the runtime**, not the syst
 - **GKS atoms** stay as markdown. No DB, no API server of MSP's own for search.
 - **Wikilinks/crosslinks** are resolved by Obsidian; MSP just writes them and reads them.
 - **Backlinks** — Obsidian's pane is the human view; `backlinks.jsonl` (M3c-1) is the headless mirror for CI / scripts.
-- **Semantic search** — Obsidian plugins (Smart Connections) provide it; see `CONCEPT--EMBEDDING-STRATEGY`.
+- **Semantic search** — Obsidian plugins (Smart Connections) provide it; see `[[CONCEPT--EMBEDDING-STRATEGY]]`.
 
 ## What MSP still owns
 
@@ -68,4 +68,4 @@ Everything that is **not** about a single atom on disk:
 
 ## Source
 
-Architectural clarification for M7+. Supersedes the implicit "MSP builds it all" framing in `FRAMEWORK--MSP-ARCHITECTURE-V2` (v1).
+Architectural clarification for M7+. Supersedes the implicit "MSP builds it all" framing in `[[FRAMEWORK--MSP-ARCHITECTURE-V2]]` (v1).

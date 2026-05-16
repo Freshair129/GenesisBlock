@@ -32,7 +32,7 @@ created_at: 2026-05-16T14:30:00.000+07:00
 
 ## Scope
 
-Closes the test-coverage and housekeeping gaps left after `BLUEPRINT--GENESIS-GRAPH-TS-FIRST` Phase 0 landed. Implementation of the Phase 0 backend itself (`GenesisGraphBackend`, `parseCypherV0`, error classes, MemoryStore wire-up) was already merged earlier. This milestone closes the BLUEPRINT's "every v0 shape + the unsupported-feature error path" test requirement and the wire-up loose ends.
+Closes the test-coverage and housekeeping gaps left after `[[BLUEPRINT--GENESIS-GRAPH-TS-FIRST]]` Phase 0 landed. Implementation of the Phase 0 backend itself (`GenesisGraphBackend`, `parseCypherV0`, error classes, MemoryStore wire-up) was already merged earlier. This milestone closes the BLUEPRINT's "every v0 shape + the unsupported-feature error path" test requirement and the wire-up loose ends.
 
 Shipped via two squash-merge PRs against `main`:
 
@@ -98,8 +98,8 @@ The bulk of the new Cypher tests (10 of 11 microtasks) were authored by the T1 t
 
 ## Out of scope (tracked elsewhere)
 
-- **Rust crate** at `packages/gks/native/genesis-graph/` — `BLUEPRINT--GENESIS-GRAPH-INTEGRATION` P3.1 – P3.6, beyond T1 single-shot scope.
-- **Default-flip** of `MemoryStore` to `GenesisGraphBackend` — explicitly gated behind P3.5 benchmarks and a separate ADR amendment, per `ADR--GENESIS-GRAPH-AS-GKS-BACKEND` §5.
+- **Rust crate** at `packages/gks/native/genesis-graph/` — `[[BLUEPRINT--GENESIS-GRAPH-INTEGRATION]]` P3.1 – P3.6, beyond T1 single-shot scope.
+- **Default-flip** of `MemoryStore` to `GenesisGraphBackend` — explicitly gated behind P3.5 benchmarks and a separate ADR amendment, per `[[ADR--GENESIS-GRAPH-AS-GKS-BACKEND]]` §5.
 - **PgGraphBackend oracle harness** — the parametrised suite currently covers `GraphStore` + `GenesisGraphBackend`. Folding `PgGraphBackend` in is P3.2 – P3.5 work; requires Postgres in CI.
 
 ## Residual
@@ -112,3 +112,8 @@ The bulk of the new Cypher tests (10 of 11 microtasks) were authored by the T1 t
 - Implemented by: @claude-opus-4-7 (T3) with @qwen-2.5-coder-14b (T1) authoring 10 of 11 new test cases
 - Verified by: 364/364 active gks tests (13 skipped, 0 failed) + typecheck
 - Date: 2026-05-16
+
+## Connections
+- [[SPEC--GENESIS-GRAPH-BACKEND]]
+- [[CONCEPT--GENESIS-GRAPH-BACKEND]]
+

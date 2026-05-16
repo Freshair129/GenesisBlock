@@ -17,13 +17,13 @@ crosslinks: {"references":["ADR--PROMOTION-WORKFLOW","CONCEPT--INBOUND-QUEUE"],"
 created_at: 2026-05-03T14:08:43.030+07:00
 ---
 
-> ⚠️ **Superseded by [`ADR--AGENT-WRITE-BOUNDARIES`](./ADR--AGENT-WRITE-BOUNDARIES.md)** (Phase 4 of `BLUEPRINT--INBOUND-TO-CANDIDATES-MIGRATION`, 2026-05-09). The L0/L1/L2 promotion-level model is replaced by a simple two-state model: `status: candidate` (in `.brain/.../candidates/`) → `status: stable` (in `gks/<type>/` after human PR + CI). Body preserved as historical context.
+> ⚠️ **Superseded by [`[[ADR--AGENT-WRITE-BOUNDARIES]]`](./[[ADR--AGENT-WRITE-BOUNDARIES]].md)** (Phase 4 of `[[BLUEPRINT--INBOUND-TO-CANDIDATES-MIGRATION]]`, 2026-05-09). The L0/L1/L2 promotion-level model is replaced by a simple two-state model: `status: candidate` (in `.brain/.../candidates/`) → `status: stable` (in `gks/<type>/` after human PR + CI). Body preserved as historical context.
 
 # ADR — promotion levels
 
 ## Context
 
-`ADR--PROMOTION-WORKFLOW` defines three gates (submission, validator, human review). Each gate moves an atom through a different *level* of confidence. Without explicit level labels, downstream tooling can't tell "validator-passed but not yet human-reviewed" from "fully promoted".
+`[[ADR--PROMOTION-WORKFLOW]]` defines three gates (submission, validator, human review). Each gate moves an atom through a different *level* of confidence. Without explicit level labels, downstream tooling can't tell "validator-passed but not yet human-reviewed" from "fully promoted".
 
 ## Decision
 
@@ -55,7 +55,7 @@ L1 → L0 backwards transition happens when the validator is re-run after a fix 
 - L1: file in `inbound/`, `validated_at` set in audit log
 - L2: file in `gks/<type>/`, `status: stable`
 
-This is why `promotion_level` appears in `ADR--FORBIDDEN-FIELDS-LIST` — agents must not write it.
+This is why `promotion_level` appears in `[[ADR--FORBIDDEN-FIELDS-LIST]]` — agents must not write it.
 
 ## Consequences
 
@@ -72,8 +72,12 @@ This is why `promotion_level` appears in `ADR--FORBIDDEN-FIELDS-LIST` — agents
 
 1. **Two levels (raw / promoted).** Rejected — loses the validator-passed signal, which is the cheapest filter for human reviewers.
 2. **Five+ levels (raw / linted / typechecked / reviewed / signed).** Considered for M4 once we add cryptographic signing. Out of scope here.
-3. **Frontmatter field for `promotion_level`.** Rejected per `ADR--FORBIDDEN-FIELDS-LIST` — derived, not authored.
+3. **Frontmatter field for `promotion_level`.** Rejected per `[[ADR--FORBIDDEN-FIELDS-LIST]]` — derived, not authored.
 
 ## Source
 
 `msp_spec.md` §8.1 (Promotion Levels).
+
+## Connections
+- [[CONCEPT--INBOUND-QUEUE]]
+

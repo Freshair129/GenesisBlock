@@ -51,7 +51,7 @@ commit `dd076db`.
 - Walker follows `crosslinks.superseded_by` transparently on superseded atoms
 - Cycle guard prevents infinite loop
 - Default off — existing CI pipelines unaffected
-- MSP pre-push hook can now pass `--through-superseded` when projects use supersede chains (e.g. FRAMEWORK--MSP-ARCHITECTURE → V2)
+- MSP pre-push hook can now pass `--through-superseded` when projects use supersede chains (e.g. [[FRAMEWORK--MSP-ARCHITECTURE]] → V2)
 
 ### Proposal 03 — Backlinks derivation API
 - New `deriveBacklinksFromEntries()` — pure derivation from an `AtomicEntry[]`
@@ -70,7 +70,7 @@ commit `dd076db`.
 - [ ] Simplify `src/orchestrator/retrieval/sources/backlinks.ts` to use `deriveBacklinksFromEntries` from GKS (removes ~150 LoC of duplicated crosslinks parsing)
 - [ ] `msp_backlinks_rebuild` MCP tool can delegate to `gks_backlinks` for the derivation step
 - [ ] Pre-push hook: consider adding `--through-superseded` to the `gks verify-flow` call (requires MSP config flag per project)
-- [ ] Phase 6 workaround in `scripts/msp/propose.mjs` — **already removed** in Phase 3 of `BLUEPRINT--INBOUND-TO-CANDIDATES-MIGRATION`; `msp_candidate` MCP handles audit atoms directly
+- [ ] Phase 6 workaround in `scripts/msp/propose.mjs` — **already removed** in Phase 3 of `[[BLUEPRINT--INBOUND-TO-CANDIDATES-MIGRATION]]`; `msp_candidate` MCP handles audit atoms directly
 
 ## GKS workspace sync note
 
@@ -83,3 +83,7 @@ sync: update `packages/gks` from GksV3 releases when new upstream features land.
 - Implemented in GksV3: commit `dd076db` on branch `claude/build-gks-v3-W8a7V`
 - Propagated to `packages/gks`: this PR
 - Date: 2026-05-11
+
+## Connections
+- [[AUDIT--GKS-UPSTREAM-PROPOSALS-FILED]]
+

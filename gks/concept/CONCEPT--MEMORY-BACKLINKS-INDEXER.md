@@ -21,7 +21,7 @@ created_at: 2026-05-03T14:16:41.740+07:00
 
 ## Problem
 
-`CONCEPT--MEMORY-VECTOR-BACKLINKS` describes the on-disk shape (`{from, to, type}` JSONL). But maintaining it by hand is impossible — every atom mutation touches multiple edges. Today there's no derivation pipeline, so the file stays empty (or worse, drifts from canonical crosslinks).
+`[[CONCEPT--MEMORY-VECTOR-BACKLINKS]]` describes the on-disk shape (`{from, to, type}` JSONL). But maintaining it by hand is impossible — every atom mutation touches multiple edges. Today there's no derivation pipeline, so the file stays empty (or worse, drifts from canonical crosslinks).
 
 ## Hypothesis
 
@@ -42,4 +42,8 @@ Out:
 
 ## Source
 
-Implements `CONCEPT--MEMORY-VECTOR-BACKLINKS`. Spec §7.3.
+Implements `[[CONCEPT--MEMORY-VECTOR-BACKLINKS]]`. Spec §7.3.
+
+## Connections
+- [[FRAMEWORK--CROSSLINKS-VOCABULARY]]
+

@@ -53,7 +53,7 @@ human gate   : Opus layer           (exit code 4)
 - One subprocess wrapper, two callers — removes the drift risk between primary and escalator paths.
 
 ### Negative
-- Hosted Gemini introduces a token cost; not appropriate for high-volume T1 microtasks. Default stays on local Ollama (per `ADR--DEFAULT-SLM-OLLAMA-QWEN-CODER`).
+- Hosted Gemini introduces a token cost; not appropriate for high-volume T1 microtasks. Default stays on local Ollama (per `[[ADR--DEFAULT-SLM-OLLAMA-QWEN-CODER]]`).
 - CLI dependency: `gemini --version` must exist on PATH when the provider is enabled. The new `SlmError('config')` makes the failure mode explicit.
 
 ### Neutral
@@ -62,3 +62,7 @@ human gate   : Opus layer           (exit code 4)
 ## Status
 
 Draft. Promotion to `stable` requires green CI on Node 20 + 22 with the new `test/codegen/slm/gemini.test.ts` passing.
+
+## Connections
+- [[CONCEPT--CODEGEN-MICROTASK-RUNNER]]
+

@@ -12,7 +12,7 @@ crosslinks: {"references":["ADR--MONOREPO-STRUCTURE","FRAMEWORK--MSP-ARCHITECTUR
 created_at: 2026-05-13T18:35:00+07:00
 ---
 
-# ADR--AGENTIC-MONOREPO-PIVOT
+# [[ADR--AGENTIC-MONOREPO-PIVOT]]
 
 ## Context
 The `cognitive_system` monorepo was originally designed with `packages/gks/` as a standalone publishable library (`@freshair129/gks`). This requirement forced a fragmented architecture where each package (GKS and MSP) maintained its own documentation, scripts, and atom vaults. This duplication resulted in increased maintenance overhead, inconsistent documentation, and complex cross-package workflows.
@@ -37,3 +37,9 @@ We have decided to drop the requirement for standalone publishing of the GKS pac
 
 ## What's NOT affected
 The separation of concerns between the GKS engine and the MSP orchestrator remains intact. GKS continues to function as the storage-engine sub-system, and its scope as defined in `ADR-008` still holds within the unified monorepo structure.
+
+## Connections
+- [[ADR--MONOREPO-STRUCTURE]]
+- [[FRAMEWORK--MSP-ARCHITECTURE-V2]]
+- [[CONCEPT--AGENT-AGNOSTIC]]
+

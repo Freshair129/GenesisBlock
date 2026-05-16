@@ -282,15 +282,15 @@ level, in addition to the parametrised TS suite:
   implementation details that may change without amending this doc.
 - The exact Cypher subset (deferred to BLUEPRINT §"Cypher v0 scope").
 - The on-disk file format byte layout (lives in
-  `BLUEPRINT--GENESIS-GRAPH-INTEGRATION` and any future
-  `ENTITY--GENESIS-BLOCK-FILE-FORMAT` atom).
+  `[[BLUEPRINT--GENESIS-GRAPH-INTEGRATION]]` and any future
+  `[[ENTITY--GENESIS-BLOCK-FILE-FORMAT]]` atom).
 
 ## 10. Amendment policy
 
 Any change to §1–§7 that breaks JS ↔ Rust ABI compatibility requires:
 
 1. A new ADR superseding the relevant section of
-   `ADR--GENESIS-GRAPH-AS-GKS-BACKEND`.
+   `[[ADR--GENESIS-GRAPH-AS-GKS-BACKEND]]`.
 2. A schema version bump per §6.
 3. A migration routine in `migrations/`.
 4. Reciprocal `supersedes` / `superseded_by` crosslinks per the MSP
@@ -302,5 +302,5 @@ the BLUEPRINT.
 
 ## Source
 
-`ADR--GENESIS-GRAPH-AS-GKS-BACKEND`, `BLUEPRINT--GENESIS-GRAPH-INTEGRATION`,
-`CONCEPT--GENESIS-GRAPH-BACKEND`.
+`[[ADR--GENESIS-GRAPH-AS-GKS-BACKEND]]`, `[[BLUEPRINT--GENESIS-GRAPH-INTEGRATION]]`,
+`[[CONCEPT--GENESIS-GRAPH-BACKEND]]`.

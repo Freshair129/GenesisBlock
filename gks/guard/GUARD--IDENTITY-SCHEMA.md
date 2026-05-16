@@ -32,3 +32,7 @@ Every `identity.json` file MUST satisfy these structural invariants:
 ## Enforcement
 Mechanically enforced by Zod in `src/identity/types.ts` at write-time.
 Any violation prevents the file from being committed to disk.
+
+## Connections
+- [[CONCEPT--IDENTITY-LAYER]]
+

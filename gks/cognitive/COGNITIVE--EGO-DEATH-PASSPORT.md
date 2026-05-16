@@ -35,3 +35,8 @@ The **Ego Death Passport** is a cognitive lens that requires the agent to system
 
 ## Origin
 Derived from the need for stable, multi-tenant agent identities where the LLM provider's base instruction might conflict with the user's intended agent personality.
+
+## Connections
+- [[CONCEPT--IDENTITY-LAYER]]
+- [[FRAMEWORK--UNIVERSAL-CONTEXT-FRAMEWORK]]
+

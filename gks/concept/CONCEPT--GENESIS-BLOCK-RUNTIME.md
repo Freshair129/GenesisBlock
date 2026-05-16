@@ -26,7 +26,7 @@ created_at: 2026-05-14T03:30:00.000+07:00
 
 ## Problem
 
-`SPEC--GENESIS-BLOCK-MANIFEST` defines a Genesis Block as a *composite knowledge unit*: a `GENESIS--<NAME>` manifest atom plus the member atoms it aggregates across the 5-dimension EVA 4.0 core (Algo + Concept + Cognitive + Runbook + Params, plus optional Guard/Safety/Stack/Protocol/Mod/Spec).
+`[[SPEC--GENESIS-BLOCK-MANIFEST]]` defines a Genesis Block as a *composite knowledge unit*: a `GENESIS--<NAME>` manifest atom plus the member atoms it aggregates across the 5-dimension EVA 4.0 core (Algo + Concept + Cognitive + Runbook + Params, plus optional Guard/Safety/Stack/Protocol/Mod/Spec).
 
 The SPEC is descriptive — it pins the *shape* of a block manifest but says nothing about how an agent should *use* one at runtime. Specifically:
 
@@ -49,17 +49,17 @@ A Genesis Block Runtime is a thin, composable layer that:
 
 The runtime owns *composition*. It does **not** own:
 
-- Tier routing — that's `dispatch()`'s job (`BLUEPRINT--AGENT-DISPATCHER`)
+- Tier routing — that's `dispatch()`'s job (`[[BLUEPRINT--AGENT-DISPATCHER]]`)
 - Atom storage — that's the resolver's job (`packages/msp/src/brain/`)
-- Manifest validation — that's the validator's job (eventually a future `PROTO--GENESIS-BLOCK-MEMBERSHIP`)
+- Manifest validation — that's the validator's job (eventually a future `[[PROTO--GENESIS-BLOCK-MEMBERSHIP]]`)
 
 ## Why not just call dispatch() directly?
 
 A reasonable question: if the agent has a prompt and a tier router, why bother with a "Genesis Block"? The answer is reuse + provenance.
 
-**Reuse.** Five-dimension blocks crystallise a behavior into a *named, citable unit*. Instead of pasting the same Cognitive lens + Algorithm + SOP + Params into every prompt by hand, the agent loads `GENESIS--IDENTITY-ENGINE` once, and the runtime composes the prompt deterministically every time. The block becomes addressable — by id, in conversation, in other atoms via `crosslinks.references`.
+**Reuse.** Five-dimension blocks crystallise a behavior into a *named, citable unit*. Instead of pasting the same Cognitive lens + Algorithm + SOP + Params into every prompt by hand, the agent loads `[[GENESIS--IDENTITY-ENGINE]]` once, and the runtime composes the prompt deterministically every time. The block becomes addressable — by id, in conversation, in other atoms via `crosslinks.references`.
 
-**Provenance.** Every execution carries the block id + tier used. The episode atom written by `dispatch()` (via `result-recorder.ts`) records *which Genesis Block produced this output*, so an audit can ask: "show me everything `GENESIS--IDENTITY-ENGINE` did this week".
+**Provenance.** Every execution carries the block id + tier used. The episode atom written by `dispatch()` (via `result-recorder.ts`) records *which Genesis Block produced this output*, so an audit can ask: "show me everything `[[GENESIS--IDENTITY-ENGINE]]` did this week".
 
 **Separation of concerns.** Authors maintain the 5 dimension atoms in `gks/`; the runtime composes them at execution time. Edit the `ALGO--` atom and the next invocation picks up the change — no prompt copy-paste hell.
 
@@ -111,11 +111,16 @@ The caller can override via `opts.tier`, which becomes `dispatch`'s `budget_hint
 
 ## What this CONCEPT does not cover
 
-- The frontmatter contract for `GENESIS--<NAME>` — owned by `SPEC--GENESIS-BLOCK-MANIFEST`
-- Validator enforcement of member resolution / status cascade — deferred to a future `PROTO--GENESIS-BLOCK-MEMBERSHIP`
+- The frontmatter contract for `GENESIS--<NAME>` — owned by `[[SPEC--GENESIS-BLOCK-MANIFEST]]`
+- Validator enforcement of member resolution / status cascade — deferred to a future `[[PROTO--GENESIS-BLOCK-MEMBERSHIP]]`
 - Per-member token budgeting or block-level cache — a future enhancement, out of Phase E5 scope
 - Multi-block composition (chaining two Genesis Blocks together) — a future runtime feature
 
 ## Source
 
-Phase E5 of the agentic-monorepo plan. Pins the runtime contract before code lands so the implementation in `packages/msp/src/genesis/` can be reviewed against this CONCEPT and the `BLUEPRINT--GENESIS-BLOCK-RUNTIME` plan.
+Phase E5 of the agentic-monorepo plan. Pins the runtime contract before code lands so the implementation in `packages/msp/src/genesis/` can be reviewed against this CONCEPT and the `[[BLUEPRINT--GENESIS-BLOCK-RUNTIME]]` plan.
+
+## Connections
+- [[CONCEPT--AGENT-AGNOSTIC]]
+- [[CONCEPT--AGENT-TIER-ROUTING]]
+

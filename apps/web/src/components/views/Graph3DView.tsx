@@ -29,8 +29,10 @@ export const Graph3DView: React.FC<Graph3DViewProps> = ({ notes, edges, focusId,
   const [size, setSize] = useState({ w: 800, h: 600 });
   const [hover, setHover] = useState<{ id: string, x: number, y: number } | null>(null);
   const [params, setParams] = useState({
-    autoRotate: true, signals: true, neurites: true, depth: true, speed: 0.3, nodeSize: 1.0,
+    autoRotate: true, signals: true, depth: true, speed: 0.3, nodeSize: 1.0,
+    showTags: false, showOrphans: true
   });
+  const [showFilters, setShowFilters] = useState(false);
 
   // Camera state
   const camRef = useRef({ yaw: 0.6, pitch: -0.25, dist: 700, target: { x: 0, y: 0, z: 0 } });
@@ -39,13 +41,15 @@ export const Graph3DView: React.FC<Graph3DViewProps> = ({ notes, edges, focusId,
     links: SimLink[], 
     byNode: Record<string, SimNode> 
   } | null>(null);
+  const alphaRef = useRef(1.0);
 
   // Sim init
   useEffect(() => {
-    const byId = Object.fromEntries(notes.map(n => [n.id, n]));
+    const { notes: processedNotes, edges: processedEdges } = GKS_SERVICE.getGraphWithTags(notes, edges, params.showTags, params.showOrphans);
+    const byId = Object.fromEntries(processedNotes.map(n => [n.id, n]));
     const R = 280;
-    const simNodes: SimNode[] = notes.map((n, i) => {
-      const phi = Math.acos(1 - 2 * (i + 0.5) / notes.length);
+    const simNodes: SimNode[] = processedNotes.map((n, i) => {
+      const phi = Math.acos(1 - 2 * (i + 0.5) / processedNotes.length);
       const theta = Math.PI * (1 + Math.sqrt(5)) * i;
       return {
         ...n,
@@ -56,7 +60,7 @@ export const Graph3DView: React.FC<Graph3DViewProps> = ({ notes, edges, focusId,
         deg: 0,
       };
     });
-    const links: SimLink[] = edges
+    const links: SimLink[] = processedEdges
       .filter(e => byId[e.source] && byId[e.target])
       .map(e => ({ source: e.source, target: e.target, phase: Math.random() }));
     
@@ -69,7 +73,8 @@ export const Graph3DView: React.FC<Graph3DViewProps> = ({ notes, edges, focusId,
       links, 
       byNode: Object.fromEntries(simNodes.map(n => [n.id, n])) 
     };
-  }, [notes, edges]);
+    alphaRef.current = 1.0;
+  }, [notes, edges, params.showTags, params.showOrphans]);
 
   // Resize
   useEffect(() => {
@@ -80,13 +85,6 @@ export const Graph3DView: React.FC<Graph3DViewProps> = ({ notes, edges, focusId,
     return () => ro.disconnect();
   }, []);
 
-  // Drag / Interaction
-  const dragRef = useRef({ down: false, lx: 0, ly: 0 });
-  
-  const onMouseDown = (e: React.MouseEvent) => { 
-    dragRef.current = { down: true, lx: e.clientX, ly: e.clientY }; 
-  };
-  
   const project = React.useCallback((x: number, y: number, z: number) => {
     const cam = camRef.current;
     const cy = Math.cos(cam.yaw), sy = Math.sin(cam.yaw);
@@ -102,9 +100,11 @@ export const Graph3DView: React.FC<Graph3DViewProps> = ({ notes, edges, focusId,
     return { sx: x1 * s, sy: y1 * s, depth: zEye, scale: s };
   }, []);
 
-  const nodeR = React.useCallback((n: SimNode, scale: number) => 
-    Math.max(2.4, (3 + Math.sqrt(n.deg) * 1.4) * scale * 0.9 * params.nodeSize), 
-  [params.nodeSize]);
+  const nodeR = React.useCallback((n: SimNode, scale: number) => {
+    const isTag = n.id.startsWith('tag:');
+    const base = isTag ? 2.2 : (3 + Math.sqrt(n.deg) * 1.4);
+    return Math.max(2.4, base * scale * 0.9 * params.nodeSize);
+  }, [params.nodeSize]);
 
   const pickNode = (mx: number, my: number) => {
     const sim = simRef.current; if (!sim) return null;
@@ -116,123 +116,45 @@ export const Graph3DView: React.FC<Graph3DViewProps> = ({ notes, edges, focusId,
       const r = nodeR(n, p.scale);
       const dx = mx - x, dy = my - y;
       const d2 = dx * dx + dy * dy;
-      if (d2 < (r + 6) * (r + 6) && p.depth < bestD) { best = n; bestD = p.depth; }
+      if (d2 < (r + 8) * (r + 8) && p.depth < bestD) { best = n; bestD = p.depth; }
     }
     return best;
   };
 
+  const dragRef = useRef({ down: false, lx: 0, ly: 0 });
+  const onMouseDown = (e: React.MouseEvent) => { dragRef.current = { down: true, lx: e.clientX, ly: e.clientY }; };
   const onMouseMove = (e: React.MouseEvent) => {
     if (!canvasRef.current) return;
     const rect = canvasRef.current.getBoundingClientRect();
     const mx = e.clientX - rect.left, my = e.clientY - rect.top;
     if (dragRef.current.down) {
-      const dx = e.clientX - dragRef.current.lx;
-      const dy = e.clientY - dragRef.current.ly;
-      camRef.current.yaw += dx * 0.005;
-      camRef.current.pitch += dy * 0.005;
+      camRef.current.yaw += (e.clientX - dragRef.current.lx) * 0.005;
+      camRef.current.pitch += (e.clientY - dragRef.current.ly) * 0.005;
       camRef.current.pitch = Math.max(-1.2, Math.min(1.2, camRef.current.pitch));
       dragRef.current.lx = e.clientX; dragRef.current.ly = e.clientY;
-      setParams(p => p.autoRotate ? { ...p, autoRotate: false } : p);
+      setParams(p => ({ ...p, autoRotate: false }));
       setHover(null);
     } else {
       const hit = pickNode(mx, my);
       setHover(hit ? { id: hit.id, x: mx, y: my } : null);
     }
   };
-
   const onMouseUp = (e: React.MouseEvent) => {
-    if (!canvasRef.current) return;
-    const rect = canvasRef.current.getBoundingClientRect();
-    const mx = e.clientX - rect.left, my = e.clientY - rect.top;
-    const moved = Math.abs(e.clientX - dragRef.current.lx) > 4 || Math.abs(e.clientY - dragRef.current.ly) > 4;
     dragRef.current.down = false;
-    if (!moved) {
-      const hit = pickNode(mx, my);
-      if (hit) onOpen?.(hit.id);
-    }
+    const rect = canvasRef.current!.getBoundingClientRect();
+    const mx = e.clientX - rect.left, my = e.clientY - rect.top;
+    const hit = pickNode(mx, my);
+    if (hit) onOpen?.(hit.id);
   };
-
   const onWheel = (e: React.WheelEvent) => {
-    const factor = Math.exp(e.deltaY * 0.001);
-    camRef.current.dist = Math.max(220, Math.min(1800, camRef.current.dist * factor));
+    camRef.current.dist = Math.max(220, Math.min(1800, camRef.current.dist * Math.exp(e.deltaY * 0.001)));
   };
 
-  // Animation & Draw Loop
-  const alphaRef = useRef(1); // Simulation energy level
-
-  useEffect(() => {
-    let raf: number, t0 = performance.now();
-    const tick = (now: number) => {
-      const dt = Math.min(0.05, (now - t0) / 1000); t0 = now;
-      const sim = simRef.current;
-      
-      // Only run physics if there's energy (alpha > 0.01)
-      if (sim && alphaRef.current > 0.01) {
-        const nodes = sim.nodes, links = sim.links;
-        const alpha = alphaRef.current;
-        const REPEL = 1800 * alpha, LINK_K = 0.05 * alpha, LINK_D = 110, CENTER = 0.012 * alpha;
-        
-        // Repulsion (O(N^2)) - we can optimize by only repelling nodes with higher degree
-        for (let i = 0; i < nodes.length; i++) {
-          const a = nodes[i];
-          // Optimization: skip repulsion for very far or low energy nodes
-          for (let j = i + 1; j < nodes.length; j++) {
-            const b = nodes[j];
-            let dx = b.x - a.x, dy = b.y - a.y, dz = b.z - a.z;
-            let d2 = dx * dx + dy * dy + dz * dz + 0.1;
-            if (d2 > 600 * 600) continue; // Skip far nodes
-            const d = Math.sqrt(d2);
-            const f = REPEL / d2;
-            const fx = (dx / d) * f, fy = (dy / d) * f, fz = (dz / d) * f;
-            a.vx -= fx; a.vy -= fy; a.vz -= fz;
-            b.vx += fx; b.vy += fy; b.vz += fz;
-          }
-        }
-        
-        // Links
-        for (const l of links) {
-          const a = sim.byNode[l.source], b = sim.byNode[l.target]; if (!a || !b) continue;
-          const dx = b.x - a.x, dy = b.y - a.y, dz = b.z - a.z;
-          const d = Math.sqrt(dx * dx + dy * dy + dz * dz) || 0.1;
-          const diff = (d - LINK_D) * LINK_K;
-          const fx = (dx / d) * diff, fy = (dy / d) * diff, fz = (dz / d) * diff;
-          a.vx += fx; a.vy += fy; a.vz += fz;
-          b.vx -= fx; b.vy -= fy; b.vz -= fz;
-        }
-        
-        // Integration
-        for (const n of nodes) {
-          n.vx += -n.x * CENTER; n.vy += -n.y * CENTER; n.vz += -n.z * CENTER;
-          n.vx *= 0.8; n.vy *= 0.8; n.vz *= 0.8;
-          n.x += n.vx; n.y += n.vy; n.z += n.vz;
-        }
-        
-        // Cool down
-        alphaRef.current *= 0.985;
-      }
-
-      if (sim) {
-        if (params.signals) {
-          for (const l of sim.links) {
-            l.phase += dt * (0.35 + (Math.sin(l.phase * 3.0) + 1) * 0.18) * params.speed * 2;
-            if (l.phase > 1) l.phase -= 1;
-          }
-        }
-        if (params.autoRotate) camRef.current.yaw += dt * 0.08 * params.speed;
-      }
-      
-      draw();
-      raf = requestAnimationFrame(tick);
-    };
-    raf = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(raf);
-  }, [size, params, focusId]);
-
-  const hexA = (hex: string, a: number) => {
+  const hexA = React.useCallback((hex: string, a: number) => {
     const h = hex.replace("#", "");
     const r = parseInt(h.slice(0, 2), 16), g = parseInt(h.slice(2, 4), 16), b = parseInt(h.slice(4, 6), 16);
     return `rgba(${r},${g},${b},${a})`;
-  };
+  }, []);
 
   const draw = React.useCallback(() => {
     const canvas = canvasRef.current; if (!canvas) return;
@@ -240,231 +162,147 @@ export const Graph3DView: React.FC<Graph3DViewProps> = ({ notes, edges, focusId,
     if (canvas.width !== size.w * dpr) { canvas.width = size.w * dpr; canvas.height = size.h * dpr; }
     const ctx = canvas.getContext("2d"); if (!ctx) return;
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-
-    // BG
     ctx.fillStyle = "#181818";
     ctx.fillRect(0, 0, size.w, size.h);
 
     const sim = simRef.current; if (!sim) return;
     const cx = size.w / 2, cy = size.h / 2;
-
     const projMap = new Map();
-    for (const n of sim.nodes) {
-      const p = project(n.x, n.y, n.z);
-      if (p) projMap.set(n.id, p);
-    }
+    sim.nodes.forEach(n => { const p = project(n.x, n.y, n.z); if (p) projMap.set(n.id, p); });
 
     const neighbors = new Set<string>();
-    if (focusId) {
-      sim.links.forEach(l => {
-        if (l.source === focusId) neighbors.add(l.target);
-        if (l.target === focusId) neighbors.add(l.source);
-      });
-    }
+    if (focusId) sim.links.forEach(l => { if (l.source === focusId) neighbors.add(l.target); if (l.target === focusId) neighbors.add(l.source); });
+    const hoverNbrs = new Set<string>();
+    if (hover) sim.links.forEach(l => { if (l.source === hover.id) hoverNbrs.add(l.target); if (l.target === hover.id) hoverNbrs.add(l.source); });
 
-    // Edges
-    const ordered = sim.links.map(l => {
+    const orderedLinks = sim.links.map(l => {
       const pa = projMap.get(l.source), pb = projMap.get(l.target);
       if (!pa || !pb) return null;
       return { l, pa, pb, depth: (pa.depth + pb.depth) / 2 };
-    }).filter((o): o is any => o !== null).sort((a, b) => b.depth - a.depth);
+    }).filter((o): o is any => !!o).sort((a,b) => b.depth - a.depth);
 
-    for (const { l, pa, pb } of ordered) {
-      const a = sim.byNode[l.source], b = sim.byNode[l.target];
-      const meta_b = GKS_SERVICE.TYPE_META[b.type as NoteType] || { raw: "#6b7390" };
-      const hot = focusId && (a.id === focusId || b.id === focusId);
-      const dim = focusId && !hot;
-      const ax = cx + pa.sx, ay = cy + pa.sy;
-      const bx = cx + pb.sx, by = cy + pb.sy;
-      const mx = (ax + bx) / 2, my = (ay + by) / 2;
-      const offMag = 18 + Math.min(60, Math.hypot(bx - ax, by - ay) * 0.08);
-      const perpx = -(by - ay), perpy = (bx - ax);
-      const plen = Math.hypot(perpx, perpy) || 1;
-      const cxm = mx + (perpx / plen) * offMag * 0.3;
-      const cym = my + (perpy / plen) * offMag * 0.3;
+    orderedLinks.forEach(({ l, pa, pb }) => {
+      const aId = l.source, bId = l.target;
+      const bNode = sim.byNode[bId];
+      const hot = (focusId && (aId === focusId || bId === focusId)) || (hover && (aId === hover.id || bId === hover.id));
+      const dim = (focusId || hover) && !hot;
+      const isHover = hover && (aId === hover.id || bId === hover.id);
+      
+      const ax = cx + pa.sx, ay = cy + pa.sy, bx = cx + pb.sx, by = cy + pb.sy;
+      const mx = (ax+bx)/2, my = (ay+by)/2;
+      const perpx = -(by-ay), perpy = (bx-ax), plen = Math.hypot(perpx, perpy) || 1;
+      const off = 18 + Math.min(60, Math.hypot(bx-ax, by-ay)*0.08);
+      const cxm = mx + (perpx/plen)*off*0.3, cym = my + (perpy/plen)*off*0.3;
 
-      ctx.strokeStyle = `rgba(${hot ? "124,92,255" : "90,100,140"}, ${dim ? 0.10 : (hot ? 0.85 : 0.35)})`;
+      const color = isHover ? "0,220,255" : (hot ? "124,92,255" : "90,100,140");
+      ctx.strokeStyle = `rgba(${color}, ${dim ? 0.08 : (hot ? 0.85 : 0.35)})`;
       ctx.lineWidth = hot ? 1.4 : 0.7;
-      ctx.beginPath();
-      ctx.moveTo(ax, ay);
-      ctx.quadraticCurveTo(cxm, cym, bx, by);
-      ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(ax, ay); ctx.quadraticCurveTo(cxm, cym, bx, by); ctx.stroke();
 
       if (params.signals && !dim) {
-        const t = l.phase;
-        const u = 1 - t;
-        const px = u * u * ax + 2 * u * t * cxm + t * t * bx;
-        const py = u * u * ay + 2 * u * t * cym + t * t * by;
-        for (let k = 0; k < 5; k++) {
-          const tt = Math.max(0, t - k * 0.04);
-          const uu = 1 - tt;
-          const tx = uu * uu * ax + 2 * uu * tt * cxm + tt * tt * bx;
-          const ty = uu * uu * ay + 2 * uu * tt * cym + tt * tt * by;
-          ctx.beginPath();
-          ctx.arc(tx, ty, 1.6 - k * 0.18, 0, Math.PI * 2);
-          ctx.fillStyle = `rgba(255,255,255,${(1 - k / 5) * (hot ? 0.95 : 0.55)})`;
-          ctx.fill();
-        }
-        ctx.beginPath(); ctx.arc(px, py, 1.8, 0, Math.PI * 2);
-        ctx.fillStyle = meta_b.raw; ctx.fill();
+        const t = l.phase, u = 1-t;
+        const px = u*u*ax + 2*u*t*cxm + t*t*bx, py = u*u*ay + 2*u*t*cym + t*t*by;
+        ctx.beginPath(); ctx.arc(px, py, 1.8, 0, Math.PI*2);
+        ctx.fillStyle = bId.startsWith('tag:') ? "#7c5cff" : (GKS_SERVICE.TYPE_META[bNode?.type as NoteType]?.raw || "#6b7390");
+        ctx.fill();
       }
-    }
+    });
 
-    // Nodes
-    const nodesByDepth = sim.nodes.map(n => ({ n, p: projMap.get(n.id) }))
-      .filter((o): o is { n: SimNode; p: any } => !!o.p)
-      .sort((a, b) => b.p.depth - a.p.depth);
-
-    for (const { n, p } of nodesByDepth) {
-      const meta = GKS_SERVICE.TYPE_META[n.type as NoteType] || { raw: "#6b7390", label: n.type };
+    const orderedNodes = sim.nodes.map(n => ({ n, p: projMap.get(n.id) })).filter(o => !!o.p).sort((a,b) => b.p.depth - a.p.depth);
+    orderedNodes.forEach(({ n, p }) => {
+      const isTag = n.id.startsWith('tag:');
+      const meta = isTag ? { raw: '#7c5cff' } : (GKS_SERVICE.TYPE_META[n.type as NoteType] || { raw: "#6b7390" });
       const r = nodeR(n, p.scale);
       const x = cx + p.sx, y = cy + p.sy;
-      const isFocus = focusId && n.id === focusId;
-      const isNbr = focusId && neighbors.has(n.id);
-      const dim = focusId && !isFocus && !isNbr;
-      const depthFade = params.depth ? Math.max(0.25, Math.min(1, 800 / p.depth)) : 1;
-      const alpha = (dim ? 0.18 : 1) * depthFade;
+      const isFocus = focusId === n.id, isHovered = hover?.id === n.id, isNbr = neighbors.has(n.id) || hoverNbrs.has(n.id);
+      const dim = (focusId || hover) && !isFocus && !isHovered && !isNbr;
+      const alpha = (dim ? 0.15 : 1) * (params.depth ? Math.max(0.25, Math.min(1, 800/p.depth)) : 1);
 
-      // Draw node core
-      ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2);
+      ctx.beginPath();
+      if (isTag) ctx.rect(x-r, y-r, r*2, r*2); else ctx.arc(x, y, r, 0, Math.PI*2);
       ctx.fillStyle = hexA(meta.raw, alpha); ctx.fill();
-      ctx.strokeStyle = `rgba(255,255,255,${alpha * 0.2})`;
-      ctx.lineWidth = 1;
-      ctx.stroke();
-
-      // Draw labels only for focus, neighbors, or very high degree nodes when zoomed in
-      const shouldShowLabel = isFocus || isNbr || (p.scale > 0.8 && n.deg >= 15);
-
-      if (shouldShowLabel) {
-        ctx.font = `${isFocus ? "600 " : ""}10px "Inter"`;
-        ctx.textAlign = "center"; 
-        ctx.fillStyle = `rgba(220, 220, 220, ${alpha * (isFocus ? 1 : 0.7)})`;
-        
-        // Add a subtle dark backing for readability
-        const txt = n.title;
-        const tw = ctx.measureText(txt).width;
-        ctx.fillStyle = `rgba(24, 24, 24, ${alpha * 0.8})`;
-        ctx.fillRect(x - tw/2 - 4, y + r + 4, tw + 8, 14);
-        
-        ctx.fillStyle = `rgba(220, 220, 220, ${alpha})`;
-        ctx.fillText(txt, x, y + r + 14);
+      
+      if (isFocus || isHovered) {
+        ctx.strokeStyle = isHovered ? "rgba(0,220,255,0.8)" : "rgba(255,255,255,0.9)";
+        ctx.lineWidth = 2; ctx.stroke();
       }
-    }
-  }, [size, focusId, params, hexA, nodeR, project]);
+
+      if (isFocus || isHovered || isNbr || (p.scale > 0.8 && n.deg >= 15)) {
+        ctx.font = `${isFocus||isHovered ? "600 " : ""}10px Inter`; ctx.textAlign = "center";
+        const tw = ctx.measureText(n.title).width;
+        ctx.fillStyle = `rgba(24,24,24,${alpha*0.8})`; ctx.fillRect(x-tw/2-4, y+r+4, tw+8, 14);
+        ctx.fillStyle = `rgba(220,220,220,${alpha})`; ctx.fillText(n.title, x, y+r+14);
+      }
+    });
+  }, [size, focusId, hover, params, hexA, nodeR, project]);
 
   useEffect(() => {
     let raf: number, t0 = performance.now();
     const tick = (now: number) => {
       const dt = Math.min(0.05, (now - t0) / 1000); t0 = now;
       const sim = simRef.current;
-      
       if (sim && alphaRef.current > 0.01) {
-        const nodes = sim.nodes, links = sim.links;
-        const alpha = alphaRef.current;
-        const REPEL = 1800 * alpha, LINK_K = 0.05 * alpha, LINK_D = 110, CENTER = 0.012 * alpha;
-        
+        const alpha = alphaRef.current, nodes = sim.nodes, links = sim.links;
+        const REPEL = 1800*alpha, LINK_K = 0.05*alpha, LINK_D = 110, CENTER = 0.012*alpha;
         for (let i = 0; i < nodes.length; i++) {
           const a = nodes[i];
-          for (let j = i + 1; j < nodes.length; j++) {
+          for (let j = i+1; j < nodes.length; j++) {
             const b = nodes[j];
-            const dx = b.x - a.x, dy = b.y - a.y, dz = b.z - a.z;
-            const d2 = dx * dx + dy * dy + dz * dz + 0.1;
-            if (d2 > 600 * 600) continue;
-            const d = Math.sqrt(d2);
-            const f = REPEL / d2;
-            const fx = (dx / d) * f, fy = (dy / d) * f, fz = (dz / d) * f;
-            a.vx -= fx; a.vy -= fy; a.vz -= fz;
-            b.vx += fx; b.vy += fy; b.vz += fz;
+            const dx = b.x-a.x, dy = b.y-a.y, dz = b.z-a.z, d2 = dx*dx+dy*dy+dz*dz+0.1;
+            if (d2 > 600*600) continue;
+            const d = Math.sqrt(d2), f = REPEL/d2;
+            a.vx -= (dx/d)*f; a.vy -= (dy/d)*f; a.vz -= (dz/d)*f;
+            b.vx += (dx/d)*f; b.vy += (dy/d)*f; b.vz += (dz/d)*f;
           }
         }
-        
-        for (const l of links) {
-          const a = sim.byNode[l.source], b = sim.byNode[l.target]; if (!a || !b) continue;
-          const dx = b.x - a.x, dy = b.y - a.y, dz = b.z - a.z;
-          const d = Math.sqrt(dx * dx + dy * dy + dz * dz) || 0.1;
-          const diff = (d - LINK_D) * LINK_K;
-          const fx = (dx / d) * diff, fy = (dy / d) * diff, fz = (dz / d) * diff;
-          a.vx += fx; a.vy += fy; a.vz += fz;
-          b.vx -= fx; b.vy -= fy; b.vz -= fz;
-        }
-        
-        for (const n of nodes) {
-          n.vx += -n.x * CENTER; n.vy += -n.y * CENTER; n.vz += -n.z * CENTER;
+        links.forEach(l => {
+          const a = sim.byNode[l.source], b = sim.byNode[l.target]; if (!a || !b) return;
+          const dx = b.x-a.x, dy = b.y-a.y, dz = b.z-a.z, d = Math.sqrt(dx*dx+dy*dy+dz*dz)||0.1;
+          const f = (d-LINK_D)*LINK_K;
+          a.vx += (dx/d)*f; a.vy += (dy/d)*f; a.vz += (dz/d)*f;
+          b.vx -= (dx/d)*f; b.vy -= (dy/d)*f; b.vz -= (dz/d)*f;
+        });
+        nodes.forEach(n => {
+          n.vx += -n.x*CENTER; n.vy += -n.y*CENTER; n.vz += -n.z*CENTER;
           n.vx *= 0.8; n.vy *= 0.8; n.vz *= 0.8;
           n.x += n.vx; n.y += n.vy; n.z += n.vz;
-        }
-        
+        });
         alphaRef.current *= 0.985;
       }
-
       if (sim) {
-        if (params.signals) {
-          for (const l of sim.links) {
-            l.phase += dt * (0.35 + (Math.sin(l.phase * 3.0) + 1) * 0.18) * params.speed * 2;
-            if (l.phase > 1) l.phase -= 1;
-          }
-        }
-        if (params.autoRotate) camRef.current.yaw += dt * 0.08 * params.speed;
+        if (params.signals) sim.links.forEach(l => { l.phase = (l.phase + dt*(0.35 + (Math.sin(l.phase*3)+1)*0.18)*params.speed*2) % 1; });
+        if (params.autoRotate) camRef.current.yaw += dt*0.08*params.speed;
       }
-      
-      draw();
-      raf = requestAnimationFrame(tick);
+      draw(); raf = requestAnimationFrame(tick);
     };
-    raf = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(raf);
+    raf = requestAnimationFrame(tick); return () => cancelAnimationFrame(raf);
   }, [params, draw]);
 
   return (
     <div className="graph-wrap" ref={wrapRef}>
-      <canvas 
-        ref={canvasRef}
-        className="graph-canvas"
-        onMouseDown={onMouseDown}
-        onMouseMove={onMouseMove}
-        onMouseUp={onMouseUp}
-        onWheel={onWheel}
-      />
+      <canvas ref={canvasRef} className="graph-canvas" onMouseDown={onMouseDown} onMouseMove={onMouseMove} onMouseUp={onMouseUp} onWheel={onWheel} />
       {hover && (
-        <div className="node-hover" style={{ left: hover.x, top: hover.y }}>
+        <div className="node-hover" style={{ left: hover.x, top: hover.y, pointerEvents: 'none' }}>
           <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
-            <TypeDot type={NOTE_BY_ID[hover.id]?.type as NoteType} />
-            <b>{NOTE_BY_ID[hover.id]?.title}</b>
-          </div>
-          <div style={{ color: "var(--text-dim)", fontFamily: "var(--font-mono)", fontSize: 10, marginTop: 2 }}>
-            {hover.id}
+            {hover.id.startsWith('tag:') ? <span style={{ color: '#7c5cff', fontWeight: 600 }}>#</span> : <TypeDot type={NOTE_BY_ID[hover.id]?.type as NoteType} />}
+            <b>{NOTE_BY_ID[hover.id]?.title || hover.id}</b>
           </div>
         </div>
       )}
-      <div className="graph-overlay">
-        <h4>Neural cortex · 3D</h4>
-        {Object.entries(GKS_SERVICE.TYPE_META).map(([t, m]) => (
-          <div className="legend-row" key={t}>
-            <span className="swatch" style={{ background: m.raw }} />
-            <span>{m.label}</span>
+      <div className="graph-controls" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+        <button className="filter-toggle" onClick={() => setShowFilters(!showFilters)} style={{ background: 'var(--bg-3)', border: '1px solid var(--border)', borderRadius: 6, padding: '4px 8px', color: 'var(--text)', cursor: 'pointer', fontSize: 12 }}>
+          Filters {showFilters ? '▼' : '▶'}
+        </button>
+        {showFilters && (
+          <div className="filter-panel" style={{ background: 'var(--bg-3)', border: '1px solid var(--border)', borderRadius: 8, padding: 12, display: 'flex', flexDirection: 'column', gap: 10, minWidth: 160, boxShadow: '0 8px 24px rgba(0,0,0,0.3)' }}>
+            <div className="row" style={{ display: 'flex', justifyContent: 'space-between' }}><label style={{ fontSize: 11 }}>Tags</label><input type="checkbox" checked={params.showTags} onChange={e => setParams(p => ({ ...p, showTags: e.target.checked }))} /></div>
+            <div className="row" style={{ display: 'flex', justifyContent: 'space-between' }}><label style={{ fontSize: 11 }}>Orphans</label><input type="checkbox" checked={params.showOrphans} onChange={e => setParams(p => ({ ...p, showOrphans: e.target.checked }))} /></div>
+            <hr style={{ border: 0, borderTop: '1px solid var(--border)', margin: '4px 0' }} />
+            <div className="row" style={{ display: 'flex', justifyContent: 'space-between' }}><label style={{ fontSize: 11 }}>Auto-orbit</label><span className={"toggle" + (params.autoRotate ? " on" : "")} onClick={() => setParams(p => ({ ...p, autoRotate: !p.autoRotate }))} /></div>
+            <div className="row"><label style={{ fontSize: 11 }}>Speed</label><input type="range" min="0" max="2" step="0.05" value={params.speed} onChange={e => setParams(p => ({ ...p, speed: +e.target.value }))} style={{ width: '100%' }} /></div>
+            <div className="row"><label style={{ fontSize: 11 }}>Node size</label><input type="range" min="0.3" max="3" step="0.1" value={params.nodeSize} onChange={e => setParams(p => ({ ...p, nodeSize: +e.target.value }))} style={{ width: '100%' }} /></div>
           </div>
-        ))}
-      </div>
-      <div className="graph-controls">
-        <div className="row">
-          <label>Auto-orbit</label>
-          <span className={"toggle" + (params.autoRotate ? " on" : "")}
-                onClick={() => setParams(p => ({ ...p, autoRotate: !p.autoRotate }))} />
-        </div>
-        <div className="row">
-          <label>Speed</label>
-          <input type="range" min="0" max="2" step="0.05" value={params.speed}
-                 onChange={e => setParams(p => ({ ...p, speed: +e.target.value }))} />
-        </div>
-        <div className="row">
-          <label>Signals</label>
-          <span className={"toggle" + (params.signals ? " on" : "")}
-                onClick={() => setParams(p => ({ ...p, signals: !p.signals }))} />
-        </div>
-        <div className="row">
-          <label>Node size</label>
-          <input type="range" min="0.3" max="3" step="0.1" value={params.nodeSize}
-                 onChange={e => setParams(p => ({ ...p, nodeSize: +e.target.value }))} />
-        </div>
+        )}
       </div>
     </div>
   );

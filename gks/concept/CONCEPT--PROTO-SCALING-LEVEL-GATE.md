@@ -17,11 +17,11 @@ crosslinks: {"references":["CONCEPT--PROTO-PATTERN","FRAMEWORK--SCALING-LEVELS"]
 created_at: 2026-05-05T16:28:00.000+07:00
 ---
 
-# CONCEPT — PROTO--SCALING-LEVEL-GATE
+# CONCEPT — [[PROTO--SCALING-LEVEL-GATE]]
 
 ## Problem
 
-`FRAMEWORK--SCALING-LEVELS` defines L1/L2/L3 — escalating impact tiers requiring more documentation:
+`[[FRAMEWORK--SCALING-LEVELS]]` defines L1/L2/L3 — escalating impact tiers requiring more documentation:
 
 - **L1** (typo, comment, single-file refactor): no atom required
 - **L2** (single-feature change ≤ N files): CONCEPT + ADR + FEAT
@@ -51,10 +51,14 @@ PR diff inspection. Runs in CI workflow (not local validate, since needs git dif
 
 ## What this CONCEPT does NOT decide
 
-- Heuristic threshold tuning — likely starts conservative (L1 cap = 10 lines), tunes via `PARAM--SCALING-LEVEL-THRESHOLDS`
+- Heuristic threshold tuning — likely starts conservative (L1 cap = 10 lines), tunes via `[[PARAM--SCALING-LEVEL-THRESHOLDS]]`
 - Predicate impl
 - Override syntax in PR description
 
 ## Source
 
-`FRAMEWORK--SCALING-LEVELS`, `CONCEPT--MSP-ROADMAP` §2 M8c.
+`[[FRAMEWORK--SCALING-LEVELS]]`, `[[CONCEPT--MSP-ROADMAP]]` §2 M8c.
+
+## Connections
+- [[CONCEPT--PROTO-PATTERN]]
+

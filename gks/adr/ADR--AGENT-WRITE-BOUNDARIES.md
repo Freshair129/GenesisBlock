@@ -22,7 +22,7 @@ created_at: 2026-05-08T17:01:00.000+07:00
 
 ## Context
 
-`CONCEPT--KNOWLEDGE-LAYERS-V2` proposes a 4-layer model that drops the inbound queue. This ADR fixes the **enforceable boundary**: where can an agent write at runtime, and where is it categorically forbidden?
+`[[CONCEPT--KNOWLEDGE-LAYERS-V2]]` proposes a 4-layer model that drops the inbound queue. This ADR fixes the **enforceable boundary**: where can an agent write at runtime, and where is it categorically forbidden?
 
 The current `msp_spec.md` §13 Authority Matrix is mixed: `gks/blueprints/` is "T3 only — Claude" with direct write permission, while every other atom type goes through inbound. That mix exists because inbound was the gate. Once inbound is gone, the matrix simplifies.
 
@@ -84,7 +84,7 @@ The current spec lets T3 (Claude as developer) edit `gks/blueprint/*.md` directl
 ### Tool-level
 
 - `msp_candidate` MCP tool writes only to `.brain/msp/projects/<ns>/candidates/`. The handler refuses any path outside that directory.
-- `msp_propose` MCP tool is **deleted** in `BLUEPRINT--INBOUND-TO-CANDIDATES-MIGRATION` phase 3.
+- `msp_propose` MCP tool is **deleted** in `[[BLUEPRINT--INBOUND-TO-CANDIDATES-MIGRATION]]` phase 3.
 - All other MSP MCP tools that write (`msp_session_append`, `msp_episode_append`, `msp_remember`, `msp_identity_set`) target `.brain/` only — verified per tool in the migration audit.
 
 ### Documentation
@@ -106,7 +106,7 @@ The current spec lets T3 (Claude as developer) edit `gks/blueprint/*.md` directl
 ### Negative
 
 - **`gks/blueprint/` direct-write convenience lost.** Past pattern of hand-editing a blueprint locally and committing without PR review goes away. Mitigation: most blueprint edits in the repo's history were already done via PR; the few direct-edit cases were small enough to PR easily.
-- **Migration cost.** All atoms that mention "inbound" or §13's mixed matrix need updates. ~10–15 atom edits, plus the spec rewrite. Tracked in `BLUEPRINT--INBOUND-TO-CANDIDATES-MIGRATION`.
+- **Migration cost.** All atoms that mention "inbound" or §13's mixed matrix need updates. ~10–15 atom edits, plus the spec rewrite. Tracked in `[[BLUEPRINT--INBOUND-TO-CANDIDATES-MIGRATION]]`.
 
 ### Neutral
 
@@ -134,13 +134,18 @@ Agents that want to record durable knowledge ask the human in chat ("should I dr
 
 ## What this ADR does NOT change
 
-- `FRAMEWORK--MSP-ARCHITECTURE-V2` boundary between MSP and GKS — orthogonal axis
-- Inbound queue removal mechanics (`BLUEPRINT--INBOUND-TO-CANDIDATES-MIGRATION` owns those)
-- `ADR--HUMAN-REVIEW-GATES` — review is still required for canon entry; this ADR just narrows *where* the review happens to PR review
+- `[[FRAMEWORK--MSP-ARCHITECTURE-V2]]` boundary between MSP and GKS — orthogonal axis
+- Inbound queue removal mechanics (`[[BLUEPRINT--INBOUND-TO-CANDIDATES-MIGRATION]]` owns those)
+- `[[ADR--HUMAN-REVIEW-GATES]]` — review is still required for canon entry; this ADR just narrows *where* the review happens to PR review
 
 ## Source
 
-- `CONCEPT--KNOWLEDGE-LAYERS-V2` — motivation for the boundary
+- `[[CONCEPT--KNOWLEDGE-LAYERS-V2]]` — motivation for the boundary
 - `msp_spec.md` §13 Authority Matrix — the mixed table being simplified
-- `ADR--HUMAN-REVIEW-GATES` — existing principle that review must precede canon
+- `[[ADR--HUMAN-REVIEW-GATES]]` — existing principle that review must precede canon
 - PR #41, PR #42 CI failures — race condition evidence
+
+## Connections
+- [[ADR--PROMOTION-WORKFLOW]]
+- [[ADR--PROMOTION-LEVELS]]
+

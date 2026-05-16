@@ -23,7 +23,7 @@ created_at: 2026-05-09T16:30:00.000+07:00
 
 ## Two graphs, one repo
 
-`FRAMEWORK--KNOWLEDGE-3-TIER` defined the **conceptual** axis of MSP: atoms in `gks/<type>/` connected by `crosslinks` (references / supersedes / implements / parent_blueprint / resolves) and tagged with Safety / Master / Genesis tier. That graph captures **why** code exists.
+`[[FRAMEWORK--KNOWLEDGE-3-TIER]]` defined the **conceptual** axis of MSP: atoms in `gks/<type>/` connected by `crosslinks` (references / supersedes / implements / parent_blueprint / resolves) and tagged with Safety / Master / Genesis tier. That graph captures **why** code exists.
 
 This frame adds an orthogonal **structural** axis: a graph over **source-code symbols** (functions, classes, types, imports) connected by `calls` / `extends` / `implements` / `imports` / `references` / `defines` edges, clustered into communities by Leiden algorithm. That graph captures **how** the code is wired.
 
@@ -49,9 +49,9 @@ The two graphs are **independently queryable** and **link via** `linked_symbols[
 
 ## Symbol Graph Processing Pipeline (12-Stage DAG)
 
-> Alias: **Block Decomposition** — the top-down half of the Genesis Block Cycle (the bottom-up `Block Assembly` half is governed by `FRAMEWORK--PHASE-GOVERNANCE`). See `docs/gks/PRD--GENESIS-BLOCK-CYCLE.md` for the unified vocabulary.
+> Alias: **Block Decomposition** — the top-down half of the Genesis Block Cycle (the bottom-up `Block Assembly` half is governed by `[[FRAMEWORK--PHASE-GOVERNANCE]]`). See `docs/gks/[[PRD--GENESIS-BLOCK-CYCLE]].md` for the unified vocabulary.
 
-เพื่อให้ Symbol Graph มีความแม่นยำเชิงสถาปัตยกรรม (Architectural Meaning) ระบบต้องผ่านกระบวนการประมวลผล 12 ระยะ (Specified by `CONCEPT--SYMBOL-GRAPH-PIPELINE`):
+เพื่อให้ Symbol Graph มีความแม่นยำเชิงสถาปัตยกรรม (Architectural Meaning) ระบบต้องผ่านกระบวนการประมวลผล 12 ระยะ (Specified by `[[CONCEPT--SYMBOL-GRAPH-PIPELINE]]`):
 
 1. **Discovery:** Scan & Structure
 2. **Specialized:** Markdown & COBOL (Legacy support)
@@ -95,14 +95,19 @@ The 6-PR sequence (PR-1 atoms → PR-6 audit + upstream proposal) is the impleme
 ## What this frame does NOT decide
 
 - Specific edge weight scheme (uniform 1.0 in v1; revisit in Phase 2)
-- Specific persistence format details — see `ADR--SYMBOL-GRAPH-PERSISTENCE` (PR-2)
-- Specific MCP tool contracts — see `FEAT--MSP-SYMBOL-MCP` (PR-2)
-- Whether tree-sitter or TS Compiler API is the parser — see `CONCEPT--PARSER-CHOICE` (sibling)
+- Specific persistence format details — see `[[ADR--SYMBOL-GRAPH-PERSISTENCE]]` (PR-2)
+- Specific MCP tool contracts — see `[[FEAT--MSP-SYMBOL-MCP]]` (PR-2)
+- Whether tree-sitter or TS Compiler API is the parser — see `[[CONCEPT--PARSER-CHOICE]]` (sibling)
 
 ## Source
 
 - User design dialogue 2026-05-13 — Defined 12-stage DAG for architectural knowledge transformation
-- `FRAMEWORK--MSP-ARCHITECTURE-V2` — base architecture
-- `PROTO--TRACE-INVARIANTS` — ensures acyclic integrity
-- `FRAMEWORK--KNOWLEDGE-3-TIER` — conceptual axis sibling
+- `[[FRAMEWORK--MSP-ARCHITECTURE-V2]]` — base architecture
+- `[[PROTO--TRACE-INVARIANTS]]` — ensures acyclic integrity
+- `[[FRAMEWORK--KNOWLEDGE-3-TIER]]` — conceptual axis sibling
 - Prior art: ctags, sourcegraph SCIP, scope-graphs (stack-graphs), comby AST-based search
+
+## Connections
+- [[CONCEPT--KNOWLEDGE-LAYERS-V2]]
+- [[ADR--SYMBOL-GRAPH-PROCESSING-STAGES]]
+

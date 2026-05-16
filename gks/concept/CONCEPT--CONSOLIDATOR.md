@@ -50,7 +50,7 @@ Episodes get written via the existing `EpisodicWriter` (`src/memory/episodic/wri
 
 ## Why hybrid scoring (not pure-deterministic, not pure-LLM)
 
-See `ADR--CONSOLIDATOR-HYBRID-SCORING` for the full decision. Briefly:
+See `[[ADR--CONSOLIDATOR-HYBRID-SCORING]]` for the full decision. Briefly:
 
 - **Pure deterministic** is too crude. Length + keyword density miss "important but short" turns (e.g. a one-line decision: "we'll use pgvector, not qdrant").
 - **Pure LLM** is too expensive. Calling a model for every chunk of every session quickly dominates inference cost — and most sessions are obviously low-importance.
@@ -100,4 +100,9 @@ session ends (or msp_remember called)
 
 ## Source
 
-`msp_spec.md` §7c (Passport — Consolidator), `CONCEPT--MEMORY-EPISODIC`, user direction "M7b approach = hybrid (deterministic + LLM borderline)" during M7-prep follow-up cleanup.
+`msp_spec.md` §7c (Passport — Consolidator), `[[CONCEPT--MEMORY-EPISODIC]]`, user direction "M7b approach = hybrid (deterministic + LLM borderline)" during M7-prep follow-up cleanup.
+
+## Connections
+- [[FRAMEWORK--MSP-ARCHITECTURE-V2]]
+- [[CONCEPT--MEMORY-SESSIONS]]
+

@@ -27,7 +27,7 @@ created_at: 2026-05-14T05:30:00.000+07:00
 
 ## 1. Summary
 
-Phase F of `ULTRAPLAN--AGENTIC-MONOREPO-PIVOT` is complete. It closes
+Phase F of `[[ULTRAPLAN--AGENTIC-MONOREPO-PIVOT]]` is complete. It closes
 loose ends from Phase E by wiring promotion ↔ runtime, surfacing the
 cost data already captured in Phase E3, and adding a retention story
 for the episode atoms that started piling up after Phase D.
@@ -57,21 +57,21 @@ did not need its own PR.
   manifest, letting callers branch on provenance.
 - **`msp-usage today | week | month | rollup-week | rollup-month`** —
   daily aggregation over the `USAGE--*` atoms emitted by Phase E3,
-  with `--write` to persist `USAGE--WEEKLY-*` / `USAGE--MONTHLY-*`
+  with `--write` to persist `[[USAGE--WEEKLY]]-*` / `[[USAGE--MONTHLY]]-*`
   roll-up atoms.
 - **`msp-episode-gc`** — applies the retention policy declared in
-  `ADR--EPISODE-GC-POLICY`: keep the last 30 days; for older episodes,
+  `[[ADR--EPISODE-GC-POLICY]]`: keep the last 30 days; for older episodes,
   keep `ok === false` and `severity === 'critical'`; archive the rest
   to `gks/episode/_archive/<YYYY-MM>/`. `--delete` swaps archive for
   unlink. CLI defaults to dry-run; `--apply` required to mutate.
 
 ### 2.3 Atom additions
 
-- `CONCEPT--PROMOTED-BLOCK-REGISTRY`, `BLUEPRINT--MASTER-RUNTIME-INTEGRATION` (F1)
-- `CONCEPT--USAGE-ROLLUPS`, `SPEC--USAGE-ROLLUP-ATOM` (F2)
-- `CONCEPT--EPISODE-RETENTION`, `ADR--EPISODE-GC-POLICY` (F4)
-- Per-stream audits: `AUDIT--PHASE-F1-MASTER-GENESIS-WIRING`,
-  `AUDIT--PHASE-F2-COST-DASHBOARD`, `AUDIT--PHASE-F4-EPISODE-GC`
+- `[[CONCEPT--PROMOTED-BLOCK-REGISTRY]]`, `[[BLUEPRINT--MASTER-RUNTIME-INTEGRATION]]` (F1)
+- `[[CONCEPT--USAGE-ROLLUPS]]`, `[[SPEC--USAGE-ROLLUP-ATOM]]` (F2)
+- `[[CONCEPT--EPISODE-RETENTION]]`, `[[ADR--EPISODE-GC-POLICY]]` (F4)
+- Per-stream audits: `[[AUDIT--PHASE-F1-MASTER-GENESIS-WIRING]]`,
+  `[[AUDIT--PHASE-F2-COST-DASHBOARD]]`, `[[AUDIT--PHASE-F4-EPISODE-GC]]`
 - This roll-up audit.
 
 ### 2.4 Test coverage delta
@@ -89,13 +89,13 @@ did not need its own PR.
 
 ## 3. Known follow-ups
 
-- The episode-storage contradiction surfaced in Phase D (`ADR--BRAIN-PATH-RESOLUTION`
+- The episode-storage contradiction surfaced in Phase D (`[[ADR--BRAIN-PATH-RESOLUTION]]`
   vs. `result-recorder.ts`) is **still open**. F4 retention runs against
   whatever path is in use; it does not resolve where episodes *should*
-  live. Tracked in `SPEC--EPISODE-ATOM` §7.
-- `USAGE--WEEKLY-*` and `USAGE--MONTHLY-*` are emitted by F2 but the
+  live. Tracked in `[[SPEC--EPISODE-ATOM]]` §7.
+- `[[USAGE--WEEKLY]]-*` and `[[USAGE--MONTHLY]]-*` are emitted by F2 but the
   validator does not have dedicated `required_fields` rules for them
-  yet — they pass via the default fallback. A `SPEC--USAGE-ROLLUP-ATOM`
+  yet — they pass via the default fallback. A `[[SPEC--USAGE-ROLLUP-ATOM]]`
   upgrade to strict required-fields is deferred.
 - The `from_master` flag is exposed on `ExecuteResult` but the
   `msp-genesis-exec` CLI does not yet surface it in human-readable
@@ -117,3 +117,8 @@ happened (`result-recorder`), aggregate cost (`msp-usage`), promote
 blocks (`msp-master-propose`), execute them (`msp-genesis-exec`), and
 garbage-collect old episodes (`msp-episode-gc`) — all from a single
 workspace.
+
+## Connections
+- [[AUDIT--PHASE-E1-REAL-CLI-WIRING]]
+- [[AUDIT--PHASE-D-AGENTIC-RUNTIME-COMPLETE]]
+

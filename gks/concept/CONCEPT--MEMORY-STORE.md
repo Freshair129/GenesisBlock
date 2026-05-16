@@ -52,3 +52,8 @@ candidate atoms for the inbound queue.
 `MemoryStore` is **paradigm-agnostic** — works equally for single-tenant
 CLI agents, multi-tenant SaaS, MSP-shaped Memory OS layered above, or
 research projects with custom consolidation cascades.
+
+## Connections
+- [[FRAMEWORK--FOUR-LAYERS]]
+- [[FEAT--LOOKUP-BY-SYMBOL]]
+

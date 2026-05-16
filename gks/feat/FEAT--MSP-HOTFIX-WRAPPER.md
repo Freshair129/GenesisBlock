@@ -75,5 +75,12 @@ $ git commit -m "tweak"
 ## Out of scope
 
 - Auto-SHA detection in `msp:hotfix:open` — user passes `$(git rev-parse HEAD)`.
-- Reviewer enforcement on close per `ADR--HUMAN-REVIEW-GATES` — defer.
+- Reviewer enforcement on close per `[[ADR--HUMAN-REVIEW-GATES]]` — defer.
 - Distributed enforcement across machines — orchestrator's job.
+
+## Connections
+- [[ADR--MSP-HOTFIX-WRAPPER]]
+- [[CONCEPT--MSP-HOTFIX-WRAPPER]]
+- [[FEAT--MSP-PRECOMMIT-HOOK]]
+- [[ADR--HOTFIX-ESCAPE-HATCH]]
+

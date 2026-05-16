@@ -157,3 +157,9 @@ T9 INTEGRATION-TEST + DOGFOOD
 | Empty body | parser returns `body === ''` | warn (not error — some atoms are pure metadata) |
 | Body has `[[X]]` inside fenced code block | wikilink extractor skips lines between ` ``` ` and ` ``` ` | not flagged as dangling |
 ```
+
+## Connections
+- [[FEAT--MSP-VALIDATOR]]
+- [[ADR--MSP-VALIDATOR]]
+- [[CONCEPT--MSP-VALIDATOR]]
+

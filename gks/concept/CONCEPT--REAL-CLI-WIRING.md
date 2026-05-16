@@ -147,7 +147,7 @@ concatenated without escaping under shell mode — this is a real risk for
 **Mitigation in current design**: prompts are treated as
 **trusted-internal** input. They originate from the MSP orchestrator
 (`packages/msp/src/master/`), never from raw external user input. This
-matches the threat model in `BLUEPRINT--AGENT-DISPATCHER`. If/when MSP
+matches the threat model in `[[BLUEPRINT--AGENT-DISPATCHER]]`. If/when MSP
 ever forwards untrusted prompts to a tier CLI, that BLUEPRINT must be
 amended and `spawn-helper.ts` hardened (e.g. resolve full binary paths
 upfront so `shell: false` can be used everywhere).
@@ -170,3 +170,8 @@ upfront so `shell: false` can be used everywhere).
 - Cross-referenced against `qwen.md`, `GEMINI.md` (root docs — qwen.md
   was stale re: `--prompt` flag and is now superseded by this atom's
   positional-arg pattern).
+
+## Connections
+- [[AUDIT--PHASE-E1-REAL-CLI-WIRING]]
+- [[CONCEPT--TIER-3-DEFERRED]]
+

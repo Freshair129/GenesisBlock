@@ -43,3 +43,8 @@ Procedural SOP for migrating identities from legacy single-root setups to the mo
 ## 5. Clean-up
 1. Delete legacy `identity.json` from the repository root.
 2. Update `.gitignore` to ensure local identity files are not committed.
+
+## Connections
+- [[ADR--GLOBAL-VS-WORKSPACE]]
+- [[ALGO--IDENTITY-RESOLUTION]]
+

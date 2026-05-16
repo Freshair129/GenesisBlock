@@ -36,7 +36,7 @@ created_at: 2026-05-05T12:00:00.000+07:00
 
 ## Scope
 
-M7e deliverable: namespaced identity store implementing the "soul" half of the MSP passport per `FEAT--IDENTITY-LAYER`, `BLUEPRINT--IDENTITY-LAYER`, and `ADR--IDENTITY-STORAGE-SHAPE`. Persists profile / voice / preferences as a single atomic-write JSON file at `.brain/msp/projects/<namespace>/identity.json`. Pure plain-data + plain-functions design — no external runtime deps.
+M7e deliverable: namespaced identity store implementing the "soul" half of the MSP passport per `[[FEAT--IDENTITY-LAYER]]`, `[[BLUEPRINT--IDENTITY-LAYER]]`, and `[[ADR--IDENTITY-STORAGE-SHAPE]]`. Persists profile / voice / preferences as a single atomic-write JSON file at `.brain/msp/projects/<namespace>/identity.json`. Pure plain-data + plain-functions design — no external runtime deps.
 
 This implementation **replaces** an earlier YAML+zod attempt that landed during M7-prep and was inconsistent with the BLUEPRINT (different shape, different storage format, validator-coupled). The replacement is doc-faithful (matches BLUEPRINT 1:1 on shape, format, defaults, set-once semantics, lazy expiry).
 
@@ -58,7 +58,7 @@ This implementation **replaces** an earlier YAML+zod attempt that landed during 
 
 ## Boundaries respected
 
-- **No `gks/` writes** — identity is execution state, not durable knowledge (per `ADR--GRAPH-IS-GKS-DOMAIN` spirit). No identity atoms, no crosslinks from identity to atoms.
+- **No `gks/` writes** — identity is execution state, not durable knowledge (per `[[ADR--GRAPH-IS-GKS-DOMAIN]]` spirit). No identity atoms, no crosslinks from identity to atoms.
 - **No MCP tool wrappers** — `msp_identity_get` / `msp_identity_set` are M7f scope.
 - **No cross-namespace operations** — every public function takes `IdentityOptions` and operates on exactly one namespace.
 - **No lockfile / multi-process write safety** — same-process writes are sequenced; cross-process is undefined behaviour per ADR. Multi-process safety is M9 work.
@@ -70,14 +70,14 @@ This implementation **replaces** an earlier YAML+zod attempt that landed during 
 
 | Atom | Phase | Type |
 |---|---|---|
-| `CONCEPT--IDENTITY-LAYER` | 1 | concept (existed) |
-| `PROTOCOL--IDENTITY-API` | 2 | protocol (NEW) |
-| `ALGO--IDENTITY-RESOLUTION` | 2 | algo (NEW) |
-| `ADR--IDENTITY-STORAGE-SHAPE` | 2 | adr (existed) |
-| `FEAT--IDENTITY-LAYER` | 2 | feat (existed) |
-| `MOD--IDENTITY` | 2 | mod (NEW) |
-| `BLUEPRINT--IDENTITY-LAYER` | 3 | blueprint (existed) |
-| `AUDIT--IDENTITY-LAYER` | 6 | audit (updated) |
+| `[[CONCEPT--IDENTITY-LAYER]]` | 1 | concept (existed) |
+| `[[PROTOCOL--IDENTITY-API]]` | 2 | protocol (NEW) |
+| `[[ALGO--IDENTITY-RESOLUTION]]` | 2 | algo (NEW) |
+| `[[ADR--IDENTITY-STORAGE-SHAPE]]` | 2 | adr (existed) |
+| `[[FEAT--IDENTITY-LAYER]]` | 2 | feat (existed) |
+| `[[MOD--IDENTITY]]` | 2 | mod (NEW) |
+| `[[BLUEPRINT--IDENTITY-LAYER]]` | 3 | blueprint (existed) |
+| `[[AUDIT--IDENTITY-LAYER]]` | 6 | audit (updated) |
 
 ## Verification
 
@@ -99,7 +99,7 @@ Test count delta: 348 → 345 (net −3, but +39 new identity tests on top of re
 
 The headline 348→370 number from FEAT was computed assuming a clean baseline (no prior identity impl). Because main already shipped a divergent YAML-based identity in commit `fe013cd`, the net delta differs even though every BLUEPRINT module / test target is met or exceeded. Net coverage of the BLUEPRINT contract is complete.
 
-## Acceptance criteria from `FEAT--IDENTITY-LAYER`
+## Acceptance criteria from `[[FEAT--IDENTITY-LAYER]]`
 
 - [x] `getIdentity(opts)` reads `.brain/msp/projects/<ns>/identity.json`, returns default-constructed Identity if missing, **does NOT** create the file
 - [x] `setProfile(opts, partial)` merges into `profile`; preserves existing fields not in `partial`; bumps `createdAt` only on first write
@@ -107,7 +107,7 @@ The headline 348→370 number from FEAT was computed assuming a clean baseline (
 - [x] `setPreference(opts, key, value, ttl?)` — `expiresAt` ISO or `expiresInMs` relative; both unset → no expiry; both supplied → `expiresAt` wins
 - [x] `getPreference(opts, key)` returns the value if present + non-expired, `null` otherwise; does **NOT** mutate the file (lazy expiry verified by mtime assertion)
 - [x] `prunePreferences(opts)` rewrites the file with expired entries removed; returns count of pruned entries; no-op when nothing is expired (no rewrite)
-- [x] All writes are atomic (tmp file + rename per `ADR--IDENTITY-STORAGE-SHAPE`)
+- [x] All writes are atomic (tmp file + rename per `[[ADR--IDENTITY-STORAGE-SHAPE]]`)
 - [x] Reading a file with `schemaVersion > 1` throws (refuse to clobber newer format)
 - [x] Namespace isolation — operations on namespace A never touch namespace B
 - [x] No `gks/` writes
@@ -194,3 +194,7 @@ Low-level escape hatches are also exported: `identityPath`, `readIdentity`, `wri
 - Implemented by: @claude-opus-4-7
 - Verified by: 39 new tests + validator (112/112) + check-links OK + typecheck clean + npm ci clean
 - Branch: `claude/msp-m7e-identity-impl`
+
+## Connections
+- [[FRAMEWORK--MSP-ARCHITECTURE-V2]]
+

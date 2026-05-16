@@ -131,5 +131,9 @@ MVP ships option (1) with option (3) for `risk: high` only. Option (2) considere
 - Open question §14 OQ-2 — MCP step-up channel; working assumption recorded.
 - WebAuthn (W3C) — Passkey standard.
 - FIDO2 / CTAP2 — hardware-backed credential standard.
-- `CONCEPT--ABAC-POLICY-ENGINE` — how policy triggers step-up.
-- `CONCEPT--SUBJECT-RESOURCE-ACTION-CONTEXT` — `last_step_up_at` lives in Subject.attributes.
+- `[[CONCEPT--ABAC-POLICY-ENGINE]]` — how policy triggers step-up.
+- `[[CONCEPT--SUBJECT-RESOURCE-ACTION-CONTEXT]]` — `last_step_up_at` lives in Subject.attributes.
+
+## Connections
+- [[FRAMEWORK--UNIVERSAL-CONTEXT-FRAMEWORK]]
+

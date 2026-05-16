@@ -32,14 +32,14 @@ created_at: 2026-05-14T03:40:00.000+07:00
 
 ## Scope
 
-Phase E5 of the agentic-monorepo pivot. Lands the composite-execution layer for `GENESIS--<NAME>` manifests as specified in `SPEC--GENESIS-BLOCK-MANIFEST` and planned in `BLUEPRINT--GENESIS-BLOCK-RUNTIME`.
+Phase E5 of the agentic-monorepo pivot. Lands the composite-execution layer for `GENESIS--<NAME>` manifests as specified in `[[SPEC--GENESIS-BLOCK-MANIFEST]]` and planned in `[[BLUEPRINT--GENESIS-BLOCK-RUNTIME]]`.
 
 ## What shipped
 
 ### Atoms (3)
-- `gks/concept/CONCEPT--GENESIS-BLOCK-RUNTIME.md` — what + why for the runtime layer
-- `gks/blueprint/BLUEPRINT--GENESIS-BLOCK-RUNTIME.md` — file layout, public API, test plan
-- `gks/audit/AUDIT--PHASE-E5-GENESIS-BLOCK-RUNTIME.md` — this atom
+- `gks/concept/[[CONCEPT--GENESIS-BLOCK-RUNTIME]].md` — what + why for the runtime layer
+- `gks/blueprint/[[BLUEPRINT--GENESIS-BLOCK-RUNTIME]].md` — file layout, public API, test plan
+- `gks/audit/[[AUDIT--PHASE-E5-GENESIS-BLOCK-RUNTIME]].md` — this atom
 
 ### Code (5 files)
 - `packages/msp/src/genesis/types.ts` — `GenesisManifest`, `ExecuteOptions`, `ExecuteResult`, `LoadedMember`, `Dimension`
@@ -75,11 +75,11 @@ Phase E5 of the agentic-monorepo pivot. Lands the composite-execution layer for 
 
 **Dispatch tier and type.** `executor.ts` always calls `dispatch({type: 'codegen', severity: 'regular', ...})`. The `codegen` type biases automatic tier routing toward T2 (Gemini) — the right default for structured composite execution. Callers can override via `opts.tier`, which becomes `dispatch`'s `budget_hint`. Severity is fixed at `regular` so cost-policy escalation rules apply normally (no special-cased critical bypass).
 
-**Loader fallbacks.** `loadMembers` first tries the canonical `gks/<dim>/<id>.md` location (e.g. `gks/algo/ALGO--FOO.md` for an algo member). On miss, it recursively scans `gks/` so atoms in non-canonical locations are still discovered. This mirrors the strategy used by `packages/msp/src/codegen/master/composer.ts`.
+**Loader fallbacks.** `loadMembers` first tries the canonical `gks/<dim>/<id>.md` location (e.g. `gks/algo/[[ALGO--FOO]].md` for an algo member). On miss, it recursively scans `gks/` so atoms in non-canonical locations are still discovered. This mirrors the strategy used by `packages/msp/src/codegen/master/composer.ts`.
 
 **Manifest shape flexibility.** The SPEC nests members under `members.core.<dim>` + `members.optional.<dim>`. The loader accepts both that nested shape and a flatter `members.<dim>` shape (no `core`/`optional` keys), which is friendlier for tmpdir fixtures and future hand-authored manifests. The runtime treats both equivalently because the SPEC's distinction is descriptive, not behavioral, at execution time.
 
-**No validation here.** The runtime does not enforce the 5-dimension promotion criterion or the status cascade from `SPEC--GENESIS-BLOCK-MANIFEST` §4. That belongs to a future `PROTO--GENESIS-BLOCK-MEMBERSHIP` and the validator, not the runtime.
+**No validation here.** The runtime does not enforce the 5-dimension promotion criterion or the status cascade from `[[SPEC--GENESIS-BLOCK-MANIFEST]]` §4. That belongs to a future `[[PROTO--GENESIS-BLOCK-MEMBERSHIP]]` and the validator, not the runtime.
 
 ## Test summary
 
@@ -93,12 +93,12 @@ test/genesis/cli.test.ts:       help + happy path + error exit codes
 ## What this AUDIT does not close
 
 - Authoring of the first real `GENESIS--<NAME>` atom in the vault — deferred until a concrete block (e.g. `IDENTITY-ENGINE`) is needed
-- Validator enforcement of member resolution — owned by future `PROTO--GENESIS-BLOCK-MEMBERSHIP`
+- Validator enforcement of member resolution — owned by future `[[PROTO--GENESIS-BLOCK-MEMBERSHIP]]`
 - Multi-block chaining, caching, streaming — explicit Phase E5 non-goals
 
 ## References
 
-- Plan: `BLUEPRINT--GENESIS-BLOCK-RUNTIME`
-- Spec: `SPEC--GENESIS-BLOCK-MANIFEST`
-- Concept: `CONCEPT--GENESIS-BLOCK-RUNTIME`
-- Dispatch contract: `BLUEPRINT--AGENT-DISPATCHER`
+- Plan: `[[BLUEPRINT--GENESIS-BLOCK-RUNTIME]]`
+- Spec: `[[SPEC--GENESIS-BLOCK-MANIFEST]]`
+- Concept: `[[CONCEPT--GENESIS-BLOCK-RUNTIME]]`
+- Dispatch contract: `[[BLUEPRINT--AGENT-DISPATCHER]]`

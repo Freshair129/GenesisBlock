@@ -86,6 +86,11 @@ The `chmod-bins.mjs` step ensures the dist file is executable post-build.
 
 ## Source
 
-- `ADR--SYMBOL-GRAPH-PERSISTENCE`, `ADR--LEIDEN-COMMUNITY-DETECTION`
+- `[[ADR--SYMBOL-GRAPH-PERSISTENCE]]`, `[[ADR--LEIDEN-COMMUNITY-DETECTION]]`
 - Existing CLI shape: `src/codegen/cli.ts` + `bin/msp-validate` pattern
 - Existing `chmod-bins.mjs` post-build step
+
+## Connections
+- [[FRAMEWORK--SYMBOL-GRAPH]]
+- [[CONCEPT--PARSER-CHOICE]]
+

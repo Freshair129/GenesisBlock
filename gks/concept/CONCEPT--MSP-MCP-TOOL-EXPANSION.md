@@ -120,4 +120,11 @@ output: { ok: true, identity: Identity }   // returns full identity post-write
 
 ## Source
 
-`msp_spec.md` §6 (MCP server) + §7b–e (tool wrappers per layer); `FEAT--MSP-MCP-SERVER` (M6 — establishes pattern).
+`msp_spec.md` §6 (MCP server) + §7b–e (tool wrappers per layer); `[[FEAT--MSP-MCP-SERVER]]` (M6 — establishes pattern).
+
+## Connections
+- [[FEAT--CONSOLIDATOR]]
+- [[FEAT--RETRIEVAL-ORCHESTRATION]]
+- [[FEAT--COMPRESSOR]]
+- [[FEAT--IDENTITY-LAYER]]
+

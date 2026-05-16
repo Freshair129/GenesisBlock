@@ -29,7 +29,7 @@ created_at: 2026-05-05T18:00:00.000+07:00
 
 ## Scope
 
-Implements `FEAT--PROTO-LOADER` per `BLUEPRINT--PROTO-LOADER` T1..T6. Foundation for M8b–f governance PROTOs.
+Implements `[[FEAT--PROTO-LOADER]]` per `[[BLUEPRINT--PROTO-LOADER]]` T1..T6. Foundation for M8b–f governance PROTOs.
 
 ## What shipped
 
@@ -39,7 +39,7 @@ Implements `FEAT--PROTO-LOADER` per `BLUEPRINT--PROTO-LOADER` T1..T6. Foundation
 | `src/validator/proto/loader.ts` | `discoverProtos()`, `runProtos()`, `shouldFailExit()` |
 | `src/validator/proto/sample.ts` | Trivial demo predicate (default export) |
 | `src/validator/cli.ts` | Calls loader after regular rules; prints PROTO summary; exits 1 if stable + severity:error |
-| `gks/proto/PROTO--SAMPLE-RULE.md` | `status: draft` demo atom |
+| `gks/proto/[[PROTO--SAMPLE-RULE]].md` | `status: draft` demo atom |
 | `test/validator/proto/loader.test.ts` | 16 tests (discover + runProtos + shouldFailExit) |
 | `test/validator/proto/sample.test.ts` | 3 tests (predicate behaviour) |
 
@@ -47,7 +47,7 @@ Implements `FEAT--PROTO-LOADER` per `BLUEPRINT--PROTO-LOADER` T1..T6. Foundation
 
 - [x] **T1 TYPES** — full surface in `types.ts`
 - [x] **T2 LOADER** — `discoverProtos`, `runProtos`, `shouldFailExit` + 16 tests
-- [x] **T3 SAMPLE** — `sample.ts` + `PROTO--SAMPLE-RULE.md` (draft) + 3 tests
+- [x] **T3 SAMPLE** — `sample.ts` + `[[PROTO--SAMPLE-RULE]].md` (draft) + 3 tests
 - [x] **T4 CONTRACT** — N/A: validator's id-format regex already accepts `PROTO--*`. `severity` field not in forbidden list. No contract change needed.
 - [x] **T5 CLI** — `src/validator/cli.ts` extended; prints `PROTOs: P passed, Q failed`; exit-code logic
 - [x] **T6 AUDIT** — this file
@@ -79,21 +79,21 @@ Predicates receive `atomicIndex` as `AtomicIndexEntry[]` (array). The CLI conver
 
 ## Counts
 
-- Atoms 142 → 143 (+1 PROTO--SAMPLE-RULE demo)
+- Atoms 142 → 143 (+1 [[PROTO--SAMPLE-RULE]] demo)
 - Tests 478 → 498 (+20)
 - New PROTO directory: `gks/proto/`
 - New impl directory: `src/validator/proto/`
 
 ## Unblocks
 
-- M8b — `PROTO--PHASE-GATES`
-- M8c — `PROTO--SCALING-LEVEL-GATE`
-- M8d — `PROTO--ALGO-PARAM-COUPLING`
-- M8e — `PROTO--AUTHORITY-ENFORCEMENT`
+- M8b — `[[PROTO--PHASE-GATES]]`
+- M8c — `[[PROTO--SCALING-LEVEL-GATE]]`
+- M8d — `[[PROTO--ALGO-PARAM-COUPLING]]`
+- M8e — `[[PROTO--AUTHORITY-ENFORCEMENT]]`
 - M8f — Audit existing rules → promote 3 to PROTO
 
 Each follows the same shape: atom in `gks/proto/`, impl in `src/validator/proto/`, predicate signature `(ctx) => PredicateResult`.
 
 ## Source
 
-`FEAT--PROTO-LOADER`, `BLUEPRINT--PROTO-LOADER`, `ADR--PROTO-ATOM-TYPE`, `CONCEPT--PROTO-PATTERN`.
+`[[FEAT--PROTO-LOADER]]`, `[[BLUEPRINT--PROTO-LOADER]]`, `[[ADR--PROTO-ATOM-TYPE]]`, `[[CONCEPT--PROTO-PATTERN]]`.

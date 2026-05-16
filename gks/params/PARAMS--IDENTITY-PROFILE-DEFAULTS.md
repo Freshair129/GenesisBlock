@@ -37,3 +37,7 @@ Baseline tunable values used when no project-specific identity overrides are pre
 - `max_context_tokens`: 2000
 - `step_up_ttl_seconds`: 300
 - `expand_limit_per_session`: 5
+
+## Connections
+- [[CONCEPT--IDENTITY-LAYER]]
+

@@ -22,7 +22,7 @@ The original 17-prefix taxonomy was implementation-first
 AUDIT). Three orthogonal axes were missing:
 
 1. **Agent governance** — skills, protocols, guardrails, policies, personas
-2. **Requirements engineering** — FR vs NFR vs constraint (split from `CONCEPT--REQ`)
+2. **Requirements engineering** — FR vs NFR vs constraint (split from `[[CONCEPT--REQ]]`)
 3. **Ops governance** — incident post-mortems, issue tracker, risks, runbooks, SLOs
 
 Plus an explicit "we must work without Linear/Jira" requirement.
@@ -56,3 +56,9 @@ Mitigated by `docs/KNOWLEDGE-TYPES.md` + `examples/atom-templates/`.
 - `examples/atom-templates/` — 17 starter `.md` templates
 - This ADR records the decision; the ISSUE-- CLI is shipped separately
   (closed in 3.5.4).
+
+## Connections
+- [[FRAMEWORK--FOUR-LAYERS]]
+- [[ADR--FLAT-ATOM-LAYOUT]]
+- [[CONCEPT--TAXONOMY-V2-3]]
+

@@ -53,9 +53,9 @@ M8f audits each rule and decides:
 | `id-format` | core | structural |
 | `id-filename-match` | core | structural |
 | `future-date` | core | structural; trivially universal |
-| `summary-min` | **PROTO** | governance per `ADR--FORBIDDEN-FIELDS-LIST` (length minimums; soft) |
-| `adr-monotonic` | **PROTO** | governance per `ADR--ANTI-HALLUCINATION-RULES` (numbering rule) |
-| `evidence-for-decisions` | **PROTO** | governance per `ADR--ANTI-HALLUCINATION-RULES` (ADR has Context/Decision/Consequences) |
+| `summary-min` | **PROTO** | governance per `[[ADR--FORBIDDEN-FIELDS-LIST]]` (length minimums; soft) |
+| `adr-monotonic` | **PROTO** | governance per `[[ADR--ANTI-HALLUCINATION-RULES]]` (numbering rule) |
+| `evidence-for-decisions` | **PROTO** | governance per `[[ADR--ANTI-HALLUCINATION-RULES]]` (ADR has Context/Decision/Consequences) |
 | `cite-or-mark-inferred` | **PROTO** | governance, soft warning per ADR |
 
 3 promotions. The promoted PROTOs link to their existing ADRs via `enforces:`.
@@ -77,4 +77,8 @@ After M8f the validator runs structural rules (core, fail-fast) THEN PROTO rules
 
 ## Source
 
-`CONCEPT--MSP-ROADMAP` §2 M8f, `CONCEPT--PROTO-PATTERN`, audit of `src/validator/rules/`.
+`[[CONCEPT--MSP-ROADMAP]]` §2 M8f, `[[CONCEPT--PROTO-PATTERN]]`, audit of `src/validator/rules/`.
+
+## Connections
+- [[FEAT--MSP-VALIDATOR]]
+

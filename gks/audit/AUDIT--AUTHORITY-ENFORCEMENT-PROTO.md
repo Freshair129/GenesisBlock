@@ -24,13 +24,13 @@ phase_override:
 created_at: 2026-05-05T18:12:00.000+07:00
 ---
 
-# M8e — PROTO--AUTHORITY-ENFORCEMENT
+# M8e — [[PROTO--AUTHORITY-ENFORCEMENT]]
 
 ## Scope
 
 Adds a draft-status PROTO that sanity-checks `.brain/msp/authority.yaml`
-against the shape declared in `CONCEPT--PROTO-AUTHORITY-ENFORCEMENT`.
-Companion to `ADR--DELEGATION-POLICY` (M9b). Foundation for the future
+against the shape declared in `[[CONCEPT--PROTO-AUTHORITY-ENFORCEMENT]]`.
+Companion to `[[ADR--DELEGATION-POLICY]]` (M9b). Foundation for the future
 PR-time CI workflow that will match git author tier to touched paths.
 
 ## What shipped
@@ -38,9 +38,9 @@ PR-time CI workflow that will match git author tier to touched paths.
 | File | Purpose |
 |---|---|
 | `src/validator/proto/authority-enforcement.ts` | Predicate: read `.brain/msp/authority.yaml`, parse YAML, validate shape, return violations |
-| `gks/proto/PROTO--AUTHORITY-ENFORCEMENT.md` | `status: draft`, `severity: error` PROTO atom; enforces `FRAMEWORK--AUTHORITY-MATRIX` |
+| `gks/proto/[[PROTO--AUTHORITY-ENFORCEMENT]].md` | `status: draft`, `severity: error` PROTO atom; enforces `[[FRAMEWORK--AUTHORITY-MATRIX]]` |
 | `test/validator/proto/authority-enforcement.test.ts` | 8 tests covering vacuous pass, valid file, invalid YAML, multi-tier user, empty paths, missing inbound, missing top-level keys, non-string entries |
-| `gks/audit/AUDIT--AUTHORITY-ENFORCEMENT-PROTO.md` | this file |
+| `gks/audit/[[AUDIT--AUTHORITY-ENFORCEMENT-PROTO]].md` | this file |
 
 ## What this PROTO checks (and doesn't)
 
@@ -59,7 +59,7 @@ What it does **not** do (out of scope for a PROTO predicate):
 
 - Match `git log` author email/login to a tier
 - Diff `base..head` and check each touched path against the author's tier
-- Enforce the L2/L3 approval matrix from `ADR--DELEGATION-POLICY`
+- Enforce the L2/L3 approval matrix from `[[ADR--DELEGATION-POLICY]]`
 - Read `.brain/msp/authority.yaml` from outside the repo root
 
 PROTO predicates have access only to `atomicIndex: AtomicIndexEntry[]` and
@@ -72,7 +72,7 @@ The shape check is real but partial — without the PR-time matcher, the
 matrix is documented intent, not enforced policy. Promoting to `stable`
 without the workflow would oversell what the PROTO catches. Once the
 companion `.github/workflows/authority-check.yml` lands (M9b follow-up
-per `ADR--DELEGATION-POLICY`), this PROTO can flip to stable.
+per `[[ADR--DELEGATION-POLICY]]`), this PROTO can flip to stable.
 
 ## Decisions during impl
 
@@ -112,7 +112,7 @@ per `ADR--DELEGATION-POLICY`), this PROTO can flip to stable.
 
 ## Counts
 
-- Atoms +2 (`PROTO--AUTHORITY-ENFORCEMENT`, this AUDIT)
+- Atoms +2 (`[[PROTO--AUTHORITY-ENFORCEMENT]]`, this AUDIT)
 - Tests +8 (authority-enforcement.test.ts)
 - New impl: 1 file (`src/validator/proto/authority-enforcement.ts`)
 
@@ -122,7 +122,7 @@ Tracked here so the next milestone slice doesn't lose context:
 
 1. **CI workflow for PR-time enforcement** —
    `.github/workflows/authority-check.yml` reads PR author + diff and
-   applies the matrix per `ADR--DELEGATION-POLICY`. Predicate stays in
+   applies the matrix per `[[ADR--DELEGATION-POLICY]]`. Predicate stays in
    the validator; workflow handles git plumbing.
 
 2. **Promote PROTO to `stable`** once (1) is shipped and observed for at
@@ -133,12 +133,16 @@ Tracked here so the next milestone slice doesn't lose context:
    lowest-tier wins? Boss arbitrates?). Out of scope for M8e per the
    CONCEPT atom.
 
-4. **Default-fallback tier** — `CONCEPT--PROTO-AUTHORITY-ENFORCEMENT`
+4. **Default-fallback tier** — `[[CONCEPT--PROTO-AUTHORITY-ENFORCEMENT]]`
    says T1 is the fallback for unknown authors. The shape check doesn't
    verify or enforce this; a future iteration could check that the union
    of all tier members is non-empty (i.e. someone is configured).
 
 ## Source
 
-`CONCEPT--PROTO-AUTHORITY-ENFORCEMENT`, `ADR--DELEGATION-POLICY`,
-`FRAMEWORK--AUTHORITY-MATRIX`, `FEAT--PROTO-LOADER`, `AUDIT--PROTO-LOADER`.
+`[[CONCEPT--PROTO-AUTHORITY-ENFORCEMENT]]`, `[[ADR--DELEGATION-POLICY]]`,
+`[[FRAMEWORK--AUTHORITY-MATRIX]]`, `[[FEAT--PROTO-LOADER]]`, `[[AUDIT--PROTO-LOADER]]`.
+
+## Connections
+- [[BLUEPRINT--PROTO-LOADER]]
+

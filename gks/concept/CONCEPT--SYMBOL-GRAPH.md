@@ -72,14 +72,18 @@ The Symbol Graph isn't novel; the value is in **integrating it as a first-class 
 
 ## What this concept does NOT define
 
-- Specific persistence format — see `ADR--SYMBOL-GRAPH-PERSISTENCE` (PR-2)
-- Specific parser choice — see `CONCEPT--PARSER-CHOICE` (sibling, this PR)
-- Specific MCP tool contracts — see `FEAT--MSP-SYMBOL-MCP` (PR-2)
+- Specific persistence format — see `[[ADR--SYMBOL-GRAPH-PERSISTENCE]]` (PR-2)
+- Specific parser choice — see `[[CONCEPT--PARSER-CHOICE]]` (sibling, this PR)
+- Specific MCP tool contracts — see `[[FEAT--MSP-SYMBOL-MCP]]` (PR-2)
 - Edge weight scheme beyond "uniform 1.0 in v1"
 - Hierarchical community detection (top-level only in v1)
 
 ## Source
 
 - User design dialogue 2026-05-09 — Tree-sitter + Leiden proposal
-- `FRAMEWORK--SYMBOL-GRAPH` — parent frame
+- `[[FRAMEWORK--SYMBOL-GRAPH]]` — parent frame
 - Prior art: ctags, sourcegraph SCIP, stack-graphs, comby (researched 2026-05-09)
+
+## Connections
+- [[FRAMEWORK--MSP-ARCHITECTURE-V2]]
+

@@ -38,7 +38,7 @@ Mirror, for every atom with `crosslinks.tunes: [...]`:
 2. If the referenced ALGO is present, it MUST declare
    `crosslinks.tunable_by: [..., <this atom's id>, ...]`.
 
-**Existence checks are out of scope** (per `ADR--GRAPH-IS-GKS-DOMAIN`):
+**Existence checks are out of scope** (per `[[ADR--GRAPH-IS-GKS-DOMAIN]]`):
 if the partner atom is missing from the index, GKS's `validate --links`
 catches that. This PROTO only enforces type-pairing + reciprocal coupling
 when both ends are visible in the index.
@@ -86,5 +86,9 @@ atom pair lands and the predicate is observed catching real drift.
 
 ## Source
 
-`CONCEPT--PROTO-ALGO-PARAM-COUPLING`, `ADR--GRAPH-IS-GKS-DOMAIN`,
-`FRAMEWORK--CROSSLINKS-VOCABULARY`.
+`[[CONCEPT--PROTO-ALGO-PARAM-COUPLING]]`, `[[ADR--GRAPH-IS-GKS-DOMAIN]]`,
+`[[FRAMEWORK--CROSSLINKS-VOCABULARY]]`.
+
+## Connections
+- [[CONCEPT--PROTO-PATTERN]]
+

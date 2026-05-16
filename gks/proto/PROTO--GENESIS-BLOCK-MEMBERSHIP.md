@@ -25,9 +25,9 @@ created_at: 2026-05-14T18:30:00.000+07:00
 
 ## Rule
 
-Every atom with `type: genesis` (a Block Manifest, per `CONCEPT--TAXONOMY-V2-3`)
+Every atom with `type: genesis` (a Block Manifest, per `[[CONCEPT--TAXONOMY-V2-3]]`)
 MUST satisfy the membership and lifecycle contract that
-`SPEC--GENESIS-BLOCK-MANIFEST` declares:
+`[[SPEC--GENESIS-BLOCK-MANIFEST]]` declares:
 
 1. **Block fields present** — the manifest declares `members:`,
    `manifest_version:`, and `daci.driver:` (SPEC §2.2).
@@ -91,6 +91,10 @@ output but do not fail-exit, per the PROTO loader's draft policy.
 
 ## Source
 
-`SPEC--GENESIS-BLOCK-MANIFEST` §5 explicitly defers machine enforcement of
-§2.2 / §3 / §4.2 to "a follow-up `PROTO--GENESIS-BLOCK-MEMBERSHIP`". This
+`[[SPEC--GENESIS-BLOCK-MANIFEST]]` §5 explicitly defers machine enforcement of
+§2.2 / §3 / §4.2 to "a follow-up `[[PROTO--GENESIS-BLOCK-MEMBERSHIP]]`". This
 atom is that follow-up.
+
+## Connections
+- [[CONCEPT--PROTO-PATTERN]]
+

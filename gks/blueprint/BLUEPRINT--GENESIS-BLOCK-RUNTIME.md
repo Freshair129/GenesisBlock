@@ -31,7 +31,7 @@ created_at: 2026-05-14T03:35:00.000+07:00
 
 # BLUEPRINT — Genesis Block Runtime
 
-Implementation plan for `CONCEPT--GENESIS-BLOCK-RUNTIME`. Lands in Phase E5 of the agentic-monorepo pivot.
+Implementation plan for `[[CONCEPT--GENESIS-BLOCK-RUNTIME]]`. Lands in Phase E5 of the agentic-monorepo pivot.
 
 ## File layout
 
@@ -182,7 +182,7 @@ Exit codes:
 
 | File | Coverage |
 |---|---|
-| `loader.test.ts` | tmpdir with mock `GENESIS--FOO.md` → assert manifest parses; missing file → throws; flat `members.*` shape supported |
+| `loader.test.ts` | tmpdir with mock `[[GENESIS--FOO]].md` → assert manifest parses; missing file → throws; flat `members.*` shape supported |
 | `composer.test.ts` | All 5 dimensions → 5 sections + user; only 2 dimensions → 2 sections; empty members → just user; section order is stable |
 | `executor.test.ts` | Mock `dispatch()` + a fake manifest/members → assert `executeBlock` passes the composed prompt; budget_hint forwarded when `opts.tier` set; `members_loaded` correct |
 | `cli.test.ts` | `--help` prints usage; missing `--prompt` → exit 2; happy path → calls executeBlock + prints output |
@@ -202,3 +202,9 @@ Phase E5 closes when:
 2. All 4 test files green under `vitest run`
 3. `tsc --noEmit` clean (no `any`, strict mode)
 4. `msp-genesis-exec --help` works end-to-end via the bin entry
+
+## Connections
+- [[SPEC--GENESIS-BLOCK-MANIFEST]]
+- [[BLUEPRINT--AGENT-DISPATCHER]]
+- [[CONCEPT--AGENT-AGNOSTIC]]
+

@@ -62,7 +62,7 @@ T*.task.yaml  ──▶  SLM (Qwen 2.5 Coder)  ──▶  raw output
 Hard rejects (fail acceptance test): `export default`, `req.body`, `req.tenantId`, `// TODO`, `// FIXME`, `// XXX`.
 Soft warns: `console.*`, `process.env.*` at route level.
 
-See `ADR--CODEGEN-FORBIDDEN-PATTERNS` for the full table with rationale per pattern.
+See `[[ADR--CODEGEN-FORBIDDEN-PATTERNS]]` for the full table with rationale per pattern.
 
 ## What gets required (per slot)
 
@@ -72,13 +72,13 @@ See `ADR--CODEGEN-FORBIDDEN-PATTERNS` for the full table with rationale per patt
 | `handler` | `export async function` or `export const = async` |
 | `helpers` | first non-comment line is `export function` or `export const` |
 
-See `ADR--CODEGEN-REQUIRED-PATTERNS`.
+See `[[ADR--CODEGEN-REQUIRED-PATTERNS]]`.
 
 ## Retry policy
 
 ≤ 3 retries with the failed test + matched forbidden pattern fed back into the next prompt. Previous attempt is stripped from context (fresh start each retry). Beyond 3 → escalate to Gemini; beyond Gemini → Opus review.
 
-See `ADR--CODEGEN-RETRY-POLICY`.
+See `[[ADR--CODEGEN-RETRY-POLICY]]`.
 
 ## Why the contract is separate from the atomic contract
 
@@ -87,3 +87,8 @@ The atomic contract governs *frontmatter*; the codegen contract governs *generat
 ## Source
 
 `msp_spec.md` §5 (Codegen Micro-task Contract).
+
+## Connections
+- [[FRAMEWORK--PHASE-GOVERNANCE]]
+- [[CONCEPT--ATOMIC-WRITE-CONTRACT]]
+

@@ -45,3 +45,8 @@ Out:
 ## Source
 
 Closes M3c-4's residual ("real `acceptanceRunner` (spawning vitest in a sandbox) is not in this PR — default no-op"). P0 item #2 from production-readiness backlog.
+
+## Connections
+- [[FEAT--CODEGEN-MICROTASK-RUNNER]]
+- [[ADR--CODEGEN-RETRY-POLICY]]
+

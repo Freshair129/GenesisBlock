@@ -17,11 +17,11 @@ crosslinks: {"references":["CONCEPT--PROTO-PATTERN","FRAMEWORK--PHASE-GOVERNANCE
 created_at: 2026-05-05T16:28:00.000+07:00
 ---
 
-# CONCEPT — PROTO--PHASE-GATES
+# CONCEPT — [[PROTO--PHASE-GATES]]
 
 ## Problem
 
-`FRAMEWORK--PHASE-GOVERNANCE` declares a phase order: P0 FRAME → P1 CONCEPT → P2 ADR/FEAT → P3 BLUEPRINT → P5 CODE → P6 AUDIT. Today the validator does not enforce this — a PR landing P5 code without a P3 BLUEPRINT slips through.
+`[[FRAMEWORK--PHASE-GOVERNANCE]]` declares a phase order: P0 FRAME → P1 CONCEPT → P2 ADR/FEAT → P3 BLUEPRINT → P5 CODE → P6 AUDIT. Today the validator does not enforce this — a PR landing P5 code without a P3 BLUEPRINT slips through.
 
 ## Rule
 
@@ -34,7 +34,7 @@ Equivalent rules for ADR-before-FEAT and CONCEPT-before-ADR (soft warnings; stri
 
 ## Trigger
 
-CI workflow + `npm run msp:validate --all`. As a PROTO atom (per M8a), it lives at `gks/proto/PROTO--PHASE-GATES.md` with predicate at `src/validator/proto/phase-gates.ts`.
+CI workflow + `npm run msp:validate --all`. As a PROTO atom (per M8a), it lives at `gks/proto/[[PROTO--PHASE-GATES]].md` with predicate at `src/validator/proto/phase-gates.ts`.
 
 ## Severity
 
@@ -42,10 +42,14 @@ CI workflow + `npm run msp:validate --all`. As a PROTO atom (per M8a), it lives 
 
 ## What this CONCEPT does NOT decide
 
-- Predicate impl details (lives in BLUEPRINT--PHASE-GATES, future work)
-- The exact FRAME atom this PROTO `enforces:` (likely `FRAMEWORK--PHASE-GOVERNANCE`)
+- Predicate impl details (lives in [[BLUEPRINT--PHASE-GATES]], future work)
+- The exact FRAME atom this PROTO `enforces:` (likely `[[FRAMEWORK--PHASE-GOVERNANCE]]`)
 - Override field shape — to be designed when impl PR opens
 
 ## Source
 
-`FRAMEWORK--PHASE-GOVERNANCE`, `CONCEPT--MSP-ROADMAP` §2 M8b, `CONCEPT--PROTO-PATTERN` (M8a foundation).
+`[[FRAMEWORK--PHASE-GOVERNANCE]]`, `[[CONCEPT--MSP-ROADMAP]]` §2 M8b, `[[CONCEPT--PROTO-PATTERN]]` (M8a foundation).
+
+## Connections
+- [[FEAT--PROTO-LOADER]]
+

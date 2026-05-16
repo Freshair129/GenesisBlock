@@ -29,7 +29,7 @@ created_at: 2026-05-05T20:00:00.000+07:00
 
 ## Scope
 
-Per `CONCEPT--PROTO-AUDIT-EXISTING-RULES`, 3 governance-flavoured rules from `src/validator/rules/` get PROTO atoms documenting them as governance contracts (instead of hardcoded structural rules). The original rule code stays in core for backward-compat; the PROTO ships `status: draft` so it runs but does not fail-exit. Cutover (PROTO promoted to stable + original removed) is M8f-2 follow-up.
+Per `[[CONCEPT--PROTO-AUDIT-EXISTING-RULES]]`, 3 governance-flavoured rules from `src/validator/rules/` get PROTO atoms documenting them as governance contracts (instead of hardcoded structural rules). The original rule code stays in core for backward-compat; the PROTO ships `status: draft` so it runs but does not fail-exit. Cutover (PROTO promoted to stable + original removed) is M8f-2 follow-up.
 
 ## What shipped
 
@@ -39,9 +39,9 @@ Per `CONCEPT--PROTO-AUDIT-EXISTING-RULES`, 3 governance-flavoured rules from `sr
 | `src/validator/proto/summary-min.ts` | wraps `summaryMin` |
 | `src/validator/proto/adr-monotonic.ts` | wraps `adrMonotonic` (filter: type==='adr') |
 | `src/validator/proto/evidence-for-decisions.ts` | wraps `evidenceForDecisions` (filter: type==='adr') |
-| `gks/proto/PROTO--SUMMARY-MIN.md` | atom |
-| `gks/proto/PROTO--ADR-MONOTONIC.md` | atom |
-| `gks/proto/PROTO--EVIDENCE-FOR-DECISIONS.md` | atom |
+| `gks/proto/[[PROTO--SUMMARY-MIN]].md` | atom |
+| `gks/proto/[[PROTO--ADR-MONOTONIC]].md` | atom |
+| `gks/proto/[[PROTO--EVIDENCE-FOR-DECISIONS]].md` | atom |
 
 ## Decisions during impl
 
@@ -65,7 +65,7 @@ Not urgent — the duplicate run is essentially free (same atom is read once for
 
 - `npm run typecheck` → clean
 - `npm test` → 498 → **535 passed** (+37 — ALSO includes loader + sample tests merged earlier from M8a; not all from M8f)
-- `npx tsx src/validator/cli.ts --all` → 9 PROTOs run; 7 pass + 2 surface real warnings against existing atoms (PROTO--PHASE-GATES + PROTO--SCALING-LEVEL-GATE flag stuff in the live tree). All draft → CI exit 0.
+- `npx tsx src/validator/cli.ts --all` → 9 PROTOs run; 7 pass + 2 surface real warnings against existing atoms ([[PROTO--PHASE-GATES]] + [[PROTO--SCALING-LEVEL-GATE]] flag stuff in the live tree). All draft → CI exit 0.
 - `npm run msp:check-links` → OK
 
 ## Counts
@@ -82,4 +82,10 @@ Not urgent — the duplicate run is essentially free (same atom is read once for
 
 ## Source
 
-`CONCEPT--PROTO-AUDIT-EXISTING-RULES`, `FEAT--PROTO-LOADER`, M8a foundation.
+`[[CONCEPT--PROTO-AUDIT-EXISTING-RULES]]`, `[[FEAT--PROTO-LOADER]]`, M8a foundation.
+
+## Connections
+- [[ADR--ANTI-HALLUCINATION-RULES]]
+- [[CONCEPT--PROTO-PATTERN]]
+- [[BLUEPRINT--PROTO-LOADER]]
+

@@ -33,13 +33,13 @@ created_at: 2026-05-03T13:34:05.276+07:00
 
 ## Scope
 
-Closes the doc-to-code loop on `FEAT--MSP-VALIDATOR`, implementing every
+Closes the doc-to-code loop on `[[FEAT--MSP-VALIDATOR]]`, implementing every
 acceptance criterion declared in that atom against the geography in
-`BLUEPRINT--MSP-VALIDATOR`. Note: GKS 3.5.6 caps `phase` at 5, so this
+`[[BLUEPRINT--MSP-VALIDATOR]]`. Note: GKS 3.5.6 caps `phase` at 5, so this
 audit is filed at P5 even though the master-spec phase is P6 — an
 upstream alignment task tracked in M3+.
 
-## Acceptance criteria from FEAT--MSP-VALIDATOR
+## Acceptance criteria from [[FEAT--MSP-VALIDATOR]]
 
 | # | Criterion | Result |
 |---|---|---|
@@ -110,12 +110,12 @@ Files:
 ## Sign-off
 
 - Implemented by: @claude-opus-4-7
-- Verified by: `gks verify-flow FEAT--MSP-VALIDATOR` (OK), `gks validate --links` (OK), `npm test` (49/49)
+- Verified by: `gks verify-flow [[FEAT--MSP-VALIDATOR]]` (OK), `gks validate --links` (OK), `npm test` (49/49)
 - Date: 2026-05-03
 
 ## References
 
-- `FEAT--MSP-VALIDATOR` — acceptance criteria source
-- `BLUEPRINT--MSP-VALIDATOR` — geography + verification plan
-- `ADR--MSP-VALIDATOR` — rule semantics + exit-code contract
+- `[[FEAT--MSP-VALIDATOR]]` — acceptance criteria source
+- `[[BLUEPRINT--MSP-VALIDATOR]]` — geography + verification plan
+- `[[ADR--MSP-VALIDATOR]]` — rule semantics + exit-code contract
 - `msp_spec.md` §4 — atomic write contract that this validator enforces

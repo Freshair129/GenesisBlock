@@ -60,11 +60,11 @@ Touched:
 
 ## Dependencies
 
-- `BLUEPRINT--PHASE-2-SUBAGENT-SCOPING` — scope filter must run before resolution tiering.
-- `FEAT--VAULT-COMPOSITION`, `FEAT--RESOLUTION-EXPAND-ON-DEMAND` — the contracts implemented.
-- `ADR--VAULT-NAMESPACE-LAYERING` — Vault is a runtime view, never stamped.
-- `ADR--RESOLUTION-TIER-COUNT` — 2-tier MVP, 4-tier data model, Phase 3.5 gate.
-- `ADR--DEFAULT-POLICY-POSTURE` — per-endpoint default-deny graduation starts here.
+- `[[BLUEPRINT--PHASE-2-SUBAGENT-SCOPING]]` — scope filter must run before resolution tiering.
+- `[[FEAT--VAULT-COMPOSITION]]`, `[[FEAT--RESOLUTION-EXPAND-ON-DEMAND]]` — the contracts implemented.
+- `[[ADR--VAULT-NAMESPACE-LAYERING]]` — Vault is a runtime view, never stamped.
+- `[[ADR--RESOLUTION-TIER-COUNT]]` — 2-tier MVP, 4-tier data model, Phase 3.5 gate.
+- `[[ADR--DEFAULT-POLICY-POSTURE]]` — per-endpoint default-deny graduation starts here.
 
 ## Tasks
 
@@ -81,6 +81,6 @@ Touched:
 ## Source
 
 - `docs/msp/UNIVERSAL-CONTEXT-FRAMEWORK_spec.md` §11 Phase 3, §5, §6, §10.
-- `FEAT--VAULT-COMPOSITION`, `FEAT--RESOLUTION-EXPAND-ON-DEMAND` — the contracts implemented.
-- `ADR--VAULT-NAMESPACE-LAYERING`, `ADR--RESOLUTION-TIER-COUNT`, `ADR--DEFAULT-POLICY-POSTURE` — governing decisions.
-- `BLUEPRINT--PHASE-2-SUBAGENT-SCOPING` — predecessor phase.
+- `[[FEAT--VAULT-COMPOSITION]]`, `[[FEAT--RESOLUTION-EXPAND-ON-DEMAND]]` — the contracts implemented.
+- `[[ADR--VAULT-NAMESPACE-LAYERING]]`, `[[ADR--RESOLUTION-TIER-COUNT]]`, `[[ADR--DEFAULT-POLICY-POSTURE]]` — governing decisions.
+- `[[BLUEPRINT--PHASE-2-SUBAGENT-SCOPING]]` — predecessor phase.

@@ -28,7 +28,7 @@ created_at: 2026-05-03T16:30:27.474+07:00
 
 ## Scope
 
-Closes FEAT--ACCEPTANCE-VITEST-RUNNER. Closes P0 item #2 (real acceptance runner) from production-readiness backlog.
+Closes [[FEAT--ACCEPTANCE-VITEST-RUNNER]]. Closes P0 item #2 (real acceptance runner) from production-readiness backlog.
 
 ## Acceptance criteria from FEAT
 
@@ -94,3 +94,9 @@ The orchestrator decides which verification files to feed in (M4c keeps that out
 - Implemented by: @claude-opus-4-7
 - Verified by: 13/13 tests including 2 real vitest spawns
 - Date: 2026-05-03
+
+## Connections
+- [[BLUEPRINT--ACCEPTANCE-VITEST-RUNNER]]
+- [[ADR--ACCEPTANCE-VITEST-RUNNER]]
+- [[FEAT--CODEGEN-MICROTASK-RUNNER]]
+

@@ -102,7 +102,7 @@ PROTO predicate. Mechanical. Catches:
 - A.crosslinks.supersedes contains B → B.crosslinks.superseded_by must contain A; B.status must be `superseded`
 - B.crosslinks.superseded_by contains A → A.crosslinks.supersedes must contain B; A.status must NOT be `superseded`
 
-100% recall on the cases it covers. Zero false positives. Pattern matches `PROTO--ALGO-PARAM-COUPLING` already in the repo.
+100% recall on the cases it covers. Zero false positives. Pattern matches `[[PROTO--ALGO-PARAM-COUPLING]]` already in the repo.
 
 ### Layer 2: Domain-scoped uniqueness
 
@@ -121,7 +121,7 @@ CI step on PRs that touch `gks/<type>/*.md`:
 1. Compute embedding of each new/changed atom (using GKS's existing `createEmbedder`)
 2. Compare against embeddings of all `status: stable` atoms of the same type
 3. For any pair with cosine similarity > 0.85, post a PR comment:
-   > "`CONCEPT--FOO` (this PR) is highly similar to existing `CONCEPT--BAR` (sim: 0.91). If they cover overlapping scope, consider supersession."
+   > "`[[CONCEPT--FOO]]` (this PR) is highly similar to existing `[[CONCEPT--BAR]]` (sim: 0.91). If they cover overlapping scope, consider supersession."
 
 **Non-blocking.** Reviewer judges. False positives are fine because the cost is just one extra glance at a comment.
 
@@ -153,7 +153,7 @@ Catches: "two atoms claim opposite things in their body text without overlapping
 **Out of scope (deferred):**
 
 - Cross-type conflicts (CONCEPT vs. ADR vs. BLUEPRINT body claims) — Layer 4 covers this probabilistically; deterministic cross-type rules are a future concern
-- Conflicts inside `.brain/candidates/` (per `CONCEPT--KNOWLEDGE-LAYERS-V2`, candidates are agent-private; not validated as canon)
+- Conflicts inside `.brain/candidates/` (per `[[CONCEPT--KNOWLEDGE-LAYERS-V2]]`, candidates are agent-private; not validated as canon)
 - Auto-rewriting atoms to resolve conflict — purely detection; resolution is human PR work
 - Conflict severity scoring beyond binary (PR-comment-or-not) — could come later
 - Detection of conflicts with external sources (CHANGELOGs, docs, code comments) — out of repo scope
@@ -188,7 +188,12 @@ Blocking layers must be **deterministic** and have **near-zero false-positive to
 
 - Existing validator rules in `src/validator/rules/`
 - Existing PROTO predicates in `gks/proto/` (templates for new PROTOs)
-- `ADR--ANTI-HALLUCINATION-RULES` — write-time anti-hallucination, complementary to PR-time contradiction detection
-- `PROTO--ALGO-PARAM-COUPLING` — pattern for reciprocal-link PROTOs
+- `[[ADR--ANTI-HALLUCINATION-RULES]]` — write-time anti-hallucination, complementary to PR-time contradiction detection
+- `[[PROTO--ALGO-PARAM-COUPLING]]` — pattern for reciprocal-link PROTOs
 - GKS `createEmbedder` — used by Layer 3 (already shipped in 3.6.0)
-- `CONCEPT--KNOWLEDGE-LAYERS-V2` — explains why candidates/ is excluded from contradiction detection
+- `[[CONCEPT--KNOWLEDGE-LAYERS-V2]]` — explains why candidates/ is excluded from contradiction detection
+
+## Connections
+- [[FRAMEWORK--MSP-ARCHITECTURE-V2]]
+- [[CONCEPT--MSP-VALIDATOR]]
+

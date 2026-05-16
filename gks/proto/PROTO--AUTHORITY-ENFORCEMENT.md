@@ -34,7 +34,7 @@ the file must be well-formed and internally consistent:
 - every entry under `tiers.<T>` and `allowed_paths.<T>` is a non-empty string
 - each tier's `allowed_paths` includes at least one entry referencing the
   candidates queue (so T1 has somewhere legal to write — per
-  `ADR--AGENT-WRITE-BOUNDARIES`)
+  `[[ADR--AGENT-WRITE-BOUNDARIES]]`)
 
 If the file is absent the predicate passes vacuously — projects can opt in
 when they're ready.
@@ -71,16 +71,16 @@ block CI. Severity stays `draft` while the M8e rollout settles.
 ## Status
 
 `draft` — gradual rollout. Promotes to `stable` after the companion CI
-workflow (PR-time author/path matching) lands per `ADR--DELEGATION-POLICY`.
+workflow (PR-time author/path matching) lands per `[[ADR--DELEGATION-POLICY]]`.
 
 ## Out of scope (for this PROTO)
 
 PROTO predicates can't see the PR's git author, commit metadata, or diff.
 The actual matrix enforcement (match author tier → check touched paths) is
 a CI workflow concern (e.g. `.github/workflows/authority-check.yml`),
-tracked in `AUDIT--AUTHORITY-ENFORCEMENT-PROTO` as future work.
+tracked in `[[AUDIT--AUTHORITY-ENFORCEMENT-PROTO]]` as future work.
 
 ## Source
 
-`CONCEPT--PROTO-AUTHORITY-ENFORCEMENT`, `FRAMEWORK--AUTHORITY-MATRIX`,
-`ADR--DELEGATION-POLICY`, `FEAT--PROTO-LOADER`.
+`[[CONCEPT--PROTO-AUTHORITY-ENFORCEMENT]]`, `[[FRAMEWORK--AUTHORITY-MATRIX]]`,
+`[[ADR--DELEGATION-POLICY]]`, `[[FEAT--PROTO-LOADER]]`.

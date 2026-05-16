@@ -34,7 +34,7 @@ Single-source-of-truth status snapshot for all M milestones triggered by user di
 | **M3a** | Pre-commit hook | #3 | 49 → 53 | 47 → 53 |
 | **M3 b/c/d** | Contract loader + 4 FEATs + phase-6 wrapper | #4 | 53 → 151 | 53 → 64 |
 | **M4 a-c** | Bin entries + GitHub Actions CI + Ollama SLM + vitest acceptance | #5 | 151 → 178 | 64 → 70 |
-| **M5 a-f** | Pre-push hook + hotfix wrapper + 3 anti-hall + required-fields + ADR--HUMAN-REVIEW-GATES + shellcheck CI | #6 | 178 → 218 | 70 → 84 |
+| **M5 a-f** | Pre-push hook + hotfix wrapper + 3 anti-hall + required-fields + [[ADR--HUMAN-REVIEW-GATES]] + shellcheck CI | #6 | 178 → 218 | 70 → 84 |
 | **M6** | `msp-mcp-server` (6 tools) | #7 | 218 → 233 | 84 → 89 |
 | **M7-prep** | Architecture v2 + spec 2.0.0 (passport over Obsidian-backed GKS) | #8 | 233 | 89 → 95 |
 | **M7-prep follow-up** | GKS audit alignment + 4 upstream proposals + two-repo validation + v0.2.0 | #9 | 233 | 95 → 100 |
@@ -63,10 +63,10 @@ These have CONCEPT atoms scoping the work but no impl yet. Specific FEAT/BLUEPRI
 
 | Milestone | What | PR | Status |
 |---|---|---|---|
-| **M8b** | `PROTO--PHASE-GATES` — enforce P0..P6 ordering at PR-time | #27 | scoped (CONCEPT) |
-| **M8c** | `PROTO--SCALING-LEVEL-GATE` — auto-detect L1/L2/L3 from diff | #27 | scoped (CONCEPT) |
-| **M8d** | `PROTO--ALGO-PARAM-COUPLING` — bi-directional `tunes ↔ tunable_by` (post-audit-scoped smaller) | #27 | scoped (CONCEPT) |
-| **M8e** | `PROTO--AUTHORITY-ENFORCEMENT` — git author tier ↔ paths | #27 | scoped (CONCEPT) |
+| **M8b** | `[[PROTO--PHASE-GATES]]` — enforce P0..P6 ordering at PR-time | #27 | scoped (CONCEPT) |
+| **M8c** | `[[PROTO--SCALING-LEVEL-GATE]]` — auto-detect L1/L2/L3 from diff | #27 | scoped (CONCEPT) |
+| **M8d** | `[[PROTO--ALGO-PARAM-COUPLING]]` — bi-directional `tunes ↔ tunable_by` (post-audit-scoped smaller) | #27 | scoped (CONCEPT) |
+| **M8e** | `[[PROTO--AUTHORITY-ENFORCEMENT]]` — git author tier ↔ paths | #27 | scoped (CONCEPT) |
 | **M8f** | Audit existing rules → promote 3 to PROTOs | #27 | scoped (CONCEPT) |
 | **M9a** | `valid_until` enforcement + scheduled review report | #27 | scoped (CONCEPT) |
 | **M9b** | Delegation policy — L2 = 2 senior, L3 = Boss-only | #27 | shipped (ADR-only — pure policy) |
@@ -84,7 +84,7 @@ The 7 atoms in PR #27 capture intent + rule + trigger + severity for each. Imple
 | **M10b** Optional Kuzu/Neo4j graph backend | Triggered when crosslinks > 50,000 |
 | **M10c** RRF tuning + retrieval benchmarks | Triggered when retrieval quality plateaus → empirical comparison |
 
-These are tracked in `CONCEPT--MSP-ROADMAP` §3-4. No atom debt; intentionally not built without trigger.
+These are tracked in `[[CONCEPT--MSP-ROADMAP]]` §3-4. No atom debt; intentionally not built without trigger.
 
 ## What's now possible
 
@@ -149,3 +149,16 @@ Optional: install Obsidian + Local REST API plugin + Smart Connections plugin (c
 ## Source
 
 Single user direction "วางแผนและทำให้จบ ทุก M" + roadmap atom + 4 parallel subagent dispatches (M7a, M7b impl, M7c impl, M7d impl, M7e impl, M7f impl) + 25 PRs landed across the session.
+
+## Connections
+- [[FRAMEWORK--MSP-ARCHITECTURE-V2]]
+- [[AUDIT--MSP-ARCHITECTURE-V2]]
+- [[AUDIT--M7-PREP-FOLLOWUP]]
+- [[AUDIT--TWO-REPO-VALIDATION]]
+- [[AUDIT--MSP-OBSIDIAN-CLIENT]]
+- [[AUDIT--CONSOLIDATOR]]
+- [[AUDIT--RETRIEVAL-ORCHESTRATION]]
+- [[AUDIT--COMPRESSOR]]
+- [[AUDIT--IDENTITY-LAYER]]
+- [[AUDIT--MSP-MCP-TOOL-EXPANSION]]
+

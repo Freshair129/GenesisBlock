@@ -67,4 +67,9 @@ console.log(result.edgeCount, result.changed)
 
 - Reverse-index lookup ("who points at X?") — computed in-memory at query time.
 - Vector embedding — orchestrator concern.
-- Incremental updates — `ADR--MEMORY-BACKLINKS-INDEXER` rejects this.
+- Incremental updates — `[[ADR--MEMORY-BACKLINKS-INDEXER]]` rejects this.
+
+## Connections
+- [[CONCEPT--MEMORY-BACKLINKS-INDEXER]]
+- [[CONCEPT--MEMORY-VECTOR-BACKLINKS]]
+

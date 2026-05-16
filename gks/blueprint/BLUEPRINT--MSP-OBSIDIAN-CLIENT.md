@@ -116,3 +116,9 @@ T3 REST-MODE         (rest.ts: probe + delegate to GKS adapter)
 T4 CLIENT-FACTORY    (client.ts: pick mode, return shape)
 T5 DEEP-LINK         (smartViewDeepLink helper)
 + test/obsidian/client.test.ts + AUDIT
+
+## Connections
+- [[FEAT--MSP-OBSIDIAN-CLIENT]]
+- [[ADR--MSP-OBSIDIAN-INTEGRATION]]
+- [[CONCEPT--OBSIDIAN-AS-RUNTIME]]
+

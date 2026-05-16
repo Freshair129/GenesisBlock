@@ -42,10 +42,10 @@ Adds the human-triggered apply step (`msp-master-propose apply <proposalPath>`) 
 
 ## Non-goals
 
-- **Auto-applying proposals.** Per `ADR--MASTER-PROMOTION-DOC-TO-CODE` and `CONCEPT--MASTER-PROMOTION`, the human gate is preserved. `apply` is a CLI a human runs; `propose` never invokes it.
+- **Auto-applying proposals.** Per `[[ADR--MASTER-PROMOTION-DOC-TO-CODE]]` and `[[CONCEPT--MASTER-PROMOTION]]`, the human gate is preserved. `apply` is a CLI a human runs; `propose` never invokes it.
 - **Public-API changes.** `ExecuteOptions`, `DispatchTask`, `DispatchResult`, `BrainQuery` and friends keep their existing shapes. Only `ExecuteResult` gains one optional field.
 - **Cross-Master contradiction detection.** Out of scope (Layer 1+).
-- **Token-cap validation on the applied Master.** The existing `PROTO--MASTER-TOKEN-CAP` rule already runs against `gks/master/` and will catch over-long bodies on the normal validator path; the apply step itself does not re-validate.
+- **Token-cap validation on the applied Master.** The existing `[[PROTO--MASTER-TOKEN-CAP]]` rule already runs against `gks/master/` and will catch over-long bodies on the normal validator path; the apply step itself does not re-validate.
 - **Authoring evidence ADRs.** `promotion_adr` is still a human deliverable; `apply` stamps the placeholder but does not create the ADR.
 
 ## Deliverables
@@ -191,9 +191,13 @@ The Master atom files themselves (`gks/master/*.md`) remain tracked — only the
 
 ## Reference
 
-- `CONCEPT--PROMOTED-BLOCK-REGISTRY` — what + why
-- `CONCEPT--MASTER-PROMOTION` — 4-of-5 rule + human gate
-- `CONCEPT--GENESIS-BLOCK-RUNTIME` — executor contract
-- `BLUEPRINT--MASTER-PROMOTION-PIPELINE` — Phase E4 (propose half)
-- `BLUEPRINT--GENESIS-BLOCK-RUNTIME` — Phase E5 (executor half)
-- `SPEC--GENESIS-BLOCK-MANIFEST` § 3.1 + § 5
+- `[[CONCEPT--PROMOTED-BLOCK-REGISTRY]]` — what + why
+- `[[CONCEPT--MASTER-PROMOTION]]` — 4-of-5 rule + human gate
+- `[[CONCEPT--GENESIS-BLOCK-RUNTIME]]` — executor contract
+- `[[BLUEPRINT--MASTER-PROMOTION-PIPELINE]]` — Phase E4 (propose half)
+- `[[BLUEPRINT--GENESIS-BLOCK-RUNTIME]]` — Phase E5 (executor half)
+- `[[SPEC--GENESIS-BLOCK-MANIFEST]]` § 3.1 + § 5
+
+## Connections
+- [[ADR--HUMAN-REVIEW-GATES]]
+

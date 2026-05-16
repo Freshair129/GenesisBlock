@@ -24,7 +24,7 @@ created_at: 2026-05-14T04:05:00.000+07:00
 
 Phase E1 of the post-monorepo-pivot ROADMAP. Verifies and (where needed)
 corrects the invocation patterns used by the T1/T2/T3 tier adapters,
-documents them in `CONCEPT--REAL-CLI-WIRING`, and adds an opt-in
+documents them in `[[CONCEPT--REAL-CLI-WIRING]]`, and adds an opt-in
 integration test suite that exercises the real CLIs locally without
 breaking CI.
 
@@ -54,8 +54,8 @@ breaking CI.
 
 | Atom | Purpose |
 |---|---|
-| `gks/concept/CONCEPT--REAL-CLI-WIRING.md` | Documents the verified invocation pattern + healthcheck semantics + integration-test gating convention. |
-| `gks/audit/AUDIT--PHASE-E1-REAL-CLI-WIRING.md` | This atom. |
+| `gks/concept/[[CONCEPT--REAL-CLI-WIRING]].md` | Documents the verified invocation pattern + healthcheck semantics + integration-test gating convention. |
+| `gks/audit/[[AUDIT--PHASE-E1-REAL-CLI-WIRING]].md` | This atom. |
 
 ## Verification matrix (2026-05-14)
 
@@ -101,18 +101,18 @@ Expected behaviour:
    run-test logs non-zero exit and passes.
 4. Send a prompt with special characters (quotes, backslashes) → confirm
    no shell-injection corruption. (Limited concern: prompts are trusted
-   internal input per `CONCEPT--REAL-CLI-WIRING` §Adapter prompt-arg
+   internal input per `[[CONCEPT--REAL-CLI-WIRING]]` §Adapter prompt-arg
    safety.)
 
 ## Follow-ups (not blocking)
 
 - **`qwen.md` doc cleanup**: that file currently documents the stale
   `--prompt` invocation pattern. A small follow-up PR should update it
-  to point at `CONCEPT--REAL-CLI-WIRING` for the source-of-truth pattern.
+  to point at `[[CONCEPT--REAL-CLI-WIRING]]` for the source-of-truth pattern.
 - **`spawn-helper.ts` hardening**: if MSP ever forwards untrusted prompts
   to a tier CLI, switch to full-binary-path resolution so `shell: false`
   can be used uniformly on Windows. Tracked under
-  `CONCEPT--REAL-CLI-WIRING` §Adapter prompt-arg safety.
+  `[[CONCEPT--REAL-CLI-WIRING]]` §Adapter prompt-arg safety.
 - **CI matrix entry**: optional future work — a separate CI job that
   installs the CLIs and sets `MSP_TEST_REAL_CLIS=1`, gated to the dev
   branch only (not main).

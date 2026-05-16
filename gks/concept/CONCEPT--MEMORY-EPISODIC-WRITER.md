@@ -20,7 +20,7 @@ created_at: 2026-05-03T14:16:39.910+07:00
 
 ## Problem
 
-Session JSONLs grow unboundedly. After 50+ turns, an agent that wants to recall "what did we decide about X" can't reasonably scan the full file. The episodic layer (`CONCEPT--MEMORY-EPISODIC`) defines the rich-summary shape; what's missing is the writer that produces episodes from session ranges.
+Session JSONLs grow unboundedly. After 50+ turns, an agent that wants to recall "what did we decide about X" can't reasonably scan the full file. The episodic layer (`[[CONCEPT--MEMORY-EPISODIC]]`) defines the rich-summary shape; what's missing is the writer that produces episodes from session ranges.
 
 ## Hypothesis
 
@@ -30,7 +30,7 @@ A writer that takes `(episodicId, turnRange, summary?, importance_score)` and ei
 
 In:
 - Append episodes to `episodic_memory.json` keyed by `episodicId`.
-- Schema validation per `CONCEPT--MEMORY-EPISODIC` (importance_score 0..1 enforced).
+- Schema validation per `[[CONCEPT--MEMORY-EPISODIC]]` (importance_score 0..1 enforced).
 - Pluggable summariser: manual, heuristic, or LLM-backed.
 - Idempotency: appending the same `episodicId` twice updates instead of duplicating.
 
@@ -40,4 +40,9 @@ Out:
 
 ## Source
 
-Implements `CONCEPT--MEMORY-EPISODIC`. Spec §7.2.
+Implements `[[CONCEPT--MEMORY-EPISODIC]]`. Spec §7.2.
+
+## Connections
+- [[CONCEPT--MEMORY-SESSIONS]]
+- [[FEAT--MEMORY-SESSIONS-WRITER]]
+

@@ -27,7 +27,7 @@ created_at: 2026-05-03T15:43:38.014+07:00
 
 ## Scope
 
-Closes FEAT--MEMORY-SESSIONS-WRITER. Implementation follows BLUEPRINT geography exactly.
+Closes [[FEAT--MEMORY-SESSIONS-WRITER]]. Implementation follows BLUEPRINT geography exactly.
 
 ## Acceptance criteria from FEAT
 
@@ -53,10 +53,14 @@ total: 20/20
 
 ## Cross-platform note
 
-Lock implementation uses POSIX `fs.open(wx)` + `process.kill(pid, 0)`. Windows compatibility (proper-lockfile or similar) deferred per ADR--MEMORY-SESSIONS-WRITER.
+Lock implementation uses POSIX `fs.open(wx)` + `process.kill(pid, 0)`. Windows compatibility (proper-lockfile or similar) deferred per [[ADR--MEMORY-SESSIONS-WRITER]].
 
 ## Sign-off
 
 - Implemented by: @claude-opus-4-7
 - Verified by: 20/20 tests including cross-process stale-lock recovery
 - Date: 2026-05-03
+
+## Connections
+- [[BLUEPRINT--MEMORY-SESSIONS-WRITER]]
+

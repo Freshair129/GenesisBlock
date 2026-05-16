@@ -33,15 +33,15 @@ created_at: 2026-05-13T10:05:00.000+07:00
 
 ## Goal
 
-Implement the analysis + proposal half of the Master Block promotion workflow described by `CONCEPT--MASTER-PROMOTION`. Phase E4 ships the pipeline that **scans** the vault for Genesis Block manifests, **analyzes** dimension coverage per the 4-of-5 rule, and **proposes** Master atoms by writing scaffolded `.proposal.md` files to `gks/inbound/`. Phase E4 does NOT ship the human-review tooling that promotes a proposal to `gks/master/` — that remains a manual editorial step per `ADR--MASTER-PROMOTION-DOC-TO-CODE`.
+Implement the analysis + proposal half of the Master Block promotion workflow described by `[[CONCEPT--MASTER-PROMOTION]]`. Phase E4 ships the pipeline that **scans** the vault for Genesis Block manifests, **analyzes** dimension coverage per the 4-of-5 rule, and **proposes** Master atoms by writing scaffolded `.proposal.md` files to `gks/inbound/`. Phase E4 does NOT ship the human-review tooling that promotes a proposal to `gks/master/` — that remains a manual editorial step per `[[ADR--MASTER-PROMOTION-DOC-TO-CODE]]`.
 
 ## Non-goals
 
-- Writing to `gks/master/` programmatically (explicit ADR rejection — `ADR--HUMAN-REVIEW-GATES`).
-- Authoring the evidence ADR for each proposed Master (each promotion still needs a human-written `ADR--MASTER-PROMOTION-<topic>`).
-- Validating that proposed Master bodies fit the 400-token cap (the `PROTO--MASTER-TOKEN-CAP` rule already runs against `gks/master/`; proposals live in `inbound/` and bypass that rule by design).
-- Mechanical contradiction detection across Master atoms (deferred to `BLUEPRINT--CONTRADICTION-DETECTION-IMPL` Layer 1+).
-- Updating the validator's per-type required-fields contract for `type: genesis` — deferred to `PROTO--GENESIS-BLOCK-MEMBERSHIP`.
+- Writing to `gks/master/` programmatically (explicit ADR rejection — `[[ADR--HUMAN-REVIEW-GATES]]`).
+- Authoring the evidence ADR for each proposed Master (each promotion still needs a human-written `[[ADR--MASTER-PROMOTION]]-<topic>`).
+- Validating that proposed Master bodies fit the 400-token cap (the `[[PROTO--MASTER-TOKEN-CAP]]` rule already runs against `gks/master/`; proposals live in `inbound/` and bypass that rule by design).
+- Mechanical contradiction detection across Master atoms (deferred to `[[BLUEPRINT--CONTRADICTION-DETECTION-IMPL]]` Layer 1+).
+- Updating the validator's per-type required-fields contract for `type: genesis` — deferred to `[[PROTO--GENESIS-BLOCK-MEMBERSHIP]]`.
 
 ## Deliverables
 
@@ -69,7 +69,7 @@ The function is **pure** — no I/O. Tests mock `lookup` to construct adversaria
 
 Search roots (in priority order, deduplicated by canonical path):
 1. `<root>/gks/genesis/`
-2. `<root>/gks/` (recursive, to catch any GENESIS atom mis-filed during the FRAME→GENESIS rename — see `ADR--TAXONOMY-V2-3-MIGRATION`)
+2. `<root>/gks/` (recursive, to catch any GENESIS atom mis-filed during the FRAME→GENESIS rename — see `[[ADR--TAXONOMY-V2-3-MIGRATION]]`)
 3. `<root>/packages/*/gks/genesis/` (post-migration per-package vaults)
 
 Files whose frontmatter is unparseable or whose `type` is not `genesis` are silently skipped.
@@ -81,7 +81,7 @@ Files whose frontmatter is unparseable or whose `type` is not `genesis` are sile
 1. Build a `lookup` callback that finds atom files under `<root>/gks/**/*.md` (and any `packages/*/gks/**/*.md`), parses frontmatter, returns `{ id, type, status, tags }`. Lookups are cached per call.
 2. Run `analyzeDimensions(block.members, lookup)`.
 3. If `!coverage.promotable`, return `{ promotable: false, reason: '<missing dimensions>' }`.
-4. If `coverage.promotable`, build a `proposed_master_id = MASTER--<deslugged block id>` (e.g. `GENESIS--IDENTITY-ENGINE` → `MASTER--IDENTITY-ENGINE`).
+4. If `coverage.promotable`, build a `proposed_master_id = MASTER--<deslugged block id>` (e.g. `[[GENESIS--IDENTITY-ENGINE]]` → `[[MASTER--IDENTITY-ENGINE]]`).
 5. Build proposed frontmatter:
    ```yaml
    id: MASTER--<NAME>
@@ -127,7 +127,7 @@ Bin registration in `packages/msp/package.json`:
 ### 5. Tests — `packages/msp/test/master/`
 
 - `dimensions.test.ts` — 10+ cases covering: each dimension in isolation, mixed cases, ids with unknown prefix (filtered), unresolved lookup, draft-not-stable members not counted, exactly-4 promotable, exactly-3 not promotable, all-5 promotable, empty input, duplicate ids.
-- `scanner.test.ts` — tmpdir fixture with one `GENESIS--FOO.md` (5-dim manifest), one unrelated CONCEPT, one malformed file, one `type: framework` file with `FRAMEWORK--` prefix (must NOT be picked up). Verify members parsed in order and across `core.*` keys.
+- `scanner.test.ts` — tmpdir fixture with one `[[GENESIS--FOO]].md` (5-dim manifest), one unrelated CONCEPT, one malformed file, one `type: framework` file with `FRAMEWORK--` prefix (must NOT be picked up). Verify members parsed in order and across `core.*` keys.
 - `promote.test.ts` — promotable block returns full proposal; under-promotable block returns `{ promotable: false, reason }`. Verify proposed frontmatter contains the canonical keys and the body has 5 section headings.
 - `cli.test.ts` — spawn the CLI via `tsx src/master/cli.ts --root=<tmpdir>` against a tmpdir; verify the table is printed to stdout. Spawn again with `--write`; verify a `gks/inbound/MASTER--<id>.proposal.md` file appears.
 
@@ -144,11 +144,11 @@ Per CONCEPT §"Out of scope":
 - `gks/master/` writes (human-only)
 - Token-cap enforcement on proposals
 - Cross-Master contradiction detection
-- `PROTO--GENESIS-BLOCK-MEMBERSHIP` (the genesis frontmatter validator rule)
+- `[[PROTO--GENESIS-BLOCK-MEMBERSHIP]]` (the genesis frontmatter validator rule)
 
 ## Reference
 
-- `CONCEPT--MASTER-PROMOTION` § "The 4-of-5 rule"
-- `SPEC--GENESIS-BLOCK-MANIFEST` § 3.1 + § 5
-- `ADR--MASTER-PROMOTION-DOC-TO-CODE` § Decision (human review)
-- `ADR--HUMAN-REVIEW-GATES`
+- `[[CONCEPT--MASTER-PROMOTION]]` § "The 4-of-5 rule"
+- `[[SPEC--GENESIS-BLOCK-MANIFEST]]` § 3.1 + § 5
+- `[[ADR--MASTER-PROMOTION-DOC-TO-CODE]]` § Decision (human review)
+- `[[ADR--HUMAN-REVIEW-GATES]]`
