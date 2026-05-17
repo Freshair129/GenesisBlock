@@ -8,14 +8,14 @@ import { join, resolve } from 'node:path'
 import { parse } from 'yaml'
 
 const rootDir = resolve(process.cwd())
-const registryPath = join(rootDir, 'atom_registry.yaml')
+const schemaPath = join(rootDir, 'atom_schema.yaml')
 
-if (!existsSync(registryPath)) {
-  console.error(`codegen: missing ${registryPath}`)
+if (!existsSync(schemaPath)) {
+  console.error(`codegen: missing ${schemaPath}`)
   process.exit(1)
 }
 
-const registry = parse(readFileSync(registryPath, 'utf8'))
+const registry = parse(readFileSync(schemaPath, 'utf8'))
 const schemasDir = join(rootDir, '.brain', 'msp', 'schemas')
 const promptsDir = join(rootDir, '.brain', 'msp', 'prompts')
 
@@ -24,7 +24,7 @@ mkdirSync(promptsDir, { recursive: true })
 
 let typesProcessed = 0
 
-const taxonomy = registry.schema_config?.taxonomy || registry.taxonomy
+const taxonomy = registry.taxonomy ?? registry.schema_config?.taxonomy
 for (const cluster of Object.values(taxonomy.clusters) as any[]) {
   for (const [id, config] of Object.entries(cluster.types) as [string, any][]) {
     const typeKey = id.toLowerCase()

@@ -8,13 +8,13 @@ import { parse as yamlParse } from 'yaml'
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const ROOT = resolve(__dirname, '..', '..')
 const GKS_DIR = join(ROOT, 'gks')
-const REGISTRY_PATH = join(ROOT, 'atom_registry.yaml')
+const SCHEMA_PATH = join(ROOT, 'atom_schema.yaml')
 
-const registry = yamlParse(readFileSync(REGISTRY_PATH, 'utf8'))
+const schema = yamlParse(readFileSync(SCHEMA_PATH, 'utf8'))
 
-// Flatten registry into prefix → {cluster, role}
+// Flatten taxonomy into prefix → {cluster, role}
 const typeMap = {}
-for (const [clusterName, cluster] of Object.entries(registry.taxonomy.clusters)) {
+for (const [clusterName, cluster] of Object.entries(schema.taxonomy.clusters)) {
   for (const [typeId, config] of Object.entries(cluster.types)) {
     typeMap[typeId.toLowerCase()] = { cluster: clusterName, role: config.role }
   }

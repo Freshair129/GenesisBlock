@@ -1,0 +1,43 @@
+id: pack-task-management
+description: Workflow and priority-based ABAC rules for operational atoms (FEAT--TASK-MANAGEMENT-PACK).
+rules:
+  - id: triage-protection
+    description: Only T2+ agents or humans can triage open issues.
+    effect: deny
+    match:
+      action: [modify]
+    condition:
+      all_of:
+        - resource.attributes.is_operational: { eq: true }
+        - resource.attributes.issue_status: { eq: open }
+        - subject.attributes.tier: { eq: T1 }
+    priority: 950
+
+  - id: urgent-escalation-required
+    description: Require Step-up Auth (PIN) for any modification to urgent tasks.
+    effect: deny
+    match:
+      action: [modify, delete]
+    condition:
+      all_of:
+        - resource.attributes.is_operational: { eq: true }
+        - resource.attributes.issue_priority: { eq: urgent }
+        - subject.last_step_up_at: { not_exists: true }
+    on_deny:
+      obligation:
+        kind: request-step-up-auth
+        params:
+          method: pin
+    priority: 900
+
+  - id: urgent-permitted-with-step-up
+    description: Permit modification of urgent tasks if recently verified (15 min).
+    effect: permit
+    match:
+      action: [modify, delete]
+    condition:
+      all_of:
+        - resource.attributes.is_operational: { eq: true }
+        - resource.attributes.issue_priority: { eq: urgent }
+        - subject.last_step_up_at: { time_within: 900 }
+    priority: 910

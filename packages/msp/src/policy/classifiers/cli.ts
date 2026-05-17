@@ -8,6 +8,7 @@ import { runClassifiers } from './engine.js'
 import { PathClassifier } from './path.js'
 import { ContentClassifier } from './content.js'
 import { CodingClassifier } from './coding.js'
+import { TaskClassifier } from './task.js'
 import type { ClassifiableResource } from './types.js'
 
 const HELP = `msp-tag — Automatic attribute tagging for GKS atoms
@@ -43,6 +44,7 @@ async function main(): Promise<number> {
     new PathClassifier(),
     new ContentClassifier(),
     new CodingClassifier(),
+    new TaskClassifier(),
   ]
   
   let updatedCount = 0
@@ -63,13 +65,15 @@ async function main(): Promise<number> {
         id: fm.id,
         path: relPath,
         body,
-        attributes: fm.attributes || {}
+        // Pass the FULL frontmatter as attributes to classifiers.
+        // The engine and classifiers can then pick what they need.
+        attributes: { ...fm }
       }
 
       const result = await runClassifiers(resource, classifiers)
       
       // Check if anything changed
-      const oldAttrText = JSON.stringify(resource.attributes)
+      const oldAttrText = JSON.stringify(fm.attributes || {})
       const newAttrText = JSON.stringify(result.attributes)
 
       if (oldAttrText !== newAttrText) {

@@ -49,25 +49,27 @@ if (!args.command || !['prompt', 'create', 'scaffold'].includes(args.command)) {
 
 if (!args.type) die('missing --type (e.g. --type=feat)')
 
-// Load registry
+// Load schema (taxonomy + id format) from atom_schema.yaml; fall back to atom_registry.yaml for test mocks
 const rootDir = resolve(args.root ?? process.cwd())
+const schemaPath = join(rootDir, 'atom_schema.yaml')
 const registryPath = join(rootDir, 'atom_registry.yaml')
-if (!existsSync(registryPath)) {
-  die(`could not find atom_registry.yaml at ${registryPath}`)
+const configPath = existsSync(schemaPath) ? schemaPath : registryPath
+if (!existsSync(configPath)) {
+  die(`could not find atom_schema.yaml at ${schemaPath}`)
 }
 
 let registry: any
 try {
-  registry = yamlParse(readFileSync(registryPath, 'utf8'))
+  registry = yamlParse(readFileSync(configPath, 'utf8'))
 } catch (e: any) {
-  die(`failed to parse atom_registry.yaml: ${e.message}`)
+  die(`failed to parse ${configPath}: ${e.message}`)
 }
 
 const type = args.type.toLowerCase()
 
 // Flatten taxonomy for quick lookup
 const TYPE_CONFIG: Record<string, { phase: number; folder: string; tier: string; sections: string[]; db_id?: string; counter?: number; atomId?: string; id?: string; seq_char?: string }> = {}
-const taxonomy = registry.schema_config?.taxonomy || registry.taxonomy
+const taxonomy = registry.taxonomy ?? registry.schema_config?.taxonomy
 if (taxonomy && taxonomy.clusters) {
   for (const cluster of Object.values(taxonomy.clusters) as any[]) {
     for (const [id, config] of Object.entries(cluster.types) as [string, any][]) {
@@ -173,7 +175,7 @@ const firstChar = config.seq_char || type.charAt(0).toUpperCase()
 const atomtypeCounter = config.counter !== undefined ? config.counter : (config.phase !== undefined ? config.phase + 1 : 1)
 
 let atomId = ''
-const schemaSpec = registry.schema_config?.schema_spec || registry.schema_spec
+const schemaSpec = registry.schema_spec ?? registry.schema_config?.schema_spec
 const atomIdTemplate = config.atomId || schemaSpec?.atomId_format || "{atom_counter}"
 atomId = formatTemplate(atomIdTemplate, {
   aliases: type.toUpperCase(),
