@@ -48,7 +48,31 @@ attributes:
   cluster: implementation_flow
   role: Governance / architectural framework
   attributes:
+    id: FRAMEWORK--UNIVERSAL-CONTEXT-FRAMEWORK
+    phase: 0
+    type: framework
+    status: draft
+    tier: process
+    source_type: axiomatic
+    vault_id: default
+    title: Universal context framework — identity-aware, policy-controlled,
+      graded-resolution retrieval
+    tags: *a1
+    crosslinks: *a2
+    created_at: 2026-05-13T08:59:37.161+07:00
+    aliases: *a3
+    cluster: implementation_flow
+    role: Governance / architectural framework
+    attributes:
+      domain: framework
     domain: framework
+    language: markdown
+    is_test: false
+    is_entrypoint: false
+    has_secret: true
+    secret_type: high_entropy_string
+    leak_risk: high
+    encryption_level: none
   domain: framework
   language: markdown
   is_test: false

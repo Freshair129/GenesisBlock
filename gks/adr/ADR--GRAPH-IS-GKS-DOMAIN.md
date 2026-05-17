@@ -44,7 +44,31 @@ attributes:
   cluster: implementation_flow
   role: Architecture decision record
   attributes:
+    id: ADR--GRAPH-IS-GKS-DOMAIN
+    phase: 2
+    type: adr
+    status: stable
+    vault_id: default
+    tier: genesis
+    source_type: axiomatic
+    title: Atomic graph traversal is GKS domain; MSP only does shift-left +
+      type-specific opinions
+    tags: *a1
+    crosslinks: *a2
+    created_at: 2026-05-04T09:02:48.270+07:00
+    aliases: *a3
+    cluster: implementation_flow
+    role: Architecture decision record
+    attributes:
+      domain: adr
     domain: adr
+    language: markdown
+    is_test: false
+    is_entrypoint: false
+    has_secret: true
+    secret_type: high_entropy_string
+    leak_risk: high
+    encryption_level: none
   domain: adr
   language: markdown
   is_test: false

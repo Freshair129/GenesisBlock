@@ -45,7 +45,31 @@ attributes:
   cluster: implementation_flow
   role: Architecture decision record
   attributes:
+    id: ADR--MONOREPO-STRUCTURE
+    phase: 2
+    type: adr
+    status: draft
+    vault_id: default
+    tier: genesis
+    source_type: axiomatic
+    title: Monorepo structure — npm workspaces with `packages/gks/` +
+      `packages/msp/`, GKS still publishes to npm
+    tags: *a1
+    crosslinks: *a2
+    created_at: 2026-05-08T13:21:00.000+07:00
+    aliases: *a3
+    cluster: implementation_flow
+    role: Architecture decision record
+    attributes:
+      domain: adr
     domain: adr
+    language: markdown
+    is_test: false
+    is_entrypoint: false
+    has_secret: true
+    secret_type: high_entropy_string
+    leak_risk: high
+    encryption_level: none
   domain: adr
   language: markdown
   is_test: false

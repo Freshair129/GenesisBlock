@@ -39,7 +39,29 @@ attributes:
   cluster: implementation_flow
   role: Strategic intent / PRD
   attributes:
+    id: CONCEPT--MEMORY-SESSIONS-WRITER
+    phase: 1
+    type: concept
+    status: stable
+    vault_id: default
+    tier: genesis
+    source_type: axiomatic
+    title: Memory sessions writer — append turns to JSONL session log
+    tags: *a1
+    crosslinks: *a2
+    created_at: 2026-05-03T14:16:38.088+07:00
+    aliases: *a3
+    cluster: implementation_flow
+    role: Strategic intent / PRD
+    attributes:
+      domain: concept
     domain: concept
+    language: markdown
+    is_test: false
+    is_entrypoint: false
+    has_secret: false
+    leak_risk: low
+    encryption_level: none
   domain: concept
   language: markdown
   is_test: false

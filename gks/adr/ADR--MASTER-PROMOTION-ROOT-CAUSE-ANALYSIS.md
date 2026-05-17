@@ -43,7 +43,30 @@ attributes:
   cluster: implementation_flow
   role: Architecture decision record
   attributes:
+    id: ADR--MASTER-PROMOTION-ROOT-CAUSE-ANALYSIS
+    phase: 2
+    type: adr
+    status: stable
+    tier: genesis
+    source_type: axiomatic
+    vault_id: default
+    title: Promote root-cause-analysis discipline to MASTER--ROOT-CAUSE-ANALYSIS
+    tags: *a1
+    crosslinks: *a2
+    created_at: 2026-05-17T02:05:00.000+07:00
+    aliases: *a3
+    cluster: implementation_flow
+    role: Architecture decision record
+    attributes:
+      domain: adr
     domain: adr
+    language: markdown
+    is_test: false
+    is_entrypoint: false
+    has_secret: true
+    secret_type: high_entropy_string
+    leak_risk: high
+    encryption_level: none
   domain: adr
   language: markdown
   is_test: false

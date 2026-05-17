@@ -42,7 +42,30 @@ attributes:
   cluster: implementation_flow
   role: Strategic intent / PRD
   attributes:
+    id: CONCEPT--PARSER-CHOICE
+    phase: 1
+    type: concept
+    status: stable
+    tier: genesis
+    source_type: axiomatic
+    vault_id: default
+    title: Parser choice — TypeScript Compiler API in v1, tree-sitter deferred to
+      Phase 2
+    tags: *a1
+    crosslinks: *a2
+    created_at: 2026-05-09T16:32:00.000+07:00
+    aliases: *a3
+    cluster: implementation_flow
+    role: Strategic intent / PRD
+    attributes:
+      domain: concept
     domain: concept
+    language: markdown
+    is_test: false
+    is_entrypoint: false
+    has_secret: false
+    leak_risk: low
+    encryption_level: none
   domain: concept
   language: markdown
   is_test: false

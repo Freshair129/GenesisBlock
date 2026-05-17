@@ -53,7 +53,33 @@ attributes:
   linked_symbols: *a4
   created_at: 2026-05-14T23:46:17.000+07:00
   attributes:
+    id: BLUEPRINT--PHASE-4-USER-ABAC
+    phase: 3
+    type: blueprint
+    status: draft
+    tier: process
+    source_type: axiomatic
+    vault_id: default
+    scale_level: L2
+    title: "BLUEPRINT — Phase 4 user-level ABAC: authenticated Subject, policy
+      packs, all read entry points enforce"
+    aliases: *a1
+    cluster: implementation_flow
+    role: Implementation plan
+    tags: *a2
+    crosslinks: *a3
+    linked_symbols: *a4
+    created_at: 2026-05-14T23:46:17.000+07:00
+    attributes:
+      domain: blueprint
     domain: blueprint
+    language: markdown
+    is_test: false
+    is_entrypoint: false
+    has_secret: true
+    secret_type: high_entropy_string
+    leak_risk: high
+    encryption_level: none
   domain: blueprint
   language: markdown
   is_test: false

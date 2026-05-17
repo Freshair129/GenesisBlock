@@ -43,7 +43,30 @@ attributes:
   cluster: implementation_flow
   role: Architecture decision record
   attributes:
+    id: ADR--PROMOTION-WORKFLOW
+    phase: 2
+    type: adr
+    status: superseded
+    tier: genesis
+    source_type: axiomatic
+    vault_id: default
+    title: Promotion workflow — three gates between agent draft and gks/
+    tags: *a1
+    crosslinks: *a2
+    created_at: 2026-05-03T14:08:40.359+07:00
+    aliases: *a3
+    cluster: implementation_flow
+    role: Architecture decision record
+    attributes:
+      domain: adr
     domain: adr
+    language: markdown
+    is_test: false
+    is_entrypoint: false
+    has_secret: true
+    secret_type: high_entropy_string
+    leak_risk: high
+    encryption_level: none
   domain: adr
   language: markdown
   is_test: false

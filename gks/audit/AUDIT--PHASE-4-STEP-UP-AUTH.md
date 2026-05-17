@@ -38,7 +38,28 @@ attributes:
   cluster: implementation_flow
   role: Test results / quality report
   attributes:
+    id: AUDIT--PHASE-4-STEP-UP-AUTH
+    phase: 6
+    type: audit
+    status: stable
+    tier: process
+    source_type: axiomatic
+    title: "AUDIT - UCF Phase 4: step-up auth and user ABAC"
+    tags: *a1
+    crosslinks: *a2
+    created_at: 2026-05-14T23:30:00+07:00
+    aliases: *a3
+    cluster: implementation_flow
+    role: Test results / quality report
+    attributes:
+      domain: audit
     domain: audit
+    language: markdown
+    is_test: false
+    is_entrypoint: false
+    has_secret: false
+    leak_risk: low
+    encryption_level: none
   domain: audit
   language: markdown
   is_test: false

@@ -52,7 +52,32 @@ attributes:
   cluster: implementation_flow
   role: Implementation plan
   attributes:
+    id: BLUEPRINT--GENESIS-BLOCK-RUNTIME
+    phase: 3
+    type: blueprint
+    status: draft
+    vault_id: default
+    tier: process
+    source_type: axiomatic
+    title: BLUEPRINT — Genesis Block Runtime — implementation plan for composite
+      execution
+    scale_level: feature
+    tags: *a1
+    crosslinks: *a2
+    linked_symbols: *a3
+    created_at: 2026-05-14T03:35:00.000+07:00
+    aliases: *a4
+    cluster: implementation_flow
+    role: Implementation plan
+    attributes:
+      domain: blueprint
     domain: blueprint
+    language: markdown
+    is_test: false
+    is_entrypoint: false
+    has_secret: false
+    leak_risk: low
+    encryption_level: none
   domain: blueprint
   language: markdown
   is_test: false

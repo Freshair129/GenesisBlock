@@ -44,7 +44,31 @@ attributes:
   cluster: implementation_flow
   role: Feature spec
   attributes:
+    id: FEAT--RESOLUTION-EXPAND-ON-DEMAND
+    phase: 2
+    type: feat
+    status: active
+    tier: process
+    source_type: axiomatic
+    vault_id: default
+    title: Resolution expand-on-demand — 2-tier recall + expand() to promote MENTION
+      to FULL
+    tags: *a1
+    crosslinks: *a2
+    created_at: 2026-05-14T19:42:02.796+07:00
+    aliases: *a3
+    cluster: implementation_flow
+    role: Feature spec
+    attributes:
+      domain: feat
     domain: feat
+    language: markdown
+    is_test: false
+    is_entrypoint: false
+    has_secret: true
+    secret_type: high_entropy_string
+    leak_risk: high
+    encryption_level: none
   domain: feat
   language: markdown
   is_test: false

@@ -42,7 +42,31 @@ attributes:
   cluster: implementation_flow
   role: Strategic intent / PRD
   attributes:
+    id: CONCEPT--REAL-CLI-WIRING
+    phase: 1
+    type: concept
+    status: stable
+    vault_id: default
+    tier: process
+    source_type: axiomatic
+    title: Real CLI wiring for T1/T2/T3 tier adapters — invocation patterns + opt-in
+      integration tests
+    tags: *a1
+    crosslinks: *a2
+    created_at: 2026-05-14T04:00:00.000+07:00
+    aliases: *a3
+    cluster: implementation_flow
+    role: Strategic intent / PRD
+    attributes:
+      domain: concept
     domain: concept
+    language: markdown
+    is_test: false
+    is_entrypoint: false
+    has_secret: true
+    secret_type: high_entropy_string
+    leak_risk: high
+    encryption_level: none
   domain: concept
   language: markdown
   is_test: false

@@ -33,7 +33,29 @@ attributes:
   cluster: implementation_flow
   role: Algorithm definition
   attributes:
+    id: ALGO--ATOM-SCAFFOLDING-TOKEN-OPTIMAL
+    phase: 2
+    type: algo
+    status: draft
+    tier: process
+    source_type: axiomatic
+    vault_id: default
+    title: Token-Optimal Atom Scaffolding
+    tags: *a1
+    crosslinks: *a2
+    created_at: 2026-05-17T04:07:43.742+07:00
+    aliases: *a3
+    cluster: implementation_flow
+    role: Algorithm definition
+    attributes:
+      domain: algo
     domain: algo
+    language: markdown
+    is_test: false
+    is_entrypoint: false
+    has_secret: false
+    leak_risk: low
+    encryption_level: none
   domain: algo
   language: markdown
   is_test: false

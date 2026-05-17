@@ -54,7 +54,30 @@ attributes:
   cluster: implementation_flow
   role: Feature spec
   attributes:
+    id: FEAT--MSP-MCP-SERVER
+    phase: 2
+    type: feat
+    status: stable
+    vault_id: default
+    tier: process
+    source_type: axiomatic
+    title: msp-mcp-server — 6 tools over stdio MCP
+    tags: *a1
+    crosslinks: *a2
+    linked_symbols: *a3
+    created_at: 2026-05-03T18:13:54.737+07:00
+    aliases: *a4
+    cluster: implementation_flow
+    role: Feature spec
+    attributes:
+      domain: feat
     domain: feat
+    language: markdown
+    is_test: false
+    is_entrypoint: false
+    has_secret: false
+    leak_risk: low
+    encryption_level: none
   domain: feat
   language: markdown
   is_test: false

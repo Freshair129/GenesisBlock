@@ -41,7 +41,29 @@ attributes:
   cluster: implementation_flow
   role: Strategic intent / PRD
   attributes:
+    id: CONCEPT--IDENTITY-LAYER
+    phase: 1
+    type: concept
+    status: stable
+    vault_id: default
+    tier: genesis
+    source_type: axiomatic
+    title: Identity layer — what makes "this agent is this agent" across sessions
+    tags: *a1
+    crosslinks: *a2
+    created_at: 2026-05-05T00:25:00.000+07:00
+    aliases: *a3
+    cluster: implementation_flow
+    role: Strategic intent / PRD
+    attributes:
+      domain: concept
     domain: concept
+    language: markdown
+    is_test: false
+    is_entrypoint: false
+    has_secret: false
+    leak_risk: low
+    encryption_level: none
   domain: concept
   language: markdown
   is_test: false

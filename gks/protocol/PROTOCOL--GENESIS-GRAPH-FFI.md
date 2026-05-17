@@ -44,7 +44,30 @@ attributes:
   cluster: agent_governance
   role: Interaction contract
   attributes:
+    id: PROTOCOL--GENESIS-GRAPH-FFI
+    phase: 2
+    type: protocol
+    status: draft
+    vault_id: default
+    tier: process
+    source_type: axiomatic
+    title: PROTOCOL — Genesis Block FFI contract (Node ↔ Rust)
+    tags: *a1
+    crosslinks: *a2
+    created_at: 2026-05-12T12:30:00.000+07:00
+    aliases: *a3
+    cluster: agent_governance
+    role: Interaction contract
+    attributes:
+      domain: protocol
     domain: protocol
+    language: markdown
+    is_test: false
+    is_entrypoint: false
+    has_secret: true
+    secret_type: high_entropy_string
+    leak_risk: high
+    encryption_level: none
   domain: protocol
   language: markdown
   is_test: false

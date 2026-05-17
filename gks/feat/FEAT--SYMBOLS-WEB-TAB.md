@@ -53,7 +53,31 @@ attributes:
   cluster: implementation_flow
   role: Feature spec
   attributes:
+    id: FEAT--SYMBOLS-WEB-TAB
+    phase: 2
+    type: feat
+    status: stable
+    tier: process
+    source_type: axiomatic
+    vault_id: default
+    title: Knowledge Browser Symbols tab — Cytoscape graph + community filter +
+      click-through
+    tags: *a1
+    crosslinks: *a2
+    linked_symbols: *a3
+    created_at: 2026-05-09T16:54:00.000+07:00
+    aliases: *a4
+    cluster: implementation_flow
+    role: Feature spec
+    attributes:
+      domain: feat
     domain: feat
+    language: markdown
+    is_test: false
+    is_entrypoint: false
+    has_secret: false
+    leak_risk: low
+    encryption_level: none
   domain: feat
   language: markdown
   is_test: false

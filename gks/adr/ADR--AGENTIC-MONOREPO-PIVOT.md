@@ -46,7 +46,30 @@ attributes:
   cluster: implementation_flow
   role: Architecture decision record
   attributes:
+    id: ADR--AGENTIC-MONOREPO-PIVOT
+    phase: 2
+    type: adr
+    status: stable
+    tier: genesis
+    source_type: axiomatic
+    vault_id: default
+    title: Drop standalone publish; cognitive_system monorepo IS the product
+      (agentic, agent-pluggable)
+    tags: *a1
+    crosslinks: *a2
+    created_at: 2026-05-13T18:35:00+07:00
+    aliases: *a3
+    cluster: implementation_flow
+    role: Architecture decision record
+    attributes:
+      domain: adr
     domain: adr
+    language: markdown
+    is_test: false
+    is_entrypoint: false
+    has_secret: false
+    leak_risk: low
+    encryption_level: none
   domain: adr
   language: markdown
   is_test: false

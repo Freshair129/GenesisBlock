@@ -45,7 +45,29 @@ attributes:
   cluster: implementation_flow
   role: Strategic intent / PRD
   attributes:
+    id: CONCEPT--MEMORY-STORE
+    phase: 1
+    type: concept
+    status: stable
+    created_at: 2026-05-13T12:00:00+07:00
+    vault_id: GKS-CORE
+    tier: genesis
+    title: MemoryStore — the unified four-layer façade
+    tags: *a1
+    crosslinks: *a2
+    linked_symbols: *a3
+    aliases: *a4
+    cluster: implementation_flow
+    role: Strategic intent / PRD
+    attributes:
+      domain: concept
     domain: concept
+    language: markdown
+    is_test: false
+    is_entrypoint: false
+    has_secret: false
+    leak_risk: low
+    encryption_level: none
   domain: concept
   language: markdown
   is_test: false

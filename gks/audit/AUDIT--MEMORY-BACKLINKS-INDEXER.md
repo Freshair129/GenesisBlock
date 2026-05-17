@@ -49,7 +49,31 @@ attributes:
   cluster: implementation_flow
   role: Test results / quality report
   attributes:
+    id: AUDIT--MEMORY-BACKLINKS-INDEXER
+    phase: 6
+    type: audit
+    status: stable
+    vault_id: default
+    tier: process
+    source_type: axiomatic
+    title: M3c-1 memory backlinks indexer acceptance audit
+    tags: *a1
+    crosslinks: *a2
+    linked_symbols: *a3
+    created_at: 2026-05-03T15:43:37.417+07:00
+    aliases: *a4
+    cluster: implementation_flow
+    role: Test results / quality report
+    attributes:
+      domain: audit
     domain: audit
+    language: markdown
+    is_test: false
+    is_entrypoint: false
+    has_secret: true
+    secret_type: high_entropy_string
+    leak_risk: high
+    encryption_level: none
   domain: audit
   language: markdown
   is_test: false

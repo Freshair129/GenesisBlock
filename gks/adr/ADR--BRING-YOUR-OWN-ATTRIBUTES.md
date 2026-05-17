@@ -42,7 +42,31 @@ attributes:
   cluster: implementation_flow
   role: Architecture decision record
   attributes:
+    id: ADR--BRING-YOUR-OWN-ATTRIBUTES
+    phase: 2
+    type: adr
+    status: stable
+    tier: process
+    source_type: axiomatic
+    vault_id: default
+    title: Bring-your-own attributes — open bag in atom metadata, GKS Namespace
+      untouched
+    tags: *a1
+    crosslinks: *a2
+    created_at: 2026-05-14T18:37:51.890+07:00
+    aliases: *a3
+    cluster: implementation_flow
+    role: Architecture decision record
+    attributes:
+      domain: adr
     domain: adr
+    language: markdown
+    is_test: false
+    is_entrypoint: false
+    has_secret: true
+    secret_type: high_entropy_string
+    leak_risk: high
+    encryption_level: none
   domain: adr
   language: markdown
   is_test: false

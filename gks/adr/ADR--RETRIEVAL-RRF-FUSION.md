@@ -44,7 +44,30 @@ attributes:
   cluster: implementation_flow
   role: Architecture decision record
   attributes:
+    id: ADR--RETRIEVAL-RRF-FUSION
+    phase: 2
+    type: adr
+    status: stable
+    vault_id: default
+    tier: genesis
+    source_type: axiomatic
+    title: Retrieval orchestration uses Reciprocal Rank Fusion (RRF) with per-source
+      weights
+    tags: *a1
+    crosslinks: *a2
+    created_at: 2026-05-05T15:55:30.000+07:00
+    aliases: *a3
+    cluster: implementation_flow
+    role: Architecture decision record
+    attributes:
+      domain: adr
     domain: adr
+    language: markdown
+    is_test: false
+    is_entrypoint: false
+    has_secret: false
+    leak_risk: low
+    encryption_level: none
   domain: adr
   language: markdown
   is_test: false

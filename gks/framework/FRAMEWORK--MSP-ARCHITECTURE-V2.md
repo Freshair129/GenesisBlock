@@ -47,7 +47,29 @@ attributes:
   cluster: implementation_flow
   role: Governance / architectural framework
   attributes:
+    id: FRAMEWORK--MSP-ARCHITECTURE-V2
+    phase: 0
+    type: framework
+    status: stable
+    vault_id: default
+    tier: genesis
+    source_type: axiomatic
+    title: MSP architecture v2 — passport-orchestrator over Obsidian-backed GKS
+    tags: *a1
+    crosslinks: *a2
+    created_at: 2026-05-03T23:55:07.217+07:00
+    aliases: *a3
+    cluster: implementation_flow
+    role: Governance / architectural framework
+    attributes:
+      domain: framework
     domain: framework
+    language: markdown
+    is_test: false
+    is_entrypoint: false
+    has_secret: false
+    leak_risk: low
+    encryption_level: none
   domain: framework
   language: markdown
   is_test: false

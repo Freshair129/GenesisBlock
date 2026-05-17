@@ -44,7 +44,33 @@ attributes:
   cluster: implementation_flow
   role: Implementation plan
   attributes:
+    id: BLUEPRINT--BRAIN-MERGE-STRATEGY
+    phase: 3
+    type: blueprint
+    status: draft
+    vault_id: default
+    tier: genesis
+    source_type: axiomatic
+    title: BLUEPRINT — Brain Merge Strategy — implementation plan for two-brain
+      resolver
+    scale_level: feature
+    tags: *a1
+    crosslinks: *a2
+    linked_symbols: *a3
+    created_at: 2026-05-14T02:00:00.000+07:00
+    aliases: *a4
+    cluster: implementation_flow
+    role: Implementation plan
+    attributes:
+      domain: blueprint
     domain: blueprint
+    language: markdown
+    is_test: false
+    is_entrypoint: false
+    has_secret: true
+    secret_type: high_entropy_string
+    leak_risk: high
+    encryption_level: none
   domain: blueprint
   language: markdown
   is_test: false

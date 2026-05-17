@@ -33,7 +33,29 @@ attributes:
   cluster: implementation_flow
   role: Technical specification
   attributes:
+    id: SPEC--ATOM-REGISTRY-SCHEMA
+    phase: 2
+    type: spec
+    status: draft
+    tier: process
+    source_type: axiomatic
+    vault_id: default
+    title: Atom Registry Schema
+    tags: *a1
+    crosslinks: *a2
+    created_at: 2026-05-17T04:07:41.308+07:00
+    aliases: *a3
+    cluster: implementation_flow
+    role: Technical specification
+    attributes:
+      domain: spec
     domain: spec
+    language: markdown
+    is_test: false
+    is_entrypoint: false
+    has_secret: false
+    leak_risk: low
+    encryption_level: none
   domain: spec
   language: markdown
   is_test: false

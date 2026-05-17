@@ -39,7 +39,30 @@ attributes:
   cluster: implementation_flow
   role: Ethical safety / AI alignment
   attributes:
+    id: SAFETY--PII-REDACTION
+    phase: 0
+    type: safety
+    status: stable
+    tier: safety
+    source_type: axiomatic
+    vault_id: default
+    title: PII Redaction Safety — protect sensitive identity data
+    tags: *a1
+    crosslinks: *a2
+    created_at: 2026-05-14T21:00:00+07:00
+    aliases: *a3
+    cluster: implementation_flow
+    role: Ethical safety / AI alignment
+    attributes:
+      domain: safety
     domain: safety
+    language: markdown
+    is_test: false
+    is_entrypoint: false
+    has_secret: true
+    secret_type: high_entropy_string
+    leak_risk: high
+    encryption_level: none
   domain: safety
   language: markdown
   is_test: false

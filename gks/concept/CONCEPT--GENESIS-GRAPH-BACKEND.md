@@ -43,7 +43,31 @@ attributes:
   cluster: implementation_flow
   role: Strategic intent / PRD
   attributes:
+    id: CONCEPT--GENESIS-GRAPH-BACKEND
+    phase: 1
+    type: concept
+    status: stable
+    vault_id: default
+    tier: genesis
+    source_type: axiomatic
+    title: Genesis Graph Backend — an embedded graph backend specialised for atomic
+      knowledge
+    tags: *a1
+    crosslinks: *a2
+    created_at: 2026-05-12T11:55:00.000+07:00
+    aliases: *a3
+    cluster: implementation_flow
+    role: Strategic intent / PRD
+    attributes:
+      domain: concept
     domain: concept
+    language: markdown
+    is_test: false
+    is_entrypoint: false
+    has_secret: true
+    secret_type: high_entropy_string
+    leak_risk: high
+    encryption_level: none
   domain: concept
   language: markdown
   is_test: false

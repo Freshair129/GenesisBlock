@@ -43,7 +43,30 @@ attributes:
   cluster: implementation_flow
   role: Strategic intent / PRD
   attributes:
+    id: CONCEPT--EMBEDDING-STRATEGY
+    phase: 1
+    type: concept
+    status: stable
+    vault_id: default
+    tier: genesis
+    source_type: axiomatic
+    title: Embedding strategy — GKS canonical writer, Smart Connections in-Obsidian
+      browse
+    tags: *a1
+    crosslinks: *a2
+    created_at: 2026-05-03T23:55:05.902+07:00
+    aliases: *a3
+    cluster: implementation_flow
+    role: Strategic intent / PRD
+    attributes:
+      domain: concept
     domain: concept
+    language: markdown
+    is_test: false
+    is_entrypoint: false
+    has_secret: false
+    leak_risk: low
+    encryption_level: none
   domain: concept
   language: markdown
   is_test: false

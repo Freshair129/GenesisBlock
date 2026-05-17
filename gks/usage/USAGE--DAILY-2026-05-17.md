@@ -24,6 +24,24 @@ attributes:
   title: USAGE — Daily cost bucket 2026-05-17
   tags: *a1
   created_at: 2026-05-17T02:10:17.957Z
+  attributes:
+    id: USAGE--DAILY-2026-05-17
+    phase: 5
+    type: usage
+    status: stable
+    tier: genesis
+    source_type: episodic
+    vault_id: default
+    title: USAGE — Daily cost bucket 2026-05-17
+    tags: *a1
+    created_at: 2026-05-17T02:10:17.957Z
+    domain: usage
+    language: markdown
+    is_test: false
+    is_entrypoint: false
+    has_secret: false
+    leak_risk: low
+    encryption_level: none
   domain: usage
   language: markdown
   is_test: false

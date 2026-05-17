@@ -43,7 +43,30 @@ attributes:
   cluster: implementation_flow
   role: Technical specification
   attributes:
+    id: SPEC--USAGE-ATOM
+    phase: 2
+    type: spec
+    status: stable
+    vault_id: default
+    tier: process
+    source_type: axiomatic
+    title: SPEC — Usage Atom — daily cost-aggregation atom contract
+    tags: *a1
+    crosslinks: *a2
+    created_at: 2026-05-14T03:45:00.000+07:00
+    aliases: *a3
+    cluster: implementation_flow
+    role: Technical specification
+    attributes:
+      domain: spec
     domain: spec
+    language: markdown
+    is_test: false
+    is_entrypoint: false
+    has_secret: true
+    secret_type: high_entropy_string
+    leak_risk: high
+    encryption_level: none
   domain: spec
   language: markdown
   is_test: false

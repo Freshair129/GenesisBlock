@@ -56,7 +56,32 @@ attributes:
   cluster: implementation_flow
   role: Test results / quality report
   attributes:
+    id: AUDIT--PHASE-GATES-PROTO
+    phase: 6
+    type: audit
+    status: stable
+    vault_id: default
+    tier: process
+    source_type: axiomatic
+    title: M8b — PROTO--PHASE-GATES — enforce P0..P6 ordering at PR-time (ships as
+      draft)
+    tags: *a1
+    crosslinks: *a2
+    linked_symbols: *a3
+    phase_override: *a4
+    created_at: 2026-05-05T18:00:00.000+07:00
+    aliases: *a5
+    cluster: implementation_flow
+    role: Test results / quality report
+    attributes:
+      domain: audit
     domain: audit
+    language: markdown
+    is_test: false
+    is_entrypoint: false
+    has_secret: false
+    leak_risk: low
+    encryption_level: none
   domain: audit
   language: markdown
   is_test: false

@@ -17,24 +17,47 @@ attributes:
   vault_id: default
   title: Subject / Resource / Action / Context — the universal request 4-tuple
   attributes:
-    domain:
-      - ucf
+    id: CONCEPT--SUBJECT-RESOURCE-ACTION-CONTEXT
+    phase: 1
+    type: concept
+    status: draft
+    tier: process
+    source_type: axiomatic
+    vault_id: default
+    title: Subject / Resource / Action / Context — the universal request 4-tuple
+    attributes:
+      domain:
+        - ucf
+        - msp
+    tags: &a1
       - msp
-  tags: &a1
-    - msp
-    - ucf
-    - concept
-    - abac
-    - request-shape
-  crosslinks: &a2
-    references:
-      - FRAMEWORK--UNIVERSAL-CONTEXT-FRAMEWORK
-      - CONCEPT--ATTRIBUTE-BAG-MODEL
+      - ucf
+      - concept
+      - abac
+      - request-shape
+    crosslinks: &a2
+      references:
+        - FRAMEWORK--UNIVERSAL-CONTEXT-FRAMEWORK
+        - CONCEPT--ATTRIBUTE-BAG-MODEL
+    created_at: 2026-05-13T08:59:38.431+07:00
+    aliases: &a3
+      - CONCEPT
+      - implementation_flow
+      - Strategic intent / PRD
+    cluster: implementation_flow
+    role: Strategic intent / PRD
+    domain: concept
+    language: markdown
+    is_test: false
+    is_entrypoint: false
+    has_secret: true
+    secret_type: high_entropy_string
+    leak_risk: high
+    encryption_level: none
+  tags: *a1
+  crosslinks: *a2
   created_at: 2026-05-13T08:59:38.431+07:00
-  aliases: &a3
-    - CONCEPT
-    - implementation_flow
-    - Strategic intent / PRD
+  aliases: *a3
   cluster: implementation_flow
   role: Strategic intent / PRD
   domain: concept

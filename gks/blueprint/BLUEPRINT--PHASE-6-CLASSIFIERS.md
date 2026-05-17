@@ -46,7 +46,30 @@ attributes:
   linked_symbols: *a3
   aliases: *a4
   attributes:
+    id: BLUEPRINT--PHASE-6-CLASSIFIERS
+    phase: 3
+    type: blueprint
+    status: draft
+    tier: process
+    source_type: axiomatic
+    vault_id: default
+    title: "BLUEPRINT — Phase 6: Classifier plugins + auto-tagging"
+    tags: *a1
+    crosslinks: *a2
+    created_at: 2026-05-17T08:52:00+07:00
+    cluster: implementation_flow
+    role: Implementation plan
+    linked_symbols: *a3
+    aliases: *a4
+    attributes:
+      domain: blueprint
     domain: blueprint
+    language: markdown
+    is_test: false
+    is_entrypoint: false
+    has_secret: false
+    leak_risk: low
+    encryption_level: none
   domain: blueprint
   language: markdown
   is_test: false

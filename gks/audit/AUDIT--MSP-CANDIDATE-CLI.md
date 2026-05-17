@@ -52,7 +52,31 @@ attributes:
   cluster: implementation_flow
   role: Test results / quality report
   attributes:
+    id: AUDIT--MSP-CANDIDATE-CLI
+    phase: 6
+    type: audit
+    status: stable
+    vault_id: default
+    tier: process
+    source_type: axiomatic
+    title: msp-candidate CLI — non-MCP agent path to MSP candidates queue
+    tags: *a1
+    crosslinks: *a2
+    linked_symbols: *a3
+    created_at: 2026-05-17T03:00:00.000+07:00
+    aliases: *a4
+    cluster: implementation_flow
+    role: Test results / quality report
+    attributes:
+      domain: audit
     domain: audit
+    language: markdown
+    is_test: false
+    is_entrypoint: false
+    has_secret: true
+    secret_type: high_entropy_string
+    leak_risk: high
+    encryption_level: none
   domain: audit
   language: markdown
   is_test: false

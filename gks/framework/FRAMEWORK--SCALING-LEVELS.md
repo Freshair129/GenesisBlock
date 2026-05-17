@@ -38,7 +38,29 @@ attributes:
   cluster: implementation_flow
   role: Governance / architectural framework
   attributes:
+    id: FRAMEWORK--SCALING-LEVELS
+    phase: 0
+    type: framework
+    status: stable
+    vault_id: default
+    tier: genesis
+    source_type: axiomatic
+    title: Scaling levels — L1/L2/L3 minimum artifact sets
+    tags: *a1
+    crosslinks: *a2
+    created_at: 2026-05-03T14:01:48.787+07:00
+    aliases: *a3
+    cluster: implementation_flow
+    role: Governance / architectural framework
+    attributes:
+      domain: framework
     domain: framework
+    language: markdown
+    is_test: false
+    is_entrypoint: false
+    has_secret: false
+    leak_risk: low
+    encryption_level: none
   domain: framework
   language: markdown
   is_test: false

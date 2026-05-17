@@ -34,7 +34,27 @@ attributes:
   cluster: implementation_flow
   role: Architecture decision record
   attributes:
+    id: ADR--NOMIC-EMBEDDER
+    phase: 2
+    type: adr
+    status: stable
+    title: Use nomic-embed-text-v1.5 as the local embedding backend
+    created_at: 2026-04-29T12:00:00+07:00
+    tags: *a1
+    tier: genesis
+    crosslinks: *a2
+    aliases: *a3
+    cluster: implementation_flow
+    role: Architecture decision record
+    attributes:
+      domain: adr
     domain: adr
+    language: markdown
+    is_test: false
+    is_entrypoint: false
+    has_secret: false
+    leak_risk: low
+    encryption_level: none
   domain: adr
   language: markdown
   is_test: false

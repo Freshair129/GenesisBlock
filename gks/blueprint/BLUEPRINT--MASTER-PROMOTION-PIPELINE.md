@@ -57,7 +57,31 @@ attributes:
   cluster: implementation_flow
   role: Implementation plan
   attributes:
+    id: BLUEPRINT--MASTER-PROMOTION-PIPELINE
+    phase: 3
+    type: blueprint
+    status: draft
+    tier: process
+    source_type: axiomatic
+    vault_id: default
+    title: BLUEPRINT — Master Block promotion pipeline (scan → analyze → propose,
+      never auto-write)
+    tags: *a1
+    crosslinks: *a2
+    linked_symbols: *a3
+    created_at: 2026-05-13T10:05:00.000+07:00
+    aliases: *a4
+    cluster: implementation_flow
+    role: Implementation plan
+    attributes:
+      domain: blueprint
     domain: blueprint
+    language: markdown
+    is_test: false
+    is_entrypoint: false
+    has_secret: false
+    leak_risk: low
+    encryption_level: none
   domain: blueprint
   language: markdown
   is_test: false

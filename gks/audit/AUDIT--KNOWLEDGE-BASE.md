@@ -51,7 +51,30 @@ attributes:
   cluster: implementation_flow
   role: Test results / quality report
   attributes:
+    id: AUDIT--KNOWLEDGE-BASE
+    phase: 6
+    type: audit
+    status: stable
+    vault_id: default
+    tier: process
+    source_type: axiomatic
+    title: Knowledge base completion audit — 41 atoms covering msp_spec.md §2-§13
+    tags: *a1
+    crosslinks: *a2
+    created_at: 2026-05-03T14:17:57.396+07:00
+    aliases: *a3
+    cluster: implementation_flow
+    role: Test results / quality report
+    attributes:
+      domain: audit
     domain: audit
+    language: markdown
+    is_test: false
+    is_entrypoint: false
+    has_secret: true
+    secret_type: high_entropy_string
+    leak_risk: high
+    encryption_level: none
   domain: audit
   language: markdown
   is_test: false

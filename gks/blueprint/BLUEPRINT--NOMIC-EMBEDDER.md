@@ -33,7 +33,28 @@ attributes:
   cluster: implementation_flow
   role: Implementation plan
   attributes:
+    id: BLUEPRINT--NOMIC-EMBEDDER
+    phase: 3
+    type: blueprint
+    scale_level: L2
+    status: stable
+    title: Implementation plan for nomic-embed-text-v1.5 embedder
+    created_at: 2026-04-29T12:00:00+07:00
+    linked_symbols: *a1
+    tier: genesis
+    links: *a2
+    aliases: *a3
+    cluster: implementation_flow
+    role: Implementation plan
+    attributes:
+      domain: blueprint
     domain: blueprint
+    language: markdown
+    is_test: false
+    is_entrypoint: false
+    has_secret: false
+    leak_risk: low
+    encryption_level: none
   domain: blueprint
   language: markdown
   is_test: false

@@ -47,7 +47,30 @@ attributes:
   cluster: implementation_flow
   role: Architecture decision record
   attributes:
+    id: ADR--MASTER-PROMOTION-CONTRADICTION-POLICY
+    phase: 2
+    type: adr
+    status: stable
+    tier: genesis
+    source_type: axiomatic
+    vault_id: default
+    title: Promote the Layer 0 supersession rule to a Master atom
+      (MASTER--ATOM-CONTRADICTION-POLICY)
+    tags: *a1
+    crosslinks: *a2
+    created_at: 2026-05-09T15:03:00.000+07:00
+    aliases: *a3
+    cluster: implementation_flow
+    role: Architecture decision record
+    attributes:
+      domain: adr
     domain: adr
+    language: markdown
+    is_test: false
+    is_entrypoint: false
+    has_secret: false
+    leak_risk: low
+    encryption_level: none
   domain: adr
   language: markdown
   is_test: false

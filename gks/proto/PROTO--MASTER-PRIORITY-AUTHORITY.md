@@ -45,7 +45,31 @@ attributes:
   cluster: implementation_flow
   role: Machine-enforced invariant
   attributes:
+    id: PROTO--MASTER-PRIORITY-AUTHORITY
+    phase: 2
+    type: proto
+    status: draft
+    severity: error
+    tier: safety
+    source_type: axiomatic
+    vault_id: default
+    title: enforce user-only authority for Master priority P0/P1 assignments
+    tags: *a1
+    crosslinks: *a2
+    created_at: 2026-05-17T02:55:00.000+07:00
+    aliases: *a3
+    cluster: implementation_flow
+    role: Machine-enforced invariant
+    attributes:
+      domain: proto
     domain: proto
+    language: markdown
+    is_test: false
+    is_entrypoint: false
+    has_secret: true
+    secret_type: high_entropy_string
+    leak_risk: high
+    encryption_level: none
   domain: proto
   language: markdown
   is_test: false

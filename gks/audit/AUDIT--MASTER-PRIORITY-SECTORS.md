@@ -62,7 +62,32 @@ attributes:
   cluster: implementation_flow
   role: Test results / quality report
   attributes:
+    id: AUDIT--MASTER-PRIORITY-SECTORS
+    phase: 6
+    type: audit
+    status: stable
+    vault_id: default
+    tier: process
+    source_type: axiomatic
+    title: Master priority sectors — P0-P4 design + RCA promotion + 3-Master
+      migration + CLAUDE.md restructure
+    tags: *a1
+    crosslinks: *a2
+    linked_symbols: *a3
+    created_at: 2026-05-17T03:05:00.000+07:00
+    aliases: *a4
+    cluster: implementation_flow
+    role: Test results / quality report
+    attributes:
+      domain: audit
     domain: audit
+    language: markdown
+    is_test: false
+    is_entrypoint: false
+    has_secret: true
+    secret_type: high_entropy_string
+    leak_risk: high
+    encryption_level: none
   domain: audit
   language: markdown
   is_test: false

@@ -53,7 +53,31 @@ attributes:
   cluster: implementation_flow
   role: Feature spec
   attributes:
+    id: FEAT--MSP-SYMBOL-MCP
+    phase: 2
+    type: feat
+    status: stable
+    tier: process
+    source_type: axiomatic
+    vault_id: default
+    title: msp_symbol_* MCP tool surface — 5 read-only tools for in-session
+      symbol-graph queries
+    tags: *a1
+    crosslinks: *a2
+    linked_symbols: *a3
+    created_at: 2026-05-09T16:52:00.000+07:00
+    aliases: *a4
+    cluster: implementation_flow
+    role: Feature spec
+    attributes:
+      domain: feat
     domain: feat
+    language: markdown
+    is_test: false
+    is_entrypoint: false
+    has_secret: false
+    leak_risk: low
+    encryption_level: none
   domain: feat
   language: markdown
   is_test: false

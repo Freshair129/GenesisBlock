@@ -57,7 +57,32 @@ attributes:
   cluster: implementation_flow
   role: Implementation plan
   attributes:
+    id: BLUEPRINT--CONTRADICTION-DETECTION-IMPL
+    phase: 3
+    type: blueprint
+    status: stable
+    vault_id: default
+    tier: process
+    source_type: axiomatic
+    title: BLUEPRINT — contradiction detection implementation (5 phases, one PR per
+      layer)
+    tags: *a1
+    crosslinks: *a2
+    linked_symbols: *a3
+    created_at: 2026-05-08T17:34:00.000+07:00
+    aliases: *a4
+    cluster: implementation_flow
+    role: Implementation plan
+    attributes:
+      domain: blueprint
     domain: blueprint
+    language: markdown
+    is_test: false
+    is_entrypoint: false
+    has_secret: true
+    secret_type: high_entropy_string
+    leak_risk: high
+    encryption_level: none
   domain: blueprint
   language: markdown
   is_test: false

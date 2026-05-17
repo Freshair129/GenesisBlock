@@ -6,23 +6,48 @@ status: draft
 tier: process
 source_type: axiomatic
 vault_id: default
-title: Config as Single Source of Truth (extend atom-registry pattern to all behavior-driving values)
-aliases:
+title: Config as Single Source of Truth (extend atom-registry pattern to all
+  behavior-driving values)
+aliases: &a1
   - CONCEPT
   - implementation_flow
   - Strategic intent / PRD
 cluster: implementation_flow
 role: Strategic intent / PRD
-tags:
+tags: &a2
   - msp
   - config
   - ssot
   - governance
-crosslinks:
+crosslinks: &a3
   references:
     - CONCEPT--ATOM-REGISTRY-AS-SSOT
     - ADR--REGISTRY-DRIVEN-SCAFFOLDING
-created_at: 2026-05-17T16:30:00.000+07:00
+created_at: 2026-05-17T16:10:00.000+07:00
+attributes:
+  id: CONCEPT--CONFIG-AS-SSOT
+  phase: 1
+  type: concept
+  status: draft
+  tier: process
+  source_type: axiomatic
+  vault_id: default
+  title: Config as Single Source of Truth (extend atom-registry pattern to all
+    behavior-driving values)
+  aliases: *a1
+  cluster: implementation_flow
+  role: Strategic intent / PRD
+  tags: *a2
+  crosslinks: *a3
+  created_at: 2026-05-17T16:10:00.000+07:00
+  domain: concept
+  language: markdown
+  is_test: false
+  is_entrypoint: false
+  has_secret: true
+  secret_type: high_entropy_string
+  leak_risk: high
+  encryption_level: none
 ---
 
 # CONCEPT — Config as Single Source of Truth

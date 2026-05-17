@@ -85,7 +85,33 @@ attributes:
   cluster: implementation_flow
   role: Block Manifest (v2.3+)
   attributes:
+    id: GENESIS--IDENTITY-ENGINE
+    phase: 0
+    type: genesis
+    status: stable
+    vault_id: default
+    tier: genesis
+    source_type: axiomatic
+    title: Identity Engine — passport-bound agent identity resolution
+    tags: *a1
+    manifest_version: 1.0.0
+    members: *a2
+    daci: *a3
+    crosslinks: *a4
+    created_at: 2026-05-14T21:10:00+07:00
+    aliases: *a5
+    cluster: implementation_flow
+    role: Block Manifest (v2.3+)
+    attributes:
+      domain: genesis
     domain: genesis
+    language: markdown
+    is_test: false
+    is_entrypoint: false
+    has_secret: true
+    secret_type: high_entropy_string
+    leak_risk: high
+    encryption_level: none
   domain: genesis
   language: markdown
   is_test: false

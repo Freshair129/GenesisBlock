@@ -44,7 +44,31 @@ attributes:
   cluster: implementation_flow
   role: Architecture decision record
   attributes:
+    id: ADR--LEIDEN-COMMUNITY-DETECTION
+    phase: 2
+    type: adr
+    status: stable
+    tier: genesis
+    source_type: axiomatic
+    vault_id: default
+    title: Leiden community detection — graphology-communities-leiden v1, Louvain
+      fallback
+    tags: *a1
+    crosslinks: *a2
+    created_at: 2026-05-09T16:51:00.000+07:00
+    aliases: *a3
+    cluster: implementation_flow
+    role: Architecture decision record
+    attributes:
+      domain: adr
     domain: adr
+    language: markdown
+    is_test: false
+    is_entrypoint: false
+    has_secret: true
+    secret_type: high_entropy_string
+    leak_risk: high
+    encryption_level: none
   domain: adr
   language: markdown
   is_test: false

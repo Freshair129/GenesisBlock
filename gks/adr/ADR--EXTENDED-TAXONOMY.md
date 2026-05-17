@@ -40,7 +40,29 @@ attributes:
   cluster: implementation_flow
   role: Architecture decision record
   attributes:
+    id: ADR--EXTENDED-TAXONOMY
+    phase: 2
+    type: adr
+    status: stable
+    created_at: 2026-05-13T12:00:00+07:00
+    vault_id: GKS-CORE
+    tier: genesis
+    title: Extended atomic taxonomy + ISSUE-- as self-hosted tracker
+    tags: *a1
+    crosslinks: *a2
+    aliases: *a3
+    cluster: implementation_flow
+    role: Architecture decision record
+    attributes:
+      domain: adr
     domain: adr
+    language: markdown
+    is_test: false
+    is_entrypoint: false
+    has_secret: true
+    secret_type: high_entropy_string
+    leak_risk: high
+    encryption_level: none
   domain: adr
   language: markdown
   is_test: false

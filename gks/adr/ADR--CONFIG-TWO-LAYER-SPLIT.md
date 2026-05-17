@@ -7,24 +7,47 @@ tier: process
 source_type: axiomatic
 vault_id: default
 title: Config 2-Layer Split — operator-facing root + package-internal manifests
-aliases:
+aliases: &a1
   - ADR
   - implementation_flow
   - Architecture decision record
 cluster: implementation_flow
 role: Architecture decision record
-tags:
+tags: &a2
   - msp
   - config
   - architecture
   - monorepo
-crosslinks:
+crosslinks: &a3
   references:
     - CONCEPT--CONFIG-AS-SSOT
     - ADR--REGISTRY-DRIVEN-SCAFFOLDING
-created_at: 2026-05-17T16:35:00.000+07:00
+created_at: 2026-05-17T16:15:00.000+07:00
 attributes:
+  id: ADR--CONFIG-TWO-LAYER-SPLIT
+  phase: 2
+  type: adr
+  status: draft
+  tier: process
+  source_type: axiomatic
+  vault_id: default
+  title: Config 2-Layer Split — operator-facing root + package-internal manifests
+  aliases: *a1
+  cluster: implementation_flow
+  role: Architecture decision record
+  tags: *a2
+  crosslinks: *a3
+  created_at: 2026-05-17T16:15:00.000+07:00
+  attributes:
+    domain: adr
   domain: adr
+  language: markdown
+  is_test: false
+  is_entrypoint: false
+  has_secret: true
+  secret_type: high_entropy_string
+  leak_risk: high
+  encryption_level: none
 ---
 
 # ADR — Config 2-Layer Split (operator-facing root + package-internal manifests)

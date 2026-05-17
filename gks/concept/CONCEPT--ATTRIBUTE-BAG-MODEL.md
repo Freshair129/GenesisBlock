@@ -17,25 +17,48 @@ attributes:
   vault_id: default
   title: Attribute bag — bring-your-own open-schema metadata
   attributes:
-    domain:
-      - ucf
+    id: CONCEPT--ATTRIBUTE-BAG-MODEL
+    phase: 1
+    type: concept
+    status: stable
+    tier: process
+    source_type: axiomatic
+    vault_id: default
+    title: Attribute bag — bring-your-own open-schema metadata
+    attributes:
+      domain:
+        - ucf
+        - msp
+    tags: &a1
       - msp
-  tags: &a1
-    - msp
-    - ucf
-    - concept
-    - attributes
-    - schema
-    - plugins
-  crosslinks: &a2
-    references:
-      - FRAMEWORK--UNIVERSAL-CONTEXT-FRAMEWORK
-      - CONCEPT--SUBJECT-RESOURCE-ACTION-CONTEXT
+      - ucf
+      - concept
+      - attributes
+      - schema
+      - plugins
+    crosslinks: &a2
+      references:
+        - FRAMEWORK--UNIVERSAL-CONTEXT-FRAMEWORK
+        - CONCEPT--SUBJECT-RESOURCE-ACTION-CONTEXT
+    created_at: 2026-05-13T08:59:39.761+07:00
+    aliases: &a3
+      - CONCEPT
+      - implementation_flow
+      - Strategic intent / PRD
+    cluster: implementation_flow
+    role: Strategic intent / PRD
+    domain: concept
+    language: markdown
+    is_test: false
+    is_entrypoint: false
+    has_secret: true
+    secret_type: high_entropy_string
+    leak_risk: high
+    encryption_level: none
+  tags: *a1
+  crosslinks: *a2
   created_at: 2026-05-13T08:59:39.761+07:00
-  aliases: &a3
-    - CONCEPT
-    - implementation_flow
-    - Strategic intent / PRD
+  aliases: *a3
   cluster: implementation_flow
   role: Strategic intent / PRD
   domain: concept

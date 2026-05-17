@@ -44,7 +44,30 @@ attributes:
   cluster: implementation_flow
   role: Strategic intent / PRD
   attributes:
+    id: CONCEPT--MSP-ROADMAP
+    phase: 1
+    type: concept
+    status: stable
+    vault_id: default
+    tier: genesis
+    source_type: axiomatic
+    title: MSP roadmap — passport-over-Obsidian execution plan M7 → M10
+    tags: *a1
+    crosslinks: *a2
+    created_at: 2026-05-04T07:06:09.872+07:00
+    aliases: *a3
+    cluster: implementation_flow
+    role: Strategic intent / PRD
+    attributes:
+      domain: concept
     domain: concept
+    language: markdown
+    is_test: false
+    is_entrypoint: false
+    has_secret: true
+    secret_type: high_entropy_string
+    leak_risk: high
+    encryption_level: none
   domain: concept
   language: markdown
   is_test: false

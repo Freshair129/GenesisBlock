@@ -40,7 +40,29 @@ attributes:
   cluster: implementation_flow
   role: Strategic intent / PRD
   attributes:
+    id: CONCEPT--AGENT-TIER-ROUTING
+    phase: 1
+    type: concept
+    status: draft
+    vault_id: default
+    tier: genesis
+    source_type: axiomatic
+    title: Agent Tier Routing — pick T1/T2/T3 per task based on capability + cost
+    tags: *a1
+    crosslinks: *a2
+    created_at: 2026-05-14T01:30:00.000+07:00
+    aliases: *a3
+    cluster: implementation_flow
+    role: Strategic intent / PRD
+    attributes:
+      domain: concept
     domain: concept
+    language: markdown
+    is_test: false
+    is_entrypoint: false
+    has_secret: false
+    leak_risk: low
+    encryption_level: none
   domain: concept
   language: markdown
   is_test: false

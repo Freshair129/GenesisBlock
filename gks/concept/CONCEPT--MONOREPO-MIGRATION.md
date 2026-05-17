@@ -47,7 +47,31 @@ attributes:
   cluster: implementation_flow
   role: Strategic intent / PRD
   attributes:
+    id: CONCEPT--MONOREPO-MIGRATION
+    phase: 1
+    type: concept
+    status: draft
+    vault_id: default
+    tier: genesis
+    source_type: axiomatic
+    title: Monorepo migration — collapse `Freshair129/msp` + `Freshair129/GksV3`
+      into one workspace while still publishing `@freshair129/gks` separately
+    tags: *a1
+    crosslinks: *a2
+    created_at: 2026-05-08T13:20:00.000+07:00
+    aliases: *a3
+    cluster: implementation_flow
+    role: Strategic intent / PRD
+    attributes:
+      domain: concept
     domain: concept
+    language: markdown
+    is_test: false
+    is_entrypoint: false
+    has_secret: true
+    secret_type: high_entropy_string
+    leak_risk: high
+    encryption_level: none
   domain: concept
   language: markdown
   is_test: false

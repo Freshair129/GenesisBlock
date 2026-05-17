@@ -48,7 +48,30 @@ attributes:
   cluster: implementation_flow
   role: Architecture decision record
   attributes:
+    id: ADR--TASK-TRACKING-AT-ORCHESTRATOR
+    phase: 2
+    type: adr
+    status: stable
+    created_at: 2026-05-13T12:00:00+07:00
+    vault_id: GKS-CORE
+    tier: genesis
+    title: Task tracking belongs to the orchestrator, not GKS
+    tags: *a1
+    crosslinks: *a2
+    linked_symbols: *a3
+    aliases: *a4
+    cluster: implementation_flow
+    role: Architecture decision record
+    attributes:
+      domain: adr
     domain: adr
+    language: markdown
+    is_test: false
+    is_entrypoint: false
+    has_secret: true
+    secret_type: high_entropy_string
+    leak_risk: high
+    encryption_level: none
   domain: adr
   language: markdown
   is_test: false

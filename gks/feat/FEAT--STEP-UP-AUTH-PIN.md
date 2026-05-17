@@ -41,7 +41,30 @@ attributes:
   cluster: implementation_flow
   role: Feature spec
   attributes:
+    id: FEAT--STEP-UP-AUTH-PIN
+    phase: 2
+    type: feat
+    status: active
+    tier: process
+    source_type: axiomatic
+    vault_id: default
+    title: Step-up auth — PIN provider, the minimal StepUpProvider implementation
+    tags: *a1
+    crosslinks: *a2
+    created_at: 2026-05-14T19:42:04.304+07:00
+    aliases: *a3
+    cluster: implementation_flow
+    role: Feature spec
+    attributes:
+      domain: feat
     domain: feat
+    language: markdown
+    is_test: false
+    is_entrypoint: false
+    has_secret: true
+    secret_type: high_entropy_string
+    leak_risk: high
+    encryption_level: none
   domain: feat
   language: markdown
   is_test: false

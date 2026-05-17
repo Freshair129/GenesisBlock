@@ -39,6 +39,31 @@ attributes:
   tags: *a2
   crosslinks: *a3
   created_at: 2026-05-17T10:07:15.100+07:00
+  attributes:
+    id: BLUEPRINT-377--DYNAMIC-COMPOUND-ID-IMPLEMENTATION--K4
+    knowledgeId: DYNAMIC-COMPOUND-ID-IMPLEMENTATION
+    phase: 3
+    type: blueprint
+    status: stable
+    vault_id: default
+    tier: process
+    source_type: axiomatic
+    title: Implementation Plan for Dynamic Compound ID Formatting and Schema
+      Restructuring
+    aliases: *a1
+    cluster: implementation_flow
+    role: Implementation plan
+    tags: *a2
+    crosslinks: *a3
+    created_at: 2026-05-17T10:07:15.100+07:00
+    domain: blueprint
+    language: markdown
+    is_test: false
+    is_entrypoint: false
+    has_secret: true
+    secret_type: high_entropy_string
+    leak_risk: high
+    encryption_level: none
   domain: blueprint
   language: markdown
   is_test: false

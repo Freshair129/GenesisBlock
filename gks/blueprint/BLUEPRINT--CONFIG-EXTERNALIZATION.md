@@ -22,9 +22,32 @@ tags: &a2
   - governance
 crosslinks: &a3
   references:
+    - CONCEPT--CONFIG-AS-SSOT
+    - ADR--CONFIG-TWO-LAYER-SPLIT
     - CONCEPT--ATOM-REGISTRY-AS-SSOT
     - ADR--REGISTRY-DRIVEN-SCAFFOLDING
-created_at: 2026-05-17T16:00:00.000+07:00
+  parent_blueprint:
+    - ADR--CONFIG-TWO-LAYER-SPLIT
+linked_symbols: &a4
+  - file: packages/msp/src/config/loader.ts
+  - file: packages/msp/src/validator/proto/master-token-cap.ts
+  - file: packages/msp/src/validator/proto/master-body-schema.ts
+  - file: packages/msp/src/validator/proto/phase-gates.ts
+  - file: packages/msp/src/validator/rules/summary-min.ts
+  - file: packages/msp/src/codegen/forbidden-patterns.ts
+  - file: packages/msp/src/codegen/post-process.ts
+  - file: packages/msp/src/orchestrator/retrieval/types.ts
+  - file: packages/msp/src/memory/sessions/lock.ts
+  - file: packages/msp/src/memory/episodic/writer.ts
+  - file: packages/msp/src/memory/episodic/summarisers/heuristic.ts
+  - file: packages/msp/src/memory/backlinks/walk.ts
+  - file: packages/msp/src/mcp/server.ts
+  - file: packages/msp/src/identity/profile.ts
+  - file: packages/msp/src/identity/voice.ts
+  - file: packages/msp/examples/hooks/pre-commit-validator.sh
+  - file: scripts/msp/re-embed.ts
+  - file: scripts/msp/pg-migrate.ts
+created_at: 2026-05-17T16:20:00.000+07:00
 attributes:
   id: BLUEPRINT--CONFIG-EXTERNALIZATION
   phase: 3
@@ -40,13 +63,38 @@ attributes:
   role: Implementation plan
   tags: *a2
   crosslinks: *a3
-  created_at: 2026-05-17T16:00:00.000+07:00
+  linked_symbols: *a4
+  created_at: 2026-05-17T16:20:00.000+07:00
+  attributes:
+    id: BLUEPRINT--CONFIG-EXTERNALIZATION
+    phase: 3
+    type: blueprint
+    status: draft
+    tier: process
+    source_type: axiomatic
+    vault_id: default
+    title: ULTRAPLAN — Config externalization to YAML (script behavior driven by
+      config, not code)
+    aliases: *a1
+    cluster: implementation_flow
+    role: Implementation plan
+    tags: *a2
+    crosslinks: *a3
+    created_at: 2026-05-17T16:00:00.000+07:00
+    domain: blueprint
+    language: markdown
+    is_test: false
+    is_entrypoint: false
+    has_secret: true
+    secret_type: high_entropy_string
+    leak_risk: high
+    encryption_level: none
   domain: blueprint
   language: markdown
   is_test: false
   is_entrypoint: false
   has_secret: true
-  secret_type: high_entropy_string
+  secret_type: aws_secret
   leak_risk: high
   encryption_level: none
 ---
@@ -99,30 +147,47 @@ After:    [config/*.yaml]           → edit, reload, done
 
 ---
 
-## ๓. Target File Layout
+## ๓. Target File Layout (2-Layer per ADR--CONFIG-TWO-LAYER-SPLIT)
 
 ```
 cognitive_system/
-├── atom_schema.yaml          ← already done
-├── atom_registry.yaml        ← already done
-├── config/                   ← NEW directory
-│   ├── README.md             ← index + schema docs
-│   ├── validator.yaml        ← P1 — validator rule thresholds, severities, required sections
-│   ├── codegen.yaml          ← P1 — forbidden patterns/imports, post-process keywords
-│   ├── retrieval.yaml        ← P2 — RRF weights, source timeouts, k constants
-│   ├── memory.yaml           ← P2 — session locks, episode thresholds, decision keywords
-│   ├── hooks.yaml            ← P3 — pre-commit/push scopes, exclusion patterns
-│   ├── mcp.yaml              ← P3 — tool manifest, server metadata
-│   ├── paths.yaml            ← P3 — index dirs, brain skeleton, output paths
-│   ├── embedding.yaml        ← P4 — chunk/batch/overlap, exclude patterns
-│   ├── database.yaml         ← P4 — pg dims, table names, validation ranges
-│   └── identity.yaml         ← P4 — default persona, namespace, voice defaults
-└── policies/                 ← existing — classifiers stay here (ABAC pattern)
-    ├── 60-coding-domain.yaml
-    └── 70-task-management.yaml
+├── atom_schema.yaml                          ← already done
+├── atom_registry.yaml                        ← already done
+│
+├── config/                                   ← LAYER 1: operator-facing (root)
+│   ├── README.md                             ← index + ownership + load order
+│   ├── validator.yaml                        ← P1 — token caps, severities, required sections
+│   ├── codegen.yaml                          ← P1 — forbidden patterns, imports, post-process
+│   ├── paths.yaml                            ← P3 — cross-cutting paths (read by both pkgs)
+│   └── policies/                             ← existing ABAC (unchanged)
+│       ├── 60-coding-domain.yaml
+│       └── 70-task-management.yaml
+│
+├── packages/msp/config/                      ← LAYER 2: MSP package internals
+│   ├── retrieval.defaults.yaml               ← P2 — RRF weights, timeouts, k constants
+│   ├── memory.defaults.yaml                  ← P2 — session locks, regex, sentence caps
+│   ├── mcp.tools.yaml                        ← P3 — tool manifest, server metadata
+│   ├── hooks.defaults.yaml                   ← P3 — pre-commit/push scope patterns
+│   └── identity.defaults.yaml                ← P4 — default persona, namespace, voice
+│
+└── packages/gks/config/                      ← LAYER 2: GKS package internals (travel-with-pkg)
+    ├── embedding.defaults.yaml               ← P4 — chunk/batch/overlap, excludes
+    └── database.defaults.yaml                ← P4 — pg dims, table names, validation
 ```
 
-**10 config files** + shared loader + index doc = **12 new artifacts**.
+**Total: ~13 YAML files** (3 root + 5 MSP + 2 GKS + 2 policies + 1 cross-cutting paths) + shared loader + index doc.
+
+### Why 2 layers (decided by ADR--CONFIG-TWO-LAYER-SPLIT)
+
+| Layer | Audience | Change cadence | Naming |
+|---|---|---|---|
+| **Layer 1** `config/` | Operators, PMs, reviewers | Frequent | `<name>.yaml` |
+| **Layer 2** `packages/<pkg>/config/` | Engineers | Rare | `<name>.defaults.yaml` |
+
+**Loader resolution chain:**
+1. `<repo>/config/<module>.yaml` — operator override
+2. `packages/<pkg>/config/<name>.defaults.yaml` — package default
+3. In-code constant — last-resort transition fallback (removed by Phase 5)
 
 ---
 
@@ -301,68 +366,78 @@ defaults:
 
 ---
 
-## ๕. Shared Loader
+## ๕. Shared Loader (2-layer aware)
 
 New module: `packages/msp/src/config/loader.ts`
 
 ```ts
-// Pattern proven in validator/utils/registry.ts — generalize it.
-export function loadConfig<T = any>(name: string, root: string): T | null
+// Pattern proven in validator/utils/registry.ts — generalize it for 2-layer.
+export function loadConfig<T = any>(
+  moduleName: string,    // e.g. 'retrieval', 'validator'
+  packageName: string,   // e.g. 'msp', 'gks' — restricts Layer 2 search
+  root: string
+): T | null
+
 export function clearConfigCache(): void   // for tests
 ```
 
-Search order:
-1. `<root>/config/<name>.yaml`
-2. Walk up 5 levels (monorepo-friendly)
-3. Return `null` if not found
+**Resolution order** (per ADR--CONFIG-TWO-LAYER-SPLIT):
+1. **Layer 1:** `<root>/config/<moduleName>.yaml` — operator override (if present)
+2. **Layer 2:** `<root>/packages/<packageName>/config/<moduleName>.defaults.yaml` — package default
+3. Walk up 5 levels (monorepo-friendly) from `root`
+4. Return `null` if not found (caller falls back to in-code constant during transition)
 
-Caching: per-name, module-level, cleared via `clearConfigCache()` in test setup.
+**Boundary enforcement:** `packageName === 'gks'` MUST NOT find a Layer 2 file under `packages/msp/config/` — enforced by passing `packageName` explicitly (no cross-package leak).
+
+**Caching:** per `(moduleName, packageName)` pair, module-level, cleared via `clearConfigCache()` in test setup.
 
 ---
 
 ## ๖. Phase Plan
 
 ### Phase 0 — Foundation (1 PR)
-- [ ] Create `config/` directory + `config/README.md` (index + conventions)
-- [ ] Implement `packages/msp/src/config/loader.ts` (generalized from `registry.ts`)
-- [ ] Unit tests for loader (walk-up, caching, missing-file fallback)
-- [ ] Document YAML conventions: `$schema_version` header, comments allowed, snake_case keys
+- [ ] Create directories: `config/`, `packages/msp/config/`, `packages/gks/config/`
+- [ ] Create `config/README.md` (index, ownership table, load order, naming convention)
+- [ ] Implement `packages/msp/src/config/loader.ts` with 2-layer resolution (`loadConfig<T>(module, key, root)`)
+- [ ] Unit tests for loader: Layer 1 override, Layer 2 fallback, missing-file → null, walk-up, caching, `clearConfigCache()`
+- [ ] JSON Schema convention: each YAML carries `$schema_version: "1.0"` header
+- [ ] Add boundary check: GKS code may NOT load from `packages/msp/config/` (enforced by lint + reviewer)
 
-### Phase 1 — Validator + Codegen (highest leverage, 1–2 PRs)
+### Phase 1 — Validator + Codegen (Layer 1 — operator-facing, 1–2 PRs)
 - [ ] Create `config/validator.yaml`
-- [ ] Refactor `validator/proto/master-token-cap.ts` → read thresholds from config
-- [ ] Refactor `validator/proto/master-body-schema.ts` → read required sections
-- [ ] Refactor `validator/proto/phase-gates.ts` → read phase mapping
-- [ ] Refactor `validator/rules/summary-min.ts` → read length + placeholders
+- [ ] Refactor `packages/msp/src/validator/proto/master-token-cap.ts` → read thresholds from config
+- [ ] Refactor `packages/msp/src/validator/proto/master-body-schema.ts` → read required sections
+- [ ] Refactor `packages/msp/src/validator/proto/phase-gates.ts` → read phase mapping
+- [ ] Refactor `packages/msp/src/validator/rules/summary-min.ts` → read length + placeholders
 - [ ] Create `config/codegen.yaml`
-- [ ] Refactor `codegen/forbidden-patterns.ts` → read patterns + imports
-- [ ] Refactor `codegen/post-process.ts` → read fence regex + keywords
+- [ ] Refactor `packages/msp/src/codegen/forbidden-patterns.ts` → read patterns + imports
+- [ ] Refactor `packages/msp/src/codegen/post-process.ts` → read fence regex + keywords
 - [ ] Update tests; verify no behavior change
 
-### Phase 2 — Retrieval + Memory (1 PR)
-- [ ] Create `config/retrieval.yaml`
-- [ ] Refactor `orchestrator/retrieval/types.ts` → `DEFAULT_WEIGHTS`, timeouts, k constants
-- [ ] Create `config/memory.yaml`
-- [ ] Refactor `memory/sessions/lock.ts` → `DEFAULT_MAX_AGE_MS`
-- [ ] Refactor `memory/episodic/writer.ts` → `DEFAULT_NAMESPACE`
-- [ ] Refactor `memory/episodic/summarisers/heuristic.ts` → all regex + thresholds
-- [ ] Refactor `memory/backlinks/walk.ts` → exclude list
+### Phase 2 — Retrieval + Memory (1 PR) — Layer 2 (MSP internal)
+- [ ] Create `packages/msp/config/retrieval.defaults.yaml`
+- [ ] Refactor `packages/msp/src/orchestrator/retrieval/types.ts` → `DEFAULT_WEIGHTS`, timeouts, k constants
+- [ ] Create `packages/msp/config/memory.defaults.yaml`
+- [ ] Refactor `packages/msp/src/memory/sessions/lock.ts` → `DEFAULT_MAX_AGE_MS`
+- [ ] Refactor `packages/msp/src/memory/episodic/writer.ts` → `DEFAULT_NAMESPACE`
+- [ ] Refactor `packages/msp/src/memory/episodic/summarisers/heuristic.ts` → all regex + thresholds
+- [ ] Refactor `packages/msp/src/memory/backlinks/walk.ts` → exclude list
 
-### Phase 3 — Hooks + MCP + Paths (1 PR)
-- [ ] Create `config/hooks.yaml`
-- [ ] Refactor `examples/hooks/pre-commit-validator.sh` → read regex from YAML (via `yq` or pre-baked sourced file)
-- [ ] Create `config/mcp.yaml`
-- [ ] Refactor `mcp/server.ts` → register tools from YAML manifest
-- [ ] Create `config/paths.yaml`
+### Phase 3 — Hooks + MCP + Paths (1 PR) — mixed
+- [ ] Create `packages/msp/config/hooks.defaults.yaml` (Layer 2)
+- [ ] Refactor `packages/msp/examples/hooks/pre-commit-validator.sh` → read regex from YAML (via `yq` or pre-baked sourced file)
+- [ ] Create `packages/msp/config/mcp.tools.yaml` (Layer 2)
+- [ ] Refactor `packages/msp/src/mcp/server.ts` → register tools from YAML manifest
+- [ ] Create `config/paths.yaml` (Layer 1 — cross-cutting; read by both packages)
 - [ ] Refactor all `.brain/msp/...` hardcodes across `memory/`, `orchestrator/`, `codegen/`
 
-### Phase 4 — Embedding + Database + Identity (1 PR)
-- [ ] Create `config/embedding.yaml`
+### Phase 4 — Embedding + Database + Identity (1 PR) — Layer 2
+- [ ] Create `packages/gks/config/embedding.defaults.yaml`
 - [ ] Refactor `scripts/msp/re-embed.ts`
-- [ ] Create `config/database.yaml`
+- [ ] Create `packages/gks/config/database.defaults.yaml`
 - [ ] Refactor `scripts/msp/pg-migrate.ts`
-- [ ] Create `config/identity.yaml`
-- [ ] Refactor `identity/profile.ts`, `identity/voice.ts` defaults
+- [ ] Create `packages/msp/config/identity.defaults.yaml`
+- [ ] Refactor `packages/msp/src/identity/profile.ts`, `voice.ts` defaults
 
 ### Phase 5 — Hardening (1 PR)
 - [ ] Add `npm run config:validate` — JSON Schema check on every YAML
@@ -413,9 +488,12 @@ Caching: per-name, module-level, cleared via `clearConfigCache()` in test setup.
 
 ## ๑๐. Acceptance criteria
 
-- [ ] All listed YAML files exist under `config/`
-- [ ] No hardcoded thresholds/patterns/mappings remain in the modules listed above
+- [ ] All Layer 1 files exist under `config/` (`validator.yaml`, `codegen.yaml`, `paths.yaml`)
+- [ ] All Layer 2 files exist under `packages/msp/config/` and `packages/gks/config/` with `.defaults.yaml` suffix
+- [ ] No hardcoded thresholds/patterns/mappings remain in the modules listed in Phase 1–4
 - [ ] `npm test --workspace=packages/msp` passes (same baseline as today)
-- [ ] `npm run config:validate` passes for every YAML
-- [ ] `config/README.md` documents what lives in each file
-- [ ] An operator can change e.g. `master_tier.thresholds.warn` from 400 → 350 in YAML and the new value is honored on next run with zero code changes
+- [ ] `npm run config:validate` passes for every YAML (per JSON Schema)
+- [ ] `config/README.md` documents every file + ownership + which package reads it
+- [ ] **Boundary check:** GKS code does NOT import from `packages/msp/config/` — verified by lint
+- [ ] **Operator scenario:** changing `config/validator.yaml` → `master_tier.thresholds.warn` from 400 → 350 takes effect on next run with **zero code changes, zero recompile**
+- [ ] **Package extraction scenario:** copying `packages/gks/` to a standalone repo carries its config (`packages/gks/config/*.defaults.yaml`) with it — no broken references

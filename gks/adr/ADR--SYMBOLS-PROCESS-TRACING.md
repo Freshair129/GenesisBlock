@@ -38,7 +38,30 @@ attributes:
   cluster: implementation_flow
   role: Architecture decision record
   attributes:
+    id: ADR--SYMBOLS-PROCESS-TRACING
+    phase: 2
+    type: adr
+    status: active
+    tier: process
+    source_type: axiomatic
+    vault_id: default
+    title: Execution flow traversal strategy and constraints
+    tags: *a1
+    crosslinks: *a2
+    created_at: 2026-05-12T15:51:00.000+07:00
+    aliases: *a3
+    cluster: implementation_flow
+    role: Architecture decision record
+    attributes:
+      domain: adr
     domain: adr
+    language: markdown
+    is_test: false
+    is_entrypoint: false
+    has_secret: true
+    secret_type: high_entropy_string
+    leak_risk: high
+    encryption_level: none
   domain: adr
   language: markdown
   is_test: false

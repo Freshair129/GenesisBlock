@@ -44,7 +44,30 @@ attributes:
   cluster: implementation_flow
   role: Strategic intent / PRD
   attributes:
+    id: CONCEPT--PROTO-ALGO-PARAM-COUPLING
+    phase: 1
+    type: concept
+    status: stable
+    vault_id: default
+    tier: genesis
+    source_type: axiomatic
+    title: PROTO--ALGO-PARAM-COUPLING — bi-directional tunes ↔ tunable_by reciprocal
+      validator
+    tags: *a1
+    crosslinks: *a2
+    created_at: 2026-05-05T16:28:00.000+07:00
+    aliases: *a3
+    cluster: implementation_flow
+    role: Strategic intent / PRD
+    attributes:
+      domain: concept
     domain: concept
+    language: markdown
+    is_test: false
+    is_entrypoint: false
+    has_secret: false
+    leak_risk: low
+    encryption_level: none
   domain: concept
   language: markdown
   is_test: false

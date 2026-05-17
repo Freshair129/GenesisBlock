@@ -28,7 +28,25 @@ attributes:
   cluster: memory
   role: Usage metrics rollup
   attributes:
+    id: USAGE--WEEKLY-2026-W19
+    phase: 6
+    type: usage
+    status: active
+    title: Usage Roll-up — 2026-W19
+    created_at: 2026-05-16T17:45:00+07:00
+    tags: *a1
+    aliases: *a2
+    cluster: memory
+    role: Usage metrics rollup
+    attributes:
+      domain: usage
     domain: usage
+    language: markdown
+    is_test: false
+    is_entrypoint: false
+    has_secret: false
+    leak_risk: low
+    encryption_level: none
   domain: usage
   language: markdown
   is_test: false

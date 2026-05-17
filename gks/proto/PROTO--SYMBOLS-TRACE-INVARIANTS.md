@@ -48,7 +48,32 @@ attributes:
   cluster: implementation_flow
   role: Machine-enforced invariant
   attributes:
+    id: PROTO--SYMBOLS-TRACE-INVARIANTS
+    phase: 2
+    type: proto
+    status: stable
+    severity: error
+    tier: safety
+    source_type: axiomatic
+    vault_id: default
+    title: Structural invariants for execution traces and atom graphs
+    tags: *a1
+    crosslinks: *a2
+    linked_symbols: *a3
+    created_at: 2026-05-14T20:00:00.000+07:00
+    aliases: *a4
+    cluster: implementation_flow
+    role: Machine-enforced invariant
+    attributes:
+      domain: proto
     domain: proto
+    language: markdown
+    is_test: false
+    is_entrypoint: false
+    has_secret: true
+    secret_type: high_entropy_string
+    leak_risk: high
+    encryption_level: none
   domain: proto
   language: markdown
   is_test: false

@@ -54,7 +54,32 @@ attributes:
   cluster: implementation_flow
   role: Algorithm definition
   attributes:
+    id: ALGO--SYMBOLS-FRAMEWORK-RECOGNITION
+    phase: 2
+    type: algo
+    status: active
+    tier: process
+    source_type: axiomatic
+    vault_id: default
+    title: Framework recognition algorithms — Next.js routing, runtime tags, data
+      fetching, ORM, MCP tools
+    tags: *a1
+    crosslinks: *a2
+    linked_symbols: *a3
+    created_at: 2026-05-12T05:37:00.000+07:00
+    aliases: *a4
+    cluster: implementation_flow
+    role: Algorithm definition
+    attributes:
+      domain: algo
     domain: algo
+    language: markdown
+    is_test: false
+    is_entrypoint: false
+    has_secret: true
+    secret_type: high_entropy_string
+    leak_risk: high
+    encryption_level: none
   domain: algo
   language: markdown
   is_test: false

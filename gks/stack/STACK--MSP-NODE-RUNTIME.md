@@ -39,7 +39,29 @@ attributes:
   cluster: implementation_flow
   role: Technology stack inventory
   attributes:
+    id: STACK--MSP-NODE-RUNTIME
+    phase: 2
+    type: stack
+    status: stable
+    tier: process
+    source_type: axiomatic
+    vault_id: default
+    title: MSP Node.js Runtime — technology inventory for identity and retrieval
+    tags: *a1
+    crosslinks: *a2
+    created_at: 2026-05-14T20:20:00+07:00
+    aliases: *a3
+    cluster: implementation_flow
+    role: Technology stack inventory
+    attributes:
+      domain: stack
     domain: stack
+    language: markdown
+    is_test: false
+    is_entrypoint: false
+    has_secret: false
+    leak_risk: low
+    encryption_level: none
   domain: stack
   language: markdown
   is_test: false

@@ -40,7 +40,30 @@ attributes:
   cluster: implementation_flow
   role: Architecture decision record
   attributes:
+    id: ADR--GEMINI-AS-SLM-PROVIDER
+    phase: 2
+    type: adr
+    status: stable
+    vault_id: default
+    tier: process
+    source_type: axiomatic
+    title: Gemini CLI is a first-class SLM provider, not only an escalator
+    tags: *a1
+    crosslinks: *a2
+    created_at: 2026-05-12T22:47:00.000+07:00
+    aliases: *a3
+    cluster: implementation_flow
+    role: Architecture decision record
+    attributes:
+      domain: adr
     domain: adr
+    language: markdown
+    is_test: false
+    is_entrypoint: false
+    has_secret: true
+    secret_type: high_entropy_string
+    leak_risk: high
+    encryption_level: none
   domain: adr
   language: markdown
   is_test: false

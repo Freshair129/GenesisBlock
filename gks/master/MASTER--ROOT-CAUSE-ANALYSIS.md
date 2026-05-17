@@ -59,7 +59,35 @@ attributes:
   cluster: implementation_flow
   role: Root-level policy / genesis rule
   attributes:
+    id: MASTER--ROOT-CAUSE-ANALYSIS
+    phase: 0
+    type: master
+    status: stable
+    tier: master
+    source_type: axiomatic
+    promoted_from: CONCEPT--ROOT-CAUSE-ANALYSIS
+    promoted_at: 2026-05-17T02:10:00.000+07:00
+    promotion_adr: ADR--MASTER-PROMOTION-ROOT-CAUSE-ANALYSIS
+    vault_id: default
+    priority: P0
+    constituents: *a1
+    title: Root cause analysis — confirm origin before any fix
+    tags: *a2
+    crosslinks: *a3
+    created_at: 2026-05-17T02:10:00.000+07:00
+    aliases: *a4
+    cluster: implementation_flow
+    role: Root-level policy / genesis rule
+    attributes:
+      domain: master
     domain: master
+    language: markdown
+    is_test: false
+    is_entrypoint: false
+    has_secret: true
+    secret_type: high_entropy_string
+    leak_risk: high
+    encryption_level: none
   domain: master
   language: markdown
   is_test: false

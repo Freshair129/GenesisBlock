@@ -38,7 +38,29 @@ attributes:
   cluster: implementation_flow
   role: Architecture decision record
   attributes:
+    id: ADR--CODEGEN-POST-PROCESSING
+    phase: 2
+    type: adr
+    status: stable
+    vault_id: default
+    tier: genesis
+    source_type: axiomatic
+    title: Codegen post-processing — strip wrapping before pattern checks
+    tags: *a1
+    crosslinks: *a2
+    created_at: 2026-05-03T14:08:41.716+07:00
+    aliases: *a3
+    cluster: implementation_flow
+    role: Architecture decision record
+    attributes:
+      domain: adr
     domain: adr
+    language: markdown
+    is_test: false
+    is_entrypoint: false
+    has_secret: false
+    leak_risk: low
+    encryption_level: none
   domain: adr
   language: markdown
   is_test: false

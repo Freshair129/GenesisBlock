@@ -39,7 +39,29 @@ attributes:
   cluster: implementation_flow
   role: Strategic intent / PRD
   attributes:
+    id: CONCEPT--ROOT-CAUSE-ANALYSIS
+    phase: 1
+    type: concept
+    status: stable
+    tier: genesis
+    source_type: axiomatic
+    vault_id: default
+    title: Root cause analysis — confirm origin before any fix
+    tags: *a1
+    crosslinks: *a2
+    created_at: 2026-05-17T02:00:00.000+07:00
+    aliases: *a3
+    cluster: implementation_flow
+    role: Strategic intent / PRD
+    attributes:
+      domain: concept
     domain: concept
+    language: markdown
+    is_test: false
+    is_entrypoint: false
+    has_secret: false
+    leak_risk: low
+    encryption_level: none
   domain: concept
   language: markdown
   is_test: false

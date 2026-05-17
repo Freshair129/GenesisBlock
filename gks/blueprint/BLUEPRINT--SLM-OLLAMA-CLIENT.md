@@ -50,7 +50,32 @@ attributes:
   cluster: implementation_flow
   role: Implementation plan
   attributes:
+    id: BLUEPRINT--SLM-OLLAMA-CLIENT
+    phase: 3
+    type: blueprint
+    scale_level: L2
+    status: stable
+    vault_id: default
+    tier: process
+    source_type: axiomatic
+    title: BLUEPRINT — Ollama SLM client implementation plan
+    tags: *a1
+    crosslinks: *a2
+    linked_symbols: *a3
+    created_at: 2026-05-03T16:22:31.964+07:00
+    aliases: *a4
+    cluster: implementation_flow
+    role: Implementation plan
+    attributes:
+      domain: blueprint
     domain: blueprint
+    language: markdown
+    is_test: false
+    is_entrypoint: false
+    has_secret: true
+    secret_type: high_entropy_string
+    leak_risk: high
+    encryption_level: none
   domain: blueprint
   language: markdown
   is_test: false

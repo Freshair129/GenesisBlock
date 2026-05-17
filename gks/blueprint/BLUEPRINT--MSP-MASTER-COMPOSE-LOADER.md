@@ -51,7 +51,31 @@ attributes:
   cluster: implementation_flow
   role: Implementation plan
   attributes:
+    id: BLUEPRINT--MSP-MASTER-COMPOSE-LOADER
+    phase: 3
+    type: blueprint
+    status: draft
+    tier: genesis
+    source_type: axiomatic
+    vault_id: default
+    title: msp master compose CLI — sector-aware Master loader with multi-tiered
+      triggers
+    tags: *a1
+    crosslinks: *a2
+    linked_symbols: *a3
+    created_at: 2026-05-17T02:50:00.000+07:00
+    aliases: *a4
+    cluster: implementation_flow
+    role: Implementation plan
+    attributes:
+      domain: blueprint
     domain: blueprint
+    language: markdown
+    is_test: false
+    is_entrypoint: false
+    has_secret: false
+    leak_risk: low
+    encryption_level: none
   domain: blueprint
   language: markdown
   is_test: false

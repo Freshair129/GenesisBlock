@@ -56,7 +56,33 @@ attributes:
   cluster: implementation_flow
   role: Implementation plan
   attributes:
+    id: BLUEPRINT--PHASE-3-VAULT-AND-RESOLUTION
+    phase: 3
+    type: blueprint
+    status: active
+    tier: process
+    source_type: axiomatic
+    vault_id: default
+    scale_level: L2
+    title: BLUEPRINT — Phase 3 vault composition + 2-tier resolution gradient, first
+      default-deny flip
+    tags: *a1
+    crosslinks: *a2
+    linked_symbols: *a3
+    created_at: 2026-05-14T22:21:54.630+07:00
+    aliases: *a4
+    cluster: implementation_flow
+    role: Implementation plan
+    attributes:
+      domain: blueprint
     domain: blueprint
+    language: markdown
+    is_test: false
+    is_entrypoint: false
+    has_secret: true
+    secret_type: aws_secret
+    leak_risk: high
+    encryption_level: none
   domain: blueprint
   language: markdown
   is_test: false

@@ -42,7 +42,30 @@ attributes:
   cluster: implementation_flow
   role: Strategic intent / PRD
   attributes:
+    id: CONCEPT--GENESIS-BLOCK-RUNTIME
+    phase: 1
+    type: concept
+    status: draft
+    vault_id: default
+    tier: process
+    source_type: axiomatic
+    title: Genesis Block Runtime — composite execution layer for GENESIS-- manifests
+    tags: *a1
+    crosslinks: *a2
+    created_at: 2026-05-14T03:30:00.000+07:00
+    aliases: *a3
+    cluster: implementation_flow
+    role: Strategic intent / PRD
+    attributes:
+      domain: concept
     domain: concept
+    language: markdown
+    is_test: false
+    is_entrypoint: false
+    has_secret: true
+    secret_type: high_entropy_string
+    leak_risk: high
+    encryption_level: none
   domain: concept
   language: markdown
   is_test: false

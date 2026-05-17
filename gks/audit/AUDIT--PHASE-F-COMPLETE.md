@@ -50,7 +50,30 @@ attributes:
   cluster: implementation_flow
   role: Test results / quality report
   attributes:
+    id: AUDIT--PHASE-F-COMPLETE
+    phase: 6
+    type: audit
+    status: stable
+    vault_id: default
+    tier: genesis
+    source_type: axiomatic
+    title: AUDIT — Phase F (refinements) — implementation complete
+    tags: *a1
+    crosslinks: *a2
+    created_at: 2026-05-14T05:30:00.000+07:00
+    aliases: *a3
+    cluster: implementation_flow
+    role: Test results / quality report
+    attributes:
+      domain: audit
     domain: audit
+    language: markdown
+    is_test: false
+    is_entrypoint: false
+    has_secret: true
+    secret_type: high_entropy_string
+    leak_risk: high
+    encryption_level: none
   domain: audit
   language: markdown
   is_test: false

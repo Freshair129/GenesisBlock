@@ -40,7 +40,31 @@ attributes:
   cluster: ops
   role: Operational response guide
   attributes:
+    id: RUNBOOK--IDENTITY-MIGRATION
+    phase: 6
+    type: runbook
+    status: stable
+    tier: process
+    source_type: axiomatic
+    vault_id: default
+    title: Identity Migration SOP — Global to Workspace Transition
+    tags: *a1
+    crosslinks: *a2
+    created_at: 2026-05-14T20:10:00+07:00
+    aliases: *a3
+    cluster: ops
+    role: Operational response guide
+    attributes:
+      domain: runbook
     domain: runbook
+    language: markdown
+    is_test: false
+    is_entrypoint: false
+    is_operational: true
+    issue_status: stable
+    has_secret: false
+    leak_risk: low
+    encryption_level: none
   domain: runbook
   language: markdown
   is_test: false

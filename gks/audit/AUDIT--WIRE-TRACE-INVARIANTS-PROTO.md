@@ -49,7 +49,32 @@ attributes:
   cluster: implementation_flow
   role: Test results / quality report
   attributes:
+    id: AUDIT--WIRE-TRACE-INVARIANTS-PROTO
+    phase: 6
+    type: audit
+    status: stable
+    vault_id: default
+    tier: process
+    source_type: axiomatic
+    title: AUDIT — wire PROTO--SYMBOLS-TRACE-INVARIANTS to its predicate + fix
+      ProtoStatus 'active'
+    tags: *a1
+    crosslinks: *a2
+    phase_override: *a3
+    created_at: 2026-05-14T19:40:00.000+07:00
+    aliases: *a4
+    cluster: implementation_flow
+    role: Test results / quality report
+    attributes:
+      domain: audit
     domain: audit
+    language: markdown
+    is_test: false
+    is_entrypoint: false
+    has_secret: true
+    secret_type: aws_secret
+    leak_risk: high
+    encryption_level: none
   domain: audit
   language: markdown
   is_test: false

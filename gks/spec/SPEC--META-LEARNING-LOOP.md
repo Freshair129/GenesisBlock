@@ -26,7 +26,26 @@ attributes:
   cluster: implementation_flow
   role: Technical specification
   attributes:
+    id: SPEC--META-LEARNING-LOOP
+    title: Meta Learning Loop (MLL) Technical Specification
+    type: spec
+    phase: 2
+    status: draft
+    tier: process
+    created_at: 2026-05-13T23:44:00.000+07:00
+    framework: FRAMEWORK--MSP-ARCHITECTURE-V2
+    aliases: *a1
+    cluster: implementation_flow
+    role: Technical specification
+    attributes:
+      domain: spec
     domain: spec
+    language: markdown
+    is_test: false
+    is_entrypoint: false
+    has_secret: false
+    leak_risk: low
+    encryption_level: none
   domain: spec
   language: markdown
   is_test: false
