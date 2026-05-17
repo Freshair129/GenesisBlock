@@ -34,14 +34,16 @@ graph TD
         FEAT -->|แยกรูปทรงข้อมูลสเปค| SPEC["SPEC-- (Specification)<br>(Wire Format/รูปทรงข้อมูล)"]
         FEAT -->|แยกโครงสร้างข้อมูล| ENTITY["ENTITY-- (Data Schema)<br>(นิยามตาราง/โมเดลข้อมูล)"]
         FEAT -->|แยกข้อตกลง API| ENDPOINT["ENDPOINT-- (API Route)<br>(Request & Response)"]
+        ENDPOINT -->|รวมศูนย์ภายใต้| API["API-- (OpenAPI Hub)<br>(OpenAPI Master Hub)"]
         FEAT -->|แยกเส้นทางความเชื่อมโยง| FLOW["FLOW-- (Data/UI Flow)<br>(แผนภาพ Sequence/User Flow)"]
         FEAT -->|แยกค่าคงที่ธุรกิจ| PARAMS["PARAMS-- (Constants)<br>(ค่าคงที่/Business Config)"]
         FEAT -->|แยกสิทธิ์การเข้าใช้งาน| ENTRYPOINT["ENTRYPOINT-- (Access Logic)<br>(Auth/Middleware)"]
+        FEAT -->|กำหนดขอบเขตโค้ดโมดูล| MOD["MOD-- (Module Manifest)<br>(Module Boundary)"]
         FEAT -->|แยกทักษะการรันเอเจนต์| SKILL["SKILL-- / MCP-- / PROTOCOL--<br>(ขีดความสามารถเอเจนต์)"]
     end
 
     subgraph Level 5: Action Plan
-        FEAT & ALGO & ENTITY & ENDPOINT & SPEC & FLOW & PARAMS & ENTRYPOINT & SKILL -->|รวบยอดทำแผนสร้างจริง| BLUEPRINT["BLUEPRINT-- (Implementation Plan)<br>(รายการชิ้นงานและ Tasks พัฒนา)"]
+        FEAT & ALGO & ENTITY & ENDPOINT & SPEC & FLOW & PARAMS & ENTRYPOINT & SKILL & API & MOD -->|รวบยอดทำแผนสร้างจริง| BLUEPRINT["BLUEPRINT-- (Implementation Plan)<br>(รายการชิ้นงานและ Tasks พัฒนา)"]
     end
 
     subgraph Level 6: Quality & Review
@@ -77,14 +79,16 @@ graph TD
         *   **──► `SPEC--` (Technical Specification)**: ข้อกำหนดรูปทรงข้อมูลระดับลึก หรือสายข้อมูลภายนอก (Data Shape / Wire Format)
         *   **──► `ENTITY--` (Data Schema)**: นิยามฟิลด์ข้อมูล ตารางฐานข้อมูล และความเชื่อมโยงเชิงโครงสร้าง
         *   **──► `ENDPOINT--` (One API Path)**: สัญญา interface รับส่งข้อมูล Request/Response สำหรับเชื่อมโยงข้ามเครื่อง
+        *   **──► `API--` (OpenAPI Hub)**: จุดรวมเอกสาร OpenAPI หลักสำหรับจัดกลุ่ม Endpoints ต่างๆ ของระบอบอินเตอร์เฟส
         *   **──► `FLOW--` (Data/UI Flow)**: แผนผัง Sequence ลำดับขั้นตอนการไหลของข้อมูลเพื่อให้อ่านพฤติกรรมของฟีเจอร์ได้ง่าย
         *   **──► `PARAMS--` (Constants)**: ค่าคงที่หรือค่าคอนฟิกธุรกิจของแอปพลิเคชัน
         *   **──► `ENTRYPOINT--` (Access Logic)**: รายละเอียดการกรองความปลอดภัยและการควบคุมสิทธิ์ผ่านมิดเดิลแวร์
+        *   **──► `MOD--` (Module Manifest)**: กำหนดขอบเขตความเป็นเจ้าของโค้ด โครงสร้างโฟลเดอร์แพ็คเกจ และสิทธิ์เปิดใช้ฟังก์ชันของโมดูลย่อย
         *   **──► `SKILL--` / `MCP--` / `PROTOCOL--`**: ขีดความสามารถพิเศษ เครื่องมือ หรือสัญญาสื่อสารของเอเจนต์ (ในกรณีที่ฟีเจอร์นั้นเป็นความสามารถของปัญญาประดิษฐ์)
 
 #### **ระดับที่ 5: Action Plan (การร่างแผนงานพัฒนา)**
 *   **จากโครงสร้างทั้งหมด สู่ `BLUEPRINT--`**:
-    *   **`BLUEPRINT--` (แผนดำเนินงาน)**: รวบรวมและวิเคราะห์ความเชื่อมโยงของอะตอมในระดับเทคนิคทั้งหมด (FEAT, ALGO, ENTITY, SPEC, FLOW, PARAMS, ENTRYPOINT, SKILL) เพื่อจัดขั้นตอนการลงมือพัฒนาเชิงปฏิบัติ มีการจัดลำดับการทำงาน (Geography) และรายการตัวงานที่นักพัฒนาหรือเอเจนต์ T1/T3 สามารถนำไปเขียนโค้ดได้จริง
+    *   **`BLUEPRINT--` (แผนดำเนินงาน)**: รวบรวมและวิเคราะห์ความเชื่อมโยงของอะตอมในระดับเทคนิคทั้งหมด (FEAT, ALGO, ENTITY, SPEC, FLOW, PARAMS, ENTRYPOINT, SKILL, API, MOD) เพื่อจัดขั้นตอนการลงมือพัฒนาเชิงปฏิบัติ มีการจัดลำดับการทำงาน (Geography) และรายการตัวงานที่นักพัฒนาหรือเอเจนต์ T1/T3 สามารถนำไปเขียนโค้ดได้จริง
 
 #### **ระดับที่ 6: Quality & Verification (รายงานการตรวจสอบหลังพัฒนา)**
 *   **จากผลลัพธ์พัฒนา สู่ `AUDIT--`**:
