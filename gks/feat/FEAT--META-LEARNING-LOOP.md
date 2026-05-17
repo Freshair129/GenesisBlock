@@ -11,6 +11,8 @@ aliases:
   - FEAT
   - implementation_flow
   - Feature spec
+cluster: implementation_flow
+role: "Feature spec"
 ---
 # FEAT — Meta Learning Loop (MLL)
 **Reference:** `d:\The Human Algorithm\T2\meta_learning_loop_technical_manual.md`

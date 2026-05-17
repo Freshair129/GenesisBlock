@@ -18,6 +18,8 @@ aliases:
   - GUARD
   - agent_governance
   - Structural / behavioural guardrail
+cluster: agent_governance
+role: "Structural / behavioural guardrail"
 ---
 
 # GUARD — Passport Non-Null

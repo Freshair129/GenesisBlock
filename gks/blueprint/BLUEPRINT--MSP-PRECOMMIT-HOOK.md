@@ -25,6 +25,8 @@ aliases:
   - BLUEPRINT
   - implementation_flow
   - Implementation plan
+cluster: implementation_flow
+role: "Implementation plan"
 ---
 
 # BLUEPRINT — pre-commit hook

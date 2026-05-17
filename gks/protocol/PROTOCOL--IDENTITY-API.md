@@ -14,6 +14,8 @@ aliases:
   - PROTOCOL
   - agent_governance
   - Interaction contract
+cluster: agent_governance
+role: "Interaction contract"
 ---
 
 # PROTOCOL — Identity API

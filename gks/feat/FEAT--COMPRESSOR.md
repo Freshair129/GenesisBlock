@@ -26,6 +26,8 @@ aliases:
   - FEAT
   - implementation_flow
   - Feature spec
+cluster: implementation_flow
+role: "Feature spec"
 ---
 
 # Context compressor — three-tier shrink-to-fit for token-budgeted episodes

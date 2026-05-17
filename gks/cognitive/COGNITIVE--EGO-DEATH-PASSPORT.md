@@ -19,6 +19,8 @@ aliases:
   - COGNITIVE
   - implementation_flow
   - Mental model / interpretive lens
+cluster: implementation_flow
+role: "Mental model / interpretive lens"
 ---
 
 # COGNITIVE — Ego Death Passport

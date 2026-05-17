@@ -15,7 +15,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 
 const repoRoot = fileURLToPath(new URL('../../../..', import.meta.url))
 const atomDateScript = join(repoRoot, 'scripts/msp/atom-date.ts')
-const scaffoldScript = join(repoRoot, 'scripts/msp/scaffold-atom.ts')
+const scaffoldScript = join(repoRoot, 'scripts/msp/msp-atom.ts')
 const supersedeScript = join(repoRoot, 'scripts/msp/supersede.ts')
 
 function runScript(scriptPath: string, args: string[]): { code: number; stdout: string; stderr: string } {
@@ -58,6 +58,21 @@ describe('msp:scaffold-atom', () => {
     // Mock the minimal gks/ tree the script writes into
     mkdirSync(join(tmpRoot, 'gks/concept'), { recursive: true })
     mkdirSync(join(tmpRoot, 'gks/adr'), { recursive: true })
+    // Mock minimal atom_registry.yaml
+    writeFileSync(
+      join(tmpRoot, 'atom_registry.yaml'),
+      `
+taxonomy:
+  clusters:
+    process:
+      types:
+        concept:
+          phase: 1
+          folder: concept
+          tier: process
+          sections: [Problem, Hypothesis, Scope]
+`,
+    )
   })
 
   afterEach(() => {
@@ -65,7 +80,7 @@ describe('msp:scaffold-atom', () => {
   })
 
   it('creates a CONCEPT atom with valid frontmatter', () => {
-    const r = runScript(scaffoldScript, [`--type=concept`, `--slug=TEST-FOO`, `--root=${tmpRoot}`])
+    const r = runScript(scaffoldScript, ['scaffold', `--type=concept`, `--slug=TEST-FOO`, `--root=${tmpRoot}`])
     expect(r.code).toBe(0)
     const path = join(tmpRoot, 'gks/concept/CONCEPT--TEST-FOO.md')
     expect(existsSync(path)).toBe(true)
@@ -80,7 +95,7 @@ describe('msp:scaffold-atom', () => {
   it('refuses to overwrite an existing file without --force', () => {
     const path = join(tmpRoot, 'gks/concept/CONCEPT--EXIST.md')
     writeFileSync(path, 'existing content')
-    const r = runScript(scaffoldScript, [`--type=concept`, `--slug=EXIST`, `--root=${tmpRoot}`])
+    const r = runScript(scaffoldScript, ['scaffold', `--type=concept`, `--slug=EXIST`, `--root=${tmpRoot}`])
     expect(r.code).not.toBe(0)
     expect(r.stderr).toMatch(/already exists/)
     // Original content preserved
@@ -88,13 +103,13 @@ describe('msp:scaffold-atom', () => {
   })
 
   it('rejects invalid slug', () => {
-    const r = runScript(scaffoldScript, [`--type=concept`, `--slug=lowercase-bad`, `--root=${tmpRoot}`])
+    const r = runScript(scaffoldScript, ['scaffold', `--type=concept`, `--slug=lowercase-bad`, `--root=${tmpRoot}`])
     expect(r.code).not.toBe(0)
     expect(r.stderr).toMatch(/invalid slug/)
   })
 
   it('rejects unknown type', () => {
-    const r = runScript(scaffoldScript, [`--type=notatype`, `--slug=FOO`, `--root=${tmpRoot}`])
+    const r = runScript(scaffoldScript, ['scaffold', `--type=notatype`, `--slug=FOO`, `--root=${tmpRoot}`])
     expect(r.code).not.toBe(0)
     expect(r.stderr).toMatch(/unknown --type/)
   })

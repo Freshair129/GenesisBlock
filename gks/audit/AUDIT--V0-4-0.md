@@ -21,6 +21,8 @@ aliases:
   - AUDIT
   - implementation_flow
   - Test results / quality report
+cluster: implementation_flow
+role: "Test results / quality report"
 ---
 
 # v0.4.0 close-out — Tier 2 PROTOs + M9a + Tier 3 defer

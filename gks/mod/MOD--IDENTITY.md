@@ -14,6 +14,8 @@ aliases:
   - MOD
   - implementation_flow
   - Module manifest
+cluster: implementation_flow
+role: "Module manifest"
 ---
 
 # MODULE — Identity (Genesis Block)

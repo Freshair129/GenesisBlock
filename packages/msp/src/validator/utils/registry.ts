@@ -62,12 +62,7 @@ export function lookupType(prefix: string, root: string) {
 
 export function buildAliases(id: string, existingAliases: unknown, root: string): string[] {
   const prefix = id.split('--')[0]!
-  const typeDef = lookupType(prefix, root)
-  
   const primary = [prefix]
-  if (typeDef) {
-    primary.push(typeDef.cluster, typeDef.role)
-  }
 
   const other = Array.isArray(existingAliases)
     ? (existingAliases.filter(x => typeof x === 'string' && !primary.includes(x)) as string[])

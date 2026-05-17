@@ -1,4 +1,4 @@
-import { buildAliases } from '../utils/registry.js'
+import { buildAliases, lookupType } from '../utils/registry.js'
 import type { ParsedAtom, ValidationContext, ValidationError } from '../types.js'
 
 function isPresent(v: unknown): boolean {
@@ -67,6 +67,37 @@ export function requiredFields(
               severity: 'error',
               message: `alias at index ${i} must match the expected '${target[i]}'`,
               offending: 'aliases',
+            })
+          }
+        }
+      }
+    }
+
+    if (field === 'cluster' || field === 'role') {
+      const val = atom.fm[field]
+      if (typeof val !== 'string' || val.trim() === '') {
+        errors.push({
+          rule: 'required-fields',
+          severity: 'error',
+          message: `frontmatter field '${field}' must be a non-empty string`,
+          offending: field,
+        })
+        continue
+      }
+
+      const expectedPrimary = (atom.fm.id ?? atom.fm.proposed_id) as string | undefined
+      if (expectedPrimary !== undefined) {
+        const root = ctx.root ?? process.cwd()
+        const prefix = expectedPrimary.split('--')[0]!
+        const typeDef = lookupType(prefix, root)
+        if (typeDef) {
+          const expected = field === 'cluster' ? typeDef.cluster : typeDef.role
+          if (val !== expected) {
+            errors.push({
+              rule: 'required-fields',
+              severity: 'error',
+              message: `frontmatter field '${field}' must match registry value '${expected}'`,
+              offending: field,
             })
           }
         }

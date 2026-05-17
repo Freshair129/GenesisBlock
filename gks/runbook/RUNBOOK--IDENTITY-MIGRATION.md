@@ -19,6 +19,8 @@ aliases:
   - RUNBOOK
   - ops
   - Operational response guide
+cluster: ops
+role: "Operational response guide"
 ---
 
 # RUNBOOK — Identity Migration

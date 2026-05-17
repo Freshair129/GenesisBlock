@@ -19,6 +19,8 @@ aliases:
   - CONCEPT
   - implementation_flow
   - Strategic intent / PRD
+cluster: implementation_flow
+role: "Strategic intent / PRD"
 ---
 
 # CONCEPT — Real CLI wiring for T1/T2/T3 adapters

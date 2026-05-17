@@ -37,6 +37,8 @@ aliases:
   - BLUEPRINT
   - implementation_flow
   - Implementation plan
+cluster: implementation_flow
+role: "Implementation plan"
 ---
 
 # BLUEPRINT — global vs workspace storage migration

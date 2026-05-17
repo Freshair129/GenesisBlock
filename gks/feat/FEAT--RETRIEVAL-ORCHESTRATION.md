@@ -28,6 +28,8 @@ aliases:
   - FEAT
   - implementation_flow
   - Feature spec
+cluster: implementation_flow
+role: "Feature spec"
 ---
 
 # Retrieval orchestration — `recall(query)` fans out across 4 sources, fuses via RRF

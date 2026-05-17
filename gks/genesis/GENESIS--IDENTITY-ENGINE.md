@@ -50,6 +50,8 @@ aliases:
   - GENESIS
   - implementation_flow
   - Block Manifest (v2.3+)
+cluster: implementation_flow
+role: "Block Manifest (v2.3+)"
 ---
 
 # GENESIS — Identity Engine

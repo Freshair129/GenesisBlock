@@ -25,6 +25,8 @@ aliases:
   - AUDIT
   - implementation_flow
   - Test results / quality report
+cluster: implementation_flow
+role: "Test results / quality report"
 ---
 
 # M7a — Obsidian client wrapper (REST adapter delegate + filesystem fallback)

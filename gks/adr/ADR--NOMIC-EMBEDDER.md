@@ -13,6 +13,8 @@ aliases:
   - ADR
   - implementation_flow
   - Architecture decision record
+cluster: implementation_flow
+role: "Architecture decision record"
 ---
 
 # ADR — Use nomic-embed-text-v1.5 as the local embedding backend

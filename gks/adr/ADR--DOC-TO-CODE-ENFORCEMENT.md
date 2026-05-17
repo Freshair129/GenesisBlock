@@ -27,6 +27,8 @@ aliases:
   - ADR
   - implementation_flow
   - Architecture decision record
+cluster: implementation_flow
+role: "Architecture decision record"
 ---
 
 # ADR — Doc-to-code enforcement model

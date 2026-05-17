@@ -18,6 +18,8 @@ aliases:
   - ALGO
   - implementation_flow
   - Algorithm definition
+cluster: implementation_flow
+role: "Algorithm definition"
 ---
 
 # ALGO — Call graph traversal

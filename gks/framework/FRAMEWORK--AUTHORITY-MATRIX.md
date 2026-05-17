@@ -18,6 +18,8 @@ aliases:
   - FRAMEWORK
   - implementation_flow
   - Governance / architectural framework
+cluster: implementation_flow
+role: "Governance / architectural framework"
 ---
 
 # FRAME — authority matrix

@@ -31,6 +31,8 @@ aliases:
   - AUDIT
   - implementation_flow
   - Test results / quality report
+cluster: implementation_flow
+role: "Test results / quality report"
 ---
 
 # M7f — MCP tool expansion (4 of 5 passport tools shipped; msp_compress deferred)

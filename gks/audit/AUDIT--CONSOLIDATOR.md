@@ -30,6 +30,8 @@ aliases:
   - AUDIT
   - implementation_flow
   - Test results / quality report
+cluster: implementation_flow
+role: "Test results / quality report"
 ---
 
 # M7b — consolidator implementation (hybrid scoring + boundary detection + summariser)

@@ -18,6 +18,8 @@ aliases:
   - PARAMS
   - implementation_flow
   - Constants / business config
+cluster: implementation_flow
+role: "Constants / business config"
 ---
 
 # PARAMS — Identity Profile Defaults

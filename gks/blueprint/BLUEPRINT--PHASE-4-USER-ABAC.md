@@ -8,6 +8,12 @@ source_type: axiomatic
 vault_id: default
 scale_level: L2
 title: "BLUEPRINT — Phase 4 user-level ABAC: authenticated Subject, policy packs, all read entry points enforce"
+aliases:
+  - BLUEPRINT
+  - implementation_flow
+  - Implementation plan
+cluster: implementation_flow
+role: "Implementation plan"
 tags:
   - msp
   - ucf

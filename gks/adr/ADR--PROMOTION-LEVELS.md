@@ -19,6 +19,8 @@ aliases:
   - ADR
   - implementation_flow
   - Architecture decision record
+cluster: implementation_flow
+role: "Architecture decision record"
 ---
 
 > ⚠️ **Superseded by [`[[ADR--AGENT-WRITE-BOUNDARIES]]`](./[[ADR--AGENT-WRITE-BOUNDARIES]].md)** (Phase 4 of `[[BLUEPRINT--INBOUND-TO-CANDIDATES-MIGRATION]]`, 2026-05-09). The L0/L1/L2 promotion-level model is replaced by a simple two-state model: `status: candidate` (in `.brain/.../candidates/`) → `status: stable` (in `gks/<type>/` after human PR + CI). Body preserved as historical context.

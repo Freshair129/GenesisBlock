@@ -30,6 +30,8 @@ aliases:
   - MASTER
   - implementation_flow
   - Root-level policy / genesis rule
+cluster: implementation_flow
+role: "Root-level policy / genesis rule"
 ---
 
 # MASTER — Atom contradiction policy (Layer 0 supersession discipline)

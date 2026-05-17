@@ -27,7 +27,7 @@ import { access, readFile, rename, writeFile } from 'node:fs/promises'
 import { resolve } from 'node:path'
 
 import { appendRegistry } from './registry.js'
-import { buildAliases } from '../validator/utils/registry.js'
+import { buildAliases, lookupType } from '../validator/utils/registry.js'
 
 export interface ApplyResult {
   readonly master_id: string
@@ -183,6 +183,26 @@ function stampFrontmatter(frontmatter: string, promotedAt: string): string {
       updated = updated.replace(aliasesRegex, newAliasesBlock)
     } else {
       updated = insertBeforeClosingDelim(updated, newAliasesBlock)
+    }
+
+    const prefix = masterId.split('--')[0]!
+    const typeDef = lookupType(prefix, process.cwd())
+    if (typeDef) {
+      // Overwrite or inject cluster
+      const clusterLine = `cluster: ${typeDef.cluster}`
+      if (/^cluster:\s*.*$/m.test(updated)) {
+        updated = updated.replace(/^cluster:\s*.*$/m, clusterLine)
+      } else {
+        updated = insertBeforeClosingDelim(updated, clusterLine)
+      }
+
+      // Overwrite or inject role
+      const roleLine = `role: ${typeDef.role}`
+      if (/^role:\s*.*$/m.test(updated)) {
+        updated = updated.replace(/^role:\s*.*$/m, roleLine)
+      } else {
+        updated = insertBeforeClosingDelim(updated, roleLine)
+      }
     }
   }
 

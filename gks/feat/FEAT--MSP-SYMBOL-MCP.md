@@ -26,6 +26,8 @@ aliases:
   - FEAT
   - implementation_flow
   - Feature spec
+cluster: implementation_flow
+role: "Feature spec"
 ---
 
 # FEAT — msp_symbol_* MCP tool surface

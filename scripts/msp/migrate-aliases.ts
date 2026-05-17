@@ -7,7 +7,7 @@ import { join, resolve, relative, dirname } from 'node:path'
 import { parse as yamlParse } from 'yaml'
 import { fileURLToPath } from 'node:url'
 
-import { buildAliases } from '../../packages/msp/src/validator/utils/registry.ts'
+import { buildAliases, lookupType } from '../../packages/msp/src/validator/utils/registry.ts'
 
 const __filename = fileURLToPath(import.meta.url)
 const REPO_ROOT = resolve(dirname(__filename), '..', '..')
@@ -48,7 +48,7 @@ async function listMarkdownFiles(dir: string): Promise<string[]> {
   return out
 }
 
-function processFrontmatter(fmText: string, aliases: string[]): string {
+function processFrontmatter(fmText: string, aliases: string[], cluster: string, role: string): string {
   // Normalize line endings
   let lines = fmText.replace(/\r\n/g, '\n').split('\n')
 
@@ -59,7 +59,7 @@ function processFrontmatter(fmText: string, aliases: string[]): string {
     const line = lines[i]!.trim()
     if (line.startsWith('aliases:')) {
       startIdx = i
-      // Find end of aliases block (either next key or end of array items starting with - or spaces)
+      // Find end of aliases block
       let j = i + 1
       while (j < lines.length) {
         const nextLine = lines[j]!
@@ -83,8 +83,10 @@ function processFrontmatter(fmText: string, aliases: string[]): string {
     lines.splice(startIdx, endIdx - startIdx)
   }
 
-  // Find where to insert. We insert aliases: block right before created_at or tags or at the end.
-  // To keep it standard, let's insert it cleanly at the end of the frontmatter object.
+  // Remove existing cluster and role fields if present
+  lines = lines.filter(line => !line.trim().startsWith('cluster:'))
+  lines = lines.filter(line => !line.trim().startsWith('role:'))
+
   // Remove any trailing empty lines in lines
   while (lines.length > 0 && lines[lines.length - 1]!.trim() === '') {
     lines.pop()
@@ -94,7 +96,37 @@ function processFrontmatter(fmText: string, aliases: string[]): string {
   for (const alias of aliases) {
     lines.push(`  - ${alias}`)
   }
+  lines.push(`cluster: ${cluster}`)
+  lines.push(`role: ${role}`)
 
+  return lines.join('\n')
+}
+
+function healFrontmatter(fmText: string): string {
+  let lines = fmText.replace(/\r\n/g, '\n').split('\n')
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i]!.trim()
+    if (line.startsWith('role:')) {
+      const match = line.match(/^role:\s*(?:"([^"]+)"|(\S+(?:\s+\S+)*))\s+(\S+)\s*$/)
+      if (match) {
+        const roleVal = match[1] ?? match[2]!
+        const clusterVal = match[3]!
+        lines[i] = `role: ${JSON.stringify(roleVal)}`
+        
+        let foundCluster = false
+        for (let j = 0; j < lines.length; j++) {
+          if (lines[j]!.trim().startsWith('cluster:')) {
+            lines[j] = `cluster: ${clusterVal}`
+            foundCluster = true
+            break
+          }
+        }
+        if (!foundCluster) {
+          lines.push(`cluster: ${clusterVal}`)
+        }
+      }
+    }
+  }
   return lines.join('\n')
 }
 
@@ -113,7 +145,8 @@ async function migrateFile(filepath: string): Promise<boolean> {
     return false
   }
 
-  const fmText = content.slice(FRONTMATTER_DELIM.length, end).trim()
+  let fmText = content.slice(FRONTMATTER_DELIM.length, end).trim()
+  fmText = healFrontmatter(fmText)
   const body = content.slice(end + `\n${FRONTMATTER_DELIM}`.length)
 
   let fm: any
@@ -135,26 +168,36 @@ async function migrateFile(filepath: string): Promise<boolean> {
     return false
   }
 
-  const targetAliases = buildAliases(id, fm.aliases, REPO_ROOT)
+  const prefix = id.split('--')[0]!
+  const typeDef = lookupType(prefix, REPO_ROOT)
+  if (!typeDef) {
+    console.warn(`[skip] ${relative(REPO_ROOT, filepath)}: no registry type definition for prefix ${prefix}`)
+    return false
+  }
 
-  // Check if aliases is already correctly set
-  if (
-    Array.isArray(fm.aliases) &&
-    fm.aliases.length >= targetAliases.length &&
-    targetAliases.every((val, index) => fm.aliases[index] === val)
-  ) {
+  const targetAliases = buildAliases(id, fm.aliases, REPO_ROOT)
+  const targetCluster = typeDef.cluster
+  const targetRole = typeDef.role
+
+  const aliasesCorrect = Array.isArray(fm.aliases) &&
+                         fm.aliases.length === targetAliases.length &&
+                         targetAliases.every((val, index) => fm.aliases[index] === val)
+  const clusterCorrect = fm.cluster === targetCluster
+  const roleCorrect = fm.role === targetRole
+
+  if (aliasesCorrect && clusterCorrect && roleCorrect) {
     // Already correct!
     return false
   }
 
-  const updatedFmText = processFrontmatter(fmText, targetAliases)
+  const updatedFmText = processFrontmatter(fmText, targetAliases, targetCluster, targetRole)
   const finalDoc = `${FRONTMATTER_DELIM}\n${updatedFmText}\n${FRONTMATTER_DELIM}${body}`
 
   if (!DRY_RUN) {
     await fs.writeFile(filepath, finalDoc, 'utf8')
   }
 
-  console.log(`${DRY_RUN ? '[dry-run]' : '[migrated]'} ${relative(REPO_ROOT, filepath)} -> aliases: [${targetAliases.join(', ')}]`)
+  console.log(`${DRY_RUN ? '[dry-run]' : '[migrated]'} ${relative(REPO_ROOT, filepath)} -> cluster: ${targetCluster}, role: ${targetRole}, aliases: [${targetAliases.join(', ')}]`)
   return true
 }
 

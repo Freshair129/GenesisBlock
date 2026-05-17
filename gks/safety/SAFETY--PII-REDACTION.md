@@ -19,6 +19,8 @@ aliases:
   - SAFETY
   - implementation_flow
   - Ethical safety / AI alignment
+cluster: implementation_flow
+role: "Ethical safety / AI alignment"
 ---
 
 # SAFETY — PII Redaction

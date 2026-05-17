@@ -14,6 +14,8 @@ aliases:
   - USAGE
   - memory
   - Usage metrics rollup
+cluster: memory
+role: "Usage metrics rollup"
 ---
 
 # Usage Roll-up — 2026-W19

@@ -18,6 +18,8 @@ aliases:
   - CONCEPT
   - implementation_flow
   - Strategic intent / PRD
+cluster: implementation_flow
+role: "Strategic intent / PRD"
 ---
 
 > ⚠️ **Superseded by [`[[CONCEPT--KNOWLEDGE-LAYERS-V2]]`](./[[CONCEPT--KNOWLEDGE-LAYERS-V2]].md)** (Phase 4 of `[[BLUEPRINT--INBOUND-TO-CANDIDATES-MIGRATION]]`, 2026-05-09). The new candidates layer doesn't use a proposal-type discriminator — every candidate is just a `${proposed_id}.md` file in `.brain/.../candidates/`. Body preserved as historical context.

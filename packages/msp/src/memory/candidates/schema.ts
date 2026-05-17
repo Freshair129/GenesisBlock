@@ -1,5 +1,5 @@
 import { parse as yamlParse } from 'yaml'
-import { buildAliases } from '../../validator/utils/registry.js'
+import { buildAliases, lookupType } from '../../validator/utils/registry.js'
 import {
   CandidateIdError,
   type CandidateFrontmatter,
@@ -30,6 +30,12 @@ export function composeFrontmatter(
   lines.push('aliases:')
   for (const alias of aliases) {
     lines.push(`  - ${alias}`)
+  }
+  const prefix = input.proposed_id.split('--')[0]!
+  const typeDef = lookupType(prefix, process.cwd())
+  if (typeDef) {
+    lines.push(`cluster: ${yamlScalar(typeDef.cluster)}`)
+    lines.push(`role: ${yamlScalar(typeDef.role)}`)
   }
   lines.push(`proposed_at: ${proposedAt}`)
   lines.push(`proposed_by: ${proposedBy}`)

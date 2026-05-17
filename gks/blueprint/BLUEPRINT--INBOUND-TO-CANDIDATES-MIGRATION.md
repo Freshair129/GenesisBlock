@@ -36,6 +36,8 @@ aliases:
   - BLUEPRINT
   - implementation_flow
   - Implementation plan
+cluster: implementation_flow
+role: "Implementation plan"
 ---
 
 # BLUEPRINT — inbound to candidates migration

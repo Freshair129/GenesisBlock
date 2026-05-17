@@ -24,6 +24,8 @@ aliases:
   - AUDIT
   - implementation_flow
   - Test results / quality report
+cluster: implementation_flow
+role: "Test results / quality report"
 ---
 
 # Contradiction detection Layer 0 — shipped

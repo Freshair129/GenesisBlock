@@ -15,6 +15,8 @@ aliases:
   - PROTO
   - implementation_flow
   - Machine-enforced invariant
+cluster: implementation_flow
+role: "Machine-enforced invariant"
 ---
 
 # PROTO — Registry Drift Check

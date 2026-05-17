@@ -19,6 +19,8 @@ aliases:
   - STACK
   - implementation_flow
   - Technology stack inventory
+cluster: implementation_flow
+role: "Technology stack inventory"
 ---
 
 # STACK — MSP Node.js Runtime

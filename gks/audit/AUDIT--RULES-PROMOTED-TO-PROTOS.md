@@ -27,6 +27,8 @@ aliases:
   - AUDIT
   - implementation_flow
   - Test results / quality report
+cluster: implementation_flow
+role: "Test results / quality report"
 ---
 
 # M8f — promote 3 existing rules → PROTO atoms

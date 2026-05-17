@@ -21,6 +21,8 @@ aliases:
   - AUDIT
   - implementation_flow
   - Test results / quality report
+cluster: implementation_flow
+role: "Test results / quality report"
 ---
 
 # AUDIT — GKS upstream proposals 01–04 merged (v3.7.0)

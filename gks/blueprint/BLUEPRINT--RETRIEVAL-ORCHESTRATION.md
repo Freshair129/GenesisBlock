@@ -28,6 +28,8 @@ aliases:
   - BLUEPRINT
   - implementation_flow
   - Implementation plan
+cluster: implementation_flow
+role: "Implementation plan"
 ---
 
 # BLUEPRINT — retrieval orchestration implementation plan

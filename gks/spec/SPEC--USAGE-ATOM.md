@@ -25,6 +25,8 @@ aliases:
   - SPEC
   - implementation_flow
   - Technical specification
+cluster: implementation_flow
+role: "Technical specification"
 ---
 
 # SPEC — Usage Atom

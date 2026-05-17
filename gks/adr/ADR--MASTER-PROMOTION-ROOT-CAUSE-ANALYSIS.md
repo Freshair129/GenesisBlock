@@ -20,6 +20,8 @@ aliases:
   - ADR
   - implementation_flow
   - Architecture decision record
+cluster: implementation_flow
+role: "Architecture decision record"
 ---
 
 # ADR — promote RCA discipline to Master

@@ -8,6 +8,12 @@ source_type: axiomatic
 vault_id: default
 scale_level: L2
 title: "BLUEPRINT — Phase 5 step-up auth: the StepUpProvider interface + PIN provider, policy-triggered"
+aliases:
+  - BLUEPRINT
+  - implementation_flow
+  - Implementation plan
+cluster: implementation_flow
+role: "Implementation plan"
 tags:
   - msp
   - ucf

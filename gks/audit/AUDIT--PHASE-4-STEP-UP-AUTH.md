@@ -21,6 +21,8 @@ aliases:
   - AUDIT
   - implementation_flow
   - Test results / quality report
+cluster: implementation_flow
+role: "Test results / quality report"
 ---
 
 # AUDIT - UCF Phase 4: Step-up Auth & User ABAC

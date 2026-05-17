@@ -19,6 +19,8 @@ aliases:
   - ADR
   - implementation_flow
   - Architecture decision record
+cluster: implementation_flow
+role: "Architecture decision record"
 ---
 
 # ADR — Using Tree-sitter for Python symbol extraction

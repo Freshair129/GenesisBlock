@@ -29,6 +29,8 @@ aliases:
   - FEAT
   - implementation_flow
   - Feature spec
+cluster: implementation_flow
+role: "Feature spec"
 ---
 
 # Identity layer — namespaced JSON store with profile / voice / preferences

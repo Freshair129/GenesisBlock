@@ -26,6 +26,8 @@ aliases:
   - FEAT
   - implementation_flow
   - Feature spec
+cluster: implementation_flow
+role: "Feature spec"
 ---
 
 # MSP MCP tools — passport-side surface (M7f)

@@ -7,7 +7,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
 import { parse as yamlParse } from 'yaml'
 
-import { buildAliases } from '../../packages/msp/src/validator/utils/registry.ts'
+import { buildAliases, lookupType } from '../../packages/msp/src/validator/utils/registry.ts'
 
 interface Args {
   command?: string
@@ -161,6 +161,9 @@ if (args.command === 'create') {
 
   const aliases = buildAliases(id, undefined, rootDir)
   const aliasesText = aliases.map(a => `  - ${a}`).join('\n')
+  const typeDef = lookupType(id.split('--')[0]!, rootDir)
+  const clusterField = typeDef ? `cluster: ${typeDef.cluster}\n` : ''
+  const roleField = typeDef ? `role: ${typeDef.role}\n` : ''
 
   let frontmatter = `---
 id: ${id}
@@ -177,7 +180,7 @@ vault_id: default
 title: ${title}
 aliases:
 ${aliasesText}
-tags:
+${clusterField}${roleField}tags:
   - msp
 crosslinks: {}
 created_at: ${isoTH}
@@ -197,6 +200,9 @@ created_at: ${isoTH}
 if (args.command === 'scaffold') {
   const aliases = buildAliases(id, undefined, rootDir)
   const aliasesText = aliases.map(a => `  - ${a}`).join('\n')
+  const typeDef = lookupType(id.split('--')[0]!, rootDir)
+  const clusterField = typeDef ? `cluster: ${typeDef.cluster}\n` : ''
+  const roleField = typeDef ? `role: ${typeDef.role}\n` : ''
 
   let frontmatter = `---
 id: ${id}
@@ -213,7 +219,7 @@ vault_id: default
 title: ${title}
 aliases:
 ${aliasesText}
-tags:
+${clusterField}${roleField}tags:
   - msp
 crosslinks: {}
 created_at: ${isoTH}

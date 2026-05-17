@@ -29,6 +29,8 @@ aliases:
   - implementation_flow
   - Feature spec
   - Feature
+cluster: implementation_flow
+role: "Feature spec"
 ---
 
 # FEAT — msp:graph CLI
