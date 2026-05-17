@@ -13,14 +13,20 @@ tags:
   - symbol-graph
   - pipeline
   - dag
-crosslinks: {"references":["CONCEPT--SYMBOL-GRAPH","FRAMEWORK--SYMBOL-GRAPH","SPEC--GENESIS-GRAPH-BACKEND"]}
+crosslinks:
+  references:
+    - CONCEPT--SYMBOL-GRAPH
+    - FRAMEWORK--SYMBOL-GRAPH
+    - SPEC--GENESIS-GRAPH-BACKEND
 created_at: 2026-05-13T19:45:00.000+07:00
 aliases:
   - CONCEPT
   - implementation_flow
   - Strategic intent / PRD
 cluster: implementation_flow
-role: "Strategic intent / PRD"
+role: Strategic intent / PRD
+attributes:
+  domain: concept
 ---
 
 # CONCEPT — Symbol Graph Processing Pipeline

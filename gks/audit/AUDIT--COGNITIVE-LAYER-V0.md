@@ -6,7 +6,8 @@ status: stable
 vault_id: default
 tier: process
 source_type: direct_experience
-title: AUDIT — Cognitive Layer V0 (Genesis Block + PgGraph + Gemini-as-subagent + createCognitiveLayer facade)
+title: AUDIT — Cognitive Layer V0 (Genesis Block + PgGraph + Gemini-as-subagent
+  + createCognitiveLayer facade)
 tags:
   - msp
   - gks
@@ -14,29 +15,39 @@ tags:
   - genesis-block
   - gemini
   - audit
-crosslinks: {"references":["CONCEPT--COGNITIVE-LAYER-FACADE","CONCEPT--HYBRID-RETRIEVAL-FTS-LAYER","ADR--DEFAULT-SLM-OLLAMA-QWEN-CODER","ADR--GEMINI-AS-SLM-PROVIDER","ADR--MEMORY-STORE-GRAPH-WIRING","BLUEPRINT--GENESIS-GRAPH-TS-FIRST","FEAT--COGNITIVE-LAYER-FACADE"]}
+crosslinks:
+  references:
+    - CONCEPT--COGNITIVE-LAYER-FACADE
+    - CONCEPT--HYBRID-RETRIEVAL-FTS-LAYER
+    - ADR--DEFAULT-SLM-OLLAMA-QWEN-CODER
+    - ADR--GEMINI-AS-SLM-PROVIDER
+    - ADR--MEMORY-STORE-GRAPH-WIRING
+    - BLUEPRINT--GENESIS-GRAPH-TS-FIRST
+    - FEAT--COGNITIVE-LAYER-FACADE
 linked_symbols:
-  - {"file":"packages/gks/src/memory/graph/genesis-graph.ts"}
-  - {"file":"packages/gks/src/memory/graph/cypher-v0.ts"}
-  - {"file":"packages/gks/src/memory/graph/genesis-graph-errors.ts"}
-  - {"file":"packages/gks/src/memory/index.ts"}
-  - {"file":"packages/msp/src/cognitive/index.ts"}
-  - {"file":"packages/msp/src/cognitive/types.ts"}
-  - {"file":"packages/msp/src/cognitive/fts.ts"}
-  - {"file":"packages/msp/src/cognitive/scale-gate.ts"}
-  - {"file":"packages/msp/src/cognitive/ssot.ts"}
-  - {"file":"packages/msp/src/cognitive/audit-only.ts"}
-  - {"file":"packages/msp/src/cognitive/compose.ts"}
-  - {"file":"packages/msp/src/codegen/slm/gemini.ts"}
-  - {"file":"packages/msp/src/codegen/runner.ts"}
-  - {"file":"packages/msp/examples/cognitive-layer-quickstart.ts"}
+  - file: packages/gks/src/memory/graph/genesis-graph.ts
+  - file: packages/gks/src/memory/graph/cypher-v0.ts
+  - file: packages/gks/src/memory/graph/genesis-graph-errors.ts
+  - file: packages/gks/src/memory/index.ts
+  - file: packages/msp/src/cognitive/index.ts
+  - file: packages/msp/src/cognitive/types.ts
+  - file: packages/msp/src/cognitive/fts.ts
+  - file: packages/msp/src/cognitive/scale-gate.ts
+  - file: packages/msp/src/cognitive/ssot.ts
+  - file: packages/msp/src/cognitive/audit-only.ts
+  - file: packages/msp/src/cognitive/compose.ts
+  - file: packages/msp/src/codegen/slm/gemini.ts
+  - file: packages/msp/src/codegen/runner.ts
+  - file: packages/msp/examples/cognitive-layer-quickstart.ts
 created_at: 2026-05-12T22:55:00.000+07:00
 aliases:
   - AUDIT
   - implementation_flow
   - Test results / quality report
 cluster: implementation_flow
-role: "Test results / quality report"
+role: Test results / quality report
+attributes:
+  domain: audit
 ---
 
 # AUDIT — Cognitive Layer V0

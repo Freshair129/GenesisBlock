@@ -6,7 +6,8 @@ status: stable
 tier: process
 source_type: axiomatic
 vault_id: default
-title: Knowledge Browser Symbols tab — Cytoscape graph + community filter + click-through
+title: Knowledge Browser Symbols tab — Cytoscape graph + community filter +
+  click-through
 tags:
   - msp
   - symbol-graph
@@ -14,21 +15,28 @@ tags:
   - knowledge-browser
   - cytoscape
   - feat
-crosslinks: {"implements":["ADR--SYMBOL-GRAPH-PERSISTENCE"],"references":["FRAMEWORK--SYMBOL-GRAPH","FEAT--MSP-SYMBOL-MCP"]}
+crosslinks:
+  implements:
+    - ADR--SYMBOL-GRAPH-PERSISTENCE
+  references:
+    - FRAMEWORK--SYMBOL-GRAPH
+    - FEAT--MSP-SYMBOL-MCP
 linked_symbols:
-  - {"file":"web/src/components/SymbolsTab.tsx"}
-  - {"file":"web/src/components/SymbolList.tsx"}
-  - {"file":"web/src/components/SymbolGraphView.tsx"}
-  - {"file":"web/src/components/SymbolDetail.tsx"}
-  - {"file":"web/src/api.ts"}
-  - {"file":"packages/msp/src/index.ts"}
+  - file: packages/msp/web/src/components/SymbolsTab.tsx
+  - file: packages/msp/web/src/components/SymbolList.tsx
+  - file: packages/msp/web/src/components/SymbolGraphView.tsx
+  - file: packages/msp/web/src/components/SymbolDetail.tsx
+  - file: packages/msp/web/src/api.ts
+  - file: packages/msp/src/index.ts
 created_at: 2026-05-09T16:54:00.000+07:00
 aliases:
   - FEAT
   - implementation_flow
   - Feature spec
 cluster: implementation_flow
-role: "Feature spec"
+role: Feature spec
+attributes:
+  domain: feat
 ---
 
 # FEAT — Knowledge Browser Symbols tab

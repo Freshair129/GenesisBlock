@@ -13,22 +13,29 @@ tags:
   - loader
   - audit
   - m8a
-crosslinks: {"references":["FEAT--PROTO-LOADER","BLUEPRINT--PROTO-LOADER","ADR--PROTO-ATOM-TYPE","CONCEPT--PROTO-PATTERN"]}
+crosslinks:
+  references:
+    - FEAT--PROTO-LOADER
+    - BLUEPRINT--PROTO-LOADER
+    - ADR--PROTO-ATOM-TYPE
+    - CONCEPT--PROTO-PATTERN
 linked_symbols:
-  - {"file":"packages/msp/src/validator/proto/types.ts"}
-  - {"file":"packages/msp/src/validator/proto/loader.ts"}
-  - {"file":"packages/msp/src/validator/proto/sample.ts"}
-  - {"file":"packages/msp/src/validator/cli.ts"}
-  - {"file":"gks/proto/PROTO--SAMPLE-RULE.md"}
-  - {"file":"packages/msp/test/validator/proto/loader.test.ts"}
-  - {"file":"packages/msp/test/validator/proto/sample.test.ts"}
+  - file: packages/msp/src/validator/proto/types.ts
+  - file: packages/msp/src/validator/proto/loader.ts
+  - file: packages/msp/src/validator/proto/sample.ts
+  - file: packages/msp/src/validator/cli.ts
+  - file: gks/proto/PROTO--SAMPLE-RULE.md
+  - file: packages/msp/test/validator/proto/loader.test.ts
+  - file: packages/msp/test/validator/proto/sample.test.ts
 created_at: 2026-05-05T18:00:00.000+07:00
 aliases:
   - AUDIT
   - implementation_flow
   - Test results / quality report
 cluster: implementation_flow
-role: "Test results / quality report"
+role: Test results / quality report
+attributes:
+  domain: audit
 ---
 
 # M8a — PROTO loader (foundation)

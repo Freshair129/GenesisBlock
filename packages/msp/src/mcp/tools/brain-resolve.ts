@@ -2,6 +2,7 @@ import { z } from 'zod'
 
 import { resolve as resolveQuery } from '../../brain/resolver.js'
 import type { AtomType, BrainQuery } from '../../brain/types.js'
+import { makeContext, makeSubject } from '../../policy/types.js'
 import { errorResult, jsonResult, type ToolHandlerCtx, type ToolTextResult } from '../types.js'
 
 export const name = 'msp_brain_resolve'
@@ -57,7 +58,7 @@ interface BrainResolveArgs {
   vault_id?: string
 }
 
-export function handler(_ctx: ToolHandlerCtx) {
+export function handler(ctx: ToolHandlerCtx) {
   return async (args: BrainResolveArgs): Promise<ToolTextResult> => {
     if (args.type !== undefined && !ATOM_TYPE_SET.has(args.type)) {
       return errorResult(
@@ -71,7 +72,10 @@ export function handler(_ctx: ToolHandlerCtx) {
     if (args.vault_id !== undefined) query.vault_id = args.vault_id
 
     try {
-      const hits = await resolveQuery(query)
+      const subject = ctx.subject ?? makeSubject('mcp-client', 'default-mcp')
+      const context = ctx.policyContext ?? makeContext('mcp-stdio', `mcp-${Date.now()}`)
+
+      const hits = await resolveQuery(query, { subject, context })
       return jsonResult({
         ok: true,
         count: hits.length,

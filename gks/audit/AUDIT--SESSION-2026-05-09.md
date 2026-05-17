@@ -6,7 +6,8 @@ status: stable
 tier: process
 source_type: axiomatic
 vault_id: default
-title: AUDIT — Session 2026-05-09 (3-tier model + Symbol Graph + reconciliation, 16 PRs)
+title: AUDIT — Session 2026-05-09 (3-tier model + Symbol Graph + reconciliation,
+  16 PRs)
 tags:
   - msp
   - audit
@@ -15,14 +16,26 @@ tags:
   - symbol-graph
   - reconciliation
   - milestone
-crosslinks: {"references":["FRAMEWORK--KNOWLEDGE-3-TIER","FRAMEWORK--SYMBOL-GRAPH","FRAMEWORK--AUTHORITY-MATRIX","AUDIT--INBOUND-TO-CANDIDATES-MIGRATION-COMPLETE","AUDIT--CORE-FRAMEWORK-RECONCILE-V1","AUDIT--SYMBOL-GRAPH-V1","AUDIT--PR-2-PACKAGE-JSON-RESIDUE","CONCEPT--KNOWLEDGE-LAYERS-V2","ADR--AGENT-WRITE-BOUNDARIES"]}
+crosslinks:
+  references:
+    - FRAMEWORK--KNOWLEDGE-3-TIER
+    - FRAMEWORK--SYMBOL-GRAPH
+    - FRAMEWORK--AUTHORITY-MATRIX
+    - AUDIT--INBOUND-TO-CANDIDATES-MIGRATION-COMPLETE
+    - AUDIT--CORE-FRAMEWORK-RECONCILE-V1
+    - AUDIT--SYMBOL-GRAPH-V1
+    - AUDIT--PR-2-PACKAGE-JSON-RESIDUE
+    - CONCEPT--KNOWLEDGE-LAYERS-V2
+    - ADR--AGENT-WRITE-BOUNDARIES
 created_at: 2026-05-09T21:00:00.000+07:00
 aliases:
   - AUDIT
   - implementation_flow
   - Test results / quality report
 cluster: implementation_flow
-role: "Test results / quality report"
+role: Test results / quality report
+attributes:
+  domain: audit
 ---
 
 # AUDIT — Session 2026-05-09

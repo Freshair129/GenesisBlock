@@ -12,16 +12,22 @@ tags:
   - m5
   - m5e
   - audit
-crosslinks: {"references":["ADR--HUMAN-REVIEW-GATES","ADR--PATH-ENCODING","ADR--AGENT-WRITE-BOUNDARIES"]}
+crosslinks:
+  references:
+    - ADR--HUMAN-REVIEW-GATES
+    - ADR--PATH-ENCODING
+    - ADR--AGENT-WRITE-BOUNDARIES
 linked_symbols:
-  - {"file":"msp_spec.md"}
+  - file: msp_spec.md
 created_at: 2026-05-03T18:01:43.397+07:00
 aliases:
   - AUDIT
   - implementation_flow
   - Test results / quality report
 cluster: implementation_flow
-role: "Test results / quality report"
+role: Test results / quality report
+attributes:
+  domain: audit
 ---
 
 # AUDIT — M5e

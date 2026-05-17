@@ -14,19 +14,25 @@ tags:
   - audit
   - ci
   - shellcheck
-crosslinks: {"references":["FEAT--MSP-PRECOMMIT-HOOK","FEAT--MSP-PREPUSH-HOOK"]}
+crosslinks:
+  references:
+    - FEAT--MSP-PRECOMMIT-HOOK
+    - FEAT--MSP-PREPUSH-HOOK
 linked_symbols:
-  - {"file":".github/workflows/test.yml"}
+  - file: .github/workflows/test.yml
 phase_override:
   skip_blueprint: true
-  reason: "M5f added a single shellcheck step to the CI workflow — a config change, not code; governed by FEAT--MSP-PRECOMMIT-HOOK / FEAT--MSP-PREPUSH-HOOK."
+  reason: M5f added a single shellcheck step to the CI workflow — a config change,
+    not code; governed by FEAT--MSP-PRECOMMIT-HOOK / FEAT--MSP-PREPUSH-HOOK.
 created_at: 2026-05-03T18:01:44.015+07:00
 aliases:
   - AUDIT
   - implementation_flow
   - Test results / quality report
 cluster: implementation_flow
-role: "Test results / quality report"
+role: Test results / quality report
+attributes:
+  domain: audit
 ---
 
 # AUDIT — M5f

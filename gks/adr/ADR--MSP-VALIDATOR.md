@@ -14,14 +14,18 @@ tags:
   - cli
   - pre-commit
   - contract
-crosslinks: {"references":["CONCEPT--MSP-VALIDATOR"]}
+crosslinks:
+  references:
+    - CONCEPT--MSP-VALIDATOR
 created_at: 2026-05-03T13:24:24.437+07:00
 aliases:
   - ADR
   - implementation_flow
   - Architecture decision record
 cluster: implementation_flow
-role: "Architecture decision record"
+role: Architecture decision record
+attributes:
+  domain: adr
 ---
 
 # ADR — MSP validator runs as a CLI gate

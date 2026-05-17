@@ -14,7 +14,19 @@ tags:
   - roadmap
   - all-m
   - v0.3.0
-crosslinks: {"references":["FRAMEWORK--MSP-ARCHITECTURE-V2","CONCEPT--MSP-ROADMAP","AUDIT--MSP-ARCHITECTURE-V2","AUDIT--M7-PREP-FOLLOWUP","AUDIT--TWO-REPO-VALIDATION","AUDIT--MSP-OBSIDIAN-CLIENT","AUDIT--CONSOLIDATOR","AUDIT--RETRIEVAL-ORCHESTRATION","AUDIT--COMPRESSOR","AUDIT--IDENTITY-LAYER","AUDIT--MSP-MCP-TOOL-EXPANSION"]}
+crosslinks:
+  references:
+    - FRAMEWORK--MSP-ARCHITECTURE-V2
+    - CONCEPT--MSP-ROADMAP
+    - AUDIT--MSP-ARCHITECTURE-V2
+    - AUDIT--M7-PREP-FOLLOWUP
+    - AUDIT--TWO-REPO-VALIDATION
+    - AUDIT--MSP-OBSIDIAN-CLIENT
+    - AUDIT--CONSOLIDATOR
+    - AUDIT--RETRIEVAL-ORCHESTRATION
+    - AUDIT--COMPRESSOR
+    - AUDIT--IDENTITY-LAYER
+    - AUDIT--MSP-MCP-TOOL-EXPANSION
 linked_symbols: []
 created_at: 2026-05-05T16:50:00.000+07:00
 aliases:
@@ -22,7 +34,9 @@ aliases:
   - implementation_flow
   - Test results / quality report
 cluster: implementation_flow
-role: "Test results / quality report"
+role: Test results / quality report
+attributes:
+  domain: audit
 ---
 
 # AUDIT — every M milestone status (v0.3.0 close-out)

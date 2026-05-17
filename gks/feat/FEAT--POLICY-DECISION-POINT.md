@@ -13,14 +13,22 @@ tags:
   - feat
   - abac
   - pdp
-crosslinks: {"references":["CONCEPT--ABAC-POLICY-ENGINE","ADR--POLICY-AS-DATA-NOT-CODE","ADR--DEFAULT-POLICY-POSTURE","ADR--TRANSPORT-AGNOSTIC-ENFORCEMENT","CONCEPT--SUBJECT-RESOURCE-ACTION-CONTEXT"]}
+crosslinks:
+  references:
+    - CONCEPT--ABAC-POLICY-ENGINE
+    - ADR--POLICY-AS-DATA-NOT-CODE
+    - ADR--DEFAULT-POLICY-POSTURE
+    - ADR--TRANSPORT-AGNOSTIC-ENFORCEMENT
+    - CONCEPT--SUBJECT-RESOURCE-ACTION-CONTEXT
 created_at: 2026-05-14T19:42:01.331+07:00
 aliases:
   - FEAT
   - implementation_flow
   - Feature spec
 cluster: implementation_flow
-role: "Feature spec"
+role: Feature spec
+attributes:
+  domain: feat
 ---
 
 # FEAT — Policy Decision Point

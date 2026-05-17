@@ -11,14 +11,21 @@ tags:
   - msp
   - symbol-graph
   - audit
-crosslinks: {"references":["CONCEPT--SYMBOLS-PROCESS-TRACING","ADR--SYMBOLS-PROCESS-TRACING","ALGO--SYMBOLS-CALL-GRAPH-TRAVERSAL","PROTO--SYMBOLS-TRACE-INVARIANTS"]}
+crosslinks:
+  references:
+    - CONCEPT--SYMBOLS-PROCESS-TRACING
+    - ADR--SYMBOLS-PROCESS-TRACING
+    - ALGO--SYMBOLS-CALL-GRAPH-TRAVERSAL
+    - PROTO--SYMBOLS-TRACE-INVARIANTS
 created_at: 2026-05-12T15:00:00.000+07:00
 aliases:
   - AUDIT
   - implementation_flow
   - Test results / quality report
 cluster: implementation_flow
-role: "Test results / quality report"
+role: Test results / quality report
+attributes:
+  domain: audit
 ---
 
 # AUDIT — Process tracing implementation

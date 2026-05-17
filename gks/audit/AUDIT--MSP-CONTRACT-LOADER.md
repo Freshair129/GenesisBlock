@@ -14,19 +14,24 @@ tags:
   - audit
   - contract
   - validator
-crosslinks: {"references":["ADR--FORBIDDEN-FIELDS-LIST","FEAT--MSP-VALIDATOR"]}
+crosslinks:
+  references:
+    - ADR--FORBIDDEN-FIELDS-LIST
+    - FEAT--MSP-VALIDATOR
 linked_symbols:
-  - {"file":".brain/msp/LLM_Contract/atomic_contract.yaml"}
-  - {"file":"packages/msp/src/validator/contract.ts"}
-  - {"file":"packages/msp/src/validator/cli.ts"}
-  - {"file":"packages/msp/test/validator/contract.test.ts"}
+  - file: .brain/msp/LLM_Contract/atomic_contract.yaml
+  - file: packages/msp/src/validator/contract.ts
+  - file: packages/msp/src/validator/cli.ts
+  - file: packages/msp/test/validator/contract.test.ts
 created_at: 2026-05-03T15:43:36.814+07:00
 aliases:
   - AUDIT
   - implementation_flow
   - Test results / quality report
 cluster: implementation_flow
-role: "Test results / quality report"
+role: Test results / quality report
+attributes:
+  domain: audit
 ---
 
 # AUDIT — runtime contract loader

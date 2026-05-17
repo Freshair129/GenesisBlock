@@ -56,12 +56,15 @@ export async function enforcePolicy(
     logPath,
   )
 
-  // Step-up Auth check (Phase 4)
-  const stepUpObligation = decision.obligations.find((o) => o.kind === 'request-step-up-auth')
-  
-  const isEnforced = 
-    opts.subject.kind === 'subagent' || 
-    opts.action === 'delete' || 
+  // Step-up Auth check (Phase 5)
+  const stepUpObligation = 
+    decision.obligations.find((o) => o.kind === 'request-step-up-auth') ||
+    decision.advice.find((a) => a.kind === 'request-step-up-auth')
+
+  const isEnforced =
+    opts.subject.kind === 'subagent' ||
+    opts.subject.kind === 'user' ||
+    opts.action === 'delete' ||
     resource.attributes.classification === 'restricted'
 
   const permitted = isEnforced ? decision.effect === 'permit' : true

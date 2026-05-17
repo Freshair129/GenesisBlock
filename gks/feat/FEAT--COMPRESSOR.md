@@ -14,20 +14,27 @@ tags:
   - token-budget
   - m7d
   - user-facing
-crosslinks: {"implements":["ADR--COMPRESSOR-THREE-TIER"],"references":["CONCEPT--CONTEXT-COMPRESSION","FEAT--CONSOLIDATOR"]}
+crosslinks:
+  implements:
+    - ADR--COMPRESSOR-THREE-TIER
+  references:
+    - CONCEPT--CONTEXT-COMPRESSION
+    - FEAT--CONSOLIDATOR
 linked_symbols:
-  - {"file":"packages/msp/src/orchestrator/compressor/index.ts"}
-  - {"file":"packages/msp/src/orchestrator/compressor/types.ts"}
-  - {"file":"packages/msp/src/orchestrator/compressor/tokens.ts"}
-  - {"file":"packages/msp/src/orchestrator/compressor/trim.ts"}
-  - {"file":"packages/msp/src/orchestrator/compressor/resummarise.ts"}
+  - file: packages/msp/src/orchestrator/compressor/index.ts
+  - file: packages/msp/src/orchestrator/compressor/types.ts
+  - file: packages/msp/src/orchestrator/compressor/tokens.ts
+  - file: packages/msp/src/orchestrator/compressor/trim.ts
+  - file: packages/msp/src/orchestrator/compressor/resummarise.ts
 created_at: 2026-05-05T16:11:00.000+07:00
 aliases:
   - FEAT
   - implementation_flow
   - Feature spec
 cluster: implementation_flow
-role: "Feature spec"
+role: Feature spec
+attributes:
+  domain: feat
 ---
 
 # Context compressor — three-tier shrink-to-fit for token-budgeted episodes

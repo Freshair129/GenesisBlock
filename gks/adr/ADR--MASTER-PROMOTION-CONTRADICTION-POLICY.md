@@ -6,7 +6,8 @@ status: stable
 tier: genesis
 source_type: axiomatic
 vault_id: default
-title: Promote the Layer 0 supersession rule to a Master atom (MASTER--ATOM-CONTRADICTION-POLICY)
+title: Promote the Layer 0 supersession rule to a Master atom
+  (MASTER--ATOM-CONTRADICTION-POLICY)
 tags:
   - msp
   - master
@@ -15,14 +16,22 @@ tags:
   - supersession
   - 3-tier
   - decision
-crosslinks: {"references":["FRAMEWORK--KNOWLEDGE-3-TIER","BLUEPRINT--CONTRADICTION-DETECTION-IMPL","MASTER--ATOM-CONTRADICTION-POLICY","ADR--CONTRADICTION-DETECTION-STACK","CONCEPT--ATOM-CONTRADICTION-DETECTION"]}
+crosslinks:
+  references:
+    - FRAMEWORK--KNOWLEDGE-3-TIER
+    - BLUEPRINT--CONTRADICTION-DETECTION-IMPL
+    - MASTER--ATOM-CONTRADICTION-POLICY
+    - ADR--CONTRADICTION-DETECTION-STACK
+    - CONCEPT--ATOM-CONTRADICTION-DETECTION
 created_at: 2026-05-09T15:03:00.000+07:00
 aliases:
   - ADR
   - implementation_flow
   - Architecture decision record
 cluster: implementation_flow
-role: "Architecture decision record"
+role: Architecture decision record
+attributes:
+  domain: adr
 ---
 
 # ADR — promote contradiction policy to Master

@@ -7,25 +7,35 @@ tier: process
 source_type: axiomatic
 vault_id: default
 scale_level: L2
-title: "BLUEPRINT — Phase 4 user-level ABAC: authenticated Subject, policy packs, all read entry points enforce"
+title: "BLUEPRINT — Phase 4 user-level ABAC: authenticated Subject, policy
+  packs, all read entry points enforce"
 aliases:
   - BLUEPRINT
   - implementation_flow
   - Implementation plan
 cluster: implementation_flow
-role: "Implementation plan"
+role: Implementation plan
 tags:
   - msp
   - ucf
   - blueprint
   - phase-4
   - abac
-crosslinks: {"references":["CONCEPT--ABAC-POLICY-ENGINE","CONCEPT--ATTRIBUTE-BAG-MODEL","FEAT--POLICY-DECISION-POINT","FEAT--IDENTITY-LAYER","ADR--DEFAULT-POLICY-POSTURE","BLUEPRINT--PHASE-3-VAULT-AND-RESOLUTION"]}
+crosslinks:
+  references:
+    - CONCEPT--ABAC-POLICY-ENGINE
+    - CONCEPT--ATTRIBUTE-BAG-MODEL
+    - FEAT--POLICY-DECISION-POINT
+    - FEAT--IDENTITY-LAYER
+    - ADR--DEFAULT-POLICY-POSTURE
+    - BLUEPRINT--PHASE-3-VAULT-AND-RESOLUTION
 linked_symbols:
-  - {"file":"packages/msp/src/policy/subject.ts"}
-  - {"file":"policies/30-multi-tenant.yaml"}
-  - {"file":"policies/40-pii-block-from-llm.yaml"}
+  - file: packages/msp/src/policy/subject.ts
+  - file: policies/30-multi-tenant.yaml
+  - file: policies/40-pii-block-from-llm.yaml
 created_at: 2026-05-14T23:46:17.000+07:00
+attributes:
+  domain: blueprint
 ---
 
 # BLUEPRINT — Phase 4: user-level ABAC

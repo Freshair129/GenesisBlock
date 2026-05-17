@@ -6,7 +6,8 @@ status: stable
 vault_id: default
 tier: process
 source_type: axiomatic
-title: ADR — Episode GC policy — 30-day window + error preservation + archive-by-default
+title: ADR — Episode GC policy — 30-day window + error preservation +
+  archive-by-default
 tags:
   - msp
   - phase-f4
@@ -26,7 +27,9 @@ aliases:
   - implementation_flow
   - Architecture decision record
 cluster: implementation_flow
-role: "Architecture decision record"
+role: Architecture decision record
+attributes:
+  domain: adr
 ---
 
 # ADR — Episode GC policy

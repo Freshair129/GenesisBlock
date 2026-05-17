@@ -14,20 +14,27 @@ tags:
   - cli
   - blueprint
   - trigger-eval
-crosslinks: {"references":["ADR--CLAUDE-MD-MASTER-PRIORITY-SECTORS","CONCEPT--MASTER-PRIORITY-SECTORS","FRAMEWORK--KNOWLEDGE-3-TIER","MASTER--MSP-DOC-TO-CODE"]}
+crosslinks:
+  references:
+    - ADR--CLAUDE-MD-MASTER-PRIORITY-SECTORS
+    - CONCEPT--MASTER-PRIORITY-SECTORS
+    - FRAMEWORK--KNOWLEDGE-3-TIER
+    - MASTER--MSP-DOC-TO-CODE
 linked_symbols:
-  - {"file":"packages/msp/src/master/compose-cli.ts"}
-  - {"file":"packages/msp/src/master/trigger-eval.ts"}
-  - {"file":"packages/msp/package.json"}
-  - {"file":"packages/msp/test/master/trigger-eval.test.ts"}
-  - {"file":"packages/msp/test/master/compose-cli.test.ts"}
+  - file: packages/msp/src/master/compose-cli.ts
+  - file: packages/msp/src/master/trigger-eval.ts
+  - file: packages/msp/package.json
+  - file: packages/msp/test/master/trigger-eval.test.ts
+  - file: packages/msp/test/master/compose-cli.test.ts
 created_at: 2026-05-17T02:50:00.000+07:00
 aliases:
   - BLUEPRINT
   - implementation_flow
   - Implementation plan
 cluster: implementation_flow
-role: "Implementation plan"
+role: Implementation plan
+attributes:
+  domain: blueprint
 ---
 
 # BLUEPRINT — msp master compose CLI loader

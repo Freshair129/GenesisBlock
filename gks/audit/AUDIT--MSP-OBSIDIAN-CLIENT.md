@@ -12,21 +12,28 @@ tags:
   - obsidian
   - m7a
   - audit
-crosslinks: {"references":["FEAT--MSP-OBSIDIAN-CLIENT","BLUEPRINT--MSP-OBSIDIAN-CLIENT","ADR--MSP-OBSIDIAN-INTEGRATION","FRAMEWORK--MSP-ARCHITECTURE-V2"]}
+crosslinks:
+  references:
+    - FEAT--MSP-OBSIDIAN-CLIENT
+    - BLUEPRINT--MSP-OBSIDIAN-CLIENT
+    - ADR--MSP-OBSIDIAN-INTEGRATION
+    - FRAMEWORK--MSP-ARCHITECTURE-V2
 linked_symbols:
-  - {"file":"packages/msp/src/obsidian/client.ts"}
-  - {"file":"packages/msp/src/obsidian/rest.ts"}
-  - {"file":"packages/msp/src/obsidian/filesystem.ts"}
-  - {"file":"packages/msp/src/obsidian/env.ts"}
-  - {"file":"packages/msp/src/obsidian/types.ts"}
-  - {"file":"packages/msp/test/obsidian/client.test.ts"}
+  - file: packages/msp/src/obsidian/client.ts
+  - file: packages/msp/src/obsidian/rest.ts
+  - file: packages/msp/src/obsidian/filesystem.ts
+  - file: packages/msp/src/obsidian/env.ts
+  - file: packages/msp/src/obsidian/types.ts
+  - file: packages/msp/test/obsidian/client.test.ts
 created_at: 2026-05-04T12:29:16.095+07:00
 aliases:
   - AUDIT
   - implementation_flow
   - Test results / quality report
 cluster: implementation_flow
-role: "Test results / quality report"
+role: Test results / quality report
+attributes:
+  domain: audit
 ---
 
 # M7a — Obsidian client wrapper (REST adapter delegate + filesystem fallback)

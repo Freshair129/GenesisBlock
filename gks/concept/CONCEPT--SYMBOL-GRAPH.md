@@ -12,14 +12,19 @@ tags:
   - symbol-graph
   - structural
   - prior-art
-crosslinks: {"references":["FRAMEWORK--SYMBOL-GRAPH","FRAMEWORK--MSP-ARCHITECTURE-V2"]}
+crosslinks:
+  references:
+    - FRAMEWORK--SYMBOL-GRAPH
+    - FRAMEWORK--MSP-ARCHITECTURE-V2
 created_at: 2026-05-09T16:31:00.000+07:00
 aliases:
   - CONCEPT
   - implementation_flow
   - Strategic intent / PRD
 cluster: implementation_flow
-role: "Strategic intent / PRD"
+role: Strategic intent / PRD
+attributes:
+  domain: concept
 ---
 
 # CONCEPT — Symbol Graph

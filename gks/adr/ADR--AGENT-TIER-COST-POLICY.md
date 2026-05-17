@@ -21,7 +21,9 @@ aliases:
   - implementation_flow
   - Architecture decision record
 cluster: implementation_flow
-role: "Architecture decision record"
+role: Architecture decision record
+attributes:
+  domain: adr
 ---
 
 # ADR — Agent Tier Cost Policy

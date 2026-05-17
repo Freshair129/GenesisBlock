@@ -6,21 +6,26 @@ status: stable
 tier: process
 source_type: axiomatic
 vault_id: default
-title: AUDIT — PR #50 missed package.json bin + files entries for deleted msp_propose
+title: AUDIT — PR
 tags:
   - msp
   - audit
   - cleanup
   - package-json
   - inbound-removal
-crosslinks: {"references":["BLUEPRINT--INBOUND-TO-CANDIDATES-MIGRATION","AUDIT--INBOUND-TO-CANDIDATES-MIGRATION-COMPLETE"]}
+crosslinks:
+  references:
+    - BLUEPRINT--INBOUND-TO-CANDIDATES-MIGRATION
+    - AUDIT--INBOUND-TO-CANDIDATES-MIGRATION-COMPLETE
 created_at: 2026-05-09T16:00:00.000+07:00
 aliases:
   - AUDIT
   - implementation_flow
   - Test results / quality report
 cluster: implementation_flow
-role: "Test results / quality report"
+role: Test results / quality report
+attributes:
+  domain: audit
 ---
 
 # AUDIT — PR #50 package.json residue cleaned up

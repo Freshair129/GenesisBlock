@@ -6,29 +6,37 @@ status: stable
 tier: process
 source_type: axiomatic
 vault_id: default
-title: AUDIT — atom workflow scripts (atom-date, scaffold-atom, supersede) verification
+title: AUDIT — atom workflow scripts (atom-date, scaffold-atom, supersede)
+  verification
 tags:
   - msp
   - audit
   - tooling
   - scripts
   - dx
-crosslinks: {"references":["MASTER--ATOM-CONTRADICTION-POLICY","PROTO--SCALING-LEVEL-GATE"]}
+crosslinks:
+  references:
+    - MASTER--ATOM-CONTRADICTION-POLICY
+    - PROTO--SCALING-LEVEL-GATE
 linked_symbols:
-  - {"file":"scripts/msp/atom-date.ts"}
-  - {"file":"scripts/msp/scaffold-atom.ts"}
-  - {"file":"scripts/msp/supersede.ts"}
-  - {"file":"packages/msp/test/scripts/workflow-scripts.test.ts"}
+  - file: scripts/msp/atom-date.ts
+  - file: scripts/msp/scaffold-atom.ts
+  - file: scripts/msp/supersede.ts
+  - file: packages/msp/test/scripts/workflow-scripts.test.ts
 phase_override:
   skip_blueprint: true
-  reason: "Small atom-authoring CLI helper scripts (atom-date / scaffold-atom / supersede) — developer tooling, not a feature surface; a per-script phase-3 blueprint would be doc theater."
+  reason: Small atom-authoring CLI helper scripts (atom-date / scaffold-atom /
+    supersede) — developer tooling, not a feature surface; a per-script phase-3
+    blueprint would be doc theater.
 created_at: 2026-05-12T22:05:00.000+07:00
 aliases:
   - AUDIT
   - implementation_flow
   - Test results / quality report
 cluster: implementation_flow
-role: "Test results / quality report"
+role: Test results / quality report
+attributes:
+  domain: audit
 ---
 
 # AUDIT — atom workflow scripts (PR-C closure)

@@ -6,13 +6,22 @@ status: stable
 vault_id: default
 tier: process
 source_type: axiomatic
-title: Post-Phase-D doc polish — sync FRAME-V2 / ROADMAP / README / msp_spec to current architecture
+title: Post-Phase-D doc polish — sync FRAME-V2 / ROADMAP / README / msp_spec to
+  current architecture
 tags:
   - msp
   - audit
   - documentation
   - polish
-crosslinks: {"references":["FRAMEWORK--MSP-ARCHITECTURE-V2","CONCEPT--AGENT-AGNOSTIC","CONCEPT--AGENT-INTEGRATION-PATTERNS","ADR--GLOBAL-VS-WORKSPACE","AUDIT--ARCH-DOC-CLEANUP","AUDIT--PHASE-B-IMPL-COMPLETE","AUDIT--PHASE-C-AGENT-INTEGRATION-DOCS"]}
+crosslinks:
+  references:
+    - FRAMEWORK--MSP-ARCHITECTURE-V2
+    - CONCEPT--AGENT-AGNOSTIC
+    - CONCEPT--AGENT-INTEGRATION-PATTERNS
+    - ADR--GLOBAL-VS-WORKSPACE
+    - AUDIT--ARCH-DOC-CLEANUP
+    - AUDIT--PHASE-B-IMPL-COMPLETE
+    - AUDIT--PHASE-C-AGENT-INTEGRATION-DOCS
 linked_symbols: []
 created_at: 2026-05-10T07:00:00.000+07:00
 aliases:
@@ -20,7 +29,9 @@ aliases:
   - implementation_flow
   - Test results / quality report
 cluster: implementation_flow
-role: "Test results / quality report"
+role: Test results / quality report
+attributes:
+  domain: audit
 ---
 
 # AUDIT — Post-Phase-D doc polish

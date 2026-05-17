@@ -6,7 +6,8 @@ status: active
 tier: process
 source_type: axiomatic
 vault_id: default
-title: Framework recognition algorithms — Next.js routing, runtime tags, data fetching, ORM, MCP tools
+title: Framework recognition algorithms — Next.js routing, runtime tags, data
+  fetching, ORM, MCP tools
 tags:
   - msp
   - symbol-graph
@@ -15,21 +16,28 @@ tags:
   - prisma
   - mcp
   - recognition
-crosslinks: {"implements":["ADR--SYMBOLS-FRAMEWORK-AWARENESS"],"references":["CONCEPT--SYMBOLS-FRAMEWORK-AWARENESS","FRAMEWORK--SYMBOL-GRAPH"]}
+crosslinks:
+  implements:
+    - ADR--SYMBOLS-FRAMEWORK-AWARENESS
+  references:
+    - CONCEPT--SYMBOLS-FRAMEWORK-AWARENESS
+    - FRAMEWORK--SYMBOL-GRAPH
 linked_symbols:
-  - {"file":"packages/msp/src/symbols/framework/routes.ts"}
-  - {"file":"packages/msp/src/symbols/framework/nextjs.ts"}
-  - {"file":"packages/msp/src/symbols/framework/runtime-tag.ts"}
-  - {"file":"packages/msp/src/symbols/framework/data-fetching.ts"}
-  - {"file":"packages/msp/src/symbols/framework/orm.ts"}
-  - {"file":"packages/msp/src/symbols/framework/mcp-tools.ts"}
+  - file: packages/msp/src/symbols/framework/routes.ts
+  - file: packages/msp/src/symbols/framework/nextjs.ts
+  - file: packages/msp/src/symbols/framework/runtime-tag.ts
+  - file: packages/msp/src/symbols/framework/data-fetching.ts
+  - file: packages/msp/src/symbols/framework/orm.ts
+  - file: packages/msp/src/symbols/framework/mcp-tools.ts
 created_at: 2026-05-12T05:37:00.000+07:00
 aliases:
   - ALGO
   - implementation_flow
   - Algorithm definition
 cluster: implementation_flow
-role: "Algorithm definition"
+role: Algorithm definition
+attributes:
+  domain: algo
 ---
 
 # ALGO — Framework recognition algorithms

@@ -7,20 +7,30 @@ created_at: 2026-05-13T12:00:00+07:00
 vault_id: GKS-CORE
 tier: genesis
 title: Bidirectional traceability via reverse citation lookup
-tags: [traceability, drift-detection, doc-to-code, lookup]
+tags:
+  - traceability
+  - drift-detection
+  - doc-to-code
+  - lookup
 crosslinks:
-  references: [CONCEPT--MEMORY-STORE, FEAT--LOOKUP-BY-SYMBOL]
+  references:
+    - CONCEPT--MEMORY-STORE
+    - FEAT--LOOKUP-BY-SYMBOL
   superseded_by: []
   resolves: []
 linked_symbols:
-  - { file: "packages/gks/src/memory/gks.ts", fn: searchBySymbol }
-  - { file: "packages/gks/src/memory/index.ts", fn: lookupBySymbol }
+  - file: packages/gks/src/memory/gks.ts
+    fn: searchBySymbol
+  - file: packages/gks/src/memory/index.ts
+    fn: lookupBySymbol
 aliases:
   - ADR
   - implementation_flow
   - Architecture decision record
 cluster: implementation_flow
-role: "Architecture decision record"
+role: Architecture decision record
+attributes:
+  domain: adr
 ---
 
 # ADR — Reverse citation lookup

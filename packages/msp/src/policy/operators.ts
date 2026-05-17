@@ -18,6 +18,7 @@ export type Operator =
   | 'not_exists' // left is undefined/null (right ignored)
   | 'matches' // regex match (right must be string)
   | 'intersect' // set intersection non-empty (both must be arrays)
+  | 'time_within' // left (ISO string) is within right (seconds) of now/context.time
 
 export function evaluateOperator(op: Operator, left: any, right: any, data?: any): boolean {
   // Resolve right-side if it's a variable reference
@@ -67,6 +68,14 @@ export function evaluateOperator(op: Operator, left: any, right: any, data?: any
           : []
       if (leftArr.length === 0 || rightArr.length === 0) return false
       return leftArr.some((item) => rightArr.includes(item))
+    }
+    case 'time_within': {
+      if (!left || typeof left !== 'string') return false
+      const leftDate = new Date(left).getTime()
+      if (isNaN(leftDate)) return false
+      const referenceDate = data?.context?.time ? new Date(data.context.time).getTime() : Date.now()
+      const diffSeconds = (referenceDate - leftDate) / 1000
+      return diffSeconds >= 0 && diffSeconds <= (Number(resolvedRight) || 0)
     }
     default:
       return false

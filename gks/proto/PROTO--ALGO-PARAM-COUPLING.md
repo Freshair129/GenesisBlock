@@ -7,7 +7,8 @@ severity: error
 vault_id: default
 tier: safety
 source_type: axiomatic
-title: PROTO--ALGO-PARAM-COUPLING — bi-directional tunes ↔ tunable_by reciprocal validator
+title: PROTO--ALGO-PARAM-COUPLING — bi-directional tunes ↔ tunable_by reciprocal
+  validator
 tags:
   - msp
   - proto
@@ -16,16 +17,24 @@ tags:
   - coupling
   - governance
   - m8d
-crosslinks: {"enforces":["FRAMEWORK--CROSSLINKS-VOCABULARY"],"references":["CONCEPT--PROTO-ALGO-PARAM-COUPLING","CONCEPT--PROTO-PATTERN","ADR--GRAPH-IS-GKS-DOMAIN"]}
+crosslinks:
+  enforces:
+    - FRAMEWORK--CROSSLINKS-VOCABULARY
+  references:
+    - CONCEPT--PROTO-ALGO-PARAM-COUPLING
+    - CONCEPT--PROTO-PATTERN
+    - ADR--GRAPH-IS-GKS-DOMAIN
 linked_symbols:
-  - {"file":"packages/msp/src/validator/proto/algo-param-coupling.ts"}
+  - file: packages/msp/src/validator/proto/algo-param-coupling.ts
 created_at: 2026-05-05T18:11:00.000+07:00
 aliases:
   - PROTO
   - implementation_flow
   - Machine-enforced invariant
 cluster: implementation_flow
-role: "Machine-enforced invariant"
+role: Machine-enforced invariant
+attributes:
+  domain: proto
 ---
 
 # PROTO — ALGO-PARAM-COUPLING

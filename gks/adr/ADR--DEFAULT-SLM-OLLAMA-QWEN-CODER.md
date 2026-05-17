@@ -6,7 +6,8 @@ status: stable
 vault_id: default
 tier: process
 source_type: axiomatic
-title: Default codegen SLM is Ollama + qwen2.5-coder (drop the qwen-CLI fallback in runner)
+title: Default codegen SLM is Ollama + qwen2.5-coder (drop the qwen-CLI fallback
+  in runner)
 tags:
   - msp
   - codegen
@@ -27,7 +28,9 @@ aliases:
   - implementation_flow
   - Architecture decision record
 cluster: implementation_flow
-role: "Architecture decision record"
+role: Architecture decision record
+attributes:
+  domain: adr
 ---
 
 # ADR — Default codegen SLM is Ollama + qwen2.5-coder

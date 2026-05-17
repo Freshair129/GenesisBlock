@@ -13,14 +13,19 @@ tags:
   - cognitive
   - ego-death
   - framework
-crosslinks: {"references":["CONCEPT--IDENTITY-LAYER","FRAMEWORK--UNIVERSAL-CONTEXT-FRAMEWORK"]}
+crosslinks:
+  references:
+    - CONCEPT--IDENTITY-LAYER
+    - FRAMEWORK--UNIVERSAL-CONTEXT-FRAMEWORK
 created_at: 2026-05-14T20:00:00+07:00
 aliases:
   - COGNITIVE
   - implementation_flow
   - Mental model / interpretive lens
 cluster: implementation_flow
-role: "Mental model / interpretive lens"
+role: Mental model / interpretive lens
+attributes:
+  domain: cognitive
 ---
 
 # COGNITIVE — Ego Death Passport

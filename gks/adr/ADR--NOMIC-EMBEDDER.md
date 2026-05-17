@@ -5,16 +5,23 @@ type: adr
 status: stable
 title: Use nomic-embed-text-v1.5 as the local embedding backend
 created_at: 2026-04-29T12:00:00+07:00
-tags: [embedder, local, nomic]
+tags:
+  - embedder
+  - local
+  - nomic
 tier: genesis
 crosslinks:
-  references: [CONCEPT--EMBEDDING-STRATEGY, BLUEPRINT--NOMIC-EMBEDDER]
+  references:
+    - CONCEPT--EMBEDDING-STRATEGY
+    - BLUEPRINT--NOMIC-EMBEDDER
 aliases:
   - ADR
   - implementation_flow
   - Architecture decision record
 cluster: implementation_flow
-role: "Architecture decision record"
+role: Architecture decision record
+attributes:
+  domain: adr
 ---
 
 # ADR — Use nomic-embed-text-v1.5 as the local embedding backend

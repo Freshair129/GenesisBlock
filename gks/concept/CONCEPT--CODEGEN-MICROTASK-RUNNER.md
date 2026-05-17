@@ -12,14 +12,19 @@ tags:
   - codegen
   - runner
   - microtask
-crosslinks: {"references":["CONCEPT--CODEGEN-MICROTASK-CONTRACT","ADR--CODEGEN-RETRY-POLICY"]}
+crosslinks:
+  references:
+    - CONCEPT--CODEGEN-MICROTASK-CONTRACT
+    - ADR--CODEGEN-RETRY-POLICY
 created_at: 2026-05-03T14:16:36.203+07:00
 aliases:
   - CONCEPT
   - implementation_flow
   - Strategic intent / PRD
 cluster: implementation_flow
-role: "Strategic intent / PRD"
+role: Strategic intent / PRD
+attributes:
+  domain: concept
 ---
 
 # CONCEPT — codegen microtask runner

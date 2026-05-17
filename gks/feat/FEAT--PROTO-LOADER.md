@@ -6,7 +6,8 @@ status: stable
 vault_id: default
 tier: process
 source_type: axiomatic
-title: PROTO loader — discovers PROTO-- atoms and runs their predicates as part of msp:validate
+title: PROTO loader — discovers PROTO-- atoms and runs their predicates as part
+  of msp:validate
 tags:
   - msp
   - proto
@@ -14,18 +15,25 @@ tags:
   - loader
   - m8a
   - user-facing
-crosslinks: {"implements":["ADR--PROTO-ATOM-TYPE"],"references":["CONCEPT--PROTO-PATTERN","FEAT--MSP-VALIDATOR"]}
+crosslinks:
+  implements:
+    - ADR--PROTO-ATOM-TYPE
+  references:
+    - CONCEPT--PROTO-PATTERN
+    - FEAT--MSP-VALIDATOR
 linked_symbols:
-  - {"file":"packages/msp/src/validator/proto/loader.ts"}
-  - {"file":"packages/msp/src/validator/proto/types.ts"}
-  - {"file":"packages/msp/src/validator/proto/sample.ts"}
+  - file: packages/msp/src/validator/proto/loader.ts
+  - file: packages/msp/src/validator/proto/types.ts
+  - file: packages/msp/src/validator/proto/sample.ts
 created_at: 2026-05-05T16:18:00.000+07:00
 aliases:
   - FEAT
   - implementation_flow
   - Feature spec
 cluster: implementation_flow
-role: "Feature spec"
+role: Feature spec
+attributes:
+  domain: feat
 ---
 
 # FEAT — PROTO loader

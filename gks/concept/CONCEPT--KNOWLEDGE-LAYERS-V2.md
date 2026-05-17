@@ -6,7 +6,8 @@ status: stable
 tier: genesis
 source_type: axiomatic
 vault_id: default
-title: Knowledge layers v2 — replace inbound queue with 4-layer model (session / episode / candidate / canon)
+title: Knowledge layers v2 — replace inbound queue with 4-layer model (session /
+  episode / candidate / canon)
 tags:
   - msp
   - knowledge
@@ -14,14 +15,24 @@ tags:
   - candidate
   - inbound-removal
   - architecture
-crosslinks: {"references":["FRAMEWORK--MSP-ARCHITECTURE-V2","CONCEPT--MEMORY-EPISODIC-WRITER","CONCEPT--MEMORY-SESSIONS"],"supersedes":["CONCEPT--INBOUND-QUEUE","CONCEPT--PROPOSAL-TYPES","CONCEPT--SUBMISSION-ENVELOPE"]}
+crosslinks:
+  references:
+    - FRAMEWORK--MSP-ARCHITECTURE-V2
+    - CONCEPT--MEMORY-EPISODIC-WRITER
+    - CONCEPT--MEMORY-SESSIONS
+  supersedes:
+    - CONCEPT--INBOUND-QUEUE
+    - CONCEPT--PROPOSAL-TYPES
+    - CONCEPT--SUBMISSION-ENVELOPE
 created_at: 2026-05-08T17:00:00.000+07:00
 aliases:
   - CONCEPT
   - implementation_flow
   - Strategic intent / PRD
 cluster: implementation_flow
-role: "Strategic intent / PRD"
+role: Strategic intent / PRD
+attributes:
+  domain: concept
 ---
 
 # CONCEPT — knowledge layers v2

@@ -14,17 +14,25 @@ tags:
   - codegen
   - marker
   - framework-spec-9.6
-crosslinks: {"enforces":["FRAMEWORK--MSP-ARCHITECTURE-V2"],"references":["CONCEPT--COGNITIVE-LAYER-FACADE","CONCEPT--CODEGEN-MICROTASK-RUNNER"]}
+crosslinks:
+  enforces:
+    - FRAMEWORK--MSP-ARCHITECTURE-V2
+  references:
+    - CONCEPT--COGNITIVE-LAYER-FACADE
+    - CONCEPT--CODEGEN-MICROTASK-RUNNER
 linked_symbols:
-  - {"file":"packages/msp/src/cognitive/compose.ts"}
-  - {"file":"packages/msp/src/cognitive/marker-constants.ts","symbol":"PROTO_AUTO_GENERATED_MARKER"}
+  - file: packages/msp/src/cognitive/compose.ts
+  - file: packages/msp/src/cognitive/marker-constants.ts
+    symbol: PROTO_AUTO_GENERATED_MARKER
 created_at: 2026-05-12T22:51:00.000+07:00
 aliases:
   - PROTO
   - implementation_flow
   - Machine-enforced invariant
 cluster: implementation_flow
-role: "Machine-enforced invariant"
+role: Machine-enforced invariant
+attributes:
+  domain: proto
 ---
 
 # PROTO — AUTO-GENERATED-MARKER

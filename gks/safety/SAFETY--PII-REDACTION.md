@@ -13,14 +13,18 @@ tags:
   - pii
   - redaction
   - identity
-crosslinks: {"references":["FRAMEWORK--UNIVERSAL-CONTEXT-FRAMEWORK"]}
+crosslinks:
+  references:
+    - FRAMEWORK--UNIVERSAL-CONTEXT-FRAMEWORK
 created_at: 2026-05-14T21:00:00+07:00
 aliases:
   - SAFETY
   - implementation_flow
   - Ethical safety / AI alignment
 cluster: implementation_flow
-role: "Ethical safety / AI alignment"
+role: Ethical safety / AI alignment
+attributes:
+  domain: safety
 ---
 
 # SAFETY — PII Redaction

@@ -12,14 +12,20 @@ tags:
   - hotfix
   - decision
   - hook
-crosslinks: {"references":["CONCEPT--MSP-HOTFIX-WRAPPER","ADR--HOTFIX-ESCAPE-HATCH","FEAT--MSP-PRECOMMIT-HOOK"]}
+crosslinks:
+  references:
+    - CONCEPT--MSP-HOTFIX-WRAPPER
+    - ADR--HOTFIX-ESCAPE-HATCH
+    - FEAT--MSP-PRECOMMIT-HOOK
 created_at: 2026-05-03T17:45:49.473+07:00
 aliases:
   - ADR
   - implementation_flow
   - Architecture decision record
 cluster: implementation_flow
-role: "Architecture decision record"
+role: Architecture decision record
+attributes:
+  domain: adr
 ---
 
 # ADR — hotfix wrapper shape

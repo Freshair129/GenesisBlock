@@ -13,24 +13,32 @@ tags:
   - audit
   - mcp
   - server
-crosslinks: {"references":["FEAT--MSP-MCP-SERVER","BLUEPRINT--MSP-MCP-SERVER","ADR--MSP-MCP-SERVER","FEAT--MSP-VALIDATOR","FEAT--CODEGEN-MICROTASK-RUNNER"]}
+crosslinks:
+  references:
+    - FEAT--MSP-MCP-SERVER
+    - BLUEPRINT--MSP-MCP-SERVER
+    - ADR--MSP-MCP-SERVER
+    - FEAT--MSP-VALIDATOR
+    - FEAT--CODEGEN-MICROTASK-RUNNER
 linked_symbols:
-  - {"file":"packages/msp/src/mcp/server.ts"}
-  - {"file":"packages/msp/src/mcp/types.ts"}
-  - {"file":"packages/msp/src/mcp/bin.ts"}
-  - {"file":"packages/msp/src/mcp/tools/validate.ts"}
-  - {"file":"src/mcp/tools/propose.ts"}
-  - {"file":"packages/msp/src/mcp/tools/run-task.ts"}
-  - {"file":"packages/msp/src/mcp/tools/session-append.ts"}
-  - {"file":"packages/msp/src/mcp/tools/episode-append.ts"}
-  - {"file":"packages/msp/src/mcp/tools/backlinks-rebuild.ts"}
+  - file: packages/msp/src/mcp/server.ts
+  - file: packages/msp/src/mcp/types.ts
+  - file: packages/msp/src/mcp/bin.ts
+  - file: packages/msp/src/mcp/tools/validate.ts
+  - file: src/mcp/tools/propose.ts
+  - file: packages/msp/src/mcp/tools/run-task.ts
+  - file: packages/msp/src/mcp/tools/session-append.ts
+  - file: packages/msp/src/mcp/tools/episode-append.ts
+  - file: packages/msp/src/mcp/tools/backlinks-rebuild.ts
 created_at: 2026-05-03T18:20:24.061+07:00
 aliases:
   - AUDIT
   - implementation_flow
   - Test results / quality report
 cluster: implementation_flow
-role: "Test results / quality report"
+role: Test results / quality report
+attributes:
+  domain: audit
 ---
 
 # AUDIT — MSP MCP server (M6)

@@ -14,14 +14,20 @@ tags:
   - windows
   - decision
   - m9f
-crosslinks: {"references":["CONCEPT--SESSION-LOCK-CROSS-PLATFORM"],"implements":["FEAT--MEMORY-SESSIONS-WRITER"]}
+crosslinks:
+  references:
+    - CONCEPT--SESSION-LOCK-CROSS-PLATFORM
+  implements:
+    - FEAT--MEMORY-SESSIONS-WRITER
 created_at: 2026-05-05T16:22:00.000+07:00
 aliases:
   - ADR
   - implementation_flow
   - Architecture decision record
 cluster: implementation_flow
-role: "Architecture decision record"
+role: Architecture decision record
+attributes:
+  domain: adr
 ---
 
 # ADR — session lock max-age

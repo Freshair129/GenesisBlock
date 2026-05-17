@@ -13,14 +13,19 @@ tags:
   - backlinks
   - indexer
   - decision
-crosslinks: {"references":["CONCEPT--MEMORY-BACKLINKS-INDEXER","CONCEPT--MEMORY-VECTOR-BACKLINKS"]}
+crosslinks:
+  references:
+    - CONCEPT--MEMORY-BACKLINKS-INDEXER
+    - CONCEPT--MEMORY-VECTOR-BACKLINKS
 created_at: 2026-05-03T14:16:42.336+07:00
 aliases:
   - ADR
   - implementation_flow
   - Architecture decision record
 cluster: implementation_flow
-role: "Architecture decision record"
+role: Architecture decision record
+attributes:
+  domain: adr
 ---
 
 # ADR — backlinks indexer rebuild strategy

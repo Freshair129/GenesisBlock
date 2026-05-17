@@ -7,21 +7,31 @@ created_at: 2026-05-13T12:00:00+07:00
 vault_id: GKS-CORE
 tier: genesis
 title: Reverse citation lookup — atoms-by-code-path
-tags: [user-facing, traceability, drift-detection]
+tags:
+  - user-facing
+  - traceability
+  - drift-detection
 crosslinks:
-  implements: [ADR--REVERSE-CITATION-LOOKUP]
-  references: [CONCEPT--MEMORY-STORE]
+  implements:
+    - ADR--REVERSE-CITATION-LOOKUP
+  references:
+    - CONCEPT--MEMORY-STORE
 linked_symbols:
-  - { file: "packages/gks/src/memory/index.ts", fn: lookupBySymbol }
-  - { file: "packages/gks/src/memory/gks.ts", fn: searchBySymbol }
-  - { file: "packages/gks/bin/gks.ts", fn: cmdLookupBySymbol }
-  - { file: "packages/gks/src/mcp-server/index.ts" }
+  - file: packages/gks/src/memory/index.ts
+    fn: lookupBySymbol
+  - file: packages/gks/src/memory/gks.ts
+    fn: searchBySymbol
+  - file: packages/gks/bin/gks.ts
+    fn: cmdLookupBySymbol
+  - file: packages/gks/src/mcp-server/index.ts
 aliases:
   - FEAT
   - implementation_flow
   - Feature spec
 cluster: implementation_flow
-role: "Feature spec"
+role: Feature spec
+attributes:
+  domain: feat
 ---
 
 # FEAT — lookupBySymbol

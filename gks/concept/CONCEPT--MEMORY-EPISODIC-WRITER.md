@@ -12,14 +12,20 @@ tags:
   - memory
   - episodic
   - writer
-crosslinks: {"references":["CONCEPT--MEMORY-EPISODIC","CONCEPT--MEMORY-SESSIONS","FEAT--MEMORY-SESSIONS-WRITER"]}
+crosslinks:
+  references:
+    - CONCEPT--MEMORY-EPISODIC
+    - CONCEPT--MEMORY-SESSIONS
+    - FEAT--MEMORY-SESSIONS-WRITER
 created_at: 2026-05-03T14:16:39.910+07:00
 aliases:
   - CONCEPT
   - implementation_flow
   - Strategic intent / PRD
 cluster: implementation_flow
-role: "Strategic intent / PRD"
+role: Strategic intent / PRD
+attributes:
+  domain: concept
 ---
 
 # CONCEPT — memory episodic writer

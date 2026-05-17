@@ -14,25 +14,33 @@ tags:
   - token-budget
   - m7d
   - audit
-crosslinks: {"references":["FEAT--COMPRESSOR","BLUEPRINT--COMPRESSOR","ADR--COMPRESSOR-THREE-TIER","CONCEPT--CONTEXT-COMPRESSION","FRAMEWORK--MSP-ARCHITECTURE-V2"]}
+crosslinks:
+  references:
+    - FEAT--COMPRESSOR
+    - BLUEPRINT--COMPRESSOR
+    - ADR--COMPRESSOR-THREE-TIER
+    - CONCEPT--CONTEXT-COMPRESSION
+    - FRAMEWORK--MSP-ARCHITECTURE-V2
 linked_symbols:
-  - {"file":"packages/msp/src/orchestrator/compressor/index.ts"}
-  - {"file":"packages/msp/src/orchestrator/compressor/types.ts"}
-  - {"file":"packages/msp/src/orchestrator/compressor/tokens.ts"}
-  - {"file":"packages/msp/src/orchestrator/compressor/text.ts"}
-  - {"file":"packages/msp/src/orchestrator/compressor/trim.ts"}
-  - {"file":"packages/msp/src/orchestrator/compressor/resummarise.ts"}
-  - {"file":"packages/msp/test/orchestrator/compressor/tokens.test.ts"}
-  - {"file":"packages/msp/test/orchestrator/compressor/trim.test.ts"}
-  - {"file":"packages/msp/test/orchestrator/compressor/resummarise.test.ts"}
-  - {"file":"packages/msp/test/orchestrator/compressor/index.test.ts"}
+  - file: packages/msp/src/orchestrator/compressor/index.ts
+  - file: packages/msp/src/orchestrator/compressor/types.ts
+  - file: packages/msp/src/orchestrator/compressor/tokens.ts
+  - file: packages/msp/src/orchestrator/compressor/text.ts
+  - file: packages/msp/src/orchestrator/compressor/trim.ts
+  - file: packages/msp/src/orchestrator/compressor/resummarise.ts
+  - file: packages/msp/test/orchestrator/compressor/tokens.test.ts
+  - file: packages/msp/test/orchestrator/compressor/trim.test.ts
+  - file: packages/msp/test/orchestrator/compressor/resummarise.test.ts
+  - file: packages/msp/test/orchestrator/compressor/index.test.ts
 created_at: 2026-05-05T16:32:00.000+07:00
 aliases:
   - AUDIT
   - implementation_flow
   - Test results / quality report
 cluster: implementation_flow
-role: "Test results / quality report"
+role: Test results / quality report
+attributes:
+  domain: audit
 ---
 
 # M7d — context compressor implementation (three-tier shrink-to-fit)

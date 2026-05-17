@@ -12,14 +12,21 @@ tags:
   - contract
   - schema
   - atomic
-crosslinks: {"references":["FRAMEWORK--MSP-ARCHITECTURE-V2","CONCEPT--KNOWLEDGE-LAYERS-V2","CONCEPT--CODEGEN-MICROTASK-CONTRACT","SPEC--ATOM-REGISTRY-SCHEMA"]}
+crosslinks:
+  references:
+    - FRAMEWORK--MSP-ARCHITECTURE-V2
+    - CONCEPT--KNOWLEDGE-LAYERS-V2
+    - CONCEPT--CODEGEN-MICROTASK-CONTRACT
+    - SPEC--ATOM-REGISTRY-SCHEMA
 created_at: 2026-05-03T14:01:51.814+07:00
 aliases:
   - CONCEPT
   - implementation_flow
   - Strategic intent / PRD
 cluster: implementation_flow
-role: "Strategic intent / PRD"
+role: Strategic intent / PRD
+attributes:
+  domain: concept
 ---
 
 # CONCEPT — atomic write contract

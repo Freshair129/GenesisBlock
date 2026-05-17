@@ -6,7 +6,8 @@ status: stable
 tier: genesis
 source_type: axiomatic
 vault_id: default
-title: CLAUDE.md MASTER BLOCKS sector — P0–P4 priority bands, user-only P0/P1, multi-tiered triggers, constituent index
+title: CLAUDE.md MASTER BLOCKS sector — P0–P4 priority bands, user-only P0/P1,
+  multi-tiered triggers, constituent index
 tags:
   - msp
   - master
@@ -16,14 +17,24 @@ tags:
   - trigger
   - constituents
   - decision
-crosslinks: {"references":["FRAMEWORK--KNOWLEDGE-3-TIER","CONCEPT--MASTER-PRIORITY-SECTORS","SPEC--GENESIS-BLOCK-MANIFEST","MASTER--MSP-DOC-TO-CODE","MASTER--ATOM-CONTRADICTION-POLICY","MASTER--ROOT-CAUSE-ANALYSIS","ADR--AGENT-WRITE-BOUNDARIES"]}
+crosslinks:
+  references:
+    - FRAMEWORK--KNOWLEDGE-3-TIER
+    - CONCEPT--MASTER-PRIORITY-SECTORS
+    - SPEC--GENESIS-BLOCK-MANIFEST
+    - MASTER--MSP-DOC-TO-CODE
+    - MASTER--ATOM-CONTRADICTION-POLICY
+    - MASTER--ROOT-CAUSE-ANALYSIS
+    - ADR--AGENT-WRITE-BOUNDARIES
 created_at: 2026-05-17T02:35:00.000+07:00
 aliases:
   - ADR
   - implementation_flow
   - Architecture decision record
 cluster: implementation_flow
-role: "Architecture decision record"
+role: Architecture decision record
+attributes:
+  domain: adr
 ---
 
 # ADR — adopt P0–P4 sector structure in CLAUDE.md MASTER BLOCKS

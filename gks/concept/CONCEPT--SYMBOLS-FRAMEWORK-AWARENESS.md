@@ -15,14 +15,20 @@ tags:
   - nextjs
   - prisma
   - mcp
-crosslinks: {"references":["FRAMEWORK--SYMBOL-GRAPH","CONCEPT--SYMBOL-GRAPH","CONCEPT--PARSER-CHOICE"]}
+crosslinks:
+  references:
+    - FRAMEWORK--SYMBOL-GRAPH
+    - CONCEPT--SYMBOL-GRAPH
+    - CONCEPT--PARSER-CHOICE
 created_at: 2026-05-12T05:35:00.000+07:00
 aliases:
   - CONCEPT
   - implementation_flow
   - Strategic intent / PRD
 cluster: implementation_flow
-role: "Strategic intent / PRD"
+role: Strategic intent / PRD
+attributes:
+  domain: concept
 ---
 
 # CONCEPT — Framework-aware symbol indexing

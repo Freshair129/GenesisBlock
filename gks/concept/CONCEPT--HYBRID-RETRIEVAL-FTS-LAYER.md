@@ -13,14 +13,19 @@ tags:
   - fts
   - hybrid-retrieval
   - framework-spec-13
-crosslinks: {"references":["CONCEPT--COGNITIVE-LAYER-FACADE","CONCEPT--MEMORY-SUBSYSTEM"]}
+crosslinks:
+  references:
+    - CONCEPT--COGNITIVE-LAYER-FACADE
+    - CONCEPT--MEMORY-SUBSYSTEM
 created_at: 2026-05-12T22:53:00.000+07:00
 aliases:
   - CONCEPT
   - implementation_flow
   - Strategic intent / PRD
 cluster: implementation_flow
-role: "Strategic intent / PRD"
+role: Strategic intent / PRD
+attributes:
+  domain: concept
 ---
 
 # CONCEPT — Hybrid Retrieval FTS layer

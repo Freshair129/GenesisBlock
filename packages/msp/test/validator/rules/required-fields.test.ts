@@ -168,5 +168,5 @@ describe('requiredFields', () => {
       expect(errs[0]!.message).toContain("field 'role' must match registry value 'Strategic intent / PRD'")
     })
   })
-  })
 })
+

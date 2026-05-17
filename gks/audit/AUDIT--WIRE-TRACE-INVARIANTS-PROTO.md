@@ -6,7 +6,8 @@ status: stable
 vault_id: default
 tier: process
 source_type: axiomatic
-title: AUDIT — wire PROTO--SYMBOLS-TRACE-INVARIANTS to its predicate + fix ProtoStatus 'active'
+title: AUDIT — wire PROTO--SYMBOLS-TRACE-INVARIANTS to its predicate + fix
+  ProtoStatus 'active'
 tags:
   - msp
   - proto
@@ -21,14 +22,17 @@ crosslinks:
     - AUDIT--PROTO-LINKED-SYMBOLS-PATH-DRIFT
 phase_override:
   skip_blueprint: true
-  reason: "Wiring fix + a one-line type correction on the already-blueprinted PROTO loader scaffold (BLUEPRINT--PROTO-LOADER); no new code surface."
+  reason: Wiring fix + a one-line type correction on the already-blueprinted PROTO
+    loader scaffold (BLUEPRINT--PROTO-LOADER); no new code surface.
 created_at: 2026-05-14T19:40:00.000+07:00
 aliases:
   - AUDIT
   - implementation_flow
   - Test results / quality report
 cluster: implementation_flow
-role: "Test results / quality report"
+role: Test results / quality report
+attributes:
+  domain: audit
 ---
 
 # AUDIT — wire [[PROTO--SYMBOLS-TRACE-INVARIANTS]]

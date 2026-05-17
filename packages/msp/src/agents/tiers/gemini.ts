@@ -26,6 +26,12 @@ export const geminiAdapter: TierAdapter = {
     return result.exit_code === 0
   },
   async run(prompt: string, opts: RunOpts): Promise<RunResult> {
-    return runCli(BIN, ['--approval-mode', 'yolo', '-p', prompt], opts)
+    // Pass prompt via stdin to avoid Windows shell quoting limits.
+    // --prompt "." ensures headless mode while allowing stdin to be read.
+    // We use a non-empty string to avoid argument-stripping bugs on Windows shell.
+    return runCli(BIN, ['--approval-mode', 'yolo', '--prompt', '.'], {
+      ...opts,
+      stdin: prompt,
+    })
   },
 }

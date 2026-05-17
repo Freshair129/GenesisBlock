@@ -14,16 +14,24 @@ tags:
   - phase-gates
   - governance
   - m8b
-crosslinks: {"enforces":["FRAMEWORK--PHASE-GOVERNANCE"],"references":["CONCEPT--PROTO-PHASE-GATES","CONCEPT--PROTO-PATTERN","FEAT--PROTO-LOADER"]}
+crosslinks:
+  enforces:
+    - FRAMEWORK--PHASE-GOVERNANCE
+  references:
+    - CONCEPT--PROTO-PHASE-GATES
+    - CONCEPT--PROTO-PATTERN
+    - FEAT--PROTO-LOADER
 linked_symbols:
-  - {"file":"packages/msp/src/validator/proto/phase-gates.ts"}
+  - file: packages/msp/src/validator/proto/phase-gates.ts
 created_at: 2026-05-05T18:00:00.000+07:00
 aliases:
   - PROTO
   - implementation_flow
   - Machine-enforced invariant
 cluster: implementation_flow
-role: "Machine-enforced invariant"
+role: Machine-enforced invariant
+attributes:
+  domain: proto
 ---
 
 # PROTO — PHASE-GATES

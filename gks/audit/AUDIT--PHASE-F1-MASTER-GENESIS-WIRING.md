@@ -6,7 +6,8 @@ status: draft
 tier: process
 source_type: axiomatic
 vault_id: default
-title: AUDIT — Phase F1 Master ↔ Genesis runtime wiring (registry + apply + executor flag)
+title: AUDIT — Phase F1 Master ↔ Genesis runtime wiring (registry + apply +
+  executor flag)
 tags:
   - msp
   - master
@@ -15,24 +16,35 @@ tags:
   - runtime
   - audit
   - phase-f1
-crosslinks: {"references":["CONCEPT--PROMOTED-BLOCK-REGISTRY","BLUEPRINT--MASTER-RUNTIME-INTEGRATION","CONCEPT--MASTER-PROMOTION","CONCEPT--GENESIS-BLOCK-RUNTIME","BLUEPRINT--MASTER-PROMOTION-PIPELINE","BLUEPRINT--GENESIS-BLOCK-RUNTIME","SPEC--GENESIS-BLOCK-MANIFEST","ADR--MASTER-PROMOTION-DOC-TO-CODE"]}
+crosslinks:
+  references:
+    - CONCEPT--PROMOTED-BLOCK-REGISTRY
+    - BLUEPRINT--MASTER-RUNTIME-INTEGRATION
+    - CONCEPT--MASTER-PROMOTION
+    - CONCEPT--GENESIS-BLOCK-RUNTIME
+    - BLUEPRINT--MASTER-PROMOTION-PIPELINE
+    - BLUEPRINT--GENESIS-BLOCK-RUNTIME
+    - SPEC--GENESIS-BLOCK-MANIFEST
+    - ADR--MASTER-PROMOTION-DOC-TO-CODE
 linked_symbols:
-  - {"file":"packages/msp/src/master/registry.ts"}
-  - {"file":"packages/msp/src/master/promote-apply.ts"}
-  - {"file":"packages/msp/src/master/cli.ts"}
-  - {"file":"packages/msp/src/genesis/executor.ts"}
-  - {"file":"packages/msp/src/genesis/types.ts"}
-  - {"file":"packages/msp/test/master/registry.test.ts"}
-  - {"file":"packages/msp/test/master/promote-apply.test.ts"}
-  - {"file":"packages/msp/test/genesis/executor.test.ts"}
-  - {"file":".gitignore"}
+  - file: packages/msp/src/master/registry.ts
+  - file: packages/msp/src/master/promote-apply.ts
+  - file: packages/msp/src/master/cli.ts
+  - file: packages/msp/src/genesis/executor.ts
+  - file: packages/msp/src/genesis/types.ts
+  - file: packages/msp/test/master/registry.test.ts
+  - file: packages/msp/test/master/promote-apply.test.ts
+  - file: packages/msp/test/genesis/executor.test.ts
+  - file: .gitignore
 created_at: 2026-05-14T05:08:00.000+07:00
 aliases:
   - AUDIT
   - implementation_flow
   - Test results / quality report
 cluster: implementation_flow
-role: "Test results / quality report"
+role: Test results / quality report
+attributes:
+  domain: audit
 ---
 
 # AUDIT — Phase F1 Master ↔ Genesis runtime wiring

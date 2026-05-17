@@ -13,14 +13,19 @@ tags:
   - backlinks
   - vector
   - indexer
-crosslinks: {"references":["CONCEPT--MEMORY-VECTOR-BACKLINKS","FRAMEWORK--CROSSLINKS-VOCABULARY"]}
+crosslinks:
+  references:
+    - CONCEPT--MEMORY-VECTOR-BACKLINKS
+    - FRAMEWORK--CROSSLINKS-VOCABULARY
 created_at: 2026-05-03T14:16:41.740+07:00
 aliases:
   - CONCEPT
   - implementation_flow
   - Strategic intent / PRD
 cluster: implementation_flow
-role: "Strategic intent / PRD"
+role: Strategic intent / PRD
+attributes:
+  domain: concept
 ---
 
 # CONCEPT — backlinks indexer

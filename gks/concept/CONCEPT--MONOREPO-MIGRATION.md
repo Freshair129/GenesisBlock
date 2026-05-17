@@ -6,7 +6,8 @@ status: draft
 vault_id: default
 tier: genesis
 source_type: axiomatic
-title: Monorepo migration — collapse `Freshair129/msp` + `Freshair129/GksV3` into one workspace while still publishing `@freshair129/gks` separately
+title: Monorepo migration — collapse `Freshair129/msp` + `Freshair129/GksV3`
+  into one workspace while still publishing `@freshair129/gks` separately
 tags:
   - monorepo
   - workspace
@@ -15,14 +16,22 @@ tags:
   - governance
   - msp
   - gks
-crosslinks: {"references":["FRAMEWORK--MSP-ARCHITECTURE-V2","ADR--GRAPH-IS-GKS-DOMAIN","AUDIT--TWO-REPO-VALIDATION","AUDIT--GKS-UPSTREAM-PROPOSALS-FILED","AUDIT--GKS-3-6-0-PUBLISHED"]}
+crosslinks:
+  references:
+    - FRAMEWORK--MSP-ARCHITECTURE-V2
+    - ADR--GRAPH-IS-GKS-DOMAIN
+    - AUDIT--TWO-REPO-VALIDATION
+    - AUDIT--GKS-UPSTREAM-PROPOSALS-FILED
+    - AUDIT--GKS-3-6-0-PUBLISHED
 created_at: 2026-05-08T13:20:00.000+07:00
 aliases:
   - CONCEPT
   - implementation_flow
   - Strategic intent / PRD
 cluster: implementation_flow
-role: "Strategic intent / PRD"
+role: Strategic intent / PRD
+attributes:
+  domain: concept
 ---
 
 # CONCEPT — monorepo migration

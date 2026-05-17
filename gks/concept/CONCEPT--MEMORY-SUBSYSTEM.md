@@ -13,14 +13,18 @@ tags:
   - sessions
   - episodic
   - vector
-crosslinks: {"references":["FRAMEWORK--MSP-ARCHITECTURE-V2"]}
+crosslinks:
+  references:
+    - FRAMEWORK--MSP-ARCHITECTURE-V2
 created_at: 2026-05-03T14:01:52.815+07:00
 aliases:
   - CONCEPT
   - implementation_flow
   - Strategic intent / PRD
 cluster: implementation_flow
-role: "Strategic intent / PRD"
+role: Strategic intent / PRD
+attributes:
+  domain: concept
 ---
 
 # CONCEPT — MSP memory subsystem

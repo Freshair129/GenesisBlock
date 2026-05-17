@@ -14,14 +14,20 @@ tags:
   - refactor
   - governance
   - m8f
-crosslinks: {"references":["CONCEPT--PROTO-PATTERN","ADR--ANTI-HALLUCINATION-RULES","FEAT--MSP-VALIDATOR"]}
+crosslinks:
+  references:
+    - CONCEPT--PROTO-PATTERN
+    - ADR--ANTI-HALLUCINATION-RULES
+    - FEAT--MSP-VALIDATOR
 created_at: 2026-05-05T16:28:00.000+07:00
 aliases:
   - CONCEPT
   - implementation_flow
   - Strategic intent / PRD
 cluster: implementation_flow
-role: "Strategic intent / PRD"
+role: Strategic intent / PRD
+attributes:
+  domain: concept
 ---
 
 # CONCEPT — audit existing validator rules → PROTO promotion

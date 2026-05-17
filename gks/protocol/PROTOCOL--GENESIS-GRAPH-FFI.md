@@ -16,14 +16,20 @@ tags:
   - rust
   - protocol
   - contract
-crosslinks: {"references":["ADR--GENESIS-GRAPH-AS-GKS-BACKEND","CONCEPT--GENESIS-GRAPH-BACKEND","BLUEPRINT--GENESIS-GRAPH-INTEGRATION"]}
+crosslinks:
+  references:
+    - ADR--GENESIS-GRAPH-AS-GKS-BACKEND
+    - CONCEPT--GENESIS-GRAPH-BACKEND
+    - BLUEPRINT--GENESIS-GRAPH-INTEGRATION
 created_at: 2026-05-12T12:30:00.000+07:00
 aliases:
   - PROTOCOL
   - agent_governance
   - Interaction contract
 cluster: agent_governance
-role: "Interaction contract"
+role: Interaction contract
+attributes:
+  domain: protocol
 ---
 
 # PROTOCOL — Genesis Block FFI

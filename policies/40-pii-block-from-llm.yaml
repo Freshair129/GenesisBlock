@@ -1,0 +1,12 @@
+id: pack-pii-block-from-llm
+description: Deny expose-to-llm for Resources whose body matches an SSN-like regex (UCF Phase 4).
+rules:
+  - id: pii-block-ssn
+    description: Block SSN-like content from LLM exposure.
+    effect: deny
+    match:
+      action: [expose-to-llm]
+    condition:
+      # Simple SSN regex: XXX-XX-XXXX
+      resource.attributes.body: { matches: "\\b\\d{3}-\\d{2}-\\d{4}\\b" }
+    priority: 600

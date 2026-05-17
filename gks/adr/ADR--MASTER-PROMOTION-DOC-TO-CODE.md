@@ -14,14 +14,20 @@ tags:
   - doc-to-code
   - 3-tier
   - decision
-crosslinks: {"references":["FRAMEWORK--KNOWLEDGE-3-TIER","CONCEPT--CODEGEN-MICROTASK-CONTRACT","MASTER--MSP-DOC-TO-CODE"]}
+crosslinks:
+  references:
+    - FRAMEWORK--KNOWLEDGE-3-TIER
+    - CONCEPT--CODEGEN-MICROTASK-CONTRACT
+    - MASTER--MSP-DOC-TO-CODE
 created_at: 2026-05-09T15:02:00.000+07:00
 aliases:
   - ADR
   - implementation_flow
   - Architecture decision record
 cluster: implementation_flow
-role: "Architecture decision record"
+role: Architecture decision record
+attributes:
+  domain: adr
 ---
 
 # ADR — promote doc-to-code to Master

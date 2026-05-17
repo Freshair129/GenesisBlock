@@ -14,20 +14,27 @@ tags:
   - backlinks
   - blueprint
   - implementation
-crosslinks: {"implements":["FEAT--MEMORY-BACKLINKS-INDEXER"],"references":["ADR--MEMORY-BACKLINKS-INDEXER","CONCEPT--MEMORY-VECTOR-BACKLINKS"]}
+crosslinks:
+  implements:
+    - FEAT--MEMORY-BACKLINKS-INDEXER
+  references:
+    - ADR--MEMORY-BACKLINKS-INDEXER
+    - CONCEPT--MEMORY-VECTOR-BACKLINKS
 linked_symbols:
-  - {"file":"packages/msp/src/memory/backlinks/indexer.ts"}
-  - {"file":"packages/msp/src/memory/backlinks/walk.ts"}
-  - {"file":"packages/msp/src/memory/backlinks/edges.ts"}
-  - {"file":"packages/msp/src/memory/backlinks/atomic-write.ts"}
-  - {"file":"packages/msp/src/memory/backlinks/cli.ts"}
+  - file: packages/msp/src/memory/backlinks/indexer.ts
+  - file: packages/msp/src/memory/backlinks/walk.ts
+  - file: packages/msp/src/memory/backlinks/edges.ts
+  - file: packages/msp/src/memory/backlinks/atomic-write.ts
+  - file: packages/msp/src/memory/backlinks/cli.ts
 created_at: 2026-05-03T14:16:43.374+07:00
 aliases:
   - BLUEPRINT
   - implementation_flow
   - Implementation plan
 cluster: implementation_flow
-role: "Implementation plan"
+role: Implementation plan
+attributes:
+  domain: blueprint
 ---
 
 # BLUEPRINT — backlinks indexer

@@ -7,7 +7,8 @@ tier: process
 source_type: axiomatic
 vault_id: default
 scale_level: L2
-title: "BLUEPRINT — Phase 3 vault composition + 2-tier resolution gradient, first default-deny flip"
+title: BLUEPRINT — Phase 3 vault composition + 2-tier resolution gradient, first
+  default-deny flip
 tags:
   - msp
   - ucf
@@ -15,19 +16,29 @@ tags:
   - phase-3
   - vault
   - resolution
-crosslinks: {"implements":["FEAT--VAULT-COMPOSITION","FEAT--RESOLUTION-EXPAND-ON-DEMAND"],"references":["ADR--VAULT-NAMESPACE-LAYERING","ADR--RESOLUTION-TIER-COUNT","ADR--DEFAULT-POLICY-POSTURE","BLUEPRINT--PHASE-2-SUBAGENT-SCOPING"]}
+crosslinks:
+  implements:
+    - FEAT--VAULT-COMPOSITION
+    - FEAT--RESOLUTION-EXPAND-ON-DEMAND
+  references:
+    - ADR--VAULT-NAMESPACE-LAYERING
+    - ADR--RESOLUTION-TIER-COUNT
+    - ADR--DEFAULT-POLICY-POSTURE
+    - BLUEPRINT--PHASE-2-SUBAGENT-SCOPING
 linked_symbols:
-  - {"file":"packages/msp/src/vault/registry.ts"}
-  - {"file":"packages/msp/src/vault/types.ts"}
-  - {"file":"packages/msp/src/orchestrator/resolution/tier.ts"}
-  - {"file":"packages/msp/src/orchestrator/resolution/budget.ts"}
+  - file: packages/msp/src/vault/registry.ts
+  - file: packages/msp/src/vault/types.ts
+  - file: packages/msp/src/orchestrator/resolution/tier.ts
+  - file: packages/msp/src/orchestrator/resolution/budget.ts
 created_at: 2026-05-14T22:21:54.630+07:00
 aliases:
   - BLUEPRINT
   - implementation_flow
   - Implementation plan
 cluster: implementation_flow
-role: "Implementation plan"
+role: Implementation plan
+attributes:
+  domain: blueprint
 ---
 
 # BLUEPRINT — Phase 3: vault composition + resolution gradient

@@ -13,18 +13,25 @@ tags:
   - slm
   - ollama
   - user-facing
-crosslinks: {"implements":["ADR--SLM-OLLAMA-CLIENT"],"references":["CONCEPT--SLM-OLLAMA-CLIENT","FEAT--CODEGEN-MICROTASK-RUNNER"]}
+crosslinks:
+  implements:
+    - ADR--SLM-OLLAMA-CLIENT
+  references:
+    - CONCEPT--SLM-OLLAMA-CLIENT
+    - FEAT--CODEGEN-MICROTASK-RUNNER
 linked_symbols:
-  - {"file":"packages/msp/src/codegen/slm/ollama.ts"}
-  - {"file":"packages/msp/src/codegen/slm/factory.ts"}
-  - {"file":"packages/msp/src/codegen/slm/types.ts"}
+  - file: packages/msp/src/codegen/slm/ollama.ts
+  - file: packages/msp/src/codegen/slm/factory.ts
+  - file: packages/msp/src/codegen/slm/types.ts
 created_at: 2026-05-03T16:22:31.444+07:00
 aliases:
   - FEAT
   - implementation_flow
   - Feature spec
 cluster: implementation_flow
-role: "Feature spec"
+role: Feature spec
+attributes:
+  domain: feat
 ---
 
 # FEAT — Ollama SLM client

@@ -12,14 +12,18 @@ tags:
   - guard
   - integrity
   - passport
-crosslinks: {"references":["FRAMEWORK--MSP-ARCHITECTURE-V2"]}
+crosslinks:
+  references:
+    - FRAMEWORK--MSP-ARCHITECTURE-V2
 created_at: 2026-05-14T20:50:00+07:00
 aliases:
   - GUARD
   - agent_governance
   - Structural / behavioural guardrail
 cluster: agent_governance
-role: "Structural / behavioural guardrail"
+role: Structural / behavioural guardrail
+attributes:
+  domain: guard
 ---
 
 # GUARD — Passport Non-Null

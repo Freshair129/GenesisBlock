@@ -13,26 +13,33 @@ tags:
   - validator
   - blueprint
   - implementation
-crosslinks: {"implements":["FEAT--MSP-VALIDATOR"],"references":["ADR--MSP-VALIDATOR","CONCEPT--MSP-VALIDATOR"]}
+crosslinks:
+  implements:
+    - FEAT--MSP-VALIDATOR
+  references:
+    - ADR--MSP-VALIDATOR
+    - CONCEPT--MSP-VALIDATOR
 linked_symbols:
-  - {"file":"packages/msp/src/validator/index.ts"}
-  - {"file":"packages/msp/src/validator/types.ts"}
-  - {"file":"packages/msp/src/validator/parse.ts"}
-  - {"file":"packages/msp/src/validator/rules/forbidden-fields.ts"}
-  - {"file":"packages/msp/src/validator/rules/dangling-wikilinks.ts"}
-  - {"file":"src/validator/rules/id-uniqueness.ts"}
-  - {"file":"packages/msp/src/validator/rules/id-format.ts"}
-  - {"file":"packages/msp/src/validator/rules/future-date.ts"}
-  - {"file":"packages/msp/src/validator/rules/summary-min.ts"}
-  - {"file":"packages/msp/src/validator/atomic-index.ts"}
-  - {"file":"packages/msp/src/validator/cli.ts"}
+  - file: packages/msp/src/validator/index.ts
+  - file: packages/msp/src/validator/types.ts
+  - file: packages/msp/src/validator/parse.ts
+  - file: packages/msp/src/validator/rules/forbidden-fields.ts
+  - file: packages/msp/src/validator/rules/dangling-wikilinks.ts
+  - file: src/validator/rules/id-uniqueness.ts
+  - file: packages/msp/src/validator/rules/id-format.ts
+  - file: packages/msp/src/validator/rules/future-date.ts
+  - file: packages/msp/src/validator/rules/summary-min.ts
+  - file: packages/msp/src/validator/atomic-index.ts
+  - file: packages/msp/src/validator/cli.ts
 created_at: 2026-05-03T13:24:25.656+07:00
 aliases:
   - BLUEPRINT
   - implementation_flow
   - Implementation plan
 cluster: implementation_flow
-role: "Implementation plan"
+role: Implementation plan
+attributes:
+  domain: blueprint
 ---
 
 # BLUEPRINT — MSP validator implementation plan

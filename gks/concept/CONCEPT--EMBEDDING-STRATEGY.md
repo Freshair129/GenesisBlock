@@ -14,14 +14,20 @@ tags:
   - semantic-search
   - smart-connections
   - obsidian
-crosslinks: {"references":["CONCEPT--OBSIDIAN-AS-RUNTIME","ADR--EMBEDDING-MODEL-PARITY","ADR--GRAPH-IS-GKS-DOMAIN"]}
+crosslinks:
+  references:
+    - CONCEPT--OBSIDIAN-AS-RUNTIME
+    - ADR--EMBEDDING-MODEL-PARITY
+    - ADR--GRAPH-IS-GKS-DOMAIN
 created_at: 2026-05-03T23:55:05.902+07:00
 aliases:
   - CONCEPT
   - implementation_flow
   - Strategic intent / PRD
 cluster: implementation_flow
-role: "Strategic intent / PRD"
+role: Strategic intent / PRD
+attributes:
+  domain: concept
 ---
 
 # CONCEPT — embedding strategy

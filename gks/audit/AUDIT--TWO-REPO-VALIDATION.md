@@ -14,7 +14,13 @@ tags:
   - validation
   - version-control
   - upstream
-crosslinks: {"references":["ADR--EMBEDDING-MODEL-PARITY","ADR--MSP-OBSIDIAN-INTEGRATION","ADR--GRAPH-IS-GKS-DOMAIN","CONCEPT--EMBEDDING-STRATEGY","AUDIT--M7-PREP-FOLLOWUP"]}
+crosslinks:
+  references:
+    - ADR--EMBEDDING-MODEL-PARITY
+    - ADR--MSP-OBSIDIAN-INTEGRATION
+    - ADR--GRAPH-IS-GKS-DOMAIN
+    - CONCEPT--EMBEDDING-STRATEGY
+    - AUDIT--M7-PREP-FOLLOWUP
 linked_symbols: []
 created_at: 2026-05-04T12:55:00.000+07:00
 aliases:
@@ -22,7 +28,9 @@ aliases:
   - implementation_flow
   - Test results / quality report
 cluster: implementation_flow
-role: "Test results / quality report"
+role: Test results / quality report
+attributes:
+  domain: audit
 ---
 
 # AUDIT — two-repo validation

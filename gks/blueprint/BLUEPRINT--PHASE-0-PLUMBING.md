@@ -7,22 +7,30 @@ tier: process
 source_type: axiomatic
 vault_id: default
 scale_level: L2
-title: "BLUEPRINT — Phase 0 plumbing: thread the 4-tuple and attribute bag, no enforcement"
+title: "BLUEPRINT — Phase 0 plumbing: thread the 4-tuple and attribute bag, no
+  enforcement"
 tags:
   - msp
   - ucf
   - blueprint
   - phase-0
-crosslinks: {"references":["CONCEPT--SUBJECT-RESOURCE-ACTION-CONTEXT","CONCEPT--ATTRIBUTE-BAG-MODEL","ADR--BRING-YOUR-OWN-ATTRIBUTES","FRAMEWORK--UNIVERSAL-CONTEXT-FRAMEWORK"]}
+crosslinks:
+  references:
+    - CONCEPT--SUBJECT-RESOURCE-ACTION-CONTEXT
+    - CONCEPT--ATTRIBUTE-BAG-MODEL
+    - ADR--BRING-YOUR-OWN-ATTRIBUTES
+    - FRAMEWORK--UNIVERSAL-CONTEXT-FRAMEWORK
 linked_symbols:
-  - {"file":"packages/msp/src/policy/types.ts"}
+  - file: packages/msp/src/policy/types.ts
 created_at: 2026-05-14T22:21:52.048+07:00
 aliases:
   - BLUEPRINT
   - implementation_flow
   - Implementation plan
 cluster: implementation_flow
-role: "Implementation plan"
+role: Implementation plan
+attributes:
+  domain: blueprint
 ---
 
 # BLUEPRINT — Phase 0: plumbing

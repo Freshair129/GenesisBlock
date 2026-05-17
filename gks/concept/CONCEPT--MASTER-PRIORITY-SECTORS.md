@@ -15,14 +15,23 @@ tags:
   - context-budget
   - claude-md
   - foundation
-crosslinks: {"references":["FRAMEWORK--KNOWLEDGE-3-TIER","SPEC--GENESIS-BLOCK-MANIFEST","CONCEPT--TAXONOMY-V2-3","MASTER--MSP-DOC-TO-CODE","MASTER--ATOM-CONTRADICTION-POLICY","MASTER--ROOT-CAUSE-ANALYSIS"]}
+crosslinks:
+  references:
+    - FRAMEWORK--KNOWLEDGE-3-TIER
+    - SPEC--GENESIS-BLOCK-MANIFEST
+    - CONCEPT--TAXONOMY-V2-3
+    - MASTER--MSP-DOC-TO-CODE
+    - MASTER--ATOM-CONTRADICTION-POLICY
+    - MASTER--ROOT-CAUSE-ANALYSIS
 created_at: 2026-05-17T02:30:00.000+07:00
 aliases:
   - CONCEPT
   - implementation_flow
   - Strategic intent / PRD
 cluster: implementation_flow
-role: "Strategic intent / PRD"
+role: Strategic intent / PRD
+attributes:
+  domain: concept
 ---
 
 # CONCEPT — Master priority sectors (P0–P4)

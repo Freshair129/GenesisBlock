@@ -13,18 +13,25 @@ tags:
   - sessions
   - writer
   - user-facing
-crosslinks: {"implements":["ADR--MEMORY-SESSIONS-WRITER"],"references":["CONCEPT--MEMORY-SESSIONS-WRITER","CONCEPT--MEMORY-SESSIONS"]}
+crosslinks:
+  implements:
+    - ADR--MEMORY-SESSIONS-WRITER
+  references:
+    - CONCEPT--MEMORY-SESSIONS-WRITER
+    - CONCEPT--MEMORY-SESSIONS
 linked_symbols:
-  - {"file":"packages/msp/src/memory/sessions/writer.ts"}
-  - {"file":"packages/msp/src/memory/sessions/types.ts"}
-  - {"file":"packages/msp/src/memory/sessions/lock.ts"}
+  - file: packages/msp/src/memory/sessions/writer.ts
+  - file: packages/msp/src/memory/sessions/types.ts
+  - file: packages/msp/src/memory/sessions/lock.ts
 created_at: 2026-05-03T14:16:39.008+07:00
 aliases:
   - FEAT
   - implementation_flow
   - Feature spec
 cluster: implementation_flow
-role: "Feature spec"
+role: Feature spec
+attributes:
+  domain: feat
 ---
 
 # FEAT — sessions writer

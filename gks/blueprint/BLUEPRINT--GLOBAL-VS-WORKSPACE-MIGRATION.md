@@ -7,7 +7,8 @@ status: stable
 vault_id: default
 tier: process
 source_type: axiomatic
-title: BLUEPRINT — implement global vs workspace storage split (~/.msp/ + .brain/msp/projects/<ns>/)
+title: BLUEPRINT — implement global vs workspace storage split (~/.msp/ +
+  .brain/msp/projects/<ns>/)
 tags:
   - msp
   - storage
@@ -16,29 +17,36 @@ tags:
   - migration
   - blueprint
   - implementation
-crosslinks: {"references":["ADR--GLOBAL-VS-WORKSPACE","CONCEPT--AGENT-AGNOSTIC","CONCEPT--NAMED-PROJECT-REGISTRY","ADR--PATH-ENCODING"]}
+crosslinks:
+  references:
+    - ADR--GLOBAL-VS-WORKSPACE
+    - CONCEPT--AGENT-AGNOSTIC
+    - CONCEPT--NAMED-PROJECT-REGISTRY
+    - ADR--PATH-ENCODING
 linked_symbols:
-  - {"file":"packages/msp/src/identity/store.ts"}
-  - {"file":"packages/msp/src/identity/types.ts"}
-  - {"file":"packages/msp/src/identity/migrate.ts"}
-  - {"file":"packages/msp/src/identity/index.ts"}
-  - {"file":"packages/msp/src/projects/registry.ts"}
-  - {"file":"packages/msp/src/projects/resolve.ts"}
-  - {"file":"packages/msp/src/projects/types.ts"}
-  - {"file":"packages/msp/src/lib/msp-home.ts"}
-  - {"file":"packages/msp/src/mcp/tools/identity-get.ts"}
-  - {"file":"packages/msp/src/mcp/tools/identity-set.ts"}
-  - {"file":"packages/msp/test/identity/store.test.ts"}
-  - {"file":"packages/msp/test/identity/migrate.test.ts"}
-  - {"file":"packages/msp/test/projects/registry.test.ts"}
-  - {"file":"packages/msp/test/projects/resolve.test.ts"}
+  - file: packages/msp/src/identity/store.ts
+  - file: packages/msp/src/identity/types.ts
+  - file: packages/msp/src/identity/migrate.ts
+  - file: packages/msp/src/identity/index.ts
+  - file: packages/msp/src/projects/registry.ts
+  - file: packages/msp/src/projects/resolve.ts
+  - file: packages/msp/src/projects/types.ts
+  - file: packages/msp/src/lib/msp-home.ts
+  - file: packages/msp/src/mcp/tools/identity-get.ts
+  - file: packages/msp/src/mcp/tools/identity-set.ts
+  - file: packages/msp/test/identity/store.test.ts
+  - file: packages/msp/test/identity/migrate.test.ts
+  - file: packages/msp/test/projects/registry.test.ts
+  - file: packages/msp/test/projects/resolve.test.ts
 created_at: 2026-05-09T07:00:00.000+07:00
 aliases:
   - BLUEPRINT
   - implementation_flow
   - Implementation plan
 cluster: implementation_flow
-role: "Implementation plan"
+role: Implementation plan
+attributes:
+  domain: blueprint
 ---
 
 # BLUEPRINT — global vs workspace storage migration

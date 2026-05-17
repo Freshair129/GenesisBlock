@@ -6,7 +6,8 @@ status: draft
 vault_id: default
 tier: genesis
 source_type: axiomatic
-title: Monorepo structure — npm workspaces with `packages/gks/` + `packages/msp/`, GKS still publishes to npm
+title: Monorepo structure — npm workspaces with `packages/gks/` +
+  `packages/msp/`, GKS still publishes to npm
 tags:
   - monorepo
   - workspace
@@ -15,14 +16,20 @@ tags:
   - decision
   - msp
   - gks
-crosslinks: {"references":["CONCEPT--MONOREPO-MIGRATION","FRAMEWORK--MSP-ARCHITECTURE-V2","ADR--GRAPH-IS-GKS-DOMAIN"]}
+crosslinks:
+  references:
+    - CONCEPT--MONOREPO-MIGRATION
+    - FRAMEWORK--MSP-ARCHITECTURE-V2
+    - ADR--GRAPH-IS-GKS-DOMAIN
 created_at: 2026-05-08T13:21:00.000+07:00
 aliases:
   - ADR
   - implementation_flow
   - Architecture decision record
 cluster: implementation_flow
-role: "Architecture decision record"
+role: Architecture decision record
+attributes:
+  domain: adr
 ---
 
 # ADR — monorepo structure

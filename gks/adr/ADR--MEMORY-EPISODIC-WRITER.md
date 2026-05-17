@@ -6,21 +6,27 @@ status: stable
 vault_id: default
 tier: genesis
 source_type: axiomatic
-title: Episodic writer is JSON-array, idempotent on episodicId, with pluggable summariser
+title: Episodic writer is JSON-array, idempotent on episodicId, with pluggable
+  summariser
 tags:
   - msp
   - memory
   - episodic
   - writer
   - decision
-crosslinks: {"references":["CONCEPT--MEMORY-EPISODIC-WRITER","CONCEPT--MEMORY-EPISODIC"]}
+crosslinks:
+  references:
+    - CONCEPT--MEMORY-EPISODIC-WRITER
+    - CONCEPT--MEMORY-EPISODIC
 created_at: 2026-05-03T14:16:40.386+07:00
 aliases:
   - ADR
   - implementation_flow
   - Architecture decision record
 cluster: implementation_flow
-role: "Architecture decision record"
+role: Architecture decision record
+attributes:
+  domain: adr
 ---
 
 # ADR — episodic writer storage shape

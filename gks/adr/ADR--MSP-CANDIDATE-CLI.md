@@ -6,7 +6,8 @@ status: stable
 tier: genesis
 source_type: axiomatic
 vault_id: default
-title: msp-candidate CLI — non-MCP agent path to MSP; no direct GKS contact; no SKILL.md for core features
+title: msp-candidate CLI — non-MCP agent path to MSP; no direct GKS contact; no
+  SKILL.md for core features
 tags:
   - msp
   - agent
@@ -14,14 +15,22 @@ tags:
   - gemini
   - qwen
   - boundary
-crosslinks: {"references":["ADR--AGENT-WRITE-BOUNDARIES","ADR--MSP-INTERFACE-LAYER","ADR--MSP-MCP-SERVER","ADR--GEMINI-AS-SLM-PROVIDER"]}
+crosslinks:
+  references:
+    - CONCEPT--KNOWLEDGE-LAYERS-V2
+    - ADR--AGENT-WRITE-BOUNDARIES
+    - ADR--MSP-INTERFACE-LAYER
+    - ADR--MSP-MCP-SERVER
+    - ADR--GEMINI-AS-SLM-PROVIDER
 created_at: 2026-05-17T00:00:00.000+07:00
 aliases:
   - ADR
   - implementation_flow
   - Architecture decision record
 cluster: implementation_flow
-role: "Architecture decision record"
+role: Architecture decision record
+attributes:
+  domain: adr
 ---
 
 # ADR — msp-candidate CLI (non-MCP agent path)

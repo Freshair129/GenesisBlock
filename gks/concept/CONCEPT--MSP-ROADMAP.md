@@ -12,14 +12,24 @@ tags:
   - roadmap
   - ultraplan
   - planning
-crosslinks: {"references":["FRAMEWORK--MSP-ARCHITECTURE-V2","CONCEPT--OBSIDIAN-AS-RUNTIME","CONCEPT--EMBEDDING-STRATEGY","ADR--MSP-OBSIDIAN-INTEGRATION","ADR--SEMANTIC-SEARCH-VIA-SMART-CONNECTIONS","ADR--GRAPH-IS-GKS-DOMAIN","ADR--EMBEDDING-MODEL-PARITY"]}
+crosslinks:
+  references:
+    - FRAMEWORK--MSP-ARCHITECTURE-V2
+    - CONCEPT--OBSIDIAN-AS-RUNTIME
+    - CONCEPT--EMBEDDING-STRATEGY
+    - ADR--MSP-OBSIDIAN-INTEGRATION
+    - ADR--SEMANTIC-SEARCH-VIA-SMART-CONNECTIONS
+    - ADR--GRAPH-IS-GKS-DOMAIN
+    - ADR--EMBEDDING-MODEL-PARITY
 created_at: 2026-05-04T07:06:09.872+07:00
 aliases:
   - CONCEPT
   - implementation_flow
   - Strategic intent / PRD
 cluster: implementation_flow
-role: "Strategic intent / PRD"
+role: Strategic intent / PRD
+attributes:
+  domain: concept
 ---
 
 # CONCEPT — MSP roadmap

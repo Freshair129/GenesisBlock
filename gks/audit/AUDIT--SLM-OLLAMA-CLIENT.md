@@ -15,19 +15,26 @@ tags:
   - codegen
   - slm
   - ollama
-crosslinks: {"references":["FEAT--SLM-OLLAMA-CLIENT","BLUEPRINT--SLM-OLLAMA-CLIENT","ADR--SLM-OLLAMA-CLIENT","FEAT--CODEGEN-MICROTASK-RUNNER"]}
+crosslinks:
+  references:
+    - FEAT--SLM-OLLAMA-CLIENT
+    - BLUEPRINT--SLM-OLLAMA-CLIENT
+    - ADR--SLM-OLLAMA-CLIENT
+    - FEAT--CODEGEN-MICROTASK-RUNNER
 linked_symbols:
-  - {"file":"packages/msp/src/codegen/slm/ollama.ts"}
-  - {"file":"packages/msp/src/codegen/slm/factory.ts"}
-  - {"file":"packages/msp/src/codegen/slm/errors.ts"}
-  - {"file":"packages/msp/src/codegen/slm/types.ts"}
+  - file: packages/msp/src/codegen/slm/ollama.ts
+  - file: packages/msp/src/codegen/slm/factory.ts
+  - file: packages/msp/src/codegen/slm/errors.ts
+  - file: packages/msp/src/codegen/slm/types.ts
 created_at: 2026-05-03T16:24:58.170+07:00
 aliases:
   - AUDIT
   - implementation_flow
   - Test results / quality report
 cluster: implementation_flow
-role: "Test results / quality report"
+role: Test results / quality report
+attributes:
+  domain: audit
 ---
 
 # AUDIT — Ollama SLM client

@@ -7,23 +7,31 @@ severity: warning
 vault_id: default
 tier: safety
 source_type: axiomatic
-title: PROTO--SCALING-LEVEL-GATE — enforce L1/L2/L3 chain consistency on FEAT atoms (M8c)
+title: PROTO--SCALING-LEVEL-GATE — enforce L1/L2/L3 chain consistency on FEAT
+  atoms (M8c)
 tags:
   - msp
   - proto
   - scaling-levels
   - governance
   - m8c
-crosslinks: {"enforces":["FRAMEWORK--SCALING-LEVELS"],"references":["CONCEPT--PROTO-SCALING-LEVEL-GATE","FEAT--PROTO-LOADER"]}
+crosslinks:
+  enforces:
+    - FRAMEWORK--SCALING-LEVELS
+  references:
+    - CONCEPT--PROTO-SCALING-LEVEL-GATE
+    - FEAT--PROTO-LOADER
 linked_symbols:
-  - {"file":"packages/msp/src/validator/proto/scaling-level-gate.ts"}
+  - file: packages/msp/src/validator/proto/scaling-level-gate.ts
 created_at: 2026-05-05T18:00:00.000+07:00
 aliases:
   - PROTO
   - implementation_flow
   - Machine-enforced invariant
 cluster: implementation_flow
-role: "Machine-enforced invariant"
+role: Machine-enforced invariant
+attributes:
+  domain: proto
 ---
 
 # PROTO — SCALING-LEVEL-GATE

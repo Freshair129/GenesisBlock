@@ -12,14 +12,18 @@ tags:
   - crosslinks
   - vocabulary
   - foundation
-crosslinks: {"references":["CONCEPT--ATOMIC-WRITE-CONTRACT"]}
+crosslinks:
+  references:
+    - CONCEPT--ATOMIC-WRITE-CONTRACT
 created_at: 2026-05-03T14:01:49.773+07:00
 aliases:
   - FRAMEWORK
   - implementation_flow
   - Governance / architectural framework
 cluster: implementation_flow
-role: "Governance / architectural framework"
+role: Governance / architectural framework
+attributes:
+  domain: framework
 ---
 
 # FRAME — crosslinks vocabulary

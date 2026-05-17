@@ -16,7 +16,9 @@ aliases:
   - implementation_flow
   - Algorithm definition
 cluster: implementation_flow
-role: "Algorithm definition"
+role: Algorithm definition
+attributes:
+  domain: algo
 ---
 
 # ALGO — Token-Optimal Atom Scaffolding

@@ -7,6 +7,7 @@ import { appendEpisode } from '../../memory/episodic/writer.js'
 import type { Episode as MemoryEpisode } from '../../memory/episodic/types.js'
 import { consolidate } from '../../orchestrator/consolidator/index.js'
 import type { Episode as ConsolidatorEpisode } from '../../orchestrator/consolidator/types.js'
+import { makeContext, makeSubject } from '../../policy/types.js'
 import { errorResult, jsonResult, type ToolHandlerCtx, type ToolTextResult } from '../types.js'
 
 export const name = 'msp_remember'
@@ -71,19 +72,24 @@ export function handler(ctx: ToolHandlerCtx) {
     const root = resolve(args.root ?? ctx.root)
     const namespace = args.namespace ?? DEFAULT_NAMESPACE
     try {
+      const subject = ctx.subject ?? makeSubject('mcp-client', 'default-mcp')
+      const context = ctx.policyContext ?? makeContext('mcp-stdio', `mcp-${Date.now()}`)
+
       const llm = createSlmClient({ provider: args.provider ?? 'mock' })
       const episodes = await consolidate({
         sessionId: args.session_id,
         root,
         namespace,
         llm,
+        subject,
+        context,
       })
 
       const llmCalls = episodes.filter((e) => e.scoreSource === 'tier2').length
 
       let persisted = 0
       for (const ep of episodes) {
-        await appendEpisode(toMemoryEpisode(ep, namespace), { root, namespace })
+        await appendEpisode(toMemoryEpisode(ep, namespace), { root, namespace, subject, context })
         persisted += 1
       }
 

@@ -4,6 +4,7 @@ import { z } from 'zod'
 
 import { appendEpisode } from '../../memory/episodic/writer.js'
 import type { Episode } from '../../memory/episodic/types.js'
+import { makeContext, makeSubject } from '../../policy/types.js'
 import { errorResult, jsonResult, type ToolHandlerCtx, type ToolTextResult } from '../types.js'
 
 export const name = 'msp_episode_append'
@@ -56,7 +57,10 @@ export function handler(ctx: ToolHandlerCtx) {
   }): Promise<ToolTextResult> => {
     const root = resolve(args.root ?? ctx.root)
     try {
-      await appendEpisode(args.episode, { root, namespace: args.namespace })
+      const subject = ctx.subject ?? makeSubject('mcp-client', 'default-mcp')
+      const context = ctx.policyContext ?? makeContext('mcp-stdio', `mcp-${Date.now()}`)
+
+      await appendEpisode(args.episode, { root, namespace: args.namespace, subject, context })
       return jsonResult({ ok: true, episodicId: args.episode.episodicId })
     } catch (err) {
       return errorResult(`episode append failed: ${(err as Error).message}`)

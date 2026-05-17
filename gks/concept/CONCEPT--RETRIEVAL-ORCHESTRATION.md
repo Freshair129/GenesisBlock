@@ -6,7 +6,8 @@ status: stable
 vault_id: default
 tier: genesis
 source_type: axiomatic
-title: Retrieval orchestration — RRF fusion across GKS vector + Obsidian + episodic + backlinks
+title: Retrieval orchestration — RRF fusion across GKS vector + Obsidian +
+  episodic + backlinks
 tags:
   - msp
   - retrieval
@@ -14,14 +15,22 @@ tags:
   - hybrid
   - msp-recall
   - m7c
-crosslinks: {"references":["FRAMEWORK--MSP-ARCHITECTURE-V2","FEAT--MSP-OBSIDIAN-CLIENT","FEAT--CONSOLIDATOR","CONCEPT--EMBEDDING-STRATEGY","CONCEPT--MEMORY-VECTOR-BACKLINKS"]}
+crosslinks:
+  references:
+    - FRAMEWORK--MSP-ARCHITECTURE-V2
+    - FEAT--MSP-OBSIDIAN-CLIENT
+    - FEAT--CONSOLIDATOR
+    - CONCEPT--EMBEDDING-STRATEGY
+    - CONCEPT--MEMORY-VECTOR-BACKLINKS
 created_at: 2026-05-05T15:55:00.000+07:00
 aliases:
   - CONCEPT
   - implementation_flow
   - Strategic intent / PRD
 cluster: implementation_flow
-role: "Strategic intent / PRD"
+role: Strategic intent / PRD
+attributes:
+  domain: concept
 ---
 
 # CONCEPT — retrieval orchestration

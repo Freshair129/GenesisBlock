@@ -7,16 +7,26 @@ created_at: 2026-05-13T12:00:00+07:00
 vault_id: GKS-CORE
 tier: genesis
 title: Extended atomic taxonomy + ISSUE-- as self-hosted tracker
-tags: [taxonomy, governance, issue-tracking, scope]
+tags:
+  - taxonomy
+  - governance
+  - issue-tracking
+  - scope
 crosslinks:
-  references: [FRAMEWORK--FOUR-LAYERS, ADR--FLAT-ATOM-LAYOUT, CONCEPT--TAXONOMY-V2-3, ADR--REGISTRY-DRIVEN-SCAFFOLDING]
+  references:
+    - FRAMEWORK--FOUR-LAYERS
+    - ADR--FLAT-ATOM-LAYOUT
+    - CONCEPT--TAXONOMY-V2-3
+    - ADR--REGISTRY-DRIVEN-SCAFFOLDING
   resolves: []
 aliases:
   - ADR
   - implementation_flow
   - Architecture decision record
 cluster: implementation_flow
-role: "Architecture decision record"
+role: Architecture decision record
+attributes:
+  domain: adr
 ---
 
 # ADR — Extended atomic taxonomy

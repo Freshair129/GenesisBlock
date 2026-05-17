@@ -7,15 +7,25 @@ vault_id: default
 tier: genesis
 source_type: axiomatic
 title: Identity Resolution Algorithm — Global vs Project Layering
-tags: [msp, identity, resolution, merging, layering]
-crosslinks: {"references":["CONCEPT--IDENTITY-LAYER","ADR--GLOBAL-VS-WORKSPACE"]}
+tags:
+  - msp
+  - identity
+  - resolution
+  - merging
+  - layering
+crosslinks:
+  references:
+    - CONCEPT--IDENTITY-LAYER
+    - ADR--GLOBAL-VS-WORKSPACE
 created_at: 2026-05-11T10:28:00.000Z
 aliases:
   - ALGO
   - implementation_flow
   - Algorithm definition
 cluster: implementation_flow
-role: "Algorithm definition"
+role: Algorithm definition
+attributes:
+  domain: algo
 ---
 
 # ALGORITHM — Identity Resolution

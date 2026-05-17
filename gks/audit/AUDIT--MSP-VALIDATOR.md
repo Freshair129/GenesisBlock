@@ -12,27 +12,33 @@ tags:
   - validator
   - audit
   - dogfood
-crosslinks: {"references":["FEAT--MSP-VALIDATOR","BLUEPRINT--MSP-VALIDATOR","ADR--MSP-VALIDATOR"]}
+crosslinks:
+  references:
+    - FEAT--MSP-VALIDATOR
+    - BLUEPRINT--MSP-VALIDATOR
+    - ADR--MSP-VALIDATOR
 linked_symbols:
-  - {"file":"packages/msp/src/validator/index.ts"}
-  - {"file":"packages/msp/src/validator/cli.ts"}
-  - {"file":"packages/msp/src/validator/parse.ts"}
-  - {"file":"packages/msp/src/validator/atomic-index.ts"}
-  - {"file":"packages/msp/src/validator/rules/forbidden-fields.ts"}
-  - {"file":"packages/msp/src/validator/rules/id-format.ts"}
-  - {"file":"packages/msp/src/validator/rules/id-filename-match.ts"}
-  - {"file":"packages/msp/src/validator/rules/adr-monotonic.ts"}
-  - {"file":"packages/msp/src/validator/rules/dangling-wikilinks.ts"}
-  - {"file":"packages/msp/src/validator/rules/future-date.ts"}
-  - {"file":"packages/msp/src/validator/rules/summary-min.ts"}
-  - {"file":"packages/msp/src/validator/rules/phase-status.ts"}
+  - file: packages/msp/src/validator/index.ts
+  - file: packages/msp/src/validator/cli.ts
+  - file: packages/msp/src/validator/parse.ts
+  - file: packages/msp/src/validator/atomic-index.ts
+  - file: packages/msp/src/validator/rules/forbidden-fields.ts
+  - file: packages/msp/src/validator/rules/id-format.ts
+  - file: packages/msp/src/validator/rules/id-filename-match.ts
+  - file: packages/msp/src/validator/rules/adr-monotonic.ts
+  - file: packages/msp/src/validator/rules/dangling-wikilinks.ts
+  - file: packages/msp/src/validator/rules/future-date.ts
+  - file: packages/msp/src/validator/rules/summary-min.ts
+  - file: packages/msp/src/validator/rules/phase-status.ts
 created_at: 2026-05-03T13:34:05.276+07:00
 aliases:
   - AUDIT
   - implementation_flow
   - Test results / quality report
 cluster: implementation_flow
-role: "Test results / quality report"
+role: Test results / quality report
+attributes:
+  domain: audit
 ---
 
 # AUDIT — MSP validator M2 acceptance

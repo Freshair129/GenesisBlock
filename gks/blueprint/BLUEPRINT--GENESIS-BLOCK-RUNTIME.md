@@ -21,18 +21,20 @@ crosslinks:
     - BLUEPRINT--AGENT-DISPATCHER
     - CONCEPT--AGENT-AGNOSTIC
 linked_symbols:
-  - {"file":"packages/msp/src/genesis/types.ts"}
-  - {"file":"packages/msp/src/genesis/loader.ts"}
-  - {"file":"packages/msp/src/genesis/composer.ts"}
-  - {"file":"packages/msp/src/genesis/executor.ts"}
-  - {"file":"packages/msp/src/genesis/cli.ts"}
+  - file: packages/msp/src/genesis/types.ts
+  - file: packages/msp/src/genesis/loader.ts
+  - file: packages/msp/src/genesis/composer.ts
+  - file: packages/msp/src/genesis/executor.ts
+  - file: packages/msp/src/genesis/cli.ts
 created_at: 2026-05-14T03:35:00.000+07:00
 aliases:
   - BLUEPRINT
   - implementation_flow
   - Implementation plan
 cluster: implementation_flow
-role: "Implementation plan"
+role: Implementation plan
+attributes:
+  domain: blueprint
 ---
 
 # BLUEPRINT — Genesis Block Runtime

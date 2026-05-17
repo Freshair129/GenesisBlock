@@ -13,14 +13,18 @@ tags:
   - rca
   - debug-discipline
   - foundation
-crosslinks: {"references":["FRAMEWORK--KNOWLEDGE-3-TIER"]}
+crosslinks:
+  references:
+    - FRAMEWORK--KNOWLEDGE-3-TIER
 created_at: 2026-05-17T02:00:00.000+07:00
 aliases:
   - CONCEPT
   - implementation_flow
   - Strategic intent / PRD
 cluster: implementation_flow
-role: "Strategic intent / PRD"
+role: Strategic intent / PRD
+attributes:
+  domain: concept
 ---
 
 # CONCEPT — Root Cause Analysis

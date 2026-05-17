@@ -12,18 +12,26 @@ tags:
   - hotfix
   - user-facing
   - hook
-crosslinks: {"implements":["ADR--MSP-HOTFIX-WRAPPER"],"references":["CONCEPT--MSP-HOTFIX-WRAPPER","FEAT--MSP-PRECOMMIT-HOOK","ADR--HOTFIX-ESCAPE-HATCH"]}
+crosslinks:
+  implements:
+    - ADR--MSP-HOTFIX-WRAPPER
+  references:
+    - CONCEPT--MSP-HOTFIX-WRAPPER
+    - FEAT--MSP-PRECOMMIT-HOOK
+    - ADR--HOTFIX-ESCAPE-HATCH
 linked_symbols:
-  - {"file":"examples/hooks/pre-commit-validator.sh"}
-  - {"file":"package.json"}
-  - {"file":"packages/msp/test/hooks/pre-commit.test.ts"}
+  - file: examples/hooks/pre-commit-validator.sh
+  - file: package.json
+  - file: packages/msp/test/hooks/pre-commit.test.ts
 created_at: 2026-05-03T17:45:50.058+07:00
 aliases:
   - FEAT
   - implementation_flow
   - Feature spec
 cluster: implementation_flow
-role: "Feature spec"
+role: Feature spec
+attributes:
+  domain: feat
 ---
 
 # FEAT — hotfix wrapper

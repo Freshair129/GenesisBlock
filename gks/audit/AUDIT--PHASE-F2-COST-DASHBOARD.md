@@ -23,19 +23,23 @@ crosslinks:
     - CONCEPT--COST-TRACKING
     - BLUEPRINT--COST-TRACKING
 linked_symbols:
-  - {"file":"packages/msp/src/usage/aggregator.ts"}
-  - {"file":"packages/msp/src/usage/rollup-writer.ts"}
-  - {"file":"packages/msp/src/usage/cli.ts"}
+  - file: packages/msp/src/usage/aggregator.ts
+  - file: packages/msp/src/usage/rollup-writer.ts
+  - file: packages/msp/src/usage/cli.ts
 phase_override:
   skip_blueprint: true
-  reason: "Phase F2 refinement stream — planned via CONCEPT--USAGE-ROLLUPS + SPEC--USAGE-ROLLUP-ATOM (the doc-to-code chain) rather than a separate phase-3 blueprint."
+  reason: Phase F2 refinement stream — planned via CONCEPT--USAGE-ROLLUPS +
+    SPEC--USAGE-ROLLUP-ATOM (the doc-to-code chain) rather than a separate
+    phase-3 blueprint.
 created_at: 2026-05-14T05:10:00.000+07:00
 aliases:
   - AUDIT
   - implementation_flow
   - Test results / quality report
 cluster: implementation_flow
-role: "Test results / quality report"
+role: Test results / quality report
+attributes:
+  domain: audit
 ---
 
 # AUDIT — Phase F2 Cost Dashboard + USAGE Roll-ups

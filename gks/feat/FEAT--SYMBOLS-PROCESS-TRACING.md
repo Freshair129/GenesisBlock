@@ -6,7 +6,8 @@ status: superseded
 tier: process
 source_type: axiomatic
 vault_id: default
-title: End-to-end process tracing — following execution flows from entry points to leaf functions
+title: End-to-end process tracing — following execution flows from entry points
+  to leaf functions
 tags:
   - msp
   - symbol-graph
@@ -14,17 +15,30 @@ tags:
   - trace
   - impact-analysis
   - feat
-crosslinks: {"implements":["ADR--SYMBOL-GRAPH-PERSISTENCE"],"references":["FRAMEWORK--SYMBOL-GRAPH","CONCEPT--SYMBOL-GRAPH","FEAT--SYMBOLS-FRAMEWORK-AWARENESS"],"superseded_by":["CONCEPT--SYMBOLS-PROCESS-TRACING","ADR--SYMBOLS-PROCESS-TRACING","ALGO--SYMBOLS-CALL-GRAPH-TRAVERSAL","PROTO--SYMBOLS-TRACE-INVARIANTS"]}
+crosslinks:
+  implements:
+    - ADR--SYMBOL-GRAPH-PERSISTENCE
+  references:
+    - FRAMEWORK--SYMBOL-GRAPH
+    - CONCEPT--SYMBOL-GRAPH
+    - FEAT--SYMBOLS-FRAMEWORK-AWARENESS
+  superseded_by:
+    - CONCEPT--SYMBOLS-PROCESS-TRACING
+    - ADR--SYMBOLS-PROCESS-TRACING
+    - ALGO--SYMBOLS-CALL-GRAPH-TRAVERSAL
+    - PROTO--SYMBOLS-TRACE-INVARIANTS
 linked_symbols:
-  - {"file":"packages/msp/src/symbols/tracer.ts"}
-  - {"file":"packages/msp/src/mcp/tools/symbol-trace.ts"}
+  - file: packages/msp/src/symbols/tracer.ts
+  - file: packages/msp/src/mcp/tools/symbol-trace.ts
 created_at: 2026-05-12T04:48:00.000+07:00
 aliases:
   - FEAT
   - implementation_flow
   - Feature spec
 cluster: implementation_flow
-role: "Feature spec"
+role: Feature spec
+attributes:
+  domain: feat
 ---
 
 # FEAT — End-to-end process tracing

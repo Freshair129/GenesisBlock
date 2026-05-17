@@ -10,6 +10,10 @@ export interface Subject {
   kind: SubjectKind
   id: string
   attributes: AttributeBag
+  /** UCF Phase 5: ISO timestamp of last successful step-up. */
+  last_step_up_at?: string
+  /** UCF Phase 5: Method used for last step-up (pin, passkey). */
+  last_step_up_method?: string
 }
 
 /** Target of an action. */

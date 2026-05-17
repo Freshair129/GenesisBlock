@@ -14,14 +14,17 @@ tags:
   - safety
   - dag
 crosslinks:
-  superseded_by: ["PROTO--SYMBOLS-TRACE-INVARIANTS"]
+  superseded_by:
+    - PROTO--SYMBOLS-TRACE-INVARIANTS
 created_at: 2026-05-13T19:47:00.000+07:00
 aliases:
   - PROTO
   - implementation_flow
   - Machine-enforced invariant
 cluster: implementation_flow
-role: "Machine-enforced invariant"
+role: Machine-enforced invariant
+attributes:
+  domain: proto
 ---
 
 # PROTO — Trace Invariants (SUPERSEDED)

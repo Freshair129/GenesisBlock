@@ -10,6 +10,7 @@ import {
   projectOverridePath,
 } from '../../identity/index.js'
 import { globalIdentityPath } from '../../lib/msp-home.js'
+import { makeContext, makeSubject } from '../../policy/types.js'
 import { errorResult, jsonResult, type ToolHandlerCtx, type ToolTextResult } from '../types.js'
 
 export const name = 'msp_identity_get'
@@ -49,13 +50,18 @@ export function handler(ctx: ToolHandlerCtx) {
   return async (args: IdentityGetArgs): Promise<ToolTextResult> => {
     const root = resolve(args.root ?? ctx.root)
     try {
+      const subject = ctx.subject ?? makeSubject('mcp-client', 'default-mcp')
+      const context = ctx.policyContext ?? makeContext('mcp-stdio', `mcp-${Date.now()}`)
+
       if (args.prune === true) {
-        await prunePreferences({ root, namespace: args.namespace })
+        await prunePreferences({ root, namespace: args.namespace, subject, context })
       }
       const identity = await getIdentity({
         root,
         namespace: args.namespace,
         view: args.view,
+        subject,
+        context,
       })
 
       if (args.explain === true) {

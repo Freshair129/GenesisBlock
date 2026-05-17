@@ -7,6 +7,8 @@ export interface TierAdapter {
 export interface RunOpts {
   timeout_ms: number
   capture_stderr: boolean
+  /** UCF Phase 6: Optional stdin to pipe to the process. */
+  stdin?: string
 }
 
 export interface RunResult {

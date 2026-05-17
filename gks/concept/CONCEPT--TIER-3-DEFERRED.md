@@ -13,14 +13,19 @@ tags:
   - tier-3
   - deferred
   - decision-log
-crosslinks: {"references":["CONCEPT--MSP-ROADMAP","AUDIT--ALL-M-MILESTONES"]}
+crosslinks:
+  references:
+    - CONCEPT--MSP-ROADMAP
+    - AUDIT--ALL-M-MILESTONES
 created_at: 2026-05-05T18:05:00.000+07:00
 aliases:
   - CONCEPT
   - implementation_flow
   - Strategic intent / PRD
 cluster: implementation_flow
-role: "Strategic intent / PRD"
+role: Strategic intent / PRD
+attributes:
+  domain: concept
 ---
 
 # CONCEPT — Tier 3 deferred milestones (explicit decision log)

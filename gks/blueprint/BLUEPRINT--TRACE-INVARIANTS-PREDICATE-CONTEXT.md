@@ -4,20 +4,25 @@ phase: 3
 type: blueprint
 status: draft
 tier: process
-title: "BLUEPRINT — Extend PredicateContext with Symbol Graph Reader"
+title: BLUEPRINT — Extend PredicateContext with Symbol Graph Reader
 crosslinks:
-  implements: ["PROTO--SYMBOLS-TRACE-INVARIANTS", "FRAMEWORK--MSP-ARCHITECTURE-V2"]
-  parent_blueprint: ["BLUEPRINT--PROTO-LOADER"]
+  implements:
+    - PROTO--SYMBOLS-TRACE-INVARIANTS
+    - FRAMEWORK--MSP-ARCHITECTURE-V2
+  parent_blueprint:
+    - BLUEPRINT--PROTO-LOADER
 linked_symbols:
-  - {"file":"packages/msp/src/validator/proto/types.ts"}
-  - {"file":"packages/msp/src/validator/proto/loader.ts"}
+  - file: packages/msp/src/validator/proto/types.ts
+  - file: packages/msp/src/validator/proto/loader.ts
 created_at: 2026-05-16T01:00:00.000+07:00
 aliases:
   - BLUEPRINT
   - implementation_flow
   - Implementation plan
 cluster: implementation_flow
-role: "Implementation plan"
+role: Implementation plan
+attributes:
+  domain: blueprint
 ---
 
 # BLUEPRINT — Predicate Context Extension for Symbol Graph

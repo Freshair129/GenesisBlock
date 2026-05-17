@@ -13,14 +13,19 @@ tags:
   - hook
   - verify-flow
   - automation
-crosslinks: {"references":["FEAT--MSP-PRECOMMIT-HOOK","FEAT--MSP-VALIDATOR"]}
+crosslinks:
+  references:
+    - FEAT--MSP-PRECOMMIT-HOOK
+    - FEAT--MSP-VALIDATOR
 created_at: 2026-05-03T17:39:27.384+07:00
 aliases:
   - CONCEPT
   - implementation_flow
   - Strategic intent / PRD
 cluster: implementation_flow
-role: "Strategic intent / PRD"
+role: Strategic intent / PRD
+attributes:
+  domain: concept
 ---
 
 # CONCEPT — MSP pre-push hook

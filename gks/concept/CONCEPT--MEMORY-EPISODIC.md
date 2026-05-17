@@ -11,14 +11,19 @@ tags:
   - msp
   - memory
   - episodic
-crosslinks: {"references":["CONCEPT--MEMORY-SUBSYSTEM","CONCEPT--MEMORY-SESSIONS"]}
+crosslinks:
+  references:
+    - CONCEPT--MEMORY-SUBSYSTEM
+    - CONCEPT--MEMORY-SESSIONS
 created_at: 2026-05-03T14:01:53.831+07:00
 aliases:
   - CONCEPT
   - implementation_flow
   - Strategic intent / PRD
 cluster: implementation_flow
-role: "Strategic intent / PRD"
+role: Strategic intent / PRD
+attributes:
+  domain: concept
 ---
 
 # CONCEPT — memory episodic

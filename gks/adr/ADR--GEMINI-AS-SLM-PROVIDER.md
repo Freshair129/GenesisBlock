@@ -13,14 +13,19 @@ tags:
   - slm
   - gemini
   - decision
-crosslinks: {"references":["ADR--DEFAULT-SLM-OLLAMA-QWEN-CODER","CONCEPT--CODEGEN-MICROTASK-RUNNER"]}
+crosslinks:
+  references:
+    - ADR--DEFAULT-SLM-OLLAMA-QWEN-CODER
+    - CONCEPT--CODEGEN-MICROTASK-RUNNER
 created_at: 2026-05-12T22:47:00.000+07:00
 aliases:
   - ADR
   - implementation_flow
   - Architecture decision record
 cluster: implementation_flow
-role: "Architecture decision record"
+role: Architecture decision record
+attributes:
+  domain: adr
 ---
 
 # ADR — Gemini CLI as a first-class SLM provider

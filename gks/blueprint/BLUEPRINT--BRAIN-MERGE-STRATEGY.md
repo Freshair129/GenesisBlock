@@ -18,14 +18,16 @@ crosslinks:
     - CONCEPT--TWO-BRAIN-ARCHITECTURE
     - ADR--BRAIN-PATH-RESOLUTION
 linked_symbols:
-  - {"file":"packages/msp/src/brain/resolver.ts"}
+  - file: packages/msp/src/brain/resolver.ts
 created_at: 2026-05-14T02:00:00.000+07:00
 aliases:
   - BLUEPRINT
   - implementation_flow
   - Implementation plan
 cluster: implementation_flow
-role: "Implementation plan"
+role: Implementation plan
+attributes:
+  domain: blueprint
 ---
 
 # BLUEPRINT — Brain Merge Strategy

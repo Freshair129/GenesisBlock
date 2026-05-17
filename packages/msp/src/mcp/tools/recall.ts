@@ -60,8 +60,8 @@ export function handler(ctx: ToolHandlerCtx) {
   return async (args: RecallToolArgs): Promise<ToolTextResult> => {
     const root = resolve(args.root ?? ctx.root)
     try {
-      const subject = makeSubject('mcp-client', 'default-mcp')
-      const context = makeContext('mcp-stdio', `mcp-${Date.now()}`)
+      const subject = ctx.subject ?? makeSubject('mcp-client', 'default-mcp')
+      const context = ctx.policyContext ?? makeContext('mcp-stdio', `mcp-${Date.now()}`)
 
       const obsidian = await tryCreateObsidianClient({ root })
       const result = await recall({

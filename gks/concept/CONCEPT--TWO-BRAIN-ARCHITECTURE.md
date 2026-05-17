@@ -13,14 +13,21 @@ tags:
   - storage
   - two-brain
   - foundation
-crosslinks: {"references":["FRAMEWORK--MSP-ARCHITECTURE-V2","CONCEPT--AGENT-AGNOSTIC","ADR--GLOBAL-VS-WORKSPACE","CONCEPT--NAMESPACE-VAULT-BRAIN"]}
+crosslinks:
+  references:
+    - FRAMEWORK--MSP-ARCHITECTURE-V2
+    - CONCEPT--AGENT-AGNOSTIC
+    - ADR--GLOBAL-VS-WORKSPACE
+    - CONCEPT--NAMESPACE-VAULT-BRAIN
 created_at: 2026-05-14T01:50:00.000+07:00
 aliases:
   - CONCEPT
   - implementation_flow
   - Strategic intent / PRD
 cluster: implementation_flow
-role: "Strategic intent / PRD"
+role: Strategic intent / PRD
+attributes:
+  domain: concept
 ---
 
 # CONCEPT — Two-Brain Architecture

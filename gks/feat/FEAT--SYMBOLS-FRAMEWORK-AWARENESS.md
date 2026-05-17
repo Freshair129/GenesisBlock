@@ -6,7 +6,8 @@ status: superseded
 tier: process
 source_type: axiomatic
 vault_id: default
-title: Framework-aware symbol indexing — recognizing API routes, ORM models, and MCP tools
+title: Framework-aware symbol indexing — recognizing API routes, ORM models, and
+  MCP tools
 tags:
   - msp
   - symbol-graph
@@ -18,17 +19,30 @@ tags:
   - orm
   - route
   - mcp
-crosslinks: {"implements":["ADR--SYMBOL-GRAPH-PERSISTENCE"],"references":["FRAMEWORK--SYMBOL-GRAPH","CONCEPT--SYMBOL-GRAPH","FEAT--MSP-SYMBOL-MCP"],"superseded_by":["CONCEPT--SYMBOLS-FRAMEWORK-AWARENESS","ADR--SYMBOLS-FRAMEWORK-AWARENESS","ALGO--SYMBOLS-FRAMEWORK-RECOGNITION","PROTO--SYMBOLS-FRAMEWORK-INVARIANTS"]}
+crosslinks:
+  implements:
+    - ADR--SYMBOL-GRAPH-PERSISTENCE
+  references:
+    - FRAMEWORK--SYMBOL-GRAPH
+    - CONCEPT--SYMBOL-GRAPH
+    - FEAT--MSP-SYMBOL-MCP
+  superseded_by:
+    - CONCEPT--SYMBOLS-FRAMEWORK-AWARENESS
+    - ADR--SYMBOLS-FRAMEWORK-AWARENESS
+    - ALGO--SYMBOLS-FRAMEWORK-RECOGNITION
+    - PROTO--SYMBOLS-FRAMEWORK-INVARIANTS
 linked_symbols:
-  - {"file":"packages/msp/src/symbols/parser/framework.ts"}
-  - {"file":"packages/msp/src/symbols/parser/orm.ts"}
+  - file: packages/msp/src/symbols/parser/framework.ts
+  - file: packages/msp/src/symbols/parser/orm.ts
 created_at: 2026-05-12T04:48:00.000+07:00
 aliases:
   - FEAT
   - implementation_flow
   - Feature spec
 cluster: implementation_flow
-role: "Feature spec"
+role: Feature spec
+attributes:
+  domain: feat
 ---
 
 # FEAT — Framework-aware symbol indexing

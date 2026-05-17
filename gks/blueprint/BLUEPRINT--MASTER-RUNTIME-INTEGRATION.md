@@ -15,24 +15,35 @@ tags:
   - registry
   - blueprint
   - phase-f1
-crosslinks: {"references":["CONCEPT--PROMOTED-BLOCK-REGISTRY","CONCEPT--MASTER-PROMOTION","CONCEPT--GENESIS-BLOCK-RUNTIME","BLUEPRINT--MASTER-PROMOTION-PIPELINE","BLUEPRINT--GENESIS-BLOCK-RUNTIME","SPEC--GENESIS-BLOCK-MANIFEST","ADR--MASTER-PROMOTION-DOC-TO-CODE","ADR--HUMAN-REVIEW-GATES"]}
+crosslinks:
+  references:
+    - CONCEPT--PROMOTED-BLOCK-REGISTRY
+    - CONCEPT--MASTER-PROMOTION
+    - CONCEPT--GENESIS-BLOCK-RUNTIME
+    - BLUEPRINT--MASTER-PROMOTION-PIPELINE
+    - BLUEPRINT--GENESIS-BLOCK-RUNTIME
+    - SPEC--GENESIS-BLOCK-MANIFEST
+    - ADR--MASTER-PROMOTION-DOC-TO-CODE
+    - ADR--HUMAN-REVIEW-GATES
 linked_symbols:
-  - {"file":"packages/msp/src/master/registry.ts"}
-  - {"file":"packages/msp/src/master/promote-apply.ts"}
-  - {"file":"packages/msp/src/master/cli.ts"}
-  - {"file":"packages/msp/src/genesis/executor.ts"}
-  - {"file":"packages/msp/src/genesis/types.ts"}
-  - {"file":"packages/msp/test/master/registry.test.ts"}
-  - {"file":"packages/msp/test/master/promote-apply.test.ts"}
-  - {"file":"packages/msp/test/genesis/executor.test.ts"}
-  - {"file":".gitignore"}
+  - file: packages/msp/src/master/registry.ts
+  - file: packages/msp/src/master/promote-apply.ts
+  - file: packages/msp/src/master/cli.ts
+  - file: packages/msp/src/genesis/executor.ts
+  - file: packages/msp/src/genesis/types.ts
+  - file: packages/msp/test/master/registry.test.ts
+  - file: packages/msp/test/master/promote-apply.test.ts
+  - file: packages/msp/test/genesis/executor.test.ts
+  - file: .gitignore
 created_at: 2026-05-14T05:05:00.000+07:00
 aliases:
   - BLUEPRINT
   - implementation_flow
   - Implementation plan
 cluster: implementation_flow
-role: "Implementation plan"
+role: Implementation plan
+attributes:
+  domain: blueprint
 ---
 
 # BLUEPRINT — Master ↔ Genesis runtime wiring (Phase F1)

@@ -5,6 +5,7 @@ import { z } from 'zod'
 import { createSlmClient } from '../../codegen/slm/factory.js'
 import { compress } from '../../orchestrator/compressor/index.js'
 import type { CompressorEpisode } from '../../orchestrator/compressor/types.js'
+import { makeContext, makeSubject } from '../../policy/types.js'
 import { errorResult, jsonResult, type ToolHandlerCtx, type ToolTextResult } from '../types.js'
 
 export const name = 'msp_compress'
@@ -56,6 +57,9 @@ export function handler(ctx: ToolHandlerCtx) {
   return async (args: CompressToolArgs): Promise<ToolTextResult> => {
     void resolve(args.root ?? ctx.root) // root accepted for parity; compress doesn't read fs
     try {
+      const subject = ctx.subject ?? makeSubject('mcp-client', 'default-mcp')
+      const context = ctx.policyContext ?? makeContext('mcp-stdio', `mcp-${Date.now()}`)
+
       const llm = createSlmClient({ provider: args.provider ?? 'mock' })
       const result = await compress({
         episodes: args.episodes,
@@ -63,6 +67,8 @@ export function handler(ctx: ToolHandlerCtx) {
         llm,
         llmTimeoutMs: args.llm_timeout_ms,
         preserveOrder: args.preserve_order,
+        subject,
+        context,
       })
       return jsonResult({
         ok: true,

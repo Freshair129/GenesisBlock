@@ -6,7 +6,8 @@ status: stable
 vault_id: default
 tier: process
 source_type: axiomatic
-title: Contradiction detection Layer 0 shipped — CLAUDE.md policy + PR template checklist
+title: Contradiction detection Layer 0 shipped — CLAUDE.md policy + PR template
+  checklist
 tags:
   - msp
   - audit
@@ -14,18 +15,24 @@ tags:
   - governance
   - layer-0
   - pr-template
-crosslinks: {"references":["CONCEPT--ATOM-CONTRADICTION-DETECTION","ADR--CONTRADICTION-DETECTION-STACK","BLUEPRINT--CONTRADICTION-DETECTION-IMPL"]}
+crosslinks:
+  references:
+    - CONCEPT--ATOM-CONTRADICTION-DETECTION
+    - ADR--CONTRADICTION-DETECTION-STACK
+    - BLUEPRINT--CONTRADICTION-DETECTION-IMPL
 linked_symbols:
-  - {"file":"CLAUDE.md"}
-  - {"file":".github/pull_request_template.md"}
-  - {"file":"ROADMAP.md"}
+  - file: CLAUDE.md
+  - file: .github/pull_request_template.md
+  - file: ROADMAP.md
 created_at: 2026-05-08T18:50:00.000+07:00
 aliases:
   - AUDIT
   - implementation_flow
   - Test results / quality report
 cluster: implementation_flow
-role: "Test results / quality report"
+role: Test results / quality report
+attributes:
+  domain: audit
 ---
 
 # Contradiction detection Layer 0 — shipped

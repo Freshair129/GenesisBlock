@@ -6,21 +6,28 @@ status: stable
 tier: process
 source_type: axiomatic
 vault_id: default
-title: AUDIT — CORE_FRAMEWORK_MASTER_SPEC.md reconciled with actual codebase (W1+W2 wave)
+title: AUDIT — CORE_FRAMEWORK_MASTER_SPEC.md reconciled with actual codebase
+  (W1+W2 wave)
 tags:
   - msp
   - audit
   - core-framework
   - documentation
   - reconciliation
-crosslinks: {"references":["FRAMEWORK--MSP-ARCHITECTURE-V2","FRAMEWORK--KNOWLEDGE-3-TIER","ADR--AGENT-WRITE-BOUNDARIES"]}
+crosslinks:
+  references:
+    - FRAMEWORK--MSP-ARCHITECTURE-V2
+    - FRAMEWORK--KNOWLEDGE-3-TIER
+    - ADR--AGENT-WRITE-BOUNDARIES
 created_at: 2026-05-09T16:30:00.000+07:00
 aliases:
   - AUDIT
   - implementation_flow
   - Test results / quality report
 cluster: implementation_flow
-role: "Test results / quality report"
+role: Test results / quality report
+attributes:
+  domain: audit
 ---
 
 # AUDIT — CORE_FRAMEWORK reconciliation v1

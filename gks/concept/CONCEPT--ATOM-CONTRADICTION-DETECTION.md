@@ -6,7 +6,8 @@ status: stable
 vault_id: default
 tier: genesis
 source_type: axiomatic
-title: Atom contradiction detection — 4-layer stack catching semantic conflict between new and existing knowledge
+title: Atom contradiction detection — 4-layer stack catching semantic conflict
+  between new and existing knowledge
 tags:
   - msp
   - validator
@@ -15,14 +16,21 @@ tags:
   - supersession
   - semantic
   - governance
-crosslinks: {"references":["FRAMEWORK--MSP-ARCHITECTURE-V2","ADR--ANTI-HALLUCINATION-RULES","CONCEPT--MSP-VALIDATOR","CONCEPT--KNOWLEDGE-LAYERS-V2"]}
+crosslinks:
+  references:
+    - FRAMEWORK--MSP-ARCHITECTURE-V2
+    - ADR--ANTI-HALLUCINATION-RULES
+    - CONCEPT--MSP-VALIDATOR
+    - CONCEPT--KNOWLEDGE-LAYERS-V2
 created_at: 2026-05-08T17:30:00.000+07:00
 aliases:
   - CONCEPT
   - implementation_flow
   - Strategic intent / PRD
 cluster: implementation_flow
-role: "Strategic intent / PRD"
+role: Strategic intent / PRD
+attributes:
+  domain: concept
 ---
 
 # CONCEPT — atom contradiction detection

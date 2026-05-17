@@ -5,6 +5,7 @@ import { z } from 'zod'
 import { SymbolStore } from '../../symbols/store/sqlite.js'
 import type { EdgeType, Symbol } from '../../symbols/types.js'
 import { dbPath, graphExists } from '../../symbols/util.js'
+import { makeContext, makeSubject } from '../../policy/types.js'
 import { errorResult, jsonResult, type ToolHandlerCtx, type ToolTextResult } from '../types.js'
 
 export const name = 'msp_symbol_impact'
@@ -48,7 +49,10 @@ export function handler(ctx: ToolHandlerCtx) {
     }
     const store = new SymbolStore()
     try {
-      store.open(dbPath(root, namespace))
+      const subject = ctx.subject ?? makeSubject('mcp-client', 'default-mcp')
+      const context = ctx.policyContext ?? makeContext('mcp-stdio', `mcp-${Date.now()}`)
+
+      store.open(dbPath(root, namespace), { subject, context })
       if (!store.getMeta('last_built_at')) {
         return errorResult("graph not built — run 'npm run msp:graph build' first")
       }

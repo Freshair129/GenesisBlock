@@ -15,23 +15,30 @@ tags:
   - genesis-graph
   - audit
   - cypher-v0
-crosslinks: {"references":["BLUEPRINT--GENESIS-GRAPH-TS-FIRST","ADR--GENESIS-GRAPH-AS-GKS-BACKEND","SPEC--GENESIS-GRAPH-BACKEND","CONCEPT--GENESIS-GRAPH-BACKEND"]}
+crosslinks:
+  references:
+    - BLUEPRINT--GENESIS-GRAPH-TS-FIRST
+    - ADR--GENESIS-GRAPH-AS-GKS-BACKEND
+    - SPEC--GENESIS-GRAPH-BACKEND
+    - CONCEPT--GENESIS-GRAPH-BACKEND
 linked_symbols:
-  - {"file":"packages/gks/src/memory/graph/genesis-graph.ts"}
-  - {"file":"packages/gks/src/memory/graph/cypher-v0.ts"}
-  - {"file":"packages/gks/src/memory/graph/genesis-graph-errors.ts"}
-  - {"file":"packages/gks/src/memory/index.ts"}
-  - {"file":"packages/gks/test/memory/genesis-graph-cypher.test.ts"}
-  - {"file":"packages/gks/test/memory/memory-store-genesis-graph.test.ts"}
-  - {"file":"apps/qwen/strip_fence.py"}
-  - {"file":"apps/qwen/run_microtask.sh"}
+  - file: packages/gks/src/memory/graph/genesis-graph.ts
+  - file: packages/gks/src/memory/graph/cypher-v0.ts
+  - file: packages/gks/src/memory/graph/genesis-graph-errors.ts
+  - file: packages/gks/src/memory/index.ts
+  - file: packages/gks/test/memory/genesis-graph-cypher.test.ts
+  - file: packages/gks/test/memory/memory-store-genesis-graph.test.ts
+  - file: apps/qwen/strip_fence.py
+  - file: apps/qwen/run_microtask.sh
 created_at: 2026-05-16T14:30:00.000+07:00
 aliases:
   - AUDIT
   - implementation_flow
   - Test results / quality report
 cluster: implementation_flow
-role: "Test results / quality report"
+role: Test results / quality report
+attributes:
+  domain: audit
 ---
 
 # AUDIT — Genesis Graph Phase 0 polish

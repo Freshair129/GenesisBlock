@@ -6,7 +6,8 @@ status: active
 tier: genesis
 source_type: axiomatic
 vault_id: default
-title: ADR — Framework-aware symbol indexing — decompose into CONCEPT + ADR + ALGO + PROTO; initial scope Next.js + Prisma + MCP
+title: ADR — Framework-aware symbol indexing — decompose into CONCEPT + ADR +
+  ALGO + PROTO; initial scope Next.js + Prisma + MCP
 tags:
   - msp
   - symbol-graph
@@ -14,14 +15,21 @@ tags:
   - adr
   - decision
   - decomposition
-crosslinks: {"references":["CONCEPT--SYMBOLS-FRAMEWORK-AWARENESS","FRAMEWORK--SYMBOL-GRAPH"],"supersedes":["FEAT--SYMBOLS-FRAMEWORK-AWARENESS"]}
+crosslinks:
+  references:
+    - CONCEPT--SYMBOLS-FRAMEWORK-AWARENESS
+    - FRAMEWORK--SYMBOL-GRAPH
+  supersedes:
+    - FEAT--SYMBOLS-FRAMEWORK-AWARENESS
 created_at: 2026-05-12T05:36:00.000+07:00
 aliases:
   - ADR
   - implementation_flow
   - Architecture decision record
 cluster: implementation_flow
-role: "Architecture decision record"
+role: Architecture decision record
+attributes:
+  domain: adr
 ---
 
 # ADR — Symbol graph framework awareness

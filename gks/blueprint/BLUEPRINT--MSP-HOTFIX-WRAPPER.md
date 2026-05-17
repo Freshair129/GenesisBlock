@@ -13,18 +13,24 @@ tags:
   - hotfix
   - blueprint
   - implementation
-crosslinks: {"implements":["FEAT--MSP-HOTFIX-WRAPPER"],"references":["ADR--MSP-HOTFIX-WRAPPER"]}
+crosslinks:
+  implements:
+    - FEAT--MSP-HOTFIX-WRAPPER
+  references:
+    - ADR--MSP-HOTFIX-WRAPPER
 linked_symbols:
-  - {"file":"examples/hooks/pre-commit-validator.sh"}
-  - {"file":"package.json"}
-  - {"file":"packages/msp/test/hooks/pre-commit.test.ts"}
+  - file: examples/hooks/pre-commit-validator.sh
+  - file: package.json
+  - file: packages/msp/test/hooks/pre-commit.test.ts
 created_at: 2026-05-03T17:45:50.637+07:00
 aliases:
   - BLUEPRINT
   - implementation_flow
   - Implementation plan
 cluster: implementation_flow
-role: "Implementation plan"
+role: Implementation plan
+attributes:
+  domain: blueprint
 ---
 
 # BLUEPRINT — hotfix wrapper

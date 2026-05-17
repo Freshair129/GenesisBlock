@@ -15,19 +15,25 @@ tags:
   - infra
   - bin
   - ci
-crosslinks: {"references":["FEAT--MSP-VALIDATOR","FEAT--MEMORY-BACKLINKS-INDEXER","FEAT--CODEGEN-MICROTASK-RUNNER"]}
+crosslinks:
+  references:
+    - FEAT--MSP-VALIDATOR
+    - FEAT--MEMORY-BACKLINKS-INDEXER
+    - FEAT--CODEGEN-MICROTASK-RUNNER
 linked_symbols:
-  - {"file":"package.json"}
-  - {"file":"tsconfig.build.json"}
-  - {"file":"scripts/msp/chmod-bins.mjs"}
-  - {"file":".github/workflows/test.yml"}
+  - file: package.json
+  - file: tsconfig.build.json
+  - file: scripts/msp/chmod-bins.mjs
+  - file: .github/workflows/test.yml
 created_at: 2026-05-03T16:20:06.903+07:00
 aliases:
   - AUDIT
   - implementation_flow
   - Test results / quality report
 cluster: implementation_flow
-role: "Test results / quality report"
+role: Test results / quality report
+attributes:
+  domain: audit
 ---
 
 # AUDIT — M4a bin entries + CI

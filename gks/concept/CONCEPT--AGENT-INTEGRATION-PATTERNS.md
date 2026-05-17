@@ -6,21 +6,29 @@ status: stable
 vault_id: default
 tier: genesis
 source_type: axiomatic
-title: Agent integration patterns — three shapes (MCP-native / MCP-bridged / shell-wrapped) honoring one contract
+title: Agent integration patterns — three shapes (MCP-native / MCP-bridged /
+  shell-wrapped) honoring one contract
 tags:
   - msp
   - agent-agnostic
   - integration
   - mcp
   - patterns
-crosslinks: {"references":["FRAMEWORK--MSP-ARCHITECTURE-V2","CONCEPT--AGENT-AGNOSTIC","CONCEPT--NAMED-PROJECT-REGISTRY","ADR--GLOBAL-VS-WORKSPACE"]}
+crosslinks:
+  references:
+    - FRAMEWORK--MSP-ARCHITECTURE-V2
+    - CONCEPT--AGENT-AGNOSTIC
+    - CONCEPT--NAMED-PROJECT-REGISTRY
+    - ADR--GLOBAL-VS-WORKSPACE
 created_at: 2026-05-10T07:00:00.000+07:00
 aliases:
   - CONCEPT
   - implementation_flow
   - Strategic intent / PRD
 cluster: implementation_flow
-role: "Strategic intent / PRD"
+role: Strategic intent / PRD
+attributes:
+  domain: concept
 ---
 
 # CONCEPT — Agent integration patterns

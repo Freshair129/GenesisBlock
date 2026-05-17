@@ -12,14 +12,20 @@ tags:
   - hotfix
   - escape-hatch
   - escalation
-crosslinks: {"references":["ADR--AGENT-WRITE-BOUNDARIES","FRAMEWORK--PHASE-GOVERNANCE","CONCEPT--MSP-HOTFIX-WRAPPER"]}
+crosslinks:
+  references:
+    - ADR--AGENT-WRITE-BOUNDARIES
+    - FRAMEWORK--PHASE-GOVERNANCE
+    - CONCEPT--MSP-HOTFIX-WRAPPER
 created_at: 2026-05-03T14:08:43.472+07:00
 aliases:
   - ADR
   - implementation_flow
   - Architecture decision record
 cluster: implementation_flow
-role: "Architecture decision record"
+role: Architecture decision record
+attributes:
+  domain: adr
 ---
 
 # ADR — hotfix escape hatch

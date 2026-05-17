@@ -14,19 +14,26 @@ tags:
   - audit
   - m3a
   - dogfood
-crosslinks: {"references":["FEAT--MSP-PRECOMMIT-HOOK","BLUEPRINT--MSP-PRECOMMIT-HOOK","ADR--MSP-PRECOMMIT-HOOK","FEAT--MSP-VALIDATOR"]}
+crosslinks:
+  references:
+    - FEAT--MSP-PRECOMMIT-HOOK
+    - BLUEPRINT--MSP-PRECOMMIT-HOOK
+    - ADR--MSP-PRECOMMIT-HOOK
+    - FEAT--MSP-VALIDATOR
 linked_symbols:
-  - {"file":"packages/msp/examples/hooks/pre-commit-validator.sh"}
-  - {"file":"packages/msp/examples/hooks/install.sh"}
-  - {"file":"packages/msp/examples/hooks/README.md"}
-  - {"file":"packages/msp/test/hooks/pre-commit.test.ts"}
+  - file: packages/msp/examples/hooks/pre-commit-validator.sh
+  - file: packages/msp/examples/hooks/install.sh
+  - file: packages/msp/examples/hooks/README.md
+  - file: packages/msp/test/hooks/pre-commit.test.ts
 created_at: 2026-05-03T14:42:57.238+07:00
 aliases:
   - AUDIT
   - implementation_flow
   - Test results / quality report
 cluster: implementation_flow
-role: "Test results / quality report"
+role: Test results / quality report
+attributes:
+  domain: audit
 ---
 
 # AUDIT — MSP pre-commit hook M3a acceptance

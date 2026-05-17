@@ -14,16 +14,24 @@ tags:
   - codegen
   - scale-gate
   - framework-spec-7.7.2
-crosslinks: {"enforces":["FRAMEWORK--MSP-ARCHITECTURE-V2"],"references":["CONCEPT--COGNITIVE-LAYER-FACADE","CONCEPT--CODEGEN-MICROTASK-RUNNER"]}
+crosslinks:
+  enforces:
+    - FRAMEWORK--MSP-ARCHITECTURE-V2
+  references:
+    - CONCEPT--COGNITIVE-LAYER-FACADE
+    - CONCEPT--CODEGEN-MICROTASK-RUNNER
 linked_symbols:
-  - {"file":"packages/msp/src/cognitive/scale-gate.ts","symbol":"enforceScaleGate"}
+  - file: packages/msp/src/cognitive/scale-gate.ts
+    symbol: enforceScaleGate
 created_at: 2026-05-12T22:52:00.000+07:00
 aliases:
   - PROTO
   - implementation_flow
   - Machine-enforced invariant
 cluster: implementation_flow
-role: "Machine-enforced invariant"
+role: Machine-enforced invariant
+attributes:
+  domain: proto
 ---
 
 # PROTO — SCALE-LEVEL-GATE

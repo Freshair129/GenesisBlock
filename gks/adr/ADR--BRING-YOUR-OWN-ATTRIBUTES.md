@@ -13,14 +13,20 @@ tags:
   - adr
   - attributes
   - schema
-crosslinks: {"references":["CONCEPT--ATTRIBUTE-BAG-MODEL","CONCEPT--NAMESPACE-VAULT-BRAIN","FRAMEWORK--UNIVERSAL-CONTEXT-FRAMEWORK"]}
+crosslinks:
+  references:
+    - CONCEPT--ATTRIBUTE-BAG-MODEL
+    - CONCEPT--NAMESPACE-VAULT-BRAIN
+    - FRAMEWORK--UNIVERSAL-CONTEXT-FRAMEWORK
 created_at: 2026-05-14T18:37:51.890+07:00
 aliases:
   - ADR
   - implementation_flow
   - Architecture decision record
 cluster: implementation_flow
-role: "Architecture decision record"
+role: Architecture decision record
+attributes:
+  domain: adr
 ---
 
 # ADR — Bring-your-own attributes

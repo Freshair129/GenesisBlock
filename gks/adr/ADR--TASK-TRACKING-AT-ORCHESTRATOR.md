@@ -7,20 +7,33 @@ created_at: 2026-05-13T12:00:00+07:00
 vault_id: GKS-CORE
 tier: genesis
 title: Task tracking belongs to the orchestrator, not GKS
-tags: [scope, taxonomy, lifecycle, msp, supersedes]
+tags:
+  - scope
+  - taxonomy
+  - lifecycle
+  - msp
+  - supersedes
 crosslinks:
-  references: [ADR--EXTENDED-TAXONOMY, CONCEPT--MSP-ROADMAP]
-  partially_supersedes: [ADR--DOC-TO-CODE-ENFORCEMENT]
+  references:
+    - ADR--EXTENDED-TAXONOMY
+    - CONCEPT--MSP-ROADMAP
+  partially_supersedes:
+    - ADR--DOC-TO-CODE-ENFORCEMENT
 linked_symbols:
-  - { file: "packages/gks/src/memory/types.ts", fn: AtomicType }
-  - { file: "packages/gks/src/scaffold/new-feature.ts", fn: scaffoldNewFeature }
-  - { file: "packages/gks/bin/gks.ts", fn: cmdNewFeature }
+  - file: packages/gks/src/memory/types.ts
+    fn: AtomicType
+  - file: packages/gks/src/scaffold/new-feature.ts
+    fn: scaffoldNewFeature
+  - file: packages/gks/bin/gks.ts
+    fn: cmdNewFeature
 aliases:
   - ADR
   - implementation_flow
   - Architecture decision record
 cluster: implementation_flow
-role: "Architecture decision record"
+role: Architecture decision record
+attributes:
+  domain: adr
 ---
 
 # ADR — Task tracking belongs to the orchestrator, not GKS

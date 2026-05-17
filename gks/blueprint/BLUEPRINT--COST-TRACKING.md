@@ -6,7 +6,8 @@ status: draft
 vault_id: default
 tier: genesis
 source_type: axiomatic
-title: BLUEPRINT — Cost Tracking — pricing math + USAGE-atom recorder + dispatch wiring
+title: BLUEPRINT — Cost Tracking — pricing math + USAGE-atom recorder + dispatch
+  wiring
 scale_level: feature
 tags:
   - msp
@@ -22,16 +23,18 @@ crosslinks:
     - BLUEPRINT--AGENT-DISPATCHER
     - ADR--AGENT-TIER-COST-POLICY
 linked_symbols:
-  - {"file":"packages/msp/src/agents/cost-tracker.ts"}
-  - {"file":"packages/msp/src/agents/usage-recorder.ts"}
-  - {"file":"packages/msp/src/agents/dispatch.ts"}
+  - file: packages/msp/src/agents/cost-tracker.ts
+  - file: packages/msp/src/agents/usage-recorder.ts
+  - file: packages/msp/src/agents/dispatch.ts
 created_at: 2026-05-14T03:46:00.000+07:00
 aliases:
   - BLUEPRINT
   - implementation_flow
   - Implementation plan
 cluster: implementation_flow
-role: "Implementation plan"
+role: Implementation plan
+attributes:
+  domain: blueprint
 ---
 
 # BLUEPRINT — Cost Tracking

@@ -2,6 +2,7 @@ import { z } from 'zod'
 
 import { dispatch as dispatchTask } from '../../agents/dispatch.js'
 import type { DispatchTask, Severity, TaskType, Tier } from '../../agents/types.js'
+import { makeContext, makeSubject } from '../../policy/types.js'
 import { errorResult, jsonResult, type ToolHandlerCtx, type ToolTextResult } from '../types.js'
 
 export const name = 'msp_dispatch'
@@ -61,7 +62,7 @@ interface DispatchArgs {
   deadline_ms?: number
 }
 
-export function handler(_ctx: ToolHandlerCtx) {
+export function handler(ctx: ToolHandlerCtx) {
   return async (args: DispatchArgs): Promise<ToolTextResult> => {
     if (args.type !== undefined && !TASK_TYPE_SET.has(args.type)) {
       return errorResult(
@@ -91,6 +92,9 @@ export function handler(_ctx: ToolHandlerCtx) {
     }
 
     try {
+      const subject = ctx.subject ?? makeSubject('mcp-client', 'default-mcp')
+      const context = ctx.policyContext ?? makeContext('mcp-stdio', `mcp-${Date.now()}`)
+
       const result = await dispatchTask(task)
       return jsonResult({
         ok: true,

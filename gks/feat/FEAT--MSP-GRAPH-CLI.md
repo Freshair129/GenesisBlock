@@ -6,7 +6,8 @@ status: stable
 tier: process
 source_type: axiomatic
 vault_id: default
-title: msp:graph CLI — build / query / community / impact / stats / dump-jsonl subcommands
+title: msp:graph CLI — build / query / community / impact / stats / dump-jsonl
+  subcommands
 tags:
   - msp
   - symbol-graph
@@ -30,7 +31,9 @@ aliases:
   - Feature spec
   - Feature
 cluster: implementation_flow
-role: "Feature spec"
+role: Feature spec
+attributes:
+  domain: feat
 ---
 
 # FEAT — msp:graph CLI

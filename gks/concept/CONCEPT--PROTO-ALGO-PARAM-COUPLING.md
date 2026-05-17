@@ -6,7 +6,8 @@ status: stable
 vault_id: default
 tier: genesis
 source_type: axiomatic
-title: PROTO--ALGO-PARAM-COUPLING — bi-directional tunes ↔ tunable_by reciprocal validator
+title: PROTO--ALGO-PARAM-COUPLING — bi-directional tunes ↔ tunable_by reciprocal
+  validator
 tags:
   - msp
   - proto
@@ -15,14 +16,19 @@ tags:
   - coupling
   - governance
   - m8d
-crosslinks: {"references":["CONCEPT--PROTO-PATTERN","ADR--GRAPH-IS-GKS-DOMAIN"]}
+crosslinks:
+  references:
+    - CONCEPT--PROTO-PATTERN
+    - ADR--GRAPH-IS-GKS-DOMAIN
 created_at: 2026-05-05T16:28:00.000+07:00
 aliases:
   - CONCEPT
   - implementation_flow
   - Strategic intent / PRD
 cluster: implementation_flow
-role: "Strategic intent / PRD"
+role: Strategic intent / PRD
+attributes:
+  domain: concept
 ---
 
 # CONCEPT — [[PROTO--ALGO-PARAM-COUPLING]]

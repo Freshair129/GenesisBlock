@@ -3,6 +3,7 @@ import { resolve } from 'node:path'
 import { z } from 'zod'
 
 import { openSession } from '../../memory/sessions/writer.js'
+import { makeContext, makeSubject } from '../../policy/types.js'
 import { errorResult, jsonResult, type ToolHandlerCtx, type ToolTextResult } from '../types.js'
 
 export const name = 'msp_session_append'
@@ -45,10 +46,15 @@ export function handler(ctx: ToolHandlerCtx) {
     const root = resolve(args.root ?? ctx.root)
     let session
     try {
+      const subject = ctx.subject ?? makeSubject('mcp-client', 'default-mcp')
+      const context = ctx.policyContext ?? makeContext('mcp-stdio', `mcp-${Date.now()}`)
+
       session = await openSession({
         root,
         episodicId: args.episodic_id,
         namespace: args.namespace,
+        subject,
+        context,
       })
       await session.appendTurn(args.turn)
       await session.close()

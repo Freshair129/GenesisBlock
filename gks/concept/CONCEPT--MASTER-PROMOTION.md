@@ -6,7 +6,8 @@ status: stable
 tier: genesis
 source_type: axiomatic
 vault_id: default
-title: Master Block promotion — 4-of-5 dimension rule + human-in-the-loop proposal flow
+title: Master Block promotion — 4-of-5 dimension rule + human-in-the-loop
+  proposal flow
 tags:
   - msp
   - master
@@ -14,14 +15,22 @@ tags:
   - genesis-block
   - dimensions
   - phase-e4
-crosslinks: {"references":["SPEC--GENESIS-BLOCK-MANIFEST","CONCEPT--TAXONOMY-V2-3","ADR--MASTER-PROMOTION-DOC-TO-CODE","ADR--MASTER-PROMOTION-CONTRADICTION-POLICY","FRAMEWORK--KNOWLEDGE-3-TIER"]}
+crosslinks:
+  references:
+    - SPEC--GENESIS-BLOCK-MANIFEST
+    - CONCEPT--TAXONOMY-V2-3
+    - ADR--MASTER-PROMOTION-DOC-TO-CODE
+    - ADR--MASTER-PROMOTION-CONTRADICTION-POLICY
+    - FRAMEWORK--KNOWLEDGE-3-TIER
 created_at: 2026-05-13T10:00:00.000+07:00
 aliases:
   - CONCEPT
   - implementation_flow
   - Strategic intent / PRD
 cluster: implementation_flow
-role: "Strategic intent / PRD"
+role: Strategic intent / PRD
+attributes:
+  domain: concept
 ---
 
 # CONCEPT — Master Block promotion

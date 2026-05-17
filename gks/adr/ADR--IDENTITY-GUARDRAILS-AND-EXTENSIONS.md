@@ -15,14 +15,21 @@ tags:
   - extensions
   - decision
   - m7e
-crosslinks: {"references":["FEAT--IDENTITY-LAYER","ADR--IDENTITY-STORAGE-SHAPE","CONCEPT--IDENTITY-LAYER","ADR--ANTI-HALLUCINATION-RULES"]}
+crosslinks:
+  references:
+    - FEAT--IDENTITY-LAYER
+    - ADR--IDENTITY-STORAGE-SHAPE
+    - CONCEPT--IDENTITY-LAYER
+    - ADR--ANTI-HALLUCINATION-RULES
 created_at: 2026-05-05T12:30:00.000+07:00
 aliases:
   - ADR
   - implementation_flow
   - Architecture decision record
 cluster: implementation_flow
-role: "Architecture decision record"
+role: Architecture decision record
+attributes:
+  domain: adr
 ---
 
 # ADR — identity profile guardrails + extensions

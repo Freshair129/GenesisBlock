@@ -13,18 +13,25 @@ tags:
   - client
   - m7a
   - user-facing
-crosslinks: {"implements":["ADR--MSP-OBSIDIAN-INTEGRATION"],"references":["CONCEPT--OBSIDIAN-AS-RUNTIME","FRAMEWORK--MSP-ARCHITECTURE-V2"]}
+crosslinks:
+  implements:
+    - ADR--MSP-OBSIDIAN-INTEGRATION
+  references:
+    - CONCEPT--OBSIDIAN-AS-RUNTIME
+    - FRAMEWORK--MSP-ARCHITECTURE-V2
 linked_symbols:
-  - {"file":"packages/msp/src/obsidian/client.ts"}
-  - {"file":"packages/msp/src/obsidian/types.ts"}
-  - {"file":"packages/msp/src/obsidian/filesystem.ts"}
+  - file: packages/msp/src/obsidian/client.ts
+  - file: packages/msp/src/obsidian/types.ts
+  - file: packages/msp/src/obsidian/filesystem.ts
 created_at: 2026-05-04T12:24:39.673+07:00
 aliases:
   - FEAT
   - implementation_flow
   - Feature spec
 cluster: implementation_flow
-role: "Feature spec"
+role: Feature spec
+attributes:
+  domain: feat
 ---
 
 # MSP Obsidian client wrapper — REST primary, filesystem fallback

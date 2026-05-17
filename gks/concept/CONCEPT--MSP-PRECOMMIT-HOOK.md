@@ -13,14 +13,19 @@ tags:
   - hook
   - validator
   - automation
-crosslinks: {"references":["FEAT--MSP-VALIDATOR","ADR--AGENT-WRITE-BOUNDARIES"]}
+crosslinks:
+  references:
+    - FEAT--MSP-VALIDATOR
+    - ADR--AGENT-WRITE-BOUNDARIES
 created_at: 2026-05-03T14:39:04.340+07:00
 aliases:
   - CONCEPT
   - implementation_flow
   - Strategic intent / PRD
 cluster: implementation_flow
-role: "Strategic intent / PRD"
+role: Strategic intent / PRD
+attributes:
+  domain: concept
 ---
 
 # CONCEPT — MSP pre-commit hook

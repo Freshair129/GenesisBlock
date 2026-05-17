@@ -14,7 +14,18 @@ tags:
   - audit
   - followup
   - gks-audit
-crosslinks: {"references":["ADR--GRAPH-IS-GKS-DOMAIN","ADR--EMBEDDING-MODEL-PARITY","FRAMEWORK--MSP-ARCHITECTURE-V2","AUDIT--MSP-ARCHITECTURE-V2","CONCEPT--MSP-ROADMAP","CONCEPT--EMBEDDING-STRATEGY","ADR--MSP-OBSIDIAN-INTEGRATION","ADR--SEMANTIC-SEARCH-VIA-SMART-CONNECTIONS","ADR--ANTI-HALLUCINATION-RULES","CONCEPT--MEMORY-VECTOR-BACKLINKS"]}
+crosslinks:
+  references:
+    - ADR--GRAPH-IS-GKS-DOMAIN
+    - ADR--EMBEDDING-MODEL-PARITY
+    - FRAMEWORK--MSP-ARCHITECTURE-V2
+    - AUDIT--MSP-ARCHITECTURE-V2
+    - CONCEPT--MSP-ROADMAP
+    - CONCEPT--EMBEDDING-STRATEGY
+    - ADR--MSP-OBSIDIAN-INTEGRATION
+    - ADR--SEMANTIC-SEARCH-VIA-SMART-CONNECTIONS
+    - ADR--ANTI-HALLUCINATION-RULES
+    - CONCEPT--MEMORY-VECTOR-BACKLINKS
 linked_symbols: []
 created_at: 2026-05-04T09:18:00.000+07:00
 aliases:
@@ -22,7 +33,9 @@ aliases:
   - implementation_flow
   - Test results / quality report
 cluster: implementation_flow
-role: "Test results / quality report"
+role: Test results / quality report
+attributes:
+  domain: audit
 ---
 
 # AUDIT — M7-prep follow-up (GKS audit alignment)

@@ -6,7 +6,8 @@ status: stable
 vault_id: default
 tier: genesis
 source_type: axiomatic
-title: Canonical embedding model — nomic-embed-text-v1.5 across GKS + Smart Connections
+title: Canonical embedding model — nomic-embed-text-v1.5 across GKS + Smart
+  Connections
 tags:
   - msp
   - gks
@@ -14,14 +15,20 @@ tags:
   - semantic-search
   - smart-connections
   - decision
-crosslinks: {"references":["CONCEPT--EMBEDDING-STRATEGY","ADR--SEMANTIC-SEARCH-VIA-SMART-CONNECTIONS","CONCEPT--OBSIDIAN-AS-RUNTIME"]}
+crosslinks:
+  references:
+    - CONCEPT--EMBEDDING-STRATEGY
+    - ADR--SEMANTIC-SEARCH-VIA-SMART-CONNECTIONS
+    - CONCEPT--OBSIDIAN-AS-RUNTIME
 created_at: 2026-05-04T09:02:48.728+07:00
 aliases:
   - ADR
   - implementation_flow
   - Architecture decision record
 cluster: implementation_flow
-role: "Architecture decision record"
+role: Architecture decision record
+attributes:
+  domain: adr
 ---
 
 # ADR — embedding model parity

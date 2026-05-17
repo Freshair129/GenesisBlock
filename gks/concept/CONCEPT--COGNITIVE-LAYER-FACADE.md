@@ -13,14 +13,20 @@ tags:
   - facade
   - memoryos
   - agent-agnostic
-crosslinks: {"references":["CONCEPT--AGENT-AGNOSTIC","CONCEPT--AGENT-INTEGRATION-PATTERNS","FRAMEWORK--MSP-ARCHITECTURE-V2"]}
+crosslinks:
+  references:
+    - CONCEPT--AGENT-AGNOSTIC
+    - CONCEPT--AGENT-INTEGRATION-PATTERNS
+    - FRAMEWORK--MSP-ARCHITECTURE-V2
 created_at: 2026-05-12T22:45:00.000+07:00
 aliases:
   - CONCEPT
   - implementation_flow
   - Strategic intent / PRD
 cluster: implementation_flow
-role: "Strategic intent / PRD"
+role: Strategic intent / PRD
+attributes:
+  domain: concept
 ---
 
 # CONCEPT — Cognitive Layer facade

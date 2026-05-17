@@ -13,14 +13,17 @@ tags:
   - acceptance
   - vitest
   - decision
-crosslinks: {"references":["CONCEPT--ACCEPTANCE-VITEST-RUNNER","ADR--CODEGEN-RETRY-POLICY"]}
+crosslinks:
+  references:
+    - CONCEPT--ACCEPTANCE-VITEST-RUNNER
+    - ADR--CODEGEN-RETRY-POLICY
 created_at: 2026-05-03T16:27:17.914+07:00
 aliases:
   - ADR
-  - implementation_flow
-  - Architecture decision record
 cluster: implementation_flow
-role: "Architecture decision record"
+role: Architecture decision record
+attributes:
+  domain: adr
 ---
 
 # ADR — vitest acceptance runner shape
@@ -117,4 +120,3 @@ For now, the runner accepts an explicit `verificationFiles` array. The M4c integ
 
 ## Connections
 - [[ADR--CODEGEN-RETRY-POLICY]]
-

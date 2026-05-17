@@ -16,14 +16,21 @@ tags:
   - safety
   - epistemic
   - provenance
-crosslinks: {"references":["FRAMEWORK--MSP-ARCHITECTURE-V2","CONCEPT--KNOWLEDGE-LAYERS-V2","ADR--AGENT-WRITE-BOUNDARIES","FRAMEWORK--AUTHORITY-MATRIX"]}
+crosslinks:
+  references:
+    - FRAMEWORK--MSP-ARCHITECTURE-V2
+    - CONCEPT--KNOWLEDGE-LAYERS-V2
+    - ADR--AGENT-WRITE-BOUNDARIES
+    - FRAMEWORK--AUTHORITY-MATRIX
 created_at: 2026-05-09T14:30:00.000+07:00
 aliases:
   - FRAMEWORK
   - implementation_flow
   - Governance / architectural framework
 cluster: implementation_flow
-role: "Governance / architectural framework"
+role: Governance / architectural framework
+attributes:
+  domain: framework
 ---
 
 # FRAME — Knowledge 3-Tier model

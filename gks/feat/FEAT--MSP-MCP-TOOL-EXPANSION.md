@@ -13,21 +13,30 @@ tags:
   - tools
   - m7f
   - user-facing
-crosslinks: {"references":["CONCEPT--MSP-MCP-TOOL-EXPANSION","FEAT--MSP-MCP-SERVER","FEAT--CONSOLIDATOR","FEAT--RETRIEVAL-ORCHESTRATION","FEAT--COMPRESSOR","FEAT--IDENTITY-LAYER"]}
+crosslinks:
+  references:
+    - CONCEPT--MSP-MCP-TOOL-EXPANSION
+    - FEAT--MSP-MCP-SERVER
+    - FEAT--CONSOLIDATOR
+    - FEAT--RETRIEVAL-ORCHESTRATION
+    - FEAT--COMPRESSOR
+    - FEAT--IDENTITY-LAYER
 linked_symbols:
-  - {"file":"packages/msp/src/mcp/server.ts"}
-  - {"file":"packages/msp/src/mcp/tools/recall.ts"}
-  - {"file":"packages/msp/src/mcp/tools/remember.ts"}
-  - {"file":"packages/msp/src/mcp/tools/compress.ts"}
-  - {"file":"packages/msp/src/mcp/tools/identity-get.ts"}
-  - {"file":"packages/msp/src/mcp/tools/identity-set.ts"}
+  - file: packages/msp/src/mcp/server.ts
+  - file: packages/msp/src/mcp/tools/recall.ts
+  - file: packages/msp/src/mcp/tools/remember.ts
+  - file: packages/msp/src/mcp/tools/compress.ts
+  - file: packages/msp/src/mcp/tools/identity-get.ts
+  - file: packages/msp/src/mcp/tools/identity-set.ts
 created_at: 2026-05-05T16:15:00.000+07:00
 aliases:
   - FEAT
   - implementation_flow
   - Feature spec
 cluster: implementation_flow
-role: "Feature spec"
+role: Feature spec
+attributes:
+  domain: feat
 ---
 
 # MSP MCP tools — passport-side surface (M7f)

@@ -61,7 +61,7 @@ export function lookupType(prefix: string, root: string) {
 }
 
 export function buildAliases(id: string, existingAliases: unknown, root: string): string[] {
-  const prefix = id.split('--')[0]!
+  const prefix = id.split('-')[0]!
   const primary = [prefix]
 
   const other = Array.isArray(existingAliases)

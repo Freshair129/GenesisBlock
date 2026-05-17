@@ -15,19 +15,25 @@ tags:
   - ollama
   - blueprint
   - implementation
-crosslinks: {"implements":["FEAT--SLM-OLLAMA-CLIENT"],"references":["ADR--SLM-OLLAMA-CLIENT"]}
+crosslinks:
+  implements:
+    - FEAT--SLM-OLLAMA-CLIENT
+  references:
+    - ADR--SLM-OLLAMA-CLIENT
 linked_symbols:
-  - {"file":"packages/msp/src/codegen/slm/ollama.ts"}
-  - {"file":"packages/msp/src/codegen/slm/factory.ts"}
-  - {"file":"packages/msp/src/codegen/slm/types.ts"}
-  - {"file":"packages/msp/src/codegen/slm/errors.ts"}
+  - file: packages/msp/src/codegen/slm/ollama.ts
+  - file: packages/msp/src/codegen/slm/factory.ts
+  - file: packages/msp/src/codegen/slm/types.ts
+  - file: packages/msp/src/codegen/slm/errors.ts
 created_at: 2026-05-03T16:22:31.964+07:00
 aliases:
   - BLUEPRINT
   - implementation_flow
   - Implementation plan
 cluster: implementation_flow
-role: "Implementation plan"
+role: Implementation plan
+attributes:
+  domain: blueprint
 ---
 
 # BLUEPRINT — Ollama SLM client

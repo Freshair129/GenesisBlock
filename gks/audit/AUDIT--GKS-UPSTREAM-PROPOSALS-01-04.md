@@ -16,13 +16,17 @@ tags:
   - verify-flow
   - embedder
 created_at: 2026-05-11T07:00:00.000+07:00
-crosslinks: {"references":["AUDIT--GKS-UPSTREAM-PROPOSALS-FILED"]}
+crosslinks:
+  references:
+    - AUDIT--GKS-UPSTREAM-PROPOSALS-FILED
 aliases:
   - AUDIT
   - implementation_flow
   - Test results / quality report
 cluster: implementation_flow
-role: "Test results / quality report"
+role: Test results / quality report
+attributes:
+  domain: audit
 ---
 
 # AUDIT — GKS upstream proposals 01–04 merged (v3.7.0)

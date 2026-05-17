@@ -7,15 +7,27 @@ vault_id: default
 tier: process
 source_type: axiomatic
 title: Identity API Protocol — Get/Set Soul Passport sub-fields
-tags: [msp, identity, api, soul, profile, voice, preferences]
-crosslinks: {"references":["CONCEPT--IDENTITY-LAYER","ADR--IDENTITY-STORAGE-SHAPE"]}
+tags:
+  - msp
+  - identity
+  - api
+  - soul
+  - profile
+  - voice
+  - preferences
+crosslinks:
+  references:
+    - CONCEPT--IDENTITY-LAYER
+    - ADR--IDENTITY-STORAGE-SHAPE
 created_at: 2026-05-11T10:28:00.000Z
 aliases:
   - PROTOCOL
   - agent_governance
   - Interaction contract
 cluster: agent_governance
-role: "Interaction contract"
+role: Interaction contract
+attributes:
+  domain: protocol
 ---
 
 # PROTOCOL — Identity API

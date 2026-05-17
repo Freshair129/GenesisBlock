@@ -6,14 +6,20 @@ status: stable
 vault_id: default
 tier: process
 source_type: axiomatic
-title: Architecture-doc cleanup — declared MSP agent-agnostic; removed 3 overlapping root specs
+title: Architecture-doc cleanup — declared MSP agent-agnostic; removed 3
+  overlapping root specs
 tags:
   - msp
   - audit
   - cleanup
   - agent-agnostic
   - ssot
-crosslinks: {"references":["FRAMEWORK--MSP-ARCHITECTURE-V2","CONCEPT--AGENT-AGNOSTIC","CONCEPT--MSP-OBSERVE-HOT-PATH","CONCEPT--NAMED-PROJECT-REGISTRY"]}
+crosslinks:
+  references:
+    - FRAMEWORK--MSP-ARCHITECTURE-V2
+    - CONCEPT--AGENT-AGNOSTIC
+    - CONCEPT--MSP-OBSERVE-HOT-PATH
+    - CONCEPT--NAMED-PROJECT-REGISTRY
 linked_symbols: []
 created_at: 2026-05-09T07:00:00.000+07:00
 aliases:
@@ -21,7 +27,9 @@ aliases:
   - implementation_flow
   - Test results / quality report
 cluster: implementation_flow
-role: "Test results / quality report"
+role: Test results / quality report
+attributes:
+  domain: audit
 ---
 
 # AUDIT — Architecture-doc cleanup (2026-05-09)

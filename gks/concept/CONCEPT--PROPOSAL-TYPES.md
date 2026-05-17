@@ -12,14 +12,20 @@ tags:
   - inbound
   - proposal-types
   - superseded
-crosslinks: {"references":["CONCEPT--SUBMISSION-ENVELOPE"],"superseded_by":["CONCEPT--KNOWLEDGE-LAYERS-V2"]}
+crosslinks:
+  references:
+    - CONCEPT--SUBMISSION-ENVELOPE
+  superseded_by:
+    - CONCEPT--KNOWLEDGE-LAYERS-V2
 created_at: 2026-05-03T14:01:51.322+07:00
 aliases:
   - CONCEPT
   - implementation_flow
   - Strategic intent / PRD
 cluster: implementation_flow
-role: "Strategic intent / PRD"
+role: Strategic intent / PRD
+attributes:
+  domain: concept
 ---
 
 > ⚠️ **Superseded by [`[[CONCEPT--KNOWLEDGE-LAYERS-V2]]`](./[[CONCEPT--KNOWLEDGE-LAYERS-V2]].md)** (Phase 4 of `[[BLUEPRINT--INBOUND-TO-CANDIDATES-MIGRATION]]`, 2026-05-09). The new candidates layer doesn't use a proposal-type discriminator — every candidate is just a `${proposed_id}.md` file in `.brain/.../candidates/`. Body preserved as historical context.

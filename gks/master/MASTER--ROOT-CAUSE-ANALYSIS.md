@@ -12,9 +12,12 @@ vault_id: default
 priority: P0
 constituents:
   required:
-    framework: [FRAMEWORK--KNOWLEDGE-3-TIER]
-    concept: [CONCEPT--ROOT-CAUSE-ANALYSIS]
-    adr: [ADR--MASTER-PROMOTION-ROOT-CAUSE-ANALYSIS]
+    framework:
+      - FRAMEWORK--KNOWLEDGE-3-TIER
+    concept:
+      - CONCEPT--ROOT-CAUSE-ANALYSIS
+    adr:
+      - ADR--MASTER-PROMOTION-ROOT-CAUSE-ANALYSIS
   optional: {}
 title: Root cause analysis — confirm origin before any fix
 tags:
@@ -23,14 +26,20 @@ tags:
   - rca
   - governance
   - instinct
-crosslinks: {"references":["FRAMEWORK--KNOWLEDGE-3-TIER","CONCEPT--ROOT-CAUSE-ANALYSIS","ADR--MASTER-PROMOTION-ROOT-CAUSE-ANALYSIS"]}
+crosslinks:
+  references:
+    - FRAMEWORK--KNOWLEDGE-3-TIER
+    - CONCEPT--ROOT-CAUSE-ANALYSIS
+    - ADR--MASTER-PROMOTION-ROOT-CAUSE-ANALYSIS
 created_at: 2026-05-17T02:10:00.000+07:00
 aliases:
   - MASTER
   - implementation_flow
   - Root-level policy / genesis rule
 cluster: implementation_flow
-role: "Root-level policy / genesis rule"
+role: Root-level policy / genesis rule
+attributes:
+  domain: master
 ---
 
 # MASTER — Root Cause Analysis

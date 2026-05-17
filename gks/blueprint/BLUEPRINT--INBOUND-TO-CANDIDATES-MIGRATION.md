@@ -7,7 +7,8 @@ status: stable
 tier: process
 source_type: axiomatic
 vault_id: default
-title: BLUEPRINT — replace inbound queue with candidates layer (phased removal of msp_propose + propose.mjs + inbound infra)
+title: BLUEPRINT — replace inbound queue with candidates layer (phased removal
+  of msp_propose + propose.mjs + inbound infra)
 tags:
   - msp
   - inbound
@@ -15,29 +16,35 @@ tags:
   - migration
   - blueprint
   - implementation
-crosslinks: {"references":["CONCEPT--KNOWLEDGE-LAYERS-V2","ADR--AGENT-WRITE-BOUNDARIES","FRAMEWORK--MSP-ARCHITECTURE-V2"]}
+crosslinks:
+  references:
+    - CONCEPT--KNOWLEDGE-LAYERS-V2
+    - ADR--AGENT-WRITE-BOUNDARIES
+    - FRAMEWORK--MSP-ARCHITECTURE-V2
 linked_symbols:
-  - {"file":"src/mcp/tools/propose.ts"}
-  - {"file":"packages/msp/src/mcp/tools/candidate.ts"}
-  - {"file":"packages/msp/src/memory/candidates/writer.ts"}
-  - {"file":"scripts/msp/propose.mjs"}
-  - {"file":"test/scripts/propose.test.ts"}
-  - {"file":"test/mcp/tools/propose.test.ts"}
-  - {"file":"packages/msp/test/mcp/tools/candidate.test.ts"}
-  - {"file":"packages/msp/test/memory/candidates/writer.test.ts"}
-  - {"file":"web/src/components/CandidatesList.tsx"}
-  - {"file":"web/src/api.ts"}
-  - {"file":"packages/msp/src/mcp/server.ts"}
-  - {"file":"package.json"}
-  - {"file":"msp_spec.md"}
-  - {"file":"CLAUDE.md"}
+  - file: src/mcp/tools/propose.ts
+  - file: packages/msp/src/mcp/tools/candidate.ts
+  - file: packages/msp/src/memory/candidates/writer.ts
+  - file: scripts/msp/propose.mjs
+  - file: test/scripts/propose.test.ts
+  - file: test/mcp/tools/propose.test.ts
+  - file: packages/msp/test/mcp/tools/candidate.test.ts
+  - file: packages/msp/test/memory/candidates/writer.test.ts
+  - file: web/src/components/CandidatesList.tsx
+  - file: web/src/api.ts
+  - file: packages/msp/src/mcp/server.ts
+  - file: package.json
+  - file: msp_spec.md
+  - file: CLAUDE.md
 created_at: 2026-05-08T17:02:00.000+07:00
 aliases:
   - BLUEPRINT
   - implementation_flow
   - Implementation plan
 cluster: implementation_flow
-role: "Implementation plan"
+role: Implementation plan
+attributes:
+  domain: blueprint
 ---
 
 # BLUEPRINT — inbound to candidates migration

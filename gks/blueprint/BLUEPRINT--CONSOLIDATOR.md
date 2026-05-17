@@ -14,25 +14,32 @@ tags:
   - blueprint
   - implementation
   - m7b
-crosslinks: {"implements":["FEAT--CONSOLIDATOR"],"references":["ADR--CONSOLIDATOR-HYBRID-SCORING","CONCEPT--CONSOLIDATOR"]}
+crosslinks:
+  implements:
+    - FEAT--CONSOLIDATOR
+  references:
+    - ADR--CONSOLIDATOR-HYBRID-SCORING
+    - CONCEPT--CONSOLIDATOR
 linked_symbols:
-  - {"file":"packages/msp/src/orchestrator/consolidator/index.ts"}
-  - {"file":"packages/msp/src/orchestrator/consolidator/types.ts"}
-  - {"file":"packages/msp/src/orchestrator/consolidator/score.ts"}
-  - {"file":"packages/msp/src/orchestrator/consolidator/boundary.ts"}
-  - {"file":"packages/msp/src/orchestrator/consolidator/summarise.ts"}
-  - {"file":"packages/msp/src/orchestrator/consolidator/llm.ts"}
-  - {"file":"packages/msp/test/orchestrator/consolidator/score.test.ts"}
-  - {"file":"packages/msp/test/orchestrator/consolidator/boundary.test.ts"}
-  - {"file":"packages/msp/test/orchestrator/consolidator/summarise.test.ts"}
-  - {"file":"packages/msp/test/orchestrator/consolidator/index.test.ts"}
+  - file: packages/msp/src/orchestrator/consolidator/index.ts
+  - file: packages/msp/src/orchestrator/consolidator/types.ts
+  - file: packages/msp/src/orchestrator/consolidator/score.ts
+  - file: packages/msp/src/orchestrator/consolidator/boundary.ts
+  - file: packages/msp/src/orchestrator/consolidator/summarise.ts
+  - file: packages/msp/src/orchestrator/consolidator/llm.ts
+  - file: packages/msp/test/orchestrator/consolidator/score.test.ts
+  - file: packages/msp/test/orchestrator/consolidator/boundary.test.ts
+  - file: packages/msp/test/orchestrator/consolidator/summarise.test.ts
+  - file: packages/msp/test/orchestrator/consolidator/index.test.ts
 created_at: 2026-05-04T17:06:30.000+07:00
 aliases:
   - BLUEPRINT
   - implementation_flow
   - Implementation plan
 cluster: implementation_flow
-role: "Implementation plan"
+role: Implementation plan
+attributes:
+  domain: blueprint
 ---
 
 # BLUEPRINT — consolidator implementation plan

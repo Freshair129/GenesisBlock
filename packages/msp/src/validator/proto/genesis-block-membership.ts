@@ -63,7 +63,7 @@ export const STATUS_ORDER = ['stub', 'raw', 'draft', 'active', 'stable'] as cons
 export const TERMINAL_STATUSES = new Set(['deprecated', 'superseded'])
 
 /** Canonical atom-id regex (mirrors gks `atomic-id.ts`). */
-export const ID_PATTERN = /^[A-Z][A-Z0-9_]*--[A-Z0-9][A-Z0-9_-]*$/
+export const ID_PATTERN = /^[A-Z][A-Z0-9_]*(?:-[a-zA-Z0-9-]+)?--[A-Z0-9][A-Z0-9_-]*(?:--K\d+)?$/
 
 /** Rank of a status in STATUS_ORDER; -1 if not a graded status. */
 export function statusRank(s: string): number {
@@ -80,7 +80,7 @@ interface ManifestFrontmatter {
 
 /** Strip the leading `---\nYAML\n---` block and parse it; null on failure. */
 export function parseFrontmatter(raw: string): ManifestFrontmatter | null {
-  const m = raw.match(/^---\s*\n([\s\S]*?)\n---\s*(?:\n|$)/)
+  const m = raw.match(/^---\r?\n([\s\S]*?)\r?\n---(?:\r?\n|$)/)
   if (!m) return null
   try {
     return parseYaml(m[1]!) as ManifestFrontmatter

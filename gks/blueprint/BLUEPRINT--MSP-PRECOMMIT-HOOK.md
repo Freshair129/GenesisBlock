@@ -14,19 +14,25 @@ tags:
   - hook
   - blueprint
   - implementation
-crosslinks: {"implements":["FEAT--MSP-PRECOMMIT-HOOK"],"references":["ADR--MSP-PRECOMMIT-HOOK"]}
+crosslinks:
+  implements:
+    - FEAT--MSP-PRECOMMIT-HOOK
+  references:
+    - ADR--MSP-PRECOMMIT-HOOK
 linked_symbols:
-  - {"file":"examples/hooks/pre-commit-validator.sh"}
-  - {"file":"examples/hooks/install.sh"}
-  - {"file":"examples/hooks/README.md"}
-  - {"file":"packages/msp/test/hooks/pre-commit.test.ts"}
+  - file: examples/hooks/pre-commit-validator.sh
+  - file: examples/hooks/install.sh
+  - file: examples/hooks/README.md
+  - file: packages/msp/test/hooks/pre-commit.test.ts
 created_at: 2026-05-03T14:39:05.783+07:00
 aliases:
   - BLUEPRINT
   - implementation_flow
   - Implementation plan
 cluster: implementation_flow
-role: "Implementation plan"
+role: Implementation plan
+attributes:
+  domain: blueprint
 ---
 
 # BLUEPRINT — pre-commit hook

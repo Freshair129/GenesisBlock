@@ -14,27 +14,33 @@ tags:
   - blueprint
   - implementation
   - ci
-crosslinks: {"references":["CONCEPT--ATOM-CONTRADICTION-DETECTION","ADR--CONTRADICTION-DETECTION-STACK","PROTO--ALGO-PARAM-COUPLING"]}
+crosslinks:
+  references:
+    - CONCEPT--ATOM-CONTRADICTION-DETECTION
+    - ADR--CONTRADICTION-DETECTION-STACK
+    - PROTO--ALGO-PARAM-COUPLING
 linked_symbols:
-  - {"file":"CLAUDE.md"}
-  - {"file":".github/pull_request_template.md"}
-  - {"file":"src/validator/proto/reciprocal-supersession.ts"}
-  - {"file":"gks/proto/PROTO--RECIPROCAL-SUPERSESSION.md"}
-  - {"file":"src/validator/proto/domain-uniqueness.ts"}
-  - {"file":"gks/proto/PROTO--DOMAIN-UNIQUENESS.md"}
-  - {"file":".brain/msp/LLM_Contract/atomic_contract.yaml"}
-  - {"file":".github/workflows/contradiction-similarity.yml"}
-  - {"file":"scripts/msp/contradiction-similarity.mjs"}
-  - {"file":".github/workflows/contradiction-judge.yml"}
-  - {"file":"scripts/msp/contradiction-judge.mjs"}
-  - {"file":".github/contradiction-detection.yml"}
+  - file: CLAUDE.md
+  - file: .github/pull_request_template.md
+  - file: src/validator/proto/reciprocal-supersession.ts
+  - file: gks/proto/PROTO--RECIPROCAL-SUPERSESSION.md
+  - file: src/validator/proto/domain-uniqueness.ts
+  - file: gks/proto/PROTO--DOMAIN-UNIQUENESS.md
+  - file: .brain/msp/LLM_Contract/atomic_contract.yaml
+  - file: .github/workflows/contradiction-similarity.yml
+  - file: scripts/msp/contradiction-similarity.mjs
+  - file: .github/workflows/contradiction-judge.yml
+  - file: scripts/msp/contradiction-judge.mjs
+  - file: .github/contradiction-detection.yml
 created_at: 2026-05-08T17:34:00.000+07:00
 aliases:
   - BLUEPRINT
   - implementation_flow
   - Implementation plan
 cluster: implementation_flow
-role: "Implementation plan"
+role: Implementation plan
+attributes:
+  domain: blueprint
 ---
 
 # BLUEPRINT — contradiction detection implementation

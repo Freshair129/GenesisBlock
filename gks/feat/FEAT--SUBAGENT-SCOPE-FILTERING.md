@@ -14,14 +14,21 @@ tags:
   - subagent
   - scope
   - codegen
-crosslinks: {"references":["CONCEPT--SUBAGENT-CONTEXT-SCOPING","CONCEPT--ABAC-POLICY-ENGINE","ADR--TRANSPORT-AGNOSTIC-ENFORCEMENT","CONCEPT--RESOLUTION-GRADIENT"]}
+crosslinks:
+  references:
+    - CONCEPT--SUBAGENT-CONTEXT-SCOPING
+    - CONCEPT--ABAC-POLICY-ENGINE
+    - ADR--TRANSPORT-AGNOSTIC-ENFORCEMENT
+    - CONCEPT--RESOLUTION-GRADIENT
 created_at: 2026-05-14T19:42:03.565+07:00
 aliases:
   - FEAT
   - implementation_flow
   - Feature spec
 cluster: implementation_flow
-role: "Feature spec"
+role: Feature spec
+attributes:
+  domain: feat
 ---
 
 # FEAT — Subagent scope filtering

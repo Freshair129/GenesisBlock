@@ -3,6 +3,7 @@ import { resolve } from 'node:path'
 import { z } from 'zod'
 
 import { rebuildBacklinks } from '../../memory/backlinks/indexer.js'
+import { makeContext, makeSubject } from '../../policy/types.js'
 import { errorResult, jsonResult, type ToolHandlerCtx, type ToolTextResult } from '../types.js'
 
 export const name = 'msp_backlinks_rebuild'
@@ -26,11 +27,16 @@ export function handler(ctx: ToolHandlerCtx) {
   }): Promise<ToolTextResult> => {
     const root = resolve(args.root ?? ctx.root)
     try {
+      const subject = ctx.subject ?? makeSubject('mcp-client', 'default-mcp')
+      const context = ctx.policyContext ?? makeContext('mcp-stdio', `mcp-${Date.now()}`)
+
       const result = await rebuildBacklinks({
         root,
         namespace: args.namespace,
         dryRun: args.dry_run === true,
         check: args.check === true,
+        subject,
+        context,
       })
       if (args.check && result.changed) {
         return errorResult(

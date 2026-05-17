@@ -6,7 +6,8 @@ status: stable
 vault_id: default
 tier: genesis
 source_type: axiomatic
-title: Semantic search — GKS canonical, Smart Connections in-Obsidian browse (parity-locked model)
+title: Semantic search — GKS canonical, Smart Connections in-Obsidian browse
+  (parity-locked model)
 tags:
   - msp
   - gks
@@ -14,14 +15,20 @@ tags:
   - smart-connections
   - obsidian
   - decision
-crosslinks: {"references":["CONCEPT--EMBEDDING-STRATEGY","ADR--EMBEDDING-MODEL-PARITY","ADR--MSP-OBSIDIAN-INTEGRATION"]}
+crosslinks:
+  references:
+    - CONCEPT--EMBEDDING-STRATEGY
+    - ADR--EMBEDDING-MODEL-PARITY
+    - ADR--MSP-OBSIDIAN-INTEGRATION
 created_at: 2026-05-03T23:55:06.784+07:00
 aliases:
   - ADR
   - implementation_flow
   - Architecture decision record
 cluster: implementation_flow
-role: "Architecture decision record"
+role: Architecture decision record
+attributes:
+  domain: adr
 ---
 
 # ADR — semantic search topology

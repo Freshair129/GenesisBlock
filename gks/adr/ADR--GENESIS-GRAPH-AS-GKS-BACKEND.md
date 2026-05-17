@@ -6,7 +6,8 @@ status: stable
 vault_id: default
 tier: genesis
 source_type: axiomatic
-title: Genesis Graph Backend ships as a GraphBackend implementation, not a parallel engine
+title: Genesis Graph Backend ships as a GraphBackend implementation, not a
+  parallel engine
 tags:
   - msp
   - gks
@@ -17,14 +18,20 @@ tags:
   - rust
   - napi
   - decision
-crosslinks: {"references":["CONCEPT--GENESIS-GRAPH-BACKEND","FRAMEWORK--MSP-ARCHITECTURE-V2","PROTOCOL--GENESIS-GRAPH-FFI"]}
+crosslinks:
+  references:
+    - CONCEPT--GENESIS-GRAPH-BACKEND
+    - FRAMEWORK--MSP-ARCHITECTURE-V2
+    - PROTOCOL--GENESIS-GRAPH-FFI
 created_at: 2026-05-12T11:57:00.000+07:00
 aliases:
   - ADR
   - implementation_flow
   - Architecture decision record
 cluster: implementation_flow
-role: "Architecture decision record"
+role: Architecture decision record
+attributes:
+  domain: adr
 ---
 
 # ADR — Genesis Graph Backend as a GKS backend

@@ -1,5 +1,9 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 
+import { readIdentity } from '../identity/store.js'
+import { hydrateSubject } from '../policy/subject.js'
+import { makeContext } from '../policy/types.js'
+
 import * as backlinksRebuild from './tools/backlinks-rebuild.js'
 import * as brainResolve from './tools/brain-resolve.js'
 import * as candidate from './tools/candidate.js'
@@ -58,9 +62,15 @@ const TOOLS = [
   expandTool,
 ] as const
 
-export function createMspMcpServer(opts: ServerOpts = {}): McpServer {
+export async function createMspMcpServer(opts: ServerOpts = {}): Promise<McpServer> {
   const root = opts.root ?? process.env.MSP_ROOT ?? process.cwd()
-  const ctx: ToolHandlerCtx = { root }
+
+  // Resolve identity once for the server (assuming stdio/local user)
+  const identity = await readIdentity({ root })
+  const subject = hydrateSubject(identity)
+  const policyContext = makeContext('mcp-stdio', `mcp-${Date.now()}`)
+
+  const ctx: ToolHandlerCtx = { root, subject, policyContext }
 
   const server = new McpServer({
     name: 'msp',

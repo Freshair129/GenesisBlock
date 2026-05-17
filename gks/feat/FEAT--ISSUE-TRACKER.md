@@ -7,20 +7,28 @@ created_at: 2026-05-13T12:00:00+07:00
 vault_id: GKS-CORE
 tier: genesis
 title: Self-hosted issue tracker (light-tier)
-tags: [user-facing, ops, issue-tracking]
+tags:
+  - user-facing
+  - ops
+  - issue-tracking
 crosslinks:
-  implements: [ADR--EXTENDED-TAXONOMY]
-  references: [CONCEPT--MEMORY-STORE]
+  implements:
+    - ADR--EXTENDED-TAXONOMY
+  references:
+    - CONCEPT--MEMORY-STORE
 linked_symbols:
-  - { file: "packages/gks/src/issue/store.ts" }
-  - { file: "packages/gks/src/issue/types.ts" }
-  - { file: "packages/gks/bin/gks.ts", fn: cmdIssue }
+  - file: packages/gks/src/issue/store.ts
+  - file: packages/gks/src/issue/types.ts
+  - file: packages/gks/bin/gks.ts
+    fn: cmdIssue
 aliases:
   - FEAT
   - implementation_flow
   - Feature spec
 cluster: implementation_flow
-role: "Feature spec"
+role: Feature spec
+attributes:
+  domain: feat
 ---
 
 # FEAT — Self-hosted issue tracker

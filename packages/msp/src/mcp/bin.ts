@@ -6,7 +6,7 @@ import { createMspMcpServer } from './server.js'
 
 async function main(): Promise<void> {
   const root = parseRootFromArgv(process.argv.slice(2))
-  const server = createMspMcpServer({ root })
+  const server = await createMspMcpServer({ root })
   const transport = new StdioServerTransport()
   await server.connect(transport)
 }

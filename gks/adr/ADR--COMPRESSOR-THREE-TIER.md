@@ -6,7 +6,8 @@ status: stable
 vault_id: default
 tier: genesis
 source_type: axiomatic
-title: Compressor — three-tier (keep / trim / resummarise) greedy fill from importance order
+title: Compressor — three-tier (keep / trim / resummarise) greedy fill from
+  importance order
 tags:
   - msp
   - compression
@@ -14,14 +15,19 @@ tags:
   - importance
   - decision
   - m7d
-crosslinks: {"references":["CONCEPT--CONTEXT-COMPRESSION","ADR--CONSOLIDATOR-HYBRID-SCORING"]}
+crosslinks:
+  references:
+    - CONCEPT--CONTEXT-COMPRESSION
+    - ADR--CONSOLIDATOR-HYBRID-SCORING
 created_at: 2026-05-05T16:10:30.000+07:00
 aliases:
   - ADR
   - implementation_flow
   - Architecture decision record
 cluster: implementation_flow
-role: "Architecture decision record"
+role: Architecture decision record
+attributes:
+  domain: adr
 ---
 
 # ADR — compressor three-tier strategy

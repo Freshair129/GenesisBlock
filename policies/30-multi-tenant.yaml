@@ -1,0 +1,14 @@
+id: pack-multi-tenant
+description: A user only sees Resources whose tenant_id is in S.tenant_ids (UCF Phase 4).
+rules:
+  - id: multi-tenant-isolation
+    description: Deny access if resource tenant_id is not in subject tenant_ids.
+    effect: deny
+    match:
+      subject_kind: [user]
+      action: [read, recall, expose-to-llm]
+    condition:
+      all_of:
+        - resource.attributes.tenant_id: { exists: true }
+        - resource.attributes.tenant_id: { ni: "subject.attributes.tenant_ids" }
+    priority: 500

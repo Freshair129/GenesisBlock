@@ -7,7 +7,13 @@ vault_id: default
 tier: genesis
 source_type: axiomatic
 title: AUDIT — Phase D Agentic Runtime — implementation complete
-tags: [msp, audit, phase-d, agentic, dispatch, two-brain]
+tags:
+  - msp
+  - audit
+  - phase-d
+  - agentic
+  - dispatch
+  - two-brain
 crosslinks:
   references:
     - BLUEPRINT--AGENT-DISPATCHER
@@ -22,7 +28,9 @@ aliases:
   - implementation_flow
   - Test results / quality report
 cluster: implementation_flow
-role: "Test results / quality report"
+role: Test results / quality report
+attributes:
+  domain: audit
 ---
 
 # AUDIT — Phase D Agentic Runtime — implementation complete

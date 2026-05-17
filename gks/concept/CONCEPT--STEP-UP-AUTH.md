@@ -14,14 +14,20 @@ tags:
   - auth
   - step-up
   - security
-crosslinks: {"references":["FRAMEWORK--UNIVERSAL-CONTEXT-FRAMEWORK","CONCEPT--ABAC-POLICY-ENGINE","CONCEPT--SUBJECT-RESOURCE-ACTION-CONTEXT"]}
+crosslinks:
+  references:
+    - FRAMEWORK--UNIVERSAL-CONTEXT-FRAMEWORK
+    - CONCEPT--ABAC-POLICY-ENGINE
+    - CONCEPT--SUBJECT-RESOURCE-ACTION-CONTEXT
 created_at: 2026-05-13T17:22:02.427+07:00
 aliases:
   - CONCEPT
   - implementation_flow
   - Strategic intent / PRD
 cluster: implementation_flow
-role: "Strategic intent / PRD"
+role: Strategic intent / PRD
+attributes:
+  domain: concept
 ---
 
 # CONCEPT — Step-up authentication

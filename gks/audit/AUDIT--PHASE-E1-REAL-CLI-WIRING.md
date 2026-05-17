@@ -13,7 +13,9 @@ tags:
   - audit
   - tier-adapters
   - integration-test
-crosslinks: {"references":["CONCEPT--REAL-CLI-WIRING"]}
+crosslinks:
+  references:
+    - CONCEPT--REAL-CLI-WIRING
 linked_symbols: []
 created_at: 2026-05-14T04:05:00.000+07:00
 aliases:
@@ -21,7 +23,9 @@ aliases:
   - implementation_flow
   - Test results / quality report
 cluster: implementation_flow
-role: "Test results / quality report"
+role: Test results / quality report
+attributes:
+  domain: audit
 ---
 
 # AUDIT — Phase E1 real CLI wiring

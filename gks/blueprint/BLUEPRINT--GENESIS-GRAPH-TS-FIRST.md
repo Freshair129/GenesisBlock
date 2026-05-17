@@ -6,7 +6,8 @@ status: stable
 vault_id: default
 tier: process
 source_type: axiomatic
-title: BLUEPRINT — Genesis Block Phase 0 TS-first backend (staged ahead of the Rust crate)
+title: BLUEPRINT — Genesis Block Phase 0 TS-first backend (staged ahead of the
+  Rust crate)
 tags:
   - msp
   - gks
@@ -15,19 +16,25 @@ tags:
   - genesis-block
   - typescript
   - blueprint
-crosslinks: {"references":["BLUEPRINT--GENESIS-GRAPH-INTEGRATION","ADR--GENESIS-GRAPH-AS-GKS-BACKEND","CONCEPT--GENESIS-GRAPH-BACKEND"]}
+crosslinks:
+  references:
+    - BLUEPRINT--GENESIS-GRAPH-INTEGRATION
+    - ADR--GENESIS-GRAPH-AS-GKS-BACKEND
+    - CONCEPT--GENESIS-GRAPH-BACKEND
 linked_symbols:
-  - { file: "packages/gks/src/memory/graph/genesis-graph.ts" }
-  - { file: "packages/gks/src/memory/graph/cypher-v0.ts" }
-  - { file: "packages/gks/src/memory/graph/genesis-graph-errors.ts" }
-  - { file: "packages/gks/src/memory/index.ts" }
+  - file: packages/gks/src/memory/graph/genesis-graph.ts
+  - file: packages/gks/src/memory/graph/cypher-v0.ts
+  - file: packages/gks/src/memory/graph/genesis-graph-errors.ts
+  - file: packages/gks/src/memory/index.ts
 created_at: 2026-05-12T22:49:00.000+07:00
 aliases:
   - BLUEPRINT
   - implementation_flow
   - Implementation plan
 cluster: implementation_flow
-role: "Implementation plan"
+role: Implementation plan
+attributes:
+  domain: blueprint
 ---
 
 # BLUEPRINT — Genesis Block Phase 0 (TS-first)

@@ -6,7 +6,8 @@ status: active
 tier: process
 source_type: axiomatic
 vault_id: default
-title: Resolution expand-on-demand — 2-tier recall + expand() to promote MENTION to FULL
+title: Resolution expand-on-demand — 2-tier recall + expand() to promote MENTION
+  to FULL
 tags:
   - msp
   - ucf
@@ -14,14 +15,20 @@ tags:
   - resolution
   - retrieval
   - mcp
-crosslinks: {"references":["CONCEPT--RESOLUTION-GRADIENT","ADR--RESOLUTION-TIER-COUNT","FRAMEWORK--UNIVERSAL-CONTEXT-FRAMEWORK"]}
+crosslinks:
+  references:
+    - CONCEPT--RESOLUTION-GRADIENT
+    - ADR--RESOLUTION-TIER-COUNT
+    - FRAMEWORK--UNIVERSAL-CONTEXT-FRAMEWORK
 created_at: 2026-05-14T19:42:02.796+07:00
 aliases:
   - FEAT
   - implementation_flow
   - Feature spec
 cluster: implementation_flow
-role: "Feature spec"
+role: Feature spec
+attributes:
+  domain: feat
 ---
 
 # FEAT — Resolution expand-on-demand

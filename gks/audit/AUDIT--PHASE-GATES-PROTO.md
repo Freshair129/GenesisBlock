@@ -13,22 +13,32 @@ tags:
   - phase-gates
   - audit
   - m8b
-crosslinks: {"references":["PROTO--PHASE-GATES","CONCEPT--PROTO-PHASE-GATES","FRAMEWORK--PHASE-GOVERNANCE","FEAT--PROTO-LOADER","BLUEPRINT--PROTO-LOADER","CONCEPT--PROTO-PATTERN"]}
+crosslinks:
+  references:
+    - PROTO--PHASE-GATES
+    - CONCEPT--PROTO-PHASE-GATES
+    - FRAMEWORK--PHASE-GOVERNANCE
+    - FEAT--PROTO-LOADER
+    - BLUEPRINT--PROTO-LOADER
+    - CONCEPT--PROTO-PATTERN
 linked_symbols:
-  - {"file":"packages/msp/src/validator/proto/phase-gates.ts"}
-  - {"file":"gks/proto/PROTO--PHASE-GATES.md"}
-  - {"file":"packages/msp/test/validator/proto/phase-gates.test.ts"}
-  - {"file":"scripts/msp/propose.mjs"}
+  - file: packages/msp/src/validator/proto/phase-gates.ts
+  - file: gks/proto/PROTO--PHASE-GATES.md
+  - file: packages/msp/test/validator/proto/phase-gates.test.ts
+  - file: scripts/msp/propose.mjs
 phase_override:
   skip_blueprint: true
-  reason: "PROTO atom + its predicate are M8a self-similar; the M8a BLUEPRINT--PROTO-LOADER covers the loader contract this predicate plugs into"
+  reason: PROTO atom + its predicate are M8a self-similar; the M8a
+    BLUEPRINT--PROTO-LOADER covers the loader contract this predicate plugs into
 created_at: 2026-05-05T18:00:00.000+07:00
 aliases:
   - AUDIT
   - implementation_flow
   - Test results / quality report
 cluster: implementation_flow
-role: "Test results / quality report"
+role: Test results / quality report
+attributes:
+  domain: audit
 ---
 
 # M8b — [[PROTO--PHASE-GATES]] (draft)

@@ -14,19 +14,25 @@ tags:
   - audit
   - memory
   - sessions
-crosslinks: {"references":["FEAT--MEMORY-SESSIONS-WRITER","BLUEPRINT--MEMORY-SESSIONS-WRITER","ADR--MEMORY-SESSIONS-WRITER"]}
+crosslinks:
+  references:
+    - FEAT--MEMORY-SESSIONS-WRITER
+    - BLUEPRINT--MEMORY-SESSIONS-WRITER
+    - ADR--MEMORY-SESSIONS-WRITER
 linked_symbols:
-  - {"file":"packages/msp/src/memory/sessions/writer.ts"}
-  - {"file":"packages/msp/src/memory/sessions/lock.ts"}
-  - {"file":"packages/msp/src/memory/sessions/schema.ts"}
-  - {"file":"packages/msp/src/memory/sessions/types.ts"}
+  - file: packages/msp/src/memory/sessions/writer.ts
+  - file: packages/msp/src/memory/sessions/lock.ts
+  - file: packages/msp/src/memory/sessions/schema.ts
+  - file: packages/msp/src/memory/sessions/types.ts
 created_at: 2026-05-03T15:43:38.014+07:00
 aliases:
   - AUDIT
   - implementation_flow
   - Test results / quality report
 cluster: implementation_flow
-role: "Test results / quality report"
+role: Test results / quality report
+attributes:
+  domain: audit
 ---
 
 # AUDIT — memory sessions writer

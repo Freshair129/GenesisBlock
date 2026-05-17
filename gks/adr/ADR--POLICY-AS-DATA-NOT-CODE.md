@@ -13,14 +13,19 @@ tags:
   - adr
   - abac
   - policy
-crosslinks: {"references":["CONCEPT--ABAC-POLICY-ENGINE","FRAMEWORK--UNIVERSAL-CONTEXT-FRAMEWORK"]}
+crosslinks:
+  references:
+    - CONCEPT--ABAC-POLICY-ENGINE
+    - FRAMEWORK--UNIVERSAL-CONTEXT-FRAMEWORK
 created_at: 2026-05-14T18:37:51.127+07:00
 aliases:
   - ADR
   - implementation_flow
   - Architecture decision record
 cluster: implementation_flow
-role: "Architecture decision record"
+role: Architecture decision record
+attributes:
+  domain: adr
 ---
 
 # ADR — Policy as data, not code

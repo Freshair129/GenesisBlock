@@ -14,19 +14,24 @@ tags:
   - audit
   - validator
   - anti-hallucination
-crosslinks: {"references":["ADR--ANTI-HALLUCINATION-RULES","FEAT--MSP-VALIDATOR"]}
+crosslinks:
+  references:
+    - ADR--ANTI-HALLUCINATION-RULES
+    - FEAT--MSP-VALIDATOR
 linked_symbols:
-  - {"file":"packages/msp/src/validator/rules/no-invented-versions.ts"}
-  - {"file":"packages/msp/src/validator/rules/evidence-for-decisions.ts"}
-  - {"file":"packages/msp/src/validator/rules/cite-or-mark-inferred.ts"}
-  - {"file":"packages/msp/src/validator/index.ts"}
+  - file: packages/msp/src/validator/rules/no-invented-versions.ts
+  - file: packages/msp/src/validator/rules/evidence-for-decisions.ts
+  - file: packages/msp/src/validator/rules/cite-or-mark-inferred.ts
+  - file: packages/msp/src/validator/index.ts
 created_at: 2026-05-03T18:01:45.959+07:00
 aliases:
   - AUDIT
   - implementation_flow
   - Test results / quality report
 cluster: implementation_flow
-role: "Test results / quality report"
+role: Test results / quality report
+attributes:
+  domain: audit
 ---
 
 # AUDIT — anti-hallucination rules complete

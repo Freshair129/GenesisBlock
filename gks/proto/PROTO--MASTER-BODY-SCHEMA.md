@@ -7,23 +7,32 @@ severity: error
 vault_id: default
 tier: safety
 source_type: axiomatic
-title: PROTO--MASTER-BODY-SCHEMA — five required H2 sections in every Master atom body (PR-5)
+title: PROTO--MASTER-BODY-SCHEMA — five required H2 sections in every Master
+  atom body (PR-5)
 tags:
   - msp
   - proto
   - master
   - schema
   - 3-tier
-crosslinks: {"enforces":["FRAMEWORK--KNOWLEDGE-3-TIER"],"references":["FRAMEWORK--KNOWLEDGE-3-TIER","ADR--MASTER-PROMOTION-DOC-TO-CODE","ADR--MASTER-PROMOTION-CONTRADICTION-POLICY"]}
+crosslinks:
+  enforces:
+    - FRAMEWORK--KNOWLEDGE-3-TIER
+  references:
+    - FRAMEWORK--KNOWLEDGE-3-TIER
+    - ADR--MASTER-PROMOTION-DOC-TO-CODE
+    - ADR--MASTER-PROMOTION-CONTRADICTION-POLICY
 linked_symbols:
-  - {"file":"packages/msp/src/validator/proto/master-body-schema.ts"}
+  - file: packages/msp/src/validator/proto/master-body-schema.ts
 created_at: 2026-05-09T15:05:00.000+07:00
 aliases:
   - PROTO
   - implementation_flow
   - Machine-enforced invariant
 cluster: implementation_flow
-role: "Machine-enforced invariant"
+role: Machine-enforced invariant
+attributes:
+  domain: proto
 ---
 
 # PROTO — MASTER-BODY-SCHEMA

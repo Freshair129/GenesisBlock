@@ -14,26 +14,33 @@ tags:
   - blueprint
   - implementation
   - m7e
-crosslinks: {"implements":["FEAT--IDENTITY-LAYER"],"references":["ADR--IDENTITY-STORAGE-SHAPE","CONCEPT--IDENTITY-LAYER"]}
+crosslinks:
+  implements:
+    - FEAT--IDENTITY-LAYER
+  references:
+    - ADR--IDENTITY-STORAGE-SHAPE
+    - CONCEPT--IDENTITY-LAYER
 linked_symbols:
-  - {"file":"packages/msp/src/identity/index.ts"}
-  - {"file":"packages/msp/src/identity/types.ts"}
-  - {"file":"packages/msp/src/identity/store.ts"}
-  - {"file":"packages/msp/src/identity/profile.ts"}
-  - {"file":"packages/msp/src/identity/voice.ts"}
-  - {"file":"packages/msp/src/identity/preferences.ts"}
-  - {"file":"packages/msp/test/identity/store.test.ts"}
-  - {"file":"packages/msp/test/identity/profile.test.ts"}
-  - {"file":"packages/msp/test/identity/voice.test.ts"}
-  - {"file":"packages/msp/test/identity/preferences.test.ts"}
-  - {"file":"packages/msp/test/identity/index.test.ts"}
+  - file: packages/msp/src/identity/index.ts
+  - file: packages/msp/src/identity/types.ts
+  - file: packages/msp/src/identity/store.ts
+  - file: packages/msp/src/identity/profile.ts
+  - file: packages/msp/src/identity/voice.ts
+  - file: packages/msp/src/identity/preferences.ts
+  - file: packages/msp/test/identity/store.test.ts
+  - file: packages/msp/test/identity/profile.test.ts
+  - file: packages/msp/test/identity/voice.test.ts
+  - file: packages/msp/test/identity/preferences.test.ts
+  - file: packages/msp/test/identity/index.test.ts
 created_at: 2026-05-05T00:26:30.000+07:00
 aliases:
   - BLUEPRINT
   - implementation_flow
   - Implementation plan
 cluster: implementation_flow
-role: "Implementation plan"
+role: Implementation plan
+attributes:
+  domain: blueprint
 ---
 
 # BLUEPRINT — identity layer implementation plan

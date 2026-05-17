@@ -256,7 +256,11 @@ export async function recall(opts: RecallOptions): Promise<RetrievalResult> {
   const pepOpts = { root, subject, action, context }
 
   for (const hit of fusedHits) {
-    const resource = makeResource('atom', hit.atomId, {}, hit.attributes ?? {})
+    const attributes = {
+      ...(hit.attributes ?? {}),
+      body: hit.snippet, // Inject snippet as body for regex matching (UCF Phase 4 PII pack)
+    }
+    const resource = makeResource('atom', hit.atomId, {}, attributes)
     const { permitted } = await enforcePolicy(resource, pepOpts)
     if (permitted) {
       filteredHits.push(hit)

@@ -13,14 +13,22 @@ tags:
   - workflow
   - governance
   - superseded
-crosslinks: {"references":["CONCEPT--INBOUND-QUEUE","CONCEPT--PROPOSAL-TYPES","FRAMEWORK--AUTHORITY-MATRIX"],"superseded_by":["ADR--AGENT-WRITE-BOUNDARIES"]}
+crosslinks:
+  references:
+    - CONCEPT--INBOUND-QUEUE
+    - CONCEPT--PROPOSAL-TYPES
+    - FRAMEWORK--AUTHORITY-MATRIX
+  superseded_by:
+    - ADR--AGENT-WRITE-BOUNDARIES
 created_at: 2026-05-03T14:08:40.359+07:00
 aliases:
   - ADR
   - implementation_flow
   - Architecture decision record
 cluster: implementation_flow
-role: "Architecture decision record"
+role: Architecture decision record
+attributes:
+  domain: adr
 ---
 
 > ⚠️ **Superseded by [`[[ADR--AGENT-WRITE-BOUNDARIES]]`](./[[ADR--AGENT-WRITE-BOUNDARIES]].md)** (Phase 4 of `[[BLUEPRINT--INBOUND-TO-CANDIDATES-MIGRATION]]`, 2026-05-09). The three-gate inbound workflow has been replaced with: agents write to `.brain/.../candidates/` via `msp_candidate`, promotion to `gks/<type>/` is a human PR action gated by CI. The body below is preserved as historical context.

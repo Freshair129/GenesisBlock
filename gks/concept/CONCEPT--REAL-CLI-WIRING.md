@@ -6,21 +6,27 @@ status: stable
 vault_id: default
 tier: process
 source_type: axiomatic
-title: Real CLI wiring for T1/T2/T3 tier adapters — invocation patterns + opt-in integration tests
+title: Real CLI wiring for T1/T2/T3 tier adapters — invocation patterns + opt-in
+  integration tests
 tags:
   - msp
   - phase-e1
   - tier-adapters
   - cli
   - integration-test
-crosslinks: {"references":["AUDIT--PHASE-E1-REAL-CLI-WIRING","CONCEPT--TIER-3-DEFERRED"]}
+crosslinks:
+  references:
+    - AUDIT--PHASE-E1-REAL-CLI-WIRING
+    - CONCEPT--TIER-3-DEFERRED
 created_at: 2026-05-14T04:00:00.000+07:00
 aliases:
   - CONCEPT
   - implementation_flow
   - Strategic intent / PRD
 cluster: implementation_flow
-role: "Strategic intent / PRD"
+role: Strategic intent / PRD
+attributes:
+  domain: concept
 ---
 
 # CONCEPT — Real CLI wiring for T1/T2/T3 adapters

@@ -7,28 +7,49 @@ created_at: 2026-05-13T12:00:00+07:00
 vault_id: GKS-CORE
 tier: genesis
 title: Doc-to-code enforcement model (master-spec §6 → GKS primitives)
-tags: [workflow, enforcement, agent-rule, hotfix, msp-gatekeeper]
+tags:
+  - workflow
+  - enforcement
+  - agent-rule
+  - hotfix
+  - msp-gatekeeper
 crosslinks:
-  references: [ADR--EXTENDED-TAXONOMY, ADR--FLAT-ATOM-LAYOUT, ADR--REVERSE-CITATION-LOOKUP, CONCEPT--MASTER-PROMOTION]
-  partially_superseded_by: [ADR--TASK-TRACKING-AT-ORCHESTRATOR]
+  references:
+    - ADR--EXTENDED-TAXONOMY
+    - ADR--FLAT-ATOM-LAYOUT
+    - ADR--REVERSE-CITATION-LOOKUP
+    - CONCEPT--MASTER-PROMOTION
+  partially_superseded_by:
+    - ADR--TASK-TRACKING-AT-ORCHESTRATOR
 linked_symbols:
-  - { file: "packages/gks/src/memory/types.ts", fn: normaliseStatus }
-  - { file: "packages/gks/src/memory/types.ts", fn: isApprovedStatus }
-  - { file: "packages/gks/src/memory/verify-flow.ts", fn: verifyFlow }
-  - { file: "packages/gks/src/memory/validate-links.ts", fn: validateLinks }
-  - { file: "packages/gks/src/scaffold/new-feature.ts", fn: scaffoldNewFeature }
-  - { file: "packages/gks/src/hotfix/store.ts" }
-  - { file: "packages/gks/src/hotfix/types.ts" }
-  - { file: "packages/gks/bin/gks.ts", fn: cmdVerifyFlow }
-  - { file: "packages/gks/bin/gks.ts", fn: cmdValidate }
-  - { file: "packages/gks/bin/gks.ts", fn: cmdNewFeature }
-  - { file: "packages/gks/bin/gks.ts", fn: cmdHotfix }
+  - file: packages/gks/src/memory/types.ts
+    fn: normaliseStatus
+  - file: packages/gks/src/memory/types.ts
+    fn: isApprovedStatus
+  - file: packages/gks/src/memory/verify-flow.ts
+    fn: verifyFlow
+  - file: packages/gks/src/memory/validate-links.ts
+    fn: validateLinks
+  - file: packages/gks/src/scaffold/new-feature.ts
+    fn: scaffoldNewFeature
+  - file: packages/gks/src/hotfix/store.ts
+  - file: packages/gks/src/hotfix/types.ts
+  - file: packages/gks/bin/gks.ts
+    fn: cmdVerifyFlow
+  - file: packages/gks/bin/gks.ts
+    fn: cmdValidate
+  - file: packages/gks/bin/gks.ts
+    fn: cmdNewFeature
+  - file: packages/gks/bin/gks.ts
+    fn: cmdHotfix
 aliases:
   - ADR
   - implementation_flow
   - Architecture decision record
 cluster: implementation_flow
-role: "Architecture decision record"
+role: Architecture decision record
+attributes:
+  domain: adr
 ---
 
 # ADR — Doc-to-code enforcement model

@@ -88,7 +88,7 @@ export function requiredFields(
       const expectedPrimary = (atom.fm.id ?? atom.fm.proposed_id) as string | undefined
       if (expectedPrimary !== undefined) {
         const root = ctx.root ?? process.cwd()
-        const prefix = expectedPrimary.split('--')[0]!
+        const prefix = expectedPrimary.split('-')[0]!
         const typeDef = lookupType(prefix, root)
         if (typeDef) {
           const expected = field === 'cluster' ? typeDef.cluster : typeDef.role

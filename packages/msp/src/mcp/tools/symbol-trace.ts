@@ -3,6 +3,7 @@ import { z } from 'zod'
 import { SymbolStore } from '../../symbols/store/sqlite.js'
 import { dbPath, graphExists } from '../../symbols/util.js'
 import { SymbolTracer } from '../../symbols/tracer/tracer.js'
+import { makeContext, makeSubject } from '../../policy/types.js'
 import { errorResult, jsonResult, type ToolHandlerCtx, type ToolTextResult } from '../types.js'
 
 export const name = 'msp_symbol_trace'
@@ -58,3 +59,4 @@ export function handler(ctx: ToolHandlerCtx) {
     }
   }
 }
+

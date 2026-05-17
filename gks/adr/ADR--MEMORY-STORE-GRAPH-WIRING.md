@@ -6,20 +6,26 @@ status: stable
 vault_id: default
 tier: process
 source_type: axiomatic
-title: GraphBackend joins MemoryStoreOptions — MemoryStore exposes store.graph after init()
+title: GraphBackend joins MemoryStoreOptions — MemoryStore exposes store.graph
+  after init()
 tags:
   - gks
   - memory
   - graph
   - decision
-crosslinks: {"references":["FRAMEWORK--MSP-ARCHITECTURE-V2","CONCEPT--MEMORY-STORE"]}
+crosslinks:
+  references:
+    - FRAMEWORK--MSP-ARCHITECTURE-V2
+    - CONCEPT--MEMORY-STORE
 created_at: 2026-05-12T22:48:00.000+07:00
 aliases:
   - ADR
   - implementation_flow
   - Architecture decision record
 cluster: implementation_flow
-role: "Architecture decision record"
+role: Architecture decision record
+attributes:
+  domain: adr
 ---
 
 # ADR — MemoryStore graphBackend wiring

@@ -12,14 +12,18 @@ tags:
   - identity
   - params
   - configuration
-crosslinks: {"references":["CONCEPT--IDENTITY-LAYER"]}
+crosslinks:
+  references:
+    - CONCEPT--IDENTITY-LAYER
 created_at: 2026-05-14T20:30:00+07:00
 aliases:
   - PARAMS
   - implementation_flow
   - Constants / business config
 cluster: implementation_flow
-role: "Constants / business config"
+role: Constants / business config
+attributes:
+  domain: params
 ---
 
 # PARAMS — Identity Profile Defaults

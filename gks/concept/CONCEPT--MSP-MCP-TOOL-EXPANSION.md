@@ -16,14 +16,22 @@ tags:
   - msp-compress
   - msp-identity
   - m7f
-crosslinks: {"references":["FEAT--MSP-MCP-SERVER","FEAT--CONSOLIDATOR","FEAT--RETRIEVAL-ORCHESTRATION","FEAT--COMPRESSOR","FEAT--IDENTITY-LAYER"]}
+crosslinks:
+  references:
+    - FEAT--MSP-MCP-SERVER
+    - FEAT--CONSOLIDATOR
+    - FEAT--RETRIEVAL-ORCHESTRATION
+    - FEAT--COMPRESSOR
+    - FEAT--IDENTITY-LAYER
 created_at: 2026-05-05T16:15:00.000+07:00
 aliases:
   - CONCEPT
   - implementation_flow
   - Strategic intent / PRD
 cluster: implementation_flow
-role: "Strategic intent / PRD"
+role: Strategic intent / PRD
+attributes:
+  domain: concept
 ---
 
 # CONCEPT — MSP MCP tool expansion

@@ -7,7 +7,14 @@ vault_id: default
 tier: genesis
 source_type: axiomatic
 title: AUDIT — Phase F (refinements) — implementation complete
-tags: [msp, audit, phase-f, master, usage, episode, gc]
+tags:
+  - msp
+  - audit
+  - phase-f
+  - master
+  - usage
+  - episode
+  - gc
 crosslinks:
   references:
     - AUDIT--PHASE-F1-MASTER-GENESIS-WIRING
@@ -26,7 +33,9 @@ aliases:
   - implementation_flow
   - Test results / quality report
 cluster: implementation_flow
-role: "Test results / quality report"
+role: Test results / quality report
+attributes:
+  domain: audit
 ---
 
 # AUDIT — Phase F (refinements) — implementation complete

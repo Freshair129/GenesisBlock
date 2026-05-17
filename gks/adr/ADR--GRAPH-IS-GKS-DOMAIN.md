@@ -6,21 +6,29 @@ status: stable
 vault_id: default
 tier: genesis
 source_type: axiomatic
-title: Atomic graph traversal is GKS domain; MSP only does shift-left + type-specific opinions
+title: Atomic graph traversal is GKS domain; MSP only does shift-left +
+  type-specific opinions
 tags:
   - msp
   - gks
   - scope
   - decision
   - governance
-crosslinks: {"references":["FRAMEWORK--MSP-ARCHITECTURE-V2","FRAMEWORK--CROSSLINKS-VOCABULARY","ADR--ANTI-HALLUCINATION-RULES","CONCEPT--GENESIS-GRAPH-BACKEND"]}
+crosslinks:
+  references:
+    - FRAMEWORK--MSP-ARCHITECTURE-V2
+    - FRAMEWORK--CROSSLINKS-VOCABULARY
+    - ADR--ANTI-HALLUCINATION-RULES
+    - CONCEPT--GENESIS-GRAPH-BACKEND
 created_at: 2026-05-04T09:02:48.270+07:00
 aliases:
   - ADR
   - implementation_flow
   - Architecture decision record
 cluster: implementation_flow
-role: "Architecture decision record"
+role: Architecture decision record
+attributes:
+  domain: adr
 ---
 
 # ADR — atomic graph is GKS domain

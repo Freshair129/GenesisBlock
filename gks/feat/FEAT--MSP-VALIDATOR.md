@@ -12,20 +12,26 @@ tags:
   - validator
   - cli
   - user-facing
-crosslinks: {"implements":["ADR--MSP-VALIDATOR"],"references":["CONCEPT--MSP-VALIDATOR"]}
+crosslinks:
+  implements:
+    - ADR--MSP-VALIDATOR
+  references:
+    - CONCEPT--MSP-VALIDATOR
 linked_symbols:
-  - {"file":"packages/msp/src/validator/index.ts"}
-  - {"file":"packages/msp/src/validator/rules/forbidden-fields.ts"}
-  - {"file":"packages/msp/src/validator/rules/dangling-wikilinks.ts"}
-  - {"file":"src/validator/rules/id-uniqueness.ts"}
-  - {"file":"packages/msp/src/validator/cli.ts"}
+  - file: packages/msp/src/validator/index.ts
+  - file: packages/msp/src/validator/rules/forbidden-fields.ts
+  - file: packages/msp/src/validator/rules/dangling-wikilinks.ts
+  - file: src/validator/rules/id-uniqueness.ts
+  - file: packages/msp/src/validator/cli.ts
 created_at: 2026-05-03T13:24:25.043+07:00
 aliases:
   - FEAT
   - implementation_flow
   - Feature spec
 cluster: implementation_flow
-role: "Feature spec"
+role: Feature spec
+attributes:
+  domain: feat
 ---
 
 # FEAT — msp:validate

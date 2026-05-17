@@ -12,14 +12,20 @@ tags:
   - validator
   - forbidden-fields
   - anti-hallucination
-crosslinks: {"references":["CONCEPT--ATOMIC-WRITE-CONTRACT"],"implements":["FEAT--MSP-VALIDATOR"]}
+crosslinks:
+  references:
+    - CONCEPT--ATOMIC-WRITE-CONTRACT
+  implements:
+    - FEAT--MSP-VALIDATOR
 created_at: 2026-05-03T14:08:40.802+07:00
 aliases:
   - ADR
   - implementation_flow
   - Architecture decision record
 cluster: implementation_flow
-role: "Architecture decision record"
+role: Architecture decision record
+attributes:
+  domain: adr
 ---
 
 # ADR — forbidden frontmatter fields

@@ -6,7 +6,7 @@ import {
   type CandidateWriteInput,
 } from './types.js'
 
-const ID_PATTERN = /^(CONCEPT|ADR|FEAT|BLUEPRINT|FRAME|AUDIT|PROTO)--[A-Z0-9-]+$/
+const ID_PATTERN = /^(CONCEPT|ADR|FEAT|BLUEPRINT|FRAME|AUDIT|PROTO)(?:-[a-zA-Z0-9-]+)?--[A-Z0-9-]+(?:--K\d+)?$/
 
 export function assertValidProposedId(id: string): void {
   if (!ID_PATTERN.test(id)) throw new CandidateIdError(id)
@@ -31,7 +31,7 @@ export function composeFrontmatter(
   for (const alias of aliases) {
     lines.push(`  - ${alias}`)
   }
-  const prefix = input.proposed_id.split('--')[0]!
+  const prefix = input.proposed_id.split('-')[0]!
   const typeDef = lookupType(prefix, process.cwd())
   if (typeDef) {
     lines.push(`cluster: ${yamlScalar(typeDef.cluster)}`)

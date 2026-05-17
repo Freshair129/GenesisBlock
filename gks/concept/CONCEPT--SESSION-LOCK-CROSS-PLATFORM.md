@@ -6,7 +6,8 @@ status: stable
 vault_id: default
 tier: genesis
 source_type: axiomatic
-title: Session lock cross-platform parity — max-age safeguard for Windows + zombie PIDs
+title: Session lock cross-platform parity — max-age safeguard for Windows +
+  zombie PIDs
 tags:
   - msp
   - sessions
@@ -14,14 +15,19 @@ tags:
   - windows
   - cross-platform
   - m9f
-crosslinks: {"references":["FEAT--MEMORY-SESSIONS-WRITER","CONCEPT--MEMORY-SESSIONS"]}
+crosslinks:
+  references:
+    - FEAT--MEMORY-SESSIONS-WRITER
+    - CONCEPT--MEMORY-SESSIONS
 created_at: 2026-05-05T16:22:00.000+07:00
 aliases:
   - CONCEPT
   - implementation_flow
   - Strategic intent / PRD
 cluster: implementation_flow
-role: "Strategic intent / PRD"
+role: Strategic intent / PRD
+attributes:
+  domain: concept
 ---
 
 # CONCEPT — session lock cross-platform parity

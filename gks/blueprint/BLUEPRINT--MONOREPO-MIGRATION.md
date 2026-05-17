@@ -15,24 +15,30 @@ tags:
   - implementation
   - msp
   - gks
-crosslinks: {"references":["CONCEPT--MONOREPO-MIGRATION","ADR--MONOREPO-STRUCTURE","FRAMEWORK--MSP-ARCHITECTURE-V2"]}
+crosslinks:
+  references:
+    - CONCEPT--MONOREPO-MIGRATION
+    - ADR--MONOREPO-STRUCTURE
+    - FRAMEWORK--MSP-ARCHITECTURE-V2
 linked_symbols:
-  - {"file":"package.json"}
-  - {"file":"packages/gks/package.json"}
-  - {"file":"packages/msp/package.json"}
-  - {"file":".github/workflows/ci.yml"}
-  - {"file":".github/workflows/publish-gks.yml"}
-  - {"file":"eslint.config.js"}
-  - {"file":"upstream/gks-proposals/"}
-  - {"file":"scripts/msp/propose.mjs"}
-  - {"file":"packages/msp/src/memory/backlinks/"}
+  - file: package.json
+  - file: packages/gks/package.json
+  - file: packages/msp/package.json
+  - file: .github/workflows/ci.yml
+  - file: .github/workflows/publish-gks.yml
+  - file: eslint.config.js
+  - file: upstream/gks-proposals/
+  - file: scripts/msp/propose.mjs
+  - file: packages/msp/src/memory/backlinks/
 created_at: 2026-05-08T13:22:00.000+07:00
 aliases:
   - BLUEPRINT
   - implementation_flow
   - Implementation plan
 cluster: implementation_flow
-role: "Implementation plan"
+role: Implementation plan
+attributes:
+  domain: blueprint
 ---
 
 # BLUEPRINT — monorepo migration

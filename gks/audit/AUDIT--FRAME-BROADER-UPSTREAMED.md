@@ -6,7 +6,7 @@ status: stable
 vault_id: default
 tier: process
 source_type: axiomatic
-title: Broad FRAME-- definition upstreamed — closes proposal #07
+title: Broad FRAME-- definition upstreamed — closes proposal
 tags:
   - msp
   - gks
@@ -14,14 +14,21 @@ tags:
   - upstream
   - taxonomy
   - framework
-crosslinks: {"references":["AUDIT--ARCH-DOC-CLEANUP","FRAMEWORK--MSP-ARCHITECTURE-V2","FRAMEWORK--KNOWLEDGE-3-TIER","FRAMEWORK--PHASE-GOVERNANCE"]}
+crosslinks:
+  references:
+    - AUDIT--ARCH-DOC-CLEANUP
+    - FRAMEWORK--MSP-ARCHITECTURE-V2
+    - FRAMEWORK--KNOWLEDGE-3-TIER
+    - FRAMEWORK--PHASE-GOVERNANCE
 created_at: 2026-05-11T17:26:00.000+07:00
 aliases:
   - AUDIT
   - implementation_flow
   - Test results / quality report
 cluster: implementation_flow
-role: "Test results / quality report"
+role: Test results / quality report
+attributes:
+  domain: audit
 ---
 
 # AUDIT — Broad FRAME-- definition upstreamed

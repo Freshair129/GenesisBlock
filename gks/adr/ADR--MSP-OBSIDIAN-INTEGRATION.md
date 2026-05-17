@@ -12,14 +12,20 @@ tags:
   - obsidian
   - integration
   - decision
-crosslinks: {"references":["CONCEPT--OBSIDIAN-AS-RUNTIME","CONCEPT--EMBEDDING-STRATEGY","ADR--GRAPH-IS-GKS-DOMAIN"]}
+crosslinks:
+  references:
+    - CONCEPT--OBSIDIAN-AS-RUNTIME
+    - CONCEPT--EMBEDDING-STRATEGY
+    - ADR--GRAPH-IS-GKS-DOMAIN
 created_at: 2026-05-03T23:55:06.326+07:00
 aliases:
   - ADR
   - implementation_flow
   - Architecture decision record
 cluster: implementation_flow
-role: "Architecture decision record"
+role: Architecture decision record
+attributes:
+  domain: adr
 ---
 
 # ADR — MSP↔Obsidian integration

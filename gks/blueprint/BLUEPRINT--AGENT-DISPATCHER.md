@@ -19,14 +19,16 @@ crosslinks:
     - ADR--AGENT-TIER-COST-POLICY
     - CONCEPT--AGENT-AGNOSTIC
 linked_symbols:
-  - {"file":"packages/msp/src/agents/dispatch.ts"}
+  - file: packages/msp/src/agents/dispatch.ts
 created_at: 2026-05-14T01:35:00.000+07:00
 aliases:
   - BLUEPRINT
   - implementation_flow
   - Implementation plan
 cluster: implementation_flow
-role: "Implementation plan"
+role: Implementation plan
+attributes:
+  domain: blueprint
 ---
 
 # BLUEPRINT — Agent Dispatcher

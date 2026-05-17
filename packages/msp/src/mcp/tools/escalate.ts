@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import { createCognitiveLayer } from '../../cognitive/index.js'
+import { makeContext, makeSubject } from '../../policy/types.js'
 import { jsonResult, type ToolHandlerCtx, type ToolTextResult } from '../types.js'
 
 export const name = 'msp_escalate'
@@ -18,11 +19,14 @@ export const inputSchema = {
 export function handler(ctx: ToolHandlerCtx) {
   return async (args: { request_scope_extension?: string[]; reason: string }): Promise<ToolTextResult> => {
     try {
+      const subject = ctx.subject ?? makeSubject('mcp-client', 'default-mcp')
+      const context = ctx.policyContext ?? makeContext('mcp-stdio', `mcp-${Date.now()}`)
+
       const layer = await createCognitiveLayer({ root: ctx.root })
       const result = await layer.escalate({
         request_scope_extension: args.request_scope_extension,
         reason: args.reason,
-      })
+      }, { subject, context })
       return jsonResult(result)
     } catch (err) {
       return {

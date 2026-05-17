@@ -14,19 +14,25 @@ tags:
   - hook
   - blueprint
   - implementation
-crosslinks: {"implements":["FEAT--MSP-PREPUSH-HOOK"],"references":["ADR--MSP-PREPUSH-HOOK"]}
+crosslinks:
+  implements:
+    - FEAT--MSP-PREPUSH-HOOK
+  references:
+    - ADR--MSP-PREPUSH-HOOK
 linked_symbols:
-  - {"file":"examples/hooks/pre-push-verify.sh"}
-  - {"file":"examples/hooks/install.sh"}
-  - {"file":"examples/hooks/README.md"}
-  - {"file":"packages/msp/test/hooks/pre-push.test.ts"}
+  - file: examples/hooks/pre-push-verify.sh
+  - file: examples/hooks/install.sh
+  - file: examples/hooks/README.md
+  - file: packages/msp/test/hooks/pre-push.test.ts
 created_at: 2026-05-03T17:39:29.189+07:00
 aliases:
   - BLUEPRINT
   - implementation_flow
   - Implementation plan
 cluster: implementation_flow
-role: "Implementation plan"
+role: Implementation plan
+attributes:
+  domain: blueprint
 ---
 
 # BLUEPRINT — pre-push hook

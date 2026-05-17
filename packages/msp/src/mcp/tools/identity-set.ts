@@ -10,6 +10,7 @@ import {
   writeIdentity,
 } from '../../identity/index.js'
 import type { Profile, Voice } from '../../identity/types.js'
+import { makeContext, makeSubject } from '../../policy/types.js'
 import { errorResult, jsonResult, type ToolHandlerCtx, type ToolTextResult } from '../types.js'
 
 export const name = 'msp_identity_set'
@@ -92,7 +93,10 @@ interface IdentitySetArgs {
 export function handler(ctx: ToolHandlerCtx) {
   return async (args: IdentitySetArgs): Promise<ToolTextResult> => {
     const root = resolve(args.root ?? ctx.root)
-    const opts = { root, namespace: args.namespace }
+    const subject = ctx.subject ?? makeSubject('mcp-client', 'default-mcp')
+    const context = ctx.policyContext ?? makeContext('mcp-stdio', `mcp-${Date.now()}`)
+
+    const opts = { root, namespace: args.namespace, subject, context }
     // Sensible default per ADR: profile + voice → global, preferences → global.
     // Callers wanting a project-level override (per-project voice/role) pass
     // `scope: 'project'` explicitly.

@@ -6,7 +6,8 @@ status: stable
 tier: process
 source_type: axiomatic
 vault_id: default
-title: AUDIT — inbound→candidates migration complete (4 phases shipped, atom supersession recorded)
+title: AUDIT — inbound→candidates migration complete (4 phases shipped, atom
+  supersession recorded)
 tags:
   - msp
   - inbound
@@ -14,14 +15,24 @@ tags:
   - migration
   - audit
   - supersession
-crosslinks: {"references":["BLUEPRINT--INBOUND-TO-CANDIDATES-MIGRATION","CONCEPT--KNOWLEDGE-LAYERS-V2","CONCEPT--INBOUND-QUEUE","ADR--AGENT-WRITE-BOUNDARIES","ADR--PROMOTION-WORKFLOW","ADR--PROMOTION-LEVELS","FRAMEWORK--KNOWLEDGE-3-TIER"]}
+crosslinks:
+  references:
+    - BLUEPRINT--INBOUND-TO-CANDIDATES-MIGRATION
+    - CONCEPT--KNOWLEDGE-LAYERS-V2
+    - CONCEPT--INBOUND-QUEUE
+    - ADR--AGENT-WRITE-BOUNDARIES
+    - ADR--PROMOTION-WORKFLOW
+    - ADR--PROMOTION-LEVELS
+    - FRAMEWORK--KNOWLEDGE-3-TIER
 created_at: 2026-05-09T14:45:00.000+07:00
 aliases:
   - AUDIT
   - implementation_flow
   - Test results / quality report
 cluster: implementation_flow
-role: "Test results / quality report"
+role: Test results / quality report
+attributes:
+  domain: audit
 ---
 
 # AUDIT — inbound→candidates migration complete

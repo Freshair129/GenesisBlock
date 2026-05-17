@@ -12,14 +12,18 @@ tags:
   - codegen
   - post-processing
   - slm
-crosslinks: {"references":["CONCEPT--CODEGEN-MICROTASK-CONTRACT"]}
+crosslinks:
+  references:
+    - CONCEPT--CODEGEN-MICROTASK-CONTRACT
 created_at: 2026-05-03T14:08:41.716+07:00
 aliases:
   - ADR
   - implementation_flow
   - Architecture decision record
 cluster: implementation_flow
-role: "Architecture decision record"
+role: Architecture decision record
+attributes:
+  domain: adr
 ---
 
 # ADR — codegen post-processing

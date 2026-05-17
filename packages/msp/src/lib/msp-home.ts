@@ -42,6 +42,11 @@ export function projectsRegistryPath(): string {
   return resolve(mspHome(), 'projects.yaml')
 }
 
+/** Path to the global authentication config (PIN hashes, etc). */
+export function authConfigPath(): string {
+  return resolve(mspHome(), 'auth.json')
+}
+
 /** Directory for cross-project audit logs (JSONL by date). */
 export function globalAuditDir(): string {
   return resolve(mspHome(), 'audit')

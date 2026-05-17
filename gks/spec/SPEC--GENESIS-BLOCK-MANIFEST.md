@@ -14,14 +14,21 @@ tags:
   - manifest
   - taxonomy
   - foundation
-crosslinks: {"references":["CONCEPT--TAXONOMY-V2-3","ADR--TAXONOMY-V2-3-MIGRATION","FRAMEWORK--AUTHORITY-MATRIX","CONCEPT--GENESIS-GRAPH-BACKEND"]}
+crosslinks:
+  references:
+    - CONCEPT--TAXONOMY-V2-3
+    - ADR--TAXONOMY-V2-3-MIGRATION
+    - FRAMEWORK--AUTHORITY-MATRIX
+    - CONCEPT--GENESIS-GRAPH-BACKEND
 created_at: 2026-05-13T13:14:43+07:00
 aliases:
   - SPEC
   - implementation_flow
   - Technical specification
 cluster: implementation_flow
-role: "Technical specification"
+role: Technical specification
+attributes:
+  domain: spec
 ---
 
 # SPEC — Genesis Block manifest

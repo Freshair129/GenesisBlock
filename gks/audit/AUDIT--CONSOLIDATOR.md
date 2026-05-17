@@ -6,32 +6,41 @@ status: stable
 vault_id: default
 tier: process
 source_type: axiomatic
-title: M7b — consolidator implementation (hybrid scoring + boundary detection + summariser)
+title: M7b — consolidator implementation (hybrid scoring + boundary detection +
+  summariser)
 tags:
   - msp
   - consolidator
   - m7b
   - audit
-crosslinks: {"references":["FEAT--CONSOLIDATOR","BLUEPRINT--CONSOLIDATOR","ADR--CONSOLIDATOR-HYBRID-SCORING","CONCEPT--CONSOLIDATOR","FRAMEWORK--MSP-ARCHITECTURE-V2"]}
+crosslinks:
+  references:
+    - FEAT--CONSOLIDATOR
+    - BLUEPRINT--CONSOLIDATOR
+    - ADR--CONSOLIDATOR-HYBRID-SCORING
+    - CONCEPT--CONSOLIDATOR
+    - FRAMEWORK--MSP-ARCHITECTURE-V2
 linked_symbols:
-  - {"file":"packages/msp/src/orchestrator/consolidator/index.ts"}
-  - {"file":"packages/msp/src/orchestrator/consolidator/types.ts"}
-  - {"file":"packages/msp/src/orchestrator/consolidator/score.ts"}
-  - {"file":"packages/msp/src/orchestrator/consolidator/boundary.ts"}
-  - {"file":"packages/msp/src/orchestrator/consolidator/summarise.ts"}
-  - {"file":"packages/msp/src/orchestrator/consolidator/llm.ts"}
-  - {"file":"packages/msp/test/orchestrator/consolidator/score.test.ts"}
-  - {"file":"packages/msp/test/orchestrator/consolidator/boundary.test.ts"}
-  - {"file":"packages/msp/test/orchestrator/consolidator/summarise.test.ts"}
-  - {"file":"packages/msp/test/orchestrator/consolidator/llm.test.ts"}
-  - {"file":"packages/msp/test/orchestrator/consolidator/index.test.ts"}
+  - file: packages/msp/src/orchestrator/consolidator/index.ts
+  - file: packages/msp/src/orchestrator/consolidator/types.ts
+  - file: packages/msp/src/orchestrator/consolidator/score.ts
+  - file: packages/msp/src/orchestrator/consolidator/boundary.ts
+  - file: packages/msp/src/orchestrator/consolidator/summarise.ts
+  - file: packages/msp/src/orchestrator/consolidator/llm.ts
+  - file: packages/msp/test/orchestrator/consolidator/score.test.ts
+  - file: packages/msp/test/orchestrator/consolidator/boundary.test.ts
+  - file: packages/msp/test/orchestrator/consolidator/summarise.test.ts
+  - file: packages/msp/test/orchestrator/consolidator/llm.test.ts
+  - file: packages/msp/test/orchestrator/consolidator/index.test.ts
 created_at: 2026-05-04T23:29:00.000+07:00
 aliases:
   - AUDIT
   - implementation_flow
   - Test results / quality report
 cluster: implementation_flow
-role: "Test results / quality report"
+role: Test results / quality report
+attributes:
+  domain: audit
 ---
 
 # M7b — consolidator implementation (hybrid scoring + boundary detection + summariser)

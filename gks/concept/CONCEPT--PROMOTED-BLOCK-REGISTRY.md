@@ -6,7 +6,8 @@ status: draft
 tier: genesis
 source_type: axiomatic
 vault_id: default
-title: Promoted-Block Registry — first-class runnable status for Master-tier Genesis Blocks
+title: Promoted-Block Registry — first-class runnable status for Master-tier
+  Genesis Blocks
 tags:
   - msp
   - master
@@ -15,14 +16,23 @@ tags:
   - genesis-block
   - runtime
   - phase-f1
-crosslinks: {"references":["CONCEPT--MASTER-PROMOTION","SPEC--GENESIS-BLOCK-MANIFEST","CONCEPT--GENESIS-BLOCK-RUNTIME","FRAMEWORK--KNOWLEDGE-3-TIER","ADR--MASTER-PROMOTION-DOC-TO-CODE","ADR--HUMAN-REVIEW-GATES"]}
+crosslinks:
+  references:
+    - CONCEPT--MASTER-PROMOTION
+    - SPEC--GENESIS-BLOCK-MANIFEST
+    - CONCEPT--GENESIS-BLOCK-RUNTIME
+    - FRAMEWORK--KNOWLEDGE-3-TIER
+    - ADR--MASTER-PROMOTION-DOC-TO-CODE
+    - ADR--HUMAN-REVIEW-GATES
 created_at: 2026-05-14T05:00:00.000+07:00
 aliases:
   - CONCEPT
   - implementation_flow
   - Strategic intent / PRD
 cluster: implementation_flow
-role: "Strategic intent / PRD"
+role: Strategic intent / PRD
+attributes:
+  domain: concept
 ---
 
 # CONCEPT — Promoted-Block Registry

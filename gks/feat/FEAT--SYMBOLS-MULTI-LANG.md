@@ -6,7 +6,8 @@ status: stable
 tier: process
 source_type: axiomatic
 vault_id: default
-title: Multi-language symbol support — adding Python and legacy COBOL parsers to MSP graph
+title: Multi-language symbol support — adding Python and legacy COBOL parsers to
+  MSP graph
 tags:
   - msp
   - symbol-graph
@@ -14,18 +15,26 @@ tags:
   - python
   - cobol
   - feat
-crosslinks: {"implements":["ADR--SYMBOL-GRAPH-PERSISTENCE"],"references":["FRAMEWORK--SYMBOL-GRAPH","CONCEPT--SYMBOL-GRAPH","FEAT--MSP-SYMBOL-MCP"]}
+crosslinks:
+  implements:
+    - ADR--SYMBOL-GRAPH-PERSISTENCE
+  references:
+    - FRAMEWORK--SYMBOL-GRAPH
+    - CONCEPT--SYMBOL-GRAPH
+    - FEAT--MSP-SYMBOL-MCP
 linked_symbols:
-  - {"file":"packages/msp/src/symbols/parser/python.ts"}
-  - {"file":"packages/msp/src/symbols/parser/cobol.ts"}
-  - {"file":"packages/msp/src/symbols/api.ts"}
+  - file: packages/msp/src/symbols/parser/python.ts
+  - file: packages/msp/src/symbols/parser/cobol.ts
+  - file: packages/msp/src/symbols/api.ts
 created_at: 2026-05-12T04:48:00.000+07:00
 aliases:
   - FEAT
   - implementation_flow
   - Feature spec
 cluster: implementation_flow
-role: "Feature spec"
+role: Feature spec
+attributes:
+  domain: feat
 ---
 
 # FEAT — Multi-language symbol support

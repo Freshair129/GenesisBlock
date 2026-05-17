@@ -13,22 +13,31 @@ tags:
   - facade
   - memoryos
   - user-facing
-crosslinks: {"implements":["CONCEPT--COGNITIVE-LAYER-FACADE"],"references":["CONCEPT--AGENT-AGNOSTIC","ADR--MEMORY-STORE-GRAPH-WIRING","ADR--GEMINI-AS-SLM-PROVIDER","ADR--DEFAULT-SLM-OLLAMA-QWEN-CODER"]}
+crosslinks:
+  implements:
+    - CONCEPT--COGNITIVE-LAYER-FACADE
+  references:
+    - CONCEPT--AGENT-AGNOSTIC
+    - ADR--MEMORY-STORE-GRAPH-WIRING
+    - ADR--GEMINI-AS-SLM-PROVIDER
+    - ADR--DEFAULT-SLM-OLLAMA-QWEN-CODER
 linked_symbols:
-  - {"file":"packages/msp/src/cognitive/index.ts"}
-  - {"file":"packages/msp/src/cognitive/types.ts"}
-  - {"file":"packages/msp/src/cognitive/fts.ts"}
-  - {"file":"packages/msp/src/cognitive/scale-gate.ts"}
-  - {"file":"packages/msp/src/cognitive/ssot.ts"}
-  - {"file":"packages/msp/src/cognitive/audit-only.ts"}
-  - {"file":"packages/msp/src/cognitive/compose.ts"}
+  - file: packages/msp/src/cognitive/index.ts
+  - file: packages/msp/src/cognitive/types.ts
+  - file: packages/msp/src/cognitive/fts.ts
+  - file: packages/msp/src/cognitive/scale-gate.ts
+  - file: packages/msp/src/cognitive/ssot.ts
+  - file: packages/msp/src/cognitive/audit-only.ts
+  - file: packages/msp/src/cognitive/compose.ts
 created_at: 2026-05-12T22:50:00.000+07:00
 aliases:
   - FEAT
   - implementation_flow
   - Feature spec
 cluster: implementation_flow
-role: "Feature spec"
+role: Feature spec
+attributes:
+  domain: feat
 ---
 
 # FEAT — createCognitiveLayer

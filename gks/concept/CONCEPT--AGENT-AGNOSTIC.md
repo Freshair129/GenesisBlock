@@ -6,21 +6,27 @@ status: stable
 vault_id: default
 tier: genesis
 source_type: axiomatic
-title: MSP is agent-agnostic — pluggable into EVA, Claude Code, Gemini CLI, Hermes, Antigravity
+title: MSP is agent-agnostic — pluggable into EVA, Claude Code, Gemini CLI,
+  Hermes, Antigravity
 tags:
   - msp
   - agent-agnostic
   - architecture
   - foundation
   - integration
-crosslinks: {"references":["FRAMEWORK--MSP-ARCHITECTURE-V2","CONCEPT--OBSIDIAN-AS-RUNTIME"]}
+crosslinks:
+  references:
+    - FRAMEWORK--MSP-ARCHITECTURE-V2
+    - CONCEPT--OBSIDIAN-AS-RUNTIME
 created_at: 2026-05-09T07:00:00.000+07:00
 aliases:
   - CONCEPT
   - implementation_flow
   - Strategic intent / PRD
 cluster: implementation_flow
-role: "Strategic intent / PRD"
+role: Strategic intent / PRD
+attributes:
+  domain: concept
 ---
 
 # CONCEPT — MSP is agent-agnostic

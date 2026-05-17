@@ -6,7 +6,8 @@ status: stable
 vault_id: default
 tier: genesis
 source_type: axiomatic
-title: Contradiction detection stack — 5 layers (human rule + reciprocal supersession + domain uniqueness + embedding hint + LLM judge)
+title: Contradiction detection stack — 5 layers (human rule + reciprocal
+  supersession + domain uniqueness + embedding hint + LLM judge)
 tags:
   - msp
   - validator
@@ -15,14 +16,21 @@ tags:
   - decision
   - ci
   - governance
-crosslinks: {"references":["CONCEPT--ATOM-CONTRADICTION-DETECTION","ADR--ANTI-HALLUCINATION-RULES","ADR--HUMAN-REVIEW-GATES","FRAMEWORK--MSP-ARCHITECTURE-V2"]}
+crosslinks:
+  references:
+    - CONCEPT--ATOM-CONTRADICTION-DETECTION
+    - ADR--ANTI-HALLUCINATION-RULES
+    - ADR--HUMAN-REVIEW-GATES
+    - FRAMEWORK--MSP-ARCHITECTURE-V2
 created_at: 2026-05-08T17:32:00.000+07:00
 aliases:
   - ADR
   - implementation_flow
   - Architecture decision record
 cluster: implementation_flow
-role: "Architecture decision record"
+role: Architecture decision record
+attributes:
+  domain: adr
 ---
 
 # ADR — contradiction detection stack

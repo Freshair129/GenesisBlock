@@ -12,14 +12,18 @@ tags:
   - symbol-graph
   - algo
   - algorithm
-crosslinks: {"implements":["ADR--SYMBOLS-PROCESS-TRACING"]}
+crosslinks:
+  implements:
+    - ADR--SYMBOLS-PROCESS-TRACING
 created_at: 2026-05-12T15:52:00.000+07:00
 aliases:
   - ALGO
   - implementation_flow
   - Algorithm definition
 cluster: implementation_flow
-role: "Algorithm definition"
+role: Algorithm definition
+attributes:
+  domain: algo
 ---
 
 # ALGO — Call graph traversal

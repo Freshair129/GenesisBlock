@@ -6,7 +6,8 @@ status: stable
 tier: genesis
 source_type: axiomatic
 vault_id: default
-title: Symbol Graph persistence — SQLite for queries + JSONL exports for git diff visibility
+title: Symbol Graph persistence — SQLite for queries + JSONL exports for git
+  diff visibility
 tags:
   - msp
   - symbol-graph
@@ -14,14 +15,19 @@ tags:
   - sqlite
   - jsonl
   - decision
-crosslinks: {"references":["FRAMEWORK--SYMBOL-GRAPH","CONCEPT--SYMBOL-GRAPH"]}
+crosslinks:
+  references:
+    - FRAMEWORK--SYMBOL-GRAPH
+    - CONCEPT--SYMBOL-GRAPH
 created_at: 2026-05-09T16:50:00.000+07:00
 aliases:
   - ADR
   - implementation_flow
   - Architecture decision record
 cluster: implementation_flow
-role: "Architecture decision record"
+role: Architecture decision record
+attributes:
+  domain: adr
 ---
 
 # ADR — Symbol Graph persistence

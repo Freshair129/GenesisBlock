@@ -6,7 +6,8 @@ status: stable
 vault_id: default
 tier: process
 source_type: axiomatic
-title: Master priority sectors — P0-P4 design + RCA promotion + 3-Master migration + CLAUDE.md restructure
+title: Master priority sectors — P0-P4 design + RCA promotion + 3-Master
+  migration + CLAUDE.md restructure
 tags:
   - msp
   - audit
@@ -15,25 +16,36 @@ tags:
   - sectors
   - rca
   - claude-md
-crosslinks: {"references":["CONCEPT--MASTER-PRIORITY-SECTORS","ADR--CLAUDE-MD-MASTER-PRIORITY-SECTORS","CONCEPT--ROOT-CAUSE-ANALYSIS","ADR--MASTER-PROMOTION-ROOT-CAUSE-ANALYSIS","MASTER--ROOT-CAUSE-ANALYSIS","BLUEPRINT--MSP-MASTER-COMPOSE-LOADER","PROTO--MASTER-PRIORITY-AUTHORITY","FRAMEWORK--KNOWLEDGE-3-TIER"]}
+crosslinks:
+  references:
+    - CONCEPT--MASTER-PRIORITY-SECTORS
+    - ADR--CLAUDE-MD-MASTER-PRIORITY-SECTORS
+    - CONCEPT--ROOT-CAUSE-ANALYSIS
+    - ADR--MASTER-PROMOTION-ROOT-CAUSE-ANALYSIS
+    - MASTER--ROOT-CAUSE-ANALYSIS
+    - BLUEPRINT--MSP-MASTER-COMPOSE-LOADER
+    - PROTO--MASTER-PRIORITY-AUTHORITY
+    - FRAMEWORK--KNOWLEDGE-3-TIER
 linked_symbols:
-  - {"file":"CLAUDE.md"}
-  - {"file":"gks/master/MASTER--ROOT-CAUSE-ANALYSIS.md"}
-  - {"file":"gks/master/MASTER--MSP-DOC-TO-CODE.md"}
-  - {"file":"gks/master/MASTER--ATOM-CONTRADICTION-POLICY.md"}
-  - {"file":"gks/concept/CONCEPT--ROOT-CAUSE-ANALYSIS.md"}
-  - {"file":"gks/adr/ADR--MASTER-PROMOTION-ROOT-CAUSE-ANALYSIS.md"}
-  - {"file":"gks/concept/CONCEPT--MASTER-PRIORITY-SECTORS.md"}
-  - {"file":"gks/adr/ADR--CLAUDE-MD-MASTER-PRIORITY-SECTORS.md"}
-  - {"file":"gks/blueprint/BLUEPRINT--MSP-MASTER-COMPOSE-LOADER.md"}
-  - {"file":"gks/proto/PROTO--MASTER-PRIORITY-AUTHORITY.md"}
+  - file: CLAUDE.md
+  - file: gks/master/MASTER--ROOT-CAUSE-ANALYSIS.md
+  - file: gks/master/MASTER--MSP-DOC-TO-CODE.md
+  - file: gks/master/MASTER--ATOM-CONTRADICTION-POLICY.md
+  - file: gks/concept/CONCEPT--ROOT-CAUSE-ANALYSIS.md
+  - file: gks/adr/ADR--MASTER-PROMOTION-ROOT-CAUSE-ANALYSIS.md
+  - file: gks/concept/CONCEPT--MASTER-PRIORITY-SECTORS.md
+  - file: gks/adr/ADR--CLAUDE-MD-MASTER-PRIORITY-SECTORS.md
+  - file: gks/blueprint/BLUEPRINT--MSP-MASTER-COMPOSE-LOADER.md
+  - file: gks/proto/PROTO--MASTER-PRIORITY-AUTHORITY.md
 created_at: 2026-05-17T03:05:00.000+07:00
 aliases:
   - AUDIT
   - implementation_flow
   - Test results / quality report
 cluster: implementation_flow
-role: "Test results / quality report"
+role: Test results / quality report
+attributes:
+  domain: audit
 ---
 
 ## Scope

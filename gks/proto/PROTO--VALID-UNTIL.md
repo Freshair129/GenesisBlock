@@ -15,16 +15,23 @@ tags:
   - valid-until
   - atrophy
   - m9a
-crosslinks: {"enforces":["FRAMEWORK--MSP-ARCHITECTURE-V2"],"references":["CONCEPT--DECISION-ATROPHY-GUARDS","FEAT--PROTO-LOADER"]}
+crosslinks:
+  enforces:
+    - FRAMEWORK--MSP-ARCHITECTURE-V2
+  references:
+    - CONCEPT--DECISION-ATROPHY-GUARDS
+    - FEAT--PROTO-LOADER
 linked_symbols:
-  - {"file":"packages/msp/src/validator/proto/valid-until.ts"}
+  - file: packages/msp/src/validator/proto/valid-until.ts
 created_at: 2026-05-05T18:10:00.000+07:00
 aliases:
   - PROTO
   - implementation_flow
   - Machine-enforced invariant
 cluster: implementation_flow
-role: "Machine-enforced invariant"
+role: Machine-enforced invariant
+attributes:
+  domain: proto
 ---
 
 # PROTO — VALID-UNTIL

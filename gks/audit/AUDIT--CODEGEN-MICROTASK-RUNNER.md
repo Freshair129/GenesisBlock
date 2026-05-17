@@ -14,22 +14,31 @@ tags:
   - audit
   - codegen
   - runner
-crosslinks: {"references":["FEAT--CODEGEN-MICROTASK-RUNNER","BLUEPRINT--CODEGEN-MICROTASK-RUNNER","ADR--CODEGEN-MICROTASK-RUNNER","ADR--CODEGEN-POST-PROCESSING","ADR--CODEGEN-FORBIDDEN-PATTERNS","ADR--CODEGEN-RETRY-POLICY"]}
+crosslinks:
+  references:
+    - FEAT--CODEGEN-MICROTASK-RUNNER
+    - BLUEPRINT--CODEGEN-MICROTASK-RUNNER
+    - ADR--CODEGEN-MICROTASK-RUNNER
+    - ADR--CODEGEN-POST-PROCESSING
+    - ADR--CODEGEN-FORBIDDEN-PATTERNS
+    - ADR--CODEGEN-RETRY-POLICY
 linked_symbols:
-  - {"file":"packages/msp/src/codegen/runner.ts"}
-  - {"file":"packages/msp/src/codegen/load-task.ts"}
-  - {"file":"packages/msp/src/codegen/post-process.ts"}
-  - {"file":"packages/msp/src/codegen/forbidden-patterns.ts"}
-  - {"file":"packages/msp/src/codegen/prompt-builder.ts"}
-  - {"file":"packages/msp/src/codegen/cli.ts"}
-  - {"file":"packages/msp/src/codegen/types.ts"}
+  - file: packages/msp/src/codegen/runner.ts
+  - file: packages/msp/src/codegen/load-task.ts
+  - file: packages/msp/src/codegen/post-process.ts
+  - file: packages/msp/src/codegen/forbidden-patterns.ts
+  - file: packages/msp/src/codegen/prompt-builder.ts
+  - file: packages/msp/src/codegen/cli.ts
+  - file: packages/msp/src/codegen/types.ts
 created_at: 2026-05-03T15:43:39.217+07:00
 aliases:
   - AUDIT
   - implementation_flow
   - Test results / quality report
 cluster: implementation_flow
-role: "Test results / quality report"
+role: Test results / quality report
+attributes:
+  domain: audit
 ---
 
 # AUDIT — codegen microtask runner

@@ -13,14 +13,20 @@ tags:
   - feat
   - vault
   - namespace
-crosslinks: {"references":["CONCEPT--NAMESPACE-VAULT-BRAIN","ADR--VAULT-NAMESPACE-LAYERING","FRAMEWORK--UNIVERSAL-CONTEXT-FRAMEWORK"]}
+crosslinks:
+  references:
+    - CONCEPT--NAMESPACE-VAULT-BRAIN
+    - ADR--VAULT-NAMESPACE-LAYERING
+    - FRAMEWORK--UNIVERSAL-CONTEXT-FRAMEWORK
 created_at: 2026-05-14T19:42:02.052+07:00
 aliases:
   - FEAT
   - implementation_flow
   - Feature spec
 cluster: implementation_flow
-role: "Feature spec"
+role: Feature spec
+attributes:
+  domain: feat
 ---
 
 # FEAT — Vault composition

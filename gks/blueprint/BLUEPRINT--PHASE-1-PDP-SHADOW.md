@@ -14,19 +14,28 @@ tags:
   - blueprint
   - phase-1
   - abac
-crosslinks: {"implements":["FEAT--POLICY-DECISION-POINT"],"references":["CONCEPT--ABAC-POLICY-ENGINE","ADR--POLICY-AS-DATA-NOT-CODE","ADR--DEFAULT-POLICY-POSTURE","BLUEPRINT--PHASE-0-PLUMBING"]}
+crosslinks:
+  implements:
+    - FEAT--POLICY-DECISION-POINT
+  references:
+    - CONCEPT--ABAC-POLICY-ENGINE
+    - ADR--POLICY-AS-DATA-NOT-CODE
+    - ADR--DEFAULT-POLICY-POSTURE
+    - BLUEPRINT--PHASE-0-PLUMBING
 linked_symbols:
-  - {"file":"packages/msp/src/policy/pdp.ts"}
-  - {"file":"packages/msp/src/policy/loader.ts"}
-  - {"file":"packages/msp/src/policy/operators.ts"}
-  - {"file":"packages/msp/src/policy/shadow-log.ts"}
+  - file: packages/msp/src/policy/pdp.ts
+  - file: packages/msp/src/policy/loader.ts
+  - file: packages/msp/src/policy/operators.ts
+  - file: packages/msp/src/policy/shadow-log.ts
 created_at: 2026-05-14T22:21:52.912+07:00
 aliases:
   - BLUEPRINT
   - implementation_flow
   - Implementation plan
 cluster: implementation_flow
-role: "Implementation plan"
+role: Implementation plan
+attributes:
+  domain: blueprint
 ---
 
 # BLUEPRINT — Phase 1: PDP in shadow mode

@@ -14,20 +14,26 @@ tags:
   - audit
   - memory
   - episodic
-crosslinks: {"references":["FEAT--MEMORY-EPISODIC-WRITER","BLUEPRINT--MEMORY-EPISODIC-WRITER","ADR--MEMORY-EPISODIC-WRITER"]}
+crosslinks:
+  references:
+    - FEAT--MEMORY-EPISODIC-WRITER
+    - BLUEPRINT--MEMORY-EPISODIC-WRITER
+    - ADR--MEMORY-EPISODIC-WRITER
 linked_symbols:
-  - {"file":"packages/msp/src/memory/episodic/writer.ts"}
-  - {"file":"packages/msp/src/memory/episodic/schema.ts"}
-  - {"file":"packages/msp/src/memory/episodic/atomic-write.ts"}
-  - {"file":"packages/msp/src/memory/episodic/summarisers/heuristic.ts"}
-  - {"file":"packages/msp/src/memory/episodic/types.ts"}
+  - file: packages/msp/src/memory/episodic/writer.ts
+  - file: packages/msp/src/memory/episodic/schema.ts
+  - file: packages/msp/src/memory/episodic/atomic-write.ts
+  - file: packages/msp/src/memory/episodic/summarisers/heuristic.ts
+  - file: packages/msp/src/memory/episodic/types.ts
 created_at: 2026-05-03T15:43:38.623+07:00
 aliases:
   - AUDIT
   - implementation_flow
   - Test results / quality report
 cluster: implementation_flow
-role: "Test results / quality report"
+role: Test results / quality report
+attributes:
+  domain: audit
 ---
 
 # AUDIT — memory episodic writer

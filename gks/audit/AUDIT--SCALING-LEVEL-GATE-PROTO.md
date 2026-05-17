@@ -14,21 +14,32 @@ tags:
   - governance
   - audit
   - m8c
-crosslinks: {"references":["PROTO--SCALING-LEVEL-GATE","CONCEPT--PROTO-SCALING-LEVEL-GATE","FRAMEWORK--SCALING-LEVELS","FEAT--PROTO-LOADER"]}
+crosslinks:
+  references:
+    - PROTO--SCALING-LEVEL-GATE
+    - CONCEPT--PROTO-SCALING-LEVEL-GATE
+    - FRAMEWORK--SCALING-LEVELS
+    - FEAT--PROTO-LOADER
 linked_symbols:
-  - {"file":"packages/msp/src/validator/proto/scaling-level-gate.ts"}
-  - {"file":"gks/proto/PROTO--SCALING-LEVEL-GATE.md"}
-  - {"file":"packages/msp/test/validator/proto/scaling-level-gate.test.ts"}
+  - file: packages/msp/src/validator/proto/scaling-level-gate.ts
+  - file: gks/proto/PROTO--SCALING-LEVEL-GATE.md
+  - file: packages/msp/test/validator/proto/scaling-level-gate.test.ts
 phase_override:
   skip_blueprint: true
-  reason: "Incremental PROTO rule plugged into the already-blueprinted loader scaffold (BLUEPRINT--PROTO-LOADER). Doc-to-code chain: CONCEPT--PROTO-SCALING-LEVEL-GATE -> PROTO--SCALING-LEVEL-GATE -> predicate -> this audit; per-rule predicates do not each warrant a separate phase-3 blueprint."
+  reason: "Incremental PROTO rule plugged into the already-blueprinted loader
+    scaffold (BLUEPRINT--PROTO-LOADER). Doc-to-code chain:
+    CONCEPT--PROTO-SCALING-LEVEL-GATE -> PROTO--SCALING-LEVEL-GATE -> predicate
+    -> this audit; per-rule predicates do not each warrant a separate phase-3
+    blueprint."
 created_at: 2026-05-05T18:00:00.000+07:00
 aliases:
   - AUDIT
   - implementation_flow
   - Test results / quality report
 cluster: implementation_flow
-role: "Test results / quality report"
+role: Test results / quality report
+attributes:
+  domain: audit
 ---
 
 # M8c — [[PROTO--SCALING-LEVEL-GATE]]

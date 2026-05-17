@@ -6,7 +6,8 @@ status: stable
 vault_id: default
 tier: process
 source_type: axiomatic
-title: M7e — identity layer implementation (profile / voice / preferences with atomic JSON store)
+title: M7e — identity layer implementation (profile / voice / preferences with
+  atomic JSON store)
 tags:
   - msp
   - identity
@@ -16,26 +17,37 @@ tags:
   - preferences
   - m7e
   - audit
-crosslinks: {"references":["FEAT--IDENTITY-LAYER","BLUEPRINT--IDENTITY-LAYER","ADR--IDENTITY-STORAGE-SHAPE","CONCEPT--IDENTITY-LAYER","FRAMEWORK--MSP-ARCHITECTURE-V2","MOD--IDENTITY","PROTOCOL--IDENTITY-API","ALGO--IDENTITY-RESOLUTION"]}
+crosslinks:
+  references:
+    - FEAT--IDENTITY-LAYER
+    - BLUEPRINT--IDENTITY-LAYER
+    - ADR--IDENTITY-STORAGE-SHAPE
+    - CONCEPT--IDENTITY-LAYER
+    - FRAMEWORK--MSP-ARCHITECTURE-V2
+    - MOD--IDENTITY
+    - PROTOCOL--IDENTITY-API
+    - ALGO--IDENTITY-RESOLUTION
 linked_symbols:
-  - {"file":"packages/msp/src/identity/index.ts"}
-  - {"file":"packages/msp/src/identity/types.ts"}
-  - {"file":"packages/msp/src/identity/store.ts"}
-  - {"file":"packages/msp/src/identity/profile.ts"}
-  - {"file":"packages/msp/src/identity/voice.ts"}
-  - {"file":"packages/msp/src/identity/preferences.ts"}
-  - {"file":"packages/msp/test/identity/store.test.ts"}
-  - {"file":"packages/msp/test/identity/profile.test.ts"}
-  - {"file":"packages/msp/test/identity/voice.test.ts"}
-  - {"file":"packages/msp/test/identity/preferences.test.ts"}
-  - {"file":"packages/msp/test/identity/index.test.ts"}
+  - file: packages/msp/src/identity/index.ts
+  - file: packages/msp/src/identity/types.ts
+  - file: packages/msp/src/identity/store.ts
+  - file: packages/msp/src/identity/profile.ts
+  - file: packages/msp/src/identity/voice.ts
+  - file: packages/msp/src/identity/preferences.ts
+  - file: packages/msp/test/identity/store.test.ts
+  - file: packages/msp/test/identity/profile.test.ts
+  - file: packages/msp/test/identity/voice.test.ts
+  - file: packages/msp/test/identity/preferences.test.ts
+  - file: packages/msp/test/identity/index.test.ts
 created_at: 2026-05-05T12:00:00.000+07:00
 aliases:
   - AUDIT
   - implementation_flow
   - Test results / quality report
 cluster: implementation_flow
-role: "Test results / quality report"
+role: Test results / quality report
+attributes:
+  domain: audit
 ---
 
 # M7e — identity layer implementation (profile / voice / preferences with atomic JSON store)

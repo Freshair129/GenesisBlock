@@ -4,6 +4,7 @@ import { z } from 'zod'
 
 import { loadAtomicIndex, validate, validateAll } from '../../validator/index.js'
 import { loadContract } from '../../validator/contract.js'
+import { makeContext, makeSubject } from '../../policy/types.js'
 import { errorResult, jsonResult, type ToolHandlerCtx, type ToolTextResult } from '../types.js'
 
 export const name = 'msp_validate'
@@ -25,36 +26,47 @@ export function handler(ctx: ToolHandlerCtx) {
     const root = resolve(args.root ?? ctx.root)
     const indexPath = resolve(root, 'gks/00_index/atomic_index.jsonl')
 
-    let atomicIndex
     try {
-      atomicIndex = await loadAtomicIndex(indexPath)
-    } catch (err) {
-      return errorResult(`atomic index unreadable: ${(err as Error).message}`)
-    }
+      const subject = ctx.subject ?? makeSubject('user', 'anonymous')
+      const context = ctx.policyContext ?? makeContext('mcp-stdio', `mcp-${Date.now()}`)
 
-    const contract = await loadContract(root)
-    const validationCtx = {
-      atomicIndex,
-      forbiddenFields: contract.forbiddenFields,
-      requiredFields: contract.requiredFields,
-    }
-
-    let results
-    if (args.all) {
-      results = await validateAll(
-        [resolve(root, 'gks'), resolve(root, '.brain/msp/projects')],
-        validationCtx,
+      console.debug(
+        `[ucf] 4-tuple: msp_validate | sub:${subject.id} | act:read | trace:${context.trace_id}`,
       )
-    } else if (args.files && args.files.length > 0) {
-      results = []
-      for (const f of args.files) {
-        results.push(await validate(resolve(root, f), validationCtx))
-      }
-    } else {
-      return errorResult('must supply either `files` or `all: true`')
-    }
 
-    const ok = results.every((r) => r.errors.length === 0)
-    return jsonResult({ ok, results })
+      let atomicIndex
+      try {
+        atomicIndex = await loadAtomicIndex(indexPath)
+      } catch (err) {
+        return errorResult(`atomic index unreadable: ${(err as Error).message}`)
+      }
+
+      const contract = await loadContract(root)
+      const validationCtx = {
+        atomicIndex,
+        forbiddenFields: contract.forbiddenFields,
+        requiredFields: contract.requiredFields,
+      }
+
+      let results
+      if (args.all) {
+        results = await validateAll(
+          [resolve(root, 'gks'), resolve(root, '.brain/msp/projects')],
+          validationCtx,
+        )
+      } else if (args.files && args.files.length > 0) {
+        results = []
+        for (const f of args.files) {
+          results.push(await validate(resolve(root, f), validationCtx))
+        }
+      } else {
+        return errorResult('must supply either `files` or `all: true`')
+      }
+
+      const ok = results.every((r) => r.errors.length === 0)
+      return jsonResult({ ok, results })
+    } catch (err) {
+      return errorResult(`validate failed: ${(err as Error).message}`)
+    }
   }
 }

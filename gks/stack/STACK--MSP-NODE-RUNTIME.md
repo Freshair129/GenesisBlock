@@ -13,14 +13,18 @@ tags:
   - nodejs
   - runtime
   - technical
-crosslinks: {"references":["FRAMEWORK--MSP-ARCHITECTURE-V2"]}
+crosslinks:
+  references:
+    - FRAMEWORK--MSP-ARCHITECTURE-V2
 created_at: 2026-05-14T20:20:00+07:00
 aliases:
   - STACK
   - implementation_flow
   - Technology stack inventory
 cluster: implementation_flow
-role: "Technology stack inventory"
+role: Technology stack inventory
+attributes:
+  domain: stack
 ---
 
 # STACK — MSP Node.js Runtime

@@ -6,7 +6,8 @@ status: stable
 tier: process
 source_type: axiomatic
 vault_id: default
-title: AUDIT — Decompose FEAT--SYMBOLS-FRAMEWORK-AWARENESS into CONCEPT + ADR + ALGO + PROTO; harden FEAT→ADR validator rule
+title: AUDIT — Decompose FEAT--SYMBOLS-FRAMEWORK-AWARENESS into CONCEPT + ADR +
+  ALGO + PROTO; harden FEAT→ADR validator rule
 tags:
   - msp
   - symbol-graph
@@ -14,19 +15,31 @@ tags:
   - decomposition
   - atom-policy
   - validator
-crosslinks: {"references":["ADR--SYMBOLS-FRAMEWORK-AWARENESS","CONCEPT--SYMBOLS-FRAMEWORK-AWARENESS","ALGO--SYMBOLS-FRAMEWORK-RECOGNITION","PROTO--SYMBOLS-FRAMEWORK-INVARIANTS","FEAT--SYMBOLS-FRAMEWORK-AWARENESS","PROTO--SCALING-LEVEL-GATE"]}
+crosslinks:
+  references:
+    - ADR--SYMBOLS-FRAMEWORK-AWARENESS
+    - CONCEPT--SYMBOLS-FRAMEWORK-AWARENESS
+    - ALGO--SYMBOLS-FRAMEWORK-RECOGNITION
+    - PROTO--SYMBOLS-FRAMEWORK-INVARIANTS
+    - FEAT--SYMBOLS-FRAMEWORK-AWARENESS
+    - PROTO--SCALING-LEVEL-GATE
 linked_symbols:
-  - {"file":"packages/msp/src/validator/proto/scaling-level-gate.ts"}
+  - file: packages/msp/src/validator/proto/scaling-level-gate.ts
 phase_override:
   skip_blueprint: true
-  reason: "The one touched file is a PROTO predicate on the already-blueprinted loader scaffold (BLUEPRINT--PROTO-LOADER); the decomposition work itself is governed by ADR--SYMBOLS-FRAMEWORK-AWARENESS + CONCEPT--SYMBOLS-FRAMEWORK-AWARENESS."
+  reason: The one touched file is a PROTO predicate on the already-blueprinted
+    loader scaffold (BLUEPRINT--PROTO-LOADER); the decomposition work itself is
+    governed by ADR--SYMBOLS-FRAMEWORK-AWARENESS +
+    CONCEPT--SYMBOLS-FRAMEWORK-AWARENESS.
 created_at: 2026-05-12T05:42:00.000+07:00
 aliases:
   - AUDIT
   - implementation_flow
   - Test results / quality report
 cluster: implementation_flow
-role: "Test results / quality report"
+role: Test results / quality report
+attributes:
+  domain: audit
 ---
 
 # AUDIT — FEAT decomposition + validator hardening

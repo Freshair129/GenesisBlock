@@ -12,14 +12,22 @@ tags:
   - mcp
   - server
   - integration
-crosslinks: {"references":["FEAT--MSP-VALIDATOR","FEAT--CODEGEN-MICROTASK-RUNNER","FEAT--MEMORY-SESSIONS-WRITER","FEAT--MEMORY-EPISODIC-WRITER","FEAT--MEMORY-BACKLINKS-INDEXER"]}
+crosslinks:
+  references:
+    - FEAT--MSP-VALIDATOR
+    - FEAT--CODEGEN-MICROTASK-RUNNER
+    - FEAT--MEMORY-SESSIONS-WRITER
+    - FEAT--MEMORY-EPISODIC-WRITER
+    - FEAT--MEMORY-BACKLINKS-INDEXER
 created_at: 2026-05-03T18:13:53.808+07:00
 aliases:
   - CONCEPT
   - implementation_flow
   - Strategic intent / PRD
 cluster: implementation_flow
-role: "Strategic intent / PRD"
+role: Strategic intent / PRD
+attributes:
+  domain: concept
 ---
 
 # CONCEPT — MSP MCP server

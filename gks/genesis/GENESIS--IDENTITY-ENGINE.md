@@ -15,22 +15,36 @@ tags:
 manifest_version: 1.0.0
 members:
   core:
-    cognitive: [COGNITIVE--EGO-DEATH-PASSPORT]
-    algo:      [ALGO--IDENTITY-RESOLUTION]
-    runbook:   [RUNBOOK--IDENTITY-MIGRATION]
-    concept:   [CONCEPT--IDENTITY-LAYER]
-    params:    [PARAMS--IDENTITY-PROFILE-DEFAULTS]
+    cognitive:
+      - COGNITIVE--EGO-DEATH-PASSPORT
+    algo:
+      - ALGO--IDENTITY-RESOLUTION
+    runbook:
+      - RUNBOOK--IDENTITY-MIGRATION
+    concept:
+      - CONCEPT--IDENTITY-LAYER
+    params:
+      - PARAMS--IDENTITY-PROFILE-DEFAULTS
   optional:
-    guard:     [GUARD--IDENTITY-SCHEMA, GUARD--PASSPORT-NONNULL]
-    protocol:  [PROTOCOL--IDENTITY-API]
-    stack:     [STACK--MSP-NODE-RUNTIME]
-    safety:    [SAFETY--PII-REDACTION]
-    mod:       [MOD--IDENTITY]
+    guard:
+      - GUARD--IDENTITY-SCHEMA
+      - GUARD--PASSPORT-NONNULL
+    protocol:
+      - PROTOCOL--IDENTITY-API
+    stack:
+      - STACK--MSP-NODE-RUNTIME
+    safety:
+      - SAFETY--PII-REDACTION
+    mod:
+      - MOD--IDENTITY
 daci:
-  driver:      MOD--IDENTITY
-  approver:    [PERSONA--T3-ARCHITECT]
-  contributor: [PERSONA--T2-IMPLEMENTER]
-  informed:    [ENTITY--MSP-USERS]
+  driver: MOD--IDENTITY
+  approver:
+    - PERSONA--T3-ARCHITECT
+  contributor:
+    - PERSONA--T2-IMPLEMENTER
+  informed:
+    - ENTITY--MSP-USERS
 crosslinks:
   references:
     - SPEC--GENESIS-BLOCK-MANIFEST
@@ -51,7 +65,9 @@ aliases:
   - implementation_flow
   - Block Manifest (v2.3+)
 cluster: implementation_flow
-role: "Block Manifest (v2.3+)"
+role: Block Manifest (v2.3+)
+attributes:
+  domain: genesis
 ---
 
 # GENESIS — Identity Engine

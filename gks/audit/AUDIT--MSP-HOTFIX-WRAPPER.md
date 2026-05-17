@@ -13,18 +13,26 @@ tags:
   - m5b
   - audit
   - hotfix
-crosslinks: {"references":["FEAT--MSP-HOTFIX-WRAPPER","BLUEPRINT--MSP-HOTFIX-WRAPPER","ADR--MSP-HOTFIX-WRAPPER","ADR--HOTFIX-ESCAPE-HATCH","FEAT--MSP-PRECOMMIT-HOOK"]}
+crosslinks:
+  references:
+    - FEAT--MSP-HOTFIX-WRAPPER
+    - BLUEPRINT--MSP-HOTFIX-WRAPPER
+    - ADR--MSP-HOTFIX-WRAPPER
+    - ADR--HOTFIX-ESCAPE-HATCH
+    - FEAT--MSP-PRECOMMIT-HOOK
 linked_symbols:
-  - {"file":"examples/hooks/pre-commit-validator.sh"}
-  - {"file":"package.json"}
-  - {"file":"packages/msp/src/validator/rules/id-format.ts"}
+  - file: examples/hooks/pre-commit-validator.sh
+  - file: package.json
+  - file: packages/msp/src/validator/rules/id-format.ts
 created_at: 2026-05-03T18:01:45.299+07:00
 aliases:
   - AUDIT
   - implementation_flow
   - Test results / quality report
 cluster: implementation_flow
-role: "Test results / quality report"
+role: Test results / quality report
+attributes:
+  domain: audit
 ---
 
 # AUDIT — hotfix wrapper (M5b)

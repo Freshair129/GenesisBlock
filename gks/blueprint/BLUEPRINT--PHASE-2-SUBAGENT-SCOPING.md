@@ -7,24 +7,33 @@ tier: process
 source_type: axiomatic
 vault_id: default
 scale_level: L2
-title: "BLUEPRINT — Phase 2 subagent scope filtering: first enforced PEP, with escalation"
+title: "BLUEPRINT — Phase 2 subagent scope filtering: first enforced PEP, with
+  escalation"
 tags:
   - msp
   - ucf
   - blueprint
   - phase-2
   - subagent
-crosslinks: {"implements":["FEAT--SUBAGENT-SCOPE-FILTERING"],"references":["CONCEPT--SUBAGENT-CONTEXT-SCOPING","ADR--TRANSPORT-AGNOSTIC-ENFORCEMENT","BLUEPRINT--PHASE-1-PDP-SHADOW"]}
+crosslinks:
+  implements:
+    - FEAT--SUBAGENT-SCOPE-FILTERING
+  references:
+    - CONCEPT--SUBAGENT-CONTEXT-SCOPING
+    - ADR--TRANSPORT-AGNOSTIC-ENFORCEMENT
+    - BLUEPRINT--PHASE-1-PDP-SHADOW
 linked_symbols:
-  - {"file":"packages/msp/src/policy/task-scope.ts"}
-  - {"file":"packages/msp/src/policy/escalation.ts"}
+  - file: packages/msp/src/policy/task-scope.ts
+  - file: packages/msp/src/policy/escalation.ts
 created_at: 2026-05-14T22:21:53.742+07:00
 aliases:
   - BLUEPRINT
   - implementation_flow
   - Implementation plan
 cluster: implementation_flow
-role: "Implementation plan"
+role: Implementation plan
+attributes:
+  domain: blueprint
 ---
 
 # BLUEPRINT — Phase 2: subagent scope filtering

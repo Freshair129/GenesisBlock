@@ -14,14 +14,21 @@ tags:
   - rca
   - 3-tier
   - decision
-crosslinks: {"references":["FRAMEWORK--KNOWLEDGE-3-TIER","CONCEPT--ROOT-CAUSE-ANALYSIS","MASTER--ROOT-CAUSE-ANALYSIS","ADR--MASTER-PROMOTION-DOC-TO-CODE"]}
+crosslinks:
+  references:
+    - FRAMEWORK--KNOWLEDGE-3-TIER
+    - CONCEPT--ROOT-CAUSE-ANALYSIS
+    - MASTER--ROOT-CAUSE-ANALYSIS
+    - ADR--MASTER-PROMOTION-DOC-TO-CODE
 created_at: 2026-05-17T02:05:00.000+07:00
 aliases:
   - ADR
   - implementation_flow
   - Architecture decision record
 cluster: implementation_flow
-role: "Architecture decision record"
+role: Architecture decision record
+attributes:
+  domain: adr
 ---
 
 # ADR — promote RCA discipline to Master

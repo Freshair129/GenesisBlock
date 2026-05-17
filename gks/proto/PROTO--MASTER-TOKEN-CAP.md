@@ -7,23 +7,32 @@ severity: error
 vault_id: default
 tier: safety
 source_type: axiomatic
-title: PROTO--MASTER-TOKEN-CAP — keep Master atom bodies prompt-injectable (warn 400 / error 600 tokens, PR-5)
+title: PROTO--MASTER-TOKEN-CAP — keep Master atom bodies prompt-injectable (warn
+  400 / error 600 tokens, PR-5)
 tags:
   - msp
   - proto
   - master
   - token-budget
   - 3-tier
-crosslinks: {"enforces":["FRAMEWORK--KNOWLEDGE-3-TIER"],"references":["FRAMEWORK--KNOWLEDGE-3-TIER","ADR--MASTER-PROMOTION-DOC-TO-CODE","ADR--MASTER-PROMOTION-CONTRADICTION-POLICY"]}
+crosslinks:
+  enforces:
+    - FRAMEWORK--KNOWLEDGE-3-TIER
+  references:
+    - FRAMEWORK--KNOWLEDGE-3-TIER
+    - ADR--MASTER-PROMOTION-DOC-TO-CODE
+    - ADR--MASTER-PROMOTION-CONTRADICTION-POLICY
 linked_symbols:
-  - {"file":"packages/msp/src/validator/proto/master-token-cap.ts"}
+  - file: packages/msp/src/validator/proto/master-token-cap.ts
 created_at: 2026-05-09T15:06:00.000+07:00
 aliases:
   - PROTO
   - implementation_flow
   - Machine-enforced invariant
 cluster: implementation_flow
-role: "Machine-enforced invariant"
+role: Machine-enforced invariant
+attributes:
+  domain: proto
 ---
 
 # PROTO — MASTER-TOKEN-CAP

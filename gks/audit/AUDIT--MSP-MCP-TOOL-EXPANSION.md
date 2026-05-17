@@ -6,33 +6,45 @@ status: stable
 vault_id: default
 tier: process
 source_type: axiomatic
-title: M7f — MCP tool expansion (4 of 5 passport tools shipped; msp_compress deferred pending M7d)
+title: M7f — MCP tool expansion (4 of 5 passport tools shipped; msp_compress
+  deferred pending M7d)
 tags:
   - msp
   - mcp
   - tools
   - m7f
   - audit
-crosslinks: {"references":["FEAT--MSP-MCP-TOOL-EXPANSION","BLUEPRINT--MSP-MCP-TOOL-EXPANSION","CONCEPT--MSP-MCP-TOOL-EXPANSION","FEAT--MSP-MCP-SERVER","FEAT--CONSOLIDATOR","FEAT--RETRIEVAL-ORCHESTRATION","FEAT--IDENTITY-LAYER","FEAT--COMPRESSOR"]}
+crosslinks:
+  references:
+    - FEAT--MSP-MCP-TOOL-EXPANSION
+    - BLUEPRINT--MSP-MCP-TOOL-EXPANSION
+    - CONCEPT--MSP-MCP-TOOL-EXPANSION
+    - FEAT--MSP-MCP-SERVER
+    - FEAT--CONSOLIDATOR
+    - FEAT--RETRIEVAL-ORCHESTRATION
+    - FEAT--IDENTITY-LAYER
+    - FEAT--COMPRESSOR
 linked_symbols:
-  - {"file":"packages/msp/src/mcp/server.ts"}
-  - {"file":"packages/msp/src/mcp/tools/recall.ts"}
-  - {"file":"packages/msp/src/mcp/tools/remember.ts"}
-  - {"file":"packages/msp/src/mcp/tools/identity-get.ts"}
-  - {"file":"packages/msp/src/mcp/tools/identity-set.ts"}
-  - {"file":"packages/msp/test/mcp/tools/recall.test.ts"}
-  - {"file":"packages/msp/test/mcp/tools/remember.test.ts"}
-  - {"file":"packages/msp/test/mcp/tools/identity-get.test.ts"}
-  - {"file":"packages/msp/test/mcp/tools/identity-set.test.ts"}
-  - {"file":"packages/msp/test/mcp/server.test.ts"}
-  - {"file":"packages/msp/test/mcp/bin.test.ts"}
+  - file: packages/msp/src/mcp/server.ts
+  - file: packages/msp/src/mcp/tools/recall.ts
+  - file: packages/msp/src/mcp/tools/remember.ts
+  - file: packages/msp/src/mcp/tools/identity-get.ts
+  - file: packages/msp/src/mcp/tools/identity-set.ts
+  - file: packages/msp/test/mcp/tools/recall.test.ts
+  - file: packages/msp/test/mcp/tools/remember.test.ts
+  - file: packages/msp/test/mcp/tools/identity-get.test.ts
+  - file: packages/msp/test/mcp/tools/identity-set.test.ts
+  - file: packages/msp/test/mcp/server.test.ts
+  - file: packages/msp/test/mcp/bin.test.ts
 created_at: 2026-05-05T16:35:30.812+07:00
 aliases:
   - AUDIT
   - implementation_flow
   - Test results / quality report
 cluster: implementation_flow
-role: "Test results / quality report"
+role: Test results / quality report
+attributes:
+  domain: audit
 ---
 
 # M7f — MCP tool expansion (4 of 5 passport tools shipped; msp_compress deferred)

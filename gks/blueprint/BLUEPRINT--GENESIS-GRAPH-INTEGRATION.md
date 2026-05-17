@@ -18,19 +18,26 @@ tags:
   - cypher
   - blueprint
   - implementation
-crosslinks: {"references":["ADR--GENESIS-GRAPH-AS-GKS-BACKEND","CONCEPT--GENESIS-GRAPH-BACKEND","FRAMEWORK--MSP-ARCHITECTURE-V2","PROTOCOL--GENESIS-GRAPH-FFI"]}
+crosslinks:
+  references:
+    - ADR--GENESIS-GRAPH-AS-GKS-BACKEND
+    - CONCEPT--GENESIS-GRAPH-BACKEND
+    - FRAMEWORK--MSP-ARCHITECTURE-V2
+    - PROTOCOL--GENESIS-GRAPH-FFI
 linked_symbols:
-  - { file: "packages/gks/src/memory/index.ts" }
-  - { file: "packages/gks/src/memory/graph/genesis-graph.ts" }
-  - { file: "packages/gks/src/memory/graph/cypher-v0.ts" }
-  - { file: "packages/gks/src/memory/graph/genesis-graph-errors.ts" }
+  - file: packages/gks/src/memory/index.ts
+  - file: packages/gks/src/memory/graph/genesis-graph.ts
+  - file: packages/gks/src/memory/graph/cypher-v0.ts
+  - file: packages/gks/src/memory/graph/genesis-graph-errors.ts
 created_at: 2026-05-12T11:59:00.000+07:00
 aliases:
   - BLUEPRINT
   - implementation_flow
   - Implementation plan
 cluster: implementation_flow
-role: "Implementation plan"
+role: Implementation plan
+attributes:
+  domain: blueprint
 ---
 
 # BLUEPRINT — Genesis Block backend integration

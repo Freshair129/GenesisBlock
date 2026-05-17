@@ -13,14 +13,19 @@ tags:
   - valid-until
   - atrophy
   - m9a
-crosslinks: {"references":["CONCEPT--PROTO-PATTERN","CONCEPT--MSP-ROADMAP"]}
+crosslinks:
+  references:
+    - CONCEPT--PROTO-PATTERN
+    - CONCEPT--MSP-ROADMAP
 created_at: 2026-05-05T16:28:00.000+07:00
 aliases:
   - CONCEPT
   - implementation_flow
   - Strategic intent / PRD
 cluster: implementation_flow
-role: "Strategic intent / PRD"
+role: Strategic intent / PRD
+attributes:
+  domain: concept
 ---
 
 # CONCEPT — decision atrophy guards

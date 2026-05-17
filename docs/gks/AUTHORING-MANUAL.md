@@ -202,6 +202,33 @@ role: "Strategic intent / PRD"
 
 ---
 
+### 3.3 มุมมอง Phase-Temporal และการจดบันทึก (Phase Activity & Devlog Mapping)
+
+ตาราง derivation tree ใน §1 และตาราง atom types ใน §3.1/§3.2 มองในมิติ **"atom ใดต่อยอดจากอะไร"** (causal/hierarchical) ส่วนตารางด้านล่างมองในมิติ **"phase ใดต้องผลิต atom อะไร"** (temporal/workflow) — เป็น quick-reference สำหรับใช้ตอน gate check ก่อนข้าม phase
+
+| Phase | กิจกรรมหลัก | Atom Artifact (durable) | Devlog (optional, EVA-style) |
+|---|---|---|---|
+| **P0** | Framework architecture & root policies | `FRAMEWORK--`, `MASTER--`; optionally `GENESIS--` Block Manifest, `SAFETY--`, `STACK--` | — |
+| **P1** | กำหนดความต้องการธุรกิจ & motivation | `CONCEPT--`, `REQ--`, `FR--`, `NFR--`, `CONSTRAINT--` | — |
+| **P2** | ออกแบบโครงสร้าง / API / decision | `ADR--`, `FEAT--`, `ALGO--`, `ENTITY--`, `FLOW--`, `API--`, `ENDPOINT--`, `ENTRYPOINT--`, `PARAMS--`, `MOD--`, `SPEC--`, `PROTO--`, `PROTOCOL--`, `GUARD--`, `POLICY--`, `PERSONA--`, `SKILL--`, `LLM--`, `SLM--`, `MCP--`, `CMD--` | — |
+| **P3** | วางแผนการแก้โค้ดเชิงลึก | `BLUEPRINT--` | `MSP-IMP-` (EVA only) |
+| **P4** | แตกงานย่อย (Task Decomposition — orchestrator) | `T*.task.yaml` (**ไม่ใช่ atom** — ดู `ADR--TASK-TRACKING-AT-ORCHESTRATOR`) | `MSP-TSK-` (EVA only) |
+| **P5** | ลงมือเขียนโค้ดจริง | `src/` | `MSP-ACT-` (EVA only) |
+| **P6** | ตรวจสอบคุณภาพและ Acceptance Test | `AUDIT--`, `INC--`, `ISSUE--`, `RUNBOOK--` | `MSP-WKT-` (EVA only) |
+| **P7** | Deploy / Ops | `ops/` configs + `RUNBOOK--` + `SLO--` + `RISK--` + `HOTFIX--` | — |
+
+#### หมายเหตุ Devlog (EVA-specific)
+
+โปรเจกต์ EVA-style (Python MSP-v9.1) ใช้ devlog IDs เป็น tracing layer แยกจาก atom store:
+- **`MSP-IMP-`** (Implementation plan log) — track per-blueprint execution
+- **`MSP-TSK-`** (Task log) — track per-microtask
+- **`MSP-ACT-`** (Action log) — per-turn agent action
+- **`MSP-WKT-`** (Walkthrough) — sign-off bundle, ≈ AUDIT-- but unstable
+
+โปรเจกต์ TypeScript MSP monorepo **ไม่บังคับ** flow นี้ — ใช้ git commits + AUDIT-- atoms แทนได้ทั้งหมด ดูรายละเอียดที่ `docs/MSP_RELATIONSHIP.md`
+
+---
+
 ## 🛠️ 4. เครื่องมือสร้างและจำลองโครงสร้างอะตอม (CLI tool)
 
 เพื่อลดข้อผิดพลาดในการป้อนข้อมูล YAML เรามีโปรแกรมจัดการอะตอมความรู้ (`msp-atom`) ซึ่งจะทำงานตามค่าคอนฟิกใน `atom_registry.yaml` โดยอัตโนมัติ

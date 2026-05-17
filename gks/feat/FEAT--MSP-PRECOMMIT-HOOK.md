@@ -12,18 +12,25 @@ tags:
   - precommit
   - hook
   - user-facing
-crosslinks: {"implements":["ADR--MSP-PRECOMMIT-HOOK"],"references":["CONCEPT--MSP-PRECOMMIT-HOOK","FEAT--MSP-VALIDATOR"]}
+crosslinks:
+  implements:
+    - ADR--MSP-PRECOMMIT-HOOK
+  references:
+    - CONCEPT--MSP-PRECOMMIT-HOOK
+    - FEAT--MSP-VALIDATOR
 linked_symbols:
-  - {"file":"examples/hooks/pre-commit-validator.sh"}
-  - {"file":"examples/hooks/install.sh"}
-  - {"file":"examples/hooks/README.md"}
+  - file: examples/hooks/pre-commit-validator.sh
+  - file: examples/hooks/install.sh
+  - file: examples/hooks/README.md
 created_at: 2026-05-03T14:39:05.322+07:00
 aliases:
   - FEAT
   - implementation_flow
   - Feature spec
 cluster: implementation_flow
-role: "Feature spec"
+role: Feature spec
+attributes:
+  domain: feat
 ---
 
 # FEAT — pre-commit hook

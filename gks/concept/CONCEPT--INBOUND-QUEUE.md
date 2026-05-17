@@ -13,14 +13,20 @@ tags:
   - write-path
   - gatekeeper
   - superseded
-crosslinks: {"references":["FRAMEWORK--MSP-ARCHITECTURE-V2"],"superseded_by":["CONCEPT--KNOWLEDGE-LAYERS-V2"]}
+crosslinks:
+  references:
+    - FRAMEWORK--MSP-ARCHITECTURE-V2
+  superseded_by:
+    - CONCEPT--KNOWLEDGE-LAYERS-V2
 created_at: 2026-05-03T14:01:50.297+07:00
 aliases:
   - CONCEPT
   - implementation_flow
   - Strategic intent / PRD
 cluster: implementation_flow
-role: "Strategic intent / PRD"
+role: Strategic intent / PRD
+attributes:
+  domain: concept
 ---
 
 > ⚠️ **Superseded by [`[[CONCEPT--KNOWLEDGE-LAYERS-V2]]`](./[[CONCEPT--KNOWLEDGE-LAYERS-V2]].md)** (Phase 4 of `[[BLUEPRINT--INBOUND-TO-CANDIDATES-MIGRATION]]`, 2026-05-09). The inbound queue has been removed; runtime atom proposals now write to `.brain/msp/projects/<ns>/candidates/` via the `msp_candidate` MCP tool. The body below is preserved as historical context.

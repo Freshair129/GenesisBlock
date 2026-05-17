@@ -3,11 +3,9 @@ import { sep } from 'node:path'
 import type { RunOpts, RunResult } from './types.js'
 
 /**
- * On Windows, bare binary names like `qwen` need a shell to resolve the
+ * On Windows, bare binary names like `gemini` need a shell to resolve the
  * `.cmd` / `.exe` / `.bat` extension via PATHEXT. But `shell: true` mangles
- * quoted arguments (see Node DEP0190). So we only enable shell mode for bare
- * names; absolute paths and names with extensions go through the safe direct
- * spawn (no arg quoting issues).
+ * quoted arguments (see Node DEP0190).
  */
 function needsShellOnWindows(bin: string): boolean {
   if (process.platform !== 'win32') return false
@@ -21,19 +19,7 @@ function needsShellOnWindows(bin: string): boolean {
 /**
  * Spawn an external CLI binary, capture stdout/stderr, and enforce a timeout.
  *
- * Cross-platform:
- *  - On Windows for bare binary names (no path / no extension), uses
- *    `shell: true` so `.cmd` shims resolve via PATHEXT.
- *  - On POSIX (and Windows with explicit paths/extensions), uses `shell: false`.
- *
- * Defensive behavior:
- *  - On ENOENT (binary missing) → returns `{ ok:false, exit_code:-1 }`. No throw.
- *    Note: on Windows with `shell: true`, cmd.exe surfaces "not recognized" as
- *    exit code 1 rather than firing an `error` event, so missing-CLI returns
- *    `{ ok:false, exit_code:1 }` in that path. Callers should treat any non-zero
- *    `exit_code` as failure.
- *  - On timeout → kills the child and returns `{ ok:false, exit_code:-1, output:'timeout' }`.
- *  - `stderr` is included on the result iff `opts.capture_stderr === true`.
+ * Supports optional stdin piping to bypass shell argument limits (UCF Phase 6).
  */
 export async function runCli(
   bin: string,
@@ -43,10 +29,15 @@ export async function runCli(
   return new Promise<RunResult>((resolve) => {
     const useShell = needsShellOnWindows(bin)
     const child = spawn(bin, args, {
-      stdio: ['ignore', 'pipe', 'pipe'],
+      stdio: [opts.stdin ? 'pipe' : 'ignore', 'pipe', 'pipe'],
       shell: useShell,
       windowsHide: true,
     })
+
+    if (opts.stdin && child.stdin) {
+      child.stdin.write(opts.stdin)
+      child.stdin.end()
+    }
 
     let stdout = ''
     let stderr = ''

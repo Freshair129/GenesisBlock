@@ -13,14 +13,17 @@ tags:
   - gatekeeper
   - schema-enforcement
   - anti-hallucination
-crosslinks: {"references":[]}
+crosslinks:
+  references: []
 created_at: 2026-05-03T13:24:23.832+07:00
 aliases:
   - CONCEPT
   - implementation_flow
   - Strategic intent / PRD
 cluster: implementation_flow
-role: "Strategic intent / PRD"
+role: Strategic intent / PRD
+attributes:
+  domain: concept
 ---
 
 # CONCEPT — MSP validator pipeline

@@ -6,16 +6,31 @@ status: stable
 tier: genesis
 source_type: axiomatic
 vault_id: default
-title: Drop standalone publish; cognitive_system monorepo IS the product (agentic, agent-pluggable)
-tags: [msp, gks, monorepo, agentic, pivot, decision, foundation]
-crosslinks: {"references":["ADR--MONOREPO-STRUCTURE","FRAMEWORK--MSP-ARCHITECTURE-V2","CONCEPT--AGENT-AGNOSTIC"],"supersedes":[]}
+title: Drop standalone publish; cognitive_system monorepo IS the product
+  (agentic, agent-pluggable)
+tags:
+  - msp
+  - gks
+  - monorepo
+  - agentic
+  - pivot
+  - decision
+  - foundation
+crosslinks:
+  references:
+    - ADR--MONOREPO-STRUCTURE
+    - FRAMEWORK--MSP-ARCHITECTURE-V2
+    - CONCEPT--AGENT-AGNOSTIC
+  supersedes: []
 created_at: 2026-05-13T18:35:00+07:00
 aliases:
   - ADR
   - implementation_flow
   - Architecture decision record
 cluster: implementation_flow
-role: "Architecture decision record"
+role: Architecture decision record
+attributes:
+  domain: adr
 ---
 
 # [[ADR--AGENTIC-MONOREPO-PIVOT]]

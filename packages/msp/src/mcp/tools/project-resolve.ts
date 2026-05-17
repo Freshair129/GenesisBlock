@@ -3,6 +3,7 @@ import { resolve as resolvePath } from 'node:path'
 import { z } from 'zod'
 
 import { resolveProject } from '../../projects/resolve.js'
+import { makeContext, makeSubject } from '../../policy/types.js'
 import { errorResult, jsonResult, type ToolHandlerCtx, type ToolTextResult } from '../types.js'
 
 export const name = 'msp_project_resolve'
@@ -34,8 +35,15 @@ interface ProjectResolveArgs {
 export function handler(ctx: ToolHandlerCtx) {
   return async (args: ProjectResolveArgs): Promise<ToolTextResult> => {
     try {
+      const subject = ctx.subject ?? makeSubject('mcp-client', 'default-mcp')
+      const context = ctx.policyContext ?? makeContext('mcp-stdio', `mcp-${Date.now()}`)
+
       const cwd = resolvePath(args.cwd ?? ctx.root)
-      const opts: { cliFlag?: string; env?: string; cwd: string } = { cwd }
+      const opts: { cliFlag?: string; env?: string; cwd: string; subject: any; context: any } = {
+        cwd,
+        subject,
+        context,
+      }
       if (typeof args.cli_flag === 'string') opts.cliFlag = args.cli_flag
       if (typeof args.env === 'string') opts.env = args.env
       else if (typeof process.env['MSP_PROJECT'] === 'string') {

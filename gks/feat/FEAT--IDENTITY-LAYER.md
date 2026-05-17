@@ -16,21 +16,27 @@ tags:
   - preferences
   - m7e
   - user-facing
-crosslinks: {"implements":["ADR--IDENTITY-STORAGE-SHAPE"],"references":["CONCEPT--IDENTITY-LAYER"]}
+crosslinks:
+  implements:
+    - ADR--IDENTITY-STORAGE-SHAPE
+  references:
+    - CONCEPT--IDENTITY-LAYER
 linked_symbols:
-  - {"file":"packages/msp/src/identity/index.ts"}
-  - {"file":"packages/msp/src/identity/types.ts"}
-  - {"file":"packages/msp/src/identity/profile.ts"}
-  - {"file":"packages/msp/src/identity/voice.ts"}
-  - {"file":"packages/msp/src/identity/preferences.ts"}
-  - {"file":"packages/msp/src/identity/store.ts"}
+  - file: packages/msp/src/identity/index.ts
+  - file: packages/msp/src/identity/types.ts
+  - file: packages/msp/src/identity/profile.ts
+  - file: packages/msp/src/identity/voice.ts
+  - file: packages/msp/src/identity/preferences.ts
+  - file: packages/msp/src/identity/store.ts
 created_at: 2026-05-05T00:26:00.000+07:00
 aliases:
   - FEAT
   - implementation_flow
   - Feature spec
 cluster: implementation_flow
-role: "Feature spec"
+role: Feature spec
+attributes:
+  domain: feat
 ---
 
 # Identity layer — namespaced JSON store with profile / voice / preferences

@@ -6,28 +6,37 @@ status: stable
 tier: process
 source_type: axiomatic
 vault_id: default
-title: msp_symbol_* MCP tool surface — 5 read-only tools for in-session symbol-graph queries
+title: msp_symbol_* MCP tool surface — 5 read-only tools for in-session
+  symbol-graph queries
 tags:
   - msp
   - symbol-graph
   - mcp
   - feat
   - tool
-crosslinks: {"implements":["ADR--SYMBOL-GRAPH-PERSISTENCE"],"references":["FRAMEWORK--SYMBOL-GRAPH","CONCEPT--SYMBOL-GRAPH","FEAT--MSP-MCP-SERVER"]}
+crosslinks:
+  implements:
+    - ADR--SYMBOL-GRAPH-PERSISTENCE
+  references:
+    - FRAMEWORK--SYMBOL-GRAPH
+    - CONCEPT--SYMBOL-GRAPH
+    - FEAT--MSP-MCP-SERVER
 linked_symbols:
-  - {"file":"packages/msp/src/mcp/tools/symbol-lookup.ts"}
-  - {"file":"packages/msp/src/mcp/tools/symbol-neighbors.ts"}
-  - {"file":"packages/msp/src/mcp/tools/symbol-impact.ts"}
-  - {"file":"packages/msp/src/mcp/tools/symbol-community.ts"}
-  - {"file":"packages/msp/src/mcp/tools/symbol-search.ts"}
-  - {"file":"packages/msp/src/mcp/server.ts"}
+  - file: packages/msp/src/mcp/tools/symbol-lookup.ts
+  - file: packages/msp/src/mcp/tools/symbol-neighbors.ts
+  - file: packages/msp/src/mcp/tools/symbol-impact.ts
+  - file: packages/msp/src/mcp/tools/symbol-community.ts
+  - file: packages/msp/src/mcp/tools/symbol-search.ts
+  - file: packages/msp/src/mcp/server.ts
 created_at: 2026-05-09T16:52:00.000+07:00
 aliases:
   - FEAT
   - implementation_flow
   - Feature spec
 cluster: implementation_flow
-role: "Feature spec"
+role: Feature spec
+attributes:
+  domain: feat
 ---
 
 # FEAT — msp_symbol_* MCP tool surface

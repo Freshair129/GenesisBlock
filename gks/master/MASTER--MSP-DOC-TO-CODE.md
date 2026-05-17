@@ -12,9 +12,12 @@ vault_id: default
 priority: P0
 constituents:
   required:
-    framework: [FRAMEWORK--KNOWLEDGE-3-TIER]
-    concept: [CONCEPT--CODEGEN-MICROTASK-CONTRACT]
-    adr: [ADR--MASTER-PROMOTION-DOC-TO-CODE]
+    framework:
+      - FRAMEWORK--KNOWLEDGE-3-TIER
+    concept:
+      - CONCEPT--CODEGEN-MICROTASK-CONTRACT
+    adr:
+      - ADR--MASTER-PROMOTION-DOC-TO-CODE
   optional: {}
 title: Doc-to-code — atoms before code, every milestone, no exceptions
 tags:
@@ -23,14 +26,20 @@ tags:
   - doc-to-code
   - governance
   - instinct
-crosslinks: {"references":["FRAMEWORK--KNOWLEDGE-3-TIER","ADR--MASTER-PROMOTION-DOC-TO-CODE","CONCEPT--CODEGEN-MICROTASK-CONTRACT"]}
+crosslinks:
+  references:
+    - FRAMEWORK--KNOWLEDGE-3-TIER
+    - ADR--MASTER-PROMOTION-DOC-TO-CODE
+    - CONCEPT--CODEGEN-MICROTASK-CONTRACT
 created_at: 2026-05-09T15:00:30.000+07:00
 aliases:
   - MASTER
   - implementation_flow
   - Root-level policy / genesis rule
 cluster: implementation_flow
-role: "Root-level policy / genesis rule"
+role: Root-level policy / genesis rule
+attributes:
+  domain: master
 ---
 
 # MASTER — Doc-to-code (atoms before code, every milestone)

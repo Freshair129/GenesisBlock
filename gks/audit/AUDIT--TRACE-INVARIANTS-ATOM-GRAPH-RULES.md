@@ -6,15 +6,22 @@ phase: 6
 tier: process
 title: AUDIT — Trace Invariants Atom-Graph Rules implementation
 created_at: 2026-05-14T11:00:00+07:00
-tags: [validator, proto, trace-invariants]
+tags:
+  - validator
+  - proto
+  - trace-invariants
 crosslinks:
-  references: [PROTO--SYMBOLS-TRACE-INVARIANTS, BLUEPRINT--PROTO-LOADER]
+  references:
+    - PROTO--SYMBOLS-TRACE-INVARIANTS
+    - BLUEPRINT--PROTO-LOADER
 aliases:
   - AUDIT
   - implementation_flow
   - Test results / quality report
 cluster: implementation_flow
-role: "Test results / quality report"
+role: Test results / quality report
+attributes:
+  domain: audit
 ---
 
 # AUDIT — Trace Invariants Atom-Graph Rules

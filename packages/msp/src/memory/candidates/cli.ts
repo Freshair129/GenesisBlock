@@ -36,7 +36,7 @@ Subcommands:
   delete      Remove a candidate from the queue
 
 Options (propose):
-  --id=<ID>           Atom ID, e.g. FEAT--MY-FEATURE (required)
+  --id=<ID>           Atom ID, e.g. FEAT-376--MY-FEATURE--K5 or FEAT--MY-FEATURE (required)
   --type=<TYPE>       ${TYPES_DISPLAY} (required)
   --title=<TITLE>     Human-readable title (required)
   --body=<TEXT>       Initial markdown body (default: empty)

@@ -162,7 +162,12 @@ export async function createCognitiveLayer(
         throw new Error(`expand: atom not found: ${req.id}`)
       }
 
-      const resource = makeResource('atom', req.id, {}, (atom.attributes as any) ?? {})
+      // Read full body first to allow content-based policy checks (UCF Phase 4)
+      const absPath = resolve(root, 'gks', atom.path)
+      const raw = await readFile(absPath, 'utf8')
+      const body = raw.split('\n---').pop()?.trim() ?? ''
+
+      const resource = makeResource('atom', req.id, {}, { ...((atom.attributes as any) ?? {}), body })
       const { permitted, decision } = await enforcePolicy(resource, { root, subject, action, context })
 
       if (!permitted) {
@@ -173,16 +178,12 @@ export async function createCognitiveLayer(
         }
       }
 
-      // Read full body
-      const absPath = resolve(root, 'gks', atom.path)
-      const raw = await readFile(absPath, 'utf8')
-      const body = raw.split('\n---').pop()?.trim() ?? ''
-
-      return {
+      const hit: CognitiveRecallHit = {
         id: req.id,
         body,
         tier: targetTier,
       }
+      return hit
     },
 
     async consolidate(sessionId: string): Promise<void> {

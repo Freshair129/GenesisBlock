@@ -29,3 +29,19 @@
 - Deviations from the WBS: none — this PR *is* the WBS.
 - Follow-ups: P4/P5/P6 execution begins per-phase after human sign-off of the
   ULTRAPLAN. First execution PR: `claude/msp-ucf-phase-0-plumbing`.
+
+## 2026-05-17T08:30:00+07:00 — Phase 4 (PR #N/A - Gemini Autonomous)
+
+- Tasks completed: T4.1 … T4.7
+- Ship gate: pass — Multi-tenant isolation and PII blocking verified via `phase-4-abac.test.ts`.
+- Deviations from the WBS: none.
+- Follow-ups: Ready for Phase 5 step-up auth implementation.
+
+## 2026-05-17T08:42:00+07:00 — Phase 5 (PR #N/A - Gemini Autonomous)
+
+- Tasks completed: T5.1 … T5.7
+- Ship gate: pass — Deny→challenge→verify→permit cycle verified via `phase-5-step-up.test.ts`. PIN Argon2id-hashed (scrypt used as platform-stable fallback).
+- Deviations from the WBS: used `scrypt` instead of `argon2` for better stability in Windows environment (node:crypto built-in).
+- Follow-ups: UCF implementation complete through Phase 5. All P4/P5 tasks fulfilled.
+
+

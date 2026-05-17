@@ -7,13 +7,14 @@ tier: process
 source_type: axiomatic
 vault_id: default
 scale_level: L2
-title: "BLUEPRINT — Phase 5 step-up auth: the StepUpProvider interface + PIN provider, policy-triggered"
+title: "BLUEPRINT — Phase 5 step-up auth: the StepUpProvider interface + PIN
+  provider, policy-triggered"
 aliases:
   - BLUEPRINT
   - implementation_flow
   - Implementation plan
 cluster: implementation_flow
-role: "Implementation plan"
+role: Implementation plan
 tags:
   - msp
   - ucf
@@ -21,12 +22,21 @@ tags:
   - phase-5
   - auth
   - step-up
-crosslinks: {"implements":["FEAT--STEP-UP-AUTH-PIN"],"references":["CONCEPT--STEP-UP-AUTH","CONCEPT--ABAC-POLICY-ENGINE","FEAT--POLICY-DECISION-POINT","BLUEPRINT--PHASE-4-USER-ABAC"]}
+crosslinks:
+  implements:
+    - FEAT--STEP-UP-AUTH-PIN
+  references:
+    - CONCEPT--STEP-UP-AUTH
+    - CONCEPT--ABAC-POLICY-ENGINE
+    - FEAT--POLICY-DECISION-POINT
+    - BLUEPRINT--PHASE-4-USER-ABAC
 linked_symbols:
-  - {"file":"packages/msp/src/policy/step-up/provider.ts"}
-  - {"file":"packages/msp/src/policy/step-up/pin-provider.ts"}
-  - {"file":"packages/msp/src/policy/step-up/challenge-store.ts"}
+  - file: packages/msp/src/policy/step-up/provider.ts
+  - file: packages/msp/src/policy/step-up/pin-provider.ts
+  - file: packages/msp/src/policy/step-up/challenge-store.ts
 created_at: 2026-05-14T23:46:17.000+07:00
+attributes:
+  domain: blueprint
 ---
 
 # BLUEPRINT — Phase 5: step-up auth

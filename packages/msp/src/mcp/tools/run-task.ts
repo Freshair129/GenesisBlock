@@ -31,9 +31,9 @@ export function handler(ctx: ToolHandlerCtx) {
     const originalCwd = process.cwd()
     process.chdir(root)
     try {
-      const subject = makeSubject('mcp-client', 'default-mcp')
+      const subject = ctx.subject ?? makeSubject('mcp-client', 'default-mcp')
       const action = 'expose-to-llm'
-      const context = makeContext('mcp-stdio', `mcp-${Date.now()}`)
+      const context = ctx.policyContext ?? makeContext('mcp-stdio', `mcp-${Date.now()}`)
 
       console.debug(
         `[ucf] 4-tuple: msp_run_task | sub:${subject.id} | act:${action} | trace:${context.trace_id}`,

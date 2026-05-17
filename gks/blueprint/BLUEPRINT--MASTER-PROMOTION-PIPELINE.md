@@ -6,7 +6,8 @@ status: draft
 tier: process
 source_type: axiomatic
 vault_id: default
-title: BLUEPRINT — Master Block promotion pipeline (scan → analyze → propose, never auto-write)
+title: BLUEPRINT — Master Block promotion pipeline (scan → analyze → propose,
+  never auto-write)
 tags:
   - msp
   - master
@@ -14,25 +15,32 @@ tags:
   - genesis-block
   - blueprint
   - phase-e4
-crosslinks: {"references":["CONCEPT--MASTER-PROMOTION","SPEC--GENESIS-BLOCK-MANIFEST","ADR--MASTER-PROMOTION-DOC-TO-CODE","ADR--HUMAN-REVIEW-GATES"]}
+crosslinks:
+  references:
+    - CONCEPT--MASTER-PROMOTION
+    - SPEC--GENESIS-BLOCK-MANIFEST
+    - ADR--MASTER-PROMOTION-DOC-TO-CODE
+    - ADR--HUMAN-REVIEW-GATES
 linked_symbols:
-  - {"file":"packages/msp/src/master/dimensions.ts"}
-  - {"file":"packages/msp/src/master/scanner.ts"}
-  - {"file":"packages/msp/src/master/promote.ts"}
-  - {"file":"packages/msp/src/master/cli.ts"}
-  - {"file":"packages/msp/test/master/dimensions.test.ts"}
-  - {"file":"packages/msp/test/master/scanner.test.ts"}
-  - {"file":"packages/msp/test/master/promote.test.ts"}
-  - {"file":"packages/msp/test/master/cli.test.ts"}
-  - {"file":"packages/msp/package.json"}
-  - {"file":"gks/inbound/"}
+  - file: packages/msp/src/master/dimensions.ts
+  - file: packages/msp/src/master/scanner.ts
+  - file: packages/msp/src/master/promote.ts
+  - file: packages/msp/src/master/cli.ts
+  - file: packages/msp/test/master/dimensions.test.ts
+  - file: packages/msp/test/master/scanner.test.ts
+  - file: packages/msp/test/master/promote.test.ts
+  - file: packages/msp/test/master/cli.test.ts
+  - file: packages/msp/package.json
+  - file: gks/inbound/
 created_at: 2026-05-13T10:05:00.000+07:00
 aliases:
   - BLUEPRINT
   - implementation_flow
   - Implementation plan
 cluster: implementation_flow
-role: "Implementation plan"
+role: Implementation plan
+attributes:
+  domain: blueprint
 ---
 
 # BLUEPRINT — Master Block promotion pipeline

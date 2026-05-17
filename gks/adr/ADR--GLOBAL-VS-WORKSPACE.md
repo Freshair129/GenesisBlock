@@ -6,7 +6,8 @@ status: stable
 vault_id: default
 tier: genesis
 source_type: axiomatic
-title: Global vs workspace storage — ~/.msp for cross-project, .brain/msp/projects/<ns>/ for per-project
+title: Global vs workspace storage — ~/.msp for cross-project,
+  .brain/msp/projects/<ns>/ for per-project
 tags:
   - msp
   - storage
@@ -14,14 +15,21 @@ tags:
   - workspace
   - agent-agnostic
   - decision
-crosslinks: {"references":["FRAMEWORK--MSP-ARCHITECTURE-V2","CONCEPT--AGENT-AGNOSTIC","CONCEPT--NAMED-PROJECT-REGISTRY","ADR--PATH-ENCODING"]}
+crosslinks:
+  references:
+    - FRAMEWORK--MSP-ARCHITECTURE-V2
+    - CONCEPT--AGENT-AGNOSTIC
+    - CONCEPT--NAMED-PROJECT-REGISTRY
+    - ADR--PATH-ENCODING
 created_at: 2026-05-09T07:00:00.000+07:00
 aliases:
   - ADR
   - implementation_flow
   - Architecture decision record
 cluster: implementation_flow
-role: "Architecture decision record"
+role: Architecture decision record
+attributes:
+  domain: adr
 ---
 
 # ADR — global vs workspace storage

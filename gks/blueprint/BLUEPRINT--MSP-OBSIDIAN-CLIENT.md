@@ -14,21 +14,28 @@ tags:
   - client
   - blueprint
   - implementation
-crosslinks: {"implements":["FEAT--MSP-OBSIDIAN-CLIENT"],"references":["ADR--MSP-OBSIDIAN-INTEGRATION","CONCEPT--OBSIDIAN-AS-RUNTIME"]}
+crosslinks:
+  implements:
+    - FEAT--MSP-OBSIDIAN-CLIENT
+  references:
+    - ADR--MSP-OBSIDIAN-INTEGRATION
+    - CONCEPT--OBSIDIAN-AS-RUNTIME
 linked_symbols:
-  - {"file":"packages/msp/src/obsidian/client.ts"}
-  - {"file":"packages/msp/src/obsidian/types.ts"}
-  - {"file":"packages/msp/src/obsidian/rest.ts"}
-  - {"file":"packages/msp/src/obsidian/filesystem.ts"}
-  - {"file":"packages/msp/src/obsidian/env.ts"}
-  - {"file":"packages/msp/test/obsidian/client.test.ts"}
+  - file: packages/msp/src/obsidian/client.ts
+  - file: packages/msp/src/obsidian/types.ts
+  - file: packages/msp/src/obsidian/rest.ts
+  - file: packages/msp/src/obsidian/filesystem.ts
+  - file: packages/msp/src/obsidian/env.ts
+  - file: packages/msp/test/obsidian/client.test.ts
 created_at: 2026-05-04T12:25:22.543+07:00
 aliases:
   - BLUEPRINT
   - implementation_flow
   - Implementation plan
 cluster: implementation_flow
-role: "Implementation plan"
+role: Implementation plan
+attributes:
+  domain: blueprint
 ---
 
 # BLUEPRINT — MSP Obsidian client implementation plan

@@ -15,18 +15,23 @@ tags:
   - invariants
   - atom-graph
 crosslinks:
-  enforces: ["ADR--SYMBOLS-PROCESS-TRACING"]
-  implements: ["ADR--SYMBOLS-PROCESS-TRACING"]
-  supersedes: ["PROTO--TRACE-INVARIANTS"]
+  enforces:
+    - ADR--SYMBOLS-PROCESS-TRACING
+  implements:
+    - ADR--SYMBOLS-PROCESS-TRACING
+  supersedes:
+    - PROTO--TRACE-INVARIANTS
 linked_symbols:
-  - {"file":"packages/msp/src/validator/proto/trace-invariants.ts"}
+  - file: packages/msp/src/validator/proto/trace-invariants.ts
 created_at: 2026-05-14T20:00:00.000+07:00
 aliases:
   - PROTO
   - implementation_flow
   - Machine-enforced invariant
 cluster: implementation_flow
-role: "Machine-enforced invariant"
+role: Machine-enforced invariant
+attributes:
+  domain: proto
 ---
 
 # PROTO — Trace Invariants

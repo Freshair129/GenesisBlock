@@ -15,18 +15,26 @@ tags:
   - blueprint
   - python
   - cobol
-crosslinks: {"implements":["FEAT--SYMBOLS-MULTI-LANG"],"references":["BLUEPRINT--SYMBOL-GRAPH-CORE","ADR--SYMBOLS-PYTHON-PARSER","ADR--SYMBOLS-COBOL-STRATEGY"]}
+crosslinks:
+  implements:
+    - FEAT--SYMBOLS-MULTI-LANG
+  references:
+    - BLUEPRINT--SYMBOL-GRAPH-CORE
+    - ADR--SYMBOLS-PYTHON-PARSER
+    - ADR--SYMBOLS-COBOL-STRATEGY
 linked_symbols:
-  - {"file":"packages/msp/src/symbols/parser/index.ts"}
-  - {"file":"packages/msp/src/symbols/parser/python.ts"}
-  - {"file":"packages/msp/src/symbols/parser/cobol.ts"}
+  - file: packages/msp/src/symbols/parser/index.ts
+  - file: packages/msp/src/symbols/parser/python.ts
+  - file: packages/msp/src/symbols/parser/cobol.ts
 created_at: 2026-05-12T05:00:00.000+07:00
 aliases:
   - BLUEPRINT
   - implementation_flow
   - Implementation plan
 cluster: implementation_flow
-role: "Implementation plan"
+role: Implementation plan
+attributes:
+  domain: blueprint
 ---
 
 # BLUEPRINT — Multi-language symbol graph expansion

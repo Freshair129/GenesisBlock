@@ -17,20 +17,31 @@ tags:
   - sqlite
   - jsonl
   - leiden
-crosslinks: {"implements":["FEAT--MSP-GRAPH-CLI","FEAT--MSP-SYMBOL-MCP"],"references":["FRAMEWORK--SYMBOL-GRAPH","CONCEPT--SYMBOL-GRAPH","CONCEPT--PARSER-CHOICE","ADR--SYMBOL-GRAPH-PERSISTENCE","ADR--LEIDEN-COMMUNITY-DETECTION"]}
+crosslinks:
+  implements:
+    - FEAT--MSP-GRAPH-CLI
+    - FEAT--MSP-SYMBOL-MCP
+  references:
+    - FRAMEWORK--SYMBOL-GRAPH
+    - CONCEPT--SYMBOL-GRAPH
+    - CONCEPT--PARSER-CHOICE
+    - ADR--SYMBOL-GRAPH-PERSISTENCE
+    - ADR--LEIDEN-COMMUNITY-DETECTION
 linked_symbols:
-  - {"file":"packages/msp/src/symbols/types.ts"}
-  - {"file":"packages/msp/src/symbols/parser/typescript.ts"}
-  - {"file":"packages/msp/src/symbols/store/sqlite.ts"}
-  - {"file":"packages/msp/src/symbols/store/jsonl.ts"}
-  - {"file":"packages/msp/src/symbols/communities/leiden.ts"}
+  - file: packages/msp/src/symbols/types.ts
+  - file: packages/msp/src/symbols/parser/typescript.ts
+  - file: packages/msp/src/symbols/store/sqlite.ts
+  - file: packages/msp/src/symbols/store/jsonl.ts
+  - file: packages/msp/src/symbols/communities/leiden.ts
 created_at: 2026-05-09T17:00:00.000+07:00
 aliases:
   - BLUEPRINT
   - implementation_flow
   - Implementation plan
 cluster: implementation_flow
-role: "Implementation plan"
+role: Implementation plan
+attributes:
+  domain: blueprint
 ---
 
 # BLUEPRINT — Symbol Graph core

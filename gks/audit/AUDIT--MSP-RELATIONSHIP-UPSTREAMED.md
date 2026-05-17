@@ -6,21 +6,28 @@ status: stable
 vault_id: default
 tier: process
 source_type: axiomatic
-title: MSP relationship docs upstreamed — closes proposal #06
+title: MSP relationship docs upstreamed — closes proposal
 tags:
   - msp
   - gks
   - audit
   - upstream
   - documentation
-crosslinks: {"references":["AUDIT--ARCH-DOC-CLEANUP","CONCEPT--AGENT-AGNOSTIC","BLUEPRINT--INBOUND-TO-CANDIDATES-MIGRATION","ADR--AGENT-WRITE-BOUNDARIES"]}
+crosslinks:
+  references:
+    - AUDIT--ARCH-DOC-CLEANUP
+    - CONCEPT--AGENT-AGNOSTIC
+    - BLUEPRINT--INBOUND-TO-CANDIDATES-MIGRATION
+    - ADR--AGENT-WRITE-BOUNDARIES
 created_at: 2026-05-11T17:25:00.000+07:00
 aliases:
   - AUDIT
   - implementation_flow
   - Test results / quality report
 cluster: implementation_flow
-role: "Test results / quality report"
+role: Test results / quality report
+attributes:
+  domain: audit
 ---
 
 # AUDIT — MSP relationship docs upstreamed

@@ -16,7 +16,9 @@ aliases:
   - implementation_flow
   - Technical specification
 cluster: implementation_flow
-role: "Technical specification"
+role: Technical specification
+attributes:
+  domain: spec
 ---
 
 # SPEC — Atom Registry Schema

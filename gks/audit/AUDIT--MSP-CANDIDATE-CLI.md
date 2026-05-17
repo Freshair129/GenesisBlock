@@ -14,24 +14,29 @@ tags:
   - candidates
   - gemini
   - qwen
-crosslinks: {"references":["ADR--MSP-CANDIDATE-CLI","ADR--AGENT-WRITE-BOUNDARIES"]}
+crosslinks:
+  references:
+    - ADR--MSP-CANDIDATE-CLI
+    - ADR--AGENT-WRITE-BOUNDARIES
 linked_symbols:
-  - {"file":"packages/msp/src/memory/candidates/cli.ts"}
-  - {"file":"packages/msp/package.json"}
-  - {"file":"scripts/msp/chmod-bins.mjs"}
-  - {"file":"scripts/create_atom.cjs"}
-  - {"file":"atom-creator/SKILL.md"}
-  - {"file":"atom-creator/references/taxonomy.md"}
-  - {"file":"gks/feat/FEAT--ATOM-CREATOR-SKILL.md"}
-  - {"file":"gks/blueprint/BLUEPRINT--ATOM-CREATOR-SKILL.md"}
-  - {"file":"gks/adr/ADR--MSP-CANDIDATE-CLI.md"}
+  - file: packages/msp/src/memory/candidates/cli.ts
+  - file: packages/msp/package.json
+  - file: scripts/msp/chmod-bins.mjs
+  - file: scripts/create_atom.cjs
+  - file: atom-creator/SKILL.md
+  - file: atom-creator/references/taxonomy.md
+  - file: gks/feat/FEAT--ATOM-CREATOR-SKILL.md
+  - file: gks/blueprint/BLUEPRINT--ATOM-CREATOR-SKILL.md
+  - file: gks/adr/ADR--MSP-CANDIDATE-CLI.md
 created_at: 2026-05-17T03:00:00.000+07:00
 aliases:
   - AUDIT
   - implementation_flow
   - Test results / quality report
 cluster: implementation_flow
-role: "Test results / quality report"
+role: Test results / quality report
+attributes:
+  domain: audit
 ---
 
 ## Scope

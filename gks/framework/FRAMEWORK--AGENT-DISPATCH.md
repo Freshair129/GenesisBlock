@@ -28,7 +28,9 @@ aliases:
   - implementation_flow
   - Governance / architectural framework
 cluster: implementation_flow
-role: "Governance / architectural framework"
+role: Governance / architectural framework
+attributes:
+  domain: framework
 ---
 
 # FRAMEWORK — Agent Dispatch

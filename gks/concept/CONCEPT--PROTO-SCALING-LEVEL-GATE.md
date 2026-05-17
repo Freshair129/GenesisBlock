@@ -6,21 +6,27 @@ status: stable
 vault_id: default
 tier: genesis
 source_type: axiomatic
-title: PROTO--SCALING-LEVEL-GATE — auto-detect L1/L2/L3 from PR diff + check required-atom set
+title: PROTO--SCALING-LEVEL-GATE — auto-detect L1/L2/L3 from PR diff + check
+  required-atom set
 tags:
   - msp
   - proto
   - scaling-levels
   - governance
   - m8c
-crosslinks: {"references":["CONCEPT--PROTO-PATTERN","FRAMEWORK--SCALING-LEVELS"]}
+crosslinks:
+  references:
+    - CONCEPT--PROTO-PATTERN
+    - FRAMEWORK--SCALING-LEVELS
 created_at: 2026-05-05T16:28:00.000+07:00
 aliases:
   - CONCEPT
   - implementation_flow
   - Strategic intent / PRD
 cluster: implementation_flow
-role: "Strategic intent / PRD"
+role: Strategic intent / PRD
+attributes:
+  domain: concept
 ---
 
 # CONCEPT — [[PROTO--SCALING-LEVEL-GATE]]

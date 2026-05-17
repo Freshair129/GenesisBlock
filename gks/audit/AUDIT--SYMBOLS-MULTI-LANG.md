@@ -6,7 +6,8 @@ status: stable
 tier: process
 source_type: axiomatic
 vault_id: default
-title: AUDIT — Multi-language symbol parsing (Python tree-sitter + COBOL regex) verification
+title: AUDIT — Multi-language symbol parsing (Python tree-sitter + COBOL regex)
+  verification
 tags:
   - msp
   - symbol-graph
@@ -15,20 +16,28 @@ tags:
   - cobol
   - audit
   - tree-sitter
-crosslinks: {"references":["FEAT--SYMBOLS-MULTI-LANG","BLUEPRINT--SYMBOLS-MULTI-LANG","ADR--SYMBOLS-PYTHON-PARSER","ADR--SYMBOLS-COBOL-STRATEGY","FRAMEWORK--SYMBOL-GRAPH"]}
+crosslinks:
+  references:
+    - FEAT--SYMBOLS-MULTI-LANG
+    - BLUEPRINT--SYMBOLS-MULTI-LANG
+    - ADR--SYMBOLS-PYTHON-PARSER
+    - ADR--SYMBOLS-COBOL-STRATEGY
+    - FRAMEWORK--SYMBOL-GRAPH
 linked_symbols:
-  - {"file":"packages/msp/src/symbols/parser/python.ts"}
-  - {"file":"packages/msp/src/symbols/parser/cobol.ts"}
-  - {"file":"packages/msp/src/symbols/parser/index.ts"}
-  - {"file":"packages/msp/test/symbols/parser-python.test.ts"}
-  - {"file":"packages/msp/test/symbols/parser-cobol.test.ts"}
+  - file: packages/msp/src/symbols/parser/python.ts
+  - file: packages/msp/src/symbols/parser/cobol.ts
+  - file: packages/msp/src/symbols/parser/index.ts
+  - file: packages/msp/test/symbols/parser-python.test.ts
+  - file: packages/msp/test/symbols/parser-cobol.test.ts
 created_at: 2026-05-12T05:12:00.000+07:00
 aliases:
   - AUDIT
   - implementation_flow
   - Test results / quality report
 cluster: implementation_flow
-role: "Test results / quality report"
+role: Test results / quality report
+attributes:
+  domain: audit
 ---
 
 # AUDIT — Multi-language symbol parsing

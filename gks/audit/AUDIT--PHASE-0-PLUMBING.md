@@ -12,14 +12,20 @@ tags:
   - ucf
   - plumbing
   - audit
-crosslinks: { "references": ["BLUEPRINT--PHASE-0-PLUMBING", "CONCEPT--SUBJECT-RESOURCE-ACTION-CONTEXT", "CONCEPT--ATTRIBUTE-BAG-MODEL"] }
+crosslinks:
+  references:
+    - BLUEPRINT--PHASE-0-PLUMBING
+    - CONCEPT--SUBJECT-RESOURCE-ACTION-CONTEXT
+    - CONCEPT--ATTRIBUTE-BAG-MODEL
 created_at: 2026-05-14T21:00:00.000+07:00
 aliases:
   - AUDIT
   - implementation_flow
   - Test results / quality report
 cluster: implementation_flow
-role: "Test results / quality report"
+role: Test results / quality report
+attributes:
+  domain: audit
 ---
 
 # AUDIT - UCF Phase 0: Propagation Plumbing

@@ -152,7 +152,10 @@ export async function composeMasterAtoms(
       continue
     }
 
-    const attributes = (parsed.fm.attributes as Record<string, any>) ?? {}
+    const attributes = {
+      ...((parsed.fm.attributes as Record<string, any>) ?? {}),
+      body: parsed.body, // Inject body for regex matching (UCF Phase 4 PII pack)
+    }
 
     // 1. PEP enforcement (Phase 2)
     if (opts.pep) {

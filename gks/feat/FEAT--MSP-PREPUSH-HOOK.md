@@ -12,18 +12,25 @@ tags:
   - prepush
   - hook
   - user-facing
-crosslinks: {"implements":["ADR--MSP-PREPUSH-HOOK"],"references":["CONCEPT--MSP-PREPUSH-HOOK","FEAT--MSP-PRECOMMIT-HOOK"]}
+crosslinks:
+  implements:
+    - ADR--MSP-PREPUSH-HOOK
+  references:
+    - CONCEPT--MSP-PREPUSH-HOOK
+    - FEAT--MSP-PRECOMMIT-HOOK
 linked_symbols:
-  - {"file":"examples/hooks/pre-push-verify.sh"}
-  - {"file":"examples/hooks/install.sh"}
-  - {"file":"examples/hooks/README.md"}
+  - file: examples/hooks/pre-push-verify.sh
+  - file: examples/hooks/install.sh
+  - file: examples/hooks/README.md
 created_at: 2026-05-03T17:39:28.605+07:00
 aliases:
   - FEAT
   - implementation_flow
   - Feature spec
 cluster: implementation_flow
-role: "Feature spec"
+role: Feature spec
+attributes:
+  domain: feat
 ---
 
 # FEAT — pre-push hook

@@ -13,15 +13,26 @@ tags:
   - bugfix
   - audit
   - claude-desktop
-crosslinks: {"references":["AUDIT--MSP-MCP-SERVER","AUDIT--MSP-MCP-TOOL-EXPANSION","AUDIT--GKS-UPSTREAM-PROPOSALS-FILED"]}
-linked_symbols: ["packages/msp/src/mcp/argv.ts","packages/msp/src/mcp/bin.ts","packages/msp/src/mcp/server.ts","packages/msp/test/mcp/argv.test.ts","packages/msp/test/mcp/bin.test.ts"]
+crosslinks:
+  references:
+    - AUDIT--MSP-MCP-SERVER
+    - AUDIT--MSP-MCP-TOOL-EXPANSION
+    - AUDIT--GKS-UPSTREAM-PROPOSALS-FILED
+linked_symbols:
+  - packages/msp/src/mcp/argv.ts
+  - packages/msp/src/mcp/bin.ts
+  - packages/msp/src/mcp/server.ts
+  - packages/msp/test/mcp/argv.test.ts
+  - packages/msp/test/mcp/bin.test.ts
 created_at: 2026-05-07T03:18:00.000+07:00
 aliases:
   - AUDIT
   - implementation_flow
   - Test results / quality report
 cluster: implementation_flow
-role: "Test results / quality report"
+role: Test results / quality report
+attributes:
+  domain: audit
 ---
 
 # AUDIT — MCP cwd resolution fix

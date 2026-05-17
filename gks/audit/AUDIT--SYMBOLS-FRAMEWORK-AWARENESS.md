@@ -14,14 +14,21 @@ tags:
   - nextjs
   - prisma
   - fastapi
-crosslinks: {"references":["CONCEPT--SYMBOLS-FRAMEWORK-AWARENESS","ADR--SYMBOLS-FRAMEWORK-AWARENESS","ALGO--SYMBOLS-FRAMEWORK-RECOGNITION","PROTO--SYMBOLS-FRAMEWORK-INVARIANTS"]}
+crosslinks:
+  references:
+    - CONCEPT--SYMBOLS-FRAMEWORK-AWARENESS
+    - ADR--SYMBOLS-FRAMEWORK-AWARENESS
+    - ALGO--SYMBOLS-FRAMEWORK-RECOGNITION
+    - PROTO--SYMBOLS-FRAMEWORK-INVARIANTS
 created_at: 2026-05-12T22:30:00.000+08:00
 aliases:
   - AUDIT
   - implementation_flow
   - Test results / quality report
 cluster: implementation_flow
-role: "Test results / quality report"
+role: Test results / quality report
+attributes:
+  domain: audit
 ---
 
 # AUDIT — Framework-awareness recognizers

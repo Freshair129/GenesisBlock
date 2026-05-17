@@ -14,20 +14,28 @@ tags:
   - summarisation
   - m7b
   - user-facing
-crosslinks: {"implements":["ADR--CONSOLIDATOR-HYBRID-SCORING"],"references":["CONCEPT--CONSOLIDATOR","FEAT--MEMORY-EPISODIC-WRITER","FEAT--MEMORY-SESSIONS-WRITER"]}
+crosslinks:
+  implements:
+    - ADR--CONSOLIDATOR-HYBRID-SCORING
+  references:
+    - CONCEPT--CONSOLIDATOR
+    - FEAT--MEMORY-EPISODIC-WRITER
+    - FEAT--MEMORY-SESSIONS-WRITER
 linked_symbols:
-  - {"file":"packages/msp/src/orchestrator/consolidator/index.ts"}
-  - {"file":"packages/msp/src/orchestrator/consolidator/types.ts"}
-  - {"file":"packages/msp/src/orchestrator/consolidator/score.ts"}
-  - {"file":"packages/msp/src/orchestrator/consolidator/boundary.ts"}
-  - {"file":"packages/msp/src/orchestrator/consolidator/summarise.ts"}
+  - file: packages/msp/src/orchestrator/consolidator/index.ts
+  - file: packages/msp/src/orchestrator/consolidator/types.ts
+  - file: packages/msp/src/orchestrator/consolidator/score.ts
+  - file: packages/msp/src/orchestrator/consolidator/boundary.ts
+  - file: packages/msp/src/orchestrator/consolidator/summarise.ts
 created_at: 2026-05-04T17:06:00.000+07:00
 aliases:
   - FEAT
   - implementation_flow
   - Feature spec
 cluster: implementation_flow
-role: "Feature spec"
+role: Feature spec
+attributes:
+  domain: feat
 ---
 
 # Consolidator — session → episode hybrid-scored gate

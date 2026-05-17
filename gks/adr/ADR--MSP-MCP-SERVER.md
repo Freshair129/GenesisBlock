@@ -12,14 +12,20 @@ tags:
   - mcp
   - decision
   - server
-crosslinks: {"references":["CONCEPT--MSP-MCP-SERVER","FEAT--MSP-VALIDATOR","FEAT--CODEGEN-MICROTASK-RUNNER"]}
+crosslinks:
+  references:
+    - CONCEPT--MSP-MCP-SERVER
+    - FEAT--MSP-VALIDATOR
+    - FEAT--CODEGEN-MICROTASK-RUNNER
 created_at: 2026-05-03T18:13:54.288+07:00
 aliases:
   - ADR
   - implementation_flow
   - Architecture decision record
 cluster: implementation_flow
-role: "Architecture decision record"
+role: Architecture decision record
+attributes:
+  domain: adr
 ---
 
 # ADR — MSP MCP server shape

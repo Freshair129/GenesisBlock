@@ -6,7 +6,8 @@ status: stable
 vault_id: default
 tier: genesis
 source_type: axiomatic
-title: Genesis Graph Backend — an embedded graph backend specialised for atomic knowledge
+title: Genesis Graph Backend — an embedded graph backend specialised for atomic
+  knowledge
 tags:
   - msp
   - gks
@@ -15,14 +16,18 @@ tags:
   - genesis-block
   - sovereign-stack
   - cypher
-crosslinks: {"references":["FRAMEWORK--MSP-ARCHITECTURE-V2"]}
+crosslinks:
+  references:
+    - FRAMEWORK--MSP-ARCHITECTURE-V2
 created_at: 2026-05-12T11:55:00.000+07:00
 aliases:
   - CONCEPT
   - implementation_flow
   - Strategic intent / PRD
 cluster: implementation_flow
-role: "Strategic intent / PRD"
+role: Strategic intent / PRD
+attributes:
+  domain: concept
 ---
 
 # CONCEPT — Genesis Graph Backend

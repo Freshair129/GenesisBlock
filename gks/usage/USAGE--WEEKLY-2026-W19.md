@@ -15,7 +15,9 @@ aliases:
   - memory
   - Usage metrics rollup
 cluster: memory
-role: "Usage metrics rollup"
+role: Usage metrics rollup
+attributes:
+  domain: usage
 ---
 
 # Usage Roll-up — 2026-W19

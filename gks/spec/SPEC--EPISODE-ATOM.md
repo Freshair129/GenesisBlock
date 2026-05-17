@@ -7,7 +7,12 @@ vault_id: default
 tier: process
 source_type: axiomatic
 title: SPEC — Episode Atom — runtime-generated dispatch record contract
-tags: [msp, agents, episode, spec, runtime]
+tags:
+  - msp
+  - agents
+  - episode
+  - spec
+  - runtime
 crosslinks:
   references:
     - BLUEPRINT--AGENT-DISPATCHER
@@ -21,7 +26,9 @@ aliases:
   - implementation_flow
   - Technical specification
 cluster: implementation_flow
-role: "Technical specification"
+role: Technical specification
+attributes:
+  domain: spec
 ---
 
 # SPEC — Episode Atom

@@ -15,21 +15,32 @@ tags:
   - atrophy
   - audit
   - m9a
-crosslinks: {"references":["PROTO--VALID-UNTIL","CONCEPT--DECISION-ATROPHY-GUARDS","FEAT--PROTO-LOADER","FRAMEWORK--MSP-ARCHITECTURE-V2"]}
+crosslinks:
+  references:
+    - PROTO--VALID-UNTIL
+    - CONCEPT--DECISION-ATROPHY-GUARDS
+    - FEAT--PROTO-LOADER
+    - FRAMEWORK--MSP-ARCHITECTURE-V2
 linked_symbols:
-  - {"file":"packages/msp/src/validator/proto/valid-until.ts"}
-  - {"file":"gks/proto/PROTO--VALID-UNTIL.md"}
-  - {"file":"packages/msp/test/validator/proto/valid-until.test.ts"}
+  - file: packages/msp/src/validator/proto/valid-until.ts
+  - file: gks/proto/PROTO--VALID-UNTIL.md
+  - file: packages/msp/test/validator/proto/valid-until.test.ts
 phase_override:
   skip_blueprint: true
-  reason: "Incremental PROTO rule plugged into the already-blueprinted loader scaffold (BLUEPRINT--PROTO-LOADER). Doc-to-code chain: CONCEPT--DECISION-ATROPHY-GUARDS -> PROTO--VALID-UNTIL -> predicate -> this audit; per-rule predicates do not each warrant a separate phase-3 blueprint."
+  reason: "Incremental PROTO rule plugged into the already-blueprinted loader
+    scaffold (BLUEPRINT--PROTO-LOADER). Doc-to-code chain:
+    CONCEPT--DECISION-ATROPHY-GUARDS -> PROTO--VALID-UNTIL -> predicate -> this
+    audit; per-rule predicates do not each warrant a separate phase-3
+    blueprint."
 created_at: 2026-05-05T18:11:00.000+07:00
 aliases:
   - AUDIT
   - implementation_flow
   - Test results / quality report
 cluster: implementation_flow
-role: "Test results / quality report"
+role: Test results / quality report
+attributes:
+  domain: audit
 ---
 
 # M9a — [[PROTO--VALID-UNTIL]] (draft)

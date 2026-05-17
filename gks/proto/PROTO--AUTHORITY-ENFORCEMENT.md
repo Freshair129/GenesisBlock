@@ -15,16 +15,24 @@ tags:
   - tier
   - governance
   - m8e
-crosslinks: {"enforces":["FRAMEWORK--AUTHORITY-MATRIX"],"references":["CONCEPT--PROTO-AUTHORITY-ENFORCEMENT","ADR--DELEGATION-POLICY","FEAT--PROTO-LOADER"]}
+crosslinks:
+  enforces:
+    - FRAMEWORK--AUTHORITY-MATRIX
+  references:
+    - CONCEPT--PROTO-AUTHORITY-ENFORCEMENT
+    - ADR--DELEGATION-POLICY
+    - FEAT--PROTO-LOADER
 linked_symbols:
-  - {"file":"packages/msp/src/validator/proto/authority-enforcement.ts"}
+  - file: packages/msp/src/validator/proto/authority-enforcement.ts
 created_at: 2026-05-05T18:10:00.000+07:00
 aliases:
   - PROTO
   - implementation_flow
   - Machine-enforced invariant
 cluster: implementation_flow
-role: "Machine-enforced invariant"
+role: Machine-enforced invariant
+attributes:
+  domain: proto
 ---
 
 # PROTO — AUTHORITY-ENFORCEMENT

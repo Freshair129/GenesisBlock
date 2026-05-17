@@ -6,31 +6,40 @@ status: draft
 tier: process
 source_type: axiomatic
 vault_id: default
-title: AUDIT — Phase E4 Master Block promotion pipeline (4-of-5 analyzer + proposal generator)
+title: AUDIT — Phase E4 Master Block promotion pipeline (4-of-5 analyzer +
+  proposal generator)
 tags:
   - msp
   - master
   - promotion
   - phase-e4
   - audit
-crosslinks: {"references":["CONCEPT--MASTER-PROMOTION","BLUEPRINT--MASTER-PROMOTION-PIPELINE","SPEC--GENESIS-BLOCK-MANIFEST","ADR--MASTER-PROMOTION-DOC-TO-CODE","ADR--HUMAN-REVIEW-GATES"]}
+crosslinks:
+  references:
+    - CONCEPT--MASTER-PROMOTION
+    - BLUEPRINT--MASTER-PROMOTION-PIPELINE
+    - SPEC--GENESIS-BLOCK-MANIFEST
+    - ADR--MASTER-PROMOTION-DOC-TO-CODE
+    - ADR--HUMAN-REVIEW-GATES
 linked_symbols:
-  - {"file":"packages/msp/src/master/dimensions.ts"}
-  - {"file":"packages/msp/src/master/scanner.ts"}
-  - {"file":"packages/msp/src/master/promote.ts"}
-  - {"file":"packages/msp/src/master/cli.ts"}
-  - {"file":"packages/msp/test/master/dimensions.test.ts"}
-  - {"file":"packages/msp/test/master/scanner.test.ts"}
-  - {"file":"packages/msp/test/master/promote.test.ts"}
-  - {"file":"packages/msp/test/master/cli.test.ts"}
-  - {"file":"packages/msp/package.json"}
+  - file: packages/msp/src/master/dimensions.ts
+  - file: packages/msp/src/master/scanner.ts
+  - file: packages/msp/src/master/promote.ts
+  - file: packages/msp/src/master/cli.ts
+  - file: packages/msp/test/master/dimensions.test.ts
+  - file: packages/msp/test/master/scanner.test.ts
+  - file: packages/msp/test/master/promote.test.ts
+  - file: packages/msp/test/master/cli.test.ts
+  - file: packages/msp/package.json
 created_at: 2026-05-13T11:00:00.000+07:00
 aliases:
   - AUDIT
   - implementation_flow
   - Test results / quality report
 cluster: implementation_flow
-role: "Test results / quality report"
+role: Test results / quality report
+attributes:
+  domain: audit
 ---
 
 # AUDIT — Phase E4 Master Block promotion pipeline
