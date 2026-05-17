@@ -5,7 +5,7 @@ import type { RequestContext, Subject } from '../../policy/types.js'
  * Logical retrieval source name. Each source produces ranked hits which
  * RRF fuses into a single result list.
  */
-export type SourceName = 'gks-vector' | 'obsidian-text' | 'grep' | 'episodic' | 'backlinks'
+export type SourceName = 'gks-vector' | 'obsidian-text' | 'grep' | 'episodic' | 'backlinks' | 'graph'
 
 /**
  * Minimal embedder shape accepted by the vector source. Compatible with the
@@ -150,6 +150,7 @@ export const DEFAULT_WEIGHTS: Record<SourceName, number> = {
   grep: 0.6,
   episodic: 1.2,
   backlinks: 0.5,
+  graph: 1.5, // High priority for structural connections
 }
 
 /**
@@ -161,6 +162,7 @@ export const DEFAULT_PER_SOURCE_TIMEOUTS: Record<SourceName, number> = {
   grep: 600,
   episodic: 100,
   backlinks: 100,
+  graph: 300,
 }
 
 export const DEFAULT_TOTAL_TIMEOUT_MS = 1500

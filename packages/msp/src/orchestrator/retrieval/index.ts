@@ -2,6 +2,7 @@ import { performance } from 'node:perf_hooks'
 
 import { rrfFuse } from './fusion.js'
 import { backlinksSource } from './sources/backlinks.js'
+import { graphSource } from './sources/graph.js'
 import { episodicSource } from './sources/episodic.js'
 import { obsidianSource } from './sources/obsidian.js'
 import { vectorSource } from './sources/vector.js'
@@ -232,23 +233,24 @@ export async function recall(opts: RecallOptions): Promise<RetrievalResult> {
   const phaseAElapsed = performance.now() - phaseAStart
   const remaining = Math.max(50, totalBudget - phaseAElapsed)
 
-  // Phase B: backlinks expansion from phase-A candidates.
+  // Phase B: multi-hop graph expansion from phase-A candidates.
   const candidates = uniqueAtomIds(results)
-  const backlinksRaced = await raceTimeout(
-    backlinksSource({
+  const graphRaced = await raceTimeout(
+    graphSource({
       root,
       namespace: readNamespaces[0]?.tenant_id ?? DEFAULT_NAMESPACE,
       candidateAtomIds: candidates,
       topK,
+      timeoutMs: budgets.graph,
     }),
-    Math.min(budgets.backlinks + 50, remaining),
-    emptySettled('backlinks'),
+    Math.min(budgets.graph + 50, remaining),
+    emptySettled('graph'),
   )
-  const backlinksRes = backlinksRaced.value
+  const graphRes = graphRaced.value
 
   // Phase C: fuse.
   const fuseStart = performance.now()
-  const allResults: SourceResult[] = [...results, backlinksRes]
+  const allResults: SourceResult[] = [...results, graphRes]
   const fusedHits = rrfFuse(allResults, { k: rrfK, weights, topK })
 
   // Phase D: Enforce Policy (PEP)
@@ -282,7 +284,7 @@ export async function recall(opts: RecallOptions): Promise<RetrievalResult> {
       vector: vectorRes.latencyMs,
       obsidian: obsidianRes.latencyMs,
       episodic: episodicRes.latencyMs,
-      backlinks: backlinksRes.latencyMs,
+      graph: graphRes.latencyMs,
       fusion: Math.round(fusionMs),
     },
   }
