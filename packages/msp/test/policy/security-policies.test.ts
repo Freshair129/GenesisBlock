@@ -16,7 +16,7 @@ describe('Security Domain Pack: Policies', () => {
   it('blocks secrets from cloud-tier agents (T2)', async () => {
     const s = makeSubject('subagent', 'gemini', { tier: 'T2' })
     const r = makeResource('atom', 'SECRET_ATOM', {}, { has_secret: true })
-    const ctx = makeContext('mcp', 't1')
+    const ctx = makeContext('mcp-stdio', 't1')
 
     const result = await enforcePolicy(r, { root, subject: s, action: 'expose-to-llm', context: ctx })
     expect(result.permitted).toBe(false)
