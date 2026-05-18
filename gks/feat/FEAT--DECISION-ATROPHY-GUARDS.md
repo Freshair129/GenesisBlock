@@ -2,7 +2,7 @@
 id: FEAT--DECISION-ATROPHY-GUARDS
 phase: 2
 type: feat
-status: proposed
+status: draft
 vault_id: default
 tier: genesis
 source_type: axiomatic
@@ -29,7 +29,7 @@ attributes:
   id: FEAT--DECISION-ATROPHY-GUARDS
   phase: 2
   type: feat
-  status: proposed
+  status: draft
   vault_id: default
   tier: genesis
   source_type: axiomatic
