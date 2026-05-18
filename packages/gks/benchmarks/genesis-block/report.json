@@ -1,0 +1,204 @@
+{
+  "benchmark": "genesis-block-graph",
+  "git_sha": "de2c8f278160fe84e19bf5a5086d83300fb92a96",
+  "git_dirty": true,
+  "generated_at": "2026-05-18T23:22:55.581Z",
+  "host": {
+    "platform": "win32",
+    "arch": "x64",
+    "node": "v25.9.0"
+  },
+  "fixture": {
+    "quick": false,
+    "seed": 42,
+    "nodes": 50000,
+    "edges": 500000,
+    "note": "FULL fixture per BLUEPRINT P3.5: 50k nodes / 500k edges"
+  },
+  "p50_target_ms": 50,
+  "runs": [
+    {
+      "name": "graph-store",
+      "description": "GraphStore (in-process JSONL baseline)",
+      "available": true,
+      "results": {
+        "bulk_load": {
+          "ops": 1,
+          "total_ms": 254132.79,
+          "mean_ms": 254132.79,
+          "min_ms": 254132.79,
+          "max_ms": 254132.79,
+          "p50_ms": 254132.79,
+          "p95_ms": 254132.79,
+          "p99_ms": 254132.79
+        },
+        "query_by_from": {
+          "ops": 1000,
+          "total_ms": 7.95,
+          "mean_ms": 0.01,
+          "min_ms": 0,
+          "max_ms": 0.19,
+          "p50_ms": 0.01,
+          "p95_ms": 0.01,
+          "p99_ms": 0.02
+        },
+        "query_by_rel": {
+          "ops": 100,
+          "total_ms": 1883.25,
+          "mean_ms": 18.83,
+          "min_ms": 16.67,
+          "max_ms": 37.36,
+          "p50_ms": 18.41,
+          "p95_ms": 23.03,
+          "p99_ms": 26.05
+        },
+        "neighbors_1hop": {
+          "ops": 1000,
+          "total_ms": 10.68,
+          "mean_ms": 0.01,
+          "min_ms": 0,
+          "max_ms": 0.22,
+          "p50_ms": 0.01,
+          "p95_ms": 0.02,
+          "p99_ms": 0.02
+        },
+        "neighbors_3hop": {
+          "ops": 100,
+          "total_ms": 86.25,
+          "mean_ms": 0.86,
+          "min_ms": 0.39,
+          "max_ms": 2.18,
+          "p50_ms": 0.87,
+          "p95_ms": 1.08,
+          "p99_ms": 1.24
+        }
+      },
+      "fixture": {
+        "nodes_ingested": 50000,
+        "edges_ingested": 500000
+      }
+    },
+    {
+      "name": "genesis-ts",
+      "description": "GenesisGraphBackend (pure-TS)",
+      "available": true,
+      "results": {
+        "bulk_load": {
+          "ops": 1,
+          "total_ms": 252617.17,
+          "mean_ms": 252617.17,
+          "min_ms": 252617.17,
+          "max_ms": 252617.17,
+          "p50_ms": 252617.17,
+          "p95_ms": 252617.17,
+          "p99_ms": 252617.17
+        },
+        "query_by_from": {
+          "ops": 1000,
+          "total_ms": 7.41,
+          "mean_ms": 0.01,
+          "min_ms": 0,
+          "max_ms": 0.14,
+          "p50_ms": 0.01,
+          "p95_ms": 0.01,
+          "p99_ms": 0.02
+        },
+        "query_by_rel": {
+          "ops": 100,
+          "total_ms": 1817.17,
+          "mean_ms": 18.17,
+          "min_ms": 16.67,
+          "max_ms": 22.91,
+          "p50_ms": 17.62,
+          "p95_ms": 19.96,
+          "p99_ms": 21.8
+        },
+        "neighbors_1hop": {
+          "ops": 1000,
+          "total_ms": 10.71,
+          "mean_ms": 0.01,
+          "min_ms": 0,
+          "max_ms": 0.26,
+          "p50_ms": 0.01,
+          "p95_ms": 0.02,
+          "p99_ms": 0.02
+        },
+        "neighbors_3hop": {
+          "ops": 100,
+          "total_ms": 91.13,
+          "mean_ms": 0.91,
+          "min_ms": 0.39,
+          "max_ms": 2.45,
+          "p50_ms": 0.89,
+          "p95_ms": 1.25,
+          "p99_ms": 1.97
+        }
+      },
+      "fixture": {
+        "nodes_ingested": 50000,
+        "edges_ingested": 500000
+      }
+    },
+    {
+      "name": "genesis-native",
+      "description": "GenesisGraphBackend (native Rust via napi-rs)",
+      "available": true,
+      "results": {
+        "bulk_load": {
+          "ops": 1,
+          "total_ms": 122403.97,
+          "mean_ms": 122403.97,
+          "min_ms": 122403.97,
+          "max_ms": 122403.97,
+          "p50_ms": 122403.97,
+          "p95_ms": 122403.97,
+          "p99_ms": 122403.97
+        },
+        "query_by_from": {
+          "ops": 1000,
+          "total_ms": 16802.9,
+          "mean_ms": 16.8,
+          "min_ms": 4.65,
+          "max_ms": 36.58,
+          "p50_ms": 17.53,
+          "p95_ms": 20,
+          "p99_ms": 23.23
+        },
+        "query_by_rel": {
+          "ops": 100,
+          "total_ms": 49037.34,
+          "mean_ms": 490.37,
+          "min_ms": 465,
+          "max_ms": 545.95,
+          "p50_ms": 487.54,
+          "p95_ms": 514.1,
+          "p99_ms": 523.46
+        },
+        "neighbors_1hop": {
+          "ops": 1000,
+          "total_ms": 205.68,
+          "mean_ms": 0.21,
+          "min_ms": 0.08,
+          "max_ms": 16.04,
+          "p50_ms": 0.17,
+          "p95_ms": 0.24,
+          "p99_ms": 0.32
+        },
+        "neighbors_3hop": {
+          "ops": 100,
+          "total_ms": 1582.29,
+          "mean_ms": 15.82,
+          "min_ms": 8.25,
+          "max_ms": 25.34,
+          "p50_ms": 16.51,
+          "p95_ms": 18.28,
+          "p99_ms": 23.93
+        }
+      },
+      "fixture": {
+        "nodes_ingested": 50000,
+        "edges_ingested": 500000
+      }
+    }
+  ]
+}

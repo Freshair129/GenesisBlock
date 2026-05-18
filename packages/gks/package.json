@@ -91,6 +91,7 @@
     "bench:locomo": "tsx benchmarks/locomo.ts",
     "bench:longmemeval": "tsx benchmarks/longmemeval.ts",
     "bench:beam": "tsx benchmarks/beam.ts",
+    "bench:graph": "tsx benchmarks/genesis-block/bench.ts",
     "bench:sweep": "tsx scripts/bench/sweep.ts",
     "re-embed": "tsx ../../scripts/msp/re-embed.ts",
     "msp:index": "tsx ../../scripts/msp/re-indexer.ts",
