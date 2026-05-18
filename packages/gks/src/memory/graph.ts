@@ -337,6 +337,12 @@ export class GraphStore implements GraphBackend {
     if (!this.path) return
     await appendJsonl(this.path, evt)
   }
+
+  async cypher(_query: string): Promise<Array<Record<string, unknown>>> {
+    throw new Error(
+      'GraphStore does not implement Cypher v0. Use createGenesisGraphBackend for Cypher support.',
+    )
+  }
 }
 
 // ─── helpers ─────────────────────────────────────────────────────────────
@@ -380,4 +386,5 @@ export interface GraphBackend {
   retractEdge(id: string, at?: string): Promise<GraphEdge | null>
   query(q?: GraphQuery): Promise<GraphEdge[]> | GraphEdge[]
   neighbors(seed: string, q?: NeighborQuery): Promise<NeighborResult[]> | NeighborResult[]
+  cypher(query: string): Promise<Array<Record<string, unknown>>>
 }

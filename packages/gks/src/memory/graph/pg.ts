@@ -341,6 +341,12 @@ class PgGraphBackend implements GraphBackend {
     }
     return map
   }
+
+  async cypher(_query: string): Promise<Array<Record<string, unknown>>> {
+    throw new Error(
+      'PgGraphBackend does not implement Cypher v0. Use createGenesisGraphBackend for Cypher support.',
+    )
+  }
 }
 
 // ─── row mappers ───────────────────────────────────────────────────────────
