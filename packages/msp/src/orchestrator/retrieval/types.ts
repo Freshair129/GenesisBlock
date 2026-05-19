@@ -76,6 +76,18 @@ export interface RetrievalHit {
 }
 
 /**
+ * Minimal reranker shape accepted by the retrieval orchestrator.
+ * Compatible with the GKS `Reranker` interface.
+ */
+export interface RetrievalReranker {
+  rerank(
+    query: string,
+    items: Array<{ id: string; text: string }>,
+  ): Promise<Array<{ id: string; score: number }>>
+  model: string
+}
+
+/**
  * Per-source latency breakdown (for debug / telemetry).
  */
 export interface RetrievalTimings {
@@ -85,6 +97,7 @@ export interface RetrievalTimings {
   backlinks?: number
   graph?: number
   fusion: number
+  rerank?: number
 }
 
 export interface RetrievalResult {
@@ -93,6 +106,8 @@ export interface RetrievalResult {
   semantic_available: boolean
   /** True when an Obsidian REST client is reachable (for deep-link rendering). */
   obsidian_available: boolean
+  /** True when a reranker was provided and functional. */
+  rerank_available?: boolean
   /** Human-readable reasons for any source that did not contribute fully. */
   fallback_reasons: string[]
   timings: RetrievalTimings
@@ -121,6 +136,15 @@ export interface RecallOptions {
    * embedder either), vector source is a no-op.
    */
   vectorBackend?: RetrievalVectorBackend
+  /**
+   * Optional reranker for second-stage precision.
+   */
+  reranker?: RetrievalReranker
+  /** If true, enables the reranking pass (if reranker is provided). */
+  rerank?: boolean
+  /** Max items to pass to the reranker. Default 30. */
+  rerankLimit?: number
+
   /** Default 10. */
   topK?: number
   /** Total budget across all sources. Default 1500ms. */

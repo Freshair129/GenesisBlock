@@ -251,13 +251,47 @@ export async function recall(opts: RecallOptions): Promise<RetrievalResult> {
   // Phase C: fuse.
   const fuseStart = performance.now()
   const allResults: SourceResult[] = [...results, graphRes]
-  const fusedHits = rrfFuse(allResults, { k: rrfK, weights, topK })
+  const fusedHits = rrfFuse(allResults, { k: rrfK, weights, topK: opts.rerank ? (opts.rerankLimit ?? 30) : topK })
+  const fusionMs = performance.now() - fuseStart
+
+  // Phase C.5: Re-rank (M10c)
+  let rerankMs = 0
+  let finalHits = fusedHits
+
+  if (opts.rerank && opts.reranker && fusedHits.length > 0) {
+    const rerankStart = performance.now()
+    try {
+      const itemsToRerank = fusedHits.map(h => ({
+        id: h.atomId,
+        text: h.snippet || '', // Reranker needs text for deep comparison
+      }))
+      
+      const reranked = await opts.reranker.rerank(opts.query, itemsToRerank)
+      
+      // Map reranked scores back to hits and re-sort
+      const scoreMap = new Map(reranked.map(r => [r.id, r.score]))
+      finalHits = fusedHits.map(h => ({
+        ...h,
+        score: scoreMap.get(h.atomId) ?? h.score, // Fallback to RRF score if missing
+      })).sort((a, b) => b.score - a.score)
+        .slice(0, topK)
+        .map((h, i) => ({ ...h, rank: i + 1 }))
+
+    } catch (err) {
+      console.warn(`[retrieval] rerank failed: ${(err as Error).message}`)
+      allResults.push({ source: 'graph', hits: [], latencyMs: 0, error: `rerank: ${(err as Error).message}` }) // Re-using error collection
+      finalHits = fusedHits.slice(0, topK)
+    }
+    rerankMs = Math.round(performance.now() - rerankStart)
+  } else {
+    finalHits = fusedHits.slice(0, topK)
+  }
 
   // Phase D: Enforce Policy (PEP)
   const filteredHits: RetrievalHit[] = []
   const pepOpts = { root, subject, action, context }
 
-  for (const hit of fusedHits) {
+  for (const hit of finalHits) {
     const attributes = {
       ...(hit.attributes ?? {}),
       body: hit.snippet ?? null, // Inject snippet as body for regex matching (UCF Phase 4 PII pack)
@@ -269,16 +303,16 @@ export async function recall(opts: RecallOptions): Promise<RetrievalResult> {
     }
   }
 
-  const fusionMs = performance.now() - fuseStart
-
   // Compute output flags + diagnostics.
   const semanticAvailable = !!opts.embedder && !!opts.vectorBackend && !vectorRes.error
   const obsidianAvailable = opts.obsidian?.mode === 'rest'
+  const rerankAvailable = !!opts.reranker
 
   const result: RetrievalResult = {
     hits: filteredHits,
     semantic_available: semanticAvailable,
     obsidian_available: obsidianAvailable,
+    rerank_available: rerankAvailable,
     fallback_reasons: collectFallbackReasons(allResults),
     timings: {
       vector: vectorRes.latencyMs,
@@ -286,6 +320,7 @@ export async function recall(opts: RecallOptions): Promise<RetrievalResult> {
       episodic: episodicRes.latencyMs,
       graph: graphRes.latencyMs,
       fusion: Math.round(fusionMs),
+      rerank: rerankMs,
     },
   }
 
