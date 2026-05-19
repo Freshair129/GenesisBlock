@@ -544,6 +544,24 @@ taxonomy:
           sections:
             - Summary
             - Source
+        NARRATIVE:
+          phase: 1
+          role: Cross-session pattern / arc
+          tier: process
+          folder: narrative
+          sections:
+            - Summary
+            - Patterns
+            - Source
+        BELIEF:
+          phase: 1
+          role: Distilled long-term belief
+          tier: process
+          folder: identity
+          sections:
+            - Belief
+            - Evidence
+            - Source
 
 process_tracking:
   description: Non-atomic IDs (not in gks/)
