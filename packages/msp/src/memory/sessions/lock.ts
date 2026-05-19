@@ -1,4 +1,4 @@
-import { lock, unlock, check } from 'proper-lockfile'
+import { lock } from 'proper-lockfile'
 import { appendFile } from 'node:fs/promises'
 
 /**
@@ -10,6 +10,7 @@ export interface LockOptions {
   stale?: number
   retries?: number
   minTimeout?: number
+  onStale?: (err: Error) => void
 }
 
 const DEFAULT_LOCK_OPTS: LockOptions = {
@@ -29,22 +30,27 @@ export async function lockSession(
   try {
     await appendFile(filePath, '', 'utf8')
   } catch (err) {
-    // Ignore errors here, as the actual locking logic will handle missing files if they are critical
+    // Ignore errors here
   }
 
   let releaseFunc: () => Promise<void>
   
   try {
-    releaseFunc = await lock(filePath, {
+    const lockOpts: any = {
       stale: opts.stale,
       retries: {
         retries: opts.retries,
         minTimeout: opts.minTimeout,
       },
-      onStale: (err) => {
+    };
+    if (opts.onStale) {
+      lockOpts.onStale = opts.onStale;
+    } else {
+      lockOpts.onStale = (err: any) => {
         console.warn(`[lock] Stale lock detected for ${filePath}: ${(err as Error).message}`)
-      }
-    })
+      };
+    }
+    releaseFunc = await lock(filePath, lockOpts);
   } catch (err) {
     throw new Error(`Failed to acquire session lock for ${filePath}: ${(err as Error).message}`)
   }
