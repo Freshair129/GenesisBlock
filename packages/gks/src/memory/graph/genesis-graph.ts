@@ -21,12 +21,12 @@
  *   `packages/msp/src/cognitive/index.ts` for the wiring.
  */
 
-import { mkdir } from 'node:fs/promises'
+import { mkdir, rename } from 'node:fs/promises'
 import { createHash, randomUUID } from 'node:crypto'
 import { createRequire } from 'node:module'
 import { join } from 'node:path'
 
-import { appendJsonl, forEachJsonl, readJsonSafe, writeJson } from '../../lib/jsonl.js'
+import { appendJsonl, forEachJsonl, readJsonSafe, writeJson, writeJsonl } from '../../lib/jsonl.js'
 import { createLogger } from '../../lib/logger.js'
 import {
   CURRENT_SCHEMA_VERSION,
@@ -84,6 +84,7 @@ interface Manifest {
  */
 export interface GenesisGraphBackendApi extends GraphBackend {
   cypher(query: string): Promise<Array<Record<string, unknown>>>
+  compact(): Promise<void>
 }
 
 export function createGenesisGraphBackend(
@@ -191,6 +192,7 @@ interface GenesisDatabaseLike {
   query(args: QueryInputLike): Promise<EdgeOutputLike[]>
   neighbors(seed: string, args: NeighborInputLike): Promise<NeighborOutputLike[]>
   cypher(query: string): Promise<unknown>
+  compact(): Promise<void>
 }
 
 interface GenesisDatabaseCtor {
@@ -272,6 +274,10 @@ class NativeGenesisGraphBackend implements GenesisGraphBackendApi {
     const out = await this.db.cypher(query)
     return out as Array<Record<string, unknown>>
   }
+
+  async compact(): Promise<void> {
+    await this.db.compact()
+  }
 }
 
 // ─── boundary converters (camelCase ↔ snake_case) ───────────────────────────
@@ -307,7 +313,7 @@ function toNeighborResult(no: NeighborOutputLike): NeighborResult {
   }
 }
 
-export class GenesisGraphBackend implements GraphBackend {
+export class GenesisGraphBackend implements GenesisGraphBackendApi {
   private readonly dir: string
   private readonly jsonlPath: string
   private readonly manifestPath: string
@@ -509,6 +515,25 @@ export class GenesisGraphBackend implements GraphBackend {
     await this.ensureLoaded()
     const plan = parseCypherV0(query)
     return this.executePlan(plan)
+  }
+
+  async compact(): Promise<void> {
+    await this.ensureLoaded()
+    const tmpPath = `${this.jsonlPath}.tmp`
+
+    const events: Event[] = []
+    for (const node of this.nodes.values()) {
+      events.push({ kind: 'node', payload: node })
+    }
+    for (const edge of this.edges.values()) {
+      if (edge.valid_to == null) {
+        events.push({ kind: 'edge', payload: edge })
+      }
+    }
+
+    await writeJsonl(tmpPath, events)
+    await rename(tmpPath, this.jsonlPath)
+    log.info('genesis-graph compacted', { path: this.jsonlPath })
   }
 
   private executePlan(plan: CypherV0Plan): Array<Record<string, unknown>> {

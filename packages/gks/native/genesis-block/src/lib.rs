@@ -344,6 +344,40 @@ impl Storage {
         self.persist(&Event::Edge(retired.clone()))?;
         Ok(Some(retired))
     }
+
+    fn compact(&self) -> Result<()> {
+        self.ensure_writable()?;
+        let tmp_path = self.path.join("genesis-graph.jsonl.tmp");
+        let mut file = FileOpenOptions::new()
+            .create(true)
+            .write(true)
+            .truncate(true)
+            .open(&tmp_path)
+            .map_err(|e| Error::from_reason(format!("genesis-block: compact: failed to open tmp file: {e}")))?;
+
+        for node in self.nodes.values() {
+            let line = serde_json::to_string(&Event::Node(node.clone()))
+                .map_err(|e| Error::from_reason(e.to_string()))?;
+            writeln!(file, "{}", line).map_err(|e| Error::from_reason(format!("genesis-block: compact: {e}")))?;
+        }
+
+        for edge in self.edges.values() {
+            // P4.1: Only keep edges that are NOT retracted (valid_to is null)
+            if edge.valid_to.is_none() {
+                let line = serde_json::to_string(&Event::Edge(edge.clone()))
+                    .map_err(|e| Error::from_reason(e.to_string()))?;
+                writeln!(file, "{}", line).map_err(|e| Error::from_reason(format!("genesis-block: compact: {e}")))?;
+            }
+        }
+
+        file.flush().map_err(|e| Error::from_reason(format!("genesis-block: compact: flush: {e}")))?;
+        drop(file);
+
+        fs::rename(&tmp_path, &self.log_path)
+            .map_err(|e| Error::from_reason(format!("genesis-block: compact: rename: {e}")))?;
+
+        Ok(())
+    }
 }
 
 // --- Cypher v0 Engine ---
@@ -563,6 +597,13 @@ impl GenesisDatabase {
             }
             Ok(Value::Array(rows))
         }).await.map_err(|e| Error::from_reason(format!("join: {e}")))?
+    }
+
+    #[napi]
+    pub async fn compact(&self) -> Result<()> {
+        let inner = Arc::clone(&self.inner);
+        tokio::task::spawn_blocking(move || inner.write().compact())
+            .await.map_err(|e| Error::from_reason(format!("join: {e}")))?
     }
 
     #[napi]

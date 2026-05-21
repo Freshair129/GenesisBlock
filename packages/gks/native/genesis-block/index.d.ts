@@ -74,6 +74,7 @@ export declare class GenesisDatabase {
   query(args: QueryInput): Promise<Array<EdgeOutput>>
   neighbors(seed: string, args: NeighborInput): Promise<Array<NeighborOutput>>
   cypher(query: string): Promise<any>
+  compact(): Promise<void>
   schemaVersionSync(): number
   statusSync(): DatabaseStatus
 }
