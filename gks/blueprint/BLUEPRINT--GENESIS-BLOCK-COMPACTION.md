@@ -13,7 +13,7 @@ cluster: implementation_flow
 role: Implementation plan
 crosslinks:
   references:
-    - FEAT--GENESIS-BLOCK-NATIVE
+    - SPEC--GENESIS-GRAPH-BACKEND
     - ADR--GENESIS-BLOCK-STORAGE-LAYOUT
 linked_symbols:
   - file: packages/gks/native/genesis-block/src/lib.rs

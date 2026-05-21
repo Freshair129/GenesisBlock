@@ -43,6 +43,7 @@ import { verifyFlow, formatVerifyFlowResult } from '../src/memory/verify-flow.js
 import { validateLinks, formatValidateLinksResult } from '../src/memory/validate-links.js'
 import { deriveBacklinksFromEntries, emitBacklinksJsonl } from '../src/memory/backlinks.js'
 import { scaffoldNewFeature } from '../src/scaffold/new-feature.js'
+import { loadRemoteIndex } from '../src/memory/remote-loader.js'
 
 interface GlobalFlags {
   root: string
@@ -796,6 +797,7 @@ async function cmdVerifyFlow(argv: string[]): Promise<void> {
     options: {
       ...GLOBAL_OPTIONS,
       'through-superseded': { type: 'boolean', default: false },
+      remote: { type: 'string', multiple: true },
     },
   })
   const flags = readGlobals(values)
@@ -807,8 +809,29 @@ async function cmdVerifyFlow(argv: string[]): Promise<void> {
   const store = await openStore(flags)
   const atomic = store.atomic
   await atomic.loadIndex()
+
   const byId = new Map<string, ReturnType<typeof atomic.filter>[number]>()
+  // Load local atoms
   for (const e of atomic.filter({})) byId.set(e.id, e)
+
+  // Load remote atoms if --remote is provided
+  const remotes = (values['remote'] as string[] | undefined) ?? []
+  for (const remotePath of remotes) {
+    try {
+      const remoteAtoms = await loadRemoteIndex(remotePath, flags.root)
+      for (const ra of remoteAtoms) {
+        if (!byId.has(ra.id)) {
+          byId.set(ra.id, ra)
+        } else {
+          console.error(`[verify-flow] skip remote atom ${ra.id} from ${remotePath} (collision with local)`)
+        }
+      }
+    } catch (err) {
+      console.error(`gks verify-flow: failed to load remote ${remotePath}: ${(err as Error).message}`)
+      process.exit(1)
+    }
+  }
+
   const result = verifyFlow(id, byId, {
     throughSuperseded: values['through-superseded'] as boolean | undefined,
   })
