@@ -22,7 +22,8 @@
     "msp-atrophy": "./dist/validator/atrophy-cli.js",
     "msp-adr": "./dist/generator/adr-cli.js",
     "msp-recall-bench": "./dist/orchestrator/retrieval/bench-cli.js",
-    "msp-mll": "./dist/orchestrator/mll/cli.js"
+    "msp-mll": "./dist/orchestrator/mll/cli.js",
+    "msp-migrate": "./dist/migration/notion/cli.js"
   },
   "scripts": {
     "dev": "concurrently \"npm run build:watch\" \"npm run test:watch\"",
@@ -37,6 +38,7 @@
     "msp:adr": "tsx src/generator/adr-cli.ts",
     "msp:recall:bench": "tsx src/orchestrator/retrieval/bench-cli.ts",
     "msp:mll": "tsx src/orchestrator/mll/cli.ts",
+    "msp:migrate": "tsx src/migration/notion/cli.ts",
     "msp:backlinks": "tsx src/memory/backlinks/cli.ts",
     "msp:check-links": "gks validate --links --root=../..",
     "msp:dispatch": "tsx src/agents/cli.ts",
@@ -50,6 +52,7 @@
     "@aflsolutions/graphology-communities-leiden": "^1.1.1",
     "@freshair129/gks": "*",
     "@modelcontextprotocol/sdk": "^1.6.0",
+    "@notionhq/client": "^5.22.0",
     "better-sqlite3": "^11.9.1",
     "chalk": "^5.4.1",
     "dotenv": "^16.4.5",
@@ -58,6 +61,7 @@
     "graphology-communities-louvain": "^2.0.2",
     "graphology-types": "^0.24.8",
     "node-fetch": "^3.3.2",
+    "notion-to-md": "^3.1.9",
     "proper-lockfile": "^4.1.2",
     "tree-sitter-python": "^0.25.0",
     "web-tree-sitter": "^0.26.8",
