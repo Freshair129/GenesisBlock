@@ -109,6 +109,7 @@ A standalone `msp-mcp-server` binary that exposes MSP's specific tools — and *
 ## Scope
 
 In:
+
 - Stdio MCP server using `@modelcontextprotocol/sdk`.
 - 6 tools, all MSP-specific:
   - `msp_validate` — run validator on file(s) or `--all`
@@ -122,6 +123,7 @@ In:
 - Tools delegate to existing TS modules — server is glue, not new logic.
 
 Out:
+
 - Re-exporting `gks_*` tools — defeats the purpose; users run both servers.
 - Authentication / TLS — local stdio.
 - Streaming responses — single round-trip per tool call.
@@ -132,9 +134,9 @@ Out:
 Closes P1 #5 (MCP server) from the M3 production-readiness backlog. Last large item before MSP can be considered "feature complete" relative to the spec.
 
 ## Connections
+
 - [[FEAT--MSP-VALIDATOR]]
 - [[FEAT--CODEGEN-MICROTASK-RUNNER]]
 - [[FEAT--MEMORY-SESSIONS-WRITER]]
 - [[FEAT--MEMORY-EPISODIC-WRITER]]
 - [[FEAT--MEMORY-BACKLINKS-INDEXER]]
-

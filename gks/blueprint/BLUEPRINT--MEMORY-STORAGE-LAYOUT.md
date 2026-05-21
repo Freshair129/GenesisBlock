@@ -54,19 +54,23 @@ All memory artifacts live under the project's `.brain/` directory (ignored by gi
 ## 3. Tasks
 
 ### T1: Counter Management (`packages/msp/src/memory/counters.ts`)
+
 - Implement an atomic counter writer.
 - Function: `updateMemoryCounters(ns, type: 'session'|'core'|'sphere')`.
 - State: `{ session_seq, core_seq, sphere_seq, total_sessions, last_session_id }`.
 - **Enforcement:** Use OS-level advisory locking (via `proper-lockfile` if available, or simple `.lock` file) during counter updates.
 
 ### T2: ULID Generator
+
 - Ensure a reliable ULID generator is available for `session_id` to maintain chronological ordering without complex parsing.
 
 ### T3: Directory Initialization
+
 - Implement `initMemoryStore(ns: string)` to ensure the required nested directory structure exists.
 - Should be called at the start of every session if not already initialized.
 
 ### T4: Permission Guards
+
 - Implement a middleware/guard that blocks the LLM's `writeFile` tool from targeting any path containing `.brain/msp/projects/<ns>/memory/`.
 
 ## 4. Verification

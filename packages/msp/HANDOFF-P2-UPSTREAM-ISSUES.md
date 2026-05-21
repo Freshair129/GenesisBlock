@@ -1,17 +1,19 @@
 # HANDOFF P2 — Ready-to-paste GKS upstream issue bodies
 
-> Open 5 separate issues at https://github.com/Freshair129/GksV3/issues/new — one per section below. Each is independently mergeable. After filing, edit the corresponding `upstream/gks-proposals/0X-*.md` to bump status from `🟡 drafted` → `🔵 awaiting upstream review` and add the issue URL.
+> Open 5 separate issues at <https://github.com/Freshair129/GksV3/issues/new> — one per section below. Each is independently mergeable. After filing, edit the corresponding `upstream/gks-proposals/0X-*.md` to bump status from `🟡 drafted` → `🔵 awaiting upstream review` and add the issue URL.
 
 ---
 
 ## Issue 1 of 5 — Accept `phase: 6` in `propose-inbound`
 
 **Title**:
+
 ```
 propose-inbound: accept phase: 6 (post-implementation audit atoms)
 ```
 
 **Body**:
+
 ```markdown
 ## Why
 
@@ -56,6 +58,7 @@ it('still rejects out-of-range', async () => {
 ## Drafted by
 
 [MSP M7-prep follow-up](https://github.com/Freshair129/msp/blob/main/upstream/gks-proposals/01-phase-6-acceptance.md) — happy to open a PR if useful.
+
 ```
 
 ---
@@ -64,7 +67,9 @@ it('still rejects out-of-range', async () => {
 
 **Title**:
 ```
+
 verify-flow: add --through-superseded flag to follow superseded_by chain
+
 ```
 
 **Body**:
@@ -115,6 +120,7 @@ Three cases: halts by default at superseded; walks through with flag; detects su
 ## Drafted by
 
 MSP M7-prep follow-up. Happy to open a PR.
+
 ```
 
 ---
@@ -123,7 +129,9 @@ MSP M7-prep follow-up. Happy to open a PR.
 
 **Title**:
 ```
+
 Add stable backlinks derivation API (gks backlinks --emit=jsonl + TS API)
+
 ```
 
 **Body**:
@@ -138,7 +146,9 @@ Memory OS layers reimplement this independently (MSP has ~200 LoC under `src/mem
 
 ### CLI
 ```
+
 gks backlinks [--emit=jsonl|json] [--out=<path>] [--filter-type=<predicate>]
+
 ```
 
 ### TS API
@@ -149,6 +159,7 @@ export async function emitBacklinksJsonl(store: MemoryStore, outPath: string, op
 ```
 
 ### Implementation sketch
+
 Walk `atomic_index.jsonl`, emit one edge per `crosslinks.<predicate>` entry, sort by `(from, to, type)` for git-diff stability. ~50 LoC.
 
 ## Compat
@@ -166,6 +177,7 @@ MSP can replace `src/memory/backlinks/` (~200 LoC) with a thin `import { deriveB
 ## Drafted by
 
 MSP M7-prep follow-up. Happy to open a PR.
+
 ```
 
 ---
@@ -174,7 +186,9 @@ MSP M7-prep follow-up. Happy to open a PR.
 
 **Title**:
 ```
+
 docs: add embedder-compatibility note for browse-side plugins (Smart Connections, etc.)
+
 ```
 
 **Body**:
@@ -219,11 +233,13 @@ MSP M7-prep follow-up. Happy to open a PR with the markdown drop-in.
 ## Issue 5 of 5 — Publish `@freshair129/gks@3.6.0` to npm
 
 **Title**:
+
 ```
 Publish @freshair129/gks@3.6.0 to npm (registry latest is still 3.5.6)
 ```
 
 **Body**:
+
 ```markdown
 ## Why
 
@@ -247,6 +263,7 @@ npm publish --access public
 ```
 
 Optionally tag the release on GitHub:
+
 ```bash
 git tag v3.6.0
 git push origin v3.6.0
@@ -281,6 +298,7 @@ npm pack                # inspect tarball:
 ## Drafted by
 
 MSP M7-prep + two-repo validation audit. Reference: [05-publish-3.6.0.md](https://github.com/Freshair129/msp/blob/main/upstream/gks-proposals/05-publish-3.6.0.md).
+
 ```
 
 ---

@@ -1,6 +1,7 @@
 Validate ALL crosslinks across the entire GKS atom tree.
 
 Call the `gks_validate_links` MCP tool with:
+
 - `root`: `.`
 
 This is the same check that runs before every commit (Agent Rule §6.3).

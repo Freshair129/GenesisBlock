@@ -1,4 +1,5 @@
 # GKS CLI — CLAUDE.md
+
 # Created At: 2026-05-14 14:00:00 +07:00 (v0.1.0-skeleton)
 
 ## What This Is
@@ -6,6 +7,7 @@
 `@freshair129/gks-cli` — command-line interface to the Genesis Knowledge System.
 
 **Consumers (both):**
+
 - **Human developers** — run `gks search`, `gks get`, `gks list` in terminal
 - **AI agents** — Claude/Gemini run these commands via Bash tool to query GKS without
   needing to read raw JSONL files or import TypeScript packages directly
@@ -28,6 +30,7 @@ gks index                   # regenerate atomic_index.jsonl
 ## Agent Usage Pattern
 
 When an AI agent needs to query GKS without importing TypeScript:
+
 ```bash
 # In Bash tool or shell script:
 gks search "episode retention" --json | jq '.results[0]'

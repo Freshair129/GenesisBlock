@@ -126,5 +126,5 @@ When in doubt, escalate. Downgrading from L3→L2 mid-PR loses an audit trail; u
 `msp_spec.md` §6.1 (Scaling Level → Required Artifacts).
 
 ## Connections
-- [[FRAMEWORK--PHASE-GOVERNANCE]]
 
+- [[FRAMEWORK--PHASE-GOVERNANCE]]

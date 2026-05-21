@@ -148,6 +148,7 @@ total: 36/36
 ## Mock SLM
 
 The default SLM client is a deterministic mock that:
+
 - Echoes a code stub if the prompt has no `// MOCK_OUTPUT:` hint.
 - Otherwise echoes whatever follows `// MOCK_OUTPUT:` in the prompt.
 
@@ -184,9 +185,9 @@ Real Qwen 2.5 Coder integration is a future task — pluggable via `opts.slmClie
 - Date: 2026-05-03
 
 ## Connections
+
 - [[BLUEPRINT--CODEGEN-MICROTASK-RUNNER]]
 - [[ADR--CODEGEN-MICROTASK-RUNNER]]
 - [[ADR--CODEGEN-POST-PROCESSING]]
 - [[ADR--CODEGEN-FORBIDDEN-PATTERNS]]
 - [[ADR--CODEGEN-RETRY-POLICY]]
-

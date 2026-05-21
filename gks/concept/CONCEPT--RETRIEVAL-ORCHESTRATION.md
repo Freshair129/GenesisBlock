@@ -140,6 +140,7 @@ score_s(hit) = weight_s / (k + r)
 Final score per hit ID = sum across sources where it appears. `k` is a constant (typical 60); `weight_s` defaults to 1.0 per source.
 
 Why RRF over weighted-sum-of-similarity:
+
 - **No score normalisation needed** — vector similarity, BM25, exact-match all live in different ranges. RRF only uses ordinal rank.
 - **Robust to outliers** — one source with an extreme score doesn't dominate.
 - **Tunable per source** without re-normalising — adjust `weight_s`.
@@ -195,6 +196,7 @@ msp_recall(query, opts)
 ```
 
 Wraps:
+
 - **`createObsidianClient`** (M7a) for Obsidian search
 - **`@evaai/gks` `recall`** OR direct `VectorBackend.search` (depending on what 3.5.6 exposes; aspirational `createNomicEmbedder` from 3.6.0 stays consistent — see `[[ADR--EMBEDDING-MODEL-PARITY]]` Status note)
 - **`Episode[]`** structure from M7b consolidator (read from `episodic_memory.json`)
@@ -224,8 +226,8 @@ Nothing new persists. M7c is pure read-side orchestration.
 `msp_spec.md` §7c, `[[FRAMEWORK--MSP-ARCHITECTURE-V2]]`, M7a/M7b/M7e completion (PRs #12, #16, #19, #20).
 
 ## Connections
+
 - [[FEAT--MSP-OBSIDIAN-CLIENT]]
 - [[FEAT--CONSOLIDATOR]]
 - [[CONCEPT--EMBEDDING-STRATEGY]]
 - [[CONCEPT--MEMORY-VECTOR-BACKLINKS]]
-

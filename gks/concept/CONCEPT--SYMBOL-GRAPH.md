@@ -162,5 +162,5 @@ The Symbol Graph isn't novel; the value is in **integrating it as a first-class 
 - Prior art: ctags, sourcegraph SCIP, stack-graphs, comby (researched 2026-05-09)
 
 ## Connections
-- [[FRAMEWORK--MSP-ARCHITECTURE-V2]]
 
+- [[FRAMEWORK--MSP-ARCHITECTURE-V2]]

@@ -176,7 +176,7 @@ Not urgent — the duplicate run is essentially free (same atom is read once for
 `[[CONCEPT--PROTO-AUDIT-EXISTING-RULES]]`, `[[FEAT--PROTO-LOADER]]`, M8a foundation.
 
 ## Connections
+
 - [[ADR--ANTI-HALLUCINATION-RULES]]
 - [[CONCEPT--PROTO-PATTERN]]
 - [[BLUEPRINT--PROTO-LOADER]]
-

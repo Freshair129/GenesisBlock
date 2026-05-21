@@ -119,12 +119,14 @@ commit `dd076db`.
 ## Changes in GKS 3.7.0
 
 ### Proposal 01 — Phase 6 acceptance
+
 - `Phase` type extended: `0 | 1 | 2 | 3 | 4 | 5 | 6`
 - `Status` type extended with `'superseded'` (was already used by MSP atoms but not in the type)
 - `validatePhase()` now allows phase 6
 - MSP can now use `gks_propose_inbound` / `InboundQueue.propose()` for AUDIT-- atoms without workarounds
 
 ### Proposal 02 — `--through-superseded`
+
 - New `VerifyFlowOptions.throughSuperseded: boolean` on the `verifyFlow()` function
 - CLI flag: `gks verify-flow <ID> --through-superseded`
 - Walker follows `crosslinks.superseded_by` transparently on superseded atoms
@@ -133,6 +135,7 @@ commit `dd076db`.
 - MSP pre-push hook can now pass `--through-superseded` when projects use supersede chains (e.g. [[FRAMEWORK--MSP-ARCHITECTURE]] → V2)
 
 ### Proposal 03 — Backlinks derivation API
+
 - New `deriveBacklinksFromEntries()` — pure derivation from an `AtomicEntry[]`
 - New `emitBacklinksJsonl()` — write to JSONL with optional filtering
 - CLI: `gks backlinks [--emit=jsonl|json] [--out=PATH] [--filter-type=...]`
@@ -141,6 +144,7 @@ commit `dd076db`.
 - MSP's `src/orchestrator/retrieval/sources/backlinks.ts` can now call `deriveBacklinksFromEntries` directly instead of maintaining its own derivation logic
 
 ### Proposal 04 — Embedder compatibility docs
+
 - New `docs/embedder-compatibility.md` in GKS
 - Covers Smart Connections model parity, re-embed workflow, and why GKS doesn't enforce model choice
 
@@ -164,5 +168,5 @@ sync: update `packages/gks` from GksV3 releases when new upstream features land.
 - Date: 2026-05-11
 
 ## Connections
-- [[AUDIT--GKS-UPSTREAM-PROPOSALS-FILED]]
 
+- [[AUDIT--GKS-UPSTREAM-PROPOSALS-FILED]]

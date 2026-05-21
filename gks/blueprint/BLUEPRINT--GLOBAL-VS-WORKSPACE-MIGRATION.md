@@ -363,6 +363,6 @@ Single PR, no feature flag. Migration is opt-out via `MSP_DISABLE_MIGRATION=1` (
 - [ ] AUDIT atom written.
 
 ## Connections
+
 - [[CONCEPT--AGENT-AGNOSTIC]]
 - [[ADR--PATH-ENCODING]]
-

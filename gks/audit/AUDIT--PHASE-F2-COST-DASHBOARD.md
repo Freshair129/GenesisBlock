@@ -190,6 +190,6 @@ Added `"msp-usage": "./dist/usage/cli.js"` to `packages/msp/package.json`.
 User direction "Phase F2 — Cost Dashboard + USAGE Roll-ups" agent task brief 2026-05-14; builds directly on Phase E3 (PR #120) `usage-recorder.ts` output contract.
 
 ## Connections
+
 - [[CONCEPT--COST-TRACKING]]
 - [[BLUEPRINT--COST-TRACKING]]
-

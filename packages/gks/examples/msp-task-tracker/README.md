@@ -10,9 +10,9 @@ Per ADR-015, live execution state (task status, assignee, comments, microtask pr
 
 ## The Seam
 
-1.  **Durable Start**: GKS provides a `BLUEPRINT--` atom. The orchestrator reads its `geography` (file paths).
-2.  **Execution Churn**: The orchestrator creates tasks in its own storage (e.g., `.brain/<ns>/tasks/` or an external API like Linear). Status changes from `open` → `in_progress` → `done`.
-3.  **Durable End**: Once all tasks for a blueprint are `done`, the orchestrator "closes the loop" by proposing an `AUDIT--` atom back to GKS via `proposeInbound()`.
+1. **Durable Start**: GKS provides a `BLUEPRINT--` atom. The orchestrator reads its `geography` (file paths).
+2. **Execution Churn**: The orchestrator creates tasks in its own storage (e.g., `.brain/<ns>/tasks/` or an external API like Linear). Status changes from `open` → `in_progress` → `done`.
+3. **Durable End**: Once all tasks for a blueprint are `done`, the orchestrator "closes the loop" by proposing an `AUDIT--` atom back to GKS via `proposeInbound()`.
 
 ## Files
 
@@ -30,8 +30,9 @@ npx tsx examples/msp-task-tracker/smoke.ts
 ## How to use this in a real MSP
 
 In a real Memory OS, you would:
-1.  Watch the GKS index for new `BLUEPRINT--` atoms.
-2.  Auto-initialize tasks in your database.
-3.  Dispatch tasks to agents via their private sessions.
-4.  When a session completes a task, update your state.
-5.  When all tasks for a blueprint are finished, generate a summary and call `gks_propose_inbound` (MCP) or `store.proposeInbound` (API).
+
+1. Watch the GKS index for new `BLUEPRINT--` atoms.
+2. Auto-initialize tasks in your database.
+3. Dispatch tasks to agents via their private sessions.
+4. When a session completes a task, update your state.
+5. When all tasks for a blueprint are finished, generate a summary and call `gks_propose_inbound` (MCP) or `store.proposeInbound` (API).

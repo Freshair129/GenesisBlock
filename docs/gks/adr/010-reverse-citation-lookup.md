@@ -13,6 +13,7 @@ and **propagation is not automatic** — each transition is a deliberate
 human-or-agent action gated by validation.
 
 ADR-009 split graph responsibilities horizontally:
+
 - **GKS** owns *atom-level* relationships (note ↔ note backlinks).
 - **GitNexus** owns *code-level* relationships (function ↔ function,
   file ↔ file, AST).
@@ -23,6 +24,7 @@ let atoms cite specific code symbols. This is **forward** traceability
 
 The gap: **no reverse traceability**. When a developer edits
 `src/stock/fefo.ts:applyFefo`:
+
 - GitNexus tells them which *code* is affected (callers, importers).
 - Nothing tells them which *atoms* govern that code.
 
@@ -50,6 +52,7 @@ blueprints, `geography`) entry matches `symbolPath`. Match semantics:
 | `{ file: "src/x.ts", fn: "foo", line: 42 }` | `src/x.ts:foo:42`           | ✓ |
 
 Surfaces:
+
 - **TS API:** `MemoryStore.lookupBySymbol(path)`
 - **CLI:** `gks lookup-by-symbol src/x.ts:foo`
 - **MCP:** new tool `gks_lookup_by_symbol`

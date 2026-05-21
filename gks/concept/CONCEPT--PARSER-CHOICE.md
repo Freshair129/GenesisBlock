@@ -172,6 +172,6 @@ The interface design absorbs this cost; we're not painting into a corner.
 - Existing `typescript` dependency in `package.json` `devDependencies`
 
 ## Connections
+
 - [[FRAMEWORK--SYMBOL-GRAPH]]
 - [[CONCEPT--SYMBOL-GRAPH]]
-

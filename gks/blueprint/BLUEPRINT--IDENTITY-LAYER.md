@@ -316,7 +316,7 @@ implementation_order:
 - Persist transient runtime state beyond profile/voice/preferences (e.g. last session id — that's session-side, not identity)
 
 ## Connections
+
 - [[FEAT--IDENTITY-LAYER]]
 - [[ADR--IDENTITY-STORAGE-SHAPE]]
 - [[CONCEPT--IDENTITY-LAYER]]
-

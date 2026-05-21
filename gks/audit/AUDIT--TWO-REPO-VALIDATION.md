@@ -203,7 +203,7 @@ npm run msp:index                       →  100 atoms indexed
 User direction "validate ทั้ง 2 repo ให้ตรงกัน + ทำ version control" during PR #9 + PR #12 merge prep. Cross-checked installed `@freshair129/gks@3.5.6` against `/tmp/GksV3/` (3.6.0 dev checkout) on 2026-05-04.
 
 ## Connections
+
 - [[ADR--GRAPH-IS-GKS-DOMAIN]]
 - [[CONCEPT--EMBEDDING-STRATEGY]]
 - [[AUDIT--M7-PREP-FOLLOWUP]]
-

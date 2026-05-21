@@ -38,6 +38,7 @@ We decide to introduce a new frontmatter field **`epistemic_state`** that is str
 ### Validator Integration
 
 The `msp:validate` suite will be updated to:
+
 1. Enforce that `epistemic_state` is one of the allowed values: `hypothesis`, `confirmed`, `contested`, `deprecated`.
 2. Allow `epistemic_state` to change in any direction in a PR (non-monotonic).
 3. Continue to enforce monotonicity for the `status` field.
@@ -45,10 +46,12 @@ The `msp:validate` suite will be updated to:
 ## Consequences
 
 ### Positive
+
 - **Granularity:** Allows for stable documents that contain currently contested information.
 - **Auto-Correction:** Enables the distiller to automatically flag beliefs for review without manually changing document statuses.
 
 ### Negative
+
 - **Metadata Load:** Increases the number of mandatory fields in memory-related atoms.
 
 ## Source

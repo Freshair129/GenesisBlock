@@ -132,6 +132,7 @@ attributes:
 ## Why Process Tracing
 
 เพื่อให้ AI สามารถทำความเข้าใจ "พฤติกรรม" ของระบบ (Runtime behavior simulation) ได้จากโค้ดต้นฉบับ:
+
 - ช่วยลดความผิดพลาดในการแก้ไขโค้ดที่ซับซ้อน (Spaghetti code) โดยการแสดงเส้นทางที่ชัดเจน
 - ช่วยในการทำ Onboarding ให้กับ Developer หรือ Agent ใหม่ โดยการแสดงลำดับการทำงานที่เกิดขึ้นจริงในระบบ
 
@@ -155,10 +156,10 @@ attributes:
 - Concept of "Neural Mapping" for code intelligence
 
 ## Connections
+
 - [[FRAMEWORK--SYMBOL-GRAPH]]
 - [[CONCEPT--SYMBOL-GRAPH]]
 - [[CONCEPT--SYMBOLS-PROCESS-TRACING]]
 - [[ADR--SYMBOLS-PROCESS-TRACING]]
 - [[ALGO--SYMBOLS-CALL-GRAPH-TRAVERSAL]]
 - [[PROTO--SYMBOLS-TRACE-INVARIANTS]]
-

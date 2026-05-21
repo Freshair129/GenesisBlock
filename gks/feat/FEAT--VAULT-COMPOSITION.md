@@ -171,5 +171,5 @@ msp-vault check alice-engineering --atom=CONCEPT--FOO   # is this atom visible i
 - `packages/gks/src/memory/types.ts` — the `Namespace` type Vaults compose.
 
 ## Connections
-- [[FRAMEWORK--UNIVERSAL-CONTEXT-FRAMEWORK]]
 
+- [[FRAMEWORK--UNIVERSAL-CONTEXT-FRAMEWORK]]

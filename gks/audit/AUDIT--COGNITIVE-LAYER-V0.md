@@ -134,6 +134,7 @@ Stand up the cognitive-layer / memoryOS stack end-to-end so EVA, Claude Code, He
 ## What shipped
 
 ### GKS — storage primitives
+
 1. `packages/gks/src/memory/graph/genesis-graph.ts` — `class GenesisGraphBackend implements GraphBackend`. Event-replay JSONL store (`<dir>/genesis-block.jsonl` + `manifest.json` version byte). Mirrors `GraphStore` semantics + adds `cypher(query)`.
 2. `packages/gks/src/memory/graph/cypher-v0.ts` — hand-written recursive-descent parser covering `[[BLUEPRINT--GENESIS-GRAPH-INTEGRATION]]` §"Cypher v0 scope". Throws `GenesisGraphUnsupportedCypher` for anything outside the subset.
 3. `packages/gks/src/memory/graph/genesis-graph-errors.ts` — `GenesisGraphUnsupportedCypher` + `GenesisGraphSchemaMismatchError`.
@@ -142,27 +143,31 @@ Stand up the cognitive-layer / memoryOS stack end-to-end so EVA, Claude Code, He
 6. `.gitignore` extended for `*.genesis-block.jsonl` and `.brain/**/graph/*.jsonl`.
 
 ### MSP — SLM tier
+
 7. `packages/msp/src/codegen/runner.ts` — removed the contradictory `?? 'qwen'` provider fallback. Default microtask SLM is now Ollama + `qwen2.5-coder:7b`, matching `[[CONCEPT--CODEGEN-MICROTASK-RUNNER]]` and `FRAMEWORK_MASTER_SPEC` §17.3. ([[ADR--DEFAULT-SLM-OLLAMA-QWEN-CODER]])
-8. `packages/msp/src/codegen/cli.ts` — help text + provider-selection block.
-9. `packages/msp/src/codegen/slm/gemini.ts` (NEW) — `createGeminiClient()` + shared `runGeminiCli()` wrapper around `gemini -p <prompt> -y`. Used by both the SLM factory and the existing escalator. ([[ADR--GEMINI-AS-SLM-PROVIDER]])
-10. `packages/msp/src/codegen/slm/factory.ts` + `slm/types.ts` — `'gemini'` added to provider union with `GeminiOpts`.
-11. `packages/msp/src/codegen/escalator/gemini.ts` — refactored to consume `runGeminiCli()`; no behaviour change.
+2. `packages/msp/src/codegen/cli.ts` — help text + provider-selection block.
+3. `packages/msp/src/codegen/slm/gemini.ts` (NEW) — `createGeminiClient()` + shared `runGeminiCli()` wrapper around `gemini -p <prompt> -y`. Used by both the SLM factory and the existing escalator. ([[ADR--GEMINI-AS-SLM-PROVIDER]])
+4. `packages/msp/src/codegen/slm/factory.ts` + `slm/types.ts` — `'gemini'` added to provider union with `GeminiOpts`.
+5. `packages/msp/src/codegen/escalator/gemini.ts` — refactored to consume `runGeminiCli()`; no behaviour change.
 
 ### MSP — cognitive layer facade
+
 12. `packages/msp/src/cognitive/index.ts` (NEW) — `createCognitiveLayer({ root, graphBackend, slm, defaultNamespace })` returns `{ recall, remember, consolidate, runTask, verifyFlow, hotfix, resolveSSOT, mcpServer, store, graph }`. ([[FEAT--COGNITIVE-LAYER-FACADE]])
-13. `packages/msp/src/cognitive/types.ts` — `CognitiveTier`, `ScaleLevel`, `CognitiveLayerOptions`, `CognitiveRecallHit`, `ScaleLevelGateError`.
-14. `packages/msp/src/cognitive/fts.ts` (NEW) — pure-Node FTS for §13 layer 2.
-15. `packages/msp/src/cognitive/scale-gate.ts` (NEW) — §7.7.2 L1/L2/L3 enforcement (`enforceScaleGate`).
-16. `packages/msp/src/cognitive/ssot.ts` (NEW) — §14.1 authority hierarchy resolver.
-17. `packages/msp/src/cognitive/audit-only.ts` (NEW) — §7.5 Memory-for-Audit stamping.
-18. `packages/msp/src/cognitive/compose.ts` + `marker-constants.ts` (NEW) — §9.6 AUTO-GENERATED marker helper.
-19. `packages/msp/src/index.ts` — re-exports `createCognitiveLayer` + cognitive types.
+2. `packages/msp/src/cognitive/types.ts` — `CognitiveTier`, `ScaleLevel`, `CognitiveLayerOptions`, `CognitiveRecallHit`, `ScaleLevelGateError`.
+3. `packages/msp/src/cognitive/fts.ts` (NEW) — pure-Node FTS for §13 layer 2.
+4. `packages/msp/src/cognitive/scale-gate.ts` (NEW) — §7.7.2 L1/L2/L3 enforcement (`enforceScaleGate`).
+5. `packages/msp/src/cognitive/ssot.ts` (NEW) — §14.1 authority hierarchy resolver.
+6. `packages/msp/src/cognitive/audit-only.ts` (NEW) — §7.5 Memory-for-Audit stamping.
+7. `packages/msp/src/cognitive/compose.ts` + `marker-constants.ts` (NEW) — §9.6 AUTO-GENERATED marker helper.
+8. `packages/msp/src/index.ts` — re-exports `createCognitiveLayer` + cognitive types.
 
 ### Quickstart + docs
+
 20. `packages/msp/examples/cognitive-layer-quickstart.ts` — 80-line end-to-end demo with GenesisGraphBackend + cypher round-trip + SSOT resolution + MCP tool surface print.
-21. `packages/msp/package.json` — `"cognitive:quickstart": "tsx examples/cognitive-layer-quickstart.ts"`.
+2. `packages/msp/package.json` — `"cognitive:quickstart": "tsx examples/cognitive-layer-quickstart.ts"`.
 
 ### Atoms authored
+
 - `[[CONCEPT--COGNITIVE-LAYER-FACADE]]`
 - `[[CONCEPT--HYBRID-RETRIEVAL-FTS-LAYER]]`
 - `[[ADR--DEFAULT-SLM-OLLAMA-QWEN-CODER]]`

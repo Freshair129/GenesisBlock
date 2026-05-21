@@ -150,11 +150,13 @@ Reject in all cases regardless of `package.json`:
 ## Consequences
 
 **Positive**
+
 - One regex per pattern; cheap to evaluate.
 - Patterns are documented per-rule with rationale, not folded into a monolithic linter.
 - Severity tiers let warning patterns surface in CI without blocking the SLM loop.
 
 **Negative**
+
 - Pattern list will drift as the codebase evolves (e.g. when we adopt a new framework). Ownership: M3 plan loads them from `codegen_microtask_contract.yaml` so changes don't need a code release.
 - Regex matching can have false positives in legitimate string contents (`"export default"` inside a comment). Acceptable — comments are stripped in post-processing.
 
@@ -168,5 +170,5 @@ Reject in all cases regardless of `package.json`:
 `msp_spec.md` §5.2 (Forbidden Imports), §5.3 (Forbidden Patterns), §5.4 (Required Patterns).
 
 ## Connections
-- [[CONCEPT--CODEGEN-MICROTASK-CONTRACT]]
 
+- [[CONCEPT--CODEGEN-MICROTASK-CONTRACT]]

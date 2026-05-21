@@ -192,7 +192,7 @@ After the migration, any wikilink that still says `[[FRAME--X]]` where `X` was r
 - **Atom contradiction across prefixes**: handled by the existing contradiction policy (`[[MASTER--ATOM-CONTRADICTION-POLICY]]`).
 
 ## Connections
+
 - [[CONCEPT--KNOWLEDGE-LAYERS-V2]]
 - [[CONCEPT--ATOMIC-WRITE-CONTRACT]]
 - [[FRAMEWORK--CROSSLINKS-VOCABULARY]]
-

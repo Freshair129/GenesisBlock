@@ -216,7 +216,7 @@ Roll-ups coexist with daily atoms in the same directory. The id-prefix distingui
 - Streaming / push-based aggregation. The writer always re-reads dailies from disk.
 
 ## Connections
+
 - [[CONCEPT--USAGE-ROLLUPS]]
 - [[CONCEPT--COST-TRACKING]]
 - [[ADR--AGENT-TIER-COST-POLICY]]
-

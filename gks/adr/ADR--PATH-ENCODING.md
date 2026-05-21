@@ -124,11 +124,13 @@ We have to pick one and harmonise.
 ## Consequences
 
 **Positive**
+
 - Tooling and spec align.
 - Existing repos using `evaAI/` stay valid without renaming.
 - The decision is recorded so future readers know it's deliberate, not an oversight.
 
 **Negative**
+
 - Anyone who already standardised on `D--<name>` per the spec must rename. Mitigated by the migration script.
 - Drift between the *master* spec (`FRAMEWORK_MASTER_SPEC.md` §7) and our local `msp_spec.md` until upstream picks one. Tracked as an upstream coordination task.
 
@@ -143,6 +145,6 @@ We have to pick one and harmonise.
 `msp_spec.md` §12 (Project Path Encoding) — explicitly flagged as an open issue in §15.
 
 ## Connections
+
 - [[FRAMEWORK--MSP-ARCHITECTURE-V2]]
 - [[CONCEPT--TAXONOMY-V2-3]]
-

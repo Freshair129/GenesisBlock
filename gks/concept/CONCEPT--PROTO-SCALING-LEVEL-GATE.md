@@ -141,5 +141,5 @@ PR diff inspection. Runs in CI workflow (not local validate, since needs git dif
 `[[FRAMEWORK--SCALING-LEVELS]]`, `[[CONCEPT--MSP-ROADMAP]]` §2 M8c.
 
 ## Connections
-- [[CONCEPT--PROTO-PATTERN]]
 
+- [[CONCEPT--PROTO-PATTERN]]

@@ -143,5 +143,5 @@ Spec doesn't mandate; orchestrators typically keep 30–90 days then archive to 
 `msp_spec.md` §7.1 (Linear Session History).
 
 ## Connections
-- [[CONCEPT--MEMORY-SUBSYSTEM]]
 
+- [[CONCEPT--MEMORY-SUBSYSTEM]]

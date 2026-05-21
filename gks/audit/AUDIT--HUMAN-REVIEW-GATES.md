@@ -104,6 +104,7 @@ attributes:
 ## Scope
 
 Two changes:
+
 1. Wrote `[[ADR--HUMAN-REVIEW-GATES]]` — fills the dangling reference in `[[ADR--PROMOTION-WORKFLOW]]` ("see [[ADR--HUMAN-REVIEW-GATES]] (TBD)"). Maps every atom type to a reviewer (Boss vs T3 self-review).
 2. Updated `msp_spec.md` §12 to reflect `[[ADR--PATH-ENCODING]]` (bare name like `evaAI`, not `D--<name>`). Removes the "open issue" framing.
 
@@ -120,5 +121,5 @@ Two changes:
 - Date: 2026-05-03
 
 ## Connections
-- [[ADR--AGENT-WRITE-BOUNDARIES]]
 
+- [[ADR--AGENT-WRITE-BOUNDARIES]]

@@ -114,15 +114,18 @@ The change is **additive** — existing callers that don't pass `graphBackend` g
 ## Consequences
 
 ### Positive
+
 - `PgGraphBackend` and `GenesisGraphBackend` are now wired into `MemoryStore` symmetrically with `pgvector` / `HnswBackend`.
 - The cognitive facade (`createCognitiveLayer`) can expose `layer.graph` without a separate factory call.
 - `[[FRAMEWORK--FOUR-LAYERS]]` is now reflected in the API surface.
 
 ### Negative
+
 - One extra dir (`<brain>/graph/`) on disk by default. Gitignored.
 - Callers that subclass MemoryStore (none in tree) must update if they override `init()`.
 
 ### Neutral
+
 - The graph backend is initialised lazily — `init()` is the trigger, so unit tests that never call init won't pay the cost.
 
 ## Status
@@ -130,6 +133,6 @@ The change is **additive** — existing callers that don't pass `graphBackend` g
 Draft. Promotion to `stable` requires green CI with the new `test/memory/memory-store.test.ts` graphBackend cases passing.
 
 ## Connections
+
 - [[FRAMEWORK--MSP-ARCHITECTURE-V2]]
 - [[CONCEPT--MEMORY-STORE]]
-

@@ -217,6 +217,6 @@ M8b–f then implement specific PROTOs (PHASE-GATES, SCALING-LEVEL-GATE, ALGO-PA
 `msp_spec.md` §10 (governance), `[[FRAMEWORK--PHASE-GOVERNANCE]]`, `[[FRAMEWORK--AUTHORITY-MATRIX]]`, `[[ADR--HUMAN-REVIEW-GATES]]`, user direction "วางแผนและทำให้จบ ทุก M" — M8a is the foundation enabling M8b–f.
 
 ## Connections
+
 - [[FRAMEWORK--MSP-ARCHITECTURE-V2]]
 - [[FEAT--MSP-VALIDATOR]]
-

@@ -173,8 +173,8 @@ spellings at the CLI/MCP boundary.
 - ADR-008 / ADR-009 / ADR-010 / ADR-012 — boundary + read-side primitives
 
 ## Connections
+
 - [[ADR--EXTENDED-TAXONOMY]]
 - [[ADR--FLAT-ATOM-LAYOUT]]
 - [[ADR--REVERSE-CITATION-LOOKUP]]
 - [[CONCEPT--MASTER-PROMOTION]]
-

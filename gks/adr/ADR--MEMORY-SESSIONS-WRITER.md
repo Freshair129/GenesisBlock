@@ -120,11 +120,13 @@ Re-entry on crash: a stale `.lock` file with a dead PID is removed on next `open
 ## Consequences
 
 **Positive**
+
 - One writer per episodic enforced cheaply.
 - Append-only means historical rows are immutable — no torn writes from in-place edits.
 - Recovery from crash is automatic on next open.
 
 **Negative**
+
 - Lock files visible in directory listings — slightly noisy. Acceptable.
 - `flock` is POSIX; Windows needs different syscall (use `proper-lockfile` package or similar). Cross-platform is M3 work.
 

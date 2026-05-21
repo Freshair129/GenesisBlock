@@ -130,6 +130,7 @@ legacy_files:
 ### Migration path
 
 To "legacify-then-clean":
+
 1. Add `legacy: true` to the atom; validator now passes.
 2. Open a P3 BLUEPRINT for refactoring the atom to current contract (one PR per type or batch).
 3. After refactor, remove `legacy: true`. Validator must pass without it.
@@ -137,11 +138,13 @@ To "legacify-then-clean":
 ## Consequences
 
 **Positive**
+
 - Adoption is incremental — no one-shot mass rewrite.
 - Legacy atoms are visible in reports, not silently broken.
 - The exemption list is narrow: structural rules (ID format, wikilinks, dates) still apply.
 
 **Negative**
+
 - `legacy: true` could be abused to bypass new rules ("just mark it legacy"). Mitigated by code review on every addition of the flag and the report-legacy count showing if it's growing.
 - The exemption set is hardcoded in the validator. M3 plan loads it from `atomic_contract.yaml`.
 
@@ -156,7 +159,7 @@ To "legacify-then-clean":
 `msp_spec.md` §10.2 (Legacy Files).
 
 ## Connections
+
 - [[ADR--ANTI-HALLUCINATION-RULES]]
 - [[ADR--FORBIDDEN-FIELDS-LIST]]
 - [[CONCEPT--MSP-VALIDATOR]]
-

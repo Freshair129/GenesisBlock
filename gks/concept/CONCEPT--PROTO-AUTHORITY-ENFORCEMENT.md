@@ -117,6 +117,7 @@ Promotion path: T1 atoms always go through inbound + human review. Direct commit
 ## Trigger
 
 CI workflow. Predicate reads:
+
 - Git author email / login from `git log`
 - Path list from `git diff --name-only base..head`
 - Tier map from `.brain/msp/authority.yaml` (project-local)
@@ -153,5 +154,5 @@ Falls back to `T1` (most restrictive) when author not in the map.
 `[[FRAMEWORK--AUTHORITY-MATRIX]]`, `[[ADR--HUMAN-REVIEW-GATES]]`, `[[CONCEPT--MSP-ROADMAP]]` §2 M8e.
 
 ## Connections
-- [[CONCEPT--PROTO-PATTERN]]
 
+- [[CONCEPT--PROTO-PATTERN]]

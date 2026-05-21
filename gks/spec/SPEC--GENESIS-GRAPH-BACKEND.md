@@ -102,25 +102,29 @@ attributes:
 ข้อกำหนดสำหรับการจัดเก็บกราฟความรู้ที่ประมวลผลผ่าน 12-stage DAG
 
 ## 1. Data Models
+
 - **Nodes:** บันทึก Symbols (Stage 5), Files (Stage 1), และ Framework Entities (Stage 6-8)
 - **Edges:** บันทึกความสัมพันธ์เชิงทิศทาง (Directional Edges) เช่น `Calls`, `Imports`, `Inherits`, `Routes_To`
 - **Metadata:** บันทึก `community_id` (Stage 11) และ `process_id` (Stage 12)
 
 ## 2. Invariants (Enforced)
+
 - **No Cycles:** ต้องไม่มีวงจรในความสัมพันธ์เชิงสืบทอด (MRO) และการสืบทอดอะตอม (Supersession) ตามกฎ `[[PROTO--TRACE-INVARIANTS]]`
 - **Referential Integrity:** ห้ามมี Edges ที่ชี้ไปยัง Node ที่ไม่มีจริง
 
 ## 3. Storage Architecture
+
 - **Adapter:** ใช้งานผ่าน `napi-rs` (Rust-based) เพื่อประสิทธิภาพสูงสุด
 - **Zero-Dependency:** ทำงานแบบ Process-local ไม่ต้องการ Database Server ภายนอก
 - **Persistance Format:** จัดเก็บในรูปแบบ Optimized Binary (LadybugDB) และรองรับการ Export เป็น JSONL สำหรับการ Audit
 
 ## 4. Query Capability
+
 - รองรับ **OpenCypher** ในการ Query ความสัมพันธ์แบบ Graph
 - รองรับการทำ **Deep Traversal** เพื่อติดตาม Execution Flow จาก Entry Point ไปยัง Leaf Node
 - รองรับ **Bi-temporal time-travel** เพื่อดูสถานะของ Graph ณ เวลาใดเวลาหนึ่งในอดีต
 
 ## Connections
+
 - [[CONCEPT--GENESIS-GRAPH-BACKEND]]
 - [[ADR--SYMBOL-GRAPH-PROCESSING-STAGES]]
-

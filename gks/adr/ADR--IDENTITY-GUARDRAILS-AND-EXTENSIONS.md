@@ -114,6 +114,7 @@ Two fields from the M7e parallel-fanout impl (commit `fe013cd`, replaced by PR #
 2. **`extensions: Record<string, unknown>`** — free-form bag for harness-specific data (Claude Code, Cursor, EVA). MSP itself never reads this; harnesses use it to attach state without forking the schema.
 
 Three operational fields from the old impl deliberately stay out:
+
 - `operational_state.last_session_id` → belongs in sessions (M7c retrieval reads this)
 - `operational_state.ongoing_context_pointer` → belongs in episodic + consolidator (M7b/d)
 - `retrieval.source_weights` → belongs in M7c orchestration config, not identity
@@ -175,12 +176,14 @@ await setProfile(opts, {
 ## Consequences
 
 **Positive**
+
 - Recovers the genuinely useful fields from the dropped impl
 - Forward-compatible — no migration, no schema bump
 - `guardrails` formalises an anti-hallucination patten that was implicit before
 - `extensions` gives harnesses an escape hatch without forking
 
 **Negative**
+
 - Slight schema growth — but both fields are tiny and default to empty
 - Harnesses must namespace their `extensions` keys by convention (no enforcement)
 - A user with hundreds of guardrails would hurt prompt budget; we don't guard
@@ -205,6 +208,6 @@ await setProfile(opts, {
 Option C from the user's M7e merge decision (PR #19 review, 2026-05-05). Recovers fields from `fe013cd` parallel-fanout impl that were dropped during BLUEPRINT alignment but had genuine architectural value.
 
 ## Connections
+
 - [[ADR--IDENTITY-STORAGE-SHAPE]]
 - [[CONCEPT--IDENTITY-LAYER]]
-

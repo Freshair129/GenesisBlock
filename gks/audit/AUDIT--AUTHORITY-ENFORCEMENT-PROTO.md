@@ -238,5 +238,5 @@ Tracked here so the next milestone slice doesn't lose context:
 `[[FRAMEWORK--AUTHORITY-MATRIX]]`, `[[FEAT--PROTO-LOADER]]`, `[[AUDIT--PROTO-LOADER]]`.
 
 ## Connections
-- [[BLUEPRINT--PROTO-LOADER]]
 
+- [[BLUEPRINT--PROTO-LOADER]]

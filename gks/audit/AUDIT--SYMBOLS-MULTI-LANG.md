@@ -120,6 +120,7 @@ attributes:
 ## Scope verified
 
 The implementation of `[[FEAT--SYMBOLS-MULTI-LANG]]` per `[[BLUEPRINT--SYMBOLS-MULTI-LANG]]`:
+
 - TypeScript parser kept as-is (existing baseline, refactored to async)
 - Python parser added via `web-tree-sitter` (WASM-loaded grammar)
 - COBOL parser added as regex-based (PROGRAM-ID, SECTION/DIVISION, PERFORM/CALL)
@@ -140,6 +141,7 @@ All 10 unit tests pass on Node 22 / Windows 10 / pnpm-style workspace:
 | **Total** | **10** | **✓ 10/10** |
 
 Run locally:
+
 ```
 npx vitest run packages/msp/test/symbols/parser*.test.ts
 ```
@@ -180,5 +182,5 @@ Duration: 3.36s (transform 174ms, setup 0ms, collect 646ms, tests 2.52s, prepare
 - Implementation by Antigravity agent (2026-05-11); PR-closure + AUDIT authored by Claude in MSP main repo
 
 ## Connections
-- [[FRAMEWORK--SYMBOL-GRAPH]]
 
+- [[FRAMEWORK--SYMBOL-GRAPH]]

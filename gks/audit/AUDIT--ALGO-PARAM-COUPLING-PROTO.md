@@ -203,6 +203,6 @@ accidentally double-enforce.
 - M8a PROTO loader (`src/validator/proto/loader.ts`) — unchanged
 
 ## Connections
+
 - [[CONCEPT--PROTO-PATTERN]]
 - [[BLUEPRINT--PROTO-LOADER]]
-

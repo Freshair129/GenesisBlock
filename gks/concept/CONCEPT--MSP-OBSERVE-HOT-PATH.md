@@ -146,10 +146,12 @@ It's the difference between "AI with good memory" (mem0 promise) and "structured
 ## Trade-offs
 
 **Positive**
+
 - Lowers the discipline cost of using MSP — works for "normal" agents, not just diligent ones.
 - Composes naturally with `[[CONCEPT--CONSOLIDATOR]]` (which today operates on episodic memory; `msp_observe` operates on raw turns one layer up).
 
 **Negative**
+
 - LLM call per turn is non-trivial cost; needs per-project budget guard.
 - Extraction quality is the bottleneck — bad extraction pollutes the atom graph faster than humans can clean.
 - Yet-another-tool in the 16-tool MSP MCP surface; only adopt if the pipeline above proves out.
@@ -159,6 +161,6 @@ It's the difference between "AI with good memory" (mem0 promise) and "structured
 `[[SPEC--ARCHITECTURE-V2]].md` §4.2 (drafted 2026-05-07, cherry-picked here on 2026-05-09 before the original was deleted). Reference patterns: mem0 (extraction + reconciliation), langmem (procedural typology). See `[[AUDIT--ARCH-DOC-CLEANUP]]`.
 
 ## Connections
+
 - [[FRAMEWORK--MSP-ARCHITECTURE-V2]]
 - [[CONCEPT--AGENT-AGNOSTIC]]
-

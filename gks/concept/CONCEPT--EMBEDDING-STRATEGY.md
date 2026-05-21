@@ -157,6 +157,6 @@ Smart Connections runs in the Obsidian Electron process the user is already payi
 User architectural direction in M7-prep + audit during M7-prep follow-up. GksV3 3.6.0 CHANGELOG. Smart Connections plugin docs. See `[[ADR--EMBEDDING-MODEL-PARITY]]` for the model lock decision.
 
 ## Connections
+
 - [[CONCEPT--OBSIDIAN-AS-RUNTIME]]
 - [[ADR--GRAPH-IS-GKS-DOMAIN]]
-

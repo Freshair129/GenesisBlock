@@ -179,6 +179,7 @@ attributes:
 ## Why Framework Awareness
 
 เพื่อให้ AI Agent สามารถทำ "Navigation" และ "Impact Analysis" ในระดับสถาปัตยกรรมได้จริง:
+
 - ช่วยให้ Agent เข้าใจว่าการเปลี่ยนโค้ดที่ฟังก์ชันหนึ่ง จะส่งผลกระทบต่อ API Route ไหนบ้าง
 - ช่วยให้การสืบค้นโค้ดเป็นไปตาม "ความต้องการทางธุรกิจ" (เช่น "หาโค้ดที่ใช้จัดการข้อมูล Order") แทนที่จะหาตามชื่อไฟล์เพียงอย่างเดียว
 
@@ -204,8 +205,8 @@ attributes:
 - Prisma Schema reference
 
 ## Connections
+
 - [[ADR--SYMBOL-GRAPH-PERSISTENCE]]
 - [[FRAMEWORK--SYMBOL-GRAPH]]
 - [[CONCEPT--SYMBOL-GRAPH]]
 - [[FEAT--MSP-SYMBOL-MCP]]
-

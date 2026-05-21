@@ -154,6 +154,7 @@ The function is **pure** — no I/O. Tests mock `lookup` to construct adversaria
 - Returns `{ genesisId, manifestPath, members: string[] }` where `members` is the union of all listed ids across `members.core.*` (flattened).
 
 Search roots (in priority order, deduplicated by canonical path):
+
 1. `<root>/gks/genesis/`
 2. `<root>/gks/` (recursive, to catch any GENESIS atom mis-filed during the FRAME→GENESIS rename — see `[[ADR--TAXONOMY-V2-3-MIGRATION]]`)
 3. `<root>/packages/*/gks/genesis/` (post-migration per-package vaults)
@@ -169,6 +170,7 @@ Files whose frontmatter is unparseable or whose `type` is not `genesis` are sile
 3. If `!coverage.promotable`, return `{ promotable: false, reason: '<missing dimensions>' }`.
 4. If `coverage.promotable`, build a `proposed_master_id = MASTER--<deslugged block id>` (e.g. `[[GENESIS--IDENTITY-ENGINE]]` → `[[MASTER--IDENTITY-ENGINE]]`).
 5. Build proposed frontmatter:
+
    ```yaml
    id: MASTER--<NAME>
    phase: 0
@@ -185,6 +187,7 @@ Files whose frontmatter is unparseable or whose `type` is not `genesis` are sile
    crosslinks: {"references":["FRAMEWORK--KNOWLEDGE-3-TIER","SPEC--GENESIS-BLOCK-MANIFEST","GENESIS--<NAME>"]}
    created_at: <ISO ICT>
    ```
+
 6. Build proposed body in the canonical 5-section schema with placeholder content for `Intent / Why / Directives / Apply when / Conflicts with`. Each section is a heading + a TODO line; the human reviewer fills the content.
 7. Return `{ promotable: true, proposed_master_id, proposed_frontmatter, proposed_body, coverage }`.
 
@@ -201,11 +204,13 @@ CLI `msp-master-propose` with subcommands implicit (single command). Flags:
 Output without `--write`: a table with columns `block | cognitive | algo | runbook | concept | params | filled | promotable`. The 5 dimension columns show "yes/no" (or "stub" for unresolved). A summary line lists how many blocks were scanned and how many were promotable.
 
 Exit codes:
+
 - `0` success (zero or more proposals written)
 - `1` no GENESIS atoms found (likely wrong `--root`)
 - `2` internal error (bad args, IO failure)
 
 Bin registration in `packages/msp/package.json`:
+
 ```json
 "msp-master-propose": "./dist/master/cli.js"
 ```
@@ -227,6 +232,7 @@ Bin registration in `packages/msp/package.json`:
 ## Out of scope
 
 Per CONCEPT §"Out of scope":
+
 - `gks/master/` writes (human-only)
 - Token-cap enforcement on proposals
 - Cross-Master contradiction detection

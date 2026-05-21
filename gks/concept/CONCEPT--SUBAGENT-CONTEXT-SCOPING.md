@@ -131,6 +131,7 @@ Critically: the **subagent does not set its own scope**. If it could, it would (
 In:
 
 - `SubagentScope` type carried in `Subject.attributes` when `Subject.kind = 'subagent'`:
+
   ```ts
   interface SubagentScope {
     needs: string[]           // domain attributes required
@@ -141,9 +142,11 @@ In:
     expand_limit?: number     // max expansions per task
   }
   ```
+
 - Task descriptor schema in `.brain/tasks/<TASK-ID>/T*.task.yaml` carrying the scope.
 - PEP in the composer (`packages/msp/src/codegen/master/composer.ts`) consults the PDP per candidate Resource using the scope as part of Subject.attributes.
 - The effective-context formula (see §10 of spec):
+
   ```
   include(R, subagent) =
       namespace_filter(R, vault)
@@ -151,13 +154,16 @@ In:
     ∩ task_scope_filter(R, subagent.scope)
     ∩ resolution_tier(R, score, budget) > omitted
   ```
+
 - **Escalation API** so the subagent can request a scope extension mid-task:
+
   ```ts
   await layer.escalate({
     request_scope_extension: ['session-management'],
     reason: 'login fix requires understanding session expiry path'
   })
   ```
+
   Parent receives, decides; subagent retries with widened scope or fails loudly.
 - Audit log entries for: scope assignment, filter drops, escalations, parent decisions on escalation.
 

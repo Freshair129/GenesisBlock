@@ -126,7 +126,7 @@ retrieval model (Resolution Gradient) to optimize context window usage.
 - Date: 2026-05-14
 
 ## Connections
+
 - [[BLUEPRINT--PHASE-3-VAULT-AND-RESOLUTION]]
 - [[FEAT--VAULT-COMPOSITION]]
 - [[FEAT--RESOLUTION-EXPAND-ON-DEMAND]]
-

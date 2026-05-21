@@ -159,7 +159,7 @@ Per `[[MASTER--ATOM-CONTRADICTION-POLICY]]`, a proposed Master that overlaps the
 - Storage-backend-aware promotion (Genesis Graph vs `GraphStore` vs `PgGraphBackend`) — orthogonal; the manifest declares no backend per SPEC §7.
 
 ## Connections
+
 - [[CONCEPT--TAXONOMY-V2-3]]
 - [[ADR--MASTER-PROMOTION-CONTRADICTION-POLICY]]
 - [[FRAMEWORK--KNOWLEDGE-3-TIER]]
-

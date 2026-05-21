@@ -209,6 +209,6 @@ Where `<root>` is the dispatcher's invocation root (typically `process.cwd()` at
 - Per-vault budget alerts — that's the cost-policy layer's job, not this SPEC's.
 
 ## Connections
+
 - [[CONCEPT--COST-TRACKING]]
 - [[BLUEPRINT--COST-TRACKING]]
-

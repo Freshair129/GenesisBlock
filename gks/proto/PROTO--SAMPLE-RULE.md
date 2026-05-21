@@ -141,7 +141,7 @@ promoted to `stable`. Real PROTOs (M8b–f) follow this shape but enforce
 real governance.
 
 ## Connections
+
 - [[FRAMEWORK--MSP-ARCHITECTURE-V2]]
 - [[CONCEPT--PROTO-PATTERN]]
 - [[FEAT--PROTO-LOADER]]
-

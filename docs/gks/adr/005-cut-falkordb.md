@@ -48,6 +48,7 @@ case for now.
 ## Consequences
 
 **Positive**
+
 - Cut a dep, an ops service, and an SSPL licence concern from the
   critical path.
 - `B.3a` shipped in 1.5 days vs. ~2-3 estimated for FalkorDB.
@@ -55,6 +56,7 @@ case for now.
   and deterministic.
 
 **Negative**
+
 - We're betting that depth ≤ 4 BFS is enough for the foreseeable
   future. If usage grows toward depth-10 walks, recursive CTE
   performance will degrade and we'll revisit (Kuzu likely).

@@ -190,7 +190,7 @@ T2 EMIT-EDGES (per-atom extraction with all predicate keys)
 T3 SORT-WRITE (atomic write + check mode + CLI)
 
 ## Connections
+
 - [[FEAT--MEMORY-BACKLINKS-INDEXER]]
 - [[ADR--MEMORY-BACKLINKS-INDEXER]]
 - [[CONCEPT--MEMORY-VECTOR-BACKLINKS]]
-

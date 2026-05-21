@@ -138,11 +138,13 @@ The runner could be (a) a long-running daemon that watches `.brain/<ns>/tasks/` 
 ## Consequences
 
 **Positive**
+
 - Composable with any orchestrator (cron, `xargs`, GitHub Actions matrix).
 - Stateless — crash = re-run with the same input.
 - Per-task cost trackable (one invocation = one budget envelope).
 
 **Negative**
+
 - No cross-task batching optimisation (sometimes useful for prompt cache reuse). Acceptable trade-off.
 - Orchestrator must implement queue ordering. Out of scope for the runner itself.
 

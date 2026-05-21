@@ -109,6 +109,7 @@ Closes M3d from the [[AUDIT--MSP-VALIDATOR]] / [[AUDIT--KNOWLEDGE-BASE]] backlog
 ## Investigation
 
 Tested whether GKS rejects phase=6 only at propose-time or also at promote/index/validator time:
+
 - propose-inbound: rejects (`InboundQueue: invalid phase 6, must be integer 0..5`)
 - inbound promote: accepts (no phase check)
 - re-indexer (vendored): accepts (already updated to 0..6)
@@ -120,6 +121,7 @@ Only GKS's CLI-level phase validation needs working around. Wrapper takes the si
 ## Implementation
 
 `scripts/msp/propose.mjs` — small Node script:
+
 1. Parses argv; detects `--phase=6`
 2. Calls `npx gks propose-inbound` with `--phase=5`
 3. After GKS creates the file, patches the frontmatter to set `phase: 6`
@@ -154,5 +156,5 @@ This very AUDIT atom was filed at phase 6 via `npm run msp:propose -- ... --phas
 - Date: 2026-05-03
 
 ## Connections
-- [[FRAMEWORK--PHASE-GOVERNANCE]]
 
+- [[FRAMEWORK--PHASE-GOVERNANCE]]

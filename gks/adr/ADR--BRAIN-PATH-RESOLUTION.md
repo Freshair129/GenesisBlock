@@ -180,5 +180,5 @@ If a global atom and a project atom have the same `id`, the project wins for **r
 - Per-tenant isolation within a single global brain (already covered by `vault_id`).
 
 ## Connections
-- [[CONCEPT--NAMESPACE-VAULT-BRAIN]]
 
+- [[CONCEPT--NAMESPACE-VAULT-BRAIN]]

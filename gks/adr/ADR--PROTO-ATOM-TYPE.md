@@ -168,12 +168,14 @@ Same as other atoms: `draft | stable | superseded`. A draft PROTO does NOT block
 ## Consequences
 
 **Positive**
+
 - Clean type boundary; FRAMEs stay descriptive, PROTOs are mechanisms
 - Extending the contract is a small change — adds one type entry, one id pattern
 - Validator loader is a small generic component; specific PROTOs are independent
 - Future `PROTO--` atoms can be drafted, tested, then promoted to `stable` (gradual rollout)
 
 **Negative**
+
 - Atom-type taxonomy growth — but justified; the prior 6 types didn't cover this space
 - Two-place change required when adding any PROTO (atom + TS file); accepted (impl is the point)
 - Contract changes need careful versioning so existing atoms still validate
@@ -197,6 +199,6 @@ Same as other atoms: `draft | stable | superseded`. A draft PROTO does NOT block
 `[[CONCEPT--PROTO-PATTERN]]`, `msp_spec.md` §10, user direction during all-M planning (M8 governance protocol layer).
 
 ## Connections
+
 - [[CONCEPT--ATOMIC-WRITE-CONTRACT]]
 - [[ADR--FORBIDDEN-FIELDS-LIST]]
-

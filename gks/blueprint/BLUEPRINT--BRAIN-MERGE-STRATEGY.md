@@ -237,5 +237,5 @@ P5 depends on Stream C (Agent Dispatcher) reaching P4. P1–P4 are independent.
 - Cross-machine sync via Tailscale / Syncthing / Git annex — out of scope; recommend users handle externally.
 
 ## Connections
-- [[CONCEPT--TWO-BRAIN-ARCHITECTURE]]
 
+- [[CONCEPT--TWO-BRAIN-ARCHITECTURE]]

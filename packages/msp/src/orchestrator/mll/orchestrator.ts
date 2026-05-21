@@ -7,6 +7,15 @@ export interface MllResult {
 }
 
 /**
+ * Heuristic to determine if a session should trigger meta-learning.
+ */
+function shouldRunMll(sessionId: string): boolean {
+  // TODO: Read episode count for sessionId.
+  // For now, we return true if session is not 'null'
+  return sessionId !== 'null' && sessionId !== ''
+}
+
+/**
  * Top-level Meta-Learning Loop (MLL) Orchestrator.
  * 
  * Runs after a successful session to extract and formalize knowledge.
@@ -27,8 +36,10 @@ export async function runMll(opts: {
     console.log(`[mll] starting meta-learning loop for session ${opts.sessionId}`)
 
     // 1. Analyze session success and complexity (Trigger check)
-    // For the MVP, we trigger based on a 'force' flag or simply run for all.
-    // In future, check Acceptance tests and turn count.
+    if (!opts.force && !shouldRunMll(opts.sessionId)) {
+      console.log(`[mll] session ${opts.sessionId} does not meet complexity threshold. skipping.`)
+      return result
+    }
     
     // 2. Distill Skill Candidate
     // We first run a 'draft' distillation to get content for stability check.

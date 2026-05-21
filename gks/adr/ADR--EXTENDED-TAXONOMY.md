@@ -140,7 +140,7 @@ Mitigated by `docs/KNOWLEDGE-TYPES.md` + `examples/atom-templates/`.
   (closed in 3.5.4).
 
 ## Connections
+
 - [[FRAMEWORK--FOUR-LAYERS]]
 - [[ADR--FLAT-ATOM-LAYOUT]]
 - [[CONCEPT--TAXONOMY-V2-3]]
-

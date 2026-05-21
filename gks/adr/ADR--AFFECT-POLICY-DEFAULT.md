@@ -36,15 +36,18 @@ We decide to adopt a **"Spartan Default"** for the affect policy, prioritizing f
 | **c** | Sensor-Backed | Forbidden. Sourced from hypothetical bio-telemetry. |
 
 ### Rationale
+
 We prioritize accuracy and reliability. Emotional inference via LLM (Tier b) can be subjective and may introduce noise into the distilled wisdom. Tier (a) represents the most stable and verifiable configuration.
 
 ## Consequences
 
 ### Positive
+
 - **Reduced Token Cost:** Summarization prompts are shorter and more focused.
 - **Reliability:** Prevents the system from "hallucinating" emotional states that aren't grounded in interaction data.
 
 ### Negative
+
 - **Lower Empathy:** The system loses the ability to track the "feeling" of interaction cycles (e.g., "The boss seemed frustrated this week").
 
 ## Source

@@ -32,35 +32,40 @@ Current retrieval treats all memory (Episodes) as having similar structural sign
 ## 3. Requirements
 
 ### 3.1 Multi-Tier RRF Fusion
--   Extend `recall()` to query the `memory/narrative` and `memory/identity` vector namespaces.
--   Implement tier-specific RRF weights:
-    -   **Identity Weight:** 1.8x (highest priority)
-    -   **Narrative Weight:** 1.4x (high priority)
-    -   **Episode Weight:** 1.0x (standard priority)
--   Each hit returned must be tagged with its source `tier`.
+
+- Extend `recall()` to query the `memory/narrative` and `memory/identity` vector namespaces.
+- Implement tier-specific RRF weights:
+  - **Identity Weight:** 1.8x (highest priority)
+  - **Narrative Weight:** 1.4x (high priority)
+  - **Episode Weight:** 1.0x (standard priority)
+- Each hit returned must be tagged with its source `tier`.
 
 ### 3.2 Identity Preamble
--   Provide a dedicated tool or option to fetch all `confirmed` Identity beliefs for the current namespace.
--   These beliefs should be formatted as a "System Preamble" block that can be prepended to the LLM's system prompt.
--   Avoid RRF filtering for the preamble; it should be deterministic based on the current `epistemic_state`.
+
+- Provide a dedicated tool or option to fetch all `confirmed` Identity beliefs for the current namespace.
+- These beliefs should be formatted as a "System Preamble" block that can be prepended to the LLM's system prompt.
+- Avoid RRF filtering for the preamble; it should be deterministic based on the current `epistemic_state`.
 
 ### 3.3 Epistemic Filtering
--   Retrieve only memory units in the `confirmed` or `hypothesis` states by default.
--   **Contested** units receive a 0.2x penalty multiplier.
--   **Deprecated** units are strictly excluded from results.
+
+- Retrieve only memory units in the `confirmed` or `hypothesis` states by default.
+- **Contested** units receive a 0.2x penalty multiplier.
+- **Deprecated** units are strictly excluded from results.
 
 ### 3.4 MCP Extension
--   Update `msp_recall` output to include the `tier` field on each hit.
--   Add `msp_identity_beliefs` tool to fetch the current preamble.
+
+- Update `msp_recall` output to include the `tier` field on each hit.
+- Add `msp_identity_beliefs` tool to fetch the current preamble.
 
 ## 4. Acceptance Criteria
 
--   [ ] `msp_recall` successfully returns a mixture of Episode, Narrative, and Identity hits.
--   [ ] Identity hits consistently rank higher than equivalent semantic hits from lower tiers.
--   [ ] Preamble tool returns only `confirmed` beliefs.
--   [ ] RRF results correctly show the `tier` of each document.
+- [ ] `msp_recall` successfully returns a mixture of Episode, Narrative, and Identity hits.
+- [ ] Identity hits consistently rank higher than equivalent semantic hits from lower tiers.
+- [ ] Preamble tool returns only `confirmed` beliefs.
+- [ ] RRF results correctly show the `tier` of each document.
 
 ## 5. Connections
--   `[[CONCEPT--IDENTITY-EVOLUTION]]` — the high-level intent.
--   `[[SPEC--888-TIERED-MEMORY-DISTILLATION]]` §9.3 — Technical specification.
--   `[[ADR--RETRIEVAL-RRF-FUSION]]` — the algorithm being extended.
+
+- `[[CONCEPT--IDENTITY-EVOLUTION]]` — the high-level intent.
+- `[[SPEC--888-TIERED-MEMORY-DISTILLATION]]` §9.3 — Technical specification.
+- `[[ADR--RETRIEVAL-RRF-FUSION]]` — the algorithm being extended.

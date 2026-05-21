@@ -203,5 +203,5 @@ Anything outside the subset raises `GenesisGraphUnsupportedCypher` with the offe
 | Schema-version drift between TS and future Rust | `enforceSchemaCompatibility()` already raises `SchemaVersionMismatchError` on major-version mismatch. |
 
 ## Connections
-- [[ADR--GENESIS-GRAPH-AS-GKS-BACKEND]]
 
+- [[ADR--GENESIS-GRAPH-AS-GKS-BACKEND]]

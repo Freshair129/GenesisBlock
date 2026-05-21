@@ -119,11 +119,13 @@ Phase E5 of the agentic-monorepo pivot. Lands the composite-execution layer for 
 ## What shipped
 
 ### Atoms (3)
+
 - `gks/concept/[[CONCEPT--GENESIS-BLOCK-RUNTIME]].md` — what + why for the runtime layer
 - `gks/blueprint/[[BLUEPRINT--GENESIS-BLOCK-RUNTIME]].md` — file layout, public API, test plan
 - `gks/audit/[[AUDIT--PHASE-E5-GENESIS-BLOCK-RUNTIME]].md` — this atom
 
 ### Code (5 files)
+
 - `packages/msp/src/genesis/types.ts` — `GenesisManifest`, `ExecuteOptions`, `ExecuteResult`, `LoadedMember`, `Dimension`
 - `packages/msp/src/genesis/loader.ts` — `loadManifest()`, `loadMembers()`
 - `packages/msp/src/genesis/composer.ts` — `composePrompt()` (pure)
@@ -131,12 +133,14 @@ Phase E5 of the agentic-monorepo pivot. Lands the composite-execution layer for 
 - `packages/msp/src/genesis/cli.ts` — `msp-genesis-exec` CLI
 
 ### Tests (4 files)
+
 - `packages/msp/test/genesis/loader.test.ts`
 - `packages/msp/test/genesis/composer.test.ts`
 - `packages/msp/test/genesis/executor.test.ts`
 - `packages/msp/test/genesis/cli.test.ts`
 
 ### Package wiring
+
 - `packages/msp/package.json` — added `msp-genesis-exec` bin entry pointing to `./dist/genesis/cli.js`
 
 ## Acceptance criteria (from BLUEPRINT)

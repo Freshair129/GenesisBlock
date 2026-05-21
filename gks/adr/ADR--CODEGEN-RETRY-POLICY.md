@@ -147,11 +147,13 @@ Escalation is invoked via `scripts/msp/escalate-to-gemini.mjs <task_id>` (script
 ## Consequences
 
 **Positive**
+
 - Bounded cost per task (≤ 4 SLM calls + 1 Gemini call + optional Opus).
 - Escalation produces a paper trail (`escalate-to-gemini` writes an audit entry).
 - The fresh-context retry breaks autoregression failure modes.
 
 **Negative**
+
 - Stripping previous attempts means the SLM doesn't learn within a session — but SLM in-context learning is unreliable anyway.
 - 3 retries × multiple tasks per microtask file can rack up costs. Monitor via per-task cost tracker.
 
@@ -166,6 +168,6 @@ Escalation is invoked via `scripts/msp/escalate-to-gemini.mjs <task_id>` (script
 `msp_spec.md` §5.5 (Retry Policy).
 
 ## Connections
+
 - [[CONCEPT--CODEGEN-MICROTASK-CONTRACT]]
 - [[ADR--CODEGEN-FORBIDDEN-PATTERNS]]
-

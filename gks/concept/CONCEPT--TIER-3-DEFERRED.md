@@ -122,6 +122,7 @@ This atom records the defer decision so future sessions don't re-litigate.
 **What**: One-shot importer that reads a Notion export ZIP and converts pages into MSP atoms (with frontmatter, crosslinks, vault_id).
 
 **Defer reason**: Notion export format is rich (pages, databases, blocks, embedded files, relations). Building a faithful converter is its own project — at least 3-5 days of design + impl + corpus testing. Premature without:
+
 - A real Notion workspace to test against
 - Decisions about how to map Notion's page-tree to MSP's flat atom-id space
 - Decisions about which Notion features map to which atom types
@@ -136,6 +137,7 @@ This atom records the defer decision so future sessions don't re-litigate.
 **What**: An LLM-creative tool that, given a code diff, produces a draft ADR ("we changed X because Y; alternatives were Z; consequences W"). Intended to reduce the "doc-first" friction from 30 minutes to 30 seconds.
 
 **Defer reason**: The hard part isn't wiring an LLM call — it's getting useful ADR drafts. Requires:
+
 - Real corpus of code-changes-with-ADRs to use as few-shot examples (we have ~12; not enough)
 - Prompt iteration with real reviewers giving feedback
 - Heuristics for "this change deserves an ADR" vs "this is just a typo fix"
@@ -172,6 +174,7 @@ Unlike consolidator (where mock LLM is fine for tests), an auto-ADR generator's 
 **What**: Empirical tuning of `rrfK` constant (currently 60) and per-source weights (currently `vector=1.0, obsidian=0.8, grep=0.6, episodic=1.2, backlinks=0.5`) using a labeled query corpus. Plus a benchmark harness for ongoing regression testing.
 
 **Defer reason**: Tuning needs real data:
+
 - Labeled queries with expected top-K hits
 - Evaluation metric (NDCG? precision@K?)
 - Corpus large enough that tuning is meaningful (not 144 atoms; more like 1,000+)
@@ -206,5 +209,5 @@ Total deferred budget: ~25 working days. Not unmanageable — just needs the rig
 User direction "ทำที่เหลือทั้งหมด" (all remaining); honest assessment of what can vs cannot be built without external triggers; `[[CONCEPT--MSP-ROADMAP]]` §3-4 deferral framing.
 
 ## Connections
-- [[AUDIT--ALL-M-MILESTONES]]
 
+- [[AUDIT--ALL-M-MILESTONES]]

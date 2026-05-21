@@ -209,6 +209,6 @@ The 5 updated atoms remain semantically valid — the original framing was a des
 GksV3 3.6.0 audit performed during M7-prep follow-up planning. User architectural correction on graph ownership + embedding model parity. See `gks/adr/[[ADR--GRAPH-IS-GKS-DOMAIN]]` and `gks/adr/[[ADR--EMBEDDING-MODEL-PARITY]]`.
 
 ## Connections
+
 - [[FRAMEWORK--MSP-ARCHITECTURE-V2]]
 - [[AUDIT--MSP-ARCHITECTURE-V2]]
-

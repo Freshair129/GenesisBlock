@@ -148,6 +148,7 @@ Two-line conceptual fix, three files in practice:
    - Strict prefix match (`--rootless` doesn't trigger)
 
 2. **`src/mcp/bin.ts`** — parse argv before constructing the server:
+
    ```ts
    const root = parseRootFromArgv(process.argv.slice(2))
    const server = createMspMcpServer({ root })
@@ -212,6 +213,6 @@ This is a P5 bug fix on existing implementation, not a new design decision. CLAU
 User direction "Fix MSP MCP cwd bug" (2026-05-07) immediately after the bug was surfaced in `[[AUDIT--GKS-UPSTREAM-PROPOSALS-FILED]]`. Claude Code session on `claude/msp-fix-mcp-cwd-bug` branch.
 
 ## Connections
+
 - [[AUDIT--MSP-MCP-SERVER]]
 - [[AUDIT--MSP-MCP-TOOL-EXPANSION]]
-

@@ -230,7 +230,7 @@ usage:
 - Cross-vault aggregation.
 
 ## Connections
+
 - [[SPEC--EPISODE-ATOM]]
 - [[BLUEPRINT--AGENT-DISPATCHER]]
 - [[ADR--AGENT-TIER-COST-POLICY]]
-

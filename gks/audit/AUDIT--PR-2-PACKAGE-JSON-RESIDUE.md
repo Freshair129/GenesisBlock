@@ -138,5 +138,5 @@ When deleting a script in a future cleanup PR, also grep `package.json` for both
 - Parent BLUEPRINT: `[[BLUEPRINT--INBOUND-TO-CANDIDATES-MIGRATION]]`
 
 ## Connections
-- [[AUDIT--INBOUND-TO-CANDIDATES-MIGRATION-COMPLETE]]
 
+- [[AUDIT--INBOUND-TO-CANDIDATES-MIGRATION-COMPLETE]]

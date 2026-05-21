@@ -127,7 +127,7 @@ retrieved atoms based on their declared `domain` scope.
 - Date: 2026-05-14
 
 ## Connections
+
 - [[BLUEPRINT--PHASE-2-SUBAGENT-SCOPING]]
 - [[FEAT--SUBAGENT-SCOPE-FILTERING]]
 - [[CONCEPT--SUBAGENT-CONTEXT-SCOPING]]
-

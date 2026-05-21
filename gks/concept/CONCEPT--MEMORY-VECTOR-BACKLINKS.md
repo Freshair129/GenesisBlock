@@ -170,5 +170,5 @@ Not blocking for M7 — the temporary code works correctly today.
 `msp_spec.md` §7.3 (Vector / Backlinks). `[[ADR--GRAPH-IS-GKS-DOMAIN]]` (M7-prep follow-up).
 
 ## Connections
-- [[CONCEPT--MEMORY-SUBSYSTEM]]
 
+- [[CONCEPT--MEMORY-SUBSYSTEM]]

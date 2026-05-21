@@ -234,6 +234,6 @@ Agents that want to record durable knowledge ask the human in chat ("should I dr
 - PR #41, PR #42 CI failures — race condition evidence
 
 ## Connections
+
 - [[ADR--PROMOTION-WORKFLOW]]
 - [[ADR--PROMOTION-LEVELS]]
-

@@ -28,6 +28,7 @@ supersedes when cosine ≥ threshold; `coexist` always keeps both.
 ## Consequences
 
 **Positive**
+
 - Audit trail by construction. Every "the user told the agent X is
   green" stays queryable for the day they later said it's blue.
 - Enables `asOf(t)` semantics on the temporal graph (ADR 005-related).
@@ -35,6 +36,7 @@ supersedes when cosine ≥ threshold; `coexist` always keeps both.
   touches tenant B's docs.
 
 **Negative**
+
 - Storage grows monotonically (mitigated by retention policies in
   Phase 6+; for now we accept the linear growth).
 - The "what's currently valid" query needs a filter on every read.
@@ -42,6 +44,7 @@ supersedes when cosine ≥ threshold; `coexist` always keeps both.
   `metadata.valid_to` filter on the JSONL backend) make this fast.
 
 **Neutral**
+
 - The default `auto` policy uses the same cosine threshold (0.92) for
   both detection and resolution. Configurable per call.
 

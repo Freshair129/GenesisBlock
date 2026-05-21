@@ -123,7 +123,7 @@ attributes:
 ผลลัพธ์สุดท้ายจะถูกบันทึกลงใน **GenesisGraphBackend** เพื่อให้ Agents สามารถ Query ความสัมพันธ์เชิงลึกได้ทันที โดยไม่ต้องประมวลผลใหม่ในทุกครั้งที่ใช้งาน
 
 ## Connections
+
 - [[CONCEPT--SYMBOL-GRAPH]]
 - [[FRAMEWORK--SYMBOL-GRAPH]]
 - [[SPEC--GENESIS-GRAPH-BACKEND]]
-

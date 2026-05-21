@@ -462,6 +462,7 @@ test/symbols/store.test.ts                  # 5 tests — store + JSONL round-tr
 - vitest: JSONL round-trip determinism — `dump → load fresh → dump`
   produces byte-identical files
 - manual smoke test (in PR description):
+
   ```bash
   npx tsx -e "
     import {parseFile} from './src/symbols/parser/typescript.js'

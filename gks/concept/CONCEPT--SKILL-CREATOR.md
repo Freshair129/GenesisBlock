@@ -39,5 +39,6 @@ The system identifies recurring successful workflows and automatically proposes 
 3. **Continuous Refinement:** Skills are not static; they are updated or superseded as new, more efficient patterns emerge.
 
 ## Connections
+
 - `[[SPEC--META-LEARNING-LOOP]]` — the technical specification for the Meta-Learning Loop.
 - `[[CONCEPT--SKILL-CANDIDATE]]` — the schema for the resulting atoms.

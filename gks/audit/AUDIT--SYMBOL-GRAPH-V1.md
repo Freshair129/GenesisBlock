@@ -184,8 +184,8 @@ The CONCEPT-stage trade-off "TS Compiler API in v1" had downstream consequences 
 - Smoke test output PR-4 subagent run, 2026-05-09
 
 ## Connections
+
 - [[ADR--SYMBOL-GRAPH-PERSISTENCE]]
 - [[ADR--LEIDEN-COMMUNITY-DETECTION]]
 - [[FEAT--MSP-SYMBOL-MCP]]
 - [[FEAT--MSP-GRAPH-CLI]]
-

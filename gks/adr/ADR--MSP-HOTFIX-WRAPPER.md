@@ -154,12 +154,14 @@ Standard `git commit --no-verify`. No new flag.
 ## Consequences
 
 **Positive**
+
 - Wrapper is one-line-per-command; trivial to maintain.
 - Pre-commit gate makes the 48 h timer a real wall, not paperwork.
 - Hot path skipped (no hotfix atoms → no extra fork/exec).
 - Single `gks hotfix check` invocation per commit (cheap — under 100 ms even with many files).
 
 **Negative**
+
 - The path-exclusion list is hardcoded. If a project keeps source under a non-`src/` root (e.g. `lib/`, `app/`), we still gate it. Acceptable — that's the desired default.
 - Thin passthrough means a `gks hotfix` interface change ripples through. Mitigation: `gks hotfix` is in GksV3's stable surface.
 
@@ -174,6 +176,6 @@ Standard `git commit --no-verify`. No new flag.
 `[[CONCEPT--MSP-HOTFIX-WRAPPER]]` + GksV3 `gks hotfix` CLI surface.
 
 ## Connections
+
 - [[ADR--HOTFIX-ESCAPE-HATCH]]
 - [[FEAT--MSP-PRECOMMIT-HOOK]]
-

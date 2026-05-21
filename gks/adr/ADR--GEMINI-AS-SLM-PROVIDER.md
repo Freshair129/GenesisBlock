@@ -113,6 +113,7 @@ Add `'gemini'` to the `SlmFactoryOpts.provider` union. The new `slm/gemini.ts` e
 - `runGeminiCli(prompt, opts)` — shared subprocess wrapper (env-var aware, timeout/maxBuffer caps, error mapping). The existing escalator is refactored to consume this helper so both call paths stay in sync.
 
 Selection knobs:
+
 - `MSP_SLM_PROVIDER=gemini` — promote Gemini to the primary SLM.
 - `GEMINI_BIN=<path>` — override the binary path (default `gemini`).
 - `GEMINI_MODEL=<id>` — passed to the CLI via `-m`.
@@ -128,15 +129,18 @@ human gate   : Opus layer           (exit code 4)
 ## Consequences
 
 ### Positive
+
 - No new tooling required — `gemini-cli` (Google's official CLI) is the only dependency, already available in most Claude/Gemini multi-agent setups.
 - Symmetric with the Ollama path — both providers go through `createSlmClient({})`, so `runTask` doesn't care which one resolves.
 - One subprocess wrapper, two callers — removes the drift risk between primary and escalator paths.
 
 ### Negative
+
 - Hosted Gemini introduces a token cost; not appropriate for high-volume T1 microtasks. Default stays on local Ollama (per `[[ADR--DEFAULT-SLM-OLLAMA-QWEN-CODER]]`).
 - CLI dependency: `gemini --version` must exist on PATH when the provider is enabled. The new `SlmError('config')` makes the failure mode explicit.
 
 ### Neutral
+
 - The escalator still defaults to Gemini even when Gemini is also the primary SLM. If Gemini-as-primary fails 3 times, escalating to Gemini-again is fine — the spec leaves this knob to the caller; we don't try to be clever.
 
 ## Status
@@ -144,5 +148,5 @@ human gate   : Opus layer           (exit code 4)
 Draft. Promotion to `stable` requires green CI on Node 20 + 22 with the new `test/codegen/slm/gemini.test.ts` passing.
 
 ## Connections
-- [[CONCEPT--CODEGEN-MICROTASK-RUNNER]]
 
+- [[CONCEPT--CODEGEN-MICROTASK-RUNNER]]

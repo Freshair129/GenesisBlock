@@ -165,8 +165,8 @@ $ git commit -m "tweak"
 - Distributed enforcement across machines — orchestrator's job.
 
 ## Connections
+
 - [[ADR--MSP-HOTFIX-WRAPPER]]
 - [[CONCEPT--MSP-HOTFIX-WRAPPER]]
 - [[FEAT--MSP-PRECOMMIT-HOOK]]
 - [[ADR--HOTFIX-ESCAPE-HATCH]]
-

@@ -144,6 +144,7 @@ M8f audits each rule and decides:
 ## Trigger
 
 This is **work** (refactor + atom write), not a runtime rule. M8f's deliverable:
+
 - 3 new PROTO atoms (SUMMARY-MIN, ADR-MONOTONIC, EVIDENCE-FOR-DECISIONS)
 - 3 wrappers in `src/validator/proto/` that delegate to the existing rule fns
 - Original `src/validator/rules/<name>.ts` files become aliases or get inlined into the PROTOs
@@ -161,5 +162,5 @@ After M8f the validator runs structural rules (core, fail-fast) THEN PROTO rules
 `[[CONCEPT--MSP-ROADMAP]]` §2 M8f, `[[CONCEPT--PROTO-PATTERN]]`, audit of `src/validator/rules/`.
 
 ## Connections
-- [[FEAT--MSP-VALIDATOR]]
 
+- [[FEAT--MSP-VALIDATOR]]

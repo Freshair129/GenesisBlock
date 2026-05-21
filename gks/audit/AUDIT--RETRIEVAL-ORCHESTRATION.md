@@ -175,12 +175,13 @@ npm run msp:check-links             → OK
 ```
 
 Test count delta: 350 → 397 (+47; target was +45, exceeded). Per-file breakdown:
-  - `fusion.test.ts`: 14 tests (target 12 — exceeded)
-  - `sources/vector.test.ts`: 5 tests (target 5)
-  - `sources/obsidian.test.ts`: 6 tests (target 6)
-  - `sources/episodic.test.ts`: 6 tests (target 6)
-  - `sources/backlinks.test.ts`: 6 tests (target 6)
-  - `index.test.ts`: 10 tests (target 10)
+
+- `fusion.test.ts`: 14 tests (target 12 — exceeded)
+- `sources/vector.test.ts`: 5 tests (target 5)
+- `sources/obsidian.test.ts`: 6 tests (target 6)
+- `sources/episodic.test.ts`: 6 tests (target 6)
+- `sources/backlinks.test.ts`: 6 tests (target 6)
+- `index.test.ts`: 10 tests (target 10)
 
 ## Acceptance criteria from `[[FEAT--RETRIEVAL-ORCHESTRATION]]`
 
@@ -271,5 +272,5 @@ Lower-level entry points are also re-exported from `index.ts` for advanced use: 
 - Branch: `claude/msp-m7c-retrieval-impl`
 
 ## Connections
-- [[FRAMEWORK--MSP-ARCHITECTURE-V2]]
 
+- [[FRAMEWORK--MSP-ARCHITECTURE-V2]]

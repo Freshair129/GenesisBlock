@@ -509,6 +509,7 @@ These form the **`memory` cluster** — a new cluster proposed for taxonomy v2.4
 ## 19. References
 
 **Internal:**
+
 - `docs/plans/ULTRAPLAN--888-MEMORY-PROTOCOL.md` — the plan this SPEC implements
 - `docs/plans/ULTRAPLAN--888-MEMORY-PROTOCOL--REVIEW-01.md` — lead-dev seat review
 - `docs/plans/ULTRAPLAN--888-MEMORY-PROTOCOL--REVIEW-02.md` — second-opinion review
@@ -520,10 +521,12 @@ These form the **`memory` cluster** — a new cluster proposed for taxonomy v2.4
 - `atom_registry.yaml`
 
 **External (inspiration only — not authoritative):**
+
 - EVA v9.6.2 `MEM_PHILOSOPHY_888.md` (mirrored at `H:\My Drive\888_Memory_Protocol\docs\01_Philosophies\`)
 - EVA v9.6.2 `MEMORY_COMPRESSION_SPEC.md` (mirrored at `H:\My Drive\888_Memory_Protocol\specs\EVA_9_0_0\`)
 
 ## 20. Connections
+
 - [[SPEC--EPISODE-ATOM]] — immutable evidence pattern reused for Session artifacts
 - [[CONCEPT--CONTEXT-COMPRESSION]] — orthogonal (within-episode vs. cross-session)
 - [[CONCEPT--EPISODE-RETENTION]] — Session retention interacts with §4 + §17 Q8

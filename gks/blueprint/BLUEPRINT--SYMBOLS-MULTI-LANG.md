@@ -146,6 +146,7 @@ function getParserForFile(filePath: string): SymbolParser {
 ## Python Parser (Tree-sitter) Implementation
 
 ใช้ `tree-sitter-python` ในการสกัดสัญลักษณ์:
+
 - **Module:** 1 โหนดต่อ 1 ไฟล์ (root node)
 - **Class:** `class_definition` → `kind: class`
 - **Function:** `function_definition` (ถ้า parent ไม่ใช่ class) → `kind: function`
@@ -156,11 +157,12 @@ function getParserForFile(filePath: string): SymbolParser {
 ## COBOL Parser (Regex) Implementation
 
 ใช้การสแกนบรรทัดต่อบรรทัด (Line-by-line scanning):
+
 - **Module:** `PROGRAM-ID. (.*).`
 - **Function:** `(.*) SECTION.` หรือ `(.*) DIVISION.`
 - **Edges:**
-    - `CALL "(.*)"` → `calls` edge (target เป็น module id)
-    - `PERFORM (.*)` → `calls` edge (target เป็น local function id)
+  - `CALL "(.*)"` → `calls` edge (target เป็น module id)
+  - `PERFORM (.*)` → `calls` edge (target เป็น local function id)
 
 ## Geography
 
@@ -175,17 +177,19 @@ function getParserForFile(filePath: string): SymbolParser {
 ## Verification plan
 
 ### Automated Tests
+
 - **Python:** Fixture `test/fixtures/symbols/sample.py` ต้องสกัดได้ ≥ 5 symbols และ ≥ 2 edges
 - **COBOL:** Fixture `test/fixtures/symbols/sample.cbl` ต้องสกัดได้ PROGRAM-ID และ CALL อย่างถูกต้อง
 - **Registry:** ทดสอบว่า `getParserForFile` คืนค่า parser ที่ถูกต้องตามนามสกุลไฟล์
 
 ### Manual Verification
+
 - รัน `npm run msp:graph build` บนโฟลเดอร์ที่มีไฟล์หลายภาษา
 - ตรวจสอบ `symbols.jsonl` ว่ามีสัญลักษณ์จากทั้ง Python และ COBOL ครบถ้วน
 
 ## Connections
+
 - [[FEAT--SYMBOLS-MULTI-LANG]]
 - [[BLUEPRINT--SYMBOL-GRAPH-CORE]]
 - [[ADR--SYMBOLS-PYTHON-PARSER]]
 - [[ADR--SYMBOLS-COBOL-STRATEGY]]
-

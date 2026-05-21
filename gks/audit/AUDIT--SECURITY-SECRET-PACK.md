@@ -64,7 +64,7 @@ The Security & Secret Domain Pack is complete. This pack provides the "Zero Clou
 
 - **Pattern Matching:** Correcty identifies AWS, OpenAI, Anthropic, and GitHub token formats.
 - **Entropy Check:** Successfully tags random-looking strings as `high_entropy_string`.
-- **Policy Enforcement:** 
+- **Policy Enforcement:**
   - Gemini (T2) → Request for secret → **DENIED**.
   - Local Qwen (T1) → Request for secret → **PERMITTED**.
   - Human User → Request for secret → **PERMITTED**.

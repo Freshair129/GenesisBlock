@@ -123,7 +123,7 @@ through the retrieval and codegen pipeline and enable the `attributes` bag in at
 - Date: 2026-05-14
 
 ## Connections
+
 - [[BLUEPRINT--PHASE-0-PLUMBING]]
 - [[CONCEPT--SUBJECT-RESOURCE-ACTION-CONTEXT]]
 - [[CONCEPT--ATTRIBUTE-BAG-MODEL]]
-

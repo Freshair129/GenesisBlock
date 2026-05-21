@@ -114,12 +114,14 @@ A pure-Node FTS over `gks/<type>/*.md` (case-insensitive substring + token-overl
 ## Scope
 
 In:
+
 - `ftsSearch(gksRoot, query, opts)` returning `RetrievalHit[]` with `metadata.matchedBy = 'fts'`.
 - Token-overlap score (matches / total-tokens) so RRF blending in `createCognitiveLayer.recall` has a comparable scalar.
 - Strip frontmatter from the snippet so users see body content.
 - Pure Node, no rg / external binary.
 
 Out:
+
 - Inverted index — N is small (hundreds of atoms in practice); O(N) scan is fine.
 - Multi-language tokenisation (Thai segmentation in particular) — defer to a follow-up if `vault_id` requires it.
 
@@ -135,6 +137,6 @@ Out:
 Without FTS the hybrid pipeline is mis-named: it's only 3 layers. Closing the gap to the documented 4 makes the recall path consistent across consumers (EVA, Claude Code, Hermes, openclaw, custom). The cost is ~70 lines of TS and one new test file.
 
 ## Connections
+
 - [[CONCEPT--COGNITIVE-LAYER-FACADE]]
 - [[CONCEPT--MEMORY-SUBSYSTEM]]
-

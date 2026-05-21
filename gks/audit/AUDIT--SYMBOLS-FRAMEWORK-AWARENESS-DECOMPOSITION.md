@@ -127,6 +127,7 @@ attributes:
 This PR delivers two coupled outcomes per `[[ADR--SYMBOLS-FRAMEWORK-AWARENESS]]`:
 
 ### 1. Atom decomposition (per ADR §1)
+
 - `[[CONCEPT--SYMBOLS-FRAMEWORK-AWARENESS]]` created (P1)
 - `[[ADR--SYMBOLS-FRAMEWORK-AWARENESS]]` created (P2)
 - `[[ALGO--SYMBOLS-FRAMEWORK-RECOGNITION]]` created (P2)
@@ -134,6 +135,7 @@ This PR delivers two coupled outcomes per `[[ADR--SYMBOLS-FRAMEWORK-AWARENESS]]`
 - `[[FEAT--SYMBOLS-FRAMEWORK-AWARENESS]]` superseded: status → `superseded`, reciprocal `superseded_by` → 4 new atoms, deprecation banner added at top of body, original content preserved verbatim below banner
 
 ### 2. Validator hardening (per ADR §5)
+
 - `src/validator/proto/scaling-level-gate.ts` modified:
   - `HARD_ENFORCE_CUTOFF = 2026-05-12T00:00:00Z` constant introduced
   - FEAT atoms with `created_at >= cutoff` now emit `severity: 'error'` for missing CONCEPT/ADR/BLUEPRINT linkage
@@ -142,6 +144,7 @@ This PR delivers two coupled outcomes per `[[ADR--SYMBOLS-FRAMEWORK-AWARENESS]]`
   - `predicate.ok` now reflects only `error`-level violations (warnings don't block)
 
 ### 3. Type-coverage fix (downstream of `SymbolKind` extension)
+
 - `KIND_SHORTHAND: Record<SymbolKind, string>` in all 3 parser files (`typescript.ts`, `python.ts`, `cobol.ts`) now exhaustively covers all 20 `SymbolKind` values including framework-aware kinds (page/layout/loading/error_boundary/route/template/middleware/not_found/entity/tool/data_loader/metadata_loader)
 - Required because PR #77's `SymbolKind` type extension broke type-coverage in this branch; fixed forward
 
@@ -188,5 +191,5 @@ This PR delivers two coupled outcomes per `[[ADR--SYMBOLS-FRAMEWORK-AWARENESS]]`
 - `HANDOFF-SYMBOLS-EXPANSION-PHASE-2.md` (continued work routed to Antigravity)
 
 ## Connections
-- [[BLUEPRINT--PROTO-LOADER]]
 
+- [[BLUEPRINT--PROTO-LOADER]]

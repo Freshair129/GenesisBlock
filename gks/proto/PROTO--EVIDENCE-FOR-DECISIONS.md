@@ -119,6 +119,7 @@ attributes:
 ## Rule
 
 Atoms with `type: adr` must contain headings (case-insensitive):
+
 - `## Context` (or `# Context`)
 - `## Decision` (or `# Decision`)
 - `## Consequences` (or `# Consequences`)
@@ -150,7 +151,7 @@ Wraps existing core rule `evidenceForDecisions` from `src/validator/rules/eviden
 `[[CONCEPT--PROTO-AUDIT-EXISTING-RULES]]`, `[[ADR--ANTI-HALLUCINATION-RULES]]`.
 
 ## Connections
+
 - [[FRAMEWORK--MSP-ARCHITECTURE-V2]]
 - [[CONCEPT--PROTO-PATTERN]]
 - [[FEAT--PROTO-LOADER]]
-

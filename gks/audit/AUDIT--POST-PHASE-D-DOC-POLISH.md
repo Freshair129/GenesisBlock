@@ -152,9 +152,9 @@ No supersession needed. All edits are **clarifications** of existing stable atom
 Recommended option 1+4 from architecture-cleanup follow-up planning. Drove from user-facing accuracy concerns ("README still says gatekeeper", "ROADMAP says 11 tools") rather than from any atom-level contradiction.
 
 ## Connections
+
 - [[CONCEPT--AGENT-AGNOSTIC]]
 - [[CONCEPT--AGENT-INTEGRATION-PATTERNS]]
 - [[AUDIT--ARCH-DOC-CLEANUP]]
 - [[AUDIT--PHASE-B-IMPL-COMPLETE]]
 - [[AUDIT--PHASE-C-AGENT-INTEGRATION-DOCS]]
-

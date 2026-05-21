@@ -216,5 +216,5 @@ This is the single most important defense against policy bugs taking down produc
 - Cedar (AWS) — modern ergonomic ABAC language; future migration target.
 
 ## Connections
-- [[FRAMEWORK--UNIVERSAL-CONTEXT-FRAMEWORK]]
 
+- [[FRAMEWORK--UNIVERSAL-CONTEXT-FRAMEWORK]]

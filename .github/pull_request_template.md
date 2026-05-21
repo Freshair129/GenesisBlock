@@ -31,4 +31,4 @@ BLUEPRINT--CONTRADICTION-DETECTION-IMPL.
 - [ ] Conflicts are explicitly marked: old atom listed in new atom's `crosslinks.supersedes`, new atom listed in old atom's `crosslinks.superseded_by`, **and** old atom's `status` flipped to `superseded` in this same PR
 - [ ] Reviewer has verified the above
 
-https://claude.ai/code/session_01QJoC28MeXjrZjRn35opuvH
+<https://claude.ai/code/session_01QJoC28MeXjrZjRn35opuvH>

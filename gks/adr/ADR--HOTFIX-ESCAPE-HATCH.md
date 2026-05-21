@@ -117,10 +117,13 @@ hotfix:
 ### How it works
 
 1. **Tag the commit**:
+
    ```sh
    git commit -m "HOTFIX: rate limiter overflow — emergency cap"
    ```
+
 2. **Open a hotfix atom** (per GksV3 ADR-014):
+
    ```sh
    gks hotfix open $(git rev-parse HEAD) \
      --title="prod down: rate limiter overflow" \
@@ -128,6 +131,7 @@ hotfix:
      --reason="customer escalation"
    # → HOTFIX--<7-char-sha>  with valid_to = now + 48h
    ```
+
 3. **Pre-commit hook** (`hotfix-gate.sh`) does NOT block during the 48h window for affected files.
 4. **After 48h**, pre-commit blocks any further commit on the affected files until the backfill atoms (`CONCEPT--`, `ADR--`, `BLUEPRINT--`) exist and are `stable`, AND `gks hotfix close` has been run.
 5. **Backfill atoms must declare** `crosslinks.resolves: [HOTFIX--<sha>]` so the close command knows the debt is paid.
@@ -141,11 +145,13 @@ hotfix:
 ## Consequences
 
 **Positive**
+
 - On-call engineers stay productive during incidents without skipping accountability.
 - Every hotfix leaves a `HOTFIX--<sha>` atom and a hard deadline.
 - 48h budget is per-file — multiple unrelated hotfixes don't compound.
 
 **Negative**
+
 - Engineers may game the tag (mark non-emergencies as HOTFIX). Mitigated by including `--reason` in the atom and reviewing during weekly retros.
 - The 48h timer is enforced *locally* (this repo's pre-commit hook). Distributed enforcement (across multiple developer machines) is an orchestrator concern per GksV3 ADR-009.
 
@@ -160,7 +166,7 @@ hotfix:
 `msp_spec.md` §10.1 (Hotfix) + `FRAMEWORK_MASTER_SPEC.md` §6.4 (referenced).
 
 ## Connections
+
 - [[ADR--AGENT-WRITE-BOUNDARIES]]
 - [[FRAMEWORK--PHASE-GOVERNANCE]]
 - [[CONCEPT--MSP-HOTFIX-WRAPPER]]
-

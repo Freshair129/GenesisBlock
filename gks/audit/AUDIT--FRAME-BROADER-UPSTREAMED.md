@@ -114,11 +114,11 @@ Records the upstreaming of Proposal #07 into `Freshair129/GksV3`. This update br
 
 ## What was done
 
-1.  **GksV3 Update**: Applied Option A (broaden definition) to `docs/KNOWLEDGE-TYPES.md` in `Freshair129/GksV3` (commit `22f1751`).
+1. **GksV3 Update**: Applied Option A (broaden definition) to `docs/KNOWLEDGE-TYPES.md` in `Freshair129/GksV3` (commit `22f1751`).
     - Widened scope to "reusable structural patterns".
     - Added explicit examples for architectural, governance, taxonomic, and methodology frames.
     - Added a distinguishing question: "is this a *reusable pattern* (vs a one-off decision)?" to help distinguish from `ADR--`.
-2.  **MSP Record Keeping**:
+2. **MSP Record Keeping**:
     - Updated `upstream/gks-proposals/README.md` status: 🟡 drafted -> 🟢 merged.
     - Moved proposal file to `upstream/gks-proposals/merged/07-frame-broader-definition.md`.
     - Updated `upstream/gks-proposals/SUBMISSION.md` to record the merge.
@@ -135,7 +135,7 @@ Records the upstreaming of Proposal #07 into `Freshair129/GksV3`. This update br
 - GksV3 Commit: `22f1751`.
 
 ## Connections
+
 - [[AUDIT--ARCH-DOC-CLEANUP]]
 - [[FRAMEWORK--KNOWLEDGE-3-TIER]]
 - [[FRAMEWORK--PHASE-GOVERNANCE]]
-

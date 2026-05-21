@@ -111,6 +111,7 @@ P2 FEAT (✓ done)  →  P3 BLUEPRINT  →  P4 microtasks (T*.task.yaml)  →  P
 ### 4.3 Atom contradiction policy
 
 If your new atom contradicts an existing `status: stable` atom of the same type:
+
 1. Add the old atom's id to `crosslinks.supersedes` of your new atom
 2. Add your new atom's id to `crosslinks.superseded_by` of the old atom
 3. Flip the old atom's `status` to `superseded`
@@ -166,6 +167,7 @@ gks/adr/ADR--SYMBOLS-COBOL-STRATEGY.md        # regex-first, tree-sitter deferre
 | `T6_cli-flags.task.yaml` | Add `--lang=python|cobol|ts` flag to `cli.ts` | `src/symbols/cli.ts` |
 
 **Acceptance criteria:**
+
 - All 6 microtasks pass their per-task acceptance test
 - `npm test --workspace=packages/msp` green
 - `npm run msp:graph -- packages/msp/test/fixtures/sample.py --emit=jsonl` outputs valid JSONL with at least 1 symbol per top-level def
@@ -195,6 +197,7 @@ gks/adr/ADR--FRAMEWORK-RECOGNIZER-PATTERN.md   # how to detect Next.js / FastAPI
 | `T5_tests.task.yaml` | Fixtures for each framework + edge cases | `test/symbols/framework/*.test.ts` |
 
 **Acceptance criteria:**
+
 - Recognizers detect ≥ 95% of routes in a real Next.js App Router project (use `web/` if it has any, otherwise generate a fixture)
 - Prisma schema parsing matches `schema.prisma` field types
 - Zero false positives on plain TS files that don't use frameworks (test with `src/symbols/types.ts` as a non-framework fixture)
@@ -220,6 +223,7 @@ gks/adr/ADR--PROCESS-TRACE-DEPTH-LIMIT.md      # how deep to follow; cycle detec
 | `T4_tracer-tests.task.yaml` | Integration test using fixtures from PR 2 (Next.js route → handler → ORM call) | `test/symbols/tracer.test.ts` |
 
 **Acceptance criteria:**
+
 - `symbol_trace` returns at least 1 trace for any framework entry-point detected in PR 2
 - Cycle detection prevents infinite loops on recursive functions (add a recursive fixture)
 - Depth limit configurable; default = 8 hops (document in BLUEPRINT)

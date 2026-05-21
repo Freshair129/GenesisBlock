@@ -151,6 +151,7 @@ packages/gks/config/
 ### Promotion path (Layer 2 → Layer 1)
 
 When a value initially internal becomes operator-tunable:
+
 1. Add the key under appropriate section in `config/<module>.yaml`
 2. Loader picks up the override automatically (no code change)
 3. Mention in PR description: "Promoted `retrieval.timeout_ms_total` to operator config"

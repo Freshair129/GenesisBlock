@@ -129,5 +129,5 @@ CI workflow + `npm run msp:validate --all`. As a PROTO atom (per M8a), it lives 
 `[[FRAMEWORK--PHASE-GOVERNANCE]]`, `[[CONCEPT--MSP-ROADMAP]]` §2 M8b, `[[CONCEPT--PROTO-PATTERN]]` (M8a foundation).
 
 ## Connections
-- [[FEAT--PROTO-LOADER]]
 
+- [[FEAT--PROTO-LOADER]]

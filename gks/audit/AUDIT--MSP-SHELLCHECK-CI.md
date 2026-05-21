@@ -129,6 +129,6 @@ Pre-commit hooks shipping with bash bugs (unquoted expansions, `set -e` interact
 - Date: 2026-05-03
 
 ## Connections
+
 - [[FEAT--MSP-PRECOMMIT-HOOK]]
 - [[FEAT--MSP-PREPUSH-HOOK]]
-

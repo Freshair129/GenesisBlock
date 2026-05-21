@@ -209,6 +209,6 @@ Tier 3 (deferred — explicit triggers)
 User direction "วางแผนและทำให้จบ ทุก M" → "ทำที่เหลือทั้งหมด". Closes Tier 2 to draft-impl + Tier 3 to explicit defer. v0.4.0 is the mechanical-governance milestone — the framework now enforces what it documents.
 
 ## Connections
+
 - [[AUDIT--ALL-M-MILESTONES]]
 - [[CONCEPT--MSP-ROADMAP]]
-

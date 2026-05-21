@@ -44,11 +44,13 @@ Every memory-related atom will carry the EVA names as aliases in its frontmatter
 ## Consequences
 
 ### Positive
+
 - **Consistency:** Aligns with existing GKS/MSP terminology.
 - **Clarity:** Uses more descriptive, less metaphorical names for technical components.
 - **Architectural Parity:** Retains the powerful 8:1 distillation ratio and 4-pillar pipeline.
 
 ### Negative
+
 - **Translation Layer:** Requires a mental mapping for developers moving between EVA and cognitive_system.
 
 ## Alternatives considered

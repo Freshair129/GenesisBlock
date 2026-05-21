@@ -143,5 +143,5 @@ Lock implementation uses POSIX `fs.open(wx)` + `process.kill(pid, 0)`. Windows c
 - Date: 2026-05-03
 
 ## Connections
-- [[BLUEPRINT--MEMORY-SESSIONS-WRITER]]
 
+- [[BLUEPRINT--MEMORY-SESSIONS-WRITER]]

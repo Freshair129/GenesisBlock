@@ -158,5 +158,5 @@ Negative / accepted costs:
 - `packages/gks/src/memory/types.ts` — `Namespace`, owned by GKS, unchanged.
 
 ## Connections
-- [[FRAMEWORK--UNIVERSAL-CONTEXT-FRAMEWORK]]
 
+- [[FRAMEWORK--UNIVERSAL-CONTEXT-FRAMEWORK]]

@@ -160,7 +160,7 @@ If no FEAT files were touched in the push range, the hook exits 0 silently (zero
 - Pushing to multiple remotes — git calls the hook once per push regardless.
 
 ## Connections
+
 - [[ADR--MSP-PREPUSH-HOOK]]
 - [[CONCEPT--MSP-PREPUSH-HOOK]]
 - [[FEAT--MSP-PRECOMMIT-HOOK]]
-

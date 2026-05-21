@@ -172,8 +172,8 @@ After F1 ships, the following should be true:
 4. The registry file is gitignored and never appears in `git status`.
 
 ## Connections
+
 - [[SPEC--GENESIS-BLOCK-MANIFEST]]
 - [[CONCEPT--GENESIS-BLOCK-RUNTIME]]
 - [[FRAMEWORK--KNOWLEDGE-3-TIER]]
 - [[ADR--HUMAN-REVIEW-GATES]]
-

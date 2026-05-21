@@ -152,9 +152,9 @@ status=stable docs, and caps the total result set. No layer is required
 This file uses "three layers" colloquially when contrasting GKS with
 its environment:
 
-- **Memory OS** = the layer above (policy + scheduling)
-- **GKS** = this repo (storage + retrieval primitives)
-- **Backends** = the layer below (where bytes physically live)
++ **Memory OS** = the layer above (policy + scheduling)
++ **GKS** = this repo (storage + retrieval primitives)
++ **Backends** = the layer below (where bytes physically live)
 
 ADR-008 records why these three roles must stay separate. ADR-009
 records why peer subsystems (GitNexus, etc.) sit *next to* GKS rather
@@ -195,22 +195,22 @@ interface AtomicEntry {
 ```
 
 **Guarantees:**
-- `lookup('CONCEPT--X')` returns the canonical note's body verbatim from
++ `lookup('CONCEPT--X')` returns the canonical note's body verbatim from
   disk if the ID exists; `null` otherwise. Never approximates, never
   hallucinates.
-- Bounds-check on `entry.path` resolution: refuses to read a file that
++ Bounds-check on `entry.path` resolution: refuses to read a file that
   resolves outside `gksRoot` (ADR-008 / security pass — defense against
   poisoned index entries).
-- `atomic_index.jsonl` is rebuilt by `npm run msp:index`
++ `atomic_index.jsonl` is rebuilt by `npm run msp:index`
   (`scripts/msp/re-indexer.ts` — walks `gks/**/*.md`, parses YAML
   frontmatter, writes a deterministic sorted JSONL, preserves
   `linked_symbols` + `geography`).
 
 **When to use:**
-- You have an exact ID (from a wikilink, a citation, an MCP tool reply).
-- You need a stable canonical reference that survives 6 months of code
++ You have an exact ID (from a wikilink, a citation, an MCP tool reply).
++ You need a stable canonical reference that survives 6 months of code
   refactors.
-- You're combining citations across atoms ("which ADRs reference
++ You're combining citations across atoms ("which ADRs reference
   `CONCEPT--EVA-TRI-BRAIN`?").
 
 **When NOT to use:** semantic queries — go through `recall(query)`
@@ -340,10 +340,10 @@ Vector.
 parallel storage primitive added in 3.5.4 for the self-hosted issue
 tracker (ADR-012):
 
-- Storage: `<root>/gks/issues/<ID>.md`, one file per issue
-- Light governance: direct write OK (reviewed via PR), schema-validated
++ Storage: `<root>/gks/issues/<ID>.md`, one file per issue
++ Light governance: direct write OK (reviewed via PR), schema-validated
   at every mutation, comments append-only by convention
-- Surface: `IssueStore.create / list / show / comment / setStatus /
++ Surface: `IssueStore.create / list / show / comment / setStatus /
   assign / close` — and 8 CLI subcommands (`gks issue *`)
 
 Why separate from `MemoryStore`? Because issues mutate frequently
@@ -389,9 +389,9 @@ const result = await retain(store, {
 3. Search same-namespace vectors at threshold ≥ `conflictThreshold`
    (default 0.92) — predecessors that may be semantic duplicates.
 4. Apply `conflictPolicy`:
-   - `auto` — heuristic: identical content text invalidates predecessor
-   - `supersede` — invalidate every match above threshold
-   - `coexist` — keep both, only flag the conflict
+   + `auto` — heuristic: identical content text invalidates predecessor
+   + `supersede` — invalidate every match above threshold
+   + `coexist` — keep both, only flag the conflict
 5. Write the new doc with stamped `valid_from`, optional `supersedes`,
    and namespace fields applied via `applyNamespace()`.
 6. Patch invalidated predecessors (`patchMetadataMany`) — set their
@@ -1119,9 +1119,9 @@ on-disk JSONL formats.
 audit metadata.
 
 **Policy:**
-- Major bump → `load()` refuses, user must run `npm run gks-migrate`.
-- Minor bump → `load()` warns but proceeds (new optional fields).
-- Patch bump → silent (doc-only / typo fixes).
++ Major bump → `load()` refuses, user must run `npm run gks-migrate`.
++ Minor bump → `load()` warns but proceeds (new optional fields).
++ Patch bump → silent (doc-only / typo fixes).
 
 **Migration runner:** `scripts/msp/gks-migrate.ts` — registry of
 forward migrations indexed by version. Walks the registry from the
@@ -1148,9 +1148,9 @@ boundaries:
 | **Cross-tenant access** | Namespace filter on every read; `crossNamespace: true` is the explicit opt-out + audited. |
 
 Out of scope (deferred to orchestrator):
-- Wikilink resolution validation
-- ID uniqueness enforcement
-- Forbidden-fields rejection per `atomic_contract.yaml`
++ Wikilink resolution validation
++ ID uniqueness enforcement
++ Forbidden-fields rejection per `atomic_contract.yaml`
 
 These belong to the MSP-gatekeeper layer above GKS — see ADR-008 +
 `docs/MSP_RELATIONSHIP.md`.
@@ -1215,9 +1215,9 @@ path. One folder per atom type (singular nouns), no phase prefix.
 
 **Two rooted spaces**, intentional:
 
-- `gks/` — git-tracked, human-reviewed, the SSOT. Strict-tier atoms
++ `gks/` — git-tracked, human-reviewed, the SSOT. Strict-tier atoms
   flow through a Pull Request → human review → merge.
-- `.brain/...` — runtime state, mostly machine-generated. Most of
++ `.brain/...` — runtime state, mostly machine-generated. Most of
   `.brain/` should be `.gitignore`d (see the project's `.gitignore`).
 
 `gks/issues/` is the only directory in `gks/` that's light-tier — direct
@@ -1248,6 +1248,7 @@ rest.
 
 Reference Python implementation: `examples/memory-os-architecture/` —
 shows a paradigm-agnostic Memory OS kernel + EVA-specific affect plugin
+
 + storage adapter that delegates to GKS.
 
 ### 11.2 Code-intelligence peer (alongside)
@@ -1280,10 +1281,10 @@ with the cached call graph (downstream callers) into a pre-push gate.
 ### 11.3 Workflow / governance / phase gates
 
 Out of scope per ADR-008. CI / process-tooling layer:
-- Phase-gate enforcement (doc-before-code) — pre-commit hook
-- Microtask codegen / composer — separate tool
-- Engineering laws (file size limits, repository pattern) — eslint
-- Multi-agent git strategy — process rule
++ Phase-gate enforcement (doc-before-code) — pre-commit hook
++ Microtask codegen / composer — separate tool
++ Engineering laws (file size limits, repository pattern) — eslint
++ Multi-agent git strategy — process rule
 
 These live in the consuming project's CI / tooling, not in GKS.
 
@@ -1312,17 +1313,17 @@ These live in the consuming project's CI / tooling, not in GKS.
 
 See `src/memory/index.ts`. Most-used:
 
-- `root` — repo root (required)
-- `defaultNamespace` — request-scoped tenant/user/agent
-- `embedder` / `embedderOptions` — pre-built or factory
-- `vectorBackend` — `(name, embedder) => VectorBackend`
-- `vectorScoreThreshold` — default cutoff (0.35)
-- `maxTotal` — recall result cap (10)
-- `reranker` — config object or `{ enabled: false }`
-- `obsidian` — adapter or omit
-- `obsidianCacheTtlSeconds` / `obsidianCacheMaxEntries` — cache knobs
-- `audit` — `{}` to enable defaults / `false` to disable
-- `cost` — `{}` to enable / `false` to disable
++ `root` — repo root (required)
++ `defaultNamespace` — request-scoped tenant/user/agent
++ `embedder` / `embedderOptions` — pre-built or factory
++ `vectorBackend` — `(name, embedder) => VectorBackend`
++ `vectorScoreThreshold` — default cutoff (0.35)
++ `maxTotal` — recall result cap (10)
++ `reranker` — config object or `{ enabled: false }`
++ `obsidian` — adapter or omit
++ `obsidianCacheTtlSeconds` / `obsidianCacheMaxEntries` — cache knobs
++ `audit` — `{}` to enable defaults / `false` to disable
++ `cost` — `{}` to enable / `false` to disable
 
 ---
 
@@ -1345,11 +1346,11 @@ embedder where relevant):
 | `reflect` (LLM) | Anthropic | 2-10 s | Sonnet latency dominated |
 
 Scaling ceilings:
-- **JSONL vector** — comfortable up to ~10k docs / store; beyond that
++ **JSONL vector** — comfortable up to ~10k docs / store; beyond that
   switch to HNSW or pgvector.
-- **In-memory `GraphStore`** — comfortable up to ~10k nodes; beyond
++ **In-memory `GraphStore`** — comfortable up to ~10k nodes; beyond
   that use `PgGraphBackend`.
-- **Atomic index** — comfortable up to ~10k atoms (linear scan in
++ **Atomic index** — comfortable up to ~10k atoms (linear scan in
   `searchBySymbol`). At 100k atoms an inverted-index file would be
   appropriate; not built yet (see ADR-010 deferred work).
 
@@ -1359,9 +1360,9 @@ Scaling ceilings:
 
 Semver-style: `MAJOR.MINOR.PATCH`.
 
-- **MAJOR** — breaking architecture change (new ADR required).
-- **MINOR** — additive feature (new MCP tool, new backend, new CLI command).
-- **PATCH** — bug fix, security pass, doc-only, refactor.
++ **MAJOR** — breaking architecture change (new ADR required).
++ **MINOR** — additive feature (new MCP tool, new backend, new CLI command).
++ **PATCH** — bug fix, security pass, doc-only, refactor.
 
 Current shipped: `3.5.4`. Per-release notes in `CHANGELOG.md`.
 
@@ -1438,4 +1439,3 @@ never inside GKS:
   - schema validation rules per consumer
   - cognitive / paradigm-specific concerns
 ```
-

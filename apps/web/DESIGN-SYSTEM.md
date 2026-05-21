@@ -1,4 +1,5 @@
 # Genesis UI — Design System
+
 # Created At: 2026-05-14 13:00:00 +07:00 (v1.0.0)
 
 > **PURPOSE — READ FIRST**
@@ -120,6 +121,7 @@ Inter is loaded from the system or CDN. JetBrains Mono is used extensively for c
 labels, metadata, and any structural UI text (section headers, kbd hints, status bar).
 
 **Fonts are loaded in `index.html`:**
+
 ```html
 <link rel="preconnect" href="https://fonts.googleapis.com"/>
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
@@ -199,6 +201,7 @@ padding:    0 12px
 ```
 
 #### Tab states
+
 ```
 default:  color=--text-mute, bg=transparent, border=1px solid transparent
 hover:    bg=--bg-2, color=--text
@@ -207,6 +210,7 @@ close (x): opacity=0 → 1 on tab hover
 ```
 
 #### Search trigger
+
 ```
 height:     28px
 bg:         --bg-2
@@ -220,6 +224,7 @@ hover:      bg=--bg-3, border=--border-strong, color=--text
 ```
 
 #### Icon buttons (tb-iconbtn)
+
 ```
 size:       28×28px
 border-radius: 7px
@@ -237,6 +242,7 @@ border-right: 1px solid --border
 ```
 
 #### Nav tabs (sb-nav)
+
 ```
 height:     28px per button
 border-radius: 6px
@@ -246,6 +252,7 @@ active:     bg=--bg-3, color=--accent
 ```
 
 #### Section headers
+
 ```
 font:       --font-mono, 10.5px, uppercase, letter-spacing=0.08em
 color:      --text-dim
@@ -253,6 +260,7 @@ padding:    10px 8px 6px
 ```
 
 #### Tree items (file list)
+
 ```
 height:     ~24px (4px top/bottom padding)
 padding:    4px 8px
@@ -267,6 +275,7 @@ transition: background 0.1s, color 0.1s
 ```
 
 #### Tag items
+
 ```
 height:     ~22px (3px top/bottom)
 padding:    3px 8px
@@ -279,6 +288,7 @@ count:      --font-mono, 10px, --text-dim, margin-left=auto
 ```
 
 #### Sidebar search input
+
 ```
 height:     28px
 bg:         --bg-2
@@ -299,12 +309,14 @@ padding:    8px 16px
 ```
 
 #### Breadcrumb (crumb)
+
 ```
 font:       --font-mono, 11px, --text-dim
 bold parts: color=--text, font-weight=600
 ```
 
 #### View switch (segmented control)
+
 ```
 container:  bg=--bg-2, border=1px solid --border, border-radius=8px, padding=2px
 button:     height=24px, padding=0 10px, border-radius=6px, font=Inter 11.5px
@@ -398,6 +410,7 @@ bot bubble:   bg=linear-gradient(180deg, rgba(124,92,255,0.08), transparent)
 The bot bubble gradient is **hardcoded purple** (not `--accent`) to always distinguish AI from user.
 
 Source chips:
+
 ```
 --font-mono, 10.5px, padding=3px 8px, border-radius=999px (pill)
 bg=--bg-2, border=1px solid --border, color=--text-mute
@@ -418,6 +431,7 @@ main:       padding=20px 24px, overflow-y=auto
 ```
 
 Model cards:
+
 ```
 grid: auto | 1fr | auto, gap=14px, padding=12px 14px
 bg=--bg-2, border=1px solid --border, border-radius=10px
@@ -536,6 +550,7 @@ Used on: status bar sync dot (green `--c-moc`), chrome pill.
 All three canvas views share the same camera and rendering model.
 
 ### Camera model
+
 ```typescript
 camTgt = useRef({ yaw: 0, pitch: 0.4, dist: 700 })  // spherical coords
 ```
@@ -543,6 +558,7 @@ camTgt = useRef({ yaw: 0, pitch: 0.4, dist: 700 })  // spherical coords
 Mouse drag → adjust `yaw` / `pitch`. Wheel → adjust `dist`.
 
 ### Perspective projection
+
 ```typescript
 const scale = dist / (dist + z_projected);
 const sx = cx + x_rotated * scale;
@@ -550,6 +566,7 @@ const sy = cy + y_projected * scale;
 ```
 
 ### RAF loop pattern (mandatory)
+
 ```typescript
 const timeRef = useRef(0);  // NEVER let time = 0 inside effect (resets on rerun)
 // in tick:
@@ -560,6 +577,7 @@ timeRef.current += dt;
 ```
 
 ### Cleanup (mandatory)
+
 ```typescript
 useEffect(() => {
   let raf: number;
@@ -570,6 +588,7 @@ useEffect(() => {
 ```
 
 ### Node colors in canvas
+
 Use `TYPE_META[n.type as keyof typeof TYPE_META]?.raw ?? '#888'` — never hardcode per-type hex in canvas draw code.
 
 ---
@@ -577,6 +596,7 @@ Use `TYPE_META[n.type as keyof typeof TYPE_META]?.raw ?? '#888'` — never hardc
 ## SECTION 7 — Do's and Don'ts
 
 ### DO
+
 1. **DO** use VS Code dark palette — `--bg-0` through `--bg-3` for layering.
 2. **DO** use JetBrains Mono for all structural UI text (labels, counts, IDs, meta, status).
 3. **DO** use `--radius: 2px` sharp corners everywhere except pills (`999px`) and explicit exceptions.
@@ -587,6 +607,7 @@ Use `TYPE_META[n.type as keyof typeof TYPE_META]?.raw ?? '#888'` — never hardc
 8. **DO** access node type colors via `TYPE_META[type]?.raw` — never use `--c-entity` etc. in canvas draw code directly.
 
 ### DON'T
+
 1. **DON'T** use external branding tokens or soft curves (e.g. `cubic-bezier(0.25,0.8,0.25,1)`).
 2. **DON'T** round corners beyond 8px on non-pill elements.
 3. **DON'T** use soft/warm shadows — only `--shadow-pop: 0 4px 12px rgba(0,0,0,0.5)`.
@@ -601,6 +622,7 @@ Use `TYPE_META[n.type as keyof typeof TYPE_META]?.raw ?? '#888'` — never hardc
 ## SECTION 8 — Component Generation Prompt Templates
 
 ### 8.1 New panel / view
+
 ```
 Create a [ViewName] component at packages/ui/src/components/views/[ViewName].tsx.
 
@@ -618,6 +640,7 @@ Rules:
 ```
 
 ### 8.2 New sidebar section
+
 ```
 Add a [SectionName] section to Sidebar.tsx.
 Section header: --font-mono, 10.5px, uppercase, letter-spacing=0.08em, color=--text-dim.
@@ -625,6 +648,7 @@ Items: tree-item pattern — 4px padding, 4px border-radius, hover=--bg-hover, a
 ```
 
 ### 8.3 New graph overlay (floating panel)
+
 ```
 Add a [OverlayName] floating panel to [ViewName].tsx.
 Style: position=absolute, bg=rgba(11,13,20,0.78), backdrop-filter=blur(10px),

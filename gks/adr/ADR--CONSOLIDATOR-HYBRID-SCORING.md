@@ -195,12 +195,14 @@ LLM calls are non-deterministic by default (`temperature > 0`). Two strategies:
 ## Consequences
 
 **Positive**
+
 - ~80% of chunks decided in microseconds (deterministic). LLM cost bounded by ~20% × maxLlmCalls cap.
 - Pluggable per `LlmClient` — same factory used by codegen runner, no new dep.
 - Headless / no-Ollama still works (deterministic-only with `keep` defaults for borderline).
 - Test suite uses mock provider — fast + reproducible.
 
 **Negative**
+
 - Two code paths to maintain (deterministic features + LLM caller). Mitigated: deterministic features are pure functions, easily unit-tested.
 - Threshold tuning needs real-session data. M7b ships with sensible defaults; tuning is M9-era work.
 - Tier 1 false-keeps that survive into tier 2 (LLM says `keep` but actually noise) → consolidator gets noisier than ideal. Acceptable trade-off vs the alternative of false-drops.
@@ -224,6 +226,6 @@ LLM calls are non-deterministic by default (`temperature > 0`). Two strategies:
 `msp_spec.md` §7c (passport consolidator), `[[CONCEPT--CONSOLIDATOR]]`, user direction (M7-prep follow-up cleanup).
 
 ## Connections
+
 - [[CONCEPT--MEMORY-EPISODIC]]
 - [[CONCEPT--SLM-OLLAMA-CLIENT]]
-

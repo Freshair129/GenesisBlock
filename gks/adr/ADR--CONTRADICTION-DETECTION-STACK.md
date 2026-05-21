@@ -209,6 +209,7 @@ For every (type T, domain D):
   - Cosine-compare against embeddings of all `status: stable` atoms of the same `type` in the index
   - For pairs with `cos_sim > 0.85` and not already linked via `supersedes` / `superseded_by`, include in PR comment
 - PR comment format:
+
   ```
   ## Atom similarity check (non-blocking)
   
@@ -220,6 +221,7 @@ For every (type T, domain D):
   § "Atom contradiction policy"). Comment is informational; does not
   block the PR.
   ```
+
 - If no pairs cross the threshold, post nothing (don't spam clean PRs)
 
 **Threshold rationale:** 0.85 chosen empirically; tunable in `.github/contradiction-detection.yml`. Experience-tune after first 10 PRs of data.
@@ -235,12 +237,15 @@ For every (type T, domain D):
 **Specification:**
 
 Trigger:
+
 - PR has the label `contradiction-check`, OR
 - Repo config sets `contradiction_judge_default: true` and PR touches `gks/<type>/*.md`
 
 For each new/changed atom:
+
 - Identify top-K=5 most similar existing stable atoms via Layer 3's embedding output
 - Send diff + those K atoms + this prompt to the LLM:
+
   ```
   You are reviewing a PR adding a new atom to a knowledge base.
   Read the new atom and the K most-similar existing atoms.
@@ -249,9 +254,11 @@ For each new/changed atom:
   Output JSON: { "contradictions": [{ "old_atom": ..., "claim": ...,
   "new_claim": ..., "severity": "definite" | "possible" | "none" }] }
   ```
+
 - Post a PR comment summarizing only `definite` and `possible` findings
 
 Cost guard:
+
 - Hard cap: 50¢/PR; if K × atom_token_count exceeds budget, truncate K
 - Soft monthly cap configurable in repo settings; over-budget skips the layer entirely with a comment
 
@@ -336,6 +343,6 @@ Cost guard:
 - `[[ADR--ANTI-HALLUCINATION-RULES]]` — complementary write-time rules
 
 ## Connections
+
 - [[ADR--HUMAN-REVIEW-GATES]]
 - [[FRAMEWORK--MSP-ARCHITECTURE-V2]]
-

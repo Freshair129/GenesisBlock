@@ -246,6 +246,7 @@ Existing stack unchanged: TypeScript ESM strict, Vitest, Express, MCP SDK, `@fre
 ## What's NOT in this session (Wave references — most retired by Phase A–D, see header note)
 
 The original `NEXT-SESSION.md` from this session (not preserved — superseded) proposed:
+
 - Wave 1.1 "Reconciliation v2" — **retired** by Phase A removing CORE_FRAMEWORK entirely
 - Wave 2.3 "Auto-inject hook for Master atoms" — open
 - Wave 3.1 "Cross-file project-wide `ts.Program`" — open
@@ -259,6 +260,6 @@ The original `NEXT-SESSION.md` from this session (not preserved — superseded) 
 - Companion PR #64 also proposed a `NEXT-SESSION.md` startup guide; that file was discarded on 2026-05-10 because Phase A–D made most of its waves either complete or retired. This AUDIT atom alone preserves the session record.
 
 ## Connections
+
 - [[CONCEPT--KNOWLEDGE-LAYERS-V2]]
 - [[ADR--AGENT-WRITE-BOUNDARIES]]
-

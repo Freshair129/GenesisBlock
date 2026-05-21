@@ -137,5 +137,5 @@ Each layer has an interface — swap the implementation without touching
 - **LLM** (consolidator): Anthropic
 
 ## Connections
-- [[CONCEPT--MEMORY-STORE]]
 
+- [[CONCEPT--MEMORY-STORE]]

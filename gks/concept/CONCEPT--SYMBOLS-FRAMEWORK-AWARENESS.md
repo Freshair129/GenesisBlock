@@ -123,6 +123,7 @@ The recognizer interface is small enough that adding support for a new framework
 ## Scope (first phase)
 
 In scope:
+
 - **Next.js (App Router)**: Page / Layout / Loading / Error / Route / Template / Middleware node kinds; server/client runtime classification; data-fetching detection (`generateStaticParams`, `getServerSideProps`, etc.)
 - **Prisma**: Model nodes + relation edges extracted from `schema.prisma`
 - **Drizzle ORM**: Schema files producing the same shape as Prisma
@@ -154,6 +155,6 @@ In scope:
 - Prisma schema reference
 
 ## Connections
+
 - [[CONCEPT--SYMBOL-GRAPH]]
 - [[CONCEPT--PARSER-CHOICE]]
-

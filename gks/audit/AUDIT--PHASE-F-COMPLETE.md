@@ -203,6 +203,6 @@ garbage-collect old episodes (`msp-episode-gc`) — all from a single
 workspace.
 
 ## Connections
+
 - [[AUDIT--PHASE-E1-REAL-CLI-WIRING]]
 - [[AUDIT--PHASE-D-AGENTIC-RUNTIME-COMPLETE]]
-

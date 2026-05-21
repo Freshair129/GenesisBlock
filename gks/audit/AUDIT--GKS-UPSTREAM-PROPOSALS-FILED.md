@@ -146,6 +146,7 @@ The bin resolves `scripts/msp/propose.mjs` relative to `process.cwd()` (which is
 ## Next-step gates (per `upstream/gks-proposals/README.md` workflow)
 
 When upstream lands one of these:
+
 1. Bump GKS dep version in `package.json`
 2. Replace MSP-side workaround with the upstream call
 3. Mark proposal file 🔵 → 🟢 merged upstream + add merge commit hash
@@ -167,5 +168,5 @@ Most concretely — when **#28 (publish 3.6.0)** lands, `[[ADR--EMBEDDING-MODEL-
 User direction "Submit new issue แล้ว" (2026-05-07) confirming all 5 GitHub submissions completed. AUDIT written autonomously to close out HANDOFF P2.
 
 ## Connections
-- [[AUDIT--TWO-REPO-VALIDATION]]
 
+- [[AUDIT--TWO-REPO-VALIDATION]]

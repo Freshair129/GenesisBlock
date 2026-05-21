@@ -27,6 +27,7 @@ install themselves on demand (or we ship a starter).
 ## Consequences
 
 **Positive**
+
 - Zero observability tax for users who don't run a collector. ~50 ns
   per call to a noop tracer/meter — well below any work being measured.
 - Tests don't need to set up an SDK; in-memory exporters in 9 test
@@ -36,6 +37,7 @@ install themselves on demand (or we ship a starter).
   same as if you removed all the spans.
 
 **Negative**
+
 - Lazy instrument resolution: `recordHistogram(name, ...)` calls
   `meter.createHistogram(name)` on every emit. If a user registers a
   MeterProvider after our module loaded, eagerly-cached instruments

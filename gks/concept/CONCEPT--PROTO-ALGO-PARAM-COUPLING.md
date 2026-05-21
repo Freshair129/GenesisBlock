@@ -114,6 +114,7 @@ Per `[[ADR--GRAPH-IS-GKS-DOMAIN]]`, **existence checks** belong in `gks validate
 ## Rule
 
 For every \[\[ALGO--X\]\] atom with `tunable_by: [\[\[PARAM--Y\]\], ...]`:
+
 - Each \[\[PARAM--Y\]\] must have `tunes: [..., \[\[ALGO--X\]\], ...]`
 
 And vice versa for every \[\[PARAM--Y\]\] with `tunes: [\[\[ALGO--X\]\], ...]`.

@@ -108,5 +108,6 @@ The system autonomously identifies and labels all secrets (API keys, tokens, pas
 3. **Encryption Awareness:** Differentiate between plaintext secrets (high risk) and vaulted/encrypted secrets (managed risk).
 
 ## Connections
+
 - `[[FRAMEWORK--UNIVERSAL-CONTEXT-FRAMEWORK]]` — the policy engine.
 - `[[SAFETY--PII-REDACTION]]` — complementary logic for personal data.

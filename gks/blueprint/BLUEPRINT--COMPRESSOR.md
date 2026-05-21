@@ -324,7 +324,7 @@ implementation_order:
 - Modify `src/orchestrator/consolidator/` or `src/memory/episodic/`
 
 ## Connections
+
 - [[FEAT--COMPRESSOR]]
 - [[ADR--COMPRESSOR-THREE-TIER]]
 - [[CONCEPT--CONTEXT-COMPRESSION]]
-

@@ -207,5 +207,5 @@ Each phase = its own PR. Stream D (Two-Brain) blocks until **P4**.
 - Multi-agent ensemble (run T1 + T2 in parallel, pick best)? Defer — ADR-level decision needed first.
 
 ## Connections
-- [[CONCEPT--AGENT-AGNOSTIC]]
 
+- [[CONCEPT--AGENT-AGNOSTIC]]

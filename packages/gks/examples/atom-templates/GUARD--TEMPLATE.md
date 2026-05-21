@@ -30,12 +30,14 @@ that prompted it.
 ## Detection
 
 How the violation is detected at runtime:
+
 - input check: ...
 - post-action audit: ...
 
 ## Enforcement
 
 What happens on violation:
+
 - block the action / rollback
 - log to audit
 - alert on-call

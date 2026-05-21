@@ -163,11 +163,13 @@ Old `OBSIDIAN_HOST` from M7-prep draft is **deprecated** — projects should ren
 ## Consequences
 
 **Positive**
+
 - One client interface for both modes; callers pick capability based on `mode`.
 - No surprise crashes — semantic recall fails gracefully when Obsidian is offline.
 - Local-only TLS posture; no accidental remote calls.
 
 **Negative**
+
 - Two code paths for the same logical operation (`searchText` via REST vs grep). Mitigated by hiding behind the client interface.
 - Smart Connections's REST endpoint shape (if exposed) is plugin-version-specific. Wrap in a probe + version check.
 
@@ -182,5 +184,5 @@ Old `OBSIDIAN_HOST` from M7-prep draft is **deprecated** — projects should ren
 `[[CONCEPT--OBSIDIAN-AS-RUNTIME]]` + Obsidian Local REST API plugin docs.
 
 ## Connections
-- [[CONCEPT--EMBEDDING-STRATEGY]]
 
+- [[CONCEPT--EMBEDDING-STRATEGY]]

@@ -121,6 +121,7 @@ file-only query matches any fn in that file; atom missing fn covers
 the whole file; line-level only enforced when both sides specify.
 
 Surfaces:
+
 - TS API: `lookupBySymbol`
 - CLI: `gks lookup-by-symbol src/x.ts:foo[:line]`
 - MCP: `gks_lookup_by_symbol`
@@ -155,6 +156,6 @@ but is deferred until measured.
 - 3.5.2 release — shipped this primitive
 
 ## Connections
+
 - [[CONCEPT--MEMORY-STORE]]
 - [[FEAT--LOOKUP-BY-SYMBOL]]
-

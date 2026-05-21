@@ -38,15 +38,18 @@ We decide to sit the **Distiller alongside the Consolidator**, with a clear sepa
 | **Scope** | Within-session recall. | Cross-session wisdom/identity. |
 
 ### Integration Flow
+
 The Distiller is a **consumer** of the Consolidator. It waits for the Consolidator to finish processing a session, reads the resulting `episodic_memory.json`, and adds it to the distillation queue.
 
 ## Consequences
 
 ### Positive
+
 - **Modular Design:** Each module has a narrow, well-defined scope.
 - **Collaborative Strength:** Consolidator handles the "what happened now," while Distiller handles "what does it mean in the long run."
 
 ### Negative
+
 - **Pipeline Latency:** The end-to-end memory pipeline becomes longer (Turn → Episode → Narrative → Identity).
 
 ## Source

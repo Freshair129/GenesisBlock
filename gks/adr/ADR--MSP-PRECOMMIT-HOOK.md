@@ -105,6 +105,7 @@ attributes:
 ## Context
 
 A pre-commit hook can be implemented as:
+
 1. **Bash script** copied into `.git/hooks/pre-commit` by the user.
 2. **husky / simple-git-hooks** managed by `package.json` (`"prepare": "husky install"`).
 3. **A node script** invoked by a thin bash shim.
@@ -172,12 +173,14 @@ bash examples/hooks/install.sh
 ## Consequences
 
 **Positive**
+
 - Zero new dependencies on `package.json`.
 - Works identically across platforms supporting Git Bash.
 - The script is the documentation — anyone can `cat` it and understand the contract.
 - Validator's existing exit-code contract (0 pass / 1 hard / 2 internal) translates 1:1.
 
 **Negative**
+
 - Each developer must install the hook manually. Mitigated by a one-line install helper + a README badge.
 - No automatic enforcement on Windows users without Git Bash. Acceptable — they get CI as a fallback.
 

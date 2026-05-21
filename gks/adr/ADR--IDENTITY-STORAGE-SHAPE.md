@@ -182,6 +182,7 @@ Identity isn't human-edited often. JSON's unambiguous parsing + native Node supp
 ## Consequences
 
 **Positive**
+
 - Single read = full identity (no cross-file sync issues)
 - Atomic write trivial (rename is atomic on POSIX)
 - No external dep (Node's `fs/promises` covers everything)
@@ -189,6 +190,7 @@ Identity isn't human-edited often. JSON's unambiguous parsing + native Node supp
 - Schema versioning gates future migrations safely
 
 **Negative**
+
 - Multi-writer support not provided. If MSP grows to multi-process per tenant, this needs a lockfile (M9 work).
 - TTL is lazy — expired preferences linger on disk until the next set/prune. Cosmetic, not correctness.
 

@@ -180,6 +180,6 @@ PROTO loader's draft policy.
 3-tier rollout plan.
 
 ## Connections
+
 - [[ADR--MASTER-PROMOTION-DOC-TO-CODE]]
 - [[ADR--MASTER-PROMOTION-CONTRADICTION-POLICY]]
-

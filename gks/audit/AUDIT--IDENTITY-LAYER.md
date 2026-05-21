@@ -286,5 +286,5 @@ Low-level escape hatches are also exported: `identityPath`, `readIdentity`, `wri
 - Branch: `claude/msp-m7e-identity-impl`
 
 ## Connections
-- [[FRAMEWORK--MSP-ARCHITECTURE-V2]]
 
+- [[FRAMEWORK--MSP-ARCHITECTURE-V2]]

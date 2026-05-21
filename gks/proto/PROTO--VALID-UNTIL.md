@@ -162,5 +162,5 @@ Tests inject "now" via the `MSP_NOW` environment variable (any ISO 8601 string p
 `[[CONCEPT--DECISION-ATROPHY-GUARDS]]`, `[[FEAT--PROTO-LOADER]]`.
 
 ## Connections
-- [[FRAMEWORK--MSP-ARCHITECTURE-V2]]
 
+- [[FRAMEWORK--MSP-ARCHITECTURE-V2]]

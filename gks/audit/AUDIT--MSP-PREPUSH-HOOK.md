@@ -145,6 +145,6 @@ Same precedent as M2 + M4a: bug recorded in audit, not as a separate INCIDENT/IS
 - Date: 2026-05-03
 
 ## Connections
+
 - [[BLUEPRINT--MSP-PREPUSH-HOOK]]
 - [[ADR--MSP-PREPUSH-HOOK]]
-

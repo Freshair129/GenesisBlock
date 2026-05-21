@@ -100,12 +100,12 @@ Using cloud LLMs (T2/T3) incurs costs. We need a clear policy for when to escala
 
 ## Decision
 
-1.  **Automatic Escalation**: If T1 fails twice on the same task (acceptance test fail), escalate to T2.
-2.  **Manual Escalation**: Users can explicitly request T2/T3 for specific tasks.
-3.  **Tier Cap**: 
+1. **Automatic Escalation**: If T1 fails twice on the same task (acceptance test fail), escalate to T2.
+2. **Manual Escalation**: Users can explicitly request T2/T3 for specific tasks.
+3. **Tier Cap**:
     - T2 (Gemini Flash) is allowed for all regular feature work.
     - T3 (Claude) is restricted to `critical` severity tasks or explicitly approved sessions.
-4.  **Token Budget**: Tasks exceeding 2M tokens context must use T2 (Gemini).
+4. **Token Budget**: Tasks exceeding 2M tokens context must use T2 (Gemini).
 
 ## Consequences
 
@@ -114,5 +114,5 @@ Using cloud LLMs (T2/T3) incurs costs. We need a clear policy for when to escala
 - Clear path for agent self-improvement (if T1 fails, T2 fixes and T1 learns).
 
 ## Connections
-- [[CONCEPT--AGENT-TIER-ROUTING]]
 
+- [[CONCEPT--AGENT-TIER-ROUTING]]

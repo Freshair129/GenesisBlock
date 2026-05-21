@@ -155,9 +155,9 @@ See `ROADMAP.md` for the full list. Phase E focuses on closing the MLL loop, har
 Phase D is closed. Phase E may begin. The agentic monorepo pivot's foundational runtime is now in place: an agent driving this repo via Claude Code (or any MCP client) can dispatch tasks, resolve memory across two brains, and leave an audit trail behind.
 
 ## Connections
+
 - [[BLUEPRINT--AGENT-DISPATCHER]]
 - [[BLUEPRINT--BRAIN-MERGE-STRATEGY]]
 - [[ADR--AGENT-TIER-COST-POLICY]]
 - [[CONCEPT--AGENT-TIER-ROUTING]]
 - [[CONCEPT--TWO-BRAIN-ARCHITECTURE]]
-

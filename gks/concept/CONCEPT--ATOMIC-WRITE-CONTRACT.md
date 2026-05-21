@@ -139,5 +139,5 @@ Without one, four predictable failure modes appear (see [[CONCEPT--KNOWLEDGE-LAY
 `msp_spec.md` §4 (Atomic Write Contract).
 
 ## Connections
-- [[FRAMEWORK--MSP-ARCHITECTURE-V2]]
 
+- [[FRAMEWORK--MSP-ARCHITECTURE-V2]]

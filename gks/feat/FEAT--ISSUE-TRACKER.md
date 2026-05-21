@@ -142,6 +142,6 @@ freely; body has `## Description` / `## Reproduction` / `## Discussion`
 - Issue → INC-- promotion automation — orchestrator
 
 ## Connections
+
 - [[ADR--EXTENDED-TAXONOMY]]
 - [[CONCEPT--MEMORY-STORE]]
-

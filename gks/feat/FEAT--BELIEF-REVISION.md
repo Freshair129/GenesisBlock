@@ -32,30 +32,35 @@ A system that never corrects itself is doomed to accumulate "knowledge debt." If
 ## 3. Requirements
 
 ### 3.1 Contradiction Detection
--   The system must automatically trigger a "Machine Judge" analysis when a new high-salience memory artifact is created.
--   Identify "logical tension" or "definite contradiction" between the new artifact and established Identity beliefs.
+
+- The system must automatically trigger a "Machine Judge" analysis when a new high-salience memory artifact is created.
+- Identify "logical tension" or "definite contradiction" between the new artifact and established Identity beliefs.
 
 ### 3.2 Epistemic State Management
--   Support regressing `epistemic_state` from `confirmed` to `contested` upon a single definite contradiction.
--   Maintain a `challenge_counter` to track the persistence of conflicts.
--   Support promoting `contested` back to `confirmed` if new evidence resolves the tension.
+
+- Support regressing `epistemic_state` from `confirmed` to `contested` upon a single definite contradiction.
+- Maintain a `challenge_counter` to track the persistence of conflicts.
+- Support promoting `contested` back to `confirmed` if new evidence resolves the tension.
 
 ### 3.3 Automated Audit & Alerting
--   Generate a human-readable `AUDIT--BELIEF-REVISION` atom whenever a Tier 3 belief is contested or downgraded.
--   Each audit must include the specific conflicting evidence and the rationale provided by the judge.
+
+- Generate a human-readable `AUDIT--BELIEF-REVISION` atom whenever a Tier 3 belief is contested or downgraded.
+- Each audit must include the specific conflicting evidence and the rationale provided by the judge.
 
 ### 3.4 Retrieval Weight Integration
--   Automatically penalize `contested` atoms in search results to prevent agents from relying on unstable knowledge.
--   Exclude `deprecated` atoms from retrieval.
+
+- Automatically penalize `contested` atoms in search results to prevent agents from relying on unstable knowledge.
+- Exclude `deprecated` atoms from retrieval.
 
 ## 4. Acceptance Criteria
 
--   [ ] A functional hook exists in the distiller pipeline for contradiction checking.
--   [ ] Identity beliefs correctly regress to `contested` when presented with contradictory session data.
--   [ ] Contested beliefs appear lower in search results due to the RRF penalty.
--   [ ] Every state regression produces a valid `AUDIT` atom in GKS.
+- [ ] A functional hook exists in the distiller pipeline for contradiction checking.
+- [ ] Identity beliefs correctly regress to `contested` when presented with contradictory session data.
+- [ ] Contested beliefs appear lower in search results due to the RRF penalty.
+- [ ] Every state regression produces a valid `AUDIT` atom in GKS.
 
 ## 5. Connections
--   `[[CONCEPT--BELIEF-REVISION]]` — the strategic intent.
--   `[[FEAT--SEMANTIC-CONTRADICTION-JUDGE]]` — the engine used for detection.
--   `[[BLUEPRINT--BELIEF-REVISION]]` — the implementation plan.
+
+- `[[CONCEPT--BELIEF-REVISION]]` — the strategic intent.
+- `[[FEAT--SEMANTIC-CONTRADICTION-JUDGE]]` — the engine used for detection.
+- `[[BLUEPRINT--BELIEF-REVISION]]` — the implementation plan.

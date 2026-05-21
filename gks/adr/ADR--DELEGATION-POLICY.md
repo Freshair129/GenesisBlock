@@ -144,12 +144,14 @@ If only 1 senior is available (e.g. small team starting out, vacation), Boss can
 ## Consequences
 
 **Positive**
+
 - Boss not the rate limiter on routine work
 - 2-senior gate preserves the "enough eyes" principle (most bugs caught by code review have ≥ 2 reviewers)
 - L3 / framework / contract / hooks remain Boss-controlled
 - Quorum override gives small-team flexibility without abandoning the model
 
 **Negative**
+
 - Requires team to actually have 2+ seniors (T2 or T3 pool of ≥ 3)
 - Reviewers must self-identify their tier — needs `.brain/msp/authority.yaml` populated
 - "Quorum override" can be abused; mitigated by 48-hour backfill review
@@ -173,5 +175,5 @@ If only 1 senior is available (e.g. small team starting out, vacation), Boss can
 `[[FRAMEWORK--AUTHORITY-MATRIX]]`, `[[ADR--HUMAN-REVIEW-GATES]]`, `[[CONCEPT--MSP-ROADMAP]]` §3 M9b, user direction (all-M planning) — needed before team scales past 5 contributors.
 
 ## Connections
-- [[CONCEPT--PROTO-AUTHORITY-ENFORCEMENT]]
 
+- [[CONCEPT--PROTO-AUTHORITY-ENFORCEMENT]]

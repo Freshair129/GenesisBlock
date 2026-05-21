@@ -32,6 +32,7 @@ What could go wrong, and under what circumstances.
 ## Indicators
 
 Early-warning signs that this risk is materialising:
+
 - ...
 
 ## Mitigations
@@ -43,5 +44,6 @@ Early-warning signs that this risk is materialising:
 ## Acceptance
 
 If mitigation is "accept the risk":
+
 - **why:** ...
 - **review:** <when to re-evaluate>

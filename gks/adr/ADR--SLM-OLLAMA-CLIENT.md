@@ -158,12 +158,14 @@ Default 120 s via `AbortSignal.timeout(120_000)`. Tunable via `opts.timeoutMs`. 
 ## Consequences
 
 **Positive**
+
 - Zero new runtime deps (`fetch` is built in).
 - Pluggable — adding Anthropic later is `createAnthropicClient` + factory branch.
 - Tests inject `fetchImpl`; no network in CI.
 - Same exit-code contract from the runner; users don't see a difference between mock and Ollama paths.
 
 **Negative**
+
 - Ollama-only for M4b. Anthropic / OpenAI users must wait or wire their own client (the `slmClient` opt accepts any `SlmClient`).
 - Default model `qwen2.5-coder:7b` requires the user to `ollama pull` it before first use. README must document.
 
@@ -178,5 +180,5 @@ Default 120 s via `AbortSignal.timeout(120_000)`. Tunable via `opts.timeoutMs`. 
 `[[CONCEPT--SLM-OLLAMA-CLIENT]]` + Ollama HTTP API docs (`/api/generate` endpoint).
 
 ## Connections
-- [[ADR--CODEGEN-RETRY-POLICY]]
 
+- [[ADR--CODEGEN-RETRY-POLICY]]

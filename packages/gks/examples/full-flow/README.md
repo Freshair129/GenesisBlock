@@ -5,9 +5,10 @@ This example demonstrates the end-to-end **Doc-to-Code lifecycle** (P1-P6) as en
 ## Purpose
 
 The `run-feature.sh` script is a convenience wrapper that guides a contributor through:
-1.  **Duplicate check**: Ensuring the feature hasn't been discussed or implemented.
-2.  **Scaffolding**: Generating the initial Concept, ADR, Feature, and Blueprint candidates.
-3.  **Gate Check**: Running `verify-flow` to ensure the documentation chain is stable before code is generated.
+
+1. **Duplicate check**: Ensuring the feature hasn't been discussed or implemented.
+2. **Scaffolding**: Generating the initial Concept, ADR, Feature, and Blueprint candidates.
+3. **Gate Check**: Running `verify-flow` to ensure the documentation chain is stable before code is generated.
 
 ## Prerequisites
 

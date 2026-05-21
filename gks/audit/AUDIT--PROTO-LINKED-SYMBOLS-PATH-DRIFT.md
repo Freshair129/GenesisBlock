@@ -179,6 +179,6 @@ draft PROTO surfaces them without blocking.
 - No source code changed — only `linked_symbols` frontmatter.
 
 ## Connections
+
 - [[FEAT--PROTO-LOADER]]
 - [[CONCEPT--PROTO-PATTERN]]
-

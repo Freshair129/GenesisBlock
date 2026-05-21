@@ -147,5 +147,5 @@ The current `@freshair129/gks` package uses the `rev-` form; MSP accepts either 
 `msp_spec.md` §3 (Inbound Flow).
 
 ## Connections
-- [[FRAMEWORK--MSP-ARCHITECTURE-V2]]
 
+- [[FRAMEWORK--MSP-ARCHITECTURE-V2]]

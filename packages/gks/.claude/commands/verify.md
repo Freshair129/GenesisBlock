@@ -3,6 +3,7 @@ Verify that all crosslinks in a feature atom chain are intact (doc-to-code enfor
 $ARGUMENTS should be an atom ID like: FEAT--ISSUE-TRACKER
 
 Call the `gks_verify_flow` MCP tool with:
+
 - `id`: $ARGUMENTS
 - `root`: `.`
 

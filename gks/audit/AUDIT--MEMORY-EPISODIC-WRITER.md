@@ -150,6 +150,6 @@ LLM-backed summarisers are pluggable via `opts.summariser`; orchestrator concern
 - Date: 2026-05-03
 
 ## Connections
+
 - [[BLUEPRINT--MEMORY-EPISODIC-WRITER]]
 - [[ADR--MEMORY-EPISODIC-WRITER]]
-

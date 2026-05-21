@@ -109,6 +109,7 @@ versioning).
 ## Three verbs
 
 `retain(content, metadata)` — write a fact with bi-temporal versioning
+
 + namespace-scoped conflict detection.
 
 `recall(query, opts)` — multi-source parallel retrieval with dedup +
@@ -120,22 +121,21 @@ candidate atoms for the inbound queue.
 
 ## Helpers
 
-- `lookup(id)` — exact-id atomic lookup, never approximates
-- `lookupBySymbol(path)` — reverse citation (ADR-010)
-- `proposeInbound(artifact)` — only authorised path to candidate atoms
-- `appendTrace(sessionId, step)` — session lifecycle
++ `lookup(id)` — exact-id atomic lookup, never approximates
++ `lookupBySymbol(path)` — reverse citation (ADR-010)
++ `proposeInbound(artifact)` — only authorised path to candidate atoms
++ `appendTrace(sessionId, step)` — session lifecycle
 
 ## What it doesn't do
 
-- No Memory OS / consolidation timing (orchestrator's job per ADR-008)
-- No code AST / call graph (peer subsystem's job per ADR-009)
-- No workflow gates (CI / process layer)
++ No Memory OS / consolidation timing (orchestrator's job per ADR-008)
++ No code AST / call graph (peer subsystem's job per ADR-009)
++ No workflow gates (CI / process layer)
 
 `MemoryStore` is **paradigm-agnostic** — works equally for single-tenant
 CLI agents, multi-tenant SaaS, MSP-shaped Memory OS layered above, or
 research projects with custom consolidation cascades.
 
 ## Connections
-- [[FRAMEWORK--FOUR-LAYERS]]
-- [[FEAT--LOOKUP-BY-SYMBOL]]
-
++ [[FRAMEWORK--FOUR-LAYERS]]
++ [[FEAT--LOOKUP-BY-SYMBOL]]

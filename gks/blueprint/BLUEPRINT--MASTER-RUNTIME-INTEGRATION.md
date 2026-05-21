@@ -203,6 +203,7 @@ msp-master-propose apply <proposalPath> [--root=<dir>]
 Existing invocations (`msp-master-propose [--root=…] [--write]`) keep working exactly as before. The CLI dispatches on the first positional: if it's `apply`, route to the apply handler; otherwise run the existing propose flow.
 
 Apply handler:
+
 - Resolves the proposal path against `--root` if relative.
 - Calls `applyPromotion(proposalPath, root)`.
 - On success, prints `✓ applied: <master_path>` and exits 0.
@@ -288,5 +289,5 @@ The Master atom files themselves (`gks/master/*.md`) remain tracked — only the
 - `[[SPEC--GENESIS-BLOCK-MANIFEST]]` § 3.1 + § 5
 
 ## Connections
-- [[ADR--HUMAN-REVIEW-GATES]]
 
+- [[ADR--HUMAN-REVIEW-GATES]]

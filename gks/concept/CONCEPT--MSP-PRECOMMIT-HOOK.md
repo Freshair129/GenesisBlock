@@ -109,6 +109,7 @@ If a portable bash hook detects staged `.md` files under `gks/` and `.brain/msp/
 ## Scope
 
 In:
+
 - Detect staged `.md` files matching `gks/**` or `.brain/msp/projects/*/inbound/**`.
 - For each, invoke `npm run msp:validate -- <file>`.
 - Block the commit if any validator run exits non-zero; print which file + which rule.
@@ -116,6 +117,7 @@ In:
 - Standard escape: `git commit --no-verify` (we don't invent a custom flag).
 
 Out:
+
 - Auto-fixing — validator is read-only by design (`[[ADR--PROMOTION-WORKFLOW]]`).
 - Running tests, typecheck, or lint — those are separate hooks composed by the user.
 - Replacing CI — local hook is best-effort; CI is the source of truth.
@@ -125,5 +127,5 @@ Out:
 Closes the M3 backlog item recorded in `[[AUDIT--MSP-VALIDATOR]]` and `[[AUDIT--KNOWLEDGE-BASE]]`.
 
 ## Connections
-- [[ADR--AGENT-WRITE-BOUNDARIES]]
 
+- [[ADR--AGENT-WRITE-BOUNDARIES]]

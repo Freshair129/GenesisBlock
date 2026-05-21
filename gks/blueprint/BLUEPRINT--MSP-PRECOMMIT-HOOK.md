@@ -185,6 +185,6 @@ T3 SUMMARISE-FAILURES (re-run without --silent + count + exit code)
 T4 INSTALL-HELPER (idempotent installer with marker comment)
 
 ## Connections
+
 - [[FEAT--MSP-PRECOMMIT-HOOK]]
 - [[ADR--MSP-PRECOMMIT-HOOK]]
-

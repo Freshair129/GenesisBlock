@@ -152,6 +152,6 @@ Every path in the repo has exactly one legal write channel. Anything else is an 
 - `[[BLUEPRINT--INBOUND-TO-CANDIDATES-MIGRATION]]` — the migration that retired `/submit-memory` + `inbound/` + the `gks inbound promote` workflow
 
 ## Connections
+
 - [[FRAMEWORK--MSP-ARCHITECTURE-V2]]
 - [[CONCEPT--KNOWLEDGE-LAYERS-V2]]
-

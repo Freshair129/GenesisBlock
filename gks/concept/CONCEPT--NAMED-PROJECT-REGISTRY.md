@@ -160,11 +160,13 @@ Per `[[CONCEPT--AGENT-AGNOSTIC]]`, every cognitive-layer client points at the sa
 ## Trade-offs
 
 **Positive**
+
 - Multi-project workflows become viable — clinic and EVA can share the same MSP install without confusion.
 - `.mspconfig` lets a project declare itself without per-client config.
 - Cross-project recall is a single flag, not a custom script.
 
 **Negative**
+
 - Adds a registration step ("register before use") — friction for one-off projects.
 - Resolution chain is one more thing to debug when "the wrong project loaded".
 
@@ -173,5 +175,5 @@ Per `[[CONCEPT--AGENT-AGNOSTIC]]`, every cognitive-layer client points at the sa
 `[[SPEC--ARCHITECTURE-V2]].md` §4.4 (drafted 2026-05-07, cherry-picked here on 2026-05-09 before the original was deleted). Coupled with the global/workspace separation work planned for Phase B. See `[[AUDIT--ARCH-DOC-CLEANUP]]`.
 
 ## Connections
-- [[FRAMEWORK--MSP-ARCHITECTURE-V2]]
 
+- [[FRAMEWORK--MSP-ARCHITECTURE-V2]]

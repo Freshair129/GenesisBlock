@@ -30,12 +30,14 @@ Implement the technical logic to load remote atom indices and merge them into th
 ## 2. Implementation Steps
 
 ### T1: Remote Index Fetcher (`packages/gks/src/memory/remote-loader.ts`)
+
 - Implement a utility to load an `atomic_index.jsonl` from a remote location.
 - Support local path resolution (absolute or relative to current root).
 - Support simple HTTP GET for remote URLs (optional for MVP, focus on local paths first).
 - Add error handling for missing or malformed remote indices.
 
 ### T2: Multi-Index Merger
+
 - Update `gks/bin/gks.ts` in the `cmdVerifyFlow` function.
 - Logic:
     1. Parse the `--remote` flag.
@@ -45,16 +47,19 @@ Implement the technical logic to load remote atom indices and merge them into th
     5. **Namespace Handling:** If collisions occur, the local atom wins. In a future iteration, we will support prefixing (e.g., `remote:ADR--XYZ`).
 
 ### T3: CLI Option Expansion
+
 - Update the `options` object in `cmdVerifyFlow` to include:
-    - `remote`: { type: 'string', multiple: true } (Allow multiple remotes).
+  - `remote`: { type: 'string', multiple: true } (Allow multiple remotes).
 - Update the help text to document the new flag.
 
 ### T4: Protocol Refinement
+
 - Ensure the `verifyFlow` core logic in `packages/gks/src/memory/verify-flow.ts` remains pure and unaffected. It already operates on a `Map<string, AtomicEntry>`, so the merge logic in the CLI is sufficient for Phase 1.
 
 ## 3. Verification Plan
 
 ### 3.1 Integration Test
+
 - Create a test fixture with two directories: `repoA` and `repoB`.
 - `repoA` contains a stable ADR.
 - `repoB` contains a FEAT that references the ADR in `repoA`.
@@ -64,5 +69,6 @@ Implement the technical logic to load remote atom indices and merge them into th
 - Verify failure.
 
 ### 3.2 Unit Tests
+
 - Test the merge logic with overlapping IDs.
 - Test loading of malformed remote indices.

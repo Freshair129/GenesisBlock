@@ -149,6 +149,7 @@ This is forward-compatible (existing lockfiles with just `<pid>` still parse). F
 - `proper-lockfile` itself isn't bulletproof on Windows (uses similar PID-liveness)
 
 If real-world Windows adoption hits problems past M9f, swap-in is straightforward:
+
 - `proper-lockfile.lock(path)` → returns a release function
 - API surface is similar; one ADR + one PR to swap
 
@@ -182,6 +183,6 @@ If real-world Windows adoption hits problems past M9f, swap-in is straightforwar
 `[[CONCEPT--MSP-ROADMAP]]` §3 M9f, user direction (all-M planning), existing `src/memory/sessions/lock.ts` audit.
 
 ## Connections
+
 - [[FEAT--MEMORY-SESSIONS-WRITER]]
 - [[CONCEPT--MEMORY-SESSIONS]]
-

@@ -164,7 +164,7 @@ test/foo/expected.test.ts > foo() returns 42: expected 41 to be 42
 - Caching across runs.
 
 ## Connections
+
 - [[ADR--ACCEPTANCE-VITEST-RUNNER]]
 - [[CONCEPT--ACCEPTANCE-VITEST-RUNNER]]
 - [[FEAT--CODEGEN-MICROTASK-RUNNER]]
-

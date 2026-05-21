@@ -244,6 +244,7 @@ T9 INTEGRATION-TEST + DOGFOOD
 | Filename has spaces / non-ASCII | regex check on basename | exit 1 with `[id-format]` |
 | Empty body | parser returns `body === ''` | warn (not error — some atoms are pure metadata) |
 | Body has `[[X]]` inside fenced code block | wikilink extractor skips lines between ` ``` ` and ` ``` ` | not flagged as dangling |
+
 ```
 
 ## Connections

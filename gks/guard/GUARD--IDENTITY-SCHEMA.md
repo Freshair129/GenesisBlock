@@ -96,19 +96,21 @@ attributes:
 # GUARD — Identity Schema
 
 ## Invariants
+
 Every `identity.json` file MUST satisfy these structural invariants:
 
 1. **Schema Version**: `schemaVersion` must be exactly `1`.
 2. **Profile Core**: `profile.name` and `profile.role` must be non-empty strings.
-3. **Voice Enums**: 
+3. **Voice Enums**:
    - `voice.formality` must be one of `[casual, neutral, formal]`.
    - `voice.responseCadence` must be one of `[terse, standard, verbose]`.
 4. **Preference Validity**: Every key in `preferences` must follow the `{ value: any, expiresAt: timestamp | null }` pattern.
 
 ## Enforcement
+
 Mechanically enforced by Zod in `src/identity/types.ts` at write-time.
 Any violation prevents the file from being committed to disk.
 
 ## Connections
-- [[CONCEPT--IDENTITY-LAYER]]
 
+- [[CONCEPT--IDENTITY-LAYER]]

@@ -115,6 +115,7 @@ attributes:
 ## Rule
 
 If `summary:` is present in atom frontmatter:
+
 - Must be a string
 - Must be 10–300 characters (after trim)
 - Must NOT contain placeholder strings: `TBD`, `TODO`, `FIXME`, `lorem ipsum`
@@ -144,7 +145,7 @@ Wraps existing core rule `summaryMin` from `src/validator/rules/summary-min.ts` 
 `[[CONCEPT--PROTO-AUDIT-EXISTING-RULES]]` (M8f), `[[ADR--ANTI-HALLUCINATION-RULES]]`.
 
 ## Connections
+
 - [[FRAMEWORK--MSP-ARCHITECTURE-V2]]
 - [[CONCEPT--PROTO-PATTERN]]
 - [[FEAT--PROTO-LOADER]]
-

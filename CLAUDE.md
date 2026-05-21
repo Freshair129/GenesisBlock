@@ -15,16 +15,19 @@
 ## P0 — Always loaded (foundation)
 
 ### MASTER--ROOT-CAUSE-ANALYSIS
+
 - **Apply when:** bug, error, ambiguous request, failed previous attempt
 - **Directive:** identify and confirm root cause before any fix
 - → `gks/master/MASTER--ROOT-CAUSE-ANALYSIS.md`
 
 ### MASTER--MSP-DOC-TO-CODE
+
 - **Apply when:** new branch, PR, file in `src/|test/|scripts/|web/`
 - **Directive:** atoms before code (FRAME→CONCEPT→ADR→BP→CODE→AUDIT)
 - → `gks/master/MASTER--MSP-DOC-TO-CODE.md`
 
 ### MASTER--ATOM-CONTRADICTION-POLICY
+
 - **Apply when:** PR adds/edits atom in `gks/<type>/`
 - **Directive:** reciprocal supersession in same PR
 - → `gks/master/MASTER--ATOM-CONTRADICTION-POLICY.md`
@@ -59,11 +62,12 @@ This is the project-internal contract for how Claude Code (and human contributor
 
 - **`packages/gks/`** — Genesis Knowledge System engine. Atomic storage, vector/graph logic, and validation.
 - **`packages/msp/`** — Memory & Soul Passport orchestrator. Uses GKS to manage agent memory and identity.
-- **`apps/web/`** — Genesis UI frontend. Vite + React 19 + TypeScript knowledge graph explorer. Deployed to https://genesis-ui-eight.vercel.app/. See `apps/web/CLAUDE.md` for full frontend guide.
+- **`apps/web/`** — Genesis UI frontend. Vite + React 19 + TypeScript knowledge graph explorer. Deployed to <https://genesis-ui-eight.vercel.app/>. See `apps/web/CLAUDE.md` for full frontend guide.
 
 > **History note.** GKS used to live in a separate repo `Freshair129/GksV3`. As of the 2026-05-11 monorepo migration (`ADR--MONOREPO-STRUCTURE`), that repo is **archived (read-only) on GitHub** and the canonical source lives here at `packages/gks/`. Do not push to `GksV3`; do not look there for current code or docs.
 
-### Authoritative docs:
+### Authoritative docs
+
 - `gks/framework/FRAMEWORK--MSP-ARCHITECTURE-V2.md` — Top-level architecture
 - `packages/msp/msp_spec.md` — Full MSP spec
 - `gks/concept/CONCEPT--TAXONOMY-V2-3.md` — atomic-knowledge prefix taxonomy (v2.3)
@@ -76,12 +80,15 @@ This is the project-internal contract for how Claude Code (and human contributor
 ## Monorepo Workflow
 
 ### Boundary Rules (ADR--MONOREPO-STRUCTURE)
+
 - **GKS** (`packages/gks/`) MUST NOT import from **MSP** (`packages/msp/`).
 - **MSP** depends on **GKS** via the workspace protocol (`"@freshair129/gks": "workspace:*"`).
 - GKS is still publishable as a standalone library.
 
 ### Useful Commands
+
 Run these from the repo root:
+
 ```bash
 npm run msp:index           # Regen atomic_index.jsonl in packages/msp
 npm run test                # Run tests across all packages
@@ -90,6 +97,7 @@ npm run build               # Build all packages
 ```
 
 Per-package commands:
+
 ```bash
 npm test --workspace=packages/gks
 npm run msp:validate --workspace=packages/msp
@@ -102,6 +110,7 @@ npm run build --workspace=packages/ui     # build Genesis UI
 > Alias: **Block Assembly** (bottom-up half of the Genesis Block Cycle) — see `docs/gks/PRD--GENESIS-BLOCK-CYCLE.md` for the unified vocabulary and its `Block Decomposition` counterpart.
 
 Every milestone follows this phase order:
+
 1. **FRAMEWORK** (architecture / governance) -> `gks/framework/` (was `FRAME--` pre-v2.3; see `ADR--TAXONOMY-V2-3-MIGRATION`)
 2. **CONCEPT** (intent) -> `gks/concept/`
 3. **ADR/FEAT** (decision) -> `gks/adr/` or `gks/feat/`
@@ -110,22 +119,26 @@ Every milestone follows this phase order:
 6. **AUDIT** (what shipped) -> `gks/audit/`
 
 ## Atom Integrity
+
 - Atoms must validate (`npm run msp:validate`) before commit.
 - Crosslinks must resolve (`npm run msp:check-links`).
 - Context tracing is mandatory: read related atoms before coding.
 
 ## Branching + PR conventions
+
 - Branch name: `claude/msp-<milestone>-<slug>`
 - Squash-merge with a 1-paragraph summary.
 - CI must be green on both Node 20 + 22.
 
 ## Environment Rules
+
 - **Timezone**: Use **UTC+07:00** (Indochina Time / ICT — Thailand) for human-readable timestamps in ISO 8601 offset format. Validator uses UTC absolute internally; `Date.parse()` handles offset correctly. Authoring rule: write `created_at: 2026-05-12T11:55:00.000+07:00` (TH wall-clock) — NOT `Z` suffix unless you've computed UTC yourself.
 
 ## Antigravity Coexistence
+
 Antigravity (IDE agent) shares this working tree. Claude Code's worktrees have previously crashed it.
+
 - Always clean up worktrees: `git worktree prune` after any branch work.
 - `.claude/` must stay in `.gitignore` — verify before committing.
 - Never set `extensions.worktreeConfig` in git config without `repositoryformatversion=1`.
 - Full details and incident post-mortems: `AGENT.md §4` + `INCIDENT_REPORT--ANTIGRAVITY-*.md`
-

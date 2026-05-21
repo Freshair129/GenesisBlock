@@ -30,6 +30,7 @@ behind a `--transport=http --port=...` flag.
 ## Consequences
 
 **Positive**
+
 - One entry point (`bin/gks-mcp-server.ts`), no web server needed,
   no auth story to design.
 - Matches the install instructions every MCP client doc page expects.
@@ -37,6 +38,7 @@ behind a `--transport=http --port=...` flag.
   spawn, fast (~5 ms per test).
 
 **Negative**
+
 - Each Claude Code window spawns its own GKS server process. Heavier
   if you have ~20 windows open; on the other hand, perfect tenant
   isolation by construction.

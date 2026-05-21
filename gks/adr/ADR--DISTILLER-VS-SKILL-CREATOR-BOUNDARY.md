@@ -36,15 +36,18 @@ We decide that the **Skill Creator is responsible for procedural patterns**, whi
 | **Factual** | Specific distilled truths about the project/user. | **8-8-8 Distiller** | `BELIEF--*` / `FACT--*` |
 
 ### Interaction
+
 If the 8-8-8 Distiller identifies a recurring procedural behavior (e.g., "The agent always uses grep before editing"), it notes it as a **theme** in the Narrative/Identity artifact but does NOT attempt to author a `SKILL--*` atom. It may optionally signal the Skill Creator to investigate.
 
 ## Consequences
 
 ### Positive
+
 - **Extraction Specialization:** Allows each extractor to use optimized prompts (procedural vs. narrative).
 - **Reduced Bloat:** Prevents the same pattern from being stored in two different atom types.
 
 ### Negative
+
 - **Dependency:** The full "behavioral DNA" of a system is split across two subsystems.
 
 ## Source

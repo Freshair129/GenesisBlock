@@ -144,7 +144,7 @@ Pure filesystem-layout decision. AtomicLayer is path-agnostic.
 - ADR 008 — storage scope (this is convention, not scope change)
 
 ## Connections
+
 - [[ADR--EXTENDED-TAXONOMY]]
 - [[FRAMEWORK--FOUR-LAYERS]]
 - [[CONCEPT--TAXONOMY-V2-3]]
-

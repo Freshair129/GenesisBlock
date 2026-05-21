@@ -23,7 +23,8 @@
     "msp-adr": "./dist/generator/adr-cli.js",
     "msp-recall-bench": "./dist/orchestrator/retrieval/bench-cli.js",
     "msp-mll": "./dist/orchestrator/mll/cli.js",
-    "msp-migrate": "./dist/migration/notion/cli.js"
+    "msp-migrate": "./dist/migration/notion/cli.js",
+    "gks": "./dist/usage/cli/gks-cli.js"
   },
   "scripts": {
     "dev": "concurrently \"npm run build:watch\" \"npm run test:watch\"",

@@ -1,6 +1,7 @@
 Scaffold a new feature through the P1→P6 doc-to-code loop.
 
 Call the `gks_new_feature` MCP tool with:
+
 - `title`: $ARGUMENTS
 - `root`: `.`
 - `taskTracker`: `local`

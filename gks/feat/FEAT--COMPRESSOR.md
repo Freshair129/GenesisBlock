@@ -173,6 +173,6 @@ interface CompressedEpisode {
 - Vector-similarity-based filtering before compression
 
 ## Connections
+
 - [[CONCEPT--CONTEXT-COMPRESSION]]
 - [[FEAT--CONSOLIDATOR]]
-

@@ -144,6 +144,7 @@ Closes PR-C of `HANDOFF-SYMBOLS-EXPANSION-PHASE-2.md` — atom workflow scripts 
 ## Test results
 
 10 / 10 tests passing locally:
+
 - `msp:atom-date` — 3 tests (default format, `--utc` flag, instant-equivalence)
 - `msp:scaffold-atom` — 4 tests (creates valid atom, refuses overwrite, rejects bad slug, rejects unknown type)
 - `msp:supersede` — 3 tests (reciprocal update, idempotency refusal, missing-atom rejection)

@@ -136,5 +136,5 @@ This mirrors the episode-recorder pattern (one atom per logical unit, written be
 - `[[ADR--AGENT-TIER-COST-POLICY]]` — the policy this concept makes observable
 
 ## Connections
-- [[CONCEPT--AGENT-TIER-ROUTING]]
 
+- [[CONCEPT--AGENT-TIER-ROUTING]]

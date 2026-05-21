@@ -207,5 +207,5 @@ PROTO promotes from `draft` to `stable`.
 `[[FRAMEWORK--SCALING-LEVELS]]`, `[[FEAT--PROTO-LOADER]]`.
 
 ## Connections
-- [[BLUEPRINT--PROTO-LOADER]]
 
+- [[BLUEPRINT--PROTO-LOADER]]

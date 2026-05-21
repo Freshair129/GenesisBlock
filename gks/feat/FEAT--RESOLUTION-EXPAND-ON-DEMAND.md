@@ -165,5 +165,5 @@ Behaviour contract:
 - `[[ADR--RESOLUTION-TIER-COUNT]]` — 2-tier MVP, 4-tier data model, Phase 3.5 gate.
 
 ## Connections
-- [[FRAMEWORK--UNIVERSAL-CONTEXT-FRAMEWORK]]
 
+- [[FRAMEWORK--UNIVERSAL-CONTEXT-FRAMEWORK]]

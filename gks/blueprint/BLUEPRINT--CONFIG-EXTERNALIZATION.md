@@ -138,6 +138,7 @@ After:    [config/*.yaml]           → edit, reload, done
 ```
 
 **Properties we want:**
+
 - **Single Source of Truth** — each policy/threshold/mapping lives in exactly one place
 - **Auditable** — changes show up in `git diff` of YAML
 - **Hot-tunable** — operators can tune without TypeScript knowledge
@@ -166,6 +167,7 @@ After:    [config/*.yaml]           → edit, reload, done
 | DB tuning | ~8 | Vector dim 1024, table `gks_vector` in `pg-migrate.ts` |
 
 **Already externalized:**
+
 - ✅ `atom_schema.yaml` — taxonomy, schema_spec, decision_rule
 - ✅ `atom_registry.yaml` — atom_list
 - ✅ `policies/60-coding-domain.yaml`, `policies/70-task-management.yaml` — ABAC classifiers
@@ -210,6 +212,7 @@ cognitive_system/
 | **Layer 2** `packages/<pkg>/config/` | Engineers | Rare | `<name>.defaults.yaml` |
 
 **Loader resolution chain:**
+
 1. `<repo>/config/<module>.yaml` — operator override
 2. `packages/<pkg>/config/<name>.defaults.yaml` — package default
 3. In-code constant — last-resort transition fallback (removed by Phase 5)
@@ -219,6 +222,7 @@ cognitive_system/
 ## ๔. Schema Sketches
 
 ### `config/validator.yaml`
+
 ```yaml
 $schema_version: "1.0"
 master_tier:
@@ -249,6 +253,7 @@ phase_governance:
 ```
 
 ### `config/codegen.yaml`
+
 ```yaml
 forbidden_patterns:
   - id: export-default
@@ -273,6 +278,7 @@ post_process:
 ```
 
 ### `config/retrieval.yaml`
+
 ```yaml
 defaults:
   total_timeout_ms: 1500
@@ -289,6 +295,7 @@ sources:
 ```
 
 ### `config/memory.yaml`
+
 ```yaml
 sessions:
   lock_ttl_ms: 300000           # 5 min
@@ -308,6 +315,7 @@ backlinks:
 ```
 
 ### `config/mcp.yaml`
+
 ```yaml
 server:
   name: msp
@@ -326,6 +334,7 @@ tools:
 ```
 
 ### `config/hooks.yaml`
+
 ```yaml
 pre_commit:
   validate_paths:
@@ -339,6 +348,7 @@ pre_push:
 ```
 
 ### `config/paths.yaml`
+
 ```yaml
 gks_root: gks
 brain_root: .brain/msp
@@ -355,6 +365,7 @@ index:
 ```
 
 ### `config/embedding.yaml`
+
 ```yaml
 default_store: atomic
 default_source: gks
@@ -369,6 +380,7 @@ exclude_patterns:
 ```
 
 ### `config/database.yaml`
+
 ```yaml
 postgres:
   vector_dim: 1024
@@ -380,6 +392,7 @@ postgres:
 ```
 
 ### `config/identity.yaml`
+
 ```yaml
 defaults:
   namespace: evaAI
@@ -407,6 +420,7 @@ export function clearConfigCache(): void   // for tests
 ```
 
 **Resolution order** (per ADR--CONFIG-TWO-LAYER-SPLIT):
+
 1. **Layer 1:** `<root>/config/<moduleName>.yaml` — operator override (if present)
 2. **Layer 2:** `<root>/packages/<packageName>/config/<moduleName>.defaults.yaml` — package default
 3. Walk up 5 levels (monorepo-friendly) from `root`
@@ -421,6 +435,7 @@ export function clearConfigCache(): void   // for tests
 ## ๖. Phase Plan
 
 ### Phase 0 — Foundation (1 PR)
+
 - [ ] Create directories: `config/`, `packages/msp/config/`, `packages/gks/config/`
 - [ ] Create `config/README.md` (index, ownership table, load order, naming convention)
 - [ ] Implement `packages/msp/src/config/loader.ts` with 2-layer resolution (`loadConfig<T>(module, key, root)`)
@@ -429,6 +444,7 @@ export function clearConfigCache(): void   // for tests
 - [ ] Add boundary check: GKS code may NOT load from `packages/msp/config/` (enforced by lint + reviewer)
 
 ### Phase 1 — Validator + Codegen (Layer 1 — operator-facing, 1–2 PRs)
+
 - [ ] Create `config/validator.yaml`
 - [ ] Refactor `packages/msp/src/validator/proto/master-token-cap.ts` → read thresholds from config
 - [ ] Refactor `packages/msp/src/validator/proto/master-body-schema.ts` → read required sections
@@ -440,6 +456,7 @@ export function clearConfigCache(): void   // for tests
 - [ ] Update tests; verify no behavior change
 
 ### Phase 2 — Retrieval + Memory (1 PR) — Layer 2 (MSP internal)
+
 - [ ] Create `packages/msp/config/retrieval.defaults.yaml`
 - [ ] Refactor `packages/msp/src/orchestrator/retrieval/types.ts` → `DEFAULT_WEIGHTS`, timeouts, k constants
 - [ ] Create `packages/msp/config/memory.defaults.yaml`
@@ -449,6 +466,7 @@ export function clearConfigCache(): void   // for tests
 - [ ] Refactor `packages/msp/src/memory/backlinks/walk.ts` → exclude list
 
 ### Phase 3 — Hooks + MCP + Paths (1 PR) — mixed
+
 - [ ] Create `packages/msp/config/hooks.defaults.yaml` (Layer 2)
 - [ ] Refactor `packages/msp/examples/hooks/pre-commit-validator.sh` → read regex from YAML (via `yq` or pre-baked sourced file)
 - [ ] Create `packages/msp/config/mcp.tools.yaml` (Layer 2)
@@ -457,6 +475,7 @@ export function clearConfigCache(): void   // for tests
 - [ ] Refactor all `.brain/msp/...` hardcodes across `memory/`, `orchestrator/`, `codegen/`
 
 ### Phase 4 — Embedding + Database + Identity (1 PR) — Layer 2
+
 - [ ] Create `packages/gks/config/embedding.defaults.yaml`
 - [ ] Refactor `scripts/msp/re-embed.ts`
 - [ ] Create `packages/gks/config/database.defaults.yaml`
@@ -465,6 +484,7 @@ export function clearConfigCache(): void   // for tests
 - [ ] Refactor `packages/msp/src/identity/profile.ts`, `voice.ts` defaults
 
 ### Phase 5 — Hardening (1 PR)
+
 - [ ] Add `npm run config:validate` — JSON Schema check on every YAML
 - [ ] Add registry-drift-style validator: each PR must `git diff config/` if it changes related code
 - [ ] Add `config/README.md` examples for each file

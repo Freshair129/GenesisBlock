@@ -28,6 +28,7 @@ swap in pgvector or HNSW at config time.
 ## Consequences
 
 **Positive**
+
 - Zero dependencies for getting started; checkout + `npm install` is
   enough.
 - One file per store keeps debugging trivial — `cat`, `jq`, `grep` all
@@ -36,12 +37,14 @@ swap in pgvector or HNSW at config time.
   is identical to fancier indexes — no recall regressions when migrating.
 
 **Negative**
+
 - O(N·d) per query. Acceptable up to ~100k vectors at 1024 dimensions
   on a typical laptop (low single-digit ms).
 - Memory pressure: the entire store is loaded into RAM on `load()`.
   Streaming variant deferred until we have a customer at >100k.
 
 **Neutral**
+
 - Forces us to design the `VectorBackend` interface early, which
   pays off when the pgvector / HNSW backends land.
 

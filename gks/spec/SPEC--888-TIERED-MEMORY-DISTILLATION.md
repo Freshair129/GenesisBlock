@@ -164,6 +164,7 @@ hypothesis   ──► confirmed ──► [stable belief]
 | `deprecated` | Disproven or superseded; retained for audit only | any |
 
 **Transition rules:**
+
 - `hypothesis → confirmed`: confidence ≥ 0.70 after at least 2 independent source episodes.
 - `confirmed → contested`: a contradiction signal arrives (user correction, conflicting episode, or Identity belief score drops below `contested_threshold`).
 - `contested → confirmed`: confidence recovers above 0.70 within `belief_revision.recovery_window_sessions`.

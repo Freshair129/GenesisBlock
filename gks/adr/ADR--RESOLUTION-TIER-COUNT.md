@@ -146,5 +146,5 @@ Negative / accepted costs:
 - `[[CONCEPT--RESOLUTION-GRADIENT]]` — the four-tier model and `expand()` semantics.
 
 ## Connections
-- [[FRAMEWORK--UNIVERSAL-CONTEXT-FRAMEWORK]]
 
+- [[FRAMEWORK--UNIVERSAL-CONTEXT-FRAMEWORK]]

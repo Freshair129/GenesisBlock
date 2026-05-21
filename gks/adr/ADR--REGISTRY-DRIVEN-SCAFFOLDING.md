@@ -97,7 +97,8 @@ The taxonomy was previously defined in `docs/gks/KNOWLEDGE-TYPES.md` but enforce
 
 ## Decision
 
-`atom_registry.yaml` is the Single Source of Truth (SSOT) for the type taxonomy. 
+`atom_registry.yaml` is the Single Source of Truth (SSOT) for the type taxonomy.
+
 - Validator, scaffolder, and future tools MUST read from this registry.
 - **Versioning Policy**: The registry uses semver for structure changes.
 - **Authority Gate**: Adding or removing types requires PR + human review only. Agents cannot autonomously add new types to the registry.

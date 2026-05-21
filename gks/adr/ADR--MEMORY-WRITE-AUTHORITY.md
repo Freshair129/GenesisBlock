@@ -30,18 +30,20 @@ We decide that the **MSP Distiller process** (the "subconscious") is the **exclu
 
 ### Authority Rules
 
-1.  **No LLM Direct Write:** The LLM agents (Consciousness layer) are forbidden from writing to `.brain/msp/projects/<ns>/memory/` paths. Any attempt to do so must be blocked by MSP file-system guards.
-2.  **Centralized Synthesis:** Only the canonical MSP distiller process can produce `Session`, `Narrative`, and `Identity` artifacts.
-3.  **Atomic Output:** The distiller authors memory artifacts and then emits corresponding atoms into GKS via the standard gatekeeper path. User-facing tools like `retain()` do NOT target memory storage paths.
+1. **No LLM Direct Write:** The LLM agents (Consciousness layer) are forbidden from writing to `.brain/msp/projects/<ns>/memory/` paths. Any attempt to do so must be blocked by MSP file-system guards.
+2. **Centralized Synthesis:** Only the canonical MSP distiller process can produce `Session`, `Narrative`, and `Identity` artifacts.
+3. **Atomic Output:** The distiller authors memory artifacts and then emits corresponding atoms into GKS via the standard gatekeeper path. User-facing tools like `retain()` do NOT target memory storage paths.
 
 ## Consequences
 
 ### Positive
+
 - **Integrity:** Guarantees that all long-term memory is produced via the validated 4-pillars pipeline.
 - **Security:** Prevents agents from "hallucinating" or forging their own long-term beliefs.
 - **Coherence:** Ensures a single, unified narrative arc for the namespace.
 
 ### Negative
+
 - **Latency:** Memory updates are asynchronous and occur between sessions, meaning the system doesn't "remember" across sessions in real-time.
 
 ## Source

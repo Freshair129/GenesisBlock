@@ -147,8 +147,8 @@ attributes:
 - `tree-sitter-python` documentation
 
 ## Connections
+
 - [[ADR--SYMBOL-GRAPH-PERSISTENCE]]
 - [[FRAMEWORK--SYMBOL-GRAPH]]
 - [[CONCEPT--SYMBOL-GRAPH]]
 - [[FEAT--MSP-SYMBOL-MCP]]
-

@@ -147,7 +147,7 @@ const link = client.smartViewDeepLink?.('FRAMEWORK--MSP-ARCHITECTURE-V2')
 - Any bundled embedder
 
 ## Connections
+
 - [[ADR--MSP-OBSIDIAN-INTEGRATION]]
 - [[CONCEPT--OBSIDIAN-AS-RUNTIME]]
 - [[FRAMEWORK--MSP-ARCHITECTURE-V2]]
-

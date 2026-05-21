@@ -95,7 +95,7 @@ The YAML structure contract for the registry is defined as follows:
 
 - **Version**: A string representing the taxonomy version (e.g., "2.4").
 - **Last Updated**: ISO-8601 timestamp with offset.
-- **Taxonomy**: 
+- **Taxonomy**:
   - **Clusters**: Broad groupings (e.g., `implementation_flow`, `agent_governance`).
     - **Types**: Key-value pairs where the key is the UPPERCASE atom prefix.
       - `phase`: The numeric phase (0-6).

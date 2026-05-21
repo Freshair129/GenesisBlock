@@ -139,5 +139,5 @@ Per-statement would be cleaner but unworkable — each ADR would balloon with ma
 `msp_spec.md` §4.6 (Epistemic & Crosslinks Block).
 
 ## Connections
-- [[CONCEPT--ATOMIC-WRITE-CONTRACT]]
 
+- [[CONCEPT--ATOMIC-WRITE-CONTRACT]]

@@ -103,6 +103,7 @@ attributes:
 ความต้องการรองรับภาษา COBOL (ตาม `[[FEAT--SYMBOLS-MULTI-LANG]]`) มีวัตถุประสงค์หลักเพื่อการสืบค้นความสัมพันธ์เชิงสถาปัตยกรรม (High-level call mapping) ในระบบ Legacy
 
 ตัวเลือกที่พิจารณา:
+
 1. **Tree-sitter-cobol:** ใช้ grammar ที่สมบูรณ์
 2. **Regex-based parser:** ใช้การสแกนบรรทัดต่อบรรทัดเพื่อหาคำสำคัญ (Keywords)
 
@@ -121,9 +122,9 @@ attributes:
 
 - สร้าง `src/symbols/parser/cobol.ts`
 - สแกนหา:
-    - `PROGRAM-ID. <NAME>.` → `module` symbol
-    - `<NAME> SECTION.` → `function` symbol
-    - `CALL "<NAME>"` หรือ `PERFORM <NAME>` → `calls` edges
+  - `PROGRAM-ID. <NAME>.` → `module` symbol
+  - `<NAME> SECTION.` → `function` symbol
+  - `CALL "<NAME>"` หรือ `PERFORM <NAME>` → `calls` edges
 - ตรวจสอบความถูกต้องของสัญลักษณ์โดยมองข้าม Area A/B ของ COBOL ในเบื้องต้น
 
 ## Consequences
@@ -132,6 +133,6 @@ attributes:
 - **Negative:** ไม่สามารถวิเคราะห์ Data Flow เชิงลึกหรือโครงสร้างข้อมูลที่ซับซ้อนได้ หากในอนาคตต้องการรายละเอียดมากขึ้น จะพิจารณาเปลี่ยนไปใช้ Tree-sitter ในเฟสถัดไป
 
 ## Connections
+
 - [[FRAMEWORK--SYMBOL-GRAPH]]
 - [[CONCEPT--SYMBOL-GRAPH]]
-

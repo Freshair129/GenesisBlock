@@ -165,7 +165,7 @@ this ADR records that those files live outside `gks/`.
 - `docs/MSP_RELATIONSHIP.md` § task tracking — the contract
 
 ## Connections
+
 - [[ADR--EXTENDED-TAXONOMY]]
 - [[CONCEPT--MSP-ROADMAP]]
 - [[ADR--DOC-TO-CODE-ENFORCEMENT]]
-

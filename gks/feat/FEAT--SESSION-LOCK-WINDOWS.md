@@ -31,25 +31,29 @@ The current session management relies on basic file system checks which are pron
 ## 3. Requirements
 
 ### 3.1 Lock Management
--   **Lock on Open:** Acquire a lock before opening or creating a session file for writing.
--   **Release on Close:** Release the lock immediately after the write operation is completed or the session is closed.
--   **Stale Lock Handling:** Automatically detect and remove stale locks (locks left behind by crashed processes) after a defined timeout.
+
+- **Lock on Open:** Acquire a lock before opening or creating a session file for writing.
+- **Release on Close:** Release the lock immediately after the write operation is completed or the session is closed.
+- **Stale Lock Handling:** Automatically detect and remove stale locks (locks left behind by crashed processes) after a defined timeout.
 
 ### 3.2 Error Handling
--   **Wait/Retry:** Implement a configurable retry logic if a lock cannot be acquired immediately.
--   **Fail Gracefully:** If a lock cannot be acquired after retries, the system must report a clear error and prevent the write operation instead of failing silently.
+
+- **Wait/Retry:** Implement a configurable retry logic if a lock cannot be acquired immediately.
+- **Fail Gracefully:** If a lock cannot be acquired after retries, the system must report a clear error and prevent the write operation instead of failing silently.
 
 ### 3.3 Platform Parity
--   The implementation must behave identically on Windows and Linux.
--   The lock files should be stored alongside the session files (e.g., `<session_id>.jsonl.lock`).
+
+- The implementation must behave identically on Windows and Linux.
+- The lock files should be stored alongside the session files (e.g., `<session_id>.jsonl.lock`).
 
 ## 4. Acceptance Criteria
 
--   [ ] Concurrent write attempts to the same session ID from different processes are correctly serialized or gated.
--   [ ] No data corruption or interleaved JSON lines observed during stress tests.
--   [ ] Stale locks from simulated process crashes are correctly handled.
--   [ ] Works seamlessly on both Windows 10/11 and Linux environments.
+- [ ] Concurrent write attempts to the same session ID from different processes are correctly serialized or gated.
+- [ ] No data corruption or interleaved JSON lines observed during stress tests.
+- [ ] Stale locks from simulated process crashes are correctly handled.
+- [ ] Works seamlessly on both Windows 10/11 and Linux environments.
 
 ## 5. Connections
--   `[[CONCEPT--MSP-ROADMAP]]` §3 M9f.
--   `[[CONCEPT--MEMORY-SESSIONS]]` — the core system this feature protects.
+
+- `[[CONCEPT--MSP-ROADMAP]]` §3 M9f.
+- `[[CONCEPT--MEMORY-SESSIONS]]` — the core system this feature protects.

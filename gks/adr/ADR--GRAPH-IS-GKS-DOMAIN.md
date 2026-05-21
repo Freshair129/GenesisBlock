@@ -155,11 +155,13 @@ When GKS ships native backlinks API, MSP code becomes a thin caller; the indexer
 ## Consequences
 
 **Positive**
+
 - Clear boundary: any future graph feature (e.g. `crosslinks.partially_supersedes`, multi-hop queries, transitive closure) goes upstream to GKS, not into MSP.
 - Reduces MSP scope; smaller surface, easier maintenance.
 - Aligns with `SCOPE.md` decision rule (1) "manipulates stored data, indexes, or queries → GKS".
 
 **Negative**
+
 - M3c-1 work technically lives in the wrong layer until upstream lands. Trade-off accepted: shipping faster vs perfect layering.
 - Some upstream PRs we may need (backlinks API, phase 6, verify-flow through superseded) are out of MSP's direct push access — proposed as drafts under `upstream/gks-proposals/` for manual application by the GKS maintainer.
 
@@ -182,6 +184,6 @@ When GKS ships native backlinks API, MSP code becomes a thin caller; the indexer
 GksV3 `SCOPE.md` "Graph" + `MSP_RELATIONSHIP.md` compatibility checklist + audit performed during M7-prep follow-up.
 
 ## Connections
+
 - [[FRAMEWORK--CROSSLINKS-VOCABULARY]]
 - [[CONCEPT--GENESIS-GRAPH-BACKEND]]
-

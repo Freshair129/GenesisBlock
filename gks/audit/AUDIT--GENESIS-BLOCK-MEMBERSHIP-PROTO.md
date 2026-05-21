@@ -156,6 +156,6 @@ For every atom with `type: genesis`, reads the manifest frontmatter and checks:
   atoms to check).
 
 ## Connections
+
 - [[CONCEPT--PROTO-PATTERN]]
 - [[CONCEPT--TAXONOMY-V2-3]]
-

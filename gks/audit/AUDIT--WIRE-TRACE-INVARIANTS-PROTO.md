@@ -166,5 +166,5 @@ a follow-up, not a mechanical wiring fix.
 - `test/validator/proto/` — 102 tests pass (loader suite 17/17).
 
 ## Connections
-- [[BLUEPRINT--PROTO-LOADER]]
 
+- [[BLUEPRINT--PROTO-LOADER]]

@@ -176,12 +176,14 @@ The caller can override via `opts.tier`, which becomes `dispatch`'s `budget_hint
 ## Trade-offs
 
 **Positive**
+
 - One named entry point (`executeBlock`) for any 5-dimension knowledge unit
 - Provenance is automatic via episode recording
 - Authors edit atoms in `gks/`; runtime picks up changes with no rebuild
 - Extends cleanly: future runtime versions can add caching, multi-agent fan-out, or alternate composition strategies without changing the manifest contract
 
 **Negative**
+
 - Composition is naive: every member body goes into the prompt, no per-member token budget. Large blocks may overrun T1/T2 context windows.
 - No conflict resolution: if two member atoms disagree, both bodies still ship to the LLM. Author discipline is the only guard.
 - Tier routing is delegated to `dispatch()`; the runtime cannot inspect or override mid-flight escalation decisions.
@@ -198,6 +200,6 @@ The caller can override via `opts.tier`, which becomes `dispatch`'s `budget_hint
 Phase E5 of the agentic-monorepo plan. Pins the runtime contract before code lands so the implementation in `packages/msp/src/genesis/` can be reviewed against this CONCEPT and the `[[BLUEPRINT--GENESIS-BLOCK-RUNTIME]]` plan.
 
 ## Connections
+
 - [[CONCEPT--AGENT-AGNOSTIC]]
 - [[CONCEPT--AGENT-TIER-ROUTING]]
-

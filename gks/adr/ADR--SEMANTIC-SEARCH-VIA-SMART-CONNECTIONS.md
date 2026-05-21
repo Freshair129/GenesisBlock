@@ -154,12 +154,14 @@ When the project outgrows JSONL (large vault, batch queries, sub-100ms latency r
 ## Consequences
 
 **Positive**
+
 - Headless agent recall works (CI, server boot, no Obsidian needed).
 - Human browse is unchanged — SC users get the familiar pane.
 - Single model = vectors interchangeable in principle; opens M10a dedup.
 - Scale-up = swap GKS backend, no rewrites.
 
 **Negative**
+
 - 2× storage until M10a — accepted at current scale.
 - User must configure SC plugin to match the canonical model. Recoverable failure: agents always get correct results (GKS canonical); only Obsidian Smart View shows divergent neighbours if user picks a different model in SC — drift visible to humans, not destructive.
 - M7c adds GKS as a hard runtime dep for semantic features (was Obsidian before this update). GKS is an npm package, easier to vend than a GUI app.
@@ -183,5 +185,5 @@ When the project outgrows JSONL (large vault, batch queries, sub-100ms latency r
 `[[CONCEPT--EMBEDDING-STRATEGY]]` + GksV3 3.6.0 CHANGELOG (`createNomicEmbedder`) + `[[ADR--EMBEDDING-MODEL-PARITY]]` + audit during M7-prep follow-up.
 
 ## Connections
-- [[ADR--MSP-OBSIDIAN-INTEGRATION]]
 
+- [[ADR--MSP-OBSIDIAN-INTEGRATION]]

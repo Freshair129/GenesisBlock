@@ -165,6 +165,7 @@ MSP_TEST_REAL_CLIS=1 npm test --workspace=packages/msp -- test/agents/integratio
 ```
 
 Expected behaviour:
+
 - **Binary missing**: healthcheck test passes (boolean returned, no throw),
   run-test logs `[real-cli] <label>: binary missing — skipping run() test`
   and returns silently.

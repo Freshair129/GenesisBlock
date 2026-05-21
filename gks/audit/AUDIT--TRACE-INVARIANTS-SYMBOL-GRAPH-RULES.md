@@ -113,6 +113,7 @@ attributes:
 ## Scope
 
 Closes out the trace-invariants predicate by:
+
 1. Wiring Rule 4a (Symbol Referential Integrity) through the new `SymbolGraphReader` injected into `PredicateContext`.
 2. Removing the misleading "Rule 1 / Rule 3" stub code from the predicate. Those two rules are runtime invariants the symbol-trace tooling enforces; they have no static violation case to test, and the previous stub was an unenforced no-op masquerading as enforcement.
 3. Promoting `[[PROTO--SYMBOLS-TRACE-INVARIANTS]]` from `status: active` → `status: stable` so its error-severity violations gate `msp:validate --all`.
@@ -149,8 +150,8 @@ Closes out the trace-invariants predicate by:
 - **Multiple cycles per SCC.** Rule 2 reports one cycle per connected component. Switching to Tarjan SCC enumeration is a follow-up if dense cycle clusters appear in practice.
 
 ## Connections
+
 - [[BLUEPRINT--PROTO-LOADER]]
 - [[BLUEPRINT--TRACE-INVARIANTS-PREDICATE-CONTEXT]]
 - [[AUDIT--TRACE-INVARIANTS-ATOM-GRAPH-RULES]]
 - [[AUDIT--WIRE-TRACE-INVARIANTS-PROTO]]
-

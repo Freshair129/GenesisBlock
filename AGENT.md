@@ -15,21 +15,25 @@
 ## P0 — Always loaded (foundation)
 
 ### MASTER--ROOT-CAUSE-ANALYSIS
+
 - **Apply when:** bug, error, ambiguous request, failed previous attempt
 - **Directive:** identify and confirm root cause before any fix
 - → `gks/master/MASTER--ROOT-CAUSE-ANALYSIS.md`
 
 ### MASTER--MSP-DOC-TO-CODE
+
 - **Apply when:** new branch, PR, file in `src/|test/|scripts/|web/`
 - **Directive:** atoms before code (FRAME→CONCEPT→ADR→BP→CODE→AUDIT)
 - → `gks/master/MASTER--MSP-DOC-TO-CODE.md`
 
 ### MASTER--ATOM-CONTRADICTION-POLICY
+
 - **Apply when:** PR adds/edits atom in `gks/<type>/`
 - **Directive:** reciprocal supersession in same PR
 - → `gks/master/MASTER--ATOM-CONTRADICTION-POLICY.md`
 
 ## P1–P4
+
 See `CLAUDE.md` § MASTER BLOCKS for the full sector layout. Gemini-relevant Masters are listed here when promoted.
 
 ---
@@ -78,16 +82,19 @@ cognitive_system/                    ← monorepo root (git root)
 ```
 
 **packages/ vs apps/ rule:**
+
 - `packages/` = things other packages/apps **import** (libraries)
 - `apps/` = things that are **deployed or run** directly (executables, servers, apps)
 - Never import from `apps/` — if code is shared, it belongs in `packages/`
 
 **CLI is also an agent interface:**
+
 - `apps/cli/` serves both humans (`gks search "..."` in terminal) and AI agents
   (Claude/Gemini invoke it via Bash tool to query GKS without importing TypeScript)
 - `apps/mcp/` serves AI agents only via Model Context Protocol
 
 **Boundary rules (ADR--MONOREPO-STRUCTURE):**
+
 - `packages/gks/` MUST NOT import from `packages/msp/` or any `apps/*`
 - `packages/msp/` depends on `packages/gks/` via `workspace:*`
 - `apps/web/` reads GKS data via a **JSON snapshot only**, never imports gks/msp directly
@@ -116,6 +123,7 @@ two known failure modes have already caused production outages (see `INCIDENT_RE
 ### Rules every other agent must follow to keep Antigravity healthy
 
 **Git hygiene — most critical:**
+
 - Never leave `.git` files inside subdirectories that Antigravity might scan.
   Claude Code worktrees at `.claude/worktrees/` each contain a `.git` file — these have previously
   crashed Antigravity's Language Server (Ref: `INCIDENT_REPORT--ANTIGRAVITY-AGENT-FAIL.md`).
@@ -123,16 +131,19 @@ two known failure modes have already caused production outages (see `INCIDENT_RE
 - Do not create nested worktrees inside `packages/*` directories.
 
 **Git config consistency:**
+
 - `core.repositoryformatversion` must be `0` unless worktreeConfig extensions are also in use.
   If both are set inconsistently, Antigravity's Language Server crashes on startup
   (Ref: `INCIDENT_REPORT--ANTIGRAVITY-GIT-CONFIG-CONFLICT.md`).
 - Check: `git config core.repositoryformatversion` — should return `0` or `1` (never mixed state).
 
 **Lock file hygiene:**
+
 - Keep ONE `package-lock.json` at repo root. Do NOT create `package-lock.json` inside individual
   `packages/*` subdirectories. Duplicate lock files confuse Antigravity's dependency graph analysis.
 
 **What Antigravity does NOT do:**
+
 - Antigravity does not read `AGENT.md`, `CLAUDE.md`, or any guidance file. It operates on code context only.
 - Antigravity does not commit or push. It only suggests inline edits.
 - Antigravity does not run npm scripts or shell commands.
@@ -203,6 +214,7 @@ Canonical ref: `gks/concept/CONCEPT--TAXONOMY-V2-3.md`
 ## 8. Validation Gates
 
 Before any atom commit:
+
 ```bash
 npm run msp:index                                                # regen atomic_index.jsonl
 npx tsx packages/msp/src/validator/cli.ts --root=packages/msp --all  # 0 failed required
@@ -210,6 +222,7 @@ npm run msp:check-links                                          # no dangling c
 ```
 
 Before any code commit in `packages/*`:
+
 ```bash
 npm run typecheck --workspace=packages/<name>
 npm test --workspace=packages/<name>
@@ -228,4 +241,4 @@ npm test --workspace=packages/<name>
 
 ---
 
-*Last updated: 2026-05-14. Owner: Boss. For tool-specific rules: `CLAUDE.md` · `GEMINI.md` · `qwen.md`*
+_Last updated: 2026-05-14. Owner: Boss. For tool-specific rules: `CLAUDE.md` · `GEMINI.md` · `qwen.md`_

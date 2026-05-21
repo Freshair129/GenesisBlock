@@ -140,6 +140,7 @@ Closes the M3a item from `[[AUDIT--MSP-VALIDATOR]]` and `[[AUDIT--KNOWLEDGE-BASE
 ```
 
 New files in M3a:
+
 - `test/hooks/pre-commit.test.ts` (4 tests) — spawns a fixture git repo, copies the hook in, stages valid/invalid atoms, asserts hook behaviour incl. `--no-verify` bypass.
 
 ## Validator dogfood (after M3a)

@@ -96,11 +96,13 @@ attributes:
 # STACK — MSP Node.js Runtime
 
 ## Runtime Environment
+
 - **Node.js**: >= 20.0.0
 - **Module System**: ESM (ECMAScript Modules)
 - **Language**: TypeScript >= 5.0.0
 
 ## Core Components
+
 - **Persistence**: File-based JSONL (GKS) + SQLite (Symbol Graph).
 - **Communication**: Model Context Protocol (MCP) for tool binding.
 - **Serialization**: `yaml` for atoms, `zod` for schema enforcement.
@@ -108,6 +110,7 @@ attributes:
 - **Auth**: `node:crypto` for nonces and hash verification.
 
 ## Dependencies
+
 - `@freshair129/gks`: Storage engine.
 - `@modelcontextprotocol/sdk`: MCP server implementation.
 - `better-sqlite3`: Native bindings for high-performance symbol storage.
@@ -115,5 +118,5 @@ attributes:
 - `zod`: Type-safe schema validation.
 
 ## Connections
-- [[FRAMEWORK--MSP-ARCHITECTURE-V2]]
 
+- [[FRAMEWORK--MSP-ARCHITECTURE-V2]]

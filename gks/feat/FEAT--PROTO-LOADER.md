@@ -159,7 +159,7 @@ PROTO predicates that fail with `severity: error` cause `--all` to exit 1. `seve
 - PROTO sandboxing — same Node process, no isolation
 
 ## Connections
+
 - [[ADR--PROTO-ATOM-TYPE]]
 - [[CONCEPT--PROTO-PATTERN]]
 - [[FEAT--MSP-VALIDATOR]]
-

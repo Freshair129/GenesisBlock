@@ -130,5 +130,5 @@ If every agent turn pulled the entire session JSONL, a 50-turn conversation woul
 `msp_spec.md` §7 (Memory Subsystem).
 
 ## Connections
-- [[FRAMEWORK--MSP-ARCHITECTURE-V2]]
 
+- [[FRAMEWORK--MSP-ARCHITECTURE-V2]]

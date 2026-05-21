@@ -35,5 +35,6 @@ As the vault grows past 5,000 atoms or when semantic search latency exceeds 500m
 3. **Pluggability:** The transition to `pgvector` should be an opt-in configuration, allowing smaller vaults to remain local-only while providing a clear upgrade path for large enterprise setups.
 
 ## Connections
+
 - `[[CONCEPT--MSP-ROADMAP]]` §4 M10a.
 - `[[ADR--MSP-OBSIDIAN-INTEGRATION]]` — the original integration decision this concept expands upon.

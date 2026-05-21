@@ -23,20 +23,25 @@ created_at: 2026-05-21T12:00:00+07:00
 # BLUEPRINT — Genesis Block Log Compaction
 
 ## 1. Problem Statement
+
 The current Genesis Block storage (Phase 3.2) uses an append-only JSONL log. Every node/edge update or retraction adds a new line. Over time, the log accumulates "stale" data (superseded properties or retracted edges), leading to:
+
 1. Increased disk usage.
 2. Slower cold-start times (more lines to replay into memory).
 3. Higher memory pressure during the replay phase.
 
 ## 2. Proposed Solution: Log Compaction
+
 Implement a "Compaction" routine in the native Rust engine that rewrites the JSONL log to contain only the minimal set of events required to reconstruct the current state of the graph.
 
 ### 2.1 Technical Requirements
+
 - **Atomic Swap:** Compaction must not corrupt the database if interrupted.
 - **Lock Integrity:** Must respect the `genesis-graph.lock` established in P3.3.
 - **Memory-to-Disk:** Leverage the fact that the `Storage` struct in memory already represents the "Current Truth".
 
 ### 2.2 Compaction Logic (Rust)
+
 1. **Prepare:** Open a temporary file `genesis-graph.jsonl.tmp` in the same directory as the database.
 2. **Serialize Nodes:** Iterate through `storage.nodes` (HashMap) and write each as an `Event::Node` line.
 3. **Serialize Edges:** Iterate through `storage.edges` (HashMap).
@@ -48,6 +53,7 @@ Implement a "Compaction" routine in the native Rust engine that rewrites the JSO
    - Verify the original file is replaced atomically.
 
 ## 3. Integration & API
+
 Add a new method to the `GenesisDatabase` class:
 
 ```typescript
@@ -56,15 +62,18 @@ compact(): Promise<void>
 ```
 
 Add a synchronous variant for internal use:
+
 ```rust
 // lib.rs
 pub fn compact_sync(&mut self) -> Result<()>
 ```
 
 ## 4. Triggers
+
 - **Manual:** Exposed via `msp-graph compact` or the `compact()` method.
 - **Auto (Future):** Threshold based on `(log_line_count / current_element_count) > threshold`.
 
 ## 5. Verification Plan
+
 - **Unit Test:** Add 100 edges, retract 50, run `compact()`, verify file size decreases and data integrity remains.
 - **Benchmark:** Compare replay time of a dirty log vs a compacted log.

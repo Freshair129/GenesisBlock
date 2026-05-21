@@ -152,12 +152,14 @@ This makes the server crash-safe and trivially parallelisable. Trade-off: per-ca
 ## Consequences
 
 **Positive**
+
 - Server is ~200 LOC of glue + 6 small handlers.
 - Same install pattern as `gks-mcp-server` — discovery is identical.
 - Pluggable SLM provider via env (`MSP_SLM_PROVIDER`) — agents can override per call too.
 - Stateless = no leaked file locks across crashes.
 
 **Negative**
+
 - Per-call session-writer open/close cost: ~5 ms file lock + write + release. Negligible at agent cadence.
 - No batch tool calls — agents must loop. SDK supports parallel calls though, so 10 concurrent appends → 10 stat/lock/append cycles in parallel. Lock acquisition would serialise per-episodic-id.
 
@@ -178,6 +180,6 @@ This makes the server crash-safe and trivially parallelisable. Trade-off: per-ca
 `[[CONCEPT--MSP-MCP-SERVER]]` + GksV3 README's MCP-server pattern + `@modelcontextprotocol/sdk` 1.x docs.
 
 ## Connections
+
 - [[FEAT--MSP-VALIDATOR]]
 - [[FEAT--CODEGEN-MICROTASK-RUNNER]]
-

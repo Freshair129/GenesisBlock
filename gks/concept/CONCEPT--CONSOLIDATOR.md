@@ -181,6 +181,6 @@ session ends (or msp_remember called)
 `msp_spec.md` §7c (Passport — Consolidator), `[[CONCEPT--MEMORY-EPISODIC]]`, user direction "M7b approach = hybrid (deterministic + LLM borderline)" during M7-prep follow-up cleanup.
 
 ## Connections
+
 - [[FRAMEWORK--MSP-ARCHITECTURE-V2]]
 - [[CONCEPT--MEMORY-SESSIONS]]
-

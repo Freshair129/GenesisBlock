@@ -150,7 +150,7 @@ A new branch is opened, a PR is drafted, or any file under `src/`, `test/`, `scr
 (none currently — flag any future Master that contradicts this directive.)
 
 ## Connections
+
 - [[CONCEPT--CODEGEN-MICROTASK-CONTRACT]]
 - [[ADR--MASTER-PROMOTION-DOC-TO-CODE]]
 - [[FRAMEWORK--KNOWLEDGE-3-TIER]]
-

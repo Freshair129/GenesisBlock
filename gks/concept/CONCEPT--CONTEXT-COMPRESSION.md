@@ -141,6 +141,7 @@ Default: greedy fill from highest-importance down, applying the cheapest tier pe
 - Trim catches the common case ("episode is mostly fine but had 3 irrelevant turns").
 
 Per-episode tier choice:
+
 1. If `episode.tokens ≤ budgetSlice`: **keep**
 2. Else if episode has ≥ 30% dropable turns (per `tier1Score` re-applied): **trim**
 3. Else: **resummarise** (target 60% of original token count)
@@ -201,5 +202,5 @@ Pure read + transform; no persistence. Episodic store unchanged.
 `msp_spec.md` §7d, `[[CONCEPT--CONSOLIDATOR]]` (compressor's input shape comes from M7b episodes), `[[FRAMEWORK--MSP-ARCHITECTURE-V2]]`.
 
 ## Connections
-- [[FEAT--CONSOLIDATOR]]
 
+- [[FEAT--CONSOLIDATOR]]

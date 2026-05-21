@@ -41,5 +41,6 @@ As the vault scales and RRF produces larger candidate sets with similar scores, 
 - **Improved Context Window Utilization:** Ensuring the most relevant knowledge is prioritised for the LLM's prompt.
 
 ## Connections
+
 - `[[CONCEPT--MSP-ROADMAP]]` §4 M10c.
 - `[[ADR--RETRIEVAL-RRF-FUSION]]` — the first-stage pipeline this concept enhances.

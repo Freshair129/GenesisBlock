@@ -148,6 +148,7 @@ else:
 ### Iteration order
 
 Episodes processed in **importance-descending order** (`episode.score` desc). This way:
+
 - Highest-importance episodes get the verbatim/trim path while budget is roomy
 - Lower-importance episodes get the resummarise/truncate path or get dropped
 - Final output preserves the most-important content with highest fidelity
@@ -157,6 +158,7 @@ If `opts.preserveOrder = true`, the **output array** is reordered chronologicall
 ### Deterministic fallback (no LLM)
 
 When `opts.llm` is undefined OR LLM call fails (timeout / parse error):
+
 - Tier 3 falls back to **truncate**: keep turns from the **end** of the episode (most recent typically most relevant), drop earlier ones until total ≤ budget slice
 - Marked `compressedBy: 'truncated'` so caller can show "(truncated)" tag in UI
 - This makes the compressor headless-safe — works in CI / no-network setups
@@ -184,6 +186,7 @@ return result preserving original chronological order
 ## Consequences
 
 **Positive**
+
 - Cost-bounded — at most N LLM calls (one per resummarise-tier episode); typically far fewer because keep/trim handle the easy cases
 - Lossless for high-importance content — keep verbatim
 - Headless-safe via truncate fallback
@@ -191,6 +194,7 @@ return result preserving original chronological order
 - Provenance-preserved — every output carries `episodeRef`
 
 **Negative**
+
 - Adds latency proportional to resummarise-tier count × LLM call time. Mitigated by tier preference (cheapest first).
 - Truncate fallback can produce mid-sentence cuts. Mitigated: cut at turn boundary, never mid-text.
 - Tier choice depends on accurate token estimates; the char/3.5 heuristic underestimates for some scripts. Mitigated by `opts.tokeniser` injection.
@@ -214,5 +218,5 @@ return result preserving original chronological order
 `msp_spec.md` §7d, `[[CONCEPT--CONTEXT-COMPRESSION]]`, M7b consolidator infrastructure (re-used for tier-1 single-turn scoring).
 
 ## Connections
-- [[ADR--CONSOLIDATOR-HYBRID-SCORING]]
 
+- [[ADR--CONSOLIDATOR-HYBRID-SCORING]]

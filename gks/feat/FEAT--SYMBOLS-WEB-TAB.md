@@ -141,6 +141,7 @@ All endpoints return `404` with `{ ok: false, error: "graph not built" }` when S
 `SymbolsTab.tsx` is the parent; mounts `SymbolList` + `SymbolGraphView` + `SymbolDetail` and threads `selectedSymbolId` state. Reuses the Cytoscape pattern from `web/src/components/GraphView.tsx` (cose layout, neighbor highlight on click, drag-to-pan).
 
 `web/src/api.ts` extends with:
+
 ```typescript
 getSymbols(): Promise<{ symbols: Symbol[]; communities: Community[] }>
 getSymbol(id: string): Promise<SymbolDetailDTO>

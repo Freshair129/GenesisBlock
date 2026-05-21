@@ -154,6 +154,7 @@ RRF is the standard 2009-era IR result for hybrid fusion: simple, robust, no nor
 ### Tie-breaking
 
 When two atoms have identical RRF scores (rare with `k=60`):
+
 1. Hit with **more contributing sources** wins (more source-overlap = stronger signal).
 2. Then **lower minimum source rank** (best single-source rank).
 3. Then **lexicographic atomId** for determinism.
@@ -181,12 +182,14 @@ If `opts.timeoutMs` is set, it overrides the sum and per-source budgets are scal
 ## Consequences
 
 **Positive**
+
 - No score-normalisation code per source — RRF only uses ranks
 - Adding a new source (e.g. M10a Smart Connections companion) is a single source adapter + a default weight
 - Per-call weight overrides let agents say "give me more episodic context"
 - Standard algorithm — easily explained in audits
 
 **Negative**
+
 - RRF discards score magnitude — a vector hit at cosine 0.99 vs 0.71 contributes the same if both rank #1 in vector. Acceptable trade-off given heterogeneous sources.
 - Default weights are gut-feel. Tuning needs real query data (M9 work via `[[PARAM--RETRIEVAL-WEIGHTS]]`).
 - `k=60` is also gut-feel from literature. Same caveat.
@@ -211,6 +214,6 @@ If `opts.timeoutMs` is set, it overrides the sum and per-source budgets are scal
 `msp_spec.md` §7c, `[[CONCEPT--RETRIEVAL-ORCHESTRATION]]`, classic Cormack et al. 2009 (Reciprocal Rank Fusion) + practical IR experience.
 
 ## Connections
+
 - [[CONCEPT--EMBEDDING-STRATEGY]]
 - [[ADR--EMBEDDING-MODEL-PARITY]]
-

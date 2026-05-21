@@ -167,6 +167,7 @@ When SKELETON ships, its content must carry **enough for the agent to decide whe
 - 1-line description (from frontmatter `description:` field or first heading)
 
 Optional, per-vault configurable:
+
 - tags / domain attributes
 - last-updated date
 - crosslink count (signal of centrality in the graph)
@@ -204,5 +205,5 @@ This is policy-author responsibility, enforced by `pack-pii` and similar packs t
 - HippoRAG (Gutiérrez et al., 2024) — multi-hop retrieval over knowledge graphs.
 
 ## Connections
-- [[CONCEPT--KNOWLEDGE-LAYERS-V2]]
 
+- [[CONCEPT--KNOWLEDGE-LAYERS-V2]]

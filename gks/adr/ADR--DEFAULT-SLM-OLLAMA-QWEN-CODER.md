@@ -120,6 +120,7 @@ This drift is the kind §14.1 calls out — **code beats spec** for runtime beha
 The microtask runner SHALL **not** hardcode a provider. It SHALL call `createSlmClient({})` and let the factory honour `MSP_SLM_PROVIDER` (default `'ollama'`) and `OLLAMA_MODEL` (default `qwen2.5-coder:7b`).
 
 Concretely:
+
 - `runner.ts:79` — remove `?? 'qwen'`.
 - `cli.ts` — update `--model` help text to mention `qwen2.5-coder:7b` default and `OLLAMA_MODEL=qwen2.5-coder:14b` upgrade path.
 - `slm/ollama.ts` — add a leading-comment that documents the 7b/14b guidance.
@@ -129,14 +130,17 @@ The `'qwen'` provider remains in the factory for callers who explicitly want the
 ## Consequences
 
 ### Positive
+
 - Code matches `[[CONCEPT--CODEGEN-MICROTASK-RUNNER]]` and `FRAMEWORK_MASTER_SPEC` §17.3.
 - The default microtask path now resolves consistently to local Ollama, which is what every supported tier mapping in the spec assumes.
 - 14B upgrade is a single env-var swap (`OLLAMA_MODEL=qwen2.5-coder:14b`) — no code change.
 
 ### Negative
+
 - Callers that relied implicitly on the standalone `qwen` CLI must now set `MSP_SLM_PROVIDER=qwen` explicitly.
 
 ### Neutral
+
 - The Gemini-as-escalator chain is unchanged: Ollama → Gemini (escalator) → Opus (human gate).
 
 ## Status
@@ -144,5 +148,5 @@ The `'qwen'` provider remains in the factory for callers who explicitly want the
 Draft. Promotion to `stable` requires green CI on Node 20 + 22 with the runner-default-slm test added in this same PR.
 
 ## Connections
-- [[CONCEPT--CODEGEN-MICROTASK-CONTRACT]]
 
+- [[CONCEPT--CODEGEN-MICROTASK-CONTRACT]]

@@ -98,9 +98,11 @@ attributes:
 > Alias: this ADR formalises the stage breakdown of **Block Decomposition** — the top-down half of the Genesis Block Cycle. See `docs/gks/[[PRD--GENESIS-BLOCK-CYCLE]].md` for the unified vocabulary.
 
 ## Context
+
 ในการสร้าง Symbol Graph ที่มีความหมายเชิงสถาปัตยกรรม (Architectural Meaning) การสกัดเพียงแค่ AST (Abstract Syntax Tree) ไม่เพียงพอต่อการทำความเข้าใจความสัมพันธ์ที่ซับซ้อน เช่น ลำดับชั้นการสืบทอด, ระบบ Routing ของ Framework, และการไหลของข้อมูลระหว่างไฟล์
 
 ## Decision
+
 เราตัดสินใจบังคับใช้กระบวนการประมวลผล 12 ระยะ (12-stage DAG) โดยจัดลำดับความสำคัญตามขั้นตอนการขยายความรู้ (Knowledge Expansion):
 
 1. **Physical Discovery:** (Scan, Structure) - เข้าใจพื้นที่ทางกายภาพ
@@ -111,6 +113,7 @@ attributes:
 6. **Abstract Analysis:** (Communities, Processes) - สรุปความหมายในระดับสูง
 
 ## Consequences
+
 - **Positive:** Agents สามารถมองเห็นภาพรวมของระบบ (Big Picture) ได้ทันทีผ่าน Graph DB
 - **Positive:** รองรับการทำ Impact Analysis ข้ามภาษาและข้ามระบบ (Legacy + Modern)
 - **Negative:** ใช้ทรัพยากรในการประมวลผลครั้งแรกสูง (Initial Indexing Cost) แต่จะคุ้มค่าในการ Query ครั้งต่อๆ ไป
@@ -118,6 +121,6 @@ attributes:
 - **Constraint:** ต้องรันผ่าน `GenesisGraphBackend` เพื่อประสิทธิภาพในการจัดการความสัมพันธ์เชิงลึก
 
 ## Connections
+
 - [[CONCEPT--SYMBOL-GRAPH-PIPELINE]]
 - [[FRAMEWORK--SYMBOL-GRAPH]]
-

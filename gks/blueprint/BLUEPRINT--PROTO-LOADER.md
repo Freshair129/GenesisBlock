@@ -285,7 +285,7 @@ dependency_for: M8b PROTO--PHASE-GATES, M8c PROTO--SCALING-LEVEL-GATE, M8d PROTO
 - Add PROTO discovery via Obsidian
 
 ## Connections
+
 - [[FEAT--PROTO-LOADER]]
 - [[ADR--PROTO-ATOM-TYPE]]
 - [[CONCEPT--PROTO-PATTERN]]
-

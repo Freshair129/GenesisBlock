@@ -143,7 +143,7 @@ Wraps existing core rule `adrMonotonic` from `src/validator/rules/adr-monotonic.
 `[[CONCEPT--PROTO-AUDIT-EXISTING-RULES]]`, `[[ADR--ANTI-HALLUCINATION-RULES]]`.
 
 ## Connections
+
 - [[FRAMEWORK--MSP-ARCHITECTURE-V2]]
 - [[CONCEPT--PROTO-PATTERN]]
 - [[FEAT--PROTO-LOADER]]
-

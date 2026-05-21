@@ -130,6 +130,7 @@ Doc-only PR. No source code changes. Records the architectural shift discovered 
 ## V1 supersede
 
 `[[FRAMEWORK--MSP-ARCHITECTURE]]` (v1):
+
 - `status: stable` → `status: superseded`
 - `crosslinks.superseded_by: [[[FRAMEWORK--MSP-ARCHITECTURE-V2]]]`
 - Body preserved verbatim with a header note pointing at v2

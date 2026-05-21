@@ -122,6 +122,6 @@ real user attributes into the Policy Decision Point (PDP).
 - Date: 2026-05-14
 
 ## Connections
+
 - [[CONCEPT--STEP-UP-AUTH]]
 - [[FEAT--STEP-UP-AUTH-PIN]]
-

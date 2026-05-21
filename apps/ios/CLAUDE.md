@@ -1,4 +1,5 @@
 # GKS iOS — CLAUDE.md
+
 # Created At: 2026-05-14 14:00:00 +07:00 (v0.1.0-skeleton)
 
 ## What This Is

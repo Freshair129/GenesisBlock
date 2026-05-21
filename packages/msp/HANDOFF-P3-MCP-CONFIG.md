@@ -32,6 +32,7 @@ Merge this `mcpServers` key into the config:
 ```
 
 Notes on the choices:
+
 - **`command: node` + absolute path to `dist/mcp/bin.js`** instead of `npx msp-mcp-server`. The HANDOFF.md template uses `npx`, but on this Windows setup the package isn't published to npm and `node` against the built bin is more direct + less fragile.
 - **`--root=G:\\msp`** points at the repo so MSP can read `gks/`, `.brain/`, and write to `.brain/msp/projects/<ns>/`.
 - **`OBSIDIAN_API_KEY`** is optional. Leave it as the placeholder if you don't run Obsidian — MSP will fall back to filesystem-only mode for `msp_recall`. To enable: install Obsidian's "Local REST API" plugin, copy the key from its settings.

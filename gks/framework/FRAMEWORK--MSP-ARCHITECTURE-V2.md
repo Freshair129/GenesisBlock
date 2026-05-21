@@ -233,6 +233,7 @@ Resolution mirrors `git`'s global-vs-local config. `MSP_PROJECT` env or `.mspcon
 ## Data flow
 
 ### Write
+
 ```
 Agent → msp_remember(turn) → sessions writer (append JSONL)
                           ↓ if importance threshold met
@@ -242,6 +243,7 @@ Agent → msp_remember(turn) → sessions writer (append JSONL)
 ```
 
 ### Read
+
 ```
 Agent → msp_recall(query)
         ↓
@@ -279,8 +281,8 @@ These all stay in v2; they just live inside the passport, not as the passport it
 User's M7-prep architectural clarification. Previous: `[[FRAMEWORK--MSP-ARCHITECTURE]]` (v1).
 
 ## Connections
+
 - [[CONCEPT--OBSIDIAN-AS-RUNTIME]]
 - [[CONCEPT--EMBEDDING-STRATEGY]]
 - [[CONCEPT--AGENT-INTEGRATION-PATTERNS]]
 - [[ADR--SEMANTIC-SEARCH-VIA-SMART-CONNECTIONS]]
-

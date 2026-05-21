@@ -188,6 +188,7 @@ msp-episode-gc [--keep-days=N] [--delete] [--dry-run] [--apply] [--root=PATH] [-
 ```
 
 Defaults are conservative:
+
 - No `--apply` → plan only, print report, exit 0. (Implicit dry-run.)
 - `--apply` + no `--delete` → archive eligible episodes.
 - `--apply --delete` → permanently remove eligible episodes.

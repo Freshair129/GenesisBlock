@@ -229,7 +229,7 @@ cd web && npm install && cd ..
 npm run dev          # backend (Express) + frontend (Vite) together
 ```
 
-Open the app at **http://localhost:3000**.
+Open the app at **<http://localhost:3000>**.
 
 ### Brain Switcher
 

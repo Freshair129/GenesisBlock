@@ -230,5 +230,5 @@ The three-layer split keeps each layer's invariants enforceable:
 - `[[FRAMEWORK--MSP-ARCHITECTURE-V2]]` — parent three-layer ecosystem; Vault is positioned at the Memory OS layer.
 
 ## Connections
-- [[FRAMEWORK--UNIVERSAL-CONTEXT-FRAMEWORK]]
 
+- [[FRAMEWORK--UNIVERSAL-CONTEXT-FRAMEWORK]]

@@ -79,6 +79,7 @@ The persistence layout is identical between backends: `<path>/manifest.json` car
 - **P3.6 Promotion** — `[[ADR--GENESIS-GRAPH-AS-GKS-BACKEND]]` is already `stable`, so no status flip is required; this AUDIT replaces the formal promotion step. The only remaining work is to confirm P3.5 benchmarks pass the success criterion and to write `AUDIT--GENESIS-GRAPH-BENCHMARK-RESULTS` once P3.5 lands. **This current AUDIT does not block on P3.5.**
 
 ## Connections
+
 - [[BLUEPRINT--GENESIS-GRAPH-INTEGRATION]]
 - [[ADR--GENESIS-GRAPH-AS-GKS-BACKEND]]
 - [[ADR--GENESIS-BLOCK-STORAGE-LAYOUT]]

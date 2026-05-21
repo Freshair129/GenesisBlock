@@ -111,6 +111,7 @@ attributes:
 `[[CONCEPT--SYMBOLS-FRAMEWORK-AWARENESS]]` establishes the problem and hypothesis: extend the symbol graph beyond syntactic structure with pluggable framework recognizers.
 
 The existing `[[FEAT--SYMBOLS-FRAMEWORK-AWARENESS]]` (`status: active`, `created_at: 2026-05-12T05:48:00.000+07:00`) bundled four concerns into one atom:
+
 1. The motivation / scope (CONCEPT material)
 2. The decision to add framework awareness + which frameworks to support (ADR material)
 3. The recognition algorithms per framework (ALGO material)
@@ -176,30 +177,37 @@ Rationale: the rule has been on the books since `[[PROTO--SCALING-LEVEL-GATE]]` 
 ## Consequences
 
 ### Positive
+
 - **Granularity**: each atom edits independently; future changes touch one concern
 - **Reusability**: CONCEPT can be cited by other framework work; ALGO is per-framework swappable; PROTO is machine-enforced
 - **Validator hardening**: hard ADR-required rule prevents the same bundling antipattern from recurring (no more "soft warning that everyone ignores")
 - **Backward-compat**: old FEAT remains in the index as `status: superseded` with reciprocal links — history preserved
 
 ### Negative
+
 - **More atoms to maintain**: 4 atoms instead of 1. Mitigation: the scaffold-atom script (Phase-2 handoff PR-C) reduces friction
 - **Validator rule may surface debt on existing FEATs**: grandfather clause shields them initially; retrofit work tracked in Phase-2 handoff PR-D
 
 ### Neutral
+
 - **No FRAME atom for now**: revisit if recognizer interface needs to evolve
 
 ## Alternatives considered
 
 ### A. Keep as a single FEAT
+
 Rejected: violates atom-type semantics per KNOWLEDGE-TYPES.md. The original FEAT mixed motivation, decision, algorithms, and invariants — making targeted edits risky and reuse impossible.
 
 ### B. Decompose into 3 atoms (no ADR)
+
 The user's first instinct (CONCEPT + ALGO + PROTO). Rejected: every decision-bearing atom needs an explicit ADR per `[[PROTO--SCALING-LEVEL-GATE]]`. Without an ADR, the *decision* to use a particular recognizer interface, or to scope to Next.js + Prisma + MCP, is undocumented.
 
 ### C. Decompose into 5 atoms (add FRAME)
+
 Considered, but the recognizer interface is well-defined by the ALGO atom's contract. Adding FRAME would be redundant documentation. Deferred to future ADR if the interface needs to evolve in a way the ALGO atom cannot capture.
 
 ### D. Multiple ALGO atoms (per recognizer)
+
 Instead of one `[[ALGO--SYMBOLS-FRAMEWORK-RECOGNITION]]` covering all recognizers, split into `[[ALGO--NEXTJS-DETECTION]]`, `[[ALGO--PRISMA-EXTRACTION]]`, `[[ALGO--MCP-DISCOVERY]]`. Deferred to implementation time: if any single recognizer grows past ~200 LOC of spec, split it out. Initial scope keeps them unified.
 
 ## What this ADR does NOT change

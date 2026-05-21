@@ -18,26 +18,31 @@ linked_symbols: []              # Pointer to the adapter code
 # LLM — <Model Name>
 
 ## Role & Tier
+
 - **Intelligence Tier:** Reasoning / Planning / Complex Mapping
 - **Preferred Phase:** P1 (Concept), P2 (ADR), P3 (Blueprint)
 
 ## Configuration
+
 - **Model ID:** `e.g., gemini-1.5-pro`
 - **Temperature:** <e.g. 0.0 for deterministic planning>
 - **Top P:** <Value>
 - **Max Tokens:** <Value>
 
 ## System Prompt / Personality
+
 - **Instruction:** <Brief summary of the core personality/role>
 - **Safety Constraints:** <Reference to SAFETY-- or GUARD-->
 
 ## Known Capabilities
+
 - [ ] Multilingual reasoning
 - [ ] Long-context window (1M+ tokens)
 - [ ] Tool use (MCP)
 - [ ] Image/Video multimodal
 
 ## Limitations
+
 - Cost per 1M tokens: $<Value>
 - Latency: <High/Medium>
 - Tokens per minute (TPM): <Value>

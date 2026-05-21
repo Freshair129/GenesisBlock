@@ -1,6 +1,7 @@
 Manage GKS hotfixes (emergency bypass atoms with 48h backfill window).
 
 $ARGUMENTS format:
+
 - `open <sha> --reason="<why>"` — open a new hotfix
 - `list` — show all open hotfixes and countdowns  
 - `close <sha>` — mark a hotfix resolved after backfill

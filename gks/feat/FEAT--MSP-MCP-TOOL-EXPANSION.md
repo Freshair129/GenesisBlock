@@ -184,10 +184,10 @@ attributes:
 - Per-tool auth — orchestrator concern (M9)
 
 ## Connections
+
 - [[CONCEPT--MSP-MCP-TOOL-EXPANSION]]
 - [[FEAT--MSP-MCP-SERVER]]
 - [[FEAT--CONSOLIDATOR]]
 - [[FEAT--RETRIEVAL-ORCHESTRATION]]
 - [[FEAT--COMPRESSOR]]
 - [[FEAT--IDENTITY-LAYER]]
-

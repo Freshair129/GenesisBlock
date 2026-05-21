@@ -400,7 +400,7 @@ implementation_order:
 - Persist anything (M7c is read-only)
 
 ## Connections
+
 - [[FEAT--RETRIEVAL-ORCHESTRATION]]
 - [[ADR--RETRIEVAL-RRF-FUSION]]
 - [[CONCEPT--RETRIEVAL-ORCHESTRATION]]
-

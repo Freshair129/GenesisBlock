@@ -147,6 +147,7 @@ Default `--include` = `"src/**/*.ts,web/src/**/*.tsx"` (excludes `node_modules`,
 ## Bin entry
 
 `package.json`:
+
 ```json
 "bin": {
   ...
@@ -179,6 +180,6 @@ The `chmod-bins.mjs` step ensures the dist file is executable post-build.
 - Existing `chmod-bins.mjs` post-build step
 
 ## Connections
+
 - [[FRAMEWORK--SYMBOL-GRAPH]]
 - [[CONCEPT--PARSER-CHOICE]]
-

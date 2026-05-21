@@ -129,11 +129,13 @@ attributes:
 ## Consequences
 
 **Positive**
+
 - Promotes are no longer ambiguous. CI / orchestrator can detect "atom waiting for Boss" vs "ready to merge".
 - T3 has explicit autonomy on CONCEPT/ENTITY/AUDIT — reduces Boss bottleneck on low-risk artifacts.
 - Hotfix open is fast (no review); close is gated (real recovery audit).
 
 **Negative**
+
 - Boss is the single point of failure for ADR/FEAT/BLUEPRINT. Mitigation: BLUEPRINT carries the "OR T3" clause for momentum during Boss absence.
 - The mapping is a default; per-project overrides need their own ADR. Adds ceremony.
 
@@ -154,7 +156,7 @@ attributes:
 `msp_spec.md` §9 (Human Review Gates) — referenced from `[[ADR--PROMOTION-WORKFLOW]]` but not previously written as an atom.
 
 ## Connections
+
 - [[ADR--AGENT-WRITE-BOUNDARIES]]
 - [[FRAMEWORK--SCALING-LEVELS]]
 - [[CONCEPT--MASTER-PROMOTION]]
-

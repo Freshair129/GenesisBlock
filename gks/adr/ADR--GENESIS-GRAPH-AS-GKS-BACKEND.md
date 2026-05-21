@@ -285,5 +285,5 @@ belongs to its own ADR, not this one.
    sections above.
 
 ## Connections
-- [[FRAMEWORK--MSP-ARCHITECTURE-V2]]
 
+- [[FRAMEWORK--MSP-ARCHITECTURE-V2]]

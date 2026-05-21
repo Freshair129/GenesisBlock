@@ -197,8 +197,8 @@ Same precedent as previous AUDITs: bug recorded in audit, not as separate INCIDE
 - Date: 2026-05-03
 
 ## Connections
+
 - [[BLUEPRINT--MSP-MCP-SERVER]]
 - [[ADR--MSP-MCP-SERVER]]
 - [[FEAT--MSP-VALIDATOR]]
 - [[FEAT--CODEGEN-MICROTASK-RUNNER]]
-

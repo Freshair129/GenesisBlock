@@ -150,6 +150,7 @@ git push origin v3.6.0                    # tag pushed
 ```
 
 Verification:
+
 ```bash
 npm view @freshair129/gks dist-tags --no-cache
 # → { latest: '3.6.0' }
@@ -170,6 +171,7 @@ npm install
 ### 4. Un-exclude Knowledge Browser source
 
 Both `tsconfig.json` and `tsconfig.build.json` had:
+
 ```jsonc
 "exclude": [..., "src/index.ts", "src/memory.ts"]
 ```
@@ -177,6 +179,7 @@ Both `tsconfig.json` and `tsconfig.build.json` had:
 These two files import `retain`/`recall` from `@freshair129/gks/memory` and `MemoryStore`/`createRestObsidianAdapter`/`wrapObsidianWithCache` from `@freshair129/gks` — symbols that 3.5.6 didn't export but 3.6.0 does.
 
 After 3.6.0 install + un-exclude:
+
 - `npm run typecheck` → clean (0 errors)
 - `npm run build` → succeeds (chmod +x runs on all 4 bins)
 - `test/mcp/argv.test.ts` (8 tests) + `test/mcp/bin.test.ts` (2 tests) → 10/10 pass
@@ -213,6 +216,7 @@ After 3.6.0 install + un-exclude:
 ### What's still aspirational
 
 The 4 remaining upstream proposals (`#29`–`#32`) are unchanged — those are non-blocking improvements:
+
 - `#32` phase 6 acceptance — workaround in `scripts/msp/propose.mjs` still active
 - `#31` verify-flow flag — still hand-pointing supersede chains
 - `#30` backlinks API — MSP still re-implements in `src/memory/backlinks/`
@@ -224,6 +228,7 @@ This is the first proposal that flowed end-to-end through the workflow defined i
 > 🟡 drafted → 🔵 awaiting upstream review → 🟢 merged upstream → moved to `merged/` + AUDIT atom
 
 The other 4 proposals (`#29`–`#32`) require either upstream code review (different repo, different workflow) or substantial engineering. Proposal #5 was self-mergeable because:
+
 1. Both repos owned by the same human (`Freshair129`)
 2. The change was an npm publish (no code change in GksV3 — just a release action)
 3. No reviewer gate was meaningful
@@ -233,6 +238,6 @@ The other 4 proposals (`#29`–`#32`) require either upstream code review (diffe
 User direction "3" (= "do both Phase A publish 3.6.0 AND Phase B setup workspace") on 2026-05-07. Phase A executed in this audit; Phase B (workspace) is separate work.
 
 ## Connections
+
 - [[AUDIT--GKS-UPSTREAM-PROPOSALS-FILED]]
 - [[AUDIT--TWO-REPO-VALIDATION]]
-

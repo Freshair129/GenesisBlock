@@ -107,6 +107,7 @@ A runner that loads a task YAML, calls the configured SLM, applies the codegen c
 ## Scope
 
 In:
+
 - Load `T*.task.yaml`, validate shape (id, parent_blueprint, prompt, acceptance, geography).
 - Invoke a pluggable SLM (Qwen 2.5 Coder default; configurable per-task).
 - Apply post-processing + forbidden-pattern checks (per the codegen ADRs).
@@ -115,6 +116,7 @@ In:
 - Emit one audit row per run (`gks/devlog/MSP-ACT-<id>.md`).
 
 Out:
+
 - BLUEPRINT generation (that's a separate concern at P3).
 - Multi-task orchestration (one task per invocation; orchestrator above sequences them).
 - Code review of accepted output (humans + CI).

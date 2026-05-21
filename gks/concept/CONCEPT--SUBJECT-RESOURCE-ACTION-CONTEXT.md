@@ -182,5 +182,5 @@ A single `read` action would not capture this distinction.
 - Open Policy Agent (OPA / Rego) — production-deployed PDP architecture.
 
 ## Connections
-- [[FRAMEWORK--UNIVERSAL-CONTEXT-FRAMEWORK]]
 
+- [[FRAMEWORK--UNIVERSAL-CONTEXT-FRAMEWORK]]

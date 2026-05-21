@@ -130,6 +130,7 @@ interface UsageSummary {
 ```
 
 Three entry points:
+
 - `aggregateDaily(root, since?, until?)` — full scan, optional date filter.
 - `aggregateWeek(root, weekIso)` — restricts to a specific ISO week (e.g. `2026-W19`).
 - `aggregateMonth(root, monthIso)` — restricts to a specific month (e.g. `2026-05`).

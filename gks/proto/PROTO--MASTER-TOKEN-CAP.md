@@ -180,6 +180,6 @@ practice, this PROTO promotes to `stable`.
 3-tier rollout plan.
 
 ## Connections
+
 - [[ADR--MASTER-PROMOTION-DOC-TO-CODE]]
 - [[ADR--MASTER-PROMOTION-CONTRADICTION-POLICY]]
-

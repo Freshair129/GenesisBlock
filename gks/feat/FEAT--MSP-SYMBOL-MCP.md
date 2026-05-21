@@ -159,6 +159,6 @@ A 6th tool `msp_symbol_subgraph(community_id)` was considered but deferred — `
 - Tool registration pattern: `src/mcp/server.ts:TOOLS` array (currently 11 entries)
 
 ## Connections
+
 - [[ADR--SYMBOL-GRAPH-PERSISTENCE]]
 - [[FEAT--MSP-MCP-SERVER]]
-

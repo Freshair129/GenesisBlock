@@ -144,5 +144,5 @@ A task that fails T1 escalates **once** to T2 (and once more to T3 if `severityâ
 - `[[CONCEPT--AGENT-AGNOSTIC]]` â€” sibling principle: MSP must work with any agent CLI
 
 ## Connections
-- [[FRAMEWORK--MSP-ARCHITECTURE-V2]]
 
+- [[FRAMEWORK--MSP-ARCHITECTURE-V2]]

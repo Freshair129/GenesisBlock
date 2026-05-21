@@ -119,6 +119,7 @@ The validator must be:
 ## Scope
 
 In:
+
 - Frontmatter schema validation (required + conditional + forbidden fields)
 - ADR-number monotonicity check against `gks/00_index/atomic_index.jsonl`
 - Wikilink resolution (`[[X]]` → `X` exists in atomic index)
@@ -127,6 +128,7 @@ In:
 - Anti-hallucination guards (no future dates, no `TBD`/`TODO` in `summary`)
 
 Out (handled elsewhere):
+
 - Content-quality review of decisions (human reviewer's job)
 - Code-symbol existence verification (GitNexus / `verify-flow`'s job)
 - Cross-tenant authorization (orchestrator's job)

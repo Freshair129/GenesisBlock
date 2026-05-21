@@ -31,20 +31,23 @@ Implement the technical machinery to automatically draft Architecture Decision R
 ## 2. Implementation Steps
 
 ### T1: Git Integration (`packages/msp/src/utils/git.ts`)
+
 - Implement a helper to extract the `git diff` of currently staged files.
 - Command: `git diff --cached`.
 - Include a list of staged filenames to help with context.
 
 ### T2: ADR Content Engine (`packages/msp/src/generator/adr-engine.ts`)
+
 - Create a prompt template for the LLM that includes:
-    - The `git diff`.
-    - User-provided hint (optional).
-    - Current codebase context (relevant symbols).
-    - Specific ADR sections (Context, Decision, Consequences).
+  - The `git diff`.
+  - User-provided hint (optional).
+  - Current codebase context (relevant symbols).
+  - Specific ADR sections (Context, Decision, Consequences).
 - Instructions to return valid Markdown with appropriate sections.
 - Use `createSlmClient` to interface with the configured provider.
 
 ### T3: CLI Implementation (`packages/msp/src/generator/adr-cli.ts`)
+
 - Implement `msp-adr draft` command.
 - Logic:
     1. Fetch staged diff (T1).
@@ -56,22 +59,26 @@ Implement the technical machinery to automatically draft Architecture Decision R
     7. Provide success message with the new file path.
 
 ### T4: ID and Metadata Automation
+
 - Reuse ID generation logic from `atom-creator` skill or implement a shared utility.
 - Ensure `created_at` uses ICT timestamp (+07:00).
 - Auto-tag based on affected file paths (e.g., if `packages/gks` is touched, add `gks` tag).
 
 ### T5: Integration and Build
+
 - Register `msp-adr` in `packages/msp/package.json` under `bin`.
 - Add `npm run msp:adr` script.
 
 ## 3. Verification Plan
 
 ### 3.1 Unit Tests
+
 - Create `packages/msp/test/generator/adr-engine.test.ts`.
 - Mock git diff and LLM response.
 - Verify section extraction and frontmatter generation.
 
 ### 3.2 Manual Acceptance
+
 - Stage a small code change.
 - Run `npm run msp:adr draft -- --staged --hint "Refactoring the logger to use a singleton"`.
 - Verify the generated file in `gks/adr/` passes `msp:validate`.

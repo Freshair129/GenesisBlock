@@ -138,6 +138,6 @@ count. JSON mode: `--json` for machine-readable output.
 - Wikilink / cross-atom integrity (orchestrator's job — `msp:validate`)
 
 ## Connections
+
 - [[ADR--REVERSE-CITATION-LOOKUP]]
 - [[CONCEPT--MEMORY-STORE]]
-

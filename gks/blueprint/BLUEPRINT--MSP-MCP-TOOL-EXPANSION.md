@@ -255,7 +255,7 @@ implementation_order:
 - Re-implement consolidate / recall / compress / identity inside the tool — wrap, don't reimplement
 
 ## Connections
+
 - [[FEAT--MSP-MCP-TOOL-EXPANSION]]
 - [[CONCEPT--MSP-MCP-TOOL-EXPANSION]]
 - [[FEAT--MSP-MCP-SERVER]]
-

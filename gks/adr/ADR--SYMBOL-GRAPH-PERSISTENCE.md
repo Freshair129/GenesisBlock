@@ -134,11 +134,13 @@ Rationale per dimension:
 ## Consequences
 
 **Positive**
+
 - Fast queries (sub-millisecond k-hop on 5000 nodes)
 - Reviewable changes via JSONL diff in PRs
 - Mirror of GKS's "JSONL = source of truth, indexed copy = queryable" approach (see `atomic_index.jsonl` + `backlinks.jsonl`)
 
 **Negative**
+
 - Two write paths must stay consistent. Mitigation: `dump-jsonl` CLI subcommand that re-emits JSONL from current SQLite — used both as a build step and as a "fix drift" tool. Tested by round-trip assertion in `test/symbols/store.test.ts` (write JSONL, load to fresh SQLite, dump JSONL, compare).
 - One additional native module. Mitigation: `better-sqlite3` is the standard Node SQLite binding; CI-tested across Node 20+22 by upstream.
 

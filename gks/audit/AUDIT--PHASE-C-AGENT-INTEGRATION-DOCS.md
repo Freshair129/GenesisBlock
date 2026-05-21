@@ -191,5 +191,5 @@ landing first (PR #65). Drafted as a single-developer slice — no Phase 4
 (TASK) handoff per `[[ADR--PROMOTION-LEVELS]]`.
 
 ## Connections
-- [[CONCEPT--NAMED-PROJECT-REGISTRY]]
 
+- [[CONCEPT--NAMED-PROJECT-REGISTRY]]

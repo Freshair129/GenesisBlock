@@ -142,12 +142,14 @@ Current state (counted on `main` at session start):
 Directory move: `gks/frame/` → `gks/framework/` in both `packages/gks` and `packages/msp`.
 
 Frontmatter update inside each renamed file:
+
 - `id:` field — old `FRAME-`​`-X` prefix becomes `[[FRAMEWORK--X]]`
 - `type: frame` → `type: framework`
 
 ### 4. Rename `GUARDRAIL--` to `GUARD--` (doc-only migration)
 
 Since zero atoms use the `GUARDRAIL--` prefix, this is a documentation-only change:
+
 - Taxonomy tables in `CLAUDE.md` (×3) and `docs/gks/KNOWLEDGE-TYPES.md`
 - Template file `packages/gks/examples/atom-templates/GUARDRAIL.md` → `GUARD.md` (with content update)
 - Two ADR references (`docs/adr/012-extended-taxonomy.md`, `docs/adr/013-flat-atom-layout.md`) noting the supersession
@@ -202,5 +204,5 @@ The migration is mechanical and reversible: the script accepts an `--inverse` fl
 - Whether `MASTER--`, `POLICY--`, `PERSONA--` should be folded into the v2.3 layers in a future revision; left explicit-preserve for now
 
 ## Connections
-- [[CONCEPT--KNOWLEDGE-LAYERS-V2]]
 
+- [[CONCEPT--KNOWLEDGE-LAYERS-V2]]

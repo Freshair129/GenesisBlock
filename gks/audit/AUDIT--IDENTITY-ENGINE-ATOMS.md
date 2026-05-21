@@ -101,9 +101,11 @@ attributes:
 # AUDIT — Identity Engine Atoms
 
 ## Scope
+
 Authoring of the 5-dimension core and auxiliary atoms for the **Identity Engine** Genesis Block, as required by `[[SPEC--GENESIS-BLOCK-MANIFEST]]`. This work unblocks the development of the Genesis Block Runtime.
 
 ## What shipped
+
 - **Manifest**: `[[GENESIS--IDENTITY-ENGINE]]` (P0) – the first real Block Manifest in the vault.
 - **Cognitive**: `[[COGNITIVE--EGO-DEATH-PASSPORT]]` – mental framework for externalised identity.
 - **Runbook**: `[[RUNBOOK--IDENTITY-MIGRATION]]` – procedural SOP for global-vs-workspace transition.
@@ -113,6 +115,7 @@ Authoring of the 5-dimension core and auxiliary atoms for the **Identity Engine*
 - **Safety**: `[[SAFETY--PII-REDACTION]]` – data protection rule.
 
 ## Verification
+
 - **Indexer**: `npm run msp:index` picked up all 8 new atoms.
 - **Validator**: `npm run msp:validate` confirmed:
   - All new atoms follow the v2.3 taxonomy.
@@ -121,6 +124,7 @@ Authoring of the 5-dimension core and auxiliary atoms for the **Identity Engine*
 - **Total atoms**: Vault size increased from 329 to 337.
 
 ## Sign-off
+
 - Implemented by: Gemini CLI
 - Verified by: `msp:validate`
 - Date: 2026-05-14

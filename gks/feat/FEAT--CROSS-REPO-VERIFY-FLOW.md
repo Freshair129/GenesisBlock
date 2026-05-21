@@ -31,29 +31,34 @@ In a microservices or multi-repository architecture, architectural decisions (AD
 ## 3. Requirements
 
 ### 3.1 Remote Index Loading
--   Support a `--remote=<repo-path-or-url>` flag in `gks verify-flow`.
--   Ability to load and parse the `atomic_index.jsonl` from the remote source.
--   Support for local filesystem paths (sibling directories) and eventually git URLs or authenticated HTTP endpoints.
+
+- Support a `--remote=<repo-path-or-url>` flag in `gks verify-flow`.
+- Ability to load and parse the `atomic_index.jsonl` from the remote source.
+- Support for local filesystem paths (sibling directories) and eventually git URLs or authenticated HTTP endpoints.
 
 ### 3.2 Unified Atom Resolution
--   The verification engine must merge the local and remote atom indices into a single resolution map.
--   Prevent ID collisions by prioritizing local atoms or using a namespace prefix for remote atoms (e.g., `repoA:ADR--XYZ`).
+
+- The verification engine must merge the local and remote atom indices into a single resolution map.
+- Prevent ID collisions by prioritizing local atoms or using a namespace prefix for remote atoms (e.g., `repoA:ADR--XYZ`).
 
 ### 3.3 Status Assertion
--   The existing `isApprovedStatus` check must apply equally to remote atoms.
--   If a local atom IMPLEMENTS a remote ADR that is still in `draft` status, the verification must fail.
+
+- The existing `isApprovedStatus` check must apply equally to remote atoms.
+- If a local atom IMPLEMENTS a remote ADR that is still in `draft` status, the verification must fail.
 
 ### 3.4 Caching (Optional but Recommended)
--   Implement a local cache for remote indices to avoid expensive network calls during every CI run.
--   Provide a `--refresh` flag to force an update of the cached index.
+
+- Implement a local cache for remote indices to avoid expensive network calls during every CI run.
+- Provide a `--refresh` flag to force an update of the cached index.
 
 ## 4. Acceptance Criteria
 
--   [ ] `gks verify-flow ID --remote=../repoA` successfully walks a chain that spans both repos.
--   [ ] Verification fails if a remote dependency is not in a stable/approved state.
--   [ ] Clear error messages identifying whether the failed atom is local or remote.
--   [ ] Unit tests covering the multi-index merge and resolution logic.
+- [ ] `gks verify-flow ID --remote=../repoA` successfully walks a chain that spans both repos.
+- [ ] Verification fails if a remote dependency is not in a stable/approved state.
+- [ ] Clear error messages identifying whether the failed atom is local or remote.
+- [ ] Unit tests covering the multi-index merge and resolution logic.
 
 ## 5. Connections
--   `[[CONCEPT--MSP-ROADMAP]]` §3 M9c.
--   `[[FRAMEWORK--PHASE-GOVERNANCE]]` — the policy being enforced across boundaries.
+
+- `[[CONCEPT--MSP-ROADMAP]]` §3 M9c.
+- `[[FRAMEWORK--PHASE-GOVERNANCE]]` — the policy being enforced across boundaries.

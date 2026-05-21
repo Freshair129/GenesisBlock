@@ -112,9 +112,10 @@ Any Master atom (located in `gks/master/`) that specifies a `priority:` of `P0` 
 
 ## Rationale
 
-Master atoms with P0/P1 priority form the "instinct" layer of the agentic system. Because P0 atoms are loaded into every session's context and P1 atoms are indexed globally, their content has a disproportionate impact on agent behavior and token consumption. 
+Master atoms with P0/P1 priority form the "instinct" layer of the agentic system. Because P0 atoms are loaded into every session's context and P1 atoms are indexed globally, their content has a disproportionate impact on agent behavior and token consumption.
 
 The risks of ungated autonomous P0/P1 promotion include:
+
 1. **Instinct Drift**: Agents could silently alter the core mandates that govern their own behavior, potentially bypassing safety rules or structural requirements.
 2. **Context Bloat**: Agents might over-prioritize their own task-specific knowledge, causing P0 to grow beyond the context window's efficient processing capacity.
 3. **Circular Logic**: An agent could create a P0 mandate that reinforces its own flawed assumptions, making them harder to correct in future sessions.
@@ -125,15 +126,16 @@ This PROTO enforces the "Human-in-the-Loop" requirement for the most sensitive l
 
 - **Target Files**: All files matching the pattern `gks/master/*.md`.
 - **Change Triggers**: Any commit or pull request that performs one of the following actions:
-    - Creates a new Master atom file with `priority: P0` or `priority: P1`.
-    - Updates an existing Master atom's `priority` field from a lower band (P2, P3, P4) to a higher band (P0, P1).
-    - Modifies the body or frontmatter of an existing P0/P1 Master atom where the priority was recently assigned.
+  - Creates a new Master atom file with `priority: P0` or `priority: P1`.
+  - Updates an existing Master atom's `priority` field from a lower band (P2, P3, P4) to a higher band (P0, P1).
+  - Modifies the body or frontmatter of an existing P0/P1 Master atom where the priority was recently assigned.
 
 ## Predicate
 
 When a Master atom in `gks/master/<ID>.md` has its `priority:` field added or changed to `P0` or `P1` in a change set, the validator must confirm the presence of EITHER:
 
 ### (a) PR Description Authorization
+
 An explicit user-authority comment in the PR description (or commit message if no PR is available) using the following exact format:
 
 `[priority-approval] user authorized priority: <P0|P1> for <atom_id>`
@@ -143,6 +145,7 @@ An explicit user-authority comment in the PR description (or commit message if n
 - The string must be present in the raw text of the PR description at the time of the validation gate check.
 
 ### (b) Promotion ADR Evidence
+
 A new promotion ADR committed in the same change set that documents the user authority and provides the formal justification for the priority level.
 
 - **File Path**: The ADR must be located in the `gks/adr/` directory.
@@ -161,7 +164,7 @@ A new promotion ADR committed in the same change set that documents the user aut
 
 ## Exemption: Initial Schema Migration
 
-The one-time commit that performs the broad migration of existing Master atoms to the new P0–P4 priority schema is exempted from this authority check. 
+The one-time commit that performs the broad migration of existing Master atoms to the new P0–P4 priority schema is exempted from this authority check.
 
 - **Mechanism**: The validator implementation checks the current commit hash against a hardcoded or configured `SCHEMA_MIGRATION_COMMIT_SHA`.
 - **Rationale**: The migration itself is authorized by `[[ADR--CLAUDE-MD-MASTER-PRIORITY-SECTORS]]`, which already contains the user's consent for the initial P0 assignments.
@@ -173,6 +176,7 @@ The implementation of this predicate logic belongs in:
 `packages/msp/src/validator/rules/master-priority-authority.ts`
 
 ### Logic Flow (Pseudo-code)
+
 1. Identify all changed files in the current diff.
 2. Filter for files in `gks/master/`.
 3. For each Master file:

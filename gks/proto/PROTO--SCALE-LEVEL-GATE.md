@@ -144,7 +144,7 @@ L1 (Quick Task) is a no-op — `runTask({ scale: 'L1' })` skips the gate entirel
 Hotfixes (§6.4) bypass the gate via `gks hotfix open` — 48 h backfill window applies.
 
 ## Connections
+
 - [[FRAMEWORK--MSP-ARCHITECTURE-V2]]
 - [[CONCEPT--COGNITIVE-LAYER-FACADE]]
 - [[CONCEPT--CODEGEN-MICROTASK-RUNNER]]
-

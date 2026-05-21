@@ -172,7 +172,7 @@ interface Episode {
 - Threshold tuning (`PARAM--` atom) → M9
 
 ## Connections
+
 - [[CONCEPT--CONSOLIDATOR]]
 - [[FEAT--MEMORY-EPISODIC-WRITER]]
 - [[FEAT--MEMORY-SESSIONS-WRITER]]
-

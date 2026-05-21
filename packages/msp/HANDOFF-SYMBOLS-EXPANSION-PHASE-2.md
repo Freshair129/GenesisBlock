@@ -120,6 +120,7 @@ Author task YAMLs under `.brain/<ns>/tasks/SYMBOLS-FRAMEWORK/`:
 ### 5.1 Decomposition (mirror current PR's pattern)
 
 Atoms to author:
+
 ```
 gks/concept/CONCEPT--SYMBOLS-PROCESS-TRACING.md
 gks/adr/ADR--SYMBOLS-PROCESS-TRACING.md
@@ -128,6 +129,7 @@ gks/proto/PROTO--SYMBOLS-TRACE-INVARIANTS.md        ← e.g. "trace MUST termina
 ```
 
 Supersede:
+
 ```
 FEAT--SYMBOLS-PROCESS-TRACING → status: superseded
                                 superseded_by: [4 atoms above]
@@ -226,6 +228,7 @@ Behavior:
 ```
 
 Constraints to enforce:
+
 - Reject if file already exists (no overwrite without --force)
 - Reject if `--slug` doesn't match `^[A-Z][A-Z0-9_-]*$`
 - Print "next steps" hint at end (e.g. "Edit body sections, then run npm run msp:validate <path>")
@@ -251,6 +254,7 @@ Behavior:
 ```
 
 Constraints:
+
 - Refuse if <OLD-ID> already has `status: superseded` (idempotency safety)
 - Refuse if any <NEW-ID> file lacks `crosslinks` block (must exist for safe append)
 - Always re-write atoms via YAML serializer — never regex-replace frontmatter (avoid eating newlines / quotes)
@@ -347,9 +351,11 @@ Not in scope of any PR above, but if you have spare cycles: a `npm run msp:graph
 
 1. **Run `date -u` before authoring atoms.** Or use `npm run msp:atom-date` after PR-C lands.
 2. **After editing atoms, ALWAYS run:**
+
    ```
    npm run msp:index && npm run msp:validate --workspace=packages/msp -- --all --root=packages/msp && npm run msp:check-links
    ```
+
    In one line. Catches drift early.
 3. **Per-PR sequence** is exactly the §6 checklist from `HANDOFF-SYMBOLS-EXPANSION.md` (branch → atoms → microtasks → impl → tests → AUDIT → push → PR draft → CI green → ready → squash-merge).
 4. **Hand-off acknowledgement**: when you start any of PR-A through PR-D, post a comment in the corresponding tracking issue (open if not present) stating which PR you're starting and ETA.

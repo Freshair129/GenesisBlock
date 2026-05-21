@@ -132,6 +132,7 @@ interface CommunityDetector {
 Selected at runtime via `meta.algorithm = "leiden" | "louvain"` so the choice is visible in build artifacts. Default = leiden; falls back to louvain only if the leiden package fails to load (with a warning logged to stderr).
 
 Parameters:
+
 - `resolution = 1.0` default; CLI flag `--resolution=<n>` (lower = bigger / fewer communities)
 - `seed = 42` fixed; CLI flag `--seed=<n>` for experimentation (changing seed = git diff churn, so default is locked)
 - `levels = 1` (top-level only); hierarchical Leiden deferred to Phase 2
@@ -139,12 +140,14 @@ Parameters:
 ## Consequences
 
 **Positive**
+
 - Honors user's stated preference for Leiden
 - Determinism via fixed seed = git-stable JSONL exports
 - Fallback path keeps the build working if the (single-maintainer) Leiden package regresses
 - Resolution flag gives users a tunable knob without changing the algorithm
 
 **Negative**
+
 - **`@aflsolutions/...` is a single-maintainer fork.** If it deprecates, we either (a) vendor the algorithm into `src/symbols/communities/leiden-vendored.ts`, (b) fall back to Louvain permanently, or (c) contribute the fork back to the official `graphology` org. Decision deferred — flag in upstream GKS proposal so the GKS maintainers can weigh in.
 - Top-level only in v1 — power users wanting hierarchical clusters need to wait for Phase 2. The SQLite schema reserves a nullable `parent_community_id` so adding levels is non-breaking.
 - Modularity is a heuristic; community labels (auto-generated as "top-dir / top-symbol-name") are best-effort — a 50-symbol community labeled "src/orchestrator" is approximately right but won't match the human mental model perfectly.
@@ -172,5 +175,5 @@ Parameters:
 - `[[ADR--SYMBOL-GRAPH-PERSISTENCE]]` — `meta.algorithm` field added to schema
 
 ## Connections
-- [[FRAMEWORK--SYMBOL-GRAPH]]
 
+- [[FRAMEWORK--SYMBOL-GRAPH]]

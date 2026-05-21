@@ -195,11 +195,13 @@ Two reasons:
 ## Trade-offs
 
 **Positive**
+
 - Documented integration is copy-paste, not bespoke per client.
 - New cognitive-layer clients can adopt MSP in minutes if they speak MCP.
 - The contract is small enough to memorize (4 rules), large enough to actually work.
 
 **Negative**
+
 - Three shapes mean three slightly-different debugging paths when something breaks ("is it the config? the env var? the bin not on PATH?"). Mitigated by the verification step in `docs/AGENT-INTEGRATION.md` (call `msp_recall "test"` once after wire-up).
 - Client-specific UX (slash commands) means the user-visible MSP surface still varies; we accept that as out-of-scope.
 
@@ -208,5 +210,5 @@ Two reasons:
 Phase C of the architecture-doc cleanup (2026-05-10). Operationalises `[[CONCEPT--AGENT-AGNOSTIC]]` by enumerating the contract every cognitive-layer client honors and the three shapes that contract takes. Concrete wiring snippets live in `docs/AGENT-INTEGRATION.md`. See `[[AUDIT--PHASE-C-AGENT-INTEGRATION-DOCS]]`.
 
 ## Connections
-- [[FRAMEWORK--MSP-ARCHITECTURE-V2]]
 
+- [[FRAMEWORK--MSP-ARCHITECTURE-V2]]

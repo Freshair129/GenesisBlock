@@ -207,6 +207,6 @@ interface GcReport {
 - Tests: `packages/msp/test/agents/episode-gc.test.ts` (+ CLI smoke).
 
 ## Connections
+
 - [[SPEC--EPISODE-ATOM]]
 - [[AUDIT--PHASE-F4-EPISODE-GC]]
-

@@ -112,12 +112,14 @@ A derivation pipeline that walks every atom in `gks/`, emits one edge per `cross
 ## Scope
 
 In:
+
 - Walk `gks/<type>/*.md`, parse frontmatter, emit edges from `crosslinks.*`.
 - Deterministic output: sort by `from`, then `to`, then `type`.
 - Atomic write (`.tmp` + rename).
 - One CLI invocation re-derives the entire graph from scratch (no incremental state to corrupt).
 
 Out:
+
 - Reverse-index lookup (computed in-memory at query time).
 - Hybrid retrieval / RRF (orchestrator).
 - Vector embedding (orchestrator + embedder of choice).
@@ -127,5 +129,5 @@ Out:
 Implements `[[CONCEPT--MEMORY-VECTOR-BACKLINKS]]`. Spec §7.3.
 
 ## Connections
-- [[FRAMEWORK--CROSSLINKS-VOCABULARY]]
 
+- [[FRAMEWORK--CROSSLINKS-VOCABULARY]]

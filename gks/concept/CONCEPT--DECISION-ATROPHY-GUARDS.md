@@ -111,6 +111,7 @@ A library of "enforced lies" forms over months.
 ### Guard 1 — `valid_until_check` (CI / weekly cron)
 
 A scheduled job that scans `gks/` for atoms with `valid_until` past `now()`. Emits:
+
 - A list to a designated `STALE_ATOMS` issue (or local file `stale_atoms.md`)
 - Optional: PR comment when a touched atom has `valid_until` in next 30 days
 
@@ -129,6 +130,7 @@ Applied to atoms tagged `tags: [roadmap, planning, ...]` (or per-id pattern).
 ## Why a CONCEPT not just a PROTO
 
 This is bigger than one rule:
+
 - M9a-1 = the scanning job (PROTO)
 - M9a-2 = the required-fields contract update
 - M9a-3 = process — what to do with stale atoms (review / supersede / update)
@@ -154,5 +156,5 @@ The CONCEPT captures the lifecycle aspect; specific PROTOs follow.
 `[[CONCEPT--MSP-ROADMAP]]` §3 M9a.
 
 ## Connections
-- [[CONCEPT--PROTO-PATTERN]]
 
+- [[CONCEPT--PROTO-PATTERN]]

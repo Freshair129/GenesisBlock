@@ -26,9 +26,10 @@ git tag -a v0.4.0 -m "MSP v0.4.0 — governance mechanism complete"
 git push origin v0.4.0
 ```
 
-**Verify on GitHub**: https://github.com/Freshair129/msp/tags should now show `v0.4.0`.
+**Verify on GitHub**: <https://github.com/Freshair129/msp/tags> should now show `v0.4.0`.
 
 **Optional**: create a release with auto-generated notes:
+
 ```bash
 gh release create v0.4.0 \
   --title "MSP v0.4.0 — governance mechanism complete" \
@@ -54,12 +55,14 @@ gh release create v0.4.0 \
 | 05 | Publish `@freshair129/gks@3.6.0` to npm | Unlocks `createNomicEmbedder()` for MSP |
 
 **Step-by-step**:
+
 1. Open `upstream/gks-proposals/SUBMISSION.md` in your editor
 2. Pick "Strategy B — Four separate issues" section (it covers all 5; the README was written when only 4 existed)
 3. Copy each issue body → paste into a new GitHub issue at `Freshair129/GksV3/issues/new`
 4. After each is filed, edit the corresponding `upstream/gks-proposals/0X-*.md` and bump the status from `🟡 drafted` to `🔵 awaiting upstream review` + add the issue URL
 
 **When upstream lands a proposal**, follow the workflow in [`upstream/gks-proposals/README.md`](./upstream/gks-proposals/README.md) "Workflow when an upstream lands":
+
 1. Bump `package.json` GKS dep to the new version
 2. Replace MSP workaround with the upstream call
 3. Bump status to `🟢 merged upstream`
@@ -100,6 +103,7 @@ npm run build      # generates dist/ if not present
 **Step 3** — restart your agent host. You should now see 11 MSP tools (`msp_validate`, `msp_propose`, `msp_run_task`, `msp_session_append`, `msp_episode_append`, `msp_backlinks_rebuild`, `msp_recall`, `msp_remember`, `msp_compress`, `msp_identity_get`, `msp_identity_set`).
 
 **Optional plugins** for fuller experience:
+
 - **Obsidian + Local REST API plugin** — enables `msp_recall`'s REST text-search path
 - **Smart Connections plugin** (configured to use `nomic-embed-text-v1.5`) — human-side semantic browse in Obsidian
 
@@ -128,6 +132,7 @@ Without these, MSP works headless (filesystem fallback). See [`examples/setup/`]
 
 1. Inspect surfaced findings. Decide whether each is a real bug (fix the atom) or false-positive (refine the predicate).
 2. Once happy with signal:
+
    ```bash
    # Edit the PROTO atom's frontmatter:
    # - status: draft → status: stable
@@ -137,9 +142,11 @@ Without these, MSP works headless (filesystem fallback). See [`examples/setup/`]
    git checkout -b claude/msp-promote-<name>
    git commit -am "promote PROTO--<NAME> draft → stable"
    ```
+
 3. Open PR. CI will exit-1 if any `severity: error` violation exists in the live tree, so bug-hunting must be done before promotion.
 
 **Recommended promotion order** (least disruptive first):
+
 1. `PROTO--SUMMARY-MIN` (overlaps with core; promoting just makes the PROTO authoritative)
 2. `PROTO--ADR-MONOTONIC` (same)
 3. `PROTO--EVIDENCE-FOR-DECISIONS` (same)
@@ -150,6 +157,7 @@ Without these, MSP works headless (filesystem fallback). See [`examples/setup/`]
 8. `PROTO--PHASE-GATES` (after fixing the 3 AUDITs / 5 ADRs OR adding `phase_override` to legitimate exceptions)
 
 **M8f-2 cleanup** (after promoting M8f's 3 PROTOs to stable):
+
 - Remove the duplicate run from `src/validator/index.ts` (existing core rules → unused once PROTO is authoritative)
 - Optionally delete `src/validator/rules/{summary-min,adr-monotonic,evidence-for-decisions}.ts` (or keep as private helpers imported by the PROTO wrappers)
 
@@ -207,16 +215,19 @@ Expected: 535 tests pass, 159 atoms validate, 9 PROTOs run (7 pass + 2 surface r
 ## 📞 If you get stuck
 
 **Validator emits a real PROTO error you didn't expect?**
+
 1. Read the offending atom's frontmatter — does it match the PROTO's contract?
 2. Check `gks/proto/PROTO--<NAME>.md` body for the rule + escape hatches
 3. If you genuinely want to skip: add `phase_override: { skip_blueprint: true, reason: "..." }` (M8b) or equivalent escape hatch documented in the PROTO
 
 **A subagent worked on this; how do I trust the diffs?**
+
 - Each milestone has an AUDIT atom under `gks/audit/AUDIT--<MILESTONE>.md` recording what shipped + impl decisions
 - The master close-out is `AUDIT--V0-4-0.md` with crosslinks to every per-milestone AUDIT
 - All PRs squash-merged with full commit message + test verification
 
 **Want to spawn another subagent?**
+
 - Read the prompt template in `CLAUDE.md` "Working with subagents"
 - Run `npm ci` in worktree first (worktree caveat documented in CLAUDE.md)
 - Always ship as `status: draft` for new PROTOs (gradual rollout)

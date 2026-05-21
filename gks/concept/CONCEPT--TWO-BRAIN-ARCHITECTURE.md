@@ -158,6 +158,6 @@ See `[[ADR--BRAIN-PATH-RESOLUTION]]` for the precise rules.
 - `[[CONCEPT--NAMESPACE-VAULT-BRAIN]]` — sibling concept on how vaults map to brains
 
 ## Connections
+
 - [[FRAMEWORK--MSP-ARCHITECTURE-V2]]
 - [[CONCEPT--AGENT-AGNOSTIC]]
-

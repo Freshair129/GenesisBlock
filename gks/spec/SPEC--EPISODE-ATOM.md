@@ -206,7 +206,7 @@ This section originally flagged a contradiction: `result-recorder.ts` wrote epis
 - Encryption at rest of episode bodies (may contain sensitive prompts).
 
 ## Connections
+
 - [[BLUEPRINT--AGENT-DISPATCHER]]
 - [[ADR--AGENT-TIER-COST-POLICY]]
 - [[CONCEPT--AGENT-TIER-ROUTING]]
-

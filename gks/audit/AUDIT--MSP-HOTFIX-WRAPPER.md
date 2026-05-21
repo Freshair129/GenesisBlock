@@ -145,8 +145,8 @@ Same precedent as M2 + M4a: bug recorded in audit + new test cases added.
 - Date: 2026-05-03
 
 ## Connections
+
 - [[BLUEPRINT--MSP-HOTFIX-WRAPPER]]
 - [[ADR--MSP-HOTFIX-WRAPPER]]
 - [[ADR--HOTFIX-ESCAPE-HATCH]]
 - [[FEAT--MSP-PRECOMMIT-HOOK]]
-

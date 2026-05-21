@@ -134,11 +134,13 @@ Everything that is **not** about a single atom on disk:
 ## Trade-offs
 
 **Positive**
+
 - Zero MSP code for search, graph, file watching, UI.
 - Users already running Obsidian get MSP value with one Local REST API plugin install.
 - Plugin ecosystem is the scale-up path: vector → Smart Connections; advanced query → Dataview.
 
 **Negative**
+
 - Hard runtime dependency on Obsidian for richest features (semantic search, graph view).
 - File-only fallback for headless / CI / no-Obsidian scenarios.
 - Plugin choice becomes a project decision (which embedder, which query plugin).

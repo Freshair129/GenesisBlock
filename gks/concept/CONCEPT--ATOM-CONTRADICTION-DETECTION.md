@@ -277,6 +277,6 @@ Blocking layers must be **deterministic** and have **near-zero false-positive to
 - `[[CONCEPT--KNOWLEDGE-LAYERS-V2]]` — explains why candidates/ is excluded from contradiction detection
 
 ## Connections
+
 - [[FRAMEWORK--MSP-ARCHITECTURE-V2]]
 - [[CONCEPT--MSP-VALIDATOR]]
-

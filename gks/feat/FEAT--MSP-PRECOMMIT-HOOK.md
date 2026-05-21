@@ -169,7 +169,7 @@ If no relevant `.md` files are staged, the hook exits silently with code 0 (zero
 - Cross-platform Windows install without Git Bash. Defer.
 
 ## Connections
+
 - [[ADR--MSP-PRECOMMIT-HOOK]]
 - [[CONCEPT--MSP-PRECOMMIT-HOOK]]
 - [[FEAT--MSP-VALIDATOR]]
-

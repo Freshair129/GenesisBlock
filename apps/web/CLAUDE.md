@@ -1,5 +1,7 @@
 # Genesis UI — Frontend CLAUDE.md
+
 # Created At: 2026-05-14 12:00:00 +07:00 (v1.1.0)
+
 # Last Updated: 2026-05-14 14:30:00 +07:00 (v1.1.0) — moved packages/ui → apps/web
 
 > Read this before doing anything in `apps/web/`.
@@ -10,7 +12,7 @@
 ## What This Is
 
 **Genesis UI** — a Vite + React 19 + TypeScript knowledge graph explorer.
-Deployed to: **https://genesis-ui-eight.vercel.app/**
+Deployed to: **<https://genesis-ui-eight.vercel.app/>**
 Vercel project ID: `prj_aELlyAqrhvnGBAPxl70HpE24DLrR`
 
 This is a **read-only visualization layer** over GKS data. It does not write to GKS.
@@ -29,6 +31,7 @@ vercel deploy --prod   # deploy to genesis-ui-eight.vercel.app
 ```
 
 From repo root:
+
 ```bash
 npm run dev --workspace=apps/web
 npm run build --workspace=apps/web
@@ -111,6 +114,7 @@ Do NOT use branding tokens or soft-app aesthetics (rounded corners, warm gradien
 ## Canvas Views — Key Patterns
 
 `Graph3DView.tsx` and `GalaxyView.tsx` both use the same camera model:
+
 - `camTgt` ref: `{ yaw, pitch, dist }` — spherical coordinates
 - Perspective projection: `z_proj = node.z * cos(pitch) + ...`, scale = `dist / (dist + z)`
 - Mouse: drag = rotate (yaw/pitch), wheel = zoom (dist)
@@ -131,6 +135,7 @@ Full guide: **`apps/web/DEPLOY.md`**
 
 Vercel project: `genesis-ui` (ID: `prj_aELlyAqrhvnGBAPxl70HpE24DLrR`)
 Deploy from `apps/web/` directory:
+
 ```bash
 cd apps/web && vercel deploy --prod
 ```

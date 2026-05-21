@@ -182,9 +182,9 @@ const server = layer.mcpServer()
 - Full §8.4 slot/layout grammar for the deterministic composer.
 
 ## Connections
+
 - [[CONCEPT--COGNITIVE-LAYER-FACADE]]
 - [[CONCEPT--AGENT-AGNOSTIC]]
 - [[ADR--MEMORY-STORE-GRAPH-WIRING]]
 - [[ADR--GEMINI-AS-SLM-PROVIDER]]
 - [[ADR--DEFAULT-SLM-OLLAMA-QWEN-CODER]]
-

@@ -230,6 +230,7 @@ export async function executeBlock(
 ```
 
 Pseudocode:
+
 ```
 1. const t0 = Date.now()
 2. const manifest = await loadManifest(blockId, opts.root)
@@ -257,6 +258,7 @@ msp-genesis-exec <blockId> --prompt "<text>" [--tier T1|T2|T3] [--root <dir>] [-
 ```
 
 Exit codes:
+
 - 0 — success
 - 1 — execution failed (manifest missing, dispatch error)
 - 2 — bad arguments
@@ -281,13 +283,14 @@ Exit codes:
 ## Acceptance
 
 Phase E5 closes when:
+
 1. The 3 atoms are authored and pass `msp-validate`
 2. All 4 test files green under `vitest run`
 3. `tsc --noEmit` clean (no `any`, strict mode)
 4. `msp-genesis-exec --help` works end-to-end via the bin entry
 
 ## Connections
+
 - [[SPEC--GENESIS-BLOCK-MANIFEST]]
 - [[BLUEPRINT--AGENT-DISPATCHER]]
 - [[CONCEPT--AGENT-AGNOSTIC]]
-

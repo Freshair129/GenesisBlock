@@ -234,7 +234,7 @@ Slightly better disk usage and stricter dependency hoisting than npm workspaces.
 ## Source
 
 - `[[CONCEPT--MONOREPO-MIGRATION]]` — motivation
-- npm workspaces docs (https://docs.npmjs.com/cli/v10/using-npm/workspaces)
+- npm workspaces docs (<https://docs.npmjs.com/cli/v10/using-npm/workspaces>)
 - Prior art: Vite (`packages/vite`, `packages/create-vite`), tRPC (`packages/server`, `packages/client`, …), Turborepo
 
 ---

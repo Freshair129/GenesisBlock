@@ -152,5 +152,5 @@ Negative / accepted costs:
 - `packages/gks/src/memory/types.ts` — the `Namespace` interface left unchanged.
 
 ## Connections
-- [[FRAMEWORK--UNIVERSAL-CONTEXT-FRAMEWORK]]
 
+- [[FRAMEWORK--UNIVERSAL-CONTEXT-FRAMEWORK]]

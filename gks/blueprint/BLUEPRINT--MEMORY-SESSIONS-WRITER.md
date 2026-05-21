@@ -189,7 +189,7 @@ T2 APPEND-TURN (schema + serialise + appendFile)
 T3 SCHEMA-VALIDATE (extracted module + tests)
 
 ## Connections
+
 - [[FEAT--MEMORY-SESSIONS-WRITER]]
 - [[ADR--MEMORY-SESSIONS-WRITER]]
 - [[CONCEPT--MEMORY-SESSIONS]]
-

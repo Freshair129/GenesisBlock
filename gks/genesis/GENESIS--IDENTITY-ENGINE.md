@@ -153,16 +153,20 @@ attributes:
 The **Identity Engine** is the first canonical Genesis Block in the MSP ecosystem. It aggregates the five essential dimensions required to define and maintain a stable agent identity ("soul") across heterogeneous sessions and providers.
 
 ## Behavioral Objective
+
 When loaded, this block instructs the agent to:
-1.  **Acknowledge** its identity as an externalized artifact (the passport).
-2.  **Surrender** pre-existing personas (Ego Death).
-3.  **Resolve** identity conflicts by favoring project-level overrides over global baselines.
-4.  **Enforce** structural integrity of its own soul (Schema Guard).
+
+1. **Acknowledge** its identity as an externalized artifact (the passport).
+2. **Surrender** pre-existing personas (Ego Death).
+3. **Resolve** identity conflicts by favoring project-level overrides over global baselines.
+4. **Enforce** structural integrity of its own soul (Schema Guard).
 
 ## Governance
+
 Decisions regarding the Identity Engine are driven by `[[MOD--IDENTITY]]`. High-level architectural changes require approval from the `[[PERSONA--T3-ARCHITECT]]`.
 
 ## Connections
+
 - [[COGNITIVE--EGO-DEATH-PASSPORT]]
 - [[ALGO--IDENTITY-RESOLUTION]]
 - [[RUNBOOK--IDENTITY-MIGRATION]]
@@ -176,4 +180,3 @@ Decisions regarding the Identity Engine are driven by `[[MOD--IDENTITY]]`. High-
 - \[\[PERSONA--T2-IMPLEMENTER\]\]
 - \[\[ENTITY--MSP-USERS\]\]
 - [[SPEC--GENESIS-BLOCK-MANIFEST]]
-

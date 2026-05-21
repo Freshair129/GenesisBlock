@@ -70,7 +70,57 @@ export class BridgeServer {
             return;
           }
 
-          await this.pg.insert(data.id, data.text, data.vector, data.metadata);
+          await this.pg.insert({
+            id: data.id,
+            store: data.store || 'default',
+            source: data.source || 'obsidian',
+            chunk_id: data.chunk_id || '0',
+            text: data.text,
+            vector: data.vector,
+            metadata: data.metadata || {}
+          });
+          res.writeHead(200, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ ok: true }));
+          return;
+        }
+
+        if (url.pathname === '/api/delete' && req.method === 'POST') {
+          const body = await this.readBody(req);
+          const data = JSON.parse(body);
+          
+          if (!this.pg) {
+            res.writeHead(503, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ error: 'Database not connected' }));
+            return;
+          }
+
+          await this.pg.delete(data.id, data.store || 'default');
+          res.writeHead(200, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ ok: true }));
+          return;
+        }
+
+        if (url.pathname === '/api/insert-batch' && req.method === 'POST') {
+          const body = await this.readBody(req);
+          const items = JSON.parse(body);
+          
+          if (!this.pg) {
+            res.writeHead(503, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ error: 'Database not connected' }));
+            return;
+          }
+
+          for (const item of items) {
+            await this.pg.insert({
+              id: item.id,
+              store: item.store || 'default',
+              source: item.source || 'obsidian',
+              chunk_id: item.chunk_id || '0',
+              text: item.text,
+              vector: item.vector,
+              metadata: item.metadata || {}
+            });
+          }
           res.writeHead(200, { 'Content-Type': 'application/json' });
           res.end(JSON.stringify({ ok: true }));
           return;

@@ -127,11 +127,13 @@ function postProcess(raw: string): string {
 ## Consequences
 
 **Positive**
+
 - One place to fix SLM wrapping artefacts.
 - Pattern checks downstream see clean code regardless of model.
 - Deterministic — same input → same output, no LLM in the loop.
 
 **Negative**
+
 - `strip_trailing_commentary` is heuristic. If a snippet legitimately ends mid-block (e.g. an unfinished helper), we'll truncate too aggressively. Acceptable — the acceptance test will catch the resulting compile error.
 - Fence stripping doesn't handle nested fences in markdown-as-string content. SLMs don't typically emit such, so accepting the risk.
 
@@ -146,5 +148,5 @@ function postProcess(raw: string): string {
 `msp_spec.md` §5.1 (Post-processing).
 
 ## Connections
-- [[CONCEPT--CODEGEN-MICROTASK-CONTRACT]]
 
+- [[CONCEPT--CODEGEN-MICROTASK-CONTRACT]]

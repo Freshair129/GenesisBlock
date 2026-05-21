@@ -30,9 +30,11 @@ What did we decide. State as one or two declarative sentences.
 ## Consequences
 
 **Positive**
+
 - ...
 
 **Negative**
+
 - ...
 
 ## Alternatives considered

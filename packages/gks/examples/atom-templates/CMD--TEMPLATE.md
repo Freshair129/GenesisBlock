@@ -19,6 +19,7 @@ linked_symbols:
 # CMD — <Title>
 
 ## Execution
+
 - **Command:** `npm run <script-name>` | `<binary-name> <args>`
 - **Runtime:** <e.g. Node.js 22 | Python 3.12 | Shell>
 
@@ -36,10 +37,12 @@ linked_symbols:
 - `DEBUG`: <Description>
 
 ## Expected Outcome
+
 - **Success:** <What happens on success (e.g. index generated)>
 - **Failure:** <Common error codes and their meaning>
 
 ## Security & Access
+
 - **Write Permission:** <Does it modify the filesystem?>
 - **Network Access:** <Does it make external calls?>
 

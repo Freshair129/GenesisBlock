@@ -111,6 +111,7 @@ A thin facade in `packages/msp/src/cognitive/index.ts` that returns one object �
 ## Scope
 
 In:
+
 - `createCognitiveLayer(opts)` factory returning the unified surface.
 - Hybrid 4-layer recall (FTS layer 2 added; atomic / vector / graph already shipped).
 - T1/T2/T3 tier routing for `runTask` (default T1 = local Ollama + qwen2.5-coder).
@@ -122,6 +123,7 @@ In:
 - `mcpServer()` pre-wired with the existing 19 MSP MCP tools — no new tools added.
 
 Out:
+
 - New MCP tools.
 - Atom-write paths from the facade — atoms still go through `msp_candidate` + PR ([[ADR--AGENT-WRITE-BOUNDARIES]]).
 - Full §8.4 slot/layout grammar for the deterministic composer — only the AUTO-GENERATED marker portion of §8.5/§9.6 is implemented in Phase 0.
@@ -146,5 +148,5 @@ This is the answer to "what makes MSP plug into a cognitive layer" — the seam 
 - `mcpServer()` returns a McpServer instance with the existing 19 tools wired.
 
 ## Connections
-- [[CONCEPT--AGENT-INTEGRATION-PATTERNS]]
 
+- [[CONCEPT--AGENT-INTEGRATION-PATTERNS]]

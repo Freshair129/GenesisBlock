@@ -183,6 +183,6 @@ verify-flow per FEAT:
 - `[[FRAMEWORK--MSP-ARCHITECTURE-V2]]` (root of the knowledge tree)
 
 ## Connections
+
 - [[CONCEPT--KNOWLEDGE-LAYERS-V2]]
 - [[ADR--AGENT-WRITE-BOUNDARIES]]
-

@@ -104,5 +104,6 @@ Every operational atom is automatically categorized by priority and status. The 
 3. **Role-Based Triage:** Reserve prioritization and assignment changes for high-tier agents (T2+) or humans.
 
 ## Connections
+
 - `[[ADR--TASK-TRACKING-AT-ORCHESTRATOR]]` — context for where volatile task state resides.
 - `[[FEAT--ISSUE-TRACKER]]` — the implementation of the core issue tracking system.

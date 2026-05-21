@@ -107,12 +107,14 @@ A writer that takes `(episodicId, turnRange, summary?, importance_score)` and ei
 ## Scope
 
 In:
+
 - Append episodes to `episodic_memory.json` keyed by `episodicId`.
 - Schema validation per `[[CONCEPT--MEMORY-EPISODIC]]` (importance_score 0..1 enforced).
 - Pluggable summariser: manual, heuristic, or LLM-backed.
 - Idempotency: appending the same `episodicId` twice updates instead of duplicating.
 
 Out:
+
 - The retrieval side (vector search, RRF) — orchestrator concern.
 - Importance-score heuristics — pluggable; default `0.5`; orchestrator can override.
 
@@ -121,6 +123,6 @@ Out:
 Implements `[[CONCEPT--MEMORY-EPISODIC]]`. Spec §7.2.
 
 ## Connections
+
 - [[CONCEPT--MEMORY-SESSIONS]]
 - [[FEAT--MEMORY-SESSIONS-WRITER]]
-

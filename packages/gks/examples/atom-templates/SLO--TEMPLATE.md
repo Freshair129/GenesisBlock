@@ -44,6 +44,7 @@ threshold: <e.g. error budget = 0.1% × monthly request volume>
 ## Error budget policy
 
 What happens when budget is exhausted:
+
 - freeze non-critical deploys
 - prioritise reliability work
 - review at next retro

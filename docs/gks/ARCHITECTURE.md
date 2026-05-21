@@ -244,6 +244,7 @@ graph LR
 ```
 
 Each is opt-out via `MemoryStoreOptions`:
+
 - `audit: false`           — disable audit log
 - `cost: false`            — disable cost tracker
 - `reranker: { enabled: false }` — disable reranker pass

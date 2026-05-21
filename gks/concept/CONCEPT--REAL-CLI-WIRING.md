@@ -125,6 +125,7 @@ qwen <prompt-positional>
 installed as `qwen.exe` shim under Python Scripts/).
 
 **Notes**:
+
 - The CLI takes the prompt as **positional** args (joined with spaces).
   There is NO `--prompt` flag. The earlier `qwen.md` doc referred to an
   aspirational pattern that the installed binary does not implement.
@@ -144,6 +145,7 @@ gemini --approval-mode yolo -p "<prompt>"
 via `npm i -g @google/gemini-cli`; verified against v0.42.0).
 
 **Flag rationale**:
+
 - `-p / --prompt`: non-interactive (headless) mode.
 - `--approval-mode yolo`: auto-approve all tool calls — required for
   agent-driven invocation; without it the CLI would prompt interactively.
@@ -160,6 +162,7 @@ globally via `npm i -g @anthropic-ai/claude-code`; verified against
 v2.1.140).
 
 **Flag rationale**:
+
 - `-p / --print`: print response and exit (non-interactive mode); the
   workspace-trust dialog is skipped when stdout is not a TTY.
 - Healthcheck: `claude --version` (supported, exits 0).
@@ -256,6 +259,6 @@ upfront so `shell: false` can be used everywhere).
   positional-arg pattern).
 
 ## Connections
+
 - [[AUDIT--PHASE-E1-REAL-CLI-WIRING]]
 - [[CONCEPT--TIER-3-DEFERRED]]
-

@@ -179,6 +179,7 @@ Both lines preserved across writers; readers tolerate either format.
 ## Why max-age before PID-liveness
 
 Order matters:
+
 1. Old lockfiles (process long-dead, OS reused PID) → max-age catches this; PID-liveness would falsely report "alive" because some other process now holds that PID
 2. Zombie PIDs (process gone but kernel-table-resident) → max-age catches this regardless of zombie state
 3. Crashed process with empty lockfile → existing NaN-stale path still works; max-age doesn't even fire
@@ -186,12 +187,14 @@ Order matters:
 ## Consequences
 
 **Positive**
+
 - No new deps
 - Forward-compat lockfile shape (existing PID-only files still parse)
 - 5-minute default chosen so that legitimate long-running consolidations (M7b — ~30s) don't trip; only abandoned locks
 - Fixes the Windows zombie-PID class without platform branches
 
 **Negative**
+
 - A legitimate caller that holds the lock > 5 minutes will be evicted. Mitigated: 5 min is way more than any realistic session-write op; callers needing more should pass `maxAgeMs` explicitly.
 - Heartbeat (re-touch mtime mid-hold) NOT implemented — would catch the long-held-legitimate case but adds complexity. Deferred.
 - `fs.stat` is one extra syscall per contention loop. Acceptable.
@@ -216,5 +219,5 @@ Order matters:
 `[[CONCEPT--SESSION-LOCK-CROSS-PLATFORM]]`, `[[CONCEPT--MSP-ROADMAP]]` §3 M9f, audit of existing `src/memory/sessions/lock.ts`.
 
 ## Connections
-- [[FEAT--MEMORY-SESSIONS-WRITER]]
 
+- [[FEAT--MEMORY-SESSIONS-WRITER]]

@@ -175,6 +175,7 @@ npm run build
 2. Added `fail-fast: false` so a failing Node version doesn't cancel the other before it produces a usable signal.
 
 **Reproduction confirmed locally**:
+
 ```sh
 rm -f .brain/msp/projects/evaAI/vector/backlinks.jsonl
 npm run msp:backlinks -- --check    # exit 1
@@ -194,7 +195,7 @@ npm run msp:backlinks -- --check     # exit 0 (no-op)
 - Date: 2026-05-03
 
 ## Connections
+
 - [[FEAT--MSP-VALIDATOR]]
 - [[FEAT--MEMORY-BACKLINKS-INDEXER]]
 - [[FEAT--CODEGEN-MICROTASK-RUNNER]]
-

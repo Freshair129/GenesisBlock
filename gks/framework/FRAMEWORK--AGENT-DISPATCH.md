@@ -184,6 +184,6 @@ Capability and cost lie on the same axis. A single-tier system either (a) burns 
 - **Master Block promotion** (`MASTER--*`, `[[BLUEPRINT--MASTER]]-*`) — knowledge composition over time; episodes feed the consolidator that eventually proposes master-block updates.
 
 ## Connections
+
 - [[CONCEPT--AGENT-TIER-ROUTING]]
 - [[ADR--AGENT-TIER-COST-POLICY]]
-

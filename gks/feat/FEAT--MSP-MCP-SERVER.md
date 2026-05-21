@@ -170,6 +170,7 @@ Restart the MCP client. Six new tools become available alongside any others:
 - Session lifetime in the server — every call is stateless.
 
 ## Connections
+
 - [[ADR--MSP-MCP-SERVER]]
 - [[CONCEPT--MSP-MCP-SERVER]]
 - [[FEAT--MSP-VALIDATOR]]
@@ -177,4 +178,3 @@ Restart the MCP client. Six new tools become available alongside any others:
 - [[FEAT--MEMORY-SESSIONS-WRITER]]
 - [[FEAT--MEMORY-EPISODIC-WRITER]]
 - [[FEAT--MEMORY-BACKLINKS-INDEXER]]
-

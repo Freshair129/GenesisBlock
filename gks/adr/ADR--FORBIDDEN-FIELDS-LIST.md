@@ -114,6 +114,7 @@ The validator must reject any inbound proposal containing one of these fields.
 Maintain a single hardcoded blacklist (in `src/validator/rules/forbidden-fields.ts`) grouped by reason:
 
 ### Identity forgery (5)
+
 - `commit_hash` — set by promote workflow from git
 - `merge_commit` — set when atom enters main
 - `tenant_id` — context, not authored
@@ -121,6 +122,7 @@ Maintain a single hardcoded blacklist (in `src/validator/rules/forbidden-fields.
 - `reviewer_approved_at` — set by human-review gate
 
 ### Authority fields — MSP only (5)
+
 - `promotion_level` — derived (L0/L1/L2)
 - `validated_at` — timestamp from validator
 - `validated_by` — identity from validator
@@ -128,12 +130,14 @@ Maintain a single hardcoded blacklist (in `src/validator/rules/forbidden-fields.
 - `hash` — content hash, derived
 
 ### Runtime metrics (4)
+
 - `execution_count`
 - `last_error`
 - `uptime`
 - `latency_p50`
 
 ### Fabrication risk (3)
+
 - `adr_number_override` — would let agents skip ADR-monotonic
 - `feature_id_override` — same idea for FEATs
 - `incident_id` — incidents are tracked separately, not embedded in atoms
@@ -145,11 +149,13 @@ The list lives **in code, not in `atomic_contract.yaml`** for M2. Loading it fro
 ## Consequences
 
 **Positive**
+
 - Mechanical, fast check (set membership, O(1) per field).
 - Adding a new forbidden field is a one-line code change + one test.
 - Clear rationale per field (the four groupings above) makes future additions easier to evaluate.
 
 **Negative**
+
 - 17 fields hardcoded means contract drift between code and `msp_spec.md` §4.3 is possible. Mitigated by the M3 plan to load from YAML.
 - The `incident_id` rule may collide with future incident tracking. If so, rename to `external_incident_id` or move to a separate atom.
 
@@ -164,6 +170,6 @@ The list lives **in code, not in `atomic_contract.yaml`** for M2. Loading it fro
 `msp_spec.md` §4.3 (Forbidden Fields) — full list reproduced above.
 
 ## Connections
+
 - [[CONCEPT--ATOMIC-WRITE-CONTRACT]]
 - [[FEAT--MSP-VALIDATOR]]
-

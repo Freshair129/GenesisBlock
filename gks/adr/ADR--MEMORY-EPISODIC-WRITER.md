@@ -125,6 +125,7 @@ Why not file-per-episode: too many small files; complicates "scan all episodes f
 ### Summariser: accept-only, with optional plugin
 
 Writer **does not** call any LLM. It accepts:
+
 - A manual `summary` string, OR
 - A `summariser` plugin function `(turns: SessionTurn[]) => Promise<EpisodeContent>`.
 
@@ -137,11 +138,13 @@ Default plugin is **heuristic** (first non-trivial assistant message + last deci
 ## Consequences
 
 **Positive**
+
 - Single file = one read for vector index rebuild.
 - Atomic rewrite = no torn writes; no lock needed.
 - Plugin boundary keeps writer testable without LLM mocks.
 
 **Negative**
+
 - O(N) read+write on every append. Acceptable until N > ~10,000; M3 may add chunked storage.
 - Mutation requires reading the whole file. Same constant.
 

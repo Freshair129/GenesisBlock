@@ -133,5 +133,5 @@ Every inbound proposal declares one of four `proposal_type` values. The promote 
 `msp_spec.md` §3.2 (Proposal Types).
 
 ## Connections
-- [[CONCEPT--SUBMISSION-ENVELOPE]]
 
+- [[CONCEPT--SUBMISSION-ENVELOPE]]

@@ -174,7 +174,7 @@ await runTask(taskPath, { slmClient: createOllamaClient({ model: 'qwen2.5-coder:
 - Date: 2026-05-03
 
 ## Connections
+
 - [[BLUEPRINT--SLM-OLLAMA-CLIENT]]
 - [[ADR--SLM-OLLAMA-CLIENT]]
 - [[FEAT--CODEGEN-MICROTASK-RUNNER]]
-

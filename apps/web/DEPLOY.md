@@ -18,11 +18,13 @@ Every time you push to the `main` branch, Vercel will automatically trigger a pr
 If you need to deploy manually or test a preview build before merging, use the Vercel CLI from the `apps/web/` directory.
 
 ### Preview Deployment
+
 ```bash
 vercel
 ```
 
 ### Production Deployment
+
 ```bash
 vercel --prod
 ```
@@ -37,12 +39,15 @@ vercel --prod
 ## 4. Troubleshooting
 
 ### Build Failures
+
 Ensure that `npm run build` passes locally before pushing. You can run this from the repo root:
+
 ```bash
 npm run build --workspace=apps/web
 ```
 
 ### Environment Variables
+
 If the UI requires API keys or special endpoints, configure them in the [Vercel Dashboard](https://vercel.com/freshair129/genesis-ui/settings/environment-variables).
 
 ---

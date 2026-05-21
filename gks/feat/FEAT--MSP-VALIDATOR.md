@@ -163,5 +163,5 @@ walks every atom under `gks/` and every candidate under `.brain/msp/projects/eva
 - Vector / semantic similarity checks
 
 ## Connections
-- [[CONCEPT--MSP-VALIDATOR]]
 
+- [[CONCEPT--MSP-VALIDATOR]]

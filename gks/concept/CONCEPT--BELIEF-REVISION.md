@@ -32,7 +32,7 @@ A healthy memory system must be able to change its mind. If a long-term belief (
 
 1. **Conflict Detection:** The distiller identifies a contradiction between a high-tier belief and a new session artifact.
 2. **Contestation:** The belief's epistemic state is regressed from `confirmed` to `contested`. A `challenge_counter` is initialized.
-3. **Recovery Window:** The system observes subsequent sessions. 
+3. **Recovery Window:** The system observes subsequent sessions.
     - If supporting evidence returns → state moves back to `confirmed`.
     - If contradictions continue (threshold hit) → belief is **downgraded**.
 4. **Downgrade:** The belief is removed from the Identity tier and converted back into a lower-tier Narrative for re-distillation or audit.

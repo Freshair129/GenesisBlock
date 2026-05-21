@@ -104,6 +104,7 @@ attributes:
 The indexer could (a) maintain incremental state — track which atoms changed and update only their edges — or (b) full rebuild — read all atoms each invocation and produce the file from scratch.
 
 Incremental sounds tempting (avoid O(N) work for a one-atom edit). But it adds:
+
 - Cache invalidation logic (which atoms touched? which edges did they own?)
 - Persistent state (`.indexer-state.json`) that can drift from reality
 - Complexity in the hot path (race between editor and indexer)
@@ -135,11 +136,13 @@ Running the indexer twice with no atom changes produces byte-identical output. I
 ## Consequences
 
 **Positive**
+
 - No state to corrupt.
 - Same input → same output, always.
 - O(N) is fast enough at our scale; if N grows past tens of thousands, revisit.
 
 **Negative**
+
 - Wastes work on minor edits. Acceptable for an interactive tool.
 - Must be re-run after every atom change to keep `backlinks.jsonl` fresh. Mitigated by pre-commit hook.
 

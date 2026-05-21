@@ -159,5 +159,5 @@ All 6 rules from `[[ADR--ANTI-HALLUCINATION-RULES]]` now implemented:
 - Date: 2026-05-03
 
 ## Connections
-- [[FEAT--MSP-VALIDATOR]]
 
+- [[FEAT--MSP-VALIDATOR]]

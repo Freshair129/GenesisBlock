@@ -1,11 +1,13 @@
 Search GKS memory for relevant knowledge.
 
 Call the `gks_recall` MCP tool with:
+
 - `query`: $ARGUMENTS
 - `root`: `.`
 - `topK`: 5
 
 Format the results as a numbered list:
+
 1. [score] source — snippet
    path (if available)
 

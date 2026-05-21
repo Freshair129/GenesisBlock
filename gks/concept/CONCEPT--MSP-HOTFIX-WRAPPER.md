@@ -113,11 +113,13 @@ If MSP exposes `npm run msp:hotfix:{open,list,close,check}` as namespace-consist
 ## Scope
 
 In:
+
 - npm scripts: `msp:hotfix:open`, `msp:hotfix:list`, `msp:hotfix:close`, `msp:hotfix:check`. All thin passthroughs.
 - Extend `examples/hooks/pre-commit-validator.sh` to gather staged paths outside `gks/` + `.brain/`, then invoke `gks hotfix check --file=<path>` once aggregating all paths.
 - Tests covering the new hook behaviour.
 
 Out:
+
 - Auto-detect HEAD SHA in `msp:hotfix:open` (user passes `$(git rev-parse HEAD)`).
 - Distributed enforcement (per `[[ADR--HOTFIX-ESCAPE-HATCH]]`: orchestrator's job, not MSP's).
 - New atom types — `HOTFIX--` already exists in the GKS taxonomy.
@@ -127,5 +129,5 @@ Out:
 P1 item #6 from the M3 production-readiness backlog.
 
 ## Connections
-- [[FEAT--MSP-PRECOMMIT-HOOK]]
 
+- [[FEAT--MSP-PRECOMMIT-HOOK]]

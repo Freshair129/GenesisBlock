@@ -230,5 +230,5 @@ This atom records intent. It does **not** decide:
 These are decided in `[[ADR--GENESIS-GRAPH-AS-GKS-BACKEND]]`.
 
 ## Connections
-- [[FRAMEWORK--MSP-ARCHITECTURE-V2]]
 
+- [[FRAMEWORK--MSP-ARCHITECTURE-V2]]

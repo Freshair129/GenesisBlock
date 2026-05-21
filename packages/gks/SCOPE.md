@@ -66,6 +66,7 @@ The features below are GKS's responsibility. Bug reports, perf work, and
 new contributions targeting these are welcome.
 
 ### Storage layers
+
 - **Atomic** — exact-id lookup against a JSONL index of canonical notes
 - **Vector** — semantic search via pluggable backend (JSONL / HNSW / pgvector)
 - **Episodic** — session traces (append-only JSONL) + summary markdown
@@ -74,6 +75,7 @@ new contributions targeting these are welcome.
   see "Out of scope" for code-graph traversal
 
 ### Cross-cutting
+
 - Bi-temporal versioning (`valid_from` / `valid_to` / `superseded_by`)
 - Multi-tenant `Namespace = { tenant_id, user_id, session_id, agent_id }`
   with per-recall scoping + cross-namespace admin gate
@@ -88,12 +90,14 @@ new contributions targeting these are welcome.
   the LLM only generates candidates)
 
 ### Surfaces
+
 - **MCP server** (stdio) — `gks_retain`, `gks_recall`, `gks_lookup`,
   `gks_propose_inbound`, `gks_reflect`, plus admin `gks_recall_cross_namespace`
 - **CLI** — `npx gks` for ad-hoc retain/recall/lookup/propose/reflect/init/status
 - **TS API** — `MemoryStore` class + functional `retain`/`recall`/`reflect`
 
 ### Extension points (bring your own)
+
 - `VectorBackend` — implement `addItem` / `search` / `patchMetadataMany`
 - `GraphBackend` — implement `addEdge` / `neighbors` / `findPath`
 - `Reranker` — implement `score(query, candidates)` for hybrid scoring
@@ -111,6 +115,7 @@ Everything below is intentionally not GKS's job. We won't accept PRs that
 move these into `src/`. Pointers to where they belong follow each item.
 
 ### Memory OS responsibilities → live in your Memory OS layer
+
 - **Consolidation timing** — when to fold sessions into cores, cores into
   spheres. GKS provides episodic write + reflect primitives; the *schedule*
   is policy.
@@ -137,6 +142,7 @@ without implementing one itself.
 shows a paradigm-agnostic Memory OS that uses GKS as its storage backend.
 
 ### Workflow / governance → live in process docs and CI
+
 - **Phase-gate enforcement** (doc-before-code, ADR-required, blueprint-required)
   — these are CI lints + pre-commit hooks, not memory engine concerns.
 - **Microtask codegen + composer** (Phase 3.5 SLM workflow) — separate tool.
@@ -152,6 +158,7 @@ monorepo root documents this layer; GKS does not implement it. (Originally extra
 from the EVA project's framework spec.)
 
 ### Code intelligence → use GitNexus or similar
+
 - **AST parsing** (TS / Python / Go / Rust / …) — language-specific work
   that grows quadratically with parser maintenance. Don't build it here.
 - **Call graphs / import graphs / blast-radius analysis** — `GraphBackend`
@@ -164,6 +171,7 @@ in your Claude Code MCP config — see `README.md` § "Pairing with a
 code-structure layer".
 
 ### LLM-side concerns → caller's responsibility
+
 - **Trust-boundary framing of recall snippets** — GKS marks `RetrievalHit.snippet`
   as untrusted in JSDoc + MCP tool descriptions. The actual prompt-side
   framing ("RETRIEVED CONTENT BEGIN/END" markers, etc.) is up to the agent
@@ -176,6 +184,7 @@ code-structure layer".
 ## How to use GKS in different stacks
 
 ### Direct (no Memory OS) — simple agents
+
 ```ts
 import { MemoryStore, retain, recall } from '@freshair129/gks'
 
@@ -185,6 +194,7 @@ const hits = await recall(store, 'preferences', { topK: 5 })
 ```
 
 ### Behind a Memory OS — sophisticated agents (EVA-style)
+
 ```python
 # Memory OS (e.g. MSP-v9.1 or examples/memory-os-architecture/) owns
 # policy + cascade; GKS is its storage backend.
@@ -201,6 +211,7 @@ os.write_episode_eva(episode, ri_level="L3", eva_affect_signal=...)
 ```
 
 ### Via MCP — any MCP-aware client (Claude Code, Cursor, custom)
+
 ```jsonc
 // ~/.config/claude/mcp.json
 {

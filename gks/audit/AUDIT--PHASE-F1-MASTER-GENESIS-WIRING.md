@@ -135,6 +135,7 @@ carries a `from_master` flag so callers can branch behaviour.
 ## What shipped
 
 ### Atoms (3)
+
 - `gks/concept/[[CONCEPT--PROMOTED-BLOCK-REGISTRY]].md` — what + why; positions
   the registry as derived state over the canonical `gks/master/*.md` atoms
   and explains why it's gitignored.
@@ -144,6 +145,7 @@ carries a `from_master` flag so callers can branch behaviour.
 - `gks/audit/[[AUDIT--PHASE-F1-MASTER-GENESIS-WIRING]].md` — this atom.
 
 ### Code (4 files — 2 new, 2 extended)
+
 - **New** `packages/msp/src/master/registry.ts` — `MasterEntry`,
   `readRegistry`, `appendRegistry`, `findActiveMaster`. Pure I/O over
   `<root>/gks/master/registry.jsonl`. Tolerates missing file + malformed
@@ -162,15 +164,18 @@ carries a `from_master` flag so callers can branch behaviour.
   `from_master: true` in the `ExecuteResult`.
 
 ### Type changes
+
 - `ExecuteResult.from_master?: boolean` — new optional field. Set to
   `true` when the registry contains an active entry for the block at
   execution time. Absent / undefined when not.
 
 ### Infra
+
 - `.gitignore` entry: `gks/master/registry.jsonl` (per
   `[[CONCEPT--PROMOTED-BLOCK-REGISTRY]]` — derived state).
 
 ### Tests
+
 - **New** `packages/msp/test/master/registry.test.ts` — 13 cases covering
   read/append/find round-trips, malformed-line tolerance, archived-only
   blocks, last-write-wins on multi-active.
@@ -196,7 +201,7 @@ carries a `from_master` flag so callers can branch behaviour.
 ## Boundaries respected
 
 - Stayed inside `packages/msp/src/master/` + `packages/msp/src/genesis/executor.ts`
-  + the 3 listed test files + `.gitignore` + the 3 atoms.
+  - the 3 listed test files + `.gitignore` + the 3 atoms.
 - No changes to `DispatchTask`, `DispatchResult`, `BrainQuery`, or any
   other public-API surface beyond the one optional field on `ExecuteResult`.
 - Did not touch `packages/msp/src/usage/` (Phase F2 territory) or episode
@@ -228,6 +233,6 @@ carries a `from_master` flag so callers can branch behaviour.
 - `[[ADR--MASTER-PROMOTION-DOC-TO-CODE]]` — human gate
 
 ## Connections
+
 - [[CONCEPT--MASTER-PROMOTION]]
 - [[CONCEPT--GENESIS-BLOCK-RUNTIME]]
-

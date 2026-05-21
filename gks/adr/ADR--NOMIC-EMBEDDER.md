@@ -108,6 +108,7 @@ GKS's primary local embedder, replacing the Ollama fallback.
 ## Rationale
 
 **nomic-embed-text-v1.5** wins on all criteria:
+
 - 768-dim: better recall quality than 384-dim for mixed-language content
 - 2048 token context: handles full Obsidian notes without truncation
 - Already listed in Smart Connections supported models → user can switch
@@ -118,10 +119,12 @@ GKS's primary local embedder, replacing the Ollama fallback.
 ## Prefix Requirement
 
 nomic uses task-specific prefixes that must be applied consistently:
+
 ```
 embedding a document → prepend "search_document: "
 embedding a query   → prepend "search_query: "
 ```
+
 Without consistent prefixes, cosine similarity scores are unreliable.
 The GKS embedder must handle this internally — callers do not prepend prefixes.
 
@@ -144,6 +147,6 @@ The GKS embedder must handle this internally — callers do not prepend prefixes
 ```
 
 ## Connections
+
 - [[CONCEPT--EMBEDDING-STRATEGY]]
 - [[BLUEPRINT--NOMIC-EMBEDDER]]
-

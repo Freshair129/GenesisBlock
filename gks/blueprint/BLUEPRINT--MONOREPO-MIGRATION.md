@@ -359,8 +359,8 @@ implementation_order:
 - `[[CONCEPT--MONOREPO-MIGRATION]]` — motivation
 - `[[ADR--MONOREPO-STRUCTURE]]` — decided structure
 - `upstream/gks-proposals/0[1234]-*.md` — proposals to absorb in phase C
-- npm workspaces docs (https://docs.npmjs.com/cli/v10/using-npm/workspaces)
+- npm workspaces docs (<https://docs.npmjs.com/cli/v10/using-npm/workspaces>)
 
 ## Connections
-- [[FRAMEWORK--MSP-ARCHITECTURE-V2]]
 
+- [[FRAMEWORK--MSP-ARCHITECTURE-V2]]

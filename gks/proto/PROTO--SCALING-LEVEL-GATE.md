@@ -185,5 +185,5 @@ not fail-exit per the PROTO loader's draft policy.
 `[[CONCEPT--MSP-ROADMAP]]` §2 M8c.
 
 ## Connections
-- [[FEAT--PROTO-LOADER]]
 
+- [[FEAT--PROTO-LOADER]]

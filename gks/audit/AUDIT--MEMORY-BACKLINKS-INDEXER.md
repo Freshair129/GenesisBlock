@@ -138,6 +138,7 @@ total: 15/15
 ## Dogfood
 
 `npm run msp:backlinks` on this repo:
+
 - 52 atoms scanned
 - 116 edges emitted to `.brain/msp/projects/evaAI/vector/backlinks.jsonl`
 - Sorted deterministically (verified by re-running with `--check` → "up-to-date")
@@ -149,6 +150,6 @@ total: 15/15
 - Date: 2026-05-03
 
 ## Connections
+
 - [[BLUEPRINT--MEMORY-BACKLINKS-INDEXER]]
 - [[ADR--MEMORY-BACKLINKS-INDEXER]]
-

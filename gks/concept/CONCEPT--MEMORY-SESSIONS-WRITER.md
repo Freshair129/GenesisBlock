@@ -106,11 +106,13 @@ A small, append-only writer keyed by `episodicId` will close the loop. Agents ca
 ## Scope
 
 In:
+
 - Open / append / close lifecycle on `.brain/msp/projects/<ns>/sessions/<episodicId>.jsonl`.
 - Schema validation per `[[CONCEPT--MEMORY-SESSIONS]]` (sessionId, episodicId, turnId, msgId, speakerId, content, optional learnId).
 - Single-writer-per-file lock (refuses concurrent open of the same episodic).
 
 Out:
+
 - Reading sessions (a separate reader; trivial — `readline` over the JSONL).
 - Episode summarisation (separate FEAT — `[[FEAT--MEMORY-EPISODIC-WRITER]]`).
 - Vector embedding (orchestrator concern).
@@ -120,5 +122,5 @@ Out:
 Implements `[[CONCEPT--MEMORY-SESSIONS]]`. Spec §7.1.
 
 ## Connections
-- [[CONCEPT--MEMORY-SUBSYSTEM]]
 
+- [[CONCEPT--MEMORY-SUBSYSTEM]]

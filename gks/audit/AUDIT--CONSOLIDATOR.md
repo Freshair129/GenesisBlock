@@ -130,9 +130,10 @@ M7b deliverable: `consolidate(opts)` orchestrator implementing the hybrid (deter
 The M7b Consolidator has been successfully implemented, providing the Memory & Soul Passport (MSP) with a crucial capability for session summarization and episodic memory creation. The Consolidator processes raw session logs (`.jsonl` files) and transforms them into a series of scored, summarized, and tagged `Episode` atoms.
 
 This implementation follows the architecture specified in [[BLUEPRINT--CONSOLIDATOR]], employing a multi-stage pipeline:
-1.  **Boundary Detection:** Chunks a session into logical conversation segments.
-2.  **Tier-1 Scoring:** Applies a deterministic scoring model to each chunk based on heuristics (decision markers, code mentions, etc.).
-3.  **Summarisation:** Generates summaries using either deterministic rules (for high-scoring chunks) or a Tier-2 LLM call (for borderline chunks).
+
+1. **Boundary Detection:** Chunks a session into logical conversation segments.
+2. **Tier-1 Scoring:** Applies a deterministic scoring model to each chunk based on heuristics (decision markers, code mentions, etc.).
+3. **Summarisation:** Generates summaries using either deterministic rules (for high-scoring chunks) or a Tier-2 LLM call (for borderline chunks).
 
 ## 2. Implementation Details
 
@@ -143,13 +144,13 @@ This implementation follows the architecture specified in [[BLUEPRINT--CONSOLIDA
 - **No threshold tuning beyond ADR defaults** — `low: 0.30`, `high: 0.65`, `boundary: 0.25` from `[[ADR--CONSOLIDATOR-HYBRID-SCORING]]`. Tunable via `ConsolidateOptions.thresholds`. PARAM atom is M9.
 - **No edits to `src/memory/episodic/` or `src/memory/sessions/`** — consumed as-is.
 
--   **`index.ts`:** The main orchestrator that coordinates the consolidation process.
--   **`boundary.ts`:** Implements semantic boundary detection using embeddings. *Note: This module required significant refactoring and its current implementation is a placeholder that will need further tuning to be fully effective.*
--   **`score.ts`:** Implements the deterministic Tier-1 scoring features.
--   **`summarise.ts`:** Implements deterministic summary and tag extraction.
--   **`llm.ts`:** Handles Tier-2 LLM calls for borderline chunks, including timeout and error handling.
--   **`session.ts`:** Handles loading and parsing of session log files.
--   **`cli.ts`:** Provides a command-line interface (`msp-consolidate`) for manual or scripted session consolidation.
+- **`index.ts`:** The main orchestrator that coordinates the consolidation process.
+- **`boundary.ts`:** Implements semantic boundary detection using embeddings. *Note: This module required significant refactoring and its current implementation is a placeholder that will need further tuning to be fully effective.*
+- **`score.ts`:** Implements the deterministic Tier-1 scoring features.
+- **`summarise.ts`:** Implements deterministic summary and tag extraction.
+- **`llm.ts`:** Handles Tier-2 LLM calls for borderline chunks, including timeout and error handling.
+- **`session.ts`:** Handles loading and parsing of session log files.
+- **`cli.ts`:** Provides a command-line interface (`msp-consolidate`) for manual or scripted session consolidation.
 
 | Atom | Phase | Type |
 |---|---|---|
@@ -161,10 +162,10 @@ This implementation follows the architecture specified in [[BLUEPRINT--CONSOLIDA
 
 ## 3. Verification
 
--   [x] **Unit Tests:** All modules have comprehensive unit tests, which are currently passing. This includes tests for boundary detection, scoring, summarization, and the main orchestrator logic.
--   [x] **Type Checking:** The entire `packages/msp` workspace passes `npm run typecheck` with no errors.
--   [x] **CLI:** The `msp-consolidate` CLI has been manually tested and successfully generates episodes from a sample session log.
--   [x] **MCP Integration:** The `msp_consolidate` tool is registered with the MCP server and can be invoked.
+- [x] **Unit Tests:** All modules have comprehensive unit tests, which are currently passing. This includes tests for boundary detection, scoring, summarization, and the main orchestrator logic.
+- [x] **Type Checking:** The entire `packages/msp` workspace passes `npm run typecheck` with no errors.
+- [x] **CLI:** The `msp-consolidate` CLI has been manually tested and successfully generates episodes from a sample session log.
+- [x] **MCP Integration:** The `msp_consolidate` tool is registered with the MCP server and can be invoked.
 
 ## 4. Known Issues & Next Steps
 
@@ -234,5 +235,5 @@ Sub-module entry points are also re-exported from `index.ts` for advanced use:
 - Branch: `claude/msp-m7b-consolidator-impl`
 
 ## Connections
-- [[FRAMEWORK--MSP-ARCHITECTURE-V2]]
 
+- [[FRAMEWORK--MSP-ARCHITECTURE-V2]]

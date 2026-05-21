@@ -257,9 +257,9 @@ M10 only when triggered (vault size, latency)
 Treat this atom as **temporary** (`valid_until: 2026-08-01`). Each milestone PR may update via `update_atomic` proposal; major scope changes (new milestone family) require a `supersede`. Public-facing summary lives at `ROADMAP.md` (root) — keep that lean and link back here.
 
 ## Connections
+
 - [[FRAMEWORK--MSP-ARCHITECTURE-V2]]
 - [[CONCEPT--OBSIDIAN-AS-RUNTIME]]
 - [[CONCEPT--EMBEDDING-STRATEGY]]
 - [[ADR--MSP-OBSIDIAN-INTEGRATION]]
 - [[ADR--SEMANTIC-SEARCH-VIA-SMART-CONNECTIONS]]
-

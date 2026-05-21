@@ -36,5 +36,6 @@ Every PR adding an atom to the knowledge base is automatically audited for logic
 3. **Advisory, Not Blocking:** LLM judgment is probabilistic. The output is a reviewer hint, not a CI gate, maintaining human sovereignty.
 
 ## Connections
+
 - `[[ADR--CONTRADICTION-DETECTION-STACK]]` — defines this as Layer 4 of the detection system.
 - `[[BLUEPRINT--GENESIS-GRAPH-INTEGRATION]]` — provides the traversal engine for context gathering.

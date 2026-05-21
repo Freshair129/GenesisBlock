@@ -174,7 +174,7 @@ result.timings                      // { vector: 142, episodic: 3, ... }
 - Query rewriting / HyDE → out of M7
 
 ## Connections
+
 - [[CONCEPT--RETRIEVAL-ORCHESTRATION]]
 - [[FEAT--MSP-OBSIDIAN-CLIENT]]
 - [[FEAT--CONSOLIDATOR]]
-

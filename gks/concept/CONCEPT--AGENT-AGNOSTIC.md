@@ -170,11 +170,13 @@ Everything above is independent of which agent is on top. EVA's biological conso
 ## Trade-offs
 
 **Positive**
+
 - Any agent that speaks MCP gets a passport for free.
 - Cleaner mental model — easier to onboard contributors who don't know EVA.
 - MSP can evolve without breaking EVA (and vice versa).
 
 **Negative**
+
 - Some current atoms reference EVA concepts and need cleanup over time (tracked via `[[AUDIT--ARCH-DOC-CLEANUP]]` and follow-up audits).
 - "Universal" surface means we can't bake EVA-specific optimisations into MSP core; they live as plugins or in EVA itself.
 
@@ -183,6 +185,6 @@ Everything above is independent of which agent is on top. EVA's biological conso
 Architectural clarification 2026-05-09 — established that MSP is the Memory OS sandwiched between agents (cognitive layer) and GKS (knowledge base). Cherry-picked from `[[SPEC--ARCHITECTURE-V2]].md` §2, §4.5 (multi-client global install pattern). See `[[AUDIT--ARCH-DOC-CLEANUP]]`.
 
 ## Connections
+
 - [[FRAMEWORK--MSP-ARCHITECTURE-V2]]
 - [[CONCEPT--OBSIDIAN-AS-RUNTIME]]
-

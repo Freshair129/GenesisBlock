@@ -150,7 +150,7 @@ await session.close()
 - Cross-platform Windows lock — M3 follow-up.
 
 ## Connections
+
 - [[ADR--MEMORY-SESSIONS-WRITER]]
 - [[CONCEPT--MEMORY-SESSIONS-WRITER]]
 - [[CONCEPT--MEMORY-SESSIONS]]
-

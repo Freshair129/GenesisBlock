@@ -145,6 +145,7 @@ Smart Connections may build its own index in `.smart-connections/` — that's us
 ### Why two indexes if model is the same
 
 Pragmatically:
+
 - GKS persists vectors in JSONL/HNSW/pgvector via its `VectorBackend` interface.
 - Smart Connections persists in `.smart-connections/` with its own schema (which is plugin-version-specific and not stable to read from outside).
 - Reading Smart Connections's storage from MSP would couple MSP to plugin internals — fragile.
@@ -164,12 +165,14 @@ Allowed but documented as a deviation. Update `MSP_EMBEDDER_MODEL` env var (or G
 ## Consequences
 
 **Positive**
+
 - Single conceptual model across surfaces — no "which embedder did this?" ambiguity.
 - Vectors interchangeable in principle (same model + tokenizer + normalisation) — opens future M10a optimisation where Smart Connections reads GKS's store.
 - Thai content support out of the box (nomic-embed-text-v1.5 has explicit multilingual training).
 - No external API keys required — fully local default (privacy + cost win).
 
 **Negative**
+
 - ~2× compute + storage until M10a — accepted at current scale.
 - User must configure Smart Connections manually. Recoverable failure: if user picks a different model in SC, agents still get correct results from GKS (canonical), only Obsidian's Smart View shows divergent neighbours. Drift visible to humans, not destructive.
 - Locks the project to a 768-dim space — moving to higher-dim models requires migration. Acceptable; nomic v1.5 is a reasonable medium-term anchor.
@@ -192,6 +195,7 @@ Until `@freshair129/gks@3.6.0` lands on npm:
 | Vector dimension | depends on Ollama model (typical 1024 for BGE-M3) | 768 (nomic) |
 
 When 3.6.0 publishes:
+
 1. `npm install @freshair129/gks@^3.6.0` (already covered by `^3.5.6` semver — auto-picks)
 2. Run `npm run gks re-embed` to migrate vectors from old model to nomic
 3. User reconfigures Smart Connections to match
@@ -208,6 +212,6 @@ When 3.6.0 publishes:
 GksV3 3.6.0 CHANGELOG (introduces `createNomicEmbedder`); audit during M7-prep follow-up; user direction for model parity to avoid re-embedding cost. Validation against published `@freshair129/gks@3.5.6` performed 2026-05-04 (M7-prep follow-up review).
 
 ## Connections
+
 - [[CONCEPT--EMBEDDING-STRATEGY]]
 - [[CONCEPT--OBSIDIAN-AS-RUNTIME]]
-

@@ -1,6 +1,7 @@
 # Drift detection
 
 > The application of `lookupBySymbol` ([ADR-010](../../docs/adr/010-reverse-citation-lookup.md))
+>
 > + cached GitNexus call edges ([ADR-009](../../docs/adr/009-msp-as-orchestrator.md)
 > peer pattern). Combines both into a single bidirectional drift check
 > suitable for a pre-push hook.
@@ -113,6 +114,7 @@ npx husky add .husky/pre-push \
 ```
 
 The hook:
+
 1. Lists code paths changed since the upstream branch.
 2. Pipes them into `check-drift.ts --stdin`.
 3. Aborts the push (exit 1) if any HIGH or MEDIUM citations exist.
@@ -145,13 +147,13 @@ GitNexus.
 
 ## What this example demonstrates
 
-- **End-to-end use of `lookupBySymbol`** — the primitive shipped in
++ **End-to-end use of `lookupBySymbol`** — the primitive shipped in
   3.5.2 finally has a concrete caller.
-- **The Pattern 2 orchestration model from ADR-009** — script combines
++ **The Pattern 2 orchestration model from ADR-009** — script combines
   GKS + (cached) GitNexus answers without GKS depending on GitNexus.
-- **Risk-aware drift gating** — not every citation should block; the
++ **Risk-aware drift gating** — not every citation should block; the
   type-based classification keeps the hook actionable.
-- **stdin / JSON / exit-code contract** — designed for hook + CI use,
++ **stdin / JSON / exit-code contract** — designed for hook + CI use,
   not interactive only.
 
 ## Tests
@@ -163,14 +165,14 @@ tsx examples/drift-detection/smoke-test.ts
 
 ## See also
 
-- [`examples/gitnexus-graph-cache/`](../gitnexus-graph-cache/) — populates
++ [`examples/gitnexus-graph-cache/`](../gitnexus-graph-cache/) — populates
   the call-graph this example consumes
-- [`examples/memory-os-architecture/`](../memory-os-architecture/) — Memory OS
++ [`examples/memory-os-architecture/`](../memory-os-architecture/) — Memory OS
   layering POC; this drift script would naturally live inside such an
   orchestrator
-- [ADR-008](../../docs/adr/008-gks-storage-engine-scope.md) —
++ [ADR-008](../../docs/adr/008-gks-storage-engine-scope.md) —
   drift-checking is the orchestrator's job, not GKS's
-- [ADR-009](../../docs/adr/009-msp-as-orchestrator.md) — peer subsystem
++ [ADR-009](../../docs/adr/009-msp-as-orchestrator.md) — peer subsystem
   pattern (GKS + GitNexus, not GKS-over-GitNexus)
-- [ADR-010](../../docs/adr/010-reverse-citation-lookup.md) — the
++ [ADR-010](../../docs/adr/010-reverse-citation-lookup.md) — the
   primitive this script applies

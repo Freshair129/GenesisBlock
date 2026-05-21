@@ -28,19 +28,23 @@ The 8-8-8 protocol suggests a fixed 8:1 ratio for memory distillation (8 Session
 We decide to make the distillation ratios **configurable defaults** rather than hardcoded constants.
 
 ### Default Values
+
 - `distillation.episodes_per_narrative`: **8**
 - `distillation.narratives_per_identity`: **8**
 
 ### Validator Rules
+
 The validator will allow a range of `{2..32}` for these ratios. Setting a ratio outside this range requires an explicit `phase_override`.
 
 ## Consequences
 
 ### Positive
+
 - **Flexibility:** Allows different namespaces to optimize their memory accumulation based on real usage patterns.
 - **Traceability:** Changes to these ratios are recorded in the central configuration.
 
 ### Negative
+
 - **Drift Risk:** If ratios are set too low, memory might become volatile; if too high, identity promotion might take too long.
 
 ## Source

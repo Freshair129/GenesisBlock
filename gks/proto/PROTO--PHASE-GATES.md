@@ -127,6 +127,7 @@ This PROTO mechanises two checks:
 ## Schema
 
 Reads `atomic_index.jsonl` (`PredicateContext.atomicIndex`) for phase + type
+
 + `linked_symbols`. Reads each candidate atom's source file from disk to
 inspect optional `phase_override.skip_blueprint: true` escape hatch.
 
@@ -186,5 +187,4 @@ BLUEPRINTs or opt them out via `phase_override`.
 `[[CONCEPT--PROTO-PHASE-GATES]]`, `[[FRAMEWORK--PHASE-GOVERNANCE]]`, `[[CONCEPT--PROTO-PATTERN]]`.
 
 ## Connections
-- [[FEAT--PROTO-LOADER]]
-
++ [[FEAT--PROTO-LOADER]]

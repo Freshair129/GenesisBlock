@@ -109,6 +109,7 @@ If a portable bash hook reads the push range from stdin (oldsha → newsha per r
 ## Scope
 
 In:
+
 - Read git's pre-push stdin format: lines of `<local-ref> <local-sha> <remote-ref> <remote-sha>`.
 - For each push range, `git diff --name-only <remote-sha>..<local-sha>` filtered to `gks/**/*.md`.
 - Extract `FEAT--<slug>` candidates either from the FEAT files directly, or from upstream FEATs that reference touched ADR/CONCEPT/BLUEPRINT atoms (best-effort: just collect FEATs whose path was touched + the FEATs explicitly named in commit messages).
@@ -116,6 +117,7 @@ In:
 - Exit 1 on any non-OK; standard `--no-verify` bypass.
 
 Out:
+
 - Reverse-link traversal (which FEATs reference a touched ADR?). We only walk FEATs whose own file was touched. The full reverse traversal is expensive and not always wanted; orchestrator can do it in CI.
 - Auto-fix.
 - Push to multiple remotes — hook runs once per push.
@@ -125,6 +127,6 @@ Out:
 P1 item #7 from the M3 production-readiness backlog.
 
 ## Connections
+
 - [[FEAT--MSP-PRECOMMIT-HOOK]]
 - [[FEAT--MSP-VALIDATOR]]
-

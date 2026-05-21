@@ -20,6 +20,7 @@ ADR-012 — you can write directly into `gks/issues/` without the candidates ste
 ## Available templates
 
 ### Implementation flow
+
 - [`ADR--TEMPLATE.md`](./ADR--TEMPLATE.md) — architecture decision
 - [`FEAT--TEMPLATE.md`](./FEAT--TEMPLATE.md) — feature spec
 - [`ALGO--TEMPLATE.md`](./ALGO--TEMPLATE.md) — algorithm
@@ -29,15 +30,18 @@ ADR-012 — you can write directly into `gks/issues/` without the candidates ste
 - [`AUDIT--TEMPLATE.md`](./AUDIT--TEMPLATE.md) — verification report
 
 ### Agent governance
+
 - [`SKILL--TEMPLATE.md`](./SKILL--TEMPLATE.md) — agent capability
 - [`PROTOCOL--TEMPLATE.md`](./PROTOCOL--TEMPLATE.md) — interaction contract (HTTP/MCP-style, multi-step handshake)
 - [`GUARD--TEMPLATE.md`](./GUARD--TEMPLATE.md) — runtime-enforced policy
 
 ### Requirements engineering
+
 - [`FR--TEMPLATE.md`](./FR--TEMPLATE.md) — functional requirement
 - [`NFR--TEMPLATE.md`](./NFR--TEMPLATE.md) — non-functional requirement
 
 ### Ops governance
+
 - [`INC--TEMPLATE.md`](./INC--TEMPLATE.md) — incident post-mortem
 - [`ISSUE--TEMPLATE.md`](./ISSUE--TEMPLATE.md) — live issue (light-governance)
 - [`HOTFIX--TEMPLATE.md`](./HOTFIX--TEMPLATE.md) — hotfix escape hatch (48h backfill window, ADR-014)
@@ -46,6 +50,7 @@ ADR-012 — you can write directly into `gks/issues/` without the candidates ste
 - [`SLO--TEMPLATE.md`](./SLO--TEMPLATE.md) — service-level objective
 
 ### Types without bundled templates
+
 For these, create the file by hand following the schema in KNOWLEDGE-TYPES.md:
 IDEA, CONCEPT, FRAME, MASTER (root policy), PROTO (machine-enforced invariant),
 MOD, API, ENDPOINT, ENTRYPOINT, PARAMS, PERSONA, POLICY, REQ, CONSTRAINT,

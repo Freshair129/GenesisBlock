@@ -33,6 +33,7 @@ Each interface keeps its surface SMALL. `VectorBackend` is currently
 ## Consequences
 
 **Positive**
+
 - pgvector + HNSW + PgGraphBackend landed in Phase 2B with zero
   changes to retain/recall/reflect callers.
 - Tests use a 50-line in-memory backend (`test/memory/vector-backend.test.ts`)
@@ -41,6 +42,7 @@ Each interface keeps its surface SMALL. `VectorBackend` is currently
   GraphBackend was already abstracted.
 
 **Negative**
+
 - Slight verbosity at MemoryStore ctor — every option is a possible
   factory (vectorBackend, obsidian, etc.).
 - Some adapters need optional methods (`rewriteAll`, `setFileHash`)

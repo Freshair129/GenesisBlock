@@ -142,11 +142,13 @@ This is why `promotion_level` appears in `[[ADR--FORBIDDEN-FIELDS-LIST]]` — ag
 ## Consequences
 
 **Positive**
+
 - Explicit levels make tooling predictable (`gks inbound list --level=L1` shows what's awaiting review).
 - Level transitions are observable in the audit log.
 - Derived nature prevents tampering.
 
 **Negative**
+
 - Three states adds complexity vs simple "in inbound or not". Mitigated by treating L0/L1 as a single "candidate" tier in most UIs.
 - Re-validation may flip L1 → L0; UIs must show this without alarm.
 
@@ -161,5 +163,5 @@ This is why `promotion_level` appears in `[[ADR--FORBIDDEN-FIELDS-LIST]]` — ag
 `msp_spec.md` §8.1 (Promotion Levels).
 
 ## Connections
-- [[CONCEPT--INBOUND-QUEUE]]
 
+- [[CONCEPT--INBOUND-QUEUE]]

@@ -155,6 +155,6 @@ console.log(result.edgeCount, result.changed)
 - Incremental updates — `[[ADR--MEMORY-BACKLINKS-INDEXER]]` rejects this.
 
 ## Connections
+
 - [[CONCEPT--MEMORY-BACKLINKS-INDEXER]]
 - [[CONCEPT--MEMORY-VECTOR-BACKLINKS]]
-

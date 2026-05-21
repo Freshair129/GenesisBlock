@@ -148,7 +148,7 @@ Files inside `gks/` (atoms) are author-edited and never carry the marker.
 Files under `src/` that pre-date Phase 0 codegen are grandfathered; the marker is only required for files emitted by `msp:run-task` after this PROTO promotes to `stable`.
 
 ## Connections
+
 - [[FRAMEWORK--MSP-ARCHITECTURE-V2]]
 - [[CONCEPT--COGNITIVE-LAYER-FACADE]]
 - [[CONCEPT--CODEGEN-MICROTASK-RUNNER]]
-

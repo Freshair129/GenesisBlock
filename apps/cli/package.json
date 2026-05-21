@@ -1,24 +1,16 @@
 {
-  "name": "@freshair129/gks-cli",
-  "version": "0.1.0",
+  "name": "@freshair129/gks-cli-app",
+  "version": "0.2.0",
   "private": true,
   "type": "module",
-  "description": "GKS command-line interface — for humans and AI agents",
   "bin": {
     "gks": "./dist/index.js"
   },
   "scripts": {
-    "dev": "tsx src/index.ts",
     "build": "tsc",
-    "typecheck": "tsc --noEmit",
-    "test": "echo 'No tests for skeleton app' && exit 0"
+    "start": "node dist/index.js"
   },
   "dependencies": {
-    "commander": "^12.0.0"
-  },
-  "devDependencies": {
-    "tsx": "^4.0.0",
-    "typescript": "~5.4.0",
-    "@types/node": "^20.0.0"
+    "msp": "*"
   }
 }

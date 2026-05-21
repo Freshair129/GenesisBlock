@@ -169,10 +169,10 @@ npm run msp:check-links             → OK
 
 Test count delta: 397 → 435 (+38; target was +35, exceeded). Per-file breakdown:
 
-  - `tokens.test.ts`: 6 tests (target 5 — exceeded)
-  - `trim.test.ts`: 7 tests (target 7)
-  - `resummarise.test.ts`: 12 tests (target 10 — exceeded; truncate path needed extra coverage)
-  - `index.test.ts`: 13 tests (target 13)
+- `tokens.test.ts`: 6 tests (target 5 — exceeded)
+- `trim.test.ts`: 7 tests (target 7)
+- `resummarise.test.ts`: 12 tests (target 10 — exceeded; truncate path needed extra coverage)
+- `index.test.ts`: 13 tests (target 13)
 
 ## Acceptance criteria from `[[FEAT--COMPRESSOR]]`
 
@@ -254,5 +254,5 @@ Lower-level entry points re-exported from `index.ts`: `DEFAULT_TOKENISER`, `esti
 - Branch: `claude/msp-m7d-compressor-impl`
 
 ## Connections
-- [[FRAMEWORK--MSP-ARCHITECTURE-V2]]
 
+- [[FRAMEWORK--MSP-ARCHITECTURE-V2]]

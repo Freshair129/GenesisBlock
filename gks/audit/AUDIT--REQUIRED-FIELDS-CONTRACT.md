@@ -143,6 +143,7 @@ test/validator/contract.test.ts:               8/8 passing (5 prior + 3 new)
 ## Conservative defaults
 
 The shipped YAML uses fields that ALL existing atoms already have:
+
 - `default`: id, phase, type, status, title, created_at
 - `adr`: + tags
 - `blueprint`: + linked_symbols
@@ -161,6 +162,6 @@ Tightening these (e.g. adding `summary` per spec) is a separate atom edit; would
 - Date: 2026-05-03
 
 ## Connections
+
 - [[ADR--FORBIDDEN-FIELDS-LIST]]
 - [[FEAT--MSP-VALIDATOR]]
-

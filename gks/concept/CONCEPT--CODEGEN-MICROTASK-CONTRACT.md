@@ -166,6 +166,6 @@ The atomic contract governs *frontmatter*; the codegen contract governs *generat
 `msp_spec.md` §5 (Codegen Micro-task Contract).
 
 ## Connections
+
 - [[FRAMEWORK--PHASE-GOVERNANCE]]
 - [[CONCEPT--ATOMIC-WRITE-CONTRACT]]
-

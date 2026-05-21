@@ -115,17 +115,20 @@ This is the chosen MVP format for **P3.2 — P3.4**. The columnar page layout fr
 ## Consequences
 
 ### Positive
+
 - P3.2 implementation surface drops from ~600 → ~250 LOC of Rust I/O.
 - Migration story is trivial: existing `*.jsonl` files in user workspaces work unchanged when the Rust backend is enabled.
 - The TS pure-fallback path (when prebuilt `.node` is missing) keeps working without divergence.
 - Bi-temporal logic (P3.3) is unaffected — JSONL already carries `valid_from` / `valid_to` columns per `[[BLUEPRINT--GENESIS-GRAPH-INTEGRATION]]` §"Module breakdown".
 
 ### Negative
+
 - Linear scan on the JSONL replay path means cold-load time scales O(events). Mitigated by: (a) keep `outIdx` / `inIdx` adjacency maps in memory like the TS impl already does; (b) JSONL parsing is parallelisable in Rust (per-line independence).
 - Single-column page benefits (range pushdown, vector instructions, compression) are not available in v0. **Tracked under future `[[ADR--GENESIS-BLOCK-COLUMNAR-STORAGE]]` to be written iff P3.5 benchmarks demand.**
 - The on-disk format is not space-optimal — JSONL is ~2-4× larger than a packed binary format. Acceptable for the expected workspace size (10s of thousands of nodes/edges in a typical project).
 
 ### Neutral
+
 - Schema version stays `1.0.0`. The schema version byte in the on-disk header (per `[[PROTOCOL--GENESIS-GRAPH-FFI]]` §6) tracks the *log event schema*, not the file container — so a future migration to columnar pages would bump *that* version, not break JSONL readers in older crates.
 
 ## Out of scope (deferred)
@@ -138,6 +141,7 @@ This is the chosen MVP format for **P3.2 — P3.4**. The columnar page layout fr
 ## Alternatives rejected
 
 **Option B (single-column page layout) was rejected** because:
+
 - It commits the hardest-to-migrate decision before any benchmark evidence exists.
 - It triples the implementation surface of P3.2.
 - Its main benefit (perf) is exactly what P3.5 is designed to measure — running P3.5 against JSONL gives us the data needed to decide whether B is even worth it.

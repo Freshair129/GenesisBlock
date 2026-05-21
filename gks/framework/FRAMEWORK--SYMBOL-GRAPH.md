@@ -195,6 +195,6 @@ The 6-PR sequence (PR-1 atoms → PR-6 audit + upstream proposal) is the impleme
 - Prior art: ctags, sourcegraph SCIP, scope-graphs (stack-graphs), comby AST-based search
 
 ## Connections
+
 - [[CONCEPT--KNOWLEDGE-LAYERS-V2]]
 - [[ADR--SYMBOL-GRAPH-PROCESSING-STAGES]]
-

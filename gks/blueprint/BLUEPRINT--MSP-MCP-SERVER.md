@@ -199,9 +199,9 @@ T4 TOOL-RUN-TASK  (delegates to existing runner with mock SLM default)
 T5 TOOL-SESSION   (delegates to sessions writer)
 T6 TOOL-EPISODE   (delegates to episodic writer)
 T7 TOOL-BACKLINKS (delegates to backlinks indexer)
+
 + smoke test (spawn the bin + send JSON-RPC) + AUDIT
 
 ## Connections
-- [[FEAT--MSP-MCP-SERVER]]
-- [[ADR--MSP-MCP-SERVER]]
-
++ [[FEAT--MSP-MCP-SERVER]]
++ [[ADR--MSP-MCP-SERVER]]

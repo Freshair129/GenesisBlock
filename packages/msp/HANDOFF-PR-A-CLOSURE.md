@@ -32,6 +32,7 @@ packages/msp/src/symbols/parser/index.ts (modified, +73 lines)
 ```
 
 ### Verified locally
+
 - `npm run typecheck` → PASS
 - All file paths match what `ALGO--SYMBOLS-FRAMEWORK-RECOGNITION.linked_symbols` declares
 
@@ -54,6 +55,7 @@ packages/msp/test/symbols/framework/
 ```
 
 **Each test file needs:**
+
 - ≥ 2 cases per recognizer (happy path + 1 edge case)
 - Use `mkdtempSync` + `writeFileSync` to create file fixtures (don't depend on real repo state)
 - Assert exact `FrameworkNode.kind` + `FrameworkEdge.type` emitted
@@ -73,6 +75,7 @@ packages/msp/test/validator/proto/framework-invariants.test.ts
 ```
 
 Test each of the 5 invariants in PROTO--SYMBOLS-FRAMEWORK-INVARIANTS:
+
 - Page MUST have RENDERS_AT edge → emit violation when missing
 - Route MUST have HANDLES edge → emit violation when missing
 - Server Component MUST NOT carry runtime: 'client' → emit violation when conflict
@@ -106,6 +109,7 @@ Write `gks/audit/AUDIT--SYMBOLS-FRAMEWORK-AWARENESS.md` following the pattern of
 ## 3. Exact files to commit in PR-A
 
 **Include:**
+
 ```
 packages/msp/src/symbols/framework/**/*.ts       (8 files — your impl)
 packages/msp/src/symbols/parser/index.ts          (your modification)
@@ -116,6 +120,7 @@ gks/audit/AUDIT--SYMBOLS-FRAMEWORK-AWARENESS.md  (you author)
 ```
 
 **Exclude (other agents' / Boss's WIP):**
+
 ```
 packages/msp/msp_spec.md           ← Boss editing separately
 gks/audit/AUDIT--CORE-FRAMEWORK-RECONCILE-V1.md

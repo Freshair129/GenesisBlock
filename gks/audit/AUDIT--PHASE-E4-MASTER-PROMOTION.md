@@ -126,6 +126,7 @@ emit per-block tables, and — under `--write` — drop scaffolded
 `MASTER--<id>.proposal.md` files to `gks/inbound/` for human review.
 
 Out of scope (deferred):
+
 - `gks/master/` writes — explicit human gate per `[[ADR--MASTER-PROMOTION-DOC-TO-CODE]]`
   and `[[ADR--HUMAN-REVIEW-GATES]]`.
 - `[[PROTO--GENESIS-BLOCK-MEMBERSHIP]]` — the validator rule that enforces the
@@ -205,5 +206,5 @@ All green under `npm test --workspace=packages/msp -- test/master/`.
    weekly and opens a draft PR with any new proposals.
 
 ## Connections
-- [[CONCEPT--MASTER-PROMOTION]]
 
+- [[CONCEPT--MASTER-PROMOTION]]

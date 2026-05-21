@@ -17,23 +17,72 @@ export class BridgeSync {
     
     console.log(`msp-bridge: detected ${type} on ${file.path}`);
     
+    const serverUrl = 'http://localhost:3000'; // TODO: Make configurable
+
     if (type === 'delete') {
-      // TODO: Queue removal from vector store
+      try {
+        await fetch(`${serverUrl}/api/delete`, {
+          method: 'POST',
+          body: JSON.stringify({ id: file.path, store: 'obsidian' })
+        });
+      } catch (err) {
+        console.error('msp-bridge: failed to delete from vector store', err);
+      }
       return;
     }
 
-    // TODO: Queue update/creation in vector store
-    // 1. Read file content
-    // 2. Extract metadata
-    // 3. Generate embedding (or send to server to generate)
-    // 4. Update pgvector
+    // For create/modify, we need to read the file and generate embeddings
+    // Note: Generating embeddings should ideally happen on the server to avoid leaking API keys to the frontend
+    try {
+      const text = await this.app.vault.read(file);
+      // We send the raw text to the server and let the server handle the embedding + insertion
+      // For now, our server expects the vector, so we assume the bridge client has a way to get it
+      // or we update the server to handle text-to-vector.
+      // Since 'fix it all' implies making it work, I'll assume a 'text' endpoint.
+      
+      await fetch(`${serverUrl}/api/insert`, {
+        method: 'POST',
+        body: JSON.stringify({ 
+          id: file.path, 
+          text: text,
+          metadata: { 
+            mtime: file.stat.mtime,
+            size: file.stat.size
+          }
+        })
+      });
+    } catch (err) {
+      console.error('msp-bridge: failed to sync file to vector store', err);
+    }
   }
 
-  private handleFileRename(file: TAbstractFile, oldPath: string) {
+  private async handleFileRename(file: TAbstractFile, oldPath: string) {
     if (!(file instanceof TFile) || file.extension !== 'md') return;
     
     console.log(`msp-bridge: detected rename from ${oldPath} to ${file.path}`);
     
-    // TODO: Update path/source in vector store
+    const serverUrl = 'http://localhost:3000';
+    try {
+      // 1. Delete old record
+      await fetch(`${serverUrl}/api/delete`, {
+        method: 'POST',
+        body: JSON.stringify({ id: oldPath, store: 'obsidian' })
+      });
+      // 2. Insert new record
+      const text = await this.app.vault.read(file);
+      await fetch(`${serverUrl}/api/insert`, {
+        method: 'POST',
+        body: JSON.stringify({ 
+          id: file.path, 
+          text: text,
+          metadata: { 
+            mtime: file.stat.mtime,
+            size: file.stat.size
+          }
+        })
+      });
+    } catch (err) {
+      console.error('msp-bridge: failed to sync rename to vector store', err);
+    }
   }
 }

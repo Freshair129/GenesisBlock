@@ -29,36 +29,41 @@ Implement the asynchronous background worker responsible for distilling memory a
 ## 2. Geography
 
 - `packages/msp/src/orchestrator/distiller/`
-    - `index.ts` (orchestrator entry point)
-    - `pillar-clean.ts` (P1)
-    - `pillar-summary.ts` (P2)
-    - `pillar-index.ts` (P3)
-    - `pillar-relation.ts` (P4)
+  - `index.ts` (orchestrator entry point)
+  - `pillar-clean.ts` (P1)
+  - `pillar-summary.ts` (P2)
+  - `pillar-index.ts` (P3)
+  - `pillar-relation.ts` (P4)
 
 ## 3. Tasks
 
 ### T1: Pillar 1 — CLEAN
+
 - Implement logic to deduplicate turns and remove low-impact metadata.
 - Inputs: List of turn objects.
 - Criterion: Strip greetings, boilerplate, and turns where `atom_impact` (from consolidator) is 0.
 
 ### T2: Pillar 2 — SUMMARY (LLM Integration)
+
 - Implement prompts for Core and Sphere synthesis.
 - Core Prompt: Synthesize narrative arc and identify concept clusters.
 - Sphere Prompt: Synthesize identity-level beliefs and behavioral patterns.
 - Integration: Use `createSlmClient` (Claude Sonnet for Core, Claude Opus for Sphere).
 
 ### T3: Pillar 3 — INDEX (Vector Store)
+
 - Compute embeddings for the synthesized summary.
 - Insert into the project's vector store under `memory/{core,sphere}` namespace.
 - Ensure bitemporal timestamps are correctly set.
 
 ### T4: Pillar 4 — RELATION (GKS Output)
+
 - For each distilled cluster/belief, produce a `NARRATIVE--` or `BELIEF--` atom.
 - Link them back to the source evidence atoms via `crosslinks.references`.
 - Call the MSP gatekeeper's internal `retain()` equivalent to write atoms to GKS.
 
 ### T5: Error and Pending Handling
+
 - Implement the `.tmp` → `rename` logic from `BLUEPRINT--MEMORY-STORAGE-LAYOUT`.
 - Ensure three-failure escalation (writing `FAILURE--DISTILLER-*` atom).
 

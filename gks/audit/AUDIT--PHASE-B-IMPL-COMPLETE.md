@@ -141,11 +141,13 @@ A one-time, idempotent migration moves any existing workspace `identity.json` to
 ### Tests (3 new files + 5 updated)
 
 New:
+
 - `test/identity/migrate.test.ts` (9 tests) — migrate on/off, idempotent, schemaVersion guard, corrupt JSON guard, merged-read with override
 - `test/projects/registry.test.ts` (12 tests) — read/write round-trip, schema rejection, registerProject duplicate guard
 - `test/projects/resolve.test.ts` (12 tests) — full priority chain + `.mspconfig` walk + error-on-unknown
 
 Updated to use `MSP_HOME` per-test isolation (legacy workspace identity tests now exercise the global path):
+
 - `test/identity/store.test.ts`, `profile.test.ts`, `voice.test.ts`, `preferences.test.ts`, `index.test.ts`
 - `test/mcp/tools/identity-get.test.ts`, `identity-set.test.ts`
 - `test/mcp/server.test.ts`, `bin.test.ts`, `tools/candidate.test.ts` (tool count assertions 16 → 19)
@@ -210,7 +212,7 @@ After the copy, every subsequent `readIdentity` fast-paths on `stat` of the glob
 `[[BLUEPRINT--GLOBAL-VS-WORKSPACE-MIGRATION]]` (Phase B impl, 2026-05-10). Atoms PR was `claude/architecture-ssot-selection-D76og` (2026-05-09); this impl PR is `claude/msp-global-workspace-impl-D76og`.
 
 ## Connections
+
 - [[CONCEPT--AGENT-AGNOSTIC]]
 - [[CONCEPT--NAMED-PROJECT-REGISTRY]]
 - [[ADR--PATH-ENCODING]]
-

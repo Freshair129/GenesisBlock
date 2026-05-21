@@ -103,6 +103,7 @@ attributes:
 ในการขยายระบบ Symbol Graph ของ MSP ให้รองรับภาษา Python (ตาม `[[FEAT--SYMBOLS-MULTI-LANG]]`) เราจำเป็นต้องเลือกวิธีสแกนรหัสต้นฉบับเพื่อสกัดสัญลักษณ์ (Classes, Functions, Methods, Imports) และความสัมพันธ์ (Calls)
 
 ตัวเลือกที่พิจารณา:
+
 1. **Python `ast` module (via spawned process):** ใช้ตัวสแกนมาตรฐานของ Python เอง
 2. **Regex-based:** ใช้ regular expressions สกัดข้อมูลพื้นฐาน
 3. **Tree-sitter (Node.js bindings):** ใช้ `tree-sitter-python` ภายใน Node.js โดยตรง
@@ -123,9 +124,9 @@ attributes:
 - ต้องติดตั้ง `tree-sitter` และ `tree-sitter-python` เป็น dependencies ใน `packages/msp`
 - สร้าง `src/symbols/parser/python.ts` ที่ implement อินเทอร์เฟซ `SymbolParser`
 - Map สัญลักษณ์:
-    - `class_definition` → `class`
-    - `function_definition` → `function` หรือ `method` (ถ้าอยู่ใน class)
-    - `import_from_statement`, `import_statement` → `imports` edges
+  - `class_definition` → `class`
+  - `function_definition` → `function` หรือ `method` (ถ้าอยู่ใน class)
+  - `import_from_statement`, `import_statement` → `imports` edges
 
 ## Consequences
 
@@ -133,6 +134,6 @@ attributes:
 - **Negative:** เพิ่ม Native dependency (`node-gyp` หรือ prebuilt binaries) ซึ่งอาจมีปัญหาในบางสภาพแวดล้อม แต่ยอมรับได้เนื่องจาก MSP รันใน Node.js 20+ เป็นหลัก
 
 ## Connections
+
 - [[FRAMEWORK--SYMBOL-GRAPH]]
 - [[CONCEPT--PARSER-CHOICE]]
-

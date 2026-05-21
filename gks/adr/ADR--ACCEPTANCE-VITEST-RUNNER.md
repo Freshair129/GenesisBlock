@@ -146,6 +146,7 @@ If JSON is malformed or empty, fall back to including the last 50 lines of stder
 ### Where verification tests come from
 
 Two options:
+
 - `opts.verificationFiles: { src: string, dest: string }[]` — caller supplies the test files. Default in M4c.
 - BLUEPRINT YAML `verification_plan` field — parse + locate test files. **Future**: too much coupling for M4c.
 
@@ -163,12 +164,14 @@ For now, the runner accepts an explicit `verificationFiles` array. The M4c integ
 ## Consequences
 
 **Positive**
+
 - Isolation by construction. No risk of corrupting the working tree.
 - Parallel-safe: each invocation gets its own tmp dir.
 - Reuses the repo's existing vitest install via symlink — no reinstall cost.
 - Failure messages flow back through the runner's `lastFailure` channel, which already feeds them into the next prompt.
 
 **Negative**
+
 - Tmp dir + symlink overhead: ~50–200 ms per invocation. Acceptable for an interactive flow.
 - Symlink unavailable on some Windows setups → fallback path exists but is slower.
 - `node_modules` shared across runs — a candidate that mutates `node_modules` could affect later runs. Acceptable risk (and would fail real-world too).
@@ -185,4 +188,5 @@ For now, the runner accepts an explicit `verificationFiles` array. The M4c integ
 `[[CONCEPT--ACCEPTANCE-VITEST-RUNNER]]` + vitest JSON reporter docs.
 
 ## Connections
+
 - [[ADR--CODEGEN-RETRY-POLICY]]

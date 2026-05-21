@@ -163,5 +163,5 @@ Not touched: GKS. `Namespace` is unchanged (per `[[ADR--BRING-YOUR-OWN-ATTRIBUTE
 - `[[ADR--BRING-YOUR-OWN-ATTRIBUTES]]` — storage decision honoured here.
 
 ## Connections
-- [[FRAMEWORK--UNIVERSAL-CONTEXT-FRAMEWORK]]
 
+- [[FRAMEWORK--UNIVERSAL-CONTEXT-FRAMEWORK]]

@@ -103,6 +103,7 @@ attributes:
 # AUDIT — Framework-awareness recognizers
 
 ## Scope verified
+
 - Implementation of 6 specialized framework recognizers:
   - `NextJsRecognizer`: App Router conventions.
   - `RoutesRecognizer`: Pages Router API + FastAPI.
@@ -114,6 +115,7 @@ attributes:
 - Structural validation via `[[PROTO--SYMBOLS-FRAMEWORK-INVARIANTS]]`.
 
 ## Test results
+
 - **Total Tests**: 21 cases across 8 test files.
 - **Pass Rate**: 100% (21/21 passed).
 - **Test Files**:
@@ -127,16 +129,18 @@ attributes:
   - `test/validator/proto/framework-invariants.test.ts`
 
 ## Deviations
+
 - Added `async` support to `DataFetchingRecognizer` to correctly detect asynchronous legacy loaders.
 - Relaxed `OrmRecognizer` path matching to support Drizzle schemas without the `.schema.ts` suffix if located in a `db/schema` directory.
 - Enabled `active` status support in `loader.ts` to allow gradual promotion of PROTOs.
 
 ## Follow-ups
+
 - Refine line-number extraction for ORM entities (currently defaults to 1).
 - Add support for Remix/SvelteKit routers in Phase 3.
 
 ## Connections
+
 - [[CONCEPT--SYMBOLS-FRAMEWORK-AWARENESS]]
 - [[ADR--SYMBOLS-FRAMEWORK-AWARENESS]]
 - [[ALGO--SYMBOLS-FRAMEWORK-RECOGNITION]]
-

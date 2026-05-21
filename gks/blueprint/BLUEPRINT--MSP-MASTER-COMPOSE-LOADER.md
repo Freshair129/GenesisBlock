@@ -135,20 +135,24 @@ msp master compose \
 The loader evaluates whether a Master's body should be loaded based on the `--turn-context` using a three-tiered approach.
 
 ### Tier 1: Keyword/Regex (Cheapest)
+
 - **Logic**: Substring or regex match against `trigger.keywords[]`.
 - **Scope**: User input + immediate previous agent output.
 - **Short-circuit**: If match found, return `LOAD_BODY`.
 
 ### Tier 2: Semantic Context Match
+
 - **Logic**: Check if the current environment matches `trigger.context[]` (e.g., active branch name, paths of modified files, specific tool failure types).
 - **Short-circuit**: If match found, return `LOAD_BODY`.
 
 ### Tier 3: LLM Relevance Call (Expensive)
+
 - **Logic**: Send a one-shot prompt to the LLM containing the Master ID, summary, and `trigger.llm_check` prompt, asking for a boolean relevance check against the conversation state.
 - **Usage**: Only if Tiers 1 and 2 are inconclusive and the Master is in a requested sector.
 - **Feature Flag**: Guarded by a feature flag/environment variable to prevent unexpected costs.
 
 ### Evaluation Order
+
 1. Check Tier 1. If match, STOP (Load).
 2. Check Tier 2. If match, STOP (Load).
 3. Check Tier 3 (if enabled). If match, STOP (Load).
@@ -159,18 +163,21 @@ The loader evaluates whether a Master's body should be loaded based on the `--tu
 The output is a single concatenated block designed for system-prompt injection.
 
 ### P0: Foundation Sector
+
 - **Inclusion**: Always included if P0 is in `--sector`.
 - **Content**: Full body but truncated to fit budget.
 - **Sections**: Include `## Intent` and `## Directives`. **Skip** `## Why`, `## Apply when`, and `## Conflicts with`.
 - **Header**: `# MASTER — <ID> (<path>)`
 
 ### P1: High-Priority Index
+
 - **Index**: Always included if P1 is in `--sector`.
 - **Body**: Included ONLY on trigger match.
 - **Format (Index)**: `- <ID>: <1-line Intent summary> (→ <path>)`
 - **Format (Body)**: Same as P0 (Intent + Directives).
 
 ### P2–P3: Contextual Indices
+
 - **Index**: Included ONLY if a trigger (Tier 1 or 2) matches the `--turn-context`.
 - **Body**: Included only if Tier 3 or a very strong Tier 2 match occurs.
 - **Format**: Same as P1.

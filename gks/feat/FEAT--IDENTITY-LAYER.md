@@ -202,5 +202,5 @@ await prunePreferences({ root, namespace: 'evaAI' })
 - Schema migration / version bump beyond v1
 
 ## Connections
-- [[CONCEPT--IDENTITY-LAYER]]
 
+- [[CONCEPT--IDENTITY-LAYER]]

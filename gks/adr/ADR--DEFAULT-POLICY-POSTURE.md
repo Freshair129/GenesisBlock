@@ -154,5 +154,5 @@ Negative / accepted costs:
 - `[[ADR--POLICY-AS-DATA-NOT-CODE]]` — the posture is itself a policy-data field, flippable per endpoint.
 
 ## Connections
-- [[FRAMEWORK--UNIVERSAL-CONTEXT-FRAMEWORK]]
 
+- [[FRAMEWORK--UNIVERSAL-CONTEXT-FRAMEWORK]]

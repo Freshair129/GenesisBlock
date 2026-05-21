@@ -144,11 +144,13 @@ Six rules, each as a small pure function returning `ValidationError[]`. Hard rul
 ## Consequences
 
 **Positive**
+
 - Each rule is independently unit-testable (pure function, injectable context).
 - Severity per rule lets us soft-launch experimental rules without blocking PRs.
 - Pattern-matched against `msp_spec.md` §4.5 verbatim — easy to audit.
 
 **Negative**
+
 - M2 ships 50% coverage (3 hard, 0 warning). Until M3, agents could still slip past with invented versions or evidence-free ADRs. Mitigated by human review (gate 3) catching the obvious cases.
 
 ## What this ADR does NOT decide
@@ -163,6 +165,6 @@ Six rules, each as a small pure function returning `ValidationError[]`. Hard rul
 `msp_spec.md` §4.5 (Anti-Hallucination Rules).
 
 ## Connections
+
 - [[CONCEPT--ATOMIC-WRITE-CONTRACT]]
 - [[FEAT--MSP-VALIDATOR]]
-

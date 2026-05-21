@@ -145,6 +145,7 @@ packages/msp/src/
 ```
 
 **Rule of dependency:**
+
 - `interfaces/` may import from `orchestrator/`, `domain/`, `clients/`
 - `orchestrator/` may import from `domain/`, `clients/` — **never** from `interfaces/`
 - `clients/` may import from `domain/` only
@@ -227,6 +228,7 @@ These responsibilities live in `interfaces/`, not orchestrator:
 ## Status note
 
 **Proposed, not implemented.** Implementation requires:
+
 1. A `[[BLUEPRINT--MSP-INTERFACE-LAYER]]` specifying exact file moves + the order of refactor steps
 2. ESLint config update (`no-restricted-imports` rule) to enforce the dependency direction
 3. CI guard that fails if `orchestrator/**` imports from `interfaces/**` or `@freshair129/gks` directly

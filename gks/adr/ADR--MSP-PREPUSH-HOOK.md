@@ -151,11 +151,13 @@ Same shape as `pre-commit-validator.sh`: a script under `examples/hooks/pre-push
 ## Consequences
 
 **Positive**
+
 - Fast: typical push touches 0–2 FEATs → 0–400 ms.
 - Cheap to reason about: each push range is checked once.
 - Composable: orchestrator can run option 2 (reverse traversal) in CI for completeness.
 
 **Negative**
+
 - A push that only touches an ADR (not its dependent FEAT file) won't catch the chain break. Mitigation: dependent FEATs usually get touched together in a single PR; CI catches the rest.
 - Stdin parsing is fragile if a hook gets called outside `git push` (e.g. a tool that mimics the protocol). Acceptable — non-git callers don't matter.
 
@@ -170,5 +172,5 @@ Same shape as `pre-commit-validator.sh`: a script under `examples/hooks/pre-push
 `[[CONCEPT--MSP-PREPUSH-HOOK]]` + git pre-push hook docs.
 
 ## Connections
-- [[FEAT--MSP-VALIDATOR]]
 
+- [[FEAT--MSP-VALIDATOR]]

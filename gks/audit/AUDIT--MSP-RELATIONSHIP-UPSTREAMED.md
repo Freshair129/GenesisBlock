@@ -114,12 +114,12 @@ Records the upstreaming of Proposal #06 into `Freshair129/GksV3`. This update sy
 
 ## What was done
 
-1.  **GksV3 Update**: Applied direct edits to `docs/MSP_RELATIONSHIP.md` in `Freshair129/GksV3` (commit `22f1751`).
+1. **GksV3 Update**: Applied direct edits to `docs/MSP_RELATIONSHIP.md` in `Freshair129/GksV3` (commit `22f1751`).
     - Added "Which MSP?" disambiguation table.
     - Replaced the inbound-queue workflow diagram with the `msp_candidate` -> `.brain/.../candidates/` pipeline.
     - Updated CLI script lists to match current `package.json`.
     - Reframed `MSP-IMP-` / `MSP-TSK-` / `MSP-WKT-` prefixes as EVA-specific process artifacts.
-2.  **MSP Record Keeping**:
+2. **MSP Record Keeping**:
     - Updated `upstream/gks-proposals/README.md` status: 🟡 drafted -> 🟢 merged.
     - Moved proposal file to `upstream/gks-proposals/merged/06-msp-relationship-update.md`.
     - Updated `upstream/gks-proposals/SUBMISSION.md` to record the merge.
@@ -136,7 +136,7 @@ Records the upstreaming of Proposal #06 into `Freshair129/GksV3`. This update sy
 - GksV3 Commit: `22f1751`.
 
 ## Connections
+
 - [[AUDIT--ARCH-DOC-CLEANUP]]
 - [[BLUEPRINT--INBOUND-TO-CANDIDATES-MIGRATION]]
 - [[ADR--AGENT-WRITE-BOUNDARIES]]
-

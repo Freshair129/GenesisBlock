@@ -140,11 +140,13 @@ draft.md ──▶ inbound queue ──▶ validator ──▶ human review ─�
 ## Consequences
 
 **Positive**
+
 - Each gate has one job; failures localised.
 - Bypass requires actively breaking the workflow (e.g. direct git push to `gks/`) — caught by pre-commit + branch protection.
 - Audit log captures every transition.
 
 **Negative**
+
 - Three gates add latency. Typical agent-to-stable: minutes if reviewer is online; hours otherwise.
 - Hotfix scenarios need the escape hatch in `[[ADR--HOTFIX-ESCAPE-HATCH]]` to skip the human gate without skipping accountability.
 
@@ -165,7 +167,7 @@ draft.md ──▶ inbound queue ──▶ validator ──▶ human review ─�
 `msp_spec.md` §3 (Inbound Flow) + §8 (Promotion).
 
 ## Connections
+
 - [[CONCEPT--INBOUND-QUEUE]]
 - [[CONCEPT--PROPOSAL-TYPES]]
 - [[FRAMEWORK--AUTHORITY-MATRIX]]
-

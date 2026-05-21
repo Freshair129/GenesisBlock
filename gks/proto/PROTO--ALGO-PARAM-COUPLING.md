@@ -183,5 +183,5 @@ atom pair lands and the predicate is observed catching real drift.
 `[[FRAMEWORK--CROSSLINKS-VOCABULARY]]`.
 
 ## Connections
-- [[CONCEPT--PROTO-PATTERN]]
 
+- [[CONCEPT--PROTO-PATTERN]]

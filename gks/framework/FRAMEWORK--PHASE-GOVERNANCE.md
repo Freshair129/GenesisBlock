@@ -120,6 +120,7 @@ P1 `CONCEPT--` must include a **High-level API Draft** (the list of endpoints th
 ## P2 enforcement: mandatory OpenAPI
 
 P2 splits the high-level API draft into three atom types:
+
 - `API--` — master OpenAPI hub
 - `ENDPOINT--` — one path/method per file
 - `ENTRYPOINT--` — auth/middleware logic
@@ -139,5 +140,5 @@ P1–P3 can be skipped only with a `HOTFIX` commit tag and a 48-hour backfill wi
 `msp_spec.md` §6.4 (Devlog Tracking) + §6.2/§6.3 (P1/P2 enforcement) + §10.1 (Hotfix).
 
 ## Connections
-- [[FRAMEWORK--MSP-ARCHITECTURE-V2]]
 
+- [[FRAMEWORK--MSP-ARCHITECTURE-V2]]

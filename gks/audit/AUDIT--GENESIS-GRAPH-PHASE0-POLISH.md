@@ -164,6 +164,7 @@ Tests       364 passed | 13 skipped (377)
 ```
 
 Files most affected:
+
 ```
 test/memory/graph.test.ts                          16 tests (parametrised, both backends)
 test/memory/genesis-graph.test.ts                   7 tests (legacy non-param suite)
@@ -177,7 +178,7 @@ The bulk of the new Cypher tests (10 of 11 microtasks) were authored by the T1 t
 
 | File | Role |
 |---|---|
-| `apps/qwen/strip_fence.py` | Strip surrounding ```ts / ```python fences from Qwen stdout — model adds them even when told not to. |
+| `apps/qwen/strip_fence.py` | Strip surrounding ```ts /```python fences from Qwen stdout — model adds them even when told not to. |
 | `apps/qwen/run_microtask.sh` | `prompt-file → qwen.py → strip_fence.py → output-file` pipeline. Used in a single shell loop to batch all 10 prompts (~6 min wall). |
 
 `qwen.md` was also fixed to document the correct positional-arg invocation and the four system-prompt presets (`--code` / `--review` / `--test` / `--doc`).
@@ -200,6 +201,6 @@ The bulk of the new Cypher tests (10 of 11 microtasks) were authored by the T1 t
 - Date: 2026-05-16
 
 ## Connections
+
 - [[SPEC--GENESIS-GRAPH-BACKEND]]
 - [[CONCEPT--GENESIS-GRAPH-BACKEND]]
-

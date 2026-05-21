@@ -107,6 +107,7 @@ If the runner spawns vitest in a sandbox containing the candidate code at the BL
 ## Scope
 
 In:
+
 - Write candidate code to `<sandbox>/<geography-path>` (sandbox is a tmp dir).
 - Symlink `node_modules` from repo root to sandbox.
 - Spawn `vitest run --reporter=json` against the sandbox; capture exit code + JSON.
@@ -114,6 +115,7 @@ In:
 - Cleanup sandbox after each invocation.
 
 Out:
+
 - vitest config inheritance (sandbox uses a minimal config).
 - Watch mode — single shot per call.
 - Test file selection logic — vitest config picks up tests; we just spawn it.
@@ -124,6 +126,6 @@ Out:
 Closes M3c-4's residual ("real `acceptanceRunner` (spawning vitest in a sandbox) is not in this PR — default no-op"). P0 item #2 from production-readiness backlog.
 
 ## Connections
+
 - [[FEAT--CODEGEN-MICROTASK-RUNNER]]
 - [[ADR--CODEGEN-RETRY-POLICY]]
-

@@ -188,12 +188,14 @@ Migration code lives in `src/identity/migrate.ts` (to be written per `[[BLUEPRIN
 ## Consequences
 
 **Positive**
+
 - Identity travels with the user, not the project — matches mental model of every other CLI agent.
 - Multi-project usage works without config rewrite.
 - Cross-project audit log enables features like "what have I asked across all projects this week".
 - `MSP_HOME` env makes test isolation trivial (no need to fake `$HOME`).
 
 **Negative**
+
 - Two-tier read path is one more thing to debug ("which layer won?"). Mitigated by `msp_identity_get { explain: true }` showing the resolution chain.
 - Migration window — old workspaces with `identity.json` get auto-migrated, which changes user-visible state without explicit consent. Mitigated by stderr warning + not deleting the old file.
 - Cross-platform `~` resolution differs (Windows: `%USERPROFILE%\.msp\`). Use `os.homedir()` from Node, not string concat.
@@ -210,5 +212,5 @@ Migration code lives in `src/identity/migrate.ts` (to be written per `[[BLUEPRIN
 Phase B of architecture-doc cleanup (2026-05-09). Driven by `[[CONCEPT--AGENT-AGNOSTIC]]` requirement that MSP plug into any cognitive-layer client. `~/.claude` / `~/.gemini` / `~/.eva` patterns are direct references. Path resolution mirrors `git`'s global-vs-local config model.
 
 ## Connections
-- [[FRAMEWORK--MSP-ARCHITECTURE-V2]]
 
+- [[FRAMEWORK--MSP-ARCHITECTURE-V2]]

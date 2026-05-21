@@ -133,6 +133,7 @@ In:
 - Trigger model: PDP-driven via `advice: ['request-step-up-auth']` + `ttl: N seconds`.
 - Subject attribute `last_step_up_at: timestamp` + `last_step_up_method: pin | totp | passkey | signed-token`.
 - StepUpProvider interface:
+
   ```ts
   interface StepUpProvider {
     id: string
@@ -141,6 +142,7 @@ In:
     verify(challenge_id: string, response: VerifyResponse): Promise<VerifyResult>
   }
   ```
+
 - Built-in providers:
   - **PinProvider** — local / single-user / homelab — re-enter PIN.
   - **PasskeyProvider** — WebAuthn signature over `prompt_hash + nonce + ts`. Phishing-resistant.
@@ -216,5 +218,5 @@ MVP ships option (1) with option (3) for `risk: high` only. Option (2) considere
 - `[[CONCEPT--SUBJECT-RESOURCE-ACTION-CONTEXT]]` — `last_step_up_at` lives in Subject.attributes.
 
 ## Connections
-- [[FRAMEWORK--UNIVERSAL-CONTEXT-FRAMEWORK]]
 
+- [[FRAMEWORK--UNIVERSAL-CONTEXT-FRAMEWORK]]

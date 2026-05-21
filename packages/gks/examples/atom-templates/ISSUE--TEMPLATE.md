@@ -30,6 +30,7 @@ What's the problem? Symptoms, scope, affected components.
 ## Reproduction
 
 Steps to reproduce (when applicable):
+
 1. ...
 2. ...
 3. observed: ...
@@ -46,6 +47,7 @@ Who / what is affected. Severity / urgency rationale.
      Status changes are logged here too. -->
 
 ### <ISO timestamp> [<MSP-USR-...>] draft
+
 First report.
 
 ## Resolution

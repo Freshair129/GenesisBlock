@@ -31,30 +31,35 @@ Many projects starting with GKS already have significant knowledge stored in Not
 ## 3. Requirements
 
 ### 3.1 Authentication & Connectivity
--   Support Notion API integration via an Internal Integration Token (`NOTION_TOKEN`).
--   Support targeting specific databases or individual page IDs.
+
+- Support Notion API integration via an Internal Integration Token (`NOTION_TOKEN`).
+- Support targeting specific databases or individual page IDs.
 
 ### 3.2 Content Transformation
--   Convert Notion blocks (paragraphs, headings, lists, code blocks, images) into standard GitHub-Flavored Markdown.
--   Identify and preserve internal page references, converting them into GKS `[[wikilinks]]` where possible.
--   Handle Notion properties (Select, Multi-select, Date) and map them to GKS frontmatter fields (tags, created_at, status).
+
+- Convert Notion blocks (paragraphs, headings, lists, code blocks, images) into standard GitHub-Flavored Markdown.
+- Identify and preserve internal page references, converting them into GKS `[[wikilinks]]` where possible.
+- Handle Notion properties (Select, Multi-select, Date) and map them to GKS frontmatter fields (tags, created_at, status).
 
 ### 3.3 Atomic Mapping
--   Provide a heuristic to map Notion database types to GKS types (e.g., a "Decisions" DB in Notion maps to `ADR--*`).
--   Automatically generate GKS-compliant IDs based on the Notion page title or a dedicated property.
+
+- Provide a heuristic to map Notion database types to GKS types (e.g., a "Decisions" DB in Notion maps to `ADR--*`).
+- Automatically generate GKS-compliant IDs based on the Notion page title or a dedicated property.
 
 ### 3.4 CLI Interface
--   Provide a command `msp-migrate notion [--database <id>] [--page <id>] [--out <dir>]`.
--   Support a `--dry-run` flag to preview the generated atoms before writing to disk.
--   Support a `--mapping <file.json>` to define custom Notion-to-GKS field mappings.
+
+- Provide a command `msp-migrate notion [--database <id>] [--page <id>] [--out <dir>]`.
+- Support a `--dry-run` flag to preview the generated atoms before writing to disk.
+- Support a `--mapping <file.json>` to define custom Notion-to-GKS field mappings.
 
 ## 4. Acceptance Criteria
 
--   [ ] A CLI command exists to fetch and convert Notion content.
--   [ ] Complex Notion pages (containing nested lists and code blocks) are accurately represented in the resulting Markdown.
--   [ ] Notion database properties are successfully converted into YAML frontmatter.
--   [ ] The imported atoms pass `msp:validate` with minimal manual correction.
+- [ ] A CLI command exists to fetch and convert Notion content.
+- [ ] Complex Notion pages (containing nested lists and code blocks) are accurately represented in the resulting Markdown.
+- [ ] Notion database properties are successfully converted into YAML frontmatter.
+- [ ] The imported atoms pass `msp:validate` with minimal manual correction.
 
 ## 5. Connections
--   `[[CONCEPT--MSP-ROADMAP]]` §3 M9d.
--   `[[CONCEPT--KNOWLEDGE-LAYERS-V2]]` — defines the structure imported data must adhere to.
+
+- `[[CONCEPT--MSP-ROADMAP]]` §3 M9d.
+- `[[CONCEPT--KNOWLEDGE-LAYERS-V2]]` — defines the structure imported data must adhere to.

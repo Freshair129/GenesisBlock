@@ -43,5 +43,3 @@
 - Ship gate: pass — Deny→challenge→verify→permit cycle verified via `phase-5-step-up.test.ts`. PIN Argon2id-hashed (scrypt used as platform-stable fallback).
 - Deviations from the WBS: used `scrypt` instead of `argon2` for better stability in Windows environment (node:crypto built-in).
 - Follow-ups: UCF implementation complete through Phase 5. All P4/P5 tasks fulfilled.
-
-

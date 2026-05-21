@@ -173,6 +173,7 @@ No promotion CLI. Human curates via the web UI's new "Candidates" tab — picks 
 ### What about agents that just want to remember mid-conversation?
 
 They use what they already have:
+
 - `msp_session_append` — append to session.jsonl (turn-level)
 - `msp_episode_append` / `msp_remember` — write to episodic_memory.json (consolidated insight)
 
@@ -211,6 +212,6 @@ The 4-layer model puts a clean wall between `.brain/` (any agent can write anyth
 - Race condition diagnosis in PR #41/#42 CI failures — direct evidence of inbound's hidden cost
 
 ## Connections
+
 - [[CONCEPT--PROPOSAL-TYPES]]
 - [[CONCEPT--SUBMISSION-ENVELOPE]]
-

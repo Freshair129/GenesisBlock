@@ -162,5 +162,5 @@ Negative / accepted costs:
 - `[[CONCEPT--STEP-UP-AUTH]]` — handles the weak-identity case for MCP stdio.
 
 ## Connections
-- [[FRAMEWORK--UNIVERSAL-CONTEXT-FRAMEWORK]]
 
+- [[FRAMEWORK--UNIVERSAL-CONTEXT-FRAMEWORK]]

@@ -61,4 +61,4 @@ Optional. Pre-empt scope creep questions:
 
 ---
 
-_Closes #?  ·  Related #?_
+*Closes #?  ·  Related #?*

@@ -19,6 +19,7 @@ linked_symbols:
 # HOOK — <Title>
 
 ## Triggering Event
+
 - **Source:** <e.g. GitHub Webhook / Redis PubSub / Internal System Event>
 - **Type:** <e.g. `push` | `user_created` | `pre-commit`>
 
@@ -37,15 +38,18 @@ linked_symbols:
 ```
 
 ## Action / Behaviour
+
 1. <What happens when this hook is triggered?>
 2. <Step 1 of the processing logic>
 3. <Step 2 ...>
 
 ## Error Handling
+
 - **Retry Policy:** <e.g. Exponential backoff (3 retries)>
 - **Dead Letter Queue:** <Yes/No>
 - **Alerting:** <Reference to RUNBOOK-- if it fails>
 
 ## Security
+
 - **Signature Verification:** <Yes/No (e.g. HMAC-SHA256)>
 - **Source Filtering:** <Allow-list of IPs or Domains>

@@ -182,6 +182,6 @@ npm run typecheck                   → clean
 - Branch: `claude/msp-m7a-obsidian-client-C4dBJ`
 
 ## Connections
+
 - [[ADR--MSP-OBSIDIAN-INTEGRATION]]
 - [[FRAMEWORK--MSP-ARCHITECTURE-V2]]
-

@@ -217,5 +217,5 @@ These fields are added to the runtime contract (`atomic_contract.yaml`) as permi
 - User design dialogue (2026-05-09 session) — the polymorphism + axiomatic + manual+ADR-evidence promotion + instinct framing decisions
 
 ## Connections
-- [[FRAMEWORK--MSP-ARCHITECTURE-V2]]
 
+- [[FRAMEWORK--MSP-ARCHITECTURE-V2]]

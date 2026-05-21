@@ -283,10 +283,10 @@ import { handler as identitySetHandler }  from '@/mcp/tools/identity-set'
 - Follow-up: file a small PR for `msp_compress` once M7d is merged to main
 
 ## Connections
+
 - [[CONCEPT--MSP-MCP-TOOL-EXPANSION]]
 - [[FEAT--MSP-MCP-SERVER]]
 - [[FEAT--CONSOLIDATOR]]
 - [[FEAT--RETRIEVAL-ORCHESTRATION]]
 - [[FEAT--IDENTITY-LAYER]]
 - [[FEAT--COMPRESSOR]]
-

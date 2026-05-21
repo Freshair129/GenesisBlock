@@ -186,8 +186,8 @@ Open questions remaining are tracked in spec §14 with working assumptions so at
 - `gks/concept/[[CONCEPT--COGNITIVE-LAYER-FACADE]].md` — the entry point that surfaces this FRAME.
 
 ## Connections
+
 - [[FRAMEWORK--MSP-ARCHITECTURE-V2]]
 - [[CONCEPT--SUBJECT-RESOURCE-ACTION-CONTEXT]]
 - [[CONCEPT--ATTRIBUTE-BAG-MODEL]]
 - [[CONCEPT--NAMESPACE-VAULT-BRAIN]]
-

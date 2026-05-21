@@ -178,7 +178,7 @@ The orchestrator decides which verification files to feed in (M4c keeps that out
 - Date: 2026-05-03
 
 ## Connections
+
 - [[BLUEPRINT--ACCEPTANCE-VITEST-RUNNER]]
 - [[ADR--ACCEPTANCE-VITEST-RUNNER]]
 - [[FEAT--CODEGEN-MICROTASK-RUNNER]]
-

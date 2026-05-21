@@ -189,5 +189,5 @@ output but do not fail-exit, per the PROTO loader's draft policy.
 atom is that follow-up.
 
 ## Connections
-- [[CONCEPT--PROTO-PATTERN]]
 
+- [[CONCEPT--PROTO-PATTERN]]

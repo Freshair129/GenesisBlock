@@ -120,15 +120,18 @@ Reason: MSP's reverse-path query (`Code → AST → Symbol Graph → Execution T
 ## Consequences
 
 ### Positive
+
 - **HALT GATE 2 unblocked** — P3.5 benchmarks can run against a frozen surface.
 - **Smaller surface = smaller bug surface.** Four removed BLUEPRINT constructs cannot regress in benchmarks because they were never implemented.
 - **Test coverage already complete.** 28 cypher integration tests in `packages/gks/test/memory/genesis-graph-cypher.test.ts` exercise the narrowed surface end-to-end.
 
 ### Negative
+
 - **Future contributors reading the BLUEPRINT may write queries the parser rejects.** Mitigated by: (a) this ADR is linked from the BLUEPRINT crosslinks; (b) the rejection error messages (`"Cypher error: MATCH pattern mismatch"` etc.) point at the failing clause; (c) MSP's actual query templates are static, in-repo strings — they're code-reviewed, not user input.
 - **Multi-WHERE syntax is non-canonical Cypher.** Anyone porting MSP queries to Neo4j later must rewrite `WHERE a.x = '1' WHERE b.y = '2'` → `WHERE a.x = '1' AND b.y = '2'`. Tracked under future `[[ADR--GENESIS-BLOCK-CYPHER-V1-EXPRESSIONS]]` if MSP grows enough query complexity to justify a real expression parser.
 
 ### Neutral
+
 - The on-disk format (`[[ADR--GENESIS-BLOCK-STORAGE-LAYOUT]]`) is unaffected — Cypher is a read-side surface that runs against the in-memory adjacency indices.
 - The pure-TS fallback at `packages/gks/src/memory/graph/genesis-graph.ts` has its own `parseCypherV0` (in `cypher-v0.ts`) which accepts a slightly different grammar (closer to BLUEPRINT). The two parsers are not bit-identical — when both backends are tested in parametrised suites, queries that exercise the drift will only run against the pure-TS path. **Tracked as known limitation; not a blocker.**
 
@@ -146,11 +149,13 @@ Reason: MSP's reverse-path query (`Code → AST → Symbol Graph → Execution T
 ## Alternatives rejected
 
 **Option B — Patch impl to match BLUEPRINT** (rewrite parser to support AND, target maps, both directions) was rejected because:
+
 - BLUEPRINT v0 was conceived before MSP's actual query templates were finalised. The narrowed surface in this ADR is what `verify-flow` and impact-analysis actually use.
 - The expression parser for AND/OR adds ~200 LOC of Rust for a future-only feature.
 - The same constructs can be added in a follow-up P4 ADR + PR if a real MSP query needs them. The cost of waiting is bounded.
 
 **Option C — Approve as-is without addendum** was rejected because:
+
 - BLUEPRINT remains the authoritative spec. Without an addendum, future contributors will read BLUEPRINT, write queries that match it, get parse errors, and have no record of why.
 - HALT GATE 2 explicitly offers the addendum option for exactly this case.
 

@@ -285,8 +285,8 @@ Out of scope for v0 (tracked as separate atoms when needed):
 | Schema migration disasters | Version byte + read-then-migrate routine, identical pattern to existing `src/lib/schema-version.ts`. |
 
 ## Connections
+
 - [[ADR--GENESIS-GRAPH-AS-GKS-BACKEND]]
 - [[CONCEPT--GENESIS-GRAPH-BACKEND]]
 - [[FRAMEWORK--MSP-ARCHITECTURE-V2]]
 - [[PROTOCOL--GENESIS-GRAPH-FFI]]
-

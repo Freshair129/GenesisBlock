@@ -107,5 +107,6 @@ Every source code file in the repository is automatically and accurately tagged 
 3. **Deterministic Logic:** Favour rule-based classification (e.g. `*.test.ts` is always a test) to ensure consistent security posture.
 
 ## Connections
+
 - `[[FRAMEWORK--UNIVERSAL-CONTEXT-FRAMEWORK]]` — the engine that enforces these policies.
 - `[[CONCEPT--ATTRIBUTE-BAG-MODEL]]` — the data model for the tags produced by this pack.

@@ -170,6 +170,7 @@ effective_context = filter_by_WHO ∩ filter_by_WHERE ∩ shape_by_HOW_MUCH
 ```
 
 A retrieval for "what does our login system look like" issued by:
+
 - Subject `alice` (engineer, no PHI clearance)
 - Vault `alice-engineering` (her personal + eng-team + company-public)
 - Resolution `{ full: 3, summary: 10, skeleton: 50, budget: 8000 tokens }`
@@ -306,6 +307,7 @@ The core treats this as opaque — it carries the bag from classifier to policy 
 Open schemas drift. To prevent unbounded field growth:
 
 1. **Attribute schema files** declare expected attributes per domain:
+
    ```yaml
    # attributes/medical.yaml
    - name: classification
@@ -319,6 +321,7 @@ Open schemas drift. To prevent unbounded field growth:
    ```
 
 2. **Policy authors declare which attributes their rules use** — the validator warns on unknown attributes:
+
    ```yaml
    uses_attributes: [classification, patient_id, hipaa_covered]
    ```
@@ -460,6 +463,7 @@ A common temptation is to collapse these into one concept (often called "workspa
 - **Brain** must persist across sessions — it carries identity / preferences / history.
 
 Collapsing them produces either:
+
 - An inflexible system (workspace = namespace, no sharing)
 - An insecure system (workspace = vault but stored as a namespace, so policy bypass is one config flip away)
 - An unobservable system (everything in one bucket, audit can't tell why something matched)
@@ -529,6 +533,7 @@ budget:
 ```
 
 `on_overflow` strategies:
+
 - `compress_full_first` — abridge FULL bodies before dropping any SKELETON.
 - `drop_lowest_first` — keep FULL intact, drop MENTION first.
 - `proportional` — scale all tiers' share.
@@ -543,6 +548,7 @@ Skeletons must carry enough information for the agent to decide whether to `expa
 ```
 
 Optional enrichments configurable per vault:
+
 - Tags / domain
 - Last-updated date
 - Direct crosslink count (signal of centrality)
@@ -622,8 +628,8 @@ The framework uses the classic XACML / OPA architecture:
 
 **Format (per D-1):** YAML with a small built-in operator set. Estimated 200 LOC for parser + evaluator. Hot-reload is supported via file watcher + monotonic policy-version counter. Migration to Cedar / OPA is a mechanical translation once policy count or expressiveness needs exceed the YAML form (target threshold: ~30 rules or any need for recursive evaluation).
 
-
 # policies/subagent-context-scoping.yaml
+
 - id: deny-out-of-scope-atoms
   description: Subagent tasks see only atoms whose domain is in scope.needs.
   uses_attributes: [domain]
@@ -650,6 +656,7 @@ The framework uses the classic XACML / OPA architecture:
   obligations: [log-phi-access, redact-fields-except-citation]
   on_deny:
     advice: ['request-step-up-auth']
+
 ```
 
 Operator language is intentionally minimal at v1 — equality, membership, set operations, basic arithmetic. Cedar / Rego is the upgrade path when expressiveness is needed.
@@ -707,6 +714,7 @@ Recommended for MSP v1:
 ### 8.3 Step-up flow
 
 ```
+
 1. Subject requests action A on Resource R.
 2. PDP evaluates → returns deny with advice: ['request-step-up-auth', ttl: 300s].
 3. PEP intercepts → triggers step-up UI / MCP step-up tool.
@@ -714,6 +722,7 @@ Recommended for MSP v1:
 5. Backend records subject.attributes.last_step_up_at = now.
 6. Subject retries action A → PDP now permits → action proceeds.
 7. Audit log records both deny+reason and subsequent permit+step-up.
+
 ```
 
 ### 8.4 Step-up over MCP stdio

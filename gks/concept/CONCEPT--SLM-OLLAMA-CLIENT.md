@@ -107,6 +107,7 @@ If the runner accepts a pluggable `SlmClient` and we ship one concrete implement
 ## Scope
 
 In:
+
 - HTTP client targeting Ollama's `/api/generate` endpoint (single-turn, no chat history).
 - Honour `OLLAMA_HOST` (default `http://127.0.0.1:11434`) + `OLLAMA_MODEL` (default `qwen2.5-coder:7b`) env vars.
 - Implements the `SlmClient` interface from `src/codegen/types.ts`.
@@ -114,6 +115,7 @@ In:
 - Pluggable factory `createSlmClient(opts?)` so future Anthropic / OpenAI clients drop in next to it.
 
 Out:
+
 - Streaming responses (we collect the full output before returning).
 - Chat-history mode (the codegen retry policy strips previous attempts anyway).
 - Authentication / TLS — Ollama is local-by-default.
@@ -124,5 +126,5 @@ Out:
 Closes M3c-4's residual ("real Qwen 2.5 Coder integration is a future task"). P0 item #1 from production-readiness backlog.
 
 ## Connections
-- [[ADR--CODEGEN-RETRY-POLICY]]
 
+- [[ADR--CODEGEN-RETRY-POLICY]]
