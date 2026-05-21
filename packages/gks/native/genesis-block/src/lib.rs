@@ -121,6 +121,14 @@ enum Event {
     Edge(EdgeOutput),
 }
 
+#[derive(Serialize, Deserialize)]
+struct Snapshot {
+    nodes: HashMap<String, NodeOutput>,
+    edges: HashMap<String, EdgeOutput>,
+    out_idx: HashMap<String, HashSet<String>>,
+    in_idx: HashMap<String, HashSet<String>>,
+}
+
 struct Storage {
     #[allow(dead_code)]
     path: PathBuf,
@@ -130,6 +138,7 @@ struct Storage {
     out_idx: HashMap<String, HashSet<String>>,
     in_idx: HashMap<String, HashSet<String>>,
     log_path: PathBuf,
+    bin_path: PathBuf,
     _lock_file: Option<File>,
 }
 
@@ -144,6 +153,8 @@ impl Storage {
         let lock_file = Self::acquire_os_lock(&root, read_only)?;
 
         let log_path = root.join("genesis-graph.jsonl");
+        let bin_path = root.join("genesis-graph.bin");
+        
         let mut storage = Self {
             path: root,
             read_only,
@@ -152,9 +163,26 @@ impl Storage {
             out_idx: HashMap::new(),
             in_idx: HashMap::new(),
             log_path: log_path.clone(),
+            bin_path,
             _lock_file: Some(lock_file),
         };
 
+        // P4.2: Load from binary snapshot if exists
+        if storage.bin_path.exists() {
+            if let Ok(mut file) = File::open(&storage.bin_path) {
+                let mut buffer = Vec::new();
+                if file.read_to_end(&mut buffer).is_ok() {
+                    if let Ok(snapshot) = bincode::deserialize::<Snapshot>(&buffer) {
+                        storage.nodes = snapshot.nodes;
+                        storage.edges = snapshot.edges;
+                        storage.out_idx = snapshot.out_idx;
+                        storage.in_idx = snapshot.in_idx;
+                    }
+                }
+            }
+        }
+
+        // Always replay JSONL to catch updates after the last snapshot
         if log_path.exists() {
             let file = FileOpenOptions::new().read(true).open(&log_path)
                 .map_err(|e| Error::from_reason(format!("genesis-block: io: {e}")))?;
@@ -348,6 +376,18 @@ impl Storage {
             return Err(Error::from_reason(format!("genesis-block: add_edge: unknown to-node {}", args.to)));
         }
 
+        // P4.3: Axiomatic Guard
+        if args.rel == "supersedes" || args.rel == "contradicts" {
+            let from_tier = self.calculate_as(&args.from);
+            let to_tier = self.calculate_as(&args.to);
+            if from_tier < to_tier {
+                return Err(Error::from_reason(format!(
+                    "Axiomatic Guard: Cannot {} a higher-tier atom (from: {}, to: {})",
+                    args.rel, args.from, args.to
+                )));
+            }
+        }
+
         let now = Utc::now().to_rfc3339();
         let id = args.id.unwrap_or_else(|| Uuid::new_v4().to_string());
         let edge = EdgeOutput {
@@ -443,6 +483,17 @@ impl Storage {
 
         fs::rename(&tmp_path, &self.log_path)
             .map_err(|e| Error::from_reason(format!("genesis-block: compact: rename: {e}")))?;
+
+        // P4.2: Save binary snapshot after compaction
+        let snapshot = Snapshot {
+            nodes: self.nodes.clone(),
+            edges: self.edges.clone(),
+            out_idx: self.out_idx.clone(),
+            in_idx: self.in_idx.clone(),
+        };
+        if let Ok(encoded) = bincode::serialize(&snapshot) {
+            fs::write(&self.bin_path, encoded).ok();
+        }
 
         Ok(())
     }
