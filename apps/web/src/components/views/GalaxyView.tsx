@@ -50,7 +50,7 @@ function gxHexA(hex: string, a: number): string {
   return `rgba(${r},${g},${b},${a.toFixed(3)})`;
 }
 
-export const GalaxyView: React.FC<GalaxyViewProps> = ({ notes, edges, focusId: _focusId, onOpen }) => {
+export const GalaxyView: React.FC<GalaxyViewProps> = ({ notes, edges, onOpen }) => {
   const wrapRef   = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [size, setSize] = useState({ w: 800, h: 600 });
@@ -312,7 +312,7 @@ export const GalaxyView: React.FC<GalaxyViewProps> = ({ notes, edges, focusId: _
         if (al < 0.02) continue;
         const sz  = Math.max(0.4, p.sz * prj.scale * 0.65);
         ctx.fillStyle = `rgba(${p.r},${p.g},${p.b},${al.toFixed(3)})`;
-        ctx.fillRect(px - sz, py - sz, sz * 2, sz * 2);
+        ctx.fillRect(x, y, p.sz * proj.scale, p.sz * proj.scale);
       }
     }
 
