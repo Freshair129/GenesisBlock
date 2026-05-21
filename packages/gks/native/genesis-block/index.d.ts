@@ -49,6 +49,7 @@ export interface QueryInput {
 export interface NeighborInput {
   depth?: number
   rel?: string
+  rels?: Array<string>
   direction?: string
   asOf?: string
   includeInvalid?: boolean

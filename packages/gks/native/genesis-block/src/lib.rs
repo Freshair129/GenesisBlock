@@ -19,6 +19,7 @@ use parking_lot::RwLock;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
+use sysinfo::{Pid, System};
 use uuid::Uuid;
 
 pub const SCHEMA_VERSION: u32 = 1;
@@ -87,6 +88,7 @@ pub struct QueryInput {
 pub struct NeighborInput {
     pub depth: Option<u32>,
     pub rel: Option<String>,
+    pub rels: Option<Vec<String>>,
     pub direction: Option<String>, // 'out' | 'in' | 'both'
     pub as_of: Option<String>,
     pub include_invalid: Option<bool>,
@@ -177,23 +179,48 @@ impl Storage {
 
     fn acquire_os_lock(root: &PathBuf, read_only: bool) -> Result<File> {
         let lock_path = root.join("genesis-graph.lock");
+
+        if !read_only && lock_path.exists() {
+            let mut content = String::new();
+            {
+                // Scope for temporary read access to check PID
+                let f = FileOpenOptions::new().read(true).open(&lock_path).ok();
+                if let Some(mut f) = f {
+                    f.read_to_string(&mut content).ok();
+                }
+            }
+
+            let pid_str = content.trim();
+            if !pid_str.is_empty() {
+                if let Ok(pid_val) = pid_str.parse::<u32>() {
+                    let mut system = System::new();
+                    system.refresh_processes();
+                    if system.process(Pid::from(pid_val as usize)).is_some() {
+                        if pid_val != std::process::id() {
+                            return Err(Error::from_reason(format!(
+                                "genesis-block: io: database is locked by another active process (PID: {})",
+                                pid_val
+                            )));
+                        }
+                    }
+                }
+            }
+        }
+
         let mut file = FileOpenOptions::new()
             .read(true)
             .write(true)
             .create(true)
             .open(&lock_path)
-            .map_err(|e| Error::from_reason(format!("genesis-block: io: {e}")))?;
+            .map_err(|e| Error::from_reason(format!("genesis-block: io: failed to open lock file: {e}")))?;
 
         if !read_only {
-            let mut content = String::new();
-            file.read_to_string(&mut content).ok();
-            let pid_str = content.trim();
-            if !pid_str.is_empty() {
-                return Err(Error::from_reason(format!("genesis-block: io: file locked by pid {}", pid_str)));
-            }
             file.set_len(0).ok();
             file.seek(SeekFrom::Start(0)).ok();
             writeln!(file, "{}", std::process::id()).ok();
+            file.flush().ok();
+            // We keep the file handle in `_lock_file` to maintain the OS lock (on Windows)
+            // or at least signal intent.
         }
         Ok(file)
     }
@@ -416,6 +443,11 @@ impl GenesisDatabase {
         let depth = args.depth.unwrap_or(1);
         let direction = args.direction.as_deref().unwrap_or("out");
         let limit = args.limit.unwrap_or(u32::MAX);
+        
+        let mut target_rels = HashSet::new();
+        if let Some(r) = args.rel { target_rels.insert(r); }
+        if let Some(rs) = args.rels { target_rels.extend(rs); }
+
         let mut results = Vec::new();
         let mut visited = HashSet::new();
         visited.insert(seed.clone());
@@ -428,7 +460,7 @@ impl GenesisDatabase {
             if direction == "in" || direction == "both" { if let Some(eids) = storage.in_idx.get(&curr_id) { edge_ids.extend(eids.clone()); } }
             for eid in edge_ids {
                 if let Some(edge) = storage.edges.get(&eid) {
-                    if let Some(ref rel) = args.rel { if edge.rel != *rel { continue; } }
+                    if !target_rels.is_empty() && !target_rels.contains(&edge.rel) { continue; }
                     if !args.include_invalid.unwrap_or(false) && edge.valid_to.is_some() { continue; }
                     let next_id = if edge.from == curr_id { edge.to.clone() } else { edge.from.clone() };
                     if visited.contains(&next_id) { continue; }
@@ -495,7 +527,15 @@ impl GenesisDatabase {
                     if val != p.equals { return Ok(Value::Array(Vec::new())); }
                 }
             }
-            let reached = Self::neighbors_internal(&storage, seed_id.clone(), NeighborInput { depth: Some(max_hops), rel: if rels.len() == 1 { Some(rels[0].clone()) } else { None }, direction: Some("out".to_string()), as_of: None, include_invalid: Some(false), limit: None })?;
+            let reached = Self::neighbors_internal(&storage, seed_id.clone(), NeighborInput { 
+                depth: Some(max_hops), 
+                rel: None,
+                rels: Some(rels.clone()), 
+                direction: Some("out".to_string()), 
+                as_of: None, 
+                include_invalid: Some(false), 
+                limit: None 
+            })?;
             let mut rows = Vec::new();
             for hit in reached {
                 if hit.depth < min_hops { continue; }
