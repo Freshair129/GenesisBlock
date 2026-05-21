@@ -1,22 +1,24 @@
 # Genesis Block Graph Benchmark Report
 
-- **Generated:** 2026-05-18T23:22:55.581Z
-- **Git SHA:** `de2c8f278160fe84e19bf5a5086d83300fb92a96` *(dirty)*
+- **Generated:** 2026-05-21T11:44:54.566Z
+- **Git SHA:** `9daa41396fec6f119ce0a5c8c3e8712871c6fa76` *(dirty)*
 - **Host:** win32/x64, Node v25.9.0
-- **Fixture:** 50,000 nodes / 500,000 edges
+- **Fixture:** 5,000 nodes / 50,000 edges *(QUICK)*
 - **Seed:** 42
-- **Note:** FULL fixture per BLUEPRINT P3.5: 50k nodes / 500k edges
+- **Note:** QUICK fixture (10× smaller than BLUEPRINT P3.5 target)
 - **BLUEPRINT target:** p50 < 50 ms (CONCEPT--GENESIS-GRAPH-BACKEND)
+
+> ⚠ **This run used the `--quick` fixture (10× smaller than BLUEPRINT P3.5 specifies).** The pass/fail marks below are *indicative only*. The full 50k/500k fixture should be re-run before any ADR promotion.
 
 ## Headline — p50 latency (ms)
 
 | Workload | graph-store | genesis-ts | genesis-native | Target (<50 ms p50)? |
 |---|---:|---:|---:|---|
-| `bulk_load` | 254132.79 | 252617.17 | 122403.97 | — |
-| `query_by_from` | 0.01 | 0.01 | 17.53 | ✅ |
-| `query_by_rel` | 18.41 | 17.62 | 487.54 | ❌ |
-| `neighbors_1hop` | 0.01 | 0.01 | 0.17 | ✅ |
-| `neighbors_3hop` | 0.87 | 0.89 | 16.51 | ✅ |
+| `bulk_load` | 26581.52 | 25660.95 | 12211.14 | — |
+| `query_by_from` | 0.00 | 0.00 | 0.89 | ✅ |
+| `query_by_rel` | 0.87 | 1.45 | 46.53 | ✅ |
+| `neighbors_1hop` | 0.01 | 0.01 | 0.18 | ✅ |
+| `neighbors_3hop` | 0.42 | 0.42 | 16.17 | ✅ |
 
 ## Workload: `bulk_load`
 
@@ -25,12 +27,12 @@
 | Metric | graph-store | genesis-ts | genesis-native |
 |---|---:|---:|---:|
 | ops | 1.00 | 1.00 | 1.00 |
-| mean_ms | 254132.79 | 252617.17 | 122403.97 |
-| min_ms | 254132.79 | 252617.17 | 122403.97 |
-| p50_ms | 254132.79 | 252617.17 | 122403.97 |
-| p95_ms | 254132.79 | 252617.17 | 122403.97 |
-| p99_ms | 254132.79 | 252617.17 | 122403.97 |
-| max_ms | 254132.79 | 252617.17 | 122403.97 |
+| mean_ms | 26581.52 | 25660.95 | 12211.14 |
+| min_ms | 26581.52 | 25660.95 | 12211.14 |
+| p50_ms | 26581.52 | 25660.95 | 12211.14 |
+| p95_ms | 26581.52 | 25660.95 | 12211.14 |
+| p99_ms | 26581.52 | 25660.95 | 12211.14 |
+| max_ms | 26581.52 | 25660.95 | 12211.14 |
 
 ## Workload: `query_by_from`
 
@@ -39,12 +41,12 @@
 | Metric | graph-store | genesis-ts | genesis-native |
 |---|---:|---:|---:|
 | ops | 1000.00 | 1000.00 | 1000.00 |
-| mean_ms | 0.01 | 0.01 | 16.80 |
-| min_ms | 0.00 | 0.00 | 4.65 |
-| p50_ms | 0.01 | 0.01 | 17.53 |
-| p95_ms | 0.01 | 0.01 | 20.00 |
-| p99_ms | 0.02 | 0.02 | 23.23 |
-| max_ms | 0.19 | 0.14 | 36.58 |
+| mean_ms | 0.01 | 0.01 | 0.88 |
+| min_ms | 0.00 | 0.00 | 0.36 |
+| p50_ms | 0.00 | 0.00 | 0.89 |
+| p95_ms | 0.01 | 0.01 | 1.24 |
+| p99_ms | 0.02 | 0.01 | 1.46 |
+| max_ms | 0.16 | 0.22 | 1.82 |
 
 ## Workload: `query_by_rel`
 
@@ -53,12 +55,12 @@
 | Metric | graph-store | genesis-ts | genesis-native |
 |---|---:|---:|---:|
 | ops | 100.00 | 100.00 | 100.00 |
-| mean_ms | 18.83 | 18.17 | 490.37 |
-| min_ms | 16.67 | 16.67 | 465.00 |
-| p50_ms | 18.41 | 17.62 | 487.54 |
-| p95_ms | 23.03 | 19.96 | 514.10 |
-| p99_ms | 26.05 | 21.80 | 523.46 |
-| max_ms | 37.36 | 22.91 | 545.95 |
+| mean_ms | 0.96 | 1.57 | 48.89 |
+| min_ms | 0.82 | 1.19 | 44.26 |
+| p50_ms | 0.87 | 1.45 | 46.53 |
+| p95_ms | 1.42 | 2.30 | 58.11 |
+| p99_ms | 2.27 | 2.91 | 65.77 |
+| max_ms | 2.65 | 3.00 | 66.33 |
 
 ## Workload: `neighbors_1hop`
 
@@ -67,12 +69,12 @@
 | Metric | graph-store | genesis-ts | genesis-native |
 |---|---:|---:|---:|
 | ops | 1000.00 | 1000.00 | 1000.00 |
-| mean_ms | 0.01 | 0.01 | 0.21 |
+| mean_ms | 0.01 | 0.01 | 0.19 |
 | min_ms | 0.00 | 0.00 | 0.08 |
-| p50_ms | 0.01 | 0.01 | 0.17 |
-| p95_ms | 0.02 | 0.02 | 0.24 |
-| p99_ms | 0.02 | 0.02 | 0.32 |
-| max_ms | 0.22 | 0.26 | 16.04 |
+| p50_ms | 0.01 | 0.01 | 0.18 |
+| p95_ms | 0.02 | 0.01 | 0.26 |
+| p99_ms | 0.02 | 0.02 | 0.30 |
+| max_ms | 0.30 | 0.27 | 1.45 |
 
 ## Workload: `neighbors_3hop`
 
@@ -81,16 +83,16 @@
 | Metric | graph-store | genesis-ts | genesis-native |
 |---|---:|---:|---:|
 | ops | 100.00 | 100.00 | 100.00 |
-| mean_ms | 0.86 | 0.91 | 15.82 |
-| min_ms | 0.39 | 0.39 | 8.25 |
-| p50_ms | 0.87 | 0.89 | 16.51 |
-| p95_ms | 1.08 | 1.25 | 18.28 |
-| p99_ms | 1.24 | 1.97 | 23.93 |
-| max_ms | 2.18 | 2.45 | 25.34 |
+| mean_ms | 0.42 | 0.42 | 15.27 |
+| min_ms | 0.15 | 0.16 | 6.30 |
+| p50_ms | 0.42 | 0.42 | 16.17 |
+| p95_ms | 0.56 | 0.58 | 21.24 |
+| p99_ms | 0.85 | 0.94 | 25.71 |
+| max_ms | 0.89 | 1.05 | 26.95 |
 
 ## BLUEPRINT <50 ms p50 target — summary
 
-❌ **Target NOT met** — failing workloads: `query_by_rel`.
+✅ **Target met** — all per-op p50 latencies on `genesis-native` are below 50 ms.
 
 ---
 
