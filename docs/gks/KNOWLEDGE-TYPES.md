@@ -27,18 +27,14 @@ the answer is here. Templates for each prefix live in
 Taxonomy v2.4 introduces the **Meta Learning Loop (MLL)** as the governing framework for knowledge evolution.
 
 ### 4D Completeness Matrix
-
 For any knowledge unit to be considered **Master** tier or **Stable**, it must ideally satisfy the **4D Completeness** rule by having at least one atom of each type in its cluster:
-
-1. **Algo** (`ALGO--`): Deterministic steps.
-2. **Concept** (`CONCEPT--`): Semantic definition.
-3. **Frame** (`FRAMEWORK--`): Cognitive context.
-4. **Proto** (`PROTOCOL--` / `PROTO--`): Invariant / Interaction contract.
+1.  **Algo** (`ALGO--`): Deterministic steps.
+2.  **Concept** (`CONCEPT--`): Semantic definition.
+3.  **Frame** (`FRAMEWORK--`): Cognitive context.
+4.  **Proto** (`PROTOCOL--` / `PROTO--`): Invariant / Interaction contract.
 
 ### MLL Metadata
-
 Atoms generated or refined by the MLL may include the following metadata fields:
-
 - `mll_stability_score`: 0.0 - 1.0 (consensus across multiple LLMs).
 - `mll_tension_detected`: Boolean (if drift was detected via 12-Stage pipeline).
 - `mll_source_episodes`: List of session IDs that contributed to this atom.
@@ -97,21 +93,18 @@ half of the Genesis Block Cycle (see `docs/gks/PRD--GENESIS-BLOCK-CYCLE.md`).
 When in doubt, this is where most contributions go.
 
 ### `IDEA--` · raw spark
-
 - **Use for:** the original prompt / one-line idea before any analysis.
 - **Don't use for:** anything that's been triaged into a concept — promote to `CONCEPT--`.
 - **Phase:** P0.
 - **Lifecycle:** typically short-lived; promoted into `CONCEPT--` within days.
 
 ### `CONCEPT--` · human-readable requirement / vision
-
 - **Use for:** PRDs, journeys, roadmaps, ROI analyses written for human review.
 - **Don't use for:** technical specifications — those are ADRs / FEATs / ALGOs / blueprints.
 - **Phase:** P1.
 - **Examples:** `CONCEPT--PRD.md`, `CONCEPT--ROADMAP.md`, `CONCEPT--JOURNEY-CHECKOUT.md`.
 
 ### `ADR--` · architecture decision record
-
 - **Use for:** every load-bearing technical or organisational decision (and its alternatives).
 - **Don't use for:** *what* the system does (FEAT) or *how* it computes things (ALGO).
 - **Phase:** P2.
@@ -119,80 +112,67 @@ When in doubt, this is where most contributions go.
 - **Status values:** `proposed` / `accepted` / `superseded` / `rejected`.
 
 ### `MOD--` · module manifest
-
 - **Use for:** declaring a module's scope, public API, and ownership boundary.
 - **Don't use for:** the code itself (P5 `src/`).
 - **Phase:** P2.
 
 ### `FEAT--` · feature spec
-
 - **Use for:** user-facing system behaviour ("when user clicks X, system Y").
 - **Don't use for:** agent capabilities — those are `SKILL--`.
 - **Phase:** P2.
 
 ### `ALGO--` · algorithm
-
 - **Use for:** computational steps, scoring formulas, ranking logic.
 - **Don't use for:** API contracts (use `API--`) or features (use `FEAT--`).
 - **Phase:** P2.
 
 ### `FLOW--` · data / UI flow
-
 - **Use for:** data movement diagrams, UI navigation flows, sequence-style flows.
 - **Don't use for:** call graphs (let GitNexus / similar handle that — see ADR-009).
 - **Phase:** P2.
 - **Tip:** also valid as `.canvas` files for Obsidian Canvas diagrams.
 
 ### `FR--` · functional requirement
-
 - **Use for:** specific functional needs that code symbols must implement.
 - **Don't use for:** high-level concepts (use `CONCEPT--`).
 - **Phase:** P1.
 
 ### `NFR--` · non-functional requirement
-
 - **Use for:** quality attributes like performance, security, or reliability.
 - **Don't use for:** behavioral rules (use `GUARD--`).
 - **Phase:** P1.
 
 ### `ENTITY--` · data schema
-
 - **Use for:** data model / DB schema definitions.
 - **Don't use for:** API request/response shapes (use `ENDPOINT--`).
 - **Phase:** P2.
 
 ### `API--` · OpenAPI master hub
-
 - **Use for:** the single canonical OpenAPI document referencing all endpoints.
 - **Don't use for:** individual endpoints — those split into `ENDPOINT--`.
 - **Phase:** P2.
 
 ### `ENDPOINT--` · one API path / method
-
 - **Use for:** a single HTTP method × path's contract (request, response, errors).
 - **Don't use for:** the cross-cutting auth/middleware (use `ENTRYPOINT--`).
 - **Phase:** P2.
 
 ### `ENTRYPOINT--` · auth / middleware / access logic
-
 - **Use for:** how requests enter the system (auth gates, rate limits, tenant resolution).
 - **Don't use for:** business logic that runs after the entrypoint (use `FEAT--` / `ALGO--`).
 - **Phase:** P2.
 
 ### `HOOK--` · event-driven entrypoint
-
 - **Use for:** webhooks, git hooks (pre-commit/pre-push), and system event listeners.
 - **Don't use for:** standard API endpoints (use `ENDPOINT--`).
 - **Phase:** P2.
 
 ### `PARAMS--` · constants / business config
-
 - **Use for:** business-meaningful numbers, threshold lists, configuration tables.
 - **Don't use for:** infra constants (Postgres pool size etc.) — those live in `ops/` configs.
 - **Phase:** P2.
 
 ### GENESIS-- · Block Manifest (v2.3+)
-
 - **Use for:** the runtime entry-point of a **Genesis Block** — a manifest atom that aggregates `COGNITIVE--`, `ALGO--`, `GUARD--` (and optionally `RUNBOOK--`, `PROTOCOL--`, `STACK--`, `SAFETY--`) atoms into a composite knowledge engine.
 - **Don't use for:** governance/architecture frameworks — those moved to `FRAMEWORK--` in v2.3.
 - **Frontmatter contract:** `SPEC--GENESIS-BLOCK-MANIFEST` — declares the `members.core` / `members.optional` / `daci:` / `manifest_version:` shape.
@@ -201,7 +181,6 @@ When in doubt, this is where most contributions go.
 - **Examples (proposed):** `GENESIS--IDENTITY-ENGINE` aggregates the identity-resolution Genesis Block.
 
 ### `FRAMEWORK--` · governance / architectural framework (v2.3+)
-
 - **Use for:** architectural patterns, governance frameworks, higher-level invariant methodologies (Knowledge 3-Tier model, JTBD, Design Thinking, phase governance), and code standards ("all DB calls go through repositories", "components ≤ 500 LOC", lint policy).
 - **Don't use for:** runtime behavioural constraints — those are `GUARD--`. For Block Manifest entries, use `GENESIS--`.
 - **Phase:** P0/P2.
@@ -209,28 +188,24 @@ When in doubt, this is where most contributions go.
 - **Renamed from:** `FRAME--` (pre-v2.3). The taxonomy migration script handles existing references.
 
 ### `STACK--` · technology stack inventory (v2.3+)
-
 - **Use for:** the language/runtime/library/tool inventory used by a subsystem or Genesis Block — e.g. "React 18 + Rust + napi-rs + pgvector".
 - **Don't use for:** module boundaries (use `MOD--`) or build config (use `PARAMS--`).
 - **Phase:** P2.
 - **Distinguishing question:** *is this a list of tools/runtimes a thing uses?* → if yes, STACK.
 
 ### `SPEC--` · technical specification (v2.3+)
-
 - **Use for:** JSON Schema, API data shape, wire format, frontmatter contract.
 - **Don't use for:** decisions (use `ADR--`) or behavioural rules (use `PROTO--`).
 - **Phase:** P2.
 - **Examples:** `SPEC--GENESIS-BLOCK-MANIFEST` (frontmatter contract for GENESIS-- atoms).
 
 ### `COGNITIVE--` · mental model / interpretive lens (v2.3+)
-
 - **Use for:** psychological / cognitive-science models the system reasons with — Erikson stages, Ego Death, Qualia, retrieval-augmented attention, etc.
 - **Don't use for:** algorithmic procedures (use `ALGO--`) or product framings (use `CONCEPT--`).
 - **Phase:** P1/P2.
 - **Distinguishing question:** *is this a lens through which the agent interprets state?* → if yes, COGNITIVE.
 
 ### `SAFETY--` · ethical safety / AI alignment (v2.3+)
-
 - **Use for:** alignment rules, ethical guardrails, PII handling, behaviour-shaping rules ("do not assist with X without consent").
 - **Don't use for:** structural data invariants (use `GUARD--`) or operational policy (use `POLICY--`).
 - **Phase:** P0/P2 (safety rules are typically foundational).
@@ -239,7 +214,6 @@ When in doubt, this is where most contributions go.
 > `MOD--` was added to the v2.3 prefix set but its long-form definition lives in Cluster 1 above (next to `FEAT--` / `ALGO--`) since it's been in the taxonomy since pre-v2.3.
 
 ### `MASTER--` · root-level policy / genesis rule
-
 - **Use for:** the small set of root-level invariants that the rest of the atom graph defers to — contradiction policy, write boundaries, atom-body schema, supersession rules.
 - **Don't use for:** code-level standards (use `GENESIS--`) or write-time validator rules (use `PROTO--`).
 - **Distinguishing question:** *is this the rule that other rules cite?* → if yes, MASTER.
@@ -248,7 +222,6 @@ When in doubt, this is where most contributions go.
 - **Lifecycle:** very stable; supersession requires high-bar ADR.
 
 ### `PROTO--` · machine-enforced invariant
-
 - **Use for:** a single short rule the **validator** checks at write/commit time, with `severity: error` and a `linked_symbols` pointer to the enforcement code.
 - **Don't use for:** runtime agent constraints (use `GUARD--`), interaction contracts (use `PROTOCOL--`), or operational responses (use `RUNBOOK--`).
 - **Distinguishing question:** *is the rule mechanically checkable by code at write-time?* → if yes, PROTO.
@@ -259,14 +232,12 @@ When in doubt, this is where most contributions go.
   - `PROTO--` often *implements* a `MASTER--` policy in machine-checkable form.
 
 ### `BLUEPRINT--` · implementation plan
-
 - **Use for:** the YAML plan that microtask codegen consumes.
 - **Don't use for:** prose specs — those are `FEAT--`.
 - **Phase:** P3.
 - **Required fields:** `metadata`, `architectural_pattern`, `data_logic`, `geography`, `api_contracts`, `verification_plan`.
 
 ### Microtasks (`T*.task.yaml`) — **not atoms**
-
 - **Why:** task state churns hourly (assigned / in-progress / blocked /
   done), accumulates comments, and has zero retrieval value once shipped.
   Atoms are durable knowledge with settling time; tasks are
@@ -282,7 +253,6 @@ When in doubt, this is where most contributions go.
   `docs/MSP_RELATIONSHIP.md` for the contract.
 
 ### `AUDIT--` · test results / quality report
-
 - **Use for:** sign-off documents recording verification outcomes.
 - **Don't use for:** the *plan* (that's `BLUEPRINT.verification_plan`); only the *result*.
 - **Phase:** P6.
@@ -294,65 +264,55 @@ because every agentic project hits them within weeks. See ADR-012 for
 rationale.
 
 ### `LLM--` · large reasoning engine
-
 - **Use for:** high-reasoning model configurations, system prompts, and architectural planning logic.
 - **Don't use for:** small execution tasks (use `SLM--`).
 - **Phase:** P2.
 
 ### `SLM--` · small execution engine
-
 - **Use for:** specialized models for codegen, summarization, or microtasks.
 - **Don't use for:** heavy architectural reasoning (use `LLM--`).
 - **Phase:** P5.
 
 ### `MCP--` · Model Context Protocol tool
-
 - **Use for:** technical definition of a tool or resource exposed via MCP JSON-RPC.
 - **Don't use for:** standard HTTP REST endpoints (use `ENDPOINT--`).
 - **Phase:** P2.
 
 ### `CMD--` · executable system command
-
 - **Use for:** CLI tools, internal scripts, and background commands.
 - **Don't use for:** multi-step workflows (use `RUNBOOK--`).
 - **Phase:** P2.
 
 ### `SKILL--` · agent capability
-
 - **Use for:** an action / tool the agent has been given access to.
 - **Don't use for:** user-facing behaviour (use `FEAT--`) or modules (use `MOD--`).
 - **Distinguishing question:** *who triggers it?* → if the agent triggers it from context, it's a SKILL.
 - **Examples:** `SKILL--CHECK-DRIFT`, `SKILL--PROPOSE-INBOUND`, `SKILL--SUMMARISE-SESSION`.
 
 ### `PROTOCOL--` · interaction contract
-
 - **Use for:** handshake / message-format contracts between agents or between agent and system (MCP, agent-to-agent).
 - **Don't use for:** HTTP API endpoint contracts — those are `ENDPOINT--`.
 - **Distinguishing question:** *is this a multi-step interaction?* → if yes, PROTOCOL; if request/response single-shot, ENDPOINT.
 
 > ⚠️ **Disambiguation — `PROTOCOL--` ใช้ความหมาย CS standard** (interaction / communication contract — HTTP protocol, MCP protocol)
 > **ไม่ใช่** "SOP / situational procedure" ตามภาษาทั่วไป สำหรับ "เมื่อ X เกิด ให้ทำ Y" ให้เลือก:
->
 > - **`RUNBOOK--`** = on-call response guide ("ถ้าเห็น alert/incident → ทำ steps เหล่านี้")
 > - **`GUARD--`** = runtime hard rule ("agent ห้ามทำ X โดยไม่มี Y") — renamed from `GUARDRAIL--` in v2.3
 > - **`POLICY--`** = operational policy ("retain data 90 วัน", "rate limit 100rps")
 > - **`SAFETY--`** = ethical / alignment rule (v2.3+) — distinct from `GUARD--` (structural)
 
 ### `GUARD--` · structural / behavioural guardrail (v2.3+)
-
 - **Use for:** runtime-enforced constraint on agent / tool behaviour ("never call X without Y") OR a data-integrity invariant ("id must match filename", "no null primary keys").
 - **Don't use for:** policy-by-decision (that's `ADR--`), operational policy (that's `POLICY--`), or ethical alignment (use `SAFETY--`).
 - **Distinguishing question:** *is it enforced at every call / write?* → if yes, GUARD.
 - **Renamed from:** `GUARDRAIL--` (pre-v2.3) — shortened for consistency with peer four-letter prefixes (`STACK`, `FRAME`, `SPEC`). Zero `GUARDRAIL--` atoms existed at migration time; the rename is doc-only.
 
 ### `POLICY--` · operational policy
-
 - **Use for:** access policies (RBAC), data retention, rate limits.
 - **Don't use for:** behavioural constraints during a single agent action — those are `GUARD--`.
 - **Distinguishing question:** *does it govern config / access at the system level?* → POLICY.
 
 ### `PERSONA--` · agent identity
-
 - **Use for:** the agent's role, voice, base system prompt seed.
 - **Don't use for:** the agent's tools — those are `SKILL--`.
 
@@ -362,23 +322,19 @@ rationale.
 verification approaches. Split per ADR-012.
 
 ### `REQ--` · umbrella requirement
-
 - **Use for:** cross-cutting requirements that span FR + NFR.
 - **Optional:** projects that only have FR/NFR can skip the umbrella.
 
 ### `FR--` · functional requirement
-
 - **Use for:** "system shall do X" — verifiable by unit / E2E.
 - **Don't use for:** "system shall be fast / available / scalable" — those are `NFR--`.
 
 ### `NFR--` · non-functional requirement
-
 - **Use for:** performance, scalability, security, availability, observability targets.
 - **Verification:** load test / pen test / chaos test / availability monitoring.
 - **Examples:** `NFR--P99-LATENCY-200MS`, `NFR--AVAILABILITY-99-9`.
 
 ### `CONSTRAINT--` · hard external constraint
-
 - **Use for:** regulatory (GDPR, HIPAA, PCI), contractual, compliance.
 - **Don't use for:** internally-chosen targets — those are `NFR--` or `POLICY--`.
 
@@ -388,13 +344,11 @@ The atomic surface of operations. Distinct from `MSP-INC-` etc., which
 are process-tracking event logs.
 
 ### `INC--` · incident post-mortem
-
 - **Use for:** distilled lesson from a production incident.
 - **Don't use for:** the raw event log — that's `MSP-INC-` in process tracking.
 - **Lifecycle:** written after triage; mostly stable thereafter.
 
 ### `HOTFIX--` · hotfix escape-hatch atom
-
 - **Use for:** the 48-hour backfill window opened when prod is down and a fix
   ships before P1–P3 atoms exist (master-spec §6.4, ADR-014).
 - **Don't use for:** the post-mortem itself — that's `INC--`.
@@ -407,7 +361,6 @@ are process-tracking event logs.
   is in place.
 
 ### `ISSUE--` · live issue tracker
-
 - **Use for:** open problems / bugs / improvement requests — replaces Linear/Jira.
 - **Don't use for:** decisions (use `ADR--`) or features (use `FEAT--`).
 - **Lifecycle:** **mutates frequently** — status changes, comments, reassignments. Lives in the
@@ -422,17 +375,14 @@ are process-tracking event logs.
   `## Discussion` (append-only chronological), `## Resolution` (filled at close).
 
 ### `RISK--` · identified risk + mitigation
-
 - **Use for:** "X could go wrong because Y" *before* it actually does.
 - **Don't use for:** post-incident learning — that's `INC--`.
 
 ### `RUNBOOK--` · operational response guide
-
 - **Use for:** "if you see X, do Y" — for on-call humans / agents.
 - **Don't use for:** decisions (`ADR--`) or risk identification (`RISK--`).
 
 ### `SLO--` · service-level objective
-
 - **Use for:** measurable availability / latency / error-rate targets + alert thresholds.
 - **Don't use for:** non-measurable goals — those are `CONCEPT--` or `NFR--`.
 
@@ -443,17 +393,14 @@ additional types that are typically auto-generated by the Consolidator
 rather than human-authored:
 
 ### `INSIGHT--` · session-derived observation
-
 - Auto-extracted by `reflect()` from session traces — represents
   something noticed during a conversation that's worth retaining.
 
 ### `FACT--` · retain-derived fact
-
 - Stored via `retain()` when the LLM asserts a discrete factual claim
   worth bi-temporal versioning.
 
 ### `RULE--` · derived behavioural rule
-
 - A heuristic / pattern derived from multiple observations. Often
   promoted later into a formal `GUARD--` or `POLICY--` after review.
 

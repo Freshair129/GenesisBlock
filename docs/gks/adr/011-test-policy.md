@@ -35,7 +35,6 @@ a frontmatter field) without tests requires a written rationale in the
 commit message. "Will add tests later" is not a rationale.
 
 This rules out both extremes:
-
 - *Strict TDD* — tests-first ceremony doesn't fit the code-and-iterate
   flow we actually use, and Phase 4 microtask codegen has its own
   acceptance-test gate (see below).

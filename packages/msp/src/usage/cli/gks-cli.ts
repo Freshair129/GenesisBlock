@@ -1,6 +1,7 @@
 import { readFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { Command } from 'commander'
+import { addBootstrapCommand } from './bootstrap.js'
 
 /**
  * Master GKS CLI Implementation.
@@ -10,6 +11,9 @@ const program = new Command()
   .name('gks')
   .description('Genesis Knowledge System CLI — for humans and AI agents')
   .version('0.2.0')
+
+// ── Bootstrap ───────────────────────────────────────────────────────────────
+addBootstrapCommand(program)
 
 // ── List ─────────────────────────────────────────────────────────────────────
 program

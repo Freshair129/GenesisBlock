@@ -5,7 +5,6 @@
 **Objective:** Unified vocabulary for the two complementary halves of the MSP knowledge engine — atom assembly (bottom-up) and code decomposition (top-down) — anchored on the **Genesis Block** as the central composite unit.
 
 **References:**
-
 - `gks/master/MASTER--MSP-DOC-TO-CODE.md` — governance source (atoms before code)
 - `gks/framework/FRAMEWORK--PHASE-GOVERNANCE.md` — mechanical 7-phase enforcement
 - `FRAMEWORK_MASTER_SPEC.md §8` — 12-Stage Symbol Graph DAG
@@ -77,7 +76,6 @@ Three issues with the current vocabulary:
 | P6 | `AUDIT--` | `MSP-WKT-` | QA sign-off |
 
 **Skip rules** (per `MASTER--MSP-DOC-TO-CODE`):
-
 - P4 may be skipped for single-developer slices (Directive #4).
 - P1..P3 may be skipped only with a `HOTFIX` commit tag and a 48-hour backfill window (`ADR--HOTFIX-ESCAPE-HATCH`).
 

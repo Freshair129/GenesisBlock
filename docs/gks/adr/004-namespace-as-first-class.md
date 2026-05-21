@@ -40,7 +40,6 @@ interface Namespace {
 ## Consequences
 
 **Positive**
-
 - Cross-tenant data leakage now requires an explicit opt-in
   (`crossNamespace: true`) and is auditable.
 - One MemoryStore instance per request can scope to a tenant cleanly.
@@ -49,7 +48,6 @@ interface Namespace {
   per-session-within-user, etc.).
 
 **Negative**
-
 - `RetainInput.sessionId` is now legacy (kept working — it maps to
   `namespace.session_id`). New code should use `namespace`.
 - One more option on the giant `MemoryStoreOptions`. We considered
