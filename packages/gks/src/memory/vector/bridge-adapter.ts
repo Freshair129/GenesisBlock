@@ -36,7 +36,7 @@ export class BridgeAdapter implements VectorBackend {
     try {
       const res = await fetch(`${this.endpoint}/api/status`);
       if (!res.ok) throw new Error(`Bridge endpoint unreachable: ${res.statusText}`);
-      const data = await res.json();
+      const data = (await res.json()) as any;
       console.log(`[bridge-adapter] connected to ${data.name} v${data.version}`);
     } catch (err) {
       console.warn(`[bridge-adapter] failed to load status: ${(err as Error).message}`);
@@ -81,7 +81,7 @@ export class BridgeAdapter implements VectorBackend {
       throw new Error(`Bridge insert failed: ${res.statusText}`);
     }
 
-    const data = await res.json();
+    const data = (await res.json()) as any;
     return data.doc;
   }
 
@@ -107,7 +107,7 @@ export class BridgeAdapter implements VectorBackend {
       throw new Error(`Bridge batch insert failed: ${res.statusText}`);
     }
 
-    const data = await res.json();
+    const data = (await res.json()) as any;
     return data.docs;
   }
 
@@ -129,7 +129,7 @@ export class BridgeAdapter implements VectorBackend {
       throw new Error(`Bridge search failed: ${res.statusText}`);
     }
 
-    const data = await res.json();
+    const data = (await res.json()) as any;
     return data.hits;
   }
 
@@ -141,7 +141,7 @@ export class BridgeAdapter implements VectorBackend {
     });
 
     if (!res.ok) return null;
-    const data = await res.json();
+    const data = (await res.json()) as any;
     return data.doc;
   }
 
@@ -153,14 +153,14 @@ export class BridgeAdapter implements VectorBackend {
     });
 
     if (!res.ok) return [];
-    const data = await res.json();
+    const data = (await res.json()) as any;
     return data.docs;
   }
 
   async get(id: string): Promise<VectorDoc | undefined> {
     const res = await fetch(`${this.endpoint}/api/get/${id}?store=${this.name}`);
     if (!res.ok) return undefined;
-    const data = await res.json();
+    const data = (await res.json()) as any;
     return data.doc;
   }
 

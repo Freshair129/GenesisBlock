@@ -51,6 +51,7 @@ import { EpisodicLayer } from './episodic.js'
 import { InboundQueue } from './inbound.js'
 import { ATOMIC_ID_PATTERN, isAtomicId } from './atomic-id.js'
 import { createReranker, rerank, type Reranker, type RerankerOptions } from './rerank.js'
+import { BgeReranker, type BgeRerankerOptions } from './vector/reranker.js'
 import {
   withCache,
   type ObsidianAdapter,

@@ -115,7 +115,7 @@
     "yaml": "^2.5.1"
   },
   "optionalDependencies": {
-    "@freshair129/gks-genesis-block-native": "workspace:*",
+    "@freshair129/gks-genesis-block-native": "*",
     "hnswlib-node": "^3.0.0"
   },
   "devDependencies": {
