@@ -3,67 +3,29 @@ id: CONCEPT--CONFIG-AS-SSOT
 phase: 1
 type: concept
 status: stable
-tier: genesis
-source_type: axiomatic
 vault_id: default
+tier: process
+source_type: axiomatic
 title: Config as Single Source of Truth (extend atom-registry pattern to all
   behavior-driving values)
-aliases: &a1
+tags:
+  - msp
+  - config
+  - ssot
+  - governance
+crosslinks:
+  references:
+    - CONCEPT--ATOM-REGISTRY-AS-SSOT
+    - ADR--REGISTRY-DRIVEN-SCAFFOLDING
+    - ADR--CONFIG-TWO-LAYER-SPLIT
+created_at: 2026-05-17T16:10:00.000+07:00
+aliases:
   - CONCEPT
   - implementation_flow
   - Strategic intent / PRD
 cluster: implementation_flow
 role: Strategic intent / PRD
-tags: &a2
-  - msp
-  - config
-  - ssot
-  - governance
-crosslinks: &a3
-  references:
-    - CONCEPT--ATOM-REGISTRY-AS-SSOT
-    - ADR--REGISTRY-DRIVEN-SCAFFOLDING
-created_at: 2026-05-17T16:10:00.000+07:00
 attributes:
-  id: CONCEPT--CONFIG-AS-SSOT
-  phase: 1
-  type: concept
-  status: stable
-  tier: process
-  source_type: axiomatic
-  vault_id: default
-  title: Config as Single Source of Truth (extend atom-registry pattern to all
-    behavior-driving values)
-  aliases: *a1
-  cluster: implementation_flow
-  role: Strategic intent / PRD
-  tags: *a2
-  crosslinks: *a3
-  created_at: 2026-05-17T16:10:00.000+07:00
-  attributes:
-    id: CONCEPT--CONFIG-AS-SSOT
-    phase: 1
-    type: concept
-    status: stable
-    tier: process
-    source_type: axiomatic
-    vault_id: default
-    title: Config as Single Source of Truth (extend atom-registry pattern to all
-      behavior-driving values)
-    aliases: *a1
-    cluster: implementation_flow
-    role: Strategic intent / PRD
-    tags: *a2
-    crosslinks: *a3
-    created_at: 2026-05-17T16:10:00.000+07:00
-    domain: concept
-    language: markdown
-    is_test: false
-    is_entrypoint: false
-    has_secret: true
-    secret_type: high_entropy_string
-    leak_risk: high
-    encryption_level: none
   domain: concept
   language: markdown
   is_test: false
@@ -103,7 +65,7 @@ The atom-registry SSOT pattern can be generalized to ALL behavior-driving config
 
 - Externalize ~150 hardcoded values across validator, codegen, retrieval, memory, hooks, mcp, paths, embedding, database, identity modules.
 - Establish shared config loader in `packages/msp/src/config/loader.ts` (generalize the existing `registry.ts` pattern).
-- Adopt the 2-layer file split decided in ADR--CONFIG-TWO-LAYER-SPLIT.
+- Adopt the 2-layer file split decided in [[ADR--CONFIG-TWO-LAYER-SPLIT]].
 - Enforce JSON Schema validation via `npm run config:validate`.
 
 ## Out of scope
@@ -122,6 +84,6 @@ The atom-registry SSOT pattern can be generalized to ALL behavior-driving config
 
 ## Source
 
-- ADR--CONFIG-TWO-LAYER-SPLIT (the layout decision)
+- [[ADR--CONFIG-TWO-LAYER-SPLIT]] (the layout decision)
 - BLUEPRINT--CONFIG-EXTERNALIZATION (execution plan)
 - Industry precedent: 12-factor app config principle, Kubernetes Helm `values.yaml`, Cargo workspace manifests

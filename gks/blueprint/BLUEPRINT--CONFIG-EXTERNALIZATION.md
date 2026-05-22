@@ -3,24 +3,18 @@ id: BLUEPRINT--CONFIG-EXTERNALIZATION
 phase: 3
 type: blueprint
 status: stable
+vault_id: default
 tier: process
 source_type: axiomatic
-vault_id: default
 title: ULTRAPLAN — Config externalization to YAML (script behavior driven by
   config, not code)
-aliases: &a1
-  - BLUEPRINT
-  - implementation_flow
-  - Implementation plan
-cluster: implementation_flow
-role: Implementation plan
-tags: &a2
+tags:
   - msp
   - config
   - yaml
   - refactor
   - governance
-crosslinks: &a3
+crosslinks:
   references:
     - CONCEPT--CONFIG-AS-SSOT
     - ADR--CONFIG-TWO-LAYER-SPLIT
@@ -28,98 +22,39 @@ crosslinks: &a3
     - ADR--REGISTRY-DRIVEN-SCAFFOLDING
   parent_blueprint:
     - ADR--CONFIG-TWO-LAYER-SPLIT
-linked_symbols: &a4
-  - file: packages/msp/src/config/loader.ts
-  - file: packages/msp/src/validator/proto/master-token-cap.ts
-  - file: packages/msp/src/validator/proto/master-body-schema.ts
-  - file: packages/msp/src/validator/proto/phase-gates.ts
-  - file: packages/msp/src/validator/rules/summary-min.ts
-  - file: packages/msp/src/codegen/forbidden-patterns.ts
-  - file: packages/msp/src/codegen/post-process.ts
-  - file: packages/msp/src/orchestrator/retrieval/types.ts
-  - file: packages/msp/src/memory/sessions/lock.ts
-  - file: packages/msp/src/memory/episodic/writer.ts
-  - file: packages/msp/src/memory/episodic/summarisers/heuristic.ts
-  - file: packages/msp/src/memory/backlinks/walk.ts
-  - file: packages/msp/src/mcp/server.ts
-  - file: packages/msp/src/identity/profile.ts
-  - file: packages/msp/src/identity/voice.ts
-  - file: packages/msp/examples/hooks/pre-commit-validator.sh
-  - file: scripts/msp/re-embed.ts
-  - file: scripts/msp/pg-migrate.ts
 created_at: 2026-05-17T16:20:00.000+07:00
+aliases:
+  - BLUEPRINT
+  - implementation_flow
+  - Implementation plan
+cluster: implementation_flow
+role: Implementation plan
 attributes:
-  id: BLUEPRINT--CONFIG-EXTERNALIZATION
-  phase: 3
-  type: blueprint
-  status: stable
-  tier: process
-  source_type: axiomatic
-  vault_id: default
-  title: ULTRAPLAN — Config externalization to YAML (script behavior driven by
-    config, not code)
-  aliases: *a1
-  cluster: implementation_flow
-  role: Implementation plan
-  tags: *a2
-  crosslinks: *a3
-  linked_symbols: *a4
-  created_at: 2026-05-17T16:20:00.000+07:00
-  attributes:
-    id: BLUEPRINT--CONFIG-EXTERNALIZATION
-    phase: 3
-    type: blueprint
-    status: stable
-    tier: process
-    source_type: axiomatic
-    vault_id: default
-    title: ULTRAPLAN — Config externalization to YAML (script behavior driven by
-      config, not code)
-    aliases: *a1
-    cluster: implementation_flow
-    role: Implementation plan
-    tags: *a2
-    crosslinks: *a3
-    linked_symbols: *a4
-    created_at: 2026-05-17T16:20:00.000+07:00
-    attributes:
-      id: BLUEPRINT--CONFIG-EXTERNALIZATION
-      phase: 3
-      type: blueprint
-      status: stable
-      tier: process
-      source_type: axiomatic
-      vault_id: default
-      title: ULTRAPLAN — Config externalization to YAML (script behavior driven by
-        config, not code)
-      aliases: *a1
-      cluster: implementation_flow
-      role: Implementation plan
-      tags: *a2
-      crosslinks: *a3
-      created_at: 2026-05-17T16:00:00.000+07:00
-      domain: blueprint
-      language: markdown
-      is_test: false
-      is_entrypoint: false
-      has_secret: true
-      secret_type: high_entropy_string
-      leak_risk: high
-      encryption_level: none
-    domain: blueprint
-    language: markdown
-    is_test: false
-    is_entrypoint: false
-    has_secret: true
-    secret_type: aws_secret
-    leak_risk: high
-    encryption_level: none
+  linked_symbols:
+    - file: packages/msp/src/config/loader.ts
+    - file: packages/msp/src/validator/proto/master-token-cap.ts
+    - file: packages/msp/src/validator/proto/master-body-schema.ts
+    - file: packages/msp/src/validator/proto/phase-gates.ts
+    - file: packages/msp/src/validator/rules/summary-min.ts
+    - file: packages/msp/src/codegen/forbidden-patterns.ts
+    - file: packages/msp/src/codegen/post-process.ts
+    - file: packages/msp/src/orchestrator/retrieval/types.ts
+    - file: packages/msp/src/memory/sessions/lock.ts
+    - file: packages/msp/src/memory/episodic/writer.ts
+    - file: packages/msp/src/memory/episodic/summarisers/heuristic.ts
+    - file: packages/msp/src/memory/backlinks/walk.ts
+    - file: packages/msp/src/mcp/server.ts
+    - file: packages/msp/src/identity/profile.ts
+    - file: packages/msp/src/identity/voice.ts
+    - file: packages/msp/examples/hooks/pre-commit-validator.sh
+    - file: scripts/msp/re-embed.ts
+    - file: scripts/msp/pg-migrate.ts
   domain: blueprint
   language: markdown
   is_test: false
   is_entrypoint: false
   has_secret: true
-  secret_type: aws_secret
+  secret_type: high_entropy_string
   leak_risk: high
   encryption_level: none
 ---
@@ -174,7 +109,7 @@ After:    [config/*.yaml]           → edit, reload, done
 
 ---
 
-## ๓. Target File Layout (2-Layer per ADR--CONFIG-TWO-LAYER-SPLIT)
+## ๓. Target File Layout (2-Layer per [[ADR--CONFIG-TWO-LAYER-SPLIT]])
 
 ```
 cognitive_system/
@@ -204,7 +139,7 @@ cognitive_system/
 
 **Total: ~13 YAML files** (3 root + 5 MSP + 2 GKS + 2 policies + 1 cross-cutting paths) + shared loader + index doc.
 
-### Why 2 layers (decided by ADR--CONFIG-TWO-LAYER-SPLIT)
+### Why 2 layers (decided by [[ADR--CONFIG-TWO-LAYER-SPLIT]])
 
 | Layer | Audience | Change cadence | Naming |
 |---|---|---|---|
@@ -419,7 +354,7 @@ export function loadConfig<T = any>(
 export function clearConfigCache(): void   // for tests
 ```
 
-**Resolution order** (per ADR--CONFIG-TWO-LAYER-SPLIT):
+**Resolution order** (per [[ADR--CONFIG-TWO-LAYER-SPLIT]]):
 
 1. **Layer 1:** `<root>/config/<moduleName>.yaml` — operator override (if present)
 2. **Layer 2:** `<root>/packages/<packageName>/config/<moduleName>.defaults.yaml` — package default
