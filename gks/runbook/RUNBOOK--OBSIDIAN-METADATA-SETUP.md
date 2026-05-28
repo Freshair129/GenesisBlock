@@ -1,13 +1,13 @@
 ---
 id: RUNBOOK--OBSIDIAN-METADATA-SETUP
-title: Obsidian Metadata Setup Guide
+title: Obsidian Metadata Menu Setup Guide
 cluster: ops
 role: Operational response guide
 crosslinks:
   depends_on:
     - PARAMS--METADATA-SETUP-PROFILE01
   references:
-    - CONCEPT--OBSIDIAN-METADATA-DESIGN
+    - RUNBOOK--OBSIDIAN-LINTER-SETUP
 attributes:
   domain: operations
   language: markdown
@@ -18,91 +18,157 @@ attributes:
   encryption_level: none
 ---
 
-# RUNBOOK — Obsidian Metadata Setup Guide
+# RUNBOOK — Obsidian Metadata Menu Setup Guide
 
-เอกสารนี้อธิบายขั้นตอนการกำหนด **front‑matter metadata** ในไฟล์ Markdown ของ Obsidian เพื่อให้ระบบ **Cross‑Link** ของ GKS สามารถแสดง property ต่าง ๆ (domain, source_type, created_at, summary ฯลฯ) อย่างถูกต้อง
+เอกสารนี้อธิบายขั้นตอนการตั้งค่า **Metadata Menu plugin** (v0.8.12, by mdelobelle) ใน Obsidian เพื่อให้ระบบ **Cross‑Link** ของ GKS แสดง property ต่าง ๆ (`domain`, `source_type`, `created_at`, `summary` ฯลฯ) ได้อย่างถูกต้องและครบถ้วน
 
 ## Trigger
-- สร้างหรือแก้ไขโน้ต Obsidian ใหม่ที่ต้องการให้ปรากฏใน Cross‑Link
-- พบว่าข้อมูลเมตาดาต้าไม่แสดงหรือแสดงค่าเป็น `null`/`undefined`
+- พบว่า Cross‑Link ใน UI ไม่แสดง property หรือแสดงค่าเป็น `null`/`undefined`
+- สร้าง note ใหม่ที่ต้องการ metadata ครบชุด
+- ตั้งค่าสภาพแวดล้อม developer ใหม่
 - ระบบ `npm run msp:validate` รายงานข้อผิดพลาดเกี่ยวกับ front‑matter schema
+
+---
 
 ## Response steps
 
-### 1️⃣ ตรวจสอบ Schema (`atom_schema.yaml`)
-1. เปิดไฟล์ `atom_schema.yaml` ที่โครงการราก (`c:/Users/freshair/cognitive_system/atom_schema.yaml`)
-2. ยืนยันว่าฟิลด์ต่อไปนี้อยู่ใน `AtomicEntry`:
-   - `domain: string`
-   - `source_type: string`
-   - `created_at: string` – ต้องเป็น ISO‑8601 พร้อม **+07:00** offset
-   - `summary?: string`
-   - `tags?: string[]`
-   - `attributes?: object` (สำหรับ `salient`, `trigger`, `hook` เป็นต้น)
+### 1️⃣ ติดตั้งและเปิดใช้งาน Plugin
+1. เปิดโปรแกรม Obsidian
+2. ไปที่ **Settings** → **Community plugins** → **Browse**
+3. ค้นหา **"Metadata Menu"** (โดยผู้พัฒนา *mdelobelle*)
+4. กด **Install** → **Enable**
 
-> **Why?**
-These fields are required by the Cross‑Link renderer. If any field is missing, the UI falls back to the minimal `MENTION` tier and will not display the richer information you expect.
+> ตรวจสอบเวอร์ชัน: ควรเป็น **v0.8.12** ขึ้นไป
 
-### 2️⃣ ปรับ Front‑Matter ของโน้ต Obsidian
-ในแต่ละไฟล์ Markdown ของ Obsidian ให้เพิ่มหรืออัปเดตบล็อก YAML header ดังนี้ (ตัวอย่าง):
+---
+
+### 2️⃣ ตั้งค่า Global Settings
+
+ไปที่ **Settings** → **Metadata Menu** แล้วตั้งค่าดังนี้:
+
+| Setting | ค่าที่แนะนำ | เหตุผล |
+|---------|------------|--------|
+| **Display field options in context menu** | ✅ ON | right-click บน note แล้วเห็น field options ทันที |
+| **Automatically save after field change** | ❌ OFF | ป้องกัน auto-save ทำลาย YAML frontmatter ของ GKS |
+| **Manage all properties** | ❌ OFF | จัดการเฉพาะ field ที่กำหนดใน Preset เท่านั้น |
+| **Add missing fields button** | ✅ ON | เพิ่ม field ที่หายผ่าน UI ได้ง่าย |
+| **Metadata button in file explorer** | ✅ ON | แสดง icon ข้าง note เพื่อเปิด form แก้ไข |
+| **fileClass files folder** | `_fileclasses/` | path สำหรับ fileClass schema (ดูขั้นตอนที่ 4) |
+
+---
+
+### 3️⃣ ตั้งค่า Preset Field Settings (Global — ใช้กับทุก note)
+
+ไปที่ **Settings** → **Metadata Menu** → **Preset Field settings** แล้วกด **"+ Add"** ทีละ field:
+
+#### `domain`
+- **Type:** `Select`
+- **Preset values:** `knowledge`, `policy`, `operations`, `standards`, `security`
+- **ทำไม Select?** ป้องกันพิมพ์ผิด เช่น `Knowledge` (ตัวพิมพ์ใหญ่) ซึ่งจะทำให้ validator reject
+
+#### `source_type`
+- **Type:** `Select`
+- **Preset values:** `gks`, `msp`, `external`
+- **ทำไม Select?** ค่านี้มีผลต่อ icon rendering ใน Cross‑Link UI โดยตรง
+
+#### `created_at`
+- **Type:** `DateTime`
+- **Format:** `YYYY-MM-DDTHH:mm:ss.SSS+07:00`
+- **Insert on creation:** ✅ ON
+- **ทำไม +07:00?** GKS ใช้ ICT timezone — ถ้าใส่ `Z` จะถูก validator reject
+
+#### `summary`
+- **Type:** `Input` (Text)
+- **ทำไมสำคัญ?** ถ้าไม่มี summary ระบบ fallback ไปใช้ tier `SKELETON` ทำให้ Cross‑Link แสดงข้อมูลน้อยลง
+
+#### `tags`
+- **Type:** `Multi`
+- **Preset values:** `onboarding`, `security`, `important`, `deprecated`, `draft`
+
+---
+
+### 4️⃣ ตั้งค่า FileClass (Per‑Folder Schema อัตโนมัติ)
+
+วิธีนี้ทำให้ทุก note ใน folder เช่น `gks/concept/` ได้รับ schema โดยอัตโนมัติ โดยไม่ต้องเพิ่ม `fileClass:` ใน frontmatter ทุกไฟล์
+
+**ขั้นตอน:**
+
+1. สร้าง folder `_fileclasses/` ใน vault root
+2. ตั้งค่า path ใน plugin: **Settings** → **Metadata Menu** → **fileClass files folder** → พิมพ์ `_fileclasses/`
+3. สร้างไฟล์ `_fileclasses/GKSAtom.md`
+4. เปิดไฟล์ `GKSAtom.md` → คลิก icon ที่ tab header → เปิด **FileClass View**
+5. ไปที่ **FileClass Settings** → เพิ่ม **Folder Mapping**:
+
+| Folder | FileClass |
+|--------|-----------|
+| `gks/concept/` | `GKSAtom` |
+| `gks/adr/` | `GKSAtom` |
+| `gks/feat/` | `GKSAtom` |
+| `gks/blueprint/` | `GKSAtom` |
+| `gks/runbook/` | `GKSAtom` |
+| `gks/params/` | `GKSAtom` |
+
+6. ไปที่ **FileClass Fields** → กด **Add field** แล้วเพิ่มตาม Preset Field Settings ในขั้นตอนที่ 3
+
+> **Note:** ถ้ากำหนด field ทั้งใน Global Preset และ fileClass — **fileClass มี priority สูงกว่าเสมอ**
+
+---
+
+### 5️⃣ ตรวจสอบ front‑matter ตัวอย่าง
+
+หลังตั้งค่าแล้ว note ของคุณควรมี front‑matter ครบชุดดังนี้:
 
 ```yaml
 ---
-id: CONCEPT--NOTE-EXAMPLE
+id: CONCEPT--EXAMPLE-NOTE
 title: ตัวอย่างโน้ต
-domain: knowledge            # ค่าที่ต้องการให้แสดงใน Cross‑Link
-source_type: gks             # gks | msp | external
-created_at: 2026-05-28T13:45:00.000+07:00   # เวลาที่สร้าง (ต้องมี +07:00)
-summary: สรุปสั้น ๆ ของโน้ต เพื่อแสดงใน tier SUMMARY
+domain: knowledge
+source_type: gks
+created_at: 2026-05-29T09:15:00.000+07:00
+summary: คำอธิบาย 1-2 ประโยค สำหรับแสดงใน Cross-Link
 tags:
   - onboarding
   - security
 attributes:
-  salient: "จุดสำคัญของโน้ต"
+  salient: "จุดเด่นของโน้ต"
   trigger: "เมื่อเกิดเหตุการณ์ X"
-  hook: "ลิงก์ย้อนกลับไปยังโน้ตต้นทาง"
+  hook: "link-to:CONCEPT--RELATED"
 ---
 ```
 
-#### รายละเอียดของแต่ละฟิลด์
-| ฟิลด์ | ประเภท | รายละเอียด | ค่าที่แนะนำ |
-|------|--------|------------|------------|
-| **id** | string (ต้องตรงกับ ID ของ Atom) | ตัวระบุที่ไม่ซ้ำ, ใช้ใน Cross‑Link | `CONCEPT--YOUR‑NOTE` |
-| **title** | string | ชื่อที่จะแสดงใน tooltip / hover | ใส่ชื่ออ่านง่าย |
-| **domain** | string | หมวดหมู่หลักของข้อมูล, ใช้จัดกลุ่มใน UI | `knowledge`, `policy`, `operations` |
-| **source_type** | string | แหล่งที่มาของ Atom (ทำให้ UI ใส่ไอคอน) | `gks` (default), `msp`, `external` |
-| **created_at** | string (ISO‑8601) | เวลา UTC+07:00, ใช้ในการเรียงลำดับและแสดง badge | `2026-05-28T13:45:00.000+07:00` |
-| **summary** | string (optional) | คำอธิบายสั้น ๆ ที่แสดงใน tier `SUMMARY` | คำอธิบาย 1‑2 ประโยค |
-| **tags** | string[] (optional) | รายการ tag เพื่อกรอง/ค้นหา | `["onboarding","security"]` |
-| **attributes** | object (optional) | คีย์‑ค่าเพิ่มเติมที่ UI สามารถอ่านได้ (salient, trigger, hook ฯลฯ) | `salient: "…", trigger: "…"` |
+---
 
-### 3️⃣ รัน Validation
+### 6️⃣ รัน Validation
 ```bash
 npm run msp:validate
 ```
-- หากไม่มี error → Metadata ถูกต้องและพร้อมใช้งานใน Cross‑Link
-- หากมี error → แก้ไขตามข้อความที่แสดง (เช่น “missing required property `domain`”)
+- ✅ ไม่มี error → Metadata ถูกต้อง พร้อมใช้งานใน Cross‑Link
+- ❌ มี error → ตรวจสอบ:
+  - `domain` ต้องเป็นค่าใน preset list (lowercase)
+  - `created_at` ต้องมี `+07:00` (ไม่ใช่ `Z`)
+  - `summary` ต้องอยู่ในบรรทัดเดียว
+  - `tags` ต้องเป็น YAML list ไม่ใช่ inline array
 
-### 4️⃣ รีบิลด์ GKS (จำเป็นเมื่อเพิ่มฟิลด์ใหม่ใน Schema)
+---
+
+### 7️⃣ ตรวจสอบผลใน UI
 ```bash
-npm run build --workspace=packages/gks
+npm run dev --workspace=packages/ui
 ```
+เปิด **Cross‑Link Viewer** → Hover บน note → ควรเห็น:
+- Domain badge
+- Source‑type icon  
+- Created‑at timestamp
+- Summary text (tier `SUMMARY`)
 
-### 5️⃣ ตรวจสอบผลใน UI
-1. เริ่ม UI ถ้ายังไม่ได้ทำ  
-   ```bash
-   npm run dev --workspace=packages/ui
-   ```
-2. เปิดหน้า **Cross‑Link Viewer** หรือ **Atom Detail** ในเบราว์เซอร์
-3. Hover ที่โน้ตที่แก้ไข → ควรเห็น:
-   - Domain badge
-   - Source‑type icon
-   - Created‑at timestamp
-   - Summary (เมื่ออยู่ใน tier `SUMMARY`)
-   - Custom attributes (ถ้ามี)
+---
 
-### 6️⃣ เอกสารอ้างอิง
-- **atom_schema.yaml** – สเปคการกำหนด front‑matter (`file:///c:/Users/freshair/cognitive_system/atom_schema.yaml`)
-- **PARAMS--METADATA-SETUP-PROFILE01** – รายละเอียดค่าเริ่มต้นที่แนะนำ (ด้านล่าง)
+## Source
+
+- [PARAMS--METADATA-SETUP-PROFILE01](file:///c:/Users/freshair/cognitive_system/gks/params/PARAMS--METADATA-SETUP-PROFILE01.md) — Metadata Menu recommended parameter profile
+- [RUNBOOK--OBSIDIAN-LINTER-SETUP](file:///c:/Users/freshair/cognitive_system/gks/runbook/RUNBOOK--OBSIDIAN-LINTER-SETUP.md) — Linter plugin setup (for YAML formatting)
+- [atom_schema.yaml](file:///c:/Users/freshair/cognitive_system/atom_schema.yaml) — GKS frontmatter standard schema
+- [Metadata Menu Documentation](https://mdelobelle.github.io/metadatamenu) — Official plugin docs
 
 ---
 
