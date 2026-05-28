@@ -8,46 +8,55 @@ document.addEventListener('DOMContentLoaded', () => {
   const PAGES = [
     {
       name: "Console Dashboard",
+      label: "Console Dashboard",
       filename: "index.html",
       icon: `<svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"></path></svg>`
     },
     {
-      name: "Page 1: Core Architecture & Governance",
+      name: "Core Architecture & Governance",
+      label: "1. สถาปัตยกรรมหลัก",
       filename: "gks_msp_specification_page_1_core_architecture_governance.html",
       icon: `<svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 002-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path></svg>`
     },
     {
-      name: "Page 2: Memory & Distillation",
+      name: "Memory Subsystem & Distillation",
+      label: "2. ระบบความจำ",
       filename: "gks_msp_specification_page_2_memory_subsystem_distillation.html",
       icon: `<svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"></path></svg>`
     },
     {
-      name: "Page 3: UCF & Policy Engine",
+      name: "Universal Context Framework & Policy Engine",
+      label: "3. นโยบาย & UCF",
       filename: "gks_msp_specification_page_3_universal_context_framework_policy_engine.html",
       icon: `<svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"></path></svg>`
     },
     {
-      name: "Page 4: Symbol Graph & Code Intel",
+      name: "Symbol Graph & Code Intelligence",
+      label: "4. กราฟสัญลักษณ์",
       filename: "gks_msp_specification_page_4_symbol_graph_code_intelligence.html",
       icon: `<svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 3.055A9.003 9.003 0 1020.945 13H11V3.055z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.488 9H15V3.512A9.025 9.025 0 0120.488 9z"></path></svg>`
     },
     {
-      name: "Page 5: Agent Dispatch Pipeline",
+      name: "Agent Dispatch Pipeline",
+      label: "5. สายพานเขียนโค้ด",
       filename: "gks_msp_specification_page_5_agent_dispatch_codegen_pipeline.html",
       icon: `<svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>`
     },
     {
-      name: "Page 6: Validation & QA Automation",
+      name: "Validation & QA Automation",
+      label: "6. ระบบตรวจประเมิน",
       filename: "gks_msp_specification_page_6_validation_automation_qa.html",
       icon: `<svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>`
     },
     {
-      name: "Page 7: Meta Learning Loop",
+      name: "Meta Learning Loop",
+      label: "7. วงจรการเรียนรู้",
       filename: "gks_msp_specification_page_7_meta_learning_loop.html",
       icon: `<svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 1121.21 15.21M17 11V5h-6M13.447 8.447L17 12"></path></svg>`
     },
     {
       name: "Interactive Backlog Board",
+      label: "แผงควบคุมบอร์ด",
       filename: "interactive_backlog_board.html",
       icon: `<svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"></path></svg>`
     }
@@ -158,7 +167,7 @@ document.addEventListener('DOMContentLoaded', () => {
     link.className = `gks-nav-link ${isCurrent ? 'active' : ''}`;
     link.innerHTML = `
       ${page.icon}
-      <span class="gks-label truncate">${page.name.split(':')[0]}</span>
+      <span class="gks-label truncate">${page.label || page.name}</span>
     `;
     pageListContainer.appendChild(link);
   });

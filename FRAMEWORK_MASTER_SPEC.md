@@ -975,10 +975,10 @@ task:
     - input: "<expression>"
       expect: "<expected value>"
   runner:
-    model: "qwen2.5-coder:14b-instruct-q4_K_M"  # หรือ qwen3-coder, llama3.x, phi-3 ฯลฯ
+    model: "Sushi-Coder RL (9B)"  # หรือ qwen3-coder, llama3.x, phi-3 ฯลฯ
     max_retries: 3
     temperature: 0.0
-    num_ctx: 4096
+    num_ctx: 16384
 ```
 
 ### 8.4 Manifest Schema

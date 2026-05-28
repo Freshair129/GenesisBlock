@@ -2,7 +2,7 @@
 id: FR--TEMPLATE
 phase: 1
 type: fr
-status: draft
+status: active
 vault_id: default
 tier: process
 source_type: axiomatic

@@ -4,7 +4,7 @@ tier: genesis
 created_at: 2026-05-13T12:00:00.000+07:00
 phase: 2
 type: guard
-status: draft
+status: active
 severity: critical              # critical | high | medium | low
 vault_id: <YOUR-PROJECT>
 title: <One-line constraint>

@@ -5,7 +5,7 @@ created_at: 2026-05-13T12:00:00.000+07:00
 phase: 2
 type: issue
 title: <Issue summary>
-status: draft
+status: active
 priority: medium                # low | medium | high | urgent
 assignee: <MSP-AGT-... or MSP-USR-...>     # optional initially
 reporter: <MSP-USR-...>

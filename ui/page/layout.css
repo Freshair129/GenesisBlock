@@ -5,10 +5,10 @@
 
 /* Core Layout Container & Animation Variables */
 :root {
-  --sidebar-width: 19.5rem;
+  --sidebar-width: 13.5rem;
   --sidebar-collapsed-width: 4.5rem;
   --navbar-height: 4.25rem;
-  --transition-smooth: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-smooth: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
   --transition-fast: all 0.2s ease-in-out;
 }
 
@@ -180,14 +180,19 @@ body.gks-layout-active {
 
 /* Label text in Links */
 .gks-label {
-  transition: var(--transition-smooth);
+  display: inline-block;
+  max-width: 150px;
+  transition: max-width 0.25s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.15s ease, transform 0.25s cubic-bezier(0.16, 1, 0.3, 1);
   opacity: 1;
+  transform: translateX(0);
 }
 
 .gks-sidebar.collapsed .gks-label {
+  max-width: 0;
   opacity: 0;
-  width: 0;
-  display: none;
+  transform: translateX(-10px);
+  overflow: hidden;
+  pointer-events: none;
 }
 
 /* Table of Contents Section (TOC) */
@@ -314,7 +319,7 @@ body.gks-layout-active {
 @media (max-width: 1023px) {
   .gks-sidebar {
     top: 0;
-    width: 17.5rem;
+    width: 13.5rem;
     transform: translateX(-100%);
     z-index: 60; /* Above the navbar on mobile */
     box-shadow: 0 20px 25px -5px rgb(0 0 0 / 0.3);

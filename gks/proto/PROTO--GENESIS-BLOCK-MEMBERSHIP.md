@@ -22,6 +22,8 @@ crosslinks:
     - SPEC--GENESIS-BLOCK-MANIFEST
     - CONCEPT--TAXONOMY-V2-3
     - CONCEPT--PROTO-PATTERN
+linked_symbols:
+  - file: packages/msp/src/validator/proto/genesis-block-membership.ts
 created_at: 2026-05-14T18:30:00.000+07:00
 aliases:
   - PROTO
@@ -31,8 +33,6 @@ cluster: implementation_flow
 role: Machine-enforced invariant
 attributes:
   severity: error
-  linked_symbols:
-    - file: packages/msp/src/validator/proto/genesis-block-membership.ts
   domain: proto
   language: markdown
   is_test: false

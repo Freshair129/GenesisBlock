@@ -49,7 +49,7 @@ promotion_adr: ADR--TAXONOMY-V2-3-MIGRATION
 
 > Complements `[[FRAME--MSP-ARCHITECTURE-V2]]`. v2 defined the **three-layer** stack (cognitive layer / Memory OS / knowledge base). This FRAME defines how, within that stack, every retrieval and tool-call decision is shaped by **three orthogonal axes** — WHO, WHERE, and HOW MUCH — and how those axes compose into a single pipeline.
 >
-> Full narrative: [`docs/msp/UNIVERSAL-CONTEXT-FRAMEWORK_spec.md`](../../docs/UNIVERSAL-CONTEXT-FRAMEWORK_spec.md).
+> Full narrative: `docs/msp/UNIVERSAL-CONTEXT-FRAMEWORK_spec.md`.
 
 ## Pattern
 

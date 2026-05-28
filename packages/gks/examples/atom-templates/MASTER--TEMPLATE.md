@@ -2,7 +2,7 @@
 id: MASTER--TEMPLATE
 phase: 0
 type: master
-status: draft
+status: active
 vault_id: default
 tier: master
 source_type: axiomatic

@@ -4,7 +4,7 @@ const REQUIRED_PROMOTION_FIELDS = ['promoted_from', 'promoted_at', 'promotion_ad
 
 export function masterRequiresPromotion(
   atom: ParsedAtom,
-  _ctx: ValidationContext,
+  ctx: ValidationContext,
 ): ValidationError[] {
   const tier = atom.fm['tier']
   if (tier !== 'master') return []
@@ -19,6 +19,31 @@ export function masterRequiresPromotion(
       })
     }
   }
+
+  const promotionAdr = atom.fm['promotion_adr']
+  if (typeof promotionAdr === 'string' && promotionAdr.length > 0) {
+    const adrEntry = ctx.atomicIndex.get(promotionAdr)
+    if (!adrEntry) {
+      errors.push({
+        rule: 'master-requires-promotion',
+        severity: 'error',
+        message: `promotion_adr '${promotionAdr}' does not resolve to any atom in the index`,
+      })
+    } else if (adrEntry.type !== 'adr') {
+      errors.push({
+        rule: 'master-requires-promotion',
+        severity: 'error',
+        message: `promotion_adr '${promotionAdr}' has type '${adrEntry.type}', expected 'adr'`,
+      })
+    } else if (adrEntry.status !== 'active' && adrEntry.status !== 'stable') {
+      errors.push({
+        rule: 'master-requires-promotion',
+        severity: 'error',
+        message: `promotion_adr '${promotionAdr}' has status '${adrEntry.status}', expected 'active' or 'stable' to prove user authorization`,
+      })
+    }
+  }
+
   if (typeof atom.fm['learned_from'] === 'object' && atom.fm['learned_from'] !== null) {
     errors.push({
       rule: 'master-requires-promotion',

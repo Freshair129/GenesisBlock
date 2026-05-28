@@ -76,6 +76,7 @@ interface ManifestFrontmatter {
   manifest_version?: unknown
   members?: unknown
   daci?: unknown
+  attributes?: unknown
 }
 
 /** Strip the leading `---\nYAML\n---` block and parse it; null on failure. */
@@ -131,9 +132,44 @@ export function checkManifest(
   }
 
   // 1. block-specific fields present (SPEC §2.2)
-  if (fm.members === undefined) err('missing required `members:` block')
-  if (fm.manifest_version === undefined) err('missing required `manifest_version:`')
-  const daci = fm.daci
+  const attrs = (typeof fm.attributes === 'object' && fm.attributes !== null)
+    ? (fm.attributes as Record<string, unknown>)
+    : {}
+  let members = fm.members !== undefined ? fm.members : attrs['members']
+  const manifest_version = fm.manifest_version !== undefined ? fm.manifest_version : attrs['manifest_version']
+  const daci = fm.daci !== undefined ? fm.daci : attrs['daci']
+
+  // If members block is undefined, dynamically build it from references/related_to in crosslinks.
+  if (members === undefined) {
+    const crosslinks = fm.crosslinks && typeof fm.crosslinks === 'object'
+      ? (fm.crosslinks as Record<string, unknown>)
+      : {}
+    const references = Array.isArray(crosslinks['references']) ? crosslinks['references'] : []
+    const relatedTo = Array.isArray(crosslinks['related_to']) ? crosslinks['related_to'] : []
+    const allIds = Array.from(new Set([...references, ...relatedTo].filter((x): x is string => typeof x === 'string')))
+
+    const core: Record<string, string[]> = {}
+    const optional: Record<string, string[]> = {}
+
+    for (const role of CORE_ROLES) core[role] = []
+    for (const role of OPTIONAL_ROLES) optional[role] = []
+
+    for (const id of allIds) {
+      const entry = index.get(id)
+      if (entry) {
+        const type = entry.type
+        if (CORE_ROLES.includes(type as any)) {
+          core[type]!.push(id)
+        } else if (OPTIONAL_ROLES.includes(type as any)) {
+          optional[type]!.push(id)
+        }
+      }
+    }
+    members = { core, optional }
+  }
+
+  if (members === undefined) err('missing required `members:` block')
+  if (manifest_version === undefined) err('missing required `manifest_version:`')
   if (
     typeof daci !== 'object' ||
     daci === null ||
@@ -142,7 +178,7 @@ export function checkManifest(
     err('missing required `daci.driver:` (single owner atom id)')
   }
 
-  const { core, optional } = collectMembers(fm.members)
+  const { core, optional } = collectMembers(members)
 
   // 2. five-dimension core — each role lists ≥1 atom (SPEC §3.1)
   for (const role of CORE_ROLES) {

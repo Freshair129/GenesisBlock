@@ -4,7 +4,7 @@ tier: genesis
 created_at: 2026-05-13T12:00:00.000+07:00
 phase: 5
 type: hotfix
-status: draft
+status: active
 title: <one-line summary of what was fixed>
 valid_from: 2026-05-13T12:00:00.000+07:00
 valid_to: 2026-05-15T12:00:00.000+07:00        # = commit time + 48 h (REQUIRED)

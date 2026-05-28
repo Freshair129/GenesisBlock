@@ -35,7 +35,7 @@ attributes:
   encryption_level: none
 ---
 
-> ⚠️ **Superseded by [`[[CONCEPT--KNOWLEDGE-LAYERS-V2]]`](./[[CONCEPT--KNOWLEDGE-LAYERS-V2]].md)** (Phase 4 of `[[BLUEPRINT--INBOUND-TO-CANDIDATES-MIGRATION]]`, 2026-05-09). The new candidates layer doesn't use a proposal-type discriminator — every candidate is just a `${proposed_id}.md` file in `.brain/.../candidates/`. Body preserved as historical context.
+> ⚠️ **Superseded by `[[CONCEPT--KNOWLEDGE-LAYERS-V2]]`** (Phase 4 of `[[BLUEPRINT--INBOUND-TO-CANDIDATES-MIGRATION]]`, 2026-05-09). The new candidates layer doesn't use a proposal-type discriminator — every candidate is just a `${proposed_id}.md` file in `.brain/.../candidates/`. Body preserved as historical context.
 
 # CONCEPT — proposal types
 

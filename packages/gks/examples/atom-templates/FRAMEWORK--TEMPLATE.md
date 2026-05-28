@@ -2,7 +2,7 @@
 id: FRAMEWORK--TEMPLATE
 phase: 0
 type: framework
-status: draft
+status: active
 vault_id: default
 tier: master
 source_type: axiomatic

@@ -2,7 +2,7 @@
 id: SAFETY--TEMPLATE
 phase: 0
 type: safety
-status: draft
+status: active
 vault_id: default
 tier: safety
 source_type: axiomatic

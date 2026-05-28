@@ -36,7 +36,7 @@ attributes:
   encryption_level: none
 ---
 
-> ⚠️ **Superseded by [`[[CONCEPT--KNOWLEDGE-LAYERS-V2]]`](./[[CONCEPT--KNOWLEDGE-LAYERS-V2]].md)** (Phase 4 of `[[BLUEPRINT--INBOUND-TO-CANDIDATES-MIGRATION]]`, 2026-05-09). The inbound queue has been removed; runtime atom proposals now write to `.brain/msp/projects/<ns>/candidates/` via the `msp_candidate` MCP tool. The body below is preserved as historical context.
+> ⚠️ **Superseded by `[[CONCEPT--KNOWLEDGE-LAYERS-V2]]`** (Phase 4 of `[[BLUEPRINT--INBOUND-TO-CANDIDATES-MIGRATION]]`, 2026-05-09). The inbound queue has been removed; runtime atom proposals now write to `.brain/msp/projects/<ns>/candidates/` via the `msp_candidate` MCP tool. The body below is preserved as historical context.
 
 # CONCEPT — inbound queue
 

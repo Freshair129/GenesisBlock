@@ -1,3 +1,27 @@
+---
+id: AUDIT--LIVE-CALL-GRAPH-FIX
+phase: 6
+type: audit
+status: stable
+vault_id: GKS-CORE
+tier: process
+source_type: episodic
+title: Root Cause Analysis — Layout and Security Issues in codev_dashboard
+created_at: 2026-05-28T15:35:00.000+07:00
+tags: [audit, rca, ui, hotfix]
+aliases:
+  - AUDIT
+  - ops
+  - Test results / quality report
+cluster: ops
+role: Test results / quality report
+crosslinks:
+  references: []
+linked_symbols: []
+attributes:
+  domain: general
+---
+
 # Root Cause Analysis & Proposed Fix: Layout and Security Issues
 
 ## [ROOT CAUSE]

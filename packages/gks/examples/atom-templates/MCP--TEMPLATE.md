@@ -4,7 +4,7 @@ tier: genesis
 created_at: 2026-05-13T12:00:00.000+07:00
 phase: 2
 type: mcp
-status: draft
+status: active
 vault_id: <YOUR-PROJECT>
 title: <One-line tool summary>
 tags: [mcp, tool, rpc]

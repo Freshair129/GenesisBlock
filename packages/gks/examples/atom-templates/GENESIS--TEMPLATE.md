@@ -2,7 +2,7 @@
 id: GENESIS--TEMPLATE
 phase: 0
 type: genesis
-status: draft
+status: active
 vault_id: default
 tier: master
 source_type: axiomatic

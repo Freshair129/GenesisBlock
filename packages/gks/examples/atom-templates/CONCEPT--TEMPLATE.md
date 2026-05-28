@@ -2,7 +2,7 @@
 id: CONCEPT--TEMPLATE
 phase: 1
 type: concept
-status: draft
+status: active
 vault_id: default
 tier: process
 source_type: axiomatic

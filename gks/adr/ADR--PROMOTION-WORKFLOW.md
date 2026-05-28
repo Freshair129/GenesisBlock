@@ -38,7 +38,7 @@ attributes:
   encryption_level: none
 ---
 
-> ⚠️ **Superseded by [`[[ADR--AGENT-WRITE-BOUNDARIES]]`](./[[ADR--AGENT-WRITE-BOUNDARIES]].md)** (Phase 4 of `[[BLUEPRINT--INBOUND-TO-CANDIDATES-MIGRATION]]`, 2026-05-09). The three-gate inbound workflow has been replaced with: agents write to `.brain/.../candidates/` via `msp_candidate`, promotion to `gks/<type>/` is a human PR action gated by CI. The body below is preserved as historical context.
+> ⚠️ **Superseded by `[[ADR--AGENT-WRITE-BOUNDARIES]]`** (Phase 4 of `[[BLUEPRINT--INBOUND-TO-CANDIDATES-MIGRATION]]`, 2026-05-09). The three-gate inbound workflow has been replaced with: agents write to `.brain/.../candidates/` via `msp_candidate`, promotion to `gks/<type>/` is a human PR action gated by CI. The body below is preserved as historical context.
 
 # ADR — promotion workflow
 

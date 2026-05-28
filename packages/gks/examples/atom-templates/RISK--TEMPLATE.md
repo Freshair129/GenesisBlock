@@ -4,7 +4,7 @@ tier: genesis
 created_at: 2026-05-13T12:00:00.000+07:00
 phase: 2
 type: risk
-status: draft
+status: active
 likelihood: medium              # low | medium | high
 impact: medium                  # low | medium | high | critical
 vault_id: <YOUR-PROJECT>

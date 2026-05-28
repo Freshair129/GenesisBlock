@@ -58,9 +58,9 @@ Three options were considered.
 | **C — Backend of GKS** (chosen) | New engine implements `GraphBackend` (`packages/gks/src/memory/graph.ts:375`); GKS still owns `MemoryStore` and the public API. | Single Rust crate + thin TS adapter (~600 LoC). | Low — additive; ADR-003 already authorises new backends. |
 
 Option C is the only one that honours
-[`ADR-003`](../../docs/gks/adr/003-pluggable-backends.md)
+`ADR-003` (`docs/gks/adr/003-pluggable-backends.md`)
 (*pluggable backends are first-class*), and avoids contradicting
-[`ADR-008`](../../docs/gks/adr/008-gks-storage-engine-scope.md)
+`ADR-008` (`docs/gks/adr/008-gks-storage-engine-scope.md`)
 (*GKS is the storage engine — orchestration lives above*).
 
 ## Decision
@@ -115,7 +115,7 @@ Concretely:
 
 ### Reconciling with ADR-005
 
-[`ADR-005`](../../docs/gks/adr/005-cut-falkordb.md) cut
+`ADR-005` (`docs/gks/adr/005-cut-falkordb.md`) cut
 FalkorDB partly to remove a Redis-module native dependency. Adding a
 `.node` addon at first glance re-introduces native code — but the
 trade-off is different:
@@ -135,7 +135,7 @@ addons.
 
 ### Reconciling with ADR-001
 
-[`ADR-001`](../../docs/gks/adr/001-file-based-vector-store.md)
+`ADR-001` (`docs/gks/adr/001-file-based-vector-store.md`)
 chose JSONL as the default vector store for diff-ability and git
 friendliness. This ADR does **not** touch the vector layer. The graph
 backend's `.db` file is opaque binary; that is acceptable because:
