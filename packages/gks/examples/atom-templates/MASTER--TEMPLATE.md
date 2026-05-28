@@ -1,11 +1,11 @@
 ---
 id: MASTER--TEMPLATE
-phase: 0
+phase: 0                     # 0 | 1 | 2 | 3 | 4 | 5 | 6
 type: master
-status: active
+status: active                  # stub | raw | draft | active | stable | deprecated | superseded | partial
 vault_id: default
-tier: master
-source_type: axiomatic
+tier: master                  # safety | master | genesis | process
+source_type: axiomatic          # axiomatic | learned
 title: <Short policy title>
 tags: [governance, policy]
 aliases:

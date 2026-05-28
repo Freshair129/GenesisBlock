@@ -1,11 +1,11 @@
 ---
 id: REQ--TEMPLATE
-phase: 1
+phase: 1                     # 0 | 1 | 2 | 3 | 4 | 5 | 6
 type: req
-status: active
+status: active                  # stub | raw | draft | active | stable | deprecated | superseded | partial
 vault_id: default
-tier: process
-source_type: axiomatic
+tier: process                  # safety | master | genesis | process
+source_type: axiomatic          # axiomatic | learned
 title: <Umbrella requirement title>
 created_at: 2026-05-13T12:00:00.000+07:00
 tags: [requirement, umbrella]

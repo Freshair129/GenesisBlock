@@ -1,10 +1,10 @@
 ---
 id: MCP--TEMPLATE
-tier: genesis
+tier: genesis                  # safety | master | genesis | process
 created_at: 2026-05-13T12:00:00.000+07:00
-phase: 2
+phase: 2                     # 0 | 1 | 2 | 3 | 4 | 5 | 6
 type: mcp
-status: active
+status: active                  # stub | raw | draft | active | stable | deprecated | superseded | partial
 vault_id: <YOUR-PROJECT>
 title: <One-line tool summary>
 tags: [mcp, tool, rpc]

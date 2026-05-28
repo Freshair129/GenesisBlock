@@ -1,11 +1,11 @@
 ---
 id: GENESIS--TEMPLATE
-phase: 0
+phase: 0                     # 0 | 1 | 2 | 3 | 4 | 5 | 6
 type: genesis
-status: active
+status: active                  # stub | raw | draft | active | stable | deprecated | superseded | partial
 vault_id: default
-tier: master
-source_type: axiomatic
+tier: master                  # safety | master | genesis | process
+source_type: axiomatic          # axiomatic | learned
 title: <Genesis Block name — Engine — short purpose>
 created_at: 2026-05-13T12:00:00.000+07:00
 tags: [manifest, knowledge-block]

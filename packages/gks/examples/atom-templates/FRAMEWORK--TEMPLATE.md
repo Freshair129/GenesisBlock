@@ -1,11 +1,11 @@
 ---
 id: FRAMEWORK--TEMPLATE
-phase: 0
+phase: 0                     # 0 | 1 | 2 | 3 | 4 | 5 | 6
 type: framework
-status: active
+status: active                  # stub | raw | draft | active | stable | deprecated | superseded | partial
 vault_id: default
-tier: master
-source_type: axiomatic
+tier: master                  # safety | master | genesis | process
+source_type: axiomatic          # axiomatic | learned
 title: <Governance or architectural framework title>
 created_at: 2026-05-13T12:00:00.000+07:00
 tags: [framework, governance]

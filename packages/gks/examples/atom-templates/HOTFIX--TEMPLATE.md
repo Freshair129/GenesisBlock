@@ -1,10 +1,10 @@
 ---
 id: HOTFIX--TEMPLATE
-tier: genesis
+tier: genesis                  # safety | master | genesis | process
 created_at: 2026-05-13T12:00:00.000+07:00
-phase: 5
+phase: 5                     # 0 | 1 | 2 | 3 | 4 | 5 | 6
 type: hotfix
-status: active
+status: active                  # stub | raw | draft | active | stable | deprecated | superseded | partial
 title: <one-line summary of what was fixed>
 valid_from: 2026-05-13T12:00:00.000+07:00
 valid_to: 2026-05-15T12:00:00.000+07:00        # = commit time + 48 h (REQUIRED)

@@ -11,37 +11,90 @@ schema_spec:
       - knowledgeId: E.g. DATABASE-CHOICE (semantic slug / conceptual cluster)
       - atomtype_counter (phase layer): E.g. K2 (derived from phase + 1)
     Example generated ID: CONCEPT-371--DATABASE-CHOICE--K2
+  required:
+    - vault_id
+    - source_type
+    - title
+    - summary
+    - tags
+    - domain
+    - priority
   fields:
     id:
       type: string
       description: Canonical compound identifier, E.g.
         CONCEPT-371--DATABASE-CHOICE--K2 or CONCEPT--DATABASE-CHOICE
+
+    version:
+      type: string
+      format: [x.y.z(b)]
+      description: Version of the atom, E.g. 1.0.0, 1.1.0, 2.0.0,1.1.2b(beta)
+
+    tier:
+      type: string
+      description: Context governance tier, E.g. atomic, genesis, master, safety, guardrail
+
     phase:
       type: integer
       description: Development phase (0 to 6)
+      
     type:
       type: string
       description: Lowercase type prefix matching the folder name, E.g. concept, adr, feat
+
     status:
       type: string
-      description: Lifecycle status, E.g. stable, draft, active, raw, stub,
-        deprecated, superseded
+      format: [placeholder, draft, mature, stable, unstable, need review, under review,
+        deprecated, superseded]
+      description: Lifecycle status
+
+    enforcement_state:
+      type: string
+      format: [active,inactive,[enforcement_by_path:name]] 
+      description: Enforcement state & lifecycle status
+
+    created_at:
+      type: string
+      format: [date-time,created_by]
+      description: Creation timestamp in ISO-8601 with ICT/Thailand offset (+07:00), by whom
+
+    last_updated:
+      type: string
+      format: [date-time,updated_by]
+      description: Last updated timestamp in ISO-8601 with ICT/Thailand offset (+07:00), by whom
+
     vault_id:
       type: string
       description: "Obsidian vault identifier, default value: default"
-    tier:
-      type: string
-      description: Context governance tier, E.g. genesis, master, safety, process
+
     source_type:
       type: string
       description: Information origin classification, E.g. axiomatic, learned, episodic
+
     title:
       type: string
       description: Short human-readable title
+
+    summary:
+      type: string
+      description: Brief summary or elevator pitch of the atom
+      max_length: 250
+
     tags:
       type: array
       items: string
       description: Categorisation tags array
+
+    domain:
+      type: string
+      description: Domain of the atom
+
+    priority:
+      type: string
+      description: Priority of the atom
+      format: [P0,P1,P2,P3,P4,P5,P6]
+
+
     crosslinks:
       type: object
       description: Semantic relations graph edges
@@ -50,26 +103,32 @@ schema_spec:
           type: array
           items: string
           description: Referenced sibling or external atom IDs
+
         implements:
           type: array
           items: string
           description: Specifications or blueprints implemented by this atom
+
         parent_blueprint:
           type: array
           items: string
           description: Blueprint driving the creation of this atom
+
         supersedes:
           type: array
           items: string
           description: Legacy atoms deprecated or replaced by this atom
+
         related_to:
           type: array
           items: string
           description: Sibling or external atom IDs related to this atom
+
         contradicts:
           type: array
           items: string
           description: Sibling or external atom IDs that this atom contradicts
+
         expands_on:
           type: array
           items: string
@@ -78,21 +137,23 @@ schema_spec:
           type: array
           items: string
           description: Sibling or external atom IDs that this atom depends on
-    created_at:
-      type: string
-      format: date-time
-      description: Creation timestamp in ISO-8601 with ICT/Thailand offset (+07:00)
+
+
     aliases:
       type: array
       items: string
       description: Obsidian aliases array, index 0 MUST be the UPPERCASE type prefix
+
     cluster:
       type: string
       description: Taxonomy grouping cluster, E.g. implementation_flow,
         agent_governance, requirements, ops, memory
+
+
     role:
       type: string
       description: Duties and responsibilities associated with the atom type
+
     attributes:
       type: object
       description: "Custom key-value metadata attributes, E.g. domain: adr"

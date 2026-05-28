@@ -1,11 +1,11 @@
 ---
 id: ISSUE--TEMPLATE
-tier: genesis
+tier: genesis                  # safety | master | genesis | process
 created_at: 2026-05-13T12:00:00.000+07:00
-phase: 2
+phase: 2                     # 0 | 1 | 2 | 3 | 4 | 5 | 6
 type: issue
 title: <Issue summary>
-status: active
+status: active                  # stub | raw | draft | active | stable | deprecated | superseded | partial
 priority: medium                # low | medium | high | urgent
 assignee: <MSP-AGT-... or MSP-USR-...>     # optional initially
 reporter: <MSP-USR-...>

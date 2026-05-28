@@ -1,11 +1,11 @@
 ---
 id: SAFETY--TEMPLATE
-phase: 0
+phase: 0                     # 0 | 1 | 2 | 3 | 4 | 5 | 6
 type: safety
-status: active
+status: active                  # stub | raw | draft | active | stable | deprecated | superseded | partial
 vault_id: default
-tier: safety
-source_type: axiomatic
+tier: safety                  # safety | master | genesis | process
+source_type: axiomatic          # axiomatic | learned
 title: <AI safety or alignment directive>
 created_at: 2026-05-13T12:00:00.000+07:00
 tags: [safety, alignment]

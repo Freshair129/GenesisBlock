@@ -4,11 +4,11 @@
 
 metadata:
   id: BLUEPRINT--TEMPLATE
-  tier: process
+  tier: process                  # safety | master | genesis | process
   created_at: 2026-05-13T12:00:00.000+07:00
   name: <human-readable>
   module: <MOD-- this builds inside>
-  status: active                 # draft | approved | implemented
+  status: active                  # stub | raw | draft | active | stable | deprecated | superseded | partial
   version: 0.1.0
   author: <MSP-USR-… or MSP-AGT-…>
   crosslinks:

@@ -1,10 +1,10 @@
 ---
 id: RISK--TEMPLATE
-tier: genesis
+tier: genesis                  # safety | master | genesis | process
 created_at: 2026-05-13T12:00:00.000+07:00
-phase: 2
+phase: 2                     # 0 | 1 | 2 | 3 | 4 | 5 | 6
 type: risk
-status: active
+status: active                  # stub | raw | draft | active | stable | deprecated | superseded | partial
 likelihood: medium              # low | medium | high
 impact: medium                  # low | medium | high | critical
 vault_id: <YOUR-PROJECT>
