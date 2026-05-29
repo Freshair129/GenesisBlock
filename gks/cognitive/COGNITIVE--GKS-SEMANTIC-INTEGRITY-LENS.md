@@ -1,6 +1,6 @@
 ---
 id: COGNITIVE--GKS-SEMANTIC-INTEGRITY-LENS
-phase: 2
+phase: 1
 type: cognitive
 status: active
 vault_id: GKS-CORE

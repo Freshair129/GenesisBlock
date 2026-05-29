@@ -741,7 +741,11 @@ export function gksLayout(root: string): {
   atomicIndex: string
 } {
   const r = resolve(root)
-  const brain = join(r, '.brain', 'msp', 'projects', 'evaAI')
+  const projectName = process.env.MSP_PROJECT || 'cognitive_system'
+  const brain = join(r, '.brain', 'msp', 'projects', projectName)
+
+  const gksBase = process.env.MSP_BRAIN_PATH ? resolve(process.env.MSP_BRAIN_PATH) : join(r, 'gks')
+
   return {
     root: r,
     brain,
@@ -751,8 +755,8 @@ export function gksLayout(root: string): {
     inbound: join(brain, 'inbound'),
     audit: join(brain, 'audit'),
     graph: join(brain, 'graph'),
-    gks: join(r, 'gks'),
-    atomicIndex: join(r, 'gks', '00_index', 'atomic_index.jsonl'),
+    gks: gksBase,
+    atomicIndex: join(gksBase, '00_index', 'atomic_index.jsonl'),
   }
 }
 

@@ -67,7 +67,7 @@ describe('msp-task-tracker example', () => {
     expect(receipt.path).toContain('AUDIT--TEST')
 
     // 5. Verify file exists
-    const inboundDir = join(root, '.brain', 'msp', 'projects', 'evaAI', 'inbound')
+    const inboundDir = join(root, '.brain', 'msp', 'projects', 'cognitive_system', 'inbound')
     const files = await readdir(inboundDir)
     expect(files.some(f => f.startsWith('AUDIT--TEST'))).toBe(true)
   })

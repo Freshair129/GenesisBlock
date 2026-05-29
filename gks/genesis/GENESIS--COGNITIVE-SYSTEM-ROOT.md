@@ -47,7 +47,7 @@ promotion_adr: ADR--MONOREPO-STRUCTURE
 
 | Atom ID | Path | สรุปสาระสำคัญ (Short Summary) |
 | :--- | :--- | :--- |
-| `FRAMEWORK_MASTER_SPEC` | [[FRAMEWORK_MASTER_SPEC]] | กฎเหล็กของระบบ: Doc-Before-Code และ 3-Tier Knowledge (GKS/MSP/Obsidian) |
+| `FRAMEWORK_MASTER_SPEC` | [FRAMEWORK_MASTER_SPEC](file:///c:/Users/freshair/cognitive_system/FRAMEWORK_MASTER_SPEC.md) | กฎเหล็กของระบบ: Doc-Before-Code และ 3-Tier Knowledge (GKS/MSP/Obsidian) |
 | `ADR--MONOREPO-STRUCTURE` | `gks/adr/ADR--MONOREPO-STRUCTURE.md` | การแบ่ง Layer: `packages/gks` (Storage) และ `packages/msp` (Orchestrator) |
 | `ADR--AGENT-WRITE-BOUNDARIES` | `gks/adr/ADR--AGENT-WRITE-BOUNDARIES.md` | ขอบเขตสิทธิ์: Agent เขียนได้เฉพาะ `.brain/` (Candidate); ส่วน `gks/` ต้องผ่าน PR เท่านั้น |
 

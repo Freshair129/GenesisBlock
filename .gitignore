@@ -19,3 +19,6 @@ gks/.smart-env/
 gks/Excalidraw/
 gks/Untitled*.canvas
 gks/[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9].md
+mcp_config.json
+.mcp.json
+

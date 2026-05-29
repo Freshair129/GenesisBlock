@@ -76,7 +76,7 @@ describe('MemoryStore', () => {
       title: 'Test Foo',
       body: 'Body of the test insight.',
     })
-    expect(receipt.path).toContain(join('.brain', 'msp', 'projects', 'evaAI', 'inbound'))
+    expect(receipt.path).toContain(join('.brain', 'msp', 'projects', 'cognitive_system', 'inbound'))
     expect(receipt.path).not.toContain(`${join(root, 'gks')}`)
 
     const md = await readFile(receipt.path, 'utf8')
@@ -112,7 +112,7 @@ describe('MemoryStore', () => {
     expect(out.memory.session_id).toBe(sessionId)
     expect(out.memory.summary).toContain('Cortex')
 
-    const dir = join(root, '.brain', 'msp', 'projects', 'evaAI', 'memory')
+    const dir = join(root, '.brain', 'msp', 'projects', 'cognitive_system', 'memory')
     const files = await readdir(dir)
     expect(files.some((f) => f.includes(sessionId))).toBe(true)
   })
@@ -136,7 +136,7 @@ describe('MemoryStore', () => {
     await cp(FIXTURES, join(root, 'gks'), { recursive: true })
 
     const { createGenesisGraphBackend } = await import('../../src/memory/graph/genesis-graph.js')
-    const dir = join(root, '.brain', 'msp', 'projects', 'evaAI', 'graph')
+    const dir = join(root, '.brain', 'msp', 'projects', 'cognitive_system', 'graph')
     const store = new MemoryStore({
       root,
       embedder: mockEmbedder(64),

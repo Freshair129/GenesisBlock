@@ -1,6 +1,6 @@
 ---
 id: RUNBOOK--GKS-REORG-OPS
-phase: 2
+phase: 6
 type: runbook
 status: active
 vault_id: GKS-CORE

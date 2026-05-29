@@ -174,7 +174,7 @@ describe('gks CLI', () => {
     expect(r.code).toBe(0)
     expect(r.stdout).toMatch(/linked_symbols: 2/)
 
-    const inboundDir = join(workdir, '.brain/msp/projects/evaAI/inbound')
+    const inboundDir = join(workdir, '.brain/msp/projects/cognitive_system/inbound')
     const fs = await import('node:fs/promises')
     const files = await fs.readdir(inboundDir)
     const artifact = files.find((f) => f.startsWith('ADR--LINKED-SYMBOL-CLI'))
