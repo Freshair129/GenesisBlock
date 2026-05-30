@@ -9,6 +9,9 @@ source_type: learned
 title: "Benchmark Report: GenesisDB Performance (LDBC-Lite Standards)"
 created_at: 2026-05-30T04:00:00+07:00
 tags: [benchmark, performance, rust, ldbc, graph-db]
+aliases: [benchmark-report]
+crosslinks:
+  references: [GENESIS--BACKEND-ENGINE]
 linked_symbols:
   - packages/gks/native/genesis-block/benches/ldbc_lite.rs
   - packages/gks/native/genesis-block/src/performance_tests.rs
@@ -81,3 +84,9 @@ GenesisDB ไม่เพียงแต่ผ่านมาตรฐาน **L
 ---
 **Reported By:** Technical Architect (Gemini-T2)
 **Validation Trace:** `cargo bench --bench ldbc_lite`
+
+---
+### Related Links
+- **Orchestrator:** [[GENESIS--BACKEND-ENGINE]]
+- **Recovery Audit:** [[AUDIT--GENESIS-BACKEND-RECOVERY-REFINEMENT]]
+- **Scalability Proof:** [[ADR--GENESISDB-SCALABILITY-VALIDATION]]

@@ -9,8 +9,9 @@ source_type: axiomatic
 title: "Algorithm: Recursive K-Impact Scoring Engine"
 tags: [gks, algo, k-impact, ranking, graph-theory]
 aliases: [k-impact-algorithm]
+created_at: 2026-05-30T03:00:00+07:00
 crosslinks:
-  references: [SPEC--K-IMPACT, ADR--GENESISDB-KIMPACT-ALGORITHM]
+  references: [SPEC--K-IMPACT, ADR--GENESISDB-KIMPACT-ALGORITHM, GENESIS--BACKEND-ENGINE]
 attributes:
   complexity: O(V_affected + E_affected)
 ---
@@ -74,3 +75,9 @@ fn trigger_incremental_refresh(target_node_id: String, storage: &mut Storage) {
 
 ## 4. Optimization: BitSet-based Depth
 To prevent deep recursion, the engine utilizes pre-computed BitSets for reachability, allowing $F_{depth}$ to be estimated in $O(1)$ bitwise operations after an initial $O(E)$ batch compute.
+
+---
+### Related Links
+- **Orchestrator:** [[GENESIS--BACKEND-ENGINE]]
+- **K-Impact Rationale:** [[ADR--GENESISDB-KIMPACT-ALGORITHM]]
+- **Base Specification:** [[SPEC--K-IMPACT]]

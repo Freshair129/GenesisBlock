@@ -236,6 +236,13 @@ GenesisDB sacrifices the ability to store a 1-Trillion edge graph across 50 serv
     Replacing `RwLock` with crossbeam's `epoch` garbage collection, enabling true zero-contention parallel reads during heavy write loads.
 
 ---
+### Related Links
+- **Root Orchestrator:** [[GENESIS--BACKEND-ENGINE]]
+- **K-Impact Algorithm:** [[ALGO--KIMPACT-CALCULATION]]
+- **Benchmark Suite:** [[ADR--GENESISDB-BENCHMARK-SUITE]]
+
+
+---
 
 ## 11. GKS & Obsidian Synchronization Architecture
 GenesisDB operates as a "Headless Brain," while Obsidian Markdown files serve as the "Human-readable Interface." Maintaining state consistency between these two systems utilizes an Event-Driven Bi-directional Synchronization architecture, adhering to Conflict-Free Last-Write-Wins (LWW) principles.

@@ -1,4 +1,18 @@
+---
+id: USAGE--DEVLOG-2026-05-30-GENESISDB-RECOVERY
+phase: 6
+type: usage
+status: stable
+vault_id: GKS-CORE
+tier: process
+source_type: learned
+title: "DevLog: GenesisDB Recovery & Systems Refinement"
+created_at: 2026-05-30T04:30:00+07:00
+tags: [devlog, genesisdb, recovery]
+---
+
 # DevLog: GenesisDB Recovery & Systems Refinement
+
 **Date:** 2026-05-30T04:30:00+07:00
 **Author:** Technical Architect (Gemini-T2 / อาหวัง)
 **Status:** MISSION ACCOMPLISHED
@@ -39,3 +53,9 @@
 ---
 **ปิดเซสชันการทำงาน**
 *(System standby... awaiting next directive)*
+
+---
+### Related Links
+- **Orchestrator:** [[GENESIS--BACKEND-ENGINE]]
+- **Recovery Audit:** [[AUDIT--GENESIS-BACKEND-RECOVERY-REFINEMENT]]
+- **Performance Report:** [[AUDIT--GENESIS-DB-LDBC-LITE-REPORT]]

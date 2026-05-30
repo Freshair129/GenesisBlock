@@ -15,7 +15,7 @@ aliases:
 cluster: ops
 role: Test results / quality report
 crosslinks:
-  references: []
+  references: [GENESIS--BACKEND-ENGINE]
 linked_symbols:
   - packages/gks/native/genesis-block/src/lib.rs
   - packages/gks/native/genesis-block/src/performance_tests.rs
@@ -61,3 +61,9 @@ attributes:
 
 **Audited By:** Rwang (อาหวัง) - Gemini-T2
 **Date:** 2026-05-30
+
+---
+### Related Links
+- **Orchestrator:** [[GENESIS--BACKEND-ENGINE]]
+- **Performance Report:** [[AUDIT--GENESIS-DB-LDBC-LITE-REPORT]]
+- **DevLog:** [[USAGE--DEVLOG-2026-05-30-GENESISDB-RECOVERY]]

@@ -1,24 +1,27 @@
 ---
 id: ADR--GENESISDB-BENCHMARK-SUITE
-phase: 3
+phase: 2
 type: adr
-status: proposed
+status: stable
 vault_id: GKS-CORE
 tier: process
 source_type: learned
 title: "ADR: Reproducible Benchmarking Methodology for High-Performance Graph Traversals"
 tags: [architecture, genesisdb, benchmark, performance, ldbc]
 aliases: [genesisdb-benchmark-methodology]
+created_at: 2026-05-30T04:00:00+07:00
+crosslinks:
+  references: [GENESIS--BACKEND-ENGINE]
 attributes:
   domain: quality-engineering
 ---
 
 # ADR--GENESISDB-BENCHMARK-SUITE
 
-## 1. Context
+## Context
 To compare GenesisDB against established engines like Neo4j or TigerGraph, we require a benchmarking methodology that is scientifically sound, reproducible, and immune to "marketing bias." Generic random graphs do not accurately simulate the "scale-free" nature of human knowledge systems, and simple average latencies hide catastrophic tail-latency issues (P99).
 
-## 2. Decision
+## Decision
 We implement a **Rigorous Native Benchmarking Suite** integrated into the Rust toolchain.
 
 ### 2.1 Synthetic Topology Generation
@@ -38,9 +41,12 @@ The suite must report:
 *   **Mutation Throughput:** Measured in Edges-per-Second (EPS) under the "Chunked-CSR" model.
 *   **Memory Efficiency:** Bytes-per-Edge (BPE) ratio.
 
-## 3. Status
-**Proposed**
-
-## 4. Consequences
+## Consequences
 *   **Positive:** GenesisDB performance claims become peer-reviewable by external database engineers. Provides immediate feedback during CI on any "latency regression" caused by new logic.
 *   **Negative:** Generating large BA graphs (e.g., 10M nodes) for a test run consumes significant time and RAM during the setup phase.
+
+---
+### Related Links
+- **Orchestrator:** [[GENESIS--BACKEND-ENGINE]]
+- **Performance Report:** [[AUDIT--GENESIS-DB-LDBC-LITE-REPORT]]
+- **Scalability Proof:** [[ADR--GENESISDB-SCALABILITY-VALIDATION]]

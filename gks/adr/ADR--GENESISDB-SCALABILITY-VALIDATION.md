@@ -1,24 +1,27 @@
 ---
 id: ADR--GENESISDB-SCALABILITY-VALIDATION
-phase: 3
+phase: 2
 type: adr
-status: proposed
+status: stable
 vault_id: GKS-CORE
 tier: process
 source_type: learned
 title: "ADR: Architectural Validation of 500M Edge Scalability in Embedded Environments"
 tags: [architecture, genesisdb, scalability, memory, hardware]
 aliases: [genesisdb-scalability-proof]
+created_at: 2026-05-30T04:00:00+07:00
+crosslinks:
+  references: [GENESIS--BACKEND-ENGINE]
 attributes:
   domain: systems-engineering
 ---
 
 # ADR--GENESISDB-SCALABILITY-VALIDATION
 
-## 1. Context
+## Context
 GenesisDB claims a scalability target of **50 Million Nodes** and **500 Million Edges** within a single-machine embedded environment. For this to be defensible, we must provide a mathematical proof of memory consumption and an architectural strategy to overcome the limits of standard 64-bit pointers.
 
-## 2. Decision
+## Decision
 We implement **Pointer Compression** and **Arena-based Addressing** to achieve high density.
 
 ### 2.1 Pointer Compression (32-bit Internal IDs)
@@ -38,9 +41,12 @@ Nodes are stored in a contiguous `NodeArena`.
 ### 2.3 Verified Envelope
 A system with **50M Nodes and 500M Edges** will have a baseline in-memory footprint of **~8.6 GB** (excluding property values and hash index overhead). This is comfortably within the reach of modern workstations and cloud instances with 32GB - 64GB RAM.
 
-## 3. Status
-**Proposed**
-
-## 4. Consequences
+## Consequences
 *   **Positive:** Proves that GenesisDB is "Systemically Fit" for large-scale cognitive graphs without requiring distributed clusters.
 *   **Negative:** Hard limit of 4.2 Billion entities due to 32-bit addressing. Transitioning to 64-bit later would double the memory footprint.
+
+---
+### Related Links
+- **Orchestrator:** [[GENESIS--BACKEND-ENGINE]]
+- **Storage Strategy:** [[ADR--GENESISDB-CSR-MUTATION-STRATEGY]]
+- **Benchmark Suite:** [[ADR--GENESISDB-BENCHMARK-SUITE]]

@@ -1,24 +1,27 @@
 ---
 id: ADR--GENESISDB-GOVERNANCE-LOGIC
-phase: 3
+phase: 2
 type: adr
-status: proposed
+status: stable
 vault_id: GKS-CORE
 tier: process
 source_type: learned
 title: "ADR: Formal Axiomatic System and Transitive Contradiction Checking"
 tags: [architecture, genesisdb, governance, logic, constraints]
 aliases: [genesisdb-axiomatic-logic]
+created_at: 2026-05-30T02:00:00+07:00
+crosslinks:
+  references: [GENESIS--BACKEND-ENGINE]
 attributes:
   domain: governance-engine
 ---
 
 # ADR--GENESISDB-GOVERNANCE-LOGIC
 
-## 1. Context
+## Context
 Initial versions of GenesisDB implemented "Axiomatic Governance" merely as a Tier Permission Rule (e.g., `Tier(source) >= Tier(target)`). A true Axiomatic System requires logical consistency checking to prevent the Knowledge Graph from holding mutually exclusive states or cyclic paradoxes, which would cause an AI agent to hallucinate or deadlock during reasoning.
 
-## 2. Decision
+## Decision
 We elevate the governance layer from permission checks to a **Formal Axiomatic Evaluation Model** executing synchronously on the write-path.
 
 ### 2.1 The Contradiction Graph Validation
@@ -34,9 +37,12 @@ To execute logical consistency checks without blocking writes for too long:
 ### 2.3 Policy Inheritance
 Lower-tier nodes (e.g., `FEAT--`) explicitly inherit the constraints of their higher-tier ancestors (e.g., `MASTER--`). An action performed on a leaf node that violates an inherited constraint is blocked.
 
-## 3. Status
-**Proposed**
-
-## 4. Consequences
+## Consequences
 *   **Positive:** GenesisDB becomes a true "Logical Knowledge Engine," not just a graph store. It guarantees non-contradictory context delivery to AI models.
 *   **Negative:** Write latency for `supersedes` and `contradicts` edge types increases by $O(V_{subgraph})$. This necessitates capping the depth of transitive checks to a hard limit (e.g., 5 levels) to guarantee latency bounds.
+
+---
+### Related Links
+- **Orchestrator:** [[GENESIS--BACKEND-ENGINE]]
+- **K-Impact Rationale:** [[ADR--GENESISDB-KIMPACT-ALGORITHM]]
+- **Impact Algorithm:** [[ALGO--KIMPACT-CALCULATION]]
