@@ -44,7 +44,7 @@ schema_spec:
 
     status:
       type: string
-      format: [placeholder, draft, mature, stable, unstable, need review, under review,
+      format: [draft, candidate, stable, unstable, need review, under review,
         deprecated, superseded]
       description: Lifecycle status
 
@@ -478,6 +478,15 @@ taxonomy:
             - Voice
             - System Prompt Seed
             - Source
+        TOOL:
+          phase: 2
+          role: Tool
+          tier: process
+          folder: tool
+          sections:
+            - Tool Definition
+            - JSON-RPC Contract
+            - Source
     requirements:
       description: Requirements engineering cluster.
       types:
@@ -521,6 +530,7 @@ taxonomy:
       description: Operational governance and incident response.
       types:
         INC:
+          name: Incident
           phase: 6
           role: Incident post-mortem
           tier: process
@@ -530,6 +540,7 @@ taxonomy:
             - Triage summary
             - Source
         HOTFIX:
+          name: Hotfix
           phase: 5
           role: Hotfix escape-hatch atom
           tier: process
@@ -539,7 +550,48 @@ taxonomy:
             - Valid until
             - Commit SHA
             - Source
+        RISK:
+          name: Risk
+          phase: 1
+          role: Identified risk + mitigation
+          tier: process
+          folder: risk
+          sections:
+            - Risk
+            - Mitigation
+            - Source
+        RUNBOOK:
+          name: Runbook
+          phase: 6
+          role: Incident response playbook
+          tier: process
+          folder: runbook
+          sections:
+            - Steps
+            - Escalation
+            - Source
+        TEST:
+          name: Test Plan / Test Case
+          phase: 5 
+          role: Test specification
+          tier: process
+          folder: test
+          sections:
+            - Test Plan
+            - Test Cases
+            - Source
+        DoD:
+          name: Definition of Done
+          phase: 1
+          role: Definition of Done
+          tier: process
+          folder: dod
+          sections:
+            - Definition of Done
+            - Verification
+            - Goal
         ISSUE:
+          name: Issue
           phase: 6
           role: Live issue tracker
           tier: process
@@ -551,6 +603,7 @@ taxonomy:
             - Resolution
             - Source
         RISK:
+          name: Risk
           phase: 1
           role: Identified risk + mitigation
           tier: process
@@ -560,6 +613,7 @@ taxonomy:
             - Mitigation
             - Source
         RUNBOOK:
+          name: Runbook
           phase: 6
           role: Operational response guide
           tier: process
@@ -569,6 +623,7 @@ taxonomy:
             - Response steps
             - Source
         SLO:
+          name: Service Level Objective
           phase: 1
           role: Service-level objective
           tier: process
@@ -613,13 +668,41 @@ taxonomy:
           sections:
             - Metrics
             - Source
-        EPISODE:
+        M-EPISODIC:
           phase: 6
-          role: Execution episode log
+          role: Episodic Memory
           tier: process
-          folder: episode
+          folder: M-EPISODIC
           sections:
             - Summary
+            - Compression
+            - Source
+        M-SESSION:
+          phase: 6
+          role: Session memory
+          tier: process
+          folder: M-SESSION
+          sections:
+            - Summary
+            - Compression
+            - Source
+        M-CORE:
+          phase: 6
+          role: Core memory
+          tier: process
+          folder: M-CORE
+          sections:
+            - Summary
+            - Compression
+            - Source
+        M-SPHERE:
+          phase: 6
+          role: Sphere memory
+          tier: process
+          folder: M-SPHERE
+          sections:
+            - Summary
+            - Compression
             - Source
         NARRATIVE:
           phase: 1

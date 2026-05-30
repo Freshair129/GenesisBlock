@@ -6,7 +6,7 @@ import {
   type CandidateWriteInput,
 } from './types.js'
 
-const ID_PATTERN = /^(CONCEPT|ADR|FEAT|BLUEPRINT|FRAME|AUDIT|PROTO)(?:-[a-zA-Z0-9-]+)?--[A-Z0-9-]+(?:--K\d+)?$/
+const ID_PATTERN = /^(CONCEPT|ADR|FEAT|BLUEPRINT|FRAME|AUDIT|PROTO|SPEC|ALGO|GENESIS|MOD|PARAMS|FRAMEWORK|COGNITIVE|SAFETY|MASTER|FLOW|ENTITY|API|ENDPOINT|ENTRYPOINT|STACK)(?:-[a-zA-Z0-9-]+)?--[A-Z0-9-]+(?:--K\d+)?$/
 
 export function assertValidProposedId(id: string): void {
   if (!ID_PATTERN.test(id)) throw new CandidateIdError(id)
@@ -34,9 +34,12 @@ export function composeFrontmatter(
   const prefix = input.proposed_id.split('-')[0]!
   const typeDef = lookupType(prefix, process.cwd())
   if (typeDef) {
+    lines.push(`phase: ${typeDef.phase}`)
+    lines.push(`tier: ${typeDef.tier}`)
     lines.push(`cluster: ${yamlScalar(typeDef.cluster)}`)
     lines.push(`role: ${yamlScalar(typeDef.role)}`)
   }
+  lines.push(`enforcement_state: inactive`)
   lines.push(`proposed_at: ${proposedAt}`)
   lines.push(`proposed_by: ${proposedBy}`)
   if (input.rationale !== undefined) lines.push(`rationale: ${yamlScalar(input.rationale)}`)
