@@ -1,6 +1,6 @@
 ---
 id: ALGO--KIMPACT-CALCULATION
-phase: 5
+phase: 2
 type: algo
 status: stable
 vault_id: GKS-CORE
