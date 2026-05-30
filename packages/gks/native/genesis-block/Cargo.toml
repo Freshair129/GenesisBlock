@@ -24,6 +24,7 @@ once_cell = "1.19"
 parking_lot = "0.12"
 sysinfo = "0.30"
 bincode = "1.3"
+hnsw_rs = "0.3.4"
 
 [build-dependencies]
 napi-build = "2.1"

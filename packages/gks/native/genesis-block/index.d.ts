@@ -12,6 +12,7 @@ export interface NodeInput {
   id?: string
   labels: Array<string>
   props?: any
+  embedding?: Array<number>
 }
 export interface NodeOutput {
   id: string
@@ -63,6 +64,11 @@ export interface NeighborOutput {
   path: Array<EdgeOutput>
   depth: number
 }
+export interface HybridSearchInput {
+  queryVector: Array<number>
+  k: number
+  alpha?: number
+}
 export interface DatabaseStatus {
   open: boolean
   readOnly: boolean
@@ -75,8 +81,8 @@ export declare class GenesisDatabase {
   addEdge(args: EdgeInput): Promise<EdgeOutput>
   retractEdge(id: string, at?: string | undefined | null): Promise<EdgeOutput | null>
   query(args: QueryInput): Promise<Array<EdgeOutput>>
+  hybridSearch(args: HybridSearchInput): Promise<Array<NeighborOutput>>
   neighbors(seed: string, args: NeighborInput): Promise<Array<NeighborOutput>>
-  cypher(query: string): Promise<any>
   compact(): Promise<void>
   schemaVersionSync(): number
   statusSync(): DatabaseStatus

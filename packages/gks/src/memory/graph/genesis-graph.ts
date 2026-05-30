@@ -85,6 +85,7 @@ interface Manifest {
 export interface GenesisGraphBackendApi extends GraphBackend {
   cypher(query: string): Promise<Array<Record<string, unknown>>>
   compact(): Promise<void>
+  hybridSearch(args: { queryVector: number[]; k: number; alpha?: number }): Promise<NeighborResult[]>
 }
 
 export function createGenesisGraphBackend(
@@ -98,7 +99,10 @@ export function createGenesisGraphBackend(
 function tryLoadNativeBackend(
   opts: GenesisGraphBackendOptions,
 ): NativeGenesisGraphBackend | null {
-  if (process.env.GKS_DISABLE_NATIVE_GRAPH || process.env.NODE_ENV === 'test') {
+  if (process.env.GKS_DISABLE_NATIVE_GRAPH) {
+    return null
+  }
+  if (process.env.NODE_ENV === 'test' && !process.env.GKS_FORCE_NATIVE_TEST) {
     return null
   }
   try {
@@ -160,6 +164,7 @@ interface NodeInputLike {
   id?: string
   labels: string[]
   props?: unknown
+  embedding?: number[]
 }
 
 interface EdgeInputLike {
@@ -191,12 +196,19 @@ interface NeighborInputLike {
   limit?: number
 }
 
+interface HybridSearchInputLike {
+  queryVector: number[]
+  k: number
+  alpha?: number
+}
+
 interface GenesisDatabaseLike {
   addNode(args: NodeInputLike): Promise<NodeOutputLike>
   addEdge(args: EdgeInputLike): Promise<EdgeOutputLike>
   retractEdge(id: string, at?: string | null): Promise<EdgeOutputLike | null>
   query(args: QueryInputLike): Promise<EdgeOutputLike[]>
   neighbors(seed: string, args: NeighborInputLike): Promise<NeighborOutputLike[]>
+  hybridSearch(args: HybridSearchInputLike): Promise<NeighborOutputLike[]>
   cypher(query: string): Promise<unknown>
   compact(): Promise<void>
 }
@@ -228,6 +240,7 @@ class NativeGenesisGraphBackend implements GenesisGraphBackendApi {
       id: args.id,
       labels: args.labels,
       props: args.props ?? {},
+      embedding: args.props?.embedding as number[] | undefined,
     })
     this.nodeCount.value++
     return toGraphNode(out)
@@ -279,6 +292,15 @@ class NativeGenesisGraphBackend implements GenesisGraphBackendApi {
   async cypher(query: string): Promise<Array<Record<string, unknown>>> {
     const out = await this.db.cypher(query)
     return out as Array<Record<string, unknown>>
+  }
+
+    async hybridSearch(args: { queryVector: number[]; k: number; alpha?: number }): Promise<NeighborResult[]> {
+    const out = await this.db.hybridSearch({
+      queryVector: args.queryVector,
+      k: args.k,
+      alpha: args.alpha,
+    })
+    return out.map(toNeighborResult)
   }
 
   async compact(): Promise<void> {
@@ -523,6 +545,10 @@ export class GenesisGraphBackend implements GenesisGraphBackendApi {
     await this.ensureLoaded()
     const plan = parseCypherV0(query)
     return this.executePlan(plan)
+  }
+
+    async hybridSearch(_args: { queryVector: number[]; k: number; alpha?: number }): Promise<NeighborResult[]> {
+    return [] // Vector search not supported in pure TS fallback
   }
 
   async compact(): Promise<void> {
