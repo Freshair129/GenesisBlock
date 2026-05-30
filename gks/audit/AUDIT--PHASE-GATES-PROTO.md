@@ -28,12 +28,12 @@ aliases:
   - Test results / quality report
 cluster: implementation_flow
 role: Test results / quality report
+linked_symbols:
+  - file: packages/msp/src/validator/proto/phase-gates.ts
+  - file: gks/proto/PROTO--PHASE-GATES.md
+  - file: packages/msp/test/validator/proto/phase-gates.test.ts
+  - file: scripts/msp/propose.mjs
 attributes:
-  linked_symbols:
-    - file: packages/msp/src/validator/proto/phase-gates.ts
-    - file: gks/proto/PROTO--PHASE-GATES.md
-    - file: packages/msp/test/validator/proto/phase-gates.test.ts
-    - file: scripts/msp/propose.mjs
   phase_override:
     skip_blueprint: true
     reason: PROTO atom + its predicate are M8a self-similar; the M8a

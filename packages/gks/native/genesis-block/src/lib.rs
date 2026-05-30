@@ -27,7 +27,7 @@ pub const SCHEMA_VERSION: u32 = 1;
 // --- Types (PROTOCOL §3) ---
 
 #[napi(object)]
-#[derive(Serialize, Deserialize, Clone)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct OpenOptions {
     pub path: String,
     pub page_cache_mb: Option<u32>,
@@ -35,6 +35,7 @@ pub struct OpenOptions {
 }
 
 #[napi(object)]
+#[derive(Debug)]
 pub struct NodeInput {
     pub id: Option<String>,
     pub labels: Vec<String>,
@@ -42,7 +43,7 @@ pub struct NodeInput {
 }
 
 #[napi(object)]
-#[derive(Serialize, Deserialize, Clone)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct NodeOutput {
     pub id: String,
     pub labels: Vec<String>,
@@ -51,6 +52,7 @@ pub struct NodeOutput {
 }
 
 #[napi(object)]
+#[derive(Debug)]
 pub struct EdgeInput {
     pub id: Option<String>,
     pub from: String,
@@ -63,7 +65,7 @@ pub struct EdgeInput {
 }
 
 #[napi(object)]
-#[derive(Serialize, Deserialize, Clone)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct EdgeOutput {
     pub id: String,
     pub from: String,
@@ -78,6 +80,7 @@ pub struct EdgeOutput {
 }
 
 #[napi(object)]
+#[derive(Debug)]
 pub struct QueryInput {
     pub from: Option<String>,
     pub to: Option<String>,
@@ -88,6 +91,7 @@ pub struct QueryInput {
 }
 
 #[napi(object)]
+#[derive(Debug)]
 pub struct NeighborInput {
     pub depth: Option<u32>,
     pub rel: Option<String>,
@@ -99,6 +103,7 @@ pub struct NeighborInput {
 }
 
 #[napi(object)]
+#[derive(Debug)]
 pub struct NeighborOutput {
     pub node: NodeOutput,
     pub path: Vec<EdgeOutput>,
@@ -106,6 +111,7 @@ pub struct NeighborOutput {
 }
 
 #[napi(object)]
+#[derive(Debug)]
 pub struct DatabaseStatus {
     pub open: bool,
     pub read_only: bool,
@@ -114,36 +120,35 @@ pub struct DatabaseStatus {
 
 // --- Internal Storage ---
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug)]
 #[serde(tag = "kind", content = "payload", rename_all = "snake_case")]
-enum Event {
+pub enum Event {
     Node(NodeOutput),
     Edge(EdgeOutput),
 }
 
 #[derive(Serialize, Deserialize)]
-struct Snapshot {
-    nodes: HashMap<String, NodeOutput>,
-    edges: HashMap<String, EdgeOutput>,
-    out_idx: HashMap<String, HashSet<String>>,
-    in_idx: HashMap<String, HashSet<String>>,
+pub struct Snapshot {
+    pub nodes: HashMap<String, NodeOutput>,
+    pub edges: HashMap<String, EdgeOutput>,
+    pub out_idx: HashMap<String, HashSet<String>>,
+    pub in_idx: HashMap<String, HashSet<String>>,
 }
 
-struct Storage {
-    #[allow(dead_code)]
-    path: PathBuf,
-    read_only: bool,
-    nodes: HashMap<String, NodeOutput>,
-    edges: HashMap<String, EdgeOutput>,
-    out_idx: HashMap<String, HashSet<String>>,
-    in_idx: HashMap<String, HashSet<String>>,
-    log_path: PathBuf,
-    bin_path: PathBuf,
-    _lock_file: Option<File>,
+pub struct Storage {
+    pub(crate) path: PathBuf,
+    pub(crate) read_only: bool,
+    pub(crate) nodes: HashMap<String, NodeOutput>,
+    pub(crate) edges: HashMap<String, EdgeOutput>,
+    pub(crate) out_idx: HashMap<String, HashSet<String>>,
+    pub(crate) in_idx: HashMap<String, HashSet<String>>,
+    pub(crate) log_path: PathBuf,
+    pub(crate) bin_path: PathBuf,
+    pub(crate) _lock_file: Option<File>,
 }
 
 impl Storage {
-    fn open(opts: OpenOptions) -> Result<Self> {
+    pub fn open(opts: OpenOptions) -> Result<Self> {
         let root = PathBuf::from(opts.path.clone());
         if !root.exists() {
             fs::create_dir_all(&root).map_err(|e| Error::from_reason(format!("genesis-block: io: {e}")))?;
@@ -203,7 +208,7 @@ impl Storage {
                     }
                 }
             }
-            storage.refresh_impacts();
+            storage.refresh_impacts(None);
         }
 
         Ok(storage)
@@ -301,12 +306,34 @@ impl Storage {
         (dd * 0.5) + (as_score * 0.3) + (sc * 0.2)
     }
 
-    fn refresh_impacts(&mut self) {
-        let ids: Vec<String> = self.nodes.keys().cloned().collect();
-        for id in ids {
-            let impact = self.compute_impact(self.nodes.get(&id).unwrap());
-            if let Some(node) = self.nodes.get_mut(&id) {
-                node.impact = Some(impact);
+    fn refresh_impacts(&mut self, affected_ids: Option<Vec<String>>) {
+        let ids_to_update = match affected_ids {
+            Some(ids) => {
+                // BFS to find all downstream nodes that might need an impact refresh
+                let mut queue = std::collections::VecDeque::from(ids);
+                let mut affected = HashSet::new();
+                while let Some(curr) = queue.pop_front() {
+                    if affected.insert(curr.clone()) {
+                        if let Some(edges) = self.out_idx.get(&curr) {
+                            for eid in edges {
+                                if let Some(e) = self.edges.get(eid) {
+                                    queue.push_back(e.to.clone());
+                                }
+                            }
+                        }
+                    }
+                }
+                affected.into_iter().collect::<Vec<_>>()
+            }
+            None => self.nodes.keys().cloned().collect(),
+        };
+
+        for id in ids_to_update {
+            if let Some(node) = self.nodes.get(&id) {
+                let impact = self.compute_impact(node);
+                if let Some(node_mut) = self.nodes.get_mut(&id) {
+                    node_mut.impact = Some(impact);
+                }
             }
         }
     }
@@ -324,7 +351,7 @@ impl Storage {
         Ok(())
     }
 
-    fn add_node(&mut self, args: NodeInput) -> Result<NodeOutput> {
+    pub fn add_node(&mut self, args: NodeInput) -> Result<NodeOutput> {
         self.ensure_writable()?;
         let id = args.id.unwrap_or_else(|| {
             let hash = format!("{:x}", md5::compute(format!("{:?}{:?}", args.labels, args.props)));
@@ -350,6 +377,7 @@ impl Storage {
             let n_cloned = n.clone();
             self.nodes.insert(id.clone(), n_cloned.clone());
             self.persist(&Event::Node(n_cloned.clone()))?;
+            self.refresh_impacts(Some(vec![id.clone()]));
             return Ok(n_cloned);
         }
 
@@ -362,12 +390,13 @@ impl Storage {
         let impact = self.compute_impact(&node);
         node.impact = Some(impact);
         
-        self.nodes.insert(id, node.clone());
+        self.nodes.insert(id.clone(), node.clone());
         self.persist(&Event::Node(node.clone()))?;
+        self.refresh_impacts(Some(vec![id]));
         Ok(node)
     }
 
-    fn add_edge(&mut self, args: EdgeInput) -> Result<EdgeOutput> {
+    pub fn add_edge(&mut self, args: EdgeInput) -> Result<EdgeOutput> {
         self.ensure_writable()?;
         if !self.nodes.contains_key(&args.from) {
             return Err(Error::from_reason(format!("genesis-block: add_edge: unknown from-node {}", args.from)));
@@ -427,13 +456,8 @@ impl Storage {
         let target_id = edge.to.clone();
         self.edges.insert(edge.id.clone(), edge.clone());
         
-        if let Some(target_node) = self.nodes.get(&target_id).cloned() {
-            let mut updated_node = target_node;
-            let new_impact = self.compute_impact(&updated_node);
-            updated_node.impact = Some(new_impact);
-            self.nodes.insert(target_id, updated_node.clone());
-            self.persist(&Event::Node(updated_node)).ok();
-        }
+        // When an edge is added, the 'to' node's incoming count changes, so its impact must be refreshed.
+        self.refresh_impacts(Some(vec![target_id]));
 
         self.persist(&Event::Edge(edge.clone()))?;
         Ok(edge)
@@ -497,6 +521,59 @@ impl Storage {
 
         Ok(())
     }
+    pub fn neighbors(&self, seed: String, args: NeighborInput) -> Result<Vec<NeighborOutput>> {
+        if !self.nodes.contains_key(&seed) { return Ok(Vec::new()); }
+        let depth = args.depth.unwrap_or(1);
+        let direction = args.direction.as_deref().unwrap_or("out");
+        
+        let mut target_rels = HashSet::new();
+        if let Some(r) = args.rel { target_rels.insert(r); }
+        if let Some(rs) = args.rels { target_rels.extend(rs); }
+
+        let mut results = Vec::new();
+        let mut visited = HashSet::new();
+        visited.insert(seed.clone());
+        let mut queue = std::collections::VecDeque::new();
+        queue.push_back((seed.clone(), Vec::new(), 0));
+        while let Some((curr_id, path, curr_depth)) = queue.pop_front() {
+            if curr_depth >= depth { continue; }
+            let mut edge_ids = HashSet::new();
+            if direction == "out" || direction == "both" { if let Some(eids) = self.out_idx.get(&curr_id) { edge_ids.extend(eids.clone()); } }
+            if direction == "in" || direction == "both" { if let Some(eids) = self.in_idx.get(&curr_id) { edge_ids.extend(eids.clone()); } }
+            
+            let mut edges_to_visit: Vec<EdgeOutput> = edge_ids.iter()
+                .filter_map(|eid| self.edges.get(eid))
+                .cloned()
+                .collect();
+            
+            // Sort edges by impact during expansion
+            edges_to_visit.sort_by(|a, b| b.impact.unwrap_or(0.0).partial_cmp(&a.impact.unwrap_or(0.0)).unwrap());
+
+            for edge in edges_to_visit {
+                if !target_rels.is_empty() && !target_rels.contains(&edge.rel) { continue; }
+                if !args.include_invalid.unwrap_or(false) && edge.valid_to.is_some() { continue; }
+                let next_id = if edge.from == curr_id { edge.to.clone() } else { edge.from.clone() };
+                if visited.contains(&next_id) { continue; }
+                visited.insert(next_id.clone());
+                if let Some(node) = self.nodes.get(&next_id) {
+                    let mut new_path = path.clone();
+                    new_path.push(edge.clone());
+                    results.push(NeighborOutput { node: node.clone(), path: new_path.clone(), depth: curr_depth + 1 });
+                    queue.push_back((next_id, new_path, curr_depth + 1));
+                }
+            }
+        }
+        
+        // Final result sorting by node impact
+        results.sort_by(|a, b| b.node.impact.unwrap_or(0.0).partial_cmp(&a.node.impact.unwrap_or(0.0)).unwrap());
+        
+        if let Some(limit) = args.limit {
+            if results.len() > limit as usize {
+                results.truncate(limit as usize);
+            }
+        }
+        Ok(results)
+    }
 }
 
 // --- Cypher v0 Engine ---
@@ -515,6 +592,9 @@ struct Predicate { alias: String, prop: String, equals: String }
 struct ReturnItem { kind: String, source: Option<String>, r#as: String }
 
 // --- N-API Class ---
+
+#[cfg(test)]
+mod performance_tests;
 
 #[napi]
 pub struct GenesisDatabase {
@@ -595,62 +675,8 @@ impl GenesisDatabase {
         let inner = Arc::clone(&self.inner);
         tokio::task::spawn_blocking(move || {
             let storage = inner.read();
-            Self::neighbors_internal(&storage, seed, args)
+            storage.neighbors(seed, args)
         }).await.map_err(|e| Error::from_reason(format!("join: {e}")))?
-    }
-
-    fn neighbors_internal(storage: &Storage, seed: String, args: NeighborInput) -> Result<Vec<NeighborOutput>> {
-        if !storage.nodes.contains_key(&seed) { return Ok(Vec::new()); }
-        let depth = args.depth.unwrap_or(1);
-        let direction = args.direction.as_deref().unwrap_or("out");
-        
-        let mut target_rels = HashSet::new();
-        if let Some(r) = args.rel { target_rels.insert(r); }
-        if let Some(rs) = args.rels { target_rels.extend(rs); }
-
-        let mut results = Vec::new();
-        let mut visited = HashSet::new();
-        visited.insert(seed.clone());
-        let mut queue = std::collections::VecDeque::new();
-        queue.push_back((seed.clone(), Vec::new(), 0));
-        while let Some((curr_id, path, curr_depth)) = queue.pop_front() {
-            if curr_depth >= depth { continue; }
-            let mut edge_ids = HashSet::new();
-            if direction == "out" || direction == "both" { if let Some(eids) = storage.out_idx.get(&curr_id) { edge_ids.extend(eids.clone()); } }
-            if direction == "in" || direction == "both" { if let Some(eids) = storage.in_idx.get(&curr_id) { edge_ids.extend(eids.clone()); } }
-            
-            let mut edges_to_visit: Vec<EdgeOutput> = edge_ids.iter()
-                .filter_map(|eid| storage.edges.get(eid))
-                .cloned()
-                .collect();
-            
-            // Sort edges by impact during expansion
-            edges_to_visit.sort_by(|a, b| b.impact.unwrap_or(0.0).partial_cmp(&a.impact.unwrap_or(0.0)).unwrap());
-
-            for edge in edges_to_visit {
-                if !target_rels.is_empty() && !target_rels.contains(&edge.rel) { continue; }
-                if !args.include_invalid.unwrap_or(false) && edge.valid_to.is_some() { continue; }
-                let next_id = if edge.from == curr_id { edge.to.clone() } else { edge.from.clone() };
-                if visited.contains(&next_id) { continue; }
-                visited.insert(next_id.clone());
-                if let Some(node) = storage.nodes.get(&next_id) {
-                    let mut new_path = path.clone();
-                    new_path.push(edge.clone());
-                    results.push(NeighborOutput { node: node.clone(), path: new_path.clone(), depth: curr_depth + 1 });
-                    queue.push_back((next_id, new_path, curr_depth + 1));
-                }
-            }
-        }
-        
-        // Final result sorting by node impact
-        results.sort_by(|a, b| b.node.impact.unwrap_or(0.0).partial_cmp(&a.node.impact.unwrap_or(0.0)).unwrap());
-        
-        if let Some(limit) = args.limit {
-            if results.len() > limit as usize {
-                results.truncate(limit as usize);
-            }
-        }
-        Ok(results)
     }
 
     #[napi]
@@ -702,7 +728,7 @@ impl GenesisDatabase {
                     if val != p.equals { return Ok(Value::Array(Vec::new())); }
                 }
             }
-            let reached = Self::neighbors_internal(&storage, seed_id.clone(), NeighborInput { 
+            let reached = storage.neighbors(seed_id.clone(), NeighborInput { 
                 depth: Some(max_hops), 
                 rel: None,
                 rels: Some(rels.clone()), 

@@ -38,7 +38,7 @@ attributes:
   encryption_level: none
 linked_symbols:
   - file: packages/gks/src/memory/atomic-id.ts
-  - file: packages/msp/src/validator/utils/registry.ts
+  - file: src/validator/utils/registry.ts
   - file: scripts/msp/msp-atom.ts
   - file: scripts/msp/codegen-schemas.ts
   - file: atom_registry.yaml
@@ -50,7 +50,7 @@ linked_symbols:
 
 * [atom_registry.yaml](file:///c:/Users/freshair/cognitive_system/atom_registry.yaml)
 * [atomic-id.ts](file:///c:/Users/freshair/cognitive_system/packages/gks/src/memory/atomic-id.ts)
-* [registry.ts](file:///c:/Users/freshair/cognitive_system/packages/msp/src/validator/utils/registry.ts)
+* [registry.ts](file:///c:/Users/freshair/cognitive_system/src/validator/utils/registry.ts)
 * [msp-atom.ts](file:///c:/Users/freshair/cognitive_system/scripts/msp/msp-atom.ts)
 * [codegen-schemas.ts](file:///c:/Users/freshair/cognitive_system/scripts/msp/codegen-schemas.ts)
 
@@ -85,7 +85,7 @@ linked_symbols:
   * [x] Purge all redundant `primary_key`, `sequence_key`, `search_key`, `phase_key` attributes from individual types.
 * [x] **Core Validation Adapters**:
   * [x] Relax `ATOMIC_ID_PATTERN` regex in `packages/gks/src/memory/atomic-id.ts` to support both legacy and compound formats.
-  * [x] Update prefix splitter in `packages/msp/src/validator/utils/registry.ts` and `required-fields.ts` to split by `-` instead of `--`.
+  * [x] Update prefix splitter in `src/validator/utils/registry.ts` and `required-fields.ts` to split by `-` instead of `--`.
   * [x] Adapt parser in `registry.ts` to support nested taxonomy.
 * [x] **Code Generation & Scaffolder**:
   * [x] Update `scripts/msp/msp-atom.ts` to resolve counter levels and templates dynamically from `registry.schema_config`.

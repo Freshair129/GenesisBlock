@@ -5,7 +5,7 @@ type: concept
 status: stable
 vault_id: default
 tier: process
-source_type: axiomatic
+source_type:
 title: ABAC policy engine — PDP / PEP separation, policy as data
 tags:
   - msp
@@ -15,7 +15,7 @@ tags:
   - pdp
   - pep
   - policy
-crosslinks:
+crosslinks: 
   references:
     - FRAMEWORK--UNIVERSAL-CONTEXT-FRAMEWORK
     - CONCEPT--SUBJECT-RESOURCE-ACTION-CONTEXT
