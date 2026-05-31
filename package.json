@@ -4,13 +4,8 @@
   "description": "Genesis Block — native Rust embedded graph engine for GKS (P3.1 scaffold)",
   "main": "index.js",
   "types": "index.d.ts",
-  "files": [
-    "index.d.ts",
-    "index.js",
-    "package.json"
-  ],
   "license": "MIT",
-  "private": true,
+  "private": false,
   "engines": {
     "node": ">=20"
   },
