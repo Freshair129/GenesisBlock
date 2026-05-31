@@ -3,6 +3,7 @@ use std::sync::Arc;
 use axum::{
     extract::{Json, State},
     http::StatusCode,
+    response::IntoResponse,
     routing::{get, post},
     Router,
 };
@@ -13,8 +14,7 @@ use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
 // Import core engine from the library
 use genesis_block_native::{
-    Storage, OpenOptions, NodeInput, NodeOutput, EdgeInput, EdgeOutput,
-    QueryInput, HybridSearchInput, NeighborOutput, DatabaseStatus
+    Storage, OpenOptions, NodeInput, EdgeInput, QueryInput, HybridSearchInput
 };
 
 #[derive(Clone)]
@@ -22,72 +22,71 @@ struct AppState {
     storage: Arc<RwLock<Storage>>,
 }
 
-type HandlerResult<T> = Result<Json<T>, (StatusCode, String)>;
-
 async fn add_node_handler(
     State(state): State<AppState>,
     Json(input): Json<NodeInput>,
-) -> HandlerResult<NodeOutput> {
+) -> impl IntoResponse {
     let mut storage = state.storage.write();
-    storage.add_node(input)
-        .map(Json)
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))
+    match storage.add_node(input) {
+        Ok(node) => (StatusCode::OK, Json(node)).into_response(),
+        Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
+    }
 }
 
 async fn add_edge_handler(
     State(state): State<AppState>,
     Json(input): Json<EdgeInput>,
-) -> HandlerResult<EdgeOutput> {
+) -> impl IntoResponse {
     let mut storage = state.storage.write();
-    storage.add_edge(input)
-        .map(Json)
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))
+    match storage.add_edge(input) {
+        Ok(edge) => (StatusCode::OK, Json(edge)).into_response(),
+        Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
+    }
 }
 
 async fn query_handler(
     State(state): State<AppState>,
     Json(input): Json<QueryInput>,
-) -> HandlerResult<Vec<EdgeOutput>> {
+) -> impl IntoResponse {
     let storage = state.storage.read();
-    storage.query(input)
-        .map(Json)
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))
+    match storage.query(input) {
+        Ok(results) => (StatusCode::OK, Json(results)).into_response(),
+        Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
+    }
 }
 
 async fn hybrid_search_handler(
     State(state): State<AppState>,
     Json(input): Json<HybridSearchInput>,
-) -> HandlerResult<Vec<NeighborOutput>> {
+) -> impl IntoResponse {
     let storage = state.storage.read();
-    storage.hybrid_search(input)
-        .map(Json)
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))
+    match storage.hybrid_search(input) {
+        Ok(results) => (StatusCode::OK, Json(results)).into_response(),
+        Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
+    }
 }
 
 async fn status_handler(
     State(state): State<AppState>,
-) -> Json<DatabaseStatus> {
+) -> impl IntoResponse {
     let storage = state.storage.read();
     Json(storage.status_sync())
 }
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    // Initialize tracing
     tracing_subscriber::registry()
         .with(tracing_subscriber::EnvFilter::try_from_default_env()
             .unwrap_or_else(|_| "genesis_db_server=info,tower_http=debug".into()))
         .with(tracing_subscriber::fmt::layer())
         .init();
 
-    // Configuration from environment
     let data_dir = std::env::var("GENESIS_DATA_DIR").unwrap_or_else(|_| ".brain/gks/storage".into());
     let port: u16 = std::env::var("GENESIS_PORT")
         .ok()
         .and_then(|p| p.parse().ok())
         .unwrap_or(3000);
 
-    // Initialize storage
     let storage = Storage::open(OpenOptions {
         path: data_dir,
         page_cache_mb: Some(64),
@@ -98,7 +97,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         storage: Arc::new(RwLock::new(storage)),
     };
 
-    // Build router
     let app = Router::new()
         .route("/v1/node/add", post(add_node_handler))
         .route("/v1/edge/add", post(add_edge_handler))
@@ -109,7 +107,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .layer(CorsLayer::permissive())
         .with_state(state);
 
-    // Start server
     let addr = SocketAddr::from(([0, 0, 0, 0], port));
     let listener = tokio::net::TcpListener::bind(addr).await?;
     tracing::info!("GenesisDB Standalone Server listening on {}", addr);
