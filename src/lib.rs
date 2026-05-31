@@ -34,7 +34,7 @@ pub struct OpenOptions {
 }
 
 #[napi(object)]
-#[derive(Debug)]
+#[derive(Serialize, Deserialize, Debug)]
 pub struct NodeInput {
     pub id: Option<String>,
     pub labels: Vec<String>,
@@ -54,7 +54,7 @@ pub struct NodeOutput {
 }
 
 #[napi(object)]
-#[derive(Debug)]
+#[derive(Serialize, Deserialize, Debug)]
 pub struct EdgeInput {
     pub id: Option<String>,
     pub from: String,
@@ -82,7 +82,7 @@ pub struct EdgeOutput {
 }
 
 #[napi(object)]
-#[derive(Debug)]
+#[derive(Serialize, Deserialize, Debug)]
 pub struct QueryInput {
     pub from: Option<String>,
     pub to: Option<String>,
@@ -93,19 +93,19 @@ pub struct QueryInput {
 }
 
 #[napi(object)]
-#[derive(Debug)]
+#[derive(Serialize, Deserialize, Debug)]
 pub struct NeighborInput {
     pub depth: Option<u32>,
     pub rel: Option<String>,
     pub rels: Option<Vec<String>>,
-    pub direction: Option<String>, // 'out' | 'in' | 'both'
+    pub direction: Option<String>,
     pub as_of: Option<String>,
     pub include_invalid: Option<bool>,
     pub limit: Option<u32>,
 }
 
 #[napi(object)]
-#[derive(Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct NeighborOutput {
     pub node: NodeOutput,
     pub path: Vec<EdgeOutput>,
@@ -113,7 +113,7 @@ pub struct NeighborOutput {
 }
 
 #[napi(object)]
-#[derive(Debug)]
+#[derive(Serialize, Deserialize, Debug)]
 pub struct HybridSearchInput {
     pub query_vector: Vec<f64>,
     pub k: u32,
@@ -121,7 +121,7 @@ pub struct HybridSearchInput {
 }
 
 #[napi(object)]
-#[derive(Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct DatabaseStatus {
     pub open: bool,
     pub read_only: bool,
@@ -158,62 +158,44 @@ pub struct NodeMetadata {
 }
 
 pub struct Storage {
-    pub(crate) path: PathBuf,
-    pub(crate) read_only: bool,
-    pub(crate) nodes: HashMap<String, NodeOutput>,
-    pub(crate) edges: HashMap<String, EdgeOutput>,
-    pub(crate) out_idx: HashMap<String, HashSet<String>>,
-    pub(crate) in_idx: HashMap<String, HashSet<String>>,
-    pub(crate) vector_arena: Vec<f32>,
-    pub(crate) metadata_arena: Vec<NodeMetadata>,
-    pub(crate) hnsw_index: Option<Hnsw<'static, f32, DistL2>>,
-    pub(crate) log_path: PathBuf,
-    pub(crate) bin_path: PathBuf,
-    pub(crate) _lock_file: Option<File>,
+    pub path: PathBuf,
+    pub read_only: bool,
+    pub nodes: HashMap<String, NodeOutput>,
+    pub edges: HashMap<String, EdgeOutput>,
+    pub out_idx: HashMap<String, HashSet<String>>,
+    pub in_idx: HashMap<String, HashSet<String>>,
+    pub vector_arena: Vec<f32>,
+    pub metadata_arena: Vec<NodeMetadata>,
+    pub hnsw_index: Option<Hnsw<'static, f32, DistL2>>,
+    pub log_path: PathBuf,
+    pub bin_path: PathBuf,
+    pub _lock_file: Option<File>,
 }
 
 impl Storage {
-    pub(crate) fn allocate_aligned_offset(current_offset: usize, align: usize) -> usize {
-        if current_offset % align == 0 {
-            current_offset
-        } else {
-            current_offset + align - (current_offset % align)
-        }
+    pub fn allocate_aligned_offset(current_offset: usize, align: usize) -> usize {
+        if current_offset % align == 0 { current_offset } else { current_offset + align - (current_offset % align) }
     }
 
     fn init_hnsw() -> Hnsw<'static, f32, DistL2> {
         Hnsw::new(16, 1000000, 16, 200, DistL2 {})
     }
 
-    fn add_vector_internal(&mut self, node_id: &str, emb_64: Vec<f64>) {
+    pub fn add_vector_internal(&mut self, node_id: &str, emb_64: Vec<f64>) {
         let emb: Vec<f32> = emb_64.into_iter().map(|v| v as f32).collect();
         let dim = emb.len() as u16;
         let current_vec_len = self.vector_arena.len();
         let aligned_offset = Self::allocate_aligned_offset(current_vec_len, 16);
-        
-        if aligned_offset > current_vec_len {
-            self.vector_arena.resize(aligned_offset, 0.0);
-        }
-        
+        if aligned_offset > current_vec_len { self.vector_arena.resize(aligned_offset, 0.0); }
         self.vector_arena.extend(emb.clone());
-        
         let arena_id = self.metadata_arena.len() as u32;
         let metadata = NodeMetadata {
-            arena_id,
-            node_id: node_id.to_string(),
-            timestamp: Utc::now().timestamp() as u64,
-            vector_dim: dim,
-            embedding_offset: aligned_offset as u64,
-            gks_attributes: Vec::new(),
+            arena_id, node_id: node_id.to_string(), timestamp: Utc::now().timestamp() as u64,
+            vector_dim: dim, embedding_offset: aligned_offset as u64, gks_attributes: Vec::new(),
         };
         self.metadata_arena.push(metadata);
-
-        if self.hnsw_index.is_none() {
-            self.hnsw_index = Some(Self::init_hnsw());
-        }
-        if let Some(ref mut hnsw) = self.hnsw_index {
-            hnsw.insert((&emb, arena_id as usize));
-        }
+        if self.hnsw_index.is_none() { self.hnsw_index = Some(Self::init_hnsw()); }
+        if let Some(ref mut hnsw) = self.hnsw_index { hnsw.insert((&emb, arena_id as usize)); }
     }
 
     fn rehydrate_hnsw_index(&mut self) {
@@ -232,9 +214,7 @@ impl Storage {
 
     pub fn open(opts: OpenOptions) -> Result<Self> {
         let root = PathBuf::from(opts.path.clone());
-        if !root.exists() {
-            fs::create_dir_all(&root).map_err(|e| Error::from_reason(format!("genesis-block: io: {e}")))?;
-        }
+        if !root.exists() { fs::create_dir_all(&root).map_err(|e| Error::from_reason(format!("genesis-block: io: {e}")))?; }
         let read_only = opts.read_only.unwrap_or(false);
         let lock_file = Self::acquire_os_lock(&root, read_only)?;
         let log_path = root.join("genesis-graph.jsonl");
@@ -245,24 +225,19 @@ impl Storage {
             vector_arena: Vec::new(), metadata_arena: Vec::new(),
             hnsw_index: None, log_path: log_path.clone(), bin_path, _lock_file: Some(lock_file),
         };
-
         if storage.bin_path.exists() {
             if let Ok(mut file) = File::open(&storage.bin_path) {
                 let mut buffer = Vec::new();
                 if file.read_to_end(&mut buffer).is_ok() {
                     if let Ok(snapshot) = bincode::deserialize::<Snapshot>(&buffer) {
-                        storage.nodes = snapshot.nodes;
-                        storage.edges = snapshot.edges;
-                        storage.out_idx = snapshot.out_idx;
-                        storage.in_idx = snapshot.in_idx;
-                        storage.vector_arena = snapshot.vector_arena;
-                        storage.metadata_arena = snapshot.metadata_arena;
+                        storage.nodes = snapshot.nodes; storage.edges = snapshot.edges;
+                        storage.out_idx = snapshot.out_idx; storage.in_idx = snapshot.in_idx;
+                        storage.vector_arena = snapshot.vector_arena; storage.metadata_arena = snapshot.metadata_arena;
                     }
                 }
             }
         }
         storage.rehydrate_hnsw_index();
-
         if log_path.exists() {
             let file = FileOpenOptions::new().read(true).open(&log_path).map_err(|e| Error::from_reason(format!("io: {e}")))?;
             let reader = BufReader::new(file);
@@ -308,45 +283,39 @@ impl Storage {
         Ok(file)
     }
 
-    fn ensure_writable(&self) -> Result<()> {
-        if self.read_only { return Err(Error::from_reason("read-only")); }
-        Ok(())
-    }
+    pub fn ensure_writable(&self) -> Result<()> { if self.read_only { return Err(Error::from_reason("read-only")); } Ok(()) }
 
-    fn index_edge_internal(&mut self, id: &str, from: &str, to: &str) {
+    pub fn index_edge_internal(&mut self, id: &str, from: &str, to: &str) {
         self.out_idx.entry(from.to_string()).or_default().insert(id.to_string());
         self.in_idx.entry(to.to_string()).or_default().insert(id.to_string());
     }
 
-    fn calculate_as(&self, id: &str) -> f64 {
+    pub fn calculate_as(&self, id: &str) -> f64 {
         if id.starts_with("MASTER--") || id.starts_with("FRAME--") { 1.0 }
         else if id.starts_with("CONCEPT--") || id.starts_with("SPEC--") { 0.8 }
         else if id.starts_with("FEAT--") || id.starts_with("ADR--") || id.starts_with("BLUEPRINT--") { 0.6 }
         else { 0.3 }
     }
 
-    fn calculate_sc(&self, node: &NodeOutput) -> f64 {
+    pub fn calculate_sc(&self, node: &NodeOutput) -> f64 {
         let status = node.props.get("status").and_then(|v| v.as_str()).unwrap_or("active");
         match status { "stable" => 1.0, "active" => 0.8, "draft" => 0.4, "deprecated" => 0.1, _ => 0.6 }
     }
 
-    fn calculate_dd(&self, id: &str) -> f64 {
+    pub fn calculate_dd(&self, id: &str) -> f64 {
         let incoming = self.in_idx.get(id).map_or(0, |set| set.len());
         (incoming as f64 / 10.0).min(1.0)
     }
 
-    fn compute_impact(&self, node: &NodeOutput) -> f64 {
-        let dd = self.calculate_dd(&node.id);
-        let as_score = self.calculate_as(&node.id);
-        let sc = self.calculate_sc(node);
-        (dd * 0.5) + (as_score * 0.3) + (sc * 0.2)
+    pub fn compute_impact(&self, node: &NodeOutput) -> f64 {
+        let dd = self.calculate_dd(&node.id); let as_score = self.calculate_as(&node.id);
+        let sc = self.calculate_sc(node); (dd * 0.5) + (as_score * 0.3) + (sc * 0.2)
     }
 
     pub fn refresh_impacts(&mut self, affected_ids: Option<Vec<String>>) {
         let ids_to_update = match affected_ids {
             Some(ids) => {
-                let mut queue = std::collections::VecDeque::from(ids);
-                let mut affected = HashSet::new();
+                let mut queue = std::collections::VecDeque::from(ids); let mut affected = HashSet::new();
                 while let Some(curr) = queue.pop_front() {
                     if affected.insert(curr.clone()) {
                         if let Some(edges) = self.out_idx.get(&curr) {
@@ -366,7 +335,7 @@ impl Storage {
         }
     }
 
-    fn persist(&self, event: &Event) -> Result<()> {
+    pub fn persist(&self, event: &Event) -> Result<()> {
         self.ensure_writable()?;
         let mut file = FileOpenOptions::new().create(true).append(true).open(&self.log_path).map_err(|e| Error::from_reason(format!("io: {e}")))?;
         let line = serde_json::to_string(event).map_err(|e| Error::from_reason(e.to_string()))?;
@@ -390,25 +359,18 @@ impl Storage {
             }
             n.labels = labels; n.props = Value::Object(props);
             let impact = self.compute_impact(n); n.impact = Some(impact);
-            self.nodes.insert(id.clone(), n.clone());
-            self.persist(&Event::Node(n.clone()))?;
-            self.refresh_impacts(Some(vec![id.clone()]));
-            return Ok(n.clone());
+            self.nodes.insert(id.clone(), n.clone()); self.persist(&Event::Node(n.clone()))?;
+            self.refresh_impacts(Some(vec![id.clone()])); return Ok(n.clone());
         }
         let mut node = NodeOutput {
             id: id.clone(), labels: args.labels,
             props: args.props.unwrap_or(Value::Object(Default::default())),
             impact: None, embedding: None,
         };
-        if let Some(emb) = args.embedding {
-            self.add_vector_internal(&id, emb.clone());
-            node.embedding = Some(emb);
-        }
+        if let Some(emb) = args.embedding { self.add_vector_internal(&id, emb.clone()); node.embedding = Some(emb); }
         let impact = self.compute_impact(&node); node.impact = Some(impact);
-        self.nodes.insert(id.clone(), node.clone());
-        self.persist(&Event::Node(node.clone()))?;
-        self.refresh_impacts(Some(vec![id]));
-        Ok(node)
+        self.nodes.insert(id.clone(), node.clone()); self.persist(&Event::Node(node.clone()))?;
+        self.refresh_impacts(Some(vec![id])); Ok(node)
     }
 
     pub fn add_edge(&mut self, args: EdgeInput) -> Result<EdgeOutput> {
@@ -426,45 +388,31 @@ impl Storage {
             valid_to: None, recorded_at: now, superseded_by: None, impact: args.impact,
         };
         self.index_edge_internal(&edge.id, &edge.from, &edge.to);
-        let target_id = edge.to.clone();
-        self.edges.insert(edge.id.clone(), edge.clone());
-        self.refresh_impacts(Some(vec![target_id]));
-        self.persist(&Event::Edge(edge.clone()))?;
+        let target_id = edge.to.clone(); self.edges.insert(edge.id.clone(), edge.clone());
+        self.refresh_impacts(Some(vec![target_id])); self.persist(&Event::Edge(edge.clone()))?;
         Ok(edge)
     }
 
-    pub fn compact(&self) -> Result<()> {
-        self.ensure_writable()?;
-        let tmp_path = self.path.join("genesis-graph.jsonl.tmp");
-        let mut file = FileOpenOptions::new().create(true).write(true).truncate(true).open(&tmp_path).map_err(|e| Error::from_reason(format!("compact: {e}")))?;
-        for node in self.nodes.values() {
-            let line = serde_json::to_string(&Event::Node(node.clone())).unwrap();
-            writeln!(file, "{}", line).ok();
+    pub fn query(&self, args: QueryInput) -> Result<Vec<EdgeOutput>> {
+        let as_of_ms = args.as_of.as_ref().and_then(|s| chrono::DateTime::parse_from_rfc3339(s).ok()).map(|dt| dt.timestamp_millis());
+        let mut results = Vec::new();
+        for e in self.edges.values() {
+            if let Some(ref from) = args.from { if e.from != *from { continue; } }
+            if let Some(ref to) = args.to { if e.to != *to { continue; } }
+            if let Some(ref rel) = args.rel { if e.rel != *rel { continue; } }
+            let is_valid = if let Some(ms) = as_of_ms {
+                let from_ms = chrono::DateTime::parse_from_rfc3339(&e.valid_from).map(|dt| dt.timestamp_millis()).unwrap_or(0);
+                let to_ms = e.valid_to.as_ref().and_then(|s| chrono::DateTime::parse_from_rfc3339(s).ok()).map(|dt| dt.timestamp_millis());
+                ms >= from_ms && to_ms.map_or(true, |end| ms < end)
+            } else { args.include_invalid.unwrap_or(false) || e.valid_to.is_none() };
+            if is_valid { results.push(e.clone()); }
         }
-        for edge in self.edges.values() {
-            if edge.valid_to.is_none() {
-                let line = serde_json::to_string(&Event::Edge(edge.clone())).unwrap();
-                writeln!(file, "{}", line).ok();
-            }
-        }
-        file.flush().ok(); drop(file); fs::rename(&tmp_path, &self.log_path).ok();
-        let snapshot = Snapshot {
-            nodes: self.nodes.clone(), edges: self.edges.clone(),
-            out_idx: self.out_idx.clone(), in_idx: self.in_idx.clone(),
-            vector_arena: self.vector_arena.clone(), metadata_arena: self.metadata_arena.clone(),
-        };
-        if let Ok(encoded) = bincode::serialize(&snapshot) { fs::write(&self.bin_path, encoded).ok(); }
-        Ok(())
+        results.sort_by(|a, b| b.impact.unwrap_or(0.0).partial_cmp(&a.impact.unwrap_or(0.0)).unwrap());
+        if let Some(limit) = args.limit { if results.len() > limit as usize { results.truncate(limit as usize); } }
+        Ok(results)
     }
 
-    pub fn retract_edge(&mut self, id: String, at: Option<String>) -> Result<Option<EdgeOutput>> {
-        self.ensure_writable()?;
-        let e = match self.edges.get_mut(&id) { Some(e) => e, None => return Ok(None) };
-        if e.valid_to.is_some() { return Ok(Some(e.clone())); }
-        let at = at.unwrap_or_else(|| Utc::now().to_rfc3339());
-        e.valid_to = Some(at); let retired = e.clone();
-        self.persist(&Event::Edge(retired.clone()))?; Ok(Some(retired))
-    }
+    pub fn status_sync(&self) -> DatabaseStatus { DatabaseStatus { open: true, read_only: self.read_only, page_cache_mb: 64 } }
 
     pub fn hybrid_search(&self, args: HybridSearchInput) -> Result<Vec<NeighborOutput>> {
         let hnsw = match &self.hnsw_index { Some(idx) => idx, None => return Err(Error::from_reason("HNSW index not initialized")) };
@@ -518,6 +466,29 @@ impl Storage {
         if let Some(limit) = args.limit { if results.len() > limit as usize { results.truncate(limit as usize); } }
         Ok(results)
     }
+
+    pub fn compact(&self) -> Result<()> {
+        self.ensure_writable()?;
+        let tmp_path = self.path.join("genesis-graph.jsonl.tmp");
+        let mut file = FileOpenOptions::new().create(true).write(true).truncate(true).open(&tmp_path).map_err(|e| Error::from_reason(format!("compact: {e}")))?;
+        for node in self.nodes.values() { let line = serde_json::to_string(&Event::Node(node.clone())).unwrap(); writeln!(file, "{}", line).ok(); }
+        for edge in self.edges.values() { if edge.valid_to.is_none() { let line = serde_json::to_string(&Event::Edge(edge.clone())).unwrap(); writeln!(file, "{}", line).ok(); } }
+        file.flush().ok(); drop(file); fs::rename(&tmp_path, &self.log_path).ok();
+        let snapshot = Snapshot {
+            nodes: self.nodes.clone(), edges: self.edges.clone(), out_idx: self.out_idx.clone(), in_idx: self.in_idx.clone(),
+            vector_arena: self.vector_arena.clone(), metadata_arena: self.metadata_arena.clone(),
+        };
+        if let Ok(encoded) = bincode::serialize(&snapshot) { fs::write(&self.bin_path, encoded).ok(); }
+        Ok(())
+    }
+
+    pub fn retract_edge(&mut self, id: String, at: Option<String>) -> Result<Option<EdgeOutput>> {
+        self.ensure_writable()?;
+        let e = match self.edges.get_mut(&id) { Some(e) => e, None => return Ok(None) };
+        if e.valid_to.is_some() { return Ok(Some(e.clone())); }
+        let at = at.unwrap_or_else(|| Utc::now().to_rfc3339()); e.valid_to = Some(at);
+        let retired = e.clone(); self.persist(&Event::Edge(retired.clone()))?; Ok(Some(retired))
+    }
 }
 
 #[napi]
@@ -532,63 +503,37 @@ impl GenesisDatabase {
     }
     #[napi]
     pub async fn add_node(&self, args: NodeInput) -> Result<NodeOutput> {
-        let inner = Arc::clone(&self.inner);
-        tokio::task::spawn_blocking(move || inner.write().add_node(args)).await.map_err(|e| Error::from_reason(format!("join: {e}")))?
+        let inner = Arc::clone(&self.inner); tokio::task::spawn_blocking(move || inner.write().add_node(args)).await.map_err(|e| Error::from_reason(format!("join: {e}")))?
     }
     #[napi]
     pub async fn add_edge(&self, args: EdgeInput) -> Result<EdgeOutput> {
-        let inner = Arc::clone(&self.inner);
-        tokio::task::spawn_blocking(move || inner.write().add_edge(args)).await.map_err(|e| Error::from_reason(format!("join: {e}")))?
+        let inner = Arc::clone(&self.inner); tokio::task::spawn_blocking(move || inner.write().add_edge(args)).await.map_err(|e| Error::from_reason(format!("join: {e}")))?
     }
     #[napi]
     pub async fn retract_edge(&self, id: String, at: Option<String>) -> Result<Option<EdgeOutput>> {
-        let inner = Arc::clone(&self.inner);
-        tokio::task::spawn_blocking(move || inner.write().retract_edge(id, at)).await.map_err(|e| Error::from_reason(format!("join: {e}")))?
+        let inner = Arc::clone(&self.inner); tokio::task::spawn_blocking(move || inner.write().retract_edge(id, at)).await.map_err(|e| Error::from_reason(format!("join: {e}")))?
     }
     #[napi]
     pub async fn query(&self, args: QueryInput) -> Result<Vec<EdgeOutput>> {
-        let inner = Arc::clone(&self.inner);
-        tokio::task::spawn_blocking(move || {
-            let storage = inner.read();
-            let as_of_ms = args.as_of.as_ref().and_then(|s| chrono::DateTime::parse_from_rfc3339(s).ok()).map(|dt| dt.timestamp_millis());
-            let mut results = Vec::new();
-            for e in storage.edges.values() {
-                if let Some(ref from) = args.from { if e.from != *from { continue; } }
-                if let Some(ref to) = args.to { if e.to != *to { continue; } }
-                if let Some(ref rel) = args.rel { if e.rel != *rel { continue; } }
-                let is_valid = if let Some(ms) = as_of_ms {
-                    let from_ms = chrono::DateTime::parse_from_rfc3339(&e.valid_from).map(|dt| dt.timestamp_millis()).unwrap_or(0);
-                    let to_ms = e.valid_to.as_ref().and_then(|s| chrono::DateTime::parse_from_rfc3339(s).ok()).map(|dt| dt.timestamp_millis());
-                    ms >= from_ms && to_ms.map_or(true, |end| ms < end)
-                } else { args.include_invalid.unwrap_or(false) || e.valid_to.is_none() };
-                if is_valid { results.push(e.clone()); }
-            }
-            results.sort_by(|a, b| b.impact.unwrap_or(0.0).partial_cmp(&a.impact.unwrap_or(0.0)).unwrap());
-            if let Some(limit) = args.limit { if results.len() > limit as usize { results.truncate(limit as usize); } }
-            Ok(results)
-        }).await.map_err(|e| Error::from_reason(format!("join: {e}")))?
+        let inner = Arc::clone(&self.inner); tokio::task::spawn_blocking(move || inner.read().query(args)).await.map_err(|e| Error::from_reason(format!("join: {e}")))?
     }
     #[napi]
     pub async fn hybrid_search(&self, args: HybridSearchInput) -> Result<Vec<NeighborOutput>> {
-        let inner = Arc::clone(&self.inner);
-        tokio::task::spawn_blocking(move || inner.read().hybrid_search(args)).await.map_err(|e| Error::from_reason(format!("join: {e}")))?
+        let inner = Arc::clone(&self.inner); tokio::task::spawn_blocking(move || inner.read().hybrid_search(args)).await.map_err(|e| Error::from_reason(format!("join: {e}")))?
     }
     #[napi]
     pub async fn neighbors(&self, seed: String, args: NeighborInput) -> Result<Vec<NeighborOutput>> {
-        let inner = Arc::clone(&self.inner);
-        tokio::task::spawn_blocking(move || inner.read().neighbors(seed, args)).await.map_err(|e| Error::from_reason(format!("join: {e}")))?
+        let inner = Arc::clone(&self.inner); tokio::task::spawn_blocking(move || inner.read().neighbors(seed, args)).await.map_err(|e| Error::from_reason(format!("join: {e}")))?
     }
     #[napi]
     pub async fn compact(&self) -> Result<()> {
-        let inner = Arc::clone(&self.inner);
-        tokio::task::spawn_blocking(move || inner.write().compact()).await.map_err(|e| Error::from_reason(format!("join: {e}")))?
+        let inner = Arc::clone(&self.inner); tokio::task::spawn_blocking(move || inner.write().compact()).await.map_err(|e| Error::from_reason(format!("join: {e}")))?
     }
     #[napi]
     pub fn schema_version_sync(&self) -> u32 { SCHEMA_VERSION }
     #[napi]
     pub fn status_sync(&self) -> DatabaseStatus {
-        let storage = self.inner.read();
-        DatabaseStatus { open: true, read_only: storage.read_only, page_cache_mb: self.page_cache_mb }
+        let storage = self.inner.read(); let mut status = storage.status_sync(); status.page_cache_mb = self.page_cache_mb; status
     }
 }
 #[napi]

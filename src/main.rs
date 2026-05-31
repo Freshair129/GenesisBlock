@@ -13,6 +13,8 @@ use tower_http::trace::TraceLayer;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
 // Import core engine from the library
+// Since this is a bin in the same crate, it refers to the lib part via the crate name.
+// The crate name in Cargo.toml is 'genesis-block-native'.
 use genesis_block_native::{
     Storage, OpenOptions, NodeInput, EdgeInput, QueryInput, HybridSearchInput
 };
