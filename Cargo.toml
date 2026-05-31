@@ -2,7 +2,7 @@
 name = "genesis-block-native"
 version = "0.0.1"
 edition = "2021"
-description = "Genesis Block — embedded graph engine for GKS (Phase 3.2-3.4)"
+description = "Genesis Block — high-performance hybrid semantic-graph engine"
 license = "MIT"
 publish = false
 
@@ -25,9 +25,17 @@ parking_lot = "0.12"
 sysinfo = "0.30"
 bincode = "1.3"
 hnsw_rs = "0.3.4"
+axum = "0.7"
+tower-http = { version = "0.5", features = ["cors", "trace"] }
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 
 [build-dependencies]
 napi-build = "2.1"
+
+[[bin]]
+name = "genesis-db-server"
+path = "src/main.rs"
 
 [[bench]]
 name = "ldbc_lite"
