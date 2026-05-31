@@ -1,7 +1,0 @@
-{
-  "outputDirectory": ".",
-  "cleanUrls": true,
-  "rewrites": [
-    { "source": "/", "destination": "/Genesis.html" }
-  ]
-}

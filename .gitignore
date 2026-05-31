@@ -1,22 +1,13 @@
-node_modules/
-dist/
-.env
-*.log
-.DS_Store
-.brain/
-!.brain/gks/
-.brain/gks/00_index/atomic_index.jsonl
-.brain/gks/00_index/backlinks.jsonl
+# Cargo
+target/
+Cargo.lock
 
-# Promoted-Block Registry (derived state — CONCEPT--PROMOTED-BLOCK-REGISTRY)
-.brain/gks/master/registry.jsonl
+# napi-rs build artifacts (per-platform .node files are CI-built and
+# distributed via per-triple optional-deps packages — not committed)
+*.node
+npm-debug.log
 
-# Obsidian / Excalidraw editor cruft
-.brain/gks/.obsidian/
-.brain/gks/.smart-env/
-.brain/gks/Excalidraw/
-.brain/gks/Untitled*.canvas
-.brain/gks/[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9].md
-mcp_config.json
-.mcp.json
-
+# Auto-generated index.js / index.d.ts are committed (P3.1) so callers
+# can require('@freshair129/gks-genesis-block-native') even before a
+# local `napi build`. P3.2+ may regenerate via `napi build` — keep both
+# files in sync with src/lib.rs manually until then.

@@ -1,34 +1,36 @@
 {
-  "name": "@freshair129/cognitive-system",
-  "version": "0.4.0",
-  "description": "Cognitive System — agentic monorepo (GKS storage engine + MSP orchestrator + multi-tier agent runtime)",
-  "private": true,
-  "type": "module",
-  "workspaces": [
-    "packages/*",
-    "apps/*"
+  "name": "@freshair129/gks-genesis-block-native",
+  "version": "0.0.1",
+  "description": "Genesis Block — native Rust embedded graph engine for GKS (P3.1 scaffold)",
+  "main": "index.js",
+  "types": "index.d.ts",
+  "files": [
+    "index.d.ts",
+    "index.js",
+    "package.json"
   ],
+  "license": "MIT",
+  "private": true,
   "engines": {
     "node": ">=20"
   },
-  "scripts": {
-    "dev": "npm run dev --workspace=packages/msp",
-    "test": "npm test --workspaces",
-    "build": "npm run build --workspaces",
-    "typecheck": "npm run typecheck --workspaces",
-    "msp:codegen": "tsx scripts/msp/codegen-schemas.ts",
-    "msp:index": "tsx scripts/msp/re-indexer.ts --root=.",
-    "msp:validate": "tsx packages/msp/src/validator/cli.ts --all --root=.",
-    "msp:policy": "npm run msp:policy --workspace=packages/msp --",
-    "msp:vault": "npm run msp:vault --workspace=packages/msp --",
-    "msp:genesis": "npm run msp:genesis --workspace=packages/msp --",
-    "msp:check-links": "gks validate --links --root=."
+  "napi": {
+    "binaryName": "genesis-block",
+    "targets": [
+      "x86_64-unknown-linux-gnu",
+      "x86_64-pc-windows-msvc",
+      "x86_64-apple-darwin",
+      "aarch64-apple-darwin"
+    ]
   },
-  "dependencies": {
-    "glob": "^13.0.6"
+  "scripts": {
+    "build": "napi build --platform --release",
+    "build:debug": "napi build --platform",
+    "prepare": "npm run build",
+    "prepublishOnly": "napi prepublish -t npm",
+    "test": "node --test __test__"
   },
   "devDependencies": {
-    "@esbuild/win32-x64": "^0.28.0",
-    "@rollup/rollup-win32-x64-msvc": "^4.60.4"
+    "@napi-rs/cli": "^2.18.0"
   }
 }
