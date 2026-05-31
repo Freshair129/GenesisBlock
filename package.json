@@ -25,7 +25,8 @@
     "prepublishOnly": "napi prepublish -t npm",
     "test": "node --test __test__"
   },
-  "devDependencies": {
+  "devDependencies": {},
+  "dependencies": {
     "@napi-rs/cli": "^2.18.0"
   }
 }
