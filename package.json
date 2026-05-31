@@ -21,9 +21,9 @@
   "scripts": {
     "build": "napi build --platform --release",
     "build:debug": "napi build --platform",
-    "prepare": "npm run build",
     "prepublishOnly": "napi prepublish -t npm",
-    "test": "node --test __test__"
+    "test": "node --test __test__",
+    "install": "npm run build"
   },
   "devDependencies": {},
   "dependencies": {
