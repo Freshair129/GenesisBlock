@@ -181,13 +181,13 @@ impl Storage {
         Hnsw::new(16, 1000000, 16, 200, DistL2 {})
     }
 
-    pub fn add_vector_internal(&mut self, node_id: &str, emb_64: Vec<f64>) {
+    pub     fn add_vector_internal(&mut self, node_id: &str, emb_64: Vec<f64>) {
         let emb: Vec<f32> = emb_64.into_iter().map(|v| v as f32).collect();
         let dim = emb.len() as u16;
         let current_vec_len = self.vector_arena.len();
-        let aligned_offset = Self::allocate_aligned_offset(current_vec_len, 16);
+        let aligned_offset = Self::allocate_aligned_offset(current_vec_len, 64);
         if aligned_offset > current_vec_len { self.vector_arena.resize(aligned_offset, 0.0); }
-        self.vector_arena.extend(emb.clone());
+        self.vector_arena.extend_from_slice(&emb);
         let arena_id = self.metadata_arena.len() as u32;
         let metadata = NodeMetadata {
             arena_id, node_id: node_id.to_string(), timestamp: Utc::now().timestamp() as u64,
@@ -343,7 +343,7 @@ impl Storage {
         Ok(())
     }
 
-    pub fn add_node(&mut self, args: NodeInput) -> Result<NodeOutput> {
+        pub fn add_node(&mut self, args: NodeInput) -> Result<NodeOutput> {
         self.ensure_writable()?;
         let id = args.id.unwrap_or_else(|| {
             let hash = format!("{:x}", md5::compute(format!("{:?}{:?}", args.labels, args.props)));
@@ -367,7 +367,10 @@ impl Storage {
             props: args.props.unwrap_or(Value::Object(Default::default())),
             impact: None, embedding: None,
         };
-        if let Some(emb) = args.embedding { self.add_vector_internal(&id, emb.clone()); node.embedding = Some(emb); }
+        if let Some(emb) = args.embedding {
+            self.add_vector_internal(&id, emb.clone());
+            node.embedding = Some(emb);
+        }
         let impact = self.compute_impact(&node); node.impact = Some(impact);
         self.nodes.insert(id.clone(), node.clone()); self.persist(&Event::Node(node.clone()))?;
         self.refresh_impacts(Some(vec![id])); Ok(node)
@@ -414,12 +417,12 @@ impl Storage {
 
     pub fn status_sync(&self) -> DatabaseStatus { DatabaseStatus { open: true, read_only: self.read_only, page_cache_mb: 64 } }
 
-    pub fn hybrid_search(&self, args: HybridSearchInput) -> Result<Vec<NeighborOutput>> {
+        pub fn hybrid_search(&self, args: HybridSearchInput) -> Result<Vec<NeighborOutput>> {
         let hnsw = match &self.hnsw_index { Some(idx) => idx, None => return Err(Error::from_reason("HNSW index not initialized")) };
         let k_vec = args.k * 2; let alpha = args.alpha.unwrap_or(0.5);
         let query_f32: Vec<f32> = args.query_vector.into_iter().map(|v| v as f32).collect();
         let results = hnsw.search(&query_f32, k_vec as usize, 100);
-        let mut hybrid_results = Vec::new();
+        let mut hybrid_results = Vec::with_capacity(results.len());
         for neighbor in results {
             let arena_id = neighbor.d_id as u32; let similarity = 1.0 - neighbor.distance;
             if let Some(meta) = self.metadata_arena.get(arena_id as usize) {
@@ -538,3 +541,4 @@ impl GenesisDatabase {
 }
 #[napi]
 pub fn engine_name_sync() -> String { "genesis-block".to_string() }
+

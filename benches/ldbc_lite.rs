@@ -5,7 +5,7 @@ use std::hint::black_box;
 
 fn setup_ldbc_graph(storage: &mut Storage, node_count: usize, fan_out: usize) {
     for i in 0..node_count {
-        storage.add_node(NodeInput {
+        storage.add_node(NodeInput { embedding: None,
             id: Some(format!("N-{}", i)),
             labels: vec!["Entity".to_string()],
             props: None,
