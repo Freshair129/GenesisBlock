@@ -347,3 +347,4 @@ impl GenesisDatabase {
     #[napi]
     pub fn status_sync(&self) -> DatabaseStatus { self.inner.status_sync() }
 }
+

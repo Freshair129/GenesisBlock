@@ -16,3 +16,6 @@ npm-debug.log
 /benches/snb/data/
 /target/
 
+
+/benches/scientific_audit_db/
+

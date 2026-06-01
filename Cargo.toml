@@ -75,3 +75,8 @@ path = "benches/hql_query_stress.rs"
 name = "industrial-audit"
 path = "benches/industrial_audit.rs"
 
+
+[[bin]]
+name = "scientific-audit"
+path = "benches/scientific_audit.rs"
+
