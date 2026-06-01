@@ -583,6 +583,47 @@ impl Storage {
         hybrid_results.truncate(args.k as usize); Ok(hybrid_results)
     }
 
+        pub fn execute_hql(&self, query: &str) -> Result<Vec<NeighborOutput>> {
+        let q_lower = query.to_lowercase();
+        
+        // Pattern 1: SEARCH <Label> SIMILAR TO [v] K <n>
+        let re_search = regex::Regex::new(r"searchs+w+s+similars+tos+[([0-9.,s-]+)]s+ks+(d+)").unwrap();
+        if let Some(caps) = re_search.captures(&q_lower) {
+            let vec_str = caps.get(1).unwrap().as_str();
+            let k = caps.get(2).unwrap().as_str().parse::<u32>().unwrap_or(5);
+            let query_vector: Vec<f64> = vec_str.split(',')
+                .map(|s| s.trim().parse::<f64>().unwrap_or(0.0))
+                .collect();
+            return self.hybrid_search(HybridSearchInput { query_vector, k, alpha: Some(0.0) });
+        }
+
+        // Pattern 2: TRAVERSE FROM <id> DEPTH <n> REL <rel>
+        let re_traverse = regex::Regex::new(r"traverses+froms+([w-]+)s+depths+(d+)s+rels+(w+)").unwrap();
+        if let Some(caps) = re_traverse.captures(&q_lower) {
+            let seed = caps.get(1).unwrap().as_str().to_string();
+            let depth = caps.get(2).unwrap().as_str().parse::<u32>().unwrap_or(1);
+            let rel = caps.get(3).unwrap().as_str().to_string();
+            return self.neighbors(seed, NeighborInput { 
+                depth: Some(depth), rel: Some(rel), rels: None, 
+                direction: Some("out".to_string()), as_of: None, 
+                include_invalid: Some(false), limit: None 
+            });
+        }
+
+        // Pattern 3: MATCH <Label> SIMILAR TO [v] ALPHA <f>
+        let re_match = regex::Regex::new(r"matchs+w+s+similars+tos+[([0-9.,s-]+)]s+alphas+([0-9.]+)").unwrap();
+        if let Some(caps) = re_match.captures(&q_lower) {
+            let vec_str = caps.get(1).unwrap().as_str();
+            let alpha = caps.get(2).unwrap().as_str().parse::<f64>().unwrap_or(0.5);
+            let query_vector: Vec<f64> = vec_str.split(',')
+                .map(|s| s.trim().parse::<f64>().unwrap_or(0.0))
+                .collect();
+            return self.hybrid_search(HybridSearchInput { query_vector, k: 10, alpha: Some(alpha) });
+        }
+
+        Err(Error::from_reason(format!("HQL Syntax Error: Unsupported query format -> {}", query)))
+    }
+
     pub fn neighbors(&self, seed: String, args: NeighborInput) -> Result<Vec<NeighborOutput>> {
         let u32_seed = match self.get_u32(&seed) { Some(id) => id, None => return Ok(Vec::new()) };
         let depth = args.depth.unwrap_or(1); let direction = args.direction.as_deref().unwrap_or("out");
@@ -697,6 +738,12 @@ impl GenesisDatabase {
     pub async fn hybrid_search(&self, args: HybridSearchInput) -> Result<Vec<NeighborOutput>> {
         let inner = Arc::clone(&self.inner); tokio::task::spawn_blocking(move || inner.read().hybrid_search(args)).await.map_err(|e| Error::from_reason(format!("join: {e}")))?
     }
+        #[napi]
+    pub async fn execute_hql(&self, query: String) -> Result<Vec<NeighborOutput>> {
+        let inner = Arc::clone(&self.inner);
+        tokio::task::spawn_blocking(move || inner.read().execute_hql(&query)).await.map_err(|e| Error::from_reason(format!("join: {}", e)))?
+    }
+
     #[napi]
     pub async fn neighbors(&self, seed: String, args: NeighborInput) -> Result<Vec<NeighborOutput>> {
         let inner = Arc::clone(&self.inner); tokio::task::spawn_blocking(move || inner.read().neighbors(seed, args)).await.map_err(|e| Error::from_reason(format!("join: {e}")))?

@@ -56,6 +56,17 @@ async fn rebuild_index_handler(
     }
 }
 
+async fn execute_hql_handler(
+    State(state): State<AppState>,
+    query: String,
+) -> impl IntoResponse {
+    let storage = state.storage.read();
+    match storage.execute_hql(&query) {
+        Ok(results) => (StatusCode::OK, Json(results)).into_response(),
+        Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
+    }
+}
+
 async fn add_node_handler(
     State(state): State<AppState>,
     Json(input): Json<NodeInput>,
@@ -135,6 +146,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 .route("/v1/bulk/nodes", post(bulk_add_nodes_handler))
         .route("/v1/bulk/edges", post(bulk_add_edges_handler))
         .route("/v1/bulk/rebuild", post(rebuild_index_handler))
+        .route("/v1/query/hql", post(execute_hql_handler))
         .route("/v1/node/add", post(add_node_handler))
         .route("/v1/edge/add", post(add_edge_handler))
         .route("/v1/query", post(query_handler))

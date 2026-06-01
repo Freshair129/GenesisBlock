@@ -64,3 +64,8 @@ path = "benches/snb_ingestion.rs"
 name = "snb-bulk-ingestion"
 path = "benches/snb_bulk_ingestion.rs"
 
+
+[[bin]]
+name = "hql-query-stress"
+path = "benches/hql_query_stress.rs"
+
