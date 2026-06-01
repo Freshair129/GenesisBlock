@@ -1,4 +1,4 @@
-# GenesisDB: An Embedded, Axiomatic Graph Engine for Cognitive AI Systems
+> **DEPRECATED (Mark III Pivot):** This document refers to the Phase 1-7 architecture and positioning. Please refer to ARCHITECTURE.md for the current Mark III system design.\n\n# GenesisDB: An Embedded, Axiomatic Graph Engine for Cognitive AI Systems
 **A Whitepaper on High-Performance Knowledge Representation**
 
 **Abstract**

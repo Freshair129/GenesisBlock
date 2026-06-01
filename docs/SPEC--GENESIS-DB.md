@@ -1,4 +1,4 @@
-# GenesisDB Technical Specification (v1.0.0)
+> **DEPRECATED (Mark III Pivot):** This document refers to the Phase 1-7 architecture and positioning. Please refer to ARCHITECTURE.md for the current Mark III system design.\n\n# GenesisDB Technical Specification (v1.0.0)
 
 ## 1. System Overview
 GenesisDB is a high-performance, embedded graph database engine written in Rust. It provides the core storage and traversal capabilities for the Genesis Knowledge System (GKS). It exposes an asynchronous Node-API (FFI) interface for consumption by TypeScript environments.
