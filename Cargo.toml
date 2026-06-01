@@ -32,6 +32,7 @@ tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 csv = "1.4.0"
 rayon = "1.12.0"
 twox-hash = "2.1.2"
+rand = "0.8"
 
 [build-dependencies]
 napi-build = "2.1"
@@ -68,4 +69,9 @@ path = "benches/snb_bulk_ingestion.rs"
 [[bin]]
 name = "hql-query-stress"
 path = "benches/hql_query_stress.rs"
+
+
+[[bin]]
+name = "industrial-audit"
+path = "benches/industrial_audit.rs"
 
