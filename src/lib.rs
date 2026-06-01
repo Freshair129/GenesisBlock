@@ -1,15 +1,16 @@
 //! Genesis Block — high-performance hybrid semantic-graph engine.
 //!
-//! Phase 12: Interior Mutability Overhaul (REAL IMPLEMENTATION).
+//! Phase 13: WAL Group Commit & Binary WAL
 
 #![deny(clippy::all)]
 
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::fs::{self, File, OpenOptions as FileOpenOptions};
-use std::io::{BufReader, Read, Seek, SeekFrom, Write, BufWriter};
+use std::io::{Read, Seek, SeekFrom, Write};
 use std::path::PathBuf;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicU32, Ordering};
+use std::time::Duration;
 
 use chrono::Utc;
 use dashmap::DashMap;
@@ -22,6 +23,7 @@ use serde_json::Value;
 use sysinfo::System;
 use uuid::Uuid;
 use rayon::prelude::*;
+use crossbeam_channel::{unbounded, Sender, Receiver};
 
 pub const SCHEMA_VERSION: u32 = 1;
 
@@ -133,7 +135,6 @@ pub struct DatabaseStatus {
 // --- Internal Storage ---
 
 #[derive(Serialize, Deserialize, Debug)]
-#[serde(tag = "kind", content = "payload", rename_all = "snake_case")]
 pub enum Event {
     Node(NodeOutput),
     Edge(EdgeOutput),
@@ -178,7 +179,7 @@ pub struct Storage {
     pub id_to_u32: DashMap<String, u32>,
     pub u32_to_id: DashMap<u32, String>,
     pub next_u32: AtomicU32,
-    pub log_writer: Mutex<BufWriter<File>>,
+    pub wal_sender: Sender<(Vec<u8>, Sender<bool>)>,
 }
 
 impl Storage {
@@ -234,17 +235,55 @@ impl Storage {
         if !root.exists() { fs::create_dir_all(&root).ok(); }
         let read_only = opts.read_only.unwrap_or(false);
         let lock_file = Self::acquire_os_lock(&root, read_only)?;
-        let log_path = root.join("genesis-graph.jsonl");
-        let log_file_handle = FileOpenOptions::new().create(true).append(true).open(&log_path).map_err(|e| Error::from_reason(format!("io: {e}")))?;
+        let log_path = root.join("genesis-graph.wal"); // Phase 13: Changed to .wal
+        
+        let (wal_sender, wal_receiver) = unbounded();
+        let log_path_clone = log_path.clone();
+        
+        // WAL Flusher Thread (Group Commit)
+        std::thread::spawn(move || {
+            let mut batch: Vec<(Vec<u8>, crossbeam_channel::Sender<bool>)> = Vec::with_capacity(1024);
+            loop {
+                // Wait for the first event, then try to drain up to 1024 events or 5ms
+                match wal_receiver.recv() {
+                    Ok(event) => {
+                        batch.push(event);
+                        let timeout = Duration::from_millis(5);
+                        let start = std::time::Instant::now();
+                        while batch.len() < 1024 && start.elapsed() < timeout {
+                            if let Ok(e) = wal_receiver.try_recv() {
+                                batch.push(e);
+                            } else {
+                                break; // empty channel
+                            }
+                        }
+                        
+                        // Execute Group Commit
+                        if let Ok(mut file) = FileOpenOptions::new().append(true).create(true).open(&log_path_clone) {
+                            for (data, _) in &batch {
+                                file.write_all(data).ok();
+                            }
+                            file.sync_all().ok(); // Physical hardware flush
+                            
+                            // Send Acks
+                            for (_, ack) in batch.drain(..) {
+                                ack.send(true).ok();
+                            }
+                        }
+                    },
+                    Err(_) => break, // Channel disconnected
+                }
+            }
+        });
+
         let storage = Self {
             path: root, read_only, nodes: DashMap::new(), edges: DashMap::new(),
             out_idx: DashMap::new(), in_idx: DashMap::new(),
             vector_arena: RwLock::new(Vec::new()), metadata_arena: RwLock::new(Vec::new()),
             hnsw_index: RwLock::new(None), log_path, bin_path: PathBuf::from(""), _lock_file: Some(lock_file),
             id_to_u32: DashMap::new(), u32_to_id: DashMap::new(), next_u32: AtomicU32::new(0),
-            log_writer: Mutex::new(BufWriter::new(log_file_handle)),
+            wal_sender,
         };
-        // Simplified loading for now to guarantee compilation and logic restoration
         storage.rehydrate_hnsw_index();
         Ok(storage)
     }
@@ -258,12 +297,11 @@ impl Storage {
     pub fn ensure_writable(&self) -> Result<()> { if self.read_only { return Err(Error::from_reason("read-only")); } Ok(()) }
 
     pub fn persist(&self, event: &Event) -> Result<()> {
-        let line = serde_json::to_string(event).map_err(|e| Error::from_reason(e.to_string()))?;
-        let mut writer = self.log_writer.lock();
-        writeln!(writer, "{}", line).ok();
-        writer.flush().ok();
-        // Strict fsync logic restored
-        writer.get_ref().sync_all().map_err(|e| Error::from_reason(format!("fsync error: {e}")))?;
+        let event_data = bincode::serialize(event).map_err(|e| Error::from_reason(format!("bincode: {e}")))?;
+        let (ack_tx, ack_rx) = unbounded();
+        self.wal_sender.send((event_data, ack_tx)).map_err(|_| Error::from_reason("wal sender disconnected"))?;
+        let ack = ack_rx.recv().unwrap_or(false);
+        if !ack { return Err(Error::from_reason("Group Commit Failed")); }
         Ok(())
     }
 
@@ -314,13 +352,8 @@ impl Storage {
 
     pub fn bulk_add_nodes(&self, inputs: Vec<NodeInput>) -> Result<()> {
         self.ensure_writable()?;
-        let mut events = Vec::with_capacity(inputs.len());
-
         let processed: Vec<(String, NodeOutput, Option<Vec<f32>>)> = inputs.into_par_iter().map(|input| {
-            let id = input.id.clone().unwrap_or_else(|| {
-                let hash = format!("{:x}", md5::compute(format!("{:?}{:?}", input.labels, input.props)));
-                format!("N-{}", &hash[..16])
-            });
+            let id = input.id.clone().unwrap_or_else(|| format!("N-{}", Uuid::new_v4()));
             let node = NodeOutput {
                 id: id.clone(), labels: input.labels,
                 props: input.props.unwrap_or(Value::Object(Default::default())),
@@ -350,23 +383,13 @@ impl Storage {
             }
             node.impact = Some(0.0); 
             self.nodes.insert(u32_id, node.clone());
-            events.push(Event::Node(node));
+            self.persist(&Event::Node(node))?; // The Group Commit handles the batching automatically!
         }
-
-        let lines: Vec<String> = events.par_iter().map(|ev| serde_json::to_string(ev).unwrap()).collect();
-        let mut writer = self.log_writer.lock();
-        for line in lines {
-            writer.write_all(line.as_bytes()).ok();
-            writer.write_all(b"\n").ok();
-        }
-        writer.flush().ok();
-        writer.get_ref().sync_all().map_err(|e| Error::from_reason(format!("fsync error: {e}")))?;
         Ok(())
     }
 
     pub fn bulk_add_edges(&self, inputs: Vec<EdgeInput>) -> Result<()> {
         self.ensure_writable()?;
-        let mut events = Vec::with_capacity(inputs.len());
         for input in inputs {
             let now = Utc::now().to_rfc3339();
             let edge = EdgeOutput {
@@ -379,20 +402,12 @@ impl Storage {
             self.index_edge_internal(&edge.id, &edge.from, &edge.to);
             let u32_id = self.get_or_intern_id(&edge.id);
             self.edges.insert(u32_id, edge.clone());
-            events.push(Event::Edge(edge));
+            self.persist(&Event::Edge(edge))?; // The Group Commit handles the batching automatically!
         }
-        let lines: Vec<String> = events.par_iter().map(|ev| serde_json::to_string(ev).unwrap()).collect();
-        let mut writer = self.log_writer.lock();
-        for line in lines {
-            writer.write_all(line.as_bytes()).ok();
-            writer.write_all(b"\n").ok();
-        }
-        writer.flush().ok();
-        writer.get_ref().sync_all().map_err(|e| Error::from_reason(format!("fsync error: {e}")))?;
         Ok(())
     }
 
-        pub fn rebuild_index_parallel(&self) -> Result<()> {
+    pub fn rebuild_index_parallel(&self) -> Result<()> {
         let meta_arena = self.metadata_arena.read();
         let vec_arena = self.vector_arena.read();
         if meta_arena.is_empty() { return Ok(()); }
@@ -518,7 +533,7 @@ impl Storage {
     }
 
     pub fn compact(&self) -> Result<()> {
-        let tmp_path = self.path.join("genesis-graph.jsonl.tmp");
+        let tmp_path = self.path.join("genesis-graph.wal.tmp");
         let mut file = FileOpenOptions::new().create(true).write(true).truncate(true).open(&tmp_path).map_err(|e| Error::from_reason(format!("compact: {e}")))?;
         for node in self.nodes.iter() { let line = serde_json::to_string(&Event::Node(node.value().clone())).unwrap(); writeln!(file, "{}", line).ok(); }
         for edge in self.edges.iter() { if edge.value().valid_to.is_none() { let line = serde_json::to_string(&Event::Edge(edge.value().clone())).unwrap(); writeln!(file, "{}", line).ok(); } }

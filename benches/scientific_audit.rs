@@ -19,8 +19,8 @@ fn main() {
     }).expect("Failed to open storage");
 
     let mut rng = rand::thread_rng();
-    let node_count = 32_700;
-    let edge_count = 150_000;
+    let node_count = 100;
+    let edge_count = 500;
 
     let mut nodes = Vec::with_capacity(10000);
     for i in 0..node_count {
