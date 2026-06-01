@@ -1,3 +1,4 @@
+#![deny(clippy::all)]
 //! Genesis Block — embedded graph engine for GKS.
 //!
 //! Phase 3.2-3.4 implementation: JSONL Storage, Locking, and Cypher v0.
@@ -343,7 +344,105 @@ impl Storage {
         Ok(())
     }
 
-        pub fn add_node(&mut self, args: NodeInput) -> Result<NodeOutput> {
+            pub fn bulk_add_nodes(&mut self, inputs: Vec<NodeInput>) -> Result<()> {
+        self.ensure_writable()?;
+        let mut events = Vec::new();
+        let mut ids_to_refresh = Vec::new();
+
+        for input in inputs {
+            let id = input.id.clone().unwrap_or_else(|| {
+                let hash = format!("{:x}", md5::compute(format!("{:?}{:?}", input.labels, input.props)));
+                format!("N-{}", &hash[..16])
+            });
+
+            let mut node = NodeOutput {
+                id: id.clone(),
+                labels: input.labels,
+                props: input.props.unwrap_or(Value::Object(Default::default())),
+                impact: None,
+                embedding: None,
+            };
+
+            if let Some(emb_64) = input.embedding {
+                let emb: Vec<f32> = emb_64.into_iter().map(|v| v as f32).collect();
+                let dim = emb.len() as u16;
+                let current_vec_len = self.vector_arena.len();
+                let aligned_offset = Self::allocate_aligned_offset(current_vec_len, 64);
+                if aligned_offset > current_vec_len { self.vector_arena.resize(aligned_offset, 0.0); }
+                self.vector_arena.extend_from_slice(&emb);
+                let arena_id = self.metadata_arena.len() as u32;
+                let metadata = NodeMetadata {
+                    arena_id, node_id: id.clone(), timestamp: Utc::now().timestamp() as u64,
+                    vector_dim: dim, embedding_offset: aligned_offset as u64, gks_attributes: Vec::new(),
+                };
+                self.metadata_arena.push(metadata);
+                node.embedding = Some(emb.into_iter().map(|v| v as f64).collect());
+            }
+
+            let impact = self.compute_impact(&node);
+            node.impact = Some(impact);
+            self.nodes.insert(id.clone(), node.clone());
+            ids_to_refresh.push(id.clone());
+            events.push(Event::Node(node));
+        }
+
+        let mut file = FileOpenOptions::new().create(true).append(true).open(&self.log_path).map_err(|e| Error::from_reason(format!("io: {}", e)))?;
+        for ev in events {
+            let line = serde_json::to_string(&ev).unwrap();
+            writeln!(file, "{}", line).ok();
+        }
+
+        self.refresh_impacts(Some(ids_to_refresh));
+        Ok(())
+    }
+
+    pub fn bulk_add_edges(&mut self, inputs: Vec<EdgeInput>) -> Result<()> {
+        self.ensure_writable()?;
+        let mut events = Vec::new();
+        let mut ids_to_refresh = Vec::new();
+
+        for input in inputs {
+            let now = Utc::now().to_rfc3339();
+            let edge = EdgeOutput {
+                id: input.id.unwrap_or_else(|| Uuid::new_v4().to_string()),
+                from: input.from, to: input.to, rel: input.rel,
+                props: input.props.unwrap_or(Value::Object(Default::default())),
+                valid_from: input.valid_from.unwrap_or_else(|| now.clone()),
+                valid_to: None, recorded_at: now, superseded_by: None, impact: input.impact,
+            };
+            self.index_edge_internal(&edge.id, &edge.from, &edge.to);
+            let target_id = edge.to.clone();
+            self.edges.insert(edge.id.clone(), edge.clone());
+            ids_to_refresh.push(target_id);
+            events.push(Event::Edge(edge));
+        }
+
+        let mut file = FileOpenOptions::new().create(true).append(true).open(&self.log_path).map_err(|e| Error::from_reason(format!("io: {}", e)))?;
+        for ev in events {
+            let line = serde_json::to_string(&ev).unwrap();
+            writeln!(file, "{}", line).ok();
+        }
+
+        self.refresh_impacts(Some(ids_to_refresh));
+        Ok(())
+    }
+
+    pub fn rebuild_index_parallel(&mut self) -> Result<()> {
+        if self.metadata_arena.is_empty() { return Ok(()); }
+        let mut hnsw = Self::init_hnsw();
+        for meta in &self.metadata_arena {
+            let start = meta.embedding_offset as usize;
+            let end = start + meta.vector_dim as usize;
+            if end <= self.vector_arena.len() {
+                let vec = &self.vector_arena[start..end];
+                hnsw.insert((vec, meta.arena_id as usize));
+            }
+        }
+        self.hnsw_index = Some(hnsw);
+        Ok(())
+    }
+
+    pub fn add_node(&mut self, args: NodeInput) -> Result<NodeOutput> {
         self.ensure_writable()?;
         let id = args.id.unwrap_or_else(|| {
             let hash = format!("{:x}", md5::compute(format!("{:?}{:?}", args.labels, args.props)));
@@ -504,6 +603,24 @@ impl GenesisDatabase {
         let storage = Storage::open(opts.clone())?;
         Ok(Self { inner: Arc::new(RwLock::new(storage)), page_cache_mb: opts.page_cache_mb.unwrap_or(64) })
     }
+        #[napi]
+    pub async fn bulk_add_nodes(&self, inputs: Vec<NodeInput>) -> Result<()> {
+        let inner = Arc::clone(&self.inner);
+        tokio::task::spawn_blocking(move || inner.write().bulk_add_nodes(inputs)).await.map_err(|e| Error::from_reason(format!("join: {}", e)))?
+    }
+
+    #[napi]
+    pub async fn bulk_add_edges(&self, inputs: Vec<EdgeInput>) -> Result<()> {
+        let inner = Arc::clone(&self.inner);
+        tokio::task::spawn_blocking(move || inner.write().bulk_add_edges(inputs)).await.map_err(|e| Error::from_reason(format!("join: {}", e)))?
+    }
+
+    #[napi]
+    pub async fn rebuild_index_parallel(&self) -> Result<()> {
+        let inner = Arc::clone(&self.inner);
+        tokio::task::spawn_blocking(move || inner.write().rebuild_index_parallel()).await.map_err(|e| Error::from_reason(format!("join: {}", e)))?
+    }
+
     #[napi]
     pub async fn add_node(&self, args: NodeInput) -> Result<NodeOutput> {
         let inner = Arc::clone(&self.inner); tokio::task::spawn_blocking(move || inner.write().add_node(args)).await.map_err(|e| Error::from_reason(format!("join: {e}")))?

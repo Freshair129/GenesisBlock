@@ -11,3 +11,8 @@ npm-debug.log
 # can require('@freshair129/gks-genesis-block-native') even before a
 # local `napi build`. P3.2+ may regenerate via `napi build` — keep both
 # files in sync with src/lib.rs manually until then.
+
+/benches/snb/temp_db_bulk/
+/benches/snb/data/
+/target/
+

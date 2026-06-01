@@ -24,6 +24,38 @@ struct AppState {
     storage: Arc<RwLock<Storage>>,
 }
 
+async fn bulk_add_nodes_handler(
+    State(state): State<AppState>,
+    Json(inputs): Json<Vec<NodeInput>>,
+) -> impl IntoResponse {
+    let mut storage = state.storage.write();
+    match storage.bulk_add_nodes(inputs) {
+        Ok(_) => StatusCode::OK.into_response(),
+        Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
+    }
+}
+
+async fn bulk_add_edges_handler(
+    State(state): State<AppState>,
+    Json(inputs): Json<Vec<EdgeInput>>,
+) -> impl IntoResponse {
+    let mut storage = state.storage.write();
+    match storage.bulk_add_edges(inputs) {
+        Ok(_) => StatusCode::OK.into_response(),
+        Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
+    }
+}
+
+async fn rebuild_index_handler(
+    State(state): State<AppState>,
+) -> impl IntoResponse {
+    let mut storage = state.storage.write();
+    match storage.rebuild_index_parallel() {
+        Ok(_) => StatusCode::OK.into_response(),
+        Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
+    }
+}
+
 async fn add_node_handler(
     State(state): State<AppState>,
     Json(input): Json<NodeInput>,
@@ -100,6 +132,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     };
 
     let app = Router::new()
+                .route("/v1/bulk/nodes", post(bulk_add_nodes_handler))
+        .route("/v1/bulk/edges", post(bulk_add_edges_handler))
+        .route("/v1/bulk/rebuild", post(rebuild_index_handler))
         .route("/v1/node/add", post(add_node_handler))
         .route("/v1/edge/add", post(add_edge_handler))
         .route("/v1/query", post(query_handler))
