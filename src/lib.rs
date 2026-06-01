@@ -1,18 +1,19 @@
-#![deny(clippy::all)]
-//! Genesis Block — embedded graph engine for GKS.
+//! Genesis Block — high-performance hybrid semantic-graph engine.
 //!
-//! Phase 3.2-3.4 implementation: JSONL Storage, Locking, and Cypher v0.
-//! Implements PROTOCOL--GENESIS-GRAPH-FFI.
+//! Phase 9.1: Turbo Core Overhaul (u32 Interning & Lock Sharding).
+//! Implements high-concurrency storage using DashMap and Arena allocation.
 
 #![deny(clippy::all)]
 
-use std::collections::{HashMap, HashSet};
+use std::collections::{HashMap, HashSet, VecDeque};
 use std::fs::{self, File, OpenOptions as FileOpenOptions};
-use std::io::{BufReader, Read, Seek, SeekFrom, Write};
+use std::io::{BufReader, Read, Seek, SeekFrom, Write, BufWriter};
 use std::path::PathBuf;
 use std::sync::Arc;
+use std::sync::atomic::{AtomicU32, Ordering};
 
 use chrono::Utc;
+use dashmap::DashMap;
 use hnsw_rs::prelude::*;
 use napi::bindgen_prelude::*;
 use napi_derive::napi;
@@ -21,6 +22,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use sysinfo::{Pid, System};
 use uuid::Uuid;
+use rayon::prelude::*;
 
 pub const SCHEMA_VERSION: u32 = 1;
 
@@ -140,12 +142,15 @@ pub enum Event {
 
 #[derive(Serialize, Deserialize)]
 pub struct Snapshot {
-    pub nodes: HashMap<String, NodeOutput>,
-    pub edges: HashMap<String, EdgeOutput>,
-    pub out_idx: HashMap<String, HashSet<String>>,
-    pub in_idx: HashMap<String, HashSet<String>>,
+    pub nodes: HashMap<u32, NodeOutput>,
+    pub edges: HashMap<u32, EdgeOutput>,
+    pub out_idx: HashMap<u32, HashSet<u32>>,
+    pub in_idx: HashMap<u32, HashSet<u32>>,
     pub vector_arena: Vec<f32>,
     pub metadata_arena: Vec<NodeMetadata>,
+    pub id_to_u32: HashMap<String, u32>,
+    pub u32_to_id: HashMap<u32, String>,
+    pub next_u32: u32,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -161,19 +166,36 @@ pub struct NodeMetadata {
 pub struct Storage {
     pub path: PathBuf,
     pub read_only: bool,
-    pub nodes: HashMap<String, NodeOutput>,
-    pub edges: HashMap<String, EdgeOutput>,
-    pub out_idx: HashMap<String, HashSet<String>>,
-    pub in_idx: HashMap<String, HashSet<String>>,
+    pub nodes: DashMap<u32, NodeOutput>,
+    pub edges: DashMap<u32, EdgeOutput>,
+    pub out_idx: DashMap<u32, HashSet<u32>>,
+    pub in_idx: DashMap<u32, HashSet<u32>>,
     pub vector_arena: Vec<f32>,
     pub metadata_arena: Vec<NodeMetadata>,
     pub hnsw_index: Option<Hnsw<'static, f32, DistL2>>,
     pub log_path: PathBuf,
     pub bin_path: PathBuf,
     pub _lock_file: Option<File>,
+    pub id_to_u32: DashMap<String, u32>,
+    pub u32_to_id: DashMap<u32, String>,
+    pub next_u32: AtomicU32,
 }
 
 impl Storage {
+    pub fn get_or_intern_id(&self, id: &str) -> u32 {
+        if let Some(existing) = self.id_to_u32.get(id) {
+            return *existing;
+        }
+        let new_id = self.next_u32.fetch_add(1, Ordering::SeqCst);
+        self.id_to_u32.insert(id.to_string(), new_id);
+        self.u32_to_id.insert(new_id, id.to_string());
+        new_id
+    }
+
+    pub fn get_u32(&self, id: &str) -> Option<u32> {
+        self.id_to_u32.get(id).map(|v| *v)
+    }
+
     pub fn allocate_aligned_offset(current_offset: usize, align: usize) -> usize {
         if current_offset % align == 0 { current_offset } else { current_offset + align - (current_offset % align) }
     }
@@ -182,7 +204,7 @@ impl Storage {
         Hnsw::new(16, 1000000, 16, 200, DistL2 {})
     }
 
-    pub     fn add_vector_internal(&mut self, node_id: &str, emb_64: Vec<f64>) {
+    pub fn add_vector_internal(&mut self, node_id: &str, emb_64: Vec<f64>) {
         let emb: Vec<f32> = emb_64.into_iter().map(|v| v as f32).collect();
         let dim = emb.len() as u16;
         let current_vec_len = self.vector_arena.len();
@@ -220,24 +242,46 @@ impl Storage {
         let lock_file = Self::acquire_os_lock(&root, read_only)?;
         let log_path = root.join("genesis-graph.jsonl");
         let bin_path = root.join("genesis-graph.bin");
-        let mut storage = Self {
-            path: root, read_only, nodes: HashMap::new(), edges: HashMap::new(),
-            out_idx: HashMap::new(), in_idx: HashMap::new(),
+        let storage = Self {
+            path: root, read_only, nodes: DashMap::new(), edges: DashMap::new(),
+            out_idx: DashMap::new(), in_idx: DashMap::new(),
             vector_arena: Vec::new(), metadata_arena: Vec::new(),
             hnsw_index: None, log_path: log_path.clone(), bin_path, _lock_file: Some(lock_file),
+            id_to_u32: DashMap::new(), u32_to_id: DashMap::new(), next_u32: AtomicU32::new(0),
         };
         if storage.bin_path.exists() {
             if let Ok(mut file) = File::open(&storage.bin_path) {
                 let mut buffer = Vec::new();
                 if file.read_to_end(&mut buffer).is_ok() {
                     if let Ok(snapshot) = bincode::deserialize::<Snapshot>(&buffer) {
-                        storage.nodes = snapshot.nodes; storage.edges = snapshot.edges;
-                        storage.out_idx = snapshot.out_idx; storage.in_idx = snapshot.in_idx;
-                        storage.vector_arena = snapshot.vector_arena; storage.metadata_arena = snapshot.metadata_arena;
+                        for (k, v) in snapshot.nodes { storage.nodes.insert(k, v); }
+                        for (k, v) in snapshot.edges { storage.edges.insert(k, v); }
+                        for (k, v) in snapshot.out_idx { storage.out_idx.insert(k, v); }
+                        for (k, v) in snapshot.in_idx { storage.in_idx.insert(k, v); }
+                        // Hack for vector_arena and metadata_arena since they are part of storage but mut
+                        // We'll need to make Storage fields wrapped in Arc/Mutex if we want full interior mutability.
+                        // For now, let's keep them as is and fix the 'mut' issues.
                     }
                 }
             }
         }
+        // Need to return mut storage to satisfy rehydrate
+        let mut storage = storage;
+        if storage.bin_path.exists() {
+            if let Ok(mut file) = File::open(&storage.bin_path) {
+                let mut buffer = Vec::new();
+                if file.read_to_end(&mut buffer).is_ok() {
+                    if let Ok(snapshot) = bincode::deserialize::<Snapshot>(&buffer) {
+                        storage.vector_arena = snapshot.vector_arena;
+                        storage.metadata_arena = snapshot.metadata_arena;
+                        for (k, v) in snapshot.id_to_u32 { storage.id_to_u32.insert(k, v); }
+                        for (k, v) in snapshot.u32_to_id { storage.u32_to_id.insert(k, v); }
+                        storage.next_u32 = AtomicU32::new(snapshot.next_u32);
+                    }
+                }
+            }
+        }
+
         storage.rehydrate_hnsw_index();
         if log_path.exists() {
             let file = FileOpenOptions::new().read(true).open(&log_path).map_err(|e| Error::from_reason(format!("io: {e}")))?;
@@ -246,12 +290,17 @@ impl Storage {
             for event in stream {
                 match event {
                     Ok(Event::Node(n)) => {
+                        let u32_id = storage.get_or_intern_id(&n.id);
                         if let Some(emb) = n.embedding.clone() { storage.add_vector_internal(&n.id, emb); }
-                        storage.nodes.insert(n.id.clone(), n);
+                        storage.nodes.insert(u32_id, n);
                     }
                     Ok(Event::Edge(e)) => {
-                        storage.index_edge_internal(&e.id, &e.from, &e.to);
-                        storage.edges.insert(e.id.clone(), e);
+                        let u32_id = storage.get_or_intern_id(&e.id);
+                        let u32_from = storage.get_or_intern_id(&e.from);
+                        let u32_to = storage.get_or_intern_id(&e.to);
+                        storage.out_idx.entry(u32_from).or_insert_with(HashSet::new).insert(u32_id);
+                        storage.in_idx.entry(u32_to).or_insert_with(HashSet::new).insert(u32_id);
+                        storage.edges.insert(u32_id, e);
                     }
                     Err(_) => return Err(Error::from_reason("malformed log")),
                 }
@@ -287,24 +336,28 @@ impl Storage {
     pub fn ensure_writable(&self) -> Result<()> { if self.read_only { return Err(Error::from_reason("read-only")); } Ok(()) }
 
     pub fn index_edge_internal(&mut self, id: &str, from: &str, to: &str) {
-        self.out_idx.entry(from.to_string()).or_default().insert(id.to_string());
-        self.in_idx.entry(to.to_string()).or_default().insert(id.to_string());
+        let u32_id = self.get_or_intern_id(id);
+        let u32_from = self.get_or_intern_id(from);
+        let u32_to = self.get_or_intern_id(to);
+        self.out_idx.entry(u32_from).or_insert_with(HashSet::new).insert(u32_id);
+        self.in_idx.entry(u32_to).or_insert_with(HashSet::new).insert(u32_id);
     }
 
-    pub fn calculate_as(&self, id: &str) -> f64 {
+    fn calculate_as(&self, id: &str) -> f64 {
         if id.starts_with("MASTER--") || id.starts_with("FRAME--") { 1.0 }
         else if id.starts_with("CONCEPT--") || id.starts_with("SPEC--") { 0.8 }
         else if id.starts_with("FEAT--") || id.starts_with("ADR--") || id.starts_with("BLUEPRINT--") { 0.6 }
         else { 0.3 }
     }
 
-    pub fn calculate_sc(&self, node: &NodeOutput) -> f64 {
+    fn calculate_sc(&self, node: &NodeOutput) -> f64 {
         let status = node.props.get("status").and_then(|v| v.as_str()).unwrap_or("active");
         match status { "stable" => 1.0, "active" => 0.8, "draft" => 0.4, "deprecated" => 0.1, _ => 0.6 }
     }
 
-    pub fn calculate_dd(&self, id: &str) -> f64 {
-        let incoming = self.in_idx.get(id).map_or(0, |set| set.len());
+    fn calculate_dd(&self, id: &str) -> f64 {
+        let u32_id = match self.get_u32(id) { Some(id) => id, None => return 0.0 };
+        let incoming = self.in_idx.get(&u32_id).map_or(0, |set| set.len());
         (incoming as f64 / 10.0).min(1.0)
     }
 
@@ -316,27 +369,34 @@ impl Storage {
     pub fn refresh_impacts(&mut self, affected_ids: Option<Vec<String>>) {
         let ids_to_update = match affected_ids {
             Some(ids) => {
-                let mut queue = std::collections::VecDeque::from(ids); let mut affected = HashSet::new();
-                while let Some(curr) = queue.pop_front() {
-                    if affected.insert(curr.clone()) {
-                        if let Some(edges) = self.out_idx.get(&curr) {
-                            for eid in edges { if let Some(e) = self.edges.get(eid) { queue.push_back(e.to.clone()); } }
+                let mut queue = VecDeque::from(ids.iter().filter_map(|id| self.get_u32(id)).collect::<Vec<_>>());
+                let mut affected = HashSet::new();
+                while let Some(curr_u32) = queue.pop_front() {
+                    if affected.insert(curr_u32) {
+                        if let Some(edges) = self.out_idx.get(&curr_u32) {
+                            for eid in edges.value() { 
+                                if let Some(e) = self.edges.get(eid) { 
+                                    if let Some(target_u32) = self.get_u32(&e.to) {
+                                        queue.push_back(target_u32); 
+                                    }
+                                } 
+                            }
                         }
                     }
                 }
                 affected.into_iter().collect::<Vec<_>>()
             }
-            None => self.nodes.keys().cloned().collect(),
+            None => self.nodes.iter().map(|r| *r.key()).collect(),
         };
-        for id in ids_to_update {
-            if let Some(node) = self.nodes.get(&id) {
-                let impact = self.compute_impact(node);
-                if let Some(node_mut) = self.nodes.get_mut(&id) { node_mut.impact = Some(impact); }
+        for u32_id in ids_to_update {
+            if let Some(mut node) = self.nodes.get_mut(&u32_id) {
+                let impact = self.compute_impact(node.value());
+                node.impact = Some(impact);
             }
         }
     }
 
-    pub fn persist(&self, event: &Event) -> Result<()> {
+    fn persist(&self, event: &Event) -> Result<()> {
         self.ensure_writable()?;
         let mut file = FileOpenOptions::new().create(true).append(true).open(&self.log_path).map_err(|e| Error::from_reason(format!("io: {e}")))?;
         let line = serde_json::to_string(event).map_err(|e| Error::from_reason(e.to_string()))?;
@@ -344,25 +404,21 @@ impl Storage {
         Ok(())
     }
 
-            pub fn bulk_add_nodes(&mut self, inputs: Vec<NodeInput>) -> Result<()> {
+    pub fn bulk_add_nodes(&mut self, inputs: Vec<NodeInput>) -> Result<()> {
         self.ensure_writable()?;
         let mut events = Vec::new();
         let mut ids_to_refresh = Vec::new();
-
         for input in inputs {
             let id = input.id.clone().unwrap_or_else(|| {
                 let hash = format!("{:x}", md5::compute(format!("{:?}{:?}", input.labels, input.props)));
                 format!("N-{}", &hash[..16])
             });
-
+            let u32_id = self.get_or_intern_id(&id);
             let mut node = NodeOutput {
-                id: id.clone(),
-                labels: input.labels,
+                id: id.clone(), labels: input.labels,
                 props: input.props.unwrap_or(Value::Object(Default::default())),
-                impact: None,
-                embedding: None,
+                impact: None, embedding: None,
             };
-
             if let Some(emb_64) = input.embedding {
                 let emb: Vec<f32> = emb_64.into_iter().map(|v| v as f32).collect();
                 let dim = emb.len() as u16;
@@ -378,20 +434,13 @@ impl Storage {
                 self.metadata_arena.push(metadata);
                 node.embedding = Some(emb.into_iter().map(|v| v as f64).collect());
             }
-
-            let impact = self.compute_impact(&node);
-            node.impact = Some(impact);
-            self.nodes.insert(id.clone(), node.clone());
+            let impact = self.compute_impact(&node); node.impact = Some(impact);
+            self.nodes.insert(u32_id, node.clone());
             ids_to_refresh.push(id.clone());
             events.push(Event::Node(node));
         }
-
-        let mut file = FileOpenOptions::new().create(true).append(true).open(&self.log_path).map_err(|e| Error::from_reason(format!("io: {}", e)))?;
-        for ev in events {
-            let line = serde_json::to_string(&ev).unwrap();
-            writeln!(file, "{}", line).ok();
-        }
-
+        let mut file = FileOpenOptions::new().create(true).append(true).open(&self.log_path).map_err(|e| Error::from_reason(format!("io: {e}")))?;
+        for ev in events { let line = serde_json::to_string(&ev).unwrap(); writeln!(file, "{}", line).ok(); }
         self.refresh_impacts(Some(ids_to_refresh));
         Ok(())
     }
@@ -400,7 +449,6 @@ impl Storage {
         self.ensure_writable()?;
         let mut events = Vec::new();
         let mut ids_to_refresh = Vec::new();
-
         for input in inputs {
             let now = Utc::now().to_rfc3339();
             let edge = EdgeOutput {
@@ -411,18 +459,14 @@ impl Storage {
                 valid_to: None, recorded_at: now, superseded_by: None, impact: input.impact,
             };
             self.index_edge_internal(&edge.id, &edge.from, &edge.to);
+            let u32_id = self.get_or_intern_id(&edge.id);
             let target_id = edge.to.clone();
-            self.edges.insert(edge.id.clone(), edge.clone());
+            self.edges.insert(u32_id, edge.clone());
             ids_to_refresh.push(target_id);
             events.push(Event::Edge(edge));
         }
-
-        let mut file = FileOpenOptions::new().create(true).append(true).open(&self.log_path).map_err(|e| Error::from_reason(format!("io: {}", e)))?;
-        for ev in events {
-            let line = serde_json::to_string(&ev).unwrap();
-            writeln!(file, "{}", line).ok();
-        }
-
+        let mut file = FileOpenOptions::new().create(true).append(true).open(&self.log_path).map_err(|e| Error::from_reason(format!("io: {e}")))?;
+        for ev in events { let line = serde_json::to_string(&ev).unwrap(); writeln!(file, "{}", line).ok(); }
         self.refresh_impacts(Some(ids_to_refresh));
         Ok(())
     }
@@ -448,8 +492,9 @@ impl Storage {
             let hash = format!("{:x}", md5::compute(format!("{:?}{:?}", args.labels, args.props)));
             format!("N-{}", &hash[..16])
         });
-        let mut existing_node = self.nodes.get(&id).cloned();
-        if let Some(ref mut n) = existing_node {
+        let u32_id = self.get_or_intern_id(&id);
+        let existing_node = self.nodes.get(&u32_id).map(|n| n.value().clone());
+        if let Some(mut n) = existing_node {
             let mut labels = n.labels.clone();
             for l in args.labels { if !labels.contains(&l) { labels.push(l); } }
             let mut props = n.props.as_object().cloned().unwrap_or_default();
@@ -457,27 +502,24 @@ impl Storage {
                 for (k, v) in new_props { props.insert(k, v); }
             }
             n.labels = labels; n.props = Value::Object(props);
-            let impact = self.compute_impact(n); n.impact = Some(impact);
-            self.nodes.insert(id.clone(), n.clone()); self.persist(&Event::Node(n.clone()))?;
-            self.refresh_impacts(Some(vec![id.clone()])); return Ok(n.clone());
+            let impact = self.compute_impact(&n); n.impact = Some(impact);
+            self.nodes.insert(u32_id, n.clone()); self.persist(&Event::Node(n.clone()))?;
+            self.refresh_impacts(Some(vec![id.clone()])); return Ok(n);
         }
         let mut node = NodeOutput {
             id: id.clone(), labels: args.labels,
             props: args.props.unwrap_or(Value::Object(Default::default())),
             impact: None, embedding: None,
         };
-        if let Some(emb) = args.embedding {
-            self.add_vector_internal(&id, emb.clone());
-            node.embedding = Some(emb);
-        }
+        if let Some(emb) = args.embedding { self.add_vector_internal(&id, emb.clone()); node.embedding = Some(emb); }
         let impact = self.compute_impact(&node); node.impact = Some(impact);
-        self.nodes.insert(id.clone(), node.clone()); self.persist(&Event::Node(node.clone()))?;
+        self.nodes.insert(u32_id, node.clone()); self.persist(&Event::Node(node.clone()))?;
         self.refresh_impacts(Some(vec![id])); Ok(node)
     }
 
     pub fn add_edge(&mut self, args: EdgeInput) -> Result<EdgeOutput> {
         self.ensure_writable()?;
-        if !self.nodes.contains_key(&args.from) || !self.nodes.contains_key(&args.to) { return Err(Error::from_reason("unknown node")); }
+        if !self.get_u32(&args.from).is_some() || !self.get_u32(&args.to).is_some() { return Err(Error::from_reason("unknown node")); }
         if args.rel == "supersedes" || args.rel == "contradicts" {
             if self.calculate_as(&args.from) < self.calculate_as(&args.to) { return Err(Error::from_reason("axiomatic guard")); }
         }
@@ -490,7 +532,8 @@ impl Storage {
             valid_to: None, recorded_at: now, superseded_by: None, impact: args.impact,
         };
         self.index_edge_internal(&edge.id, &edge.from, &edge.to);
-        let target_id = edge.to.clone(); self.edges.insert(edge.id.clone(), edge.clone());
+        let u32_id = self.get_or_intern_id(&edge.id);
+        let target_id = edge.to.clone(); self.edges.insert(u32_id, edge.clone());
         self.refresh_impacts(Some(vec![target_id])); self.persist(&Event::Edge(edge.clone()))?;
         Ok(edge)
     }
@@ -498,16 +541,17 @@ impl Storage {
     pub fn query(&self, args: QueryInput) -> Result<Vec<EdgeOutput>> {
         let as_of_ms = args.as_of.as_ref().and_then(|s| chrono::DateTime::parse_from_rfc3339(s).ok()).map(|dt| dt.timestamp_millis());
         let mut results = Vec::new();
-        for e in self.edges.values() {
-            if let Some(ref from) = args.from { if e.from != *from { continue; } }
-            if let Some(ref to) = args.to { if e.to != *to { continue; } }
-            if let Some(ref rel) = args.rel { if e.rel != *rel { continue; } }
+        for r in self.edges.iter() {
+            let edge = r.value();
+            if let Some(ref from) = args.from { if edge.from != *from { continue; } }
+            if let Some(ref to) = args.to { if edge.to != *to { continue; } }
+            if let Some(ref rel) = args.rel { if edge.rel != *rel { continue; } }
             let is_valid = if let Some(ms) = as_of_ms {
-                let from_ms = chrono::DateTime::parse_from_rfc3339(&e.valid_from).map(|dt| dt.timestamp_millis()).unwrap_or(0);
-                let to_ms = e.valid_to.as_ref().and_then(|s| chrono::DateTime::parse_from_rfc3339(s).ok()).map(|dt| dt.timestamp_millis());
+                let from_ms = chrono::DateTime::parse_from_rfc3339(&edge.valid_from).map(|dt| dt.timestamp_millis()).unwrap_or(0);
+                let to_ms = edge.valid_to.as_ref().and_then(|s| chrono::DateTime::parse_from_rfc3339(s).ok()).map(|dt| dt.timestamp_millis());
                 ms >= from_ms && to_ms.map_or(true, |end| ms < end)
-            } else { args.include_invalid.unwrap_or(false) || e.valid_to.is_none() };
-            if is_valid { results.push(e.clone()); }
+            } else { args.include_invalid.unwrap_or(false) || edge.valid_to.is_none() };
+            if is_valid { results.push(edge.clone()); }
         }
         results.sort_by(|a, b| b.impact.unwrap_or(0.0).partial_cmp(&a.impact.unwrap_or(0.0)).unwrap());
         if let Some(limit) = args.limit { if results.len() > limit as usize { results.truncate(limit as usize); } }
@@ -516,7 +560,7 @@ impl Storage {
 
     pub fn status_sync(&self) -> DatabaseStatus { DatabaseStatus { open: true, read_only: self.read_only, page_cache_mb: 64 } }
 
-        pub fn hybrid_search(&self, args: HybridSearchInput) -> Result<Vec<NeighborOutput>> {
+    pub fn hybrid_search(&self, args: HybridSearchInput) -> Result<Vec<NeighborOutput>> {
         let hnsw = match &self.hnsw_index { Some(idx) => idx, None => return Err(Error::from_reason("HNSW index not initialized")) };
         let k_vec = args.k * 2; let alpha = args.alpha.unwrap_or(0.5);
         let query_f32: Vec<f32> = args.query_vector.into_iter().map(|v| v as f32).collect();
@@ -525,11 +569,13 @@ impl Storage {
         for neighbor in results {
             let arena_id = neighbor.d_id as u32; let similarity = 1.0 - neighbor.distance;
             if let Some(meta) = self.metadata_arena.get(arena_id as usize) {
-                if let Some(node) = self.nodes.get(&meta.node_id) {
-                    let mut node_out = node.clone();
-                    let hybrid_score = (similarity as f64 * (1.0 - alpha)) + (node_out.impact.unwrap_or(0.0) * alpha);
-                    node_out.impact = Some(hybrid_score);
-                    hybrid_results.push(NeighborOutput { node: node_out, path: Vec::new(), depth: 0 });
+                if let Some(u32_id) = self.get_u32(&meta.node_id) {
+                    if let Some(node) = self.nodes.get(&u32_id) {
+                        let mut node_out = node.value().clone();
+                        let hybrid_score = (similarity as f64 * (1.0 - alpha)) + (node_out.impact.unwrap_or(0.0) * alpha);
+                        node_out.impact = Some(hybrid_score);
+                        hybrid_results.push(NeighborOutput { node: node_out, path: Vec::new(), depth: 0 });
+                    }
                 }
             }
         }
@@ -538,29 +584,30 @@ impl Storage {
     }
 
     pub fn neighbors(&self, seed: String, args: NeighborInput) -> Result<Vec<NeighborOutput>> {
-        if !self.nodes.contains_key(&seed) { return Ok(Vec::new()); }
+        let u32_seed = match self.get_u32(&seed) { Some(id) => id, None => return Ok(Vec::new()) };
         let depth = args.depth.unwrap_or(1); let direction = args.direction.as_deref().unwrap_or("out");
         let mut target_rels = HashSet::new(); if let Some(r) = args.rel { target_rels.insert(r); }
         if let Some(rs) = args.rels { target_rels.extend(rs); }
-        let mut results = Vec::new(); let mut visited = HashSet::new(); visited.insert(seed.clone());
-        let mut queue = std::collections::VecDeque::new(); queue.push_back((seed.clone(), Vec::new(), 0));
-        while let Some((curr_id, path, curr_depth)) = queue.pop_front() {
+        let mut results = Vec::new(); let mut visited = HashSet::new(); visited.insert(u32_seed);
+        let mut queue = VecDeque::new(); queue.push_back((u32_seed, Vec::new(), 0));
+        while let Some((curr_u32, path, curr_depth)) = queue.pop_front() {
             if curr_depth >= depth { continue; }
-            let mut edge_ids = HashSet::new();
-            if direction == "out" || direction == "both" { if let Some(eids) = self.out_idx.get(&curr_id) { edge_ids.extend(eids.clone()); } }
-            if direction == "in" || direction == "both" { if let Some(eids) = self.in_idx.get(&curr_id) { edge_ids.extend(eids.clone()); } }
-            let mut edges_to_visit: Vec<EdgeOutput> = edge_ids.iter().filter_map(|eid| self.edges.get(eid)).cloned().collect();
+            let mut edge_u32_ids = HashSet::new();
+            if direction == "out" || direction == "both" { if let Some(eids) = self.out_idx.get(&curr_u32) { edge_u32_ids.extend(eids.clone()); } }
+            if direction == "in" || direction == "both" { if let Some(eids) = self.in_idx.get(&curr_u32) { edge_u32_ids.extend(eids.clone()); } }
+            let mut edges_to_visit: Vec<EdgeOutput> = edge_u32_ids.iter().filter_map(|eid| self.edges.get(eid)).map(|r| r.value().clone()).collect();
             edges_to_visit.sort_by(|a, b| b.impact.unwrap_or(0.0).partial_cmp(&a.impact.unwrap_or(0.0)).unwrap());
             for edge in edges_to_visit {
                 if !target_rels.is_empty() && !target_rels.contains(&edge.rel) { continue; }
                 if !args.include_invalid.unwrap_or(false) && edge.valid_to.is_some() { continue; }
-                let next_id = if edge.from == curr_id { edge.to.clone() } else { edge.from.clone() };
-                if visited.contains(&next_id) { continue; }
-                visited.insert(next_id.clone());
-                if let Some(node) = self.nodes.get(&next_id) {
+                let next_str_id = if self.get_u32(&edge.from) == Some(curr_u32) { &edge.to } else { &edge.from };
+                let next_u32 = self.get_u32(next_str_id).unwrap();
+                if visited.contains(&next_u32) { continue; }
+                visited.insert(next_u32);
+                if let Some(node) = self.nodes.get(&next_u32) {
                     let mut new_path = path.clone(); new_path.push(edge.clone());
-                    results.push(NeighborOutput { node: node.clone(), path: new_path.clone(), depth: curr_depth + 1 });
-                    queue.push_back((next_id, new_path, curr_depth + 1));
+                    results.push(NeighborOutput { node: node.value().clone(), path: new_path.clone(), depth: curr_depth + 1 });
+                    queue.push_back((next_u32, new_path, curr_depth + 1));
                 }
             }
         }
@@ -573,12 +620,19 @@ impl Storage {
         self.ensure_writable()?;
         let tmp_path = self.path.join("genesis-graph.jsonl.tmp");
         let mut file = FileOpenOptions::new().create(true).write(true).truncate(true).open(&tmp_path).map_err(|e| Error::from_reason(format!("compact: {e}")))?;
-        for node in self.nodes.values() { let line = serde_json::to_string(&Event::Node(node.clone())).unwrap(); writeln!(file, "{}", line).ok(); }
-        for edge in self.edges.values() { if edge.valid_to.is_none() { let line = serde_json::to_string(&Event::Edge(edge.clone())).unwrap(); writeln!(file, "{}", line).ok(); } }
+        for node in self.nodes.iter() { let line = serde_json::to_string(&Event::Node(node.value().clone())).unwrap(); writeln!(file, "{}", line).ok(); }
+        for edge in self.edges.iter() { if edge.value().valid_to.is_none() { let line = serde_json::to_string(&Event::Edge(edge.value().clone())).unwrap(); writeln!(file, "{}", line).ok(); } }
         file.flush().ok(); drop(file); fs::rename(&tmp_path, &self.log_path).ok();
         let snapshot = Snapshot {
-            nodes: self.nodes.clone(), edges: self.edges.clone(), out_idx: self.out_idx.clone(), in_idx: self.in_idx.clone(),
-            vector_arena: self.vector_arena.clone(), metadata_arena: self.metadata_arena.clone(),
+            nodes: self.nodes.iter().map(|r| (*r.key(), r.value().clone())).collect(),
+            edges: self.edges.iter().map(|r| (*r.key(), r.value().clone())).collect(),
+            out_idx: self.out_idx.iter().map(|r| (*r.key(), r.value().clone())).collect(),
+            in_idx: self.in_idx.iter().map(|r| (*r.key(), r.value().clone())).collect(),
+            vector_arena: self.vector_arena.clone(),
+            metadata_arena: self.metadata_arena.clone(),
+            id_to_u32: self.id_to_u32.iter().map(|r| (r.key().clone(), *r.value())).collect(),
+            u32_to_id: self.u32_to_id.iter().map(|r| (*r.key(), r.value().clone())).collect(),
+            next_u32: self.next_u32.load(Ordering::SeqCst),
         };
         if let Ok(encoded) = bincode::serialize(&snapshot) { fs::write(&self.bin_path, encoded).ok(); }
         Ok(())
@@ -586,7 +640,8 @@ impl Storage {
 
     pub fn retract_edge(&mut self, id: String, at: Option<String>) -> Result<Option<EdgeOutput>> {
         self.ensure_writable()?;
-        let e = match self.edges.get_mut(&id) { Some(e) => e, None => return Ok(None) };
+        let u32_id = match self.get_u32(&id) { Some(id) => id, None => return Ok(None) };
+        let mut e = match self.edges.get_mut(&u32_id) { Some(e) => e, None => return Ok(None) };
         if e.valid_to.is_some() { return Ok(Some(e.clone())); }
         let at = at.unwrap_or_else(|| Utc::now().to_rfc3339()); e.valid_to = Some(at);
         let retired = e.clone(); self.persist(&Event::Edge(retired.clone()))?; Ok(Some(retired))
@@ -603,22 +658,23 @@ impl GenesisDatabase {
         let storage = Storage::open(opts.clone())?;
         Ok(Self { inner: Arc::new(RwLock::new(storage)), page_cache_mb: opts.page_cache_mb.unwrap_or(64) })
     }
-        #[napi]
+
+    #[napi]
     pub async fn bulk_add_nodes(&self, inputs: Vec<NodeInput>) -> Result<()> {
         let inner = Arc::clone(&self.inner);
-        tokio::task::spawn_blocking(move || inner.write().bulk_add_nodes(inputs)).await.map_err(|e| Error::from_reason(format!("join: {}", e)))?
+        tokio::task::spawn_blocking(move || inner.write().bulk_add_nodes(inputs)).await.map_err(|e| Error::from_reason(format!("join: {e}")))?
     }
 
     #[napi]
     pub async fn bulk_add_edges(&self, inputs: Vec<EdgeInput>) -> Result<()> {
         let inner = Arc::clone(&self.inner);
-        tokio::task::spawn_blocking(move || inner.write().bulk_add_edges(inputs)).await.map_err(|e| Error::from_reason(format!("join: {}", e)))?
+        tokio::task::spawn_blocking(move || inner.write().bulk_add_edges(inputs)).await.map_err(|e| Error::from_reason(format!("join: {e}")))?
     }
 
     #[napi]
     pub async fn rebuild_index_parallel(&self) -> Result<()> {
         let inner = Arc::clone(&self.inner);
-        tokio::task::spawn_blocking(move || inner.write().rebuild_index_parallel()).await.map_err(|e| Error::from_reason(format!("join: {}", e)))?
+        tokio::task::spawn_blocking(move || inner.write().rebuild_index_parallel()).await.map_err(|e| Error::from_reason(format!("join: {e}")))?
     }
 
     #[napi]
@@ -658,4 +714,3 @@ impl GenesisDatabase {
 }
 #[napi]
 pub fn engine_name_sync() -> String { "genesis-block".to_string() }
-
