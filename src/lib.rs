@@ -188,6 +188,15 @@ impl Storage {
         let new_id = self.next_u32.fetch_add(1, Ordering::SeqCst);
         self.id_to_u32.insert(id.to_string(), new_id);
         self.u32_to_id.insert(new_id, id.to_string());
+        
+        // Trigram Indexing
+        if id.len() >= 3 {
+            for i in 0..id.len() - 2 {
+                let trigram = &id[i..i+3].to_lowercase();
+                self.trigram_index.entry(trigram.clone()).or_insert_with(HashSet::new).insert(new_id);
+            }
+        }
+        
         new_id
     }
 
@@ -237,41 +246,49 @@ impl Storage {
         let lock_file = Self::acquire_os_lock(&root, read_only)?;
         let log_path = root.join("genesis-graph.wal"); // Phase 13: Changed to .wal
         
-        let (wal_sender, wal_receiver) = unbounded();
+        let (wal_sender, wal_receiver): (Sender<(Event, Sender<bool>)>, Receiver<(Event, Sender<bool>)>) = unbounded();
         let log_path_clone = log_path.clone();
+
         
-        // WAL Flusher Thread (Group Commit)
+        // WAL Flusher Thread (Optimized Group Commit)
         std::thread::spawn(move || {
-            let mut batch: Vec<(Vec<u8>, crossbeam_channel::Sender<bool>)> = Vec::with_capacity(1024);
-            loop {
-                // Wait for the first event, then try to drain up to 1024 events or 5ms
-                match wal_receiver.recv() {
-                    Ok(event) => {
-                        batch.push(event);
-                        let timeout = Duration::from_millis(5);
-                        let start = std::time::Instant::now();
-                        while batch.len() < 1024 && start.elapsed() < timeout {
-                            if let Ok(e) = wal_receiver.try_recv() {
-                                batch.push(e);
-                            } else {
-                                break; // empty channel
+            let file_res = FileOpenOptions::new().append(true).create(true).open(&log_path_clone);
+            if let Ok(file) = file_res {
+                let mut writer = std::io::BufWriter::with_capacity(128 * 1024, file);
+                let mut batch: Vec<crossbeam_channel::Sender<bool>> = Vec::with_capacity(1024);
+                
+                loop {
+                    match wal_receiver.recv() {
+                        Ok((event, ack_tx)) => {
+                            batch.push(ack_tx);
+                            if let Ok(json) = serde_json::to_string(&event) {
+                                writer.write_all(json.as_bytes()).ok();
+                                writer.write_all(b"\n").ok();
                             }
-                        }
-                        
-                        // Execute Group Commit
-                        if let Ok(mut file) = FileOpenOptions::new().append(true).create(true).open(&log_path_clone) {
-                            for (data, _) in &batch {
-                                file.write_all(data).ok();
-                            }
-                            file.sync_all().ok(); // Physical hardware flush
                             
-                            // Send Acks
-                            for (_, ack) in batch.drain(..) {
+                            let timeout = Duration::from_millis(5);
+                            let start = std::time::Instant::now();
+                            while batch.len() < 1024 && start.elapsed() < timeout {
+                                if let Ok((event, ack_tx)) = wal_receiver.try_recv() {
+                                    batch.push(ack_tx);
+                                    if let Ok(json) = serde_json::to_string(&event) {
+                                        writer.write_all(json.as_bytes()).ok();
+                                        writer.write_all(b"\n").ok();
+                                    }
+                                } else {
+                                    break;
+                                }
+                            }
+                            
+                            writer.flush().ok();
+                            writer.get_mut().sync_all().ok();
+                            
+                            for ack in batch.drain(..) {
                                 ack.send(true).ok();
                             }
-                        }
-                    },
-                    Err(_) => break, // Channel disconnected
+                        },
+                        Err(_) => break,
+                    }
                 }
             }
         });
@@ -280,8 +297,10 @@ impl Storage {
             path: root, read_only, nodes: DashMap::new(), edges: DashMap::new(),
             out_idx: DashMap::new(), in_idx: DashMap::new(),
             vector_arena: RwLock::new(Vec::new()), metadata_arena: RwLock::new(Vec::new()),
-            hnsw_index: RwLock::new(None), log_path, bin_path: PathBuf::from(""), _lock_file: Some(lock_file),
+            hnsw_index: RwLock::new(None), log_path: log_path.clone(), bin_path: PathBuf::from(""), _lock_file: Some(lock_file),
             id_to_u32: DashMap::new(), u32_to_id: DashMap::new(), next_u32: AtomicU32::new(0),
+            is_rebuilding: AtomicBool::new(false),
+            trigram_index: DashMap::new(),
             wal_sender,
         };
         storage.rehydrate_hnsw_index();
