@@ -1,0 +1,46 @@
+﻿name: GenesisDB Performance Audit
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  benchmark:
+    name: Scientific Performance Audit
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Install Rust Toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Rust Cache
+        uses: Swatinem/rust-cache@v2
+
+      - name: Build Benchmark (Release)
+        run: cargo build --release --bin scientific-audit
+
+      - name: Run Scientific Audit (15s Durable fsync)
+        run: |
+          mkdir -p benches/scientific_audit_db
+          ./target/release/scientific-audit > audit_result.txt
+          cat audit_result.txt
+
+      - name: Upload Audit Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: genesisdb-audit-report
+          path: audit_result.txt
+
+      - name: Performance Regression Check
+        run: |
+          TPS=$(grep "Throughput:" audit_result.txt | awk '{print $2}' | cut -d'.' -f1)
+          if [ "$TPS" -lt 100 ]; then
+            echo "❌ Performance Regression Detected! Throughput dropped below 100 TPS durable."
+            exit 1
+          fi
+          echo "✅ Performance verified: $TPS TPS (Durable)"
