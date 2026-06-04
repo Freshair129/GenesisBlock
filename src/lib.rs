@@ -1,16 +1,16 @@
-﻿//! Genesis Block â€” high-performance hybrid semantic-graph engine.
+//! Genesis Block — high-performance hybrid semantic-graph engine.
 //!
 //! Mark IV: Global Scale & Reasoning
 
 #![deny(clippy::all)]
 
-use std::collections::{HashMap, HashSet, VecDeque};
+use std::collections::{HashSet, VecDeque};
 use std::fs::{self, File, OpenOptions as FileOpenOptions};
-use std::io::{Read, Write};
+use std::io::Write;
 use std::path::PathBuf;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicU32, AtomicBool, Ordering};
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use chrono::Utc;
 use dashmap::DashMap;
@@ -21,7 +21,6 @@ use parking_lot::RwLock;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use uuid::Uuid;
-use rayon::prelude::*;
 use crossbeam_channel::{unbounded, Sender, Receiver};
 
 pub mod query;
@@ -29,7 +28,7 @@ use query::HqlCommand;
 
 pub const SCHEMA_VERSION: u32 = 1;
 
-// --- Types (PROTOCOL Â§3) ---
+// --- Types (PROTOCOL §3) ---
 
 #[napi(object)]
 #[derive(Serialize, Deserialize, Clone, Debug)]
@@ -173,13 +172,39 @@ pub struct Storage {
     pub wal_sender: Sender<(Event, Sender<bool>)>,
 }
 
+// --- Governance (AXIOMATIC GUARDS §2) ---
+
+#[derive(Debug, PartialEq, PartialOrd)]
+pub enum Tier {
+    MASTER = 0,
+    SPEC = 1,
+    ADR = 2,
+    USER = 3,
+}
+
+impl Tier {
+    pub fn from_labels(labels: &[String]) -> Self {
+        if labels.iter().any(|l| l.to_uppercase() == "MASTER") { Tier::MASTER }
+        else if labels.iter().any(|l| l.to_uppercase() == "SPEC") { Tier::SPEC }
+        else if labels.iter().any(|l| l.to_uppercase() == "ADR") { Tier::ADR }
+        else { Tier::USER }
+    }
+}
+
 impl Storage {
+    fn validate_governance(&self, labels: &[String], is_system: bool) -> Result<()> {
+        let tier = Tier::from_labels(labels);
+        if tier == Tier::MASTER && !is_system {
+            return Err(Error::from_reason("403 Forbidden: MASTER tier is immutable for external agents"));
+        }
+        Ok(())
+    }
+
     pub fn get_or_intern_id(&self, id: &str) -> u32 {
         if let Some(existing) = self.id_to_u32.get(id) { return *existing; }
         let new_id = self.next_u32.fetch_add(1, Ordering::SeqCst);
         self.id_to_u32.insert(id.to_string(), new_id);
         self.u32_to_id.insert(new_id, id.to_string());
-        
         if id.len() >= 3 {
             for i in 0..id.len() - 2 {
                 let trigram = id[i..i+3].to_lowercase();
@@ -198,13 +223,12 @@ impl Storage {
         let dim = emb.len() as u16;
         let mut vec_arena = self.vector_arena.write();
         let current_vec_len = vec_arena.len();
-        let aligned_offset = current_vec_len; 
         vec_arena.extend_from_slice(&emb);
         let mut meta_arena = self.metadata_arena.write();
         let arena_id = meta_arena.len() as u32;
         meta_arena.push(NodeMetadata {
             arena_id, node_id: node_id.to_string(), timestamp: Utc::now().timestamp() as u64,
-            vector_dim: dim, embedding_offset: aligned_offset as u64, gks_attributes: Vec::new(),
+            vector_dim: dim, embedding_offset: current_vec_len as u64, gks_attributes: Vec::new(),
         });
         if self.hnsw_index.read().is_none() { *self.hnsw_index.write() = Some(Self::init_hnsw()); }
         if let Some(ref mut hnsw) = *self.hnsw_index.write() { hnsw.insert((&emb, arena_id as usize)); }
@@ -244,7 +268,7 @@ impl Storage {
                                 let _ = writer.write_all(b"\n");
                             }
                             let timeout = Duration::from_millis(5);
-                            let start = std::time::Instant::now();
+                            let start = Instant::now();
                             while batch.len() < 1024 && start.elapsed() < timeout {
                                 if let Ok((e, tx)) = wal_receiver.try_recv() {
                                     batch.push(tx);
@@ -340,6 +364,7 @@ impl Storage {
 
     pub fn add_node(&self, args: NodeInput) -> Result<NodeOutput> {
         self.ensure_writable()?;
+        self.validate_governance(&args.labels, false)?; 
         let id = args.id.unwrap_or_else(|| format!("N-{}", Uuid::new_v4()));
         let u32_id = self.get_or_intern_id(&id);
         let mut node = NodeOutput { id: id.clone(), labels: args.labels, props: args.props.unwrap_or(Value::Object(Default::default())), impact: Some(0.7), embedding: None };
@@ -364,9 +389,7 @@ impl Storage {
 
     pub fn rebuild_index_parallel(&self) -> Result<()> {
         self.is_rebuilding.store(true, Ordering::SeqCst);
-        let result = (|| {
-            self.rehydrate_hnsw_index(); Ok(())
-        })();
+        let result = (|| { self.rehydrate_hnsw_index(); Ok(()) })();
         self.is_rebuilding.store(false, Ordering::SeqCst);
         result
     }
@@ -478,5 +501,3 @@ impl GenesisDatabase {
     #[napi] pub fn status_sync(&self) -> DatabaseStatus { self.inner.status_sync() }
 }
 #[napi] pub fn engine_name_sync() -> String { "genesis-block".to_string() }
-
-
