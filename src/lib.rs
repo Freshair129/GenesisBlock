@@ -500,16 +500,36 @@ impl Storage {
         let results = hnsw.search(&query_f32, (args.k * 2) as usize, 100);
         let mut hybrid_results = Vec::new();
         let meta_arena = self.metadata_arena.read();
+        let alpha = args.alpha.unwrap_or(0.5);
+
         for neighbor in results {
             if let Some(meta) = meta_arena.get(neighbor.d_id as usize) {
                 if let Some(u32_id) = self.get_u32(&meta.node_id) {
                     if let Some(node) = self.nodes.get(&u32_id) {
-                        hybrid_results.push(NeighborOutput { node: node.value().clone(), path: Vec::new(), depth: 0 });
+                        let mut node_out = node.value().clone();
+                        let similarity = 1.0 - neighbor.distance as f64;
+                        
+                        // Reasoning Score R = (Sim * 0.6) + (Impact * 0.4) if alpha is default
+                        // Using provided alpha for flexibility
+                        let reasoning_score = (similarity * (1.0 - alpha)) + (node_out.impact.unwrap_or(0.0) * alpha);
+                        node_out.impact = Some(reasoning_score);
+                        
+                        hybrid_results.push(NeighborOutput { node: node_out, path: Vec::new(), depth: 0 });
                     }
                 }
             }
         }
-        hybrid_results.truncate(args.k as usize); Ok(hybrid_results)
+        hybrid_results.sort_by(|a, b| b.node.impact.partial_cmp(&a.node.impact).unwrap());
+        hybrid_results.truncate(args.k as usize); 
+        Ok(hybrid_results)
+    }
+
+    pub fn get_ranked_context(&self, args: HybridSearchInput) -> Result<Vec<NeighborOutput>> {
+        // Step 4: Logic-Gated Context
+        // Force alpha to 0.4 for R = (Sim * 0.6) + (Impact * 0.4)
+        let mut context_args = args;
+        context_args.alpha = Some(0.4);
+        self.hybrid_search(context_args)
     }
 
     pub fn neighbors(&self, seed: String, args: NeighborInput, is_inferred: bool) -> Result<Vec<NeighborOutput>> {

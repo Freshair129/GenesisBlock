@@ -13,8 +13,6 @@ use tower_http::trace::TraceLayer;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
 // Import core engine from the library
-// Since this is a bin in the same crate, it refers to the lib part via the crate name.
-// The crate name in Cargo.toml is 'genesis-block-native'.
 use genesis_block_native::{
     Storage, OpenOptions, NodeInput, EdgeInput, QueryInput, HybridSearchInput
 };
@@ -56,17 +54,6 @@ async fn rebuild_index_handler(
     }
 }
 
-async fn execute_hql_handler(
-    State(state): State<AppState>,
-    query: String,
-) -> impl IntoResponse {
-    let storage = state.storage.read();
-    match storage.execute_hql(&query) {
-        Ok(results) => (StatusCode::OK, Json(results)).into_response(),
-        Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
-    }
-}
-
 async fn add_node_handler(
     State(state): State<AppState>,
     Json(input): Json<NodeInput>,
@@ -89,11 +76,28 @@ async fn add_edge_handler(
     }
 }
 
+async fn execute_hql_handler(
+    State(state): State<AppState>,
+    Json(query): Json<String>,
+) -> impl IntoResponse {
+    let storage = state.storage.read();
+    if storage.is_rebuilding.load(std::sync::atomic::Ordering::SeqCst) {
+        return (StatusCode::SERVICE_UNAVAILABLE, "Engine is rebuilding index...").into_response();
+    }
+    match storage.execute_hql(&query) {
+        Ok(results) => (StatusCode::OK, Json(results)).into_response(),
+        Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
+    }
+}
+
 async fn query_handler(
     State(state): State<AppState>,
     Json(input): Json<QueryInput>,
 ) -> impl IntoResponse {
     let storage = state.storage.read();
+    if storage.is_rebuilding.load(std::sync::atomic::Ordering::SeqCst) {
+        return (StatusCode::SERVICE_UNAVAILABLE, "Engine is rebuilding index...").into_response();
+    }
     match storage.query(input) {
         Ok(results) => (StatusCode::OK, Json(results)).into_response(),
         Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
@@ -105,7 +109,24 @@ async fn hybrid_search_handler(
     Json(input): Json<HybridSearchInput>,
 ) -> impl IntoResponse {
     let storage = state.storage.read();
+    if storage.is_rebuilding.load(std::sync::atomic::Ordering::SeqCst) {
+        return (StatusCode::SERVICE_UNAVAILABLE, "Engine is rebuilding index...").into_response();
+    }
     match storage.hybrid_search(input) {
+        Ok(results) => (StatusCode::OK, Json(results)).into_response(),
+        Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
+    }
+}
+
+async fn ranked_context_handler(
+    State(state): State<AppState>,
+    Json(input): Json<HybridSearchInput>,
+) -> impl IntoResponse {
+    let storage = state.storage.read();
+    if storage.is_rebuilding.load(std::sync::atomic::Ordering::SeqCst) {
+        return (StatusCode::SERVICE_UNAVAILABLE, "Engine is rebuilding index...").into_response();
+    }
+    match storage.get_ranked_context(input) {
         Ok(results) => (StatusCode::OK, Json(results)).into_response(),
         Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
     }
@@ -143,7 +164,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     };
 
     let app = Router::new()
-                .route("/v1/bulk/nodes", post(bulk_add_nodes_handler))
+        .route("/v1/bulk/nodes", post(bulk_add_nodes_handler))
         .route("/v1/bulk/edges", post(bulk_add_edges_handler))
         .route("/v1/bulk/rebuild", post(rebuild_index_handler))
         .route("/v1/query/hql", post(execute_hql_handler))
@@ -151,6 +172,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .route("/v1/edge/add", post(add_edge_handler))
         .route("/v1/query", post(query_handler))
         .route("/v1/search/hybrid", post(hybrid_search_handler))
+        .route("/v1/reason/context", post(ranked_context_handler))
         .route("/v1/status", get(status_handler))
         .layer(TraceLayer::new_for_http())
         .layer(CorsLayer::permissive())
