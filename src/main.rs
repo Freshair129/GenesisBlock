@@ -28,7 +28,7 @@ async fn bulk_add_nodes_handler(
     State(state): State<AppState>,
     Json(inputs): Json<Vec<NodeInput>>,
 ) -> impl IntoResponse {
-    let mut storage = state.storage.write();
+    let storage = state.storage.write();
     match storage.bulk_add_nodes(inputs) {
         Ok(_) => StatusCode::OK.into_response(),
         Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
@@ -39,7 +39,7 @@ async fn bulk_add_edges_handler(
     State(state): State<AppState>,
     Json(inputs): Json<Vec<EdgeInput>>,
 ) -> impl IntoResponse {
-    let mut storage = state.storage.write();
+    let storage = state.storage.write();
     match storage.bulk_add_edges(inputs) {
         Ok(_) => StatusCode::OK.into_response(),
         Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
@@ -49,7 +49,7 @@ async fn bulk_add_edges_handler(
 async fn rebuild_index_handler(
     State(state): State<AppState>,
 ) -> impl IntoResponse {
-    let mut storage = state.storage.write();
+    let storage = state.storage.write();
     match storage.rebuild_index_parallel() {
         Ok(_) => StatusCode::OK.into_response(),
         Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
@@ -71,7 +71,7 @@ async fn add_node_handler(
     State(state): State<AppState>,
     Json(input): Json<NodeInput>,
 ) -> impl IntoResponse {
-    let mut storage = state.storage.write();
+    let storage = state.storage.write();
     match storage.add_node(input) {
         Ok(node) => (StatusCode::OK, Json(node)).into_response(),
         Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
@@ -82,7 +82,7 @@ async fn add_edge_handler(
     State(state): State<AppState>,
     Json(input): Json<EdgeInput>,
 ) -> impl IntoResponse {
-    let mut storage = state.storage.write();
+    let storage = state.storage.write();
     match storage.add_edge(input) {
         Ok(edge) => (StatusCode::OK, Json(edge)).into_response(),
         Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),

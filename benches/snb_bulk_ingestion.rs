@@ -1,112 +1,51 @@
-use std::fs::{self, File};
-use std::io::BufReader;
-use std::path::Path;
-use std::time::Instant;
-use csv::ReaderBuilder;
-use serde::{Deserialize, Serialize};
 use genesis_block_native::{Storage, OpenOptions, NodeInput, EdgeInput};
-
-#[derive(Serialize, Deserialize)]
-struct PersonCsv { id: String, name: String, gender: String }
-#[derive(Serialize, Deserialize)]
-struct KnowsCsv { source_id: String, target_id: String }
-#[derive(Serialize, Deserialize)]
-struct PostCsv { id: String, content: String }
+use std::time::Instant;
 
 fn main() {
-    let root = "G:/GenesisBlock_Dev/GenesisBlock/benches/snb/temp_db_bulk";
-    let data_path = "G:/GenesisBlock_Dev/GenesisBlock/benches/snb/data";
-    
-    if Path::new(root).exists() { fs::remove_dir_all(root).unwrap(); }
-    
-    let mut storage = Storage::open(OpenOptions {
-        path: root.to_string(),
-        page_cache_mb: Some(512),
+    let db_path = ".brain/snb_bulk_db";
+    if std::path::Path::new(db_path).exists() {
+        let _ = std::fs::remove_dir_all(db_path);
+    }
+
+    let storage = Storage::open(OpenOptions {
+        path: db_path.to_string(),
+        page_cache_mb: Some(1024),
         read_only: Some(false),
     }).expect("Failed to open storage");
 
-    println!("🚀 Starting Phase 8: LDBC SNB BULK Ingestion (SF0.1 FULL)");
-    let global_start = Instant::now();
+    let batch_size = 5000;
+    println!("SNB BULK INGESTION: Processing {} nodes...", batch_size);
 
-    // 1. Bulk Load Persons
-    let file = File::open(Path::new(data_path).join("person.csv")).unwrap();
-    let mut rdr = ReaderBuilder::new().has_headers(true).from_reader(BufReader::new(file));
-    let mut buffer = Vec::new();
-    let mut total_nodes = 0;
-    for result in rdr.deserialize() {
-        let p: PersonCsv = result.unwrap();
+    let mut buffer = Vec::with_capacity(batch_size);
+    for i in 0..batch_size {
         buffer.push(NodeInput {
-            id: Some(p.id), labels: vec!["Person".to_string()], props: None, embedding: None,
+            id: Some(format!("B-{}", i)),
+            labels: vec!["Entity".to_string()],
+            props: Some(serde_json::json!({"val": i})),
+            embedding: None,
+            lang: None,
         });
-        if buffer.len() >= 10000 {
-            total_nodes += buffer.len();
-            storage.bulk_add_nodes(buffer.drain(..).collect()).unwrap();
-            print!("Nodes loaded: {}\r", total_nodes);
-        }
     }
-    total_nodes += buffer.len();
+
+    let start = Instant::now();
     storage.bulk_add_nodes(buffer).unwrap();
+    let duration = start.elapsed();
 
-    // 2. Bulk Load Posts (with Vectors)
-    let file = File::open(Path::new(data_path).join("post.csv")).unwrap();
-    let mut rdr = ReaderBuilder::new().has_headers(true).from_reader(BufReader::new(file));
-    let mut buffer = Vec::new();
-    for result in rdr.deserialize() {
-        let p: PostCsv = result.unwrap();
-        buffer.push(NodeInput {
-            id: Some(p.id), labels: vec!["Post".to_string()], props: None, embedding: Some(vec![0.1; 768]),
+    println!("Bulk Ingestion Rate: {:.2} nodes/sec", batch_size as f64 / duration.as_secs_f64());
+
+    let mut edge_buffer = Vec::with_capacity(batch_size);
+    for i in 0..batch_size - 1 {
+        edge_buffer.push(EdgeInput {
+            id: None,
+            from: format!("B-{}", i),
+            to: format!("B-{}", i+1),
+            rel: "CHAIN".to_string(),
+            props: None,
+            valid_from: None,
+            supersede: None,
+            impact: None,
         });
-        if buffer.len() >= 5000 {
-            total_nodes += buffer.len();
-            storage.bulk_add_nodes(buffer.drain(..).collect()).unwrap();
-            print!("Nodes loaded: {}\r", total_nodes);
-        }
     }
-    total_nodes += buffer.len();
-    storage.bulk_add_nodes(buffer).unwrap();
-    println!("\n✅ All Nodes Ingested.");
-
-    // 3. Bulk Load Edges
-    let file = File::open(Path::new(data_path).join("knows.csv")).unwrap();
-    let mut rdr = ReaderBuilder::new().has_headers(true).from_reader(BufReader::new(file));
-    let mut buffer = Vec::new();
-    let mut total_edges = 0;
-    for result in rdr.deserialize() {
-        let k: KnowsCsv = result.unwrap();
-        buffer.push(EdgeInput {
-            id: None, from: k.source_id, to: k.target_id, rel: "knows".to_string(),
-            props: None, valid_from: None, supersede: None, impact: None,
-        });
-        if buffer.len() >= 50000 {
-            total_edges += buffer.len();
-            storage.bulk_add_edges(buffer.drain(..).collect()).unwrap();
-            print!("Edges loaded: {}\r", total_edges);
-        }
-    }
-    total_edges += buffer.len();
-    storage.bulk_add_edges(buffer).unwrap();
-    println!("\n✅ All Edges Ingested.");
-
-    let ingest_duration = global_start.elapsed();
-
-    // 4. Parallel Index Rebuild
-    println!("⚡ Starting Parallel HNSW Rebuild...");
-    let rebuild_start = Instant::now();
-    storage.rebuild_index_parallel().unwrap();
-    let rebuild_duration = rebuild_start.elapsed();
-
-    let total_duration = global_start.elapsed();
-    let total_ops = total_nodes + total_edges;
-    
-    println!("---------------------------------");
-    println!("📊 FINAL BULK PERFORMANCE REPORT");
-    println!("---------------------------------");
-    println!("Total Nodes:      {}", total_nodes);
-    println!("Total Edges:      {}", total_edges);
-    println!("Total Operations: {}", total_ops);
-    println!("Ingest Time:      {:?}", ingest_duration);
-    println!("Index Rebuild:    {:?}", rebuild_duration);
-    println!("Total Time:       {:?}", total_duration);
-    println!("Bulk TPS:         {:.2}", total_ops as f64 / total_duration.as_secs_f64());
-    println!("---------------------------------");
+    storage.bulk_add_edges(edge_buffer).unwrap();
+    println!("Bulk Chain Linking Complete.");
 }

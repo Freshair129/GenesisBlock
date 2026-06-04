@@ -19,6 +19,7 @@ pub enum HqlCommand {
         vector: Vec<f64>,
         k: u32,
         fuzzy: bool,
+        lang: Option<String>,
     },
     Traverse {
         seed: String,
@@ -31,6 +32,7 @@ pub enum HqlCommand {
         vector: Vec<f64>,
         alpha: f64,
         fuzzy: bool,
+        lang: Option<String>,
     },
 }
 
@@ -76,11 +78,22 @@ impl HqlCommand {
         (id, fuzzy)
     }
 
+    fn parse_lang_spec(pair: pest::iterators::Pair<Rule>) -> String {
+        for inner in pair.into_inner() {
+            if inner.as_rule() == Rule::string_lit {
+                let s = inner.as_str();
+                return s[1..s.len()-1].to_string(); // strip quotes
+            }
+        }
+        "en".to_string()
+    }
+
     fn parse_search(pair: pest::iterators::Pair<Rule>) -> Self {
         let mut target = String::new();
         let mut vector = Vec::new();
         let mut k = 5;
         let mut fuzzy = false;
+        let mut lang = None;
 
         for inner in pair.into_inner() {
             match inner.as_rule() {
@@ -95,11 +108,12 @@ impl HqlCommand {
                         .collect();
                 }
                 Rule::k => k = inner.as_str().parse::<u32>().unwrap_or(5),
+                Rule::lang_spec => lang = Some(Self::parse_lang_spec(inner)),
                 _ => {}
             }
         }
 
-        HqlCommand::Search { target, vector, k, fuzzy }
+        HqlCommand::Search { target, vector, k, fuzzy, lang }
     }
 
     fn parse_traverse(pair: pest::iterators::Pair<Rule>) -> Self {
@@ -145,6 +159,7 @@ impl HqlCommand {
         let mut vector = Vec::new();
         let mut alpha = 0.5;
         let mut fuzzy = false;
+        let mut lang = None;
 
         for inner in pair.into_inner() {
             match inner.as_rule() {
@@ -159,10 +174,11 @@ impl HqlCommand {
                         .collect();
                 }
                 Rule::alpha => alpha = inner.as_str().parse::<f64>().unwrap_or(0.5),
+                Rule::lang_spec => lang = Some(Self::parse_lang_spec(inner)),
                 _ => {}
             }
         }
 
-        HqlCommand::Hybrid { target, vector, alpha, fuzzy }
+        HqlCommand::Hybrid { target, vector, alpha, fuzzy, lang }
     }
 }

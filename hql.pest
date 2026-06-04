@@ -1,5 +1,6 @@
 WHITESPACE = _{ " " | "\t" | "\r" | "\n" }
 identifier = @{ (ASCII_ALPHANUMERIC | "_" | "-")+ }
+string_lit = @{ "\"" ~ (!"\"" ~ ANY)* ~ "\"" }
 fuzzy_prefix = { "~" }
 target = { fuzzy_prefix? ~ identifier }
 seed = { fuzzy_prefix? ~ identifier }
@@ -13,9 +14,10 @@ vector = { number ~ ("," ~ number)* }
 k = { ASCII_DIGIT+ }
 depth = { ASCII_DIGIT+ }
 alpha = { number }
+lang_spec = { ^"LANGUAGE" ~ string_lit }
 
-search = { ^"SEARCH" ~ target ~ ^"SIMILAR" ~ ^"TO" ~ "[" ~ vector ~ "]" ~ ^"K" ~ k }
+search = { ^"SEARCH" ~ target ~ ^"SIMILAR" ~ ^"TO" ~ "[" ~ vector ~ "]" ~ ^"K" ~ k ~ lang_spec? }
 traverse = { ^"TRAVERSE" ~ ^"FROM" ~ seed ~ ^"DEPTH" ~ depth ~ ^"REL" ~ rel }
-hybrid = { ^"MATCH" ~ target ~ ^"SIMILAR" ~ ^"TO" ~ "[" ~ vector ~ "]" ~ ^"ALPHA" ~ alpha }
+hybrid = { ^"MATCH" ~ target ~ ^"SIMILAR" ~ ^"TO" ~ "[" ~ vector ~ "]" ~ ^"ALPHA" ~ alpha ~ lang_spec? }
 
 query = { SOI ~ (search | traverse | hybrid) ~ EOI }

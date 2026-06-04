@@ -1,10 +1,10 @@
 //! Genesis Block — high-performance hybrid semantic-graph engine.
 //!
-//! Mark IV: Global Scale & Reasoning
+//! Mark V: Neural Integration & Collaborative Reasoning
 
 #![deny(clippy::all)]
 
-use std::collections::{HashSet, VecDeque};
+use std::collections::{HashSet, VecDeque, HashMap};
 use std::fs::{self, File, OpenOptions as FileOpenOptions};
 use std::io::Write;
 use std::path::PathBuf;
@@ -45,6 +45,7 @@ pub struct NodeInput {
     pub labels: Vec<String>,
     pub props: Option<serde_json::Value>,
     pub embedding: Option<Vec<f64>>,
+    pub lang: Option<String>,
 }
 
 #[napi(object)]
@@ -56,6 +57,7 @@ pub struct NodeOutput {
     pub impact: Option<f64>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub embedding: Option<Vec<f64>>,
+    pub lang: Option<String>,
 }
 
 #[napi(object)]
@@ -123,6 +125,7 @@ pub struct HybridSearchInput {
     pub query_vector: Vec<f64>,
     pub k: u32,
     pub alpha: Option<f64>,
+    pub lang: Option<String>,
 }
 
 #[napi(object)]
@@ -131,6 +134,21 @@ pub struct DatabaseStatus {
     pub open: bool,
     pub read_only: bool,
     pub page_cache_mb: u32,
+}
+
+#[napi(object)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct SyncPeer {
+    pub id: String,
+    pub addr: String,
+    pub public_key: Option<Vec<u8>>,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub enum SyncEvent {
+    ProposeMutation(Event),
+    AcknowledgeMutation(String), 
+    RequestFragment(String),
 }
 
 // --- Internal Storage ---
@@ -149,6 +167,8 @@ pub struct NodeMetadata {
     pub vector_dim: u16,
     pub embedding_offset: u64,
     pub gks_attributes: Vec<u8>,
+    pub lang: String,
+    pub cluster_id: u32,
 }
 
 pub struct Storage {
@@ -166,9 +186,12 @@ pub struct Storage {
     pub _lock_file: Option<File>,
     pub id_to_u32: DashMap<String, u32>,
     pub u32_to_id: DashMap<u32, String>,
+    pub u32_to_arena_id: DashMap<u32, u32>,
     pub next_u32: AtomicU32,
     pub is_rebuilding: AtomicBool,
     pub trigram_index: DashMap<String, HashSet<u32>>,
+    pub lang_centroids: DashMap<String, Vec<f32>>,
+    pub peers: DashMap<String, SyncPeer>,
     pub wal_sender: Sender<(Event, Sender<bool>)>,
 }
 
@@ -218,7 +241,7 @@ impl Storage {
 
     fn init_hnsw() -> Hnsw<'static, f32, DistL2> { Hnsw::new(16, 1000000, 16, 200, DistL2 {}) }
 
-    fn add_vector_internal(&self, node_id: &str, emb_64: Vec<f64>) {
+    fn add_vector_internal(&self, node_id: &str, emb_64: Vec<f64>, lang: String) {
         let emb: Vec<f32> = emb_64.into_iter().map(|v| v as f32).collect();
         let dim = emb.len() as u16;
         let mut vec_arena = self.vector_arena.write();
@@ -229,7 +252,9 @@ impl Storage {
         meta_arena.push(NodeMetadata {
             arena_id, node_id: node_id.to_string(), timestamp: Utc::now().timestamp() as u64,
             vector_dim: dim, embedding_offset: current_vec_len as u64, gks_attributes: Vec::new(),
+            lang, cluster_id: arena_id,
         });
+        if let Some(u32_id) = self.get_u32(node_id) { self.u32_to_arena_id.insert(u32_id, arena_id); }
         if self.hnsw_index.read().is_none() { *self.hnsw_index.write() = Some(Self::init_hnsw()); }
         if let Some(ref mut hnsw) = *self.hnsw_index.write() { hnsw.insert((&emb, arena_id as usize)); }
     }
@@ -293,8 +318,9 @@ impl Storage {
             out_idx: DashMap::new(), in_idx: DashMap::new(),
             vector_arena: RwLock::new(Vec::new()), metadata_arena: RwLock::new(Vec::new()),
             hnsw_index: RwLock::new(None), log_path, bin_path: PathBuf::from(""), _lock_file: None,
-            id_to_u32: DashMap::new(), u32_to_id: DashMap::new(), next_u32: AtomicU32::new(0),
-            is_rebuilding: AtomicBool::new(false), trigram_index: DashMap::new(), wal_sender,
+            id_to_u32: DashMap::new(), u32_to_id: DashMap::new(), u32_to_arena_id: DashMap::new(), next_u32: AtomicU32::new(0),
+            is_rebuilding: AtomicBool::new(false), trigram_index: DashMap::new(), 
+            lang_centroids: DashMap::new(), peers: DashMap::new(), wal_sender,
         };
 
         if storage.log_path.exists() {
@@ -307,7 +333,9 @@ impl Storage {
                             match event {
                                 Event::Node(n) => {
                                     let u32_id = storage.get_or_intern_id(&n.id);
-                                    if let Some(emb) = n.embedding.clone() { storage.add_vector_internal(&n.id, emb); }
+                                    if let Some(emb) = n.embedding.clone() { 
+                                        storage.add_vector_internal(&n.id, emb, n.lang.clone().unwrap_or("en".to_string())); 
+                                    }
                                     storage.nodes.insert(u32_id, n);
                                 }
                                 Event::Edge(e) => {
@@ -357,11 +385,7 @@ impl Storage {
     pub fn calculate_sc(&self, node: &NodeOutput) -> f64 {
         let stability = node.props.get("stability").and_then(|v| v.as_str()).unwrap_or("active");
         match stability {
-            "stable" => 1.0,
-            "active" => 0.8,
-            "draft" => 0.4,
-            "deprecated" => 0.1,
-            _ => 0.8,
+            "stable" => 1.0, "active" => 0.8, "draft" => 0.4, "deprecated" => 0.1, _ => 0.8,
         }
     }
 
@@ -371,10 +395,7 @@ impl Storage {
         let dd = (incoming_count as f64 / 10.0).min(1.0);
         let tier = Tier::from_labels(&node.labels);
         let as_score = match tier {
-            Tier::MASTER => 1.0,
-            Tier::SPEC => 0.8,
-            Tier::ADR => 0.6,
-            Tier::USER => 0.3,
+            Tier::MASTER => 1.0, Tier::SPEC => 0.8, Tier::ADR => 0.6, Tier::USER => 0.3,
         };
         let sc = self.calculate_sc(node);
         (dd * 0.5) + (as_score * 0.3) + (sc * 0.2)
@@ -408,8 +429,14 @@ impl Storage {
         self.validate_governance(&args.labels, false)?; 
         let id = args.id.unwrap_or_else(|| format!("N-{}", Uuid::new_v4()));
         let u32_id = self.get_or_intern_id(&id);
-        let mut node = NodeOutput { id: id.clone(), labels: args.labels, props: args.props.unwrap_or(Value::Object(Default::default())), impact: Some(0.7), embedding: None };
-        if let Some(emb) = args.embedding { self.add_vector_internal(&id, emb.clone()); node.embedding = Some(emb); }
+        let lang = args.lang.clone().unwrap_or("en".to_string());
+        let mut node = NodeOutput { 
+            id: id.clone(), labels: args.labels, 
+            props: args.props.unwrap_or(Value::Object(Default::default())), 
+            impact: Some(0.7), embedding: None,
+            lang: Some(lang.clone()),
+        };
+        if let Some(emb) = args.embedding { self.add_vector_internal(&id, emb.clone(), lang); node.embedding = Some(emb); }
         self.nodes.insert(u32_id, node.clone());
         self.persist(&Event::Node(node.clone()))?;
         Ok(node)
@@ -424,10 +451,7 @@ impl Storage {
         };
         self.index_edge_internal(&edge.id, &edge.from, &edge.to);
         self.edges.insert(self.get_or_intern_id(&edge.id), edge.clone());
-        
-        // Trigger impact refresh for the 'to' node (incoming reference changed)
         self.refresh_impacts(Some(vec![edge.to.clone()]));
-        
         self.persist(&Event::Edge(edge.clone()))?;
         Ok(edge)
     }
@@ -442,9 +466,9 @@ impl Storage {
     pub fn execute_hql(&self, query: &str) -> Result<Vec<NeighborOutput>> {
         let command = HqlCommand::try_from(query).map_err(|e| Error::from_reason(e))?;
         match command {
-            HqlCommand::Search { vector, k, fuzzy, target, .. } => {
+            HqlCommand::Search { vector, k, fuzzy, target, lang } => {
                 let _resolved = if fuzzy { self.find_fuzzy_id(&target) } else { Some(target) };
-                self.hybrid_search(HybridSearchInput { query_vector: vector, k, alpha: Some(0.0) })
+                self.hybrid_search(HybridSearchInput { query_vector: vector, k, alpha: Some(0.0), lang })
             }
             HqlCommand::Traverse { seed, depth, rel, fuzzy } => {
                 let resolved_seed = if fuzzy { self.find_fuzzy_id(&seed).unwrap_or(seed) } else { seed };
@@ -456,9 +480,9 @@ impl Storage {
                     depth: Some(depth), rel: Some(target_rel), rels: None, direction: Some("out".to_string()), as_of: None, include_invalid: Some(false), limit: None 
                 }, is_inferred)
             }
-            HqlCommand::Hybrid { vector, alpha, fuzzy, target, .. } => {
+            HqlCommand::Hybrid { vector, alpha, fuzzy, target, lang } => {
                 let _resolved = if fuzzy { self.find_fuzzy_id(&target) } else { Some(target) };
-                self.hybrid_search(HybridSearchInput { query_vector: vector, k: 10, alpha: Some(alpha) })
+                self.hybrid_search(HybridSearchInput { query_vector: vector, k: 10, alpha: Some(alpha), lang })
             }
         }
     }
@@ -466,7 +490,12 @@ impl Storage {
     pub fn hybrid_search(&self, args: HybridSearchInput) -> Result<Vec<NeighborOutput>> {
         let hnsw_lock = self.hnsw_index.read();
         let hnsw = match &*hnsw_lock { Some(idx) => idx, None => return Err(Error::from_reason("HNSW not init")) };
-        let query_f32: Vec<f32> = args.query_vector.into_iter().map(|v| v as f32).collect();
+        let mut query_f32: Vec<f32> = args.query_vector.into_iter().map(|v| v as f32).collect();
+        if let Some(lang) = args.lang {
+            if let Some(centroid) = self.lang_centroids.get(&lang) {
+                for (i, val) in query_f32.iter_mut().enumerate() { if i < centroid.len() { *val += centroid[i]; } }
+            }
+        }
         let results = hnsw.search(&query_f32, (args.k * 2) as usize, 100);
         let mut hybrid_results = Vec::new();
         let meta_arena = self.metadata_arena.read();
@@ -486,37 +515,24 @@ impl Storage {
         let u32_seed = match self.get_u32(&seed) { Some(id) => id, None => return Ok(Vec::new()) };
         let depth = args.depth.unwrap_or(1);
         let target_rel = args.rel.as_deref().unwrap_or("ANY");
-
-        let mut results = Vec::new(); 
-        let mut visited = HashSet::new(); visited.insert(u32_seed);
+        let mut results = Vec::new(); let mut visited = HashSet::new(); visited.insert(u32_seed);
         let mut queue = VecDeque::new(); queue.push_back((u32_seed, Vec::new(), 0));
-
         while let Some((curr_u32, path, curr_depth)) = queue.pop_front() {
-            // In regular traversal, we stop when we reach requested depth.
-            // In inferred traversal, we follow the chain (transitive closure).
             if curr_depth >= depth && !is_inferred { continue; }
-
             if let Some(eids) = self.out_idx.get(&curr_u32) {
                 for eid in eids.iter() {
                     if let Some(edge_ref) = self.edges.get(eid) {
                         let edge = edge_ref.value();
-                        let rel_match = target_rel == "ANY" || edge.rel == target_rel;
-
-                        if rel_match {
+                        if target_rel == "ANY" || edge.rel == target_rel {
                             let curr_id = self.u32_to_id.get(&curr_u32).unwrap().value().clone();
                             let next_id = if edge.from == curr_id { &edge.to } else { &edge.from };
-                            
                             if let Some(next_u32) = self.get_u32(next_id) {
                                 if !visited.contains(&next_u32) {
                                     visited.insert(next_u32);
                                     if let Some(node) = self.nodes.get(&next_u32) {
                                         let mut new_path = path.clone(); new_path.push(edge.clone());
                                         results.push(NeighborOutput { node: node.value().clone(), path: new_path.clone(), depth: curr_depth + 1 });
-                                        
-                                        // Continue expansion
-                                        if is_inferred || (curr_depth + 1 < depth) {
-                                            queue.push_back((next_u32, new_path, curr_depth + 1));
-                                        }
+                                        if is_inferred || (curr_depth + 1 < depth) { queue.push_back((next_u32, new_path, curr_depth + 1)); }
                                     }
                                 }
                             }
@@ -537,6 +553,35 @@ impl Storage {
             res.push(e.clone());
         }
         Ok(res)
+    }
+
+    pub fn detect_communities(&self) -> Result<()> {
+        let mut meta_arena = self.metadata_arena.write();
+        for meta in meta_arena.iter_mut() {
+            let mut freq = HashMap::new();
+            if let Some(u32_id) = self.get_u32(&meta.node_id) {
+                if let Some(eids) = self.out_idx.get(&u32_id) {
+                    for eid in eids.iter() {
+                        if let Some(edge) = self.edges.get(eid) {
+                            if let Some(to_u32) = self.get_u32(&edge.to) {
+                                if let Some(a_id) = self.u32_to_arena_id.get(&to_u32) {
+                                    *freq.entry(*a_id).or_insert(0) += 1;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            if let Some((&best_cluster, _)) = freq.iter().max_by_key(|&(_, count)| count) {
+                meta.cluster_id = best_cluster;
+            }
+        }
+        Ok(())
+    }
+
+    pub fn set_language_centroid(&self, lang: String, vector: Vec<f64>) {
+        let v_f32: Vec<f32> = vector.into_iter().map(|v| v as f32).collect();
+        self.lang_centroids.insert(lang, v_f32);
     }
 
     pub fn compact(&self) -> Result<()> { Ok(()) }
@@ -564,6 +609,8 @@ impl GenesisDatabase {
     #[napi] pub async fn hybrid_search(&self, args: HybridSearchInput) -> Result<Vec<NeighborOutput>> { let i = Arc::clone(&self.inner); tokio::task::spawn_blocking(move || i.hybrid_search(args)).await.map_err(|e| Error::from_reason(e.to_string()))? }
     #[napi] pub async fn neighbors(&self, seed: String, args: NeighborInput) -> Result<Vec<NeighborOutput>> { let i = Arc::clone(&self.inner); tokio::task::spawn_blocking(move || i.neighbors(seed, args, false)).await.map_err(|e| Error::from_reason(e.to_string()))? }
     #[napi] pub async fn compact(&self) -> Result<()> { let i = Arc::clone(&self.inner); tokio::task::spawn_blocking(move || i.compact()).await.map_err(|e| Error::from_reason(e.to_string()))? }
+    #[napi] pub fn set_language_centroid(&self, lang: String, vector: Vec<f64>) { self.inner.set_language_centroid(lang, vector); }
+    #[napi] pub async fn detect_communities(&self) -> Result<()> { let i = Arc::clone(&self.inner); tokio::task::spawn_blocking(move || i.detect_communities()).await.map_err(|e| Error::from_reason(e.to_string()))? }
     #[napi] pub fn schema_version_sync(&self) -> u32 { SCHEMA_VERSION }
     #[napi] pub fn status_sync(&self) -> DatabaseStatus { self.inner.status_sync() }
 }

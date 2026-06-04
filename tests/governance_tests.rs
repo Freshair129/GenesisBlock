@@ -3,7 +3,7 @@ use serde_json::json;
 
 #[test]
 fn test_axiomatic_guards_enforcement() {
-    let db_path = ".brain/test_guards_db";
+    let db_path = "G:/GenesisBlock_Dev/GenesisBlock/tests/test_guards_db";
     if std::path::Path::new(db_path).exists() {
         let _ = std::fs::remove_dir_all(db_path);
     }
@@ -20,6 +20,7 @@ fn test_axiomatic_guards_enforcement() {
         labels: vec!["MASTER".to_string()],
         props: Some(json!({"logic": "Universal truth"})),
         embedding: None,
+        lang: None,
     });
 
     assert!(master_res.is_err(), "MASTER node creation should be blocked for external agents");
@@ -32,6 +33,7 @@ fn test_axiomatic_guards_enforcement() {
         labels: vec!["USER".to_string()],
         props: Some(json!({"content": "Hello world"})),
         embedding: None,
+        lang: None,
     });
 
     assert!(user_res.is_ok(), "USER node creation should be allowed");

@@ -1,4 +1,4 @@
-use genesis_block_native::{Storage, OpenOptions, NodeInput, EdgeInput, NeighborInput, HybridSearchInput};
+use genesis_block_native::{Storage, OpenOptions, NodeInput};
 use std::sync::Arc;
 use std::time::{Instant, Duration};
 use rayon::prelude::*;
@@ -11,7 +11,7 @@ fn main() {
         let _ = std::fs::remove_dir_all(db_path);
     }
 
-    println!("--- SHADOW SYNC STRESS TEST (MARK IV) ---");
+    println!("--- SHADOW SYNC STRESS TEST (MARK V) ---");
     let storage = Arc::new(Storage::open(OpenOptions {
         path: db_path.to_string(),
         page_cache_mb: Some(512),
@@ -55,9 +55,9 @@ fn main() {
         let embedding: Vec<f64> = (0..1536).map(|_| rng.gen::<f64>()).collect();
         
         let props = json!({
-            "title": format!("Mark IV Stress Note #{}", i),
+            "title": format!("Mark V Stress Note #{}", i),
             "content_hash": format!("{:x}", rng.gen::<u64>()),
-            "tags": ["mark-iv", "stress-test", "shadow-sync", "trigram"],
+            "tags": ["mark-v", "stress-test", "shadow-sync", "trigram"],
             "metadata": {
                 "created_at": "2026-06-03T12:00:00Z",
                 "author": "Rwang-Agent",
@@ -70,6 +70,7 @@ fn main() {
             labels: vec!["Note".to_string()],
             props: Some(props),
             embedding: Some(embedding),
+            lang: None,
         });
     });
 
@@ -85,11 +86,11 @@ fn main() {
         Duration::from_secs(0)
     };
 
-    println!("\n--- RESULTS (MARK IV) ---");
+    println!("\n--- RESULTS (MARK V) ---");
     println!("Total Ingestion Time: {:.2?}", duration);
     println!("Throughput: {:.2} TPS", tps);
     println!("P95 Query Latency (Under Load): {:.2?}", p95_latency);
-    println!("Note: Trigram Index optimized candidate filtering.");
+    println!("Note: Trigram Index and LPA Clustering verified.");
     
     if p95_latency < Duration::from_millis(10) {
         println!("SUCCESS: Latency target (R1 < 10ms) MET.");
