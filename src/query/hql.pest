@@ -1,0 +1,17 @@
+WHITESPACE = _{ " " | "\t" | "\r" | "\n" }
+identifier = @{ (ASCII_ALPHANUMERIC | "_" | "-")+ }
+fuzzy_prefix = { "~" }
+target = { fuzzy_prefix? ~ identifier }
+seed = { fuzzy_prefix? ~ identifier }
+rel = { identifier }
+number = @{ ("+" | "-")? ~ ASCII_DIGIT+ ~ ("." ~ ASCII_DIGIT+)? }
+vector = { number ~ ("," ~ number)* }
+k = { ASCII_DIGIT+ }
+depth = { ASCII_DIGIT+ }
+alpha = { number }
+
+search = { ^"SEARCH" ~ target ~ ^"SIMILAR" ~ ^"TO" ~ "[" ~ vector ~ "]" ~ ^"K" ~ k }
+traverse = { ^"TRAVERSE" ~ ^"FROM" ~ seed ~ ^"DEPTH" ~ depth ~ ^"REL" ~ rel }
+hybrid = { ^"MATCH" ~ target ~ ^"SIMILAR" ~ ^"TO" ~ "[" ~ vector ~ "]" ~ ^"ALPHA" ~ alpha }
+
+query = { SOI ~ (search | traverse | hybrid) ~ EOI }
