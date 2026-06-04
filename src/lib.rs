@@ -354,6 +354,47 @@ impl Storage {
         if max_sim > 0.85 { best_id } else { None }
     }
 
+    pub fn calculate_sc(&self, node: &NodeOutput) -> f64 {
+        let stability = node.props.get("stability").and_then(|v| v.as_str()).unwrap_or("active");
+        match stability {
+            "stable" => 1.0,
+            "active" => 0.8,
+            "draft" => 0.4,
+            "deprecated" => 0.1,
+            _ => 0.8,
+        }
+    }
+
+    pub fn compute_impact(&self, node: &NodeOutput) -> f64 {
+        let u32_id = match self.get_u32(&node.id) { Some(id) => id, None => return 0.7 };
+        let incoming_count = self.in_idx.get(&u32_id).map(|edges| edges.len()).unwrap_or(0);
+        let dd = (incoming_count as f64 / 10.0).min(1.0);
+        let tier = Tier::from_labels(&node.labels);
+        let as_score = match tier {
+            Tier::MASTER => 1.0,
+            Tier::SPEC => 0.8,
+            Tier::ADR => 0.6,
+            Tier::USER => 0.3,
+        };
+        let sc = self.calculate_sc(node);
+        (dd * 0.5) + (as_score * 0.3) + (sc * 0.2)
+    }
+
+    pub fn refresh_impacts(&self, affected_ids: Option<Vec<String>>) {
+        let ids_to_process = match affected_ids {
+            Some(ids) => ids,
+            None => self.nodes.iter().map(|entry| entry.value().id.clone()).collect(),
+        };
+        for id in ids_to_process {
+            if let Some(u32_id) = self.get_u32(&id) {
+                if let Some(mut node_ref) = self.nodes.get_mut(&u32_id) {
+                    let new_impact = self.compute_impact(node_ref.value());
+                    node_ref.value_mut().impact = Some(new_impact);
+                }
+            }
+        }
+    }
+
     pub fn index_edge_internal(&self, id: &str, from: &str, to: &str) {
         let u32_id = self.get_or_intern_id(id);
         let u32_from = self.get_or_intern_id(from);
@@ -383,6 +424,10 @@ impl Storage {
         };
         self.index_edge_internal(&edge.id, &edge.from, &edge.to);
         self.edges.insert(self.get_or_intern_id(&edge.id), edge.clone());
+        
+        // Trigger impact refresh for the 'to' node (incoming reference changed)
+        self.refresh_impacts(Some(vec![edge.to.clone()]));
+        
         self.persist(&Event::Edge(edge.clone()))?;
         Ok(edge)
     }
