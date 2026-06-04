@@ -37,6 +37,8 @@ crossbeam-channel = "0.5.15"
 pest = "2.7"
 pest_derive = "2.7"
 strsim = "0.11"
+sha2 = "0.10"
+hex = "0.4"
 
 [build-dependencies]
 napi-build = "2.1"

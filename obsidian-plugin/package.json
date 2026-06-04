@@ -1,0 +1,19 @@
+{
+	"name": "genesis-shadow-sync",
+	"version": "0.1.0",
+	"description": "Obsidian plugin for GenesisDB",
+	"main": "main.js",
+	"scripts": {
+		"dev": "esbuild main.ts --bundle --external:obsidian --external:electron --format=cjs --watch --outfile=main.js",
+		"build": "esbuild main.ts --bundle --external:obsidian --external:electron --format=cjs --minify --outfile=main.js"
+	},
+	"keywords": [],
+	"author": "",
+	"license": "MIT",
+	"devDependencies": {
+		"@types/node": "^20.0.0",
+		"esbuild": "0.21.4",
+		"obsidian": "latest",
+		"typescript": "^5.4.5"
+	}
+}

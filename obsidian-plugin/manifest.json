@@ -1,0 +1,10 @@
+{
+	"id": "gks-genesis-shadow-sync",
+	"name": "Genesis Shadow Sync",
+	"version": "0.1.0",
+	"minAppVersion": "1.0.0",
+	"description": "Real-time Neural Bridge between Obsidian and GenesisDB.",
+	"author": "Freshair",
+	"authorUrl": "https://github.com/Freshair129",
+	"isDesktopOnly": true
+}
