@@ -11,6 +11,7 @@ use std::path::PathBuf;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicU32, AtomicBool, Ordering};
 use std::time::{Duration, Instant};
+use sha2::{Sha256, Digest};
 
 use chrono::Utc;
 use dashmap::DashMap;
@@ -584,6 +585,21 @@ impl Storage {
         self.lang_centroids.insert(lang, v_f32);
     }
 
+    pub fn get_merkle_root(&self) -> String {
+        if !self.log_path.exists() { return "0".repeat(64); }
+        let mut hasher = Sha256::new();
+        if let Ok(file) = File::open(&self.log_path) {
+            let reader = std::io::BufReader::new(file);
+            use std::io::BufRead;
+            for line_res in reader.lines() {
+                if let Ok(line) = line_res {
+                    hasher.update(line.as_bytes());
+                }
+            }
+        }
+        hex::encode(hasher.finalize())
+    }
+
     pub fn compact(&self) -> Result<()> { Ok(()) }
     pub fn retract_edge(&self, _id: String, _at: Option<String>) -> Result<Option<EdgeOutput>> { Ok(None) }
     pub fn status_sync(&self) -> DatabaseStatus { DatabaseStatus { open: true, read_only: self.read_only, page_cache_mb: 512 } }
@@ -611,6 +627,7 @@ impl GenesisDatabase {
     #[napi] pub async fn compact(&self) -> Result<()> { let i = Arc::clone(&self.inner); tokio::task::spawn_blocking(move || i.compact()).await.map_err(|e| Error::from_reason(e.to_string()))? }
     #[napi] pub fn set_language_centroid(&self, lang: String, vector: Vec<f64>) { self.inner.set_language_centroid(lang, vector); }
     #[napi] pub async fn detect_communities(&self) -> Result<()> { let i = Arc::clone(&self.inner); tokio::task::spawn_blocking(move || i.detect_communities()).await.map_err(|e| Error::from_reason(e.to_string()))? }
+    #[napi] pub fn get_merkle_root(&self) -> String { self.inner.get_merkle_root() }
     #[napi] pub fn schema_version_sync(&self) -> u32 { SCHEMA_VERSION }
     #[napi] pub fn status_sync(&self) -> DatabaseStatus { self.inner.status_sync() }
 }
