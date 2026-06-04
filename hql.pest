@@ -3,7 +3,11 @@ identifier = @{ (ASCII_ALPHANUMERIC | "_" | "-")+ }
 fuzzy_prefix = { "~" }
 target = { fuzzy_prefix? ~ identifier }
 seed = { fuzzy_prefix? ~ identifier }
-rel = { identifier }
+
+rel_type = { identifier }
+infer_rel = { ^"INFER" ~ "(" ~ identifier ~ ")" }
+rel = { infer_rel | rel_type }
+
 number = @{ ("+" | "-")? ~ ASCII_DIGIT+ ~ ("." ~ ASCII_DIGIT+)? }
 vector = { number ~ ("," ~ number)* }
 k = { ASCII_DIGIT+ }

@@ -1,9 +1,9 @@
-﻿use crate::query::ast::HqlCommand;
+﻿use crate::query::ast::{HqlCommand, HqlRel};
 
 #[derive(Debug, Clone)]
 pub enum PlanStep {
     VectorSearch { vector: Vec<f32>, k: usize },
-    GraphTraversal { seed: String, depth: u32, rel: String, fuzzy: bool },
+    GraphTraversal { seed: String, depth: u32, rel: HqlRel, fuzzy: bool },
     ApplyKImpact { alpha: f64 },
 }
 

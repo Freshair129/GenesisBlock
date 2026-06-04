@@ -448,9 +448,13 @@ impl Storage {
             }
             HqlCommand::Traverse { seed, depth, rel, fuzzy } => {
                 let resolved_seed = if fuzzy { self.find_fuzzy_id(&seed).unwrap_or(seed) } else { seed };
+                let (target_rel, is_inferred) = match rel {
+                    query::ast::HqlRel::Physical(r) => (r, false),
+                    query::ast::HqlRel::Inferred(r) => (r, true),
+                };
                 self.neighbors(resolved_seed, NeighborInput { 
-                    depth: Some(depth), rel: Some(rel), rels: None, direction: Some("out".to_string()), as_of: None, include_invalid: Some(false), limit: None 
-                })
+                    depth: Some(depth), rel: Some(target_rel), rels: None, direction: Some("out".to_string()), as_of: None, include_invalid: Some(false), limit: None 
+                }, is_inferred)
             }
             HqlCommand::Hybrid { vector, alpha, fuzzy, target, .. } => {
                 let _resolved = if fuzzy { self.find_fuzzy_id(&target) } else { Some(target) };
@@ -478,24 +482,42 @@ impl Storage {
         hybrid_results.truncate(args.k as usize); Ok(hybrid_results)
     }
 
-    pub fn neighbors(&self, seed: String, args: NeighborInput) -> Result<Vec<NeighborOutput>> {
+    pub fn neighbors(&self, seed: String, args: NeighborInput, is_inferred: bool) -> Result<Vec<NeighborOutput>> {
         let u32_seed = match self.get_u32(&seed) { Some(id) => id, None => return Ok(Vec::new()) };
         let depth = args.depth.unwrap_or(1);
-        let mut results = Vec::new(); let mut visited = HashSet::new(); visited.insert(u32_seed);
+        let target_rel = args.rel.as_deref().unwrap_or("ANY");
+
+        let mut results = Vec::new(); 
+        let mut visited = HashSet::new(); visited.insert(u32_seed);
         let mut queue = VecDeque::new(); queue.push_back((u32_seed, Vec::new(), 0));
+
         while let Some((curr_u32, path, curr_depth)) = queue.pop_front() {
-            if curr_depth >= depth { continue; }
+            // In regular traversal, we stop when we reach requested depth.
+            // In inferred traversal, we follow the chain (transitive closure).
+            if curr_depth >= depth && !is_inferred { continue; }
+
             if let Some(eids) = self.out_idx.get(&curr_u32) {
                 for eid in eids.iter() {
-                    if let Some(edge) = self.edges.get(eid) {
-                        let next_id = if edge.from == self.u32_to_id.get(&curr_u32).unwrap().value().clone() { &edge.to } else { &edge.from };
-                        if let Some(next_u32) = self.get_u32(next_id) {
-                            if !visited.contains(&next_u32) {
-                                visited.insert(next_u32);
-                                if let Some(node) = self.nodes.get(&next_u32) {
-                                    let mut new_path = path.clone(); new_path.push(edge.value().clone());
-                                    results.push(NeighborOutput { node: node.value().clone(), path: new_path.clone(), depth: curr_depth + 1 });
-                                    queue.push_back((next_u32, new_path, curr_depth + 1));
+                    if let Some(edge_ref) = self.edges.get(eid) {
+                        let edge = edge_ref.value();
+                        let rel_match = target_rel == "ANY" || edge.rel == target_rel;
+
+                        if rel_match {
+                            let curr_id = self.u32_to_id.get(&curr_u32).unwrap().value().clone();
+                            let next_id = if edge.from == curr_id { &edge.to } else { &edge.from };
+                            
+                            if let Some(next_u32) = self.get_u32(next_id) {
+                                if !visited.contains(&next_u32) {
+                                    visited.insert(next_u32);
+                                    if let Some(node) = self.nodes.get(&next_u32) {
+                                        let mut new_path = path.clone(); new_path.push(edge.clone());
+                                        results.push(NeighborOutput { node: node.value().clone(), path: new_path.clone(), depth: curr_depth + 1 });
+                                        
+                                        // Continue expansion
+                                        if is_inferred || (curr_depth + 1 < depth) {
+                                            queue.push_back((next_u32, new_path, curr_depth + 1));
+                                        }
+                                    }
                                 }
                             }
                         }
@@ -540,7 +562,7 @@ impl GenesisDatabase {
     #[napi] pub async fn query(&self, args: QueryInput) -> Result<Vec<EdgeOutput>> { let i = Arc::clone(&self.inner); tokio::task::spawn_blocking(move || i.query(args)).await.map_err(|e| Error::from_reason(e.to_string()))? }
     #[napi] pub async fn execute_hql(&self, query: String) -> Result<Vec<NeighborOutput>> { let i = Arc::clone(&self.inner); tokio::task::spawn_blocking(move || i.execute_hql(&query)).await.map_err(|e| Error::from_reason(e.to_string()))? }
     #[napi] pub async fn hybrid_search(&self, args: HybridSearchInput) -> Result<Vec<NeighborOutput>> { let i = Arc::clone(&self.inner); tokio::task::spawn_blocking(move || i.hybrid_search(args)).await.map_err(|e| Error::from_reason(e.to_string()))? }
-    #[napi] pub async fn neighbors(&self, seed: String, args: NeighborInput) -> Result<Vec<NeighborOutput>> { let i = Arc::clone(&self.inner); tokio::task::spawn_blocking(move || i.neighbors(seed, args)).await.map_err(|e| Error::from_reason(e.to_string()))? }
+    #[napi] pub async fn neighbors(&self, seed: String, args: NeighborInput) -> Result<Vec<NeighborOutput>> { let i = Arc::clone(&self.inner); tokio::task::spawn_blocking(move || i.neighbors(seed, args, false)).await.map_err(|e| Error::from_reason(e.to_string()))? }
     #[napi] pub async fn compact(&self) -> Result<()> { let i = Arc::clone(&self.inner); tokio::task::spawn_blocking(move || i.compact()).await.map_err(|e| Error::from_reason(e.to_string()))? }
     #[napi] pub fn schema_version_sync(&self) -> u32 { SCHEMA_VERSION }
     #[napi] pub fn status_sync(&self) -> DatabaseStatus { self.inner.status_sync() }

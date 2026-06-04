@@ -7,6 +7,12 @@ use std::convert::TryFrom;
 pub struct HqlParser;
 
 #[derive(Debug, Clone)]
+pub enum HqlRel {
+    Physical(String),
+    Inferred(String),
+}
+
+#[derive(Debug, Clone)]
 pub enum HqlCommand {
     Search {
         target: String,
@@ -17,7 +23,7 @@ pub enum HqlCommand {
     Traverse {
         seed: String,
         depth: u32,
-        rel: String,
+        rel: HqlRel,
         fuzzy: bool,
     },
     Hybrid {
@@ -99,7 +105,7 @@ impl HqlCommand {
     fn parse_traverse(pair: pest::iterators::Pair<Rule>) -> Self {
         let mut seed = String::new();
         let mut depth = 1;
-        let mut rel = String::new();
+        let mut rel = HqlRel::Physical("ANY".to_string());
         let mut fuzzy = false;
 
         for inner in pair.into_inner() {
@@ -110,7 +116,23 @@ impl HqlCommand {
                     fuzzy = f;
                 }
                 Rule::depth => depth = inner.as_str().parse::<u32>().unwrap_or(1),
-                Rule::rel => rel = inner.as_str().trim().to_string(),
+                Rule::rel => {
+                    for r in inner.into_inner() {
+                        match r.as_rule() {
+                            Rule::rel_type => {
+                                rel = HqlRel::Physical(r.as_str().to_string());
+                            }
+                            Rule::infer_rel => {
+                                for inner_r in r.into_inner() {
+                                    if inner_r.as_rule() == Rule::identifier {
+                                        rel = HqlRel::Inferred(inner_r.as_str().to_string());
+                                    }
+                                }
+                            }
+                            _ => {}
+                        }
+                    }
+                }
                 _ => {}
             }
         }
