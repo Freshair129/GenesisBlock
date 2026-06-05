@@ -14,12 +14,58 @@ use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
 // Import core engine from the library
 use genesis_block_native::{
-    Storage, OpenOptions, NodeInput, EdgeInput, QueryInput, HybridSearchInput
+    Storage, OpenOptions, NodeInput, EdgeInput, QueryInput, HybridSearchInput, Event
 };
 
 #[derive(Clone)]
 struct AppState {
     storage: Arc<RwLock<Storage>>,
+}
+
+#[derive(serde::Deserialize)]
+struct VoteInput {
+    pub proposal_id: String,
+    pub peer_id: String,
+    pub approve: bool,
+}
+
+#[derive(serde::Deserialize)]
+struct ProposalInput {
+    pub event: Event,
+    pub signature: Vec<u8>,
+}
+
+async fn consensus_propose_handler(
+    State(state): State<AppState>,
+    Json(input): Json<ProposalInput>,
+) -> impl IntoResponse {
+    let storage = state.storage.read();
+    match storage.propose_consensus(input.event, input.signature) {
+        Ok(id) => (StatusCode::OK, Json(id)).into_response(),
+        Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
+    }
+}
+
+async fn consensus_vote_handler(
+    State(state): State<AppState>,
+    Json(input): Json<VoteInput>,
+) -> impl IntoResponse {
+    let storage = state.storage.read();
+    match storage.submit_vote(input.proposal_id, input.peer_id, input.approve) {
+        Ok(reached_quorum) => (StatusCode::OK, Json(reached_quorum)).into_response(),
+        Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
+    }
+}
+
+async fn consensus_verify_handler(
+    State(state): State<AppState>,
+    Json(event): Json<Event>,
+) -> impl IntoResponse {
+    let storage = state.storage.read();
+    match storage.semantic_verify(&event) {
+        Ok(is_valid) => (StatusCode::OK, Json(is_valid)).into_response(),
+        Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
+    }
 }
 
 async fn bulk_add_nodes_handler(

@@ -1,6 +1,6 @@
 //! Genesis Block — high-performance hybrid semantic-graph engine.
 //!
-//! Mark V: Neural Integration & Collaborative Reasoning
+//! Mark VI: Collective Intelligence & Autonomic Substrate
 
 #![deny(clippy::all)]
 
@@ -172,6 +172,39 @@ pub struct NodeMetadata {
     pub cluster_id: u32,
 }
 
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct ConsensusProposal {
+    pub proposal_id: String,
+    pub event: Event,
+    pub signature: Vec<u8>,
+    pub votes: HashMap<String, bool>, // PeerID -> Vote
+}
+
+#[napi(object)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct SuperNode {
+    pub cluster_id: u32,
+    pub theme: String,
+    pub member_count: u32,
+    pub impact: f64,
+    pub centroid: Vec<f64>,
+}
+
+#[napi(object)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct MetaEdge {
+    pub from_cluster: u32,
+    pub to_cluster: u32,
+    pub weight: u32,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum OptimizationTask {
+    ConsolidateStagnant,
+    PruneEntropy,
+    RebuildMetaGraph,
+}
+
 pub struct Storage {
     pub path: PathBuf,
     pub read_only: bool,
@@ -193,6 +226,9 @@ pub struct Storage {
     pub trigram_index: DashMap<String, HashSet<u32>>,
     pub lang_centroids: DashMap<String, Vec<f32>>,
     pub peers: DashMap<String, SyncPeer>,
+    pub proposals: DashMap<String, ConsensusProposal>,
+    pub meta_nodes: DashMap<u32, SuperNode>,
+    pub meta_edges: DashMap<String, MetaEdge>, 
     pub wal_sender: Sender<(Event, Sender<bool>)>,
 }
 
@@ -321,7 +357,9 @@ impl Storage {
             hnsw_index: RwLock::new(None), log_path, bin_path: PathBuf::from(""), _lock_file: None,
             id_to_u32: DashMap::new(), u32_to_id: DashMap::new(), u32_to_arena_id: DashMap::new(), next_u32: AtomicU32::new(0),
             is_rebuilding: AtomicBool::new(false), trigram_index: DashMap::new(), 
-            lang_centroids: DashMap::new(), peers: DashMap::new(), wal_sender,
+            lang_centroids: DashMap::new(), peers: DashMap::new(),
+            proposals: DashMap::new(), meta_nodes: DashMap::new(), meta_edges: DashMap::new(),
+            wal_sender,
         };
 
         if storage.log_path.exists() {
@@ -354,6 +392,17 @@ impl Storage {
         Ok(storage)
     }
 
+    pub fn start_autonomic_loop(storage: Arc<Self>) {
+        std::thread::spawn(move || {
+            loop {
+                std::thread::sleep(Duration::from_secs(3600)); 
+                if !storage.read_only {
+                    let _ = storage.perform_autonomic_optimization();
+                }
+            }
+        });
+    }
+
     pub fn ensure_writable(&self) -> Result<()> { if self.read_only { return Err(Error::from_reason("read-only")); } Ok(()) }
 
     pub fn persist(&self, event: &Event) -> Result<()> {
@@ -381,6 +430,69 @@ impl Storage {
             }
         }
         if max_sim > 0.85 { best_id } else { None }
+    }
+
+    pub fn semantic_verify(&self, event: &Event) -> Result<bool> {
+        match event {
+            Event::Node(node) => {
+                if let Some(emb) = &node.embedding {
+                    let context = self.get_ranked_context(HybridSearchInput {
+                        query_vector: emb.clone(),
+                        k: 3,
+                        alpha: Some(0.4),
+                        lang: node.lang.clone(),
+                    })?;
+                    
+                    for neighbor in context {
+                        if neighbor.node.impact.unwrap_or(0.0) > 0.8 {
+                            if node.labels != neighbor.node.labels && neighbor.node.labels.contains(&"MASTER".to_string()) {
+                                return Ok(false);
+                            }
+                        }
+                    }
+                }
+                Ok(true)
+            }
+            Event::Edge(_) => Ok(true),
+        }
+    }
+
+    pub fn propose_consensus(&self, event: Event, signature: Vec<u8>) -> Result<String> {
+        let proposal_id = Uuid::new_v4().to_string();
+        let proposal = ConsensusProposal {
+            proposal_id: proposal_id.clone(),
+            event,
+            signature,
+            votes: HashMap::new(),
+        };
+        self.proposals.insert(proposal_id.clone(), proposal);
+        Ok(proposal_id)
+    }
+
+    pub fn submit_vote(&self, proposal_id: String, peer_id: String, approve: bool) -> Result<bool> {
+        if let Some(mut proposal_ref) = self.proposals.get_mut(&proposal_id) {
+            proposal_ref.value_mut().votes.insert(peer_id, approve);
+            let approvals = proposal_ref.value().votes.values().filter(|&&v| v).count();
+            
+            if approvals > (self.peers.len() / 2) {
+                let event = proposal_ref.value().event.clone();
+                match event {
+                    Event::Node(mut n) => {
+                        if !n.labels.contains(&"MASTER".to_string()) { n.labels.push("MASTER".to_string()); }
+                        let u32_id = self.get_or_intern_id(&n.id);
+                        self.nodes.insert(u32_id, n.clone());
+                        self.persist(&Event::Node(n))?;
+                    }
+                    Event::Edge(e) => {
+                        let u32_id = self.get_or_intern_id(&e.id);
+                        self.edges.insert(u32_id, e.clone());
+                        self.persist(&Event::Edge(e))?;
+                    }
+                }
+                return Ok(true);
+            }
+        }
+        Ok(false)
     }
 
     pub fn calculate_sc(&self, node: &NodeOutput) -> f64 {
@@ -594,6 +706,93 @@ impl Storage {
         Ok(())
     }
 
+    pub fn generate_meta_graph(&self) -> Result<()> {
+        let mut cluster_groups: HashMap<u32, Vec<u32>> = HashMap::new();
+        let meta_arena = self.metadata_arena.read();
+        for meta in meta_arena.iter() {
+            if let Some(u32_id) = self.get_u32(&meta.node_id) {
+                cluster_groups.entry(meta.cluster_id).or_insert_with(Vec::new).push(u32_id);
+            }
+        }
+        let vec_arena = self.vector_arena.read();
+        for (c_id, members) in cluster_groups.iter() {
+            let mut centroid = vec![0.0; 1536];
+            let mut total_impact = 0.0;
+            let mut count = 0;
+            for &u32_id in members {
+                if let Some(node) = self.nodes.get(&u32_id) {
+                    total_impact += node.value().impact.unwrap_or(0.0);
+                    if let Some(a_id) = self.u32_to_arena_id.get(&u32_id) {
+                        if let Some(meta) = meta_arena.get(*a_id as usize) {
+                            let start = meta.embedding_offset as usize;
+                            let end = start + meta.vector_dim as usize;
+                            if end <= vec_arena.len() {
+                                for (i, val) in vec_arena[start..end].iter().enumerate() {
+                                    if i < 1536 { centroid[i] += *val as f64; }
+                                }
+                                count += 1;
+                            }
+                        }
+                    }
+                }
+            }
+            if count > 0 {
+                for val in centroid.iter_mut() { *val /= count as f64; }
+                self.meta_nodes.insert(*c_id, SuperNode {
+                    cluster_id: *c_id, theme: format!("Theme-{}", c_id),
+                    member_count: members.len() as u32, impact: total_impact / members.len() as f64,
+                    centroid,
+                });
+            }
+        }
+        for entry in self.edges.iter() {
+            let edge = entry.value();
+            if let (Some(from_u32), Some(to_u32)) = (self.get_u32(&edge.from), self.get_u32(&edge.to)) {
+                if let (Some(from_cid), Some(to_id)) = (self.u32_to_arena_id.get(&from_u32), self.u32_to_arena_id.get(&to_u32)) {
+                    let c1 = meta_arena[*from_cid as usize].cluster_id;
+                    let c2 = meta_arena[*to_id as usize].cluster_id;
+                    if c1 != c2 {
+                        let key = format!("{}:{}", c1, c2);
+                        let mut meta_edge = self.meta_edges.entry(key.clone()).or_insert(MetaEdge { from_cluster: c1, to_cluster: c2, weight: 0 });
+                        meta_edge.weight += 1;
+                    }
+                }
+            }
+        }
+        Ok(())
+    }
+
+    pub fn perform_autonomic_optimization(&self) -> Result<()> {
+        println!("Mark VI: Executing Autonomic Maintenance...");
+        self.prune_orphaned_nodes()?;
+        self.generate_meta_graph()?;
+        Ok(())
+    }
+
+    pub fn prune_orphaned_nodes(&self) -> Result<()> {
+        let mut to_delete = Vec::new();
+        for entry in self.nodes.iter() {
+            let u32_id = entry.key();
+            let is_master = entry.value().labels.contains(&"MASTER".to_string());
+            if !is_master {
+                let has_in = self.in_idx.contains_key(u32_id);
+                let has_out = self.out_idx.contains_key(u32_id);
+                if !has_in && !has_out {
+                    to_delete.push(entry.value().id.clone());
+                }
+            }
+        }
+        for id in to_delete {
+            if let Some(u32_id) = self.get_u32(&id) {
+                self.nodes.remove(&u32_id);
+                self.id_to_u32.remove(&id);
+                self.u32_to_id.remove(&u32_id);
+                println!("Mark VI: Pruned orphaned node '{}'", id);
+            }
+        }
+        Ok(())
+    }
+
     pub fn set_language_centroid(&self, lang: String, vector: Vec<f64>) {
         let v_f32: Vec<f32> = vector.into_iter().map(|v| v as f32).collect();
         self.lang_centroids.insert(lang, v_f32);
@@ -679,7 +878,11 @@ pub struct GenesisDatabase { inner: Arc<Storage> }
 #[napi]
 impl GenesisDatabase {
     #[napi(factory)]
-    pub fn open(opts: OpenOptions) -> Result<Self> { Ok(Self { inner: Arc::new(Storage::open(opts)?) }) }
+    pub fn open(opts: OpenOptions) -> Result<Self> { 
+        let storage = Arc::new(Storage::open(opts)?);
+        Storage::start_autonomic_loop(Arc::clone(&storage));
+        Ok(Self { inner: storage }) 
+    }
     #[napi] pub async fn bulk_add_nodes(&self, inputs: Vec<NodeInput>) -> Result<()> { let i = Arc::clone(&self.inner); tokio::task::spawn_blocking(move || i.bulk_add_nodes(inputs)).await.map_err(|e| Error::from_reason(e.to_string()))? }
     #[napi] pub async fn bulk_add_edges(&self, inputs: Vec<EdgeInput>) -> Result<()> { let i = Arc::clone(&self.inner); tokio::task::spawn_blocking(move || i.bulk_add_edges(inputs)).await.map_err(|e| Error::from_reason(e.to_string()))? }
     #[napi] pub async fn rebuild_index_parallel(&self) -> Result<()> { let i = Arc::clone(&self.inner); tokio::task::spawn_blocking(move || i.rebuild_index_parallel()).await.map_err(|e| Error::from_reason(e.to_string()))? }
@@ -694,6 +897,18 @@ impl GenesisDatabase {
     #[napi] pub fn set_language_centroid(&self, lang: String, vector: Vec<f64>) { self.inner.set_language_centroid(lang, vector); }
     #[napi] pub async fn detect_communities(&self) -> Result<()> { let i = Arc::clone(&self.inner); tokio::task::spawn_blocking(move || i.detect_communities()).await.map_err(|e| Error::from_reason(e.to_string()))? }
     #[napi] pub async fn calculate_structural_gaps(&self) -> Result<Vec<GapSuggestion>> { let i = Arc::clone(&self.inner); tokio::task::spawn_blocking(move || i.calculate_structural_gaps()).await.map_err(|e| Error::from_reason(e.to_string()))? }
+    #[napi] pub async fn generate_meta_graph(&self) -> Result<()> { let i = Arc::clone(&self.inner); tokio::task::spawn_blocking(move || i.generate_meta_graph()).await.map_err(|e| Error::from_reason(e.to_string()))? }
+    #[napi] pub async fn semantic_verify(&self, event_json: String) -> Result<bool> { 
+        let i = Arc::clone(&self.inner); 
+        let event = serde_json::from_str::<Event>(&event_json).map_err(|e| Error::from_reason(e.to_string()))?;
+        tokio::task::spawn_blocking(move || i.semantic_verify(&event)).await.map_err(|e| Error::from_reason(e.to_string()))? 
+    }
+    #[napi] pub async fn propose_consensus(&self, event_json: String, signature: Vec<u8>) -> Result<String> { 
+        let i = Arc::clone(&self.inner); 
+        let event = serde_json::from_str::<Event>(&event_json).map_err(|e| Error::from_reason(e.to_string()))?;
+        tokio::task::spawn_blocking(move || i.propose_consensus(event, signature)).await.map_err(|e| Error::from_reason(e.to_string()))? 
+    }
+    #[napi] pub async fn submit_vote(&self, proposal_id: String, peer_id: String, approve: bool) -> Result<bool> { let i = Arc::clone(&self.inner); tokio::task::spawn_blocking(move || i.submit_vote(proposal_id, peer_id, approve)).await.map_err(|e| Error::from_reason(e.to_string()))? }
     #[napi] pub fn get_merkle_root(&self) -> String { self.inner.get_merkle_root() }
     #[napi] pub fn schema_version_sync(&self) -> u32 { SCHEMA_VERSION }
     #[napi] pub fn status_sync(&self) -> DatabaseStatus { self.inner.status_sync() }
