@@ -13,6 +13,7 @@ export interface NodeInput {
   labels: Array<string>
   props?: any
   embedding?: Array<number>
+  lang?: string
 }
 export interface NodeOutput {
   id: string
@@ -20,6 +21,7 @@ export interface NodeOutput {
   props: any
   impact?: number
   embedding?: Array<number>
+  lang?: string
 }
 export interface EdgeInput {
   id?: string
@@ -69,22 +71,36 @@ export interface HybridSearchInput {
   queryVector: Array<number>
   k: number
   alpha?: number
+  lang?: string
 }
 export interface DatabaseStatus {
   open: boolean
   readOnly: boolean
   pageCacheMb: number
 }
+export interface SyncPeer {
+  id: string
+  addr: string
+  publicKey?: Array<number>
+}
 export declare function engineNameSync(): string
+export declare function schemaVersionSync(): number
 export declare class GenesisDatabase {
   static open(opts: OpenOptions): GenesisDatabase
+  bulkAddNodes(inputs: Array<NodeInput>): Promise<void>
+  bulkAddEdges(inputs: Array<EdgeInput>): Promise<void>
+  rebuildIndexParallel(): Promise<void>
   addNode(args: NodeInput): Promise<NodeOutput>
   addEdge(args: EdgeInput): Promise<EdgeOutput>
   retractEdge(id: string, at?: string | undefined | null): Promise<EdgeOutput | null>
   query(args: QueryInput): Promise<Array<EdgeOutput>>
+  executeHql(query: string): Promise<Array<NeighborOutput>>
   hybridSearch(args: HybridSearchInput): Promise<Array<NeighborOutput>>
   neighbors(seed: string, args: NeighborInput): Promise<Array<NeighborOutput>>
   compact(): Promise<void>
+  setLanguageCentroid(lang: string, vector: Array<number>): void
+  detectCommunities(): Promise<void>
+  getMerkleRoot(): string
   schemaVersionSync(): number
   statusSync(): DatabaseStatus
 }

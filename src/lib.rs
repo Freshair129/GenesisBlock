@@ -508,12 +508,8 @@ impl Storage {
                     if let Some(node) = self.nodes.get(&u32_id) {
                         let mut node_out = node.value().clone();
                         let similarity = 1.0 - neighbor.distance as f64;
-                        
-                        // Reasoning Score R = (Sim * 0.6) + (Impact * 0.4) if alpha is default
-                        // Using provided alpha for flexibility
                         let reasoning_score = (similarity * (1.0 - alpha)) + (node_out.impact.unwrap_or(0.0) * alpha);
                         node_out.impact = Some(reasoning_score);
-                        
                         hybrid_results.push(NeighborOutput { node: node_out, path: Vec::new(), depth: 0 });
                     }
                 }
@@ -525,8 +521,6 @@ impl Storage {
     }
 
     pub fn get_ranked_context(&self, args: HybridSearchInput) -> Result<Vec<NeighborOutput>> {
-        // Step 4: Logic-Gated Context
-        // Force alpha to 0.4 for R = (Sim * 0.6) + (Impact * 0.4)
         let mut context_args = args;
         context_args.alpha = Some(0.4);
         self.hybrid_search(context_args)
@@ -612,9 +606,7 @@ impl Storage {
             let reader = std::io::BufReader::new(file);
             use std::io::BufRead;
             for line_res in reader.lines() {
-                if let Ok(line) = line_res {
-                    hasher.update(line.as_bytes());
-                }
+                if let Ok(line) = line_res { hasher.update(line.as_bytes()); }
             }
         }
         hex::encode(hasher.finalize())
@@ -625,6 +617,60 @@ impl Storage {
     pub fn status_sync(&self) -> DatabaseStatus { DatabaseStatus { open: true, read_only: self.read_only, page_cache_mb: 512 } }
     pub fn bulk_add_nodes(&self, inputs: Vec<NodeInput>) -> Result<()> { for i in inputs { self.add_node(i)?; } Ok(()) }
     pub fn bulk_add_edges(&self, inputs: Vec<EdgeInput>) -> Result<()> { for i in inputs { self.add_edge(i)?; } Ok(()) }
+    
+    pub fn calculate_structural_gaps(&self) -> Result<Vec<GapSuggestion>> {
+        let mut gaps = Vec::new();
+        let mut cluster_centroids: HashMap<u32, Vec<f32>> = HashMap::new();
+        let mut cluster_member_count: HashMap<u32, u32> = HashMap::new();
+        let mut cluster_impact: HashMap<u32, f64> = HashMap::new();
+        let meta_arena = self.metadata_arena.read();
+        let vec_arena = self.vector_arena.read();
+        for meta in meta_arena.iter() {
+            let c_id = meta.cluster_id;
+            let start = meta.embedding_offset as usize;
+            let end = start + meta.vector_dim as usize;
+            if end <= vec_arena.len() {
+                let vec = &vec_arena[start..end];
+                let entry = cluster_centroids.entry(c_id).or_insert_with(|| vec![0.0; meta.vector_dim as usize]);
+                for (i, val) in vec.iter().enumerate() { entry[i] += val; }
+                *cluster_member_count.entry(c_id).or_insert(0) += 1;
+                if let Some(u32_id) = self.get_u32(&meta.node_id) {
+                    if let Some(node) = self.nodes.get(&u32_id) { *cluster_impact.entry(c_id).or_insert(0.0) += node.value().impact.unwrap_or(0.0); }
+                }
+            }
+        }
+        for (c_id, centroid) in cluster_centroids.iter_mut() {
+            let count = cluster_member_count[c_id] as f32;
+            for val in centroid.iter_mut() { *val /= count; }
+        }
+        let cluster_ids: Vec<u32> = cluster_centroids.keys().cloned().collect();
+        for i in 0..cluster_ids.len() {
+            for j in i + 1..cluster_ids.len() {
+                let id_a = cluster_ids[i]; let id_b = cluster_ids[j];
+                let avg_impact_a = cluster_impact[&id_a] / cluster_member_count[&id_a] as f64;
+                let avg_impact_b = cluster_impact[&id_b] / cluster_member_count[&id_b] as f64;
+                if avg_impact_a < 0.5 || avg_impact_b < 0.5 { continue; }
+                let dist = DistL2 {}.eval(&cluster_centroids[&id_a], &cluster_centroids[&id_b]);
+                let similarity = 1.0 / (1.0 + dist as f64);
+                if similarity > 0.75 {
+                    gaps.push(GapSuggestion {
+                        cluster_a: id_a, cluster_b: id_b, similarity,
+                        reason: format!("High-authority clusters ({:.2} & {:.2}) are semantically related but physically disconnected.", avg_impact_a, avg_impact_b),
+                    });
+                }
+            }
+        }
+        Ok(gaps)
+    }
+}
+
+#[napi(object)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct GapSuggestion {
+    pub cluster_a: u32,
+    pub cluster_b: u32,
+    pub similarity: f64,
+    pub reason: String,
 }
 
 #[napi]
@@ -647,8 +693,10 @@ impl GenesisDatabase {
     #[napi] pub async fn compact(&self) -> Result<()> { let i = Arc::clone(&self.inner); tokio::task::spawn_blocking(move || i.compact()).await.map_err(|e| Error::from_reason(e.to_string()))? }
     #[napi] pub fn set_language_centroid(&self, lang: String, vector: Vec<f64>) { self.inner.set_language_centroid(lang, vector); }
     #[napi] pub async fn detect_communities(&self) -> Result<()> { let i = Arc::clone(&self.inner); tokio::task::spawn_blocking(move || i.detect_communities()).await.map_err(|e| Error::from_reason(e.to_string()))? }
+    #[napi] pub async fn calculate_structural_gaps(&self) -> Result<Vec<GapSuggestion>> { let i = Arc::clone(&self.inner); tokio::task::spawn_blocking(move || i.calculate_structural_gaps()).await.map_err(|e| Error::from_reason(e.to_string()))? }
     #[napi] pub fn get_merkle_root(&self) -> String { self.inner.get_merkle_root() }
     #[napi] pub fn schema_version_sync(&self) -> u32 { SCHEMA_VERSION }
     #[napi] pub fn status_sync(&self) -> DatabaseStatus { self.inner.status_sync() }
 }
 #[napi] pub fn engine_name_sync() -> String { "genesis-block".to_string() }
+#[napi] pub fn schema_version_sync() -> u32 { SCHEMA_VERSION }
