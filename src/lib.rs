@@ -196,6 +196,8 @@ pub struct SuperNode {
     pub member_count: u32,
     pub impact: f64,
     pub centroid: Vec<f64>,
+    pub timestamp: String,
+    pub drift: Option<f64>,
 }
 
 #[napi(object)]
@@ -236,7 +238,8 @@ pub struct Storage {
     pub peers: DashMap<String, SyncPeer>,
     pub proposals: DashMap<String, ConsensusProposal>,
     pub meta_nodes: DashMap<u32, SuperNode>,
-    pub meta_edges: DashMap<String, MetaEdge>, 
+    pub meta_edges: DashMap<String, MetaEdge>,
+    pub meta_history: DashMap<u32, Vec<SuperNode>>,
     pub wal_sender: Sender<(Event, Sender<bool>)>,
 }
 
@@ -289,10 +292,10 @@ impl Storage {
     fn add_vector_internal(&self, node_id: &str, emb_64: Vec<f64>, lang: String) {
         let emb: Vec<f32> = emb_64.into_iter().map(|v| v as f32).collect();
         let dim = emb.len() as u16;
+        let mut meta_arena = self.metadata_arena.write();
         let mut vec_arena = self.vector_arena.write();
         let current_vec_len = vec_arena.len();
         vec_arena.extend_from_slice(&emb);
-        let mut meta_arena = self.metadata_arena.write();
         let arena_id = meta_arena.len() as u32;
         meta_arena.push(NodeMetadata {
             arena_id, node_id: node_id.to_string(), timestamp: Utc::now().timestamp() as u64,
@@ -300,8 +303,12 @@ impl Storage {
             lang, cluster_id: arena_id,
         });
         if let Some(u32_id) = self.get_u32(node_id) { self.u32_to_arena_id.insert(u32_id, arena_id); }
-        if self.hnsw_index.read().is_none() { *self.hnsw_index.write() = Some(Self::init_hnsw()); }
-        if let Some(ref mut hnsw) = *self.hnsw_index.write() { hnsw.insert((&emb, arena_id as usize)); }
+        if self.hnsw_index.read().is_none() { 
+            *self.hnsw_index.write() = Some(Self::init_hnsw()); 
+        }
+        if let Some(ref mut hnsw) = *self.hnsw_index.write() { 
+            hnsw.insert((&emb, arena_id as usize)); 
+        }
     }
 
     fn rehydrate_hnsw_index(&self) {
@@ -367,6 +374,7 @@ impl Storage {
             is_rebuilding: AtomicBool::new(false), trigram_index: DashMap::new(), 
             lang_centroids: DashMap::new(), peers: DashMap::new(),
             proposals: DashMap::new(), meta_nodes: DashMap::new(), meta_edges: DashMap::new(),
+            meta_history: DashMap::new(),
             wal_sender,
         };
 
@@ -415,8 +423,12 @@ impl Storage {
 
     pub fn persist(&self, event: &Event) -> Result<()> {
         let (ack_tx, ack_rx) = unbounded();
+        println!("Persisting event...");
         self.wal_sender.send((event.clone(), ack_tx)).map_err(|_| Error::from_reason("wal disconnected"))?;
-        let _ = ack_rx.recv(); Ok(())
+        println!("Waiting for WAL ACK...");
+        let _ = ack_rx.recv(); 
+        println!("WAL ACK received.");
+        Ok(())
     }
 
     pub fn find_fuzzy_id(&self, id: &str) -> Option<String> {
@@ -743,15 +755,31 @@ impl Storage {
 
     pub fn detect_communities(&self) -> Result<()> {
         let mut meta_arena = self.metadata_arena.write();
-        for meta in meta_arena.iter_mut() {
+        let mut new_clusters = Vec::with_capacity(meta_arena.len());
+        for meta in meta_arena.iter() {
             let mut freq = HashMap::new();
             if let Some(u32_id) = self.get_u32(&meta.node_id) {
-                if let Some(eids) = self.out_idx.get(&u32_id) {
-                    for eid in eids.iter() {
-                        if let Some(edge) = self.edges.get(eid) {
-                            if let Some(to_u32) = self.get_u32(&edge.to) {
-                                if let Some(a_id) = self.u32_to_arena_id.get(&to_u32) {
-                                    *freq.entry(*a_id).or_insert(0) += 1;
+                let out_eids = self.out_idx.get(&u32_id).map(|v| v.value().clone()).unwrap_or_default();
+                for eid in out_eids {
+                    if let Some(edge) = self.edges.get(&eid) {
+                        let other_id = if edge.from == meta.node_id { &edge.to } else { &edge.from };
+                        if let Some(to_u32) = self.get_u32(other_id) {
+                            if let Some(a_id) = self.u32_to_arena_id.get(&to_u32) {
+                                if let Some(other_meta) = meta_arena.get(*a_id as usize) {
+                                    *freq.entry(other_meta.cluster_id).or_insert(0) += 1;
+                                }
+                            }
+                        }
+                    }
+                }
+                let in_eids = self.in_idx.get(&u32_id).map(|v| v.value().clone()).unwrap_or_default();
+                for eid in in_eids {
+                    if let Some(edge) = self.edges.get(&eid) {
+                        let other_id = if edge.from == meta.node_id { &edge.to } else { &edge.from };
+                        if let Some(to_u32) = self.get_u32(other_id) {
+                            if let Some(a_id) = self.u32_to_arena_id.get(&to_u32) {
+                                if let Some(other_meta) = meta_arena.get(*a_id as usize) {
+                                    *freq.entry(other_meta.cluster_id).or_insert(0) += 1;
                                 }
                             }
                         }
@@ -759,10 +787,29 @@ impl Storage {
                 }
             }
             if let Some((&best_cluster, _)) = freq.iter().max_by_key(|&(_, count)| count) {
-                meta.cluster_id = best_cluster;
+                new_clusters.push(best_cluster);
+            } else {
+                new_clusters.push(meta.cluster_id);
             }
         }
+        for (i, meta) in meta_arena.iter_mut().enumerate() {
+            meta.cluster_id = new_clusters[i];
+        }
         Ok(())
+    }
+
+    pub fn cosine_similarity(v1: &[f64], v2: &[f64]) -> f64 {
+        if v1.len() != v2.len() || v1.is_empty() { return 0.0; }
+        let mut dot = 0.0;
+        let mut norm_a = 0.0;
+        let mut norm_b = 0.0;
+        for i in 0..v1.len() {
+            dot += v1[i] * v2[i];
+            norm_a += v1[i].powi(2);
+            norm_b += v2[i].powi(2);
+        }
+        if norm_a == 0.0 || norm_b == 0.0 { return 0.0; }
+        dot / (norm_a.sqrt() * norm_b.sqrt())
     }
 
     pub fn generate_meta_graph(&self) -> Result<()> {
@@ -774,6 +821,8 @@ impl Storage {
             }
         }
         let vec_arena = self.vector_arena.read();
+        let now = Utc::now().to_rfc3339();
+
         for (c_id, members) in cluster_groups.iter() {
             let mut centroid = vec![0.0; 1536];
             let mut total_impact = 0.0;
@@ -797,11 +846,25 @@ impl Storage {
             }
             if count > 0 {
                 for val in centroid.iter_mut() { *val /= count as f64; }
-                self.meta_nodes.insert(*c_id, SuperNode {
+                
+                let mut drift = None;
+                if let Some(history) = self.meta_history.get(c_id) {
+                    if let Some(prev) = history.last() {
+                        let sim = Self::cosine_similarity(&centroid, &prev.centroid);
+                        drift = Some(1.0 - sim);
+                    }
+                }
+
+                let sn = SuperNode {
                     cluster_id: *c_id, theme: format!("Theme-{}", c_id),
                     member_count: members.len() as u32, impact: total_impact / members.len() as f64,
-                    centroid,
-                });
+                    centroid: centroid.clone(),
+                    timestamp: now.clone(),
+                    drift,
+                };
+
+                self.meta_nodes.insert(*c_id, sn.clone());
+                self.meta_history.entry(*c_id).or_insert_with(Vec::new).push(sn);
             }
         }
         for entry in self.edges.iter() {
@@ -920,6 +983,10 @@ impl Storage {
         }
         Ok(gaps)
     }
+
+    pub fn get_meta_history(&self, cluster_id: u32) -> Vec<SuperNode> {
+        self.meta_history.get(&cluster_id).map(|v| v.value().clone()).unwrap_or_default()
+    }
 }
 
 #[napi(object)]
@@ -958,6 +1025,7 @@ impl GenesisDatabase {
     #[napi] pub async fn detect_communities(&self) -> Result<()> { let i = Arc::clone(&self.inner); tokio::task::spawn_blocking(move || i.detect_communities()).await.map_err(|e| Error::from_reason(e.to_string()))? }
     #[napi] pub async fn calculate_structural_gaps(&self) -> Result<Vec<GapSuggestion>> { let i = Arc::clone(&self.inner); tokio::task::spawn_blocking(move || i.calculate_structural_gaps()).await.map_err(|e| Error::from_reason(e.to_string()))? }
     #[napi] pub async fn generate_meta_graph(&self) -> Result<()> { let i = Arc::clone(&self.inner); tokio::task::spawn_blocking(move || i.generate_meta_graph()).await.map_err(|e| Error::from_reason(e.to_string()))? }
+    #[napi] pub async fn get_meta_history(&self, cluster_id: u32) -> Result<Vec<SuperNode>> { let i = Arc::clone(&self.inner); tokio::task::spawn_blocking(move || Ok(i.get_meta_history(cluster_id))).await.map_err(|e| Error::from_reason(e.to_string()))? }
     #[napi] pub async fn semantic_verify(&self, event_json: String) -> Result<bool> { 
         let i = Arc::clone(&self.inner); 
         let event = serde_json::from_str::<Event>(&event_json).map_err(|e| Error::from_reason(e.to_string()))?;

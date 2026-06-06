@@ -140,6 +140,15 @@ async fn supersede_node_handler(
     }
 }
 
+async fn get_meta_history_handler(
+    State(state): State<AppState>,
+    axum::extract::Path(cluster_id): axum::extract::Path<u32>,
+) -> impl IntoResponse {
+    let storage = state.storage.read();
+    let history = storage.get_meta_history(cluster_id);
+    (StatusCode::OK, Json(history)).into_response()
+}
+
 async fn execute_hql_handler(
     State(state): State<AppState>,
     Json(query): Json<String>,
@@ -235,6 +244,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .route("/v1/node/add", post(add_node_handler))
         .route("/v1/node/supersede", post(supersede_node_handler))
         .route("/v1/edge/add", post(add_edge_handler))
+        .route("/v1/insight/drift/:cluster_id", get(get_meta_history_handler))
         .route("/v1/query", post(query_handler))
         .route("/v1/search/hybrid", post(hybrid_search_handler))
         .route("/v1/reason/context", post(ranked_context_handler))
