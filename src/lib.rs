@@ -48,6 +48,7 @@ pub struct NodeInput {
     pub embedding: Option<Vec<f64>>,
     pub lang: Option<String>,
     pub valid_from: Option<String>,
+    pub caused_by: Option<String>,
 }
 
 #[napi(object)]
@@ -62,6 +63,7 @@ pub struct NodeOutput {
     pub lang: Option<String>,
     pub valid_from: String,
     pub valid_to: Option<String>,
+    pub caused_by: Option<String>,
 }
 
 #[napi(object)]
@@ -75,6 +77,7 @@ pub struct EdgeInput {
     pub valid_from: Option<String>,
     pub supersede: Option<bool>,
     pub impact: Option<f64>,
+    pub caused_by: Option<String>,
 }
 
 #[napi(object)]
@@ -90,6 +93,7 @@ pub struct EdgeOutput {
     pub recorded_at: String,
     pub superseded_by: Option<String>,
     pub impact: Option<f64>,
+    pub caused_by: Option<String>,
 }
 
 #[napi(object)]
@@ -555,6 +559,7 @@ impl Storage {
             lang: Some(lang.clone()),
             valid_from: args.valid_from.unwrap_or_else(|| Utc::now().to_rfc3339()),
             valid_to: None,
+            caused_by: args.caused_by,
         };
         if let Some(emb) = args.embedding { self.add_vector_internal(&id, emb.clone(), lang); node.embedding = Some(emb); }
         self.nodes.insert(u32_id, node.clone());
@@ -568,12 +573,44 @@ impl Storage {
             id: args.id.unwrap_or_else(|| Uuid::new_v4().to_string()), from: args.from, to: args.to, rel: args.rel,
             props: args.props.unwrap_or(Value::Object(Default::default())), valid_from: Utc::now().to_rfc3339(), valid_to: None, recorded_at: Utc::now().to_rfc3339(),
             superseded_by: None, impact: args.impact,
+            caused_by: args.caused_by,
         };
         self.index_edge_internal(&edge.id, &edge.from, &edge.to);
         self.edges.insert(self.get_or_intern_id(&edge.id), edge.clone());
         self.refresh_impacts(Some(vec![edge.to.clone()]));
         self.persist(&Event::Edge(edge.clone()))?;
         Ok(edge)
+    }
+
+    pub fn supersede_node(&self, id: String, new_props: Option<Value>, caused_by: Option<String>) -> Result<NodeOutput> {
+        self.ensure_writable()?;
+        let u32_id = match self.get_u32(&id) {
+            Some(i) => i,
+            None => return Err(Error::from_reason(format!("Node {} not found", id))),
+        };
+
+        let now = Utc::now().to_rfc3339();
+
+        let mut old_node = match self.nodes.get(&u32_id) {
+            Some(node) => node.value().clone(),
+            None => return Err(Error::from_reason("Node not in memory index")),
+        };
+
+        old_node.valid_to = Some(now.clone());
+        self.persist(&Event::Node(old_node.clone()))?;
+
+        let mut new_node = old_node.clone();
+        new_node.valid_from = now.clone();
+        new_node.valid_to = None;
+        new_node.caused_by = caused_by;
+        if let Some(props) = new_props {
+            new_node.props = props;
+        }
+
+        self.nodes.insert(u32_id, new_node.clone());
+        self.persist(&Event::Node(new_node.clone()))?;
+
+        Ok(new_node)
     }
 
     pub fn rebuild_index_parallel(&self) -> Result<()> {
@@ -910,6 +947,7 @@ impl GenesisDatabase {
     #[napi] pub async fn rebuild_index_parallel(&self) -> Result<()> { let i = Arc::clone(&self.inner); tokio::task::spawn_blocking(move || i.rebuild_index_parallel()).await.map_err(|e| Error::from_reason(e.to_string()))? }
     #[napi] pub async fn add_node(&self, args: NodeInput) -> Result<NodeOutput> { let i = Arc::clone(&self.inner); tokio::task::spawn_blocking(move || i.add_node(args)).await.map_err(|e| Error::from_reason(e.to_string()))? }
     #[napi] pub async fn add_edge(&self, args: EdgeInput) -> Result<EdgeOutput> { let i = Arc::clone(&self.inner); tokio::task::spawn_blocking(move || i.add_edge(args)).await.map_err(|e| Error::from_reason(e.to_string()))? }
+    #[napi] pub async fn supersede_node(&self, id: String, new_props: Option<serde_json::Value>, caused_by: Option<String>) -> Result<NodeOutput> { let i = Arc::clone(&self.inner); tokio::task::spawn_blocking(move || i.supersede_node(id, new_props, caused_by)).await.map_err(|e| Error::from_reason(e.to_string()))? }
     #[napi] pub async fn retract_edge(&self, id: String, at: Option<String>) -> Result<Option<EdgeOutput>> { let i = Arc::clone(&self.inner); tokio::task::spawn_blocking(move || i.retract_edge(id, at)).await.map_err(|e| Error::from_reason(e.to_string()))? }
     #[napi] pub async fn query(&self, args: QueryInput) -> Result<Vec<EdgeOutput>> { let i = Arc::clone(&self.inner); tokio::task::spawn_blocking(move || i.query(args)).await.map_err(|e| Error::from_reason(e.to_string()))? }
     #[napi] pub async fn execute_hql(&self, query: String) -> Result<Vec<NeighborOutput>> { let i = Arc::clone(&self.inner); tokio::task::spawn_blocking(move || i.execute_hql(&query)).await.map_err(|e| Error::from_reason(e.to_string()))? }

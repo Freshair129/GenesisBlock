@@ -19,4 +19,12 @@ npm-debug.log
 
 /benches/scientific_audit_db/
 
-\n/*.wal\n\n/*.bin\n\n/*.lock\n\n/benches/*_db/\n\n/tests/*_db/\n
+# Data/WAL
+**/*.wal
+**/*.lock
+**/*.bin
+.brain/
+**/temp_db/
+**/temp_db_bulk/
+benches/*_db/
+tests/*_db/\n

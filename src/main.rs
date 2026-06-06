@@ -122,6 +122,24 @@ async fn add_edge_handler(
     }
 }
 
+#[derive(serde::Deserialize)]
+struct SupersedeInput {
+    pub id: String,
+    pub new_props: Option<serde_json::Value>,
+    pub caused_by: Option<String>,
+}
+
+async fn supersede_node_handler(
+    State(state): State<AppState>,
+    Json(input): Json<SupersedeInput>,
+) -> impl IntoResponse {
+    let storage = state.storage.write();
+    match storage.supersede_node(input.id, input.new_props, input.caused_by) {
+        Ok(node) => (StatusCode::OK, Json(node)).into_response(),
+        Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
+    }
+}
+
 async fn execute_hql_handler(
     State(state): State<AppState>,
     Json(query): Json<String>,
@@ -215,6 +233,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .route("/v1/bulk/rebuild", post(rebuild_index_handler))
         .route("/v1/query/hql", post(execute_hql_handler))
         .route("/v1/node/add", post(add_node_handler))
+        .route("/v1/node/supersede", post(supersede_node_handler))
         .route("/v1/edge/add", post(add_edge_handler))
         .route("/v1/query", post(query_handler))
         .route("/v1/search/hybrid", post(hybrid_search_handler))
