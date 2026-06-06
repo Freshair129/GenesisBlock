@@ -18,13 +18,13 @@ fn setup_test_db(name: &str) -> Storage {
 fn test_node_creation_and_interning() {
     let storage = setup_test_db("test_node_interning");
     
-    let node = storage.add_node(NodeInput { 
+    let node = storage.add_node(NodeInput {  
         id: Some("user_1".to_string()),
         labels: vec!["User".to_string()],
         props: None,
         embedding: None,
         lang: None,
-     valid_from: None, caused_by: None, }).unwrap();
+     valid_from: None, caused_by: None,  ttl: None, }).unwrap();
 
     assert_eq!(node.id, "user_1");
     
@@ -37,10 +37,10 @@ fn test_node_creation_and_interning() {
 fn test_edge_creation_and_graph_traversal() {
     let storage = setup_test_db("test_graph_traversal");
     
-    storage.add_node(NodeInput {  id: Some("A".to_string()), labels: vec![], props: None, embedding: None, lang: None, valid_from: None, caused_by: None, }).unwrap();
-    storage.add_node(NodeInput {  id: Some("B".to_string()), labels: vec![], props: None, embedding: None, lang: None, valid_from: None, caused_by: None, }).unwrap();
+    storage.add_node(NodeInput {   id: Some("A".to_string()), labels: vec![], props: None, embedding: None, lang: None, valid_from: None, caused_by: None,  ttl: None, }).unwrap();
+    storage.add_node(NodeInput {   id: Some("B".to_string()), labels: vec![], props: None, embedding: None, lang: None, valid_from: None, caused_by: None,  ttl: None, }).unwrap();
     
-    let _edge = storage.add_edge(EdgeInput { 
+    let _edge = storage.add_edge(EdgeInput {  
         id: Some("E1".to_string()),
         from: "A".to_string(),
         to: "B".to_string(),
@@ -49,7 +49,7 @@ fn test_edge_creation_and_graph_traversal() {
         valid_from: None,
         supersede: None,
         impact: None,
-     caused_by: None, }).unwrap();
+     caused_by: None,  }).unwrap();
 
     let neighbors = storage.execute_hql("TRAVERSE FROM A DEPTH 1 REL knows").unwrap();
     assert_eq!(neighbors.len(), 1);
@@ -60,19 +60,19 @@ fn test_edge_creation_and_graph_traversal() {
 fn test_vector_arena_and_hybrid_search() {
     let storage = setup_test_db("test_hybrid_search");
     
-    storage.add_node(NodeInput { 
+    storage.add_node(NodeInput {  
         id: Some("v1".to_string()),
         labels: vec![], props: None,
         embedding: Some(vec![1.0, 0.0, 0.0]),
         lang: None,
-     valid_from: None, caused_by: None, }).unwrap();
+     valid_from: None, caused_by: None,  ttl: None, }).unwrap();
     
-    storage.add_node(NodeInput { 
+    storage.add_node(NodeInput {  
         id: Some("v2".to_string()),
         labels: vec![], props: None,
         embedding: Some(vec![0.0, 1.0, 0.0]),
         lang: None,
-     valid_from: None, caused_by: None, }).unwrap();
+     valid_from: None, caused_by: None,  ttl: None, }).unwrap();
     
     storage.rebuild_index_parallel().unwrap();
 
@@ -88,7 +88,7 @@ fn test_wal_group_commit_durability() {
 
     {
         let storage = Storage::open(OpenOptions { path: db_path.to_string(), page_cache_mb: None, read_only: Some(false) }).unwrap();
-        storage.add_node(NodeInput {  id: Some("durable_node".to_string()), labels: vec![], props: None, embedding: None, lang: None, valid_from: None, caused_by: None, }).unwrap();
+        storage.add_node(NodeInput {   id: Some("durable_node".to_string()), labels: vec![], props: None, embedding: None, lang: None, valid_from: None, caused_by: None,  ttl: None, }).unwrap();
     } 
 
     {

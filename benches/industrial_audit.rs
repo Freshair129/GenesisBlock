@@ -23,13 +23,13 @@ fn main() {
         let id = format!("ID-{}", i);
         let mut rng = rand::thread_rng();
         
-        let node = storage.add_node(NodeInput { 
+        let node = storage.add_node(NodeInput {  
             id: Some(id.clone()),
             labels: vec!["Asset".to_string()],
             props: Some(serde_json::json!({"status": "active", "value": rng.gen::<f64>()})),
             embedding: None,
             lang: None,
-         valid_from: None, caused_by: None, }).unwrap();
+         valid_from: None, caused_by: None,  ttl: None, }).unwrap();
         nodes.push(node.id);
     }
     let duration = start.elapsed();

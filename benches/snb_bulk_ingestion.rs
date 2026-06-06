@@ -18,13 +18,13 @@ fn main() {
 
     let mut buffer = Vec::with_capacity(batch_size);
     for i in 0..batch_size {
-        buffer.push(NodeInput { 
+        buffer.push(NodeInput {  
             id: Some(format!("B-{}", i)),
             labels: vec!["Entity".to_string()],
             props: Some(serde_json::json!({"val": i})),
             embedding: None,
             lang: None,
-         valid_from: None, caused_by: None, });
+         valid_from: None, caused_by: None,  ttl: None, });
     }
 
     let start = Instant::now();
@@ -35,7 +35,7 @@ fn main() {
 
     let mut edge_buffer = Vec::with_capacity(batch_size);
     for i in 0..batch_size - 1 {
-        edge_buffer.push(EdgeInput { 
+        edge_buffer.push(EdgeInput {  
             id: None,
             from: format!("B-{}", i),
             to: format!("B-{}", i+1),
@@ -44,7 +44,7 @@ fn main() {
             valid_from: None,
             supersede: None,
             impact: None,
-         caused_by: None, });
+         caused_by: None,  });
     }
     storage.bulk_add_edges(edge_buffer).unwrap();
     println!("Bulk Chain Linking Complete.");

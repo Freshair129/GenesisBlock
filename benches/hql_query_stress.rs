@@ -21,19 +21,19 @@ fn main() {
     println!("Ingesting {} nodes for HQL stress test...", node_count);
     for i in 0..node_count {
         let id = format!("N-{}", i);
-        let node = storage.add_node(NodeInput { 
+        let node = storage.add_node(NodeInput {  
             id: Some(id.clone()),
             labels: vec!["Node".to_string()],
             props: None,
             embedding: Some(vec![i as f64; 1536]),
             lang: None,
-         valid_from: None, caused_by: None, }).unwrap();
+         valid_from: None, caused_by: None,  ttl: None, }).unwrap();
         nodes.push(node.id);
     }
 
     println!("Linking nodes with edges...");
     for i in 0..node_count - 1 {
-        let _ = storage.add_edge(EdgeInput { 
+        let _ = storage.add_edge(EdgeInput {  
             id: None,
             from: nodes[i].clone(),
             to: nodes[i+1].clone(),
@@ -42,7 +42,7 @@ fn main() {
             valid_from: None,
             supersede: None,
             impact: None,
-         caused_by: None, });
+         caused_by: None,  });
     }
 
     storage.rebuild_index_parallel().unwrap();

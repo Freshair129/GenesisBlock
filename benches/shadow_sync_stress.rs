@@ -65,13 +65,13 @@ fn main() {
             }
         });
 
-        let _ = storage.add_node(NodeInput { 
+        let _ = storage.add_node(NodeInput {  
             id: Some(id),
             labels: vec!["Note".to_string()],
             props: Some(props),
             embedding: Some(embedding),
             lang: None,
-         valid_from: None, caused_by: None, });
+         valid_from: None, caused_by: None,  ttl: None, });
     });
 
     let duration = start_time.elapsed();

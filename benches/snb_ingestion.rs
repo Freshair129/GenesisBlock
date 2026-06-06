@@ -18,17 +18,17 @@ fn main() {
 
     let start = Instant::now();
     for i in 0..person_count {
-        storage.add_node(NodeInput { 
+        storage.add_node(NodeInput {  
             id: Some(format!("Person-{}", i)),
             labels: vec!["Person".to_string()],
             props: Some(serde_json::json!({"name": format!("User {}", i)})),
             embedding: None,
             lang: None,
-         valid_from: None, caused_by: None, }).unwrap();
+         valid_from: None, caused_by: None,  ttl: None, }).unwrap();
     }
 
     for i in 0..person_count - 1 {
-        storage.add_edge(EdgeInput { 
+        storage.add_edge(EdgeInput {  
             id: None,
             from: format!("Person-{}", i),
             to: format!("Person-{}", i + 1),
@@ -37,7 +37,7 @@ fn main() {
             valid_from: None,
             supersede: None,
             impact: None,
-         caused_by: None, }).unwrap();
+         caused_by: None,  }).unwrap();
     }
     let duration = start.elapsed();
     println!("Ingested {} Persons and relationships in {:?}", person_count, duration);

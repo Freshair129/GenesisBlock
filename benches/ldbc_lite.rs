@@ -5,17 +5,17 @@ use std::hint::black_box;
 
 fn setup_ldbc_graph(storage: &mut Storage, node_count: usize, fan_out: usize) {
     for i in 0..node_count {
-        storage.add_node(NodeInput {  embedding: None,
+        storage.add_node(NodeInput {   embedding: None,
             id: Some(format!("N-{}", i)),
             labels: vec!["Entity".to_string()],
             props: None,
-         valid_from: None, caused_by: None, }).unwrap();
+         valid_from: None, caused_by: None,  ttl: None, }).unwrap();
     }
 
     for i in 0..node_count {
         for _ in 0..fan_out {
             let to = rand::random_range(0..node_count);
-            storage.add_edge(EdgeInput { 
+            storage.add_edge(EdgeInput {  
                 id: None,
                 from: format!("N-{}", i),
                 to: format!("N-{}", to),
@@ -24,7 +24,7 @@ fn setup_ldbc_graph(storage: &mut Storage, node_count: usize, fan_out: usize) {
                 valid_from: None,
                 supersede: None,
                 impact: None,
-             caused_by: None, }).ok();
+             caused_by: None,  }).ok();
         }
     }
 }

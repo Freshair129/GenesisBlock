@@ -15,7 +15,7 @@ fn test_vector_drift_tracking() {
     // 1. Add some nodes to form a cluster
     let mut v1 = vec![0.0; 1536];
     v1[0] = 1.0; 
-    storage.add_node(NodeInput {
+    storage.add_node(NodeInput { 
         id: Some("node-1".to_string()),
         labels: vec!["USER".to_string()],
         props: None,
@@ -23,9 +23,9 @@ fn test_vector_drift_tracking() {
         lang: Some("en".to_string()),
         valid_from: None,
         caused_by: None,
-    }).unwrap();
+     ttl: None, }).unwrap();
 
-    storage.add_node(NodeInput {
+    storage.add_node(NodeInput { 
         id: Some("node-2".to_string()),
         labels: vec!["USER".to_string()],
         props: None,
@@ -33,12 +33,12 @@ fn test_vector_drift_tracking() {
         lang: Some("en".to_string()),
         valid_from: None,
         caused_by: None,
-    }).unwrap();
+     ttl: None, }).unwrap();
 
-    storage.add_edge(EdgeInput {
+    storage.add_edge(EdgeInput { 
         id: None, from: "node-1".to_string(), to: "node-2".to_string(), rel: "KNOWS".to_string(),
         props: None, valid_from: None, supersede: None, impact: None, caused_by: None,
-    }).unwrap();
+     }).unwrap();
 
     // 2. Initial community detection and meta-graph generation
     println!("Step 2: Starting meta-graph generation...");
@@ -59,7 +59,7 @@ fn test_vector_drift_tracking() {
     let mut v2 = vec![0.0; 1536];
     v2[1] = 1.0; 
 
-    storage.add_node(NodeInput {
+    storage.add_node(NodeInput { 
         id: Some("node-3".to_string()),
         labels: vec!["USER".to_string()],
         props: None,
@@ -67,12 +67,12 @@ fn test_vector_drift_tracking() {
         lang: Some("en".to_string()),
         valid_from: None,
         caused_by: None,
-    }).unwrap();
+     ttl: None, }).unwrap();
 
-    storage.add_edge(EdgeInput {
+    storage.add_edge(EdgeInput { 
         id: None, from: "node-2".to_string(), to: "node-3".to_string(), rel: "KNOWS".to_string(),
         props: None, valid_from: None, supersede: None, impact: None, caused_by: None,
-    }).unwrap();
+     }).unwrap();
     println!("Step 3: Done.");
 
     // 4. Regenerate meta-graph

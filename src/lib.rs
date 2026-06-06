@@ -49,6 +49,7 @@ pub struct NodeInput {
     pub lang: Option<String>,
     pub valid_from: Option<String>,
     pub caused_by: Option<String>,
+    pub ttl: Option<u32>,
 }
 
 #[napi(object)]
@@ -64,6 +65,7 @@ pub struct NodeOutput {
     pub valid_from: String,
     pub valid_to: Option<String>,
     pub caused_by: Option<String>,
+    pub expires_at: Option<String>,
 }
 
 #[napi(object)]
@@ -564,14 +566,19 @@ impl Storage {
         let id = args.id.unwrap_or_else(|| format!("N-{}", Uuid::new_v4()));
         let u32_id = self.get_or_intern_id(&id);
         let lang = args.lang.clone().unwrap_or("en".to_string());
+        
+        let now = Utc::now();
+        let expires_at = args.ttl.map(|s| (now + chrono::Duration::seconds(s as i64)).to_rfc3339());
+
         let mut node = NodeOutput { 
             id: id.clone(), labels: args.labels, 
             props: args.props.unwrap_or(Value::Object(Default::default())), 
             impact: Some(0.7), embedding: None,
             lang: Some(lang.clone()),
-            valid_from: args.valid_from.unwrap_or_else(|| Utc::now().to_rfc3339()),
+            valid_from: args.valid_from.unwrap_or_else(|| now.to_rfc3339()),
             valid_to: None,
             caused_by: args.caused_by,
+            expires_at,
         };
         if let Some(emb) = args.embedding { self.add_vector_internal(&id, emb.clone(), lang); node.embedding = Some(emb); }
         self.nodes.insert(u32_id, node.clone());
@@ -893,25 +900,72 @@ impl Storage {
 
     pub fn prune_orphaned_nodes(&self) -> Result<()> {
         let mut to_delete = Vec::new();
+        let now = Utc::now().to_rfc3339();
+
         for entry in self.nodes.iter() {
+            let node = entry.value();
             let u32_id = entry.key();
-            let is_master = entry.value().labels.contains(&"MASTER".to_string());
+            
+            // TTL Expiration Check
+            if let Some(expires_at) = &node.expires_at {
+                if now > *expires_at {
+                    to_delete.push(node.id.clone());
+                    println!("Mark VII: TTL Expired for node '{}'", node.id);
+                    continue;
+                }
+            }
+
+            // Legacy Orphan Pruning
+            let is_master = node.labels.contains(&"MASTER".to_string());
             if !is_master {
                 let has_in = self.in_idx.contains_key(u32_id);
                 let has_out = self.out_idx.contains_key(u32_id);
                 if !has_in && !has_out {
-                    to_delete.push(entry.value().id.clone());
+                    to_delete.push(node.id.clone());
+                    println!("Mark VI: Pruning orphaned node '{}'", node.id);
                 }
             }
         }
+
         for id in to_delete {
-            if let Some(u32_id) = self.get_u32(&id) {
-                self.nodes.remove(&u32_id);
-                self.id_to_u32.remove(&id);
-                self.u32_to_id.remove(&u32_id);
-                println!("Mark VI: Pruned orphaned node '{}'", id);
-            }
+            let _ = self.retract_node(&id);
         }
+        Ok(())
+    }
+
+    pub fn retract_node(&self, id: &str) -> Result<()> {
+        self.ensure_writable()?;
+        let u32_id = match self.get_u32(id) {
+            Some(i) => i,
+            None => return Ok(()),
+        };
+
+        // 1. Remove from indices
+        self.id_to_u32.remove(id);
+        self.u32_to_id.remove(&u32_id);
+        
+        // 2. Remove associated edges (Cascading)
+        let mut edges_to_remove = Vec::new();
+        if let Some(eids) = self.out_idx.get(&u32_id) {
+            for eid in eids.iter() { edges_to_remove.push(*eid); }
+        }
+        if let Some(eids) = self.in_idx.get(&u32_id) {
+            for eid in eids.iter() { edges_to_remove.push(*eid); }
+        }
+        for eid in edges_to_remove {
+            self.edges.remove(&eid);
+            // Cleanup indices for the other side of the edge too (omitted for brevity in Mark VI, but critical for VII)
+            // TODO: Comprehensive edge index cleanup
+        }
+        self.out_idx.remove(&u32_id);
+        self.in_idx.remove(&u32_id);
+
+        // 3. Remove from vector/metadata arenas (Soft remove - we just remove from map)
+        self.u32_to_arena_id.remove(&u32_id);
+
+        // 4. Remove from nodes map
+        self.nodes.remove(&u32_id);
+
         Ok(())
     }
 

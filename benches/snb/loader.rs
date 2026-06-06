@@ -37,12 +37,12 @@ pub fn load_snb_dataset(storage: &mut Storage, path: &str) {
             let mut props = serde_json::Map::new();
             props.insert("name".to_string(), serde_json::Value::String(person.name));
             props.insert("gender".to_string(), serde_json::Value::String(person.gender));
-            storage.add_node(NodeInput { 
+            storage.add_node(NodeInput {  
                 id: Some(person.id),
                 labels: vec!["Person".to_string()],
                 props: Some(serde_json::Value::Object(props)),
                 embedding: None,
-             valid_from: None, caused_by: None, }).unwrap();
+             valid_from: None, caused_by: None,  ttl: None, }).unwrap();
         }
     }
 
@@ -54,12 +54,12 @@ pub fn load_snb_dataset(storage: &mut Storage, path: &str) {
             let mut props = serde_json::Map::new();
             props.insert("content".to_string(), serde_json::Value::String(post.content));
             let mut embedding = vec![0.1; 768]; // Simplified mock embedding
-            storage.add_node(NodeInput { 
+            storage.add_node(NodeInput {  
                 id: Some(post.id),
                 labels: vec!["Post".to_string()],
                 props: Some(serde_json::Value::Object(props)),
                 embedding: Some(embedding),
-             valid_from: None, caused_by: None, }).unwrap();
+             valid_from: None, caused_by: None,  ttl: None, }).unwrap();
         }
     }
 
@@ -68,10 +68,10 @@ pub fn load_snb_dataset(storage: &mut Storage, path: &str) {
         let mut reader = ReaderBuilder::new().has_headers(true).from_reader(BufReader::new(file));
         for result in reader.deserialize() {
             let knows: KnowsCsv = result.unwrap();
-            storage.add_edge(EdgeInput { 
+            storage.add_edge(EdgeInput {  
                 id: None, from: knows.source_id, to: knows.target_id, rel: "knows".to_string(),
                 props: None, valid_from: None, supersede: None, impact: None,
-             caused_by: None, }).unwrap();
+             caused_by: None,  }).unwrap();
         }
     }
 }
