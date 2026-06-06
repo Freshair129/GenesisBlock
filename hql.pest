@@ -15,9 +15,10 @@ k = { ASCII_DIGIT+ }
 depth = { ASCII_DIGIT+ }
 alpha = { number }
 lang_spec = { ^"LANGUAGE" ~ string_lit }
+as_of = { ^"AS" ~ ^"OF" ~ string_lit }
 
-search = { ^"SEARCH" ~ target ~ ^"SIMILAR" ~ ^"TO" ~ "[" ~ vector ~ "]" ~ ^"K" ~ k ~ lang_spec? }
-traverse = { ^"TRAVERSE" ~ ^"FROM" ~ seed ~ ^"DEPTH" ~ depth ~ ^"REL" ~ rel }
-hybrid = { ^"MATCH" ~ target ~ ^"SIMILAR" ~ ^"TO" ~ "[" ~ vector ~ "]" ~ ^"ALPHA" ~ alpha ~ lang_spec? }
+search = { ^"SEARCH" ~ target ~ ^"SIMILAR" ~ ^"TO" ~ "[" ~ vector ~ "]" ~ ^"K" ~ k ~ lang_spec? ~ as_of? }
+traverse = { ^"TRAVERSE" ~ ^"FROM" ~ seed ~ ^"DEPTH" ~ depth ~ ^"REL" ~ rel ~ as_of? }
+hybrid = { ^"MATCH" ~ target ~ ^"SIMILAR" ~ ^"TO" ~ "[" ~ vector ~ "]" ~ ^"ALPHA" ~ alpha ~ lang_spec? ~ as_of? }
 
 query = { SOI ~ (search | traverse | hybrid) ~ EOI }

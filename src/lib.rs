@@ -47,6 +47,7 @@ pub struct NodeInput {
     pub props: Option<serde_json::Value>,
     pub embedding: Option<Vec<f64>>,
     pub lang: Option<String>,
+    pub valid_from: Option<String>,
 }
 
 #[napi(object)]
@@ -59,6 +60,8 @@ pub struct NodeOutput {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub embedding: Option<Vec<f64>>,
     pub lang: Option<String>,
+    pub valid_from: String,
+    pub valid_to: Option<String>,
 }
 
 #[napi(object)]
@@ -127,6 +130,7 @@ pub struct HybridSearchInput {
     pub k: u32,
     pub alpha: Option<f64>,
     pub lang: Option<String>,
+    pub as_of: Option<String>,
 }
 
 #[napi(object)]
@@ -441,6 +445,7 @@ impl Storage {
                         k: 3,
                         alpha: Some(0.4),
                         lang: node.lang.clone(),
+                        as_of: None,
                     })?;
                     
                     for neighbor in context {
@@ -548,6 +553,8 @@ impl Storage {
             props: args.props.unwrap_or(Value::Object(Default::default())), 
             impact: Some(0.7), embedding: None,
             lang: Some(lang.clone()),
+            valid_from: args.valid_from.unwrap_or_else(|| Utc::now().to_rfc3339()),
+            valid_to: None,
         };
         if let Some(emb) = args.embedding { self.add_vector_internal(&id, emb.clone(), lang); node.embedding = Some(emb); }
         self.nodes.insert(u32_id, node.clone());
@@ -579,25 +586,35 @@ impl Storage {
     pub fn execute_hql(&self, query: &str) -> Result<Vec<NeighborOutput>> {
         let command = HqlCommand::try_from(query).map_err(|e| Error::from_reason(e))?;
         match command {
-            HqlCommand::Search { vector, k, fuzzy, target, lang } => {
+            HqlCommand::Search { vector, k, fuzzy, target, lang, as_of } => {
                 let _resolved = if fuzzy { self.find_fuzzy_id(&target) } else { Some(target) };
-                self.hybrid_search(HybridSearchInput { query_vector: vector, k, alpha: Some(0.0), lang })
+                self.hybrid_search(HybridSearchInput { query_vector: vector, k, alpha: Some(0.0), lang, as_of })
             }
-            HqlCommand::Traverse { seed, depth, rel, fuzzy } => {
+            HqlCommand::Traverse { seed, depth, rel, fuzzy, as_of } => {
                 let resolved_seed = if fuzzy { self.find_fuzzy_id(&seed).unwrap_or(seed) } else { seed };
                 let (target_rel, is_inferred) = match rel {
                     query::ast::HqlRel::Physical(r) => (r, false),
                     query::ast::HqlRel::Inferred(r) => (r, true),
                 };
                 self.neighbors(resolved_seed, NeighborInput { 
-                    depth: Some(depth), rel: Some(target_rel), rels: None, direction: Some("out".to_string()), as_of: None, include_invalid: Some(false), limit: None 
+                    depth: Some(depth), rel: Some(target_rel), rels: None, direction: Some("out".to_string()), as_of, include_invalid: Some(false), limit: None 
                 }, is_inferred)
             }
-            HqlCommand::Hybrid { vector, alpha, fuzzy, target, lang } => {
+            HqlCommand::Hybrid { vector, alpha, fuzzy, target, lang, as_of } => {
                 let _resolved = if fuzzy { self.find_fuzzy_id(&target) } else { Some(target) };
-                self.hybrid_search(HybridSearchInput { query_vector: vector, k: 10, alpha: Some(alpha), lang })
+                self.hybrid_search(HybridSearchInput { query_vector: vector, k: 10, alpha: Some(alpha), lang, as_of })
             }
         }
+    }
+
+    fn is_valid_as_of(valid_from: &str, valid_to: &Option<String>, as_of: &Option<String>) -> bool {
+        if let Some(as_of_str) = as_of {
+            if valid_from > as_of_str.as_str() { return false; }
+            if let Some(to) = valid_to {
+                if as_of_str.as_str() >= to.as_str() { return false; }
+            }
+        }
+        true
     }
 
     pub fn hybrid_search(&self, args: HybridSearchInput) -> Result<Vec<NeighborOutput>> {
@@ -619,6 +636,11 @@ impl Storage {
                 if let Some(u32_id) = self.get_u32(&meta.node_id) {
                     if let Some(node) = self.nodes.get(&u32_id) {
                         let mut node_out = node.value().clone();
+                        
+                        if !Self::is_valid_as_of(&node_out.valid_from, &node_out.valid_to, &args.as_of) {
+                            continue;
+                        }
+
                         let similarity = 1.0 - neighbor.distance as f64;
                         let reasoning_score = (similarity * (1.0 - alpha)) + (node_out.impact.unwrap_or(0.0) * alpha);
                         node_out.impact = Some(reasoning_score);

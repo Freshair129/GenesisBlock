@@ -1,10 +1,10 @@
-# GENESISDB ROADMAP (MARK V -> MARK VI)
+# GENESISDB ROADMAP (MARK VI -> MARK VII)
 **Positioning:** Local Hybrid Knowledge Engine for AI Agents
 
 ## Current Status
 - **Engineering Quality:** 10/10 (Clean Code, Fully Tested, Trigram Optimized)
-- **Production Readiness:** 9/10 (WAL Group Commit, HNSW, AST HQL, Fuzzy ID)
-- **Core Architecture:** Neural Bridge, LPA Clustering, Merkle Sync, Logic-Gated Context.
+- **Production Readiness:** 10/10 (Deployed Obsidian Bridge, Collective Intelligence)
+- **Core Architecture:** Neural Bridge, LPA Clustering, Merkle Sync, Logic-Gated Context, Consensus Protocol.
 - **Verified Benchmark:** 121 TPS (Complex Ingestion) / < 30µs Latency (Query).
 
 ---
@@ -17,24 +17,29 @@
 
 ---
 
-## Phase 18: Collective Intelligence (MARK VI - IN PROGRESS)
-*The engine evolves from an intelligent retriever to a collaborative thinker.*
+## Phase 18: Collective Intelligence (MARK VI - COMPLETED)
+- [x] **Structural Insight Engine (Thinking Module):** Discover "Logical Gaps" via centroid proximity.
+- [x] **Multi-Agent Neural Consensus:** Semantic voting protocol and cryptographic signatures for Axioms.
+- [x] **Hierarchical Reasoning Tiers:** Super-Nodes and Meta-Edges representing "Themes".
+- [x] **Self-Optimizing Substrate:** Autonomic maintenance loop for pruning and re-indexing.
 
-### 1. Structural Insight Engine (Thinking Module) - [DONE]
-- **Objective:** Discover "Logical Gaps" in the knowledge graph.
-- **Implementation:** Centroid proximity analysis between authority clusters.
-- **Output:** Suggests missing connections between related but disconnected high-impact topics.
+---
 
-### 2. Multi-Agent Neural Consensus (Active Verification) - [UPCOMING]
-- **Objective:** Enable decentralized verification of "Axioms" across agents.
-- **Implementation:** Semantic voting protocol and cryptographic proposal signing.
-- **Goal:** Reach a network-wide quorum before promoting knowledge to the `MASTER` tier.
+## Phase 19: Temporal Reasoning & Event Sourcing (MARK VII - UPCOMING)
+*The engine evolves to understand time, state changes, and the historical evolution of knowledge.*
 
-### 3. Hierarchical Reasoning Tiers
-- **Objective:** Support multi-level abstraction.
-- **Implementation:** Abstracting clusters into higher-order "Super-Nodes".
-- **Goal:** Enable the engine to reason about "Themes" and "Strategies" rather than just individual notes.
+### 1. Multi-Dimensional Temporal Queries
+- **Objective:** Allow HQL to query the graph state at any specific point in time (Time-Travel Queries).
+- **Implementation:** Utilize the `valid_from` and `valid_to` bitemporal fields in the graph core.
 
-### 4. Self-Optimizing Substrate
-- **Objective:** Automated maintenance based on usage patterns.
-- **Implementation:** Background consolidation of stagnant nodes and index re-sharding.
+### 2. Causality Chains (Event Sourcing)
+- **Objective:** Understand the "Why" behind knowledge mutations.
+- **Implementation:** Link `ADR` and `SPEC` nodes directly to the specific WAL events that triggered structural changes.
+
+### 3. State-Transition Reasoning
+- **Objective:** Enable the Insight Engine to detect trends over time (e.g., "Cluster A is merging with Cluster B over the last 30 days").
+- **Implementation:** Snapshotting cluster centroids and tracking vector drift.
+
+### 4. Ephemeral Nodes & TTL (Time-To-Live)
+- **Objective:** Support short-lived knowledge atoms (e.g., current task context, daily logs) that self-prune.
+- **Implementation:** Add TTL fields to `NodeMetadata` monitored by the Autonomic Substrate.
