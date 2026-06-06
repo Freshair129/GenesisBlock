@@ -1,15 +1,16 @@
-# GENESISDB ROADMAP (MARK VI -> MARK VII)
+# GENESISDB ROADMAP (MARK VII -> MARK VIII)
 **Positioning:** Local Hybrid Knowledge Engine for AI Agents
 
 ## Current Status
 - **Engineering Quality:** 10/10 (Clean Code, Fully Tested, Trigram Optimized)
 - **Production Readiness:** 10/10 (Deployed Obsidian Bridge, Collective Intelligence)
 - **Core Architecture:** Neural Bridge, LPA Clustering, Merkle Sync, Logic-Gated Context, Consensus Protocol.
+- **Temporal Engine:** Bitemporal Querying, Event Sourcing, Vector Drift Tracking, TTL.
 - **Verified Benchmark:** 121 TPS (Complex Ingestion) / < 30µs Latency (Query).
 
 ---
 
-## Phase 17: Advanced Neural Integration (MARK V - COMPLETED)
+## MARK V: Advanced Neural Integration (COMPLETED)
 - [x] **Cross-Lingual Knowledge Mapping:** Thai-English Neural Bridge.
 - [x] **Automatic Graph Clustering:** LPA community detection for knowledge grouping.
 - [x] **Collaborative WAL Infrastructure:** Merkle-tree based state reconciliation.
@@ -17,7 +18,7 @@
 
 ---
 
-## Phase 18: Collective Intelligence (MARK VI - COMPLETED)
+## MARK VI: Collective Intelligence (COMPLETED)
 - [x] **Structural Insight Engine (Thinking Module):** Discover "Logical Gaps" via centroid proximity.
 - [x] **Multi-Agent Neural Consensus:** Semantic voting protocol and cryptographic signatures for Axioms.
 - [x] **Hierarchical Reasoning Tiers:** Super-Nodes and Meta-Edges representing "Themes".
@@ -25,21 +26,14 @@
 
 ---
 
-## Phase 19: Temporal Reasoning & Event Sourcing (MARK VII - UPCOMING)
-*The engine evolves to understand time, state changes, and the historical evolution of knowledge.*
+## MARK VII: Temporal Reasoning & Event Sourcing (COMPLETED)
+- [x] **Multi-Dimensional Temporal Queries:** HQL `AS OF` syntax for time-travel.
+- [x] **Causality Chains (Event Sourcing):** `caused_by` audit logs and immutable `supersede_node` updates.
+- [x] **State-Transition Reasoning:** Longitudinal vector drift tracking for theme evolution.
+- [x] **Ephemeral Nodes & TTL:** Self-pruning task context and short-term memory atoms.
 
-### 1. Multi-Dimensional Temporal Queries
-- **Objective:** Allow HQL to query the graph state at any specific point in time (Time-Travel Queries).
-- **Implementation:** Utilize the `valid_from` and `valid_to` bitemporal fields in the graph core.
+---
 
-### 2. Causality Chains (Event Sourcing)
-- **Objective:** Understand the "Why" behind knowledge mutations.
-- **Implementation:** Link `ADR` and `SPEC` nodes directly to the specific WAL events that triggered structural changes.
-
-### 3. State-Transition Reasoning
-- **Objective:** Enable the Insight Engine to detect trends over time (e.g., "Cluster A is merging with Cluster B over the last 30 days").
-- **Implementation:** Snapshotting cluster centroids and tracking vector drift.
-
-### 4. Ephemeral Nodes & TTL (Time-To-Live)
-- **Objective:** Support short-lived knowledge atoms (e.g., current task context, daily logs) that self-prune.
-- **Implementation:** Add TTL fields to `NodeMetadata` monitored by the Autonomic Substrate.
+## MARK VIII: Real-time Collaborative Synchronization (UPCOMING)
+- **Objective:** Enable multi-user/agent collaborative graph editing via Merkle-based sync.
+- **Implementation:** CRDT integration for concurrent edits and p2p gossip protocol.
