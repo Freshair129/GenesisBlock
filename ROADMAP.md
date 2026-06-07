@@ -1,7 +1,8 @@
 # GENESISDB ROADMAP (MARK VII -> MARK VIII)
 **Positioning:** Local Hybrid Knowledge Engine for AI Agents
+**Master Specification:** [MASTER-SPEC--GENESIS-DB.md](docs/MASTER-SPEC--GENESIS-DB.md)
 
-## Current Status
+## Current Status...
 - **Engineering Quality:** 10/10 (Clean Code, Fully Tested, Trigram Optimized)
 - **Production Readiness:** 10/10 (Deployed Obsidian Bridge, Collective Intelligence)
 - **Core Architecture:** Neural Bridge, LPA Clustering, Merkle Sync, Logic-Gated Context, Consensus Protocol.
