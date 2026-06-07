@@ -46,7 +46,8 @@ async fn test_temporal_time_travel() {
     // --- TIME TRAVEL QUERY 1: AS OF 2024 ---
     // Should see Concept A and Concept B connected.
     let hql_2024 = "TRAVERSE FROM \"Concept-A\" DEPTH 1 REL ANY AS OF \"2024-06-01T00:00:00Z\"";
-    let results_2024 = db.execute_hql(hql_2024.to_string()).await.unwrap();
+    let res_2024 = db.execute_hql(hql_2024.to_string()).await.unwrap();
+    let results_2024: Vec<genesis_block_native::NeighborOutput> = serde_json::from_value(res_2024).unwrap();
     assert_eq!(results_2024.len(), 1, "Should find 1 neighbor in 2024");
     assert_eq!(results_2024[0].node.id, "Concept-B");
 
@@ -74,14 +75,16 @@ async fn test_temporal_time_travel() {
     // --- TIME TRAVEL QUERY 2: AS OF 2025 ---
     // Concept-C did not exist yet! Traversal from Concept-A should ONLY yield Concept-B.
     let hql_2025 = "TRAVERSE FROM \"Concept-A\" DEPTH 1 REL ANY AS OF \"2025-01-01T00:00:00Z\"";
-    let results_2025 = db.execute_hql(hql_2025.to_string()).await.unwrap();
+    let res_2025 = db.execute_hql(hql_2025.to_string()).await.unwrap();
+    let results_2025: Vec<genesis_block_native::NeighborOutput> = serde_json::from_value(res_2025).unwrap();
     assert_eq!(results_2025.len(), 1, "Should still only find Concept-B in 2025");
     assert_eq!(results_2025[0].node.id, "Concept-B");
 
     // --- PRESENT DAY QUERY: AS OF 2027 ---
     // Should see BOTH Concept-B and Concept-C
     let hql_2027 = "TRAVERSE FROM \"Concept-A\" DEPTH 1 REL ANY AS OF \"2027-01-01T00:00:00Z\"";
-    let results_2027 = db.execute_hql(hql_2027.to_string()).await.unwrap();
+    let res_2027 = db.execute_hql(hql_2027.to_string()).await.unwrap();
+    let results_2027: Vec<genesis_block_native::NeighborOutput> = serde_json::from_value(res_2027).unwrap();
     assert_eq!(results_2027.len(), 2, "Should find both B and C in 2027");
 
     let _ = std::fs::remove_dir_all(&opts.path);

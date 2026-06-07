@@ -108,6 +108,51 @@ pub struct EdgeOutput {
     pub clock: LogicalClock,
 }
 
+#[napi]
+#[derive(PartialEq, Eq, PartialOrd, Ord)]
+pub enum ScalingTier {
+    H0 = 0,
+    H1 = 1,
+    H2 = 2,
+    H3 = 3,
+    H4 = 4,
+    H5 = 5,
+}
+
+impl ScalingTier {
+    pub fn from_str(s: &str) -> Self {
+        match s.to_uppercase().as_str() {
+            "H0" => ScalingTier::H0,
+            "H1" => ScalingTier::H1,
+            "H2" => ScalingTier::H2,
+            "H3" => ScalingTier::H3,
+            "H4" => ScalingTier::H4,
+            "H5" => ScalingTier::H5,
+            _ => ScalingTier::H1,
+        }
+    }
+    pub fn hops(&self) -> u32 {
+        match self {
+            ScalingTier::H0 => 0,
+            ScalingTier::H1 => 1,
+            ScalingTier::H2 => 2,
+            ScalingTier::H3 => 3,
+            ScalingTier::H4 => 4,
+            ScalingTier::H5 => 5,
+        }
+    }
+}
+
+#[napi(object)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct ContextPackage {
+    pub nodes: Vec<NodeOutput>,
+    pub edges: Vec<EdgeOutput>,
+    pub super_nodes: Vec<SuperNode>,
+    pub token_estimate: u32,
+    pub reasoning_path: String,
+}
+
 #[napi(object)]
 #[derive(Serialize, Deserialize, Debug)]
 pub struct QueryInput {
@@ -481,7 +526,6 @@ impl Storage {
 
         // 2. Lexical Fuzzy (Thai-aware Trigrams)
         let mut candidates = HashSet::new();
-        let id_lower = id.to_lowercase();
         let tokens = Self::tokenize_id(id);
         
         for trigram in tokens {
@@ -706,12 +750,13 @@ impl Storage {
         result
     }
 
-    pub fn execute_hql(&self, query: &str) -> Result<Vec<NeighborOutput>> {
+    pub fn execute_hql(&self, query: &str) -> Result<serde_json::Value> {
         let command = HqlCommand::try_from(query).map_err(|e| Error::from_reason(e))?;
         match command {
             HqlCommand::Search { vector, k, fuzzy, target, lang, as_of } => {
                 let _resolved = if fuzzy { self.find_fuzzy_id(&target) } else { Some(target) };
-                self.hybrid_search(HybridSearchInput { query_vector: vector, k, alpha: Some(0.0), lang, as_of })
+                let res = self.hybrid_search(HybridSearchInput { query_vector: vector, k, alpha: Some(0.0), lang, as_of })?;
+                Ok(serde_json::to_value(res).unwrap())
             }
             HqlCommand::Traverse { seed, depth, rel, fuzzy, as_of } => {
                 let resolved_seed = if fuzzy { self.find_fuzzy_id(&seed).unwrap_or(seed) } else { seed };
@@ -719,13 +764,19 @@ impl Storage {
                     query::ast::HqlRel::Physical(r) => (r, false),
                     query::ast::HqlRel::Inferred(r) => (r, true),
                 };
-                self.neighbors(resolved_seed, NeighborInput { 
+                let res = self.neighbors(resolved_seed, NeighborInput { 
                     depth: Some(depth), rel: Some(target_rel), rels: None, direction: Some("out".to_string()), as_of, include_invalid: Some(false), limit: None 
-                }, is_inferred)
+                }, is_inferred)?;
+                Ok(serde_json::to_value(res).unwrap())
             }
             HqlCommand::Hybrid { vector, alpha, fuzzy, target, lang, as_of } => {
                 let _resolved = if fuzzy { self.find_fuzzy_id(&target) } else { Some(target) };
-                self.hybrid_search(HybridSearchInput { query_vector: vector, k: 10, alpha: Some(alpha), lang, as_of })
+                let res = self.hybrid_search(HybridSearchInput { query_vector: vector, k: 10, alpha: Some(alpha), lang, as_of })?;
+                Ok(serde_json::to_value(res).unwrap())
+            }
+            HqlCommand::Context { target, tier, budget, fuzzy } => {
+                let res = self.retrieve_context(&target, &tier, budget, fuzzy)?;
+                Ok(serde_json::to_value(res).unwrap())
             }
         }
     }
@@ -1104,6 +1155,92 @@ impl Storage {
         self.logical_clock.load(Ordering::SeqCst)
     }
 
+    pub fn retrieve_context(&self, target_id: &str, tier_str: &str, budget: Option<u32>, fuzzy: bool) -> Result<ContextPackage> {
+        let tier = ScalingTier::from_str(tier_str);
+        let hops = tier.hops();
+        let target_id_resolved = if fuzzy { self.find_fuzzy_id(target_id).unwrap_or(target_id.to_string()) } else { target_id.to_string() };
+        
+        // 1. Graph Expansion (BFS)
+        let mut nodes = HashMap::new();
+        let mut edges = Vec::new();
+        let mut queue = VecDeque::new();
+        
+        if let Some(u32_id) = self.get_u32(&target_id_resolved) {
+            queue.push_back((u32_id, 0));
+            if let Some(node) = self.nodes.get(&u32_id) {
+                nodes.insert(u32_id, node.value().clone());
+            }
+        }
+
+        let mut visited = HashSet::new();
+        while let Some((curr_u32, curr_depth)) = queue.pop_front() {
+            if curr_depth >= hops || visited.contains(&curr_u32) { continue; }
+            visited.insert(curr_u32);
+
+            if let Some(eids) = self.out_idx.get(&curr_u32) {
+                for eid in eids.iter() {
+                    if let Some(edge_ref) = self.edges.get(eid) {
+                        let edge = edge_ref.value();
+                        edges.push(edge.clone());
+                        if let Some(next_u32) = self.get_u32(&edge.to) {
+                            if !nodes.contains_key(&next_u32) {
+                                if let Some(node) = self.nodes.get(&next_u32) {
+                                    nodes.insert(next_u32, node.value().clone());
+                                    queue.push_back((next_u32, curr_depth + 1));
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            // Also back-links for context
+            if let Some(eids) = self.in_idx.get(&curr_u32) {
+                for eid in eids.iter() {
+                    if let Some(edge_ref) = self.edges.get(eid) {
+                        let edge = edge_ref.value();
+                        edges.push(edge.clone());
+                        if let Some(prev_u32) = self.get_u32(&edge.from) {
+                            if !nodes.contains_key(&prev_u32) {
+                                if let Some(node) = self.nodes.get(&prev_u32) {
+                                    nodes.insert(prev_u32, node.value().clone());
+                                    queue.push_back((prev_u32, curr_depth + 1));
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // 2. Ranking & Budget Check
+        let node_list: Vec<NodeOutput> = nodes.into_values().collect();
+        let total_chars: usize = node_list.iter().map(|n| n.props.to_string().len()).sum();
+        let token_estimate = (total_chars / 4) as u32;
+
+        let mut super_nodes = Vec::new();
+        let mut final_nodes = node_list;
+
+        if let Some(b) = budget {
+            if token_estimate > b {
+                // Compression: Switch to SuperNodes for high-level context
+                println!("GRL: Budget exceeded ({} > {}). Compressing to SuperNodes.", token_estimate, b);
+                for entry in self.meta_nodes.iter() {
+                    super_nodes.push(entry.value().clone());
+                }
+                final_nodes.clear(); // Prune atoms
+                edges.clear();
+            }
+        }
+
+        Ok(ContextPackage {
+            nodes: final_nodes,
+            edges,
+            super_nodes,
+            token_estimate,
+            reasoning_path: format!("Resolved {} as of Tier {} ({} hops)", target_id_resolved, tier_str, hops),
+        })
+    }
+
     pub fn set_language_centroid(&self, lang: String, vector: Vec<f64>) {
         let v_f32: Vec<f32> = vector.into_iter().map(|v| v as f32).collect();
         self.lang_centroids.insert(lang, v_f32);
@@ -1205,8 +1342,15 @@ impl GenesisDatabase {
     #[napi] pub async fn add_edge(&self, args: EdgeInput) -> Result<EdgeOutput> { let i = Arc::clone(&self.inner); tokio::task::spawn_blocking(move || i.add_edge(args)).await.map_err(|e| Error::from_reason(e.to_string()))? }
     #[napi] pub async fn supersede_node(&self, id: String, new_props: Option<serde_json::Value>, caused_by: Option<String>) -> Result<NodeOutput> { let i = Arc::clone(&self.inner); tokio::task::spawn_blocking(move || i.supersede_node(id, new_props, caused_by)).await.map_err(|e| Error::from_reason(e.to_string()))? }
     #[napi] pub async fn retract_edge(&self, id: String, at: Option<String>) -> Result<Option<EdgeOutput>> { let i = Arc::clone(&self.inner); tokio::task::spawn_blocking(move || i.retract_edge(id, at)).await.map_err(|e| Error::from_reason(e.to_string()))? }
-    #[napi] pub async fn query(&self, args: QueryInput) -> Result<Vec<EdgeOutput>> { let i = Arc::clone(&self.inner); tokio::task::spawn_blocking(move || i.query(args)).await.map_err(|e| Error::from_reason(e.to_string()))? }
-    #[napi] pub async fn execute_hql(&self, query: String) -> Result<Vec<NeighborOutput>> { let i = Arc::clone(&self.inner); tokio::task::spawn_blocking(move || i.execute_hql(&query)).await.map_err(|e| Error::from_reason(e.to_string()))? }
+    #[napi] pub async fn retrieve_context(&self, target_id: String, tier: String, budget: Option<u32>, fuzzy: bool) -> Result<ContextPackage> {
+        let i = Arc::clone(&self.inner);
+        tokio::task::spawn_blocking(move || i.retrieve_context(&target_id, &tier, budget, fuzzy)).await.map_err(|e| Error::from_reason(e.to_string()))?
+    }
+    #[napi] pub async fn execute_hql(&self, query: String) -> Result<Value> { 
+        let i = Arc::clone(&self.inner); 
+        let res = tokio::task::spawn_blocking(move || i.execute_hql(&query)).await.map_err(|e| Error::from_reason(e.to_string()))??;
+        Ok(serde_json::to_value(res).map_err(|e| Error::from_reason(e.to_string()))?)
+    }
     #[napi] pub async fn hybrid_search(&self, args: HybridSearchInput) -> Result<Vec<NeighborOutput>> { let i = Arc::clone(&self.inner); tokio::task::spawn_blocking(move || i.hybrid_search(args)).await.map_err(|e| Error::from_reason(e.to_string()))? }
     #[napi] pub async fn neighbors(&self, seed: String, args: NeighborInput) -> Result<Vec<NeighborOutput>> { let i = Arc::clone(&self.inner); tokio::task::spawn_blocking(move || i.neighbors(seed, args, false)).await.map_err(|e| Error::from_reason(e.to_string()))? }
     #[napi] pub async fn compact(&self) -> Result<()> { let i = Arc::clone(&self.inner); tokio::task::spawn_blocking(move || i.compact()).await.map_err(|e| Error::from_reason(e.to_string()))? }

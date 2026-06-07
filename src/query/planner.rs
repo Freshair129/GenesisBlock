@@ -5,6 +5,7 @@ pub enum PlanStep {
     VectorSearch { vector: Vec<f32>, k: usize },
     GraphTraversal { seed: String, depth: u32, rel: HqlRel, fuzzy: bool },
     ApplyKImpact { alpha: f64 },
+    ContextRetrieval { target: String, tier: String, budget: Option<u32>, fuzzy: bool },
 }
 
 pub struct QueryPlan {
@@ -32,6 +33,9 @@ impl LogicalPlanner {
                     k: 10 
                 });
                 steps.push(PlanStep::ApplyKImpact { alpha });
+            }
+            HqlCommand::Context { target, tier, budget, fuzzy } => {
+                steps.push(PlanStep::ContextRetrieval { target, tier, budget, fuzzy });
             }
         }
         QueryPlan { steps }

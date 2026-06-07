@@ -37,6 +37,12 @@ pub enum HqlCommand {
         lang: Option<String>,
         as_of: Option<String>,
     },
+    Context {
+        target: String,
+        tier: String,
+        budget: Option<u32>,
+        fuzzy: bool,
+    },
 }
 
 impl TryFrom<&str> for HqlCommand {
@@ -54,6 +60,7 @@ impl TryFrom<&str> for HqlCommand {
                             Rule::search => return Ok(Self::parse_search(inner_pair)),
                             Rule::traverse => return Ok(Self::parse_traverse(inner_pair)),
                             Rule::hybrid => return Ok(Self::parse_hybrid(inner_pair)),
+                            Rule::context => return Ok(Self::parse_context(inner_pair)),
                             Rule::EOI => continue,
                             _ => unreachable!("Unexpected rule in query: {:?}", inner_pair.as_rule()),
                         }
@@ -199,5 +206,27 @@ impl HqlCommand {
         }
 
         HqlCommand::Hybrid { target, vector, alpha, fuzzy, lang, as_of }
+    }
+
+    fn parse_context(pair: pest::iterators::Pair<Rule>) -> Self {
+        let mut target = String::new();
+        let mut tier = "H1".to_string();
+        let mut budget = None;
+        let mut fuzzy = false;
+
+        for inner in pair.into_inner() {
+            match inner.as_rule() {
+                Rule::target => {
+                    let (id, f) = Self::parse_id_with_fuzzy(inner);
+                    target = id;
+                    fuzzy = f;
+                }
+                Rule::tier => tier = inner.as_str().to_string(),
+                Rule::budget => budget = Some(inner.as_str().parse::<u32>().unwrap_or(32000)),
+                _ => {}
+            }
+        }
+
+        HqlCommand::Context { target, tier, budget, fuzzy }
     }
 }

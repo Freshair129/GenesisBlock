@@ -51,7 +51,8 @@ fn test_edge_creation_and_graph_traversal() {
         impact: None,
      caused_by: None,  }).unwrap();
 
-    let neighbors = storage.execute_hql("TRAVERSE FROM A DEPTH 1 REL knows").unwrap();
+    let res = storage.execute_hql("TRAVERSE FROM A DEPTH 1 REL knows").unwrap();
+    let neighbors: Vec<genesis_block_native::NeighborOutput> = serde_json::from_value(res).unwrap();
     assert_eq!(neighbors.len(), 1);
     assert_eq!(neighbors[0].node.id, "B");
 }
@@ -76,7 +77,8 @@ fn test_vector_arena_and_hybrid_search() {
     
     storage.rebuild_index_parallel().unwrap();
 
-    let results = storage.execute_hql("SEARCH Node SIMILAR TO [0.9, 0.1, 0.0] K 1").unwrap();
+    let res = storage.execute_hql("SEARCH Node SIMILAR TO [0.9, 0.1, 0.0] K 1").unwrap();
+    let results: Vec<genesis_block_native::NeighborOutput> = serde_json::from_value(res).unwrap();
     assert_eq!(results.len(), 1);
     assert_eq!(results[0].node.id, "v1");
 }

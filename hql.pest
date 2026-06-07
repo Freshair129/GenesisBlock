@@ -21,4 +21,8 @@ search = { ^"SEARCH" ~ target ~ ^"SIMILAR" ~ ^"TO" ~ "[" ~ vector ~ "]" ~ ^"K" ~
 traverse = { ^"TRAVERSE" ~ ^"FROM" ~ seed ~ ^"DEPTH" ~ depth ~ ^"REL" ~ rel ~ as_of? }
 hybrid = { ^"MATCH" ~ target ~ ^"SIMILAR" ~ ^"TO" ~ "[" ~ vector ~ "]" ~ ^"ALPHA" ~ alpha ~ lang_spec? ~ as_of? }
 
-query = { SOI ~ (search | traverse | hybrid) ~ EOI }
+budget = { ASCII_DIGIT+ }
+tier = { "H0" | "H1" | "H2" | "H3" | "H4" | "H5" }
+context = { ^"CONTEXT" ~ ^"FOR" ~ target ~ ^"TIER" ~ tier ~ (^"BUDGET" ~ budget)? }
+
+query = { SOI ~ (search | traverse | hybrid | context) ~ EOI }
