@@ -2,28 +2,13 @@
 **Positioning:** Local Hybrid Knowledge Engine for AI Agents
 **Master Specification:** [MASTER-SPEC--GENESIS-DB.md](docs/MASTER-SPEC--GENESIS-DB.md)
 
-## Current Status...
+## Current Status
 - **Engineering Quality:** 10/10 (Clean Code, Fully Tested, Trigram Optimized)
 - **Production Readiness:** 10/10 (Deployed Obsidian Bridge, Collective Intelligence)
 - **Core Architecture:** Neural Bridge, LPA Clustering, Merkle Sync, Logic-Gated Context, Consensus Protocol.
 - **Temporal Engine:** Bitemporal Querying, Event Sourcing, Vector Drift Tracking, TTL.
+- **Cognitive Layer:** Graph Retrieval Layer (GRL) with H0-H5 Scaling Protocol.
 - **Verified Benchmark:** 121 TPS (Complex Ingestion) / < 30µs Latency (Query).
-
----
-
-## MARK V: Advanced Neural Integration (COMPLETED)
-- [x] **Cross-Lingual Knowledge Mapping:** Thai-English Neural Bridge.
-- [x] **Automatic Graph Clustering:** LPA community detection for knowledge grouping.
-- [x] **Collaborative WAL Infrastructure:** Merkle-tree based state reconciliation.
-- [x] **Logic-Gated Context Windows:** Reasoning Score ($R$) for prioritized context delivery.
-
----
-
-## MARK VI: Collective Intelligence (COMPLETED)
-- [x] **Structural Insight Engine (Thinking Module):** Discover "Logical Gaps" via centroid proximity.
-- [x] **Multi-Agent Neural Consensus:** Semantic voting protocol and cryptographic signatures for Axioms.
-- [x] **Hierarchical Reasoning Tiers:** Super-Nodes and Meta-Edges representing "Themes".
-- [x] **Self-Optimizing Substrate:** Autonomic maintenance loop for pruning and re-indexing.
 
 ---
 
@@ -35,6 +20,14 @@
 
 ---
 
-## MARK VIII: Real-time Collaborative Synchronization (UPCOMING)
-- **Objective:** Enable multi-user/agent collaborative graph editing via Merkle-based sync.
-- **Implementation:** CRDT integration for concurrent edits and p2p gossip protocol.
+## MARK VIII: Distributed Intelligence (Current)
+- [x] **Step 1: CRDT Foundation:** Logical Clocks (Lamport) and `reconcile_state` for eventual consistency.
+- [x] **Step 1.5: Thai Fuzzy Hardening:** Thai-aware character-level indexing and typo-tolerant thresholds.
+- [x] **Step 2: Graph Retrieval Layer (GRL):** Implementation of the H0-H5 Context Scaling Tier and HQL `CONTEXT` command.
+- [ ] **Step 3: P2P Gossip Protocol:** Peer discovery and decentralized state synchronization across agent swarms.
+
+---
+
+## MARK IX: System Hardening & Persistence (Upcoming)
+- **Objective:** Production-grade reliability and instant-load indices.
+- **Implementation:** HNSW Index Serialization (.bin), Incremental Index Compaction, and Transactional Batching.

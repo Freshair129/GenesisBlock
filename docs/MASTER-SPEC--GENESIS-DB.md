@@ -20,6 +20,12 @@ GenesisDB bridges lexical and semantic search via a dual-indexing strategy:
 2.  **Vector Index (HNSW):** Hierarchical Navigable Small Worlds index for high-dimensional vector proximity search.
 3.  **Neural Bridge:** Multi-lingual support via language centroids and mean-centering, allowing English queries to match Thai contexts.
 
+### 2.3 Graph Retrieval Layer (GRL)
+The GRL implements the **Context Scaling Tier (H0-H5)** protocol to govern agent context acquisition:
+- **Resolver:** Maps tiers (H0=Self, H1=Neighbors, H2=Feature, H3=Module, H4=Arch, H5=System) to graph hops.
+- **Budget Manager:** Estimates token usage and automatically compresses results to **SuperNodes** if the agent's `BUDGET` is exceeded.
+- **Orchestrator:** Combines vector anchors with tiered graph expansion in a single reasoning pipeline.
+
 ## 3. Data Model & Bitemporality
 
 ### 3.1 Node Schema
