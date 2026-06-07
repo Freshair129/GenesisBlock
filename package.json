@@ -23,10 +23,12 @@
     "build:debug": "napi build --platform",
     "prepublishOnly": "napi prepublish -t npm",
     "test": "node --test __test__",
-    "install": "npm run build"
+    "install": "npm run build",
+    "mcp:start": "node mcp/server.js"
   },
-  "devDependencies": {},
   "dependencies": {
-    "@napi-rs/cli": "^2.18.0"
+    "@modelcontextprotocol/sdk": "^1.29.0",
+    "@napi-rs/cli": "^2.18.0",
+    "zod": "^4.4.3"
   }
 }

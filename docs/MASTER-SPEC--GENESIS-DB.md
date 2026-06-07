@@ -103,7 +103,12 @@ MATCH target SIMILAR TO [...] ALPHA 0.4 LANGUAGE "en"
 ```
 
 ## 8. Deployment & Connectivity
-- **Rust Core:** Compiled to native binary or CDYLIB.
-- **NAPI-RS:** Exposes asynchronous bindings for Node.js/TypeScript.
-- **Axum REST Server:** Provides a standalone `/v1/` API for remote agent interaction.
-- **Obsidian Bridge:** Integration with the Obsidian "Shadow Sync" plugin for human visualization.
+### 8.2 Model Context Protocol (MCP)
+GenesisBlock provides a native MCP server for seamless integration with LLMs.
+- **Transport:** Stdio (Local) and SSE (Swarm).
+- **Tools Exposed:**
+    - `query_hql`: Direct execution of hybrid queries.
+    - `retrieve_tiered_context`: Access to the GRL scaling protocol (H0-H5).
+    - `add_knowledge`: Dynamic knowledge injection with provenance.
+- **Usage:** Run `npm run mcp:start` and configure the client with the resulting stdio stream.
+

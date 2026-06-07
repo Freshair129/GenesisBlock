@@ -1,4 +1,4 @@
-# GENESISDB ROADMAP (MARK IX -> MARK X)
+# GENESISDB ROADMAP (MARK X -> MARK XI)
 **Positioning:** Local Hybrid Knowledge Engine for AI Agents
 **Master Specification:** [MASTER-SPEC--GENESIS-DB.md](docs/MASTER-SPEC--GENESIS-DB.md)
 
@@ -35,12 +35,14 @@
 
 ---
 
-## MARK X: Swarm Hardening & Cryptographic Identity (Current)
-- **Objective:** Secure the multi-agent swarm and enforce axiomatic governance via signatures.
-- **Implementation:** ed25519 Peer Identities, Signed Mutations, and Quorum Verification for MASTER tier.
+## MARK X: Swarm Hardening & Cryptographic Identity [COMPLETED]
+- [x] **Step 1: ed25519 Peer Identities:** Automated keypair generation and PeerID mapping.
+- [x] **Step 2: Signed Mutations:** Digital signatures for every event (WAL & Gossip).
+- [x] **Step 3: Quorum-based Governance:** Multi-signature approval for MASTER tier axioms.
 
 ---
 
-## MARK XI: Enterprise Integration & Tooling (Upcoming)
-- **Objective:** Seamless integration with standard AI frameworks and host environments.
-- **Implementation:** MCP (Model Context Protocol) Server, Python/Go Bindings, and Real-time Visualization Dashboard.
+## MARK XI: Enterprise Integration & Tooling (Current)
+- [x] **Step 1: MCP Server:** Model Context Protocol implementation for LLM native tool integration. [Guide](docs/MCP-GUIDE.md)
+- [ ] **Step 2: External Bindings:** Develop official Python and Go clients.
+- [ ] **Step 3: GKS Insight Dashboard:** Real-time visualization of swarm health and knowledge drift.

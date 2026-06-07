@@ -7,6 +7,7 @@ export interface OpenOptions {
   path: string
   pageCacheMb?: number
   readOnly?: boolean
+  vectorDim?: number
 }
 export interface NodeInput {
   id?: string
@@ -14,6 +15,13 @@ export interface NodeInput {
   props?: any
   embedding?: Array<number>
   lang?: string
+  validFrom?: string
+  causedBy?: string
+  ttl?: number
+}
+export interface LogicalClock {
+  time: number
+  peerId: string
 }
 export interface NodeOutput {
   id: string
@@ -22,6 +30,11 @@ export interface NodeOutput {
   impact?: number
   embedding?: Array<number>
   lang?: string
+  validFrom: string
+  validTo?: string
+  causedBy?: string
+  expiresAt?: string
+  clock: LogicalClock
 }
 export interface EdgeInput {
   id?: string
@@ -32,6 +45,7 @@ export interface EdgeInput {
   validFrom?: string
   supersede?: boolean
   impact?: number
+  causedBy?: string
 }
 export interface EdgeOutput {
   id: string
@@ -44,6 +58,23 @@ export interface EdgeOutput {
   recordedAt: string
   supersededBy?: string
   impact?: number
+  causedBy?: string
+  clock: LogicalClock
+}
+export const enum ScalingTier {
+  H0 = 0,
+  H1 = 1,
+  H2 = 2,
+  H3 = 3,
+  H4 = 4,
+  H5 = 5
+}
+export interface ContextPackage {
+  nodes: Array<NodeOutput>
+  edges: Array<EdgeOutput>
+  superNodes: Array<SuperNode>
+  tokenEstimate: number
+  reasoningPath: string
 }
 export interface QueryInput {
   from?: string
@@ -72,6 +103,7 @@ export interface HybridSearchInput {
   k: number
   alpha?: number
   lang?: string
+  asOf?: string
 }
 export interface DatabaseStatus {
   open: boolean
@@ -81,7 +113,36 @@ export interface DatabaseStatus {
 export interface SyncPeer {
   id: string
   addr: string
-  publicKey?: Array<number>
+  lastSeen: number
+  verifyingKey: Array<number>
+}
+export interface BatchInput {
+  nodes: Array<NodeInput>
+  edges: Array<EdgeInput>
+}
+export interface BatchOutput {
+  nodes: Array<NodeOutput>
+  edges: Array<EdgeOutput>
+}
+export interface SuperNode {
+  clusterId: number
+  theme: string
+  memberCount: number
+  impact: number
+  centroid: Array<number>
+  timestamp: string
+  drift?: number
+}
+export interface MetaEdge {
+  fromCluster: number
+  toCluster: number
+  weight: number
+}
+export interface GapSuggestion {
+  clusterA: number
+  clusterB: number
+  similarity: number
+  reason: string
 }
 export declare function engineNameSync(): string
 export declare function schemaVersionSync(): number
@@ -92,14 +153,25 @@ export declare class GenesisDatabase {
   rebuildIndexParallel(): Promise<void>
   addNode(args: NodeInput): Promise<NodeOutput>
   addEdge(args: EdgeInput): Promise<EdgeOutput>
+  supersedeNode(id: string, newProps?: any | undefined | null, causedBy?: string | undefined | null): Promise<NodeOutput>
   retractEdge(id: string, at?: string | undefined | null): Promise<EdgeOutput | null>
-  query(args: QueryInput): Promise<Array<EdgeOutput>>
-  executeHql(query: string): Promise<Array<NeighborOutput>>
+  retrieveContext(targetId: string, tier: string, budget: number | undefined | null, fuzzy: boolean): Promise<ContextPackage>
+  executeHql(query: string): Promise<any>
   hybridSearch(args: HybridSearchInput): Promise<Array<NeighborOutput>>
   neighbors(seed: string, args: NeighborInput): Promise<Array<NeighborOutput>>
+  saveState(): Promise<void>
   compact(): Promise<void>
   setLanguageCentroid(lang: string, vector: Array<number>): void
   detectCommunities(): Promise<void>
+  calculateStructuralGaps(): Promise<Array<GapSuggestion>>
+  generateMetaGraph(): Promise<void>
+  getMetaHistory(clusterId: number): Promise<Array<SuperNode>>
+  reconcileState(eventsJson: string): Promise<void>
+  semanticVerify(eventJson: string): Promise<boolean>
+  proposeConsensus(eventJson: string, signature: Array<number>): Promise<string>
+  submitVote(proposalId: string, peerId: string, approve: boolean): Promise<boolean>
+  getLocalPeerId(): string
+  getLogicalClock(): number
   getMerkleRoot(): string
   schemaVersionSync(): number
   statusSync(): DatabaseStatus
