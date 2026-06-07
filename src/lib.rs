@@ -234,12 +234,27 @@ pub enum SyncEvent {
     RequestFragment(String),
 }
 
+#[napi(object)]
+#[derive(Serialize, Deserialize, Debug)]
+pub struct BatchInput {
+    pub nodes: Vec<NodeInput>,
+    pub edges: Vec<EdgeInput>,
+}
+
+#[napi(object)]
+#[derive(Serialize, Deserialize, Debug)]
+pub struct BatchOutput {
+    pub nodes: Vec<NodeOutput>,
+    pub edges: Vec<EdgeOutput>,
+}
+
 // --- Internal Storage ---
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub enum Event {
     Node(NodeOutput),
     Edge(EdgeOutput),
+    Batch(Vec<Event>),
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -511,7 +526,27 @@ impl Storage {
                                         storage.index_edge_internal(&e.id, &e.from, &e.to);
                                         storage.edges.insert(u32_id, e);
                                     }
-                                }
+                                    Event::Batch(events) => {
+                                        for batch_event in events {
+                                            match batch_event {
+                                                Event::Node(n) => {
+                                                    let u32_id = storage.get_or_intern_id(&n.id);
+                                                    if let Some(emb) = n.embedding.clone() { 
+                                                        storage.add_vector_internal(&n.id, emb, n.lang.clone().unwrap_or("en".to_string())); 
+                                                    }
+                                                    storage.nodes.insert(u32_id, n);
+                                                }
+                                                Event::Edge(e) => {
+                                                    let u32_id = storage.get_or_intern_id(&e.id);
+                                                    storage.index_edge_internal(&e.id, &e.from, &e.to);
+                                                    storage.edges.insert(u32_id, e);
+                                                }
+                                                _ => {}
+                                            }
+                                        }
+                                    }
+                                    }
+
                             }
                         }
                     }
@@ -602,6 +637,12 @@ impl Storage {
                 Ok(true)
             }
             Event::Edge(_) => Ok(true),
+            Event::Batch(events) => {
+                for e in events {
+                    if !self.semantic_verify(e)? { return Ok(false); }
+                }
+                Ok(true)
+            }
         }
     }
 
@@ -635,6 +676,23 @@ impl Storage {
                         let u32_id = self.get_or_intern_id(&e.id);
                         self.edges.insert(u32_id, e.clone());
                         self.persist(&Event::Edge(e))?;
+                    }
+                    Event::Batch(events) => {
+                        for e in events {
+                            match e {
+                                Event::Node(mut n) => {
+                                    if !n.labels.contains(&"MASTER".to_string()) { n.labels.push("MASTER".to_string()); }
+                                    let u32_id = self.get_or_intern_id(&n.id);
+                                    self.nodes.insert(u32_id, n.clone());
+                                }
+                                Event::Edge(edge) => {
+                                    let u32_id = self.get_or_intern_id(&edge.id);
+                                    self.edges.insert(u32_id, edge.clone());
+                                }
+                                _ => {}
+                            }
+                        }
+                        self.persist(&proposal_ref.value().event.clone())?;
                     }
                 }
                 return Ok(true);
@@ -1181,6 +1239,9 @@ impl Storage {
                         self.persist(&Event::Edge(remote_edge))?;
                     }
                 }
+                Event::Batch(inner_events) => {
+                    let _ = self.reconcile_state(inner_events);
+                }
             }
         }
         Ok(())
@@ -1483,6 +1544,78 @@ impl Storage {
 
         println!("Mark IX: Instant load complete in {:?}", start.elapsed());
         true
+    }
+
+    pub fn execute_batch(&self, input: BatchInput) -> Result<BatchOutput> {
+        self.ensure_writable()?;
+        
+        // 1. Validation Phase (All-or-Nothing)
+        for node in &input.nodes {
+            self.validate_governance(&node.labels, false)?;
+        }
+
+        let mut output_nodes = Vec::with_capacity(input.nodes.len());
+        let mut output_edges = Vec::with_capacity(input.edges.len());
+        let mut events = Vec::with_capacity(input.nodes.len() + input.edges.len());
+
+        // 2. Processing Phase (In-Memory Prep)
+        let now = Utc::now();
+        
+        for args in input.nodes {
+            let id = args.id.unwrap_or_else(|| format!("N-{}", Uuid::new_v4()));
+            let lang = args.lang.unwrap_or("en".to_string());
+            let expires_at = args.ttl.map(|s| (now + chrono::Duration::seconds(s as i64)).to_rfc3339());
+            
+            let node = NodeOutput {
+                id: id.clone(), labels: args.labels,
+                props: args.props.unwrap_or(Value::Object(Default::default())),
+                impact: Some(0.7), embedding: args.embedding.clone(),
+                lang: Some(lang.clone()),
+                valid_from: args.valid_from.unwrap_or_else(|| now.to_rfc3339()),
+                valid_to: None, caused_by: args.caused_by, expires_at,
+                clock: self.next_clock(),
+            };
+            
+            events.push(Event::Node(node.clone()));
+            output_nodes.push(node);
+        }
+
+        for args in input.edges {
+            let edge = EdgeOutput {
+                id: args.id.unwrap_or_else(|| Uuid::new_v4().to_string()), 
+                from: args.from, to: args.to, rel: args.rel,
+                props: args.props.unwrap_or(Value::Object(Default::default())), 
+                valid_from: Utc::now().to_rfc3339(), valid_to: None, recorded_at: Utc::now().to_rfc3339(),
+                superseded_by: None, impact: args.impact, caused_by: args.caused_by,
+                clock: self.next_clock(),
+            };
+            events.push(Event::Edge(edge.clone()));
+            output_edges.push(edge);
+        }
+
+        // 3. Persistence Phase (Atomic WAL Write)
+        self.persist(&Event::Batch(events.clone()))?;
+
+        // 4. Memory Index Phase
+        for event in events {
+            match event {
+                Event::Node(n) => {
+                    let u32_id = self.get_or_intern_id(&n.id);
+                    if let Some(emb) = n.embedding.clone() { 
+                        self.add_vector_internal(&n.id, emb, n.lang.clone().unwrap_or("en".to_string())); 
+                    }
+                    self.nodes.insert(u32_id, n);
+                }
+                Event::Edge(e) => {
+                    let u32_id = self.get_or_intern_id(&e.id);
+                    self.index_edge_internal(&e.id, &e.from, &e.to);
+                    self.edges.insert(u32_id, e);
+                }
+                _ => {}
+            }
+        }
+
+        Ok(BatchOutput { nodes: output_nodes, edges: output_edges })
     }
 
     pub fn set_language_centroid(&self, lang: String, vector: Vec<f64>) {
