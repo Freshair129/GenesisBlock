@@ -53,6 +53,13 @@ pub struct NodeInput {
 }
 
 #[napi(object)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
+pub struct LogicalClock {
+    pub time: u32,
+    pub peer_id: String,
+}
+
+#[napi(object)]
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct NodeOutput {
     pub id: String,
@@ -66,6 +73,7 @@ pub struct NodeOutput {
     pub valid_to: Option<String>,
     pub caused_by: Option<String>,
     pub expires_at: Option<String>,
+    pub clock: LogicalClock,
 }
 
 #[napi(object)]
@@ -96,6 +104,7 @@ pub struct EdgeOutput {
     pub superseded_by: Option<String>,
     pub impact: Option<f64>,
     pub caused_by: Option<String>,
+    pub clock: LogicalClock,
 }
 
 #[napi(object)]
@@ -243,6 +252,8 @@ pub struct Storage {
     pub meta_edges: DashMap<String, MetaEdge>,
     pub meta_history: DashMap<u32, Vec<SuperNode>>,
     pub wal_sender: Sender<(Event, Sender<bool>)>,
+    pub local_peer_id: String,
+    pub logical_clock: AtomicU32,
 }
 
 // --- Governance (AXIOMATIC GUARDS §2) ---
@@ -378,6 +389,8 @@ impl Storage {
             proposals: DashMap::new(), meta_nodes: DashMap::new(), meta_edges: DashMap::new(),
             meta_history: DashMap::new(),
             wal_sender,
+            local_peer_id: format!("agent-{}", Uuid::new_v4().to_string()[..8].to_string()),
+            logical_clock: AtomicU32::new(0),
         };
 
         if storage.log_path.exists() {
@@ -425,12 +438,8 @@ impl Storage {
 
     pub fn persist(&self, event: &Event) -> Result<()> {
         let (ack_tx, ack_rx) = unbounded();
-        println!("Persisting event...");
         self.wal_sender.send((event.clone(), ack_tx)).map_err(|_| Error::from_reason("wal disconnected"))?;
-        println!("Waiting for WAL ACK...");
-        let _ = ack_rx.recv(); 
-        println!("WAL ACK received.");
-        Ok(())
+        let _ = ack_rx.recv(); Ok(())
     }
 
     pub fn find_fuzzy_id(&self, id: &str) -> Option<String> {
@@ -560,6 +569,11 @@ impl Storage {
         self.in_idx.entry(u32_to).or_insert_with(HashSet::new).insert(u32_id);
     }
 
+    fn next_clock(&self) -> LogicalClock {
+        let time = self.logical_clock.fetch_add(1, Ordering::SeqCst) + 1;
+        LogicalClock { time, peer_id: self.local_peer_id.clone() }
+    }
+
     pub fn add_node(&self, args: NodeInput) -> Result<NodeOutput> {
         self.ensure_writable()?;
         self.validate_governance(&args.labels, false)?; 
@@ -579,6 +593,7 @@ impl Storage {
             valid_to: None,
             caused_by: args.caused_by,
             expires_at,
+            clock: self.next_clock(),
         };
         if let Some(emb) = args.embedding { self.add_vector_internal(&id, emb.clone(), lang); node.embedding = Some(emb); }
         self.nodes.insert(u32_id, node.clone());
@@ -593,6 +608,7 @@ impl Storage {
             props: args.props.unwrap_or(Value::Object(Default::default())), valid_from: Utc::now().to_rfc3339(), valid_to: None, recorded_at: Utc::now().to_rfc3339(),
             superseded_by: None, impact: args.impact,
             caused_by: args.caused_by,
+            clock: self.next_clock(),
         };
         self.index_edge_internal(&edge.id, &edge.from, &edge.to);
         self.edges.insert(self.get_or_intern_id(&edge.id), edge.clone());
@@ -625,6 +641,7 @@ impl Storage {
         if let Some(props) = new_props {
             new_node.props = props;
         }
+        new_node.clock = self.next_clock();
 
         self.nodes.insert(u32_id, new_node.clone());
         self.persist(&Event::Node(new_node.clone()))?;
@@ -969,6 +986,65 @@ impl Storage {
         Ok(())
     }
 
+    pub fn reconcile_state(&self, events: Vec<Event>) -> Result<()> {
+        self.ensure_writable()?;
+        for event in events {
+            match event {
+                Event::Node(remote_node) => {
+                    let u32_id = self.get_or_intern_id(&remote_node.id);
+                    let mut apply = true;
+                    if let Some(local_node) = self.nodes.get(&u32_id) {
+                        if remote_node.clock < local_node.value().clock {
+                            apply = false;
+                        }
+                    }
+                    if apply {
+                        // Sync local clock
+                        let mut current = self.logical_clock.load(Ordering::SeqCst);
+                        while remote_node.clock.time > current {
+                            match self.logical_clock.compare_exchange_weak(current, remote_node.clock.time, Ordering::SeqCst, Ordering::SeqCst) {
+                                Ok(_) => break,
+                                Err(actual) => current = actual,
+                            }
+                        }
+                        
+                        if let Some(emb) = &remote_node.embedding {
+                            self.add_vector_internal(&remote_node.id, emb.clone(), remote_node.lang.clone().unwrap_or("en".to_string()));
+                        }
+                        self.nodes.insert(u32_id, remote_node.clone());
+                        self.persist(&Event::Node(remote_node))?;
+                    }
+                }
+                Event::Edge(remote_edge) => {
+                    let u32_id = self.get_or_intern_id(&remote_edge.id);
+                    let mut apply = true;
+                    if let Some(local_edge) = self.edges.get(&u32_id) {
+                        if remote_edge.clock < local_edge.value().clock {
+                            apply = false;
+                        }
+                    }
+                    if apply {
+                        let mut current = self.logical_clock.load(Ordering::SeqCst);
+                        while remote_edge.clock.time > current {
+                            match self.logical_clock.compare_exchange_weak(current, remote_edge.clock.time, Ordering::SeqCst, Ordering::SeqCst) {
+                                Ok(_) => break,
+                                Err(actual) => current = actual,
+                            }
+                        }
+                        self.index_edge_internal(&remote_edge.id, &remote_edge.from, &remote_edge.to);
+                        self.edges.insert(u32_id, remote_edge.clone());
+                        self.persist(&Event::Edge(remote_edge))?;
+                    }
+                }
+            }
+        }
+        Ok(())
+    }
+
+    pub fn get_logical_clock(&self) -> u32 {
+        self.logical_clock.load(Ordering::SeqCst)
+    }
+
     pub fn set_language_centroid(&self, lang: String, vector: Vec<f64>) {
         let v_f32: Vec<f32> = vector.into_iter().map(|v| v as f32).collect();
         self.lang_centroids.insert(lang, v_f32);
@@ -1080,6 +1156,11 @@ impl GenesisDatabase {
     #[napi] pub async fn calculate_structural_gaps(&self) -> Result<Vec<GapSuggestion>> { let i = Arc::clone(&self.inner); tokio::task::spawn_blocking(move || i.calculate_structural_gaps()).await.map_err(|e| Error::from_reason(e.to_string()))? }
     #[napi] pub async fn generate_meta_graph(&self) -> Result<()> { let i = Arc::clone(&self.inner); tokio::task::spawn_blocking(move || i.generate_meta_graph()).await.map_err(|e| Error::from_reason(e.to_string()))? }
     #[napi] pub async fn get_meta_history(&self, cluster_id: u32) -> Result<Vec<SuperNode>> { let i = Arc::clone(&self.inner); tokio::task::spawn_blocking(move || Ok(i.get_meta_history(cluster_id))).await.map_err(|e| Error::from_reason(e.to_string()))? }
+    #[napi] pub async fn reconcile_state(&self, events_json: String) -> Result<()> {
+        let i = Arc::clone(&self.inner);
+        let events = serde_json::from_str::<Vec<Event>>(&events_json).map_err(|e| Error::from_reason(e.to_string()))?;
+        tokio::task::spawn_blocking(move || i.reconcile_state(events)).await.map_err(|e| Error::from_reason(e.to_string()))?
+    }
     #[napi] pub async fn semantic_verify(&self, event_json: String) -> Result<bool> { 
         let i = Arc::clone(&self.inner); 
         let event = serde_json::from_str::<Event>(&event_json).map_err(|e| Error::from_reason(e.to_string()))?;
@@ -1091,6 +1172,8 @@ impl GenesisDatabase {
         tokio::task::spawn_blocking(move || i.propose_consensus(event, signature)).await.map_err(|e| Error::from_reason(e.to_string()))? 
     }
     #[napi] pub async fn submit_vote(&self, proposal_id: String, peer_id: String, approve: bool) -> Result<bool> { let i = Arc::clone(&self.inner); tokio::task::spawn_blocking(move || i.submit_vote(proposal_id, peer_id, approve)).await.map_err(|e| Error::from_reason(e.to_string()))? }
+    #[napi] pub fn get_local_peer_id(&self) -> String { self.inner.local_peer_id.clone() }
+    #[napi] pub fn get_logical_clock(&self) -> u32 { self.inner.logical_clock.load(Ordering::SeqCst) }
     #[napi] pub fn get_merkle_root(&self) -> String { self.inner.get_merkle_root() }
     #[napi] pub fn schema_version_sync(&self) -> u32 { SCHEMA_VERSION }
     #[napi] pub fn status_sync(&self) -> DatabaseStatus { self.inner.status_sync() }
