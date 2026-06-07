@@ -120,3 +120,11 @@ The official Python library provides high-level bindings for AI and Data Science
     - Tiered Context Retrieval (H0-H5).
     - Support for NumPy-compatible vector injection.
 
+### 8.4 Go SDK
+The official Go client enables high-performance, cloud-native backend integration.
+- **Module:** `github.com/freshair129/genesisblock-go`
+- **Features:**
+    - Context-aware methods (`context.Context`).
+    - Concurrent-safe execution.
+    - Full mapping of GKS schemas to Go structs.
+
