@@ -1,52 +1,43 @@
-> **DEPRECATED (Mark III Pivot):** This document refers to the Phase 1-7 architecture and positioning. Please refer to ARCHITECTURE.md for the current Mark III system design.\n\n# GenesisDB: An Embedded, Axiomatic Graph Engine for Cognitive AI Systems
-**A Whitepaper on High-Performance Knowledge Representation**
+# GenesisDB: A Distributed Semantic-Graph Substrate for Multi-Agent Autonomy
+**Whitepaper v2.0.0 - Towards Collective Intelligence**
 
-**Abstract**
-As Artificial Intelligence systems evolve from stateless language models to stateful, reasoning agents, the need for robust, low-latency knowledge representation becomes critical. Traditional graph databases, typically designed as standalone server-client architectures running on the JVM, introduce unacceptable network and serialization overhead for real-time cognitive loops. This whitepaper introduces **GenesisDB**, an embedded, Rust-native graph engine designed specifically for the Genesis Knowledge System (GKS). By combining microsecond-level traversal latency with built-in axiomatic governance and bi-temporal state tracking, GenesisDB establishes a new paradigm for agentic memory systems.
+## Abstract
+GenesisDB evolves from a local embedded database into a **Distributed Semantic Substrate**. By synthesizing high-dimensional vector embeddings, structured graph relationships, and bitemporal event sourcing, GenesisDB provides the foundational memory layer for the **Genesis Knowledge System (GKS)**. This paper details the architecture of our **Neural Bridge (Thai-English)**, the **CRDT-based synchronization protocol**, and the **Autonomic Substrate** that enables self-optimizing knowledge structures.
 
 ---
 
-## 1. Introduction: The Cognitive Bottleneck
+## 1. The Multi-Agent Knowledge Problem
+As AI systems shift from single-agent task executors to multi-agent swarms, the primary bottleneck is **Shared Context**. Existing solutions like Vector Databases provide similarity search but lack relational reasoning; Graph Databases provide relationships but struggle with the fuzzy nature of natural language and cross-lingual drift. 
 
-Modern AI agents require an external memory structure—a "brain"—to store context, decisions, and relationships (the Knowledge Graph). However, querying a standard graph database (e.g., Neo4j) over an HTTP/Bolt protocol during a rapid reasoning loop creates a severe bottleneck. The latency incurred by network hops, query parsing, and JSON serialization often exceeds the time the LLM takes to generate the next token. 
+**GenesisDB** solves this by unifying these dimensions into a single, microsecond-latency engine.
 
-Furthermore, AI agents need strict "guardrails" to prevent hallucinated data from corrupting core system directives. Relying on application-layer logic to enforce these rules is brittle. 
+## 2. Core Innovations (Mark VIII)
 
-**GenesisDB** addresses these challenges directly by embedding the graph engine within the host process and enforcing governance rules natively at the storage layer.
+### 2.1 The Thai-English Neural Bridge
+Unlike standard databases, GenesisDB is **linguistically aware**. 
+- **Mean-Centering:** We implement language-specific centroids to bridge the semantic gap between Thai and English embeddings. 
+- **Thai-Aware Fuzzy Search:** Our lexical engine uses custom tokenization that handles Thai combining marks (vowels/tones), ensuring high-recall searching even in the presence of linguistic noise or typos.
 
-## 2. Architectural Philosophy
+### 2.2 Bitemporal Event Sourcing & Causality
+GenesisDB replaces destructive updates with a **Causality Chain**. 
+- **`supersede_node`:** Every state change creates a new version, preserving the old state with logical time (`valid_to`).
+- **Auditability:** Every mutation is linked to a `caused_by` event (e.g., an agentic decision or an ADR), allowing the system to reason about *why* knowledge evolved.
 
-### 2.1 The Embedded Advantage (Rust & FFI)
-GenesisDB is written in Rust, leveraging memory safety without garbage collection overhead. It is compiled as a native binary and bound directly to the V8 engine (via `napi-rs`). 
-*   **Zero Network Latency:** Traversal algorithms execute in the same memory space as the host application.
-*   **Deterministic Performance:** Unlike JVM-based engines (e.g., Neo4j), GenesisDB does not suffer from Garbage Collection pauses, ensuring predictable microsecond latencies crucial for real-time AI.
+### 2.3 Distributed Consistency (CRDT & Logical Clocks)
+To support multi-agent collaboration without a central master, we implement:
+- **Lamport Timestamps:** Ensuring a deterministic total ordering of events across the swarm.
+- **LWW (Last-Write-Wins) CRDT:** Reconciling divergent graph states through a Merkle-tree based synchronization protocol.
 
-### 2.2 Axiomatic Governance
-Knowledge in GKS is hierarchical (e.g., `Master` rules > `Concept` drafts). GenesisDB introduces **Axiomatic Guards** directly into the mutation pipeline. The engine autonomously rejects operations where a lower-tier entity attempts to supersede or contradict a higher-tier entity. This ensures the foundational integrity of the AI's knowledge base cannot be compromised, even by rogue sub-agents.
+## 3. The Thinking Substrate: Autonomic Maintenance
+The engine is not passive; it possesses an **Autonomic Loop** that performs background reasoning:
+1.  **Community Detection (LPA):** Automatically groups related atoms of knowledge into high-level themes.
+2.  **Semantic Drift Tracking:** Measures the "Vector Drift" of these themes over time to identify shifting consensus or emerging concepts.
+3.  **Structural Gap Detection:** Finds semantically related clusters that lack physical links, prompting agents to explore new logical connections.
 
-### 2.3 Bi-Temporal Reality
-To support the fluid nature of AI reasoning and backtracking, GenesisDB implements a bi-temporal data model:
-1.  **Logical Time (`valid_from`, `valid_to`):** When the fact was true in the context of the domain.
-2.  **Physical Time (`recorded_at`):** When the engine ingested the data.
-This allows the system to perform "Time-Travel Queries," reconstructing the exact state of the graph prior to a specific reasoning step without destructive deletions.
+## 4. Technical Performance
+- **Query Latency:** < 30µs (HNSW + DashMap optimized).
+- **Ingestion Throughput:** > 120 TPS (fsync-compliant, batched WAL).
+- **Embedded Architecture:** Zero-copy memory access via NAPI-RS for high-performance host integration.
 
-## 3. Storage and State Management
-
-GenesisDB employs a **Hybrid Persistence Model**:
-*   **WAL (Write-Ahead Log):** Every mutation is appended to a JSONL file, ensuring durability.
-*   **Binary Compaction:** Periodically, the in-memory state is compacted into a dense, serialized binary format (Bincode).
-*   **Atomic Snapshots:** The compaction process utilizes an atomic `write-and-rename` strategy. If the system crashes mid-write, the graph recovers perfectly from the last healthy snapshot plus the JSONL tail, eliminating the risk of data corruption.
-
-## 4. Performance Profile (LDBC-Lite Benchmarks)
-
-Benchmark tests simulating a dense cognitive graph (5,000 nodes, 25,000 edges) reveal staggering performance advantages over traditional architectures:
-
-*   **1-Hop Traversal:** ~10 Microseconds
-*   **3-Hop Traversal:** ~0.55 Milliseconds
-*   **Incremental Recalculation:** Implementing BFS-based dirty tracking improved computational efficiency by **~289x** compared to full-graph recalculation.
-
-While enterprise databases like Neo4j excel at distributed, terabyte-scale analytics, GenesisDB dominates the **sub-gigabyte, ultra-low-latency embedded space**, performing 20-50x faster for cognitive reasoning workloads.
-
-## 5. Conclusion
-
-GenesisDB represents a specialized evolution in graph technology. By discarding the client-server model in favor of an embedded, Rust-native architecture, and by integrating axiomatic safety directly into the engine, GenesisDB provides the speed, safety, and reliability required to act as the primary memory engine for advanced AI ecosystems.
+## 5. Conclusion: The Path to Axiomatic Truth
+Through the **Consensus Protocol**, GenesisDB allows a swarm of agents to promote unverified "USER" data into "MASTER" axioms. This represents the final step in human-machine collaboration: a system that not only stores information but actively curates and evolves its own foundational truth.
