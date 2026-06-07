@@ -1,52 +1,49 @@
 # Whitepaper: Genesis Knowledge System (GKS)
-**Version:** 1.0.0 (Mark V)
-**Status:** Production Ready
+**Version:** 2.0.0 (Mark VIII)
+**Status:** Active - Distributed Intelligence
 **Architect:** Rwang (อาหวัง)
 
 ## 1. Executive Summary
-The Genesis Knowledge System (GKS) is a next-generation, high-performance hybrid semantic-graph substrate designed specifically for AI Agents and Personal Knowledge Management (PKM). It bridges the gap between raw file-based notes (Obsidian) and high-speed neural reasoning engines, providing a verifiable and scalable "Shadow Brain" for human-machine collaboration.
+The Genesis Knowledge System (GKS) is a high-performance distributed semantic substrate designed for **Human-Machine Autonomy**. It serves as the unified "Shadow Brain" where human thought (Obsidian) and machine reasoning (AI Agents) merge. By Mark VIII, GKS has evolved from a local engine into a decentralized, bitemporal ecosystem capable of collective consensus and eventual consistency across high-latency networks.
 
 ## 2. Core Architecture: The "Mechanical Sympathy" Engine
-GKS is engineered in Rust with a focus on hardware-level optimization.
 
-### 2.1 Persistence Layer (WAL Group Commit)
-- **Technology:** Line-Delimited JSON Write-Ahead Log.
-- **Innovation:** Implements a background flusher that batches mutations every 5ms or 1024 events.
-- **Performance:** Resolves the 139 TPS durable write bottleneck, enabling massive ingestion bursts from concurrent AI agents.
+### 2.1 Storage Model (WAL & CRDT)
+- **L0 Durability:** JSONL Write-Ahead Log with **Group Commit** logic (< 5ms latency).
+- **L3 Collaboration:** Conflict-free Replicated Data Types (**CRDT**) using **Lamport Timestamps**. Every mutation is deterministically ordered across agents, enabling masterless synchronization.
 
-### 2.2 Semantic Indexing (Hybrid HNSW)
-- **Indexing:** Integrated Vector + Graph indexing via `hnsw_rs`.
-- **Latency:** P95 Query Latency < 40µs (verified via Mark IV Stress Test).
-- **Optimization:** Trigram-based $O(1)$ candidate lookup for fuzzy ID matching, ensuring stability at million-node scales.
+### 2.2 Neural-Hybrid Indexing
+- **Vector substrate:** HNSW-based similarity search (P95 < 30µs).
+- **Lexical substrate:** **Thai-aware Tokenization** filtering combining marks (vowels/tones) to unify fuzzy lookups (e.g., "บ้าน" vs "บาน").
+- **Neural Bridge:** Cross-lingual English-Thai mean-centering for language-agnostic retrieval.
 
-## 3. Intelligent Reasoning Pillars (Mark IV & V)
+## 3. Distributed Reasoning Pillars (Mark VI - VIII)
 
-### 3.1 K-Impact Score ($U(n)$)
-A deterministic authority model that ranks knowledge based on:
-- **Dependency Depth:** Structural graph importance.
-- **Axiomatic Strictness:** Governance tiering (MASTER vs. USER).
-- **Stability Confidence:** Content reliability metadata.
+### 3.1 K-Impact Score ($R(n)$)
+Evaluates the authority of knowledge atoms based on graph topology (Dependency Depth), governance tier (Axiomatic Strictness), and stability metadata.
 
-### 3.2 Transitive Inference (Virtual Edges)
-Allows the engine to deduce implicit relationships (e.g., organizational hierarchies) JIT during query execution, keeping the storage footprint lean while providing deep logical context.
+### 3.2 Structural Insight Engine
+A proactive reasoning loop that analyzes the meta-graph to:
+- **Detect Community Centroids:** Grouping atoms into emergent themes.
+- **Identify Logical Gaps:** Prompting agents to bridge semantically close but disconnected ideas.
+- **Track Semantic Drift:** Measuring vector drift of themes over time to observe the evolution of knowledge consensus.
 
-### 3.3 Neural Bridge (Cross-Lingual Mapping)
-Uses **Mean-Centering Normalization** to map Thai and English embedding spaces into a single canonical region, enabling seamless cross-lingual retrieval.
+### 3.3 Bitemporal Event Sourcing
+Absolute auditability via the **Causality Chain**. Updates follow a "supersession" pattern where the history of every node is preserved. The `caused_by` field links mutations to triggering events like ADRs or Consensus Votes.
 
-## 4. Data Governance: Axiomatic Guards
-A strict tier-based integrity system:
-- **MASTER:** Immutable for external agents. Protects core reasoning logic.
-- **SPEC/ADR:** Requires temporal metadata and versioned retractions.
-- **USER:** Flexible, human-driven data.
+## 4. Governance: The Axiomatic Guard Protocol
+A strict hierarchy of truth:
+- **MASTER (Tier 0):** Immutable system axioms. Can only be modified via **Multi-Agent Neural Consensus**.
+- **SPEC / ADR (Tier 1-2):** Formal specifications and architecture decisions.
+- **USER (Tier 3):** Exploratory data and personal notes.
 
-## 5. The Obsidian Bridge: Shadow Sync
-The human interface for GKS. It provides:
-- **Real-time Watchdog:** Automatic Markdown-to-Graph translation.
-- **Logic-Gated Context:** A dedicated `/v1/reason/context` endpoint for providing LLMs with authoritative, ranked knowledge snippets.
-- **Intelligent Sidebar:** Real-time visibility into K-Impact and clusters.
+## 5. Deployment: The Collaborative Swarm
+- **Shadow Sync:** The Obsidian plugin provides human-centric visualization and real-time vault indexing.
+- **Agentic API:** Axum REST and NAPI bindings for seamless LLM context injection.
+- **P2P Gossip:** Future-ready infrastructure for decentralized knowledge replication across agent swarms.
 
 ## 6. Conclusion
-GenesisDB is no longer a simple database; it is a verifiable reasoning substrate. By combining the durability of enterprise systems with the intelligence of neural mapping, GKS provides the necessary infrastructure for the next generation of collaborative AI ecosystems.
+The Genesis Knowledge System is the infrastructure for **Collective Intelligence**. It provides the speed of local hardware, the flexibility of neural models, and the rigor of axiomatic governance, forming a resilient and evolving memory for the future of AI.
 
 ---
-**Build verified. Scale tested. Reasoning active.**
+**Verified for Scale. Hardened for Thai. Decentralizing Logic.**
