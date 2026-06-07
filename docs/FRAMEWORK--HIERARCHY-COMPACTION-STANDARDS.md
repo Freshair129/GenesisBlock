@@ -122,3 +122,4 @@ crosslink:
 | 1.3.0b | 2026-06-07 | active | ทำการวิเคราะห์และแยกแกนเนื้องาน (WBS) ออกจากแกนเวลา (Sprint/Cycle) และปรับการแมป H0-H5 ให้ตรงตามมาตรฐาน Agile |
 | 1.2.0b | 2026-06-07 | active | เพิ่มการเชื่อมโยงระบบแกนเวลา (Sprint/Cycle) เข้ากับ Hop H0-H5 และปรับโครงสร้างหัวข้อย่อย |
 | 1.0.0b | 2026-06-02 | active | ร่างโครงสร้างมาตรฐานการบีบอัดข้อมูลระบบและ Hierarchy Compaction รุ่นแรก |
+| 2.0.0 | 2026-06-07 | stable | Integrated with GenesisBlock Mark XI. Formalized Context Scaling Tier (H0-H5) as a native retrieval protocol. |

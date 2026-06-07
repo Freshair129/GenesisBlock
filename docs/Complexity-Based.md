@@ -176,3 +176,4 @@ Split monolith into services
 C-3
 Text → Doc → Diagram → Code
 ```
+`n## CHANGELOG`n`n| Version | Date | Status | Summary |`n|---------|------|--------|---------|`n| 1.1.0 | 2026-06-07 | stable | Milestone � Aligned with Mark XI distributed intelligence. Integrated C-3 Architecture-Driven workflow for P2P and GRL features. |`n| 1.0.0 | 2026-06-05 | stable | Initial release of complexity-based execution path rules. |
