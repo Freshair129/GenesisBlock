@@ -12,6 +12,9 @@ use std::sync::Arc;
 use std::sync::atomic::{AtomicU32, AtomicBool, Ordering};
 use std::time::{Duration, Instant};
 use sha2::{Sha256, Digest};
+use ed25519_dalek::{SigningKey, VerifyingKey, SecretKey};
+use rand::rngs::OsRng;
+use rand::Rng;
 
 use chrono::Utc;
 use dashmap::DashMap;
@@ -334,6 +337,8 @@ pub struct Storage {
     pub logical_clock: AtomicU32,
     pub vector_dim: u16,
     pub gossip_port: AtomicU32,
+    pub signing_key: SigningKey,
+    pub verifying_key: VerifyingKey,
 }
 
 // --- Governance (AXIOMATIC GUARDS §2) ---
@@ -451,6 +456,23 @@ impl Storage {
         if !root.exists() { fs::create_dir_all(&root).ok(); }
         let read_only = opts.read_only.unwrap_or(false);
         let vector_dim = opts.vector_dim.unwrap_or(1536) as u16;
+
+        // --- Cryptographic Identity (Mark X) ---
+        let identity_path = root.join("identity.bin");
+        let signing_key = if identity_path.exists() {
+            let bytes = fs::read(&identity_path).map_err(|e| Error::from_reason(e.to_string()))?;
+            SigningKey::from_bytes(bytes.as_slice().try_into().map_err(|_| Error::from_reason("invalid identity key length"))?)
+        } else {
+            
+            let key = SigningKey::from_bytes(&OsRng.gen::<[u8; 32]>());
+            if !read_only {
+                fs::write(&identity_path, key.to_bytes()).map_err(|e| Error::from_reason(e.to_string()))?;
+            }
+            key
+        };
+        let verifying_key = signing_key.verifying_key();
+        let local_peer_id = hex::encode(Sha256::digest(verifying_key.as_bytes()))[..16].to_string();
+
         let log_path = root.join("genesis-graph.wal");
         let (wal_sender, wal_receiver): (Sender<(Event, Sender<bool>)>, Receiver<(Event, Sender<bool>)>) = unbounded();
         let log_path_clone = log_path.clone();
@@ -499,10 +521,12 @@ impl Storage {
             proposals: DashMap::new(), meta_nodes: DashMap::new(), meta_edges: DashMap::new(),
             meta_history: DashMap::new(),
             wal_sender,
-            local_peer_id: format!("agent-{}", Uuid::new_v4().to_string()[..8].to_string()),
+            local_peer_id,
             logical_clock: AtomicU32::new(0),
             vector_dim,
             gossip_port: AtomicU32::new(0),
+            signing_key,
+            verifying_key,
         };
 
         if !storage.try_load_state() {
