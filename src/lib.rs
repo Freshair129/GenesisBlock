@@ -1618,6 +1618,69 @@ impl Storage {
         Ok(BatchOutput { nodes: output_nodes, edges: output_edges })
     }
 
+    pub fn perform_index_compaction(&self) -> Result<()> {
+        println!("Mark IX: Starting Index Compaction...");
+        let start = Instant::now();
+        
+        // 1. Identify Live Set
+        let live_nodes: HashSet<u32> = self.nodes.iter().map(|e| *e.key()).collect();
+        
+        // 2. Lock and Compact Arenas
+        let mut meta_arena = self.metadata_arena.write();
+        let mut vec_arena = self.vector_arena.write();
+        
+        let mut new_meta = Vec::with_capacity(live_nodes.len());
+        let mut new_vec = Vec::with_capacity(live_nodes.len() * self.vector_dim as usize);
+        
+        self.u32_to_arena_id.clear();
+
+        for meta in meta_arena.iter() {
+            if let Some(u32_id) = self.get_u32(&meta.node_id) {
+                if live_nodes.contains(&u32_id) {
+                    let start_off = meta.embedding_offset as usize;
+                    let end_off = start_off + meta.vector_dim as usize;
+                    
+                    if end_off <= vec_arena.len() {
+                        let new_offset = new_vec.len() as u64;
+                        new_vec.extend_from_slice(&vec_arena[start_off..end_off]);
+                        
+                        let new_arena_id = new_meta.len() as u32;
+                        let mut meta_clone = meta.clone();
+                        meta_clone.arena_id = new_arena_id;
+                        meta_clone.embedding_offset = new_offset;
+                        
+                        self.u32_to_arena_id.insert(u32_id, new_arena_id);
+                        new_meta.push(meta_clone);
+                    }
+                }
+            }
+        }
+
+        *meta_arena = new_meta;
+        *vec_arena = new_vec;
+        
+        // 3. Rebuild HNSW from scratch
+        drop(meta_arena);
+        drop(vec_arena);
+        self.rehydrate_hnsw_index();
+
+        // 4. Prune Adjacency Indices
+        let mut orphaned_indices = Vec::new();
+        for entry in self.out_idx.iter() {
+            if !live_nodes.contains(entry.key()) { orphaned_indices.push(*entry.key()); }
+        }
+        for k in orphaned_indices { self.out_idx.remove(&k); }
+
+        let mut orphaned_in = Vec::new();
+        for entry in self.in_idx.iter() {
+            if !live_nodes.contains(entry.key()) { orphaned_in.push(*entry.key()); }
+        }
+        for k in orphaned_in { self.in_idx.remove(&k); }
+
+        println!("Mark IX: Index Compaction complete in {:?}. Arenas resized to {} nodes.", start.elapsed(), live_nodes.len());
+        Ok(())
+    }
+
     pub fn set_language_centroid(&self, lang: String, vector: Vec<f64>) {
         let v_f32: Vec<f32> = vector.into_iter().map(|v| v as f32).collect();
         self.lang_centroids.insert(lang, v_f32);
