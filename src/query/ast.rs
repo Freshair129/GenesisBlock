@@ -82,6 +82,10 @@ impl HqlCommand {
             match inner.as_rule() {
                 Rule::fuzzy_prefix => fuzzy = true,
                 Rule::identifier => id = inner.as_str().to_string(),
+                Rule::string_lit => {
+                    let s = inner.as_str();
+                    id = s[1..s.len()-1].to_string(); // strip quotes
+                }
                 _ => {}
             }
         }

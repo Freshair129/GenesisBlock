@@ -1,2 +1,2 @@
-{"Node":{"id":"v1","labels":[],"props":{},"impact":0.7,"embedding":[1.0,0.0,0.0],"lang":"en"}}
-{"Node":{"id":"v2","labels":[],"props":{},"impact":0.7,"embedding":[0.0,1.0,0.0],"lang":"en"}}
+{"Node":{"id":"v1","labels":[],"props":{},"impact":0.7,"embedding":[1.0,0.0,0.0],"lang":"en","valid_from":"2026-06-07T11:24:02.194117500+00:00","valid_to":null,"caused_by":null,"expires_at":null,"clock":{"time":1,"peer_id":"agent-1af9ad49"}}}
+{"Node":{"id":"v2","labels":[],"props":{},"impact":0.7,"embedding":[0.0,1.0,0.0],"lang":"en","valid_from":"2026-06-07T11:24:03.483194300+00:00","valid_to":null,"caused_by":null,"expires_at":null,"clock":{"time":2,"peer_id":"agent-1af9ad49"}}}

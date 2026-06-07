@@ -207,7 +207,24 @@ pub struct DatabaseStatus {
 pub struct SyncPeer {
     pub id: String,
     pub addr: String,
-    pub public_key: Option<Vec<u8>>,
+    pub last_seen: u32,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub enum GossipMessage {
+    Heartbeat { 
+        peer_id: String, 
+        merkle_root: String, 
+        logical_time: u32,
+        port: u16 
+    },
+    PullRequest { 
+        from_clock: u32,
+        target_peer_id: String 
+    },
+    PushDelta { 
+        events: Vec<Event> 
+    },
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -301,6 +318,7 @@ pub struct Storage {
     pub local_peer_id: String,
     pub logical_clock: AtomicU32,
     pub vector_dim: u16,
+    pub gossip_port: AtomicU32,
 }
 
 // --- Governance (AXIOMATIC GUARDS §2) ---
@@ -469,6 +487,7 @@ impl Storage {
             local_peer_id: format!("agent-{}", Uuid::new_v4().to_string()[..8].to_string()),
             logical_clock: AtomicU32::new(0),
             vector_dim,
+            gossip_port: AtomicU32::new(0),
         };
 
         if storage.log_path.exists() {
@@ -846,15 +865,28 @@ impl Storage {
                 for eid in eids.iter() {
                     if let Some(edge_ref) = self.edges.get(eid) {
                         let edge = edge_ref.value();
+                        
+                        // Time-travel check for Edges
+                        if !Self::is_valid_as_of(&edge.valid_from, &edge.valid_to, &args.as_of) {
+                            continue;
+                        }
+
                         if target_rel == "ANY" || edge.rel == target_rel {
                             let curr_id = self.u32_to_id.get(&curr_u32).unwrap().value().clone();
                             let next_id = if edge.from == curr_id { &edge.to } else { &edge.from };
                             if let Some(next_u32) = self.get_u32(next_id) {
                                 if !visited.contains(&next_u32) {
                                     visited.insert(next_u32);
-                                    if let Some(node) = self.nodes.get(&next_u32) {
+                                    if let Some(node_ref) = self.nodes.get(&next_u32) {
+                                        let node = node_ref.value();
+
+                                        // Time-travel check for Nodes
+                                        if !Self::is_valid_as_of(&node.valid_from, &node.valid_to, &args.as_of) {
+                                            continue;
+                                        }
+
                                         let mut new_path = path.clone(); new_path.push(edge.clone());
-                                        results.push(NeighborOutput { node: node.value().clone(), path: new_path.clone(), depth: curr_depth + 1 });
+                                        results.push(NeighborOutput { node: node.clone(), path: new_path.clone(), depth: curr_depth + 1 });
                                         if is_inferred || (curr_depth + 1 < depth) { queue.push_back((next_u32, new_path, curr_depth + 1)); }
                                     }
                                 }
@@ -1241,6 +1273,98 @@ impl Storage {
         })
     }
 
+    pub fn start_gossip_manager(storage: Arc<Self>) {
+        let peer_id = storage.local_peer_id.clone();
+        tokio::spawn(async move {
+            let socket = match tokio::net::UdpSocket::bind("0.0.0.0:0").await {
+                Ok(s) => {
+                    let addr = s.local_addr().unwrap();
+                    storage.gossip_port.store(addr.port() as u32, Ordering::SeqCst);
+                    println!("Gossip: Bound to UDP port {}", addr.port());
+                    s
+                }
+                Err(e) => {
+                    println!("Gossip: Failed to bind UDP socket: {}", e);
+                    return;
+                }
+            };
+            socket.set_broadcast(true).unwrap();
+
+            let mut buf = [0u8; 65535];
+            let mut heartbeat_interval = tokio::time::interval(Duration::from_secs(5));
+
+            loop {
+                tokio::select! {
+                    _ = heartbeat_interval.tick() => {
+                        let msg = GossipMessage::Heartbeat {
+                            peer_id: peer_id.clone(),
+                            merkle_root: storage.get_merkle_root(),
+                            logical_time: storage.get_logical_clock(),
+                            port: storage.gossip_port.load(Ordering::SeqCst) as u16,
+                        };
+                        if let Ok(data) = serde_json::to_vec(&msg) {
+                            // Broadcast to local network (using standard broadcast address)
+                            let _ = socket.send_to(&data, "255.255.255.255:30001").await; // Fixed port for discovery
+                        }
+                    }
+                    result = socket.recv_from(&mut buf) => {
+                        if let Ok((len, addr)) = result {
+                            if let Ok(msg) = serde_json::from_slice::<GossipMessage>(&buf[..len]) {
+                                match msg {
+                                    GossipMessage::Heartbeat { peer_id: p_id, merkle_root, logical_time: _, port } => {
+                                        if p_id != peer_id {
+                                            let peer_addr = format!("{}:{}", addr.ip(), port);
+                                            storage.peers.insert(p_id.clone(), SyncPeer {
+                                                id: p_id.clone(),
+                                                addr: peer_addr.clone(),
+                                                last_seen: Utc::now().timestamp() as u32,
+                                            });
+
+                                            // If state differs, request a sync
+                                            if merkle_root != storage.get_merkle_root() {
+                                                println!("Gossip: Divergent state with peer {}. Requesting sync.", p_id);
+                                                let req = GossipMessage::PullRequest {
+                                                    from_clock: storage.get_logical_clock(),
+                                                    target_peer_id: peer_id.clone(),
+                                                };
+                                                if let Ok(data) = serde_json::to_vec(&req) {
+                                                    let _ = socket.send_to(&data, peer_addr).await;
+                                                }
+                                            }
+                                        }
+                                    }
+                                    GossipMessage::PullRequest { from_clock: _, target_peer_id: _ } => {
+                                        // TODO: Binary search WAL for events after from_clock and send PushDelta
+                                    }
+                                    GossipMessage::PushDelta { events } => {
+                                        let _ = storage.reconcile_state(events);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        });
+
+        // Also bind discovery listener on the fixed port
+        tokio::spawn(async move {
+            let socket = match tokio::net::UdpSocket::bind("0.0.0.0:30001").await {
+                Ok(s) => s,
+                Err(_) => return, // Port already taken by another local node
+            };
+            socket.set_broadcast(true).unwrap();
+            let mut buf = [0u8; 65535];
+            loop {
+                if let Ok((len, _addr)) = socket.recv_from(&mut buf).await {
+                    if let Ok(GossipMessage::Heartbeat { .. }) = serde_json::from_slice::<GossipMessage>(&buf[..len]) {
+                        // Discovery logic...
+                    }
+                }
+            }
+        });
+    }
+
     pub fn set_language_centroid(&self, lang: String, vector: Vec<f64>) {
         let v_f32: Vec<f32> = vector.into_iter().map(|v| v as f32).collect();
         self.lang_centroids.insert(lang, v_f32);
@@ -1333,6 +1457,7 @@ impl GenesisDatabase {
     pub fn open(opts: OpenOptions) -> Result<Self> { 
         let storage = Arc::new(Storage::open(opts)?);
         Storage::start_autonomic_loop(Arc::clone(&storage));
+        Storage::start_gossip_manager(Arc::clone(&storage));
         Ok(Self { inner: storage }) 
     }
     #[napi] pub async fn bulk_add_nodes(&self, inputs: Vec<NodeInput>) -> Result<()> { let i = Arc::clone(&self.inner); tokio::task::spawn_blocking(move || i.bulk_add_nodes(inputs)).await.map_err(|e| Error::from_reason(e.to_string()))? }

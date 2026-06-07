@@ -1,6 +1,7 @@
-use genesis_block_native::{Storage, OpenOptions, NodeInput, EdgeInput};
+use genesis_block_native::{Storage, OpenOptions, NodeInput, EdgeInput, NeighborOutput};
 use std::fs;
 use std::path::Path;
+use serde_json::from_value;
 
 fn setup_test_db(name: &str) -> Storage {
     let db_path = format!("G:/GenesisBlock_Dev/GenesisBlock/tests/{}", name);
@@ -11,7 +12,8 @@ fn setup_test_db(name: &str) -> Storage {
         path: db_path,
         page_cache_mb: Some(64),
         read_only: Some(false),
-     vector_dim: None, }).unwrap()
+        vector_dim: None,
+    }).unwrap()
 }
 
 #[test]
@@ -24,7 +26,10 @@ fn test_node_creation_and_interning() {
         props: None,
         embedding: None,
         lang: None,
-     valid_from: None, caused_by: None,  ttl: None, }).unwrap();
+        valid_from: None,
+        caused_by: None,
+        ttl: None,
+    }).unwrap();
 
     assert_eq!(node.id, "user_1");
     
@@ -37,10 +42,10 @@ fn test_node_creation_and_interning() {
 fn test_edge_creation_and_graph_traversal() {
     let storage = setup_test_db("test_graph_traversal");
     
-    storage.add_node(NodeInput {   id: Some("A".to_string()), labels: vec![], props: None, embedding: None, lang: None, valid_from: None, caused_by: None,  ttl: None, }).unwrap();
-    storage.add_node(NodeInput {   id: Some("B".to_string()), labels: vec![], props: None, embedding: None, lang: None, valid_from: None, caused_by: None,  ttl: None, }).unwrap();
+    storage.add_node(NodeInput { id: Some("A".to_string()), labels: vec![], props: None, embedding: None, lang: None, valid_from: None, caused_by: None, ttl: None }).unwrap();
+    storage.add_node(NodeInput { id: Some("B".to_string()), labels: vec![], props: None, embedding: None, lang: None, valid_from: None, caused_by: None, ttl: None }).unwrap();
     
-    let _edge = storage.add_edge(EdgeInput {  
+    storage.add_edge(EdgeInput {  
         id: Some("E1".to_string()),
         from: "A".to_string(),
         to: "B".to_string(),
@@ -49,36 +54,52 @@ fn test_edge_creation_and_graph_traversal() {
         valid_from: None,
         supersede: None,
         impact: None,
-     caused_by: None,  }).unwrap();
+        caused_by: None,
+    }).unwrap();
 
     let res = storage.execute_hql("TRAVERSE FROM A DEPTH 1 REL knows").unwrap();
-    let neighbors: Vec<genesis_block_native::NeighborOutput> = serde_json::from_value(res).unwrap();
+    let neighbors: Vec<NeighborOutput> = from_value(res).unwrap();
     assert_eq!(neighbors.len(), 1);
     assert_eq!(neighbors[0].node.id, "B");
 }
 
 #[test]
 fn test_vector_arena_and_hybrid_search() {
-    let storage = setup_test_db("test_hybrid_search");
+    let db_path = "G:/GenesisBlock_Dev/GenesisBlock/tests/test_hybrid_search";
+    if Path::new(db_path).exists() {
+        fs::remove_dir_all(db_path).unwrap();
+    }
+    let storage = Storage::open(OpenOptions { 
+        path: db_path.to_string(),
+        page_cache_mb: Some(64),
+        read_only: Some(false),
+        vector_dim: Some(3),
+    }).unwrap();
     
     storage.add_node(NodeInput {  
         id: Some("v1".to_string()),
         labels: vec![], props: None,
         embedding: Some(vec![1.0, 0.0, 0.0]),
         lang: None,
-     valid_from: None, caused_by: None,  ttl: None, }).unwrap();
+        valid_from: None,
+        caused_by: None,
+        ttl: None,
+    }).unwrap();
     
     storage.add_node(NodeInput {  
         id: Some("v2".to_string()),
         labels: vec![], props: None,
         embedding: Some(vec![0.0, 1.0, 0.0]),
         lang: None,
-     valid_from: None, caused_by: None,  ttl: None, }).unwrap();
+        valid_from: None,
+        caused_by: None,
+        ttl: None,
+    }).unwrap();
     
     storage.rebuild_index_parallel().unwrap();
 
     let res = storage.execute_hql("SEARCH Node SIMILAR TO [0.9, 0.1, 0.0] K 1").unwrap();
-    let results: Vec<genesis_block_native::NeighborOutput> = serde_json::from_value(res).unwrap();
+    let results: Vec<NeighborOutput> = from_value(res).unwrap();
     assert_eq!(results.len(), 1);
     assert_eq!(results[0].node.id, "v1");
 }
@@ -89,12 +110,12 @@ fn test_wal_group_commit_durability() {
     if Path::new(db_path).exists() { fs::remove_dir_all(db_path).unwrap(); }
 
     {
-        let storage = Storage::open(OpenOptions {  path: db_path.to_string(), page_cache_mb: None, read_only: Some(false), vector_dim: None, }).unwrap();
-        storage.add_node(NodeInput {   id: Some("durable_node".to_string()), labels: vec![], props: None, embedding: None, lang: None, valid_from: None, caused_by: None,  ttl: None, }).unwrap();
+        let storage = Storage::open(OpenOptions { path: db_path.to_string(), page_cache_mb: None, read_only: Some(false), vector_dim: None }).unwrap();
+        storage.add_node(NodeInput { id: Some("durable_node".to_string()), labels: vec![], props: None, embedding: None, lang: None, valid_from: None, caused_by: None, ttl: None }).unwrap();
     } 
 
     {
-        let storage = Storage::open(OpenOptions {  path: db_path.to_string(), page_cache_mb: None, read_only: Some(false), vector_dim: None, }).unwrap();
+        let storage = Storage::open(OpenOptions { path: db_path.to_string(), page_cache_mb: None, read_only: Some(false), vector_dim: None }).unwrap();
         let u32_id = storage.get_u32("durable_node").expect("Node should exist after WAL replay");
         let node = storage.nodes.get(&u32_id).unwrap();
         assert_eq!(node.id, "durable_node");

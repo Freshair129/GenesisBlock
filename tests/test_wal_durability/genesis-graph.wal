@@ -1,1 +1,1 @@
-{"Node":{"id":"durable_node","labels":[],"props":{},"impact":0.7,"lang":"en"}}
+{"Node":{"id":"durable_node","labels":[],"props":{},"impact":0.7,"lang":"en","valid_from":"2026-06-07T11:24:02.194151500+00:00","valid_to":null,"caused_by":null,"expires_at":null,"clock":{"time":1,"peer_id":"agent-68cbb12c"}}}
