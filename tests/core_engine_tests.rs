@@ -7,11 +7,11 @@ fn setup_test_db(name: &str) -> Storage {
     if Path::new(&db_path).exists() {
         fs::remove_dir_all(&db_path).unwrap();
     }
-    Storage::open(OpenOptions {
+    Storage::open(OpenOptions { 
         path: db_path,
         page_cache_mb: Some(64),
         read_only: Some(false),
-    }).unwrap()
+     vector_dim: None, }).unwrap()
 }
 
 #[test]
@@ -87,12 +87,12 @@ fn test_wal_group_commit_durability() {
     if Path::new(db_path).exists() { fs::remove_dir_all(db_path).unwrap(); }
 
     {
-        let storage = Storage::open(OpenOptions { path: db_path.to_string(), page_cache_mb: None, read_only: Some(false) }).unwrap();
+        let storage = Storage::open(OpenOptions {  path: db_path.to_string(), page_cache_mb: None, read_only: Some(false), vector_dim: None, }).unwrap();
         storage.add_node(NodeInput {   id: Some("durable_node".to_string()), labels: vec![], props: None, embedding: None, lang: None, valid_from: None, caused_by: None,  ttl: None, }).unwrap();
     } 
 
     {
-        let storage = Storage::open(OpenOptions { path: db_path.to_string(), page_cache_mb: None, read_only: Some(false) }).unwrap();
+        let storage = Storage::open(OpenOptions {  path: db_path.to_string(), page_cache_mb: None, read_only: Some(false), vector_dim: None, }).unwrap();
         let u32_id = storage.get_u32("durable_node").expect("Node should exist after WAL replay");
         let node = storage.nodes.get(&u32_id).unwrap();
         assert_eq!(node.id, "durable_node");

@@ -226,11 +226,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .and_then(|p| p.parse().ok())
         .unwrap_or(3000);
 
-    let storage = Storage::open(OpenOptions {
+    let storage = Storage::open(OpenOptions { 
         path: data_dir,
         page_cache_mb: Some(64),
         read_only: Some(false),
-    })?;
+     vector_dim: None, })?;
 
     let state = AppState {
         storage: Arc::new(RwLock::new(storage)),

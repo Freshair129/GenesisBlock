@@ -31,11 +31,11 @@ fn setup_ldbc_graph(storage: &mut Storage, node_count: usize, fan_out: usize) {
 
 fn bench_traversal(c: &mut Criterion) {
     let dir = tempdir().unwrap();
-    let opts = OpenOptions {
+    let opts = OpenOptions { 
         path: dir.path().to_str().unwrap().to_string(),
         page_cache_mb: Some(128),
         read_only: Some(false),
-    };
+     vector_dim: None, };
     let mut storage = Storage::open(opts).unwrap();
     
     let node_count = 1000; // Reduced for faster benchmarking

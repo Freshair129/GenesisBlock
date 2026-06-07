@@ -6,11 +6,11 @@ use tempfile::tempdir;
 fn test_vector_drift_tracking() {
     let dir = tempdir().unwrap();
     let path = dir.path().to_str().unwrap().to_string();
-    let storage = Arc::new(Storage::open(OpenOptions {
+    let storage = Arc::new(Storage::open(OpenOptions { 
         path,
         page_cache_mb: Some(64),
         read_only: Some(false),
-    }).unwrap());
+     vector_dim: None, }).unwrap());
 
     // 1. Add some nodes to form a cluster
     let mut v1 = vec![0.0; 1536];

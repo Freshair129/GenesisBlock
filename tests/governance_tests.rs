@@ -8,11 +8,11 @@ fn test_axiomatic_guards_enforcement() {
         let _ = std::fs::remove_dir_all(db_path);
     }
 
-    let storage = Storage::open(OpenOptions {
+    let storage = Storage::open(OpenOptions { 
         path: db_path.to_string(),
         page_cache_mb: Some(64),
         read_only: Some(false),
-    }).expect("Failed to open storage");
+     vector_dim: None, }).expect("Failed to open storage");
 
     // 1. Attempt to create a MASTER node (should fail for external agents)
     let master_res = storage.add_node(NodeInput {  

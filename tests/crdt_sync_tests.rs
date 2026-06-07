@@ -8,17 +8,17 @@ fn test_crdt_conflict_resolution() {
     let dir_a = tempdir().unwrap();
     let dir_b = tempdir().unwrap();
     
-    let storage_a = Arc::new(Storage::open(OpenOptions {
+    let storage_a = Arc::new(Storage::open(OpenOptions { 
         path: dir_a.path().to_str().unwrap().to_string(),
         page_cache_mb: Some(64),
         read_only: Some(false),
-    }).unwrap());
+     vector_dim: None, }).unwrap());
 
-    let storage_b = Arc::new(Storage::open(OpenOptions {
+    let storage_b = Arc::new(Storage::open(OpenOptions { 
         path: dir_b.path().to_str().unwrap().to_string(),
         page_cache_mb: Some(64),
         read_only: Some(false),
-    }).unwrap());
+     vector_dim: None, }).unwrap());
 
     // 1. Agent A creates a node
     let node_a = storage_a.add_node(NodeInput {
@@ -62,11 +62,11 @@ fn test_crdt_conflict_resolution() {
 #[test]
 fn test_logical_clock_convergence() {
     let dir = tempdir().unwrap();
-    let storage = Storage::open(OpenOptions {
+    let storage = Storage::open(OpenOptions { 
         path: dir.path().to_str().unwrap().to_string(),
         page_cache_mb: Some(64),
         read_only: Some(false),
-    }).unwrap();
+     vector_dim: None, }).unwrap();
 
     // Initial clock is 0 (or first mutation makes it 1)
     let n1 = storage.add_node(NodeInput {

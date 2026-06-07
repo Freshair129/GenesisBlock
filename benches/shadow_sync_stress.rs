@@ -12,11 +12,11 @@ fn main() {
     }
 
     println!("--- SHADOW SYNC STRESS TEST (MARK V) ---");
-    let storage = Arc::new(Storage::open(OpenOptions {
+    let storage = Arc::new(Storage::open(OpenOptions { 
         path: db_path.to_string(),
         page_cache_mb: Some(512),
         read_only: Some(false),
-    }).expect("Failed to open storage"));
+     vector_dim: None, }).expect("Failed to open storage"));
 
     let node_count = 10_000;
     let writer_threads = 12;
@@ -102,11 +102,11 @@ fn main() {
     drop(storage);
 
     // Verification Phase
-    let storage_verify = Storage::open(OpenOptions {
+    let storage_verify = Storage::open(OpenOptions { 
         path: db_path.to_string(),
         page_cache_mb: Some(64),
         read_only: Some(true),
-    }).expect("Failed to reopen storage for verification");
+     vector_dim: None, }).expect("Failed to reopen storage for verification");
 
     let u32_id = storage_verify.get_u32("Note-9999");
     

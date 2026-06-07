@@ -7,11 +7,11 @@ use chrono::Utc;
 fn test_ephemeral_nodes_ttl() {
     let dir = tempdir().unwrap();
     let path = dir.path().to_str().unwrap().to_string();
-    let storage = Arc::new(Storage::open(OpenOptions {
+    let storage = Arc::new(Storage::open(OpenOptions { 
         path,
         page_cache_mb: Some(64),
         read_only: Some(false),
-    }).unwrap());
+     vector_dim: None, }).unwrap());
 
     // 1. Add a node with 2-second TTL
     let node_res = storage.add_node(NodeInput {

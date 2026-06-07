@@ -6,11 +6,11 @@ use tempfile::tempdir;
 fn test_thai_fuzzy_hardening() {
     let dir = tempdir().unwrap();
     let path = dir.path().to_str().unwrap().to_string();
-    let storage = Storage::open(OpenOptions {
+    let storage = Storage::open(OpenOptions { 
         path,
         page_cache_mb: Some(64),
         read_only: Some(false),
-    }).unwrap();
+     vector_dim: None, }).unwrap();
 
     // 1. Add a Thai node: "บ้าน" (House)
     // Note: "บ้าน" has base 'บ', 'า', 'น' and combining mark '้' (tone)

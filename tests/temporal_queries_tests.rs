@@ -3,11 +3,11 @@ use serde_json::json;
 
 #[tokio::test]
 async fn test_temporal_time_travel() {
-    let opts = OpenOptions {
+    let opts = OpenOptions { 
         path: ".brain/test_temporal_db".to_string(),
         page_cache_mb: Some(10),
         read_only: Some(false),
-    };
+     vector_dim: None, };
     let _ = std::fs::remove_dir_all(&opts.path);
     let db = GenesisDatabase::open(opts.clone()).unwrap();
 

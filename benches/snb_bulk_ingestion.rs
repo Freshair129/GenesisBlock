@@ -7,11 +7,11 @@ fn main() {
         let _ = std::fs::remove_dir_all(db_path);
     }
 
-    let storage = Storage::open(OpenOptions {
+    let storage = Storage::open(OpenOptions { 
         path: db_path.to_string(),
         page_cache_mb: Some(1024),
         read_only: Some(false),
-    }).expect("Failed to open storage");
+     vector_dim: None, }).expect("Failed to open storage");
 
     let batch_size = 5000;
     println!("SNB BULK INGESTION: Processing {} nodes...", batch_size);

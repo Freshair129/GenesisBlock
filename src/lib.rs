@@ -37,6 +37,7 @@ pub struct OpenOptions {
     pub path: String,
     pub page_cache_mb: Option<u32>,
     pub read_only: Option<bool>,
+    pub vector_dim: Option<u32>,
 }
 
 #[napi(object)]
@@ -254,6 +255,7 @@ pub struct Storage {
     pub wal_sender: Sender<(Event, Sender<bool>)>,
     pub local_peer_id: String,
     pub logical_clock: AtomicU32,
+    pub vector_dim: u16,
 }
 
 // --- Governance (AXIOMATIC GUARDS §2) ---
@@ -334,7 +336,6 @@ impl Storage {
 
     fn add_vector_internal(&self, node_id: &str, emb_64: Vec<f64>, lang: String) {
         let emb: Vec<f32> = emb_64.into_iter().map(|v| v as f32).collect();
-        let dim = emb.len() as u16;
         let mut meta_arena = self.metadata_arena.write();
         let mut vec_arena = self.vector_arena.write();
         let current_vec_len = vec_arena.len();
@@ -342,7 +343,7 @@ impl Storage {
         let arena_id = meta_arena.len() as u32;
         meta_arena.push(NodeMetadata {
             arena_id, node_id: node_id.to_string(), timestamp: Utc::now().timestamp() as u64,
-            vector_dim: dim, embedding_offset: current_vec_len as u64, gks_attributes: Vec::new(),
+            vector_dim: self.vector_dim, embedding_offset: current_vec_len as u64, gks_attributes: Vec::new(),
             lang, cluster_id: arena_id,
         });
         if let Some(u32_id) = self.get_u32(node_id) { self.u32_to_arena_id.insert(u32_id, arena_id); }
@@ -371,6 +372,7 @@ impl Storage {
         let root = PathBuf::from(opts.path.clone());
         if !root.exists() { fs::create_dir_all(&root).ok(); }
         let read_only = opts.read_only.unwrap_or(false);
+        let vector_dim = opts.vector_dim.unwrap_or(1536) as u16;
         let log_path = root.join("genesis-graph.wal");
         let (wal_sender, wal_receiver): (Sender<(Event, Sender<bool>)>, Receiver<(Event, Sender<bool>)>) = unbounded();
         let log_path_clone = log_path.clone();
@@ -421,6 +423,7 @@ impl Storage {
             wal_sender,
             local_peer_id: format!("agent-{}", Uuid::new_v4().to_string()[..8].to_string()),
             logical_clock: AtomicU32::new(0),
+            vector_dim,
         };
 
         if storage.log_path.exists() {
@@ -895,7 +898,7 @@ impl Storage {
         let now = Utc::now().to_rfc3339();
 
         for (c_id, members) in cluster_groups.iter() {
-            let mut centroid = vec![0.0; 1536];
+            let mut centroid = vec![0.0; self.vector_dim as usize];
             let mut total_impact = 0.0;
             let mut count = 0;
             for &u32_id in members {
@@ -907,7 +910,7 @@ impl Storage {
                             let end = start + meta.vector_dim as usize;
                             if end <= vec_arena.len() {
                                 for (i, val) in vec_arena[start..end].iter().enumerate() {
-                                    if i < 1536 { centroid[i] += *val as f64; }
+                                    if i < self.vector_dim as usize { centroid[i] += *val as f64; }
                                 }
                                 count += 1;
                             }
@@ -1004,11 +1007,7 @@ impl Storage {
             None => return Ok(()),
         };
 
-        // 1. Remove from indices
-        self.id_to_u32.remove(id);
-        self.u32_to_id.remove(&u32_id);
-        
-        // 2. Remove associated edges (Cascading)
+        // 1. Collect all edges to remove
         let mut edges_to_remove = Vec::new();
         if let Some(eids) = self.out_idx.get(&u32_id) {
             for eid in eids.iter() { edges_to_remove.push(*eid); }
@@ -1016,18 +1015,31 @@ impl Storage {
         if let Some(eids) = self.in_idx.get(&u32_id) {
             for eid in eids.iter() { edges_to_remove.push(*eid); }
         }
+
+        // 2. Comprehensive bi-directional index cleanup
         for eid in edges_to_remove {
+            if let Some(edge_ref) = self.edges.get(&eid) {
+                let edge = edge_ref.value();
+                if let (Some(from_u32), Some(to_u32)) = (self.get_u32(&edge.from), self.get_u32(&edge.to)) {
+                    // Remove from source node's out-index
+                    if let Some(mut out_set) = self.out_idx.get_mut(&from_u32) {
+                        out_set.remove(&eid);
+                    }
+                    // Remove from target node's in-index
+                    if let Some(mut in_set) = self.in_idx.get_mut(&to_u32) {
+                        in_set.remove(&eid);
+                    }
+                }
+            }
             self.edges.remove(&eid);
-            // Cleanup indices for the other side of the edge too (omitted for brevity in Mark VI, but critical for VII)
-            // TODO: Comprehensive edge index cleanup
         }
+
+        // 3. Remove node and primary indices
+        self.id_to_u32.remove(id);
+        self.u32_to_id.remove(&u32_id);
         self.out_idx.remove(&u32_id);
         self.in_idx.remove(&u32_id);
-
-        // 3. Remove from vector/metadata arenas (Soft remove - we just remove from map)
         self.u32_to_arena_id.remove(&u32_id);
-
-        // 4. Remove from nodes map
         self.nodes.remove(&u32_id);
 
         Ok(())
