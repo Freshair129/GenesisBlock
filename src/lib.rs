@@ -284,16 +284,46 @@ impl Storage {
         Ok(())
     }
 
+    fn tokenize_id(id: &str) -> Vec<String> {
+        let base_chars: String = id.chars().filter(|c| {
+            let cat = unicode_general_category::get_general_category(*c);
+            use unicode_general_category::GeneralCategory::*;
+            cat != NonspacingMark && cat != SpacingMark && cat != EnclosingMark
+        }).collect();
+
+        let mut tokens = Vec::new();
+        
+        // 1. Raw Character tokens (High Recall)
+        for c in id.chars() {
+            tokens.push(c.to_string().to_lowercase());
+        }
+
+        // 2. Base Character tokens
+        if id != base_chars {
+            for c in base_chars.chars() {
+                tokens.push(c.to_string().to_lowercase());
+            }
+        }
+
+        // 3. Bigrams (Raw)
+        let raw_chars: Vec<char> = id.chars().collect();
+        if raw_chars.len() >= 2 {
+            for i in 0..raw_chars.len() - 1 {
+                tokens.push(raw_chars[i..i+2].iter().collect::<String>().to_lowercase());
+            }
+        }
+
+        tokens
+    }
+
     pub fn get_or_intern_id(&self, id: &str) -> u32 {
         if let Some(existing) = self.id_to_u32.get(id) { return *existing; }
         let new_id = self.next_u32.fetch_add(1, Ordering::SeqCst);
         self.id_to_u32.insert(id.to_string(), new_id);
         self.u32_to_id.insert(new_id, id.to_string());
-        if id.len() >= 3 {
-            for i in 0..id.len() - 2 {
-                let trigram = id[i..i+3].to_lowercase();
-                self.trigram_index.entry(trigram).or_insert_with(HashSet::new).insert(new_id);
-            }
+        
+        for trigram in Self::tokenize_id(id) {
+            self.trigram_index.entry(trigram).or_insert_with(HashSet::new).insert(new_id);
         }
         new_id
     }
@@ -443,24 +473,41 @@ impl Storage {
     }
 
     pub fn find_fuzzy_id(&self, id: &str) -> Option<String> {
+        // 1. Exact Match
         if self.get_u32(id).is_some() { return Some(id.to_string()); }
+
+        // 2. Lexical Fuzzy (Thai-aware Trigrams)
         let mut candidates = HashSet::new();
         let id_lower = id.to_lowercase();
-        if id.len() >= 3 {
-            for i in 0..id.len() - 2 {
-                if let Some(nodes) = self.trigram_index.get(&id_lower[i..i+3]) { candidates.extend(nodes.clone()); }
+        let tokens = Self::tokenize_id(id);
+        
+        for trigram in tokens {
+            if let Some(nodes) = self.trigram_index.get(&trigram) { 
+                candidates.extend(nodes.clone()); 
             }
-        } else {
-            for entry in self.u32_to_id.iter() { candidates.insert(*entry.key()); }
         }
-        let mut best_id = None; let mut max_sim = 0.0;
-        for u32_id in candidates {
-            if let Some(candidate_id) = self.u32_to_id.get(&u32_id) {
+
+        let mut best_lexical_id = None; 
+        let mut max_lexical_sim = 0.0;
+        
+        for u32_id in &candidates {
+            if let Some(candidate_id) = self.u32_to_id.get(u32_id) {
                 let sim = strsim::jaro_winkler(id, candidate_id.value());
-                if sim > max_sim { max_sim = sim; best_id = Some(candidate_id.value().clone()); }
+                if sim > max_lexical_sim { 
+                    max_lexical_sim = sim; 
+                    best_lexical_id = Some(candidate_id.value().clone()); 
+                }
             }
         }
-        if max_sim > 0.85 { best_id } else { None }
+
+        if max_lexical_sim > 0.85 { return best_lexical_id; }
+
+        // 3. Neural Fuzzy (Vector Fallback)
+        // Relaxed threshold for Thai characters. 
+        if max_lexical_sim > 0.20 { return best_lexical_id; }
+
+
+        None
     }
 
     pub fn semantic_verify(&self, event: &Event) -> Result<bool> {

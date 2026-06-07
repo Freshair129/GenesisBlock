@@ -39,6 +39,7 @@ pest_derive = "2.7"
 strsim = "0.11"
 sha2 = "0.10"
 hex = "0.4"
+unicode-general-category = "1.1.0"
 
 [build-dependencies]
 napi-build = "2.1"
