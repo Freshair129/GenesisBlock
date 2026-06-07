@@ -105,16 +105,17 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       }
 
       case "add_knowledge": {
-        const result = await db.addNode({
-          id: arguments.id || null,
+        const input = {
           labels: arguments.labels,
-          props: arguments.props || null,
-          embedding: arguments.embedding || null,
           lang: "en",
-          validFrom: null,
           causedBy: "mcp-agent",
-          ttl: arguments.ttl || null,
-        });
+        };
+        if (arguments.id) input.id = arguments.id;
+        if (arguments.props) input.props = arguments.props;
+        if (arguments.embedding) input.embedding = arguments.embedding;
+        if (arguments.ttl) input.ttl = arguments.ttl;
+
+        const result = await db.addNode(input);
         return { content: [{ type: "text", text: `Knowledge atom added: ${result.id}` }] };
       }
 
