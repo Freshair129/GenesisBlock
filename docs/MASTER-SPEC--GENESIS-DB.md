@@ -112,3 +112,11 @@ GenesisBlock provides a native MCP server for seamless integration with LLMs.
     - `add_knowledge`: Dynamic knowledge injection with provenance.
 - **Usage:** Run `npm run mcp:start` and configure the client with the resulting stdio stream.
 
+### 8.3 Python SDK
+The official Python library provides high-level bindings for AI and Data Science research.
+- **Installation:** `pip install genesisdb-python/`
+- **Features:** 
+    - Typed models for Nodes and Edges.
+    - Tiered Context Retrieval (H0-H5).
+    - Support for NumPy-compatible vector injection.
+

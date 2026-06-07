@@ -44,5 +44,6 @@
 
 ## MARK XI: Enterprise Integration & Tooling (Current)
 - [x] **Step 1: MCP Server:** Model Context Protocol implementation for LLM native tool integration. [Guide](docs/MCP-GUIDE.md)
-- [ ] **Step 2: External Bindings:** Develop official Python and Go clients.
-- [ ] **Step 3: GKS Insight Dashboard:** Real-time visualization of swarm health and knowledge drift.
+- [x] **Step 2: Python SDK:** High-level bindings for Data Science and AI research. [Guide](docs/PYTHON-SDK-GUIDE.md)
+- [ ] **Step 3: External Bindings:** Develop official Go client.
+- [ ] **Step 4: GKS Insight Dashboard:** Real-time visualization of swarm health and knowledge drift.
