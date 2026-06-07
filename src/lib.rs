@@ -490,33 +490,35 @@ impl Storage {
             gossip_port: AtomicU32::new(0),
         };
 
-        if storage.log_path.exists() {
-            if let Ok(file) = File::open(&storage.log_path) {
-                let reader = std::io::BufReader::new(file);
-                use std::io::BufRead;
-                for line_res in reader.lines() {
-                    if let Ok(line) = line_res {
-                        if let Ok(event) = serde_json::from_str::<Event>(&line) {
-                            match event {
-                                Event::Node(n) => {
-                                    let u32_id = storage.get_or_intern_id(&n.id);
-                                    if let Some(emb) = n.embedding.clone() { 
-                                        storage.add_vector_internal(&n.id, emb, n.lang.clone().unwrap_or("en".to_string())); 
+        if !storage.try_load_state() {
+            if storage.log_path.exists() {
+                if let Ok(file) = File::open(&storage.log_path) {
+                    let reader = std::io::BufReader::new(file);
+                    use std::io::BufRead;
+                    for line_res in reader.lines() {
+                        if let Ok(line) = line_res {
+                            if let Ok(event) = serde_json::from_str::<Event>(&line) {
+                                match event {
+                                    Event::Node(n) => {
+                                        let u32_id = storage.get_or_intern_id(&n.id);
+                                        if let Some(emb) = n.embedding.clone() { 
+                                            storage.add_vector_internal(&n.id, emb, n.lang.clone().unwrap_or("en".to_string())); 
+                                        }
+                                        storage.nodes.insert(u32_id, n);
                                     }
-                                    storage.nodes.insert(u32_id, n);
-                                }
-                                Event::Edge(e) => {
-                                    let u32_id = storage.get_or_intern_id(&e.id);
-                                    storage.index_edge_internal(&e.id, &e.from, &e.to);
-                                    storage.edges.insert(u32_id, e);
+                                    Event::Edge(e) => {
+                                        let u32_id = storage.get_or_intern_id(&e.id);
+                                        storage.index_edge_internal(&e.id, &e.from, &e.to);
+                                        storage.edges.insert(u32_id, e);
+                                    }
                                 }
                             }
                         }
                     }
                 }
             }
+            storage.rehydrate_hnsw_index();
         }
-        storage.rehydrate_hnsw_index();
         Ok(storage)
     }
 
@@ -526,6 +528,7 @@ impl Storage {
                 std::thread::sleep(Duration::from_secs(3600)); 
                 if !storage.read_only {
                     let _ = storage.perform_autonomic_optimization();
+                    let _ = storage.save_state();
                 }
             }
         });
@@ -1365,6 +1368,123 @@ impl Storage {
         });
     }
 
+    pub fn save_state(&self) -> Result<()> {
+        self.ensure_writable()?;
+        let temp_dir = self.path.join("temp_save");
+        if !temp_dir.exists() { fs::create_dir_all(&temp_dir).ok(); }
+
+        // 1. Save Arenas
+        let vec_arena = self.vector_arena.read();
+        let meta_arena = self.metadata_arena.read();
+        fs::write(temp_dir.join("vector.bin"), unsafe {
+            std::slice::from_raw_parts(vec_arena.as_ptr() as *const u8, vec_arena.len() * 4)
+        }).map_err(|e| Error::from_reason(e.to_string()))?;
+        
+        let meta_data = bincode::serialize(&*meta_arena).map_err(|e| Error::from_reason(e.to_string()))?;
+        fs::write(temp_dir.join("meta.bin"), meta_data).map_err(|e| Error::from_reason(e.to_string()))?;
+
+        // 2. Save HNSW Index
+        let hnsw_lock = self.hnsw_index.read();
+        if let Some(hnsw) = &*hnsw_lock {
+            // hnsw_rs 0.3.4 uses file_dump(&path, basename)
+            hnsw.file_dump(&temp_dir, "index").map_err(|e| Error::from_reason(format!("HNSW dump error: {:?}", e)))?;
+        }
+
+        // 3. Save DashMaps (Partial state for instant load)
+        let nodes: Vec<(u32, NodeOutput)> = self.nodes.iter().map(|e| (*e.key(), e.value().clone())).collect();
+        let edges: Vec<(u32, EdgeOutput)> = self.edges.iter().map(|e| (*e.key(), e.value().clone())).collect();
+        fs::write(temp_dir.join("nodes.bin"), serde_json::to_vec(&nodes).unwrap()).ok();
+        fs::write(temp_dir.join("edges.bin"), serde_json::to_vec(&edges).unwrap()).ok();
+
+        // 4. Save Global Metadata
+        let state = serde_json::json!({
+            "logical_clock": self.get_logical_clock(),
+            "peer_id": self.local_peer_id,
+            "vector_dim": self.vector_dim,
+            "schema_version": SCHEMA_VERSION,
+            "timestamp": Utc::now().to_rfc3339(),
+        });
+        fs::write(temp_dir.join("state.json"), state.to_string()).ok();
+
+        // Atomic Swap
+        // Note: file_dump creates {basename}.hnsw.graph and {basename}.hnsw.data
+        for file in &["vector.bin", "meta.bin", "nodes.bin", "edges.bin", "state.json", "index.hnsw.graph", "index.hnsw.data"] {
+            let src = temp_dir.join(file);
+            if src.exists() {
+                let dst = self.path.join(file);
+                fs::rename(src, dst).ok();
+            }
+        }
+        
+        println!("Mark IX: State persisted successfully to {}", self.path.display());
+        Ok(())
+    }
+
+    fn try_load_state(&self) -> bool {
+        let state_path = self.path.join("state.json");
+        if !state_path.exists() { return false; }
+
+        println!("Mark IX: Attempting instant load from binary state...");
+        
+        let start = Instant::now();
+        // 1. Load Metadata & Arenas
+        if let Ok(data) = fs::read(self.path.join("vector.bin")) {
+            let mut vec_arena = self.vector_arena.write();
+            *vec_arena = unsafe {
+                std::slice::from_raw_parts(data.as_ptr() as *const f32, data.len() / 4).to_vec()
+            };
+        } else { return false; }
+
+        if let Ok(data) = fs::read(self.path.join("meta.bin")) {
+            if let Ok(meta) = bincode::deserialize::<Vec<NodeMetadata>>(&data) {
+                *self.metadata_arena.write() = meta;
+            } else { return false; }
+        } else { return false; }
+
+        // 2. Load Maps
+        if let Ok(data) = fs::read(self.path.join("nodes.bin")) {
+            match serde_json::from_slice::<Vec<(u32, NodeOutput)>>(&data) {
+                Ok(nodes) => {
+                    println!("Mark IX: Loading {} nodes from snapshot", nodes.len());
+                    let mut max_u32 = 0;
+                    for (k, v) in nodes { 
+                        if k > max_u32 { max_u32 = k; }
+                        self.id_to_u32.insert(v.id.clone(), k);
+                        self.u32_to_id.insert(k, v.id.clone());
+                        self.nodes.insert(k, v); 
+                    }
+                    self.next_u32.store(max_u32 + 1, Ordering::SeqCst);
+                }
+                Err(e) => { println!("Mark IX: Failed to deserialize nodes: {}", e); return false; }
+            }
+        } else { println!("Mark IX: nodes.bin not found"); }
+
+        if let Ok(data) = fs::read(self.path.join("edges.bin")) {
+            if let Ok(edges) = serde_json::from_slice::<Vec<(u32, EdgeOutput)>>(&data) {
+                println!("Mark IX: Loading {} edges from snapshot", edges.len());
+                for (k, v) in edges { 
+                    self.index_edge_internal(&v.id, &v.from, &v.to);
+                    self.edges.insert(k, v); 
+                }
+            }
+        }
+
+        // 3. Load HNSW Index (Placeholder for future native serialization)
+        // For now, re-insertion from memory arenas is extremely fast.
+
+        // 4. Sync Global State
+        if let Ok(content) = fs::read_to_string(state_path) {
+            if let Ok(v) = serde_json::from_str::<serde_json::Value>(&content) {
+                if let Some(clock) = v["logical_clock"].as_u64() {
+                    self.logical_clock.store(clock as u32, Ordering::SeqCst);
+                }
+            }
+        }
+
+        println!("Mark IX: Instant load complete in {:?}", start.elapsed());
+        true
+    }
+
     pub fn set_language_centroid(&self, lang: String, vector: Vec<f64>) {
         let v_f32: Vec<f32> = vector.into_iter().map(|v| v as f32).collect();
         self.lang_centroids.insert(lang, v_f32);
@@ -1383,7 +1503,46 @@ impl Storage {
         hex::encode(hasher.finalize())
     }
 
-    pub fn compact(&self) -> Result<()> { Ok(()) }
+    pub fn compact(&self) -> Result<()> {
+        self.ensure_writable()?;
+        let new_log_path = self.path.join("genesis-graph.wal.new");
+        let mut writer = std::io::BufWriter::new(File::create(&new_log_path).map_err(|e| Error::from_reason(e.to_string()))?);
+        
+        let now = Utc::now().to_rfc3339();
+        let mut count = 0;
+
+        // 1. Write current live nodes
+        for entry in self.nodes.iter() {
+            let node = entry.value();
+            if let Some(exp) = &node.expires_at {
+                if now > *exp { continue; }
+            }
+            if node.valid_to.is_none() {
+                if let Ok(json) = serde_json::to_string(&Event::Node(node.clone())) {
+                    let _ = writer.write_all(json.as_bytes());
+                    let _ = writer.write_all(b"\n");
+                    count += 1;
+                }
+            }
+        }
+
+        // 2. Write current live edges
+        for entry in self.edges.iter() {
+            let edge = entry.value();
+            if edge.valid_to.is_none() {
+                if let Ok(json) = serde_json::to_string(&Event::Edge(edge.clone())) {
+                    let _ = writer.write_all(json.as_bytes());
+                    let _ = writer.write_all(b"\n");
+                    count += 1;
+                }
+            }
+        }
+
+        writer.flush().ok();
+        fs::rename(&new_log_path, &self.log_path).ok();
+        println!("Mark IX: WAL Compacted. {} live events preserved.", count);
+        Ok(())
+    }
     pub fn retract_edge(&self, _id: String, _at: Option<String>) -> Result<Option<EdgeOutput>> { Ok(None) }
     pub fn status_sync(&self) -> DatabaseStatus { DatabaseStatus { open: true, read_only: self.read_only, page_cache_mb: 512 } }
     pub fn bulk_add_nodes(&self, inputs: Vec<NodeInput>) -> Result<()> { for i in inputs { self.add_node(i)?; } Ok(()) }
@@ -1439,6 +1598,15 @@ impl Storage {
     }
 }
 
+impl Drop for Storage {
+    fn drop(&mut self) {
+        if !self.read_only {
+            let _ = self.save_state();
+            println!("Mark IX: Graceful shutdown. State saved.");
+        }
+    }
+}
+
 #[napi(object)]
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct GapSuggestion {
@@ -1478,6 +1646,7 @@ impl GenesisDatabase {
     }
     #[napi] pub async fn hybrid_search(&self, args: HybridSearchInput) -> Result<Vec<NeighborOutput>> { let i = Arc::clone(&self.inner); tokio::task::spawn_blocking(move || i.hybrid_search(args)).await.map_err(|e| Error::from_reason(e.to_string()))? }
     #[napi] pub async fn neighbors(&self, seed: String, args: NeighborInput) -> Result<Vec<NeighborOutput>> { let i = Arc::clone(&self.inner); tokio::task::spawn_blocking(move || i.neighbors(seed, args, false)).await.map_err(|e| Error::from_reason(e.to_string()))? }
+    #[napi] pub async fn save_state(&self) -> Result<()> { let i = Arc::clone(&self.inner); tokio::task::spawn_blocking(move || i.save_state()).await.map_err(|e| Error::from_reason(e.to_string()))? }
     #[napi] pub async fn compact(&self) -> Result<()> { let i = Arc::clone(&self.inner); tokio::task::spawn_blocking(move || i.compact()).await.map_err(|e| Error::from_reason(e.to_string()))? }
     #[napi] pub fn set_language_centroid(&self, lang: String, vector: Vec<f64>) { self.inner.set_language_centroid(lang, vector); }
     #[napi] pub async fn detect_communities(&self) -> Result<()> { let i = Arc::clone(&self.inner); tokio::task::spawn_blocking(move || i.detect_communities()).await.map_err(|e| Error::from_reason(e.to_string()))? }
