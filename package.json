@@ -21,6 +21,7 @@
   "scripts": {
     "build": "napi build --platform --release",
     "build:debug": "napi build --platform",
+    "agents:validate": "node .agents/validate-agent-registry.mjs",
     "prepublishOnly": "napi prepublish -t npm",
     "test": "node --test __test__",
     "install": "npm run build",

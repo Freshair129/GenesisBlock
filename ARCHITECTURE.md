@@ -1,33 +1,22 @@
-# Architecture: Mark VIII - Genesis Knowledge System (GKS)
+# Architecture Entrypoint
 
-For the authoritative technical specification, see: [MASTER-SPEC--GENESIS-DB.md](docs/MASTER-SPEC--GENESIS-DB.md)
+This root file is a short architecture index for humans, tools, and agents.
 
-## Positioning
-GenesisDB is a **local-first hybrid knowledge engine** optimized for human-machine collaboration. It prioritizes **low-latency reasoning** and **distributed eventual consistency** via CRDTs.
+## Read Order
 
-## Core Architecture Layers
+1. Start with the C4 architecture index: [docs/C4--GENESISDB-ARCHITECTURE.md](docs/C4--GENESISDB-ARCHITECTURE.md)
+2. Use the parent technical specification for authoritative behavior: [docs/MASTER-SPEC--GENESIS-DB.md](docs/MASTER-SPEC--GENESIS-DB.md)
+3. Follow feature-level specs, TDDs, ADRs, and code anchors from the C4 map.
 
-### 1. Storage & Persistence (L0)
-- **WAL-Based Durability**: Every mutation is logged to `genesis-graph.wal` (JSONL).
-- **Zero-Copy Memory Map**: Utilizes **DashMap** for thread-safe concurrent access.
-- **Bitemporal Pattern**: Updates follow the "Retract and Re-insert" pattern for absolute auditability.
+## Current System Shape
 
-### 2. Semantic & Indexing (L1)
-- **HNSW Vector Index**: High-speed similarity search for high-dimensional embeddings.
-- **Thai-Aware Lexical Index**: Trigram indexing optimized for Thai character combining marks.
-- **Neural Bridge**: Language-agnostic context matching via mean-centering.
+GenesisDB is a local-first hybrid knowledge engine optimized for human-machine collaboration. Its main containers are:
 
-### 3. Reasoning & Autonomic Loop (L2)
-- **K-Impact Scoring**: Evaluates the authority of information based on connectivity and governance.
-- **Community Detection (LPA)**: Automatically clusters related knowledge into themes.
-- **Structural Insight**: Detects logical gaps and semantic drift over time.
+- Rust core engine: storage, WAL, HNSW, graph indices, HQL, GRL, governance, CRDT, consensus.
+- Axum REST server: `/v1/*` HTTP surface for agents, SDKs, and dashboard.
+- N-API package: native Node/TypeScript integration.
+- MCP server: LLM tool interface.
+- Python and Go SDKs: REST clients.
+- Dashboard and Obsidian-facing integrations.
 
-### 4. Distributed Collaboration (L3)
-- **Logical Clocks**: Lamport timestamps for deterministic event ordering.
-- **CRDT Synchronization**: Reconciles divergent states across multiple agents without a central authority.
-- **Neural Consensus**: Multi-agent voting protocol for promoting data to the "MASTER" axiom tier.
-
-## Interface
-- **HQL (Hybrid Query Language)**: A unified syntax for semantic search and graph traversal.
-- **NAPI-RS**: Native asynchronous bindings for TypeScript/Obsidian.
-- **Axum REST API**: Standardized endpoint for remote AI agents.
+Do not duplicate architecture decisions in this file. Update the C4 map, master spec, ADRs, or feature specs instead.

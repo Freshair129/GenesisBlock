@@ -1,0 +1,387 @@
+version: "0.2.0b"
+
+root_contract:
+  global_context:
+    - setup/AGENT.md
+    - AGENT.md
+    - ARCHITECTURE.md
+    - CONTRIBUTING.md
+    - README.md
+    - docs/C4--GENESISDB-ARCHITECTURE.md
+    - docs/MASTER-SPEC--GENESIS-DB.md
+    - .agents/agent-registry.yaml
+    - .agents/validate-agent-registry.mjs
+
+executor_defaults:
+  default: codex
+
+executors:
+  codex:
+    transport: codex_exec
+    allowed_modes:
+      - doc
+      - plan
+      - audit
+      - atomic
+  ollama:
+    transport: ollama_cli
+    allowed_modes:
+      - atomic
+      - audit
+
+defaults:
+  mode: doc
+  max_files: 16
+  max_chars_per_file: 12000
+  include_extensions:
+    - .md
+    - .html
+    - .txt
+    - .yaml
+    - .yml
+    - .ps1
+    - .mjs
+    - .ts
+    - .tsx
+    - .go
+    - .rs
+    - .js
+
+modes:
+  doc:
+    include:
+      - global_context
+      - agent_contract
+      - agent_default_context
+      - scope_context
+  plan:
+    include:
+      - global_context
+      - agent_contract
+      - agent_default_context
+      - scope_context
+  audit:
+    include:
+      - global_context
+      - agent_contract
+      - agent_default_context
+      - scope_context
+      - scope_verification_context
+  atomic:
+    include:
+      - global_context
+      - agent_contract
+      - agent_default_context
+      - scope_atomic_context
+
+agents:
+  origin:
+    agent_id: agt_origin
+    label: Origin (ออริจิน)
+    role: architecture_ssot
+    persona: "maps repository architecture and keeps SSOT navigation coherent"
+    permission:
+      default_executor: codex
+      allowed_executors:
+        - codex
+      allowed_modes:
+        - doc
+        - audit
+      requires_approval_for_code: true
+    scope:
+      - docs/
+      - src/
+      - mcp/
+      - dashboard/
+      - genesisdb-go/
+      - genesisdb-python/
+    asset:
+      - docs/C4--GENESISDB-ARCHITECTURE.md
+      - docs/MASTER-SPEC--GENESIS-DB.md
+    context:
+      - docs/C4--GENESISDB-ARCHITECTURE.md
+      - docs/MASTER-SPEC--GENESIS-DB.md
+    contract: .agents/origin/AGENT.md
+    execution_policy:
+      default_executor: codex
+      allowed_executors:
+        - codex
+      default_mode: doc
+      local_model_tier: default
+    default_context:
+      - docs/C4--GENESISDB-ARCHITECTURE.md
+      - docs/MASTER-SPEC--GENESIS-DB.md
+    allowed_scopes:
+      - docs/
+      - src/
+      - mcp/
+      - dashboard/
+      - genesisdb-go/
+      - genesisdb-python/
+
+  lyra:
+    agent_id: agt_lyra
+    label: Lyra (ไลรา)
+    role: docs_planning
+    persona: "turns ideas into disciplined plans and document-first change paths"
+    permission:
+      default_executor: codex
+      allowed_executors:
+        - codex
+      allowed_modes:
+        - plan
+        - doc
+      requires_approval_for_code: true
+    scope:
+      - docs/
+    asset:
+      - docs/C4--GENESISDB-ARCHITECTURE.md
+      - docs/MASTER-SPEC--GENESIS-DB.md
+      - docs/TDD--DOCUMENTATION-GOVERNANCE-SSOT-ENFORCEMENT.md
+    context:
+      - docs/C4--GENESISDB-ARCHITECTURE.md
+      - docs/MASTER-SPEC--GENESIS-DB.md
+    contract: .agents/lyra/AGENT.md
+    execution_policy:
+      default_executor: codex
+      allowed_executors:
+        - codex
+      default_mode: plan
+      local_model_tier: default
+    default_context:
+      - docs/C4--GENESISDB-ARCHITECTURE.md
+      - docs/MASTER-SPEC--GENESIS-DB.md
+    allowed_scopes:
+      - docs/
+
+  rusty:
+    agent_id: agt_rusty
+    label: Rusty (รัสตี้)
+    role: rust_core
+    persona: "implements Rust core mechanics with tight attention to runtime behavior"
+    permission:
+      default_executor: ollama
+      allowed_executors:
+        - ollama
+      allowed_modes:
+        - atomic
+        - audit
+      requires_approval_for_code: true
+    scope:
+      - src/
+      - tests/
+    asset:
+      - src/lib.rs
+      - src/main.rs
+      - tests/
+    context:
+      - docs/C4--GENESISDB-ARCHITECTURE.md
+      - src/lib.rs
+      - docs/MASTER-SPEC--GENESIS-DB.md
+    contract: .agents/rusty/AGENT.md
+    execution_policy:
+      default_executor: ollama
+      allowed_executors:
+        - ollama
+      default_mode: atomic
+      local_model_tier: specific
+    specific_models:
+      - "Aroow-Rust-Coder-9B-Q4_K_S-GGUF:Q4_K_S"
+      - "gemma4-rust-coder:latest"
+      - "gemma4-rust-coder-q8:latest"
+    default_context:
+      - docs/C4--GENESISDB-ARCHITECTURE.md
+      - src/lib.rs
+      - docs/MASTER-SPEC--GENESIS-DB.md
+    allowed_scopes:
+      - src/
+      - tests/
+
+  genesis:
+    agent_id: agt_genesis
+    label: Genesis (เจเนซิส)
+    role: devops
+    persona: "keeps release, handoff, and automation paths deterministic and recoverable"
+    permission:
+      default_executor: codex
+      allowed_executors:
+        - codex
+        - ollama
+      allowed_modes:
+        - atomic
+        - audit
+      requires_approval_for_code: true
+    scope:
+      - .github/
+      - .agents/
+      - setup/
+    asset:
+      - setup/AGENT.md
+      - .agents/agent-registry.yaml
+    context:
+      - setup/AGENT.md
+      - .agents/
+      - .github/workflows/
+    contract: setup/AGENT.md
+    execution_policy:
+      default_executor: codex
+      allowed_executors:
+        - codex
+        - ollama
+      default_mode: atomic
+      local_model_tier: retry
+    default_context:
+      - setup/AGENT.md
+      - .agents/
+      - .github/workflows/
+    allowed_scopes:
+      - .github/
+      - .agents/
+      - setup/
+
+  ather:
+    agent_id: agt_ather
+    label: Ather (อาเธอร์)
+    role: audit
+    persona: "reviews evidence, flags drift, and verifies that claims are backed by tests or docs"
+    permission:
+      default_executor: codex
+      allowed_executors:
+        - codex
+      allowed_modes:
+        - audit
+        - doc
+      requires_approval_for_code: false
+    scope:
+      - docs/
+      - AGENT.md
+      - ARCHITECTURE.md
+      - CONTRIBUTING.md
+      - README.md
+      - setup/
+    asset:
+      - docs/C4--GENESISDB-ARCHITECTURE.md
+      - docs/TDD--DOCUMENTATION-GOVERNANCE-SSOT-ENFORCEMENT.md
+    context:
+      - docs/C4--GENESISDB-ARCHITECTURE.md
+      - docs/
+      - AGENT.md
+    contract: .agents/ather/AGENT.md
+    execution_policy:
+      default_executor: codex
+      allowed_executors:
+        - codex
+      default_mode: audit
+      local_model_tier: tiny
+    default_context:
+      - docs/C4--GENESISDB-ARCHITECTURE.md
+      - docs/
+    allowed_scopes:
+      - docs/
+      - AGENT.md
+      - ARCHITECTURE.md
+      - CONTRIBUTING.md
+      - README.md
+      - setup/
+
+  kin:
+    agent_id: agt_kin
+    label: Kin (คิน)
+    role: documentation_restoration
+    persona: "restores damaged docs and turns broken diffs into coherent, repairable knowledge"
+    permission:
+      default_executor: codex
+      allowed_executors:
+        - codex
+      allowed_modes:
+        - doc
+        - audit
+      requires_approval_for_code: true
+    scope:
+      - docs/
+      - setup/
+      - .agents/
+    asset:
+      - docs/C4--GENESISDB-ARCHITECTURE.md
+      - docs/TDD--DOCUMENTATION-GOVERNANCE-SSOT-ENFORCEMENT.md
+      - docs/WHITEPAPER--GENESIS-DB.md
+    context:
+      - docs/C4--GENESISDB-ARCHITECTURE.md
+      - docs/WHITEPAPER--GENESIS-DB.md
+      - docs/WHITEPAPER--GENESIS-KNOWLEDGE-SYSTEM.md
+    contract: .agents/kin/AGENT.md
+    execution_policy:
+      default_executor: codex
+      allowed_executors:
+        - codex
+      default_mode: doc
+      local_model_tier: tiny
+    default_context:
+      - docs/C4--GENESISDB-ARCHITECTURE.md
+      - docs/WHITEPAPER--GENESIS-DB.md
+      - docs/WHITEPAPER--GENESIS-KNOWLEDGE-SYSTEM.md
+    allowed_scopes:
+      - docs/
+      - setup/
+      - .agents/
+
+routes:
+  src/lib.rs:
+    preferred_agent: rusty
+    reviewers:
+      - ather
+
+  src/main.rs:
+    preferred_agent: origin
+    reviewers:
+      - ather
+
+  mcp/:
+    preferred_agent: origin
+    reviewers:
+      - ather
+
+  genesisdb-go/:
+    preferred_agent: origin
+    reviewers:
+      - ather
+
+  genesisdb-python/:
+    preferred_agent: origin
+    reviewers:
+      - ather
+
+  dashboard/:
+    preferred_agent: genesis
+    reviewers:
+      - ather
+
+  docs/:
+    preferred_agent: ather
+    reviewers:
+      - genesis
+
+  AGENT.md:
+    preferred_agent: ather
+    reviewers:
+      - genesis
+
+  ARCHITECTURE.md:
+    preferred_agent: ather
+    reviewers:
+      - genesis
+
+  CONTRIBUTING.md:
+    preferred_agent: ather
+    reviewers:
+      - genesis
+
+  README.md:
+    preferred_agent: ather
+    reviewers:
+      - genesis
+
+  setup/:
+    preferred_agent: genesis
+    reviewers:
+      - ather

@@ -2,9 +2,9 @@
 proposed_id: C4--GENESISDB-ARCHITECTURE
 type: architecture-index
 status: candidate
-version: 0.1.0b
+version: 0.1.1b
 created_at: 2026-06-13T22:50:11+07:00,ATHER,9b1ced3
-last_update: 2026-06-13T22:50:11+07:00,ATHER
+last_update: 2026-06-14T00:29:45+07:00,ATHER
 attributes:
   domain: architecture
   scope: repository
@@ -32,7 +32,7 @@ attributes:
 
 | Layer | Primary SSOT | Supporting Sources | Notes |
 |---|---|---|---|
-| C1 System Context | `docs/MASTER-SPEC--GENESIS-DB.md` | `README.md`, `WHITEPAPER--GENESIS-DB.md`, `ARCHITECTURE.md` | Defines GenesisDB as local-first hybrid knowledge engine for human-machine collaboration. |
+| C1 System Context | `docs/MASTER-SPEC--GENESIS-DB.md` | `README.md`, `docs/WHITEPAPER--GENESIS-DB.md`, `docs/WHITEPAPER--GENESIS-KNOWLEDGE-SYSTEM.md`, `ARCHITECTURE.md` | Defines GenesisDB as local-first hybrid knowledge engine for human-machine collaboration. |
 | C2 Container | This document | `src/main.rs`, `mcp/server.js`, `index.d.ts`, SDK docs, dashboard docs | Container map is currently reconstructed from code and scattered docs. |
 | C3 Component | `docs/SPEC--*.md`, `docs/DESIGN--*.md`, ADRs | `src/lib.rs`, `src/query/*`, tests | Component ownership is distributed by feature/spec. |
 | C4 Code / Low-Level | Source code and targeted design docs | `src/lib.rs`, `src/main.rs`, `hql.pest`, `index.d.ts`, SDK clients | Low-level truth is code, but public behavior must be reflected upward into specs. |
@@ -214,4 +214,5 @@ Expected checks:
 
 | Version | Date | Status | Summary | Commit Hash | Agent |
 |---------|------|--------|---------|-------------|-------|
+| 0.1.1b | 2026-06-14 | candidate | Updated C1 supporting sources after moving the GKS whitepaper into docs. | 4101228 | ATHER |
 | 0.1.0b | 2026-06-13 | candidate | Initial C4 architecture index and SSOT map. | 9b1ced3 | ATHER |

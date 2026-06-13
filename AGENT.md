@@ -1,8 +1,8 @@
 ---
-version: "0.1.0b"
-created_at: "2026-06-13T19:39:22+07:00,ATHER,uncommitted"
-last_update: "2026-06-13T19:39:22+07:00,ATHER"
-status: "candidate"
+version: "0.2.1b"
+created_at: "2026-06-13T19:39:22+07:00,ATHER,9b1ced3"
+last_update: "2026-06-14T00:29:45+07:00,ATHER"
+status: "beta"
 attributes:
   domain: "agent-governance"
   doc_type: "core-directive"
@@ -30,6 +30,10 @@ GenesisBlock is a local-first hybrid semantic-graph engine for AI agents and hum
 
 ## Architecture Map
 
+Agent registry SSOT: `.agents/agent-registry.yaml`. Use `agent_id` as the stable identity and `label` as the human-facing name.
+
+Start architecture discovery from `docs/C4--GENESISDB-ARCHITECTURE.md`. Treat it as the architecture index and SSOT map for C1-C4 navigation. The authoritative parent spec remains `docs/MASTER-SPEC--GENESIS-DB.md`.
+
 - Rust core: `src/lib.rs`
   - storage, WAL, HNSW, graph indices, governance, HQL execution, GRL, CRDT, consensus.
 - Standalone REST server: `src/main.rs`
@@ -44,7 +48,7 @@ GenesisBlock is a local-first hybrid semantic-graph engine for AI agents and hum
 - UI integrations:
   - Dashboard: `dashboard/`
   - Obsidian plugin: `obsidian-plugin/`
-- Specs and governance docs live in `docs/`, with `docs/MASTER-SPEC--GENESIS-DB.md` as current parent spec.
+- Specs and governance docs live in `docs/`, with `docs/C4--GENESISDB-ARCHITECTURE.md` as the architecture entrypoint and `docs/MASTER-SPEC--GENESIS-DB.md` as current parent spec.
 
 ## Core Capabilities
 
@@ -63,7 +67,7 @@ GenesisBlock is a local-first hybrid semantic-graph engine for AI agents and hum
 ## Important Caveats
 
 - Worktree may already contain user changes. Do not overwrite or revert them without explicit approval.
-- Some docs contain deprecated notes, encoding artifacts, or generated "Thinking Process" text. Prefer current parent docs plus implementation evidence.
+- Some docs contain deprecated notes or encoding artifacts. Prefer the C4 map, current parent docs, and implementation evidence.
 - `/v1/query/hql` currently expects a raw JSON string body. Python/Go SDKs appear to send `{ "query": "..." }`, so verify before changing SDK or server behavior.
 - `hql.pest` at repo root is more complete than `src/query/hql.pest`; verify actual grammar source before editing HQL.
 - `retract_edge` is currently a stub returning `Ok(None)`.
@@ -76,9 +80,10 @@ GenesisBlock is a local-first hybrid semantic-graph engine for AI agents and hum
 cargo test
 cargo check
 cargo run --bin genesis-db-server
-npm test
+node --test __test__/*.mjs
 npm run build
 npm run mcp:start
+npm run agents:validate
 ```
 
 Dashboard:
@@ -103,9 +108,13 @@ npm run lint
 | From | To | Change |
 |---|---|---|
 | none | 0.1.0b | New repository agent-context document proposed from docs/codebase review. |
+| 0.1.0b | 0.2.0b | Added C4 architecture index as the required architecture discovery entrypoint and promoted context to beta. |
+| 0.2.0b | 0.2.1b | Added agent registry SSOT and registry validation command to the repository context. |
 
 ## CHANGELOG
 
 | Version | Date | Status | Summary | Commit Hash | Agent |
 |---|---|---|---|---|---|
-| 0.1.0b | 2026-06-13 | candidate | Initial AGENT context drafted from repository docs, code, tests, SDKs, MCP, dashboard, and workflow rules. | uncommitted | ATHER |
+| 0.2.1b | 2026-06-14 | beta | Added agent registry SSOT and validation command. | working-tree | ATHER |
+| 0.2.0b | 2026-06-14 | beta | Added C4 architecture index entrypoint and clarified SSOT read order for agents. | 4101228 | ATHER |
+| 0.1.0b | 2026-06-13 | candidate | Initial AGENT context drafted from repository docs, code, tests, SDKs, MCP, dashboard, and workflow rules. | 9b1ced3 | ATHER |
