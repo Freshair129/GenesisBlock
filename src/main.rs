@@ -14,7 +14,7 @@ use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
 // Import core engine from the library
 use genesis_block_native::{
-    Storage, OpenOptions, NodeInput, EdgeInput, QueryInput, HybridSearchInput, Event
+    Storage, OpenOptions, NodeInput, EdgeInput, QueryInput, HybridSearchInput, Event, SyncPeer
 };
 
 #[derive(Clone)]
@@ -205,11 +205,49 @@ async fn ranked_context_handler(
     }
 }
 
+#[derive(serde::Serialize)]
+struct SwarmStatus {
+    pub peer_id: String,
+    pub logical_clock: u32,
+    pub peers: Vec<SyncPeer>,
+}
+
+#[derive(serde::Serialize)]
+struct ExtendedStatus {
+    pub open: bool,
+    pub read_only: bool,
+    pub page_cache_mb: u32,
+    pub node_count: usize,
+    pub edge_count: usize,
+    pub memory_usage_mb: f64,
+}
+
+async fn swarm_status_handler(
+    State(state): State<AppState>,
+) -> impl IntoResponse {
+    let storage = state.storage.read();
+    let status = SwarmStatus {
+        peer_id: storage.local_peer_id.clone(),
+        logical_clock: storage.get_logical_clock(),
+        peers: storage.peers.iter().map(|e| e.value().clone()).collect(),
+    };
+    Json(status)
+}
+
 async fn status_handler(
     State(state): State<AppState>,
 ) -> impl IntoResponse {
     let storage = state.storage.read();
-    Json(storage.status_sync())
+    let base = storage.status_sync();
+    let status = ExtendedStatus {
+        open: base.open,
+        read_only: base.read_only,
+        page_cache_mb: base.page_cache_mb,
+        node_count: storage.nodes.len(),
+        edge_count: storage.edges.len(),
+        memory_usage_mb: (storage.vector_arena.read().len() * 4) as f64 / 1024.0 / 1024.0,
+    };
+    Json(status)
 }
 
 #[tokio::main]
@@ -249,9 +287,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .route("/v1/search/hybrid", post(hybrid_search_handler))
         .route("/v1/reason/context", post(ranked_context_handler))
         .route("/v1/status", get(status_handler))
+        .route("/v1/swarm/status", get(swarm_status_handler))
         .layer(TraceLayer::new_for_http())
         .layer(CorsLayer::permissive())
         .with_state(state);
+
 
     let addr = SocketAddr::from(([0, 0, 0, 0], port));
     let listener = tokio::net::TcpListener::bind(addr).await?;
