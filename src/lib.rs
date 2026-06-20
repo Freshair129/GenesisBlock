@@ -413,7 +413,7 @@ impl Storage {
 
     pub fn get_u32(&self, id: &str) -> Option<u32> { self.id_to_u32.get(id).map(|v| *v) }
 
-    fn init_hnsw() -> Hnsw<'static, f32, DistL2> { Hnsw::new(16, 1000000, 16, 200, DistL2 {}) }
+    fn init_hnsw() -> Hnsw<'static, f32, DistL2> { Hnsw::new(16, 1000000, 16, 100, DistL2 {}) }
 
     fn ensure_hnsw_init(&self) {
         if self.hnsw_index.read().is_none() {

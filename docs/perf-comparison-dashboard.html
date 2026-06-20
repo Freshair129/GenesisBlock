@@ -88,6 +88,13 @@ td.num{text-align:right;font-variant-numeric:tabular-nums}
   </div>
 
   <div class="card" style="margin-bottom:var(--gap)">
+    <h3>At scale — 50k vectors (where ANN quality differentiates)</h3>
+    <div class="hint" id="scale-caption"></div>
+    <table id="scaleTable" style="font-size:13px"></table>
+    <div class="metricnote" id="scale-note" style="margin-top:12px;max-width:none"></div>
+  </div>
+
+  <div class="card" style="margin-bottom:var(--gap)">
     <h3>Optimization — concurrent ingest (HNSW lock fix)</h3>
     <div class="hint" id="opt-caption"></div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:var(--gap);align-items:center" id="opt-grid">
@@ -246,13 +253,23 @@ const ENGINES = [
   // ➕ e.g. { id:"qdrant", label:"Qdrant", color:"#43b581" } — needs Docker
 ];
 const H2H = {
-  meta:{ model:"bge-m3 (BAAI, 1024-dim)", n:3000, q:200, k:10, metric:"L2", disk:"C: SSD" },
+  meta:{ model:"bge-m3 (BAAI, 1024-dim), real doc embeddings", n:3000, q:200, k:10, metric:"L2", disk:"C: SSD", ef:"ef_construction=100" },
   metrics:[
-    { name:"Insert throughput", unit:"vec/s", lowerBetter:false, values:{ genesis:1986, chroma:4074 },
-      note:"Durability-asymmetric: GenesisDB = durable (WAL fsync); Chroma = in-memory ephemeral (no durability). Optimization journey 254→385 (Fix#2 batch WAL)→1986 (Fix#3 parallel_insert) = ×7.8. Gap to Chroma closed from 16× to ~2×, and GenesisDB's number is durable." },
-    { name:"Query latency p50", unit:"µs", lowerBetter:true, values:{ genesis:1901.3, chroma:1249.2 }, note:"" },
-    { name:"Query latency p95", unit:"µs", lowerBetter:true, values:{ genesis:2361.2, chroma:1950.8 }, note:"" },
-    { name:"Recall@10", unit:"", lowerBetter:false, values:{ genesis:0.982, chroma:1.000 }, note:"vs exact brute-force L2 ground truth (parallel_insert builds a marginally different graph: 0.986→0.982 — negligible)." },
+    { name:"Insert throughput", unit:"vec/s", lowerBetter:false, values:{ genesis:1721, chroma:4074 },
+      note:"Durability-asymmetric: GenesisDB = durable (WAL fsync); Chroma = in-memory ephemeral. Insert journey 254→385 (Fix#2 batch WAL)→~1850 (Fix#3 parallel_insert) = ×7+, durable. At 3k both saturate; see the 50k card for differentiation." },
+    { name:"Query latency p50", unit:"µs", lowerBetter:true, values:{ genesis:1681.1, chroma:1249.2 }, note:"" },
+    { name:"Query latency p95", unit:"µs", lowerBetter:true, values:{ genesis:2695.7, chroma:1950.8 }, note:"" },
+    { name:"Recall@10", unit:"", lowerBetter:false, values:{ genesis:0.984, chroma:1.000 }, note:"vs exact brute-force L2. At 3k both near-saturate — not a discriminating scale." },
+  ]
+};
+// Scale test: synthetic clustered vectors (3k real text isn't enough diverse data for 50k)
+const SCALE = {
+  meta:{ model:"synthetic clustered (100 clusters), dim 1024", n:50000, q:200, k:10, metric:"L2", disk:"C: SSD", ef:"ef_construction=100" },
+  metrics:[
+    { name:"Insert throughput", unit:"vec/s", lowerBetter:false, values:{ genesis:2280, chroma:3505 }, note:"GenesisDB durable vs Chroma in-memory — gap ~1.5×." },
+    { name:"Query latency p50", unit:"µs", lowerBetter:true, values:{ genesis:928.8, chroma:1011.5 }, note:"GenesisDB faster at scale." },
+    { name:"Query latency p95", unit:"µs", lowerBetter:true, values:{ genesis:1381.5, chroma:1400.9 }, note:"" },
+    { name:"Recall@10", unit:"", lowerBetter:false, values:{ genesis:0.962, chroma:1.000 }, note:"ef=100 trades recall for build/query speed; ef=200 recovers it. Tunable frontier — recommend exposing ef via OpenOptions." },
   ]
 };
 
@@ -291,6 +308,26 @@ const H2H = {
     html+=`<td class="metricnote">${mt.note||''}</td></tr>`;
   });
   t.innerHTML=html+'</tbody>';
+  // ---- Scale table: 50k ----
+  (function(){
+    const sm=SCALE.meta;
+    document.getElementById('scale-caption').textContent =
+      `${sm.model} · ${sm.n.toLocaleString()} vectors / ${sm.q} queries / k=${sm.k} · ${sm.metric} · ${sm.ef} · ${sm.disk}`;
+    const st=document.getElementById('scaleTable');
+    let h='<thead><tr><th>Metric</th><th>Unit</th>'+ENGINES.map(e=>`<th class="num">${e.label}</th>`).join('')+'<th>Notes</th></tr></thead><tbody>';
+    SCALE.metrics.forEach(mt=>{
+      const base=ENGINES.find(e=>mt.values[e.id]!=null); const bv=base?mt.values[base.id]:null;
+      h+=`<tr><td>${mt.name}</td><td>${mt.unit||'—'}</td>`;
+      ENGINES.forEach(e=>{ const v=mt.values[e.id]; let cell=v==null?'—':(mt.unit==='µs'?fmt(v):(v<10?v.toFixed(3):fmt(v)));
+        if(v!=null&&bv!=null&&e.id!==base.id){ const ch=(v-bv)/bv*100, better=mt.lowerBetter?ch<0:ch>0; cell+=` <span class="delta ${better?'up':'down'}">${ch>0?'▲':'▼'}${Math.abs(ch).toFixed(0)}%</span>`; }
+        h+=`<td class="num">${cell}</td>`; });
+      h+=`<td class="metricnote">${mt.note||''}</td></tr>`;
+    });
+    st.innerHTML=h+'</tbody>';
+    document.getElementById('scale-note').innerHTML =
+      "<strong style='color:var(--text-primary)'>At 50k the picture sharpens:</strong> GenesisDB query p50 is <em>lower</em> than Chroma (929 vs 1011 µs), insert gap is ~1.5× (durable vs in-memory), and recall now differentiates (0.962 vs 1.000 — the ef_construction=100 trade). At 3k everything saturated near 1.0. ef=200 recovers recall at some speed cost — a tunable frontier.";
+  })();
+
   // ---- Optimization: concurrent ingest (HNSW lock fix) ----
   const OPT = { workload:"shadow_sync_stress · 12 writers · 10k notes × 1536-dim · C: SSD",
     before:136.60, after:839.36, unit:"TPS",

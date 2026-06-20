@@ -131,7 +131,30 @@ def do_finalize():
     p(f"\nNote: GenesisDB insert = durable per-op WAL fsync; Chroma = in-memory batch add.")
     p("Query latency & recall are the apples-to-apples HNSW-vs-HNSW metrics.")
 
+def do_synth(n):
+    # Synthetic clustered vectors for scale tests where we lack N diverse real
+    # texts. Gaussian blobs around random centroids, unit-normalized (like bge-m3).
+    # Standard ANN-quality workload; identical vectors are fed to both engines.
+    rng = np.random.default_rng(42)
+    n_clusters = max(16, n // 500)
+    centers = rng.standard_normal((n_clusters, DIM)).astype(np.float32)
+    assign = rng.integers(0, n_clusters, size=n + Q)
+    pts = centers[assign] + (0.18 * rng.standard_normal((n + Q, DIM))).astype(np.float32)
+    pts /= (np.linalg.norm(pts, axis=1, keepdims=True) + 1e-9)
+    pts = pts.astype(np.float32)
+    corpus, queries = pts[:n], pts[n:n+Q]
+    corpus.tofile(os.path.join(BENCH, "corpus.f32"))
+    queries.tofile(os.path.join(BENCH, "queries.f32"))
+    json.dump({"n": n, "q": Q, "dim": DIM, "k": K, "model": f"synthetic-clustered ({n_clusters} clusters, dim {DIM})"},
+              open(os.path.join(BENCH, "meta.json"), "w"))
+    cn = (corpus**2).sum(1); qn = (queries**2).sum(1)
+    d2 = qn[:, None] + cn[None, :] - 2.0 * (queries @ corpus.T)
+    gt = np.argsort(d2, axis=1)[:, :K]
+    json.dump(gt.tolist(), open(os.path.join(BENCH, "ground_truth.json"), "w"))
+    p(f"synth: {n} corpus + {Q} queries, dim {DIM}, {n_clusters} clusters + exact L2 ground truth")
+
 mode = sys.argv[1] if len(sys.argv) > 1 else "all"
+if mode == "synth": do_synth(int(sys.argv[2]))
 if mode in ("embed", "all"): do_embed()
 if mode in ("chroma", "all"): do_chroma()
 if mode == "finalize": do_finalize()
