@@ -542,7 +542,7 @@ impl Storage {
                                         if let Some(emb) = n.embedding.clone() { 
                                             storage.add_vector_internal(&n.id, emb, n.lang.clone().unwrap_or("en".to_string())); 
                                         }
-                                        storage.nodes.insert(u32_id, n);
+                                        storage.insert_node_lean(u32_id, n);
                                     }
                                     Event::Edge(e) => {
                                         let u32_id = storage.get_or_intern_id(&e.id);
@@ -557,7 +557,7 @@ impl Storage {
                                                     if let Some(emb) = n.embedding.clone() { 
                                                         storage.add_vector_internal(&n.id, emb, n.lang.clone().unwrap_or("en".to_string())); 
                                                     }
-                                                    storage.nodes.insert(u32_id, n);
+                                                    storage.insert_node_lean(u32_id, n);
                                                 }
                                                 Event::Edge(e) => {
                                                     let u32_id = storage.get_or_intern_id(&e.id);
@@ -715,7 +715,7 @@ impl Storage {
                             n_axiom.labels.push("MASTER".to_string()); 
                         }
                         let u32_id = self.get_or_intern_id(&n_axiom.id);
-                        self.nodes.insert(u32_id, n_axiom.clone());
+                        self.insert_node_lean(u32_id, n_axiom.clone());
                         self.persist_signed(SignedEvent {
                             event: Event::Node(n_axiom),
                             signature: signed_event.signature.clone(),
@@ -734,7 +734,7 @@ impl Storage {
                                     let mut n_axiom = n.clone();
                                     if !n_axiom.labels.contains(&"MASTER".to_string()) { n_axiom.labels.push("MASTER".to_string()); }
                                     let u32_id = self.get_or_intern_id(&n_axiom.id);
-                                    self.nodes.insert(u32_id, n_axiom);
+                                    self.insert_node_lean(u32_id, n_axiom);
                                 }
                                 Event::Edge(edge) => {
                                     let u32_id = self.get_or_intern_id(&edge.id);
@@ -799,6 +799,16 @@ impl Storage {
         LogicalClock { time, peer_id: self.local_peer_id.clone() }
     }
 
+    /// Insert a node into the in-memory store without its embedding.
+    /// The f32 vector lives in `vector_arena` + the HNSW index (the source of
+    /// truth for search); keeping a third f64 copy on every node wastes ~12 KB
+    /// per node (the largest avoidable per-node cost). The full embedding is
+    /// still persisted in the WAL `Event::Node` for replay/arena rebuild.
+    fn insert_node_lean(&self, u32_id: u32, mut node: NodeOutput) {
+        node.embedding = None;
+        self.nodes.insert(u32_id, node);
+    }
+
     pub fn add_node(&self, args: NodeInput) -> Result<NodeOutput> {
         self.ensure_writable()?;
         self.validate_governance(&args.labels, false)?; 
@@ -821,7 +831,7 @@ impl Storage {
             clock: self.next_clock(),
         };
         if let Some(emb) = args.embedding { self.add_vector_internal(&id, emb.clone(), lang); node.embedding = Some(emb); }
-        self.nodes.insert(u32_id, node.clone());
+        self.insert_node_lean(u32_id, node.clone());
         self.persist(&Event::Node(node.clone()))?;
         Ok(node)
     }
@@ -871,7 +881,7 @@ impl Storage {
         }
         new_node.clock = self.next_clock();
 
-        self.nodes.insert(u32_id, new_node.clone());
+        self.insert_node_lean(u32_id, new_node.clone());
         self.persist(&Event::Node(new_node.clone()))?;
 
         Ok(new_node)
@@ -1288,7 +1298,7 @@ impl Storage {
                         if let Some(emb) = &remote_node.embedding {
                             self.add_vector_internal(&remote_node.id, emb.clone(), remote_node.lang.clone().unwrap_or("en".to_string()));
                         }
-                        self.nodes.insert(u32_id, remote_node.clone());
+                        self.insert_node_lean(u32_id, remote_node.clone());
                         self.persist_signed(signed_event.clone())?;
                     }
                 }
@@ -1608,7 +1618,7 @@ impl Storage {
                         if k > max_u32 { max_u32 = k; }
                         self.id_to_u32.insert(v.id.clone(), k);
                         self.u32_to_id.insert(k, v.id.clone());
-                        self.nodes.insert(k, v); 
+                        self.insert_node_lean(k, v); 
                     }
                     self.next_u32.store(max_u32 + 1, Ordering::SeqCst);
                 }
@@ -1700,7 +1710,7 @@ impl Storage {
                     if let Some(emb) = n.embedding.clone() { 
                         self.add_vector_internal(&n.id, emb, n.lang.clone().unwrap_or("en".to_string())); 
                     }
-                    self.nodes.insert(u32_id, n);
+                    self.insert_node_lean(u32_id, n);
                 }
                 Event::Edge(e) => {
                     let u32_id = self.get_or_intern_id(&e.id);
