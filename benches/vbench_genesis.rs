@@ -52,23 +52,34 @@ fn main() {
     let efc: u32 = std::env::var("GB_EF").ok().and_then(|s| s.parse().ok()).unwrap_or(200);
     storage.set_index_params(efc, 100);
 
-    // --- Insert via bulk path: one Event::Batch (one WAL fsync) per 1024-chunk,
-    //     matching Chroma's batched add. Still durable. ---
+    // --- Insert via bulk path, streamed in chunks so we never materialize all
+    //     N NodeInputs at once (at 1M x 1024 that f64 staging would be ~8 GB). ---
     let t = Instant::now();
-    let inputs: Vec<NodeInput> = (0..n)
-        .map(|i| NodeInput {
-            id: Some(i.to_string()),
-            labels: vec!["doc".to_string()],
-            props: None,
-            embedding: Some(corpus[i * dim..(i + 1) * dim].iter().map(|&x| x as f64).collect()),
-            lang: None,
-            valid_from: None,
-            caused_by: None,
-            ttl: None,
-        })
-        .collect();
-    storage.bulk_add_nodes(inputs).unwrap();
+    let chunk = 10_000usize;
+    let mut i0 = 0usize;
+    while i0 < n {
+        let i1 = (i0 + chunk).min(n);
+        let inputs: Vec<NodeInput> = (i0..i1)
+            .map(|i| NodeInput {
+                id: Some(i.to_string()),
+                labels: vec!["doc".to_string()],
+                props: None,
+                embedding: Some(corpus[i * dim..(i + 1) * dim].iter().map(|&x| x as f64).collect()),
+                lang: None,
+                valid_from: None,
+                caused_by: None,
+                ttl: None,
+            })
+            .collect();
+        storage.bulk_add_nodes(inputs).unwrap();
+        i0 = i1;
+    }
     let insert_sec = t.elapsed().as_secs_f64();
+    let peak_rss_mb = {
+        let mut s = sysinfo::System::new_all();
+        s.refresh_all();
+        sysinfo::get_current_pid().ok().and_then(|pid| s.process(pid).map(|p| p.memory())).unwrap_or(0) / 1024 / 1024
+    };
 
     // k-NN query runner at the current ef_search (alpha=0 => pure vector search)
     let run_queries = |st: &Storage| -> (Vec<f64>, Vec<Vec<i64>>) {
@@ -121,7 +132,9 @@ fn main() {
         "ef_construction": efc,
         "n": n, "q": q, "dim": dim, "k": k,
         "insert_sec": insert_sec,
+        "build_sec": insert_sec,
         "insert_per_sec": n as f64 / insert_sec,
+        "peak_rss_mb": peak_rss_mb,
         "q_p50_us": percentile(&sorted, 50.0),
         "q_p95_us": percentile(&sorted, 95.0),
         "q_mean_us": lats_us.iter().sum::<f64>() / lats_us.len() as f64,
@@ -131,7 +144,7 @@ fn main() {
     let mut f = fs::File::create(format!("{bench}/genesis_results.json")).unwrap();
     f.write_all(serde_json::to_string_pretty(&out).unwrap().as_bytes()).unwrap();
     println!(
-        "GenesisDB: insert {:.0} vec/s ({:.2}s), query p50 {:.1}µs p95 {:.1}µs",
-        n as f64 / insert_sec, insert_sec, percentile(&sorted, 50.0), percentile(&sorted, 95.0)
+        "GenesisDB: insert {:.0} vec/s (build {:.2}s), RSS {} MB, query p50 {:.1}µs p95 {:.1}µs",
+        n as f64 / insert_sec, insert_sec, peak_rss_mb, percentile(&sorted, 50.0), percentile(&sorted, 95.0)
     );
 }

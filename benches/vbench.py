@@ -220,9 +220,28 @@ def do_frontier():
     for key in ("chroma", "qdrant"):
         if key in out: p(f"  ref {key:<6} p50 {out[key]['p50_us']:.1f}us  recall {out[key]['recall']:.3f}")
 
+def do_scalerow():
+    gt = np.asarray(json.load(open(os.path.join(BENCH, "ground_truth.json"))))
+    g = json.load(open(os.path.join(BENCH, "genesis_results.json")))
+    r = recall_at_k(g["topk"], gt)
+    row = {"engine": "GenesisDB", "n": g["n"], "build_sec": g.get("build_sec"), "rss_mb": g.get("peak_rss_mb"),
+           "insert_per_sec": g["insert_per_sec"], "q_p50_us": g["q_p50_us"], "recall": r}
+    cr = None
+    cpath = os.path.join(BENCH, "chroma_results.json")
+    if os.path.exists(cpath): cr = json.load(open(cpath))
+    p(f"GenesisDB  N={g['n']:>9,}  build={g.get('build_sec',0):7.1f}s  RSS={g.get('peak_rss_mb','?'):>6} MB  "
+      f"insert={g['insert_per_sec']:7.0f}/s  p50={g['q_p50_us']:8.1f}us  recall={r:.3f}")
+    if cr:
+        p(f"Chroma     N={cr['n']:>9,}  build={cr['insert_sec']:7.1f}s  RSS={'    -':>6}     "
+          f"insert={cr['insert_per_sec']:7.0f}/s  p50={cr['q_p50_ms']*1000:8.1f}us  recall={cr['recall_at_k']:.3f}")
+    # append to a running scale log
+    log = os.path.join(BENCH, "scale_log.jsonl")
+    with open(log, "a") as f: f.write(json.dumps(row) + "\n")
+
 mode = sys.argv[1] if len(sys.argv) > 1 else "all"
 if mode == "synth": do_synth(int(sys.argv[2]))
 if mode == "frontier": do_frontier()
+if mode == "scalerow": do_scalerow()
 if mode in ("embed", "all"): do_embed()
 if mode in ("chroma", "all"): do_chroma()
 if mode == "qdrant": do_qdrant()

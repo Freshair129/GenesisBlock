@@ -110,6 +110,13 @@ td.num{text-align:right;font-variant-numeric:tabular-nums}
     </div>
   </div>
 
+  <div class="card" style="margin-bottom:var(--gap)">
+    <h3>Graph traversal (P22, LDBC-lite) — k-hop latency vs scale</h3>
+    <div class="hint" id="graph-caption"></div>
+    <table id="graphTable" style="font-size:13px"></table>
+    <div class="metricnote" id="graph-note" style="margin-top:12px;max-width:none"></div>
+  </div>
+
   <div class="howto">
     <strong style="color:var(--text-primary)">➕ Add Run 3 (or more)</strong> — edit two places in the <code>&lt;script&gt;</code> at the bottom of this file, then refresh:<br>
     1. Append to <code>RUNS</code>: <code>{ id:"p15", label:"P15 …", env:"…", color:"#43b581" }</code><br>
@@ -296,6 +303,15 @@ const FRONTIER = {
             {ef:128,lat:1097.4,recall:0.984},{ef:256,lat:1255.0,recall:0.988},{ef:512,lat:2119.4,recall:0.990} ],
   chroma:{lat:990.2,recall:0.981}, qdrant:{lat:3300.8,recall:0.999}
 };
+// P22 graph traversal (fanout 8, limit 1000)
+const GRAPH = {
+  meta:{ fanout:8, limit:1000, q:200, disk:"C: SSD" },
+  rows:[
+    { n:10000,   edges:80000,   hop1:23.1, hop3:1967.3, hop6:4211.1, tput1:41525, rss:146 },
+    { n:100000,  edges:800000,  hop1:21.6, hop3:2334.3, hop6:4403.3, tput1:42783, rss:1057 },
+    { n:1000000, edges:8000000, hop1:35.4, hop3:4582.3, hop6:9293.3, tput1:27898, rss:12613 },
+  ]
+};
 
 (function(){
   // ---- Recall–Latency frontier (scatter) ----
@@ -396,7 +412,25 @@ const FRONTIER = {
   document.getElementById('opt-note').innerHTML = `<strong style="color:var(--text-primary)">×${(OPT.after/OPT.before).toFixed(1)} throughput</strong> (${fmt(OPT.before)} → ${fmt(OPT.after)} ${OPT.unit}). ${OPT.note}`;
 
   document.getElementById('h2h-note').innerHTML =
-    "<strong style='color:var(--text-primary)'>Read:</strong> query latency &amp; recall are the fair HNSW-vs-HNSW metrics — GenesisDB is in the same ballpark (recall 0.987 vs 1.000; query ~1.5× slower). Insert is durability-asymmetric (GenesisDB fsyncs every op). Qdrant was the original target but needs Docker (unavailable here); Chroma is the closest embedded HNSW competitor and matches the project's own \"local knowledge engine\" positioning.";
+    "<strong style='color:var(--text-primary)'>Read:</strong> query latency &amp; recall are the fair HNSW-vs-HNSW metrics. The 3k run near-saturates; the frontier and 100k cards (with Qdrant) are the discriminating views. Insert is durability-asymmetric (GenesisDB persists every write).";
+
+  // ---- P22 graph traversal table ----
+  (function(){
+    const gm=GRAPH.meta;
+    document.getElementById('graph-caption').textContent =
+      `directed random graph · fanout=${gm.fanout} · ${gm.q} traversals/seed-depth · limit=${gm.limit} · ${gm.disk} · pure graph (no embeddings)`;
+    const gt=document.getElementById('graphTable');
+    let h='<thead><tr><th>Nodes</th><th>Edges</th><th class="num">hop1 p50</th><th class="num">hop3 p50</th><th class="num">hop6 p50</th><th class="num">hop1 thrpt</th><th class="num">RSS</th></tr></thead><tbody>';
+    GRAPH.rows.forEach(r=>{
+      h+=`<tr><td class="num">${r.n.toLocaleString()}</td><td class="num">${r.edges.toLocaleString()}</td>`+
+         `<td class="num">${r.hop1.toFixed(1)} µs</td><td class="num">${(r.hop3/1000).toFixed(2)} ms</td>`+
+         `<td class="num">${(r.hop6/1000).toFixed(2)} ms</td><td class="num">${r.tput1.toLocaleString()}/s</td>`+
+         `<td class="num">${r.rss>=1024?(r.rss/1024).toFixed(1)+' GB':r.rss+' MB'}</td></tr>`;
+    });
+    gt.innerHTML=h+'</tbody>';
+    document.getElementById('graph-note').innerHTML =
+      "<strong style='color:var(--text-primary)'>O(neighborhood), not O(N):</strong> 1-hop latency stays in the tens of µs across a 100× node increase (23→22→35 µs, ~28–43k traversals/s) — local queries don't slow down as the graph grows. Multi-hop stays bounded (ms). The real ceiling is RAM: 1M nodes / 8M edges = 12.6 GB (edge-UUID interning dominates), so ~10M is out of reach on a 32 GB host. Engine fix shipped: <code>neighbors</code> now honors <code>limit</code> (previously ignored → depth-6 could traverse a whole component).";
+  })();
 })();
 </script>
 </body>

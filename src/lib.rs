@@ -1027,6 +1027,7 @@ impl Storage {
         let u32_seed = match self.get_u32(&seed) { Some(id) => id, None => return Ok(Vec::new()) };
         let depth = args.depth.unwrap_or(1);
         let target_rel = args.rel.as_deref().unwrap_or("ANY");
+        let lim = args.limit.map(|l| l as usize);
         let mut results = Vec::new(); let mut visited = HashSet::new(); visited.insert(u32_seed);
         let mut queue = VecDeque::new(); queue.push_back((u32_seed, Vec::new(), 0));
         while let Some((curr_u32, path, curr_depth)) = queue.pop_front() {
@@ -1057,6 +1058,7 @@ impl Storage {
 
                                         let mut new_path = path.clone(); new_path.push(edge.clone());
                                         results.push(NeighborOutput { node: node.clone(), path: new_path.clone(), depth: curr_depth + 1 });
+                                        if let Some(l) = lim { if results.len() >= l { return Ok(results); } }
                                         if is_inferred || (curr_depth + 1 < depth) { queue.push_back((next_u32, new_path, curr_depth + 1)); }
                                     }
                                 }
