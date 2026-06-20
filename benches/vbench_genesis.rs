@@ -48,23 +48,22 @@ fn main() {
     })
     .expect("open storage");
 
-    // --- Insert (durable: each add_node fsyncs the WAL) ---
+    // --- Insert via bulk path: one Event::Batch (one WAL fsync) per 1024-chunk,
+    //     matching Chroma's batched add. Still durable. ---
     let t = Instant::now();
-    for i in 0..n {
-        let emb: Vec<f64> = corpus[i * dim..(i + 1) * dim].iter().map(|&x| x as f64).collect();
-        storage
-            .add_node(NodeInput {
-                id: Some(i.to_string()),
-                labels: vec!["doc".to_string()],
-                props: None,
-                embedding: Some(emb),
-                lang: None,
-                valid_from: None,
-                caused_by: None,
-                ttl: None,
-            })
-            .unwrap();
-    }
+    let inputs: Vec<NodeInput> = (0..n)
+        .map(|i| NodeInput {
+            id: Some(i.to_string()),
+            labels: vec!["doc".to_string()],
+            props: None,
+            embedding: Some(corpus[i * dim..(i + 1) * dim].iter().map(|&x| x as f64).collect()),
+            lang: None,
+            valid_from: None,
+            caused_by: None,
+            ttl: None,
+        })
+        .collect();
+    storage.bulk_add_nodes(inputs).unwrap();
     let insert_sec = t.elapsed().as_secs_f64();
 
     // --- k-NN query (alpha=0 => pure vector search via HNSW) ---
@@ -92,7 +91,7 @@ fn main() {
         "q_p95_us": percentile(&sorted, 95.0),
         "q_mean_us": lats_us.iter().sum::<f64>() / lats_us.len() as f64,
         "topk": topk,
-        "durability": "per-op WAL fsync"
+        "durability": "durable, batched WAL fsync (1024/chunk)"
     });
     let mut f = fs::File::create(format!("{bench}/genesis_results.json")).unwrap();
     f.write_all(serde_json::to_string_pretty(&out).unwrap().as_bytes()).unwrap();

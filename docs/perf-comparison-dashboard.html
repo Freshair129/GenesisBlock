@@ -248,8 +248,8 @@ const ENGINES = [
 const H2H = {
   meta:{ model:"bge-m3 (BAAI, 1024-dim)", n:3000, q:200, k:10, metric:"L2", disk:"C: SSD" },
   metrics:[
-    { name:"Insert throughput", unit:"vec/s", lowerBetter:false, values:{ genesis:254, chroma:4074 },
-      note:"NOT apples-to-apples: GenesisDB does durable per-op WAL fsync; Chroma adds in-memory (ephemeral, no durability)." },
+    { name:"Insert throughput", unit:"vec/s", lowerBetter:false, values:{ genesis:385, chroma:4074 },
+      note:"Durability-asymmetric: GenesisDB = durable batched WAL fsync; Chroma = in-memory (ephemeral). Fix #2 (batch WAL) lifted GenesisDB 254→385 (+52%); the remaining gap is single-threaded HNSW build (hnsw_rs ef_construction=200) — addressable by parallel_insert / ef tuning (Fix #3)." },
     { name:"Query latency p50", unit:"µs", lowerBetter:true, values:{ genesis:1901.3, chroma:1249.2 }, note:"" },
     { name:"Query latency p95", unit:"µs", lowerBetter:true, values:{ genesis:2361.2, chroma:1950.8 }, note:"" },
     { name:"Recall@10", unit:"", lowerBetter:false, values:{ genesis:0.987, chroma:1.000 }, note:"vs exact brute-force L2 ground truth." },

@@ -1856,8 +1856,28 @@ impl Storage {
     }
     pub fn retract_edge(&self, _id: String, _at: Option<String>) -> Result<Option<EdgeOutput>> { Ok(None) }
     pub fn status_sync(&self) -> DatabaseStatus { DatabaseStatus { open: true, read_only: self.read_only, page_cache_mb: 512 } }
-    pub fn bulk_add_nodes(&self, inputs: Vec<NodeInput>) -> Result<()> { for i in inputs { self.add_node(i)?; } Ok(()) }
-    pub fn bulk_add_edges(&self, inputs: Vec<EdgeInput>) -> Result<()> { for i in inputs { self.add_edge(i)?; } Ok(()) }
+    // Bulk paths route through execute_batch so each chunk is ONE Event::Batch =
+    // ONE WAL fsync (vs one fsync per item). Chunked to bound the size of a
+    // single serialized batch / fsync.
+    const BULK_CHUNK: usize = 1024;
+    pub fn bulk_add_nodes(&self, inputs: Vec<NodeInput>) -> Result<()> {
+        let mut it = inputs.into_iter();
+        loop {
+            let chunk: Vec<NodeInput> = it.by_ref().take(Self::BULK_CHUNK).collect();
+            if chunk.is_empty() { break; }
+            self.execute_batch(BatchInput { nodes: chunk, edges: Vec::new() })?;
+        }
+        Ok(())
+    }
+    pub fn bulk_add_edges(&self, inputs: Vec<EdgeInput>) -> Result<()> {
+        let mut it = inputs.into_iter();
+        loop {
+            let chunk: Vec<EdgeInput> = it.by_ref().take(Self::BULK_CHUNK).collect();
+            if chunk.is_empty() { break; }
+            self.execute_batch(BatchInput { nodes: Vec::new(), edges: chunk })?;
+        }
+        Ok(())
+    }
     
     pub fn calculate_structural_gaps(&self) -> Result<Vec<GapSuggestion>> {
         let mut gaps = Vec::new();
