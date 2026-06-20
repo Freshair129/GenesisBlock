@@ -415,9 +415,18 @@ impl Storage {
 
     fn init_hnsw() -> Hnsw<'static, f32, DistL2> { Hnsw::new(16, 1000000, 16, 200, DistL2 {}) }
 
-    fn add_vector_internal(&self, node_id: &str, emb_64: Vec<f64>, lang: String) {
+    fn ensure_hnsw_init(&self) {
+        if self.hnsw_index.read().is_none() {
+            let mut w = self.hnsw_index.write();
+            if w.is_none() { *w = Some(Self::init_hnsw()); }
+        }
+    }
+
+    /// Push a vector into the arena/metadata and return (f32 vector, arena_id).
+    /// Does NOT touch the HNSW index — callers insert (single) or parallel_insert
+    /// (batch). Short critical section: only the arena Vec pushes are exclusive.
+    fn stage_vector(&self, node_id: &str, emb_64: Vec<f64>, lang: String) -> (Vec<f32>, u32) {
         let emb: Vec<f32> = emb_64.into_iter().map(|v| v as f32).collect();
-        // Short critical section: only the arena Vec pushes need exclusive access.
         let arena_id = {
             let mut meta_arena = self.metadata_arena.write();
             let mut vec_arena = self.vector_arena.write();
@@ -430,18 +439,31 @@ impl Storage {
                 lang, cluster_id: arena_id,
             });
             arena_id
-        }; // arena locks released here, BEFORE the slow HNSW insert
+        };
         if let Some(u32_id) = self.get_u32(node_id) { self.u32_to_arena_id.insert(u32_id, arena_id); }
-        // One-time init under a write lock (double-checked); steady-state inserts
-        // hold only a shared read lock. hnsw_rs `insert(&self)` is internally
-        // synchronized, so concurrent writers no longer serialize on a global
-        // write lock (the P13 bottleneck).
-        if self.hnsw_index.read().is_none() {
-            let mut w = self.hnsw_index.write();
-            if w.is_none() { *w = Some(Self::init_hnsw()); }
-        }
+        (emb, arena_id)
+    }
+
+    fn add_vector_internal(&self, node_id: &str, emb_64: Vec<f64>, lang: String) {
+        let (emb, arena_id) = self.stage_vector(node_id, emb_64, lang);
+        self.ensure_hnsw_init();
+        // insert(&self): hnsw_rs is internally synchronized -> shared read lock.
         if let Some(ref hnsw) = *self.hnsw_index.read() {
             hnsw.insert((&emb, arena_id as usize));
+        }
+    }
+
+    /// Batch vector insertion: stage all vectors, then build the HNSW graph with
+    /// one rayon-parallel `parallel_insert` call (multi-core) instead of N
+    /// single-threaded inserts. Used by the bulk/batch ingest path.
+    fn add_vectors_batch(&self, items: Vec<(String, Vec<f64>, String)>) {
+        if items.is_empty() { return; }
+        let staged: Vec<(Vec<f32>, u32)> =
+            items.into_iter().map(|(id, emb, lang)| self.stage_vector(&id, emb, lang)).collect();
+        self.ensure_hnsw_init();
+        let refs: Vec<(&Vec<f32>, usize)> = staged.iter().map(|(v, id)| (v, *id as usize)).collect();
+        if let Some(ref hnsw) = *self.hnsw_index.read() {
+            hnsw.parallel_insert(&refs);
         }
     }
 
@@ -1711,13 +1733,15 @@ impl Storage {
         // 3. Persistence Phase (Atomic WAL Write)
         self.persist(&Event::Batch(events.clone()))?;
 
-        // 4. Memory Index Phase
+        // 4. Memory Index Phase — collect vectors and build the HNSW graph once
+        //    via parallel_insert instead of N single-threaded inserts.
+        let mut vec_items: Vec<(String, Vec<f64>, String)> = Vec::new();
         for event in events {
             match event {
                 Event::Node(n) => {
                     let u32_id = self.get_or_intern_id(&n.id);
-                    if let Some(emb) = n.embedding.clone() { 
-                        self.add_vector_internal(&n.id, emb, n.lang.clone().unwrap_or("en".to_string())); 
+                    if let Some(emb) = n.embedding.clone() {
+                        vec_items.push((n.id.clone(), emb, n.lang.clone().unwrap_or_else(|| "en".to_string())));
                     }
                     self.insert_node_lean(u32_id, n);
                 }
@@ -1729,6 +1753,7 @@ impl Storage {
                 _ => {}
             }
         }
+        self.add_vectors_batch(vec_items);
 
         Ok(BatchOutput { nodes: output_nodes, edges: output_edges })
     }
