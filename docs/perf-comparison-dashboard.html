@@ -87,6 +87,15 @@ td.num{text-align:right;font-variant-numeric:tabular-nums}
     <div class="metricnote" id="h2h-note" style="margin-top:12px;max-width:none"></div>
   </div>
 
+  <div class="card" style="margin-bottom:var(--gap)">
+    <h3>Optimization — concurrent ingest (HNSW lock fix)</h3>
+    <div class="hint" id="opt-caption"></div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:var(--gap);align-items:center" id="opt-grid">
+      <div><canvas id="optChart" style="max-height:220px"></canvas></div>
+      <div class="metricnote" id="opt-note" style="max-width:none"></div>
+    </div>
+  </div>
+
   <div class="howto">
     <strong style="color:var(--text-primary)">➕ Add Run 3 (or more)</strong> — edit two places in the <code>&lt;script&gt;</code> at the bottom of this file, then refresh:<br>
     1. Append to <code>RUNS</code>: <code>{ id:"p15", label:"P15 …", env:"…", color:"#43b581" }</code><br>
@@ -282,6 +291,23 @@ const H2H = {
     html+=`<td class="metricnote">${mt.note||''}</td></tr>`;
   });
   t.innerHTML=html+'</tbody>';
+  // ---- Optimization: concurrent ingest (HNSW lock fix) ----
+  const OPT = { workload:"shadow_sync_stress · 12 writers · 10k notes × 1536-dim · C: SSD",
+    before:136.60, after:839.36, unit:"TPS",
+    note:"Removed the per-op global HNSW <code>.write()</code> lock — hnsw_rs <code>insert(&self)</code> is internally synchronized, so inserts now run under a shared <code>.read()</code> lock; arena locks scoped to the µs Vec pushes only. ~2-line change. P95 query under load 1.13→6.31ms (still &lt;10ms); durability/WAL-replay unchanged; cargo test green." };
+  document.getElementById('opt-caption').textContent = OPT.workload;
+  new Chart(document.getElementById('optChart'),{
+    type:'bar',
+    data:{ labels:["Before (per-op write lock)","After (shared read lock)"],
+      datasets:[{label:OPT.unit,data:[OPT.before,OPT.after],
+        backgroundColor:["#9aa3b4cc","#43b581cc"],borderColor:["#9aa3b4","#43b581"],borderWidth:1,borderRadius:4}] },
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},
+      title:{display:true,text:`concurrent ingest throughput — ×${(OPT.after/OPT.before).toFixed(1)} (higher is better)`,color:'#9aa3b4',font:{size:12}},
+      tooltip:{callbacks:{label:c=>`${fmt(c.parsed.y)} ${OPT.unit}`}}},
+      scales:{x:{ticks:{color:'#9aa3b4',font:{size:10}},grid:{color:'#252a38'}},y:{beginAtZero:true,ticks:{color:'#9aa3b4'},grid:{color:'#252a38'}}}}
+  });
+  document.getElementById('opt-note').innerHTML = `<strong style="color:var(--text-primary)">×${(OPT.after/OPT.before).toFixed(1)} throughput</strong> (${fmt(OPT.before)} → ${fmt(OPT.after)} ${OPT.unit}). ${OPT.note}`;
+
   document.getElementById('h2h-note').innerHTML =
     "<strong style='color:var(--text-primary)'>Read:</strong> query latency &amp; recall are the fair HNSW-vs-HNSW metrics — GenesisDB is in the same ballpark (recall 0.987 vs 1.000; query ~1.5× slower). Insert is durability-asymmetric (GenesisDB fsyncs every op). Qdrant was the original target but needs Docker (unavailable here); Chroma is the closest embedded HNSW competitor and matches the project's own \"local knowledge engine\" positioning.";
 })();

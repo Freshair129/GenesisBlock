@@ -417,22 +417,31 @@ impl Storage {
 
     fn add_vector_internal(&self, node_id: &str, emb_64: Vec<f64>, lang: String) {
         let emb: Vec<f32> = emb_64.into_iter().map(|v| v as f32).collect();
-        let mut meta_arena = self.metadata_arena.write();
-        let mut vec_arena = self.vector_arena.write();
-        let current_vec_len = vec_arena.len();
-        vec_arena.extend_from_slice(&emb);
-        let arena_id = meta_arena.len() as u32;
-        meta_arena.push(NodeMetadata {
-            arena_id, node_id: node_id.to_string(), timestamp: Utc::now().timestamp() as u64,
-            vector_dim: self.vector_dim, embedding_offset: current_vec_len as u64, gks_attributes: Vec::new(),
-            lang, cluster_id: arena_id,
-        });
+        // Short critical section: only the arena Vec pushes need exclusive access.
+        let arena_id = {
+            let mut meta_arena = self.metadata_arena.write();
+            let mut vec_arena = self.vector_arena.write();
+            let current_vec_len = vec_arena.len();
+            vec_arena.extend_from_slice(&emb);
+            let arena_id = meta_arena.len() as u32;
+            meta_arena.push(NodeMetadata {
+                arena_id, node_id: node_id.to_string(), timestamp: Utc::now().timestamp() as u64,
+                vector_dim: self.vector_dim, embedding_offset: current_vec_len as u64, gks_attributes: Vec::new(),
+                lang, cluster_id: arena_id,
+            });
+            arena_id
+        }; // arena locks released here, BEFORE the slow HNSW insert
         if let Some(u32_id) = self.get_u32(node_id) { self.u32_to_arena_id.insert(u32_id, arena_id); }
-        if self.hnsw_index.read().is_none() { 
-            *self.hnsw_index.write() = Some(Self::init_hnsw()); 
+        // One-time init under a write lock (double-checked); steady-state inserts
+        // hold only a shared read lock. hnsw_rs `insert(&self)` is internally
+        // synchronized, so concurrent writers no longer serialize on a global
+        // write lock (the P13 bottleneck).
+        if self.hnsw_index.read().is_none() {
+            let mut w = self.hnsw_index.write();
+            if w.is_none() { *w = Some(Self::init_hnsw()); }
         }
-        if let Some(ref mut hnsw) = *self.hnsw_index.write() { 
-            hnsw.insert((&emb, arena_id as usize)); 
+        if let Some(ref hnsw) = *self.hnsw_index.read() {
+            hnsw.insert((&emb, arena_id as usize));
         }
     }
 
