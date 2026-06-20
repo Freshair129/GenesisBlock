@@ -2,6 +2,7 @@ use criterion::{criterion_group, criterion_main, Criterion};
 use genesis_block_native::*;
 use tempfile::tempdir;
 use std::hint::black_box;
+use rand::Rng;
 
 fn setup_ldbc_graph(storage: &mut Storage, node_count: usize, fan_out: usize) {
     for i in 0..node_count {
@@ -9,12 +10,12 @@ fn setup_ldbc_graph(storage: &mut Storage, node_count: usize, fan_out: usize) {
             id: Some(format!("N-{}", i)),
             labels: vec!["Entity".to_string()],
             props: None,
-         valid_from: None, caused_by: None,  ttl: None, }).unwrap();
+         valid_from: None, caused_by: None,  ttl: None, lang: None, }).unwrap();
     }
 
     for i in 0..node_count {
         for _ in 0..fan_out {
-            let to = rand::random_range(0..node_count);
+            let to = rand::thread_rng().gen_range(0..node_count);
             storage.add_edge(EdgeInput {  
                 id: None,
                 from: format!("N-{}", i),
@@ -55,7 +56,7 @@ fn bench_traversal(c: &mut Criterion) {
                     as_of: None,
                     include_invalid: Some(false),
                     limit: Some(100),
-                }).ok();
+                }, false).ok();
             });
         });
     }

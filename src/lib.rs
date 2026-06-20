@@ -390,32 +390,12 @@ impl Storage {
     fn tokenize_id(id: &str) -> Vec<String> {
         let base_chars: String = id.chars().filter(|c| {
             let cat = unicode_general_category::get_general_category(*c);
-            use unicode_general_category::GeneralCategory::*;
-            cat != NonspacingMark && cat != SpacingMark && cat != EnclosingMark
+            !matches!(cat, unicode_general_category::GeneralCategory::NonspacingMark | unicode_general_category::GeneralCategory::SpacingMark | unicode_general_category::GeneralCategory::EnclosingMark)
         }).collect();
 
-        let mut tokens = Vec::new();
-        
-        // 1. Raw Character tokens (High Recall)
-        for c in id.chars() {
-            tokens.push(c.to_string().to_lowercase());
-        }
-
-        // 2. Base Character tokens
-        if id != base_chars {
-            for c in base_chars.chars() {
-                tokens.push(c.to_string().to_lowercase());
-            }
-        }
-
-        // 3. Bigrams (Raw)
-        let raw_chars: Vec<char> = id.chars().collect();
-        if raw_chars.len() >= 2 {
-            for i in 0..raw_chars.len() - 1 {
-                tokens.push(raw_chars[i..i+2].iter().collect::<String>().to_lowercase());
-            }
-        }
-
+        let mut tokens: Vec<String> = id.chars().map(|c| c.to_lowercase().to_string()).collect();
+        if id != base_chars { tokens.extend(base_chars.chars().map(|c| c.to_lowercase().to_string())); }
+        tokens.extend(id.chars().collect::<Vec<_>>().windows(2).map(|w| w.iter().collect::<String>().to_lowercase()));
         tokens
     }
 
@@ -594,8 +574,12 @@ impl Storage {
                     }
                 }
             }
-            storage.rehydrate_hnsw_index();
         }
+        // Rebuild the HNSW index for BOTH load paths: WAL replay and the
+        // instant snapshot load (try_load_state populates the vector/metadata
+        // arenas but never rehydrates HNSW, leaving semantic search broken
+        // until a manual rebuild).
+        storage.rehydrate_hnsw_index();
         Ok(storage)
     }
 
@@ -846,13 +830,16 @@ impl Storage {
         self.ensure_writable()?;
         let edge = EdgeOutput {
             id: args.id.unwrap_or_else(|| Uuid::new_v4().to_string()), from: args.from, to: args.to, rel: args.rel,
-            props: args.props.unwrap_or(Value::Object(Default::default())), valid_from: Utc::now().to_rfc3339(), valid_to: None, recorded_at: Utc::now().to_rfc3339(),
+            props: args.props.unwrap_or(Value::Object(Default::default())), 
+            valid_from: args.valid_from.unwrap_or_else(|| Utc::now().to_rfc3339()), 
+            valid_to: None, recorded_at: Utc::now().to_rfc3339(),
             superseded_by: None, impact: args.impact,
             caused_by: args.caused_by,
             clock: self.next_clock(),
         };
+        let u32_id = self.get_or_intern_id(&edge.id);
         self.index_edge_internal(&edge.id, &edge.from, &edge.to);
-        self.edges.insert(self.get_or_intern_id(&edge.id), edge.clone());
+        self.edges.insert(u32_id, edge.clone());
         self.refresh_impacts(Some(vec![edge.to.clone()]));
         self.persist(&Event::Edge(edge.clone()))?;
         Ok(edge)
@@ -1438,8 +1425,8 @@ impl Storage {
     }
 
     pub fn start_gossip_manager(storage: Arc<Self>) {
-        let peer_id = storage.local_peer_id.clone();
-        let verifying_key_bytes = storage.verifying_key.to_bytes().to_vec();
+        let _peer_id = storage.local_peer_id.clone();
+        let _verifying_key_bytes = storage.verifying_key.to_bytes().to_vec();
 
         tokio::spawn(async move {
             let socket = match tokio::net::UdpSocket::bind("0.0.0.0:0").await {
@@ -1508,7 +1495,7 @@ impl Storage {
                                         // Auto-verify and store proposal
                                         storage.proposals.insert(proposal.proposal_id.clone(), proposal);
                                     }
-                                    GossipMessage::ConsensusVote { proposal_id, voter_peer_id, approve, signature } => {
+                                    GossipMessage::ConsensusVote { proposal_id, voter_peer_id, approve, signature: _ } => {
                                         let _ = storage.submit_vote(proposal_id, voter_peer_id, approve);
                                         // TODO: verify signature of the vote itself if needed
                                     }
@@ -1600,9 +1587,9 @@ impl Storage {
         // 1. Load Metadata & Arenas
         if let Ok(data) = fs::read(self.path.join("vector.bin")) {
             let mut vec_arena = self.vector_arena.write();
-            *vec_arena = unsafe {
-                std::slice::from_raw_parts(data.as_ptr() as *const f32, data.len() / 4).to_vec()
-            };
+            *vec_arena = data.chunks_exact(4)
+                .map(|chunk| f32::from_le_bytes(chunk.try_into().unwrap()))
+                .collect();
         } else { return false; }
 
         if let Ok(data) = fs::read(self.path.join("meta.bin")) {
