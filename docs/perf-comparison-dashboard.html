@@ -77,6 +77,16 @@ td.num{text-align:right;font-variant-numeric:tabular-nums}
     <table id="metricTable"></table>
   </div>
 
+  <div class="card" style="margin-bottom:var(--gap)">
+    <h3>Engine head-to-head — vector k-NN</h3>
+    <div class="hint" id="h2h-caption"></div>
+    <div style="display:grid;grid-template-columns:1.1fr 1fr;gap:var(--gap);align-items:start" id="h2h-grid">
+      <div><canvas id="h2hLatChart" style="max-height:260px"></canvas></div>
+      <table id="h2hTable" style="font-size:13px"></table>
+    </div>
+    <div class="metricnote" id="h2h-note" style="margin-top:12px;max-width:none"></div>
+  </div>
+
   <div class="howto">
     <strong style="color:var(--text-primary)">➕ Add Run 3 (or more)</strong> — edit two places in the <code>&lt;script&gt;</code> at the bottom of this file, then refresh:<br>
     1. Append to <code>RUNS</code>: <code>{ id:"p15", label:"P15 …", env:"…", color:"#43b581" }</code><br>
@@ -216,6 +226,64 @@ barChart('qChart',  METRICS.filter(m=>m.group.startsWith('Query')), {unit:'µs'}
   });
   html+='</tbody>';
   t.innerHTML=html;
+})();
+
+/* ============================================================
+   ENGINE HEAD-TO-HEAD (vector k-NN) — add a competitor here
+   ============================================================ */
+const ENGINES = [
+  { id:"genesis", label:"GenesisDB (hnsw_rs)", color:"#5b8def" },
+  { id:"chroma",  label:"Chroma (hnswlib)",    color:"#e8a33d" },
+  // ➕ e.g. { id:"qdrant", label:"Qdrant", color:"#43b581" } — needs Docker
+];
+const H2H = {
+  meta:{ model:"bge-m3 (BAAI, 1024-dim)", n:3000, q:200, k:10, metric:"L2", disk:"C: SSD" },
+  metrics:[
+    { name:"Insert throughput", unit:"vec/s", lowerBetter:false, values:{ genesis:254, chroma:4074 },
+      note:"NOT apples-to-apples: GenesisDB does durable per-op WAL fsync; Chroma adds in-memory (ephemeral, no durability)." },
+    { name:"Query latency p50", unit:"µs", lowerBetter:true, values:{ genesis:1901.3, chroma:1249.2 }, note:"" },
+    { name:"Query latency p95", unit:"µs", lowerBetter:true, values:{ genesis:2361.2, chroma:1950.8 }, note:"" },
+    { name:"Recall@10", unit:"", lowerBetter:false, values:{ genesis:0.987, chroma:1.000 }, note:"vs exact brute-force L2 ground truth." },
+  ]
+};
+
+(function(){
+  const m=H2H.meta;
+  document.getElementById('h2h-caption').textContent =
+    `Embeddings: ${m.model} via local Ollama · ${m.n.toLocaleString()} vectors / ${m.q} queries / k=${m.k} · ${m.metric} distance · ${m.disk} · identical vectors fed to both engines`;
+  // latency grouped bar
+  const latMetrics=H2H.metrics.filter(x=>x.name.startsWith("Query"));
+  new Chart(document.getElementById('h2hLatChart'),{
+    type:'bar',
+    data:{ labels:latMetrics.map(x=>x.name.replace("Query latency ","")),
+      datasets:ENGINES.map(e=>({label:e.label,data:latMetrics.map(x=>x.values[e.id]??null),
+        backgroundColor:e.color+"cc",borderColor:e.color,borderWidth:1,borderRadius:4})).filter(d=>d.data.some(v=>v!=null)) },
+    options:{responsive:true,maintainAspectRatio:false,plugins:{
+      legend:{labels:{color:'#9aa3b4',usePointStyle:true,font:{size:11}}},
+      title:{display:true,text:'k-NN query latency (lower is better)',color:'#9aa3b4',font:{size:12}},
+      tooltip:{callbacks:{label:c=>`${c.dataset.label}: ${fmt(c.parsed.y)} µs`}}},
+      scales:{x:{ticks:{color:'#9aa3b4'},grid:{color:'#252a38'}},y:{beginAtZero:true,ticks:{color:'#9aa3b4'},grid:{color:'#252a38'}}}}
+  });
+  // table
+  const t=document.getElementById('h2hTable');
+  let html='<thead><tr><th>Metric</th><th>Unit</th>'+ENGINES.map(e=>`<th class="num">${e.label}</th>`).join('')+'<th>Notes</th></tr></thead><tbody>';
+  H2H.metrics.forEach(mt=>{
+    const base=ENGINES.find(e=>mt.values[e.id]!=null);
+    const bv=base?mt.values[base.id]:null;
+    html+=`<tr><td>${mt.name}</td><td>${mt.unit||'—'}</td>`;
+    ENGINES.forEach(e=>{
+      const v=mt.values[e.id]; let cell=v==null?'—':(mt.unit==='µs'?fmt(v):(v<10?v.toFixed(3):fmt(v)));
+      if(v!=null&&bv!=null&&e.id!==base.id){
+        const ch=(v-bv)/bv*100, better=mt.lowerBetter?ch<0:ch>0;
+        cell+=` <span class="delta ${better?'up':'down'}">${ch>0?'▲':'▼'}${Math.abs(ch).toFixed(0)}%</span>`;
+      }
+      html+=`<td class="num">${cell}</td>`;
+    });
+    html+=`<td class="metricnote">${mt.note||''}</td></tr>`;
+  });
+  t.innerHTML=html+'</tbody>';
+  document.getElementById('h2h-note').innerHTML =
+    "<strong style='color:var(--text-primary)'>Read:</strong> query latency &amp; recall are the fair HNSW-vs-HNSW metrics — GenesisDB is in the same ballpark (recall 0.987 vs 1.000; query ~1.5× slower). Insert is durability-asymmetric (GenesisDB fsyncs every op). Qdrant was the original target but needs Docker (unavailable here); Chroma is the closest embedded HNSW competitor and matches the project's own \"local knowledge engine\" positioning.";
 })();
 </script>
 </body>

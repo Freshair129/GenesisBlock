@@ -93,3 +93,8 @@ path = "benches/industrial_audit.rs"
 name = "scientific-audit"
 path = "benches/scientific_audit.rs"
 
+
+[[bin]]
+name = "vbench-genesis"
+path = "benches/vbench_genesis.rs"
+
