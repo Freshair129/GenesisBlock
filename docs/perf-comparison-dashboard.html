@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GenesisDB — Performance Comparison Dashboard</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.5.1" integrity="sha384-jb8JQMbMoBUzgWatfe6COACi2ljcDdZQ2OxczGA3bGNeWe+6DChMTBJemed7ZnvJ" crossorigin="anonymous"></script>
+<style>
+:root{
+  --bg-primary:#0f1117; --bg-card:#181b24; --bg-header:#12141c; --bg-soft:#1f2330;
+  --text-primary:#e6e8ee; --text-secondary:#9aa3b4; --border:#252a38;
+  --c1:#5b8def; --c2:#e8a33d; --c3:#43b581; --c4:#e0556b; --c5:#9b7be0;
+  --positive:#43b581; --negative:#e0556b; --neutral:#9aa3b4; --gap:16px; --radius:12px;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:var(--bg-primary);color:var(--text-primary);line-height:1.5}
+.container{max-width:1400px;margin:0 auto;padding:var(--gap)}
+.header{background:linear-gradient(135deg,#1a1f2e,#12141c);border:1px solid var(--border);padding:22px 26px;border-radius:var(--radius);margin-bottom:var(--gap);display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px}
+.header h1{font-size:20px;font-weight:700;letter-spacing:.2px}
+.header .sub{font-size:13px;color:var(--text-secondary);margin-top:3px}
+.legend{display:flex;gap:14px;flex-wrap:wrap;font-size:12px}
+.legend .run{display:flex;align-items:center;gap:6px;color:var(--text-secondary)}
+.dot{width:11px;height:11px;border-radius:3px;display:inline-block}
+.note-banner{background:#1c1f15;border:1px solid #3a3a1e;color:#e8d98a;font-size:12.5px;padding:10px 14px;border-radius:8px;margin-bottom:var(--gap)}
+.kpi-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:var(--gap);margin-bottom:var(--gap)}
+.kpi-card{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius);padding:18px 20px}
+.kpi-label{font-size:12px;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.5px}
+.kpi-value{font-size:26px;font-weight:800;margin:6px 0 2px}
+.kpi-sub{font-size:12px;color:var(--text-secondary)}
+.kpi-value.good{color:var(--positive)} .kpi-value.warn{color:var(--c2)}
+.chart-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(420px,1fr));gap:var(--gap);margin-bottom:var(--gap)}
+.card{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius);padding:18px 20px}
+.card h3{font-size:14px;font-weight:600;margin-bottom:4px}
+.card .hint{font-size:11.5px;color:var(--text-secondary);margin-bottom:12px}
+.card canvas{max-height:300px}
+.table-section{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius);padding:18px 20px;overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th,td{text-align:left;padding:9px 12px;border-bottom:1px solid var(--border);white-space:nowrap}
+thead th{color:var(--text-secondary);font-size:11px;text-transform:uppercase;letter-spacing:.5px}
+td.num{text-align:right;font-variant-numeric:tabular-nums}
+.grouprow td{background:var(--bg-soft);font-weight:700;color:var(--text-primary);font-size:12px;text-transform:uppercase;letter-spacing:.4px}
+.delta{font-size:11px;margin-left:6px}
+.delta.up{color:var(--positive)} .delta.down{color:var(--negative)}
+.metricnote{color:var(--text-secondary);font-size:11.5px;white-space:normal;max-width:320px}
+.badge{font-size:10px;padding:2px 7px;border-radius:20px;border:1px solid var(--border);color:var(--text-secondary)}
+.badge.cmp{color:var(--c3);border-color:#234} .badge.nc{color:var(--c2);border-color:#432}
+.footer{color:var(--text-secondary);font-size:12px;padding:14px 4px;text-align:center}
+.howto{background:var(--bg-card);border:1px dashed var(--border);border-radius:var(--radius);padding:16px 20px;margin-bottom:var(--gap);font-size:12.5px;color:var(--text-secondary)}
+.howto code{background:#0c0e14;padding:2px 6px;border-radius:4px;color:#cdd5e6}
+</style>
+</head>
+<body>
+<div class="container">
+  <div class="header">
+    <div>
+      <h1>GenesisDB — Performance Comparison</h1>
+      <div class="sub" id="subtitle"></div>
+    </div>
+    <div class="legend" id="legend"></div>
+  </div>
+
+  <div class="note-banner" id="banner"></div>
+
+  <div class="kpi-row" id="kpis"></div>
+
+  <div class="chart-row">
+    <div class="card"><h3>Traversal latency by hop</h3><div class="hint">lower is better · in-memory, disk-independent (comparable)</div><canvas id="latChart"></canvas></div>
+    <div class="card"><h3>Resident memory</h3><div class="hint">lower is better · log scale · disk-independent</div><canvas id="memChart"></canvas></div>
+  </div>
+  <div class="chart-row">
+    <div class="card"><h3>Write throughput (storage-dependent)</h3><div class="hint">higher is better · dominated by WAL fsync latency of the disk</div><canvas id="thrChart"></canvas></div>
+    <div class="card"><h3>Query latency (in-memory)</h3><div class="hint">lower is better · HQL avg & concurrent P95</div><canvas id="qChart"></canvas></div>
+  </div>
+
+  <div class="table-section">
+    <h3 style="margin-bottom:12px;font-size:14px">All metrics</h3>
+    <table id="metricTable"></table>
+  </div>
+
+  <div class="howto">
+    <strong style="color:var(--text-primary)">➕ Add Run 3 (or more)</strong> — edit two places in the <code>&lt;script&gt;</code> at the bottom of this file, then refresh:<br>
+    1. Append to <code>RUNS</code>: <code>{ id:"p15", label:"P15 …", env:"…", color:"#43b581" }</code><br>
+    2. For each metric in <code>METRICS</code>, add the new run's number to <code>values</code>: <code>values:{ …, p15: 12.3 }</code> (omit or use <code>null</code> if not measured → shows "—").<br>
+    Charts add a series and the table adds a column automatically.
+  </div>
+
+  <div class="footer" id="footer"></div>
+</div>
+
+<script>
+/* ============================================================
+   EDIT HERE TO ADD RUNS / METRICS
+   ============================================================ */
+const RUNS = [
+  { id:"hist",   label:"Historical (P7–P13)", env:"NVMe / SSD",        color:"#9aa3b4" },
+  { id:"p14hdd", label:"P14 — G: (HDD)",       env:"7200rpm HDD",       color:"#5b8def" },
+  { id:"p14ssd", label:"P14 — C: (SSD)",       env:"SATA SSD",          color:"#43b581" },
+  // ➕ add e.g. { id:"p15", label:"P15 — NVMe", env:"NVMe", color:"#e8a33d" },
+];
+
+// lowerBetter: true => smaller value is better (latency, RAM). false => higher is better (throughput).
+// comparable: true => apples-to-apples across environments; false => storage/scale dependent.
+const METRICS = [
+  { group:"Memory (disk-independent → comparable)", name:"Scientific RSS — 5k nodes × 1536-dim", unit:"MB", lowerBetter:true, comparable:true,
+    values:{ hist:null, p14hdd:82, p14ssd:null }, note:"Same machine, before P-B (f64 embedding) = 147 MB → after = 82 MB (−44%). Historical P12 measured 32k nodes = 15,890 MB on the old Mark VII engine (different scale/engine)." },
+  { group:"Memory (disk-independent → comparable)", name:"Shadow-sync peak RSS — 10k × 1536, 12w/4r", unit:"MB", lowerBetter:true, comparable:false,
+    values:{ hist:31960, p14hdd:213, p14ssd:null }, note:"Historical P11 (31.96 GB) used a different harness that also accumulated 50k+ result sets — directional only, not apples-to-apples." },
+
+  { group:"Traversal latency (in-memory → comparable)", name:"1-hop", unit:"µs", lowerBetter:true, comparable:true,
+    values:{ hist:12.79, p14hdd:8.37, p14ssd:null }, note:"ldbc_lite criterion median. Scale note: P7 ran 5k/25k; current bench 1k/5k edges." },
+  { group:"Traversal latency (in-memory → comparable)", name:"2-hop", unit:"µs", lowerBetter:true, comparable:true,
+    values:{ hist:81.03, p14hdd:78.28, p14ssd:null }, note:"" },
+  { group:"Traversal latency (in-memory → comparable)", name:"3-hop", unit:"µs", lowerBetter:true, comparable:true,
+    values:{ hist:522.07, p14hdd:527.85, p14ssd:null }, note:"Edge revert added a get_u32 string→u32 lookup per hop; no measurable cost." },
+
+  { group:"Query latency (in-memory → comparable)", name:"HQL query — avg (1k × 1536)", unit:"µs", lowerBetter:true, comparable:true,
+    values:{ hist:27, p14hdd:10.49, p14ssd:null }, note:"Historical = P10 mean latency (37k QPS run)." },
+  { group:"Query latency (in-memory → comparable)", name:"Shadow-sync P95 under load", unit:"µs", lowerBetter:true, comparable:true,
+    values:{ hist:null, p14hdd:432, p14ssd:null }, note:"" },
+
+  { group:"Write throughput (storage-dependent → NOT comparable across disks)", name:"Bulk ingest — 5k, single-thread", unit:"nodes/s", lowerBetter:false, comparable:false,
+    values:{ hist:null, p14hdd:24.34, p14ssd:1128.68 }, note:"Same binary; only WAL target differs → ~46× (HDD→SSD). Per-op fsync (no group-commit batching single-threaded)." },
+  { group:"Write throughput (storage-dependent → NOT comparable across disks)", name:"Industrial ingest — 10k props", unit:"nodes/s", lowerBetter:false, comparable:false,
+    values:{ hist:null, p14hdd:22.51, p14ssd:943.79 }, note:"~42× (HDD→SSD), same binary." },
+  { group:"Write throughput (storage-dependent → NOT comparable across disks)", name:"Concurrent mixed — shadow 10k", unit:"TPS", lowerBetter:false, comparable:false,
+    values:{ hist:834, p14hdd:118.34, p14ssd:null }, note:"Historical = P13 group-commit, 12 threads on NVMe. Current on HDD; HNSW-insert-lock bound." },
+
+  { group:"Durability / suite health", name:"Audit benches that compile & run", unit:"count", lowerBetter:false, comparable:true,
+    values:{ hist:0, p14hdd:7, p14ssd:null }, note:"Were uncompilable due to the u32 edge refactor; restored by the revert. Snapshot instant-load + WAL replay verified." },
+];
+
+const META = {
+  subtitle:"Run 1 = historical audits (NVMe) · Run 2 = P14 post-refactor (this machine). Disk-bound numbers are not comparable across environments — see banner.",
+  banner:"⚠️ Storage caveat: the project lives on G: (WDC WD10EZEX, 7200rpm HDD); historical P7–P13 ran on NVMe/SSD. The same P14 binary ran 42–46× faster for writes on C: (SSD), proving the low HDD write rates are storage, not a regression. Memory & in-memory latency are disk-independent and fully comparable.",
+  footer:"GenesisDB performance comparison · generated 2026-06-21 · commits b5e9771 (edge revert) + 75d560e (embedding dedup) · see AUDIT--P14-POST-REFACTOR-VERIFICATION.md"
+};
+/* ============================================================
+   END EDIT AREA
+   ============================================================ */
+
+const fmt = v => v==null ? "—" : (Math.abs(v)>=1000 ? v.toLocaleString(undefined,{maximumFractionDigits:0}) : (Number.isInteger(v)?v:v.toFixed(2)));
+const runColor = id => (RUNS.find(r=>r.id===id)||{}).color || "#888";
+
+document.getElementById('subtitle').textContent = META.subtitle;
+document.getElementById('banner').textContent = META.banner;
+document.getElementById('footer').textContent = META.footer;
+document.getElementById('legend').innerHTML = RUNS.map(r=>`<span class="run"><span class="dot" style="background:${r.color}"></span>${r.label} <span style="opacity:.6">· ${r.env}</span></span>`).join('');
+
+/* ---------- KPI cards (auto-computed highlights) ---------- */
+function pct(base,cur){ if(base==null||cur==null||base===0) return null; return (cur-base)/base*100; }
+function findMetric(name){ return METRICS.find(m=>m.name.startsWith(name)); }
+const kpis=[];
+(()=>{
+  const sci=findMetric("Scientific RSS");
+  kpis.push({label:"RAM — 5k×1536 (P-B)", value:"−44%", sub:"147 MB → 82 MB net RSS", cls:"good"});
+  const h1=findMetric("1-hop");
+  const d=pct(h1.values.hist,h1.values.p14hdd);
+  kpis.push({label:"Traversal 1-hop", value:(d!=null?(d>0?"+":"")+d.toFixed(0)+"%":"—"), sub:`${fmt(h1.values.hist)} → ${fmt(h1.values.p14hdd)} µs`, cls:"good"});
+  kpis.push({label:"Storage factor (HDD→SSD)", value:"42–46×", sub:"same binary, write throughput", cls:"warn"});
+  const su=findMetric("Audit benches");
+  kpis.push({label:"Suite restored", value:`${fmt(su.values.p14hdd)}/7`, sub:"benches green (was 0 — uncompilable)", cls:"good"});
+})();
+document.getElementById('kpis').innerHTML = kpis.map(k=>`<div class="kpi-card"><div class="kpi-label">${k.label}</div><div class="kpi-value ${k.cls||''}">${k.value}</div><div class="kpi-sub">${k.sub}</div></div>`).join('');
+
+/* ---------- Chart helpers ---------- */
+function datasetsFor(metrics){
+  return RUNS.map(r=>({
+    label:r.label,
+    data:metrics.map(m=>m.values[r.id]??null),
+    backgroundColor:r.color+"cc", borderColor:r.color, borderWidth:1, borderRadius:4
+  })).filter(ds=>ds.data.some(v=>v!=null));
+}
+function barChart(canvas, metrics, {log=false, unit=""}={}){
+  const labels=metrics.map(m=>m.name.replace(/ —.*/,'').replace(/\(.*\)/,'').trim());
+  new Chart(document.getElementById(canvas),{
+    type:'bar',
+    data:{labels, datasets:datasetsFor(metrics)},
+    options:{responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{labels:{color:'#9aa3b4',usePointStyle:true,padding:14,font:{size:11}}},
+        tooltip:{callbacks:{label:c=>`${c.dataset.label}: ${c.parsed.y==null?'—':fmt(c.parsed.y)} ${unit}`}}},
+      scales:{
+        x:{ticks:{color:'#9aa3b4',font:{size:11}},grid:{color:'#252a38'}},
+        y:{type:log?'logarithmic':'linear',beginAtZero:!log,ticks:{color:'#9aa3b4',font:{size:11}},grid:{color:'#252a38'}}}
+    }
+  });
+}
+barChart('latChart', METRICS.filter(m=>m.group.startsWith('Traversal')), {unit:'µs'});
+barChart('memChart', METRICS.filter(m=>m.group.startsWith('Memory')), {log:true, unit:'MB'});
+barChart('thrChart', METRICS.filter(m=>m.group.startsWith('Write')), {unit:''});
+barChart('qChart',  METRICS.filter(m=>m.group.startsWith('Query')), {unit:'µs'});
+
+/* ---------- Metric table ---------- */
+(function(){
+  const t=document.getElementById('metricTable');
+  let html='<thead><tr><th>Metric</th><th>Unit</th>'+RUNS.map(r=>`<th class="num">${r.label}</th>`).join('')+'<th>Comparable</th><th>Notes</th></tr></thead><tbody>';
+  let lastGroup=null;
+  METRICS.forEach(m=>{
+    if(m.group!==lastGroup){ html+=`<tr class="grouprow"><td colspan="${RUNS.length+4}">${m.group}</td></tr>`; lastGroup=m.group; }
+    // baseline = first run with a value (for delta)
+    const baseRun=RUNS.find(r=>m.values[r.id]!=null);
+    const base=baseRun?m.values[baseRun.id]:null;
+    html+=`<tr><td>${m.name}</td><td>${m.unit}</td>`;
+    RUNS.forEach((r,i)=>{
+      const v=m.values[r.id];
+      let cell=fmt(v);
+      if(v!=null && base!=null && r.id!==baseRun.id){
+        const change=(v-base)/base*100;
+        const better=m.lowerBetter?change<0:change>0;
+        const arrow=change>0?'▲':'▼';
+        cell+=` <span class="delta ${better?'up':'down'}">${arrow}${Math.abs(change).toFixed(0)}%</span>`;
+      }
+      html+=`<td class="num">${cell}</td>`;
+    });
+    html+=`<td><span class="badge ${m.comparable?'cmp':'nc'}">${m.comparable?'yes':'env-dep'}</span></td>`;
+    html+=`<td class="metricnote">${m.note||''}</td></tr>`;
+  });
+  html+='</tbody>';
+  t.innerHTML=html;
+})();
+</script>
+</body>
+</html>
