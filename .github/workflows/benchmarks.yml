@@ -22,7 +22,9 @@ jobs:
         uses: Swatinem/rust-cache@v2
 
       - name: Build Benchmark (Release)
-        run: cargo build --release --bin scientific-audit
+        # The bin targets are gated behind the `bins` feature (they link the
+        # napi lib and are excluded from the default `napi build` cdylib build).
+        run: cargo build --release --features bins --bin scientific-audit
 
       - name: Run Scientific Audit (15s Durable fsync)
         run: |
