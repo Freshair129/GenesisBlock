@@ -112,24 +112,72 @@ def do_chroma():
     p(f"Chroma: insert {out['insert_per_sec']:.0f} vec/s, query p50 {out['q_p50_ms']*1000:.1f}us "
       f"p95 {out['q_p95_ms']*1000:.1f}us, recall@{k} {out['recall_at_k']:.3f}")
 
+def do_qdrant():
+    from qdrant_client import QdrantClient, models
+    meta = json.load(open(os.path.join(BENCH, "meta.json")))
+    n, q, dim, k = meta["n"], meta["q"], meta["dim"], meta["k"]
+    corpus = np.fromfile(os.path.join(BENCH, "corpus.f32"), dtype=np.float32).reshape(n, dim)
+    queries = np.fromfile(os.path.join(BENCH, "queries.f32"), dtype=np.float32).reshape(q, dim)
+    client = QdrantClient(host="localhost", grpc_port=6334, prefer_grpc=True, timeout=300)
+    try: client.delete_collection("vbench")
+    except Exception: pass
+    client.create_collection("vbench",
+        vectors_config=models.VectorParams(size=dim, distance=models.Distance.EUCLID))
+    t = time.time()
+    B = 1000
+    for i in range(0, n, B):
+        pts = [models.PointStruct(id=j, vector=corpus[j].tolist()) for j in range(i, min(i+B, n))]
+        client.upsert("vbench", points=pts, wait=True)
+    # wait for async HNSW indexing to finish (bounded)
+    for _ in range(240):
+        info = client.get_collection("vbench")
+        if str(info.status).endswith("green") and (info.indexed_vectors_count or 0) >= n: break
+        time.sleep(0.5)
+    insert_sec = time.time() - t
+    lat, topk = [], []
+    for qi in range(q):
+        t0 = time.perf_counter()
+        try:
+            res = client.query_points("vbench", query=queries[qi].tolist(), limit=k).points
+        except Exception:
+            res = client.search("vbench", query_vector=queries[qi].tolist(), limit=k)
+        lat.append((time.perf_counter() - t0) * 1000.0)
+        topk.append([int(pt.id) for pt in res])
+    lat = np.asarray(lat)
+    gt = np.asarray(json.load(open(os.path.join(BENCH, "ground_truth.json"))))
+    out = {"engine": "Qdrant (server, gRPC)", "model": meta.get("model"), "n": n, "q": q, "dim": dim, "k": k,
+           "insert_sec": insert_sec, "insert_per_sec": n / insert_sec,
+           "q_p50_ms": float(np.percentile(lat, 50)), "q_p95_ms": float(np.percentile(lat, 95)),
+           "q_mean_ms": float(lat.mean()), "recall_at_k": recall_at_k(topk, gt),
+           "durability": "server, persisted; network/gRPC overhead in latency"}
+    json.dump(out, open(os.path.join(BENCH, "qdrant_results.json"), "w"), indent=2)
+    p(f"Qdrant: insert {out['insert_per_sec']:.0f} vec/s, query p50 {out['q_p50_ms']*1000:.1f}us "
+      f"p95 {out['q_p95_ms']*1000:.1f}us, recall@{k} {out['recall_at_k']:.3f}")
+
+def _p50_us(r):  return r["q_p50_us"] if "q_p50_us" in r else r["q_p50_ms"] * 1000
+def _p95_us(r):  return r["q_p95_us"] if "q_p95_us" in r else r["q_p95_ms"] * 1000
+
 def do_finalize():
     gt = np.asarray(json.load(open(os.path.join(BENCH, "ground_truth.json"))))
+    meta = json.load(open(os.path.join(BENCH, "meta.json")))
+    engines = []
     g = json.load(open(os.path.join(BENCH, "genesis_results.json")))
-    c = json.load(open(os.path.join(BENCH, "chroma_results.json")))
-    g["recall_at_k"] = recall_at_k(g["topk"], gt)
-    g.pop("topk", None)
-    combined = {"genesis": g, "chroma": c}
-    json.dump(combined, open(os.path.join(BENCH, "results.json"), "w"), indent=2)
+    g["recall_at_k"] = recall_at_k(g["topk"], gt); g.pop("topk", None)
+    engines.append(g)
+    for fn in ("chroma_results.json", "qdrant_results.json"):
+        path = os.path.join(BENCH, fn)
+        if os.path.exists(path): engines.append(json.load(open(path)))
+    json.dump({e["engine"]: e for e in engines}, open(os.path.join(BENCH, "results.json"), "w"), indent=2)
     k = g["k"]
-    p("\n================ RESULT (bge-m3 1024-dim, L2, same vectors) ================")
-    p(f"{'metric':<26}{'GenesisDB (hnsw_rs)':>22}{'Chroma (hnswlib)':>22}")
-    p("-"*70)
-    p(f"{'insert (vec/s)':<26}{g['insert_per_sec']:>22.0f}{c['insert_per_sec']:>22.0f}")
-    p(f"{'query p50':<26}{g['q_p50_us']:>19.1f}us{c['q_p50_ms']*1000:>19.1f}us")
-    p(f"{'query p95':<26}{g['q_p95_us']:>19.1f}us{c['q_p95_ms']*1000:>19.1f}us")
-    p(f"{'recall@'+str(k):<26}{g['recall_at_k']:>22.3f}{c['recall_at_k']:>22.3f}")
-    p(f"\nNote: GenesisDB insert = durable per-op WAL fsync; Chroma = in-memory batch add.")
-    p("Query latency & recall are the apples-to-apples HNSW-vs-HNSW metrics.")
+    p(f"\n========= RESULT ({meta.get('model')}, n={meta['n']}, L2, same vectors) =========")
+    hdr = f"{'metric':<16}" + "".join(f"{e['engine']:>26}" for e in engines)
+    p(hdr); p("-" * len(hdr))
+    p(f"{'insert (vec/s)':<16}" + "".join(f"{e['insert_per_sec']:>26.0f}" for e in engines))
+    p(f"{'query p50 (us)':<16}" + "".join(f"{_p50_us(e):>26.1f}" for e in engines))
+    p(f"{'query p95 (us)':<16}" + "".join(f"{_p95_us(e):>26.1f}" for e in engines))
+    p(f"{'recall@'+str(k):<16}" + "".join(f"{e['recall_at_k']:>26.3f}" for e in engines))
+    p("\nGenesisDB insert = durable batched WAL fsync; Chroma = in-memory ephemeral;")
+    p("Qdrant = server (persisted) with network/gRPC overhead in query latency.")
 
 def do_synth(n):
     # Synthetic clustered vectors for scale tests where we lack N diverse real
@@ -157,4 +205,5 @@ mode = sys.argv[1] if len(sys.argv) > 1 else "all"
 if mode == "synth": do_synth(int(sys.argv[2]))
 if mode in ("embed", "all"): do_embed()
 if mode in ("chroma", "all"): do_chroma()
+if mode == "qdrant": do_qdrant()
 if mode == "finalize": do_finalize()

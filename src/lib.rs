@@ -9,7 +9,7 @@ use std::fs::{self, File, OpenOptions as FileOpenOptions};
 use std::io::Write;
 use std::path::PathBuf;
 use std::sync::Arc;
-use std::sync::atomic::{AtomicU32, AtomicBool, Ordering};
+use std::sync::atomic::{AtomicU32, AtomicUsize, AtomicBool, Ordering};
 use std::time::{Duration, Instant};
 use sha2::{Sha256, Digest};
 use ed25519_dalek::{SigningKey, VerifyingKey, Signature, Signer, Verifier};
@@ -355,6 +355,8 @@ pub struct Storage {
     pub logical_clock: AtomicU32,
     pub vector_dim: u16,
     pub gossip_port: AtomicU32,
+    pub ef_construction: AtomicUsize,
+    pub ef_search: AtomicUsize,
     pub signing_key: SigningKey,
     pub verifying_key: VerifyingKey,
 }
@@ -413,12 +415,20 @@ impl Storage {
 
     pub fn get_u32(&self, id: &str) -> Option<u32> { self.id_to_u32.get(id).map(|v| *v) }
 
-    fn init_hnsw() -> Hnsw<'static, f32, DistL2> { Hnsw::new(16, 1000000, 16, 100, DistL2 {}) }
+    fn init_hnsw(ef_construction: usize) -> Hnsw<'static, f32, DistL2> { Hnsw::new(16, 1000000, 16, ef_construction, DistL2 {}) }
+
+    /// Tune HNSW build/search effort. Call before bulk load to trade recall for
+    /// speed (e.g. 100/100 = fast, 200/100 = quality default). Affects future
+    /// inserts and the next rebuild; not a retroactive re-index.
+    pub fn set_index_params(&self, ef_construction: u32, ef_search: u32) {
+        self.ef_construction.store(ef_construction as usize, Ordering::Relaxed);
+        self.ef_search.store(ef_search as usize, Ordering::Relaxed);
+    }
 
     fn ensure_hnsw_init(&self) {
         if self.hnsw_index.read().is_none() {
             let mut w = self.hnsw_index.write();
-            if w.is_none() { *w = Some(Self::init_hnsw()); }
+            if w.is_none() { *w = Some(Self::init_hnsw(self.ef_construction.load(Ordering::Relaxed))); }
         }
     }
 
@@ -470,7 +480,7 @@ impl Storage {
     fn rehydrate_hnsw_index(&self) {
         let meta_arena = self.metadata_arena.read();
         if meta_arena.is_empty() { return; }
-        let hnsw = Self::init_hnsw();
+        let hnsw = Self::init_hnsw(self.ef_construction.load(Ordering::Relaxed));
         let vec_arena = self.vector_arena.read();
         for meta in meta_arena.iter() {
             let start = meta.embedding_offset as usize;
@@ -554,6 +564,10 @@ impl Storage {
             logical_clock: AtomicU32::new(0),
             vector_dim,
             gossip_port: AtomicU32::new(0),
+            // HNSW tunables — quality-first defaults; override via set_index_params
+            // before bulk load to trade recall for build/query speed.
+            ef_construction: AtomicUsize::new(200),
+            ef_search: AtomicUsize::new(100),
             signing_key,
             verifying_key,
         };
@@ -975,7 +989,7 @@ impl Storage {
                 for (i, val) in query_f32.iter_mut().enumerate() { if i < centroid.len() { *val += centroid[i]; } }
             }
         }
-        let results = hnsw.search(&query_f32, (args.k * 2) as usize, 100);
+        let results = hnsw.search(&query_f32, (args.k * 2) as usize, self.ef_search.load(Ordering::Relaxed));
         let mut hybrid_results = Vec::new();
         let meta_arena = self.metadata_arena.read();
         let alpha = args.alpha.unwrap_or(0.5);
@@ -2005,6 +2019,7 @@ impl GenesisDatabase {
     #[napi] pub async fn save_state(&self) -> Result<()> { let i = Arc::clone(&self.inner); tokio::task::spawn_blocking(move || i.save_state()).await.map_err(|e| Error::from_reason(e.to_string()))? }
     #[napi] pub async fn compact(&self) -> Result<()> { let i = Arc::clone(&self.inner); tokio::task::spawn_blocking(move || i.compact()).await.map_err(|e| Error::from_reason(e.to_string()))? }
     #[napi] pub fn set_language_centroid(&self, lang: String, vector: Vec<f64>) { self.inner.set_language_centroid(lang, vector); }
+    #[napi] pub fn set_index_params(&self, ef_construction: u32, ef_search: u32) { self.inner.set_index_params(ef_construction, ef_search); }
     #[napi] pub async fn detect_communities(&self) -> Result<()> { let i = Arc::clone(&self.inner); tokio::task::spawn_blocking(move || i.detect_communities()).await.map_err(|e| Error::from_reason(e.to_string()))? }
     #[napi] pub async fn calculate_structural_gaps(&self) -> Result<Vec<GapSuggestion>> { let i = Arc::clone(&self.inner); tokio::task::spawn_blocking(move || i.calculate_structural_gaps()).await.map_err(|e| Error::from_reason(e.to_string()))? }
     #[napi] pub async fn generate_meta_graph(&self) -> Result<()> { let i = Arc::clone(&self.inner); tokio::task::spawn_blocking(move || i.generate_meta_graph()).await.map_err(|e| Error::from_reason(e.to_string()))? }

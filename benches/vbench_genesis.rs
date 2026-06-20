@@ -48,6 +48,10 @@ fn main() {
     })
     .expect("open storage");
 
+    // HNSW build/search effort (override without rebuilding via GB_EF env).
+    let efc: u32 = std::env::var("GB_EF").ok().and_then(|s| s.parse().ok()).unwrap_or(200);
+    storage.set_index_params(efc, 100);
+
     // --- Insert via bulk path: one Event::Batch (one WAL fsync) per 1024-chunk,
     //     matching Chroma's batched add. Still durable. ---
     let t = Instant::now();
@@ -84,6 +88,7 @@ fn main() {
     let out = serde_json::json!({
         "engine": "GenesisDB (hnsw_rs)",
         "model": model,
+        "ef_construction": efc,
         "n": n, "q": q, "dim": dim, "k": k,
         "insert_sec": insert_sec,
         "insert_per_sec": n as f64 / insert_sec,
