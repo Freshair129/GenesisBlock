@@ -70,18 +70,48 @@ fn main() {
     storage.bulk_add_nodes(inputs).unwrap();
     let insert_sec = t.elapsed().as_secs_f64();
 
-    // --- k-NN query (alpha=0 => pure vector search via HNSW) ---
-    let mut lats_us: Vec<f64> = Vec::with_capacity(q);
-    let mut topk: Vec<Vec<i64>> = Vec::with_capacity(q);
-    for qi in 0..q {
-        let qv: Vec<f64> = queries[qi * dim..(qi + 1) * dim].iter().map(|&x| x as f64).collect();
-        let t0 = Instant::now();
-        let res = storage
-            .hybrid_search(HybridSearchInput { query_vector: qv, k: k as u32, alpha: Some(0.0), lang: None, as_of: None })
-            .unwrap();
-        lats_us.push(t0.elapsed().as_nanos() as f64 / 1000.0);
-        topk.push(res.iter().take(k).map(|nb| nb.node.id.parse::<i64>().unwrap_or(-1)).collect());
+    // k-NN query runner at the current ef_search (alpha=0 => pure vector search)
+    let run_queries = |st: &Storage| -> (Vec<f64>, Vec<Vec<i64>>) {
+        let mut lats = Vec::with_capacity(q);
+        let mut tk = Vec::with_capacity(q);
+        for qi in 0..q {
+            let qv: Vec<f64> = queries[qi * dim..(qi + 1) * dim].iter().map(|&x| x as f64).collect();
+            let t0 = Instant::now();
+            let res = st
+                .hybrid_search(HybridSearchInput { query_vector: qv, k: k as u32, alpha: Some(0.0), lang: None, as_of: None })
+                .unwrap();
+            lats.push(t0.elapsed().as_nanos() as f64 / 1000.0);
+            tk.push(res.iter().take(k).map(|nb| nb.node.id.parse::<i64>().unwrap_or(-1)).collect());
+        }
+        (lats, tk)
+    };
+
+    // Recall–Latency frontier: build once, sweep ef_search at query time.
+    if let Ok(sweep) = std::env::var("GB_EF_SWEEP") {
+        let mut points = Vec::new();
+        for tok in sweep.split(',') {
+            let efs: u32 = tok.trim().parse().unwrap_or(100);
+            storage.set_index_params(efc, efs);
+            let (lats, tk) = run_queries(&storage);
+            let mut s = lats.clone(); s.sort_by(|a, b| a.partial_cmp(b).unwrap());
+            points.push(serde_json::json!({
+                "ef_search": efs,
+                "q_p50_us": percentile(&s, 50.0),
+                "q_p95_us": percentile(&s, 95.0),
+                "topk": tk
+            }));
+            println!("  ef_search={} -> p50 {:.1}µs", efs, percentile(&s, 50.0));
+        }
+        let out = serde_json::json!({
+            "engine": "GenesisDB (hnsw_rs)", "model": model, "ef_construction": efc,
+            "n": n, "q": q, "dim": dim, "k": k, "insert_per_sec": n as f64 / insert_sec, "points": points
+        });
+        fs::write(format!("{bench}/genesis_frontier.json"), serde_json::to_string_pretty(&out).unwrap()).unwrap();
+        println!("GenesisDB frontier written ({} points)", points.len());
+        return;
     }
+
+    let (lats_us, topk) = run_queries(&storage);
     let mut sorted = lats_us.clone();
     sorted.sort_by(|a, b| a.partial_cmp(b).unwrap());
 

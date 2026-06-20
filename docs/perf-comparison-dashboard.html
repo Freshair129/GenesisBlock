@@ -78,6 +78,13 @@ td.num{text-align:right;font-variant-numeric:tabular-nums}
   </div>
 
   <div class="card" style="margin-bottom:var(--gap)">
+    <h3>Recall–Latency frontier (GenesisDB ef_search sweep) — the real position</h3>
+    <div class="hint" id="frontier-caption"></div>
+    <canvas id="frontierChart" style="max-height:340px"></canvas>
+    <div class="metricnote" id="frontier-note" style="margin-top:12px;max-width:none"></div>
+  </div>
+
+  <div class="card" style="margin-bottom:var(--gap)">
     <h3>Engine head-to-head — vector k-NN</h3>
     <div class="hint" id="h2h-caption"></div>
     <div style="display:grid;grid-template-columns:1.1fr 1fr;gap:var(--gap);align-items:start" id="h2h-grid">
@@ -282,7 +289,41 @@ const SCALE = {
   ]
 };
 
+// Recall–Latency frontier: GenesisDB ef_search sweep at 100k + reference points
+const FRONTIER = {
+  meta:{ n:100000, dim:1024, ef_construction:200 },
+  genesis:[ {ef:16,lat:559.8,recall:0.859},{ef:32,lat:653.6,recall:0.913},{ef:64,lat:812.2,recall:0.964},
+            {ef:128,lat:1097.4,recall:0.984},{ef:256,lat:1255.0,recall:0.988},{ef:512,lat:2119.4,recall:0.990} ],
+  chroma:{lat:990.2,recall:0.981}, qdrant:{lat:3300.8,recall:0.999}
+};
+
 (function(){
+  // ---- Recall–Latency frontier (scatter) ----
+  (function(){
+    const fm=FRONTIER.meta;
+    document.getElementById('frontier-caption').textContent =
+      `${fm.n.toLocaleString()} synthetic vectors · dim ${fm.dim} · ef_construction=${fm.ef_construction} · query-time ef_search swept · x=p50 latency, y=recall@10`;
+    new Chart(document.getElementById('frontierChart'),{
+      type:'scatter',
+      data:{ datasets:[
+        { label:'GenesisDB (ef_search 16→512)', data:FRONTIER.genesis.map(p=>({x:p.lat,y:p.recall,ef:p.ef})),
+          borderColor:'#5b8def', backgroundColor:'#5b8def', showLine:true, tension:0.3, pointRadius:5, pointHoverRadius:7 },
+        { label:'Chroma (hnswlib)', data:[{x:FRONTIER.chroma.lat,y:FRONTIER.chroma.recall}],
+          borderColor:'#e8a33d', backgroundColor:'#e8a33d', pointRadius:8, pointStyle:'rectRot', showLine:false },
+        { label:'Qdrant (server)', data:[{x:FRONTIER.qdrant.lat,y:FRONTIER.qdrant.recall}],
+          borderColor:'#9b7be0', backgroundColor:'#9b7be0', pointRadius:8, pointStyle:'triangle', showLine:false },
+      ]},
+      options:{responsive:true,maintainAspectRatio:false,
+        plugins:{legend:{labels:{color:'#9aa3b4',usePointStyle:true,font:{size:11}}},
+          tooltip:{callbacks:{label:c=>{const ef=c.raw.ef?`ef=${c.raw.ef}, `:'';return `${c.dataset.label}: ${ef}${fmt(c.parsed.x)}µs, recall ${c.parsed.y.toFixed(3)}`;}}}},
+        scales:{
+          x:{title:{display:true,text:'query p50 latency (µs) — lower-left-up is better',color:'#9aa3b4'},type:'logarithmic',ticks:{color:'#9aa3b4'},grid:{color:'#252a38'}},
+          y:{title:{display:true,text:'recall@10',color:'#9aa3b4'},min:0.84,max:1.0,ticks:{color:'#9aa3b4'},grid:{color:'#252a38'}}}}
+    });
+    document.getElementById('frontier-note').innerHTML =
+      "<strong style='color:var(--text-primary)'>The honest position:</strong> GenesisDB's curve passes right through Chroma's single point — at ef_search=128 GenesisDB reaches recall 0.984 (> Chroma 0.981) at ~1.1 ms, and ef=64 gives 0.964 at 0.81 ms (faster). The two share essentially the same recall↔latency frontier. Qdrant sits high-recall/high-latency (0.999 @ 3.3 ms) — its extra recall costs the localhost network round-trip. ef_search is a live knob (set_index_params) so a deployment picks any point on this curve.";
+  })();
+
   const m=H2H.meta;
   document.getElementById('h2h-caption').textContent =
     `Embeddings: ${m.model} via local Ollama · ${m.n.toLocaleString()} vectors / ${m.q} queries / k=${m.k} · ${m.metric} distance · ${m.disk} · identical vectors fed to both engines`;

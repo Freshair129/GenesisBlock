@@ -201,8 +201,28 @@ def do_synth(n):
     json.dump(gt.tolist(), open(os.path.join(BENCH, "ground_truth.json"), "w"))
     p(f"synth: {n} corpus + {Q} queries, dim {DIM}, {n_clusters} clusters + exact L2 ground truth")
 
+def do_frontier():
+    gt = np.asarray(json.load(open(os.path.join(BENCH, "ground_truth.json"))))
+    fr = json.load(open(os.path.join(BENCH, "genesis_frontier.json")))
+    pts = [{"ef_search": p["ef_search"], "p50_us": p["q_p50_us"], "p95_us": p["q_p95_us"],
+            "recall": recall_at_k(p["topk"], gt)} for p in fr["points"]]
+    out = {"genesis": {"engine": "GenesisDB (hnsw_rs)", "ef_construction": fr["ef_construction"],
+                       "n": fr["n"], "dim": fr["dim"], "points": pts}}
+    for fn, key in (("chroma_results.json", "chroma"), ("qdrant_results.json", "qdrant")):
+        path = os.path.join(BENCH, fn)
+        if os.path.exists(path):
+            r = json.load(open(path)); out[key] = {"p50_us": _p50_us(r), "recall": r["recall_at_k"]}
+    json.dump(out, open(os.path.join(BENCH, "frontier_results.json"), "w"), indent=2)
+    p(f"\n===== RECALL-LATENCY FRONTIER (GenesisDB, n={fr['n']}, ef_construction={fr['ef_construction']}) =====")
+    p(f"{'ef_search':>10}{'p50 (us)':>12}{'p95 (us)':>12}{'recall@'+str(fr['k']):>12}")
+    for pt in pts:
+        p(f"{pt['ef_search']:>10}{pt['p50_us']:>12.1f}{pt['p95_us']:>12.1f}{pt['recall']:>12.3f}")
+    for key in ("chroma", "qdrant"):
+        if key in out: p(f"  ref {key:<6} p50 {out[key]['p50_us']:.1f}us  recall {out[key]['recall']:.3f}")
+
 mode = sys.argv[1] if len(sys.argv) > 1 else "all"
 if mode == "synth": do_synth(int(sys.argv[2]))
+if mode == "frontier": do_frontier()
 if mode in ("embed", "all"): do_embed()
 if mode in ("chroma", "all"): do_chroma()
 if mode == "qdrant": do_qdrant()
