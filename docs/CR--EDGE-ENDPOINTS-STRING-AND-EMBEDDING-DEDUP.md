@@ -1,7 +1,7 @@
 ---
 proposed_id: CR--EDGE-ENDPOINTS-STRING-AND-EMBEDDING-DEDUP
 type: change-request
-status: implemented-pending-merge
+status: merged
 aliases:
   - CR
 tier: process
@@ -109,5 +109,5 @@ avoidable per-node memory cost.
 | Role | Name | Decision | Date |
 |---|---|---|---|
 | Author | agent | proposed | 2026-06-21 |
-| Reviewer | _Boss_ | _pending_ | |
-| Merge | _pending_ | | |
+| Reviewer | Boss | approved | 2026-06-21 |
+| Merge | Boss | merged to `main` (fast-forward `3392feb..11dd357`) | 2026-06-21 |
