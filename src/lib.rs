@@ -25,7 +25,7 @@ use parking_lot::RwLock;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use uuid::Uuid;
-use crossbeam_channel::{unbounded, Sender, Receiver};
+use crossbeam_channel::{unbounded, bounded, Sender, Receiver};
 
 pub mod query;
 use query::HqlCommand;
@@ -429,31 +429,6 @@ impl VectorCollection {
         arena_id
     }
 
-    fn insert_one(&self, node_u32: Option<u32>, node_id: &str, emb_64: Vec<f64>, lang: String, ef_c: usize) {
-        let emb = self.prep(emb_64);
-        let arena_id = self.stage(node_u32, node_id, &emb, lang);
-        self.ensure_hnsw(ef_c);
-        // insert(&self): hnsw_rs is internally synchronized -> shared read lock.
-        if let Some(ref h) = *self.hnsw.read() { h.insert((&emb, arena_id as usize)); }
-    }
-
-    /// Stage all vectors, then build the HNSW graph with one rayon-parallel
-    /// `parallel_insert`. Items: (node_u32, node_id, emb_f64, lang).
-    fn insert_batch(&self, items: Vec<(Option<u32>, String, Vec<f64>, String)>, ef_c: usize) {
-        if items.is_empty() { return; }
-        let staged: Vec<(Vec<f32>, u32)> = items
-            .into_iter()
-            .map(|(nu, id, emb, lang)| {
-                let e = self.prep(emb);
-                let aid = self.stage(nu, &id, &e, lang);
-                (e, aid)
-            })
-            .collect();
-        self.ensure_hnsw(ef_c);
-        let refs: Vec<(&Vec<f32>, usize)> = staged.iter().map(|(v, id)| (v, *id as usize)).collect();
-        if let Some(ref h) = *self.hnsw.read() { h.parallel_insert(&refs); }
-    }
-
     /// Rebuild this collection's HNSW from its arena (the source of truth).
     fn rehydrate(&self, ef_c: usize) {
         let meta = self.metadata.read();
@@ -477,6 +452,16 @@ impl VectorCollection {
             count: self.count.load(Ordering::Relaxed) as u32,
         }
     }
+}
+
+/// A unit of deferred HNSW indexing, processed off the write hot path by the
+/// per-Storage indexing thread (ADR--GENESISDB-ASYNC-INDEXING). The vector is
+/// already staged in the collection's arena (durable) before the job is sent;
+/// only the HNSW graph insert is deferred.
+enum IndexJob {
+    One { coll: Arc<VectorCollection>, arena_id: u32, emb: Vec<f32>, ef_c: usize },
+    Batch { coll: Arc<VectorCollection>, items: Vec<(Vec<f32>, u32)>, ef_c: usize },
+    Flush(Sender<()>),
 }
 
 pub struct Storage {
@@ -505,6 +490,13 @@ pub struct Storage {
     pub meta_edges: DashMap<String, MetaEdge>,
     pub meta_history: DashMap<u32, Vec<SuperNode>>,
     pub wal_sender: Sender<(SignedEvent, Sender<bool>)>,
+    /// Deferred-indexing queue: live HNSW inserts run off the write hot path on
+    /// a dedicated thread (ADR--GENESISDB-ASYNC-INDEXING). Internal — drive via
+    /// add/flush, not directly (the job type is private).
+    index_tx: Sender<IndexJob>,
+    /// Vectors staged in an arena but not yet inserted into HNSW (observability;
+    /// see `index_lag` / `flush_index`).
+    index_pending: Arc<AtomicUsize>,
     pub local_peer_id: String,
     pub logical_clock: AtomicU32,
     pub gossip_port: AtomicU32,
@@ -626,7 +618,9 @@ impl Storage {
     }
 
     /// Insert one vector into the named (or default) collection. Validates the
-    /// embedding length against the collection dim before staging.
+    /// embedding length against the collection dim, stages it into the arena
+    /// (durable, immediately in-memory), and defers the HNSW insert to the
+    /// indexing thread (ADR--GENESISDB-ASYNC-INDEXING).
     fn add_vector_internal(&self, collection: &Option<String>, node_id: &str, emb_64: Vec<f64>, lang: String) -> Result<()> {
         let coll = self.resolve_collection(collection)?;
         if emb_64.len() != coll.dim as usize {
@@ -635,9 +629,40 @@ impl Storage {
             )));
         }
         let node_u32 = self.get_u32(node_id);
-        coll.insert_one(node_u32, node_id, emb_64, lang, self.ef_construction.load(Ordering::Relaxed));
+        let emb = coll.prep(emb_64);
+        let arena_id = coll.stage(node_u32, node_id, &emb, lang);
+        self.enqueue_one(&coll, arena_id, emb);
         Ok(())
     }
+
+    fn enqueue_one(&self, coll: &Arc<VectorCollection>, arena_id: u32, emb: Vec<f32>) {
+        self.index_pending.fetch_add(1, Ordering::Relaxed);
+        let _ = self.index_tx.send(IndexJob::One {
+            coll: Arc::clone(coll), arena_id, emb,
+            ef_c: self.ef_construction.load(Ordering::Relaxed),
+        });
+    }
+
+    fn enqueue_batch(&self, coll: &Arc<VectorCollection>, items: Vec<(Vec<f32>, u32)>) {
+        if items.is_empty() { return; }
+        self.index_pending.fetch_add(items.len(), Ordering::Relaxed);
+        let _ = self.index_tx.send(IndexJob::Batch {
+            coll: Arc::clone(coll), items,
+            ef_c: self.ef_construction.load(Ordering::Relaxed),
+        });
+    }
+
+    /// Block until every queued vector has been inserted into its HNSW index.
+    /// Use before asserting searchability, and before any operation that
+    /// reassigns arena ids (compaction / index rebuild) so a pending insert
+    /// never targets a stale arena id.
+    pub fn flush_index(&self) {
+        let (tx, rx) = bounded(1);
+        if self.index_tx.send(IndexJob::Flush(tx)).is_ok() { let _ = rx.recv(); }
+    }
+
+    /// Vectors staged but not yet inserted into HNSW (eventually-searchable lag).
+    pub fn index_lag(&self) -> u32 { self.index_pending.load(Ordering::Relaxed) as u32 }
 
     /// WAL-replay / CRDT-sync vector insert: tolerant of a not-yet-created
     /// collection. `create_collection` is an in-memory op (durable only via the
@@ -645,7 +670,11 @@ impl Storage {
     /// a collection we lack — auto-provision it from the embedding's dim (L2,
     /// model "recovered"). A subsequent save_state records the true model/metric.
     /// The live `add_node` path stays strict; only recovery/sync auto-provisions.
-    fn replay_vector(&self, collection: &Option<String>, node_id: &str, emb: Vec<f64>, lang: String) {
+    /// `index = false` (startup WAL replay): stage into the arena only — the
+    /// post-load `rehydrate_hnsw_index` builds every index once, so enqueuing
+    /// here would double-insert. `index = true` (runtime CRDT sync): stage AND
+    /// enqueue the deferred HNSW insert, since no rehydrate follows.
+    fn replay_vector(&self, collection: &Option<String>, node_id: &str, emb: Vec<f64>, lang: String, index: bool) {
         let name = collection.clone().unwrap_or_else(|| self.default_collection.clone());
         if !self.collections.contains_key(&name) {
             self.collections.insert(
@@ -653,7 +682,13 @@ impl Storage {
                 Arc::new(VectorCollection::new(name.clone(), "recovered".to_string(), emb.len() as u16, Metric::L2)),
             );
         }
-        let _ = self.add_vector_internal(&Some(name), node_id, emb, lang);
+        if let Ok(coll) = self.resolve_collection(&Some(name)) {
+            if emb.len() != coll.dim as usize { return; }
+            let node_u32 = self.get_u32(node_id);
+            let e = coll.prep(emb);
+            let arena_id = coll.stage(node_u32, node_id, &e, lang);
+            if index { self.enqueue_one(&coll, arena_id, e); }
+        }
     }
 
     /// Rebuild every collection's HNSW from its arena (both load paths).
@@ -721,6 +756,33 @@ impl Storage {
             }
         });
 
+        // --- Deferred-indexing thread (ADR--GENESISDB-ASYNC-INDEXING) ---
+        // Drains HNSW insert jobs off the write hot path. Bounded for
+        // backpressure: a sustained bulk load blocks the writer rather than
+        // growing an unbounded queue of vector copies.
+        let (index_tx, index_rx): (Sender<IndexJob>, Receiver<IndexJob>) = bounded(4096);
+        let index_pending = Arc::new(AtomicUsize::new(0));
+        let index_pending_thread = Arc::clone(&index_pending);
+        std::thread::spawn(move || {
+            while let Ok(job) = index_rx.recv() {
+                match job {
+                    IndexJob::One { coll, arena_id, emb, ef_c } => {
+                        coll.ensure_hnsw(ef_c);
+                        // insert(&self): hnsw_rs is internally synchronized -> read lock.
+                        if let Some(ref h) = *coll.hnsw.read() { h.insert((&emb, arena_id as usize)); }
+                        index_pending_thread.fetch_sub(1, Ordering::Relaxed);
+                    }
+                    IndexJob::Batch { coll, items, ef_c } => {
+                        coll.ensure_hnsw(ef_c);
+                        let refs: Vec<(&Vec<f32>, usize)> = items.iter().map(|(v, id)| (v, *id as usize)).collect();
+                        if let Some(ref h) = *coll.hnsw.read() { h.parallel_insert(&refs); }
+                        index_pending_thread.fetch_sub(items.len(), Ordering::Relaxed);
+                    }
+                    IndexJob::Flush(ack) => { let _ = ack.send(()); }
+                }
+            }
+        });
+
         // The `default` collection always exists; legacy single-space data and
         // any node added without an explicit collection routes here. Its dim is
         // the OpenOptions vector_dim (back-compat with the old global space).
@@ -741,6 +803,8 @@ impl Storage {
             proposals: DashMap::new(), meta_nodes: DashMap::new(), meta_edges: DashMap::new(),
             meta_history: DashMap::new(),
             wal_sender,
+            index_tx,
+            index_pending,
             local_peer_id,
             logical_clock: AtomicU32::new(0),
             gossip_port: AtomicU32::new(0),
@@ -765,7 +829,7 @@ impl Storage {
                                     Event::Node(n) => {
                                         let u32_id = storage.get_or_intern_id(&n.id);
                                         if let Some(emb) = n.embedding.clone() {
-                                            storage.replay_vector(&n.collection, &n.id, emb, n.lang.clone().unwrap_or("en".to_string()));
+                                            storage.replay_vector(&n.collection, &n.id, emb, n.lang.clone().unwrap_or("en".to_string()), false);
                                         }
                                         storage.insert_node_lean(u32_id, n);
                                     }
@@ -779,7 +843,7 @@ impl Storage {
                                                 Event::Node(n) => {
                                                     let u32_id = storage.get_or_intern_id(&n.id);
                                                     if let Some(emb) = n.embedding.clone() {
-                                                        storage.replay_vector(&n.collection, &n.id, emb, n.lang.clone().unwrap_or("en".to_string()));
+                                                        storage.replay_vector(&n.collection, &n.id, emb, n.lang.clone().unwrap_or("en".to_string()), false);
                                                     }
                                                     storage.insert_node_lean(u32_id, n);
                                                 }
@@ -1123,6 +1187,7 @@ impl Storage {
 
     pub fn rebuild_index_parallel(&self) -> Result<()> {
         self.is_rebuilding.store(true, Ordering::SeqCst);
+        self.flush_index();
         let result = (|| { self.rehydrate_hnsw_index(); Ok(()) })();
         self.is_rebuilding.store(false, Ordering::SeqCst);
         result
@@ -1582,7 +1647,7 @@ impl Storage {
                         }
                         
                         if let Some(emb) = &remote_node.embedding {
-                            self.replay_vector(&remote_node.collection, &remote_node.id, emb.clone(), remote_node.lang.clone().unwrap_or("en".to_string()));
+                            self.replay_vector(&remote_node.collection, &remote_node.id, emb.clone(), remote_node.lang.clone().unwrap_or("en".to_string()), true);
                         }
                         self.insert_node_lean(u32_id, remote_node.clone());
                         self.persist_signed(signed_event.clone())?;
@@ -2094,10 +2159,21 @@ impl Storage {
                 _ => {}
             }
         }
-        let ef_c = self.ef_construction.load(Ordering::Relaxed);
         for (cn, items) in by_coll {
-            // Collection existence was validated in the processing phase.
-            if let Ok(coll) = self.resolve_collection(&Some(cn)) { coll.insert_batch(items, ef_c); }
+            // Collection existence was validated in the processing phase. Stage
+            // all vectors synchronously (durable arena), then defer the HNSW
+            // build to the indexing thread as one parallel_insert job.
+            if let Ok(coll) = self.resolve_collection(&Some(cn)) {
+                let staged: Vec<(Vec<f32>, u32)> = items
+                    .into_iter()
+                    .map(|(nu, id, emb, lang)| {
+                        let e = coll.prep(emb);
+                        let aid = coll.stage(nu, &id, &e, lang);
+                        (e, aid)
+                    })
+                    .collect();
+                self.enqueue_batch(&coll, staged);
+            }
         }
 
         Ok(BatchOutput { nodes: output_nodes, edges: output_edges })
@@ -2106,6 +2182,9 @@ impl Storage {
     pub fn perform_index_compaction(&self) -> Result<()> {
         println!("Mark IX: Starting Index Compaction...");
         let start = Instant::now();
+        // Drain pending HNSW inserts first — compaction reassigns arena ids, so
+        // a queued insert with a stale id must not run against the new arena.
+        self.flush_index();
         
         // 1. Identify Live Set
         let live_nodes: HashSet<u32> = self.nodes.iter().map(|e| *e.key()).collect();
@@ -2351,6 +2430,8 @@ impl GenesisDatabase {
     #[napi] pub async fn compact(&self) -> Result<()> { let i = Arc::clone(&self.inner); tokio::task::spawn_blocking(move || i.compact()).await.map_err(|e| Error::from_reason(e.to_string()))? }
     #[napi] pub async fn create_collection(&self, name: String, model: String, dim: u32, metric: Option<String>) -> Result<()> { let i = Arc::clone(&self.inner); tokio::task::spawn_blocking(move || i.create_collection(name, model, dim, metric)).await.map_err(|e| Error::from_reason(e.to_string()))? }
     #[napi] pub fn list_collections(&self) -> Vec<CollectionInfo> { self.inner.list_collections() }
+    #[napi] pub async fn flush_index(&self) -> Result<()> { let i = Arc::clone(&self.inner); tokio::task::spawn_blocking(move || i.flush_index()).await.map_err(|e| Error::from_reason(e.to_string())) }
+    #[napi] pub fn index_lag(&self) -> u32 { self.inner.index_lag() }
     #[napi] pub fn set_language_centroid(&self, lang: String, vector: Vec<f64>) { self.inner.set_language_centroid(lang, vector); }
     #[napi] pub fn set_index_params(&self, ef_construction: u32, ef_search: u32) { self.inner.set_index_params(ef_construction, ef_search); }
     #[napi] pub async fn detect_communities(&self) -> Result<()> { let i = Arc::clone(&self.inner); tokio::task::spawn_blocking(move || i.detect_communities()).await.map_err(|e| Error::from_reason(e.to_string()))? }

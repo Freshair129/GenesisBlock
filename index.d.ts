@@ -182,6 +182,8 @@ export declare class GenesisDatabase {
   compact(): Promise<void>
   createCollection(name: string, model: string, dim: number, metric?: string | undefined | null): Promise<void>
   listCollections(): Array<CollectionInfo>
+  flushIndex(): Promise<void>
+  indexLag(): number
   setLanguageCentroid(lang: string, vector: Array<number>): void
   setIndexParams(efConstruction: number, efSearch: number): void
   detectCommunities(): Promise<void>

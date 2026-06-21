@@ -29,6 +29,9 @@ fn add(s: &Storage, id: &str, emb: Vec<f64>, collection: Option<&str>) -> Result
 }
 
 fn search(s: &Storage, q: Vec<f64>, k: u32, collection: Option<&str>) -> Result<Vec<String>, String> {
+    // Indexing is asynchronous (eventually-searchable); flush so the vector is
+    // guaranteed in the HNSW before we assert on results.
+    s.flush_index();
     s.hybrid_search(HybridSearchInput {
         query_vector: q, k, alpha: Some(0.0), lang: None, as_of: None,
         collection: collection.map(|c| c.to_string()),
