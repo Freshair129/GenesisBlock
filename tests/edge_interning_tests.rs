@@ -31,7 +31,7 @@ fn open(path: &str) -> Storage {
 fn node(s: &Storage, id: &str) {
     s.add_node(NodeInput {
         id: Some(id.to_string()), labels: vec![], props: None, embedding: None,
-        lang: None, valid_from: None, caused_by: None, ttl: None,
+        lang: None, valid_from: None, caused_by: None, ttl: None, collection: None,
     })
     .unwrap();
 }

@@ -42,7 +42,7 @@ pub fn load_snb_dataset(storage: &mut Storage, path: &str) {
                 labels: vec!["Person".to_string()],
                 props: Some(serde_json::Value::Object(props)),
                 embedding: None,
-             valid_from: None, caused_by: None,  ttl: None, }).unwrap();
+             valid_from: None, caused_by: None,  ttl: None, collection: None, }).unwrap();
         }
     }
 
@@ -59,7 +59,7 @@ pub fn load_snb_dataset(storage: &mut Storage, path: &str) {
                 labels: vec!["Post".to_string()],
                 props: Some(serde_json::Value::Object(props)),
                 embedding: Some(embedding),
-             valid_from: None, caused_by: None,  ttl: None, }).unwrap();
+             valid_from: None, caused_by: None,  ttl: None, collection: None, }).unwrap();
         }
     }
 

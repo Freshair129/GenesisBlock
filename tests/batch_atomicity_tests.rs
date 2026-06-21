@@ -26,7 +26,7 @@ fn test_mark_ix_batch_atomicity() {
             lang: None,
             valid_from: None,
             caused_by: None,
-            ttl: None,
+            ttl: None, collection: None,
         }],
         edges: vec![EdgeInput {
             id: Some("batched_edge".to_string()),
@@ -62,7 +62,7 @@ fn test_mark_ix_batch_atomicity() {
                 lang: None,
                 valid_from: None,
                 caused_by: None,
-                ttl: None,
+                ttl: None, collection: None,
             },
             NodeInput {
                 id: Some("invalid_master_node".to_string()),
@@ -72,7 +72,7 @@ fn test_mark_ix_batch_atomicity() {
                 lang: None,
                 valid_from: None,
                 caused_by: None,
-                ttl: None,
+                ttl: None, collection: None,
             }
         ],
         edges: vec![],

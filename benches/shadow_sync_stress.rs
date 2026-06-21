@@ -71,7 +71,7 @@ fn main() {
             props: Some(props),
             embedding: Some(embedding),
             lang: None,
-         valid_from: None, caused_by: None,  ttl: None, });
+         valid_from: None, caused_by: None,  ttl: None, collection: None, });
     });
 
     let duration = start_time.elapsed();

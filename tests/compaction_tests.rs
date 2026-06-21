@@ -26,15 +26,16 @@ fn test_mark_ix_memory_reclamation_compaction() {
             lang: Some("en".to_string()),
             valid_from: None,
             caused_by: None,
-            ttl: None,
+            ttl: None, collection: None,
         }).unwrap();
     }
 
-    // Verify initial arena size
+    // Verify initial arena size (default collection)
     {
-        let vec_arena = storage.vector_arena.read();
+        let coll = storage.collections.get("default").unwrap();
+        let vec_arena = coll.arena.read();
         assert_eq!(vec_arena.len(), 100 * 3, "Initial vector arena should have 300 elements");
-        let meta_arena = storage.metadata_arena.read();
+        let meta_arena = coll.metadata.read();
         assert_eq!(meta_arena.len(), 100, "Initial metadata arena should have 100 entries");
     }
 
@@ -46,7 +47,8 @@ fn test_mark_ix_memory_reclamation_compaction() {
     // DashMap size is reduced, but Arenas are still large (fragmented)
     assert_eq!(storage.nodes.len(), 10);
     {
-        let vec_arena = storage.vector_arena.read();
+        let coll = storage.collections.get("default").unwrap();
+        let vec_arena = coll.arena.read();
         assert_eq!(vec_arena.len(), 100 * 3, "Arenas should still be large before compaction");
     }
 
@@ -55,9 +57,10 @@ fn test_mark_ix_memory_reclamation_compaction() {
 
     // 4. Verify Reclamation
     {
-        let vec_arena = storage.vector_arena.read();
+        let coll = storage.collections.get("default").unwrap();
+        let vec_arena = coll.arena.read();
         assert_eq!(vec_arena.len(), 10 * 3, "Vector arena should be reclaimed to 30 elements");
-        let meta_arena = storage.metadata_arena.read();
+        let meta_arena = coll.metadata.read();
         assert_eq!(meta_arena.len(), 10, "Metadata arena should be reclaimed to 10 entries");
     }
 
@@ -68,6 +71,7 @@ fn test_mark_ix_memory_reclamation_compaction() {
         alpha: Some(0.0),
         lang: None,
         as_of: None,
+        collection: None,
     }).unwrap();
     
     assert_eq!(search_res.len(), 1);

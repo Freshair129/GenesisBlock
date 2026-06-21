@@ -30,7 +30,7 @@ fn main() {
             props: None,
             embedding: Some(embedding),
             lang: None,
-         valid_from: None, caused_by: None,  ttl: None, }).unwrap();
+         valid_from: None, caused_by: None,  ttl: None, collection: None, }).unwrap();
         nodes.push(node.id);
     }
     let duration = start.elapsed();

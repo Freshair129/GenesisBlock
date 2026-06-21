@@ -52,7 +52,7 @@ fn main() {
         let i1 = (i0 + chunk).min(n);
         let nodes: Vec<NodeInput> = (i0..i1).map(|i| NodeInput {
             id: Some(format!("g{i}")), labels: vec!["v".to_string()], props: None,
-            embedding: None, lang: None, valid_from: None, caused_by: None, ttl: None,
+            embedding: None, lang: None, valid_from: None, caused_by: None, ttl: None, collection: None,
         }).collect();
         storage.bulk_add_nodes(nodes).unwrap();
         i0 = i1;

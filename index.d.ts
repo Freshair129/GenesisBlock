@@ -18,6 +18,8 @@ export interface NodeInput {
   validFrom?: string
   causedBy?: string
   ttl?: number
+  /** Vector collection to route `embedding` into. Defaults to `default`. */
+  collection?: string
 }
 export interface LogicalClock {
   time: number
@@ -35,6 +37,11 @@ export interface NodeOutput {
   causedBy?: string
   expiresAt?: string
   clock: LogicalClock
+  /**
+   * Which vector collection this node's embedding lives in (None = default).
+   * Persisted in the WAL `Event::Node` so replay rebuilds the right space.
+   */
+  collection?: string
 }
 export interface EdgeInput {
   id?: string
@@ -104,11 +111,23 @@ export interface HybridSearchInput {
   alpha?: number
   lang?: string
   asOf?: string
+  /**
+   * Vector collection to search. Defaults to `default`. Query dim is
+   * validated against the collection dim (closes the cross-space bug).
+   */
+  collection?: string
 }
 export interface DatabaseStatus {
   open: boolean
   readOnly: boolean
   pageCacheMb: number
+}
+export interface CollectionInfo {
+  name: string
+  model: string
+  dim: number
+  metric: string
+  count: number
 }
 export interface SyncPeer {
   id: string
@@ -161,7 +180,10 @@ export declare class GenesisDatabase {
   neighbors(seed: string, args: NeighborInput): Promise<Array<NeighborOutput>>
   saveState(): Promise<void>
   compact(): Promise<void>
+  createCollection(name: string, model: string, dim: number, metric?: string | undefined | null): Promise<void>
+  listCollections(): Array<CollectionInfo>
   setLanguageCentroid(lang: string, vector: Array<number>): void
+  setIndexParams(efConstruction: number, efSearch: number): void
   detectCommunities(): Promise<void>
   calculateStructuralGaps(): Promise<Array<GapSuggestion>>
   generateMetaGraph(): Promise<void>

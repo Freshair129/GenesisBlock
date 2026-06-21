@@ -23,7 +23,7 @@ fn test_vector_drift_tracking() {
         lang: Some("en".to_string()),
         valid_from: None,
         caused_by: None,
-     ttl: None, }).unwrap();
+     ttl: None, collection: None, }).unwrap();
 
     storage.add_node(NodeInput { 
         id: Some("node-2".to_string()),
@@ -33,7 +33,7 @@ fn test_vector_drift_tracking() {
         lang: Some("en".to_string()),
         valid_from: None,
         caused_by: None,
-     ttl: None, }).unwrap();
+     ttl: None, collection: None, }).unwrap();
 
     storage.add_edge(EdgeInput { 
         id: None, from: "node-1".to_string(), to: "node-2".to_string(), rel: "KNOWS".to_string(),
@@ -47,7 +47,8 @@ fn test_vector_drift_tracking() {
     println!("Step 2: Done.");
 
     let c_id = {
-        let meta_arena = storage.metadata_arena.read();
+        let coll = storage.collections.get("default").unwrap();
+        let meta_arena = coll.metadata.read();
         meta_arena[0].cluster_id // node-1's cluster
     };
     
@@ -67,7 +68,7 @@ fn test_vector_drift_tracking() {
         lang: Some("en".to_string()),
         valid_from: None,
         caused_by: None,
-     ttl: None, }).unwrap();
+     ttl: None, collection: None, }).unwrap();
 
     storage.add_edge(EdgeInput { 
         id: None, from: "node-2".to_string(), to: "node-3".to_string(), rel: "KNOWS".to_string(),
@@ -83,7 +84,8 @@ fn test_vector_drift_tracking() {
 
     // Find node-1's cluster again (it might have changed ID but should have history)
     let c_id_new = {
-        let meta_arena = storage.metadata_arena.read();
+        let coll = storage.collections.get("default").unwrap();
+        let meta_arena = coll.metadata.read();
         meta_arena[0].cluster_id
     };
     let history_v2 = storage.get_meta_history(c_id_new);

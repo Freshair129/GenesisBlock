@@ -26,7 +26,7 @@ fn node(s: &Storage, id: &str) {
         lang: None,
         valid_from: None,
         caused_by: None,
-        ttl: None,
+        ttl: None, collection: None,
     })
     .unwrap();
 }

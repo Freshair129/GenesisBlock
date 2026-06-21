@@ -21,7 +21,7 @@ async fn test_temporal_time_travel() {
         lang: Some("en".to_string()),
         valid_from: Some("2024-01-01T00:00:00Z".to_string()),
         caused_by: None,
-        ttl: None,
+        ttl: None, collection: None,
     }).await.unwrap();
 
     // 2. Create another node in the past
@@ -33,7 +33,7 @@ async fn test_temporal_time_travel() {
         lang: Some("en".to_string()),
         valid_from: Some("2024-01-01T00:00:00Z".to_string()),
         caused_by: None,
-        ttl: None,
+        ttl: None, collection: None,
     }).await.unwrap();
 
     // 3. Connect them in the past
@@ -65,7 +65,7 @@ async fn test_temporal_time_travel() {
         lang: Some("en".to_string()),
         valid_from: Some("2026-01-01T00:00:00Z".to_string()),
         caused_by: None,
-        ttl: None,
+        ttl: None, collection: None,
     }).await.unwrap();
 
     let _edge_v2 = db.add_edge(EdgeInput {  

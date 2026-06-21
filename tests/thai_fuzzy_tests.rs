@@ -22,7 +22,7 @@ fn test_thai_fuzzy_hardening() {
         lang: Some("th".to_string()),
         valid_from: None,
         caused_by: None,
-        ttl: None,
+        ttl: None, collection: None,
     }).unwrap();
 
     // 2. Search using "บาน" (Bloom/Open - very similar lexically but different meaning)

@@ -32,7 +32,7 @@ fn test_crdt_conflict_resolution() {
         lang: Some("en".to_string()),
         valid_from: None,
         caused_by: None,
-        ttl: None,
+        ttl: None, collection: None,
     }).unwrap();
 
     // 2. Mock a SignedEvent for replication
@@ -113,7 +113,7 @@ fn test_logical_clock_convergence() {
 
     let n1 = storage.add_node(NodeInput {
         id: Some("n1".to_string()), labels: vec![], props: None, embedding: None, lang: None,
-        valid_from: None, caused_by: None, ttl: None,
+        valid_from: None, caused_by: None, ttl: None, collection: None,
     }).unwrap();
     assert_eq!(n1.clock.time, 1);
 
@@ -157,7 +157,7 @@ fn test_cryptographic_forgery_rejection() {
 
     let node_a = storage_a.add_node(NodeInput {
         id: Some("A".to_string()), labels: vec![], props: None, embedding: None, lang: None,
-        valid_from: None, caused_by: None, ttl: None,
+        valid_from: None, caused_by: None, ttl: None, collection: None,
     }).unwrap();
 
     storage_b.peers.insert(storage_a.local_peer_id.clone(), genesis_block_native::SyncPeer {

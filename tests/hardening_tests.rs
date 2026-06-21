@@ -15,12 +15,12 @@ fn test_bi_directional_edge_cleanup() {
     // 1. Add two nodes
     storage.add_node(NodeInput {
         id: Some("A".to_string()), labels: vec!["USER".to_string()], props: None,
-        embedding: None, lang: None, valid_from: None, caused_by: None, ttl: None,
+        embedding: None, lang: None, valid_from: None, caused_by: None, ttl: None, collection: None,
     }).unwrap();
 
     storage.add_node(NodeInput {
         id: Some("B".to_string()), labels: vec!["USER".to_string()], props: None,
-        embedding: None, lang: None, valid_from: None, caused_by: None, ttl: None,
+        embedding: None, lang: None, valid_from: None, caused_by: None, ttl: None, collection: None,
     }).unwrap();
 
     // 2. Link them A -> B
@@ -64,7 +64,8 @@ fn test_configurable_vector_dim() {
         vector_dim: Some(768),
     }).unwrap();
 
-    assert_eq!(storage.vector_dim, 768);
+    // The configured dim now lives on the default collection.
+    assert_eq!(storage.collections.get("default").unwrap().dim, 768);
 
     // Add node with 768-dim vector
     let v_768 = vec![0.5; 768];
@@ -76,11 +77,12 @@ fn test_configurable_vector_dim() {
         lang: Some("en".to_string()),
         valid_from: None,
         caused_by: None,
-        ttl: None,
+        ttl: None, collection: None,
     }).unwrap();
 
-    // Verify metadata reflects the correct dimension
-    let meta_arena = storage.metadata_arena.read();
+    // Verify metadata reflects the correct dimension (default collection)
+    let coll = storage.collections.get("default").unwrap();
+    let meta_arena = coll.metadata.read();
     assert_eq!(meta_arena[0].vector_dim, 768);
     
     println!("Configurable vector dimension verified.");

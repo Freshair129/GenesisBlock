@@ -123,6 +123,30 @@ async fn add_edge_handler(
 }
 
 #[derive(serde::Deserialize)]
+struct CreateCollectionInput {
+    pub name: String,
+    pub model: String,
+    pub dim: u32,
+    pub metric: Option<String>,
+}
+
+async fn create_collection_handler(
+    State(state): State<AppState>,
+    Json(input): Json<CreateCollectionInput>,
+) -> impl IntoResponse {
+    let storage = state.storage.write();
+    match storage.create_collection(input.name, input.model, input.dim, input.metric) {
+        Ok(()) => (StatusCode::OK, Json(serde_json::json!({"ok": true}))).into_response(),
+        Err(e) => (StatusCode::BAD_REQUEST, e.to_string()).into_response(),
+    }
+}
+
+async fn list_collections_handler(State(state): State<AppState>) -> impl IntoResponse {
+    let storage = state.storage.read();
+    (StatusCode::OK, Json(storage.list_collections())).into_response()
+}
+
+#[derive(serde::Deserialize)]
 struct SupersedeInput {
     pub id: String,
     pub new_props: Option<serde_json::Value>,
@@ -245,7 +269,7 @@ async fn status_handler(
         page_cache_mb: base.page_cache_mb,
         node_count: storage.nodes.len(),
         edge_count: storage.edges.len(),
-        memory_usage_mb: (storage.vector_arena.read().len() * 4) as f64 / 1024.0 / 1024.0,
+        memory_usage_mb: storage.collections.iter().map(|c| c.value().arena.read().len() * 4).sum::<usize>() as f64 / 1024.0 / 1024.0,
     };
     Json(status)
 }
@@ -282,6 +306,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .route("/v1/node/add", post(add_node_handler))
         .route("/v1/node/supersede", post(supersede_node_handler))
         .route("/v1/edge/add", post(add_edge_handler))
+        .route("/v1/collection/create", post(create_collection_handler))
+        .route("/v1/collections", get(list_collections_handler))
         .route("/v1/insight/drift/:cluster_id", get(get_meta_history_handler))
         .route("/v1/query", post(query_handler))
         .route("/v1/search/hybrid", post(hybrid_search_handler))

@@ -174,14 +174,22 @@ user action required; old DBs keep working.
 1. ~~**P-A (RAM):** dynamic `max_elements`.~~ **DROPPED** — measured ~8 MB
    impact (§1 correction, §4).
 2. **P-B (dedup):** ✅ **DONE** (commit 75d560e) — `insert_node_lean`, ~44% RSS.
-3. **P-C (collections):** introduce `VectorCollection`, migrate the global space
-   to `default`, route `add_vector`/search by collection, add dim validation.
-   *(open — the real remaining work)*
-4. **P-D (surface):** `NodeInput.collection`, `HybridSearchInput.collection`, HQL
-   `IN` clause, REST/NAPI admin ops. `index.d.ts` already declares string edge
-   endpoints (consistent post-revert); regen only if collection fields are added.
+3. **P-C (collections):** ✅ **DONE** (2026-06-22, [[ADR--GENESISDB-MULTI-COLLECTION]]).
+   `VectorCollection` + `collections` map replace the global space; `default`
+   always exists; routing by `NodeInput.collection`; per-collection HNSW/arena;
+   dim validation on insert + search; per-collection snapshot files + manifest;
+   legacy `vector.bin`/`meta.bin` migrates to `default`; WAL-replay auto-provisions
+   missing collections from the embedding dim. Community/meta/gaps run over the
+   `default` collection; compaction loops all collections. Cosine = normalize-then-L2.
+4. **P-D (surface):** ✅ **DONE** — `NodeInput.collection`,
+   `NodeOutput.collection`, `HybridSearchInput.collection`; NAPI
+   `create_collection`/`list_collections` (+ `CollectionInfo`); REST
+   `POST /v1/collection/create`, `GET /v1/collections`; `index.d.ts` regenerated.
+   **Deferred:** HQL `IN <collection>` clause (grammar-source ambiguity) and the
+   same-node-multi-vector `add_vector` op (needs an `Event::Vector` variant) —
+   tracked as follow-ups in the ADR.
 
-P-B shipped independently and de-risked the rest. P-C/P-D remain.
+P-B shipped independently and de-risked the rest. **P-C/P-D shipped 2026-06-22.**
 
 ## 9. Impact (measured, not estimated)
 

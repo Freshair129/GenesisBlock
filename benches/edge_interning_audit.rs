@@ -81,7 +81,7 @@ fn main() {
                 lang: None,
                 valid_from: None,
                 caused_by: None,
-                ttl: None,
+                ttl: None, collection: None,
             })
             .collect();
         storage.bulk_add_nodes(nodes).unwrap();

@@ -28,7 +28,7 @@ fn test_node_creation_and_interning() {
         lang: None,
         valid_from: None,
         caused_by: None,
-        ttl: None,
+        ttl: None, collection: None,
     }).unwrap();
 
     assert_eq!(node.id, "user_1");
@@ -42,8 +42,8 @@ fn test_node_creation_and_interning() {
 fn test_edge_creation_and_graph_traversal() {
     let storage = setup_test_db("test_graph_traversal");
     
-    storage.add_node(NodeInput { id: Some("A".to_string()), labels: vec![], props: None, embedding: None, lang: None, valid_from: None, caused_by: None, ttl: None }).unwrap();
-    storage.add_node(NodeInput { id: Some("B".to_string()), labels: vec![], props: None, embedding: None, lang: None, valid_from: None, caused_by: None, ttl: None }).unwrap();
+    storage.add_node(NodeInput { id: Some("A".to_string()), labels: vec![], props: None, embedding: None, lang: None, valid_from: None, caused_by: None, ttl: None, collection: None }).unwrap();
+    storage.add_node(NodeInput { id: Some("B".to_string()), labels: vec![], props: None, embedding: None, lang: None, valid_from: None, caused_by: None, ttl: None, collection: None }).unwrap();
     
     storage.add_edge(EdgeInput {  
         id: Some("E1".to_string()),
@@ -83,7 +83,7 @@ fn test_vector_arena_and_hybrid_search() {
         lang: None,
         valid_from: None,
         caused_by: None,
-        ttl: None,
+        ttl: None, collection: None,
     }).unwrap();
     
     storage.add_node(NodeInput {  
@@ -93,7 +93,7 @@ fn test_vector_arena_and_hybrid_search() {
         lang: None,
         valid_from: None,
         caused_by: None,
-        ttl: None,
+        ttl: None, collection: None,
     }).unwrap();
     
     storage.rebuild_index_parallel().unwrap();
@@ -111,7 +111,7 @@ fn test_wal_group_commit_durability() {
 
     {
         let storage = Storage::open(OpenOptions { path: db_path.to_string(), page_cache_mb: None, read_only: Some(false), vector_dim: None }).unwrap();
-        storage.add_node(NodeInput { id: Some("durable_node".to_string()), labels: vec![], props: None, embedding: None, lang: None, valid_from: None, caused_by: None, ttl: None }).unwrap();
+        storage.add_node(NodeInput { id: Some("durable_node".to_string()), labels: vec![], props: None, embedding: None, lang: None, valid_from: None, caused_by: None, ttl: None, collection: None }).unwrap();
     } 
 
     {

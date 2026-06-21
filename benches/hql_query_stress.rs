@@ -27,7 +27,7 @@ fn main() {
             props: None,
             embedding: Some(vec![i as f64; 1536]),
             lang: None,
-         valid_from: None, caused_by: None,  ttl: None, }).unwrap();
+         valid_from: None, caused_by: None,  ttl: None, collection: None, }).unwrap();
         nodes.push(node.id);
     }
 

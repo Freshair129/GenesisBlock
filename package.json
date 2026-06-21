@@ -23,7 +23,7 @@
     "build:debug": "napi build --platform",
     "agents:validate": "node .agents/validate-agent-registry.mjs",
     "prepublishOnly": "napi prepublish -t npm",
-    "test": "node --test __test__",
+    "test": "node --test __test__/*.mjs",
     "install": "npm run build",
     "mcp:start": "node mcp/server.js"
   },

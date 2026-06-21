@@ -24,7 +24,7 @@ fn main() {
             props: Some(serde_json::json!({"val": i})),
             embedding: None,
             lang: None,
-         valid_from: None, caused_by: None,  ttl: None, });
+         valid_from: None, caused_by: None,  ttl: None, collection: None, });
     }
 
     let start = Instant::now();

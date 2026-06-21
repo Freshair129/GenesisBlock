@@ -22,7 +22,7 @@ fn test_ephemeral_nodes_ttl() {
         lang: Some("en".to_string()),
         valid_from: None,
         caused_by: None,
-        ttl: Some(2),
+        ttl: Some(2), collection: None,
     }).unwrap();
 
     assert!(node_res.expires_at.is_some());
@@ -37,7 +37,7 @@ fn test_ephemeral_nodes_ttl() {
         lang: Some("en".to_string()),
         valid_from: None,
         caused_by: None,
-        ttl: None,
+        ttl: None, collection: None,
     }).unwrap();
 
     // 3. Link them

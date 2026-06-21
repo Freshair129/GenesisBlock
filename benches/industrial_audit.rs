@@ -29,7 +29,7 @@ fn main() {
             props: Some(serde_json::json!({"status": "active", "value": rng.gen::<f64>()})),
             embedding: None,
             lang: None,
-         valid_from: None, caused_by: None,  ttl: None, }).unwrap();
+         valid_from: None, caused_by: None,  ttl: None, collection: None, }).unwrap();
         nodes.push(node.id);
     }
     let duration = start.elapsed();

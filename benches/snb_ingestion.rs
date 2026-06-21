@@ -24,7 +24,7 @@ fn main() {
             props: Some(serde_json::json!({"name": format!("User {}", i)})),
             embedding: None,
             lang: None,
-         valid_from: None, caused_by: None,  ttl: None, }).unwrap();
+         valid_from: None, caused_by: None,  ttl: None, collection: None, }).unwrap();
     }
 
     for i in 0..person_count - 1 {

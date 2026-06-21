@@ -16,17 +16,17 @@ fn test_grl_context_retrieval_tiered() {
     // 1. Setup a small graph: A -> B -> C
     storage.add_node(NodeInput {
         id: Some("A".to_string()), labels: vec!["USER".to_string()], props: Some(json!({"text": "Node A content"})),
-        embedding: None, lang: None, valid_from: None, caused_by: None, ttl: None,
+        embedding: None, lang: None, valid_from: None, caused_by: None, ttl: None, collection: None,
     }).unwrap();
 
     storage.add_node(NodeInput {
         id: Some("B".to_string()), labels: vec!["USER".to_string()], props: Some(json!({"text": "Node B content"})),
-        embedding: None, lang: None, valid_from: None, caused_by: None, ttl: None,
+        embedding: None, lang: None, valid_from: None, caused_by: None, ttl: None, collection: None,
     }).unwrap();
 
     storage.add_node(NodeInput {
         id: Some("C".to_string()), labels: vec!["USER".to_string()], props: Some(json!({"text": "Node C content"})),
-        embedding: None, lang: None, valid_from: None, caused_by: None, ttl: None,
+        embedding: None, lang: None, valid_from: None, caused_by: None, ttl: None, collection: None,
     }).unwrap();
 
     storage.add_edge(EdgeInput {
@@ -71,7 +71,7 @@ fn test_grl_budget_compression() {
     // Add some nodes and metadata to allow SuperNode generation
     storage.add_node(NodeInput {
         id: Some("A".to_string()), labels: vec!["USER".to_string()], props: Some(json!({"large": "x".repeat(100)})),
-        embedding: Some(vec![0.1; 1536]), lang: None, valid_from: None, caused_by: None, ttl: None,
+        embedding: Some(vec![0.1; 1536]), lang: None, valid_from: None, caused_by: None, ttl: None, collection: None,
     }).unwrap();
 
     storage.detect_communities().unwrap();
@@ -96,7 +96,7 @@ fn test_hql_context_command() {
 
     storage.add_node(NodeInput {
         id: Some("Target".to_string()), labels: vec!["USER".to_string()], props: None,
-        embedding: None, lang: None, valid_from: None, caused_by: None, ttl: None,
+        embedding: None, lang: None, valid_from: None, caused_by: None, ttl: None, collection: None,
     }).unwrap();
 
     // Test HQL CONTEXT

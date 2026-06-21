@@ -26,7 +26,7 @@ fn test_mark_ix_instant_load_persistence() {
             lang: Some("en".to_string()),
             valid_from: None,
             caused_by: None,
-            ttl: None,
+            ttl: None, collection: None,
         }).unwrap();
 
         // Manual save or let Drop handle it
@@ -48,8 +48,9 @@ fn test_mark_ix_instant_load_persistence() {
         let node = storage.nodes.get(&u32_id).unwrap();
         assert_eq!(node.id, "persist_1");
         
-        // Verify vector arena was loaded
-        let meta_arena = storage.metadata_arena.read();
+        // Verify vector arena was loaded (default collection)
+        let coll = storage.collections.get("default").unwrap();
+        let meta_arena = coll.metadata.read();
         assert_eq!(meta_arena.len(), 1);
         assert_eq!(meta_arena[0].node_id, "persist_1");
     }

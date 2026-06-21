@@ -21,7 +21,7 @@ fn test_axiomatic_guards_enforcement() {
         props: Some(json!({"logic": "Universal truth"})),
         embedding: None,
         lang: None,
-     valid_from: None, caused_by: None,  ttl: None, });
+     valid_from: None, caused_by: None,  ttl: None, collection: None, });
 
     assert!(master_res.is_err(), "MASTER node creation should be blocked for external agents");
     let err_msg = master_res.unwrap_err().to_string();
@@ -34,7 +34,7 @@ fn test_axiomatic_guards_enforcement() {
         props: Some(json!({"content": "Hello world"})),
         embedding: None,
         lang: None,
-     valid_from: None, caused_by: None,  ttl: None, });
+     valid_from: None, caused_by: None,  ttl: None, collection: None, });
 
     assert!(user_res.is_ok(), "USER node creation should be allowed");
     

@@ -54,6 +54,8 @@ pub struct NodeInput {
     pub valid_from: Option<String>,
     pub caused_by: Option<String>,
     pub ttl: Option<u32>,
+    /// Vector collection to route `embedding` into. Defaults to `default`.
+    pub collection: Option<String>,
 }
 
 #[napi(object)]
@@ -78,6 +80,10 @@ pub struct NodeOutput {
     pub caused_by: Option<String>,
     pub expires_at: Option<String>,
     pub clock: LogicalClock,
+    /// Which vector collection this node's embedding lives in (None = default).
+    /// Persisted in the WAL `Event::Node` so replay rebuilds the right space.
+    #[serde(default)]
+    pub collection: Option<String>,
 }
 
 #[napi(object)]
@@ -195,6 +201,9 @@ pub struct HybridSearchInput {
     pub alpha: Option<f64>,
     pub lang: Option<String>,
     pub as_of: Option<String>,
+    /// Vector collection to search. Defaults to `default`. Query dim is
+    /// validated against the collection dim (closes the cross-space bug).
+    pub collection: Option<String>,
 }
 
 #[napi(object)]
@@ -203,6 +212,16 @@ pub struct DatabaseStatus {
     pub open: bool,
     pub read_only: bool,
     pub page_cache_mb: u32,
+}
+
+#[napi(object)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct CollectionInfo {
+    pub name: String,
+    pub model: String,
+    pub dim: u32,
+    pub metric: String,
+    pub count: u32,
 }
 
 #[napi(object)]
@@ -325,6 +344,141 @@ pub enum OptimizationTask {
     RebuildMetaGraph,
 }
 
+/// Distance/ranking metric for a vector collection. Cosine is implemented as
+/// L2 over L2-normalized vectors (SPEC §10) so a single `DistL2` HNSW index
+/// type serves both — vectors are normalized on insert and at query time.
+#[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq)]
+pub enum Metric { L2, Cosine }
+
+impl Metric {
+    fn parse(s: &str) -> Self {
+        if s.eq_ignore_ascii_case("cosine") { Metric::Cosine } else { Metric::L2 }
+    }
+    fn as_str(&self) -> &'static str {
+        match self { Metric::L2 => "L2", Metric::Cosine => "Cosine" }
+    }
+}
+
+/// One isolated vector space (ADR--GENESISDB-MULTI-COLLECTION / SPEC §3). All
+/// vectors in a collection come from ONE embedding model and share one dim +
+/// metric + arena + metadata + HNSW index. Cross-model distances are
+/// meaningless, so models must never share a collection.
+pub struct VectorCollection {
+    pub name: String,
+    pub model: String,
+    pub dim: u16,
+    pub metric: Metric,
+    pub arena: RwLock<Vec<f32>>,            // dense, row-major, stride = dim
+    pub metadata: RwLock<Vec<NodeMetadata>>,
+    pub hnsw: RwLock<Option<Hnsw<'static, f32, DistL2>>>,
+    pub node_to_arena: DashMap<u32, u32>,   // node u32 -> arena_id (this collection)
+    pub count: AtomicUsize,
+}
+
+impl VectorCollection {
+    fn new(name: String, model: String, dim: u16, metric: Metric) -> Self {
+        Self {
+            name, model, dim, metric,
+            arena: RwLock::new(Vec::new()),
+            metadata: RwLock::new(Vec::new()),
+            hnsw: RwLock::new(None),
+            node_to_arena: DashMap::new(),
+            count: AtomicUsize::new(0),
+        }
+    }
+
+    fn build_hnsw(ef_construction: usize) -> Hnsw<'static, f32, DistL2> {
+        Hnsw::new(16, 1_000_000, 16, ef_construction, DistL2 {})
+    }
+
+    fn ensure_hnsw(&self, ef_construction: usize) {
+        if self.hnsw.read().is_none() {
+            let mut w = self.hnsw.write();
+            if w.is_none() { *w = Some(Self::build_hnsw(ef_construction)); }
+        }
+    }
+
+    /// f64 -> f32, normalizing for Cosine collections so DistL2 ranks by cosine.
+    fn prep(&self, emb_64: Vec<f64>) -> Vec<f32> {
+        let mut emb: Vec<f32> = emb_64.into_iter().map(|v| v as f32).collect();
+        if self.metric == Metric::Cosine {
+            let norm: f32 = emb.iter().map(|x| x * x).sum::<f32>().sqrt();
+            if norm > 0.0 { for x in emb.iter_mut() { *x /= norm; } }
+        }
+        emb
+    }
+
+    /// Push a prepared vector into the arena/metadata, return its arena_id.
+    /// Does NOT touch HNSW. Short critical section: only the Vec pushes.
+    fn stage(&self, node_u32: Option<u32>, node_id: &str, emb: &[f32], lang: String) -> u32 {
+        let arena_id = {
+            let mut meta = self.metadata.write();
+            let mut arena = self.arena.write();
+            let off = arena.len();
+            arena.extend_from_slice(emb);
+            let arena_id = meta.len() as u32;
+            meta.push(NodeMetadata {
+                arena_id, node_id: node_id.to_string(), timestamp: Utc::now().timestamp() as u64,
+                vector_dim: self.dim, embedding_offset: off as u64, gks_attributes: Vec::new(),
+                lang, cluster_id: arena_id,
+            });
+            arena_id
+        };
+        if let Some(u) = node_u32 { self.node_to_arena.insert(u, arena_id); }
+        self.count.fetch_add(1, Ordering::Relaxed);
+        arena_id
+    }
+
+    fn insert_one(&self, node_u32: Option<u32>, node_id: &str, emb_64: Vec<f64>, lang: String, ef_c: usize) {
+        let emb = self.prep(emb_64);
+        let arena_id = self.stage(node_u32, node_id, &emb, lang);
+        self.ensure_hnsw(ef_c);
+        // insert(&self): hnsw_rs is internally synchronized -> shared read lock.
+        if let Some(ref h) = *self.hnsw.read() { h.insert((&emb, arena_id as usize)); }
+    }
+
+    /// Stage all vectors, then build the HNSW graph with one rayon-parallel
+    /// `parallel_insert`. Items: (node_u32, node_id, emb_f64, lang).
+    fn insert_batch(&self, items: Vec<(Option<u32>, String, Vec<f64>, String)>, ef_c: usize) {
+        if items.is_empty() { return; }
+        let staged: Vec<(Vec<f32>, u32)> = items
+            .into_iter()
+            .map(|(nu, id, emb, lang)| {
+                let e = self.prep(emb);
+                let aid = self.stage(nu, &id, &e, lang);
+                (e, aid)
+            })
+            .collect();
+        self.ensure_hnsw(ef_c);
+        let refs: Vec<(&Vec<f32>, usize)> = staged.iter().map(|(v, id)| (v, *id as usize)).collect();
+        if let Some(ref h) = *self.hnsw.read() { h.parallel_insert(&refs); }
+    }
+
+    /// Rebuild this collection's HNSW from its arena (the source of truth).
+    fn rehydrate(&self, ef_c: usize) {
+        let meta = self.metadata.read();
+        if meta.is_empty() { return; }
+        let hnsw = Self::build_hnsw(ef_c);
+        let arena = self.arena.read();
+        for m in meta.iter() {
+            let start = m.embedding_offset as usize;
+            let end = start + m.vector_dim as usize;
+            if end <= arena.len() { hnsw.insert((&arena[start..end], m.arena_id as usize)); }
+        }
+        *self.hnsw.write() = Some(hnsw);
+    }
+
+    fn info(&self) -> CollectionInfo {
+        CollectionInfo {
+            name: self.name.clone(),
+            model: self.model.clone(),
+            dim: self.dim as u32,
+            metric: self.metric.as_str().to_string(),
+            count: self.count.load(Ordering::Relaxed) as u32,
+        }
+    }
+}
+
 pub struct Storage {
     pub path: PathBuf,
     pub read_only: bool,
@@ -332,15 +486,15 @@ pub struct Storage {
     pub edges: DashMap<u64, EdgeOutput>,
     pub out_idx: DashMap<u32, HashSet<u64>>,
     pub in_idx: DashMap<u32, HashSet<u64>>,
-    pub vector_arena: RwLock<Vec<f32>>,
-    pub metadata_arena: RwLock<Vec<NodeMetadata>>,
-    pub hnsw_index: RwLock<Option<Hnsw<'static, f32, DistL2>>>,
+    /// Per-model/per-dim isolated vector spaces, keyed by collection name.
+    /// Replaces the former single global arena/metadata/hnsw/u32_to_arena_id.
+    pub collections: DashMap<String, Arc<VectorCollection>>,
+    pub default_collection: String,
     pub log_path: PathBuf,
     pub bin_path: PathBuf,
     pub _lock_file: Option<File>,
     pub id_to_u32: DashMap<String, u32>,
     pub u32_to_id: DashMap<u32, String>,
-    pub u32_to_arena_id: DashMap<u32, u32>,
     pub next_u32: AtomicU32,
     pub is_rebuilding: AtomicBool,
     pub trigram_index: DashMap<String, HashSet<u32>>,
@@ -353,7 +507,6 @@ pub struct Storage {
     pub wal_sender: Sender<(SignedEvent, Sender<bool>)>,
     pub local_peer_id: String,
     pub logical_clock: AtomicU32,
-    pub vector_dim: u16,
     pub gossip_port: AtomicU32,
     pub ef_construction: AtomicUsize,
     pub ef_search: AtomicUsize,
@@ -428,79 +581,85 @@ impl Storage {
 
     pub fn get_u32(&self, id: &str) -> Option<u32> { self.id_to_u32.get(id).map(|v| *v) }
 
-    fn init_hnsw(ef_construction: usize) -> Hnsw<'static, f32, DistL2> { Hnsw::new(16, 1000000, 16, ef_construction, DistL2 {}) }
-
     /// Tune HNSW build/search effort. Call before bulk load to trade recall for
     /// speed (e.g. 100/100 = fast, 200/100 = quality default). Affects future
-    /// inserts and the next rebuild; not a retroactive re-index.
+    /// inserts and the next rebuild; not a retroactive re-index. Applies to all
+    /// collections (the tunables are global).
     pub fn set_index_params(&self, ef_construction: u32, ef_search: u32) {
         self.ef_construction.store(ef_construction as usize, Ordering::Relaxed);
         self.ef_search.store(ef_search as usize, Ordering::Relaxed);
     }
 
-    fn ensure_hnsw_init(&self) {
-        if self.hnsw_index.read().is_none() {
-            let mut w = self.hnsw_index.write();
-            if w.is_none() { *w = Some(Self::init_hnsw(self.ef_construction.load(Ordering::Relaxed))); }
+    // --- Collection resolution (multi-collection vector space) ---
+
+    /// The default vector collection (always present — created at open).
+    fn default_coll(&self) -> Arc<VectorCollection> {
+        self.collections
+            .get(&self.default_collection)
+            .map(|r| Arc::clone(r.value()))
+            .expect("default collection must always exist")
+    }
+
+    /// Resolve a collection by optional name (None -> default).
+    fn resolve_collection(&self, name: &Option<String>) -> Result<Arc<VectorCollection>> {
+        let n = name.clone().unwrap_or_else(|| self.default_collection.clone());
+        self.collections
+            .get(&n)
+            .map(|r| Arc::clone(r.value()))
+            .ok_or_else(|| Error::from_reason(format!("collection '{}' not found", n)))
+    }
+
+    /// Create an isolated vector collection. Idempotent-erroring: fails if a
+    /// collection with this name already exists.
+    pub fn create_collection(&self, name: String, model: String, dim: u32, metric: Option<String>) -> Result<()> {
+        self.ensure_writable()?;
+        if self.collections.contains_key(&name) {
+            return Err(Error::from_reason(format!("collection '{}' already exists", name)));
         }
+        let m = metric.as_deref().map(Metric::parse).unwrap_or(Metric::L2);
+        self.collections.insert(name.clone(), Arc::new(VectorCollection::new(name, model, dim as u16, m)));
+        Ok(())
     }
 
-    /// Push a vector into the arena/metadata and return (f32 vector, arena_id).
-    /// Does NOT touch the HNSW index — callers insert (single) or parallel_insert
-    /// (batch). Short critical section: only the arena Vec pushes are exclusive.
-    fn stage_vector(&self, node_id: &str, emb_64: Vec<f64>, lang: String) -> (Vec<f32>, u32) {
-        let emb: Vec<f32> = emb_64.into_iter().map(|v| v as f32).collect();
-        let arena_id = {
-            let mut meta_arena = self.metadata_arena.write();
-            let mut vec_arena = self.vector_arena.write();
-            let current_vec_len = vec_arena.len();
-            vec_arena.extend_from_slice(&emb);
-            let arena_id = meta_arena.len() as u32;
-            meta_arena.push(NodeMetadata {
-                arena_id, node_id: node_id.to_string(), timestamp: Utc::now().timestamp() as u64,
-                vector_dim: self.vector_dim, embedding_offset: current_vec_len as u64, gks_attributes: Vec::new(),
-                lang, cluster_id: arena_id,
-            });
-            arena_id
-        };
-        if let Some(u32_id) = self.get_u32(node_id) { self.u32_to_arena_id.insert(u32_id, arena_id); }
-        (emb, arena_id)
+    pub fn list_collections(&self) -> Vec<CollectionInfo> {
+        self.collections.iter().map(|c| c.value().info()).collect()
     }
 
-    fn add_vector_internal(&self, node_id: &str, emb_64: Vec<f64>, lang: String) {
-        let (emb, arena_id) = self.stage_vector(node_id, emb_64, lang);
-        self.ensure_hnsw_init();
-        // insert(&self): hnsw_rs is internally synchronized -> shared read lock.
-        if let Some(ref hnsw) = *self.hnsw_index.read() {
-            hnsw.insert((&emb, arena_id as usize));
+    /// Insert one vector into the named (or default) collection. Validates the
+    /// embedding length against the collection dim before staging.
+    fn add_vector_internal(&self, collection: &Option<String>, node_id: &str, emb_64: Vec<f64>, lang: String) -> Result<()> {
+        let coll = self.resolve_collection(collection)?;
+        if emb_64.len() != coll.dim as usize {
+            return Err(Error::from_reason(format!(
+                "embedding dim {} != collection '{}' dim {}", emb_64.len(), coll.name, coll.dim
+            )));
         }
+        let node_u32 = self.get_u32(node_id);
+        coll.insert_one(node_u32, node_id, emb_64, lang, self.ef_construction.load(Ordering::Relaxed));
+        Ok(())
     }
 
-    /// Batch vector insertion: stage all vectors, then build the HNSW graph with
-    /// one rayon-parallel `parallel_insert` call (multi-core) instead of N
-    /// single-threaded inserts. Used by the bulk/batch ingest path.
-    fn add_vectors_batch(&self, items: Vec<(String, Vec<f64>, String)>) {
-        if items.is_empty() { return; }
-        let staged: Vec<(Vec<f32>, u32)> =
-            items.into_iter().map(|(id, emb, lang)| self.stage_vector(&id, emb, lang)).collect();
-        self.ensure_hnsw_init();
-        let refs: Vec<(&Vec<f32>, usize)> = staged.iter().map(|(v, id)| (v, *id as usize)).collect();
-        if let Some(ref hnsw) = *self.hnsw_index.read() {
-            hnsw.parallel_insert(&refs);
+    /// WAL-replay / CRDT-sync vector insert: tolerant of a not-yet-created
+    /// collection. `create_collection` is an in-memory op (durable only via the
+    /// snapshot manifest), so on pure WAL replay — or a remote node referencing
+    /// a collection we lack — auto-provision it from the embedding's dim (L2,
+    /// model "recovered"). A subsequent save_state records the true model/metric.
+    /// The live `add_node` path stays strict; only recovery/sync auto-provisions.
+    fn replay_vector(&self, collection: &Option<String>, node_id: &str, emb: Vec<f64>, lang: String) {
+        let name = collection.clone().unwrap_or_else(|| self.default_collection.clone());
+        if !self.collections.contains_key(&name) {
+            self.collections.insert(
+                name.clone(),
+                Arc::new(VectorCollection::new(name.clone(), "recovered".to_string(), emb.len() as u16, Metric::L2)),
+            );
         }
+        let _ = self.add_vector_internal(&Some(name), node_id, emb, lang);
     }
 
+    /// Rebuild every collection's HNSW from its arena (both load paths).
     fn rehydrate_hnsw_index(&self) {
-        let meta_arena = self.metadata_arena.read();
-        if meta_arena.is_empty() { return; }
-        let hnsw = Self::init_hnsw(self.ef_construction.load(Ordering::Relaxed));
-        let vec_arena = self.vector_arena.read();
-        for meta in meta_arena.iter() {
-            let start = meta.embedding_offset as usize;
-            let end = start + meta.vector_dim as usize;
-            if end <= vec_arena.len() { hnsw.insert((&vec_arena[start..end], meta.arena_id as usize)); }
-        }
-        *self.hnsw_index.write() = Some(hnsw);
+        let ef_c = self.ef_construction.load(Ordering::Relaxed);
+        for c in self.collections.iter() { c.value().rehydrate(ef_c); }
     }
 
     pub fn open(opts: OpenOptions) -> Result<Self> {
@@ -562,20 +721,28 @@ impl Storage {
             }
         });
 
+        // The `default` collection always exists; legacy single-space data and
+        // any node added without an explicit collection routes here. Its dim is
+        // the OpenOptions vector_dim (back-compat with the old global space).
+        let collections: DashMap<String, Arc<VectorCollection>> = DashMap::new();
+        collections.insert(
+            "default".to_string(),
+            Arc::new(VectorCollection::new("default".to_string(), "default".to_string(), vector_dim, Metric::L2)),
+        );
+
         let storage = Self {
             path: root, read_only, nodes: DashMap::new(), edges: DashMap::new(),
             out_idx: DashMap::new(), in_idx: DashMap::new(),
-            vector_arena: RwLock::new(Vec::new()), metadata_arena: RwLock::new(Vec::new()),
-            hnsw_index: RwLock::new(None), log_path, bin_path: PathBuf::from(""), _lock_file: None,
-            id_to_u32: DashMap::new(), u32_to_id: DashMap::new(), u32_to_arena_id: DashMap::new(), next_u32: AtomicU32::new(0),
-            is_rebuilding: AtomicBool::new(false), trigram_index: DashMap::new(), 
+            collections, default_collection: "default".to_string(),
+            log_path, bin_path: PathBuf::from(""), _lock_file: None,
+            id_to_u32: DashMap::new(), u32_to_id: DashMap::new(), next_u32: AtomicU32::new(0),
+            is_rebuilding: AtomicBool::new(false), trigram_index: DashMap::new(),
             lang_centroids: DashMap::new(), peers: DashMap::new(),
             proposals: DashMap::new(), meta_nodes: DashMap::new(), meta_edges: DashMap::new(),
             meta_history: DashMap::new(),
             wal_sender,
             local_peer_id,
             logical_clock: AtomicU32::new(0),
-            vector_dim,
             gossip_port: AtomicU32::new(0),
             // HNSW tunables — quality-first defaults; override via set_index_params
             // before bulk load to trade recall for build/query speed.
@@ -597,8 +764,8 @@ impl Storage {
                                 match event {
                                     Event::Node(n) => {
                                         let u32_id = storage.get_or_intern_id(&n.id);
-                                        if let Some(emb) = n.embedding.clone() { 
-                                            storage.add_vector_internal(&n.id, emb, n.lang.clone().unwrap_or("en".to_string())); 
+                                        if let Some(emb) = n.embedding.clone() {
+                                            storage.replay_vector(&n.collection, &n.id, emb, n.lang.clone().unwrap_or("en".to_string()));
                                         }
                                         storage.insert_node_lean(u32_id, n);
                                     }
@@ -611,8 +778,8 @@ impl Storage {
                                             match batch_event {
                                                 Event::Node(n) => {
                                                     let u32_id = storage.get_or_intern_id(&n.id);
-                                                    if let Some(emb) = n.embedding.clone() { 
-                                                        storage.add_vector_internal(&n.id, emb, n.lang.clone().unwrap_or("en".to_string())); 
+                                                    if let Some(emb) = n.embedding.clone() {
+                                                        storage.replay_vector(&n.collection, &n.id, emb, n.lang.clone().unwrap_or("en".to_string()));
                                                     }
                                                     storage.insert_node_lean(u32_id, n);
                                                 }
@@ -716,6 +883,7 @@ impl Storage {
                         alpha: Some(0.4),
                         lang: node.lang.clone(),
                         as_of: None,
+                        collection: node.collection.clone(),
                     })?;
                     
                     for neighbor in context {
@@ -879,9 +1047,9 @@ impl Storage {
         let now = Utc::now();
         let expires_at = args.ttl.map(|s| (now + chrono::Duration::seconds(s as i64)).to_rfc3339());
 
-        let mut node = NodeOutput { 
-            id: id.clone(), labels: args.labels, 
-            props: args.props.unwrap_or(Value::Object(Default::default())), 
+        let mut node = NodeOutput {
+            id: id.clone(), labels: args.labels,
+            props: args.props.unwrap_or(Value::Object(Default::default())),
             impact: Some(0.7), embedding: None,
             lang: Some(lang.clone()),
             valid_from: args.valid_from.unwrap_or_else(|| now.to_rfc3339()),
@@ -889,8 +1057,15 @@ impl Storage {
             caused_by: args.caused_by,
             expires_at,
             clock: self.next_clock(),
+            collection: None,
         };
-        if let Some(emb) = args.embedding { self.add_vector_internal(&id, emb.clone(), lang); node.embedding = Some(emb); }
+        if let Some(emb) = args.embedding {
+            // Validate + stage BEFORE recording the collection on the node, so a
+            // dim mismatch fails the add instead of persisting a bad reference.
+            self.add_vector_internal(&args.collection, &id, emb.clone(), lang)?;
+            node.embedding = Some(emb);
+            node.collection = Some(args.collection.clone().unwrap_or_else(|| self.default_collection.clone()));
+        }
         self.insert_node_lean(u32_id, node.clone());
         self.persist(&Event::Node(node.clone()))?;
         Ok(node)
@@ -958,7 +1133,7 @@ impl Storage {
         match command {
             HqlCommand::Search { vector, k, fuzzy, target, lang, as_of } => {
                 let _resolved = if fuzzy { self.find_fuzzy_id(&target) } else { Some(target) };
-                let res = self.hybrid_search(HybridSearchInput { query_vector: vector, k, alpha: Some(0.0), lang, as_of })?;
+                let res = self.hybrid_search(HybridSearchInput { query_vector: vector, k, alpha: Some(0.0), lang, as_of, collection: None })?;
                 Ok(serde_json::to_value(res).unwrap())
             }
             HqlCommand::Traverse { seed, depth, rel, fuzzy, as_of } => {
@@ -974,7 +1149,7 @@ impl Storage {
             }
             HqlCommand::Hybrid { vector, alpha, fuzzy, target, lang, as_of } => {
                 let _resolved = if fuzzy { self.find_fuzzy_id(&target) } else { Some(target) };
-                let res = self.hybrid_search(HybridSearchInput { query_vector: vector, k: 10, alpha: Some(alpha), lang, as_of })?;
+                let res = self.hybrid_search(HybridSearchInput { query_vector: vector, k: 10, alpha: Some(alpha), lang, as_of, collection: None })?;
                 Ok(serde_json::to_value(res).unwrap())
             }
             HqlCommand::Context { target, tier, budget, fuzzy } => {
@@ -995,7 +1170,15 @@ impl Storage {
     }
 
     pub fn hybrid_search(&self, args: HybridSearchInput) -> Result<Vec<NeighborOutput>> {
-        let hnsw_lock = self.hnsw_index.read();
+        let coll = self.resolve_collection(&args.collection)?;
+        // Dim validation closes the silent cross-space bug: a query from a
+        // different model/dim is rejected, not ranked into garbage.
+        if args.query_vector.len() != coll.dim as usize {
+            return Err(Error::from_reason(format!(
+                "query dim {} != collection '{}' dim {}", args.query_vector.len(), coll.name, coll.dim
+            )));
+        }
+        let hnsw_lock = coll.hnsw.read();
         let hnsw = match &*hnsw_lock { Some(idx) => idx, None => return Err(Error::from_reason("HNSW not init")) };
         let mut query_f32: Vec<f32> = args.query_vector.into_iter().map(|v| v as f32).collect();
         if let Some(lang) = args.lang {
@@ -1003,9 +1186,14 @@ impl Storage {
                 for (i, val) in query_f32.iter_mut().enumerate() { if i < centroid.len() { *val += centroid[i]; } }
             }
         }
+        // Cosine collections store normalized vectors; normalize the query too.
+        if coll.metric == Metric::Cosine {
+            let norm: f32 = query_f32.iter().map(|x| x * x).sum::<f32>().sqrt();
+            if norm > 0.0 { for x in query_f32.iter_mut() { *x /= norm; } }
+        }
         let results = hnsw.search(&query_f32, (args.k * 2) as usize, self.ef_search.load(Ordering::Relaxed));
         let mut hybrid_results = Vec::new();
-        let meta_arena = self.metadata_arena.read();
+        let meta_arena = coll.metadata.read();
         let alpha = args.alpha.unwrap_or(0.5);
 
         for neighbor in results {
@@ -1125,7 +1313,9 @@ impl Storage {
     }
 
     pub fn detect_communities(&self) -> Result<()> {
-        let mut meta_arena = self.metadata_arena.write();
+        // Community detection runs over the default collection's vector space.
+        let coll = self.default_coll();
+        let mut meta_arena = coll.metadata.write();
         let mut new_clusters = Vec::with_capacity(meta_arena.len());
         for meta in meta_arena.iter() {
             let mut freq = HashMap::new();
@@ -1135,7 +1325,7 @@ impl Storage {
                     if let Some(edge) = self.edges.get(&eid) {
                         let other_id = if edge.from == meta.node_id { &edge.to } else { &edge.from };
                         if let Some(to_u32) = self.get_u32(other_id) {
-                            if let Some(a_id) = self.u32_to_arena_id.get(&to_u32) {
+                            if let Some(a_id) = coll.node_to_arena.get(&to_u32) {
                                 if let Some(other_meta) = meta_arena.get(*a_id as usize) {
                                     *freq.entry(other_meta.cluster_id).or_insert(0) += 1;
                                 }
@@ -1148,7 +1338,7 @@ impl Storage {
                     if let Some(edge) = self.edges.get(&eid) {
                         let other_id = if edge.from == meta.node_id { &edge.to } else { &edge.from };
                         if let Some(to_u32) = self.get_u32(other_id) {
-                            if let Some(a_id) = self.u32_to_arena_id.get(&to_u32) {
+                            if let Some(a_id) = coll.node_to_arena.get(&to_u32) {
                                 if let Some(other_meta) = meta_arena.get(*a_id as usize) {
                                     *freq.entry(other_meta.cluster_id).or_insert(0) += 1;
                                 }
@@ -1184,30 +1374,33 @@ impl Storage {
     }
 
     pub fn generate_meta_graph(&self) -> Result<()> {
+        // Meta-graph is built over the default collection's vector space.
+        let coll = self.default_coll();
+        let dim = coll.dim as usize;
         let mut cluster_groups: HashMap<u32, Vec<u32>> = HashMap::new();
-        let meta_arena = self.metadata_arena.read();
+        let meta_arena = coll.metadata.read();
         for meta in meta_arena.iter() {
             if let Some(u32_id) = self.get_u32(&meta.node_id) {
                 cluster_groups.entry(meta.cluster_id).or_insert_with(Vec::new).push(u32_id);
             }
         }
-        let vec_arena = self.vector_arena.read();
+        let vec_arena = coll.arena.read();
         let now = Utc::now().to_rfc3339();
 
         for (c_id, members) in cluster_groups.iter() {
-            let mut centroid = vec![0.0; self.vector_dim as usize];
+            let mut centroid = vec![0.0; dim];
             let mut total_impact = 0.0;
             let mut count = 0;
             for &u32_id in members {
                 if let Some(node) = self.nodes.get(&u32_id) {
                     total_impact += node.value().impact.unwrap_or(0.0);
-                    if let Some(a_id) = self.u32_to_arena_id.get(&u32_id) {
+                    if let Some(a_id) = coll.node_to_arena.get(&u32_id) {
                         if let Some(meta) = meta_arena.get(*a_id as usize) {
                             let start = meta.embedding_offset as usize;
                             let end = start + meta.vector_dim as usize;
                             if end <= vec_arena.len() {
                                 for (i, val) in vec_arena[start..end].iter().enumerate() {
-                                    if i < self.vector_dim as usize { centroid[i] += *val as f64; }
+                                    if i < dim { centroid[i] += *val as f64; }
                                 }
                                 count += 1;
                             }
@@ -1241,7 +1434,7 @@ impl Storage {
         for entry in self.edges.iter() {
             let edge = entry.value();
             if let (Some(from_u32), Some(to_u32)) = (self.get_u32(&edge.from), self.get_u32(&edge.to)) {
-                if let (Some(from_cid), Some(to_id)) = (self.u32_to_arena_id.get(&from_u32), self.u32_to_arena_id.get(&to_u32)) {
+                if let (Some(from_cid), Some(to_id)) = (coll.node_to_arena.get(&from_u32), coll.node_to_arena.get(&to_u32)) {
                     let c1 = meta_arena[*from_cid as usize].cluster_id;
                     let c2 = meta_arena[*to_id as usize].cluster_id;
                     if c1 != c2 {
@@ -1338,7 +1531,9 @@ impl Storage {
         self.u32_to_id.remove(&u32_id);
         self.out_idx.remove(&u32_id);
         self.in_idx.remove(&u32_id);
-        self.u32_to_arena_id.remove(&u32_id);
+        // The node may have a vector in any collection — drop the mapping in all.
+        // (Arena slots are reclaimed lazily by compaction, as before.)
+        for c in self.collections.iter() { c.value().node_to_arena.remove(&u32_id); }
         self.nodes.remove(&u32_id);
 
         Ok(())
@@ -1387,7 +1582,7 @@ impl Storage {
                         }
                         
                         if let Some(emb) = &remote_node.embedding {
-                            self.add_vector_internal(&remote_node.id, emb.clone(), remote_node.lang.clone().unwrap_or("en".to_string()));
+                            self.replay_vector(&remote_node.collection, &remote_node.id, emb.clone(), remote_node.lang.clone().unwrap_or("en".to_string()));
                         }
                         self.insert_node_lean(u32_id, remote_node.clone());
                         self.persist_signed(signed_event.clone())?;
@@ -1628,51 +1823,54 @@ impl Storage {
     pub fn save_state(&self) -> Result<()> {
         self.ensure_writable()?;
         let temp_dir = self.path.join("temp_save");
-        if !temp_dir.exists() { fs::create_dir_all(&temp_dir).ok(); }
+        if temp_dir.exists() { let _ = fs::remove_dir_all(&temp_dir); }
+        fs::create_dir_all(&temp_dir).ok();
 
-        // 1. Save Arenas
-        let vec_arena = self.vector_arena.read();
-        let meta_arena = self.metadata_arena.read();
-        fs::write(temp_dir.join("vector.bin"), unsafe {
-            std::slice::from_raw_parts(vec_arena.as_ptr() as *const u8, vec_arena.len() * 4)
-        }).map_err(|e| Error::from_reason(e.to_string()))?;
-        
-        let meta_data = bincode::serialize(&*meta_arena).map_err(|e| Error::from_reason(e.to_string()))?;
-        fs::write(temp_dir.join("meta.bin"), meta_data).map_err(|e| Error::from_reason(e.to_string()))?;
-
-        // 2. Save HNSW Index
-        let hnsw_lock = self.hnsw_index.read();
-        if let Some(hnsw) = &*hnsw_lock {
-            // hnsw_rs 0.3.4 uses file_dump(&path, basename)
-            hnsw.file_dump(&temp_dir, "index").map_err(|e| Error::from_reason(format!("HNSW dump error: {:?}", e)))?;
+        // 1. Per-collection arenas + metadata + a manifest. HNSW is NOT dumped —
+        //    it rehydrates cheaply from each arena on load (the arena is the
+        //    source of truth). state.json's `collections` array drives reload.
+        let mut manifest: Vec<serde_json::Value> = Vec::new();
+        for c in self.collections.iter() {
+            let coll = c.value();
+            let arena = coll.arena.read();
+            fs::write(temp_dir.join(format!("vec_{}.bin", coll.name)), unsafe {
+                std::slice::from_raw_parts(arena.as_ptr() as *const u8, arena.len() * 4)
+            }).map_err(|e| Error::from_reason(e.to_string()))?;
+            let meta = coll.metadata.read();
+            let meta_data = bincode::serialize(&*meta).map_err(|e| Error::from_reason(e.to_string()))?;
+            fs::write(temp_dir.join(format!("meta_{}.bin", coll.name)), meta_data).map_err(|e| Error::from_reason(e.to_string()))?;
+            manifest.push(serde_json::json!({
+                "name": coll.name, "model": coll.model, "dim": coll.dim, "metric": coll.metric.as_str()
+            }));
         }
 
-        // 3. Save DashMaps (Partial state for instant load)
+        // 2. Save DashMaps (Partial state for instant load)
         let nodes: Vec<(u32, NodeOutput)> = self.nodes.iter().map(|e| (*e.key(), e.value().clone())).collect();
         let edges: Vec<(u64, EdgeOutput)> = self.edges.iter().map(|e| (*e.key(), e.value().clone())).collect();
         fs::write(temp_dir.join("nodes.bin"), serde_json::to_vec(&nodes).unwrap()).ok();
         fs::write(temp_dir.join("edges.bin"), serde_json::to_vec(&edges).unwrap()).ok();
 
-        // 4. Save Global Metadata
+        // 3. Save Global Metadata (incl. collections manifest)
         let state = serde_json::json!({
             "logical_clock": self.get_logical_clock(),
             "peer_id": self.local_peer_id,
-            "vector_dim": self.vector_dim,
+            "collections": manifest,
             "schema_version": SCHEMA_VERSION,
             "timestamp": Utc::now().to_rfc3339(),
         });
         fs::write(temp_dir.join("state.json"), state.to_string()).ok();
 
-        // Atomic Swap
-        // Note: file_dump creates {basename}.hnsw.graph and {basename}.hnsw.data
-        for file in &["vector.bin", "meta.bin", "nodes.bin", "edges.bin", "state.json", "index.hnsw.graph", "index.hnsw.data"] {
-            let src = temp_dir.join(file);
-            if src.exists() {
-                let dst = self.path.join(file);
-                fs::rename(src, dst).ok();
+        // Atomic-ish swap: per-collection filenames are dynamic, so move every
+        // file produced into the db root instead of a fixed list.
+        if let Ok(entries) = fs::read_dir(&temp_dir) {
+            for entry in entries.flatten() {
+                if let Some(name) = entry.path().file_name() {
+                    fs::rename(entry.path(), self.path.join(name)).ok();
+                }
             }
         }
-        
+        let _ = fs::remove_dir_all(&temp_dir);
+
         println!("Mark IX: State persisted successfully to {}", self.path.display());
         Ok(())
     }
@@ -1682,21 +1880,62 @@ impl Storage {
         if !state_path.exists() { return false; }
 
         println!("Mark IX: Attempting instant load from binary state...");
-        
-        let start = Instant::now();
-        // 1. Load Metadata & Arenas
-        if let Ok(data) = fs::read(self.path.join("vector.bin")) {
-            let mut vec_arena = self.vector_arena.write();
-            *vec_arena = data.chunks_exact(4)
-                .map(|chunk| f32::from_le_bytes(chunk.try_into().unwrap()))
-                .collect();
-        } else { return false; }
 
-        if let Ok(data) = fs::read(self.path.join("meta.bin")) {
-            if let Ok(meta) = bincode::deserialize::<Vec<NodeMetadata>>(&data) {
-                *self.metadata_arena.write() = meta;
-            } else { return false; }
-        } else { return false; }
+        let start = Instant::now();
+        let state_val: serde_json::Value = match fs::read_to_string(&state_path)
+            .ok()
+            .and_then(|c| serde_json::from_str(&c).ok())
+        {
+            Some(v) => v,
+            None => return false,
+        };
+
+        // 1. Load vector collections. New format: `collections` manifest +
+        //    vec_<name>.bin / meta_<name>.bin. Legacy: a single vector.bin /
+        //    meta.bin pair, migrated transparently into the `default` collection.
+        self.collections.clear();
+        if let Some(colls) = state_val["collections"].as_array() {
+            for cm in colls {
+                let name = cm["name"].as_str().unwrap_or("default").to_string();
+                let model = cm["model"].as_str().unwrap_or("default").to_string();
+                let dim = cm["dim"].as_u64().unwrap_or(0) as u16;
+                let metric = Metric::parse(cm["metric"].as_str().unwrap_or("L2"));
+                let coll = VectorCollection::new(name.clone(), model, dim, metric);
+                if let Ok(data) = fs::read(self.path.join(format!("vec_{}.bin", name))) {
+                    *coll.arena.write() = data.chunks_exact(4)
+                        .map(|c| f32::from_le_bytes(c.try_into().unwrap())).collect();
+                }
+                if let Ok(data) = fs::read(self.path.join(format!("meta_{}.bin", name))) {
+                    if let Ok(meta) = bincode::deserialize::<Vec<NodeMetadata>>(&data) {
+                        coll.count.store(meta.len(), Ordering::Relaxed);
+                        *coll.metadata.write() = meta;
+                    }
+                }
+                self.collections.insert(name, Arc::new(coll));
+            }
+        } else if let Ok(data) = fs::read(self.path.join("vector.bin")) {
+            // Legacy single-space DB -> wrap as the `default` collection.
+            let dim = state_val["vector_dim"].as_u64().unwrap_or(1536) as u16;
+            let coll = VectorCollection::new("default".to_string(), "default".to_string(), dim, Metric::L2);
+            *coll.arena.write() = data.chunks_exact(4)
+                .map(|c| f32::from_le_bytes(c.try_into().unwrap())).collect();
+            if let Ok(md) = fs::read(self.path.join("meta.bin")) {
+                if let Ok(meta) = bincode::deserialize::<Vec<NodeMetadata>>(&md) {
+                    coll.count.store(meta.len(), Ordering::Relaxed);
+                    *coll.metadata.write() = meta;
+                }
+            }
+            self.collections.insert("default".to_string(), Arc::new(coll));
+        } else {
+            return false;
+        }
+        // Guarantee the default collection always exists post-load.
+        if !self.collections.contains_key(&self.default_collection) {
+            self.collections.insert(
+                self.default_collection.clone(),
+                Arc::new(VectorCollection::new(self.default_collection.clone(), "default".to_string(), 1536, Metric::L2)),
+            );
+        }
 
         // 2. Load Maps
         if let Ok(data) = fs::read(self.path.join("nodes.bin")) {
@@ -1751,16 +1990,20 @@ impl Storage {
             }
         }
 
-        // 3. Load HNSW Index (Placeholder for future native serialization)
-        // For now, re-insertion from memory arenas is extremely fast.
-
-        // 4. Sync Global State
-        if let Ok(content) = fs::read_to_string(state_path) {
-            if let Ok(v) = serde_json::from_str::<serde_json::Value>(&content) {
-                if let Some(clock) = v["logical_clock"].as_u64() {
-                    self.logical_clock.store(clock as u32, Ordering::SeqCst);
-                }
+        // 3. Rebuild each collection's node_to_arena from its metadata (needs
+        //    id_to_u32, populated by the node load above). HNSW itself is
+        //    rehydrated from the arenas by the caller (open -> rehydrate_hnsw_index).
+        for c in self.collections.iter() {
+            let coll = c.value();
+            let meta = coll.metadata.read();
+            for m in meta.iter() {
+                if let Some(u) = self.get_u32(&m.node_id) { coll.node_to_arena.insert(u, m.arena_id); }
             }
+        }
+
+        // 4. Sync Global State (clock) from the already-parsed manifest.
+        if let Some(clock) = state_val["logical_clock"].as_u64() {
+            self.logical_clock.store(clock as u32, Ordering::SeqCst);
         }
 
         println!("Mark IX: Instant load complete in {:?}", start.elapsed());
@@ -1786,7 +2029,19 @@ impl Storage {
             let id = args.id.unwrap_or_else(|| format!("N-{}", Uuid::new_v4()));
             let lang = args.lang.unwrap_or("en".to_string());
             let expires_at = args.ttl.map(|s| (now + chrono::Duration::seconds(s as i64)).to_rfc3339());
-            
+
+            // Resolve + dim-validate the target collection up-front so a bad
+            // vector fails the whole batch BEFORE the WAL write (all-or-nothing).
+            let coll_name = if let Some(emb) = &args.embedding {
+                let coll = self.resolve_collection(&args.collection)?;
+                if emb.len() != coll.dim as usize {
+                    return Err(Error::from_reason(format!(
+                        "embedding dim {} != collection '{}' dim {}", emb.len(), coll.name, coll.dim
+                    )));
+                }
+                Some(coll.name.clone())
+            } else { None };
+
             let node = NodeOutput {
                 id: id.clone(), labels: args.labels,
                 props: args.props.unwrap_or(Value::Object(Default::default())),
@@ -1795,8 +2050,9 @@ impl Storage {
                 valid_from: args.valid_from.unwrap_or_else(|| now.to_rfc3339()),
                 valid_to: None, caused_by: args.caused_by, expires_at,
                 clock: self.next_clock(),
+                collection: coll_name,
             };
-            
+
             events.push(Event::Node(node.clone()));
             output_nodes.push(node);
         }
@@ -1817,15 +2073,17 @@ impl Storage {
         // 3. Persistence Phase (Atomic WAL Write)
         self.persist(&Event::Batch(events.clone()))?;
 
-        // 4. Memory Index Phase — collect vectors and build the HNSW graph once
-        //    via parallel_insert instead of N single-threaded inserts.
-        let mut vec_items: Vec<(String, Vec<f64>, String)> = Vec::new();
+        // 4. Memory Index Phase — collect vectors per collection and build each
+        //    HNSW graph once via parallel_insert instead of N single inserts.
+        //    Items grouped by collection: (node_u32, node_id, emb, lang).
+        let mut by_coll: HashMap<String, Vec<(Option<u32>, String, Vec<f64>, String)>> = HashMap::new();
         for event in events {
             match event {
                 Event::Node(n) => {
                     let u32_id = self.get_or_intern_id(&n.id);
                     if let Some(emb) = n.embedding.clone() {
-                        vec_items.push((n.id.clone(), emb, n.lang.clone().unwrap_or_else(|| "en".to_string())));
+                        let cn = n.collection.clone().unwrap_or_else(|| self.default_collection.clone());
+                        by_coll.entry(cn).or_default().push((Some(u32_id), n.id.clone(), emb, n.lang.clone().unwrap_or_else(|| "en".to_string())));
                     }
                     self.insert_node_lean(u32_id, n);
                 }
@@ -1836,7 +2094,11 @@ impl Storage {
                 _ => {}
             }
         }
-        self.add_vectors_batch(vec_items);
+        let ef_c = self.ef_construction.load(Ordering::Relaxed);
+        for (cn, items) in by_coll {
+            // Collection existence was validated in the processing phase.
+            if let Ok(coll) = self.resolve_collection(&Some(cn)) { coll.insert_batch(items, ef_c); }
+        }
 
         Ok(BatchOutput { nodes: output_nodes, edges: output_edges })
     }
@@ -1847,44 +2109,42 @@ impl Storage {
         
         // 1. Identify Live Set
         let live_nodes: HashSet<u32> = self.nodes.iter().map(|e| *e.key()).collect();
-        
-        // 2. Lock and Compact Arenas
-        let mut meta_arena = self.metadata_arena.write();
-        let mut vec_arena = self.vector_arena.write();
-        
-        let mut new_meta = Vec::with_capacity(live_nodes.len());
-        let mut new_vec = Vec::with_capacity(live_nodes.len() * self.vector_dim as usize);
-        
-        self.u32_to_arena_id.clear();
 
-        for meta in meta_arena.iter() {
-            if let Some(u32_id) = self.get_u32(&meta.node_id) {
-                if live_nodes.contains(&u32_id) {
-                    let start_off = meta.embedding_offset as usize;
-                    let end_off = start_off + meta.vector_dim as usize;
-                    
-                    if end_off <= vec_arena.len() {
-                        let new_offset = new_vec.len() as u64;
-                        new_vec.extend_from_slice(&vec_arena[start_off..end_off]);
-                        
-                        let new_arena_id = new_meta.len() as u32;
-                        let mut meta_clone = meta.clone();
-                        meta_clone.arena_id = new_arena_id;
-                        meta_clone.embedding_offset = new_offset;
-                        
-                        self.u32_to_arena_id.insert(u32_id, new_arena_id);
-                        new_meta.push(meta_clone);
+        // 2. Compact each collection's arena independently (drop dead-node slots,
+        //    rebuild node_to_arena), then rehydrate its HNSW.
+        for c in self.collections.iter() {
+            let coll = c.value();
+            let mut meta_arena = coll.metadata.write();
+            let mut vec_arena = coll.arena.write();
+
+            let mut new_meta = Vec::with_capacity(live_nodes.len());
+            let mut new_vec = Vec::with_capacity(live_nodes.len() * coll.dim as usize);
+            coll.node_to_arena.clear();
+
+            for meta in meta_arena.iter() {
+                if let Some(u32_id) = self.get_u32(&meta.node_id) {
+                    if live_nodes.contains(&u32_id) {
+                        let start_off = meta.embedding_offset as usize;
+                        let end_off = start_off + meta.vector_dim as usize;
+                        if end_off <= vec_arena.len() {
+                            let new_offset = new_vec.len() as u64;
+                            new_vec.extend_from_slice(&vec_arena[start_off..end_off]);
+                            let new_arena_id = new_meta.len() as u32;
+                            let mut meta_clone = meta.clone();
+                            meta_clone.arena_id = new_arena_id;
+                            meta_clone.embedding_offset = new_offset;
+                            coll.node_to_arena.insert(u32_id, new_arena_id);
+                            new_meta.push(meta_clone);
+                        }
                     }
                 }
             }
+            coll.count.store(new_meta.len(), Ordering::Relaxed);
+            *meta_arena = new_meta;
+            *vec_arena = new_vec;
         }
 
-        *meta_arena = new_meta;
-        *vec_arena = new_vec;
-        
-        // 3. Rebuild HNSW from scratch
-        drop(meta_arena);
-        drop(vec_arena);
+        // 3. Rebuild every collection's HNSW from its compacted arena.
         self.rehydrate_hnsw_index();
 
         // 4. Prune Adjacency Indices
@@ -1992,8 +2252,10 @@ impl Storage {
         let mut cluster_centroids: HashMap<u32, Vec<f32>> = HashMap::new();
         let mut cluster_member_count: HashMap<u32, u32> = HashMap::new();
         let mut cluster_impact: HashMap<u32, f64> = HashMap::new();
-        let meta_arena = self.metadata_arena.read();
-        let vec_arena = self.vector_arena.read();
+        // Structural gaps are computed over the default collection's space.
+        let coll = self.default_coll();
+        let meta_arena = coll.metadata.read();
+        let vec_arena = coll.arena.read();
         for meta in meta_arena.iter() {
             let c_id = meta.cluster_id;
             let start = meta.embedding_offset as usize;
@@ -2087,6 +2349,8 @@ impl GenesisDatabase {
     #[napi] pub async fn neighbors(&self, seed: String, args: NeighborInput) -> Result<Vec<NeighborOutput>> { let i = Arc::clone(&self.inner); tokio::task::spawn_blocking(move || i.neighbors(seed, args, false)).await.map_err(|e| Error::from_reason(e.to_string()))? }
     #[napi] pub async fn save_state(&self) -> Result<()> { let i = Arc::clone(&self.inner); tokio::task::spawn_blocking(move || i.save_state()).await.map_err(|e| Error::from_reason(e.to_string()))? }
     #[napi] pub async fn compact(&self) -> Result<()> { let i = Arc::clone(&self.inner); tokio::task::spawn_blocking(move || i.compact()).await.map_err(|e| Error::from_reason(e.to_string()))? }
+    #[napi] pub async fn create_collection(&self, name: String, model: String, dim: u32, metric: Option<String>) -> Result<()> { let i = Arc::clone(&self.inner); tokio::task::spawn_blocking(move || i.create_collection(name, model, dim, metric)).await.map_err(|e| Error::from_reason(e.to_string()))? }
+    #[napi] pub fn list_collections(&self) -> Vec<CollectionInfo> { self.inner.list_collections() }
     #[napi] pub fn set_language_centroid(&self, lang: String, vector: Vec<f64>) { self.inner.set_language_centroid(lang, vector); }
     #[napi] pub fn set_index_params(&self, ef_construction: u32, ef_search: u32) { self.inner.set_index_params(ef_construction, ef_search); }
     #[napi] pub async fn detect_communities(&self) -> Result<()> { let i = Arc::clone(&self.inner); tokio::task::spawn_blocking(move || i.detect_communities()).await.map_err(|e| Error::from_reason(e.to_string()))? }
