@@ -1,6 +1,10 @@
 // Layer A (ADR--GENESISDB-EDGE-ID-INTERNING): edges use the lean interning path
 // — no trigram_index pollution, no redundant u32_to_id reverse entry — while
 // staying fully traversable and WAL-replay-stable.
+//
+// Layer B (ADR--GENESISDB-EDGE-NUMERIC-KEYS): edges are keyed by the
+// deterministic u64 hash `Storage::edge_key(id)` and carry NO `id_to_u32`
+// string entry at all. Idempotency = "is this u64 already in `edges`?".
 
 use genesis_block_native::{Storage, OpenOptions, NodeInput, EdgeInput, NeighborInput};
 use std::fs;
@@ -75,23 +79,102 @@ fn edges_do_not_pollute_trigram() {
     assert_eq!(before, after, "edge ids must contribute 0 trigram members");
 }
 
-/// Edges get a forward id_to_u32 entry (for idempotency/delete) but NOT a
-/// reverse u32_to_id entry (EdgeOutput.id is canonical).
+/// Layer B: edges carry NO `id_to_u32` string entry (neither forward nor
+/// reverse). They are reachable only via the deterministic `edge_key` hash in
+/// the `edges` map. Nodes keep both forward and reverse entries.
 #[test]
-fn edges_absent_from_reverse_map() {
+fn edges_absent_from_id_maps() {
     let s = open(&fresh("test_edge_intern_reverse"));
     node(&s, "A");
     node(&s, "B");
     edge(&s, "edge-xyz", "A", "B", "LINK");
 
-    let eu = s.get_u32("edge-xyz").expect("edge must be in forward id_to_u32");
+    // Edge id is NOT in id_to_u32 at all (no 8M UUID strings — the Layer B win).
     assert!(
-        s.u32_to_id.get(&eu).is_none(),
-        "edge u32 must NOT be in the reverse u32_to_id map"
+        s.get_u32("edge-xyz").is_none(),
+        "edge id must NOT occupy a forward id_to_u32 entry under numeric keys"
     );
-    // Nodes still have their reverse entry.
+    // But the edge IS keyed by its u64 hash in the edges map.
+    assert!(
+        s.edges.get(&Storage::edge_key("edge-xyz")).is_some(),
+        "edge must be reachable via its numeric key"
+    );
+    // Nodes still have both forward and reverse entries.
     let au = s.get_u32("A").unwrap();
     assert_eq!(s.u32_to_id.get(&au).unwrap().value(), "A");
+}
+
+/// Layer B: edge_key is a pure deterministic function of the id string.
+#[test]
+fn edge_key_is_deterministic() {
+    assert_eq!(Storage::edge_key("e1"), Storage::edge_key("e1"));
+    assert_ne!(Storage::edge_key("e1"), Storage::edge_key("e2"));
+    // Stable across the whole UUID surface we actually use.
+    let uuid = "aaaaaaaa-0000-0000-0000-000000000001";
+    assert_eq!(Storage::edge_key(uuid), Storage::edge_key(uuid));
+}
+
+/// Layer B: re-applying the same edge id is idempotent — same u64 key, no dup,
+/// adjacency stays single-membered.
+#[test]
+fn edge_reapply_is_idempotent() {
+    let s = open(&fresh("test_edge_intern_idempotent"));
+    node(&s, "A");
+    node(&s, "B");
+    edge(&s, "dup-edge", "A", "B", "LINK");
+    edge(&s, "dup-edge", "A", "B", "LINK"); // same id again
+
+    assert_eq!(s.edges.len(), 1, "re-applied edge must not duplicate");
+    let au = s.get_u32("A").unwrap();
+    let out_len = s.out_idx.get(&au).unwrap().len();
+    assert_eq!(out_len, 1, "out_idx must hold the edge key once");
+}
+
+/// Layer B: delete-by-node removes the edge (by u64 key) and both adjacency
+/// sides — and leaves no stray id_to_u32 entry (there was none to leak).
+#[test]
+fn delete_removes_numeric_edge_and_adjacency() {
+    let s = open(&fresh("test_edge_intern_delete"));
+    node(&s, "A");
+    node(&s, "B");
+    edge(&s, "del-edge", "A", "B", "LINK");
+    let key = Storage::edge_key("del-edge");
+    let bu = s.get_u32("B").unwrap();
+    assert!(s.edges.get(&key).is_some());
+
+    s.retract_node("A").unwrap();
+
+    assert!(s.edges.get(&key).is_none(), "edge must be gone");
+    let b_still_has_edge = s.in_idx.get(&bu).map(|s| s.contains(&key)).unwrap_or(false);
+    assert!(!b_still_has_edge, "B's in-index must drop the edge key");
+}
+
+/// Layer B: snapshot round-trip keeps edges + out_idx/in_idx consistent, with
+/// keys re-derived from the edge ids (not the saved tuple key).
+#[test]
+fn numeric_keys_survive_snapshot_roundtrip() {
+    let path = fresh("test_edge_intern_numeric_reload");
+    let key2 = Storage::edge_key("aaaaaaaa-0000-0000-0000-000000000002");
+    {
+        let s = open(&path);
+        for n in ["A", "B", "C", "D"] { node(&s, n); }
+        edge(&s, "aaaaaaaa-0000-0000-0000-000000000001", "A", "B", "LINK");
+        edge(&s, "aaaaaaaa-0000-0000-0000-000000000002", "A", "C", "LINK");
+        edge(&s, "aaaaaaaa-0000-0000-0000-000000000003", "C", "D", "LINK");
+        assert!(s.edges.get(&key2).is_some());
+        // drop -> snapshot flush
+    }
+    let s2 = open(&path);
+    // Edge still keyed by the deterministic hash after reload.
+    assert!(
+        s2.edges.get(&key2).is_some(),
+        "edge must be reachable by re-derived numeric key after reload"
+    );
+    // Adjacency consistent: A still reaches B and C.
+    assert_eq!(hop1_out(&s2, "A"), 2, "adjacency must survive reload");
+    let au = s2.get_u32("A").unwrap();
+    let has_key = s2.out_idx.get(&au).unwrap().contains(&key2);
+    assert!(has_key, "out_idx must hold the re-derived edge key after reload");
 }
 
 /// fuzzy node resolution must never surface an edge id as a candidate.

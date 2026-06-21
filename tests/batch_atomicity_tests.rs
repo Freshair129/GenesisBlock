@@ -45,9 +45,11 @@ fn test_mark_ix_batch_atomicity() {
     assert_eq!(output.nodes.len(), 1);
     assert_eq!(output.edges.len(), 1);
 
-    // Verify existence in memory
+    // Verify existence in memory. Nodes live in id_to_u32; edges are keyed by
+    // their deterministic u64 hash and are NOT in id_to_u32
+    // (ADR--GENESISDB-EDGE-NUMERIC-KEYS).
     assert!(storage.get_u32("batched_node").is_some());
-    assert!(storage.get_u32("batched_edge").is_some());
+    assert!(storage.edges.get(&Storage::edge_key("batched_edge")).is_some());
 
     // 2. Test Atomic Failure (Invalid Governance Tier)
     let bad_batch = BatchInput {

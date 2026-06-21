@@ -31,20 +31,23 @@ fn test_bi_directional_edge_cleanup() {
 
     let u32_a = storage.get_u32("A").unwrap();
     let u32_b = storage.get_u32("B").unwrap();
+    // Edges are keyed by the deterministic u64 hash, not `id_to_u32`
+    // (ADR--GENESISDB-EDGE-NUMERIC-KEYS).
+    let e1_key = Storage::edge_key("E1");
 
     // Verify indices exist
-    assert!(storage.out_idx.get(&u32_a).unwrap().contains(&storage.get_u32("E1").unwrap()));
-    assert!(storage.in_idx.get(&u32_b).unwrap().contains(&storage.get_u32("E1").unwrap()));
+    assert!(storage.out_idx.get(&u32_a).unwrap().contains(&e1_key));
+    assert!(storage.in_idx.get(&u32_b).unwrap().contains(&e1_key));
 
     // 3. Retract node A
     storage.retract_node("A").unwrap();
 
     // 4. Verify Edge E1 is gone from main edges map
-    assert!(storage.edges.get(&storage.get_u32("E1").unwrap_or(9999)).is_none());
+    assert!(storage.edges.get(&e1_key).is_none());
 
     // 5. CRITICAL: Verify node B's in-index is cleaned up (Bi-directional cleanup)
     if let Some(in_set) = storage.in_idx.get(&u32_b) {
-        assert!(!in_set.contains(&storage.get_u32("E1").unwrap_or(9999)), "Node B's in-index should not contain the deleted edge");
+        assert!(!in_set.contains(&e1_key), "Node B's in-index should not contain the deleted edge");
     }
     
     println!("Bi-directional edge cleanup verified.");
