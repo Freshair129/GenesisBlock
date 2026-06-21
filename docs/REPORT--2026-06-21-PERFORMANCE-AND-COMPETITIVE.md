@@ -193,10 +193,16 @@ largely the embedded-vs-server tax (bolt + Cypher planning + JVM).
 10k/100k/500k); incremental(1 node) flat at ~1–1.7 µs → **O(V_affected) proven**
 (up to 398,000× faster than a full pass).
 
+**P26 Kuzu head-to-head (embedded↔embedded, 100k):** GenesisDB wins point/local
+traversal latency (hop1 22 µs vs 3,653 µs, 7–166× across hops); **Kuzu wins
+ingest ~60× (COPY) and memory ~11×** (columnar analytical store). Different sweet
+spots — GenesisDB for low-latency agent memory, Kuzu for bulk graph analytics.
+Kuzu's 11× lower memory confirms edge-UUID interning is GenesisDB's top RAM lever.
+
 **Positioning (reframed):** GenesisDB is an **embedded analytics / agent-memory
 graph+vector engine** — nearest comparators are Kuzu, DuckDB+graph, RocksDB+graph
-layer; Neo4j/Qdrant are well-known references, not the category. Next fairest
-datapoint: a Kuzu (embedded↔embedded) head-to-head.
+layer; Neo4j/Qdrant are well-known references, not the category. Competitor
+matrix now complete: Chroma/Qdrant (vector), Neo4j/Kuzu (graph).
 
 ---
 
