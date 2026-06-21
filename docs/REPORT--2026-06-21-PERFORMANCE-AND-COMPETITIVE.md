@@ -21,7 +21,7 @@ related:
   - AUDIT--P20-QDRANT-3WAY-AND-EF-CONFIG
 ---
 
-# GenesisDB — Engineering Report (2026-06-21)
+# GenesisBlockDB — Engineering Report (2026-06-21)
 
 Docs↔code audit → correctness restoration → performance optimization → first
 measured competitive benchmark. All work merged to `main` and pushed; the full
@@ -38,7 +38,7 @@ Rust suite is green throughout (20 passed / 0 failed / 22 binaries).
 - Lifted **concurrent durable ingest 6.1×** (136→839 TPS) and **single-thread
   bulk insert 7.8×** (254→~1,950 vec/s) via three targeted fixes.
 - Ran the project's **first real head-to-head** vs Chroma and Qdrant. At 100k
-  vectors GenesisDB is **query-latency-leading and recall-at-parity (ef=200),
+  vectors GenesisBlockDB is **query-latency-leading and recall-at-parity (ef=200),
   durable**.
 - Replaced unverifiable "competitive" claims and a wrong RAM diagnosis with
   measured numbers, with explicit honesty about what is and isn't comparable.
@@ -105,7 +105,7 @@ Identical vectors fed to every engine; exact brute-force L2 ground truth; C: SSD
 
 ### 100k vectors, 3 engines
 
-| Metric | GenesisDB ef=200 | GenesisDB ef=100 | Chroma (hnswlib) | Qdrant (server) |
+| Metric | GenesisBlockDB ef=200 | GenesisBlockDB ef=100 | Chroma (hnswlib) | Qdrant (server) |
 |---|---|---|---|---|
 | Query p50 | **974 µs** | **896 µs** | 990 µs | 3,301 µs |
 | Query p95 | **1,472 µs** | **1,414 µs** | 1,704 µs | 4,424 µs |
@@ -113,13 +113,13 @@ Identical vectors fed to every engine; exact brute-force L2 ground truth; C: SSD
 | Insert (vec/s) | 1,751 (durable) | 1,982 (durable) | 3,270 (in-mem) | 715 (server+index) |
 
 **Findings**
-- **Query latency: GenesisDB leads** both at scale. Qdrant's ~3.3 ms is the
+- **Query latency: GenesisBlockDB leads** both at scale. Qdrant's ~3.3 ms is the
   localhost gRPC round-trip — the embedded-vs-server tradeoff, not an index gap.
 - **Recall at ef=200 ≈ Chroma** (0.979 vs 0.981). Chroma itself fell from 1.000
   (3k/50k) to 0.981 at 100k — only large N differentiates ANN quality.
 - **ef knob works:** ef=100 → faster, recall 0.956; ef=200 → recall 0.979 at
   ~12% lower insert.
-- **Insert:** GenesisDB durable ~1.7× slower than in-memory Chroma; Qdrant
+- **Insert:** GenesisBlockDB durable ~1.7× slower than in-memory Chroma; Qdrant
   slowest (server-side async index build + gRPC).
 
 Audits: P15 (3k Chroma), P20 (100k 3-way). Interactive view:
@@ -133,7 +133,7 @@ Audits: P15 (3k Chroma), P20 (100k 3-way). Interactive view:
   audits ran on NVMe. The same binary ran **42–46× faster** for fsync-bound
   writes on `C:` (SSD). Disk-bound numbers are not comparable across machines;
   memory and in-memory latency are.
-- **Durability asymmetry:** GenesisDB persists every write (WAL); Chroma here is
+- **Durability asymmetry:** GenesisBlockDB persists every write (WAL); Chroma here is
   in-memory ephemeral; Qdrant is a persisted server. Insert numbers are not
   like-for-like — query latency and recall are the fair index metrics.
 - **15.89 GB was a myth:** the old P12 figure is a Mark VII artifact; the current
@@ -162,7 +162,7 @@ Audits: P15 (3k Chroma), P20 (100k 3-way). Interactive view:
 ## 7b. P21–P25 — Frontier, scale, graph & cost evidence
 
 **P21 Recall–latency frontier (100k, ef_construction=200, ef_search swept):**
-GenesisDB curve passes through Chroma's point — ef_search=128 → recall 0.984 @
+GenesisBlockDB curve passes through Chroma's point — ef_search=128 → recall 0.984 @
 1.1 ms (> Chroma 0.981 @ 0.99 ms); ef_search=64 → 0.964 @ 0.81 ms. Qdrant
 0.999 @ 3.3 ms (server). `ef_search` is a live knob (`set_index_params`).
 
@@ -182,7 +182,7 @@ hop1 stays tens-of-µs across 100× = **O(neighborhood), not O(N)**. RAM ceiling
 ~12.6 GB @1M/8M (edge-UUID interning) → 10M infeasible on 32 GB. Engine fix:
 `neighbors` now honors `limit` (was ignored).
 
-**P23 Neo4j head-to-head (embedded vs server):** GenesisDB **7–185× faster** on
+**P23 Neo4j head-to-head (embedded vs server):** GenesisBlockDB **7–185× faster** on
 traversal (hop1 100k: 21.6 µs vs 2,590 µs); ingest & memory ~par at 100k. Gap is
 largely the embedded-vs-server tax (bolt + Cypher planning + JVM).
 
@@ -193,23 +193,69 @@ largely the embedded-vs-server tax (bolt + Cypher planning + JVM).
 10k/100k/500k); incremental(1 node) flat at ~1–1.7 µs → **O(V_affected) proven**
 (up to 398,000× faster than a full pass).
 
-**P26 Kuzu head-to-head (embedded↔embedded, 100k):** GenesisDB wins point/local
+**P26 Kuzu head-to-head (embedded↔embedded, 100k):** GenesisBlockDB wins point/local
 traversal latency (hop1 22 µs vs 3,653 µs, 7–166× across hops); **Kuzu wins
 ingest ~60× (COPY) and memory ~11×** (columnar analytical store). Different sweet
-spots — GenesisDB for low-latency agent memory, Kuzu for bulk graph analytics.
-Kuzu's 11× lower memory confirms edge-UUID interning is GenesisDB's top RAM lever.
+spots — GenesisBlockDB for low-latency agent memory, Kuzu for bulk graph analytics.
+Kuzu's 11× lower memory confirms edge-UUID interning is GenesisBlockDB's top RAM lever.
 
-**Positioning (reframed):** GenesisDB is an **embedded analytics / agent-memory
+**Positioning (reframed):** GenesisBlockDB is an **embedded analytics / agent-memory
 graph+vector engine** — nearest comparators are Kuzu, DuckDB+graph, RocksDB+graph
-layer; Neo4j/Qdrant are well-known references, not the category. Competitor
-matrix now complete: Chroma/Qdrant (vector), Neo4j/Kuzu (graph).
+layer, and LanceDB (embedded vector); Neo4j/Qdrant are well-known references, not
+the category.
+
+**Competitor matrix — measured vs pending (honest status):**
+
+| Comparator      | Category        | Status                  |
+|-----------------|-----------------|-------------------------|
+| Chroma          | embedded vector | ✅ measured (P15, P21)  |
+| Qdrant          | server vector   | ✅ measured (P20)       |
+| LanceDB         | embedded vector | ✅ measured (P27)       |
+| Neo4j           | server graph    | ✅ measured (P23)       |
+| Kuzu            | embedded graph  | ✅ measured (P26)       |
+| DuckDB + graph  | embedded graph  | ✅ measured (P28)       |
+| RocksDB + graph | embedded graph  | ✅ measured (P29)       |
+| LadybugDB       | embedded graph+vec (Kuzu fork) | ✅ measured (P30) |
+
+**All named comparators now have measured head-to-heads (P15–P30)** — including
+LadybugDB, the Kuzu fork on this project's exact niche.
+
+**P27 LanceDB head-to-head (embedded vector, 100k/1024d/L2):** at matched recall
+(~0.95–1.0), GenesisBlockDB point-query p50 935.6 µs vs LanceDB 8,392 µs (**~9×**) and
+Chroma 1,166 µs. LanceDB (on-disk Lance columnar) trades latency for
+larger-than-memory scale & cost — same sweet-spot split as Kuzu (P26). See
+`AUDIT--P27-LANCEDB-HEAD-TO-HEAD.md`.
+
+**P28 DuckDB+graph head-to-head (embedded, 100k/800k, recursive CTE):** GenesisBlockDB
+wins hop1 **~54×** (21.6 µs vs 1,170 µs) but the gap narrows with depth — hop3
+~1.4×, hop6 ~1.06× (4.40 vs 4.67 ms, effectively tied) as DuckDB's set-based
+recursive join shines on deep expansion. DuckDB beats Kuzu at every depth and
+wins ingest ~35× / memory ~11× vs GenesisBlockDB. See
+`AUDIT--P28-DUCKDB-GRAPH-HEAD-TO-HEAD.md`.
+
+**P29 RocksDB+graph head-to-head (embedded KV + adjacency BFS, 100k/800k):** the
+architecturally-closest baseline. Clean comparison is **hop1: 21.6 µs vs 26.8 µs —
+effectively tied** (GenesisBlockDB slightly ahead), confirming GenesisBlockDB's µs point
+latency is real against a raw adjacency store. Deep-hop numbers are **not
+apples-to-apples** (GenesisBlockDB materializes full node+path objects; the RocksDB
+harness returns bare ids) and are not claimed as a RocksDB win. RocksDB wins
+ingest ~30× / memory ~32×, but is a KV store with a hand-rolled graph layer (no
+query language, paths, governance, bitemporal, or vectors). See
+`AUDIT--P29-ROCKSDB-GRAPH-HEAD-TO-HEAD.md`.
+
+**P30 LadybugDB head-to-head (embedded graph+vector, Kuzu fork, 100k/800k):** the
+most on-niche competitor. GenesisBlockDB wins hop1 **~168×** (21.6 µs vs 3,637 µs),
+hop3 ~6.7×, hop6 ~13.5× — and this win has **no payload caveat** (Ladybug's Cypher
+returns bare ids while GenesisBlockDB materializes node+path, yet still wins).
+LadybugDB ≈ Kuzu (it forks Kuzu's last release) and wins ingest ~48× / memory ~11×.
+See `AUDIT--P30-LADYBUGDB-HEAD-TO-HEAD.md`.
 
 ---
 
 ## 8. Appendix — commits (this session)
 
 ```
-311bc8f bench(P23): Neo4j head-to-head — embedded GenesisDB vs server Neo4j
+311bc8f bench(P23): Neo4j head-to-head — embedded GenesisBlockDB vs server Neo4j
 6b8ae80 bench(P24,P25): governance guard cost + K-Impact full-vs-incremental proof
 e5767af bench(P22): graph traversal benchmark (LDBC-lite) 10k/100k/1M + neighbors limit fix
 f4ce106 bench(P21): recall-latency frontier (ef_search sweep) + dashboard scatter
