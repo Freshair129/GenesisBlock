@@ -138,8 +138,8 @@ flowchart TB
 | Component | Responsibility | Source / Entry Points | Related Docs |
 |---|---|---|---|
 | Storage Model | Node/edge persistence, WAL, snapshots, recovery | `src/lib.rs` | master spec, batch atomicity, WAL ADR |
-| In-Memory Embedding Arena | Runtime vector storage and embedding-backed retrieval state | `src/lib.rs` | master spec, HNSW hybrid index design |
-| Hybrid Search | Vector and lexical retrieval with ranking | `src/lib.rs`, HNSW design | HNSW hybrid index design |
+| Vector Collections | Per-model/dim isolated vector spaces (`collections: DashMap<String, Arc<VectorCollection>>`, each with its own arena + metadata + HNSW + metric); a `default` collection always exists. Async indexing thread (off the write path). | `src/lib.rs` | master spec, HNSW hybrid index design, `ADR--GENESISDB-MULTI-COLLECTION`, `ADR--GENESISDB-ASYNC-INDEXING` |
+| Hybrid Search | Per-collection vector + lexical retrieval with ranking; query dim validated against the collection | `src/lib.rs`, HNSW design | HNSW hybrid index design |
 | Graph Retrieval Layer | Tiered context retrieval by hop budget and fuzzy matching | `src/lib.rs::retrieve_context` | `SPEC--GRAPH-RETRIEVAL-LAYER.md` |
 | HQL Engine | Parse and execute search/traverse/context/infer queries | `src/lib.rs::execute_hql`, `hql.pest` | HQL section in master spec, API docs |
 | Symbolic Graph / AST Boundary | Symbolic relationships, query grammar, and structured traversal semantics | `src/lib.rs`, `hql.pest` | master spec, HQL docs |
@@ -156,6 +156,7 @@ flowchart TB
 | Bulk ingest | `/v1/bulk/nodes`, `/v1/bulk/edges`, `/v1/bulk/rebuild` | `src/main.rs` |
 | Query | `/v1/query/hql`, `/v1/query` | `src/main.rs` |
 | Mutation | `/v1/node/add`, `/v1/node/supersede`, `/v1/edge/add` | `src/main.rs` |
+| Collections | `/v1/collection/create`, `/v1/collections` | `src/main.rs` |
 | Retrieval | `/v1/search/hybrid`, `/v1/reason/context` | `src/main.rs` |
 | Insight / status | `/v1/insight/drift/:cluster_id`, `/v1/status`, `/v1/swarm/status` | `src/main.rs` |
 

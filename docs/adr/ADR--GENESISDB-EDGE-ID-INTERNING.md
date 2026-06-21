@@ -34,11 +34,17 @@ less, RocksDB+graph ~32× less. [[RCA--EDGE-ID-INTERNING-RAM]] (confirmed,
      UUID, but `EdgeOutput.id` (in the `edges` map) already holds the canonical
      string. ~6% of edge RAM.
 
-Implementation note: the live graph index is `out_idx`/`in_idx`
+Implementation note: at Layer A the live graph index was `out_idx`/`in_idx`
 (`DashMap<u32, HashSet<u32>>`) plus `edges: DashMap<u32, EdgeOutput>` — **not**
 the EdgeArena/CSR described in [[ADR--GENESISDB-CSR-MUTATION-STRATEGY]] (that
 layout is not yet in the code). This ADR is scoped to the id-interning layer and
 does not assume CSR.
+
+> **Superseded by Layer B ([[ADR--GENESISDB-EDGE-NUMERIC-KEYS]], shipped
+> 2026-06-21):** edges are now keyed by a deterministic `u64` hash — `edges:
+> DashMap<u64, EdgeOutput>`, `out_idx`/`in_idx: DashMap<u32, HashSet<u64>>` — and
+> edge id strings are no longer interned into `id_to_u32` at all. The Layer-A
+> description above reflects the pre-Layer-B state.
 
 Constraint (from SELF-NOTE / temporal model): edge `from`/`to` and `id` are
 **String** at the API and WAL boundary — client-knowable and WAL-replay-stable.

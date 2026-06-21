@@ -32,7 +32,7 @@ RocksDB+graph); Neo4j/Qdrant are references, not the category.
 ## Core Capabilities
 
 - Durable node and edge ingestion through WAL-backed storage.
-- HNSW-backed semantic search with Thai-aware lexical matching.
+- HNSW-backed semantic search (per-model/dim vector collections; async indexing) with Thai-aware lexical matching.
 - HQL query execution for search, traversal, hybrid retrieval, and context.
 - Graph Retrieval Layer (GRL) for tiered agent context packages.
 - Bitemporal node evolution through supersession rather than destructive overwrite.

@@ -13,15 +13,19 @@ GenesisBlockDB prioritizes in-memory dominance and ultra-low-latency traversal. 
 ## 2. Technical Architecture
 
 ### 2.1 Storage Layout & Memory Management
-The `NodeMetadata` structure is augmented to include vector embeddings while maintaining cache locality.
-*   **Contiguous Vector Storage:** All `vector_data` fields are stored contiguously in the `NodeArena` to maximize SIMD/Cache hits.
-*   **Alignment:** `embedding_offset` is aligned to 64-byte cache line boundaries.
-*   **Arena ID Mapping:** The HNSW structure uses the dense `u32 Arena ID` as the primary key.
+> **Updated (ADR--GENESISDB-MULTI-COLLECTION):** there is no single global arena.
+> Each named `VectorCollection` owns its own contiguous `arena: Vec<f32>`,
+> `metadata: Vec<NodeMetadata>`, and HNSW index, keyed by model+dim+metric. The
+> notes below apply **per collection**; a `default` collection always exists.
+
+*   **Contiguous Vector Storage:** A collection's vectors are stored contiguously in its arena (stride = collection dim) to maximize SIMD/Cache hits.
+*   **Alignment:** `embedding_offset` indexes into the collection arena.
+*   **Arena ID Mapping:** The HNSW structure uses the dense `u32 Arena ID` (per-collection `node_to_arena`) as the primary key.
 
 ### 2.2 HNSW Indexing Logic
-*   **In-Memory Only:** The full HNSW graph structure (layers and neighbor indices) resides in RAM.
-*   **Synchronous Mutation Hook:** Index updates occur during CREATE/UPDATE operations.
-*   **Incremental Re-indexing:** Only affected neighbors are re-linked, maintaining amortized $O(1)$ mutation performance.
+*   **In-Memory Only:** The full HNSW graph structure (layers and neighbor indices) resides in RAM, rebuilt from the arena on load.
+*   **Asynchronous Mutation (ADR--GENESISDB-ASYNC-INDEXING):** CREATE/UPDATE stage the vector into the collection arena synchronously (durable via WAL), then **enqueue** the HNSW insert onto a dedicated indexing thread. Vectors are **eventually searchable**; `flush_index()` drains the queue for read-your-write.
+*   **Incremental Re-indexing:** The indexing thread inserts via `hnsw_rs` (single or rayon `parallel_insert` for batches), maintaining amortized $O(1)$ mutation off the caller thread.
 
 ### 2.3 Zero-Copy FFI Contract
 *   The `hybrid_search` FFI call accepts an input vector pointer (`f32*`) and returns a result buffer of `u32` Arena IDs.

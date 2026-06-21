@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 GenesisBlock / GenesisBlockDB is a local-first **hybrid semantic-graph database engine** written in Rust. A single Rust crate (`genesis-block-native`) compiles to two artifacts from the same core: a `cdylib` Node.js native addon (via NAPI-RS) and an `rlib` consumed by a standalone Axum REST server. Everything else (Python SDK, Go SDK, MCP server, dashboard, Obsidian plugin) is a client over one of those two surfaces.
 
-The whole engine lives in `src/lib.rs` (~1900 lines): storage, WAL persistence, HNSW vector index, graph indices, bitemporal node/edge model, governance tiers, HQL execution, Graph Retrieval Layer (GRL), CRDT sync, and ed25519-signed consensus. There is no module split for the core — it is one large file by design.
+The whole engine lives in `src/lib.rs` (~2500 lines): storage, WAL persistence, per-collection HNSW vector indexes (async indexing), graph indices, bitemporal node/edge model, governance tiers, HQL execution, Graph Retrieval Layer (GRL), CRDT sync, and ed25519-signed consensus. There is no module split for the core — it is one large file by design.
 
 ## Build & run
 
@@ -28,7 +28,7 @@ Two independent test surfaces — run the one matching your change, both for cro
 cargo test                               # Rust integration tests in tests/*.rs
 cargo test --test governance_tests       # single test FILE (each tests/*.rs is its own crate)
 cargo test --test governance_tests -- master_tier   # single test by name substring
-npm test                                 # node --test __test__  (NAPI + MCP surface)
+npm test                                 # node --test __test__/*.mjs  (NAPI + MCP surface)
 node --test __test__/mcp.test.mjs        # single Node test file
 ```
 
@@ -58,6 +58,9 @@ cd dashboard && npm run dev  # optional operational dashboard (reads /v1/status,
 - **HQL pipeline.** Query text → `pest` grammar → `src/query/ast.rs` (`HqlCommand`) → `src/query/mod.rs` `LogicalPlanner::plan` (produces `QueryPlan` of `PlanStep`s) → executed against `Storage`. Commands: `SEARCH`, `TRAVERSE`, `MATCH`/`HYBRID`, `CONTEXT`.
 - **Grammar source of truth is ambiguous.** There are two `.pest` files — `src/query/hql.pest` (used by the build) and a root `hql.pest`. Historically the root one was more complete. Confirm which one `build.rs` / `pest_derive` actually loads before editing grammar.
 - **Bitemporal, append-mostly.** Nodes evolve by `supersede_node` (new version + `caused_by` link), not destructive update. Edges have `valid_from`/`valid_to`. Note `retract_edge` is currently a stub returning `Ok(None)`.
+- **Vector spaces are per-collection.** There is no single global vector arena/HNSW/`vector_dim`. `Storage.collections: DashMap<String, Arc<VectorCollection>>` (each owns arena+metadata+HNSW+metric+dim); a `default` collection always exists. `NodeInput.collection` routes a node's embedding; `HybridSearchInput.collection` scopes search and validates query dim. Snapshot = per-collection `vec_<name>.bin`/`meta_<name>.bin` + a `collections` manifest in `state.json`; legacy single-space DBs migrate to `default`. See `ADR--GENESISDB-MULTI-COLLECTION`.
+- **HNSW indexing is async.** `add_node`/`execute_batch` stage the vector into the arena (durable via WAL) and **enqueue** the HNSW insert onto a per-`Storage` indexing thread; vectors are *eventually searchable*. Call `flush_index()` for read-your-write (tests do); `index_lag()` reports the backlog. Compaction/rebuild flush first. See `ADR--GENESISDB-ASYNC-INDEXING`.
+- **Edges keyed by u64 hash.** `edges: DashMap<u64, EdgeOutput>` keyed by `Storage::edge_key(id) = trunc64(SHA256(id))`; `out_idx`/`in_idx` are `DashMap<u32, HashSet<u64>>`. Edge id strings are **not** interned into `id_to_u32` (only nodes are). See `ADR--GENESISDB-EDGE-NUMERIC-KEYS`.
 - **Governance tiers** (`Tier`/`ScalingTier` enums): external agents cannot directly create `MASTER`-tier nodes. Governance is enforced in the engine, not the transport layer — test it via `tests/governance_tests.rs`.
 - **CRDT sync & consensus**: Lamport/logical clocks, ed25519-signed `SignedEvent`s, LWW reconciliation, Merkle root. Swarm identity (ed25519 keypair) is persisted under the database path.
 

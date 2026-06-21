@@ -1,6 +1,6 @@
 # GenesisBlockDB REST API Reference
 
-**Generated from `src/main.rs` (Axum server) — 2026-06-21.** This replaces the
+**Generated from `src/main.rs` (Axum server) — 2026-06-22.** This replaces the
 prior corrupted file. The server is the SSOT; update this when routes change.
 
 - **Base URL:** `http://localhost:3000` (port via `GENESIS_PORT`, bind `0.0.0.0`)
@@ -21,6 +21,8 @@ prior corrupted file. The server is the SSOT; update this when routes change.
 | POST | `/v1/node/add` | `NodeInput` | `NodeOutput` |
 | POST | `/v1/node/supersede` | `{ id, new_props?, caused_by? }` | `NodeOutput` |
 | POST | `/v1/edge/add` | `EdgeInput` | `EdgeOutput` |
+| POST | `/v1/collection/create` | `{ name, model, dim, metric? }` | `{ ok: true }` |
+| GET | `/v1/collections` | _none_ | `CollectionInfo[]` |
 | POST | `/v1/bulk/nodes` | `NodeInput[]` | `200` (empty) |
 | POST | `/v1/bulk/edges` | `EdgeInput[]` | `200` (empty) |
 | POST | `/v1/bulk/rebuild` | _none_ | `200` (empty) |
@@ -39,7 +41,13 @@ prior corrupted file. The server is the SSOT; update this when routes change.
 tiered `retrieve_context` / HQL `CONTEXT` end-to-end, `neighbors` (graph
 traversal), `retract_edge`, `compact`, `detect_communities`,
 `generate_meta_graph`, `calculate_structural_gaps`, `set_language_centroid`,
-`set_index_params`, `reconcile_state`.
+`set_index_params`, `reconcile_state`, `flush_index`, `index_lag`.
+
+> **Async vector indexing.** HNSW insertion runs off the write path on a
+> dedicated indexing thread — a vector is durable (WAL) and in its collection's
+> arena immediately, but **eventually searchable** (the index lags). NAPI exposes
+> `flushIndex()` (drain the queue — read-your-write) and `indexLag()` (staged but
+> not-yet-indexed count). See `ADR--GENESISDB-ASYNC-INDEXING`.
 
 ## HQL (`/v1/query/hql`, raw string body)
 ```
@@ -56,15 +64,19 @@ k-NN (alpha=0); `MATCH` is hybrid (vector + K-Impact, k=10).
 ### NodeInput
 ```jsonc
 { "id": "N-1"?, "labels": ["USER"], "props": {}?, "embedding": [f64]?,
-  "lang": "en"?, "valid_from": "<rfc3339>"?, "caused_by": "…"?, "ttl": 3600? }
+  "lang": "en"?, "valid_from": "<rfc3339>"?, "caused_by": "…"?, "ttl": 3600?,
+  "collection": "default"? }
 ```
+_(`collection` routes `embedding` into a named vector space; defaults to `default`.)_
 ### NodeOutput
 ```jsonc
 { "id", "labels": [], "props": {}, "impact": f64?, "embedding": [f64]?,
   "lang": "en"?, "valid_from", "valid_to": null?, "caused_by": null?,
-  "expires_at": null?, "clock": { "time": u32, "peer_id": "…" } }
+  "expires_at": null?, "clock": { "time": u32, "peer_id": "…" },
+  "collection": "default"? }
 ```
-_(Embedding is omitted from node read responses — the vector lives in the arena/HNSW.)_
+_(Embedding is omitted from node read responses — the vector lives in its
+collection's arena/HNSW. `collection` records which space it lives in.)_
 
 ### EdgeInput / EdgeOutput
 ```jsonc
@@ -85,8 +97,17 @@ _(Embedding is omitted from node read responses — the vector lives in the aren
 ```
 ### HybridSearchInput (`/v1/search/hybrid`, `/v1/reason/context`)
 ```jsonc
-{ "query_vector": [f64], "k": u32, "alpha": f64?, "lang": "…"?, "as_of": "…"? }
+{ "query_vector": [f64], "k": u32, "alpha": f64?, "lang": "…"?, "as_of": "…"?,
+  "collection": "default"? }
 ```
+_(Searches the named collection; query length is validated against the
+collection dim — a mismatch is a typed error, not garbage neighbors.)_
+### CollectionInfo (`/v1/collections`)
+```jsonc
+{ "name", "model", "dim": u32, "metric": "L2|Cosine", "count": u32 }
+```
+_(Create with `POST /v1/collection/create` `{ name, model, dim, metric? }`;
+`metric` defaults to `L2`. A `default` collection always exists.)_
 ### NeighborOutput
 ```jsonc
 { "node": NodeOutput, "path": [EdgeOutput], "depth": u32 }

@@ -10,14 +10,22 @@ GenesisBlockDB uses a **Log-Structured Merge-Friendly** architecture based on a 
 - **Primary Log:** `genesis-graph.wal` (JSONL format) stores all mutation events.
 - **Persistence:** High-durability append-only logic with batched group commits.
 - **In-Memory State:**
-    - `DashMap<u32, NodeOutput>`: Primary node storage.
-    - `DashMap<u32, EdgeOutput>`: Primary edge storage.
-    - `Adjacency Indices`: Forward (`out_idx`) and Backward (`in_idx`) mapping for $O(1)$ traversal.
+    - `DashMap<u32, NodeOutput>`: Primary node storage (nodes interned to `u32`).
+    - `DashMap<u64, EdgeOutput>`: Primary edge storage. Edges are keyed by a
+      deterministic `u64 = trunc64(SHA256(id))` (`Storage::edge_key`); edge id
+      strings are **not** interned into `id_to_u32` (ADR--GENESISDB-EDGE-NUMERIC-KEYS).
+    - `Adjacency Indices`: Forward (`out_idx`) and Backward (`in_idx`),
+      `DashMap<u32, HashSet<u64>>` (node `u32` → set of edge `u64` keys), for $O(1)$ traversal.
 
 ### 2.2 Semantic Hybrid Indexing
 GenesisBlockDB bridges lexical and semantic search via a dual-indexing strategy:
 1.  **Lexical Index (Trigrams/Bigrams):** Thai-aware tokenization that strips combining marks (vowels/tones) to provide high-recall fuzzy matching for terms like "บ้าน" vs "บาน".
-2.  **Vector Index (HNSW):** Hierarchical Navigable Small Worlds index for high-dimensional vector proximity search.
+2.  **Vector Index (HNSW), per collection:** vectors live in named
+    `VectorCollection`s — each with its own model, dim, metric, arena, and HNSW
+    index — not one global space (ADR--GENESISDB-MULTI-COLLECTION). A `default`
+    collection always exists. HNSW insertion is **asynchronous** (off the write
+    hot path; eventually searchable — `flush_index` forces a drain;
+    ADR--GENESISDB-ASYNC-INDEXING).
 3.  **Neural Bridge:** Multi-lingual support via language centroids and mean-centering, allowing English queries to match Thai contexts.
 
 ### 2.3 Graph Retrieval Layer (GRL)

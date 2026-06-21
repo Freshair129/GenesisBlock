@@ -26,7 +26,10 @@ index instead of editing 40+ spec frontmatters. Status legend:
 | SPEC--INDEX-COMPACTION | `compact` / `perform_index_compaction` (`compaction_tests`) |
 | SPEC--CROSS-LINGUAL-MAPPING | `set_language_centroid`, centroid mean-centering (`thai_fuzzy_tests`) |
 | SPEC--CRYPTOGRAPHIC-SWARM | ed25519 identity, signed events |
-| DESIGN--HNSW-HYBRID-INDEX | `hnsw_rs` arena index (P14–P21) |
+| DESIGN--HNSW-HYBRID-INDEX | `hnsw_rs` per-collection index, **async indexing** (P14–P21; ADR--GENESISDB-ASYNC-INDEXING) |
+| SPEC--MULTI-COLLECTION-VECTOR-SPACE | per-collection vector spaces P-C/P-D (`multi_collection_tests`; ADR--GENESISDB-MULTI-COLLECTION) |
+| ADR--GENESISDB-EDGE-ID-INTERNING, ADR--GENESISDB-EDGE-NUMERIC-KEYS | lean + numeric `u64` edge keys, −44% edge RAM (`edge_interning_tests`) |
+| ADR--GENESISDB-ASYNC-INDEXING | deferred HNSW indexing, P95 6.31→0.60 ms (`async_indexing_tests`) |
 | DESIGN--TRANSITIVE-INFERENCE | `INFER(...)` unbounded traversal |
 | TDD--GENESISDB-DUAL-TRACK | WAL + binary snapshot, instant-load + replay (P14) |
 | TDD--NEURAL-CONSENSUS-PROTOCOL | `propose_consensus`/`submit_vote` quorum (`crdt_sync_tests`) |
@@ -43,7 +46,7 @@ index instead of editing 40+ spec frontmatters. Status legend:
 | SPEC--OBSIDIAN-UI-INTEGRATION | plugin present; `503`/maintenance contract not implemented |
 
 ## Proposed (not built)
-- SPEC--MULTI-COLLECTION-VECTOR-SPACE (P-B embedding dedup landed; per-collection P-C/P-D open)
+- _(none currently — SPEC--MULTI-COLLECTION-VECTOR-SPACE P-C/P-D shipped 2026-06-22; see Implemented. Deferred follow-ups: HQL `IN <collection>` clause + same-node multi-vector `add_vector`.)_
 
 ## Superseded
 - **EXPANSION-SPEC--GENESIS-DB** — explicitly DEPRECATED.

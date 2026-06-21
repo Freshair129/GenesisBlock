@@ -11,7 +11,7 @@ The ingestion process maps the LDBC Social Network schema directly to GenesisBlo
   - \Person\ -> GKS Atomic Node (Label: Person).
   - \Post\ -> GKS Atomic Node (Label: Post) + **768-dim Semantic Vector**.
 - **Edge Mapping:** \Knows\ -> GKS Atomic Edge (Rel: knows).
-- **Hardening:** Every operation was synchronously committed to the JSONL Write-Ahead Log (WAL) and indexed into the HNSW engine.
+- **Hardening:** Every operation was synchronously committed to the JSONL Write-Ahead Log (WAL) and indexed into the HNSW engine. _(Historical: as of 2026-06-22, HNSW indexing is asynchronous — the WAL commit is still synchronous/durable, but the index insert is deferred to a background thread. See ADR--GENESISDB-ASYNC-INDEXING.)_
 
 ## 3. Empirical Results (SF0.1 Baseline)
 Measurements performed on Intel(R) Core(TM) i7-8700K CPU @ 3.70GHz.
