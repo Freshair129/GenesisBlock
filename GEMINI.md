@@ -1,6 +1,7 @@
 ---
-version: "1.2.0"
+version: "1.3.0"
 created_at: "2026-06-15T00:00:00+07:00,Agent: GeminiCLI"
+last_update: "2026-06-22,Claude (engine-model sync)"
 status: "Stable"
 attributes:
   domain: "genesis-block-db"
@@ -38,7 +39,7 @@ When called by GoVibe, Codex, Claude Code, or another external orchestrator, Gem
 ## 2. Technical Standards
 
 ### 2.1 Memory Safety & Binary Loading
-- **Safe Loading:** Avoid `unsafe` for binary slice conversion unless performance profiling dictates it. Prefer `chunks_exact` and `from_le_bytes` for loading `vector.bin` to ensure alignment and safety.
+- **Safe Loading:** Avoid `unsafe` for binary slice conversion unless performance profiling dictates it. Prefer `chunks_exact` and `from_le_bytes` for loading the per-collection `vec_<name>.bin` arenas (legacy `vector.bin` migrates to the `default` collection) to ensure alignment and safety.
 - **Alignment:** Always verify byte alignment when loading binary snapshots.
 
 ### 2.2 Temporal Logic
@@ -47,6 +48,11 @@ When called by GoVibe, Codex, Claude Code, or another external orchestrator, Gem
 ### 2.3 Consensus & Governance
 - **API Endpoints:** The standalone server (`src/main.rs`) must expose `/v1/consensus/*` endpoints to support multi-agent voting and promotion.
 - **Axiomatic Guards:** MASTER tier nodes are immutable for external agents. This is enforced in `validate_governance`.
+
+### 2.4 Current Engine Model (shipped 2026-06-22)
+- **Edges keyed by `u64` hash:** `edges: DashMap<u64, EdgeOutput>` keyed by `Storage::edge_key(id) = trunc64(SHA256(id))`; `out_idx`/`in_idx: DashMap<u32, HashSet<u64>>`. Edge id strings are **not** interned into `id_to_u32` (nodes only). See `ADR--GENESISDB-EDGE-NUMERIC-KEYS`.
+- **Per-collection vector spaces:** no global arena/HNSW/`vector_dim`. `Storage.collections: DashMap<String, Arc<VectorCollection>>` (+ `default_collection`); each collection owns its arena + metadata + HNSW + metric + dim. `NodeInput.collection` routes embeddings; `HybridSearchInput.collection` scopes + dim-validates search. REST `/v1/collection/create`, `/v1/collections`. See `ADR--GENESISDB-MULTI-COLLECTION`.
+- **Async HNSW indexing:** inserts run off the write path on a per-`Storage` indexing thread; vectors are *eventually searchable*. Use `flush_index()` for read-your-write, `index_lag()` for backlog. See `ADR--GENESISDB-ASYNC-INDEXING`.
 
 ## 3. Workflow & Verification
 
