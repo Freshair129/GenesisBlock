@@ -2,7 +2,7 @@
 proposed_id: C4--GENESISDB-ARCHITECTURE
 type: architecture-index
 status: candidate
-version: 0.1.1b
+version: 0.1.2b
 created_at: 2026-06-13T22:50:11+07:00,ATHER,9b1ced3
 last_update: 2026-06-14T00:29:45+07:00,ATHER
 attributes:
@@ -15,6 +15,12 @@ attributes:
 ---
 
 # C4--GENESISDB-ARCHITECTURE
+
+> **Positioning & evidence (2026-06-21):** GenesisDB is an **embedded
+> analytics / agent-memory graph + vector engine** (comparators: Kuzu,
+> DuckDB+graph, RocksDB+graph; Neo4j/Qdrant as references). Measured performance
+> & competitive results: [REPORT--2026-06-21-PERFORMANCE-AND-COMPETITIVE.md](REPORT--2026-06-21-PERFORMANCE-AND-COMPETITIVE.md)
+> (audits P14–P25). Prior "<30 µs / 120 TPS" figures are retracted.
 
 ## 1. Purpose
 
@@ -40,14 +46,13 @@ attributes:
 
 ## 3. C1 - System Context
 
-GenesisDB is a local-first hybrid semantic graph and knowledge engine. It provides durable graph storage, semantic search, graph traversal, HQL query execution,
-agent context retrieval, and multi-agent synchronization primitives.
+GenesisDB is a local-first hybrid semantic-graph database engine. Its core responsibility is backend runtime behavior: durable storage, WAL/snapshot persistence, in-memory embedding storage, vector/HNSW indexing, symbolic graph relationships, graph traversal, HQL/AST execution, hybrid search, retrieval, community detection, and synchronization primitives.
 
 ### External Actors
 
 | Actor | Goal | Interfaces |
 |---|---|---|
-| Human knowledge worker | Manage and inspect knowledge through Obsidian/dashboard workflows | Obsidian plugin, dashboard, Markdown-facing flows |
+| Human knowledge worker | Inspect or operate knowledge through optional clients | Obsidian plugin, dashboard, Markdown-facing flows |
 | AI agent / LLM tool caller | Store, retrieve, and reason over structured knowledge | MCP server, REST API, N-API |
 | Application developer | Embed GenesisDB into apps and tools | N-API package, Python SDK, Go SDK, REST |
 | Peer GenesisDB node | Synchronize knowledge and participate in consensus | CRDT/gossip/consensus primitives |
@@ -83,8 +88,8 @@ flowchart LR
 | MCP Server | Tool interface for LLM clients | `mcp/server.js` | `docs/MCP-GUIDE.md`, `docs/SPEC--MCP-SERVER.md` |
 | Python SDK | Python REST client | `genesisdb-python/genesisdb/client.py` | `docs/PYTHON-SDK-GUIDE.md`, `docs/SPEC--PYTHON-SDK.md` |
 | Go SDK | Go REST client | `genesisdb-go/client.go` | `docs/SPEC--GO-SDK.md` |
-| Dashboard | Operational UI for status and visualization | `dashboard/` | `docs/AUDIT--DASHBOARD-E2E.md` |
-| Obsidian Plugin | Human-facing PKM bridge | `obsidian-plugin/` if present | `docs/SPEC--OBSIDIAN-UI-INTEGRATION.md`, dual-track TDD |
+| Dashboard | Optional operational UI consuming status/search APIs | `dashboard/` | `docs/AUDIT--DASHBOARD-E2E.md` |
+| Obsidian Plugin | Optional human-facing PKM bridge consuming engine interfaces | `obsidian-plugin/` if present | `docs/SPEC--OBSIDIAN-UI-INTEGRATION.md`, dual-track TDD |
 
 ### Container Diagram
 
@@ -133,10 +138,13 @@ flowchart TB
 | Component | Responsibility | Source / Entry Points | Related Docs |
 |---|---|---|---|
 | Storage Model | Node/edge persistence, WAL, snapshots, recovery | `src/lib.rs` | master spec, batch atomicity, WAL ADR |
+| In-Memory Embedding Arena | Runtime vector storage and embedding-backed retrieval state | `src/lib.rs` | master spec, HNSW hybrid index design |
 | Hybrid Search | Vector and lexical retrieval with ranking | `src/lib.rs`, HNSW design | HNSW hybrid index design |
 | Graph Retrieval Layer | Tiered context retrieval by hop budget and fuzzy matching | `src/lib.rs::retrieve_context` | `SPEC--GRAPH-RETRIEVAL-LAYER.md` |
 | HQL Engine | Parse and execute search/traverse/context/infer queries | `src/lib.rs::execute_hql`, `hql.pest` | HQL section in master spec, API docs |
+| Symbolic Graph / AST Boundary | Symbolic relationships, query grammar, and structured traversal semantics | `src/lib.rs`, `hql.pest` | master spec, HQL docs |
 | K-Impact / Reasoning | Impact scoring, inference, structural insight, drift | `src/lib.rs` | K-impact specs, transitive inference design |
+| Community Detection | Cluster/community discovery for graph insight and SuperNode generation | `src/lib.rs` | graph clustering and structural insight specs |
 | Axiomatic Governance | Tier permissions and logical guardrails | `src/lib.rs` | governance ADR, axiomatic guards spec |
 | CRDT / Sync | Event reconciliation and collaborative state handling | `src/lib.rs` | collaborative sync and gossip specs |
 | Consensus | Proposal/vote/verification primitives | `src/lib.rs`, REST handlers if routed | neural consensus TDD |
@@ -171,7 +179,7 @@ The C4 code level is intentionally anchored to source files instead of duplicati
 | MCP tool surface | `mcp/server.js` tool definitions | `docs/MCP-GUIDE.md` | Medium |
 | SDK request/response shapes | Python and Go SDK clients | API reference and REST handlers | High |
 | Persistence safety | WAL/snapshot code in `src/lib.rs` | WAL ADR, audit reports | High |
-| Dashboard status contract | `dashboard/` hooks/components and REST status routes | dashboard audit docs | Medium |
+| Optional dashboard status contract | `dashboard/` hooks/components and REST status routes | dashboard audit docs | Medium |
 
 ## 7. Known Architecture Drift
 
@@ -214,5 +222,6 @@ Expected checks:
 
 | Version | Date | Status | Summary | Commit Hash | Agent |
 |---------|------|--------|---------|-------------|-------|
+| 0.1.2b | 2026-06-14 | candidate | Clarified GenesisDB as backend DB/runtime engine first and marked dashboard/Obsidian as optional consumers. | working-tree | ATHER |
 | 0.1.1b | 2026-06-14 | candidate | Updated C1 supporting sources after moving the GKS whitepaper into docs. | 4101228 | ATHER |
 | 0.1.0b | 2026-06-13 | candidate | Initial C4 architecture index and SSOT map. | 9b1ced3 | ATHER |

@@ -9,7 +9,19 @@ Following a rigorous CTO-level review of the Phase 8-12 audits and the current s
 ## 3. Decision
 We are officially pivoting the market positioning of GenesisDB.
 **OLD POSITIONING:** "Enterprise-Grade Hybrid Semantic-Graph Database"
-**NEW POSITIONING:** "Local Hybrid Knowledge Engine for AI Agents"
+**NEW POSITIONING:** "Embedded analytics / agent-memory graph + vector engine"
+(refined from "Local Hybrid Knowledge Engine for AI Agents").
+
+**Comparator set (refined 2026-06-21):** nearest peers are **Kuzu, DuckDB
+(graph extension), RocksDB + graph layer** (embedded); Chroma/LanceDB (embedded
+vector); Neo4j/Qdrant are well-known *references*, not the category.
+
+> **Evidence update (2026-06-21):** the re-benchmarking this ADR called for is
+> done — vector vs Chroma/Qdrant (recall-latency frontier), graph traversal
+> 10k–1M, Neo4j head-to-head (embedded 7–185× on k-hop), and governance /
+> incremental-K-Impact cost proofs. See
+> `REPORT--2026-06-21-PERFORMANCE-AND-COMPETITIVE.md` (audits P14–P25). The
+> "oversell" figures (P12) are formally retracted; current claims are measured.
 
 ## 4. Rationale
 By targeting the "Local Knowledge Engine" market, GenesisDB competes against systems like Chroma, LanceDB, and local GraphRAG implementations. In this arena, GenesisDB's unique strengths provide a massive competitive advantage:

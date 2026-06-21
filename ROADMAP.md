@@ -1,10 +1,16 @@
-# GENESISDB ROADMAP (MARK X -> MARK XI)
-**Positioning:** Local Hybrid Knowledge Engine for AI Agents
+# GENESISDB ROADMAP (MARK XI -> MARK XII)
+**Positioning:** Embedded analytics / agent-memory graph + vector engine
+(comparators: Kuzu, DuckDB+graph, RocksDB+graph; Neo4j/Qdrant as references).
 **Master Specification:** [MASTER-SPEC--GENESIS-DB.md](docs/MASTER-SPEC--GENESIS-DB.md)
+**Evidence:** [REPORT--2026-06-21-PERFORMANCE-AND-COMPETITIVE.md](docs/REPORT--2026-06-21-PERFORMANCE-AND-COMPETITIVE.md) (audits P14–P25)
 
-## Current Status
-- **Engineering Quality:** 10/10 (Clean Code, Fully Tested, Trigram Optimized)
-- **Production Readiness:** 10/10 (Persistent Indices, Batch Atomicity, GC)
+## Current Status (evidence-backed 2026-06-21)
+- **Benchmark Credibility:** vector (vs Chroma/Qdrant + recall-latency frontier),
+  graph (10k–1M, vs Neo4j), and cost proofs (governance, incremental K-Impact)
+  — all measured and reproducible. Earlier "<30 µs / 120 TPS" figures retracted.
+- **Production Readiness:** advanced prototype. Durable WAL + snapshot/replay
+  verified; full suite green. Open: deferred indexing, edge-id interning RAM,
+  gossip anti-entropy stub, `retract_edge` stub.
 - **Core Architecture:** Neural Bridge, LPA Clustering, Merkle Sync, Logic-Gated Context, Consensus Protocol.
 - **Temporal Engine:** Bitemporal Querying, Event Sourcing, Vector Drift Tracking, TTL.
 - **Cognitive Layer:** Graph Retrieval Layer (GRL) with H0-H5 Scaling Protocol.
@@ -47,3 +53,20 @@
 - [x] **Step 2: Python SDK:** High-level bindings for Data Science and AI research. [Guide](docs/PYTHON-SDK-GUIDE.md)
 - [x] **Step 3: Go SDK:** Official client for cloud-native infrastructure and high-performance backends.
 - [ ] **Step 4: GKS Insight Dashboard:** Real-time visualization of swarm health and knowledge drift.
+
+---
+
+## MARK XII: Benchmark Evidence & Hardening (COMPLETED 2026-06-21)
+- [x] **Vector vs Chroma/Qdrant** + recall–latency frontier (P15/P20/P21).
+- [x] **Graph traversal 10k/100k/1M** — O(neighborhood) (P22).
+- [x] **Neo4j head-to-head** — embedded 7–185× (P23).
+- [x] **Governance & K-Impact cost** — guard <0.1%, incremental O(V_affected) (P24/P25).
+- [x] **Engine perf:** −44% RAM, ×6.1 concurrent ingest, ×7.8 bulk insert, configurable HNSW `ef` (P14/P16–P19).
+- [x] **Interactive dashboard:** `docs/perf-comparison-dashboard.html`.
+
+## MARK XIII: Next (proposed)
+- [ ] **Kuzu head-to-head** (embedded↔embedded — fairest comparator).
+- [ ] **Edge-id interning rework** (u64 ids) to push graph scale past 1M / 32 GB.
+- [ ] **Deferred/async indexing** to keep query latency flat during bulk load.
+- [ ] **Multi-collection vector space** (per-model/dim; [SPEC](docs/SPEC--MULTI-COLLECTION-VECTOR-SPACE.md)).
+- [ ] **Doc hygiene:** status tags on specs; regenerate `API_REFERENCE.md` from code.

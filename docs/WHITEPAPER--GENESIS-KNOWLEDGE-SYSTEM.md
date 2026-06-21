@@ -1,6 +1,6 @@
 # Whitepaper: Genesis Knowledge System (GKS)
-**Version:** 2.0.0 (Mark VIII)
-**Status:** Active - Distributed Intelligence
+**Version:** 2.0.0 (Mark VIII) · evidence-backed revision 2026-06-21
+**Status:** Embedded agent-memory engine — benchmarked (audits P14–P25)
 **Architect:** Rwang (อาหวัง)
 
 ## 1. Executive Summary
@@ -13,7 +13,13 @@ The Genesis Knowledge System (GKS) is a high-performance distributed semantic su
 - **L3 Collaboration:** Conflict-free Replicated Data Types (**CRDT**) using **Lamport Timestamps**. Every mutation is deterministically ordered across agents, enabling masterless synchronization.
 
 ### 2.2 Neural-Hybrid Indexing
-- **Vector substrate:** HNSW-based similarity search (P95 < 30µs).
+- **Vector substrate:** HNSW similarity search. Measured (bge-m3 1024-dim, 100k):
+  recall@10 0.984 at ~1.1 ms p50 — at parity with Chroma on the same
+  recall↔latency frontier (audit P21/P20). *(The earlier "P95 < 30 µs" was a
+  measurement artifact and is retracted; 30 µs is closer to a 1-hop graph
+  lookup — see below.)*
+- **Graph substrate:** index-backed traversal; 1-hop p50 ~22 µs, O(neighborhood)
+  not O(N), and 7–185× faster than server Neo4j on k-hop (audit P22/P23).
 - **Lexical substrate:** **Thai-aware Tokenization** filtering combining marks (vowels/tones) to unify fuzzy lookups (e.g., "บ้าน" vs "บาน").
 - **Neural Bridge:** Cross-lingual English-Thai mean-centering for language-agnostic retrieval.
 
@@ -45,5 +51,11 @@ A strict hierarchy of truth:
 ## 6. Conclusion
 The Genesis Knowledge System is the infrastructure for **Collective Intelligence**. It provides the speed of local hardware, the flexibility of neural models, and the rigor of axiomatic governance, forming a resilient and evolving memory for the future of AI.
 
+## 7. Evidence
+Performance and competitive claims are measured and reproducible — see
+`REPORT--2026-06-21-PERFORMANCE-AND-COMPETITIVE.md` and audits P14–P25
+(vector frontier vs Chroma/Qdrant, graph traversal 10k–1M, Neo4j head-to-head,
+governance & incremental K-Impact cost). Harnesses live in `benches/`.
+
 ---
-**Verified for Scale. Hardened for Thai. Decentralizing Logic.**
+**Benchmarked, not narrated. Hardened for Thai. Embedded by design.**
