@@ -1026,42 +1026,70 @@ impl Storage {
     pub fn neighbors(&self, seed: String, args: NeighborInput, is_inferred: bool) -> Result<Vec<NeighborOutput>> {
         let u32_seed = match self.get_u32(&seed) { Some(id) => id, None => return Ok(Vec::new()) };
         let depth = args.depth.unwrap_or(1);
-        let target_rel = args.rel.as_deref().unwrap_or("ANY");
+
+        // Rel filter: args.rels (non-empty) overrides args.rel; "ANY" or None → no filter.
+        let rels_filter: Option<HashSet<String>> = match args.rels.as_ref() {
+            Some(v) if !v.is_empty() => Some(v.iter().cloned().collect()),
+            _ => match args.rel.as_deref() {
+                None | Some("ANY") => None,
+                Some(r) => {
+                    let mut s = HashSet::new();
+                    s.insert(r.to_string());
+                    Some(s)
+                }
+            },
+        };
+        let rel_allowed = |rel: &str| -> bool {
+            match &rels_filter { None => true, Some(s) => s.contains(rel) }
+        };
+
+        // Direction: "out" (default, back-compat), "in", "both". Case-insensitive.
+        let dir = args.direction.as_deref().map(|s| s.to_ascii_lowercase()).unwrap_or_else(|| "out".to_string());
+        let walk_out = dir == "out" || dir == "both";
+        let walk_in  = dir == "in"  || dir == "both";
+
         let lim = args.limit.map(|l| l as usize);
         let mut results = Vec::new(); let mut visited = HashSet::new(); visited.insert(u32_seed);
         let mut queue = VecDeque::new(); queue.push_back((u32_seed, Vec::new(), 0));
         while let Some((curr_u32, path, curr_depth)) = queue.pop_front() {
             if curr_depth >= depth && !is_inferred { continue; }
-            if let Some(eids) = self.out_idx.get(&curr_u32) {
-                for eid in eids.iter() {
-                    if let Some(edge_ref) = self.edges.get(eid) {
-                        let edge = edge_ref.value();
-                        
-                        // Time-travel check for Edges
-                        if !Self::is_valid_as_of(&edge.valid_from, &edge.valid_to, &args.as_of) {
-                            continue;
-                        }
 
-                        if target_rel == "ANY" || edge.rel == target_rel {
-                            let curr_id = self.u32_to_id.get(&curr_u32).unwrap().value().clone();
-                            let next_id = if edge.from == curr_id { &edge.to } else { &edge.from };
-                            if let Some(next_u32) = self.get_u32(next_id) {
-                                if !visited.contains(&next_u32) {
-                                    visited.insert(next_u32);
-                                    if let Some(node_ref) = self.nodes.get(&next_u32) {
-                                        let node = node_ref.value();
+            // Collect candidate edge ids from chosen directions, dedup by eid.
+            let mut eid_set: HashSet<u32> = HashSet::new();
+            if walk_out {
+                if let Some(out_eids) = self.out_idx.get(&curr_u32) { eid_set.extend(out_eids.iter().copied()); }
+            }
+            if walk_in {
+                if let Some(in_eids) = self.in_idx.get(&curr_u32) { eid_set.extend(in_eids.iter().copied()); }
+            }
 
-                                        // Time-travel check for Nodes
-                                        if !Self::is_valid_as_of(&node.valid_from, &node.valid_to, &args.as_of) {
-                                            continue;
-                                        }
+            for eid in eid_set.iter() {
+                if let Some(edge_ref) = self.edges.get(eid) {
+                    let edge = edge_ref.value();
 
-                                        let mut new_path = path.clone(); new_path.push(edge.clone());
-                                        results.push(NeighborOutput { node: node.clone(), path: new_path.clone(), depth: curr_depth + 1 });
-                                        if let Some(l) = lim { if results.len() >= l { return Ok(results); } }
-                                        if is_inferred || (curr_depth + 1 < depth) { queue.push_back((next_u32, new_path, curr_depth + 1)); }
-                                    }
+                    // Time-travel check for Edges
+                    if !Self::is_valid_as_of(&edge.valid_from, &edge.valid_to, &args.as_of) {
+                        continue;
+                    }
+                    if !rel_allowed(&edge.rel) { continue; }
+
+                    let curr_id = self.u32_to_id.get(&curr_u32).unwrap().value().clone();
+                    let next_id = if edge.from == curr_id { &edge.to } else { &edge.from };
+                    if let Some(next_u32) = self.get_u32(next_id) {
+                        if !visited.contains(&next_u32) {
+                            visited.insert(next_u32);
+                            if let Some(node_ref) = self.nodes.get(&next_u32) {
+                                let node = node_ref.value();
+
+                                // Time-travel check for Nodes
+                                if !Self::is_valid_as_of(&node.valid_from, &node.valid_to, &args.as_of) {
+                                    continue;
                                 }
+
+                                let mut new_path = path.clone(); new_path.push(edge.clone());
+                                results.push(NeighborOutput { node: node.clone(), path: new_path.clone(), depth: curr_depth + 1 });
+                                if let Some(l) = lim { if results.len() >= l { return Ok(results); } }
+                                if is_inferred || (curr_depth + 1 < depth) { queue.push_back((next_u32, new_path, curr_depth + 1)); }
                             }
                         }
                     }
