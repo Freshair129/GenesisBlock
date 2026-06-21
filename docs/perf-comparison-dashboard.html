@@ -118,6 +118,13 @@ td.num{text-align:right;font-variant-numeric:tabular-nums}
   </div>
 
   <div class="card" style="margin-bottom:var(--gap)">
+    <h3>Graph head-to-head (P23) — embedded GenesisDB vs server Neo4j</h3>
+    <div class="hint" id="neo-caption"></div>
+    <table id="neoTable" style="font-size:13px"></table>
+    <div class="metricnote" id="neo-note" style="margin-top:12px;max-width:none"></div>
+  </div>
+
+  <div class="card" style="margin-bottom:var(--gap)">
     <h3>Engine internals — K-Impact incremental (P25) & governance guard (P24)</h3>
     <div class="hint" id="ki-caption"></div>
     <table id="kiTable" style="font-size:13px"></table>
@@ -310,6 +317,19 @@ const FRONTIER = {
             {ef:128,lat:1097.4,recall:0.984},{ef:256,lat:1255.0,recall:0.988},{ef:512,lat:2119.4,recall:0.990} ],
   chroma:{lat:990.2,recall:0.981}, qdrant:{lat:3300.8,recall:0.999}
 };
+// P23 Neo4j head-to-head (embedded vs server), fanout-8 graph
+const NEO = {
+  rows:[
+    { n:10000,  metric:"hop1 p50", g:23.1,   neo:4273.8, unit:"µs" },
+    { n:10000,  metric:"hop3 p50", g:1967.3, neo:20688.1, unit:"µs" },
+    { n:10000,  metric:"hop6 p50", g:4211.1, neo:32111.9, unit:"µs" },
+    { n:100000, metric:"hop1 p50", g:21.6,   neo:2590.4, unit:"µs" },
+    { n:100000, metric:"hop3 p50", g:2334.3, neo:19736.8, unit:"µs" },
+    { n:100000, metric:"hop6 p50", g:4403.3, neo:31636.2, unit:"µs" },
+    { n:100000, metric:"memory",   g:1057,   neo:1077,   unit:"MB" },
+    { n:100000, metric:"edge ingest", g:24400, neo:23300, unit:"ms" },
+  ]
+};
 // P25 K-Impact full vs incremental + P24 governance guard
 const KIMPACT = {
   guard_ns: 524, guard_overhead_pct: "<0.1% of a durable write",
@@ -446,6 +466,26 @@ const GRAPH = {
     gt.innerHTML=h+'</tbody>';
     document.getElementById('graph-note').innerHTML =
       "<strong style='color:var(--text-primary)'>O(neighborhood), not O(N):</strong> 1-hop latency stays in the tens of µs across a 100× node increase (23→22→35 µs, ~28–43k traversals/s) — local queries don't slow down as the graph grows. Multi-hop stays bounded (ms). The real ceiling is RAM: 1M nodes / 8M edges = 12.6 GB (edge-UUID interning dominates), so ~10M is out of reach on a 32 GB host. Engine fix shipped: <code>neighbors</code> now honors <code>limit</code> (previously ignored → depth-6 could traverse a whole component).";
+  })();
+
+  // ---- P23 Neo4j head-to-head ----
+  (function(){
+    document.getElementById('neo-caption').textContent =
+      "fanout-8 random graph · same topology params · embedded GenesisDB (in-process) vs Neo4j (server, bolt+JVM) · C: SSD";
+    const nt=document.getElementById('neoTable');
+    let h='<thead><tr><th>N</th><th>Metric</th><th class="num">GenesisDB (embedded)</th><th class="num">Neo4j (server)</th><th class="num">GenesisDB ×</th></tr></thead><tbody>';
+    NEO.rows.forEach(r=>{
+      const lower=true; // all these: lower better
+      const adv = r.neo/r.g; // how many× GenesisDB is better (for time/mem where lower=better and g<neo)
+      const fmtv=(v)=> r.unit==='µs'?(v>=1000?(v/1000).toFixed(2)+' ms':v.toFixed(1)+' µs') : (r.unit==='ms'?(v/1000).toFixed(1)+' s' : (v>=1024?(v/1024).toFixed(1)+' GB':v+' MB'));
+      const better = r.g < r.neo;
+      h+=`<tr><td class="num">${r.n.toLocaleString()}</td><td>${r.metric}</td>`+
+         `<td class="num">${fmtv(r.g)}</td><td class="num">${fmtv(r.neo)}</td>`+
+         `<td class="num"><span class="delta ${better?'up':'down'}">${adv>=1?adv.toFixed(1)+'×':(1/adv).toFixed(1)+'× slower'}</span></td></tr>`;
+    });
+    nt.innerHTML=h+'</tbody>';
+    document.getElementById('neo-note').innerHTML =
+      "<strong style='color:var(--text-primary)'>Embedded wins traversal 7–185×.</strong> hop1's huge gap is mostly the embedded-vs-server tax (Neo4j pays bolt round-trip + Cypher planning + JVM per query); GenesisDB does an in-process index lookup (~20 µs). Deeper hops are 7–10×. Ingest and memory are ~par at 100k (Neo4j carries a ~700 MB JVM floor, so it's 5× heavier at 10k). Caveat: an <em>embedded</em> Neo4j would narrow latency — but the agent-memory thesis is precisely that you shouldn't pay the server tax. Kuzu (embedded↔embedded) is the fairest next comparison.";
   })();
 
   // ---- P24/P25 engine internals ----
