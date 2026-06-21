@@ -413,6 +413,19 @@ impl Storage {
         new_id
     }
 
+    /// Intern an EDGE id: assign a u32 key + the forward `id_to_u32` entry ONLY.
+    /// Unlike `get_or_intern_id`, this skips `trigram_index` and the reverse
+    /// `u32_to_id` map — edges are never fuzzy-searched (`find_fuzzy_id` is
+    /// node-only) and `EdgeOutput.id` is the canonical reverse lookup. This is
+    /// the dominant graph-RAM lever (~48 trigram members + 1 String/edge saved).
+    /// See ADR--GENESISDB-EDGE-ID-INTERNING / RCA--EDGE-ID-INTERNING-RAM.
+    pub fn get_or_intern_edge_id(&self, id: &str) -> u32 {
+        if let Some(existing) = self.id_to_u32.get(id) { return *existing; }
+        let new_id = self.next_u32.fetch_add(1, Ordering::SeqCst);
+        self.id_to_u32.insert(id.to_string(), new_id);
+        new_id
+    }
+
     pub fn get_u32(&self, id: &str) -> Option<u32> { self.id_to_u32.get(id).map(|v| *v) }
 
     fn init_hnsw(ef_construction: usize) -> Hnsw<'static, f32, DistL2> { Hnsw::new(16, 1000000, 16, ef_construction, DistL2 {}) }
@@ -590,8 +603,7 @@ impl Storage {
                                         storage.insert_node_lean(u32_id, n);
                                     }
                                     Event::Edge(e) => {
-                                        let u32_id = storage.get_or_intern_id(&e.id);
-                                        storage.index_edge_internal(&e.id, &e.from, &e.to);
+                                        let u32_id = storage.index_edge_internal(&e.id, &e.from, &e.to);
                                         storage.edges.insert(u32_id, e);
                                     }
                                     Event::Batch(events) => {
@@ -605,8 +617,7 @@ impl Storage {
                                                     storage.insert_node_lean(u32_id, n);
                                                 }
                                                 Event::Edge(e) => {
-                                                    let u32_id = storage.get_or_intern_id(&e.id);
-                                                    storage.index_edge_internal(&e.id, &e.from, &e.to);
+                                                    let u32_id = storage.index_edge_internal(&e.id, &e.from, &e.to);
                                                     storage.edges.insert(u32_id, e);
                                                 }
                                                 _ => {}
@@ -768,7 +779,7 @@ impl Storage {
                         })?;
                     }
                     Event::Edge(e) => {
-                        let u32_id = self.get_or_intern_id(&e.id);
+                        let u32_id = self.get_or_intern_edge_id(&e.id);
                         self.edges.insert(u32_id, e.clone());
                         self.persist_signed(signed_event.clone())?;
                     }
@@ -782,7 +793,7 @@ impl Storage {
                                     self.insert_node_lean(u32_id, n_axiom);
                                 }
                                 Event::Edge(edge) => {
-                                    let u32_id = self.get_or_intern_id(&edge.id);
+                                    let u32_id = self.get_or_intern_edge_id(&edge.id);
                                     self.edges.insert(u32_id, edge.clone());
                                 }
                                 _ => {}
@@ -831,12 +842,16 @@ impl Storage {
         }
     }
 
-    pub fn index_edge_internal(&self, id: &str, from: &str, to: &str) {
-        let u32_id = self.get_or_intern_id(id);
+    /// Index an edge into the adjacency maps and return its u32 key. The edge id
+    /// uses the lean edge-interning path (no trigram/reverse); `from`/`to` are
+    /// node ids and keep the full node intern (they are searchable).
+    pub fn index_edge_internal(&self, id: &str, from: &str, to: &str) -> u32 {
+        let u32_id = self.get_or_intern_edge_id(id);
         let u32_from = self.get_or_intern_id(from);
         let u32_to = self.get_or_intern_id(to);
         self.out_idx.entry(u32_from).or_insert_with(HashSet::new).insert(u32_id);
         self.in_idx.entry(u32_to).or_insert_with(HashSet::new).insert(u32_id);
+        u32_id
     }
 
     fn next_clock(&self) -> LogicalClock {
@@ -892,8 +907,7 @@ impl Storage {
             caused_by: args.caused_by,
             clock: self.next_clock(),
         };
-        let u32_id = self.get_or_intern_id(&edge.id);
-        self.index_edge_internal(&edge.id, &edge.from, &edge.to);
+        let u32_id = self.index_edge_internal(&edge.id, &edge.from, &edge.to);
         self.edges.insert(u32_id, edge.clone());
         self.refresh_impacts(Some(vec![edge.to.clone()]));
         self.persist(&Event::Edge(edge.clone()))?;
@@ -1313,6 +1327,9 @@ impl Storage {
                         in_set.remove(&eid);
                     }
                 }
+                // Sweep the edge's forward id_to_u32 entry (edges are not in
+                // u32_to_id under the lean edge-interning path).
+                self.id_to_u32.remove(&edge.id);
             }
             self.edges.remove(&eid);
         }
@@ -1378,11 +1395,12 @@ impl Storage {
                     }
                 }
                 Event::Edge(remote_edge) => {
-                    let u32_id = self.get_or_intern_id(&remote_edge.id);
                     let mut apply = true;
-                    if let Some(local_edge) = self.edges.get(&u32_id) {
-                        if remote_edge.clock < local_edge.value().clock {
-                            apply = false;
+                    if let Some(u32_id) = self.get_u32(&remote_edge.id) {
+                        if let Some(local_edge) = self.edges.get(&u32_id) {
+                            if remote_edge.clock < local_edge.value().clock {
+                                apply = false;
+                            }
                         }
                     }
                     if apply {
@@ -1393,7 +1411,7 @@ impl Storage {
                                 Err(actual) => current = actual,
                             }
                         }
-                        self.index_edge_internal(&remote_edge.id, &remote_edge.from, &remote_edge.to);
+                        let u32_id = self.index_edge_internal(&remote_edge.id, &remote_edge.from, &remote_edge.to);
                         self.edges.insert(u32_id, remote_edge.clone());
                         self.persist_signed(signed_event.clone())?;
                     }
@@ -1689,11 +1707,22 @@ impl Storage {
                 Ok(nodes) => {
                     println!("Mark IX: Loading {} nodes from snapshot", nodes.len());
                     let mut max_u32 = 0;
-                    for (k, v) in nodes { 
+                    for (k, v) in nodes {
                         if k > max_u32 { max_u32 = k; }
                         self.id_to_u32.insert(v.id.clone(), k);
                         self.u32_to_id.insert(k, v.id.clone());
-                        self.insert_node_lean(k, v); 
+                        // Rebuild the trigram index for this node id under its
+                        // SAVED key `k` (no re-interning — `get_or_intern_id`
+                        // would mint a fresh u32 and desync the maps). Without
+                        // this, `find_fuzzy_id` is dead after every snapshot
+                        // instant-load until new nodes are added. Nodes only —
+                        // edges intentionally skip trigram
+                        // (ADR--GENESISDB-EDGE-ID-INTERNING), and edges aren't
+                        // loaded here.
+                        for trigram in Self::tokenize_id(&v.id) {
+                            self.trigram_index.entry(trigram).or_insert_with(HashSet::new).insert(k);
+                        }
+                        self.insert_node_lean(k, v);
                     }
                     self.next_u32.store(max_u32 + 1, Ordering::SeqCst);
                 }
@@ -1704,9 +1733,23 @@ impl Storage {
         if let Ok(data) = fs::read(self.path.join("edges.bin")) {
             if let Ok(edges) = serde_json::from_slice::<Vec<(u32, EdgeOutput)>>(&data) {
                 println!("Mark IX: Loading {} edges from snapshot", edges.len());
-                for (k, v) in edges { 
-                    self.index_edge_internal(&v.id, &v.from, &v.to);
-                    self.edges.insert(k, v); 
+                let mut max_edge_u32 = 0;
+                for (k, v) in edges {
+                    if k > max_edge_u32 { max_edge_u32 = k; }
+                    // Register the edge under its SAVED key so out_idx/in_idx and
+                    // the edges map agree. Re-interning would allocate a fresh
+                    // u32 decoupled from `k` and corrupt adjacency on reload.
+                    self.id_to_u32.insert(v.id.clone(), k);
+                    let from_u32 = self.get_or_intern_id(&v.from);
+                    let to_u32 = self.get_or_intern_id(&v.to);
+                    self.out_idx.entry(from_u32).or_insert_with(HashSet::new).insert(k);
+                    self.in_idx.entry(to_u32).or_insert_with(HashSet::new).insert(k);
+                    self.edges.insert(k, v);
+                }
+                // The id counter was set from node keys only; advance it past
+                // every edge key too, or a future insert could reuse one.
+                if max_edge_u32 + 1 > self.next_u32.load(Ordering::SeqCst) {
+                    self.next_u32.store(max_edge_u32 + 1, Ordering::SeqCst);
                 }
             }
         }
@@ -1790,8 +1833,7 @@ impl Storage {
                     self.insert_node_lean(u32_id, n);
                 }
                 Event::Edge(e) => {
-                    let u32_id = self.get_or_intern_id(&e.id);
-                    self.index_edge_internal(&e.id, &e.from, &e.to);
+                    let u32_id = self.index_edge_internal(&e.id, &e.from, &e.to);
                     self.edges.insert(u32_id, e);
                 }
                 _ => {}

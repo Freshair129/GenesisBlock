@@ -108,3 +108,8 @@ path = "benches/graph_bench.rs"
 name = "gov-kimpact-bench"
 path = "benches/gov_kimpact_bench.rs"
 
+
+[[bin]]
+name = "edge-interning-audit"
+path = "benches/edge_interning_audit.rs"
+
