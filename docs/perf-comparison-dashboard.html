@@ -125,6 +125,13 @@ td.num{text-align:right;font-variant-numeric:tabular-nums}
   </div>
 
   <div class="card" style="margin-bottom:var(--gap)">
+    <h3>Embedded graph head-to-head (P26) — GenesisDB vs Kuzu</h3>
+    <div class="hint" id="kuzu-caption"></div>
+    <table id="kuzuTable" style="font-size:13px"></table>
+    <div class="metricnote" id="kuzu-note" style="margin-top:12px;max-width:none"></div>
+  </div>
+
+  <div class="card" style="margin-bottom:var(--gap)">
     <h3>Engine internals — K-Impact incremental (P25) & governance guard (P24)</h3>
     <div class="hint" id="ki-caption"></div>
     <table id="kiTable" style="font-size:13px"></table>
@@ -330,6 +337,16 @@ const NEO = {
     { n:100000, metric:"edge ingest", g:24400, neo:23300, unit:"ms" },
   ]
 };
+// P26 Kuzu (embedded) head-to-head @100k
+const KUZU = {
+  rows:[
+    { metric:"hop1 p50",    g:22,    k:3653,  unit:"µs", winner:"g" },
+    { metric:"hop3 p50",    g:2334,  k:15705, unit:"µs", winner:"g" },
+    { metric:"hop6 p50",    g:4403,  k:60915, unit:"µs", winner:"g" },
+    { metric:"edge ingest", g:24400, k:400,   unit:"ms", winner:"k" },
+    { metric:"memory",      g:1057,  k:97,    unit:"MB", winner:"k" },
+  ]
+};
 // P25 K-Impact full vs incremental + P24 governance guard
 const KIMPACT = {
   guard_ns: 524, guard_overhead_pct: "<0.1% of a durable write",
@@ -486,6 +503,24 @@ const GRAPH = {
     nt.innerHTML=h+'</tbody>';
     document.getElementById('neo-note').innerHTML =
       "<strong style='color:var(--text-primary)'>Embedded wins traversal 7–185×.</strong> hop1's huge gap is mostly the embedded-vs-server tax (Neo4j pays bolt round-trip + Cypher planning + JVM per query); GenesisDB does an in-process index lookup (~20 µs). Deeper hops are 7–10×. Ingest and memory are ~par at 100k (Neo4j carries a ~700 MB JVM floor, so it's 5× heavier at 10k). Caveat: an <em>embedded</em> Neo4j would narrow latency — but the agent-memory thesis is precisely that you shouldn't pay the server tax. Kuzu (embedded↔embedded) is the fairest next comparison.";
+  })();
+
+  // ---- P26 Kuzu (embedded) head-to-head ----
+  (function(){
+    document.getElementById('kuzu-caption').textContent =
+      "100k nodes / 800k edges, fanout-8 · both embedded (no server tax) · Kuzu COPY bulk-load + prepared Cypher · C: SSD";
+    const kt=document.getElementById('kuzuTable');
+    const fmtv=(v,u)=> u==='µs'?(v>=1000?(v/1000).toFixed(2)+' ms':v.toFixed(0)+' µs') : (u==='ms'?(v/1000).toFixed(1)+' s' : (v>=1024?(v/1024).toFixed(1)+' GB':v+' MB'));
+    let h='<thead><tr><th>Metric</th><th class="num">GenesisDB</th><th class="num">Kuzu</th><th class="num">Winner</th></tr></thead><tbody>';
+    KUZU.rows.forEach(r=>{
+      const ratio = r.winner==='g' ? (r.k/r.g) : (r.g/r.k);
+      const w = r.winner==='g' ? 'GenesisDB' : 'Kuzu';
+      h+=`<tr><td>${r.metric}</td><td class="num">${fmtv(r.g,r.unit)}</td><td class="num">${fmtv(r.k,r.unit)}</td>`+
+         `<td class="num"><span class="delta ${r.winner==='g'?'up':'down'}">${w} ${ratio.toFixed(0)}×</span></td></tr>`;
+    });
+    kt.innerHTML=h+'</tbody>';
+    document.getElementById('kuzu-note').innerHTML =
+      "<strong style='color:var(--text-primary)'>Different sweet spots (the honest result):</strong> GenesisDB wins point/local traversal latency 7–166× (adjacency-list + direct call — built for agent-memory point queries). Kuzu wins ingest ~60× and memory ~11× (columnar analytical engine: fast COPY bulk-load, compact store; point-query latency isn't its target). Both embedded. Kuzu's 11× lower memory confirms that GenesisDB's edge-UUID interning is the top RAM optimization target (→ numeric ids).";
   })();
 
   // ---- P24/P25 engine internals ----
