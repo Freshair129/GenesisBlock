@@ -1,7 +1,7 @@
 # Software Requirements Document (SRD): Self-Optimizing Substrate
 
 ## 1. Introduction
-The **Self-Optimizing Substrate** is the autonomic nervous system of GenesisDB (Mark VI). As the knowledge graph grows through Shadow Sync and AI interactions, it may accumulate redundancy or fragmented indexes. This module automates the maintenance tasks required to sustain peak performance and logical clarity.
+The **Self-Optimizing Substrate** is the autonomic nervous system of GenesisBlockDB (Mark VI). As the knowledge graph grows through Shadow Sync and AI interactions, it may accumulate redundancy or fragmented indexes. This module automates the maintenance tasks required to sustain peak performance and logical clarity.
 
 ## 2. Functional Requirements
 

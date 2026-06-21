@@ -1,7 +1,7 @@
 # Software Requirements Document (SRD): Multi-Agent Neural Consensus
 
 ## 1. Introduction
-The **Multi-Agent Neural Consensus** module is the pinnacle of Mark VI. It enables a decentralized network of GenesisDB instances to operate as a single **Collective Brain**. It ensures that high-authority knowledge (Axioms) is only accepted into the network after passing a multi-peer validation process.
+The **Multi-Agent Neural Consensus** module is the pinnacle of Mark VI. It enables a decentralized network of GenesisBlockDB instances to operate as a single **Collective Brain**. It ensures that high-authority knowledge (Axioms) is only accepted into the network after passing a multi-peer validation process.
 
 ## 2. Functional Requirements
 

@@ -10,11 +10,11 @@ attributes:
   target_path: "G:\\GenesisBlock_Dev\\GenesisBlock\\AGENT.md"
 ---
 
-# AGENT Context: GenesisBlock / GenesisDB
+# AGENT Context: GenesisBlock / GenesisBlockDB
 
 ## Mission
 
-GenesisBlock is a local-first hybrid semantic-graph database engine for AI agents and human-machine collaboration. Treat GenesisDB as the Rust-native backend substrate: storage layer, WAL persistence, DB engine, retriever, in-memory embedding arena, graph traversal, hybrid/vector search, HNSW, symbolic graph reasoning, HQL/AST, community detection, governance, and CRDT sync.
+GenesisBlock is a local-first hybrid semantic-graph database engine for AI agents and human-machine collaboration. Treat GenesisBlockDB as the Rust-native backend substrate: storage layer, WAL persistence, DB engine, retriever, in-memory embedding arena, graph traversal, hybrid/vector search, HNSW, symbolic graph reasoning, HQL/AST, community detection, governance, and CRDT sync.
 
 ## Operating Workflow
 
@@ -110,7 +110,7 @@ npm run lint
 | none | 0.1.0b | New repository agent-context document proposed from docs/codebase review. |
 | 0.1.0b | 0.2.0b | Added C4 architecture index as the required architecture discovery entrypoint and promoted context to beta. |
 | 0.2.0b | 0.2.1b | Added agent registry SSOT and registry validation command to the repository context. |
-| 0.2.1b | 0.2.2b | Clarified GenesisDB as backend/runtime engine first; dashboard/Obsidian are optional client surfaces. |
+| 0.2.1b | 0.2.2b | Clarified GenesisBlockDB as backend/runtime engine first; dashboard/Obsidian are optional client surfaces. |
 
 ## CHANGELOG
 

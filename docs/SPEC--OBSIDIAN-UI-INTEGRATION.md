@@ -1,7 +1,7 @@
 # Functional Specification: Obsidian UI Integration (The Bridge)
 
 ## 1. Objective
-Build the **Human-to-Machine Bridge** for GenesisDB. This phase implements the Obsidian Plugin components that allow users to interact with the engine's intelligence directly from their Markdown vault.
+Build the **Human-to-Machine Bridge** for GenesisBlockDB. This phase implements the Obsidian Plugin components that allow users to interact with the engine's intelligence directly from their Markdown vault.
 
 ## 2. UI Components
 
@@ -18,7 +18,7 @@ Build the **Human-to-Machine Bridge** for GenesisDB. This phase implements the O
 - **Syncing State:** Shows a blue icon: "Syncing Knowledge...".
 
 ### 2.3 Query Modal (HQL Interface)
-- **Trigger:** Command Palette (`Ctrl+P` -> "GenesisDB: Run HQL Query").
+- **Trigger:** Command Palette (`Ctrl+P` -> "GenesisBlockDB: Run HQL Query").
 - **Interface:** A simple text input area for HQL commands.
 - **Output:** A list of results with clickable links to open the corresponding Obsidian notes.
 

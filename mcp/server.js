@@ -10,7 +10,7 @@ const path = require("path");
 
 // 1. Initialize Database
 const dbPath = process.env.GENESIS_DB_PATH || path.join(process.cwd(), ".brain/mcp_db");
-console.error(`GRL: Initializing GenesisDB at ${dbPath}`);
+console.error(`GRL: Initializing GenesisBlockDB at ${dbPath}`);
 
 const db = GenesisDatabase.open({
   path: dbPath,

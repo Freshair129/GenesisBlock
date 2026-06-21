@@ -1,7 +1,7 @@
 # Software Requirements Document (SRD): State-Transition Reasoning (Mark VII, Step 3)
 
 ## 1. Introduction
-**State-Transition Reasoning** enables GenesisDB to observe and reason about the evolution of knowledge structures. By snapshotting cluster centroids over time, the engine can detect "Semantic Drift"—the gradual movement of concepts in vector space. This allows AI agents to identify emerging trends, shifting consensus, or the merging of once-distinct knowledge domains.
+**State-Transition Reasoning** enables GenesisBlockDB to observe and reason about the evolution of knowledge structures. By snapshotting cluster centroids over time, the engine can detect "Semantic Drift"—the gradual movement of concepts in vector space. This allows AI agents to identify emerging trends, shifting consensus, or the merging of once-distinct knowledge domains.
 
 ## 2. Functional Requirements
 

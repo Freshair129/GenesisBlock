@@ -1,7 +1,7 @@
 # Architecture Blueprint: Mark XI — Enterprise Integration (Step 1: MCP Server)
 
 ## 1. Introduction
-The **Model Context Protocol (MCP)** is an open standard that enables AI models to interact with local data sources and tools. By implementing an MCP server for GenesisBlock, we enable any compliant agent (e.g., Claude Desktop, IDE extensions) to natively use GenesisDB as its long-term memory and reasoning substrate. This design follows the **C-3 (Architecture-Driven)** workflow.
+The **Model Context Protocol (MCP)** is an open standard that enables AI models to interact with local data sources and tools. By implementing an MCP server for GenesisBlock, we enable any compliant agent (e.g., Claude Desktop, IDE extensions) to natively use GenesisBlockDB as its long-term memory and reasoning substrate. This design follows the **C-3 (Architecture-Driven)** workflow.
 
 ## 2. Software Requirements Document (SRD)
 
@@ -38,7 +38,7 @@ graph TD
     end
     
     subgraph "Storage Engine"
-        Core[GenesisDB Core]
+        Core[GenesisBlockDB Core]
         GRL[Graph Retrieval Layer]
     end
     

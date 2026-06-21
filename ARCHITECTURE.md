@@ -10,7 +10,7 @@ This root file is a short architecture index for humans, tools, and agents.
 
 ## Current System Shape
 
-GenesisDB is a local-first hybrid semantic-graph database engine optimized for backend memory and retrieval workloads. Its main runtime containers are:
+GenesisBlockDB is a local-first hybrid semantic-graph database engine optimized for backend memory and retrieval workloads. Its main runtime containers are:
 
 - Rust core engine: storage, WAL, HNSW, graph indices, HQL, GRL, governance, CRDT, consensus.
 - Axum REST server: `/v1/*` HTTP surface for agents, SDKs, and dashboard.

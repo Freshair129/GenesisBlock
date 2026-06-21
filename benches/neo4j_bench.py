@@ -1,6 +1,6 @@
 """
 P23 — Neo4j head-to-head graph traversal (same topology params as P22).
-Embedded GenesisDB vs client-server Neo4j (bolt + JVM). Caveat: Neo4j latency
+Embedded GenesisBlockDB vs client-server Neo4j (bolt + JVM). Caveat: Neo4j latency
 includes the bolt round-trip + JVM; memory is JVM heap+pagecache, not RSS.
 """
 import os, sys, json, time, random, subprocess

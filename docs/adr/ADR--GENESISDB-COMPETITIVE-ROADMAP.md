@@ -4,7 +4,7 @@
 **Draft / Proposed**
 
 ## 2. Context
-The Phase 8 audit revealed a significant performance gap between GenesisDB (~3.7k vec/sec) and industry leaders like Qdrant/Weaviate (50k - 200k vec/sec). Additionally, current memory usage (~2.3 KB/record) limits scalability to SF100 levels. We must choose between maintaining the current developer-friendly architecture or performing a radical overhaul for competitive performance.
+The Phase 8 audit revealed a significant performance gap between GenesisBlockDB (~3.7k vec/sec) and industry leaders like Qdrant/Weaviate (50k - 200k vec/sec). Additionally, current memory usage (~2.3 KB/record) limits scalability to SF100 levels. We must choose between maintaining the current developer-friendly architecture or performing a radical overhaul for competitive performance.
 
 ## 3. Comparison of Architectural Paths
 
@@ -48,4 +48,4 @@ We will transition to **Path B: High-Density Sharded Engine** in Phase 9.
 3.  **Phase 11:** Performance Audit against Qdrant/Neo4j.
 
 ## 7. Consequences
-This shift marks the transition of GenesisDB from a "GKS Internal Tool" to a "Production-Grade Database Engine". Development will be slower and more rigorous, requiring deep systems programming skills.
+This shift marks the transition of GenesisBlockDB from a "GKS Internal Tool" to a "Production-Grade Database Engine". Development will be slower and more rigorous, requiring deep systems programming skills.

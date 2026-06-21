@@ -25,7 +25,7 @@ The Group Commit implementation is a definitive success, yielding a 600% increas
 The remaining bottleneck is not the disk, but the **HNSW Index**. While the WAL now flushes quickly, every \dd_edge\ (and node) currently locks the global \RwLock\ of the HNSW index if vector embeddings are present. To scale to tens of thousands of TPS, the HNSW implementation must be swapped for a lock-free concurrent variant (e.g., using atomic arrays or \rc-swap\).
 
 ## 5. Strategic Conclusion
-GenesisDB (Mark III) has successfully deployed industry-standard durability mechanics. As a "Local Hybrid Knowledge Engine", a sustainable throughput of ~830 durable mixed ops/sec (with sub-millisecond search latencies) is highly performant and massively exceeds the requirements for local AI Agent operations (which typically peak at < 10 ops/sec).
+GenesisBlockDB (Mark III) has successfully deployed industry-standard durability mechanics. As a "Local Hybrid Knowledge Engine", a sustainable throughput of ~830 durable mixed ops/sec (with sub-millisecond search latencies) is highly performant and massively exceeds the requirements for local AI Agent operations (which typically peak at < 10 ops/sec).
 
 **Status:** ENTERPRISE INFRASTRUCTURE DEPLOYED
 **Date:** 2026-06-01

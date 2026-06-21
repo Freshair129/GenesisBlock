@@ -7,7 +7,7 @@ How commands and data enter the native core.
 - **Network Path:** External Client -> HTTP POST (Axum) -> JSON Deserialization -> Rust Structs.
 
 ## 2. Memory Architecture (The Hybrid Arena)
-GenesisDB uses a contiguous memory model for 'Mechanical Sympathy'.
+GenesisBlockDB uses a contiguous memory model for 'Mechanical Sympathy'.
 
 - **Vector Arena (f32):** Aligned to 64-byte boundaries (16 f32 elements). Ensures one vector per cache line for optimal SIMD/AVX retrieval.
 - **Metadata Arena:** Dense array of \NodeMetadata\ (ArenaID, NodeID, Offsets). Optimized for O(1) attribute lookup during re-ranking.

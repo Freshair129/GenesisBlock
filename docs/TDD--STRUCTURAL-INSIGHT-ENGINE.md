@@ -1,7 +1,7 @@
 # Software Requirements Document (SRD): Structural Insight Engine
 
 ## 1. Introduction
-The **Structural Insight Engine** is an advanced analytical module for GenesisDB (Mark VI). Inspired by InfraNodus, it moves beyond retrieval-augmented generation (RAG) toward **Structural Thinking**. It identifies concepts, groups them into topical communities, and—most importantly—reveals "Gaps" in the user's knowledge graph.
+The **Structural Insight Engine** is an advanced analytical module for GenesisBlockDB (Mark VI). Inspired by InfraNodus, it moves beyond retrieval-augmented generation (RAG) toward **Structural Thinking**. It identifies concepts, groups them into topical communities, and—most importantly—reveals "Gaps" in the user's knowledge graph.
 
 ## 2. Functional Requirements
 

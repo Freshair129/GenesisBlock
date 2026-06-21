@@ -1,7 +1,7 @@
 # Software Requirements Document (SRD): Multi-Dimensional Temporal Queries
 
 ## 1. Introduction
-The **Multi-Dimensional Temporal Queries** module is the foundational step of GenesisDB Mark VII. It introduces the dimension of "Time" to the knowledge graph. By enabling Time-Travel Queries, AI agents can retrieve historical states of knowledge, allowing them to reason about how concepts have evolved or what the accepted truth was at a specific moment in the past.
+The **Multi-Dimensional Temporal Queries** module is the foundational step of GenesisBlockDB Mark VII. It introduces the dimension of "Time" to the knowledge graph. By enabling Time-Travel Queries, AI agents can retrieve historical states of knowledge, allowing them to reason about how concepts have evolved or what the accepted truth was at a specific moment in the past.
 
 ## 2. Functional Requirements
 
@@ -21,7 +21,7 @@ The **Multi-Dimensional Temporal Queries** module is the foundational step of Ge
 # Technical Design Document (TDD): Temporal Engine Implementation
 
 ## 1. Architecture: Bitemporal Data Model
-GenesisDB already contains rudimentary bitemporal fields (`valid_from`, `valid_to`) in the `EdgeOutput` struct. Mark VII will operationalize these fields and extend them to `NodeOutput`.
+GenesisBlockDB already contains rudimentary bitemporal fields (`valid_from`, `valid_to`) in the `EdgeOutput` struct. Mark VII will operationalize these fields and extend them to `NodeOutput`.
 
 ## 2. Data Structure Updates (`src/lib.rs`)
 

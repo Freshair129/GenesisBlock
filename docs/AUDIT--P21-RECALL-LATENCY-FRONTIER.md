@@ -46,11 +46,11 @@ Reference points: **Chroma** 990 µs / 0.981 · **Qdrant** 3301 µs / 0.999.
 
 ## 4. Reading
 
-- **GenesisDB's frontier passes through Chroma's point.** ef_search=128 →
+- **GenesisBlockDB's frontier passes through Chroma's point.** ef_search=128 →
   recall 0.984 (> Chroma's 0.981) at ~1.1 ms; ef_search=64 → 0.964 at 0.81 ms
   (faster than Chroma). They occupy essentially the same recall↔latency frontier.
 - **Qdrant** trades latency for recall: 0.999 but 3.3 ms (localhost gRPC). On the
-  curve it's the high-recall/high-latency corner; GenesisDB reaches 0.990 at
+  curve it's the high-recall/high-latency corner; GenesisBlockDB reaches 0.990 at
   2.1 ms (faster) for marginally less recall.
 - `ef_search` is a **live knob** (`set_index_params`) — a deployment selects any
   point on this curve without rebuilding.

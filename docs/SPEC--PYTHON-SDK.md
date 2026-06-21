@@ -1,12 +1,12 @@
 # Software Requirements Document (SRD): Python Client Binding (Mark XI, Step 2)
 
 ## 1. Introduction
-To enable data scientists and AI researchers to use GenesisDB within their native workflows (e.g., Jupyter, LangChain, Autogen), we must provide a high-level **Python Client**. This library will abstract the REST API complexity and provide a Pythonic interface for graph-semantic operations.
+To enable data scientists and AI researchers to use GenesisBlockDB within their native workflows (e.g., Jupyter, LangChain, Autogen), we must provide a high-level **Python Client**. This library will abstract the REST API complexity and provide a Pythonic interface for graph-semantic operations.
 
 ## 2. Functional Requirements
 
 ### FR1: Connection Management
-- Connect to a standalone GenesisDB server via HTTP/REST.
+- Connect to a standalone GenesisBlockDB server via HTTP/REST.
 - Support health checks and version verification.
 
 ### FR2: Semantic Operations
@@ -64,7 +64,7 @@ results = client.query("TRAVERSE FROM 'Neural Bridge' DEPTH 2 REL ANY")
 ## 4. Definition of Done (DoD)
 1.  [ ] Python library structure established.
 2.  [ ] Core methods (`add_node`, `query`, `get_context`) implemented.
-3.  [ ] **Integration Test:** A Python script successfully adds a node and retrieves it from a running GenesisDB server.
+3.  [ ] **Integration Test:** A Python script successfully adds a node and retrieves it from a running GenesisBlockDB server.
 4.  [ ] Documentation updated in `docs/PYTHON-SDK-GUIDE.md`.
 
 ---

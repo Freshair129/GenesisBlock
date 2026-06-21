@@ -183,7 +183,7 @@ class GenesisSidebarView extends ItemView {
                 });
             }
         } catch (e) {
-            container.createEl("p", { text: "Could not reach GenesisDB." });
+            container.createEl("p", { text: "Could not reach GenesisBlockDB." });
         }
     }
 }

@@ -1,7 +1,7 @@
 # Software Requirements Document (SRD): Transaction / Batch Atomicity (Mark IX, Step 2)
 
 ## 1. Introduction
-Complex knowledge mutations often involve multiple interdependent steps (e.g., adding a new concept node and linking it to existing themes). Currently, GenesisDB processes these individually. **Mark IX Step 2** introduces **Batch Atomicity**, ensuring that a group of mutations either succeeds entirely or leaves the system unchanged.
+Complex knowledge mutations often involve multiple interdependent steps (e.g., adding a new concept node and linking it to existing themes). Currently, GenesisBlockDB processes these individually. **Mark IX Step 2** introduces **Batch Atomicity**, ensuring that a group of mutations either succeeds entirely or leaves the system unchanged.
 
 ## 2. Functional Requirements
 

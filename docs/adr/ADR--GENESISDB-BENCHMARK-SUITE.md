@@ -16,7 +16,7 @@ proposed_by: agent
 # ADR--GENESISDB-BENCHMARK-SUITE
 
 ## Context
-To compare GenesisDB against established engines like Neo4j or TigerGraph, we require a benchmarking methodology that is scientifically sound, reproducible, and immune to "marketing bias." Generic random graphs do not accurately simulate the "scale-free" nature of human knowledge systems, and simple average latencies hide catastrophic tail-latency issues (P99).
+To compare GenesisBlockDB against established engines like Neo4j or TigerGraph, we require a benchmarking methodology that is scientifically sound, reproducible, and immune to "marketing bias." Generic random graphs do not accurately simulate the "scale-free" nature of human knowledge systems, and simple average latencies hide catastrophic tail-latency issues (P99).
 
 ## Decision
 We implement a **Rigorous Native Benchmarking Suite** integrated into the Rust toolchain.
@@ -39,7 +39,7 @@ The suite must report:
 *   **Memory Efficiency:** Bytes-per-Edge (BPE) ratio.
 
 ## Consequences
-*   **Positive:** GenesisDB performance claims become peer-reviewable by external database engineers. Provides immediate feedback during CI on any "latency regression" caused by new logic.
+*   **Positive:** GenesisBlockDB performance claims become peer-reviewable by external database engineers. Provides immediate feedback during CI on any "latency regression" caused by new logic.
 *   **Negative:** Generating large BA graphs (e.g., 10M nodes) for a test run consumes significant time and RAM during the setup phase.
 
 ---

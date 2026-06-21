@@ -298,7 +298,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let addr = SocketAddr::from(([0, 0, 0, 0], port));
     let listener = tokio::net::TcpListener::bind(addr).await?;
-    tracing::info!("GenesisDB Standalone Server listening on {}", addr);
+    tracing::info!("GenesisBlockDB Standalone Server listening on {}", addr);
     axum::serve(listener, app).await?;
 
     Ok(())

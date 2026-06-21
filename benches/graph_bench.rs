@@ -106,7 +106,7 @@ fn main() {
     }
 
     let out = serde_json::json!({
-        "engine": "GenesisDB", "n": n, "fanout": fanout, "edges": total_edges, "limit": limit,
+        "engine": "GenesisBlockDB", "n": n, "fanout": fanout, "edges": total_edges, "limit": limit,
         "node_ingest_sec": node_sec, "edge_ingest_sec": edge_sec, "rss_mb": rss, "depths": per_depth
     });
     fs::write(format!("{bench}/graph_results_{n}.json"), serde_json::to_string_pretty(&out).unwrap()).unwrap();

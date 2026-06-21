@@ -1,7 +1,7 @@
 # Software Requirements Document (SRD): Graph Retrieval Layer (GRL)
 
 ## 1. Introduction
-The **Graph Retrieval Layer (GRL)** transforms GenesisDB from a hybrid database into a **Cognitive Retrieval Engine (CRE)**. Instead of raw queries, AI agents interact with the GRL via the **Context Scaling Tier (H0-H5)** protocol. The GRL acts as an intelligent orchestrator that resolves the optimal knowledge radius (Hops), prioritizes high-impact nodes, and compresses context to fit within the agent's token budget.
+The **Graph Retrieval Layer (GRL)** transforms GenesisBlockDB from a hybrid database into a **Cognitive Retrieval Engine (CRE)**. Instead of raw queries, AI agents interact with the GRL via the **Context Scaling Tier (H0-H5)** protocol. The GRL acts as an intelligent orchestrator that resolves the optimal knowledge radius (Hops), prioritizes high-impact nodes, and compresses context to fit within the agent's token budget.
 
 ## 2. Functional Requirements
 

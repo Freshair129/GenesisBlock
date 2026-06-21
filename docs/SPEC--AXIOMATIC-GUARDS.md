@@ -4,7 +4,7 @@
 Implement a robust data governance layer called **Axiomatic Guards**. This system enforces integrity constraints based on data "Tiers" to ensure that the engine's core reasoning and specifications (the "Axioms") cannot be corrupted or accidentally overwritten by external agents or plugins.
 
 ## 2. Governance Tiers
-Every node and edge in GenesisDB will belong to a specific governance tier, defined by its `labels` or `props`.
+Every node and edge in GenesisBlockDB will belong to a specific governance tier, defined by its `labels` or `props`.
 
 | Tier | Priority | Governance Rule |
 | :--- | :--- | :--- |

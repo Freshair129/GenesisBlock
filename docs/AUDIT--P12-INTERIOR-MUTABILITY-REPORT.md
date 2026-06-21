@@ -4,7 +4,7 @@
 Phase 12 marks the most significant performance breakthrough in GenesisBlockDB's history. By implementing **Refined Interior Mutability**, we have eliminated the "Global Lock" bottleneck, resulting in a **1,600x increase in mixed-workload throughput**. The engine is now capable of handling extreme concurrency (Reads + Writes) at the scale of 350,000+ Operations Per Second.
 
 ## 2. Technical Breakthrough: Interior Mutability
-Previously, GenesisDB suffered from severe contention where a single write operation blocked all concurrent reads. 
+Previously, GenesisBlockDB suffered from severe contention where a single write operation blocked all concurrent reads. 
 
 **The Solution:**
 - **Decoupled State:** Replaced \RwLock<Storage>\ with a sharded \DashMap\ and granular \RwLock\ wrappers around specific arenas (\ector_arena\, \metadata_arena\).

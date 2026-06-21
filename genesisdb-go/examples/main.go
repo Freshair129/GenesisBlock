@@ -9,7 +9,7 @@ import (
 )
 
 func main() {
-	// Initialize client (assumes GenesisDB is running at localhost:3000)
+	// Initialize client (assumes GenesisBlockDB is running at localhost:3000)
 	client := genesisdb.NewClient("http://localhost:3000")
 	ctx := context.Background()
 

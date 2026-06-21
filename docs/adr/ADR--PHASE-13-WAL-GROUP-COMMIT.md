@@ -4,7 +4,7 @@
 **Draft / Proposed**
 
 ## 2. Context
-The Phase 12 Scientific Audit revealed that enforcing strict \sync()\ on every individual write operation creates a massive I/O bottleneck, collapsing throughput to ~139 TPS under 12-thread contention on consumer NVMe hardware. To achieve high durable throughput (e.g., matching RocksDB's 50k+ TPS) while maintaining ACID compliance, GenesisDB requires a mechanism to amortize the cost of \sync\ across multiple concurrent transactions.
+The Phase 12 Scientific Audit revealed that enforcing strict \sync()\ on every individual write operation creates a massive I/O bottleneck, collapsing throughput to ~139 TPS under 12-thread contention on consumer NVMe hardware. To achieve high durable throughput (e.g., matching RocksDB's 50k+ TPS) while maintaining ACID compliance, GenesisBlockDB requires a mechanism to amortize the cost of \sync\ across multiple concurrent transactions.
 
 ## 3. Decision
 We will implement a **WAL Group Commit** architecture.

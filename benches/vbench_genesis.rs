@@ -1,4 +1,4 @@
-// Head-to-head vector benchmark harness (GenesisDB side).
+// Head-to-head vector benchmark harness (GenesisBlockDB side).
 // Reads the SAME embedding vectors used by the Chroma harness so the comparison
 // is apples-to-apples: identical corpus, identical queries, identical k.
 // Vectors are produced by vbench.py (bge-m3, 1024-dim) and exchanged as raw
@@ -114,11 +114,11 @@ fn main() {
             println!("  ef_search={} -> p50 {:.1}µs", efs, percentile(&s, 50.0));
         }
         let out = serde_json::json!({
-            "engine": "GenesisDB (hnsw_rs)", "model": model, "ef_construction": efc,
+            "engine": "GenesisBlockDB (hnsw_rs)", "model": model, "ef_construction": efc,
             "n": n, "q": q, "dim": dim, "k": k, "insert_per_sec": n as f64 / insert_sec, "points": points
         });
         fs::write(format!("{bench}/genesis_frontier.json"), serde_json::to_string_pretty(&out).unwrap()).unwrap();
-        println!("GenesisDB frontier written ({} points)", points.len());
+        println!("GenesisBlockDB frontier written ({} points)", points.len());
         return;
     }
 
@@ -127,7 +127,7 @@ fn main() {
     sorted.sort_by(|a, b| a.partial_cmp(b).unwrap());
 
     let out = serde_json::json!({
-        "engine": "GenesisDB (hnsw_rs)",
+        "engine": "GenesisBlockDB (hnsw_rs)",
         "model": model,
         "ef_construction": efc,
         "n": n, "q": q, "dim": dim, "k": k,
@@ -144,7 +144,7 @@ fn main() {
     let mut f = fs::File::create(format!("{bench}/genesis_results.json")).unwrap();
     f.write_all(serde_json::to_string_pretty(&out).unwrap().as_bytes()).unwrap();
     println!(
-        "GenesisDB: insert {:.0} vec/s (build {:.2}s), RSS {} MB, query p50 {:.1}µs p95 {:.1}µs",
+        "GenesisBlockDB: insert {:.0} vec/s (build {:.2}s), RSS {} MB, query p50 {:.1}µs p95 {:.1}µs",
         n as f64 / insert_sec, insert_sec, peak_rss_mb, percentile(&sorted, 50.0), percentile(&sorted, 95.0)
     );
 }

@@ -1,13 +1,13 @@
 # Software Requirements Document (SRD): Go Client Binding (Mark XI, Step 3)
 
 ## 1. Introduction
-To support cloud-native infrastructures and high-performance backend systems, we must provide an official **Go Client (SDK)**. This library will enable developers to build robust, concurrent AI applications that leverage GenesisDB for low-latency reasoning and distributed synchronization.
+To support cloud-native infrastructures and high-performance backend systems, we must provide an official **Go Client (SDK)**. This library will enable developers to build robust, concurrent AI applications that leverage GenesisBlockDB for low-latency reasoning and distributed synchronization.
 
 ## 2. Functional Requirements
 
 ### FR1: Idiomatic Go Interface
 - Use standard Go idioms (structs, methods with error returns).
-- Provide a `Client` struct that manages the connection to a GenesisDB server.
+- Provide a `Client` struct that manages the connection to a GenesisBlockDB server.
 
 ### FR2: Semantic Operations
 - Support `AddNode` and `AddEdge` with JSON-to-Struct mapping.
@@ -61,7 +61,7 @@ res, err := client.Query(ctx, "SEARCH Node SIMILAR TO [0.1, 0.2] K 1")
 ## 4. Definition of Done (DoD)
 1.  [ ] Go library structure and `go.mod` initialized.
 2.  [ ] Core methods (`AddNode`, `Query`, `GetContext`) implemented and tested.
-3.  [ ] **Integration Test:** A Go test suite successfully interacts with a live GenesisDB server.
+3.  [ ] **Integration Test:** A Go test suite successfully interacts with a live GenesisBlockDB server.
 4.  [ ] Documentation updated in `docs/GO-SDK-GUIDE.md`.
 
 ---

@@ -1,7 +1,7 @@
 # Functional Specification: Automatic Graph Clustering (Mark V)
 
 ## 1. Objective
-Enable **Unsupervised Reasoning** via Automatic Graph Clustering. The goal is to allow GenesisDB to discover implicit "Knowledge Communities" and automatically group related nodes without requiring human-curated tags or labels.
+Enable **Unsupervised Reasoning** via Automatic Graph Clustering. The goal is to allow GenesisBlockDB to discover implicit "Knowledge Communities" and automatically group related nodes without requiring human-curated tags or labels.
 
 ## 2. Technical Approach: Label Propagation Algorithm (LPA)
 Given the real-time, highly mutable nature of Obsidian vaults, we will implement a synchronous **Label Propagation Algorithm (LPA)**. It is fast, operates well on dynamic graphs, and scales linearly $O(V+E)$.

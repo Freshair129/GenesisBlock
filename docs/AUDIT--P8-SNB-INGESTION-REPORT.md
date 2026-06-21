@@ -1,10 +1,10 @@
 ﻿# AUDIT--P8-GENESISDB-SNB-INGESTION-REPORT
 
 ## 1. Executive Summary
-This report certifies the successful implementation of the **LDBC SNB Standardized Ingestion Pipeline**. GenesisDB demonstrated stable performance under a hybrid write-load (Graph + Vector + WAL) at a Scale Factor of 0.1.
+This report certifies the successful implementation of the **LDBC SNB Standardized Ingestion Pipeline**. GenesisBlockDB demonstrated stable performance under a hybrid write-load (Graph + Vector + WAL) at a Scale Factor of 0.1.
 
 ## 2. Ingestion Methodology
-The ingestion process maps the LDBC Social Network schema directly to GenesisDB's native arenas:
+The ingestion process maps the LDBC Social Network schema directly to GenesisBlockDB's native arenas:
 
 - **Parallel Parser:** Custom Rust loader (\enches/snb_ingestion.rs\) using the \csv\ crate.
 - **Node Mapping:** 
@@ -35,7 +35,7 @@ To achieve the next performance tier, we recommend:
 2. **Concurrent Indexing:** Parallelize HNSW insertion using the \ayon\ crate.
 
 ## 6. Verdict
-GenesisDB is **FUNCTIONALLY CAPABLE** of handling standardized social network workloads. The engine maintained integrity and searchability throughout the stress test.
+GenesisBlockDB is **FUNCTIONALLY CAPABLE** of handling standardized social network workloads. The engine maintained integrity and searchability throughout the stress test.
 
 **Verified by:** T2 Agent ARCHITECT
 **Date:** 2026-06-01

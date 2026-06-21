@@ -19,7 +19,7 @@ proposed_by: agent
 Modern graph databases typically rely on PageRank or HITS for node ranking. However, for a Knowledge Graph (GKS), "popularity" (number of links) does not always equal "truth" or "architectural importance." A high-tier `MASTER` rule may have few incoming links but must outweigh a thousand low-tier `EPISODE` logs.
 
 ## Decision
-We adopt the **K-Impact Model** as the primary ranking engine for GenesisDB. The technical execution of the formulas is delegated to [[ALGO--KIMPACT-CALCULATION]].
+We adopt the **K-Impact Model** as the primary ranking engine for GenesisBlockDB. The technical execution of the formulas is delegated to [[ALGO--KIMPACT-CALCULATION]].
 
 ### 2.1 Rationale for Weighted Dimension
 1.  **Structure (DD) > Authority (AS):** We allocate 50% weight to Dependency Depth because structural reliance is the strongest indicator of "Criticality."

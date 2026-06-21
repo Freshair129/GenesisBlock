@@ -1,9 +1,9 @@
-# GenesisDB: An Embedded Semantic-Graph Engine for AI Agent Memory
+# GenesisBlockDB: An Embedded Semantic-Graph Engine for AI Agent Memory
 **Whitepaper — evidence-backed revision (2026-06-21)**
 **Status:** Advanced prototype with measured benchmarks (see §4, audits P14–P25)
 
 ## Abstract
-GenesisDB is an **embedded, local-first hybrid graph + vector engine** for AI
+GenesisBlockDB is an **embedded, local-first hybrid graph + vector engine** for AI
 agent memory and analytics. It unifies HNSW vector search, an index-backed
 property graph, a bitemporal/event-sourced model, governance tiers, and
 optional CRDT synchronization in a single in-process Rust core (compiling to a
@@ -11,7 +11,7 @@ Node.js NAPI addon and an Axum REST server). This revision replaces earlier
 aspirational performance figures with **measured, reproducible benchmarks**.
 
 ## 1. Positioning
-GenesisDB is an **embedded analytics / agent-memory engine**, not a distributed
+GenesisBlockDB is an **embedded analytics / agent-memory engine**, not a distributed
 enterprise graph DB. Its nearest comparators are **Kuzu, DuckDB (graph
 extension), and RocksDB + graph layer**; Neo4j and Qdrant are well-known
 *references* rather than the category. The design trades horizontal scale-out
@@ -19,7 +19,7 @@ for **in-process, microsecond-class local queries** — exactly what an agent's
 working memory needs.
 
 Vector DBs give similarity but not relations; graph DBs give relations but not
-fuzzy/cross-lingual semantics. GenesisDB unifies both in one embedded engine.
+fuzzy/cross-lingual semantics. GenesisBlockDB unifies both in one embedded engine.
 
 ## 2. Core innovations
 
@@ -60,7 +60,7 @@ are retracted** (see AUDIT--P12).
 ### 4.1 Vector k-NN (HNSW, bge-m3 1024-dim, L2, 100k vectors)
 - **Recall–latency frontier** (ef_search swept, ef_construction=200): recall
   0.984 @ ~1.1 ms (p50) at ef_search=128; 0.964 @ 0.81 ms at ef_search=64.
-- vs **Chroma** (hnswlib): 0.981 @ 0.99 ms — GenesisDB's curve passes through
+- vs **Chroma** (hnswlib): 0.981 @ 0.99 ms — GenesisBlockDB's curve passes through
   Chroma's point (same recall↔latency frontier). vs **Qdrant** (server):
   0.999 @ 3.3 ms (carries gRPC network cost).
 - **Durable bulk insert:** ~2,000 vec/s (×7.8 over the naïve path) via batched
@@ -80,8 +80,8 @@ are retracted** (see AUDIT--P12).
 **O(neighborhood), not O(N)**. RAM (edge-id interning) is the scaling ceiling
 (~12.6 GB at 1M/8M).
 
-### 4.3 vs Neo4j (embedded GenesisDB vs server Neo4j, same topology)
-GenesisDB is **7–185× faster** on k-hop traversal (hop1 @100k: 22 µs vs
+### 4.3 vs Neo4j (embedded GenesisBlockDB vs server Neo4j, same topology)
+GenesisBlockDB is **7–185× faster** on k-hop traversal (hop1 @100k: 22 µs vs
 2,590 µs); ingest and memory are ~par at 100k. The gap is largely the
 embedded-vs-server tax (bolt + Cypher planning + JVM).
 
@@ -111,7 +111,7 @@ P24/P25 (governance / K-Impact). Harnesses: `benches/vbench*.{rs,py}`,
 `graph_bench.rs`, `gov_kimpact_bench.rs`, `neo4j_bench.py`.
 
 ## 7. Conclusion
-GenesisDB is a credible **embedded AI-native graph+vector engine**: vector recall
+GenesisBlockDB is a credible **embedded AI-native graph+vector engine**: vector recall
 at parity with Chroma on the same frontier, graph traversal that stays µs-class
 as the graph grows, durable writes, and proven incremental-update and governance
 costs — claims now backed by reproducible measurement rather than narrative.

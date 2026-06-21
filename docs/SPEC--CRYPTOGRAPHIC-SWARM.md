@@ -1,12 +1,12 @@
 # Software Requirements Document (SRD): Swarm Hardening & Cryptographic Identity (Mark X)
 
 ## 1. Introduction
-GenesisDB currently allows any network participant to join the Gossip swarm and propose mutations. **Mark X** introduces a cryptographic trust layer. By assigning every agent a unique ed25519 identity, the system can verify the origin of knowledge atoms and enforce strict governance rules based on cryptographic proofs.
+GenesisBlockDB currently allows any network participant to join the Gossip swarm and propose mutations. **Mark X** introduces a cryptographic trust layer. By assigning every agent a unique ed25519 identity, the system can verify the origin of knowledge atoms and enforce strict governance rules based on cryptographic proofs.
 
 ## 2. Functional Requirements
 
 ### FR1: Peer Identity (ed25519)
-- Every GenesisDB instance must generate a unique asymmetric keypair upon first initialization.
+- Every GenesisBlockDB instance must generate a unique asymmetric keypair upon first initialization.
 - The `PeerID` will be derived from the SHA-256 hash of the public key.
 
 ### FR2: Signed Mutations

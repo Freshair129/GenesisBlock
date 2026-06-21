@@ -1,7 +1,7 @@
 # Technical Design: Transitive Inference & Virtual Edges (Mark IV - Step 4)
 
 ## 1. Objective
-Introduce "Transitive Inference" to allow GenesisDB to deduce implicit relationships that are not physically stored in the Write-Ahead Log. This enables high-level semantic queries like "Who is in my Org Chart?" based on low-level links like "Who do I report to?".
+Introduce "Transitive Inference" to allow GenesisBlockDB to deduce implicit relationships that are not physically stored in the Write-Ahead Log. This enables high-level semantic queries like "Who is in my Org Chart?" based on low-level links like "Who do I report to?".
 
 ## 2. HQL Grammar Expansion (`hql.pest`)
 Introduce the `INFER` keyword as a modifier for traversals.

@@ -7,7 +7,7 @@ aliases:
   - P23
 tier: process
 cluster: implementation_flow
-role: "Graph head-to-head: embedded GenesisDB vs server Neo4j"
+role: "Graph head-to-head: embedded GenesisBlockDB vs server Neo4j"
 phase: 23
 audited_at: 2026-06-21
 proposed_by: agent
@@ -21,19 +21,19 @@ related:
 ## 1. Setup
 
 Neo4j (`neo4j:latest`, Docker, `NEO4J_AUTH=none`, 4 GB heap) via the Python bolt
-driver (`benches`/`neo4j_bench.py`) vs GenesisDB embedded (P22, `graph-bench`).
+driver (`benches`/`neo4j_bench.py`) vs GenesisBlockDB embedded (P22, `graph-bench`).
 Same topology parameters: N nodes, fanout-8 random directed edges, depths {1,3,6},
 200 queries/depth, `LIMIT 1000`, C: SSD. Edges are independent draws of identical
 statistics (not byte-identical sets).
 
-**Caveat (the whole point):** GenesisDB runs **in-process**; Neo4j is
+**Caveat (the whole point):** GenesisBlockDB runs **in-process**; Neo4j is
 **client-server** — each query pays a bolt round-trip + Cypher planning + JVM.
-Memory is GenesisDB RSS vs Neo4j JVM heap+store. This compares the engines *as
+Memory is GenesisBlockDB RSS vs Neo4j JVM heap+store. This compares the engines *as
 typically deployed* (embedded vs server), not two embedded libraries.
 
 ## 2. Results
 
-| N | metric | GenesisDB (embedded) | Neo4j (server) | GenesisDB advantage |
+| N | metric | GenesisBlockDB (embedded) | Neo4j (server) | GenesisBlockDB advantage |
 |---|---|---|---|---|
 | 10k | hop1 p50 | 23.1 µs | 4,273.8 µs | **185×** |
 | 10k | hop3 p50 | 1.97 ms | 20.69 ms | 10.5× |
@@ -47,14 +47,14 @@ typically deployed* (embedded vs server), not two embedded libraries.
 
 ## 3. Reading
 
-- **Traversal: GenesisDB is 7–185× faster.** hop1 shows the largest gap because
+- **Traversal: GenesisBlockDB is 7–185× faster.** hop1 shows the largest gap because
   Neo4j's per-query cost there is dominated by bolt + Cypher planning + JVM, not
-  graph work; GenesisDB does a direct in-process index lookup (~20 µs).
+  graph work; GenesisBlockDB does a direct in-process index lookup (~20 µs).
   Deeper hops (7–10×) reflect engine + protocol together.
 - **Ingest is ~par at 100k** (both ~23–24 s for 800k edges) — Neo4j's batched
-  index-backed `MATCH…CREATE` is competitive with GenesisDB's durable batch path.
+  index-backed `MATCH…CREATE` is competitive with GenesisBlockDB's durable batch path.
 - **Memory ~par at 100k** (~1.06 GB each); at 10k Neo4j's JVM baseline (~700 MB)
-  makes it 5× heavier — GenesisDB has no fixed runtime floor.
+  makes it 5× heavier — GenesisBlockDB has no fixed runtime floor.
 - **Honest framing:** much of the hop1 gap is the embedded-vs-server tax. An
   *embedded* Neo4j would narrow it. But the positioning thesis is exactly that an
   agent-memory engine should be embedded and not pay that tax — which the numbers

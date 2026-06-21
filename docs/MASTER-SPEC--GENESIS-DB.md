@@ -1,12 +1,12 @@
 # GenesisBlock DB: Master Specification (v2.0.0)
 
 ## 1. Abstract
-GenesisBlock DB (GenesisDB) is a high-performance, embedded hybrid semantic-graph database engine written in Rust. It is designed as the "Shadow Brain" for human-machine collaboration, providing a unified substrate for structured graph relationships, unstructured vector embeddings, and bitemporal event sourcing.
+GenesisBlock DB (GenesisBlockDB) is a high-performance, embedded hybrid semantic-graph database engine written in Rust. It is designed as the "Shadow Brain" for human-machine collaboration, providing a unified substrate for structured graph relationships, unstructured vector embeddings, and bitemporal event sourcing.
 
 ## 2. Core Architecture
 
 ### 2.1 Storage Model
-GenesisDB uses a **Log-Structured Merge-Friendly** architecture based on a Write-Ahead Log (WAL).
+GenesisBlockDB uses a **Log-Structured Merge-Friendly** architecture based on a Write-Ahead Log (WAL).
 - **Primary Log:** `genesis-graph.wal` (JSONL format) stores all mutation events.
 - **Persistence:** High-durability append-only logic with batched group commits.
 - **In-Memory State:**
@@ -15,7 +15,7 @@ GenesisDB uses a **Log-Structured Merge-Friendly** architecture based on a Write
     - `Adjacency Indices`: Forward (`out_idx`) and Backward (`in_idx`) mapping for $O(1)$ traversal.
 
 ### 2.2 Semantic Hybrid Indexing
-GenesisDB bridges lexical and semantic search via a dual-indexing strategy:
+GenesisBlockDB bridges lexical and semantic search via a dual-indexing strategy:
 1.  **Lexical Index (Trigrams/Bigrams):** Thai-aware tokenization that strips combining marks (vowels/tones) to provide high-recall fuzzy matching for terms like "บ้าน" vs "บาน".
 2.  **Vector Index (HNSW):** Hierarchical Navigable Small Worlds index for high-dimensional vector proximity search.
 3.  **Neural Bridge:** Multi-lingual support via language centroids and mean-centering, allowing English queries to match Thai contexts.
@@ -43,7 +43,7 @@ The GRL implements the **Context Scaling Tier (H0-H5)** protocol to govern agent
 | `clock` | LogicalClock | Lamport timestamp (CRDT support). |
 
 ### 3.2 Bitemporal Philosophy
-GenesisDB follows an **immutable-by-default** update pattern. Updates use the `supersede_node` logic:
+GenesisBlockDB follows an **immutable-by-default** update pattern. Updates use the `supersede_node` logic:
 1.  The existing node version is marked with `valid_to = now`.
 2.  A new node version is inserted with `valid_from = now` and the updated properties.
 3.  The `caused_by` field links the mutation to its causal context (e.g., an ADR document).
@@ -78,14 +78,14 @@ The `ConsensusProposal` protocol allows agents to vote on promoting USER data to
 
 ## 6. Distributed Synchronization (CRDT)
 
-GenesisDB ensures eventual consistency across distributed agents using:
+GenesisBlockDB ensures eventual consistency across distributed agents using:
 - **Lamport Timestamps:** `LogicalClock { time, peer_id }` for global event ordering.
 - **LWW (Last-Write-Wins):** Deterministic conflict resolution during `reconcile_state`.
 - **Clock Jump:** Local clocks synchronize with the maximum known global time upon replication.
 
 ## 7. HQL (Hybrid Query Language)
 
-GenesisDB exposes a specialized language for reasoning over graph and vector data.
+GenesisBlockDB exposes a specialized language for reasoning over graph and vector data.
 
 ### 7.1 Search (Lexical/Vector)
 ```sql

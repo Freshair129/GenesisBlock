@@ -1,6 +1,6 @@
-# GenesisDB
+# GenesisBlockDB
 
-GenesisDB is an **embedded, local-first hybrid graph + vector engine for AI agent
+GenesisBlockDB is an **embedded, local-first hybrid graph + vector engine for AI agent
 memory and analytics**. A single in-process Rust core (storage + WAL, HNSW vector
 index, index-backed property graph, bitemporal/event-sourced model, governance
 tiers, optional CRDT sync) compiles to a Node.js NAPI addon and an Axum REST

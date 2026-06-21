@@ -3,7 +3,7 @@
 ## 1. Executive Summary: The Harsh Reality
 Following the CTO's critical review, the initial Phase 12 results (400k+ QPS, 100ns P50) were exposed as **severe measurement artifacts**. The read methods were stubbed to return \Ok(Vec::new())\, and the write path completely lacked hardware durability (\sync\).
 
-This report documents the true, unvarnished performance of GenesisDB after completely rebuilding the \src/lib.rs\ logic and enforcing strict NVMe \sync_all()\ on every single mutation. 
+This report documents the true, unvarnished performance of GenesisBlockDB after completely rebuilding the \src/lib.rs\ logic and enforcing strict NVMe \sync_all()\ on every single mutation. 
 
 The results validate the CTO's intuition: **GenesisBlockDB is an Advanced Prototype, not an Enterprise Database.**
 
@@ -22,7 +22,7 @@ The results validate the CTO's intuition: **GenesisBlockDB is an Advanced Protot
 | **Peak RAM** | **15.89 GB** | Stable memory consumption on 32k nodes / 150k edges. |
 
 ## 4. Strategic Pivot Validation
-The CTO's assessment (Production Readiness: 5/10) was perfectly accurate. GenesisDB currently lacks the "Group Commit" and "Query Planner" features required to achieve high concurrent write throughput. 
+The CTO's assessment (Production Readiness: 5/10) was perfectly accurate. GenesisBlockDB currently lacks the "Group Commit" and "Query Planner" features required to achieve high concurrent write throughput. 
 
 Therefore, the decision to pivot positioning to a **"Local Hybrid Knowledge Engine for AI Agents"** (competing with Chroma/Local SQLite) is strategically sound. For single-agent local execution (where concurrent heavy writes are rare), a ~1ms search latency is excellent and highly competitive.
 

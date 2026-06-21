@@ -1,6 +1,6 @@
 """
 MARK XIII — Kuzu head-to-head (embedded <-> embedded graph engine).
-Fairest comparator: both GenesisDB and Kuzu run in-process (no server/network).
+Fairest comparator: both GenesisBlockDB and Kuzu run in-process (no server/network).
 Same topology params as P22/P23 (N nodes, fanout-8 random), depths {1,3,6}.
 """
 import os, sys, json, time, random, shutil

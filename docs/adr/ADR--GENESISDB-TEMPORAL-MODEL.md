@@ -16,7 +16,7 @@ proposed_by: agent
 # ADR--GENESISDB-TEMPORAL-MODEL
 
 ## Context
-Current GenesisDB versions implement bi-temporal metadata primarily on edges (`valid_from`, `valid_to`). However, a truly robust cognitive engine requires **Temporal Node Properties** to track the evolution of concepts and attributes over time without destructive overwrites. Standard graph databases often struggle with "Property Versioning," leading to data duplication or loss of historical context.
+Current GenesisBlockDB versions implement bi-temporal metadata primarily on edges (`valid_from`, `valid_to`). However, a truly robust cognitive engine requires **Temporal Node Properties** to track the evolution of concepts and attributes over time without destructive overwrites. Standard graph databases often struggle with "Property Versioning," leading to data duplication or loss of historical context.
 
 ## Decision
 We implement a **Full Bi-Temporal Graph Model** using **Value-History Arenas (VHA)** and **Version Chains**.

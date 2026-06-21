@@ -16,7 +16,7 @@ type Client struct {
 	HTTPClient *http.Client
 }
 
-// NewClient creates a new GenesisDB client.
+// NewClient creates a new GenesisBlockDB client.
 func NewClient(baseURL string) *Client {
 	return &Client{
 		BaseURL: strings.TrimSuffix(baseURL, "/"),

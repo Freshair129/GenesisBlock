@@ -16,7 +16,7 @@ proposed_by: agent
 # ADR--GENESISDB-GOVERNANCE-LOGIC
 
 ## Context
-Initial versions of GenesisDB implemented "Axiomatic Governance" merely as a Tier Permission Rule (e.g., `Tier(source) >= Tier(target)`). A true Axiomatic System requires logical consistency checking to prevent the Knowledge Graph from holding mutually exclusive states or cyclic paradoxes, which would cause an AI agent to hallucinate or deadlock during reasoning.
+Initial versions of GenesisBlockDB implemented "Axiomatic Governance" merely as a Tier Permission Rule (e.g., `Tier(source) >= Tier(target)`). A true Axiomatic System requires logical consistency checking to prevent the Knowledge Graph from holding mutually exclusive states or cyclic paradoxes, which would cause an AI agent to hallucinate or deadlock during reasoning.
 
 ## Decision
 We elevate the governance layer from permission checks to a **Formal Axiomatic Evaluation Model** executing synchronously on the write-path.
@@ -35,7 +35,7 @@ To execute logical consistency checks without blocking writes for too long:
 Lower-tier nodes (e.g., `FEAT--`) explicitly inherit the constraints of their higher-tier ancestors (e.g., `MASTER--`). An action performed on a leaf node that violates an inherited constraint is blocked.
 
 ## Consequences
-*   **Positive:** GenesisDB becomes a true "Logical Knowledge Engine," not just a graph store. It guarantees non-contradictory context delivery to AI models.
+*   **Positive:** GenesisBlockDB becomes a true "Logical Knowledge Engine," not just a graph store. It guarantees non-contradictory context delivery to AI models.
 *   **Negative:** Write latency for `supersedes` and `contradicts` edge types increases by $O(V_{subgraph})$. This necessitates capping the depth of transitive checks to a hard limit (e.g., 5 levels) to guarantee latency bounds.
 
 ---

@@ -1,7 +1,7 @@
 # Software Requirements Document (SRD): Hierarchical Reasoning
 
 ## 1. Introduction
-**Hierarchical Reasoning** is the next evolutionary step for GenesisDB (Mark VI). While previous versions focused on individual nodes and clusters, this module enables the engine to reason about **Abstract Themes**. It transforms clusters of knowledge into "Super-Nodes," allowing AI agents to perform high-level strategic analysis across different domains of knowledge.
+**Hierarchical Reasoning** is the next evolutionary step for GenesisBlockDB (Mark VI). While previous versions focused on individual nodes and clusters, this module enables the engine to reason about **Abstract Themes**. It transforms clusters of knowledge into "Super-Nodes," allowing AI agents to perform high-level strategic analysis across different domains of knowledge.
 
 ## 2. Functional Requirements
 

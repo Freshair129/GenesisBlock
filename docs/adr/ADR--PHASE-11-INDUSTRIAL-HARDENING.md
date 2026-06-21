@@ -28,4 +28,4 @@ We will prioritize **Industrial Resilience** over new features (like Distributed
 - **Con:** Delayed progress on Distributed Mode.
 
 ## 7. Strategic Importance
-This phase transforms GenesisDB from a "high-speed engine" into a "reliable infrastructure component" that can be trusted with mission-critical knowledge.
+This phase transforms GenesisBlockDB from a "high-speed engine" into a "reliable infrastructure component" that can be trusted with mission-critical knowledge.

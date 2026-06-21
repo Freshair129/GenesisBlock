@@ -31,7 +31,7 @@ graph TD
     end
     
     subgraph "Internal Node"
-        A --> DB[GenesisDB Core]
+        A --> DB[GenesisBlockDB Core]
         DB --> WAL[genesis-graph.wal]
         DB --> Merkle[Merkle Tree]
     end
@@ -79,7 +79,7 @@ pub enum GossipMessage {
 3.  **Conflict Resolution:** Leverage the existing `reconcile_state` (Mark VIII Step 1).
 
 ## 5. Definition of Done (DoD)
-1.  [ ] Two independent GenesisDB instances can discover each other automatically.
+1.  [ ] Two independent GenesisBlockDB instances can discover each other automatically.
 2.  [ ] Adding a node to Instance A causes it to appear in Instance B within < 500ms.
 3.  [ ] **Network Partition Test:** Disable network, mutate both, re-enable -> both instances converge to the same state.
 4.  [ ] Documentation updated in `MASTER-SPEC--GENESIS-DB.md`.

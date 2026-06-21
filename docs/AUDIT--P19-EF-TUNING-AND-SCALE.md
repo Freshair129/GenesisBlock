@@ -38,7 +38,7 @@ This confirms 3k cannot distinguish ANN quality.
 
 ## 3. Result — 50k (synthetic-clustered, ef=100, C: SSD)
 
-| Metric | GenesisDB (hnsw_rs) | Chroma (hnswlib) |
+| Metric | GenesisBlockDB (hnsw_rs) | Chroma (hnswlib) |
 |---|---|---|
 | Insert (durable / in-mem) | 2,280 vec/s | 3,505 vec/s |
 | Query p50 | **928.8 µs** | 1,011.5 µs |
@@ -46,7 +46,7 @@ This confirms 3k cannot distinguish ANN quality.
 | Recall@10 | 0.962 | 1.000 |
 
 At scale the picture sharpens:
-- **Query latency: GenesisDB now ≤ Chroma** (929 vs 1011 µs p50). hnsw_rs search
+- **Query latency: GenesisBlockDB now ≤ Chroma** (929 vs 1011 µs p50). hnsw_rs search
   on the ef=100 graph is competitive/faster.
 - **Insert gap narrows to ~1.5×** (durable vs non-durable).
 - **Recall differentiates: 0.962 vs 1.000.** This is the cost of `ef_construction
@@ -57,7 +57,7 @@ At scale the picture sharpens:
 
 The 0.962 vs 1.000 gap is a **tunable speed↔recall trade**, not a fundamental
 hnsw_rs deficit: raising `ef_construction` back to 200 (and/or the query-time
-`ef`) moves GenesisDB back up the recall curve at some latency cost.
+`ef`) moves GenesisBlockDB back up the recall curve at some latency cost.
 
 **Recommendation:** expose `ef_construction` (and query `ef`) via `OpenOptions`
 instead of hardcoding, with a quality-first default (200) and an opt-in

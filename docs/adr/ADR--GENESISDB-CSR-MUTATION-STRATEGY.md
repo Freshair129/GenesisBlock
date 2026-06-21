@@ -16,7 +16,7 @@ proposed_by: agent
 # ADR--GENESISDB-CSR-MUTATION-STRATEGY
 
 ## Context
-GenesisDB v1.x relies on a Compressed Sparse Row (CSR) layout for ultra-low latency graph traversals. While standard CSR guarantees $O(1)$ read complexity by keeping adjacency lists contiguous in memory, it suffers from catastrophic $O(E)$ time complexity on writes (mutations), requiring massive memory relocations for every new edge. Given our operational target of 25,000 Ops/sec, standard CSR is inviable.
+GenesisBlockDB v1.x relies on a Compressed Sparse Row (CSR) layout for ultra-low latency graph traversals. While standard CSR guarantees $O(1)$ read complexity by keeping adjacency lists contiguous in memory, it suffers from catastrophic $O(E)$ time complexity on writes (mutations), requiring massive memory relocations for every new edge. Given our operational target of 25,000 Ops/sec, standard CSR is inviable.
 
 ## Decision
 We adopt a **Chunked-CSR with Slack Space (Over-provisioning) Strategy** combined with **Out-of-Place Relocation**.

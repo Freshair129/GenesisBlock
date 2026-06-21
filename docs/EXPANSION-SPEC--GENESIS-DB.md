@@ -1,4 +1,4 @@
-> **DEPRECATED (Mark III Pivot):** This document refers to the Phase 1-7 architecture and positioning. Please refer to ARCHITECTURE.md for the current Mark III system design.\n\n# GenesisDB: Deep Technical Expansion Specification (v1.x)
+> **DEPRECATED (Mark III Pivot):** This document refers to the Phase 1-7 architecture and positioning. Please refer to ARCHITECTURE.md for the current Mark III system design.\n\n# GenesisBlockDB: Deep Technical Expansion Specification (v1.x)
 **Document Status:** MASTER SPECIFICATION  
 **Version:** 1.0.1  
 **Domain:** Distributed Systems, Graph Theory, Storage Engineering  
@@ -7,14 +7,14 @@
 ---
 
 ## 0. Abstract
-This specification defines the rigorous systems-level architecture of **GenesisDB**, an embedded, Rust-native graph database. It transitions the engine from a high-level conceptual framework into a deterministic, mechanically sympathetic database engine. The design prioritizes ultra-low-latency traversals, deterministic memory management, and built-in axiomatic governance for cognitive AI agents, explicitly trading distributed horizontal scaling for vertical, in-memory embedded dominance.
+This specification defines the rigorous systems-level architecture of **GenesisBlockDB**, an embedded, Rust-native graph database. It transitions the engine from a high-level conceptual framework into a deterministic, mechanically sympathetic database engine. The design prioritizes ultra-low-latency traversals, deterministic memory management, and built-in axiomatic governance for cognitive AI agents, explicitly trading distributed horizontal scaling for vertical, in-memory embedded dominance.
 
 ---
 
 ## 1. Storage Engine Internals
 
 ### 1.1 Physical Graph Layout & Memory Model
-GenesisDB currently utilizes standard Rust `HashMap` structures for ID-to-entity resolution. However, the rigorous v1.x specification defines a transition to a **Hybrid Arena-Hash Model** to mitigate pointer-chasing overhead and maximize L1/L2 cache locality.
+GenesisBlockDB currently utilizes standard Rust `HashMap` structures for ID-to-entity resolution. However, the rigorous v1.x specification defines a transition to a **Hybrid Arena-Hash Model** to mitigate pointer-chasing overhead and maximize L1/L2 cache locality.
 
 *   **Primary Lookup (Hash Index):** `HashMap<String, u32>` maps UUIDs/String IDs to a dense 32-bit integer array index (Arena ID).
 *   **Adjacency Storage (CSR-like):** Edges are stored in a Compressed Sparse Row (CSR) inspired format. 
@@ -30,7 +30,7 @@ GenesisDB currently utilizes standard Rust `HashMap` structures for ID-to-entity
 ### 1.3 N-API & V8 Data Marshaling Resolution
   แม้ว่า Rust Engine จะสามารถหาผลลัพธ์การเดินกราฟได้ใน 10µs แต่การส่งผลลัพธ์จำนวน 1,000 โหนดข้าม FFI Boundary ไปยัง
   Node.js (V8) มักจะเกิด Data Marshaling Overhead (ใช้เวลา 2-5ms ในการทำ napi_create_object วนลูป)
-  GenesisDB แก้ปัญหาคอขวดนี้ด้วยสถาปัตยกรรม Zero-Copy / Bulk Buffer Passing
+  GenesisBlockDB แก้ปัญหาคอขวดนี้ด้วยสถาปัตยกรรม Zero-Copy / Bulk Buffer Passing
 
    * Avoid FFI Object Instantiation: แทนที่จะสร้าง V8 JavaScript Object ทีละตัวใน C++/Rust (ซึ่งมี Overhead
      ของ V8 GC) ระบบจะทำ Serialize ผลลัพธ์ทั้งหมดให้อยู่ในรูปของ FlatBuffers หรือ Bincode ในหน่วยความจำของ Rust
@@ -45,13 +45,13 @@ GenesisDB currently utilizes standard Rust `HashMap` structures for ID-to-entity
 ## 2. Concurrency & Consistency Model
 
 ### 2.1 Concurrency Semantics
-GenesisDB employs a **Single Writer, Multiple Reader (SWMR)** model via `parking_lot::RwLock` at the global graph level.
+GenesisBlockDB employs a **Single Writer, Multiple Reader (SWMR)** model via `parking_lot::RwLock` at the global graph level.
 *   **Write Contention Strategy:** Mutations (Add Node/Edge) acquire an exclusive write lock. Because writes are purely in-memory append operations (followed by async WAL flushing), the lock is held for `< 5µs`.
 *   **Read Concurrency:** Traversals acquire shared read locks. 
 *   **Atomicity Model:** Every FFI call via Node-API is an atomic transaction boundary.
 
 ### 2.2 MVCC & Bi-Temporal Isolation
-While the lock is SWMR, GenesisDB implements **Snapshot Isolation** conceptually through its bi-temporal edges.
+While the lock is SWMR, GenesisBlockDB implements **Snapshot Isolation** conceptually through its bi-temporal edges.
 *   Readers supply an `as_of` timestamp. 
 *   Writers do not perform destructive updates (`DELETE`); they append a `valid_to` timestamp (Logical Tombstone).
 *   *Tradeoff:* Readers block writers during the traversal. Future versions will adopt an RCU (Read-Copy-Update) or Epoch-based reclamation model to achieve true lock-free reads.
@@ -101,7 +101,7 @@ The current regex-based Cypher subset is insufficient for complex planning. The 
 *   **Filtering Complexity:** Predicate pushdown is utilized. Temporal filters (`valid_to IS NULL`) are evaluated *during* edge expansion, not post-expansion, reducing memory allocation for intermediate result sets.
 
 ### 4.2 Cypher Subset Limitations & Microsecond Trade-offs
-  GenesisDB ไม่ได้ตั้งเป้าหมายที่จะผ่าน 100% TCK (Technology Compatibility Kit) ของ OpenCypher
+  GenesisBlockDB ไม่ได้ตั้งเป้าหมายที่จะผ่าน 100% TCK (Technology Compatibility Kit) ของ OpenCypher
   การรองรับฟีเจอร์ถูกตัดสินใจผ่านแนวคิด Microsecond-Latency Budget ฟีเจอร์ใดที่ทำให้เกิด Pipeline Breaking
   (ต้องรอข้อมูลครบก่อนถึงจะทำงานต่อได้) หรือต้องจอง Memory ขนาดใหญ่ (Large Heap Allocation) จะถูกตัดออก เพื่อบีบให้
   Traversal Planner ทำงานได้ภายใน L1/L2 Cache ของ CPU
@@ -146,7 +146,7 @@ graph TD
 *Feature Limit:* Traversals are currently single-threaded. Parallelizing BFS via `rayon` introduces thread-spawning overhead that exceeds the cost of a 3-hop traversal on a 10M node graph. Parallelism is reserved exclusively for batch impact scoring, not individual queries.
 
 ### 5.3 The K-Impact (Knowledge Impact) Engine
-GenesisDB abandons generic PageRank in favor of a specialized, deterministic metric called **K-Impact**. This metric calculates the architectural weight, logical authority, and stability of every atom in the knowledge graph. 
+GenesisBlockDB abandons generic PageRank in favor of a specialized, deterministic metric called **K-Impact**. This metric calculates the architectural weight, logical authority, and stability of every atom in the knowledge graph. 
 
 Instead of a full $O(N)$ recalculation on every mutation, the engine tracks the mutated node and performs a localized BFS to update only the downstream nodes affected by the change, reducing time complexity to $O(V_{affected} + E_{affected})$.
 
@@ -184,7 +184,7 @@ When an operation is rejected by the Axiomatic Guard, the engine returns an `Axi
 
 ## 7. Scalability Envelope (Operational Limits)
 
-GenesisDB is explicitly **NOT** a distributed database. It trades horizontal scale for microsecond latency.
+GenesisBlockDB is explicitly **NOT** a distributed database. It trades horizontal scale for microsecond latency.
 
 | Metric | Target Envelope | Hard Limit / Degradation Point |
 |---|---|---|
@@ -198,7 +198,7 @@ GenesisDB is explicitly **NOT** a distributed database. It trades horizontal sca
 
 ## 8. Benchmark Methodology
 
-To ensure defensibility against industry giants, GenesisDB benchmarks follow strict parameters:
+To ensure defensibility against industry giants, GenesisBlockDB benchmarks follow strict parameters:
 *   **Hardware:** AWS c6i.2xlarge (8 vCPU, 16GB RAM) or equivalent local NVMe SSD.
 *   **Topology:** Barabási–Albert preferential attachment model (scale-free network, mimicking real human knowledge).
 *   **Cache State:** 
@@ -210,9 +210,9 @@ To ensure defensibility against industry giants, GenesisDB benchmarks follow str
 
 ## 9. Comparative Analysis: World-Class Matrix
 
-How GenesisDB compares to Tier-1 industry graph databases.
+How GenesisBlockDB compares to Tier-1 industry graph databases.
 
-| Feature | GenesisDB | Neo4j | TigerGraph | Dgraph | ArangoDB |
+| Feature | GenesisBlockDB | Neo4j | TigerGraph | Dgraph | ArangoDB |
 |---|---|---|---|---|---|
 | **Primary Architecture** | **Embedded / Native** | Server / JVM | Server / MPP (C++) | Distributed (Go) | Multi-model (C++) |
 | **Data Locality** | **In-Process (Zero IPC)** | Network (Bolt/HTTP) | Network (REST/GSQL) | Network (gRPC) | Network (HTTP) |
@@ -222,7 +222,7 @@ How GenesisDB compares to Tier-1 industry graph databases.
 | **AI Agent Suitability**| **Ideal (Brain-in-box)** | Secondary (Backend DB) | Heavy Analytics | Web Backends | Generic Backends |
 
 **Tradeoff Analysis:**
-GenesisDB sacrifices the ability to store a 1-Trillion edge graph across 50 servers. In return, it achieves latencies 20x to 100x lower than Neo4j for graphs under 50 Million edges, while requiring zero DevOps maintenance, making it the mathematically optimal choice for edge-deployed or isolated agentic AI systems.
+GenesisBlockDB sacrifices the ability to store a 1-Trillion edge graph across 50 servers. In return, it achieves latencies 20x to 100x lower than Neo4j for graphs under 50 Million edges, while requiring zero DevOps maintenance, making it the mathematically optimal choice for edge-deployed or isolated agentic AI systems.
 
 ---
 
@@ -231,7 +231,7 @@ GenesisDB sacrifices the ability to store a 1-Trillion edge graph across 50 serv
 1.  **Vector-Graph Hybridization (v2.0):** 
     Integrating HNSW (Hierarchical Navigable Small World) indices directly into the Node Arena. This will allow Cypher queries to combine exact structural traversals with semantic similarity (e.g., `MATCH (n) WHERE vector_distance(n.emb, query) < 0.2 RETURN n`).
 2.  **WebAssembly (WASM) Target:**
-    Compiling the core engine to `wasm32-unknown-unknown` to allow GenesisDB to run inside browser-based local AI agents, achieving true "Local-First" cognitive computing.
+    Compiling the core engine to `wasm32-unknown-unknown` to allow GenesisBlockDB to run inside browser-based local AI agents, achieving true "Local-First" cognitive computing.
 3.  **Lock-Free Reads (Epoch-based Reclamation):**
     Replacing `RwLock` with crossbeam's `epoch` garbage collection, enabling true zero-contention parallel reads during heavy write loads.
 
@@ -245,14 +245,14 @@ GenesisDB sacrifices the ability to store a 1-Trillion edge graph across 50 serv
 ---
 
 ## 11. GKS & Obsidian Synchronization Architecture
-GenesisDB operates as a "Headless Brain," while Obsidian Markdown files serve as the "Human-readable Interface." Maintaining state consistency between these two systems utilizes an Event-Driven Bi-directional Synchronization architecture, adhering to Conflict-Free Last-Write-Wins (LWW) principles.
+GenesisBlockDB operates as a "Headless Brain," while Obsidian Markdown files serve as the "Human-readable Interface." Maintaining state consistency between these two systems utilizes an Event-Driven Bi-directional Synchronization architecture, adhering to Conflict-Free Last-Write-Wins (LWW) principles.
 
 ```mermaid
 sequenceDiagram
     participant Obs as Obsidian (Markdown)
     participant WD as Watchdog (Chokidar)
     participant Sync as GKS Sync Daemon
-    participant GDB as GenesisDB (Rust FFI)
+    participant GDB as GenesisBlockDB (Rust FFI)
     
     Note over Obs, GDB: Flow 1: Human Edit (Markdown -> DB)
     Obs->>WD: File Modified (FS Event)
@@ -270,6 +270,6 @@ sequenceDiagram
 **State Management & Conflict Resolution:**
 1.  **Source of Truth Segregation:**
     *   **Obsidian Markdown:** Source of Truth for *Content* and *Human Intent*.
-    *   **GenesisDB:** Source of Truth for *Topology*, *Impact Scores*, and *Axiomatic Rules*.
-2.  **Soft Deletion (Referential Integrity):** If a user deletes an `.md` file in Obsidian, the GKS Sync Daemon does not perform a hard delete in GenesisDB. Instead, it issues a `retract_edge()` command, updating the `valid_to` timestamp to `Utc::now()`. This preserves the historical relationship for Time-Travel Queries.
-3.  **Conflict Prevention (LWW):** During a race condition where an AI Agent mutates data concurrently with a human edit, the Sync Daemon evaluates the `recorded_at` timestamp. Neural mutations (GenesisDB) will not blindly overwrite User Content without passing through the asynchronous validation process of an `ADR` or `AUDIT` atom generation.
+    *   **GenesisBlockDB:** Source of Truth for *Topology*, *Impact Scores*, and *Axiomatic Rules*.
+2.  **Soft Deletion (Referential Integrity):** If a user deletes an `.md` file in Obsidian, the GKS Sync Daemon does not perform a hard delete in GenesisBlockDB. Instead, it issues a `retract_edge()` command, updating the `valid_to` timestamp to `Utc::now()`. This preserves the historical relationship for Time-Travel Queries.
+3.  **Conflict Prevention (LWW):** During a race condition where an AI Agent mutates data concurrently with a human edit, the Sync Daemon evaluates the `recorded_at` timestamp. Neural mutations (GenesisBlockDB) will not blindly overwrite User Content without passing through the asynchronous validation process of an `ADR` or `AUDIT` atom generation.

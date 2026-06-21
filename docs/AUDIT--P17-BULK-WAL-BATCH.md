@@ -23,7 +23,7 @@ related:
 
 `bulk_add_nodes` / `bulk_add_edges` looped `add_node` / `add_edge`, so every item
 paid its own WAL `sync_all()` round-trip. The competitive harness (P15) used the
-same per-item path: GenesisDB inserted 3,000 vectors at **254 vec/s** vs Chroma's
+same per-item path: GenesisBlockDB inserted 3,000 vectors at **254 vec/s** vs Chroma's
 batched **4,074 vec/s**.
 
 ## 2. Fix

@@ -1,7 +1,7 @@
 # Software Requirements Document (SRD): Index Compaction & Cleanup (Mark IX, Step 3)
 
 ## 1. Introduction
-As GenesisDB scales, frequent retractions and TTL expirations leave "holes" in the memory arenas and stale entries in the HNSW graph. **Mark IX Step 3** introduces **Autonomic Compaction**, a background process that reclaims physical memory and optimizes search structures by pruning dead data.
+As GenesisBlockDB scales, frequent retractions and TTL expirations leave "holes" in the memory arenas and stale entries in the HNSW graph. **Mark IX Step 3** introduces **Autonomic Compaction**, a background process that reclaims physical memory and optimizes search structures by pruning dead data.
 
 ## 2. Functional Requirements
 

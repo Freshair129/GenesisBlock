@@ -1,7 +1,7 @@
 # Software Requirements Document (SRD): Causality Chains (Event Sourcing)
 
 ## 1. Introduction
-The **Causality Chains** module (Mark VII, Step 2) transforms GenesisDB from a state-based database into an event-sourced reasoning engine. It enables the system to not only track *when* knowledge changed (achieved in Step 1 via Temporal Queries) but *why* it changed. By explicitly linking state mutations to the events, documents, or agents that caused them, the engine achieves absolute auditability and explainability.
+The **Causality Chains** module (Mark VII, Step 2) transforms GenesisBlockDB from a state-based database into an event-sourced reasoning engine. It enables the system to not only track *when* knowledge changed (achieved in Step 1 via Temporal Queries) but *why* it changed. By explicitly linking state mutations to the events, documents, or agents that caused them, the engine achieves absolute auditability and explainability.
 
 ## 2. Functional Requirements
 

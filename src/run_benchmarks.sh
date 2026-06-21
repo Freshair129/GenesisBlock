@@ -1,9 +1,9 @@
 #!/bin/bash
-# run_benchmarks.sh — GenesisDB Production Benchmark Runner
+# run_benchmarks.sh — GenesisBlockDB Production Benchmark Runner
 
 set -e
 
-echo "🔧 Building GenesisDB Benchmark Suite..."
+echo "🔧 Building GenesisBlockDB Benchmark Suite..."
 cargo build --release
 
 echo "🚀 Running Full Production Benchmark..."

@@ -17,7 +17,7 @@ attributes:
 
 ## 1. Context
 
-GenesisDB ใช้แนวทาง Documentation-Driven Development (DDD) และประกาศให้
+GenesisBlockDB ใช้แนวทาง Documentation-Driven Development (DDD) และประกาศให้
 `docs/MASTER-SPEC--GENESIS-DB.md` เป็นเอกสารอ้างอิงหลักของระบบ แต่สถานะปัจจุบันยังเป็นการบังคับใช้เชิงมนุษย์มากกว่าเชิงกลไก:
 
 - `ARCHITECTURE.md` ระบุว่า master spec เป็น authoritative technical spec
@@ -26,7 +26,7 @@ GenesisDB ใช้แนวทาง Documentation-Driven Development (DDD) แ
 - repository ยังไม่มี script, CI workflow, หรือ active git hook ที่ตรวจ doc/code drift โดยตรง
 
 เอกสารนี้ออกแบบชั้น governance enforcement เพื่อทำให้ SSOT, doc diff, agent context diff, และ quality gates ตรวจได้ซ้ำและบังคับใช้ได้จริง
-โดยยังไม่เปลี่ยน runtime behavior ของ GenesisDB core engine
+โดยยังไม่เปลี่ยน runtime behavior ของ GenesisBlockDB core engine
 
 ## 2. Problem Statement
 
@@ -54,7 +54,7 @@ GenesisDB ใช้แนวทาง Documentation-Driven Development (DDD) แ
 
 ### 3.2 Out of Scope
 
-- ไม่แก้ GenesisDB runtime behavior
+- ไม่แก้ GenesisBlockDB runtime behavior
 - ไม่แก้ Rust/Python/Go/Node SDK contract ในเอกสารนี้
 - ไม่แก้ dashboard lint หรือ e2e flow ในเอกสารนี้
 - ไม่เปลี่ยน release process ภายนอก GitHub Actions
@@ -257,7 +257,7 @@ Rollback ต้องทำได้โดยไม่กระทบ runtime:
 - มี npm script หรือ equivalent command สำหรับรัน validator
 - มี CI workflow หรือ documented local gate
 - มี baseline audit report สำหรับ drift ปัจจุบัน
-- ไม่มี runtime behavior change ของ GenesisDB core engine จาก governance work
+- ไม่มี runtime behavior change ของ GenesisBlockDB core engine จาก governance work
 
 ## 12. Open Questions
 

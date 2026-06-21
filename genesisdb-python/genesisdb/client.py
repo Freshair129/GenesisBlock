@@ -15,7 +15,7 @@ class GenesisClient:
             # but we can try listing status or just assume alive
             pass
         except Exception as e:
-            raise ConnectionError(f"Could not connect to GenesisDB at {self.base_url}: {e}")
+            raise ConnectionError(f"Could not connect to GenesisBlockDB at {self.base_url}: {e}")
 
     def query(self, hql: str) -> Any:
         """Executes a raw HQL command."""

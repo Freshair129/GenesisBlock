@@ -65,7 +65,7 @@
 - [x] **Interactive dashboard:** `docs/perf-comparison-dashboard.html`.
 
 ## MARK XIII: Next (proposed)
-- [x] **Kuzu head-to-head** (embedded↔embedded, P26): GenesisDB wins traversal
+- [x] **Kuzu head-to-head** (embedded↔embedded, P26): GenesisBlockDB wins traversal
   latency 7–166×; Kuzu wins ingest ~60× & memory ~11× — different sweet spots.
 - [ ] **Edge-id interning rework** (u64 ids) to push graph scale past 1M / 32 GB.
 - [ ] **Deferred/async indexing** to keep query latency flat during bulk load.

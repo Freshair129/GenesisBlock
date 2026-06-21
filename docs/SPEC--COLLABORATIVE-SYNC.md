@@ -1,7 +1,7 @@
 # Functional Specification: Collaborative WAL & Decentralized Sync (Mark V)
 
 ## 1. Objective
-Transform GenesisDB from a siloed engine into a **Collaborative Knowledge Substrate**. This feature allows multiple GenesisDB instances (Agents) to synchronize their Write-Ahead Logs (WAL) in a peer-to-peer fashion, ensuring that "Axioms" and "Knowledge Atoms" discovered by Agent A are securely propagated to Agent B.
+Transform GenesisBlockDB from a siloed engine into a **Collaborative Knowledge Substrate**. This feature allows multiple GenesisBlockDB instances (Agents) to synchronize their Write-Ahead Logs (WAL) in a peer-to-peer fashion, ensuring that "Axioms" and "Knowledge Atoms" discovered by Agent A are securely propagated to Agent B.
 
 ## 2. Technical Approach: The Gossip Protocol
 We will implement a lightweight **Gossip Protocol** to handle real-time synchronization.

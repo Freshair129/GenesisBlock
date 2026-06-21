@@ -1,4 +1,4 @@
-# GenesisDB HNSW Hybrid Index Integration: SWE Design Document (v1.0)
+# GenesisBlockDB HNSW Hybrid Index Integration: SWE Design Document (v1.0)
 
 **Document Status:** Draft Specification  
 **Target Audience:** Core Systems Developers, Indexing Specialists  
@@ -6,9 +6,9 @@
 ---
 
 ## 1. Introduction and Rationale
-This document specifies the integration of a Hierarchical Navigable Small World (HNSW) index into the GenesisDB storage and query pipeline. The primary goal is to enable high-performance semantic search (vector similarity) alongside existing structural graph traversals (adjacency searches). 
+This document specifies the integration of a Hierarchical Navigable Small World (HNSW) index into the GenesisBlockDB storage and query pipeline. The primary goal is to enable high-performance semantic search (vector similarity) alongside existing structural graph traversals (adjacency searches). 
 
-GenesisDB prioritizes in-memory dominance and ultra-low-latency traversal. The HNSW index will be an in-process data structure residing within the Node Arena memory space to eliminate IPC overhead.
+GenesisBlockDB prioritizes in-memory dominance and ultra-low-latency traversal. The HNSW index will be an in-process data structure residing within the Node Arena memory space to eliminate IPC overhead.
 
 ## 2. Technical Architecture
 

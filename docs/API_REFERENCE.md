@@ -1,4 +1,4 @@
-# GenesisDB REST API Reference
+# GenesisBlockDB REST API Reference
 
 **Generated from `src/main.rs` (Axum server) — 2026-06-21.** This replaces the
 prior corrupted file. The server is the SSOT; update this when routes change.

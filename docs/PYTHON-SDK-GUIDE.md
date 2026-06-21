@@ -8,7 +8,7 @@ pip install .
 ```
 
 ## 2. Getting Started
-The Python SDK allows you to interact with a running GenesisDB server.
+The Python SDK allows you to interact with a running GenesisBlockDB server.
 
 ```python
 from genesisdb import GenesisClient

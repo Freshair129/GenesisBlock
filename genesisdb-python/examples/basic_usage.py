@@ -5,7 +5,7 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from genesisdb import GenesisClient
 
 def main():
-    # Note: Requires a running GenesisDB server on localhost:3000
+    # Note: Requires a running GenesisBlockDB server on localhost:3000
     try:
         client = GenesisClient("http://localhost:3000")
         

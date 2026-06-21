@@ -1,4 +1,4 @@
-# GenesisDB — Canonical Version (SSOT)
+# GenesisBlockDB — Canonical Version (SSOT)
 
 This file is the **single source of truth for version/status**. Per-document
 `version:` frontmatter across `docs/` is historically inconsistent (whitepaper

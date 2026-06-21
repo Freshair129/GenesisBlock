@@ -44,7 +44,7 @@ sequential `insert`.
 vs **Chroma (hnswlib): 4,074 vec/s** (in-memory, non-durable).
 
 - **×7.8 overall** (254 → 1,986); ×5.2 from parallel_insert alone.
-- Gap to Chroma closed from **16× → ~2×** — and GenesisDB's 1,986 is **durable**
+- Gap to Chroma closed from **16× → ~2×** — and GenesisBlockDB's 1,986 is **durable**
   (WAL-persisted) while Chroma's 4,074 is in-memory ephemeral.
 - Recall 0.986 → 0.982: parallel build yields a marginally different graph;
   negligible. Query latency unchanged (1,668 µs p50).

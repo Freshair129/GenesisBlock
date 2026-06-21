@@ -1,5 +1,5 @@
 class GenesisError(Exception):
-    """Base error for GenesisDB SDK"""
+    """Base error for GenesisBlockDB SDK"""
     pass
 
 class ConnectionError(GenesisError):

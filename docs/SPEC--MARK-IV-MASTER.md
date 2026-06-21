@@ -1,7 +1,7 @@
 # Master Specification: Mark IV (Global Scale & Reasoning)
 
 ## 1. Objective
-Transition GenesisDB into the **Mark IV** era. The primary goals are to optimize the O(N) fuzzy search implemented for Obsidian, enforce strict data governance (Axiomatic Guards), and introduce the first layer of graph-based reasoning.
+Transition GenesisBlockDB into the **Mark IV** era. The primary goals are to optimize the O(N) fuzzy search implemented for Obsidian, enforce strict data governance (Axiomatic Guards), and introduce the first layer of graph-based reasoning.
 
 ## 2. Trigram Performance Standard (Optimization)
 The current `find_fuzzy_id` iterates through all node IDs ($O(N)$). As Obsidian vaults grow to 100k+ notes, this will exceed the <10ms latency target.

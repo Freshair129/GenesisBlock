@@ -1,7 +1,7 @@
 {
 	"name": "genesis-shadow-sync",
 	"version": "0.1.0",
-	"description": "Obsidian plugin for GenesisDB",
+	"description": "Obsidian plugin for GenesisBlockDB",
 	"main": "main.js",
 	"scripts": {
 		"dev": "esbuild main.ts --bundle --external:obsidian --external:electron --format=cjs --watch --outfile=main.js",

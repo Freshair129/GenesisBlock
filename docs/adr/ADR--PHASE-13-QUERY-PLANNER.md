@@ -4,7 +4,7 @@
 **Proposed**
 
 ## 2. Context
-Currently, HQL (Hybrid Query Language) strings are handled by a primitive regex dispatcher. This approach is fragile, doesn't support complex logical nesting (AND/OR), and lacks optimization (e.g., deciding whether to perform a vector search before a graph traversal). To become a true "Knowledge Engine", GenesisDB requires a formal query pipeline.
+Currently, HQL (Hybrid Query Language) strings are handled by a primitive regex dispatcher. This approach is fragile, doesn't support complex logical nesting (AND/OR), and lacks optimization (e.g., deciding whether to perform a vector search before a graph traversal). To become a true "Knowledge Engine", GenesisBlockDB requires a formal query pipeline.
 
 ## 3. Decision
 We will implement a structured Query Engine consisting of a **Pest-based Parser**, an **Abstract Syntax Tree (AST)**, and a **Logical/Physical Planner**.

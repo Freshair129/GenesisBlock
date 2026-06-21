@@ -16,7 +16,7 @@ attributes:
 
 # C4--GENESISDB-ARCHITECTURE
 
-> **Positioning & evidence (2026-06-21):** GenesisDB is an **embedded
+> **Positioning & evidence (2026-06-21):** GenesisBlockDB is an **embedded
 > analytics / agent-memory graph + vector engine** (comparators: Kuzu,
 > DuckDB+graph, RocksDB+graph; Neo4j/Qdrant as references). Measured performance
 > & competitive results: [REPORT--2026-06-21-PERFORMANCE-AND-COMPETITIVE.md](REPORT--2026-06-21-PERFORMANCE-AND-COMPETITIVE.md)
@@ -24,7 +24,7 @@ attributes:
 
 ## 1. Purpose
 
-เอกสารนี้เป็น architecture index และ SSOT map สำหรับ GenesisDB ในรูปแบบ C4:
+เอกสารนี้เป็น architecture index และ SSOT map สำหรับ GenesisBlockDB ในรูปแบบ C4:
 
 - C1 - System Context
 - C2 - Container
@@ -38,7 +38,7 @@ attributes:
 
 | Layer | Primary SSOT | Supporting Sources | Notes |
 |---|---|---|---|
-| C1 System Context | `docs/MASTER-SPEC--GENESIS-DB.md` | `README.md`, `docs/WHITEPAPER--GENESIS-DB.md`, `docs/WHITEPAPER--GENESIS-KNOWLEDGE-SYSTEM.md`, `ARCHITECTURE.md` | Defines GenesisDB as local-first hybrid knowledge engine for human-machine collaboration. |
+| C1 System Context | `docs/MASTER-SPEC--GENESIS-DB.md` | `README.md`, `docs/WHITEPAPER--GENESIS-DB.md`, `docs/WHITEPAPER--GENESIS-KNOWLEDGE-SYSTEM.md`, `ARCHITECTURE.md` | Defines GenesisBlockDB as local-first hybrid knowledge engine for human-machine collaboration. |
 | C2 Container | This document | `src/main.rs`, `mcp/server.js`, `index.d.ts`, SDK docs, dashboard docs | Container map is currently reconstructed from code and scattered docs. |
 | C3 Component | `docs/SPEC--*.md`, `docs/DESIGN--*.md`, ADRs | `src/lib.rs`, `src/query/*`, tests | Component ownership is distributed by feature/spec. |
 | C4 Code / Low-Level | Source code and targeted design docs | `src/lib.rs`, `src/main.rs`, `hql.pest`, `index.d.ts`, SDK clients | Low-level truth is code, but public behavior must be reflected upward into specs. |
@@ -46,7 +46,7 @@ attributes:
 
 ## 3. C1 - System Context
 
-GenesisDB is a local-first hybrid semantic-graph database engine. Its core responsibility is backend runtime behavior: durable storage, WAL/snapshot persistence, in-memory embedding storage, vector/HNSW indexing, symbolic graph relationships, graph traversal, HQL/AST execution, hybrid search, retrieval, community detection, and synchronization primitives.
+GenesisBlockDB is a local-first hybrid semantic-graph database engine. Its core responsibility is backend runtime behavior: durable storage, WAL/snapshot persistence, in-memory embedding storage, vector/HNSW indexing, symbolic graph relationships, graph traversal, HQL/AST execution, hybrid search, retrieval, community detection, and synchronization primitives.
 
 ### External Actors
 
@@ -54,8 +54,8 @@ GenesisDB is a local-first hybrid semantic-graph database engine. Its core respo
 |---|---|---|
 | Human knowledge worker | Inspect or operate knowledge through optional clients | Obsidian plugin, dashboard, Markdown-facing flows |
 | AI agent / LLM tool caller | Store, retrieve, and reason over structured knowledge | MCP server, REST API, N-API |
-| Application developer | Embed GenesisDB into apps and tools | N-API package, Python SDK, Go SDK, REST |
-| Peer GenesisDB node | Synchronize knowledge and participate in consensus | CRDT/gossip/consensus primitives |
+| Application developer | Embed GenesisBlockDB into apps and tools | N-API package, Python SDK, Go SDK, REST |
+| Peer GenesisBlockDB node | Synchronize knowledge and participate in consensus | CRDT/gossip/consensus primitives |
 
 ### System Context Diagram
 
@@ -67,9 +67,9 @@ flowchart LR
     app["Application Developer"] --> napi["N-API Package"]
     app --> rest["REST API"]
     app --> sdk["Python / Go SDKs"]
-    peer["Peer GenesisDB Node"] <--> sync["CRDT / Consensus Sync"]
+    peer["Peer GenesisBlockDB Node"] <--> sync["CRDT / Consensus Sync"]
 
-    obsidian --> core["GenesisDB"]
+    obsidian --> core["GenesisBlockDB"]
     dashboard --> rest
     mcp --> core
     napi --> core
@@ -112,7 +112,7 @@ flowchart TB
         sdkgo["Go SDK"]
     end
 
-    subgraph engine["GenesisDB Runtime"]
+    subgraph engine["GenesisBlockDB Runtime"]
         core["Rust Core Engine\nsrc/lib.rs"]
         wal["WAL + Snapshot"]
         index["Hybrid Indexes\nHNSW + lexical + graph"]
@@ -163,7 +163,7 @@ flowchart TB
 
 | Tool | Responsibility | Source |
 |---|---|---|
-| `query_hql` | Execute HQL through the local GenesisDB binding | `mcp/server.js` |
+| `query_hql` | Execute HQL through the local GenesisBlockDB binding | `mcp/server.js` |
 | `retrieve_tiered_context` | Retrieve context for an agent target/tier | `mcp/server.js` |
 | `add_knowledge` | Add node-like knowledge from an LLM client | `mcp/server.js` |
 
@@ -222,6 +222,6 @@ Expected checks:
 
 | Version | Date | Status | Summary | Commit Hash | Agent |
 |---------|------|--------|---------|-------------|-------|
-| 0.1.2b | 2026-06-14 | candidate | Clarified GenesisDB as backend DB/runtime engine first and marked dashboard/Obsidian as optional consumers. | working-tree | ATHER |
+| 0.1.2b | 2026-06-14 | candidate | Clarified GenesisBlockDB as backend DB/runtime engine first and marked dashboard/Obsidian as optional consumers. | working-tree | ATHER |
 | 0.1.1b | 2026-06-14 | candidate | Updated C1 supporting sources after moving the GKS whitepaper into docs. | 4101228 | ATHER |
 | 0.1.0b | 2026-06-13 | candidate | Initial C4 architecture index and SSOT map. | 9b1ced3 | ATHER |

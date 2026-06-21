@@ -38,7 +38,7 @@ RAM usage spiked to ~32GB. This is likely due to the unoptimized collection of 5
 3. **Async Streaming:** Implement streaming responses for large query results to prevent RAM spikes.
 
 ## 7. Final Verdict: ROBUST BUT CONTENTIOUS
-GenesisDB is stable and durable (Zero crashes during stress), but its concurrency is currently limited by the global lock container. It is ready for single-user PKM use but requires **Refined Mutability** for enterprise-scale agent systems.
+GenesisBlockDB is stable and durable (Zero crashes during stress), but its concurrency is currently limited by the global lock container. It is ready for single-user PKM use but requires **Refined Mutability** for enterprise-scale agent systems.
 
 **Verified by:** T2 Agent ARCHITECT (Gemini)
 **Date:** 2026-06-01

@@ -1,4 +1,4 @@
-﻿name: GenesisDB Performance Audit
+﻿name: GenesisBlockDB Performance Audit
 
 on:
   push:

@@ -1,7 +1,7 @@
 ﻿# FLOW--GENESIS-BLOCK-WORKFLOW
 
 ## 1. Engine Initialization
-The boot sequence of a GenesisDB instance.
+The boot sequence of a GenesisBlockDB instance.
 
 1. **Path Resolution:** Locate \genesis-graph.lock\ and acquire OS-level file lock.
 2. **Snapshot Load:** If \.bin\ exists, deserialize the full state using Bincode.

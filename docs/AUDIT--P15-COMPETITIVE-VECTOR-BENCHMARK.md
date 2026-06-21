@@ -17,7 +17,7 @@ related:
   - adr/ADR--GENESISDB-COMPETITIVE-ROADMAP
 ---
 
-# AUDIT — P15 Competitive Vector Benchmark (GenesisDB vs Chroma)
+# AUDIT — P15 Competitive Vector Benchmark (GenesisBlockDB vs Chroma)
 
 ## 1. Why
 
@@ -44,18 +44,18 @@ embedded HNSW engine and the exact competitor named in
 `ADR--GENESISDB-MARKET-POSITIONING`. Qdrant can be added later (needs Docker).
 
 **Controls:** identical corpus (3,000 vectors) and identical queries (200), same
-`k=10`, same **L2** distance (GenesisDB `DistL2` ↔ Chroma `hnsw:space=l2`), same
+`k=10`, same **L2** distance (GenesisBlockDB `DistL2` ↔ Chroma `hnsw:space=l2`), same
 machine, both on **C: (SSD)**. Ground truth = exact brute-force L2 top-10.
 
 **Asymmetries (disclosed):**
-- GenesisDB = embedded in-process, **durable per-op WAL fsync** on insert.
+- GenesisBlockDB = embedded in-process, **durable per-op WAL fsync** on insert.
 - Chroma = embedded in-process, **in-memory (ephemeral), batched add** — no
   durability. → insert numbers are not apples-to-apples; query latency and
   recall are.
 
 ## 4. Results (bge-m3 1024-dim, L2, same vectors)
 
-| Metric | GenesisDB (hnsw_rs) | Chroma (hnswlib) | Comparable? |
+| Metric | GenesisBlockDB (hnsw_rs) | Chroma (hnswlib) | Comparable? |
 |---|---|---|---|
 | Insert throughput | 254 vec/s | 4,074 vec/s | no (durability-asymmetric) |
 | Query latency p50 | 1,901 µs | 1,249 µs | **yes** |
@@ -66,7 +66,7 @@ machine, both on **C: (SSD)**. Ground truth = exact brute-force L2 top-10.
 
 - **Recall:** 0.987 vs 1.000 — effectively at parity; both excellent. The small
   gap is HNSW search-effort (`ef_search`) tuning, not an algorithmic deficit.
-- **Query latency:** GenesisDB ~1.5× slower — same ballpark. GenesisDB's
+- **Query latency:** GenesisBlockDB ~1.5× slower — same ballpark. GenesisBlockDB's
   `hybrid_search` does extra work even at `alpha=0` (k-impact path, full
   `NeighborOutput` + path construction) vs Chroma's tuned C++ ANN returning bare
   ids. Headroom exists (skip k-impact / lighter return type on pure-vector path).
@@ -74,7 +74,7 @@ machine, both on **C: (SSD)**. Ground truth = exact brute-force L2 top-10.
   lock (the P13-identified bottleneck). Not a like-for-like number against
   in-memory Chroma; a batch/bulk durable path would close most of the gap.
 
-**Verdict:** GenesisDB is a **credible local vector engine** — at recall parity
+**Verdict:** GenesisBlockDB is a **credible local vector engine** — at recall parity
 and within ~1.5× query latency of Chroma — with a real, honest write-durability
 cost and clear query-path optimization headroom. No overselling.
 
@@ -83,9 +83,9 @@ cost and clear query-path optimization headroom. No overselling.
 ```
 # 1. embeddings + Chroma (Python; needs Ollama running with bge-m3, pip install chromadb numpy)
 python benches/vbench.py all
-# 2. GenesisDB side (vectors shared via the bench dir)
+# 2. GenesisBlockDB side (vectors shared via the bench dir)
 GB_VBENCH=<bench-dir> cargo run --release --bin vbench-genesis
-# 3. combined table + GenesisDB recall
+# 3. combined table + GenesisBlockDB recall
 python benches/vbench.py finalize
 ```
 
@@ -99,4 +99,4 @@ Harness: `benches/vbench.py` (embed/Chroma/ground-truth) + `benches/vbench_genes
 - Add **Qdrant** (Docker) and **hnswlib-direct** as additional columns.
 - Scale to 50k–100k vectors (recall@10 at 3k is saturated near 1.0 for both;
   larger N differentiates ANN quality).
-- Re-measure GenesisDB query after trimming the pure-vector return path.
+- Re-measure GenesisBlockDB query after trimming the pure-vector return path.

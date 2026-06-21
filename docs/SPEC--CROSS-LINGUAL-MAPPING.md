@@ -1,7 +1,7 @@
 # Functional Specification: Cross-Lingual Knowledge Mapping (Mark V)
 
 ## 1. Objective
-Enable **Thai-English Neural Retrieval**. This feature allows GenesisDB to resolve semantic queries across different languages, ensuring that a query performed in Thai (e.g., "การเรียนรู้ของเครื่อง") can correctly retrieve relevant nodes stored in English (e.g., "Machine Learning") and vice-versa.
+Enable **Thai-English Neural Retrieval**. This feature allows GenesisBlockDB to resolve semantic queries across different languages, ensuring that a query performed in Thai (e.g., "การเรียนรู้ของเครื่อง") can correctly retrieve relevant nodes stored in English (e.g., "Machine Learning") and vice-versa.
 
 ## 2. Technical Approach: The Canonical Space
 Embeddings from different languages often occupy different regions in the high-dimensional space. We will implement a **Semantic Normalizer** to bridge this gap.
