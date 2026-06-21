@@ -30,4 +30,7 @@ dashboard/dist/
 **/temp_db/
 **/temp_db_bulk/
 benches/*_db/
-tests/*_db/\n
+
+# Test scratch DBs — generated AND consumed within each `cargo test` run
+# (every test does remove_dir_all first; not committed fixtures)
+tests/test_*/
