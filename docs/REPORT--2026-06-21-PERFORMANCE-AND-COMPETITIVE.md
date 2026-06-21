@@ -159,9 +159,55 @@ Audits: P15 (3k Chroma), P20 (100k 3-way). Interactive view:
 
 ---
 
+## 7b. P21–P25 — Frontier, scale, graph & cost evidence
+
+**P21 Recall–latency frontier (100k, ef_construction=200, ef_search swept):**
+GenesisDB curve passes through Chroma's point — ef_search=128 → recall 0.984 @
+1.1 ms (> Chroma 0.981 @ 0.99 ms); ef_search=64 → 0.964 @ 0.81 ms. Qdrant
+0.999 @ 3.3 ms (server). `ef_search` is a live knob (`set_index_params`).
+
+**P21 vector scale:** RSS 1.57 GB @100k → 7.7 GB @500k (linear); recall at
+ef_search=100 falls 0.982 → 0.891 by 500k (needs higher ef_search at scale).
+1M ≈ RAM ceiling on 32 GB.
+
+**P22 graph traversal (LDBC-lite, fanout 8):**
+
+| N | hop1 p50 | hop3 p50 | hop6 p50 | hop1 thrpt | RSS |
+|---|---|---|---|---|---|
+| 10k | 23.1 µs | 1.97 ms | 4.21 ms | 41,525/s | 146 MB |
+| 100k | 21.6 µs | 2.33 ms | 4.40 ms | 42,783/s | 1.06 GB |
+| 1M | 35.4 µs | 4.58 ms | 9.29 ms | 27,898/s | 12.6 GB |
+
+hop1 stays tens-of-µs across 100× = **O(neighborhood), not O(N)**. RAM ceiling
+~12.6 GB @1M/8M (edge-UUID interning) → 10M infeasible on 32 GB. Engine fix:
+`neighbors` now honors `limit` (was ignored).
+
+**P23 Neo4j head-to-head (embedded vs server):** GenesisDB **7–185× faster** on
+traversal (hop1 100k: 21.6 µs vs 2,590 µs); ingest & memory ~par at 100k. Gap is
+largely the embedded-vs-server tax (bolt + Cypher planning + JVM).
+
+**P24 governance guard:** ~524 ns/op = **< 0.1 %** of a durable write
+(optimizable ~10× by dropping per-label allocation).
+
+**P25 K-Impact full vs incremental:** full ~O(V) (9 → 104 → 664 ms at
+10k/100k/500k); incremental(1 node) flat at ~1–1.7 µs → **O(V_affected) proven**
+(up to 398,000× faster than a full pass).
+
+**Positioning (reframed):** GenesisDB is an **embedded analytics / agent-memory
+graph+vector engine** — nearest comparators are Kuzu, DuckDB+graph, RocksDB+graph
+layer; Neo4j/Qdrant are well-known references, not the category. Next fairest
+datapoint: a Kuzu (embedded↔embedded) head-to-head.
+
+---
+
 ## 8. Appendix — commits (this session)
 
 ```
+311bc8f bench(P23): Neo4j head-to-head — embedded GenesisDB vs server Neo4j
+6b8ae80 bench(P24,P25): governance guard cost + K-Impact full-vs-incremental proof
+e5767af bench(P22): graph traversal benchmark (LDBC-lite) 10k/100k/1M + neighbors limit fix
+f4ce106 bench(P21): recall-latency frontier (ef_search sweep) + dashboard scatter
+965c01b docs: add consolidated session report
 440afaa feat(engine): configurable HNSW ef + Qdrant 3-way benchmark at 100k
 2c289cc perf(engine): ef_construction 200->100 + 50k-scale ANN benchmark
 ce06746 perf(engine): parallel HNSW build on batch path (parallel_insert) -> 5.2x
