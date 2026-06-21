@@ -117,6 +117,13 @@ td.num{text-align:right;font-variant-numeric:tabular-nums}
     <div class="metricnote" id="graph-note" style="margin-top:12px;max-width:none"></div>
   </div>
 
+  <div class="card" style="margin-bottom:var(--gap)">
+    <h3>Engine internals — K-Impact incremental (P25) & governance guard (P24)</h3>
+    <div class="hint" id="ki-caption"></div>
+    <table id="kiTable" style="font-size:13px"></table>
+    <div class="metricnote" id="ki-note" style="margin-top:12px;max-width:none"></div>
+  </div>
+
   <div class="howto">
     <strong style="color:var(--text-primary)">➕ Add Run 3 (or more)</strong> — edit two places in the <code>&lt;script&gt;</code> at the bottom of this file, then refresh:<br>
     1. Append to <code>RUNS</code>: <code>{ id:"p15", label:"P15 …", env:"…", color:"#43b581" }</code><br>
@@ -303,6 +310,15 @@ const FRONTIER = {
             {ef:128,lat:1097.4,recall:0.984},{ef:256,lat:1255.0,recall:0.988},{ef:512,lat:2119.4,recall:0.990} ],
   chroma:{lat:990.2,recall:0.981}, qdrant:{lat:3300.8,recall:0.999}
 };
+// P25 K-Impact full vs incremental + P24 governance guard
+const KIMPACT = {
+  guard_ns: 524, guard_overhead_pct: "<0.1% of a durable write",
+  rows:[
+    { n:10000,  full_ms:9.00,   inc_us:0.916, speedup:9827 },
+    { n:100000, full_ms:104.00, inc_us:1.480, speedup:70287 },
+    { n:500000, full_ms:664.22, inc_us:1.668, speedup:398105 },
+  ]
+};
 // P22 graph traversal (fanout 8, limit 1000)
 const GRAPH = {
   meta:{ fanout:8, limit:1000, q:200, disk:"C: SSD" },
@@ -430,6 +446,21 @@ const GRAPH = {
     gt.innerHTML=h+'</tbody>';
     document.getElementById('graph-note').innerHTML =
       "<strong style='color:var(--text-primary)'>O(neighborhood), not O(N):</strong> 1-hop latency stays in the tens of µs across a 100× node increase (23→22→35 µs, ~28–43k traversals/s) — local queries don't slow down as the graph grows. Multi-hop stays bounded (ms). The real ceiling is RAM: 1M nodes / 8M edges = 12.6 GB (edge-UUID interning dominates), so ~10M is out of reach on a 32 GB host. Engine fix shipped: <code>neighbors</code> now honors <code>limit</code> (previously ignored → depth-6 could traverse a whole component).";
+  })();
+
+  // ---- P24/P25 engine internals ----
+  (function(){
+    document.getElementById('ki-caption').textContent =
+      `K-Impact recompute: full refresh_impacts(None) vs incremental(1 node) on fanout-8 graphs · governance guard microbench`;
+    const kt=document.getElementById('kiTable');
+    let h='<thead><tr><th>Nodes</th><th class="num">Full recompute</th><th class="num">Incremental (1 node)</th><th class="num">Speedup</th></tr></thead><tbody>';
+    KIMPACT.rows.forEach(r=>{
+      h+=`<tr><td class="num">${r.n.toLocaleString()}</td><td class="num">${r.full_ms.toFixed(1)} ms</td>`+
+         `<td class="num">${r.inc_us.toFixed(2)} µs</td><td class="num"><span class="delta up">${r.speedup.toLocaleString()}×</span></td></tr>`;
+    });
+    kt.innerHTML=h+'</tbody>';
+    document.getElementById('ki-note').innerHTML =
+      `<strong style="color:var(--text-primary)">P25 — O(V_affected) proven:</strong> full recompute scales with N (9→104→664 ms), while an incremental single-node update stays flat at ~1–1.7 µs across 50× scale → confirms the whitepaper's O(V_affected + E_affected) claim (up to 398,000× faster than a full pass). <strong style="color:var(--text-primary)">P24 — governance guard:</strong> ~${KIMPACT.guard_ns} ns/op, ${KIMPACT.guard_overhead_pct} — effectively free on the durable write path (optimizable ~10× by dropping per-label allocation).`;
   })();
 })();
 </script>

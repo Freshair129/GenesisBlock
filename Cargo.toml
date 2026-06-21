@@ -103,3 +103,8 @@ path = "benches/vbench_genesis.rs"
 name = "graph-bench"
 path = "benches/graph_bench.rs"
 
+
+[[bin]]
+name = "gov-kimpact-bench"
+path = "benches/gov_kimpact_bench.rs"
+

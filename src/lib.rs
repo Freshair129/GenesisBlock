@@ -381,7 +381,7 @@ impl Tier {
 }
 
 impl Storage {
-    fn validate_governance(&self, labels: &[String], is_system: bool) -> Result<()> {
+    pub fn validate_governance(&self, labels: &[String], is_system: bool) -> Result<()> {
         let tier = Tier::from_labels(labels);
         if tier == Tier::MASTER && !is_system {
             return Err(Error::from_reason("403 Forbidden: MASTER tier is immutable for external agents"));
