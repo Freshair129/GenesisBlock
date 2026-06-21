@@ -25,8 +25,9 @@ RocksDB+graph); Neo4j/Qdrant are references, not the category.
 - Architecture index / C4 map: [docs/C4--GENESISDB-ARCHITECTURE.md](docs/C4--GENESISDB-ARCHITECTURE.md)
 - Authoritative parent specification: [docs/MASTER-SPEC--GENESIS-DB.md](docs/MASTER-SPEC--GENESIS-DB.md)
 - Whitepapers: [docs/WHITEPAPER--GENESIS-DB.md](docs/WHITEPAPER--GENESIS-DB.md), [docs/WHITEPAPER--GENESIS-KNOWLEDGE-SYSTEM.md](docs/WHITEPAPER--GENESIS-KNOWLEDGE-SYSTEM.md)
+- API reference (regenerated from code): [docs/API_REFERENCE.md](docs/API_REFERENCE.md)
+- Version SSOT: [docs/VERSION.md](docs/VERSION.md) · Doc status index: [docs/DOC-STATUS.md](docs/DOC-STATUS.md)
 - Agent context: [AGENT.md](AGENT.md) · Contributor workflow: [CONTRIBUTING.md](CONTRIBUTING.md)
-- _Note: `docs/API_REFERENCE.md` is stale/corrupted (contains a leaked LLM transcript) — pending regeneration from code; trust `src/main.rs` routes + the report meanwhile._
 
 ## Core Capabilities
 

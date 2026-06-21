@@ -69,4 +69,5 @@
 - [ ] **Edge-id interning rework** (u64 ids) to push graph scale past 1M / 32 GB.
 - [ ] **Deferred/async indexing** to keep query latency flat during bulk load.
 - [ ] **Multi-collection vector space** (per-model/dim; [SPEC](docs/SPEC--MULTI-COLLECTION-VECTOR-SPACE.md)).
-- [ ] **Doc hygiene:** status tags on specs; regenerate `API_REFERENCE.md` from code.
+- [x] **Doc hygiene:** `API_REFERENCE.md` regenerated from `main.rs`; version SSOT
+  ([VERSION.md](docs/VERSION.md)); status index ([DOC-STATUS.md](docs/DOC-STATUS.md)).
