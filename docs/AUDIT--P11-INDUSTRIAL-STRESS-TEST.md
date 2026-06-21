@@ -1,7 +1,7 @@
-﻿# AUDIT--P11-GENESISDB-INDUSTRIAL-STRESS-TEST-REPORT
+﻿# AUDIT--P11-GENESISBLOCKDB-INDUSTRIAL-STRESS-TEST-REPORT
 
 ## 1. Executive Summary
-Phase 11 served as the "Industrial Hardening" examination of GenesisDB. The test revealed the engine's true behavior under mixed concurrent pressure (80% Read / 20% Write). While the engine remained 100% stable, the audit exposed a critical architectural bottleneck in the global locking strategy.
+Phase 11 served as the "Industrial Hardening" examination of GenesisBlockDB. The test revealed the engine's true behavior under mixed concurrent pressure (80% Read / 20% Write). While the engine remained 100% stable, the audit exposed a critical architectural bottleneck in the global locking strategy.
 
 ## 2. Test Environment
 - **CPU:** Intel(R) Core(TM) i7-8700K (12 Threads)

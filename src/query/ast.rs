@@ -3,7 +3,7 @@ use pest_derive::Parser;
 use std::convert::TryFrom;
 
 #[derive(Parser)]
-#[grammar = "hql.pest"]
+#[grammar = "query/hql.pest"]
 pub struct HqlParser;
 
 #[derive(Debug, Clone)]

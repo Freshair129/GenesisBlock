@@ -1,4 +1,4 @@
-version: "0.2.0b"
+version: "0.2.1b"
 
 root_contract:
   global_context:
@@ -92,7 +92,6 @@ agents:
       - docs/
       - src/
       - mcp/
-      - dashboard/
       - genesisdb-go/
       - genesisdb-python/
     asset:
@@ -115,7 +114,6 @@ agents:
       - docs/
       - src/
       - mcp/
-      - dashboard/
       - genesisdb-go/
       - genesisdb-python/
 
@@ -201,7 +199,7 @@ agents:
     agent_id: agt_genesis
     label: Genesis (เจเนซิส)
     role: devops
-    persona: "keeps release, handoff, and automation paths deterministic and recoverable"
+    persona: "keeps release, handoff, automation, and optional ops surfaces deterministic and recoverable"
     permission:
       default_executor: codex
       allowed_executors:
@@ -215,13 +213,16 @@ agents:
       - .github/
       - .agents/
       - setup/
+      - dashboard/
     asset:
       - setup/AGENT.md
       - .agents/agent-registry.yaml
+      - docs/AUDIT--DASHBOARD-E2E.md
     context:
       - setup/AGENT.md
       - .agents/
       - .github/workflows/
+      - dashboard/
     contract: setup/AGENT.md
     execution_policy:
       default_executor: codex
@@ -238,6 +239,7 @@ agents:
       - .github/
       - .agents/
       - setup/
+      - dashboard/
 
   ather:
     agent_id: agt_ather

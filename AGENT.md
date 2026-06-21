@@ -1,5 +1,5 @@
 ---
-version: "0.2.1b"
+version: "0.2.2b"
 created_at: "2026-06-13T19:39:22+07:00,ATHER,9b1ced3"
 last_update: "2026-06-14T00:29:45+07:00,ATHER"
 status: "beta"
@@ -14,7 +14,7 @@ attributes:
 
 ## Mission
 
-GenesisBlock is a local-first hybrid semantic-graph engine for AI agents and human-machine collaboration. Treat GenesisDB as the Rust-native core memory substrate with graph traversal, vector search, bitemporal history, governance, CRDT sync, MCP access, SDKs, and dashboard/Obsidian integrations.
+GenesisBlock is a local-first hybrid semantic-graph database engine for AI agents and human-machine collaboration. Treat GenesisDB as the Rust-native backend substrate: storage layer, WAL persistence, DB engine, retriever, in-memory embedding arena, graph traversal, hybrid/vector search, HNSW, symbolic graph reasoning, HQL/AST, community detection, governance, and CRDT sync.
 
 ## Operating Workflow
 
@@ -45,9 +45,9 @@ Start architecture discovery from `docs/C4--GENESISDB-ARCHITECTURE.md`. Treat it
 - SDKs:
   - Python: `genesisdb-python/`
   - Go: `genesisdb-go/`
-- UI integrations:
-  - Dashboard: `dashboard/`
-  - Obsidian plugin: `obsidian-plugin/`
+- Optional client/ops surfaces:
+  - Dashboard: `dashboard/` (operational consumer, not core runtime)
+  - Obsidian plugin: `obsidian-plugin/` (human-facing bridge, not DB ownership)
 - Specs and governance docs live in `docs/`, with `docs/C4--GENESISDB-ARCHITECTURE.md` as the architecture entrypoint and `docs/MASTER-SPEC--GENESIS-DB.md` as current parent spec.
 
 ## Core Capabilities
@@ -62,7 +62,7 @@ Start architecture discovery from `docs/C4--GENESISDB-ARCHITECTURE.md`. Treat it
 - CRDT sync: Lamport clocks, signed events, LWW-style reconciliation.
 - Swarm identity: ed25519 identity stored under database path.
 - Autonomic maintenance: pruning, meta-graph generation, state persistence.
-- REST status and swarm status for dashboard and Obsidian health checks.
+- REST status and swarm status expose engine health to optional dashboard and Obsidian consumers.
 
 ## Important Caveats
 
@@ -110,11 +110,13 @@ npm run lint
 | none | 0.1.0b | New repository agent-context document proposed from docs/codebase review. |
 | 0.1.0b | 0.2.0b | Added C4 architecture index as the required architecture discovery entrypoint and promoted context to beta. |
 | 0.2.0b | 0.2.1b | Added agent registry SSOT and registry validation command to the repository context. |
+| 0.2.1b | 0.2.2b | Clarified GenesisDB as backend/runtime engine first; dashboard/Obsidian are optional client surfaces. |
 
 ## CHANGELOG
 
 | Version | Date | Status | Summary | Commit Hash | Agent |
 |---|---|---|---|---|---|
+| 0.2.2b | 2026-06-14 | beta | Clarified backend/runtime ownership and downgraded UI surfaces to optional consumers. | working-tree | ATHER |
 | 0.2.1b | 2026-06-14 | beta | Added agent registry SSOT and validation command. | working-tree | ATHER |
 | 0.2.0b | 2026-06-14 | beta | Added C4 architecture index entrypoint and clarified SSOT read order for agents. | 4101228 | ATHER |
 | 0.1.0b | 2026-06-13 | candidate | Initial AGENT context drafted from repository docs, code, tests, SDKs, MCP, dashboard, and workflow rules. | 9b1ced3 | ATHER |

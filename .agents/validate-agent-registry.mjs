@@ -142,6 +142,7 @@ for (const agentId of expectedAgents) {
 
 const seenAgentIds = new Set();
 const seenLabels = new Set();
+const agentScopes = new Map();
 
 for (const [agentId, blockLines] of blocks.entries()) {
   const stableId = valueFrom(blockLines, 'agent_id');
@@ -184,6 +185,7 @@ for (const [agentId, blockLines] of blocks.entries()) {
   if (seenLabels.has(label)) fail(`Duplicate label: ${label}`);
   seenAgentIds.add(stableId);
   seenLabels.add(label);
+  agentScopes.set(agentId, allowedScopes);
 }
 
 const routeBlocks = topLevelBlocks(routesSection, /^\s{2}[A-Za-z0-9_./-]+:\s*$/);
@@ -192,6 +194,11 @@ for (const [routeKey, routeBlock] of routeBlocks.entries()) {
   const preferred = valueFrom(routeBlock, 'preferred_agent');
   if (!preferred) fail(`Missing preferred_agent for route ${routeKey}`);
   if (!blocks.has(preferred)) fail(`Route ${routeKey} points to unknown agent: ${preferred}`);
+  const preferredScopes = agentScopes.get(preferred) || [];
+  const routeAllowed = preferredScopes.some((scope) => routeKey === scope || routeKey.startsWith(scope));
+  if (!routeAllowed) {
+    fail(`Route ${routeKey} is not inside allowed_scopes for preferred agent ${preferred}`);
+  }
   const reviewers = listFrom(routeBlock, 'reviewers');
   for (const reviewer of reviewers) {
     if (!blocks.has(reviewer)) {

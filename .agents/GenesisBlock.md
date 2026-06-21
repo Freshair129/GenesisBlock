@@ -1,12 +1,12 @@
 ---
-title: genesisblock example
-summary: ตัวอย่างการรวมatomเข้าด้วยกันเพื่อสร้างเอกสาร
-doc_id: GVDOC-1003
+title: Genesis Block Reference Example
+summary: A concrete example of atom composition within a Genesis Block, using a stock control system as a case study.
+doc_id: GVDOC-1005
 created: "2026-06-02T19:40:00+07:00,Boss(CEO)"
-updated: "2026-06-07T12:20:00+07:00,Boss(CEO),98db9a5"
-version: "1.3.0b"
+updated: "2026-06-13T10:15:00+07:00,Rwang (อาหวัง)"
+version: "1.3.1"
 state: active
-type: framework
+type: example
 vault_id: default
 source_type: axiomatic
 tags:
@@ -15,18 +15,12 @@ tags:
   - scaling
   - graph
   - framework
-aliases:
-role: Governance / architectural framework
-block_manifest:
-wikilink: [[FRAMEWORK--HIERARCHY-COMPACTION-STANDARDS]] 
-crosslink:
-
+  - example
 ---
-# GENESIS--COGNITIVE-ENGINE
 
-**GKS Cognitive Engine Manifest (Runtime Entry-point)**
-เอกสารบัญชีรายชื่อ (Manifest) ระดับสูงสุดที่รวบรวม "สมอง" และ "กฎเกณฑ์" ทั้งหมดที่ควบคุม AI Agent ภายใน GKS (Genesis Knowledge System) 
-เอกสารนี้ทำหน้าที่เสมือนตัวบอกทิศทางให้ AI รับรู้ถึงสภาพแวดล้อม ขอบเขต และขั้นตอนการทำงานอย่างเป็นระบบ
+# GENESIS--REFERENCE-CASE (Inventory System)
+
+**NOTE:** This file is a reference example following the standards defined in `docs/specs/SPEC-Genesis-Block.md`.
 
 ตัวอย่างการประกอบร่างเป็น Genesis Block ที่ผูกกับระบบการจัดการสต็อก
 ```yaml

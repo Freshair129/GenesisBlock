@@ -288,6 +288,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .route("/v1/reason/context", post(ranked_context_handler))
         .route("/v1/status", get(status_handler))
         .route("/v1/swarm/status", get(swarm_status_handler))
+        .route("/v1/consensus/propose", post(consensus_propose_handler))
+        .route("/v1/consensus/vote", post(consensus_vote_handler))
+        .route("/v1/consensus/verify", post(consensus_verify_handler))
         .layer(TraceLayer::new_for_http())
         .layer(CorsLayer::permissive())
         .with_state(state);

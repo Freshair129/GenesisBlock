@@ -1,7 +1,7 @@
-﻿# AUDIT--P9-GENESISDB-TURBO-CORE-PERFORMANCE-REPORT
+﻿# AUDIT--P9-GENESISBLOCKDB-TURBO-CORE-PERFORMANCE-REPORT
 
 ## 1. Executive Summary
-Phase 9.1 represents the most significant architectural overhaul of GenesisDB to date. By transitioning from a "Rich-Object Prototype" to a **"High-Density Sharded Engine"**, we have achieved a **22x increase in ingestion throughput** and established a foundation for 50,000+ QPS high-concurrency workloads.
+Phase 9.1 represents the most significant architectural overhaul of GenesisBlockDB to date. By transitioning from a "Rich-Object Prototype" to a **"High-Density Sharded Engine"**, we have achieved a **22x increase in ingestion throughput** and established a foundation for 50,000+ QPS high-concurrency workloads.
 
 ## 2. Architectural Breakthroughs (Turbo Mode)
 The following core systems were refactored to remove serial bottlenecks:
@@ -31,7 +31,7 @@ The following core systems were refactored to remove serial bottlenecks:
 - **Snapshot Integrity:** Bincode binary snapshots now include the Interning Map (\id_to_u32\) for consistent state restoration.
 
 ## 6. Strategic Verdict: ENGINE "ของจริง" (MARK II)
-GenesisDB v1.5.0 is now a viable competitor for high-throughput hybrid workloads. The transition to Path B (High-Density) has successfully bridged the performance gap, moving the engine from "Promising Prototype" to "Production-Grade Core".
+GenesisBlockDB v1.5.0 is now a viable competitor for high-throughput hybrid workloads. The transition to Path B (High-Density) has successfully bridged the performance gap, moving the engine from "Promising Prototype" to "Production-Grade Core".
 
 **Certified by:** T2 Agent ARCHITECT (Gemini)
 **Date:** 2026-06-01
