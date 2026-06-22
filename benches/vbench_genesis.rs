@@ -89,7 +89,7 @@ fn main() {
             let qv: Vec<f64> = queries[qi * dim..(qi + 1) * dim].iter().map(|&x| x as f64).collect();
             let t0 = Instant::now();
             let res = st
-                .hybrid_search(HybridSearchInput { query_vector: qv, k: k as u32, alpha: Some(0.0), lang: None, as_of: None, collection: None })
+                .hybrid_search(HybridSearchInput { query_vector: qv, k: k as u32, alpha: Some(0.0), lang: None, as_of: None, collection: None, ef_search: None })
                 .unwrap();
             lats.push(t0.elapsed().as_nanos() as f64 / 1000.0);
             tk.push(res.iter().take(k).map(|nb| nb.node.id.parse::<i64>().unwrap_or(-1)).collect());

@@ -55,7 +55,7 @@ fn many_collection_indexes_do_not_oom() {
         q[i % dim] = 1.0 + i as f64;
         let hits = s.hybrid_search(HybridSearchInput {
             query_vector: q, k: 1, alpha: Some(0.0), lang: None, as_of: None,
-            collection: Some(format!("c{i}")),
+            collection: Some(format!("c{i}")), ef_search: None,
         }).unwrap();
         assert_eq!(hits.len(), 1, "collection c{i} returns its single vector");
         assert_eq!(hits[0].node.id, format!("n{i}"));
@@ -94,7 +94,7 @@ fn index_grows_past_initial_floor() {
     // neighbors. (Exact identity isn't asserted — the synthetic vectors collide,
     // and HNSW is approximate; correctness of recall is covered elsewhere.)
     let hits = s.hybrid_search(HybridSearchInput {
-        query_vector: emb_for(n - 1, dim), k: 5, alpha: Some(0.0), lang: None, as_of: None, collection: None,
+        query_vector: emb_for(n - 1, dim), k: 5, alpha: Some(0.0), lang: None, as_of: None, collection: None, ef_search: None,
     }).unwrap();
     assert_eq!(hits.len(), 5, "grown index returns k neighbors");
 }

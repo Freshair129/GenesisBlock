@@ -38,7 +38,7 @@ fn top1(s: &Storage, q: Vec<f64>, coll: &str) -> Option<String> {
     s.flush_index();
     s.hybrid_search(HybridSearchInput {
         query_vector: q, k: 1, alpha: Some(0.0), lang: None, as_of: None,
-        collection: Some(coll.to_string()),
+        collection: Some(coll.to_string()), ef_search: None,
     }).unwrap().into_iter().map(|n| n.node.id).next()
 }
 

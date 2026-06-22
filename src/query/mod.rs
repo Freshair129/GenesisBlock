@@ -1,45 +1,8 @@
-﻿pub mod ast;
+pub mod ast;
 pub use ast::HqlCommand;
-use crate::query::ast::HqlRel;
 
-#[derive(Debug, Clone)]
-pub enum PlanStep {
-    VectorSearch { vector: Vec<f32>, k: usize },
-    GraphTraversal { seed: String, depth: u32, rel: HqlRel, fuzzy: bool },
-    ApplyKImpact { alpha: f64 },
-    ContextRetrieval { target: String, tier: String, budget: Option<u32>, fuzzy: bool },
-}
-
-pub struct QueryPlan {
-    pub steps: Vec<PlanStep>,
-}
-
-pub struct LogicalPlanner;
-
-impl LogicalPlanner {
-    pub fn plan(command: HqlCommand) -> QueryPlan {
-        let mut steps = Vec::new();
-        match command {
-            HqlCommand::Search { target: _, vector, k, fuzzy: _, lang: _, as_of: _, collection: _ } => {
-                steps.push(PlanStep::VectorSearch { 
-                    vector: vector.into_iter().map(|v| v as f32).collect(), 
-                    k: k as usize 
-                });
-            }
-            HqlCommand::Traverse { seed, depth, rel, fuzzy, as_of: _ } => {
-                steps.push(PlanStep::GraphTraversal { seed, depth, rel, fuzzy });
-            }
-            HqlCommand::Hybrid { target: _, vector, alpha, fuzzy: _, lang: _, as_of: _, collection: _ } => {
-                steps.push(PlanStep::VectorSearch { 
-                    vector: vector.into_iter().map(|v| v as f32).collect(), 
-                    k: 10 
-                });
-                steps.push(PlanStep::ApplyKImpact { alpha });
-            }
-            HqlCommand::Context { target, tier, budget, fuzzy } => {
-                steps.push(PlanStep::ContextRetrieval { target, tier, budget, fuzzy });
-            }
-        }
-        QueryPlan { steps }
-    }
-}
+// NOTE: `execute_hql` (in src/lib.rs) pattern-matches `HqlCommand` and dispatches
+// to Storage methods directly — there is no intermediate logical plan. The old
+// `LogicalPlanner` / `QueryPlan` / `PlanStep` types were dead code (never called)
+// and were removed in MARK XIV. If a cost-based planner is reintroduced, add it
+// here and route `execute_hql` through it.
