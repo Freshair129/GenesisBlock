@@ -1,20 +1,27 @@
-# GENESISDB ROADMAP (MARK XI -> MARK XII)
-**Positioning:** Embedded analytics / agent-memory graph + vector engine
-(comparators: Kuzu, DuckDB+graph, RocksDB+graph; Neo4j/Qdrant as references).
+# GENESISDB ROADMAP (MARK XIII → MARK XIV)
+**Positioning:** Embedded analytics / agent-memory graph + vector engine —
+the only embedded database with graph + vector + bitemporal + CRDT + governance
+in a single binary. Nearest comparators: Kuzu, DuckDB+graph, LanceDB, LadybugDB.
 **Master Specification:** [MASTER-SPEC--GENESIS-DB.md](docs/MASTER-SPEC--GENESIS-DB.md)
-**Evidence:** [REPORT--2026-06-21-PERFORMANCE-AND-COMPETITIVE.md](docs/REPORT--2026-06-21-PERFORMANCE-AND-COMPETITIVE.md) (audits P14–P25)
+**Evidence:** [REPORT--2026-06-21-PERFORMANCE-AND-COMPETITIVE.md](docs/REPORT--2026-06-21-PERFORMANCE-AND-COMPETITIVE.md) (P14–P30, all 8 competitors measured)
+**Metrics:** [METRICS-REVIEW--2026-06-22-WEEKLY.md](docs/METRICS-REVIEW--2026-06-22-WEEKLY.md)
 
-## Current Status (evidence-backed 2026-06-21)
-- **Benchmark Credibility:** vector (vs Chroma/Qdrant + recall-latency frontier),
-  graph (10k–1M, vs Neo4j), and cost proofs (governance, incremental K-Impact)
-  — all measured and reproducible. Earlier "<30 µs / 120 TPS" figures retracted.
-- **Production Readiness:** advanced prototype. Durable WAL + snapshot/replay
-  verified; full suite green. Open: deferred indexing, edge-id interning RAM,
-  gossip anti-entropy stub, `retract_edge` stub.
-- **Core Architecture:** Neural Bridge, LPA Clustering, Merkle Sync, Logic-Gated Context, Consensus Protocol.
+## Current Status (evidence-backed 2026-06-22)
+- **Benchmark Credibility:** 8/8 named competitors measured (P15–P30). Vector vs
+  Chroma/Qdrant/LanceDB; graph vs Neo4j/Kuzu/DuckDB+graph/RocksDB+graph/LadybugDB.
+  hop1 p50 = 21.6 µs; LadybugDB (closest on-niche competitor) = 3,637 µs (**168×**).
+- **Production Readiness:** advanced prototype. Suite green: 23 binaries,
+  49 cargo tests / 7 npm tests pass. Open: `retract_edge` stub, gossip
+  anti-entropy, per-query `ef_search`, GKS Dashboard.
+- **Core Architecture:** Neural Bridge, LPA Clustering, Merkle Sync,
+  Logic-Gated Context, Consensus Protocol + ed25519 vote signatures (PR #6).
 - **Temporal Engine:** Bitemporal Querying, Event Sourcing, Vector Drift Tracking, TTL.
-- **Cognitive Layer:** Graph Retrieval Layer (GRL) with H0-H5 Scaling Protocol.
+- **Cognitive Layer:** Graph Retrieval Layer (GRL) H0–H5; HQL `IN <collection>` (PR #3).
 - **Distributed Intelligence:** CRDT Foundation, P2P Gossip, Logical Clocks.
+- **Vector:** Multi-collection per-model/dim isolation; `add_vector` multi-vector
+  per node (PR #4); async HNSW indexing (10× P95 improvement); configurable `ef`.
+- **Graph:** u128 edge keys (collision rate 9e-26, PR #7); edge-id numeric
+  interning Layer A+B (−44% RAM on edges).
 
 ---
 
@@ -48,11 +55,11 @@
 
 ---
 
-## MARK XI: Enterprise Integration & Tooling (Current)
+## MARK XI: Enterprise Integration & Tooling (MOSTLY COMPLETE)
 - [x] **Step 1: MCP Server:** Model Context Protocol implementation for LLM native tool integration. [Guide](docs/MCP-GUIDE.md)
 - [x] **Step 2: Python SDK:** High-level bindings for Data Science and AI research. [Guide](docs/PYTHON-SDK-GUIDE.md)
 - [x] **Step 3: Go SDK:** Official client for cloud-native infrastructure and high-performance backends.
-- [ ] **Step 4: GKS Insight Dashboard:** Real-time visualization of swarm health and knowledge drift.
+- [ ] **Step 4: GKS Insight Dashboard:** Real-time visualization of swarm health and knowledge drift. *(moved to MARK XIV)*
 
 ---
 
@@ -64,11 +71,90 @@
 - [x] **Engine perf:** −44% RAM, ×6.1 concurrent ingest, ×7.8 bulk insert, configurable HNSW `ef` (P14/P16–P19).
 - [x] **Interactive dashboard:** `docs/perf-comparison-dashboard.html`.
 
-## MARK XIII: Next (proposed)
-- [x] **Kuzu head-to-head** (embedded↔embedded, P26): GenesisBlockDB wins traversal
-  latency 7–166×; Kuzu wins ingest ~60× & memory ~11× — different sweet spots.
-- [ ] **Edge-id interning rework** (u64 ids) to push graph scale past 1M / 32 GB.
-- [ ] **Deferred/async indexing** to keep query latency flat during bulk load.
-- [ ] **Multi-collection vector space** (per-model/dim; [SPEC](docs/SPEC--MULTI-COLLECTION-VECTOR-SPACE.md)).
-- [x] **Doc hygiene:** `API_REFERENCE.md` regenerated from `main.rs`; version SSOT
-  ([VERSION.md](docs/VERSION.md)); status index ([DOC-STATUS.md](docs/DOC-STATUS.md)).
+---
+
+## MARK XIII: Scale & Full Benchmark Coverage (COMPLETED 2026-06-22)
+
+*ทุก item ใน MARK XIII merge แล้วใน session 2026-06-22 (6 PRs + 3 engine levers)*
+
+### Benchmark Completions
+- [x] **Kuzu head-to-head** (P26): GenesisBlockDB hop1 **7–166×** faster; Kuzu ingest **60×**, memory **11×** — different sweet spots documented. [Audit](docs/AUDIT--P26-KUZU-HEAD-TO-HEAD.md)
+- [x] **LanceDB head-to-head** (P27): GenesisBlockDB point-query **~9×** faster; LanceDB trades latency for disk-scale. [Audit](docs/AUDIT--P27-LANCEDB-HEAD-TO-HEAD.md)
+- [x] **DuckDB+graph head-to-head** (P28): hop1 **54×**, tied hop6 — validates deep-traversal architecture. [Audit](docs/AUDIT--P28-DUCKDB-GRAPH-HEAD-TO-HEAD.md)
+- [x] **RocksDB+graph head-to-head** (P29): hop1 **effectively tied** — confirms µs latency is real vs raw KV adjacency. [Audit](docs/AUDIT--P29-ROCKSDB-GRAPH-HEAD-TO-HEAD.md)
+- [x] **LadybugDB head-to-head** (P30, closest on-niche competitor — Kuzu fork, regulated industries): hop1 **168×**, hop3 **6.7×**, hop6 **13.5×**; no payload caveat. [Audit](docs/AUDIT--P30-LADYBUGDB-HEAD-TO-HEAD.md)
+
+### Engine Scale Improvements (PRs #2–#7)
+- [x] **HNSW capacity OOM fix** (PR #2): fixed 133 MB/index over-allocation bug.
+- [x] **HQL `IN <collection>` clause** (PR #3): scope vector search to named collection.
+- [x] **`add_vector` — multi-vector per node** (PR #4): one embedding per collection per node.
+- [x] **Background thread hygiene** (PR #5): join indexing threads on Drop.
+- [x] **Consensus vote signature verification** (PR #6): ed25519 validation on inbound votes — closes security gap.
+- [x] **u128 edge keys** (PR #7): collision rate 1.7e-6 → 9e-26. [ADR](docs/adr/ADR--GENESISDB-EDGE-NUMERIC-KEYS.md)
+
+### Engine Levers (session 2026-06-22)
+- [x] **Edge-id interning Layer A+B**: drop edge UUID strings + trigram pollution → edge RAM −44% (965 MB → 600 MB @100k/800k). [ADR](docs/adr/ADR--GENESISDB-EDGE-ID-INTERNING.md)
+- [x] **Async HNSW indexing**: move HNSW insert off write hot path → P95 query latency 6.31 → 0.60 ms (≈10×) under concurrent ingest. [ADR](docs/adr/ADR--GENESISDB-ASYNC-INDEXING.md)
+- [x] **Multi-collection vector space**: per-model/dim isolation; snapshot = per-collection `.bin` + manifest. [ADR](docs/adr/ADR--GENESISDB-MULTI-COLLECTION.md) [Spec](docs/SPEC--MULTI-COLLECTION-VECTOR-SPACE.md)
+
+### Documentation
+- [x] **Doc hygiene:** `API_REFERENCE.md` regenerated; version SSOT ([VERSION.md](docs/VERSION.md)); status index ([DOC-STATUS.md](docs/DOC-STATUS.md)).
+- [x] **Competitive Market Brief:** full landscape analysis + positioning ([Section 9, REPORT](docs/REPORT--2026-06-21-PERFORMANCE-AND-COMPETITIVE.md))
+- [x] **Weekly Metrics Review:** first evidence-backed metrics review ([METRICS-REVIEW--2026-06-22-WEEKLY.md](docs/METRICS-REVIEW--2026-06-22-WEEKLY.md))
+
+---
+
+## MARK XIV: Market Credibility & Scale Ceiling (Proposed)
+
+> **Theme:** Convert benchmark wins into market presence; push RAM ceiling beyond 1M nodes; close remaining correctness stubs.
+
+### Priority 1 — Scale Ceiling (🔴 สูงมาก)
+- [ ] **Recall@500k sweep:** measure ef_search=200 at 500k vectors to confirm recall
+  recovers from 0.891 → target ≥0.975; document tuning guidance. *(1–2 days)*
+- [~] **Node RAM ceiling — id interning:** A1 (drop `u32_to_id` reverse map) + A3
+  (`trigram_index` → roaring) **shipped** 2026-06-23; A2 (`NodeMetadata.node_id`→u32,
+  meta-bin migration) deferred. [ADR](docs/adr/ADR--GENESISDB-NODE-ID-INTERNING.md).
+  RSS quantification at 500k–2M still pending a probe run.
+
+### Priority 2 — Market Evidence (🟡 กลาง)
+- [ ] **Public benchmark page:** publish P15–P30 results as a standalone page
+  (HTML or hosted). Competitor-specific tables with honest caveats already written.
+  *(1 day — content exists)*
+- [ ] **TypeScript type definitions + quickstart:** `npm install genesis-block`
+  with full TS types and a working "5-minute" example. NAPI moat is locked behind
+  poor DX without this. *(3–5 days)*
+- [ ] **Competitive positioning copy:** update README + docs/landing to lead with
+  "verifiable agent memory" narrative and MASTER tier benchmark. *(1 day)*
+
+### Priority 3 — Correctness & Technical Debt (🟡 กลาง)
+- [ ] **`retract_edge` implementation:** currently returns `Ok(None)` stub; blocks
+  full graph mutation support. *(1–2 days)*
+- [ ] **`LogicalPlanner` dead code removal:** safe to delete post-MARK XIII; keeps
+  `src/query/mod.rs` clean. *(half day)*
+- [ ] **Per-query / per-collection `ef_search`:** currently global knob; per-query
+  override would allow high-recall and low-latency queries to coexist. *(2–3 days)*
+
+### Priority 4 — Vector Quality (🟢 ต่ำ)
+- [~] **Scalar / binary quantization:** **SQ8 shipped** 2026-06-23 (full resident cut —
+  per-collection `Quant`, arena+HNSW u8, 4× RAM *and* disk). Binary (BQ) deferred to a
+  focused PR (no-mmap f32 sidecar + custom popcount distance).
+  [ADR](docs/adr/ADR--GENESISDB-VECTOR-QUANTIZATION.md). Recall harness on real data pending.
+- [ ] **GKS Insight Dashboard** *(carried from MARK XI Step 4)*: real-time swarm
+  health and knowledge drift visualization. *(1–2 weeks)*
+
+### Priority 5 — Distributed (🟢 ต่ำ; C-3 own session)
+- [ ] **Gossip `PullRequest` anti-entropy:** complete P2P sync loop; currently
+  push-only with stub pull path. *(own session — complex, requires careful design)*
+
+---
+
+## Roadmap Changes This Update (2026-06-22)
+
+| Change | รายละเอียด |
+|---|---|
+| MARK XIII → **COMPLETED** | ทุก item done ใน 6 PRs + 3 engine levers (session 2026-06-22) |
+| MARK XIV **proposed** | 9 items ใน 5 priority buckets พร้อม effort estimate |
+| MARK XI Step 4 | Dashboard ย้ายไป MARK XIV Priority 4 (ไม่ได้ cut — แค่ sequence) |
+| Evidence links | อัพเดทจาก P14–P25 → P14–P30 (8/8 competitors measured) |
+| Positioning | อัพเดทให้รวม LadybugDB ในฐานะ closest on-niche competitor |
+| Header | อัพเดทจาก "MARK XI → MARK XII" → "MARK XIII → MARK XIV" |
