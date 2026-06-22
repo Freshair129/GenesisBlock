@@ -481,9 +481,9 @@ pub struct Storage {
     pub path: PathBuf,
     pub read_only: bool,
     pub nodes: DashMap<u32, NodeOutput>,
-    pub edges: DashMap<u64, EdgeOutput>,
-    pub out_idx: DashMap<u32, HashSet<u64>>,
-    pub in_idx: DashMap<u32, HashSet<u64>>,
+    pub edges: DashMap<u128, EdgeOutput>,
+    pub out_idx: DashMap<u32, HashSet<u128>>,
+    pub in_idx: DashMap<u32, HashSet<u128>>,
     /// Per-model/per-dim isolated vector spaces, keyed by collection name.
     /// Replaces the former single global arena/metadata/hnsw/u32_to_arena_id.
     pub collections: DashMap<String, Arc<VectorCollection>>,
@@ -586,9 +586,13 @@ impl Storage {
     /// stored coordination. `EdgeOutput.id` remains the canonical reverse
     /// lookup. Idempotency = "is this u64 already in `edges`?".
     /// See ADR--GENESISDB-EDGE-NUMERIC-KEYS (Layer B) / RCA--EDGE-ID-INTERNING-RAM.
-    pub fn edge_key(id: &str) -> u64 {
+    pub fn edge_key(id: &str) -> u128 {
+        // 128-bit truncation of SHA256(id). Widened from u64 (Layer B) to slash
+        // the birthday-collision risk: ~1.7e-6 at 8M edges (u64) -> ~9e-26 (u128).
+        // The key is always derived from EdgeOutput.id, never stored, so this is a
+        // pure in-memory width change — legacy u64 snapshots re-key transparently.
         let digest = Sha256::digest(id.as_bytes());
-        u64::from_be_bytes(digest[..8].try_into().unwrap())
+        u128::from_be_bytes(digest[..16].try_into().unwrap())
     }
 
     pub fn get_u32(&self, id: &str) -> Option<u32> { self.id_to_u32.get(id).map(|v| *v) }
@@ -1033,8 +1037,8 @@ impl Storage {
                         })?;
                     }
                     Event::Edge(e) => {
-                        let edge_u64 = Self::edge_key(&e.id);
-                        self.edges.insert(edge_u64, e.clone());
+                        let ekey = Self::edge_key(&e.id);
+                        self.edges.insert(ekey, e.clone());
                         self.persist_signed(signed_event.clone())?;
                     }
                     Event::Batch(events) => {
@@ -1047,8 +1051,8 @@ impl Storage {
                                     self.insert_node_lean(u32_id, n_axiom);
                                 }
                                 Event::Edge(edge) => {
-                                    let edge_u64 = Self::edge_key(&edge.id);
-                                    self.edges.insert(edge_u64, edge.clone());
+                                    let ekey = Self::edge_key(&edge.id);
+                                    self.edges.insert(ekey, edge.clone());
                                 }
                                 _ => {}
                             }
@@ -1096,16 +1100,16 @@ impl Storage {
         }
     }
 
-    /// Index an edge into the adjacency maps and return its u64 key. The edge key
+    /// Index an edge into the adjacency maps and return its u128 key. The edge key
     /// is the deterministic `edge_key(id)` hash (no trigram/reverse/`id_to_u32`);
     /// `from`/`to` are node ids and keep the full node intern (they are searchable).
-    pub fn index_edge_internal(&self, id: &str, from: &str, to: &str) -> u64 {
-        let edge_u64 = Self::edge_key(id);
+    pub fn index_edge_internal(&self, id: &str, from: &str, to: &str) -> u128 {
+        let ekey = Self::edge_key(id);
         let u32_from = self.get_or_intern_id(from);
         let u32_to = self.get_or_intern_id(to);
-        self.out_idx.entry(u32_from).or_insert_with(HashSet::new).insert(edge_u64);
-        self.in_idx.entry(u32_to).or_insert_with(HashSet::new).insert(edge_u64);
-        edge_u64
+        self.out_idx.entry(u32_from).or_insert_with(HashSet::new).insert(ekey);
+        self.in_idx.entry(u32_to).or_insert_with(HashSet::new).insert(ekey);
+        ekey
     }
 
     fn next_clock(&self) -> LogicalClock {
@@ -1344,7 +1348,7 @@ impl Storage {
             if curr_depth >= depth && !is_inferred { continue; }
 
             // Collect candidate edge ids from chosen directions, dedup by eid.
-            let mut eid_set: HashSet<u64> = HashSet::new();
+            let mut eid_set: HashSet<u128> = HashSet::new();
             if walk_out {
                 if let Some(out_eids) = self.out_idx.get(&curr_u32) { eid_set.extend(out_eids.iter().copied()); }
             }
@@ -1933,7 +1937,7 @@ impl Storage {
 
         // 2. Save DashMaps (Partial state for instant load)
         let nodes: Vec<(u32, NodeOutput)> = self.nodes.iter().map(|e| (*e.key(), e.value().clone())).collect();
-        let edges: Vec<(u64, EdgeOutput)> = self.edges.iter().map(|e| (*e.key(), e.value().clone())).collect();
+        let edges: Vec<(u128, EdgeOutput)> = self.edges.iter().map(|e| (*e.key(), e.value().clone())).collect();
         fs::write(temp_dir.join("nodes.bin"), serde_json::to_vec(&nodes).unwrap()).ok();
         fs::write(temp_dir.join("edges.bin"), serde_json::to_vec(&edges).unwrap()).ok();
 
@@ -2054,10 +2058,10 @@ impl Storage {
         } else { println!("Mark IX: nodes.bin not found"); }
 
         if let Ok(data) = fs::read(self.path.join("edges.bin")) {
-            // Deserialize as u64 tuples. Legacy snapshots wrote u32 keys; JSON
-            // numbers widen into u64 fine, and the saved key is ignored anyway
-            // (see below), so both widths load transparently.
-            if let Ok(edges) = serde_json::from_slice::<Vec<(u64, EdgeOutput)>>(&data) {
+            // Deserialize as u128 tuples. Legacy snapshots wrote u32/u64 keys; JSON
+            // numbers widen into u128 fine, and the saved key is ignored anyway
+            // (re-derived below), so all widths load transparently.
+            if let Ok(edges) = serde_json::from_slice::<Vec<(u128, EdgeOutput)>>(&data) {
                 println!("Mark IX: Loading {} edges from snapshot", edges.len());
                 for (_saved_k, v) in edges {
                     // Re-derive the edge key deterministically from the edge id

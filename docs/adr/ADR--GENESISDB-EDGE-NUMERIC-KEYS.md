@@ -77,15 +77,21 @@ Layer B is edges-only.
   edge id-spaces; the Layer-A "register under saved key" dance becomes "re-derive key").
 - Edge insert is one hash, no map write to `id_to_u32`.
 
+> **Update (2026-06-22): widened to u128.** `edge_key` now returns `u128`
+> (`trunc128(SHA256(id))`, first 16 bytes); `edges: DashMap<u128, EdgeOutput>`,
+> `out_idx`/`in_idx: DashMap<u32, HashSet<u128>>`. This drops the birthday-collision
+> bound at 8M edges from **~1.7·10⁻⁶ (u64) to ~9·10⁻²⁶ (u128)** — the "Future
+> hardening" below, now done. The key remains derived-not-stored, so legacy
+> u64-keyed `edges.bin` loads transparently (a u64 JSON number widens into u128 and
+> is re-derived anyway). +8 B/edge — negligible vs the EdgeOutput payload. Tests:
+> `tests/edge_u128_tests.rs`.
+
 ### Negative / Trade-offs
-- **u64 truncated-hash collision** is theoretically possible. Birthday bound at 8M
-  edges: ≈ n²/2⁶⁵ ≈ (8·10⁶)²/3.7·10¹⁹ ≈ **1.7·10⁻⁶** over a database's full lifetime
-  at max design scale. On collision, two distinct edges would share a `edges` key and
-  silently overwrite/merge adjacency. Deemed **acceptable** for a local-first,
-  single-writer agent-memory store at this scale; `EdgeOutput.id` still holds the true
-  string, so a collision is *detectable* at read time if ever needed. Future hardening
-  (if scale or guarantees demand): widen to u128 (full key fits 16 bytes) or verify
-  `edges[k].id == id` on insert and relocate. Not done now.
+- ~~**u64 truncated-hash collision**~~ (superseded by the u128 widening above; kept
+  for the decision trail). Birthday bound at 8M edges: ≈ n²/2⁶⁵ ≈
+  (8·10⁶)²/3.7·10¹⁹ ≈ **1.7·10⁻⁶** under the original u64 key — deemed acceptable
+  then, and now reduced to ~9·10⁻²⁶ by widening to u128. `EdgeOutput.id` still holds
+  the true string, so a collision is *detectable* at read time if ever needed.
 - WAL/snapshot edge **key width changes** (u32→u64). Legacy `edges.bin` is handled by
   re-deriving the key on load (see Decision §6), so existing local DBs migrate
   transparently; the WAL itself stores `EdgeOutput` (string id), not the numeric key, so
@@ -139,3 +145,4 @@ cases). No WAL/CRDT semantic change.
 |---|---|---|
 | 0.1.0 | 2026-06-21 | Proposed & accepted: numeric u64 edge keys (deterministic SHA256-trunc), drop edge UUID strings from `id_to_u32`; u64 collision risk documented & accepted. |
 | 0.2.0 | 2026-06-21 | Shipped & measured: −9.9% (100k) / −8.6% (200k) further edge RAM; edge UUID strings → 0; combined A+B −44% vs original baseline. |
+| 0.3.0 | 2026-06-22 | Widened edge key u64 → u128 (`trunc128(SHA256)`): collision bound ~1.7e-6 → ~9e-26 at 8M edges; key still derived-not-stored, legacy u64 snapshots load transparently. `tests/edge_u128_tests.rs`. |
