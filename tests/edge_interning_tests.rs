@@ -46,7 +46,7 @@ fn edge(s: &Storage, eid: &str, from: &str, to: &str, rel: &str) {
 }
 
 fn trigram_members(s: &Storage) -> usize {
-    s.trigram_index.iter().map(|e| e.value().len()).sum()
+    s.trigram_index.iter().map(|e| e.value().len() as usize).sum()
 }
 
 fn hop1_out(s: &Storage, id: &str) -> usize {
@@ -99,9 +99,11 @@ fn edges_absent_from_id_maps() {
         s.edges.get(&Storage::edge_key("edge-xyz")).is_some(),
         "edge must be reachable via its numeric key"
     );
-    // Nodes still have both forward and reverse entries.
+    // Nodes keep a forward id_to_u32 entry; the reverse map was dropped
+    // (ADR--GENESISDB-NODE-ID-INTERNING, Layer A). A u32's id is now recovered
+    // from the canonical `nodes[u32].id` record instead.
     let au = s.get_u32("A").unwrap();
-    assert_eq!(s.u32_to_id.get(&au).unwrap().value(), "A");
+    assert_eq!(s.nodes.get(&au).unwrap().value().id, "A");
 }
 
 /// Layer B: edge_key is a pure deterministic function of the id string.
