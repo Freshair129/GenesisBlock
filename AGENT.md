@@ -66,7 +66,7 @@ Start architecture discovery from `docs/C4--GENESISDB-ARCHITECTURE.md`. Treat it
 
 ## Current Engine Model (shipped 2026-06-22)
 
-- **Edges keyed by `u64` hash.** `edges: DashMap<u64, EdgeOutput>` keyed by `Storage::edge_key(id) = trunc64(SHA256(id))`; `out_idx`/`in_idx: DashMap<u32, HashSet<u64>>`. Edge id strings are **not** interned into `id_to_u32` (nodes only). `ADR--GENESISDB-EDGE-NUMERIC-KEYS`.
+- **Edges keyed by `u128` hash.** `edges: DashMap<u128, EdgeOutput>` keyed by `Storage::edge_key(id) = trunc128(SHA256(id))`; `out_idx`/`in_idx: DashMap<u32, HashSet<u128>>`. Key is derived from `EdgeOutput.id` (never stored authoritatively); legacy u64-keyed snapshots load transparently. Edge id strings are **not** interned into `id_to_u32` (nodes only). `ADR--GENESISDB-EDGE-NUMERIC-KEYS`.
 - **Per-collection vector spaces.** No global arena/HNSW/`vector_dim`; `Storage.collections: DashMap<String, Arc<VectorCollection>>` (+ `default_collection`). `NodeInput.collection` routes a node's embedding; `HybridSearchInput.collection` scopes + dim-validates search. Snapshot = per-collection `vec_<name>.bin`/`meta_<name>.bin` + a `collections` manifest in `state.json`; legacy single-space DBs migrate to `default`. New REST `/v1/collection/create`, `/v1/collections`; NAPI `createCollection`/`listCollections`. `ADR--GENESISDB-MULTI-COLLECTION`.
 - **Async HNSW indexing.** `add_node`/`execute_batch` stage the vector (durable via WAL) and enqueue the HNSW insert onto a per-`Storage` indexing thread — vectors are *eventually searchable*. `flush_index()` for read-your-write; `index_lag()` for backlog; compaction/rebuild flush first. `ADR--GENESISDB-ASYNC-INDEXING`.
 

@@ -50,7 +50,7 @@ When called by GoVibe, Codex, Claude Code, or another external orchestrator, Gem
 - **Axiomatic Guards:** MASTER tier nodes are immutable for external agents. This is enforced in `validate_governance`.
 
 ### 2.4 Current Engine Model (shipped 2026-06-22)
-- **Edges keyed by `u64` hash:** `edges: DashMap<u64, EdgeOutput>` keyed by `Storage::edge_key(id) = trunc64(SHA256(id))`; `out_idx`/`in_idx: DashMap<u32, HashSet<u64>>`. Edge id strings are **not** interned into `id_to_u32` (nodes only). See `ADR--GENESISDB-EDGE-NUMERIC-KEYS`.
+- **Edges keyed by `u128` hash:** `edges: DashMap<u128, EdgeOutput>` keyed by `Storage::edge_key(id) = trunc128(SHA256(id))`; `out_idx`/`in_idx: DashMap<u32, HashSet<u128>>`. Key is derived from `EdgeOutput.id` (never stored authoritatively); legacy u64-keyed snapshots load transparently. Edge id strings are **not** interned into `id_to_u32` (nodes only). See `ADR--GENESISDB-EDGE-NUMERIC-KEYS`.
 - **Per-collection vector spaces:** no global arena/HNSW/`vector_dim`. `Storage.collections: DashMap<String, Arc<VectorCollection>>` (+ `default_collection`); each collection owns its arena + metadata + HNSW + metric + dim. `NodeInput.collection` routes embeddings; `HybridSearchInput.collection` scopes + dim-validates search. REST `/v1/collection/create`, `/v1/collections`. See `ADR--GENESISDB-MULTI-COLLECTION`.
 - **Async HNSW indexing:** inserts run off the write path on a per-`Storage` indexing thread; vectors are *eventually searchable*. Use `flush_index()` for read-your-write, `index_lag()` for backlog. See `ADR--GENESISDB-ASYNC-INDEXING`.
 
