@@ -32,7 +32,7 @@ fn search(s: &Storage, q: Vec<f64>, k: u32, collection: Option<&str>) -> Vec<Str
     s.flush_index();
     s.hybrid_search(HybridSearchInput {
         query_vector: q, k, alpha: Some(0.0), lang: None, as_of: None,
-        collection: collection.map(|c| c.to_string()),
+        collection: collection.map(|c| c.to_string()), ef_search: None,
     }).unwrap().into_iter().map(|n| n.node.id).collect()
 }
 

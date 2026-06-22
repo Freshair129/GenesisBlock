@@ -29,7 +29,7 @@ fn add(s: &Storage, id: &str, emb: Vec<f64>) {
 
 fn search_ids(s: &Storage, q: Vec<f64>, k: u32) -> Vec<String> {
     s.hybrid_search(HybridSearchInput {
-        query_vector: q, k, alpha: Some(0.0), lang: None, as_of: None, collection: None,
+        query_vector: q, k, alpha: Some(0.0), lang: None, as_of: None, collection: None, ef_search: None,
     }).unwrap().into_iter().map(|n| n.node.id).collect()
 }
 

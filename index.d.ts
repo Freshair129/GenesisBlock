@@ -116,6 +116,14 @@ export interface HybridSearchInput {
    * validated against the collection dim (closes the cross-space bug).
    */
   collection?: string
+  /**
+   * Per-query HNSW `ef_search` override. When `None`, falls back to the
+   * engine-global value (`set_index_params`). Higher = better recall, higher
+   * latency. Lets a single index serve both high-recall and low-latency
+   * callers (the global value can't satisfy both as N grows — see the
+   * Recall@500k frontier).
+   */
+  efSearch?: number
 }
 export interface DatabaseStatus {
   open: boolean

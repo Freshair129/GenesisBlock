@@ -72,6 +72,7 @@ fn test_mark_ix_memory_reclamation_compaction() {
         lang: None,
         as_of: None,
         collection: None,
+        ef_search: None,
     }).unwrap();
     
     assert_eq!(search_res.len(), 1);

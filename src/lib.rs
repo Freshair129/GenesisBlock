@@ -205,6 +205,12 @@ pub struct HybridSearchInput {
     /// Vector collection to search. Defaults to `default`. Query dim is
     /// validated against the collection dim (closes the cross-space bug).
     pub collection: Option<String>,
+    /// Per-query HNSW `ef_search` override. When `None`, falls back to the
+    /// engine-global value (`set_index_params`). Higher = better recall, higher
+    /// latency. Lets a single index serve both high-recall and low-latency
+    /// callers (the global value can't satisfy both as N grows — see the
+    /// Recall@500k frontier).
+    pub ef_search: Option<u32>,
 }
 
 #[napi(object)]
@@ -1180,6 +1186,7 @@ impl Storage {
                         lang: node.lang.clone(),
                         as_of: None,
                         collection: node.collection.clone(),
+                        ef_search: None,
                     })?;
                     
                     for neighbor in context {
@@ -1477,7 +1484,7 @@ impl Storage {
         match command {
             HqlCommand::Search { vector, k, fuzzy, target, lang, as_of, collection } => {
                 let _resolved = if fuzzy { self.find_fuzzy_id(&target) } else { Some(target) };
-                let res = self.hybrid_search(HybridSearchInput { query_vector: vector, k, alpha: Some(0.0), lang, as_of, collection })?;
+                let res = self.hybrid_search(HybridSearchInput { query_vector: vector, k, alpha: Some(0.0), lang, as_of, collection, ef_search: None })?;
                 Ok(serde_json::to_value(res).unwrap())
             }
             HqlCommand::Traverse { seed, depth, rel, fuzzy, as_of } => {
@@ -1493,7 +1500,7 @@ impl Storage {
             }
             HqlCommand::Hybrid { vector, alpha, fuzzy, target, lang, as_of, collection } => {
                 let _resolved = if fuzzy { self.find_fuzzy_id(&target) } else { Some(target) };
-                let res = self.hybrid_search(HybridSearchInput { query_vector: vector, k: 10, alpha: Some(alpha), lang, as_of, collection })?;
+                let res = self.hybrid_search(HybridSearchInput { query_vector: vector, k: 10, alpha: Some(alpha), lang, as_of, collection, ef_search: None })?;
                 Ok(serde_json::to_value(res).unwrap())
             }
             HqlCommand::Context { target, tier, budget, fuzzy } => {
@@ -1534,10 +1541,13 @@ impl Storage {
             if norm > 0.0 { for x in query_f32.iter_mut() { *x /= norm; } }
         }
         // VecIndex quantizes the query per mode and returns (arena_id, distance_f32).
+        // Per-query ef_search override falls back to the engine-global default.
+        let ef = args.ef_search.map(|e| e as usize)
+            .unwrap_or_else(|| self.ef_search.load(Ordering::Relaxed));
         let results = {
             let hnsw_lock = coll.hnsw.read();
             match &*hnsw_lock {
-                Some(idx) => idx.search_f32(&query_f32, (args.k * 2) as usize, self.ef_search.load(Ordering::Relaxed)),
+                Some(idx) => idx.search_f32(&query_f32, (args.k * 2) as usize, ef),
                 None => return Err(Error::from_reason("HNSW not init")),
             }
         };

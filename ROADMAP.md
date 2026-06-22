@@ -109,8 +109,10 @@ in a single binary. Nearest comparators: Kuzu, DuckDB+graph, LanceDB, LadybugDB.
 > **Theme:** Convert benchmark wins into market presence; push RAM ceiling beyond 1M nodes; close remaining correctness stubs.
 
 ### Priority 1 — Scale Ceiling (🔴 สูงมาก)
-- [ ] **Recall@500k sweep:** measure ef_search=200 at 500k vectors to confirm recall
-  recovers from 0.891 → target ≥0.975; document tuning guidance. *(1–2 days)*
+- [x] **Recall@500k sweep:** **done** 2026-06-23. Reproduced the regression at the global
+  default (ef=200 → recall@10 0.887); recall recovers with ef_search — 0.940 @400, **0.973 @800**
+  — at ~3.1× p50 latency (1458→4528µs). Conclusion: a single global ef can't serve both scales →
+  motivates per-query ef_search (P3, shipped). Numbers in `gb_vbench_500k/frontier_results.json`.
 - [~] **Node RAM ceiling — id interning:** A1 (drop `u32_to_id` reverse map) + A3
   (`trigram_index` → roaring) **shipped** 2026-06-23; A2 (`NodeMetadata.node_id`→u32,
   meta-bin migration) deferred. [ADR](docs/adr/ADR--GENESISDB-NODE-ID-INTERNING.md).
@@ -129,10 +131,11 @@ in a single binary. Nearest comparators: Kuzu, DuckDB+graph, LanceDB, LadybugDB.
 ### Priority 3 — Correctness & Technical Debt (🟡 กลาง)
 - [ ] **`retract_edge` implementation:** currently returns `Ok(None)` stub; blocks
   full graph mutation support. *(1–2 days)*
-- [ ] **`LogicalPlanner` dead code removal:** safe to delete post-MARK XIII; keeps
-  `src/query/mod.rs` clean. *(half day)*
-- [ ] **Per-query / per-collection `ef_search`:** currently global knob; per-query
-  override would allow high-recall and low-latency queries to coexist. *(2–3 days)*
+- [x] **`LogicalPlanner` dead code removal:** **done** 2026-06-23 — removed the unused
+  `LogicalPlanner`/`QueryPlan`/`PlanStep` from `src/query/mod.rs` (`execute_hql` dispatches directly).
+- [~] **Per-query / per-collection `ef_search`:** per-query override **shipped** 2026-06-23
+  (`HybridSearchInput.ef_search: Option<u32>`, falls back to the global). Per-collection default
+  still open.
 
 ### Priority 4 — Vector Quality (🟢 ต่ำ)
 - [~] **Scalar / binary quantization:** **SQ8 shipped** 2026-06-23 (full resident cut —
