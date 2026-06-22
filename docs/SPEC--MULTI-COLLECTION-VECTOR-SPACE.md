@@ -156,7 +156,9 @@ This phase is done; §3/§6/§7 (per-collection spaces) remain the open work.
 - `HybridSearchInput` gains `collection: Option<String>`.
 - HQL: optional `IN <collection>` clause on `SEARCH`/`MATCH`:
   `SEARCH target SIMILAR TO [..] K 5 IN "code"`. Grammar adds
-  `in_clause = { ^"IN" ~ string_lit }`; default collection if omitted.
+  `collection_spec = { ^"IN" ~ (identifier | string_lit) }` (placed after `K`/
+  `ALPHA`, before `LANGUAGE`/`AS OF`); the name may be quoted or a bare
+  identifier; default collection if omitted. ✅ **DONE** (2026-06-22).
 
 **Dim validation:** every search validates `query.len() == collection.dim`,
 returning a typed error instead of silently producing garbage neighbors.
@@ -195,9 +197,11 @@ user action required; old DBs keep working.
    `NodeOutput.collection`, `HybridSearchInput.collection`; NAPI
    `create_collection`/`list_collections` (+ `CollectionInfo`); REST
    `POST /v1/collection/create`, `GET /v1/collections`; `index.d.ts` regenerated.
-   **Deferred:** HQL `IN <collection>` clause (grammar-source ambiguity) and the
-   same-node-multi-vector `add_vector` op (needs an `Event::Vector` variant) —
-   tracked as follow-ups in the ADR.
+   HQL `IN <collection>` clause ✅ **DONE** (2026-06-22) — `collection_spec` rule
+   in `src/query/hql.pest`, threaded through `HqlCommand::Search`/`Hybrid` →
+   `execute_hql` → scoped `hybrid_search`; covered by `tests/hql_collection_tests.rs`
+   (6 tests). **Still deferred:** same-node-multi-vector `add_vector` op (needs an
+   `Event::Vector` variant) — tracked as a follow-up in the ADR.
 
 P-B shipped independently and de-risked the rest. **P-C/P-D shipped 2026-06-22.**
 

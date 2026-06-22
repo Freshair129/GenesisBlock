@@ -1262,9 +1262,9 @@ impl Storage {
     pub fn execute_hql(&self, query: &str) -> Result<serde_json::Value> {
         let command = HqlCommand::try_from(query).map_err(|e| Error::from_reason(e))?;
         match command {
-            HqlCommand::Search { vector, k, fuzzy, target, lang, as_of } => {
+            HqlCommand::Search { vector, k, fuzzy, target, lang, as_of, collection } => {
                 let _resolved = if fuzzy { self.find_fuzzy_id(&target) } else { Some(target) };
-                let res = self.hybrid_search(HybridSearchInput { query_vector: vector, k, alpha: Some(0.0), lang, as_of, collection: None })?;
+                let res = self.hybrid_search(HybridSearchInput { query_vector: vector, k, alpha: Some(0.0), lang, as_of, collection })?;
                 Ok(serde_json::to_value(res).unwrap())
             }
             HqlCommand::Traverse { seed, depth, rel, fuzzy, as_of } => {
@@ -1278,9 +1278,9 @@ impl Storage {
                 }, is_inferred)?;
                 Ok(serde_json::to_value(res).unwrap())
             }
-            HqlCommand::Hybrid { vector, alpha, fuzzy, target, lang, as_of } => {
+            HqlCommand::Hybrid { vector, alpha, fuzzy, target, lang, as_of, collection } => {
                 let _resolved = if fuzzy { self.find_fuzzy_id(&target) } else { Some(target) };
-                let res = self.hybrid_search(HybridSearchInput { query_vector: vector, k: 10, alpha: Some(alpha), lang, as_of, collection: None })?;
+                let res = self.hybrid_search(HybridSearchInput { query_vector: vector, k: 10, alpha: Some(alpha), lang, as_of, collection })?;
                 Ok(serde_json::to_value(res).unwrap())
             }
             HqlCommand::Context { target, tier, budget, fuzzy } => {
