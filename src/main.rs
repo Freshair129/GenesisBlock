@@ -141,6 +141,24 @@ async fn add_edge_handler(
 }
 
 #[derive(serde::Deserialize)]
+struct RetractEdgeInput {
+    pub id: String,
+    pub at: Option<String>,
+}
+
+async fn retract_edge_handler(
+    State(state): State<AppState>,
+    Json(input): Json<RetractEdgeInput>,
+) -> impl IntoResponse {
+    let storage = state.storage.write();
+    match storage.retract_edge(input.id, input.at) {
+        Ok(Some(edge)) => (StatusCode::OK, Json(edge)).into_response(),
+        Ok(None) => (StatusCode::NOT_FOUND, "edge not found").into_response(),
+        Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
+    }
+}
+
+#[derive(serde::Deserialize)]
 struct CreateCollectionInput {
     pub name: String,
     pub model: String,
@@ -343,6 +361,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .route("/v1/node/add", post(add_node_handler))
         .route("/v1/node/supersede", post(supersede_node_handler))
         .route("/v1/edge/add", post(add_edge_handler))
+        .route("/v1/edge/retract", post(retract_edge_handler))
         .route("/v1/collection/create", post(create_collection_handler))
         .route("/v1/collections", get(list_collections_handler))
         .route("/v1/vector/add", post(add_vector_handler))

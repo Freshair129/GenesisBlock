@@ -129,8 +129,9 @@ in a single binary. Nearest comparators: Kuzu, DuckDB+graph, LanceDB, LadybugDB.
   "verifiable agent memory" narrative and MASTER tier benchmark. *(1 day)*
 
 ### Priority 3 — Correctness & Technical Debt (🟡 กลาง)
-- [ ] **`retract_edge` implementation:** currently returns `Ok(None)` stub; blocks
-  full graph mutation support. *(1–2 days)*
+- [x] **`retract_edge` implementation:** **done** 2026-06-23 — bitemporal soft-delete
+  (sets `valid_to`, advances clock); `neighbors` hides retracted edges from the current view
+  unless `include_invalid`; exposed at REST `/v1/edge/retract`. History preserved for time-travel.
 - [x] **`LogicalPlanner` dead code removal:** **done** 2026-06-23 — removed the unused
   `LogicalPlanner`/`QueryPlan`/`PlanStep` from `src/query/mod.rs` (`execute_hql` dispatches directly).
 - [~] **Per-query / per-collection `ef_search`:** per-query override **shipped** 2026-06-23

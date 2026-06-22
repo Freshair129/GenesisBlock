@@ -76,7 +76,7 @@ Start architecture discovery from `docs/C4--GENESISDB-ARCHITECTURE.md`. Treat it
 - Some docs contain deprecated notes or encoding artifacts. Prefer the C4 map, current parent docs, and implementation evidence.
 - `/v1/query/hql` currently expects a raw JSON string body. Python/Go SDKs appear to send `{ "query": "..." }`, so verify before changing SDK or server behavior.
 - HQL grammar SSOT is `src/query/hql.pest` (`src/query/ast.rs` declares `#[grammar = "query/hql.pest"]`). The old root `hql.pest` no longer exists — do not re-create it; keep grammar changes in sync with `src/query/ast.rs`.
-- `retract_edge` is currently a stub returning `Ok(None)`.
+- `retract_edge` performs a bitemporal soft-delete (sets `valid_to`); `neighbors` hides retracted edges from the current view unless `include_invalid = true`. Exposed at REST `/v1/edge/retract`.
 - `execute_batch` exists in core but is not exposed as a REST route in `src/main.rs`.
 - `docs/API_REFERENCE.md` was regenerated from `src/main.rs` (2026-06-22) and is current; `README.md` is high-level — both fine to cite now.
 

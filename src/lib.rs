@@ -1610,6 +1610,9 @@ impl Storage {
         let walk_in  = dir == "in"  || dir == "both";
 
         let lim = args.limit.map(|l| l as usize);
+        // Retraction visibility: by default a retracted edge (valid_to passed) is
+        // hidden from the current view; `include_invalid = true` surfaces it.
+        let include_invalid = args.include_invalid.unwrap_or(false);
         let mut results = Vec::new(); let mut visited = HashSet::new(); visited.insert(u32_seed);
         let mut queue = VecDeque::new(); queue.push_back((u32_seed, Vec::new(), 0));
         while let Some((curr_u32, path, curr_depth)) = queue.pop_front() {
@@ -1631,6 +1634,15 @@ impl Storage {
                     // Time-travel check for Edges
                     if !Self::is_valid_as_of(&edge.valid_from, &edge.valid_to, &args.as_of) {
                         continue;
+                    }
+                    // Retraction filter for the current view: `is_valid_as_of` only
+                    // bounds valid_to when `as_of` is set, so with no as_of an edge
+                    // retracted in the past is still "valid" there. Hide it unless
+                    // the caller opted into invalidated edges.
+                    if args.as_of.is_none() && !include_invalid {
+                        if let Some(to) = &edge.valid_to {
+                            if Utc::now().to_rfc3339().as_str() >= to.as_str() { continue; }
+                        }
                     }
                     if !rel_allowed(&edge.rel) { continue; }
 
@@ -2606,7 +2618,26 @@ impl Storage {
         println!("Mark IX: WAL Compacted. {} live events preserved.", count);
         Ok(())
     }
-    pub fn retract_edge(&self, _id: String, _at: Option<String>) -> Result<Option<EdgeOutput>> { Ok(None) }
+    /// Bitemporal retraction (soft-delete): set the edge's `valid_to` so it is no
+    /// longer live in the current view, while preserving the relationship for
+    /// time-travel queries (`as_of` before `at`, or `include_invalid = true`).
+    /// `at` defaults to now. Returns the retracted edge, or `None` if no edge with
+    /// `id` exists. Idempotent on the live/retracted distinction — re-retracting
+    /// just moves `valid_to`.
+    pub fn retract_edge(&self, id: String, at: Option<String>) -> Result<Option<EdgeOutput>> {
+        self.ensure_writable()?;
+        let ekey = Self::edge_key(&id);
+        let mut edge = match self.edges.get(&ekey) {
+            Some(e) => e.value().clone(),
+            None => return Ok(None),
+        };
+        edge.valid_to = Some(at.unwrap_or_else(|| Utc::now().to_rfc3339()));
+        edge.clock = self.next_clock(); // advance for CRDT LWW: the retraction must win
+        self.edges.insert(ekey, edge.clone());
+        self.refresh_impacts(Some(vec![edge.to.clone()]));
+        self.persist(&Event::Edge(edge.clone()))?;
+        Ok(Some(edge))
+    }
     pub fn status_sync(&self) -> DatabaseStatus { DatabaseStatus { open: true, read_only: self.read_only, page_cache_mb: 512 } }
     // Bulk paths route through execute_batch so each chunk is ONE Event::Batch =
     // ONE WAL fsync (vs one fsync per item). Chunked to bound the size of a
