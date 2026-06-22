@@ -151,6 +151,9 @@ This phase is done; §3/§6/§7 (per-collection spaces) remain the open work.
 - New explicit vector op (REST + NAPI):
   `add_vector(node_id: String, collection: String, embedding: Vec<f64>)` — lets a
   node carry a code-embedding *and* a text-embedding in different collections.
+  ✅ **DONE** (2026-06-22, [[ADR--GENESISDB-ADD-VECTOR]]): `Event::Vector` +
+  `add_vector`; NAPI `addVector`, REST `POST /v1/vector/add`. Durable via WAL
+  replay; no compaction/snapshot changes needed (arenas are the source of truth).
 - New admin ops: `create_collection(name, model, dim, metric)`,
   `list_collections() -> Vec<CollectionInfo>`.
 - `HybridSearchInput` gains `collection: Option<String>`.
@@ -197,11 +200,13 @@ user action required; old DBs keep working.
    `NodeOutput.collection`, `HybridSearchInput.collection`; NAPI
    `create_collection`/`list_collections` (+ `CollectionInfo`); REST
    `POST /v1/collection/create`, `GET /v1/collections`; `index.d.ts` regenerated.
-   HQL `IN <collection>` clause ✅ **DONE** (2026-06-22) — `collection_spec` rule
-   in `src/query/hql.pest`, threaded through `HqlCommand::Search`/`Hybrid` →
-   `execute_hql` → scoped `hybrid_search`; covered by `tests/hql_collection_tests.rs`
-   (6 tests). **Still deferred:** same-node-multi-vector `add_vector` op (needs an
-   `Event::Vector` variant) — tracked as a follow-up in the ADR.
+   Both follow-ups now shipped (2026-06-22):
+   - HQL `IN <collection>` clause ✅ **DONE** — `collection_spec` rule in
+     `src/query/hql.pest`, threaded through `HqlCommand::Search`/`Hybrid` →
+     `execute_hql` → scoped `hybrid_search`; `tests/hql_collection_tests.rs` (6).
+   - Same-node-multi-vector `add_vector` op ✅ **DONE**
+     ([[ADR--GENESISDB-ADD-VECTOR]]): `Event::Vector` variant + `add_vector`
+     (NAPI `addVector`, REST `POST /v1/vector/add`); `tests/add_vector_tests.rs` (5).
 
 P-B shipped independently and de-risked the rest. **P-C/P-D shipped 2026-06-22.**
 

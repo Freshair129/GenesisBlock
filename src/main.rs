@@ -165,6 +165,24 @@ async fn list_collections_handler(State(state): State<AppState>) -> impl IntoRes
 }
 
 #[derive(serde::Deserialize)]
+struct AddVectorInput {
+    pub node_id: String,
+    pub collection: String,
+    pub embedding: Vec<f64>,
+}
+
+async fn add_vector_handler(
+    State(state): State<AppState>,
+    Json(input): Json<AddVectorInput>,
+) -> impl IntoResponse {
+    let storage = state.storage.write();
+    match storage.add_vector(input.node_id, input.collection, input.embedding) {
+        Ok(()) => (StatusCode::OK, Json(serde_json::json!({"ok": true}))).into_response(),
+        Err(e) => (StatusCode::BAD_REQUEST, e.to_string()).into_response(),
+    }
+}
+
+#[derive(serde::Deserialize)]
 struct SupersedeInput {
     pub id: String,
     pub new_props: Option<serde_json::Value>,
@@ -326,6 +344,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .route("/v1/edge/add", post(add_edge_handler))
         .route("/v1/collection/create", post(create_collection_handler))
         .route("/v1/collections", get(list_collections_handler))
+        .route("/v1/vector/add", post(add_vector_handler))
         .route("/v1/insight/drift/:cluster_id", get(get_meta_history_handler))
         .route("/v1/query", post(query_handler))
         .route("/v1/search/hybrid", post(hybrid_search_handler))
