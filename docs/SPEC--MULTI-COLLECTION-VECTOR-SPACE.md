@@ -29,14 +29,17 @@ Three problems, one root cause: the engine has **exactly one global vector space
    **[RESOLVED — see §5, P-B]** Measured at 5k nodes/dim 1536: net RSS dropped
    147 MB → 82 MB (~44%); extrapolated 32k: ~960 MB → ~525 MB.
 
-> **Correction (measured 2026-06-21).** An earlier hypothesis blamed
-> `init_hnsw()`'s hardcoded `max_elements = 1_000_000` (`src/lib.rs:416`).
-> Reading hnsw_rs 0.3.4 (`PointIndexation::new`) shows `max_elements` is only a
-> `Vec::with_capacity` *hint* for the layer pointer tables, not a hard cap and
-> not vector-data pre-allocation — its real cost is ~8 MB, and inserts beyond it
-> simply grow the Vec. The audit's **15.89 GB / 32k nodes** figure is an
-> artifact of the old Mark VII engine; the current engine measures ~1 GB at
-> 32k. `max_elements` tuning is therefore deprioritized (§4).
+> **Correction (measured 2026-06-21, revised 2026-06-22).** `max_elements` is a
+> `Vec::with_capacity` *hint* for the layer pointer tables (hnsw_rs 0.3.4
+> `PointIndexation::new`), not a hard cap and not vector-data pre-allocation, and
+> inserts beyond it simply grow the Vec — all true. **But the original "~8 MB"
+> cost estimate was wrong:** a backtrace of an OOM abort showed the hardcoded
+> `max_elements = 1_000_000` reserving **>100 MB per index** (the per-layer
+> fractions compound rather than shrink). With multi-collection that stacked into
+> an intermittent OOM; now fixed by sizing the reservation to the data (§4,
+> [[ADR--GENESISDB-HNSW-CAPACITY]]). Separately, the audit's **15.89 GB / 32k
+> nodes** figure is an artifact of the old Mark VII engine; the current engine
+> measures ~1 GB at 32k.
 
 ## 2. Goals / Non-Goals
 
@@ -88,11 +91,18 @@ pub default_collection: String,   // "default"
 `NodeMetadata.cluster_id` / community fields stay in node-graph land; vector
 metadata moves into `VectorMeta { arena_id, node_id, embedding_offset, lang }`.
 
-## 4. Dynamic HNSW capacity (DEPRIORITIZED — ~8 MB, not the RAM fix)
+## 4. Dynamic HNSW capacity — ✅ DONE ([[ADR--GENESISDB-HNSW-CAPACITY]], 2026-06-22)
 
-> Superseded by the §1 correction: `max_elements` is a `with_capacity` hint
-> (~8 MB at 1M), not the RAM driver. Keep only as minor hygiene; the real RAM
-> win was the embedding dedup in §5. Left here for reference.
+> **The §1 "~8 MB" estimate was wrong** (corrected 2026-06-22). A backtrace of an
+> OOM abort showed `Hnsw::new(.., 1_000_000, ..)` reserving **>100 MB per index**
+> (one layer table = 133 MB): hnsw_rs's per-layer fraction does not shrink the way
+> the manual estimate assumed. Harmless under one global index, but multi-collection
+> made it acute — N collections × >100 MB stacked into an OOM `abort()` (Windows
+> `0xC0000409`) under parallel/many-DB load. **Fixed:** `build_hnsw(ef, cap)` sizes
+> the reservation to the data (`cap.max(HNSW_MIN_CAP=1024)`); `ensure_hnsw` reserves
+> the floor and grows on demand (hnsw_rs `Vec::push`, correctness-safe), `rehydrate`
+> sizes to `meta.len()`. No 2×-rebuild scheme needed. The embedding dedup in §5 was a
+> separate, additional RAM win. Tests: `tests/hnsw_capacity_tests.rs`.
 
 Replace the hardcoded constructor with size-aware construction + amortized
 doubling. Do **not** rely on hnsw_rs auto-growth; rebuild from the arena (we own
