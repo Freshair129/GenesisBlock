@@ -34,7 +34,8 @@ prior corrupted file. The server is the SSOT; update this when routes change.
 | GET | `/v1/status` | _none_ | `ExtendedStatus` |
 | GET | `/v1/swarm/status` | _none_ | `SwarmStatus` |
 | POST | `/v1/consensus/propose` | `{ event: Event, signature: u8[] }` | `String` (proposal id) |
-| POST | `/v1/consensus/vote` | `{ proposal_id, peer_id, approve }` | `bool` (quorum reached) |
+| POST | `/v1/consensus/sign-vote` | `{ proposal_id, approve }` | `u8[]` (ed25519 signature) |
+| POST | `/v1/consensus/vote` | `{ proposal_id, peer_id, approve, signature: u8[] }` | `bool` (quorum reached) |
 | POST | `/v1/consensus/verify` | `Event` | `bool` |
 
 **Engine capabilities NOT exposed over REST** (NAPI/embedded only): `execute_batch`,
@@ -126,3 +127,10 @@ Tiers `MASTER` (0) / `SPEC` (1) / `ADR` (2) / `USER` (3), derived from node
 `labels`. External callers cannot create/modify `MASTER`-tier nodes (→ `403`-class
 error); MASTER promotion requires multi-signature consensus. Guard cost is
 <0.1% of a write (audit P24).
+
+**Consensus votes are signed.** A voter signs `VOTE|{proposal_id}|{peer_id}|{approve}`
+with its ed25519 key (`/v1/consensus/sign-vote`); `submit_vote` verifies the
+signature against the voter's registered public key (`SyncPeer.verifying_key`, or
+this node's own key for a self-vote) before counting it. Unknown-peer, malformed,
+or non-matching signatures are rejected (`400`) and not counted — forged or
+replayed votes cannot reach quorum. See `ADR--GENESISDB-CONSENSUS-VOTE-SIGNATURES`.
