@@ -407,15 +407,20 @@ impl Metric {
 /// `None` keeps lossless f32 end-to-end — byte-identical to pre-quant DBs.
 /// `ScalarU8` (SQ8) stores BOTH the resident arena and the HNSW as u8 (the
 /// "full resident cut", ~4× vector RAM); symmetric quant, no rerank.
+/// `Binary` (BQ) packs each dim to one sign bit (u64 words) with a popcount-
+/// Hamming HNSW — ~32× vector RAM, lossy. This cut is symmetric with no rerank
+/// (matching SQ8's first cut); an f32-sidecar rerank stage is a future lever.
 #[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq)]
-pub enum Quant { None, ScalarU8 }
+pub enum Quant { None, ScalarU8, Binary }
 
 impl Quant {
     fn parse(s: &str) -> Self {
-        if s.eq_ignore_ascii_case("sq8") || s.eq_ignore_ascii_case("scalaru8") { Quant::ScalarU8 } else { Quant::None }
+        if s.eq_ignore_ascii_case("sq8") || s.eq_ignore_ascii_case("scalaru8") { Quant::ScalarU8 }
+        else if s.eq_ignore_ascii_case("bq") || s.eq_ignore_ascii_case("binary") { Quant::Binary }
+        else { Quant::None }
     }
     fn as_str(&self) -> &'static str {
-        match self { Quant::None => "none", Quant::ScalarU8 => "sq8" }
+        match self { Quant::None => "none", Quant::ScalarU8 => "sq8", Quant::Binary => "bq" }
     }
 }
 
@@ -434,6 +439,42 @@ fn sq8_q(v: f32) -> u8 {
 #[inline]
 fn sq8_dq(q: u8) -> f32 { (q as f32 - SQ8_BIAS) / SQ8_SCALE }
 
+// Binary quantization (BQ): one sign bit per dim, packed into u64 words. Distance
+// is bit Hamming via popcount.
+#[inline]
+fn bq_words(dim: usize) -> usize { (dim + 63) / 64 }
+
+/// Pack a prepared f32 vector to sign-bit codes (bit set iff component > 0).
+#[inline]
+fn bq_pack(emb: &[f32]) -> Vec<u64> {
+    let mut w = vec![0u64; bq_words(emb.len())];
+    for (i, &x) in emb.iter().enumerate() {
+        if x > 0.0 { w[i >> 6] |= 1u64 << (i & 63); }
+    }
+    w
+}
+
+/// Expand `dim` sign bits back to ±1.0 f32 (for the heuristic f32 readers only —
+/// meta-graph / clustering; never for search). Lossless on sign, not magnitude.
+#[inline]
+fn bq_unpack(words: &[u64], dim: usize) -> Vec<f32> {
+    (0..dim).map(|i| if words[i >> 6] & (1u64 << (i & 63)) != 0 { 1.0 } else { -1.0 }).collect()
+}
+
+/// Bit-Hamming distance over BQ-packed u64 codes. anndists' `DistHamming<u64>`
+/// counts WORD inequality (wrong for bit codes), so HNSW uses this popcount
+/// variant. Distance is the raw bit-difference count (normalized to [0,1] by the
+/// caller via the dim).
+#[derive(Clone)]
+struct DistBinaryHamming;
+impl Distance<u64> for DistBinaryHamming {
+    fn eval(&self, a: &[u64], b: &[u64]) -> f32 {
+        let mut d = 0u32;
+        for i in 0..a.len() { d += (a[i] ^ b[i]).count_ones(); }
+        d as f32
+    }
+}
+
 /// The resident vector arena, element type chosen by the collection's `Quant`.
 /// Offsets/lengths are in scalar-component units (== dim), identical across
 /// variants — so `NodeMetadata.embedding_offset`/`vector_dim` mean the same in
@@ -441,15 +482,28 @@ fn sq8_dq(q: u8) -> f32 { (q as f32 - SQ8_BIAS) / SQ8_SCALE }
 pub enum ArenaStore {
     F32(Vec<f32>),
     U8(Vec<u8>),
+    /// BQ: bit-packed sign codes — `n` vectors × `bq_words(dim)` u64 words.
+    /// `len()` still reports logical components (`n*dim`), so `embedding_offset`
+    /// stays in component units exactly like the f32/u8 variants and the shared
+    /// `start + len <= arena.len()` bounds checks remain valid.
+    Binary { data: Vec<u64>, dim: usize, n: usize },
 }
 
 impl ArenaStore {
-    fn new(q: Quant) -> Self {
-        match q { Quant::None => ArenaStore::F32(Vec::new()), Quant::ScalarU8 => ArenaStore::U8(Vec::new()) }
+    fn new(q: Quant, dim: usize) -> Self {
+        match q {
+            Quant::None => ArenaStore::F32(Vec::new()),
+            Quant::ScalarU8 => ArenaStore::U8(Vec::new()),
+            Quant::Binary => ArenaStore::Binary { data: Vec::new(), dim, n: 0 },
+        }
     }
     /// Number of scalar components stored (NOT bytes).
     pub fn len(&self) -> usize {
-        match self { ArenaStore::F32(v) => v.len(), ArenaStore::U8(v) => v.len() }
+        match self {
+            ArenaStore::F32(v) => v.len(),
+            ArenaStore::U8(v) => v.len(),
+            ArenaStore::Binary { n, dim, .. } => n * dim,
+        }
     }
     pub fn is_empty(&self) -> bool { self.len() == 0 }
     /// Append a prepared f32 vector, quantizing per mode.
@@ -457,6 +511,7 @@ impl ArenaStore {
         match self {
             ArenaStore::F32(v) => v.extend_from_slice(emb),
             ArenaStore::U8(v) => v.extend(emb.iter().map(|&x| sq8_q(x))),
+            ArenaStore::Binary { data, n, .. } => { data.extend(bq_pack(emb)); *n += 1; }
         }
     }
     /// Read a vector back as f32 (dequantizing per mode). For the heuristic
@@ -465,6 +520,11 @@ impl ArenaStore {
         match self {
             ArenaStore::F32(v) => v[start..start + len].to_vec(),
             ArenaStore::U8(v) => v[start..start + len].iter().map(|&q| sq8_dq(q)).collect(),
+            ArenaStore::Binary { data, dim, .. } => {
+                let wpv = bq_words(*dim);
+                let ws = (start / *dim) * wpv;
+                bq_unpack(&data[ws..ws + wpv], len)
+            }
         }
     }
     /// Append elements [start, start+len) from `src` (same variant) — compaction.
@@ -472,6 +532,12 @@ impl ArenaStore {
         match (self, src) {
             (ArenaStore::F32(d), ArenaStore::F32(s)) => d.extend_from_slice(&s[start..start + len]),
             (ArenaStore::U8(d), ArenaStore::U8(s)) => d.extend_from_slice(&s[start..start + len]),
+            (ArenaStore::Binary { data: d, n, .. }, ArenaStore::Binary { data: s, dim, .. }) => {
+                let wpv = bq_words(*dim);
+                let ws = (start / *dim) * wpv;
+                d.extend_from_slice(&s[ws..ws + wpv]);
+                *n += 1;
+            }
             _ => {} // a collection never mixes variants
         }
     }
@@ -482,14 +548,20 @@ impl ArenaStore {
                 std::slice::from_raw_parts(v.as_ptr() as *const u8, v.len() * 4)
             }.to_vec(),
             ArenaStore::U8(v) => v.clone(),
+            ArenaStore::Binary { data, .. } => data.iter().flat_map(|w| w.to_le_bytes()).collect(),
         }
     }
-    fn from_bytes(data: &[u8], q: Quant) -> Self {
+    fn from_bytes(data: &[u8], q: Quant, dim: usize) -> Self {
         match q {
             Quant::None => ArenaStore::F32(
                 data.chunks_exact(4).map(|c| f32::from_le_bytes(c.try_into().unwrap())).collect()
             ),
             Quant::ScalarU8 => ArenaStore::U8(data.to_vec()),
+            Quant::Binary => {
+                let words: Vec<u64> = data.chunks_exact(8).map(|c| u64::from_le_bytes(c.try_into().unwrap())).collect();
+                let wpv = bq_words(dim).max(1);
+                ArenaStore::Binary { n: words.len() / wpv, data: words, dim }
+            }
         }
     }
 }
@@ -499,6 +571,7 @@ impl ArenaStore {
 enum VecIndex {
     F32(Hnsw<'static, f32, DistL2>),
     U8(Hnsw<'static, u8, DistL2>),
+    Binary(Hnsw<'static, u64, DistBinaryHamming>),
 }
 
 impl VecIndex {
@@ -507,6 +580,7 @@ impl VecIndex {
         match q {
             Quant::None => VecIndex::F32(Hnsw::new(16, cap, 16, ef_c, DistL2 {})),
             Quant::ScalarU8 => VecIndex::U8(Hnsw::new(16, cap, 16, ef_c, DistL2 {})),
+            Quant::Binary => VecIndex::Binary(Hnsw::new(16, cap, 16, ef_c, DistBinaryHamming {})),
         }
     }
     fn insert_f32(&self, emb: &[f32], id: usize) {
@@ -515,6 +589,10 @@ impl VecIndex {
             VecIndex::U8(h) => {
                 let q: Vec<u8> = emb.iter().map(|&x| sq8_q(x)).collect();
                 h.insert((&q, id));
+            }
+            VecIndex::Binary(h) => {
+                let c = bq_pack(emb);
+                h.insert((&c, id));
             }
         }
     }
@@ -530,19 +608,31 @@ impl VecIndex {
                 let refs: Vec<(&Vec<u8>, usize)> = q.iter().map(|(v, id)| (v, *id)).collect();
                 h.parallel_insert(&refs);
             }
+            VecIndex::Binary(h) => {
+                let q: Vec<(Vec<u64>, usize)> = items.iter()
+                    .map(|(v, id)| (bq_pack(v), *id as usize)).collect();
+                let refs: Vec<(&Vec<u64>, usize)> = q.iter().map(|(v, id)| (v, *id)).collect();
+                h.parallel_insert(&refs);
+            }
         }
     }
     /// Search, returning `(arena_id, distance_f32)` so callers never name the
     /// hnsw_rs `Neighbour` type or branch on element type.
     fn search_f32(&self, query: &[f32], k: usize, ef: usize) -> Vec<(usize, f32)> {
-        let raw = match self {
-            VecIndex::F32(h) => h.search(query, k, ef),
+        match self {
+            VecIndex::F32(h) => h.search(query, k, ef).into_iter().map(|n| (n.d_id, n.distance)).collect(),
             VecIndex::U8(h) => {
                 let q: Vec<u8> = query.iter().map(|&x| sq8_q(x)).collect();
-                h.search(&q, k, ef)
+                h.search(&q, k, ef).into_iter().map(|n| (n.d_id, n.distance)).collect()
             }
-        };
-        raw.into_iter().map(|n| (n.d_id, n.distance)).collect()
+            VecIndex::Binary(h) => {
+                // Normalize Hamming (0..dim) to [0,1] so `1 - distance` stays a
+                // sane similarity for the hybrid score blend.
+                let c = bq_pack(query);
+                let dim = query.len().max(1) as f32;
+                h.search(&c, k, ef).into_iter().map(|n| (n.d_id, n.distance / dim)).collect()
+            }
+        }
     }
 }
 
@@ -567,7 +657,7 @@ impl VectorCollection {
     fn new(name: String, model: String, dim: u16, metric: Metric, quant: Quant) -> Self {
         Self {
             name, model, dim, metric, quant,
-            arena: RwLock::new(ArenaStore::new(quant)),
+            arena: RwLock::new(ArenaStore::new(quant, dim as usize)),
             metadata: RwLock::new(Vec::new()),
             hnsw: RwLock::new(None),
             node_to_arena: DashMap::new(),
@@ -2314,7 +2404,7 @@ impl Storage {
                 let quant = Quant::parse(cm["quant"].as_str().unwrap_or("none"));
                 let coll = VectorCollection::new(name.clone(), model, dim, metric, quant);
                 if let Ok(data) = fs::read(self.path.join(format!("vec_{}.bin", name))) {
-                    *coll.arena.write() = ArenaStore::from_bytes(&data, quant);
+                    *coll.arena.write() = ArenaStore::from_bytes(&data, quant, dim as usize);
                 }
                 if let Ok(data) = fs::read(self.path.join(format!("meta_{}.bin", name))) {
                     if cm["mv"].as_u64().unwrap_or(0) >= 1 {
@@ -2334,7 +2424,7 @@ impl Storage {
             // Legacy single-space DB -> wrap as the `default` collection.
             let dim = state_val["vector_dim"].as_u64().unwrap_or(1536) as u16;
             let coll = VectorCollection::new("default".to_string(), "default".to_string(), dim, Metric::L2, Quant::None);
-            *coll.arena.write() = ArenaStore::from_bytes(&data, Quant::None);
+            *coll.arena.write() = ArenaStore::from_bytes(&data, Quant::None, dim as usize);
             if let Ok(md) = fs::read(self.path.join("meta.bin")) {
                 // Legacy single-space snapshots always predate A2 (String layout).
                 if let Ok(v0) = bincode::deserialize::<Vec<NodeMetadataV0>>(&md) {
@@ -2562,7 +2652,7 @@ impl Storage {
             let mut vec_arena = coll.arena.write();
 
             let mut new_meta = Vec::with_capacity(live_nodes.len());
-            let mut new_vec = ArenaStore::new(coll.quant);
+            let mut new_vec = ArenaStore::new(coll.quant, coll.dim as usize);
             coll.node_to_arena.clear();
 
             for meta in meta_arena.iter() {

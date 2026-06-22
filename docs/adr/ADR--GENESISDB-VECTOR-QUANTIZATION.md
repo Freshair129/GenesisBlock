@@ -15,7 +15,7 @@ proposed_by: agent
 
 # ADR--GENESISDB-VECTOR-QUANTIZATION
 
-**Status:** Accepted (SQ8 shipped 2026-06-23, full resident cut; BQ deferred)
+**Status:** Accepted (SQ8 + BQ shipped 2026-06-23, full resident cut; BQ as a no-rerank first cut, f32-sidecar rerank deferred)
 **Date:** 2026-06-22
 **Deciders:** Engine owner (Boss)
 **Roadmap:** MARK XIV Priority 4 — "Scalar / binary quantization: close the Qdrant
@@ -217,13 +217,16 @@ land per-query `ef` alongside or before Layer B.
 4. [ ] Recall harness (recall@k vs exact brute force) at 100k/500k; gate default-on
        SQ8 behind measured recall ≥ 0.975. *(toy tests can't measure recall — HNSW is
        approximate on tiny sets; needs a real-data probe.)*
-5. [ ] BQ (`u64` bit-pack + a **custom** `Distance<u64>` — anndists' built-in u64
-       `DistHamming` is whole-word inequality, NOT bit popcount) + oversample/rerank.
-       **`memmap2` declined** → exact-f32 for rerank comes from an on-disk f32 sidecar
-       (`vecf32_<name>.bin`) appended at `stage` and read via std `File` seek/read.
-       NOTE (found during impl): the sidecar interacts with `save_state` (must not be
-       clobbered by the u64 arena dump) and **compaction** (must be rewritten when
-       arena ids change) — materially heavier than the other phases; do as a focused PR.
+5. [~] BQ (`u64` bit-pack + a **custom** `Distance<u64>` — anndists' built-in u64
+       `DistHamming` is whole-word inequality, NOT bit popcount). **Shipped 2026-06-23**
+       as a no-rerank first cut: `ArenaStore::Binary { data: Vec<u64>, dim, n }` (one sign
+       bit/dim — raw sign, no per-dim centering in this cut; `len()` reports `n*dim` so
+       `embedding_offset` stays in component units and the shared bounds checks hold),
+       `VecIndex::Binary(Hnsw<u64, DistBinaryHamming>)`, Hamming normalized to [0,1] by dim
+       for the score blend. ~32× RAM/disk. **Oversample + rerank still deferred:** `memmap2`
+       declined → exact-f32 for rerank needs an on-disk f32 sidecar (`vecf32_<name>.bin`)
+       whose interaction with `save_state` and **compaction** (rewrite on arena-id change)
+       is the heavy part — a focused follow-up PR.
 6. [ ] Record before/after RSS + recall in a new `RCA--VECTOR-QUANTIZATION` and in
        [[METRICS-REVIEW--2026-06-22-WEEKLY]].
 
@@ -245,7 +248,19 @@ type `u8` for `ScalarU8` collections (4× resident + disk), `f32` for `None` (un
 `hybrid_search` quantizes the query symmetrically; heuristic f32 readers (meta-graph,
 clustering) dequantize via `f32_at`; compaction is element-agnostic. Manifest gains
 `"quant"`; absent ⇒ `None`, so existing DBs load byte-identical. Suite green (26 test
-groups), `bins` builds. BQ (Action 5) deferred to a focused PR for the reasons noted.
+groups), `bins` builds.
+
+### Outcome (BQ, shipped 2026-06-23)
+BQ shipped as a no-rerank first cut (symmetric, matching SQ8). `Quant::Binary` packs each
+dim to one sign bit into `u64` words; `VecIndex::Binary` ranks by popcount Hamming via the
+custom `DistBinaryHamming` (anndists' `DistHamming<u64>` is word-inequality, unusable). The
+arena keeps `embedding_offset` in component units (`len() == n*dim`), so the meta-graph /
+clustering `f32_at` readers (bit → ±1), compaction's `append_range`, and the shared
+`start+len <= arena.len()` checks all work unchanged. Hamming is normalized to [0,1] by dim
+so `1 - distance` stays a sane similarity. Create with `quant: "bq"`; `vec_<name>.bin` is
+~32× smaller. `tests/binary_quant_tests.rs` (exact-match top-1, reopen round-trip, 32× disk).
+The oversample + f32-sidecar **rerank** stage (Action 5 tail) remains deferred — its
+save_state/compaction interaction is the heavy part.
 
 ---
 ### Related Links
@@ -261,3 +276,4 @@ groups), `bins` builds. BQ (Action 5) deferred to a focused PR for the reasons n
 |---|---|---|
 | 0.1.0 | 2026-06-22 | Proposed: per-collection `Quant` mode, lossless f32 on disk; Layer A (SQ8, symmetric, 4×) decided first; Layer B (BQ + oversample/rerank via mmap) designed; PQ deferred. |
 | 0.2.0 | 2026-06-23 | Accepted + SQ8 shipped as the **full resident cut** (arena+HNSW u8, 4× RAM *and* disk; reversibility traded away). `ArenaStore`/`VecIndex` enums behind separate locks. BQ revised to a no-mmap on-disk f32 sidecar (heavier — own PR); built-in u64 `DistHamming` found to be word-inequality, so BQ needs a custom popcount distance. |
+| 0.3.0 | 2026-06-23 | BQ shipped as a **no-rerank first cut**: `Quant::Binary`, `ArenaStore::Binary` (u64 sign-bit codes, offsets in component units), `VecIndex::Binary` + `DistBinaryHamming` popcount, Hamming normalized by dim. ~32× RAM/disk. Full suite green incl. `binary_quant_tests` (exact-match top-1, reopen round-trip, 32× disk). The f32-sidecar oversample/rerank stage remains deferred (save_state/compaction interaction). |
