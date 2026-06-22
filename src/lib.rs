@@ -510,6 +510,13 @@ pub struct Storage {
     /// Vectors staged in an arena but not yet inserted into HNSW (observability;
     /// see `index_lag` / `flush_index`).
     index_pending: Arc<AtomicUsize>,
+    /// Join handles for the WAL-writer and deferred-indexing threads. Held so
+    /// `Drop` can close their senders + join them — letting any in-flight WAL
+    /// flush / HNSW insert finish before the process tears down, rather than
+    /// leaving detached threads running into static teardown. `Option` so `Drop`
+    /// can `take()`.
+    wal_handle: Option<std::thread::JoinHandle<()>>,
+    index_handle: Option<std::thread::JoinHandle<()>>,
     pub local_peer_id: String,
     pub logical_clock: AtomicU32,
     pub gossip_port: AtomicU32,
@@ -736,7 +743,7 @@ impl Storage {
         let (wal_sender, wal_receiver): (Sender<(SignedEvent, Sender<bool>)>, Receiver<(SignedEvent, Sender<bool>)>) = unbounded();
         let log_path_clone = log_path.clone();
 
-        std::thread::spawn(move || {
+        let wal_handle = std::thread::spawn(move || {
             if let Ok(file) = FileOpenOptions::new().append(true).create(true).open(&log_path_clone) {
                 let mut writer = std::io::BufWriter::with_capacity(128 * 1024, file);
                 let mut batch: Vec<crossbeam_channel::Sender<bool>> = Vec::with_capacity(1024);
@@ -776,7 +783,7 @@ impl Storage {
         let (index_tx, index_rx): (Sender<IndexJob>, Receiver<IndexJob>) = bounded(4096);
         let index_pending = Arc::new(AtomicUsize::new(0));
         let index_pending_thread = Arc::clone(&index_pending);
-        std::thread::spawn(move || {
+        let index_handle = std::thread::spawn(move || {
             while let Ok(job) = index_rx.recv() {
                 match job {
                     IndexJob::One { coll, arena_id, emb, ef_c } => {
@@ -818,6 +825,8 @@ impl Storage {
             wal_sender,
             index_tx,
             index_pending,
+            wal_handle: Some(wal_handle),
+            index_handle: Some(index_handle),
             local_peer_id,
             logical_clock: AtomicU32::new(0),
             gossip_port: AtomicU32::new(0),
@@ -2395,6 +2404,22 @@ impl Drop for Storage {
     fn drop(&mut self) {
         if !self.read_only {
             let _ = self.save_state();
+        }
+        // Shut the background workers down deterministically instead of leaving
+        // them detached. Each worker's recv() loop exits only once its sender is
+        // dropped; the senders are still-live struct fields here, so swap each for
+        // a throwaway channel — that drops the original (no other clones exist) and
+        // closes the queue — then join the thread so any in-flight WAL flush / HNSW
+        // insert finishes before the process tears down. Pending (un-joined) index
+        // jobs are safe to abandon: their vectors are already in the durable arena
+        // and the HNSW rehydrates from it on load.
+        let (dead_wal, _) = unbounded();
+        drop(std::mem::replace(&mut self.wal_sender, dead_wal));
+        let (dead_idx, _) = bounded(1);
+        drop(std::mem::replace(&mut self.index_tx, dead_idx));
+        if let Some(h) = self.wal_handle.take() { let _ = h.join(); }
+        if let Some(h) = self.index_handle.take() { let _ = h.join(); }
+        if !self.read_only {
             println!("Mark IX: Graceful shutdown. State saved.");
         }
     }
