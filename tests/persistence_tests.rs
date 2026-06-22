@@ -52,7 +52,9 @@ fn test_mark_ix_instant_load_persistence() {
         let coll = storage.collections.get("default").unwrap();
         let meta_arena = coll.metadata.read();
         assert_eq!(meta_arena.len(), 1);
-        assert_eq!(meta_arena[0].node_id, "persist_1");
+        // A2: metadata stores the interned u32; it resolves back to the node id.
+        assert_eq!(meta_arena[0].node_u32, u32_id);
+        assert_eq!(storage.nodes.get(&meta_arena[0].node_u32).unwrap().id, "persist_1");
     }
     
     println!("Mark IX: Persistence verification successful.");

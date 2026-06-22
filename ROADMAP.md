@@ -113,10 +113,12 @@ in a single binary. Nearest comparators: Kuzu, DuckDB+graph, LanceDB, LadybugDB.
   default (ef=200 → recall@10 0.887); recall recovers with ef_search — 0.940 @400, **0.973 @800**
   — at ~3.1× p50 latency (1458→4528µs). Conclusion: a single global ef can't serve both scales →
   motivates per-query ef_search (P3, shipped). Numbers in `gb_vbench_500k/frontier_results.json`.
-- [~] **Node RAM ceiling — id interning:** A1 (drop `u32_to_id` reverse map) + A3
-  (`trigram_index` → roaring) **shipped** 2026-06-23; A2 (`NodeMetadata.node_id`→u32,
-  meta-bin migration) deferred. [ADR](docs/adr/ADR--GENESISDB-NODE-ID-INTERNING.md).
-  RSS quantification at 500k–2M still pending a probe run.
+- [x] **Node RAM ceiling — id interning:** A1 (drop `u32_to_id` reverse map) + A3
+  (`trigram_index` → roaring) **shipped** 2026-06-23; **A2 (`NodeMetadata.node_id`→u32)
+  shipped** 2026-06-23 — drops the per-vector × per-collection String copy; on-disk
+  `meta_*.bin` format gated by a manifest `mv` flag, pre-A2 snapshots migrate on load.
+  [ADR](docs/adr/ADR--GENESISDB-NODE-ID-INTERNING.md). RSS quantification at 500k–2M
+  still pending a probe run.
 
 ### Priority 2 — Market Evidence (🟡 กลาง)
 - [ ] **Public benchmark page:** publish P15–P30 results as a standalone page
