@@ -141,6 +141,9 @@ This phase is done; §3/§6/§7 (per-collection spaces) remain the open work.
 - New explicit vector op (REST + NAPI):
   `add_vector(node_id: String, collection: String, embedding: Vec<f64>)` — lets a
   node carry a code-embedding *and* a text-embedding in different collections.
+  ✅ **DONE** (2026-06-22, [[ADR--GENESISDB-ADD-VECTOR]]): `Event::Vector` +
+  `add_vector`; NAPI `addVector`, REST `POST /v1/vector/add`. Durable via WAL
+  replay; no compaction/snapshot changes needed (arenas are the source of truth).
 - New admin ops: `create_collection(name, model, dim, metric)`,
   `list_collections() -> Vec<CollectionInfo>`.
 - `HybridSearchInput` gains `collection: Option<String>`.
@@ -185,9 +188,10 @@ user action required; old DBs keep working.
    `NodeOutput.collection`, `HybridSearchInput.collection`; NAPI
    `create_collection`/`list_collections` (+ `CollectionInfo`); REST
    `POST /v1/collection/create`, `GET /v1/collections`; `index.d.ts` regenerated.
-   **Deferred:** HQL `IN <collection>` clause (grammar-source ambiguity) and the
-   same-node-multi-vector `add_vector` op (needs an `Event::Vector` variant) —
-   tracked as follow-ups in the ADR.
+   Same-node-multi-vector `add_vector` op ✅ **DONE** (2026-06-22,
+   [[ADR--GENESISDB-ADD-VECTOR]]): `Event::Vector` variant + `add_vector` (NAPI
+   `addVector`, REST `POST /v1/vector/add`). HQL `IN <collection>` clause is
+   tracked separately (its own branch/PR).
 
 P-B shipped independently and de-risked the rest. **P-C/P-D shipped 2026-06-22.**
 

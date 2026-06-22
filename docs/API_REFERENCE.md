@@ -23,6 +23,7 @@ prior corrupted file. The server is the SSOT; update this when routes change.
 | POST | `/v1/edge/add` | `EdgeInput` | `EdgeOutput` |
 | POST | `/v1/collection/create` | `{ name, model, dim, metric? }` | `{ ok: true }` |
 | GET | `/v1/collections` | _none_ | `CollectionInfo[]` |
+| POST | `/v1/vector/add` | `{ node_id, collection, embedding }` | `{ ok: true }` |
 | POST | `/v1/bulk/nodes` | `NodeInput[]` | `200` (empty) |
 | POST | `/v1/bulk/edges` | `EdgeInput[]` | `200` (empty) |
 | POST | `/v1/bulk/rebuild` | _none_ | `200` (empty) |
@@ -108,6 +109,14 @@ collection dim — a mismatch is a typed error, not garbage neighbors.)_
 ```
 _(Create with `POST /v1/collection/create` `{ name, model, dim, metric? }`;
 `metric` defaults to `L2`. A `default` collection always exists.)_
+### Attach a vector to a node (`POST /v1/vector/add`)
+```jsonc
+{ "node_id": "N-1", "collection": "code", "embedding": [f64] }
+```
+_(Attaches an ADDITIONAL vector to an existing node in another collection — one
+node, one vector per collection, e.g. a `code` and a `text` embedding. The node
+must exist; `embedding` length is validated against the collection dim. Durable
+via WAL `Event::Vector`; eventually searchable. NAPI: `addVector`.)_
 ### NeighborOutput
 ```jsonc
 { "node": NodeOutput, "path": [EdgeOutput], "depth": u32 }

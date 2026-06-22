@@ -295,6 +295,20 @@ pub enum Event {
     Node(NodeOutput),
     Edge(EdgeOutput),
     Batch(Vec<Event>),
+    /// Attach an additional vector to an existing node in a named collection
+    /// (a node may hold one vector per collection — e.g. code + text embeddings).
+    /// Carries the f64 embedding for WAL replay, mirroring `Event::Node`.
+    Vector(VectorEvent),
+}
+
+/// Payload of `Event::Vector`: a standalone vector attached to a node, routed to
+/// `collection` (None = default). `lang` defaults to "en" on replay if absent.
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct VectorEvent {
+    pub node_id: String,
+    pub collection: Option<String>,
+    pub embedding: Vec<f64>,
+    pub lang: Option<String>,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -635,6 +649,33 @@ impl Storage {
         Ok(())
     }
 
+    /// Attach an additional vector to an existing node, in `collection`. Lets one
+    /// node carry vectors from different models/spaces (e.g. a `code` embedding
+    /// and a `text` embedding). The node must already exist; the embedding dim is
+    /// validated against the collection. The vector is staged into the arena
+    /// (durable), the HNSW insert is deferred (eventually searchable), and an
+    /// `Event::Vector` is persisted for replay — same durability as a node's
+    /// primary embedding. A node holds at most one vector per collection;
+    /// re-adding to a collection it already has supersedes the prior mapping
+    /// (the old arena slot is reclaimed on the next compaction).
+    pub fn add_vector(&self, node_id: String, collection: String, embedding: Vec<f64>) -> Result<()> {
+        self.ensure_writable()?;
+        // A vector attaches to a node — the node must exist.
+        let exists = self.get_u32(&node_id).map_or(false, |u| self.nodes.contains_key(&u));
+        if !exists {
+            return Err(Error::from_reason(format!("node '{}' not found", node_id)));
+        }
+        let lang = "en".to_string();
+        let coll = Some(collection);
+        // Validates dim, stages into the arena, enqueues the deferred HNSW insert.
+        self.add_vector_internal(&coll, &node_id, embedding.clone(), lang.clone())?;
+        // Durability: replayed by the WAL `Event::Vector` arm.
+        self.persist(&Event::Vector(VectorEvent {
+            node_id, collection: coll, embedding, lang: Some(lang),
+        }))?;
+        Ok(())
+    }
+
     fn enqueue_one(&self, coll: &Arc<VectorCollection>, arena_id: u32, emb: Vec<f32>) {
         self.index_pending.fetch_add(1, Ordering::Relaxed);
         let _ = self.index_tx.send(IndexJob::One {
@@ -837,6 +878,11 @@ impl Storage {
                                         let u32_id = storage.index_edge_internal(&e.id, &e.from, &e.to);
                                         storage.edges.insert(u32_id, e);
                                     }
+                                    Event::Vector(v) => {
+                                        // Stage only (index=false): rehydrate_hnsw_index
+                                        // after load builds every index once.
+                                        storage.replay_vector(&v.collection, &v.node_id, v.embedding, v.lang.clone().unwrap_or_else(|| "en".to_string()), false);
+                                    }
                                     Event::Batch(events) => {
                                         for batch_event in events {
                                             match batch_event {
@@ -961,6 +1007,8 @@ impl Storage {
                 Ok(true)
             }
             Event::Edge(_) => Ok(true),
+            // A vector attachment carries no governance/axiom implication.
+            Event::Vector(_) => Ok(true),
             Event::Batch(events) => {
                 for e in events {
                     if !self.semantic_verify(e)? { return Ok(false); }
@@ -1031,6 +1079,11 @@ impl Storage {
                                 _ => {}
                             }
                         }
+                        self.persist_signed(signed_event.clone())?;
+                    }
+                    // Vectors aren't axiom subjects; persist for durability if one
+                    // is ever proposed through consensus.
+                    Event::Vector(_) => {
                         self.persist_signed(signed_event.clone())?;
                     }
                 }
@@ -1672,6 +1725,12 @@ impl Storage {
                         self.edges.insert(u32_id, remote_edge.clone());
                         self.persist_signed(signed_event.clone())?;
                     }
+                }
+                Event::Vector(remote_vec) => {
+                    // Runtime sync: stage AND enqueue (index=true) — no rehydrate
+                    // follows. Auto-provisions the collection if this peer lacks it.
+                    self.replay_vector(&remote_vec.collection, &remote_vec.node_id, remote_vec.embedding.clone(), remote_vec.lang.clone().unwrap_or_else(|| "en".to_string()), true);
+                    self.persist_signed(signed_event.clone())?;
                 }
                 Event::Batch(inner_events) => {
                     // Recursive call needs SignedEvent wrapping, but for now we handle batches as single signed units
@@ -2430,6 +2489,7 @@ impl GenesisDatabase {
     #[napi] pub async fn compact(&self) -> Result<()> { let i = Arc::clone(&self.inner); tokio::task::spawn_blocking(move || i.compact()).await.map_err(|e| Error::from_reason(e.to_string()))? }
     #[napi] pub async fn create_collection(&self, name: String, model: String, dim: u32, metric: Option<String>) -> Result<()> { let i = Arc::clone(&self.inner); tokio::task::spawn_blocking(move || i.create_collection(name, model, dim, metric)).await.map_err(|e| Error::from_reason(e.to_string()))? }
     #[napi] pub fn list_collections(&self) -> Vec<CollectionInfo> { self.inner.list_collections() }
+    #[napi] pub async fn add_vector(&self, node_id: String, collection: String, embedding: Vec<f64>) -> Result<()> { let i = Arc::clone(&self.inner); tokio::task::spawn_blocking(move || i.add_vector(node_id, collection, embedding)).await.map_err(|e| Error::from_reason(e.to_string()))? }
     #[napi] pub async fn flush_index(&self) -> Result<()> { let i = Arc::clone(&self.inner); tokio::task::spawn_blocking(move || i.flush_index()).await.map_err(|e| Error::from_reason(e.to_string())) }
     #[napi] pub fn index_lag(&self) -> u32 { self.inner.index_lag() }
     #[napi] pub fn set_language_centroid(&self, lang: String, vector: Vec<f64>) { self.inner.set_language_centroid(lang, vector); }
