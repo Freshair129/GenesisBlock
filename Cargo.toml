@@ -9,6 +9,15 @@ publish = false
 [lib]
 crate-type = ["cdylib", "rlib"]
 
+[features]
+# `bins` gates the standalone server + benchmark executables. Each one links the
+# napi-using lib, so it cannot link as a standalone binary during the default
+# `cargo build` / `napi build` — `napi_*` symbols (e.g. napi_get_cb_info) are only
+# provided by the Node host for the cdylib. Keeping the bins behind an off-by-
+# default feature lets `npm install` (napi build) compile ONLY the .node cdylib,
+# while `cargo build --features bins` still builds them for benchmarks/dev.
+bins = []
+
 [dependencies]
 napi = { version = "2.16", default-features = false, features = ["napi8", "async", "serde-json"] }
 napi-derive = "2.16"
@@ -48,6 +57,7 @@ napi-build = "2.1"
 [[bin]]
 name = "genesis-db-server"
 path = "src/main.rs"
+required-features = ["bins"]
 
 [[bench]]
 name = "ldbc_lite"
@@ -67,49 +77,59 @@ tempfile = "3.27.0"
 [[bin]]
 name = "snb-ingestion"
 path = "benches/snb_ingestion.rs"
+required-features = ["bins"]
 
 
 [[bin]]
 name = "snb-bulk-ingestion"
 path = "benches/snb_bulk_ingestion.rs"
+required-features = ["bins"]
 
 
 [[bin]]
 name = "shadow-sync-stress"
 path = "benches/shadow_sync_stress.rs"
+required-features = ["bins"]
 
 
 [[bin]]
 name = "hql-query-stress"
 path = "benches/hql_query_stress.rs"
+required-features = ["bins"]
 
 
 [[bin]]
 name = "industrial-audit"
 path = "benches/industrial_audit.rs"
+required-features = ["bins"]
 
 
 [[bin]]
 name = "scientific-audit"
 path = "benches/scientific_audit.rs"
+required-features = ["bins"]
 
 
 [[bin]]
 name = "vbench-genesis"
 path = "benches/vbench_genesis.rs"
+required-features = ["bins"]
 
 
 [[bin]]
 name = "graph-bench"
 path = "benches/graph_bench.rs"
+required-features = ["bins"]
 
 
 [[bin]]
 name = "gov-kimpact-bench"
 path = "benches/gov_kimpact_bench.rs"
+required-features = ["bins"]
 
 
 [[bin]]
 name = "edge-interning-audit"
 path = "benches/edge_interning_audit.rs"
+required-features = ["bins"]
 
