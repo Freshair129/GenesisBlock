@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>GenesisBlockDB — verifiable, local-first agent memory</title>
+<meta name="description" content="An embedded hybrid graph + vector engine for AI agent memory: bitemporal, signed, local-first. Benchmarked, not narrated." />
+<style>
+  :root { --bg:#0b0e14; --fg:#e6e6e6; --muted:#9aa4b2; --accent:#7aa2f7; --card:#141925; --border:#222a3a; }
+  * { box-sizing:border-box; }
+  body { margin:0; font:16px/1.6 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif; background:var(--bg); color:var(--fg); }
+  .wrap { max-width:880px; margin:0 auto; padding:64px 24px; }
+  h1 { font-size:2.4rem; line-height:1.15; margin:0 0 .4em; }
+  h1 .accent { color:var(--accent); }
+  .lede { font-size:1.2rem; color:var(--muted); margin:0 0 2rem; }
+  .grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:16px; margin:2rem 0; }
+  a.card { display:block; text-decoration:none; color:inherit; background:var(--card); border:1px solid var(--border); border-radius:12px; padding:20px; transition:border-color .15s,transform .15s; }
+  a.card:hover { border-color:var(--accent); transform:translateY(-2px); }
+  a.card h3 { margin:0 0 6px; font-size:1.05rem; }
+  a.card p { margin:0; color:var(--muted); font-size:.92rem; }
+  .stats { display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:16px; margin:2rem 0; }
+  .stat { background:var(--card); border:1px solid var(--border); border-radius:12px; padding:18px; }
+  .stat .n { font-size:1.7rem; font-weight:700; color:var(--accent); }
+  .stat .l { color:var(--muted); font-size:.85rem; }
+  code { background:#0d1320; border:1px solid var(--border); border-radius:6px; padding:2px 6px; font-size:.9em; }
+  footer { color:var(--muted); font-size:.85rem; margin-top:3rem; border-top:1px solid var(--border); padding-top:1.5rem; }
+  a { color:var(--accent); }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>GenesisBlock<span class="accent">DB</span></h1>
+  <p class="lede">Verifiable, local-first <strong>agent memory</strong> — an embedded engine
+  that unifies a vector index and a property graph behind one durable, bitemporal,
+  ed25519-signed store. Benchmarked, not narrated.</p>
+
+  <div class="stats">
+    <div class="stat"><div class="n">~22 µs</div><div class="l">1-hop p50, O(neighborhood) to 1M nodes</div></div>
+    <div class="stat"><div class="n">0.984</div><div class="l">vector recall@10 @ ~1.1 ms p50</div></div>
+    <div class="stat"><div class="n">189×</div><div class="l">faster k-hop vs Kuzu</div></div>
+    <div class="stat"><div class="n">4–32×</div><div class="l">vector RAM cut (SQ8 / binary quant)</div></div>
+  </div>
+
+  <div class="grid">
+    <a class="card" href="perf-comparison-dashboard.html">
+      <h3>📊 Benchmark dashboard →</h3>
+      <p>Interactive head-to-head charts vs Kuzu, DuckDB, RocksDB, LadybugDB, Chroma, Qdrant, Neo4j.</p>
+    </a>
+    <a class="card" href="REPORT--2026-06-21-PERFORMANCE-AND-COMPETITIVE.md">
+      <h3>📑 Performance report →</h3>
+      <p>The consolidated competitive analysis with honest caveats (audits P14–P31).</p>
+    </a>
+    <a class="card" href="../QUICKSTART.md">
+      <h3>⚡ 5-minute quickstart →</h3>
+      <p>Embed it in Node.js: open, add knowledge, hybrid-search — no server.</p>
+    </a>
+    <a class="card" href="POSITIONING.md">
+      <h3>🎯 Positioning →</h3>
+      <p>Why an embedded graph + vector engine for verifiable agent memory.</p>
+    </a>
+    <a class="card" href="C4--GENESISDB-ARCHITECTURE.md">
+      <h3>🏗 Architecture (C4) →</h3>
+      <p>The architecture index / SSOT map for the engine.</p>
+    </a>
+    <a class="card" href="https://github.com/Freshair129/GenesisBlock">
+      <h3>⌥ Source →</h3>
+      <p>One Rust core → Node.js NAPI addon + Axum REST server.</p>
+    </a>
+  </div>
+
+  <p>Install: <code>npm install @freshair129/gks-genesis-block-native</code> &nbsp;·&nbsp;
+     or run the server: <code>cargo run --bin genesis-db-server</code></p>
+
+  <footer>
+    GenesisBlockDB — local-first hybrid semantic-graph database engine.
+    Embedded · bitemporal · signed · CRDT-syncable.
+  </footer>
+</div>
+</body>
+</html>

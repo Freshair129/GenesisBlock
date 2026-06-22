@@ -1,0 +1,46 @@
+# Publish the static benchmark/landing page (docs/) to GitHub Pages.
+#
+# One-time setup: repo Settings → Pages → Source = "GitHub Actions". Until that
+# is enabled this workflow is a no-op safety net; it does not change anything.
+name: Deploy docs to Pages
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'docs/**'
+      - 'QUICKSTART.md'
+      - '.github/workflows/pages.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# One deploy at a time; let an in-progress run finish.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      # Stage docs/ as the site root, and include QUICKSTART.md so docs/index.html
+      # can link to ../QUICKSTART.md.
+      - name: Assemble site
+        run: |
+          mkdir -p _site
+          cp -r docs/* _site/
+          cp QUICKSTART.md _site/QUICKSTART.md || true
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+      - id: deployment
+        uses: actions/deploy-pages@v4

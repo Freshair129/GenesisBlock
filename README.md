@@ -7,7 +7,9 @@ tiers, optional CRDT sync) compiles to a Node.js NAPI addon and an Axum REST
 server. Nearest comparators are embedded engines (Kuzu, DuckDB+graph,
 RocksDB+graph); Neo4j/Qdrant are references, not the category.
 
-**Benchmarked, not narrated** — see the [consolidated performance report](docs/REPORT--2026-06-21-PERFORMANCE-AND-COMPETITIVE.md) (audits P14–P25).
+**Benchmarked, not narrated** — see the [consolidated performance report](docs/REPORT--2026-06-21-PERFORMANCE-AND-COMPETITIVE.md) (audits P14–P25) and the [interactive benchmark dashboard](docs/perf-comparison-dashboard.html).
+
+**New here?** → [5-minute Quickstart (Node.js)](QUICKSTART.md) · [Why GenesisBlockDB (Positioning)](docs/POSITIONING.md)
 
 ## Measured performance (2026-06-21, on SSD; see report)
 
@@ -21,6 +23,9 @@ RocksDB+graph); Neo4j/Qdrant are references, not the category.
 
 ## Documentation Entrypoints
 
+- Quickstart (embed in Node.js): [QUICKSTART.md](QUICKSTART.md)
+- Positioning / competitive narrative: [docs/POSITIONING.md](docs/POSITIONING.md)
+- Live benchmark page (GitHub Pages): [docs/index.html](docs/index.html) · interactive [dashboard](docs/perf-comparison-dashboard.html)
 - Performance & competitive report: [docs/REPORT--2026-06-21-PERFORMANCE-AND-COMPETITIVE.md](docs/REPORT--2026-06-21-PERFORMANCE-AND-COMPETITIVE.md)
 - Architecture index / C4 map: [docs/C4--GENESISDB-ARCHITECTURE.md](docs/C4--GENESISDB-ARCHITECTURE.md)
 - Authoritative parent specification: [docs/MASTER-SPEC--GENESIS-DB.md](docs/MASTER-SPEC--GENESIS-DB.md)
