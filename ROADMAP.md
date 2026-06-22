@@ -147,8 +147,13 @@ in a single binary. Nearest comparators: Kuzu, DuckDB+graph, LanceDB, LadybugDB.
   word-inequality), ~32× vector RAM/disk. Symmetric, no-rerank first cut (matching SQ8); an
   f32-sidecar rerank stage is a future lever. Create with `quant: "bq"`.
   [ADR](docs/adr/ADR--GENESISDB-VECTOR-QUANTIZATION.md). Recall harness on real data pending.
-- [ ] **GKS Insight Dashboard** *(carried from MARK XI Step 4)*: real-time swarm
-  health and knowledge drift visualization. *(1–2 weeks)*
+- [x] **GKS Insight Dashboard** *(carried from MARK XI Step 4)*: **shipped** 2026-06-23.
+  New read-only REST `GET /v1/insight/communities` (meta-graph SuperNodes + MetaEdges) and
+  `GET /v1/insight/gaps` (structural gaps), plus `POST /v1/insight/rebuild` (recompute via
+  `detect_communities`+`generate_meta_graph`). The dashboard's placeholder is replaced by an
+  `InsightPanel` (community cards with size/impact/drift bars + structural-gap list + Rebuild),
+  `useInsight` hook, `api` methods. `dashboard` `tsc -b && vite build` green. *(Force-graph
+  cluster viz is a future enhancement; this ships the data + a working panel.)*
 
 ### Priority 5 — Distributed (🟢 ต่ำ; C-3 own session)
 - [x] **Gossip `PullRequest` anti-entropy:** **shipped** 2026-06-23 — the PullRequest

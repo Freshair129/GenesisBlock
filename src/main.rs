@@ -228,6 +228,35 @@ async fn get_meta_history_handler(
     (StatusCode::OK, Json(history)).into_response()
 }
 
+// --- GKS Insight surface (community clusters / structural gaps) -------------
+
+/// Current meta-graph: community SuperNodes + the MetaEdges between clusters.
+/// Read-only — call POST /v1/insight/rebuild to recompute from current vectors.
+async fn insight_communities_handler(State(state): State<AppState>) -> impl IntoResponse {
+    let storage = state.storage.read();
+    let nodes: Vec<_> = storage.meta_nodes.iter().map(|e| e.value().clone()).collect();
+    let edges: Vec<_> = storage.meta_edges.iter().map(|e| e.value().clone()).collect();
+    (StatusCode::OK, Json(serde_json::json!({ "nodes": nodes, "edges": edges }))).into_response()
+}
+
+/// Structural gaps: pairs of clusters that are semantically close but not linked.
+async fn insight_gaps_handler(State(state): State<AppState>) -> impl IntoResponse {
+    let storage = state.storage.read();
+    match storage.calculate_structural_gaps() {
+        Ok(gaps) => (StatusCode::OK, Json(gaps)).into_response(),
+        Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
+    }
+}
+
+/// Recompute community assignments + the meta-graph from the current vectors.
+async fn insight_rebuild_handler(State(state): State<AppState>) -> impl IntoResponse {
+    let storage = state.storage.write();
+    match storage.detect_communities().and_then(|_| storage.generate_meta_graph()) {
+        Ok(()) => (StatusCode::OK, Json(serde_json::json!({ "ok": true }))).into_response(),
+        Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
+    }
+}
+
 async fn execute_hql_handler(
     State(state): State<AppState>,
     Json(query): Json<String>,
@@ -366,6 +395,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .route("/v1/collections", get(list_collections_handler))
         .route("/v1/vector/add", post(add_vector_handler))
         .route("/v1/insight/drift/:cluster_id", get(get_meta_history_handler))
+        .route("/v1/insight/communities", get(insight_communities_handler))
+        .route("/v1/insight/gaps", get(insight_gaps_handler))
+        .route("/v1/insight/rebuild", post(insight_rebuild_handler))
         .route("/v1/query", post(query_handler))
         .route("/v1/search/hybrid", post(hybrid_search_handler))
         .route("/v1/reason/context", post(ranked_context_handler))

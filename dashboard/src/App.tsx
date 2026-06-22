@@ -1,5 +1,6 @@
 import { Layout } from './components/Layout';
 import { useStatus } from './hooks/useStatus';
+import { InsightPanel } from './components/InsightPanel';
 import { RefreshCcw, AlertTriangle } from 'lucide-react';
 
 function App() {
@@ -73,12 +74,7 @@ function App() {
             )}
           </div>
 
-          <div className="bg-surface border border-white/5 p-8 rounded-xl h-full flex flex-col">
-             <h2 className="text-lg font-bold text-white mb-4">Visual Insight Preview</h2>
-             <div className="flex-1 flex items-center justify-center text-slate-500 italic text-center">
-              Graph visualization will be implemented in Phase 3
-            </div>
-          </div>
+          <InsightPanel />
         </div>
       </div>
     </Layout>
