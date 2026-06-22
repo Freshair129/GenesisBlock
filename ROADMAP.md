@@ -141,9 +141,11 @@ in a single binary. Nearest comparators: Kuzu, DuckDB+graph, LanceDB, LadybugDB.
   still open.
 
 ### Priority 4 — Vector Quality (🟢 ต่ำ)
-- [~] **Scalar / binary quantization:** **SQ8 shipped** 2026-06-23 (full resident cut —
-  per-collection `Quant`, arena+HNSW u8, 4× RAM *and* disk). Binary (BQ) deferred to a
-  focused PR (no-mmap f32 sidecar + custom popcount distance).
+- [x] **Scalar / binary quantization:** **SQ8 + BQ shipped** 2026-06-23. SQ8 (full
+  resident cut — arena+HNSW u8, 4× RAM *and* disk). **BQ (binary)**: 1 sign bit/dim packed
+  into u64 words + custom popcount `DistBinaryHamming` HNSW (anndists' u64 `DistHamming` is
+  word-inequality), ~32× vector RAM/disk. Symmetric, no-rerank first cut (matching SQ8); an
+  f32-sidecar rerank stage is a future lever. Create with `quant: "bq"`.
   [ADR](docs/adr/ADR--GENESISDB-VECTOR-QUANTIZATION.md). Recall harness on real data pending.
 - [ ] **GKS Insight Dashboard** *(carried from MARK XI Step 4)*: real-time swarm
   health and knowledge drift visualization. *(1–2 weeks)*
