@@ -97,8 +97,10 @@ GenesisBlockDB exposes a specialized language for reasoning over graph and vecto
 
 ### 7.1 Search (Lexical/Vector)
 ```sql
-SEARCH ~target SIMILAR TO [v1, v2, ...] K 5 LANGUAGE "th" AS OF "2026-01-01T00:00:00Z"
+SEARCH ~target SIMILAR TO [v1, v2, ...] K 5 IN "code" LANGUAGE "th" AS OF "2026-01-01T00:00:00Z"
 ```
+The optional `IN <collection>` clause (quoted or bare identifier) scopes the
+search to a named vector collection; omitted → the `default` collection.
 
 ### 7.2 Traverse (Graph)
 ```sql

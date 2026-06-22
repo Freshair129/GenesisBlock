@@ -21,6 +21,7 @@ pub enum HqlCommand {
         fuzzy: bool,
         lang: Option<String>,
         as_of: Option<String>,
+        collection: Option<String>,
     },
     Traverse {
         seed: String,
@@ -36,6 +37,7 @@ pub enum HqlCommand {
         fuzzy: bool,
         lang: Option<String>,
         as_of: Option<String>,
+        collection: Option<String>,
     },
     Context {
         target: String,
@@ -112,6 +114,20 @@ impl HqlCommand {
         "".to_string()
     }
 
+    fn parse_collection_spec(pair: pest::iterators::Pair<Rule>) -> String {
+        for inner in pair.into_inner() {
+            match inner.as_rule() {
+                Rule::identifier => return inner.as_str().to_string(),
+                Rule::string_lit => {
+                    let s = inner.as_str();
+                    return s[1..s.len()-1].to_string(); // strip quotes
+                }
+                _ => {}
+            }
+        }
+        String::new()
+    }
+
     fn parse_search(pair: pest::iterators::Pair<Rule>) -> Self {
         let mut target = String::new();
         let mut vector = Vec::new();
@@ -119,6 +135,7 @@ impl HqlCommand {
         let mut fuzzy = false;
         let mut lang = None;
         let mut as_of = None;
+        let mut collection = None;
 
         for inner in pair.into_inner() {
             match inner.as_rule() {
@@ -133,13 +150,14 @@ impl HqlCommand {
                         .collect();
                 }
                 Rule::k => k = inner.as_str().parse::<u32>().unwrap_or(5),
+                Rule::collection_spec => collection = Some(Self::parse_collection_spec(inner)),
                 Rule::lang_spec => lang = Some(Self::parse_lang_spec(inner)),
                 Rule::as_of => as_of = Some(Self::parse_as_of(inner)),
                 _ => {}
             }
         }
 
-        HqlCommand::Search { target, vector, k, fuzzy, lang, as_of }
+        HqlCommand::Search { target, vector, k, fuzzy, lang, as_of, collection }
     }
 
     fn parse_traverse(pair: pest::iterators::Pair<Rule>) -> Self {
@@ -189,6 +207,7 @@ impl HqlCommand {
         let mut fuzzy = false;
         let mut lang = None;
         let mut as_of = None;
+        let mut collection = None;
 
         for inner in pair.into_inner() {
             match inner.as_rule() {
@@ -203,13 +222,14 @@ impl HqlCommand {
                         .collect();
                 }
                 Rule::alpha => alpha = inner.as_str().parse::<f64>().unwrap_or(0.5),
+                Rule::collection_spec => collection = Some(Self::parse_collection_spec(inner)),
                 Rule::lang_spec => lang = Some(Self::parse_lang_spec(inner)),
                 Rule::as_of => as_of = Some(Self::parse_as_of(inner)),
                 _ => {}
             }
         }
 
-        HqlCommand::Hybrid { target, vector, alpha, fuzzy, lang, as_of }
+        HqlCommand::Hybrid { target, vector, alpha, fuzzy, lang, as_of, collection }
     }
 
     fn parse_context(pair: pest::iterators::Pair<Rule>) -> Self {

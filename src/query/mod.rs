@@ -20,7 +20,7 @@ impl LogicalPlanner {
     pub fn plan(command: HqlCommand) -> QueryPlan {
         let mut steps = Vec::new();
         match command {
-            HqlCommand::Search { target: _, vector, k, fuzzy: _, lang: _, as_of: _ } => {
+            HqlCommand::Search { target: _, vector, k, fuzzy: _, lang: _, as_of: _, collection: _ } => {
                 steps.push(PlanStep::VectorSearch { 
                     vector: vector.into_iter().map(|v| v as f32).collect(), 
                     k: k as usize 
@@ -29,7 +29,7 @@ impl LogicalPlanner {
             HqlCommand::Traverse { seed, depth, rel, fuzzy, as_of: _ } => {
                 steps.push(PlanStep::GraphTraversal { seed, depth, rel, fuzzy });
             }
-            HqlCommand::Hybrid { target: _, vector, alpha, fuzzy: _, lang: _, as_of: _ } => {
+            HqlCommand::Hybrid { target: _, vector, alpha, fuzzy: _, lang: _, as_of: _, collection: _ } => {
                 steps.push(PlanStep::VectorSearch { 
                     vector: vector.into_iter().map(|v| v as f32).collect(), 
                     k: 10 

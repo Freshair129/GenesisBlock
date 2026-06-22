@@ -16,10 +16,11 @@ depth = { ASCII_DIGIT+ }
 alpha = { number }
 lang_spec = { ^"LANGUAGE" ~ string_lit }
 as_of = { ^"AS" ~ ^"OF" ~ string_lit }
+collection_spec = { ^"IN" ~ (identifier | string_lit) }
 
-search = { ^"SEARCH" ~ target ~ ^"SIMILAR" ~ ^"TO" ~ "[" ~ vector ~ "]" ~ ^"K" ~ k ~ lang_spec? ~ as_of? }
+search = { ^"SEARCH" ~ target ~ ^"SIMILAR" ~ ^"TO" ~ "[" ~ vector ~ "]" ~ ^"K" ~ k ~ collection_spec? ~ lang_spec? ~ as_of? }
 traverse = { ^"TRAVERSE" ~ ^"FROM" ~ seed ~ ^"DEPTH" ~ depth ~ ^"REL" ~ rel ~ as_of? }
-hybrid = { ^"MATCH" ~ target ~ ^"SIMILAR" ~ ^"TO" ~ "[" ~ vector ~ "]" ~ ^"ALPHA" ~ alpha ~ lang_spec? ~ as_of? }
+hybrid = { ^"MATCH" ~ target ~ ^"SIMILAR" ~ ^"TO" ~ "[" ~ vector ~ "]" ~ ^"ALPHA" ~ alpha ~ collection_spec? ~ lang_spec? ~ as_of? }
 
 budget = { ASCII_DIGIT+ }
 tier = { "H0" | "H1" | "H2" | "H3" | "H4" | "H5" }

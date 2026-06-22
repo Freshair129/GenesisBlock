@@ -51,13 +51,16 @@ traversal), `retract_edge`, `compact`, `detect_communities`,
 
 ## HQL (`/v1/query/hql`, raw string body)
 ```
-SEARCH <target> SIMILAR TO [v1, v2, …] K <k> [LANGUAGE "th"] [AS OF "<rfc3339>"]
+SEARCH <target> SIMILAR TO [v1, v2, …] K <k> [IN <collection>] [LANGUAGE "th"] [AS OF "<rfc3339>"]
 TRAVERSE FROM <seed> DEPTH <n> REL <rel|INFER(rel)|ANY> [AS OF "…"]
-MATCH <target> SIMILAR TO [v…] ALPHA <a> [LANGUAGE "…"] [AS OF "…"]
+MATCH <target> SIMILAR TO [v…] ALPHA <a> [IN <collection>] [LANGUAGE "…"] [AS OF "…"]
 CONTEXT FOR <target> TIER <H0..H5> [BUDGET <n>]
 ```
 `~` prefix on target/seed enables fuzzy id resolution. `SEARCH` runs pure vector
-k-NN (alpha=0); `MATCH` is hybrid (vector + K-Impact, k=10).
+k-NN (alpha=0); `MATCH` is hybrid (vector + K-Impact, k=10). `IN <collection>`
+scopes the query to a named vector collection (quoted `"code"` or bare `code`);
+omitted → the `default` collection. The query dim is validated against the
+collection dim.
 
 ## Data model (from `src/lib.rs`)
 
