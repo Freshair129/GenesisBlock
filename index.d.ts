@@ -127,6 +127,7 @@ export interface CollectionInfo {
   model: string
   dim: number
   metric: string
+  quant: string
   count: number
 }
 export interface SyncPeer {
@@ -180,7 +181,7 @@ export declare class GenesisDatabase {
   neighbors(seed: string, args: NeighborInput): Promise<Array<NeighborOutput>>
   saveState(): Promise<void>
   compact(): Promise<void>
-  createCollection(name: string, model: string, dim: number, metric?: string | undefined | null): Promise<void>
+  createCollection(name: string, model: string, dim: number, metric?: string | undefined | null, quant?: string | undefined | null): Promise<void>
   listCollections(): Array<CollectionInfo>
   addVector(nodeId: string, collection: string, embedding: Array<number>): Promise<void>
   flushIndex(): Promise<void>

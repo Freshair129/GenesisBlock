@@ -18,6 +18,7 @@ use rand::Rng;
 
 use chrono::Utc;
 use dashmap::DashMap;
+use roaring::RoaringBitmap;
 use hnsw_rs::prelude::*;
 use napi::bindgen_prelude::*;
 use napi_derive::napi;
@@ -221,6 +222,7 @@ pub struct CollectionInfo {
     pub model: String,
     pub dim: u32,
     pub metric: String,
+    pub quant: String,
     pub count: u32,
 }
 
@@ -373,6 +375,149 @@ impl Metric {
     }
 }
 
+/// Per-collection vector quantization (ADR--GENESISDB-VECTOR-QUANTIZATION).
+/// `None` keeps lossless f32 end-to-end — byte-identical to pre-quant DBs.
+/// `ScalarU8` (SQ8) stores BOTH the resident arena and the HNSW as u8 (the
+/// "full resident cut", ~4× vector RAM); symmetric quant, no rerank.
+#[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq)]
+pub enum Quant { None, ScalarU8 }
+
+impl Quant {
+    fn parse(s: &str) -> Self {
+        if s.eq_ignore_ascii_case("sq8") || s.eq_ignore_ascii_case("scalaru8") { Quant::ScalarU8 } else { Quant::None }
+    }
+    fn as_str(&self) -> &'static str {
+        match self { Quant::None => "none", Quant::ScalarU8 => "sq8" }
+    }
+}
+
+// SQ8 maps [-1,1] -> [0,255] with a FIXED affine scale, so concurrent async
+// inserts agree without any of them having seen the whole data distribution.
+// Cosine collections are already unit-normalized into [-1,1] (clean); L2 values
+// outside [-1,1] clamp (documented limitation of the first cut).
+const SQ8_SCALE: f32 = 127.5;
+const SQ8_BIAS: f32 = 127.5;
+
+#[inline]
+fn sq8_q(v: f32) -> u8 {
+    let q = (v * SQ8_SCALE + SQ8_BIAS).round();
+    if q <= 0.0 { 0 } else if q >= 255.0 { 255 } else { q as u8 }
+}
+#[inline]
+fn sq8_dq(q: u8) -> f32 { (q as f32 - SQ8_BIAS) / SQ8_SCALE }
+
+/// The resident vector arena, element type chosen by the collection's `Quant`.
+/// Offsets/lengths are in scalar-component units (== dim), identical across
+/// variants — so `NodeMetadata.embedding_offset`/`vector_dim` mean the same in
+/// every mode; only the on-disk byte width differs (4 for f32, 1 for u8).
+pub enum ArenaStore {
+    F32(Vec<f32>),
+    U8(Vec<u8>),
+}
+
+impl ArenaStore {
+    fn new(q: Quant) -> Self {
+        match q { Quant::None => ArenaStore::F32(Vec::new()), Quant::ScalarU8 => ArenaStore::U8(Vec::new()) }
+    }
+    /// Number of scalar components stored (NOT bytes).
+    pub fn len(&self) -> usize {
+        match self { ArenaStore::F32(v) => v.len(), ArenaStore::U8(v) => v.len() }
+    }
+    pub fn is_empty(&self) -> bool { self.len() == 0 }
+    /// Append a prepared f32 vector, quantizing per mode.
+    fn push_f32(&mut self, emb: &[f32]) {
+        match self {
+            ArenaStore::F32(v) => v.extend_from_slice(emb),
+            ArenaStore::U8(v) => v.extend(emb.iter().map(|&x| sq8_q(x))),
+        }
+    }
+    /// Read a vector back as f32 (dequantizing per mode). For the heuristic
+    /// f32-value readers (meta-graph / clustering) only — never for search.
+    fn f32_at(&self, start: usize, len: usize) -> Vec<f32> {
+        match self {
+            ArenaStore::F32(v) => v[start..start + len].to_vec(),
+            ArenaStore::U8(v) => v[start..start + len].iter().map(|&q| sq8_dq(q)).collect(),
+        }
+    }
+    /// Append elements [start, start+len) from `src` (same variant) — compaction.
+    fn append_range(&mut self, src: &ArenaStore, start: usize, len: usize) {
+        match (self, src) {
+            (ArenaStore::F32(d), ArenaStore::F32(s)) => d.extend_from_slice(&s[start..start + len]),
+            (ArenaStore::U8(d), ArenaStore::U8(s)) => d.extend_from_slice(&s[start..start + len]),
+            _ => {} // a collection never mixes variants
+        }
+    }
+    /// Raw little-endian bytes for the `vec_<name>.bin` snapshot.
+    fn to_bytes(&self) -> Vec<u8> {
+        match self {
+            ArenaStore::F32(v) => unsafe {
+                std::slice::from_raw_parts(v.as_ptr() as *const u8, v.len() * 4)
+            }.to_vec(),
+            ArenaStore::U8(v) => v.clone(),
+        }
+    }
+    fn from_bytes(data: &[u8], q: Quant) -> Self {
+        match q {
+            Quant::None => ArenaStore::F32(
+                data.chunks_exact(4).map(|c| f32::from_le_bytes(c.try_into().unwrap())).collect()
+            ),
+            Quant::ScalarU8 => ArenaStore::U8(data.to_vec()),
+        }
+    }
+}
+
+/// HNSW index, element type chosen by `Quant`. `search` distances are always f32
+/// (the `Distance::eval` contract), so callers stay mode-agnostic.
+enum VecIndex {
+    F32(Hnsw<'static, f32, DistL2>),
+    U8(Hnsw<'static, u8, DistL2>),
+}
+
+impl VecIndex {
+    fn build(q: Quant, ef_c: usize, cap: usize) -> Self {
+        let cap = cap.max(VectorCollection::HNSW_MIN_CAP);
+        match q {
+            Quant::None => VecIndex::F32(Hnsw::new(16, cap, 16, ef_c, DistL2 {})),
+            Quant::ScalarU8 => VecIndex::U8(Hnsw::new(16, cap, 16, ef_c, DistL2 {})),
+        }
+    }
+    fn insert_f32(&self, emb: &[f32], id: usize) {
+        match self {
+            VecIndex::F32(h) => h.insert((emb, id)),
+            VecIndex::U8(h) => {
+                let q: Vec<u8> = emb.iter().map(|&x| sq8_q(x)).collect();
+                h.insert((&q, id));
+            }
+        }
+    }
+    fn parallel_insert_f32(&self, items: &[(Vec<f32>, u32)]) {
+        match self {
+            VecIndex::F32(h) => {
+                let refs: Vec<(&Vec<f32>, usize)> = items.iter().map(|(v, id)| (v, *id as usize)).collect();
+                h.parallel_insert(&refs);
+            }
+            VecIndex::U8(h) => {
+                let q: Vec<(Vec<u8>, usize)> = items.iter()
+                    .map(|(v, id)| (v.iter().map(|&x| sq8_q(x)).collect(), *id as usize)).collect();
+                let refs: Vec<(&Vec<u8>, usize)> = q.iter().map(|(v, id)| (v, *id)).collect();
+                h.parallel_insert(&refs);
+            }
+        }
+    }
+    /// Search, returning `(arena_id, distance_f32)` so callers never name the
+    /// hnsw_rs `Neighbour` type or branch on element type.
+    fn search_f32(&self, query: &[f32], k: usize, ef: usize) -> Vec<(usize, f32)> {
+        let raw = match self {
+            VecIndex::F32(h) => h.search(query, k, ef),
+            VecIndex::U8(h) => {
+                let q: Vec<u8> = query.iter().map(|&x| sq8_q(x)).collect();
+                h.search(&q, k, ef)
+            }
+        };
+        raw.into_iter().map(|n| (n.d_id, n.distance)).collect()
+    }
+}
+
 /// One isolated vector space (ADR--GENESISDB-MULTI-COLLECTION / SPEC §3). All
 /// vectors in a collection come from ONE embedding model and share one dim +
 /// metric + arena + metadata + HNSW index. Cross-model distances are
@@ -382,18 +527,19 @@ pub struct VectorCollection {
     pub model: String,
     pub dim: u16,
     pub metric: Metric,
-    pub arena: RwLock<Vec<f32>>,            // dense, row-major, stride = dim
+    pub quant: Quant,
+    pub arena: RwLock<ArenaStore>,          // element type per `quant`; offsets in components
     pub metadata: RwLock<Vec<NodeMetadata>>,
-    pub hnsw: RwLock<Option<Hnsw<'static, f32, DistL2>>>,
+    hnsw: RwLock<Option<VecIndex>>,
     pub node_to_arena: DashMap<u32, u32>,   // node u32 -> arena_id (this collection)
     pub count: AtomicUsize,
 }
 
 impl VectorCollection {
-    fn new(name: String, model: String, dim: u16, metric: Metric) -> Self {
+    fn new(name: String, model: String, dim: u16, metric: Metric, quant: Quant) -> Self {
         Self {
-            name, model, dim, metric,
-            arena: RwLock::new(Vec::new()),
+            name, model, dim, metric, quant,
+            arena: RwLock::new(ArenaStore::new(quant)),
             metadata: RwLock::new(Vec::new()),
             hnsw: RwLock::new(None),
             node_to_arena: DashMap::new(),
@@ -412,16 +558,12 @@ impl VectorCollection {
     /// aborted on OOM. Size to the data instead (ADR--GENESISDB-HNSW-CAPACITY).
     const HNSW_MIN_CAP: usize = 1024;
 
-    fn build_hnsw(ef_construction: usize, cap: usize) -> Hnsw<'static, f32, DistL2> {
-        Hnsw::new(16, cap.max(Self::HNSW_MIN_CAP), 16, ef_construction, DistL2 {})
-    }
-
     fn ensure_hnsw(&self, ef_construction: usize) {
         if self.hnsw.read().is_none() {
             let mut w = self.hnsw.write();
             // Lazy create: final element count is unknown here, so reserve the
             // floor and let inserts grow it. Rehydrate (count known) sizes exactly.
-            if w.is_none() { *w = Some(Self::build_hnsw(ef_construction, Self::HNSW_MIN_CAP)); }
+            if w.is_none() { *w = Some(VecIndex::build(self.quant, ef_construction, Self::HNSW_MIN_CAP)); }
         }
     }
 
@@ -442,7 +584,7 @@ impl VectorCollection {
             let mut meta = self.metadata.write();
             let mut arena = self.arena.write();
             let off = arena.len();
-            arena.extend_from_slice(emb);
+            arena.push_f32(emb);
             let arena_id = meta.len() as u32;
             meta.push(NodeMetadata {
                 arena_id, node_id: node_id.to_string(), timestamp: Utc::now().timestamp() as u64,
@@ -460,14 +602,17 @@ impl VectorCollection {
     fn rehydrate(&self, ef_c: usize) {
         let meta = self.metadata.read();
         if meta.is_empty() { return; }
-        let hnsw = Self::build_hnsw(ef_c, meta.len());
+        let index = VecIndex::build(self.quant, ef_c, meta.len());
         let arena = self.arena.read();
         for m in meta.iter() {
             let start = m.embedding_offset as usize;
-            let end = start + m.vector_dim as usize;
-            if end <= arena.len() { hnsw.insert((&arena[start..end], m.arena_id as usize)); }
+            let len = m.vector_dim as usize;
+            if start + len <= arena.len() {
+                let v = arena.f32_at(start, len);
+                index.insert_f32(&v, m.arena_id as usize);
+            }
         }
-        *self.hnsw.write() = Some(hnsw);
+        *self.hnsw.write() = Some(index);
     }
 
     fn info(&self) -> CollectionInfo {
@@ -476,6 +621,7 @@ impl VectorCollection {
             model: self.model.clone(),
             dim: self.dim as u32,
             metric: self.metric.as_str().to_string(),
+            quant: self.quant.as_str().to_string(),
             count: self.count.load(Ordering::Relaxed) as u32,
         }
     }
@@ -506,10 +652,17 @@ pub struct Storage {
     pub bin_path: PathBuf,
     pub _lock_file: Option<File>,
     pub id_to_u32: DashMap<String, u32>,
-    pub u32_to_id: DashMap<u32, String>,
+    // Node interning Layer A (ADR--GENESISDB-NODE-ID-INTERNING): the u32->id
+    // reverse map was dropped. A u32's id string is read from `nodes[u32].id`
+    // (the canonical copy) on the rare paths that need it — mirroring how edges
+    // resolve via `EdgeOutput.id` (ADR--GENESISDB-EDGE-ID-INTERNING). Saves one
+    // full id-string copy per interned id.
     pub next_u32: AtomicU32,
     pub is_rebuilding: AtomicBool,
-    pub trigram_index: DashMap<String, HashSet<u32>>,
+    // Posting lists are roaring bitmaps, not HashSet<u32>: far denser per-node
+    // overhead at scale, union/iter stay fast (ADR--GENESISDB-NODE-ID-INTERNING,
+    // A3). Only `find_fuzzy_id` reads this; nodes only (edges skip trigram).
+    pub trigram_index: DashMap<String, RoaringBitmap>,
     pub lang_centroids: DashMap<String, Vec<f32>>,
     pub peers: DashMap<String, SyncPeer>,
     pub proposals: DashMap<String, ConsensusProposal>,
@@ -584,10 +737,11 @@ impl Storage {
         if let Some(existing) = self.id_to_u32.get(id) { return *existing; }
         let new_id = self.next_u32.fetch_add(1, Ordering::SeqCst);
         self.id_to_u32.insert(id.to_string(), new_id);
-        self.u32_to_id.insert(new_id, id.to_string());
-        
+        // No reverse-map insert: id string is recoverable via `nodes[u32].id`
+        // (ADR--GENESISDB-NODE-ID-INTERNING, Layer A).
+
         for trigram in Self::tokenize_id(id) {
-            self.trigram_index.entry(trigram).or_insert_with(HashSet::new).insert(new_id);
+            self.trigram_index.entry(trigram).or_insert_with(RoaringBitmap::new).insert(new_id);
         }
         new_id
     }
@@ -641,13 +795,14 @@ impl Storage {
 
     /// Create an isolated vector collection. Idempotent-erroring: fails if a
     /// collection with this name already exists.
-    pub fn create_collection(&self, name: String, model: String, dim: u32, metric: Option<String>) -> Result<()> {
+    pub fn create_collection(&self, name: String, model: String, dim: u32, metric: Option<String>, quant: Option<String>) -> Result<()> {
         self.ensure_writable()?;
         if self.collections.contains_key(&name) {
             return Err(Error::from_reason(format!("collection '{}' already exists", name)));
         }
         let m = metric.as_deref().map(Metric::parse).unwrap_or(Metric::L2);
-        self.collections.insert(name.clone(), Arc::new(VectorCollection::new(name, model, dim as u16, m)));
+        let q = quant.as_deref().map(Quant::parse).unwrap_or(Quant::None);
+        self.collections.insert(name.clone(), Arc::new(VectorCollection::new(name, model, dim as u16, m, q)));
         Ok(())
     }
 
@@ -744,7 +899,7 @@ impl Storage {
         if !self.collections.contains_key(&name) {
             self.collections.insert(
                 name.clone(),
-                Arc::new(VectorCollection::new(name.clone(), "recovered".to_string(), emb.len() as u16, Metric::L2)),
+                Arc::new(VectorCollection::new(name.clone(), "recovered".to_string(), emb.len() as u16, Metric::L2, Quant::None)),
             );
         }
         if let Ok(coll) = self.resolve_collection(&Some(name)) {
@@ -834,13 +989,13 @@ impl Storage {
                     IndexJob::One { coll, arena_id, emb, ef_c } => {
                         coll.ensure_hnsw(ef_c);
                         // insert(&self): hnsw_rs is internally synchronized -> read lock.
-                        if let Some(ref h) = *coll.hnsw.read() { h.insert((&emb, arena_id as usize)); }
+                        // The job ships f32; VecIndex quantizes per mode before insert.
+                        if let Some(ref idx) = *coll.hnsw.read() { idx.insert_f32(&emb, arena_id as usize); }
                         index_pending_thread.fetch_sub(1, Ordering::Relaxed);
                     }
                     IndexJob::Batch { coll, items, ef_c } => {
                         coll.ensure_hnsw(ef_c);
-                        let refs: Vec<(&Vec<f32>, usize)> = items.iter().map(|(v, id)| (v, *id as usize)).collect();
-                        if let Some(ref h) = *coll.hnsw.read() { h.parallel_insert(&refs); }
+                        if let Some(ref idx) = *coll.hnsw.read() { idx.parallel_insert_f32(&items); }
                         index_pending_thread.fetch_sub(items.len(), Ordering::Relaxed);
                     }
                     IndexJob::Flush(ack) => { let _ = ack.send(()); }
@@ -854,7 +1009,7 @@ impl Storage {
         let collections: DashMap<String, Arc<VectorCollection>> = DashMap::new();
         collections.insert(
             "default".to_string(),
-            Arc::new(VectorCollection::new("default".to_string(), "default".to_string(), vector_dim, Metric::L2)),
+            Arc::new(VectorCollection::new("default".to_string(), "default".to_string(), vector_dim, Metric::L2, Quant::None)),
         );
 
         let storage = Self {
@@ -862,7 +1017,7 @@ impl Storage {
             out_idx: DashMap::new(), in_idx: DashMap::new(),
             collections, default_collection: "default".to_string(),
             log_path, bin_path: PathBuf::from(""), _lock_file: None,
-            id_to_u32: DashMap::new(), u32_to_id: DashMap::new(), next_u32: AtomicU32::new(0),
+            id_to_u32: DashMap::new(), next_u32: AtomicU32::new(0),
             is_rebuilding: AtomicBool::new(false), trigram_index: DashMap::new(),
             lang_centroids: DashMap::new(), peers: DashMap::new(),
             proposals: DashMap::new(), meta_nodes: DashMap::new(), meta_edges: DashMap::new(),
@@ -981,8 +1136,8 @@ impl Storage {
         let tokens = Self::tokenize_id(id);
         
         for trigram in tokens {
-            if let Some(nodes) = self.trigram_index.get(&trigram) { 
-                candidates.extend(nodes.clone()); 
+            if let Some(nodes) = self.trigram_index.get(&trigram) {
+                candidates.extend(nodes.value().iter());
             }
         }
 
@@ -990,11 +1145,16 @@ impl Storage {
         let mut max_lexical_sim = 0.0;
         
         for u32_id in &candidates {
-            if let Some(candidate_id) = self.u32_to_id.get(u32_id) {
-                let sim = strsim::jaro_winkler(id, candidate_id.value());
-                if sim > max_lexical_sim { 
-                    max_lexical_sim = sim; 
-                    best_lexical_id = Some(candidate_id.value().clone()); 
+            // Resolve the candidate's id from the canonical `nodes` record
+            // (the reverse map was dropped — ADR--GENESISDB-NODE-ID-INTERNING).
+            // Trigram candidates that intern only as edge endpoints (no node
+            // record) are skipped: fuzzy id resolution targets real nodes.
+            if let Some(node_ref) = self.nodes.get(u32_id) {
+                let candidate_id = &node_ref.value().id;
+                let sim = strsim::jaro_winkler(id, candidate_id);
+                if sim > max_lexical_sim {
+                    max_lexical_sim = sim;
+                    best_lexical_id = Some(candidate_id.clone());
                 }
             }
         }
@@ -1362,8 +1522,6 @@ impl Storage {
                 "query dim {} != collection '{}' dim {}", args.query_vector.len(), coll.name, coll.dim
             )));
         }
-        let hnsw_lock = coll.hnsw.read();
-        let hnsw = match &*hnsw_lock { Some(idx) => idx, None => return Err(Error::from_reason("HNSW not init")) };
         let mut query_f32: Vec<f32> = args.query_vector.into_iter().map(|v| v as f32).collect();
         if let Some(lang) = args.lang {
             if let Some(centroid) = self.lang_centroids.get(&lang) {
@@ -1375,22 +1533,29 @@ impl Storage {
             let norm: f32 = query_f32.iter().map(|x| x * x).sum::<f32>().sqrt();
             if norm > 0.0 { for x in query_f32.iter_mut() { *x /= norm; } }
         }
-        let results = hnsw.search(&query_f32, (args.k * 2) as usize, self.ef_search.load(Ordering::Relaxed));
+        // VecIndex quantizes the query per mode and returns (arena_id, distance_f32).
+        let results = {
+            let hnsw_lock = coll.hnsw.read();
+            match &*hnsw_lock {
+                Some(idx) => idx.search_f32(&query_f32, (args.k * 2) as usize, self.ef_search.load(Ordering::Relaxed)),
+                None => return Err(Error::from_reason("HNSW not init")),
+            }
+        };
         let mut hybrid_results = Vec::new();
         let meta_arena = coll.metadata.read();
         let alpha = args.alpha.unwrap_or(0.5);
 
-        for neighbor in results {
-            if let Some(meta) = meta_arena.get(neighbor.d_id as usize) {
+        for (d_id, distance) in results {
+            if let Some(meta) = meta_arena.get(d_id) {
                 if let Some(u32_id) = self.get_u32(&meta.node_id) {
                     if let Some(node) = self.nodes.get(&u32_id) {
                         let mut node_out = node.value().clone();
-                        
+
                         if !Self::is_valid_as_of(&node_out.valid_from, &node_out.valid_to, &args.as_of) {
                             continue;
                         }
 
-                        let similarity = 1.0 - neighbor.distance as f64;
+                        let similarity = 1.0 - distance as f64;
                         let reasoning_score = (similarity * (1.0 - alpha)) + (node_out.impact.unwrap_or(0.0) * alpha);
                         node_out.impact = Some(reasoning_score);
                         hybrid_results.push(NeighborOutput { node: node_out, path: Vec::new(), depth: 0 });
@@ -1459,8 +1624,12 @@ impl Storage {
                     }
                     if !rel_allowed(&edge.rel) { continue; }
 
-                    let curr_id = self.u32_to_id.get(&curr_u32).unwrap().value().clone();
-                    let next_id = if edge.from == curr_id { &edge.to } else { &edge.from };
+                    // Pick the far endpoint by u32 identity rather than by
+                    // reverse-mapping curr_u32 back to its string: the near
+                    // endpoint is whichever of from/to interns to curr_u32. This
+                    // needs no u32->id reverse map and avoids a per-edge string
+                    // clone (ADR--GENESISDB-NODE-ID-INTERNING, Layer A).
+                    let next_id = if self.get_u32(&edge.from) == Some(curr_u32) { &edge.to } else { &edge.from };
                     if let Some(next_u32) = self.get_u32(next_id) {
                         if !visited.contains(&next_u32) {
                             visited.insert(next_u32);
@@ -1581,9 +1750,11 @@ impl Storage {
                     if let Some(a_id) = coll.node_to_arena.get(&u32_id) {
                         if let Some(meta) = meta_arena.get(*a_id as usize) {
                             let start = meta.embedding_offset as usize;
-                            let end = start + meta.vector_dim as usize;
-                            if end <= vec_arena.len() {
-                                for (i, val) in vec_arena[start..end].iter().enumerate() {
+                            let len = meta.vector_dim as usize;
+                            if start + len <= vec_arena.len() {
+                                // f32_at dequantizes for SQ8 — heuristic centroid math
+                                // tolerates the quantization noise.
+                                for (i, val) in vec_arena.f32_at(start, len).iter().enumerate() {
                                     if i < dim { centroid[i] += *val as f64; }
                                 }
                                 count += 1;
@@ -1712,7 +1883,6 @@ impl Storage {
 
         // 3. Remove node and primary indices
         self.id_to_u32.remove(id);
-        self.u32_to_id.remove(&u32_id);
         self.out_idx.remove(&u32_id);
         self.in_idx.remove(&u32_id);
         // The node may have a vector in any collection — drop the mapping in all.
@@ -2025,14 +2195,14 @@ impl Storage {
         for c in self.collections.iter() {
             let coll = c.value();
             let arena = coll.arena.read();
-            fs::write(temp_dir.join(format!("vec_{}.bin", coll.name)), unsafe {
-                std::slice::from_raw_parts(arena.as_ptr() as *const u8, arena.len() * 4)
-            }).map_err(|e| Error::from_reason(e.to_string()))?;
+            fs::write(temp_dir.join(format!("vec_{}.bin", coll.name)), arena.to_bytes())
+                .map_err(|e| Error::from_reason(e.to_string()))?;
             let meta = coll.metadata.read();
             let meta_data = bincode::serialize(&*meta).map_err(|e| Error::from_reason(e.to_string()))?;
             fs::write(temp_dir.join(format!("meta_{}.bin", coll.name)), meta_data).map_err(|e| Error::from_reason(e.to_string()))?;
             manifest.push(serde_json::json!({
-                "name": coll.name, "model": coll.model, "dim": coll.dim, "metric": coll.metric.as_str()
+                "name": coll.name, "model": coll.model, "dim": coll.dim,
+                "metric": coll.metric.as_str(), "quant": coll.quant.as_str()
             }));
         }
 
@@ -2092,10 +2262,10 @@ impl Storage {
                 let model = cm["model"].as_str().unwrap_or("default").to_string();
                 let dim = cm["dim"].as_u64().unwrap_or(0) as u16;
                 let metric = Metric::parse(cm["metric"].as_str().unwrap_or("L2"));
-                let coll = VectorCollection::new(name.clone(), model, dim, metric);
+                let quant = Quant::parse(cm["quant"].as_str().unwrap_or("none"));
+                let coll = VectorCollection::new(name.clone(), model, dim, metric, quant);
                 if let Ok(data) = fs::read(self.path.join(format!("vec_{}.bin", name))) {
-                    *coll.arena.write() = data.chunks_exact(4)
-                        .map(|c| f32::from_le_bytes(c.try_into().unwrap())).collect();
+                    *coll.arena.write() = ArenaStore::from_bytes(&data, quant);
                 }
                 if let Ok(data) = fs::read(self.path.join(format!("meta_{}.bin", name))) {
                     if let Ok(meta) = bincode::deserialize::<Vec<NodeMetadata>>(&data) {
@@ -2108,9 +2278,8 @@ impl Storage {
         } else if let Ok(data) = fs::read(self.path.join("vector.bin")) {
             // Legacy single-space DB -> wrap as the `default` collection.
             let dim = state_val["vector_dim"].as_u64().unwrap_or(1536) as u16;
-            let coll = VectorCollection::new("default".to_string(), "default".to_string(), dim, Metric::L2);
-            *coll.arena.write() = data.chunks_exact(4)
-                .map(|c| f32::from_le_bytes(c.try_into().unwrap())).collect();
+            let coll = VectorCollection::new("default".to_string(), "default".to_string(), dim, Metric::L2, Quant::None);
+            *coll.arena.write() = ArenaStore::from_bytes(&data, Quant::None);
             if let Ok(md) = fs::read(self.path.join("meta.bin")) {
                 if let Ok(meta) = bincode::deserialize::<Vec<NodeMetadata>>(&md) {
                     coll.count.store(meta.len(), Ordering::Relaxed);
@@ -2125,7 +2294,7 @@ impl Storage {
         if !self.collections.contains_key(&self.default_collection) {
             self.collections.insert(
                 self.default_collection.clone(),
-                Arc::new(VectorCollection::new(self.default_collection.clone(), "default".to_string(), 1536, Metric::L2)),
+                Arc::new(VectorCollection::new(self.default_collection.clone(), "default".to_string(), 1536, Metric::L2, Quant::None)),
             );
         }
 
@@ -2138,7 +2307,6 @@ impl Storage {
                     for (k, v) in nodes {
                         if k > max_u32 { max_u32 = k; }
                         self.id_to_u32.insert(v.id.clone(), k);
-                        self.u32_to_id.insert(k, v.id.clone());
                         // Rebuild the trigram index for this node id under its
                         // SAVED key `k` (no re-interning — `get_or_intern_id`
                         // would mint a fresh u32 and desync the maps). Without
@@ -2148,7 +2316,7 @@ impl Storage {
                         // (ADR--GENESISDB-EDGE-ID-INTERNING), and edges aren't
                         // loaded here.
                         for trigram in Self::tokenize_id(&v.id) {
-                            self.trigram_index.entry(trigram).or_insert_with(HashSet::new).insert(k);
+                            self.trigram_index.entry(trigram).or_insert_with(RoaringBitmap::new).insert(k);
                         }
                         self.insert_node_lean(k, v);
                     }
@@ -2324,17 +2492,17 @@ impl Storage {
             let mut vec_arena = coll.arena.write();
 
             let mut new_meta = Vec::with_capacity(live_nodes.len());
-            let mut new_vec = Vec::with_capacity(live_nodes.len() * coll.dim as usize);
+            let mut new_vec = ArenaStore::new(coll.quant);
             coll.node_to_arena.clear();
 
             for meta in meta_arena.iter() {
                 if let Some(u32_id) = self.get_u32(&meta.node_id) {
                     if live_nodes.contains(&u32_id) {
                         let start_off = meta.embedding_offset as usize;
-                        let end_off = start_off + meta.vector_dim as usize;
-                        if end_off <= vec_arena.len() {
+                        let len = meta.vector_dim as usize;
+                        if start_off + len <= vec_arena.len() {
                             let new_offset = new_vec.len() as u64;
-                            new_vec.extend_from_slice(&vec_arena[start_off..end_off]);
+                            new_vec.append_range(&vec_arena, start_off, len);
                             let new_arena_id = new_meta.len() as u32;
                             let mut meta_clone = meta.clone();
                             meta_clone.arena_id = new_arena_id;
@@ -2465,9 +2633,9 @@ impl Storage {
         for meta in meta_arena.iter() {
             let c_id = meta.cluster_id;
             let start = meta.embedding_offset as usize;
-            let end = start + meta.vector_dim as usize;
-            if end <= vec_arena.len() {
-                let vec = &vec_arena[start..end];
+            let len = meta.vector_dim as usize;
+            if start + len <= vec_arena.len() {
+                let vec = vec_arena.f32_at(start, len);
                 let entry = cluster_centroids.entry(c_id).or_insert_with(|| vec![0.0; meta.vector_dim as usize]);
                 for (i, val) in vec.iter().enumerate() { entry[i] += val; }
                 *cluster_member_count.entry(c_id).or_insert(0) += 1;
@@ -2571,7 +2739,7 @@ impl GenesisDatabase {
     #[napi] pub async fn neighbors(&self, seed: String, args: NeighborInput) -> Result<Vec<NeighborOutput>> { let i = Arc::clone(&self.inner); tokio::task::spawn_blocking(move || i.neighbors(seed, args, false)).await.map_err(|e| Error::from_reason(e.to_string()))? }
     #[napi] pub async fn save_state(&self) -> Result<()> { let i = Arc::clone(&self.inner); tokio::task::spawn_blocking(move || i.save_state()).await.map_err(|e| Error::from_reason(e.to_string()))? }
     #[napi] pub async fn compact(&self) -> Result<()> { let i = Arc::clone(&self.inner); tokio::task::spawn_blocking(move || i.compact()).await.map_err(|e| Error::from_reason(e.to_string()))? }
-    #[napi] pub async fn create_collection(&self, name: String, model: String, dim: u32, metric: Option<String>) -> Result<()> { let i = Arc::clone(&self.inner); tokio::task::spawn_blocking(move || i.create_collection(name, model, dim, metric)).await.map_err(|e| Error::from_reason(e.to_string()))? }
+    #[napi] pub async fn create_collection(&self, name: String, model: String, dim: u32, metric: Option<String>, quant: Option<String>) -> Result<()> { let i = Arc::clone(&self.inner); tokio::task::spawn_blocking(move || i.create_collection(name, model, dim, metric, quant)).await.map_err(|e| Error::from_reason(e.to_string()))? }
     #[napi] pub fn list_collections(&self) -> Vec<CollectionInfo> { self.inner.list_collections() }
     #[napi] pub async fn add_vector(&self, node_id: String, collection: String, embedding: Vec<f64>) -> Result<()> { let i = Arc::clone(&self.inner); tokio::task::spawn_blocking(move || i.add_vector(node_id, collection, embedding)).await.map_err(|e| Error::from_reason(e.to_string()))? }
     #[napi] pub async fn flush_index(&self) -> Result<()> { let i = Arc::clone(&self.inner); tokio::task::spawn_blocking(move || i.flush_index()).await.map_err(|e| Error::from_reason(e.to_string())) }

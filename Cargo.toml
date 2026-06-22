@@ -50,6 +50,7 @@ sha2 = "0.10"
 hex = "0.4"
 unicode-general-category = "1.1.0"
 ed25519-dalek = { version = "2.2.0", features = ["serde"] }
+roaring = "0.10"
 
 [build-dependencies]
 napi-build = "2.1"

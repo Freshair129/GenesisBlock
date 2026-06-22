@@ -35,7 +35,7 @@ fn trigram_stats(s: &Storage) -> (usize, usize) {
     let mut members = 0usize;
     for e in s.trigram_index.iter() {
         entries += 1;
-        members += e.value().len();
+        members += e.value().len() as usize; // RoaringBitmap::len() -> u64
     }
     (entries, members)
 }
@@ -43,8 +43,10 @@ fn trigram_stats(s: &Storage) -> (usize, usize) {
 fn string_bytes_keys(s: &Storage) -> usize {
     s.id_to_u32.iter().map(|e| e.key().len()).sum()
 }
-fn string_bytes_vals(s: &Storage) -> usize {
-    s.u32_to_id.iter().map(|e| e.value().len()).sum()
+fn string_bytes_vals(_s: &Storage) -> usize {
+    // Reverse u32->id map removed (ADR--GENESISDB-NODE-ID-INTERNING, Layer A);
+    // id strings now live only in id_to_u32 keys + nodes[u32].id.
+    0
 }
 
 fn main() {
@@ -130,7 +132,7 @@ fn main() {
 
     // --- structural breakdown after edges ---
     let id_to_u32_total = storage.id_to_u32.len();
-    let u32_to_id_total = storage.u32_to_id.len();
+    let u32_to_id_total = 0usize; // reverse map removed (node id interning Layer A)
     let edges_map = storage.edges.len();
     let nodes_map = storage.nodes.len();
     let out_entries: usize = storage.out_idx.len();
@@ -152,7 +154,7 @@ fn main() {
     println!();
     println!("--- structural counts after full build ---");
     println!("  id_to_u32 (String->u32)   entries={id_to_u32_total:>10}  key string bytes={key_bytes:>12}");
-    println!("  u32_to_id (u32->String)   entries={u32_to_id_total:>10}  val string bytes={val_bytes:>12}");
+    println!("  u32_to_id (u32->String)   entries={u32_to_id_total:>10}  val string bytes={val_bytes:>12}  (removed — node id interning Layer A)");
     println!("  trigram_index             entries={tri_entries:>10}  set members={tri_members:>12}");
     println!("  edges  (u32->EdgeOutput)  entries={edges_map:>10}");
     println!("  nodes  (u32->NodeOutput)  entries={nodes_map:>10}");
@@ -161,7 +163,7 @@ fn main() {
     println!();
     println!("--- edge-attributable interning (the lever) ---");
     println!("  edge UUIDs interned          : {edge_ids_interned}");
-    println!("  -> id_to_u32 + u32_to_id     : 2 String copies each (~36 B UUID)");
+    println!("  -> id_to_u32 (reverse map removed): 1 String copy each (~36 B UUID)");
     println!("  -> trigram members from edges: {edge_tri_members}  (~{:.1} per edge UUID)",
         edge_tri_members as f64 / edge_ids_interned.max(1) as f64);
     println!("  RSS edges delta              : {:.1} MB for {total_edges} edges = {:.1} B/edge",
