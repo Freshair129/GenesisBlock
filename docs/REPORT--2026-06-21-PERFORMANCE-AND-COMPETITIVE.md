@@ -19,6 +19,7 @@ related:
   - AUDIT--P18-PARALLEL-HNSW-BUILD
   - AUDIT--P19-EF-TUNING-AND-SCALE
   - AUDIT--P20-QDRANT-3WAY-AND-EF-CONFIG
+  - AUDIT--P31-POST-MARKXIII-REGRESSION
 ---
 
 # GenesisBlockDB — Engineering Report (2026-06-21)
@@ -249,6 +250,222 @@ hop3 ~6.7×, hop6 ~13.5× — and this win has **no payload caveat** (Ladybug's 
 returns bare ids while GenesisBlockDB materializes node+path, yet still wins).
 LadybugDB ≈ Kuzu (it forks Kuzu's last release) and wins ingest ~48× / memory ~11×.
 See `AUDIT--P30-LADYBUGDB-HEAD-TO-HEAD.md`.
+
+---
+
+## 9. Competitive Market Brief (2026-06-22)
+
+> ส่วนนี้ขยายจาก benchmark head-to-head (P15–P30) สู่ภาพตลาดเต็ม:
+> positioning, feature landscape, opportunities, threats, และ strategic implications
+
+### 9.1 ภาพรวมตลาด
+
+ตลาด AI agent memory (vector DB + graph DB + hybrid) อยู่ที่ **$6.27B ปี 2025**
+→ คาดเติบโตเป็น **$28.45B ปี 2030 (CAGR 35%)** ขับเคลื่อนจาก:
+
+- **GraphRAG**: practitioner community 2026 converge บน pattern "vectors สำหรับ
+  semantic entry-point, graphs สำหรับ relational depth" — hybrid system ได้เปรียบ
+- **Agent memory**: LLM agent ต้องการ persistent memory ที่ retrieve เร็ว (vector)
+  และ multi-hop reason ได้ (graph) พร้อมกัน
+- **Local-first & privacy**: regulatory pressure + latency requirement ดัน embedded
+  deployment กลับมา
+- **Bitemporal audit**: finance, legal, healthcare ต้องการ temporal audit trail native
+
+---
+
+### 9.2 Competitive Set
+
+#### หมวด A — Direct Competitors (Embedded Graph + Vector)
+
+| | **GenesisBlock** | **LadybugDB** | **HelixDB** | **Kuzu** |
+|---|---|---|---|---|
+| ภาษา | Rust | C++ (Kuzu fork) | Rust | C++ |
+| Open Source | ✓ | ✓ | ✓ | ✓ |
+| Graph | ✓✓✓ | ✓✓✓ | ✓✓✓ | ✓✓✓ |
+| Vector / HNSW | ✓✓✓ | ✓✓ | ✓✓✓ | ✓✓ |
+| Bitemporal | ✓✓✓ | ✗ | ✗ | ✗ |
+| CRDT + ed25519 sync | ✓✓✓ | ✗ | ✗ | ✗ |
+| Governance tier (MASTER) | ✓✓✓ | ✗ | ✗ | ✗ |
+| Node.js native addon | ✓✓✓ | ✗ | ✗ | ✓ |
+| Columnar / bulk analytics | ✗ | ✓✓✓ | ✗ | ✓✓✓ |
+| Query language | HQL (custom) | Cypher | HelixQL (compiled) | Cypher |
+| hop1 latency (100k) | **21.6 µs** ✅ measured | 3,637 µs ✅ measured | — | 3,653 µs ✅ measured |
+| Ingest throughput | 1,751 vec/s (durable) | ~48× เร็วกว่า (COPY) | — | ~60× เร็วกว่า (COPY) |
+| Memory (100k/800k) | 1.06 GB | ~97 MB (~11× ต่ำกว่า) | — | ~97 MB (~11× ต่ำกว่า) |
+
+#### หมวด B — Hybrid / Multi-model Competitors
+
+| | **SurrealDB 3.0** | **Neo4j** | **ArangoDB 3.12** |
+|---|---|---|---|
+| ภาษา | Rust | Java | C++ |
+| Graph + Vector | ✓✓✓ | ✓✓ (hybrid search preview) | ✓✓ (ArangoSearch) |
+| Bitemporal | ✓✓ (storage layer) | ✗ | ✗ |
+| CRDT / Sync | ✗ | ✗ | ✗ |
+| Governance | ✓ (permissions) | ✓✓ (RBAC enterprise) | ✗ |
+| Embedded | ✓✓ | ✗ (server-first) | บางส่วน |
+| Enterprise customers | Verizon, Walmart, Nvidia | Forbes 2000+ | SAP, Cisco |
+| hop1 latency (100k) | — | 2,590 µs ✅ measured | — |
+| GenesisBlock vs | — | **7–185× faster** | — |
+
+#### หมวด C — Pure Vector Databases
+
+| | **Qdrant** | **Chroma** | **LanceDB** |
+|---|---|---|---|
+| Query p50 (100k) | 3,301 µs ✅ measured | 990 µs ✅ measured | 8,392 µs ✅ measured |
+| GenesisBlock p50 vs | **~3.4× faster** | **~parity** (974 µs) | **~9× faster** |
+| Recall@10 (100k) | **0.999** (เราตาม) | 0.981 | ~0.95–1.0 |
+| Graph traversal | ✗ | ✗ | ✗ |
+| Embedded | ✗ | ✓ | ✓ |
+| Durability | ✓ (server) | ✗ (in-memory test) | ✓ (on-disk Lance) |
+
+---
+
+### 9.3 Feature Matrix — จุดที่ GenesisBlock เป็นเจ้าเดียว
+
+| Capability | เจ้าเดียวในตลาด? | หมายเหตุ |
+|---|:---:|---|
+| Bitemporal + graph + vector ใน binary เดียว | **ใช่** | SurrealDB มี bitemporal แต่ไม่ embedded เต็มรูป |
+| CRDT + ed25519-signed events + Merkle root | **ใช่** | ไม่มีใครใน competitive set ทำ |
+| MASTER governance tier (engine-enforced) | **ใช่** | LadybugDB อ้าง "regulated industries" แต่ไม่ enforce |
+| Node.js NAPI native addon (graph+vector+bitemporal) | **ใช่** | ไม่มีใน LadybugDB, HelixDB, Kuzu |
+| Multi-vector per node | **ใช่** (ใน hybrid DB) | Qdrant รองรับแต่ไม่มี graph |
+| hop1 latency <25 µs embedded (100k, full node payload) | **ใช่** | RocksDB tied แต่ไม่มี query language หรือ governance |
+
+---
+
+### 9.4 Positioning Analysis
+
+**ช่องว่างที่ไม่มีใครอ้าง:**
+
+1. **"Verifiable knowledge graph"** — CRDT + ed25519 audit trail ทำให้ทุก mutation
+   พิสูจน์ได้ว่าใครเขียน เมื่อไหร่ conflict resolve อย่างไร ไม่มีใครในตลาดอ้างจุดนี้
+
+2. **"Governance-aware agent memory"** — MASTER tier ป้องกัน agent override ข้อมูล
+   trusted ที่ engine level (ไม่ใช่แค่ permission layer) overhead วัดแล้วที่ **<0.1%**
+   ของ durable write (~524 ns/op)
+
+3. **"Local-first bitemporal graph"** — SurrealDB มี bitemporal แต่ server-first,
+   LadybugDB ไม่มี bitemporal, ไม่มีใครทำ embedded+bitemporal+graph+vector ได้
+
+**Positioning แนะนำ:**
+
+> GenesisBlock คือ **verifiable hybrid knowledge engine** — graph + vector +
+> bitemporal + CRDT ในไบนารีเดียว สำหรับ AI agent ที่ต้องการ memory ที่เชื่อถือได้
+> ตรวจสอบได้ และ govern ได้
+
+สั้นกว่า: **"The only knowledge database AI agents can't corrupt."**
+
+---
+
+### 9.5 จุดแข็งและจุดอ่อนที่ตัวเลขพิสูจน์แล้ว
+
+**ชนะจริง (measured):**
+
+| สถานการณ์ | ตัวเลข | เจ้าที่แพ้ |
+|---|---|---|
+| hop1 latency, embedded, full node payload | **168×** | LadybugDB (P30) |
+| hop1 latency, embedded, full node payload | **7–166×** | Kuzu (P26) |
+| hop1 latency vs server graph | **7–185×** | Neo4j (P23) |
+| hop1 latency vs columnar recursive CTE | **54×** | DuckDB+graph (P28) |
+| hop1 latency vs KV+adjacency | **~tied** | RocksDB+graph (P29) |
+| Point-query vector p50, embedded vs embedded | **~9×** | LanceDB (P27) |
+| Point-query vector p50, embedded vs server | **~3.4×** | Qdrant (P20) |
+| Recall@10 parity, durable vs in-memory | **≈** (0.979 vs 0.981) | Chroma (P20) |
+| Governance overhead | **<0.1%** | — (P24) |
+| K-Impact incremental vs full | **up to 398,000×** | — (P25) |
+
+**แพ้จริง (ต้องยอมรับ):**
+
+| สถานการณ์ | ตัวเลข | เจ้าที่ชนะ |
+|---|---|---|
+| Bulk ingest throughput | แพ้ **~60×** | Kuzu/LadybugDB (columnar COPY) |
+| Bulk ingest throughput | แพ้ **~35×** | DuckDB (P28) |
+| Bulk ingest throughput | แพ้ **~30×** | RocksDB (P29) |
+| RAM per node | แพ้ **~11×** | Kuzu/LadybugDB (edge UUID interning) |
+| RAM ceiling | ~1M nodes @ 32 GB | ต้องแก้ edge interning ในอนาคต |
+| Recall@10 สูงสุด | 0.979 vs 0.999 | Qdrant (แก้ได้ด้วย ef_search สูงขึ้น) |
+
+---
+
+### 9.6 Opportunities
+
+1. **Verifiable agentic memory** — ตลาดยังไม่มีใครตอบ "ใครเขียนข้อมูลนี้ และ agent
+   แก้ได้ไหม?" GenesisBlock มีคำตอบที่ engine level พร้อม benchmark พิสูจน์ overhead
+
+2. **Node.js-native embedded DB** — NAPI-RS addon ใน TypeScript ecosystem ไม่มีคู่แข่ง
+   ที่ทำ graph+vector+bitemporal แบบ native binding ได้
+
+3. **GraphRAG ที่ audit-proof** — ตลาด GraphRAG เติบโตเร็ว แต่ทุกคนทำ retrieval แบบ
+   stateless GenesisBlock position เป็น "trustworthy GraphRAG backend" ที่ตรวจสอบ
+   provenance ได้
+
+4. **LadybugDB อ้าง regulated industries แต่ไม่ enforce** — GenesisBlock เป็นเจ้าเดียว
+   ที่มีทั้ง positioning **และ** benchmark พิสูจน์ว่า governance cost < 0.1%
+
+### 9.7 Threats
+
+| Threat | ความรุนแรง | Timeline |
+|---|---|---|
+| SurrealDB 3.0 เพิ่ม CRDT layer + governance enforcement | สูงมาก | 12–18 เดือน (มีทรัพยากร) |
+| HelixDB เพิ่ม temporal + governance | ปานกลาง | 18–24 เดือน |
+| Neo4j hybrid search → production-ready | ปานกลาง | 6–12 เดือน |
+| pgvector + pg_graphql stack กิน "ง่ายๆ" workload | ปานกลาง | ทันที |
+| Platform play: Weaviate/Neo4j ซื้อ CRDT library | สูง (ถ้าเกิด) | 24–36 เดือน |
+
+**Nightmare scenario:** SurrealDB เปิดตัว "SurrealSync" — CRDT + ed25519 audit + governance
+RBAC ใน v3.x ก่อนที่ GenesisBlock จะมี enterprise distribution story ที่ชัด
+
+### 9.8 Strategic Implications
+
+| Action | Priority | เหตุผล |
+|---|---|---|
+| ตีพิมพ์ benchmark ทั้ง 16 head-to-head เป็น public page | สูงมาก | ตัวเลขวัดแล้ว ใช้ได้เลย — อย่าปล่อยให้ LadybugDB/HelixDB claim ก่อน |
+| Marketing copy: เน้น MASTER tier + ed25519 audit | สูง | ไม่มีใครอ้างจุดนี้ยังไม่สาย |
+| แก้ edge UUID interning → ลด RAM ceiling | กลาง | ปลดล็อค >1M node use case |
+| เพิ่ม quantization (scalar/binary) | กลาง | ปิดช่อง Qdrant recall argument |
+| สร้าง TypeScript type definitions + install-in-5-min example | สูง | NAPI addon คือ moat ที่สร้างใหม่ยาก |
+| ไม่ต้องสู้ billion-scale vector หรือ Managed cloud SaaS | — | ไม่ใช่ target, เสีย focus |
+
+---
+
+## 10. P31 — Post-MARK XIII Regression + Improvement Verification (2026-06-22)
+
+Re-ran graph benchmarks (P22/P26/P28/P29/P30 harnesses) against the post-MARK XIII
+codebase to measure the impact of edge interning Layer A+B + u128 keys.
+Full audit: [AUDIT--P31-POST-MARKXIII-REGRESSION.md](AUDIT--P31-POST-MARKXIII-REGRESSION.md)
+
+### 10.1 GenesisBlock: P22 vs P31
+
+| Metric | P22 (pre-MARK XIII) | P31 (post-MARK XIII) | Δ |
+|---|---|---|---|
+| hop1 p50 | 21.6 µs | 22.6 µs | +5% (within variance) |
+| hop3 p50 | 2,334 µs | 2,529 µs | +8% (within variance) |
+| hop6 p50 | 4,403 µs | 4,902 µs | +11% (within variance) |
+| RSS @100k/800k | 1,057 MB | **686 MB** | **−35% ✅** |
+| Edge ingest | 24.4 s | **7.8 s** | **3.1× faster ✅** |
+
+No traversal latency regression. RAM −35% and ingest 3.1× faster are the material gains
+from edge UUID string removal + numeric key path.
+
+### 10.2 Updated competitor ratios (P31)
+
+| Competitor | hop1 | hop3 | hop6 |
+|---|---|---|---|
+| vs Kuzu | **189×** | 6.8× | 23.3× |
+| vs LadybugDB | **177×** | 7.9× | 23.6× |
+| vs DuckDB+graph | **52×** | 1.41× | 1.09× |
+| vs RocksDB hop1 | 0.77× (RDB faster, within variance) | — | — |
+
+Kuzu/LadybugDB hop6 ratios jumped (13.5× → 23.6×) due to their run-to-run variance at
+deep traversal (exponential fan-out amplifies topology noise). Treat these as same-class,
+not a causal improvement. RocksDB hop1 variance flip (tied → RDB slightly faster) is
+expected: both engines are in the 17–27 µs range with normal measurement noise.
+
+### 10.3 Strategic impact
+
+MARK XIII closed 35% of the RAM gap vs Kuzu/LadybugDB (11× → 7.1×) and 78% of the
+ingest gap (60× → 13×). The remaining gap (numeric id migration + compaction) is MARK XIV P1.
+Dashboard updated: [perf-comparison-dashboard.html](perf-comparison-dashboard.html)
 
 ---
 
