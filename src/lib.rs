@@ -387,14 +387,27 @@ impl VectorCollection {
         }
     }
 
-    fn build_hnsw(ef_construction: usize) -> Hnsw<'static, f32, DistL2> {
-        Hnsw::new(16, 1_000_000, 16, ef_construction, DistL2 {})
+    /// Build an HNSW index reserving capacity for ~`cap` elements. hnsw_rs uses
+    /// this only as a `Vec::with_capacity` hint per graph layer and grows via
+    /// plain `Vec::push` on overflow (hnsw.rs:511), so a small `cap` is safe —
+    /// it just reallocates (amortized) past the hint. The old hardcoded
+    /// `1_000_000` was NOT ~8 MB as once assumed: the layer-fraction reservation
+    /// compounds across layers to >100 MB *per index*, so every freshly-created
+    /// collection index eagerly committed that much. With many collections (or
+    /// many DBs open at once, e.g. parallel tests) those reservations stacked and
+    /// aborted on OOM. Size to the data instead (ADR--GENESISDB-HNSW-CAPACITY).
+    const HNSW_MIN_CAP: usize = 1024;
+
+    fn build_hnsw(ef_construction: usize, cap: usize) -> Hnsw<'static, f32, DistL2> {
+        Hnsw::new(16, cap.max(Self::HNSW_MIN_CAP), 16, ef_construction, DistL2 {})
     }
 
     fn ensure_hnsw(&self, ef_construction: usize) {
         if self.hnsw.read().is_none() {
             let mut w = self.hnsw.write();
-            if w.is_none() { *w = Some(Self::build_hnsw(ef_construction)); }
+            // Lazy create: final element count is unknown here, so reserve the
+            // floor and let inserts grow it. Rehydrate (count known) sizes exactly.
+            if w.is_none() { *w = Some(Self::build_hnsw(ef_construction, Self::HNSW_MIN_CAP)); }
         }
     }
 
@@ -433,7 +446,7 @@ impl VectorCollection {
     fn rehydrate(&self, ef_c: usize) {
         let meta = self.metadata.read();
         if meta.is_empty() { return; }
-        let hnsw = Self::build_hnsw(ef_c);
+        let hnsw = Self::build_hnsw(ef_c, meta.len());
         let arena = self.arena.read();
         for m in meta.iter() {
             let start = m.embedding_offset as usize;
