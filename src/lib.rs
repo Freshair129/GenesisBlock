@@ -987,11 +987,51 @@ impl Storage {
         Ok(proposal_id)
     }
 
-        pub fn submit_vote(&self, proposal_id: String, peer_id: String, approve: bool) -> Result<bool> {
+    /// Canonical bytes a peer signs to cast a vote. Binding the proposal id,
+    /// voter id, and the approve/reject choice prevents replaying a vote onto a
+    /// different proposal or flipping its decision.
+    fn vote_payload(proposal_id: &str, voter_peer_id: &str, approve: bool) -> Vec<u8> {
+        format!("VOTE|{}|{}|{}", proposal_id, voter_peer_id, approve).into_bytes()
+    }
+
+    /// The ed25519 public key for `peer_id`: this node's own key for a self-vote,
+    /// otherwise the key registered for that peer (via gossip Heartbeat). `None`
+    /// if the peer is unknown — an unknown peer cannot have its vote verified.
+    fn peer_verifying_key(&self, peer_id: &str) -> Option<VerifyingKey> {
+        if peer_id == self.local_peer_id {
+            return Some(self.verifying_key);
+        }
+        let bytes = self.peers.get(peer_id)?.verifying_key.clone();
+        let arr: [u8; 32] = bytes.as_slice().try_into().ok()?;
+        VerifyingKey::from_bytes(&arr).ok()
+    }
+
+    /// Sign a vote with this node's key so a remote proposal-holder can verify it
+    /// authentically came from this peer. Returns the detached ed25519 signature.
+    pub fn sign_vote(&self, proposal_id: String, approve: bool) -> Vec<u8> {
+        let payload = Self::vote_payload(&proposal_id, &self.local_peer_id, approve);
+        self.signing_key.sign(&payload).to_bytes().to_vec()
+    }
+
+    pub fn submit_vote(&self, proposal_id: String, peer_id: String, approve: bool, signature: Vec<u8>) -> Result<bool> {
+        // Verify the vote is authentically signed by `peer_id` before recording
+        // it — otherwise any caller could forge votes on another peer's behalf and
+        // drive a proposal to quorum. Unknown peers, malformed or non-matching
+        // signatures are rejected (the vote is not counted).
+        let vkey = self.peer_verifying_key(&peer_id)
+            .ok_or_else(|| Error::from_reason(format!("unknown voter peer '{}' (no verifying key)", peer_id)))?;
+        let payload = Self::vote_payload(&proposal_id, &peer_id, approve);
+        let sig = Signature::from_slice(&signature)
+            .map_err(|_| Error::from_reason("malformed vote signature"))?;
+        vkey.verify(&payload, &sig)
+            .map_err(|_| Error::from_reason("invalid vote signature"))?;
+
         if let Some(mut proposal_ref) = self.proposals.get_mut(&proposal_id) {
             let proposal = proposal_ref.value_mut();
             proposal.votes.insert(peer_id.clone(), approve);
-            
+            // Retain the verified signature as proof of the vote (quorum_signatures).
+            proposal.quorum_signatures.insert(peer_id.clone(), signature);
+
             let approvals = proposal.votes.values().filter(|&&v| v).count();
             
             if approvals > (self.peers.len() / 2) {
@@ -1855,8 +1895,10 @@ impl Storage {
                                         // Auto-verify and store proposal
                                         storage.proposals.insert(proposal.proposal_id.clone(), proposal);
                                     }
-                                    GossipMessage::ConsensusVote { proposal_id, voter_peer_id, approve, signature: _ } => {
-                                        let _ = storage.submit_vote(proposal_id, voter_peer_id, approve);
+                                    GossipMessage::ConsensusVote { proposal_id, voter_peer_id, approve, signature } => {
+                                        // submit_vote verifies the signature against the
+                                        // voter's registered key; forged votes are dropped.
+                                        let _ = storage.submit_vote(proposal_id, voter_peer_id, approve, signature);
                                         // TODO: verify signature of the vote itself if needed
                                     }
                                 }
@@ -2453,7 +2495,8 @@ impl GenesisDatabase {
         let event = serde_json::from_str::<Event>(&event_json).map_err(|e| Error::from_reason(e.to_string()))?;
         tokio::task::spawn_blocking(move || i.propose_consensus(event, signature)).await.map_err(|e| Error::from_reason(e.to_string()))? 
     }
-    #[napi] pub async fn submit_vote(&self, proposal_id: String, peer_id: String, approve: bool) -> Result<bool> { let i = Arc::clone(&self.inner); tokio::task::spawn_blocking(move || i.submit_vote(proposal_id, peer_id, approve)).await.map_err(|e| Error::from_reason(e.to_string()))? }
+    #[napi] pub async fn submit_vote(&self, proposal_id: String, peer_id: String, approve: bool, signature: Vec<u8>) -> Result<bool> { let i = Arc::clone(&self.inner); tokio::task::spawn_blocking(move || i.submit_vote(proposal_id, peer_id, approve, signature)).await.map_err(|e| Error::from_reason(e.to_string()))? }
+    #[napi] pub fn sign_vote(&self, proposal_id: String, approve: bool) -> Vec<u8> { self.inner.sign_vote(proposal_id, approve) }
     #[napi] pub fn get_local_peer_id(&self) -> String { self.inner.local_peer_id.clone() }
     #[napi] pub fn get_logical_clock(&self) -> u32 { self.inner.logical_clock.load(Ordering::SeqCst) }
     #[napi] pub fn get_merkle_root(&self) -> String { self.inner.get_merkle_root() }
