@@ -2272,8 +2272,28 @@ impl Storage {
                                             }
                                         }
                                     }
-                                    GossipMessage::PullRequest { from_clock: _, target_peer_id: _ } => {
-                                        // TODO: Implement PushDelta response with SignedEvents
+                                    GossipMessage::PullRequest { from_clock, target_peer_id } => {
+                                        // Anti-entropy: reply with our events newer than the
+                                        // requester's clock, addressed to its registered gossip
+                                        // addr (the heartbeat port, not the ephemeral src port).
+                                        // Bound the reply to one UDP datagram; the requester's
+                                        // clock advances on apply, so the next heartbeat round
+                                        // pulls the remainder until the roots stop differing.
+                                        if let Some(reply_addr) = storage.peers.get(&target_peer_id).map(|p| p.addr.clone()) {
+                                            let mut batch = Vec::new();
+                                            let mut bytes = 0usize;
+                                            for ev in storage.events_since(from_clock) {
+                                                let sz = serde_json::to_vec(&ev).map(|v| v.len()).unwrap_or(0) + 2;
+                                                if !batch.is_empty() && bytes + sz > 60_000 { break; }
+                                                bytes += sz;
+                                                batch.push(ev);
+                                            }
+                                            if !batch.is_empty() {
+                                                if let Ok(data) = serde_json::to_vec(&GossipMessage::PushDelta { events: batch }) {
+                                                    let _ = socket.send_to(&data, reply_addr).await;
+                                                }
+                                            }
+                                        }
                                     }
                                     GossipMessage::PushDelta { events } => {
                                         let _ = storage.reconcile_state(events);
@@ -2716,6 +2736,43 @@ impl Storage {
         hex::encode(hasher.finalize())
     }
 
+    /// Logical time of an event (max over a batch). `Event::Vector` carries no
+    /// clock, so it is not time-filterable and is excluded from pull deltas.
+    fn event_time(e: &Event) -> Option<u32> {
+        match e {
+            Event::Node(n) => Some(n.clock.time),
+            Event::Edge(ed) => Some(ed.clock.time),
+            Event::Batch(v) => v.iter().filter_map(Self::event_time).max(),
+            Event::Vector(_) => None,
+        }
+    }
+
+    /// Anti-entropy source side: the WAL `SignedEvent`s strictly newer than
+    /// `from_clock`, sorted ascending by logical time. A peer that pulls these and
+    /// applies them via `reconcile_state` converges its graph state toward ours;
+    /// because they advance the requester's clock, the next round pulls only the
+    /// remainder (so batching by the caller is safe). Events are already signed by
+    /// their original author, so they verify on the receiver.
+    /// Note: `Event::Vector` (secondary add_vector embeddings) has no clock and is
+    /// not yet included — primary node embeddings ride on `Event::Node` and do sync.
+    pub fn events_since(&self, from_clock: u32) -> Vec<SignedEvent> {
+        if !self.log_path.exists() { return Vec::new(); }
+        let mut out: Vec<(u32, SignedEvent)> = Vec::new();
+        if let Ok(file) = File::open(&self.log_path) {
+            let reader = std::io::BufReader::new(file);
+            use std::io::BufRead;
+            for line in reader.lines().map_while(|r| r.ok()) {
+                if let Ok(se) = serde_json::from_str::<SignedEvent>(&line) {
+                    if let Some(t) = Self::event_time(&se.event) {
+                        if t > from_clock { out.push((t, se)); }
+                    }
+                }
+            }
+        }
+        out.sort_by_key(|(t, _)| *t);
+        out.into_iter().map(|(_, se)| se).collect()
+    }
+
     pub fn compact(&self) -> Result<()> {
         self.ensure_writable()?;
         let new_log_path = self.path.join("genesis-graph.wal.new");
@@ -2933,6 +2990,13 @@ impl GenesisDatabase {
         let i = Arc::clone(&self.inner);
         let events = serde_json::from_str::<Vec<SignedEvent>>(&events_json).map_err(|e| Error::from_reason(e.to_string()))?;
         tokio::task::spawn_blocking(move || i.reconcile_state(events)).await.map_err(|e| Error::from_reason(e.to_string()))?
+    }
+    /// Anti-entropy source side: JSON of the signed events newer than `from_clock`
+    /// (sorted by logical time). Pair with `reconcile_state` on the puller.
+    #[napi] pub async fn events_since(&self, from_clock: u32) -> Result<String> {
+        let i = Arc::clone(&self.inner);
+        tokio::task::spawn_blocking(move || serde_json::to_string(&i.events_since(from_clock)).map_err(|e| Error::from_reason(e.to_string())))
+            .await.map_err(|e| Error::from_reason(e.to_string()))?
     }
     #[napi] pub async fn semantic_verify(&self, event_json: String) -> Result<bool> { 
         let i = Arc::clone(&self.inner); 

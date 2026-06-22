@@ -201,6 +201,11 @@ export declare class GenesisDatabase {
   generateMetaGraph(): Promise<void>
   getMetaHistory(clusterId: number): Promise<Array<SuperNode>>
   reconcileState(eventsJson: string): Promise<void>
+  /**
+   * Anti-entropy source side: JSON of the signed events newer than `from_clock`
+   * (sorted by logical time). Pair with `reconcile_state` on the puller.
+   */
+  eventsSince(fromClock: number): Promise<string>
   semanticVerify(eventJson: string): Promise<boolean>
   proposeConsensus(eventJson: string, signature: Array<number>): Promise<string>
   submitVote(proposalId: string, peerId: string, approve: boolean, signature: Array<number>): Promise<boolean>

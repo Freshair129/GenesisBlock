@@ -98,8 +98,10 @@ replay verified end-to-end (P14/P16).
 ## 5. Honest limitations
 - Insert throughput trails in-memory Chroma (~1.5–2×) — durability + hnsw_rs
   build cost; deferred indexing is the next lever.
-- Anti-entropy gossip pull is a stub; `retract_edge` is a stub; `neighbors`
-  honors `limit` but not yet `direction`/`rels`.
+- Anti-entropy gossip pull is implemented (PullRequest → `events_since` →
+  `reconcile_state`), but exact Merkle convergence still needs ordered/version-vector
+  digests. `retract_edge` is a bitemporal soft-delete. `neighbors` honors
+  `limit`/`direction`/`rels`/`include_invalid`.
 - RAM bounds graph scale (~1M nodes / 8M edges on 32 GB); edge-id interning is
   the top optimization target.
 

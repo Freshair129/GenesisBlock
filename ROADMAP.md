@@ -151,8 +151,13 @@ in a single binary. Nearest comparators: Kuzu, DuckDB+graph, LanceDB, LadybugDB.
   health and knowledge drift visualization. *(1–2 weeks)*
 
 ### Priority 5 — Distributed (🟢 ต่ำ; C-3 own session)
-- [ ] **Gossip `PullRequest` anti-entropy:** complete P2P sync loop; currently
-  push-only with stub pull path. *(own session — complex, requires careful design)*
+- [x] **Gossip `PullRequest` anti-entropy:** **shipped** 2026-06-23 — the PullRequest
+  handler (was a `// TODO`) now replies with `events_since(from_clock)` (signed WAL events
+  newer than the requester's clock, sorted by logical time, bounded to one UDP datagram).
+  Peers apply via `reconcile_state` (LWW) and converge graph state over rounds; NAPI
+  `events_since`. `tests/anti_entropy_tests.rs`. *(Note: exact Merkle convergence needs
+  ordered/version-vector digests — pre-existing limitation; `Event::Vector` secondary
+  embeddings not yet in deltas.)*
 
 ---
 
