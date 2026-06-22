@@ -11,11 +11,13 @@ GenesisBlockDB uses a **Log-Structured Merge-Friendly** architecture based on a 
 - **Persistence:** High-durability append-only logic with batched group commits.
 - **In-Memory State:**
     - `DashMap<u32, NodeOutput>`: Primary node storage (nodes interned to `u32`).
-    - `DashMap<u64, EdgeOutput>`: Primary edge storage. Edges are keyed by a
-      deterministic `u64 = trunc64(SHA256(id))` (`Storage::edge_key`); edge id
-      strings are **not** interned into `id_to_u32` (ADR--GENESISDB-EDGE-NUMERIC-KEYS).
+    - `DashMap<u128, EdgeOutput>`: Primary edge storage. Edges are keyed by a
+      deterministic `u128 = trunc128(SHA256(id))` (`Storage::edge_key`); the key is
+      derived from `EdgeOutput.id`, never stored authoritatively (legacy u64-keyed
+      snapshots load transparently). Edge id strings are **not** interned into
+      `id_to_u32` (ADR--GENESISDB-EDGE-NUMERIC-KEYS).
     - `Adjacency Indices`: Forward (`out_idx`) and Backward (`in_idx`),
-      `DashMap<u32, HashSet<u64>>` (node `u32` → set of edge `u64` keys), for $O(1)$ traversal.
+      `DashMap<u32, HashSet<u128>>` (node `u32` → set of edge `u128` keys), for $O(1)$ traversal.
 
 ### 2.2 Semantic Hybrid Indexing
 GenesisBlockDB bridges lexical and semantic search via a dual-indexing strategy:
@@ -97,8 +99,10 @@ GenesisBlockDB exposes a specialized language for reasoning over graph and vecto
 
 ### 7.1 Search (Lexical/Vector)
 ```sql
-SEARCH ~target SIMILAR TO [v1, v2, ...] K 5 LANGUAGE "th" AS OF "2026-01-01T00:00:00Z"
+SEARCH ~target SIMILAR TO [v1, v2, ...] K 5 IN "code" LANGUAGE "th" AS OF "2026-01-01T00:00:00Z"
 ```
+The optional `IN <collection>` clause (quoted or bare identifier) scopes the
+search to a named vector collection; omitted → the `default` collection.
 
 ### 7.2 Traverse (Graph)
 ```sql

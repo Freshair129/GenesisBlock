@@ -35,7 +35,8 @@ prior corrupted file. The server is the SSOT; update this when routes change.
 | GET | `/v1/status` | _none_ | `ExtendedStatus` |
 | GET | `/v1/swarm/status` | _none_ | `SwarmStatus` |
 | POST | `/v1/consensus/propose` | `{ event: Event, signature: u8[] }` | `String` (proposal id) |
-| POST | `/v1/consensus/vote` | `{ proposal_id, peer_id, approve }` | `bool` (quorum reached) |
+| POST | `/v1/consensus/sign-vote` | `{ proposal_id, approve }` | `u8[]` (ed25519 signature) |
+| POST | `/v1/consensus/vote` | `{ proposal_id, peer_id, approve, signature: u8[] }` | `bool` (quorum reached) |
 | POST | `/v1/consensus/verify` | `Event` | `bool` |
 
 **Engine capabilities NOT exposed over REST** (NAPI/embedded only): `execute_batch`,
@@ -52,13 +53,16 @@ traversal), `retract_edge`, `compact`, `detect_communities`,
 
 ## HQL (`/v1/query/hql`, raw string body)
 ```
-SEARCH <target> SIMILAR TO [v1, v2, …] K <k> [LANGUAGE "th"] [AS OF "<rfc3339>"]
+SEARCH <target> SIMILAR TO [v1, v2, …] K <k> [IN <collection>] [LANGUAGE "th"] [AS OF "<rfc3339>"]
 TRAVERSE FROM <seed> DEPTH <n> REL <rel|INFER(rel)|ANY> [AS OF "…"]
-MATCH <target> SIMILAR TO [v…] ALPHA <a> [LANGUAGE "…"] [AS OF "…"]
+MATCH <target> SIMILAR TO [v…] ALPHA <a> [IN <collection>] [LANGUAGE "…"] [AS OF "…"]
 CONTEXT FOR <target> TIER <H0..H5> [BUDGET <n>]
 ```
 `~` prefix on target/seed enables fuzzy id resolution. `SEARCH` runs pure vector
-k-NN (alpha=0); `MATCH` is hybrid (vector + K-Impact, k=10).
+k-NN (alpha=0); `MATCH` is hybrid (vector + K-Impact, k=10). `IN <collection>`
+scopes the query to a named vector collection (quoted `"code"` or bare `code`);
+omitted → the `default` collection. The query dim is validated against the
+collection dim.
 
 ## Data model (from `src/lib.rs`)
 
@@ -135,3 +139,10 @@ Tiers `MASTER` (0) / `SPEC` (1) / `ADR` (2) / `USER` (3), derived from node
 `labels`. External callers cannot create/modify `MASTER`-tier nodes (→ `403`-class
 error); MASTER promotion requires multi-signature consensus. Guard cost is
 <0.1% of a write (audit P24).
+
+**Consensus votes are signed.** A voter signs `VOTE|{proposal_id}|{peer_id}|{approve}`
+with its ed25519 key (`/v1/consensus/sign-vote`); `submit_vote` verifies the
+signature against the voter's registered public key (`SyncPeer.verifying_key`, or
+this node's own key for a self-vote) before counting it. Unknown-peer, malformed,
+or non-matching signatures are rejected (`400`) and not counted — forged or
+replayed votes cannot reach quorum. See `ADR--GENESISDB-CONSENSUS-VOTE-SIGNATURES`.

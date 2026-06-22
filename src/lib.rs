@@ -401,14 +401,27 @@ impl VectorCollection {
         }
     }
 
-    fn build_hnsw(ef_construction: usize) -> Hnsw<'static, f32, DistL2> {
-        Hnsw::new(16, 1_000_000, 16, ef_construction, DistL2 {})
+    /// Build an HNSW index reserving capacity for ~`cap` elements. hnsw_rs uses
+    /// this only as a `Vec::with_capacity` hint per graph layer and grows via
+    /// plain `Vec::push` on overflow (hnsw.rs:511), so a small `cap` is safe —
+    /// it just reallocates (amortized) past the hint. The old hardcoded
+    /// `1_000_000` was NOT ~8 MB as once assumed: the layer-fraction reservation
+    /// compounds across layers to >100 MB *per index*, so every freshly-created
+    /// collection index eagerly committed that much. With many collections (or
+    /// many DBs open at once, e.g. parallel tests) those reservations stacked and
+    /// aborted on OOM. Size to the data instead (ADR--GENESISDB-HNSW-CAPACITY).
+    const HNSW_MIN_CAP: usize = 1024;
+
+    fn build_hnsw(ef_construction: usize, cap: usize) -> Hnsw<'static, f32, DistL2> {
+        Hnsw::new(16, cap.max(Self::HNSW_MIN_CAP), 16, ef_construction, DistL2 {})
     }
 
     fn ensure_hnsw(&self, ef_construction: usize) {
         if self.hnsw.read().is_none() {
             let mut w = self.hnsw.write();
-            if w.is_none() { *w = Some(Self::build_hnsw(ef_construction)); }
+            // Lazy create: final element count is unknown here, so reserve the
+            // floor and let inserts grow it. Rehydrate (count known) sizes exactly.
+            if w.is_none() { *w = Some(Self::build_hnsw(ef_construction, Self::HNSW_MIN_CAP)); }
         }
     }
 
@@ -447,7 +460,7 @@ impl VectorCollection {
     fn rehydrate(&self, ef_c: usize) {
         let meta = self.metadata.read();
         if meta.is_empty() { return; }
-        let hnsw = Self::build_hnsw(ef_c);
+        let hnsw = Self::build_hnsw(ef_c, meta.len());
         let arena = self.arena.read();
         for m in meta.iter() {
             let start = m.embedding_offset as usize;
@@ -482,9 +495,9 @@ pub struct Storage {
     pub path: PathBuf,
     pub read_only: bool,
     pub nodes: DashMap<u32, NodeOutput>,
-    pub edges: DashMap<u64, EdgeOutput>,
-    pub out_idx: DashMap<u32, HashSet<u64>>,
-    pub in_idx: DashMap<u32, HashSet<u64>>,
+    pub edges: DashMap<u128, EdgeOutput>,
+    pub out_idx: DashMap<u32, HashSet<u128>>,
+    pub in_idx: DashMap<u32, HashSet<u128>>,
     /// Per-model/per-dim isolated vector spaces, keyed by collection name.
     /// Replaces the former single global arena/metadata/hnsw/u32_to_arena_id.
     pub collections: DashMap<String, Arc<VectorCollection>>,
@@ -511,6 +524,13 @@ pub struct Storage {
     /// Vectors staged in an arena but not yet inserted into HNSW (observability;
     /// see `index_lag` / `flush_index`).
     index_pending: Arc<AtomicUsize>,
+    /// Join handles for the WAL-writer and deferred-indexing threads. Held so
+    /// `Drop` can close their senders + join them — letting any in-flight WAL
+    /// flush / HNSW insert finish before the process tears down, rather than
+    /// leaving detached threads running into static teardown. `Option` so `Drop`
+    /// can `take()`.
+    wal_handle: Option<std::thread::JoinHandle<()>>,
+    index_handle: Option<std::thread::JoinHandle<()>>,
     pub local_peer_id: String,
     pub logical_clock: AtomicU32,
     pub gossip_port: AtomicU32,
@@ -580,9 +600,13 @@ impl Storage {
     /// stored coordination. `EdgeOutput.id` remains the canonical reverse
     /// lookup. Idempotency = "is this u64 already in `edges`?".
     /// See ADR--GENESISDB-EDGE-NUMERIC-KEYS (Layer B) / RCA--EDGE-ID-INTERNING-RAM.
-    pub fn edge_key(id: &str) -> u64 {
+    pub fn edge_key(id: &str) -> u128 {
+        // 128-bit truncation of SHA256(id). Widened from u64 (Layer B) to slash
+        // the birthday-collision risk: ~1.7e-6 at 8M edges (u64) -> ~9e-26 (u128).
+        // The key is always derived from EdgeOutput.id, never stored, so this is a
+        // pure in-memory width change — legacy u64 snapshots re-key transparently.
         let digest = Sha256::digest(id.as_bytes());
-        u64::from_be_bytes(digest[..8].try_into().unwrap())
+        u128::from_be_bytes(digest[..16].try_into().unwrap())
     }
 
     pub fn get_u32(&self, id: &str) -> Option<u32> { self.id_to_u32.get(id).map(|v| *v) }
@@ -764,7 +788,7 @@ impl Storage {
         let (wal_sender, wal_receiver): (Sender<(SignedEvent, Sender<bool>)>, Receiver<(SignedEvent, Sender<bool>)>) = unbounded();
         let log_path_clone = log_path.clone();
 
-        std::thread::spawn(move || {
+        let wal_handle = std::thread::spawn(move || {
             if let Ok(file) = FileOpenOptions::new().append(true).create(true).open(&log_path_clone) {
                 let mut writer = std::io::BufWriter::with_capacity(128 * 1024, file);
                 let mut batch: Vec<crossbeam_channel::Sender<bool>> = Vec::with_capacity(1024);
@@ -804,7 +828,7 @@ impl Storage {
         let (index_tx, index_rx): (Sender<IndexJob>, Receiver<IndexJob>) = bounded(4096);
         let index_pending = Arc::new(AtomicUsize::new(0));
         let index_pending_thread = Arc::clone(&index_pending);
-        std::thread::spawn(move || {
+        let index_handle = std::thread::spawn(move || {
             while let Ok(job) = index_rx.recv() {
                 match job {
                     IndexJob::One { coll, arena_id, emb, ef_c } => {
@@ -846,6 +870,8 @@ impl Storage {
             wal_sender,
             index_tx,
             index_pending,
+            wal_handle: Some(wal_handle),
+            index_handle: Some(index_handle),
             local_peer_id,
             logical_clock: AtomicU32::new(0),
             gossip_port: AtomicU32::new(0),
@@ -1035,11 +1061,51 @@ impl Storage {
         Ok(proposal_id)
     }
 
-        pub fn submit_vote(&self, proposal_id: String, peer_id: String, approve: bool) -> Result<bool> {
+    /// Canonical bytes a peer signs to cast a vote. Binding the proposal id,
+    /// voter id, and the approve/reject choice prevents replaying a vote onto a
+    /// different proposal or flipping its decision.
+    fn vote_payload(proposal_id: &str, voter_peer_id: &str, approve: bool) -> Vec<u8> {
+        format!("VOTE|{}|{}|{}", proposal_id, voter_peer_id, approve).into_bytes()
+    }
+
+    /// The ed25519 public key for `peer_id`: this node's own key for a self-vote,
+    /// otherwise the key registered for that peer (via gossip Heartbeat). `None`
+    /// if the peer is unknown — an unknown peer cannot have its vote verified.
+    fn peer_verifying_key(&self, peer_id: &str) -> Option<VerifyingKey> {
+        if peer_id == self.local_peer_id {
+            return Some(self.verifying_key);
+        }
+        let bytes = self.peers.get(peer_id)?.verifying_key.clone();
+        let arr: [u8; 32] = bytes.as_slice().try_into().ok()?;
+        VerifyingKey::from_bytes(&arr).ok()
+    }
+
+    /// Sign a vote with this node's key so a remote proposal-holder can verify it
+    /// authentically came from this peer. Returns the detached ed25519 signature.
+    pub fn sign_vote(&self, proposal_id: String, approve: bool) -> Vec<u8> {
+        let payload = Self::vote_payload(&proposal_id, &self.local_peer_id, approve);
+        self.signing_key.sign(&payload).to_bytes().to_vec()
+    }
+
+    pub fn submit_vote(&self, proposal_id: String, peer_id: String, approve: bool, signature: Vec<u8>) -> Result<bool> {
+        // Verify the vote is authentically signed by `peer_id` before recording
+        // it — otherwise any caller could forge votes on another peer's behalf and
+        // drive a proposal to quorum. Unknown peers, malformed or non-matching
+        // signatures are rejected (the vote is not counted).
+        let vkey = self.peer_verifying_key(&peer_id)
+            .ok_or_else(|| Error::from_reason(format!("unknown voter peer '{}' (no verifying key)", peer_id)))?;
+        let payload = Self::vote_payload(&proposal_id, &peer_id, approve);
+        let sig = Signature::from_slice(&signature)
+            .map_err(|_| Error::from_reason("malformed vote signature"))?;
+        vkey.verify(&payload, &sig)
+            .map_err(|_| Error::from_reason("invalid vote signature"))?;
+
         if let Some(mut proposal_ref) = self.proposals.get_mut(&proposal_id) {
             let proposal = proposal_ref.value_mut();
             proposal.votes.insert(peer_id.clone(), approve);
-            
+            // Retain the verified signature as proof of the vote (quorum_signatures).
+            proposal.quorum_signatures.insert(peer_id.clone(), signature);
+
             let approvals = proposal.votes.values().filter(|&&v| v).count();
             
             if approvals > (self.peers.len() / 2) {
@@ -1059,8 +1125,8 @@ impl Storage {
                         })?;
                     }
                     Event::Edge(e) => {
-                        let edge_u64 = Self::edge_key(&e.id);
-                        self.edges.insert(edge_u64, e.clone());
+                        let ekey = Self::edge_key(&e.id);
+                        self.edges.insert(ekey, e.clone());
                         self.persist_signed(signed_event.clone())?;
                     }
                     Event::Batch(events) => {
@@ -1073,8 +1139,8 @@ impl Storage {
                                     self.insert_node_lean(u32_id, n_axiom);
                                 }
                                 Event::Edge(edge) => {
-                                    let edge_u64 = Self::edge_key(&edge.id);
-                                    self.edges.insert(edge_u64, edge.clone());
+                                    let ekey = Self::edge_key(&edge.id);
+                                    self.edges.insert(ekey, edge.clone());
                                 }
                                 _ => {}
                             }
@@ -1127,16 +1193,16 @@ impl Storage {
         }
     }
 
-    /// Index an edge into the adjacency maps and return its u64 key. The edge key
+    /// Index an edge into the adjacency maps and return its u128 key. The edge key
     /// is the deterministic `edge_key(id)` hash (no trigram/reverse/`id_to_u32`);
     /// `from`/`to` are node ids and keep the full node intern (they are searchable).
-    pub fn index_edge_internal(&self, id: &str, from: &str, to: &str) -> u64 {
-        let edge_u64 = Self::edge_key(id);
+    pub fn index_edge_internal(&self, id: &str, from: &str, to: &str) -> u128 {
+        let ekey = Self::edge_key(id);
         let u32_from = self.get_or_intern_id(from);
         let u32_to = self.get_or_intern_id(to);
-        self.out_idx.entry(u32_from).or_insert_with(HashSet::new).insert(edge_u64);
-        self.in_idx.entry(u32_to).or_insert_with(HashSet::new).insert(edge_u64);
-        edge_u64
+        self.out_idx.entry(u32_from).or_insert_with(HashSet::new).insert(ekey);
+        self.in_idx.entry(u32_to).or_insert_with(HashSet::new).insert(ekey);
+        ekey
     }
 
     fn next_clock(&self) -> LogicalClock {
@@ -1249,9 +1315,9 @@ impl Storage {
     pub fn execute_hql(&self, query: &str) -> Result<serde_json::Value> {
         let command = HqlCommand::try_from(query).map_err(|e| Error::from_reason(e))?;
         match command {
-            HqlCommand::Search { vector, k, fuzzy, target, lang, as_of } => {
+            HqlCommand::Search { vector, k, fuzzy, target, lang, as_of, collection } => {
                 let _resolved = if fuzzy { self.find_fuzzy_id(&target) } else { Some(target) };
-                let res = self.hybrid_search(HybridSearchInput { query_vector: vector, k, alpha: Some(0.0), lang, as_of, collection: None })?;
+                let res = self.hybrid_search(HybridSearchInput { query_vector: vector, k, alpha: Some(0.0), lang, as_of, collection })?;
                 Ok(serde_json::to_value(res).unwrap())
             }
             HqlCommand::Traverse { seed, depth, rel, fuzzy, as_of } => {
@@ -1265,9 +1331,9 @@ impl Storage {
                 }, is_inferred)?;
                 Ok(serde_json::to_value(res).unwrap())
             }
-            HqlCommand::Hybrid { vector, alpha, fuzzy, target, lang, as_of } => {
+            HqlCommand::Hybrid { vector, alpha, fuzzy, target, lang, as_of, collection } => {
                 let _resolved = if fuzzy { self.find_fuzzy_id(&target) } else { Some(target) };
-                let res = self.hybrid_search(HybridSearchInput { query_vector: vector, k: 10, alpha: Some(alpha), lang, as_of, collection: None })?;
+                let res = self.hybrid_search(HybridSearchInput { query_vector: vector, k: 10, alpha: Some(alpha), lang, as_of, collection })?;
                 Ok(serde_json::to_value(res).unwrap())
             }
             HqlCommand::Context { target, tier, budget, fuzzy } => {
@@ -1375,7 +1441,7 @@ impl Storage {
             if curr_depth >= depth && !is_inferred { continue; }
 
             // Collect candidate edge ids from chosen directions, dedup by eid.
-            let mut eid_set: HashSet<u64> = HashSet::new();
+            let mut eid_set: HashSet<u128> = HashSet::new();
             if walk_out {
                 if let Some(out_eids) = self.out_idx.get(&curr_u32) { eid_set.extend(out_eids.iter().copied()); }
             }
@@ -1914,8 +1980,10 @@ impl Storage {
                                         // Auto-verify and store proposal
                                         storage.proposals.insert(proposal.proposal_id.clone(), proposal);
                                     }
-                                    GossipMessage::ConsensusVote { proposal_id, voter_peer_id, approve, signature: _ } => {
-                                        let _ = storage.submit_vote(proposal_id, voter_peer_id, approve);
+                                    GossipMessage::ConsensusVote { proposal_id, voter_peer_id, approve, signature } => {
+                                        // submit_vote verifies the signature against the
+                                        // voter's registered key; forged votes are dropped.
+                                        let _ = storage.submit_vote(proposal_id, voter_peer_id, approve, signature);
                                         // TODO: verify signature of the vote itself if needed
                                     }
                                 }
@@ -1970,7 +2038,7 @@ impl Storage {
 
         // 2. Save DashMaps (Partial state for instant load)
         let nodes: Vec<(u32, NodeOutput)> = self.nodes.iter().map(|e| (*e.key(), e.value().clone())).collect();
-        let edges: Vec<(u64, EdgeOutput)> = self.edges.iter().map(|e| (*e.key(), e.value().clone())).collect();
+        let edges: Vec<(u128, EdgeOutput)> = self.edges.iter().map(|e| (*e.key(), e.value().clone())).collect();
         fs::write(temp_dir.join("nodes.bin"), serde_json::to_vec(&nodes).unwrap()).ok();
         fs::write(temp_dir.join("edges.bin"), serde_json::to_vec(&edges).unwrap()).ok();
 
@@ -2091,10 +2159,10 @@ impl Storage {
         } else { println!("Mark IX: nodes.bin not found"); }
 
         if let Ok(data) = fs::read(self.path.join("edges.bin")) {
-            // Deserialize as u64 tuples. Legacy snapshots wrote u32 keys; JSON
-            // numbers widen into u64 fine, and the saved key is ignored anyway
-            // (see below), so both widths load transparently.
-            if let Ok(edges) = serde_json::from_slice::<Vec<(u64, EdgeOutput)>>(&data) {
+            // Deserialize as u128 tuples. Legacy snapshots wrote u32/u64 keys; JSON
+            // numbers widen into u128 fine, and the saved key is ignored anyway
+            // (re-derived below), so all widths load transparently.
+            if let Ok(edges) = serde_json::from_slice::<Vec<(u128, EdgeOutput)>>(&data) {
                 println!("Mark IX: Loading {} edges from snapshot", edges.len());
                 for (_saved_k, v) in edges {
                     // Re-derive the edge key deterministically from the edge id
@@ -2441,6 +2509,22 @@ impl Drop for Storage {
     fn drop(&mut self) {
         if !self.read_only {
             let _ = self.save_state();
+        }
+        // Shut the background workers down deterministically instead of leaving
+        // them detached. Each worker's recv() loop exits only once its sender is
+        // dropped; the senders are still-live struct fields here, so swap each for
+        // a throwaway channel — that drops the original (no other clones exist) and
+        // closes the queue — then join the thread so any in-flight WAL flush / HNSW
+        // insert finishes before the process tears down. Pending (un-joined) index
+        // jobs are safe to abandon: their vectors are already in the durable arena
+        // and the HNSW rehydrates from it on load.
+        let (dead_wal, _) = unbounded();
+        drop(std::mem::replace(&mut self.wal_sender, dead_wal));
+        let (dead_idx, _) = bounded(1);
+        drop(std::mem::replace(&mut self.index_tx, dead_idx));
+        if let Some(h) = self.wal_handle.take() { let _ = h.join(); }
+        if let Some(h) = self.index_handle.take() { let _ = h.join(); }
+        if !self.read_only {
             println!("Mark IX: Graceful shutdown. State saved.");
         }
     }
@@ -2513,7 +2597,8 @@ impl GenesisDatabase {
         let event = serde_json::from_str::<Event>(&event_json).map_err(|e| Error::from_reason(e.to_string()))?;
         tokio::task::spawn_blocking(move || i.propose_consensus(event, signature)).await.map_err(|e| Error::from_reason(e.to_string()))? 
     }
-    #[napi] pub async fn submit_vote(&self, proposal_id: String, peer_id: String, approve: bool) -> Result<bool> { let i = Arc::clone(&self.inner); tokio::task::spawn_blocking(move || i.submit_vote(proposal_id, peer_id, approve)).await.map_err(|e| Error::from_reason(e.to_string()))? }
+    #[napi] pub async fn submit_vote(&self, proposal_id: String, peer_id: String, approve: bool, signature: Vec<u8>) -> Result<bool> { let i = Arc::clone(&self.inner); tokio::task::spawn_blocking(move || i.submit_vote(proposal_id, peer_id, approve, signature)).await.map_err(|e| Error::from_reason(e.to_string()))? }
+    #[napi] pub fn sign_vote(&self, proposal_id: String, approve: bool) -> Vec<u8> { self.inner.sign_vote(proposal_id, approve) }
     #[napi] pub fn get_local_peer_id(&self) -> String { self.inner.local_peer_id.clone() }
     #[napi] pub fn get_logical_clock(&self) -> u32 { self.inner.logical_clock.load(Ordering::SeqCst) }
     #[napi] pub fn get_merkle_root(&self) -> String { self.inner.get_merkle_root() }

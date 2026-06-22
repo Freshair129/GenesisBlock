@@ -194,7 +194,8 @@ export declare class GenesisDatabase {
   reconcileState(eventsJson: string): Promise<void>
   semanticVerify(eventJson: string): Promise<boolean>
   proposeConsensus(eventJson: string, signature: Array<number>): Promise<string>
-  submitVote(proposalId: string, peerId: string, approve: boolean): Promise<boolean>
+  submitVote(proposalId: string, peerId: string, approve: boolean, signature: Array<number>): Promise<boolean>
+  signVote(proposalId: string, approve: boolean): Array<number>
   getLocalPeerId(): string
   getLogicalClock(): number
   getMerkleRoot(): string

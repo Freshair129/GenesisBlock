@@ -27,6 +27,14 @@ struct VoteInput {
     pub proposal_id: String,
     pub peer_id: String,
     pub approve: bool,
+    /// ed25519 signature over the vote, produced by the voter via `/v1/consensus/sign-vote`.
+    pub signature: Vec<u8>,
+}
+
+#[derive(serde::Deserialize)]
+struct SignVoteInput {
+    pub proposal_id: String,
+    pub approve: bool,
 }
 
 #[derive(serde::Deserialize)]
@@ -51,10 +59,20 @@ async fn consensus_vote_handler(
     Json(input): Json<VoteInput>,
 ) -> impl IntoResponse {
     let storage = state.storage.read();
-    match storage.submit_vote(input.proposal_id, input.peer_id, input.approve) {
+    match storage.submit_vote(input.proposal_id, input.peer_id, input.approve, input.signature) {
         Ok(reached_quorum) => (StatusCode::OK, Json(reached_quorum)).into_response(),
-        Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
+        // A bad/unknown/forged signature is a client error, not a server fault.
+        Err(e) => (StatusCode::BAD_REQUEST, e.to_string()).into_response(),
     }
+}
+
+async fn consensus_sign_vote_handler(
+    State(state): State<AppState>,
+    Json(input): Json<SignVoteInput>,
+) -> impl IntoResponse {
+    let storage = state.storage.read();
+    let sig = storage.sign_vote(input.proposal_id, input.approve);
+    (StatusCode::OK, Json(sig)).into_response()
 }
 
 async fn consensus_verify_handler(
@@ -335,6 +353,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .route("/v1/swarm/status", get(swarm_status_handler))
         .route("/v1/consensus/propose", post(consensus_propose_handler))
         .route("/v1/consensus/vote", post(consensus_vote_handler))
+        .route("/v1/consensus/sign-vote", post(consensus_sign_vote_handler))
         .route("/v1/consensus/verify", post(consensus_verify_handler))
         .layer(TraceLayer::new_for_http())
         .layer(CorsLayer::permissive())
