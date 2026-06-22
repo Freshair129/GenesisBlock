@@ -15,7 +15,7 @@ proposed_by: agent
 
 # ADR--GENESISDB-NODE-ID-INTERNING
 
-**Status:** Accepted (A1 shipped 2026-06-23; A2/A3 deferred)
+**Status:** Accepted — A1, A2, A3 all shipped 2026-06-23
 **Date:** 2026-06-22
 **Deciders:** Engine owner (Boss)
 **Roadmap:** MARK XIV Priority 1 — "Node RAM ceiling investigation … `id_to_u32`
@@ -201,9 +201,13 @@ bookkeeping RAM, quantization frees vector RAM. Both are needed to clear 16/32 G
        writes in `get_or_intern_id`/reload/`delete`. Added `tests/node_interning_tests.rs`
        (exact resolve, fuzzy resolve, traversal both directions, snapshot reload).
        *(shipped 2026-06-23)*
-2. [ ] A2: change `NodeMetadata.node_id: String` → `node_u32: u32` **with a versioned
-       `meta_<name>.bin` reader** (old bins deserialize via a compat path). Update the
-       reload `node_to_arena` rebuild (`:2264`) to use the stored u32 directly.
+2. [x] A2: changed `NodeMetadata.node_id: String` → `node_u32: u32` with a versioned
+       `meta_<name>.bin` reader. The collections manifest gained an `mv` flag (1 = u32
+       layout; absent ⇒ pre-A2 String). Legacy `NodeMetadataV0` is deserialized and
+       migrated to interned u32 during the `node_to_arena` rebuild (after `id_to_u32`
+       loads from `nodes.bin`). `stage` now takes a `u32`; community/meta-graph code
+       compares interned u32s instead of id Strings. `tests/node_meta_a2_tests.rs`
+       (new-format round-trip + hand-crafted legacy-snapshot migration). *(shipped 2026-06-23)*
 3. [x] **A3: `trigram_index` value → roaring bitmap** (`roaring = "0.10"`).
        `get_or_intern_id`/reload insert into `RoaringBitmap`; `find_fuzzy_id`
        accumulates candidates via `bitmap.iter()`; measurement helpers cast
@@ -263,3 +267,4 @@ pass). **A2 remains deferred** (meta-bin format migration — see Decision).
 | 0.1.0 | 2026-06-22 | Proposed: keep dense `u32` node key; Layer A (drop reverse map, `NodeMetadata` u32 back-link, dense trigram posting lists) decided first; Layer B (`Arc<str>` id dedup + optional trigram) designed; node-id hashing rejected (ids must round-trip exactly). |
 | 0.2.0 | 2026-06-23 | Accepted (partial): A1 (drop `u32_to_id` reverse map) implemented + tested (suite green). A2 (`NodeMetadata` u32) reclassified as on-disk format migration; A3 (dense trigram) reclassified as roaring-dep C-2 — both deferred with reasons. |
 | 0.3.0 | 2026-06-23 | A3 shipped: `trigram_index` → `RoaringBitmap` (`roaring = "0.10"`); suite green. Only A2 remains. |
+| 0.4.0 | 2026-06-23 | A2 shipped: `NodeMetadata.node_id: String` → `node_u32: u32`; manifest `mv` flag gates the `meta_*.bin` format; pre-A2 snapshots migrate on load via `NodeMetadataV0`. All three levers (A1/A2/A3) now complete. Full suite green incl. `node_meta_a2_tests` (legacy-snapshot round-trip). |

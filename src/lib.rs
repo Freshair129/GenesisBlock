@@ -322,13 +322,35 @@ pub struct VectorEvent {
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct NodeMetadata {
     pub arena_id: u32,
-    pub node_id: String,
+    /// Interned node id (u32), not the String form — A2 of
+    /// `ADR--GENESISDB-NODE-ID-INTERNING`: drops a per-vector × per-collection
+    /// String copy. The String is recoverable via `nodes[node_u32].id`. Pre-A2
+    /// snapshots stored a String here and are migrated on load via
+    /// `NodeMetadataV0` (selected by the manifest `mv` flag).
+    pub node_u32: u32,
     pub timestamp: u64,
     pub vector_dim: u16,
     pub embedding_offset: u64,
     pub gks_attributes: Vec<u8>,
     pub lang: String,
     pub cluster_id: u32,
+}
+
+/// Pre-A2 on-disk layout of `NodeMetadata` (node id as a String). Used ONLY to
+/// read legacy `meta_*.bin` / `meta.bin` snapshots, which are migrated to the
+/// interned-u32 `NodeMetadata` on load. bincode is not self-describing, so the
+/// format is chosen by the manifest `mv` flag (absent ⇒ legacy), never by trial
+/// deserialization (which would silently misread).
+#[derive(Deserialize)]
+struct NodeMetadataV0 {
+    arena_id: u32,
+    node_id: String,
+    timestamp: u64,
+    vector_dim: u16,
+    embedding_offset: u64,
+    gks_attributes: Vec<u8>,
+    lang: String,
+    cluster_id: u32,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -585,7 +607,7 @@ impl VectorCollection {
 
     /// Push a prepared vector into the arena/metadata, return its arena_id.
     /// Does NOT touch HNSW. Short critical section: only the Vec pushes.
-    fn stage(&self, node_u32: Option<u32>, node_id: &str, emb: &[f32], lang: String) -> u32 {
+    fn stage(&self, node_u32: u32, emb: &[f32], lang: String) -> u32 {
         let arena_id = {
             let mut meta = self.metadata.write();
             let mut arena = self.arena.write();
@@ -593,13 +615,13 @@ impl VectorCollection {
             arena.push_f32(emb);
             let arena_id = meta.len() as u32;
             meta.push(NodeMetadata {
-                arena_id, node_id: node_id.to_string(), timestamp: Utc::now().timestamp() as u64,
+                arena_id, node_u32, timestamp: Utc::now().timestamp() as u64,
                 vector_dim: self.dim, embedding_offset: off as u64, gks_attributes: Vec::new(),
                 lang, cluster_id: arena_id,
             });
             arena_id
         };
-        if let Some(u) = node_u32 { self.node_to_arena.insert(u, arena_id); }
+        self.node_to_arena.insert(node_u32, arena_id);
         self.count.fetch_add(1, Ordering::Relaxed);
         arena_id
     }
@@ -827,9 +849,9 @@ impl Storage {
                 "embedding dim {} != collection '{}' dim {}", emb_64.len(), coll.name, coll.dim
             )));
         }
-        let node_u32 = self.get_u32(node_id);
+        let node_u32 = self.get_or_intern_id(node_id);
         let emb = coll.prep(emb_64);
-        let arena_id = coll.stage(node_u32, node_id, &emb, lang);
+        let arena_id = coll.stage(node_u32, &emb, lang);
         self.enqueue_one(&coll, arena_id, emb);
         Ok(())
     }
@@ -910,9 +932,9 @@ impl Storage {
         }
         if let Ok(coll) = self.resolve_collection(&Some(name)) {
             if emb.len() != coll.dim as usize { return; }
-            let node_u32 = self.get_u32(node_id);
+            let node_u32 = self.get_or_intern_id(node_id);
             let e = coll.prep(emb);
-            let arena_id = coll.stage(node_u32, node_id, &e, lang);
+            let arena_id = coll.stage(node_u32, &e, lang);
             if index { self.enqueue_one(&coll, arena_id, e); }
         }
     }
@@ -1557,7 +1579,7 @@ impl Storage {
 
         for (d_id, distance) in results {
             if let Some(meta) = meta_arena.get(d_id) {
-                if let Some(u32_id) = self.get_u32(&meta.node_id) {
+                { let u32_id = meta.node_u32; // A2: id interned in metadata
                     if let Some(node) = self.nodes.get(&u32_id) {
                         let mut node_out = node.value().clone();
 
@@ -1694,11 +1716,11 @@ impl Storage {
         let mut new_clusters = Vec::with_capacity(meta_arena.len());
         for meta in meta_arena.iter() {
             let mut freq = HashMap::new();
-            if let Some(u32_id) = self.get_u32(&meta.node_id) {
+            { let u32_id = meta.node_u32; // A2: id interned in metadata
                 let out_eids = self.out_idx.get(&u32_id).map(|v| v.value().clone()).unwrap_or_default();
                 for eid in out_eids {
                     if let Some(edge) = self.edges.get(&eid) {
-                        let other_id = if edge.from == meta.node_id { &edge.to } else { &edge.from };
+                        let other_id = if self.get_u32(&edge.from) == Some(meta.node_u32) { &edge.to } else { &edge.from };
                         if let Some(to_u32) = self.get_u32(other_id) {
                             if let Some(a_id) = coll.node_to_arena.get(&to_u32) {
                                 if let Some(other_meta) = meta_arena.get(*a_id as usize) {
@@ -1711,7 +1733,7 @@ impl Storage {
                 let in_eids = self.in_idx.get(&u32_id).map(|v| v.value().clone()).unwrap_or_default();
                 for eid in in_eids {
                     if let Some(edge) = self.edges.get(&eid) {
-                        let other_id = if edge.from == meta.node_id { &edge.to } else { &edge.from };
+                        let other_id = if self.get_u32(&edge.from) == Some(meta.node_u32) { &edge.to } else { &edge.from };
                         if let Some(to_u32) = self.get_u32(other_id) {
                             if let Some(a_id) = coll.node_to_arena.get(&to_u32) {
                                 if let Some(other_meta) = meta_arena.get(*a_id as usize) {
@@ -1755,9 +1777,7 @@ impl Storage {
         let mut cluster_groups: HashMap<u32, Vec<u32>> = HashMap::new();
         let meta_arena = coll.metadata.read();
         for meta in meta_arena.iter() {
-            if let Some(u32_id) = self.get_u32(&meta.node_id) {
-                cluster_groups.entry(meta.cluster_id).or_insert_with(Vec::new).push(u32_id);
-            }
+            cluster_groups.entry(meta.cluster_id).or_insert_with(Vec::new).push(meta.node_u32);
         }
         let vec_arena = coll.arena.read();
         let now = Utc::now().to_rfc3339();
@@ -2224,7 +2244,10 @@ impl Storage {
             fs::write(temp_dir.join(format!("meta_{}.bin", coll.name)), meta_data).map_err(|e| Error::from_reason(e.to_string()))?;
             manifest.push(serde_json::json!({
                 "name": coll.name, "model": coll.model, "dim": coll.dim,
-                "metric": coll.metric.as_str(), "quant": coll.quant.as_str()
+                "metric": coll.metric.as_str(), "quant": coll.quant.as_str(),
+                // meta format version: 1 = NodeMetadata.node_u32 (A2). Absent ⇒ 0
+                // (pre-A2 String layout), migrated on load.
+                "mv": 1
             }));
         }
 
@@ -2278,6 +2301,10 @@ impl Storage {
         //    vec_<name>.bin / meta_<name>.bin. Legacy: a single vector.bin /
         //    meta.bin pair, migrated transparently into the `default` collection.
         self.collections.clear();
+        // Pre-A2 (mv absent) collections store String node ids in meta; they can't
+        // be interned to u32 here because id_to_u32 is only populated when nodes.bin
+        // loads (step 2). Stash the raw legacy metas and migrate them in step 3.
+        let mut legacy_meta: HashMap<String, Vec<NodeMetadataV0>> = HashMap::new();
         if let Some(colls) = state_val["collections"].as_array() {
             for cm in colls {
                 let name = cm["name"].as_str().unwrap_or("default").to_string();
@@ -2290,9 +2317,15 @@ impl Storage {
                     *coll.arena.write() = ArenaStore::from_bytes(&data, quant);
                 }
                 if let Ok(data) = fs::read(self.path.join(format!("meta_{}.bin", name))) {
-                    if let Ok(meta) = bincode::deserialize::<Vec<NodeMetadata>>(&data) {
-                        coll.count.store(meta.len(), Ordering::Relaxed);
-                        *coll.metadata.write() = meta;
+                    if cm["mv"].as_u64().unwrap_or(0) >= 1 {
+                        if let Ok(meta) = bincode::deserialize::<Vec<NodeMetadata>>(&data) {
+                            coll.count.store(meta.len(), Ordering::Relaxed);
+                            *coll.metadata.write() = meta;
+                        }
+                    } else if let Ok(v0) = bincode::deserialize::<Vec<NodeMetadataV0>>(&data) {
+                        // Pre-A2 String layout — migrate to interned u32 in step 3.
+                        coll.count.store(v0.len(), Ordering::Relaxed);
+                        legacy_meta.insert(name.clone(), v0);
                     }
                 }
                 self.collections.insert(name, Arc::new(coll));
@@ -2303,9 +2336,10 @@ impl Storage {
             let coll = VectorCollection::new("default".to_string(), "default".to_string(), dim, Metric::L2, Quant::None);
             *coll.arena.write() = ArenaStore::from_bytes(&data, Quant::None);
             if let Ok(md) = fs::read(self.path.join("meta.bin")) {
-                if let Ok(meta) = bincode::deserialize::<Vec<NodeMetadata>>(&md) {
-                    coll.count.store(meta.len(), Ordering::Relaxed);
-                    *coll.metadata.write() = meta;
+                // Legacy single-space snapshots always predate A2 (String layout).
+                if let Ok(v0) = bincode::deserialize::<Vec<NodeMetadataV0>>(&md) {
+                    coll.count.store(v0.len(), Ordering::Relaxed);
+                    legacy_meta.insert("default".to_string(), v0);
                 }
             }
             self.collections.insert("default".to_string(), Arc::new(coll));
@@ -2377,9 +2411,23 @@ impl Storage {
         //    rehydrated from the arenas by the caller (open -> rehydrate_hnsw_index).
         for c in self.collections.iter() {
             let coll = c.value();
-            let meta = coll.metadata.read();
-            for m in meta.iter() {
-                if let Some(u) = self.get_u32(&m.node_id) { coll.node_to_arena.insert(u, m.arena_id); }
+            if let Some(v0s) = legacy_meta.remove(coll.name.as_str()) {
+                // Pre-A2 migration: intern each String id (now that id_to_u32 is
+                // ready) into the new u32 metadata, and rebuild node_to_arena.
+                let mut migrated = Vec::with_capacity(v0s.len());
+                for v0 in v0s {
+                    let nu = self.get_u32(&v0.node_id).unwrap_or_else(|| self.get_or_intern_id(&v0.node_id));
+                    coll.node_to_arena.insert(nu, v0.arena_id);
+                    migrated.push(NodeMetadata {
+                        arena_id: v0.arena_id, node_u32: nu, timestamp: v0.timestamp,
+                        vector_dim: v0.vector_dim, embedding_offset: v0.embedding_offset,
+                        gks_attributes: v0.gks_attributes, lang: v0.lang, cluster_id: v0.cluster_id,
+                    });
+                }
+                *coll.metadata.write() = migrated;
+            } else {
+                let meta = coll.metadata.read();
+                for m in meta.iter() { coll.node_to_arena.insert(m.node_u32, m.arena_id); }
             }
         }
 
@@ -2458,14 +2506,14 @@ impl Storage {
         // 4. Memory Index Phase — collect vectors per collection and build each
         //    HNSW graph once via parallel_insert instead of N single inserts.
         //    Items grouped by collection: (node_u32, node_id, emb, lang).
-        let mut by_coll: HashMap<String, Vec<(Option<u32>, String, Vec<f64>, String)>> = HashMap::new();
+        let mut by_coll: HashMap<String, Vec<(u32, String, Vec<f64>, String)>> = HashMap::new();
         for event in events {
             match event {
                 Event::Node(n) => {
                     let u32_id = self.get_or_intern_id(&n.id);
                     if let Some(emb) = n.embedding.clone() {
                         let cn = n.collection.clone().unwrap_or_else(|| self.default_collection.clone());
-                        by_coll.entry(cn).or_default().push((Some(u32_id), n.id.clone(), emb, n.lang.clone().unwrap_or_else(|| "en".to_string())));
+                        by_coll.entry(cn).or_default().push((u32_id, n.id.clone(), emb, n.lang.clone().unwrap_or_else(|| "en".to_string())));
                     }
                     self.insert_node_lean(u32_id, n);
                 }
@@ -2483,9 +2531,9 @@ impl Storage {
             if let Ok(coll) = self.resolve_collection(&Some(cn)) {
                 let staged: Vec<(Vec<f32>, u32)> = items
                     .into_iter()
-                    .map(|(nu, id, emb, lang)| {
+                    .map(|(nu, _id, emb, lang)| {
                         let e = coll.prep(emb);
-                        let aid = coll.stage(nu, &id, &e, lang);
+                        let aid = coll.stage(nu, &e, lang);
                         (e, aid)
                     })
                     .collect();
@@ -2518,7 +2566,7 @@ impl Storage {
             coll.node_to_arena.clear();
 
             for meta in meta_arena.iter() {
-                if let Some(u32_id) = self.get_u32(&meta.node_id) {
+                { let u32_id = meta.node_u32; // A2: id interned in metadata
                     if live_nodes.contains(&u32_id) {
                         let start_off = meta.embedding_offset as usize;
                         let len = meta.vector_dim as usize;
@@ -2680,7 +2728,7 @@ impl Storage {
                 let entry = cluster_centroids.entry(c_id).or_insert_with(|| vec![0.0; meta.vector_dim as usize]);
                 for (i, val) in vec.iter().enumerate() { entry[i] += val; }
                 *cluster_member_count.entry(c_id).or_insert(0) += 1;
-                if let Some(u32_id) = self.get_u32(&meta.node_id) {
+                { let u32_id = meta.node_u32; // A2: id interned in metadata
                     if let Some(node) = self.nodes.get(&u32_id) { *cluster_impact.entry(c_id).or_insert(0.0) += node.value().impact.unwrap_or(0.0); }
                 }
             }
