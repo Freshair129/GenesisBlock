@@ -175,7 +175,9 @@ async fn add_vector_handler(
     State(state): State<AppState>,
     Json(input): Json<AddVectorInput>,
 ) -> impl IntoResponse {
-    let storage = state.storage.write();
+    // add_vector mutates through interior mutability (DashMap/arena), so a shared
+    // read lock is sufficient — no need to serialize writers here.
+    let storage = state.storage.read();
     match storage.add_vector(input.node_id, input.collection, input.embedding) {
         Ok(()) => (StatusCode::OK, Json(serde_json::json!({"ok": true}))).into_response(),
         Err(e) => (StatusCode::BAD_REQUEST, e.to_string()).into_response(),
