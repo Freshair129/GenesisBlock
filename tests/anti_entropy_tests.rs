@@ -4,7 +4,7 @@
 // applies them with `reconcile_state` and converges. Tested at the Storage API
 // level (the UDP loop just wires these two calls together).
 
-use genesis_block_native::{Storage, OpenOptions, NodeInput, EdgeInput, NeighborInput, SyncPeer, Event};
+use genesis_block_native::{Storage, OpenOptions, NodeInput, EdgeInput, NeighborInput, SyncPeer, Event, HybridSearchInput};
 use std::fs;
 use std::path::Path;
 
@@ -101,4 +101,62 @@ fn reapplying_delta_is_safe() {
     b.reconcile_state(delta.clone()).unwrap();
     b.reconcile_state(delta).unwrap(); // idempotent at the data level
     assert!(b.get_u32("Z").is_some());
+}
+
+/// Secondary embeddings (`add_vector`) now carry a clock, so they ride in pull
+/// deltas (`events_since` used to drop them for lack of a clock). A peer that
+/// lacks the collection auto-provisions it on receive, and the synced vector
+/// becomes searchable there.
+#[test]
+fn pull_delta_syncs_secondary_vectors() {
+    let a = open(&fresh("test_ae_vec_a"));
+    a.create_collection("code".to_string(), "m".to_string(), 4, None, None, None, None).unwrap();
+    node(&a, "N");
+    a.add_vector("N".to_string(), "code".to_string(), vec![1.0, 0.0, 0.0, 0.0]).unwrap();
+
+    let b = open(&fresh("test_ae_vec_b")); // B has no "code" collection
+    b.peers.insert(a.local_peer_id.clone(), SyncPeer {
+        id: a.local_peer_id.clone(), addr: String::new(), last_seen: 0,
+        verifying_key: a.verifying_key.to_bytes().to_vec(),
+    });
+
+    let delta = a.events_since(0);
+    assert!(delta.iter().any(|se| matches!(se.event, Event::Vector(_))),
+        "the pull delta now includes the secondary vector (Event::Vector)");
+
+    b.reconcile_state(delta).unwrap();
+    b.flush_index();
+    let hits: Vec<String> = b.hybrid_search(HybridSearchInput {
+        query_vector: vec![1.0, 0.0, 0.0, 0.0], k: 5, alpha: Some(0.0),
+        lang: None, as_of: None, collection: Some("code".to_string()), ef_search: None,
+    }).unwrap().into_iter().map(|n| n.node.id).collect();
+    assert!(hits.contains(&"N".to_string()),
+        "the secondary vector synced to B (collection auto-provisioned) and is searchable");
+}
+
+/// `compact()` preserves live secondary vectors and writes readable SignedEvent
+/// lines: after compaction + reload-from-WAL (no snapshot), the added vector
+/// survives and stays searchable — secondary embeddings used to be dropped by
+/// compaction, and compact's WAL output used to be unparseable on reload.
+#[test]
+fn compaction_preserves_secondary_vectors() {
+    let path = fresh("test_ae_compact_vec");
+    {
+        let a = open(&path);
+        a.create_collection("code".to_string(), "m".to_string(), 4, None, None, None, None).unwrap();
+        node(&a, "N");
+        a.add_vector("N".to_string(), "code".to_string(), vec![1.0, 0.0, 0.0, 0.0]).unwrap();
+        a.flush_index();
+        a.compact().unwrap();
+    }
+    // Reopen WITHOUT a snapshot → replays the compacted WAL.
+    let a = open(&path);
+    a.flush_index();
+    assert!(a.get_u32("N").is_some(), "node survived compaction + reload");
+    let hits: Vec<String> = a.hybrid_search(HybridSearchInput {
+        query_vector: vec![1.0, 0.0, 0.0, 0.0], k: 5, alpha: Some(0.0),
+        lang: None, as_of: None, collection: Some("code".to_string()), ef_search: None,
+    }).unwrap().into_iter().map(|n| n.node.id).collect();
+    assert!(hits.contains(&"N".to_string()),
+        "secondary vector survived compaction + reload-from-WAL and is searchable");
 }
