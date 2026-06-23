@@ -29,6 +29,7 @@ use uuid::Uuid;
 use crossbeam_channel::{unbounded, bounded, Sender, Receiver};
 
 pub mod query;
+pub mod router;
 use query::HqlCommand;
 
 pub const SCHEMA_VERSION: u32 = 1;

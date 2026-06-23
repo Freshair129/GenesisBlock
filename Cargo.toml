@@ -74,6 +74,8 @@ anyhow = "1.0.102"
 criterion = "0.8.2"
 rand = "0.8"
 tempfile = "3.27.0"
+tower = { version = "0.4", features = ["util"] }
+http-body-util = "0.1"
 
 [[bin]]
 name = "snb-ingestion"
