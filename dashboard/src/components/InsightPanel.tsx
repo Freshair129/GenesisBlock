@@ -1,5 +1,7 @@
-import { Activity, GitMerge, RefreshCcw } from 'lucide-react';
+import { useState } from 'react';
+import { Activity, GitMerge, RefreshCcw, LayoutGrid, Share2 } from 'lucide-react';
 import { useInsight } from '../hooks/useInsight';
+import { CommunityGraph } from './CommunityGraph';
 
 /**
  * GKS Insight panel: community clusters (size / impact / semantic drift) and the
@@ -11,6 +13,7 @@ export function InsightPanel() {
   const { graph, gaps, error, rebuilding, rebuild } = useInsight();
   const clusters = graph?.nodes ?? [];
   const maxMembers = Math.max(1, ...clusters.map((c) => c.member_count));
+  const [view, setView] = useState<'cards' | 'graph'>('cards');
 
   return (
     <div className="bg-surface border border-white/5 p-6 rounded-xl shadow-lg flex flex-col">
@@ -18,14 +21,37 @@ export function InsightPanel() {
         <h2 className="text-lg font-bold text-white flex items-center gap-2">
           <Activity size={18} className="text-accent-blue" /> GKS Insight
         </h2>
-        <button
-          onClick={() => rebuild()}
-          disabled={rebuilding}
-          className="flex items-center space-x-2 px-3 py-1.5 bg-background/50 hover:bg-white/5 rounded-lg text-xs font-medium border border-white/10 transition-colors disabled:opacity-50"
-        >
-          <RefreshCcw size={14} className={rebuilding ? 'animate-spin' : ''} />
-          <span>{rebuilding ? 'Rebuilding…' : 'Rebuild'}</span>
-        </button>
+        <div className="flex items-center gap-2">
+          {/* Cards / force-graph view toggle */}
+          <div className="flex items-center rounded-lg border border-white/10 overflow-hidden">
+            <button
+              onClick={() => setView('cards')}
+              title="Card list"
+              className={`px-2 py-1.5 text-xs transition-colors ${
+                view === 'cards' ? 'bg-white/10 text-white' : 'text-slate-400 hover:bg-white/5'
+              }`}
+            >
+              <LayoutGrid size={14} />
+            </button>
+            <button
+              onClick={() => setView('graph')}
+              title="Force graph"
+              className={`px-2 py-1.5 text-xs transition-colors ${
+                view === 'graph' ? 'bg-white/10 text-white' : 'text-slate-400 hover:bg-white/5'
+              }`}
+            >
+              <Share2 size={14} />
+            </button>
+          </div>
+          <button
+            onClick={() => rebuild()}
+            disabled={rebuilding}
+            className="flex items-center space-x-2 px-3 py-1.5 bg-background/50 hover:bg-white/5 rounded-lg text-xs font-medium border border-white/10 transition-colors disabled:opacity-50"
+          >
+            <RefreshCcw size={14} className={rebuilding ? 'animate-spin' : ''} />
+            <span>{rebuilding ? 'Rebuilding…' : 'Rebuild'}</span>
+          </button>
+        </div>
       </div>
 
       {error && <div className="text-red-400 text-sm mb-3">{error}</div>}
@@ -34,6 +60,13 @@ export function InsightPanel() {
         <div className="text-slate-500 text-sm italic py-4">
           No communities yet — add vectors, then click{' '}
           <span className="text-slate-300">Rebuild</span> to detect clusters.
+        </div>
+      ) : view === 'graph' ? (
+        <div className="space-y-2 mb-5">
+          <h3 className="text-slate-400 text-xs uppercase tracking-wider">
+            Communities ({clusters.length})
+          </h3>
+          <CommunityGraph nodes={clusters} edges={graph?.edges ?? []} gaps={gaps ?? []} />
         </div>
       ) : (
         <div className="space-y-2 mb-5">
