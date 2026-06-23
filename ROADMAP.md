@@ -207,8 +207,11 @@ in a single binary. Nearest comparators: Kuzu, DuckDB+graph, LanceDB, LadybugDB.
   (a ~3.6 GB@1M graph+metadata floor dominates). On disk the **arena** bin IS 4× (SQ8) /
   32× (BQ) exactly; rerank adds a full f32 sidecar (snapshot > f32). **2M blocked** — the
   uncompacted WAL would hit ~40 GB > free disk (see P3 WAL item).
-- [ ] **SQ8/BQ recall on real embeddings:** run [benches/scripts/recall_harness.md](benches/scripts/recall_harness.md)
-  to prove quantization (and f32-rerank) hold recall on real data, not just synthetic. *(compute time, no code)*
+- [x] **SQ8/BQ recall on real embeddings:** **done** 2026-06-24 ([AUDIT--P33 §3.4](docs/AUDIT--P33-RSS-QUANT-MATRIX.md))
+  — real bge-m3 corpus (n=3000, k=10, ef=200). f32 = 0.9875; **SQ8+rerank = 0.9875 (full recovery)**;
+  **BQ alone = 0.6845 (catastrophic — unusable)**; **BQ+rerank = 0.9655** (+0.28, ~5× faster than f32).
+  Guidance: SQ8+rerank for max quality, BQ+rerank for max RAM/speed, never BQ alone.
+  Follow-up: ef-frontier sweep on quant configs + larger real corpus.
 
 ### Priority 2 — Go Public (🟡 กลาง; artifacts shipped in #16, just need the switch)
 - [ ] **Enable GitHub Pages** → publish the P15–P30 benchmark page (Settings → Pages →

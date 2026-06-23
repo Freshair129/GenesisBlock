@@ -1,7 +1,7 @@
 ---
 proposed_id: AUDIT--P33-RSS-QUANT-MATRIX
 type: audit
-status: partial
+status: complete
 aliases:
   - AUDIT
   - P33
@@ -87,6 +87,19 @@ The WAL (`genesis-graph.wal`) is **quant-independent** (2092 MB for every config
 scales linearly — measured **~20.4 GB at 1M**, which drove free disk to **2.1 GB** and
 starved the snapshot save.
 
+### Recall on real embeddings (bge-m3, n=3000, k=10, ef=200)
+
+Generated with `python benches/vbench.py embed` (real bge-m3 vectors over the repo docs,
+exact-L2 ground truth) — *not* the synthetic corpus. Scored by `score_recall.py`.
+
+| quant | rerank | recall@10 | vs f32 | p50 µs |
+|-------|:------:|----------:|-------:|-------:|
+| none  | –      | **0.9875**| —      | 1671   |
+| sq8   | no     | 0.9485    | −0.039 | 1686   |
+| sq8   | **yes**| **0.9875**| **±0** | 1694   |
+| bq    | no     | **0.6845**| **−0.303** | **227** |
+| bq    | **yes**| 0.9655    | −0.022 | 317    |
+
 ## 4. Findings
 
 - **Corrected f32 baseline: 5.75 GB @ 500k**, not the 7.69 GB of the first probe run.
@@ -121,6 +134,14 @@ starved the snapshot save.
   f32 sidecar (`fvec_<name>.bin`, ~409.6 MB @100k) is added on top of the quantized arena,
   so sq8+rerank (516.7 MB) and bq+rerank (431.3 MB) both exceed f32-none (419.3 MB). Rerank
   trades disk *and* RAM for recall; it does not save space.
+- **Recall on real embeddings resolves the quant/rerank tradeoff (the key open question).**
+  Baseline f32 = **0.9875** @ ef 200. **SQ8 + rerank fully recovers f32 recall (0.9875)** at
+  2× RAM / 4× arena-disk — zero quality loss. **BQ alone is catastrophic (0.6845, −0.303)** —
+  exactly the predicted same-sign/different-magnitude collapse, **not usable** for recall-sensitive
+  work. **BQ + rerank rescues it to 0.9655** (+0.281) — viable, and **~5× faster than f32**
+  (317 vs 1671 µs) at 2.9× less RAM. So the rerank RAM/disk cost (above) is *justified*: it is
+  what makes quantization usable. Deployment guidance: **SQ8+rerank** for max quality,
+  **BQ+rerank** for max RAM/speed when ~0.97 recall is acceptable; never **BQ alone**.
 - **⚠ The WAL is the real disk ceiling, and it is unbounded.** `genesis-graph.wal` is
   quant-independent (stores raw input embeddings) and **never compacted** in this path:
   ~2.1 GB @100k, **~20.4 GB @1M** — 5× the f32 snapshot, 51× the BQ snapshot. At 1M it drove
@@ -153,10 +174,9 @@ starved the snapshot save.
 - **⚠ WAL compaction / rotation** — the headline ops finding. At 1M the uncompacted WAL
   is ~20 GB and starves the snapshot save. This belongs on the roadmap as a production
   hardening item (MARK XV P3), ahead of any further vector/on-disk work.
-- **Recall is NOT measured here.** BQ's RAM/latency/disk wins are meaningless until its
-  recall is measured on real embeddings — same-sign/different-magnitude vectors
-  collapse under BQ without rerank. This is the remaining P1 half
-  ([recall harness runbook](../benches/scripts/recall_harness.md)).
+- ~~Recall on real embeddings~~ **DONE** (§3.4) — SQ8+rerank = f32; BQ needs rerank.
+  Follow-up: a recall–latency *frontier* (sweep ef on the quant configs), and a larger real
+  corpus (this used n=3000 from the repo docs).
 - **The non-vector RAM floor (~3.6 GB @1M) is the next RAM target** — graph-link and
   metadata compaction would beat further vector quantization. MARK XV P4 reframed
   accordingly.
