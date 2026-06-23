@@ -1788,12 +1788,18 @@ impl Storage {
         // f32-sidecar rerank: replace each candidate's quantized distance with the
         // exact f32 distance, re-sort ascending, and keep the best k*2 for the
         // hybrid blend below. The arena_id (d_id) indexes the sidecar at d_id*dim.
+        // A candidate the sidecar is missing keeps its quantized distance, so an
+        // absent/truncated `fvec_<name>.bin` degrades to quantized-only search
+        // rather than silently dropping every hit (it would otherwise return empty).
         if let Some(sidecar) = &coll.f32_sidecar {
             let sc = sidecar.read();
             let dim = coll.dim as usize;
-            results = results.into_iter().filter_map(|(d_id, _)| {
+            results = results.into_iter().map(|(d_id, qd)| {
                 let start = d_id * dim;
-                sc.get(start..start + dim).map(|v| (d_id, exact_l2(&query_f32, v)))
+                match sc.get(start..start + dim) {
+                    Some(v) => (d_id, exact_l2(&query_f32, v)),
+                    None => (d_id, qd),
+                }
             }).collect();
             results.sort_by(|a, b| a.1.partial_cmp(&b.1).unwrap_or(std::cmp::Ordering::Equal));
             results.truncate(k2);
@@ -2581,10 +2587,16 @@ impl Storage {
                 }
                 // Rerank sidecar: exact f32 vectors, parallel to the arena. Only
                 // present when the collection opted into rerank (and is quantized).
+                // Only adopt a sidecar that parallels the arena exactly — a missing
+                // or truncated fvec is left empty so search degrades to quantized
+                // (the query path falls back per-candidate), never to empty results.
                 if let Some(sidecar) = &coll.f32_sidecar {
                     if let Ok(data) = fs::read(self.path.join(format!("fvec_{}.bin", name))) {
-                        *sidecar.write() = data.chunks_exact(4)
+                        let v: Vec<f32> = data.chunks_exact(4)
                             .map(|c| f32::from_le_bytes(c.try_into().unwrap())).collect();
+                        if v.len() == coll.arena.read().len() {
+                            *sidecar.write() = v;
+                        }
                     }
                 }
                 if let Ok(data) = fs::read(self.path.join(format!("meta_{}.bin", name))) {
