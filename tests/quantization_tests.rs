@@ -55,7 +55,7 @@ fn seed(s: &Storage, coll: &str) {
 #[test]
 fn sq8_finds_exact_match() {
     let s = open(&fresh("test_q_sq8_exact"));
-    s.create_collection("sq8c".into(), "m".into(), 4, Some("Cosine".into()), Some("sq8".into()), None).unwrap();
+    s.create_collection("sq8c".into(), "m".into(), 4, Some("Cosine".into()), Some("sq8".into()), None, None).unwrap();
     seed(&s, "sq8c");
     assert_eq!(top1(&s, vec![1.0, 0.0, 0.0, 0.0], "sq8c").as_deref(), Some("A"));
     assert_eq!(top1(&s, vec![0.0, 0.0, 1.0, 0.0], "sq8c").as_deref(), Some("C"));
@@ -66,7 +66,7 @@ fn sq8_finds_exact_match() {
 #[test]
 fn none_finds_exact_match() {
     let s = open(&fresh("test_q_none_exact"));
-    s.create_collection("f32c".into(), "m".into(), 4, Some("Cosine".into()), None, None).unwrap();
+    s.create_collection("f32c".into(), "m".into(), 4, Some("Cosine".into()), None, None, None).unwrap();
     seed(&s, "f32c");
     assert_eq!(top1(&s, vec![1.0, 0.0, 0.0, 0.0], "f32c").as_deref(), Some("A"));
 }
@@ -78,7 +78,7 @@ fn sq8_survives_reload() {
     let path = fresh("test_q_sq8_reload");
     {
         let s = open(&path);
-        s.create_collection("sq8c".into(), "m".into(), 4, Some("Cosine".into()), Some("sq8".into()), None).unwrap();
+        s.create_collection("sq8c".into(), "m".into(), 4, Some("Cosine".into()), Some("sq8".into()), None, None).unwrap();
         seed(&s, "sq8c");
         assert_eq!(top1(&s, vec![1.0, 0.0, 0.0, 0.0], "sq8c").as_deref(), Some("A"));
         s.save_state().unwrap();
@@ -95,8 +95,8 @@ fn sq8_disk_is_quarter_of_f32() {
     let path = fresh("test_q_disk_width");
     {
         let s = open(&path);
-        s.create_collection("f32c".into(), "m".into(), 4, Some("Cosine".into()), None, None).unwrap();
-        s.create_collection("sq8c".into(), "m".into(), 4, Some("Cosine".into()), Some("sq8".into()), None).unwrap();
+        s.create_collection("f32c".into(), "m".into(), 4, Some("Cosine".into()), None, None, None).unwrap();
+        s.create_collection("sq8c".into(), "m".into(), 4, Some("Cosine".into()), Some("sq8".into()), None, None).unwrap();
         seed(&s, "f32c");
         seed(&s, "sq8c");
         s.flush_index();
