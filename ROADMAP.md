@@ -10,9 +10,10 @@ in a single binary. Nearest comparators: Kuzu, DuckDB+graph, LanceDB, LadybugDB.
 - **Benchmark Credibility:** 8/8 named competitors measured (P15–P30). Vector vs
   Chroma/Qdrant/LanceDB; graph vs Neo4j/Kuzu/DuckDB+graph/RocksDB+graph/LadybugDB.
   hop1 p50 = 21.6 µs; LadybugDB (closest on-niche competitor) = 3,637 µs (**168×**).
-- **Production Readiness:** advanced prototype. Suite green: 23 binaries,
-  49 cargo tests / 7 npm tests pass. Open: `retract_edge` stub, gossip
-  anti-entropy, per-query `ef_search`, GKS Dashboard.
+- **Production Readiness:** advanced prototype. Suite green: 34 test binaries /
+  7 npm tests pass. MARK XIV closed all prior correctness stubs (`retract_edge`,
+  gossip anti-entropy + `Event::Vector` sync + ordered Merkle, per-query &
+  per-collection `ef_search`, GKS Dashboard + force-graph, SQ8/BQ + rerank).
 - **Core Architecture:** Neural Bridge, LPA Clustering, Merkle Sync,
   Logic-Gated Context, Consensus Protocol + ed25519 vote signatures (PR #6).
 - **Temporal Engine:** Bitemporal Querying, Event Sourcing, Vector Drift Tracking, TTL.
@@ -104,9 +105,16 @@ in a single binary. Nearest comparators: Kuzu, DuckDB+graph, LanceDB, LadybugDB.
 
 ---
 
-## MARK XIV: Market Credibility & Scale Ceiling (Proposed)
+## MARK XIV: Market Credibility & Scale Ceiling (COMPLETED 2026-06-23)
 
 > **Theme:** Convert benchmark wins into market presence; push RAM ceiling beyond 1M nodes; close remaining correctness stubs.
+>
+> **Status:** all code items closed. P1 scale ceiling measured + node-id interning/quant
+> shipped; P2 DX/positioning shipped; P3 per-collection `ef_search`; P4 f32-rerank +
+> force-graph viz; P5 `Event::Vector` sync + ordered Merkle. Remaining items are
+> compute/ops only: RSS probe 500k–2M ([runbook](benches/scripts/rss_probe.md)),
+> SQ8/BQ recall on real data ([runbook](benches/scripts/recall_harness.md)), and enabling
+> GitHub Pages for the published benchmark page.
 
 ### Priority 1 — Scale Ceiling (🔴 สูงมาก)
 - [x] **Recall@500k sweep:** **done** 2026-06-23. Reproduced the regression at the global
@@ -136,33 +144,47 @@ in a single binary. Nearest comparators: Kuzu, DuckDB+graph, LanceDB, LadybugDB.
   unless `include_invalid`; exposed at REST `/v1/edge/retract`. History preserved for time-travel.
 - [x] **`LogicalPlanner` dead code removal:** **done** 2026-06-23 — removed the unused
   `LogicalPlanner`/`QueryPlan`/`PlanStep` from `src/query/mod.rs` (`execute_hql` dispatches directly).
-- [~] **Per-query / per-collection `ef_search`:** per-query override **shipped** 2026-06-23
-  (`HybridSearchInput.ef_search: Option<u32>`, falls back to the global). Per-collection default
-  still open.
+- [x] **Per-query / per-collection `ef_search`:** **done** 2026-06-23 — per-query override
+  (`HybridSearchInput.ef_search: Option<u32>`) plus a **per-collection default**
+  (`create_collection(..., ef_search)`, persisted in the manifest). Resolution: per-query →
+  per-collection → engine-global (PR #20). Motivated by the Recall@500k frontier
+  ([AUDIT--P32](docs/AUDIT--P32-RECALL-500K-FRONTIER.md)): a single global ef can't serve
+  100k (recall 0.982) and 500k (0.887) at once.
 
 ### Priority 4 — Vector Quality (🟢 ต่ำ)
 - [x] **Scalar / binary quantization:** **SQ8 + BQ shipped** 2026-06-23. SQ8 (full
   resident cut — arena+HNSW u8, 4× RAM *and* disk). **BQ (binary)**: 1 sign bit/dim packed
   into u64 words + custom popcount `DistBinaryHamming` HNSW (anndists' u64 `DistHamming` is
-  word-inequality), ~32× vector RAM/disk. Symmetric, no-rerank first cut (matching SQ8); an
-  f32-sidecar rerank stage is a future lever. Create with `quant: "bq"`.
-  [ADR](docs/adr/ADR--GENESISDB-VECTOR-QUANTIZATION.md). Recall harness on real data pending.
+  word-inequality), ~32× vector RAM/disk. Create with `quant: "bq"`.
+  [ADR](docs/adr/ADR--GENESISDB-VECTOR-QUANTIZATION.md).
+  **f32-sidecar rerank shipped** 2026-06-23 (PR #21): a quantized collection created with
+  `rerank: true` keeps the exact f32 vectors in a `fvec_<name>.bin` sidecar, over-fetches
+  quantized candidates, and re-scores them exactly — recovers recall (especially BQ, where
+  same-sign vectors of different magnitude collapse to identical codes). Recall harness on
+  real data still pending ([runbook](benches/scripts/recall_harness.md)).
 - [x] **GKS Insight Dashboard** *(carried from MARK XI Step 4)*: **shipped** 2026-06-23.
   New read-only REST `GET /v1/insight/communities` (meta-graph SuperNodes + MetaEdges) and
   `GET /v1/insight/gaps` (structural gaps), plus `POST /v1/insight/rebuild` (recompute via
   `detect_communities`+`generate_meta_graph`). The dashboard's placeholder is replaced by an
   `InsightPanel` (community cards with size/impact/drift bars + structural-gap list + Rebuild),
-  `useInsight` hook, `api` methods. `dashboard` `tsc -b && vite build` green. *(Force-graph
-  cluster viz is a future enhancement; this ships the data + a working panel.)*
+  `useInsight` hook, `api` methods. `dashboard` `tsc -b && vite build` green.
+  **Force-graph cluster viz shipped** 2026-06-23 (PR #22): a `CommunityGraph` (react-force-graph-2d)
+  toggleable with the card list — SuperNodes sized by member count, tinted by drift; MetaEdges
+  weighted; structural gaps overlaid as dashed links.
 
 ### Priority 5 — Distributed (🟢 ต่ำ; C-3 own session)
 - [x] **Gossip `PullRequest` anti-entropy:** **shipped** 2026-06-23 — the PullRequest
   handler (was a `// TODO`) now replies with `events_since(from_clock)` (signed WAL events
   newer than the requester's clock, sorted by logical time, bounded to one UDP datagram).
   Peers apply via `reconcile_state` (LWW) and converge graph state over rounds; NAPI
-  `events_since`. `tests/anti_entropy_tests.rs`. *(Note: exact Merkle convergence needs
-  ordered/version-vector digests — pre-existing limitation; `Event::Vector` secondary
-  embeddings not yet in deltas.)*
+  `events_since`. `tests/anti_entropy_tests.rs`.
+- [x] **`Event::Vector` secondary embeddings in deltas:** **done** 2026-06-23 (PR #23) —
+  `VectorEvent` gained a logical clock, so `events_since` now includes secondary
+  embeddings; a peer auto-provisions the collection on receive. `compact()` preserves them
+  and now writes readable `SignedEvent` lines (latent-bug fix).
+- [x] **Exact Merkle convergence:** **done** 2026-06-23 (PR #24) — `get_merkle_root` is now an
+  order-independent digest of the graph state (nodes + edges by id + clock + validity),
+  so peers at the same state share a root regardless of WAL write order.
 
 ---
 
