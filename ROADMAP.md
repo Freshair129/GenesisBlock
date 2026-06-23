@@ -129,14 +129,14 @@ in a single binary. Nearest comparators: Kuzu, DuckDB+graph, LanceDB, LadybugDB.
   still pending a probe run.
 
 ### Priority 2 — Market Evidence (🟡 กลาง)
-- [ ] **Public benchmark page:** publish P15–P30 results as a standalone page
-  (HTML or hosted). Competitor-specific tables with honest caveats already written.
-  *(1 day — content exists)*
-- [ ] **TypeScript type definitions + quickstart:** `npm install genesis-block`
-  with full TS types and a working "5-minute" example. NAPI moat is locked behind
-  poor DX without this. *(3–5 days)*
-- [ ] **Competitive positioning copy:** update README + docs/landing to lead with
-  "verifiable agent memory" narrative and MASTER tier benchmark. *(1 day)*
+- [x] **Public benchmark page:** **artifact shipped** 2026-06-23 (PR #16) — `docs/index.html`
+  landing + `.github/workflows/pages.yml`. Publishing is the only remaining step and is **ops,
+  not code**: enable Settings → Pages → Source = GitHub Actions. *(carried to MARK XV P2)*
+- [x] **TypeScript type definitions + quickstart:** **done** 2026-06-23 (PR #16) —
+  `package.json` `exports`/`files`, generated `index.d.ts`, and `QUICKSTART.md`
+  (Node-embed 5-minute example). npm publish of `genesis-block` not yet run *(carried to MARK XV P2)*.
+- [x] **Competitive positioning copy:** **done** 2026-06-23 (PR #16) — `docs/POSITIONING.md`
+  + README links leading with the "verifiable agent memory" narrative.
 
 ### Priority 3 — Correctness & Technical Debt (🟡 กลาง)
 - [x] **`retract_edge` implementation:** **done** 2026-06-23 — bitemporal soft-delete
@@ -188,6 +188,58 @@ in a single binary. Nearest comparators: Kuzu, DuckDB+graph, LanceDB, LadybugDB.
 
 ---
 
+## MARK XV: Validation, Publication & Production Credibility (ACTIVE 2026-06-23)
+
+> **Theme:** MARK XIV made the engine code-complete. MARK XV proves the claims on real
+> data, ships them to the public, and closes the "advanced prototype → production" gap.
+> No new engine features lead this milestone — it is about *evidence, adoption, and durability*.
+>
+> **Status:** ACTIVE — accepted 2026-06-23. P1 inherits the three compute/ops
+> follow-ups that MARK XIV could not run in-session (runbooks already written).
+> **Sequencing:** P1 (validate) → P2 (publish, gated on P1 numbers) → P3 (hardening,
+> parallelizable) → P4 (only if the P1 probe shows a real ceiling).
+
+### Priority 1 — Validate the Claims (🔴 สูงมาก; compute, runbooks exist)
+- [~] **RSS + disk probe 100k–1M:** **done through 1M** 2026-06-24
+  ([AUDIT--P33](docs/AUDIT--P33-RSS-QUANT-MATRIX.md)) — required harness fixes (corpus
+  now streamed from disk; quant path; WAL-isolated disk). f32 RSS@1M = **11.4 GB** (fits
+  32 GB), SQ8 **2.06×** / BQ **2.93×** smaller — *total* RSS, not the per-vector 4×/32×
+  (a ~3.6 GB@1M graph+metadata floor dominates). On disk the **arena** bin IS 4× (SQ8) /
+  32× (BQ) exactly; rerank adds a full f32 sidecar (snapshot > f32). **2M blocked** — the
+  uncompacted WAL would hit ~40 GB > free disk (see P3 WAL item).
+- [ ] **SQ8/BQ recall on real embeddings:** run [benches/scripts/recall_harness.md](benches/scripts/recall_harness.md)
+  to prove quantization (and f32-rerank) hold recall on real data, not just synthetic. *(compute time, no code)*
+
+### Priority 2 — Go Public (🟡 กลาง; artifacts shipped in #16, just need the switch)
+- [ ] **Enable GitHub Pages** → publish the P15–P30 benchmark page (Settings → Pages →
+  Source = GitHub Actions). *(ops, ~5 min — depends on P1 numbers being final)*
+- [ ] **npm publish `genesis-block`:** first real external install path. TS defs + quickstart
+  already exist (#16); verify the 5-minute QUICKSTART end-to-end on a clean machine first. *(1 day)*
+
+### Priority 3 — Production Hardening (🟡 กลาง; the "prototype → production" gap)
+- [ ] **⚠ WAL compaction / rotation (evidence-backed, [AUDIT--P33](docs/AUDIT--P33-RSS-QUANT-MATRIX.md)):**
+  `genesis-graph.wal` is never compacted and stores raw embeddings — **~20 GB at 1M nodes**,
+  which starved the snapshot save and nearly filled a 233 GB disk. This is the real disk
+  ceiling (dwarfs the snapshot 5–51×) and blocks the 2M probe. Highest-priority P3 item:
+  compact the WAL on snapshot / rotate it / drop applied entries.
+- [ ] **Crash-recovery test suite:** WAL-replay correctness under `kill -9` mid-write
+  (durability is asserted but not adversarially tested).
+- [ ] **Observability endpoint:** expose `index_lag`, RSS, query p50/p95 via REST for the
+  dashboard (today `index_lag()` exists but isn't surfaced operationally).
+- [ ] **Async-HNSW backpressure:** bound/flow-control the indexing queue under sustained
+  ingest so the backlog can't grow unbounded.
+
+### Priority 4 — Scale Ceiling Round 2 (🟢 ต่ำ; gated on P1 probe)
+- [ ] **Graph + metadata RAM compaction (reframed by [AUDIT--P33](docs/AUDIT--P33-RSS-QUANT-MATRIX.md)):**
+  P33 shows a **~1.8 GB non-vector floor** (HNSW links + node/edge metadata + interning maps)
+  dominates RSS once vectors are quantized — so further *vector* compression / on-disk vectors
+  hit diminishing returns. The higher-leverage target is the graph/metadata floor itself.
+- [ ] **On-disk vector strategy beyond RAM:** only if the 1M/2M probe shows a wall.
+  `memmap2` was declined; explore alternatives (BQ f32-sidecar already on disk).
+  *Lower priority than the graph floor per P33.*
+
+---
+
 ## MARK XVI: Mobile SDK & Embedded App (Phase 0 COMPLETE 2026-06-29 — PR #37, v0.2.0)
 
 > **Theme:** GenesisBlockDB as a first-class embedded mobile engine — local-first,
@@ -223,6 +275,15 @@ in a single binary. Nearest comparators: Kuzu, DuckDB+graph, LanceDB, LadybugDB.
 - [ ] **Android `.aar` + Kotlin wrapper:** JNI bridge (`src/jni.rs`); `class GenesisDB` with coroutines API; distributed via Maven/Gradle
 - [ ] **React Native package (`react-native-genesisdb`):** native module wrapping iOS xcframework + Android `.aar`; TypeScript types mirror `index.d.ts`; distributed via npm
 - [ ] **Flutter plugin:** deferred — `flutter_rust_bridge` auto-generated Dart bindings; added when user demand confirmed
+---
+
+## Roadmap Changes This Update (2026-06-23)
+
+| Change | Detail |
+|---|---|
+| MARK XIV P2 reconciled | The 3 Priority-2 items were stale `[ ]` while the status header claimed them shipped. TS defs + quickstart and positioning copy **done** (PR #16); public benchmark page **artifact shipped** (#16), publishing carried to MARK XV as an ops step. |
+| MARK XIV → **fully closed** | All code items merged to `main` (`1c030b9`). Only compute/ops follow-ups remained, now relocated to MARK XV P1/P2 so they aren't lost. |
+| MARK XV **accepted (ACTIVE)** | New milestone: *Validation, Publication & Production Credibility* — 8 items in 4 buckets. No engine features lead; focus is evidence + adoption + durability. Sequencing locked: P1 validate → P2 publish (gated) → P3 harden → P4 (conditional). |
 
 ---
 
