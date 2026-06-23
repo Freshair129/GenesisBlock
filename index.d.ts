@@ -139,6 +139,8 @@ export interface CollectionInfo {
   count: number
   /** Per-collection default HNSW `ef_search`. `None` ⇒ uses the engine-global default. */
   efSearch?: number
+  /** Whether this (quantized) collection keeps an f32 sidecar for exact rerank. */
+  rerank: boolean
 }
 export interface SyncPeer {
   id: string
@@ -191,7 +193,7 @@ export declare class GenesisDatabase {
   neighbors(seed: string, args: NeighborInput): Promise<Array<NeighborOutput>>
   saveState(): Promise<void>
   compact(): Promise<void>
-  createCollection(name: string, model: string, dim: number, metric?: string | undefined | null, quant?: string | undefined | null, efSearch?: number | undefined | null): Promise<void>
+  createCollection(name: string, model: string, dim: number, metric?: string | undefined | null, quant?: string | undefined | null, efSearch?: number | undefined | null, rerank?: boolean | undefined | null): Promise<void>
   listCollections(): Array<CollectionInfo>
   addVector(nodeId: string, collection: string, embedding: Array<number>): Promise<void>
   flushIndex(): Promise<void>

@@ -232,6 +232,8 @@ pub struct CollectionInfo {
     pub count: u32,
     /// Per-collection default HNSW `ef_search`. `None` ⇒ uses the engine-global default.
     pub ef_search: Option<u32>,
+    /// Whether this (quantized) collection keeps an f32 sidecar for exact rerank.
+    pub rerank: bool,
 }
 
 #[napi(object)]
@@ -414,10 +416,14 @@ impl Metric {
 /// Per-collection vector quantization (ADR--GENESISDB-VECTOR-QUANTIZATION).
 /// `None` keeps lossless f32 end-to-end — byte-identical to pre-quant DBs.
 /// `ScalarU8` (SQ8) stores BOTH the resident arena and the HNSW as u8 (the
-/// "full resident cut", ~4× vector RAM); symmetric quant, no rerank.
+/// "full resident cut", ~4× vector RAM); symmetric quant.
 /// `Binary` (BQ) packs each dim to one sign bit (u64 words) with a popcount-
-/// Hamming HNSW — ~32× vector RAM, lossy. This cut is symmetric with no rerank
-/// (matching SQ8's first cut); an f32-sidecar rerank stage is a future lever.
+/// Hamming HNSW — ~32× vector RAM, lossy.
+/// Either quantized mode may opt into an **f32-sidecar rerank** (per-collection
+/// `rerank` flag): the exact f32 vectors are kept in a `fvec_<name>.bin` sidecar
+/// and used to re-score an over-fetched candidate set, recovering recall lost to
+/// quantization (ADR--GENESISDB-VECTOR-QUANTIZATION). `None` collections never
+/// allocate a sidecar — the arena is already exact f32.
 #[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub enum Quant { None, ScalarU8, Binary }
 
@@ -467,6 +473,20 @@ fn bq_pack(emb: &[f32]) -> Vec<u64> {
 #[inline]
 fn bq_unpack(words: &[u64], dim: usize) -> Vec<f32> {
     (0..dim).map(|i| if words[i >> 6] & (1u64 << (i & 63)) != 0 { 1.0 } else { -1.0 }).collect()
+}
+
+/// Default over-fetch multiplier for f32-sidecar rerank: pull `k * this` quantized
+/// candidates from the HNSW, then re-score them exactly and keep the best `k*2`.
+/// Bigger = better recall, more f32 distance work. BQ (1 bit/dim) benefits most.
+const RERANK_OVERFETCH: usize = 8;
+
+/// Exact Euclidean distance between two prepared f32 vectors. Used by the rerank
+/// stage; reuses the same geometry as the F32 HNSW (`DistL2`). For Cosine
+/// collections both the query and the sidecar vector are unit-normalized, so this
+/// ranks by cosine (L2 on the unit sphere is monotonic in 1-cos). Exact match ⇒ 0.
+#[inline]
+fn exact_l2(a: &[f32], b: &[f32]) -> f32 {
+    a.iter().zip(b).map(|(x, y)| { let d = x - y; d * d }).sum::<f32>().sqrt()
 }
 
 /// Bit-Hamming distance over BQ-packed u64 codes. anndists' `DistHamming<u64>`
@@ -663,12 +683,26 @@ pub struct VectorCollection {
     /// `None` ⇒ fall back to the engine-global default. Resolution order in
     /// `hybrid_search`: per-query override → this → engine-global.
     pub ef_search: Option<u32>,
+    /// Optional exact-f32 sidecar for rerank: a flat `Vec<f32>` parallel to the
+    /// quantized arena (vector at arena_id `i` occupies `[i*dim .. (i+1)*dim]`,
+    /// i.e. the same `embedding_offset` units as the arena). `Some` only for a
+    /// quantized collection created with `rerank = true`; `None` collections and
+    /// non-rerank quantized collections leave it `None`. Persisted as
+    /// `fvec_<name>.bin`.
+    pub f32_sidecar: Option<RwLock<Vec<f32>>>,
 }
 
 impl VectorCollection {
-    fn new(name: String, model: String, dim: u16, metric: Metric, quant: Quant, ef_search: Option<u32>) -> Self {
+    fn new(name: String, model: String, dim: u16, metric: Metric, quant: Quant, ef_search: Option<u32>, rerank: bool) -> Self {
+        // Rerank only makes sense for a lossy (quantized) arena; a `None`
+        // collection already stores exact f32, so never allocate a sidecar there.
+        let f32_sidecar = if rerank && quant != Quant::None {
+            Some(RwLock::new(Vec::new()))
+        } else {
+            None
+        };
         Self {
-            name, model, dim, metric, quant, ef_search,
+            name, model, dim, metric, quant, ef_search, f32_sidecar,
             arena: RwLock::new(ArenaStore::new(quant, dim as usize)),
             metadata: RwLock::new(Vec::new()),
             hnsw: RwLock::new(None),
@@ -715,6 +749,12 @@ impl VectorCollection {
             let mut arena = self.arena.write();
             let off = arena.len();
             arena.push_f32(emb);
+            // Rerank sidecar: keep the exact f32 in lock-step with the arena.
+            // Same offset units (components), so `embedding_offset` indexes both.
+            // Lock order is meta → arena → sidecar everywhere (stage / compaction).
+            if let Some(sidecar) = &self.f32_sidecar {
+                sidecar.write().extend_from_slice(emb);
+            }
             let arena_id = meta.len() as u32;
             meta.push(NodeMetadata {
                 arena_id, node_u32, timestamp: Utc::now().timestamp() as u64,
@@ -754,6 +794,7 @@ impl VectorCollection {
             quant: self.quant.as_str().to_string(),
             count: self.count.load(Ordering::Relaxed) as u32,
             ef_search: self.ef_search,
+            rerank: self.f32_sidecar.is_some(),
         }
     }
 }
@@ -926,14 +967,14 @@ impl Storage {
 
     /// Create an isolated vector collection. Idempotent-erroring: fails if a
     /// collection with this name already exists.
-    pub fn create_collection(&self, name: String, model: String, dim: u32, metric: Option<String>, quant: Option<String>, ef_search: Option<u32>) -> Result<()> {
+    pub fn create_collection(&self, name: String, model: String, dim: u32, metric: Option<String>, quant: Option<String>, ef_search: Option<u32>, rerank: Option<bool>) -> Result<()> {
         self.ensure_writable()?;
         if self.collections.contains_key(&name) {
             return Err(Error::from_reason(format!("collection '{}' already exists", name)));
         }
         let m = metric.as_deref().map(Metric::parse).unwrap_or(Metric::L2);
         let q = quant.as_deref().map(Quant::parse).unwrap_or(Quant::None);
-        self.collections.insert(name.clone(), Arc::new(VectorCollection::new(name, model, dim as u16, m, q, ef_search)));
+        self.collections.insert(name.clone(), Arc::new(VectorCollection::new(name, model, dim as u16, m, q, ef_search, rerank.unwrap_or(false))));
         Ok(())
     }
 
@@ -1030,7 +1071,7 @@ impl Storage {
         if !self.collections.contains_key(&name) {
             self.collections.insert(
                 name.clone(),
-                Arc::new(VectorCollection::new(name.clone(), "recovered".to_string(), emb.len() as u16, Metric::L2, Quant::None, None)),
+                Arc::new(VectorCollection::new(name.clone(), "recovered".to_string(), emb.len() as u16, Metric::L2, Quant::None, None, false)),
             );
         }
         if let Ok(coll) = self.resolve_collection(&Some(name)) {
@@ -1140,7 +1181,7 @@ impl Storage {
         let collections: DashMap<String, Arc<VectorCollection>> = DashMap::new();
         collections.insert(
             "default".to_string(),
-            Arc::new(VectorCollection::new("default".to_string(), "default".to_string(), vector_dim, Metric::L2, Quant::None, None)),
+            Arc::new(VectorCollection::new("default".to_string(), "default".to_string(), vector_dim, Metric::L2, Quant::None, None, false)),
         );
 
         let storage = Self {
@@ -1731,13 +1772,38 @@ impl Storage {
         let ef = args.ef_search.map(|e| e as usize)
             .or_else(|| coll.ef_search.map(|e| e as usize))
             .unwrap_or_else(|| self.ef_search.load(Ordering::Relaxed));
-        let results = {
+        // Over-fetch more quantized candidates when a rerank sidecar is present, so
+        // the exact re-score has a wider pool to recover recall from.
+        let k2 = (args.k * 2) as usize;
+        let fetch = if coll.f32_sidecar.is_some() {
+            (args.k as usize).saturating_mul(RERANK_OVERFETCH).max(k2)
+        } else { k2 };
+        let mut results = {
             let hnsw_lock = coll.hnsw.read();
             match &*hnsw_lock {
-                Some(idx) => idx.search_f32(&query_f32, (args.k * 2) as usize, ef),
+                Some(idx) => idx.search_f32(&query_f32, fetch, ef),
                 None => return Err(Error::from_reason("HNSW not init")),
             }
         };
+        // f32-sidecar rerank: replace each candidate's quantized distance with the
+        // exact f32 distance, re-sort ascending, and keep the best k*2 for the
+        // hybrid blend below. The arena_id (d_id) indexes the sidecar at d_id*dim.
+        // A candidate the sidecar is missing keeps its quantized distance, so an
+        // absent/truncated `fvec_<name>.bin` degrades to quantized-only search
+        // rather than silently dropping every hit (it would otherwise return empty).
+        if let Some(sidecar) = &coll.f32_sidecar {
+            let sc = sidecar.read();
+            let dim = coll.dim as usize;
+            results = results.into_iter().map(|(d_id, qd)| {
+                let start = d_id * dim;
+                match sc.get(start..start + dim) {
+                    Some(v) => (d_id, exact_l2(&query_f32, v)),
+                    None => (d_id, qd),
+                }
+            }).collect();
+            results.sort_by(|a, b| a.1.partial_cmp(&b.1).unwrap_or(std::cmp::Ordering::Equal));
+            results.truncate(k2);
+        }
         let mut hybrid_results = Vec::new();
         let meta_arena = coll.metadata.read();
         let alpha = args.alpha.unwrap_or(0.5);
@@ -2432,11 +2498,20 @@ impl Storage {
             let meta = coll.metadata.read();
             let meta_data = bincode::serialize(&*meta).map_err(|e| Error::from_reason(e.to_string()))?;
             fs::write(temp_dir.join(format!("meta_{}.bin", coll.name)), meta_data).map_err(|e| Error::from_reason(e.to_string()))?;
+            // Rerank sidecar (exact f32) — only when the collection carries one.
+            if let Some(sidecar) = &coll.f32_sidecar {
+                let s = sidecar.read();
+                let bytes: Vec<u8> = s.iter().flat_map(|f| f.to_le_bytes()).collect();
+                fs::write(temp_dir.join(format!("fvec_{}.bin", coll.name)), bytes)
+                    .map_err(|e| Error::from_reason(e.to_string()))?;
+            }
             manifest.push(serde_json::json!({
                 "name": coll.name, "model": coll.model, "dim": coll.dim,
                 "metric": coll.metric.as_str(), "quant": coll.quant.as_str(),
                 // Per-collection default ef_search; absent ⇒ None (engine-global).
                 "ef_search": coll.ef_search,
+                // f32-sidecar rerank; absent ⇒ false (no sidecar loaded).
+                "rerank": coll.f32_sidecar.is_some(),
                 // meta format version: 1 = NodeMetadata.node_u32 (A2). Absent ⇒ 0
                 // (pre-A2 String layout), migrated on load.
                 "mv": 1
@@ -2505,9 +2580,24 @@ impl Storage {
                 let metric = Metric::parse(cm["metric"].as_str().unwrap_or("L2"));
                 let quant = Quant::parse(cm["quant"].as_str().unwrap_or("none"));
                 let ef_search = cm["ef_search"].as_u64().map(|e| e as u32);
-                let coll = VectorCollection::new(name.clone(), model, dim, metric, quant, ef_search);
+                let rerank = cm["rerank"].as_bool().unwrap_or(false);
+                let coll = VectorCollection::new(name.clone(), model, dim, metric, quant, ef_search, rerank);
                 if let Ok(data) = fs::read(self.path.join(format!("vec_{}.bin", name))) {
                     *coll.arena.write() = ArenaStore::from_bytes(&data, quant, dim as usize);
+                }
+                // Rerank sidecar: exact f32 vectors, parallel to the arena. Only
+                // present when the collection opted into rerank (and is quantized).
+                // Only adopt a sidecar that parallels the arena exactly — a missing
+                // or truncated fvec is left empty so search degrades to quantized
+                // (the query path falls back per-candidate), never to empty results.
+                if let Some(sidecar) = &coll.f32_sidecar {
+                    if let Ok(data) = fs::read(self.path.join(format!("fvec_{}.bin", name))) {
+                        let v: Vec<f32> = data.chunks_exact(4)
+                            .map(|c| f32::from_le_bytes(c.try_into().unwrap())).collect();
+                        if v.len() == coll.arena.read().len() {
+                            *sidecar.write() = v;
+                        }
+                    }
                 }
                 if let Ok(data) = fs::read(self.path.join(format!("meta_{}.bin", name))) {
                     if cm["mv"].as_u64().unwrap_or(0) >= 1 {
@@ -2526,7 +2616,7 @@ impl Storage {
         } else if let Ok(data) = fs::read(self.path.join("vector.bin")) {
             // Legacy single-space DB -> wrap as the `default` collection.
             let dim = state_val["vector_dim"].as_u64().unwrap_or(1536) as u16;
-            let coll = VectorCollection::new("default".to_string(), "default".to_string(), dim, Metric::L2, Quant::None, None);
+            let coll = VectorCollection::new("default".to_string(), "default".to_string(), dim, Metric::L2, Quant::None, None, false);
             *coll.arena.write() = ArenaStore::from_bytes(&data, Quant::None, dim as usize);
             if let Ok(md) = fs::read(self.path.join("meta.bin")) {
                 // Legacy single-space snapshots always predate A2 (String layout).
@@ -2543,7 +2633,7 @@ impl Storage {
         if !self.collections.contains_key(&self.default_collection) {
             self.collections.insert(
                 self.default_collection.clone(),
-                Arc::new(VectorCollection::new(self.default_collection.clone(), "default".to_string(), 1536, Metric::L2, Quant::None, None)),
+                Arc::new(VectorCollection::new(self.default_collection.clone(), "default".to_string(), 1536, Metric::L2, Quant::None, None, false)),
             );
         }
 
@@ -2753,9 +2843,14 @@ impl Storage {
             let coll = c.value();
             let mut meta_arena = coll.metadata.write();
             let mut vec_arena = coll.arena.write();
+            // Rerank sidecar is compacted in lock-step (lock order: meta → arena
+            // → sidecar). It uses the same `embedding_offset`/`len` component units
+            // as the arena, so its slices move identically.
+            let mut sidecar_guard = coll.f32_sidecar.as_ref().map(|s| s.write());
 
             let mut new_meta = Vec::with_capacity(live_nodes.len());
             let mut new_vec = ArenaStore::new(coll.quant, coll.dim as usize);
+            let mut new_sidecar: Vec<f32> = Vec::new();
             coll.node_to_arena.clear();
 
             for meta in meta_arena.iter() {
@@ -2766,6 +2861,11 @@ impl Storage {
                         if start_off + len <= vec_arena.len() {
                             let new_offset = new_vec.len() as u64;
                             new_vec.append_range(&vec_arena, start_off, len);
+                            if let Some(old_sidecar) = sidecar_guard.as_deref() {
+                                if let Some(slice) = old_sidecar.get(start_off..start_off + len) {
+                                    new_sidecar.extend_from_slice(slice);
+                                }
+                            }
                             let new_arena_id = new_meta.len() as u32;
                             let mut meta_clone = meta.clone();
                             meta_clone.arena_id = new_arena_id;
@@ -2779,6 +2879,7 @@ impl Storage {
             coll.count.store(new_meta.len(), Ordering::Relaxed);
             *meta_arena = new_meta;
             *vec_arena = new_vec;
+            if let Some(g) = sidecar_guard.as_mut() { **g = new_sidecar; }
         }
 
         // 3. Rebuild every collection's HNSW from its compacted arena.
@@ -3058,7 +3159,7 @@ impl GenesisDatabase {
     #[napi] pub async fn neighbors(&self, seed: String, args: NeighborInput) -> Result<Vec<NeighborOutput>> { let i = Arc::clone(&self.inner); tokio::task::spawn_blocking(move || i.neighbors(seed, args, false)).await.map_err(|e| Error::from_reason(e.to_string()))? }
     #[napi] pub async fn save_state(&self) -> Result<()> { let i = Arc::clone(&self.inner); tokio::task::spawn_blocking(move || i.save_state()).await.map_err(|e| Error::from_reason(e.to_string()))? }
     #[napi] pub async fn compact(&self) -> Result<()> { let i = Arc::clone(&self.inner); tokio::task::spawn_blocking(move || i.compact()).await.map_err(|e| Error::from_reason(e.to_string()))? }
-    #[napi] pub async fn create_collection(&self, name: String, model: String, dim: u32, metric: Option<String>, quant: Option<String>, ef_search: Option<u32>) -> Result<()> { let i = Arc::clone(&self.inner); tokio::task::spawn_blocking(move || i.create_collection(name, model, dim, metric, quant, ef_search)).await.map_err(|e| Error::from_reason(e.to_string()))? }
+    #[napi] pub async fn create_collection(&self, name: String, model: String, dim: u32, metric: Option<String>, quant: Option<String>, ef_search: Option<u32>, rerank: Option<bool>) -> Result<()> { let i = Arc::clone(&self.inner); tokio::task::spawn_blocking(move || i.create_collection(name, model, dim, metric, quant, ef_search, rerank)).await.map_err(|e| Error::from_reason(e.to_string()))? }
     #[napi] pub fn list_collections(&self) -> Vec<CollectionInfo> { self.inner.list_collections() }
     #[napi] pub async fn add_vector(&self, node_id: String, collection: String, embedding: Vec<f64>) -> Result<()> { let i = Arc::clone(&self.inner); tokio::task::spawn_blocking(move || i.add_vector(node_id, collection, embedding)).await.map_err(|e| Error::from_reason(e.to_string()))? }
     #[napi] pub async fn flush_index(&self) -> Result<()> { let i = Arc::clone(&self.inner); tokio::task::spawn_blocking(move || i.flush_index()).await.map_err(|e| Error::from_reason(e.to_string())) }

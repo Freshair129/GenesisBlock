@@ -42,7 +42,7 @@ const B: [f64; 8] = [-1.0, -1.0, -1.0, -1.0, 1.0, 1.0, 1.0, 1.0];
 const C: [f64; 8] = [1.0, -1.0, 1.0, -1.0, 1.0, -1.0, 1.0, -1.0];
 
 fn seed(s: &Storage, coll: &str) {
-    s.create_collection(coll.to_string(), "m".to_string(), 8, None, Some("bq".to_string()), None).unwrap();
+    s.create_collection(coll.to_string(), "m".to_string(), 8, None, Some("bq".to_string()), None, None).unwrap();
     add(s, "A", A.to_vec(), coll);
     add(s, "B", B.to_vec(), coll);
     add(s, "C", C.to_vec(), coll);
@@ -82,7 +82,7 @@ fn bq_disk_is_32x_smaller() {
     let path = fresh("test_bq_size");
     let dim = 128u32;
     let s = open(&path, dim); // default collection is f32 (None)
-    s.create_collection("bq".to_string(), "m".to_string(), dim, None, Some("bq".to_string()), None).unwrap();
+    s.create_collection("bq".to_string(), "m".to_string(), dim, None, Some("bq".to_string()), None, None).unwrap();
     let v: Vec<f64> = (0..dim).map(|i| if i % 3 == 0 { 0.5 } else { -0.5 }).collect();
     add(&s, "F", v.clone(), "default");
     add(&s, "Q", v.clone(), "bq");

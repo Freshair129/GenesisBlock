@@ -38,7 +38,7 @@ fn ids(v: &serde_json::Value) -> Vec<String> {
 
 fn two_collections(name: &str) -> Storage {
     let s = open_dim(&fresh(name), 4);
-    s.create_collection("code".to_string(), "jina-code".to_string(), 4, Some("L2".to_string()), None, None).unwrap();
+    s.create_collection("code".to_string(), "jina-code".to_string(), 4, Some("L2".to_string()), None, None, None).unwrap();
     add(&s, "code-A", vec![1.0, 0.0, 0.0, 0.0], Some("code"));
     add(&s, "code-B", vec![0.0, 1.0, 0.0, 0.0], Some("code"));
     add(&s, "def-A", vec![1.0, 0.0, 0.0, 0.0], None); // -> default

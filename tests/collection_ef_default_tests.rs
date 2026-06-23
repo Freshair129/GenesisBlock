@@ -60,8 +60,8 @@ fn seed(s: &Storage, coll: &str) {
 #[test]
 fn info_exposes_ef_default() {
     let s = open(&fresh("test_cef_info"));
-    s.create_collection("withef".into(), "m".into(), 4, None, None, Some(77)).unwrap();
-    s.create_collection("noef".into(), "m".into(), 4, None, None, None).unwrap();
+    s.create_collection("withef".into(), "m".into(), 4, None, None, Some(77), None).unwrap();
+    s.create_collection("noef".into(), "m".into(), 4, None, None, None, None).unwrap();
     assert_eq!(info(&s, "withef").ef_search, Some(77));
     assert_eq!(info(&s, "noef").ef_search, None);
 }
@@ -74,8 +74,8 @@ fn ef_default_survives_reload() {
     let path = fresh("test_cef_reload");
     {
         let s = open(&path);
-        s.create_collection("withef".into(), "m".into(), 4, None, None, Some(77)).unwrap();
-        s.create_collection("noef".into(), "m".into(), 4, None, None, None).unwrap();
+        s.create_collection("withef".into(), "m".into(), 4, None, None, Some(77), None).unwrap();
+        s.create_collection("noef".into(), "m".into(), 4, None, None, None, None).unwrap();
         seed(&s, "withef");
         s.flush_index();
         s.save_state().unwrap();
@@ -91,7 +91,7 @@ fn ef_default_survives_reload() {
 #[test]
 fn collection_default_search_finds_exact() {
     let s = open(&fresh("test_cef_search"));
-    s.create_collection("withef".into(), "m".into(), 4, None, None, Some(64)).unwrap();
+    s.create_collection("withef".into(), "m".into(), 4, None, None, Some(64), None).unwrap();
     seed(&s, "withef");
     // per-query ef = None -> falls through to the collection's default (64)
     assert_eq!(top1(&s, vec![1.0, 0.0, 0.0, 0.0], "withef", None).as_deref(), Some("A"));
@@ -103,7 +103,7 @@ fn collection_default_search_finds_exact() {
 fn per_query_override_beats_collection_default() {
     let s = open(&fresh("test_cef_override"));
     // Collection default is a tiny ef; the per-query override raises it.
-    s.create_collection("withef".into(), "m".into(), 4, None, None, Some(1)).unwrap();
+    s.create_collection("withef".into(), "m".into(), 4, None, None, Some(1), None).unwrap();
     seed(&s, "withef");
     assert_eq!(top1(&s, vec![1.0, 0.0, 0.0, 0.0], "withef", Some(64)).as_deref(), Some("A"));
 }

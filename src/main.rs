@@ -166,6 +166,7 @@ struct CreateCollectionInput {
     pub metric: Option<String>,
     pub quant: Option<String>,
     pub ef_search: Option<u32>,
+    pub rerank: Option<bool>,
 }
 
 async fn create_collection_handler(
@@ -173,7 +174,7 @@ async fn create_collection_handler(
     Json(input): Json<CreateCollectionInput>,
 ) -> impl IntoResponse {
     let storage = state.storage.write();
-    match storage.create_collection(input.name, input.model, input.dim, input.metric, input.quant, input.ef_search) {
+    match storage.create_collection(input.name, input.model, input.dim, input.metric, input.quant, input.ef_search, input.rerank) {
         Ok(()) => (StatusCode::OK, Json(serde_json::json!({"ok": true}))).into_response(),
         Err(e) => (StatusCode::BAD_REQUEST, e.to_string()).into_response(),
     }
