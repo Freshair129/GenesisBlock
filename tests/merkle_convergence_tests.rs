@@ -115,3 +115,36 @@ fn empty_state_is_zero_root() {
     let a = open(&fresh("test_mk_empty"));
     assert_eq!(a.get_merkle_root(), "0".repeat(64));
 }
+
+/// A secondary vector flips the root: `add_vector` changes no node/edge field, so
+/// without vector presence in the digest its root would be unchanged — and a peer
+/// missing only that vector would never be told to pull. The digest includes a
+/// (collection, node) presence entry so the divergence is detectable.
+#[test]
+fn secondary_vector_changes_root() {
+    let a = open(&fresh("test_mk_vec"));
+    a.create_collection("code".to_string(), "m".to_string(), 4, None, None, None, None).unwrap();
+    node(&a, "N");
+    let r1 = a.get_merkle_root();
+    a.add_vector("N".to_string(), "code".to_string(), vec![1.0, 0.0, 0.0, 0.0]).unwrap();
+    let r2 = a.get_merkle_root();
+    assert_ne!(r1, r2, "adding a secondary vector flips the root (vector presence in the digest)");
+}
+
+/// Ids containing the would-be delimiter bytes ('|', '\n') don't break the digest
+/// or collide with a differently-shaped state — fields are length-prefixed, not
+/// delimiter-joined, so a crafted id can't forge another entry.
+#[test]
+fn delimiter_laden_ids_dont_break_digest() {
+    let a = open(&fresh("test_mk_inj_a"));
+    node(&a, "x|y\nz"); // id carries the digest's delimiter bytes
+    let root1 = a.get_merkle_root();
+    assert_eq!(root1, a.get_merkle_root(), "root is stable for a delimiter-laden id");
+    assert_ne!(root1, "0".repeat(64), "non-empty state is not the zero root");
+
+    let b = open(&fresh("test_mk_inj_b"));
+    node(&b, "x");
+    node(&b, "y");
+    assert_ne!(root1, b.get_merkle_root(),
+        "one delimiter-laden node does not collide with two plain nodes");
+}
