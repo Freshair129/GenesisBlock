@@ -359,6 +359,12 @@ pub struct ConsensusProposal {
     pub signed_event: SignedEvent,
     pub votes: HashMap<String, bool>, // PeerID -> Vote
     pub quorum_signatures: HashMap<String, Vec<u8>>, // PeerID -> Signature
+    /// Set once the proposal has crossed quorum and been applied. Guards against
+    /// re-applying (and re-persisting) the event on every approving vote that
+    /// arrives after quorum. `#[serde(default)]` so proposals gossiped by peers
+    /// running an older build (no field) deserialize as not-yet-committed.
+    #[serde(default)]
+    pub committed: bool,
 }
 
 #[napi(object)]
@@ -1323,8 +1329,20 @@ impl Storage {
         }
     }
 
-        pub fn propose_consensus(&self, event: Event, signature: Vec<u8>) -> Result<String> {
+    /// Open a consensus proposal for `event`. The proposal is signed with this
+    /// node's own key (the `_signature` param is ignored — an external caller has
+    /// no access to the local private key, so a caller-supplied signature could
+    /// never be authentic; signing here binds the proposal to this node as its
+    /// authentic originator). The event must also pass `semantic_verify`, so a
+    /// proposal that conflicts with an existing high-impact MASTER axiom is
+    /// rejected up front rather than slipping through to quorum.
+    pub fn propose_consensus(&self, event: Event, _signature: Vec<u8>) -> Result<String> {
+        if !self.semantic_verify(&event)? {
+            return Err(Error::from_reason("proposal rejected by semantic_verify (conflicts with a governing axiom)"));
+        }
         let proposal_id = Uuid::new_v4().to_string();
+        let event_data = serde_json::to_vec(&event).map_err(|e| Error::from_reason(e.to_string()))?;
+        let signature = self.signing_key.sign(&event_data).to_bytes().to_vec();
         let signed_event = SignedEvent {
             event,
             signature,
@@ -1335,6 +1353,7 @@ impl Storage {
             signed_event,
             votes: HashMap::new(),
             quorum_signatures: HashMap::new(),
+            committed: false,
         };
         self.proposals.insert(proposal_id.clone(), proposal);
         Ok(proposal_id)
@@ -1359,6 +1378,28 @@ impl Storage {
         VerifyingKey::from_bytes(&arr).ok()
     }
 
+    /// Verify that `se.signature` is an authentic ed25519 signature by
+    /// `se.signer_peer_id` over the canonical event bytes (`serde_json::to_vec`,
+    /// the same convention `persist`/`propose` sign with). Unknown signer,
+    /// malformed signature, or non-matching signature all return `false`. This is
+    /// the single source of truth for event-level signature checks — the WAL sync
+    /// (`reconcile_state`), the consensus propose/commit paths all route here.
+    fn verify_event_signature(&self, se: &SignedEvent) -> bool {
+        let vkey = match self.peer_verifying_key(&se.signer_peer_id) {
+            Some(k) => k,
+            None => return false,
+        };
+        let data = match serde_json::to_vec(&se.event) {
+            Ok(d) => d,
+            Err(_) => return false,
+        };
+        let sig = match Signature::from_slice(&se.signature) {
+            Ok(s) => s,
+            Err(_) => return false,
+        };
+        vkey.verify(&data, &sig).is_ok()
+    }
+
     /// Sign a vote with this node's key so a remote proposal-holder can verify it
     /// authentically came from this peer. Returns the detached ed25519 signature.
     pub fn sign_vote(&self, proposal_id: String, approve: bool) -> Vec<u8> {
@@ -1381,59 +1422,85 @@ impl Storage {
 
         if let Some(mut proposal_ref) = self.proposals.get_mut(&proposal_id) {
             let proposal = proposal_ref.value_mut();
+            // Already-committed guard: once quorum is crossed and the event applied,
+            // later approving votes must not re-apply or re-persist it.
+            if proposal.committed {
+                return Ok(true);
+            }
             proposal.votes.insert(peer_id.clone(), approve);
             // Retain the verified signature as proof of the vote (quorum_signatures).
             proposal.quorum_signatures.insert(peer_id.clone(), signature);
 
             let approvals = proposal.votes.values().filter(|&&v| v).count();
-            
-            if approvals > (self.peers.len() / 2) {
-                let signed_event = &proposal.signed_event;
-                match &signed_event.event {
-                    Event::Node(n) => {
-                        let mut n_axiom = n.clone();
-                        if !n_axiom.labels.contains(&"MASTER".to_string()) { 
-                            n_axiom.labels.push("MASTER".to_string()); 
-                        }
-                        let u32_id = self.get_or_intern_id(&n_axiom.id);
-                        self.insert_node_lean(u32_id, n_axiom.clone());
-                        self.persist_signed(SignedEvent {
-                            event: Event::Node(n_axiom),
-                            signature: signed_event.signature.clone(),
-                            signer_peer_id: signed_event.signer_peer_id.clone(),
-                        })?;
-                    }
-                    Event::Edge(e) => {
-                        let ekey = Self::edge_key(&e.id);
-                        self.edges.insert(ekey, e.clone());
-                        self.persist_signed(signed_event.clone())?;
-                    }
-                    Event::Batch(events) => {
-                        for e in events {
-                            match e {
-                                Event::Node(n) => {
-                                    let mut n_axiom = n.clone();
-                                    if !n_axiom.labels.contains(&"MASTER".to_string()) { n_axiom.labels.push("MASTER".to_string()); }
-                                    let u32_id = self.get_or_intern_id(&n_axiom.id);
-                                    self.insert_node_lean(u32_id, n_axiom);
-                                }
-                                Event::Edge(edge) => {
-                                    let ekey = Self::edge_key(&edge.id);
-                                    self.edges.insert(ekey, edge.clone());
-                                }
-                                _ => {}
-                            }
-                        }
-                        self.persist_signed(signed_event.clone())?;
-                    }
-                    // Vectors aren't axiom subjects; persist for durability if one
-                    // is ever proposed through consensus.
-                    Event::Vector(_) => {
-                        self.persist_signed(signed_event.clone())?;
-                    }
-                }
-                return Ok(true);
+
+            // Quorum is a strict majority of the swarm. `self.peers` excludes this
+            // node, so the membership denominator is peers + self.
+            if approvals <= (self.peers.len() + 1) / 2 {
+                return Ok(false);
             }
+
+            // Last gate before the event becomes durable state: re-verify the
+            // proposal's own event signature (a gossiped proposal is verified on
+            // receipt, but defense-in-depth) and re-run the governance check.
+            let signed_event = proposal.signed_event.clone();
+            if !self.verify_event_signature(&signed_event) {
+                return Err(Error::from_reason("proposal event signature invalid at commit"));
+            }
+            if !self.semantic_verify(&signed_event.event)? {
+                return Err(Error::from_reason("proposal rejected by semantic_verify at commit"));
+            }
+
+            match &signed_event.event {
+                Event::Node(n) => {
+                    let mut n_axiom = n.clone();
+                    if !n_axiom.labels.contains(&"MASTER".to_string()) {
+                        n_axiom.labels.push("MASTER".to_string());
+                    }
+                    let u32_id = self.get_or_intern_id(&n_axiom.id);
+                    self.insert_node_lean(u32_id, n_axiom.clone());
+                    self.persist_signed(SignedEvent {
+                        event: Event::Node(n_axiom),
+                        signature: signed_event.signature.clone(),
+                        signer_peer_id: signed_event.signer_peer_id.clone(),
+                    })?;
+                }
+                Event::Edge(e) => {
+                    // Index into the adjacency maps (out_idx/in_idx) so the
+                    // committed edge is traversable in this process — not just
+                    // present in `edges` until the next reload.
+                    let ekey = self.index_edge_internal(&e.id, &e.from, &e.to);
+                    self.edges.insert(ekey, e.clone());
+                    self.refresh_impacts(Some(vec![e.to.clone()]));
+                    self.persist_signed(signed_event.clone())?;
+                }
+                Event::Batch(events) => {
+                    for e in events {
+                        match e {
+                            Event::Node(n) => {
+                                let mut n_axiom = n.clone();
+                                if !n_axiom.labels.contains(&"MASTER".to_string()) { n_axiom.labels.push("MASTER".to_string()); }
+                                let u32_id = self.get_or_intern_id(&n_axiom.id);
+                                self.insert_node_lean(u32_id, n_axiom);
+                            }
+                            Event::Edge(edge) => {
+                                let ekey = self.index_edge_internal(&edge.id, &edge.from, &edge.to);
+                                self.edges.insert(ekey, edge.clone());
+                            }
+                            _ => {}
+                        }
+                    }
+                    self.persist_signed(signed_event.clone())?;
+                }
+                // A committed vector is staged + enqueued (index=true) so it is
+                // searchable in this process, matching the CRDT-sync path — not
+                // merely persisted for a future replay.
+                Event::Vector(v) => {
+                    self.replay_vector(&v.collection, &v.node_id, v.embedding.clone(), v.lang.clone().unwrap_or_else(|| "en".to_string()), true);
+                    self.persist_signed(signed_event.clone())?;
+                }
+            }
+            proposal.committed = true;
+            return Ok(true);
         }
         Ok(false)
     }
@@ -1686,7 +1753,14 @@ impl Storage {
             }
         }
         hybrid_results.sort_by(|a, b| b.node.impact.partial_cmp(&a.node.impact).unwrap());
-        hybrid_results.truncate(args.k as usize); 
+        // Dedupe by node id, keeping the highest-scoring hit. A node may hold more
+        // than one arena/HNSW slot in a collection — e.g. after `add_vector`
+        // supersedes a prior vector, the orphaned slot lingers until compaction —
+        // so the raw HNSW result set can surface the same node twice. Sorted
+        // descending by score, `retain` keeps the first (best) occurrence.
+        let mut seen: HashSet<String> = HashSet::new();
+        hybrid_results.retain(|n| seen.insert(n.node.id.clone()));
+        hybrid_results.truncate(args.k as usize);
         Ok(hybrid_results)
     }
 
@@ -2031,20 +2105,11 @@ impl Storage {
             let event = &signed_event.event;
             let signer_id = &signed_event.signer_peer_id;
             
-            // 1. Verify Signature
-            if signer_id != &self.local_peer_id {
-                let verified = if let Some(peer) = self.peers.get(signer_id) {
-                    if let Ok(v_key) = VerifyingKey::from_bytes(&peer.verifying_key.as_slice().try_into().unwrap_or([0u8; 32])) {
-                        let data = serde_json::to_vec(event).unwrap_or_default();
-                        let sig = Signature::from_slice(&signed_event.signature).unwrap_or(Signature::from_bytes(&[0u8; 64]));
-                        v_key.verify(&data, &sig).is_ok()
-                    } else { false }
-                } else { false };
-
-                if !verified {
-                    println!("Mark X: REJECTED event from {}. Invalid signature or unknown peer.", signer_id);
-                    continue;
-                }
+            // 1. Verify Signature (local events are self-trusted; remote events
+            // must carry an authentic signature from their registered peer key).
+            if signer_id != &self.local_peer_id && !self.verify_event_signature(&signed_event) {
+                println!("Mark X: REJECTED event from {}. Invalid signature or unknown peer.", signer_id);
+                continue;
             }
 
             // 2. Apply Event logic
@@ -2299,8 +2364,15 @@ impl Storage {
                                         let _ = storage.reconcile_state(events);
                                     }
                                     GossipMessage::ConsensusPropose { proposal } => {
-                                        // Auto-verify and store proposal
-                                        storage.proposals.insert(proposal.proposal_id.clone(), proposal);
+                                        // Verify the proposal's event is authentically signed by
+                                        // its claimed originator before storing it. An unsigned or
+                                        // forged proposal could otherwise be driven to quorum and
+                                        // applied as a MASTER axiom, bypassing governance.
+                                        if storage.verify_event_signature(&proposal.signed_event) {
+                                            storage.proposals.insert(proposal.proposal_id.clone(), proposal);
+                                        } else {
+                                            println!("Mark X: REJECTED proposal {} — invalid event signature or unknown signer.", proposal.proposal_id);
+                                        }
                                     }
                                     GossipMessage::ConsensusVote { proposal_id, voter_peer_id, approve, signature } => {
                                         // submit_vote verifies the signature against the

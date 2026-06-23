@@ -106,3 +106,18 @@ fn attached_vector_survives_wal_replay() {
     let in_default = search(&s2, vec![1.0, 0.0, 0.0, 0.0], 5, None);
     assert!(in_default.contains(&"N1".to_string()));
 }
+
+/// Re-adding a vector for the same node in a collection it already has supersedes
+/// the node->arena mapping but leaves the old arena/HNSW slot until compaction, so
+/// the raw index can surface the node twice. Search must dedupe by node id.
+#[test]
+fn readding_vector_does_not_duplicate_search_hits() {
+    let s = open_dim(&fresh("test_av_dedup"), 4);
+    add_node(&s, "N1", vec![1.0, 0.0, 0.0, 0.0], None); // primary vector in default
+    // Attach a second vector for N1 in the SAME (default) collection.
+    s.add_vector("N1".to_string(), "default".to_string(), vec![1.0, 0.0, 0.0, 0.0]).unwrap();
+
+    let hits = search(&s, vec![1.0, 0.0, 0.0, 0.0], 5, None);
+    let n1_count = hits.iter().filter(|id| id.as_str() == "N1").count();
+    assert_eq!(n1_count, 1, "a superseded vector must not surface the node twice");
+}
