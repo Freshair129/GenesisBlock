@@ -230,6 +230,8 @@ pub struct CollectionInfo {
     pub metric: String,
     pub quant: String,
     pub count: u32,
+    /// Per-collection default HNSW `ef_search`. `None` ⇒ uses the engine-global default.
+    pub ef_search: Option<u32>,
 }
 
 #[napi(object)]
@@ -657,12 +659,16 @@ pub struct VectorCollection {
     hnsw: RwLock<Option<VecIndex>>,
     pub node_to_arena: DashMap<u32, u32>,   // node u32 -> arena_id (this collection)
     pub count: AtomicUsize,
+    /// Per-collection default HNSW `ef_search`. Set at creation, immutable.
+    /// `None` ⇒ fall back to the engine-global default. Resolution order in
+    /// `hybrid_search`: per-query override → this → engine-global.
+    pub ef_search: Option<u32>,
 }
 
 impl VectorCollection {
-    fn new(name: String, model: String, dim: u16, metric: Metric, quant: Quant) -> Self {
+    fn new(name: String, model: String, dim: u16, metric: Metric, quant: Quant, ef_search: Option<u32>) -> Self {
         Self {
-            name, model, dim, metric, quant,
+            name, model, dim, metric, quant, ef_search,
             arena: RwLock::new(ArenaStore::new(quant, dim as usize)),
             metadata: RwLock::new(Vec::new()),
             hnsw: RwLock::new(None),
@@ -747,6 +753,7 @@ impl VectorCollection {
             metric: self.metric.as_str().to_string(),
             quant: self.quant.as_str().to_string(),
             count: self.count.load(Ordering::Relaxed) as u32,
+            ef_search: self.ef_search,
         }
     }
 }
@@ -919,14 +926,14 @@ impl Storage {
 
     /// Create an isolated vector collection. Idempotent-erroring: fails if a
     /// collection with this name already exists.
-    pub fn create_collection(&self, name: String, model: String, dim: u32, metric: Option<String>, quant: Option<String>) -> Result<()> {
+    pub fn create_collection(&self, name: String, model: String, dim: u32, metric: Option<String>, quant: Option<String>, ef_search: Option<u32>) -> Result<()> {
         self.ensure_writable()?;
         if self.collections.contains_key(&name) {
             return Err(Error::from_reason(format!("collection '{}' already exists", name)));
         }
         let m = metric.as_deref().map(Metric::parse).unwrap_or(Metric::L2);
         let q = quant.as_deref().map(Quant::parse).unwrap_or(Quant::None);
-        self.collections.insert(name.clone(), Arc::new(VectorCollection::new(name, model, dim as u16, m, q)));
+        self.collections.insert(name.clone(), Arc::new(VectorCollection::new(name, model, dim as u16, m, q, ef_search)));
         Ok(())
     }
 
@@ -1023,7 +1030,7 @@ impl Storage {
         if !self.collections.contains_key(&name) {
             self.collections.insert(
                 name.clone(),
-                Arc::new(VectorCollection::new(name.clone(), "recovered".to_string(), emb.len() as u16, Metric::L2, Quant::None)),
+                Arc::new(VectorCollection::new(name.clone(), "recovered".to_string(), emb.len() as u16, Metric::L2, Quant::None, None)),
             );
         }
         if let Ok(coll) = self.resolve_collection(&Some(name)) {
@@ -1133,7 +1140,7 @@ impl Storage {
         let collections: DashMap<String, Arc<VectorCollection>> = DashMap::new();
         collections.insert(
             "default".to_string(),
-            Arc::new(VectorCollection::new("default".to_string(), "default".to_string(), vector_dim, Metric::L2, Quant::None)),
+            Arc::new(VectorCollection::new("default".to_string(), "default".to_string(), vector_dim, Metric::L2, Quant::None, None)),
         );
 
         let storage = Self {
@@ -1720,8 +1727,9 @@ impl Storage {
             if norm > 0.0 { for x in query_f32.iter_mut() { *x /= norm; } }
         }
         // VecIndex quantizes the query per mode and returns (arena_id, distance_f32).
-        // Per-query ef_search override falls back to the engine-global default.
+        // ef_search resolution: per-query override → per-collection default → engine-global.
         let ef = args.ef_search.map(|e| e as usize)
+            .or_else(|| coll.ef_search.map(|e| e as usize))
             .unwrap_or_else(|| self.ef_search.load(Ordering::Relaxed));
         let results = {
             let hnsw_lock = coll.hnsw.read();
@@ -2427,6 +2435,8 @@ impl Storage {
             manifest.push(serde_json::json!({
                 "name": coll.name, "model": coll.model, "dim": coll.dim,
                 "metric": coll.metric.as_str(), "quant": coll.quant.as_str(),
+                // Per-collection default ef_search; absent ⇒ None (engine-global).
+                "ef_search": coll.ef_search,
                 // meta format version: 1 = NodeMetadata.node_u32 (A2). Absent ⇒ 0
                 // (pre-A2 String layout), migrated on load.
                 "mv": 1
@@ -2494,7 +2504,8 @@ impl Storage {
                 let dim = cm["dim"].as_u64().unwrap_or(0) as u16;
                 let metric = Metric::parse(cm["metric"].as_str().unwrap_or("L2"));
                 let quant = Quant::parse(cm["quant"].as_str().unwrap_or("none"));
-                let coll = VectorCollection::new(name.clone(), model, dim, metric, quant);
+                let ef_search = cm["ef_search"].as_u64().map(|e| e as u32);
+                let coll = VectorCollection::new(name.clone(), model, dim, metric, quant, ef_search);
                 if let Ok(data) = fs::read(self.path.join(format!("vec_{}.bin", name))) {
                     *coll.arena.write() = ArenaStore::from_bytes(&data, quant, dim as usize);
                 }
@@ -2515,7 +2526,7 @@ impl Storage {
         } else if let Ok(data) = fs::read(self.path.join("vector.bin")) {
             // Legacy single-space DB -> wrap as the `default` collection.
             let dim = state_val["vector_dim"].as_u64().unwrap_or(1536) as u16;
-            let coll = VectorCollection::new("default".to_string(), "default".to_string(), dim, Metric::L2, Quant::None);
+            let coll = VectorCollection::new("default".to_string(), "default".to_string(), dim, Metric::L2, Quant::None, None);
             *coll.arena.write() = ArenaStore::from_bytes(&data, Quant::None, dim as usize);
             if let Ok(md) = fs::read(self.path.join("meta.bin")) {
                 // Legacy single-space snapshots always predate A2 (String layout).
@@ -2532,7 +2543,7 @@ impl Storage {
         if !self.collections.contains_key(&self.default_collection) {
             self.collections.insert(
                 self.default_collection.clone(),
-                Arc::new(VectorCollection::new(self.default_collection.clone(), "default".to_string(), 1536, Metric::L2, Quant::None)),
+                Arc::new(VectorCollection::new(self.default_collection.clone(), "default".to_string(), 1536, Metric::L2, Quant::None, None)),
             );
         }
 
@@ -3047,7 +3058,7 @@ impl GenesisDatabase {
     #[napi] pub async fn neighbors(&self, seed: String, args: NeighborInput) -> Result<Vec<NeighborOutput>> { let i = Arc::clone(&self.inner); tokio::task::spawn_blocking(move || i.neighbors(seed, args, false)).await.map_err(|e| Error::from_reason(e.to_string()))? }
     #[napi] pub async fn save_state(&self) -> Result<()> { let i = Arc::clone(&self.inner); tokio::task::spawn_blocking(move || i.save_state()).await.map_err(|e| Error::from_reason(e.to_string()))? }
     #[napi] pub async fn compact(&self) -> Result<()> { let i = Arc::clone(&self.inner); tokio::task::spawn_blocking(move || i.compact()).await.map_err(|e| Error::from_reason(e.to_string()))? }
-    #[napi] pub async fn create_collection(&self, name: String, model: String, dim: u32, metric: Option<String>, quant: Option<String>) -> Result<()> { let i = Arc::clone(&self.inner); tokio::task::spawn_blocking(move || i.create_collection(name, model, dim, metric, quant)).await.map_err(|e| Error::from_reason(e.to_string()))? }
+    #[napi] pub async fn create_collection(&self, name: String, model: String, dim: u32, metric: Option<String>, quant: Option<String>, ef_search: Option<u32>) -> Result<()> { let i = Arc::clone(&self.inner); tokio::task::spawn_blocking(move || i.create_collection(name, model, dim, metric, quant, ef_search)).await.map_err(|e| Error::from_reason(e.to_string()))? }
     #[napi] pub fn list_collections(&self) -> Vec<CollectionInfo> { self.inner.list_collections() }
     #[napi] pub async fn add_vector(&self, node_id: String, collection: String, embedding: Vec<f64>) -> Result<()> { let i = Arc::clone(&self.inner); tokio::task::spawn_blocking(move || i.add_vector(node_id, collection, embedding)).await.map_err(|e| Error::from_reason(e.to_string()))? }
     #[napi] pub async fn flush_index(&self) -> Result<()> { let i = Arc::clone(&self.inner); tokio::task::spawn_blocking(move || i.flush_index()).await.map_err(|e| Error::from_reason(e.to_string())) }

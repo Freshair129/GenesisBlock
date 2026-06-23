@@ -37,7 +37,7 @@ fn many_collection_indexes_do_not_oom() {
 
     for i in 0..64 {
         let name = format!("c{i}");
-        s.create_collection(name.clone(), "m".to_string(), dim as u32, None, None).unwrap();
+        s.create_collection(name.clone(), "m".to_string(), dim as u32, None, None, None).unwrap();
         // A distinct one-hot vector per collection so we can verify isolation.
         let mut emb = vec![0.0f64; dim];
         emb[i % dim] = 1.0 + i as f64; // unique direction/magnitude

@@ -104,7 +104,7 @@ fn consensus_committed_vector_is_searchable() {
     s.flush_index();
     let hits: Vec<String> = s.hybrid_search(HybridSearchInput {
         query_vector: vec![1.0, 0.0, 0.0, 0.0], k: 5, alpha: Some(0.0),
-        lang: None, as_of: None, collection: None,
+        lang: None, as_of: None, collection: None, ef_search: None,
     }).unwrap().into_iter().map(|n| n.node.id).collect();
     assert!(hits.contains(&"N1".to_string()), "consensus-committed vector is searchable now");
 }

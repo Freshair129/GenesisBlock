@@ -41,7 +41,7 @@ fn search(s: &Storage, q: Vec<f64>, k: u32, collection: Option<&str>) -> Vec<Str
 #[test]
 fn node_carries_vectors_in_two_collections() {
     let s = open_dim(&fresh("test_av_two"), 4);
-    s.create_collection("code".to_string(), "jina-code".to_string(), 3, Some("L2".to_string()), None).unwrap();
+    s.create_collection("code".to_string(), "jina-code".to_string(), 3, Some("L2".to_string()), None, None).unwrap();
 
     // Primary embedding in the default collection (dim 4).
     add_node(&s, "N1", vec![1.0, 0.0, 0.0, 0.0], None);
@@ -59,7 +59,7 @@ fn node_carries_vectors_in_two_collections() {
 #[test]
 fn add_vector_to_missing_node_errors() {
     let s = open_dim(&fresh("test_av_missing"), 4);
-    s.create_collection("code".to_string(), "m".to_string(), 3, None, None).unwrap();
+    s.create_collection("code".to_string(), "m".to_string(), 3, None, None, None).unwrap();
     let r = s.add_vector("ghost".to_string(), "code".to_string(), vec![1.0, 0.0, 0.0]);
     assert!(r.is_err());
     assert!(r.unwrap_err().to_string().contains("not found"));
@@ -69,7 +69,7 @@ fn add_vector_to_missing_node_errors() {
 #[test]
 fn add_vector_dim_mismatch_errors() {
     let s = open_dim(&fresh("test_av_dim"), 4);
-    s.create_collection("code".to_string(), "m".to_string(), 3, None, None).unwrap();
+    s.create_collection("code".to_string(), "m".to_string(), 3, None, None, None).unwrap();
     add_node(&s, "N1", vec![1.0, 0.0, 0.0, 0.0], None);
     let r = s.add_vector("N1".to_string(), "code".to_string(), vec![1.0, 0.0]); // 2 != 3
     assert!(r.is_err());
@@ -94,7 +94,7 @@ fn attached_vector_survives_wal_replay() {
     let path = fresh("test_av_wal");
     {
         let s = open_dim(&path, 4);
-        s.create_collection("code".to_string(), "jina-code".to_string(), 3, None, None).unwrap();
+        s.create_collection("code".to_string(), "jina-code".to_string(), 3, None, None, None).unwrap();
         add_node(&s, "N1", vec![1.0, 0.0, 0.0, 0.0], None);
         s.add_vector("N1".to_string(), "code".to_string(), vec![0.0, 0.0, 1.0]).unwrap();
         // No save_state() -> reopen replays the WAL (Event::Node + Event::Vector).

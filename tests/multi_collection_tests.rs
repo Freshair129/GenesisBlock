@@ -43,8 +43,8 @@ fn search(s: &Storage, q: Vec<f64>, k: u32, collection: Option<&str>) -> Result<
 #[test]
 fn two_collections_are_isolated() {
     let s = open_dim(&fresh("test_mc_isolated"), 4);
-    s.create_collection("code".to_string(), "jina-code".to_string(), 4, Some("L2".to_string()), None).unwrap();
-    s.create_collection("text".to_string(), "bge-m3".to_string(), 3, Some("Cosine".to_string()), None).unwrap();
+    s.create_collection("code".to_string(), "jina-code".to_string(), 4, Some("L2".to_string()), None, None).unwrap();
+    s.create_collection("text".to_string(), "bge-m3".to_string(), 3, Some("Cosine".to_string()), None, None).unwrap();
 
     add(&s, "code-A", vec![1.0, 0.0, 0.0, 0.0], Some("code")).unwrap();
     add(&s, "code-B", vec![0.0, 1.0, 0.0, 0.0], Some("code")).unwrap();
@@ -62,7 +62,7 @@ fn two_collections_are_isolated() {
 #[test]
 fn dim_mismatch_is_rejected() {
     let s = open_dim(&fresh("test_mc_dim"), 4);
-    s.create_collection("code".to_string(), "m".to_string(), 4, None, None).unwrap();
+    s.create_collection("code".to_string(), "m".to_string(), 4, None, None, None).unwrap();
 
     let bad_insert = add(&s, "x", vec![1.0, 2.0, 3.0], Some("code")); // 3 != 4
     assert!(bad_insert.is_err(), "insert with wrong dim must error");
@@ -87,7 +87,7 @@ fn unknown_collection_errors() {
 #[test]
 fn default_routing_and_listing() {
     let s = open_dim(&fresh("test_mc_default"), 4);
-    s.create_collection("code".to_string(), "m".to_string(), 4, None, None).unwrap();
+    s.create_collection("code".to_string(), "m".to_string(), 4, None, None, None).unwrap();
     add(&s, "d1", vec![1.0, 0.0, 0.0, 0.0], None).unwrap();       // -> default
     add(&s, "c1", vec![0.0, 1.0, 0.0, 0.0], Some("code")).unwrap(); // -> code
 
@@ -110,7 +110,7 @@ fn collections_survive_snapshot_reload() {
     let path = fresh("test_mc_snapshot");
     {
         let s = open_dim(&path, 4);
-        s.create_collection("code".to_string(), "jina-code".to_string(), 4, Some("Cosine".to_string()), None).unwrap();
+        s.create_collection("code".to_string(), "jina-code".to_string(), 4, Some("Cosine".to_string()), None, None).unwrap();
         add(&s, "c1", vec![1.0, 0.0, 0.0, 0.0], Some("code")).unwrap();
         s.save_state().unwrap();
     }
@@ -131,7 +131,7 @@ fn wal_replay_recovers_custom_collection() {
     let path = fresh("test_mc_wal");
     {
         let s = open_dim(&path, 4);
-        s.create_collection("code".to_string(), "jina-code".to_string(), 4, None, None).unwrap();
+        s.create_collection("code".to_string(), "jina-code".to_string(), 4, None, None, None).unwrap();
         add(&s, "c1", vec![0.0, 0.0, 1.0, 0.0], Some("code")).unwrap();
         // NOTE: no save_state() -> reopen must replay the WAL.
     }
