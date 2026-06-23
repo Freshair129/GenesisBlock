@@ -2952,8 +2952,10 @@ impl Storage {
     /// because they advance the requester's clock, the next round pulls only the
     /// remainder (so batching by the caller is safe). Events are already signed by
     /// their original author, so they verify on the receiver.
-    /// Note: `Event::Vector` (secondary add_vector embeddings) has no clock and is
-    /// not yet included — primary node embeddings ride on `Event::Node` and do sync.
+    /// `Event::Vector` (secondary add_vector embeddings) now carries a clock too, so
+    /// it is included here and replicates like nodes/edges. (Legacy pre-clock WAL
+    /// entries deserialize to a zero clock and are not `> from_clock`, so they don't
+    /// re-sync on their own — re-`add_vector` re-stamps them with a live clock.)
     pub fn events_since(&self, from_clock: u32) -> Vec<SignedEvent> {
         if !self.log_path.exists() { return Vec::new(); }
         let mut out: Vec<(u32, SignedEvent)> = Vec::new();
