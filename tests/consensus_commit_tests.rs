@@ -97,6 +97,7 @@ fn consensus_committed_vector_is_searchable() {
     let ev = Event::Vector(VectorEvent {
         node_id: "N1".to_string(), collection: None,
         embedding: vec![1.0, 0.0, 0.0, 0.0], lang: Some("en".to_string()),
+        clock: LogicalClock { time: 1, peer_id: "p".to_string() },
     });
     let pid = s.propose_consensus(ev, vec![0u8; 64]).unwrap();
     assert!(approve(&s, &pid), "self-vote reaches quorum");

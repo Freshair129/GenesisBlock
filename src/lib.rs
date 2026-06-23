@@ -60,7 +60,7 @@ pub struct NodeInput {
 }
 
 #[napi(object)]
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Serialize, Deserialize, Clone, Debug, Default, PartialEq, Eq, PartialOrd, Ord)]
 pub struct LogicalClock {
     pub time: u32,
     pub peer_id: String,
@@ -321,6 +321,13 @@ pub struct VectorEvent {
     pub collection: Option<String>,
     pub embedding: Vec<f64>,
     pub lang: Option<String>,
+    /// Logical clock at the time the vector was attached. Lets `events_since`
+    /// time-filter secondary embeddings into anti-entropy pull deltas (they used
+    /// to be excluded for lack of a clock). `#[serde(default)]` ⇒ pre-clock WAL
+    /// entries deserialize with a zero clock and still replay (they never block
+    /// LWW, since vectors are append-applied).
+    #[serde(default)]
+    pub clock: LogicalClock,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -1020,9 +1027,12 @@ impl Storage {
         let coll = Some(collection);
         // Validates dim, stages into the arena, enqueues the deferred HNSW insert.
         self.add_vector_internal(&coll, &node_id, embedding.clone(), lang.clone())?;
+        // Stamp a logical clock so the vector is time-orderable for anti-entropy
+        // (events_since) — secondary embeddings now sync across peers like nodes.
+        let clock = self.next_clock();
         // Durability: replayed by the WAL `Event::Vector` arm.
         self.persist(&Event::Vector(VectorEvent {
-            node_id, collection: coll, embedding, lang: Some(lang),
+            node_id, collection: coll, embedding, lang: Some(lang), clock,
         }))?;
         Ok(())
     }
@@ -1283,18 +1293,24 @@ impl Storage {
 
     pub fn ensure_writable(&self) -> Result<()> { if self.read_only { return Err(Error::from_reason("read-only")); } Ok(()) }
 
-    pub fn persist(&self, event: &Event) -> Result<()> {
-        let (ack_tx, ack_rx) = unbounded();
-        
-        let event_data = serde_json::to_vec(event).map_err(|e| Error::from_reason(e.to_string()))?;
+    /// Sign an event with this node's key, producing a WAL/gossip-ready
+    /// `SignedEvent`. The WAL is a log of `SignedEvent` lines — `persist`,
+    /// `reconcile_state`, and `compact` all write through this so the format is
+    /// uniform and every reader (`try_load_state` replay, `events_since`) can
+    /// parse it back.
+    fn sign_event(&self, event: &Event) -> SignedEvent {
+        let event_data = serde_json::to_vec(event).unwrap_or_default();
         let signature = self.signing_key.sign(&event_data).to_bytes().to_vec();
-        
-        let signed_event = SignedEvent {
+        SignedEvent {
             event: event.clone(),
             signature,
             signer_peer_id: self.local_peer_id.clone(),
-        };
+        }
+    }
 
+    pub fn persist(&self, event: &Event) -> Result<()> {
+        let (ack_tx, ack_rx) = unbounded();
+        let signed_event = self.sign_event(event);
         self.wal_sender.send((signed_event, ack_tx)).map_err(|_| Error::from_reason("wal disconnected"))?;
         let _ = ack_rx.recv(); Ok(())
     }
@@ -2234,8 +2250,19 @@ impl Storage {
                     }
                 }
                 Event::Vector(remote_vec) => {
+                    // Advance the local clock to the vector's time (like Node/Edge),
+                    // so a peer that pulls and re-emits keeps logical time monotone.
+                    let mut current = self.logical_clock.load(Ordering::SeqCst);
+                    while remote_vec.clock.time > current {
+                        match self.logical_clock.compare_exchange_weak(current, remote_vec.clock.time, Ordering::SeqCst, Ordering::SeqCst) {
+                            Ok(_) => break,
+                            Err(actual) => current = actual,
+                        }
+                    }
                     // Runtime sync: stage AND enqueue (index=true) — no rehydrate
                     // follows. Auto-provisions the collection if this peer lacks it.
+                    // Vectors are append-applied (no LWW): a node holds at most one
+                    // vector per collection, deduped at query time.
                     self.replay_vector(&remote_vec.collection, &remote_vec.node_id, remote_vec.embedding.clone(), remote_vec.lang.clone().unwrap_or_else(|| "en".to_string()), true);
                     self.persist_signed(signed_event.clone())?;
                 }
@@ -2920,14 +2947,14 @@ impl Storage {
         hex::encode(hasher.finalize())
     }
 
-    /// Logical time of an event (max over a batch). `Event::Vector` carries no
-    /// clock, so it is not time-filterable and is excluded from pull deltas.
+    /// Logical time of an event (max over a batch). `Event::Vector` now carries a
+    /// clock, so it is time-filterable and included in anti-entropy pull deltas.
     fn event_time(e: &Event) -> Option<u32> {
         match e {
             Event::Node(n) => Some(n.clock.time),
             Event::Edge(ed) => Some(ed.clock.time),
             Event::Batch(v) => v.iter().filter_map(Self::event_time).max(),
-            Event::Vector(_) => None,
+            Event::Vector(v) => Some(v.clock.time),
         }
     }
 
@@ -2937,8 +2964,10 @@ impl Storage {
     /// because they advance the requester's clock, the next round pulls only the
     /// remainder (so batching by the caller is safe). Events are already signed by
     /// their original author, so they verify on the receiver.
-    /// Note: `Event::Vector` (secondary add_vector embeddings) has no clock and is
-    /// not yet included — primary node embeddings ride on `Event::Node` and do sync.
+    /// `Event::Vector` (secondary add_vector embeddings) now carries a clock too, so
+    /// it is included here and replicates like nodes/edges. (Legacy pre-clock WAL
+    /// entries deserialize to a zero clock and are not `> from_clock`, so they don't
+    /// re-sync on their own — re-`add_vector` re-stamps them with a live clock.)
     pub fn events_since(&self, from_clock: u32) -> Vec<SignedEvent> {
         if !self.log_path.exists() { return Vec::new(); }
         let mut out: Vec<(u32, SignedEvent)> = Vec::new();
@@ -2972,7 +3001,7 @@ impl Storage {
                 if now > *exp { continue; }
             }
             if node.valid_to.is_none() {
-                if let Ok(json) = serde_json::to_string(&Event::Node(node.clone())) {
+                if let Ok(json) = serde_json::to_string(&self.sign_event(&Event::Node(node.clone()))) {
                     let _ = writer.write_all(json.as_bytes());
                     let _ = writer.write_all(b"\n");
                     count += 1;
@@ -2984,7 +3013,41 @@ impl Storage {
         for entry in self.edges.iter() {
             let edge = entry.value();
             if edge.valid_to.is_none() {
-                if let Ok(json) = serde_json::to_string(&Event::Edge(edge.clone())) {
+                if let Ok(json) = serde_json::to_string(&self.sign_event(&Event::Edge(edge.clone()))) {
+                    let _ = writer.write_all(json.as_bytes());
+                    let _ = writer.write_all(b"\n");
+                    count += 1;
+                }
+            }
+        }
+
+        // 3. Carry forward live secondary vectors (Event::Vector from add_vector).
+        // Primary embeddings ride on Event::Node (written above, lossless); secondary
+        // ones live only in the WAL, and the resident arena is potentially quantized
+        // — so reconstructing them losslessly means reading the pre-compact WAL, not
+        // the arena. Keep the latest (highest-clock) vector per (node, collection)
+        // for still-live nodes; drop the rest.
+        {
+            use std::io::BufRead;
+            let mut latest: HashMap<(String, Option<String>), VectorEvent> = HashMap::new();
+            if let Ok(file) = File::open(&self.log_path) {
+                let reader = std::io::BufReader::new(file);
+                for line in reader.lines().map_while(|r| r.ok()) {
+                    if let Ok(se) = serde_json::from_str::<SignedEvent>(&line) {
+                        if let Event::Vector(v) = se.event {
+                            let live = self.get_u32(&v.node_id).map_or(false, |u| self.nodes.contains_key(&u));
+                            if !live { continue; }
+                            let key = (v.node_id.clone(), v.collection.clone());
+                            match latest.get(&key) {
+                                Some(prev) if prev.clock.time >= v.clock.time => {}
+                                _ => { latest.insert(key, v); }
+                            }
+                        }
+                    }
+                }
+            }
+            for v in latest.into_values() {
+                if let Ok(json) = serde_json::to_string(&self.sign_event(&Event::Vector(v))) {
                     let _ = writer.write_all(json.as_bytes());
                     let _ = writer.write_all(b"\n");
                     count += 1;
