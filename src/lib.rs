@@ -2934,16 +2934,60 @@ impl Storage {
         self.lang_centroids.insert(lang, v_f32);
     }
 
+    /// Order-independent digest of the current graph state. Two peers that hold
+    /// the same nodes, edges, and per-node vector presence produce the SAME root
+    /// regardless of the order events landed in their WALs. This is the gossip
+    /// divergence trigger (Heartbeat compares roots → issue a PullRequest), so an
+    /// order-independent root lets peers actually converge instead of re-pulling
+    /// forever on insertion-order alone.
+    ///
+    /// Previously this hashed the WAL line-by-line in file order, so two peers at
+    /// identical state but different write order diverged permanently. We digest
+    /// the canonical in-memory state instead. Each entry is a length-prefixed field
+    /// sequence (NOT delimiter-joined): node/edge ids are arbitrary user strings
+    /// (may contain `|`/`\n`), so a joined format would let a crafted id forge
+    /// another entry and collide two distinct states to one root. Nodes/edges carry
+    /// `id, clock.time, clock.peer, valid_to` (clock = supersession/version,
+    /// `valid_to` = edge retraction); each (collection, node-id) with a vector adds
+    /// a presence entry so a vector-only difference still flips the root and pulls
+    /// (the old WAL-hash root included `Event::Vector` lines — this preserves that
+    /// signal). Presence only: a re-`add_vector` superseding the same
+    /// (node, collection) with a different embedding is not distinguished here.
     pub fn get_merkle_root(&self) -> String {
-        if !self.log_path.exists() { return "0".repeat(64); }
-        let mut hasher = Sha256::new();
-        if let Ok(file) = File::open(&self.log_path) {
-            let reader = std::io::BufReader::new(file);
-            use std::io::BufRead;
-            for line_res in reader.lines() {
-                if let Ok(line) = line_res { hasher.update(line.as_bytes()); }
+        // Unambiguous entry encoding: each field is `u32 little-endian length ++ bytes`.
+        fn entry(parts: &[&[u8]]) -> Vec<u8> {
+            let mut b = Vec::new();
+            for p in parts {
+                b.extend_from_slice(&(p.len() as u32).to_le_bytes());
+                b.extend_from_slice(p);
+            }
+            b
+        }
+        let mut entries: Vec<Vec<u8>> = Vec::with_capacity(self.nodes.len() + self.edges.len());
+        for e in self.nodes.iter() {
+            let n = e.value();
+            let t = n.clock.time.to_le_bytes();
+            entries.push(entry(&[b"N", n.id.as_bytes(), &t, n.clock.peer_id.as_bytes(), n.valid_to.as_deref().unwrap_or("").as_bytes()]));
+        }
+        for e in self.edges.iter() {
+            let ed = e.value();
+            let t = ed.clock.time.to_le_bytes();
+            entries.push(entry(&[b"E", ed.id.as_bytes(), &t, ed.clock.peer_id.as_bytes(), ed.valid_to.as_deref().unwrap_or("").as_bytes()]));
+        }
+        // Vector presence per (collection, node id) — peer-independent string ids,
+        // not local u32 interning. Restores the divergence signal for vectors.
+        for c in self.collections.iter() {
+            let coll = c.value();
+            for kv in coll.node_to_arena.iter() {
+                if let Some(node) = self.nodes.get(kv.key()) {
+                    entries.push(entry(&[b"V", coll.name.as_bytes(), node.value().id.as_bytes()]));
+                }
             }
         }
+        if entries.is_empty() { return "0".repeat(64); }
+        entries.sort();
+        let mut hasher = Sha256::new();
+        for e in &entries { hasher.update(e); }
         hex::encode(hasher.finalize())
     }
 
