@@ -6,17 +6,19 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 GenesisBlock / GenesisBlockDB is a local-first **hybrid semantic-graph database engine** written in Rust. A single Rust crate (`genesis-block-native`) compiles to two artifacts from the same core: a `cdylib` Node.js native addon (via NAPI-RS) and an `rlib` consumed by a standalone Axum REST server. Everything else (Python SDK, Go SDK, MCP server, dashboard, Obsidian plugin) is a client over one of those two surfaces.
 
-The whole engine lives in `src/lib.rs` (~2500 lines): storage, WAL persistence, per-collection HNSW vector indexes (async indexing), graph indices, bitemporal node/edge model, governance tiers, HQL execution, Graph Retrieval Layer (GRL), CRDT sync, and ed25519-signed consensus. There is no module split for the core — it is one large file by design.
+The whole engine lives in `src/lib.rs` (~3000 lines): storage, WAL persistence, per-collection HNSW vector indexes (async indexing), graph indices, bitemporal node/edge model, governance tiers, HQL execution, Graph Retrieval Layer (GRL), CRDT sync, and ed25519-signed consensus. The storage core is one large file by design — the only split-out module is `src/query/` (the HQL `pest` grammar + AST).
 
 ## Build & run
 
 ```bash
-cargo build                              # build rlib + bin
-cargo build --release                    # LTO release (slow; see Cargo.toml profile)
-cargo run --bin genesis-db-server        # REST server, listens on :3000, routes under /v1/*
-npm run build                            # napi build --platform --release -> index.win32-x64-msvc.node
-npm run build:debug                      # debug native addon (faster iteration)
+cargo build                                       # build cdylib + rlib (bins are off by default)
+cargo build --release                             # LTO release (slow; see Cargo.toml profile)
+cargo run --features bins --bin genesis-db-server # REST server, listens on :3000, routes under /v1/*
+npm run build                                     # napi build --platform --release -> index.win32-x64-msvc.node
+npm run build:debug                               # debug native addon (faster iteration)
 ```
+
+All `[[bin]]` targets (the REST server plus the benchmark/audit harnesses) are gated behind the off-by-default `bins` feature, so default `cargo build` / `napi build` compiles **only** the `.node` cdylib — pass `--features bins` to build or run any of them. (See the comment in `Cargo.toml`: the bins link the napi-using lib, whose `napi_*` symbols are only provided by the Node host for the cdylib.)
 
 `npm install` is wired to run `npm run build` (the native addon) via the `install` script — be aware it triggers a Rust compile.
 
@@ -39,9 +41,9 @@ Rust tests are **integration tests only** — `src/lib.rs` contains no `#[test]`
 Several `[[bin]]` targets in `Cargo.toml` are load/audit harnesses, plus a Criterion bench. Run these before claiming no perf regression on storage/index/HQL changes:
 
 ```bash
-cargo bench --bench ldbc_lite
-cargo run --release --bin industrial-audit     # also: scientific-audit, snb-ingestion,
-                                               # snb-bulk-ingestion, shadow-sync-stress, hql-query-stress
+cargo bench --bench ldbc_lite                            # Criterion bench ([[bench]], not gated)
+cargo run --release --features bins --bin industrial-audit   # also: scientific-audit, snb-ingestion,
+                                                         # snb-bulk-ingestion, shadow-sync-stress, hql-query-stress
 ```
 
 ## Other surfaces
