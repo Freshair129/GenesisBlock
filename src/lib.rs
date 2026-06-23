@@ -2922,16 +2922,34 @@ impl Storage {
         self.lang_centroids.insert(lang, v_f32);
     }
 
+    /// Order-independent digest of the current graph state. Two peers that hold
+    /// the same nodes and edges — same ids, version clocks, and retraction state —
+    /// produce the SAME root regardless of the order events landed in their WALs.
+    /// This is the gossip divergence trigger (Heartbeat compares roots → issue a
+    /// PullRequest), so an order-independent root lets peers actually converge
+    /// instead of re-pulling forever on insertion-order alone.
+    ///
+    /// Previously this hashed the WAL line-by-line in file order, so two peers at
+    /// identical state but different write order diverged permanently. We digest
+    /// the canonical in-memory state instead: nodes and edges each contribute
+    /// `id | clock.time | clock.peer | valid_to`, sorted by id. Including the
+    /// clock captures supersession/version; including `valid_to` captures edge
+    /// retraction. (Secondary vectors are not in the digest — they have no
+    /// LWW/version identity; they replicate via `Event::Vector` deltas instead.)
     pub fn get_merkle_root(&self) -> String {
-        if !self.log_path.exists() { return "0".repeat(64); }
-        let mut hasher = Sha256::new();
-        if let Ok(file) = File::open(&self.log_path) {
-            let reader = std::io::BufReader::new(file);
-            use std::io::BufRead;
-            for line_res in reader.lines() {
-                if let Ok(line) = line_res { hasher.update(line.as_bytes()); }
-            }
+        let mut lines: Vec<String> = Vec::with_capacity(self.nodes.len() + self.edges.len());
+        for e in self.nodes.iter() {
+            let n = e.value();
+            lines.push(format!("N|{}|{}|{}|{}", n.id, n.clock.time, n.clock.peer_id, n.valid_to.as_deref().unwrap_or("")));
         }
+        for e in self.edges.iter() {
+            let ed = e.value();
+            lines.push(format!("E|{}|{}|{}|{}", ed.id, ed.clock.time, ed.clock.peer_id, ed.valid_to.as_deref().unwrap_or("")));
+        }
+        if lines.is_empty() { return "0".repeat(64); }
+        lines.sort();
+        let mut hasher = Sha256::new();
+        for l in &lines { hasher.update(l.as_bytes()); hasher.update(b"\n"); }
         hex::encode(hasher.finalize())
     }
 
