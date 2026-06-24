@@ -817,6 +817,23 @@ enum IndexJob {
     Flush(Sender<()>),
 }
 
+/// A message to the WAL-writer thread. Every WAL mutation is serialized through
+/// this single channel so appends and checkpoints can never race the file.
+///
+/// `Checkpoint` exists because the writer thread holds `genesis-graph.wal` open
+/// for append for the whole `Storage` lifetime, and Windows refuses to rename
+/// over a file with a live handle — so the old rename-based `compact()` silently
+/// no-op'd there and the WAL grew unbounded (AUDIT--P33: ~20 GB at 1M nodes).
+/// Only the thread that owns the handle can replace the file safely, so the
+/// checkpoint payload (already-serialized live-state `SignedEvent` lines) is
+/// handed to it and the file is truncated + rewritten there (see `wal_checkpoint`).
+pub enum WalMsg {
+    /// Append one signed event; `ack` fires once it is flushed + fsynced.
+    Append(SignedEvent, Sender<bool>),
+    /// Replace the entire WAL with `data` (live-state snapshot), then ack.
+    Checkpoint { data: Vec<u8>, ack: Sender<bool> },
+}
+
 pub struct Storage {
     pub path: PathBuf,
     pub read_only: bool,
@@ -849,7 +866,7 @@ pub struct Storage {
     pub meta_nodes: DashMap<u32, SuperNode>,
     pub meta_edges: DashMap<String, MetaEdge>,
     pub meta_history: DashMap<u32, Vec<SuperNode>>,
-    pub wal_sender: Sender<(SignedEvent, Sender<bool>)>,
+    pub wal_sender: Sender<WalMsg>,
     /// Deferred-indexing queue: live HNSW inserts run off the write hot path on
     /// a dedicated thread (ADR--GENESISDB-ASYNC-INDEXING). Internal — drive via
     /// add/flush, not directly (the job type is private).
@@ -1123,16 +1140,20 @@ impl Storage {
         let local_peer_id = hex::encode(Sha256::digest(verifying_key.as_bytes()))[..16].to_string();
 
         let log_path = root.join("genesis-graph.wal");
-        let (wal_sender, wal_receiver): (Sender<(SignedEvent, Sender<bool>)>, Receiver<(SignedEvent, Sender<bool>)>) = unbounded();
+        let (wal_sender, wal_receiver): (Sender<WalMsg>, Receiver<WalMsg>) = unbounded();
         let log_path_clone = log_path.clone();
 
         let wal_handle = std::thread::spawn(move || {
             if let Ok(file) = FileOpenOptions::new().append(true).create(true).open(&log_path_clone) {
                 let mut writer = std::io::BufWriter::with_capacity(128 * 1024, file);
                 let mut batch: Vec<crossbeam_channel::Sender<bool>> = Vec::with_capacity(1024);
+                // A checkpoint pulled out of the micro-batch drain is stashed here
+                // and applied only after the in-flight append batch is flushed +
+                // acked, so the new (live-state) WAL never loses a just-acked write.
+                let mut pending_ckpt: Option<(Vec<u8>, crossbeam_channel::Sender<bool>)> = None;
                 loop {
                     match wal_receiver.recv() {
-                        Ok((signed_event, ack_tx)) => {
+                        Ok(WalMsg::Append(signed_event, ack_tx)) => {
                             batch.push(ack_tx);
                             if let Ok(json) = serde_json::to_string(&signed_event) {
                                 let _ = writer.write_all(json.as_bytes());
@@ -1141,17 +1162,31 @@ impl Storage {
                             let timeout = Duration::from_millis(5);
                             let start = Instant::now();
                             while batch.len() < 1024 && start.elapsed() < timeout {
-                                if let Ok((se, tx)) = wal_receiver.try_recv() {
-                                    batch.push(tx);
-                                    if let Ok(j) = serde_json::to_string(&se) {
-                                        let _ = writer.write_all(j.as_bytes());
-                                        let _ = writer.write_all(b"\n");
+                                match wal_receiver.try_recv() {
+                                    Ok(WalMsg::Append(se, tx)) => {
+                                        batch.push(tx);
+                                        if let Ok(j) = serde_json::to_string(&se) {
+                                            let _ = writer.write_all(j.as_bytes());
+                                            let _ = writer.write_all(b"\n");
+                                        }
                                     }
-                                } else { break; }
+                                    // Defer the checkpoint: drain ends so the current
+                                    // append batch is durably flushed + acked first.
+                                    Ok(WalMsg::Checkpoint { data, ack }) => { pending_ckpt = Some((data, ack)); break; }
+                                    Err(_) => break,
+                                }
                             }
                             let _ = writer.flush();
                             let _ = writer.get_mut().sync_all();
                             for ack in batch.drain(..) { let _ = ack.send(true); }
+                            if let Some((data, ack)) = pending_ckpt.take() {
+                                Self::wal_checkpoint(&mut writer, &log_path_clone, &data);
+                                let _ = ack.send(true);
+                            }
+                        },
+                        Ok(WalMsg::Checkpoint { data, ack }) => {
+                            Self::wal_checkpoint(&mut writer, &log_path_clone, &data);
+                            let _ = ack.send(true);
                         },
                         Err(_) => break,
                     }
@@ -1312,7 +1347,7 @@ impl Storage {
     pub fn persist(&self, event: &Event) -> Result<()> {
         let (ack_tx, ack_rx) = unbounded();
         let signed_event = self.sign_event(event);
-        self.wal_sender.send((signed_event, ack_tx)).map_err(|_| Error::from_reason("wal disconnected"))?;
+        self.wal_sender.send(WalMsg::Append(signed_event, ack_tx)).map_err(|_| Error::from_reason("wal disconnected"))?;
         let _ = ack_rx.recv(); Ok(())
     }
 
@@ -2284,7 +2319,7 @@ impl Storage {
 
     pub fn persist_signed(&self, signed_event: SignedEvent) -> Result<()> {
         let (ack_tx, ack_rx) = unbounded();
-        self.wal_sender.send((signed_event, ack_tx)).map_err(|_| Error::from_reason("wal disconnected"))?;
+        self.wal_sender.send(WalMsg::Append(signed_event, ack_tx)).map_err(|_| Error::from_reason("wal disconnected"))?;
         let _ = ack_rx.recv(); Ok(())
     }
 
@@ -2563,15 +2598,32 @@ impl Storage {
         fs::write(temp_dir.join("state.json"), state.to_string()).ok();
 
         // Atomic-ish swap: per-collection filenames are dynamic, so move every
-        // file produced into the db root instead of a fixed list.
+        // file produced into the db root instead of a fixed list. `state.json` is
+        // moved LAST and on its own: the load path only does an instant load when
+        // state.json exists, so renaming it last means a crash mid-swap leaves no
+        // state.json → reload falls back to the (still-intact) WAL. Truncating the
+        // WAL below is therefore safe only after state.json is durably in place.
         if let Ok(entries) = fs::read_dir(&temp_dir) {
             for entry in entries.flatten() {
-                if let Some(name) = entry.path().file_name() {
-                    fs::rename(entry.path(), self.path.join(name)).ok();
+                let p = entry.path();
+                if p.file_name().map_or(false, |n| n == "state.json") { continue; }
+                if let Some(name) = p.file_name() {
+                    fs::rename(&p, self.path.join(name)).ok();
                 }
             }
         }
+        let state_tmp = temp_dir.join("state.json");
+        if state_tmp.exists() {
+            fs::rename(&state_tmp, self.path.join("state.json")).ok();
+        }
         let _ = fs::remove_dir_all(&temp_dir);
+
+        // Snapshot is durable and authoritative; compact the WAL down to live
+        // state so it stays bounded instead of growing without limit (AUDIT--P33:
+        // ~20 GB at 1M nodes). compact-to-live-state (not truncate-to-empty) keeps
+        // the WAL a complete, independent recovery source. Best-effort: a failed
+        // compaction only leaves a larger WAL, never a corrupt one.
+        let _ = self.compact();
 
         println!("Mark IX: State persisted successfully to {}", self.path.display());
         Ok(())
@@ -3031,24 +3083,81 @@ impl Storage {
         out.into_iter().map(|(_, se)| se).collect()
     }
 
+    /// Reconstruct a live node's primary embedding from its collection arena, at
+    /// the arena's resident fidelity (exact for `Quant::None`, dequantized
+    /// otherwise — the SAME fidelity the snapshot restores, since the snapshot also
+    /// persists the arena, not the original f64). `compact` needs this because the
+    /// resident `NodeOutput` is stored lean (`insert_node_lean` nulls `embedding`),
+    /// so a node cloned out of `self.nodes` carries no vector; without
+    /// re-attaching it the rewritten WAL would silently drop every embedding and
+    /// stop being a self-contained recovery source. Streamed per node, so it never
+    /// materializes all embeddings at once. Returns `None` for vector-less nodes.
+    fn reconstruct_embedding(&self, node: &NodeOutput, node_u32: u32) -> Option<Vec<f64>> {
+        let coll = self.resolve_collection(&node.collection).ok()?;
+        let aid = *coll.node_to_arena.get(&node_u32)?;
+        let meta = coll.metadata.read();
+        let m = meta.get(aid as usize)?;
+        let (start, len) = (m.embedding_offset as usize, m.vector_dim as usize);
+        let arena = coll.arena.read();
+        if start + len > arena.len() { return None; }
+        Some(arena.f32_at(start, len).into_iter().map(|x| x as f64).collect())
+    }
+
+    /// Replace the open WAL's contents with `data`, executed ON the WAL-writer
+    /// thread so it owns the file handle being swapped. The old `compact()` wrote a
+    /// `.new` file and `fs::rename`d it over the WAL from the caller thread — but
+    /// the writer thread keeps `genesis-graph.wal` open for the whole `Storage`
+    /// lifetime and Windows refuses to rename over a file with a live handle, so
+    /// that rename silently failed (`.ok()`) and the WAL never shrank (AUDIT--P33).
+    ///
+    /// Truncation is done by REOPENING the file, not `set_len(0)`: a Rust
+    /// append-mode handle is granted `FILE_GENERIC_WRITE & !FILE_WRITE_DATA` on
+    /// Windows, so `SetEndOfFile` (what `set_len` calls) is refused on it — the
+    /// truncate fails silently and the new events just get appended to the old log.
+    /// A fresh `write+truncate` handle starts the file at length 0; afterward we
+    /// reopen in append mode for subsequent writes. Both opens succeed alongside
+    /// the handle being replaced because Rust opens files share-read/write/delete.
+    fn wal_checkpoint(writer: &mut std::io::BufWriter<File>, path: &std::path::Path, data: &[u8]) {
+        let _ = writer.flush();
+        let _ = writer.get_mut().sync_all();
+        // Truncate-to-zero + write the live-state snapshot through a fresh handle.
+        if let Ok(f) = FileOpenOptions::new().write(true).create(true).truncate(true).open(path) {
+            *writer = std::io::BufWriter::with_capacity(128 * 1024, f); // old append handle dropped
+            let _ = writer.write_all(data);
+            let _ = writer.flush();
+            let _ = writer.get_mut().sync_all();
+        }
+        // Restore an append-mode handle for the steady-state append path.
+        if let Ok(f) = FileOpenOptions::new().append(true).create(true).open(path) {
+            *writer = std::io::BufWriter::with_capacity(128 * 1024, f); // truncate handle dropped
+        }
+    }
+
     pub fn compact(&self) -> Result<()> {
         self.ensure_writable()?;
-        let new_log_path = self.path.join("genesis-graph.wal.new");
-        let mut writer = std::io::BufWriter::new(File::create(&new_log_path).map_err(|e| Error::from_reason(e.to_string()))?);
-        
+        // Build the live-state snapshot in memory, then hand it to the WAL thread
+        // to atomically replace the file (serialized with appends; see WalMsg).
+        let mut buf: Vec<u8> = Vec::new();
+
         let now = Utc::now().to_rfc3339();
         let mut count = 0;
 
-        // 1. Write current live nodes
+        // 1. Write current live nodes. The resident node is lean (no embedding),
+        //    so re-attach its vector from the arena — otherwise a WAL-only reload
+        //    (no snapshot) would reconstruct the graph but lose every embedding.
         for entry in self.nodes.iter() {
             let node = entry.value();
             if let Some(exp) = &node.expires_at {
                 if now > *exp { continue; }
             }
             if node.valid_to.is_none() {
-                if let Ok(json) = serde_json::to_string(&self.sign_event(&Event::Node(node.clone()))) {
-                    let _ = writer.write_all(json.as_bytes());
-                    let _ = writer.write_all(b"\n");
+                let mut node = node.clone();
+                if node.embedding.is_none() {
+                    node.embedding = self.reconstruct_embedding(&node, *entry.key());
+                }
+                if let Ok(json) = serde_json::to_string(&self.sign_event(&Event::Node(node))) {
+                    buf.extend_from_slice(json.as_bytes());
+                    buf.push(b'\n');
                     count += 1;
                 }
             }
@@ -3059,8 +3168,8 @@ impl Storage {
             let edge = entry.value();
             if edge.valid_to.is_none() {
                 if let Ok(json) = serde_json::to_string(&self.sign_event(&Event::Edge(edge.clone()))) {
-                    let _ = writer.write_all(json.as_bytes());
-                    let _ = writer.write_all(b"\n");
+                    buf.extend_from_slice(json.as_bytes());
+                    buf.push(b'\n');
                     count += 1;
                 }
             }
@@ -3093,15 +3202,20 @@ impl Storage {
             }
             for v in latest.into_values() {
                 if let Ok(json) = serde_json::to_string(&self.sign_event(&Event::Vector(v))) {
-                    let _ = writer.write_all(json.as_bytes());
-                    let _ = writer.write_all(b"\n");
+                    buf.extend_from_slice(json.as_bytes());
+                    buf.push(b'\n');
                     count += 1;
                 }
             }
         }
 
-        writer.flush().ok();
-        fs::rename(&new_log_path, &self.log_path).ok();
+        // Hand the rebuilt WAL to the writer thread and block until it has
+        // truncated + rewritten + fsynced through its own handle.
+        let (ack_tx, ack_rx) = unbounded();
+        self.wal_sender
+            .send(WalMsg::Checkpoint { data: buf, ack: ack_tx })
+            .map_err(|_| Error::from_reason("wal disconnected"))?;
+        let _ = ack_rx.recv();
         println!("Mark IX: WAL Compacted. {} live events preserved.", count);
         Ok(())
     }
