@@ -25,6 +25,8 @@ dashboard/dist/
 # Data/WAL
 **/*.wal
 **/*.lock
+# ...but track the root Cargo.lock for reproducible binary/addon builds
+!/Cargo.lock
 **/*.bin
 .brain/
 **/temp_db/

@@ -1,0 +1,59 @@
+{
+  "$comment": "Version manifest for the GenesisBlockDB multi-surface repo. The engine (Rust core) is the anchor; every client surface declares the engine SCHEMA_VERSION it targets. SCHEMA_VERSION is the on-disk/data-format version (src/lib.rs: SCHEMA_VERSION), independent of package semver. Bump a surface's `version` on release; bump `engine.schemaVersion` only on a breaking on-disk format change.",
+  "engine": {
+    "name": "genesis-block-native",
+    "version": "0.1.0-beta.1",
+    "schemaVersion": 1,
+    "artifacts": ["cdylib (npm native addon)", "rlib (Axum REST server)"]
+  },
+  "surfaces": [
+    {
+      "name": "@freshair129/gks-genesis-block-native",
+      "path": ".",
+      "type": "npm-native-addon",
+      "version": "0.1.0-beta.1",
+      "targetsSchemaVersion": 1,
+      "minEngineVersion": "0.1.0-beta.1"
+    },
+    {
+      "name": "genesisdb-python",
+      "path": "genesisdb-python",
+      "type": "rest-client-sdk",
+      "version": "0.1.0",
+      "targetsSchemaVersion": 1,
+      "minEngineVersion": "0.1.0-beta.1"
+    },
+    {
+      "name": "genesisblock-go",
+      "path": "genesisdb-go",
+      "type": "rest-client-sdk",
+      "version": "0.1.0",
+      "targetsSchemaVersion": 1,
+      "minEngineVersion": "0.1.0-beta.1"
+    },
+    {
+      "name": "genesis-mcp-server",
+      "path": "mcp",
+      "type": "mcp-server",
+      "version": "0.1.0-beta.1",
+      "targetsSchemaVersion": 1,
+      "minEngineVersion": "0.1.0-beta.1"
+    },
+    {
+      "name": "genesis-dashboard",
+      "path": "dashboard",
+      "type": "web-dashboard",
+      "version": "0.0.0",
+      "targetsSchemaVersion": 1,
+      "minEngineVersion": "0.1.0-beta.1"
+    },
+    {
+      "name": "genesis-obsidian-plugin",
+      "path": "obsidian-plugin",
+      "type": "obsidian-plugin",
+      "version": "0.1.0",
+      "targetsSchemaVersion": 1,
+      "minEngineVersion": "0.1.0-beta.1"
+    }
+  ]
+}
