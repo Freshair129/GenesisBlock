@@ -1,0 +1,112 @@
+# Build the NAPI native addon for every published target and publish to npm.
+#
+# Triggered by pushing a version tag (e.g. v0.1.0-beta.1) or manually.
+#
+# PREREQUISITES (must be set up once before this can actually publish):
+#   1. Repo secret NPM_TOKEN — an npm automation token with publish rights to
+#      the @freshair129 scope. Settings → Secrets and variables → Actions.
+#   2. package.json `install: npm run build` forces a Rust compile on EVERY
+#      consumer `npm install`. Before the first real publish, change it so
+#      consumers receive the prebuilt platform addon instead of recompiling
+#      (the napi optionalDependencies + index.js resolver already handle
+#      runtime selection). CI here uses `--ignore-scripts` to avoid recompiling.
+#
+# Flow (napi-rs v2): each matrix host builds one target's .node and uploads it;
+# the publish job downloads them all, `napi artifacts` lays them into npm/<target>/
+# package dirs, then `npm publish` runs — `prepublishOnly` (napi prepublish -t npm)
+# publishes the per-platform packages and rewrites the main package's
+# optionalDependencies.
+
+name: Release (npm publish)
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write # npm provenance
+
+jobs:
+  build:
+    name: build ${{ matrix.target }}
+    runs-on: ${{ matrix.host }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - host: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+          - host: windows-latest
+            target: x86_64-pc-windows-msvc
+          - host: macos-13
+            target: x86_64-apple-darwin
+          - host: macos-latest
+            target: aarch64-apple-darwin
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ matrix.target }}
+
+      # --ignore-scripts: skip the `install` script so npm does not kick off a
+      # second (platform-default) Rust build before we build the real target.
+      - name: Install dependencies
+        run: npm ci --ignore-scripts
+
+      - name: Build native addon (${{ matrix.target }})
+        run: npx napi build --platform --release --target ${{ matrix.target }}
+
+      - name: Upload addon artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: bindings-${{ matrix.target }}
+          path: '*.node'
+          if-no-files-found: error
+
+  publish:
+    name: publish to npm
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          registry-url: 'https://registry.npmjs.org'
+
+      - name: Install dependencies
+        run: npm ci --ignore-scripts
+
+      - name: Download all addon artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Lay artifacts into per-platform npm dirs
+        run: npx napi artifacts --dir artifacts
+
+      - name: Show what will be published
+        run: ls -R ./npm || true
+
+      # prepublishOnly (napi prepublish -t npm) fires here: publishes the
+      # per-platform packages and updates the main package optionalDependencies.
+      # --tag beta keeps this prerelease off the npm `latest` dist-tag.
+      - name: Publish to npm
+        run: |
+          npm config set provenance true
+          npm publish --access public --tag beta
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
