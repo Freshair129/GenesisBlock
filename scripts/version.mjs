@@ -21,7 +21,9 @@ const CARGO = join(ROOT, 'Cargo.toml');
 const PKG = join(ROOT, 'package.json');
 const MODULES = join(ROOT, 'modules.json');
 
-const NPM_SURFACE = '@freshair129/gks-genesis-block-native';
+// The npm surface in modules.json is the package itself — derive its name from
+// package.json so a rename can't silently desync the surface entry.
+const NPM_SURFACE = JSON.parse(readFileSync(PKG, 'utf8')).name;
 
 // MAJOR.MINOR.PATCH(-prerelease)? — prerelease is dot-separated alnum/hyphen.
 const SEMVER = /^(\d+)\.(\d+)\.(\d+)(?:-([0-9A-Za-z]+(?:\.[0-9A-Za-z]+)*))?$/;

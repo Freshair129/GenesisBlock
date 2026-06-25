@@ -1,7 +1,7 @@
 use std::sync::Arc;
 use std::sync::atomic::Ordering;
 use axum::{
-    extract::{Json, State},
+    extract::{DefaultBodyLimit, Json, State},
     http::StatusCode,
     response::IntoResponse,
     routing::{get, post},
@@ -403,7 +403,13 @@ pub fn build_router(state: AppState) -> Router {
         .route("/v1/bulk/nodes", post(bulk_add_nodes_handler))
         .route("/v1/bulk/edges", post(bulk_add_edges_handler))
         .route("/v1/bulk/rebuild", post(rebuild_index_handler))
-        .route("/v1/query/hql", post(execute_hql_handler))
+        // HQL is a query string; cap the body at 256 KiB so a malformed/huge
+        // request can't force a large allocation (defense-in-depth — the bulk
+        // routes that legitimately carry embeddings keep the default limit).
+        .route(
+            "/v1/query/hql",
+            post(execute_hql_handler).layer(DefaultBodyLimit::max(256 * 1024)),
+        )
         .route("/v1/node/add", post(add_node_handler))
         .route("/v1/node/supersede", post(supersede_node_handler))
         .route("/v1/edge/add", post(add_edge_handler))
