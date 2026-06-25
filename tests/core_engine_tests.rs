@@ -4,7 +4,7 @@ use std::path::Path;
 use serde_json::from_value;
 
 fn setup_test_db(name: &str) -> Storage {
-    let db_path = format!("G:/GenesisBlock_Dev/GenesisBlock/tests/{}", name);
+    let db_path = format!("{}/{}", env!("CARGO_TARGET_TMPDIR"), name);
     if Path::new(&db_path).exists() {
         fs::remove_dir_all(&db_path).unwrap();
     }
@@ -65,7 +65,7 @@ fn test_edge_creation_and_graph_traversal() {
 
 #[test]
 fn test_vector_arena_and_hybrid_search() {
-    let db_path = "G:/GenesisBlock_Dev/GenesisBlock/tests/test_hybrid_search";
+    let db_path = concat!(env!("CARGO_TARGET_TMPDIR"), "/test_hybrid_search");
     if Path::new(db_path).exists() {
         fs::remove_dir_all(db_path).unwrap();
     }
@@ -106,7 +106,7 @@ fn test_vector_arena_and_hybrid_search() {
 
 #[test]
 fn test_wal_group_commit_durability() {
-    let db_path = "G:/GenesisBlock_Dev/GenesisBlock/tests/test_wal_durability";
+    let db_path = concat!(env!("CARGO_TARGET_TMPDIR"), "/test_wal_durability");
     if Path::new(db_path).exists() { fs::remove_dir_all(db_path).unwrap(); }
 
     {

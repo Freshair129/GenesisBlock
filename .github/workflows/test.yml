@@ -1,0 +1,74 @@
+# Real test gate: runs the actual test suites on every PR and push to main.
+#
+# This is the correctness gate (distinct from benchmarks.yml, which is a perf
+# audit). A red run here MUST block merge — no `continue-on-error`, no silent
+# `exit 0` skips.
+#
+# Platform note: the storage core is decoupled from the napi bindings (the
+# `napi-bindings` feature, default-on, gates the cdylib surface). `cargo test
+# --no-default-features` builds the core + integration tests with NO napi_*
+# symbols, so the Rust tests link and run on all three platforms including Linux.
+# `npm test` exercises the napi cdylib path at runtime on all three.
+
+name: Tests
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+permissions:
+  contents: read
+
+jobs:
+  version-consistency:
+    name: version consistency (SSOT)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      # Fails if Cargo.toml / package.json / modules.json disagree on the engine
+      # version. Keeps the x.y.z[-prerelease] across surfaces in lock-step.
+      - name: Check version SSOT
+        run: node scripts/version.mjs check
+
+  rust-tests:
+    name: cargo test (${{ matrix.host }})
+    runs-on: ${{ matrix.host }}
+    strategy:
+      fail-fast: false
+      matrix:
+        host: [ ubuntu-latest, windows-latest, macos-latest ]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      # --no-default-features drops the napi bindings so the integration tests
+      # link as plain native binaries (no napi_* symbols) — works on Linux too.
+      - name: cargo test (core, no napi)
+        run: cargo test --no-default-features
+
+  node-tests:
+    name: npm test (${{ matrix.host }})
+    runs-on: ${{ matrix.host }}
+    strategy:
+      fail-fast: false
+      matrix:
+        host: [ ubuntu-latest, windows-latest, macos-latest ]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      # --ignore-scripts so `prepare` doesn't double-build; we build explicitly.
+      - name: Install deps (no build)
+        run: npm ci --ignore-scripts
+      - name: Build native addon
+        run: npm run build
+      - name: npm test
+        run: npm test

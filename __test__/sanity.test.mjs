@@ -5,11 +5,22 @@ import assert from 'node:assert/strict'
 // object, which we destructure here. Avoids the Node 20 ESM static-analysis
 // gotcha with native bindings (the names are filled in at runtime).
 import binding from '../index.js'
+import { readFileSync } from 'node:fs'
+import { fileURLToPath } from 'node:url'
 
-const { schemaVersionSync, engineNameSync } = binding
+const { schemaVersionSync, engineNameSync, versionSync } = binding
 
 test('engineNameSync returns the stable identifier', () => {
   assert.equal(engineNameSync(), 'genesis-block')
+})
+
+test('versionSync matches package.json version (single source of truth)', () => {
+  const pkg = JSON.parse(
+    readFileSync(fileURLToPath(new URL('../package.json', import.meta.url)), 'utf8'),
+  )
+  // The Rust ENGINE_VERSION is env!("CARGO_PKG_VERSION"); the version CLI keeps
+  // Cargo.toml and package.json in lock-step, so these must be equal.
+  assert.equal(versionSync(), pkg.version)
 })
 
 test('schemaVersionSync matches the TypeScript-side CURRENT_SCHEMA_VERSION major byte', () => {

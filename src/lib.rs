@@ -20,8 +20,37 @@ use chrono::Utc;
 use dashmap::DashMap;
 use roaring::RoaringBitmap;
 use hnsw_rs::prelude::*;
+#[cfg(feature = "napi-bindings")]
 use napi::bindgen_prelude::*;
+#[cfg(feature = "napi-bindings")]
 use napi_derive::napi;
+
+// When the napi bindings are disabled (REST server / Linux integration-test
+// build) the storage core uses a minimal Error/Result that mirror the only napi
+// API it relies on — `Error::from_reason`. This is what lets the core link as a
+// plain native binary with no napi_* symbols (core/napi split, #161). The cdylib
+// build (default features) is unchanged: it still uses napi's Error/Result.
+#[cfg(not(feature = "napi-bindings"))]
+mod core_error {
+    #[derive(Debug)]
+    pub struct Error {
+        pub reason: String,
+    }
+    impl Error {
+        pub fn from_reason<T: Into<String>>(reason: T) -> Self {
+            Error { reason: reason.into() }
+        }
+    }
+    impl std::fmt::Display for Error {
+        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+            write!(f, "{}", self.reason)
+        }
+    }
+    impl std::error::Error for Error {}
+    pub type Result<T> = std::result::Result<T, Error>;
+}
+#[cfg(not(feature = "napi-bindings"))]
+use core_error::{Error, Result};
 use parking_lot::RwLock;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -33,10 +62,16 @@ pub mod router;
 use query::HqlCommand;
 
 pub const SCHEMA_VERSION: u32 = 1;
+/// Stable engine identifier (independent of package version).
+pub const ENGINE_NAME: &str = "genesis-block";
+/// Engine package version (semver x.y.z[-prerelease]), baked in from Cargo.toml
+/// at compile time. Single source of truth for the running version — surfaced
+/// via `version_sync()` (NAPI) and `GET /v1/version` (REST).
+pub const ENGINE_VERSION: &str = env!("CARGO_PKG_VERSION");
 
 // --- Types (PROTOCOL §3) ---
 
-#[napi(object)]
+#[cfg_attr(feature = "napi-bindings", napi(object))]
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct OpenOptions {
     pub path: String,
@@ -45,7 +80,7 @@ pub struct OpenOptions {
     pub vector_dim: Option<u32>,
 }
 
-#[napi(object)]
+#[cfg_attr(feature = "napi-bindings", napi(object))]
 #[derive(Serialize, Deserialize, Debug)]
 pub struct NodeInput {
     pub id: Option<String>,
@@ -60,14 +95,14 @@ pub struct NodeInput {
     pub collection: Option<String>,
 }
 
-#[napi(object)]
+#[cfg_attr(feature = "napi-bindings", napi(object))]
 #[derive(Serialize, Deserialize, Clone, Debug, Default, PartialEq, Eq, PartialOrd, Ord)]
 pub struct LogicalClock {
     pub time: u32,
     pub peer_id: String,
 }
 
-#[napi(object)]
+#[cfg_attr(feature = "napi-bindings", napi(object))]
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct NodeOutput {
     pub id: String,
@@ -88,7 +123,7 @@ pub struct NodeOutput {
     pub collection: Option<String>,
 }
 
-#[napi(object)]
+#[cfg_attr(feature = "napi-bindings", napi(object))]
 #[derive(Serialize, Deserialize, Debug)]
 pub struct EdgeInput {
     pub id: Option<String>,
@@ -102,7 +137,7 @@ pub struct EdgeInput {
     pub caused_by: Option<String>,
 }
 
-#[napi(object)]
+#[cfg_attr(feature = "napi-bindings", napi(object))]
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct EdgeOutput {
     pub id: String,
@@ -119,7 +154,7 @@ pub struct EdgeOutput {
     pub clock: LogicalClock,
 }
 
-#[napi]
+#[cfg_attr(feature = "napi-bindings", napi)]
 #[derive(PartialEq, Eq, PartialOrd, Ord)]
 pub enum ScalingTier {
     H0 = 0,
@@ -154,7 +189,7 @@ impl ScalingTier {
     }
 }
 
-#[napi(object)]
+#[cfg_attr(feature = "napi-bindings", napi(object))]
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct ContextPackage {
     pub nodes: Vec<NodeOutput>,
@@ -164,7 +199,7 @@ pub struct ContextPackage {
     pub reasoning_path: String,
 }
 
-#[napi(object)]
+#[cfg_attr(feature = "napi-bindings", napi(object))]
 #[derive(Serialize, Deserialize, Debug)]
 pub struct QueryInput {
     pub from: Option<String>,
@@ -175,7 +210,7 @@ pub struct QueryInput {
     pub limit: Option<u32>,
 }
 
-#[napi(object)]
+#[cfg_attr(feature = "napi-bindings", napi(object))]
 #[derive(Serialize, Deserialize, Debug)]
 pub struct NeighborInput {
     pub depth: Option<u32>,
@@ -187,7 +222,7 @@ pub struct NeighborInput {
     pub limit: Option<u32>,
 }
 
-#[napi(object)]
+#[cfg_attr(feature = "napi-bindings", napi(object))]
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct NeighborOutput {
     pub node: NodeOutput,
@@ -195,7 +230,7 @@ pub struct NeighborOutput {
     pub depth: u32,
 }
 
-#[napi(object)]
+#[cfg_attr(feature = "napi-bindings", napi(object))]
 #[derive(Serialize, Deserialize, Debug)]
 pub struct HybridSearchInput {
     pub query_vector: Vec<f64>,
@@ -214,7 +249,7 @@ pub struct HybridSearchInput {
     pub ef_search: Option<u32>,
 }
 
-#[napi(object)]
+#[cfg_attr(feature = "napi-bindings", napi(object))]
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct DatabaseStatus {
     pub open: bool,
@@ -222,7 +257,7 @@ pub struct DatabaseStatus {
     pub page_cache_mb: u32,
 }
 
-#[napi(object)]
+#[cfg_attr(feature = "napi-bindings", napi(object))]
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct CollectionInfo {
     pub name: String,
@@ -237,7 +272,7 @@ pub struct CollectionInfo {
     pub rerank: bool,
 }
 
-#[napi(object)]
+#[cfg_attr(feature = "napi-bindings", napi(object))]
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct SyncPeer {
     pub id: String,
@@ -287,14 +322,14 @@ pub enum SyncEvent {
     RequestFragment(String),
 }
 
-#[napi(object)]
+#[cfg_attr(feature = "napi-bindings", napi(object))]
 #[derive(Serialize, Deserialize, Debug)]
 pub struct BatchInput {
     pub nodes: Vec<NodeInput>,
     pub edges: Vec<EdgeInput>,
 }
 
-#[napi(object)]
+#[cfg_attr(feature = "napi-bindings", napi(object))]
 #[derive(Serialize, Deserialize, Debug)]
 pub struct BatchOutput {
     pub nodes: Vec<NodeOutput>,
@@ -379,7 +414,7 @@ pub struct ConsensusProposal {
     pub committed: bool,
 }
 
-#[napi(object)]
+#[cfg_attr(feature = "napi-bindings", napi(object))]
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct SuperNode {
     pub cluster_id: u32,
@@ -391,7 +426,7 @@ pub struct SuperNode {
     pub drift: Option<f64>,
 }
 
-#[napi(object)]
+#[cfg_attr(feature = "napi-bindings", napi(object))]
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct MetaEdge {
     pub from_cluster: u32,
@@ -1117,11 +1152,45 @@ impl Storage {
         for c in self.collections.iter() { c.value().rehydrate(ef_c); }
     }
 
+    /// Read the on-disk schema version from the snapshot manifest (state.json).
+    /// `Some(0)` for a pre-versioned snapshot lacking the field; `None` when no
+    /// snapshot exists yet (fresh database). Used by the open-time compatibility
+    /// gate to refuse databases written by a newer engine.
+    fn read_ondisk_schema_version(root: &std::path::Path) -> Option<u32> {
+        let state_path = root.join("state.json");
+        if !state_path.exists() { return None; }
+        let txt = fs::read_to_string(&state_path).ok()?;
+        let val: serde_json::Value = serde_json::from_str(&txt).ok()?;
+        Some(val["schema_version"].as_u64().unwrap_or(0) as u32)
+    }
+
     pub fn open(opts: OpenOptions) -> Result<Self> {
         let root = PathBuf::from(opts.path.clone());
         if !root.exists() { fs::create_dir_all(&root).ok(); }
         let read_only = opts.read_only.unwrap_or(false);
         let vector_dim = opts.vector_dim.unwrap_or(1536) as u16;
+
+        // --- Schema-version compatibility gate (forward-incompat protection) ---
+        // A database written by a NEWER engine must not be silently misread.
+        // Read the on-disk schema version from the snapshot manifest and refuse
+        // to open if it exceeds what this engine understands. Older snapshots
+        // fall through to the existing on-load migrations (legacy meta/edge
+        // formats) and are rewritten at the current SCHEMA_VERSION on the next
+        // save_state().
+        if let Some(on_disk) = Self::read_ondisk_schema_version(&root) {
+            if on_disk > SCHEMA_VERSION {
+                return Err(Error::from_reason(format!(
+                    "database schema v{} was written by a newer engine; this engine supports up to v{}. Upgrade the engine to open this database.",
+                    on_disk, SCHEMA_VERSION
+                )));
+            }
+            if on_disk < SCHEMA_VERSION {
+                println!(
+                    "Schema: migrating on-disk format v{} -> v{} (applied on load, persisted on next save).",
+                    on_disk, SCHEMA_VERSION
+                );
+            }
+        }
 
         // --- Cryptographic Identity (Mark X) ---
         let identity_path = root.join("identity.bin");
@@ -1830,7 +1899,21 @@ impl Storage {
         let fetch = if coll.f32_sidecar.is_some() {
             (args.k as usize).saturating_mul(RERANK_OVERFETCH).max(k2)
         } else { k2 };
-        let mut results = {
+        // When a rerank sidecar is present and the over-fetch would already pull
+        // ~every slot, skip the approximate HNSW prefilter and score the full
+        // sidecar exactly. The HNSW prefilter can nondeterministically drop a
+        // candidate whose quantized code ties with another (e.g. two same-sign
+        // BQ vectors collapse to one code), which would deny rerank the true
+        // nearest. Exact brute force in this regime makes rerank deterministic
+        // and recall exact. Large collections (fetch << slot count — e.g. the
+        // 1M recall benchmarks) keep the HNSW path unchanged.
+        let exact_rerank_slots = coll.f32_sidecar.as_ref().and_then(|s| {
+            let n = s.read().len() / (coll.dim as usize).max(1);
+            (n > 0 && fetch >= n).then_some(n)
+        });
+        let mut results = if let Some(n) = exact_rerank_slots {
+            (0..n).map(|i| (i, 0.0f32)).collect()
+        } else {
             let hnsw_lock = coll.hnsw.read();
             match &*hnsw_lock {
                 Some(idx) => idx.search_f32(&query_f32, fetch, ef),
@@ -1878,7 +1961,14 @@ impl Storage {
                 }
             }
         }
-        hybrid_results.sort_by(|a, b| b.node.impact.partial_cmp(&a.node.impact).unwrap());
+        // NaN-safe: a poisoned (NaN) impact score must not panic the whole query.
+        // Treat incomparable scores as equal so sorting degrades gracefully.
+        hybrid_results.sort_by(|a, b| {
+            b.node
+                .impact
+                .partial_cmp(&a.node.impact)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
         // Dedupe by node id, keeping the highest-scoring hit. A node may hold more
         // than one arena/HNSW slot in a collection — e.g. after `add_vector`
         // supersedes a prior vector, the orphaned slot lingers until compaction —
@@ -2420,7 +2510,13 @@ impl Storage {
         tokio::spawn(async move {
             let socket = match tokio::net::UdpSocket::bind("0.0.0.0:0").await {
                 Ok(s) => {
-                    let addr = s.local_addr().unwrap();
+                    let addr = match s.local_addr() {
+                        Ok(a) => a,
+                        Err(e) => {
+                            println!("Gossip: Failed to read local socket addr: {}", e);
+                            return;
+                        }
+                    };
                     storage.gossip_port.store(addr.port() as u32, Ordering::SeqCst);
                     println!("Gossip: Bound to UDP port {}", addr.port());
                     s
@@ -2430,7 +2526,10 @@ impl Storage {
                     return;
                 }
             };
-            socket.set_broadcast(true).unwrap();
+            if let Err(e) = socket.set_broadcast(true) {
+                println!("Gossip: Failed to enable broadcast: {}", e);
+                return;
+            }
 
             let mut buf = [0u8; 65535];
             let mut heartbeat_interval = tokio::time::interval(Duration::from_secs(5));
@@ -2531,7 +2630,10 @@ impl Storage {
                 Ok(s) => s,
                 Err(_) => return,
             };
-            socket.set_broadcast(true).unwrap();
+            if let Err(e) = socket.set_broadcast(true) {
+                println!("Gossip: Failed to enable broadcast on discovery listener: {}", e);
+                return;
+            }
             let mut buf = [0u8; 65535];
             loop {
                 if let Ok((len, _addr)) = socket.recv_from(&mut buf).await {
@@ -3340,7 +3442,7 @@ impl Drop for Storage {
     }
 }
 
-#[napi(object)]
+#[cfg_attr(feature = "napi-bindings", napi(object))]
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct GapSuggestion {
     pub cluster_a: u32,
@@ -3349,9 +3451,11 @@ pub struct GapSuggestion {
     pub reason: String,
 }
 
+#[cfg(feature = "napi-bindings")]
 #[napi]
 pub struct GenesisDatabase { inner: Arc<Storage> }
 
+#[cfg(feature = "napi-bindings")]
 #[napi]
 impl GenesisDatabase {
     #[napi(factory)]
@@ -3420,7 +3524,12 @@ impl GenesisDatabase {
     #[napi] pub fn get_logical_clock(&self) -> u32 { self.inner.logical_clock.load(Ordering::SeqCst) }
     #[napi] pub fn get_merkle_root(&self) -> String { self.inner.get_merkle_root() }
     #[napi] pub fn schema_version_sync(&self) -> u32 { SCHEMA_VERSION }
+    #[napi] pub fn version_sync(&self) -> String { ENGINE_VERSION.to_string() }
     #[napi] pub fn status_sync(&self) -> DatabaseStatus { self.inner.status_sync() }
 }
-#[napi] pub fn engine_name_sync() -> String { "genesis-block".to_string() }
+#[cfg(feature = "napi-bindings")]
+#[napi] pub fn engine_name_sync() -> String { ENGINE_NAME.to_string() }
+#[cfg(feature = "napi-bindings")]
 #[napi] pub fn schema_version_sync() -> u32 { SCHEMA_VERSION }
+#[cfg(feature = "napi-bindings")]
+#[napi] pub fn version_sync() -> String { ENGINE_VERSION.to_string() }

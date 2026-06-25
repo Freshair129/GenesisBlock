@@ -178,6 +178,7 @@ export interface GapSuggestion {
 }
 export declare function engineNameSync(): string
 export declare function schemaVersionSync(): number
+export declare function versionSync(): string
 export declare class GenesisDatabase {
   static open(opts: OpenOptions): GenesisDatabase
   bulkAddNodes(inputs: Array<NodeInput>): Promise<void>
@@ -218,5 +219,6 @@ export declare class GenesisDatabase {
   getLogicalClock(): number
   getMerkleRoot(): string
   schemaVersionSync(): number
+  versionSync(): string
   statusSync(): DatabaseStatus
 }

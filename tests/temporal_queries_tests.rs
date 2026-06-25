@@ -1,19 +1,24 @@
-use genesis_block_native::{OpenOptions, NodeInput, EdgeInput, GenesisDatabase, NeighborOutput};
+// Bitemporal time-travel over TRAVERSE ... AS OF. Exercises the storage core
+// directly (Storage, sync) so it builds and runs with or without the napi
+// bindings (core/napi split, #161) — the async GenesisDatabase wrapper is just a
+// thin offload over these same Storage methods.
+use genesis_block_native::{OpenOptions, NodeInput, EdgeInput, Storage, NeighborOutput};
 use serde_json::{json, from_value};
 
-#[tokio::test]
-async fn test_temporal_time_travel() {
-    let opts = OpenOptions { 
-        path: ".brain/test_temporal_db".to_string(),
+#[test]
+fn test_temporal_time_travel() {
+    let path = concat!(env!("CARGO_TARGET_TMPDIR"), "/test_temporal_db");
+    let opts = OpenOptions {
+        path: path.to_string(),
         page_cache_mb: Some(10),
         read_only: Some(false),
-        vector_dim: None, 
+        vector_dim: None,
     };
-    let _ = std::fs::remove_dir_all(&opts.path);
-    let db = GenesisDatabase::open(opts.clone()).unwrap();
+    let _ = std::fs::remove_dir_all(path);
+    let db = Storage::open(opts).unwrap();
 
     // 1. Create a node in the past (Year 2024)
-    let _node_v1 = db.add_node(NodeInput {  
+    let _node_v1 = db.add_node(NodeInput {
         id: Some("Concept-A".to_string()),
         labels: vec!["Idea".to_string()],
         props: Some(json!({"desc": "Version 1"})),
@@ -22,10 +27,10 @@ async fn test_temporal_time_travel() {
         valid_from: Some("2024-01-01T00:00:00Z".to_string()),
         caused_by: None,
         ttl: None, collection: None,
-    }).await.unwrap();
+    }).unwrap();
 
     // 2. Create another node in the past
-    let _node_b = db.add_node(NodeInput {  
+    let _node_b = db.add_node(NodeInput {
         id: Some("Concept-B".to_string()),
         labels: vec!["Idea".to_string()],
         props: Some(json!({"desc": "Original B"})),
@@ -34,10 +39,10 @@ async fn test_temporal_time_travel() {
         valid_from: Some("2024-01-01T00:00:00Z".to_string()),
         caused_by: None,
         ttl: None, collection: None,
-    }).await.unwrap();
+    }).unwrap();
 
     // 3. Connect them in the past
-    let _edge_v1 = db.add_edge(EdgeInput {  
+    let _edge_v1 = db.add_edge(EdgeInput {
         id: Some("E1".to_string()),
         from: "Concept-A".to_string(),
         to: "Concept-B".to_string(),
@@ -47,17 +52,17 @@ async fn test_temporal_time_travel() {
         supersede: None,
         impact: Some(0.8),
         caused_by: None,
-    }).await.unwrap();
+    }).unwrap();
 
     // --- TIME TRAVEL QUERY 1: AS OF 2024 ---
     let hql_2024 = "TRAVERSE FROM \"Concept-A\" DEPTH 1 REL ANY AS OF \"2024-06-01T00:00:00Z\"";
-    let res_2024 = db.execute_hql(hql_2024.to_string()).await.unwrap();
+    let res_2024 = db.execute_hql(hql_2024).unwrap();
     let results_2024: Vec<NeighborOutput> = from_value(res_2024).unwrap();
     assert_eq!(results_2024.len(), 1, "Should find 1 neighbor in 2024");
     assert_eq!(results_2024[0].node.id, "Concept-B");
 
     // 4. Future node
-    let _node_c_future = db.add_node(NodeInput {  
+    let _node_c_future = db.add_node(NodeInput {
         id: Some("Concept-C".to_string()),
         labels: vec!["FutureIdea".to_string()],
         props: Some(json!({"desc": "Born in 2026"})),
@@ -66,9 +71,9 @@ async fn test_temporal_time_travel() {
         valid_from: Some("2026-01-01T00:00:00Z".to_string()),
         caused_by: None,
         ttl: None, collection: None,
-    }).await.unwrap();
+    }).unwrap();
 
-    let _edge_v2 = db.add_edge(EdgeInput {  
+    let _edge_v2 = db.add_edge(EdgeInput {
         id: Some("E2".to_string()),
         from: "Concept-A".to_string(),
         to: "Concept-C".to_string(),
@@ -78,20 +83,20 @@ async fn test_temporal_time_travel() {
         supersede: None,
         impact: Some(0.9),
         caused_by: None,
-    }).await.unwrap();
+    }).unwrap();
 
     // --- TIME TRAVEL QUERY 2: AS OF 2025 ---
     let hql_2025 = "TRAVERSE FROM \"Concept-A\" DEPTH 1 REL ANY AS OF \"2025-01-01T00:00:00Z\"";
-    let res_2025 = db.execute_hql(hql_2025.to_string()).await.unwrap();
+    let res_2025 = db.execute_hql(hql_2025).unwrap();
     let results_2025: Vec<NeighborOutput> = from_value(res_2025).unwrap();
     assert_eq!(results_2025.len(), 1, "Should still only find Concept-B in 2025");
     assert_eq!(results_2025[0].node.id, "Concept-B");
 
     // --- PRESENT DAY QUERY: AS OF 2027 ---
     let hql_2027 = "TRAVERSE FROM \"Concept-A\" DEPTH 1 REL ANY AS OF \"2027-01-01T00:00:00Z\"";
-    let res_2027 = db.execute_hql(hql_2027.to_string()).await.unwrap();
+    let res_2027 = db.execute_hql(hql_2027).unwrap();
     let results_2027: Vec<NeighborOutput> = from_value(res_2027).unwrap();
     assert_eq!(results_2027.len(), 2, "Should find both B and C in 2027");
 
-    let _ = std::fs::remove_dir_all(&opts.path);
+    let _ = std::fs::remove_dir_all(path);
 }

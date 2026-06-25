@@ -4,7 +4,7 @@ use std::path::Path;
 
 #[test]
 fn test_mark_ix_memory_reclamation_compaction() {
-    let db_path = "G:/GenesisBlock_Dev/GenesisBlock/tests/test_compaction_db";
+    let db_path = concat!(env!("CARGO_TARGET_TMPDIR"), "/test_compaction_db");
     if Path::new(db_path).exists() {
         fs::remove_dir_all(db_path).unwrap();
     }

@@ -9,7 +9,7 @@ use std::fs;
 use std::path::Path;
 
 fn fresh(name: &str) -> String {
-    let db_path = format!("G:/GenesisBlock_Dev/GenesisBlock/tests/{}", name);
+    let db_path = format!("{}/{}", env!("CARGO_TARGET_TMPDIR"), name);
     if Path::new(&db_path).exists() {
         fs::remove_dir_all(&db_path).unwrap();
     }

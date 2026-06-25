@@ -1,6 +1,6 @@
 {
   "name": "@freshair129/gks-genesis-block-native",
-  "version": "0.1.0-beta.1",
+  "version": "0.1.0-beta.2",
   "description": "Genesis Block — native Rust embedded graph engine for GKS (P3.1 scaffold)",
   "main": "index.js",
   "types": "index.d.ts",
@@ -38,8 +38,12 @@
     "build:debug": "napi build --platform",
     "agents:validate": "node .agents/validate-agent-registry.mjs",
     "prepublishOnly": "napi prepublish -t npm",
-    "test": "node --test __test__/*.mjs",
-    "install": "npm run build",
+    "test": "node --test __test__/mcp.test.mjs __test__/sanity.test.mjs",
+    "version:get": "node scripts/version.mjs get",
+    "version:check": "node scripts/version.mjs check",
+    "version:set": "node scripts/version.mjs set",
+    "version:bump": "node scripts/version.mjs bump",
+    "update:check": "node scripts/check-update.mjs",
     "mcp:start": "node mcp/server.js"
   },
   "dependencies": {

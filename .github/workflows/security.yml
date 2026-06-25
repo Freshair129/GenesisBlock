@@ -1,0 +1,34 @@
+# Dependency vulnerability gate: audits Cargo.lock against the RustSec advisory
+# database on every push/PR to main, and weekly to catch newly-disclosed CVEs in
+# already-pinned dependencies.
+#
+# Requires Cargo.lock to be committed (it is, as of the beta cut).
+
+name: Security Audit
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - '**/Cargo.toml'
+      - '**/Cargo.lock'
+      - '.github/workflows/security.yml'
+  pull_request:
+    branches: [ main ]
+  schedule:
+    # Weekly, Monday 06:00 UTC — surfaces advisories filed against pinned deps.
+    - cron: '0 6 * * 1'
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    name: cargo audit (RustSec)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: RustSec advisory audit
+        uses: rustsec/audit-check@v2
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}

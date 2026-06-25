@@ -1,7 +1,7 @@
 use std::sync::Arc;
 use std::sync::atomic::Ordering;
 use axum::{
-    extract::{Json, State},
+    extract::{DefaultBodyLimit, Json, State},
     http::StatusCode,
     response::IntoResponse,
     routing::{get, post},
@@ -280,10 +280,31 @@ async fn insight_rebuild_handler(State(state): State<AppState>) -> impl IntoResp
     }
 }
 
+/// HQL request body. Accepts both the historical raw-JSON-string form
+/// (`"SEARCH ..."`) and the object form the Python/Go SDKs send
+/// (`{"query": "SEARCH ..."}`), so neither side has to change. Untagged: serde
+/// tries each variant in order.
+#[derive(serde::Deserialize)]
+#[serde(untagged)]
+enum HqlBody {
+    Raw(String),
+    Wrapped { query: String },
+}
+
+impl HqlBody {
+    fn into_query(self) -> String {
+        match self {
+            HqlBody::Raw(q) => q,
+            HqlBody::Wrapped { query } => query,
+        }
+    }
+}
+
 async fn execute_hql_handler(
     State(state): State<AppState>,
-    Json(query): Json<String>,
+    Json(body): Json<HqlBody>,
 ) -> impl IntoResponse {
+    let query = body.into_query();
     let storage = state.storage.read();
     if storage.is_rebuilding.load(Ordering::SeqCst) {
         return (StatusCode::SERVICE_UNAVAILABLE, "Engine is rebuilding index...").into_response();
@@ -362,6 +383,17 @@ async fn status_handler(State(state): State<AppState>) -> impl IntoResponse {
     Json(status)
 }
 
+/// Engine version + schema version + stable name. Lets clients and ops tooling
+/// query the running version (and on-disk schema version) to decide whether an
+/// update is needed. Static — no engine state required.
+async fn version_handler() -> impl IntoResponse {
+    Json(serde_json::json!({
+        "engine_name": crate::ENGINE_NAME,
+        "version": crate::ENGINE_VERSION,
+        "schema_version": crate::SCHEMA_VERSION,
+    }))
+}
+
 // ---------------------------------------------------------------------------
 // Router builder — shared by main.rs and integration tests
 // ---------------------------------------------------------------------------
@@ -371,7 +403,13 @@ pub fn build_router(state: AppState) -> Router {
         .route("/v1/bulk/nodes", post(bulk_add_nodes_handler))
         .route("/v1/bulk/edges", post(bulk_add_edges_handler))
         .route("/v1/bulk/rebuild", post(rebuild_index_handler))
-        .route("/v1/query/hql", post(execute_hql_handler))
+        // HQL is a query string; cap the body at 256 KiB so a malformed/huge
+        // request can't force a large allocation (defense-in-depth — the bulk
+        // routes that legitimately carry embeddings keep the default limit).
+        .route(
+            "/v1/query/hql",
+            post(execute_hql_handler).layer(DefaultBodyLimit::max(256 * 1024)),
+        )
         .route("/v1/node/add", post(add_node_handler))
         .route("/v1/node/supersede", post(supersede_node_handler))
         .route("/v1/edge/add", post(add_edge_handler))
@@ -387,6 +425,7 @@ pub fn build_router(state: AppState) -> Router {
         .route("/v1/search/hybrid", post(hybrid_search_handler))
         .route("/v1/reason/context", post(ranked_context_handler))
         .route("/v1/status", get(status_handler))
+        .route("/v1/version", get(version_handler))
         .route("/v1/swarm/status", get(swarm_status_handler))
         .route("/v1/consensus/propose", post(consensus_propose_handler))
         .route("/v1/consensus/vote", post(consensus_vote_handler))

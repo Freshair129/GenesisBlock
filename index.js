@@ -310,9 +310,10 @@ if (!nativeBinding) {
   throw new Error(`Failed to load native binding`)
 }
 
-const { ScalingTier, GenesisDatabase, engineNameSync, schemaVersionSync } = nativeBinding
+const { ScalingTier, GenesisDatabase, engineNameSync, schemaVersionSync, versionSync } = nativeBinding
 
 module.exports.ScalingTier = ScalingTier
 module.exports.GenesisDatabase = GenesisDatabase
 module.exports.engineNameSync = engineNameSync
 module.exports.schemaVersionSync = schemaVersionSync
+module.exports.versionSync = versionSync
