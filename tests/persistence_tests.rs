@@ -4,7 +4,7 @@ use std::path::Path;
 
 #[test]
 fn test_mark_ix_instant_load_persistence() {
-    let db_path = "G:/GenesisBlock_Dev/GenesisBlock/tests/test_persistence_db";
+    let db_path = concat!(env!("CARGO_TARGET_TMPDIR"), "/test_persistence_db");
     if Path::new(db_path).exists() {
         fs::remove_dir_all(db_path).unwrap();
     }

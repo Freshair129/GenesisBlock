@@ -3,7 +3,7 @@ use serde_json::json;
 
 #[test]
 fn test_axiomatic_guards_enforcement() {
-    let db_path = "G:/GenesisBlock_Dev/GenesisBlock/tests/test_guards_db";
+    let db_path = concat!(env!("CARGO_TARGET_TMPDIR"), "/test_guards_db");
     if std::path::Path::new(db_path).exists() {
         let _ = std::fs::remove_dir_all(db_path);
     }
