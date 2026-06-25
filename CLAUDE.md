@@ -18,7 +18,9 @@ npm run build                                     # napi build --platform --rele
 npm run build:debug                               # debug native addon (faster iteration)
 ```
 
-All `[[bin]]` targets (the REST server plus the benchmark/audit harnesses) are gated behind the off-by-default `bins` feature, so default `cargo build` / `napi build` compiles **only** the `.node` cdylib — pass `--features bins` to build or run any of them. (See the comment in `Cargo.toml`: the bins link the napi-using lib, whose `napi_*` symbols are only provided by the Node host for the cdylib.)
+All `[[bin]]` targets (the REST server plus the benchmark/audit harnesses) are gated behind the off-by-default `bins` feature, so default `cargo build` / `napi build` compiles **only** the `.node` cdylib — pass `--features bins` to build or run any of them.
+
+**core/napi split (#161):** the napi bindings are gated behind the default-on `napi-bindings` feature. The storage core (`Storage` + all its methods) uses a tiny `Error`/`Result` shim when that feature is off, so the core, the REST server, and the integration tests build as **plain native binaries with no `napi_*` symbols** — which is what lets them link on Linux. Build the standalone server with `cargo build --no-default-features --features bins --bin genesis-db-server`; run the Rust tests anywhere (incl. Linux CI) with `cargo test --no-default-features`. The default build (napi on) is unchanged and still produces the cdylib. The `#[napi]`/`#[napi(object)]` attributes are `cfg_attr`-gated; `GenesisDatabase` (the async wrapper) is the only napi-only type.
 
 A local `npm install` (dev clone) runs `napi build --platform --release` via the `prepare` script — so a fresh clone triggers a Rust compile. Registry **consumers** do NOT run `prepare`; they receive the prebuilt platform addon through napi's `optionalDependencies` (no compile). CI uses `npm ci --ignore-scripts` to skip it.
 

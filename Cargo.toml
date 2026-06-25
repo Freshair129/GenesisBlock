@@ -10,17 +10,20 @@ publish = false
 crate-type = ["cdylib", "rlib"]
 
 [features]
-# `bins` gates the standalone server + benchmark executables. Each one links the
-# napi-using lib, so it cannot link as a standalone binary during the default
-# `cargo build` / `napi build` — `napi_*` symbols (e.g. napi_get_cb_info) are only
-# provided by the Node host for the cdylib. Keeping the bins behind an off-by-
-# default feature lets `npm install` (napi build) compile ONLY the .node cdylib,
-# while `cargo build --features bins` still builds them for benchmarks/dev.
+# napi-bindings (default ON) compiles the NAPI cdylib surface (the GenesisDatabase
+# wrapper + #[napi] exports = the Node addon). Turn it OFF to build the storage
+# core + REST server / integration tests as plain native binaries with NO napi_*
+# symbol dependency — which is what lets them link on Linux CI. The core's
+# Error/Result fall back to a tiny shim when this is off (see src/lib.rs).
+default = ["napi-bindings"]
+napi-bindings = ["dep:napi", "dep:napi-derive"]
+# `bins` gates the standalone server + benchmark executables. Build them WITHOUT
+# napi for a standalone link: `cargo build --no-default-features --features bins`.
 bins = []
 
 [dependencies]
-napi = { version = "2.16", default-features = false, features = ["napi8", "async", "serde-json"] }
-napi-derive = "2.16"
+napi = { version = "2.16", default-features = false, features = ["napi8", "async", "serde-json"], optional = true }
+napi-derive = { version = "2.16", optional = true }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 chrono = { version = "0.4", features = ["serde"] }

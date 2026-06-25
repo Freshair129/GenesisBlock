@@ -31,6 +31,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   and this `CHANGELOG.md`.
 
 ### Changed
+- **core/napi split (#161):** the napi bindings are now gated behind a
+  default-on `napi-bindings` feature. With it off
+  (`cargo build/test --no-default-features`), the storage core, REST server, and
+  all integration tests compile as plain native binaries with no `napi_*`
+  symbols — so they link and run on Linux. The CI test gate now runs `cargo test
+  --no-default-features` on **all three** platforms (Linux/Windows/macOS); the
+  default build still produces the napi cdylib unchanged. `temporal_queries_tests`
+  was converted from the async `GenesisDatabase` wrapper to the sync `Storage`
+  core so it runs in both modes.
 - `package.json`: native build moved from the `install` script to `prepare`, so
   registry consumers receive the prebuilt platform addon (via napi
   `optionalDependencies`) instead of being forced to compile Rust on every

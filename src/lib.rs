@@ -20,8 +20,37 @@ use chrono::Utc;
 use dashmap::DashMap;
 use roaring::RoaringBitmap;
 use hnsw_rs::prelude::*;
+#[cfg(feature = "napi-bindings")]
 use napi::bindgen_prelude::*;
+#[cfg(feature = "napi-bindings")]
 use napi_derive::napi;
+
+// When the napi bindings are disabled (REST server / Linux integration-test
+// build) the storage core uses a minimal Error/Result that mirror the only napi
+// API it relies on — `Error::from_reason`. This is what lets the core link as a
+// plain native binary with no napi_* symbols (core/napi split, #161). The cdylib
+// build (default features) is unchanged: it still uses napi's Error/Result.
+#[cfg(not(feature = "napi-bindings"))]
+mod core_error {
+    #[derive(Debug)]
+    pub struct Error {
+        pub reason: String,
+    }
+    impl Error {
+        pub fn from_reason<T: Into<String>>(reason: T) -> Self {
+            Error { reason: reason.into() }
+        }
+    }
+    impl std::fmt::Display for Error {
+        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+            write!(f, "{}", self.reason)
+        }
+    }
+    impl std::error::Error for Error {}
+    pub type Result<T> = std::result::Result<T, Error>;
+}
+#[cfg(not(feature = "napi-bindings"))]
+use core_error::{Error, Result};
 use parking_lot::RwLock;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -42,7 +71,7 @@ pub const ENGINE_VERSION: &str = env!("CARGO_PKG_VERSION");
 
 // --- Types (PROTOCOL §3) ---
 
-#[napi(object)]
+#[cfg_attr(feature = "napi-bindings", napi(object))]
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct OpenOptions {
     pub path: String,
@@ -51,7 +80,7 @@ pub struct OpenOptions {
     pub vector_dim: Option<u32>,
 }
 
-#[napi(object)]
+#[cfg_attr(feature = "napi-bindings", napi(object))]
 #[derive(Serialize, Deserialize, Debug)]
 pub struct NodeInput {
     pub id: Option<String>,
@@ -66,14 +95,14 @@ pub struct NodeInput {
     pub collection: Option<String>,
 }
 
-#[napi(object)]
+#[cfg_attr(feature = "napi-bindings", napi(object))]
 #[derive(Serialize, Deserialize, Clone, Debug, Default, PartialEq, Eq, PartialOrd, Ord)]
 pub struct LogicalClock {
     pub time: u32,
     pub peer_id: String,
 }
 
-#[napi(object)]
+#[cfg_attr(feature = "napi-bindings", napi(object))]
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct NodeOutput {
     pub id: String,
@@ -94,7 +123,7 @@ pub struct NodeOutput {
     pub collection: Option<String>,
 }
 
-#[napi(object)]
+#[cfg_attr(feature = "napi-bindings", napi(object))]
 #[derive(Serialize, Deserialize, Debug)]
 pub struct EdgeInput {
     pub id: Option<String>,
@@ -108,7 +137,7 @@ pub struct EdgeInput {
     pub caused_by: Option<String>,
 }
 
-#[napi(object)]
+#[cfg_attr(feature = "napi-bindings", napi(object))]
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct EdgeOutput {
     pub id: String,
@@ -125,7 +154,7 @@ pub struct EdgeOutput {
     pub clock: LogicalClock,
 }
 
-#[napi]
+#[cfg_attr(feature = "napi-bindings", napi)]
 #[derive(PartialEq, Eq, PartialOrd, Ord)]
 pub enum ScalingTier {
     H0 = 0,
@@ -160,7 +189,7 @@ impl ScalingTier {
     }
 }
 
-#[napi(object)]
+#[cfg_attr(feature = "napi-bindings", napi(object))]
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct ContextPackage {
     pub nodes: Vec<NodeOutput>,
@@ -170,7 +199,7 @@ pub struct ContextPackage {
     pub reasoning_path: String,
 }
 
-#[napi(object)]
+#[cfg_attr(feature = "napi-bindings", napi(object))]
 #[derive(Serialize, Deserialize, Debug)]
 pub struct QueryInput {
     pub from: Option<String>,
@@ -181,7 +210,7 @@ pub struct QueryInput {
     pub limit: Option<u32>,
 }
 
-#[napi(object)]
+#[cfg_attr(feature = "napi-bindings", napi(object))]
 #[derive(Serialize, Deserialize, Debug)]
 pub struct NeighborInput {
     pub depth: Option<u32>,
@@ -193,7 +222,7 @@ pub struct NeighborInput {
     pub limit: Option<u32>,
 }
 
-#[napi(object)]
+#[cfg_attr(feature = "napi-bindings", napi(object))]
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct NeighborOutput {
     pub node: NodeOutput,
@@ -201,7 +230,7 @@ pub struct NeighborOutput {
     pub depth: u32,
 }
 
-#[napi(object)]
+#[cfg_attr(feature = "napi-bindings", napi(object))]
 #[derive(Serialize, Deserialize, Debug)]
 pub struct HybridSearchInput {
     pub query_vector: Vec<f64>,
@@ -220,7 +249,7 @@ pub struct HybridSearchInput {
     pub ef_search: Option<u32>,
 }
 
-#[napi(object)]
+#[cfg_attr(feature = "napi-bindings", napi(object))]
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct DatabaseStatus {
     pub open: bool,
@@ -228,7 +257,7 @@ pub struct DatabaseStatus {
     pub page_cache_mb: u32,
 }
 
-#[napi(object)]
+#[cfg_attr(feature = "napi-bindings", napi(object))]
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct CollectionInfo {
     pub name: String,
@@ -243,7 +272,7 @@ pub struct CollectionInfo {
     pub rerank: bool,
 }
 
-#[napi(object)]
+#[cfg_attr(feature = "napi-bindings", napi(object))]
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct SyncPeer {
     pub id: String,
@@ -293,14 +322,14 @@ pub enum SyncEvent {
     RequestFragment(String),
 }
 
-#[napi(object)]
+#[cfg_attr(feature = "napi-bindings", napi(object))]
 #[derive(Serialize, Deserialize, Debug)]
 pub struct BatchInput {
     pub nodes: Vec<NodeInput>,
     pub edges: Vec<EdgeInput>,
 }
 
-#[napi(object)]
+#[cfg_attr(feature = "napi-bindings", napi(object))]
 #[derive(Serialize, Deserialize, Debug)]
 pub struct BatchOutput {
     pub nodes: Vec<NodeOutput>,
@@ -385,7 +414,7 @@ pub struct ConsensusProposal {
     pub committed: bool,
 }
 
-#[napi(object)]
+#[cfg_attr(feature = "napi-bindings", napi(object))]
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct SuperNode {
     pub cluster_id: u32,
@@ -397,7 +426,7 @@ pub struct SuperNode {
     pub drift: Option<f64>,
 }
 
-#[napi(object)]
+#[cfg_attr(feature = "napi-bindings", napi(object))]
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct MetaEdge {
     pub from_cluster: u32,
@@ -3413,7 +3442,7 @@ impl Drop for Storage {
     }
 }
 
-#[napi(object)]
+#[cfg_attr(feature = "napi-bindings", napi(object))]
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct GapSuggestion {
     pub cluster_a: u32,
@@ -3422,9 +3451,11 @@ pub struct GapSuggestion {
     pub reason: String,
 }
 
+#[cfg(feature = "napi-bindings")]
 #[napi]
 pub struct GenesisDatabase { inner: Arc<Storage> }
 
+#[cfg(feature = "napi-bindings")]
 #[napi]
 impl GenesisDatabase {
     #[napi(factory)]
@@ -3496,6 +3527,9 @@ impl GenesisDatabase {
     #[napi] pub fn version_sync(&self) -> String { ENGINE_VERSION.to_string() }
     #[napi] pub fn status_sync(&self) -> DatabaseStatus { self.inner.status_sync() }
 }
+#[cfg(feature = "napi-bindings")]
 #[napi] pub fn engine_name_sync() -> String { ENGINE_NAME.to_string() }
+#[cfg(feature = "napi-bindings")]
 #[napi] pub fn schema_version_sync() -> u32 { SCHEMA_VERSION }
+#[cfg(feature = "napi-bindings")]
 #[napi] pub fn version_sync() -> String { ENGINE_VERSION.to_string() }
