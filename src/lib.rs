@@ -1282,7 +1282,25 @@ impl Storage {
                     }
                     IndexJob::Batch { coll, items, ef_c } => {
                         coll.ensure_hnsw(ef_c);
-                        if let Some(ref idx) = *coll.hnsw.read() { idx.parallel_insert_f32(&items); }
+                        if let Some(ref idx) = *coll.hnsw.read() {
+                            // hnsw_rs `parallel_insert` can leave nodes UNREACHABLE on
+                            // small / near-degenerate graphs — concurrent insertion races
+                            // graph linkage, so a vector lands in the arena but never gets
+                            // wired into the navigable graph and search can never find it.
+                            // RCA (collinear 30-pt loads): parallel_insert 97/300 loads had
+                            // an unsearchable vector; sequential insert 0/300. Parallelism
+                            // only pays off past a few hundred vectors anyway (rayon spawn
+                            // overhead), so insert small batches sequentially for correct
+                            // connectivity and keep the parallel path for large bulk loads
+                            // (real high-dim data indexes fine there — recall benchmarks
+                            // 0.98+). See ADR--GENESISDB-ASYNC-INDEXING.
+                            const PARALLEL_INSERT_MIN: usize = 1024;
+                            if items.len() < PARALLEL_INSERT_MIN {
+                                for (emb, id) in &items { idx.insert_f32(emb, *id as usize); }
+                            } else {
+                                idx.parallel_insert_f32(&items);
+                            }
+                        }
                         index_pending_thread.fetch_sub(items.len(), Ordering::Relaxed);
                     }
                     IndexJob::Flush(ack) => { let _ = ack.send(()); }
