@@ -465,3 +465,39 @@ async fn test_consensus_sign_vote_returns_bytes() {
     assert!(sig.is_array(), "sign-vote must return a JSON array of bytes");
     assert!(!sig.as_array().unwrap().is_empty(), "signature must be non-empty");
 }
+
+// ---------------------------------------------------------------------------
+// HQL body contract
+// ---------------------------------------------------------------------------
+
+/// `/v1/query/hql` must accept BOTH body shapes: the historical raw JSON string
+/// (`"TRAVERSE ..."`) and the object form the Python/Go SDKs send
+/// (`{"query": "TRAVERSE ..."}`). Pins the contract so neither side drifts.
+#[tokio::test]
+async fn test_hql_accepts_both_raw_and_wrapped_body() {
+    let (app, _dir) = make_app();
+    post_json(&app, "/v1/node/add", json!({ "id": "hsrc", "labels": [] })).await;
+    post_json(&app, "/v1/node/add", json!({ "id": "hdst", "labels": [] })).await;
+    post_json(
+        &app,
+        "/v1/edge/add",
+        json!({ "id": "he1", "from": "hsrc", "to": "hdst", "rel": "LINKS" }),
+    )
+    .await;
+
+    let hql = "TRAVERSE FROM hsrc DEPTH 1 REL LINKS";
+
+    // Raw JSON string form (legacy / native contract).
+    let raw_body = serde_json::to_string(hql).unwrap();
+    let (raw_status, _raw) = post_raw(&app, "/v1/query/hql", "application/json", &raw_body).await;
+    assert_eq!(raw_status, StatusCode::OK, "raw-string HQL body must be accepted");
+
+    // Wrapped object form ({"query": "..."}) — what the SDKs send.
+    let (wrapped_status, _wrapped) =
+        post_json(&app, "/v1/query/hql", json!({ "query": hql })).await;
+    assert_eq!(
+        wrapped_status,
+        StatusCode::OK,
+        "wrapped {{\"query\": ...}} HQL body must be accepted (SDK contract)"
+    );
+}

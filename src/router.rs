@@ -280,10 +280,31 @@ async fn insight_rebuild_handler(State(state): State<AppState>) -> impl IntoResp
     }
 }
 
+/// HQL request body. Accepts both the historical raw-JSON-string form
+/// (`"SEARCH ..."`) and the object form the Python/Go SDKs send
+/// (`{"query": "SEARCH ..."}`), so neither side has to change. Untagged: serde
+/// tries each variant in order.
+#[derive(serde::Deserialize)]
+#[serde(untagged)]
+enum HqlBody {
+    Raw(String),
+    Wrapped { query: String },
+}
+
+impl HqlBody {
+    fn into_query(self) -> String {
+        match self {
+            HqlBody::Raw(q) => q,
+            HqlBody::Wrapped { query } => query,
+        }
+    }
+}
+
 async fn execute_hql_handler(
     State(state): State<AppState>,
-    Json(query): Json<String>,
+    Json(body): Json<HqlBody>,
 ) -> impl IntoResponse {
+    let query = body.into_query();
     let storage = state.storage.read();
     if storage.is_rebuilding.load(Ordering::SeqCst) {
         return (StatusCode::SERVICE_UNAVAILABLE, "Engine is rebuilding index...").into_response();

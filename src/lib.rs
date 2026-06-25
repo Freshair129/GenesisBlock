@@ -1830,7 +1830,21 @@ impl Storage {
         let fetch = if coll.f32_sidecar.is_some() {
             (args.k as usize).saturating_mul(RERANK_OVERFETCH).max(k2)
         } else { k2 };
-        let mut results = {
+        // When a rerank sidecar is present and the over-fetch would already pull
+        // ~every slot, skip the approximate HNSW prefilter and score the full
+        // sidecar exactly. The HNSW prefilter can nondeterministically drop a
+        // candidate whose quantized code ties with another (e.g. two same-sign
+        // BQ vectors collapse to one code), which would deny rerank the true
+        // nearest. Exact brute force in this regime makes rerank deterministic
+        // and recall exact. Large collections (fetch << slot count — e.g. the
+        // 1M recall benchmarks) keep the HNSW path unchanged.
+        let exact_rerank_slots = coll.f32_sidecar.as_ref().and_then(|s| {
+            let n = s.read().len() / (coll.dim as usize).max(1);
+            (n > 0 && fetch >= n).then_some(n)
+        });
+        let mut results = if let Some(n) = exact_rerank_slots {
+            (0..n).map(|i| (i, 0.0f32)).collect()
+        } else {
             let hnsw_lock = coll.hnsw.read();
             match &*hnsw_lock {
                 Some(idx) => idx.search_f32(&query_f32, fetch, ef),
