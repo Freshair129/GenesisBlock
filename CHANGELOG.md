@@ -7,9 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.0-beta.2] - 2026-06-25
+
 ### Added
-- CI test gate (`.github/workflows/test.yml`): runs `cargo test` (Windows/macOS)
-  and `npm test` (Linux/Windows/macOS) on every PR and push to `main`. Replaces
+- CI test gate (`.github/workflows/test.yml`): runs `cargo test`
+  (Linux/Windows/macOS, via `--no-default-features`) and `npm test`
+  (Linux/Windows/macOS) on every PR and push to `main`. Replaces
   the prior situation where the only `main` workflow was a perf audit that
   skipped itself on Linux, so no CI gate actually exercised the test suites.
 - Security audit gate (`.github/workflows/security.yml`): `cargo audit` against
@@ -74,5 +77,6 @@ First beta cut.
 - napi cross-compile matrix and npm publish on version tag
   (`.github/workflows/release.yml`).
 
-[Unreleased]: https://github.com/Freshair129/GenesisBlock/compare/v0.1.0-beta.1...HEAD
+[Unreleased]: https://github.com/Freshair129/GenesisBlock/compare/v0.1.0-beta.2...HEAD
+[0.1.0-beta.2]: https://github.com/Freshair129/GenesisBlock/compare/v0.1.0-beta.1...v0.1.0-beta.2
 [0.1.0-beta.1]: https://github.com/Freshair129/GenesisBlock/releases/tag/v0.1.0-beta.1
