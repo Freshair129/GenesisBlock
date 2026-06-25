@@ -6,6 +6,8 @@ Cargo.lock
 # distributed via per-triple optional-deps packages — not committed)
 *.node
 npm-debug.log
+# Audit/bench/test run logs (e.g. ga_b3_full.log) — never commit run logs
+*.log
 dashboard/playwright-report/
 dashboard/test-results/
 dashboard/dist/
