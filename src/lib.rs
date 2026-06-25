@@ -2645,6 +2645,27 @@ impl Storage {
         });
     }
 
+    /// Rename `from`→`to`, retrying transient Windows sharing violations. The AV
+    /// scanner / search indexer briefly opens a freshly-written file, and Windows
+    /// then fails `MoveFileEx` with ACCESS_DENIED/SHARING_VIOLATION (os err 5/32/33)
+    /// until it releases — a few ms later. Without the retry the `.ok()` callers in
+    /// `save_state` silently drop the snapshot under parallel load, leaving reload
+    /// to fall back to a (correct but slower) full WAL replay. Best-effort: a final
+    /// failure returns `false` rather than erroring, since the snapshot is only an
+    /// instant-load optimization layered on the authoritative WAL.
+    fn rename_with_retry(from: &std::path::Path, to: &std::path::Path) -> bool {
+        for _ in 0..50 {
+            match fs::rename(from, to) {
+                Ok(_) => return true,
+                Err(e) if matches!(e.raw_os_error(), Some(5) | Some(32) | Some(33)) => {
+                    std::thread::sleep(Duration::from_millis(20));
+                }
+                Err(_) => return false,
+            }
+        }
+        fs::rename(from, to).is_ok()
+    }
+
     pub fn save_state(&self) -> Result<()> {
         self.ensure_writable()?;
         let temp_dir = self.path.join("temp_save");
@@ -2710,13 +2731,13 @@ impl Storage {
                 let p = entry.path();
                 if p.file_name().map_or(false, |n| n == "state.json") { continue; }
                 if let Some(name) = p.file_name() {
-                    fs::rename(&p, self.path.join(name)).ok();
+                    Self::rename_with_retry(&p, &self.path.join(name));
                 }
             }
         }
         let state_tmp = temp_dir.join("state.json");
         if state_tmp.exists() {
-            fs::rename(&state_tmp, self.path.join("state.json")).ok();
+            Self::rename_with_retry(&state_tmp, &self.path.join("state.json"));
         }
         let _ = fs::remove_dir_all(&temp_dir);
 
