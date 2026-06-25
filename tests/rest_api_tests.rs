@@ -501,3 +501,23 @@ async fn test_hql_accepts_both_raw_and_wrapped_body() {
         "wrapped {{\"query\": ...}} HQL body must be accepted (SDK contract)"
     );
 }
+
+// ---------------------------------------------------------------------------
+// Version surface
+// ---------------------------------------------------------------------------
+
+/// `GET /v1/version` reports engine name, package version, and on-disk schema
+/// version — the update/version-control surface for clients and ops tooling.
+#[tokio::test]
+async fn test_version_route_reports_engine_version() {
+    let (app, _dir) = make_app();
+    let (status, body) = get_json(&app, "/v1/version").await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(body["engine_name"], json!("genesis-block"));
+    assert_eq!(
+        body["version"],
+        json!(env!("CARGO_PKG_VERSION")),
+        "REST version must match the compiled CARGO_PKG_VERSION"
+    );
+    assert!(body["schema_version"].is_number(), "schema_version present");
+}

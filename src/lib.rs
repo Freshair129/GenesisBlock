@@ -33,6 +33,12 @@ pub mod router;
 use query::HqlCommand;
 
 pub const SCHEMA_VERSION: u32 = 1;
+/// Stable engine identifier (independent of package version).
+pub const ENGINE_NAME: &str = "genesis-block";
+/// Engine package version (semver x.y.z[-prerelease]), baked in from Cargo.toml
+/// at compile time. Single source of truth for the running version — surfaced
+/// via `version_sync()` (NAPI) and `GET /v1/version` (REST).
+pub const ENGINE_VERSION: &str = env!("CARGO_PKG_VERSION");
 
 // --- Types (PROTOCOL §3) ---
 
@@ -1117,11 +1123,45 @@ impl Storage {
         for c in self.collections.iter() { c.value().rehydrate(ef_c); }
     }
 
+    /// Read the on-disk schema version from the snapshot manifest (state.json).
+    /// `Some(0)` for a pre-versioned snapshot lacking the field; `None` when no
+    /// snapshot exists yet (fresh database). Used by the open-time compatibility
+    /// gate to refuse databases written by a newer engine.
+    fn read_ondisk_schema_version(root: &std::path::Path) -> Option<u32> {
+        let state_path = root.join("state.json");
+        if !state_path.exists() { return None; }
+        let txt = fs::read_to_string(&state_path).ok()?;
+        let val: serde_json::Value = serde_json::from_str(&txt).ok()?;
+        Some(val["schema_version"].as_u64().unwrap_or(0) as u32)
+    }
+
     pub fn open(opts: OpenOptions) -> Result<Self> {
         let root = PathBuf::from(opts.path.clone());
         if !root.exists() { fs::create_dir_all(&root).ok(); }
         let read_only = opts.read_only.unwrap_or(false);
         let vector_dim = opts.vector_dim.unwrap_or(1536) as u16;
+
+        // --- Schema-version compatibility gate (forward-incompat protection) ---
+        // A database written by a NEWER engine must not be silently misread.
+        // Read the on-disk schema version from the snapshot manifest and refuse
+        // to open if it exceeds what this engine understands. Older snapshots
+        // fall through to the existing on-load migrations (legacy meta/edge
+        // formats) and are rewritten at the current SCHEMA_VERSION on the next
+        // save_state().
+        if let Some(on_disk) = Self::read_ondisk_schema_version(&root) {
+            if on_disk > SCHEMA_VERSION {
+                return Err(Error::from_reason(format!(
+                    "database schema v{} was written by a newer engine; this engine supports up to v{}. Upgrade the engine to open this database.",
+                    on_disk, SCHEMA_VERSION
+                )));
+            }
+            if on_disk < SCHEMA_VERSION {
+                println!(
+                    "Schema: migrating on-disk format v{} -> v{} (applied on load, persisted on next save).",
+                    on_disk, SCHEMA_VERSION
+                );
+            }
+        }
 
         // --- Cryptographic Identity (Mark X) ---
         let identity_path = root.join("identity.bin");
@@ -3453,7 +3493,9 @@ impl GenesisDatabase {
     #[napi] pub fn get_logical_clock(&self) -> u32 { self.inner.logical_clock.load(Ordering::SeqCst) }
     #[napi] pub fn get_merkle_root(&self) -> String { self.inner.get_merkle_root() }
     #[napi] pub fn schema_version_sync(&self) -> u32 { SCHEMA_VERSION }
+    #[napi] pub fn version_sync(&self) -> String { ENGINE_VERSION.to_string() }
     #[napi] pub fn status_sync(&self) -> DatabaseStatus { self.inner.status_sync() }
 }
-#[napi] pub fn engine_name_sync() -> String { "genesis-block".to_string() }
+#[napi] pub fn engine_name_sync() -> String { ENGINE_NAME.to_string() }
 #[napi] pub fn schema_version_sync() -> u32 { SCHEMA_VERSION }
+#[napi] pub fn version_sync() -> String { ENGINE_VERSION.to_string() }

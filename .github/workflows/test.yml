@@ -24,6 +24,19 @@ permissions:
   contents: read
 
 jobs:
+  version-consistency:
+    name: version consistency (SSOT)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      # Fails if Cargo.toml / package.json / modules.json disagree on the engine
+      # version. Keeps the x.y.z[-prerelease] across surfaces in lock-step.
+      - name: Check version SSOT
+        run: node scripts/version.mjs check
+
   rust-tests:
     name: cargo test (${{ matrix.host }})
     runs-on: ${{ matrix.host }}

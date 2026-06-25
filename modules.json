@@ -4,7 +4,10 @@
     "name": "genesis-block-native",
     "version": "0.1.0-beta.1",
     "schemaVersion": 1,
-    "artifacts": ["cdylib (npm native addon)", "rlib (Axum REST server)"]
+    "artifacts": [
+      "cdylib (npm native addon)",
+      "rlib (Axum REST server)"
+    ]
   },
   "surfaces": [
     {

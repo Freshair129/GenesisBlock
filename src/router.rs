@@ -383,6 +383,17 @@ async fn status_handler(State(state): State<AppState>) -> impl IntoResponse {
     Json(status)
 }
 
+/// Engine version + schema version + stable name. Lets clients and ops tooling
+/// query the running version (and on-disk schema version) to decide whether an
+/// update is needed. Static — no engine state required.
+async fn version_handler() -> impl IntoResponse {
+    Json(serde_json::json!({
+        "engine_name": crate::ENGINE_NAME,
+        "version": crate::ENGINE_VERSION,
+        "schema_version": crate::SCHEMA_VERSION,
+    }))
+}
+
 // ---------------------------------------------------------------------------
 // Router builder — shared by main.rs and integration tests
 // ---------------------------------------------------------------------------
@@ -408,6 +419,7 @@ pub fn build_router(state: AppState) -> Router {
         .route("/v1/search/hybrid", post(hybrid_search_handler))
         .route("/v1/reason/context", post(ranked_context_handler))
         .route("/v1/status", get(status_handler))
+        .route("/v1/version", get(version_handler))
         .route("/v1/swarm/status", get(swarm_status_handler))
         .route("/v1/consensus/propose", post(consensus_propose_handler))
         .route("/v1/consensus/vote", post(consensus_vote_handler))

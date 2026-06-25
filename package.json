@@ -40,6 +40,11 @@
     "prepublishOnly": "napi prepublish -t npm",
     "test": "node --test __test__/*.mjs",
     "prepare": "napi build --platform --release",
+    "version:get": "node scripts/version.mjs get",
+    "version:check": "node scripts/version.mjs check",
+    "version:set": "node scripts/version.mjs set",
+    "version:bump": "node scripts/version.mjs bump",
+    "update:check": "node scripts/check-update.mjs",
     "mcp:start": "node mcp/server.js"
   },
   "dependencies": {

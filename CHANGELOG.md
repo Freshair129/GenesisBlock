@@ -14,7 +14,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   skipped itself on Linux, so no CI gate actually exercised the test suites.
 - Security audit gate (`.github/workflows/security.yml`): `cargo audit` against
   the RustSec advisory database on push/PR and weekly.
-- `SECURITY.md` (vulnerability reporting policy) and this `CHANGELOG.md`.
+- **Version control (semver SSOT):** `scripts/version.mjs` keeps the engine
+  version (`x.y.z[-prerelease]`) in lock-step across `Cargo.toml`,
+  `package.json`, and `modules.json` (`npm run version:get|check|set|bump`). CI
+  `version-consistency` job fails the build on drift.
+- **Update system:**
+  - `GET /v1/version` (REST) and `versionSync()` (NAPI) report
+    `{engine_name, version, schema_version}` so clients/ops can see the running
+    version. Engine version is baked from `CARGO_PKG_VERSION` (`ENGINE_VERSION`).
+  - `scripts/check-update.mjs` (`npm run update:check`) — notify-only update
+    check against the npm registry (never auto-installs).
+  - Schema-version compatibility gate on open: a database written by a newer
+    engine is refused with a clear error (forward-incompat protection); older /
+    pre-versioned snapshots open via the existing migration path.
+- `SECURITY.md` (vulnerability reporting policy), `docs/OPERATIONS.md` runbook,
+  and this `CHANGELOG.md`.
 
 ### Changed
 - `package.json`: native build moved from the `install` script to `prepare`, so
@@ -23,6 +37,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `npm install`. Local dev clones still build on install.
 
 ### Fixed
+- Deterministic rerank: the rerank+compaction path was nondeterministic under
+  load (two same-sign BQ vectors collapse to one binary code, so the approximate
+  HNSW prefilter could surface only one of the tied pair). When a rerank sidecar
+  is present and the over-fetch already covers ~every slot, the full sidecar is
+  now scored exactly. Large collections keep the HNSW path (recall benchmarks
+  unaffected).
+- `/v1/query/hql` now accepts both the raw-JSON-string body and the
+  `{"query": "..."}` object body the Python/Go SDKs send (was: raw string only,
+  which rejected every SDK request).
 - Hardened panic paths in the engine: NaN-safe sort in hybrid search
   (`partial_cmp` no longer `unwrap`s), and the gossip/swarm UDP setup
   (`local_addr` / `set_broadcast`) now fails gracefully instead of panicking the
