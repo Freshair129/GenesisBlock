@@ -20,7 +20,7 @@ npm run build:debug                               # debug native addon (faster i
 
 All `[[bin]]` targets (the REST server plus the benchmark/audit harnesses) are gated behind the off-by-default `bins` feature, so default `cargo build` / `napi build` compiles **only** the `.node` cdylib — pass `--features bins` to build or run any of them. (See the comment in `Cargo.toml`: the bins link the napi-using lib, whose `napi_*` symbols are only provided by the Node host for the cdylib.)
 
-`npm install` is wired to run `npm run build` (the native addon) via the `install` script — be aware it triggers a Rust compile.
+A local `npm install` (dev clone) runs `napi build --platform --release` via the `prepare` script — so a fresh clone triggers a Rust compile. Registry **consumers** do NOT run `prepare`; they receive the prebuilt platform addon through napi's `optionalDependencies` (no compile). CI uses `npm ci --ignore-scripts` to skip it.
 
 ## Tests
 

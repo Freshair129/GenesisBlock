@@ -1,0 +1,61 @@
+# Real test gate: runs the actual test suites on every PR and push to main.
+#
+# This is the correctness gate (distinct from benchmarks.yml, which is a perf
+# audit). A red run here MUST block merge — no `continue-on-error`, no silent
+# `exit 0` skips.
+#
+# Platform note: the Rust integration tests in tests/*.rs link the lib as an
+# rlib, which pulls in the napi_* symbols the Node host normally provides. Those
+# resolve when building test executables on Windows/macOS but NOT as standalone
+# binaries on Linux (same root cause as the gated bins; tracked in
+# cognitive_system#161 — separate the storage core from the napi bindings).
+# Until that split lands, `cargo test` runs on Windows + macOS. `npm test` loads
+# the cdylib at runtime, so it runs on all three platforms including Linux.
+
+name: Tests
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+permissions:
+  contents: read
+
+jobs:
+  rust-tests:
+    name: cargo test (${{ matrix.host }})
+    runs-on: ${{ matrix.host }}
+    strategy:
+      fail-fast: false
+      matrix:
+        host: [ windows-latest, macos-latest ]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: cargo test
+        run: cargo test
+
+  node-tests:
+    name: npm test (${{ matrix.host }})
+    runs-on: ${{ matrix.host }}
+    strategy:
+      fail-fast: false
+      matrix:
+        host: [ ubuntu-latest, windows-latest, macos-latest ]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      # --ignore-scripts so `prepare` doesn't double-build; we build explicitly.
+      - name: Install deps (no build)
+        run: npm ci --ignore-scripts
+      - name: Build native addon
+        run: npm run build
+      - name: npm test
+        run: npm test

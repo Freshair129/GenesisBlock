@@ -1878,7 +1878,14 @@ impl Storage {
                 }
             }
         }
-        hybrid_results.sort_by(|a, b| b.node.impact.partial_cmp(&a.node.impact).unwrap());
+        // NaN-safe: a poisoned (NaN) impact score must not panic the whole query.
+        // Treat incomparable scores as equal so sorting degrades gracefully.
+        hybrid_results.sort_by(|a, b| {
+            b.node
+                .impact
+                .partial_cmp(&a.node.impact)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
         // Dedupe by node id, keeping the highest-scoring hit. A node may hold more
         // than one arena/HNSW slot in a collection — e.g. after `add_vector`
         // supersedes a prior vector, the orphaned slot lingers until compaction —
@@ -2420,7 +2427,13 @@ impl Storage {
         tokio::spawn(async move {
             let socket = match tokio::net::UdpSocket::bind("0.0.0.0:0").await {
                 Ok(s) => {
-                    let addr = s.local_addr().unwrap();
+                    let addr = match s.local_addr() {
+                        Ok(a) => a,
+                        Err(e) => {
+                            println!("Gossip: Failed to read local socket addr: {}", e);
+                            return;
+                        }
+                    };
                     storage.gossip_port.store(addr.port() as u32, Ordering::SeqCst);
                     println!("Gossip: Bound to UDP port {}", addr.port());
                     s
@@ -2430,7 +2443,10 @@ impl Storage {
                     return;
                 }
             };
-            socket.set_broadcast(true).unwrap();
+            if let Err(e) = socket.set_broadcast(true) {
+                println!("Gossip: Failed to enable broadcast: {}", e);
+                return;
+            }
 
             let mut buf = [0u8; 65535];
             let mut heartbeat_interval = tokio::time::interval(Duration::from_secs(5));
@@ -2531,7 +2547,10 @@ impl Storage {
                 Ok(s) => s,
                 Err(_) => return,
             };
-            socket.set_broadcast(true).unwrap();
+            if let Err(e) = socket.set_broadcast(true) {
+                println!("Gossip: Failed to enable broadcast on discovery listener: {}", e);
+                return;
+            }
             let mut buf = [0u8; 65535];
             loop {
                 if let Ok((len, _addr)) = socket.recv_from(&mut buf).await {
