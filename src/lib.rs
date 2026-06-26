@@ -1846,12 +1846,18 @@ impl Storage {
     }
 
     pub fn execute_hql(&self, query: &str) -> Result<serde_json::Value> {
+        // Serialize an HQL result into a JSON value, propagating (rather than
+        // panicking on) the practically-impossible serde failure so a malformed
+        // result can never take down the read worker / REST handler thread.
+        fn to_value<T: serde::Serialize>(res: T) -> Result<serde_json::Value> {
+            serde_json::to_value(res).map_err(|e| Error::from_reason(format!("HQL result serialization failed: {e}")))
+        }
         let command = HqlCommand::try_from(query).map_err(|e| Error::from_reason(e))?;
         match command {
             HqlCommand::Search { vector, k, fuzzy, target, lang, as_of, collection } => {
                 let _resolved = if fuzzy { self.find_fuzzy_id(&target) } else { Some(target) };
                 let res = self.hybrid_search(HybridSearchInput { query_vector: vector, k, alpha: Some(0.0), lang, as_of, collection, ef_search: None })?;
-                Ok(serde_json::to_value(res).unwrap())
+                to_value(res)
             }
             HqlCommand::Traverse { seed, depth, rel, fuzzy, as_of } => {
                 let resolved_seed = if fuzzy { self.find_fuzzy_id(&seed).unwrap_or(seed) } else { seed };
@@ -1859,19 +1865,19 @@ impl Storage {
                     query::ast::HqlRel::Physical(r) => (r, false),
                     query::ast::HqlRel::Inferred(r) => (r, true),
                 };
-                let res = self.neighbors(resolved_seed, NeighborInput { 
-                    depth: Some(depth), rel: Some(target_rel), rels: None, direction: Some("out".to_string()), as_of, include_invalid: Some(false), limit: None 
+                let res = self.neighbors(resolved_seed, NeighborInput {
+                    depth: Some(depth), rel: Some(target_rel), rels: None, direction: Some("out".to_string()), as_of, include_invalid: Some(false), limit: None
                 }, is_inferred)?;
-                Ok(serde_json::to_value(res).unwrap())
+                to_value(res)
             }
             HqlCommand::Hybrid { vector, alpha, fuzzy, target, lang, as_of, collection } => {
                 let _resolved = if fuzzy { self.find_fuzzy_id(&target) } else { Some(target) };
                 let res = self.hybrid_search(HybridSearchInput { query_vector: vector, k: 10, alpha: Some(alpha), lang, as_of, collection, ef_search: None })?;
-                Ok(serde_json::to_value(res).unwrap())
+                to_value(res)
             }
             HqlCommand::Context { target, tier, budget, fuzzy } => {
                 let res = self.retrieve_context(&target, &tier, budget, fuzzy)?;
-                Ok(serde_json::to_value(res).unwrap())
+                to_value(res)
             }
         }
     }
@@ -2629,10 +2635,11 @@ impl Storage {
                                         }
                                     }
                                     GossipMessage::ConsensusVote { proposal_id, voter_peer_id, approve, signature } => {
-                                        // submit_vote verifies the signature against the
-                                        // voter's registered key; forged votes are dropped.
+                                        // submit_vote verifies the vote's ed25519 signature
+                                        // against the voter's registered key before counting
+                                        // it (see Storage::submit_vote); forged or unsigned
+                                        // votes are rejected and never reach quorum.
                                         let _ = storage.submit_vote(proposal_id, voter_peer_id, approve, signature);
-                                        // TODO: verify signature of the vote itself if needed
                                     }
                                 }
                             }
@@ -2725,8 +2732,11 @@ impl Storage {
         // 2. Save DashMaps (Partial state for instant load)
         let nodes: Vec<(u32, NodeOutput)> = self.nodes.iter().map(|e| (*e.key(), e.value().clone())).collect();
         let edges: Vec<(u128, EdgeOutput)> = self.edges.iter().map(|e| (*e.key(), e.value().clone())).collect();
-        fs::write(temp_dir.join("nodes.bin"), serde_json::to_vec(&nodes).unwrap()).ok();
-        fs::write(temp_dir.join("edges.bin"), serde_json::to_vec(&edges).unwrap()).ok();
+        // Best-effort snapshot writes (the WAL stays the authoritative recovery
+        // source). Skip a file on serialize failure instead of `.unwrap()`-panicking
+        // the save thread — a missing snapshot file just degrades reload to WAL replay.
+        if let Ok(bytes) = serde_json::to_vec(&nodes) { fs::write(temp_dir.join("nodes.bin"), bytes).ok(); }
+        if let Ok(bytes) = serde_json::to_vec(&edges) { fs::write(temp_dir.join("edges.bin"), bytes).ok(); }
 
         // 3. Save Global Metadata (incl. collections manifest)
         let state = serde_json::json!({

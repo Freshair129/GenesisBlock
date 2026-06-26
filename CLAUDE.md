@@ -70,7 +70,7 @@ cd dashboard && npm run dev  # optional operational dashboard (reads /v1/status,
 
 ## Gotchas
 
-- `/v1/query/hql` expects a **raw JSON string** body, but the Python/Go SDKs send `{ "query": "..." }`. Verify the actual contract before changing either side.
+- `/v1/query/hql` accepts **both** body shapes — a raw JSON string (`"SEARCH ..."`) and the object the Python/Go SDKs send (`{ "query": "..." }`) — via the `#[serde(untagged)] HqlBody` enum in `src/router.rs` (covered by `tests/rest_api_tests.rs`). Keep that untagged enum if you touch the route.
 - `execute_batch` exists in the core but is **not** exposed as a REST route.
 - Docs under `docs/` are governance/spec-heavy and some contain stale notes or encoding artifacts. Prefer code evidence and the C4 map over prose.
 

@@ -521,3 +521,75 @@ async fn test_version_route_reports_engine_version() {
     );
     assert!(body["schema_version"].is_number(), "schema_version present");
 }
+
+// ---------------------------------------------------------------------------
+// Route-wiring parity guard
+// ---------------------------------------------------------------------------
+
+/// Drift guard: every public `/v1/*` route the engine is supposed to expose must
+/// be wired into `build_router` with the right HTTP method. CLAUDE.md warns the
+/// NAPI and REST front-ends are hand-wired twice and can drift; this test fails
+/// loudly if a route is removed/renamed or its method changes, so a missing REST
+/// binding is caught here instead of by an SDK 404 in the field.
+///
+/// It asserts only that each (method, path) is *wired* — a wired route with a
+/// minimal/invalid body answers 400/422/500, never 404 (no route) or 405 (wrong
+/// method). It deliberately does NOT assert success, so it stays decoupled from
+/// per-route request schemas.
+#[tokio::test]
+async fn test_all_v1_routes_are_wired() {
+    // Keep this list in lockstep with `build_router` in src/router.rs.
+    let post_routes = [
+        "/v1/bulk/nodes",
+        "/v1/bulk/edges",
+        "/v1/bulk/rebuild",
+        "/v1/query/hql",
+        "/v1/node/add",
+        "/v1/node/supersede",
+        "/v1/edge/add",
+        "/v1/edge/retract",
+        "/v1/collection/create",
+        "/v1/vector/add",
+        "/v1/insight/rebuild",
+        "/v1/query",
+        "/v1/search/hybrid",
+        "/v1/reason/context",
+        "/v1/consensus/propose",
+        "/v1/consensus/vote",
+        "/v1/consensus/sign-vote",
+        "/v1/consensus/verify",
+    ];
+    let get_routes = [
+        "/v1/collections",
+        "/v1/insight/drift/1",
+        "/v1/insight/communities",
+        "/v1/insight/gaps",
+        "/v1/status",
+        "/v1/version",
+        "/v1/swarm/status",
+    ];
+
+    let (app, _dir) = make_app();
+
+    for path in post_routes {
+        // Minimal body — most routes reject it (400/422), which still proves the
+        // route exists. `{}` is valid JSON so the body limit / extractor engages.
+        let (status, _) = post_raw(&app, path, "application/json", "{}").await;
+        assert_ne!(status, StatusCode::NOT_FOUND, "POST {path} is not wired (404)");
+        assert_ne!(
+            status,
+            StatusCode::METHOD_NOT_ALLOWED,
+            "POST {path} wired with wrong method (405)"
+        );
+    }
+
+    for path in get_routes {
+        let (status, _) = get_json(&app, path).await;
+        assert_ne!(status, StatusCode::NOT_FOUND, "GET {path} is not wired (404)");
+        assert_ne!(
+            status,
+            StatusCode::METHOD_NOT_ALLOWED,
+            "GET {path} wired with wrong method (405)"
+        );
+    }
+}
