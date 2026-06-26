@@ -97,9 +97,46 @@ fn checkpointed_wal_replays_to_identical_live_state() {
         s.compact().unwrap(); // truncate WAL to live state through the open handle
     } // Drop also runs save_state() (snapshot + another checkpoint).
 
-    // Force the WAL-replay load path: remove state.json so try_load_state() fails
-    // and open() replays the (compacted) WAL instead of instant-loading.
-    fs::remove_file(Path::new(&path).join("state.json")).unwrap();
+    // Force the WAL-replay load path: state.json must be GONE so try_load_state()
+    // fails and open() replays the (compacted) WAL instead of instant-loading.
+    //
+    // This deletion is intentionally tolerant, and that does NOT mask a durability
+    // bug — the snapshot is a best-effort instant-load optimization layered ON TOP
+    // of the WAL. save_state() writes state.json LAST precisely so that an absent
+    // snapshot is a valid state that falls back to the WAL (see save_state's swap
+    // comment in src/lib.rs), and compact() carries the live graph into the WAL
+    // itself. The real recovery invariant is asserted below, against the WAL.
+    //
+    // Under heavy parallel load on Windows two transient, non-bug states appear:
+    //   * NotFound — the `.ok()`-swallowed best-effort snapshot rename did not land
+    //     under AV/IO contention, so the WAL-replay path is ALREADY forced. Done.
+    //   * sharing violation (os err 5/32/33) — the just-written file is briefly
+    //     held open by the AV scanner / search indexer. It releases in a few ms;
+    //     retry rather than fail. (The checkpoint+snapshot are already durable: the
+    //     Storage's Drop ran save_state() — which blocks on compact()'s ack — and
+    //     then joined the WAL writer thread before this scope exited, so there is no
+    //     missing barrier to paper over here.)
+    let sj = Path::new(&path).join("state.json");
+    let mut attempts = 0;
+    loop {
+        match fs::remove_file(&sj) {
+            Ok(_) => break,
+            // Snapshot never landed (or already removed) ⇒ WAL replay already forced.
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => break,
+            // Transient Windows sharing violation on the freshly-written file.
+            Err(e) if attempts < 100 && matches!(e.raw_os_error(), Some(5) | Some(32) | Some(33)) => {
+                attempts += 1;
+                std::thread::sleep(std::time::Duration::from_millis(20));
+            }
+            Err(e) => {
+                let listing: Vec<String> = fs::read_dir(&path).map(|rd| rd.flatten()
+                    .map(|e| e.file_name().to_string_lossy().into_owned()).collect()).unwrap_or_default();
+                panic!("could not remove state.json to force WAL replay after {attempts} retries: \
+                        kind={:?} raw_os={:?} exists={} dir={:?}",
+                    e.kind(), e.raw_os_error(), sj.exists(), listing);
+            }
+        }
+    }
 
     let s2 = open(&path);
     s2.flush_index();
