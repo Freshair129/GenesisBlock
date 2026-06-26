@@ -576,6 +576,14 @@ impl ArenaStore {
             ArenaStore::Binary { n, dim, .. } => n * dim,
         }
     }
+    /// Actual heap bytes consumed by the vector data.
+    pub fn byte_size(&self) -> usize {
+        match self {
+            ArenaStore::F32(v) => v.len() * 4,
+            ArenaStore::U8(v) => v.len(),
+            ArenaStore::Binary { data, .. } => data.len() * 8,
+        }
+    }
     pub fn is_empty(&self) -> bool { self.len() == 0 }
     /// Append a prepared f32 vector, quantizing per mode.
     fn push_f32(&mut self, emb: &[f32]) {

@@ -55,7 +55,7 @@ cargo build
 Run the standalone server:
 
 ```bash
-cargo run --bin genesis-db-server
+cargo run --features bins --bin genesis-db-server
 ```
 
 The server listens on port `3000` by default and exposes routes under `/v1/*`.
