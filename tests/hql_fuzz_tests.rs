@@ -449,7 +449,7 @@ fn random_bytes_never_panic() {
 #[test]
 fn random_mutations_of_valid_queries() {
     let queries = [VALID_SEARCH, VALID_TRAVERSE, VALID_HYBRID, VALID_CONTEXT];
-    for (_qi, query) in queries.iter().enumerate() {
+    for query in queries.iter() {
         let bytes = query.as_bytes().to_vec();
         for pos in 0..bytes.len() {
             for replacement in [0u8, b' ', b'[', b']', b',', b'"', b'~', 255] {

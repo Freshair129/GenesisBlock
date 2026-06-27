@@ -103,8 +103,8 @@ fn run_soak(cfg: SoakConfig) {
             // Spread embeddings using a hash-like scheme so they don't cluster
             // in dim=4 space when node_idx grows large.
             let x = node_idx as f64;
-            for d in 0..dim {
-                emb[d] = ((x * (d as f64 + 1.0) * 0.6180339887).fract() - 0.5) * 2.0;
+            for (d, val) in emb.iter_mut().enumerate() {
+                *val = ((x * (d as f64 + 1.0) * 0.6180339887).fract() - 0.5) * 2.0;
             }
 
             s.add_node(NodeInput {
@@ -128,8 +128,8 @@ fn run_soak(cfg: SoakConfig) {
         let probe_idx = cycle_base;
         let mut probe_emb = vec![0.0f64; dim];
         let x = probe_idx as f64;
-        for d in 0..dim {
-            probe_emb[d] = ((x * (d as f64 + 1.0) * 0.6180339887).fract() - 0.5) * 2.0;
+        for (d, val) in probe_emb.iter_mut().enumerate() {
+            *val = ((x * (d as f64 + 1.0) * 0.6180339887).fract() - 0.5) * 2.0;
         }
 
         let t1 = Instant::now();
