@@ -130,6 +130,19 @@ test('MCP Server: Life-cycle and Tools', async (t) => {
     assert.strictEqual(result.isError, true, "missing labels must return isError:true");
   });
 
+  await t.test('query_hql tool — malformed HQL returns structured error, not crash', async () => {
+    const result = await client.callTool({
+      name: "query_hql",
+      arguments: {
+        query: "THIS IS NOT VALID HQL @@@"
+      }
+    });
+    // The server catches parse/execution errors and returns isError: true with
+    // the message in content — the process must stay alive (no unhandled throw).
+    assert.strictEqual(result.isError, true, 'malformed HQL must set isError: true');
+    assert.ok(result.content[0].text.length > 0, 'error response must include a message');
+  });
+
   // Graceful shutdown
   await transport.close();
 });
