@@ -70,7 +70,7 @@ test('MCP Server: Life-cycle and Tools', async (t) => {
     const result = await client.callTool({
       name: "query_hql",
       arguments: {
-        query: 'TRAVERSE "mcp-test-node" DEPTH 1 REL ANY'
+        query: 'TRAVERSE FROM "mcp-test-node" DEPTH 1 REL ANY'
       }
     });
     assert.strictEqual(result.isError, undefined);
