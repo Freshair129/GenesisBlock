@@ -67,7 +67,7 @@ await db.saveState()
   isolated collections with `createCollection(name, model, dim, metric)`.
 - **Bitemporal queries** — every node/edge has `valid_from`/`valid_to`; pass
   `asOf` to query the graph as it was at a past instant.
-- **REST instead of in-process** — `cargo run --bin genesis-db-server` exposes
+- **REST instead of in-process** — `cargo run --features bins --bin genesis-db-server` exposes
   the same engine under `/v1/*` on port 3000.
 - **Performance** — see the [benchmark page](docs/index.html) and the
   [competitive report](docs/REPORT--2026-06-21-PERFORMANCE-AND-COMPETITIVE.md).

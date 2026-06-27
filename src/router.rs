@@ -2,13 +2,14 @@ use std::sync::Arc;
 use std::sync::atomic::Ordering;
 use axum::{
     extract::{DefaultBodyLimit, Json, State},
-    http::StatusCode,
+    http::{HeaderValue, StatusCode},
     response::IntoResponse,
     routing::{get, post},
     Router,
 };
 use parking_lot::RwLock;
-use tower_http::cors::CorsLayer;
+use tower_http::cors::{AllowOrigin, CorsLayer};
+use tower_http::limit::RequestBodyLimitLayer;
 use tower_http::trace::TraceLayer;
 
 use crate::{Storage, NodeInput, EdgeInput, QueryInput, HybridSearchInput, Event, SyncPeer};
@@ -376,9 +377,16 @@ async fn status_handler(State(state): State<AppState>) -> impl IntoResponse {
         page_cache_mb: base.page_cache_mb,
         node_count: storage.nodes.len(),
         edge_count: storage.edges.len(),
-        memory_usage_mb: storage.collections.iter()
-            .map(|c| c.value().arena.read().len() * 4)
-            .sum::<usize>() as f64 / 1024.0 / 1024.0,
+        memory_usage_mb: {
+            // Vector arenas: actual bytes (f32=4B/elem, SQ8=1B/elem, BQ=1bit/elem).
+            let vec_bytes: usize = storage.collections.iter()
+                .map(|c| c.value().arena.read().byte_size())
+                .sum();
+            // Rough estimates for node/edge heap (props map + DashMap overhead).
+            let node_bytes = storage.nodes.len() * 512;
+            let edge_bytes = storage.edges.len() * 256;
+            (vec_bytes + node_bytes + edge_bytes) as f64 / 1024.0 / 1024.0
+        },
     };
     Json(status)
 }
@@ -432,6 +440,33 @@ pub fn build_router(state: AppState) -> Router {
         .route("/v1/consensus/sign-vote", post(consensus_sign_vote_handler))
         .route("/v1/consensus/verify", post(consensus_verify_handler))
         .layer(TraceLayer::new_for_http())
-        .layer(CorsLayer::permissive())
+        .layer(cors_layer())
+        // 64 MB hard cap on all request bodies; bulk endpoints stay well under.
+        .layer(RequestBodyLimitLayer::new(64 * 1024 * 1024))
         .with_state(state)
+}
+
+/// Build a CORS layer.
+///
+/// Default: allow only localhost origins (safe for embedded / dev use).
+/// Set `GENESIS_CORS_ORIGIN=*` to restore permissive mode for hosted deployments
+/// where you want browser access from any origin.
+fn cors_layer() -> CorsLayer {
+    match std::env::var("GENESIS_CORS_ORIGIN").as_deref() {
+        Ok("*") => CorsLayer::permissive(),
+        Ok(origin) => {
+            let allowed = origin.parse::<HeaderValue>().expect("GENESIS_CORS_ORIGIN is not a valid header value");
+            CorsLayer::new()
+                .allow_origin(AllowOrigin::exact(allowed))
+                .allow_methods(tower_http::cors::Any)
+                .allow_headers(tower_http::cors::Any)
+        }
+        Err(_) => CorsLayer::new()
+            .allow_origin(AllowOrigin::predicate(|origin: &HeaderValue, _| {
+                let b = origin.as_bytes();
+                b.starts_with(b"http://localhost:") || b.starts_with(b"http://127.0.0.1:")
+            }))
+            .allow_methods(tower_http::cors::Any)
+            .allow_headers(tower_http::cors::Any),
+    }
 }
