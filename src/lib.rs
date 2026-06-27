@@ -2246,6 +2246,10 @@ impl Storage {
     }
 
     pub fn execute_hql(&self, query: &str) -> Result<serde_json::Value> {
+        fn to_value<T: serde::Serialize>(res: T) -> Result<serde_json::Value> {
+            serde_json::to_value(res)
+                .map_err(|e| Error::from_reason(format!("HQL result serialization failed: {e}")))
+        }
         let command = HqlCommand::try_from(query).map_err(Error::from_reason)?;
         match command {
             HqlCommand::Search {
@@ -2271,7 +2275,7 @@ impl Storage {
                     collection,
                     ef_search: None,
                 })?;
-                Ok(serde_json::to_value(res).unwrap())
+                to_value(res)
             }
             HqlCommand::Traverse {
                 seed,
@@ -2302,7 +2306,7 @@ impl Storage {
                     },
                     is_inferred,
                 )?;
-                Ok(serde_json::to_value(res).unwrap())
+                to_value(res)
             }
             HqlCommand::Hybrid {
                 vector,
@@ -2327,7 +2331,7 @@ impl Storage {
                     collection,
                     ef_search: None,
                 })?;
-                Ok(serde_json::to_value(res).unwrap())
+                to_value(res)
             }
             HqlCommand::Context {
                 target,
@@ -2336,7 +2340,7 @@ impl Storage {
                 fuzzy,
             } => {
                 let res = self.retrieve_context(&target, &tier, budget, fuzzy)?;
-                Ok(serde_json::to_value(res).unwrap())
+                to_value(res)
             }
         }
     }
@@ -3294,10 +3298,11 @@ impl Storage {
                                         }
                                     }
                                     GossipMessage::ConsensusVote { proposal_id, voter_peer_id, approve, signature } => {
-                                        // submit_vote verifies the signature against the
-                                        // voter's registered key; forged votes are dropped.
+                                        // submit_vote verifies the vote's ed25519 signature
+                                        // against the voter's registered key before counting
+                                        // it (see Storage::submit_vote); forged or unsigned
+                                        // votes are rejected and never reach quorum.
                                         let _ = storage.submit_vote(proposal_id, voter_peer_id, approve, signature);
-                                        // TODO: verify signature of the vote itself if needed
                                     }
                                 }
                             }
@@ -3410,16 +3415,12 @@ impl Storage {
             .iter()
             .map(|e| (*e.key(), e.value().clone()))
             .collect();
-        fs::write(
-            temp_dir.join("nodes.bin"),
-            serde_json::to_vec(&nodes).unwrap(),
-        )
-        .ok();
-        fs::write(
-            temp_dir.join("edges.bin"),
-            serde_json::to_vec(&edges).unwrap(),
-        )
-        .ok();
+        if let Ok(bytes) = serde_json::to_vec(&nodes) {
+            fs::write(temp_dir.join("nodes.bin"), bytes).ok();
+        }
+        if let Ok(bytes) = serde_json::to_vec(&edges) {
+            fs::write(temp_dir.join("edges.bin"), bytes).ok();
+        }
 
         // 3. Save Global Metadata (incl. collections manifest)
         let state = serde_json::json!({

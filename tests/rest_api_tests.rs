@@ -653,7 +653,6 @@ async fn test_version_route_reports_engine_version() {
 
 #[tokio::test]
 async fn test_no_key_passes_when_api_key_unset() {
-    // api_key: None → every request is allowed (default local-only mode).
     let (app, _dir) = make_app();
     let (status, body) = get_json(&app, "/v1/status").await;
     assert_eq!(status, StatusCode::OK);
@@ -663,7 +662,6 @@ async fn test_no_key_passes_when_api_key_unset() {
 #[tokio::test]
 async fn test_api_key_gate_missing_header_returns_401() {
     let (app, _dir) = make_app_with_key("s3cr3t");
-    // No Authorization header → 401.
     let req = axum::http::Request::builder()
         .method("GET")
         .uri("/v1/status")
@@ -698,4 +696,71 @@ async fn test_api_key_gate_correct_key_passes() {
     let (status, body) = oneshot(&app, req).await;
     assert_eq!(status, StatusCode::OK);
     assert_eq!(body["open"], json!(true));
+}
+
+// ---------------------------------------------------------------------------
+// Route-wiring parity guard
+// ---------------------------------------------------------------------------
+
+#[tokio::test]
+async fn test_all_v1_routes_are_wired() {
+    let post_routes = [
+        "/v1/bulk/nodes",
+        "/v1/bulk/edges",
+        "/v1/bulk/rebuild",
+        "/v1/query/hql",
+        "/v1/node/add",
+        "/v1/node/supersede",
+        "/v1/edge/add",
+        "/v1/edge/retract",
+        "/v1/collection/create",
+        "/v1/vector/add",
+        "/v1/insight/rebuild",
+        "/v1/query",
+        "/v1/search/hybrid",
+        "/v1/reason/context",
+        "/v1/consensus/propose",
+        "/v1/consensus/vote",
+        "/v1/consensus/sign-vote",
+        "/v1/consensus/verify",
+    ];
+    let get_routes = [
+        "/v1/collections",
+        "/v1/insight/drift/1",
+        "/v1/insight/communities",
+        "/v1/insight/gaps",
+        "/v1/status",
+        "/v1/version",
+        "/v1/swarm/status",
+    ];
+
+    let (app, _dir) = make_app();
+
+    for path in post_routes {
+        let (status, _) = post_raw(&app, path, "application/json", "{}").await;
+        assert_ne!(
+            status,
+            StatusCode::NOT_FOUND,
+            "POST {path} is not wired (404)"
+        );
+        assert_ne!(
+            status,
+            StatusCode::METHOD_NOT_ALLOWED,
+            "POST {path} wired with wrong method (405)"
+        );
+    }
+
+    for path in get_routes {
+        let (status, _) = get_json(&app, path).await;
+        assert_ne!(
+            status,
+            StatusCode::NOT_FOUND,
+            "GET {path} is not wired (404)"
+        );
+        assert_ne!(
+            status,
+            StatusCode::METHOD_NOT_ALLOWED,
+            "GET {path} wired with wrong method (405)"
+        );
+    }
 }

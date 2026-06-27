@@ -70,7 +70,7 @@ test('MCP Server: Life-cycle and Tools', async (t) => {
     const result = await client.callTool({
       name: "query_hql",
       arguments: {
-        query: 'TRAVERSE "mcp-test-node" DEPTH 1'
+        query: 'TRAVERSE "mcp-test-node" DEPTH 1 REL ANY'
       }
     });
     assert.strictEqual(result.isError, undefined);
@@ -105,8 +105,8 @@ test('MCP Server: Life-cycle and Tools', async (t) => {
     const data = JSON.parse(result.content[0].text);
     assert.ok(data.nodes, 'context package must have nodes');
     assert.ok(data.edges !== undefined, 'context package must have edges');
-    assert.ok(typeof data.token_estimate === 'number', 'token_estimate must be a number');
-    assert.ok(typeof data.reasoning_path === 'string', 'reasoning_path must be a string');
+    assert.ok(typeof data.tokenEstimate === 'number', 'tokenEstimate must be a number');
+    assert.ok(typeof data.reasoningPath === 'string', 'reasoningPath must be a string');
   });
 
   await t.test('query_hql error path: malformed HQL returns structured error', async () => {
