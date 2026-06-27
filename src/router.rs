@@ -2,7 +2,8 @@ use std::sync::Arc;
 use std::sync::atomic::Ordering;
 use axum::{
     extract::{DefaultBodyLimit, Json, State},
-    http::{HeaderValue, StatusCode},
+    http::{header, HeaderValue, StatusCode},
+    middleware::{self, Next},
     response::IntoResponse,
     routing::{get, post},
     Router,
@@ -21,6 +22,9 @@ use crate::{Storage, NodeInput, EdgeInput, QueryInput, HybridSearchInput, Event,
 #[derive(Clone)]
 pub struct AppState {
     pub storage: Arc<RwLock<Storage>>,
+    /// When set, every request must carry `Authorization: Bearer <key>`.
+    /// Leave `None` (the default) for unauthenticated local-only use.
+    pub api_key: Option<String>,
 }
 
 // ---------------------------------------------------------------------------
@@ -441,9 +445,36 @@ pub fn build_router(state: AppState) -> Router {
         .route("/v1/consensus/verify", post(consensus_verify_handler))
         .layer(TraceLayer::new_for_http())
         .layer(cors_layer())
+        // API key guard runs after CORS (so OPTIONS preflight is never blocked)
+        // but before the body-limit layer (so we don't waste I/O on unauthorized
+        // bodies).
+        .layer(middleware::from_fn_with_state(state.clone(), api_key_guard))
         // 64 MB hard cap on all request bodies; bulk endpoints stay well under.
         .layer(RequestBodyLimitLayer::new(64 * 1024 * 1024))
         .with_state(state)
+}
+
+/// Reject requests missing a valid `Authorization: Bearer <key>` header when
+/// `GENESIS_API_KEY` was set at startup (stored in `AppState.api_key`).
+/// No-ops when `api_key` is `None` — safe for unauthenticated local use.
+async fn api_key_guard(
+    State(state): State<AppState>,
+    req: axum::extract::Request,
+    next: Next,
+) -> impl IntoResponse {
+    if let Some(ref expected) = state.api_key {
+        let authorized = req
+            .headers()
+            .get(header::AUTHORIZATION)
+            .and_then(|v| v.to_str().ok())
+            .and_then(|v| v.strip_prefix("Bearer "))
+            .map(|token| token == expected.as_str())
+            .unwrap_or(false);
+        if !authorized {
+            return (StatusCode::UNAUTHORIZED, "Unauthorized").into_response();
+        }
+    }
+    next.run(req).await
 }
 
 /// Build a CORS layer.

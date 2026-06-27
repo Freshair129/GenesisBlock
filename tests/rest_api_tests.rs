@@ -32,8 +32,34 @@ fn make_app() -> (Router, TempDir) {
     .expect("Storage::open in test");
     let state = AppState {
         storage: Arc::new(RwLock::new(storage)),
+        api_key: None,
     };
     (build_router(state), dir)
+}
+
+fn make_app_with_key(key: &str) -> (Router, TempDir) {
+    let dir = TempDir::new().unwrap();
+    let storage = Storage::open(OpenOptions {
+        path: dir.path().to_str().unwrap().to_string(),
+        page_cache_mb: Some(16),
+        read_only: Some(false),
+        vector_dim: None,
+    })
+    .expect("Storage::open in test");
+    let state = AppState {
+        storage: Arc::new(RwLock::new(storage)),
+        api_key: Some(key.to_string()),
+    };
+    (build_router(state), dir)
+}
+
+/// Send a pre-built Request and return (status, parsed JSON body).
+async fn oneshot(app: &Router, req: axum::http::Request<axum::body::Body>) -> (StatusCode, serde_json::Value) {
+    let resp = app.clone().oneshot(req).await.unwrap();
+    let status = resp.status();
+    let bytes = resp.into_body().collect().await.unwrap().to_bytes();
+    let value: serde_json::Value = serde_json::from_slice(&bytes).unwrap_or(serde_json::Value::Null);
+    (status, value)
 }
 
 /// POST a JSON value, return (status, parsed body).
@@ -520,4 +546,57 @@ async fn test_version_route_reports_engine_version() {
         "REST version must match the compiled CARGO_PKG_VERSION"
     );
     assert!(body["schema_version"].is_number(), "schema_version present");
+}
+
+// ---------------------------------------------------------------------------
+// API key middleware
+// ---------------------------------------------------------------------------
+
+#[tokio::test]
+async fn test_no_key_passes_when_api_key_unset() {
+    // api_key: None → every request is allowed (default local-only mode).
+    let (app, _dir) = make_app();
+    let (status, body) = get_json(&app, "/v1/status").await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(body["open"], json!(true));
+}
+
+#[tokio::test]
+async fn test_api_key_gate_missing_header_returns_401() {
+    let (app, _dir) = make_app_with_key("s3cr3t");
+    // No Authorization header → 401.
+    let req = axum::http::Request::builder()
+        .method("GET")
+        .uri("/v1/status")
+        .body(axum::body::Body::empty())
+        .unwrap();
+    let (status, _) = oneshot(&app, req).await;
+    assert_eq!(status, StatusCode::UNAUTHORIZED);
+}
+
+#[tokio::test]
+async fn test_api_key_gate_wrong_key_returns_401() {
+    let (app, _dir) = make_app_with_key("s3cr3t");
+    let req = axum::http::Request::builder()
+        .method("GET")
+        .uri("/v1/status")
+        .header("Authorization", "Bearer wrong-key")
+        .body(axum::body::Body::empty())
+        .unwrap();
+    let (status, _) = oneshot(&app, req).await;
+    assert_eq!(status, StatusCode::UNAUTHORIZED);
+}
+
+#[tokio::test]
+async fn test_api_key_gate_correct_key_passes() {
+    let (app, _dir) = make_app_with_key("s3cr3t");
+    let req = axum::http::Request::builder()
+        .method("GET")
+        .uri("/v1/status")
+        .header("Authorization", "Bearer s3cr3t")
+        .body(axum::body::Body::empty())
+        .unwrap();
+    let (status, body) = oneshot(&app, req).await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(body["open"], json!(true));
 }

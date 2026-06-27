@@ -87,3 +87,50 @@ fn test_configurable_vector_dim() {
     
     println!("Configurable vector dimension verified.");
 }
+
+#[test]
+fn test_concurrent_node_writes_are_safe() {
+    use std::thread;
+
+    let dir = tempdir().unwrap();
+    let storage = Arc::new(
+        Storage::open(OpenOptions {
+            path: dir.path().to_str().unwrap().to_string(),
+            page_cache_mb: Some(64),
+            read_only: Some(false),
+            vector_dim: None,
+        })
+        .unwrap(),
+    );
+
+    const N: usize = 64;
+    let handles: Vec<_> = (0..N)
+        .map(|i| {
+            let s = Arc::clone(&storage);
+            thread::spawn(move || {
+                s.add_node(NodeInput {
+                    id: Some(format!("concurrent-{i}")),
+                    labels: vec!["Concurrent".into()],
+                    props: None,
+                    embedding: None,
+                    lang: None,
+                    valid_from: None,
+                    caused_by: None,
+                    ttl: None,
+                    collection: None,
+                })
+                .expect("concurrent add_node must not fail");
+            })
+        })
+        .collect();
+
+    for h in handles {
+        h.join().expect("writer thread panicked");
+    }
+
+    assert_eq!(
+        storage.nodes.len(),
+        N,
+        "all {N} concurrent node writes must be visible after all threads finish"
+    );
+}
