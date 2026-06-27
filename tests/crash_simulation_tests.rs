@@ -107,7 +107,11 @@ fn truncated_wal_recovers_intact_entries() {
             .collect();
     }
 
-    assert!(wal_lines.len() >= 10, "expected ≥10 WAL lines, got {}", wal_lines.len());
+    assert!(
+        wal_lines.len() >= 10,
+        "expected ≥10 WAL lines, got {}",
+        wal_lines.len()
+    );
 
     // Rebuild WAL with lines 0..7 intact + a truncated line 7.
     let keep: String = wal_lines[..7].join("\n") + "\n";

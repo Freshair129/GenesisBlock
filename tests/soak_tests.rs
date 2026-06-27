@@ -16,8 +16,8 @@ use std::path::Path;
 use std::time::Instant;
 
 fn fresh(name: &str) -> String {
-    let base = std::env::var("SOAK_TMPDIR")
-        .unwrap_or_else(|_| env!("CARGO_TARGET_TMPDIR").to_string());
+    let base =
+        std::env::var("SOAK_TMPDIR").unwrap_or_else(|_| env!("CARGO_TARGET_TMPDIR").to_string());
     let p = format!("{}/{}", base, name);
     if Path::new(&p).exists() {
         fs::remove_dir_all(&p).unwrap();
@@ -193,7 +193,11 @@ fn run_soak(cfg: SoakConfig) {
     // --- Assertions ---
     let recall_misses: usize = all_stats.iter().filter(|s| !s.recall_ok).count();
     let miss_rate = recall_misses as f64 / all_stats.len() as f64;
-    println!("  Recall misses: {recall_misses}/{} ({:.1}%)", all_stats.len(), miss_rate * 100.0);
+    println!(
+        "  Recall misses: {recall_misses}/{} ({:.1}%)",
+        all_stats.len(),
+        miss_rate * 100.0
+    );
 
     // Latency should not degrade catastrophically (last 10 cycles vs first 10).
     let first_10_avg: f64 = all_stats[..10.min(all_stats.len())]

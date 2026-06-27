@@ -376,7 +376,10 @@ fn context_with_budget() {
 #[test]
 fn valid_search_parses() {
     parses_ok(VALID_SEARCH);
-    if let Ok(HqlCommand::Search { target, vector, k, .. }) = HqlCommand::try_from(VALID_SEARCH) {
+    if let Ok(HqlCommand::Search {
+        target, vector, k, ..
+    }) = HqlCommand::try_from(VALID_SEARCH)
+    {
         assert_eq!(target, "mynode");
         assert_eq!(vector, vec![1.0, 2.0, 3.0]);
         assert_eq!(k, 10);
@@ -425,7 +428,9 @@ fn pseudo_random_bytes(seed: u64, len: usize) -> Vec<u8> {
     let mut state = seed;
     (0..len)
         .map(|_| {
-            state = state.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
+            state = state
+                .wrapping_mul(6364136223846793005)
+                .wrapping_add(1442695040888963407);
             (state >> 33) as u8
         })
         .collect()

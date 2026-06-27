@@ -69,7 +69,10 @@ fn search_top1(s: &Storage, query: [f64; 4]) -> String {
             ef_search: None,
         })
         .unwrap();
-    results.first().map(|r| r.node.id.clone()).unwrap_or_default()
+    results
+        .first()
+        .map(|r| r.node.id.clone())
+        .unwrap_or_default()
 }
 
 // ---------------------------------------------------------------------------
@@ -255,13 +258,21 @@ fn graph_indices_survive_roundtrip() {
     let a_id = s.get_u32("gi_a").unwrap();
     let out_edges = s.out_idx.get(&a_id);
     assert!(out_edges.is_some(), "out_idx should be rebuilt");
-    assert_eq!(out_edges.unwrap().len(), 2, "gi_a should have 2 outgoing edges");
+    assert_eq!(
+        out_edges.unwrap().len(),
+        2,
+        "gi_a should have 2 outgoing edges"
+    );
 
     // in_idx for gi_c should have 2 incoming edges.
     let c_id = s.get_u32("gi_c").unwrap();
     let in_edges = s.in_idx.get(&c_id);
     assert!(in_edges.is_some(), "in_idx should be rebuilt");
-    assert_eq!(in_edges.unwrap().len(), 2, "gi_c should have 2 incoming edges");
+    assert_eq!(
+        in_edges.unwrap().len(),
+        2,
+        "gi_c should have 2 incoming edges"
+    );
 }
 
 // ---------------------------------------------------------------------------
@@ -388,7 +399,12 @@ fn labels_survive_roundtrip() {
 
     {
         let s = open(&path);
-        add_node(&s, "lbl_node", [1.0, 0.0, 0.0, 0.0], &["Alpha", "Beta", "Gamma"]);
+        add_node(
+            &s,
+            "lbl_node",
+            [1.0, 0.0, 0.0, 0.0],
+            &["Alpha", "Beta", "Gamma"],
+        );
         s.save_state().unwrap();
     }
 
