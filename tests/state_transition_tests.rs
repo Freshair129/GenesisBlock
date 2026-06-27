@@ -1,4 +1,4 @@
-use genesis_block_native::{Storage, OpenOptions, NodeInput, EdgeInput};
+use genesis_block_native::{EdgeInput, NodeInput, OpenOptions, Storage};
 use std::sync::Arc;
 use tempfile::tempdir;
 
@@ -6,39 +6,60 @@ use tempfile::tempdir;
 fn test_vector_drift_tracking() {
     let dir = tempdir().unwrap();
     let path = dir.path().to_str().unwrap().to_string();
-    let storage = Arc::new(Storage::open(OpenOptions { 
-        path,
-        page_cache_mb: Some(64),
-        read_only: Some(false),
-     vector_dim: None, }).unwrap());
+    let storage = Arc::new(
+        Storage::open(OpenOptions {
+            path,
+            page_cache_mb: Some(64),
+            read_only: Some(false),
+            vector_dim: None,
+        })
+        .unwrap(),
+    );
 
     // 1. Add some nodes to form a cluster
     let mut v1 = vec![0.0; 1536];
-    v1[0] = 1.0; 
-    storage.add_node(NodeInput { 
-        id: Some("node-1".to_string()),
-        labels: vec!["USER".to_string()],
-        props: None,
-        embedding: Some(v1.clone()),
-        lang: Some("en".to_string()),
-        valid_from: None,
-        caused_by: None,
-     ttl: None, collection: None, }).unwrap();
+    v1[0] = 1.0;
+    storage
+        .add_node(NodeInput {
+            id: Some("node-1".to_string()),
+            labels: vec!["USER".to_string()],
+            props: None,
+            embedding: Some(v1.clone()),
+            lang: Some("en".to_string()),
+            valid_from: None,
+            caused_by: None,
+            ttl: None,
+            collection: None,
+        })
+        .unwrap();
 
-    storage.add_node(NodeInput { 
-        id: Some("node-2".to_string()),
-        labels: vec!["USER".to_string()],
-        props: None,
-        embedding: Some(v1.clone()),
-        lang: Some("en".to_string()),
-        valid_from: None,
-        caused_by: None,
-     ttl: None, collection: None, }).unwrap();
+    storage
+        .add_node(NodeInput {
+            id: Some("node-2".to_string()),
+            labels: vec!["USER".to_string()],
+            props: None,
+            embedding: Some(v1.clone()),
+            lang: Some("en".to_string()),
+            valid_from: None,
+            caused_by: None,
+            ttl: None,
+            collection: None,
+        })
+        .unwrap();
 
-    storage.add_edge(EdgeInput { 
-        id: None, from: "node-1".to_string(), to: "node-2".to_string(), rel: "KNOWS".to_string(),
-        props: None, valid_from: None, supersede: None, impact: None, caused_by: None,
-     }).unwrap();
+    storage
+        .add_edge(EdgeInput {
+            id: None,
+            from: "node-1".to_string(),
+            to: "node-2".to_string(),
+            rel: "KNOWS".to_string(),
+            props: None,
+            valid_from: None,
+            supersede: None,
+            impact: None,
+            caused_by: None,
+        })
+        .unwrap();
 
     // 2. Initial community detection and meta-graph generation
     println!("Step 2: Starting meta-graph generation...");
@@ -51,29 +72,42 @@ fn test_vector_drift_tracking() {
         let meta_arena = coll.metadata.read();
         meta_arena[0].cluster_id // node-1's cluster
     };
-    
+
     let history_v1 = storage.get_meta_history(c_id);
     assert_eq!(history_v1.len(), 1);
 
     // 3. Update nodes
     println!("Step 3: Adding node-3...");
     let mut v2 = vec![0.0; 1536];
-    v2[1] = 1.0; 
+    v2[1] = 1.0;
 
-    storage.add_node(NodeInput { 
-        id: Some("node-3".to_string()),
-        labels: vec!["USER".to_string()],
-        props: None,
-        embedding: Some(v2.clone()),
-        lang: Some("en".to_string()),
-        valid_from: None,
-        caused_by: None,
-     ttl: None, collection: None, }).unwrap();
+    storage
+        .add_node(NodeInput {
+            id: Some("node-3".to_string()),
+            labels: vec!["USER".to_string()],
+            props: None,
+            embedding: Some(v2.clone()),
+            lang: Some("en".to_string()),
+            valid_from: None,
+            caused_by: None,
+            ttl: None,
+            collection: None,
+        })
+        .unwrap();
 
-    storage.add_edge(EdgeInput { 
-        id: None, from: "node-2".to_string(), to: "node-3".to_string(), rel: "KNOWS".to_string(),
-        props: None, valid_from: None, supersede: None, impact: None, caused_by: None,
-     }).unwrap();
+    storage
+        .add_edge(EdgeInput {
+            id: None,
+            from: "node-2".to_string(),
+            to: "node-3".to_string(),
+            rel: "KNOWS".to_string(),
+            props: None,
+            valid_from: None,
+            supersede: None,
+            impact: None,
+            caused_by: None,
+        })
+        .unwrap();
     println!("Step 3: Done.");
 
     // 4. Regenerate meta-graph
@@ -89,8 +123,12 @@ fn test_vector_drift_tracking() {
         meta_arena[0].cluster_id
     };
     let history_v2 = storage.get_meta_history(c_id_new);
-    println!("History for cluster {}: {} entries", c_id_new, history_v2.len());
-    
+    println!(
+        "History for cluster {}: {} entries",
+        c_id_new,
+        history_v2.len()
+    );
+
     if history_v2.len() > 1 {
         let drift = history_v2.last().unwrap().drift;
         println!("Detected Drift: {:?}", drift);
@@ -100,11 +138,18 @@ fn test_vector_drift_tracking() {
         let mut found_history = false;
         for entry in storage.meta_history.iter() {
             if entry.value().len() > 1 {
-                println!("Found history for cluster {}: {} entries", entry.key(), entry.value().len());
+                println!(
+                    "Found history for cluster {}: {} entries",
+                    entry.key(),
+                    entry.value().len()
+                );
                 found_history = true;
                 break;
             }
         }
-        assert!(found_history, "At least one cluster should have recorded history across snapshots");
+        assert!(
+            found_history,
+            "At least one cluster should have recorded history across snapshots"
+        );
     }
 }

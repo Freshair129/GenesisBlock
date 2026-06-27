@@ -4,7 +4,7 @@
 // that resolution so the win can't silently regress fuzzy match, traversal
 // direction, or snapshot reload.
 
-use genesis_block_native::{Storage, OpenOptions, NodeInput, EdgeInput, NeighborInput};
+use genesis_block_native::{EdgeInput, NeighborInput, NodeInput, OpenOptions, Storage};
 use std::fs;
 use std::path::Path;
 
@@ -28,17 +28,30 @@ fn open(path: &str) -> Storage {
 
 fn node(s: &Storage, id: &str) {
     s.add_node(NodeInput {
-        id: Some(id.to_string()), labels: vec![], props: None, embedding: None,
-        lang: None, valid_from: None, caused_by: None, ttl: None, collection: None,
+        id: Some(id.to_string()),
+        labels: vec![],
+        props: None,
+        embedding: None,
+        lang: None,
+        valid_from: None,
+        caused_by: None,
+        ttl: None,
+        collection: None,
     })
     .unwrap();
 }
 
 fn edge(s: &Storage, eid: &str, from: &str, to: &str, rel: &str) {
     s.add_edge(EdgeInput {
-        id: Some(eid.to_string()), from: from.to_string(), to: to.to_string(),
-        rel: rel.to_string(), props: None, valid_from: None, supersede: None,
-        impact: None, caused_by: None,
+        id: Some(eid.to_string()),
+        from: from.to_string(),
+        to: to.to_string(),
+        rel: rel.to_string(),
+        props: None,
+        valid_from: None,
+        supersede: None,
+        impact: None,
+        caused_by: None,
     })
     .unwrap();
 }
@@ -47,8 +60,13 @@ fn hop1(s: &Storage, id: &str, dir: &str) -> Vec<String> {
     s.neighbors(
         id.to_string(),
         NeighborInput {
-            depth: Some(1), rel: None, rels: None, direction: Some(dir.to_string()),
-            as_of: None, include_invalid: Some(false), limit: Some(1000),
+            depth: Some(1),
+            rel: None,
+            rels: None,
+            direction: Some(dir.to_string()),
+            as_of: None,
+            include_invalid: Some(false),
+            limit: Some(1000),
         },
         false,
     )

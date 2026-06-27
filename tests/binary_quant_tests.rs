@@ -6,35 +6,58 @@
 // sign pattern → Hamming 0) is top-1; (b) BQ survives save+reopen; (c) the
 // vec_<name>.bin is ~32× smaller than the f32 equivalent.
 
-use genesis_block_native::{Storage, OpenOptions, NodeInput, HybridSearchInput};
+use genesis_block_native::{HybridSearchInput, NodeInput, OpenOptions, Storage};
 use std::fs;
 use std::path::Path;
 
 fn fresh(name: &str) -> String {
     let p = format!("{}/{}", env!("CARGO_TARGET_TMPDIR"), name);
-    if Path::new(&p).exists() { fs::remove_dir_all(&p).unwrap(); }
+    if Path::new(&p).exists() {
+        fs::remove_dir_all(&p).unwrap();
+    }
     p
 }
 
 fn open(path: &str, dim: u32) -> Storage {
     Storage::open(OpenOptions {
-        path: path.to_string(), page_cache_mb: Some(32), read_only: Some(false), vector_dim: Some(dim),
-    }).unwrap()
+        path: path.to_string(),
+        page_cache_mb: Some(32),
+        read_only: Some(false),
+        vector_dim: Some(dim),
+    })
+    .unwrap()
 }
 
 fn add(s: &Storage, id: &str, emb: Vec<f64>, coll: &str) {
     s.add_node(NodeInput {
-        id: Some(id.to_string()), labels: vec![], props: None, embedding: Some(emb), lang: None,
-        valid_from: None, caused_by: None, ttl: None, collection: Some(coll.to_string()),
-    }).unwrap();
+        id: Some(id.to_string()),
+        labels: vec![],
+        props: None,
+        embedding: Some(emb),
+        lang: None,
+        valid_from: None,
+        caused_by: None,
+        ttl: None,
+        collection: Some(coll.to_string()),
+    })
+    .unwrap();
 }
 
 fn top1(s: &Storage, q: Vec<f64>, coll: &str) -> Option<String> {
     s.flush_index();
     s.hybrid_search(HybridSearchInput {
-        query_vector: q, k: 1, alpha: Some(0.0), lang: None, as_of: None,
-        collection: Some(coll.to_string()), ef_search: None,
-    }).unwrap().into_iter().map(|n| n.node.id).next()
+        query_vector: q,
+        k: 1,
+        alpha: Some(0.0),
+        lang: None,
+        as_of: None,
+        collection: Some(coll.to_string()),
+        ef_search: None,
+    })
+    .unwrap()
+    .into_iter()
+    .map(|n| n.node.id)
+    .next()
 }
 
 const A: [f64; 8] = [1.0, 1.0, 1.0, 1.0, -1.0, -1.0, -1.0, -1.0];
@@ -42,7 +65,16 @@ const B: [f64; 8] = [-1.0, -1.0, -1.0, -1.0, 1.0, 1.0, 1.0, 1.0];
 const C: [f64; 8] = [1.0, -1.0, 1.0, -1.0, 1.0, -1.0, 1.0, -1.0];
 
 fn seed(s: &Storage, coll: &str) {
-    s.create_collection(coll.to_string(), "m".to_string(), 8, None, Some("bq".to_string()), None, None).unwrap();
+    s.create_collection(
+        coll.to_string(),
+        "m".to_string(),
+        8,
+        None,
+        Some("bq".to_string()),
+        None,
+        None,
+    )
+    .unwrap();
     add(s, "A", A.to_vec(), coll);
     add(s, "B", B.to_vec(), coll);
     add(s, "C", C.to_vec(), coll);
@@ -82,14 +114,27 @@ fn bq_disk_is_32x_smaller() {
     let path = fresh("test_bq_size");
     let dim = 128u32;
     let s = open(&path, dim); // default collection is f32 (None)
-    s.create_collection("bq".to_string(), "m".to_string(), dim, None, Some("bq".to_string()), None, None).unwrap();
-    let v: Vec<f64> = (0..dim).map(|i| if i % 3 == 0 { 0.5 } else { -0.5 }).collect();
+    s.create_collection(
+        "bq".to_string(),
+        "m".to_string(),
+        dim,
+        None,
+        Some("bq".to_string()),
+        None,
+        None,
+    )
+    .unwrap();
+    let v: Vec<f64> = (0..dim)
+        .map(|i| if i % 3 == 0 { 0.5 } else { -0.5 })
+        .collect();
     add(&s, "F", v.clone(), "default");
     add(&s, "Q", v.clone(), "bq");
     s.flush_index();
     s.save_state().unwrap();
 
-    let full = fs::metadata(format!("{}/vec_default.bin", path)).unwrap().len();
+    let full = fs::metadata(format!("{}/vec_default.bin", path))
+        .unwrap()
+        .len();
     let bq = fs::metadata(format!("{}/vec_bq.bin", path)).unwrap().len();
     assert_eq!(full, (dim as u64) * 4, "f32 = 4 bytes/dim");
     assert_eq!(bq, 16, "bq = ceil(128/64)=2 words * 8 bytes");

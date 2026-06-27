@@ -31,15 +31,16 @@ test('MCP Server: Life-cycle and Tools', async (t) => {
 
   await client.connect(transport);
 
-  await t.test('list tools', async () => {
+  await t.test('list tools returns all three tools', async () => {
     const result = await client.listTools();
     const toolNames = result.tools.map(t => t.name);
-    assert.ok(toolNames.includes('query_hql'));
-    assert.ok(toolNames.includes('retrieve_tiered_context'));
-    assert.ok(toolNames.includes('add_knowledge'));
+    assert.ok(toolNames.includes('query_hql'), 'query_hql tool must be listed');
+    assert.ok(toolNames.includes('retrieve_tiered_context'), 'retrieve_tiered_context tool must be listed');
+    assert.ok(toolNames.includes('add_knowledge'), 'add_knowledge tool must be listed');
+    assert.strictEqual(result.tools.length, 3, 'exactly 3 tools should be listed');
   });
 
-  await t.test('add_knowledge tool', async () => {
+  await t.test('add_knowledge with explicit ID', async () => {
     const result = await client.callTool({
       name: "add_knowledge",
       arguments: {
@@ -50,24 +51,34 @@ test('MCP Server: Life-cycle and Tools', async (t) => {
     });
     assert.strictEqual(result.isError, undefined);
     assert.ok(result.content[0].text.includes('Knowledge atom added'));
+    assert.ok(result.content[0].text.includes('mcp-test-node'), 'response should contain the node ID');
   });
 
-  await t.test('query_hql tool', async () => {
+  await t.test('add_knowledge generates ID when omitted', async () => {
+    const result = await client.callTool({
+      name: "add_knowledge",
+      arguments: {
+        labels: ["AUTO_ID"],
+        props: { auto: true }
+      }
+    });
+    assert.strictEqual(result.isError, undefined);
+    assert.ok(result.content[0].text.includes('Knowledge atom added'));
+  });
+
+  await t.test('query_hql traverses known node', async () => {
     const result = await client.callTool({
       name: "query_hql",
       arguments: {
-        query: "TRAVERSE FROM mcp-test-node DEPTH 0 REL ANY"
+        query: 'TRAVERSE FROM "mcp-test-node" DEPTH 1 REL ANY'
       }
     });
     assert.strictEqual(result.isError, undefined);
     const data = JSON.parse(result.content[0].text);
-    // Depth 0 should return at least the node itself (reconciled as NeighborOutput)
-    // Wait, traverse from seed with depth 0 might return empty or just seed.
-    // Based on our implementation, it starts with queue.push_back((seed, ...)) and checks depth.
-    assert.ok(Array.isArray(data));
+    assert.ok(Array.isArray(data), 'TRAVERSE result must be an array');
   });
 
-  await t.test('retrieve_tiered_context tool', async () => {
+  await t.test('retrieve_tiered_context H0 returns target node', async () => {
     const result = await client.callTool({
       name: "retrieve_tiered_context",
       arguments: {
@@ -77,7 +88,46 @@ test('MCP Server: Life-cycle and Tools', async (t) => {
     });
     assert.strictEqual(result.isError, undefined);
     const data = JSON.parse(result.content[0].text);
-    assert.strictEqual(data.nodes[0].id, "mcp-test-node");
+    assert.ok(data.nodes, 'context package must have nodes array');
+    assert.strictEqual(data.nodes[0].id, "mcp-test-node", 'H0 context must include the target node');
+  });
+
+  await t.test('retrieve_tiered_context H1 returns context package shape', async () => {
+    const result = await client.callTool({
+      name: "retrieve_tiered_context",
+      arguments: {
+        target: "mcp-test-node",
+        tier: "H1",
+        budget: 1000
+      }
+    });
+    assert.strictEqual(result.isError, undefined);
+    const data = JSON.parse(result.content[0].text);
+    assert.ok(data.nodes, 'context package must have nodes');
+    assert.ok(data.edges !== undefined, 'context package must have edges');
+    assert.ok(typeof data.tokenEstimate === 'number', 'tokenEstimate must be a number');
+    assert.ok(typeof data.reasoningPath === 'string', 'reasoningPath must be a string');
+  });
+
+  await t.test('query_hql error path: malformed HQL returns structured error', async () => {
+    const result = await client.callTool({
+      name: "query_hql",
+      arguments: {
+        query: "NOT VALID HQL $$$$"
+      }
+    });
+    assert.strictEqual(result.isError, true, "malformed HQL must return isError:true");
+    const msg = result.content[0].text;
+    assert.ok(typeof msg === 'string' && msg.length > 0, "error message must be a non-empty string");
+  });
+
+  await t.test('add_knowledge missing labels returns error', async () => {
+    const result = await client.callTool({
+      name: "add_knowledge",
+      arguments: {}
+    });
+    // Missing required field 'labels' should produce an error
+    assert.strictEqual(result.isError, true, "missing labels must return isError:true");
   });
 
   // Graceful shutdown

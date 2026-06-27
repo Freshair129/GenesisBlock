@@ -7,36 +7,58 @@
 // identically on a small set; (c) an override below the global default still
 // returns k results (the value is honoured, not clamped to the global).
 
-use genesis_block_native::{Storage, OpenOptions, NodeInput, HybridSearchInput};
+use genesis_block_native::{HybridSearchInput, NodeInput, OpenOptions, Storage};
 use std::fs;
 use std::path::Path;
 
 fn fresh(name: &str) -> String {
     let p = format!("{}/{}", env!("CARGO_TARGET_TMPDIR"), name);
-    if Path::new(&p).exists() { fs::remove_dir_all(&p).unwrap(); }
+    if Path::new(&p).exists() {
+        fs::remove_dir_all(&p).unwrap();
+    }
     p
 }
 
 fn open(path: &str) -> Storage {
     Storage::open(OpenOptions {
-        path: path.to_string(), page_cache_mb: Some(64), read_only: Some(false), vector_dim: Some(4),
-    }).unwrap()
+        path: path.to_string(),
+        page_cache_mb: Some(64),
+        read_only: Some(false),
+        vector_dim: Some(4),
+    })
+    .unwrap()
 }
 
 fn add(s: &Storage, id: &str, emb: Vec<f64>) {
     s.add_node(NodeInput {
-        id: Some(id.to_string()), labels: vec![], props: None,
-        embedding: Some(emb), lang: None, valid_from: None, caused_by: None, ttl: None,
+        id: Some(id.to_string()),
+        labels: vec![],
+        props: None,
+        embedding: Some(emb),
+        lang: None,
+        valid_from: None,
+        caused_by: None,
+        ttl: None,
         collection: None,
-    }).unwrap();
+    })
+    .unwrap();
 }
 
 fn search(s: &Storage, q: Vec<f64>, k: u32, ef: Option<u32>) -> Vec<String> {
     s.flush_index();
     s.hybrid_search(HybridSearchInput {
-        query_vector: q, k, alpha: Some(0.0), lang: None, as_of: None,
-        collection: None, ef_search: ef,
-    }).unwrap().into_iter().map(|n| n.node.id).collect()
+        query_vector: q,
+        k,
+        alpha: Some(0.0),
+        lang: None,
+        as_of: None,
+        collection: None,
+        ef_search: ef,
+    })
+    .unwrap()
+    .into_iter()
+    .map(|n| n.node.id)
+    .collect()
 }
 
 fn seed(s: &Storage) {
@@ -75,5 +97,9 @@ fn low_override_still_returns_k() {
     let s = open(&fresh("test_ef_low"));
     seed(&s);
     let hits = search(&s, vec![1.0, 0.0, 0.0, 0.0], 3, Some(16));
-    assert_eq!(hits.len(), 3, "k results returned even with a low ef_search override");
+    assert_eq!(
+        hits.len(),
+        3,
+        "k results returned even with a low ef_search override"
+    );
 }

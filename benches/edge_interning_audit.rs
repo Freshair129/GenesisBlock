@@ -7,14 +7,17 @@
 //   GB_VBENCH=C:\Users\freshair\gb_vbench GB_AUDIT_N=100000 GB_AUDIT_FANOUT=8 \
 //     cargo run --release --bin edge-interning-audit
 
-use genesis_block_native::{Storage, OpenOptions, NodeInput, EdgeInput};
-use rand::{Rng, SeedableRng};
+use genesis_block_native::{EdgeInput, NodeInput, OpenOptions, Storage};
 use rand::rngs::StdRng;
+use rand::{Rng, SeedableRng};
 use std::fs;
 use std::time::Instant;
 
 fn env_usize(k: &str, d: usize) -> usize {
-    std::env::var(k).ok().and_then(|s| s.parse().ok()).unwrap_or(d)
+    std::env::var(k)
+        .ok()
+        .and_then(|s| s.parse().ok())
+        .unwrap_or(d)
 }
 
 fn rss_mb() -> f64 {
@@ -66,7 +69,10 @@ fn main() {
     .expect("open");
 
     let rss_empty = rss_mb();
-    println!("=== edge-interning RCA: N={n} fanout={fanout} (edges≈{}) ===", n * fanout);
+    println!(
+        "=== edge-interning RCA: N={n} fanout={fanout} (edges≈{}) ===",
+        n * fanout
+    );
     println!("[stage 0] empty open                RSS {rss_empty:8.1} MB");
 
     // --- nodes ---
@@ -83,7 +89,8 @@ fn main() {
                 lang: None,
                 valid_from: None,
                 caused_by: None,
-                ttl: None, collection: None,
+                ttl: None,
+                collection: None,
             })
             .collect();
         storage.bulk_add_nodes(nodes).unwrap();
@@ -155,7 +162,9 @@ fn main() {
     println!("--- structural counts after full build ---");
     println!("  id_to_u32 (String->u32)   entries={id_to_u32_total:>10}  key string bytes={key_bytes:>12}");
     println!("  u32_to_id (u32->String)   entries={u32_to_id_total:>10}  val string bytes={val_bytes:>12}  (removed — node id interning Layer A)");
-    println!("  trigram_index             entries={tri_entries:>10}  set members={tri_members:>12}");
+    println!(
+        "  trigram_index             entries={tri_entries:>10}  set members={tri_members:>12}"
+    );
     println!("  edges  (u32->EdgeOutput)  entries={edges_map:>10}");
     println!("  nodes  (u32->NodeOutput)  entries={nodes_map:>10}");
     println!("  out_idx                   entries={out_entries:>10}  members={out_members:>12}");
@@ -164,10 +173,15 @@ fn main() {
     println!("--- edge-attributable interning (the lever) ---");
     println!("  edge UUIDs interned          : {edge_ids_interned}");
     println!("  -> id_to_u32 (reverse map removed): 1 String copy each (~36 B UUID)");
-    println!("  -> trigram members from edges: {edge_tri_members}  (~{:.1} per edge UUID)",
-        edge_tri_members as f64 / edge_ids_interned.max(1) as f64);
-    println!("  RSS edges delta              : {:.1} MB for {total_edges} edges = {:.1} B/edge",
-        rss_edges - rss_nodes, (rss_edges - rss_nodes) * 1024.0 * 1024.0 / total_edges.max(1) as f64);
+    println!(
+        "  -> trigram members from edges: {edge_tri_members}  (~{:.1} per edge UUID)",
+        edge_tri_members as f64 / edge_ids_interned.max(1) as f64
+    );
+    println!(
+        "  RSS edges delta              : {:.1} MB for {total_edges} edges = {:.1} B/edge",
+        rss_edges - rss_nodes,
+        (rss_edges - rss_nodes) * 1024.0 * 1024.0 / total_edges.max(1) as f64
+    );
 
     let out = serde_json::json!({
         "probe": "edge-interning-audit", "n": n, "fanout": fanout, "edges": total_edges,

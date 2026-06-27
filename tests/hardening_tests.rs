@@ -1,4 +1,4 @@
-use genesis_block_native::{Storage, OpenOptions, NodeInput, EdgeInput};
+use genesis_block_native::{EdgeInput, NodeInput, OpenOptions, Storage};
 use std::sync::Arc;
 use tempfile::tempdir;
 
@@ -10,24 +10,52 @@ fn test_bi_directional_edge_cleanup() {
         page_cache_mb: Some(64),
         read_only: Some(false),
         vector_dim: Some(1536),
-    }).unwrap();
+    })
+    .unwrap();
 
     // 1. Add two nodes
-    storage.add_node(NodeInput {
-        id: Some("A".to_string()), labels: vec!["USER".to_string()], props: None,
-        embedding: None, lang: None, valid_from: None, caused_by: None, ttl: None, collection: None,
-    }).unwrap();
+    storage
+        .add_node(NodeInput {
+            id: Some("A".to_string()),
+            labels: vec!["USER".to_string()],
+            props: None,
+            embedding: None,
+            lang: None,
+            valid_from: None,
+            caused_by: None,
+            ttl: None,
+            collection: None,
+        })
+        .unwrap();
 
-    storage.add_node(NodeInput {
-        id: Some("B".to_string()), labels: vec!["USER".to_string()], props: None,
-        embedding: None, lang: None, valid_from: None, caused_by: None, ttl: None, collection: None,
-    }).unwrap();
+    storage
+        .add_node(NodeInput {
+            id: Some("B".to_string()),
+            labels: vec!["USER".to_string()],
+            props: None,
+            embedding: None,
+            lang: None,
+            valid_from: None,
+            caused_by: None,
+            ttl: None,
+            collection: None,
+        })
+        .unwrap();
 
     // 2. Link them A -> B
-    storage.add_edge(EdgeInput {
-        id: Some("E1".to_string()), from: "A".to_string(), to: "B".to_string(), rel: "KNOWS".to_string(),
-        props: None, valid_from: None, supersede: None, impact: None, caused_by: None,
-    }).unwrap();
+    storage
+        .add_edge(EdgeInput {
+            id: Some("E1".to_string()),
+            from: "A".to_string(),
+            to: "B".to_string(),
+            rel: "KNOWS".to_string(),
+            props: None,
+            valid_from: None,
+            supersede: None,
+            impact: None,
+            caused_by: None,
+        })
+        .unwrap();
 
     let u32_a = storage.get_u32("A").unwrap();
     let u32_b = storage.get_u32("B").unwrap();
@@ -47,9 +75,12 @@ fn test_bi_directional_edge_cleanup() {
 
     // 5. CRITICAL: Verify node B's in-index is cleaned up (Bi-directional cleanup)
     if let Some(in_set) = storage.in_idx.get(&u32_b) {
-        assert!(!in_set.contains(&e1_key), "Node B's in-index should not contain the deleted edge");
+        assert!(
+            !in_set.contains(&e1_key),
+            "Node B's in-index should not contain the deleted edge"
+        );
     }
-    
+
     println!("Bi-directional edge cleanup verified.");
 }
 
@@ -62,28 +93,79 @@ fn test_configurable_vector_dim() {
         page_cache_mb: Some(64),
         read_only: Some(false),
         vector_dim: Some(768),
-    }).unwrap();
+    })
+    .unwrap();
 
     // The configured dim now lives on the default collection.
     assert_eq!(storage.collections.get("default").unwrap().dim, 768);
 
     // Add node with 768-dim vector
     let v_768 = vec![0.5; 768];
-    storage.add_node(NodeInput {
-        id: Some("node-768".to_string()),
-        labels: vec!["USER".to_string()],
-        props: None,
-        embedding: Some(v_768.clone()),
-        lang: Some("en".to_string()),
-        valid_from: None,
-        caused_by: None,
-        ttl: None, collection: None,
-    }).unwrap();
+    storage
+        .add_node(NodeInput {
+            id: Some("node-768".to_string()),
+            labels: vec!["USER".to_string()],
+            props: None,
+            embedding: Some(v_768.clone()),
+            lang: Some("en".to_string()),
+            valid_from: None,
+            caused_by: None,
+            ttl: None,
+            collection: None,
+        })
+        .unwrap();
 
     // Verify metadata reflects the correct dimension (default collection)
     let coll = storage.collections.get("default").unwrap();
     let meta_arena = coll.metadata.read();
     assert_eq!(meta_arena[0].vector_dim, 768);
-    
+
     println!("Configurable vector dimension verified.");
+}
+
+#[test]
+fn test_concurrent_node_writes_are_safe() {
+    use std::thread;
+
+    let dir = tempdir().unwrap();
+    let storage = Arc::new(
+        Storage::open(OpenOptions {
+            path: dir.path().to_str().unwrap().to_string(),
+            page_cache_mb: Some(64),
+            read_only: Some(false),
+            vector_dim: None,
+        })
+        .unwrap(),
+    );
+
+    const N: usize = 64;
+    let handles: Vec<_> = (0..N)
+        .map(|i| {
+            let s = Arc::clone(&storage);
+            thread::spawn(move || {
+                s.add_node(NodeInput {
+                    id: Some(format!("concurrent-{i}")),
+                    labels: vec!["Concurrent".into()],
+                    props: None,
+                    embedding: None,
+                    lang: None,
+                    valid_from: None,
+                    caused_by: None,
+                    ttl: None,
+                    collection: None,
+                })
+                .expect("concurrent add_node must not fail");
+            })
+        })
+        .collect();
+
+    for h in handles {
+        h.join().expect("writer thread panicked");
+    }
+
+    assert_eq!(
+        storage.nodes.len(),
+        N,
+        "all {N} concurrent node writes must be visible after all threads finish"
+    );
 }

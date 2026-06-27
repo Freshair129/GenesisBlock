@@ -1,20 +1,23 @@
+use parking_lot::RwLock;
 use std::net::SocketAddr;
 use std::sync::Arc;
-use parking_lot::RwLock;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
-use genesis_block_native::{Storage, OpenOptions};
 use genesis_block_native::router::{build_router, AppState};
+use genesis_block_native::{OpenOptions, Storage};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     tracing_subscriber::registry()
-        .with(tracing_subscriber::EnvFilter::try_from_default_env()
-            .unwrap_or_else(|_| "genesis_db_server=info,tower_http=debug".into()))
+        .with(
+            tracing_subscriber::EnvFilter::try_from_default_env()
+                .unwrap_or_else(|_| "genesis_db_server=info,tower_http=debug".into()),
+        )
         .with(tracing_subscriber::fmt::layer())
         .init();
 
-    let data_dir = std::env::var("GENESIS_DATA_DIR").unwrap_or_else(|_| ".brain/gks/storage".into());
+    let data_dir =
+        std::env::var("GENESIS_DATA_DIR").unwrap_or_else(|_| ".brain/gks/storage".into());
     let port: u16 = std::env::var("GENESIS_PORT")
         .ok()
         .and_then(|p| p.parse().ok())
@@ -31,8 +34,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         vector_dim: None,
     })?;
 
+    let api_key = std::env::var("GENESIS_API_KEY").ok();
+    if api_key.is_some() {
+        tracing::info!("API key authentication enabled (GENESIS_API_KEY is set)");
+    } else {
+        tracing::warn!("No GENESIS_API_KEY set — server is unauthenticated; set it for any non-local deployment");
+    }
     let state = AppState {
         storage: Arc::new(RwLock::new(storage)),
+        api_key,
     };
 
     let app = build_router(state);

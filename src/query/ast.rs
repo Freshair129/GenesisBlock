@@ -51,8 +51,8 @@ impl TryFrom<&str> for HqlCommand {
     type Error = String;
 
     fn try_from(query: &str) -> Result<Self, Self::Error> {
-        let pairs = HqlParser::parse(Rule::query, query)
-            .map_err(|e| format!("HQL Parse Error: {}", e))?;
+        let pairs =
+            HqlParser::parse(Rule::query, query).map_err(|e| format!("HQL Parse Error: {}", e))?;
 
         for pair in pairs {
             match pair.as_rule() {
@@ -64,7 +64,9 @@ impl TryFrom<&str> for HqlCommand {
                             Rule::hybrid => return Ok(Self::parse_hybrid(inner_pair)),
                             Rule::context => return Ok(Self::parse_context(inner_pair)),
                             Rule::EOI => continue,
-                            _ => unreachable!("Unexpected rule in query: {:?}", inner_pair.as_rule()),
+                            _ => {
+                                unreachable!("Unexpected rule in query: {:?}", inner_pair.as_rule())
+                            }
                         }
                     }
                 }
@@ -86,7 +88,7 @@ impl HqlCommand {
                 Rule::identifier => id = inner.as_str().to_string(),
                 Rule::string_lit => {
                     let s = inner.as_str();
-                    id = s[1..s.len()-1].to_string(); // strip quotes
+                    id = s[1..s.len() - 1].to_string(); // strip quotes
                 }
                 _ => {}
             }
@@ -98,7 +100,7 @@ impl HqlCommand {
         for inner in pair.into_inner() {
             if inner.as_rule() == Rule::string_lit {
                 let s = inner.as_str();
-                return s[1..s.len()-1].to_string(); // strip quotes
+                return s[1..s.len() - 1].to_string(); // strip quotes
             }
         }
         "en".to_string()
@@ -108,7 +110,7 @@ impl HqlCommand {
         for inner in pair.into_inner() {
             if inner.as_rule() == Rule::string_lit {
                 let s = inner.as_str();
-                return s[1..s.len()-1].to_string(); // strip quotes
+                return s[1..s.len() - 1].to_string(); // strip quotes
             }
         }
         "".to_string()
@@ -120,7 +122,7 @@ impl HqlCommand {
                 Rule::identifier => return inner.as_str().to_string(),
                 Rule::string_lit => {
                     let s = inner.as_str();
-                    return s[1..s.len()-1].to_string(); // strip quotes
+                    return s[1..s.len() - 1].to_string(); // strip quotes
                 }
                 _ => {}
             }
@@ -145,7 +147,8 @@ impl HqlCommand {
                     fuzzy = f;
                 }
                 Rule::vector => {
-                    vector = inner.into_inner()
+                    vector = inner
+                        .into_inner()
                         .map(|n| n.as_str().parse::<f64>().unwrap_or(0.0))
                         .collect();
                 }
@@ -157,7 +160,15 @@ impl HqlCommand {
             }
         }
 
-        HqlCommand::Search { target, vector, k, fuzzy, lang, as_of, collection }
+        HqlCommand::Search {
+            target,
+            vector,
+            k,
+            fuzzy,
+            lang,
+            as_of,
+            collection,
+        }
     }
 
     fn parse_traverse(pair: pest::iterators::Pair<Rule>) -> Self {
@@ -197,7 +208,13 @@ impl HqlCommand {
             }
         }
 
-        HqlCommand::Traverse { seed, depth, rel, fuzzy, as_of }
+        HqlCommand::Traverse {
+            seed,
+            depth,
+            rel,
+            fuzzy,
+            as_of,
+        }
     }
 
     fn parse_hybrid(pair: pest::iterators::Pair<Rule>) -> Self {
@@ -217,7 +234,8 @@ impl HqlCommand {
                     fuzzy = f;
                 }
                 Rule::vector => {
-                    vector = inner.into_inner()
+                    vector = inner
+                        .into_inner()
                         .map(|n| n.as_str().parse::<f64>().unwrap_or(0.0))
                         .collect();
                 }
@@ -229,7 +247,15 @@ impl HqlCommand {
             }
         }
 
-        HqlCommand::Hybrid { target, vector, alpha, fuzzy, lang, as_of, collection }
+        HqlCommand::Hybrid {
+            target,
+            vector,
+            alpha,
+            fuzzy,
+            lang,
+            as_of,
+            collection,
+        }
     }
 
     fn parse_context(pair: pest::iterators::Pair<Rule>) -> Self {
@@ -251,6 +277,11 @@ impl HqlCommand {
             }
         }
 
-        HqlCommand::Context { target, tier, budget, fuzzy }
+        HqlCommand::Context {
+            target,
+            tier,
+            budget,
+            fuzzy,
+        }
     }
 }

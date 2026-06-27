@@ -1,4 +1,4 @@
-use genesis_block_native::{Storage, OpenOptions, NodeInput, EdgeInput, BatchInput};
+use genesis_block_native::{BatchInput, EdgeInput, NodeInput, OpenOptions, Storage};
 use std::fs;
 use std::path::Path;
 
@@ -9,12 +9,13 @@ fn test_mark_ix_batch_atomicity() {
         fs::remove_dir_all(db_path).unwrap();
     }
 
-    let storage = Storage::open(OpenOptions { 
+    let storage = Storage::open(OpenOptions {
         path: db_path.to_string(),
         page_cache_mb: Some(64),
         read_only: Some(false),
         vector_dim: Some(1536),
-    }).unwrap();
+    })
+    .unwrap();
 
     // 1. Execute a successful batch (1 Node + 1 Edge)
     let batch = BatchInput {
@@ -26,7 +27,8 @@ fn test_mark_ix_batch_atomicity() {
             lang: None,
             valid_from: None,
             caused_by: None,
-            ttl: None, collection: None,
+            ttl: None,
+            collection: None,
         }],
         edges: vec![EdgeInput {
             id: Some("batched_edge".to_string()),
@@ -49,7 +51,10 @@ fn test_mark_ix_batch_atomicity() {
     // their deterministic u64 hash and are NOT in id_to_u32
     // (ADR--GENESISDB-EDGE-NUMERIC-KEYS).
     assert!(storage.get_u32("batched_node").is_some());
-    assert!(storage.edges.get(&Storage::edge_key("batched_edge")).is_some());
+    assert!(storage
+        .edges
+        .get(&Storage::edge_key("batched_edge"))
+        .is_some());
 
     // 2. Test Atomic Failure (Invalid Governance Tier)
     let bad_batch = BatchInput {
@@ -62,7 +67,8 @@ fn test_mark_ix_batch_atomicity() {
                 lang: None,
                 valid_from: None,
                 caused_by: None,
-                ttl: None, collection: None,
+                ttl: None,
+                collection: None,
             },
             NodeInput {
                 id: Some("invalid_master_node".to_string()),
@@ -72,17 +78,24 @@ fn test_mark_ix_batch_atomicity() {
                 lang: None,
                 valid_from: None,
                 caused_by: None,
-                ttl: None, collection: None,
-            }
+                ttl: None,
+                collection: None,
+            },
         ],
         edges: vec![],
     };
 
     let fail_res = storage.execute_batch(bad_batch);
-    assert!(fail_res.is_err(), "Batch should fail due to MASTER tier violation");
+    assert!(
+        fail_res.is_err(),
+        "Batch should fail due to MASTER tier violation"
+    );
 
     // CRITICAL: Verify "valid_node" from the failed batch was NOT created
-    assert!(storage.get_u32("valid_node").is_none(), "Atomicity failure: valid_node was created despite batch failure");
+    assert!(
+        storage.get_u32("valid_node").is_none(),
+        "Atomicity failure: valid_node was created despite batch failure"
+    );
 
     println!("Mark IX: Batch Atomicity verification successful.");
 }

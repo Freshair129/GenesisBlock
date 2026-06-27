@@ -1,18 +1,19 @@
-use std::sync::Arc;
-use std::sync::atomic::Ordering;
 use axum::{
     extract::{DefaultBodyLimit, Json, State},
-    http::{HeaderValue, StatusCode},
+    http::{header, HeaderValue, StatusCode},
+    middleware::{self, Next},
     response::IntoResponse,
     routing::{get, post},
     Router,
 };
 use parking_lot::RwLock;
+use std::sync::atomic::Ordering;
+use std::sync::Arc;
 use tower_http::cors::{AllowOrigin, CorsLayer};
 use tower_http::limit::RequestBodyLimitLayer;
 use tower_http::trace::TraceLayer;
 
-use crate::{Storage, NodeInput, EdgeInput, QueryInput, HybridSearchInput, Event, SyncPeer};
+use crate::{EdgeInput, Event, HybridSearchInput, NodeInput, QueryInput, Storage, SyncPeer};
 
 // ---------------------------------------------------------------------------
 // App state
@@ -21,6 +22,9 @@ use crate::{Storage, NodeInput, EdgeInput, QueryInput, HybridSearchInput, Event,
 #[derive(Clone)]
 pub struct AppState {
     pub storage: Arc<RwLock<Storage>>,
+    /// When set, every request must carry `Authorization: Bearer <key>`.
+    /// Leave `None` (the default) for unauthenticated local-only use.
+    pub api_key: Option<String>,
 }
 
 // ---------------------------------------------------------------------------
@@ -119,7 +123,12 @@ async fn consensus_vote_handler(
     Json(input): Json<VoteInput>,
 ) -> impl IntoResponse {
     let storage = state.storage.read();
-    match storage.submit_vote(input.proposal_id, input.peer_id, input.approve, input.signature) {
+    match storage.submit_vote(
+        input.proposal_id,
+        input.peer_id,
+        input.approve,
+        input.signature,
+    ) {
         Ok(reached_quorum) => (StatusCode::OK, Json(reached_quorum)).into_response(),
         Err(e) => (StatusCode::BAD_REQUEST, e.to_string()).into_response(),
     }
@@ -167,9 +176,7 @@ async fn bulk_add_edges_handler(
     }
 }
 
-async fn rebuild_index_handler(
-    State(state): State<AppState>,
-) -> impl IntoResponse {
+async fn rebuild_index_handler(State(state): State<AppState>) -> impl IntoResponse {
     let storage = state.storage.write();
     match storage.rebuild_index_parallel() {
         Ok(_) => StatusCode::OK.into_response(),
@@ -216,7 +223,15 @@ async fn create_collection_handler(
     Json(input): Json<CreateCollectionInput>,
 ) -> impl IntoResponse {
     let storage = state.storage.write();
-    match storage.create_collection(input.name, input.model, input.dim, input.metric, input.quant, input.ef_search, input.rerank) {
+    match storage.create_collection(
+        input.name,
+        input.model,
+        input.dim,
+        input.metric,
+        input.quant,
+        input.ef_search,
+        input.rerank,
+    ) {
         Ok(()) => (StatusCode::OK, Json(serde_json::json!({"ok": true}))).into_response(),
         Err(e) => (StatusCode::BAD_REQUEST, e.to_string()).into_response(),
     }
@@ -260,9 +275,21 @@ async fn get_meta_history_handler(
 
 async fn insight_communities_handler(State(state): State<AppState>) -> impl IntoResponse {
     let storage = state.storage.read();
-    let nodes: Vec<_> = storage.meta_nodes.iter().map(|e| e.value().clone()).collect();
-    let edges: Vec<_> = storage.meta_edges.iter().map(|e| e.value().clone()).collect();
-    (StatusCode::OK, Json(serde_json::json!({ "nodes": nodes, "edges": edges }))).into_response()
+    let nodes: Vec<_> = storage
+        .meta_nodes
+        .iter()
+        .map(|e| e.value().clone())
+        .collect();
+    let edges: Vec<_> = storage
+        .meta_edges
+        .iter()
+        .map(|e| e.value().clone())
+        .collect();
+    (
+        StatusCode::OK,
+        Json(serde_json::json!({ "nodes": nodes, "edges": edges })),
+    )
+        .into_response()
 }
 
 async fn insight_gaps_handler(State(state): State<AppState>) -> impl IntoResponse {
@@ -275,7 +302,10 @@ async fn insight_gaps_handler(State(state): State<AppState>) -> impl IntoRespons
 
 async fn insight_rebuild_handler(State(state): State<AppState>) -> impl IntoResponse {
     let storage = state.storage.write();
-    match storage.detect_communities().and_then(|_| storage.generate_meta_graph()) {
+    match storage
+        .detect_communities()
+        .and_then(|_| storage.generate_meta_graph())
+    {
         Ok(()) => (StatusCode::OK, Json(serde_json::json!({ "ok": true }))).into_response(),
         Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
     }
@@ -308,7 +338,11 @@ async fn execute_hql_handler(
     let query = body.into_query();
     let storage = state.storage.read();
     if storage.is_rebuilding.load(Ordering::SeqCst) {
-        return (StatusCode::SERVICE_UNAVAILABLE, "Engine is rebuilding index...").into_response();
+        return (
+            StatusCode::SERVICE_UNAVAILABLE,
+            "Engine is rebuilding index...",
+        )
+            .into_response();
     }
     match storage.execute_hql(&query) {
         Ok(results) => (StatusCode::OK, Json(results)).into_response(),
@@ -322,7 +356,11 @@ async fn query_handler(
 ) -> impl IntoResponse {
     let storage = state.storage.read();
     if storage.is_rebuilding.load(Ordering::SeqCst) {
-        return (StatusCode::SERVICE_UNAVAILABLE, "Engine is rebuilding index...").into_response();
+        return (
+            StatusCode::SERVICE_UNAVAILABLE,
+            "Engine is rebuilding index...",
+        )
+            .into_response();
     }
     match storage.query(input) {
         Ok(results) => (StatusCode::OK, Json(results)).into_response(),
@@ -336,7 +374,11 @@ async fn hybrid_search_handler(
 ) -> impl IntoResponse {
     let storage = state.storage.read();
     if storage.is_rebuilding.load(Ordering::SeqCst) {
-        return (StatusCode::SERVICE_UNAVAILABLE, "Engine is rebuilding index...").into_response();
+        return (
+            StatusCode::SERVICE_UNAVAILABLE,
+            "Engine is rebuilding index...",
+        )
+            .into_response();
     }
     match storage.hybrid_search(input) {
         Ok(results) => (StatusCode::OK, Json(results)).into_response(),
@@ -350,7 +392,11 @@ async fn ranked_context_handler(
 ) -> impl IntoResponse {
     let storage = state.storage.read();
     if storage.is_rebuilding.load(Ordering::SeqCst) {
-        return (StatusCode::SERVICE_UNAVAILABLE, "Engine is rebuilding index...").into_response();
+        return (
+            StatusCode::SERVICE_UNAVAILABLE,
+            "Engine is rebuilding index...",
+        )
+            .into_response();
     }
     match storage.get_ranked_context(input) {
         Ok(results) => (StatusCode::OK, Json(results)).into_response(),
@@ -379,7 +425,9 @@ async fn status_handler(State(state): State<AppState>) -> impl IntoResponse {
         edge_count: storage.edges.len(),
         memory_usage_mb: {
             // Vector arenas: actual bytes (f32=4B/elem, SQ8=1B/elem, BQ=1bit/elem).
-            let vec_bytes: usize = storage.collections.iter()
+            let vec_bytes: usize = storage
+                .collections
+                .iter()
                 .map(|c| c.value().arena.read().byte_size())
                 .sum();
             // Rough estimates for node/edge heap (props map + DashMap overhead).
@@ -425,7 +473,10 @@ pub fn build_router(state: AppState) -> Router {
         .route("/v1/collection/create", post(create_collection_handler))
         .route("/v1/collections", get(list_collections_handler))
         .route("/v1/vector/add", post(add_vector_handler))
-        .route("/v1/insight/drift/:cluster_id", get(get_meta_history_handler))
+        .route(
+            "/v1/insight/drift/:cluster_id",
+            get(get_meta_history_handler),
+        )
         .route("/v1/insight/communities", get(insight_communities_handler))
         .route("/v1/insight/gaps", get(insight_gaps_handler))
         .route("/v1/insight/rebuild", post(insight_rebuild_handler))
@@ -441,9 +492,36 @@ pub fn build_router(state: AppState) -> Router {
         .route("/v1/consensus/verify", post(consensus_verify_handler))
         .layer(TraceLayer::new_for_http())
         .layer(cors_layer())
+        // API key guard runs after CORS (so OPTIONS preflight is never blocked)
+        // but before the body-limit layer (so we don't waste I/O on unauthorized
+        // bodies).
+        .layer(middleware::from_fn_with_state(state.clone(), api_key_guard))
         // 64 MB hard cap on all request bodies; bulk endpoints stay well under.
         .layer(RequestBodyLimitLayer::new(64 * 1024 * 1024))
         .with_state(state)
+}
+
+/// Reject requests missing a valid `Authorization: Bearer <key>` header when
+/// `GENESIS_API_KEY` was set at startup (stored in `AppState.api_key`).
+/// No-ops when `api_key` is `None` — safe for unauthenticated local use.
+async fn api_key_guard(
+    State(state): State<AppState>,
+    req: axum::extract::Request,
+    next: Next,
+) -> impl IntoResponse {
+    if let Some(ref expected) = state.api_key {
+        let authorized = req
+            .headers()
+            .get(header::AUTHORIZATION)
+            .and_then(|v| v.to_str().ok())
+            .and_then(|v| v.strip_prefix("Bearer "))
+            .map(|token| token == expected.as_str())
+            .unwrap_or(false);
+        if !authorized {
+            return (StatusCode::UNAUTHORIZED, "Unauthorized").into_response();
+        }
+    }
+    next.run(req).await
 }
 
 /// Build a CORS layer.
@@ -455,7 +533,9 @@ fn cors_layer() -> CorsLayer {
     match std::env::var("GENESIS_CORS_ORIGIN").as_deref() {
         Ok("*") => CorsLayer::permissive(),
         Ok(origin) => {
-            let allowed = origin.parse::<HeaderValue>().expect("GENESIS_CORS_ORIGIN is not a valid header value");
+            let allowed = origin
+                .parse::<HeaderValue>()
+                .expect("GENESIS_CORS_ORIGIN is not a valid header value");
             CorsLayer::new()
                 .allow_origin(AllowOrigin::exact(allowed))
                 .allow_methods(tower_http::cors::Any)
