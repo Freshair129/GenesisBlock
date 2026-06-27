@@ -1,13 +1,13 @@
 # GenesisBlockDB REST API Reference
 
-**Generated from `src/main.rs` (Axum server) — 2026-06-22.** This replaces the
+**Generated from `src/router.rs` (Axum server) — 2026-06-28.** This replaces the
 prior corrupted file. The server is the SSOT; update this when routes change.
 
 - **Base URL:** `http://localhost:3000` (port via `GENESIS_PORT`, bind `0.0.0.0`)
 - **Data dir:** `.brain/gks/storage` (via `GENESIS_DATA_DIR`)
 - **Bodies:** JSON. **Errors:** `500 Internal Server Error` with a plain-text
   message. CORS: permissive.
-- **Run:** `cargo run --bin genesis-db-server`
+- **Run:** `cargo run --features bins --bin genesis-db-server`
 
 > ⚠️ Two contract gotchas that have bitten SDKs:
 > 1. `POST /v1/query/hql` takes a **raw JSON string** body (e.g. `"SEARCH …"`),
@@ -21,6 +21,7 @@ prior corrupted file. The server is the SSOT; update this when routes change.
 | POST | `/v1/node/add` | `NodeInput` | `NodeOutput` |
 | POST | `/v1/node/supersede` | `{ id, new_props?, caused_by? }` | `NodeOutput` |
 | POST | `/v1/edge/add` | `EdgeInput` | `EdgeOutput` |
+| POST | `/v1/edge/retract` | `{ id, at? }` | `EdgeOutput` (retracted) |
 | POST | `/v1/collection/create` | `{ name, model, dim, metric? }` | `{ ok: true }` |
 | GET | `/v1/collections` | _none_ | `CollectionInfo[]` |
 | POST | `/v1/vector/add` | `{ node_id, collection, embedding }` | `{ ok: true }` |
@@ -32,7 +33,11 @@ prior corrupted file. The server is the SSOT; update this when routes change.
 | POST | `/v1/search/hybrid` | `HybridSearchInput` | `NeighborOutput[]` |
 | POST | `/v1/reason/context` | `HybridSearchInput` | `NeighborOutput[]` (alpha forced 0.4) |
 | GET | `/v1/insight/drift/:cluster_id` | path `u32` | `SuperNode[]` |
+| GET | `/v1/insight/communities` | _none_ | community detection results |
+| GET | `/v1/insight/gaps` | _none_ | structural gap analysis |
+| POST | `/v1/insight/rebuild` | _none_ | trigger community detection rebuild |
 | GET | `/v1/status` | _none_ | `ExtendedStatus` |
+| GET | `/v1/version` | _none_ | `{ version }` |
 | GET | `/v1/swarm/status` | _none_ | `SwarmStatus` |
 | POST | `/v1/consensus/propose` | `{ event: Event, signature: u8[] }` | `String` (proposal id) |
 | POST | `/v1/consensus/sign-vote` | `{ proposal_id, approve }` | `u8[]` (ed25519 signature) |
@@ -41,8 +46,7 @@ prior corrupted file. The server is the SSOT; update this when routes change.
 
 **Engine capabilities NOT exposed over REST** (NAPI/embedded only): `execute_batch`,
 tiered `retrieve_context` / HQL `CONTEXT` end-to-end, `neighbors` (graph
-traversal), `retract_edge`, `compact`, `detect_communities`,
-`generate_meta_graph`, `calculate_structural_gaps`, `set_language_centroid`,
+traversal), `compact`, `set_language_centroid`,
 `set_index_params`, `reconcile_state`, `flush_index`, `index_lag`.
 
 > **Async vector indexing.** HNSW insertion runs off the write path on a
