@@ -1,0 +1,131 @@
+# Manual-trigger benchmark workflow for large-scale vector workloads.
+#
+# Runs the soak tests (light + medium: up to 180k vectors) and the Criterion
+# micro-benchmark (ldbc_lite) on demand. Too slow and resource-heavy for every
+# PR — trigger manually from the Actions tab or via `gh workflow run`.
+#
+# Usage:
+#   gh workflow run bench-manual.yml                         # default: medium
+#   gh workflow run bench-manual.yml -f profile=light        # quick smoke
+#   gh workflow run bench-manual.yml -f profile=all          # light + medium
+
+name: Benchmark (manual)
+
+on:
+  workflow_dispatch:
+    inputs:
+      profile:
+        description: 'Soak profile to run'
+        required: true
+        default: 'medium'
+        type: choice
+        options:
+          - light
+          - medium
+          - all
+
+permissions:
+  contents: read
+
+jobs:
+  soak:
+    name: soak (${{ matrix.profile }}) — ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ ubuntu-latest, windows-latest ]
+        profile: ${{ inputs.profile == 'all' && fromJSON('["light","medium"]') || fromJSON(format('["{0}"]', inputs.profile)) }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: bench-${{ matrix.os }}
+
+      - name: Run soak_${{ matrix.profile }}
+        env:
+          SOAK_TMPDIR: ${{ runner.temp }}/genesis_soak
+        run: |
+          mkdir -p "$SOAK_TMPDIR" 2>/dev/null || true
+          cargo test --no-default-features --test soak_tests --release \
+            -- --ignored soak_${{ matrix.profile }} --nocapture
+
+  criterion:
+    name: Criterion (ldbc_lite) — ubuntu
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: bench-criterion
+
+      - name: cargo bench (ldbc_lite)
+        run: cargo bench --bench ldbc_lite -- --output-format bencher 2>&1 | tee bench_output.txt
+
+      - name: Upload benchmark results
+        uses: actions/upload-artifact@v4
+        with:
+          name: criterion-results
+          path: |
+            bench_output.txt
+            target/criterion/
+          retention-days: 30
+
+  audit:
+    name: audit bins — ubuntu
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: bench-audit
+
+      - name: Build audit binaries
+        continue-on-error: true
+        run: |
+          cargo build --release --no-default-features --features bins \
+            --bin industrial-audit \
+            --bin scientific-audit \
+            --bin hql-query-stress
+
+      - name: Industrial audit
+        run: |
+          BIN=./target/release/industrial-audit
+          if [ -x "$BIN" ]; then
+            $BIN 2>&1 | tee industrial_result.txt
+          else
+            echo "industrial-audit not built; skipping"
+          fi
+
+      - name: Scientific audit
+        run: |
+          BIN=./target/release/scientific-audit
+          if [ -x "$BIN" ]; then
+            $BIN 2>&1 | tee scientific_result.txt
+          else
+            echo "scientific-audit not built; skipping"
+          fi
+
+      - name: HQL query stress
+        run: |
+          BIN=./target/release/hql-query-stress
+          if [ -x "$BIN" ]; then
+            $BIN 2>&1 | tee hql_stress_result.txt
+          else
+            echo "hql-query-stress not built; skipping"
+          fi
+
+      - name: Upload audit results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: audit-results
+          path: |
+            *_result.txt
+          retention-days: 30
