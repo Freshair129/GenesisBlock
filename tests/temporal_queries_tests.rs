@@ -2,8 +2,8 @@
 // directly (Storage, sync) so it builds and runs with or without the napi
 // bindings (core/napi split, #161) — the async GenesisDatabase wrapper is just a
 // thin offload over these same Storage methods.
-use genesis_block_native::{OpenOptions, NodeInput, EdgeInput, Storage, NeighborOutput};
-use serde_json::{json, from_value};
+use genesis_block_native::{EdgeInput, NeighborOutput, NodeInput, OpenOptions, Storage};
+use serde_json::{from_value, json};
 
 #[test]
 fn test_temporal_time_travel() {
@@ -18,41 +18,49 @@ fn test_temporal_time_travel() {
     let db = Storage::open(opts).unwrap();
 
     // 1. Create a node in the past (Year 2024)
-    let _node_v1 = db.add_node(NodeInput {
-        id: Some("Concept-A".to_string()),
-        labels: vec!["Idea".to_string()],
-        props: Some(json!({"desc": "Version 1"})),
-        embedding: Some(vec![0.1; 1536]),
-        lang: Some("en".to_string()),
-        valid_from: Some("2024-01-01T00:00:00Z".to_string()),
-        caused_by: None,
-        ttl: None, collection: None,
-    }).unwrap();
+    let _node_v1 = db
+        .add_node(NodeInput {
+            id: Some("Concept-A".to_string()),
+            labels: vec!["Idea".to_string()],
+            props: Some(json!({"desc": "Version 1"})),
+            embedding: Some(vec![0.1; 1536]),
+            lang: Some("en".to_string()),
+            valid_from: Some("2024-01-01T00:00:00Z".to_string()),
+            caused_by: None,
+            ttl: None,
+            collection: None,
+        })
+        .unwrap();
 
     // 2. Create another node in the past
-    let _node_b = db.add_node(NodeInput {
-        id: Some("Concept-B".to_string()),
-        labels: vec!["Idea".to_string()],
-        props: Some(json!({"desc": "Original B"})),
-        embedding: Some(vec![0.2; 1536]),
-        lang: Some("en".to_string()),
-        valid_from: Some("2024-01-01T00:00:00Z".to_string()),
-        caused_by: None,
-        ttl: None, collection: None,
-    }).unwrap();
+    let _node_b = db
+        .add_node(NodeInput {
+            id: Some("Concept-B".to_string()),
+            labels: vec!["Idea".to_string()],
+            props: Some(json!({"desc": "Original B"})),
+            embedding: Some(vec![0.2; 1536]),
+            lang: Some("en".to_string()),
+            valid_from: Some("2024-01-01T00:00:00Z".to_string()),
+            caused_by: None,
+            ttl: None,
+            collection: None,
+        })
+        .unwrap();
 
     // 3. Connect them in the past
-    let _edge_v1 = db.add_edge(EdgeInput {
-        id: Some("E1".to_string()),
-        from: "Concept-A".to_string(),
-        to: "Concept-B".to_string(),
-        rel: "RELATES_TO".to_string(),
-        props: None,
-        valid_from: Some("2024-02-01T00:00:00Z".to_string()),
-        supersede: None,
-        impact: Some(0.8),
-        caused_by: None,
-    }).unwrap();
+    let _edge_v1 = db
+        .add_edge(EdgeInput {
+            id: Some("E1".to_string()),
+            from: "Concept-A".to_string(),
+            to: "Concept-B".to_string(),
+            rel: "RELATES_TO".to_string(),
+            props: None,
+            valid_from: Some("2024-02-01T00:00:00Z".to_string()),
+            supersede: None,
+            impact: Some(0.8),
+            caused_by: None,
+        })
+        .unwrap();
 
     // --- TIME TRAVEL QUERY 1: AS OF 2024 ---
     let hql_2024 = "TRAVERSE FROM \"Concept-A\" DEPTH 1 REL ANY AS OF \"2024-06-01T00:00:00Z\"";
@@ -62,34 +70,43 @@ fn test_temporal_time_travel() {
     assert_eq!(results_2024[0].node.id, "Concept-B");
 
     // 4. Future node
-    let _node_c_future = db.add_node(NodeInput {
-        id: Some("Concept-C".to_string()),
-        labels: vec!["FutureIdea".to_string()],
-        props: Some(json!({"desc": "Born in 2026"})),
-        embedding: Some(vec![0.3; 1536]),
-        lang: Some("en".to_string()),
-        valid_from: Some("2026-01-01T00:00:00Z".to_string()),
-        caused_by: None,
-        ttl: None, collection: None,
-    }).unwrap();
+    let _node_c_future = db
+        .add_node(NodeInput {
+            id: Some("Concept-C".to_string()),
+            labels: vec!["FutureIdea".to_string()],
+            props: Some(json!({"desc": "Born in 2026"})),
+            embedding: Some(vec![0.3; 1536]),
+            lang: Some("en".to_string()),
+            valid_from: Some("2026-01-01T00:00:00Z".to_string()),
+            caused_by: None,
+            ttl: None,
+            collection: None,
+        })
+        .unwrap();
 
-    let _edge_v2 = db.add_edge(EdgeInput {
-        id: Some("E2".to_string()),
-        from: "Concept-A".to_string(),
-        to: "Concept-C".to_string(),
-        rel: "RELATES_TO".to_string(),
-        props: None,
-        valid_from: Some("2026-02-01T00:00:00Z".to_string()),
-        supersede: None,
-        impact: Some(0.9),
-        caused_by: None,
-    }).unwrap();
+    let _edge_v2 = db
+        .add_edge(EdgeInput {
+            id: Some("E2".to_string()),
+            from: "Concept-A".to_string(),
+            to: "Concept-C".to_string(),
+            rel: "RELATES_TO".to_string(),
+            props: None,
+            valid_from: Some("2026-02-01T00:00:00Z".to_string()),
+            supersede: None,
+            impact: Some(0.9),
+            caused_by: None,
+        })
+        .unwrap();
 
     // --- TIME TRAVEL QUERY 2: AS OF 2025 ---
     let hql_2025 = "TRAVERSE FROM \"Concept-A\" DEPTH 1 REL ANY AS OF \"2025-01-01T00:00:00Z\"";
     let res_2025 = db.execute_hql(hql_2025).unwrap();
     let results_2025: Vec<NeighborOutput> = from_value(res_2025).unwrap();
-    assert_eq!(results_2025.len(), 1, "Should still only find Concept-B in 2025");
+    assert_eq!(
+        results_2025.len(),
+        1,
+        "Should still only find Concept-B in 2025"
+    );
     assert_eq!(results_2025[0].node.id, "Concept-B");
 
     // --- PRESENT DAY QUERY: AS OF 2027 ---

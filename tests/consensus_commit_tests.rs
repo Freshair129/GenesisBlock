@@ -9,54 +9,101 @@
 // See the consensus `submit_vote` block in src/lib.rs.
 
 use genesis_block_native::{
-    Storage, OpenOptions, NodeInput, NeighborInput, HybridSearchInput,
-    Event, EdgeOutput, VectorEvent, NodeOutput, LogicalClock,
+    EdgeOutput, Event, HybridSearchInput, LogicalClock, NeighborInput, NodeInput, NodeOutput,
+    OpenOptions, Storage, VectorEvent,
 };
 use std::fs;
 use std::path::Path;
 
 fn fresh(name: &str) -> String {
     let p = format!("{}/{}", env!("CARGO_TARGET_TMPDIR"), name);
-    if Path::new(&p).exists() { fs::remove_dir_all(&p).unwrap(); }
+    if Path::new(&p).exists() {
+        fs::remove_dir_all(&p).unwrap();
+    }
     p
 }
 
 fn open(path: &str, dim: u32) -> Storage {
     Storage::open(OpenOptions {
-        path: path.to_string(), page_cache_mb: Some(64), read_only: Some(false), vector_dim: Some(dim),
-    }).unwrap()
+        path: path.to_string(),
+        page_cache_mb: Some(64),
+        read_only: Some(false),
+        vector_dim: Some(dim),
+    })
+    .unwrap()
 }
 
 fn node(s: &Storage, id: &str) {
     s.add_node(NodeInput {
-        id: Some(id.to_string()), labels: vec![], props: None, embedding: None,
-        lang: None, valid_from: None, caused_by: None, ttl: None, collection: None,
-    }).unwrap();
+        id: Some(id.to_string()),
+        labels: vec![],
+        props: None,
+        embedding: None,
+        lang: None,
+        valid_from: None,
+        caused_by: None,
+        ttl: None,
+        collection: None,
+    })
+    .unwrap();
 }
 
 fn mk_node(id: &str) -> NodeOutput {
     NodeOutput {
-        id: id.to_string(), labels: vec!["USER".to_string()], props: serde_json::json!({}),
-        impact: None, embedding: None, lang: None,
-        valid_from: "2026-01-01T00:00:00Z".to_string(), valid_to: None, caused_by: None,
-        expires_at: None, clock: LogicalClock { time: 1, peer_id: "p".to_string() }, collection: None,
+        id: id.to_string(),
+        labels: vec!["USER".to_string()],
+        props: serde_json::json!({}),
+        impact: None,
+        embedding: None,
+        lang: None,
+        valid_from: "2026-01-01T00:00:00Z".to_string(),
+        valid_to: None,
+        caused_by: None,
+        expires_at: None,
+        clock: LogicalClock {
+            time: 1,
+            peer_id: "p".to_string(),
+        },
+        collection: None,
     }
 }
 
 fn mk_edge(id: &str, from: &str, to: &str) -> EdgeOutput {
     EdgeOutput {
-        id: id.to_string(), from: from.to_string(), to: to.to_string(), rel: "LINK".to_string(),
-        props: serde_json::json!({}), valid_from: "2026-01-01T00:00:00Z".to_string(), valid_to: None,
-        recorded_at: "2026-01-01T00:00:00Z".to_string(), superseded_by: None, impact: None,
-        caused_by: None, clock: LogicalClock { time: 1, peer_id: "p".to_string() },
+        id: id.to_string(),
+        from: from.to_string(),
+        to: to.to_string(),
+        rel: "LINK".to_string(),
+        props: serde_json::json!({}),
+        valid_from: "2026-01-01T00:00:00Z".to_string(),
+        valid_to: None,
+        recorded_at: "2026-01-01T00:00:00Z".to_string(),
+        superseded_by: None,
+        impact: None,
+        caused_by: None,
+        clock: LogicalClock {
+            time: 1,
+            peer_id: "p".to_string(),
+        },
     }
 }
 
 fn hop1_out(s: &Storage, id: &str) -> usize {
-    s.neighbors(id.to_string(), NeighborInput {
-        depth: Some(1), rel: None, rels: None, direction: Some("out".to_string()),
-        as_of: None, include_invalid: Some(false), limit: Some(1000),
-    }, false).unwrap().len()
+    s.neighbors(
+        id.to_string(),
+        NeighborInput {
+            depth: Some(1),
+            rel: None,
+            rels: None,
+            direction: Some("out".to_string()),
+            as_of: None,
+            include_invalid: Some(false),
+            limit: Some(1000),
+        },
+        false,
+    )
+    .unwrap()
+    .len()
 }
 
 /// Self-sign + submit an approving vote, returning whether quorum was reached.
@@ -82,9 +129,15 @@ fn consensus_committed_edge_is_traversable() {
     let s = open(&fresh("test_cc_edge"), 4);
     node(&s, "A");
     node(&s, "B");
-    let pid = s.propose_consensus(Event::Edge(mk_edge("e-AB", "A", "B")), vec![0u8; 64]).unwrap();
+    let pid = s
+        .propose_consensus(Event::Edge(mk_edge("e-AB", "A", "B")), vec![0u8; 64])
+        .unwrap();
     assert!(approve(&s, &pid), "self-vote reaches quorum");
-    assert_eq!(hop1_out(&s, "A"), 1, "consensus-committed edge is in the adjacency index");
+    assert_eq!(
+        hop1_out(&s, "A"),
+        1,
+        "consensus-committed edge is in the adjacency index"
+    );
 }
 
 /// A Vector committed through consensus is staged + enqueued, so it is
@@ -95,19 +148,37 @@ fn consensus_committed_vector_is_searchable() {
     let s = open(&path, 4);
     node(&s, "N1"); // the vector attaches to an existing node
     let ev = Event::Vector(VectorEvent {
-        node_id: "N1".to_string(), collection: None,
-        embedding: vec![1.0, 0.0, 0.0, 0.0], lang: Some("en".to_string()),
-        clock: LogicalClock { time: 1, peer_id: "p".to_string() },
+        node_id: "N1".to_string(),
+        collection: None,
+        embedding: vec![1.0, 0.0, 0.0, 0.0],
+        lang: Some("en".to_string()),
+        clock: LogicalClock {
+            time: 1,
+            peer_id: "p".to_string(),
+        },
     });
     let pid = s.propose_consensus(ev, vec![0u8; 64]).unwrap();
     assert!(approve(&s, &pid), "self-vote reaches quorum");
 
     s.flush_index();
-    let hits: Vec<String> = s.hybrid_search(HybridSearchInput {
-        query_vector: vec![1.0, 0.0, 0.0, 0.0], k: 5, alpha: Some(0.0),
-        lang: None, as_of: None, collection: None, ef_search: None,
-    }).unwrap().into_iter().map(|n| n.node.id).collect();
-    assert!(hits.contains(&"N1".to_string()), "consensus-committed vector is searchable now");
+    let hits: Vec<String> = s
+        .hybrid_search(HybridSearchInput {
+            query_vector: vec![1.0, 0.0, 0.0, 0.0],
+            k: 5,
+            alpha: Some(0.0),
+            lang: None,
+            as_of: None,
+            collection: None,
+            ef_search: None,
+        })
+        .unwrap()
+        .into_iter()
+        .map(|n| n.node.id)
+        .collect();
+    assert!(
+        hits.contains(&"N1".to_string()),
+        "consensus-committed vector is searchable now"
+    );
 }
 
 /// Crossing quorum applies + persists exactly once. A second approving vote that
@@ -120,13 +191,25 @@ fn recommit_after_quorum_does_not_repersist() {
     // propose_consensus is in-memory only — nothing in the WAL yet.
     assert_eq!(wal_lines(&path), 0);
 
-    let pid = s.propose_consensus(Event::Node(mk_node("N1")), vec![0u8; 64]).unwrap();
-    assert!(approve(&s, &pid), "first authentic vote crosses quorum and commits");
+    let pid = s
+        .propose_consensus(Event::Node(mk_node("N1")), vec![0u8; 64])
+        .unwrap();
+    assert!(
+        approve(&s, &pid),
+        "first authentic vote crosses quorum and commits"
+    );
     let after_commit = wal_lines(&path);
     assert_eq!(after_commit, 1, "commit persists the event once");
 
     // Re-vote (same peer, same authentic signature). The guard returns Ok(true)
     // without re-applying — the WAL must not grow.
-    assert!(approve(&s, &pid), "a post-quorum vote still reports quorum reached");
-    assert_eq!(wal_lines(&path), after_commit, "no re-persist after the proposal is committed");
+    assert!(
+        approve(&s, &pid),
+        "a post-quorum vote still reports quorum reached"
+    );
+    assert_eq!(
+        wal_lines(&path),
+        after_commit,
+        "no re-persist after the proposal is committed"
+    );
 }

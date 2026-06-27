@@ -4,26 +4,26 @@
 
 #![deny(clippy::all)]
 
-use std::collections::{HashSet, VecDeque, HashMap};
+use ed25519_dalek::{Signature, Signer, SigningKey, Verifier, VerifyingKey};
+use rand::rngs::OsRng;
+use rand::Rng;
+use sha2::{Digest, Sha256};
+use std::collections::{HashMap, HashSet, VecDeque};
 use std::fs::{self, File, OpenOptions as FileOpenOptions};
 use std::io::Write;
 use std::path::PathBuf;
+use std::sync::atomic::{AtomicBool, AtomicU32, AtomicUsize, Ordering};
 use std::sync::Arc;
-use std::sync::atomic::{AtomicU32, AtomicUsize, AtomicBool, Ordering};
 use std::time::{Duration, Instant};
-use sha2::{Sha256, Digest};
-use ed25519_dalek::{SigningKey, VerifyingKey, Signature, Signer, Verifier};
-use rand::rngs::OsRng;
-use rand::Rng;
 
 use chrono::Utc;
 use dashmap::DashMap;
-use roaring::RoaringBitmap;
 use hnsw_rs::prelude::*;
 #[cfg(feature = "napi-bindings")]
 use napi::bindgen_prelude::*;
 #[cfg(feature = "napi-bindings")]
 use napi_derive::napi;
+use roaring::RoaringBitmap;
 
 // When the napi bindings are disabled (REST server / Linux integration-test
 // build) the storage core uses a minimal Error/Result that mirror the only napi
@@ -38,7 +38,9 @@ mod core_error {
     }
     impl Error {
         pub fn from_reason<T: Into<String>>(reason: T) -> Self {
-            Error { reason: reason.into() }
+            Error {
+                reason: reason.into(),
+            }
         }
     }
     impl std::fmt::Display for Error {
@@ -51,11 +53,11 @@ mod core_error {
 }
 #[cfg(not(feature = "napi-bindings"))]
 use core_error::{Error, Result};
+use crossbeam_channel::{bounded, unbounded, Receiver, Sender};
 use parking_lot::RwLock;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use uuid::Uuid;
-use crossbeam_channel::{unbounded, bounded, Sender, Receiver};
 
 pub mod query;
 pub mod router;
@@ -166,7 +168,7 @@ pub enum ScalingTier {
 }
 
 impl ScalingTier {
-    pub fn from_str(s: &str) -> Self {
+    pub fn parse(s: &str) -> Self {
         match s.to_uppercase().as_str() {
             "H0" => ScalingTier::H0,
             "H1" => ScalingTier::H1,
@@ -290,22 +292,22 @@ pub struct SignedEvent {
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub enum GossipMessage {
-    Heartbeat { 
-        peer_id: String, 
-        merkle_root: String, 
+    Heartbeat {
+        peer_id: String,
+        merkle_root: String,
         logical_time: u32,
         port: u16,
-        verifying_key: Vec<u8>
+        verifying_key: Vec<u8>,
     },
-    PullRequest { 
+    PullRequest {
         from_clock: u32,
-        target_peer_id: String 
+        target_peer_id: String,
     },
-    PushDelta { 
-        events: Vec<SignedEvent> 
+    PushDelta {
+        events: Vec<SignedEvent>,
     },
     ConsensusPropose {
-        proposal: ConsensusProposal,
+        proposal: Box<ConsensusProposal>,
     },
     ConsensusVote {
         proposal_id: String,
@@ -317,8 +319,8 @@ pub enum GossipMessage {
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub enum SyncEvent {
-    ProposeMutation(Event),
-    AcknowledgeMutation(String), 
+    ProposeMutation(Box<Event>),
+    AcknowledgeMutation(String),
     RequestFragment(String),
 }
 
@@ -445,14 +447,24 @@ pub enum OptimizationTask {
 /// L2 over L2-normalized vectors (SPEC §10) so a single `DistL2` HNSW index
 /// type serves both — vectors are normalized on insert and at query time.
 #[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq)]
-pub enum Metric { L2, Cosine }
+pub enum Metric {
+    L2,
+    Cosine,
+}
 
 impl Metric {
     fn parse(s: &str) -> Self {
-        if s.eq_ignore_ascii_case("cosine") { Metric::Cosine } else { Metric::L2 }
+        if s.eq_ignore_ascii_case("cosine") {
+            Metric::Cosine
+        } else {
+            Metric::L2
+        }
     }
     fn as_str(&self) -> &'static str {
-        match self { Metric::L2 => "L2", Metric::Cosine => "Cosine" }
+        match self {
+            Metric::L2 => "L2",
+            Metric::Cosine => "Cosine",
+        }
     }
 }
 
@@ -468,16 +480,28 @@ impl Metric {
 /// quantization (ADR--GENESISDB-VECTOR-QUANTIZATION). `None` collections never
 /// allocate a sidecar — the arena is already exact f32.
 #[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq)]
-pub enum Quant { None, ScalarU8, Binary }
+pub enum Quant {
+    None,
+    ScalarU8,
+    Binary,
+}
 
 impl Quant {
     fn parse(s: &str) -> Self {
-        if s.eq_ignore_ascii_case("sq8") || s.eq_ignore_ascii_case("scalaru8") { Quant::ScalarU8 }
-        else if s.eq_ignore_ascii_case("bq") || s.eq_ignore_ascii_case("binary") { Quant::Binary }
-        else { Quant::None }
+        if s.eq_ignore_ascii_case("sq8") || s.eq_ignore_ascii_case("scalaru8") {
+            Quant::ScalarU8
+        } else if s.eq_ignore_ascii_case("bq") || s.eq_ignore_ascii_case("binary") {
+            Quant::Binary
+        } else {
+            Quant::None
+        }
     }
     fn as_str(&self) -> &'static str {
-        match self { Quant::None => "none", Quant::ScalarU8 => "sq8", Quant::Binary => "bq" }
+        match self {
+            Quant::None => "none",
+            Quant::ScalarU8 => "sq8",
+            Quant::Binary => "bq",
+        }
     }
 }
 
@@ -491,22 +515,34 @@ const SQ8_BIAS: f32 = 127.5;
 #[inline]
 fn sq8_q(v: f32) -> u8 {
     let q = (v * SQ8_SCALE + SQ8_BIAS).round();
-    if q <= 0.0 { 0 } else if q >= 255.0 { 255 } else { q as u8 }
+    if q <= 0.0 {
+        0
+    } else if q >= 255.0 {
+        255
+    } else {
+        q as u8
+    }
 }
 #[inline]
-fn sq8_dq(q: u8) -> f32 { (q as f32 - SQ8_BIAS) / SQ8_SCALE }
+fn sq8_dq(q: u8) -> f32 {
+    (q as f32 - SQ8_BIAS) / SQ8_SCALE
+}
 
 // Binary quantization (BQ): one sign bit per dim, packed into u64 words. Distance
 // is bit Hamming via popcount.
 #[inline]
-fn bq_words(dim: usize) -> usize { (dim + 63) / 64 }
+fn bq_words(dim: usize) -> usize {
+    dim.div_ceil(64)
+}
 
 /// Pack a prepared f32 vector to sign-bit codes (bit set iff component > 0).
 #[inline]
 fn bq_pack(emb: &[f32]) -> Vec<u64> {
     let mut w = vec![0u64; bq_words(emb.len())];
     for (i, &x) in emb.iter().enumerate() {
-        if x > 0.0 { w[i >> 6] |= 1u64 << (i & 63); }
+        if x > 0.0 {
+            w[i >> 6] |= 1u64 << (i & 63);
+        }
     }
     w
 }
@@ -515,7 +551,15 @@ fn bq_pack(emb: &[f32]) -> Vec<u64> {
 /// meta-graph / clustering; never for search). Lossless on sign, not magnitude.
 #[inline]
 fn bq_unpack(words: &[u64], dim: usize) -> Vec<f32> {
-    (0..dim).map(|i| if words[i >> 6] & (1u64 << (i & 63)) != 0 { 1.0 } else { -1.0 }).collect()
+    (0..dim)
+        .map(|i| {
+            if words[i >> 6] & (1u64 << (i & 63)) != 0 {
+                1.0
+            } else {
+                -1.0
+            }
+        })
+        .collect()
 }
 
 /// Default over-fetch multiplier for f32-sidecar rerank: pull `k * this` quantized
@@ -529,7 +573,14 @@ const RERANK_OVERFETCH: usize = 8;
 /// ranks by cosine (L2 on the unit sphere is monotonic in 1-cos). Exact match ⇒ 0.
 #[inline]
 fn exact_l2(a: &[f32], b: &[f32]) -> f32 {
-    a.iter().zip(b).map(|(x, y)| { let d = x - y; d * d }).sum::<f32>().sqrt()
+    a.iter()
+        .zip(b)
+        .map(|(x, y)| {
+            let d = x - y;
+            d * d
+        })
+        .sum::<f32>()
+        .sqrt()
 }
 
 /// Bit-Hamming distance over BQ-packed u64 codes. anndists' `DistHamming<u64>`
@@ -541,7 +592,9 @@ struct DistBinaryHamming;
 impl Distance<u64> for DistBinaryHamming {
     fn eval(&self, a: &[u64], b: &[u64]) -> f32 {
         let mut d = 0u32;
-        for i in 0..a.len() { d += (a[i] ^ b[i]).count_ones(); }
+        for i in 0..a.len() {
+            d += (a[i] ^ b[i]).count_ones();
+        }
         d as f32
     }
 }
@@ -557,7 +610,11 @@ pub enum ArenaStore {
     /// `len()` still reports logical components (`n*dim`), so `embedding_offset`
     /// stays in component units exactly like the f32/u8 variants and the shared
     /// `start + len <= arena.len()` bounds checks remain valid.
-    Binary { data: Vec<u64>, dim: usize, n: usize },
+    Binary {
+        data: Vec<u64>,
+        dim: usize,
+        n: usize,
+    },
 }
 
 impl ArenaStore {
@@ -565,7 +622,11 @@ impl ArenaStore {
         match q {
             Quant::None => ArenaStore::F32(Vec::new()),
             Quant::ScalarU8 => ArenaStore::U8(Vec::new()),
-            Quant::Binary => ArenaStore::Binary { data: Vec::new(), dim, n: 0 },
+            Quant::Binary => ArenaStore::Binary {
+                data: Vec::new(),
+                dim,
+                n: 0,
+            },
         }
     }
     /// Number of scalar components stored (NOT bytes).
@@ -584,13 +645,18 @@ impl ArenaStore {
             ArenaStore::Binary { data, .. } => data.len() * 8,
         }
     }
-    pub fn is_empty(&self) -> bool { self.len() == 0 }
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
     /// Append a prepared f32 vector, quantizing per mode.
     fn push_f32(&mut self, emb: &[f32]) {
         match self {
             ArenaStore::F32(v) => v.extend_from_slice(emb),
             ArenaStore::U8(v) => v.extend(emb.iter().map(|&x| sq8_q(x))),
-            ArenaStore::Binary { data, n, .. } => { data.extend(bq_pack(emb)); *n += 1; }
+            ArenaStore::Binary { data, n, .. } => {
+                data.extend(bq_pack(emb));
+                *n += 1;
+            }
         }
     }
     /// Read a vector back as f32 (dequantizing per mode). For the heuristic
@@ -623,9 +689,9 @@ impl ArenaStore {
     /// Raw little-endian bytes for the `vec_<name>.bin` snapshot.
     fn to_bytes(&self) -> Vec<u8> {
         match self {
-            ArenaStore::F32(v) => unsafe {
-                std::slice::from_raw_parts(v.as_ptr() as *const u8, v.len() * 4)
-            }.to_vec(),
+            ArenaStore::F32(v) => {
+                unsafe { std::slice::from_raw_parts(v.as_ptr() as *const u8, v.len() * 4) }.to_vec()
+            }
             ArenaStore::U8(v) => v.clone(),
             ArenaStore::Binary { data, .. } => data.iter().flat_map(|w| w.to_le_bytes()).collect(),
         }
@@ -633,13 +699,22 @@ impl ArenaStore {
     fn from_bytes(data: &[u8], q: Quant, dim: usize) -> Self {
         match q {
             Quant::None => ArenaStore::F32(
-                data.chunks_exact(4).map(|c| f32::from_le_bytes(c.try_into().unwrap())).collect()
+                data.chunks_exact(4)
+                    .map(|c| f32::from_le_bytes(c.try_into().unwrap()))
+                    .collect(),
             ),
             Quant::ScalarU8 => ArenaStore::U8(data.to_vec()),
             Quant::Binary => {
-                let words: Vec<u64> = data.chunks_exact(8).map(|c| u64::from_le_bytes(c.try_into().unwrap())).collect();
+                let words: Vec<u64> = data
+                    .chunks_exact(8)
+                    .map(|c| u64::from_le_bytes(c.try_into().unwrap()))
+                    .collect();
                 let wpv = bq_words(dim).max(1);
-                ArenaStore::Binary { n: words.len() / wpv, data: words, dim }
+                ArenaStore::Binary {
+                    n: words.len() / wpv,
+                    data: words,
+                    dim,
+                }
             }
         }
     }
@@ -678,18 +753,23 @@ impl VecIndex {
     fn parallel_insert_f32(&self, items: &[(Vec<f32>, u32)]) {
         match self {
             VecIndex::F32(h) => {
-                let refs: Vec<(&Vec<f32>, usize)> = items.iter().map(|(v, id)| (v, *id as usize)).collect();
+                let refs: Vec<(&Vec<f32>, usize)> =
+                    items.iter().map(|(v, id)| (v, *id as usize)).collect();
                 h.parallel_insert(&refs);
             }
             VecIndex::U8(h) => {
-                let q: Vec<(Vec<u8>, usize)> = items.iter()
-                    .map(|(v, id)| (v.iter().map(|&x| sq8_q(x)).collect(), *id as usize)).collect();
+                let q: Vec<(Vec<u8>, usize)> = items
+                    .iter()
+                    .map(|(v, id)| (v.iter().map(|&x| sq8_q(x)).collect(), *id as usize))
+                    .collect();
                 let refs: Vec<(&Vec<u8>, usize)> = q.iter().map(|(v, id)| (v, *id)).collect();
                 h.parallel_insert(&refs);
             }
             VecIndex::Binary(h) => {
-                let q: Vec<(Vec<u64>, usize)> = items.iter()
-                    .map(|(v, id)| (bq_pack(v), *id as usize)).collect();
+                let q: Vec<(Vec<u64>, usize)> = items
+                    .iter()
+                    .map(|(v, id)| (bq_pack(v), *id as usize))
+                    .collect();
                 let refs: Vec<(&Vec<u64>, usize)> = q.iter().map(|(v, id)| (v, *id)).collect();
                 h.parallel_insert(&refs);
             }
@@ -699,17 +779,27 @@ impl VecIndex {
     /// hnsw_rs `Neighbour` type or branch on element type.
     fn search_f32(&self, query: &[f32], k: usize, ef: usize) -> Vec<(usize, f32)> {
         match self {
-            VecIndex::F32(h) => h.search(query, k, ef).into_iter().map(|n| (n.d_id, n.distance)).collect(),
+            VecIndex::F32(h) => h
+                .search(query, k, ef)
+                .into_iter()
+                .map(|n| (n.d_id, n.distance))
+                .collect(),
             VecIndex::U8(h) => {
                 let q: Vec<u8> = query.iter().map(|&x| sq8_q(x)).collect();
-                h.search(&q, k, ef).into_iter().map(|n| (n.d_id, n.distance)).collect()
+                h.search(&q, k, ef)
+                    .into_iter()
+                    .map(|n| (n.d_id, n.distance))
+                    .collect()
             }
             VecIndex::Binary(h) => {
                 // Normalize Hamming (0..dim) to [0,1] so `1 - distance` stays a
                 // sane similarity for the hybrid score blend.
                 let c = bq_pack(query);
                 let dim = query.len().max(1) as f32;
-                h.search(&c, k, ef).into_iter().map(|n| (n.d_id, n.distance / dim)).collect()
+                h.search(&c, k, ef)
+                    .into_iter()
+                    .map(|n| (n.d_id, n.distance / dim))
+                    .collect()
             }
         }
     }
@@ -725,10 +815,10 @@ pub struct VectorCollection {
     pub dim: u16,
     pub metric: Metric,
     pub quant: Quant,
-    pub arena: RwLock<ArenaStore>,          // element type per `quant`; offsets in components
+    pub arena: RwLock<ArenaStore>, // element type per `quant`; offsets in components
     pub metadata: RwLock<Vec<NodeMetadata>>,
     hnsw: RwLock<Option<VecIndex>>,
-    pub node_to_arena: DashMap<u32, u32>,   // node u32 -> arena_id (this collection)
+    pub node_to_arena: DashMap<u32, u32>, // node u32 -> arena_id (this collection)
     pub count: AtomicUsize,
     /// Per-collection default HNSW `ef_search`. Set at creation, immutable.
     /// `None` ⇒ fall back to the engine-global default. Resolution order in
@@ -744,7 +834,15 @@ pub struct VectorCollection {
 }
 
 impl VectorCollection {
-    fn new(name: String, model: String, dim: u16, metric: Metric, quant: Quant, ef_search: Option<u32>, rerank: bool) -> Self {
+    fn new(
+        name: String,
+        model: String,
+        dim: u16,
+        metric: Metric,
+        quant: Quant,
+        ef_search: Option<u32>,
+        rerank: bool,
+    ) -> Self {
         // Rerank only makes sense for a lossy (quantized) arena; a `None`
         // collection already stores exact f32, so never allocate a sidecar there.
         let f32_sidecar = if rerank && quant != Quant::None {
@@ -753,7 +851,13 @@ impl VectorCollection {
             None
         };
         Self {
-            name, model, dim, metric, quant, ef_search, f32_sidecar,
+            name,
+            model,
+            dim,
+            metric,
+            quant,
+            ef_search,
+            f32_sidecar,
             arena: RwLock::new(ArenaStore::new(quant, dim as usize)),
             metadata: RwLock::new(Vec::new()),
             hnsw: RwLock::new(None),
@@ -778,7 +882,13 @@ impl VectorCollection {
             let mut w = self.hnsw.write();
             // Lazy create: final element count is unknown here, so reserve the
             // floor and let inserts grow it. Rehydrate (count known) sizes exactly.
-            if w.is_none() { *w = Some(VecIndex::build(self.quant, ef_construction, Self::HNSW_MIN_CAP)); }
+            if w.is_none() {
+                *w = Some(VecIndex::build(
+                    self.quant,
+                    ef_construction,
+                    Self::HNSW_MIN_CAP,
+                ));
+            }
         }
     }
 
@@ -787,7 +897,11 @@ impl VectorCollection {
         let mut emb: Vec<f32> = emb_64.into_iter().map(|v| v as f32).collect();
         if self.metric == Metric::Cosine {
             let norm: f32 = emb.iter().map(|x| x * x).sum::<f32>().sqrt();
-            if norm > 0.0 { for x in emb.iter_mut() { *x /= norm; } }
+            if norm > 0.0 {
+                for x in emb.iter_mut() {
+                    *x /= norm;
+                }
+            }
         }
         emb
     }
@@ -808,9 +922,14 @@ impl VectorCollection {
             }
             let arena_id = meta.len() as u32;
             meta.push(NodeMetadata {
-                arena_id, node_u32, timestamp: Utc::now().timestamp() as u64,
-                vector_dim: self.dim, embedding_offset: off as u64, gks_attributes: Vec::new(),
-                lang, cluster_id: arena_id,
+                arena_id,
+                node_u32,
+                timestamp: Utc::now().timestamp() as u64,
+                vector_dim: self.dim,
+                embedding_offset: off as u64,
+                gks_attributes: Vec::new(),
+                lang,
+                cluster_id: arena_id,
             });
             arena_id
         };
@@ -822,7 +941,9 @@ impl VectorCollection {
     /// Rebuild this collection's HNSW from its arena (the source of truth).
     fn rehydrate(&self, ef_c: usize) {
         let meta = self.metadata.read();
-        if meta.is_empty() { return; }
+        if meta.is_empty() {
+            return;
+        }
         let index = VecIndex::build(self.quant, ef_c, meta.len());
         let arena = self.arena.read();
         for m in meta.iter() {
@@ -855,8 +976,17 @@ impl VectorCollection {
 /// already staged in the collection's arena (durable) before the job is sent;
 /// only the HNSW graph insert is deferred.
 enum IndexJob {
-    One { coll: Arc<VectorCollection>, arena_id: u32, emb: Vec<f32>, ef_c: usize },
-    Batch { coll: Arc<VectorCollection>, items: Vec<(Vec<f32>, u32)>, ef_c: usize },
+    One {
+        coll: Arc<VectorCollection>,
+        arena_id: u32,
+        emb: Vec<f32>,
+        ef_c: usize,
+    },
+    Batch {
+        coll: Arc<VectorCollection>,
+        items: Vec<(Vec<f32>, u32)>,
+        ef_c: usize,
+    },
     Flush(Sender<()>),
 }
 
@@ -872,7 +1002,7 @@ enum IndexJob {
 /// handed to it and the file is truncated + rewritten there (see `wal_checkpoint`).
 pub enum WalMsg {
     /// Append one signed event; `ack` fires once it is flushed + fsynced.
-    Append(SignedEvent, Sender<bool>),
+    Append(Box<SignedEvent>, Sender<bool>),
     /// Replace the entire WAL with `data` (live-state snapshot), then ack.
     Checkpoint { data: Vec<u8>, ack: Sender<bool> },
 }
@@ -945,43 +1075,73 @@ pub enum Tier {
 
 impl Tier {
     pub fn from_labels(labels: &[String]) -> Self {
-        if labels.iter().any(|l| l.to_uppercase() == "MASTER") { Tier::MASTER }
-        else if labels.iter().any(|l| l.to_uppercase() == "SPEC") { Tier::SPEC }
-        else if labels.iter().any(|l| l.to_uppercase() == "ADR") { Tier::ADR }
-        else { Tier::USER }
+        if labels.iter().any(|l| l.to_uppercase() == "MASTER") {
+            Tier::MASTER
+        } else if labels.iter().any(|l| l.to_uppercase() == "SPEC") {
+            Tier::SPEC
+        } else if labels.iter().any(|l| l.to_uppercase() == "ADR") {
+            Tier::ADR
+        } else {
+            Tier::USER
+        }
     }
 }
+
+/// Batch-insert entry: (node_u32, node_id, embedding, lang).
+type CollVecBatch = Vec<(u32, String, Vec<f64>, String)>;
 
 impl Storage {
     pub fn validate_governance(&self, labels: &[String], is_system: bool) -> Result<()> {
         let tier = Tier::from_labels(labels);
         if tier == Tier::MASTER && !is_system {
-            return Err(Error::from_reason("403 Forbidden: MASTER tier is immutable for external agents"));
+            return Err(Error::from_reason(
+                "403 Forbidden: MASTER tier is immutable for external agents",
+            ));
         }
         Ok(())
     }
 
     fn tokenize_id(id: &str) -> Vec<String> {
-        let base_chars: String = id.chars().filter(|c| {
-            let cat = unicode_general_category::get_general_category(*c);
-            !matches!(cat, unicode_general_category::GeneralCategory::NonspacingMark | unicode_general_category::GeneralCategory::SpacingMark | unicode_general_category::GeneralCategory::EnclosingMark)
-        }).collect();
+        let base_chars: String = id
+            .chars()
+            .filter(|c| {
+                let cat = unicode_general_category::get_general_category(*c);
+                !matches!(
+                    cat,
+                    unicode_general_category::GeneralCategory::NonspacingMark
+                        | unicode_general_category::GeneralCategory::SpacingMark
+                        | unicode_general_category::GeneralCategory::EnclosingMark
+                )
+            })
+            .collect();
 
         let mut tokens: Vec<String> = id.chars().map(|c| c.to_lowercase().to_string()).collect();
-        if id != base_chars { tokens.extend(base_chars.chars().map(|c| c.to_lowercase().to_string())); }
-        tokens.extend(id.chars().collect::<Vec<_>>().windows(2).map(|w| w.iter().collect::<String>().to_lowercase()));
+        if id != base_chars {
+            tokens.extend(base_chars.chars().map(|c| c.to_lowercase().to_string()));
+        }
+        tokens.extend(
+            id.chars()
+                .collect::<Vec<_>>()
+                .windows(2)
+                .map(|w| w.iter().collect::<String>().to_lowercase()),
+        );
         tokens
     }
 
     pub fn get_or_intern_id(&self, id: &str) -> u32 {
-        if let Some(existing) = self.id_to_u32.get(id) { return *existing; }
+        if let Some(existing) = self.id_to_u32.get(id) {
+            return *existing;
+        }
         let new_id = self.next_u32.fetch_add(1, Ordering::SeqCst);
         self.id_to_u32.insert(id.to_string(), new_id);
         // No reverse-map insert: id string is recoverable via `nodes[u32].id`
         // (ADR--GENESISDB-NODE-ID-INTERNING, Layer A).
 
         for trigram in Self::tokenize_id(id) {
-            self.trigram_index.entry(trigram).or_insert_with(RoaringBitmap::new).insert(new_id);
+            self.trigram_index
+                .entry(trigram)
+                .or_default()
+                .insert(new_id);
         }
         new_id
     }
@@ -1003,14 +1163,17 @@ impl Storage {
         u128::from_be_bytes(digest[..16].try_into().unwrap())
     }
 
-    pub fn get_u32(&self, id: &str) -> Option<u32> { self.id_to_u32.get(id).map(|v| *v) }
+    pub fn get_u32(&self, id: &str) -> Option<u32> {
+        self.id_to_u32.get(id).map(|v| *v)
+    }
 
     /// Tune HNSW build/search effort. Call before bulk load to trade recall for
     /// speed (e.g. 100/100 = fast, 200/100 = quality default). Affects future
     /// inserts and the next rebuild; not a retroactive re-index. Applies to all
     /// collections (the tunables are global).
     pub fn set_index_params(&self, ef_construction: u32, ef_search: u32) {
-        self.ef_construction.store(ef_construction as usize, Ordering::Relaxed);
+        self.ef_construction
+            .store(ef_construction as usize, Ordering::Relaxed);
         self.ef_search.store(ef_search as usize, Ordering::Relaxed);
     }
 
@@ -1026,7 +1189,9 @@ impl Storage {
 
     /// Resolve a collection by optional name (None -> default).
     fn resolve_collection(&self, name: &Option<String>) -> Result<Arc<VectorCollection>> {
-        let n = name.clone().unwrap_or_else(|| self.default_collection.clone());
+        let n = name
+            .clone()
+            .unwrap_or_else(|| self.default_collection.clone());
         self.collections
             .get(&n)
             .map(|r| Arc::clone(r.value()))
@@ -1035,14 +1200,38 @@ impl Storage {
 
     /// Create an isolated vector collection. Idempotent-erroring: fails if a
     /// collection with this name already exists.
-    pub fn create_collection(&self, name: String, model: String, dim: u32, metric: Option<String>, quant: Option<String>, ef_search: Option<u32>, rerank: Option<bool>) -> Result<()> {
+    #[allow(clippy::too_many_arguments)]
+    pub fn create_collection(
+        &self,
+        name: String,
+        model: String,
+        dim: u32,
+        metric: Option<String>,
+        quant: Option<String>,
+        ef_search: Option<u32>,
+        rerank: Option<bool>,
+    ) -> Result<()> {
         self.ensure_writable()?;
         if self.collections.contains_key(&name) {
-            return Err(Error::from_reason(format!("collection '{}' already exists", name)));
+            return Err(Error::from_reason(format!(
+                "collection '{}' already exists",
+                name
+            )));
         }
         let m = metric.as_deref().map(Metric::parse).unwrap_or(Metric::L2);
         let q = quant.as_deref().map(Quant::parse).unwrap_or(Quant::None);
-        self.collections.insert(name.clone(), Arc::new(VectorCollection::new(name, model, dim as u16, m, q, ef_search, rerank.unwrap_or(false))));
+        self.collections.insert(
+            name.clone(),
+            Arc::new(VectorCollection::new(
+                name,
+                model,
+                dim as u16,
+                m,
+                q,
+                ef_search,
+                rerank.unwrap_or(false),
+            )),
+        );
         Ok(())
     }
 
@@ -1054,11 +1243,20 @@ impl Storage {
     /// embedding length against the collection dim, stages it into the arena
     /// (durable, immediately in-memory), and defers the HNSW insert to the
     /// indexing thread (ADR--GENESISDB-ASYNC-INDEXING).
-    fn add_vector_internal(&self, collection: &Option<String>, node_id: &str, emb_64: Vec<f64>, lang: String) -> Result<()> {
+    fn add_vector_internal(
+        &self,
+        collection: &Option<String>,
+        node_id: &str,
+        emb_64: Vec<f64>,
+        lang: String,
+    ) -> Result<()> {
         let coll = self.resolve_collection(collection)?;
         if emb_64.len() != coll.dim as usize {
             return Err(Error::from_reason(format!(
-                "embedding dim {} != collection '{}' dim {}", emb_64.len(), coll.name, coll.dim
+                "embedding dim {} != collection '{}' dim {}",
+                emb_64.len(),
+                coll.name,
+                coll.dim
             )));
         }
         let node_u32 = self.get_or_intern_id(node_id);
@@ -1077,10 +1275,17 @@ impl Storage {
     /// primary embedding. A node holds at most one vector per collection;
     /// re-adding to a collection it already has supersedes the prior mapping
     /// (the old arena slot is reclaimed on the next compaction).
-    pub fn add_vector(&self, node_id: String, collection: String, embedding: Vec<f64>) -> Result<()> {
+    pub fn add_vector(
+        &self,
+        node_id: String,
+        collection: String,
+        embedding: Vec<f64>,
+    ) -> Result<()> {
         self.ensure_writable()?;
         // A vector attaches to a node — the node must exist.
-        let exists = self.get_u32(&node_id).map_or(false, |u| self.nodes.contains_key(&u));
+        let exists = self
+            .get_u32(&node_id)
+            .is_some_and(|u| self.nodes.contains_key(&u));
         if !exists {
             return Err(Error::from_reason(format!("node '{}' not found", node_id)));
         }
@@ -1093,7 +1298,11 @@ impl Storage {
         let clock = self.next_clock();
         // Durability: replayed by the WAL `Event::Vector` arm.
         self.persist(&Event::Vector(VectorEvent {
-            node_id, collection: coll, embedding, lang: Some(lang), clock,
+            node_id,
+            collection: coll,
+            embedding,
+            lang: Some(lang),
+            clock,
         }))?;
         Ok(())
     }
@@ -1101,16 +1310,21 @@ impl Storage {
     fn enqueue_one(&self, coll: &Arc<VectorCollection>, arena_id: u32, emb: Vec<f32>) {
         self.index_pending.fetch_add(1, Ordering::Relaxed);
         let _ = self.index_tx.send(IndexJob::One {
-            coll: Arc::clone(coll), arena_id, emb,
+            coll: Arc::clone(coll),
+            arena_id,
+            emb,
             ef_c: self.ef_construction.load(Ordering::Relaxed),
         });
     }
 
     fn enqueue_batch(&self, coll: &Arc<VectorCollection>, items: Vec<(Vec<f32>, u32)>) {
-        if items.is_empty() { return; }
+        if items.is_empty() {
+            return;
+        }
         self.index_pending.fetch_add(items.len(), Ordering::Relaxed);
         let _ = self.index_tx.send(IndexJob::Batch {
-            coll: Arc::clone(coll), items,
+            coll: Arc::clone(coll),
+            items,
             ef_c: self.ef_construction.load(Ordering::Relaxed),
         });
     }
@@ -1121,11 +1335,15 @@ impl Storage {
     /// never targets a stale arena id.
     pub fn flush_index(&self) {
         let (tx, rx) = bounded(1);
-        if self.index_tx.send(IndexJob::Flush(tx)).is_ok() { let _ = rx.recv(); }
+        if self.index_tx.send(IndexJob::Flush(tx)).is_ok() {
+            let _ = rx.recv();
+        }
     }
 
     /// Vectors staged but not yet inserted into HNSW (eventually-searchable lag).
-    pub fn index_lag(&self) -> u32 { self.index_pending.load(Ordering::Relaxed) as u32 }
+    pub fn index_lag(&self) -> u32 {
+        self.index_pending.load(Ordering::Relaxed) as u32
+    }
 
     /// WAL-replay / CRDT-sync vector insert: tolerant of a not-yet-created
     /// collection. `create_collection` is an in-memory op (durable only via the
@@ -1137,27 +1355,50 @@ impl Storage {
     /// post-load `rehydrate_hnsw_index` builds every index once, so enqueuing
     /// here would double-insert. `index = true` (runtime CRDT sync): stage AND
     /// enqueue the deferred HNSW insert, since no rehydrate follows.
-    fn replay_vector(&self, collection: &Option<String>, node_id: &str, emb: Vec<f64>, lang: String, index: bool) {
-        let name = collection.clone().unwrap_or_else(|| self.default_collection.clone());
+    fn replay_vector(
+        &self,
+        collection: &Option<String>,
+        node_id: &str,
+        emb: Vec<f64>,
+        lang: String,
+        index: bool,
+    ) {
+        let name = collection
+            .clone()
+            .unwrap_or_else(|| self.default_collection.clone());
         if !self.collections.contains_key(&name) {
             self.collections.insert(
                 name.clone(),
-                Arc::new(VectorCollection::new(name.clone(), "recovered".to_string(), emb.len() as u16, Metric::L2, Quant::None, None, false)),
+                Arc::new(VectorCollection::new(
+                    name.clone(),
+                    "recovered".to_string(),
+                    emb.len() as u16,
+                    Metric::L2,
+                    Quant::None,
+                    None,
+                    false,
+                )),
             );
         }
         if let Ok(coll) = self.resolve_collection(&Some(name)) {
-            if emb.len() != coll.dim as usize { return; }
+            if emb.len() != coll.dim as usize {
+                return;
+            }
             let node_u32 = self.get_or_intern_id(node_id);
             let e = coll.prep(emb);
             let arena_id = coll.stage(node_u32, &e, lang);
-            if index { self.enqueue_one(&coll, arena_id, e); }
+            if index {
+                self.enqueue_one(&coll, arena_id, e);
+            }
         }
     }
 
     /// Rebuild every collection's HNSW from its arena (both load paths).
     fn rehydrate_hnsw_index(&self) {
         let ef_c = self.ef_construction.load(Ordering::Relaxed);
-        for c in self.collections.iter() { c.value().rehydrate(ef_c); }
+        for c in self.collections.iter() {
+            c.value().rehydrate(ef_c);
+        }
     }
 
     /// Read the on-disk schema version from the snapshot manifest (state.json).
@@ -1166,7 +1407,9 @@ impl Storage {
     /// gate to refuse databases written by a newer engine.
     fn read_ondisk_schema_version(root: &std::path::Path) -> Option<u32> {
         let state_path = root.join("state.json");
-        if !state_path.exists() { return None; }
+        if !state_path.exists() {
+            return None;
+        }
         let txt = fs::read_to_string(&state_path).ok()?;
         let val: serde_json::Value = serde_json::from_str(&txt).ok()?;
         Some(val["schema_version"].as_u64().unwrap_or(0) as u32)
@@ -1174,7 +1417,9 @@ impl Storage {
 
     pub fn open(opts: OpenOptions) -> Result<Self> {
         let root = PathBuf::from(opts.path.clone());
-        if !root.exists() { fs::create_dir_all(&root).ok(); }
+        if !root.exists() {
+            fs::create_dir_all(&root).ok();
+        }
         let read_only = opts.read_only.unwrap_or(false);
         let vector_dim = opts.vector_dim.unwrap_or(1536) as u16;
 
@@ -1204,12 +1449,17 @@ impl Storage {
         let identity_path = root.join("identity.bin");
         let signing_key = if identity_path.exists() {
             let bytes = fs::read(&identity_path).map_err(|e| Error::from_reason(e.to_string()))?;
-            SigningKey::from_bytes(bytes.as_slice().try_into().map_err(|_| Error::from_reason("invalid identity key length"))?)
+            SigningKey::from_bytes(
+                bytes
+                    .as_slice()
+                    .try_into()
+                    .map_err(|_| Error::from_reason("invalid identity key length"))?,
+            )
         } else {
-            
             let key = SigningKey::from_bytes(&OsRng.gen::<[u8; 32]>());
             if !read_only {
-                fs::write(&identity_path, key.to_bytes()).map_err(|e| Error::from_reason(e.to_string()))?;
+                fs::write(&identity_path, key.to_bytes())
+                    .map_err(|e| Error::from_reason(e.to_string()))?;
             }
             key
         };
@@ -1221,7 +1471,11 @@ impl Storage {
         let log_path_clone = log_path.clone();
 
         let wal_handle = std::thread::spawn(move || {
-            if let Ok(file) = FileOpenOptions::new().append(true).create(true).open(&log_path_clone) {
+            if let Ok(file) = FileOpenOptions::new()
+                .append(true)
+                .create(true)
+                .open(&log_path_clone)
+            {
                 let mut writer = std::io::BufWriter::with_capacity(128 * 1024, file);
                 let mut batch: Vec<crossbeam_channel::Sender<bool>> = Vec::with_capacity(1024);
                 // A checkpoint pulled out of the micro-batch drain is stashed here
@@ -1249,22 +1503,27 @@ impl Storage {
                                     }
                                     // Defer the checkpoint: drain ends so the current
                                     // append batch is durably flushed + acked first.
-                                    Ok(WalMsg::Checkpoint { data, ack }) => { pending_ckpt = Some((data, ack)); break; }
+                                    Ok(WalMsg::Checkpoint { data, ack }) => {
+                                        pending_ckpt = Some((data, ack));
+                                        break;
+                                    }
                                     Err(_) => break,
                                 }
                             }
                             let _ = writer.flush();
                             let _ = writer.get_mut().sync_all();
-                            for ack in batch.drain(..) { let _ = ack.send(true); }
+                            for ack in batch.drain(..) {
+                                let _ = ack.send(true);
+                            }
                             if let Some((data, ack)) = pending_ckpt.take() {
                                 Self::wal_checkpoint(&mut writer, &log_path_clone, &data);
                                 let _ = ack.send(true);
                             }
-                        },
+                        }
                         Ok(WalMsg::Checkpoint { data, ack }) => {
                             Self::wal_checkpoint(&mut writer, &log_path_clone, &data);
                             let _ = ack.send(true);
-                        },
+                        }
                         Err(_) => break,
                     }
                 }
@@ -1281,11 +1540,18 @@ impl Storage {
         let index_handle = std::thread::spawn(move || {
             while let Ok(job) = index_rx.recv() {
                 match job {
-                    IndexJob::One { coll, arena_id, emb, ef_c } => {
+                    IndexJob::One {
+                        coll,
+                        arena_id,
+                        emb,
+                        ef_c,
+                    } => {
                         coll.ensure_hnsw(ef_c);
                         // insert(&self): hnsw_rs is internally synchronized -> read lock.
                         // The job ships f32; VecIndex quantizes per mode before insert.
-                        if let Some(ref idx) = *coll.hnsw.read() { idx.insert_f32(&emb, arena_id as usize); }
+                        if let Some(ref idx) = *coll.hnsw.read() {
+                            idx.insert_f32(&emb, arena_id as usize);
+                        }
                         index_pending_thread.fetch_sub(1, Ordering::Relaxed);
                     }
                     IndexJob::Batch { coll, items, ef_c } => {
@@ -1304,14 +1570,18 @@ impl Storage {
                             // 0.98+). See ADR--GENESISDB-ASYNC-INDEXING.
                             const PARALLEL_INSERT_MIN: usize = 1024;
                             if items.len() < PARALLEL_INSERT_MIN {
-                                for (emb, id) in &items { idx.insert_f32(emb, *id as usize); }
+                                for (emb, id) in &items {
+                                    idx.insert_f32(emb, *id as usize);
+                                }
                             } else {
                                 idx.parallel_insert_f32(&items);
                             }
                         }
                         index_pending_thread.fetch_sub(items.len(), Ordering::Relaxed);
                     }
-                    IndexJob::Flush(ack) => { let _ = ack.send(()); }
+                    IndexJob::Flush(ack) => {
+                        let _ = ack.send(());
+                    }
                 }
             }
         });
@@ -1322,18 +1592,38 @@ impl Storage {
         let collections: DashMap<String, Arc<VectorCollection>> = DashMap::new();
         collections.insert(
             "default".to_string(),
-            Arc::new(VectorCollection::new("default".to_string(), "default".to_string(), vector_dim, Metric::L2, Quant::None, None, false)),
+            Arc::new(VectorCollection::new(
+                "default".to_string(),
+                "default".to_string(),
+                vector_dim,
+                Metric::L2,
+                Quant::None,
+                None,
+                false,
+            )),
         );
 
         let storage = Self {
-            path: root, read_only, nodes: DashMap::new(), edges: DashMap::new(),
-            out_idx: DashMap::new(), in_idx: DashMap::new(),
-            collections, default_collection: "default".to_string(),
-            log_path, bin_path: PathBuf::from(""), _lock_file: None,
-            id_to_u32: DashMap::new(), next_u32: AtomicU32::new(0),
-            is_rebuilding: AtomicBool::new(false), trigram_index: DashMap::new(),
-            lang_centroids: DashMap::new(), peers: DashMap::new(),
-            proposals: DashMap::new(), meta_nodes: DashMap::new(), meta_edges: DashMap::new(),
+            path: root,
+            read_only,
+            nodes: DashMap::new(),
+            edges: DashMap::new(),
+            out_idx: DashMap::new(),
+            in_idx: DashMap::new(),
+            collections,
+            default_collection: "default".to_string(),
+            log_path,
+            bin_path: PathBuf::from(""),
+            _lock_file: None,
+            id_to_u32: DashMap::new(),
+            next_u32: AtomicU32::new(0),
+            is_rebuilding: AtomicBool::new(false),
+            trigram_index: DashMap::new(),
+            lang_centroids: DashMap::new(),
+            peers: DashMap::new(),
+            proposals: DashMap::new(),
+            meta_nodes: DashMap::new(),
+            meta_edges: DashMap::new(),
             meta_history: DashMap::new(),
             wal_sender,
             index_tx,
@@ -1351,49 +1641,64 @@ impl Storage {
             verifying_key,
         };
 
-        if !storage.try_load_state() {
-            if storage.log_path.exists() {
-                if let Ok(file) = File::open(&storage.log_path) {
-                    let reader = std::io::BufReader::new(file);
-                    use std::io::BufRead;
-                    for line_res in reader.lines() {
-                        if let Ok(line) = line_res {
-                            if let Ok(signed_event) = serde_json::from_str::<SignedEvent>(&line) {
-                                let event = signed_event.event;
-                                match event {
-                                    Event::Node(n) => {
-                                        let u32_id = storage.get_or_intern_id(&n.id);
-                                        if let Some(emb) = n.embedding.clone() {
-                                            storage.replay_vector(&n.collection, &n.id, emb, n.lang.clone().unwrap_or("en".to_string()), false);
-                                        }
-                                        storage.insert_node_lean(u32_id, n);
-                                    }
-                                    Event::Edge(e) => {
-                                        let u32_id = storage.index_edge_internal(&e.id, &e.from, &e.to);
-                                        storage.edges.insert(u32_id, e);
-                                    }
-                                    Event::Vector(v) => {
-                                        // Stage only (index=false): rehydrate_hnsw_index
-                                        // after load builds every index once.
-                                        storage.replay_vector(&v.collection, &v.node_id, v.embedding, v.lang.clone().unwrap_or_else(|| "en".to_string()), false);
-                                    }
-                                    Event::Batch(events) => {
-                                        for batch_event in events {
-                                            match batch_event {
-                                                Event::Node(n) => {
-                                                    let u32_id = storage.get_or_intern_id(&n.id);
-                                                    if let Some(emb) = n.embedding.clone() {
-                                                        storage.replay_vector(&n.collection, &n.id, emb, n.lang.clone().unwrap_or("en".to_string()), false);
-                                                    }
-                                                    storage.insert_node_lean(u32_id, n);
-                                                }
-                                                Event::Edge(e) => {
-                                                    let u32_id = storage.index_edge_internal(&e.id, &e.from, &e.to);
-                                                    storage.edges.insert(u32_id, e);
-                                                }
-                                                _ => {}
+        if !storage.try_load_state() && storage.log_path.exists() {
+            if let Ok(file) = File::open(&storage.log_path) {
+                let reader = std::io::BufReader::new(file);
+                use std::io::BufRead;
+                for line in reader.lines().map_while(|r| r.ok()) {
+                    if let Ok(signed_event) = serde_json::from_str::<SignedEvent>(&line) {
+                        let event = signed_event.event;
+                        match event {
+                            Event::Node(n) => {
+                                let u32_id = storage.get_or_intern_id(&n.id);
+                                if let Some(emb) = n.embedding.clone() {
+                                    storage.replay_vector(
+                                        &n.collection,
+                                        &n.id,
+                                        emb,
+                                        n.lang.clone().unwrap_or("en".to_string()),
+                                        false,
+                                    );
+                                }
+                                storage.insert_node_lean(u32_id, n);
+                            }
+                            Event::Edge(e) => {
+                                let u32_id = storage.index_edge_internal(&e.id, &e.from, &e.to);
+                                storage.edges.insert(u32_id, e);
+                            }
+                            Event::Vector(v) => {
+                                // Stage only (index=false): rehydrate_hnsw_index
+                                // after load builds every index once.
+                                storage.replay_vector(
+                                    &v.collection,
+                                    &v.node_id,
+                                    v.embedding,
+                                    v.lang.clone().unwrap_or_else(|| "en".to_string()),
+                                    false,
+                                );
+                            }
+                            Event::Batch(events) => {
+                                for batch_event in events {
+                                    match batch_event {
+                                        Event::Node(n) => {
+                                            let u32_id = storage.get_or_intern_id(&n.id);
+                                            if let Some(emb) = n.embedding.clone() {
+                                                storage.replay_vector(
+                                                    &n.collection,
+                                                    &n.id,
+                                                    emb,
+                                                    n.lang.clone().unwrap_or("en".to_string()),
+                                                    false,
+                                                );
                                             }
+                                            storage.insert_node_lean(u32_id, n);
                                         }
+                                        Event::Edge(e) => {
+                                            let u32_id =
+                                                storage.index_edge_internal(&e.id, &e.from, &e.to);
+                                            storage.edges.insert(u32_id, e);
+                                        }
+                                        _ => {}
                                     }
                                 }
                             }
@@ -1411,18 +1716,21 @@ impl Storage {
     }
 
     pub fn start_autonomic_loop(storage: Arc<Self>) {
-        std::thread::spawn(move || {
-            loop {
-                std::thread::sleep(Duration::from_secs(3600)); 
-                if !storage.read_only {
-                    let _ = storage.perform_autonomic_optimization();
-                    let _ = storage.save_state();
-                }
+        std::thread::spawn(move || loop {
+            std::thread::sleep(Duration::from_secs(3600));
+            if !storage.read_only {
+                let _ = storage.perform_autonomic_optimization();
+                let _ = storage.save_state();
             }
         });
     }
 
-    pub fn ensure_writable(&self) -> Result<()> { if self.read_only { return Err(Error::from_reason("read-only")); } Ok(()) }
+    pub fn ensure_writable(&self) -> Result<()> {
+        if self.read_only {
+            return Err(Error::from_reason("read-only"));
+        }
+        Ok(())
+    }
 
     /// Sign an event with this node's key, producing a WAL/gossip-ready
     /// `SignedEvent`. The WAL is a log of `SignedEvent` lines — `persist`,
@@ -1442,27 +1750,32 @@ impl Storage {
     pub fn persist(&self, event: &Event) -> Result<()> {
         let (ack_tx, ack_rx) = unbounded();
         let signed_event = self.sign_event(event);
-        self.wal_sender.send(WalMsg::Append(signed_event, ack_tx)).map_err(|_| Error::from_reason("wal disconnected"))?;
-        let _ = ack_rx.recv(); Ok(())
+        self.wal_sender
+            .send(WalMsg::Append(Box::new(signed_event), ack_tx))
+            .map_err(|_| Error::from_reason("wal disconnected"))?;
+        let _ = ack_rx.recv();
+        Ok(())
     }
 
     pub fn find_fuzzy_id(&self, id: &str) -> Option<String> {
         // 1. Exact Match
-        if self.get_u32(id).is_some() { return Some(id.to_string()); }
+        if self.get_u32(id).is_some() {
+            return Some(id.to_string());
+        }
 
         // 2. Lexical Fuzzy (Thai-aware Trigrams)
         let mut candidates = HashSet::new();
         let tokens = Self::tokenize_id(id);
-        
+
         for trigram in tokens {
             if let Some(nodes) = self.trigram_index.get(&trigram) {
                 candidates.extend(nodes.value().iter());
             }
         }
 
-        let mut best_lexical_id = None; 
+        let mut best_lexical_id = None;
         let mut max_lexical_sim = 0.0;
-        
+
         for u32_id in &candidates {
             // Resolve the candidate's id from the canonical `nodes` record
             // (the reverse map was dropped — ADR--GENESISDB-NODE-ID-INTERNING).
@@ -1478,12 +1791,15 @@ impl Storage {
             }
         }
 
-        if max_lexical_sim > 0.85 { return best_lexical_id; }
+        if max_lexical_sim > 0.85 {
+            return best_lexical_id;
+        }
 
         // 3. Neural Fuzzy (Vector Fallback)
-        // Relaxed threshold for Thai characters. 
-        if max_lexical_sim > 0.20 { return best_lexical_id; }
-
+        // Relaxed threshold for Thai characters.
+        if max_lexical_sim > 0.20 {
+            return best_lexical_id;
+        }
 
         None
     }
@@ -1501,12 +1817,13 @@ impl Storage {
                         collection: node.collection.clone(),
                         ef_search: None,
                     })?;
-                    
+
                     for neighbor in context {
-                        if neighbor.node.impact.unwrap_or(0.0) > 0.8 {
-                            if node.labels != neighbor.node.labels && neighbor.node.labels.contains(&"MASTER".to_string()) {
-                                return Ok(false);
-                            }
+                        if neighbor.node.impact.unwrap_or(0.0) > 0.8
+                            && node.labels != neighbor.node.labels
+                            && neighbor.node.labels.contains(&"MASTER".to_string())
+                        {
+                            return Ok(false);
                         }
                     }
                 }
@@ -1517,7 +1834,9 @@ impl Storage {
             Event::Vector(_) => Ok(true),
             Event::Batch(events) => {
                 for e in events {
-                    if !self.semantic_verify(e)? { return Ok(false); }
+                    if !self.semantic_verify(e)? {
+                        return Ok(false);
+                    }
                 }
                 Ok(true)
             }
@@ -1533,10 +1852,13 @@ impl Storage {
     /// rejected up front rather than slipping through to quorum.
     pub fn propose_consensus(&self, event: Event, _signature: Vec<u8>) -> Result<String> {
         if !self.semantic_verify(&event)? {
-            return Err(Error::from_reason("proposal rejected by semantic_verify (conflicts with a governing axiom)"));
+            return Err(Error::from_reason(
+                "proposal rejected by semantic_verify (conflicts with a governing axiom)",
+            ));
         }
         let proposal_id = Uuid::new_v4().to_string();
-        let event_data = serde_json::to_vec(&event).map_err(|e| Error::from_reason(e.to_string()))?;
+        let event_data =
+            serde_json::to_vec(&event).map_err(|e| Error::from_reason(e.to_string()))?;
         let signature = self.signing_key.sign(&event_data).to_bytes().to_vec();
         let signed_event = SignedEvent {
             event,
@@ -1602,13 +1924,23 @@ impl Storage {
         self.signing_key.sign(&payload).to_bytes().to_vec()
     }
 
-    pub fn submit_vote(&self, proposal_id: String, peer_id: String, approve: bool, signature: Vec<u8>) -> Result<bool> {
+    pub fn submit_vote(
+        &self,
+        proposal_id: String,
+        peer_id: String,
+        approve: bool,
+        signature: Vec<u8>,
+    ) -> Result<bool> {
         // Verify the vote is authentically signed by `peer_id` before recording
         // it — otherwise any caller could forge votes on another peer's behalf and
         // drive a proposal to quorum. Unknown peers, malformed or non-matching
         // signatures are rejected (the vote is not counted).
-        let vkey = self.peer_verifying_key(&peer_id)
-            .ok_or_else(|| Error::from_reason(format!("unknown voter peer '{}' (no verifying key)", peer_id)))?;
+        let vkey = self.peer_verifying_key(&peer_id).ok_or_else(|| {
+            Error::from_reason(format!(
+                "unknown voter peer '{}' (no verifying key)",
+                peer_id
+            ))
+        })?;
         let payload = Self::vote_payload(&proposal_id, &peer_id, approve);
         let sig = Signature::from_slice(&signature)
             .map_err(|_| Error::from_reason("malformed vote signature"))?;
@@ -1624,13 +1956,15 @@ impl Storage {
             }
             proposal.votes.insert(peer_id.clone(), approve);
             // Retain the verified signature as proof of the vote (quorum_signatures).
-            proposal.quorum_signatures.insert(peer_id.clone(), signature);
+            proposal
+                .quorum_signatures
+                .insert(peer_id.clone(), signature);
 
             let approvals = proposal.votes.values().filter(|&&v| v).count();
 
             // Quorum is a strict majority of the swarm. `self.peers` excludes this
             // node, so the membership denominator is peers + self.
-            if approvals <= (self.peers.len() + 1) / 2 {
+            if approvals <= self.peers.len().div_ceil(2) {
                 return Ok(false);
             }
 
@@ -1639,10 +1973,14 @@ impl Storage {
             // receipt, but defense-in-depth) and re-run the governance check.
             let signed_event = proposal.signed_event.clone();
             if !self.verify_event_signature(&signed_event) {
-                return Err(Error::from_reason("proposal event signature invalid at commit"));
+                return Err(Error::from_reason(
+                    "proposal event signature invalid at commit",
+                ));
             }
             if !self.semantic_verify(&signed_event.event)? {
-                return Err(Error::from_reason("proposal rejected by semantic_verify at commit"));
+                return Err(Error::from_reason(
+                    "proposal rejected by semantic_verify at commit",
+                ));
             }
 
             match &signed_event.event {
@@ -1673,7 +2011,9 @@ impl Storage {
                         match e {
                             Event::Node(n) => {
                                 let mut n_axiom = n.clone();
-                                if !n_axiom.labels.contains(&"MASTER".to_string()) { n_axiom.labels.push("MASTER".to_string()); }
+                                if !n_axiom.labels.contains(&"MASTER".to_string()) {
+                                    n_axiom.labels.push("MASTER".to_string());
+                                }
                                 let u32_id = self.get_or_intern_id(&n_axiom.id);
                                 self.insert_node_lean(u32_id, n_axiom);
                             }
@@ -1690,7 +2030,13 @@ impl Storage {
                 // searchable in this process, matching the CRDT-sync path — not
                 // merely persisted for a future replay.
                 Event::Vector(v) => {
-                    self.replay_vector(&v.collection, &v.node_id, v.embedding.clone(), v.lang.clone().unwrap_or_else(|| "en".to_string()), true);
+                    self.replay_vector(
+                        &v.collection,
+                        &v.node_id,
+                        v.embedding.clone(),
+                        v.lang.clone().unwrap_or_else(|| "en".to_string()),
+                        true,
+                    );
                     self.persist_signed(signed_event.clone())?;
                 }
             }
@@ -1701,19 +2047,37 @@ impl Storage {
     }
 
     pub fn calculate_sc(&self, node: &NodeOutput) -> f64 {
-        let stability = node.props.get("stability").and_then(|v| v.as_str()).unwrap_or("active");
+        let stability = node
+            .props
+            .get("stability")
+            .and_then(|v| v.as_str())
+            .unwrap_or("active");
         match stability {
-            "stable" => 1.0, "active" => 0.8, "draft" => 0.4, "deprecated" => 0.1, _ => 0.8,
+            "stable" => 1.0,
+            "active" => 0.8,
+            "draft" => 0.4,
+            "deprecated" => 0.1,
+            _ => 0.8,
         }
     }
 
     pub fn compute_impact(&self, node: &NodeOutput) -> f64 {
-        let u32_id = match self.get_u32(&node.id) { Some(id) => id, None => return 0.7 };
-        let incoming_count = self.in_idx.get(&u32_id).map(|edges| edges.len()).unwrap_or(0);
+        let u32_id = match self.get_u32(&node.id) {
+            Some(id) => id,
+            None => return 0.7,
+        };
+        let incoming_count = self
+            .in_idx
+            .get(&u32_id)
+            .map(|edges| edges.len())
+            .unwrap_or(0);
         let dd = (incoming_count as f64 / 10.0).min(1.0);
         let tier = Tier::from_labels(&node.labels);
         let as_score = match tier {
-            Tier::MASTER => 1.0, Tier::SPEC => 0.8, Tier::ADR => 0.6, Tier::USER => 0.3,
+            Tier::MASTER => 1.0,
+            Tier::SPEC => 0.8,
+            Tier::ADR => 0.6,
+            Tier::USER => 0.3,
         };
         let sc = self.calculate_sc(node);
         (dd * 0.5) + (as_score * 0.3) + (sc * 0.2)
@@ -1722,7 +2086,11 @@ impl Storage {
     pub fn refresh_impacts(&self, affected_ids: Option<Vec<String>>) {
         let ids_to_process = match affected_ids {
             Some(ids) => ids,
-            None => self.nodes.iter().map(|entry| entry.value().id.clone()).collect(),
+            None => self
+                .nodes
+                .iter()
+                .map(|entry| entry.value().id.clone())
+                .collect(),
         };
         for id in ids_to_process {
             if let Some(u32_id) = self.get_u32(&id) {
@@ -1741,14 +2109,17 @@ impl Storage {
         let ekey = Self::edge_key(id);
         let u32_from = self.get_or_intern_id(from);
         let u32_to = self.get_or_intern_id(to);
-        self.out_idx.entry(u32_from).or_insert_with(HashSet::new).insert(ekey);
-        self.in_idx.entry(u32_to).or_insert_with(HashSet::new).insert(ekey);
+        self.out_idx.entry(u32_from).or_default().insert(ekey);
+        self.in_idx.entry(u32_to).or_default().insert(ekey);
         ekey
     }
 
     fn next_clock(&self) -> LogicalClock {
         let time = self.logical_clock.fetch_add(1, Ordering::SeqCst) + 1;
-        LogicalClock { time, peer_id: self.local_peer_id.clone() }
+        LogicalClock {
+            time,
+            peer_id: self.local_peer_id.clone(),
+        }
     }
 
     /// Insert a node into the in-memory store without its embedding.
@@ -1763,18 +2134,22 @@ impl Storage {
 
     pub fn add_node(&self, args: NodeInput) -> Result<NodeOutput> {
         self.ensure_writable()?;
-        self.validate_governance(&args.labels, false)?; 
+        self.validate_governance(&args.labels, false)?;
         let id = args.id.unwrap_or_else(|| format!("N-{}", Uuid::new_v4()));
         let u32_id = self.get_or_intern_id(&id);
         let lang = args.lang.clone().unwrap_or("en".to_string());
-        
+
         let now = Utc::now();
-        let expires_at = args.ttl.map(|s| (now + chrono::Duration::seconds(s as i64)).to_rfc3339());
+        let expires_at = args
+            .ttl
+            .map(|s| (now + chrono::Duration::seconds(s as i64)).to_rfc3339());
 
         let mut node = NodeOutput {
-            id: id.clone(), labels: args.labels,
+            id: id.clone(),
+            labels: args.labels,
             props: args.props.unwrap_or(Value::Object(Default::default())),
-            impact: Some(0.7), embedding: None,
+            impact: Some(0.7),
+            embedding: None,
             lang: Some(lang.clone()),
             valid_from: args.valid_from.unwrap_or_else(|| now.to_rfc3339()),
             valid_to: None,
@@ -1788,7 +2163,11 @@ impl Storage {
             // dim mismatch fails the add instead of persisting a bad reference.
             self.add_vector_internal(&args.collection, &id, emb.clone(), lang)?;
             node.embedding = Some(emb);
-            node.collection = Some(args.collection.clone().unwrap_or_else(|| self.default_collection.clone()));
+            node.collection = Some(
+                args.collection
+                    .clone()
+                    .unwrap_or_else(|| self.default_collection.clone()),
+            );
         }
         self.insert_node_lean(u32_id, node.clone());
         self.persist(&Event::Node(node.clone()))?;
@@ -1798,11 +2177,16 @@ impl Storage {
     pub fn add_edge(&self, args: EdgeInput) -> Result<EdgeOutput> {
         self.ensure_writable()?;
         let edge = EdgeOutput {
-            id: args.id.unwrap_or_else(|| Uuid::new_v4().to_string()), from: args.from, to: args.to, rel: args.rel,
-            props: args.props.unwrap_or(Value::Object(Default::default())), 
-            valid_from: args.valid_from.unwrap_or_else(|| Utc::now().to_rfc3339()), 
-            valid_to: None, recorded_at: Utc::now().to_rfc3339(),
-            superseded_by: None, impact: args.impact,
+            id: args.id.unwrap_or_else(|| Uuid::new_v4().to_string()),
+            from: args.from,
+            to: args.to,
+            rel: args.rel,
+            props: args.props.unwrap_or(Value::Object(Default::default())),
+            valid_from: args.valid_from.unwrap_or_else(|| Utc::now().to_rfc3339()),
+            valid_to: None,
+            recorded_at: Utc::now().to_rfc3339(),
+            superseded_by: None,
+            impact: args.impact,
             caused_by: args.caused_by,
             clock: self.next_clock(),
         };
@@ -1813,7 +2197,12 @@ impl Storage {
         Ok(edge)
     }
 
-    pub fn supersede_node(&self, id: String, new_props: Option<Value>, caused_by: Option<String>) -> Result<NodeOutput> {
+    pub fn supersede_node(
+        &self,
+        id: String,
+        new_props: Option<Value>,
+        caused_by: Option<String>,
+    ) -> Result<NodeOutput> {
         self.ensure_writable()?;
         let u32_id = match self.get_u32(&id) {
             Some(i) => i,
@@ -1848,36 +2237,104 @@ impl Storage {
     pub fn rebuild_index_parallel(&self) -> Result<()> {
         self.is_rebuilding.store(true, Ordering::SeqCst);
         self.flush_index();
-        let result = (|| { self.rehydrate_hnsw_index(); Ok(()) })();
+        let result = {
+            self.rehydrate_hnsw_index();
+            Ok(())
+        };
         self.is_rebuilding.store(false, Ordering::SeqCst);
         result
     }
 
     pub fn execute_hql(&self, query: &str) -> Result<serde_json::Value> {
-        let command = HqlCommand::try_from(query).map_err(|e| Error::from_reason(e))?;
+        let command = HqlCommand::try_from(query).map_err(Error::from_reason)?;
         match command {
-            HqlCommand::Search { vector, k, fuzzy, target, lang, as_of, collection } => {
-                let _resolved = if fuzzy { self.find_fuzzy_id(&target) } else { Some(target) };
-                let res = self.hybrid_search(HybridSearchInput { query_vector: vector, k, alpha: Some(0.0), lang, as_of, collection, ef_search: None })?;
+            HqlCommand::Search {
+                vector,
+                k,
+                fuzzy,
+                target,
+                lang,
+                as_of,
+                collection,
+            } => {
+                let _resolved = if fuzzy {
+                    self.find_fuzzy_id(&target)
+                } else {
+                    Some(target)
+                };
+                let res = self.hybrid_search(HybridSearchInput {
+                    query_vector: vector,
+                    k,
+                    alpha: Some(0.0),
+                    lang,
+                    as_of,
+                    collection,
+                    ef_search: None,
+                })?;
                 Ok(serde_json::to_value(res).unwrap())
             }
-            HqlCommand::Traverse { seed, depth, rel, fuzzy, as_of } => {
-                let resolved_seed = if fuzzy { self.find_fuzzy_id(&seed).unwrap_or(seed) } else { seed };
+            HqlCommand::Traverse {
+                seed,
+                depth,
+                rel,
+                fuzzy,
+                as_of,
+            } => {
+                let resolved_seed = if fuzzy {
+                    self.find_fuzzy_id(&seed).unwrap_or(seed)
+                } else {
+                    seed
+                };
                 let (target_rel, is_inferred) = match rel {
                     query::ast::HqlRel::Physical(r) => (r, false),
                     query::ast::HqlRel::Inferred(r) => (r, true),
                 };
-                let res = self.neighbors(resolved_seed, NeighborInput { 
-                    depth: Some(depth), rel: Some(target_rel), rels: None, direction: Some("out".to_string()), as_of, include_invalid: Some(false), limit: None 
-                }, is_inferred)?;
+                let res = self.neighbors(
+                    resolved_seed,
+                    NeighborInput {
+                        depth: Some(depth),
+                        rel: Some(target_rel),
+                        rels: None,
+                        direction: Some("out".to_string()),
+                        as_of,
+                        include_invalid: Some(false),
+                        limit: None,
+                    },
+                    is_inferred,
+                )?;
                 Ok(serde_json::to_value(res).unwrap())
             }
-            HqlCommand::Hybrid { vector, alpha, fuzzy, target, lang, as_of, collection } => {
-                let _resolved = if fuzzy { self.find_fuzzy_id(&target) } else { Some(target) };
-                let res = self.hybrid_search(HybridSearchInput { query_vector: vector, k: 10, alpha: Some(alpha), lang, as_of, collection, ef_search: None })?;
+            HqlCommand::Hybrid {
+                vector,
+                alpha,
+                fuzzy,
+                target,
+                lang,
+                as_of,
+                collection,
+            } => {
+                let _resolved = if fuzzy {
+                    self.find_fuzzy_id(&target)
+                } else {
+                    Some(target)
+                };
+                let res = self.hybrid_search(HybridSearchInput {
+                    query_vector: vector,
+                    k: 10,
+                    alpha: Some(alpha),
+                    lang,
+                    as_of,
+                    collection,
+                    ef_search: None,
+                })?;
                 Ok(serde_json::to_value(res).unwrap())
             }
-            HqlCommand::Context { target, tier, budget, fuzzy } => {
+            HqlCommand::Context {
+                target,
+                tier,
+                budget,
+                fuzzy,
+            } => {
                 let res = self.retrieve_context(&target, &tier, budget, fuzzy)?;
                 Ok(serde_json::to_value(res).unwrap())
             }
@@ -1886,9 +2343,13 @@ impl Storage {
 
     fn is_valid_as_of(valid_from: &str, valid_to: &Option<String>, as_of: &Option<String>) -> bool {
         if let Some(as_of_str) = as_of {
-            if valid_from > as_of_str.as_str() { return false; }
+            if valid_from > as_of_str.as_str() {
+                return false;
+            }
             if let Some(to) = valid_to {
-                if as_of_str.as_str() >= to.as_str() { return false; }
+                if as_of_str.as_str() >= to.as_str() {
+                    return false;
+                }
             }
         }
         true
@@ -1900,23 +2361,36 @@ impl Storage {
         // different model/dim is rejected, not ranked into garbage.
         if args.query_vector.len() != coll.dim as usize {
             return Err(Error::from_reason(format!(
-                "query dim {} != collection '{}' dim {}", args.query_vector.len(), coll.name, coll.dim
+                "query dim {} != collection '{}' dim {}",
+                args.query_vector.len(),
+                coll.name,
+                coll.dim
             )));
         }
         let mut query_f32: Vec<f32> = args.query_vector.into_iter().map(|v| v as f32).collect();
         if let Some(lang) = args.lang {
             if let Some(centroid) = self.lang_centroids.get(&lang) {
-                for (i, val) in query_f32.iter_mut().enumerate() { if i < centroid.len() { *val += centroid[i]; } }
+                for (i, val) in query_f32.iter_mut().enumerate() {
+                    if i < centroid.len() {
+                        *val += centroid[i];
+                    }
+                }
             }
         }
         // Cosine collections store normalized vectors; normalize the query too.
         if coll.metric == Metric::Cosine {
             let norm: f32 = query_f32.iter().map(|x| x * x).sum::<f32>().sqrt();
-            if norm > 0.0 { for x in query_f32.iter_mut() { *x /= norm; } }
+            if norm > 0.0 {
+                for x in query_f32.iter_mut() {
+                    *x /= norm;
+                }
+            }
         }
         // VecIndex quantizes the query per mode and returns (arena_id, distance_f32).
         // ef_search resolution: per-query override → per-collection default → engine-global.
-        let ef = args.ef_search.map(|e| e as usize)
+        let ef = args
+            .ef_search
+            .map(|e| e as usize)
             .or_else(|| coll.ef_search.map(|e| e as usize))
             .unwrap_or_else(|| self.ef_search.load(Ordering::Relaxed));
         // Over-fetch more quantized candidates when a rerank sidecar is present, so
@@ -1924,7 +2398,9 @@ impl Storage {
         let k2 = (args.k * 2) as usize;
         let fetch = if coll.f32_sidecar.is_some() {
             (args.k as usize).saturating_mul(RERANK_OVERFETCH).max(k2)
-        } else { k2 };
+        } else {
+            k2
+        };
         // When a rerank sidecar is present and the over-fetch would already pull
         // ~every slot, skip the approximate HNSW prefilter and score the full
         // sidecar exactly. The HNSW prefilter can nondeterministically drop a
@@ -1955,13 +2431,16 @@ impl Storage {
         if let Some(sidecar) = &coll.f32_sidecar {
             let sc = sidecar.read();
             let dim = coll.dim as usize;
-            results = results.into_iter().map(|(d_id, qd)| {
-                let start = d_id * dim;
-                match sc.get(start..start + dim) {
-                    Some(v) => (d_id, exact_l2(&query_f32, v)),
-                    None => (d_id, qd),
-                }
-            }).collect();
+            results = results
+                .into_iter()
+                .map(|(d_id, qd)| {
+                    let start = d_id * dim;
+                    match sc.get(start..start + dim) {
+                        Some(v) => (d_id, exact_l2(&query_f32, v)),
+                        None => (d_id, qd),
+                    }
+                })
+                .collect();
             results.sort_by(|a, b| a.1.partial_cmp(&b.1).unwrap_or(std::cmp::Ordering::Equal));
             results.truncate(k2);
         }
@@ -1971,18 +2450,28 @@ impl Storage {
 
         for (d_id, distance) in results {
             if let Some(meta) = meta_arena.get(d_id) {
-                { let u32_id = meta.node_u32; // A2: id interned in metadata
+                {
+                    let u32_id = meta.node_u32; // A2: id interned in metadata
                     if let Some(node) = self.nodes.get(&u32_id) {
                         let mut node_out = node.value().clone();
 
-                        if !Self::is_valid_as_of(&node_out.valid_from, &node_out.valid_to, &args.as_of) {
+                        if !Self::is_valid_as_of(
+                            &node_out.valid_from,
+                            &node_out.valid_to,
+                            &args.as_of,
+                        ) {
                             continue;
                         }
 
                         let similarity = 1.0 - distance as f64;
-                        let reasoning_score = (similarity * (1.0 - alpha)) + (node_out.impact.unwrap_or(0.0) * alpha);
+                        let reasoning_score =
+                            (similarity * (1.0 - alpha)) + (node_out.impact.unwrap_or(0.0) * alpha);
                         node_out.impact = Some(reasoning_score);
-                        hybrid_results.push(NeighborOutput { node: node_out, path: Vec::new(), depth: 0 });
+                        hybrid_results.push(NeighborOutput {
+                            node: node_out,
+                            path: Vec::new(),
+                            depth: 0,
+                        });
                     }
                 }
             }
@@ -2012,8 +2501,16 @@ impl Storage {
         self.hybrid_search(context_args)
     }
 
-    pub fn neighbors(&self, seed: String, args: NeighborInput, is_inferred: bool) -> Result<Vec<NeighborOutput>> {
-        let u32_seed = match self.get_u32(&seed) { Some(id) => id, None => return Ok(Vec::new()) };
+    pub fn neighbors(
+        &self,
+        seed: String,
+        args: NeighborInput,
+        is_inferred: bool,
+    ) -> Result<Vec<NeighborOutput>> {
+        let u32_seed = match self.get_u32(&seed) {
+            Some(id) => id,
+            None => return Ok(Vec::new()),
+        };
         let depth = args.depth.unwrap_or(1);
 
         // Rel filter: args.rels (non-empty) overrides args.rel; "ANY" or None → no filter.
@@ -2029,30 +2526,46 @@ impl Storage {
             },
         };
         let rel_allowed = |rel: &str| -> bool {
-            match &rels_filter { None => true, Some(s) => s.contains(rel) }
+            match &rels_filter {
+                None => true,
+                Some(s) => s.contains(rel),
+            }
         };
 
         // Direction: "out" (default, back-compat), "in", "both". Case-insensitive.
-        let dir = args.direction.as_deref().map(|s| s.to_ascii_lowercase()).unwrap_or_else(|| "out".to_string());
+        let dir = args
+            .direction
+            .as_deref()
+            .map(|s| s.to_ascii_lowercase())
+            .unwrap_or_else(|| "out".to_string());
         let walk_out = dir == "out" || dir == "both";
-        let walk_in  = dir == "in"  || dir == "both";
+        let walk_in = dir == "in" || dir == "both";
 
         let lim = args.limit.map(|l| l as usize);
         // Retraction visibility: by default a retracted edge (valid_to passed) is
         // hidden from the current view; `include_invalid = true` surfaces it.
         let include_invalid = args.include_invalid.unwrap_or(false);
-        let mut results = Vec::new(); let mut visited = HashSet::new(); visited.insert(u32_seed);
-        let mut queue = VecDeque::new(); queue.push_back((u32_seed, Vec::new(), 0));
+        let mut results = Vec::new();
+        let mut visited = HashSet::new();
+        visited.insert(u32_seed);
+        let mut queue = VecDeque::new();
+        queue.push_back((u32_seed, Vec::new(), 0));
         while let Some((curr_u32, path, curr_depth)) = queue.pop_front() {
-            if curr_depth >= depth && !is_inferred { continue; }
+            if curr_depth >= depth && !is_inferred {
+                continue;
+            }
 
             // Collect candidate edge ids from chosen directions, dedup by eid.
             let mut eid_set: HashSet<u128> = HashSet::new();
             if walk_out {
-                if let Some(out_eids) = self.out_idx.get(&curr_u32) { eid_set.extend(out_eids.iter().copied()); }
+                if let Some(out_eids) = self.out_idx.get(&curr_u32) {
+                    eid_set.extend(out_eids.iter().copied());
+                }
             }
             if walk_in {
-                if let Some(in_eids) = self.in_idx.get(&curr_u32) { eid_set.extend(in_eids.iter().copied()); }
+                if let Some(in_eids) = self.in_idx.get(&curr_u32) {
+                    eid_set.extend(in_eids.iter().copied());
+                }
             }
 
             for eid in eid_set.iter() {
@@ -2069,17 +2582,25 @@ impl Storage {
                     // the caller opted into invalidated edges.
                     if args.as_of.is_none() && !include_invalid {
                         if let Some(to) = &edge.valid_to {
-                            if Utc::now().to_rfc3339().as_str() >= to.as_str() { continue; }
+                            if Utc::now().to_rfc3339().as_str() >= to.as_str() {
+                                continue;
+                            }
                         }
                     }
-                    if !rel_allowed(&edge.rel) { continue; }
+                    if !rel_allowed(&edge.rel) {
+                        continue;
+                    }
 
                     // Pick the far endpoint by u32 identity rather than by
                     // reverse-mapping curr_u32 back to its string: the near
                     // endpoint is whichever of from/to interns to curr_u32. This
                     // needs no u32->id reverse map and avoids a per-edge string
                     // clone (ADR--GENESISDB-NODE-ID-INTERNING, Layer A).
-                    let next_id = if self.get_u32(&edge.from) == Some(curr_u32) { &edge.to } else { &edge.from };
+                    let next_id = if self.get_u32(&edge.from) == Some(curr_u32) {
+                        &edge.to
+                    } else {
+                        &edge.from
+                    };
                     if let Some(next_u32) = self.get_u32(next_id) {
                         if !visited.contains(&next_u32) {
                             visited.insert(next_u32);
@@ -2087,14 +2608,29 @@ impl Storage {
                                 let node = node_ref.value();
 
                                 // Time-travel check for Nodes
-                                if !Self::is_valid_as_of(&node.valid_from, &node.valid_to, &args.as_of) {
+                                if !Self::is_valid_as_of(
+                                    &node.valid_from,
+                                    &node.valid_to,
+                                    &args.as_of,
+                                ) {
                                     continue;
                                 }
 
-                                let mut new_path = path.clone(); new_path.push(edge.clone());
-                                results.push(NeighborOutput { node: node.clone(), path: new_path.clone(), depth: curr_depth + 1 });
-                                if let Some(l) = lim { if results.len() >= l { return Ok(results); } }
-                                if is_inferred || (curr_depth + 1 < depth) { queue.push_back((next_u32, new_path, curr_depth + 1)); }
+                                let mut new_path = path.clone();
+                                new_path.push(edge.clone());
+                                results.push(NeighborOutput {
+                                    node: node.clone(),
+                                    path: new_path.clone(),
+                                    depth: curr_depth + 1,
+                                });
+                                if let Some(l) = lim {
+                                    if results.len() >= l {
+                                        return Ok(results);
+                                    }
+                                }
+                                if is_inferred || (curr_depth + 1 < depth) {
+                                    queue.push_back((next_u32, new_path, curr_depth + 1));
+                                }
                             }
                         }
                     }
@@ -2108,8 +2644,16 @@ impl Storage {
         let mut res = Vec::new();
         for r in self.edges.iter() {
             let e = r.value();
-            if let Some(ref f) = args.from { if e.from != *f { continue; } }
-            if let Some(ref t) = args.to { if e.to != *t { continue; } }
+            if let Some(ref f) = args.from {
+                if e.from != *f {
+                    continue;
+                }
+            }
+            if let Some(ref t) = args.to {
+                if e.to != *t {
+                    continue;
+                }
+            }
             res.push(e.clone());
         }
         Ok(res)
@@ -2122,11 +2666,20 @@ impl Storage {
         let mut new_clusters = Vec::with_capacity(meta_arena.len());
         for meta in meta_arena.iter() {
             let mut freq = HashMap::new();
-            { let u32_id = meta.node_u32; // A2: id interned in metadata
-                let out_eids = self.out_idx.get(&u32_id).map(|v| v.value().clone()).unwrap_or_default();
+            {
+                let u32_id = meta.node_u32; // A2: id interned in metadata
+                let out_eids = self
+                    .out_idx
+                    .get(&u32_id)
+                    .map(|v| v.value().clone())
+                    .unwrap_or_default();
                 for eid in out_eids {
                     if let Some(edge) = self.edges.get(&eid) {
-                        let other_id = if self.get_u32(&edge.from) == Some(meta.node_u32) { &edge.to } else { &edge.from };
+                        let other_id = if self.get_u32(&edge.from) == Some(meta.node_u32) {
+                            &edge.to
+                        } else {
+                            &edge.from
+                        };
                         if let Some(to_u32) = self.get_u32(other_id) {
                             if let Some(a_id) = coll.node_to_arena.get(&to_u32) {
                                 if let Some(other_meta) = meta_arena.get(*a_id as usize) {
@@ -2136,10 +2689,18 @@ impl Storage {
                         }
                     }
                 }
-                let in_eids = self.in_idx.get(&u32_id).map(|v| v.value().clone()).unwrap_or_default();
+                let in_eids = self
+                    .in_idx
+                    .get(&u32_id)
+                    .map(|v| v.value().clone())
+                    .unwrap_or_default();
                 for eid in in_eids {
                     if let Some(edge) = self.edges.get(&eid) {
-                        let other_id = if self.get_u32(&edge.from) == Some(meta.node_u32) { &edge.to } else { &edge.from };
+                        let other_id = if self.get_u32(&edge.from) == Some(meta.node_u32) {
+                            &edge.to
+                        } else {
+                            &edge.from
+                        };
                         if let Some(to_u32) = self.get_u32(other_id) {
                             if let Some(a_id) = coll.node_to_arena.get(&to_u32) {
                                 if let Some(other_meta) = meta_arena.get(*a_id as usize) {
@@ -2163,7 +2724,9 @@ impl Storage {
     }
 
     pub fn cosine_similarity(v1: &[f64], v2: &[f64]) -> f64 {
-        if v1.len() != v2.len() || v1.is_empty() { return 0.0; }
+        if v1.len() != v2.len() || v1.is_empty() {
+            return 0.0;
+        }
         let mut dot = 0.0;
         let mut norm_a = 0.0;
         let mut norm_b = 0.0;
@@ -2172,7 +2735,9 @@ impl Storage {
             norm_a += v1[i].powi(2);
             norm_b += v2[i].powi(2);
         }
-        if norm_a == 0.0 || norm_b == 0.0 { return 0.0; }
+        if norm_a == 0.0 || norm_b == 0.0 {
+            return 0.0;
+        }
         dot / (norm_a.sqrt() * norm_b.sqrt())
     }
 
@@ -2183,7 +2748,10 @@ impl Storage {
         let mut cluster_groups: HashMap<u32, Vec<u32>> = HashMap::new();
         let meta_arena = coll.metadata.read();
         for meta in meta_arena.iter() {
-            cluster_groups.entry(meta.cluster_id).or_insert_with(Vec::new).push(meta.node_u32);
+            cluster_groups
+                .entry(meta.cluster_id)
+                .or_default()
+                .push(meta.node_u32);
         }
         let vec_arena = coll.arena.read();
         let now = Utc::now().to_rfc3339();
@@ -2203,7 +2771,9 @@ impl Storage {
                                 // f32_at dequantizes for SQ8 — heuristic centroid math
                                 // tolerates the quantization noise.
                                 for (i, val) in vec_arena.f32_at(start, len).iter().enumerate() {
-                                    if i < dim { centroid[i] += *val as f64; }
+                                    if i < dim {
+                                        centroid[i] += *val as f64;
+                                    }
                                 }
                                 count += 1;
                             }
@@ -2212,8 +2782,10 @@ impl Storage {
                 }
             }
             if count > 0 {
-                for val in centroid.iter_mut() { *val /= count as f64; }
-                
+                for val in centroid.iter_mut() {
+                    *val /= count as f64;
+                }
+
                 let mut drift = None;
                 if let Some(history) = self.meta_history.get(c_id) {
                     if let Some(prev) = history.last() {
@@ -2223,26 +2795,38 @@ impl Storage {
                 }
 
                 let sn = SuperNode {
-                    cluster_id: *c_id, theme: format!("Theme-{}", c_id),
-                    member_count: members.len() as u32, impact: total_impact / members.len() as f64,
+                    cluster_id: *c_id,
+                    theme: format!("Theme-{}", c_id),
+                    member_count: members.len() as u32,
+                    impact: total_impact / members.len() as f64,
                     centroid: centroid.clone(),
                     timestamp: now.clone(),
                     drift,
                 };
 
                 self.meta_nodes.insert(*c_id, sn.clone());
-                self.meta_history.entry(*c_id).or_insert_with(Vec::new).push(sn);
+                self.meta_history.entry(*c_id).or_default().push(sn);
             }
         }
         for entry in self.edges.iter() {
             let edge = entry.value();
-            if let (Some(from_u32), Some(to_u32)) = (self.get_u32(&edge.from), self.get_u32(&edge.to)) {
-                if let (Some(from_cid), Some(to_id)) = (coll.node_to_arena.get(&from_u32), coll.node_to_arena.get(&to_u32)) {
+            if let (Some(from_u32), Some(to_u32)) =
+                (self.get_u32(&edge.from), self.get_u32(&edge.to))
+            {
+                if let (Some(from_cid), Some(to_id)) = (
+                    coll.node_to_arena.get(&from_u32),
+                    coll.node_to_arena.get(&to_u32),
+                ) {
                     let c1 = meta_arena[*from_cid as usize].cluster_id;
                     let c2 = meta_arena[*to_id as usize].cluster_id;
                     if c1 != c2 {
                         let key = format!("{}:{}", c1, c2);
-                        let mut meta_edge = self.meta_edges.entry(key.clone()).or_insert(MetaEdge { from_cluster: c1, to_cluster: c2, weight: 0 });
+                        let mut meta_edge =
+                            self.meta_edges.entry(key.clone()).or_insert(MetaEdge {
+                                from_cluster: c1,
+                                to_cluster: c2,
+                                weight: 0,
+                            });
                         meta_edge.weight += 1;
                     }
                 }
@@ -2265,7 +2849,7 @@ impl Storage {
         for entry in self.nodes.iter() {
             let node = entry.value();
             let u32_id = entry.key();
-            
+
             // TTL Expiration Check
             if let Some(expires_at) = &node.expires_at {
                 if now > *expires_at {
@@ -2303,17 +2887,23 @@ impl Storage {
         // 1. Collect all edges to remove
         let mut edges_to_remove = Vec::new();
         if let Some(eids) = self.out_idx.get(&u32_id) {
-            for eid in eids.iter() { edges_to_remove.push(*eid); }
+            for eid in eids.iter() {
+                edges_to_remove.push(*eid);
+            }
         }
         if let Some(eids) = self.in_idx.get(&u32_id) {
-            for eid in eids.iter() { edges_to_remove.push(*eid); }
+            for eid in eids.iter() {
+                edges_to_remove.push(*eid);
+            }
         }
 
         // 2. Comprehensive bi-directional index cleanup
         for eid in edges_to_remove {
             if let Some(edge_ref) = self.edges.get(&eid) {
                 let edge = edge_ref.value();
-                if let (Some(from_u32), Some(to_u32)) = (self.get_u32(&edge.from), self.get_u32(&edge.to)) {
+                if let (Some(from_u32), Some(to_u32)) =
+                    (self.get_u32(&edge.from), self.get_u32(&edge.to))
+                {
                     // Remove from source node's out-index
                     if let Some(mut out_set) = self.out_idx.get_mut(&from_u32) {
                         out_set.remove(&eid);
@@ -2335,7 +2925,9 @@ impl Storage {
         self.in_idx.remove(&u32_id);
         // The node may have a vector in any collection — drop the mapping in all.
         // (Arena slots are reclaimed lazily by compaction, as before.)
-        for c in self.collections.iter() { c.value().node_to_arena.remove(&u32_id); }
+        for c in self.collections.iter() {
+            c.value().node_to_arena.remove(&u32_id);
+        }
         self.nodes.remove(&u32_id);
 
         Ok(())
@@ -2346,11 +2938,14 @@ impl Storage {
         for signed_event in signed_events {
             let event = &signed_event.event;
             let signer_id = &signed_event.signer_peer_id;
-            
+
             // 1. Verify Signature (local events are self-trusted; remote events
             // must carry an authentic signature from their registered peer key).
             if signer_id != &self.local_peer_id && !self.verify_event_signature(&signed_event) {
-                println!("Mark X: REJECTED event from {}. Invalid signature or unknown peer.", signer_id);
+                println!(
+                    "Mark X: REJECTED event from {}. Invalid signature or unknown peer.",
+                    signer_id
+                );
                 continue;
             }
 
@@ -2368,14 +2963,25 @@ impl Storage {
                         // Sync local clock
                         let mut current = self.logical_clock.load(Ordering::SeqCst);
                         while remote_node.clock.time > current {
-                            match self.logical_clock.compare_exchange_weak(current, remote_node.clock.time, Ordering::SeqCst, Ordering::SeqCst) {
+                            match self.logical_clock.compare_exchange_weak(
+                                current,
+                                remote_node.clock.time,
+                                Ordering::SeqCst,
+                                Ordering::SeqCst,
+                            ) {
                                 Ok(_) => break,
                                 Err(actual) => current = actual,
                             }
                         }
-                        
+
                         if let Some(emb) = &remote_node.embedding {
-                            self.replay_vector(&remote_node.collection, &remote_node.id, emb.clone(), remote_node.lang.clone().unwrap_or("en".to_string()), true);
+                            self.replay_vector(
+                                &remote_node.collection,
+                                &remote_node.id,
+                                emb.clone(),
+                                remote_node.lang.clone().unwrap_or("en".to_string()),
+                                true,
+                            );
                         }
                         self.insert_node_lean(u32_id, remote_node.clone());
                         self.persist_signed(signed_event.clone())?;
@@ -2391,12 +2997,21 @@ impl Storage {
                     if apply {
                         let mut current = self.logical_clock.load(Ordering::SeqCst);
                         while remote_edge.clock.time > current {
-                            match self.logical_clock.compare_exchange_weak(current, remote_edge.clock.time, Ordering::SeqCst, Ordering::SeqCst) {
+                            match self.logical_clock.compare_exchange_weak(
+                                current,
+                                remote_edge.clock.time,
+                                Ordering::SeqCst,
+                                Ordering::SeqCst,
+                            ) {
                                 Ok(_) => break,
                                 Err(actual) => current = actual,
                             }
                         }
-                        let u32_id = self.index_edge_internal(&remote_edge.id, &remote_edge.from, &remote_edge.to);
+                        let u32_id = self.index_edge_internal(
+                            &remote_edge.id,
+                            &remote_edge.from,
+                            &remote_edge.to,
+                        );
                         self.edges.insert(u32_id, remote_edge.clone());
                         self.persist_signed(signed_event.clone())?;
                     }
@@ -2406,7 +3021,12 @@ impl Storage {
                     // so a peer that pulls and re-emits keeps logical time monotone.
                     let mut current = self.logical_clock.load(Ordering::SeqCst);
                     while remote_vec.clock.time > current {
-                        match self.logical_clock.compare_exchange_weak(current, remote_vec.clock.time, Ordering::SeqCst, Ordering::SeqCst) {
+                        match self.logical_clock.compare_exchange_weak(
+                            current,
+                            remote_vec.clock.time,
+                            Ordering::SeqCst,
+                            Ordering::SeqCst,
+                        ) {
                             Ok(_) => break,
                             Err(actual) => current = actual,
                         }
@@ -2415,17 +3035,26 @@ impl Storage {
                     // follows. Auto-provisions the collection if this peer lacks it.
                     // Vectors are append-applied (no LWW): a node holds at most one
                     // vector per collection, deduped at query time.
-                    self.replay_vector(&remote_vec.collection, &remote_vec.node_id, remote_vec.embedding.clone(), remote_vec.lang.clone().unwrap_or_else(|| "en".to_string()), true);
+                    self.replay_vector(
+                        &remote_vec.collection,
+                        &remote_vec.node_id,
+                        remote_vec.embedding.clone(),
+                        remote_vec.lang.clone().unwrap_or_else(|| "en".to_string()),
+                        true,
+                    );
                     self.persist_signed(signed_event.clone())?;
                 }
                 Event::Batch(inner_events) => {
                     // Recursive call needs SignedEvent wrapping, but for now we handle batches as single signed units
                     // To keep it simple, we wrap inner events or just apply them since the batch itself is verified.
-                    let wrapped_inners: Vec<SignedEvent> = inner_events.iter().map(|e| SignedEvent {
-                        event: e.clone(),
-                        signature: signed_event.signature.clone(), // Reuse batch signature
-                        signer_peer_id: signer_id.clone(),
-                    }).collect();
+                    let wrapped_inners: Vec<SignedEvent> = inner_events
+                        .iter()
+                        .map(|e| SignedEvent {
+                            event: e.clone(),
+                            signature: signed_event.signature.clone(), // Reuse batch signature
+                            signer_peer_id: signer_id.clone(),
+                        })
+                        .collect();
                     let _ = self.reconcile_state(wrapped_inners);
                 }
             }
@@ -2435,24 +3064,38 @@ impl Storage {
 
     pub fn persist_signed(&self, signed_event: SignedEvent) -> Result<()> {
         let (ack_tx, ack_rx) = unbounded();
-        self.wal_sender.send(WalMsg::Append(signed_event, ack_tx)).map_err(|_| Error::from_reason("wal disconnected"))?;
-        let _ = ack_rx.recv(); Ok(())
+        self.wal_sender
+            .send(WalMsg::Append(Box::new(signed_event), ack_tx))
+            .map_err(|_| Error::from_reason("wal disconnected"))?;
+        let _ = ack_rx.recv();
+        Ok(())
     }
 
     pub fn get_logical_clock(&self) -> u32 {
         self.logical_clock.load(Ordering::SeqCst)
     }
 
-    pub fn retrieve_context(&self, target_id: &str, tier_str: &str, budget: Option<u32>, fuzzy: bool) -> Result<ContextPackage> {
-        let tier = ScalingTier::from_str(tier_str);
+    pub fn retrieve_context(
+        &self,
+        target_id: &str,
+        tier_str: &str,
+        budget: Option<u32>,
+        fuzzy: bool,
+    ) -> Result<ContextPackage> {
+        let tier = ScalingTier::parse(tier_str);
         let hops = tier.hops();
-        let target_id_resolved = if fuzzy { self.find_fuzzy_id(target_id).unwrap_or(target_id.to_string()) } else { target_id.to_string() };
-        
+        let target_id_resolved = if fuzzy {
+            self.find_fuzzy_id(target_id)
+                .unwrap_or(target_id.to_string())
+        } else {
+            target_id.to_string()
+        };
+
         // 1. Graph Expansion (BFS)
         let mut nodes = HashMap::new();
         let mut edges = Vec::new();
         let mut queue = VecDeque::new();
-        
+
         if let Some(u32_id) = self.get_u32(&target_id_resolved) {
             queue.push_back((u32_id, 0));
             if let Some(node) = self.nodes.get(&u32_id) {
@@ -2462,7 +3105,9 @@ impl Storage {
 
         let mut visited = HashSet::new();
         while let Some((curr_u32, curr_depth)) = queue.pop_front() {
-            if curr_depth >= hops || visited.contains(&curr_u32) { continue; }
+            if curr_depth >= hops || visited.contains(&curr_u32) {
+                continue;
+            }
             visited.insert(curr_u32);
 
             if let Some(eids) = self.out_idx.get(&curr_u32) {
@@ -2471,9 +3116,11 @@ impl Storage {
                         let edge = edge_ref.value();
                         edges.push(edge.clone());
                         if let Some(next_u32) = self.get_u32(&edge.to) {
-                            if !nodes.contains_key(&next_u32) {
+                            if let std::collections::hash_map::Entry::Vacant(e) =
+                                nodes.entry(next_u32)
+                            {
                                 if let Some(node) = self.nodes.get(&next_u32) {
-                                    nodes.insert(next_u32, node.value().clone());
+                                    e.insert(node.value().clone());
                                     queue.push_back((next_u32, curr_depth + 1));
                                 }
                             }
@@ -2488,9 +3135,11 @@ impl Storage {
                         let edge = edge_ref.value();
                         edges.push(edge.clone());
                         if let Some(prev_u32) = self.get_u32(&edge.from) {
-                            if !nodes.contains_key(&prev_u32) {
+                            if let std::collections::hash_map::Entry::Vacant(e) =
+                                nodes.entry(prev_u32)
+                            {
                                 if let Some(node) = self.nodes.get(&prev_u32) {
-                                    nodes.insert(prev_u32, node.value().clone());
+                                    e.insert(node.value().clone());
                                     queue.push_back((prev_u32, curr_depth + 1));
                                 }
                             }
@@ -2511,7 +3160,10 @@ impl Storage {
         if let Some(b) = budget {
             if token_estimate > b {
                 // Compression: Switch to SuperNodes for high-level context
-                println!("GRL: Budget exceeded ({} > {}). Compressing to SuperNodes.", token_estimate, b);
+                println!(
+                    "GRL: Budget exceeded ({} > {}). Compressing to SuperNodes.",
+                    token_estimate, b
+                );
                 for entry in self.meta_nodes.iter() {
                     super_nodes.push(entry.value().clone());
                 }
@@ -2525,7 +3177,10 @@ impl Storage {
             edges,
             super_nodes,
             token_estimate,
-            reasoning_path: format!("Resolved {} as of Tier {} ({} hops)", target_id_resolved, tier_str, hops),
+            reasoning_path: format!(
+                "Resolved {} as of Tier {} ({} hops)",
+                target_id_resolved, tier_str, hops
+            ),
         })
     }
 
@@ -2543,7 +3198,9 @@ impl Storage {
                             return;
                         }
                     };
-                    storage.gossip_port.store(addr.port() as u32, Ordering::SeqCst);
+                    storage
+                        .gossip_port
+                        .store(addr.port() as u32, Ordering::SeqCst);
                     println!("Gossip: Bound to UDP port {}", addr.port());
                     s
                 }
@@ -2631,7 +3288,7 @@ impl Storage {
                                         // forged proposal could otherwise be driven to quorum and
                                         // applied as a MASTER axiom, bypassing governance.
                                         if storage.verify_event_signature(&proposal.signed_event) {
-                                            storage.proposals.insert(proposal.proposal_id.clone(), proposal);
+                                            storage.proposals.insert(proposal.proposal_id.clone(), *proposal);
                                         } else {
                                             println!("Mark X: REJECTED proposal {} — invalid event signature or unknown signer.", proposal.proposal_id);
                                         }
@@ -2657,13 +3314,18 @@ impl Storage {
                 Err(_) => return,
             };
             if let Err(e) = socket.set_broadcast(true) {
-                println!("Gossip: Failed to enable broadcast on discovery listener: {}", e);
+                println!(
+                    "Gossip: Failed to enable broadcast on discovery listener: {}",
+                    e
+                );
                 return;
             }
             let mut buf = [0u8; 65535];
             loop {
                 if let Ok((len, _addr)) = socket.recv_from(&mut buf).await {
-                    if let Ok(GossipMessage::Heartbeat { .. }) = serde_json::from_slice::<GossipMessage>(&buf[..len]) {
+                    if let Ok(GossipMessage::Heartbeat { .. }) =
+                        serde_json::from_slice::<GossipMessage>(&buf[..len])
+                    {
                         // Discovery logic handled via broadcast in main loop
                     }
                 }
@@ -2695,7 +3357,9 @@ impl Storage {
     pub fn save_state(&self) -> Result<()> {
         self.ensure_writable()?;
         let temp_dir = self.path.join("temp_save");
-        if temp_dir.exists() { let _ = fs::remove_dir_all(&temp_dir); }
+        if temp_dir.exists() {
+            let _ = fs::remove_dir_all(&temp_dir);
+        }
         fs::create_dir_all(&temp_dir).ok();
 
         // 1. Per-collection arenas + metadata + a manifest. HNSW is NOT dumped —
@@ -2705,11 +3369,16 @@ impl Storage {
         for c in self.collections.iter() {
             let coll = c.value();
             let arena = coll.arena.read();
-            fs::write(temp_dir.join(format!("vec_{}.bin", coll.name)), arena.to_bytes())
-                .map_err(|e| Error::from_reason(e.to_string()))?;
+            fs::write(
+                temp_dir.join(format!("vec_{}.bin", coll.name)),
+                arena.to_bytes(),
+            )
+            .map_err(|e| Error::from_reason(e.to_string()))?;
             let meta = coll.metadata.read();
-            let meta_data = bincode::serialize(&*meta).map_err(|e| Error::from_reason(e.to_string()))?;
-            fs::write(temp_dir.join(format!("meta_{}.bin", coll.name)), meta_data).map_err(|e| Error::from_reason(e.to_string()))?;
+            let meta_data =
+                bincode::serialize(&*meta).map_err(|e| Error::from_reason(e.to_string()))?;
+            fs::write(temp_dir.join(format!("meta_{}.bin", coll.name)), meta_data)
+                .map_err(|e| Error::from_reason(e.to_string()))?;
             // Rerank sidecar (exact f32) — only when the collection carries one.
             if let Some(sidecar) = &coll.f32_sidecar {
                 let s = sidecar.read();
@@ -2731,10 +3400,26 @@ impl Storage {
         }
 
         // 2. Save DashMaps (Partial state for instant load)
-        let nodes: Vec<(u32, NodeOutput)> = self.nodes.iter().map(|e| (*e.key(), e.value().clone())).collect();
-        let edges: Vec<(u128, EdgeOutput)> = self.edges.iter().map(|e| (*e.key(), e.value().clone())).collect();
-        fs::write(temp_dir.join("nodes.bin"), serde_json::to_vec(&nodes).unwrap()).ok();
-        fs::write(temp_dir.join("edges.bin"), serde_json::to_vec(&edges).unwrap()).ok();
+        let nodes: Vec<(u32, NodeOutput)> = self
+            .nodes
+            .iter()
+            .map(|e| (*e.key(), e.value().clone()))
+            .collect();
+        let edges: Vec<(u128, EdgeOutput)> = self
+            .edges
+            .iter()
+            .map(|e| (*e.key(), e.value().clone()))
+            .collect();
+        fs::write(
+            temp_dir.join("nodes.bin"),
+            serde_json::to_vec(&nodes).unwrap(),
+        )
+        .ok();
+        fs::write(
+            temp_dir.join("edges.bin"),
+            serde_json::to_vec(&edges).unwrap(),
+        )
+        .ok();
 
         // 3. Save Global Metadata (incl. collections manifest)
         let state = serde_json::json!({
@@ -2755,7 +3440,9 @@ impl Storage {
         if let Ok(entries) = fs::read_dir(&temp_dir) {
             for entry in entries.flatten() {
                 let p = entry.path();
-                if p.file_name().map_or(false, |n| n == "state.json") { continue; }
+                if p.file_name().is_some_and(|n| n == "state.json") {
+                    continue;
+                }
                 if let Some(name) = p.file_name() {
                     Self::rename_with_retry(&p, &self.path.join(name));
                 }
@@ -2774,13 +3461,18 @@ impl Storage {
         // compaction only leaves a larger WAL, never a corrupt one.
         let _ = self.compact();
 
-        println!("Mark IX: State persisted successfully to {}", self.path.display());
+        println!(
+            "Mark IX: State persisted successfully to {}",
+            self.path.display()
+        );
         Ok(())
     }
 
     fn try_load_state(&self) -> bool {
         let state_path = self.path.join("state.json");
-        if !state_path.exists() { return false; }
+        if !state_path.exists() {
+            return false;
+        }
 
         println!("Mark IX: Attempting instant load from binary state...");
 
@@ -2810,7 +3502,15 @@ impl Storage {
                 let quant = Quant::parse(cm["quant"].as_str().unwrap_or("none"));
                 let ef_search = cm["ef_search"].as_u64().map(|e| e as u32);
                 let rerank = cm["rerank"].as_bool().unwrap_or(false);
-                let coll = VectorCollection::new(name.clone(), model, dim, metric, quant, ef_search, rerank);
+                let coll = VectorCollection::new(
+                    name.clone(),
+                    model,
+                    dim,
+                    metric,
+                    quant,
+                    ef_search,
+                    rerank,
+                );
                 if let Ok(data) = fs::read(self.path.join(format!("vec_{}.bin", name))) {
                     *coll.arena.write() = ArenaStore::from_bytes(&data, quant, dim as usize);
                 }
@@ -2821,8 +3521,10 @@ impl Storage {
                 // (the query path falls back per-candidate), never to empty results.
                 if let Some(sidecar) = &coll.f32_sidecar {
                     if let Ok(data) = fs::read(self.path.join(format!("fvec_{}.bin", name))) {
-                        let v: Vec<f32> = data.chunks_exact(4)
-                            .map(|c| f32::from_le_bytes(c.try_into().unwrap())).collect();
+                        let v: Vec<f32> = data
+                            .chunks_exact(4)
+                            .map(|c| f32::from_le_bytes(c.try_into().unwrap()))
+                            .collect();
                         if v.len() == coll.arena.read().len() {
                             *sidecar.write() = v;
                         }
@@ -2845,7 +3547,15 @@ impl Storage {
         } else if let Ok(data) = fs::read(self.path.join("vector.bin")) {
             // Legacy single-space DB -> wrap as the `default` collection.
             let dim = state_val["vector_dim"].as_u64().unwrap_or(1536) as u16;
-            let coll = VectorCollection::new("default".to_string(), "default".to_string(), dim, Metric::L2, Quant::None, None, false);
+            let coll = VectorCollection::new(
+                "default".to_string(),
+                "default".to_string(),
+                dim,
+                Metric::L2,
+                Quant::None,
+                None,
+                false,
+            );
             *coll.arena.write() = ArenaStore::from_bytes(&data, Quant::None, dim as usize);
             if let Ok(md) = fs::read(self.path.join("meta.bin")) {
                 // Legacy single-space snapshots always predate A2 (String layout).
@@ -2854,7 +3564,8 @@ impl Storage {
                     legacy_meta.insert("default".to_string(), v0);
                 }
             }
-            self.collections.insert("default".to_string(), Arc::new(coll));
+            self.collections
+                .insert("default".to_string(), Arc::new(coll));
         } else {
             return false;
         }
@@ -2862,7 +3573,15 @@ impl Storage {
         if !self.collections.contains_key(&self.default_collection) {
             self.collections.insert(
                 self.default_collection.clone(),
-                Arc::new(VectorCollection::new(self.default_collection.clone(), "default".to_string(), 1536, Metric::L2, Quant::None, None, false)),
+                Arc::new(VectorCollection::new(
+                    self.default_collection.clone(),
+                    "default".to_string(),
+                    1536,
+                    Metric::L2,
+                    Quant::None,
+                    None,
+                    false,
+                )),
             );
         }
 
@@ -2873,7 +3592,9 @@ impl Storage {
                     println!("Mark IX: Loading {} nodes from snapshot", nodes.len());
                     let mut max_u32 = 0;
                     for (k, v) in nodes {
-                        if k > max_u32 { max_u32 = k; }
+                        if k > max_u32 {
+                            max_u32 = k;
+                        }
                         self.id_to_u32.insert(v.id.clone(), k);
                         // Rebuild the trigram index for this node id under its
                         // SAVED key `k` (no re-interning — `get_or_intern_id`
@@ -2884,15 +3605,20 @@ impl Storage {
                         // (ADR--GENESISDB-EDGE-ID-INTERNING), and edges aren't
                         // loaded here.
                         for trigram in Self::tokenize_id(&v.id) {
-                            self.trigram_index.entry(trigram).or_insert_with(RoaringBitmap::new).insert(k);
+                            self.trigram_index.entry(trigram).or_default().insert(k);
                         }
                         self.insert_node_lean(k, v);
                     }
                     self.next_u32.store(max_u32 + 1, Ordering::SeqCst);
                 }
-                Err(e) => { println!("Mark IX: Failed to deserialize nodes: {}", e); return false; }
+                Err(e) => {
+                    println!("Mark IX: Failed to deserialize nodes: {}", e);
+                    return false;
+                }
             }
-        } else { println!("Mark IX: nodes.bin not found"); }
+        } else {
+            println!("Mark IX: nodes.bin not found");
+        }
 
         if let Ok(data) = fs::read(self.path.join("edges.bin")) {
             // Deserialize as u128 tuples. Legacy snapshots wrote u32/u64 keys; JSON
@@ -2911,8 +3637,8 @@ impl Storage {
                     let k = Self::edge_key(&v.id);
                     let from_u32 = self.get_or_intern_id(&v.from);
                     let to_u32 = self.get_or_intern_id(&v.to);
-                    self.out_idx.entry(from_u32).or_insert_with(HashSet::new).insert(k);
-                    self.in_idx.entry(to_u32).or_insert_with(HashSet::new).insert(k);
+                    self.out_idx.entry(from_u32).or_default().insert(k);
+                    self.in_idx.entry(to_u32).or_default().insert(k);
                     self.edges.insert(k, v);
                 }
             }
@@ -2928,18 +3654,27 @@ impl Storage {
                 // ready) into the new u32 metadata, and rebuild node_to_arena.
                 let mut migrated = Vec::with_capacity(v0s.len());
                 for v0 in v0s {
-                    let nu = self.get_u32(&v0.node_id).unwrap_or_else(|| self.get_or_intern_id(&v0.node_id));
+                    let nu = self
+                        .get_u32(&v0.node_id)
+                        .unwrap_or_else(|| self.get_or_intern_id(&v0.node_id));
                     coll.node_to_arena.insert(nu, v0.arena_id);
                     migrated.push(NodeMetadata {
-                        arena_id: v0.arena_id, node_u32: nu, timestamp: v0.timestamp,
-                        vector_dim: v0.vector_dim, embedding_offset: v0.embedding_offset,
-                        gks_attributes: v0.gks_attributes, lang: v0.lang, cluster_id: v0.cluster_id,
+                        arena_id: v0.arena_id,
+                        node_u32: nu,
+                        timestamp: v0.timestamp,
+                        vector_dim: v0.vector_dim,
+                        embedding_offset: v0.embedding_offset,
+                        gks_attributes: v0.gks_attributes,
+                        lang: v0.lang,
+                        cluster_id: v0.cluster_id,
                     });
                 }
                 *coll.metadata.write() = migrated;
             } else {
                 let meta = coll.metadata.read();
-                for m in meta.iter() { coll.node_to_arena.insert(m.node_u32, m.arena_id); }
+                for m in meta.iter() {
+                    coll.node_to_arena.insert(m.node_u32, m.arena_id);
+                }
             }
         }
 
@@ -2954,7 +3689,7 @@ impl Storage {
 
     pub fn execute_batch(&self, input: BatchInput) -> Result<BatchOutput> {
         self.ensure_writable()?;
-        
+
         // 1. Validation Phase (All-or-Nothing)
         for node in &input.nodes {
             self.validate_governance(&node.labels, false)?;
@@ -2966,11 +3701,13 @@ impl Storage {
 
         // 2. Processing Phase (In-Memory Prep)
         let now = Utc::now();
-        
+
         for args in input.nodes {
             let id = args.id.unwrap_or_else(|| format!("N-{}", Uuid::new_v4()));
             let lang = args.lang.unwrap_or("en".to_string());
-            let expires_at = args.ttl.map(|s| (now + chrono::Duration::seconds(s as i64)).to_rfc3339());
+            let expires_at = args
+                .ttl
+                .map(|s| (now + chrono::Duration::seconds(s as i64)).to_rfc3339());
 
             // Resolve + dim-validate the target collection up-front so a bad
             // vector fails the whole batch BEFORE the WAL write (all-or-nothing).
@@ -2978,19 +3715,28 @@ impl Storage {
                 let coll = self.resolve_collection(&args.collection)?;
                 if emb.len() != coll.dim as usize {
                     return Err(Error::from_reason(format!(
-                        "embedding dim {} != collection '{}' dim {}", emb.len(), coll.name, coll.dim
+                        "embedding dim {} != collection '{}' dim {}",
+                        emb.len(),
+                        coll.name,
+                        coll.dim
                     )));
                 }
                 Some(coll.name.clone())
-            } else { None };
+            } else {
+                None
+            };
 
             let node = NodeOutput {
-                id: id.clone(), labels: args.labels,
+                id: id.clone(),
+                labels: args.labels,
                 props: args.props.unwrap_or(Value::Object(Default::default())),
-                impact: Some(0.7), embedding: args.embedding.clone(),
+                impact: Some(0.7),
+                embedding: args.embedding.clone(),
                 lang: Some(lang.clone()),
                 valid_from: args.valid_from.unwrap_or_else(|| now.to_rfc3339()),
-                valid_to: None, caused_by: args.caused_by, expires_at,
+                valid_to: None,
+                caused_by: args.caused_by,
+                expires_at,
                 clock: self.next_clock(),
                 collection: coll_name,
             };
@@ -3001,11 +3747,17 @@ impl Storage {
 
         for args in input.edges {
             let edge = EdgeOutput {
-                id: args.id.unwrap_or_else(|| Uuid::new_v4().to_string()), 
-                from: args.from, to: args.to, rel: args.rel,
-                props: args.props.unwrap_or(Value::Object(Default::default())), 
-                valid_from: Utc::now().to_rfc3339(), valid_to: None, recorded_at: Utc::now().to_rfc3339(),
-                superseded_by: None, impact: args.impact, caused_by: args.caused_by,
+                id: args.id.unwrap_or_else(|| Uuid::new_v4().to_string()),
+                from: args.from,
+                to: args.to,
+                rel: args.rel,
+                props: args.props.unwrap_or(Value::Object(Default::default())),
+                valid_from: Utc::now().to_rfc3339(),
+                valid_to: None,
+                recorded_at: Utc::now().to_rfc3339(),
+                superseded_by: None,
+                impact: args.impact,
+                caused_by: args.caused_by,
                 clock: self.next_clock(),
             };
             events.push(Event::Edge(edge.clone()));
@@ -3018,14 +3770,22 @@ impl Storage {
         // 4. Memory Index Phase — collect vectors per collection and build each
         //    HNSW graph once via parallel_insert instead of N single inserts.
         //    Items grouped by collection: (node_u32, node_id, emb, lang).
-        let mut by_coll: HashMap<String, Vec<(u32, String, Vec<f64>, String)>> = HashMap::new();
+        let mut by_coll: HashMap<String, CollVecBatch> = HashMap::new();
         for event in events {
             match event {
                 Event::Node(n) => {
                     let u32_id = self.get_or_intern_id(&n.id);
                     if let Some(emb) = n.embedding.clone() {
-                        let cn = n.collection.clone().unwrap_or_else(|| self.default_collection.clone());
-                        by_coll.entry(cn).or_default().push((u32_id, n.id.clone(), emb, n.lang.clone().unwrap_or_else(|| "en".to_string())));
+                        let cn = n
+                            .collection
+                            .clone()
+                            .unwrap_or_else(|| self.default_collection.clone());
+                        by_coll.entry(cn).or_default().push((
+                            u32_id,
+                            n.id.clone(),
+                            emb,
+                            n.lang.clone().unwrap_or_else(|| "en".to_string()),
+                        ));
                     }
                     self.insert_node_lean(u32_id, n);
                 }
@@ -3053,7 +3813,10 @@ impl Storage {
             }
         }
 
-        Ok(BatchOutput { nodes: output_nodes, edges: output_edges })
+        Ok(BatchOutput {
+            nodes: output_nodes,
+            edges: output_edges,
+        })
     }
 
     pub fn perform_index_compaction(&self) -> Result<()> {
@@ -3062,7 +3825,7 @@ impl Storage {
         // Drain pending HNSW inserts first — compaction reassigns arena ids, so
         // a queued insert with a stale id must not run against the new arena.
         self.flush_index();
-        
+
         // 1. Identify Live Set
         let live_nodes: HashSet<u32> = self.nodes.iter().map(|e| *e.key()).collect();
 
@@ -3083,7 +3846,8 @@ impl Storage {
             coll.node_to_arena.clear();
 
             for meta in meta_arena.iter() {
-                { let u32_id = meta.node_u32; // A2: id interned in metadata
+                {
+                    let u32_id = meta.node_u32; // A2: id interned in metadata
                     if live_nodes.contains(&u32_id) {
                         let start_off = meta.embedding_offset as usize;
                         let len = meta.vector_dim as usize;
@@ -3108,7 +3872,9 @@ impl Storage {
             coll.count.store(new_meta.len(), Ordering::Relaxed);
             *meta_arena = new_meta;
             *vec_arena = new_vec;
-            if let Some(g) = sidecar_guard.as_mut() { **g = new_sidecar; }
+            if let Some(g) = sidecar_guard.as_mut() {
+                **g = new_sidecar;
+            }
         }
 
         // 3. Rebuild every collection's HNSW from its compacted arena.
@@ -3117,17 +3883,29 @@ impl Storage {
         // 4. Prune Adjacency Indices
         let mut orphaned_indices = Vec::new();
         for entry in self.out_idx.iter() {
-            if !live_nodes.contains(entry.key()) { orphaned_indices.push(*entry.key()); }
+            if !live_nodes.contains(entry.key()) {
+                orphaned_indices.push(*entry.key());
+            }
         }
-        for k in orphaned_indices { self.out_idx.remove(&k); }
+        for k in orphaned_indices {
+            self.out_idx.remove(&k);
+        }
 
         let mut orphaned_in = Vec::new();
         for entry in self.in_idx.iter() {
-            if !live_nodes.contains(entry.key()) { orphaned_in.push(*entry.key()); }
+            if !live_nodes.contains(entry.key()) {
+                orphaned_in.push(*entry.key());
+            }
         }
-        for k in orphaned_in { self.in_idx.remove(&k); }
+        for k in orphaned_in {
+            self.in_idx.remove(&k);
+        }
 
-        println!("Mark IX: Index Compaction complete in {:?}. Arenas resized to {} nodes.", start.elapsed(), live_nodes.len());
+        println!(
+            "Mark IX: Index Compaction complete in {:?}. Arenas resized to {} nodes.",
+            start.elapsed(),
+            live_nodes.len()
+        );
         Ok(())
     }
 
@@ -3169,12 +3947,24 @@ impl Storage {
         for e in self.nodes.iter() {
             let n = e.value();
             let t = n.clock.time.to_le_bytes();
-            entries.push(entry(&[b"N", n.id.as_bytes(), &t, n.clock.peer_id.as_bytes(), n.valid_to.as_deref().unwrap_or("").as_bytes()]));
+            entries.push(entry(&[
+                b"N",
+                n.id.as_bytes(),
+                &t,
+                n.clock.peer_id.as_bytes(),
+                n.valid_to.as_deref().unwrap_or("").as_bytes(),
+            ]));
         }
         for e in self.edges.iter() {
             let ed = e.value();
             let t = ed.clock.time.to_le_bytes();
-            entries.push(entry(&[b"E", ed.id.as_bytes(), &t, ed.clock.peer_id.as_bytes(), ed.valid_to.as_deref().unwrap_or("").as_bytes()]));
+            entries.push(entry(&[
+                b"E",
+                ed.id.as_bytes(),
+                &t,
+                ed.clock.peer_id.as_bytes(),
+                ed.valid_to.as_deref().unwrap_or("").as_bytes(),
+            ]));
         }
         // Vector presence per (collection, node id) — peer-independent string ids,
         // not local u32 interning. Restores the divergence signal for vectors.
@@ -3182,14 +3972,22 @@ impl Storage {
             let coll = c.value();
             for kv in coll.node_to_arena.iter() {
                 if let Some(node) = self.nodes.get(kv.key()) {
-                    entries.push(entry(&[b"V", coll.name.as_bytes(), node.value().id.as_bytes()]));
+                    entries.push(entry(&[
+                        b"V",
+                        coll.name.as_bytes(),
+                        node.value().id.as_bytes(),
+                    ]));
                 }
             }
         }
-        if entries.is_empty() { return "0".repeat(64); }
+        if entries.is_empty() {
+            return "0".repeat(64);
+        }
         entries.sort();
         let mut hasher = Sha256::new();
-        for e in &entries { hasher.update(e); }
+        for e in &entries {
+            hasher.update(e);
+        }
         hex::encode(hasher.finalize())
     }
 
@@ -3215,7 +4013,9 @@ impl Storage {
     /// entries deserialize to a zero clock and are not `> from_clock`, so they don't
     /// re-sync on their own — re-`add_vector` re-stamps them with a live clock.)
     pub fn events_since(&self, from_clock: u32) -> Vec<SignedEvent> {
-        if !self.log_path.exists() { return Vec::new(); }
+        if !self.log_path.exists() {
+            return Vec::new();
+        }
         let mut out: Vec<(u32, SignedEvent)> = Vec::new();
         if let Ok(file) = File::open(&self.log_path) {
             let reader = std::io::BufReader::new(file);
@@ -3223,7 +4023,9 @@ impl Storage {
             for line in reader.lines().map_while(|r| r.ok()) {
                 if let Ok(se) = serde_json::from_str::<SignedEvent>(&line) {
                     if let Some(t) = Self::event_time(&se.event) {
-                        if t > from_clock { out.push((t, se)); }
+                        if t > from_clock {
+                            out.push((t, se));
+                        }
                     }
                 }
             }
@@ -3248,8 +4050,16 @@ impl Storage {
         let m = meta.get(aid as usize)?;
         let (start, len) = (m.embedding_offset as usize, m.vector_dim as usize);
         let arena = coll.arena.read();
-        if start + len > arena.len() { return None; }
-        Some(arena.f32_at(start, len).into_iter().map(|x| x as f64).collect())
+        if start + len > arena.len() {
+            return None;
+        }
+        Some(
+            arena
+                .f32_at(start, len)
+                .into_iter()
+                .map(|x| x as f64)
+                .collect(),
+        )
     }
 
     /// Replace the open WAL's contents with `data`, executed ON the WAL-writer
@@ -3270,7 +4080,12 @@ impl Storage {
         let _ = writer.flush();
         let _ = writer.get_mut().sync_all();
         // Truncate-to-zero + write the live-state snapshot through a fresh handle.
-        if let Ok(f) = FileOpenOptions::new().write(true).create(true).truncate(true).open(path) {
+        if let Ok(f) = FileOpenOptions::new()
+            .write(true)
+            .create(true)
+            .truncate(true)
+            .open(path)
+        {
             *writer = std::io::BufWriter::with_capacity(128 * 1024, f); // old append handle dropped
             let _ = writer.write_all(data);
             let _ = writer.flush();
@@ -3297,7 +4112,9 @@ impl Storage {
         for entry in self.nodes.iter() {
             let node = entry.value();
             if let Some(exp) = &node.expires_at {
-                if now > *exp { continue; }
+                if now > *exp {
+                    continue;
+                }
             }
             if node.valid_to.is_none() {
                 let mut node = node.clone();
@@ -3316,7 +4133,9 @@ impl Storage {
         for entry in self.edges.iter() {
             let edge = entry.value();
             if edge.valid_to.is_none() {
-                if let Ok(json) = serde_json::to_string(&self.sign_event(&Event::Edge(edge.clone()))) {
+                if let Ok(json) =
+                    serde_json::to_string(&self.sign_event(&Event::Edge(edge.clone())))
+                {
                     buf.extend_from_slice(json.as_bytes());
                     buf.push(b'\n');
                     count += 1;
@@ -3338,12 +4157,18 @@ impl Storage {
                 for line in reader.lines().map_while(|r| r.ok()) {
                     if let Ok(se) = serde_json::from_str::<SignedEvent>(&line) {
                         if let Event::Vector(v) = se.event {
-                            let live = self.get_u32(&v.node_id).map_or(false, |u| self.nodes.contains_key(&u));
-                            if !live { continue; }
+                            let live = self
+                                .get_u32(&v.node_id)
+                                .is_some_and(|u| self.nodes.contains_key(&u));
+                            if !live {
+                                continue;
+                            }
                             let key = (v.node_id.clone(), v.collection.clone());
                             match latest.get(&key) {
                                 Some(prev) if prev.clock.time >= v.clock.time => {}
-                                _ => { latest.insert(key, v); }
+                                _ => {
+                                    latest.insert(key, v);
+                                }
                             }
                         }
                     }
@@ -3362,7 +4187,10 @@ impl Storage {
         // truncated + rewritten + fsynced through its own handle.
         let (ack_tx, ack_rx) = unbounded();
         self.wal_sender
-            .send(WalMsg::Checkpoint { data: buf, ack: ack_tx })
+            .send(WalMsg::Checkpoint {
+                data: buf,
+                ack: ack_tx,
+            })
             .map_err(|_| Error::from_reason("wal disconnected"))?;
         let _ = ack_rx.recv();
         println!("Mark IX: WAL Compacted. {} live events preserved.", count);
@@ -3388,7 +4216,13 @@ impl Storage {
         self.persist(&Event::Edge(edge.clone()))?;
         Ok(Some(edge))
     }
-    pub fn status_sync(&self) -> DatabaseStatus { DatabaseStatus { open: true, read_only: self.read_only, page_cache_mb: 512 } }
+    pub fn status_sync(&self) -> DatabaseStatus {
+        DatabaseStatus {
+            open: true,
+            read_only: self.read_only,
+            page_cache_mb: 512,
+        }
+    }
     // Bulk paths route through execute_batch so each chunk is ONE Event::Batch =
     // ONE WAL fsync (vs one fsync per item). Chunked to bound the size of a
     // single serialized batch / fsync.
@@ -3397,8 +4231,13 @@ impl Storage {
         let mut it = inputs.into_iter();
         loop {
             let chunk: Vec<NodeInput> = it.by_ref().take(Self::BULK_CHUNK).collect();
-            if chunk.is_empty() { break; }
-            self.execute_batch(BatchInput { nodes: chunk, edges: Vec::new() })?;
+            if chunk.is_empty() {
+                break;
+            }
+            self.execute_batch(BatchInput {
+                nodes: chunk,
+                edges: Vec::new(),
+            })?;
         }
         Ok(())
     }
@@ -3406,12 +4245,17 @@ impl Storage {
         let mut it = inputs.into_iter();
         loop {
             let chunk: Vec<EdgeInput> = it.by_ref().take(Self::BULK_CHUNK).collect();
-            if chunk.is_empty() { break; }
-            self.execute_batch(BatchInput { nodes: Vec::new(), edges: chunk })?;
+            if chunk.is_empty() {
+                break;
+            }
+            self.execute_batch(BatchInput {
+                nodes: Vec::new(),
+                edges: chunk,
+            })?;
         }
         Ok(())
     }
-    
+
     pub fn calculate_structural_gaps(&self) -> Result<Vec<GapSuggestion>> {
         let mut gaps = Vec::new();
         let mut cluster_centroids: HashMap<u32, Vec<f32>> = HashMap::new();
@@ -3427,25 +4271,38 @@ impl Storage {
             let len = meta.vector_dim as usize;
             if start + len <= vec_arena.len() {
                 let vec = vec_arena.f32_at(start, len);
-                let entry = cluster_centroids.entry(c_id).or_insert_with(|| vec![0.0; meta.vector_dim as usize]);
-                for (i, val) in vec.iter().enumerate() { entry[i] += val; }
+                let entry = cluster_centroids
+                    .entry(c_id)
+                    .or_insert_with(|| vec![0.0; meta.vector_dim as usize]);
+                for (i, val) in vec.iter().enumerate() {
+                    entry[i] += val;
+                }
                 *cluster_member_count.entry(c_id).or_insert(0) += 1;
-                { let u32_id = meta.node_u32; // A2: id interned in metadata
-                    if let Some(node) = self.nodes.get(&u32_id) { *cluster_impact.entry(c_id).or_insert(0.0) += node.value().impact.unwrap_or(0.0); }
+                {
+                    let u32_id = meta.node_u32; // A2: id interned in metadata
+                    if let Some(node) = self.nodes.get(&u32_id) {
+                        *cluster_impact.entry(c_id).or_insert(0.0) +=
+                            node.value().impact.unwrap_or(0.0);
+                    }
                 }
             }
         }
         for (c_id, centroid) in cluster_centroids.iter_mut() {
             let count = cluster_member_count[c_id] as f32;
-            for val in centroid.iter_mut() { *val /= count; }
+            for val in centroid.iter_mut() {
+                *val /= count;
+            }
         }
         let cluster_ids: Vec<u32> = cluster_centroids.keys().cloned().collect();
         for i in 0..cluster_ids.len() {
             for j in i + 1..cluster_ids.len() {
-                let id_a = cluster_ids[i]; let id_b = cluster_ids[j];
+                let id_a = cluster_ids[i];
+                let id_b = cluster_ids[j];
                 let avg_impact_a = cluster_impact[&id_a] / cluster_member_count[&id_a] as f64;
                 let avg_impact_b = cluster_impact[&id_b] / cluster_member_count[&id_b] as f64;
-                if avg_impact_a < 0.5 || avg_impact_b < 0.5 { continue; }
+                if avg_impact_a < 0.5 || avg_impact_b < 0.5 {
+                    continue;
+                }
                 let dist = DistL2 {}.eval(&cluster_centroids[&id_a], &cluster_centroids[&id_b]);
                 let similarity = 1.0 / (1.0 + dist as f64);
                 if similarity > 0.75 {
@@ -3460,7 +4317,10 @@ impl Storage {
     }
 
     pub fn get_meta_history(&self, cluster_id: u32) -> Vec<SuperNode> {
-        self.meta_history.get(&cluster_id).map(|v| v.value().clone()).unwrap_or_default()
+        self.meta_history
+            .get(&cluster_id)
+            .map(|v| v.value().clone())
+            .unwrap_or_default()
     }
 }
 
@@ -3481,8 +4341,12 @@ impl Drop for Storage {
         drop(std::mem::replace(&mut self.wal_sender, dead_wal));
         let (dead_idx, _) = bounded(1);
         drop(std::mem::replace(&mut self.index_tx, dead_idx));
-        if let Some(h) = self.wal_handle.take() { let _ = h.join(); }
-        if let Some(h) = self.index_handle.take() { let _ = h.join(); }
+        if let Some(h) = self.wal_handle.take() {
+            let _ = h.join();
+        }
+        if let Some(h) = self.index_handle.take() {
+            let _ = h.join();
+        }
         if !self.read_only {
             println!("Mark IX: Graceful shutdown. State saved.");
         }
@@ -3500,83 +4364,305 @@ pub struct GapSuggestion {
 
 #[cfg(feature = "napi-bindings")]
 #[napi]
-pub struct GenesisDatabase { inner: Arc<Storage> }
+pub struct GenesisDatabase {
+    inner: Arc<Storage>,
+}
 
 #[cfg(feature = "napi-bindings")]
 #[napi]
 impl GenesisDatabase {
     #[napi(factory)]
-    pub fn open(opts: OpenOptions) -> Result<Self> { 
+    pub fn open(opts: OpenOptions) -> Result<Self> {
         let storage = Arc::new(Storage::open(opts)?);
         Storage::start_autonomic_loop(Arc::clone(&storage));
         Storage::start_gossip_manager(Arc::clone(&storage));
-        Ok(Self { inner: storage }) 
+        Ok(Self { inner: storage })
     }
-    #[napi] pub async fn bulk_add_nodes(&self, inputs: Vec<NodeInput>) -> Result<()> { let i = Arc::clone(&self.inner); tokio::task::spawn_blocking(move || i.bulk_add_nodes(inputs)).await.map_err(|e| Error::from_reason(e.to_string()))? }
-    #[napi] pub async fn bulk_add_edges(&self, inputs: Vec<EdgeInput>) -> Result<()> { let i = Arc::clone(&self.inner); tokio::task::spawn_blocking(move || i.bulk_add_edges(inputs)).await.map_err(|e| Error::from_reason(e.to_string()))? }
-    #[napi] pub async fn rebuild_index_parallel(&self) -> Result<()> { let i = Arc::clone(&self.inner); tokio::task::spawn_blocking(move || i.rebuild_index_parallel()).await.map_err(|e| Error::from_reason(e.to_string()))? }
-    #[napi] pub async fn add_node(&self, args: NodeInput) -> Result<NodeOutput> { let i = Arc::clone(&self.inner); tokio::task::spawn_blocking(move || i.add_node(args)).await.map_err(|e| Error::from_reason(e.to_string()))? }
-    #[napi] pub async fn add_edge(&self, args: EdgeInput) -> Result<EdgeOutput> { let i = Arc::clone(&self.inner); tokio::task::spawn_blocking(move || i.add_edge(args)).await.map_err(|e| Error::from_reason(e.to_string()))? }
-    #[napi] pub async fn supersede_node(&self, id: String, new_props: Option<serde_json::Value>, caused_by: Option<String>) -> Result<NodeOutput> { let i = Arc::clone(&self.inner); tokio::task::spawn_blocking(move || i.supersede_node(id, new_props, caused_by)).await.map_err(|e| Error::from_reason(e.to_string()))? }
-    #[napi] pub async fn retract_edge(&self, id: String, at: Option<String>) -> Result<Option<EdgeOutput>> { let i = Arc::clone(&self.inner); tokio::task::spawn_blocking(move || i.retract_edge(id, at)).await.map_err(|e| Error::from_reason(e.to_string()))? }
-    #[napi] pub async fn retrieve_context(&self, target_id: String, tier: String, budget: Option<u32>, fuzzy: bool) -> Result<ContextPackage> {
+    #[napi]
+    pub async fn bulk_add_nodes(&self, inputs: Vec<NodeInput>) -> Result<()> {
         let i = Arc::clone(&self.inner);
-        tokio::task::spawn_blocking(move || i.retrieve_context(&target_id, &tier, budget, fuzzy)).await.map_err(|e| Error::from_reason(e.to_string()))?
+        tokio::task::spawn_blocking(move || i.bulk_add_nodes(inputs))
+            .await
+            .map_err(|e| Error::from_reason(e.to_string()))?
     }
-    #[napi] pub async fn execute_hql(&self, query: String) -> Result<Value> { 
-        let i = Arc::clone(&self.inner); 
-        let res = tokio::task::spawn_blocking(move || i.execute_hql(&query)).await.map_err(|e| Error::from_reason(e.to_string()))??;
+    #[napi]
+    pub async fn bulk_add_edges(&self, inputs: Vec<EdgeInput>) -> Result<()> {
+        let i = Arc::clone(&self.inner);
+        tokio::task::spawn_blocking(move || i.bulk_add_edges(inputs))
+            .await
+            .map_err(|e| Error::from_reason(e.to_string()))?
+    }
+    #[napi]
+    pub async fn rebuild_index_parallel(&self) -> Result<()> {
+        let i = Arc::clone(&self.inner);
+        tokio::task::spawn_blocking(move || i.rebuild_index_parallel())
+            .await
+            .map_err(|e| Error::from_reason(e.to_string()))?
+    }
+    #[napi]
+    pub async fn add_node(&self, args: NodeInput) -> Result<NodeOutput> {
+        let i = Arc::clone(&self.inner);
+        tokio::task::spawn_blocking(move || i.add_node(args))
+            .await
+            .map_err(|e| Error::from_reason(e.to_string()))?
+    }
+    #[napi]
+    pub async fn add_edge(&self, args: EdgeInput) -> Result<EdgeOutput> {
+        let i = Arc::clone(&self.inner);
+        tokio::task::spawn_blocking(move || i.add_edge(args))
+            .await
+            .map_err(|e| Error::from_reason(e.to_string()))?
+    }
+    #[napi]
+    pub async fn supersede_node(
+        &self,
+        id: String,
+        new_props: Option<serde_json::Value>,
+        caused_by: Option<String>,
+    ) -> Result<NodeOutput> {
+        let i = Arc::clone(&self.inner);
+        tokio::task::spawn_blocking(move || i.supersede_node(id, new_props, caused_by))
+            .await
+            .map_err(|e| Error::from_reason(e.to_string()))?
+    }
+    #[napi]
+    pub async fn retract_edge(&self, id: String, at: Option<String>) -> Result<Option<EdgeOutput>> {
+        let i = Arc::clone(&self.inner);
+        tokio::task::spawn_blocking(move || i.retract_edge(id, at))
+            .await
+            .map_err(|e| Error::from_reason(e.to_string()))?
+    }
+    #[napi]
+    pub async fn retrieve_context(
+        &self,
+        target_id: String,
+        tier: String,
+        budget: Option<u32>,
+        fuzzy: bool,
+    ) -> Result<ContextPackage> {
+        let i = Arc::clone(&self.inner);
+        tokio::task::spawn_blocking(move || i.retrieve_context(&target_id, &tier, budget, fuzzy))
+            .await
+            .map_err(|e| Error::from_reason(e.to_string()))?
+    }
+    #[napi]
+    pub async fn execute_hql(&self, query: String) -> Result<Value> {
+        let i = Arc::clone(&self.inner);
+        let res = tokio::task::spawn_blocking(move || i.execute_hql(&query))
+            .await
+            .map_err(|e| Error::from_reason(e.to_string()))??;
         Ok(serde_json::to_value(res).map_err(|e| Error::from_reason(e.to_string()))?)
     }
-    #[napi] pub async fn hybrid_search(&self, args: HybridSearchInput) -> Result<Vec<NeighborOutput>> { let i = Arc::clone(&self.inner); tokio::task::spawn_blocking(move || i.hybrid_search(args)).await.map_err(|e| Error::from_reason(e.to_string()))? }
-    #[napi] pub async fn neighbors(&self, seed: String, args: NeighborInput) -> Result<Vec<NeighborOutput>> { let i = Arc::clone(&self.inner); tokio::task::spawn_blocking(move || i.neighbors(seed, args, false)).await.map_err(|e| Error::from_reason(e.to_string()))? }
-    #[napi] pub async fn save_state(&self) -> Result<()> { let i = Arc::clone(&self.inner); tokio::task::spawn_blocking(move || i.save_state()).await.map_err(|e| Error::from_reason(e.to_string()))? }
-    #[napi] pub async fn compact(&self) -> Result<()> { let i = Arc::clone(&self.inner); tokio::task::spawn_blocking(move || i.compact()).await.map_err(|e| Error::from_reason(e.to_string()))? }
-    #[napi] pub async fn create_collection(&self, name: String, model: String, dim: u32, metric: Option<String>, quant: Option<String>, ef_search: Option<u32>, rerank: Option<bool>) -> Result<()> { let i = Arc::clone(&self.inner); tokio::task::spawn_blocking(move || i.create_collection(name, model, dim, metric, quant, ef_search, rerank)).await.map_err(|e| Error::from_reason(e.to_string()))? }
-    #[napi] pub fn list_collections(&self) -> Vec<CollectionInfo> { self.inner.list_collections() }
-    #[napi] pub async fn add_vector(&self, node_id: String, collection: String, embedding: Vec<f64>) -> Result<()> { let i = Arc::clone(&self.inner); tokio::task::spawn_blocking(move || i.add_vector(node_id, collection, embedding)).await.map_err(|e| Error::from_reason(e.to_string()))? }
-    #[napi] pub async fn flush_index(&self) -> Result<()> { let i = Arc::clone(&self.inner); tokio::task::spawn_blocking(move || i.flush_index()).await.map_err(|e| Error::from_reason(e.to_string())) }
-    #[napi] pub fn index_lag(&self) -> u32 { self.inner.index_lag() }
-    #[napi] pub fn set_language_centroid(&self, lang: String, vector: Vec<f64>) { self.inner.set_language_centroid(lang, vector); }
-    #[napi] pub fn set_index_params(&self, ef_construction: u32, ef_search: u32) { self.inner.set_index_params(ef_construction, ef_search); }
-    #[napi] pub async fn detect_communities(&self) -> Result<()> { let i = Arc::clone(&self.inner); tokio::task::spawn_blocking(move || i.detect_communities()).await.map_err(|e| Error::from_reason(e.to_string()))? }
-    #[napi] pub async fn calculate_structural_gaps(&self) -> Result<Vec<GapSuggestion>> { let i = Arc::clone(&self.inner); tokio::task::spawn_blocking(move || i.calculate_structural_gaps()).await.map_err(|e| Error::from_reason(e.to_string()))? }
-    #[napi] pub async fn generate_meta_graph(&self) -> Result<()> { let i = Arc::clone(&self.inner); tokio::task::spawn_blocking(move || i.generate_meta_graph()).await.map_err(|e| Error::from_reason(e.to_string()))? }
-    #[napi] pub async fn get_meta_history(&self, cluster_id: u32) -> Result<Vec<SuperNode>> { let i = Arc::clone(&self.inner); tokio::task::spawn_blocking(move || Ok(i.get_meta_history(cluster_id))).await.map_err(|e| Error::from_reason(e.to_string()))? }
-    #[napi] pub async fn reconcile_state(&self, events_json: String) -> Result<()> {
+    #[napi]
+    pub async fn hybrid_search(&self, args: HybridSearchInput) -> Result<Vec<NeighborOutput>> {
         let i = Arc::clone(&self.inner);
-        let events = serde_json::from_str::<Vec<SignedEvent>>(&events_json).map_err(|e| Error::from_reason(e.to_string()))?;
-        tokio::task::spawn_blocking(move || i.reconcile_state(events)).await.map_err(|e| Error::from_reason(e.to_string()))?
+        tokio::task::spawn_blocking(move || i.hybrid_search(args))
+            .await
+            .map_err(|e| Error::from_reason(e.to_string()))?
+    }
+    #[napi]
+    pub async fn neighbors(
+        &self,
+        seed: String,
+        args: NeighborInput,
+    ) -> Result<Vec<NeighborOutput>> {
+        let i = Arc::clone(&self.inner);
+        tokio::task::spawn_blocking(move || i.neighbors(seed, args, false))
+            .await
+            .map_err(|e| Error::from_reason(e.to_string()))?
+    }
+    #[napi]
+    pub async fn save_state(&self) -> Result<()> {
+        let i = Arc::clone(&self.inner);
+        tokio::task::spawn_blocking(move || i.save_state())
+            .await
+            .map_err(|e| Error::from_reason(e.to_string()))?
+    }
+    #[napi]
+    pub async fn compact(&self) -> Result<()> {
+        let i = Arc::clone(&self.inner);
+        tokio::task::spawn_blocking(move || i.compact())
+            .await
+            .map_err(|e| Error::from_reason(e.to_string()))?
+    }
+    #[napi]
+    pub async fn create_collection(
+        &self,
+        name: String,
+        model: String,
+        dim: u32,
+        metric: Option<String>,
+        quant: Option<String>,
+        ef_search: Option<u32>,
+        rerank: Option<bool>,
+    ) -> Result<()> {
+        let i = Arc::clone(&self.inner);
+        tokio::task::spawn_blocking(move || {
+            i.create_collection(name, model, dim, metric, quant, ef_search, rerank)
+        })
+        .await
+        .map_err(|e| Error::from_reason(e.to_string()))?
+    }
+    #[napi]
+    pub fn list_collections(&self) -> Vec<CollectionInfo> {
+        self.inner.list_collections()
+    }
+    #[napi]
+    pub async fn add_vector(
+        &self,
+        node_id: String,
+        collection: String,
+        embedding: Vec<f64>,
+    ) -> Result<()> {
+        let i = Arc::clone(&self.inner);
+        tokio::task::spawn_blocking(move || i.add_vector(node_id, collection, embedding))
+            .await
+            .map_err(|e| Error::from_reason(e.to_string()))?
+    }
+    #[napi]
+    pub async fn flush_index(&self) -> Result<()> {
+        let i = Arc::clone(&self.inner);
+        tokio::task::spawn_blocking(move || i.flush_index())
+            .await
+            .map_err(|e| Error::from_reason(e.to_string()))
+    }
+    #[napi]
+    pub fn index_lag(&self) -> u32 {
+        self.inner.index_lag()
+    }
+    #[napi]
+    pub fn set_language_centroid(&self, lang: String, vector: Vec<f64>) {
+        self.inner.set_language_centroid(lang, vector);
+    }
+    #[napi]
+    pub fn set_index_params(&self, ef_construction: u32, ef_search: u32) {
+        self.inner.set_index_params(ef_construction, ef_search);
+    }
+    #[napi]
+    pub async fn detect_communities(&self) -> Result<()> {
+        let i = Arc::clone(&self.inner);
+        tokio::task::spawn_blocking(move || i.detect_communities())
+            .await
+            .map_err(|e| Error::from_reason(e.to_string()))?
+    }
+    #[napi]
+    pub async fn calculate_structural_gaps(&self) -> Result<Vec<GapSuggestion>> {
+        let i = Arc::clone(&self.inner);
+        tokio::task::spawn_blocking(move || i.calculate_structural_gaps())
+            .await
+            .map_err(|e| Error::from_reason(e.to_string()))?
+    }
+    #[napi]
+    pub async fn generate_meta_graph(&self) -> Result<()> {
+        let i = Arc::clone(&self.inner);
+        tokio::task::spawn_blocking(move || i.generate_meta_graph())
+            .await
+            .map_err(|e| Error::from_reason(e.to_string()))?
+    }
+    #[napi]
+    pub async fn get_meta_history(&self, cluster_id: u32) -> Result<Vec<SuperNode>> {
+        let i = Arc::clone(&self.inner);
+        tokio::task::spawn_blocking(move || Ok(i.get_meta_history(cluster_id)))
+            .await
+            .map_err(|e| Error::from_reason(e.to_string()))?
+    }
+    #[napi]
+    pub async fn reconcile_state(&self, events_json: String) -> Result<()> {
+        let i = Arc::clone(&self.inner);
+        let events = serde_json::from_str::<Vec<SignedEvent>>(&events_json)
+            .map_err(|e| Error::from_reason(e.to_string()))?;
+        tokio::task::spawn_blocking(move || i.reconcile_state(events))
+            .await
+            .map_err(|e| Error::from_reason(e.to_string()))?
     }
     /// Anti-entropy source side: JSON of the signed events newer than `from_clock`
     /// (sorted by logical time). Pair with `reconcile_state` on the puller.
-    #[napi] pub async fn events_since(&self, from_clock: u32) -> Result<String> {
+    #[napi]
+    pub async fn events_since(&self, from_clock: u32) -> Result<String> {
         let i = Arc::clone(&self.inner);
-        tokio::task::spawn_blocking(move || serde_json::to_string(&i.events_since(from_clock)).map_err(|e| Error::from_reason(e.to_string())))
-            .await.map_err(|e| Error::from_reason(e.to_string()))?
+        tokio::task::spawn_blocking(move || {
+            serde_json::to_string(&i.events_since(from_clock))
+                .map_err(|e| Error::from_reason(e.to_string()))
+        })
+        .await
+        .map_err(|e| Error::from_reason(e.to_string()))?
     }
-    #[napi] pub async fn semantic_verify(&self, event_json: String) -> Result<bool> { 
-        let i = Arc::clone(&self.inner); 
-        let event = serde_json::from_str::<Event>(&event_json).map_err(|e| Error::from_reason(e.to_string()))?;
-        tokio::task::spawn_blocking(move || i.semantic_verify(&event)).await.map_err(|e| Error::from_reason(e.to_string()))? 
+    #[napi]
+    pub async fn semantic_verify(&self, event_json: String) -> Result<bool> {
+        let i = Arc::clone(&self.inner);
+        let event = serde_json::from_str::<Event>(&event_json)
+            .map_err(|e| Error::from_reason(e.to_string()))?;
+        tokio::task::spawn_blocking(move || i.semantic_verify(&event))
+            .await
+            .map_err(|e| Error::from_reason(e.to_string()))?
     }
-    #[napi] pub async fn propose_consensus(&self, event_json: String, signature: Vec<u8>) -> Result<String> { 
-        let i = Arc::clone(&self.inner); 
-        let event = serde_json::from_str::<Event>(&event_json).map_err(|e| Error::from_reason(e.to_string()))?;
-        tokio::task::spawn_blocking(move || i.propose_consensus(event, signature)).await.map_err(|e| Error::from_reason(e.to_string()))? 
+    #[napi]
+    pub async fn propose_consensus(
+        &self,
+        event_json: String,
+        signature: Vec<u8>,
+    ) -> Result<String> {
+        let i = Arc::clone(&self.inner);
+        let event = serde_json::from_str::<Event>(&event_json)
+            .map_err(|e| Error::from_reason(e.to_string()))?;
+        tokio::task::spawn_blocking(move || i.propose_consensus(event, signature))
+            .await
+            .map_err(|e| Error::from_reason(e.to_string()))?
     }
-    #[napi] pub async fn submit_vote(&self, proposal_id: String, peer_id: String, approve: bool, signature: Vec<u8>) -> Result<bool> { let i = Arc::clone(&self.inner); tokio::task::spawn_blocking(move || i.submit_vote(proposal_id, peer_id, approve, signature)).await.map_err(|e| Error::from_reason(e.to_string()))? }
-    #[napi] pub fn sign_vote(&self, proposal_id: String, approve: bool) -> Vec<u8> { self.inner.sign_vote(proposal_id, approve) }
-    #[napi] pub fn get_local_peer_id(&self) -> String { self.inner.local_peer_id.clone() }
-    #[napi] pub fn get_logical_clock(&self) -> u32 { self.inner.logical_clock.load(Ordering::SeqCst) }
-    #[napi] pub fn get_merkle_root(&self) -> String { self.inner.get_merkle_root() }
-    #[napi] pub fn schema_version_sync(&self) -> u32 { SCHEMA_VERSION }
-    #[napi] pub fn version_sync(&self) -> String { ENGINE_VERSION.to_string() }
-    #[napi] pub fn status_sync(&self) -> DatabaseStatus { self.inner.status_sync() }
+    #[napi]
+    pub async fn submit_vote(
+        &self,
+        proposal_id: String,
+        peer_id: String,
+        approve: bool,
+        signature: Vec<u8>,
+    ) -> Result<bool> {
+        let i = Arc::clone(&self.inner);
+        tokio::task::spawn_blocking(move || i.submit_vote(proposal_id, peer_id, approve, signature))
+            .await
+            .map_err(|e| Error::from_reason(e.to_string()))?
+    }
+    #[napi]
+    pub fn sign_vote(&self, proposal_id: String, approve: bool) -> Vec<u8> {
+        self.inner.sign_vote(proposal_id, approve)
+    }
+    #[napi]
+    pub fn get_local_peer_id(&self) -> String {
+        self.inner.local_peer_id.clone()
+    }
+    #[napi]
+    pub fn get_logical_clock(&self) -> u32 {
+        self.inner.logical_clock.load(Ordering::SeqCst)
+    }
+    #[napi]
+    pub fn get_merkle_root(&self) -> String {
+        self.inner.get_merkle_root()
+    }
+    #[napi]
+    pub fn schema_version_sync(&self) -> u32 {
+        SCHEMA_VERSION
+    }
+    #[napi]
+    pub fn version_sync(&self) -> String {
+        ENGINE_VERSION.to_string()
+    }
+    #[napi]
+    pub fn status_sync(&self) -> DatabaseStatus {
+        self.inner.status_sync()
+    }
 }
 #[cfg(feature = "napi-bindings")]
-#[napi] pub fn engine_name_sync() -> String { ENGINE_NAME.to_string() }
+#[napi]
+pub fn engine_name_sync() -> String {
+    ENGINE_NAME.to_string()
+}
 #[cfg(feature = "napi-bindings")]
-#[napi] pub fn schema_version_sync() -> u32 { SCHEMA_VERSION }
+#[napi]
+pub fn schema_version_sync() -> u32 {
+    SCHEMA_VERSION
+}
 #[cfg(feature = "napi-bindings")]
-#[napi] pub fn version_sync() -> String { ENGINE_VERSION.to_string() }
+#[napi]
+pub fn version_sync() -> String {
+    ENGINE_VERSION.to_string()
+}

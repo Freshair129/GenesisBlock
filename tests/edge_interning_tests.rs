@@ -6,7 +6,7 @@
 // deterministic u64 hash `Storage::edge_key(id)` and carry NO `id_to_u32`
 // string entry at all. Idempotency = "is this u64 already in `edges`?".
 
-use genesis_block_native::{Storage, OpenOptions, NodeInput, EdgeInput, NeighborInput};
+use genesis_block_native::{EdgeInput, NeighborInput, NodeInput, OpenOptions, Storage};
 use std::fs;
 use std::path::Path;
 
@@ -30,31 +30,52 @@ fn open(path: &str) -> Storage {
 
 fn node(s: &Storage, id: &str) {
     s.add_node(NodeInput {
-        id: Some(id.to_string()), labels: vec![], props: None, embedding: None,
-        lang: None, valid_from: None, caused_by: None, ttl: None, collection: None,
+        id: Some(id.to_string()),
+        labels: vec![],
+        props: None,
+        embedding: None,
+        lang: None,
+        valid_from: None,
+        caused_by: None,
+        ttl: None,
+        collection: None,
     })
     .unwrap();
 }
 
 fn edge(s: &Storage, eid: &str, from: &str, to: &str, rel: &str) {
     s.add_edge(EdgeInput {
-        id: Some(eid.to_string()), from: from.to_string(), to: to.to_string(),
-        rel: rel.to_string(), props: None, valid_from: None, supersede: None,
-        impact: None, caused_by: None,
+        id: Some(eid.to_string()),
+        from: from.to_string(),
+        to: to.to_string(),
+        rel: rel.to_string(),
+        props: None,
+        valid_from: None,
+        supersede: None,
+        impact: None,
+        caused_by: None,
     })
     .unwrap();
 }
 
 fn trigram_members(s: &Storage) -> usize {
-    s.trigram_index.iter().map(|e| e.value().len() as usize).sum()
+    s.trigram_index
+        .iter()
+        .map(|e| e.value().len() as usize)
+        .sum()
 }
 
 fn hop1_out(s: &Storage, id: &str) -> usize {
     s.neighbors(
         id.to_string(),
         NeighborInput {
-            depth: Some(1), rel: None, rels: None, direction: Some("out".to_string()),
-            as_of: None, include_invalid: Some(false), limit: Some(1000),
+            depth: Some(1),
+            rel: None,
+            rels: None,
+            direction: Some("out".to_string()),
+            as_of: None,
+            include_invalid: Some(false),
+            limit: Some(1000),
         },
         false,
     )
@@ -66,7 +87,9 @@ fn hop1_out(s: &Storage, id: &str) -> usize {
 #[test]
 fn edges_do_not_pollute_trigram() {
     let s = open(&fresh("test_edge_intern_trigram"));
-    for n in ["A", "B", "C", "D"] { node(&s, n); }
+    for n in ["A", "B", "C", "D"] {
+        node(&s, n);
+    }
     let before = trigram_members(&s);
 
     // UUID-shaped edge ids — the worst case (~48 trigram members each under the
@@ -159,7 +182,9 @@ fn numeric_keys_survive_snapshot_roundtrip() {
     let key2 = Storage::edge_key("aaaaaaaa-0000-0000-0000-000000000002");
     {
         let s = open(&path);
-        for n in ["A", "B", "C", "D"] { node(&s, n); }
+        for n in ["A", "B", "C", "D"] {
+            node(&s, n);
+        }
         edge(&s, "aaaaaaaa-0000-0000-0000-000000000001", "A", "B", "LINK");
         edge(&s, "aaaaaaaa-0000-0000-0000-000000000002", "A", "C", "LINK");
         edge(&s, "aaaaaaaa-0000-0000-0000-000000000003", "C", "D", "LINK");
@@ -176,7 +201,10 @@ fn numeric_keys_survive_snapshot_roundtrip() {
     assert_eq!(hop1_out(&s2, "A"), 2, "adjacency must survive reload");
     let au = s2.get_u32("A").unwrap();
     let has_key = s2.out_idx.get(&au).unwrap().contains(&key2);
-    assert!(has_key, "out_idx must hold the re-derived edge key after reload");
+    assert!(
+        has_key,
+        "out_idx must hold the re-derived edge key after reload"
+    );
 }
 
 /// fuzzy node resolution must never surface an edge id as a candidate.
@@ -185,7 +213,7 @@ fn fuzzy_id_never_resolves_to_edge() {
     let s = open(&fresh("test_edge_intern_fuzzy"));
     node(&s, "Node-Alpha");
     edge(&s, "Node-Alphaa", "Node-Alpha", "Node-Alpha", "SELF"); // near-miss edge id
-    // A near-miss query should resolve to the node, never the edge.
+                                                                 // A near-miss query should resolve to the node, never the edge.
     let hit = s.find_fuzzy_id("Node-Alpha");
     assert_eq!(hit, Some("Node-Alpha".to_string()));
 }
@@ -194,7 +222,9 @@ fn fuzzy_id_never_resolves_to_edge() {
 #[test]
 fn edges_still_traversable() {
     let s = open(&fresh("test_edge_intern_traverse"));
-    for n in ["A", "B", "C"] { node(&s, n); }
+    for n in ["A", "B", "C"] {
+        node(&s, n);
+    }
     edge(&s, "e1", "A", "B", "LINK");
     edge(&s, "e2", "A", "C", "LINK");
     assert_eq!(hop1_out(&s, "A"), 2, "A should reach B and C");
@@ -212,7 +242,9 @@ fn reload_stable_and_trigram_unpolluted() {
     let (edges_n, hop_a, tri_live);
     {
         let s = open(&path);
-        for n in ["A", "B", "C", "D"] { node(&s, n); }
+        for n in ["A", "B", "C", "D"] {
+            node(&s, n);
+        }
         edge(&s, "aaaaaaaa-0000-0000-0000-000000000001", "A", "B", "LINK");
         edge(&s, "aaaaaaaa-0000-0000-0000-000000000002", "A", "C", "LINK");
         edge(&s, "aaaaaaaa-0000-0000-0000-000000000003", "C", "D", "LINK");
@@ -222,7 +254,10 @@ fn reload_stable_and_trigram_unpolluted() {
         // drop -> release lock, flush snapshot
     }
     // Live build: trigram reflects the 4 short node ids only, never ~144 (3*48).
-    assert!(tri_live < 100, "live trigram ({tri_live}) must exclude edge ids");
+    assert!(
+        tri_live < 100,
+        "live trigram ({tri_live}) must exclude edge ids"
+    );
 
     let s2 = open(&path); // reload (snapshot instant-load or WAL replay)
     assert_eq!(s2.edges.len(), edges_n, "edge count must survive reload");
@@ -247,7 +282,10 @@ fn fuzzy_id_survives_snapshot_reload() {
         node(&s, "Concept-Alpha");
         node(&s, "สวัสดีชาวโลก"); // Thai id — the trigram path's reason to exist
         node(&s, "filler-one");
-        assert!(trigram_members(&s) > 0, "sanity: live build populates trigram");
+        assert!(
+            trigram_members(&s) > 0,
+            "sanity: live build populates trigram"
+        );
         // drop -> graceful shutdown flushes the binary snapshot
     }
 

@@ -1,9 +1,9 @@
-use genesis_block_native::{Storage, OpenOptions, NodeInput};
-use std::sync::Arc;
-use std::time::{Instant, Duration};
+use genesis_block_native::{NodeInput, OpenOptions, Storage};
+use rand::Rng;
 use rayon::prelude::*;
 use serde_json::json;
-use rand::Rng;
+use std::sync::Arc;
+use std::time::{Duration, Instant};
 
 fn main() {
     let db_path = ".brain/shadow_sync_stress_db";
@@ -12,18 +12,28 @@ fn main() {
     }
 
     println!("--- SHADOW SYNC STRESS TEST (MARK V) ---");
-    let storage = Arc::new(Storage::open(OpenOptions { 
-        path: db_path.to_string(),
-        page_cache_mb: Some(512),
-        read_only: Some(false),
-     vector_dim: None, }).expect("Failed to open storage"));
+    let storage = Arc::new(
+        Storage::open(OpenOptions {
+            path: db_path.to_string(),
+            page_cache_mb: Some(512),
+            read_only: Some(false),
+            vector_dim: None,
+        })
+        .expect("Failed to open storage"),
+    );
 
     let node_count = 10_000;
     let writer_threads = 12;
     let reader_threads = 4;
 
-    println!("Simulating {} notes with 1536-dim embeddings and complex JSON props...", node_count);
-    println!("Concurrency: {} Writers vs {} Readers", writer_threads, reader_threads);
+    println!(
+        "Simulating {} notes with 1536-dim embeddings and complex JSON props...",
+        node_count
+    );
+    println!(
+        "Concurrency: {} Writers vs {} Readers",
+        writer_threads, reader_threads
+    );
 
     let start_time = Instant::now();
 
@@ -33,15 +43,15 @@ fn main() {
         let mut rng = rand::thread_rng();
         let mut total_queries = 0;
         let mut latencies = Vec::new();
-        
+
         while total_queries < 500 {
             let node_id = format!("Note-{}", rng.gen_range(0..node_count.max(1)));
             let query = format!("TRAVERSE FROM ~\"{}\" DEPTH 2 REL ANY", node_id);
-            
+
             let q_start = Instant::now();
             let _ = storage_reader.execute_hql(&query);
             latencies.push(q_start.elapsed());
-            
+
             total_queries += 1;
             std::thread::sleep(Duration::from_millis(10));
         }
@@ -53,7 +63,7 @@ fn main() {
         let id = format!("Note-{}", i);
         let mut rng = rand::thread_rng();
         let embedding: Vec<f64> = (0..1536).map(|_| rng.gen::<f64>()).collect();
-        
+
         let props = json!({
             "title": format!("Mark V Stress Note #{}", i),
             "content_hash": format!("{:x}", rng.gen::<u64>()),
@@ -65,18 +75,22 @@ fn main() {
             }
         });
 
-        let _ = storage.add_node(NodeInput {  
+        let _ = storage.add_node(NodeInput {
             id: Some(id),
             labels: vec!["Note".to_string()],
             props: Some(props),
             embedding: Some(embedding),
             lang: None,
-         valid_from: None, caused_by: None,  ttl: None, collection: None, });
+            valid_from: None,
+            caused_by: None,
+            ttl: None,
+            collection: None,
+        });
     });
 
     let duration = start_time.elapsed();
     let tps = node_count as f64 / duration.as_secs_f64();
-    
+
     let latencies = reader_handle.join().unwrap();
     let p95_latency = if !latencies.is_empty() {
         let mut l = latencies;
@@ -91,7 +105,7 @@ fn main() {
     println!("Throughput: {:.2} TPS", tps);
     println!("P95 Query Latency (Under Load): {:.2?}", p95_latency);
     println!("Note: Trigram Index and LPA Clustering verified.");
-    
+
     if p95_latency < Duration::from_millis(10) {
         println!("SUCCESS: Latency target (R1 < 10ms) MET.");
     } else {
@@ -102,14 +116,16 @@ fn main() {
     drop(storage);
 
     // Verification Phase
-    let storage_verify = Storage::open(OpenOptions { 
+    let storage_verify = Storage::open(OpenOptions {
         path: db_path.to_string(),
         page_cache_mb: Some(64),
         read_only: Some(true),
-     vector_dim: None, }).expect("Failed to reopen storage for verification");
+        vector_dim: None,
+    })
+    .expect("Failed to reopen storage for verification");
 
     let u32_id = storage_verify.get_u32("Note-9999");
-    
+
     if u32_id.is_some() {
         println!("VERIFICATION: Node 'Note-9999' found. WAL Replay SUCCESS.");
     } else {

@@ -1,4 +1,4 @@
-use genesis_block_native::{Storage, OpenOptions, NodeInput, EdgeInput, NeighborInput};
+use genesis_block_native::{EdgeInput, NeighborInput, NodeInput, OpenOptions, Storage};
 use std::collections::HashSet;
 use std::fs;
 use std::path::Path;
@@ -26,7 +26,8 @@ fn node(s: &Storage, id: &str) {
         lang: None,
         valid_from: None,
         caused_by: None,
-        ttl: None, collection: None,
+        ttl: None,
+        collection: None,
     })
     .unwrap();
 }

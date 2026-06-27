@@ -54,11 +54,15 @@ fn make_app_with_key(key: &str) -> (Router, TempDir) {
 }
 
 /// Send a pre-built Request and return (status, parsed JSON body).
-async fn oneshot(app: &Router, req: axum::http::Request<axum::body::Body>) -> (StatusCode, serde_json::Value) {
+async fn oneshot(
+    app: &Router,
+    req: axum::http::Request<axum::body::Body>,
+) -> (StatusCode, serde_json::Value) {
     let resp = app.clone().oneshot(req).await.unwrap();
     let status = resp.status();
     let bytes = resp.into_body().collect().await.unwrap().to_bytes();
-    let value: serde_json::Value = serde_json::from_slice(&bytes).unwrap_or(serde_json::Value::Null);
+    let value: serde_json::Value =
+        serde_json::from_slice(&bytes).unwrap_or(serde_json::Value::Null);
     (status, value)
 }
 
@@ -123,7 +127,10 @@ async fn test_swarm_status_has_peer_id() {
     let (app, _dir) = make_app();
     let (status, body) = get_json(&app, "/v1/swarm/status").await;
     assert_eq!(status, StatusCode::OK);
-    assert!(body["peer_id"].as_str().unwrap_or("").len() > 0, "peer_id must be non-empty");
+    assert!(
+        !body["peer_id"].as_str().unwrap_or("").is_empty(),
+        "peer_id must be non-empty"
+    );
 }
 
 // ---------------------------------------------------------------------------
@@ -141,14 +148,22 @@ async fn test_add_node_round_trip() {
     .await;
     assert_eq!(status, StatusCode::OK);
     assert_eq!(body["id"], json!("node_a"));
-    assert!(body["labels"].as_array().unwrap().contains(&json!("Person")));
+    assert!(body["labels"]
+        .as_array()
+        .unwrap()
+        .contains(&json!("Person")));
 }
 
 #[tokio::test]
 async fn test_supersede_node_updates_props() {
     let (app, _dir) = make_app();
     // Add original
-    post_json(&app, "/v1/node/add", json!({ "id": "n1", "labels": [], "props": {"v": 1} })).await;
+    post_json(
+        &app,
+        "/v1/node/add",
+        json!({ "id": "n1", "labels": [], "props": {"v": 1} }),
+    )
+    .await;
     // Supersede
     let (status, body) = post_json(
         &app,
@@ -181,12 +196,8 @@ async fn test_add_edge_visible_in_query() {
     assert_eq!(edge["rel"], json!("LINKS"));
 
     // Query edges from src
-    let (q_status, rows) = post_json(
-        &app,
-        "/v1/query",
-        json!({ "from": "src", "rel": "LINKS" }),
-    )
-    .await;
+    let (q_status, rows) =
+        post_json(&app, "/v1/query", json!({ "from": "src", "rel": "LINKS" })).await;
     assert_eq!(q_status, StatusCode::OK);
     let arr = rows.as_array().unwrap();
     assert!(!arr.is_empty(), "query must return the added edge");
@@ -198,14 +209,23 @@ async fn test_retract_edge_hidden_from_current_view() {
     let (app, _dir) = make_app();
     post_json(&app, "/v1/node/add", json!({ "id": "ret_a", "labels": [] })).await;
     post_json(&app, "/v1/node/add", json!({ "id": "ret_b", "labels": [] })).await;
-    post_json(&app, "/v1/edge/add", json!({ "id": "er1", "from": "ret_a", "to": "ret_b", "rel": "KNOWS" })).await;
+    post_json(
+        &app,
+        "/v1/edge/add",
+        json!({ "id": "er1", "from": "ret_a", "to": "ret_b", "rel": "KNOWS" }),
+    )
+    .await;
 
     // Confirm the edge is visible via TRAVERSE before retraction
     let before_hql = serde_json::to_string("TRAVERSE FROM ret_a DEPTH 1 REL KNOWS").unwrap();
-    let (pre_status, pre_body) = post_raw(&app, "/v1/query/hql", "application/json", &before_hql).await;
+    let (pre_status, pre_body) =
+        post_raw(&app, "/v1/query/hql", "application/json", &before_hql).await;
     assert_eq!(pre_status, StatusCode::OK);
     let pre: serde_json::Value = serde_json::from_str(&pre_body).unwrap();
-    assert!(!pre.as_array().unwrap().is_empty(), "edge must be visible via TRAVERSE before retraction");
+    assert!(
+        !pre.as_array().unwrap().is_empty(),
+        "edge must be visible via TRAVERSE before retraction"
+    );
 
     // Retract
     let (ret_status, _) = post_json(&app, "/v1/edge/retract", json!({ "id": "er1" })).await;
@@ -213,7 +233,8 @@ async fn test_retract_edge_hidden_from_current_view() {
 
     // TRAVERSE (uses neighbors()) now hides the retracted edge from current view
     let after_hql = serde_json::to_string("TRAVERSE FROM ret_a DEPTH 1 REL KNOWS").unwrap();
-    let (post_status, post_body) = post_raw(&app, "/v1/query/hql", "application/json", &after_hql).await;
+    let (post_status, post_body) =
+        post_raw(&app, "/v1/query/hql", "application/json", &after_hql).await;
     assert_eq!(post_status, StatusCode::OK);
     let after: serde_json::Value = serde_json::from_str(&post_body).unwrap();
     assert!(
@@ -264,7 +285,12 @@ async fn test_bulk_add_nodes() {
     // query by `from` with no rel returns adjacency — at least the endpoint responded OK
     assert_eq!(qs, StatusCode::OK);
     // confirm node exists: add an edge and traverse
-    post_json(&app, "/v1/bulk/edges", json!([{ "id": "bke1", "from": "bulk1", "to": "bulk2", "rel": "R" }])).await;
+    post_json(
+        &app,
+        "/v1/bulk/edges",
+        json!([{ "id": "bke1", "from": "bulk1", "to": "bulk2", "rel": "R" }]),
+    )
+    .await;
     let (qs2, rows2) = post_json(&app, "/v1/query", json!({ "from": "bulk1", "rel": "R" })).await;
     assert_eq!(qs2, StatusCode::OK);
     assert_eq!(rows2.as_array().unwrap()[0]["to"], json!("bulk2"));
@@ -296,15 +322,33 @@ async fn test_create_and_list_collections() {
         .iter()
         .filter_map(|v| v["name"].as_str())
         .collect();
-    assert!(names.contains(&"articles"), "newly created collection must appear in list: {:?}", names);
+    assert!(
+        names.contains(&"articles"),
+        "newly created collection must appear in list: {:?}",
+        names
+    );
 }
 
 #[tokio::test]
 async fn test_duplicate_collection_returns_400() {
     let (app, _dir) = make_app();
-    post_json(&app, "/v1/collection/create", json!({ "name": "dup", "model": "m", "dim": 4 })).await;
-    let (status, _) = post_json(&app, "/v1/collection/create", json!({ "name": "dup", "model": "m", "dim": 4 })).await;
-    assert_eq!(status, StatusCode::BAD_REQUEST, "duplicate collection must return 400");
+    post_json(
+        &app,
+        "/v1/collection/create",
+        json!({ "name": "dup", "model": "m", "dim": 4 }),
+    )
+    .await;
+    let (status, _) = post_json(
+        &app,
+        "/v1/collection/create",
+        json!({ "name": "dup", "model": "m", "dim": 4 }),
+    )
+    .await;
+    assert_eq!(
+        status,
+        StatusCode::BAD_REQUEST,
+        "duplicate collection must return 400"
+    );
 }
 
 // ---------------------------------------------------------------------------
@@ -316,7 +360,12 @@ async fn test_hybrid_search_after_index_rebuild() {
     let (app, _dir) = make_app();
 
     // Create an explicit collection with dim=3
-    post_json(&app, "/v1/collection/create", json!({ "name": "vtest", "model": "m", "dim": 3 })).await;
+    post_json(
+        &app,
+        "/v1/collection/create",
+        json!({ "name": "vtest", "model": "m", "dim": 3 }),
+    )
+    .await;
 
     // Add two nodes with embeddings into the collection
     post_json(
@@ -345,8 +394,15 @@ async fn test_hybrid_search_after_index_rebuild() {
     .await;
     assert_eq!(search_status, StatusCode::OK);
     let hits = results.as_array().unwrap();
-    assert!(!hits.is_empty(), "hybrid search must return at least one result");
-    assert_eq!(hits[0]["node"]["id"], json!("v1"), "nearest node should be v1");
+    assert!(
+        !hits.is_empty(),
+        "hybrid search must return at least one result"
+    );
+    assert_eq!(
+        hits[0]["node"]["id"],
+        json!("v1"),
+        "nearest node should be v1"
+    );
 }
 
 #[tokio::test]
@@ -354,7 +410,12 @@ async fn test_add_vector_wrong_dim_rejected() {
     let (app, _dir) = make_app();
 
     // Create collection with dim=4
-    post_json(&app, "/v1/collection/create", json!({ "name": "dim4", "model": "m", "dim": 4 })).await;
+    post_json(
+        &app,
+        "/v1/collection/create",
+        json!({ "name": "dim4", "model": "m", "dim": 4 }),
+    )
+    .await;
     // Add a node first
     post_json(&app, "/v1/node/add", json!({ "id": "nd1", "labels": [] })).await;
     // Try to add a 3-dim vector to a 4-dim collection
@@ -364,13 +425,22 @@ async fn test_add_vector_wrong_dim_rejected() {
         json!({ "node_id": "nd1", "collection": "dim4", "embedding": [1.0, 0.0, 0.0] }),
     )
     .await;
-    assert_eq!(status, StatusCode::BAD_REQUEST, "wrong-dim vector must be rejected with 400");
+    assert_eq!(
+        status,
+        StatusCode::BAD_REQUEST,
+        "wrong-dim vector must be rejected with 400"
+    );
 }
 
 #[tokio::test]
 async fn test_reason_context_returns_ok() {
     let (app, _dir) = make_app();
-    post_json(&app, "/v1/collection/create", json!({ "name": "ctx", "model": "m", "dim": 2 })).await;
+    post_json(
+        &app,
+        "/v1/collection/create",
+        json!({ "name": "ctx", "model": "m", "dim": 2 }),
+    )
+    .await;
     post_json(
         &app,
         "/v1/node/add",
@@ -395,14 +465,23 @@ async fn test_reason_context_returns_ok() {
 #[tokio::test]
 async fn test_hql_raw_json_string_body_succeeds() {
     let (app, _dir) = make_app();
-    post_json(&app, "/v1/node/add", json!({ "id": "hql_fmt_node", "labels": [] })).await;
+    post_json(
+        &app,
+        "/v1/node/add",
+        json!({ "id": "hql_fmt_node", "labels": [] }),
+    )
+    .await;
 
     // /v1/query/hql expects the body to be a JSON-encoded STRING (not a JSON object).
     // serde_json::to_string("TRAVERSE ...") produces the JSON string literal with surrounding
     // quotes, e.g. `"TRAVERSE FROM hql_fmt_node DEPTH 1 REL DUMMY"` — that is the correct body.
     let hql_body = serde_json::to_string("TRAVERSE FROM hql_fmt_node DEPTH 1 REL DUMMY").unwrap();
     let (status, _) = post_raw(&app, "/v1/query/hql", "application/json", &hql_body).await;
-    assert_eq!(status, StatusCode::OK, "HQL endpoint must accept a raw JSON string body");
+    assert_eq!(
+        status,
+        StatusCode::OK,
+        "HQL endpoint must accept a raw JSON string body"
+    );
 }
 
 #[tokio::test]
@@ -422,8 +501,18 @@ async fn test_hql_object_body_rejected() {
 #[tokio::test]
 async fn test_hql_traverse_finds_neighbor() {
     let (app, _dir) = make_app();
-    post_json(&app, "/v1/node/add", json!({ "id": "src_hql", "labels": [] })).await;
-    post_json(&app, "/v1/node/add", json!({ "id": "dst_hql", "labels": [] })).await;
+    post_json(
+        &app,
+        "/v1/node/add",
+        json!({ "id": "src_hql", "labels": [] }),
+    )
+    .await;
+    post_json(
+        &app,
+        "/v1/node/add",
+        json!({ "id": "dst_hql", "labels": [] }),
+    )
+    .await;
     post_json(
         &app,
         "/v1/edge/add",
@@ -488,8 +577,14 @@ async fn test_consensus_sign_vote_returns_bytes() {
     .await;
     assert_eq!(status, StatusCode::OK);
     // Returns a byte array (Vec<u8> serialised as JSON array)
-    assert!(sig.is_array(), "sign-vote must return a JSON array of bytes");
-    assert!(!sig.as_array().unwrap().is_empty(), "signature must be non-empty");
+    assert!(
+        sig.is_array(),
+        "sign-vote must return a JSON array of bytes"
+    );
+    assert!(
+        !sig.as_array().unwrap().is_empty(),
+        "signature must be non-empty"
+    );
 }
 
 // ---------------------------------------------------------------------------
@@ -516,7 +611,11 @@ async fn test_hql_accepts_both_raw_and_wrapped_body() {
     // Raw JSON string form (legacy / native contract).
     let raw_body = serde_json::to_string(hql).unwrap();
     let (raw_status, _raw) = post_raw(&app, "/v1/query/hql", "application/json", &raw_body).await;
-    assert_eq!(raw_status, StatusCode::OK, "raw-string HQL body must be accepted");
+    assert_eq!(
+        raw_status,
+        StatusCode::OK,
+        "raw-string HQL body must be accepted"
+    );
 
     // Wrapped object form ({"query": "..."}) — what the SDKs send.
     let (wrapped_status, _wrapped) =
