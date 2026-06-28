@@ -59,10 +59,10 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use uuid::Uuid;
 
-pub mod query;
-pub mod router;
 #[cfg(feature = "ffi")]
 mod ffi;
+pub mod query;
+pub mod router;
 use query::HqlCommand;
 
 pub const SCHEMA_VERSION: u32 = 1;

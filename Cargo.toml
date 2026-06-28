@@ -5,6 +5,12 @@ edition = "2021"
 description = "Genesis Block — high-performance hybrid semantic-graph engine"
 license = "MIT"
 publish = false
+# The files in benches/ are [[bin]] audit harnesses (required-features = ["bins"]),
+# not Criterion benches — the only real bench is the explicit [[bench]] ldbc_lite.
+# Disable bench auto-discovery so cargo does not also synthesize phantom bench
+# targets from benches/*.rs: those would ignore required-features and fail to link
+# `sysinfo` (now optional, bins-only) under `--no-default-features --all-targets`.
+autobenches = false
 
 [lib]
 crate-type = ["cdylib", "rlib"]
