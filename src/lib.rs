@@ -61,6 +61,8 @@ use uuid::Uuid;
 
 #[cfg(feature = "ffi")]
 mod ffi;
+#[cfg(feature = "android-jni")]
+mod jni;
 pub mod query;
 pub mod router;
 use query::HqlCommand;
