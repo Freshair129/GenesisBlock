@@ -7,6 +7,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-06-29
+
+First non-beta release. Lays the MARK XVI foundation for embedding
+GenesisBlockDB in-process on mobile (iOS/Android), the same way SQLite ships
+inside an app — no server, no network.
+
+### Added
+- **Mobile build features (`Cargo.toml`):** `mobile` builds the storage core for
+  iOS/Android targets (no napi, no bins, no sysinfo); `ffi` exposes the C ABI
+  layer. `sysinfo` (bench-only RSS probe) is now an optional dependency owned by
+  the `bins` feature, so it never enters a mobile build.
+- **C FFI layer (`src/ffi.rs`):** 8 `#[no_mangle]` C symbols
+  (`genesisdb_open`/`close`/`add_node`/`search`/`execute_hql`/
+  `retrieve_context`/`flush_index`/`free_string`) over the synchronous `Storage`
+  core, gated behind the `ffi` feature. `catch_unwind`-guarded so panics never
+  cross the boundary; JSON-in/JSON-out mirrors the REST/NAPI contract. Consumed
+  by the future iOS xcframework and Android JNI bridge.
+- **Mobile cross-compile CI (`.github/workflows/mobile-build.yml`):** `ios-build`
+  (macOS runner → `aarch64-apple-ios` + simulator), `android-build` (Linux +
+  cargo-ndk → arm64 + armv7), and `host-mobile-check`
+  (`cargo test --no-default-features --features mobile`).
+- **Spec & roadmap:** `docs/SPEC--MOBILE-SDK.md` (Phase 0/A/B, Levels A+B) and the
+  MARK XVI section in `ROADMAP.md`.
+
+### Notes
+- No engine behavior change for existing surfaces. `Storage::open(OpenOptions)`
+  already takes a caller-supplied DB path, so mobile sandboxing needs no core
+  change. iOS/Android cross-compile is validated only by the new CI on
+  GitHub-hosted runners (the dev host is Windows).
+
 ## [0.1.0-beta.2] - 2026-06-25
 
 ### Added
@@ -77,6 +107,7 @@ First beta cut.
 - napi cross-compile matrix and npm publish on version tag
   (`.github/workflows/release.yml`).
 
-[Unreleased]: https://github.com/Freshair129/GenesisBlock/compare/v0.1.0-beta.2...HEAD
+[Unreleased]: https://github.com/Freshair129/GenesisBlock/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/Freshair129/GenesisBlock/compare/v0.1.0-beta.2...v0.2.0
 [0.1.0-beta.2]: https://github.com/Freshair129/GenesisBlock/compare/v0.1.0-beta.1...v0.1.0-beta.2
 [0.1.0-beta.1]: https://github.com/Freshair129/GenesisBlock/releases/tag/v0.1.0-beta.1

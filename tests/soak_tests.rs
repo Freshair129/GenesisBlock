@@ -150,7 +150,7 @@ fn run_soak(cfg: SoakConfig) {
         let recall_ok = results.iter().any(|r| r.node.id == expected_id);
 
         // --- Compact ---
-        if cfg.compact_every > 0 && (cycle + 1) % cfg.compact_every == 0 {
+        if cfg.compact_every > 0 && (cycle + 1).is_multiple_of(cfg.compact_every) {
             s.save_state().unwrap();
         }
 
@@ -165,7 +165,7 @@ fn run_soak(cfg: SoakConfig) {
             disk_mb: mb(disk),
         };
 
-        if cycle % 10 == 0 || cycle == cfg.total_cycles - 1 || !recall_ok {
+        if cycle.is_multiple_of(10) || cycle == cfg.total_cycles - 1 || !recall_ok {
             println!(
                 "  {:>6} {:>8} {:>10} {:>10} {:>8} {:>8.1}",
                 stats.cycle,
