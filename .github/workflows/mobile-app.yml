@@ -1,0 +1,74 @@
+# CI for the genesisblock-mobile/ Tauri v2 app (MARK XVI Phase A).
+#
+# This is SEPARATE from mobile-build.yml (which cross-compiles the *engine* SDK
+# feature sets). Here we type-check + build the app frontend and `cargo check`
+# the Tauri shell against the engine path dep, so the app can't rot silently.
+#
+# The app is a standalone crate (not in the root cargo workspace), so the root
+# test.yml never touches it — this workflow is the only gate that does.
+name: mobile-app
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - "genesisblock-mobile/**"
+      - ".github/workflows/mobile-app.yml"
+  pull_request:
+    paths:
+      - "genesisblock-mobile/**"
+      - ".github/workflows/mobile-app.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  frontend:
+    name: frontend (tsc + vite build)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: genesisblock-mobile
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: genesisblock-mobile/package-lock.json
+      - name: npm ci
+        run: npm ci
+      - name: tsc --noEmit
+        run: npx tsc --noEmit
+      - name: vite build
+        run: npm run build
+
+  tauri-rust:
+    name: tauri shell (cargo check)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      # Tauri v2 Linux system dependencies (webkit2gtk 4.1 on Ubuntu 24.04).
+      - name: Install Tauri system deps
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libwebkit2gtk-4.1-dev \
+            libgtk-3-dev \
+            libayatana-appindicator3-dev \
+            librsvg2-dev \
+            patchelf \
+            build-essential \
+            curl wget file \
+            libssl-dev \
+            libxdo-dev
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: genesisblock-mobile/src-tauri
+      - name: cargo check (Tauri shell vs engine)
+        working-directory: genesisblock-mobile/src-tauri
+        run: cargo check --locked
