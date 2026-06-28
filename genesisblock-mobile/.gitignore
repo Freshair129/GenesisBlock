@@ -1,0 +1,30 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+dist-ssr/
+*.local
+
+# Tauri (generated / build artifacts)
+src-tauri/target/
+src-tauri/gen/
+# Real app icons are generated with `npx tauri icon <source.png>`; the committed
+# icons/ are throwaway placeholders so the Rust crate type-checks.
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Editor / OS
+.vscode/*
+!.vscode/extensions.json
+.idea/
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
