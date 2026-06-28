@@ -369,6 +369,23 @@ npm run tauri android build
 The SDK is extracted from the proven Phase A core.  
 **Input:** Phase A shipped and validated on real hardware.
 
+> **Foundations landed (2026-06-29, branch `feat/mxvi-phase-b-foundations`).** The
+> host/CI-verifiable Rust layer that both B-1 and B-2 sit on top of is in place — the
+> remaining B-1/B-2/B-3 work is platform glue (Swift/Kotlin/RN wrappers + xcframework/.aar
+> assembly) that can only be built/validated on macOS/NDK/devices via CI:
+> - **C header** — `include/genesisdb.h` generated from `src/ffi.rs` by `cbindgen`
+>   (`cbindgen.toml` + `scripts/gen-header.sh`); the xcframework's `-headers` input. Committed
+>   and verified fresh by the `c-header-freshness` CI gate.
+> - **JNI bridge** — `src/jni.rs` behind the new `android-jni` feature (pulls the pure-Rust
+>   `jni` crate), exporting `Java_dev_genesisblock_GenesisDB_native*` over the sync `Storage`
+>   core, panic-safe and JSON-in/out exactly like `src/ffi.rs`.
+> - **crate-type** — added `staticlib` (the iOS `.a`) alongside `cdylib` (Android `.so`).
+> - **CI** — `mobile-build.yml` now builds the real SDK feature sets
+>   (`mobile ffi` for iOS, `mobile ffi android-jni` for Android), verifies the `.a`/`.so`
+>   slices are produced, runs the integration tests under `mobile ffi android-jni` on the
+>   host, and gates header freshness. (Previously it built only `--features mobile`, so the
+>   FFI/JNI surface was never cross-compiled.)
+
 ### B-1: iOS xcframework + Swift wrapper (~2 weeks)
 
 ```bash

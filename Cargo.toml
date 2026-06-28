@@ -13,7 +13,10 @@ publish = false
 autobenches = false
 
 [lib]
-crate-type = ["cdylib", "rlib"]
+#   cdylib  — Node addon (napi) + Android `.so` loaded via System.loadLibrary
+#   staticlib — `.a` slices combined into the iOS GenesisBlockDB.xcframework
+#   rlib    — REST server / integration tests / benches link the core directly
+crate-type = ["cdylib", "staticlib", "rlib"]
 
 [features]
 # napi-bindings (default ON) compiles the NAPI cdylib surface (the GenesisDatabase
@@ -32,9 +35,15 @@ bins = ["dep:sysinfo"]
 # no sysinfo (the RSS probe relies on OS APIs that fail in mobile sandboxes).
 # Build: cargo build --no-default-features --features mobile --target aarch64-apple-ios
 mobile = []
-# `ffi` exposes the C ABI layer (src/ffi.rs) consumed by the iOS xcframework and
-# Android JNI bridge. Composes with `mobile`: --features "mobile ffi".
+# `ffi` exposes the C ABI layer (src/ffi.rs) consumed by the iOS xcframework
+# (and any C/Swift caller). Composes with `mobile`: --features "mobile ffi".
 ffi = []
+# `android-jni` exposes the JNI bridge (src/jni.rs): the
+# `Java_dev_genesisblock_GenesisDB_native*` symbols the Android `.aar`'s Kotlin
+# wrapper binds via System.loadLibrary. Pulls in the `jni` crate. Compose with
+# `mobile`: --features "mobile ffi android-jni". The `jni` crate is pure Rust and
+# also builds on the host triple, so this type-checks off-device.
+android-jni = ["dep:jni"]
 
 [dependencies]
 napi = { version = "2.16", default-features = false, features = ["napi8", "async", "serde-json"], optional = true }
@@ -50,6 +59,9 @@ dashmap = "6.0"
 once_cell = "1.19"
 parking_lot = "0.12"
 sysinfo = { version = "0.30", optional = true }
+# Android JNI bridge (src/jni.rs); only enabled by the `android-jni` feature.
+# No `invocation` feature → does not link a JVM, so it builds on the host triple.
+jni = { version = "0.21", optional = true }
 bincode = "1.3"
 hnsw_rs = "0.3.4"
 axum = "0.7"

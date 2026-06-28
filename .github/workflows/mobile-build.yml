@@ -11,6 +11,14 @@
 #   probe uses OS APIs that fail in mobile sandboxes). That decoupled core is
 #   what links on iOS/Android and on plain Linux.
 #
+# Phase B (SDK) builds the SDK surface on top of that core:
+#   iOS     — `--features "mobile ffi"`  → staticlib + C ABI (src/ffi.rs) for
+#             the GenesisBlockDB.xcframework. The C header is include/genesisdb.h.
+#   Android — `--features "mobile ffi android-jni"` → cdylib `.so` exporting the
+#             JNI bridge (src/jni.rs) the .aar's Kotlin wrapper binds.
+# The `android-jni` build also type-checks on the host (the `jni` crate is pure
+# Rust), so host-mobile-check exercises it without a device.
+#
 # Targets (from SPEC §0-B):
 #   aarch64-apple-ios          — iOS device
 #   aarch64-apple-ios-sim      — iOS Simulator (Apple Silicon)
@@ -25,12 +33,18 @@ on:
     branches: [ main ]
     paths:
       - 'src/**'
+      - 'include/**'
+      - 'cbindgen.toml'
+      - 'scripts/gen-header.sh'
       - 'Cargo.toml'
       - '.github/workflows/mobile-build.yml'
   pull_request:
     branches: [ main ]
     paths:
       - 'src/**'
+      - 'include/**'
+      - 'cbindgen.toml'
+      - 'scripts/gen-header.sh'
       - 'Cargo.toml'
       - '.github/workflows/mobile-build.yml'
 
@@ -60,11 +74,17 @@ jobs:
       - name: Ensure iOS targets installed
         run: rustup target add aarch64-apple-ios aarch64-apple-ios-sim
 
-      - name: Build core for aarch64-apple-ios (device)
-        run: cargo build --no-default-features --features mobile --target aarch64-apple-ios
+      # `mobile ffi` → the staticlib + C ABI the xcframework is assembled from.
+      - name: Build SDK core for aarch64-apple-ios (device)
+        run: cargo build --no-default-features --features "mobile ffi" --target aarch64-apple-ios
 
-      - name: Build core for aarch64-apple-ios-sim (simulator)
-        run: cargo build --no-default-features --features mobile --target aarch64-apple-ios-sim
+      - name: Build SDK core for aarch64-apple-ios-sim (simulator)
+        run: cargo build --no-default-features --features "mobile ffi" --target aarch64-apple-ios-sim
+
+      # The xcframework links libgenesis_block_native.a — confirm the staticlib
+      # slice is actually produced for the device target.
+      - name: Verify iOS staticlib (.a) was produced
+        run: test -f target/aarch64-apple-ios/debug/libgenesis_block_native.a
 
   # Android arm64 + armv7 via cargo-ndk. nttld/setup-ndk provisions the NDK;
   # cargo-ndk wires the right clang linker per target so no manual
@@ -101,20 +121,27 @@ jobs:
 
       # cargo-ndk selects the NDK clang linker for each --target; `build` then
       # invokes cargo build with the mobile feature for both ABIs.
-      - name: Build core for Android (arm64 + armv7)
+      # `mobile ffi android-jni` → the cdylib `.so` exporting the JNI bridge
+      # (src/jni.rs) that the .aar's Kotlin wrapper binds via System.loadLibrary.
+      - name: Build SDK core for Android (arm64 + armv7)
         env:
           ANDROID_NDK_HOME: ${{ steps.setup-ndk.outputs.ndk-path }}
         run: |
           cargo ndk \
             --target aarch64-linux-android \
             --target armv7-linux-androideabi \
-            build --no-default-features --features mobile
+            build --no-default-features --features "mobile ffi android-jni"
+
+      # System.loadLibrary("genesis_block_native") needs the .so — confirm the
+      # cdylib slice exists for arm64.
+      - name: Verify Android shared lib (.so) was produced
+        run: test -f target/aarch64-linux-android/debug/libgenesis_block_native.so
 
   # P2 "cargo test --features mobile green": the core/napi split is designed to
   # link on Linux, so the mobile-feature build AND the integration test suite
   # run here on the host triple (no cross-compile, real test execution).
   host-mobile-check:
-    name: host build + test (mobile feature)
+    name: host build + test (mobile SDK features)
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -126,8 +153,40 @@ jobs:
         with:
           key: mobile-host
 
-      - name: cargo build (mobile feature, host triple)
-        run: cargo build --no-default-features --features mobile
+      # Full SDK feature set on the host: `android-jni` pulls the pure-Rust `jni`
+      # crate, which compiles off-device, so the JNI bridge (src/jni.rs) and the
+      # C ABI (src/ffi.rs) both type-check and the integration tests run for real.
+      - name: cargo build (mobile SDK features, host triple)
+        run: cargo build --no-default-features --features "mobile ffi android-jni"
 
-      - name: cargo test (mobile feature, host triple)
-        run: cargo test --no-default-features --features mobile
+      - name: cargo test (mobile SDK features, host triple)
+        run: cargo test --no-default-features --features "mobile ffi android-jni"
+
+  # The C header (include/genesisdb.h) is the iOS/Swift contract and is generated
+  # from src/ffi.rs by cbindgen. It is committed so consumers and the xcframework
+  # build don't need cbindgen — this gate fails if it drifts from src/ffi.rs.
+  c-header-freshness:
+    name: C header freshness (cbindgen)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: mobile-cbindgen
+
+      - name: Install cbindgen
+        run: cargo install cbindgen --locked
+
+      - name: Regenerate header from src/ffi.rs
+        run: bash scripts/gen-header.sh
+
+      - name: Fail if committed header is stale
+        run: |
+          if ! git diff --exit-code include/genesisdb.h; then
+            echo "::error::include/genesisdb.h is out of date with src/ffi.rs. Run scripts/gen-header.sh and commit the result." >&2
+            exit 1
+          fi
