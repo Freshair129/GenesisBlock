@@ -83,7 +83,7 @@ flowchart LR
 | Container | Responsibility | Current Source | Primary Docs |
 |---|---|---|---|
 | Rust Core Engine | Storage, WAL, indexing, graph traversal, HQL, reasoning, CRDT, consensus primitives | `src/lib.rs`, `hql.pest` | `MASTER-SPEC--GENESIS-DB.md`, feature specs, ADRs |
-| Axum REST Server | HTTP API for bulk ingest, HQL, node/edge mutation, search, context, status | `src/main.rs` | `docs/API_REFERENCE.md` |
+| Axum REST Server | HTTP API for bulk ingest, HQL, node/edge mutation, search, context, status | `src/main.rs`, `src/router.rs` | `docs/API_REFERENCE.md` |
 | N-API Package | Native Node/TypeScript bindings over Rust core | `src/lib.rs`, `index.d.ts`, `index.js` | `docs/API_REFERENCE.md`, NPM package metadata |
 | MCP Server | Tool interface for LLM clients | `mcp/server.js` | `docs/MCP-GUIDE.md`, `docs/SPEC--MCP-SERVER.md` |
 | Python SDK | Python REST client | `genesisdb-python/genesisdb/client.py` | `docs/PYTHON-SDK-GUIDE.md`, `docs/SPEC--PYTHON-SDK.md` |
@@ -153,12 +153,12 @@ flowchart TB
 
 | Component | Routes | Source |
 |---|---|---|
-| Bulk ingest | `/v1/bulk/nodes`, `/v1/bulk/edges`, `/v1/bulk/rebuild` | `src/main.rs` |
-| Query | `/v1/query/hql`, `/v1/query` | `src/main.rs` |
-| Mutation | `/v1/node/add`, `/v1/node/supersede`, `/v1/edge/add` | `src/main.rs` |
-| Collections | `/v1/collection/create`, `/v1/collections` | `src/main.rs` |
-| Retrieval | `/v1/search/hybrid`, `/v1/reason/context` | `src/main.rs` |
-| Insight / status | `/v1/insight/drift/:cluster_id`, `/v1/status`, `/v1/swarm/status` | `src/main.rs` |
+| Bulk ingest | `/v1/bulk/nodes`, `/v1/bulk/edges`, `/v1/bulk/rebuild` | `src/router.rs` |
+| Query | `/v1/query/hql`, `/v1/query` | `src/router.rs` |
+| Mutation | `/v1/node/add`, `/v1/node/supersede`, `/v1/edge/add`, `/v1/edge/retract`, `/v1/vector/add` | `src/router.rs` |
+| Collections | `/v1/collection/create`, `/v1/collections` | `src/router.rs` |
+| Retrieval | `/v1/search/hybrid`, `/v1/reason/context` | `src/router.rs` |
+| Insight / status | `/v1/insight/drift/:cluster_id`, `/v1/insight/communities`, `/v1/insight/gaps`, `/v1/insight/rebuild`, `/v1/status`, `/v1/version`, `/v1/swarm/status` | `src/router.rs` |
 
 ### MCP Components
 
@@ -176,7 +176,7 @@ The C4 code level is intentionally anchored to source files instead of duplicati
 |---|---|---|---|
 | Core database type and exported N-API class | `src/lib.rs` | `index.d.ts` | High |
 | HQL execution | `src/lib.rs::execute_hql`, `hql.pest` | REST `/v1/query/hql`, SDK `query()` methods | High |
-| REST route surface | `src/main.rs` route table | `docs/API_REFERENCE.md`, SDK clients | High |
+| REST route surface | `src/router.rs` route table | `docs/API_REFERENCE.md`, SDK clients | High |
 | MCP tool surface | `mcp/server.js` tool definitions | `docs/MCP-GUIDE.md` | Medium |
 | SDK request/response shapes | Python and Go SDK clients | API reference and REST handlers | High |
 | Persistence safety | WAL/snapshot code in `src/lib.rs` | WAL ADR, audit reports | High |
@@ -188,7 +188,7 @@ These findings are intentionally listed here until the governance validator can 
 
 | Drift | Evidence | Expected Resolution |
 |---|---|---|
-| HQL REST body shape mismatch | REST handler accepts raw JSON string; Python/Go SDKs send `{ "query": hql }` | Decide one contract, update API docs, SDKs, and tests together |
+| HQL REST body shape mismatch | REST handler accepts **both** via `#[serde(untagged)] HqlBody` in `src/router.rs`: raw JSON string AND `{ "query": hql }` | Resolved — both shapes accepted; covered by `tests/rest_api_tests.rs` |
 | Dashboard audit target mismatch | Audit doc and e2e target URL differ | Align audit doc, Playwright config/spec, and dashboard scripts |
 | Governance rules are documented but not enforced | No validator script, CI gate, or active git hook | Implement governance TDD Phase 2 |
 | Some specs retain open DoD/review text while code exists | Multiple `SPEC--*.md` files | Baseline audit, then update status/changelog |
@@ -198,7 +198,7 @@ These findings are intentionally listed here until the governance validator can 
 
 When changing architecture-relevant files:
 
-1. If `src/lib.rs`, `src/main.rs`, `mcp/server.js`, `index.d.ts`, or SDK clients change, check this C4 index for affected layer.
+1. If `src/lib.rs`, `src/main.rs`, `src/router.rs`, `mcp/server.js`, `index.d.ts`, or SDK clients change, check this C4 index for affected layer.
 2. If a public contract changes, update `docs/API_REFERENCE.md` and the related SDK/MCP docs.
 3. If a component responsibility changes, update the C3 table and related spec/ADR.
 4. If a container is added or removed, update the C2 diagram and SSOT hierarchy.
