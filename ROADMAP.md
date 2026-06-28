@@ -188,6 +188,42 @@ in a single binary. Nearest comparators: Kuzu, DuckDB+graph, LanceDB, LadybugDB.
 
 ---
 
+---
+
+## MARK XVI: Mobile SDK & Embedded App (PROPOSED 2026-06-29)
+
+> **Theme:** GenesisBlockDB as a first-class embedded mobile engine — local-first,
+> in-process, no server required. Two artifacts: a standalone mobile app with graph +
+> retriever UI (Level A), and a reusable SDK any developer can embed (Level B).
+>
+> **Spec:** [SPEC--MOBILE-SDK.md](docs/SPEC--MOBILE-SDK.md)
+>
+> **Complexity:** C-3. Phase 0 is a prerequisite for all subsequent phases.
+
+### Phase 0 — Foundation (~1 week)
+- [x] **`mobile` Cargo feature:** added `mobile` + `ffi` features; `sysinfo` made optional and owned by `bins` (it is bench-only, not used in `src/`). `cargo build --no-default-features --features mobile` exits 0 with no `sysinfo` compiled in
+- [ ] **Cross-compile probe:** `aarch64-apple-ios`, `aarch64-apple-ios-sim`, `aarch64-linux-android` all exit 0 _(in progress)_
+- [ ] **C FFI layer (`src/ffi.rs`):** 7 core symbols (`open`, `close`, `add_node`, `execute_hql`, `search`, `retrieve_context`, `free_string`) with JSON-in/JSON-out contract _(in progress)_
+- [ ] **WAL path injection:** document sandboxed path convention (`app_data_dir()` → DB root); no core change required — `Storage::open` already takes the DB root via `OpenOptions.path`
+
+> **Note (2026-06-29):** 0-A done. The original plan assumed `sysinfo` was used inside `src/lib.rs` and needed `#[cfg(feature = "mobile")]` gating; a grep proved it is **bench-only** (used by `benches/{edge_interning_audit,graph_bench,vbench_genesis}.rs`), so the fix was purely `Cargo.toml` dependency wiring — no core code changed. 0-B and 0-C are being completed in parallel.
+
+### Phase A — GenesisBlock Mobile App, Level A (~3 weeks)
+- [ ] **Tauri v2 mobile project (`genesisblock-mobile/`):** iOS + Android targets, `genesis-block-native` as `--no-default-features --features mobile` dep
+- [ ] **Tauri commands (`commands.rs`):** `add_node`, `search`, `execute_hql`, `retrieve_context`, `get_graph_snapshot`, `flush_index` — mirrors NAPI surface
+- [ ] **Graph view:** sigma.js WebGL; node color = governance tier; only valid edges (bitemporal now); pinch-zoom + tap-to-inspect
+- [ ] **Retriever panel:** HQL `CONTEXT` → H0–H5 tier cards; tap node on graph triggers retrieval; highlights result nodes
+- [ ] **CRDT sync toggle:** mobile ↔ desktop sync via existing gossip layer (UDP; optional)
+- [ ] **Device validation:** installs + runs on physical iPhone (arm64) and physical Android (arm64); WAL persists across app restarts
+
+### Phase B — SDK for Other Apps, Level B (~6 weeks)
+- [ ] **iOS xcframework + Swift wrapper:** static `.a` for `aarch64-apple-ios` + sim slice; `actor GenesisDB` async/await API; distributed via Swift Package Manager
+- [ ] **Android `.aar` + Kotlin wrapper:** JNI bridge (`src/jni.rs`); `class GenesisDB` with coroutines API; distributed via Maven/Gradle
+- [ ] **React Native package (`react-native-genesisdb`):** native module wrapping iOS xcframework + Android `.aar`; TypeScript types mirror `index.d.ts`; distributed via npm
+- [ ] **Flutter plugin:** deferred — `flutter_rust_bridge` auto-generated Dart bindings; added when user demand confirmed
+
+---
+
 ## Roadmap Changes This Update (2026-06-22)
 
 | Change | รายละเอียด |

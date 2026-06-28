@@ -61,6 +61,8 @@ use uuid::Uuid;
 
 pub mod query;
 pub mod router;
+#[cfg(feature = "ffi")]
+mod ffi;
 use query::HqlCommand;
 
 pub const SCHEMA_VERSION: u32 = 1;

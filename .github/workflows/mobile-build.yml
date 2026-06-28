@@ -1,0 +1,133 @@
+# Mobile cross-compile gate (MARK XVI Phase 0-B "Cross-compile probe").
+#
+# Proves the storage core links for iOS and Android targets and that the
+# `mobile` feature build + test stays green on Linux CI. The dev box is Windows
+# with no Mac and no Android NDK, so these jobs CANNOT be validated locally —
+# they exist precisely so GitHub's macOS/Linux runners do the cross-compile.
+#
+# Build model (see CLAUDE.md + docs/SPEC--MOBILE-SDK.md):
+#   `cargo build --no-default-features --features mobile` drops the napi
+#   bindings (no napi_* symbols), the `bins` feature, and `sysinfo` (its RSS
+#   probe uses OS APIs that fail in mobile sandboxes). That decoupled core is
+#   what links on iOS/Android and on plain Linux.
+#
+# Targets (from SPEC §0-B):
+#   aarch64-apple-ios          — iOS device
+#   aarch64-apple-ios-sim      — iOS Simulator (Apple Silicon)
+#   aarch64-linux-android      — Android arm64
+#   armv7-linux-androideabi    — Android 32-bit ABI
+
+name: Mobile Build
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ main ]
+    paths:
+      - 'src/**'
+      - 'Cargo.toml'
+      - '.github/workflows/mobile-build.yml'
+  pull_request:
+    branches: [ main ]
+    paths:
+      - 'src/**'
+      - 'Cargo.toml'
+      - '.github/workflows/mobile-build.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  # iOS device + simulator. macOS runner is the ONLY way to validate iOS —
+  # the dev machine is Windows with no Mac.
+  ios-build:
+    name: iOS cross-compile (device + sim)
+    runs-on: macos-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-ios, aarch64-apple-ios-sim
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: mobile-ios
+
+      # Belt-and-suspenders: the toolchain action already installs the targets
+      # above, but the SPEC documents `rustup target add` explicitly.
+      - name: Ensure iOS targets installed
+        run: rustup target add aarch64-apple-ios aarch64-apple-ios-sim
+
+      - name: Build core for aarch64-apple-ios (device)
+        run: cargo build --no-default-features --features mobile --target aarch64-apple-ios
+
+      - name: Build core for aarch64-apple-ios-sim (simulator)
+        run: cargo build --no-default-features --features mobile --target aarch64-apple-ios-sim
+
+  # Android arm64 + armv7 via cargo-ndk. nttld/setup-ndk provisions the NDK;
+  # cargo-ndk wires the right clang linker per target so no manual
+  # --config target.<triple>.linker is needed (cf. SPEC §0-B note).
+  android-build:
+    name: Android cross-compile (arm64 + armv7)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-linux-android, armv7-linux-androideabi
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: mobile-android
+
+      - name: Ensure Android targets installed
+        run: rustup target add aarch64-linux-android armv7-linux-androideabi
+
+      # Pinned to an LTS NDK. cargo-ndk expects ANDROID_NDK_HOME / ANDROID_NDK_ROOT,
+      # which this action exports.
+      - name: Install Android NDK
+        uses: nttld/setup-ndk@v1
+        id: setup-ndk
+        with:
+          ndk-version: r26d
+          add-to-path: true
+
+      - name: Install cargo-ndk
+        run: cargo install cargo-ndk --locked
+
+      # cargo-ndk selects the NDK clang linker for each --target; `build` then
+      # invokes cargo build with the mobile feature for both ABIs.
+      - name: Build core for Android (arm64 + armv7)
+        env:
+          ANDROID_NDK_HOME: ${{ steps.setup-ndk.outputs.ndk-path }}
+        run: |
+          cargo ndk \
+            --target aarch64-linux-android \
+            --target armv7-linux-androideabi \
+            build --no-default-features --features mobile
+
+  # P2 "cargo test --features mobile green": the core/napi split is designed to
+  # link on Linux, so the mobile-feature build AND the integration test suite
+  # run here on the host triple (no cross-compile, real test execution).
+  host-mobile-check:
+    name: host build + test (mobile feature)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: mobile-host
+
+      - name: cargo build (mobile feature, host triple)
+        run: cargo build --no-default-features --features mobile
+
+      - name: cargo test (mobile feature, host triple)
+        run: cargo test --no-default-features --features mobile
