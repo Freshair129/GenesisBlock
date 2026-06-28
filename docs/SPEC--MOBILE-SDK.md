@@ -1,7 +1,7 @@
 ---
 version: "1.0.0"
 created_at: "2026-06-29"
-status: "proposed"
+status: "phase-0-complete"
 mark: "XVI"
 complexity: "C-3"
 doc_type: "spec"
@@ -105,7 +105,13 @@ cargo build --no-default-features --features mobile
 **Status:** DONE. Verified locally — `cargo build --no-default-features --features mobile`
 exits 0 with no `sysinfo` compiled in.
 
-### 0-B: Cross-compile probe
+### 0-B: Cross-compile probe — **DONE (CI-validated)**
+
+**Status:** DONE 2026-06-29. `.github/workflows/mobile-build.yml` builds the core for
+`aarch64-apple-ios` + `aarch64-apple-ios-sim` (macOS runner) and `aarch64-linux-android` +
+`armv7-linux-androideabi` (Linux runner, cargo-ndk). All green on PR #37. This CI is the
+**only** place iOS/Android linking is exercised — the dev host is Windows (no macOS/Xcode,
+no local NDK), so cross-compile cannot be reproduced locally.
 
 ```bash
 rustup target add aarch64-apple-ios
@@ -130,7 +136,14 @@ an explicit path), any dep that uses `getrandom` without mobile backend.
 
 **Acceptance:** `cargo build --target aarch64-apple-ios` exits 0 with warnings only.
 
-### 0-C: C FFI layer (`src/ffi.rs`)
+### 0-C: C FFI layer (`src/ffi.rs`) — **DONE**
+
+**Status:** DONE 2026-06-29 (shipped in PR #37). Implemented as 8 `#[no_mangle]` symbols
+(`genesisdb_open`/`close`/`add_node`/`search`/`execute_hql`/`retrieve_context`/
+`flush_index`/`free_string`), gated `#[cfg(feature = "ffi")]`, every entry point wrapped in
+`catch_unwind`. The handle boxes `Arc<Storage>` and calls the **synchronous** `Storage`
+methods directly (the tokio/`spawn_blocking` offload lives only in the napi-only
+`GenesisDatabase` wrapper, so no runtime is pulled into the mobile binary).
 
 Required for Phase B (SDK). Tauri (Phase A) calls Rust directly, but the iOS xcframework
 and Android JNI both need a stable C ABI.
@@ -495,6 +508,51 @@ for the initial SDK release; added when there is demonstrated user demand.
 
 ---
 
+## Versioning model — is mobile shared with desktop, or counted separately?
+
+**Two layers, two answers.**
+
+**1. The engine core is ONE version, shared.** Desktop and mobile are the *same crate*
+(`genesis-block-native`) compiled with different feature flags — not separate codebases:
+
+| Target | Build |
+|---|---|
+| Desktop — Node addon | `napi build` (default `napi-bindings`) → cdylib |
+| Desktop — REST server | `--no-default-features --features bins` → rlib |
+| Mobile — iOS / Android | `--no-default-features --features "mobile ffi"` → staticlib |
+
+All three come from one `Cargo.toml` with one `version`. They **cannot diverge** — there is
+no separate "mobile version" of the engine. As of this writing every target is `0.2.0`. A
+bug fix or schema change bumps the single engine version and all surfaces inherit it. The
+on-disk format is tracked orthogonally by `SCHEMA_VERSION` (`src/lib.rs`), also shared.
+
+**2. Distribution packages are counted SEPARATELY, pinned to a minimum engine version.**
+`modules.json` is the manifest: the `engine` block holds the one shared engine version, and
+each consumer *surface* carries its own `version` + a `minEngineVersion`. This already exists
+for the non-mobile surfaces (Python SDK `0.1.0`, Go SDK `0.1.0`, MCP `0.1.0-beta.1`, etc.) —
+each ships on its own cadence but declares the oldest engine it works against.
+
+The future mobile artifacts follow the same pattern — each becomes a new surface entry:
+
+| Surface (Phase A/B) | Own `version` | `minEngineVersion` |
+|---|---|---|
+| `genesisblock-mobile` (Tauri app) | independent | the engine it bundles |
+| iOS `GenesisBlockDB.xcframework` | independent | the engine it wraps |
+| Android `genesisdb-android` (.aar) | independent | the engine it wraps |
+| `react-native-genesisdb` | independent | the engine it wraps |
+
+**Policy (0.x / beta):** keep each mobile package's `version` **coupled** to the engine
+version (ship `0.2.x` packages against a `0.2.x` engine) for simplicity — one number to
+reason about. **Decouple at 1.0**, once the engine API and the SDK ergonomics stabilise
+independently. The `scripts/version.mjs` SSOT + the `version-consistency` CI gate enforce
+that the engine value stays identical across `Cargo.toml` / `package.json` / `modules.json`;
+per-surface versions are managed in `modules.json` and are intentionally *not* gated.
+
+**TL;DR:** the *engine* is one version, shared by desktop and mobile (same crate, different
+features). The *shipping packages* are versioned separately but each pins a `minEngineVersion`.
+
+---
+
 ## Risk register
 
 | Risk | Likelihood | Mitigation |
@@ -515,8 +573,10 @@ for the initial SDK release; added when there is demonstrated user demand.
 2. **Embedding on mobile:** who generates the vector embeddings? On-device (Core ML / ONNX
    Runtime) or user-supplied float arrays? Phase A defers this — `NodeInput.embedding` is
    optional and the retriever panel works on graph structure without vectors.
-3. **SDK versioning:** pin SDK version to engine semver (`0.1.x` SDK ↔ `0.1.x` engine) or
-   decouple? Recommend coupling for the beta period, decoupling at 1.0.
+3. **SDK versioning:** ~~pin SDK version to engine semver or decouple?~~ **Resolved** — see
+   the [Versioning model](#versioning-model--is-mobile-shared-with-desktop-or-counted-separately)
+   section: engine is one shared version; packages are separate but pinned to a
+   `minEngineVersion`; coupled during 0.x, decoupled at 1.0.
 4. **App Store distribution of xcframework:** binary targets in SPM require a checksum and
    a public release URL. Private distribution via XCFramework zip + local `Package.swift`
    is also viable for enterprise customers.

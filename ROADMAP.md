@@ -1,4 +1,4 @@
-# GENESISDB ROADMAP (MARK XIII → MARK XIV)
+# GENESISDB ROADMAP (current milestone: MARK XVI — Mobile, v0.2.0)
 **Positioning:** Embedded analytics / agent-memory graph + vector engine —
 the only embedded database with graph + vector + bitemporal + CRDT + governance
 in a single binary. Nearest comparators: Kuzu, DuckDB+graph, LanceDB, LadybugDB.
@@ -188,9 +188,7 @@ in a single binary. Nearest comparators: Kuzu, DuckDB+graph, LanceDB, LadybugDB.
 
 ---
 
----
-
-## MARK XVI: Mobile SDK & Embedded App (PROPOSED 2026-06-29)
+## MARK XVI: Mobile SDK & Embedded App (Phase 0 COMPLETE 2026-06-29 — PR #37, v0.2.0)
 
 > **Theme:** GenesisBlockDB as a first-class embedded mobile engine — local-first,
 > in-process, no server required. Two artifacts: a standalone mobile app with graph +
@@ -199,14 +197,18 @@ in a single binary. Nearest comparators: Kuzu, DuckDB+graph, LanceDB, LadybugDB.
 > **Spec:** [SPEC--MOBILE-SDK.md](docs/SPEC--MOBILE-SDK.md)
 >
 > **Complexity:** C-3. Phase 0 is a prerequisite for all subsequent phases.
+>
+> **Status:** Phase 0 **merged to main** via [PR #37](https://github.com/Freshair129/GenesisBlock/pull/37)
+> (engine `0.1.0-beta.2` → **`0.2.0`**, first non-beta). All 13 CI jobs green, incl.
+> iOS + Android cross-compile on GitHub runners. Phase A is next.
 
-### Phase 0 — Foundation (~1 week)
+### Phase 0 — Foundation (~1 week) ✅ DONE
 - [x] **`mobile` Cargo feature:** added `mobile` + `ffi` features; `sysinfo` made optional and owned by `bins` (it is bench-only, not used in `src/`). `cargo build --no-default-features --features mobile` exits 0 with no `sysinfo` compiled in
-- [ ] **Cross-compile probe:** `aarch64-apple-ios`, `aarch64-apple-ios-sim`, `aarch64-linux-android` all exit 0 _(in progress)_
-- [ ] **C FFI layer (`src/ffi.rs`):** 7 core symbols (`open`, `close`, `add_node`, `execute_hql`, `search`, `retrieve_context`, `free_string`) with JSON-in/JSON-out contract _(in progress)_
-- [ ] **WAL path injection:** document sandboxed path convention (`app_data_dir()` → DB root); no core change required — `Storage::open` already takes the DB root via `OpenOptions.path`
+- [x] **Cross-compile probe:** `aarch64-apple-ios` (device + sim) and `aarch64-linux-android` (arm64 + armv7) build green — validated by `.github/workflows/mobile-build.yml` on macOS + Linux runners (the Windows dev host can't cross-compile iOS locally)
+- [x] **C FFI layer (`src/ffi.rs`):** 8 `#[no_mangle]` symbols (`open`, `close`, `add_node`, `search`, `execute_hql`, `retrieve_context`, `flush_index`, `free_string`), `catch_unwind`-guarded, gated `#[cfg(feature = "ffi")]`, JSON-in/JSON-out mirroring the REST/NAPI contract
+- [x] **WAL path injection:** documented sandboxed path convention (`app_data_dir()` → DB root); no core change required — `Storage::open(OpenOptions)` already takes the DB root via `OpenOptions.path` (`src/lib.rs:1418`)
 
-> **Note (2026-06-29):** 0-A done. The original plan assumed `sysinfo` was used inside `src/lib.rs` and needed `#[cfg(feature = "mobile")]` gating; a grep proved it is **bench-only** (used by `benches/{edge_interning_audit,graph_bench,vbench_genesis}.rs`), so the fix was purely `Cargo.toml` dependency wiring — no core code changed. 0-B and 0-C are being completed in parallel.
+> **Note (2026-06-29):** The original plan assumed `sysinfo` was used inside `src/lib.rs` and needed `#[cfg(feature = "mobile")]` gating; a grep proved it is **bench-only** (used by `benches/{edge_interning_audit,graph_bench,vbench_genesis}.rs`), so the fix was purely `Cargo.toml` dependency wiring — no core code changed. Side-effect caught in CI: making `sysinfo` optional broke `cargo clippy --all-targets` via phantom auto-discovered bench targets → fixed with `autobenches = false`.
 
 ### Phase A — GenesisBlock Mobile App, Level A (~3 weeks)
 - [ ] **Tauri v2 mobile project (`genesisblock-mobile/`):** iOS + Android targets, `genesis-block-native` as `--no-default-features --features mobile` dep
