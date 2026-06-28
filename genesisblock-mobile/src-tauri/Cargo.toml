@@ -1,0 +1,25 @@
+[package]
+name = "genesisblock-mobile"
+version = "0.1.0"
+description = "GenesisBlock mobile app — embeds the GenesisBlockDB engine in-process via Tauri v2"
+edition = "2021"
+publish = false
+
+[lib]
+# `_lib` suffix avoids a name collision with the `genesisblock-mobile` bin on
+# Windows; the staticlib/cdylib crate-types are required for the mobile targets.
+name = "genesisblock_mobile_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2" }
+
+[dependencies]
+tauri = { version = "2", features = [] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+# The GenesisBlockDB engine, built for mobile (no napi, no bins, no sysinfo).
+# Tauri commands call these Storage methods directly — we do NOT go through the
+# C FFI layer (that exists for the iOS xcframework / Android JNI bridge).
+genesis-block-native = { path = "../..", default-features = false, features = ["mobile"] }
