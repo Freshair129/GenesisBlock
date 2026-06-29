@@ -234,6 +234,12 @@ pub struct NeighborOutput {
     pub node: NodeOutput,
     pub path: Vec<EdgeOutput>,
     pub depth: u32,
+    /// Relevance score for ranked results (hybrid_search): the blended
+    /// `similarity*(1-alpha) + impact*alpha`. `None` for graph traversal
+    /// (`neighbors`), which is not relevance-ranked. Kept separate from
+    /// `node.impact` so the caller still sees the node's true graph-authority
+    /// signal and can fuse it itself (see ADR--GENESISDB-KIMPACT-AS-SIGNAL).
+    pub score: Option<f64>,
 }
 
 #[cfg_attr(feature = "napi-bindings", napi(object))]
@@ -2249,6 +2255,162 @@ impl Storage {
         result
     }
 
+    /// Extract a queryable field from a result row as a JSON value.
+    /// Absent props / unset score resolve to `Null` (never panics).
+    fn hql_field_value(n: &NeighborOutput, f: &query::ast::HqlField) -> serde_json::Value {
+        use query::ast::HqlField;
+        match f {
+            HqlField::Id => serde_json::Value::String(n.node.id.clone()),
+            HqlField::Label => {
+                serde_json::to_value(&n.node.labels).unwrap_or(serde_json::Value::Null)
+            }
+            HqlField::Score => match n.score {
+                Some(s) => serde_json::json!(s),
+                None => serde_json::Value::Null,
+            },
+            HqlField::Depth => serde_json::json!(n.depth),
+            HqlField::Prop(k) => n.node.props.get(k).cloned().unwrap_or(serde_json::Value::Null),
+        }
+    }
+
+    fn hql_cmp_num(l: f64, op: query::ast::HqlOp, r: f64) -> bool {
+        use query::ast::HqlOp;
+        match op {
+            HqlOp::Eq => l == r,
+            HqlOp::Ne => l != r,
+            HqlOp::Lt => l < r,
+            HqlOp::Le => l <= r,
+            HqlOp::Gt => l > r,
+            HqlOp::Ge => l >= r,
+            _ => false,
+        }
+    }
+
+    fn hql_cmp_str(l: &str, op: query::ast::HqlOp, r: &str) -> bool {
+        use query::ast::HqlOp;
+        match op {
+            HqlOp::Eq => l == r,
+            HqlOp::Ne => l != r,
+            HqlOp::Lt => l < r,
+            HqlOp::Le => l <= r,
+            HqlOp::Gt => l > r,
+            HqlOp::Ge => l >= r,
+            _ => false,
+        }
+    }
+
+    /// Evaluate one WHERE predicate against a row. Missing field, null, or a
+    /// type mismatch all yield `false` (SQL-style UNKNOWN -> excluded), for every
+    /// operator including `!=`. See ADR--GENESISDB-HQL-FILTER-PROJECTION.
+    fn hql_eval_predicate(n: &NeighborOutput, p: &query::ast::HqlPredicate) -> bool {
+        use query::ast::{HqlField, HqlOp, HqlValue};
+        // `label` is multi-valued: equality/membership tests scan the label set.
+        if let HqlField::Label = p.field {
+            if let HqlValue::Str(s) = &p.value {
+                return match p.op {
+                    HqlOp::Eq => n.node.labels.iter().any(|l| l == s),
+                    HqlOp::Ne => !n.node.labels.iter().any(|l| l == s),
+                    HqlOp::Contains => n.node.labels.iter().any(|l| l.contains(s.as_str())),
+                    HqlOp::StartsWith => n.node.labels.iter().any(|l| l.starts_with(s.as_str())),
+                    _ => false,
+                };
+            }
+            return false; // label compared against a number
+        }
+
+        let lhs = Self::hql_field_value(n, &p.field);
+        match (p.op, &p.value) {
+            (HqlOp::Contains, HqlValue::Str(s)) => {
+                lhs.as_str().is_some_and(|x| x.contains(s.as_str()))
+            }
+            (HqlOp::StartsWith, HqlValue::Str(s)) => {
+                lhs.as_str().is_some_and(|x| x.starts_with(s.as_str()))
+            }
+            (HqlOp::Contains | HqlOp::StartsWith, _) => false,
+            (op, HqlValue::Num(r)) => match lhs.as_f64() {
+                Some(l) => Self::hql_cmp_num(l, op, *r),
+                None => false,
+            },
+            (op, HqlValue::Str(r)) => match lhs.as_str() {
+                Some(l) => Self::hql_cmp_str(l, op, r),
+                None => false,
+            },
+        }
+    }
+
+    /// Numeric-when-both-numeric, else string ordering for ORDER BY.
+    fn hql_cmp_order(a: &serde_json::Value, b: &serde_json::Value) -> std::cmp::Ordering {
+        use std::cmp::Ordering;
+        if let (Some(x), Some(y)) = (a.as_f64(), b.as_f64()) {
+            return x.partial_cmp(&y).unwrap_or(Ordering::Equal);
+        }
+        if let (Some(x), Some(y)) = (a.as_str(), b.as_str()) {
+            return x.cmp(y);
+        }
+        a.to_string().cmp(&b.to_string())
+    }
+
+    /// Apply the optional WHERE / ORDER BY / LIMIT / RETURN clauses to a result
+    /// list, in that order, then serialize. Pure post-processing — no planner.
+    fn apply_hql_clauses(
+        mut results: Vec<NeighborOutput>,
+        clauses: &query::ast::HqlClauses,
+    ) -> Result<serde_json::Value> {
+        use query::ast::HqlReturn;
+        let ser_err =
+            |e: serde_json::Error| Error::from_reason(format!("HQL result serialization failed: {e}"));
+
+        // 1. WHERE (conjunction of predicates)
+        if !clauses.where_preds.is_empty() {
+            results
+                .retain(|n| clauses.where_preds.iter().all(|p| Self::hql_eval_predicate(n, p)));
+        }
+
+        // 2. ORDER BY (nulls always last, regardless of ASC/DESC)
+        if let Some((field, desc)) = &clauses.order_by {
+            results.sort_by(|a, b| {
+                let av = Self::hql_field_value(a, field);
+                let bv = Self::hql_field_value(b, field);
+                match (av.is_null(), bv.is_null()) {
+                    (true, true) => std::cmp::Ordering::Equal,
+                    (true, false) => std::cmp::Ordering::Greater,
+                    (false, true) => std::cmp::Ordering::Less,
+                    (false, false) => {
+                        let ord = Self::hql_cmp_order(&av, &bv);
+                        if *desc {
+                            ord.reverse()
+                        } else {
+                            ord
+                        }
+                    }
+                }
+            });
+        }
+
+        // 3. LIMIT (after filter + order)
+        if let Some(n) = clauses.limit {
+            results.truncate(n);
+        }
+
+        // 4. RETURN projection (None / `*` keep the full NeighborOutput shape)
+        match &clauses.ret {
+            None | Some(HqlReturn::All) => serde_json::to_value(&results).map_err(ser_err),
+            Some(HqlReturn::Fields(fields)) => {
+                let arr: Vec<serde_json::Value> = results
+                    .iter()
+                    .map(|n| {
+                        let mut obj = serde_json::Map::new();
+                        for f in fields {
+                            obj.insert(f.output_key(), Self::hql_field_value(n, f));
+                        }
+                        serde_json::Value::Object(obj)
+                    })
+                    .collect();
+                serde_json::to_value(arr).map_err(ser_err)
+            }
+        }
+    }
+
     pub fn execute_hql(&self, query: &str) -> Result<serde_json::Value> {
         fn to_value<T: serde::Serialize>(res: T) -> Result<serde_json::Value> {
             serde_json::to_value(res)
@@ -2264,6 +2426,7 @@ impl Storage {
                 lang,
                 as_of,
                 collection,
+                clauses,
             } => {
                 let _resolved = if fuzzy {
                     self.find_fuzzy_id(&target)
@@ -2279,7 +2442,7 @@ impl Storage {
                     collection,
                     ef_search: None,
                 })?;
-                to_value(res)
+                Self::apply_hql_clauses(res, &clauses)
             }
             HqlCommand::Traverse {
                 seed,
@@ -2287,6 +2450,7 @@ impl Storage {
                 rel,
                 fuzzy,
                 as_of,
+                clauses,
             } => {
                 let resolved_seed = if fuzzy {
                     self.find_fuzzy_id(&seed).unwrap_or(seed)
@@ -2310,7 +2474,7 @@ impl Storage {
                     },
                     is_inferred,
                 )?;
-                to_value(res)
+                Self::apply_hql_clauses(res, &clauses)
             }
             HqlCommand::Hybrid {
                 vector,
@@ -2320,6 +2484,7 @@ impl Storage {
                 lang,
                 as_of,
                 collection,
+                clauses,
             } => {
                 let _resolved = if fuzzy {
                     self.find_fuzzy_id(&target)
@@ -2335,7 +2500,7 @@ impl Storage {
                     collection,
                     ef_search: None,
                 })?;
-                to_value(res)
+                Self::apply_hql_clauses(res, &clauses)
             }
             HqlCommand::Context {
                 target,
@@ -2454,14 +2619,17 @@ impl Storage {
         }
         let mut hybrid_results = Vec::new();
         let meta_arena = coll.metadata.read();
-        let alpha = args.alpha.unwrap_or(0.5);
+        // Default to pure vector similarity. K-Impact blending is opt-in via an
+        // explicit `alpha > 0` — see ADR--GENESISDB-KIMPACT-AS-SIGNAL. (Was 0.5,
+        // which silently mixed graph-authority into every query.)
+        let alpha = args.alpha.unwrap_or(0.0);
 
         for (d_id, distance) in results {
             if let Some(meta) = meta_arena.get(d_id) {
                 {
                     let u32_id = meta.node_u32; // A2: id interned in metadata
                     if let Some(node) = self.nodes.get(&u32_id) {
-                        let mut node_out = node.value().clone();
+                        let node_out = node.value().clone();
 
                         if !Self::is_valid_as_of(
                             &node_out.valid_from,
@@ -2474,22 +2642,24 @@ impl Storage {
                         let similarity = 1.0 - distance as f64;
                         let reasoning_score =
                             (similarity * (1.0 - alpha)) + (node_out.impact.unwrap_or(0.0) * alpha);
-                        node_out.impact = Some(reasoning_score);
+                        // Carry the ranking score in `score`; leave `node.impact`
+                        // as the node's true graph-authority signal (don't clobber
+                        // it) so the caller can fuse it itself.
                         hybrid_results.push(NeighborOutput {
                             node: node_out,
                             path: Vec::new(),
                             depth: 0,
+                            score: Some(reasoning_score),
                         });
                     }
                 }
             }
         }
-        // NaN-safe: a poisoned (NaN) impact score must not panic the whole query.
+        // NaN-safe: a poisoned (NaN) score must not panic the whole query.
         // Treat incomparable scores as equal so sorting degrades gracefully.
         hybrid_results.sort_by(|a, b| {
-            b.node
-                .impact
-                .partial_cmp(&a.node.impact)
+            b.score
+                .partial_cmp(&a.score)
                 .unwrap_or(std::cmp::Ordering::Equal)
         });
         // Dedupe by node id, keeping the highest-scoring hit. A node may hold more
@@ -2630,6 +2800,7 @@ impl Storage {
                                     node: node.clone(),
                                     path: new_path.clone(),
                                     depth: curr_depth + 1,
+                                    score: None,
                                 });
                                 if let Some(l) = lim {
                                     if results.len() >= l {

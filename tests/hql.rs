@@ -79,11 +79,10 @@ fn edge(s: &Storage, from: &str, to: &str, rel: &str) {
 // -----------------------------------------------------------------------
 // 1. TRAVERSE valid: A->B->C, depth 2
 //
-// NOTE: The HQL parser has a known bug where `DEPTH N` always parses to 1
-// (the `depth` rule's `.as_str().parse::<u32>()` fails and falls through
-// to `unwrap_or(1)`). The direct `neighbors()` API with `depth: Some(2)`
-// correctly returns both B and C. This test asserts the ACTUAL behavior
-// (depth 1 via HQL) and also verifies depth 2 works via the direct API.
+// The `DEPTH N` parser bug (where the non-atomic `depth` rule let trailing
+// whitespace creep into the span, failing `.parse()` and defaulting to 1) is
+// fixed — the digit rules are now atomic (`@{ ASCII_DIGIT+ }`). HQL DEPTH 2
+// now reaches both B (1-hop) and C (2-hop).
 // -----------------------------------------------------------------------
 #[test]
 fn hql_traverse_valid() {
@@ -96,14 +95,14 @@ fn hql_traverse_valid() {
     edge(&s, "A", "B", "KNOWS");
     edge(&s, "B", "C", "KNOWS");
 
-    // HQL TRAVERSE — currently limited by parser depth bug (always depth 1).
+    // HQL TRAVERSE depth 2 — now honored (digit-rule whitespace bug fixed).
     let res = s.execute_hql("TRAVERSE FROM A DEPTH 2 REL KNOWS").unwrap();
     let neighbors: Vec<NeighborOutput> = from_value(res).unwrap();
     let ids: Vec<&str> = neighbors.iter().map(|n| n.node.id.as_str()).collect();
     assert!(ids.contains(&"B"), "depth-1 neighbor B must appear");
+    assert!(ids.contains(&"C"), "depth-2 neighbor C must appear (DEPTH now honored)");
 
-    // Verify depth-2 works through the direct API (proves the graph is wired
-    // correctly even though the HQL path is limited by the parser bug).
+    // Cross-check the direct `neighbors()` API agrees.
     let direct = s
         .neighbors(
             "A".to_string(),
@@ -290,17 +289,15 @@ fn hql_depth_0() {
     node(&s, "B");
     edge(&s, "A", "B", "KNOWS");
 
-    // DEPTH 0 is syntactically valid (grammar accepts any ASCII_DIGIT+).
-    // Due to the HQL parser depth bug (always parses to 1), DEPTH 0 actually
-    // behaves as depth 1.
+    // DEPTH 0 is syntactically valid (grammar accepts any ASCII_DIGIT+) and now
+    // parses correctly to 0 (digit-rule whitespace bug fixed) — no expansion.
     let res = s.execute_hql("TRAVERSE FROM A DEPTH 0 REL KNOWS");
     assert!(res.is_ok(), "DEPTH 0 must not crash: {:?}", res.err());
 
     let neighbors: Vec<NeighborOutput> = from_value(res.unwrap()).unwrap();
-    // Document: depth 0 via HQL currently returns 1 result (same as depth 1
-    // because the parser always defaults depth to 1).
-    println!(
-        "DEPTH 0 via HQL returned {} neighbor(s) (parser depth bug: always 1)",
+    assert!(
+        neighbors.is_empty(),
+        "DEPTH 0 expands nothing, got {} neighbor(s)",
         neighbors.len()
     );
 }

@@ -104,6 +104,7 @@ export interface NeighborOutput {
   node: NodeOutput
   path: Array<EdgeOutput>
   depth: number
+  score?: number
 }
 export interface HybridSearchInput {
   queryVector: Array<number>
