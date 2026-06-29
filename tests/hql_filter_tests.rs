@@ -61,10 +61,30 @@ fn edge(s: &Storage, from: &str, to: &str, rel: &str) {
 fn chat_fixture(name: &str) -> Storage {
     let s = open(&fresh(name));
     node(&s, "user5", &[], json!({}));
-    node(&s, "msg1", &["Message"], json!({"text": "hello world", "side": "them", "time": 300}));
-    node(&s, "msg2", &["Message"], json!({"text": "bye now", "side": "me", "time": 100}));
-    node(&s, "msg3", &["Notification"], json!({"text": "weather alert", "side": "them", "time": 200}));
-    node(&s, "msg4", &["Message"], json!({"side": "them", "time": 50})); // no text
+    node(
+        &s,
+        "msg1",
+        &["Message"],
+        json!({"text": "hello world", "side": "them", "time": 300}),
+    );
+    node(
+        &s,
+        "msg2",
+        &["Message"],
+        json!({"text": "bye now", "side": "me", "time": 100}),
+    );
+    node(
+        &s,
+        "msg3",
+        &["Notification"],
+        json!({"text": "weather alert", "side": "them", "time": 200}),
+    );
+    node(
+        &s,
+        "msg4",
+        &["Message"],
+        json!({"side": "them", "time": 50}),
+    ); // no text
     node(&s, "msg5", &["Message"], json!({"text": "orphan"})); // no side, no time
     for m in ["msg1", "msg2", "msg3", "msg4", "msg5"] {
         edge(&s, "user5", m, "SENT");
@@ -90,7 +110,10 @@ fn ids(v: &Value) -> Vec<String> {
 #[test]
 fn where_label_membership() {
     let s = chat_fixture("hqlf_label");
-    let v = run(&s, r#"TRAVERSE FROM user5 DEPTH 1 REL SENT WHERE label = "Message" RETURN id"#);
+    let v = run(
+        &s,
+        r#"TRAVERSE FROM user5 DEPTH 1 REL SENT WHERE label = "Message" RETURN id"#,
+    );
     let mut got = ids(&v);
     got.sort();
     assert_eq!(got, vec!["msg1", "msg2", "msg4", "msg5"]); // not msg3 (Notification)
@@ -107,7 +130,7 @@ fn where_prop_eq_and_projects_null_for_missing_field() {
     let mut got = ids(&v);
     got.sort();
     assert_eq!(got, vec!["msg1", "msg3", "msg4"]); // msg5 excluded (no side), msg2 is "me"
-    // msg4 has side=them but no text -> projected as null, must not panic/omit.
+                                                   // msg4 has side=them but no text -> projected as null, must not panic/omit.
     let msg4 = arr.iter().find(|o| o["id"] == json!("msg4")).unwrap();
     assert_eq!(msg4.get("text"), Some(&Value::Null));
 }
@@ -115,7 +138,10 @@ fn where_prop_eq_and_projects_null_for_missing_field() {
 #[test]
 fn where_numeric_excludes_missing_and_smaller() {
     let s = chat_fixture("hqlf_num");
-    let v = run(&s, r#"TRAVERSE FROM user5 DEPTH 1 REL SENT WHERE prop.time > 150 RETURN id"#);
+    let v = run(
+        &s,
+        r#"TRAVERSE FROM user5 DEPTH 1 REL SENT WHERE prop.time > 150 RETURN id"#,
+    );
     let mut got = ids(&v);
     got.sort();
     // msg1=300, msg3=200 pass; msg2=100, msg4=50 fail; msg5 (no time) excluded.
@@ -125,7 +151,10 @@ fn where_numeric_excludes_missing_and_smaller() {
 #[test]
 fn where_ne_excludes_missing_sql_semantics() {
     let s = chat_fixture("hqlf_ne");
-    let v = run(&s, r#"TRAVERSE FROM user5 DEPTH 1 REL SENT WHERE prop.side != "me" RETURN id"#);
+    let v = run(
+        &s,
+        r#"TRAVERSE FROM user5 DEPTH 1 REL SENT WHERE prop.side != "me" RETURN id"#,
+    );
     let mut got = ids(&v);
     got.sort();
     // them: msg1, msg3, msg4 pass; msg2 (me) fails; msg5 (no side) EXCLUDED (SQL NULL).
@@ -208,11 +237,17 @@ fn no_clause_is_backward_compatible() {
 fn score_is_null_on_traverse() {
     let s = chat_fixture("hqlf_score_null");
     // WHERE score > 0.8 excludes everything (traverse rows have no score).
-    let v = run(&s, r#"TRAVERSE FROM user5 DEPTH 1 REL SENT WHERE score > 0.8 RETURN id"#);
+    let v = run(
+        &s,
+        r#"TRAVERSE FROM user5 DEPTH 1 REL SENT WHERE score > 0.8 RETURN id"#,
+    );
     assert_eq!(v.as_array().unwrap().len(), 0);
 
     // RETURN score -> null, no panic.
-    let v2 = run(&s, r#"TRAVERSE FROM user5 DEPTH 1 REL SENT RETURN id, score"#);
+    let v2 = run(
+        &s,
+        r#"TRAVERSE FROM user5 DEPTH 1 REL SENT RETURN id, score"#,
+    );
     let first = &v2.as_array().unwrap()[0];
     assert_eq!(first.get("score"), Some(&Value::Null));
 }
@@ -256,7 +291,11 @@ fn search_order_by_score_desc_projects_numeric_score() {
     assert!(!arr.is_empty(), "search returns at least one hit");
     let scores: Vec<f64> = arr
         .iter()
-        .map(|o| o["score"].as_f64().expect("score projected as numeric, not null"))
+        .map(|o| {
+            o["score"]
+                .as_f64()
+                .expect("score projected as numeric, not null")
+        })
         .collect();
     for w in scores.windows(2) {
         assert!(w[0] >= w[1], "ORDER BY score DESC: {scores:?}");
@@ -283,11 +322,20 @@ fn where_startswith() {
 fn where_numeric_boundary_inclusive_vs_exclusive() {
     let s = chat_fixture("hqlf_bound");
     // time: msg1=300, msg2=100, msg3=200, msg4=50, msg5=null
-    let ge = run(&s, r#"TRAVERSE FROM user5 DEPTH 1 REL SENT WHERE prop.time >= 200 ORDER BY prop.time ASC RETURN id"#);
+    let ge = run(
+        &s,
+        r#"TRAVERSE FROM user5 DEPTH 1 REL SENT WHERE prop.time >= 200 ORDER BY prop.time ASC RETURN id"#,
+    );
     assert_eq!(ids(&ge), vec!["msg3", "msg1"]); // 200 included
-    let gt = run(&s, r#"TRAVERSE FROM user5 DEPTH 1 REL SENT WHERE prop.time > 200 RETURN id"#);
+    let gt = run(
+        &s,
+        r#"TRAVERSE FROM user5 DEPTH 1 REL SENT WHERE prop.time > 200 RETURN id"#,
+    );
     assert_eq!(ids(&gt), vec!["msg1"]); // 200 excluded
-    let le = run(&s, r#"TRAVERSE FROM user5 DEPTH 1 REL SENT WHERE prop.time <= 100 ORDER BY prop.time ASC RETURN id"#);
+    let le = run(
+        &s,
+        r#"TRAVERSE FROM user5 DEPTH 1 REL SENT WHERE prop.time <= 100 ORDER BY prop.time ASC RETURN id"#,
+    );
     assert_eq!(ids(&le), vec!["msg4", "msg2"]); // 100 included
 }
 
@@ -308,13 +356,18 @@ fn return_star_equals_no_return() {
     // Both paths emit the full NeighborOutput shape (no projection). Traversal
     // order is not part of the contract without ORDER BY (neighbors() iterates a
     // HashSet), so compare the deserialized rows as a set by id + same shape.
-    let none: Vec<NeighborOutput> = from_value(run(&s, r#"TRAVERSE FROM user5 DEPTH 1 REL SENT"#)).unwrap();
-    let star: Vec<NeighborOutput> = from_value(run(&s, r#"TRAVERSE FROM user5 DEPTH 1 REL SENT RETURN *"#)).unwrap();
+    let none: Vec<NeighborOutput> =
+        from_value(run(&s, r#"TRAVERSE FROM user5 DEPTH 1 REL SENT"#)).unwrap();
+    let star: Vec<NeighborOutput> =
+        from_value(run(&s, r#"TRAVERSE FROM user5 DEPTH 1 REL SENT RETURN *"#)).unwrap();
     let mut a: Vec<String> = none.iter().map(|n| n.node.id.clone()).collect();
     let mut b: Vec<String> = star.iter().map(|n| n.node.id.clone()).collect();
     a.sort();
     b.sort();
-    assert_eq!(a, b, "RETURN * yields the same NeighborOutput set as no RETURN clause");
+    assert_eq!(
+        a, b,
+        "RETURN * yields the same NeighborOutput set as no RETURN clause"
+    );
     assert_eq!(a.len(), 5);
 }
 
@@ -325,11 +378,18 @@ fn return_key_collision_last_wins() {
     // node whose props.id differs from its node id
     node(&s, "msgX", &["Message"], json!({"id": "PROP_ID_VALUE"}));
     edge(&s, "user5", "msgX", "SENT");
-    let v = run(&s, r#"TRAVERSE FROM user5 DEPTH 1 REL SENT RETURN id, prop.id"#);
+    let v = run(
+        &s,
+        r#"TRAVERSE FROM user5 DEPTH 1 REL SENT RETURN id, prop.id"#,
+    );
     let obj = &v.as_array().unwrap()[0];
     // Both project to key "id"; documented contract = last field wins (prop.id).
     assert_eq!(obj.get("id"), Some(&json!("PROP_ID_VALUE")));
-    assert_eq!(obj.as_object().unwrap().len(), 1, "collided key appears once");
+    assert_eq!(
+        obj.as_object().unwrap().len(),
+        1,
+        "collided key appears once"
+    );
 }
 
 #[test]
@@ -348,10 +408,16 @@ fn where_label_ne_membership() {
 fn where_type_mismatch_excludes() {
     let s = chat_fixture("hqlf_typemismatch");
     // string literal vs numeric prop -> excluded
-    let a = run(&s, r#"TRAVERSE FROM user5 DEPTH 1 REL SENT WHERE prop.time = "300" RETURN id"#);
+    let a = run(
+        &s,
+        r#"TRAVERSE FROM user5 DEPTH 1 REL SENT WHERE prop.time = "300" RETURN id"#,
+    );
     assert_eq!(a.as_array().unwrap().len(), 0);
     // numeric literal vs string prop -> excluded
-    let b = run(&s, r#"TRAVERSE FROM user5 DEPTH 1 REL SENT WHERE prop.text = 100 RETURN id"#);
+    let b = run(
+        &s,
+        r#"TRAVERSE FROM user5 DEPTH 1 REL SENT WHERE prop.text = 100 RETURN id"#,
+    );
     assert_eq!(b.as_array().unwrap().len(), 0);
 }
 
@@ -374,7 +440,10 @@ fn where_three_way_and_with_missing_conjunct() {
 #[test]
 fn prop_accessor_is_case_insensitive() {
     let s = chat_fixture("hqlf_propcase");
-    let v = run(&s, r#"TRAVERSE FROM user5 DEPTH 1 REL SENT WHERE PROP.side = "them" RETURN id"#);
+    let v = run(
+        &s,
+        r#"TRAVERSE FROM user5 DEPTH 1 REL SENT WHERE PROP.side = "them" RETURN id"#,
+    );
     let mut got = ids(&v);
     got.sort();
     assert_eq!(got, vec!["msg1", "msg3", "msg4"]); // same as lowercase prop.side
@@ -384,7 +453,10 @@ fn prop_accessor_is_case_insensitive() {
 fn order_by_label_does_not_panic() {
     let s = chat_fixture("hqlf_orderlabel");
     // label is multi-valued; ORDER BY label must not panic and must keep all rows.
-    let v = run(&s, r#"TRAVERSE FROM user5 DEPTH 1 REL SENT ORDER BY label RETURN id"#);
+    let v = run(
+        &s,
+        r#"TRAVERSE FROM user5 DEPTH 1 REL SENT ORDER BY label RETURN id"#,
+    );
     assert_eq!(v.as_array().unwrap().len(), 5);
 }
 
@@ -397,7 +469,11 @@ fn hybrid_match_carries_clauses() {
         vector_dim: Some(2),
     })
     .unwrap();
-    for (id, emb) in [("a", vec![1.0, 0.0]), ("b", vec![0.8, 0.6]), ("c", vec![0.0, 1.0])] {
+    for (id, emb) in [
+        ("a", vec![1.0, 0.0]),
+        ("b", vec![0.8, 0.6]),
+        ("c", vec![0.0, 1.0]),
+    ] {
         s.add_node(NodeInput {
             id: Some(id.to_string()),
             labels: vec!["Doc".to_string()],
@@ -413,9 +489,15 @@ fn hybrid_match_carries_clauses() {
     }
     s.flush_index();
     // MATCH (hybrid) must accept the same trailing clauses as SEARCH.
-    let v = run(&s, r#"MATCH q SIMILAR TO [1.0,0.0] ALPHA 0.5 ORDER BY score DESC LIMIT 2 RETURN id, score"#);
+    let v = run(
+        &s,
+        r#"MATCH q SIMILAR TO [1.0,0.0] ALPHA 0.5 ORDER BY score DESC LIMIT 2 RETURN id, score"#,
+    );
     let arr = v.as_array().unwrap();
-    assert!(!arr.is_empty() && arr.len() <= 2, "LIMIT 2 caps MATCH result");
+    assert!(
+        !arr.is_empty() && arr.len() <= 2,
+        "LIMIT 2 caps MATCH result"
+    );
     let scores: Vec<f64> = arr
         .iter()
         .map(|o| o["score"].as_f64().expect("score projected as numeric"))
@@ -450,14 +532,19 @@ fn search_no_return_keeps_neighboroutput_shape() {
     let v = run(&s, r#"SEARCH q SIMILAR TO [1.0,0.0] K 5"#);
     let rows: Vec<NeighborOutput> = from_value(v).unwrap(); // full shape, no projection
     assert!(!rows.is_empty(), "search returns the indexed doc");
-    assert!(rows.iter().all(|r| r.score.is_some()), "SEARCH rows carry a score");
+    assert!(
+        rows.iter().all(|r| r.score.is_some()),
+        "SEARCH rows carry a score"
+    );
 }
 
 #[test]
 fn context_rejects_trailing_clauses() {
     let s = chat_fixture("hqlf_ctx_reject");
     assert!(s.execute_hql("CONTEXT FOR msg1 TIER H0 LIMIT 1").is_err());
-    assert!(s.execute_hql(r#"CONTEXT FOR msg1 TIER H0 WHERE id = "x""#).is_err());
+    assert!(s
+        .execute_hql(r#"CONTEXT FOR msg1 TIER H0 WHERE id = "x""#)
+        .is_err());
     assert!(s.execute_hql("CONTEXT FOR msg1 TIER H0 RETURN id").is_err());
     // but plain CONTEXT (with optional BUDGET) still works
     assert!(s.execute_hql("CONTEXT FOR msg1 TIER H0 BUDGET 100").is_ok());
@@ -477,7 +564,13 @@ fn digit_rules_parse_exact_values() {
     assert!(matches!(k, HqlCommand::Search { k: 7, .. }));
 
     let budget = HqlCommand::try_from("CONTEXT FOR x TIER H2 BUDGET 64000").unwrap();
-    assert!(matches!(budget, HqlCommand::Context { budget: Some(64000), .. }));
+    assert!(matches!(
+        budget,
+        HqlCommand::Context {
+            budget: Some(64000),
+            ..
+        }
+    ));
 
     let limit = HqlCommand::try_from("TRAVERSE FROM a DEPTH 1 REL R LIMIT 9").unwrap();
     let cl: HqlClauses = match limit {
@@ -497,5 +590,9 @@ fn limit_overflow_saturates_not_drops() {
         HqlCommand::Traverse { clauses, .. } => clauses.limit,
         _ => panic!(),
     };
-    assert_eq!(limit, Some(usize::MAX), "oversized LIMIT saturates, not dropped to None");
+    assert_eq!(
+        limit,
+        Some(usize::MAX),
+        "oversized LIMIT saturates, not dropped to None"
+    );
 }

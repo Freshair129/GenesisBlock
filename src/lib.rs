@@ -2269,7 +2269,12 @@ impl Storage {
                 None => serde_json::Value::Null,
             },
             HqlField::Depth => serde_json::json!(n.depth),
-            HqlField::Prop(k) => n.node.props.get(k).cloned().unwrap_or(serde_json::Value::Null),
+            HqlField::Prop(k) => n
+                .node
+                .props
+                .get(k)
+                .cloned()
+                .unwrap_or(serde_json::Value::Null),
         }
     }
 
@@ -2357,13 +2362,18 @@ impl Storage {
         clauses: &query::ast::HqlClauses,
     ) -> Result<serde_json::Value> {
         use query::ast::HqlReturn;
-        let ser_err =
-            |e: serde_json::Error| Error::from_reason(format!("HQL result serialization failed: {e}"));
+        let ser_err = |e: serde_json::Error| {
+            Error::from_reason(format!("HQL result serialization failed: {e}"))
+        };
 
         // 1. WHERE (conjunction of predicates)
         if !clauses.where_preds.is_empty() {
-            results
-                .retain(|n| clauses.where_preds.iter().all(|p| Self::hql_eval_predicate(n, p)));
+            results.retain(|n| {
+                clauses
+                    .where_preds
+                    .iter()
+                    .all(|p| Self::hql_eval_predicate(n, p))
+            });
         }
 
         // 2. ORDER BY (nulls always last, regardless of ASC/DESC)

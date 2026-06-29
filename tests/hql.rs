@@ -100,7 +100,10 @@ fn hql_traverse_valid() {
     let neighbors: Vec<NeighborOutput> = from_value(res).unwrap();
     let ids: Vec<&str> = neighbors.iter().map(|n| n.node.id.as_str()).collect();
     assert!(ids.contains(&"B"), "depth-1 neighbor B must appear");
-    assert!(ids.contains(&"C"), "depth-2 neighbor C must appear (DEPTH now honored)");
+    assert!(
+        ids.contains(&"C"),
+        "depth-2 neighbor C must appear (DEPTH now honored)"
+    );
 
     // Cross-check the direct `neighbors()` API agrees.
     let direct = s
