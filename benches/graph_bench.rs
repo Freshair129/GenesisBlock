@@ -49,6 +49,7 @@ fn main() {
         .map(|s| s.split(',').filter_map(|x| x.trim().parse().ok()).collect())
         .unwrap_or_else(|| vec![1, 3, 6]);
 
+    let ts_start = chrono::Utc::now();
     let dbpath = format!("{bench}/gdb_graph");
     let _ = fs::remove_dir_all(&dbpath);
     let storage = Storage::open(OpenOptions {
@@ -178,4 +179,44 @@ fn main() {
         serde_json::to_string_pretty(&out).unwrap(),
     )
     .unwrap();
+
+    // Suite-format metrics for the Independent Benchmark Suite assembler. The
+    // headline latency fields use the *deepest* traversal depth measured. This
+    // is a descriptive benchmark: `pass` means "ran to completion", not a
+    // pass/fail threshold.
+    let ts_end = chrono::Utc::now();
+    let deepest = per_depth.last().cloned().unwrap_or(serde_json::json!({}));
+    let to_ms = |v: &serde_json::Value, key: &str| {
+        v.get(key).and_then(|x| x.as_f64()).unwrap_or(0.0) / 1000.0 // µs -> ms
+    };
+    let metrics = serde_json::json!({
+        "benchmark_id": "graph_traversal",
+        "project": "GenesisBlockDB",
+        "timestamp_start": ts_start.to_rfc3339(),
+        "timestamp_end": ts_end.to_rfc3339(),
+        "duration_sec": (ts_end - ts_start).num_seconds().max(0),
+        "interrupted": false,
+        "config": {
+            "profile": "graph_traversal",
+            "n": n, "fanout": fanout, "edges": total_edges, "limit": limit, "depths": depths
+        },
+        "results": {
+            "pass": true,
+            "total_nodes": n,
+            "peak_ram_mb": rss,
+            "node_ingest_sec": node_sec,
+            "edge_ingest_sec": edge_sec,
+            "deepest_depth": deepest.get("depth").and_then(|x| x.as_u64()).unwrap_or(0),
+            "query_latency_p50_ms": to_ms(&deepest, "p50_us"),
+            "query_latency_p95_ms": to_ms(&deepest, "p95_us"),
+            "query_latency_p99_ms": to_ms(&deepest, "p99_us"),
+            "per_depth": per_depth
+        }
+    });
+    fs::write(
+        format!("{bench}/graph_bench_metrics.json"),
+        serde_json::to_string_pretty(&metrics).unwrap(),
+    )
+    .unwrap();
+    println!("metrics JSON written: {bench}/graph_bench_metrics.json");
 }

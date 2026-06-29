@@ -4,6 +4,17 @@
 **Suite:** `tests/soak_tests.rs`
 **Result:** 2/2 PASS (light + medium)
 
+> **⚠ Internal audit (Level 0).** The light/medium numbers below were measured by
+> the maintainer on a single machine and have **not** been independently
+> reproduced. For the reproducible, schema-verified workflow (smoke / 1h / 12h
+> soak, graph, vector) that anyone can run and submit, see
+> [`../BENCHMARKING.md`](../BENCHMARKING.md) and
+> [`benchmarks/INDEPENDENT-BENCHMARKS.md`](benchmarks/INDEPENDENT-BENCHMARKS.md).
+> The duration-bounded `soak_heavy` profile (used by the Independent Benchmark
+> Suite for the 12h soak) lives in the same `tests/soak_tests.rs` file. The
+> **12h soak is internal until reproduced externally** — see the credibility
+> levels in INDEPENDENT-BENCHMARKS.md.
+
 ## Motivation
 
 Soak tests detect problems that only surface under sustained load: memory

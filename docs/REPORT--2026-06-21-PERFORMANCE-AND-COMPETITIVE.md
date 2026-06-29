@@ -24,6 +24,12 @@ related:
 
 # GenesisBlockDB — Engineering Report (2026-06-21)
 
+> **Internal audit (Level 0).** The numbers in this report were measured by the
+> maintainer on one machine and are **not** independently reproduced. For the
+> reproducible, schema-verified benchmark workflow that anyone can run and submit,
+> see [`../BENCHMARKING.md`](../BENCHMARKING.md) and
+> [`benchmarks/INDEPENDENT-BENCHMARKS.md`](benchmarks/INDEPENDENT-BENCHMARKS.md).
+
 Docs↔code audit → correctness restoration → performance optimization → first
 measured competitive benchmark. All work merged to `main` and pushed; the full
 Rust suite is green throughout (20 passed / 0 failed / 22 binaries).
