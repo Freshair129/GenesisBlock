@@ -1,0 +1,53 @@
+{
+  "_fixture": true,
+  "_note": "SYNTHETIC test fixture — short soak smoke, passing. Not a real result.",
+  "benchmark_id": "soak_smoke",
+  "project": "GenesisBlockDB",
+  "commit": "0123456789abcdef0123456789abcdef01234567",
+  "repo_dirty": false,
+  "interrupted": false,
+  "version": "0.2.0",
+  "timestamp_start": "2026-01-01T00:00:00+00:00",
+  "timestamp_end": "2026-01-01T00:02:00+00:00",
+  "duration_sec": 120,
+  "environment": {
+    "os": "Windows-10-10.0.19045-SP0",
+    "cpu": "Intel64 Family 6 Model 158 Stepping 10, GenuineIntel",
+    "ram_gb": 32.0,
+    "disk": "C:\\temp (120.0 GB free / 232.0 GB total)",
+    "rustc": "rustc 1.96.0 (ac68faa20 2026-05-25)",
+    "cargo": "cargo 1.96.0 (30a34c682 2026-05-25)"
+  },
+  "config": {
+    "profile": "soak_smoke",
+    "duration_target_sec": 120,
+    "dim": 16,
+    "nodes_per_cycle": 500,
+    "compact_every": 20,
+    "query_k": 10,
+    "ef_search": 200,
+    "recall_threshold": 0.1
+  },
+  "results": {
+    "pass": true,
+    "cycles": 240,
+    "total_nodes": 120000,
+    "final_disk_mb": 41.2,
+    "peak_ram_mb": 210.0,
+    "recall_miss_rate": 0.004,
+    "query_latency_p50_ms": 0.0,
+    "query_latency_p95_ms": 1.0,
+    "query_latency_p99_ms": 1.0,
+    "ingest_latency_p50_ms": 380.0,
+    "ingest_latency_p95_ms": 440.0,
+    "reopen_ok": true,
+    "reopen_load_sec": 0.31
+  },
+  "artifacts": {
+    "raw_log": "raw.log",
+    "stderr_log": "stderr.log",
+    "summary_markdown": "summary.md",
+    "result_json": "result.json",
+    "env_json": "env.json"
+  }
+}

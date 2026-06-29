@@ -1,0 +1,130 @@
+# Independent Benchmark Suite — schema-verified, reproducible benchmarks.
+#
+# Two tiers (see docs/benchmarks/CI-RUNNERS.md):
+#   - smoke (+ verifier self-test): GitHub-hosted, runs on PRs and on demand.
+#   - long soak (1h/12h): self-hosted only, manual workflow_dispatch.
+#
+# This is intentionally separate from benchmarks.yml (per-PR audit) and
+# bench-manual.yml (manual audit/criterion) so those remain untouched.
+
+name: Independent Benchmark
+
+on:
+  pull_request:
+    branches: [ main ]
+    paths:
+      - 'benchmark/**'
+      - 'benches/vector_bench.rs'
+      - 'benches/graph_bench.rs'
+      - 'tests/soak_tests.rs'
+      - '.github/workflows/independent-benchmark.yml'
+  workflow_dispatch:
+    inputs:
+      benchmark:
+        description: 'Which benchmark to run'
+        required: true
+        default: 'smoke'
+        type: choice
+        options:
+          - smoke
+          - graph
+          - vector
+          - soak_1h
+          - soak_12h
+
+permissions:
+  contents: read
+
+jobs:
+  # Always-on, fast: the verifier's own unit tests. No engine build needed.
+  verifier-tests:
+    name: verify_report unit tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+      - name: Run verifier tests
+        run: python -m unittest benchmark.test_verify_report -v
+
+  # Fast smoke benchmark on GitHub-hosted runners (PR + manual smoke).
+  smoke:
+    name: smoke benchmark (${{ matrix.os }})
+    if: github.event_name == 'pull_request' || inputs.benchmark == 'smoke'
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ ubuntu-latest, windows-latest ]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+      - name: Run smoke soak (60s) — Linux/macOS
+        if: runner.os != 'Windows'
+        env:
+          SOAK_DURATION_SEC: 60
+        run: bash benchmark/run_smoke.sh
+      - name: Run smoke soak (60s) — Windows
+        if: runner.os == 'Windows'
+        env:
+          SOAK_DURATION_SEC: 60
+        shell: pwsh
+        run: .\benchmark\run_smoke.ps1
+      - name: Upload run directory
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: smoke-${{ matrix.os }}
+          path: benchmark/results/**
+          retention-days: 30
+
+  # Optional fast graph/vector on demand (hosted).
+  micro:
+    name: ${{ inputs.benchmark }} benchmark
+    if: github.event_name == 'workflow_dispatch' && (inputs.benchmark == 'graph' || inputs.benchmark == 'vector')
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+      - name: Run ${{ inputs.benchmark }}
+        run: bash benchmark/run_${{ inputs.benchmark }}_bench.sh
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ${{ inputs.benchmark }}-result
+          path: benchmark/results/**
+          retention-days: 90
+
+  # Long soak — SELF-HOSTED ONLY. Never falls back to a hosted runner: if no
+  # runner with the `soak` label is online, this job simply queues.
+  soak:
+    name: long soak (${{ inputs.benchmark }})
+    if: github.event_name == 'workflow_dispatch' && (inputs.benchmark == 'soak_1h' || inputs.benchmark == 'soak_12h')
+    runs-on: [ self-hosted, soak ]
+    timeout-minutes: 900  # 15h ceiling so a 12h soak has headroom
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Run ${{ inputs.benchmark }}
+        env:
+          # soak_12h -> 43200s (default); soak_1h -> 3600s
+          SOAK_DURATION_SEC: ${{ inputs.benchmark == 'soak_1h' && '3600' || '43200' }}
+        run: bash benchmark/run_soak_12h.sh
+      - name: Upload run directory
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ inputs.benchmark }}-result
+          path: benchmark/results/**
+          retention-days: 90

@@ -38,3 +38,12 @@ benches/*_db/
 # Test scratch DBs — generated AND consumed within each `cargo test` run
 # (every test does remove_dir_all first; not committed fixtures)
 tests/test_*/
+
+# Independent Benchmark Suite run outputs — generated locally, attached to
+# issues manually (see BENCHMARKING.md §8). Keep the directory, ignore the runs.
+/benchmark/results/*
+!/benchmark/results/.gitkeep
+
+# Python bytecode cache
+__pycache__/
+*.pyc

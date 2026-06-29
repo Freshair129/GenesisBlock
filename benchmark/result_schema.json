@@ -1,0 +1,95 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://github.com/Freshair129/GenesisBlock/benchmark/result_schema.json",
+  "title": "GenesisBlockDB Independent Benchmark Result",
+  "description": "Canonical machine-readable result for a soak benchmark (benchmark_id starting with 'soak_'). Graph/vector benchmarks reuse the same top-level envelope but carry a benchmark-specific 'results' block; see verify_report.py for the profile-aware checks. All fields are filled by benchmark/assemble_result.py from the engine-emitted metrics JSON plus the host-captured env.json — the benchmark code never self-reports its own environment.",
+  "type": "object",
+  "additionalProperties": true,
+  "required": [
+    "benchmark_id",
+    "project",
+    "commit",
+    "repo_dirty",
+    "version",
+    "timestamp_start",
+    "timestamp_end",
+    "duration_sec",
+    "environment",
+    "config",
+    "results",
+    "artifacts"
+  ],
+  "properties": {
+    "benchmark_id": { "type": "string", "minLength": 1 },
+    "project": { "type": "string", "minLength": 1 },
+    "commit": { "type": "string", "minLength": 7 },
+    "repo_dirty": { "type": "boolean" },
+    "interrupted": { "type": "boolean" },
+    "version": { "type": "string", "minLength": 1 },
+    "timestamp_start": { "type": "string", "minLength": 1 },
+    "timestamp_end": { "type": "string", "minLength": 1 },
+    "duration_sec": { "type": "number", "minimum": 0 },
+    "environment": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["os", "cpu", "ram_gb", "disk", "rustc", "cargo"],
+      "properties": {
+        "os": { "type": ["string", "null"] },
+        "cpu": { "type": ["string", "null"] },
+        "ram_gb": { "type": ["number", "null"] },
+        "disk": { "type": ["string", "null"] },
+        "rustc": { "type": ["string", "null"] },
+        "cargo": { "type": ["string", "null"] }
+      }
+    },
+    "config": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "profile": { "type": ["string", "null"] },
+        "duration_target_sec": { "type": ["integer", "null"] },
+        "nodes_per_cycle": { "type": ["integer", "null"] },
+        "compact_every": { "type": ["integer", "null"] },
+        "query_k": { "type": ["integer", "null"] },
+        "ef_search": { "type": ["integer", "null"] }
+      }
+    },
+    "results": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": [
+        "pass",
+        "total_nodes",
+        "query_latency_p50_ms",
+        "query_latency_p95_ms",
+        "query_latency_p99_ms"
+      ],
+      "properties": {
+        "pass": { "type": "boolean" },
+        "cycles": { "type": ["integer", "null"] },
+        "total_nodes": { "type": "integer", "minimum": 0 },
+        "final_disk_mb": { "type": ["number", "null"] },
+        "peak_ram_mb": { "type": ["number", "null"] },
+        "recall_miss_rate": { "type": ["number", "null"] },
+        "query_latency_p50_ms": { "type": "number", "minimum": 0 },
+        "query_latency_p95_ms": { "type": "number", "minimum": 0 },
+        "query_latency_p99_ms": { "type": "number", "minimum": 0 },
+        "ingest_latency_p50_ms": { "type": ["number", "null"] },
+        "ingest_latency_p95_ms": { "type": ["number", "null"] },
+        "reopen_ok": { "type": ["boolean", "null"] },
+        "reopen_load_sec": { "type": ["number", "null"] }
+      }
+    },
+    "artifacts": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "raw_log": { "type": ["string", "null"] },
+        "stderr_log": { "type": ["string", "null"] },
+        "summary_markdown": { "type": ["string", "null"] },
+        "result_json": { "type": ["string", "null"] },
+        "env_json": { "type": ["string", "null"] }
+      }
+    }
+  }
+}

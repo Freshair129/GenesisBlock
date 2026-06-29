@@ -156,6 +156,12 @@ required-features = ["bins"]
 
 
 [[bin]]
+name = "vector-bench"
+path = "benches/vector_bench.rs"
+required-features = ["bins"]
+
+
+[[bin]]
 name = "gov-kimpact-bench"
 path = "benches/gov_kimpact_bench.rs"
 required-features = ["bins"]

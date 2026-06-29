@@ -1,0 +1,53 @@
+{
+  "_fixture": true,
+  "_note": "SYNTHETIC \u2014 dirty working tree (REJECTED unless --allow-dirty).",
+  "benchmark_id": "soak_heavy_12h",
+  "project": "GenesisBlockDB",
+  "commit": "0123456789abcdef0123456789abcdef01234567",
+  "repo_dirty": true,
+  "interrupted": false,
+  "version": "0.2.0",
+  "timestamp_start": "2026-01-01T00:00:00+00:00",
+  "timestamp_end": "2026-01-01T12:00:00+00:00",
+  "duration_sec": 43210,
+  "environment": {
+    "os": "Linux-6.1.0-x86_64",
+    "cpu": "AMD Ryzen 9 5950X 16-Core Processor",
+    "ram_gb": 64.0,
+    "disk": "/data (820.0 GB free / 1863.0 GB total)",
+    "rustc": "rustc 1.96.0 (ac68faa20 2026-05-25)",
+    "cargo": "cargo 1.96.0 (30a34c682 2026-05-25)"
+  },
+  "config": {
+    "profile": "soak_heavy_12h",
+    "duration_target_sec": 43200,
+    "dim": 16,
+    "nodes_per_cycle": 500,
+    "compact_every": 20,
+    "query_k": 10,
+    "ef_search": 200,
+    "recall_threshold": 0.1
+  },
+  "results": {
+    "pass": true,
+    "cycles": 51234,
+    "total_nodes": 25617000,
+    "final_disk_mb": 9123.4,
+    "peak_ram_mb": 5821.0,
+    "recall_miss_rate": 0.012,
+    "query_latency_p50_ms": 0.0,
+    "query_latency_p95_ms": 1.0,
+    "query_latency_p99_ms": 2.0,
+    "ingest_latency_p50_ms": 410.0,
+    "ingest_latency_p95_ms": 470.0,
+    "reopen_ok": true,
+    "reopen_load_sec": 4.812
+  },
+  "artifacts": {
+    "raw_log": "raw.log",
+    "stderr_log": "stderr.log",
+    "summary_markdown": "summary.md",
+    "result_json": "result.json",
+    "env_json": "env.json"
+  }
+}

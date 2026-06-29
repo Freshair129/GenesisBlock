@@ -2,3 +2,8 @@
 # against fresh output in CI (mobile-build.yml "C header freshness"). Pin LF so a
 # CRLF checkout on a Windows dev box can't make that gate spuriously fail.
 include/genesisdb.h text eol=lf
+
+# Benchmark shell scripts must stay LF — a CRLF checkout breaks bash on
+# Linux/macOS/CI (`\r` in the shebang / line endings). The .ps1 siblings are
+# Windows-only and unaffected.
+benchmark/*.sh text eol=lf
