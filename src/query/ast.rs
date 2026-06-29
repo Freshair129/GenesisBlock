@@ -221,7 +221,9 @@ impl HqlCommand {
                     let v = inner.into_inner().next();
                     if let Some(vp) = v {
                         match vp.as_rule() {
-                            Rule::string_lit => value = HqlValue::Str(Self::parse_string_lit(vp.as_str())),
+                            Rule::string_lit => {
+                                value = HqlValue::Str(Self::parse_string_lit(vp.as_str()))
+                            }
                             Rule::number => {
                                 value = HqlValue::Num(vp.as_str().parse::<f64>().unwrap_or(0.0))
                             }
