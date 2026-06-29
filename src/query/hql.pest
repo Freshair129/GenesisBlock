@@ -11,18 +11,40 @@ rel = { infer_rel | rel_type }
 
 number = @{ ("+" | "-")? ~ ASCII_DIGIT+ ~ ("." ~ ASCII_DIGIT+)? }
 vector = { number ~ ("," ~ number)* }
-k = { ASCII_DIGIT+ }
-depth = { ASCII_DIGIT+ }
+// Digit rules MUST be atomic (@): a non-atomic `{ ASCII_DIGIT+ }` lets pest's
+// implicit WHITESPACE creep into the matched span (e.g. "2 "), which then fails
+// `.parse()` and silently falls back to the default — this was the long-standing
+// "DEPTH always parses to 1" bug. See ADR--GENESISDB-HQL-FILTER-PROJECTION.
+k = @{ ASCII_DIGIT+ }
+depth = @{ ASCII_DIGIT+ }
 alpha = { number }
 lang_spec = { ^"LANGUAGE" ~ string_lit }
 as_of = { ^"AS" ~ ^"OF" ~ string_lit }
 collection_spec = { ^"IN" ~ (identifier | string_lit) }
 
-search = { ^"SEARCH" ~ target ~ ^"SIMILAR" ~ ^"TO" ~ "[" ~ vector ~ "]" ~ ^"K" ~ k ~ collection_spec? ~ lang_spec? ~ as_of? }
-traverse = { ^"TRAVERSE" ~ ^"FROM" ~ seed ~ ^"DEPTH" ~ depth ~ ^"REL" ~ rel ~ as_of? }
-hybrid = { ^"MATCH" ~ target ~ ^"SIMILAR" ~ ^"TO" ~ "[" ~ vector ~ "]" ~ ^"ALPHA" ~ alpha ~ collection_spec? ~ lang_spec? ~ as_of? }
+// --- filter / projection / ergonomics clauses (ADR--GENESISDB-HQL-FILTER-PROJECTION) ---
+// All four are optional and post-process the command's result list in order:
+// WHERE -> ORDER BY -> LIMIT -> RETURN. prop.<key> reaches into a node's `props`.
+prop_field = @{ ^"prop." ~ (ASCII_ALPHANUMERIC | "_" | "-")+ }
+field = { prop_field | ^"id" | ^"label" | ^"score" | ^"depth" }
+op = { "<=" | ">=" | "!=" | "=" | "<" | ">" | ^"CONTAINS" | ^"STARTSWITH" }
+filter_value = { string_lit | number }
+predicate = { field ~ op ~ filter_value }
+where_clause = { ^"WHERE" ~ predicate ~ (^"AND" ~ predicate)* }
+order_dir = { ^"ASC" | ^"DESC" }
+order_clause = { ^"ORDER" ~ ^"BY" ~ field ~ order_dir? }
+limit_n = @{ ASCII_DIGIT+ }
+limit_clause = { ^"LIMIT" ~ limit_n }
+return_all = { "*" }
+return_clause = { ^"RETURN" ~ (return_all | field ~ ("," ~ field)*) }
+// Whole group is nullable, so existing clause-free queries still parse unchanged.
+clauses = { where_clause? ~ order_clause? ~ limit_clause? ~ return_clause? }
 
-budget = { ASCII_DIGIT+ }
+search = { ^"SEARCH" ~ target ~ ^"SIMILAR" ~ ^"TO" ~ "[" ~ vector ~ "]" ~ ^"K" ~ k ~ collection_spec? ~ lang_spec? ~ as_of? ~ clauses }
+traverse = { ^"TRAVERSE" ~ ^"FROM" ~ seed ~ ^"DEPTH" ~ depth ~ ^"REL" ~ rel ~ as_of? ~ clauses }
+hybrid = { ^"MATCH" ~ target ~ ^"SIMILAR" ~ ^"TO" ~ "[" ~ vector ~ "]" ~ ^"ALPHA" ~ alpha ~ collection_spec? ~ lang_spec? ~ as_of? ~ clauses }
+
+budget = @{ ASCII_DIGIT+ }
 tier = { "H0" | "H1" | "H2" | "H3" | "H4" | "H5" }
 context = { ^"CONTEXT" ~ ^"FOR" ~ target ~ ^"TIER" ~ tier ~ (^"BUDGET" ~ budget)? }
 

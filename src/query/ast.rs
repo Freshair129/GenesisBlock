@@ -12,6 +12,75 @@ pub enum HqlRel {
     Inferred(String),
 }
 
+/// A queryable field in WHERE / ORDER BY / RETURN clauses.
+/// `Prop(key)` reaches into a node's `props` object; the rest are top-level.
+#[derive(Debug, Clone, PartialEq)]
+pub enum HqlField {
+    Id,
+    Label,
+    Score,
+    Depth,
+    Prop(String),
+}
+
+impl HqlField {
+    /// The output key used when this field is projected via RETURN
+    /// (`prop.text` -> `"text"`, `score` -> `"score"`, ...).
+    pub fn output_key(&self) -> String {
+        match self {
+            HqlField::Id => "id".to_string(),
+            HqlField::Label => "label".to_string(),
+            HqlField::Score => "score".to_string(),
+            HqlField::Depth => "depth".to_string(),
+            HqlField::Prop(k) => k.clone(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum HqlOp {
+    Eq,
+    Ne,
+    Lt,
+    Le,
+    Gt,
+    Ge,
+    Contains,
+    StartsWith,
+}
+
+#[derive(Debug, Clone)]
+pub enum HqlValue {
+    Str(String),
+    Num(f64),
+}
+
+#[derive(Debug, Clone)]
+pub struct HqlPredicate {
+    pub field: HqlField,
+    pub op: HqlOp,
+    pub value: HqlValue,
+}
+
+/// RETURN projection: `All` is `RETURN *` (keep the full NeighborOutput shape);
+/// `Fields` reshapes each hit into a flat object of the named fields.
+#[derive(Debug, Clone)]
+pub enum HqlReturn {
+    All,
+    Fields(Vec<HqlField>),
+}
+
+/// Optional post-process clauses applied (in this order) to a command's result
+/// list: WHERE filter -> ORDER BY -> LIMIT -> RETURN projection. An absent
+/// `ret` means no RETURN clause (full NeighborOutput list, unchanged behavior).
+#[derive(Debug, Clone, Default)]
+pub struct HqlClauses {
+    pub where_preds: Vec<HqlPredicate>,
+    pub order_by: Option<(HqlField, bool)>, // (field, descending)
+    pub limit: Option<usize>,
+    pub ret: Option<HqlReturn>,
+}
+
 #[derive(Debug, Clone)]
 pub enum HqlCommand {
     Search {
@@ -22,6 +91,7 @@ pub enum HqlCommand {
         lang: Option<String>,
         as_of: Option<String>,
         collection: Option<String>,
+        clauses: HqlClauses,
     },
     Traverse {
         seed: String,
@@ -29,6 +99,7 @@ pub enum HqlCommand {
         rel: HqlRel,
         fuzzy: bool,
         as_of: Option<String>,
+        clauses: HqlClauses,
     },
     Hybrid {
         target: String,
@@ -38,6 +109,7 @@ pub enum HqlCommand {
         lang: Option<String>,
         as_of: Option<String>,
         collection: Option<String>,
+        clauses: HqlClauses,
     },
     Context {
         target: String,
@@ -116,6 +188,127 @@ impl HqlCommand {
         "".to_string()
     }
 
+    fn parse_string_lit(s: &str) -> String {
+        // strip surrounding double quotes
+        if s.len() >= 2 {
+            s[1..s.len() - 1].to_string()
+        } else {
+            s.to_string()
+        }
+    }
+
+    fn parse_predicate(pair: pest::iterators::Pair<Rule>) -> HqlPredicate {
+        let mut field = HqlField::Id;
+        let mut op = HqlOp::Eq;
+        let mut value = HqlValue::Str(String::new());
+        for inner in pair.into_inner() {
+            match inner.as_rule() {
+                Rule::field => field = Self::field_from_pair(inner),
+                Rule::op => {
+                    op = match inner.as_str().to_uppercase().as_str() {
+                        "=" => HqlOp::Eq,
+                        "!=" => HqlOp::Ne,
+                        "<" => HqlOp::Lt,
+                        "<=" => HqlOp::Le,
+                        ">" => HqlOp::Gt,
+                        ">=" => HqlOp::Ge,
+                        "CONTAINS" => HqlOp::Contains,
+                        "STARTSWITH" => HqlOp::StartsWith,
+                        _ => HqlOp::Eq,
+                    }
+                }
+                Rule::filter_value => {
+                    let v = inner.into_inner().next();
+                    if let Some(vp) = v {
+                        match vp.as_rule() {
+                            Rule::string_lit => value = HqlValue::Str(Self::parse_string_lit(vp.as_str())),
+                            Rule::number => {
+                                value = HqlValue::Num(vp.as_str().parse::<f64>().unwrap_or(0.0))
+                            }
+                            _ => {}
+                        }
+                    }
+                }
+                _ => {}
+            }
+        }
+        HqlPredicate { field, op, value }
+    }
+
+    /// Resolve a `field` rule pair into an `HqlField`.
+    fn field_from_pair(pair: pest::iterators::Pair<Rule>) -> HqlField {
+        if let Some(inner) = pair.clone().into_inner().next() {
+            if inner.as_rule() == Rule::prop_field {
+                let s = inner.as_str();
+                return HqlField::Prop(s["prop.".len()..].to_string());
+            }
+        }
+        // Bare keyword field (id/label/score/depth) — `field` has no inner token
+        // for these, so read its own matched text.
+        match pair.as_str().to_lowercase().as_str() {
+            "id" => HqlField::Id,
+            "label" => HqlField::Label,
+            "score" => HqlField::Score,
+            "depth" => HqlField::Depth,
+            other => HqlField::Prop(other.to_string()),
+        }
+    }
+
+    fn parse_clauses(pair: pest::iterators::Pair<Rule>) -> HqlClauses {
+        let mut c = HqlClauses::default();
+        for inner in pair.into_inner() {
+            match inner.as_rule() {
+                Rule::where_clause => {
+                    for p in inner.into_inner() {
+                        if p.as_rule() == Rule::predicate {
+                            c.where_preds.push(Self::parse_predicate(p));
+                        }
+                    }
+                }
+                Rule::order_clause => {
+                    let mut f = HqlField::Score;
+                    let mut desc = false;
+                    for p in inner.into_inner() {
+                        match p.as_rule() {
+                            Rule::field => f = Self::field_from_pair(p),
+                            Rule::order_dir => desc = p.as_str().eq_ignore_ascii_case("DESC"),
+                            _ => {}
+                        }
+                    }
+                    c.order_by = Some((f, desc));
+                }
+                Rule::limit_clause => {
+                    for p in inner.into_inner() {
+                        if p.as_rule() == Rule::limit_n {
+                            // Saturate on overflow rather than silently dropping the
+                            // clause: an absurdly large LIMIT means "no practical cap"
+                            // (truncate(usize::MAX) is a no-op), never "no LIMIT at all".
+                            c.limit = Some(p.as_str().parse::<usize>().unwrap_or(usize::MAX));
+                        }
+                    }
+                }
+                Rule::return_clause => {
+                    let mut fields = Vec::new();
+                    let mut all = false;
+                    for p in inner.into_inner() {
+                        match p.as_rule() {
+                            Rule::return_all => all = true,
+                            Rule::field => fields.push(Self::field_from_pair(p)),
+                            _ => {}
+                        }
+                    }
+                    c.ret = Some(if all {
+                        HqlReturn::All
+                    } else {
+                        HqlReturn::Fields(fields)
+                    });
+                }
+                _ => {}
+            }
+        }
+        c
+    }
+
     fn parse_collection_spec(pair: pest::iterators::Pair<Rule>) -> String {
         for inner in pair.into_inner() {
             match inner.as_rule() {
@@ -138,6 +331,7 @@ impl HqlCommand {
         let mut lang = None;
         let mut as_of = None;
         let mut collection = None;
+        let mut clauses = HqlClauses::default();
 
         for inner in pair.into_inner() {
             match inner.as_rule() {
@@ -156,6 +350,7 @@ impl HqlCommand {
                 Rule::collection_spec => collection = Some(Self::parse_collection_spec(inner)),
                 Rule::lang_spec => lang = Some(Self::parse_lang_spec(inner)),
                 Rule::as_of => as_of = Some(Self::parse_as_of(inner)),
+                Rule::clauses => clauses = Self::parse_clauses(inner),
                 _ => {}
             }
         }
@@ -168,6 +363,7 @@ impl HqlCommand {
             lang,
             as_of,
             collection,
+            clauses,
         }
     }
 
@@ -177,6 +373,7 @@ impl HqlCommand {
         let mut rel = HqlRel::Physical("ANY".to_string());
         let mut fuzzy = false;
         let mut as_of = None;
+        let mut clauses = HqlClauses::default();
 
         for inner in pair.into_inner() {
             match inner.as_rule() {
@@ -204,6 +401,7 @@ impl HqlCommand {
                     }
                 }
                 Rule::as_of => as_of = Some(Self::parse_as_of(inner)),
+                Rule::clauses => clauses = Self::parse_clauses(inner),
                 _ => {}
             }
         }
@@ -214,6 +412,7 @@ impl HqlCommand {
             rel,
             fuzzy,
             as_of,
+            clauses,
         }
     }
 
@@ -225,6 +424,7 @@ impl HqlCommand {
         let mut lang = None;
         let mut as_of = None;
         let mut collection = None;
+        let mut clauses = HqlClauses::default();
 
         for inner in pair.into_inner() {
             match inner.as_rule() {
@@ -243,6 +443,7 @@ impl HqlCommand {
                 Rule::collection_spec => collection = Some(Self::parse_collection_spec(inner)),
                 Rule::lang_spec => lang = Some(Self::parse_lang_spec(inner)),
                 Rule::as_of => as_of = Some(Self::parse_as_of(inner)),
+                Rule::clauses => clauses = Self::parse_clauses(inner),
                 _ => {}
             }
         }
@@ -255,6 +456,7 @@ impl HqlCommand {
             lang,
             as_of,
             collection,
+            clauses,
         }
     }
 
