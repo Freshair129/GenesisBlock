@@ -234,6 +234,12 @@ pub struct NeighborOutput {
     pub node: NodeOutput,
     pub path: Vec<EdgeOutput>,
     pub depth: u32,
+    /// Relevance score for ranked results (hybrid_search): the blended
+    /// `similarity*(1-alpha) + impact*alpha`. `None` for graph traversal
+    /// (`neighbors`), which is not relevance-ranked. Kept separate from
+    /// `node.impact` so the caller still sees the node's true graph-authority
+    /// signal and can fuse it itself (see ADR--GENESISDB-KIMPACT-AS-SIGNAL).
+    pub score: Option<f64>,
 }
 
 #[cfg_attr(feature = "napi-bindings", napi(object))]
@@ -2454,14 +2460,17 @@ impl Storage {
         }
         let mut hybrid_results = Vec::new();
         let meta_arena = coll.metadata.read();
-        let alpha = args.alpha.unwrap_or(0.5);
+        // Default to pure vector similarity. K-Impact blending is opt-in via an
+        // explicit `alpha > 0` — see ADR--GENESISDB-KIMPACT-AS-SIGNAL. (Was 0.5,
+        // which silently mixed graph-authority into every query.)
+        let alpha = args.alpha.unwrap_or(0.0);
 
         for (d_id, distance) in results {
             if let Some(meta) = meta_arena.get(d_id) {
                 {
                     let u32_id = meta.node_u32; // A2: id interned in metadata
                     if let Some(node) = self.nodes.get(&u32_id) {
-                        let mut node_out = node.value().clone();
+                        let node_out = node.value().clone();
 
                         if !Self::is_valid_as_of(
                             &node_out.valid_from,
@@ -2474,22 +2483,24 @@ impl Storage {
                         let similarity = 1.0 - distance as f64;
                         let reasoning_score =
                             (similarity * (1.0 - alpha)) + (node_out.impact.unwrap_or(0.0) * alpha);
-                        node_out.impact = Some(reasoning_score);
+                        // Carry the ranking score in `score`; leave `node.impact`
+                        // as the node's true graph-authority signal (don't clobber
+                        // it) so the caller can fuse it itself.
                         hybrid_results.push(NeighborOutput {
                             node: node_out,
                             path: Vec::new(),
                             depth: 0,
+                            score: Some(reasoning_score),
                         });
                     }
                 }
             }
         }
-        // NaN-safe: a poisoned (NaN) impact score must not panic the whole query.
+        // NaN-safe: a poisoned (NaN) score must not panic the whole query.
         // Treat incomparable scores as equal so sorting degrades gracefully.
         hybrid_results.sort_by(|a, b| {
-            b.node
-                .impact
-                .partial_cmp(&a.node.impact)
+            b.score
+                .partial_cmp(&a.score)
                 .unwrap_or(std::cmp::Ordering::Equal)
         });
         // Dedupe by node id, keeping the highest-scoring hit. A node may hold more
@@ -2630,6 +2641,7 @@ impl Storage {
                                     node: node.clone(),
                                     path: new_path.clone(),
                                     depth: curr_depth + 1,
+                                    score: None,
                                 });
                                 if let Some(l) = lim {
                                     if results.len() >= l {
