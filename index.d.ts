@@ -104,6 +104,13 @@ export interface NeighborOutput {
   node: NodeOutput
   path: Array<EdgeOutput>
   depth: number
+  /**
+   * Relevance score for ranked results (hybrid_search): the blended
+   * `similarity*(1-alpha) + impact*alpha`. `None` for graph traversal
+   * (`neighbors`), which is not relevance-ranked. Kept separate from
+   * `node.impact` so the caller still sees the node's true graph-authority
+   * signal and can fuse it itself (see ADR--GENESISDB-KIMPACT-AS-SIGNAL).
+   */
   score?: number
 }
 export interface HybridSearchInput {
