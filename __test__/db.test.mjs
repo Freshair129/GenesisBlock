@@ -12,6 +12,19 @@ function tempDb(suffix) {
   return path.join(os.tmpdir(), `genesis-napi-test-${suffix}-${process.pid}`);
 }
 
+// Best-effort temp-dir removal. On Windows the in-process WAL writer + indexing
+// threads keep the DB files open for the lifetime of the GenesisDatabase (their
+// handles are only released when it is GC'd), so an immediate rmSync raises
+// ENOTEMPTY/EBUSY/EPERM. The assertions are what we care about; the OS reclaims
+// the temp dir, so we swallow those lock errors and let other errors surface.
+function cleanup(dbPath) {
+  try {
+    fs.rmSync(dbPath, { recursive: true, force: true });
+  } catch (err) {
+    if (!['ENOTEMPTY', 'EBUSY', 'EPERM', 'EACCES'].includes(err.code)) throw err;
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Read-your-write: add a node with a vector, flush the HNSW index, then
 // hybridSearch must return that node as the nearest neighbour.
@@ -26,7 +39,7 @@ test('NAPI: read-your-write — addNode + flushIndex + hybridSearch', async () =
     assert.strictEqual(results.length, 1, 'search must return exactly one result');
     assert.strictEqual(results[0].node.id, 'v1', 'nearest neighbour must be the inserted node');
   } finally {
-    fs.rmSync(dbPath, { recursive: true, force: true });
+    cleanup(dbPath);
   }
 });
 
@@ -44,7 +57,7 @@ test('NAPI: indexLag is zero after flushIndex', async () => {
     await db.flushIndex();
     assert.strictEqual(db.indexLag(), 0, 'lag must be zero after flush');
   } finally {
-    fs.rmSync(dbPath, { recursive: true, force: true });
+    cleanup(dbPath);
   }
 });
 
@@ -65,7 +78,7 @@ test('NAPI: wrong-dim embedding rejects cleanly', async () => {
     }
     assert.ok(threw, 'wrong-dim vector must throw an error');
   } finally {
-    fs.rmSync(dbPath, { recursive: true, force: true });
+    cleanup(dbPath);
   }
 });
 
@@ -91,7 +104,7 @@ test('NAPI: collection isolation — node in alpha invisible from beta search', 
     assert.ok(!ids.includes('alpha-node'),
       `alpha-node must not appear in beta search; got: ${JSON.stringify(ids)}`);
   } finally {
-    fs.rmSync(dbPath, { recursive: true, force: true });
+    cleanup(dbPath);
   }
 });
 
@@ -116,6 +129,6 @@ test('NAPI: edge survives saveState + reopen', async () => {
       assert.strictEqual(neighbors[0].node.id, 'dst');
     }
   } finally {
-    fs.rmSync(dbPath, { recursive: true, force: true });
+    cleanup(dbPath);
   }
 });

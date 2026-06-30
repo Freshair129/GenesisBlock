@@ -132,7 +132,8 @@ fn test_supersede_node_bitemporal_as_of() {
         page_cache_mb: Some(10),
         read_only: Some(false),
         vector_dim: None,
-    }).unwrap();
+    })
+    .unwrap();
 
     // Hub + target, both created in the distant past.
     db.add_node(NodeInput {
@@ -145,7 +146,8 @@ fn test_supersede_node_bitemporal_as_of() {
         caused_by: None,
         ttl: None,
         collection: None,
-    }).unwrap();
+    })
+    .unwrap();
 
     db.add_node(NodeInput {
         id: Some("target".to_string()),
@@ -157,7 +159,8 @@ fn test_supersede_node_bitemporal_as_of() {
         caused_by: None,
         ttl: None,
         collection: None,
-    }).unwrap();
+    })
+    .unwrap();
 
     db.add_edge(EdgeInput {
         id: Some("hub-to-target".to_string()),
@@ -169,44 +172,63 @@ fn test_supersede_node_bitemporal_as_of() {
         supersede: None,
         impact: None,
         caused_by: None,
-    }).unwrap();
+    })
+    .unwrap();
 
     // Pre-supersession: target is visible in a past-time query.
     let pre: Vec<NeighborOutput> = from_value(
-        db.execute_hql("TRAVERSE FROM hub DEPTH 1 REL ANY AS OF \"2022-01-01T00:00:00Z\"").unwrap()
-    ).unwrap();
+        db.execute_hql("TRAVERSE FROM hub DEPTH 1 REL ANY AS OF \"2022-01-01T00:00:00Z\"")
+            .unwrap(),
+    )
+    .unwrap();
     assert_eq!(pre.len(), 1, "target must be visible before supersession");
-    assert_eq!(pre[0].node.props["version"], 1, "pre-supersession props must be v1");
+    assert_eq!(
+        pre[0].node.props["version"], 1,
+        "pre-supersession props must be v1"
+    );
 
     // Supersede: valid_from advances to now (~2026), valid_to cleared.
-    let new_ver = db.supersede_node(
-        "target".to_string(),
-        Some(json!({"version": 2})),
-        None,
-    ).unwrap();
-    assert_eq!(new_ver.props["version"], 2, "supersede must return updated props");
+    let new_ver = db
+        .supersede_node("target".to_string(), Some(json!({"version": 2})), None)
+        .unwrap();
+    assert_eq!(
+        new_ver.props["version"], 2,
+        "supersede must return updated props"
+    );
 
     // Current view (no AS OF): always sees the latest version.
-    let cur: Vec<NeighborOutput> = from_value(
-        db.execute_hql("TRAVERSE FROM hub DEPTH 1 REL ANY").unwrap()
-    ).unwrap();
+    let cur: Vec<NeighborOutput> =
+        from_value(db.execute_hql("TRAVERSE FROM hub DEPTH 1 REL ANY").unwrap()).unwrap();
     assert_eq!(cur.len(), 1, "target still reachable in current view");
     assert_eq!(cur[0].node.props["version"], 2, "current view has v2 props");
 
     // AS OF 2022 after supersession: in-memory node has valid_from ~now (2026)
     // which is after 2022, so it is filtered out.
     let past: Vec<NeighborOutput> = from_value(
-        db.execute_hql("TRAVERSE FROM hub DEPTH 1 REL ANY AS OF \"2022-01-01T00:00:00Z\"").unwrap()
-    ).unwrap();
-    assert!(past.is_empty(),
-        "superseded node has valid_from=now; must not appear in a 2022 AS OF query");
+        db.execute_hql("TRAVERSE FROM hub DEPTH 1 REL ANY AS OF \"2022-01-01T00:00:00Z\"")
+            .unwrap(),
+    )
+    .unwrap();
+    assert!(
+        past.is_empty(),
+        "superseded node has valid_from=now; must not appear in a 2022 AS OF query"
+    );
 
     // AS OF far future: valid_from ~now < 2099, valid_to = None → visible.
     let future: Vec<NeighborOutput> = from_value(
-        db.execute_hql("TRAVERSE FROM hub DEPTH 1 REL ANY AS OF \"2099-01-01T00:00:00Z\"").unwrap()
-    ).unwrap();
-    assert_eq!(future.len(), 1, "target must be visible in far-future AS OF query");
-    assert_eq!(future[0].node.props["version"], 2, "far-future query returns v2");
+        db.execute_hql("TRAVERSE FROM hub DEPTH 1 REL ANY AS OF \"2099-01-01T00:00:00Z\"")
+            .unwrap(),
+    )
+    .unwrap();
+    assert_eq!(
+        future.len(),
+        1,
+        "target must be visible in far-future AS OF query"
+    );
+    assert_eq!(
+        future[0].node.props["version"], 2,
+        "far-future query returns v2"
+    );
 
     let _ = std::fs::remove_dir_all(path);
 }

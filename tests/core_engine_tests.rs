@@ -202,7 +202,9 @@ fn test_wal_group_commit_durability() {
 #[test]
 fn test_edge_wal_durability_without_snapshot() {
     let db_path = setup_test_db_path("test_edge_wal_durability");
-    if Path::new(&db_path).exists() { fs::remove_dir_all(&db_path).unwrap(); }
+    if Path::new(&db_path).exists() {
+        fs::remove_dir_all(&db_path).unwrap();
+    }
 
     {
         let storage = Storage::open(OpenOptions {
@@ -210,22 +212,47 @@ fn test_edge_wal_durability_without_snapshot() {
             page_cache_mb: None,
             read_only: Some(false),
             vector_dim: None,
-        }).unwrap();
-        storage.add_node(NodeInput {
-            id: Some("src".to_string()), labels: vec![], props: None, embedding: None,
-            lang: None, valid_from: None, caused_by: None, ttl: None, collection: None,
-        }).unwrap();
-        storage.add_node(NodeInput {
-            id: Some("dst".to_string()), labels: vec![], props: None, embedding: None,
-            lang: None, valid_from: None, caused_by: None, ttl: None, collection: None,
-        }).unwrap();
-        storage.add_edge(EdgeInput {
-            id: Some("e1".to_string()),
-            from: "src".to_string(),
-            to: "dst".to_string(),
-            rel: "CONNECTS".to_string(),
-            props: None, valid_from: None, supersede: None, impact: None, caused_by: None,
-        }).unwrap();
+        })
+        .unwrap();
+        storage
+            .add_node(NodeInput {
+                id: Some("src".to_string()),
+                labels: vec![],
+                props: None,
+                embedding: None,
+                lang: None,
+                valid_from: None,
+                caused_by: None,
+                ttl: None,
+                collection: None,
+            })
+            .unwrap();
+        storage
+            .add_node(NodeInput {
+                id: Some("dst".to_string()),
+                labels: vec![],
+                props: None,
+                embedding: None,
+                lang: None,
+                valid_from: None,
+                caused_by: None,
+                ttl: None,
+                collection: None,
+            })
+            .unwrap();
+        storage
+            .add_edge(EdgeInput {
+                id: Some("e1".to_string()),
+                from: "src".to_string(),
+                to: "dst".to_string(),
+                rel: "CONNECTS".to_string(),
+                props: None,
+                valid_from: None,
+                supersede: None,
+                impact: None,
+                caused_by: None,
+            })
+            .unwrap();
         // Drop without save_state — WAL-only durability.
     }
 
@@ -235,10 +262,17 @@ fn test_edge_wal_durability_without_snapshot() {
             page_cache_mb: None,
             read_only: Some(false),
             vector_dim: None,
-        }).unwrap();
-        let res = storage.execute_hql("TRAVERSE FROM src DEPTH 1 REL CONNECTS").unwrap();
+        })
+        .unwrap();
+        let res = storage
+            .execute_hql("TRAVERSE FROM src DEPTH 1 REL CONNECTS")
+            .unwrap();
         let neighbors: Vec<NeighborOutput> = from_value(res).unwrap();
-        assert_eq!(neighbors.len(), 1, "edge must survive WAL replay without a snapshot");
+        assert_eq!(
+            neighbors.len(),
+            1,
+            "edge must survive WAL replay without a snapshot"
+        );
         assert_eq!(neighbors[0].node.id, "dst");
     }
 }
