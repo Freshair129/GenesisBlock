@@ -47,3 +47,6 @@ tests/test_*/
 # Python bytecode cache
 __pycache__/
 *.pyc
+
+# Local doc/audit export artifacts (generated, not source)
+docs/audit.zip
