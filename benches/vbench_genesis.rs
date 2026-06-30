@@ -7,18 +7,23 @@
 //
 // Run:  GB_VBENCH=C:\Users\freshair\gb_vbench cargo run --release --bin vbench-genesis
 
-use genesis_block_native::{Storage, OpenOptions, NodeInput, HybridSearchInput};
+use genesis_block_native::{HybridSearchInput, NodeInput, OpenOptions, Storage};
 use std::fs;
 use std::io::{BufReader, Read, Write};
 use std::time::Instant;
 
 fn read_f32(path: &str) -> Vec<f32> {
     let bytes = fs::read(path).expect("read f32 file");
-    bytes.chunks_exact(4).map(|c| f32::from_le_bytes([c[0], c[1], c[2], c[3]])).collect()
+    bytes
+        .chunks_exact(4)
+        .map(|c| f32::from_le_bytes([c[0], c[1], c[2], c[3]]))
+        .collect()
 }
 
 fn percentile(sorted: &[f64], p: f64) -> f64 {
-    if sorted.is_empty() { return 0.0; }
+    if sorted.is_empty() {
+        return 0.0;
+    }
     let idx = ((p / 100.0) * (sorted.len() as f64 - 1.0)).round() as usize;
     sorted[idx.min(sorted.len() - 1)]
 }
@@ -54,7 +59,10 @@ fn main() {
     .expect("open storage");
 
     // HNSW build/search effort (override without rebuilding via GB_EF env).
-    let efc: u32 = std::env::var("GB_EF").ok().and_then(|s| s.parse().ok()).unwrap_or(200);
+    let efc: u32 = std::env::var("GB_EF")
+        .ok()
+        .and_then(|s| s.parse().ok())
+        .unwrap_or(200);
     storage.set_index_params(efc, 100);
 
     // --- RSS / quant probe knobs (MARK XV P1) -------------------------------
@@ -65,15 +73,30 @@ fn main() {
     //                                from ONE corpus. NOTE: recall scoring against
     //                                the full-corpus ground truth is only valid at
     //                                GB_LIMIT == n; use GB_LIMIT for RSS/latency.
-    let quant = std::env::var("GB_QUANT").unwrap_or_else(|_| "none".into()).to_lowercase();
-    let rerank = std::env::var("GB_RERANK").ok().map(|v| v == "1" || v.eq_ignore_ascii_case("true")).unwrap_or(false);
-    let limit = std::env::var("GB_LIMIT").ok().and_then(|s| s.parse::<usize>().ok());
+    let quant = std::env::var("GB_QUANT")
+        .unwrap_or_else(|_| "none".into())
+        .to_lowercase();
+    let rerank = std::env::var("GB_RERANK")
+        .ok()
+        .map(|v| v == "1" || v.eq_ignore_ascii_case("true"))
+        .unwrap_or(false);
+    let limit = std::env::var("GB_LIMIT")
+        .ok()
+        .and_then(|s| s.parse::<usize>().ok());
     let n_eff = limit.map(|l| l.min(n)).unwrap_or(n);
     // Route ingest+search to a quantized collection when requested; else the
     // legacy default space (collection: None) so old invocations are unchanged.
     let coll: Option<String> = if quant != "none" {
         storage
-            .create_collection("bench".into(), model.clone(), dim as u32, None, Some(quant.clone()), None, Some(rerank))
+            .create_collection(
+                "bench".into(),
+                model.clone(),
+                dim as u32,
+                None,
+                Some(quant.clone()),
+                None,
+                Some(rerank),
+            )
             .expect("create_collection");
         Some("bench".to_string())
     } else {
@@ -92,17 +115,26 @@ fn main() {
         let rows = i1 - i0;
         let mut buf = vec![0u8; rows * dim * 4];
         corpus_rdr.read_exact(&mut buf).expect("read corpus chunk");
-        let fbuf: Vec<f32> = buf.chunks_exact(4).map(|c| f32::from_le_bytes([c[0], c[1], c[2], c[3]])).collect();
+        let fbuf: Vec<f32> = buf
+            .chunks_exact(4)
+            .map(|c| f32::from_le_bytes([c[0], c[1], c[2], c[3]]))
+            .collect();
         let inputs: Vec<NodeInput> = (0..rows)
             .map(|r| NodeInput {
                 id: Some((i0 + r).to_string()),
                 labels: vec!["doc".to_string()],
                 props: None,
-                embedding: Some(fbuf[r * dim..(r + 1) * dim].iter().map(|&x| x as f64).collect()),
+                embedding: Some(
+                    fbuf[r * dim..(r + 1) * dim]
+                        .iter()
+                        .map(|&x| x as f64)
+                        .collect(),
+                ),
                 lang: None,
                 valid_from: None,
                 caused_by: None,
-                ttl: None, collection: coll.clone(),
+                ttl: None,
+                collection: coll.clone(),
             })
             .collect();
         storage.bulk_add_nodes(inputs).unwrap();
@@ -116,7 +148,12 @@ fn main() {
     let peak_rss_mb = {
         let mut s = sysinfo::System::new_all();
         s.refresh_all();
-        sysinfo::get_current_pid().ok().and_then(|pid| s.process(pid).map(|p| p.memory())).unwrap_or(0) / 1024 / 1024
+        sysinfo::get_current_pid()
+            .ok()
+            .and_then(|pid| s.process(pid).map(|p| p.memory()))
+            .unwrap_or(0)
+            / 1024
+            / 1024
     };
 
     // k-NN query runner at the current ef_search (alpha=0 => pure vector search)
@@ -124,13 +161,29 @@ fn main() {
         let mut lats = Vec::with_capacity(q);
         let mut tk = Vec::with_capacity(q);
         for qi in 0..q {
-            let qv: Vec<f64> = queries[qi * dim..(qi + 1) * dim].iter().map(|&x| x as f64).collect();
+            let qv: Vec<f64> = queries[qi * dim..(qi + 1) * dim]
+                .iter()
+                .map(|&x| x as f64)
+                .collect();
             let t0 = Instant::now();
             let res = st
-                .hybrid_search(HybridSearchInput { query_vector: qv, k: k as u32, alpha: Some(0.0), lang: None, as_of: None, collection: coll.clone(), ef_search: None })
+                .hybrid_search(HybridSearchInput {
+                    query_vector: qv,
+                    k: k as u32,
+                    alpha: Some(0.0),
+                    lang: None,
+                    as_of: None,
+                    collection: coll.clone(),
+                    ef_search: None,
+                })
                 .unwrap();
             lats.push(t0.elapsed().as_nanos() as f64 / 1000.0);
-            tk.push(res.iter().take(k).map(|nb| nb.node.id.parse::<i64>().unwrap_or(-1)).collect());
+            tk.push(
+                res.iter()
+                    .take(k)
+                    .map(|nb| nb.node.id.parse::<i64>().unwrap_or(-1))
+                    .collect(),
+            );
         }
         (lats, tk)
     };
@@ -142,7 +195,8 @@ fn main() {
             let efs: u32 = tok.trim().parse().unwrap_or(100);
             storage.set_index_params(efc, efs);
             let (lats, tk) = run_queries(&storage);
-            let mut s = lats.clone(); s.sort_by(|a, b| a.partial_cmp(b).unwrap());
+            let mut s = lats.clone();
+            s.sort_by(|a, b| a.partial_cmp(b).unwrap());
             points.push(serde_json::json!({
                 "ef_search": efs,
                 "q_p50_us": percentile(&s, 50.0),
@@ -156,7 +210,11 @@ fn main() {
             "n": n_eff, "q": q, "dim": dim, "k": k, "quant": quant, "rerank": rerank,
             "peak_rss_mb": peak_rss_mb, "insert_per_sec": n_eff as f64 / insert_sec, "points": points
         });
-        fs::write(format!("{bench}/genesis_frontier.json"), serde_json::to_string_pretty(&out).unwrap()).unwrap();
+        fs::write(
+            format!("{bench}/genesis_frontier.json"),
+            serde_json::to_string_pretty(&out).unwrap(),
+        )
+        .unwrap();
         println!("GenesisBlockDB frontier written ({} points)", points.len());
         return;
     }
@@ -181,7 +239,8 @@ fn main() {
         "durability": "durable, batched WAL fsync (1024/chunk)"
     });
     let mut f = fs::File::create(format!("{bench}/genesis_results.json")).unwrap();
-    f.write_all(serde_json::to_string_pretty(&out).unwrap().as_bytes()).unwrap();
+    f.write_all(serde_json::to_string_pretty(&out).unwrap().as_bytes())
+        .unwrap();
     println!(
         "GenesisBlockDB: n={} quant={} rerank={} | insert {:.0} vec/s (build {:.2}s), RSS {} MB, query p50 {:.1}µs p95 {:.1}µs",
         n_eff, quant, rerank, n_eff as f64 / insert_sec, insert_sec, peak_rss_mb, percentile(&sorted, 50.0), percentile(&sorted, 95.0)
