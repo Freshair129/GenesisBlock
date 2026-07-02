@@ -15,7 +15,7 @@ proposed_by: agent
 
 # ADR--GENESISDB-VECTOR-QUANTIZATION
 
-**Status:** Accepted (SQ8 + BQ shipped 2026-06-23, full resident cut; BQ as a no-rerank first cut, f32-sidecar rerank deferred)
+**Status:** Accepted (SQ8 + BQ shipped 2026-06-23, full resident cut; BQ oversample + f32-sidecar rerank SHIPPED 2026-07-02 as an on-disk positioned-read sidecar — see [[ADR--GENESISDB-ONDISK-RERANK-SIDECAR]])
 **Date:** 2026-06-22
 **Deciders:** Engine owner (Boss)
 **Roadmap:** MARK XIV Priority 4 — "Scalar / binary quantization: close the Qdrant
@@ -95,7 +95,7 @@ rebuild. The RAM win comes from what is held *resident*, not from what is on dis
 
 Layer A is the memory lever: it turns 500k×1536 from 3.0 GB → 0.75 GB resident.
 
-### Layer B — Binary quantization (BQ) + exact rerank (DESIGNED, opt-in)
+### Layer B — Binary quantization (BQ) + exact rerank (SHIPPED, opt-in)
 
 1. 1 bit/dim (sign of the centered component), bit-packed into `u64` words →
    `Hnsw<'static, u64, DistHamming>`. **32× reduction** (6 144 → 192 B/vector); BQ
@@ -104,14 +104,18 @@ Layer A is the memory lever: it turns 500k×1536 from 3.0 GB → 0.75 GB residen
    `k * oversample` Hamming candidates, then re-score those candidates against exact
    `f32` vectors and truncate to `k`. This extends the rerank stage `hybrid_search`
    already runs (it over-fetches `k*2` today).
-3. Exact vectors for rerank come from the on-disk `vec_<name>.bin` via **`mmap`**
-   (memmap2), *not* a resident f32 arena — otherwise the RAM win is cancelled.
-   Rerank touches only the top `k*oversample` rows, so only those pages fault in.
-   (Windows `mmap` is viable but must be validated against the snapshot-reload and
-   bench harnesses; see [[feedback_bench_windows]].)
+3. **Shipped 2026-07-02:** exact vectors for rerank come from a dedicated on-disk
+   `fvec_<name>.bin` sidecar, read via **positioned `seek_read`/`read_at`** (not
+   `mmap` — `memmap2` was declined; not a resident `Vec<f32>` either — an initial
+   resident cut was shipped and then replaced after RCA found it canceled the RAM
+   win, see [[RCA--VECTOR-QUANTIZATION]]). `SidecarReader` (`src/lib.rs` ~826-1013)
+   does per-row positioned reads with an LRU, and only the top `k*oversample` rows
+   are ever touched. Full design + acceptance in
+   [[ADR--GENESISDB-ONDISK-RERANK-SIDECAR]].
 
 Layer B is the recall lever: BQ + rerank is the Qdrant-style path to recall@~0.99
-at a fraction of the memory and with faster traversal (Hamming ≫ f32 L2).
+at a fraction of the memory and with faster traversal (Hamming ≫ f32 L2). **Rerank
+is now shipped** as the on-disk positioned-read sidecar described above.
 
 ### Out of scope (this ADR)
 
@@ -137,15 +141,17 @@ Deferred to its own ADR; Layers A/B do not preclude it.
 ### Option B — Binary + oversample/rerank via mmap'd f32
 | Dimension | Assessment |
 |-----------|------------|
-| Complexity | High — bit-packing, Hamming index, mmap rerank, oversample knob, Windows mmap validation |
-| Memory | **32×** index reduction (3.0 → 0.19 GB resident @ 500k); f32 stays on disk (paged) |
+| Complexity | High — bit-packing, Hamming index, on-disk positioned-read rerank sidecar, oversample knob |
+| Memory | **32×** index reduction (3.0 → 0.19 GB resident @ 500k); f32 stays on disk in `fvec_<name>.bin`, read via `seek_read`/`read_at` (not paged via mmap) |
 | Recall | ~0.98–0.99 *with* rerank; poor without |
 | Latency | Faster ANN (Hamming) + rerank tail on top-N |
-| Migration | None on disk; adds mmap dependency |
+| Migration | None on disk; adds a sidecar file per collection |
 
 **Pros:** The recall@0.999 story at minimum RAM; best traversal speed.
-**Cons:** Highest complexity; rerank latency depends on disk/page-cache; mmap on
-Windows needs proving.
+**Cons:** Highest complexity; rerank latency depends on disk I/O for cold rows
+(mitigated by the `SidecarReader` LRU). **Shipped** — see
+[[ADR--GENESISDB-ONDISK-RERANK-SIDECAR]] for the final positioned-read design
+(mmap was evaluated and declined; Windows mmap concerns are moot).
 
 ### Option C — Product Quantization (PQ)
 | Dimension | Assessment |
@@ -189,8 +195,10 @@ land per-query `ef` alongside or before Layer B.
 ### Negative
 - The arena + HNSW handle becomes an enum over element types (`f32`/`u8`/`u64`);
   `stage`, `prep`, `search`, `rehydrate`, and snapshot all branch on `Quant`.
-- BQ adds an `mmap` dependency and a rerank latency tail; Windows mmap must be
-  validated against snapshot-reload and the audit harnesses.
+- BQ's rerank adds an on-disk sidecar file (`fvec_<name>.bin`) and a rerank
+  latency tail on cold rows; **shipped** as positioned `seek_read`/`read_at` with
+  an LRU (no `mmap` dependency — declined in favor of Windows-safe positioned
+  reads). See [[ADR--GENESISDB-ONDISK-RERANK-SIDECAR]].
 
 ### Neutral / Trade-offs
 - WAL and the `f32` snapshot format are unchanged; existing single-/multi-collection
@@ -217,16 +225,19 @@ land per-query `ef` alongside or before Layer B.
 4. [ ] Recall harness (recall@k vs exact brute force) at 100k/500k; gate default-on
        SQ8 behind measured recall ≥ 0.975. *(toy tests can't measure recall — HNSW is
        approximate on tiny sets; needs a real-data probe.)*
-5. [~] BQ (`u64` bit-pack + a **custom** `Distance<u64>` — anndists' built-in u64
+5. [x] BQ (`u64` bit-pack + a **custom** `Distance<u64>` — anndists' built-in u64
        `DistHamming` is whole-word inequality, NOT bit popcount). **Shipped 2026-06-23**
        as a no-rerank first cut: `ArenaStore::Binary { data: Vec<u64>, dim, n }` (one sign
        bit/dim — raw sign, no per-dim centering in this cut; `len()` reports `n*dim` so
        `embedding_offset` stays in component units and the shared bounds checks hold),
        `VecIndex::Binary(Hnsw<u64, DistBinaryHamming>)`, Hamming normalized to [0,1] by dim
-       for the score blend. ~32× RAM/disk. **Oversample + rerank still deferred:** `memmap2`
-       declined → exact-f32 for rerank needs an on-disk f32 sidecar (`vecf32_<name>.bin`)
-       whose interaction with `save_state` and **compaction** (rewrite on arena-id change)
-       is the heavy part — a focused follow-up PR.
+       for the score blend. ~32× RAM/disk. **Oversample + rerank shipped 2026-07-02**
+       as an on-disk positioned-read sidecar (`fvec_<name>.bin`, `SidecarReader` with
+       `seek_read`/`read_at` + LRU, `src/lib.rs` ~826-1013) — `memmap2` was declined in
+       favor of this Windows-safe approach; `load()`/`stage()` handle the `save_state`
+       and compaction interaction (arena-id rewrite on compaction re-appends via
+       `write_rows`; a row-count mismatch degrades gracefully to quantized-only, no
+       rerank). Full design in [[ADR--GENESISDB-ONDISK-RERANK-SIDECAR]].
 6. [ ] Record before/after RSS + recall in a new `RCA--VECTOR-QUANTIZATION` and in
        [[METRICS-REVIEW--2026-06-22-WEEKLY]].
 
@@ -259,11 +270,24 @@ clustering `f32_at` readers (bit → ±1), compaction's `append_range`, and the 
 `start+len <= arena.len()` checks all work unchanged. Hamming is normalized to [0,1] by dim
 so `1 - distance` stays a sane similarity. Create with `quant: "bq"`; `vec_<name>.bin` is
 ~32× smaller. `tests/binary_quant_tests.rs` (exact-match top-1, reopen round-trip, 32× disk).
-The oversample + f32-sidecar **rerank** stage (Action 5 tail) remains deferred — its
-save_state/compaction interaction is the heavy part.
+
+### Outcome (rerank sidecar, shipped 2026-07-02)
+The oversample + f32-sidecar **rerank** stage (Action 5 tail) is shipped as an on-disk
+positioned-read sidecar, not a resident buffer and not `mmap`. `f32_sidecar:
+Option<RwLock<SidecarReader>>` (`src/lib.rs` ~826-1013) opens `fvec_<name>.bin` and
+serves exact-f32 rows via `seek_read`/`read_at` (Windows-safe) with an LRU cache;
+`row(d_id)`/`len_rows()`/`write_rows()` are the accessors. `load()` opens a reader and
+guards `len_rows() == arena_rows` — a mismatch (e.g. a sidecar that didn't survive
+compaction) sets the sidecar to `None` and rerank degrades to quantized-only rather
+than erroring. `stage()` appends new rows via `write_rows`. This design was chosen
+*after* an initial resident-`Vec<f32>` cut was found (via
+[[RCA--VECTOR-QUANTIZATION]]) to cancel most of the RAM win BQ/SQ8 were shipped for —
+see [[ADR--GENESISDB-ONDISK-RERANK-SIDECAR]] for the full RCA, design, and acceptance
+criteria. `tests/rerank_tests.rs` covers the sidecar path.
 
 ---
 ### Related Links
+- **Rerank sidecar design (shipped 2026-07-02):** [[ADR--GENESISDB-ONDISK-RERANK-SIDECAR]]
 - **Sibling RAM lever:** [[ADR--GENESISDB-NODE-ID-INTERNING]]
 - **Multi-collection substrate:** [[ADR--GENESISDB-MULTI-COLLECTION]]
 - **Async index path quantization plugs into:** [[ADR--GENESISDB-ASYNC-INDEXING]]
@@ -277,3 +301,4 @@ save_state/compaction interaction is the heavy part.
 | 0.1.0 | 2026-06-22 | Proposed: per-collection `Quant` mode, lossless f32 on disk; Layer A (SQ8, symmetric, 4×) decided first; Layer B (BQ + oversample/rerank via mmap) designed; PQ deferred. |
 | 0.2.0 | 2026-06-23 | Accepted + SQ8 shipped as the **full resident cut** (arena+HNSW u8, 4× RAM *and* disk; reversibility traded away). `ArenaStore`/`VecIndex` enums behind separate locks. BQ revised to a no-mmap on-disk f32 sidecar (heavier — own PR); built-in u64 `DistHamming` found to be word-inequality, so BQ needs a custom popcount distance. |
 | 0.3.0 | 2026-06-23 | BQ shipped as a **no-rerank first cut**: `Quant::Binary`, `ArenaStore::Binary` (u64 sign-bit codes, offsets in component units), `VecIndex::Binary` + `DistBinaryHamming` popcount, Hamming normalized by dim. ~32× RAM/disk. Full suite green incl. `binary_quant_tests` (exact-match top-1, reopen round-trip, 32× disk). The f32-sidecar oversample/rerank stage remains deferred (save_state/compaction interaction). |
+| 0.4.0 | 2026-07-02 | Oversample + f32-sidecar **rerank shipped**: on-disk `fvec_<name>.bin` sidecar read via positioned `seek_read`/`read_at` (`SidecarReader`, LRU), not `mmap` and not resident — see [[ADR--GENESISDB-ONDISK-RERANK-SIDECAR]] for the RCA that led here (an earlier resident-`Vec<f32>` cut canceled most of BQ/SQ8's RAM win) and the final design/acceptance. |
