@@ -117,6 +117,34 @@ Layer B is the recall lever: BQ + rerank is the Qdrant-style path to recall@~0.9
 at a fraction of the memory and with faster traversal (Hamming ≫ f32 L2). **Rerank
 is now shipped** as the on-disk positioned-read sidecar described above.
 
+### Layer C — F16 half-precision (design gate P2a-T0, 2026-07-02)
+
+Near-lossless 2× arena/disk cut, aimed at the mobile SDK (the MARK XVI sweet
+spot: recall ≈ f32 with no sidecar bookkeeping). Two forks were open before
+implementation; both are now DECIDED with evidence:
+
+1. **HNSW distance = dequantize-on-insert (NOT native f16 distance).**
+   `anndists` 0.1.5 (`hnsw_rs` 0.3.4's distance crate) implements
+   `Distance<T>` for `DistL2` over **f32, f64, i32, i64, u32, u16, u8 only** —
+   verified in `anndists-0.1.5/src/dist/distances.rs` (`implementL2Distance!`
+   invocations); there is **no `Distance<half::f16>`**. So F16 cannot index
+   natively like SQ8 (native `u8`) or BQ (custom `u64` Hamming). Contract: the
+   **arena** stores f16 (`Vec<u16>` bit patterns, 2 B/elem) but the **HNSW is
+   `Hnsw<'static, f32, DistL2>`** — each row is dequantized f16→f32 at insert and
+   the query is packed as f32. No sidecar (F16 is near-lossless; the `rerank`
+   flag is ignored for F16).
+2. **f16↔f32 via the `half` crate** (promote `half` 2.7.1 from a transitive
+   `anndists` dep to a direct dep). Correct IEEE-754 binary16 rounding for free
+   (already compiled); hand-rolling the conversion was rejected as error-prone
+   for zero build savings.
+
+**RAM honesty (gate requirement):** because the HNSW copy stays f32, F16 shrinks
+only the arena and the on-disk `vec_<name>.bin` snapshot (**2×** there), NOT the
+HNSW graph. Total *resident* RAM at 1536-d is arena(2×) + HNSW(4×) ≈ **~1.33×**
+reduction vs f32 — the honest number; the headline "2×" is the arena/disk
+footprint, not total resident. (SQ8 shrinks both arena and HNSW because a native
+`u8` distance exists; F16 has no native distance, so only the arena shrinks.)
+
 ### Out of scope (this ADR)
 
 **Product Quantization (PQ).** Best compression/recall frontier, but requires

@@ -750,6 +750,7 @@ dependencies = [
  "csv",
  "dashmap",
  "ed25519-dalek",
+ "half",
  "hex",
  "hnsw_rs",
  "http-body-util",
