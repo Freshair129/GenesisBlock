@@ -51,6 +51,7 @@ fn top1(s: &Storage, q: Vec<f64>) -> Option<String> {
         as_of: None,
         collection: None,
         ef_search: None,
+        oversample: None,
     })
     .unwrap()
     .into_iter()

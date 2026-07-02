@@ -83,6 +83,7 @@ fn many_collection_indexes_do_not_oom() {
                 as_of: None,
                 collection: Some(format!("c{i}")),
                 ef_search: None,
+                oversample: None,
             })
             .unwrap();
         assert_eq!(hits.len(), 1, "collection c{i} returns its single vector");
@@ -150,6 +151,7 @@ fn index_grows_past_initial_floor() {
             as_of: None,
             collection: None,
             ef_search: None,
+            oversample: None,
         })
         .unwrap();
     assert_eq!(hits.len(), 5, "grown index returns k neighbors");

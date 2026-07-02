@@ -226,6 +226,7 @@ fn snapshot_reload_with_vectors() {
             as_of: None,
             collection: None,
             ef_search: None,
+            oversample: None,
         })
         .unwrap();
     assert!(!results.is_empty(), "hybrid_search should return the node");

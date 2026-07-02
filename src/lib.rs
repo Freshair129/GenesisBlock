@@ -266,6 +266,12 @@ pub struct HybridSearchInput {
     /// callers (the global value can't satisfy both as N grows — see the
     /// Recall@500k frontier).
     pub ef_search: Option<u32>,
+    /// Per-query rerank over-fetch multiplier. When `None`, falls back to the
+    /// `RERANK_OVERFETCH` default. Only affects collections that carry a rerank
+    /// sidecar (quantized + rerank); ignored otherwise. Higher = a wider exact
+    /// re-score pool = better recall on quantized collections, at the cost of
+    /// more positioned sidecar reads per query. Mirrors the `ef_search` knob.
+    pub oversample: Option<u32>,
 }
 
 #[cfg_attr(feature = "napi-bindings", napi(object))]
@@ -2083,6 +2089,7 @@ impl Storage {
                         as_of: None,
                         collection: node.collection.clone(),
                         ef_search: None,
+                        oversample: None,
                     })?;
 
                     for neighbor in context {
@@ -2708,6 +2715,7 @@ impl Storage {
                     as_of,
                     collection,
                     ef_search: None,
+                    oversample: None,
                 })?;
                 Self::apply_hql_clauses(res, &clauses)
             }
@@ -2766,6 +2774,7 @@ impl Storage {
                     as_of,
                     collection,
                     ef_search: None,
+                    oversample: None,
                 })?;
                 Self::apply_hql_clauses(res, &clauses)
             }
@@ -2834,10 +2843,16 @@ impl Storage {
             .or_else(|| coll.ef_search.map(|e| e as usize))
             .unwrap_or_else(|| self.ef_search.load(Ordering::Relaxed));
         // Over-fetch more quantized candidates when a rerank sidecar is present, so
-        // the exact re-score has a wider pool to recover recall from.
+        // the exact re-score has a wider pool to recover recall from. The
+        // multiplier is a per-query override → `RERANK_OVERFETCH` default; it only
+        // matters on the sidecar branch (the `else k2` path is untouched).
+        let overfetch = args
+            .oversample
+            .map(|o| o as usize)
+            .unwrap_or(RERANK_OVERFETCH);
         let k2 = (args.k * 2) as usize;
         let fetch = if coll.f32_sidecar.is_some() {
-            (args.k as usize).saturating_mul(RERANK_OVERFETCH).max(k2)
+            (args.k as usize).saturating_mul(overfetch).max(k2)
         } else {
             k2
         };

@@ -98,6 +98,7 @@ fn test_mark_ix_memory_reclamation_compaction() {
             as_of: None,
             collection: None,
             ef_search: None,
+            oversample: None,
         })
         .unwrap();
 

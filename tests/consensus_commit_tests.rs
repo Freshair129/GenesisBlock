@@ -170,6 +170,7 @@ fn consensus_committed_vector_is_searchable() {
             as_of: None,
             collection: None,
             ef_search: None,
+            oversample: None,
         })
         .unwrap()
         .into_iter()

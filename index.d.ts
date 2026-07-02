@@ -132,6 +132,14 @@ export interface HybridSearchInput {
    * Recall@500k frontier).
    */
   efSearch?: number
+  /**
+   * Per-query rerank over-fetch multiplier. When `None`, falls back to the
+   * `RERANK_OVERFETCH` default. Only affects collections that carry a rerank
+   * sidecar (quantized + rerank); ignored otherwise. Higher = a wider exact
+   * re-score pool = better recall on quantized collections, at the cost of
+   * more positioned sidecar reads per query. Mirrors the `ef_search` knob.
+   */
+  oversample?: number
 }
 export interface DatabaseStatus {
   open: boolean

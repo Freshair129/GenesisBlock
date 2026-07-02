@@ -273,6 +273,7 @@ fn concurrent_search_while_write() {
                 as_of: None,
                 collection: None,
                 ef_search: None,
+                oversample: None,
             });
             // We don't assert result count — just that it doesn't panic.
         }

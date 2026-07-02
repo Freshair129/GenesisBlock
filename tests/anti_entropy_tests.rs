@@ -207,6 +207,7 @@ fn pull_delta_syncs_secondary_vectors() {
             as_of: None,
             collection: Some("code".to_string()),
             ef_search: None,
+            oversample: None,
         })
         .unwrap()
         .into_iter()
@@ -263,6 +264,7 @@ fn compaction_preserves_secondary_vectors() {
             as_of: None,
             collection: Some("code".to_string()),
             ef_search: None,
+            oversample: None,
         })
         .unwrap()
         .into_iter()

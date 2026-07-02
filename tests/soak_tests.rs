@@ -260,6 +260,7 @@ fn run_soak(cfg: SoakConfig) {
                 as_of: None,
                 collection: None,
                 ef_search: cfg.ef_search,
+                oversample: None,
             })
             .unwrap();
         let query_ms = t1.elapsed().as_millis();

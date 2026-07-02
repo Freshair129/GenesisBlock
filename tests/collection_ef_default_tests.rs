@@ -64,6 +64,7 @@ fn top1(s: &Storage, q: Vec<f64>, coll: &str, ef: Option<u32>) -> Option<String>
         as_of: None,
         collection: Some(coll.to_string()),
         ef_search: ef,
+        oversample: None,
     })
     .unwrap()
     .into_iter()

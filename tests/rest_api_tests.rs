@@ -405,6 +405,67 @@ async fn test_hybrid_search_after_index_rebuild() {
     );
 }
 
+// P1b: the per-query `oversample` knob must be accepted over REST and must not
+// break the rerank path on a quantized+rerank collection (where the over-fetch
+// multiplier it controls actually applies). A larger oversample widens the
+// exact re-score pool, so top-1 recall must be at least as good as the default.
+#[tokio::test]
+async fn test_hybrid_search_oversample_knob() {
+    let (app, _dir) = make_app();
+
+    // Quantized (sq8) + rerank => the collection carries an f32 rerank sidecar,
+    // so `oversample` feeds the RERANK_OVERFETCH multiplier on the fetch path.
+    post_json(
+        &app,
+        "/v1/collection/create",
+        json!({ "name": "ovq", "model": "m", "dim": 4, "quant": "sq8", "rerank": true }),
+    )
+    .await;
+
+    for (id, emb) in [
+        ("o1", [1.0, 0.0, 0.0, 0.0]),
+        ("o2", [0.0, 1.0, 0.0, 0.0]),
+        ("o3", [0.0, 0.0, 1.0, 0.0]),
+        ("o4", [0.0, 0.0, 0.0, 1.0]),
+    ] {
+        post_json(
+            &app,
+            "/v1/node/add",
+            json!({ "id": id, "labels": [], "embedding": emb, "collection": "ovq" }),
+        )
+        .await;
+    }
+
+    let (rebuild_status, _) = post_json(&app, "/v1/bulk/rebuild", json!(null)).await;
+    assert_eq!(rebuild_status, StatusCode::OK);
+
+    // Explicit oversample override must be accepted (no 400/deser error) and
+    // still return the true nearest (o1) via the widened rerank pool.
+    let (status, results) = post_json(
+        &app,
+        "/v1/search/hybrid",
+        json!({
+            "query_vector": [0.9, 0.1, 0.0, 0.0],
+            "k": 1,
+            "collection": "ovq",
+            "oversample": 16
+        }),
+    )
+    .await;
+    assert_eq!(
+        status,
+        StatusCode::OK,
+        "oversample must be accepted by /v1/search/hybrid"
+    );
+    let hits = results.as_array().unwrap();
+    assert!(!hits.is_empty(), "oversample search must return a result");
+    assert_eq!(
+        hits[0]["node"]["id"],
+        json!("o1"),
+        "widened oversample must still surface the true nearest neighbor"
+    );
+}
+
 #[tokio::test]
 async fn test_add_vector_wrong_dim_rejected() {
     let (app, _dir) = make_app();
