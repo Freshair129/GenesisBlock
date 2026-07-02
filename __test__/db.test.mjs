@@ -162,3 +162,48 @@ test('NAPI: edge survives saveState + reopen', async () => {
     cleanup(dbPath);
   }
 });
+
+// ---------------------------------------------------------------------------
+// P2c: NAPI/REST parity — listCollections() exposes the same per-collection
+// quant ops fields the REST /v1/status collections array carries. For a
+// quantized+rerank collection the sidecar is on-disk (post-P0), so
+// sidecarResidentBytes must be 0 (proves the RAM win); sidecarDiskBytes shows
+// where the bytes went; indexLag is the engine-global backlog (also on
+// db.indexLag()).
+// ---------------------------------------------------------------------------
+test('NAPI: listCollections exposes quant ops (sidecar resident bytes ~0, index_lag)', async () => {
+  const dbPath = tempDb('quant-ops');
+  try {
+    const db = GenesisDatabase.open({ path: dbPath });
+    // name, model, dim, metric, quant, efSearch, rerank
+    await db.createCollection('quantized_rerank', 'bge-m3', 8, 'L2', 'sq8', null, true);
+    await db.addNode({
+      id: 'n1',
+      labels: [],
+      embedding: [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8],
+      collection: 'quantized_rerank',
+    });
+    await db.flushIndex();
+
+    const cols = db.listCollections();
+    const entry = cols.find(c => c.name === 'quantized_rerank');
+    assert.ok(entry, 'quantized_rerank must appear in listCollections()');
+
+    assert.strictEqual(entry.quant, 'sq8', 'quant must be reported');
+    // On-disk sidecar ⇒ 0 resident bytes (the P0 RAM win).
+    assert.strictEqual(entry.sidecarResidentBytes, 0,
+      'on-disk sidecar must report 0 resident bytes');
+    // 1 row * dim 8 * 4B = 32 on-disk bytes.
+    assert.strictEqual(entry.sidecarDiskBytes, 32,
+      'sidecarDiskBytes must reflect on-disk row bytes');
+    assert.strictEqual(typeof entry.arenaResidentBytes, 'number',
+      'arenaResidentBytes must be numeric');
+    assert.strictEqual(typeof entry.indexLag, 'number',
+      'per-collection indexLag must be numeric');
+    // Parity with the dedicated global accessor.
+    assert.strictEqual(entry.indexLag, db.indexLag(),
+      'per-collection indexLag must equal the engine-global db.indexLag()');
+  } finally {
+    cleanup(dbPath);
+  }
+});

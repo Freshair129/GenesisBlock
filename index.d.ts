@@ -157,6 +157,36 @@ export interface CollectionInfo {
   efSearch?: number
   /** Whether this (quantized) collection keeps an f32 sidecar for exact rerank. */
   rerank: boolean
+  /**
+   * Ops/credibility (P2c): resident (RAM) bytes held by the exact-f32 rerank
+   * sidecar. **≈0 post-P0**: the sidecar is on-disk (`fvec_<name>.bin`) behind a
+   * positioned-read `SidecarReader`, not a resident `Vec<f32>`, so its vector
+   * data consumes no heap. This field exists to PROVE the P0 RAM win (see
+   * docs/RCA--VECTOR-QUANTIZATION.md); a non-zero value here would mean the
+   * resident-sidecar regression came back. (`i64` not `u64`: byte counts fit a
+   * JS-safe integer and NAPI maps `i64`→JS number; `u64` would force BigInt.)
+   */
+  sidecarResidentBytes: number
+  /**
+   * Ops/credibility (P2c): on-disk bytes of the rerank sidecar
+   * (`len_rows * dim * 4`), i.e. where the exact-f32 vectors actually live now.
+   * `0` when the collection has no sidecar. Shows RAM → disk is where the bytes
+   * went, not that they vanished.
+   */
+  sidecarDiskBytes: number
+  /**
+   * Ops/credibility (P2c): resident (RAM) bytes of this collection's vector
+   * arena (`arena.byte_size()` — f32=4B/elem, SQ8=1B/elem, BQ=1bit/elem).
+   * Context for the residency story: this is the RAM the quantized arena costs.
+   */
+  arenaResidentBytes: number
+  /**
+   * Ops/credibility (P2c): engine-global async-indexing backlog
+   * (`Storage::index_lag()`) — vectors staged into the arena but not yet
+   * inserted into HNSW. Not per-collection (one indexing thread serves all
+   * collections); the SAME value is repeated on every entry for convenience.
+   */
+  indexLag: number
 }
 export interface SyncPeer {
   id: string

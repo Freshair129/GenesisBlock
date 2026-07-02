@@ -296,6 +296,28 @@ pub struct CollectionInfo {
     pub ef_search: Option<u32>,
     /// Whether this (quantized) collection keeps an f32 sidecar for exact rerank.
     pub rerank: bool,
+    /// Ops/credibility (P2c): resident (RAM) bytes held by the exact-f32 rerank
+    /// sidecar. **≈0 post-P0**: the sidecar is on-disk (`fvec_<name>.bin`) behind a
+    /// positioned-read `SidecarReader`, not a resident `Vec<f32>`, so its vector
+    /// data consumes no heap. This field exists to PROVE the P0 RAM win (see
+    /// docs/RCA--VECTOR-QUANTIZATION.md); a non-zero value here would mean the
+    /// resident-sidecar regression came back. (`i64` not `u64`: byte counts fit a
+    /// JS-safe integer and NAPI maps `i64`→JS number; `u64` would force BigInt.)
+    pub sidecar_resident_bytes: i64,
+    /// Ops/credibility (P2c): on-disk bytes of the rerank sidecar
+    /// (`len_rows * dim * 4`), i.e. where the exact-f32 vectors actually live now.
+    /// `0` when the collection has no sidecar. Shows RAM → disk is where the bytes
+    /// went, not that they vanished.
+    pub sidecar_disk_bytes: i64,
+    /// Ops/credibility (P2c): resident (RAM) bytes of this collection's vector
+    /// arena (`arena.byte_size()` — f32=4B/elem, SQ8=1B/elem, BQ=1bit/elem).
+    /// Context for the residency story: this is the RAM the quantized arena costs.
+    pub arena_resident_bytes: i64,
+    /// Ops/credibility (P2c): engine-global async-indexing backlog
+    /// (`Storage::index_lag()`) — vectors staged into the arena but not yet
+    /// inserted into HNSW. Not per-collection (one indexing thread serves all
+    /// collections); the SAME value is repeated on every entry for convenience.
+    pub index_lag: u32,
 }
 
 #[cfg_attr(feature = "napi-bindings", napi(object))]
@@ -1347,7 +1369,19 @@ impl VectorCollection {
         *self.hnsw.write() = Some(index);
     }
 
-    fn info(&self) -> CollectionInfo {
+    /// `index_lag` is engine-global (`Storage::index_lag()`), passed in by
+    /// `Storage::list_collections()` so every entry carries it — `info()` lives on
+    /// the collection and has no view of the Storage-wide indexing backlog.
+    fn info(&self, index_lag: u32) -> CollectionInfo {
+        // Sidecar is ON DISK post-P0: its vector data is not resident, so resident
+        // bytes are 0. On-disk bytes = live rows * dim * 4 (fixed dim).
+        let (sidecar_resident_bytes, sidecar_disk_bytes) = match &self.f32_sidecar {
+            Some(s) => {
+                let rows = s.read().len_rows() as i64;
+                (0i64, rows * (self.dim as i64) * 4)
+            }
+            None => (0i64, 0i64),
+        };
         CollectionInfo {
             name: self.name.clone(),
             model: self.model.clone(),
@@ -1357,6 +1391,10 @@ impl VectorCollection {
             count: self.count.load(Ordering::Relaxed) as u32,
             ef_search: self.ef_search,
             rerank: self.f32_sidecar.is_some(),
+            sidecar_resident_bytes,
+            sidecar_disk_bytes,
+            arena_resident_bytes: self.arena.read().byte_size() as i64,
+            index_lag,
         }
     }
 }
@@ -1636,7 +1674,12 @@ impl Storage {
     }
 
     pub fn list_collections(&self) -> Vec<CollectionInfo> {
-        self.collections.iter().map(|c| c.value().info()).collect()
+        // `index_lag` is engine-global; snapshot it once and stamp every entry.
+        let lag = self.index_lag();
+        self.collections
+            .iter()
+            .map(|c| c.value().info(lag))
+            .collect()
     }
 
     /// Insert one vector into the named (or default) collection. Validates the
