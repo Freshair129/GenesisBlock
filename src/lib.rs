@@ -517,7 +517,12 @@ pub enum Quant {
 
 impl Quant {
     fn parse(s: &str) -> Self {
-        if s.eq_ignore_ascii_case("sq8") || s.eq_ignore_ascii_case("scalaru8") {
+        // "sq8c"/"sq8-calibrated" are SQ8 with the calibrated-scale opt-in — same
+        // storage element type; the calibrate flag is read via `sq8_calibrate_requested`.
+        if s.eq_ignore_ascii_case("sq8")
+            || s.eq_ignore_ascii_case("scalaru8")
+            || Self::sq8_calibrate_requested(s)
+        {
             Quant::ScalarU8
         } else if s.eq_ignore_ascii_case("bq") || s.eq_ignore_ascii_case("binary") {
             Quant::Binary
@@ -535,18 +540,31 @@ impl Quant {
             Quant::F16 => "f16",
         }
     }
+    /// Whether a `quant` string requests the SQ8 **calibrated** scale (P2b opt-in).
+    /// `"sq8"` is fixed-scale (default); `"sq8c"`/`"sq8-calibrated"`/`"sq8_calibrated"`
+    /// opt into the per-collection quantile scale computed at compaction.
+    fn sq8_calibrate_requested(s: &str) -> bool {
+        s.eq_ignore_ascii_case("sq8c")
+            || s.eq_ignore_ascii_case("sq8-calibrated")
+            || s.eq_ignore_ascii_case("sq8_calibrated")
+    }
 }
 
-// SQ8 maps [-1,1] -> [0,255] with a FIXED affine scale, so concurrent async
-// inserts agree without any of them having seen the whole data distribution.
-// Cosine collections are already unit-normalized into [-1,1] (clean); L2 values
-// outside [-1,1] clamp (documented limitation of the first cut).
+// SQ8 maps a value range -> [0,255] with an affine `q = v*scale + bias`. The
+// DEFAULT (fixed) scale assumes [-1,1] so concurrent async inserts agree without
+// any of them having seen the whole data distribution. Cosine collections are
+// unit-normalized into [-1,1] (clean); L2 values outside [-1,1] clamp. The
+// per-collection **calibrated** scale (P2b, opt-in via `quant:"sq8c"`) replaces
+// this default with a quantile range computed at compaction — see
+// `sq8_snapshot`/`perform_index_compaction`.
 const SQ8_SCALE: f32 = 127.5;
 const SQ8_BIAS: f32 = 127.5;
+/// The fixed (scale, bias) — used when a collection has no calibrated scale.
+const SQ8_FIXED: (f32, f32) = (SQ8_SCALE, SQ8_BIAS);
 
 #[inline]
-fn sq8_q(v: f32) -> u8 {
-    let q = (v * SQ8_SCALE + SQ8_BIAS).round();
+fn sq8_q(v: f32, scale: f32, bias: f32) -> u8 {
+    let q = (v * scale + bias).round();
     if q <= 0.0 {
         0
     } else if q >= 255.0 {
@@ -556,8 +574,8 @@ fn sq8_q(v: f32) -> u8 {
     }
 }
 #[inline]
-fn sq8_dq(q: u8) -> f32 {
-    (q as f32 - SQ8_BIAS) / SQ8_SCALE
+fn sq8_dq(q: u8, scale: f32, bias: f32) -> f32 {
+    (q as f32 - bias) / scale
 }
 
 // Binary quantization (BQ): one sign bit per dim, packed into u64 words. Distance
@@ -658,7 +676,15 @@ impl Distance<u64> for DistBinaryHamming {
 /// every mode; only the on-disk byte width differs (4 for f32, 1 for u8).
 pub enum ArenaStore {
     F32(Vec<f32>),
-    U8(Vec<u8>),
+    /// SQ8: one u8 per component with an affine `(scale, bias)`. The scale is
+    /// carried IN the variant so `f32_at`/`push_f32` dequantize/quantize without
+    /// an external param — `SQ8_FIXED` by default, or a per-collection calibrated
+    /// range (P2b) installed at compaction / load. All rows in one arena share it.
+    U8 {
+        data: Vec<u8>,
+        scale: f32,
+        bias: f32,
+    },
     /// BQ: bit-packed sign codes — `n` vectors × `bq_words(dim)` u64 words.
     /// `len()` still reports logical components (`n*dim`), so `embedding_offset`
     /// stays in component units exactly like the f32/u8 variants and the shared
@@ -679,7 +705,11 @@ impl ArenaStore {
     fn new(q: Quant, dim: usize) -> Self {
         match q {
             Quant::None => ArenaStore::F32(Vec::new()),
-            Quant::ScalarU8 => ArenaStore::U8(Vec::new()),
+            Quant::ScalarU8 => ArenaStore::U8 {
+                data: Vec::new(),
+                scale: SQ8_FIXED.0,
+                bias: SQ8_FIXED.1,
+            },
             Quant::Binary => ArenaStore::Binary {
                 data: Vec::new(),
                 dim,
@@ -692,7 +722,7 @@ impl ArenaStore {
     pub fn len(&self) -> usize {
         match self {
             ArenaStore::F32(v) => v.len(),
-            ArenaStore::U8(v) => v.len(),
+            ArenaStore::U8 { data, .. } => data.len(),
             ArenaStore::Binary { n, dim, .. } => n * dim,
             ArenaStore::F16(v) => v.len(),
         }
@@ -701,7 +731,7 @@ impl ArenaStore {
     pub fn byte_size(&self) -> usize {
         match self {
             ArenaStore::F32(v) => v.len() * 4,
-            ArenaStore::U8(v) => v.len(),
+            ArenaStore::U8 { data, .. } => data.len(),
             ArenaStore::Binary { data, .. } => data.len() * 8,
             ArenaStore::F16(v) => v.len() * 2,
         }
@@ -709,13 +739,31 @@ impl ArenaStore {
     pub fn is_empty(&self) -> bool {
         self.len() == 0
     }
+    /// Overwrite the SQ8 (scale, bias). No-op on non-U8 arenas. Used by load to
+    /// adopt a persisted calibrated scale and by compaction's re-pack.
+    fn set_sq8_scale(&mut self, s: f32, b: f32) {
+        if let ArenaStore::U8 { scale, bias, .. } = self {
+            *scale = s;
+            *bias = b;
+        }
+    }
+    /// This arena's SQ8 (scale, bias), or `SQ8_FIXED` for non-U8 arenas.
+    fn sq8_scale(&self) -> (f32, f32) {
+        match self {
+            ArenaStore::U8 { scale, bias, .. } => (*scale, *bias),
+            _ => SQ8_FIXED,
+        }
+    }
     /// Append a prepared f32 vector, quantizing per mode. `center` is the BQ
     /// per-dim centering vector (`None` ⇒ uncentered); it only affects the
     /// `Binary` arm — F32/U8 ignore it.
     fn push_f32(&mut self, emb: &[f32], center: Option<&[f32]>) {
         match self {
             ArenaStore::F32(v) => v.extend_from_slice(emb),
-            ArenaStore::U8(v) => v.extend(emb.iter().map(|&x| sq8_q(x))),
+            ArenaStore::U8 { data, scale, bias } => {
+                let (s, b) = (*scale, *bias);
+                data.extend(emb.iter().map(|&x| sq8_q(x, s, b)));
+            }
             ArenaStore::Binary { data, n, .. } => {
                 data.extend(bq_pack_centered(emb, center));
                 *n += 1;
@@ -728,7 +776,10 @@ impl ArenaStore {
     fn f32_at(&self, start: usize, len: usize) -> Vec<f32> {
         match self {
             ArenaStore::F32(v) => v[start..start + len].to_vec(),
-            ArenaStore::U8(v) => v[start..start + len].iter().map(|&q| sq8_dq(q)).collect(),
+            ArenaStore::U8 { data, scale, bias } => data[start..start + len]
+                .iter()
+                .map(|&q| sq8_dq(q, *scale, *bias))
+                .collect(),
             ArenaStore::Binary { data, dim, .. } => {
                 let wpv = bq_words(*dim);
                 let ws = (start / *dim) * wpv;
@@ -744,7 +795,24 @@ impl ArenaStore {
     fn append_range(&mut self, src: &ArenaStore, start: usize, len: usize) {
         match (self, src) {
             (ArenaStore::F32(d), ArenaStore::F32(s)) => d.extend_from_slice(&s[start..start + len]),
-            (ArenaStore::U8(d), ArenaStore::U8(s)) => d.extend_from_slice(&s[start..start + len]),
+            (
+                ArenaStore::U8 {
+                    data: d,
+                    scale: ds,
+                    bias: db,
+                },
+                ArenaStore::U8 {
+                    data: s,
+                    scale: ss,
+                    bias: sb,
+                },
+            ) => {
+                // Codes are only comparable under one scale; inherit the source's
+                // so a copied arena keeps interpreting its u8s correctly.
+                d.extend_from_slice(&s[start..start + len]);
+                *ds = *ss;
+                *db = *sb;
+            }
             (ArenaStore::Binary { data: d, n, .. }, ArenaStore::Binary { data: s, dim, .. }) => {
                 let wpv = bq_words(*dim);
                 let ws = (start / *dim) * wpv;
@@ -761,7 +829,7 @@ impl ArenaStore {
             ArenaStore::F32(v) => {
                 unsafe { std::slice::from_raw_parts(v.as_ptr() as *const u8, v.len() * 4) }.to_vec()
             }
-            ArenaStore::U8(v) => v.clone(),
+            ArenaStore::U8 { data, .. } => data.clone(),
             ArenaStore::Binary { data, .. } => data.iter().flat_map(|w| w.to_le_bytes()).collect(),
             ArenaStore::F16(v) => v.iter().flat_map(|b| b.to_le_bytes()).collect(),
         }
@@ -773,7 +841,13 @@ impl ArenaStore {
                     .map(|c| f32::from_le_bytes(c.try_into().unwrap()))
                     .collect(),
             ),
-            Quant::ScalarU8 => ArenaStore::U8(data.to_vec()),
+            // Scale defaults to fixed; load() injects a persisted calibrated scale
+            // via `set_sq8_scale` after this (the u8 codes are scale-agnostic bytes).
+            Quant::ScalarU8 => ArenaStore::U8 {
+                data: data.to_vec(),
+                scale: SQ8_FIXED.0,
+                bias: SQ8_FIXED.1,
+            },
             Quant::Binary => {
                 let words: Vec<u64> = data
                     .chunks_exact(8)
@@ -821,11 +895,11 @@ impl VecIndex {
     /// vector (`None` ⇒ uncentered) and only affects the `Binary` arm. Callers
     /// packing a RAW embedding pass the collection's center; `rehydrate` — which
     /// feeds already-centered arena codes as ±1 — passes `None`.
-    fn insert_f32(&self, emb: &[f32], id: usize, center: Option<&[f32]>) {
+    fn insert_f32(&self, emb: &[f32], id: usize, center: Option<&[f32]>, sq8: (f32, f32)) {
         match self {
             VecIndex::F32(h) => h.insert((emb, id)),
             VecIndex::U8(h) => {
-                let q: Vec<u8> = emb.iter().map(|&x| sq8_q(x)).collect();
+                let q: Vec<u8> = emb.iter().map(|&x| sq8_q(x, sq8.0, sq8.1)).collect();
                 h.insert((&q, id));
             }
             VecIndex::Binary(h) => {
@@ -840,7 +914,12 @@ impl VecIndex {
             }
         }
     }
-    fn parallel_insert_f32(&self, items: &[(Vec<f32>, u32)], center: Option<&[f32]>) {
+    fn parallel_insert_f32(
+        &self,
+        items: &[(Vec<f32>, u32)],
+        center: Option<&[f32]>,
+        sq8: (f32, f32),
+    ) {
         match self {
             VecIndex::F32(h) => {
                 let refs: Vec<(&Vec<f32>, usize)> =
@@ -850,7 +929,12 @@ impl VecIndex {
             VecIndex::U8(h) => {
                 let q: Vec<(Vec<u8>, usize)> = items
                     .iter()
-                    .map(|(v, id)| (v.iter().map(|&x| sq8_q(x)).collect(), *id as usize))
+                    .map(|(v, id)| {
+                        (
+                            v.iter().map(|&x| sq8_q(x, sq8.0, sq8.1)).collect(),
+                            *id as usize,
+                        )
+                    })
                     .collect();
                 let refs: Vec<(&Vec<u8>, usize)> = q.iter().map(|(v, id)| (v, *id)).collect();
                 h.parallel_insert(&refs);
@@ -891,6 +975,7 @@ impl VecIndex {
         k: usize,
         ef: usize,
         center: Option<&[f32]>,
+        sq8: (f32, f32),
     ) -> Vec<(usize, f32)> {
         match self {
             VecIndex::F32(h) => h
@@ -899,7 +984,7 @@ impl VecIndex {
                 .map(|n| (n.d_id, n.distance))
                 .collect(),
             VecIndex::U8(h) => {
-                let q: Vec<u8> = query.iter().map(|&x| sq8_q(x)).collect();
+                let q: Vec<u8> = query.iter().map(|&x| sq8_q(x, sq8.0, sq8.1)).collect();
                 h.search(&q, k, ef)
                     .into_iter()
                     .map(|n| (n.d_id, n.distance))
@@ -1172,6 +1257,17 @@ pub struct VectorCollection {
     /// freshly-computed center through the shared `Arc<VectorCollection>` without
     /// a `&mut`. `None` inside ⇒ uncentered.
     pub bq_center: RwLock<Option<Vec<f32>>>,
+    /// Whether this SQ8 collection opts into a **calibrated** scale (P2b). Set at
+    /// creation from a `quant:"sq8c"`/`"sq8-calibrated"` request and persisted in
+    /// the manifest. `false` ⇒ the fixed `SQ8_FIXED` scale (byte-identical to
+    /// pre-P2b). Calibration also needs an f32 source, so it only fires for an
+    /// SQ8 collection that ALSO has a rerank sidecar.
+    pub sq8_calibrate: bool,
+    /// Per-collection calibrated SQ8 `(scale, bias)`, computed at compaction from
+    /// the quantile range of the sidecar f32. `None` ⇒ `SQ8_FIXED`. Kept lock-step
+    /// with the arena's own `(scale, bias)` (set together at compaction/load) so
+    /// the HNSW (threaded this value) and the arena agree on one scale.
+    pub sq8_scale: RwLock<Option<(f32, f32)>>,
 }
 
 impl VectorCollection {
@@ -1195,6 +1291,7 @@ impl VectorCollection {
         rerank: bool,
         sidecar_path: Option<PathBuf>,
         truncate: bool,
+        sq8_calibrate: bool,
     ) -> Self {
         // Rerank only makes sense for a lossy (quantized) arena; a `None`
         // collection already stores exact f32, so never open a sidecar there.
@@ -1228,6 +1325,10 @@ impl VectorCollection {
             // Uncentered until a compaction computes the mean from the sidecar;
             // load() overwrites this from `bqmean_<name>.bin` when present.
             bq_center: RwLock::new(None),
+            sq8_calibrate,
+            // Fixed scale until a compaction calibrates (opt-in SQ8 only);
+            // load() overwrites this from `sq8scale_<name>.bin` when present.
+            sq8_scale: RwLock::new(None),
         }
     }
 
@@ -1240,6 +1341,17 @@ impl VectorCollection {
             return None;
         }
         self.bq_center.read().clone()
+    }
+
+    /// The SQ8 `(scale, bias)` to pack/unpack with — the calibrated scale if one
+    /// has been computed, else `SQ8_FIXED`. Always `SQ8_FIXED` for non-SQ8
+    /// collections. Must match the arena's own `(scale, bias)`; they are set
+    /// together at compaction and load.
+    fn sq8_snapshot(&self) -> (f32, f32) {
+        if self.quant != Quant::ScalarU8 {
+            return SQ8_FIXED;
+        }
+        self.sq8_scale.read().unwrap_or(SQ8_FIXED)
     }
 
     /// Build an HNSW index reserving capacity for ~`cap` elements. hnsw_rs uses
@@ -1333,6 +1445,9 @@ impl VectorCollection {
         }
         let index = VecIndex::build(self.quant, ef_c, meta.len());
         let arena = self.arena.read();
+        // SQ8: re-quantize with the ARENA's own scale (what f32_at just dequantized
+        // with), so the rehydrated HNSW codes match the arena exactly.
+        let sq8 = arena.sq8_scale();
         for m in meta.iter() {
             let start = m.embedding_offset as usize;
             let len = m.vector_dim as usize;
@@ -1341,7 +1456,7 @@ impl VectorCollection {
                 // The arena already holds centered BQ codes; `f32_at` returns them
                 // as ±1, so re-packing must NOT center again (pass `None`) — the
                 // sign of ±1 reproduces the stored centered code exactly.
-                index.insert_f32(&v, m.arena_id as usize, None);
+                index.insert_f32(&v, m.arena_id as usize, None, sq8);
             }
         }
         *self.hnsw.write() = Some(index);
@@ -1610,6 +1725,10 @@ impl Storage {
         }
         let m = metric.as_deref().map(Metric::parse).unwrap_or(Metric::L2);
         let q = quant.as_deref().map(Quant::parse).unwrap_or(Quant::None);
+        // SQ8 calibrated-scale opt-in, encoded in the quant string ("sq8c") so it
+        // needs no new create_collection arg (automatic NAPI+REST parity).
+        let sq8_calibrate =
+            q == Quant::ScalarU8 && quant.as_deref().is_some_and(Quant::sq8_calibrate_requested);
         let rerank = rerank.unwrap_or(false);
         // Fresh collection: truncate-create an empty fvec so on-disk rows start
         // lock-step with the (empty) arena. Path only matters when rerank+quant.
@@ -1630,6 +1749,7 @@ impl Storage {
                 rerank,
                 sidecar_path,
                 true, // fresh collection: start empty
+                sq8_calibrate,
             )),
         );
         Ok(())
@@ -1779,6 +1899,7 @@ impl Storage {
                     false,
                     None, // recovered collections are Quant::None + no rerank
                     true,
+                    false, // Quant::None ⇒ no SQ8 calibration
                 )),
             );
         }
@@ -1955,14 +2076,16 @@ impl Storage {
                         // arena. Compaction flushes the queue before recomputing the
                         // center, so this read matches the stage-time value (no skew).
                         let center = coll.center_snapshot();
+                        let sq8 = coll.sq8_snapshot();
                         if let Some(ref idx) = *coll.hnsw.read() {
-                            idx.insert_f32(&emb, arena_id as usize, center.as_deref());
+                            idx.insert_f32(&emb, arena_id as usize, center.as_deref(), sq8);
                         }
                         index_pending_thread.fetch_sub(1, Ordering::Relaxed);
                     }
                     IndexJob::Batch { coll, items, ef_c } => {
                         coll.ensure_hnsw(ef_c);
                         let center = coll.center_snapshot();
+                        let sq8 = coll.sq8_snapshot();
                         if let Some(ref idx) = *coll.hnsw.read() {
                             // hnsw_rs `parallel_insert` can leave nodes UNREACHABLE on
                             // small / near-degenerate graphs — concurrent insertion races
@@ -1978,10 +2101,10 @@ impl Storage {
                             const PARALLEL_INSERT_MIN: usize = 1024;
                             if items.len() < PARALLEL_INSERT_MIN {
                                 for (emb, id) in &items {
-                                    idx.insert_f32(emb, *id as usize, center.as_deref());
+                                    idx.insert_f32(emb, *id as usize, center.as_deref(), sq8);
                                 }
                             } else {
-                                idx.parallel_insert_f32(&items, center.as_deref());
+                                idx.parallel_insert_f32(&items, center.as_deref(), sq8);
                             }
                         }
                         index_pending_thread.fetch_sub(items.len(), Ordering::Relaxed);
@@ -2009,6 +2132,7 @@ impl Storage {
                 false,
                 None, // default is Quant::None + no rerank
                 true,
+                false, // Quant::None ⇒ no SQ8 calibration
             )),
         );
 
@@ -3012,9 +3136,12 @@ impl Storage {
             // the exact-f32 rerank stage below. `None` (non-BQ / uncentered) ⇒
             // byte-identical to the pre-P1a query path.
             let center = coll.center_snapshot();
+            // SQ8: pack the query with the collection's scale (calibrated or fixed),
+            // matching the indexed codes. Non-SQ8 ⇒ SQ8_FIXED, ignored by the arm.
+            let sq8 = coll.sq8_snapshot();
             let hnsw_lock = coll.hnsw.read();
             match &*hnsw_lock {
-                Some(idx) => idx.search_f32(&query_f32, fetch, ef, center.as_deref()),
+                Some(idx) => idx.search_f32(&query_f32, fetch, ef, center.as_deref(), sq8),
                 None => return Err(Error::from_reason("HNSW not init")),
             }
         };
@@ -4026,6 +4153,14 @@ impl Storage {
                 fs::write(temp_dir.join(format!("bqmean_{}.bin", coll.name)), bytes)
                     .map_err(|e| Error::from_reason(e.to_string()))?;
             }
+            // P2b — calibrated SQ8 (scale,bias) = 8 le-f32 bytes. Written only when
+            // calibrated; absent ⇒ fixed scale (back-compat).
+            if let Some((scale, bias)) = *coll.sq8_scale.read() {
+                let mut bytes = scale.to_le_bytes().to_vec();
+                bytes.extend_from_slice(&bias.to_le_bytes());
+                fs::write(temp_dir.join(format!("sq8scale_{}.bin", coll.name)), bytes)
+                    .map_err(|e| Error::from_reason(e.to_string()))?;
+            }
             manifest.push(serde_json::json!({
                 "name": coll.name, "model": coll.model, "dim": coll.dim,
                 "metric": coll.metric.as_str(), "quant": coll.quant.as_str(),
@@ -4033,6 +4168,8 @@ impl Storage {
                 "ef_search": coll.ef_search,
                 // f32-sidecar rerank; absent ⇒ false (no sidecar loaded).
                 "rerank": coll.f32_sidecar.is_some(),
+                // SQ8 calibrated-scale opt-in; absent ⇒ false (fixed scale).
+                "sq8_calibrate": coll.sq8_calibrate,
                 // meta format version: 1 = NodeMetadata.node_u32 (A2). Absent ⇒ 0
                 // (pre-A2 String layout), migrated on load.
                 "mv": 1
@@ -4138,6 +4275,8 @@ impl Storage {
                 let quant = Quant::parse(cm["quant"].as_str().unwrap_or("none"));
                 let ef_search = cm["ef_search"].as_u64().map(|e| e as u32);
                 let rerank = cm["rerank"].as_bool().unwrap_or(false);
+                // P2b — whether this SQ8 collection opted into a calibrated scale.
+                let sq8_calibrate = cm["sq8_calibrate"].as_bool().unwrap_or(false);
                 // Open the on-disk sidecar (if any) WITHOUT truncating — adopt the
                 // rows a prior save/compaction wrote. We validate row-count against
                 // the arena below and drop the sidecar on mismatch.
@@ -4156,9 +4295,24 @@ impl Storage {
                     rerank,
                     sidecar_path,
                     false, // load: adopt existing on-disk rows, don't truncate
+                    sq8_calibrate,
                 );
                 if let Ok(data) = fs::read(self.path.join(format!("vec_{}.bin", name))) {
                     *coll.arena.write() = ArenaStore::from_bytes(&data, quant, dim as usize);
+                }
+                // P2b — adopt the persisted calibrated SQ8 (scale,bias), if any. The
+                // arena's u8 codes are scale-agnostic bytes, so inject the scale into
+                // BOTH the collection snapshot and the arena (kept lock-step). Absent
+                // /short file ⇒ leave `None` ⇒ fixed scale (back-compat).
+                if quant == Quant::ScalarU8 {
+                    if let Ok(bytes) = fs::read(self.path.join(format!("sq8scale_{}.bin", name))) {
+                        if bytes.len() == 8 {
+                            let scale = f32::from_le_bytes(bytes[0..4].try_into().unwrap());
+                            let bias = f32::from_le_bytes(bytes[4..8].try_into().unwrap());
+                            *coll.sq8_scale.write() = Some((scale, bias));
+                            coll.arena.write().set_sq8_scale(scale, bias);
+                        }
+                    }
                 }
                 // P1a — adopt the persisted BQ centering vector, if any. Only for
                 // BQ collections and only when the file is exactly `dim` f32s (a
@@ -4228,6 +4382,7 @@ impl Storage {
                 false,
                 None, // legacy single-space DB is Quant::None + no rerank
                 true,
+                false, // Quant::None ⇒ no SQ8 calibration
             );
             *coll.arena.write() = ArenaStore::from_bytes(&data, Quant::None, dim as usize);
             if let Ok(md) = fs::read(self.path.join("meta.bin")) {
@@ -4256,6 +4411,7 @@ impl Storage {
                     false,
                     None, // default fallback is Quant::None + no rerank
                     true,
+                    false, // Quant::None ⇒ no SQ8 calibration
                 )),
             );
         }
@@ -4616,6 +4772,35 @@ impl Storage {
                     }
                     *vec_arena = recentered;
                     *coll.bq_center.write() = Some(center);
+                }
+
+                // P2b — SQ8 calibrated scale (opt-in). Same moment/structure as BQ
+                // centering: derive a robust [lo,hi] quantile range from the
+                // survivors' exact f32, map it affinely to [0,255], and re-pack the
+                // arena with the new (scale,bias) so its codes, the rehydrated HNSW,
+                // and later inserts/queries all share one scale. A degenerate range
+                // (all-equal) keeps the fixed scale.
+                if rewrite_ok
+                    && coll.quant == Quant::ScalarU8
+                    && coll.sq8_calibrate
+                    && !row_bytes.is_empty()
+                {
+                    let mut vals: Vec<f32> = row_bytes.iter().flatten().copied().collect();
+                    vals.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+                    let n = vals.len();
+                    let lo = vals[((n as f32 * 0.005) as usize).min(n - 1)];
+                    let hi = vals[((n as f32 * 0.995) as usize).min(n - 1)];
+                    if hi - lo > 1e-6 {
+                        let scale = 255.0 / (hi - lo);
+                        let bias = -lo * scale;
+                        let mut recalibrated = ArenaStore::new(coll.quant, dim);
+                        recalibrated.set_sq8_scale(scale, bias);
+                        for r in &row_bytes {
+                            recalibrated.push_f32(r, None);
+                        }
+                        *vec_arena = recalibrated;
+                        *coll.sq8_scale.write() = Some((scale, bias));
+                    }
                 }
             }
         }
