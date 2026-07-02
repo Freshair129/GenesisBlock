@@ -570,6 +570,27 @@ fn bq_pack(emb: &[f32]) -> Vec<u64> {
     w
 }
 
+/// Pack with optional per-dim centering: the bit is set iff `x - center[i] > 0`.
+/// `center == None` is byte-identical to `bq_pack` (the pre-P1a behavior). The
+/// SAME center MUST be applied on every insert path and on the query, or the
+/// codes live in different spaces and Hamming distance is meaningless. When
+/// `center` is shorter than `emb` (should not happen — both are `dim`), the
+/// unmatched tail falls back to the uncentered sign so the loop never panics.
+#[inline]
+fn bq_pack_centered(emb: &[f32], center: Option<&[f32]>) -> Vec<u64> {
+    let Some(c) = center else {
+        return bq_pack(emb);
+    };
+    let mut w = vec![0u64; bq_words(emb.len())];
+    for (i, &x) in emb.iter().enumerate() {
+        let m = c.get(i).copied().unwrap_or(0.0);
+        if x - m > 0.0 {
+            w[i >> 6] |= 1u64 << (i & 63);
+        }
+    }
+    w
+}
+
 /// Expand `dim` sign bits back to ±1.0 f32 (for the heuristic f32 readers only —
 /// meta-graph / clustering; never for search). Lossless on sign, not magnitude.
 #[inline]
@@ -671,13 +692,15 @@ impl ArenaStore {
     pub fn is_empty(&self) -> bool {
         self.len() == 0
     }
-    /// Append a prepared f32 vector, quantizing per mode.
-    fn push_f32(&mut self, emb: &[f32]) {
+    /// Append a prepared f32 vector, quantizing per mode. `center` is the BQ
+    /// per-dim centering vector (`None` ⇒ uncentered); it only affects the
+    /// `Binary` arm — F32/U8 ignore it.
+    fn push_f32(&mut self, emb: &[f32], center: Option<&[f32]>) {
         match self {
             ArenaStore::F32(v) => v.extend_from_slice(emb),
             ArenaStore::U8(v) => v.extend(emb.iter().map(|&x| sq8_q(x))),
             ArenaStore::Binary { data, n, .. } => {
-                data.extend(bq_pack(emb));
+                data.extend(bq_pack_centered(emb, center));
                 *n += 1;
             }
         }
@@ -760,7 +783,11 @@ impl VecIndex {
             Quant::Binary => VecIndex::Binary(Hnsw::new(16, cap, 16, ef_c, DistBinaryHamming {})),
         }
     }
-    fn insert_f32(&self, emb: &[f32], id: usize) {
+    /// Insert one prepared f32 vector. `center` is the BQ per-dim centering
+    /// vector (`None` ⇒ uncentered) and only affects the `Binary` arm. Callers
+    /// packing a RAW embedding pass the collection's center; `rehydrate` — which
+    /// feeds already-centered arena codes as ±1 — passes `None`.
+    fn insert_f32(&self, emb: &[f32], id: usize, center: Option<&[f32]>) {
         match self {
             VecIndex::F32(h) => h.insert((emb, id)),
             VecIndex::U8(h) => {
@@ -768,12 +795,12 @@ impl VecIndex {
                 h.insert((&q, id));
             }
             VecIndex::Binary(h) => {
-                let c = bq_pack(emb);
+                let c = bq_pack_centered(emb, center);
                 h.insert((&c, id));
             }
         }
     }
-    fn parallel_insert_f32(&self, items: &[(Vec<f32>, u32)]) {
+    fn parallel_insert_f32(&self, items: &[(Vec<f32>, u32)], center: Option<&[f32]>) {
         match self {
             VecIndex::F32(h) => {
                 let refs: Vec<(&Vec<f32>, usize)> =
@@ -791,7 +818,7 @@ impl VecIndex {
             VecIndex::Binary(h) => {
                 let q: Vec<(Vec<u64>, usize)> = items
                     .iter()
-                    .map(|(v, id)| (bq_pack(v), *id as usize))
+                    .map(|(v, id)| (bq_pack_centered(v, center), *id as usize))
                     .collect();
                 let refs: Vec<(&Vec<u64>, usize)> = q.iter().map(|(v, id)| (v, *id)).collect();
                 h.parallel_insert(&refs);
@@ -800,7 +827,18 @@ impl VecIndex {
     }
     /// Search, returning `(arena_id, distance_f32)` so callers never name the
     /// hnsw_rs `Neighbour` type or branch on element type.
-    fn search_f32(&self, query: &[f32], k: usize, ef: usize) -> Vec<(usize, f32)> {
+    /// `center` (BQ only, `None` ⇒ uncentered) must be the SAME vector the insert
+    /// paths used, or the query code and the indexed codes live in different
+    /// spaces. It centers a local copy of the query for packing only — the
+    /// caller's `query` slice is untouched, so the exact-f32 rerank stage still
+    /// sees the raw (uncentered) query.
+    fn search_f32(
+        &self,
+        query: &[f32],
+        k: usize,
+        ef: usize,
+        center: Option<&[f32]>,
+    ) -> Vec<(usize, f32)> {
         match self {
             VecIndex::F32(h) => h
                 .search(query, k, ef)
@@ -817,7 +855,7 @@ impl VecIndex {
             VecIndex::Binary(h) => {
                 // Normalize Hamming (0..dim) to [0,1] so `1 - distance` stays a
                 // sane similarity for the hybrid score blend.
-                let c = bq_pack(query);
+                let c = bq_pack_centered(query, center);
                 let dim = query.len().max(1) as f32;
                 h.search(&c, k, ef)
                     .into_iter()
@@ -1062,6 +1100,20 @@ pub struct VectorCollection {
     /// The `RwLock` serializes stage-time appends (`write_rows`) and the
     /// compaction rewrite/reopen against readers.
     pub f32_sidecar: Option<RwLock<SidecarReader>>,
+    /// Per-dim BQ centering vector (`len == dim`), computed at compaction as the
+    /// mean of the live rows' exact f32 (read from `f32_sidecar`). bge-m3 dims are
+    /// positive-biased, so an uncentered `x > 0` sign bit carries little signal;
+    /// subtracting this mean before the sign bit rebalances the codes and lifts
+    /// BQ ranking quality (BQ-with-centering; Faiss/Qdrant `ubinary`). `Some` only
+    /// for a `Quant::Binary` collection that carries a sidecar (the f32 source the
+    /// mean needs) AND has been compacted at least once; `None` everywhere else ⇒
+    /// uncentered `bq_pack` (byte-identical to pre-P1a behavior). Persisted as
+    /// `bqmean_<name>.bin`. Query and EVERY insert path subtract the SAME center;
+    /// rehydrate feeds already-centered arena codes (±1) and does NOT re-center.
+    /// `RwLock<Option<…>>` (not `Option<RwLock<…>>`) so compaction can install a
+    /// freshly-computed center through the shared `Arc<VectorCollection>` without
+    /// a `&mut`. `None` inside ⇒ uncentered.
+    pub bq_center: RwLock<Option<Vec<f32>>>,
 }
 
 impl VectorCollection {
@@ -1115,7 +1167,21 @@ impl VectorCollection {
             hnsw: RwLock::new(None),
             node_to_arena: DashMap::new(),
             count: AtomicUsize::new(0),
+            // Uncentered until a compaction computes the mean from the sidecar;
+            // load() overwrites this from `bqmean_<name>.bin` when present.
+            bq_center: RwLock::new(None),
         }
+    }
+
+    /// Snapshot this collection's BQ centering vector for a pack/search call.
+    /// Returns `None` (⇒ uncentered) unless the collection has a computed center
+    /// AND is BQ — so non-BQ collections are always uncentered. The clone keeps
+    /// the (short) `bq_center` read lock off the hot pack loop.
+    fn center_snapshot(&self) -> Option<Vec<f32>> {
+        if self.quant != Quant::Binary {
+            return None;
+        }
+        self.bq_center.read().clone()
     }
 
     /// Build an HNSW index reserving capacity for ~`cap` elements. hnsw_rs uses
@@ -1161,11 +1227,15 @@ impl VectorCollection {
     /// Push a prepared vector into the arena/metadata, return its arena_id.
     /// Does NOT touch HNSW. Short critical section: only the Vec pushes.
     fn stage(&self, node_u32: u32, emb: &[f32], lang: String) -> u32 {
+        // BQ centering: the arena stores centered sign codes (`sign(x-center)`),
+        // but the sidecar below keeps the RAW f32 (rerank re-scores exactly and
+        // the next compaction recomputes the mean from raw). `None` ⇒ uncentered.
+        let center = self.center_snapshot();
         let arena_id = {
             let mut meta = self.metadata.write();
             let mut arena = self.arena.write();
             let off = arena.len();
-            arena.push_f32(emb);
+            arena.push_f32(emb, center.as_deref());
             // Rerank sidecar: persist the exact f32 row to disk in lock-step with
             // the arena. `write_rows` positioned-appends exactly `dim*4` bytes at
             // file-EOF = `arena_id*dim*4`, so the on-disk row index stays lock-step
@@ -1210,7 +1280,10 @@ impl VectorCollection {
             let len = m.vector_dim as usize;
             if start + len <= arena.len() {
                 let v = arena.f32_at(start, len);
-                index.insert_f32(&v, m.arena_id as usize);
+                // The arena already holds centered BQ codes; `f32_at` returns them
+                // as ±1, so re-packing must NOT center again (pass `None`) — the
+                // sign of ±1 reproduces the stored centered code exactly.
+                index.insert_f32(&v, m.arena_id as usize, None);
             }
         }
         *self.hnsw.write() = Some(index);
@@ -1820,13 +1893,18 @@ impl Storage {
                         coll.ensure_hnsw(ef_c);
                         // insert(&self): hnsw_rs is internally synchronized -> read lock.
                         // The job ships f32; VecIndex quantizes per mode before insert.
+                        // BQ centering: apply the SAME center `stage` used for the
+                        // arena. Compaction flushes the queue before recomputing the
+                        // center, so this read matches the stage-time value (no skew).
+                        let center = coll.center_snapshot();
                         if let Some(ref idx) = *coll.hnsw.read() {
-                            idx.insert_f32(&emb, arena_id as usize);
+                            idx.insert_f32(&emb, arena_id as usize, center.as_deref());
                         }
                         index_pending_thread.fetch_sub(1, Ordering::Relaxed);
                     }
                     IndexJob::Batch { coll, items, ef_c } => {
                         coll.ensure_hnsw(ef_c);
+                        let center = coll.center_snapshot();
                         if let Some(ref idx) = *coll.hnsw.read() {
                             // hnsw_rs `parallel_insert` can leave nodes UNREACHABLE on
                             // small / near-degenerate graphs — concurrent insertion races
@@ -1842,10 +1920,10 @@ impl Storage {
                             const PARALLEL_INSERT_MIN: usize = 1024;
                             if items.len() < PARALLEL_INSERT_MIN {
                                 for (emb, id) in &items {
-                                    idx.insert_f32(emb, *id as usize);
+                                    idx.insert_f32(emb, *id as usize, center.as_deref());
                                 }
                             } else {
-                                idx.parallel_insert_f32(&items);
+                                idx.parallel_insert_f32(&items, center.as_deref());
                             }
                         }
                         index_pending_thread.fetch_sub(items.len(), Ordering::Relaxed);
@@ -2871,9 +2949,14 @@ impl Storage {
         let mut results = if let Some(n) = exact_rerank_slots {
             (0..n).map(|i| (i, 0.0f32)).collect()
         } else {
+            // BQ centering: pack the query with the SAME center the index used.
+            // `search_f32` centers a local copy only — `query_f32` stays raw for
+            // the exact-f32 rerank stage below. `None` (non-BQ / uncentered) ⇒
+            // byte-identical to the pre-P1a query path.
+            let center = coll.center_snapshot();
             let hnsw_lock = coll.hnsw.read();
             match &*hnsw_lock {
-                Some(idx) => idx.search_f32(&query_f32, fetch, ef),
+                Some(idx) => idx.search_f32(&query_f32, fetch, ef, center.as_deref()),
                 None => return Err(Error::from_reason("HNSW not init")),
             }
         };
@@ -3877,6 +3960,14 @@ impl Storage {
                     "fvec snapshot size must equal rows*dim*4"
                 );
             }
+            // P1a — BQ centering vector (flat le-f32, len == dim). Written only
+            // when present (BQ + compacted). Absent on reload ⇒ `None` ⇒
+            // uncentered, so pre-P1a snapshots keep their exact behavior.
+            if let Some(center) = coll.bq_center.read().as_ref() {
+                let bytes: Vec<u8> = center.iter().flat_map(|f| f.to_le_bytes()).collect();
+                fs::write(temp_dir.join(format!("bqmean_{}.bin", coll.name)), bytes)
+                    .map_err(|e| Error::from_reason(e.to_string()))?;
+            }
             manifest.push(serde_json::json!({
                 "name": coll.name, "model": coll.model, "dim": coll.dim,
                 "metric": coll.metric.as_str(), "quant": coll.quant.as_str(),
@@ -4010,6 +4101,22 @@ impl Storage {
                 );
                 if let Ok(data) = fs::read(self.path.join(format!("vec_{}.bin", name))) {
                     *coll.arena.write() = ArenaStore::from_bytes(&data, quant, dim as usize);
+                }
+                // P1a — adopt the persisted BQ centering vector, if any. Only for
+                // BQ collections and only when the file is exactly `dim` f32s (a
+                // short/absent file ⇒ leave `None` ⇒ uncentered, back-compat). The
+                // arena above already holds centered codes, so the center just has
+                // to match what packed them; every later insert/query reuses it.
+                if quant == Quant::Binary && dim > 0 {
+                    if let Ok(bytes) = fs::read(self.path.join(format!("bqmean_{}.bin", name))) {
+                        if bytes.len() == dim as usize * 4 {
+                            let center: Vec<f32> = bytes
+                                .chunks_exact(4)
+                                .map(|c| f32::from_le_bytes(c.try_into().unwrap()))
+                                .collect();
+                            *coll.bq_center.write() = Some(center);
+                        }
+                    }
                 }
                 // Rerank sidecar is on-disk (fvec_<name>.bin), opened by `new`.
                 // Only ADOPT it if its row count exactly parallels the arena — a
@@ -4423,6 +4530,34 @@ impl Storage {
                             break;
                         }
                     }
+                }
+
+                // P1a — BQ per-dim centering. `row_bytes` holds every surviving
+                // row's EXACT f32 (raw, uncentered — the sidecar keeps it raw) in
+                // new-arena order, so this is the moment the mean can be computed.
+                // We (1) install the new center and (2) re-pack the BQ arena with
+                // it, so the arena codes, the rehydrated HNSW (step 3, from the
+                // arena), and every subsequent insert/query all agree on one center.
+                // Non-BQ collections and empty/failed rewrites are left untouched.
+                if rewrite_ok && coll.quant == Quant::Binary && !row_bytes.is_empty() {
+                    let mut center = vec![0.0f32; dim];
+                    for r in &row_bytes {
+                        for (i, &x) in r.iter().take(dim).enumerate() {
+                            center[i] += x;
+                        }
+                    }
+                    let inv = 1.0 / row_bytes.len() as f32;
+                    for m in center.iter_mut() {
+                        *m *= inv;
+                    }
+                    // Re-pack the arena as centered sign codes; offsets stay i*dim
+                    // (fixed dim), matching the meta already written above.
+                    let mut recentered = ArenaStore::new(coll.quant, dim);
+                    for r in &row_bytes {
+                        recentered.push_f32(r, Some(&center));
+                    }
+                    *vec_arena = recentered;
+                    *coll.bq_center.write() = Some(center);
                 }
             }
         }
