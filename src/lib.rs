@@ -954,6 +954,19 @@ impl SidecarReader {
         Some(row)
     }
 
+    /// Truncate the backing file to zero length and drop the LRU cache. Used by
+    /// compaction to rewrite the sidecar in place (truncate, then re-append the
+    /// surviving rows via `write_rows`). Clearing the cache is REQUIRED: after a
+    /// truncate+rewrite, a given row index `d_id` may hold a different vector than
+    /// before, so any cached decode keyed by that index is stale and must go.
+    fn truncate_empty(&self) -> std::io::Result<()> {
+        self.file.set_len(0)?;
+        let mut c = self.cache.lock();
+        c.map.clear();
+        c.order.clear();
+        Ok(())
+    }
+
     /// Number of complete `dim`-wide rows on disk (`file_len / (dim*4)`).
     pub fn len_rows(&self) -> usize {
         if self.dim == 0 {
@@ -967,9 +980,10 @@ impl SidecarReader {
     }
 
     /// Append helper: write flat f32 `rows` to the end of the file as
-    /// little-endian bytes. Used later by save / compaction to (re)materialize
-    /// the sidecar. Does not touch the LRU (writers rebuild the file wholesale).
-    #[allow(dead_code)]
+    /// little-endian bytes. Used by `stage()` (append one row per add), and by
+    /// save / compaction to (re)materialize the sidecar. Does not touch the LRU:
+    /// a freshly-appended `d_id` has never been read so it can't be cached stale,
+    /// and re-materialize paths open a fresh reader with an empty cache.
     fn write_rows(&self, rows: &[f32]) -> std::io::Result<()> {
         let mut buf = Vec::with_capacity(rows.len() * 4);
         for &v in rows {
@@ -1029,16 +1043,30 @@ pub struct VectorCollection {
     /// `None` ⇒ fall back to the engine-global default. Resolution order in
     /// `hybrid_search`: per-query override → this → engine-global.
     pub ef_search: Option<u32>,
-    /// Optional exact-f32 sidecar for rerank: a flat `Vec<f32>` parallel to the
-    /// quantized arena (vector at arena_id `i` occupies `[i*dim .. (i+1)*dim]`,
-    /// i.e. the same `embedding_offset` units as the arena). `Some` only for a
-    /// quantized collection created with `rerank = true`; `None` collections and
-    /// non-rerank quantized collections leave it `None`. Persisted as
-    /// `fvec_<name>.bin`.
-    pub f32_sidecar: Option<RwLock<Vec<f32>>>,
+    /// Optional exact-f32 sidecar for rerank, kept ON DISK (post-P0) in
+    /// `fvec_<name>.bin` behind a positioned-read `SidecarReader` — NOT resident
+    /// in RAM (the old `Vec<f32>` re-created the very residency cost rerank was
+    /// meant to avoid; see docs/RCA--VECTOR-QUANTIZATION.md). Row `arena_id` lives
+    /// at byte offset `arena_id * dim * 4` (fixed dim ⇒ `arena_id*dim ==
+    /// embedding_offset`), so the on-disk row index stays lock-step with the
+    /// arena. `Some` only for a quantized collection created with `rerank = true`;
+    /// `None` collections and non-rerank quantized collections leave it `None`.
+    /// The `RwLock` serializes stage-time appends (`write_rows`) and the
+    /// compaction rewrite/reopen against readers.
+    pub f32_sidecar: Option<RwLock<SidecarReader>>,
 }
 
 impl VectorCollection {
+    /// `sidecar_path` is the on-disk backing for the rerank sidecar. It is only
+    /// consulted when `rerank && quant != None`; callers pass
+    /// `Some(<path>/fvec_<name>.bin)` in that case and `None` otherwise. The file
+    /// is opened read+write here (created if absent). `truncate` controls whether
+    /// a pre-existing file is emptied: `true` for a freshly-created collection
+    /// (starts empty), `false` on load (adopt the on-disk rows, then the caller
+    /// validates `len_rows()` against the arena and drops the sidecar on
+    /// mismatch). If the open fails we degrade to `None` (quantized-only search)
+    /// rather than abort collection creation.
+    #[allow(clippy::too_many_arguments)]
     fn new(
         name: String,
         model: String,
@@ -1047,11 +1075,22 @@ impl VectorCollection {
         quant: Quant,
         ef_search: Option<u32>,
         rerank: bool,
+        sidecar_path: Option<PathBuf>,
+        truncate: bool,
     ) -> Self {
         // Rerank only makes sense for a lossy (quantized) arena; a `None`
-        // collection already stores exact f32, so never allocate a sidecar there.
+        // collection already stores exact f32, so never open a sidecar there.
         let f32_sidecar = if rerank && quant != Quant::None {
-            Some(RwLock::new(Vec::new()))
+            sidecar_path.and_then(|p| {
+                FileOpenOptions::new()
+                    .read(true)
+                    .write(true)
+                    .create(true)
+                    .truncate(truncate)
+                    .open(&p)
+                    .ok()
+                    .map(|f| RwLock::new(SidecarReader::new(f, dim as usize)))
+            })
         } else {
             None
         };
@@ -1119,11 +1158,18 @@ impl VectorCollection {
             let mut arena = self.arena.write();
             let off = arena.len();
             arena.push_f32(emb);
-            // Rerank sidecar: keep the exact f32 in lock-step with the arena.
-            // Same offset units (components), so `embedding_offset` indexes both.
-            // Lock order is meta → arena → sidecar everywhere (stage / compaction).
+            // Rerank sidecar: persist the exact f32 row to disk in lock-step with
+            // the arena. `write_rows` positioned-appends exactly `dim*4` bytes at
+            // file-EOF = `arena_id*dim*4`, so the on-disk row index stays lock-step
+            // with `embedding_offset/dim`. We hold arena.write() (exclusive) across
+            // this call, so appends are serialized — no shared-cursor race. Lock
+            // order stays meta → arena → sidecar everywhere (stage / compaction).
+            // A write failure must not silently corrupt the sidecar; on error we
+            // give up on rerank for this collection by dropping to quantized-only
+            // rather than leave the file half-written (a short row would desync the
+            // whole tail). Load/compaction/save all guard len_rows == arena_rows.
             if let Some(sidecar) = &self.f32_sidecar {
-                sidecar.write().extend_from_slice(emb);
+                let _ = sidecar.write().write_rows(emb);
             }
             let arena_id = meta.len() as u32;
             meta.push(NodeMetadata {
@@ -1425,6 +1471,14 @@ impl Storage {
         }
         let m = metric.as_deref().map(Metric::parse).unwrap_or(Metric::L2);
         let q = quant.as_deref().map(Quant::parse).unwrap_or(Quant::None);
+        let rerank = rerank.unwrap_or(false);
+        // Fresh collection: truncate-create an empty fvec so on-disk rows start
+        // lock-step with the (empty) arena. Path only matters when rerank+quant.
+        let sidecar_path = if rerank && q != Quant::None {
+            Some(self.path.join(format!("fvec_{}.bin", name)))
+        } else {
+            None
+        };
         self.collections.insert(
             name.clone(),
             Arc::new(VectorCollection::new(
@@ -1434,7 +1488,9 @@ impl Storage {
                 m,
                 q,
                 ef_search,
-                rerank.unwrap_or(false),
+                rerank,
+                sidecar_path,
+                true, // fresh collection: start empty
             )),
         );
         Ok(())
@@ -1582,6 +1638,8 @@ impl Storage {
                     Quant::None,
                     None,
                     false,
+                    None, // recovered collections are Quant::None + no rerank
+                    true,
                 )),
             );
         }
@@ -1805,6 +1863,8 @@ impl Storage {
                 Quant::None,
                 None,
                 false,
+                None, // default is Quant::None + no rerank
+                true,
             )),
         );
 
@@ -2788,7 +2848,7 @@ impl Storage {
         // and recall exact. Large collections (fetch << slot count — e.g. the
         // 1M recall benchmarks) keep the HNSW path unchanged.
         let exact_rerank_slots = coll.f32_sidecar.as_ref().and_then(|s| {
-            let n = s.read().len() / (coll.dim as usize).max(1);
+            let n = s.read().len_rows();
             (n > 0 && fetch >= n).then_some(n)
         });
         let mut results = if let Some(n) = exact_rerank_slots {
@@ -2808,15 +2868,15 @@ impl Storage {
         // rather than silently dropping every hit (it would otherwise return empty).
         if let Some(sidecar) = &coll.f32_sidecar {
             let sc = sidecar.read();
-            let dim = coll.dim as usize;
+            // Positioned disk read per candidate (LRU-fronted so a small/hot
+            // collection doesn't pay N cold reads/query). A missing/short row
+            // (`row` -> None) keeps the candidate's quantized distance — never
+            // drops it — so a truncated fvec degrades to quantized, not empty.
             results = results
                 .into_iter()
-                .map(|(d_id, qd)| {
-                    let start = d_id * dim;
-                    match sc.get(start..start + dim) {
-                        Some(v) => (d_id, exact_l2(&query_f32, v)),
-                        None => (d_id, qd),
-                    }
+                .map(|(d_id, qd)| match sc.row(d_id) {
+                    Some(v) => (d_id, exact_l2(&query_f32, &v)),
+                    None => (d_id, qd),
                 })
                 .collect();
             results.sort_by(|a, b| a.1.partial_cmp(&b.1).unwrap_or(std::cmp::Ordering::Equal));
@@ -3765,11 +3825,42 @@ impl Storage {
             fs::write(temp_dir.join(format!("meta_{}.bin", coll.name)), meta_data)
                 .map_err(|e| Error::from_reason(e.to_string()))?;
             // Rerank sidecar (exact f32) — only when the collection carries one.
+            // Backing is now ON DISK; stream each row through the reader into the
+            // temp fvec instead of re-materializing a resident Vec<f32>. Streaming
+            // `0..len_rows` (not a raw byte copy of the live file) guarantees the
+            // snapshot is exactly `live_count` rows even if the live file ever held
+            // trailing bytes. Assert size == rows*dim*4 before adopting the temp.
             if let Some(sidecar) = &coll.f32_sidecar {
                 let s = sidecar.read();
-                let bytes: Vec<u8> = s.iter().flat_map(|f| f.to_le_bytes()).collect();
-                fs::write(temp_dir.join(format!("fvec_{}.bin", coll.name)), bytes)
+                let dim = coll.dim as usize;
+                let rows = s.len_rows();
+                let out_path = temp_dir.join(format!("fvec_{}.bin", coll.name));
+                let out = FileOpenOptions::new()
+                    .write(true)
+                    .create(true)
+                    .truncate(true)
+                    .open(&out_path)
                     .map_err(|e| Error::from_reason(e.to_string()))?;
+                let mut w = std::io::BufWriter::new(out);
+                for i in 0..rows {
+                    // A row the live file can't serve (should not happen: live fvec
+                    // is lock-step with the arena) is written as zeros so the file
+                    // stays exactly rows*dim wide and reload's len guard still holds.
+                    let row = s.row(i).unwrap_or_else(|| vec![0.0f32; dim]);
+                    for v in &row {
+                        w.write_all(&v.to_le_bytes())
+                            .map_err(|e| Error::from_reason(e.to_string()))?;
+                    }
+                }
+                w.flush().map_err(|e| Error::from_reason(e.to_string()))?;
+                let written = fs::metadata(&out_path)
+                    .map(|m| m.len())
+                    .unwrap_or(0);
+                debug_assert_eq!(
+                    written,
+                    (rows * dim * 4) as u64,
+                    "fvec snapshot size must equal rows*dim*4"
+                );
             }
             manifest.push(serde_json::json!({
                 "name": coll.name, "model": coll.model, "dim": coll.dim,
@@ -3883,7 +3974,15 @@ impl Storage {
                 let quant = Quant::parse(cm["quant"].as_str().unwrap_or("none"));
                 let ef_search = cm["ef_search"].as_u64().map(|e| e as u32);
                 let rerank = cm["rerank"].as_bool().unwrap_or(false);
-                let coll = VectorCollection::new(
+                // Open the on-disk sidecar (if any) WITHOUT truncating — adopt the
+                // rows a prior save/compaction wrote. We validate row-count against
+                // the arena below and drop the sidecar on mismatch.
+                let sidecar_path = if rerank && quant != Quant::None {
+                    Some(self.path.join(format!("fvec_{}.bin", name)))
+                } else {
+                    None
+                };
+                let mut coll = VectorCollection::new(
                     name.clone(),
                     model,
                     dim,
@@ -3891,24 +3990,35 @@ impl Storage {
                     quant,
                     ef_search,
                     rerank,
+                    sidecar_path,
+                    false, // load: adopt existing on-disk rows, don't truncate
                 );
                 if let Ok(data) = fs::read(self.path.join(format!("vec_{}.bin", name))) {
                     *coll.arena.write() = ArenaStore::from_bytes(&data, quant, dim as usize);
                 }
-                // Rerank sidecar: exact f32 vectors, parallel to the arena. Only
-                // present when the collection opted into rerank (and is quantized).
-                // Only adopt a sidecar that parallels the arena exactly — a missing
-                // or truncated fvec is left empty so search degrades to quantized
-                // (the query path falls back per-candidate), never to empty results.
-                if let Some(sidecar) = &coll.f32_sidecar {
-                    if let Ok(data) = fs::read(self.path.join(format!("fvec_{}.bin", name))) {
-                        let v: Vec<f32> = data
-                            .chunks_exact(4)
-                            .map(|c| f32::from_le_bytes(c.try_into().unwrap()))
-                            .collect();
-                        if v.len() == coll.arena.read().len() {
-                            *sidecar.write() = v;
+                // Rerank sidecar is on-disk (fvec_<name>.bin), opened by `new`.
+                // Only ADOPT it if its row count exactly parallels the arena — a
+                // missing / truncated fvec (partial or crash-torn snapshot) is
+                // dropped to `None` so search degrades to quantized-only (the query
+                // path falls back per-candidate), never to empty results. `new`
+                // .create(true)'d an empty file for a missing fvec, which fails this
+                // guard (0 rows ≠ arena rows) and is correctly discarded.
+                if coll.f32_sidecar.is_some() {
+                    let arena_rows = {
+                        let a = coll.arena.read();
+                        if dim == 0 {
+                            0
+                        } else {
+                            a.len() / dim as usize
                         }
+                    };
+                    let sidecar_rows = coll
+                        .f32_sidecar
+                        .as_ref()
+                        .map(|s| s.read().len_rows())
+                        .unwrap_or(0);
+                    if sidecar_rows != arena_rows {
+                        coll.f32_sidecar = None;
                     }
                 }
                 if let Ok(data) = fs::read(self.path.join(format!("meta_{}.bin", name))) {
@@ -3936,6 +4046,8 @@ impl Storage {
                 Quant::None,
                 None,
                 false,
+                None, // legacy single-space DB is Quant::None + no rerank
+                true,
             );
             *coll.arena.write() = ArenaStore::from_bytes(&data, Quant::None, dim as usize);
             if let Ok(md) = fs::read(self.path.join("meta.bin")) {
@@ -3962,6 +4074,8 @@ impl Storage {
                     Quant::None,
                     None,
                     false,
+                    None, // default fallback is Quant::None + no rerank
+                    true,
                 )),
             );
         }
@@ -4217,13 +4331,21 @@ impl Storage {
             let mut meta_arena = coll.metadata.write();
             let mut vec_arena = coll.arena.write();
             // Rerank sidecar is compacted in lock-step (lock order: meta → arena
-            // → sidecar). It uses the same `embedding_offset`/`len` component units
-            // as the arena, so its slices move identically.
-            let mut sidecar_guard = coll.f32_sidecar.as_ref().map(|s| s.write());
+            // → sidecar). Backing is now ON DISK. We first collect each surviving
+            // old row index (keyed by `embedding_offset/dim` in the OLD arena — the
+            // SAME order the arena remap uses), THEN rewrite the on-disk fvec IN
+            // PLACE through the held reader: truncate to empty and re-append each
+            // live row via positioned writes. No tmp file / rename (which fails
+            // over an open handle on Windows) and no resident Vec<f32> — rows are
+            // read one at a time off disk and written one at a time back. All under
+            // the held sidecar write guard, so no reader sees a half-rewritten file.
+            let sidecar_guard = coll.f32_sidecar.as_ref().map(|s| s.write());
+            let dim = coll.dim as usize;
 
             let mut new_meta = Vec::with_capacity(live_nodes.len());
             let mut new_vec = ArenaStore::new(coll.quant, coll.dim as usize);
-            let mut new_sidecar: Vec<f32> = Vec::new();
+            // Old arena row indices of the survivors, in new-arena order.
+            let mut surviving_old_rows: Vec<usize> = Vec::new();
             coll.node_to_arena.clear();
 
             for meta in meta_arena.iter() {
@@ -4235,10 +4357,8 @@ impl Storage {
                         if start_off + len <= vec_arena.len() {
                             let new_offset = new_vec.len() as u64;
                             new_vec.append_range(&vec_arena, start_off, len);
-                            if let Some(old_sidecar) = sidecar_guard.as_deref() {
-                                if let Some(slice) = old_sidecar.get(start_off..start_off + len) {
-                                    new_sidecar.extend_from_slice(slice);
-                                }
+                            if sidecar_guard.is_some() {
+                                surviving_old_rows.push(if dim > 0 { start_off / dim } else { 0 });
                             }
                             let new_arena_id = new_meta.len() as u32;
                             let mut meta_clone = meta.clone();
@@ -4253,8 +4373,42 @@ impl Storage {
             coll.count.store(new_meta.len(), Ordering::Relaxed);
             *meta_arena = new_meta;
             *vec_arena = new_vec;
-            if let Some(g) = sidecar_guard.as_mut() {
-                **g = new_sidecar;
+
+            // In-place on-disk rewrite of the sidecar to match the compacted arena.
+            // Read every survivor row off the OLD file first (into a transient
+            // per-row buffer, one at a time), truncate the file, then append the
+            // rows back in the new order. On any I/O error we truncate to empty so
+            // the load-time len guard drops the (now-desynced) sidecar to quantized,
+            // never rerank on torn data. `f32_sidecar` lives behind an `Arc`, so the
+            // Option can't be nulled here — the reader's file just ends up empty.
+            if let Some(guard) = sidecar_guard.as_deref() {
+                // Snapshot the old rows before truncation (positioned reads off the
+                // still-intact file; each is dropped after we buffer its bytes).
+                let mut rewrite_ok = true;
+                let mut row_bytes: Vec<Vec<f32>> = Vec::with_capacity(surviving_old_rows.len());
+                for &old_row in &surviving_old_rows {
+                    match guard.row(old_row) {
+                        Some(r) => row_bytes.push(r),
+                        None => {
+                            rewrite_ok = false;
+                            break;
+                        }
+                    }
+                }
+                // Truncate to empty (also clears the stale LRU) then re-append.
+                if guard.truncate_empty().is_err() {
+                    rewrite_ok = false;
+                }
+                if rewrite_ok {
+                    for r in &row_bytes {
+                        if guard.write_rows(r).is_err() {
+                            // Partial write: truncate back to empty so we never
+                            // present a torn tail; degrade to quantized on reload.
+                            let _ = guard.truncate_empty();
+                            break;
+                        }
+                    }
+                }
             }
         }
 
