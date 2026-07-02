@@ -11,6 +11,13 @@ use sha2::{Digest, Sha256};
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::fs::{self, File, OpenOptions as FileOpenOptions};
 use std::io::Write;
+// Positioned (offset) reads for the on-disk rerank sidecar. Both are gated by
+// `#[cfg]` so the crate builds on either platform; NEVER mmap (Windows rename /
+// atomic-swap safety — see ADR--GENESISDB-ONDISK-RERANK-SIDECAR).
+#[cfg(unix)]
+use std::os::unix::fs::FileExt;
+#[cfg(windows)]
+use std::os::windows::fs::FileExt;
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, AtomicU32, AtomicUsize, Ordering};
 use std::sync::Arc;
@@ -812,6 +819,194 @@ impl VecIndex {
                     .collect()
             }
         }
+    }
+}
+
+/// Fixed capacity (in rows) of the per-`SidecarReader` LRU decode cache. Bounds
+/// the resident bytes at `SIDECAR_CACHE_ROWS * dim * 4` regardless of collection
+/// size, so the cache can never re-create the resident-RAM problem the on-disk
+/// sidecar exists to solve. 4096 rows × 1024 dim × 4 B ≈ 16 MiB worst case.
+pub const SIDECAR_CACHE_ROWS: usize = 4096;
+
+/// Positioned-read view over `fvec_<name>.bin` — the exact-f32 rerank sidecar,
+/// kept ON DISK (post-P0) instead of resident in a `Vec<f32>`. Row `d_id` lives
+/// at byte offset `d_id * dim * 4`, `dim` little-endian f32s, matching the
+/// resident-era layout exactly (no migration; legacy files reused as-is). Reads
+/// use `seek_read` (Windows) / `read_at` (Unix) behind `#[cfg]` — NEVER mmap
+/// (see ADR--GENESISDB-ONDISK-RERANK-SIDECAR for the Windows-safety rationale).
+///
+/// A small bounded LRU (`SIDECAR_CACHE_ROWS`) fronts the disk so hot rerank rows
+/// don't re-hit the file. The cache `Mutex` is strictly nested: `row()` takes it
+/// only to look up / insert a decoded row and releases it before/after the disk
+/// read — it is never held across, and never wraps, the arena or `meta` locks,
+/// so the `meta → arena → sidecar` order is preserved.
+pub struct SidecarReader {
+    file: File,
+    dim: usize,
+    /// Bounded LRU: `(d_id -> decoded row)` newest-last. Hand-rolled over a
+    /// `Vec` (no new crate dep); capacity == `SIDECAR_CACHE_ROWS`.
+    cache: parking_lot::Mutex<SidecarCache>,
+}
+
+/// Hand-rolled bounded LRU keyed by `d_id`. `order` is a recency list, front =
+/// least-recently-used, back = most-recently-used; `map` holds the decoded rows.
+/// On a hit the key is moved to the back; on insert past capacity the front key
+/// is evicted. Kept tiny/local so it needs no external LRU crate.
+struct SidecarCache {
+    map: HashMap<usize, Vec<f32>>,
+    order: VecDeque<usize>,
+}
+
+impl SidecarCache {
+    fn new() -> Self {
+        SidecarCache {
+            map: HashMap::new(),
+            order: VecDeque::new(),
+        }
+    }
+
+    /// Move `d_id` to the most-recently-used position. Linear scan of `order`
+    /// bounded by `SIDECAR_CACHE_ROWS`, so O(cap) worst case.
+    fn touch(&mut self, d_id: usize) {
+        if let Some(pos) = self.order.iter().position(|&k| k == d_id) {
+            self.order.remove(pos);
+        }
+        self.order.push_back(d_id);
+    }
+
+    fn get(&mut self, d_id: usize) -> Option<Vec<f32>> {
+        if let Some(row) = self.map.get(&d_id).cloned() {
+            self.touch(d_id);
+            Some(row)
+        } else {
+            None
+        }
+    }
+
+    fn put(&mut self, d_id: usize, row: Vec<f32>) {
+        if self.map.contains_key(&d_id) {
+            self.map.insert(d_id, row);
+            self.touch(d_id);
+            return;
+        }
+        while self.order.len() >= SIDECAR_CACHE_ROWS {
+            if let Some(evict) = self.order.pop_front() {
+                self.map.remove(&evict);
+            } else {
+                break;
+            }
+        }
+        self.map.insert(d_id, row);
+        self.order.push_back(d_id);
+    }
+}
+
+impl SidecarReader {
+    /// `pub` (not just `pub(crate)`) so `tests/*.rs` integration crates — which
+    /// link against this crate as an external dependency — can construct a
+    /// reader directly against a hand-written `fvec_<name>.bin` fixture. Query
+    /// API surface is unaffected: this type is not reachable from any HQL/NAPI
+    /// entry point.
+    pub fn new(file: File, dim: usize) -> Self {
+        SidecarReader {
+            file,
+            dim,
+            cache: parking_lot::Mutex::new(SidecarCache::new()),
+        }
+    }
+
+    /// Read exactly `dim` little-endian f32s for arena row `d_id` at byte offset
+    /// `d_id * dim * 4`. Returns `None` on a short read / out-of-range `d_id`
+    /// (never panics, never reads past EOF). Checks the LRU cache first; a cache
+    /// hit is byte-identical to the disk read.
+    pub fn row(&self, d_id: usize) -> Option<Vec<f32>> {
+        if self.dim == 0 {
+            return None;
+        }
+        // Fast path: cached decode.
+        if let Some(row) = self.cache.lock().get(d_id) {
+            return Some(row);
+        }
+
+        let row_bytes = self.dim.checked_mul(4)?; // symmetry with the offset overflow guard below
+        let offset = (d_id as u64).checked_mul(row_bytes as u64)?;
+        let mut buf = vec![0u8; row_bytes];
+        // Loop to tolerate short positioned reads (fill the whole row or bail).
+        let mut filled = 0usize;
+        while filled < row_bytes {
+            let cur = offset + filled as u64;
+            #[cfg(windows)]
+            let n = self.file.seek_read(&mut buf[filled..], cur).ok()?;
+            #[cfg(unix)]
+            let n = self.file.read_at(&mut buf[filled..], cur).ok()?;
+            if n == 0 {
+                // EOF before a full row — out of range / truncated.
+                return None;
+            }
+            filled += n;
+        }
+
+        let row: Vec<f32> = buf
+            .chunks_exact(4)
+            .map(|c| f32::from_le_bytes(c.try_into().unwrap()))
+            .collect();
+        self.cache.lock().put(d_id, row.clone());
+        Some(row)
+    }
+
+    /// Number of complete `dim`-wide rows on disk (`file_len / (dim*4)`).
+    pub fn len_rows(&self) -> usize {
+        if self.dim == 0 {
+            return 0;
+        }
+        let row_bytes = (self.dim * 4) as u64;
+        match self.file.metadata() {
+            Ok(m) => (m.len() / row_bytes) as usize,
+            Err(_) => 0,
+        }
+    }
+
+    /// Append helper: write flat f32 `rows` to the end of the file as
+    /// little-endian bytes. Used later by save / compaction to (re)materialize
+    /// the sidecar. Does not touch the LRU (writers rebuild the file wholesale).
+    #[allow(dead_code)]
+    fn write_rows(&self, rows: &[f32]) -> std::io::Result<()> {
+        let mut buf = Vec::with_capacity(rows.len() * 4);
+        for &v in rows {
+            buf.extend_from_slice(&v.to_le_bytes());
+        }
+        // Positioned append at current EOF so this stays symmetric with the
+        // positioned-read path (no reliance on a shared file cursor).
+        let end = self.file.metadata()?.len();
+        #[cfg(windows)]
+        {
+            let mut written = 0usize;
+            while written < buf.len() {
+                let n = self.file.seek_write(&buf[written..], end + written as u64)?;
+                if n == 0 {
+                    return Err(std::io::Error::new(
+                        std::io::ErrorKind::WriteZero,
+                        "sidecar write_rows wrote 0 bytes",
+                    ));
+                }
+                written += n;
+            }
+        }
+        #[cfg(unix)]
+        {
+            let mut written = 0usize;
+            while written < buf.len() {
+                let n = self.file.write_at(&buf[written..], end + written as u64)?;
+                if n == 0 {
+                    return Err(std::io::Error::new(
+                        std::io::ErrorKind::WriteZero,
+                        "sidecar write_rows wrote 0 bytes",
+                    ));
+                }
+                written += n;
+            }
+        }
+        Ok(())
     }
 }
 
