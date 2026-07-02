@@ -143,8 +143,8 @@ fn legacy_fvec_opens_and_reranks_exact() {
 
     // Arena order is insertion order: BIG=0, SMALL=1, NEG=2 (dim=4).
     let legacy_rows: Vec<Vec<f32>> = vec![
-        vec![1.0, 1.0, 1.0, 1.0],   // BIG  (d_id 0)
-        vec![0.2, 0.2, 0.2, 0.2],   // SMALL(d_id 1)
+        vec![1.0, 1.0, 1.0, 1.0],     // BIG  (d_id 0)
+        vec![0.2, 0.2, 0.2, 0.2],     // SMALL(d_id 1)
         vec![-1.0, -1.0, -1.0, -1.0], // NEG (d_id 2)
     ];
     let legacy_bytes = encode_legacy_fvec(&legacy_rows);
@@ -158,7 +158,10 @@ fn legacy_fvec_opens_and_reranks_exact() {
     // Sanity: save_state() already wrote a same-shaped file; replacing it
     // with our independently hand-built buffer proves this test is not just
     // reopening the writer's own untouched output.
-    assert!(fvec_path.exists(), "save_state must have written fvec_c.bin");
+    assert!(
+        fvec_path.exists(),
+        "save_state must have written fvec_c.bin"
+    );
     {
         let mut f = File::create(&fvec_path).unwrap();
         f.write_all(&legacy_bytes).unwrap();
@@ -199,10 +202,8 @@ fn truncated_legacy_fvec_degrades_not_adopted() {
     // Full legacy rows for BIG and SMALL, but NEG's row is short by one f32
     // (simulates a truncated/corrupt legacy snapshot) so total row count no
     // longer divides evenly into 3 whole rows of dim 4 f32s.
-    let mut legacy_bytes = encode_legacy_fvec(&[
-        vec![1.0, 1.0, 1.0, 1.0],
-        vec![0.2, 0.2, 0.2, 0.2],
-    ]);
+    let mut legacy_bytes =
+        encode_legacy_fvec(&[vec![1.0, 1.0, 1.0, 1.0], vec![0.2, 0.2, 0.2, 0.2]]);
     legacy_bytes.extend_from_slice(&(-1.0f32).to_le_bytes());
     legacy_bytes.extend_from_slice(&(-1.0f32).to_le_bytes());
     legacy_bytes.extend_from_slice(&(-1.0f32).to_le_bytes());

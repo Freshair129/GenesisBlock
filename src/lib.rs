@@ -884,8 +884,8 @@ impl SidecarCache {
     }
 
     fn put(&mut self, d_id: usize, row: Vec<f32>) {
-        if self.map.contains_key(&d_id) {
-            self.map.insert(d_id, row);
+        if self.map.insert(d_id, row).is_some() {
+            // Key already resident: the value is overwritten above; just bump recency.
             self.touch(d_id);
             return;
         }
@@ -896,7 +896,7 @@ impl SidecarCache {
                 break;
             }
         }
-        self.map.insert(d_id, row);
+        // Row was inserted above; the new key just needs its recency slot.
         self.order.push_back(d_id);
     }
 }
@@ -996,7 +996,9 @@ impl SidecarReader {
         {
             let mut written = 0usize;
             while written < buf.len() {
-                let n = self.file.seek_write(&buf[written..], end + written as u64)?;
+                let n = self
+                    .file
+                    .seek_write(&buf[written..], end + written as u64)?;
                 if n == 0 {
                     return Err(std::io::Error::new(
                         std::io::ErrorKind::WriteZero,
@@ -3853,9 +3855,7 @@ impl Storage {
                     }
                 }
                 w.flush().map_err(|e| Error::from_reason(e.to_string()))?;
-                let written = fs::metadata(&out_path)
-                    .map(|m| m.len())
-                    .unwrap_or(0);
+                let written = fs::metadata(&out_path).map(|m| m.len()).unwrap_or(0);
                 debug_assert_eq!(
                     written,
                     (rows * dim * 4) as u64,
@@ -4358,7 +4358,7 @@ impl Storage {
                             let new_offset = new_vec.len() as u64;
                             new_vec.append_range(&vec_arena, start_off, len);
                             if sidecar_guard.is_some() {
-                                surviving_old_rows.push(if dim > 0 { start_off / dim } else { 0 });
+                                surviving_old_rows.push(start_off.checked_div(dim).unwrap_or(0));
                             }
                             let new_arena_id = new_meta.len() as u32;
                             let mut meta_clone = meta.clone();

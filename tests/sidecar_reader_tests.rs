@@ -33,7 +33,11 @@ fn write_fvec(path: &str, rows: &[Vec<f32>]) {
 }
 
 fn open_reader(path: &str, dim: usize) -> SidecarReader {
-    let file = OpenOptions::new().read(true).write(true).open(path).unwrap();
+    let file = OpenOptions::new()
+        .read(true)
+        .write(true)
+        .open(path)
+        .unwrap();
     SidecarReader::new(file, dim)
 }
 
@@ -85,13 +89,15 @@ fn cache_hit_returns_same_value_and_survives_eviction() {
 
     // Read SIDECAR_CACHE_ROWS distinct *other* rows (1..=SIDECAR_CACHE_ROWS),
     // which is enough to push row 0 out of the bounded LRU.
-    for i in 1..=SIDECAR_CACHE_ROWS {
+    for (i, expected) in rows.iter().enumerate().take(SIDECAR_CACHE_ROWS + 1).skip(1) {
         let got = reader.row(i).expect("row should exist");
-        assert_eq!(got, rows[i]);
+        assert_eq!(&got, expected);
     }
 
     // Row 0 was evicted from the cache; re-reading it must still return the
     // correct value, served from disk this time.
-    let refetched = reader.row(0).expect("row 0 should still be readable from disk");
+    let refetched = reader
+        .row(0)
+        .expect("row 0 should still be readable from disk");
     assert_eq!(refetched, rows[0]);
 }
