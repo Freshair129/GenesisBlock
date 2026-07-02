@@ -13,7 +13,9 @@ use tower_http::cors::{AllowOrigin, CorsLayer};
 use tower_http::limit::RequestBodyLimitLayer;
 use tower_http::trace::TraceLayer;
 
-use crate::{EdgeInput, Event, HybridSearchInput, NodeInput, QueryInput, Storage, SyncPeer};
+use crate::{
+    CollectionInfo, EdgeInput, Event, HybridSearchInput, NodeInput, QueryInput, Storage, SyncPeer,
+};
 
 // ---------------------------------------------------------------------------
 // App state
@@ -101,6 +103,15 @@ struct ExtendedStatus {
     pub node_count: usize,
     pub edge_count: usize,
     pub memory_usage_mb: f64,
+    /// Ops/credibility (P2c): engine-global async-indexing backlog
+    /// (`Storage::index_lag()`), reported once at the top level. Also mirrored on
+    /// each `collections` entry for convenience.
+    pub index_lag: u32,
+    /// Ops/credibility (P2c): per-collection quant + residency ops. Each entry is
+    /// a `CollectionInfo` carrying `quant`, `count`, `sidecar_resident_bytes`
+    /// (≈0 post-P0 — the sidecar is on-disk; this PROVES the RAM win),
+    /// `sidecar_disk_bytes`, `arena_resident_bytes`, and `index_lag`.
+    pub collections: Vec<CollectionInfo>,
 }
 
 // ---------------------------------------------------------------------------
@@ -435,6 +446,8 @@ async fn status_handler(State(state): State<AppState>) -> impl IntoResponse {
             let edge_bytes = storage.edges.len() * 256;
             (vec_bytes + node_bytes + edge_bytes) as f64 / 1024.0 / 1024.0
         },
+        index_lag: storage.index_lag(),
+        collections: storage.list_collections(),
     };
     Json(status)
 }

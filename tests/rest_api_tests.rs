@@ -122,6 +122,89 @@ async fn test_status_returns_open() {
     assert_eq!(body["read_only"], json!(false));
 }
 
+/// P2c: `/v1/status` exposes per-collection quant ops. For a quantized+rerank
+/// collection the sidecar is on-disk (post-P0), so `sidecar_resident_bytes` must
+/// be ≈0 (asserted == 0) — the field exists to PROVE the RAM win. `quant` and
+/// `index_lag` must be present and correctly typed on the collection entry, and
+/// `index_lag` also at the top level.
+#[tokio::test]
+async fn test_status_exposes_quant_ops() {
+    let (app, _dir) = make_app();
+
+    // A quantized (sq8) collection with an exact-f32 rerank sidecar.
+    let (create_status, _) = post_json(
+        &app,
+        "/v1/collection/create",
+        json!({
+            "name": "quantized_rerank",
+            "model": "bge-m3",
+            "dim": 8,
+            "quant": "sq8",
+            "rerank": true,
+        }),
+    )
+    .await;
+    assert_eq!(create_status, StatusCode::OK);
+
+    // Stage a node+vector so the sidecar has an on-disk row to size.
+    let (add_status, _) = post_json(
+        &app,
+        "/v1/node/add",
+        json!({
+            "id": "n1",
+            "labels": [],
+            "embedding": [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8],
+            "collection": "quantized_rerank",
+        }),
+    )
+    .await;
+    assert_eq!(add_status, StatusCode::OK);
+
+    let (status, body) = get_json(&app, "/v1/status").await;
+    assert_eq!(status, StatusCode::OK);
+
+    // Top-level engine-global index_lag is present + numeric.
+    assert!(
+        body["index_lag"].is_u64(),
+        "top-level index_lag must be a number: {}",
+        body["index_lag"]
+    );
+
+    let collections = body["collections"]
+        .as_array()
+        .expect("status must carry a collections array");
+    let entry = collections
+        .iter()
+        .find(|c| c["name"] == json!("quantized_rerank"))
+        .expect("quantized_rerank collection must appear in status.collections");
+
+    // quant string matches the created quant mode.
+    assert_eq!(entry["quant"], json!("sq8"), "quant must be reported");
+    // rerank sidecar is ON DISK post-P0 ⇒ resident bytes are 0 (proves the win).
+    assert_eq!(
+        entry["sidecar_resident_bytes"],
+        json!(0),
+        "on-disk sidecar must report 0 resident bytes (post-P0 RAM win)"
+    );
+    // The bytes moved to disk, not vanished: 1 row * dim 8 * 4B = 32 bytes.
+    assert_eq!(
+        entry["sidecar_disk_bytes"],
+        json!(32),
+        "sidecar_disk_bytes must reflect on-disk row bytes"
+    );
+    // arena resident bytes present + numeric.
+    assert!(
+        entry["arena_resident_bytes"].is_u64(),
+        "arena_resident_bytes must be a number"
+    );
+    // index_lag present + numeric per-collection too (mirrors the global value).
+    assert!(
+        entry["index_lag"].is_u64(),
+        "per-collection index_lag must be a number: {}",
+        entry["index_lag"]
+    );
+}
+
 #[tokio::test]
 async fn test_swarm_status_has_peer_id() {
     let (app, _dir) = make_app();
