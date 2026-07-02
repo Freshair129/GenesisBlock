@@ -32,4 +32,4 @@ include = ["GenesisHandle"]
 # The `.a` is always built with `--features ffi`, so the genesisdb_* symbols are
 # unconditionally present — no `#if defined(...)` guard. Drop unrelated crate
 # pub items that cbindgen would otherwise sweep in (only the C ABI belongs here).
-exclude = ["SCHEMA_VERSION"]
+exclude = ["SCHEMA_VERSION", "SIDECAR_CACHE_ROWS"]
