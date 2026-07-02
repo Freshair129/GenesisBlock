@@ -25,6 +25,7 @@ use std::time::{Duration, Instant};
 
 use chrono::Utc;
 use dashmap::DashMap;
+use half::f16;
 use hnsw_rs::prelude::*;
 #[cfg(feature = "napi-bindings")]
 use napi::bindgen_prelude::*;
@@ -497,6 +498,10 @@ impl Metric {
 /// "full resident cut", ~4× vector RAM); symmetric quant.
 /// `Binary` (BQ) packs each dim to one sign bit (u64 words) with a popcount-
 /// Hamming HNSW — ~32× vector RAM, lossy.
+/// `F16` stores the arena as IEEE half-precision (`u16` bits, 2×/elem on the
+/// arena + disk snapshot) and dequantizes to f32 for the HNSW (`anndists` has no
+/// `Distance<f16>`), so the HNSW copy stays f32 — near-lossless recall, arena/disk
+/// 2×, total resident ~1.33× at 1536-d. No sidecar (see ADR Layer C / P2a-T0).
 /// Either quantized mode may opt into an **f32-sidecar rerank** (per-collection
 /// `rerank` flag): the exact f32 vectors are kept in a `fvec_<name>.bin` sidecar
 /// and used to re-score an over-fetched candidate set, recovering recall lost to
@@ -507,6 +512,7 @@ pub enum Quant {
     None,
     ScalarU8,
     Binary,
+    F16,
 }
 
 impl Quant {
@@ -515,6 +521,8 @@ impl Quant {
             Quant::ScalarU8
         } else if s.eq_ignore_ascii_case("bq") || s.eq_ignore_ascii_case("binary") {
             Quant::Binary
+        } else if s.eq_ignore_ascii_case("f16") || s.eq_ignore_ascii_case("half") {
+            Quant::F16
         } else {
             Quant::None
         }
@@ -524,6 +532,7 @@ impl Quant {
             Quant::None => "none",
             Quant::ScalarU8 => "sq8",
             Quant::Binary => "bq",
+            Quant::F16 => "f16",
         }
     }
 }
@@ -659,6 +668,11 @@ pub enum ArenaStore {
         dim: usize,
         n: usize,
     },
+    /// F16: one IEEE half (`f16::to_bits()` → `u16`) per component, so `len()` is
+    /// the component count exactly like F32/U8. 2 B/elem on the arena and in the
+    /// `vec_<name>.bin` snapshot. Dequantized to f32 for the HNSW (no native f16
+    /// distance) and for the heuristic f32 readers.
+    F16(Vec<u16>),
 }
 
 impl ArenaStore {
@@ -671,6 +685,7 @@ impl ArenaStore {
                 dim,
                 n: 0,
             },
+            Quant::F16 => ArenaStore::F16(Vec::new()),
         }
     }
     /// Number of scalar components stored (NOT bytes).
@@ -679,6 +694,7 @@ impl ArenaStore {
             ArenaStore::F32(v) => v.len(),
             ArenaStore::U8(v) => v.len(),
             ArenaStore::Binary { n, dim, .. } => n * dim,
+            ArenaStore::F16(v) => v.len(),
         }
     }
     /// Actual heap bytes consumed by the vector data.
@@ -687,6 +703,7 @@ impl ArenaStore {
             ArenaStore::F32(v) => v.len() * 4,
             ArenaStore::U8(v) => v.len(),
             ArenaStore::Binary { data, .. } => data.len() * 8,
+            ArenaStore::F16(v) => v.len() * 2,
         }
     }
     pub fn is_empty(&self) -> bool {
@@ -703,6 +720,7 @@ impl ArenaStore {
                 data.extend(bq_pack_centered(emb, center));
                 *n += 1;
             }
+            ArenaStore::F16(v) => v.extend(emb.iter().map(|&x| f16::from_f32(x).to_bits())),
         }
     }
     /// Read a vector back as f32 (dequantizing per mode). For the heuristic
@@ -716,6 +734,10 @@ impl ArenaStore {
                 let ws = (start / *dim) * wpv;
                 bq_unpack(&data[ws..ws + wpv], len)
             }
+            ArenaStore::F16(v) => v[start..start + len]
+                .iter()
+                .map(|&b| f16::from_bits(b).to_f32())
+                .collect(),
         }
     }
     /// Append elements [start, start+len) from `src` (same variant) — compaction.
@@ -729,6 +751,7 @@ impl ArenaStore {
                 d.extend_from_slice(&s[ws..ws + wpv]);
                 *n += 1;
             }
+            (ArenaStore::F16(d), ArenaStore::F16(s)) => d.extend_from_slice(&s[start..start + len]),
             _ => {} // a collection never mixes variants
         }
     }
@@ -740,6 +763,7 @@ impl ArenaStore {
             }
             ArenaStore::U8(v) => v.clone(),
             ArenaStore::Binary { data, .. } => data.iter().flat_map(|w| w.to_le_bytes()).collect(),
+            ArenaStore::F16(v) => v.iter().flat_map(|b| b.to_le_bytes()).collect(),
         }
     }
     fn from_bytes(data: &[u8], q: Quant, dim: usize) -> Self {
@@ -762,6 +786,11 @@ impl ArenaStore {
                     dim,
                 }
             }
+            Quant::F16 => ArenaStore::F16(
+                data.chunks_exact(2)
+                    .map(|c| u16::from_le_bytes(c.try_into().unwrap()))
+                    .collect(),
+            ),
         }
     }
 }
@@ -772,6 +801,10 @@ enum VecIndex {
     F32(Hnsw<'static, f32, DistL2>),
     U8(Hnsw<'static, u8, DistL2>),
     Binary(Hnsw<'static, u64, DistBinaryHamming>),
+    /// F16 has no native `Distance<f16>` (anndists), so it indexes f32: rows are
+    /// dequantized f16→f32 on insert. The graph copy is therefore f32-sized; the
+    /// F16 win is on the arena/snapshot only (ADR Layer C).
+    F16(Hnsw<'static, f32, DistL2>),
 }
 
 impl VecIndex {
@@ -781,6 +814,7 @@ impl VecIndex {
             Quant::None => VecIndex::F32(Hnsw::new(16, cap, 16, ef_c, DistL2 {})),
             Quant::ScalarU8 => VecIndex::U8(Hnsw::new(16, cap, 16, ef_c, DistL2 {})),
             Quant::Binary => VecIndex::Binary(Hnsw::new(16, cap, 16, ef_c, DistBinaryHamming {})),
+            Quant::F16 => VecIndex::F16(Hnsw::new(16, cap, 16, ef_c, DistL2 {})),
         }
     }
     /// Insert one prepared f32 vector. `center` is the BQ per-dim centering
@@ -797,6 +831,12 @@ impl VecIndex {
             VecIndex::Binary(h) => {
                 let c = bq_pack_centered(emb, center);
                 h.insert((&c, id));
+            }
+            VecIndex::F16(h) => {
+                // Index the f16-rounded value (not raw emb) so a fresh insert and a
+                // rehydrate-from-arena produce byte-identical HNSW inputs.
+                let q: Vec<f32> = emb.iter().map(|&x| f16::from_f32(x).to_f32()).collect();
+                h.insert((&q, id));
             }
         }
     }
@@ -821,6 +861,19 @@ impl VecIndex {
                     .map(|(v, id)| (bq_pack_centered(v, center), *id as usize))
                     .collect();
                 let refs: Vec<(&Vec<u64>, usize)> = q.iter().map(|(v, id)| (v, *id)).collect();
+                h.parallel_insert(&refs);
+            }
+            VecIndex::F16(h) => {
+                let q: Vec<(Vec<f32>, usize)> = items
+                    .iter()
+                    .map(|(v, id)| {
+                        (
+                            v.iter().map(|&x| f16::from_f32(x).to_f32()).collect(),
+                            *id as usize,
+                        )
+                    })
+                    .collect();
+                let refs: Vec<(&Vec<f32>, usize)> = q.iter().map(|(v, id)| (v, *id)).collect();
                 h.parallel_insert(&refs);
             }
         }
@@ -862,6 +915,11 @@ impl VecIndex {
                     .map(|n| (n.d_id, n.distance / dim))
                     .collect()
             }
+            VecIndex::F16(h) => h
+                .search(query, k, ef)
+                .into_iter()
+                .map(|n| (n.d_id, n.distance))
+                .collect(),
         }
     }
 }
@@ -1140,7 +1198,7 @@ impl VectorCollection {
     ) -> Self {
         // Rerank only makes sense for a lossy (quantized) arena; a `None`
         // collection already stores exact f32, so never open a sidecar there.
-        let f32_sidecar = if rerank && quant != Quant::None {
+        let f32_sidecar = if rerank && matches!(quant, Quant::ScalarU8 | Quant::Binary) {
             sidecar_path.and_then(|p| {
                 FileOpenOptions::new()
                     .read(true)
@@ -4083,7 +4141,7 @@ impl Storage {
                 // Open the on-disk sidecar (if any) WITHOUT truncating — adopt the
                 // rows a prior save/compaction wrote. We validate row-count against
                 // the arena below and drop the sidecar on mismatch.
-                let sidecar_path = if rerank && quant != Quant::None {
+                let sidecar_path = if rerank && matches!(quant, Quant::ScalarU8 | Quant::Binary) {
                     Some(self.path.join(format!("fvec_{}.bin", name)))
                 } else {
                     None
