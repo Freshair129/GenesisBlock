@@ -100,6 +100,71 @@ exact-L2 ground truth) — *not* the synthetic corpus. Scored by `score_recall.p
 | bq    | no     | **0.6845**| **−0.303** | **227** |
 | bq    | **yes**| 0.9655    | −0.022 | 317    |
 
+#### P1a centered-BQ addendum (2026-07-02, same corpus, protocol identical)
+
+P1a shipped **per-dim BQ centering** (`VectorCollection::bq_center`, computed at
+compaction from the rerank sidecar, applied via `bq_pack_centered` on all
+insert/query paths). This row set measures whether centering lifts the BQ ranking.
+Same cached corpus/queries/ground-truth as above (byte-identical `corpus.f32` —
+n=3000, k=10, ef=200, real bge-m3, exact-L2 GT); the only change is that the
+collection is a `bq`+`rerank=true` space **run through a compaction** so the center
+is computed and the arena re-packed with centered codes. Centered *BQ-alone* recall
+is read **pre-rerank is not separable in this harness** — so "bq (centered), no
+rerank" is a `rerank=false` centered collection (raw centered Hamming ranking), and
+"bq (centered), rerank" is the full centered+rerank pipeline. Each figure is the
+median of 3 runs (HNSW build is nondeterministic; per-run spread ≈ ±0.002).
+
+| quant | rerank | recall@10 | vs uncentered | note |
+|-------|:------:|----------:|--------------:|------|
+| bq (uncentered) | no  | 0.6845 | — (baseline) | prior matrix row |
+| **bq (centered)** | no  | **0.6810** | **−0.0035** | centered raw Hamming — **no lift** |
+| bq (uncentered) | **yes** | 0.9655 | — (baseline) | prior matrix row |
+| **bq (centered)** | **yes** | **0.9640** | **−0.0015** | **no regression** (within noise) |
+
+Centered runs: 0.6790 / 0.6810 / 0.6820 (median 0.6810); the uncentered control on
+this same build: 0.6830 / 0.6825 / 0.6860 (+ 0.6845 matrix) — **the two bands
+overlap**, so per-dim centering is **recall-neutral for BQ-alone on real bge-m3**,
+not the hoped-for lift. **BQ+rerank is unaffected (0.9640 ≈ 0.9655 baseline — no
+regression).**
+
+**Why no lift (mechanistic):** centering is *not* a no-op here — bge-m3's per-dim
+mean is substantial (‖mean‖₂ = 0.66; mean |per-dim mean| = 0.0147, comparable to the
+typical per-value magnitude 0.024), and subtracting it **flips 21% of the sign
+bits**. But recall is unchanged, i.e. for this distribution the uncentered sign bits
+already carry the discriminative signal and re-centering shifts the code without a
+net ranking gain. Centering targets *positive-biased* embeddings where most dims
+share a sign (the toy set in `tests/bq_centering_tests.rs` — where it demonstrably
+fixes BQ-alone); bge-m3 is L2-normalized and **mixed-sign per dim**, so it does not
+benefit. **Interpretation:** P1a centering is correct and harmless (default-off for
+non-BQ, back-compat preserved) but its recall payoff is distribution-dependent; on
+bge-m3 it neither helps nor hurts, and BQ-alone remains **unusable without rerank**
+(the §4 guidance stands: never BQ alone; use **BQ+rerank**).
+
+**Harness commands** (build once, then run each config; recall scored against the
+cached exact-L2 GT):
+
+```bash
+cargo build --release --features bins --bin vbench-genesis
+export GB_VBENCH=C:/Users/freshair/gb_vbench   # cached bge-m3 corpus/queries/GT
+BIN=./target/release/vbench-genesis.exe
+
+# centered BQ-alone  (GB_COMPACT=1 triggers the P1a center computation + arena re-pack)
+GB_QUANT=bq GB_RERANK=0 GB_COMPACT=1 GB_EF=200 "$BIN"
+python benches/scripts/score_recall.py "bq(centered)" 0
+
+# centered BQ+rerank  (confirm no regression)
+GB_QUANT=bq GB_RERANK=1 GB_COMPACT=1 GB_EF=200 "$BIN"
+python benches/scripts/score_recall.py "bq(centered)" 1
+
+# uncentered controls (GB_COMPACT=0 = no center; reproduces the 0.6845 / 0.9655 rows)
+GB_QUANT=bq GB_RERANK=0 GB_COMPACT=0 GB_EF=200 "$BIN"
+GB_QUANT=bq GB_RERANK=1 GB_COMPACT=0 GB_EF=200 "$BIN"
+```
+
+`GB_COMPACT` is a new backward-compatible knob added to `benches/vbench_genesis.rs`
+for this task: it runs `Storage::compact()` after ingest (the only path that computes
+`bq_center`); default-off leaves every prior invocation byte-unchanged.
+
 ## 4. Findings
 
 - **Corrected f32 baseline: 5.75 GB @ 500k**, not the 7.69 GB of the first probe run.
@@ -142,6 +207,14 @@ exact-L2 ground truth) — *not* the synthetic corpus. Scored by `score_recall.p
   (317 vs 1671 µs) at 2.9× less RAM. So the rerank RAM/disk cost (above) is *justified*: it is
   what makes quantization usable. Deployment guidance: **SQ8+rerank** for max quality,
   **BQ+rerank** for max RAM/speed when ~0.97 recall is acceptable; never **BQ alone**.
+- **P1a per-dim BQ centering is recall-neutral on bge-m3 (measured 2026-07-02, §3.4
+  addendum).** Centered BQ-alone = **0.6810** vs uncentered **0.6845** — within the
+  ±0.002 run-to-run band, so **no lift**, despite centering flipping 21% of the sign
+  bits (bge-m3 has a non-trivial ‖mean‖₂ = 0.66, but is L2-normalized and mixed-sign
+  per dim, so its sign codes don't benefit). BQ+rerank is **not regressed** (0.9640 ≈
+  0.9655). Centering fixes *positive-biased* distributions (proven on the
+  `bq_centering_tests.rs` toy set) but its payoff is distribution-dependent; on
+  bge-m3 it neither helps nor hurts. **BQ-alone remains unusable without rerank.**
 - **⚠ The WAL is the real disk ceiling, and it is unbounded.** `genesis-graph.wal` is
   quant-independent (stores raw input embeddings) and **never compacted** in this path:
   ~2.1 GB @100k, **~20.4 GB @1M** — 5× the f32 snapshot, 51× the BQ snapshot. At 1M it drove

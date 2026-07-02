@@ -144,6 +144,20 @@ fn main() {
     // Drain the async HNSW backlog so the index is fully resident before RSS is
     // read (otherwise the probe undercounts the graph).
     storage.flush_index();
+    // GB_COMPACT=1 — run a compaction after ingest. This is the ONLY path that
+    // computes the P1a per-dim BQ centering vector (`bq_center`): compaction reads
+    // every survivor row off the rerank sidecar, takes the per-dim mean, installs
+    // it as the collection center, and re-packs the BQ arena + rehydrates HNSW
+    // with centered sign codes. Needed to measure CENTERED-BQ recall (P1a-T4).
+    // No-op'd by default so pre-existing invocations are byte-unchanged.
+    let compact = std::env::var("GB_COMPACT")
+        .ok()
+        .map(|v| v == "1" || v.eq_ignore_ascii_case("true"))
+        .unwrap_or(false);
+    if compact {
+        storage.compact().expect("compact");
+        storage.flush_index();
+    }
     let insert_sec = t.elapsed().as_secs_f64();
     let peak_rss_mb = {
         let mut s = sysinfo::System::new_all();
@@ -175,6 +189,7 @@ fn main() {
                     as_of: None,
                     collection: coll.clone(),
                     ef_search: None,
+                    oversample: None,
                 })
                 .unwrap();
             lats.push(t0.elapsed().as_nanos() as f64 / 1000.0);
