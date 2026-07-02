@@ -226,6 +226,7 @@ fn checkpointed_wal_replays_to_identical_live_state() {
             as_of: None,
             collection: None,
             ef_search: None,
+            oversample: None,
         })
         .unwrap()
         .into_iter()

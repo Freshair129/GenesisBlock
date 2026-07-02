@@ -44,6 +44,36 @@ test('NAPI: read-your-write — addNode + flushIndex + hybridSearch', async () =
 });
 
 // ---------------------------------------------------------------------------
+// P1b: the per-query `oversample` knob must pass through the NAPI hybridSearch
+// surface and still return the true nearest on a quantized+rerank collection
+// (where it widens the exact rerank pool).
+// ---------------------------------------------------------------------------
+test('NAPI: hybridSearch accepts oversample on a quantized+rerank collection', async () => {
+  const dbPath = tempDb('oversample');
+  try {
+    const db = GenesisDatabase.open({ path: dbPath, vectorDim: 3 });
+    // name, model, dim, metric, quant, efSearch, rerank
+    await db.createCollection('ovq', 'm', 4, 'L2', 'sq8', null, true);
+    await db.addNode({ id: 'o1', labels: [], embedding: [1.0, 0.0, 0.0, 0.0], collection: 'ovq' });
+    await db.addNode({ id: 'o2', labels: [], embedding: [0.0, 1.0, 0.0, 0.0], collection: 'ovq' });
+    await db.addNode({ id: 'o3', labels: [], embedding: [0.0, 0.0, 1.0, 0.0], collection: 'ovq' });
+    await db.flushIndex();
+
+    const results = await db.hybridSearch({
+      queryVector: [0.9, 0.1, 0.0, 0.0],
+      k: 1,
+      alpha: 0.0,
+      collection: 'ovq',
+      oversample: 16,
+    });
+    assert.strictEqual(results.length, 1, 'oversample search must return exactly one result');
+    assert.strictEqual(results[0].node.id, 'o1', 'widened oversample must still surface the true nearest');
+  } finally {
+    cleanup(dbPath);
+  }
+});
+
+// ---------------------------------------------------------------------------
 // Index lag drops to zero after flushIndex — confirms the async indexing
 // queue is drained and the synchronous lag counter reflects that.
 // ---------------------------------------------------------------------------

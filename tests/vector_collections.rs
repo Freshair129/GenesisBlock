@@ -51,6 +51,7 @@ fn search_q(
         as_of: None,
         collection: collection.map(|c| c.to_string()),
         ef_search: ef,
+        oversample: None,
     })
     .map(|v| v.into_iter().map(|n| n.node.id).collect())
     .map_err(|e| e.to_string())

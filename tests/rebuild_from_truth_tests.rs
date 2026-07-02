@@ -67,6 +67,7 @@ fn search_top1(s: &Storage, query: [f64; 4]) -> String {
             as_of: None,
             collection: None,
             ef_search: None,
+            oversample: None,
         })
         .unwrap();
     results

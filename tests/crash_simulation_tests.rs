@@ -75,6 +75,7 @@ fn search_returns(s: &Storage, query: [f64; 4], expected_id: &str) -> bool {
             as_of: None,
             collection: None,
             ef_search: None,
+            oversample: None,
         })
         .unwrap();
     results.iter().any(|r| r.node.id == expected_id)

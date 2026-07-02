@@ -48,6 +48,7 @@ fn search_ids(s: &Storage, q: Vec<f64>, k: u32) -> Vec<String> {
         as_of: None,
         collection: None,
         ef_search: None,
+        oversample: None,
     })
     .unwrap()
     .into_iter()

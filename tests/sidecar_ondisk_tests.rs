@@ -62,6 +62,7 @@ fn top1(s: &Storage, q: Vec<f64>, coll: &str) -> Option<String> {
         as_of: None,
         collection: Some(coll.to_string()),
         ef_search: None,
+        oversample: None,
     })
     .unwrap()
     .into_iter()
@@ -323,6 +324,7 @@ fn corrupted_fvec_same_length_does_not_panic_or_empty() {
             as_of: None,
             collection: Some("c".to_string()),
             ef_search: None,
+            oversample: None,
         })
         .unwrap();
     assert!(

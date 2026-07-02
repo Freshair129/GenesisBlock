@@ -352,6 +352,7 @@ fn chunk_with_embedding() {
             as_of: None,
             collection: None,
             ef_search: None,
+            oversample: None,
         })
         .unwrap();
 

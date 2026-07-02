@@ -50,6 +50,7 @@ fn search(s: &Storage, q: Vec<f64>, k: u32, collection: Option<&str>) -> Vec<Str
         as_of: None,
         collection: collection.map(|c| c.to_string()),
         ef_search: None,
+        oversample: None,
     })
     .unwrap()
     .into_iter()
