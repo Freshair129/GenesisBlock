@@ -95,6 +95,27 @@ async fn get_json(app: &Router, uri: &str) -> (StatusCode, Value) {
     (status, value)
 }
 
+/// GET, return (status, content-type header, raw text body) — for non-JSON
+/// responses like `/metrics` (Prometheus text format).
+async fn get_text(app: &Router, uri: &str) -> (StatusCode, String, String) {
+    let req = Request::builder()
+        .method("GET")
+        .uri(uri)
+        .body(Body::empty())
+        .unwrap();
+    let resp = app.clone().oneshot(req).await.unwrap();
+    let status = resp.status();
+    let content_type = resp
+        .headers()
+        .get(axum::http::header::CONTENT_TYPE)
+        .and_then(|v| v.to_str().ok())
+        .unwrap_or("")
+        .to_string();
+    let bytes = resp.into_body().collect().await.unwrap().to_bytes();
+    let text = String::from_utf8_lossy(&bytes).into_owned();
+    (status, content_type, text)
+}
+
 /// POST a raw string body (not JSON-encoded as an object), return status + raw text.
 async fn post_raw(app: &Router, uri: &str, content_type: &str, raw: &str) -> (StatusCode, String) {
     let req = Request::builder()
@@ -792,6 +813,135 @@ async fn test_version_route_reports_engine_version() {
 }
 
 // ---------------------------------------------------------------------------
+// Prometheus /metrics (Wave 1.1, ADR--GENESISDB-COMPETITIVE-SUPERIORITY)
+// ---------------------------------------------------------------------------
+
+/// `GET /metrics` (root, no `/v1` prefix) must return 200 with a text
+/// content-type and must reflect the current node count.
+#[tokio::test]
+async fn test_metrics_returns_ok_with_node_count() {
+    let (app, _dir) = make_app();
+
+    let (status, content_type, body) = get_text(&app, "/metrics").await;
+    assert_eq!(status, StatusCode::OK);
+    assert!(
+        content_type.starts_with("text/plain"),
+        "metrics content-type must be text/plain-ish, got: {content_type}"
+    );
+    assert!(
+        body.contains("genesisdb_nodes_total 0"),
+        "metrics must report 0 nodes on an empty database:\n{body}"
+    );
+
+    // Add three nodes, then confirm the gauge reflects the new count.
+    for id in ["m1", "m2", "m3"] {
+        post_json(&app, "/v1/node/add", json!({ "id": id, "labels": [] })).await;
+    }
+    let (status2, _, body2) = get_text(&app, "/metrics").await;
+    assert_eq!(status2, StatusCode::OK);
+    assert!(
+        body2.contains("genesisdb_nodes_total 3"),
+        "metrics must report 3 nodes after adding three:\n{body2}"
+    );
+    assert!(
+        body2.contains("# HELP genesisdb_nodes_total"),
+        "metrics must carry a HELP line for genesisdb_nodes_total"
+    );
+    assert!(
+        body2.contains("# TYPE genesisdb_nodes_total gauge"),
+        "metrics must declare genesisdb_nodes_total as a gauge"
+    );
+}
+
+/// Per-collection metrics (`genesisdb_collection_vectors{collection="..."}`)
+/// must appear once a collection exists, labeled with its name.
+#[tokio::test]
+async fn test_metrics_includes_per_collection_vectors() {
+    let (app, _dir) = make_app();
+
+    post_json(
+        &app,
+        "/v1/collection/create",
+        json!({ "name": "metrics_col", "model": "m", "dim": 4 }),
+    )
+    .await;
+    post_json(
+        &app,
+        "/v1/node/add",
+        json!({
+            "id": "mc1",
+            "labels": [],
+            "embedding": [1.0, 0.0, 0.0, 0.0],
+            "collection": "metrics_col"
+        }),
+    )
+    .await;
+
+    let (status, _, body) = get_text(&app, "/metrics").await;
+    assert_eq!(status, StatusCode::OK);
+    assert!(
+        body.contains("genesisdb_collections_total 2"),
+        "metrics must count the default collection plus the new one:\n{body}"
+    );
+    assert!(
+        body.contains("genesisdb_collection_vectors{collection=\"metrics_col\"} 1"),
+        "per-collection vector gauge must appear labeled with the collection name:\n{body}"
+    );
+    // Sidecar/arena residency gauges (reused from CollectionInfo) must also be present.
+    assert!(
+        body.contains("genesisdb_collection_sidecar_resident_bytes{collection=\"metrics_col\"}"),
+        "sidecar resident bytes gauge must appear per collection:\n{body}"
+    );
+    assert!(
+        body.contains("genesisdb_collection_arena_resident_bytes{collection=\"metrics_col\"}"),
+        "arena resident bytes gauge must appear per collection:\n{body}"
+    );
+}
+
+/// `/metrics` must not require the API key even when one is configured —
+/// scrapers should not need the bearer token (matches Qdrant's default).
+#[tokio::test]
+async fn test_metrics_unauthenticated_even_with_api_key_set() {
+    let (app, _dir) = make_app_with_key("s3cr3t");
+    let req = Request::builder()
+        .method("GET")
+        .uri("/metrics")
+        .body(Body::empty())
+        .unwrap();
+    let resp = app.clone().oneshot(req).await.unwrap();
+    assert_eq!(
+        resp.status(),
+        StatusCode::OK,
+        "/metrics must be reachable without Authorization even when GENESIS_API_KEY is set"
+    );
+}
+
+/// Other engine-wide gauges (`genesisdb_index_lag`, `genesisdb_is_rebuilding`,
+/// `genesisdb_memory_usage_mb`) must be present and correctly typed.
+#[tokio::test]
+async fn test_metrics_exposes_index_lag_and_rebuild_gauges() {
+    let (app, _dir) = make_app();
+    let (status, _, body) = get_text(&app, "/metrics").await;
+    assert_eq!(status, StatusCode::OK);
+    assert!(
+        body.contains("# TYPE genesisdb_index_lag gauge"),
+        "genesisdb_index_lag must be declared as a gauge:\n{body}"
+    );
+    assert!(
+        body.contains("# TYPE genesisdb_is_rebuilding gauge"),
+        "genesisdb_is_rebuilding must be declared as a gauge:\n{body}"
+    );
+    assert!(
+        body.contains("genesisdb_is_rebuilding 0"),
+        "genesisdb_is_rebuilding must be 0 outside of a rebuild:\n{body}"
+    );
+    assert!(
+        body.contains("# TYPE genesisdb_memory_usage_mb gauge"),
+        "genesisdb_memory_usage_mb must be declared as a gauge:\n{body}"
+    );
+}
+
+// ---------------------------------------------------------------------------
 // API key middleware
 // ---------------------------------------------------------------------------
 
@@ -876,6 +1026,7 @@ async fn test_all_v1_routes_are_wired() {
         "/v1/status",
         "/v1/version",
         "/v1/swarm/status",
+        "/metrics",
     ];
 
     let (app, _dir) = make_app();
