@@ -45,7 +45,7 @@ MATCH  [~]<target> [SIMILAR TO [ <vector> ]] ALPHA <a> [K <k>] [EF <n>] [OVERSAM
 
 - **Literal vector present** → exactly v1 behavior (vector wins; target is documentation-only). Byte-identical results.
 - **`SIMILAR TO` omitted** → *search-by-node*: the (fuzzy-)resolved target must name a live node; its **stored embedding** becomes the query vector (fetched via the collection resolution rule below). "More like this node" without any client-side embedding.
-  - Collection resolution: the node's embedding lives in the collection it was ingested into; an explicit `IN <collection>` must match that collection's dimension or the query errors.
+  - Collection resolution: the node's embedding lives in the collection it was ingested into, and the search runs in **that same collection**; an explicit `IN <collection>` naming a *different* collection is an error even if dimensions match (same-dim-different-space would be a silently-wrong ranking — the class §1 forbids). *(Tightened from dim-match to collection-identity at the P0-T0 design gate, DESIGN--HQL-P0-DECISIONS §1.)*
   - Target resolves to nothing (even after fuzzy) → **error** `"HQL: target '<t>' does not resolve to a node and no vector was given"`. Never an empty-result silent success.
   - Resolved node has no stored embedding → same error class, naming the cause.
 - The dead `_resolved` binding is gone: resolution output is always consumed or surfaced as an error.
