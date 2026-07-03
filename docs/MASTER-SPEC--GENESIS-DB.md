@@ -32,7 +32,7 @@ GenesisBlockDB bridges lexical and semantic search via a dual-indexing strategy:
 
 ### 2.3 Graph Retrieval Layer (GRL)
 The GRL implements the **Context Scaling Tier (H0-H6)** protocol to govern agent context acquisition:
-- **Resolver:** Maps tiers (H0=Subtask/PR, H1=Task/Component, H2=Story/Feature, H3=Epic/Module, H4=Phase/Architecture, H5=Masterplan/Roadmap, H6=Enterprise Ceiling (single-agent max)) to graph hops.
+- **Resolver:** Maps tiers H0–H6 to graph hops (H0=0 hops … H6=6 hops, the max retrieval radius).
 - **Budget Manager:** Estimates token usage and automatically compresses results to **SuperNodes** if the agent's `BUDGET` is exceeded.
 - **Orchestrator:** Combines vector anchors with tiered graph expansion in a single reasoning pipeline.
 

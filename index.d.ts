@@ -83,6 +83,21 @@ export interface ContextPackage {
   superNodes: Array<SuperNode>
   tokenEstimate: number
   reasoningPath: string
+  /** The requested tier's hop radius (`tier.hops()`). */
+  hopsRequested: number
+  /** The deepest BFS depth actually reached among nodes included in this package. */
+  hopsServed: number
+  /**
+   * True if, at the max requested depth, the BFS frontier still had
+   * unexpanded/undiscovered neighbors — i.e. more graph exists beyond the
+   * tier boundary. False if traversal exhausted the reachable subgraph
+   * before the tier limit. Purely a retrieval-mechanics signal; what a
+   * consumer does with it (e.g. decomposition policy) is out of scope
+   * for the engine.
+   */
+  ceilingHit: boolean
+  /** True if budget/SuperNode compression replaced atoms in this package. */
+  truncated: boolean
 }
 export interface QueryInput {
   from?: string

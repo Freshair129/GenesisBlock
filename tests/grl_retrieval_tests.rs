@@ -243,3 +243,122 @@ fn test_hql_context_command() {
 
     println!("HQL CONTEXT command verified.");
 }
+
+#[test]
+fn test_grl_ceiling_signal_deep_graph() {
+    // A chain longer than the requested tier must report ceiling_hit=true:
+    // the BFS frontier still has an undiscovered/unexpanded neighbor sitting
+    // right at the tier boundary. Build an 8-node chain N0->N1->...->N7 (7
+    // edges) and query TIER H3 (3 hops) from N0 — the chain continues well
+    // past hop 3.
+    let dir = tempdir().unwrap();
+    let storage = Storage::open(OpenOptions {
+        path: dir.path().to_str().unwrap().to_string(),
+        page_cache_mb: Some(64),
+        read_only: Some(false),
+        vector_dim: Some(1536),
+    })
+    .unwrap();
+
+    for i in 0..=7 {
+        storage
+            .add_node(NodeInput {
+                id: Some(format!("N{i}")),
+                labels: vec!["USER".to_string()],
+                props: None,
+                embedding: None,
+                lang: None,
+                valid_from: None,
+                caused_by: None,
+                ttl: None,
+                collection: None,
+            })
+            .unwrap();
+    }
+    for i in 0..7 {
+        storage
+            .add_edge(EdgeInput {
+                id: None,
+                from: format!("N{i}"),
+                to: format!("N{}", i + 1),
+                rel: "knows".to_string(),
+                props: None,
+                valid_from: None,
+                supersede: None,
+                impact: None,
+                caused_by: None,
+            })
+            .unwrap();
+    }
+
+    let ctx = storage.retrieve_context("N0", "H3", None, false).unwrap();
+    assert_eq!(ctx.hops_requested, 3);
+    assert_eq!(ctx.hops_served, 3);
+    assert!(
+        ctx.ceiling_hit,
+        "expected ceiling_hit=true: chain extends past the H3 boundary"
+    );
+}
+
+#[test]
+fn test_grl_ceiling_signal_shallow_graph() {
+    // A subgraph that's exhausted well before the requested tier must NOT
+    // report ceiling_hit: there's no more graph beyond what was returned.
+    // A -> B is a 2-node graph; TIER H5 (5 hops) has nothing left to expand
+    // after depth 1.
+    let dir = tempdir().unwrap();
+    let storage = Storage::open(OpenOptions {
+        path: dir.path().to_str().unwrap().to_string(),
+        page_cache_mb: Some(64),
+        read_only: Some(false),
+        vector_dim: Some(1536),
+    })
+    .unwrap();
+
+    storage
+        .add_node(NodeInput {
+            id: Some("A".to_string()),
+            labels: vec!["USER".to_string()],
+            props: None,
+            embedding: None,
+            lang: None,
+            valid_from: None,
+            caused_by: None,
+            ttl: None,
+            collection: None,
+        })
+        .unwrap();
+    storage
+        .add_node(NodeInput {
+            id: Some("B".to_string()),
+            labels: vec!["USER".to_string()],
+            props: None,
+            embedding: None,
+            lang: None,
+            valid_from: None,
+            caused_by: None,
+            ttl: None,
+            collection: None,
+        })
+        .unwrap();
+    storage
+        .add_edge(EdgeInput {
+            id: None,
+            from: "A".to_string(),
+            to: "B".to_string(),
+            rel: "knows".to_string(),
+            props: None,
+            valid_from: None,
+            supersede: None,
+            impact: None,
+            caused_by: None,
+        })
+        .unwrap();
+
+    let ctx = storage.retrieve_context("A", "H5", None, false).unwrap();
+    assert!(
+        !ctx.ceiling_hit,
+        "expected ceiling_hit=false: 2-node graph is exhausted before the H5 boundary"
+    );
+    assert!(ctx.hops_served <= 1);
+}

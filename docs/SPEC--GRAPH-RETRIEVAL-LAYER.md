@@ -3,27 +3,21 @@
 ## 1. Introduction
 The **Graph Retrieval Layer (GRL)** transforms GenesisBlockDB from a hybrid database into a **Cognitive Retrieval Engine (CRE)**. Instead of raw queries, AI agents interact with the GRL via the **Context Scaling Tier (H0-H6)** protocol. The GRL acts as an intelligent orchestrator that resolves the optimal knowledge radius (Hops), prioritizes high-impact nodes, and compresses context to fit within the agent's token budget.
 
-> **Tier ceiling semantics (aligned to `STD-Execution-Governance` H0–H6).** A tier is
-> **how far a single agent scopes context**, not "how much of the project it
-> understands". `H6` is the **hard ceiling: 6 hops maximum for one agent**. Work
-> that would require more than 6 hops must be **decomposed across multiple agents**
-> (each scoping its own ≤6-hop radius), never retrieved deeper. H6 is a
-> decomposition trigger, not a whole-graph scan.
+> Work-scope interpretation of tiers (what H3 means for a task, decomposition
+> policy at the ceiling, etc.) is a **downstream consumer governance concern**,
+> not engine semantics — the engine only resolves hops, budget, and compression.
 
 ## 2. Functional Requirements
 
 ### FR1: Context Resolver (Tier Mapping)
-- The system must map semantic tiers to physical graph hops (labels aligned to
-  `STD-Execution-Governance` §3 H-Scale):
-    - **H0 (Subtask / PR):** 0 Hops. Only the target node.
-    - **H1 (Task / Component):** 1 Hop. Direct imports/exports and parent/child.
-    - **H2 (Story / Feature):** 2 Hops. Local functional grouping.
-    - **H3 (Epic / Module):** 3 Hops. Integration-level context.
-    - **H4 (Phase / Architecture):** 4 Hops. High-level system design.
-    - **H5 (Masterplan / Roadmap):** 5 Hops. Platform / operating-model context.
-    - **H6 (Full Network / Enterprise Ceiling):** 6 Hops. The **single-agent maximum**.
-      Beyond 6 hops, decompose into multiple agents (see ceiling note above) — H6
-      does not mean "scan the whole graph".
+- The system must map semantic tiers to physical graph hops:
+    - **H0:** 0 hops.
+    - **H1:** 1 hop.
+    - **H2:** 2 hops.
+    - **H3:** 3 hops.
+    - **H4:** 4 hops.
+    - **H5:** 5 hops.
+    - **H6:** 6 hops — the maximum retrieval radius (configurable ceiling, default 6).
 
 ### FR2: Hybrid Semantic Expansion
 - Retrieval must combine **Vector Similarity** (find relevant concepts) with **Graph Traversal** (expand into related knowledge) to build a coherent Sub-graph.
@@ -58,13 +52,13 @@ pub struct ContextPackage {
 ```rust
 #[napi]
 pub enum ScalingTier {
-    H0 = 0, // Subtask / PR
-    H1 = 1, // Task / Component
-    H2 = 2, // Story / Feature
-    H3 = 3, // Epic / Module
-    H4 = 4, // Phase / Architecture
-    H5 = 5, // Masterplan / Roadmap
-    H6 = 6, // Full Network / Enterprise Ceiling — single-agent max, then decompose
+    H0 = 0, // 0 hops
+    H1 = 1, // 1 hop
+    H2 = 2, // 2 hops
+    H3 = 3, // 3 hops
+    H4 = 4, // 4 hops
+    H5 = 5, // 5 hops
+    H6 = 6, // 6 hops (max radius, configurable ceiling)
 }
 ```
 

@@ -177,10 +177,9 @@ pub enum ScalingTier {
     H3 = 3,
     H4 = 4,
     H5 = 5,
-    // H6 is the single-agent context ceiling (STD-Execution-Governance H0–H6):
-    // 6 hops is the maximum radius one agent may scope. Work that needs more
-    // than 6 hops must be decomposed across multiple agents, not retrieved
-    // deeper — H6 is a hard cap, not "the whole graph".
+    // H6 = 6 hops — the maximum retrieval radius (configurable default
+    // ceiling). Consumers decide decomposition policy at the ceiling; the
+    // engine only resolves hops.
     H6 = 6,
 }
 
@@ -218,6 +217,19 @@ pub struct ContextPackage {
     pub super_nodes: Vec<SuperNode>,
     pub token_estimate: u32,
     pub reasoning_path: String,
+    /// The requested tier's hop radius (`tier.hops()`).
+    pub hops_requested: u32,
+    /// The deepest BFS depth actually reached among nodes included in this package.
+    pub hops_served: u32,
+    /// True if, at the max requested depth, the BFS frontier still had
+    /// unexpanded/undiscovered neighbors — i.e. more graph exists beyond the
+    /// tier boundary. False if traversal exhausted the reachable subgraph
+    /// before the tier limit. Purely a retrieval-mechanics signal; what a
+    /// consumer does with it (e.g. decomposition policy) is out of scope
+    /// for the engine.
+    pub ceiling_hit: bool,
+    /// True if budget/SuperNode compression replaced atoms in this package.
+    pub truncated: bool,
 }
 
 #[cfg_attr(feature = "napi-bindings", napi(object))]
@@ -4214,6 +4226,13 @@ impl Storage {
         let mut nodes = HashMap::new();
         let mut edges = Vec::new();
         let mut queue = VecDeque::new();
+        // Observability: deepest depth of any node actually included in the
+        // package (tracked at discovery/insertion time), and whether the BFS
+        // frontier still had a not-yet-visited neighbor waiting at the tier
+        // boundary (the "ceiling hit" signal — more graph exists beyond the
+        // requested radius).
+        let mut hops_served: u32 = 0;
+        let mut ceiling_hit = false;
 
         if let Some(u32_id) = self.get_u32(&target_id_resolved) {
             queue.push_back((u32_id, 0));
@@ -4224,7 +4243,16 @@ impl Storage {
 
         let mut visited = HashSet::new();
         while let Some((curr_u32, curr_depth)) = queue.pop_front() {
-            if curr_depth >= hops || visited.contains(&curr_u32) {
+            if curr_depth >= hops {
+                // Boundary skip: this node was discovered (queued) but sits
+                // exactly at/beyond the requested radius, so it is never
+                // expanded — the graph continues past the tier ceiling.
+                if !visited.contains(&curr_u32) {
+                    ceiling_hit = true;
+                }
+                continue;
+            }
+            if visited.contains(&curr_u32) {
                 continue;
             }
             visited.insert(curr_u32);
@@ -4240,6 +4268,7 @@ impl Storage {
                             {
                                 if let Some(node) = self.nodes.get(&next_u32) {
                                     e.insert(node.value().clone());
+                                    hops_served = hops_served.max(curr_depth + 1);
                                     queue.push_back((next_u32, curr_depth + 1));
                                 }
                             }
@@ -4259,6 +4288,7 @@ impl Storage {
                             {
                                 if let Some(node) = self.nodes.get(&prev_u32) {
                                     e.insert(node.value().clone());
+                                    hops_served = hops_served.max(curr_depth + 1);
                                     queue.push_back((prev_u32, curr_depth + 1));
                                 }
                             }
@@ -4275,6 +4305,7 @@ impl Storage {
 
         let mut super_nodes = Vec::new();
         let mut final_nodes = node_list;
+        let mut truncated = false;
 
         if let Some(b) = budget {
             if token_estimate > b {
@@ -4288,6 +4319,7 @@ impl Storage {
                 }
                 final_nodes.clear(); // Prune atoms
                 edges.clear();
+                truncated = true;
             }
         }
 
@@ -4300,6 +4332,10 @@ impl Storage {
                 "Resolved {} as of Tier {} ({} hops)",
                 target_id_resolved, tier_str, hops
             ),
+            hops_requested: hops,
+            hops_served,
+            ceiling_hit,
+            truncated,
         })
     }
 
