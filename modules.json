@@ -57,6 +57,22 @@
       "version": "0.1.0",
       "targetsSchemaVersion": 1,
       "minEngineVersion": "0.1.0-beta.1"
+    },
+    {
+      "name": "genesisdb-android",
+      "path": "android/genesisdb",
+      "type": "mobile-sdk-android",
+      "version": "0.1.0",
+      "targetsSchemaVersion": 1,
+      "minEngineVersion": "0.2.0"
+    },
+    {
+      "name": "react-native-genesisdb",
+      "path": "react-native-genesisdb",
+      "type": "mobile-sdk-react-native",
+      "version": "0.1.0",
+      "targetsSchemaVersion": 1,
+      "minEngineVersion": "0.2.0"
     }
   ]
 }

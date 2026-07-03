@@ -420,6 +420,20 @@ Distribution: Swift Package Manager via `Package.swift` + binary target pointing
 xcframework. Release CI uploads the xcframework as a GitHub release asset; `Package.swift`
 references the release URL + checksum.
 
+> **B-2 landed (2026-07-03).** `android/genesisdb/` is a real Gradle library
+> module: `Types.kt` (data classes with explicit `@SerialName` snake_case wire
+> mapping — the FFI/JNI JSON contract is the engine's raw un-renamed
+> `serde_json` output, NOT the camelCase in `index.d.ts`, which is a
+> napi-rs-only convention) and `GenesisDB.kt` (coroutine wrapper over the 7
+> `src/jni.rs` symbols). `WireFormatTest.kt` proves the wire contract on pure
+> JVM (no native lib, no NDK). CI (`mobile-build.yml`): `android-jvm-tests`
+> runs those tests on every PR; `android-aar` assembles a real `.aar` on top
+> of `android-build`'s cargo-ndk `.so` output and uploads it as a build
+> artifact. `scripts/gen-android-jnilibs.sh` mirrors the CI staging step for
+> local dev (still host-only — no NDK on the Windows dev box). Not yet done:
+> publishing the `.aar` to Maven Central/GitHub Packages (still `0.1.0`,
+> unpublished) and the on-device/Gradle-project acceptance checks below.
+
 ### B-2: Android .aar + Kotlin wrapper (~2 weeks)
 
 JNI bridge (`src/jni.rs`):
@@ -465,6 +479,23 @@ dependencies {
     implementation("dev.genesisblock:genesisdb-android:0.1.0")
 }
 ```
+
+> **B-3 landed for Android (2026-07-03).** `react-native-genesisdb/` is a real
+> npm package: `src/types.ts` (snake_case wire types, matching the
+> `genesisdb-python`/`genesisdb-go` precedent — deliberately NOT translated to
+> camelCase, since a generic deep-recasing layer would corrupt caller keys
+> inside the opaque `props` field), `src/index.ts` (the public `GenesisDB`
+> class, JSON pass-through only, no marshalling logic to get wrong), and
+> `android/` (`GenesisDbModule.kt` bridging RN's Promise-based API to Phase
+> B-2's `dev.genesisblock.GenesisDB`, using a small opaque `dbId` int instead
+> of the raw native pointer to avoid JS-number precision loss on the bridge).
+> `src/__tests__/index.test.ts` covers the pass-through layer under plain
+> Jest (`rn-genesisdb-tests` CI job) — no RN runtime needed. **iOS is a stub**
+> (`ios/GenesisDbModule.swift` + `.m` + podspec): `pod install` and
+> autolinking succeed, but every method rejects with
+> `GENESISDB_IOS_NOT_IMPLEMENTED` pending B-1. Not yet done: publishing to
+> npm, and building/testing the native modules inside a real RN host app
+> (out of scope for this monorepo's CI — same host-only carve-out as B-1/B-2).
 
 ### B-3: React Native package (~2 weeks, parallel with B-1/B-2)
 
