@@ -104,6 +104,65 @@ fn test_grl_context_retrieval_tiered() {
 }
 
 #[test]
+fn test_grl_tier_h6_ceiling() {
+    // H6 is the single-agent context ceiling: exactly 6 hops, no more.
+    // Build a 7-node chain N0 -> N1 -> ... -> N6 (6 edges) and assert H6
+    // reaches N6 while H5 stops at N5.
+    let dir = tempdir().unwrap();
+    let storage = Storage::open(OpenOptions {
+        path: dir.path().to_str().unwrap().to_string(),
+        page_cache_mb: Some(64),
+        read_only: Some(false),
+        vector_dim: Some(1536),
+    })
+    .unwrap();
+
+    for i in 0..=6 {
+        storage
+            .add_node(NodeInput {
+                id: Some(format!("N{i}")),
+                labels: vec!["USER".to_string()],
+                props: None,
+                embedding: None,
+                lang: None,
+                valid_from: None,
+                caused_by: None,
+                ttl: None,
+                collection: None,
+            })
+            .unwrap();
+    }
+    for i in 0..6 {
+        storage
+            .add_edge(EdgeInput {
+                id: None,
+                from: format!("N{i}"),
+                to: format!("N{}", i + 1),
+                rel: "knows".to_string(),
+                props: None,
+                valid_from: None,
+                supersede: None,
+                impact: None,
+                caused_by: None,
+            })
+            .unwrap();
+    }
+
+    // H5 reaches N5 (5 hops) but not the 6th-hop node N6.
+    let ctx_h5 = storage.retrieve_context("N0", "H5", None, false).unwrap();
+    assert!(ctx_h5.nodes.iter().any(|n| n.id == "N5"));
+    assert!(!ctx_h5.nodes.iter().any(|n| n.id == "N6"));
+
+    // H6 reaches the full 6-hop radius including N6 (the ceiling).
+    let ctx_h6 = storage.retrieve_context("N0", "H6", None, false).unwrap();
+    assert!(ctx_h6.nodes.iter().any(|n| n.id == "N6"));
+    assert_eq!(ctx_h6.nodes.len(), 7);
+
+    // HQL surface: TIER H6 parses and executes.
+    assert!(storage.execute_hql("CONTEXT FOR N0 TIER H6").is_ok());
+}
+
+#[test]
 fn test_grl_budget_compression() {
     let dir = tempdir().unwrap();
     let storage = Storage::open(OpenOptions {

@@ -29,7 +29,7 @@ Allows the agent to run raw HQL commands.
 - **Output:** JSON results from the engine.
 
 ### `retrieve_tiered_context`
-The primary tool for RAG. It uses the GRL protocol (H0-H5) to load a relevant sub-graph within a token budget.
+The primary tool for RAG. It uses the GRL protocol (H0-H6) to load a relevant sub-graph within a token budget.
 - **Input:** 
     - `target`: Node ID or search term.
     - `tier`: "H0" through "H5".

@@ -8,7 +8,7 @@ The **Model Context Protocol (MCP)** is an open standard that enables AI models 
 ### FR1: Tool Exposure
 The MCP server must expose the following core engine capabilities as "Tools":
 - `query_hql`: Execute raw HQL commands.
-- `get_context`: Retrieve tiered context (H0-H5) for a given topic.
+- `get_context`: Retrieve tiered context (H0-H6) for a given topic.
 - `hybrid_search`: Perform semantic and lexical search.
 - `add_knowledge`: Atomic injection of nodes and edges.
 
@@ -55,12 +55,12 @@ graph TD
 ```json
 {
   "name": "retrieve_tiered_context",
-  "description": "Retrieves an optimized knowledge fragment from the graph based on H0-H5 scaling tiers.",
+  "description": "Retrieves an optimized knowledge fragment from the graph based on H0-H6 scaling tiers.",
   "input_schema": {
     "type": "object",
     "properties": {
       "target": { "type": "string" },
-      "tier": { "type": "string", "enum": ["H0", "H1", "H2", "H3", "H4", "H5"] },
+      "tier": { "type": "string", "enum": ["H0", "H1", "H2", "H3", "H4", "H5", "H6"] },
       "budget": { "type": "number", "description": "Token limit for compression." }
     },
     "required": ["target", "tier"]

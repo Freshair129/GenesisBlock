@@ -1,18 +1,29 @@
 # Software Requirements Document (SRD): Graph Retrieval Layer (GRL)
 
 ## 1. Introduction
-The **Graph Retrieval Layer (GRL)** transforms GenesisBlockDB from a hybrid database into a **Cognitive Retrieval Engine (CRE)**. Instead of raw queries, AI agents interact with the GRL via the **Context Scaling Tier (H0-H5)** protocol. The GRL acts as an intelligent orchestrator that resolves the optimal knowledge radius (Hops), prioritizes high-impact nodes, and compresses context to fit within the agent's token budget.
+The **Graph Retrieval Layer (GRL)** transforms GenesisBlockDB from a hybrid database into a **Cognitive Retrieval Engine (CRE)**. Instead of raw queries, AI agents interact with the GRL via the **Context Scaling Tier (H0-H6)** protocol. The GRL acts as an intelligent orchestrator that resolves the optimal knowledge radius (Hops), prioritizes high-impact nodes, and compresses context to fit within the agent's token budget.
+
+> **Tier ceiling semantics (aligned to `STD-Execution-Governance` H0–H6).** A tier is
+> **how far a single agent scopes context**, not "how much of the project it
+> understands". `H6` is the **hard ceiling: 6 hops maximum for one agent**. Work
+> that would require more than 6 hops must be **decomposed across multiple agents**
+> (each scoping its own ≤6-hop radius), never retrieved deeper. H6 is a
+> decomposition trigger, not a whole-graph scan.
 
 ## 2. Functional Requirements
 
 ### FR1: Context Resolver (Tier Mapping)
-- The system must map semantic tiers to physical graph hops:
-    - **H0 (Self):** 0 Hops. Only the target node.
-    - **H1 (Neighbors):** 1 Hop. Direct imports/exports and parent/child.
-    - **H2 (Feature):** 2 Hops. Local functional grouping.
-    - **H3 (Module):** 3 Hops. Integration-level context.
-    - **H4 (Architecture):** 4 Hops. High-level system design.
-    - **H5 (Enterprise):** 5 Hops. Full knowledge base scan.
+- The system must map semantic tiers to physical graph hops (labels aligned to
+  `STD-Execution-Governance` §3 H-Scale):
+    - **H0 (Subtask / PR):** 0 Hops. Only the target node.
+    - **H1 (Task / Component):** 1 Hop. Direct imports/exports and parent/child.
+    - **H2 (Story / Feature):** 2 Hops. Local functional grouping.
+    - **H3 (Epic / Module):** 3 Hops. Integration-level context.
+    - **H4 (Phase / Architecture):** 4 Hops. High-level system design.
+    - **H5 (Masterplan / Roadmap):** 5 Hops. Platform / operating-model context.
+    - **H6 (Full Network / Enterprise Ceiling):** 6 Hops. The **single-agent maximum**.
+      Beyond 6 hops, decompose into multiple agents (see ceiling note above) — H6
+      does not mean "scan the whole graph".
 
 ### FR2: Hybrid Semantic Expansion
 - Retrieval must combine **Vector Similarity** (find relevant concepts) with **Graph Traversal** (expand into related knowledge) to build a coherent Sub-graph.
@@ -47,12 +58,13 @@ pub struct ContextPackage {
 ```rust
 #[napi]
 pub enum ScalingTier {
-    H0 = 0, // Self
-    H1 = 1, // Neighbors
-    H2 = 2, // Feature
-    H3 = 3, // Module
-    H4 = 4, // Architecture
-    H5 = 5, // Enterprise
+    H0 = 0, // Subtask / PR
+    H1 = 1, // Task / Component
+    H2 = 2, // Story / Feature
+    H3 = 3, // Epic / Module
+    H4 = 4, // Phase / Architecture
+    H5 = 5, // Masterplan / Roadmap
+    H6 = 6, // Full Network / Enterprise Ceiling — single-agent max, then decompose
 }
 ```
 
@@ -71,7 +83,7 @@ pub enum ScalingTier {
 ## 3. HQL Grammar Update (`hql.pest`)
 ```pest
 context = { ^"CONTEXT" ~ ^"FOR" ~ target ~ ^"TIER" ~ tier ~ (^"BUDGET" ~ budget)? }
-tier = { "H0" | "H1" | "H2" | "H3" | "H4" | "H5" }
+tier = { "H0" | "H1" | "H2" | "H3" | "H4" | "H5" | "H6" }
 ```
 
 ---

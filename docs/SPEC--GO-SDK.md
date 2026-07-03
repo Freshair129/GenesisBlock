@@ -12,7 +12,7 @@ To support cloud-native infrastructures and high-performance backend systems, we
 ### FR2: Semantic Operations
 - Support `AddNode` and `AddEdge` with JSON-to-Struct mapping.
 - Implement `ExecuteHQL` to return results as `[]map[string]interface{}` or typed slices.
-- Integrate `GetContext` using the H0-H5 Context Scaling Tier protocol.
+- Integrate `GetContext` using the H0-H6 Context Scaling Tier protocol.
 
 ### FR3: Concurrency Safety
 - Ensure the client is safe for use across multiple goroutines.

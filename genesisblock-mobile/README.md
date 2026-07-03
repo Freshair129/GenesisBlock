@@ -13,7 +13,7 @@ genesisblock-mobile/
 │   ├── lib/api.ts           # typed Tauri invoke() wrappers + engine types
 │   └── components/
 │       ├── GraphView.tsx    # sigma.js WebGL graph (node color = governance tier)
-│       └── RetrieverPanel.tsx  # HQL CONTEXT → H0–H5 tier cards
+│       └── RetrieverPanel.tsx  # HQL CONTEXT → H0–H6 tier cards
 └── src-tauri/               # Rust shell
     ├── src/commands.rs      # 7 Tauri commands over Arc<Storage> (spawn_blocking)
     └── src/lib.rs           # opens DB at app_data_dir()/genesisdb, manages state

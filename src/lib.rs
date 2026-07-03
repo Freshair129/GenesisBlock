@@ -177,6 +177,11 @@ pub enum ScalingTier {
     H3 = 3,
     H4 = 4,
     H5 = 5,
+    // H6 is the single-agent context ceiling (STD-Execution-Governance H0–H6):
+    // 6 hops is the maximum radius one agent may scope. Work that needs more
+    // than 6 hops must be decomposed across multiple agents, not retrieved
+    // deeper — H6 is a hard cap, not "the whole graph".
+    H6 = 6,
 }
 
 impl ScalingTier {
@@ -188,6 +193,7 @@ impl ScalingTier {
             "H3" => ScalingTier::H3,
             "H4" => ScalingTier::H4,
             "H5" => ScalingTier::H5,
+            "H6" => ScalingTier::H6,
             _ => ScalingTier::H1,
         }
     }
@@ -199,6 +205,7 @@ impl ScalingTier {
             ScalingTier::H3 => 3,
             ScalingTier::H4 => 4,
             ScalingTier::H5 => 5,
+            ScalingTier::H6 => 6,
         }
     }
 }

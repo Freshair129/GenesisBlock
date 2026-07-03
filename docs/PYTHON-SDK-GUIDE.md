@@ -22,7 +22,7 @@ node = client.add_node(
     props={"role": "reasoner"}
 )
 
-# Semantic retrieval with H0-H5 tiers
+# Semantic retrieval with H0-H6 tiers
 context = client.get_context(target="agent-1", tier="H1")
 
 # Raw HQL

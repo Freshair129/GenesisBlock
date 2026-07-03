@@ -12,7 +12,7 @@ To enable data scientists and AI researchers to use GenesisBlockDB within their 
 ### FR2: Semantic Operations
 - Wrapper for `add_node` and `add_edge` with automatic JSON serialization.
 - Support for `execute_hql` returning native Python dictionaries/lists.
-- Integration of `retrieve_context` using the H0-H5 tier protocol.
+- Integration of `retrieve_context` using the H0-H6 tier protocol.
 
 ### FR3: Vector Support
 - Seamless handling of NumPy arrays or lists for embeddings.

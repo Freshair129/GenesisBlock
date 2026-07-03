@@ -307,14 +307,15 @@ fn single_element_vector() {
 
 #[test]
 fn all_valid_tiers() {
-    for t in ["H0", "H1", "H2", "H3", "H4", "H5"] {
+    for t in ["H0", "H1", "H2", "H3", "H4", "H5", "H6"] {
         parses_ok(&format!("CONTEXT FOR mynode TIER {t}"));
     }
 }
 
 #[test]
 fn invalid_tiers() {
-    let invalid = ["H6", "H7", "H99", "X1", "h0", "MASTER", ""];
+    // H6 is now the valid ceiling (see all_valid_tiers); H7+ stay invalid.
+    let invalid = ["H7", "H99", "X1", "h0", "MASTER", ""];
     for t in &invalid {
         must_not_panic(&format!("CONTEXT FOR mynode TIER {t}"));
     }

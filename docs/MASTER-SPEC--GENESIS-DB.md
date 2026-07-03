@@ -31,8 +31,8 @@ GenesisBlockDB bridges lexical and semantic search via a dual-indexing strategy:
 3.  **Neural Bridge:** Multi-lingual support via language centroids and mean-centering, allowing English queries to match Thai contexts.
 
 ### 2.3 Graph Retrieval Layer (GRL)
-The GRL implements the **Context Scaling Tier (H0-H5)** protocol to govern agent context acquisition:
-- **Resolver:** Maps tiers (H0=Self, H1=Neighbors, H2=Feature, H3=Module, H4=Arch, H5=System) to graph hops.
+The GRL implements the **Context Scaling Tier (H0-H6)** protocol to govern agent context acquisition:
+- **Resolver:** Maps tiers (H0=Subtask/PR, H1=Task/Component, H2=Story/Feature, H3=Epic/Module, H4=Phase/Architecture, H5=Masterplan/Roadmap, H6=Enterprise Ceiling (single-agent max)) to graph hops.
 - **Budget Manager:** Estimates token usage and automatically compresses results to **SuperNodes** if the agent's `BUDGET` is exceeded.
 - **Orchestrator:** Combines vector anchors with tiered graph expansion in a single reasoning pipeline.
 
@@ -120,7 +120,7 @@ GenesisBlock provides a native MCP server for seamless integration with LLMs.
 - **Transport:** Stdio (Local) and SSE (Swarm).
 - **Tools Exposed:**
     - `query_hql`: Direct execution of hybrid queries.
-    - `retrieve_tiered_context`: Access to the GRL scaling protocol (H0-H5).
+    - `retrieve_tiered_context`: Access to the GRL scaling protocol (H0-H6).
     - `add_knowledge`: Dynamic knowledge injection with provenance.
 - **Usage:** Run `npm run mcp:start` and configure the client with the resulting stdio stream.
 
@@ -129,7 +129,7 @@ The official Python library provides high-level bindings for AI and Data Science
 - **Installation:** `pip install genesisdb-python/`
 - **Features:** 
     - Typed models for Nodes and Edges.
-    - Tiered Context Retrieval (H0-H5).
+    - Tiered Context Retrieval (H0-H6).
     - Support for NumPy-compatible vector injection.
 
 ### 8.4 Go SDK

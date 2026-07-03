@@ -329,7 +329,7 @@ support, smaller bundle than vis-network.
 // src/components/RetrieverPanel.tsx
 // Input: free-text query OR selected node id from graph tap
 // Command: CONTEXT "<query>" TIER H0 H1 H2 H3 LIMIT 20
-// Output: tier cards H0 (exact match) → H5 (broad context)
+// Output: tier cards H0 (exact match) → H6 (broad context)
 // Side effect: highlight matching nodes on graph (sigma setHighlight)
 // Toggle: CRDT sync on/off (calls Tauri command toggle_sync)
 ```
@@ -355,7 +355,7 @@ npm run tauri android build
 - [ ] App installs and launches on a physical iOS device (iPhone, not Simulator only)
 - [ ] App installs and launches on a physical Android device (arm64)
 - [ ] `add_node` → node appears in graph view within 3s (async HNSW indexing)
-- [ ] CONTEXT query returns H0–H5 tiers in retriever panel
+- [ ] CONTEXT query returns H0–H6 tiers in retriever panel
 - [ ] 1000 nodes render at ≥30 fps on graph view
 - [ ] WAL survives app restart (data persists across launches)
 - [ ] CRDT sync successfully exchanges events with a desktop GenesisDB instance

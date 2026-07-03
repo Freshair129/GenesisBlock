@@ -57,7 +57,7 @@ Start architecture discovery from `docs/C4--GENESISDB-ARCHITECTURE.md`. Treat it
 - HNSW-backed vector search over **per-model/dim vector collections** (a `default` always exists; query dim validated per collection). HNSW indexing is **asynchronous** (off the write path; eventually searchable — `flush_index`/`index_lag`). Optional language centroids.
 - Thai-aware fuzzy ID matching through combining-mark filtering and lexical similarity.
 - HQL commands: `SEARCH`, `TRAVERSE`, `MATCH`, `CONTEXT`.
-- Graph Retrieval Layer (GRL): H0-H5 context tiers with token-budget fallback to SuperNodes.
+- Graph Retrieval Layer (GRL): H0-H6 context tiers with token-budget fallback to SuperNodes.
 - Governance: external agents cannot directly create `MASTER` tier nodes.
 - CRDT sync: Lamport clocks, signed events, LWW-style reconciliation.
 - Swarm identity: ed25519 identity stored under database path.

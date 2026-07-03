@@ -17,7 +17,7 @@ in a single binary. Nearest comparators: Kuzu, DuckDB+graph, LanceDB, LadybugDB.
 - **Core Architecture:** Neural Bridge, LPA Clustering, Merkle Sync,
   Logic-Gated Context, Consensus Protocol + ed25519 vote signatures (PR #6).
 - **Temporal Engine:** Bitemporal Querying, Event Sourcing, Vector Drift Tracking, TTL.
-- **Cognitive Layer:** Graph Retrieval Layer (GRL) H0–H5; HQL `IN <collection>` (PR #3).
+- **Cognitive Layer:** Graph Retrieval Layer (GRL) H0–H6; HQL `IN <collection>` (PR #3).
 - **Distributed Intelligence:** CRDT Foundation, P2P Gossip, Logical Clocks.
 - **Vector:** Multi-collection per-model/dim isolation; `add_vector` multi-vector
   per node (PR #4); async HNSW indexing (10× P95 improvement); configurable `ef`.
@@ -37,7 +37,7 @@ in a single binary. Nearest comparators: Kuzu, DuckDB+graph, LanceDB, LadybugDB.
 ## MARK VIII: Distributed Intelligence (COMPLETED)
 - [x] **Step 1: CRDT Foundation:** Logical Clocks (Lamport) and `reconcile_state` for eventual consistency.
 - [x] **Step 1.5: Thai Fuzzy Hardening:** Thai-aware character-level indexing and typo-tolerant thresholds.
-- [x] **Step 2: Graph Retrieval Layer (GRL):** Implementation of the H0-H5 Context Scaling Tier and HQL `CONTEXT` command.
+- [x] **Step 2: Graph Retrieval Layer (GRL):** Implementation of the H0-H6 Context Scaling Tier and HQL `CONTEXT` command.
 - [x] **Step 3: P2P Gossip Protocol:** Peer discovery and decentralized state synchronization across agent swarms.
 
 ---
@@ -269,7 +269,7 @@ in a single binary. Nearest comparators: Kuzu, DuckDB+graph, LanceDB, LadybugDB.
 - [ ] **Tauri v2 mobile project (`genesisblock-mobile/`):** iOS + Android targets, `genesis-block-native` as `--no-default-features --features mobile` dep
 - [ ] **Tauri commands (`commands.rs`):** `add_node`, `search`, `execute_hql`, `retrieve_context`, `get_graph_snapshot`, `flush_index` — mirrors NAPI surface
 - [ ] **Graph view:** sigma.js WebGL; node color = governance tier; only valid edges (bitemporal now); pinch-zoom + tap-to-inspect
-- [ ] **Retriever panel:** HQL `CONTEXT` → H0–H5 tier cards; tap node on graph triggers retrieval; highlights result nodes
+- [ ] **Retriever panel:** HQL `CONTEXT` → H0–H6 tier cards; tap node on graph triggers retrieval; highlights result nodes
 - [ ] **CRDT sync toggle:** mobile ↔ desktop sync via existing gossip layer (UDP; optional)
 - [ ] **Device validation:** installs + runs on physical iPhone (arm64) and physical Android (arm64); WAL persists across app restarts
 
