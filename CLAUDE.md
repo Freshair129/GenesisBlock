@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 GenesisBlock / GenesisBlockDB is a local-first **hybrid semantic-graph database engine** written in Rust. A single Rust crate (`genesis-block-native`) compiles to two artifacts from the same core: a `cdylib` Node.js native addon (via NAPI-RS) and an `rlib` consumed by a standalone Axum REST server. Everything else (Python SDK, Go SDK, MCP server, dashboard, Obsidian plugin) is a client over one of those two surfaces.
 
-The whole engine lives in `src/lib.rs` (~4700 lines): storage, WAL persistence, per-collection HNSW vector indexes (async indexing), graph indices, bitemporal node/edge model, governance tiers, HQL execution, Graph Retrieval Layer (GRL), CRDT sync, and ed25519-signed consensus. The storage core is one large file by design — the only split-out module is `src/query/` (the HQL `pest` grammar + AST).
+The whole engine lives in `src/lib.rs` (~6,000 lines): storage, WAL persistence, per-collection HNSW vector indexes (async indexing), graph indices, bitemporal node/edge model, governance tiers, HQL execution, Graph Retrieval Layer (GRL), CRDT sync, and ed25519-signed consensus. The storage core is one large file by design — the only split-out module is `src/query/` (the HQL `pest` grammar + AST).
 
 ## Build & run
 
