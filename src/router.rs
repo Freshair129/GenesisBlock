@@ -464,11 +464,164 @@ async fn version_handler() -> impl IntoResponse {
 }
 
 // ---------------------------------------------------------------------------
+// Prometheus /metrics (Wave 1.1, ADR--GENESISDB-COMPETITIVE-SUPERIORITY)
+// ---------------------------------------------------------------------------
+
+/// Escape a label value per the Prometheus text-format spec: backslash and
+/// double-quote must be backslash-escaped, and a literal newline must become
+/// `\n`. Collection names are user-supplied, so this is not just defense in
+/// depth — an unescaped quote in a name would break the exposition format.
+fn escape_label_value(value: &str) -> String {
+    let mut out = String::with_capacity(value.len());
+    for c in value.chars() {
+        match c {
+            '\\' => out.push_str("\\\\"),
+            '"' => out.push_str("\\\""),
+            '\n' => out.push_str("\\n"),
+            _ => out.push(c),
+        }
+    }
+    out
+}
+
+/// Render the engine's current state as Prometheus/OpenMetrics text-format
+/// exposition. Hand-rolled (no `prometheus` crate dependency) — the format is
+/// a handful of `# HELP` / `# TYPE` lines followed by `metric{labels} value`,
+/// which is trivial to emit directly from `Storage`'s existing status surface
+/// (the same fields `/v1/status` and `list_collections()` already expose).
+fn render_metrics(storage: &Storage) -> String {
+    let mut out = String::new();
+
+    let node_count = storage.nodes.len();
+    let edge_count = storage.edges.len();
+    let collections = storage.list_collections();
+    let index_lag = storage.index_lag();
+    let is_rebuilding = storage.is_rebuilding.load(Ordering::SeqCst);
+    let memory_usage_mb: f64 = {
+        let vec_bytes: usize = storage
+            .collections
+            .iter()
+            .map(|c| c.value().arena.read().byte_size())
+            .sum();
+        let node_bytes = storage.nodes.len() * 512;
+        let edge_bytes = storage.edges.len() * 256;
+        (vec_bytes + node_bytes + edge_bytes) as f64 / 1024.0 / 1024.0
+    };
+
+    out.push_str("# HELP genesisdb_nodes_total Total number of nodes currently stored.\n");
+    out.push_str("# TYPE genesisdb_nodes_total gauge\n");
+    out.push_str(&format!("genesisdb_nodes_total {}\n", node_count));
+
+    out.push_str("# HELP genesisdb_edges_total Total number of edges currently stored.\n");
+    out.push_str("# TYPE genesisdb_edges_total gauge\n");
+    out.push_str(&format!("genesisdb_edges_total {}\n", edge_count));
+
+    out.push_str(
+        "# HELP genesisdb_collections_total Total number of vector collections.\n",
+    );
+    out.push_str("# TYPE genesisdb_collections_total gauge\n");
+    out.push_str(&format!(
+        "genesisdb_collections_total {}\n",
+        collections.len()
+    ));
+
+    out.push_str(
+        "# HELP genesisdb_index_lag Async HNSW indexing backlog (vectors staged but not yet indexed).\n",
+    );
+    out.push_str("# TYPE genesisdb_index_lag gauge\n");
+    out.push_str(&format!("genesisdb_index_lag {}\n", index_lag));
+
+    out.push_str(
+        "# HELP genesisdb_memory_usage_mb Approximate resident memory used by vector arenas, nodes, and edges, in megabytes.\n",
+    );
+    out.push_str("# TYPE genesisdb_memory_usage_mb gauge\n");
+    out.push_str(&format!("genesisdb_memory_usage_mb {}\n", memory_usage_mb));
+
+    out.push_str(
+        "# HELP genesisdb_is_rebuilding Whether the engine is currently rebuilding its vector index (1) or not (0).\n",
+    );
+    out.push_str("# TYPE genesisdb_is_rebuilding gauge\n");
+    out.push_str(&format!(
+        "genesisdb_is_rebuilding {}\n",
+        if is_rebuilding { 1 } else { 0 }
+    ));
+
+    out.push_str(
+        "# HELP genesisdb_collection_vectors Number of vectors stored in a collection.\n",
+    );
+    out.push_str("# TYPE genesisdb_collection_vectors gauge\n");
+    for c in &collections {
+        out.push_str(&format!(
+            "genesisdb_collection_vectors{{collection=\"{}\"}} {}\n",
+            escape_label_value(&c.name),
+            c.count
+        ));
+    }
+
+    out.push_str(
+        "# HELP genesisdb_collection_sidecar_resident_bytes Resident (RAM) bytes held by a collection's exact-f32 rerank sidecar.\n",
+    );
+    out.push_str("# TYPE genesisdb_collection_sidecar_resident_bytes gauge\n");
+    for c in &collections {
+        out.push_str(&format!(
+            "genesisdb_collection_sidecar_resident_bytes{{collection=\"{}\"}} {}\n",
+            escape_label_value(&c.name),
+            c.sidecar_resident_bytes
+        ));
+    }
+
+    out.push_str(
+        "# HELP genesisdb_collection_sidecar_disk_bytes On-disk bytes of a collection's exact-f32 rerank sidecar.\n",
+    );
+    out.push_str("# TYPE genesisdb_collection_sidecar_disk_bytes gauge\n");
+    for c in &collections {
+        out.push_str(&format!(
+            "genesisdb_collection_sidecar_disk_bytes{{collection=\"{}\"}} {}\n",
+            escape_label_value(&c.name),
+            c.sidecar_disk_bytes
+        ));
+    }
+
+    out.push_str(
+        "# HELP genesisdb_collection_arena_resident_bytes Resident (RAM) bytes held by a collection's vector arena.\n",
+    );
+    out.push_str("# TYPE genesisdb_collection_arena_resident_bytes gauge\n");
+    for c in &collections {
+        out.push_str(&format!(
+            "genesisdb_collection_arena_resident_bytes{{collection=\"{}\"}} {}\n",
+            escape_label_value(&c.name),
+            c.arena_resident_bytes
+        ));
+    }
+
+    out
+}
+
+/// `GET /metrics` — Prometheus/OpenMetrics text-format exposition, at the
+/// conventional root path (no `/v1` prefix; Prometheus scrapers default to
+/// `/metrics` at root). Intentionally mounted OUTSIDE the `api_key_guard`
+/// layer (see `build_router`): the payload is operational counts only, no row
+/// data, matching Qdrant's default of an unauthenticated `/metrics` endpoint.
+/// If you later need to gate this behind the API key (e.g. to avoid leaking
+/// even node/edge counts), move its `.route(...)` above the guard layer in
+/// `build_router` instead of merging it in afterward.
+async fn metrics_handler(State(state): State<AppState>) -> impl IntoResponse {
+    let storage = state.storage.read();
+    let body = render_metrics(&storage);
+    (
+        StatusCode::OK,
+        [(header::CONTENT_TYPE, "text/plain; version=0.0.4")],
+        body,
+    )
+        .into_response()
+}
+
+// ---------------------------------------------------------------------------
 // Router builder — shared by main.rs and integration tests
 // ---------------------------------------------------------------------------
 
 pub fn build_router(state: AppState) -> Router {
-    Router::new()
+    let guarded = Router::new()
         .route("/v1/bulk/nodes", post(bulk_add_nodes_handler))
         .route("/v1/bulk/edges", post(bulk_add_edges_handler))
         .route("/v1/bulk/rebuild", post(rebuild_index_handler))
@@ -509,9 +662,24 @@ pub fn build_router(state: AppState) -> Router {
         // but before the body-limit layer (so we don't waste I/O on unauthorized
         // bodies).
         .layer(middleware::from_fn_with_state(state.clone(), api_key_guard))
+        .with_state(state.clone());
+
+    // `GET /metrics` (root, no `/v1` prefix — Prometheus convention). Merged in
+    // AFTER the guarded router above has its `api_key_guard` layer applied, so
+    // this route does NOT go through that middleware: `Router::layer` only
+    // affects routes already registered at the time it's called, and `.merge`
+    // combines two independent routers rather than nesting one inside the
+    // other's middleware stack. Scrapers can hit `/metrics` unauthenticated —
+    // matches Qdrant's default (its `/metrics` carries no row data, only
+    // operational counts, so this is not a data-exposure regression).
+    let metrics_router = Router::new()
+        .route("/metrics", get(metrics_handler))
+        .with_state(state);
+
+    guarded
+        .merge(metrics_router)
         // 64 MB hard cap on all request bodies; bulk endpoints stay well under.
         .layer(RequestBodyLimitLayer::new(64 * 1024 * 1024))
-        .with_state(state)
 }
 
 /// Reject requests missing a valid `Authorization: Bearer <key>` header when
