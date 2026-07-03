@@ -1,6 +1,6 @@
 # PLAN — Vector Quantization Refinement (Swarm Execution Plan)
 
-**Status:** Proposed · **Scope:** GenesisBlockDB engine (`src/lib.rs`, `src/router.rs`, `index.d.ts`) + tests + ADR
+**Status:** Shipped (all phases merged to `main` 2026-07-02, PRs #51–#58) · **Scope:** GenesisBlockDB engine (`src/lib.rs`, `src/router.rs`, `index.d.ts`) + tests + ADR
 **Parent:** ADR--GENESISDB-VECTOR-QUANTIZATION (stale; rerank shipped resident, ADR still says "deferred")
 **Root cause being corrected:** the f32-sidecar rerank arena ships as `pub f32_sidecar: Option<RwLock<Vec<f32>>>` (`src/lib.rs:843`) — fully heap-resident. It is loaded whole at open (`src/lib.rs:3708-3718`), written whole on save (`src/lib.rs:3572-3578`), and held **fully resident** for the collection's lifetime — a normal query slices only the over-fetched candidate rows, while the small-collection `exact_rerank_slots` brute-force path scans all live rows (`src/lib.rs:2595-2629`). The defect is residency, not per-query whole-reads. Verified per-vector resident RAM at 1536-dim: None = 12288 B; BQ rerank-off = 384 B (**32×**); **BQ rerank-on = 6528 B (only 1.88× vs None)** — the 6144 B sidecar is **94.1%** of resident bytes. The ADR (lines 107-108) explicitly warned a resident f32 rerank arena would cancel the RAM win and proposed mmap; `memmap2` was declined and the resident `Vec<f32>` shipped anyway. This plan moves the sidecar OFF-RAM via positioned disk reads (no mmap, Windows-safe) and adds the recall/ops refinements (BQ centering, per-query oversample, F16, SQ8 calibration, status exposure).
 
