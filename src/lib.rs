@@ -3045,22 +3045,57 @@ impl Storage {
             Error::from_reason(format!("HQL result serialization failed: {e}"))
         };
         type Row = serde_json::Map<String, serde_json::Value>;
+        // One consistent "current instant" for the whole query instead of a
+        // timestamp that drifts per edge visited (hoisted out of the hop loop).
+        let now_rfc3339 = Utc::now().to_rfc3339();
 
-        // 1. Anchor: scan live nodes matching the start pattern's constraints.
+        // 1. Anchor: an exact-id string constraint (`{id:"..."}`) resolves in
+        // O(1) via the id->u32 index instead of scanning every live node;
+        // everything else (label-only, numeric id, unconstrained) keeps the
+        // scan (a numeric id can't be looked up by the string-keyed index, and
+        // label indexing is P2-T3). The id fast path still runs the exact same
+        // `is_valid_as_of` + `node_matches` checks the scan would, so an id
+        // that resolves but fails those checks yields an empty frontier, not
+        // an error — identical to what the scan produces for a non-match.
+        let id_anchor: Option<&str> = pattern.start.props.iter().find_map(|(k, v)| {
+            if k == "id" {
+                if let query::ast::HqlValue::Str(s) = v {
+                    return Some(s.as_str());
+                }
+            }
+            None
+        });
         let mut frontier: Vec<(u32, Row)> = Vec::new();
-        for entry in self.nodes.iter() {
-            let node = entry.value();
-            if !Self::is_valid_as_of(&node.valid_from, &node.valid_to, as_of) {
-                continue;
+        if let Some(id) = id_anchor {
+            if let Some(u32_id) = self.get_u32(id) {
+                if let Some(entry) = self.nodes.get(&u32_id) {
+                    let node = entry.value();
+                    if Self::is_valid_as_of(&node.valid_from, &node.valid_to, as_of)
+                        && Self::node_matches(node, &pattern.start)
+                    {
+                        let mut row = Row::new();
+                        if let Some(v) = &pattern.start.var {
+                            row.insert(v.clone(), serde_json::to_value(node).map_err(ser_err)?);
+                        }
+                        frontier.push((u32_id, row));
+                    }
+                }
             }
-            if !Self::node_matches(node, &pattern.start) {
-                continue;
+        } else {
+            for entry in self.nodes.iter() {
+                let node = entry.value();
+                if !Self::is_valid_as_of(&node.valid_from, &node.valid_to, as_of) {
+                    continue;
+                }
+                if !Self::node_matches(node, &pattern.start) {
+                    continue;
+                }
+                let mut row = Row::new();
+                if let Some(v) = &pattern.start.var {
+                    row.insert(v.clone(), serde_json::to_value(node).map_err(ser_err)?);
+                }
+                frontier.push((*entry.key(), row));
             }
-            let mut row = Row::new();
-            if let Some(v) = &pattern.start.var {
-                row.insert(v.clone(), serde_json::to_value(node).map_err(ser_err)?);
-            }
-            frontier.push((*entry.key(), row));
         }
 
         // 2. Expand each (edge, node) hop; Cartesian over surviving neighbours.
@@ -3095,7 +3130,7 @@ impl Storage {
                     // Hide retracted edges in the current view (mirror `neighbors`).
                     if as_of.is_none() {
                         if let Some(to) = &edge.valid_to {
-                            if Utc::now().to_rfc3339().as_str() >= to.as_str() {
+                            if now_rfc3339.as_str() >= to.as_str() {
                                 continue;
                             }
                         }
@@ -3656,6 +3691,9 @@ impl Storage {
         // Retraction visibility: by default a retracted edge (valid_to passed) is
         // hidden from the current view; `include_invalid = true` surfaces it.
         let include_invalid = args.include_invalid.unwrap_or(false);
+        // One consistent "current instant" for the whole query instead of a
+        // timestamp that drifts per edge visited (hoisted out of the BFS loop).
+        let now_rfc3339 = Utc::now().to_rfc3339();
         let mut results = Vec::new();
         let mut visited = HashSet::new();
         visited.insert(u32_seed);
@@ -3693,7 +3731,7 @@ impl Storage {
                     // the caller opted into invalidated edges.
                     if args.as_of.is_none() && !include_invalid {
                         if let Some(to) = &edge.valid_to {
-                            if Utc::now().to_rfc3339().as_str() >= to.as_str() {
+                            if now_rfc3339.as_str() >= to.as_str() {
                                 continue;
                             }
                         }
