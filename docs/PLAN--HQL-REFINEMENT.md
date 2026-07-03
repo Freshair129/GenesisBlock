@@ -198,6 +198,8 @@ Recommended PR cadence: **PR1 = P0** (correctness + exposure — every item is e
 
 # P2 — Clause ergonomics
 
+> **⚠ SUPERSEDED IN EXECUTION (2026-07-03) by [ADR--GENESISDB-EMBEDDED-SQLITE-SUBSTRATE](adr/ADR--GENESISDB-EMBEDDED-SQLITE-SUBSTRATE.md) phase S2.** The *language contract* below (grammar, semantics, tests) stands unchanged; the *execution strategy* changes: P2-T1's WHERE/OR evaluator and P2-T2's count compile down to SQL over the embedded SQLite projection (gaining pushed-down, indexed filtering), and P2-T3's bespoke `label_idx` is cancelled in favor of an indexed `node_labels` table. `score`/`depth` predicates stay in the small native evaluator. P2-T4 unchanged. Do not implement these tasks as written without reading the ADR first.
+
 ### P2-T1 — `OR` + parentheses in WHERE
 - **Scope:** `hql.pest`: predicate grammar becomes `expr = term (OR term)*; term = factor (AND factor)*; factor = predicate | "(" expr ")"` for **both** `where_clause` and `pat_where` (shared rules where pest allows); `ast.rs`: predicate tree replaces `Vec<HqlPredicate>` (keep a compat constructor so `apply_hql_clauses`/`pattern_eval_predicate` evaluate the tree); SQL-null semantics unchanged (null ⇒ false at the leaf, standard three-valued collapse documented).
 - **Complexity:** M · **Executor:** Opus 4.8 (precedence + PEG backtracking against the existing clause chain is the risk) · **Depends-on:** P1 merged
@@ -225,6 +227,8 @@ Recommended PR cadence: **PR1 = P0** (correctness + exposure — every item is e
 ---
 
 # P3 — Path 3: text query without a caller vector (design first)
+
+> **⚠ DESIGN FORK RESOLVED (2026-07-03) by [ADR--GENESISDB-EMBEDDED-SQLITE-SUBSTRATE](adr/ADR--GENESISDB-EMBEDDED-SQLITE-SUBSTRATE.md) phase S3:** option (b) in-engine lexical, implemented on embedded SQLite FTS5 (trigram BM25) + RRF — not hand-rolled Rust BM25 — serving HQL `SEARCH TEXT` and Wave 2.5's native hybrid through one lexical engine. P3-T0 shrinks to specifying ranking/fusion semantics and the honest-failure contract.
 
 ### P3-T0 — Design ADR: `SEARCH TEXT "…"`
 - **Scope:** New `docs/adr/ADR--GENESISDB-HQL-TEXT-QUERY.md` weighing the three candidate designs with evidence: **(a) node-anchored search** — ships in P0-T1, zero embedder, covers "more like this node"; record it as the shipped baseline, not the answer. **(b) in-engine lexical search** — score over the existing trigram index (`find_fuzzy_id` already walks it, `src/lib.rs:2336-2372`) generalized from id-matching to text scoring, optionally BM25-weighted, fused with the vector score via RRF when a vector/`ALPHA` is also present. This is the **same primitive** the competitive ADR's Wave 2.5 (native dense+sparse hybrid, NotiKeeper-validated RRF+BM25) needs — one implementation should serve both; this ADR must reconcile scope with Wave 2.5 rather than shipping a second lexical path. **(c) client-side embed hook** — NAPI callback / REST sidecar contract so `SEARCH TEXT` embeds via the caller's model (bge-m3 at our consumers); zero engine ML, but per-front-end wiring and it breaks the "one funnel" parity property. Decision + task list for the implementation PR(s).
