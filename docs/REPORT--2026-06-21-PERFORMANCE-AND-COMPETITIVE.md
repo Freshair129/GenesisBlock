@@ -328,6 +328,9 @@ See `AUDIT--P30-LADYBUGDB-HEAD-TO-HEAD.md`.
 
 ### 9.3 Feature Matrix — จุดที่ GenesisBlock เป็นเจ้าเดียว
 
+> ⚠ **แก้ไข 2026-07-03:** ตารางนี้มีข้อผิดพลาด/ข้อมูลตกยุค 3 จุด — ดู §11
+> (Corrections) ท้ายรายงาน และ ADR--GENESISDB-COMPETITIVE-SUPERIORITY §4
+
 | Capability | เจ้าเดียวในตลาด? | หมายเหตุ |
 |---|:---:|---|
 | Bitemporal + graph + vector ใน binary เดียว | **ใช่** | SurrealDB มี bitemporal แต่ไม่ embedded เต็มรูป |
@@ -500,3 +503,34 @@ b5e9771 fix(engine): revert edge from/to to String; restore build + green suite
 
 Reproduce the benchmark: `benches/vbench.py` (embed/Chroma/Qdrant/ground-truth)
 + `benches/vbench_genesis.rs` (`[[bin]] vbench-genesis`, `GB_EF` env).
+
+---
+
+## 11. Corrections & staleness (added 2026-07-03)
+
+Findings from the Opus-gated competitive-superiority audit
+(`ADR--GENESISDB-COMPETITIVE-SUPERIORITY`, 2026-07-03). This report is a dated
+record; rather than rewriting history, corrections are listed here:
+
+1. **§9.3 "Multi-vector per node — ใช่" is FALSE.** `NodeInput` has exactly one
+   `embedding: Option<Vec<f64>>` routed to one named collection
+   (`src/lib.rs:99-110`). The real capability is *multiple collections, one vector
+   per node per collection*. Retracted.
+2. **§9.3 "Node.js NAPI native addon — ไม่มีใน LadybugDB" is stale.** LadybugDB
+   ships npm `@ladybugdb/core` (verified 2026-07-03). The defensible uniqueness is
+   the combined embedded bitemporal+signed-governance+graph+vector binary, not
+   Node embeddability alone.
+3. **§9.2 Kuzu column is defunct.** Apple acqui-hired Kuzu Inc (~2025-10-09);
+   `kuzudb/kuzu` archived read-only 2025-10-10. LadybugDB (MIT, v0.18.0 as of
+   2026-07-01, ~monthly cadence) is the community successor — P30 measured 0.15.3
+   and needs a re-run (planned as P35).
+4. **§9.5 hop1 ratios carry conditions** documented in the underlying audits but
+   dropped here: DuckDB 52× is hop1-only (hop6 effectively tied, P28 §4); the
+   Neo4j band is largely the embedded-vs-server tax (P23 §3); LanceDB 9× was at
+   recall 0.948 vs their 0.998 (P27 §3); ratios were measured at 100k only.
+5. **§9.7 threat table update (2026-07-03):** Neo4j hybrid-search threat
+   MATERIALIZED on schedule (Cypher 25 `SEARCH` GA 2026.02). SurrealDB
+   CRDT+ed25519 "nightmare scenario" did NOT materialize (SurrealDS is
+   quorum-based; no signing/bitemporal in 3.0 docs). Uniqueness claims in §9.4
+   are now externally verified for the first time — no same-tier or enterprise
+   vendor ships bitemporal + signed/verifiable storage natively.
