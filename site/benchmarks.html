@@ -1,0 +1,440 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>GenesisBlockDB — Benchmark Results</title>
+<meta name="description" content="Measured head-to-head benchmarks vs Kuzu, LadybugDB, DuckDB, RocksDB, Neo4j, Qdrant, Chroma, LanceDB — wins and losses shown with equal weight, every number sourced to its audit doc." />
+<style>
+  :root {
+    --bg:#0b0e14; --bg-card:#141925; --bg-soft:#1b2130; --fg:#e6e6e6; --muted:#9aa4b2;
+    --accent:#7aa2f7; --border:#222a3a; --good:#4caf7d; --bad:#e0556b; --warn:#e8a33d;
+  }
+  * { box-sizing:border-box; }
+  body { margin:0; font:16px/1.6 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif; background:var(--bg); color:var(--fg); }
+  .wrap { max-width:1180px; margin:0 auto; padding:40px 24px 80px; }
+  h1 { font-size:2rem; line-height:1.2; margin:0 0 .3em; }
+  h1 .accent { color:var(--accent); }
+  h2 { font-size:1.35rem; margin:2.4em 0 .6em; border-bottom:1px solid var(--border); padding-bottom:.4em; }
+  h3 { font-size:1.05rem; margin:1.6em 0 .5em; color:var(--fg); }
+  .lede { font-size:1.1rem; color:var(--muted); margin:0 0 1.6rem; max-width:800px; }
+  a { color:var(--accent); }
+  code { background:#0d1320; border:1px solid var(--border); border-radius:5px; padding:1px 6px; font-size:.88em; }
+  .banner {
+    background:#1c2418; border:1px solid #3a4a2e; border-left:4px solid var(--warn);
+    color:#e8d98a; font-size:.92rem; padding:16px 20px; border-radius:8px; margin-bottom:2rem;
+  }
+  .banner strong { color:#f2e6a8; }
+  .banner p { margin:.4em 0; }
+  .meta-strip { display:flex; flex-wrap:wrap; gap:10px; margin:1.2rem 0 2rem; }
+  .pill { background:var(--bg-card); border:1px solid var(--border); border-radius:20px; padding:5px 14px; font-size:.82rem; color:var(--muted); }
+  table { width:100%; border-collapse:collapse; font-size:.88rem; margin:1rem 0 1.6rem; background:var(--bg-card); border-radius:10px; overflow:hidden; }
+  caption { text-align:left; caption-side:top; color:var(--muted); font-size:.82rem; margin-bottom:.5em; }
+  th, td { text-align:left; padding:9px 12px; border-bottom:1px solid var(--border); vertical-align:top; }
+  thead th { background:var(--bg-soft); color:var(--muted); font-size:.72rem; text-transform:uppercase; letter-spacing:.04em; white-space:nowrap; }
+  td.num, th.num { text-align:right; font-variant-numeric:tabular-nums; white-space:nowrap; }
+  tbody tr:hover { background:#161c29; }
+  tbody tr:last-child td { border-bottom:none; }
+  .src { font-size:.78rem; color:var(--muted); white-space:nowrap; }
+  .src a { color:#8fb3f9; }
+  .win  { color:var(--good); font-weight:700; }
+  .loss { color:var(--bad); font-weight:700; }
+  .tie  { color:var(--warn); font-weight:700; }
+  .cond { font-size:.8rem; color:var(--muted); max-width:280px; }
+  .card { background:var(--bg-card); border:1px solid var(--border); border-radius:12px; padding:18px 22px; margin:1rem 0; }
+  .card.losses { border-color:#4a2e2e; }
+  .card.losses h3 { color:#f0a0ac; }
+  .card.moat { border-color:#2e4a3a; }
+  .card.moat h3 { color:#7fe0b0; }
+  .grid2 { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
+  @media (max-width:800px){ .grid2{ grid-template-columns:1fr; } table{ font-size:.78rem; } th,td{ padding:7px 8px; } }
+  footer { color:var(--muted); font-size:.85rem; margin-top:3rem; border-top:1px solid var(--border); padding-top:1.5rem; }
+  .toc { columns:2; column-gap:2rem; font-size:.88rem; }
+  .toc a { display:block; padding:2px 0; }
+  @media (max-width:700px){ .toc{ columns:1; } }
+  .dagger { color:var(--warn); }
+  hr.sep { border:none; border-top:1px solid var(--border); margin:2.4rem 0; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <h1>GenesisBlock<span class="accent">DB</span> — Benchmark Results</h1>
+  <p class="lede">Every head-to-head number GenesisBlockDB has measured against a named competitor,
+  shown with its scale, dimension, durability mode, date, and source audit doc — wins
+  <strong>and</strong> losses given equal weight. If a number here embarrasses us, it stays.</p>
+
+  <div class="banner">
+    <p><strong>Level 0 — maintainer-measured, not independently reproduced.</strong>
+    Every figure on this page was run by the maintainer on one dev machine
+    (Windows 10, Intel i7-8700K, 32 GB RAM, SATA SSD unless noted). Competitor-side
+    numbers are <strong>2026-06-21 vintage</strong> and were not re-run against our
+    improved post-MARK-XIII baseline (a caveat that cuts both ways — some of our own
+    numbers improved since, some competitor numbers may have too).</p>
+    <p>For a <strong>reproducible</strong> result you (or anyone) can run independently on your
+    own hardware, see <a href="https://github.com/Freshair129/GenesisBlock/blob/main/BENCHMARKING.md">BENCHMARKING.md</a>
+    and the <a href="https://github.com/Freshair129/GenesisBlock/tree/main/benchmark">benchmark/</a> suite
+    (clone-and-run soak/graph/vector harnesses, schema-verified <code>result.json</code>,
+    a trust-gate verifier — the engine never self-reports its own environment). See
+    <a href="https://github.com/Freshair129/GenesisBlock/blob/main/docs/benchmarks/INDEPENDENT-BENCHMARKS.md">docs/benchmarks/INDEPENDENT-BENCHMARKS.md</a>
+    for the credibility-level distinction and how to submit your own run.</p>
+  </div>
+
+  <div class="meta-strip">
+    <span class="pill">Competitor-side runs: 2026-06-21</span>
+    <span class="pill">Our re-runs: 2026-06-22 → 2026-06-23 (P31–P33)</span>
+    <span class="pill">Scale: 100k nodes / 800k edges (graph) · 100k × 1024-dim (vector) unless noted</span>
+    <span class="pill">Source: <a href="https://github.com/Freshair129/GenesisBlock/blob/main/docs/ADR--GENESISDB-COMPETITIVE-SUPERIORITY.md">ADR--GENESISDB-COMPETITIVE-SUPERIORITY</a></span>
+  </div>
+
+  <div class="toc">
+    <a href="#wins">1. Where we win (≥20% target met)</a>
+    <a href="#losses">2. Where we lose or tie (the honest list)</a>
+    <a href="#moat">3. The two moat axes (no competitor has these)</a>
+    <a href="#vector">4. Vector detail — recall/latency frontier</a>
+    <a href="#graph">5. Graph detail — hop-by-hop</a>
+    <a href="#memory">6. Memory &amp; quantization detail</a>
+    <a href="#durability">7. Durability — 12-hour soak</a>
+    <a href="#unmeasured">8. What we haven't measured yet</a>
+    <a href="#methodology">9. Methodology &amp; conditions glossary</a>
+  </div>
+
+  <h2 id="wins">1. Where we win — same-tier, ≥20% target met (measured)</h2>
+  <p style="color:var(--muted);max-width:820px">All rows below are <strong>measured</strong>, not projected. Read the
+  "Conditions / caveats" column before quoting a number — several wins are real but
+  narrower than a bare ratio suggests (see the honesty notes inline and §2).</p>
+
+  <table>
+    <caption>Axis, competitor, our number, their number, margin, and the exact conditions under which it was measured.</caption>
+    <thead>
+      <tr><th>Axis</th><th>Competitor</th><th class="num">Us</th><th class="num">Them</th><th class="num">Margin</th><th>Conditions / caveats</th><th>Source</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>hop1 traversal</td><td>Kuzu 0.11.3 <span class="dagger">†archived</span></td>
+        <td class="num">22.6 µs</td><td class="num">~3,653 µs</td><td class="num win">~189× faster</td>
+        <td class="cond">100k nodes / 800k edges, fanout-8, embedded↔embedded, C: SSD. Kuzu archived 2025-10-10 (Apple acqui-hired the team) — <a href="#kuzu-note">see note</a>.</td>
+        <td class="src"><a href="https://github.com/Freshair129/GenesisBlock/blob/main/docs/AUDIT--P26-KUZU-HEAD-TO-HEAD.md">P26</a>, <a href="https://github.com/Freshair129/GenesisBlock/blob/main/docs/AUDIT--P31-POST-MARKXIII-REGRESSION.md">P31</a></td>
+      </tr>
+      <tr>
+        <td>hop1 traversal</td><td>LadybugDB 0.15.3 <span class="dagger">†stale</span></td>
+        <td class="num">22.6 µs</td><td class="num">~3,637 µs</td><td class="num win">~177× faster</td>
+        <td class="cond">Same corpus as Kuzu row. No payload caveat in our favor — we return full node+path, they return bare ids, and we <em>still</em> win. But LadybugDB is now v0.18.0 (3 releases newer, added WAL group-commits + ART indexes) — <strong>not re-measured</strong>, tracked as Wave 0.2 (P35).</td>
+        <td class="src"><a href="https://github.com/Freshair129/GenesisBlock/blob/main/docs/AUDIT--P30-LADYBUGDB-HEAD-TO-HEAD.md">P30</a>, P31</td>
+      </tr>
+      <tr>
+        <td>hop1 traversal</td><td>DuckDB 1.5.4 + recursive CTE</td>
+        <td class="num">21.6 µs</td><td class="num">1,169.8 µs</td><td class="num win">~54× faster</td>
+        <td class="cond"><strong>hop1-only.</strong> The gap collapses with depth: hop3 is only ~1.4× and <strong>hop6 is 4,902 µs vs 5,336 µs — effectively tied (within noise)</strong>. Do not quote "54×" without the hop6 caveat — see §2.</td>
+        <td class="src"><a href="https://github.com/Freshair129/GenesisBlock/blob/main/docs/AUDIT--P28-DUCKDB-GRAPH-HEAD-TO-HEAD.md">P28</a>, P31</td>
+      </tr>
+      <tr>
+        <td>vector query p50</td><td>Qdrant 1.x (server, gRPC)</td>
+        <td class="num">974 µs @ 0.979 recall</td><td class="num">3,301 µs @ 0.999 recall</td><td class="num win">~3.4× faster</td>
+        <td class="cond">100k × 1024-dim, L2, embedded (us) vs client-server localhost gRPC (Qdrant) — most of this gap is the network round-trip + protocol tax, not an index deficit. Qdrant also holds <strong>higher recall</strong> (0.999 vs 0.979).</td>
+        <td class="src"><a href="https://github.com/Freshair129/GenesisBlock/blob/main/docs/AUDIT--P20-QDRANT-3WAY-AND-EF-CONFIG.md">P20</a></td>
+      </tr>
+      <tr>
+        <td>vector query p50</td><td>LanceDB 0.33.0 (IVF_HNSW_FLAT)</td>
+        <td class="num">935.6 µs @ 0.948 recall</td><td class="num">8,392 µs @ 0.998 recall</td><td class="num win">~9× faster</td>
+        <td class="cond"><strong>Measured at lower recall than LanceDB</strong> (0.948 vs 0.998) — this condition is mandatory whenever this number is quoted. LanceDB's on-disk columnar store targets larger-than-memory scale &amp; cheap storage, not lowest p50 — different design target.</td>
+        <td class="src"><a href="https://github.com/Freshair129/GenesisBlock/blob/main/docs/AUDIT--P27-LANCEDB-HEAD-TO-HEAD.md">P27</a></td>
+      </tr>
+      <tr>
+        <td>index crash-safety</td><td>DuckDB <code>vss</code> extension</td>
+        <td class="num" colspan="1">HNSW WAL-covered, durable</td><td class="num">persistence experimental, no WAL recovery, RAM-only, f32-only</td><td class="num win">qualitative win</td>
+        <td class="cond">DuckDB's own docs flag <code>vss</code> persistence as experimental with documented data-loss risk.</td>
+        <td class="src">duckdb.org/docs (fetched 2026-07-03)</td>
+      </tr>
+      <tr>
+        <td>quantization lineup</td><td>DuckDB <code>vss</code> / Chroma</td>
+        <td class="num">SQ8 4.00× / BQ 32.0× arena-disk, per-collection</td><td class="num">none (either)</td><td class="num win">capability win</td>
+        <td class="cond">Structural + tests-green ratios for the on-disk arena bin; the whole-process empirical sweep is what this page's "Level 0" caveat covers most directly — see §6.</td>
+        <td class="src"><a href="https://github.com/Freshair129/GenesisBlock/blob/main/docs/AUDIT--P33-RSS-QUANT-MATRIX.md">P33</a>, <a href="https://github.com/Freshair129/GenesisBlock/blob/main/docs/AUDIT--ONDISK-RERANK-RSS.md">ONDISK-RERANK-RSS</a></td>
+      </tr>
+      <tr>
+        <td>bitemporal model</td><td>all six same-tier engines</td>
+        <td class="num" colspan="1">supersede/retract, tested</td><td class="num">none found in any</td><td class="num win">sole capability</td>
+        <td class="cond">Verified absent in Kuzu, LadybugDB, DuckDB, RocksDB, Chroma, Qdrant, LanceDB, Neo4j, and SurrealDB 3.0 (external vendor-doc sweep, 2026-07-03).</td>
+        <td class="src">ADR §1.1, §2.1</td>
+      </tr>
+      <tr>
+        <td>verifiability / governance</td><td>all six same-tier engines</td>
+        <td class="num" colspan="1">ed25519 SignedEvent + tiered governance, tested</td><td class="num">none found in any</td><td class="num win">sole capability</td>
+        <td class="cond">Same external sweep — no vendor (incl. SurrealDB's quorum-consensus SurrealDS 3.0) ships signed/verifiable audit trails natively.</td>
+        <td class="src">ADR §1.1, §2.1</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h2 id="losses">2. Where we lose or tie — the honest list</h2>
+  <div class="card losses">
+    <p style="margin:0 0 1em">This table is <strong>not</strong> an afterthought. Per the governing ADR: "the page's
+    credibility IS the honesty" — these rows get the same visual weight as §1's wins.</p>
+    <table style="margin:0">
+      <thead>
+        <tr><th>Axis</th><th>Competitor</th><th class="num">Us vs them</th><th class="num">Gap</th><th>Root cause / condition</th><th>Source</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>bulk edge ingest</td><td>Kuzu / LadybugDB (COPY)</td>
+          <td class="num">7.8 s vs 0.4–0.6 s</td><td class="num loss">13–19× slower</td>
+          <td class="cond">Was 60× pre-MARK-XIII (our 3.1× self-improvement; competitor not re-run). They build columnar/CSR <em>outside</em> the live write path; we serialize per-op Events through WAL even batched.</td>
+          <td class="src">P26, P31</td>
+        </tr>
+        <tr>
+          <td>bulk edge ingest</td><td>DuckDB / RocksDB</td>
+          <td class="num">7.8 s vs 0.7–1.9 s</td><td class="num loss">4–11× slower</td>
+          <td class="cond">Same mechanism as above.</td>
+          <td class="src">P28, P29</td>
+        </tr>
+        <tr>
+          <td>RSS @ 100k/800k</td><td>Kuzu / LadybugDB</td>
+          <td class="num">686 MB vs ~97 MB</td><td class="num loss">7.1× more RAM</td>
+          <td class="cond">Was 11× pre-MARK-XIII. No node-id interning yet (edge side is done); <code>hnsw_rs</code> keeps an independent second in-RAM copy of every vector.</td>
+          <td class="src">P31</td>
+        </tr>
+        <tr>
+          <td>RSS @ 100k/800k</td><td>RocksDB + adjacency</td>
+          <td class="num">686 MB vs 33 MB</td><td class="num loss">20.8× more RAM</td>
+          <td class="cond">Same interning lever + our payload-richer node model.</td>
+          <td class="src">P29, P31</td>
+        </tr>
+        <tr>
+          <td>durable vector ingest</td><td>Chroma / LanceDB</td>
+          <td class="num">1,751–1,982 vs 2,750–3,270 vec/s</td><td class="num loss">1.6–1.7× slower</td>
+          <td class="cond">Durability asymmetry — we fsync a WAL, Chroma is in-memory ephemeral. Fair caveat, but still a lost benchmark row.</td>
+          <td class="src">P20, P27</td>
+        </tr>
+        <tr>
+          <td>hop6 deep traversal</td><td>DuckDB (recursive CTE)</td>
+          <td class="num">4,902 µs vs 4,669–5,336 µs</td><td class="num tie">tied (−5%…+8%)</td>
+          <td class="cond">Per-result <code>NeighborOutput{node,path}</code> cloning dominates our deep-hop time, not graph-walk cost — a known optimization target (Wave 2.3, lean traversal mode), not a capability gap.</td>
+          <td class="src">P28, P29 §4</td>
+        </tr>
+        <tr>
+          <td>hop1</td><td>RocksDB + adjacency BFS</td>
+          <td class="num">22.6 µs vs 17.4 µs</td><td class="num tie">tied-class (variance flip)</td>
+          <td class="cond">Both sit in a 17–27 µs band across repeated runs — normal benchmark noise at single-digit-µs scale, not a structural edge either way.</td>
+          <td class="src">P31 §4</td>
+        </tr>
+        <tr>
+          <td>recall ceiling</td><td>Qdrant (server)</td>
+          <td class="num">0.990 (ef=512) vs 0.999</td><td class="num loss">−0.009 absolute</td>
+          <td class="cond">ef-bounded on the identical synthetic corpus. On real bge-m3 embeddings, SQ8+rerank reaches 0.9875 = f32 parity, but that's a different (n=3,000) corpus — not directly comparable to this row.</td>
+          <td class="src">P20, P21, P33</td>
+        </tr>
+        <tr>
+          <td>larger-than-memory vectors</td><td>LanceDB (IVF_PQ on disk)</td>
+          <td class="num" colspan="1">no capability</td><td class="num loss">structural −100%</td>
+          <td class="cond"><code>hnsw_rs</code> is RAM-only; there is no on-disk vector index in the engine today (only "NEVER mmap" comments in the source). Planned: Wave 3.1, Vamana/DiskANN-style on-disk index.</td>
+          <td class="src">ADR §2.2, §7 Wave 3</td>
+        </tr>
+        <tr>
+          <td>recall @ 500k (self, not vs competitor)</td><td>— (scale regression vs our own 100k)</td>
+          <td class="num">0.887 @ default ef=200</td><td class="num tie">vs 0.982 @ 100k</td>
+          <td class="cond">A single global <code>ef_search</code> default tuned for 100k degrades at 500k. Architecturally fixed by per-query/per-collection <code>ef_search</code> (shipped), but any headline recall claim must carry its scale condition.</td>
+          <td class="src"><a href="https://github.com/Freshair129/GenesisBlock/blob/main/docs/AUDIT--P32-RECALL-500K-FRONTIER.md">P32</a></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h2 id="moat">3. The two moat axes</h2>
+  <div class="grid2">
+    <div class="card moat">
+      <h3>Bitemporal data model</h3>
+      <p>Every node/edge carries <code>valid_from</code>/<code>valid_to</code>; evolution is
+      supersession (<code>supersede_node</code>), not destructive overwrite.
+      <code>retract_edge</code> is a bitemporal soft-delete. Verified absent in all six
+      same-tier engines measured here <em>and</em> in the enterprise field (Qdrant,
+      Weaviate, Milvus, Neo4j, SurrealDB, pgvector, Elastic — all checked 2026-07-03).</p>
+    </div>
+    <div class="card moat">
+      <h3>Signed, verifiable audit trail</h3>
+      <p>Events are ed25519-signed; governance tiers enforce MASTER-tier lockout in the
+      engine, not the transport layer; consensus votes are signature-checked with a
+      Merkle root. No enterprise or same-tier vendor ships this natively — including
+      SurrealDB 3.0's SurrealDS, which is quorum-consensus, not CRDT, and has no signed
+      audit trail.</p>
+    </div>
+  </div>
+  <p style="color:var(--muted);font-size:.9rem;max-width:820px">These are the only two axes
+  simultaneously ahead of the entire same-tier <strong>and</strong> enterprise field, and the
+  only claims in this document with zero recall-condition or scale-condition asterisk. See
+  ADR §1.1 and §4 for the external verification pass.</p>
+
+  <h2 id="vector">4. Vector detail — recall/latency frontier</h2>
+  <p style="color:var(--muted);max-width:820px">100k vectors, dim 1024, <code>ef_construction=200</code>,
+  L2, exact ground truth. Sweeping <code>ef_search</code> shows GenesisBlockDB's own
+  recall↔latency curve passes through both reference competitor points — this is the fair way
+  to compare an approximate index, versus quoting a single (latency, recall) pair.</p>
+  <table>
+    <caption>Source: <a href="https://github.com/Freshair129/GenesisBlock/blob/main/docs/AUDIT--P21-RECALL-LATENCY-FRONTIER.md">AUDIT--P21-RECALL-LATENCY-FRONTIER</a> (audited 2026-06-21)</caption>
+    <thead><tr><th>ef_search</th><th class="num">p50 (µs)</th><th class="num">p95 (µs)</th><th class="num">recall@10</th><th>Reference</th></tr></thead>
+    <tbody>
+      <tr><td>16</td><td class="num">559.8</td><td class="num">879.5</td><td class="num">0.859</td><td></td></tr>
+      <tr><td>32</td><td class="num">653.6</td><td class="num">1,050.7</td><td class="num">0.913</td><td></td></tr>
+      <tr><td>64</td><td class="num">812.2</td><td class="num">1,394.6</td><td class="num">0.964</td><td></td></tr>
+      <tr><td>128</td><td class="num">1,097.4</td><td class="num">2,145.5</td><td class="num">0.984</td><td>&gt; Chroma's recall at lower latency</td></tr>
+      <tr><td>256</td><td class="num">1,255.0</td><td class="num">1,874.6</td><td class="num">0.988</td><td></td></tr>
+      <tr><td>512</td><td class="num">2,119.4</td><td class="num">3,069.8</td><td class="num">0.990</td><td>faster than Qdrant, marginally less recall</td></tr>
+      <tr><td style="color:var(--muted)">— Chroma (hnswlib, in-mem)</td><td class="num">990</td><td class="num">—</td><td class="num">0.981</td><td>reference point, not on our curve</td></tr>
+      <tr><td style="color:var(--muted)">— Qdrant (server, gRPC)</td><td class="num">3,301</td><td class="num">—</td><td class="num">0.999</td><td>reference point, embedded-vs-server tax included</td></tr>
+    </tbody>
+  </table>
+
+  <h3>Quantization recall — real bge-m3 embeddings (n=3,000, not synthetic)</h3>
+  <table>
+    <caption>Source: <a href="https://github.com/Freshair129/GenesisBlock/blob/main/docs/AUDIT--P33-RSS-QUANT-MATRIX.md">AUDIT--P33-RSS-QUANT-MATRIX</a> §3.4 (audited 2026-06-23, centering addendum 2026-07-02). Different corpus from the frontier table above — do not cross-compare recall numbers between the two.</caption>
+    <thead><tr><th>Quant</th><th>Rerank</th><th class="num">Recall@10</th><th class="num">vs f32</th><th class="num">p50 (µs)</th></tr></thead>
+    <tbody>
+      <tr><td>none (f32)</td><td>—</td><td class="num">0.9875</td><td class="num">—</td><td class="num">1,671</td></tr>
+      <tr><td>SQ8</td><td>no</td><td class="num">0.9485</td><td class="num loss">−0.039</td><td class="num">1,686</td></tr>
+      <tr><td>SQ8</td><td>yes</td><td class="num win">0.9875</td><td class="num win">±0 (f32 parity)</td><td class="num">1,694</td></tr>
+      <tr><td>BQ</td><td>no</td><td class="num loss">0.6845</td><td class="num loss">−0.303 (unusable alone)</td><td class="num">227</td></tr>
+      <tr><td>BQ</td><td>yes</td><td class="num">0.9655</td><td class="num">−0.022</td><td class="num">317</td></tr>
+    </tbody>
+  </table>
+  <p style="color:var(--muted);font-size:.9rem;max-width:820px"><strong>Guidance from the audit:</strong>
+  SQ8+rerank for max quality (f32-parity recall at 2× RAM / 4× arena-disk savings);
+  BQ+rerank for max RAM/speed when ~0.97 recall is acceptable; <strong>never BQ alone</strong>
+  (catastrophic recall collapse, confirmed not fixed by per-dim centering on bge-m3's
+  mixed-sign distribution — P33 §3.4 addendum).</p>
+
+  <h2 id="graph">5. Graph detail — hop-by-hop, all measured competitors</h2>
+  <table>
+    <caption>100k nodes / 800k edges, fanout-8, 200 queries/depth, LIMIT 1000. GenesisBlockDB row is the P31 post-MARK-XIII re-run (2026-06-22); competitor rows are 2026-06-21 and were not re-run against this baseline.</caption>
+    <thead>
+      <tr><th>Engine</th><th class="num">hop1 p50</th><th class="num">hop3 p50</th><th class="num">hop6 p50</th><th class="num">RSS</th><th class="num">Edge ingest</th><th>vs us (hop1)</th></tr>
+    </thead>
+    <tbody>
+      <tr style="background:#182036"><td><strong>GenesisBlockDB</strong> (P31)</td><td class="num"><strong>22.6 µs</strong></td><td class="num"><strong>2,529 µs</strong></td><td class="num"><strong>4,902 µs</strong></td><td class="num"><strong>686 MB</strong></td><td class="num">7.8 s</td><td>—</td></tr>
+      <tr><td>RocksDB + adjacency BFS</td><td class="num">17.4 µs</td><td class="num">536 µs <span class="dagger">†</span></td><td class="num">720 µs <span class="dagger">†</span></td><td class="num">33 MB</td><td class="num">1.1 s</td><td class="tie">0.77× (RocksDB faster)</td></tr>
+      <tr><td>DuckDB + recursive CTE</td><td class="num">1,170 µs</td><td class="num">3,565 µs</td><td class="num">5,336 µs</td><td class="num">99 MB</td><td class="num">1.9 s</td><td class="win">52× slower (tied by hop6)</td></tr>
+      <tr><td>Kuzu 0.11.3 <span class="dagger">†archived</span></td><td class="num">4,275 µs</td><td class="num">17,301 µs</td><td class="num">114,456 µs</td><td class="num">97 MB</td><td class="num">0.6 s</td><td class="win">189× slower</td></tr>
+      <tr><td>LadybugDB 0.15.3 <span class="dagger">†stale</span></td><td class="num">4,002 µs</td><td class="num">20,032 µs</td><td class="num">115,829 µs</td><td class="num">96 MB</td><td class="num">0.5 s</td><td class="win">177× slower</td></tr>
+      <tr><td>Neo4j (server, bolt)</td><td class="num">2,590 µs (100k)</td><td class="num">19,737 µs</td><td class="num">31,636 µs</td><td class="num">~1,077 MB (100k)</td><td class="num">23.3 s (100k)</td><td class="win">120× slower (100k)</td></tr>
+    </tbody>
+  </table>
+  <p class="cond" style="max-width:820px">† RocksDB's hop3/hop6 numbers return bare node ids, not full <code>NeighborOutput&#123;node,path&#125;</code> objects — <strong>not apples-to-apples</strong>, per P29/P31. The clean comparison point is hop1, where the two architectures land in the same latency class (17–27 µs band across runs — variance, not a structural edge). Neo4j numbers are from <a href="https://github.com/Freshair129/GenesisBlock/blob/main/docs/AUDIT--P23-NEO4J-HEAD-TO-HEAD.md">P23</a> (server, embedded-vs-server tax dominates hop1; ingest/memory are ~par at 100k).</p>
+
+  <h2 id="memory">6. Memory &amp; quantization detail (RSS × quant × scale)</h2>
+  <p style="color:var(--muted);max-width:820px">Whole-process RSS, not just the vector arena — this
+  is why the "4×/32×" per-vector quantization ratio does <strong>not</strong> translate 1:1 into
+  process-level RAM savings. A ~1.8 GB non-vector floor (HNSW graph links, node/edge metadata,
+  interning maps) is untouched by vector quantization and dominates once vectors shrink.</p>
+  <table>
+    <caption>Source: <a href="https://github.com/Freshair129/GenesisBlock/blob/main/docs/AUDIT--P33-RSS-QUANT-MATRIX.md">AUDIT--P33-RSS-QUANT-MATRIX</a>, dim 1024, synthetic corpus, 32 GB RAM box (audited 2026-06-23)</caption>
+    <thead><tr><th>Quant</th><th>Rerank</th><th class="num">100k</th><th class="num">250k</th><th class="num">500k</th><th class="num">1M</th><th class="num">×f32 @1M</th></tr></thead>
+    <tbody>
+      <tr><td>none (f32)</td><td>—</td><td class="num">1,158 MB</td><td class="num">2,887 MB</td><td class="num">5,745 MB</td><td class="num">11,408 MB</td><td class="num">1.00×</td></tr>
+      <tr><td>SQ8</td><td>no</td><td class="num">589 MB</td><td class="num">1,448 MB</td><td class="num">2,823 MB</td><td class="num">5,534 MB</td><td class="num win">2.06× smaller</td></tr>
+      <tr><td>SQ8</td><td>yes</td><td class="num">984 MB</td><td class="num">2,429 MB</td><td class="num">4,753 MB</td><td class="num">9,440 MB</td><td class="num">1.21× smaller</td></tr>
+      <tr><td>BQ</td><td>no</td><td class="num">466 MB</td><td class="num">1,084 MB</td><td class="num">1,981 MB</td><td class="num">3,898 MB</td><td class="num win">2.93× smaller</td></tr>
+      <tr><td>BQ</td><td>yes</td><td class="num">838 MB</td><td class="num">2,041 MB</td><td class="num">3,976 MB</td><td class="num">7,773 MB</td><td class="num">1.47× smaller</td></tr>
+    </tbody>
+  </table>
+  <p style="color:var(--muted);font-size:.9rem;max-width:820px">On-disk, the per-vector ratio
+  <strong>is</strong> exact for the arena file alone: <code>vec_&lt;name&gt;.bin</code> shrinks
+  409.6→102.4 MB (4.0×, SQ8) → 12.8 MB (32×, BQ) at 100k — matching the ADR's quantization design
+  exactly. Rerank costs RAM and disk (a full f32 sidecar sits on top, positioned-read off-RAM per
+  <a href="https://github.com/Freshair129/GenesisBlock/blob/main/docs/AUDIT--ONDISK-RERANK-RSS.md">ONDISK-RERANK-RSS</a>)
+  — it is recall insurance paid in resources, not free.</p>
+  <p class="cond" style="max-width:820px"><strong>Known ops gap surfaced by this audit (not a
+  competitor comparison):</strong> the WAL is quant-independent and was not compacted in this
+  measurement path — ~20.4 GB at 1M, 5× the f32 snapshot. Flagged as a production durability
+  concern in P33 §6; WAL compaction has since shipped (see project memory / PR history) but the
+  1M RSS numbers above predate that fix and are RSS-only, not disk-ceiling claims.</p>
+
+  <h2 id="durability">7. Durability — 12-hour soak</h2>
+  <table>
+    <caption>Source: <a href="https://github.com/Freshair129/GenesisBlock/blob/main/docs/AUDIT--SOAK-TEST-12H.md">AUDIT--SOAK-TEST-12H</a>, <code>tests/soak_tests.rs::soak_heavy</code>, audited 2026-06-29. Not a competitor comparison — our own durability gate.</caption>
+    <thead><tr><th>Metric</th><th class="num">Value</th></tr></thead>
+    <tbody>
+      <tr><td>Duration</td><td class="num">12.1 h (43,437 s)</td></tr>
+      <tr><td>Total nodes ingested</td><td class="num">4,720,000</td></tr>
+      <tr><td>Final disk (bounded by WAL compaction)</td><td class="num">4,241 MB</td></tr>
+      <tr><td>Recall miss rate</td><td class="num">6.6% (619 / 9,440 cycles, &lt; 10% threshold)</td></tr>
+      <tr><td>Latency drift start→end</td><td class="num">none (ingest flat 360–420 ms/cycle throughout)</td></tr>
+      <tr><td>Reopen after drop (4.72M nodes)</td><td class="num">61.5 s, spot-check OK</td></tr>
+    </tbody>
+  </table>
+
+  <h2 id="unmeasured">8. What we haven't measured yet</h2>
+  <div class="card">
+    <ul style="margin:0;padding-left:1.2em">
+      <li><strong>HelixDB v3.0.7</strong> (YC, Apache-2.0, Rust) — the closest live same-tier
+      rival. No direct head-to-head exists; their vendor bench (12–16× Neo4j) uses different
+      hardware/topology and cannot be compared to anything on this page.</li>
+      <li><strong>LadybugDB 0.18.0</strong> — this page's LadybugDB numbers are v0.15.3
+      (3 releases stale as of 2026-07-03); v0.18 added WAL group-commits + ART indexes.</li>
+      <li><strong>Post-P0 empirical RSS sweep @500k/1M</strong> for the on-disk rerank sidecar —
+      the 4.00×/32.0× ratios in §6 are a structural proof + green correctness tests, not yet an
+      empirical whole-process measurement at that scale (command ready, not yet run).</li>
+      <li>Competitor ingest/RAM ratios re-run against our current baseline; any competitor at
+      1M scale; p99 latency anywhere; concurrent mixed read/write QPS; crash-recovery time;
+      REST-layer (Axum) throughput — all P7–P33 harnesses hit the storage core directly, never
+      the HTTP surface.</li>
+    </ul>
+  </div>
+
+  <h2 id="methodology">9. Methodology &amp; conditions glossary</h2>
+  <div class="card">
+    <ul style="margin:0;padding-left:1.2em;color:var(--muted);font-size:.92rem">
+      <li><strong>Embedded vs server:</strong> GenesisBlockDB, Kuzu, LadybugDB, DuckDB, RocksDB,
+      Chroma, and LanceDB all run in-process. Qdrant and Neo4j are client-server — their numbers
+      include a network/protocol round-trip that an embedded engine does not pay. This is
+      called out per-row above; it is a real deployment-shape difference, not a benchmarking
+      trick in either direction.</li>
+      <li><strong>Durability asymmetry:</strong> GenesisBlockDB's ingest numbers are durable
+      (WAL fsync per batch). Chroma is in-memory/ephemeral. DuckDB/Kuzu/RocksDB/LadybugDB bulk
+      loads in these audits are non-durable bulk paths (comparable on time-to-queryable, not on
+      durability guarantees).</li>
+      <li><strong>Payload asymmetry:</strong> our <code>neighbors()</code> returns full
+      <code>NeighborOutput&#123;node,path&#125;</code> objects; several competitors return bare
+      node ids. Flagged with † wherever it materially affects the number (P29 RocksDB deep-hop
+      rows). Where we still win despite doing more work per result (e.g. vs LadybugDB), that is
+      noted explicitly as a stronger result, not hidden.</li>
+      <li><strong>Recall is a knob, not a fixed ceiling:</strong> HNSW's <code>ef_search</code>
+      trades recall for latency. Never compare a bare latency number across engines without
+      also stating the recall at which it was measured — every vector row on this page carries
+      its recall condition for that reason.</li>
+      <li><strong>Scale conditions:</strong> "22 µs across 10k→1M" describes our own traversal
+      curve; ratios against named competitors were measured only at 100k/800k unless a row
+      explicitly says otherwise (e.g. Neo4j's 10k row).</li>
+      <li><strong>Dates matter:</strong> competitor-side benchmarks are 2026-06-21. Our own
+      numbers were re-verified 2026-06-22 (P31, post-MARK-XIII) and 2026-06-23 (P32/P33).
+      LadybugDB and Kuzu's ecosystem status (archived / superseded) was verified 2026-07-03.</li>
+    </ul>
+  </div>
+  <p id="kuzu-note" style="color:var(--muted);font-size:.85rem;max-width:820px">
+  <strong>Kuzu note:</strong> Apple acqui-hired the Kuzu Inc. team (~2025-10-09; disclosed via
+  EU merger filing 2026-02-11); <code>kuzudb/kuzu</code> was archived read-only 2025-10-10.
+  <strong>LadybugDB</strong> is the community-maintained MIT fork that continues from Kuzu's
+  last release and is now the comparator an agent-memory builder would actually pick.</p>
+
+  <hr class="sep" />
+
+  <footer>
+    <p>GenesisBlockDB — local-first hybrid semantic-graph database engine. Embedded ·
+    bitemporal · signed · CRDT-syncable.</p>
+    <p>This page is generated from, and should be regenerated whenever, the underlying
+    <code>docs/AUDIT--*.md</code> files change. See
+    <a href="https://github.com/Freshair129/GenesisBlock/blob/main/docs/ADR--GENESISDB-COMPETITIVE-SUPERIORITY.md">ADR--GENESISDB-COMPETITIVE-SUPERIORITY</a>
+    for the full competitive audit this page summarizes, including the enterprise-parity
+    checklist (currently below-bar on 10/16 ops-floor capabilities — TLS, RBAC, metrics,
+    backup, HA, multi-tenancy, compliance — all fixable without touching the storage engine).</p>
+    <p><a href="https://github.com/Freshair129/GenesisBlock">Source</a> ·
+    <a href="https://github.com/Freshair129/GenesisBlock/blob/main/docs/POSITIONING.md">Positioning</a> ·
+    <a href="https://github.com/Freshair129/GenesisBlock/blob/main/docs/perf-comparison-dashboard.html">Interactive dashboard (docs/, pre-P32/P33, some panels stale — see note below)</a></p>
+    <p style="font-size:.78rem">Note on the interactive dashboard: <code>docs/perf-comparison-dashboard.html</code>
+    predates the P32 (recall@500k) and P33 (RSS×quant×scale) audits and does not carry the
+    hop6-tied / LanceDB-recall-condition framing as prominently as this page does. This page,
+    not the dashboard, is the current source of truth for competitive claims; treat the
+    dashboard as a historical/interactive supplement.</p>
+  </footer>
+
+</div>
+</body>
+</html>

@@ -1,16 +1,16 @@
-# Publish the static benchmark/landing page (docs/) to GitHub Pages.
+# Publish the static benchmark/landing page (site/) to GitHub Pages.
 #
-# One-time setup: repo Settings → Pages → Source = "GitHub Actions". Until that
-# is enabled this workflow is a no-op safety net; it does not change anything.
-name: Deploy docs to Pages
+# workflow_dispatch ONLY — this is publish-PREP, not auto-publish. There is no
+# push trigger: merging to main does NOT deploy anything. A maintainer decides
+# when to publish by running this workflow manually from the Actions tab.
+#
+# One-time setup (still required even after a manual run succeeds once): repo
+# Settings → Pages → Source = "GitHub Actions". Until that is enabled, a
+# manual run will fail at the deploy-pages step with a clear error; nothing is
+# exposed publicly before then.
+name: Deploy site to Pages
 
 on:
-  push:
-    branches: [main]
-    paths:
-      - 'docs/**'
-      - 'QUICKSTART.md'
-      - '.github/workflows/pages.yml'
   workflow_dispatch:
 
 permissions:
@@ -31,16 +31,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      # Stage docs/ as the site root, and include QUICKSTART.md so docs/index.html
-      # can link to ../QUICKSTART.md.
-      - name: Assemble site
-        run: |
-          mkdir -p _site
-          cp -r docs/* _site/
-          cp QUICKSTART.md _site/QUICKSTART.md || true
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:
-          path: _site
+          path: site
       - id: deployment
         uses: actions/deploy-pages@v4
