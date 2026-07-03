@@ -36,7 +36,7 @@ const server = new Server(
 const TOOLS = [
   {
     name: "query_hql",
-    description: "Executes a raw HQL (Hybrid Query Language) command on the knowledge graph.",
+    description: "Executes a raw HQL (Hybrid Query Language) command on the knowledge graph. Supports five command forms: SEARCH, TRAVERSE, MATCH <pattern> (Cypher-style linear paths), MATCH…SIMILAR/HYBRID, and CONTEXT; SEARCH/HYBRID's SIMILAR TO [vector] is optional (omit it to search by node), and both accept K/EF/OVERSAMPLE, while TRAVERSE accepts DIRECTION in|out|both and REL a|b.",
     inputSchema: {
       type: "object",
       properties: {

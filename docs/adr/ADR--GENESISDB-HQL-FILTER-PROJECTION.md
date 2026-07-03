@@ -1,7 +1,7 @@
 ---
 proposed_id: ADR--GENESISDB-HQL-FILTER-PROJECTION
 type: adr
-status: candidate
+status: shipped
 aliases:
   - ADR
 phase: 2
@@ -14,6 +14,8 @@ proposed_by: agent
 ---
 
 # ADR--GENESISDB-HQL-FILTER-PROJECTION
+
+Shipped/merged to main 2026-06-29 (PR #44 lineage); path-1 successor (Cypher-style pattern matching) shipped via PR #60.
 
 ## Context
 
@@ -126,7 +128,7 @@ SEARCH ~weather SIMILAR TO [..] K 50
   WHERE prop.side = "them" AND prop.time > 1782000000000
   ORDER BY prop.time DESC LIMIT 10
 
-TRAVERSE FROM user:5 DEPTH 2 REL SENT_BY
+TRAVERSE FROM user:5 DEPTH 2 REL SENT_BY   -- colon ids parse unquoted since P0 (DESIGN--HQL-P0-DECISIONS.md §2)
   WHERE label = "Message"
   RETURN id, prop.text
 
