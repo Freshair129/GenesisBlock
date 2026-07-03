@@ -2,12 +2,23 @@ WHITESPACE = _{ " " | "\t" | "\r" | "\n" }
 identifier = @{ (ASCII_ALPHANUMERIC | "_" | "-")+ }
 string_lit = @{ "\"" ~ (!"\"" ~ ANY)* ~ "\"" }
 fuzzy_prefix = { "~" }
-target = { fuzzy_prefix? ~ (identifier | string_lit) }
-seed = { fuzzy_prefix? ~ (identifier | string_lit) }
+// Colon-qualified id (`user:5`), scoped to seed/target ONLY — the project's own
+// idiom (agent registry, NotiKeeper) unquoted. Atomic + tried before `identifier`
+// (PEG longest-viable-first): `user:5` matches whole here; a bare `user` fails
+// the required `(":" ~ identifier)+` and falls through to `identifier`. Does NOT
+// touch pattern rules (`pat_label` etc.) — `(a:Label)` is unaffected.
+qualified_id = @{ identifier ~ (":" ~ identifier)+ }
+target = { fuzzy_prefix? ~ (qualified_id | identifier | string_lit) }
+seed = { fuzzy_prefix? ~ (qualified_id | identifier | string_lit) }
 
 rel_type = { identifier }
 infer_rel = { ^"INFER" ~ "(" ~ identifier ~ ")" }
-rel = { infer_rel | rel_type }
+// Multi-rel alternation `REL a|b|c` — at least one rel_type, `|`-separated.
+// Single rel keeps the same shape as before (one-element list).
+rel_list = { rel_type ~ ("|" ~ rel_type)* }
+rel = { infer_rel | rel_list }
+direction_kw = { ^"in" | ^"out" | ^"both" }
+direction_spec = { ^"DIRECTION" ~ direction_kw }
 
 number = @{ ("+" | "-")? ~ ASCII_DIGIT+ ~ ("." ~ ASCII_DIGIT+)? }
 vector = { number ~ ("," ~ number)* }
@@ -21,6 +32,12 @@ alpha = { number }
 lang_spec = { ^"LANGUAGE" ~ string_lit }
 as_of = { ^"AS" ~ ^"OF" ~ string_lit }
 collection_spec = { ^"IN" ~ (identifier | string_lit) }
+// Per-query HNSW knobs (P32 recall fix / VQ rerank oversample), atomic digit
+// rules per the DEPTH-bug precedent above.
+ef_n = @{ ASCII_DIGIT+ }
+ef_spec = { ^"EF" ~ ef_n }
+oversample_n = @{ ASCII_DIGIT+ }
+oversample_spec = { ^"OVERSAMPLE" ~ oversample_n }
 
 // --- filter / projection / ergonomics clauses (ADR--GENESISDB-HQL-FILTER-PROJECTION) ---
 // All four are optional and post-process the command's result list in order:
@@ -40,9 +57,13 @@ return_clause = { ^"RETURN" ~ (return_all | field ~ ("," ~ field)*) }
 // Whole group is nullable, so existing clause-free queries still parse unchanged.
 clauses = { where_clause? ~ order_clause? ~ limit_clause? ~ return_clause? }
 
-search = { ^"SEARCH" ~ target ~ ^"SIMILAR" ~ ^"TO" ~ "[" ~ vector ~ "]" ~ ^"K" ~ k ~ collection_spec? ~ lang_spec? ~ as_of? ~ clauses }
-traverse = { ^"TRAVERSE" ~ ^"FROM" ~ seed ~ ^"DEPTH" ~ depth ~ ^"REL" ~ rel ~ as_of? ~ clauses }
-hybrid = { ^"MATCH" ~ target ~ ^"SIMILAR" ~ ^"TO" ~ "[" ~ vector ~ "]" ~ ^"ALPHA" ~ alpha ~ collection_spec? ~ lang_spec? ~ as_of? ~ clauses }
+// SIMILAR TO [vector] is optional (search-by-node, DESIGN--HQL-P0-DECISIONS §1).
+// PEG safety: the group is followed by a mandatory keyword (`K`/`ALPHA`) disjoint
+// from `SIMILAR`, so pest's greedy `(...)?` never backtracks — every v1 query
+// (which always has SIMILAR TO) parses byte-identically.
+search = { ^"SEARCH" ~ target ~ (^"SIMILAR" ~ ^"TO" ~ "[" ~ vector ~ "]")? ~ ^"K" ~ k ~ collection_spec? ~ lang_spec? ~ as_of? ~ ef_spec? ~ oversample_spec? ~ clauses }
+traverse = { ^"TRAVERSE" ~ ^"FROM" ~ seed ~ ^"DEPTH" ~ depth ~ ^"REL" ~ rel ~ direction_spec? ~ as_of? ~ clauses }
+hybrid = { ^"MATCH" ~ target ~ (^"SIMILAR" ~ ^"TO" ~ "[" ~ vector ~ "]")? ~ ^"ALPHA" ~ alpha ~ (^"K" ~ k)? ~ collection_spec? ~ lang_spec? ~ as_of? ~ ef_spec? ~ oversample_spec? ~ clauses }
 
 // --- Cypher-style graph pattern matching (ADR--GENESISDB-HQL-CYPHER-PATTERNS, path 1) ---
 // A linear path pattern: an anchor node followed by zero+ (edge, node) hops.

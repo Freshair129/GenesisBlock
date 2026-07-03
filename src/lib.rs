@@ -3358,6 +3358,67 @@ impl Storage {
         }
     }
 
+    /// Search-by-node target resolution (DESIGN--HQL-P0-DECISIONS §1, P0-T1):
+    /// when a HQL SEARCH/hybrid query omits `SIMILAR TO [vector]`, resolve the
+    /// (fuzzy-)target to a live node and use ITS stored embedding as the query
+    /// vector, searched in the node's own collection. Returns
+    /// `(query_vector, collection_to_use)`. `requested_collection` is the
+    /// query's explicit `IN <collection>` (if any); it must equal the node's
+    /// collection or this errors (never silently searches the wrong space).
+    fn resolve_search_by_node(
+        &self,
+        target: &str,
+        fuzzy: bool,
+        requested_collection: &Option<String>,
+    ) -> Result<(Vec<f64>, Option<String>)> {
+        let id = if fuzzy {
+            self.find_fuzzy_id(target).ok_or_else(|| {
+                Error::from_reason(format!(
+                    "HQL: target '{}' does not resolve to a node and no vector was given",
+                    target
+                ))
+            })?
+        } else {
+            target.to_string()
+        };
+        let u32_id = self.get_u32(&id).ok_or_else(|| {
+            Error::from_reason(format!(
+                "HQL: target '{}' does not resolve to a node and no vector was given",
+                target
+            ))
+        })?;
+        let node = self
+            .nodes
+            .get(&u32_id)
+            .ok_or_else(|| {
+                Error::from_reason(format!(
+                    "HQL: target '{}' does not resolve to a node and no vector was given",
+                    target
+                ))
+            })?
+            .value()
+            .clone();
+        if let Some(requested) = requested_collection {
+            let node_coll = node
+                .collection
+                .clone()
+                .unwrap_or_else(|| self.default_collection.clone());
+            if requested != &node_coll {
+                return Err(Error::from_reason(format!(
+                    "HQL: node '{}' lives in collection '{}' but IN '{}' was given; omit IN or match the node's collection",
+                    id, node_coll, requested
+                )));
+            }
+        }
+        let qvec = self.reconstruct_embedding(&node, u32_id).ok_or_else(|| {
+            Error::from_reason(format!(
+                "HQL: node '{}' has no stored embedding and no vector was given",
+                id
+            ))
+        })?;
+        Ok((qvec, node.collection.clone()))
+    }
+
     pub fn execute_hql(&self, query: &str) -> Result<serde_json::Value> {
         fn to_value<T: serde::Serialize>(res: T) -> Result<serde_json::Value> {
             serde_json::to_value(res)
@@ -3373,22 +3434,23 @@ impl Storage {
                 lang,
                 as_of,
                 collection,
+                ef_search,
+                oversample,
                 clauses,
             } => {
-                let _resolved = if fuzzy {
-                    self.find_fuzzy_id(&target)
-                } else {
-                    Some(target)
+                let (query_vector, resolved_collection) = match vector {
+                    Some(v) => (v, collection),
+                    None => self.resolve_search_by_node(&target, fuzzy, &collection)?,
                 };
                 let res = self.hybrid_search(HybridSearchInput {
-                    query_vector: vector,
+                    query_vector,
                     k,
                     alpha: Some(0.0),
                     lang,
                     as_of,
-                    collection,
-                    ef_search: None,
-                    oversample: None,
+                    collection: resolved_collection,
+                    ef_search,
+                    oversample,
                 })?;
                 Self::apply_hql_clauses(res, &clauses)
             }
@@ -3396,6 +3458,7 @@ impl Storage {
                 seed,
                 depth,
                 rel,
+                direction,
                 fuzzy,
                 as_of,
                 clauses,
@@ -3405,17 +3468,17 @@ impl Storage {
                 } else {
                     seed
                 };
-                let (target_rel, is_inferred) = match rel {
-                    query::ast::HqlRel::Physical(r) => (r, false),
-                    query::ast::HqlRel::Inferred(r) => (r, true),
+                let (rels, is_inferred) = match rel {
+                    query::ast::HqlRel::Physical(r) => (Some(r), false),
+                    query::ast::HqlRel::Inferred(r) => (Some(vec![r]), true),
                 };
                 let res = self.neighbors(
                     resolved_seed,
                     NeighborInput {
                         depth: Some(depth),
-                        rel: Some(target_rel),
-                        rels: None,
-                        direction: Some("out".to_string()),
+                        rel: None,
+                        rels,
+                        direction: Some(direction.unwrap_or_else(|| "out".to_string())),
                         as_of,
                         include_invalid: Some(false),
                         limit: None,
@@ -3427,27 +3490,29 @@ impl Storage {
             HqlCommand::Hybrid {
                 vector,
                 alpha,
+                k,
                 fuzzy,
                 target,
                 lang,
                 as_of,
                 collection,
+                ef_search,
+                oversample,
                 clauses,
             } => {
-                let _resolved = if fuzzy {
-                    self.find_fuzzy_id(&target)
-                } else {
-                    Some(target)
+                let (query_vector, resolved_collection) = match vector {
+                    Some(v) => (v, collection),
+                    None => self.resolve_search_by_node(&target, fuzzy, &collection)?,
                 };
                 let res = self.hybrid_search(HybridSearchInput {
-                    query_vector: vector,
-                    k: 10,
+                    query_vector,
+                    k: k.unwrap_or(10),
                     alpha: Some(alpha),
                     lang,
                     as_of,
-                    collection,
-                    ef_search: None,
-                    oversample: None,
+                    collection: resolved_collection,
+                    ef_search,
+                    oversample,
                 })?;
                 Self::apply_hql_clauses(res, &clauses)
             }
