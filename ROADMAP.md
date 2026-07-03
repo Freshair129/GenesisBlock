@@ -274,9 +274,9 @@ in a single binary. Nearest comparators: Kuzu, DuckDB+graph, LanceDB, LadybugDB.
 - [ ] **Device validation:** installs + runs on physical iPhone (arm64) and physical Android (arm64); WAL persists across app restarts
 
 ### Phase B — SDK for Other Apps, Level B (~6 weeks)
-- [ ] **iOS xcframework + Swift wrapper:** static `.a` for `aarch64-apple-ios` + sim slice; `actor GenesisDB` async/await API; distributed via Swift Package Manager
-- [ ] **Android `.aar` + Kotlin wrapper:** JNI bridge (`src/jni.rs`); `class GenesisDB` with coroutines API; distributed via Maven/Gradle
-- [ ] **React Native package (`react-native-genesisdb`):** native module wrapping iOS xcframework + Android `.aar`; TypeScript types mirror `index.d.ts`; distributed via npm
+- [ ] **iOS xcframework + Swift wrapper:** static `.a` for `aarch64-apple-ios` + sim slice; `actor GenesisDB` async/await API; distributed via Swift Package Manager — not started
+- [x] **Android `.aar` + Kotlin wrapper (written, unpublished):** `android/genesisdb/` — JNI bridge (`src/jni.rs`) wrapped by coroutine `class GenesisDB` (`GenesisDB.kt`); wire-format data classes carry explicit `@SerialName`s because the JNI/FFI JSON contract is the engine's raw snake_case `serde_json`, not `index.d.ts`'s napi-only camelCase. CI: `android-jvm-tests` (pure-JVM wire tests) + `android-aar` (assembles a real `.aar` from cargo-ndk output) in `mobile-build.yml`. Not yet published to Maven
+- [x] **React Native package (Android side written, unpublished):** `react-native-genesisdb/` — `src/index.ts` is JSON pass-through (snake_case wire types, matching the `genesisdb-python`/`genesisdb-go` precedent — no camelCase conversion, which would corrupt caller keys inside the opaque `props` field); `android/GenesisDbModule.kt` bridges to the `.aar` above via an opaque `dbId` (never the raw native pointer, to dodge JS-number precision loss). `ios/` is a stub that compiles and rejects every call pending the Swift wrapper above. `rn-genesisdb-tests` CI job covers the TS layer under Jest
 - [ ] **Flutter plugin:** deferred — `flutter_rust_bridge` auto-generated Dart bindings; added when user demand confirmed
 ---
 

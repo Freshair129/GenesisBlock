@@ -1,0 +1,53 @@
+// react-native-genesisdb Android module (MARK XVI Phase B-3).
+//
+// Thin RN bridge over dev.genesisblock:genesisdb-android (Phase B-2) — this
+// module holds NO JNI declarations of its own. It cannot bind directly to the
+// `Java_dev_genesisblock_GenesisDB_native*` symbols (those are resolved by
+// the calling class's fully-qualified name, `dev.genesisblock.GenesisDB`),
+// so it depends on that real class and never touches the native handle
+// itself; see GenesisDbModule.kt.
+//
+// This module is validated by building it inside a real RN host app, not by
+// this monorepo's CI — there is no host app here to resolve
+// `com.facebook.react:react-android` against, mirroring the existing
+// host-only scope carved out for B-1 (iOS) in docs/SPEC--MOBILE-SDK.md.
+apply plugin: 'com.android.library'
+apply plugin: 'kotlin-android'
+apply plugin: 'kotlinx-serialization'
+
+android {
+    namespace "dev.genesisblock.reactnative"
+    compileSdkVersion 34
+
+    defaultConfig {
+        minSdkVersion 24
+        targetSdkVersion 34
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+
+    kotlinOptions {
+        jvmTarget = "17"
+    }
+}
+
+repositories {
+    google()
+    mavenCentral()
+}
+
+dependencies {
+    // Supplied by the RN host app's own dependency graph; compileOnly avoids
+    // pulling a second copy into the final APK.
+    compileOnly "com.facebook.react:react-android:+"
+
+    // The genesisdb-android .aar (Phase B-2). Once published this resolves
+    // from Maven Central/GitHub Packages; for local monorepo development,
+    // `./gradlew :genesisdb:publishToMavenLocal` from ../../android and add
+    // `mavenLocal()` to the consuming app's repositories.
+    implementation "dev.genesisblock:genesisdb-android:0.1.0"
+    implementation "org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.3"
+}

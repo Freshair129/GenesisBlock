@@ -19,6 +19,14 @@
 # The `android-jni` build also type-checks on the host (the `jni` crate is pure
 # Rust), so host-mobile-check exercises it without a device.
 #
+# B-2 (android/genesisdb, the Kotlin wrapper + .aar) has two more gates:
+#   android-jvm-tests — pure-JVM kotlinx.serialization tests for the wire
+#                       contract (android/README.md "Wire format gotcha").
+#                       Needs no native .so and no NDK.
+#   android-aar       — assembles the actual .aar on top of android-build's
+#                       .so slices, proving the Gradle module links against
+#                       real cargo-ndk output end to end.
+#
 # Targets (from SPEC §0-B):
 #   aarch64-apple-ios          — iOS device
 #   aarch64-apple-ios-sim      — iOS Simulator (Apple Silicon)
@@ -36,6 +44,9 @@ on:
       - 'include/**'
       - 'cbindgen.toml'
       - 'scripts/gen-header.sh'
+      - 'scripts/gen-android-jnilibs.sh'
+      - 'android/**'
+      - 'react-native-genesisdb/**'
       - 'Cargo.toml'
       - '.github/workflows/mobile-build.yml'
   pull_request:
@@ -45,6 +56,9 @@ on:
       - 'include/**'
       - 'cbindgen.toml'
       - 'scripts/gen-header.sh'
+      - 'scripts/gen-android-jnilibs.sh'
+      - 'android/**'
+      - 'react-native-genesisdb/**'
       - 'Cargo.toml'
       - '.github/workflows/mobile-build.yml'
 
@@ -136,6 +150,108 @@ jobs:
       # cdylib slice exists for arm64.
       - name: Verify Android shared lib (.so) was produced
         run: test -f target/aarch64-linux-android/debug/libgenesis_block_native.so
+
+      # Stage both ABI slices for the android-aar job (same layout
+      # scripts/gen-android-jnilibs.sh produces for local dev).
+      - name: Stage jniLibs for android-aar
+        run: |
+          mkdir -p jnilibs-out/arm64-v8a jnilibs-out/armeabi-v7a
+          cp target/aarch64-linux-android/debug/libgenesis_block_native.so jnilibs-out/arm64-v8a/
+          cp target/armv7-linux-androideabi/debug/libgenesis_block_native.so jnilibs-out/armeabi-v7a/
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: android-jnilibs
+          path: jnilibs-out/
+          retention-days: 7
+
+  # B-2: pure-JVM kotlinx.serialization tests for android/genesisdb's wire
+  # contract (Types.kt @SerialName vs the engine's un-renamed serde JSON).
+  # No native .so, no NDK — these run on any JDK.
+  android-jvm-tests:
+    name: Android SDK JVM tests (wire contract)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: android-actions/setup-android@v3
+
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: 8.7
+
+      - name: gradle :genesisdb:testDebugUnitTest
+        working-directory: android
+        run: gradle :genesisdb:testDebugUnitTest
+
+  # B-2: assemble the real .aar on top of android-build's cargo-ndk output —
+  # proves the Gradle module actually links a genuine .so, not just that it
+  # type-checks. See android/README.md "Building".
+  android-aar:
+    name: Assemble genesisdb .aar
+    needs: android-build
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: android-jnilibs
+          path: android/genesisdb/src/main/jniLibs
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: android-actions/setup-android@v3
+
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: 8.7
+
+      - name: gradle :genesisdb:assembleRelease
+        working-directory: android
+        run: gradle :genesisdb:assembleRelease
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: genesisdb-android-aar
+          path: android/genesisdb/build/outputs/aar/*.aar
+          retention-days: 14
+
+  # B-3: react-native-genesisdb's TS pass-through layer. Pure Node/Jest against
+  # a stubbed `react-native` module (src/__mocks__/react-native.ts) — no RN
+  # runtime, no Android/iOS build. The android/ and ios/ native module sources
+  # under react-native-genesisdb are validated by building them inside a real
+  # RN host app, which is out of scope for this monorepo's CI (same host-only
+  # carve-out as B-1/B-2's device paths).
+  rn-genesisdb-tests:
+    name: react-native-genesisdb TS tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: react-native-genesisdb
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - run: npm install --no-audit --no-fund
+
+      - run: npx tsc -p tsconfig.json --noEmit
+
+      - run: npx jest
 
   # P2 "cargo test --features mobile green": the core/napi split is designed to
   # link on Linux, so the mobile-feature build AND the integration test suite

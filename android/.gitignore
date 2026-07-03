@@ -1,0 +1,9 @@
+.gradle/
+build/
+*.iml
+.idea/
+local.properties
+
+# Native libs are produced by cargo-ndk in CI (or locally via
+# scripts/gen-android-jnilibs.sh) — never commit built .so binaries.
+genesisdb/src/main/jniLibs/
