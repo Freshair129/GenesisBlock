@@ -2988,6 +2988,341 @@ impl Storage {
         }
     }
 
+    // --- Cypher pattern matching (ADR--GENESISDB-HQL-CYPHER-PATTERNS, path 1) ---
+
+    /// Does a node satisfy a pattern node's `:Label` and `{k:v}` constraints?
+    fn node_matches(node: &NodeOutput, pat: &query::ast::NodePattern) -> bool {
+        if let Some(label) = &pat.label {
+            if !node.labels.iter().any(|l| l == label) {
+                return false;
+            }
+        }
+        for (k, v) in &pat.props {
+            // `{id:"..."}` addresses the node's top-level id (there is no `:id`
+            // syntax and anchoring a pattern by a known id is the common case);
+            // every other key is a lookup into `props`.
+            if k == "id" {
+                let ok = match v {
+                    query::ast::HqlValue::Str(s) => &node.id == s,
+                    query::ast::HqlValue::Num(n) => node.id == n.to_string(),
+                };
+                if !ok {
+                    return false;
+                }
+                continue;
+            }
+            match node.props.get(k) {
+                Some(av) => {
+                    if !Self::json_eq_hqlvalue(av, v) {
+                        return false;
+                    }
+                }
+                None => return false,
+            }
+        }
+        true
+    }
+
+    /// Exact-equality of a JSON value against an inline `{k:v}` constraint value.
+    fn json_eq_hqlvalue(actual: &serde_json::Value, expected: &query::ast::HqlValue) -> bool {
+        match expected {
+            query::ast::HqlValue::Num(n) => actual.as_f64().map(|a| a == *n).unwrap_or(false),
+            query::ast::HqlValue::Str(s) => actual.as_str().map(|a| a == s).unwrap_or(false),
+        }
+    }
+
+    /// Match a linear path pattern by deterministic left-to-right expansion over
+    /// the graph indices, then apply the pattern's WHERE/ORDER BY/LIMIT/RETURN
+    /// over the resulting variable-binding rows. No planner (ADR path 1).
+    fn match_pattern(
+        &self,
+        pattern: &query::ast::GraphPattern,
+        as_of: &Option<String>,
+        clauses: &query::ast::PatternClauses,
+    ) -> Result<serde_json::Value> {
+        use query::ast::PatternDirection;
+        let ser_err = |e: serde_json::Error| {
+            Error::from_reason(format!("HQL result serialization failed: {e}"))
+        };
+        type Row = serde_json::Map<String, serde_json::Value>;
+
+        // 1. Anchor: scan live nodes matching the start pattern's constraints.
+        let mut frontier: Vec<(u32, Row)> = Vec::new();
+        for entry in self.nodes.iter() {
+            let node = entry.value();
+            if !Self::is_valid_as_of(&node.valid_from, &node.valid_to, as_of) {
+                continue;
+            }
+            if !Self::node_matches(node, &pattern.start) {
+                continue;
+            }
+            let mut row = Row::new();
+            if let Some(v) = &pattern.start.var {
+                row.insert(v.clone(), serde_json::to_value(node).map_err(ser_err)?);
+            }
+            frontier.push((*entry.key(), row));
+        }
+
+        // 2. Expand each (edge, node) hop; Cartesian over surviving neighbours.
+        for (edge_pat, node_pat) in &pattern.hops {
+            let (walk_out, walk_in) = match edge_pat.direction {
+                PatternDirection::Out => (true, false),
+                PatternDirection::In => (false, true),
+                PatternDirection::Both => (true, true),
+            };
+            let mut next: Vec<(u32, Row)> = Vec::new();
+            for (curr, row) in &frontier {
+                let mut eids: HashSet<u128> = HashSet::new();
+                if walk_out {
+                    if let Some(s) = self.out_idx.get(curr) {
+                        eids.extend(s.iter().copied());
+                    }
+                }
+                if walk_in {
+                    if let Some(s) = self.in_idx.get(curr) {
+                        eids.extend(s.iter().copied());
+                    }
+                }
+                for eid in &eids {
+                    let edge_ref = match self.edges.get(eid) {
+                        Some(e) => e,
+                        None => continue,
+                    };
+                    let edge = edge_ref.value();
+                    if !Self::is_valid_as_of(&edge.valid_from, &edge.valid_to, as_of) {
+                        continue;
+                    }
+                    // Hide retracted edges in the current view (mirror `neighbors`).
+                    if as_of.is_none() {
+                        if let Some(to) = &edge.valid_to {
+                            if Utc::now().to_rfc3339().as_str() >= to.as_str() {
+                                continue;
+                            }
+                        }
+                    }
+                    if let Some(rt) = &edge_pat.rel_type {
+                        if &edge.rel != rt {
+                            continue;
+                        }
+                    }
+                    // Far endpoint = the one that is not the current node.
+                    let far_id = if self.get_u32(&edge.from) == Some(*curr) {
+                        &edge.to
+                    } else {
+                        &edge.from
+                    };
+                    let far_u32 = match self.get_u32(far_id) {
+                        Some(x) => x,
+                        None => continue,
+                    };
+                    let far_ref = match self.nodes.get(&far_u32) {
+                        Some(n) => n,
+                        None => continue,
+                    };
+                    let far_node = far_ref.value();
+                    if !Self::is_valid_as_of(&far_node.valid_from, &far_node.valid_to, as_of) {
+                        continue;
+                    }
+                    if !Self::node_matches(far_node, node_pat) {
+                        continue;
+                    }
+                    let mut nb = row.clone();
+                    if let Some(v) = &edge_pat.var {
+                        nb.insert(v.clone(), serde_json::to_value(edge).map_err(ser_err)?);
+                    }
+                    if let Some(v) = &node_pat.var {
+                        nb.insert(v.clone(), serde_json::to_value(far_node).map_err(ser_err)?);
+                    }
+                    next.push((far_u32, nb));
+                }
+            }
+            frontier = next;
+        }
+
+        let mut rows: Vec<Row> = frontier.into_iter().map(|(_, b)| b).collect();
+
+        // 3. WHERE (conjunction), 4. ORDER BY (nulls last), 5. LIMIT.
+        if !clauses.where_preds.is_empty() {
+            rows.retain(|b| {
+                clauses
+                    .where_preds
+                    .iter()
+                    .all(|p| Self::pattern_eval_predicate(b, p))
+            });
+        }
+        if let Some((qf, desc)) = &clauses.order_by {
+            rows.sort_by(|a, b| {
+                let av = Self::pattern_resolve(a, qf);
+                let bv = Self::pattern_resolve(b, qf);
+                match (av.is_null(), bv.is_null()) {
+                    (true, true) => std::cmp::Ordering::Equal,
+                    (true, false) => std::cmp::Ordering::Greater,
+                    (false, true) => std::cmp::Ordering::Less,
+                    (false, false) => {
+                        let ord = Self::hql_cmp_order(&av, &bv);
+                        if *desc {
+                            ord.reverse()
+                        } else {
+                            ord
+                        }
+                    }
+                }
+            });
+        }
+        if let Some(n) = clauses.limit {
+            rows.truncate(n);
+        }
+
+        // 6. RETURN projection.
+        use query::ast::PatternReturn;
+        match &clauses.ret {
+            None | Some(PatternReturn::All) => serde_json::to_value(rows).map_err(ser_err),
+            Some(PatternReturn::Fields(fields)) => {
+                let arr: Vec<serde_json::Value> = rows
+                    .iter()
+                    .map(|b| {
+                        let mut obj = serde_json::Map::new();
+                        for f in fields {
+                            obj.insert(f.output_key(), Self::pattern_resolve(b, f));
+                        }
+                        serde_json::Value::Object(obj)
+                    })
+                    .collect();
+                serde_json::to_value(arr).map_err(ser_err)
+            }
+        }
+    }
+
+    /// Resolve a `var` / `var.field` against a binding row into a JSON value.
+    fn pattern_resolve(
+        binding: &serde_json::Map<String, serde_json::Value>,
+        qf: &query::ast::QualField,
+    ) -> serde_json::Value {
+        use query::ast::HqlField;
+        let entity = match binding.get(&qf.var) {
+            Some(e) => e,
+            None => return serde_json::Value::Null,
+        };
+        match &qf.field {
+            None => entity.clone(),
+            Some(HqlField::Id) => entity.get("id").cloned().unwrap_or(serde_json::Value::Null),
+            Some(HqlField::Label) => {
+                // node → labels array; edge → rel string.
+                if let Some(labels) = entity.get("labels") {
+                    labels.clone()
+                } else if let Some(rel) = entity.get("rel") {
+                    rel.clone()
+                } else {
+                    serde_json::Value::Null
+                }
+            }
+            Some(HqlField::Prop(k)) => entity
+                .get("props")
+                .and_then(|p| p.get(k))
+                .cloned()
+                .unwrap_or(serde_json::Value::Null),
+            Some(HqlField::Score) | Some(HqlField::Depth) => serde_json::Value::Null,
+        }
+    }
+
+    fn pattern_eval_predicate(
+        binding: &serde_json::Map<String, serde_json::Value>,
+        pred: &query::ast::PatternPredicate,
+    ) -> bool {
+        use query::ast::{HqlField, HqlOp, HqlValue};
+        // Node `.label` uses membership semantics (labels array contains value);
+        // an edge `.label` (rel string) falls through to normal string compare.
+        if let Some(HqlField::Label) = &pred.field.field {
+            if let Some(entity) = binding.get(&pred.field.var) {
+                if let Some(serde_json::Value::Array(labels)) = entity.get("labels") {
+                    let target = match &pred.value {
+                        HqlValue::Str(s) => s.clone(),
+                        HqlValue::Num(n) => n.to_string(),
+                    };
+                    let contains = labels.iter().any(|l| l.as_str() == Some(target.as_str()));
+                    return match pred.op {
+                        HqlOp::Eq => contains,
+                        HqlOp::Ne => !contains,
+                        _ => false,
+                    };
+                }
+            }
+        }
+        let actual = Self::pattern_resolve(binding, &pred.field);
+        Self::json_cmp(&actual, pred.op, &pred.value)
+    }
+
+    /// Compare a resolved JSON value against a target with SQL-style null
+    /// handling: null/missing/non-coercible ⇒ false for every operator. Numeric
+    /// when both parse numerically, else string.
+    fn json_cmp(
+        actual: &serde_json::Value,
+        op: query::ast::HqlOp,
+        target: &query::ast::HqlValue,
+    ) -> bool {
+        use query::ast::{HqlOp, HqlValue};
+        if actual.is_null() {
+            return false;
+        }
+        let as_string = |v: &serde_json::Value| -> Option<String> {
+            match v {
+                serde_json::Value::String(s) => Some(s.clone()),
+                serde_json::Value::Number(n) => Some(n.to_string()),
+                serde_json::Value::Bool(b) => Some(b.to_string()),
+                _ => None,
+            }
+        };
+        match op {
+            HqlOp::Contains | HqlOp::StartsWith => {
+                let s = match as_string(actual) {
+                    Some(s) => s,
+                    None => return false,
+                };
+                let t = match target {
+                    HqlValue::Str(t) => t.clone(),
+                    HqlValue::Num(n) => n.to_string(),
+                };
+                match op {
+                    HqlOp::Contains => s.contains(&t),
+                    _ => s.starts_with(&t),
+                }
+            }
+            _ => {
+                let t_num = match target {
+                    HqlValue::Num(n) => Some(*n),
+                    HqlValue::Str(_) => None,
+                };
+                let ord = if let (Some(a), Some(t)) = (actual.as_f64(), t_num) {
+                    a.partial_cmp(&t)
+                } else {
+                    let a = match as_string(actual) {
+                        Some(a) => a,
+                        None => return false,
+                    };
+                    let t = match target {
+                        HqlValue::Str(t) => t.clone(),
+                        HqlValue::Num(n) => n.to_string(),
+                    };
+                    Some(a.cmp(&t))
+                };
+                let ord = match ord {
+                    Some(o) => o,
+                    None => return false,
+                };
+                use std::cmp::Ordering::*;
+                match op {
+                    HqlOp::Eq => ord == Equal,
+                    HqlOp::Ne => ord != Equal,
+                    HqlOp::Lt => ord == Less,
+                    HqlOp::Le => ord != Greater,
+                    HqlOp::Gt => ord == Greater,
+                    HqlOp::Ge => ord != Less,
+                    _ => false,
+                }
+            }
+        }
+    }
+
     pub fn execute_hql(&self, query: &str) -> Result<serde_json::Value> {
         fn to_value<T: serde::Serialize>(res: T) -> Result<serde_json::Value> {
             serde_json::to_value(res)
@@ -3090,6 +3425,11 @@ impl Storage {
                 let res = self.retrieve_context(&target, &tier, budget, fuzzy)?;
                 to_value(res)
             }
+            HqlCommand::MatchPattern {
+                pattern,
+                as_of,
+                clauses,
+            } => self.match_pattern(&pattern, &as_of, &clauses),
         }
     }
 

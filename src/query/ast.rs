@@ -81,6 +81,83 @@ pub struct HqlClauses {
     pub ret: Option<HqlReturn>,
 }
 
+// --- Cypher-style graph pattern matching (ADR--GENESISDB-HQL-CYPHER-PATTERNS) ---
+
+/// Which index a hop follows and which endpoint is the "far" node.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum PatternDirection {
+    Out,  // (a)-[r]->(b): follow outgoing edges, far = the other endpoint
+    In,   // (a)<-[r]-(b): follow incoming edges
+    Both, // (a)-[r]-(b): either direction
+}
+
+/// A node in a pattern: `(var? :Label? {k:v,...}?)`. Every part is optional;
+/// `()` matches any node. Inline `props` are exact-equality constraints.
+#[derive(Debug, Clone, Default)]
+pub struct NodePattern {
+    pub var: Option<String>,
+    pub label: Option<String>,
+    pub props: Vec<(String, HqlValue)>,
+}
+
+/// An edge in a pattern: direction + optional variable + optional `:Type`.
+#[derive(Debug, Clone)]
+pub struct EdgePattern {
+    pub var: Option<String>,
+    pub rel_type: Option<String>,
+    pub direction: PatternDirection,
+}
+
+/// A linear path pattern: an anchor node then zero+ `(edge, node)` hops.
+#[derive(Debug, Clone)]
+pub struct GraphPattern {
+    pub start: NodePattern,
+    pub hops: Vec<(EdgePattern, NodePattern)>,
+}
+
+/// A variable-qualified clause field: `a` (`field` None → whole bound entity)
+/// or `a.id` / `a.label` / `a.prop.<key>` (reusing `HqlField`).
+#[derive(Debug, Clone)]
+pub struct QualField {
+    pub var: String,
+    pub field: Option<HqlField>,
+}
+
+impl QualField {
+    /// Output key when projected via RETURN: `a` (bare) or `a.id` / `a.<propkey>`.
+    pub fn output_key(&self) -> String {
+        match &self.field {
+            None => self.var.clone(),
+            Some(HqlField::Id) => format!("{}.id", self.var),
+            Some(HqlField::Label) => format!("{}.label", self.var),
+            Some(HqlField::Score) => format!("{}.score", self.var),
+            Some(HqlField::Depth) => format!("{}.depth", self.var),
+            Some(HqlField::Prop(k)) => format!("{}.{}", self.var, k),
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct PatternPredicate {
+    pub field: QualField,
+    pub op: HqlOp,
+    pub value: HqlValue,
+}
+
+#[derive(Debug, Clone)]
+pub enum PatternReturn {
+    All,
+    Fields(Vec<QualField>),
+}
+
+#[derive(Debug, Clone, Default)]
+pub struct PatternClauses {
+    pub where_preds: Vec<PatternPredicate>,
+    pub order_by: Option<(QualField, bool)>, // (field, descending)
+    pub limit: Option<usize>,
+    pub ret: Option<PatternReturn>,
+}
+
 #[derive(Debug, Clone)]
 pub enum HqlCommand {
     Search {
@@ -117,6 +194,11 @@ pub enum HqlCommand {
         budget: Option<u32>,
         fuzzy: bool,
     },
+    MatchPattern {
+        pattern: GraphPattern,
+        as_of: Option<String>,
+        clauses: PatternClauses,
+    },
 }
 
 impl TryFrom<&str> for HqlCommand {
@@ -134,6 +216,9 @@ impl TryFrom<&str> for HqlCommand {
                             Rule::search => return Ok(Self::parse_search(inner_pair)),
                             Rule::traverse => return Ok(Self::parse_traverse(inner_pair)),
                             Rule::hybrid => return Ok(Self::parse_hybrid(inner_pair)),
+                            Rule::match_pattern => {
+                                return Ok(Self::parse_match_pattern(inner_pair))
+                            }
                             Rule::context => return Ok(Self::parse_context(inner_pair)),
                             Rule::EOI => continue,
                             _ => {
@@ -486,6 +571,265 @@ impl HqlCommand {
             tier,
             budget,
             fuzzy,
+        }
+    }
+
+    // --- Cypher pattern parsing (ADR--GENESISDB-HQL-CYPHER-PATTERNS) ---
+
+    fn op_from_str(s: &str) -> HqlOp {
+        match s.to_uppercase().as_str() {
+            "=" => HqlOp::Eq,
+            "!=" => HqlOp::Ne,
+            "<" => HqlOp::Lt,
+            "<=" => HqlOp::Le,
+            ">" => HqlOp::Gt,
+            ">=" => HqlOp::Ge,
+            "CONTAINS" => HqlOp::Contains,
+            "STARTSWITH" => HqlOp::StartsWith,
+            _ => HqlOp::Eq,
+        }
+    }
+
+    /// Parse a `filter_value` (`string_lit | number`) rule into an `HqlValue`.
+    fn parse_filter_value(pair: pest::iterators::Pair<Rule>) -> HqlValue {
+        if let Some(vp) = pair.into_inner().next() {
+            match vp.as_rule() {
+                Rule::string_lit => HqlValue::Str(Self::parse_string_lit(vp.as_str())),
+                Rule::number => HqlValue::Num(vp.as_str().parse::<f64>().unwrap_or(0.0)),
+                _ => HqlValue::Str(String::new()),
+            }
+        } else {
+            HqlValue::Str(String::new())
+        }
+    }
+
+    /// `pat_label` = `":" ~ identifier` — return the identifier text.
+    fn parse_pat_label(pair: pest::iterators::Pair<Rule>) -> String {
+        pair.into_inner()
+            .find(|p| p.as_rule() == Rule::identifier)
+            .map(|p| p.as_str().to_string())
+            .unwrap_or_default()
+    }
+
+    fn parse_pat_props(pair: pest::iterators::Pair<Rule>) -> Vec<(String, HqlValue)> {
+        let mut props = Vec::new();
+        for pp in pair.into_inner() {
+            if pp.as_rule() == Rule::prop_pair {
+                let mut key = String::new();
+                let mut val = HqlValue::Str(String::new());
+                for inner in pp.into_inner() {
+                    match inner.as_rule() {
+                        Rule::identifier => key = inner.as_str().to_string(),
+                        Rule::filter_value => val = Self::parse_filter_value(inner),
+                        _ => {}
+                    }
+                }
+                props.push((key, val));
+            }
+        }
+        props
+    }
+
+    fn parse_node_pattern(pair: pest::iterators::Pair<Rule>) -> NodePattern {
+        let mut np = NodePattern::default();
+        for inner in pair.into_inner() {
+            match inner.as_rule() {
+                Rule::pat_var => np.var = Some(inner.as_str().to_string()),
+                Rule::pat_label => np.label = Some(Self::parse_pat_label(inner)),
+                Rule::pat_props => np.props = Self::parse_pat_props(inner),
+                _ => {}
+            }
+        }
+        np
+    }
+
+    fn parse_edge_pattern(pair: pest::iterators::Pair<Rule>) -> EdgePattern {
+        // edge_pattern = { edge_in | edge_out | edge_both }; the inner rule
+        // carries the direction and an optional rel_detail.
+        let mut var = None;
+        let mut rel_type = None;
+        let mut direction = PatternDirection::Out;
+        if let Some(dir_pair) = pair.into_inner().next() {
+            direction = match dir_pair.as_rule() {
+                Rule::edge_in => PatternDirection::In,
+                Rule::edge_out => PatternDirection::Out,
+                Rule::edge_both => PatternDirection::Both,
+                _ => PatternDirection::Out,
+            };
+            for d in dir_pair.into_inner() {
+                if d.as_rule() == Rule::rel_detail {
+                    for r in d.into_inner() {
+                        match r.as_rule() {
+                            Rule::pat_var => var = Some(r.as_str().to_string()),
+                            Rule::pat_label => rel_type = Some(Self::parse_pat_label(r)),
+                            _ => {}
+                        }
+                    }
+                }
+            }
+        }
+        EdgePattern {
+            var,
+            rel_type,
+            direction,
+        }
+    }
+
+    fn parse_hop(pair: pest::iterators::Pair<Rule>) -> (EdgePattern, NodePattern) {
+        let mut edge = EdgePattern {
+            var: None,
+            rel_type: None,
+            direction: PatternDirection::Out,
+        };
+        let mut node = NodePattern::default();
+        for inner in pair.into_inner() {
+            match inner.as_rule() {
+                Rule::edge_pattern => edge = Self::parse_edge_pattern(inner),
+                Rule::node_pattern => node = Self::parse_node_pattern(inner),
+                _ => {}
+            }
+        }
+        (edge, node)
+    }
+
+    fn parse_graph_pattern(pair: pest::iterators::Pair<Rule>) -> GraphPattern {
+        let mut start = NodePattern::default();
+        let mut hops = Vec::new();
+        let mut seen_anchor = false;
+        for inner in pair.into_inner() {
+            match inner.as_rule() {
+                // The only direct `node_pattern` child is the anchor; hop nodes
+                // are nested inside their `hop`.
+                Rule::node_pattern if !seen_anchor => {
+                    start = Self::parse_node_pattern(inner);
+                    seen_anchor = true;
+                }
+                Rule::hop => hops.push(Self::parse_hop(inner)),
+                _ => {}
+            }
+        }
+        GraphPattern { start, hops }
+    }
+
+    /// `qual_tail` = `prop_field | id | label` → an `HqlField`.
+    fn qual_tail_to_field(pair: pest::iterators::Pair<Rule>) -> HqlField {
+        if let Some(inner) = pair.clone().into_inner().next() {
+            if inner.as_rule() == Rule::prop_field {
+                let s = inner.as_str();
+                return HqlField::Prop(s["prop.".len()..].to_string());
+            }
+        }
+        match pair.as_str().to_lowercase().as_str() {
+            "id" => HqlField::Id,
+            "label" => HqlField::Label,
+            other => HqlField::Prop(other.to_string()),
+        }
+    }
+
+    fn parse_qual_field(pair: pest::iterators::Pair<Rule>) -> QualField {
+        let mut var = String::new();
+        let mut field = None;
+        for inner in pair.into_inner() {
+            match inner.as_rule() {
+                Rule::identifier => var = inner.as_str().to_string(),
+                Rule::qual_tail => field = Some(Self::qual_tail_to_field(inner)),
+                _ => {}
+            }
+        }
+        QualField { var, field }
+    }
+
+    fn parse_pat_predicate(pair: pest::iterators::Pair<Rule>) -> PatternPredicate {
+        let mut field = QualField {
+            var: String::new(),
+            field: None,
+        };
+        let mut op = HqlOp::Eq;
+        let mut value = HqlValue::Str(String::new());
+        for inner in pair.into_inner() {
+            match inner.as_rule() {
+                Rule::qual_field => field = Self::parse_qual_field(inner),
+                Rule::op => op = Self::op_from_str(inner.as_str()),
+                Rule::filter_value => value = Self::parse_filter_value(inner),
+                _ => {}
+            }
+        }
+        PatternPredicate { field, op, value }
+    }
+
+    fn parse_pat_clauses(pair: pest::iterators::Pair<Rule>) -> PatternClauses {
+        let mut c = PatternClauses::default();
+        for inner in pair.into_inner() {
+            match inner.as_rule() {
+                Rule::pat_where => {
+                    for p in inner.into_inner() {
+                        if p.as_rule() == Rule::pat_predicate {
+                            c.where_preds.push(Self::parse_pat_predicate(p));
+                        }
+                    }
+                }
+                Rule::pat_order => {
+                    let mut f = None;
+                    let mut desc = false;
+                    for p in inner.into_inner() {
+                        match p.as_rule() {
+                            Rule::qual_field => f = Some(Self::parse_qual_field(p)),
+                            Rule::order_dir => desc = p.as_str().eq_ignore_ascii_case("DESC"),
+                            _ => {}
+                        }
+                    }
+                    if let Some(f) = f {
+                        c.order_by = Some((f, desc));
+                    }
+                }
+                Rule::limit_clause => {
+                    for p in inner.into_inner() {
+                        if p.as_rule() == Rule::limit_n {
+                            c.limit = Some(p.as_str().parse::<usize>().unwrap_or(usize::MAX));
+                        }
+                    }
+                }
+                Rule::pat_return => {
+                    let mut fields = Vec::new();
+                    let mut all = false;
+                    for p in inner.into_inner() {
+                        match p.as_rule() {
+                            Rule::return_all => all = true,
+                            Rule::qual_field => fields.push(Self::parse_qual_field(p)),
+                            _ => {}
+                        }
+                    }
+                    c.ret = Some(if all {
+                        PatternReturn::All
+                    } else {
+                        PatternReturn::Fields(fields)
+                    });
+                }
+                _ => {}
+            }
+        }
+        c
+    }
+
+    fn parse_match_pattern(pair: pest::iterators::Pair<Rule>) -> Self {
+        let mut pattern = GraphPattern {
+            start: NodePattern::default(),
+            hops: Vec::new(),
+        };
+        let mut as_of = None;
+        let mut clauses = PatternClauses::default();
+        for inner in pair.into_inner() {
+            match inner.as_rule() {
+                Rule::graph_pattern => pattern = Self::parse_graph_pattern(inner),
+                Rule::as_of => as_of = Some(Self::parse_as_of(inner)),
+                Rule::pat_clauses => clauses = Self::parse_pat_clauses(inner),
+                _ => {}
+            }
+        }
+        HqlCommand::MatchPattern {
+            pattern,
+            as_of,
+            clauses,
         }
     }
 }

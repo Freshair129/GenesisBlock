@@ -60,13 +60,25 @@ traversal), `compact`, `set_language_centroid`,
 SEARCH <target> SIMILAR TO [v1, v2, …] K <k> [IN <collection>] [LANGUAGE "th"] [AS OF "<rfc3339>"]
 TRAVERSE FROM <seed> DEPTH <n> REL <rel|INFER(rel)|ANY> [AS OF "…"]
 MATCH <target> SIMILAR TO [v…] ALPHA <a> [IN <collection>] [LANGUAGE "…"] [AS OF "…"]
+MATCH (<node>) (<edge> (<node>))* [AS OF "…"] [<clauses>]        # Cypher graph patterns
 CONTEXT FOR <target> TIER <H0..H5> [BUDGET <n>]
+
+# Optional trailing <clauses> on SEARCH / TRAVERSE / MATCH (both forms):
+  [ WHERE <field> <op> <value> (AND …)* ] [ ORDER BY <field> (ASC|DESC)? ] [ LIMIT <n> ] [ RETURN <field> ("," …)* ]
 ```
 `~` prefix on target/seed enables fuzzy id resolution. `SEARCH` runs pure vector
-k-NN (alpha=0); `MATCH` is hybrid (vector + K-Impact, k=10). `IN <collection>`
-scopes the query to a named vector collection (quoted `"code"` or bare `code`);
-omitted → the `default` collection. The query dim is validated against the
-collection dim.
+k-NN (alpha=0); `MATCH <t> SIMILAR` is hybrid (vector + K-Impact, k=10). `IN
+<collection>` scopes the query to a named vector collection (quoted `"code"` or
+bare `code`); omitted → the `default` collection. The query dim is validated
+against the collection dim.
+
+**Cypher graph patterns** (`MATCH (` routes here, not to hybrid): a linear path
+`(a:Label {k:v})-[r:REL]->(b) …`. Nodes are `(var? :Label? {props}?)`; edges are
+`-[var? :Type?]->` / `<-[…]-` / `-[…]-` (out / in / either). `{id:"…"}` anchors on
+a node id. Clause fields are variable-qualified — `a`, `a.id`, `a.label`,
+`a.prop.<key>`; `RETURN` omitted ⇒ one object per row keyed by variable. Linear
+paths only in v1 (no variable-length `*`, branching, or `OR`). See
+`ADR--GENESISDB-HQL-CYPHER-PATTERNS`.
 
 ## Data model (from `src/lib.rs`)
 
