@@ -138,4 +138,6 @@ MATCH topic SIMILAR TO [..] ALPHA 0
 ---
 ### Related Links
 - **Query pipeline:** `src/query/hql.pest`, `src/query/ast.rs`, `Storage::execute_hql`
-- **Deferred (path 1):** pattern matching needs a new execution/planning layer
+- **Path 1 (shipped):** Cypher-style pattern matching landed *without* a planner —
+  linear path expansion over the graph indices. See
+  [ADR--GENESISDB-HQL-CYPHER-PATTERNS](ADR--GENESISDB-HQL-CYPHER-PATTERNS.md).

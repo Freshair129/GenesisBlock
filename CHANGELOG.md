@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **HQL Cypher-style graph patterns (path 1):** a fifth HQL command,
+  `MATCH (a:Label {k:v})-[r:REL]->(b) ...`, matching linear path patterns by
+  deterministic left-to-right expansion over the graph indices — **no query
+  planner**. Supports node label/prop constraints, edge type + direction
+  (`->`/`<-`/`-`), `{id:"…"}` anchoring, and variable-qualified
+  `WHERE`/`ORDER BY`/`LIMIT`/`RETURN` (`a`, `a.id`, `a.label`, `a.prop.<key>`)
+  plus `AS OF`. `MATCH (` routes to patterns; `MATCH <t> SIMILAR TO …` remains
+  the hybrid command (no breaking change). v1 is linear-path-only (no
+  variable-length `*`, branching, or `OR`). Lands on both NAPI (`executeHql`)
+  and REST (`/v1/query/hql`) with no signature change. See
+  `docs/adr/ADR--GENESISDB-HQL-CYPHER-PATTERNS.md`; tests in
+  `tests/hql_cypher_tests.rs`.
+
 ## [0.2.0] - 2026-06-29
 
 First non-beta release. Lays the MARK XVI foundation for embedding
