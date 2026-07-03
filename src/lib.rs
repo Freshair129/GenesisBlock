@@ -209,6 +209,29 @@ impl ScalingTier {
     }
 }
 
+/// Retrieval-coverage signal for a `ContextPackage` — whether the returned
+/// context is complete, hit the tier boundary, or was compressed. This is the
+/// engine's factual "how much did I actually cover" report; a consumer (e.g.
+/// MSP) decides what to do about it (compact / delegate / decompose) — the
+/// engine states facts, never policy. Nested as its own object so future
+/// coverage fields (status enum, node/edge counts, etc. — a separate CR) grow
+/// here additively without breaking the `ContextPackage` surface.
+#[cfg_attr(feature = "napi-bindings", napi(object))]
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct CoverageReport {
+    /// The requested tier's hop radius (`tier.hops()`).
+    pub hops_requested: u32,
+    /// The deepest BFS depth actually reached among nodes included in this package.
+    pub hops_served: u32,
+    /// True if, at the max requested depth, the BFS frontier still had
+    /// unexpanded/undiscovered neighbors — i.e. more graph exists beyond the
+    /// tier boundary. False if traversal exhausted the reachable subgraph
+    /// before the tier limit.
+    pub ceiling_hit: bool,
+    /// True if budget/SuperNode compression replaced atoms in this package.
+    pub truncated: bool,
+}
+
 #[cfg_attr(feature = "napi-bindings", napi(object))]
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct ContextPackage {
@@ -217,19 +240,8 @@ pub struct ContextPackage {
     pub super_nodes: Vec<SuperNode>,
     pub token_estimate: u32,
     pub reasoning_path: String,
-    /// The requested tier's hop radius (`tier.hops()`).
-    pub hops_requested: u32,
-    /// The deepest BFS depth actually reached among nodes included in this package.
-    pub hops_served: u32,
-    /// True if, at the max requested depth, the BFS frontier still had
-    /// unexpanded/undiscovered neighbors — i.e. more graph exists beyond the
-    /// tier boundary. False if traversal exhausted the reachable subgraph
-    /// before the tier limit. Purely a retrieval-mechanics signal; what a
-    /// consumer does with it (e.g. decomposition policy) is out of scope
-    /// for the engine.
-    pub ceiling_hit: bool,
-    /// True if budget/SuperNode compression replaced atoms in this package.
-    pub truncated: bool,
+    /// Retrieval-coverage signal (tier boundary / compression). See `CoverageReport`.
+    pub coverage: CoverageReport,
 }
 
 #[cfg_attr(feature = "napi-bindings", napi(object))]
@@ -4332,10 +4344,12 @@ impl Storage {
                 "Resolved {} as of Tier {} ({} hops)",
                 target_id_resolved, tier_str, hops
             ),
-            hops_requested: hops,
-            hops_served,
-            ceiling_hit,
-            truncated,
+            coverage: CoverageReport {
+                hops_requested: hops,
+                hops_served,
+                ceiling_hit,
+                truncated,
+            },
         })
     }
 

@@ -45,6 +45,17 @@ pub struct ContextPackage {
     pub super_nodes: Vec<SuperNode>,
     pub token_estimate: u32,
     pub reasoning_path: String, // Traceability: "Found via Vector -> Expanded 2 Hops"
+    pub coverage: CoverageReport, // retrieval-coverage signal (tier boundary / compression)
+}
+
+// Engine states facts (hit the tier boundary? compressed?); the consumer
+// decides policy (compact / delegate / decompose). Future coverage fields grow
+// here without breaking ContextPackage.
+pub struct CoverageReport {
+    pub hops_requested: u32,
+    pub hops_served: u32,
+    pub ceiling_hit: bool,
+    pub truncated: bool,
 }
 ```
 

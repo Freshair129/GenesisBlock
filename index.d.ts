@@ -77,12 +77,16 @@ export const enum ScalingTier {
   H5 = 5,
   H6 = 6
 }
-export interface ContextPackage {
-  nodes: Array<NodeOutput>
-  edges: Array<EdgeOutput>
-  superNodes: Array<SuperNode>
-  tokenEstimate: number
-  reasoningPath: string
+/**
+ * Retrieval-coverage signal for a `ContextPackage` — whether the returned
+ * context is complete, hit the tier boundary, or was compressed. This is the
+ * engine's factual "how much did I actually cover" report; a consumer (e.g.
+ * MSP) decides what to do about it (compact / delegate / decompose) — the
+ * engine states facts, never policy. Nested as its own object so future
+ * coverage fields (status enum, node/edge counts, etc. — a separate CR) grow
+ * here additively without breaking the `ContextPackage` surface.
+ */
+export interface CoverageReport {
   /** The requested tier's hop radius (`tier.hops()`). */
   hopsRequested: number
   /** The deepest BFS depth actually reached among nodes included in this package. */
@@ -91,13 +95,20 @@ export interface ContextPackage {
    * True if, at the max requested depth, the BFS frontier still had
    * unexpanded/undiscovered neighbors — i.e. more graph exists beyond the
    * tier boundary. False if traversal exhausted the reachable subgraph
-   * before the tier limit. Purely a retrieval-mechanics signal; what a
-   * consumer does with it (e.g. decomposition policy) is out of scope
-   * for the engine.
+   * before the tier limit.
    */
   ceilingHit: boolean
   /** True if budget/SuperNode compression replaced atoms in this package. */
   truncated: boolean
+}
+export interface ContextPackage {
+  nodes: Array<NodeOutput>
+  edges: Array<EdgeOutput>
+  superNodes: Array<SuperNode>
+  tokenEstimate: number
+  reasoningPath: string
+  /** Retrieval-coverage signal (tier boundary / compression). See `CoverageReport`. */
+  coverage: CoverageReport
 }
 export interface QueryInput {
   from?: string

@@ -292,10 +292,10 @@ fn test_grl_ceiling_signal_deep_graph() {
     }
 
     let ctx = storage.retrieve_context("N0", "H3", None, false).unwrap();
-    assert_eq!(ctx.hops_requested, 3);
-    assert_eq!(ctx.hops_served, 3);
+    assert_eq!(ctx.coverage.hops_requested, 3);
+    assert_eq!(ctx.coverage.hops_served, 3);
     assert!(
-        ctx.ceiling_hit,
+        ctx.coverage.ceiling_hit,
         "expected ceiling_hit=true: chain extends past the H3 boundary"
     );
 }
@@ -357,8 +357,8 @@ fn test_grl_ceiling_signal_shallow_graph() {
 
     let ctx = storage.retrieve_context("A", "H5", None, false).unwrap();
     assert!(
-        !ctx.ceiling_hit,
+        !ctx.coverage.ceiling_hit,
         "expected ceiling_hit=false: 2-node graph is exhausted before the H5 boundary"
     );
-    assert!(ctx.hops_served <= 1);
+    assert!(ctx.coverage.hops_served <= 1);
 }
