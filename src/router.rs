@@ -516,9 +516,7 @@ fn render_metrics(storage: &Storage) -> String {
     out.push_str("# TYPE genesisdb_edges_total gauge\n");
     out.push_str(&format!("genesisdb_edges_total {}\n", edge_count));
 
-    out.push_str(
-        "# HELP genesisdb_collections_total Total number of vector collections.\n",
-    );
+    out.push_str("# HELP genesisdb_collections_total Total number of vector collections.\n");
     out.push_str("# TYPE genesisdb_collections_total gauge\n");
     out.push_str(&format!(
         "genesisdb_collections_total {}\n",
@@ -546,9 +544,7 @@ fn render_metrics(storage: &Storage) -> String {
         if is_rebuilding { 1 } else { 0 }
     ));
 
-    out.push_str(
-        "# HELP genesisdb_collection_vectors Number of vectors stored in a collection.\n",
-    );
+    out.push_str("# HELP genesisdb_collection_vectors Number of vectors stored in a collection.\n");
     out.push_str("# TYPE genesisdb_collection_vectors gauge\n");
     for c in &collections {
         out.push_str(&format!(
