@@ -546,6 +546,52 @@ fn traverse_rel_alternation_returns_union() {
     );
 }
 
+/// `REL ANY` maps to wildcard traversal, while a concrete rel stays filtered.
+#[test]
+fn traverse_rel_any_restores_wildcard() {
+    let p = fresh("p0_traverse_rel_any");
+    let s = open(&p);
+    node(&s, "A");
+    node(&s, "B");
+    node(&s, "C");
+    node(&s, "D");
+    edge(&s, "A", "B", "LINK");
+    edge(&s, "A", "C", "REF");
+    edge(&s, "A", "D", "OTHER");
+
+    let any_res = s.execute_hql("TRAVERSE FROM A DEPTH 1 REL ANY").unwrap();
+    let any_ids: Vec<String> = any_res
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|n| n["node"]["id"].as_str().unwrap().to_string())
+        .collect();
+    assert!(
+        any_ids.contains(&"B".to_string()),
+        "REL ANY must include LINK target B, got {:?}",
+        any_ids
+    );
+    assert!(
+        any_ids.contains(&"C".to_string()),
+        "REL ANY must include REF target C, got {:?}",
+        any_ids
+    );
+    assert!(
+        any_ids.contains(&"D".to_string()),
+        "REL ANY must include OTHER target D, got {:?}",
+        any_ids
+    );
+
+    let link_res = s.execute_hql("TRAVERSE FROM A DEPTH 1 REL LINK").unwrap();
+    let link_ids: Vec<String> = link_res
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|n| n["node"]["id"].as_str().unwrap().to_string())
+        .collect();
+    assert_eq!(link_ids, vec!["B".to_string()]);
+}
+
 /// Omitted DIRECTION ⇒ "out" (back-compat unedited-oracle check inline here).
 #[test]
 fn traverse_direction_omitted_defaults_to_out() {

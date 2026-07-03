@@ -235,6 +235,17 @@ export declare class GenesisDatabase {
   supersedeNode(id: string, newProps?: any | undefined | null, causedBy?: string | undefined | null): Promise<NodeOutput>
   retractEdge(id: string, at?: string | undefined | null): Promise<EdgeOutput | null>
   retrieveContext(targetId: string, tier: string, budget: number | undefined | null, fuzzy: boolean): Promise<ContextPackage>
+  /**
+   * Executes an HQL query and returns the command result as JSON.
+   * Supports SEARCH, TRAVERSE, MATCH graph patterns, MATCH ... SIMILAR
+   * hybrid search, and CONTEXT retrieval forms.
+   * SEARCH/MATCH hybrid may omit `SIMILAR TO [vector]` to search by the
+   * target node's stored embedding.
+   * Hybrid MATCH accepts `K <n>`; SEARCH and hybrid accept `EF <n>` and
+   * `OVERSAMPLE <n>` tuning clauses.
+   * TRAVERSE supports `DIRECTION in|out|both` and `REL a|b` alternation.
+   * Seed and target ids may contain unquoted colons, such as `user:5`.
+   */
   executeHql(query: string): Promise<any>
   hybridSearch(args: HybridSearchInput): Promise<Array<NeighborOutput>>
   neighbors(seed: string, args: NeighborInput): Promise<Array<NeighborOutput>>

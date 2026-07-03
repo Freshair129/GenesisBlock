@@ -102,10 +102,21 @@ const VALID_SEARCH: &str = "SEARCH mynode SIMILAR TO [1.0,2.0,3.0] K 10";
 const VALID_TRAVERSE: &str = "TRAVERSE FROM seed_node DEPTH 3 REL KNOWS";
 const VALID_HYBRID: &str = "MATCH target SIMILAR TO [0.5,0.5] ALPHA 0.7";
 const VALID_CONTEXT: &str = "CONTEXT FOR node_id TIER H2";
+const VALID_SEARCH_BY_NODE: &str = "SEARCH user:5 K 5 EF 64 OVERSAMPLE 3";
+const VALID_HYBRID_BY_NODE: &str = "MATCH user:5 ALPHA 0.5 K 7 EF 64 OVERSAMPLE 3";
+const VALID_TRAVERSE_P0: &str = "TRAVERSE FROM user:5 DEPTH 3 REL LINK|REF DIRECTION both";
 
 #[test]
 fn progressive_truncation() {
-    for query in [VALID_SEARCH, VALID_TRAVERSE, VALID_HYBRID, VALID_CONTEXT] {
+    for query in [
+        VALID_SEARCH,
+        VALID_TRAVERSE,
+        VALID_HYBRID,
+        VALID_CONTEXT,
+        VALID_SEARCH_BY_NODE,
+        VALID_HYBRID_BY_NODE,
+        VALID_TRAVERSE_P0,
+    ] {
         for len in 0..query.len() {
             must_not_panic(&query[..len]);
         }
@@ -119,9 +130,12 @@ fn keyword_case_mutations() {
         "SEARCH mynode similar TO [1.0] K 5",
         "Search Mynode Similar To [1.0] K 5",
         "sEaRcH mynode SIMILAR TO [1.0] K 5",
+        "search user:5 k 5 ef 64 oversample 3",
         "traverse from seed depth 3 rel knows",
         "Traverse From Seed Depth 3 Rel Knows",
+        "traverse from user:5 depth 3 rel link|ref direction both",
         "match target similar to [0.5] alpha 0.7",
+        "match user:5 alpha 0.5 k 7 ef 64 oversample 3",
         "context for node tier h1",
         "CONTEXT FOR node TIER h1",
     ];
@@ -206,8 +220,11 @@ fn missing_required_clauses() {
 fn extreme_k_values() {
     let inputs = [
         "SEARCH x SIMILAR TO [1.0] K 0",
+        "SEARCH x K 0",
         "SEARCH x SIMILAR TO [1.0] K 1",
+        "MATCH x ALPHA 0.5 K 1",
         "SEARCH x SIMILAR TO [1.0] K 999999999",
+        "MATCH x SIMILAR TO [1.0] ALPHA 0.5 K 999999999",
         "SEARCH x SIMILAR TO [1.0] K 4294967295",
         "SEARCH x SIMILAR TO [1.0] K 99999999999999999999",
     ];
@@ -220,7 +237,10 @@ fn extreme_k_values() {
 fn extreme_depth_values() {
     let inputs = [
         "TRAVERSE FROM x DEPTH 0 REL KNOWS",
+        "TRAVERSE FROM user:5 DEPTH 0 REL KNOWS|LIKES DIRECTION in",
         "TRAVERSE FROM x DEPTH 4294967295 REL KNOWS",
+        "TRAVERSE FROM user:5 DEPTH 3 REL KNOWS|LIKES DIRECTION out",
+        "TRAVERSE FROM user:5 DEPTH 3 REL KNOWS|LIKES DIRECTION both",
         "TRAVERSE FROM x DEPTH 99999999999999999999 REL KNOWS",
     ];
     for s in &inputs {
@@ -271,6 +291,39 @@ fn extreme_budget_values() {
         "CONTEXT FOR x TIER H1 BUDGET 1",
         "CONTEXT FOR x TIER H1 BUDGET 4294967295",
         "CONTEXT FOR x TIER H1 BUDGET 99999999999999999999",
+    ];
+    for s in &inputs {
+        must_not_panic(s);
+    }
+}
+
+#[test]
+fn p0_optional_vector_and_tuning_values() {
+    let inputs = [
+        "SEARCH x K 5",
+        "SEARCH user:5 K 5 EF 64",
+        "SEARCH user:5 K 5 OVERSAMPLE 3",
+        "SEARCH user:5 K 5 EF 64 OVERSAMPLE 3",
+        "MATCH x ALPHA 0.5",
+        "MATCH user:5 ALPHA 0.5 K 7",
+        "MATCH user:5 ALPHA 0.5 K 7 EF 64",
+        "MATCH user:5 ALPHA 0.5 K 7 OVERSAMPLE 3",
+        "MATCH user:5 ALPHA 0.5 K 7 EF 64 OVERSAMPLE 3",
+    ];
+    for s in &inputs {
+        must_not_panic(s);
+    }
+}
+
+#[test]
+fn p0_traverse_direction_rel_alternation_and_colon_ids() {
+    let inputs = [
+        "TRAVERSE FROM user:5 DEPTH 1 REL LINK|REF",
+        "TRAVERSE FROM user:5 DEPTH 1 REL LINK|REF DIRECTION in",
+        "TRAVERSE FROM user:5 DEPTH 1 REL LINK|REF DIRECTION out",
+        "TRAVERSE FROM user:5 DEPTH 1 REL LINK|REF DIRECTION both",
+        "TRAVERSE FROM user:5 DEPTH 1 REL ANY",
+        "TRAVERSE FROM user:5 DEPTH 1 REL LINK|ANY",
     ];
     for s in &inputs {
         must_not_panic(s);
@@ -345,6 +398,7 @@ fn fuzzy_prefix_variants() {
 #[test]
 fn search_with_all_optional_clauses() {
     parses_ok("SEARCH mynode SIMILAR TO [1.0,2.0] K 5 IN mycoll LANGUAGE \"en\" AS OF \"2024-01-01T00:00:00Z\"");
+    parses_ok("SEARCH user:5 K 5 IN mycoll LANGUAGE \"en\" AS OF \"2024-01-01T00:00:00Z\" EF 64 OVERSAMPLE 3");
 }
 
 #[test]
@@ -362,6 +416,13 @@ fn traverse_with_as_of() {
 #[test]
 fn traverse_with_infer_rel() {
     parses_ok("TRAVERSE FROM seed DEPTH 2 REL INFER(similarity)");
+}
+
+#[test]
+fn traverse_with_p0_direction_rel_alternation() {
+    parses_ok("TRAVERSE FROM user:5 DEPTH 2 REL KNOWS|LIKES DIRECTION in");
+    parses_ok("TRAVERSE FROM user:5 DEPTH 2 REL KNOWS|LIKES DIRECTION out");
+    parses_ok("TRAVERSE FROM user:5 DEPTH 2 REL KNOWS|LIKES DIRECTION both");
 }
 
 #[test]
@@ -389,10 +450,55 @@ fn valid_search_parses() {
 }
 
 #[test]
+fn valid_search_by_node_p0_parses() {
+    parses_ok(VALID_SEARCH_BY_NODE);
+    if let Ok(HqlCommand::Search {
+        target,
+        vector,
+        k,
+        ef_search,
+        oversample,
+        ..
+    }) = HqlCommand::try_from(VALID_SEARCH_BY_NODE)
+    {
+        assert_eq!(target, "user:5");
+        assert_eq!(vector, None);
+        assert_eq!(k, 5);
+        assert_eq!(ef_search, Some(64));
+        assert_eq!(oversample, Some(3));
+    } else {
+        panic!("Expected Search variant");
+    }
+}
+
+#[test]
 fn valid_traverse_parses() {
     parses_ok(VALID_TRAVERSE);
     if let Ok(HqlCommand::Traverse { seed, .. }) = HqlCommand::try_from(VALID_TRAVERSE) {
         assert_eq!(seed, "seed_node");
+    } else {
+        panic!("Expected Traverse variant");
+    }
+}
+
+#[test]
+fn valid_traverse_p0_parses() {
+    parses_ok(VALID_TRAVERSE_P0);
+    if let Ok(HqlCommand::Traverse {
+        seed,
+        rel,
+        direction,
+        ..
+    }) = HqlCommand::try_from(VALID_TRAVERSE_P0)
+    {
+        assert_eq!(seed, "user:5");
+        assert_eq!(direction, Some("both".to_string()));
+        match rel {
+            genesis_block_native::query::ast::HqlRel::Physical(rels) => {
+                assert_eq!(rels, vec!["LINK".to_string(), "REF".to_string()]);
+            }
+            other => panic!("Expected physical rel, got {other:?}"),
+        }
     } else {
         panic!("Expected Traverse variant");
     }
@@ -404,6 +510,30 @@ fn valid_hybrid_parses() {
     if let Ok(HqlCommand::Hybrid { target, alpha, .. }) = HqlCommand::try_from(VALID_HYBRID) {
         assert_eq!(target, "target");
         assert!((alpha - 0.7).abs() < 1e-9);
+    } else {
+        panic!("Expected Hybrid variant");
+    }
+}
+
+#[test]
+fn valid_hybrid_by_node_p0_parses() {
+    parses_ok(VALID_HYBRID_BY_NODE);
+    if let Ok(HqlCommand::Hybrid {
+        target,
+        vector,
+        alpha,
+        k,
+        ef_search,
+        oversample,
+        ..
+    }) = HqlCommand::try_from(VALID_HYBRID_BY_NODE)
+    {
+        assert_eq!(target, "user:5");
+        assert_eq!(vector, None);
+        assert!((alpha - 0.5).abs() < 1e-9);
+        assert_eq!(k, Some(7));
+        assert_eq!(ef_search, Some(64));
+        assert_eq!(oversample, Some(3));
     } else {
         panic!("Expected Hybrid variant");
     }
@@ -448,7 +578,15 @@ fn random_bytes_never_panic() {
 
 #[test]
 fn random_mutations_of_valid_queries() {
-    let queries = [VALID_SEARCH, VALID_TRAVERSE, VALID_HYBRID, VALID_CONTEXT];
+    let queries = [
+        VALID_SEARCH,
+        VALID_TRAVERSE,
+        VALID_HYBRID,
+        VALID_CONTEXT,
+        VALID_SEARCH_BY_NODE,
+        VALID_HYBRID_BY_NODE,
+        VALID_TRAVERSE_P0,
+    ];
     for query in queries.iter() {
         let bytes = query.as_bytes().to_vec();
         for pos in 0..bytes.len() {

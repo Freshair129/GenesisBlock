@@ -3469,6 +3469,9 @@ impl Storage {
                     seed
                 };
                 let (rels, is_inferred) = match rel {
+                    query::ast::HqlRel::Physical(r) if r.len() == 1 && r[0] == "ANY" => {
+                        (None, false)
+                    }
                     query::ast::HqlRel::Physical(r) => (Some(r), false),
                     query::ast::HqlRel::Inferred(r) => (Some(vec![r]), true),
                 };
@@ -5859,6 +5862,15 @@ impl GenesisDatabase {
             .await
             .map_err(|e| Error::from_reason(e.to_string()))?
     }
+    /// Executes an HQL query and returns the command result as JSON.
+    /// Supports SEARCH, TRAVERSE, MATCH graph patterns, MATCH ... SIMILAR
+    /// hybrid search, and CONTEXT retrieval forms.
+    /// SEARCH/MATCH hybrid may omit `SIMILAR TO [vector]` to search by the
+    /// target node's stored embedding.
+    /// Hybrid MATCH accepts `K <n>`; SEARCH and hybrid accept `EF <n>` and
+    /// `OVERSAMPLE <n>` tuning clauses.
+    /// TRAVERSE supports `DIRECTION in|out|both` and `REL a|b` alternation.
+    /// Seed and target ids may contain unquoted colons, such as `user:5`.
     #[napi]
     pub async fn execute_hql(&self, query: String) -> Result<Value> {
         let i = Arc::clone(&self.inner);
