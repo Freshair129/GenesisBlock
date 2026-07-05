@@ -222,6 +222,11 @@ for this task: it runs `Storage::compact()` after ingest (the only path that com
   disk savings are invisible until the WAL is compacted/rotated.* This is a production
   durability/ops concern, not a quant issue.
 
+2026-07-05 addendum: the WAL section above is still correct as a description of the 2026-06-24
+audit run, but it is no longer the current engine state. WAL compaction has since shipped; the
+open item now is a rerun of the 2M/RSS evidence under the current compaction path when a
+resource-safe window is approved.
+
 ## 5. Harness defects fixed (so the numbers are trustworthy)
 
 `benches/vbench_genesis.rs` before this audit:
