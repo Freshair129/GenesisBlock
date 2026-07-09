@@ -1,15 +1,45 @@
-# 33 — Task Breakdown (Waves W1–W4)
+# 33 — Task Breakdown (Waves W0–W4)
 
 > **Machine SSOT:** `queue/IMPLEMENTATION_QUEUE.json`. Titles/status here MUST match; JSON is authoritative (RWANG §8).
 > **Local dispatch:** every task carries `LOCAL_SAFE` or `CLOUD_REQUIRED` (§12.4). The dispatcher (Rwang / manual) reads the JSON.
-> **Frozen constraints (all tasks):** no changes to Storage core methods, public NAPI/REST/FFI signatures, on-disk/WAL format, or HQL grammar semantics. Any such change requires `docs/ARCHITECTURE_CHANGE_REQUEST.md`.
+> **Frozen constraints (all tasks):** no changes to Storage core methods, public NAPI/REST/FFI signatures, on-disk/WAL format. HQL grammar semantics: P1/P2/P3 frozen; **P0 narrowly unfrozen for W0** per [`ACR-HQL-P0`](ARCHITECTURE_CHANGE_REQUEST--HQL-P0-BUGFIXES.md). Any further change requires a new `ARCHITECTURE_CHANGE_REQUEST`.
+
+---
+
+## Wave W0 — HQL P0 pre-publish (from ACR-HQL-P0)
+
+**Purpose:** land the P0 correctness+exposure defect fixes so W1 publishes an engine that honors its documented grammar, and preserve the pre-P0 baseline for BENCH-SPEC. Time-critical: the baseline window closes on the next merge to `main`.
+
+**Non-negotiable ordering:** TASK-0000a → TASK-0000b → TASK-0000c. TASK-0000a on a **clean** tree; do not stage the P0 code until TASK-0000a output is committed.
+
+### TASK-0000a — Capture v1 pre-P0 HQL baseline
+- **Category:** Verification · **Complexity:** S · **Context:** Small · **Local:** LOCAL_SAFE · **Verification:** Benchmark · **Deps:** none · **Ready:** ✅
+- **Purpose:** run existing HQL bench harnesses against `main` HEAD before any P0 code lands; produce comparison baseline for BENCH-SPEC.
+- **Scope in:** the existing `hql-query-stress` [[bin]] + any bench script that exercises `SEARCH`/`MATCH`/`TRAVERSE` shapes. **Out:** implementation changes.
+- **Outputs:** `benches/baselines/hql-v1/{run.log,summary.json}` + one-line note in `state/events.jsonl`.
+- **Acceptance:** committed baseline files; `git status` was clean at start-of-run; hash of `HEAD` at capture time is recorded.
+- **Hazard:** if run after P0 code is applied, baseline is worthless — TASK-0000b MUST NOT start before TASK-0000a's output is committed.
+
+### TASK-0000b — Merge HQL P0 defect fixes
+- **Category:** Core · **Complexity:** M · **Context:** Medium · **Local:** LOCAL_SAFE · **Verification:** Unit · **Deps:** TASK-0000a
+- **Purpose:** land the P0 track from `docs/PLAN--HQL-REFINEMENT.md` — SEARCH target becomes meaningful (search-by-node when literal vector omitted); hybrid `K` exposed via grammar; `EF`/`OVERSAMPLE`/`DIRECTION` grammar; rel alternation.
+- **Scope in:** `src/query/hql.pest`, `src/query/ast.rs`, `src/lib.rs` (`execute_hql`), `tests/hql*.rs`; PLAN/SPEC track-boundary notes ride along. **Out:** P1 (variable-length paths), P2 (OR / label-index), P3 (text-query ADR).
+- **Frozen:** Storage core methods, public NAPI/REST/FFI signatures.
+- **Acceptance:** existing tests remain green; new tests cover new grammar; `cargo test` clean.
+- **Rollback:** if TASK-0000c shows p50 or recall regression >5% at equal semantic input, revert.
+
+### TASK-0000c — Capture post-P0 baseline + CHANGELOG delta
+- **Category:** Verification · **Complexity:** XS · **Context:** Small · **Local:** LOCAL_SAFE · **Verification:** Benchmark · **Deps:** TASK-0000b
+- **Purpose:** re-run same harness; produce comparable numbers to gate rollback.
+- **Outputs:** `benches/baselines/hql-v2-p0/{run.log,summary.json}`; 2-line delta note appended to `CHANGELOG.md`.
+- **Acceptance:** delta committed; no regression >5% at equal semantic input; if regression, rollback per TASK-0000b acceptance.
 
 ---
 
 ## Wave W1 — Publish Engine (unblocks GATE-DEMAND-1)
 
 ### TASK-0001 — Verify + dry-run release pipeline
-- **Category:** Infrastructure · **Complexity:** S · **Context:** Small · **Local:** CLOUD_REQUIRED (secrets + CI) · **Verification:** Build · **Deps:** none · **Ready:** ✅
+- **Category:** Infrastructure · **Complexity:** S · **Context:** Small · **Local:** CLOUD_REQUIRED (secrets + CI) · **Verification:** Build · **Deps:** TASK-0000c · **Ready:** blocked (was ready pre-ACR)
 - **Purpose:** confirm `NPM_TOKEN` valid, GitHub release workflow builds all 5 target triples (napi artifacts), and prebuild optionalDependency packages resolve.
 - **Scope in:** GitHub Actions dry-run; secrets check; matrix output inspection. **Out:** publishing (TASK-0004).
 - **Outputs:** dry-run log; go/no-go note in `state/events.jsonl`.
@@ -121,10 +151,15 @@ Owner-authority gate: **first-10-external-installs signal within ~1 month** of p
 
 | Wave | Total | LOCAL_SAFE | CLOUD_REQUIRED |
 |---|---|---|---|
+| **W0** | **3** | **3 (0000a, 0000b, 0000c)** | **0** |
 | W1 | 5 | 3 (0002, 0003, 0005) | 2 (0001, 0004) |
 | W2 | 5 | 4 (0006, 0008, 0009, 0010) | 1 (0007) |
 | W3 | 5 | 4 (0011, 0012, 0014, 0015) | 1 (0013) |
 | W4 | 3 | 1 (0018) | 2 (0016, 0017) |
-| **Total** | **18** | **12 (67%)** | **6 (33%)** |
+| **Total** | **21** | **15 (71%)** | **6 (29%)** |
 
-Ready-now for local pickup (deps=[], ready=true, LOCAL_SAFE): **TASK-0002, TASK-0003, TASK-0009, TASK-0011, TASK-0012, TASK-0014.**
+**Ready-now for local pickup (deps=[], ready=true, LOCAL_SAFE):**
+- **TASK-0000a** (top priority — hazard window)
+- TASK-0002, TASK-0003, TASK-0009, TASK-0011, TASK-0012, TASK-0014 (can run in parallel with W0)
+
+TASK-0001 (was ready:true) now depends on TASK-0000c per ACR — cannot publish until W0 exits.
