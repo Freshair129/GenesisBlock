@@ -104,7 +104,7 @@ codegen-units = 1
 strip = "symbols"
 
 [dev-dependencies]
-anyhow = "1.0.102"
+anyhow = "1.0.103"  # RUSTSEC-2026-0190 fix (Error::downcast_mut unsoundness)
 criterion = "0.8.2"
 rand = "0.8"
 tempfile = "3.27.0"
