@@ -1,0 +1,4 @@
+{"ts":"2026-07-07T12:00:00+07:00","event":"phase_transition","phase":0,"status":"in_progress","note":"Bootstrap: fresh RWANG init, MASTER_PLAN authored"}
+{"ts":"2026-07-07T12:10:00+07:00","event":"owner_approval","phase":0,"decision":"approve","note":"owner said 'approve' + requested local-dispatch backlog"}
+{"ts":"2026-07-07T12:15:00+07:00","event":"phase_transition","phase":6,"status":"in_progress","note":"Phases 1-5 declared INHERITED-FROZEN per MASTER_PLAN"}
+{"ts":"2026-07-07T12:30:00+07:00","event":"phase_transition","phase":6,"status":"awaiting_approval","note":"18 tasks / 4 waves decomposed; 12 LOCAL_SAFE; GATE-DEMAND-1 blocking W2-W4"}

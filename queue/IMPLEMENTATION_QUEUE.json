@@ -1,0 +1,39 @@
+{
+  "id": "QUEUE-ENGINE-WEDGE",
+  "type": "implementation_queue",
+  "title": "Engine-Wedge-First — dispatchable tasks (Waves W1-W4)",
+  "version": "1.0.0",
+  "source_of_truth": true,
+  "adr": "docs/adr/ADR--ENGINE-WEDGE-FIRST.md",
+  "created_at": "2026-07-07T12:15:00+07:00",
+  "updated_at": "2026-07-07T12:15:00+07:00",
+  "frozen_constraints": "Do NOT change: Storage core methods, public NAPI/REST/FFI signatures, on-disk/WAL format, HQL grammar semantics. Any such change requires docs/ARCHITECTURE_CHANGE_REQUEST.md.",
+  "gate": {
+    "id": "GATE-DEMAND-1",
+    "after_wave": "W1",
+    "criterion": "first-10-external-installs signal within ~1 month of engine publish",
+    "authority": "owner",
+    "blocks": ["W2", "W3", "W4"],
+    "note": "Publishing is near-free; do not fund W2-W4 expensive halves until this clears."
+  },
+  "tasks": [
+    {"id":"TASK-0001","wave":"W1","title":"Verify + dry-run release pipeline (NPM_TOKEN, napi artifacts x5 triples)","category":"Infrastructure","deps":[],"priority":1,"capability":"Infrastructure","complexity":"S","context":"Small","local_safe":"CLOUD_REQUIRED","reason_cloud":"secrets + CI infra","verification":"Build","ready":true},
+    {"id":"TASK-0002","wave":"W1","title":"Fix publish dist-tag (hardcoded --tag beta -> version-correct latest/beta)","category":"Infrastructure","deps":[],"priority":1,"capability":"Implementation","complexity":"XS","context":"Tiny","local_safe":"LOCAL_SAFE","verification":"StaticAnalysis","ready":true},
+    {"id":"TASK-0003","wave":"W1","title":"Fix QUICKSTART install steps + SECURITY.md version (0.1.0-beta -> 0.2.0)","category":"Documentation","deps":[],"priority":2,"capability":"Documentation","complexity":"XS","context":"Small","local_safe":"LOCAL_SAFE","verification":"StaticAnalysis","ready":true},
+    {"id":"TASK-0004","wave":"W1","title":"Tag v0.2.0 + run release matrix + publish prebuild optionalDependencies + main pkg","category":"Infrastructure","deps":["TASK-0001","TASK-0002","TASK-0003"],"priority":1,"capability":"Infrastructure","complexity":"M","context":"Small","local_safe":"CLOUD_REQUIRED","reason_cloud":"publish action + human confirm","verification":"Build","ready":false},
+    {"id":"TASK-0005","wave":"W1","title":"Clean-machine smoke: npm install -> load .node -> add/search round-trip","category":"Testing","deps":["TASK-0004"],"priority":1,"capability":"Testing","complexity":"S","context":"Small","local_safe":"LOCAL_SAFE","verification":"Unit","ready":false},
+    {"id":"TASK-0006","wave":"W2","title":"Extract Rwang genesis-sidecar.mjs + knowledge.mjs -> standalone path-independent adapter (remove G:/ default -> config/param)","category":"Core","deps":["TASK-0004"],"priority":2,"capability":"Implementation","complexity":"M","context":"Medium","local_safe":"LOCAL_SAFE","verification":"Unit","ready":false,"gated_by":"GATE-DEMAND-1"},
+    {"id":"TASK-0007","wave":"W2","title":"Package + publish the adapter (exports, package.json, README)","category":"Infrastructure","deps":["TASK-0006"],"priority":2,"capability":"Infrastructure","complexity":"S","context":"Small","local_safe":"CLOUD_REQUIRED","reason_cloud":"publish","verification":"Build","ready":false,"gated_by":"GATE-DEMAND-1"},
+    {"id":"TASK-0008","wave":"W2","title":"Make mcp/server.js npx-able (bin entry + published package)","category":"Infrastructure","deps":["TASK-0004"],"priority":2,"capability":"Implementation","complexity":"S","context":"Small","local_safe":"LOCAL_SAFE","verification":"Snapshot","ready":false,"gated_by":"GATE-DEMAND-1"},
+    {"id":"TASK-0009","wave":"W2","title":"Fix MCP vectorDim 1536 -> 1024 (bge-m3 default); verify against engine default","category":"Core","deps":[],"priority":3,"capability":"Implementation","complexity":"XS","context":"Tiny","local_safe":"LOCAL_SAFE","verification":"Unit","ready":true},
+    {"id":"TASK-0010","wave":"W2","title":"Adapter contract tests (path-independent load + addNode/hybridSearch/retrieveContext round-trip)","category":"Testing","deps":["TASK-0006"],"priority":2,"capability":"Testing","complexity":"S","context":"Medium","local_safe":"LOCAL_SAFE","verification":"Unit","ready":false,"gated_by":"GATE-DEMAND-1"},
+    {"id":"TASK-0011","wave":"W3","title":"Dockerfile for genesis-db-server (multi-stage, --features bins)","category":"Infrastructure","deps":[],"priority":3,"capability":"Infrastructure","complexity":"S","context":"Small","local_safe":"LOCAL_SAFE","verification":"Build","ready":true},
+    {"id":"TASK-0012","wave":"W3","title":"SIGTERM graceful shutdown -> save_state() in main.rs","category":"Infrastructure","deps":[],"priority":3,"capability":"Implementation","complexity":"S","context":"Small","local_safe":"LOCAL_SAFE","verification":"Compiler","ready":true},
+    {"id":"TASK-0013","wave":"W3","title":"Unauthenticated /health route (distinct from key-guarded /v1/status)","category":"Agent","deps":[],"priority":3,"capability":"Integration","complexity":"XS","context":"Small","local_safe":"CLOUD_REQUIRED","reason_cloud":"public interface addition","verification":"Unit","ready":true},
+    {"id":"TASK-0014","wave":"W3","title":"SDK auth header support (Python + Go: Bearer vs api_key_guard)","category":"Core","deps":[],"priority":3,"capability":"Implementation","complexity":"S","context":"Medium","local_safe":"LOCAL_SAFE","verification":"Unit","ready":true},
+    {"id":"TASK-0015","wave":"W3","title":"REST API contract tests incl. auth path","category":"Testing","deps":["TASK-0013","TASK-0014"],"priority":3,"capability":"Testing","complexity":"M","context":"Medium","local_safe":"LOCAL_SAFE","verification":"Unit","ready":false,"gated_by":"GATE-DEMAND-1"},
+    {"id":"TASK-0016","wave":"W4","title":"Analyze Graphiti GraphDriver contract vs HQL subset -> adapter-or-translator decision doc","category":"Documentation","deps":[],"priority":4,"capability":"Architecture","complexity":"M","context":"Large","local_safe":"CLOUD_REQUIRED","reason_cloud":"architecture/interface decision","verification":"Review","ready":false,"gated_by":"GATE-DEMAND-1"},
+    {"id":"TASK-0017","wave":"W4","title":"Implement Graphiti driver (gated on TASK-0016 outcome)","category":"Agent","deps":["TASK-0016","TASK-0011","TASK-0014"],"priority":4,"capability":"Integration","complexity":"L","context":"Large","local_safe":"CLOUD_REQUIRED","reason_cloud":"public integration/interface","verification":"Unit","ready":false,"gated_by":"GATE-DEMAND-1"},
+    {"id":"TASK-0018","wave":"W4","title":"Graphiti driver conformance tests + runnable example","category":"Testing","deps":["TASK-0017"],"priority":4,"capability":"Testing","complexity":"S","context":"Medium","local_safe":"LOCAL_SAFE","verification":"Snapshot","ready":false,"gated_by":"GATE-DEMAND-1"}
+  ]
+}
