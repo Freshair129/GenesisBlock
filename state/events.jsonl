@@ -2,3 +2,6 @@
 {"ts":"2026-07-07T12:10:00+07:00","event":"owner_approval","phase":0,"decision":"approve","note":"owner said 'approve' + requested local-dispatch backlog"}
 {"ts":"2026-07-07T12:15:00+07:00","event":"phase_transition","phase":6,"status":"in_progress","note":"Phases 1-5 declared INHERITED-FROZEN per MASTER_PLAN"}
 {"ts":"2026-07-07T12:30:00+07:00","event":"phase_transition","phase":6,"status":"awaiting_approval","note":"18 tasks / 4 waves decomposed; 12 LOCAL_SAFE; GATE-DEMAND-1 blocking W2-W4"}
+{"ts":"2026-07-07T13:00:00+07:00","event":"acr_proposed","id":"ACR-HQL-P0","doc":"docs/ARCHITECTURE_CHANGE_REQUEST--HQL-P0-BUGFIXES.md","note":"narrowly unfreezes HQL P0 grammar; adds W0 pre-publish; owner-driven (Boss 'ลุย')"}
+{"ts":"2026-07-07T13:05:00+07:00","event":"queue_update","added":["TASK-0000a","TASK-0000b","TASK-0000c"],"note":"W0 wave added; TASK-0001 dep changed to TASK-0000c"}
+{"ts":"2026-07-07T13:05:00+07:00","event":"hazard_flagged","task":"TASK-0000a","hazard":"baseline capture window closes on next main merge; MUST run on clean tree"}

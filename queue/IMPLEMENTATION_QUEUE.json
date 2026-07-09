@@ -7,17 +7,23 @@
   "adr": "docs/adr/ADR--ENGINE-WEDGE-FIRST.md",
   "created_at": "2026-07-07T12:15:00+07:00",
   "updated_at": "2026-07-07T12:15:00+07:00",
-  "frozen_constraints": "Do NOT change: Storage core methods, public NAPI/REST/FFI signatures, on-disk/WAL format, HQL grammar semantics. Any such change requires docs/ARCHITECTURE_CHANGE_REQUEST.md.",
+  "frozen_constraints": "Do NOT change: Storage core methods, public NAPI/REST/FFI signatures, on-disk/WAL format. HQL grammar semantics: P1/P2/P3 remain frozen; P0 narrowly unfrozen per docs/ARCHITECTURE_CHANGE_REQUEST--HQL-P0-BUGFIXES.md (approved). Any further change requires a new ARCHITECTURE_CHANGE_REQUEST.",
+  "amendments": [
+    {"id":"ACR-HQL-P0","doc":"docs/ARCHITECTURE_CHANGE_REQUEST--HQL-P0-BUGFIXES.md","effect":"adds W0 pre-publish with TASK-0000a/b/c; narrowly unfreezes HQL P0 grammar; preserves ADR wedge-first discipline","approved_at":null}
+  ],
   "gate": {
     "id": "GATE-DEMAND-1",
     "after_wave": "W1",
     "criterion": "first-10-external-installs signal within ~1 month of engine publish",
     "authority": "owner",
     "blocks": ["W2", "W3", "W4"],
-    "note": "Publishing is near-free; do not fund W2-W4 expensive halves until this clears."
+    "note": "Publishing is near-free; do not fund W2-W4 expensive halves until this clears. Also blocks HQL P1/P2/P3 per ADR."
   },
   "tasks": [
-    {"id":"TASK-0001","wave":"W1","title":"Verify + dry-run release pipeline (NPM_TOKEN, napi artifacts x5 triples)","category":"Infrastructure","deps":[],"priority":1,"capability":"Infrastructure","complexity":"S","context":"Small","local_safe":"CLOUD_REQUIRED","reason_cloud":"secrets + CI infra","verification":"Build","ready":true},
+    {"id":"TASK-0000a","wave":"W0","title":"Capture v1 pre-P0 HQL baseline on clean main (bench harnesses; commit under benches/baselines/hql-v1/)","category":"Verification","deps":[],"priority":0,"capability":"Benchmark","complexity":"S","context":"Small","local_safe":"LOCAL_SAFE","verification":"Benchmark","ready":true,"hazard":"MUST run on clean main before TASK-0000b; window closes on next merge","acr":"ACR-HQL-P0"},
+    {"id":"TASK-0000b","wave":"W0","title":"Merge HQL P0 defect fixes (SEARCH target meaningful, hybrid K exposed, EF/OVERSAMPLE/DIRECTION grammar, rel alternation) + tests","category":"Core","deps":["TASK-0000a"],"priority":0,"capability":"Implementation","complexity":"M","context":"Medium","local_safe":"LOCAL_SAFE","verification":"Unit","ready":false,"scope":"P0 only per docs/PLAN--HQL-REFINEMENT.md; P1/P2/P3 excluded","acr":"ACR-HQL-P0"},
+    {"id":"TASK-0000c","wave":"W0","title":"Capture post-P0 baseline + CHANGELOG delta (benches/baselines/hql-v2-p0/)","category":"Verification","deps":["TASK-0000b"],"priority":0,"capability":"Benchmark","complexity":"XS","context":"Small","local_safe":"LOCAL_SAFE","verification":"Benchmark","ready":false,"rollback":"revert TASK-0000b if p50 or recall regresses >5% at equal semantic input","acr":"ACR-HQL-P0"},
+    {"id":"TASK-0001","wave":"W1","title":"Verify + dry-run release pipeline (NPM_TOKEN, napi artifacts x5 triples)","category":"Infrastructure","deps":["TASK-0000c"],"priority":1,"capability":"Infrastructure","complexity":"S","context":"Small","local_safe":"CLOUD_REQUIRED","reason_cloud":"secrets + CI infra","verification":"Build","ready":false,"note":"was ready:true pre-ACR; now depends on W0 exit"},
     {"id":"TASK-0002","wave":"W1","title":"Fix publish dist-tag (hardcoded --tag beta -> version-correct latest/beta)","category":"Infrastructure","deps":[],"priority":1,"capability":"Implementation","complexity":"XS","context":"Tiny","local_safe":"LOCAL_SAFE","verification":"StaticAnalysis","ready":true},
     {"id":"TASK-0003","wave":"W1","title":"Fix QUICKSTART install steps + SECURITY.md version (0.1.0-beta -> 0.2.0)","category":"Documentation","deps":[],"priority":2,"capability":"Documentation","complexity":"XS","context":"Small","local_safe":"LOCAL_SAFE","verification":"StaticAnalysis","ready":true},
     {"id":"TASK-0004","wave":"W1","title":"Tag v0.2.0 + run release matrix + publish prebuild optionalDependencies + main pkg","category":"Infrastructure","deps":["TASK-0001","TASK-0002","TASK-0003"],"priority":1,"capability":"Infrastructure","complexity":"M","context":"Small","local_safe":"CLOUD_REQUIRED","reason_cloud":"publish action + human confirm","verification":"Build","ready":false},

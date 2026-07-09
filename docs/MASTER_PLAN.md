@@ -17,6 +17,11 @@ architecturally-frozen engine**, NOT as a greenfield 0→7 architecture build.
   regenerated: `CLAUDE.md`, `docs/C4--GENESISDB-ARCHITECTURE.md`, the `docs/adr/*` set,
   `PROTOCOL--GENESIS-GRAPH-FFI`, `SPEC--MOBILE-SDK`, `BENCH-SPEC--HQL-MOAT-AND-EXPRESSIVENESS`,
   `SPEC--SQLITE-SUBSTRATE-S0-S1`. Any change to them requires an `ARCHITECTURE_CHANGE_REQUEST` (§11.2).
+- **Approved amendment:** [`ARCHITECTURE_CHANGE_REQUEST--HQL-P0-BUGFIXES`](ARCHITECTURE_CHANGE_REQUEST--HQL-P0-BUGFIXES.md)
+  narrowly unfreezes HQL **P0 grammar** (correctness+exposure defects) for pre-publish landing.
+  P1/P2/P3 remain frozen behind GATE-DEMAND-1. Rationale: shipping documented-but-broken behavior
+  under GATE-DEMAND-1 would poison the demand signal, and the pre-P0 v1 baseline window closes
+  on the next merge to `main`.
 - **Rejected alternative:** regenerate all 38 canonical docs for the existing system — rejected as
   over-process on a frozen codebase (violates Operating Principle #1; adds no architectural value).
 - **The real path:** Phase 0 (this plan) → **Phase 6** (decompose the ADR's 4 steps into tasks +
@@ -34,10 +39,12 @@ architecturally-frozen engine**, NOT as a greenfield 0→7 architecture build.
 ## 2. Dependency Graph
 
 ```
-W1 Publish engine ──▶ [DEMAND GATE: first-10-installs ~1mo] ──▶ W2 Adapter+MCP ──▶ W4 Graphiti driver
-       │                                                            │                    ▲
-       └────────────────────────────────────────────▶ W3 REST binary/Docker/SDK-auth ───┘
+W0 HQL-P0 (baseline→merge→bench) ──▶ W1 Publish engine ──▶ [DEMAND GATE: first-10-installs ~1mo] ──▶ W2 Adapter+MCP ──▶ W4 Graphiti driver
+                                            │                                                            │                    ▲
+                                            └────────────────────────────────────────────▶ W3 REST binary/Docker/SDK-auth ───┘
 ```
+- **W0** (from ACR-HQL-P0): TASK-0000a baseline **MUST** precede TASK-0000b code-merge; TASK-0000c re-benches.
+- Baseline window closes on next merge to `main` — W0 is time-critical.
 - W2 (adapter) requires W1 (published engine to depend on).
 - W4 (Graphiti driver) requires W3 (REST/SDK, since the Python/Graphiti channel rides REST) **and**
   an external check of Graphiti's `GraphDriver` contract vs the HQL subset (adapter-vs-translator).
@@ -56,6 +63,7 @@ W1 Publish engine ──▶ [DEMAND GATE: first-10-installs ~1mo] ──▶ W2 A
 | **7 Implementation** | `src/`/packaging changes per wave; `state/progress.jsonl` + `events.jsonl` | Each wave compiles, verifies, reviewed; **W1 gate decision recorded** before W2 |
 
 **Wave→ADR-step mapping (Phase 7):**
+- **W0 = amendment ACR-HQL-P0** — capture v1 baseline; merge HQL P0 defect fixes (SEARCH target meaningful, hybrid `K` exposed, `EF`/`OVERSAMPLE`/`DIRECTION` grammar, rel alternation); re-bench.
 - **W1 = ADR step 1** — publish engine: verify `NPM_TOKEN`, tag `v0.2.0`, fire 5-triple release matrix, fix QUICKSTART/dist-tag(`beta`→correct)/SECURITY.md(0.1.0→0.2.0), publish prebuild `optionalDependencies`.
 - **W2 = ADR step 2** — extract Rwang `store/genesis-sidecar.mjs`+`knowledge.mjs` → first published path-independent consumer package; make `mcp/server.js` npx-able (bin entry; fix `vectorDim:1536`→1024).
 - **W3 = ADR step 3** — REST server as binary + Docker image; SDK auth header support (Python/Go clients vs `api_key_guard`); unauth `/health`; SIGTERM `save_state()`.
@@ -73,6 +81,7 @@ W1 Publish engine ──▶ [DEMAND GATE: first-10-installs ~1mo] ──▶ W2 A
 
 | Wave | Complexity | Rationale |
 |---|---|---|
+| **W0 HQL-P0** | **S/M** | P0 code is already authored in the working tree; W0 work = baseline capture + merge + re-bench; ≤3 working days |
 | W1 Publish | **M** | pure packaging/release plumbing; no engine code change; NPM_TOKEN/matrix unverified = the risk |
 | W2 Adapter+MCP | **M** | ~600 lines already exist in Rwang; work is de-`G:/`-ing + packaging + npx bin |
 | W3 REST/Docker/SDK | **M/L** | Dockerfile (none exists) + graceful shutdown + SDK auth + health route |
@@ -82,6 +91,9 @@ W1 Publish engine ──▶ [DEMAND GATE: first-10-installs ~1mo] ──▶ W2 A
 
 | Risk | Likelihood | Impact | Mitigation |
 |---|---|---|---|
+| **W0 baseline captured on dirty tree** (P0 already applied) | Med | High | ACR-HQL-P0 §4 mandatory ordering; verify `git status` clean at capture; TASK-0000a `hazard` flag in queue |
+| **Post-P0 regression on existing benches** | Low | Med | ACR-HQL-P0 §4 rollback path (revert if p50/recall regress >5% at equal semantic input) |
+| **HQL P1/P2/P3 scope creep into W0** | Med | Med | ACR-HQL-P0 §1 scope is explicit; P1 fold requires a new ACR; track-boundary notes in PLAN & SPEC |
 | **No external demand** (nobody installs) | Med | High | The whole point of the GATE — publish is cheap; measure before spending |
 | `NPM_TOKEN`/release matrix never validated | Med | Med | W1 first sub-task = dry-run the release workflow end-to-end |
 | Graphiti `GraphDriver` needs full Cypher (adapter→translator) | Med | Med | Check contract **before** W4 commit; W4 gated |
