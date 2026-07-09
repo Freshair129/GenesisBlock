@@ -15,7 +15,8 @@
     {"from":"MOD-DRIVER","to":"MOD-REST","kind":"depends_on"}
   ],
   "waves": [
-    {"id":"W1","name":"Publish engine","tasks":["TASK-0001","TASK-0002","TASK-0003","TASK-0004","TASK-0005"],"exit":"npm install works on a clean machine; smoke passes","local_ratio":"3/5 LOCAL_SAFE"},
+    {"id":"W0","name":"Pre-publish (HQL P0 native track, per ACR-HQL-P0)","tasks":["TASK-0000a","TASK-0000b","TASK-0000c"],"exit":"P0 defect fixes on main; v1 + post-fix baselines committed; no regression >5%","local_ratio":"3/3 LOCAL_SAFE","hazard":"baseline capture MUST precede code merge; window closes on next main merge","acr":"ACR-HQL-P0"},
+    {"id":"W1","name":"Publish engine","tasks":["TASK-0001","TASK-0002","TASK-0003","TASK-0004","TASK-0005"],"exit":"npm install works on a clean machine; smoke passes","local_ratio":"3/5 LOCAL_SAFE","depends_on":"W0"},
     {"id":"W2","name":"Adapter + MCP","tasks":["TASK-0006","TASK-0007","TASK-0008","TASK-0009","TASK-0010"],"exit":"published adapter + npx MCP server; contract tests pass","local_ratio":"4/5 LOCAL_SAFE","gated_by":"GATE-DEMAND-1"},
     {"id":"W3","name":"REST binary + Docker + SDK auth","tasks":["TASK-0011","TASK-0012","TASK-0013","TASK-0014","TASK-0015"],"exit":"docker run works; SDK auth green","local_ratio":"4/5 LOCAL_SAFE","gated_by":"GATE-DEMAND-1"},
     {"id":"W4","name":"Graphiti driver","tasks":["TASK-0016","TASK-0017","TASK-0018"],"exit":"driver conformance + runnable example","local_ratio":"1/3 LOCAL_SAFE","gated_by":"GATE-DEMAND-1"}
