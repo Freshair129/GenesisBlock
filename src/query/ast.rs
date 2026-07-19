@@ -162,8 +162,10 @@ pub struct PatternClauses {
 pub enum HqlCommand {
     Search {
         target: String,
-        vector: Vec<f64>,
+        vector: Option<Vec<f64>>,
         k: u32,
+        ef_search: Option<u32>,
+        oversample: Option<u32>,
         fuzzy: bool,
         lang: Option<String>,
         as_of: Option<String>,
@@ -174,14 +176,19 @@ pub enum HqlCommand {
         seed: String,
         depth: u32,
         rel: HqlRel,
+        rels: Option<Vec<String>>,
+        direction: Option<String>,
         fuzzy: bool,
         as_of: Option<String>,
         clauses: HqlClauses,
     },
     Hybrid {
         target: String,
-        vector: Vec<f64>,
+        vector: Option<Vec<f64>>,
         alpha: f64,
+        k: u32,
+        ef_search: Option<u32>,
+        oversample: Option<u32>,
         fuzzy: bool,
         lang: Option<String>,
         as_of: Option<String>,
@@ -213,13 +220,11 @@ impl TryFrom<&str> for HqlCommand {
                 Rule::query => {
                     for inner_pair in pair.into_inner() {
                         match inner_pair.as_rule() {
-                            Rule::search => return Ok(Self::parse_search(inner_pair)),
-                            Rule::traverse => return Ok(Self::parse_traverse(inner_pair)),
-                            Rule::hybrid => return Ok(Self::parse_hybrid(inner_pair)),
-                            Rule::match_pattern => {
-                                return Ok(Self::parse_match_pattern(inner_pair))
-                            }
-                            Rule::context => return Ok(Self::parse_context(inner_pair)),
+                            Rule::search => return Self::parse_search(inner_pair),
+                            Rule::traverse => return Self::parse_traverse(inner_pair),
+                            Rule::hybrid => return Self::parse_hybrid(inner_pair),
+                            Rule::match_pattern => return Self::parse_match_pattern(inner_pair),
+                            Rule::context => return Self::parse_context(inner_pair),
                             Rule::EOI => continue,
                             _ => {
                                 unreachable!("Unexpected rule in query: {:?}", inner_pair.as_rule())
@@ -236,6 +241,24 @@ impl TryFrom<&str> for HqlCommand {
 }
 
 impl HqlCommand {
+    fn parse_f64(value: &str, field: &str) -> Result<f64, String> {
+        let parsed = value
+            .parse::<f64>()
+            .map_err(|_| format!("HQL Parse Error: {field} value out of range: {value}"))?;
+        if !parsed.is_finite() {
+            return Err(format!(
+                "HQL Parse Error: {field} value out of range: {value}"
+            ));
+        }
+        Ok(parsed)
+    }
+
+    fn parse_u32(value: &str, field: &str) -> Result<u32, String> {
+        value
+            .parse::<u32>()
+            .map_err(|_| format!("HQL Parse Error: {field} value out of range: {value}"))
+    }
+
     fn parse_id_with_fuzzy(pair: pest::iterators::Pair<Rule>) -> (String, bool) {
         let mut id = String::new();
         let mut fuzzy = false;
@@ -282,7 +305,7 @@ impl HqlCommand {
         }
     }
 
-    fn parse_predicate(pair: pest::iterators::Pair<Rule>) -> HqlPredicate {
+    fn parse_predicate(pair: pest::iterators::Pair<Rule>) -> Result<HqlPredicate, String> {
         let mut field = HqlField::Id;
         let mut op = HqlOp::Eq;
         let mut value = HqlValue::Str(String::new());
@@ -310,7 +333,10 @@ impl HqlCommand {
                                 value = HqlValue::Str(Self::parse_string_lit(vp.as_str()))
                             }
                             Rule::number => {
-                                value = HqlValue::Num(vp.as_str().parse::<f64>().unwrap_or(0.0))
+                                value = HqlValue::Num(Self::parse_f64(
+                                    vp.as_str(),
+                                    "filter number",
+                                )?)
                             }
                             _ => {}
                         }
@@ -319,7 +345,7 @@ impl HqlCommand {
                 _ => {}
             }
         }
-        HqlPredicate { field, op, value }
+        Ok(HqlPredicate { field, op, value })
     }
 
     /// Resolve a `field` rule pair into an `HqlField`.
@@ -341,14 +367,14 @@ impl HqlCommand {
         }
     }
 
-    fn parse_clauses(pair: pest::iterators::Pair<Rule>) -> HqlClauses {
+    fn parse_clauses(pair: pest::iterators::Pair<Rule>) -> Result<HqlClauses, String> {
         let mut c = HqlClauses::default();
         for inner in pair.into_inner() {
             match inner.as_rule() {
                 Rule::where_clause => {
                     for p in inner.into_inner() {
                         if p.as_rule() == Rule::predicate {
-                            c.where_preds.push(Self::parse_predicate(p));
+                            c.where_preds.push(Self::parse_predicate(p)?);
                         }
                     }
                 }
@@ -393,7 +419,7 @@ impl HqlCommand {
                 _ => {}
             }
         }
-        c
+        Ok(c)
     }
 
     fn parse_collection_spec(pair: pest::iterators::Pair<Rule>) -> String {
@@ -410,10 +436,18 @@ impl HqlCommand {
         String::new()
     }
 
-    fn parse_search(pair: pest::iterators::Pair<Rule>) -> Self {
+    fn parse_vector(pair: pest::iterators::Pair<Rule>) -> Result<Vec<f64>, String> {
+        pair.into_inner()
+            .map(|n| Self::parse_f64(n.as_str(), "vector component"))
+            .collect()
+    }
+
+    fn parse_search(pair: pest::iterators::Pair<Rule>) -> Result<Self, String> {
         let mut target = String::new();
-        let mut vector = Vec::new();
+        let mut vector = None;
         let mut k = 5;
+        let mut ef_search = None;
+        let mut oversample = None;
         let mut fuzzy = false;
         let mut lang = None;
         let mut as_of = None;
@@ -427,37 +461,54 @@ impl HqlCommand {
                     target = id;
                     fuzzy = f;
                 }
-                Rule::vector => {
-                    vector = inner
-                        .into_inner()
-                        .map(|n| n.as_str().parse::<f64>().unwrap_or(0.0))
-                        .collect();
+                Rule::similar_clause => {
+                    if let Some(v) = inner.into_inner().find(|p| p.as_rule() == Rule::vector) {
+                        vector = Some(Self::parse_vector(v)?);
+                    }
                 }
-                Rule::k => k = inner.as_str().parse::<u32>().unwrap_or(5),
+                Rule::k => k = Self::parse_u32(inner.as_str(), "K")?,
+                Rule::ef_spec => {
+                    for p in inner.into_inner() {
+                        if p.as_rule() == Rule::ef {
+                            ef_search = Some(Self::parse_u32(p.as_str(), "EF")?);
+                        }
+                    }
+                }
+                Rule::oversample_spec => {
+                    for p in inner.into_inner() {
+                        if p.as_rule() == Rule::oversample {
+                            oversample = Some(Self::parse_u32(p.as_str(), "OVERSAMPLE")?);
+                        }
+                    }
+                }
                 Rule::collection_spec => collection = Some(Self::parse_collection_spec(inner)),
                 Rule::lang_spec => lang = Some(Self::parse_lang_spec(inner)),
                 Rule::as_of => as_of = Some(Self::parse_as_of(inner)),
-                Rule::clauses => clauses = Self::parse_clauses(inner),
+                Rule::clauses => clauses = Self::parse_clauses(inner)?,
                 _ => {}
             }
         }
 
-        HqlCommand::Search {
+        Ok(HqlCommand::Search {
             target,
             vector,
             k,
+            ef_search,
+            oversample,
             fuzzy,
             lang,
             as_of,
             collection,
             clauses,
-        }
+        })
     }
 
-    fn parse_traverse(pair: pest::iterators::Pair<Rule>) -> Self {
+    fn parse_traverse(pair: pest::iterators::Pair<Rule>) -> Result<Self, String> {
         let mut seed = String::new();
         let mut depth = 1;
         let mut rel = HqlRel::Physical("ANY".to_string());
+        let mut rels = None;
+        let mut direction = None;
         let mut fuzzy = false;
         let mut as_of = None;
         let mut clauses = HqlClauses::default();
@@ -469,12 +520,22 @@ impl HqlCommand {
                     seed = id;
                     fuzzy = f;
                 }
-                Rule::depth => depth = inner.as_str().parse::<u32>().unwrap_or(1),
+                Rule::depth => depth = Self::parse_u32(inner.as_str(), "DEPTH")?,
                 Rule::rel => {
                     for r in inner.into_inner() {
                         match r.as_rule() {
                             Rule::rel_type => {
-                                rel = HqlRel::Physical(r.as_str().to_string());
+                                let names: Vec<String> = r
+                                    .into_inner()
+                                    .filter(|p| p.as_rule() == Rule::rel_name)
+                                    .map(|p| p.as_str().to_string())
+                                    .collect();
+                                if let Some(first) = names.first() {
+                                    rel = HqlRel::Physical(first.clone());
+                                }
+                                if names.len() > 1 {
+                                    rels = Some(names);
+                                }
                             }
                             Rule::infer_rel => {
                                 for inner_r in r.into_inner() {
@@ -487,26 +548,38 @@ impl HqlCommand {
                         }
                     }
                 }
+                Rule::direction_spec => {
+                    for p in inner.into_inner() {
+                        if p.as_rule() == Rule::direction {
+                            direction = Some(p.as_str().to_ascii_lowercase());
+                        }
+                    }
+                }
                 Rule::as_of => as_of = Some(Self::parse_as_of(inner)),
-                Rule::clauses => clauses = Self::parse_clauses(inner),
+                Rule::clauses => clauses = Self::parse_clauses(inner)?,
                 _ => {}
             }
         }
 
-        HqlCommand::Traverse {
+        Ok(HqlCommand::Traverse {
             seed,
             depth,
             rel,
+            rels,
+            direction,
             fuzzy,
             as_of,
             clauses,
-        }
+        })
     }
 
-    fn parse_hybrid(pair: pest::iterators::Pair<Rule>) -> Self {
+    fn parse_hybrid(pair: pest::iterators::Pair<Rule>) -> Result<Self, String> {
         let mut target = String::new();
-        let mut vector = Vec::new();
+        let mut vector = None;
         let mut alpha = 0.5;
+        let mut k = 10;
+        let mut ef_search = None;
+        let mut oversample = None;
         let mut fuzzy = false;
         let mut lang = None;
         let mut as_of = None;
@@ -520,34 +593,51 @@ impl HqlCommand {
                     target = id;
                     fuzzy = f;
                 }
-                Rule::vector => {
-                    vector = inner
-                        .into_inner()
-                        .map(|n| n.as_str().parse::<f64>().unwrap_or(0.0))
-                        .collect();
+                Rule::similar_clause => {
+                    if let Some(v) = inner.into_inner().find(|p| p.as_rule() == Rule::vector) {
+                        vector = Some(Self::parse_vector(v)?);
+                    }
                 }
-                Rule::alpha => alpha = inner.as_str().parse::<f64>().unwrap_or(0.5),
+                Rule::alpha => alpha = Self::parse_f64(inner.as_str(), "ALPHA")?,
+                Rule::k => k = Self::parse_u32(inner.as_str(), "K")?,
+                Rule::ef_spec => {
+                    for p in inner.into_inner() {
+                        if p.as_rule() == Rule::ef {
+                            ef_search = Some(Self::parse_u32(p.as_str(), "EF")?);
+                        }
+                    }
+                }
+                Rule::oversample_spec => {
+                    for p in inner.into_inner() {
+                        if p.as_rule() == Rule::oversample {
+                            oversample = Some(Self::parse_u32(p.as_str(), "OVERSAMPLE")?);
+                        }
+                    }
+                }
                 Rule::collection_spec => collection = Some(Self::parse_collection_spec(inner)),
                 Rule::lang_spec => lang = Some(Self::parse_lang_spec(inner)),
                 Rule::as_of => as_of = Some(Self::parse_as_of(inner)),
-                Rule::clauses => clauses = Self::parse_clauses(inner),
+                Rule::clauses => clauses = Self::parse_clauses(inner)?,
                 _ => {}
             }
         }
 
-        HqlCommand::Hybrid {
+        Ok(HqlCommand::Hybrid {
             target,
             vector,
             alpha,
+            k,
+            ef_search,
+            oversample,
             fuzzy,
             lang,
             as_of,
             collection,
             clauses,
-        }
+        })
     }
 
-    fn parse_context(pair: pest::iterators::Pair<Rule>) -> Self {
+    fn parse_context(pair: pest::iterators::Pair<Rule>) -> Result<Self, String> {
         let mut target = String::new();
         let mut tier = "H1".to_string();
         let mut budget = None;
@@ -561,17 +651,17 @@ impl HqlCommand {
                     fuzzy = f;
                 }
                 Rule::tier => tier = inner.as_str().to_string(),
-                Rule::budget => budget = Some(inner.as_str().parse::<u32>().unwrap_or(32000)),
+                Rule::budget => budget = Some(Self::parse_u32(inner.as_str(), "BUDGET")?),
                 _ => {}
             }
         }
 
-        HqlCommand::Context {
+        Ok(HqlCommand::Context {
             target,
             tier,
             budget,
             fuzzy,
-        }
+        })
     }
 
     // --- Cypher pattern parsing (ADR--GENESISDB-HQL-CYPHER-PATTERNS) ---
@@ -591,15 +681,18 @@ impl HqlCommand {
     }
 
     /// Parse a `filter_value` (`string_lit | number`) rule into an `HqlValue`.
-    fn parse_filter_value(pair: pest::iterators::Pair<Rule>) -> HqlValue {
+    fn parse_filter_value(pair: pest::iterators::Pair<Rule>) -> Result<HqlValue, String> {
         if let Some(vp) = pair.into_inner().next() {
             match vp.as_rule() {
-                Rule::string_lit => HqlValue::Str(Self::parse_string_lit(vp.as_str())),
-                Rule::number => HqlValue::Num(vp.as_str().parse::<f64>().unwrap_or(0.0)),
-                _ => HqlValue::Str(String::new()),
+                Rule::string_lit => Ok(HqlValue::Str(Self::parse_string_lit(vp.as_str()))),
+                Rule::number => Ok(HqlValue::Num(Self::parse_f64(
+                    vp.as_str(),
+                    "filter number",
+                )?)),
+                _ => Ok(HqlValue::Str(String::new())),
             }
         } else {
-            HqlValue::Str(String::new())
+            Ok(HqlValue::Str(String::new()))
         }
     }
 
@@ -611,7 +704,7 @@ impl HqlCommand {
             .unwrap_or_default()
     }
 
-    fn parse_pat_props(pair: pest::iterators::Pair<Rule>) -> Vec<(String, HqlValue)> {
+    fn parse_pat_props(pair: pest::iterators::Pair<Rule>) -> Result<Vec<(String, HqlValue)>, String> {
         let mut props = Vec::new();
         for pp in pair.into_inner() {
             if pp.as_rule() == Rule::prop_pair {
@@ -620,27 +713,27 @@ impl HqlCommand {
                 for inner in pp.into_inner() {
                     match inner.as_rule() {
                         Rule::identifier => key = inner.as_str().to_string(),
-                        Rule::filter_value => val = Self::parse_filter_value(inner),
+                        Rule::filter_value => val = Self::parse_filter_value(inner)?,
                         _ => {}
                     }
                 }
                 props.push((key, val));
             }
         }
-        props
+        Ok(props)
     }
 
-    fn parse_node_pattern(pair: pest::iterators::Pair<Rule>) -> NodePattern {
+    fn parse_node_pattern(pair: pest::iterators::Pair<Rule>) -> Result<NodePattern, String> {
         let mut np = NodePattern::default();
         for inner in pair.into_inner() {
             match inner.as_rule() {
                 Rule::pat_var => np.var = Some(inner.as_str().to_string()),
                 Rule::pat_label => np.label = Some(Self::parse_pat_label(inner)),
-                Rule::pat_props => np.props = Self::parse_pat_props(inner),
+                Rule::pat_props => np.props = Self::parse_pat_props(inner)?,
                 _ => {}
             }
         }
-        np
+        Ok(np)
     }
 
     fn parse_edge_pattern(pair: pest::iterators::Pair<Rule>) -> EdgePattern {
@@ -675,7 +768,7 @@ impl HqlCommand {
         }
     }
 
-    fn parse_hop(pair: pest::iterators::Pair<Rule>) -> (EdgePattern, NodePattern) {
+    fn parse_hop(pair: pest::iterators::Pair<Rule>) -> Result<(EdgePattern, NodePattern), String> {
         let mut edge = EdgePattern {
             var: None,
             rel_type: None,
@@ -685,14 +778,14 @@ impl HqlCommand {
         for inner in pair.into_inner() {
             match inner.as_rule() {
                 Rule::edge_pattern => edge = Self::parse_edge_pattern(inner),
-                Rule::node_pattern => node = Self::parse_node_pattern(inner),
+                Rule::node_pattern => node = Self::parse_node_pattern(inner)?,
                 _ => {}
             }
         }
-        (edge, node)
+        Ok((edge, node))
     }
 
-    fn parse_graph_pattern(pair: pest::iterators::Pair<Rule>) -> GraphPattern {
+    fn parse_graph_pattern(pair: pest::iterators::Pair<Rule>) -> Result<GraphPattern, String> {
         let mut start = NodePattern::default();
         let mut hops = Vec::new();
         let mut seen_anchor = false;
@@ -701,14 +794,14 @@ impl HqlCommand {
                 // The only direct `node_pattern` child is the anchor; hop nodes
                 // are nested inside their `hop`.
                 Rule::node_pattern if !seen_anchor => {
-                    start = Self::parse_node_pattern(inner);
+                    start = Self::parse_node_pattern(inner)?;
                     seen_anchor = true;
                 }
-                Rule::hop => hops.push(Self::parse_hop(inner)),
+                Rule::hop => hops.push(Self::parse_hop(inner)?),
                 _ => {}
             }
         }
-        GraphPattern { start, hops }
+        Ok(GraphPattern { start, hops })
     }
 
     /// `qual_tail` = `prop_field | id | label` → an `HqlField`.
@@ -739,7 +832,7 @@ impl HqlCommand {
         QualField { var, field }
     }
 
-    fn parse_pat_predicate(pair: pest::iterators::Pair<Rule>) -> PatternPredicate {
+    fn parse_pat_predicate(pair: pest::iterators::Pair<Rule>) -> Result<PatternPredicate, String> {
         let mut field = QualField {
             var: String::new(),
             field: None,
@@ -750,21 +843,21 @@ impl HqlCommand {
             match inner.as_rule() {
                 Rule::qual_field => field = Self::parse_qual_field(inner),
                 Rule::op => op = Self::op_from_str(inner.as_str()),
-                Rule::filter_value => value = Self::parse_filter_value(inner),
+                Rule::filter_value => value = Self::parse_filter_value(inner)?,
                 _ => {}
             }
         }
-        PatternPredicate { field, op, value }
+        Ok(PatternPredicate { field, op, value })
     }
 
-    fn parse_pat_clauses(pair: pest::iterators::Pair<Rule>) -> PatternClauses {
+    fn parse_pat_clauses(pair: pest::iterators::Pair<Rule>) -> Result<PatternClauses, String> {
         let mut c = PatternClauses::default();
         for inner in pair.into_inner() {
             match inner.as_rule() {
                 Rule::pat_where => {
                     for p in inner.into_inner() {
                         if p.as_rule() == Rule::pat_predicate {
-                            c.where_preds.push(Self::parse_pat_predicate(p));
+                            c.where_preds.push(Self::parse_pat_predicate(p)?);
                         }
                     }
                 }
@@ -808,10 +901,10 @@ impl HqlCommand {
                 _ => {}
             }
         }
-        c
+        Ok(c)
     }
 
-    fn parse_match_pattern(pair: pest::iterators::Pair<Rule>) -> Self {
+    fn parse_match_pattern(pair: pest::iterators::Pair<Rule>) -> Result<Self, String> {
         let mut pattern = GraphPattern {
             start: NodePattern::default(),
             hops: Vec::new(),
@@ -820,16 +913,16 @@ impl HqlCommand {
         let mut clauses = PatternClauses::default();
         for inner in pair.into_inner() {
             match inner.as_rule() {
-                Rule::graph_pattern => pattern = Self::parse_graph_pattern(inner),
+                Rule::graph_pattern => pattern = Self::parse_graph_pattern(inner)?,
                 Rule::as_of => as_of = Some(Self::parse_as_of(inner)),
-                Rule::pat_clauses => clauses = Self::parse_pat_clauses(inner),
+                Rule::pat_clauses => clauses = Self::parse_pat_clauses(inner)?,
                 _ => {}
             }
         }
-        HqlCommand::MatchPattern {
+        Ok(HqlCommand::MatchPattern {
             pattern,
             as_of,
             clauses,
-        }
+        })
     }
 }

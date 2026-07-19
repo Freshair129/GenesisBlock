@@ -18,6 +18,8 @@ related:
 
 **This is the normative target contract for [PLAN--HQL-REFINEMENT](PLAN--HQL-REFINEMENT.md).** Everything here is either (a) fixed by the plan's task definitions, or (b) marked **⚙ design-gated** — the recommended form is written here and P0-T0/P1-T0/P3-T0 may amend it; if a gate amends, this spec is updated in the same PR. Sections not restated (clause null semantics, collections, AS OF, surfaces, return shapes) are **inherited unchanged from [SPEC--HQL-V1](SPEC--HQL-V1.md)**.
 
+**Track boundary (2026-07-05):** `P0` is a native HQL correctness/exposure milestone and remains intentionally separable from the SQLite substrate implementation track. SQLite may change the execution strategy for `P2/P3`, but `P0` semantics in this spec must remain implementable and shippable without waiting for `S0/S1`. See [SPEC--SQLITE-SUBSTRATE-S0-S1](SPEC--SQLITE-SUBSTRATE-S0-S1.md).
+
 **Version identity:** "HQL v2" = the language state after the P0, P1, and P2 PRs are merged. Each PR ships a self-consistent subset (P0-only is a valid intermediate state); this spec describes the union. P3 (`SEARCH TEXT`) is **reserved syntax**, specified only after its ADR (P3-T0).
 
 ---
@@ -32,6 +34,8 @@ related:
 ---
 
 ## 2. P0 — command deltas (correctness & exposure)
+
+`P0` is the last phase in this spec whose implementation contract is fully substrate-independent: it is about fixing wrong-answer behavior and exposing existing native engine knobs/capabilities through HQL, REST, NAPI, and MCP's shared `execute_hql` funnel.
 
 ### 2.1 SEARCH / hybrid: search-by-node (target becomes meaningful) — ⚙ design-gated (P0-T0)
 
