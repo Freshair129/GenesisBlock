@@ -3051,14 +3051,15 @@ impl Storage {
         // scan and seed directly from the interned id; otherwise fall back to
         // the existing live-node scan.
         let mut frontier: Vec<(u32, Row)> = Vec::new();
-        let anchor_id = pattern
-            .start
-            .props
-            .iter()
-            .find_map(|(key, value)| match (key.as_str(), value) {
-                ("id", query::ast::HqlValue::Str(id)) => Some(id.clone()),
-                _ => None,
-            });
+        let anchor_id =
+            pattern
+                .start
+                .props
+                .iter()
+                .find_map(|(key, value)| match (key.as_str(), value) {
+                    ("id", query::ast::HqlValue::Str(id)) => Some(id.clone()),
+                    _ => None,
+                });
         if let Some(anchor_id) = anchor_id {
             if let Some(anchor_u32) = self.get_u32(&anchor_id) {
                 if let Some(entry) = self.nodes.get(&anchor_u32) {

@@ -333,10 +333,8 @@ impl HqlCommand {
                                 value = HqlValue::Str(Self::parse_string_lit(vp.as_str()))
                             }
                             Rule::number => {
-                                value = HqlValue::Num(Self::parse_f64(
-                                    vp.as_str(),
-                                    "filter number",
-                                )?)
+                                value =
+                                    HqlValue::Num(Self::parse_f64(vp.as_str(), "filter number")?)
                             }
                             _ => {}
                         }
@@ -704,7 +702,9 @@ impl HqlCommand {
             .unwrap_or_default()
     }
 
-    fn parse_pat_props(pair: pest::iterators::Pair<Rule>) -> Result<Vec<(String, HqlValue)>, String> {
+    fn parse_pat_props(
+        pair: pest::iterators::Pair<Rule>,
+    ) -> Result<Vec<(String, HqlValue)>, String> {
         let mut props = Vec::new();
         for pp in pair.into_inner() {
             if pp.as_rule() == Rule::prop_pair {

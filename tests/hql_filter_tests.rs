@@ -602,8 +602,8 @@ fn strict_numeric_parse_errors_surface_in_ast() {
     use genesis_block_native::query::ast::HqlCommand;
     use std::convert::TryFrom;
 
-    let k_err = HqlCommand::try_from("SEARCH q SIMILAR TO [1.0] K 99999999999999999999")
-        .unwrap_err();
+    let k_err =
+        HqlCommand::try_from("SEARCH q SIMILAR TO [1.0] K 99999999999999999999").unwrap_err();
     assert!(k_err.contains("K value out of range"));
 
     let depth_err =
@@ -638,8 +638,7 @@ fn hybrid_and_search_parse_new_exposed_knobs() {
         }
     ));
 
-    let hybrid =
-        HqlCommand::try_from("MATCH q ALPHA 0.5 K 50 EF 256 OVERSAMPLE 11").unwrap();
+    let hybrid = HqlCommand::try_from("MATCH q ALPHA 0.5 K 50 EF 256 OVERSAMPLE 11").unwrap();
     assert!(matches!(
         hybrid,
         HqlCommand::Hybrid {
