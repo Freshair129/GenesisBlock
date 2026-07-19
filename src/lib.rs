@@ -3524,18 +3524,22 @@ impl Storage {
     /// below is what actually hides it from the current view. `include_invalid`
     /// is the caller's opt-in escape hatch to see retracted/superseded items
     /// even in the current view (mirrors `neighbors`' `include_invalid`).
+    /// `now` is the caller's RFC3339 clock reading, taken ONCE per query —
+    /// this helper sits on per-edge hot loops, so it must not allocate a
+    /// fresh timestamp per call.
     fn is_currently_visible(
         valid_from: &str,
         valid_to: &Option<String>,
         as_of: &Option<String>,
         include_invalid: bool,
+        now: &str,
     ) -> bool {
         if !Self::is_valid_as_of(valid_from, valid_to, as_of) {
             return false;
         }
         if as_of.is_none() && !include_invalid {
             if let Some(to) = valid_to {
-                if Utc::now().to_rfc3339().as_str() >= to.as_str() {
+                if now >= to.as_str() {
                     return false;
                 }
             }
@@ -3752,6 +3756,7 @@ impl Storage {
         // Retraction visibility: by default a retracted edge (valid_to passed) is
         // hidden from the current view; `include_invalid = true` surfaces it.
         let include_invalid = args.include_invalid.unwrap_or(false);
+        let now = Utc::now().to_rfc3339();
         let mut results = Vec::new();
         let mut visited = HashSet::new();
         visited.insert(u32_seed);
@@ -3786,6 +3791,7 @@ impl Storage {
                         &edge.valid_to,
                         &args.as_of,
                         include_invalid,
+                        &now,
                     ) {
                         continue;
                     }
@@ -3864,6 +3870,7 @@ impl Storage {
     /// superseded is unchanged from before this method enforced visibility.
     pub fn query(&self, args: QueryInput) -> Result<Vec<EdgeOutput>> {
         let include_invalid = args.include_invalid.unwrap_or(false);
+        let now = Utc::now().to_rfc3339();
         let mut res = Vec::new();
         for r in self.edges.iter() {
             let e = r.value();
@@ -3877,8 +3884,13 @@ impl Storage {
                     continue;
                 }
             }
-            if !Self::is_currently_visible(&e.valid_from, &e.valid_to, &args.as_of, include_invalid)
-            {
+            if !Self::is_currently_visible(
+                &e.valid_from,
+                &e.valid_to,
+                &args.as_of,
+                include_invalid,
+                &now,
+            ) {
                 continue;
             }
             // Endpoint nodes must also be in view: a node superseded after
