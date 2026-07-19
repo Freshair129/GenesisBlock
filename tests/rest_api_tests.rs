@@ -237,6 +237,41 @@ async fn test_swarm_status_has_peer_id() {
     );
 }
 
+#[tokio::test]
+async fn test_swarm_status_has_merkle_root() {
+    let (app, _dir) = make_app();
+    let (status, body) = get_json(&app, "/v1/swarm/status").await;
+    assert_eq!(status, StatusCode::OK);
+    assert!(
+        body["merkle_root"].is_string(),
+        "merkle_root must be present (folded get_merkle_root); got: {body}"
+    );
+}
+
+#[tokio::test]
+async fn test_retrieve_context_tiered() {
+    let (app, _dir) = make_app();
+    let (st, _) = post_json(
+        &app,
+        "/v1/node/add",
+        serde_json::json!({"id": "ctx_root", "labels": ["Doc"]}),
+    )
+    .await;
+    assert_eq!(st, StatusCode::OK);
+
+    let (status, body) = post_json(
+        &app,
+        "/v1/context/retrieve",
+        serde_json::json!({"target_id": "ctx_root", "tier": "H1"}),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK, "retrieve_context failed: {body}");
+    assert!(
+        body["nodes"].is_array() && body["token_estimate"].is_number(),
+        "ContextPackage shape expected; got: {body}"
+    );
+}
+
 // ---------------------------------------------------------------------------
 // Node
 // ---------------------------------------------------------------------------
@@ -1285,6 +1320,7 @@ async fn test_all_v1_routes_are_wired() {
         "/v1/query",
         "/v1/search/hybrid",
         "/v1/reason/context",
+        "/v1/context/retrieve",
         "/v1/consensus/propose",
         "/v1/consensus/vote",
         "/v1/consensus/sign-vote",
