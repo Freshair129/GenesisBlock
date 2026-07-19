@@ -1,4 +1,4 @@
-//! REST API integration tests — exercises all 24 /v1/* routes via in-process
+//! REST API integration tests — exercises all 25 /v1/* routes via in-process
 //! Axum oneshot calls (no TCP socket). Each test gets its own TempDir so
 //! there is no shared state between tests.
 //!
@@ -400,6 +400,69 @@ async fn test_bulk_add_nodes() {
     assert_eq!(rows2.as_array().unwrap()[0]["to"], json!("bulk2"));
     // suppress unused warning
     let _ = rows;
+}
+
+// ---------------------------------------------------------------------------
+// Batch (Storage::execute_batch — mixed nodes+edges, one all-or-nothing write)
+// ---------------------------------------------------------------------------
+
+#[tokio::test]
+async fn test_batch_round_trip_nodes_and_edges() {
+    let (app, _dir) = make_app();
+    let (status, body) = post_json(
+        &app,
+        "/v1/batch",
+        json!({
+            "nodes": [
+                { "id": "batch_a", "labels": ["Tag"] },
+                { "id": "batch_b", "labels": ["Tag"] }
+            ],
+            "edges": [
+                { "id": "batch_e1", "from": "batch_a", "to": "batch_b", "rel": "LINKS" }
+            ]
+        }),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+
+    let nodes = body["nodes"].as_array().expect("batch response has nodes");
+    assert_eq!(nodes.len(), 2);
+    assert_eq!(nodes[0]["id"], json!("batch_a"));
+    assert_eq!(nodes[1]["id"], json!("batch_b"));
+
+    let edges = body["edges"].as_array().expect("batch response has edges");
+    assert_eq!(edges.len(), 1);
+    assert_eq!(edges[0]["rel"], json!("LINKS"));
+
+    // The edge must be immediately queryable — same transaction as the nodes.
+    let (q_status, rows) = post_json(
+        &app,
+        "/v1/query",
+        json!({ "from": "batch_a", "rel": "LINKS" }),
+    )
+    .await;
+    assert_eq!(q_status, StatusCode::OK);
+    assert_eq!(rows.as_array().unwrap()[0]["to"], json!("batch_b"));
+}
+
+#[tokio::test]
+async fn test_batch_malformed_body_rejected() {
+    let (app, _dir) = make_app();
+    // `edges` is required (no #[serde(default)]) — omitting it must fail
+    // deserialization rather than silently defaulting to an empty batch.
+    let (status, _) = post_json(
+        &app,
+        "/v1/batch",
+        json!({
+            "nodes": [{ "id": "malformed_a", "labels": [] }]
+        }),
+    )
+    .await;
+    assert_ne!(
+        status,
+        StatusCode::OK,
+        "a batch body missing the required `edges` field must not succeed"
+    );
 }
 
 // ---------------------------------------------------------------------------
@@ -1002,6 +1065,7 @@ async fn test_all_v1_routes_are_wired() {
         "/v1/bulk/nodes",
         "/v1/bulk/edges",
         "/v1/bulk/rebuild",
+        "/v1/batch",
         "/v1/query/hql",
         "/v1/node/add",
         "/v1/node/supersede",
