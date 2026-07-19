@@ -58,12 +58,10 @@ const NAPI_TO_REST: &[(&str, Option<&str>)] = &[
     ("add_edge", Some("/v1/edge/add")),
     ("supersede_node", Some("/v1/node/supersede")),
     ("retract_edge", Some("/v1/edge/retract")),
-    // Confirmed gap found during this audit (not fixed here — out of scope for
-    // this PR, which only adds the /v1/batch route): the GRL tiered-context
-    // method (target_id/tier/budget/fuzzy) has NO REST route. `/v1/reason/context`
-    // calls the *different* `Storage::get_ranked_context` (a HybridSearchInput-
-    // based ranked-context method), not `retrieve_context`. Flagged separately.
-    ("retrieve_context", None),
+    // GRL tiered retrieval (target_id/tier/budget/fuzzy). NOT the same as
+    // `/v1/reason/context`, which calls `Storage::get_ranked_context`
+    // (HybridSearchInput-based) — the two routes coexist deliberately.
+    ("retrieve_context", Some("/v1/context/retrieve")),
     ("execute_hql", Some("/v1/query/hql")),
     ("hybrid_search", Some("/v1/search/hybrid")),
     // No direct REST route; graph traversal is reachable via HQL TRAVERSE
@@ -109,9 +107,8 @@ const NAPI_TO_REST: &[(&str, Option<&str>)] = &[
     ("get_local_peer_id", Some("/v1/swarm/status")),
     // Folded into SwarmStatus.logical_clock (same route as above).
     ("get_logical_clock", Some("/v1/swarm/status")),
-    // Confirmed gap found during this audit (not fixed here — out of scope):
-    // no REST route exposes the Merkle root anywhere. Flagged as a follow-up.
-    ("get_merkle_root", None),
+    // Folded into SwarmStatus.merkle_root (same route as peer_id/clock).
+    ("get_merkle_root", Some("/v1/swarm/status")),
     // version_handler returns schema_version from `crate::SCHEMA_VERSION` directly.
     ("schema_version_sync", Some("/v1/version")),
     // version_handler returns version from `crate::ENGINE_VERSION` directly.

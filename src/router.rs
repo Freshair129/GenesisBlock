@@ -93,7 +93,19 @@ struct SupersedeInput {
 struct SwarmStatus {
     pub peer_id: String,
     pub logical_clock: u32,
+    pub merkle_root: String,
     pub peers: Vec<SyncPeer>,
+}
+
+/// Body for `POST /v1/context/retrieve` — mirrors the NAPI `retrieve_context`
+/// signature (GRL tiered retrieval), not `HybridSearchInput` (which backs the
+/// separate `/v1/reason/context` ranked-context route).
+#[derive(serde::Deserialize)]
+struct RetrieveContextInput {
+    pub target_id: String,
+    pub tier: String,
+    pub budget: Option<u32>,
+    pub fuzzy: Option<bool>,
 }
 
 #[derive(serde::Serialize)]
@@ -445,11 +457,35 @@ async fn ranked_context_handler(
     }
 }
 
+async fn retrieve_context_handler(
+    State(state): State<AppState>,
+    Json(input): Json<RetrieveContextInput>,
+) -> impl IntoResponse {
+    let storage = state.storage.read();
+    if storage.is_rebuilding.load(Ordering::SeqCst) {
+        return (
+            StatusCode::SERVICE_UNAVAILABLE,
+            "Engine is rebuilding index...",
+        )
+            .into_response();
+    }
+    match storage.retrieve_context(
+        &input.target_id,
+        &input.tier,
+        input.budget,
+        input.fuzzy.unwrap_or(false),
+    ) {
+        Ok(pkg) => (StatusCode::OK, Json(pkg)).into_response(),
+        Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
+    }
+}
+
 async fn swarm_status_handler(State(state): State<AppState>) -> impl IntoResponse {
     let storage = state.storage.read();
     let status = SwarmStatus {
         peer_id: storage.local_peer_id.clone(),
         logical_clock: storage.get_logical_clock(),
+        merkle_root: storage.get_merkle_root(),
         peers: storage.peers.iter().map(|e| e.value().clone()).collect(),
     };
     Json(status)
@@ -676,6 +712,7 @@ pub fn build_router(state: AppState) -> Router {
         .route("/v1/query", post(query_handler))
         .route("/v1/search/hybrid", post(hybrid_search_handler))
         .route("/v1/reason/context", post(ranked_context_handler))
+        .route("/v1/context/retrieve", post(retrieve_context_handler))
         .route("/v1/status", get(status_handler))
         .route("/v1/version", get(version_handler))
         .route("/v1/swarm/status", get(swarm_status_handler))
