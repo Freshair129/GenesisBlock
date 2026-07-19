@@ -62,7 +62,16 @@ sysinfo = { version = "0.30", optional = true }
 # Android JNI bridge (src/jni.rs); only enabled by the `android-jni` feature.
 # No `invocation` feature → does not link a JVM, so it builds on the host triple.
 jni = { version = "0.21", optional = true }
+# ADR--GENESISDB-BINCODE-EXIT: bincode 1.3 is unmaintained (RUSTSEC-2025-0141,
+# ignored in security.yml). Kept as a read-only legacy fallback for metadata
+# snapshots (meta_<name>.bin) for a deprecation window; the write path now
+# uses `postcard` (below) exclusively. Do not add new bincode call sites.
 bincode = "1.3"
+# Metadata snapshot serializer (ADR--GENESISDB-BINCODE-EXIT): maintained,
+# serde-based, no_std/alloc-compatible (aligns with the `mobile` feature's
+# no_std direction). `default-features = false` + `alloc` keeps it lean for
+# the mobile build (no std-only extras pulled in).
+postcard = { version = "1.1", default-features = false, features = ["alloc"] }
 hnsw_rs = "0.3.4"
 # f16↔f32 for the F16 quantization arena (Quant::F16). Already compiled as a
 # transitive dep of anndists (hnsw_rs' distance crate); promoted to a direct dep.
@@ -110,6 +119,10 @@ rand = "0.8"
 tempfile = "3.27.0"
 tower = { version = "0.4", features = ["util"] }
 http-body-util = "0.1"
+# Only for tests/meta_format_migration_tests.rs, to hand-construct a legacy
+# bincode-encoded `meta_<name>.bin` fixture (ADR--GENESISDB-BINCODE-EXIT).
+bincode = "1.3"
+postcard = { version = "1.1", features = ["use-std"] }
 
 [[bin]]
 name = "snb-ingestion"
