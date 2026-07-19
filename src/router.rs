@@ -14,7 +14,8 @@ use tower_http::limit::RequestBodyLimitLayer;
 use tower_http::trace::TraceLayer;
 
 use crate::{
-    CollectionInfo, EdgeInput, Event, HybridSearchInput, NodeInput, QueryInput, Storage, SyncPeer,
+    BatchInput, CollectionInfo, EdgeInput, Event, HybridSearchInput, NodeInput, QueryInput,
+    Storage, SyncPeer,
 };
 
 // ---------------------------------------------------------------------------
@@ -191,6 +192,24 @@ async fn rebuild_index_handler(State(state): State<AppState>) -> impl IntoRespon
     let storage = state.storage.write();
     match storage.rebuild_index_parallel() {
         Ok(_) => StatusCode::OK.into_response(),
+        Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
+    }
+}
+
+/// `Storage::execute_batch` is the core primitive `/v1/bulk/nodes` and
+/// `/v1/bulk/edges` are each built on top of internally (mixed nodes+edges in
+/// ONE all-or-nothing WAL write / `Event::Batch`) — it previously had no direct
+/// REST route (documented gotcha in CLAUDE.md). Mirrors `bulk_add_nodes_handler`'s
+/// shape: same error mapping (`INTERNAL_SERVER_ERROR` on a `Result::Err`, since
+/// `execute_batch` surfaces both governance and dimension-validation failures
+/// through the same `Error` type as `add_node`/`bulk_add_nodes`).
+async fn execute_batch_handler(
+    State(state): State<AppState>,
+    Json(input): Json<BatchInput>,
+) -> impl IntoResponse {
+    let storage = state.storage.write();
+    match storage.execute_batch(input) {
+        Ok(output) => (StatusCode::OK, Json(output)).into_response(),
         Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
     }
 }
@@ -632,6 +651,7 @@ pub fn build_router(state: AppState) -> Router {
         .route("/v1/bulk/nodes", post(bulk_add_nodes_handler))
         .route("/v1/bulk/edges", post(bulk_add_edges_handler))
         .route("/v1/bulk/rebuild", post(rebuild_index_handler))
+        .route("/v1/batch", post(execute_batch_handler))
         // HQL is a query string; cap the body at 256 KiB so a malformed/huge
         // request can't force a large allocation (defense-in-depth — the bulk
         // routes that legitimately carry embeddings keep the default limit).
