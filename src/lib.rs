@@ -448,6 +448,50 @@ struct NodeMetadataV0 {
     cluster_id: u32,
 }
 
+/// 4-byte magic prefixing the on-disk `meta_<name>.bin` blob written by the
+/// current code (ADR--GENESISDB-BINCODE-EXIT). Its presence/absence is the
+/// format discriminator: bincode 1.3 is unmaintained (RUSTSEC-2025-0141) and
+/// non-self-describing (there was never a marker for it), so `GBP1` is what
+/// makes the *new* postcard container sniffable going forward. Absent ⇒ a
+/// pre-existing bincode blob, whose V1-vs-V0 shape is still resolved by the
+/// manifest `mv` flag, never by trial deserialization (see `NodeMetadataV0`
+/// doc comment above).
+const META_MAGIC: &[u8; 4] = b"GBP1";
+
+/// Encode a metadata snapshot in the current on-disk format: `GBP1` magic +
+/// `postcard::to_allocvec(&Vec<NodeMetadata>)`. Every `save_state()` call
+/// writes this format, so a legacy (bincode) snapshot loaded via
+/// `decode_metadata_snapshot`'s fallback path is transparently rewritten as
+/// postcard the next time the DB saves — no separate migration step needed.
+fn encode_metadata_snapshot(meta: &[NodeMetadata]) -> Result<Vec<u8>> {
+    let mut out = Vec::with_capacity(4 + meta.len() * 32);
+    out.extend_from_slice(META_MAGIC);
+    let body = postcard::to_allocvec(meta).map_err(|e| Error::from_reason(e.to_string()))?;
+    out.extend_from_slice(&body);
+    Ok(out)
+}
+
+/// Sniff-first decode of a `meta_<name>.bin` / `meta.bin` blob:
+///   - `GBP1` magic present -> `Some(postcard::from_bytes(..))`. A magic hit
+///     whose body fails to decode is corruption (not "unrecognized format"),
+///     so the caller must treat `Some(Err(_))` as a loud failure rather than
+///     falling through to the legacy bincode arms — bincode is non-self-
+///     describing, so silently trying it against postcard bytes risks
+///     "successfully" misparsing garbage into a bogus-but-valid result.
+///   - no magic -> `None`, meaning "fall back to the existing legacy bincode
+///     try-chain" (unchanged: V1 vs V0 is still resolved by the manifest `mv`
+///     flag, never by trial deserialization).
+fn decode_metadata_snapshot(data: &[u8]) -> Option<std::result::Result<Vec<NodeMetadata>, String>> {
+    if data.len() >= META_MAGIC.len() && &data[..META_MAGIC.len()] == META_MAGIC {
+        Some(
+            postcard::from_bytes::<Vec<NodeMetadata>>(&data[META_MAGIC.len()..])
+                .map_err(|e| e.to_string()),
+        )
+    } else {
+        None
+    }
+}
+
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct ConsensusProposal {
     pub proposal_id: String,
@@ -4488,8 +4532,7 @@ impl Storage {
             )
             .map_err(|e| Error::from_reason(e.to_string()))?;
             let meta = coll.metadata.read();
-            let meta_data =
-                bincode::serialize(&*meta).map_err(|e| Error::from_reason(e.to_string()))?;
+            let meta_data = encode_metadata_snapshot(&meta)?;
             fs::write(temp_dir.join(format!("meta_{}.bin", coll.name)), meta_data)
                 .map_err(|e| Error::from_reason(e.to_string()))?;
             // Rerank sidecar (exact f32) — only when the collection carries one.
@@ -4739,15 +4782,35 @@ impl Storage {
                     }
                 }
                 if let Ok(data) = fs::read(self.path.join(format!("meta_{}.bin", name))) {
-                    if cm["mv"].as_u64().unwrap_or(0) >= 1 {
-                        if let Ok(meta) = bincode::deserialize::<Vec<NodeMetadata>>(&data) {
+                    match decode_metadata_snapshot(&data) {
+                        Some(Ok(meta)) => {
                             coll.count.store(meta.len(), Ordering::Relaxed);
                             *coll.metadata.write() = meta;
                         }
-                    } else if let Ok(v0) = bincode::deserialize::<Vec<NodeMetadataV0>>(&data) {
-                        // Pre-A2 String layout — migrate to interned u32 in step 3.
-                        coll.count.store(v0.len(), Ordering::Relaxed);
-                        legacy_meta.insert(name.clone(), v0);
+                        Some(Err(e)) => {
+                            // GBP1 magic present but the postcard body didn't decode:
+                            // corruption, not an unrecognized legacy format. Fail
+                            // loudly rather than silently falling through to the
+                            // bincode arms below (ADR--GENESISDB-BINCODE-EXIT).
+                            panic!(
+                                "corrupt metadata snapshot meta_{}.bin: GBP1 magic \
+                                 present but postcard body failed to decode: {}",
+                                name, e
+                            );
+                        }
+                        None if cm["mv"].as_u64().unwrap_or(0) >= 1 => {
+                            if let Ok(meta) = bincode::deserialize::<Vec<NodeMetadata>>(&data) {
+                                coll.count.store(meta.len(), Ordering::Relaxed);
+                                *coll.metadata.write() = meta;
+                            }
+                        }
+                        None => {
+                            if let Ok(v0) = bincode::deserialize::<Vec<NodeMetadataV0>>(&data) {
+                                // Pre-A2 String layout — migrate to interned u32 in step 3.
+                                coll.count.store(v0.len(), Ordering::Relaxed);
+                                legacy_meta.insert(name.clone(), v0);
+                            }
+                        }
                     }
                 }
                 self.collections.insert(name, Arc::new(coll));
@@ -4769,10 +4832,25 @@ impl Storage {
             );
             *coll.arena.write() = ArenaStore::from_bytes(&data, Quant::None, dim as usize);
             if let Ok(md) = fs::read(self.path.join("meta.bin")) {
-                // Legacy single-space snapshots always predate A2 (String layout).
-                if let Ok(v0) = bincode::deserialize::<Vec<NodeMetadataV0>>(&md) {
-                    coll.count.store(v0.len(), Ordering::Relaxed);
-                    legacy_meta.insert("default".to_string(), v0);
+                match decode_metadata_snapshot(&md) {
+                    Some(Ok(meta)) => {
+                        coll.count.store(meta.len(), Ordering::Relaxed);
+                        *coll.metadata.write() = meta;
+                    }
+                    Some(Err(e)) => {
+                        panic!(
+                            "corrupt metadata snapshot meta.bin: GBP1 magic present \
+                             but postcard body failed to decode: {}",
+                            e
+                        );
+                    }
+                    None => {
+                        // Legacy single-space snapshots always predate A2 (String layout).
+                        if let Ok(v0) = bincode::deserialize::<Vec<NodeMetadataV0>>(&md) {
+                            coll.count.store(v0.len(), Ordering::Relaxed);
+                            legacy_meta.insert("default".to_string(), v0);
+                        }
+                    }
                 }
             }
             self.collections
