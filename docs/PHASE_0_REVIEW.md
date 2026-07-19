@@ -1,3 +1,7 @@
+---
+status: current
+---
+
 # Phase 0 Review — Discovery
 
 **Status:** approved (2026-07-07, owner "approve")

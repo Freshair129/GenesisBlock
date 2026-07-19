@@ -1,7 +1,7 @@
 ---
 proposed_id: AUDIT--P23-NEO4J-HEAD-TO-HEAD
 type: audit
-status: complete
+status: historical
 aliases:
   - AUDIT
   - P23

@@ -1,3 +1,7 @@
+---
+status: current
+---
+
 # PLAN — HQL Refinement (Swarm Execution Plan)
 
 **Status:** Proposed (2026-07-03) · **Scope:** `src/query/hql.pest`, `src/query/ast.rs`, `src/lib.rs` (`execute_hql` / `match_pattern` / `apply_hql_clauses` / `neighbors`), tests, docs

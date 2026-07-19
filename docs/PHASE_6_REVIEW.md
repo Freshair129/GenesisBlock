@@ -1,3 +1,7 @@
+---
+status: current
+---
+
 # Phase 6 Review — Handoff & Task Decomposition
 
 **Status:** awaiting_approval (2026-07-07)

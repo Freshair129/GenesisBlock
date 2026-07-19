@@ -1,3 +1,7 @@
+---
+status: current
+---
+
 # ROUND 4 — The Top-Level Fork: Engine-Wedge vs Platform-First
 
 > **สำหรับ Boss:** เปิด session ของแต่ละ agent (โมเดลเดิม) → อ่าน charter ตัวเอง + ไฟล์นี้

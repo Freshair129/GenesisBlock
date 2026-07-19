@@ -1,3 +1,7 @@
+---
+status: current
+---
+
 # Software Requirements Document (SRD): Causality Chains (Event Sourcing)
 
 ## 1. Introduction

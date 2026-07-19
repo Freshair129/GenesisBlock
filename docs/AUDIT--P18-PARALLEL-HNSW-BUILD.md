@@ -1,7 +1,7 @@
 ---
 proposed_id: AUDIT--P18-PARALLEL-HNSW-BUILD
 type: audit
-status: complete
+status: historical
 aliases:
   - AUDIT
   - P18

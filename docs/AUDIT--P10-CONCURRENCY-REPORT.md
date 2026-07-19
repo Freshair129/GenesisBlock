@@ -1,4 +1,8 @@
-﻿# AUDIT--P10-GENESISDB-HQL-CONCURRENCY-CERTIFICATION
+---
+status: historical
+---
+
+# AUDIT--P10-GENESISDB-HQL-CONCURRENCY-CERTIFICATION
 
 ## 1. Executive Summary
 Phase 10 represents the "Usability & Concurrency" peak of the GenesisBlockDB mission. The implementation of **Hybrid Query Language (HQL)** combined with **16-way Lock Sharding** has transformed the engine into a high-throughput read/write system capable of serving tens of thousands of requests per second with microsecond-level latency.

@@ -1,3 +1,7 @@
+---
+status: current
+---
+
 # FLOW--GENESIS-BLOCK-WORKFLOW
 
 ## 1. Engine Initialization

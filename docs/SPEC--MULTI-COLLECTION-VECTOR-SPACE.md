@@ -1,7 +1,7 @@
 ---
 version: "0.1.0b"
 created_at: "2026-06-21,ATHER"
-status: "Proposed"
+status: current
 attributes:
   domain: "storage-engine"
   doc_type: "feature-spec"

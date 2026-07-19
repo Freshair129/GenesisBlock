@@ -1,3 +1,7 @@
+---
+status: current
+---
+
 # GenesisBlockDB: An Embedded Semantic-Graph Engine for AI Agent Memory
 **Whitepaper — evidence-backed revision (2026-06-21)**
 **Status:** Advanced prototype with measured benchmarks (see §4, audits P14–P25)

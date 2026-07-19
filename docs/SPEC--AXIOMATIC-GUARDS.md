@@ -1,3 +1,7 @@
+---
+status: current
+---
+
 # Functional Specification: Axiomatic Guards (Data Governance)
 
 ## 1. Objective

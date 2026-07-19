@@ -1,7 +1,7 @@
 ---
 proposed_id: SPEC--HQL-V2
 type: spec
-status: target
+status: current
 tier: process
 cluster: implementation_flow
 role: "HQL v2 target specification — normative contract for PLAN--HQL-REFINEMENT (P0–P2 normative; design-gated items marked; P3 reserved)"

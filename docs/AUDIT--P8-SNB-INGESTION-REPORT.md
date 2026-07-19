@@ -1,4 +1,8 @@
-﻿# AUDIT--P8-GENESISDB-SNB-INGESTION-REPORT
+---
+status: historical
+---
+
+# AUDIT--P8-GENESISDB-SNB-INGESTION-REPORT
 
 ## 1. Executive Summary
 This report certifies the successful implementation of the **LDBC SNB Standardized Ingestion Pipeline**. GenesisBlockDB demonstrated stable performance under a hybrid write-load (Graph + Vector + WAL) at a Scale Factor of 0.1.

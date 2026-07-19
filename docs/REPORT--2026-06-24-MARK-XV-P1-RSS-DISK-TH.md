@@ -1,7 +1,7 @@
 ---
 proposed_id: REPORT--2026-06-24-MARK-XV-P1-RSS-DISK-TH
 type: report
-status: complete
+status: historical
 aliases:
   - REPORT-TH
   - MARK-XV-P1
