@@ -50,3 +50,6 @@ __pycache__/
 
 # Local doc/audit export artifacts (generated, not source)
 docs/audit.zip
+
+# stray doc archives in repo root
+/docs.zip
