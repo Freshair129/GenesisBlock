@@ -3046,21 +3046,50 @@ impl Storage {
         };
         type Row = serde_json::Map<String, serde_json::Value>;
 
-        // 1. Anchor: scan live nodes matching the start pattern's constraints.
+        let now = Utc::now().to_rfc3339();
+        // 1. Anchor: if the anchor has an exact `id` constraint, skip the full
+        // scan and seed directly from the interned id; otherwise fall back to
+        // the existing live-node scan.
         let mut frontier: Vec<(u32, Row)> = Vec::new();
-        for entry in self.nodes.iter() {
-            let node = entry.value();
-            if !Self::is_valid_as_of(&node.valid_from, &node.valid_to, as_of) {
-                continue;
+        let anchor_id =
+            pattern
+                .start
+                .props
+                .iter()
+                .find_map(|(key, value)| match (key.as_str(), value) {
+                    ("id", query::ast::HqlValue::Str(id)) => Some(id.clone()),
+                    _ => None,
+                });
+        if let Some(anchor_id) = anchor_id {
+            if let Some(anchor_u32) = self.get_u32(&anchor_id) {
+                if let Some(entry) = self.nodes.get(&anchor_u32) {
+                    let node = entry.value();
+                    if Self::is_valid_as_of(&node.valid_from, &node.valid_to, as_of)
+                        && Self::node_matches(node, &pattern.start)
+                    {
+                        let mut row = Row::new();
+                        if let Some(v) = &pattern.start.var {
+                            row.insert(v.clone(), serde_json::to_value(node).map_err(ser_err)?);
+                        }
+                        frontier.push((anchor_u32, row));
+                    }
+                }
             }
-            if !Self::node_matches(node, &pattern.start) {
-                continue;
+        } else {
+            for entry in self.nodes.iter() {
+                let node = entry.value();
+                if !Self::is_valid_as_of(&node.valid_from, &node.valid_to, as_of) {
+                    continue;
+                }
+                if !Self::node_matches(node, &pattern.start) {
+                    continue;
+                }
+                let mut row = Row::new();
+                if let Some(v) = &pattern.start.var {
+                    row.insert(v.clone(), serde_json::to_value(node).map_err(ser_err)?);
+                }
+                frontier.push((*entry.key(), row));
             }
-            let mut row = Row::new();
-            if let Some(v) = &pattern.start.var {
-                row.insert(v.clone(), serde_json::to_value(node).map_err(ser_err)?);
-            }
-            frontier.push((*entry.key(), row));
         }
 
         // 2. Expand each (edge, node) hop; Cartesian over surviving neighbours.
@@ -3095,7 +3124,7 @@ impl Storage {
                     // Hide retracted edges in the current view (mirror `neighbors`).
                     if as_of.is_none() {
                         if let Some(to) = &edge.valid_to {
-                            if Utc::now().to_rfc3339().as_str() >= to.as_str() {
+                            if now.as_str() >= to.as_str() {
                                 continue;
                             }
                         }
@@ -3328,11 +3357,52 @@ impl Storage {
             serde_json::to_value(res)
                 .map_err(|e| Error::from_reason(format!("HQL result serialization failed: {e}")))
         }
+        fn resolved_target_id(storage: &Storage, target: &str, fuzzy: bool) -> Result<String> {
+            if fuzzy {
+                storage.find_fuzzy_id(target).ok_or_else(|| {
+                    Error::from_reason(format!(
+                        "HQL: target '{target}' does not resolve to a node and no vector was given"
+                    ))
+                })
+            } else {
+                Ok(target.to_string())
+            }
+        }
+        fn hql_query_vector(
+            storage: &Storage,
+            target: &str,
+            fuzzy: bool,
+            vector: Option<Vec<f64>>,
+        ) -> Result<Vec<f64>> {
+            if let Some(vector) = vector {
+                return Ok(vector);
+            }
+            let resolved = resolved_target_id(storage, target, fuzzy)?;
+            let node_u32 = storage.get_u32(&resolved).ok_or_else(|| {
+                Error::from_reason(format!(
+                    "HQL: target '{target}' does not resolve to a node and no vector was given"
+                ))
+            })?;
+            let node = storage.nodes.get(&node_u32).ok_or_else(|| {
+                Error::from_reason(format!(
+                    "HQL: target '{resolved}' does not resolve to a live node and no vector was given"
+                ))
+            })?;
+            storage
+                .reconstruct_embedding(node.value(), node_u32)
+                .ok_or_else(|| {
+                    Error::from_reason(format!(
+                        "HQL: target '{resolved}' has no stored embedding and no vector was given"
+                    ))
+                })
+        }
         let command = HqlCommand::try_from(query).map_err(Error::from_reason)?;
         match command {
             HqlCommand::Search {
                 vector,
                 k,
+                ef_search,
+                oversample,
                 fuzzy,
                 target,
                 lang,
@@ -3340,20 +3410,16 @@ impl Storage {
                 collection,
                 clauses,
             } => {
-                let _resolved = if fuzzy {
-                    self.find_fuzzy_id(&target)
-                } else {
-                    Some(target)
-                };
+                let query_vector = hql_query_vector(self, &target, fuzzy, vector)?;
                 let res = self.hybrid_search(HybridSearchInput {
-                    query_vector: vector,
+                    query_vector,
                     k,
                     alpha: Some(0.0),
                     lang,
                     as_of,
                     collection,
-                    ef_search: None,
-                    oversample: None,
+                    ef_search,
+                    oversample,
                 })?;
                 Self::apply_hql_clauses(res, &clauses)
             }
@@ -3361,6 +3427,8 @@ impl Storage {
                 seed,
                 depth,
                 rel,
+                rels,
+                direction,
                 fuzzy,
                 as_of,
                 clauses,
@@ -3379,8 +3447,8 @@ impl Storage {
                     NeighborInput {
                         depth: Some(depth),
                         rel: Some(target_rel),
-                        rels: None,
-                        direction: Some("out".to_string()),
+                        rels,
+                        direction: direction.or_else(|| Some("out".to_string())),
                         as_of,
                         include_invalid: Some(false),
                         limit: None,
@@ -3392,6 +3460,9 @@ impl Storage {
             HqlCommand::Hybrid {
                 vector,
                 alpha,
+                k,
+                ef_search,
+                oversample,
                 fuzzy,
                 target,
                 lang,
@@ -3399,20 +3470,16 @@ impl Storage {
                 collection,
                 clauses,
             } => {
-                let _resolved = if fuzzy {
-                    self.find_fuzzy_id(&target)
-                } else {
-                    Some(target)
-                };
+                let query_vector = hql_query_vector(self, &target, fuzzy, vector)?;
                 let res = self.hybrid_search(HybridSearchInput {
-                    query_vector: vector,
-                    k: 10,
+                    query_vector,
+                    k,
                     alpha: Some(alpha),
                     lang,
                     as_of,
                     collection,
-                    ef_search: None,
-                    oversample: None,
+                    ef_search,
+                    oversample,
                 })?;
                 Self::apply_hql_clauses(res, &clauses)
             }
