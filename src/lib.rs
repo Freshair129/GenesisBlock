@@ -3513,6 +3513,35 @@ impl Storage {
         true
     }
 
+    /// Shared bitemporal current-view rule, used by every read path that walks
+    /// live nodes/edges (`neighbors`, `query`): a node/edge is visible when
+    /// `is_valid_as_of` bounds its window relative to `as_of` AND, when no
+    /// `as_of` is given (the "now" / current view), it hasn't been retracted
+    /// or superseded in the past. `is_valid_as_of` alone doesn't cover the
+    /// no-`as_of` case: a `valid_to` set at some point in the past is still
+    /// "valid" by that check when `as_of` is `None`, so the retraction check
+    /// below is what actually hides it from the current view. `include_invalid`
+    /// is the caller's opt-in escape hatch to see retracted/superseded items
+    /// even in the current view (mirrors `neighbors`' `include_invalid`).
+    fn is_currently_visible(
+        valid_from: &str,
+        valid_to: &Option<String>,
+        as_of: &Option<String>,
+        include_invalid: bool,
+    ) -> bool {
+        if !Self::is_valid_as_of(valid_from, valid_to, as_of) {
+            return false;
+        }
+        if as_of.is_none() && !include_invalid {
+            if let Some(to) = valid_to {
+                if Utc::now().to_rfc3339().as_str() >= to.as_str() {
+                    return false;
+                }
+            }
+        }
+        true
+    }
+
     pub fn hybrid_search(&self, args: HybridSearchInput) -> Result<Vec<NeighborOutput>> {
         let coll = self.resolve_collection(&args.collection)?;
         // Dim validation closes the silent cross-space bug: a query from a
@@ -3722,7 +3751,6 @@ impl Storage {
         // Retraction visibility: by default a retracted edge (valid_to passed) is
         // hidden from the current view; `include_invalid = true` surfaces it.
         let include_invalid = args.include_invalid.unwrap_or(false);
-        let now = Utc::now().to_rfc3339();
         let mut results = Vec::new();
         let mut visited = HashSet::new();
         visited.insert(u32_seed);
@@ -3750,20 +3778,15 @@ impl Storage {
                 if let Some(edge_ref) = self.edges.get(eid) {
                     let edge = edge_ref.value();
 
-                    // Time-travel check for Edges
-                    if !Self::is_valid_as_of(&edge.valid_from, &edge.valid_to, &args.as_of) {
+                    // Bitemporal current-view check for Edges (time-travel bound +
+                    // retraction hiding); see `is_currently_visible`.
+                    if !Self::is_currently_visible(
+                        &edge.valid_from,
+                        &edge.valid_to,
+                        &args.as_of,
+                        include_invalid,
+                    ) {
                         continue;
-                    }
-                    // Retraction filter for the current view: `is_valid_as_of` only
-                    // bounds valid_to when `as_of` is set, so with no as_of an edge
-                    // retracted in the past is still "valid" there. Hide it unless
-                    // the caller opted into invalidated edges.
-                    if args.as_of.is_none() && !include_invalid {
-                        if let Some(to) = &edge.valid_to {
-                            if now.as_str() >= to.as_str() {
-                                continue;
-                            }
-                        }
                     }
                     if !rel_allowed(&edge.rel) {
                         continue;
@@ -3819,7 +3842,27 @@ impl Storage {
         Ok(results)
     }
 
+    /// Bitemporal current-view semantics (mirrors `neighbors` / HQL
+    /// `TRAVERSE ... AS OF`). By default (`as_of` and `include_invalid` both
+    /// absent) this returns only edges that are valid *now*: a retracted edge
+    /// (`retract_edge` set its `valid_to` in the past) is excluded, and so is
+    /// an edge whose `from`/`to` node is currently out of its bitemporal
+    /// window — e.g. a node that was `supersede_node`d, whose live version's
+    /// `valid_from` has advanced past the requested view. This closes a
+    /// correctness gap where the old raw scan returned every edge ever
+    /// written, regardless of retraction/supersession.
+    ///
+    /// Two optional `QueryInput` fields change that, backward-compatibly:
+    ///   - `as_of` (RFC3339 timestamp): evaluate visibility at that point in
+    ///     time instead of "now" — same time-travel semantics used elsewhere
+    ///     (HQL `AS OF`, `neighbors`'s `as_of`).
+    ///   - `include_invalid: true`: escape hatch that restores the historical
+    ///     raw-scan behavior, surfacing retracted/superseded items too.
+    ///
+    /// Absent both fields, behavior for data that was never retracted or
+    /// superseded is unchanged from before this method enforced visibility.
     pub fn query(&self, args: QueryInput) -> Result<Vec<EdgeOutput>> {
+        let include_invalid = args.include_invalid.unwrap_or(false);
         let mut res = Vec::new();
         for r in self.edges.iter() {
             let e = r.value();
@@ -3833,9 +3876,34 @@ impl Storage {
                     continue;
                 }
             }
+            if !Self::is_currently_visible(&e.valid_from, &e.valid_to, &args.as_of, include_invalid)
+            {
+                continue;
+            }
+            // Endpoint nodes must also be in view: a node superseded after
+            // `as_of` (or, in the current view, one whose live `valid_from`
+            // is still ahead of "now" post-supersession) hides the edge too —
+            // same rule `neighbors` applies to the far node on each hop.
+            if !self.endpoint_currently_visible(&e.from, &args.as_of)
+                || !self.endpoint_currently_visible(&e.to, &args.as_of)
+            {
+                continue;
+            }
             res.push(e.clone());
         }
         Ok(res)
+    }
+
+    /// Is the node named `id` within its bitemporal window as of `as_of` (or
+    /// "now" when `as_of` is `None`)? A dangling reference (no such node in
+    /// the live index) is treated as visible — existence isn't `query`'s
+    /// concern, only bitemporal validity of nodes that DO exist, matching the
+    /// node time-travel check `neighbors` runs on the far endpoint of a hop.
+    fn endpoint_currently_visible(&self, id: &str, as_of: &Option<String>) -> bool {
+        match self.get_u32(id).and_then(|u32_id| self.nodes.get(&u32_id)) {
+            Some(node_ref) => Self::is_valid_as_of(&node_ref.valid_from, &node_ref.valid_to, as_of),
+            None => true,
+        }
     }
 
     pub fn detect_communities(&self) -> Result<()> {

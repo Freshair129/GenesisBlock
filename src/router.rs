@@ -14,7 +14,8 @@ use tower_http::limit::RequestBodyLimitLayer;
 use tower_http::trace::TraceLayer;
 
 use crate::{
-    CollectionInfo, EdgeInput, Event, HybridSearchInput, NodeInput, QueryInput, Storage, SyncPeer,
+    BatchInput, CollectionInfo, EdgeInput, Event, HybridSearchInput, NodeInput, QueryInput,
+    Storage, SyncPeer,
 };
 
 // ---------------------------------------------------------------------------
@@ -195,6 +196,24 @@ async fn rebuild_index_handler(State(state): State<AppState>) -> impl IntoRespon
     }
 }
 
+/// `Storage::execute_batch` is the core primitive `/v1/bulk/nodes` and
+/// `/v1/bulk/edges` are each built on top of internally (mixed nodes+edges in
+/// ONE all-or-nothing WAL write / `Event::Batch`) — it previously had no direct
+/// REST route (documented gotcha in CLAUDE.md). Mirrors `bulk_add_nodes_handler`'s
+/// shape: same error mapping (`INTERNAL_SERVER_ERROR` on a `Result::Err`, since
+/// `execute_batch` surfaces both governance and dimension-validation failures
+/// through the same `Error` type as `add_node`/`bulk_add_nodes`).
+async fn execute_batch_handler(
+    State(state): State<AppState>,
+    Json(input): Json<BatchInput>,
+) -> impl IntoResponse {
+    let storage = state.storage.write();
+    match storage.execute_batch(input) {
+        Ok(output) => (StatusCode::OK, Json(output)).into_response(),
+        Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
+    }
+}
+
 async fn add_node_handler(
     State(state): State<AppState>,
     Json(input): Json<NodeInput>,
@@ -361,6 +380,17 @@ async fn execute_hql_handler(
     }
 }
 
+/// `POST /v1/query` — filter edges by `from`/`to`, bitemporal **current-view
+/// by default**: retracted edges (`/v1/edge/retract`) and edges whose
+/// endpoint node has been superseded (`/v1/node/supersede`) out of view are
+/// excluded, same visibility rule `TRAVERSE`/`neighbors` use (see
+/// `Storage::query` for the exact semantics). Two optional body fields
+/// change that, backward-compatibly (absent = current view, unchanged from
+/// before this endpoint enforced visibility):
+///   - `as_of` (RFC3339 timestamp): time-travel — evaluate visibility at that
+///     point in time instead of "now".
+///   - `include_invalid: true`: escape hatch that restores the historical
+///     raw-scan behavior, surfacing retracted/superseded edges too.
 async fn query_handler(
     State(state): State<AppState>,
     Json(input): Json<QueryInput>,
@@ -621,6 +651,7 @@ pub fn build_router(state: AppState) -> Router {
         .route("/v1/bulk/nodes", post(bulk_add_nodes_handler))
         .route("/v1/bulk/edges", post(bulk_add_edges_handler))
         .route("/v1/bulk/rebuild", post(rebuild_index_handler))
+        .route("/v1/batch", post(execute_batch_handler))
         // HQL is a query string; cap the body at 256 KiB so a malformed/huge
         // request can't force a large allocation (defense-in-depth — the bulk
         // routes that legitimately carry embeddings keep the default limit).
