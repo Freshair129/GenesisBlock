@@ -1,3 +1,7 @@
+---
+status: current
+---
+
 # Architecture Blueprint: Mark XI — Enterprise Integration (Step 1: MCP Server)
 
 ## 1. Introduction

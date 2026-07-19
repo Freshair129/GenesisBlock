@@ -1,3 +1,7 @@
+---
+status: historical
+---
+
 # AUDIT--SOAK-TEST: Long-Running Soak Tests
 
 **Date:** 2026-06-28

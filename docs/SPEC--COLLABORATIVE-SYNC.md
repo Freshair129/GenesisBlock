@@ -1,3 +1,7 @@
+---
+status: current
+---
+
 # Functional Specification: Collaborative WAL & Decentralized Sync (Mark V)
 
 ## 1. Objective

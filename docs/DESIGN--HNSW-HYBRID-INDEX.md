@@ -1,3 +1,7 @@
+---
+status: current
+---
+
 # GenesisBlockDB HNSW Hybrid Index Integration: SWE Design Document (v1.0)
 
 **Document Status:** Draft Specification  

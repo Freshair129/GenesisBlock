@@ -1,4 +1,8 @@
-﻿# AUDIT--P12-SCIENTIFIC-VERIFICATION-REPORT (REALITY CHECK)
+---
+status: historical
+---
+
+# AUDIT--P12-SCIENTIFIC-VERIFICATION-REPORT (REALITY CHECK)
 
 ## 1. Executive Summary: The Harsh Reality
 Following the CTO's critical review, the initial Phase 12 results (400k+ QPS, 100ns P50) were exposed as **severe measurement artifacts**. The read methods were stubbed to return \Ok(Vec::new())\, and the write path completely lacked hardware durability (\sync\).

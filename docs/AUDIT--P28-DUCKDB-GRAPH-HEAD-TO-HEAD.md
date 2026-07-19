@@ -1,7 +1,7 @@
 ---
 proposed_id: AUDIT--P28-DUCKDB-GRAPH-HEAD-TO-HEAD
 type: audit
-status: complete
+status: historical
 aliases:
   - AUDIT
   - P28

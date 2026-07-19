@@ -19,11 +19,15 @@ fn fresh(name: &str) -> String {
 }
 
 fn open(path: &str) -> Storage {
+    open_dim(path, None)
+}
+
+fn open_dim(path: &str, vector_dim: Option<u32>) -> Storage {
     Storage::open(OpenOptions {
         path: path.to_string(),
         page_cache_mb: Some(32),
         read_only: Some(false),
-        vector_dim: None,
+        vector_dim,
     })
     .unwrap()
 }
@@ -303,4 +307,87 @@ fn hql_depth_0() {
         "DEPTH 0 expands nothing, got {} neighbor(s)",
         neighbors.len()
     );
+}
+
+#[test]
+fn hql_search_without_literal_vector_uses_target_embedding() {
+    let p = fresh("hql_search_by_node");
+    let s = open_dim(&p, Some(2));
+
+    s.add_node(NodeInput {
+        id: Some("anchor".to_string()),
+        labels: vec![],
+        props: None,
+        embedding: Some(vec![1.0, 0.0]),
+        lang: None,
+        valid_from: None,
+        caused_by: None,
+        ttl: None,
+        collection: None,
+    })
+    .unwrap();
+    s.add_node(NodeInput {
+        id: Some("near".to_string()),
+        labels: vec![],
+        props: None,
+        embedding: Some(vec![0.99, 0.01]),
+        lang: None,
+        valid_from: None,
+        caused_by: None,
+        ttl: None,
+        collection: None,
+    })
+    .unwrap();
+    s.add_node(NodeInput {
+        id: Some("far".to_string()),
+        labels: vec![],
+        props: None,
+        embedding: Some(vec![0.0, 1.0]),
+        lang: None,
+        valid_from: None,
+        caused_by: None,
+        ttl: None,
+        collection: None,
+    })
+    .unwrap();
+    s.flush_index();
+
+    let res = s.execute_hql("SEARCH anchor K 2").unwrap();
+    let neighbors: Vec<NeighborOutput> = from_value(res).unwrap();
+    let ids: Vec<&str> = neighbors.iter().map(|n| n.node.id.as_str()).collect();
+    assert!(ids.contains(&"anchor"));
+    assert!(ids.contains(&"near"));
+}
+
+#[test]
+fn hql_search_without_vector_errors_for_missing_embedding() {
+    let p = fresh("hql_search_by_node_no_embedding");
+    let s = open_dim(&p, Some(2));
+    node(&s, "plain");
+
+    let err = s.execute_hql("SEARCH plain K 1").unwrap_err().to_string();
+    assert!(err.contains("no stored embedding"));
+}
+
+#[test]
+fn hql_traverse_direction_and_multi_rel_are_exposed() {
+    let p = fresh("hql_traverse_direction_multi_rel");
+    let s = open(&p);
+    for id in ["A", "B", "C", "D", "E"] {
+        node(&s, id);
+    }
+    edge(&s, "B", "A", "LIKES");
+    edge(&s, "A", "C", "KNOWS");
+    edge(&s, "A", "D", "LIKES");
+    edge(&s, "E", "A", "FOLLOWS");
+
+    let res = s
+        .execute_hql("TRAVERSE FROM A DEPTH 1 REL LIKES|FOLLOWS DIRECTION both")
+        .unwrap();
+    let neighbors: Vec<NeighborOutput> = from_value(res).unwrap();
+    let ids: Vec<&str> = neighbors.iter().map(|n| n.node.id.as_str()).collect();
+    assert!(ids.contains(&"B"));
+    assert!(ids.contains(&"D"));
+    assert!(ids.contains(&"E"));
+    assert!(!ids.contains(&"C"));
 }

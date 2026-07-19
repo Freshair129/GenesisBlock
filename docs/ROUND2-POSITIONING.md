@@ -1,3 +1,7 @@
+---
+status: current
+---
+
 # ROUND 2 — Positioning: Tier, Substrate & Scope (Genesis · LYRA · KAIROS)
 
 > **สำหรับ Boss:** เปิด session ของแต่ละ agent (Genesis=Fable-5, LYRA=GPT-5.5, KAIROS=Gemini

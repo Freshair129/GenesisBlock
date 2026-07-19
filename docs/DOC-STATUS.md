@@ -1,3 +1,7 @@
+---
+status: historical
+---
+
 # Documentation Status Index (SSOT)
 
 Central status manifest (best-effort from code evidence, 2026-06-21) — a single

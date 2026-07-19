@@ -1,7 +1,7 @@
 ---
 proposed_id: AUDIT--P33-RSS-QUANT-MATRIX
 type: audit
-status: complete
+status: historical
 aliases:
   - AUDIT
   - P33

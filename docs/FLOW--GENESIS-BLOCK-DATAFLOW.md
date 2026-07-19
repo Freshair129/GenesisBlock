@@ -1,4 +1,8 @@
-﻿# FLOW--GENESIS-BLOCK-DATAFLOW
+---
+status: current
+---
+
+# FLOW--GENESIS-BLOCK-DATAFLOW
 
 ## 1. Data Ingress & Routing
 How commands and data enter the native core.

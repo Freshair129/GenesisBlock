@@ -1,3 +1,7 @@
+---
+status: current
+---
+
 # GenesisBlock DB: Master Specification (v2.0.0)
 
 ## 1. Abstract

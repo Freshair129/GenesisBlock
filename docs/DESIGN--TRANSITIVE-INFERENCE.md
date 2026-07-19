@@ -1,3 +1,7 @@
+---
+status: current
+---
+
 # Technical Design: Transitive Inference & Virtual Edges (Mark IV - Step 4)
 
 ## 1. Objective

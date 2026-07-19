@@ -1,4 +1,8 @@
-﻿# TDD--GENESISDB-DUAL-TRACK-ARCHITECTURE
+---
+status: current
+---
+
+# TDD--GENESISDB-DUAL-TRACK-ARCHITECTURE
 
 ## 1. Executive Summary
 GenesisBlockDB is evolving into a **Dual-Track Hybrid Engine** designed to solve the "File System Fragmentation" problem in PKM (Obsidian) while providing enterprise-grade performance (50k+ TPS) for AI Agent systems.

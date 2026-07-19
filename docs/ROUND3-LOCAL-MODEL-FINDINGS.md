@@ -1,3 +1,7 @@
+---
+status: historical
+---
+
 # ROUND 3 — Local-Model Findings (worker + orchestrator + on-device lens)
 
 > Record of Boss's Round-3 briefing (the checkable source the interview answers quote from).

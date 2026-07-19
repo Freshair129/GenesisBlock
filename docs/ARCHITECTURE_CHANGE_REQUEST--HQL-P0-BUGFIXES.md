@@ -1,3 +1,7 @@
+---
+status: current
+---
+
 # ARCHITECTURE_CHANGE_REQUEST — Fold HQL P0 bugfixes into Wave 0 (pre-publish)
 
 **Status:** proposed · **Requested:** 2026-07-07 · **Requester:** Boss (CEO)

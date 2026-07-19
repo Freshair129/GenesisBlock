@@ -1,3 +1,7 @@
+---
+status: current
+---
+
 # 36 — Task Execution Order (Waves)
 
 > Machine SSOT: `queue/PROJECT_GRAPH.json` (`waves[]`). This doc is the human-readable view.

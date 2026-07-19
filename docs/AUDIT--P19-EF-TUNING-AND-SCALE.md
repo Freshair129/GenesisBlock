@@ -1,7 +1,7 @@
 ---
 proposed_id: AUDIT--P19-EF-TUNING-AND-SCALE
 type: audit
-status: complete
+status: historical
 aliases:
   - AUDIT
   - P19

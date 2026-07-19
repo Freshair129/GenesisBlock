@@ -1,3 +1,7 @@
+---
+status: current
+---
+
 # GenesisBlockDB REST API Reference
 
 **Generated from `src/router.rs` (Axum server) — 2026-06-28.** This replaces the

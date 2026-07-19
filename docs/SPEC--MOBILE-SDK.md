@@ -1,7 +1,7 @@
 ---
 version: "1.0.0"
 created_at: "2026-06-29"
-status: "phase-0-complete"
+status: current
 mark: "XVI"
 complexity: "C-3"
 doc_type: "spec"

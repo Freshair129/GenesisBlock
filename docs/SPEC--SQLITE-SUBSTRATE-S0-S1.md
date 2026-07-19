@@ -1,7 +1,7 @@
 ---
 proposed_id: SPEC--SQLITE-SUBSTRATE-S0-S1
 type: spec
-status: target
+status: current
 tier: process
 cluster: implementation_flow
 role: "SQLite substrate S0/S1 target specification - normative contract for foundation and props migration before SQL-backed HQL phases"

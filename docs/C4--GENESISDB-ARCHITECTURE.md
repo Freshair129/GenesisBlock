@@ -1,7 +1,7 @@
 ---
 proposed_id: C4--GENESISDB-ARCHITECTURE
 type: architecture-index
-status: candidate
+status: current
 version: 0.1.2b
 created_at: 2026-06-13T22:50:11+07:00,ATHER,9b1ced3
 last_update: 2026-06-14T00:29:45+07:00,ATHER
