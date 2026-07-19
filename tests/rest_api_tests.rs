@@ -368,6 +368,214 @@ async fn test_retract_unknown_edge_returns_404() {
 }
 
 // ---------------------------------------------------------------------------
+// Bitemporal current-view semantics for /v1/query
+// ---------------------------------------------------------------------------
+//
+// `/v1/query` used to be a raw scan over every edge ever written, ignoring
+// retraction and node supersession entirely. It now defaults to a
+// current-view (bitemporally-valid-now) filter, with `as_of` (time travel)
+// and `include_invalid: true` (escape hatch back to the old raw-scan
+// behavior) as opt-ins — mirroring the visibility rule `TRAVERSE`/`neighbors`
+// already use. See `Storage::query` / `Storage::is_currently_visible`.
+
+#[tokio::test]
+async fn v1_query_bitemporal_retracted_edge_as_of_and_current_view() {
+    let (app, _dir) = make_app();
+    post_json(
+        &app,
+        "/v1/node/add",
+        json!({ "id": "bt_a", "labels": [], "valid_from": "2020-01-01T00:00:00Z" }),
+    )
+    .await;
+    post_json(
+        &app,
+        "/v1/node/add",
+        json!({ "id": "bt_b", "labels": [], "valid_from": "2020-01-01T00:00:00Z" }),
+    )
+    .await;
+    post_json(
+        &app,
+        "/v1/edge/add",
+        json!({
+            "id": "bte1", "from": "bt_a", "to": "bt_b", "rel": "LINKS",
+            "valid_from": "2020-01-01T00:00:00Z"
+        }),
+    )
+    .await;
+
+    // Before retraction: an as_of in the past still finds the edge.
+    let (s1, r1) = post_json(
+        &app,
+        "/v1/query",
+        json!({ "from": "bt_a", "as_of": "2021-01-01T00:00:00Z" }),
+    )
+    .await;
+    assert_eq!(s1, StatusCode::OK);
+    assert!(
+        !r1.as_array().unwrap().is_empty(),
+        "edge must be visible via as_of before retraction"
+    );
+
+    // Retract it.
+    let (ret_status, _) = post_json(&app, "/v1/edge/retract", json!({ "id": "bte1" })).await;
+    assert_eq!(ret_status, StatusCode::OK);
+
+    // Default current view (no as_of, no include_invalid): hidden.
+    let (s2, r2) = post_json(&app, "/v1/query", json!({ "from": "bt_a" })).await;
+    assert_eq!(s2, StatusCode::OK);
+    assert!(
+        r2.as_array().unwrap().is_empty(),
+        "retracted edge must be hidden from the default current-view /v1/query"
+    );
+
+    // Time travel to before the retraction: still visible (retraction hasn't
+    // happened yet as of that timestamp).
+    let (s3, r3) = post_json(
+        &app,
+        "/v1/query",
+        json!({ "from": "bt_a", "as_of": "2021-01-01T00:00:00Z" }),
+    )
+    .await;
+    assert_eq!(s3, StatusCode::OK);
+    assert!(
+        !r3.as_array().unwrap().is_empty(),
+        "as_of before the retraction must still find the edge, even after it was retracted"
+    );
+
+    // Escape hatch: include_invalid=true restores the old raw-scan behavior.
+    let (s4, r4) = post_json(
+        &app,
+        "/v1/query",
+        json!({ "from": "bt_a", "include_invalid": true }),
+    )
+    .await;
+    assert_eq!(s4, StatusCode::OK);
+    assert!(
+        !r4.as_array().unwrap().is_empty(),
+        "include_invalid=true must restore visibility of the retracted edge"
+    );
+}
+
+#[tokio::test]
+async fn v1_query_bitemporal_superseded_node_default_latest() {
+    let (app, _dir) = make_app();
+    post_json(
+        &app,
+        "/v1/node/add",
+        json!({ "id": "bt_hub", "labels": [], "valid_from": "2020-01-01T00:00:00Z" }),
+    )
+    .await;
+    post_json(
+        &app,
+        "/v1/node/add",
+        json!({
+            "id": "bt_target", "labels": [], "props": {"version": 1},
+            "valid_from": "2020-01-01T00:00:00Z"
+        }),
+    )
+    .await;
+    post_json(
+        &app,
+        "/v1/edge/add",
+        json!({
+            "id": "bte2", "from": "bt_hub", "to": "bt_target", "rel": "LINKS",
+            "valid_from": "2020-01-01T00:00:00Z"
+        }),
+    )
+    .await;
+
+    // Pre-supersession: as_of in the past sees the edge.
+    let (s0, r0) = post_json(
+        &app,
+        "/v1/query",
+        json!({ "from": "bt_hub", "as_of": "2021-01-01T00:00:00Z" }),
+    )
+    .await;
+    assert_eq!(s0, StatusCode::OK);
+    assert!(
+        !r0.as_array().unwrap().is_empty(),
+        "edge must be visible before supersession via as_of"
+    );
+
+    // Supersede the target node: its live version now has valid_from ~ "now".
+    let (sup_status, sup_body) = post_json(
+        &app,
+        "/v1/node/supersede",
+        json!({ "id": "bt_target", "new_props": {"version": 2} }),
+    )
+    .await;
+    assert_eq!(sup_status, StatusCode::OK);
+    assert_eq!(sup_body["props"]["version"], json!(2));
+
+    // Default (current) view: the engine keeps only the latest node version
+    // in memory, so the edge naming that node is still reachable — this is
+    // what "default view returns only the latest version" means in practice.
+    let (s1, r1) = post_json(&app, "/v1/query", json!({ "from": "bt_hub" })).await;
+    assert_eq!(s1, StatusCode::OK);
+    assert!(
+        !r1.as_array().unwrap().is_empty(),
+        "edge must still be visible in the current view after supersession"
+    );
+
+    // Time travel to before the supersession now excludes the edge: the
+    // live node's valid_from advanced to ~now (after 2021), so it — and any
+    // edge naming it — falls out of view for a 2021 as_of.
+    let (s2, r2) = post_json(
+        &app,
+        "/v1/query",
+        json!({ "from": "bt_hub", "as_of": "2021-01-01T00:00:00Z" }),
+    )
+    .await;
+    assert_eq!(s2, StatusCode::OK);
+    assert!(
+        r2.as_array().unwrap().is_empty(),
+        "post-supersession, a pre-supersession as_of must no longer see the \
+         (now-advanced) node, hiding the edge too"
+    );
+}
+
+#[tokio::test]
+async fn v1_query_bitemporal_no_flags_backward_compat() {
+    let (app, _dir) = make_app();
+    post_json(
+        &app,
+        "/v1/node/add",
+        json!({ "id": "bt_src", "labels": [] }),
+    )
+    .await;
+    post_json(
+        &app,
+        "/v1/node/add",
+        json!({ "id": "bt_dst", "labels": [] }),
+    )
+    .await;
+    let (e_status, _edge) = post_json(
+        &app,
+        "/v1/edge/add",
+        json!({ "id": "bte3", "from": "bt_src", "to": "bt_dst", "rel": "LINKS" }),
+    )
+    .await;
+    assert_eq!(e_status, StatusCode::OK);
+
+    // No as_of, no include_invalid, nothing retracted or superseded: behaves
+    // exactly like the old raw scan.
+    let (q_status, rows) = post_json(
+        &app,
+        "/v1/query",
+        json!({ "from": "bt_src", "rel": "LINKS" }),
+    )
+    .await;
+    assert_eq!(q_status, StatusCode::OK);
+    let arr = rows.as_array().unwrap();
+    assert_eq!(
+        arr.len(),
+        1,
+        "unflagged query on a fresh DB returns the edge exactly as before"
+    );
+    assert_eq!(arr[0]["to"], json!("bt_dst"));
+}
+
+// ---------------------------------------------------------------------------
 // Bulk operations
 // ---------------------------------------------------------------------------
 

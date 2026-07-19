@@ -361,6 +361,17 @@ async fn execute_hql_handler(
     }
 }
 
+/// `POST /v1/query` — filter edges by `from`/`to`, bitemporal **current-view
+/// by default**: retracted edges (`/v1/edge/retract`) and edges whose
+/// endpoint node has been superseded (`/v1/node/supersede`) out of view are
+/// excluded, same visibility rule `TRAVERSE`/`neighbors` use (see
+/// `Storage::query` for the exact semantics). Two optional body fields
+/// change that, backward-compatibly (absent = current view, unchanged from
+/// before this endpoint enforced visibility):
+///   - `as_of` (RFC3339 timestamp): time-travel — evaluate visibility at that
+///     point in time instead of "now".
+///   - `include_invalid: true`: escape hatch that restores the historical
+///     raw-scan behavior, surfacing retracted/superseded edges too.
 async fn query_handler(
     State(state): State<AppState>,
     Json(input): Json<QueryInput>,
