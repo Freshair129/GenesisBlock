@@ -1,3 +1,7 @@
+---
+status: historical
+---
+
 # AUDIT--HQL-FUZZ: HQL Parser Fuzz / Property-Based Tests
 
 **Date:** 2026-06-28

@@ -26,6 +26,7 @@ block_manifest:
 wikilink:  
 crosslink:
 
+status: current
 ---
 
 # FRAMEWORK::HIERARCHY-COMPACTION-STANDARDS

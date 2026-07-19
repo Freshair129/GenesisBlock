@@ -1,7 +1,7 @@
 ---
 proposed_id: AUDIT--P20-QDRANT-3WAY-AND-EF-CONFIG
 type: audit
-status: complete
+status: historical
 aliases:
   - AUDIT
   - P20

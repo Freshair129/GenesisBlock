@@ -1,7 +1,7 @@
 ---
 proposed_id: AUDIT--P22-GRAPH-TRAVERSAL
 type: audit
-status: complete
+status: historical
 aliases:
   - AUDIT
   - P22

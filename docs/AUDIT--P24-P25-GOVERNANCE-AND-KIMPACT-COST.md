@@ -1,7 +1,7 @@
 ---
 proposed_id: AUDIT--P24-P25-GOVERNANCE-AND-KIMPACT-COST
 type: audit
-status: complete
+status: historical
 aliases:
   - AUDIT
   - P24

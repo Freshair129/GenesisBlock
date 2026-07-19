@@ -1,3 +1,7 @@
+---
+status: current
+---
+
 # Software Requirements Document (SRD): State-Transition Reasoning (Mark VII, Step 3)
 
 ## 1. Introduction

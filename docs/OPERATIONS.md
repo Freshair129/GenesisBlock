@@ -1,3 +1,7 @@
+---
+status: current
+---
+
 # GenesisBlockDB — Operations Runbook
 
 Operational guidance for running the REST server (`genesis-db-server`) or an

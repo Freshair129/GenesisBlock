@@ -1,3 +1,7 @@
+---
+status: current
+---
+
 # BENCH SPEC — HQL Moat (G3) + Language Expressiveness
 
 > **สถานะ:** draft · **จุดประสงค์:** the single experiment set that decides GO/NO-GO on

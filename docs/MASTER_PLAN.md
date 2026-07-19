@@ -1,3 +1,7 @@
+---
+status: current
+---
+
 # MASTER_PLAN — GenesisBlock Engine-Wedge-First Distribution Program
 
 > Phase 0 deliverable. **Status: draft until the owner approves Phase 0.**

@@ -1,3 +1,7 @@
+---
+status: current
+---
+
 # Software Requirements Document (SRD): Swarm Hardening & Cryptographic Identity (Mark X)
 
 ## 1. Introduction

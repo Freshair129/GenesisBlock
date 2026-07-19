@@ -1,3 +1,7 @@
+---
+status: current
+---
+
 # Master Specification: Mark IV (Global Scale & Reasoning)
 
 ## 1. Objective

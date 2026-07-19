@@ -1,7 +1,7 @@
 ---
 proposed_id: TDD--DOCUMENTATION-GOVERNANCE-SSOT-ENFORCEMENT
 type: tdd
-status: candidate
+status: current
 version: 0.1.0b
 created_at: 2026-06-13T21:21:44+07:00,ATHER,9b1ced3
 last_update: 2026-06-13T21:21:44+07:00,ATHER

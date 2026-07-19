@@ -1,7 +1,7 @@
 ---
 proposed_id: AUDIT--P16-CONCURRENCY-LOCK-FIX
 type: audit
-status: complete
+status: historical
 aliases:
   - AUDIT
   - P16

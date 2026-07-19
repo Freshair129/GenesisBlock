@@ -1,7 +1,7 @@
 ---
 proposed_id: AUDIT--P15-COMPETITIVE-VECTOR-BENCHMARK
 type: audit
-status: complete
+status: historical
 aliases:
   - AUDIT
   - P15

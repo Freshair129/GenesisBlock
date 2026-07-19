@@ -1,3 +1,7 @@
+---
+status: current
+---
+
 # Software Requirements Document (SRD): Go Client Binding (Mark XI, Step 3)
 
 ## 1. Introduction

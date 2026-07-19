@@ -1,3 +1,7 @@
+---
+status: current
+---
+
 # Functional Specification: K-Impact Engine & Transitive Inference (Mark IV)
 
 ## 1. Objective

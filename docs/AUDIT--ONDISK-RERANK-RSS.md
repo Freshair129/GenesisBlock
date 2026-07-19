@@ -1,3 +1,7 @@
+---
+status: historical
+---
+
 # AUDIT — On-disk rerank sidecar: resident-RAM restoration (P0-T9)
 
 **Change under audit:** VECTOR-QUANTIZATION P0 — the exact-f32 rerank sidecar moved

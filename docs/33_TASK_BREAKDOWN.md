@@ -1,3 +1,7 @@
+---
+status: current
+---
+
 # 33 — Task Breakdown (Waves W0–W4)
 
 > **Machine SSOT:** `queue/IMPLEMENTATION_QUEUE.json`. Titles/status here MUST match; JSON is authoritative (RWANG §8).
