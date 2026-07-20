@@ -32,6 +32,7 @@ use napi::bindgen_prelude::*;
 #[cfg(feature = "napi-bindings")]
 use napi_derive::napi;
 use roaring::RoaringBitmap;
+use rusqlite::{params, Connection, OpenFlags, OptionalExtension};
 
 // When the napi bindings are disabled (REST server / Linux integration-test
 // build) the storage core uses a minimal Error/Result that mirror the only napi
@@ -62,7 +63,7 @@ mod core_error {
 #[cfg(not(feature = "napi-bindings"))]
 use core_error::{Error, Result};
 use crossbeam_channel::{bounded, unbounded, Receiver, Sender};
-use parking_lot::RwLock;
+use parking_lot::{Mutex, RwLock};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use uuid::Uuid;
@@ -76,6 +77,8 @@ pub mod router;
 use query::HqlCommand;
 
 pub const SCHEMA_VERSION: u32 = 1;
+const PROJECTION_SCHEMA_VERSION: u32 = 2;
+const PROJECTION_DB_FILE: &str = "projection.sqlite";
 /// Stable engine identifier (independent of package version).
 pub const ENGINE_NAME: &str = "genesis-block";
 /// Engine package version (semver x.y.z[-prerelease]), baked in from Cargo.toml
@@ -1597,6 +1600,8 @@ pub enum WalMsg {
 pub struct Storage {
     pub path: PathBuf,
     pub read_only: bool,
+    projection_path: PathBuf,
+    projection_db: Mutex<Connection>,
     pub nodes: DashMap<u32, NodeOutput>,
     pub edges: DashMap<u128, EdgeOutput>,
     pub out_idx: DashMap<u32, HashSet<u128>>,
@@ -2025,6 +2030,335 @@ impl Storage {
         Some(val["schema_version"].as_u64().unwrap_or(0) as u32)
     }
 
+    fn open_projection(path: &std::path::Path, read_only: bool) -> Result<Connection> {
+        let flags = if read_only {
+            OpenFlags::SQLITE_OPEN_READ_ONLY
+        } else {
+            OpenFlags::SQLITE_OPEN_READ_WRITE | OpenFlags::SQLITE_OPEN_CREATE
+        };
+        Connection::open_with_flags(path, flags).map_err(|e| Error::from_reason(e.to_string()))
+    }
+
+    fn init_projection_schema(conn: &Connection) -> Result<()> {
+        conn.execute_batch(
+            "
+            PRAGMA foreign_keys = ON;
+            PRAGMA journal_mode = WAL;
+            PRAGMA synchronous = NORMAL;
+            CREATE TABLE IF NOT EXISTS props (
+                node_u32 INTEGER PRIMARY KEY,
+                payload TEXT NOT NULL,
+                clock_time INTEGER NOT NULL,
+                clock_peer TEXT NOT NULL DEFAULT '',
+                valid_from TEXT NOT NULL,
+                valid_to TEXT
+            );
+            CREATE TABLE IF NOT EXISTS node_labels (
+                node_u32 INTEGER NOT NULL,
+                label TEXT NOT NULL,
+                PRIMARY KEY (node_u32, label)
+            );
+            CREATE TABLE IF NOT EXISTS projection_state (
+                key TEXT PRIMARY KEY,
+                value TEXT NOT NULL
+            );
+            ",
+        )
+        .map_err(|e| Error::from_reason(e.to_string()))?;
+        let has_clock_peer = conn
+            .prepare("PRAGMA table_info(props)")
+            .and_then(|mut stmt| {
+                let rows = stmt.query_map([], |row| row.get::<_, String>(1))?;
+                for name in rows {
+                    if name? == "clock_peer" {
+                        return Ok(true);
+                    }
+                }
+                Ok(false)
+            })
+            .map_err(|e| Error::from_reason(e.to_string()))?;
+        if !has_clock_peer {
+            conn.execute(
+                "ALTER TABLE props ADD COLUMN clock_peer TEXT NOT NULL DEFAULT ''",
+                [],
+            )
+            .map_err(|e| Error::from_reason(e.to_string()))?;
+        }
+        conn.execute(
+            "INSERT INTO projection_state(key, value) VALUES('schema_version', ?1)
+             ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+            [PROJECTION_SCHEMA_VERSION.to_string()],
+        )
+        .map_err(|e| Error::from_reason(e.to_string()))?;
+        conn.execute(
+            "INSERT INTO projection_state(key, value) VALUES('node_clock', '0')
+             ON CONFLICT(key) DO NOTHING",
+            [],
+        )
+        .map_err(|e| Error::from_reason(e.to_string()))?;
+        Ok(())
+    }
+
+    fn projection_state_set<C>(conn: &C, key: &str, value: &str) -> Result<()>
+    where
+        C: std::ops::Deref<Target = Connection>,
+    {
+        conn.execute(
+            "INSERT INTO projection_state(key, value) VALUES(?1, ?2)
+             ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+            params![key, value],
+        )
+        .map_err(|e| Error::from_reason(e.to_string()))?;
+        Ok(())
+    }
+
+    fn projection_apply_node_conn(
+        conn: &mut Connection,
+        node_u32: u32,
+        node: &NodeOutput,
+    ) -> Result<()> {
+        let tx = conn
+            .transaction()
+            .map_err(|e| Error::from_reason(e.to_string()))?;
+        Self::projection_apply_node_tx(&tx, node_u32, node)?;
+        Self::projection_state_set(&tx, "node_clock", &node.clock.time.to_string())?;
+        tx.commit().map_err(|e| Error::from_reason(e.to_string()))?;
+        Ok(())
+    }
+
+    fn projection_apply_node_tx(
+        tx: &rusqlite::Transaction<'_>,
+        node_u32: u32,
+        node: &NodeOutput,
+    ) -> Result<()> {
+        let current_clock: Option<(u32, String)> = tx
+            .query_row(
+                "SELECT clock_time, clock_peer FROM props WHERE node_u32 = ?1",
+                [node_u32],
+                |row| Ok((row.get(0)?, row.get(1)?)),
+            )
+            .optional()
+            .map_err(|e| Error::from_reason(e.to_string()))?;
+        if current_clock.is_some_and(|seen| seen > (node.clock.time, node.clock.peer_id.clone())) {
+            return Ok(());
+        }
+
+        let payload =
+            serde_json::to_string(&node.props).map_err(|e| Error::from_reason(e.to_string()))?;
+        tx.execute(
+            "INSERT INTO props(node_u32, payload, clock_time, clock_peer, valid_from, valid_to)
+             VALUES(?1, ?2, ?3, ?4, ?5, ?6)
+             ON CONFLICT(node_u32) DO UPDATE SET
+                 payload = excluded.payload,
+                 clock_time = excluded.clock_time,
+                 clock_peer = excluded.clock_peer,
+                 valid_from = excluded.valid_from,
+                 valid_to = excluded.valid_to
+             WHERE excluded.clock_time > props.clock_time
+                OR (excluded.clock_time = props.clock_time
+                    AND excluded.clock_peer >= props.clock_peer)",
+            params![
+                node_u32,
+                payload,
+                node.clock.time,
+                node.clock.peer_id,
+                node.valid_from,
+                node.valid_to
+            ],
+        )
+        .map_err(|e| Error::from_reason(e.to_string()))?;
+        tx.execute("DELETE FROM node_labels WHERE node_u32 = ?1", [node_u32])
+            .map_err(|e| Error::from_reason(e.to_string()))?;
+        for label in &node.labels {
+            tx.execute(
+                "INSERT OR REPLACE INTO node_labels(node_u32, label) VALUES(?1, ?2)",
+                params![node_u32, label],
+            )
+            .map_err(|e| Error::from_reason(e.to_string()))?;
+        }
+        Ok(())
+    }
+
+    fn projection_apply_event(&self, event: &Event) -> Result<()> {
+        if self.read_only {
+            return Ok(());
+        }
+        let mut conn = self.projection_db.lock();
+        match event {
+            Event::Node(node) => {
+                let node_u32 = self.get_or_intern_id(&node.id);
+                Self::projection_apply_node_conn(&mut conn, node_u32, node)?;
+            }
+            Event::Batch(events) => {
+                let tx = conn
+                    .transaction()
+                    .map_err(|e| Error::from_reason(e.to_string()))?;
+                let mut max_clock = 0;
+                for inner in events {
+                    if let Event::Node(node) = inner {
+                        let node_u32 = self.get_or_intern_id(&node.id);
+                        if node.clock.time > max_clock {
+                            max_clock = node.clock.time;
+                        }
+                        Self::projection_apply_node_tx(&tx, node_u32, node)?;
+                    }
+                }
+                if max_clock > 0 {
+                    Self::projection_state_set(&tx, "node_clock", &max_clock.to_string())?;
+                }
+                tx.commit().map_err(|e| Error::from_reason(e.to_string()))?;
+            }
+            _ => {}
+        }
+        Ok(())
+    }
+
+    fn projection_snapshot(&self, target: &std::path::Path) -> Result<()> {
+        if self.read_only {
+            return Ok(());
+        }
+        if target.exists() {
+            let _ = fs::remove_file(target);
+        }
+        let escaped = target.to_string_lossy().replace('\'', "''");
+        let conn = self.projection_db.lock();
+        conn.execute_batch("PRAGMA wal_checkpoint(FULL);")
+            .map_err(|e| Error::from_reason(e.to_string()))?;
+        conn.execute_batch(&format!("VACUUM INTO '{}';", escaped))
+            .map_err(|e| Error::from_reason(e.to_string()))?;
+        Ok(())
+    }
+
+    fn projection_reopen_fresh(&self) -> Result<()> {
+        if self.read_only {
+            return Ok(());
+        }
+        if self.projection_path.exists() {
+            let _ = fs::remove_file(&self.projection_path);
+        }
+        let conn = Self::open_projection(&self.projection_path, false)?;
+        Self::init_projection_schema(&conn)?;
+        *self.projection_db.lock() = conn;
+        Ok(())
+    }
+
+    fn projection_replay_wal(&self) -> Result<()> {
+        if !self.log_path.exists() {
+            let projection_complete = self
+                .nodes
+                .iter()
+                .all(|entry| self.projection_props(*entry.key()).ok().flatten().is_some());
+            if projection_complete {
+                return Ok(());
+            }
+            return Err(Error::from_reason(
+                "projection recovery requires genesis-graph.wal when node props are missing",
+            ));
+        }
+        use std::io::BufRead;
+        let file = File::open(&self.log_path).map_err(|e| Error::from_reason(e.to_string()))?;
+        let reader = std::io::BufReader::new(file);
+        for line in reader.lines() {
+            let line = line.map_err(|e| Error::from_reason(e.to_string()))?;
+            if line.trim().is_empty() {
+                continue;
+            }
+            let Ok(signed_event) = serde_json::from_str::<SignedEvent>(&line) else {
+                continue;
+            };
+            match signed_event.event {
+                Event::Node(node) => {
+                    self.projection_apply_event(&Event::Node(node))?;
+                }
+                Event::Batch(events) => {
+                    let pending: Vec<Event> = events
+                        .into_iter()
+                        .filter_map(|event| match event {
+                            Event::Node(node) => Some(Event::Node(node)),
+                            _ => None,
+                        })
+                        .collect();
+                    if !pending.is_empty() {
+                        self.projection_apply_event(&Event::Batch(pending))?;
+                    }
+                }
+                _ => {}
+            }
+        }
+        let projection_complete = self
+            .nodes
+            .iter()
+            .all(|entry| self.projection_props(*entry.key()).ok().flatten().is_some());
+        if !projection_complete {
+            return Err(Error::from_reason(
+                "WAL replay did not recover props for every resident node",
+            ));
+        }
+        Ok(())
+    }
+
+    fn projection_sync_on_open(&self) -> Result<()> {
+        if self.read_only {
+            return Ok(());
+        }
+        // Lamport time is not a WAL cursor: distinct peers may emit equal clocks,
+        // and compaction rewrites the WAL. Scan the authoritative WAL on open and
+        // rely on full-clock LWW upserts for idempotence. A durable sequence cursor
+        // belongs to the unified transaction protocol, not this S0/S1 projection.
+        if self.projection_replay_wal().is_err() {
+            self.projection_reopen_fresh()?;
+            self.projection_replay_wal()?;
+        }
+        Ok(())
+    }
+
+    pub fn projection_props(&self, node_u32: u32) -> Result<Option<Value>> {
+        let conn = self.projection_db.lock();
+        let payload: Option<String> = conn
+            .query_row(
+                "SELECT payload FROM props WHERE node_u32 = ?1",
+                [node_u32],
+                |row| row.get(0),
+            )
+            .optional()
+            .map_err(|e| Error::from_reason(e.to_string()))?;
+        match payload {
+            Some(raw) => serde_json::from_str(&raw)
+                .map(Some)
+                .map_err(|e| Error::from_reason(e.to_string())),
+            None => Ok(None),
+        }
+    }
+
+    fn hydrated_props(&self, node_u32: u32, node: &NodeOutput) -> Value {
+        if !node.props.is_null() {
+            return node.props.clone();
+        }
+        self.projection_props(node_u32)
+            .ok()
+            .flatten()
+            .unwrap_or_else(|| Value::Object(Default::default()))
+    }
+
+    fn hydrated_node(&self, node_u32: u32, node: &NodeOutput) -> NodeOutput {
+        if !node.props.is_null() {
+            return node.clone();
+        }
+        let mut hydrated = node.clone();
+        hydrated.props = self.hydrated_props(node_u32, node);
+        hydrated
+    }
+
+    pub fn node_view(&self, id: &str) -> Option<NodeOutput> {
+        let u32_id = self.get_u32(id)?;
+        self.node_view_u32(u32_id)
+    }
+
+    pub fn node_view_u32(&self, u32_id: u32) -> Option<NodeOutput> {
+        let node = self.nodes.get(&u32_id)?;
+        Some(self.hydrated_node(u32_id, node.value()))
+    }
+
     pub fn open(opts: OpenOptions) -> Result<Self> {
         let root = PathBuf::from(opts.path.clone());
         if !root.exists() {
@@ -2077,6 +2411,33 @@ impl Storage {
         let local_peer_id = hex::encode(Sha256::digest(verifying_key.as_bytes()))[..16].to_string();
 
         let log_path = root.join("genesis-graph.wal");
+        let projection_path = root.join(PROJECTION_DB_FILE);
+        let projection_conn = if read_only {
+            Self::open_projection(&projection_path, true)?
+        } else {
+            match Self::open_projection(&projection_path, false) {
+                Ok(conn) if Self::init_projection_schema(&conn).is_ok() => conn,
+                Ok(conn) => {
+                    drop(conn);
+                    if projection_path.exists() {
+                        fs::remove_file(&projection_path)
+                            .map_err(|e| Error::from_reason(e.to_string()))?;
+                    }
+                    let conn = Self::open_projection(&projection_path, false)?;
+                    Self::init_projection_schema(&conn)?;
+                    conn
+                }
+                Err(_) => {
+                    if projection_path.exists() {
+                        fs::remove_file(&projection_path)
+                            .map_err(|e| Error::from_reason(e.to_string()))?;
+                    }
+                    let conn = Self::open_projection(&projection_path, false)?;
+                    Self::init_projection_schema(&conn)?;
+                    conn
+                }
+            }
+        };
         let (wal_sender, wal_receiver): (Sender<WalMsg>, Receiver<WalMsg>) = unbounded();
         let log_path_clone = log_path.clone();
 
@@ -2226,6 +2587,8 @@ impl Storage {
         let storage = Self {
             path: root,
             read_only,
+            projection_path,
+            projection_db: Mutex::new(projection_conn),
             nodes: DashMap::new(),
             edges: DashMap::new(),
             out_idx: DashMap::new(),
@@ -2332,6 +2695,7 @@ impl Storage {
         // arenas but never rehydrates HNSW, leaving semantic search broken
         // until a manual rebuild).
         storage.rehydrate_hnsw_index();
+        storage.projection_sync_on_open()?;
         Ok(storage)
     }
 
@@ -2374,6 +2738,7 @@ impl Storage {
             .send(WalMsg::Append(Box::new(signed_event), ack_tx))
             .map_err(|_| Error::from_reason("wal disconnected"))?;
         let _ = ack_rx.recv();
+        self.projection_apply_event(event)?;
         Ok(())
     }
 
@@ -2668,9 +3033,14 @@ impl Storage {
     }
 
     pub fn calculate_sc(&self, node: &NodeOutput) -> f64 {
+        let props = self
+            .get_u32(&node.id)
+            .map(|u32_id| self.hydrated_props(u32_id, node))
+            .unwrap_or_else(|| node.props.clone());
         let stability = node
             .props
             .get("stability")
+            .or_else(|| props.get("stability"))
             .and_then(|v| v.as_str())
             .unwrap_or("active");
         match stability {
@@ -2687,6 +3057,7 @@ impl Storage {
             Some(id) => id,
             None => return 0.7,
         };
+        let hydrated = self.hydrated_node(u32_id, node);
         let incoming_count = self
             .in_idx
             .get(&u32_id)
@@ -2700,7 +3071,7 @@ impl Storage {
             Tier::ADR => 0.6,
             Tier::USER => 0.3,
         };
-        let sc = self.calculate_sc(node);
+        let sc = self.calculate_sc(&hydrated);
         (dd * 0.5) + (as_score * 0.3) + (sc * 0.2)
     }
 
@@ -2750,6 +3121,7 @@ impl Storage {
     /// still persisted in the WAL `Event::Node` for replay/arena rebuild.
     fn insert_node_lean(&self, u32_id: u32, mut node: NodeOutput) {
         node.embedding = None;
+        node.props = Value::Null;
         self.nodes.insert(u32_id, node);
     }
 
@@ -2833,7 +3205,7 @@ impl Storage {
         let now = Utc::now().to_rfc3339();
 
         let mut old_node = match self.nodes.get(&u32_id) {
-            Some(node) => node.value().clone(),
+            Some(node) => self.hydrated_node(u32_id, node.value()),
             None => return Err(Error::from_reason("Node not in memory index")),
         };
 
@@ -3035,12 +3407,18 @@ impl Storage {
     // --- Cypher pattern matching (ADR--GENESISDB-HQL-CYPHER-PATTERNS, path 1) ---
 
     /// Does a node satisfy a pattern node's `:Label` and `{k:v}` constraints?
-    fn node_matches(node: &NodeOutput, pat: &query::ast::NodePattern) -> bool {
+    fn node_matches(
+        &self,
+        node_u32: u32,
+        node: &NodeOutput,
+        pat: &query::ast::NodePattern,
+    ) -> bool {
         if let Some(label) = &pat.label {
             if !node.labels.iter().any(|l| l == label) {
                 return false;
             }
         }
+        let props = self.hydrated_props(node_u32, node);
         for (k, v) in &pat.props {
             // `{id:"..."}` addresses the node's top-level id (there is no `:id`
             // syntax and anchoring a pattern by a known id is the common case);
@@ -3055,7 +3433,7 @@ impl Storage {
                 }
                 continue;
             }
-            match node.props.get(k) {
+            match props.get(k) {
                 Some(av) => {
                     if !Self::json_eq_hqlvalue(av, v) {
                         return false;
@@ -3109,8 +3487,9 @@ impl Storage {
                 if let Some(entry) = self.nodes.get(&anchor_u32) {
                     let node = entry.value();
                     if Self::is_valid_as_of(&node.valid_from, &node.valid_to, as_of)
-                        && Self::node_matches(node, &pattern.start)
+                        && self.node_matches(anchor_u32, node, &pattern.start)
                     {
+                        let node = self.hydrated_node(anchor_u32, node);
                         let mut row = Row::new();
                         if let Some(v) = &pattern.start.var {
                             row.insert(v.clone(), serde_json::to_value(node).map_err(ser_err)?);
@@ -3125,9 +3504,10 @@ impl Storage {
                 if !Self::is_valid_as_of(&node.valid_from, &node.valid_to, as_of) {
                     continue;
                 }
-                if !Self::node_matches(node, &pattern.start) {
+                if !self.node_matches(*entry.key(), node, &pattern.start) {
                     continue;
                 }
+                let node = self.hydrated_node(*entry.key(), node);
                 let mut row = Row::new();
                 if let Some(v) = &pattern.start.var {
                     row.insert(v.clone(), serde_json::to_value(node).map_err(ser_err)?);
@@ -3196,9 +3576,10 @@ impl Storage {
                     if !Self::is_valid_as_of(&far_node.valid_from, &far_node.valid_to, as_of) {
                         continue;
                     }
-                    if !Self::node_matches(far_node, node_pat) {
+                    if !self.node_matches(far_u32, far_node, node_pat) {
                         continue;
                     }
+                    let far_node = self.hydrated_node(far_u32, far_node);
                     let mut nb = row.clone();
                     if let Some(v) = &edge_pat.var {
                         nb.insert(v.clone(), serde_json::to_value(edge).map_err(ser_err)?);
@@ -3706,7 +4087,7 @@ impl Storage {
                 {
                     let u32_id = meta.node_u32; // A2: id interned in metadata
                     if let Some(node) = self.nodes.get(&u32_id) {
-                        let node_out = node.value().clone();
+                        let node_out = self.hydrated_node(u32_id, node.value());
 
                         if !Self::is_valid_as_of(
                             &node_out.valid_from,
@@ -3871,7 +4252,7 @@ impl Storage {
                                 let mut new_path = path.clone();
                                 new_path.push(edge.clone());
                                 results.push(NeighborOutput {
-                                    node: node.clone(),
+                                    node: self.hydrated_node(next_u32, node),
                                     path: new_path.clone(),
                                     depth: curr_depth + 1,
                                     score: None,
@@ -4368,10 +4749,12 @@ impl Storage {
 
     pub fn persist_signed(&self, signed_event: SignedEvent) -> Result<()> {
         let (ack_tx, ack_rx) = unbounded();
+        let event = signed_event.event.clone();
         self.wal_sender
             .send(WalMsg::Append(Box::new(signed_event), ack_tx))
             .map_err(|_| Error::from_reason("wal disconnected"))?;
         let _ = ack_rx.recv();
+        self.projection_apply_event(&event)?;
         Ok(())
     }
 
@@ -4403,7 +4786,7 @@ impl Storage {
         if let Some(u32_id) = self.get_u32(&target_id_resolved) {
             queue.push_back((u32_id, 0));
             if let Some(node) = self.nodes.get(&u32_id) {
-                nodes.insert(u32_id, node.value().clone());
+                nodes.insert(u32_id, self.hydrated_node(u32_id, node.value()));
             }
         }
 
@@ -4424,7 +4807,7 @@ impl Storage {
                                 nodes.entry(next_u32)
                             {
                                 if let Some(node) = self.nodes.get(&next_u32) {
-                                    e.insert(node.value().clone());
+                                    e.insert(self.hydrated_node(next_u32, node.value()));
                                     queue.push_back((next_u32, curr_depth + 1));
                                 }
                             }
@@ -4443,7 +4826,7 @@ impl Storage {
                                 nodes.entry(prev_u32)
                             {
                                 if let Some(node) = self.nodes.get(&prev_u32) {
-                                    e.insert(node.value().clone());
+                                    e.insert(self.hydrated_node(prev_u32, node.value()));
                                     queue.push_back((prev_u32, curr_depth + 1));
                                 }
                             }
@@ -4767,6 +5150,7 @@ impl Storage {
         if let Ok(bytes) = serde_json::to_vec(&edges) {
             fs::write(temp_dir.join("edges.bin"), bytes).ok();
         }
+        self.projection_snapshot(&temp_dir.join(PROJECTION_DB_FILE))?;
 
         // 3. Save Global Metadata (incl. collections manifest)
         let state = serde_json::json!({
@@ -5655,6 +6039,7 @@ impl Storage {
             }
             if node.valid_to.is_none() {
                 let mut node = node.clone();
+                node.props = self.hydrated_props(*entry.key(), &node);
                 if node.embedding.is_none() {
                     node.embedding = self.reconstruct_embedding(&node, *entry.key());
                 }

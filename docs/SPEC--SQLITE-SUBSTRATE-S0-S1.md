@@ -123,7 +123,7 @@ S0 is complete only if these invariants hold:
 
 1. **WAL-first:** a mutation is durable only when the signed WAL says it is durable.
 2. **Idempotent apply:** replaying the same WAL slice into SQLite more than once converges to the same projection state.
-3. **Gap healing:** if SQLite lags behind the WAL, open/recovery replays only the missing suffix.
+3. **Gap healing:** if SQLite lags behind the WAL, open/recovery replays authoritative WAL events idempotently. S0/S1 may scan the full WAL; durable missing-suffix cursoring is owned by unified transaction phase U3 because Lamport time is not a WAL sequence.
 4. **Full rebuild:** if SQLite is missing or invalid, the engine can recreate it from authoritative state without manual intervention.
 5. **Snapshot coherence:** the SQLite file joins the same snapshot unit as the native snapshot outputs.
 
@@ -219,8 +219,54 @@ The implementation PRs for S0 and S1 must update:
 - Graph/traversal correctness and performance gates pass.
 - Recovery invariants from S0 still hold.
 
-## 9. Version diff
+## 9. Implementation evidence snapshot (2026-07-20)
+
+The current working implementation satisfies the S0/S1 contract shape with the following
+repo-verified evidence:
+
+- `rusqlite` is embedded with the bundled build path, and the projection schema includes
+  `props`, `node_labels`, and `projection_state`.
+- Projection replay/rebuild behavior is covered by `tests/sqlite_substrate_s0_tests.rs`,
+  including missing/corrupt SQLite recovery, stale-watermark healing, full-clock LWW, and snapshot round-trip.
+- Resident nodes are now lean for `props`: the runtime stores `Value::Null` in the primary
+  in-memory node map and hydrates `props` through the SQLite projection for behaviorally
+  compatible reads.
+- Public HQL behavior remains on the native executor track; the targeted HQL P0 suites still
+  pass independently of the substrate work.
+
+### 9.1 Benchmark evidence
+
+Audit harness: `sqlite-props-audit` (`benches/sqlite_props_audit.rs`).
+
+Medium run (`N=5000`, `fanout=4`, `prop_bytes=1024`, `depth=3`, `q=100`):
+
+- RSS: `16 MB -> 25 MB -> 44 MB`
+- Node ingest: `1.81 s`
+- Edge ingest: `0.67 s`
+- Resident nodes: `5000`
+- Resident null props: `5000`
+- Resident lean ratio: `1.0`
+- Expected inline payload bytes: `5,120,000`
+- Resident inline prop bytes: `20,000`
+- Saved resident payload lower bound: `5,100,000`
+- Traversal: `p50 4444.2 us`, `p95 6021.3 us`, `p99 7522.0 us`, `214 trav/s`
+
+Large run (`N=20000`, `fanout=4`, `prop_bytes=2048`, `depth=3`, `q=200`):
+
+- RSS: `15 MB -> 40 MB -> 106 MB`
+- Node ingest: `31.3 s`
+- Edge ingest: `5.7 s`
+- Traversal: `p50 4551.0 us`, `p95 6073.9 us`, `p99 6913.5 us`, `211 trav/s`
+
+Interpretation: the resident graph stays fully lean for `props` while traversal latency stays
+in the same hop-3 class as the medium run. This meets the intent of the S1 RSS/traversal gate:
+payload bytes moved off the resident node map without introducing a material hop-path regression
+in the measured fixture.
+
+## 10. Version diff
 
 | From | To | Change |
 |---|---|---|
 | none | 0.1.0b | New doc-first target spec for SQLite substrate S0/S1, with explicit separation from the HQL P0 native correctness/exposure track. |
+| 0.1.0b | 0.1.1b | Added implementation evidence and benchmark snapshot for the current S0/S1 SQLite substrate rollout. |
+| 0.1.1b | 0.1.2b | Corrected recovery contract: Lamport time is not a WAL cursor; S0/S1 uses idempotent full-WAL replay and defers durable sequence cursoring to U3. |

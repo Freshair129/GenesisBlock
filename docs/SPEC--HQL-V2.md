@@ -81,6 +81,10 @@ Any numeric token whose value-parse fails (u32/f64 overflow, etc.) is a parse er
 
 Recommended: `qualified_id = identifier (":" identifier)+` accepted for `seed`/`target` **only** (never inside pattern syntax, where `:` introduces labels), so `TRAVERSE FROM user:5 …` parses. If the gate rejects (PEG risk), the fallback decision is: quoting is mandatory and all docs/examples are corrected (P0-T9). Either way the v1 broken-example state ends.
 
+Implementation note (2026-07-20): the current repo keeps colon-bearing ids quoted-only in
+command positions. The grammar does not implement an unquoted `qualified_id` form for
+`user:5`; callers must write string literals such as `TRAVERSE FROM "user:5" DEPTH 2 REL SENT_BY`.
+
 ### 2.7 Executor guarantees (no syntax)
 
 - One `Utc::now()` per query (not per edge) in `match_pattern` and `neighbors` — a query sees a single consistent "current" instant (P0-T6).

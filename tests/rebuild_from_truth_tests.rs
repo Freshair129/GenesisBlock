@@ -192,8 +192,7 @@ fn node_properties_survive_roundtrip() {
     }
 
     let s = open(&path);
-    let u32_id = s.get_u32("props_node").expect("node should exist");
-    let node = s.nodes.get(&u32_id).unwrap();
+    let node = s.node_view("props_node").expect("node should exist");
     let props = &node.props;
     assert_eq!(props["name"], "GenesisBlock");
     assert_eq!(props["version"], 42);

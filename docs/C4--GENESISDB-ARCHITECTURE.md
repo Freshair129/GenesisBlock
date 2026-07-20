@@ -2,9 +2,9 @@
 proposed_id: C4--GENESISDB-ARCHITECTURE
 type: architecture-index
 status: current
-version: 0.1.2b
+version: 0.1.3b
 created_at: 2026-06-13T22:50:11+07:00,ATHER,9b1ced3
-last_update: 2026-06-14T00:29:45+07:00,ATHER
+last_update: 2026-07-20T22:10:00+07:00,ATHER
 attributes:
   domain: architecture
   scope: repository
@@ -46,7 +46,7 @@ attributes:
 
 ## 3. C1 - System Context
 
-GenesisBlockDB is a local-first hybrid semantic-graph database engine. Its core responsibility is backend runtime behavior: durable storage, WAL/snapshot persistence, in-memory embedding storage, vector/HNSW indexing, symbolic graph relationships, graph traversal, HQL/AST execution, hybrid search, retrieval, community detection, and synchronization primitives.
+GenesisBlockDB is a local-first relational + graph + vector database operational boundary. Its Rust runtime owns signed-WAL durability, an embedded SQLite relational projection, native graph traversal, per-collection vector/HNSW indexes, typed/native APIs, HQL compatibility execution, retrieval, and synchronization primitives.
 
 ### External Actors
 
@@ -82,7 +82,7 @@ flowchart LR
 
 | Container | Responsibility | Current Source | Primary Docs |
 |---|---|---|---|
-| Rust Core Engine | Storage, WAL, indexing, graph traversal, HQL, reasoning, CRDT, consensus primitives | `src/lib.rs`, `hql.pest` | `MASTER-SPEC--GENESIS-DB.md`, feature specs, ADRs |
+| Rust Core Engine | Unified lifecycle, signed WAL, SQLite projection, native graph/vector indexes, HQL compatibility, reasoning, CRDT, consensus primitives | `src/lib.rs`, `src/query/*` | `MASTER-SPEC--GENESIS-DB.md`, unified-boundary spec, feature specs, ADRs |
 | Axum REST Server | HTTP API for bulk ingest, HQL, node/edge mutation, search, context, status | `src/main.rs`, `src/router.rs` | `docs/API_REFERENCE.md` |
 | N-API Package | Native Node/TypeScript bindings over Rust core | `src/lib.rs`, `index.d.ts`, `index.js` | `docs/API_REFERENCE.md`, NPM package metadata |
 | MCP Server | Tool interface for LLM clients | `mcp/server.js` | `docs/MCP-GUIDE.md`, `docs/SPEC--MCP-SERVER.md` |
@@ -115,6 +115,7 @@ flowchart TB
     subgraph engine["GenesisBlockDB Runtime"]
         core["Rust Core Engine\nsrc/lib.rs"]
         wal["WAL + Snapshot"]
+        sqlite["Embedded SQLite\nprops + labels"]
         index["Hybrid Indexes\nHNSW + lexical + graph"]
     end
 
@@ -128,6 +129,7 @@ flowchart TB
     napi --> core
     rest --> core
     core --> wal
+    core --> sqlite
     core --> index
 ```
 
@@ -137,11 +139,12 @@ flowchart TB
 
 | Component | Responsibility | Source / Entry Points | Related Docs |
 |---|---|---|---|
-| Storage Model | Node/edge persistence, WAL, snapshots, recovery | `src/lib.rs` | master spec, batch atomicity, WAL ADR |
+| Storage Model | One operational boundary over signed WAL, SQLite projection, native snapshots, replay and recovery | `src/lib.rs` | master spec, unified-boundary spec, SQLite substrate ADR |
+| Relational Projection | Paged node properties and normalized labels; future app schemas/joins remain U2 | `src/lib.rs` (`projection_*`) | `SPEC--SQLITE-SUBSTRATE-S0-S1`, unified-boundary spec |
 | Vector Collections | Per-model/dim isolated vector spaces (`collections: DashMap<String, Arc<VectorCollection>>`, each with its own arena + metadata + HNSW + metric); a `default` collection always exists. Async indexing thread (off the write path). | `src/lib.rs` | master spec, HNSW hybrid index design, `ADR--GENESISDB-MULTI-COLLECTION`, `ADR--GENESISDB-ASYNC-INDEXING` |
 | Hybrid Search | Per-collection vector + lexical retrieval with ranking; query dim validated against the collection | `src/lib.rs`, HNSW design | HNSW hybrid index design |
 | Graph Retrieval Layer | Tiered context retrieval by hop budget and fuzzy matching | `src/lib.rs::retrieve_context` | `SPEC--GRAPH-RETRIEVAL-LAYER.md` |
-| HQL Engine | Parse and execute search/traverse/context/infer queries | `src/lib.rs::execute_hql`, `hql.pest` | HQL section in master spec, API docs |
+| HQL Compatibility Frontend | Parse and execute current search/traverse/context queries without owning storage semantics | `src/lib.rs::execute_hql`, `src/query/*` | HQL section in master spec, API docs |
 | Symbolic Graph / AST Boundary | Symbolic relationships, query grammar, and structured traversal semantics | `src/lib.rs`, `hql.pest` | master spec, HQL docs |
 | K-Impact / Reasoning | Impact scoring, inference, structural insight, drift | `src/lib.rs` | K-impact specs, transitive inference design |
 | Community Detection | Cluster/community discovery for graph insight and SuperNode generation | `src/lib.rs` | graph clustering and structural insight specs |

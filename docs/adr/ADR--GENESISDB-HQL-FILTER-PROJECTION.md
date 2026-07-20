@@ -1,7 +1,7 @@
 ---
 proposed_id: ADR--GENESISDB-HQL-FILTER-PROJECTION
 type: adr
-status: candidate
+status: current
 aliases:
   - ADR
 phase: 2
@@ -14,6 +14,10 @@ proposed_by: agent
 ---
 
 # ADR--GENESISDB-HQL-FILTER-PROJECTION
+
+> Status note (2026-07-20): shipped in the current codebase as the planner-free
+> filter/projection layer for HQL list-returning commands. Examples below are
+> updated to match the current grammar.
 
 ## Context
 
@@ -126,7 +130,7 @@ SEARCH ~weather SIMILAR TO [..] K 50
   WHERE prop.side = "them" AND prop.time > 1782000000000
   ORDER BY prop.time DESC LIMIT 10
 
-TRAVERSE FROM user:5 DEPTH 2 REL SENT_BY
+TRAVERSE FROM "user:5" DEPTH 2 REL SENT_BY
   WHERE label = "Message"
   RETURN id, prop.text
 

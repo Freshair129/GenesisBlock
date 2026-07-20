@@ -58,6 +58,7 @@ regex = "1"
 dashmap = "6.0"
 once_cell = "1.19"
 parking_lot = "0.12"
+rusqlite = { version = "0.32", features = ["bundled"] }
 sysinfo = { version = "0.30", optional = true }
 # Android JNI bridge (src/jni.rs); only enabled by the `android-jni` feature.
 # No `invocation` feature → does not link a JVM, so it builds on the host triple.
@@ -187,5 +188,10 @@ required-features = ["bins"]
 [[bin]]
 name = "edge-interning-audit"
 path = "benches/edge_interning_audit.rs"
+required-features = ["bins"]
+
+[[bin]]
+name = "sqlite-props-audit"
+path = "benches/sqlite_props_audit.rs"
 required-features = ["bins"]
 
