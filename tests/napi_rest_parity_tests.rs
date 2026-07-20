@@ -56,6 +56,11 @@ const NAPI_TO_REST: &[(&str, Option<&str>)] = &[
     ("rebuild_index_parallel", Some("/v1/bulk/rebuild")),
     ("add_node", Some("/v1/node/add")),
     ("add_edge", Some("/v1/edge/add")),
+    ("register_relational_schema", Some("/v1/relational/schema")),
+    ("apply_relational_rows", Some("/v1/relational/mutate")),
+    ("query_relational", Some("/v1/relational/query")),
+    ("commit_transaction", Some("/v1/transaction/commit")),
+    ("stable_frontier", Some("/v1/frontier")),
     ("supersede_node", Some("/v1/node/supersede")),
     ("retract_edge", Some("/v1/edge/retract")),
     // GRL tiered retrieval (target_id/tier/budget/fuzzy). NOT the same as

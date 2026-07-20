@@ -14,8 +14,8 @@ use tower_http::limit::RequestBodyLimitLayer;
 use tower_http::trace::TraceLayer;
 
 use crate::{
-    BatchInput, CollectionInfo, EdgeInput, Event, HybridSearchInput, NodeInput, QueryInput,
-    Storage, SyncPeer,
+    BatchInput, CollectionInfo, EdgeInput, Event, GenesisTransaction, HybridSearchInput, NodeInput,
+    QueryInput, RelationalQuery, RelationalRowMutation, RelationalSchemaPackage, Storage, SyncPeer,
 };
 
 // ---------------------------------------------------------------------------
@@ -83,6 +83,12 @@ struct SupersedeInput {
     pub id: String,
     pub new_props: Option<serde_json::Value>,
     pub caused_by: Option<String>,
+}
+
+#[derive(serde::Deserialize)]
+struct RelationalRowsInput {
+    namespace: String,
+    mutations: Vec<RelationalRowMutation>,
 }
 
 // ---------------------------------------------------------------------------
@@ -224,6 +230,55 @@ async fn execute_batch_handler(
         Ok(output) => (StatusCode::OK, Json(output)).into_response(),
         Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
     }
+}
+
+async fn relational_schema_handler(
+    State(state): State<AppState>,
+    Json(package): Json<RelationalSchemaPackage>,
+) -> impl IntoResponse {
+    let storage = state.storage.read();
+    match storage.register_relational_schema(package) {
+        Ok(version) => (StatusCode::OK, Json(version)).into_response(),
+        Err(e) => (StatusCode::BAD_REQUEST, e.to_string()).into_response(),
+    }
+}
+
+async fn relational_mutate_handler(
+    State(state): State<AppState>,
+    Json(input): Json<RelationalRowsInput>,
+) -> impl IntoResponse {
+    let storage = state.storage.read();
+    match storage.apply_relational_rows(&input.namespace, input.mutations) {
+        Ok(()) => StatusCode::NO_CONTENT.into_response(),
+        Err(e) => (StatusCode::BAD_REQUEST, e.to_string()).into_response(),
+    }
+}
+
+async fn relational_query_handler(
+    State(state): State<AppState>,
+    Json(query): Json<RelationalQuery>,
+) -> impl IntoResponse {
+    let storage = state.storage.read();
+    match storage.query_relational(query) {
+        Ok(rows) => (StatusCode::OK, Json(rows)).into_response(),
+        Err(e) => (StatusCode::BAD_REQUEST, e.to_string()).into_response(),
+    }
+}
+
+async fn transaction_commit_handler(
+    State(state): State<AppState>,
+    Json(transaction): Json<GenesisTransaction>,
+) -> impl IntoResponse {
+    let storage = state.storage.read();
+    match storage.commit_transaction(transaction) {
+        Ok(result) => (StatusCode::OK, Json(result)).into_response(),
+        Err(e) => (StatusCode::CONFLICT, e.to_string()).into_response(),
+    }
+}
+
+async fn stable_frontier_handler(State(state): State<AppState>) -> impl IntoResponse {
+    let storage = state.storage.read();
+    (StatusCode::OK, Json(storage.stable_frontier())).into_response()
 }
 
 async fn add_node_handler(
@@ -688,6 +743,11 @@ pub fn build_router(state: AppState) -> Router {
         .route("/v1/bulk/edges", post(bulk_add_edges_handler))
         .route("/v1/bulk/rebuild", post(rebuild_index_handler))
         .route("/v1/batch", post(execute_batch_handler))
+        .route("/v1/relational/schema", post(relational_schema_handler))
+        .route("/v1/relational/mutate", post(relational_mutate_handler))
+        .route("/v1/relational/query", post(relational_query_handler))
+        .route("/v1/transaction/commit", post(transaction_commit_handler))
+        .route("/v1/frontier", get(stable_frontier_handler))
         // HQL is a query string; cap the body at 256 KiB so a malformed/huge
         // request can't force a large allocation (defense-in-depth — the bulk
         // routes that legitimately carry embeddings keep the default limit).

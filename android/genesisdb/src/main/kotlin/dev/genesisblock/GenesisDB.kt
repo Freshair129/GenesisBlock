@@ -71,6 +71,32 @@ class GenesisDB private constructor(private var handle: Long) : AutoCloseable {
         json.decodeFromString(ContextPackage.serializer(), result)
     }
 
+    /** Register a versioned relational schema package using the canonical JSON contract. */
+    suspend fun registerRelationalSchema(packageJson: String): Int = withContext(Dispatchers.IO) {
+        nativeRegisterRelationalSchema(requireOpen(), packageJson)?.toIntOrNull()
+            ?: throw GenesisDBException("registerRelationalSchema failed")
+    }
+
+    /** Apply a typed relational mutation group; raw SQL writes are intentionally unavailable. */
+    suspend fun applyRelationalRows(inputJson: String) = withContext(Dispatchers.IO) {
+        nativeApplyRelationalRows(requireOpen(), inputJson)
+            ?: throw GenesisDBException("applyRelationalRows failed")
+    }
+
+    /** Execute a bounded typed relational query and return its JSON row array. */
+    suspend fun queryRelational(queryJson: String): JsonElement = withContext(Dispatchers.IO) {
+        val result = nativeQueryRelational(requireOpen(), queryJson)
+            ?: throw GenesisDBException("queryRelational failed")
+        json.parseToJsonElement(result)
+    }
+
+    /** Commit one canonical cross-domain Genesis transaction. */
+    suspend fun commitTransaction(transactionJson: String): JsonElement = withContext(Dispatchers.IO) {
+        val result = nativeCommitTransaction(requireOpen(), transactionJson)
+            ?: throw GenesisDBException("commitTransaction failed")
+        json.parseToJsonElement(result)
+    }
+
     /** Flush the async HNSW index so recently added vectors become
      * searchable (read-your-write). */
     suspend fun flushIndex() = withContext(Dispatchers.IO) {
@@ -117,6 +143,10 @@ class GenesisDB private constructor(private var handle: Long) : AutoCloseable {
         @JvmStatic private external fun nativeSearch(handle: Long, jsonInput: String): String?
         @JvmStatic private external fun nativeExecuteHql(handle: Long, query: String): String?
         @JvmStatic private external fun nativeRetrieveContext(handle: Long, jsonInput: String): String?
+        @JvmStatic private external fun nativeRegisterRelationalSchema(handle: Long, jsonInput: String): String?
+        @JvmStatic private external fun nativeApplyRelationalRows(handle: Long, jsonInput: String): String?
+        @JvmStatic private external fun nativeQueryRelational(handle: Long, jsonInput: String): String?
+        @JvmStatic private external fun nativeCommitTransaction(handle: Long, jsonInput: String): String?
         @JvmStatic private external fun nativeFlushIndex(handle: Long): Int
     }
 }

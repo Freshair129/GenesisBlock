@@ -81,6 +81,18 @@ const char *genesisdb_execute_hql(GenesisHandle *handle, const char *hql);
  */
 const char *genesisdb_retrieve_context(GenesisHandle *handle, const char *json_input);
 
+/* Register a versioned relational schema package encoded as JSON. */
+const char *genesisdb_register_relational_schema(GenesisHandle *handle, const char *json_input);
+
+/* Apply a typed relational mutation group encoded as JSON. */
+int32_t genesisdb_apply_relational_rows(GenesisHandle *handle, const char *json_input);
+
+/* Execute a bounded typed relational query encoded as JSON. */
+const char *genesisdb_query_relational(GenesisHandle *handle, const char *json_input);
+
+/* Commit one canonical cross-domain Genesis transaction encoded as JSON. */
+const char *genesisdb_commit_transaction(GenesisHandle *handle, const char *json_input);
+
 /*
  Flush the async HNSW index so staged vectors become searchable
  (read-your-write). Returns 0 on success, nonzero on a null/invalid handle or
