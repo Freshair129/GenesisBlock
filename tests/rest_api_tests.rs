@@ -143,6 +143,91 @@ async fn test_status_returns_open() {
     assert_eq!(body["read_only"], json!(false));
 }
 
+#[tokio::test]
+async fn test_relational_u2_canonical_routes() {
+    let (app, _dir) = make_app();
+    let package = json!({
+        "namespace": "restapp",
+        "schema_version": 1,
+        "previous_version": null,
+        "package_id": "00000000-0000-4000-8000-000000000301",
+        "schema_hash": "",
+        "tables": [{
+            "name": "notes",
+            "columns": [
+                {"name": "id", "column_type": "EntityId", "nullable": false},
+                {"name": "title", "column_type": "Text", "nullable": false}
+            ],
+            "primary_key": ["id"],
+            "foreign_keys": [],
+            "indexes": []
+        }],
+        "named_queries": [{
+            "name": "note_by_id",
+            "parameters": [{"name": "note_id", "column_type": "EntityId"}],
+            "query": {
+                "namespace": "restapp",
+                "table": "notes",
+                "columns": ["notes.title"],
+                "joins": [],
+                "filters": [{"column": "notes.id", "value": {"$param": "note_id"}}],
+                "limit": null
+            },
+            "default_limit": 1,
+            "max_limit": 10
+        }]
+    });
+    let (status, version) = post_json(&app, "/v1/relational/schema/register", package).await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(version, json!(1));
+
+    let (status, registered) = get_json(&app, "/v1/relational/schema/restapp").await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(registered["schema_hash"].as_str().unwrap().len(), 64);
+
+    let (status, receipt) = post_json(
+        &app,
+        "/v1/relational/mutate",
+        json!({
+            "mutation_id": "00000000-0000-4000-8000-000000000302",
+            "namespace": "restapp",
+            "schema_version": 1,
+            "operations": [{
+                "table": "notes",
+                "kind": "Upsert",
+                "values": {"id": "note-1", "title": "Canonical"},
+                "key": null
+            }]
+        }),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(receipt["affected_rows"], json!(1));
+
+    let (status, rows) = post_json(
+        &app,
+        "/v1/relational/query",
+        json!({
+            "namespace": "restapp",
+            "schema_version": 1,
+            "query_name": "note_by_id",
+            "parameters": {"note_id": "note-1"},
+            "limit": 1
+        }),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(rows, json!([{"notes.title": "Canonical"}]));
+
+    let (status, _) = post_json(
+        &app,
+        "/v1/relational/query",
+        json!({"namespace": "restapp", "table": "notes", "columns": ["notes.title"]}),
+    )
+    .await;
+    assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY);
+}
+
 /// P2c: `/v1/status` exposes per-collection quant ops. For a quantized+rerank
 /// collection the sidecar is on-disk (post-P0), so `sidecar_resident_bytes` must
 /// be ≈0 (asserted == 0) — the field exists to PROVE the RAM win. `quant` and
@@ -1309,6 +1394,10 @@ async fn test_all_v1_routes_are_wired() {
         "/v1/bulk/edges",
         "/v1/bulk/rebuild",
         "/v1/batch",
+        "/v1/relational/schema",
+        "/v1/relational/schema/register",
+        "/v1/relational/mutate",
+        "/v1/relational/query",
         "/v1/query/hql",
         "/v1/node/add",
         "/v1/node/supersede",

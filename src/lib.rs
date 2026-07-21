@@ -444,6 +444,14 @@ pub enum Event {
     /// Typed application row mutations applied atomically to the SQLite projection.
     RelationalRows {
         namespace: String,
+        #[serde(default)]
+        schema_version: u32,
+        #[serde(default)]
+        mutation_id: String,
+        #[serde(default)]
+        payload_hash: String,
+        #[serde(default)]
+        affected_rows: u32,
         mutations: Vec<RelationalRowMutation>,
     },
     /// One canonical cross-domain commit with a single durable sequence.
@@ -475,6 +483,8 @@ pub enum RelationalColumnType {
     Boolean,
     Json,
     Blob,
+    Timestamp,
+    EntityId,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
@@ -482,6 +492,8 @@ pub struct RelationalColumn {
     pub name: String,
     pub column_type: RelationalColumnType,
     pub nullable: bool,
+    #[serde(default)]
+    pub default: Option<Value>,
 }
 
 impl RelationalColumn {
@@ -490,6 +502,7 @@ impl RelationalColumn {
             name: name.to_string(),
             column_type,
             nullable: false,
+            default: None,
         }
     }
 }
@@ -517,16 +530,26 @@ pub struct RelationalTable {
     pub indexes: Vec<RelationalIndex>,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 pub struct RelationalSchemaPackage {
     pub namespace: String,
     pub schema_version: u32,
+    #[serde(default)]
+    pub previous_version: Option<u32>,
+    #[serde(default)]
+    pub package_id: String,
+    #[serde(default)]
+    pub schema_hash: String,
     pub tables: Vec<RelationalTable>,
+    #[serde(default)]
+    pub named_queries: Vec<NamedQueryDefinition>,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
 pub enum RelationalMutationKind {
+    Insert,
     Upsert,
+    Update,
     Delete,
 }
 
@@ -536,6 +559,24 @@ pub struct RelationalRowMutation {
     pub kind: RelationalMutationKind,
     pub values: Value,
     pub key: Option<Value>,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
+pub struct RelationalMutationBatch {
+    pub mutation_id: String,
+    pub namespace: String,
+    pub schema_version: u32,
+    pub operations: Vec<RelationalRowMutation>,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+pub struct RelationalMutationResult {
+    pub mutation_id: String,
+    pub namespace: String,
+    pub schema_version: u32,
+    pub wal_committed: bool,
+    pub projection_applied: bool,
+    pub affected_rows: u32,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
@@ -558,6 +599,15 @@ pub struct RelationalJoin {
     pub table: String,
     pub left_column: String,
     pub right_column: String,
+    #[serde(default)]
+    pub kind: RelationalJoinKind,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, Default)]
+pub enum RelationalJoinKind {
+    #[default]
+    Inner,
+    Left,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
@@ -567,6 +617,30 @@ pub struct RelationalQuery {
     pub columns: Vec<String>,
     pub joins: Vec<RelationalJoin>,
     pub filters: Vec<RelationalFilter>,
+    pub limit: Option<u32>,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+pub struct RelationalQueryParameter {
+    pub name: String,
+    pub column_type: RelationalColumnType,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
+pub struct NamedQueryDefinition {
+    pub name: String,
+    pub parameters: Vec<RelationalQueryParameter>,
+    pub query: RelationalQuery,
+    pub default_limit: u32,
+    pub max_limit: u32,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
+pub struct NamedQueryRequest {
+    pub namespace: String,
+    pub schema_version: u32,
+    pub query_name: String,
+    pub parameters: Value,
     pub limit: Option<u32>,
 }
 
@@ -2220,7 +2294,16 @@ impl Storage {
             CREATE TABLE IF NOT EXISTS relational_schema_registry (
                 namespace TEXT PRIMARY KEY,
                 schema_version INTEGER NOT NULL,
+                package_id TEXT NOT NULL DEFAULT '',
+                schema_hash TEXT NOT NULL DEFAULT '',
                 package_json TEXT NOT NULL
+            );
+            CREATE TABLE IF NOT EXISTS applied_relational_mutations (
+                mutation_id TEXT PRIMARY KEY,
+                namespace TEXT NOT NULL,
+                schema_version INTEGER NOT NULL,
+                payload_hash TEXT NOT NULL,
+                affected_rows INTEGER NOT NULL
             );
             CREATE TABLE IF NOT EXISTS applied_transactions (
                 transaction_id TEXT PRIMARY KEY,
@@ -2245,6 +2328,27 @@ impl Storage {
         if !has_clock_peer {
             conn.execute(
                 "ALTER TABLE props ADD COLUMN clock_peer TEXT NOT NULL DEFAULT ''",
+                [],
+            )
+            .map_err(|e| Error::from_reason(e.to_string()))?;
+        }
+        let registry_columns = conn
+            .prepare("PRAGMA table_info(relational_schema_registry)")
+            .and_then(|mut stmt| {
+                stmt.query_map([], |row| row.get::<_, String>(1))?
+                    .collect::<std::result::Result<HashSet<_>, _>>()
+            })
+            .map_err(|e| Error::from_reason(e.to_string()))?;
+        if !registry_columns.contains("package_id") {
+            conn.execute(
+                "ALTER TABLE relational_schema_registry ADD COLUMN package_id TEXT NOT NULL DEFAULT ''",
+                [],
+            )
+            .map_err(|e| Error::from_reason(e.to_string()))?;
+        }
+        if !registry_columns.contains("schema_hash") {
+            conn.execute(
+                "ALTER TABLE relational_schema_registry ADD COLUMN schema_hash TEXT NOT NULL DEFAULT ''",
                 [],
             )
             .map_err(|e| Error::from_reason(e.to_string()))?;
@@ -2292,11 +2396,80 @@ impl Storage {
         Ok(format!("app_{namespace}__{table}"))
     }
 
+    fn validate_namespace(value: &str) -> Result<()> {
+        let mut chars = value.chars();
+        let valid_first = chars.next().is_some_and(|ch| ch.is_ascii_lowercase());
+        let reserved = ["genesis", "sqlite", "internal"];
+        if value.len() > 63
+            || !valid_first
+            || !chars.all(|ch| ch == '_' || ch.is_ascii_lowercase() || ch.is_ascii_digit())
+            || value.starts_with("_gb_")
+            || reserved.iter().any(|prefix| value.starts_with(prefix))
+        {
+            return Err(Error::from_reason(
+                "REL_NAMESPACE_INVALID: invalid or reserved relational namespace",
+            ));
+        }
+        Ok(())
+    }
+
+    fn relational_value_matches(column_type: &RelationalColumnType, value: &Value) -> bool {
+        match column_type {
+            RelationalColumnType::Text => value.is_string(),
+            RelationalColumnType::Integer => value.as_i64().is_some(),
+            RelationalColumnType::Real => value.as_f64().is_some_and(f64::is_finite),
+            RelationalColumnType::Boolean => value.is_boolean(),
+            RelationalColumnType::Json => true,
+            RelationalColumnType::Blob => value.as_array().is_some_and(|bytes| {
+                bytes
+                    .iter()
+                    .all(|byte| byte.as_u64().is_some_and(|value| value <= u8::MAX as u64))
+            }),
+            RelationalColumnType::Timestamp => value
+                .as_str()
+                .is_some_and(|value| chrono::DateTime::parse_from_rfc3339(value).is_ok()),
+            RelationalColumnType::EntityId => value
+                .as_str()
+                .is_some_and(|value| !value.is_empty() && value.len() <= 256),
+        }
+    }
+
+    fn schema_hash(package: &RelationalSchemaPackage) -> Result<String> {
+        let mut canonical = package.clone();
+        canonical.schema_hash.clear();
+        let bytes =
+            serde_json::to_vec(&canonical).map_err(|e| Error::from_reason(e.to_string()))?;
+        Ok(hex::encode(Sha256::digest(bytes)))
+    }
+
+    fn normalize_schema_package(
+        mut package: RelationalSchemaPackage,
+    ) -> Result<RelationalSchemaPackage> {
+        if Uuid::parse_str(&package.package_id).is_err() {
+            return Err(Error::from_reason(
+                "REL_SCHEMA_VALIDATION_FAILED: package_id must be a UUID",
+            ));
+        }
+        let calculated = Self::schema_hash(&package)?;
+        if !package.schema_hash.is_empty() && package.schema_hash != calculated {
+            return Err(Error::from_reason(
+                "REL_SCHEMA_VALIDATION_FAILED: schema_hash mismatch",
+            ));
+        }
+        package.schema_hash = calculated;
+        Ok(package)
+    }
+
     fn validate_relational_schema(package: &RelationalSchemaPackage) -> Result<()> {
-        Self::validate_identifier(&package.namespace)?;
+        Self::validate_namespace(&package.namespace)?;
         if package.schema_version == 0 || package.tables.is_empty() {
             return Err(Error::from_reason(
                 "relational schema requires a positive version and at least one table",
+            ));
+        }
+        if package.tables.len() > 64 || package.named_queries.len() > 128 {
+            return Err(Error::from_reason(
+                "REL_SCHEMA_VALIDATION_FAILED: schema resource limit exceeded",
             ));
         }
         let mut table_names = HashSet::new();
@@ -2308,6 +2481,15 @@ impl Storage {
                     table.name
                 )));
             }
+            if table.columns.len() > 128
+                || table.primary_key.is_empty()
+                || table.primary_key.len() > 4
+                || table.indexes.len() > 64
+            {
+                return Err(Error::from_reason(
+                    "REL_SCHEMA_VALIDATION_FAILED: table resource limit exceeded",
+                ));
+            }
             let mut column_names = HashSet::new();
             for column in &table.columns {
                 Self::validate_identifier(&column.name)?;
@@ -2316,6 +2498,13 @@ impl Storage {
                         "duplicate relational column: {}.{}",
                         table.name, column.name
                     )));
+                }
+                if let Some(default) = &column.default {
+                    if !Self::relational_value_matches(&column.column_type, default) {
+                        return Err(Error::from_reason(
+                            "REL_SCHEMA_VALIDATION_FAILED: column default type mismatch",
+                        ));
+                    }
                 }
             }
             if table.primary_key.is_empty()
@@ -2362,6 +2551,120 @@ impl Storage {
                 }
             }
         }
+        let mut query_names = HashSet::new();
+        for named in &package.named_queries {
+            Self::validate_identifier(&named.name)?;
+            if !query_names.insert(named.name.as_str())
+                || named.default_limit == 0
+                || named.default_limit > named.max_limit
+                || named.max_limit > 1000
+                || named.parameters.len() > 128
+                || named.query.namespace != package.namespace
+            {
+                return Err(Error::from_reason(
+                    "REL_SCHEMA_VALIDATION_FAILED: invalid named query",
+                ));
+            }
+            let mut parameter_names = HashSet::new();
+            for parameter in &named.parameters {
+                Self::validate_identifier(&parameter.name)?;
+                if !parameter_names.insert(parameter.name.as_str()) {
+                    return Err(Error::from_reason(
+                        "REL_SCHEMA_VALIDATION_FAILED: duplicate query parameter",
+                    ));
+                }
+            }
+            for filter in &named.query.filters {
+                if let Some(parameter) = filter
+                    .value
+                    .as_object()
+                    .and_then(|marker| marker.get("$param"))
+                    .and_then(Value::as_str)
+                {
+                    if !parameter_names.contains(parameter) {
+                        return Err(Error::from_reason(
+                            "REL_SCHEMA_VALIDATION_FAILED: unknown named-query parameter",
+                        ));
+                    }
+                }
+            }
+            if named.query.columns.is_empty()
+                || named.query.joins.len() > 8
+                || named.query.filters.len() > 128
+                || !package
+                    .tables
+                    .iter()
+                    .any(|table| table.name == named.query.table)
+            {
+                return Err(Error::from_reason(
+                    "REL_SCHEMA_VALIDATION_FAILED: invalid named-query shape",
+                ));
+            }
+            let mut available = HashSet::from([named.query.table.clone()]);
+            for join in &named.query.joins {
+                if !package.tables.iter().any(|table| table.name == join.table)
+                    || !available.insert(join.table.clone())
+                {
+                    return Err(Error::from_reason(
+                        "REL_SCHEMA_VALIDATION_FAILED: invalid named-query join",
+                    ));
+                }
+            }
+            for column in named
+                .query
+                .columns
+                .iter()
+                .chain(named.query.filters.iter().map(|filter| &filter.column))
+                .chain(
+                    named
+                        .query
+                        .joins
+                        .iter()
+                        .flat_map(|join| [&join.left_column, &join.right_column]),
+                )
+            {
+                Self::resolve_query_column(package, &available, column)?;
+            }
+            for filter in &named.query.filters {
+                let (_, column_name) =
+                    Self::resolve_query_column(package, &available, &filter.column)?;
+                let table_name = filter
+                    .column
+                    .split_once('.')
+                    .expect("validated qualified column")
+                    .0;
+                let column = package
+                    .tables
+                    .iter()
+                    .find(|table| table.name == table_name)
+                    .and_then(|table| {
+                        table
+                            .columns
+                            .iter()
+                            .find(|column| column.name == column_name)
+                    })
+                    .expect("validated named-query column");
+                if let Some(parameter) = filter
+                    .value
+                    .as_object()
+                    .and_then(|marker| marker.get("$param"))
+                    .and_then(Value::as_str)
+                {
+                    let definition = named
+                        .parameters
+                        .iter()
+                        .find(|definition| definition.name == parameter)
+                        .expect("validated named-query parameter");
+                    if definition.column_type != column.column_type {
+                        return Err(Error::from_reason(
+                            "REL_SCHEMA_VALIDATION_FAILED: query parameter type does not match filter column",
+                        ));
+                    }
+                } else {
+                    Self::json_to_sql_typed(column, &filter.value)?;
+                }
+            }
+        }
         for table in &package.tables {
             for foreign_key in &table.foreign_keys {
                 let referenced = package
@@ -2403,9 +2706,11 @@ impl Storage {
         previous: &RelationalSchemaPackage,
         next: &RelationalSchemaPackage,
     ) -> Result<()> {
-        if next.schema_version <= previous.schema_version {
+        if next.schema_version != previous.schema_version + 1
+            || next.previous_version != Some(previous.schema_version)
+        {
             return Err(Error::from_reason(
-                "relational schema version must increase",
+                "REL_SCHEMA_VERSION_CONFLICT: schema version must advance exactly once",
             ));
         }
         for old_table in &previous.tables {
@@ -2428,18 +2733,36 @@ impl Storage {
                         Error::from_reason("relational schema cannot remove a column")
                     })?;
                 if new_column.column_type != old_column.column_type
-                    || (old_column.nullable && !new_column.nullable)
+                    || new_column.nullable != old_column.nullable
+                    || new_column.default != old_column.default
                 {
                     return Err(Error::from_reason(
                         "relational schema cannot change a column incompatibly",
                     ));
                 }
             }
-            if new_table.columns.iter().any(|column| {
-                !old_table.columns.iter().any(|old| old.name == column.name) && !column.nullable
+            if new_table.foreign_keys != old_table.foreign_keys {
+                return Err(Error::from_reason(
+                    "relational schema cannot change foreign keys on an existing table",
+                ));
+            }
+            if old_table.indexes.iter().any(|old_index| {
+                !new_table
+                    .indexes
+                    .iter()
+                    .any(|new_index| new_index == old_index)
             }) {
                 return Err(Error::from_reason(
-                    "new relational columns must be nullable",
+                    "relational schema cannot remove or redefine an existing index",
+                ));
+            }
+            if new_table.columns.iter().any(|column| {
+                !old_table.columns.iter().any(|old| old.name == column.name)
+                    && !column.nullable
+                    && column.default.is_none()
+            }) {
+                return Err(Error::from_reason(
+                    "new relational columns must be nullable or have a literal default",
                 ));
             }
         }
@@ -2448,10 +2771,23 @@ impl Storage {
 
     fn sqlite_type(column_type: &RelationalColumnType) -> &'static str {
         match column_type {
-            RelationalColumnType::Text | RelationalColumnType::Json => "TEXT",
+            RelationalColumnType::Text
+            | RelationalColumnType::Json
+            | RelationalColumnType::Timestamp
+            | RelationalColumnType::EntityId => "TEXT",
             RelationalColumnType::Integer | RelationalColumnType::Boolean => "INTEGER",
             RelationalColumnType::Real => "REAL",
             RelationalColumnType::Blob => "BLOB",
+        }
+    }
+
+    fn sqlite_literal(column: &RelationalColumn, value: &Value) -> Result<String> {
+        match Self::json_to_sql_typed(column, value)? {
+            SqlValue::Null => Ok("NULL".to_string()),
+            SqlValue::Integer(value) => Ok(value.to_string()),
+            SqlValue::Real(value) => Ok(value.to_string()),
+            SqlValue::Text(value) => Ok(format!("'{}'", value.replace('\'', "''"))),
+            SqlValue::Blob(value) => Ok(format!("X'{}'", hex::encode(value))),
         }
     }
 
@@ -2466,6 +2802,10 @@ impl Storage {
                 return Ok(());
             }
             Self::validate_schema_upgrade(previous, package)?;
+        } else if package.schema_version != 1 || package.previous_version.is_some() {
+            return Err(Error::from_reason(
+                "REL_SCHEMA_VERSION_CONFLICT: initial schema must be version 1",
+            ));
         }
         for table in &package.tables {
             let physical = Self::physical_table(&package.namespace, &table.name)?;
@@ -2473,13 +2813,23 @@ impl Storage {
                 .columns
                 .iter()
                 .map(|column| {
-                    format!(
-                        "\"{}\" {}{}",
+                    let default = column
+                        .default
+                        .as_ref()
+                        .map(|value| Self::sqlite_literal(column, value))
+                        .transpose()?
+                        .map(|value| format!(" DEFAULT {value}"))
+                        .unwrap_or_default();
+                    Ok(format!(
+                        "\"{}\" {}{}{}",
                         column.name,
                         Self::sqlite_type(&column.column_type),
-                        if column.nullable { "" } else { " NOT NULL" }
-                    )
+                        if column.nullable { "" } else { " NOT NULL" },
+                        default
+                    ))
                 })
+                .collect::<Result<Vec<_>>>()?
+                .into_iter()
                 .chain(std::iter::once(format!(
                     "PRIMARY KEY ({})",
                     table
@@ -2527,9 +2877,17 @@ impl Storage {
                     .filter(|column| !old_table.columns.iter().any(|old| old.name == column.name))
                 {
                     conn.execute_batch(&format!(
-                        "ALTER TABLE \"{physical}\" ADD COLUMN \"{}\" {}",
+                        "ALTER TABLE \"{physical}\" ADD COLUMN \"{}\" {}{}{}",
                         column.name,
-                        Self::sqlite_type(&column.column_type)
+                        Self::sqlite_type(&column.column_type),
+                        if column.nullable { "" } else { " NOT NULL" },
+                        column
+                            .default
+                            .as_ref()
+                            .map(|value| Self::sqlite_literal(column, value))
+                            .transpose()?
+                            .map(|value| format!(" DEFAULT {value}"))
+                            .unwrap_or_default()
                     ))
                     .map_err(|e| Error::from_reason(e.to_string()))?;
                 }
@@ -2555,12 +2913,20 @@ impl Storage {
         let package_json =
             serde_json::to_string(package).map_err(|e| Error::from_reason(e.to_string()))?;
         conn.execute(
-            "INSERT INTO relational_schema_registry(namespace, schema_version, package_json)
-             VALUES(?1, ?2, ?3)
+            "INSERT INTO relational_schema_registry(namespace, schema_version, package_id, schema_hash, package_json)
+             VALUES(?1, ?2, ?3, ?4, ?5)
              ON CONFLICT(namespace) DO UPDATE SET
                 schema_version = excluded.schema_version,
+                package_id = excluded.package_id,
+                schema_hash = excluded.schema_hash,
                 package_json = excluded.package_json",
-            params![package.namespace, package.schema_version, package_json],
+            params![
+                package.namespace,
+                package.schema_version,
+                package.package_id,
+                package.schema_hash,
+                package_json
+            ],
         )
         .map_err(|e| Error::from_reason(e.to_string()))?;
         Ok(())
@@ -2582,6 +2948,37 @@ impl Storage {
         }
     }
 
+    fn json_to_sql_typed(column: &RelationalColumn, value: &Value) -> Result<SqlValue> {
+        if value.is_null() {
+            return if column.nullable {
+                Ok(SqlValue::Null)
+            } else {
+                Err(Error::from_reason(
+                    "REL_TYPE_MISMATCH: null supplied for required column",
+                ))
+            };
+        }
+        if !Self::relational_value_matches(&column.column_type, value) {
+            return Err(Error::from_reason(
+                "REL_TYPE_MISMATCH: relational value does not match column type",
+            ));
+        }
+        match column.column_type {
+            RelationalColumnType::Blob => Ok(SqlValue::Blob(
+                value
+                    .as_array()
+                    .expect("validated blob")
+                    .iter()
+                    .map(|byte| byte.as_u64().expect("validated byte") as u8)
+                    .collect(),
+            )),
+            RelationalColumnType::Json => serde_json::to_string(value)
+                .map(SqlValue::Text)
+                .map_err(|e| Error::from_reason(e.to_string())),
+            _ => Self::json_to_sql(value),
+        }
+    }
+
     fn validate_row_mutation(
         schema: &RelationalSchemaPackage,
         mutation: &RelationalRowMutation,
@@ -2592,7 +2989,9 @@ impl Storage {
             .find(|table| table.name == mutation.table)
             .ok_or_else(|| Error::from_reason("relational mutation references unknown table"))?;
         let object = match mutation.kind {
-            RelationalMutationKind::Upsert => mutation.values.as_object(),
+            RelationalMutationKind::Insert
+            | RelationalMutationKind::Upsert
+            | RelationalMutationKind::Update => mutation.values.as_object(),
             RelationalMutationKind::Delete => mutation.key.as_ref().and_then(Value::as_object),
         }
         .ok_or_else(|| Error::from_reason("relational mutation requires an object payload"))?;
@@ -2605,14 +3004,36 @@ impl Storage {
             ));
         }
         match mutation.kind {
-            RelationalMutationKind::Upsert => {
-                if table
-                    .columns
-                    .iter()
-                    .any(|column| !column.nullable && !object.contains_key(&column.name))
-                {
+            RelationalMutationKind::Insert | RelationalMutationKind::Upsert => {
+                if table.columns.iter().any(|column| {
+                    !column.nullable
+                        && column.default.is_none()
+                        && !object.contains_key(&column.name)
+                }) {
                     return Err(Error::from_reason(
                         "relational upsert omits a required column",
+                    ));
+                }
+            }
+            RelationalMutationKind::Update => {
+                let key = mutation
+                    .key
+                    .as_ref()
+                    .and_then(Value::as_object)
+                    .ok_or_else(|| {
+                        Error::from_reason("relational update requires a primary-key object")
+                    })?;
+                if object.is_empty()
+                    || table
+                        .primary_key
+                        .iter()
+                        .any(|column| !key.contains_key(column))
+                    || object
+                        .keys()
+                        .any(|column| table.primary_key.contains(column))
+                {
+                    return Err(Error::from_reason(
+                        "relational update requires a complete key and cannot change it",
                     ));
                 }
             }
@@ -2628,6 +3049,26 @@ impl Storage {
                 }
             }
         }
+        for (name, value) in object {
+            let column = table
+                .columns
+                .iter()
+                .find(|column| column.name == *name)
+                .expect("validated column");
+            Self::json_to_sql_typed(column, value)?;
+        }
+        if let Some(key) = mutation.key.as_ref().and_then(Value::as_object) {
+            for name in &table.primary_key {
+                if let Some(value) = key.get(name) {
+                    let column = table
+                        .columns
+                        .iter()
+                        .find(|column| column.name == *name)
+                        .expect("validated primary key");
+                    Self::json_to_sql_typed(column, value)?;
+                }
+            }
+        }
         Ok(())
     }
 
@@ -2635,7 +3076,8 @@ impl Storage {
         tx: &rusqlite::Transaction<'_>,
         schema: &RelationalSchemaPackage,
         mutations: &[RelationalRowMutation],
-    ) -> Result<()> {
+    ) -> Result<u32> {
+        let mut affected = 0u32;
         for mutation in mutations {
             Self::validate_row_mutation(schema, mutation)?;
             let table = schema
@@ -2645,7 +3087,7 @@ impl Storage {
                 .expect("validated relational mutation");
             let physical = Self::physical_table(&schema.namespace, &table.name)?;
             match mutation.kind {
-                RelationalMutationKind::Upsert => {
+                RelationalMutationKind::Insert | RelationalMutationKind::Upsert => {
                     let object = mutation.values.as_object().expect("validated object");
                     let columns: Vec<&String> = table
                         .columns
@@ -2656,35 +3098,103 @@ impl Storage {
                         .collect();
                     let values = columns
                         .iter()
-                        .map(|column| Self::json_to_sql(&object[*column]))
+                        .map(|column| {
+                            let definition = table
+                                .columns
+                                .iter()
+                                .find(|definition| definition.name == column.as_str())
+                                .expect("validated column");
+                            Self::json_to_sql_typed(definition, &object[*column])
+                        })
                         .collect::<Result<Vec<_>>>()?;
                     let updates: Vec<String> = columns
                         .iter()
                         .filter(|column| !table.primary_key.contains(column))
                         .map(|column| format!("\"{column}\" = excluded.\"{column}\""))
                         .collect();
-                    let conflict = if updates.is_empty() {
-                        "DO NOTHING".to_string()
+                    let conflict = if matches!(mutation.kind, RelationalMutationKind::Insert) {
+                        String::new()
+                    } else if updates.is_empty() {
+                        " ON CONFLICT DO NOTHING".to_string()
                     } else {
-                        format!("DO UPDATE SET {}", updates.join(", "))
+                        format!(
+                            " ON CONFLICT ({}) DO UPDATE SET {}",
+                            table
+                                .primary_key
+                                .iter()
+                                .map(|column| format!("\"{column}\""))
+                                .collect::<Vec<_>>()
+                                .join(", "),
+                            updates.join(", ")
+                        )
                     };
                     let sql = format!(
-                        "INSERT INTO \"{physical}\" ({}) VALUES ({}) ON CONFLICT ({}) {conflict}",
+                        "INSERT INTO \"{physical}\" ({}) VALUES ({}){conflict}",
                         columns
                             .iter()
                             .map(|column| format!("\"{column}\""))
                             .collect::<Vec<_>>()
                             .join(", "),
-                        vec!["?"; columns.len()].join(", "),
+                        vec!["?"; columns.len()].join(", ")
+                    );
+                    affected = affected.saturating_add(
+                        tx.execute(&sql, params_from_iter(values))
+                            .map_err(|e| Error::from_reason(e.to_string()))?
+                            as u32,
+                    );
+                }
+                RelationalMutationKind::Update => {
+                    let object = mutation.values.as_object().expect("validated object");
+                    let key = mutation
+                        .key
+                        .as_ref()
+                        .and_then(Value::as_object)
+                        .expect("validated key");
+                    let set_columns = object.keys().collect::<Vec<_>>();
+                    let mut values = set_columns
+                        .iter()
+                        .map(|name| {
+                            let column = table
+                                .columns
+                                .iter()
+                                .find(|column| column.name == name.as_str())
+                                .expect("validated column");
+                            Self::json_to_sql_typed(column, &object[name.as_str()])
+                        })
+                        .collect::<Result<Vec<_>>>()?;
+                    values.extend(
                         table
                             .primary_key
                             .iter()
-                            .map(|column| format!("\"{column}\""))
-                            .collect::<Vec<_>>()
-                            .join(", ")
+                            .map(|name| {
+                                let column = table
+                                    .columns
+                                    .iter()
+                                    .find(|column| column.name == *name)
+                                    .expect("validated key column");
+                                Self::json_to_sql_typed(column, &key[name])
+                            })
+                            .collect::<Result<Vec<_>>>()?,
                     );
-                    tx.execute(&sql, params_from_iter(values))
-                        .map_err(|e| Error::from_reason(e.to_string()))?;
+                    let sql = format!(
+                        "UPDATE \"{physical}\" SET {} WHERE {}",
+                        set_columns
+                            .iter()
+                            .map(|column| format!("\"{column}\" = ?"))
+                            .collect::<Vec<_>>()
+                            .join(", "),
+                        table
+                            .primary_key
+                            .iter()
+                            .map(|column| format!("\"{column}\" = ?"))
+                            .collect::<Vec<_>>()
+                            .join(" AND ")
+                    );
+                    affected = affected.saturating_add(
+                        tx.execute(&sql, params_from_iter(values))
+                            .map_err(|e| Error::from_reason(e.to_string()))?
+                            as u32,
+                    );
                 }
                 RelationalMutationKind::Delete => {
                     let object = mutation
@@ -2695,7 +3205,14 @@ impl Storage {
                     let values = table
                         .primary_key
                         .iter()
-                        .map(|column| Self::json_to_sql(&object[column]))
+                        .map(|name| {
+                            let column = table
+                                .columns
+                                .iter()
+                                .find(|column| column.name == *name)
+                                .expect("validated key column");
+                            Self::json_to_sql_typed(column, &object[name])
+                        })
                         .collect::<Result<Vec<_>>>()?;
                     let sql = format!(
                         "DELETE FROM \"{physical}\" WHERE {}",
@@ -2706,12 +3223,15 @@ impl Storage {
                             .collect::<Vec<_>>()
                             .join(" AND ")
                     );
-                    tx.execute(&sql, params_from_iter(values))
-                        .map_err(|e| Error::from_reason(e.to_string()))?;
+                    affected = affected.saturating_add(
+                        tx.execute(&sql, params_from_iter(values))
+                            .map_err(|e| Error::from_reason(e.to_string()))?
+                            as u32,
+                    );
                 }
             }
         }
-        Ok(())
+        Ok(affected)
     }
 
     fn projection_state_set<C>(conn: &C, key: &str, value: &str) -> Result<()>
@@ -2813,14 +3333,54 @@ impl Storage {
             }
             Event::RelationalRows {
                 namespace,
+                schema_version,
+                mutation_id,
+                payload_hash,
+                affected_rows,
                 mutations,
             } => {
                 let schema = Self::load_relational_schema_conn(&conn, namespace)?
                     .ok_or_else(|| Error::from_reason("relational schema is not registered"))?;
+                if *schema_version != 0 && *schema_version != schema.schema_version {
+                    return Err(Error::from_reason(
+                        "REL_SCHEMA_VERSION_CONFLICT: mutation schema version is not current",
+                    ));
+                }
+                if !mutation_id.is_empty() {
+                    let existing: Option<String> = conn
+                        .query_row(
+                            "SELECT payload_hash FROM applied_relational_mutations WHERE mutation_id = ?1",
+                            [mutation_id],
+                            |row| row.get(0),
+                        )
+                        .optional()
+                        .map_err(|e| Error::from_reason(e.to_string()))?;
+                    if let Some(existing) = existing {
+                        return if existing == *payload_hash {
+                            Ok(())
+                        } else {
+                            Err(Error::from_reason(
+                                "REL_MUTATION_CONFLICT: mutation identity reused with different payload",
+                            ))
+                        };
+                    }
+                }
                 let tx = conn
                     .transaction()
                     .map_err(|e| Error::from_reason(e.to_string()))?;
-                Self::projection_apply_rows_tx(&tx, &schema, mutations)?;
+                let applied = Self::projection_apply_rows_tx(&tx, &schema, mutations)?;
+                let recorded_affected = if mutations.is_empty() {
+                    *affected_rows
+                } else {
+                    applied
+                };
+                if !mutation_id.is_empty() {
+                    tx.execute(
+                        "INSERT INTO applied_relational_mutations(mutation_id, namespace, schema_version, payload_hash, affected_rows) VALUES(?1, ?2, ?3, ?4, ?5)",
+                        params![mutation_id, namespace, schema.schema_version, payload_hash, recorded_affected],
+                    )
+                    .map_err(|e| Error::from_reason(e.to_string()))?;
+                }
                 tx.commit().map_err(|e| Error::from_reason(e.to_string()))?;
             }
             Event::Transaction(transaction) => {
@@ -2848,7 +3408,7 @@ impl Storage {
                 for group in &transaction.relational {
                     let schema = Self::load_relational_schema_conn(&tx, &group.namespace)?
                         .ok_or_else(|| Error::from_reason("relational schema is not registered"))?;
-                    Self::projection_apply_rows_tx(&tx, &schema, &group.mutations)?;
+                    let _ = Self::projection_apply_rows_tx(&tx, &schema, &group.mutations)?;
                 }
                 tx.execute(
                     "INSERT INTO applied_transactions(transaction_id, commit_sequence, payload_hash) VALUES(?1, ?2, ?3)",
@@ -2948,10 +3508,18 @@ impl Storage {
                 }
                 Event::RelationalRows {
                     namespace,
+                    schema_version,
+                    mutation_id,
+                    payload_hash,
+                    affected_rows,
                     mutations,
                 } => {
                     self.projection_apply_event(&Event::RelationalRows {
                         namespace,
+                        schema_version,
+                        mutation_id,
+                        payload_hash,
+                        affected_rows,
                         mutations,
                     })?;
                 }
@@ -2968,9 +3536,17 @@ impl Storage {
                             }
                             Event::RelationalRows {
                                 namespace,
+                                schema_version,
+                                mutation_id,
+                                payload_hash,
+                                affected_rows,
                                 mutations,
                             } => Some(Event::RelationalRows {
                                 namespace,
+                                schema_version,
+                                mutation_id,
+                                payload_hash,
+                                affected_rows,
                                 mutations,
                             }),
                             Event::Transaction(transaction) => {
@@ -3033,18 +3609,126 @@ impl Storage {
 
     pub fn register_relational_schema(&self, package: RelationalSchemaPackage) -> Result<u32> {
         self.ensure_writable()?;
+        let package = Self::normalize_schema_package(package)?;
         Self::validate_relational_schema(&package)?;
-        {
-            let conn = self.projection_db.lock();
-            if let Some(previous) = Self::load_relational_schema_conn(&conn, &package.namespace)? {
-                if previous == package {
-                    return Ok(package.schema_version);
-                }
-                Self::validate_schema_upgrade(&previous, &package)?;
+        let _commit_guard = self.commit_lock.lock();
+        let mut conn = self.projection_db.lock();
+        if let Some(previous) = Self::load_relational_schema_conn(&conn, &package.namespace)? {
+            if previous == package {
+                return Ok(package.schema_version);
             }
+            Self::validate_schema_upgrade(&previous, &package)?;
+        } else if package.schema_version != 1 || package.previous_version.is_some() {
+            return Err(Error::from_reason(
+                "REL_SCHEMA_VERSION_CONFLICT: initial schema must be version 1",
+            ));
         }
-        self.persist(&Event::RelationalSchema(package.clone()))?;
+        let tx = conn
+            .transaction()
+            .map_err(|e| Error::from_reason(e.to_string()))?;
+        Self::projection_apply_schema_conn(&tx, &package)?;
+        self.append_wal_event(&Event::RelationalSchema(package.clone()))?;
+        tx.commit().map_err(|e| Error::from_reason(e.to_string()))?;
         Ok(package.schema_version)
+    }
+
+    pub fn get_relational_schema(
+        &self,
+        namespace: &str,
+    ) -> Result<Option<RelationalSchemaPackage>> {
+        Self::validate_namespace(namespace)?;
+        let conn = self.projection_db.lock();
+        Self::load_relational_schema_conn(&conn, namespace)
+    }
+
+    pub fn apply_relational_batch(
+        &self,
+        batch: RelationalMutationBatch,
+    ) -> Result<RelationalMutationResult> {
+        self.ensure_writable()?;
+        Self::validate_namespace(&batch.namespace)?;
+        if Uuid::parse_str(&batch.mutation_id).is_err()
+            || batch.operations.is_empty()
+            || batch.operations.len() > 1000
+        {
+            return Err(Error::from_reason(
+                "REL_SCHEMA_VALIDATION_FAILED: invalid relational mutation batch",
+            ));
+        }
+        let encoded = serde_json::to_vec(&batch).map_err(|e| Error::from_reason(e.to_string()))?;
+        if encoded.len() > 8 * 1024 * 1024 {
+            return Err(Error::from_reason(
+                "REL_QUERY_LIMIT_EXCEEDED: mutation batch exceeds 8 MiB",
+            ));
+        }
+        let payload_hash = hex::encode(Sha256::digest(&encoded));
+        let _commit_guard = self.commit_lock.lock();
+        let mut conn = self.projection_db.lock();
+        let schema = Self::load_relational_schema_conn(&conn, &batch.namespace)?
+            .ok_or_else(|| Error::from_reason("REL_SCHEMA_NOT_FOUND"))?;
+        if schema.schema_version != batch.schema_version {
+            return Err(Error::from_reason(
+                "REL_SCHEMA_VERSION_CONFLICT: mutation schema version is not current",
+            ));
+        }
+        for mutation in &batch.operations {
+            Self::validate_row_mutation(&schema, mutation)?;
+        }
+        let existing: Option<(String, u32)> = conn
+            .query_row(
+                "SELECT payload_hash, affected_rows FROM applied_relational_mutations WHERE mutation_id = ?1",
+                [&batch.mutation_id],
+                |row| Ok((row.get(0)?, row.get(1)?)),
+            )
+            .optional()
+            .map_err(|e| Error::from_reason(e.to_string()))?;
+        if let Some((existing_hash, affected_rows)) = existing {
+            if existing_hash != payload_hash {
+                return Err(Error::from_reason(
+                    "REL_MUTATION_CONFLICT: mutation identity reused with different payload",
+                ));
+            }
+            return Ok(RelationalMutationResult {
+                mutation_id: batch.mutation_id,
+                namespace: batch.namespace,
+                schema_version: batch.schema_version,
+                wal_committed: true,
+                projection_applied: true,
+                affected_rows,
+            });
+        }
+        let tx = conn
+            .transaction()
+            .map_err(|e| Error::from_reason(e.to_string()))?;
+        let affected_rows = Self::projection_apply_rows_tx(&tx, &schema, &batch.operations)?;
+        self.append_wal_event(&Event::RelationalRows {
+            namespace: batch.namespace.clone(),
+            schema_version: batch.schema_version,
+            mutation_id: batch.mutation_id.clone(),
+            payload_hash: payload_hash.clone(),
+            affected_rows,
+            mutations: batch.operations.clone(),
+        })?;
+        tx.execute(
+            "INSERT INTO applied_relational_mutations(mutation_id, namespace, schema_version, payload_hash, affected_rows) VALUES(?1, ?2, ?3, ?4, ?5)",
+            params![
+                batch.mutation_id,
+                batch.namespace,
+                batch.schema_version,
+                payload_hash,
+                affected_rows
+            ],
+        )
+        .map_err(|e| Error::from_reason(e.to_string()))?;
+        tx.commit().map_err(|e| Error::from_reason(e.to_string()))?;
+        Ok(RelationalMutationResult {
+            mutation_id: batch.mutation_id,
+            namespace: batch.namespace,
+            schema_version: batch.schema_version,
+            wal_committed: true,
+            projection_applied: true,
+            affected_rows,
+        })
     }
 
     pub fn apply_relational_rows(
@@ -3053,7 +3737,7 @@ impl Storage {
         mutations: Vec<RelationalRowMutation>,
     ) -> Result<()> {
         self.ensure_writable()?;
-        Self::validate_identifier(namespace)?;
+        Self::validate_namespace(namespace)?;
         if mutations.is_empty() {
             return Ok(());
         }
@@ -3065,10 +3749,19 @@ impl Storage {
                 Self::validate_row_mutation(&schema, mutation)?;
             }
         }
-        self.persist(&Event::RelationalRows {
+        let schema_version = {
+            let conn = self.projection_db.lock();
+            Self::load_relational_schema_conn(&conn, namespace)?
+                .ok_or_else(|| Error::from_reason("REL_SCHEMA_NOT_FOUND"))?
+                .schema_version
+        };
+        self.apply_relational_batch(RelationalMutationBatch {
+            mutation_id: Uuid::new_v4().to_string(),
             namespace: namespace.to_string(),
-            mutations,
+            schema_version,
+            operations: mutations,
         })
+        .map(|_| ())
     }
 
     fn resolve_query_column(
@@ -3111,15 +3804,47 @@ impl Storage {
         ))
     }
 
+    fn query_column_definition<'a>(
+        schema: &'a RelationalSchemaPackage,
+        available_tables: &HashSet<String>,
+        column: &str,
+    ) -> Result<&'a RelationalColumn> {
+        Self::resolve_query_column(schema, available_tables, column)?;
+        let (table_name, column_name) = column
+            .split_once('.')
+            .expect("validated qualified relational column");
+        schema
+            .tables
+            .iter()
+            .find(|table| table.name == table_name)
+            .and_then(|table| {
+                table
+                    .columns
+                    .iter()
+                    .find(|candidate| candidate.name == column_name)
+            })
+            .ok_or_else(|| Error::from_reason("relational query references unknown column"))
+    }
+
     pub fn query_relational(&self, query: RelationalQuery) -> Result<Vec<Value>> {
-        Self::validate_identifier(&query.namespace)?;
+        Self::validate_namespace(&query.namespace)?;
         Self::validate_identifier(&query.table)?;
         if query.columns.is_empty() {
             return Err(Error::from_reason(
                 "relational query requires at least one selected column",
             ));
         }
-        let limit = query.limit.unwrap_or(100).min(1000);
+        if query.joins.len() > 8 || query.filters.len() > 128 {
+            return Err(Error::from_reason(
+                "REL_QUERY_LIMIT_EXCEEDED: query shape exceeds U2 bounds",
+            ));
+        }
+        let limit = query.limit.unwrap_or(100);
+        if limit == 0 || limit > 1000 {
+            return Err(Error::from_reason(
+                "REL_QUERY_LIMIT_EXCEEDED: query row limit must be 1..1000",
+            ));
+        }
         let conn = self.projection_db.lock();
         let schema = Self::load_relational_schema_conn(&conn, &query.namespace)?
             .ok_or_else(|| Error::from_reason("relational schema is not registered"))?;
@@ -3141,6 +3866,14 @@ impl Storage {
             .columns
             .iter()
             .map(|column| Self::resolve_query_column(&schema, &available_tables, column))
+            .collect::<Result<Vec<_>>>()?;
+        let selected_types = query
+            .columns
+            .iter()
+            .map(|column| {
+                Self::query_column_definition(&schema, &available_tables, column)
+                    .map(|definition| definition.column_type.clone())
+            })
             .collect::<Result<Vec<_>>>()?;
         let base = Self::physical_table(&query.namespace, &query.table)?;
         let mut sql = format!(
@@ -3164,7 +3897,11 @@ impl Storage {
                 ));
             }
             sql.push_str(&format!(
-                " INNER JOIN \"{physical}\" ON \"{left_table}\".\"{left_column}\" = \"{right_table}\".\"{right_column}\""
+                " {} JOIN \"{physical}\" ON \"{left_table}\".\"{left_column}\" = \"{right_table}\".\"{right_column}\"",
+                match join.kind {
+                    RelationalJoinKind::Inner => "INNER",
+                    RelationalJoinKind::Left => "LEFT",
+                }
             ));
         }
         let mut parameters = Vec::new();
@@ -3175,7 +3912,9 @@ impl Storage {
                 .map(|filter| {
                     let (table, column) =
                         Self::resolve_query_column(&schema, &available_tables, &filter.column)?;
-                    parameters.push(Self::json_to_sql(&filter.value)?);
+                    let definition =
+                        Self::query_column_definition(&schema, &available_tables, &filter.column)?;
+                    parameters.push(Self::json_to_sql_typed(definition, &filter.value)?);
                     Ok(format!("\"{table}\".\"{column}\" = ?"))
                 })
                 .collect::<Result<Vec<_>>>()?;
@@ -3189,14 +3928,22 @@ impl Storage {
             .query_map(params_from_iter(parameters), |row| {
                 let mut object = serde_json::Map::new();
                 for (index, name) in query.columns.iter().enumerate() {
-                    let value = match row.get_ref(index)? {
-                        ValueRef::Null => Value::Null,
-                        ValueRef::Integer(value) => Value::from(value),
-                        ValueRef::Real(value) => Value::from(value),
-                        ValueRef::Text(value) => {
+                    let value = match (&selected_types[index], row.get_ref(index)?) {
+                        (RelationalColumnType::Boolean, ValueRef::Integer(value)) => {
+                            Value::Bool(value != 0)
+                        }
+                        (RelationalColumnType::Json, ValueRef::Text(value)) => {
+                            serde_json::from_slice(value).unwrap_or_else(|_| {
+                                Value::String(String::from_utf8_lossy(value).into_owned())
+                            })
+                        }
+                        (_, ValueRef::Null) => Value::Null,
+                        (_, ValueRef::Integer(value)) => Value::from(value),
+                        (_, ValueRef::Real(value)) => Value::from(value),
+                        (_, ValueRef::Text(value)) => {
                             Value::String(String::from_utf8_lossy(value).into_owned())
                         }
-                        ValueRef::Blob(value) => {
+                        (_, ValueRef::Blob(value)) => {
                             Value::Array(value.iter().copied().map(Value::from).collect())
                         }
                     };
@@ -3207,6 +3954,75 @@ impl Storage {
             .map_err(|e| Error::from_reason(e.to_string()))?;
         rows.collect::<std::result::Result<Vec<_>, _>>()
             .map_err(|e| Error::from_reason(e.to_string()))
+    }
+
+    pub fn execute_named_query(&self, request: NamedQueryRequest) -> Result<Vec<Value>> {
+        Self::validate_namespace(&request.namespace)?;
+        Self::validate_identifier(&request.query_name)?;
+        let definition = {
+            let conn = self.projection_db.lock();
+            let schema = Self::load_relational_schema_conn(&conn, &request.namespace)?
+                .ok_or_else(|| Error::from_reason("REL_SCHEMA_NOT_FOUND"))?;
+            if schema.schema_version != request.schema_version {
+                return Err(Error::from_reason(
+                    "REL_SCHEMA_VERSION_CONFLICT: query schema version is not current",
+                ));
+            }
+            schema
+                .named_queries
+                .iter()
+                .find(|query| query.name == request.query_name)
+                .cloned()
+                .ok_or_else(|| Error::from_reason("REL_QUERY_NOT_FOUND"))?
+        };
+        let parameters = request.parameters.as_object().ok_or_else(|| {
+            Error::from_reason("REL_TYPE_MISMATCH: named-query parameters must be an object")
+        })?;
+        if parameters.len() != definition.parameters.len() {
+            return Err(Error::from_reason(
+                "REL_TYPE_MISMATCH: missing or extra named-query parameter",
+            ));
+        }
+        for parameter in &definition.parameters {
+            let value = parameters.get(&parameter.name).ok_or_else(|| {
+                Error::from_reason("REL_TYPE_MISMATCH: missing named-query parameter")
+            })?;
+            if !Self::relational_value_matches(&parameter.column_type, value) {
+                return Err(Error::from_reason(
+                    "REL_TYPE_MISMATCH: named-query parameter type mismatch",
+                ));
+            }
+        }
+        if parameters
+            .keys()
+            .any(|name| !definition.parameters.iter().any(|item| item.name == *name))
+        {
+            return Err(Error::from_reason(
+                "REL_TYPE_MISMATCH: unknown named-query parameter",
+            ));
+        }
+        let mut query = definition.query;
+        for filter in &mut query.filters {
+            if let Some(parameter) = filter
+                .value
+                .as_object()
+                .and_then(|marker| marker.get("$param"))
+                .and_then(Value::as_str)
+            {
+                filter.value = parameters
+                    .get(parameter)
+                    .expect("validated named-query parameter")
+                    .clone();
+            }
+        }
+        let limit = request.limit.unwrap_or(definition.default_limit);
+        if limit == 0 || limit > definition.max_limit {
+            return Err(Error::from_reason(
+                "REL_QUERY_LIMIT_EXCEEDED: named-query limit exceeds definition",
+            ));
+        }
+        query.limit = Some(limit);
+        self.query_relational(query)
     }
 
     fn relational_snapshot_events(&self) -> Result<Vec<Event>> {
@@ -3246,14 +4062,22 @@ impl Storage {
                     .query_map([], |row| {
                         let mut object = serde_json::Map::new();
                         for (index, column) in table.columns.iter().enumerate() {
-                            let value = match row.get_ref(index)? {
-                                ValueRef::Null => Value::Null,
-                                ValueRef::Integer(value) => Value::from(value),
-                                ValueRef::Real(value) => Value::from(value),
-                                ValueRef::Text(value) => {
+                            let value = match (&column.column_type, row.get_ref(index)?) {
+                                (RelationalColumnType::Boolean, ValueRef::Integer(value)) => {
+                                    Value::Bool(value != 0)
+                                }
+                                (RelationalColumnType::Json, ValueRef::Text(value)) => {
+                                    serde_json::from_slice(value).unwrap_or_else(|_| {
+                                        Value::String(String::from_utf8_lossy(value).into_owned())
+                                    })
+                                }
+                                (_, ValueRef::Null) => Value::Null,
+                                (_, ValueRef::Integer(value)) => Value::from(value),
+                                (_, ValueRef::Real(value)) => Value::from(value),
+                                (_, ValueRef::Text(value)) => {
                                     Value::String(String::from_utf8_lossy(value).into_owned())
                                 }
-                                ValueRef::Blob(value) => {
+                                (_, ValueRef::Blob(value)) => {
                                     Value::Array(value.iter().copied().map(Value::from).collect())
                                 }
                             };
@@ -3272,11 +4096,35 @@ impl Storage {
                 if !rows.is_empty() {
                     events.push(Event::RelationalRows {
                         namespace: package.namespace.clone(),
+                        schema_version: package.schema_version,
+                        mutation_id: String::new(),
+                        payload_hash: String::new(),
+                        affected_rows: 0,
                         mutations: rows,
                     });
                 }
             }
         }
+        let mut applied = conn
+            .prepare(
+                "SELECT mutation_id, namespace, schema_version, payload_hash, affected_rows FROM applied_relational_mutations ORDER BY mutation_id",
+            )
+            .map_err(|e| Error::from_reason(e.to_string()))?;
+        let markers = applied
+            .query_map([], |row| {
+                Ok(Event::RelationalRows {
+                    mutation_id: row.get(0)?,
+                    namespace: row.get(1)?,
+                    schema_version: row.get(2)?,
+                    payload_hash: row.get(3)?,
+                    affected_rows: row.get(4)?,
+                    mutations: vec![],
+                })
+            })
+            .map_err(|e| Error::from_reason(e.to_string()))?
+            .collect::<std::result::Result<Vec<_>, _>>()
+            .map_err(|e| Error::from_reason(e.to_string()))?;
+        events.extend(markers);
         Ok(events)
     }
 
@@ -3727,7 +4575,7 @@ impl Storage {
         }
     }
 
-    pub fn persist(&self, event: &Event) -> Result<()> {
+    fn append_wal_event(&self, event: &Event) -> Result<()> {
         let (ack_tx, ack_rx) = unbounded();
         let signed_event = self.sign_event(event);
         self.wal_sender
@@ -3736,6 +4584,11 @@ impl Storage {
         if !ack_rx.recv().unwrap_or(false) {
             return Err(Error::from_reason("wal append failed"));
         }
+        Ok(())
+    }
+
+    pub fn persist(&self, event: &Event) -> Result<()> {
+        self.append_wal_event(event)?;
         self.projection_apply_event(event)?;
         Ok(())
     }
@@ -7574,6 +8427,28 @@ impl GenesisDatabase {
             .map_err(|e| Error::from_reason(e.to_string()))?
     }
     #[napi]
+    pub async fn get_relational_schema(&self, namespace: String) -> Result<String> {
+        let i = Arc::clone(&self.inner);
+        tokio::task::spawn_blocking(move || {
+            let package = i.get_relational_schema(&namespace)?;
+            serde_json::to_string(&package).map_err(|e| Error::from_reason(e.to_string()))
+        })
+        .await
+        .map_err(|e| Error::from_reason(e.to_string()))?
+    }
+    #[napi]
+    pub async fn apply_relational_batch(&self, batch_json: String) -> Result<String> {
+        let batch = serde_json::from_str::<RelationalMutationBatch>(&batch_json)
+            .map_err(|e| Error::from_reason(e.to_string()))?;
+        let i = Arc::clone(&self.inner);
+        tokio::task::spawn_blocking(move || {
+            let result = i.apply_relational_batch(batch)?;
+            serde_json::to_string(&result).map_err(|e| Error::from_reason(e.to_string()))
+        })
+        .await
+        .map_err(|e| Error::from_reason(e.to_string()))?
+    }
+    #[napi]
     pub async fn apply_relational_rows(
         &self,
         namespace: String,
@@ -7609,6 +8484,18 @@ impl GenesisDatabase {
         tokio::task::spawn_blocking(move || i.supersede_node(id, new_props, caused_by))
             .await
             .map_err(|e| Error::from_reason(e.to_string()))?
+    }
+    #[napi]
+    pub async fn execute_named_query(&self, request_json: String) -> Result<String> {
+        let request = serde_json::from_str::<NamedQueryRequest>(&request_json)
+            .map_err(|e| Error::from_reason(e.to_string()))?;
+        let i = Arc::clone(&self.inner);
+        tokio::task::spawn_blocking(move || {
+            let rows = i.execute_named_query(request)?;
+            serde_json::to_string(&rows).map_err(|e| Error::from_reason(e.to_string()))
+        })
+        .await
+        .map_err(|e| Error::from_reason(e.to_string()))?
     }
     #[napi]
     pub async fn commit_transaction(&self, transaction_json: String) -> Result<String> {

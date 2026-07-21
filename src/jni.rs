@@ -37,8 +37,9 @@ use jni::JNIEnv;
 use serde::Deserialize;
 
 use crate::{
-    GenesisTransaction, HybridSearchInput, NodeInput, OpenOptions, RelationalQuery,
-    RelationalRowMutation, RelationalSchemaPackage, Storage,
+    GenesisTransaction, HybridSearchInput, NamedQueryRequest, NodeInput, OpenOptions,
+    RelationalMutationBatch, RelationalQuery, RelationalRowMutation, RelationalSchemaPackage,
+    Storage,
 };
 
 #[derive(Deserialize)]
@@ -255,6 +256,31 @@ pub extern "system" fn Java_dev_genesisblock_GenesisDB_nativeRegisterRelationalS
 }
 
 #[no_mangle]
+pub extern "system" fn Java_dev_genesisblock_GenesisDB_nativeGetRelationalSchema(
+    mut env: JNIEnv,
+    _class: JClass,
+    handle: jlong,
+    namespace: JString,
+) -> jstring {
+    json_op(&mut env, handle, &namespace, |storage, namespace| {
+        serde_json::to_string(&storage.get_relational_schema(namespace).ok()?).ok()
+    })
+}
+
+#[no_mangle]
+pub extern "system" fn Java_dev_genesisblock_GenesisDB_nativeApplyRelationalBatch(
+    mut env: JNIEnv,
+    _class: JClass,
+    handle: jlong,
+    json_input: JString,
+) -> jstring {
+    json_op(&mut env, handle, &json_input, |storage, json| {
+        let batch = serde_json::from_str::<RelationalMutationBatch>(json).ok()?;
+        serde_json::to_string(&storage.apply_relational_batch(batch).ok()?).ok()
+    })
+}
+
+#[no_mangle]
 pub extern "system" fn Java_dev_genesisblock_GenesisDB_nativeApplyRelationalRows(
     mut env: JNIEnv,
     _class: JClass,
@@ -280,6 +306,19 @@ pub extern "system" fn Java_dev_genesisblock_GenesisDB_nativeQueryRelational(
     json_op(&mut env, handle, &json_input, |storage, json| {
         let query = serde_json::from_str::<RelationalQuery>(json).ok()?;
         serde_json::to_string(&storage.query_relational(query).ok()?).ok()
+    })
+}
+
+#[no_mangle]
+pub extern "system" fn Java_dev_genesisblock_GenesisDB_nativeExecuteNamedQuery(
+    mut env: JNIEnv,
+    _class: JClass,
+    handle: jlong,
+    json_input: JString,
+) -> jstring {
+    json_op(&mut env, handle, &json_input, |storage, json| {
+        let request = serde_json::from_str::<NamedQueryRequest>(json).ok()?;
+        serde_json::to_string(&storage.execute_named_query(request).ok()?).ok()
     })
 }
 

@@ -29,6 +29,9 @@ fn schema() -> RelationalSchemaPackage {
     RelationalSchemaPackage {
         namespace: "fung".to_string(),
         schema_version: 1,
+        previous_version: None,
+        package_id: "00000000-0000-4000-8000-000000000002".to_string(),
+        schema_hash: String::new(),
         tables: vec![RelationalTable {
             name: "notes".to_string(),
             columns: vec![
@@ -39,6 +42,7 @@ fn schema() -> RelationalSchemaPackage {
             foreign_keys: vec![],
             indexes: vec![],
         }],
+        named_queries: vec![],
     }
 }
 

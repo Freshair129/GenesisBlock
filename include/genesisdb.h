@@ -84,11 +84,20 @@ const char *genesisdb_retrieve_context(GenesisHandle *handle, const char *json_i
 /* Register a versioned relational schema package encoded as JSON. */
 const char *genesisdb_register_relational_schema(GenesisHandle *handle, const char *json_input);
 
+/* Return the current relational schema package for `namespace`. */
+const char *genesisdb_get_relational_schema(GenesisHandle *handle, const char *namespace);
+
+/* Apply an idempotent U2 mutation batch and return its result as JSON. */
+const char *genesisdb_apply_relational_batch(GenesisHandle *handle, const char *json_input);
+
 /* Apply a typed relational mutation group encoded as JSON. */
 int32_t genesisdb_apply_relational_rows(GenesisHandle *handle, const char *json_input);
 
 /* Execute a bounded typed relational query encoded as JSON. */
 const char *genesisdb_query_relational(GenesisHandle *handle, const char *json_input);
+
+/* Execute a registered named query and return its JSON row array. */
+const char *genesisdb_execute_named_query(GenesisHandle *handle, const char *json_input);
 
 /* Commit one canonical cross-domain Genesis transaction encoded as JSON. */
 const char *genesisdb_commit_transaction(GenesisHandle *handle, const char *json_input);

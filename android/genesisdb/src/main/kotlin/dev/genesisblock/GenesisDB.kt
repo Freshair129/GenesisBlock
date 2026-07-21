@@ -77,6 +77,20 @@ class GenesisDB private constructor(private var handle: Long) : AutoCloseable {
             ?: throw GenesisDBException("registerRelationalSchema failed")
     }
 
+    /** Return the current relational schema package for a namespace. */
+    suspend fun getRelationalSchema(namespace: String): JsonElement = withContext(Dispatchers.IO) {
+        val result = nativeGetRelationalSchema(requireOpen(), namespace)
+            ?: throw GenesisDBException("getRelationalSchema failed")
+        json.parseToJsonElement(result)
+    }
+
+    /** Apply an idempotent U2 mutation batch and return its commit receipt. */
+    suspend fun applyRelationalBatch(batchJson: String): JsonElement = withContext(Dispatchers.IO) {
+        val result = nativeApplyRelationalBatch(requireOpen(), batchJson)
+            ?: throw GenesisDBException("applyRelationalBatch failed")
+        json.parseToJsonElement(result)
+    }
+
     /** Apply a typed relational mutation group; raw SQL writes are intentionally unavailable. */
     suspend fun applyRelationalRows(inputJson: String) = withContext(Dispatchers.IO) {
         nativeApplyRelationalRows(requireOpen(), inputJson)
@@ -87,6 +101,13 @@ class GenesisDB private constructor(private var handle: Long) : AutoCloseable {
     suspend fun queryRelational(queryJson: String): JsonElement = withContext(Dispatchers.IO) {
         val result = nativeQueryRelational(requireOpen(), queryJson)
             ?: throw GenesisDBException("queryRelational failed")
+        json.parseToJsonElement(result)
+    }
+
+    /** Execute a registered named query; arbitrary SQL is never accepted. */
+    suspend fun executeNamedQuery(requestJson: String): JsonElement = withContext(Dispatchers.IO) {
+        val result = nativeExecuteNamedQuery(requireOpen(), requestJson)
+            ?: throw GenesisDBException("executeNamedQuery failed")
         json.parseToJsonElement(result)
     }
 
@@ -144,8 +165,11 @@ class GenesisDB private constructor(private var handle: Long) : AutoCloseable {
         @JvmStatic private external fun nativeExecuteHql(handle: Long, query: String): String?
         @JvmStatic private external fun nativeRetrieveContext(handle: Long, jsonInput: String): String?
         @JvmStatic private external fun nativeRegisterRelationalSchema(handle: Long, jsonInput: String): String?
+        @JvmStatic private external fun nativeGetRelationalSchema(handle: Long, namespace: String): String?
+        @JvmStatic private external fun nativeApplyRelationalBatch(handle: Long, jsonInput: String): String?
         @JvmStatic private external fun nativeApplyRelationalRows(handle: Long, jsonInput: String): String?
         @JvmStatic private external fun nativeQueryRelational(handle: Long, jsonInput: String): String?
+        @JvmStatic private external fun nativeExecuteNamedQuery(handle: Long, jsonInput: String): String?
         @JvmStatic private external fun nativeCommitTransaction(handle: Long, jsonInput: String): String?
         @JvmStatic private external fun nativeFlushIndex(handle: Long): Int
     }

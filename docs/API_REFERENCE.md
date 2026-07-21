@@ -4,7 +4,7 @@ status: current
 
 # GenesisBlockDB REST API Reference
 
-**Generated from `src/router.rs` (Axum server) — 2026-06-28.** This replaces the
+**Generated from `src/router.rs` (Axum server) — 2026-07-21.** This replaces the
 prior corrupted file. The server is the SSOT; update this when routes change.
 
 - **Base URL:** `http://localhost:3000` (port via `GENESIS_PORT`, bind `0.0.0.0`)
@@ -32,6 +32,10 @@ prior corrupted file. The server is the SSOT; update this when routes change.
 | POST | `/v1/bulk/nodes` | `NodeInput[]` | `200` (empty) |
 | POST | `/v1/bulk/edges` | `EdgeInput[]` | `200` (empty) |
 | POST | `/v1/bulk/rebuild` | _none_ | `200` (empty) |
+| POST | `/v1/relational/schema/register` | `RelationalSchemaPackage` | current `schema_version` |
+| GET | `/v1/relational/schema/:namespace` | _none_ | normalized `RelationalSchemaPackage` or `404` |
+| POST | `/v1/relational/mutate` | `RelationalMutationBatch` | `RelationalMutationResult` |
+| POST | `/v1/relational/query` | `NamedQueryRequest` | JSON row array |
 | POST | `/v1/query/hql` | **raw JSON string** (HQL) | `JSON` (shape depends on command) |
 | POST | `/v1/query` | `QueryInput` | `EdgeOutput[]` |
 | POST | `/v1/search/hybrid` | `HybridSearchInput` | `NeighborOutput[]` |
@@ -52,6 +56,38 @@ prior corrupted file. The server is the SSOT; update this when routes change.
 tiered `retrieve_context` / HQL `CONTEXT` end-to-end, `neighbors` (graph
 traversal), `compact`, `set_language_centroid`,
 `set_index_params`, `reconcile_state`, `flush_index`, `index_lag`.
+
+## Relational U2 contract
+
+Applications never receive a SQLite handle and cannot submit raw SQL. Schema
+registration and mutation events enter the signed Genesis WAL before the staged
+SQLite transaction commits. Network reads execute only named queries registered
+in the current schema package; the ad hoc `query_relational` method remains an
+embedded compatibility API and is not a REST route.
+
+```jsonc
+// RelationalMutationBatch
+{
+  "mutation_id": "UUID",
+  "namespace": "app_namespace",
+  "schema_version": 1,
+  "operations": [{ "table": "notes", "kind": "Upsert", "values": {}, "key": null }]
+}
+
+// NamedQueryRequest
+{
+  "namespace": "app_namespace",
+  "schema_version": 1,
+  "query_name": "note_by_id",
+  "parameters": { "note_id": "note-1" },
+  "limit": 10
+}
+```
+
+`mutation_id` retries are idempotent only when the complete payload is identical;
+reuse with another payload returns `REL_MUTATION_CONFLICT`. Schema versions must
+advance exactly by one and additive migrations cannot remove or incompatibly
+change existing tables, columns, or primary keys.
 
 > **Async vector indexing.** HNSW insertion runs off the write path on a
 > dedicated indexing thread — a vector is durable (WAL) and in its collection's

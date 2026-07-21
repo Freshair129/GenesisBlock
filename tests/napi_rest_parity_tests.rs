@@ -56,9 +56,20 @@ const NAPI_TO_REST: &[(&str, Option<&str>)] = &[
     ("rebuild_index_parallel", Some("/v1/bulk/rebuild")),
     ("add_node", Some("/v1/node/add")),
     ("add_edge", Some("/v1/edge/add")),
-    ("register_relational_schema", Some("/v1/relational/schema")),
-    ("apply_relational_rows", Some("/v1/relational/mutate")),
-    ("query_relational", Some("/v1/relational/query")),
+    (
+        "register_relational_schema",
+        Some("/v1/relational/schema/register"),
+    ),
+    (
+        "get_relational_schema",
+        Some("/v1/relational/schema/:namespace"),
+    ),
+    ("apply_relational_batch", Some("/v1/relational/mutate")),
+    // Compatibility-only embedded API; REST intentionally requires the U2 batch envelope.
+    ("apply_relational_rows", None),
+    // Compatibility-only embedded API; REST intentionally permits named queries only.
+    ("query_relational", None),
+    ("execute_named_query", Some("/v1/relational/query")),
     ("commit_transaction", Some("/v1/transaction/commit")),
     ("stable_frontier", Some("/v1/frontier")),
     ("supersede_node", Some("/v1/node/supersede")),

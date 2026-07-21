@@ -1,5 +1,5 @@
 use axum::{
-    extract::{DefaultBodyLimit, Json, State},
+    extract::{DefaultBodyLimit, Json, Path, State},
     http::{header, HeaderValue, StatusCode},
     middleware::{self, Next},
     response::IntoResponse,
@@ -14,8 +14,9 @@ use tower_http::limit::RequestBodyLimitLayer;
 use tower_http::trace::TraceLayer;
 
 use crate::{
-    BatchInput, CollectionInfo, EdgeInput, Event, GenesisTransaction, HybridSearchInput, NodeInput,
-    QueryInput, RelationalQuery, RelationalRowMutation, RelationalSchemaPackage, Storage, SyncPeer,
+    BatchInput, CollectionInfo, EdgeInput, Event, GenesisTransaction, HybridSearchInput,
+    NamedQueryRequest, NodeInput, QueryInput, RelationalMutationBatch, RelationalSchemaPackage,
+    Storage, SyncPeer,
 };
 
 // ---------------------------------------------------------------------------
@@ -83,12 +84,6 @@ struct SupersedeInput {
     pub id: String,
     pub new_props: Option<serde_json::Value>,
     pub caused_by: Option<String>,
-}
-
-#[derive(serde::Deserialize)]
-struct RelationalRowsInput {
-    namespace: String,
-    mutations: Vec<RelationalRowMutation>,
 }
 
 // ---------------------------------------------------------------------------
@@ -243,23 +238,35 @@ async fn relational_schema_handler(
     }
 }
 
-async fn relational_mutate_handler(
+async fn relational_schema_get_handler(
     State(state): State<AppState>,
-    Json(input): Json<RelationalRowsInput>,
+    Path(namespace): Path<String>,
 ) -> impl IntoResponse {
     let storage = state.storage.read();
-    match storage.apply_relational_rows(&input.namespace, input.mutations) {
-        Ok(()) => StatusCode::NO_CONTENT.into_response(),
+    match storage.get_relational_schema(&namespace) {
+        Ok(Some(package)) => (StatusCode::OK, Json(package)).into_response(),
+        Ok(None) => StatusCode::NOT_FOUND.into_response(),
+        Err(e) => (StatusCode::NOT_FOUND, e.to_string()).into_response(),
+    }
+}
+
+async fn relational_mutate_handler(
+    State(state): State<AppState>,
+    Json(batch): Json<RelationalMutationBatch>,
+) -> impl IntoResponse {
+    let storage = state.storage.read();
+    match storage.apply_relational_batch(batch) {
+        Ok(result) => (StatusCode::OK, Json(result)).into_response(),
         Err(e) => (StatusCode::BAD_REQUEST, e.to_string()).into_response(),
     }
 }
 
 async fn relational_query_handler(
     State(state): State<AppState>,
-    Json(query): Json<RelationalQuery>,
+    Json(request): Json<NamedQueryRequest>,
 ) -> impl IntoResponse {
     let storage = state.storage.read();
-    match storage.query_relational(query) {
+    match storage.execute_named_query(request) {
         Ok(rows) => (StatusCode::OK, Json(rows)).into_response(),
         Err(e) => (StatusCode::BAD_REQUEST, e.to_string()).into_response(),
     }
@@ -744,6 +751,14 @@ pub fn build_router(state: AppState) -> Router {
         .route("/v1/bulk/rebuild", post(rebuild_index_handler))
         .route("/v1/batch", post(execute_batch_handler))
         .route("/v1/relational/schema", post(relational_schema_handler))
+        .route(
+            "/v1/relational/schema/register",
+            post(relational_schema_handler),
+        )
+        .route(
+            "/v1/relational/schema/:namespace",
+            get(relational_schema_get_handler),
+        )
         .route("/v1/relational/mutate", post(relational_mutate_handler))
         .route("/v1/relational/query", post(relational_query_handler))
         .route("/v1/transaction/commit", post(transaction_commit_handler))

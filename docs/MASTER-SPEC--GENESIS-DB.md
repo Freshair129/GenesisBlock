@@ -14,7 +14,7 @@ GenesisBlockDB uses a **Log-Structured Merge-Friendly** architecture based on a 
 - **Primary Log:** `genesis-graph.wal` (JSONL format) stores all mutation events.
 - **Persistence:** High-durability append-only logic with batched group commits.
 - **Unified operational boundary:** applications open, mutate, query, back up, and restore GenesisBlockDB as one database. SQLite is an internal relational projection; native graph/vector indexes are not separate application-managed databases.
-- **Relational projection:** embedded SQLite (`rusqlite`, bundled) stores node properties and normalized labels in S0/S1. App-defined tables, joins, and migrations are U2; unified cross-domain commit sequencing is U3.
+- **Relational projection:** embedded SQLite (`rusqlite`, bundled) stores node properties, normalized labels, and U2 app-defined tables. Versioned additive schemas, idempotent typed mutation batches, and bounded named joins are available through Genesis APIs; SQLite remains internal and rebuildable from the signed WAL. Unified cross-domain commit sequencing remains U3.
 - **In-Memory State:**
     - `DashMap<u32, NodeOutput>`: Lean primary node records (nodes interned to `u32`); `props` are hydrated from SQLite rather than retained on the traversal path.
     - `DashMap<u128, EdgeOutput>`: Primary edge storage. Edges are keyed by a

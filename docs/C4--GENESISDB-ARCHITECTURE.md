@@ -2,9 +2,9 @@
 proposed_id: C4--GENESISDB-ARCHITECTURE
 type: architecture-index
 status: current
-version: 0.1.3b
+version: 0.1.4b
 created_at: 2026-06-13T22:50:11+07:00,ATHER,9b1ced3
-last_update: 2026-07-20T22:10:00+07:00,ATHER
+last_update: 2026-07-21T05:00:00+07:00,ATHER
 attributes:
   domain: architecture
   scope: repository
@@ -115,7 +115,7 @@ flowchart TB
     subgraph engine["GenesisBlockDB Runtime"]
         core["Rust Core Engine\nsrc/lib.rs"]
         wal["WAL + Snapshot"]
-        sqlite["Embedded SQLite\nprops + labels"]
+        sqlite["Embedded SQLite\nprops + labels + app tables"]
         index["Hybrid Indexes\nHNSW + lexical + graph"]
     end
 
@@ -140,7 +140,7 @@ flowchart TB
 | Component | Responsibility | Source / Entry Points | Related Docs |
 |---|---|---|---|
 | Storage Model | One operational boundary over signed WAL, SQLite projection, native snapshots, replay and recovery | `src/lib.rs` | master spec, unified-boundary spec, SQLite substrate ADR |
-| Relational Projection | Paged node properties and normalized labels; future app schemas/joins remain U2 | `src/lib.rs` (`projection_*`) | `SPEC--SQLITE-SUBSTRATE-S0-S1`, unified-boundary spec |
+| Relational Projection | Paged node properties, normalized labels, versioned app schemas, typed mutation batches and bounded named joins; SQLite remains a WAL-rebuildable internal projection | `src/lib.rs` (`projection_*`, `register_relational_schema`, `apply_relational_batch`, `execute_named_query`) | `SPEC--SQLITE-SUBSTRATE-S0-S1`, `SPEC--GENESISDB-RELATIONAL-APPLICATION-CONTRACT-U2` |
 | Vector Collections | Per-model/dim isolated vector spaces (`collections: DashMap<String, Arc<VectorCollection>>`, each with its own arena + metadata + HNSW + metric); a `default` collection always exists. Async indexing thread (off the write path). | `src/lib.rs` | master spec, HNSW hybrid index design, `ADR--GENESISDB-MULTI-COLLECTION`, `ADR--GENESISDB-ASYNC-INDEXING` |
 | Hybrid Search | Per-collection vector + lexical retrieval with ranking; query dim validated against the collection | `src/lib.rs`, HNSW design | HNSW hybrid index design |
 | Graph Retrieval Layer | Tiered context retrieval by hop budget and fuzzy matching | `src/lib.rs::retrieve_context` | `SPEC--GRAPH-RETRIEVAL-LAYER.md` |
@@ -159,6 +159,7 @@ flowchart TB
 | Bulk ingest | `/v1/bulk/nodes`, `/v1/bulk/edges`, `/v1/bulk/rebuild` | `src/router.rs` |
 | Query | `/v1/query/hql`, `/v1/query` | `src/router.rs` |
 | Mutation | `/v1/node/add`, `/v1/node/supersede`, `/v1/edge/add`, `/v1/edge/retract`, `/v1/vector/add` | `src/router.rs` |
+| Relational | `/v1/relational/schema/register`, `/v1/relational/schema/:namespace`, `/v1/relational/mutate`, `/v1/relational/query` | `src/router.rs` |
 | Collections | `/v1/collection/create`, `/v1/collections` | `src/router.rs` |
 | Retrieval | `/v1/search/hybrid`, `/v1/reason/context` | `src/router.rs` |
 | Insight / status | `/v1/insight/drift/:cluster_id`, `/v1/insight/communities`, `/v1/insight/gaps`, `/v1/insight/rebuild`, `/v1/status`, `/v1/version`, `/v1/swarm/status` | `src/router.rs` |
@@ -226,6 +227,7 @@ Expected checks:
 
 | Version | Date | Status | Summary | Commit Hash | Agent |
 |---------|------|--------|---------|-------------|-------|
+| 0.1.4b | 2026-07-21 | beta | Truth-synced U2 relational app schemas, mutation batches, named joins, recovery ownership and public routes. | working-tree | ATHER |
 | 0.1.2b | 2026-06-14 | candidate | Clarified GenesisBlockDB as backend DB/runtime engine first and marked dashboard/Obsidian as optional consumers. | working-tree | ATHER |
 | 0.1.1b | 2026-06-14 | candidate | Updated C1 supporting sources after moving the GKS whitepaper into docs. | 4101228 | ATHER |
 | 0.1.0b | 2026-06-13 | candidate | Initial C4 architecture index and SSOT map. | 9b1ced3 | ATHER |

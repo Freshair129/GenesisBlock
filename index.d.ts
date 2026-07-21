@@ -232,14 +232,17 @@ export declare class GenesisDatabase {
   rebuildIndexParallel(): Promise<void>
   addNode(args: NodeInput): Promise<NodeOutput>
   addEdge(args: EdgeInput): Promise<EdgeOutput>
+  registerRelationalSchema(packageJson: string): Promise<number>
+  getRelationalSchema(namespace: string): Promise<string>
+  applyRelationalBatch(batchJson: string): Promise<string>
+  applyRelationalRows(namespace: string, mutationsJson: string): Promise<void>
+  queryRelational(queryJson: string): Promise<string>
   supersedeNode(id: string, newProps?: any | undefined | null, causedBy?: string | undefined | null): Promise<NodeOutput>
+  executeNamedQuery(requestJson: string): Promise<string>
+  commitTransaction(transactionJson: string): Promise<string>
+  stableFrontier(): number
   retractEdge(id: string, at?: string | undefined | null): Promise<EdgeOutput | null>
   retrieveContext(targetId: string, tier: string, budget: number | undefined | null, fuzzy: boolean): Promise<ContextPackage>
-  /**
-   * Execute raw HQL through the shared parser/executor funnel.
-   * Supports SEARCH, TRAVERSE, MATCH (<pattern>), MATCH <target> SIMILAR
-   * (hybrid), and CONTEXT. Colon-bearing ids such as `user:5` must be quoted.
-   */
   executeHql(query: string): Promise<any>
   hybridSearch(args: HybridSearchInput): Promise<Array<NeighborOutput>>
   neighbors(seed: string, args: NeighborInput): Promise<Array<NeighborOutput>>

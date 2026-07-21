@@ -1,8 +1,8 @@
 ---
-version: "0.1.0b"
+version: "0.1.1b"
 created_at: "2026-07-20T22:45:00+07:00,ATHER,working-tree"
-last_update: "2026-07-20T22:45:00+07:00,ATHER"
-status: candidate
+last_update: "2026-07-21T05:00:00+07:00,ATHER"
+status: beta
 superseded_by: null
 attributes:
   doc_type: "spec"
@@ -627,9 +627,11 @@ U2 เสร็จเมื่อ:
 | From | To | Change |
 |---|---|---|
 | none | `0.1.0b` | Candidate U2 contract for versioned schemas, additive migrations, typed relational mutations and named parameterized joins under signed-WAL authority. |
+| `0.1.0b` | `0.1.1b` | Approved by Boss; promoted to beta and opened U2 implementation/review gate. |
 
 ## CHANGELOG
 
 | Version | Date | Status | Summary | Commit Hash | Agent |
 |---|---|---|---|---|---|
 | `0.1.0b` | 2026-07-20 | candidate | Initial doc-first U2 requirements, architecture, API, migration, security, recovery and verification contract; no code authorized. | working-tree | ATHER |
+| `0.1.1b` | 2026-07-21 | beta | Approved by Boss; implementation authorized. | c2ad8de+working-tree | ATHER |

@@ -28,8 +28,9 @@ use std::sync::Arc;
 use serde::Deserialize;
 
 use crate::{
-    GenesisTransaction, HybridSearchInput, NodeInput, OpenOptions, RelationalQuery,
-    RelationalRowMutation, RelationalSchemaPackage, Storage,
+    GenesisTransaction, HybridSearchInput, NamedQueryRequest, NodeInput, OpenOptions,
+    RelationalMutationBatch, RelationalQuery, RelationalRowMutation, RelationalSchemaPackage,
+    Storage,
 };
 
 #[derive(Deserialize)]
@@ -314,6 +315,41 @@ pub extern "C" fn genesisdb_register_relational_schema(
     })
 }
 
+/// Return the current relational schema package for a namespace.
+#[no_mangle]
+pub extern "C" fn genesisdb_get_relational_schema(
+    handle: *mut GenesisHandle,
+    namespace: *const c_char,
+) -> *const c_char {
+    guard_json(|| {
+        let output = (|| -> Option<String> {
+            let storage = unsafe { handle_storage(handle) }?;
+            let namespace = unsafe { cstr_to_str(namespace) }?;
+            let package = storage.get_relational_schema(namespace).ok()?;
+            serde_json::to_string(&package).ok()
+        })();
+        output.map(string_to_cstr).unwrap_or(std::ptr::null())
+    })
+}
+
+/// Apply an idempotent U2 mutation batch encoded as JSON.
+#[no_mangle]
+pub extern "C" fn genesisdb_apply_relational_batch(
+    handle: *mut GenesisHandle,
+    json_input: *const c_char,
+) -> *const c_char {
+    guard_json(|| {
+        let output = (|| -> Option<String> {
+            let storage = unsafe { handle_storage(handle) }?;
+            let json = unsafe { cstr_to_str(json_input) }?;
+            let batch = serde_json::from_str::<RelationalMutationBatch>(json).ok()?;
+            let result = storage.apply_relational_batch(batch).ok()?;
+            serde_json::to_string(&result).ok()
+        })();
+        output.map(string_to_cstr).unwrap_or(std::ptr::null())
+    })
+}
+
 /// Apply a typed relational mutation batch encoded as JSON.
 #[no_mangle]
 pub extern "C" fn genesisdb_apply_relational_rows(
@@ -367,6 +403,24 @@ pub extern "C" fn genesisdb_query_relational(
             },
             Err(_) => std::ptr::null(),
         }
+    })
+}
+
+/// Execute a registered named query encoded as JSON.
+#[no_mangle]
+pub extern "C" fn genesisdb_execute_named_query(
+    handle: *mut GenesisHandle,
+    json_input: *const c_char,
+) -> *const c_char {
+    guard_json(|| {
+        let output = (|| -> Option<String> {
+            let storage = unsafe { handle_storage(handle) }?;
+            let json = unsafe { cstr_to_str(json_input) }?;
+            let request = serde_json::from_str::<NamedQueryRequest>(json).ok()?;
+            let rows = storage.execute_named_query(request).ok()?;
+            serde_json::to_string(&rows).ok()
+        })();
+        output.map(string_to_cstr).unwrap_or(std::ptr::null())
     })
 }
 

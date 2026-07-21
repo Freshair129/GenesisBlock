@@ -1,7 +1,7 @@
 use genesis_block_native::{
     OpenOptions, RelationalColumn, RelationalColumnType, RelationalFilter, RelationalForeignKey,
-    RelationalJoin, RelationalMutationKind, RelationalQuery, RelationalRowMutation,
-    RelationalSchemaPackage, RelationalTable, Storage,
+    RelationalJoin, RelationalJoinKind, RelationalMutationKind, RelationalQuery,
+    RelationalRowMutation, RelationalSchemaPackage, RelationalTable, Storage,
 };
 use serde_json::json;
 use std::fs;
@@ -29,6 +29,9 @@ fn fung_schema() -> RelationalSchemaPackage {
     RelationalSchemaPackage {
         namespace: "fung".to_string(),
         schema_version: 1,
+        previous_version: None,
+        package_id: "00000000-0000-4000-8000-000000000001".to_string(),
+        schema_hash: String::new(),
         tables: vec![
             RelationalTable {
                 name: "projects".to_string(),
@@ -56,6 +59,7 @@ fn fung_schema() -> RelationalSchemaPackage {
                 indexes: vec![],
             },
         ],
+        named_queries: vec![],
     }
 }
 
@@ -97,6 +101,7 @@ fn relational_schema_rows_and_join_use_one_genesis_handle() {
                 table: "projects".to_string(),
                 left_column: "notes.project_id".to_string(),
                 right_column: "projects.id".to_string(),
+                kind: RelationalJoinKind::Inner,
             }],
             filters: vec![RelationalFilter::equal("notes.id", json!("note-1"))],
             limit: Some(10),
