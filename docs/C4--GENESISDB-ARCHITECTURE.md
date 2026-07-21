@@ -2,9 +2,9 @@
 proposed_id: C4--GENESISDB-ARCHITECTURE
 type: architecture-index
 status: current
-version: 0.1.4b
+version: 0.1.7b
 created_at: 2026-06-13T22:50:11+07:00,ATHER,9b1ced3
-last_update: 2026-07-21T05:00:00+07:00,ATHER
+last_update: 2026-07-22T00:22:00+07:00,ATHER
 attributes:
   domain: architecture
   scope: repository
@@ -52,7 +52,7 @@ GenesisBlockDB is a local-first relational + graph + vector database operational
 
 | Actor | Goal | Interfaces |
 |---|---|---|
-| Human knowledge worker | Inspect or operate knowledge through optional clients | Obsidian plugin, dashboard, Markdown-facing flows |
+| Human knowledge worker | Inspect or operate knowledge through optional clients | Obsidian plugin, dashboard, planned Genesis Studio, Markdown-facing flows |
 | AI agent / LLM tool caller | Store, retrieve, and reason over structured knowledge | MCP server, REST API, N-API |
 | Application developer | Embed GenesisBlockDB into apps and tools | N-API package, Python SDK, Go SDK, REST |
 | Peer GenesisBlockDB node | Synchronize knowledge and participate in consensus | CRDT/gossip/consensus primitives |
@@ -63,6 +63,7 @@ GenesisBlockDB is a local-first relational + graph + vector database operational
 flowchart LR
     human["Human Knowledge Worker"] --> obsidian["Obsidian / Markdown Workflow"]
     human --> dashboard["Dashboard"]
+    human -. candidate .-> studio["Genesis Studio Desktop"]
     agent["AI Agent / LLM Client"] --> mcp["MCP Server"]
     app["Application Developer"] --> napi["N-API Package"]
     app --> rest["REST API"]
@@ -71,6 +72,8 @@ flowchart LR
 
     obsidian --> core["GenesisBlockDB"]
     dashboard --> rest
+    studio -. local embedded .-> core
+    studio -. remote self-hosted .-> rest
     mcp --> core
     napi --> core
     rest --> core
@@ -89,6 +92,7 @@ flowchart LR
 | Python SDK | Python REST client | `genesisdb-python/genesisdb/client.py` | `docs/PYTHON-SDK-GUIDE.md`, `docs/SPEC--PYTHON-SDK.md` |
 | Go SDK | Go REST client | `genesisdb-go/client.go` | `docs/SPEC--GO-SDK.md` |
 | Dashboard | Optional operational UI consuming status/search APIs | `dashboard/` | `docs/AUDIT--DASHBOARD-E2E.md` |
+| Genesis Studio Desktop (S1 beta) | Tauri + React read-only controller with fixture, exclusive local embedded and API-key-capable remote transports; bounded graph/entity/HQL/logical-relational contracts are core-owned | `studio/`, `src/lib.rs`, `src/router.rs` | `docs/SPEC--GENESIS-STUDIO-DESKTOP.md` |
 | Obsidian Plugin | Optional human-facing PKM bridge consuming engine interfaces | `obsidian-plugin/` if present | `docs/SPEC--OBSIDIAN-UI-INTEGRATION.md`, dual-track TDD |
 
 ### Container Diagram
@@ -101,6 +105,7 @@ flowchart TB
         py["Python App"]
         go["Go App"]
         ui["Dashboard"]
+        studio["Genesis Studio Desktop\n(S1 beta / read-only)"]
         obs["Obsidian"]
     end
 
@@ -124,6 +129,8 @@ flowchart TB
     py --> sdkpy --> rest
     go --> sdkgo --> rest
     ui --> rest
+    studio -. remote .-> rest
+    studio -. local embedded .-> core
     obs --> napi
     mcp --> core
     napi --> core
@@ -185,6 +192,7 @@ The C4 code level is intentionally anchored to source files instead of duplicati
 | SDK request/response shapes | Python and Go SDK clients | API reference and REST handlers | High |
 | Persistence safety | WAL/snapshot code in `src/lib.rs` | WAL ADR, audit reports | High |
 | Optional dashboard status contract | `dashboard/` hooks/components and REST status routes | dashboard audit docs | Medium |
+| Studio S1 transport, scene and ownership contracts | `studio/src/domain/*`, `studio/src/transports/*`, `studio/src-tauri/*`, `src/lib.rs`, `src/router.rs` | `SPEC--GENESIS-STUDIO-DESKTOP` | High |
 
 ## 7. Known Architecture Drift
 
@@ -197,6 +205,7 @@ These findings are intentionally listed here until the governance validator can 
 | Governance rules are documented but not enforced | No validator script, CI gate, or active git hook | Implement governance TDD Phase 2 |
 | Some specs retain open DoD/review text while code exists | Multiple `SPEC--*.md` files | Baseline audit, then update status/changelog |
 | Low-level C4 view is source-anchored only | No generated module map or symbol index | Add validator/report that extracts code anchors |
+| Genesis Studio production operations remain gated | S1 read paths, bounded graph DTOs, capability negotiation and exclusive process ownership exist; lifecycle backup/restore and OIDC/JWT scoped authorization do not | Keep mutation/operations UI disabled until server-side scopes and operator contracts pass their S2-S4 reviews |
 
 ## 8. Change Rules
 
@@ -227,6 +236,9 @@ Expected checks:
 
 | Version | Date | Status | Summary | Commit Hash | Agent |
 |---------|------|--------|---------|-------------|-------|
+| 0.1.7b | 2026-07-22 | beta | Truth-synced Studio S1 read-only local/remote adapters, bounded core APIs and process ownership while retaining S2-S4 gates. | working-tree | ATHER |
+| 0.1.6b | 2026-07-21 | beta | Truth-synced the verified fixture-only Studio S0 shell while retaining S1+ API gaps. | working-tree | ATHER |
+| 0.1.5b | 2026-07-21 | candidate | Added planned Genesis Studio Desktop container, local/remote boundaries and explicit runtime API gaps. | working-tree | ATHER |
 | 0.1.4b | 2026-07-21 | beta | Truth-synced U2 relational app schemas, mutation batches, named joins, recovery ownership and public routes. | working-tree | ATHER |
 | 0.1.2b | 2026-06-14 | candidate | Clarified GenesisBlockDB as backend DB/runtime engine first and marked dashboard/Obsidian as optional consumers. | working-tree | ATHER |
 | 0.1.1b | 2026-06-14 | candidate | Updated C1 supporting sources after moving the GKS whitepaper into docs. | 4101228 | ATHER |

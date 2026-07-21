@@ -287,6 +287,88 @@ pub struct DatabaseStatus {
     pub page_cache_mb: u32,
 }
 
+pub const STUDIO_PROTOCOL_VERSION: &str = "1";
+pub const STUDIO_SCENE_NODE_CEILING: usize = 1000;
+pub const STUDIO_SCENE_EDGE_CEILING: usize = 3000;
+pub const STUDIO_SCENE_PAGE_LIMIT: usize = 500;
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct StudioCapabilities {
+    pub protocol_version: String,
+    pub engine_version: String,
+    pub mode: String,
+    pub read_features: Vec<String>,
+    pub write_features: Vec<String>,
+    pub auth_features: Vec<String>,
+    pub limits: StudioLimits,
+    pub consistency: String,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct StudioLimits {
+    pub initial_scene_nodes: usize,
+    pub scene_node_ceiling: usize,
+    pub scene_edge_ceiling: usize,
+    pub expansion_nodes: usize,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, Default)]
+pub struct StudioGraphSceneRequest {
+    pub seed: Option<String>,
+    pub limit: Option<usize>,
+    pub offset: Option<usize>,
+    pub direction: Option<String>,
+    pub as_of: Option<String>,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct StudioGraphNode {
+    pub id: String,
+    pub label: String,
+    pub labels: Vec<String>,
+    pub collection: Option<String>,
+    pub valid_from: String,
+    pub valid_to: Option<String>,
+    pub caused_by: Option<String>,
+    pub impact: Option<f64>,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct StudioGraphEdge {
+    pub id: String,
+    pub from: String,
+    pub to: String,
+    pub relation: String,
+    pub valid_from: String,
+    pub valid_to: Option<String>,
+    pub caused_by: Option<String>,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct StudioGraphScene {
+    pub scene_id: String,
+    pub frontier: u64,
+    pub nodes: Vec<StudioGraphNode>,
+    pub edges: Vec<StudioGraphEdge>,
+    pub groups: Vec<String>,
+    pub truncated: bool,
+    pub continuation: Option<String>,
+    pub warnings: Vec<String>,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct StudioEntityInspection {
+    pub entity_id: String,
+    pub frontier: u64,
+    pub node: StudioGraphNode,
+    pub properties: Value,
+    pub incident_edges: Vec<StudioGraphEdge>,
+    pub vector_collection: Option<String>,
+    pub vector_present: bool,
+    pub index_lag: u32,
+    pub availability: HashMap<String, String>,
+}
+
 #[cfg_attr(feature = "napi-bindings", napi(object))]
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct CollectionInfo {
@@ -3641,6 +3723,22 @@ impl Storage {
         Self::load_relational_schema_conn(&conn, namespace)
     }
 
+    pub fn list_relational_schemas(&self) -> Result<Vec<RelationalSchemaPackage>> {
+        let conn = self.projection_db.lock();
+        let mut statement = conn
+            .prepare("SELECT package_json FROM relational_schema_registry ORDER BY namespace")
+            .map_err(|e| Error::from_reason(e.to_string()))?;
+        let schemas = statement
+            .query_map([], |row| row.get::<_, String>(0))
+            .map_err(|e| Error::from_reason(e.to_string()))?
+            .map(|row| {
+                let raw = row.map_err(|e| Error::from_reason(e.to_string()))?;
+                serde_json::from_str(&raw).map_err(|e| Error::from_reason(e.to_string()))
+            })
+            .collect();
+        schemas
+    }
+
     pub fn apply_relational_batch(
         &self,
         batch: RelationalMutationBatch,
@@ -4187,6 +4285,25 @@ impl Storage {
         if !root.exists() {
             fs::create_dir_all(&root).ok();
         }
+        let lock_path = root.join("genesis.lock");
+        let lock_file = FileOpenOptions::new()
+            .read(true)
+            .write(true)
+            .create(true)
+            .open(&lock_path)
+            .map_err(|e| {
+                Error::from_reason(format!(
+                    "failed to open database ownership lock {}: {}",
+                    lock_path.display(),
+                    e
+                ))
+            })?;
+        fs2::FileExt::try_lock_exclusive(&lock_file).map_err(|_| {
+            Error::from_reason(format!(
+                "database is already open by another GenesisBlockDB process: {}",
+                root.display()
+            ))
+        })?;
         let read_only = opts.read_only.unwrap_or(false);
         let vector_dim = opts.vector_dim.unwrap_or(1536) as u16;
 
@@ -4264,65 +4381,76 @@ impl Storage {
         let (wal_sender, wal_receiver): (Sender<WalMsg>, Receiver<WalMsg>) = unbounded();
         let log_path_clone = log_path.clone();
 
-        let wal_handle = std::thread::spawn(move || {
-            if let Ok(file) = FileOpenOptions::new()
-                .append(true)
-                .create(true)
-                .open(&log_path_clone)
-            {
-                let mut writer = std::io::BufWriter::with_capacity(128 * 1024, file);
-                let mut batch: Vec<crossbeam_channel::Sender<bool>> = Vec::with_capacity(1024);
-                // A checkpoint pulled out of the micro-batch drain is stashed here
-                // and applied only after the in-flight append batch is flushed +
-                // acked, so the new (live-state) WAL never loses a just-acked write.
-                let mut pending_ckpt: Option<(Vec<u8>, crossbeam_channel::Sender<bool>)> = None;
-                loop {
-                    match wal_receiver.recv() {
-                        Ok(WalMsg::Append(signed_event, ack_tx)) => {
-                            batch.push(ack_tx);
-                            if let Ok(json) = serde_json::to_string(&signed_event) {
-                                let _ = writer.write_all(json.as_bytes());
-                                let _ = writer.write_all(b"\n");
-                            }
-                            let timeout = Duration::from_millis(5);
-                            let start = Instant::now();
-                            while batch.len() < 1024 && start.elapsed() < timeout {
-                                match wal_receiver.try_recv() {
-                                    Ok(WalMsg::Append(se, tx)) => {
-                                        batch.push(tx);
-                                        if let Ok(j) = serde_json::to_string(&se) {
-                                            let _ = writer.write_all(j.as_bytes());
-                                            let _ = writer.write_all(b"\n");
+        let wal_handle = if read_only {
+            std::thread::spawn(move || {
+                while let Ok(message) = wal_receiver.recv() {
+                    let ack = match message {
+                        WalMsg::Append(_, ack) | WalMsg::Checkpoint { ack, .. } => ack,
+                    };
+                    let _ = ack.send(false);
+                }
+            })
+        } else {
+            std::thread::spawn(move || {
+                if let Ok(file) = FileOpenOptions::new()
+                    .append(true)
+                    .create(true)
+                    .open(&log_path_clone)
+                {
+                    let mut writer = std::io::BufWriter::with_capacity(128 * 1024, file);
+                    let mut batch: Vec<crossbeam_channel::Sender<bool>> = Vec::with_capacity(1024);
+                    // A checkpoint pulled out of the micro-batch drain is stashed here
+                    // and applied only after the in-flight append batch is flushed +
+                    // acked, so the new (live-state) WAL never loses a just-acked write.
+                    let mut pending_ckpt: Option<(Vec<u8>, crossbeam_channel::Sender<bool>)> = None;
+                    loop {
+                        match wal_receiver.recv() {
+                            Ok(WalMsg::Append(signed_event, ack_tx)) => {
+                                batch.push(ack_tx);
+                                if let Ok(json) = serde_json::to_string(&signed_event) {
+                                    let _ = writer.write_all(json.as_bytes());
+                                    let _ = writer.write_all(b"\n");
+                                }
+                                let timeout = Duration::from_millis(5);
+                                let start = Instant::now();
+                                while batch.len() < 1024 && start.elapsed() < timeout {
+                                    match wal_receiver.try_recv() {
+                                        Ok(WalMsg::Append(se, tx)) => {
+                                            batch.push(tx);
+                                            if let Ok(j) = serde_json::to_string(&se) {
+                                                let _ = writer.write_all(j.as_bytes());
+                                                let _ = writer.write_all(b"\n");
+                                            }
                                         }
+                                        // Defer the checkpoint: drain ends so the current
+                                        // append batch is durably flushed + acked first.
+                                        Ok(WalMsg::Checkpoint { data, ack }) => {
+                                            pending_ckpt = Some((data, ack));
+                                            break;
+                                        }
+                                        Err(_) => break,
                                     }
-                                    // Defer the checkpoint: drain ends so the current
-                                    // append batch is durably flushed + acked first.
-                                    Ok(WalMsg::Checkpoint { data, ack }) => {
-                                        pending_ckpt = Some((data, ack));
-                                        break;
-                                    }
-                                    Err(_) => break,
+                                }
+                                let _ = writer.flush();
+                                let _ = writer.get_mut().sync_all();
+                                for ack in batch.drain(..) {
+                                    let _ = ack.send(true);
+                                }
+                                if let Some((data, ack)) = pending_ckpt.take() {
+                                    Self::wal_checkpoint(&mut writer, &log_path_clone, &data);
+                                    let _ = ack.send(true);
                                 }
                             }
-                            let _ = writer.flush();
-                            let _ = writer.get_mut().sync_all();
-                            for ack in batch.drain(..) {
-                                let _ = ack.send(true);
-                            }
-                            if let Some((data, ack)) = pending_ckpt.take() {
+                            Ok(WalMsg::Checkpoint { data, ack }) => {
                                 Self::wal_checkpoint(&mut writer, &log_path_clone, &data);
                                 let _ = ack.send(true);
                             }
+                            Err(_) => break,
                         }
-                        Ok(WalMsg::Checkpoint { data, ack }) => {
-                            Self::wal_checkpoint(&mut writer, &log_path_clone, &data);
-                            let _ = ack.send(true);
-                        }
-                        Err(_) => break,
                     }
                 }
-            }
-        });
+            })
+        };
 
         // --- Deferred-indexing thread (ADR--GENESISDB-ASYNC-INDEXING) ---
         // Drains HNSW insert jobs off the write hot path. Bounded for
@@ -4422,7 +4550,7 @@ impl Storage {
             default_collection: "default".to_string(),
             log_path,
             bin_path: PathBuf::from(""),
-            _lock_file: None,
+            _lock_file: Some(lock_file),
             id_to_u32: DashMap::new(),
             next_u32: AtomicU32::new(0),
             is_rebuilding: AtomicBool::new(false),
@@ -5968,6 +6096,296 @@ impl Storage {
         }
     }
 
+    pub fn execute_hql_read_only(&self, query: &str) -> Result<serde_json::Value> {
+        let command = HqlCommand::try_from(query).map_err(Error::from_reason)?;
+        match command {
+            HqlCommand::Search { .. }
+            | HqlCommand::Traverse { .. }
+            | HqlCommand::Hybrid { .. }
+            | HqlCommand::Context { .. }
+            | HqlCommand::MatchPattern { .. } => self.execute_hql(query),
+        }
+    }
+
+    fn studio_graph_node(&self, node_u32: u32, node: &NodeOutput) -> StudioGraphNode {
+        let hydrated = self.hydrated_node(node_u32, node);
+        let label = hydrated
+            .props
+            .get("title")
+            .or_else(|| hydrated.props.get("name"))
+            .and_then(Value::as_str)
+            .unwrap_or(&hydrated.id)
+            .to_string();
+        StudioGraphNode {
+            id: hydrated.id,
+            label,
+            labels: hydrated.labels,
+            collection: hydrated.collection,
+            valid_from: hydrated.valid_from,
+            valid_to: hydrated.valid_to,
+            caused_by: hydrated.caused_by,
+            impact: hydrated.impact,
+        }
+    }
+
+    fn studio_graph_edge(edge: &EdgeOutput) -> StudioGraphEdge {
+        StudioGraphEdge {
+            id: edge.id.clone(),
+            from: edge.from.clone(),
+            to: edge.to.clone(),
+            relation: edge.rel.clone(),
+            valid_from: edge.valid_from.clone(),
+            valid_to: edge.valid_to.clone(),
+            caused_by: edge.caused_by.clone(),
+        }
+    }
+
+    pub fn studio_capabilities(
+        &self,
+        mode: &str,
+        auth_features: Vec<String>,
+    ) -> StudioCapabilities {
+        StudioCapabilities {
+            protocol_version: STUDIO_PROTOCOL_VERSION.to_string(),
+            engine_version: ENGINE_VERSION.to_string(),
+            mode: mode.to_string(),
+            read_features: vec![
+                "status.read".to_string(),
+                "relational.read".to_string(),
+                "graph.scene.read".to_string(),
+                "graph.scene.expand".to_string(),
+                "vector.read".to_string(),
+                "hql.read".to_string(),
+                "entity.inspect".to_string(),
+            ],
+            write_features: Vec::new(),
+            auth_features,
+            limits: StudioLimits {
+                initial_scene_nodes: STUDIO_SCENE_PAGE_LIMIT,
+                scene_node_ceiling: STUDIO_SCENE_NODE_CEILING,
+                scene_edge_ceiling: STUDIO_SCENE_EDGE_CEILING,
+                expansion_nodes: 100,
+            },
+            consistency: "stable-frontier".to_string(),
+        }
+    }
+
+    pub fn studio_graph_scene(&self, request: StudioGraphSceneRequest) -> Result<StudioGraphScene> {
+        let limit = request.limit.unwrap_or(240);
+        if limit == 0 || limit > STUDIO_SCENE_PAGE_LIMIT {
+            return Err(Error::from_reason(format!(
+                "STUDIO_SCENE_LIMIT_EXCEEDED: limit must be 1..{}",
+                STUDIO_SCENE_PAGE_LIMIT
+            )));
+        }
+        let offset = request.offset.unwrap_or(0);
+        if offset >= STUDIO_SCENE_NODE_CEILING {
+            return Err(Error::from_reason(format!(
+                "STUDIO_SCENE_LIMIT_EXCEEDED: offset must be below {}",
+                STUDIO_SCENE_NODE_CEILING
+            )));
+        }
+        let direction = request
+            .direction
+            .clone()
+            .unwrap_or_else(|| "both".to_string())
+            .to_ascii_lowercase();
+        if !matches!(direction.as_str(), "out" | "in" | "both") {
+            return Err(Error::from_reason(
+                "STUDIO_SCENE_INVALID_DIRECTION: expected out, in, or both",
+            ));
+        }
+        let now = Utc::now().to_rfc3339();
+        let mut candidates: Vec<(u32, NodeOutput)> = if let Some(seed) = request.seed.as_ref() {
+            let seed_u32 = self
+                .get_u32(seed)
+                .ok_or_else(|| Error::from_reason("STUDIO_ENTITY_NOT_FOUND"))?;
+            let seed_node = self
+                .nodes
+                .get(&seed_u32)
+                .map(|node| self.hydrated_node(seed_u32, node.value()))
+                .ok_or_else(|| Error::from_reason("STUDIO_ENTITY_NOT_FOUND"))?;
+            if !Self::is_currently_visible(
+                &seed_node.valid_from,
+                &seed_node.valid_to,
+                &request.as_of,
+                false,
+                &now,
+            ) {
+                return Err(Error::from_reason("STUDIO_ENTITY_NOT_FOUND_AT_VIEW"));
+            }
+            let mut selected = vec![(seed_u32, seed_node)];
+            selected.extend(
+                self.neighbors(
+                    seed.clone(),
+                    NeighborInput {
+                        depth: Some(1),
+                        rel: None,
+                        rels: None,
+                        direction: Some(direction),
+                        as_of: request.as_of.clone(),
+                        include_invalid: Some(false),
+                        limit: Some(STUDIO_SCENE_NODE_CEILING as u32),
+                    },
+                    false,
+                )?
+                .into_iter()
+                .filter_map(|result| {
+                    self.get_u32(&result.node.id)
+                        .map(|node_u32| (node_u32, result.node))
+                }),
+            );
+            selected
+        } else {
+            self.nodes
+                .iter()
+                .filter(|entry| {
+                    Self::is_currently_visible(
+                        &entry.valid_from,
+                        &entry.valid_to,
+                        &request.as_of,
+                        false,
+                        &now,
+                    )
+                })
+                .map(|entry| {
+                    (
+                        *entry.key(),
+                        self.hydrated_node(*entry.key(), entry.value()),
+                    )
+                })
+                .collect()
+        };
+        candidates.sort_by(|left, right| left.1.id.cmp(&right.1.id));
+        candidates.dedup_by(|left, right| left.1.id == right.1.id);
+        let candidate_count = candidates.len().min(STUDIO_SCENE_NODE_CEILING);
+        let page: Vec<(u32, NodeOutput)> = candidates
+            .into_iter()
+            .take(STUDIO_SCENE_NODE_CEILING)
+            .skip(offset)
+            .take(limit)
+            .collect();
+        let selected_ids: HashSet<String> = page.iter().map(|(_, node)| node.id.clone()).collect();
+        let nodes: Vec<StudioGraphNode> = page
+            .iter()
+            .map(|(node_u32, node)| self.studio_graph_node(*node_u32, node))
+            .collect();
+        let mut all_edges: Vec<StudioGraphEdge> = self
+            .edges
+            .iter()
+            .filter(|entry| {
+                let edge = entry.value();
+                selected_ids.contains(&edge.from)
+                    && selected_ids.contains(&edge.to)
+                    && Self::is_currently_visible(
+                        &edge.valid_from,
+                        &edge.valid_to,
+                        &request.as_of,
+                        false,
+                        &now,
+                    )
+            })
+            .map(|entry| Self::studio_graph_edge(entry.value()))
+            .collect();
+        all_edges.sort_by(|left, right| left.id.cmp(&right.id));
+        let edges_truncated = all_edges.len() > STUDIO_SCENE_EDGE_CEILING;
+        all_edges.truncate(STUDIO_SCENE_EDGE_CEILING);
+        let next_offset = offset.saturating_add(nodes.len());
+        let nodes_truncated = next_offset < candidate_count;
+        let mut groups: Vec<String> = nodes
+            .iter()
+            .flat_map(|node| node.labels.iter().cloned())
+            .collect();
+        groups.sort();
+        groups.dedup();
+        let mut warnings = Vec::new();
+        if edges_truncated {
+            warnings.push("STUDIO_SCENE_EDGE_CEILING_REACHED".to_string());
+        }
+        Ok(StudioGraphScene {
+            scene_id: Uuid::new_v4().to_string(),
+            frontier: self.stable_frontier(),
+            nodes,
+            edges: all_edges,
+            groups,
+            truncated: nodes_truncated || edges_truncated,
+            continuation: nodes_truncated.then(|| next_offset.to_string()),
+            warnings,
+        })
+    }
+
+    pub fn studio_inspect_entity(&self, entity_id: &str) -> Result<StudioEntityInspection> {
+        let node_u32 = self
+            .get_u32(entity_id)
+            .ok_or_else(|| Error::from_reason("STUDIO_ENTITY_NOT_FOUND"))?;
+        let hydrated = self
+            .node_view_u32(node_u32)
+            .ok_or_else(|| Error::from_reason("STUDIO_ENTITY_NOT_FOUND"))?;
+        let now = Utc::now().to_rfc3339();
+        let mut incident_edges: Vec<StudioGraphEdge> = self
+            .edges
+            .iter()
+            .filter(|entry| {
+                let edge = entry.value();
+                (edge.from == entity_id || edge.to == entity_id)
+                    && Self::is_currently_visible(
+                        &edge.valid_from,
+                        &edge.valid_to,
+                        &None,
+                        false,
+                        &now,
+                    )
+                    && self.endpoint_currently_visible(&edge.from, &None)
+                    && self.endpoint_currently_visible(&edge.to, &None)
+            })
+            .map(|entry| Self::studio_graph_edge(entry.value()))
+            .collect();
+        incident_edges.sort_by(|left, right| left.id.cmp(&right.id));
+        incident_edges.truncate(1000);
+        let collection_name = hydrated
+            .collection
+            .clone()
+            .unwrap_or_else(|| self.default_collection.clone());
+        let vector_present = self
+            .collections
+            .get(&collection_name)
+            .map(|collection| {
+                collection
+                    .metadata
+                    .read()
+                    .iter()
+                    .any(|metadata| metadata.node_u32 == node_u32)
+            })
+            .unwrap_or(false);
+        let index_lag = self.index_lag();
+        let mut availability = HashMap::new();
+        availability.insert("relational".to_string(), "available".to_string());
+        availability.insert("graph".to_string(), "available".to_string());
+        availability.insert(
+            "vector".to_string(),
+            if vector_present && index_lag > 0 {
+                "stale"
+            } else if vector_present {
+                "available"
+            } else {
+                "not_present"
+            }
+            .to_string(),
+        );
+        availability.insert("temporal".to_string(), "available".to_string());
+        Ok(StudioEntityInspection {
+            entity_id: entity_id.to_string(),
+            frontier: self.stable_frontier(),
+            node: self.studio_graph_node(node_u32, &hydrated),
+            properties: hydrated.props,
+            incident_edges,
+            vector_collection: vector_present.then_some(collection_name),
+            vector_present,
+            index_lag,
+            availability,
+        })
+    }
+
     fn is_valid_as_of(valid_from: &str, valid_to: &Option<String>, as_of: &Option<String>) -> bool {
         if let Some(as_of_str) = as_of {
             if valid_from > as_of_str.as_str() {
@@ -6382,7 +6800,16 @@ impl Storage {
     /// node time-travel check `neighbors` runs on the far endpoint of a hop.
     fn endpoint_currently_visible(&self, id: &str, as_of: &Option<String>) -> bool {
         match self.get_u32(id).and_then(|u32_id| self.nodes.get(&u32_id)) {
-            Some(node_ref) => Self::is_valid_as_of(&node_ref.valid_from, &node_ref.valid_to, as_of),
+            Some(node_ref) => {
+                let now = Utc::now().to_rfc3339();
+                Self::is_currently_visible(
+                    &node_ref.valid_from,
+                    &node_ref.valid_to,
+                    as_of,
+                    false,
+                    &now,
+                )
+            }
             None => true,
         }
     }

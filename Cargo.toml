@@ -59,6 +59,7 @@ dashmap = "6.0"
 once_cell = "1.19"
 parking_lot = "0.12"
 rusqlite = { version = "0.32", features = ["bundled"] }
+fs2 = "0.4.3"
 sysinfo = { version = "0.30", optional = true }
 # Android JNI bridge (src/jni.rs); only enabled by the `android-jni` feature.
 # No `invocation` feature → does not link a JVM, so it builds on the host triple.

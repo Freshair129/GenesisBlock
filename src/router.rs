@@ -1,5 +1,5 @@
 use axum::{
-    extract::{DefaultBodyLimit, Json, Path, State},
+    extract::{DefaultBodyLimit, Json, Path, Query, State},
     http::{header, HeaderValue, StatusCode},
     middleware::{self, Next},
     response::IntoResponse,
@@ -16,7 +16,7 @@ use tower_http::trace::TraceLayer;
 use crate::{
     BatchInput, CollectionInfo, EdgeInput, Event, GenesisTransaction, HybridSearchInput,
     NamedQueryRequest, NodeInput, QueryInput, RelationalMutationBatch, RelationalSchemaPackage,
-    Storage, SyncPeer,
+    Storage, StudioGraphSceneRequest, SyncPeer,
 };
 
 // ---------------------------------------------------------------------------
@@ -286,6 +286,61 @@ async fn transaction_commit_handler(
 async fn stable_frontier_handler(State(state): State<AppState>) -> impl IntoResponse {
     let storage = state.storage.read();
     (StatusCode::OK, Json(storage.stable_frontier())).into_response()
+}
+
+async fn studio_capabilities_handler(State(state): State<AppState>) -> impl IntoResponse {
+    let storage = state.storage.read();
+    let auth_features = if state.api_key.is_some() {
+        vec!["api-key".to_string()]
+    } else {
+        Vec::new()
+    };
+    Json(storage.studio_capabilities("remote", auth_features))
+}
+
+async fn studio_graph_scene_handler(
+    State(state): State<AppState>,
+    Query(request): Query<StudioGraphSceneRequest>,
+) -> impl IntoResponse {
+    let storage = state.storage.read();
+    match storage.studio_graph_scene(request) {
+        Ok(scene) => (StatusCode::OK, Json(scene)).into_response(),
+        Err(error) => (StatusCode::BAD_REQUEST, error.to_string()).into_response(),
+    }
+}
+
+async fn studio_entity_handler(
+    State(state): State<AppState>,
+    Path(entity_id): Path<String>,
+) -> impl IntoResponse {
+    let storage = state.storage.read();
+    match storage.studio_inspect_entity(&entity_id) {
+        Ok(inspection) => (StatusCode::OK, Json(inspection)).into_response(),
+        Err(error) if error.to_string().contains("NOT_FOUND") => {
+            (StatusCode::NOT_FOUND, error.to_string()).into_response()
+        }
+        Err(error) => (StatusCode::BAD_REQUEST, error.to_string()).into_response(),
+    }
+}
+
+async fn studio_read_hql_handler(
+    State(state): State<AppState>,
+    Json(body): Json<HqlBody>,
+) -> impl IntoResponse {
+    let query = body.into_query();
+    let storage = state.storage.read();
+    match storage.execute_hql_read_only(&query) {
+        Ok(result) => (StatusCode::OK, Json(result)).into_response(),
+        Err(error) => (StatusCode::BAD_REQUEST, error.to_string()).into_response(),
+    }
+}
+
+async fn studio_relational_schemas_handler(State(state): State<AppState>) -> impl IntoResponse {
+    let storage = state.storage.read();
+    match storage.list_relational_schemas() {
+        Ok(schemas) => (StatusCode::OK, Json(schemas)).into_response(),
+        Err(error) => (StatusCode::INTERNAL_SERVER_ERROR, error.to_string()).into_response(),
+    }
 }
 
 async fn add_node_handler(
@@ -763,6 +818,17 @@ pub fn build_router(state: AppState) -> Router {
         .route("/v1/relational/query", post(relational_query_handler))
         .route("/v1/transaction/commit", post(transaction_commit_handler))
         .route("/v1/frontier", get(stable_frontier_handler))
+        .route("/v1/studio/capabilities", get(studio_capabilities_handler))
+        .route("/v1/studio/graph", get(studio_graph_scene_handler))
+        .route("/v1/studio/entity/:entity_id", get(studio_entity_handler))
+        .route(
+            "/v1/studio/query/read",
+            post(studio_read_hql_handler).layer(DefaultBodyLimit::max(256 * 1024)),
+        )
+        .route(
+            "/v1/studio/relational/schemas",
+            get(studio_relational_schemas_handler),
+        )
         // HQL is a query string; cap the body at 256 KiB so a malformed/huge
         // request can't force a large allocation (defense-in-depth — the bulk
         // routes that legitimately carry embeddings keep the default limit).
