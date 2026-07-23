@@ -6,6 +6,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 GenesisBlock / GenesisBlockDB is a local-first **hybrid semantic-graph database engine** written in Rust. A single Rust crate (`genesis-block-native`) compiles to two artifacts from the same core: a `cdylib` Node.js native addon (via NAPI-RS) and an `rlib` consumed by a standalone Axum REST server. Everything else (Python SDK, Go SDK, MCP server, dashboard, Obsidian plugin) is a client over one of those two surfaces.
 
+Treat GenesisBlockDB as the application's one database boundary. Callers should not open or own separate SQLite, graph, or vector databases for Genesis-managed data.
+
 The whole engine lives in `src/lib.rs` (~6,000 lines): storage, WAL persistence, per-collection HNSW vector indexes (async indexing), graph indices, bitemporal node/edge model, governance tiers, HQL execution, Graph Retrieval Layer (GRL), CRDT sync, and ed25519-signed consensus. The storage core is one large file by design — the only split-out module is `src/query/` (the HQL `pest` grammar + AST).
 
 ## Build & run
@@ -63,6 +65,9 @@ cd dashboard && npm run dev  # optional operational dashboard (reads /v1/status,
 ## Architecture notes that span files
 
 - **One core, two front-ends.** `GenesisDatabase` (NAPI class in `src/lib.rs`) wraps `Arc<Storage>` and exposes every operation as an `async` method that offloads to `tokio::task::spawn_blocking`. `src/main.rs` re-wraps the *same* `Storage` as Axum handlers under `/v1/*`. When you add an engine capability, you usually wire it in **both** places (NAPI method + REST route) — they can drift, so check both.
+- **One operational boundary, multiple internal stores.** The app-facing contract is GenesisBlockDB itself, not a bundle of databases the caller manages. Signed WAL is the durability authority; native graph/vector structures and `projection.sqlite` are internal materializations or projections owned by the engine.
+- **WAL authority vs snapshot/projection files.** `genesis-graph.wal` is the mutation source of truth. Files such as `state.json`, `nodes.bin`, `edges.bin`, `vec_<name>.bin`, `fvec_<name>.bin`, and `projection.sqlite` are filesystem-backed materialized state used for reload, querying, and rebuild. Recovery may trust a durable snapshot for instant load, but rebuildable projections must never outrank the WAL in the durability contract.
+- **SQLite is internal.** `projection.sqlite` is an embedded relational projection for props, labels, and app tables. It is rebuildable from Genesis-owned state, and no caller should write to it directly or treat it as an external app database.
 - **HQL pipeline.** Query text → `pest` grammar → `src/query/ast.rs` (`HqlCommand`) → `Storage::execute_hql` pattern-matches the command and dispatches **directly** to Storage methods (`hybrid_search`, `neighbors`, `retrieve_context`). There is no intermediate logical plan — the old `LogicalPlanner`/`QueryPlan`/`PlanStep` were dead code, removed in MARK XIV. Commands: `SEARCH`, `TRAVERSE`, `MATCH <pattern>` (Cypher-style linear paths), `MATCH…SIMILAR`/`HYBRID`, `CONTEXT`.
 - **Grammar source of truth: `src/query/hql.pest`.** `src/query/ast.rs` declares `#[grammar = "query/hql.pest"]`, so that file is what `pest_derive` loads. The old root `hql.pest` no longer exists — do not re-create it. Keep grammar changes in sync with `src/query/ast.rs`.
 - **Bitemporal, append-mostly.** Nodes evolve by `supersede_node` (new version + `caused_by` link), not destructive update. Edges have `valid_from`/`valid_to`. `retract_edge` is a bitemporal soft-delete: it sets `valid_to` (default now) and advances the edge clock; the edge stays in the log and is visible to time-travel queries (`as_of` before the retraction, or `include_invalid = true`) but `neighbors` hides it from the current view. REST: `/v1/edge/retract`.
@@ -77,6 +82,7 @@ cd dashboard && npm run dev  # optional operational dashboard (reads /v1/status,
 
 - `/v1/query/hql` accepts **both** body shapes — a raw JSON string (`"SEARCH ..."`) and the object the Python/Go SDKs send (`{ "query": "..." }`) — via the `#[serde(untagged)] HqlBody` enum in `src/router.rs` (covered by `tests/rest_api_tests.rs`). Keep that untagged enum if you touch the route.
 - `execute_batch` exists in the core but is **not** exposed as a REST route.
+- Do not design new features around caller-managed direct SQLite access. If a future relational, document, or KV subsystem is added, it should join the Genesis transaction/WAL model as an internal store, not reopen external dual-write architecture.
 - Docs under `docs/` are governance/spec-heavy and some contain stale notes or encoding artifacts. Prefer code evidence and the C4 map over prose.
 
 ## Where to read next
