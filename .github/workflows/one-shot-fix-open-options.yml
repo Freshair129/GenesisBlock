@@ -21,23 +21,20 @@ jobs:
         run: |
           python - <<'PY'
           from pathlib import Path
+          import re
 
           path = Path('src/lib.rs')
           text = path.read_text(encoding='utf-8')
-          old = '''        let lock_file = FileOpenOptions::new()
-              .read(true)
-              .write(true)
-              .create(true)
-              .open(&lock_path)'''
-          new = '''        let lock_file = FileOpenOptions::new()
-              .read(true)
-              .write(true)
-              .create(true)
-              .truncate(false)
-              .open(&lock_path)'''
-          if old not in text:
-              raise SystemExit('target OpenOptions block not found')
-          path.write_text(text.replace(old, new, 1), encoding='utf-8')
+          pattern = re.compile(
+              r"(let lock_file = FileOpenOptions::new\(\)\s*"
+              r"\.read\(true\)\s*"
+              r"\.write\(true\)\s*"
+              r"\.create\(true\))(\s*\.open\(&lock_path\))"
+          )
+          updated, count = pattern.subn(r"\1\n            .truncate(false)\2", text, count=1)
+          if count != 1:
+              raise SystemExit(f'expected one lock-file OpenOptions block, found {count}')
+          path.write_text(updated, encoding='utf-8')
           PY
       - name: Remove one-shot workflow and commit
         run: |
