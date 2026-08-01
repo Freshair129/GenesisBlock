@@ -1,17 +1,16 @@
 name: One-shot fix OpenOptions semantics
 
 on:
-  push:
+  pull_request:
     branches:
-      - agent/tech-debt-hardening
-    paths:
-      - .github/workflows/one-shot-fix-open-options.yml
+      - main
 
 permissions:
   contents: write
 
 jobs:
   patch:
+    if: github.event.pull_request.head.ref == 'agent/tech-debt-hardening'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
