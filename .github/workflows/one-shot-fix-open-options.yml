@@ -1,0 +1,50 @@
+name: One-shot fix OpenOptions semantics
+
+on:
+  push:
+    branches:
+      - agent/tech-debt-hardening
+    paths:
+      - .github/workflows/one-shot-fix-open-options.yml
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/tech-debt-hardening
+          fetch-depth: 0
+      - name: Patch lock-file open semantics
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          path = Path('src/lib.rs')
+          text = path.read_text(encoding='utf-8')
+          old = '''        let lock_file = FileOpenOptions::new()
+              .read(true)
+              .write(true)
+              .create(true)
+              .open(&lock_path)'''
+          new = '''        let lock_file = FileOpenOptions::new()
+              .read(true)
+              .write(true)
+              .create(true)
+              .truncate(false)
+              .open(&lock_path)'''
+          if old not in text:
+              raise SystemExit('target OpenOptions block not found')
+          path.write_text(text.replace(old, new, 1), encoding='utf-8')
+          PY
+      - name: Remove one-shot workflow and commit
+        run: |
+          git rm .github/workflows/one-shot-fix-open-options.yml
+          git add src/lib.rs
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "fix(storage): preserve database lock file contents explicitly"
+          git push origin HEAD:agent/tech-debt-hardening
