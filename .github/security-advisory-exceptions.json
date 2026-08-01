@@ -1,0 +1,19 @@
+{
+  "RUSTSEC-2025-0141": {
+    "package": "bincode",
+    "kind": "unmaintained",
+    "reason": "Read-only legacy metadata snapshot fallback during the postcard migration window.",
+    "owner": "persistence",
+    "review_by": "2026-10-31",
+    "remove_at_version": "0.4.0",
+    "tracking": "ADR--GENESISDB-BINCODE-EXIT"
+  },
+  "RUSTSEC-2026-0204": {
+    "package": "crossbeam-epoch",
+    "kind": "unmaintained",
+    "reason": "Transitive dependency; migration depends on upstream dashmap/crossbeam consumers.",
+    "owner": "dependencies",
+    "review_by": "2026-10-31",
+    "tracking": "TECH-DEBT--DEPENDENCY-EXCEPTIONS"
+  }
+}
