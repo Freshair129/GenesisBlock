@@ -11,6 +11,12 @@
 #include <stdlib.h>
 #include <stdint.h>
 
+#define STUDIO_SCENE_NODE_CEILING 1000
+
+#define STUDIO_SCENE_EDGE_CEILING 3000
+
+#define STUDIO_SCENE_PAGE_LIMIT 500
+
 /*
  Opaque handle handed back to C. Wraps an `Arc<Storage>` so the engine's
  internal background threads (WAL writer, async HNSW indexer) keep their
@@ -81,25 +87,39 @@ const char *genesisdb_execute_hql(GenesisHandle *handle, const char *hql);
  */
 const char *genesisdb_retrieve_context(GenesisHandle *handle, const char *json_input);
 
-/* Register a versioned relational schema package encoded as JSON. */
+/*
+ Register a versioned relational schema package encoded as JSON.
+ */
 const char *genesisdb_register_relational_schema(GenesisHandle *handle, const char *json_input);
 
-/* Return the current relational schema package for `namespace`. */
-const char *genesisdb_get_relational_schema(GenesisHandle *handle, const char *namespace);
+/*
+ Return the current relational schema package for a namespace.
+ */
+const char *genesisdb_get_relational_schema(GenesisHandle *handle, const char *namespace_);
 
-/* Apply an idempotent U2 mutation batch and return its result as JSON. */
+/*
+ Apply an idempotent U2 mutation batch encoded as JSON.
+ */
 const char *genesisdb_apply_relational_batch(GenesisHandle *handle, const char *json_input);
 
-/* Apply a typed relational mutation group encoded as JSON. */
+/*
+ Apply a typed relational mutation batch encoded as JSON.
+ */
 int32_t genesisdb_apply_relational_rows(GenesisHandle *handle, const char *json_input);
 
-/* Execute a bounded typed relational query encoded as JSON. */
+/*
+ Execute a bounded relational query encoded as JSON.
+ */
 const char *genesisdb_query_relational(GenesisHandle *handle, const char *json_input);
 
-/* Execute a registered named query and return its JSON row array. */
+/*
+ Execute a registered named query encoded as JSON.
+ */
 const char *genesisdb_execute_named_query(GenesisHandle *handle, const char *json_input);
 
-/* Commit one canonical cross-domain Genesis transaction encoded as JSON. */
+/*
+ Commit one canonical cross-domain transaction encoded as JSON.
+ */
 const char *genesisdb_commit_transaction(GenesisHandle *handle, const char *json_input);
 
 /*
