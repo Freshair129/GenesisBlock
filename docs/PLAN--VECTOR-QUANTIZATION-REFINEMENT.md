@@ -1,3 +1,7 @@
+---
+status: historical
+---
+
 # PLAN — Vector Quantization Refinement (Swarm Execution Plan)
 
 **Status:** Shipped (all phases merged to `main` 2026-07-02, PRs #51–#58) · **Scope:** GenesisBlockDB engine (`src/lib.rs`, `src/router.rs`, `index.d.ts`) + tests + ADR

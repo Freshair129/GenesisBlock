@@ -58,11 +58,22 @@ regex = "1"
 dashmap = "6.0"
 once_cell = "1.19"
 parking_lot = "0.12"
+rusqlite = { version = "0.32", features = ["bundled"] }
+fs2 = "0.4.3"
 sysinfo = { version = "0.30", optional = true }
 # Android JNI bridge (src/jni.rs); only enabled by the `android-jni` feature.
 # No `invocation` feature → does not link a JVM, so it builds on the host triple.
 jni = { version = "0.21", optional = true }
+# ADR--GENESISDB-BINCODE-EXIT: bincode 1.3 is unmaintained (RUSTSEC-2025-0141,
+# ignored in security.yml). Kept as a read-only legacy fallback for metadata
+# snapshots (meta_<name>.bin) for a deprecation window; the write path now
+# uses `postcard` (below) exclusively. Do not add new bincode call sites.
 bincode = "1.3"
+# Metadata snapshot serializer (ADR--GENESISDB-BINCODE-EXIT): maintained,
+# serde-based, no_std/alloc-compatible (aligns with the `mobile` feature's
+# no_std direction). `default-features = false` + `alloc` keeps it lean for
+# the mobile build (no std-only extras pulled in).
+postcard = { version = "1.1", default-features = false, features = ["alloc"] }
 hnsw_rs = "0.3.4"
 # f16↔f32 for the F16 quantization arena (Quant::F16). Already compiled as a
 # transitive dep of anndists (hnsw_rs' distance crate); promoted to a direct dep.
@@ -104,12 +115,16 @@ codegen-units = 1
 strip = "symbols"
 
 [dev-dependencies]
-anyhow = "1.0.102"
+anyhow = "1.0.103"  # RUSTSEC-2026-0190 fix (Error::downcast_mut unsoundness)
 criterion = "0.8.2"
 rand = "0.8"
 tempfile = "3.27.0"
 tower = { version = "0.4", features = ["util"] }
 http-body-util = "0.1"
+# Only for tests/meta_format_migration_tests.rs, to hand-construct a legacy
+# bincode-encoded `meta_<name>.bin` fixture (ADR--GENESISDB-BINCODE-EXIT).
+bincode = "1.3"
+postcard = { version = "1.1", features = ["use-std"] }
 
 [[bin]]
 name = "snb-ingestion"
@@ -174,5 +189,10 @@ required-features = ["bins"]
 [[bin]]
 name = "edge-interning-audit"
 path = "benches/edge_interning_audit.rs"
+required-features = ["bins"]
+
+[[bin]]
+name = "sqlite-props-audit"
+path = "benches/sqlite_props_audit.rs"
 required-features = ["bins"]
 

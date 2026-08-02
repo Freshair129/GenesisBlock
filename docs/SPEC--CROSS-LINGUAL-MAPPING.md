@@ -1,3 +1,7 @@
+---
+status: current
+---
+
 # Functional Specification: Cross-Lingual Knowledge Mapping (Mark V)
 
 ## 1. Objective

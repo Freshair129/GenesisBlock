@@ -1,3 +1,7 @@
+---
+status: current
+---
+
 # Software Requirements Document (SRD): Hierarchical Reasoning
 
 ## 1. Introduction

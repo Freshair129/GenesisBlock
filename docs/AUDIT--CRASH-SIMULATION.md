@@ -1,3 +1,7 @@
+---
+status: historical
+---
+
 # AUDIT--CRASH-SIMULATION: WAL & Snapshot Crash Recovery Tests
 
 **Date:** 2026-06-28

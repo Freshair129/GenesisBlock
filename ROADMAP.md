@@ -212,6 +212,9 @@ in a single binary. Nearest comparators: Kuzu, DuckDB+graph, LanceDB, LadybugDB.
   **BQ alone = 0.6845 (catastrophic — unusable)**; **BQ+rerank = 0.9655** (+0.28, ~5× faster than f32).
   Guidance: SQ8+rerank for max quality, BQ+rerank for max RAM/speed, never BQ alone.
   Follow-up: ef-frontier sweep on quant configs + larger real corpus.
+  Status note (2026-07-05): the old "2M blocked by missing WAL compaction" wording above is now
+  historical. WAL compaction has shipped; the current state is **2M rerun pending** under the
+  current compaction path, once a resource-safe window is approved.
 
 ### Priority 2 — Go Public (🟡 กลาง; artifacts shipped in #16, just need the switch)
 - [ ] **Enable GitHub Pages** → publish the P15–P30 benchmark page (Settings → Pages →
@@ -225,6 +228,10 @@ in a single binary. Nearest comparators: Kuzu, DuckDB+graph, LanceDB, LadybugDB.
   which starved the snapshot save and nearly filled a 233 GB disk. This is the real disk
   ceiling (dwarfs the snapshot 5–51×) and blocks the 2M probe. Highest-priority P3 item:
   compact the WAL on snapshot / rotate it / drop applied entries.
+- [~] WAL compaction status note (2026-07-05): compaction on snapshot has already shipped, and
+  the 12 h soak shows bounded disk under periodic compaction. The remaining P3 work is follow-up
+  evidence and ops hardening: rerun the 2M/RSS probe when a resource-safe window is approved,
+  then decide whether explicit rotation or dropping applied entries is still needed.
 - [ ] **Crash-recovery test suite:** WAL-replay correctness under `kill -9` mid-write
   (durability is asserted but not adversarially tested).
 - [ ] **Observability endpoint:** expose `index_lag`, RSS, query p50/p95 via REST for the

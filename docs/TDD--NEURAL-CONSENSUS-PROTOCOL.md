@@ -1,3 +1,7 @@
+---
+status: current
+---
+
 # Software Requirements Document (SRD): Multi-Agent Neural Consensus
 
 ## 1. Introduction

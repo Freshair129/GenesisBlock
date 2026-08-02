@@ -1,3 +1,7 @@
+---
+status: current
+---
+
 # GenesisBlockDB — Canonical Version (SSOT)
 
 This file is the **single source of truth for version/status**. Per-document

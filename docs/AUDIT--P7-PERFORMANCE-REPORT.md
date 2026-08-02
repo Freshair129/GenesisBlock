@@ -1,4 +1,8 @@
-﻿# AUDIT--P7-GENESISDB-DETAILED-PERFORMANCE-CERTIFICATION
+---
+status: historical
+---
+
+# AUDIT--P7-GENESISDB-DETAILED-PERFORMANCE-CERTIFICATION
 
 ## 1. Executive Summary
 GenesisBlockDB has been subjected to a rigorous Phase 7 audit, optimizing for mechanical sympathy and hybrid search performance. This report details the empirical results of those optimizations.

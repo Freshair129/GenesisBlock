@@ -1,3 +1,7 @@
+---
+status: historical
+---
+
 # AUDIT: Dashboard E2E Verification (Mark XII)
 
 ## 📊 Executive Summary

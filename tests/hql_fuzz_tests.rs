@@ -398,7 +398,7 @@ fn fuzzy_prefix_variants() {
 #[test]
 fn search_with_all_optional_clauses() {
     parses_ok("SEARCH mynode SIMILAR TO [1.0,2.0] K 5 IN mycoll LANGUAGE \"en\" AS OF \"2024-01-01T00:00:00Z\"");
-    parses_ok("SEARCH user:5 K 5 IN mycoll LANGUAGE \"en\" AS OF \"2024-01-01T00:00:00Z\" EF 64 OVERSAMPLE 3");
+    parses_ok("SEARCH user:5 K 5 EF 64 OVERSAMPLE 3 IN mycoll LANGUAGE \"en\" AS OF \"2024-01-01T00:00:00Z\"");
 }
 
 #[test]
@@ -487,6 +487,7 @@ fn valid_traverse_p0_parses() {
     if let Ok(HqlCommand::Traverse {
         seed,
         rel,
+        rels,
         direction,
         ..
     }) = HqlCommand::try_from(VALID_TRAVERSE_P0)
@@ -494,8 +495,9 @@ fn valid_traverse_p0_parses() {
         assert_eq!(seed, "user:5");
         assert_eq!(direction, Some("both".to_string()));
         match rel {
-            genesis_block_native::query::ast::HqlRel::Physical(rels) => {
-                assert_eq!(rels, vec!["LINK".to_string(), "REF".to_string()]);
+            genesis_block_native::query::ast::HqlRel::Physical(first) => {
+                assert_eq!(first, "LINK");
+                assert_eq!(rels, Some(vec!["LINK".to_string(), "REF".to_string()]));
             }
             other => panic!("Expected physical rel, got {other:?}"),
         }
@@ -531,7 +533,7 @@ fn valid_hybrid_by_node_p0_parses() {
         assert_eq!(target, "user:5");
         assert_eq!(vector, None);
         assert!((alpha - 0.5).abs() < 1e-9);
-        assert_eq!(k, Some(7));
+        assert_eq!(k, 7);
         assert_eq!(ef_search, Some(64));
         assert_eq!(oversample, Some(3));
     } else {

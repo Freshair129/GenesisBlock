@@ -1,7 +1,7 @@
 ---
 proposed_id: METRICS-REVIEW--2026-06-22-WEEKLY
 type: metrics-review
-status: complete
+status: historical
 period: week ending 2026-06-22
 data_source: benchmark P15–P30 (session 2026-06-21)
 related:

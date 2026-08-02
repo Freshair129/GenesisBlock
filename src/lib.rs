@@ -19,7 +19,7 @@ use std::os::unix::fs::FileExt;
 #[cfg(windows)]
 use std::os::windows::fs::FileExt;
 use std::path::PathBuf;
-use std::sync::atomic::{AtomicBool, AtomicU32, AtomicUsize, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU32, AtomicU64, AtomicUsize, Ordering};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
@@ -32,6 +32,8 @@ use napi::bindgen_prelude::*;
 #[cfg(feature = "napi-bindings")]
 use napi_derive::napi;
 use roaring::RoaringBitmap;
+use rusqlite::types::{Value as SqlValue, ValueRef};
+use rusqlite::{params, params_from_iter, Connection, OpenFlags, OptionalExtension};
 
 // When the napi bindings are disabled (REST server / Linux integration-test
 // build) the storage core uses a minimal Error/Result that mirror the only napi
@@ -62,7 +64,7 @@ mod core_error {
 #[cfg(not(feature = "napi-bindings"))]
 use core_error::{Error, Result};
 use crossbeam_channel::{bounded, unbounded, Receiver, Sender};
-use parking_lot::RwLock;
+use parking_lot::{Mutex, RwLock};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use uuid::Uuid;
@@ -76,6 +78,8 @@ pub mod router;
 use query::HqlCommand;
 
 pub const SCHEMA_VERSION: u32 = 1;
+const PROJECTION_SCHEMA_VERSION: u32 = 2;
+const PROJECTION_DB_FILE: &str = "projection.sqlite";
 /// Stable engine identifier (independent of package version).
 pub const ENGINE_NAME: &str = "genesis-block";
 /// Engine package version (semver x.y.z[-prerelease]), baked in from Cargo.toml
@@ -95,7 +99,7 @@ pub struct OpenOptions {
 }
 
 #[cfg_attr(feature = "napi-bindings", napi(object))]
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct NodeInput {
     pub id: Option<String>,
     pub labels: Vec<String>,
@@ -138,7 +142,7 @@ pub struct NodeOutput {
 }
 
 #[cfg_attr(feature = "napi-bindings", napi(object))]
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct EdgeInput {
     pub id: Option<String>,
     pub from: String,
@@ -283,6 +287,88 @@ pub struct DatabaseStatus {
     pub page_cache_mb: u32,
 }
 
+pub const STUDIO_PROTOCOL_VERSION: &str = "1";
+pub const STUDIO_SCENE_NODE_CEILING: usize = 1000;
+pub const STUDIO_SCENE_EDGE_CEILING: usize = 3000;
+pub const STUDIO_SCENE_PAGE_LIMIT: usize = 500;
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct StudioCapabilities {
+    pub protocol_version: String,
+    pub engine_version: String,
+    pub mode: String,
+    pub read_features: Vec<String>,
+    pub write_features: Vec<String>,
+    pub auth_features: Vec<String>,
+    pub limits: StudioLimits,
+    pub consistency: String,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct StudioLimits {
+    pub initial_scene_nodes: usize,
+    pub scene_node_ceiling: usize,
+    pub scene_edge_ceiling: usize,
+    pub expansion_nodes: usize,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, Default)]
+pub struct StudioGraphSceneRequest {
+    pub seed: Option<String>,
+    pub limit: Option<usize>,
+    pub offset: Option<usize>,
+    pub direction: Option<String>,
+    pub as_of: Option<String>,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct StudioGraphNode {
+    pub id: String,
+    pub label: String,
+    pub labels: Vec<String>,
+    pub collection: Option<String>,
+    pub valid_from: String,
+    pub valid_to: Option<String>,
+    pub caused_by: Option<String>,
+    pub impact: Option<f64>,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct StudioGraphEdge {
+    pub id: String,
+    pub from: String,
+    pub to: String,
+    pub relation: String,
+    pub valid_from: String,
+    pub valid_to: Option<String>,
+    pub caused_by: Option<String>,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct StudioGraphScene {
+    pub scene_id: String,
+    pub frontier: u64,
+    pub nodes: Vec<StudioGraphNode>,
+    pub edges: Vec<StudioGraphEdge>,
+    pub groups: Vec<String>,
+    pub truncated: bool,
+    pub continuation: Option<String>,
+    pub warnings: Vec<String>,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct StudioEntityInspection {
+    pub entity_id: String,
+    pub frontier: u64,
+    pub node: StudioGraphNode,
+    pub properties: Value,
+    pub incident_edges: Vec<StudioGraphEdge>,
+    pub vector_collection: Option<String>,
+    pub vector_present: bool,
+    pub index_lag: u32,
+    pub availability: HashMap<String, String>,
+}
+
 #[cfg_attr(feature = "napi-bindings", napi(object))]
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct CollectionInfo {
@@ -371,7 +457,7 @@ pub enum SyncEvent {
 }
 
 #[cfg_attr(feature = "napi-bindings", napi(object))]
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct BatchInput {
     pub nodes: Vec<NodeInput>,
     pub edges: Vec<EdgeInput>,
@@ -382,6 +468,46 @@ pub struct BatchInput {
 pub struct BatchOutput {
     pub nodes: Vec<NodeOutput>,
     pub edges: Vec<EdgeOutput>,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct RelationalMutationGroup {
+    pub namespace: String,
+    pub mutations: Vec<RelationalRowMutation>,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct VectorUpsertInput {
+    pub node_id: String,
+    pub collection: String,
+    pub embedding: Vec<f64>,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct GenesisTransaction {
+    pub transaction_id: String,
+    pub expected_frontier: Option<u64>,
+    pub relational: Vec<RelationalMutationGroup>,
+    pub graph: BatchInput,
+    pub vectors: Vec<VectorUpsertInput>,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct GenesisTransactionEvent {
+    pub transaction_id: String,
+    pub commit_sequence: u64,
+    pub payload_hash: String,
+    pub relational: Vec<RelationalMutationGroup>,
+    pub nodes: Vec<NodeOutput>,
+    pub edges: Vec<EdgeOutput>,
+    pub vectors: Vec<VectorEvent>,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+pub struct CommitResult {
+    pub transaction_id: String,
+    pub commit_sequence: u64,
+    pub stable: bool,
 }
 
 // --- Internal Storage ---
@@ -395,6 +521,23 @@ pub enum Event {
     /// (a node may hold one vector per collection — e.g. code + text embeddings).
     /// Carries the f64 embedding for WAL replay, mirroring `Event::Node`.
     Vector(VectorEvent),
+    /// Versioned application relational schema, durably ordered by Genesis WAL.
+    RelationalSchema(RelationalSchemaPackage),
+    /// Typed application row mutations applied atomically to the SQLite projection.
+    RelationalRows {
+        namespace: String,
+        #[serde(default)]
+        schema_version: u32,
+        #[serde(default)]
+        mutation_id: String,
+        #[serde(default)]
+        payload_hash: String,
+        #[serde(default)]
+        affected_rows: u32,
+        mutations: Vec<RelationalRowMutation>,
+    },
+    /// One canonical cross-domain commit with a single durable sequence.
+    Transaction(GenesisTransactionEvent),
 }
 
 /// Payload of `Event::Vector`: a standalone vector attached to a node, routed to
@@ -412,6 +555,175 @@ pub struct VectorEvent {
     /// LWW, since vectors are append-applied).
     #[serde(default)]
     pub clock: LogicalClock,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
+pub enum RelationalColumnType {
+    Text,
+    Integer,
+    Real,
+    Boolean,
+    Json,
+    Blob,
+    Timestamp,
+    EntityId,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
+pub struct RelationalColumn {
+    pub name: String,
+    pub column_type: RelationalColumnType,
+    pub nullable: bool,
+    #[serde(default)]
+    pub default: Option<Value>,
+}
+
+impl RelationalColumn {
+    pub fn required(name: &str, column_type: RelationalColumnType) -> Self {
+        Self {
+            name: name.to_string(),
+            column_type,
+            nullable: false,
+            default: None,
+        }
+    }
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
+pub struct RelationalForeignKey {
+    pub columns: Vec<String>,
+    pub referenced_table: String,
+    pub referenced_columns: Vec<String>,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
+pub struct RelationalIndex {
+    pub name: String,
+    pub columns: Vec<String>,
+    pub unique: bool,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
+pub struct RelationalTable {
+    pub name: String,
+    pub columns: Vec<RelationalColumn>,
+    pub primary_key: Vec<String>,
+    pub foreign_keys: Vec<RelationalForeignKey>,
+    pub indexes: Vec<RelationalIndex>,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
+pub struct RelationalSchemaPackage {
+    pub namespace: String,
+    pub schema_version: u32,
+    #[serde(default)]
+    pub previous_version: Option<u32>,
+    #[serde(default)]
+    pub package_id: String,
+    #[serde(default)]
+    pub schema_hash: String,
+    pub tables: Vec<RelationalTable>,
+    #[serde(default)]
+    pub named_queries: Vec<NamedQueryDefinition>,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
+pub enum RelationalMutationKind {
+    Insert,
+    Upsert,
+    Update,
+    Delete,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
+pub struct RelationalRowMutation {
+    pub table: String,
+    pub kind: RelationalMutationKind,
+    pub values: Value,
+    pub key: Option<Value>,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
+pub struct RelationalMutationBatch {
+    pub mutation_id: String,
+    pub namespace: String,
+    pub schema_version: u32,
+    pub operations: Vec<RelationalRowMutation>,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+pub struct RelationalMutationResult {
+    pub mutation_id: String,
+    pub namespace: String,
+    pub schema_version: u32,
+    pub wal_committed: bool,
+    pub projection_applied: bool,
+    pub affected_rows: u32,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
+pub struct RelationalFilter {
+    pub column: String,
+    pub value: Value,
+}
+
+impl RelationalFilter {
+    pub fn equal(column: &str, value: Value) -> Self {
+        Self {
+            column: column.to_string(),
+            value,
+        }
+    }
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
+pub struct RelationalJoin {
+    pub table: String,
+    pub left_column: String,
+    pub right_column: String,
+    #[serde(default)]
+    pub kind: RelationalJoinKind,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, Default)]
+pub enum RelationalJoinKind {
+    #[default]
+    Inner,
+    Left,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
+pub struct RelationalQuery {
+    pub namespace: String,
+    pub table: String,
+    pub columns: Vec<String>,
+    pub joins: Vec<RelationalJoin>,
+    pub filters: Vec<RelationalFilter>,
+    pub limit: Option<u32>,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+pub struct RelationalQueryParameter {
+    pub name: String,
+    pub column_type: RelationalColumnType,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
+pub struct NamedQueryDefinition {
+    pub name: String,
+    pub parameters: Vec<RelationalQueryParameter>,
+    pub query: RelationalQuery,
+    pub default_limit: u32,
+    pub max_limit: u32,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
+pub struct NamedQueryRequest {
+    pub namespace: String,
+    pub schema_version: u32,
+    pub query_name: String,
+    pub parameters: Value,
+    pub limit: Option<u32>,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -446,6 +758,50 @@ struct NodeMetadataV0 {
     gks_attributes: Vec<u8>,
     lang: String,
     cluster_id: u32,
+}
+
+/// 4-byte magic prefixing the on-disk `meta_<name>.bin` blob written by the
+/// current code (ADR--GENESISDB-BINCODE-EXIT). Its presence/absence is the
+/// format discriminator: bincode 1.3 is unmaintained (RUSTSEC-2025-0141) and
+/// non-self-describing (there was never a marker for it), so `GBP1` is what
+/// makes the *new* postcard container sniffable going forward. Absent ⇒ a
+/// pre-existing bincode blob, whose V1-vs-V0 shape is still resolved by the
+/// manifest `mv` flag, never by trial deserialization (see `NodeMetadataV0`
+/// doc comment above).
+const META_MAGIC: &[u8; 4] = b"GBP1";
+
+/// Encode a metadata snapshot in the current on-disk format: `GBP1` magic +
+/// `postcard::to_allocvec(&Vec<NodeMetadata>)`. Every `save_state()` call
+/// writes this format, so a legacy (bincode) snapshot loaded via
+/// `decode_metadata_snapshot`'s fallback path is transparently rewritten as
+/// postcard the next time the DB saves — no separate migration step needed.
+fn encode_metadata_snapshot(meta: &[NodeMetadata]) -> Result<Vec<u8>> {
+    let mut out = Vec::with_capacity(4 + meta.len() * 32);
+    out.extend_from_slice(META_MAGIC);
+    let body = postcard::to_allocvec(meta).map_err(|e| Error::from_reason(e.to_string()))?;
+    out.extend_from_slice(&body);
+    Ok(out)
+}
+
+/// Sniff-first decode of a `meta_<name>.bin` / `meta.bin` blob:
+///   - `GBP1` magic present -> `Some(postcard::from_bytes(..))`. A magic hit
+///     whose body fails to decode is corruption (not "unrecognized format"),
+///     so the caller must treat `Some(Err(_))` as a loud failure rather than
+///     falling through to the legacy bincode arms — bincode is non-self-
+///     describing, so silently trying it against postcard bytes risks
+///     "successfully" misparsing garbage into a bogus-but-valid result.
+///   - no magic -> `None`, meaning "fall back to the existing legacy bincode
+///     try-chain" (unchanged: V1 vs V0 is still resolved by the manifest `mv`
+///     flag, never by trial deserialization).
+fn decode_metadata_snapshot(data: &[u8]) -> Option<std::result::Result<Vec<NodeMetadata>, String>> {
+    if data.len() >= META_MAGIC.len() && &data[..META_MAGIC.len()] == META_MAGIC {
+        Some(
+            postcard::from_bytes::<Vec<NodeMetadata>>(&data[META_MAGIC.len()..])
+                .map_err(|e| e.to_string()),
+        )
+    } else {
+        None
+    }
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -1553,6 +1909,10 @@ pub enum WalMsg {
 pub struct Storage {
     pub path: PathBuf,
     pub read_only: bool,
+    projection_path: PathBuf,
+    projection_db: Mutex<Connection>,
+    commit_lock: Mutex<()>,
+    commit_sequence: AtomicU64,
     pub nodes: DashMap<u32, NodeOutput>,
     pub edges: DashMap<u128, EdgeOutput>,
     pub out_idx: DashMap<u32, HashSet<u128>>,
@@ -1981,11 +2341,1970 @@ impl Storage {
         Some(val["schema_version"].as_u64().unwrap_or(0) as u32)
     }
 
+    fn open_projection(path: &std::path::Path, read_only: bool) -> Result<Connection> {
+        let flags = if read_only {
+            OpenFlags::SQLITE_OPEN_READ_ONLY
+        } else {
+            OpenFlags::SQLITE_OPEN_READ_WRITE | OpenFlags::SQLITE_OPEN_CREATE
+        };
+        Connection::open_with_flags(path, flags).map_err(|e| Error::from_reason(e.to_string()))
+    }
+
+    fn init_projection_schema(conn: &Connection) -> Result<()> {
+        conn.execute_batch(
+            "
+            PRAGMA foreign_keys = ON;
+            PRAGMA journal_mode = WAL;
+            PRAGMA synchronous = NORMAL;
+            CREATE TABLE IF NOT EXISTS props (
+                node_u32 INTEGER PRIMARY KEY,
+                payload TEXT NOT NULL,
+                clock_time INTEGER NOT NULL,
+                clock_peer TEXT NOT NULL DEFAULT '',
+                valid_from TEXT NOT NULL,
+                valid_to TEXT
+            );
+            CREATE TABLE IF NOT EXISTS node_labels (
+                node_u32 INTEGER NOT NULL,
+                label TEXT NOT NULL,
+                PRIMARY KEY (node_u32, label)
+            );
+            CREATE TABLE IF NOT EXISTS projection_state (
+                key TEXT PRIMARY KEY,
+                value TEXT NOT NULL
+            );
+            CREATE TABLE IF NOT EXISTS relational_schema_registry (
+                namespace TEXT PRIMARY KEY,
+                schema_version INTEGER NOT NULL,
+                package_id TEXT NOT NULL DEFAULT '',
+                schema_hash TEXT NOT NULL DEFAULT '',
+                package_json TEXT NOT NULL
+            );
+            CREATE TABLE IF NOT EXISTS applied_relational_mutations (
+                mutation_id TEXT PRIMARY KEY,
+                namespace TEXT NOT NULL,
+                schema_version INTEGER NOT NULL,
+                payload_hash TEXT NOT NULL,
+                affected_rows INTEGER NOT NULL
+            );
+            CREATE TABLE IF NOT EXISTS applied_transactions (
+                transaction_id TEXT PRIMARY KEY,
+                commit_sequence INTEGER NOT NULL UNIQUE,
+                payload_hash TEXT NOT NULL
+            );
+            ",
+        )
+        .map_err(|e| Error::from_reason(e.to_string()))?;
+        let has_clock_peer = conn
+            .prepare("PRAGMA table_info(props)")
+            .and_then(|mut stmt| {
+                let rows = stmt.query_map([], |row| row.get::<_, String>(1))?;
+                for name in rows {
+                    if name? == "clock_peer" {
+                        return Ok(true);
+                    }
+                }
+                Ok(false)
+            })
+            .map_err(|e| Error::from_reason(e.to_string()))?;
+        if !has_clock_peer {
+            conn.execute(
+                "ALTER TABLE props ADD COLUMN clock_peer TEXT NOT NULL DEFAULT ''",
+                [],
+            )
+            .map_err(|e| Error::from_reason(e.to_string()))?;
+        }
+        let registry_columns = conn
+            .prepare("PRAGMA table_info(relational_schema_registry)")
+            .and_then(|mut stmt| {
+                stmt.query_map([], |row| row.get::<_, String>(1))?
+                    .collect::<std::result::Result<HashSet<_>, _>>()
+            })
+            .map_err(|e| Error::from_reason(e.to_string()))?;
+        if !registry_columns.contains("package_id") {
+            conn.execute(
+                "ALTER TABLE relational_schema_registry ADD COLUMN package_id TEXT NOT NULL DEFAULT ''",
+                [],
+            )
+            .map_err(|e| Error::from_reason(e.to_string()))?;
+        }
+        if !registry_columns.contains("schema_hash") {
+            conn.execute(
+                "ALTER TABLE relational_schema_registry ADD COLUMN schema_hash TEXT NOT NULL DEFAULT ''",
+                [],
+            )
+            .map_err(|e| Error::from_reason(e.to_string()))?;
+        }
+        conn.execute(
+            "INSERT INTO projection_state(key, value) VALUES('schema_version', ?1)
+             ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+            [PROJECTION_SCHEMA_VERSION.to_string()],
+        )
+        .map_err(|e| Error::from_reason(e.to_string()))?;
+        conn.execute(
+            "INSERT INTO projection_state(key, value) VALUES('node_clock', '0')
+             ON CONFLICT(key) DO NOTHING",
+            [],
+        )
+        .map_err(|e| Error::from_reason(e.to_string()))?;
+        conn.execute(
+            "INSERT INTO projection_state(key, value) VALUES('stable_frontier', '0')
+             ON CONFLICT(key) DO NOTHING",
+            [],
+        )
+        .map_err(|e| Error::from_reason(e.to_string()))?;
+        Ok(())
+    }
+
+    fn validate_identifier(value: &str) -> Result<()> {
+        let mut chars = value.chars();
+        let valid_first = chars
+            .next()
+            .is_some_and(|ch| ch == '_' || ch.is_ascii_alphabetic());
+        if value.len() > 64
+            || !valid_first
+            || !chars.all(|ch| ch == '_' || ch.is_ascii_alphanumeric())
+        {
+            return Err(Error::from_reason(format!(
+                "invalid relational identifier: {value}"
+            )));
+        }
+        Ok(())
+    }
+
+    fn physical_table(namespace: &str, table: &str) -> Result<String> {
+        Self::validate_identifier(namespace)?;
+        Self::validate_identifier(table)?;
+        Ok(format!("app_{namespace}__{table}"))
+    }
+
+    fn validate_namespace(value: &str) -> Result<()> {
+        let mut chars = value.chars();
+        let valid_first = chars.next().is_some_and(|ch| ch.is_ascii_lowercase());
+        let reserved = ["genesis", "sqlite", "internal"];
+        if value.len() > 63
+            || !valid_first
+            || !chars.all(|ch| ch == '_' || ch.is_ascii_lowercase() || ch.is_ascii_digit())
+            || value.starts_with("_gb_")
+            || reserved.iter().any(|prefix| value.starts_with(prefix))
+        {
+            return Err(Error::from_reason(
+                "REL_NAMESPACE_INVALID: invalid or reserved relational namespace",
+            ));
+        }
+        Ok(())
+    }
+
+    fn relational_value_matches(column_type: &RelationalColumnType, value: &Value) -> bool {
+        match column_type {
+            RelationalColumnType::Text => value.is_string(),
+            RelationalColumnType::Integer => value.as_i64().is_some(),
+            RelationalColumnType::Real => value.as_f64().is_some_and(f64::is_finite),
+            RelationalColumnType::Boolean => value.is_boolean(),
+            RelationalColumnType::Json => true,
+            RelationalColumnType::Blob => value.as_array().is_some_and(|bytes| {
+                bytes
+                    .iter()
+                    .all(|byte| byte.as_u64().is_some_and(|value| value <= u8::MAX as u64))
+            }),
+            RelationalColumnType::Timestamp => value
+                .as_str()
+                .is_some_and(|value| chrono::DateTime::parse_from_rfc3339(value).is_ok()),
+            RelationalColumnType::EntityId => value
+                .as_str()
+                .is_some_and(|value| !value.is_empty() && value.len() <= 256),
+        }
+    }
+
+    fn schema_hash(package: &RelationalSchemaPackage) -> Result<String> {
+        let mut canonical = package.clone();
+        canonical.schema_hash.clear();
+        let bytes =
+            serde_json::to_vec(&canonical).map_err(|e| Error::from_reason(e.to_string()))?;
+        Ok(hex::encode(Sha256::digest(bytes)))
+    }
+
+    fn normalize_schema_package(
+        mut package: RelationalSchemaPackage,
+    ) -> Result<RelationalSchemaPackage> {
+        if Uuid::parse_str(&package.package_id).is_err() {
+            return Err(Error::from_reason(
+                "REL_SCHEMA_VALIDATION_FAILED: package_id must be a UUID",
+            ));
+        }
+        let calculated = Self::schema_hash(&package)?;
+        if !package.schema_hash.is_empty() && package.schema_hash != calculated {
+            return Err(Error::from_reason(
+                "REL_SCHEMA_VALIDATION_FAILED: schema_hash mismatch",
+            ));
+        }
+        package.schema_hash = calculated;
+        Ok(package)
+    }
+
+    fn validate_relational_schema(package: &RelationalSchemaPackage) -> Result<()> {
+        Self::validate_namespace(&package.namespace)?;
+        if package.schema_version == 0 || package.tables.is_empty() {
+            return Err(Error::from_reason(
+                "relational schema requires a positive version and at least one table",
+            ));
+        }
+        if package.tables.len() > 64 || package.named_queries.len() > 128 {
+            return Err(Error::from_reason(
+                "REL_SCHEMA_VALIDATION_FAILED: schema resource limit exceeded",
+            ));
+        }
+        let mut table_names = HashSet::new();
+        for table in &package.tables {
+            Self::validate_identifier(&table.name)?;
+            if !table_names.insert(table.name.as_str()) || table.columns.is_empty() {
+                return Err(Error::from_reason(format!(
+                    "duplicate or empty relational table: {}",
+                    table.name
+                )));
+            }
+            if table.columns.len() > 128
+                || table.primary_key.is_empty()
+                || table.primary_key.len() > 4
+                || table.indexes.len() > 64
+            {
+                return Err(Error::from_reason(
+                    "REL_SCHEMA_VALIDATION_FAILED: table resource limit exceeded",
+                ));
+            }
+            let mut column_names = HashSet::new();
+            for column in &table.columns {
+                Self::validate_identifier(&column.name)?;
+                if !column_names.insert(column.name.as_str()) {
+                    return Err(Error::from_reason(format!(
+                        "duplicate relational column: {}.{}",
+                        table.name, column.name
+                    )));
+                }
+                if let Some(default) = &column.default {
+                    if !Self::relational_value_matches(&column.column_type, default) {
+                        return Err(Error::from_reason(
+                            "REL_SCHEMA_VALIDATION_FAILED: column default type mismatch",
+                        ));
+                    }
+                }
+            }
+            if table.primary_key.is_empty()
+                || table
+                    .primary_key
+                    .iter()
+                    .any(|column| !column_names.contains(column.as_str()))
+            {
+                return Err(Error::from_reason(format!(
+                    "invalid primary key for relational table: {}",
+                    table.name
+                )));
+            }
+            for foreign_key in &table.foreign_keys {
+                if foreign_key.columns.is_empty()
+                    || foreign_key.columns.len() != foreign_key.referenced_columns.len()
+                    || foreign_key
+                        .columns
+                        .iter()
+                        .any(|column| !column_names.contains(column.as_str()))
+                {
+                    return Err(Error::from_reason(format!(
+                        "invalid foreign key for relational table: {}",
+                        table.name
+                    )));
+                }
+                Self::validate_identifier(&foreign_key.referenced_table)?;
+                for column in &foreign_key.referenced_columns {
+                    Self::validate_identifier(column)?;
+                }
+            }
+            for index in &table.indexes {
+                Self::validate_identifier(&index.name)?;
+                if index.columns.is_empty()
+                    || index
+                        .columns
+                        .iter()
+                        .any(|column| !column_names.contains(column.as_str()))
+                {
+                    return Err(Error::from_reason(format!(
+                        "invalid index for relational table: {}",
+                        table.name
+                    )));
+                }
+            }
+        }
+        let mut query_names = HashSet::new();
+        for named in &package.named_queries {
+            Self::validate_identifier(&named.name)?;
+            if !query_names.insert(named.name.as_str())
+                || named.default_limit == 0
+                || named.default_limit > named.max_limit
+                || named.max_limit > 1000
+                || named.parameters.len() > 128
+                || named.query.namespace != package.namespace
+            {
+                return Err(Error::from_reason(
+                    "REL_SCHEMA_VALIDATION_FAILED: invalid named query",
+                ));
+            }
+            let mut parameter_names = HashSet::new();
+            for parameter in &named.parameters {
+                Self::validate_identifier(&parameter.name)?;
+                if !parameter_names.insert(parameter.name.as_str()) {
+                    return Err(Error::from_reason(
+                        "REL_SCHEMA_VALIDATION_FAILED: duplicate query parameter",
+                    ));
+                }
+            }
+            for filter in &named.query.filters {
+                if let Some(parameter) = filter
+                    .value
+                    .as_object()
+                    .and_then(|marker| marker.get("$param"))
+                    .and_then(Value::as_str)
+                {
+                    if !parameter_names.contains(parameter) {
+                        return Err(Error::from_reason(
+                            "REL_SCHEMA_VALIDATION_FAILED: unknown named-query parameter",
+                        ));
+                    }
+                }
+            }
+            if named.query.columns.is_empty()
+                || named.query.joins.len() > 8
+                || named.query.filters.len() > 128
+                || !package
+                    .tables
+                    .iter()
+                    .any(|table| table.name == named.query.table)
+            {
+                return Err(Error::from_reason(
+                    "REL_SCHEMA_VALIDATION_FAILED: invalid named-query shape",
+                ));
+            }
+            let mut available = HashSet::from([named.query.table.clone()]);
+            for join in &named.query.joins {
+                if !package.tables.iter().any(|table| table.name == join.table)
+                    || !available.insert(join.table.clone())
+                {
+                    return Err(Error::from_reason(
+                        "REL_SCHEMA_VALIDATION_FAILED: invalid named-query join",
+                    ));
+                }
+            }
+            for column in named
+                .query
+                .columns
+                .iter()
+                .chain(named.query.filters.iter().map(|filter| &filter.column))
+                .chain(
+                    named
+                        .query
+                        .joins
+                        .iter()
+                        .flat_map(|join| [&join.left_column, &join.right_column]),
+                )
+            {
+                Self::resolve_query_column(package, &available, column)?;
+            }
+            for filter in &named.query.filters {
+                let (_, column_name) =
+                    Self::resolve_query_column(package, &available, &filter.column)?;
+                let table_name = filter
+                    .column
+                    .split_once('.')
+                    .expect("validated qualified column")
+                    .0;
+                let column = package
+                    .tables
+                    .iter()
+                    .find(|table| table.name == table_name)
+                    .and_then(|table| {
+                        table
+                            .columns
+                            .iter()
+                            .find(|column| column.name == column_name)
+                    })
+                    .expect("validated named-query column");
+                if let Some(parameter) = filter
+                    .value
+                    .as_object()
+                    .and_then(|marker| marker.get("$param"))
+                    .and_then(Value::as_str)
+                {
+                    let definition = named
+                        .parameters
+                        .iter()
+                        .find(|definition| definition.name == parameter)
+                        .expect("validated named-query parameter");
+                    if definition.column_type != column.column_type {
+                        return Err(Error::from_reason(
+                            "REL_SCHEMA_VALIDATION_FAILED: query parameter type does not match filter column",
+                        ));
+                    }
+                } else {
+                    Self::json_to_sql_typed(column, &filter.value)?;
+                }
+            }
+        }
+        for table in &package.tables {
+            for foreign_key in &table.foreign_keys {
+                let referenced = package
+                    .tables
+                    .iter()
+                    .find(|candidate| candidate.name == foreign_key.referenced_table)
+                    .ok_or_else(|| Error::from_reason("foreign key references unknown table"))?;
+                if foreign_key.referenced_columns.iter().any(|column| {
+                    !referenced
+                        .columns
+                        .iter()
+                        .any(|candidate| candidate.name == *column)
+                }) {
+                    return Err(Error::from_reason("foreign key references unknown column"));
+                }
+            }
+        }
+        Ok(())
+    }
+
+    fn load_relational_schema_conn(
+        conn: &Connection,
+        namespace: &str,
+    ) -> Result<Option<RelationalSchemaPackage>> {
+        let package_json: Option<String> = conn
+            .query_row(
+                "SELECT package_json FROM relational_schema_registry WHERE namespace = ?1",
+                [namespace],
+                |row| row.get(0),
+            )
+            .optional()
+            .map_err(|e| Error::from_reason(e.to_string()))?;
+        package_json
+            .map(|json| serde_json::from_str(&json).map_err(|e| Error::from_reason(e.to_string())))
+            .transpose()
+    }
+
+    fn validate_schema_upgrade(
+        previous: &RelationalSchemaPackage,
+        next: &RelationalSchemaPackage,
+    ) -> Result<()> {
+        if next.schema_version != previous.schema_version + 1
+            || next.previous_version != Some(previous.schema_version)
+        {
+            return Err(Error::from_reason(
+                "REL_SCHEMA_VERSION_CONFLICT: schema version must advance exactly once",
+            ));
+        }
+        for old_table in &previous.tables {
+            let new_table = next
+                .tables
+                .iter()
+                .find(|table| table.name == old_table.name)
+                .ok_or_else(|| Error::from_reason("relational schema cannot remove a table"))?;
+            if new_table.primary_key != old_table.primary_key {
+                return Err(Error::from_reason(
+                    "relational schema cannot change a primary key",
+                ));
+            }
+            for old_column in &old_table.columns {
+                let new_column = new_table
+                    .columns
+                    .iter()
+                    .find(|column| column.name == old_column.name)
+                    .ok_or_else(|| {
+                        Error::from_reason("relational schema cannot remove a column")
+                    })?;
+                if new_column.column_type != old_column.column_type
+                    || new_column.nullable != old_column.nullable
+                    || new_column.default != old_column.default
+                {
+                    return Err(Error::from_reason(
+                        "relational schema cannot change a column incompatibly",
+                    ));
+                }
+            }
+            if new_table.foreign_keys != old_table.foreign_keys {
+                return Err(Error::from_reason(
+                    "relational schema cannot change foreign keys on an existing table",
+                ));
+            }
+            if old_table.indexes.iter().any(|old_index| {
+                !new_table
+                    .indexes
+                    .iter()
+                    .any(|new_index| new_index == old_index)
+            }) {
+                return Err(Error::from_reason(
+                    "relational schema cannot remove or redefine an existing index",
+                ));
+            }
+            if new_table.columns.iter().any(|column| {
+                !old_table.columns.iter().any(|old| old.name == column.name)
+                    && !column.nullable
+                    && column.default.is_none()
+            }) {
+                return Err(Error::from_reason(
+                    "new relational columns must be nullable or have a literal default",
+                ));
+            }
+        }
+        Ok(())
+    }
+
+    fn sqlite_type(column_type: &RelationalColumnType) -> &'static str {
+        match column_type {
+            RelationalColumnType::Text
+            | RelationalColumnType::Json
+            | RelationalColumnType::Timestamp
+            | RelationalColumnType::EntityId => "TEXT",
+            RelationalColumnType::Integer | RelationalColumnType::Boolean => "INTEGER",
+            RelationalColumnType::Real => "REAL",
+            RelationalColumnType::Blob => "BLOB",
+        }
+    }
+
+    fn sqlite_literal(column: &RelationalColumn, value: &Value) -> Result<String> {
+        match Self::json_to_sql_typed(column, value)? {
+            SqlValue::Null => Ok("NULL".to_string()),
+            SqlValue::Integer(value) => Ok(value.to_string()),
+            SqlValue::Real(value) => Ok(value.to_string()),
+            SqlValue::Text(value) => Ok(format!("'{}'", value.replace('\'', "''"))),
+            SqlValue::Blob(value) => Ok(format!("X'{}'", hex::encode(value))),
+        }
+    }
+
+    fn projection_apply_schema_conn(
+        conn: &Connection,
+        package: &RelationalSchemaPackage,
+    ) -> Result<()> {
+        Self::validate_relational_schema(package)?;
+        let previous = Self::load_relational_schema_conn(conn, &package.namespace)?;
+        if let Some(previous) = &previous {
+            if previous == package {
+                return Ok(());
+            }
+            Self::validate_schema_upgrade(previous, package)?;
+        } else if package.schema_version != 1 || package.previous_version.is_some() {
+            return Err(Error::from_reason(
+                "REL_SCHEMA_VERSION_CONFLICT: initial schema must be version 1",
+            ));
+        }
+        for table in &package.tables {
+            let physical = Self::physical_table(&package.namespace, &table.name)?;
+            let definitions = table
+                .columns
+                .iter()
+                .map(|column| {
+                    let default = column
+                        .default
+                        .as_ref()
+                        .map(|value| Self::sqlite_literal(column, value))
+                        .transpose()?
+                        .map(|value| format!(" DEFAULT {value}"))
+                        .unwrap_or_default();
+                    Ok(format!(
+                        "\"{}\" {}{}{}",
+                        column.name,
+                        Self::sqlite_type(&column.column_type),
+                        if column.nullable { "" } else { " NOT NULL" },
+                        default
+                    ))
+                })
+                .collect::<Result<Vec<_>>>()?
+                .into_iter()
+                .chain(std::iter::once(format!(
+                    "PRIMARY KEY ({})",
+                    table
+                        .primary_key
+                        .iter()
+                        .map(|column| format!("\"{column}\""))
+                        .collect::<Vec<_>>()
+                        .join(", ")
+                )))
+                .chain(table.foreign_keys.iter().map(|foreign_key| {
+                    let referenced =
+                        Self::physical_table(&package.namespace, &foreign_key.referenced_table)
+                            .expect("validated relational schema");
+                    format!(
+                        "FOREIGN KEY ({}) REFERENCES \"{}\" ({})",
+                        foreign_key
+                            .columns
+                            .iter()
+                            .map(|column| format!("\"{column}\""))
+                            .collect::<Vec<_>>()
+                            .join(", "),
+                        referenced,
+                        foreign_key
+                            .referenced_columns
+                            .iter()
+                            .map(|column| format!("\"{column}\""))
+                            .collect::<Vec<_>>()
+                            .join(", ")
+                    )
+                }))
+                .collect::<Vec<_>>();
+            conn.execute_batch(&format!(
+                "CREATE TABLE IF NOT EXISTS \"{physical}\" ({})",
+                definitions.join(", ")
+            ))
+            .map_err(|e| Error::from_reason(e.to_string()))?;
+
+            if let Some(old_table) = previous
+                .as_ref()
+                .and_then(|old| old.tables.iter().find(|old| old.name == table.name))
+            {
+                for column in table
+                    .columns
+                    .iter()
+                    .filter(|column| !old_table.columns.iter().any(|old| old.name == column.name))
+                {
+                    conn.execute_batch(&format!(
+                        "ALTER TABLE \"{physical}\" ADD COLUMN \"{}\" {}{}{}",
+                        column.name,
+                        Self::sqlite_type(&column.column_type),
+                        if column.nullable { "" } else { " NOT NULL" },
+                        column
+                            .default
+                            .as_ref()
+                            .map(|value| Self::sqlite_literal(column, value))
+                            .transpose()?
+                            .map(|value| format!(" DEFAULT {value}"))
+                            .unwrap_or_default()
+                    ))
+                    .map_err(|e| Error::from_reason(e.to_string()))?;
+                }
+            }
+            for index in &table.indexes {
+                let index_name =
+                    format!("idx_{}__{}__{}", package.namespace, table.name, index.name);
+                conn.execute_batch(&format!(
+                    "CREATE {} INDEX IF NOT EXISTS \"{}\" ON \"{}\" ({})",
+                    if index.unique { "UNIQUE" } else { "" },
+                    index_name,
+                    physical,
+                    index
+                        .columns
+                        .iter()
+                        .map(|column| format!("\"{column}\""))
+                        .collect::<Vec<_>>()
+                        .join(", ")
+                ))
+                .map_err(|e| Error::from_reason(e.to_string()))?;
+            }
+        }
+        let package_json =
+            serde_json::to_string(package).map_err(|e| Error::from_reason(e.to_string()))?;
+        conn.execute(
+            "INSERT INTO relational_schema_registry(namespace, schema_version, package_id, schema_hash, package_json)
+             VALUES(?1, ?2, ?3, ?4, ?5)
+             ON CONFLICT(namespace) DO UPDATE SET
+                schema_version = excluded.schema_version,
+                package_id = excluded.package_id,
+                schema_hash = excluded.schema_hash,
+                package_json = excluded.package_json",
+            params![
+                package.namespace,
+                package.schema_version,
+                package.package_id,
+                package.schema_hash,
+                package_json
+            ],
+        )
+        .map_err(|e| Error::from_reason(e.to_string()))?;
+        Ok(())
+    }
+
+    fn json_to_sql(value: &Value) -> Result<SqlValue> {
+        match value {
+            Value::Null => Ok(SqlValue::Null),
+            Value::Bool(value) => Ok(SqlValue::Integer(i64::from(*value))),
+            Value::Number(value) => value
+                .as_i64()
+                .map(SqlValue::Integer)
+                .or_else(|| value.as_f64().map(SqlValue::Real))
+                .ok_or_else(|| Error::from_reason("unsupported relational number")),
+            Value::String(value) => Ok(SqlValue::Text(value.clone())),
+            Value::Array(_) | Value::Object(_) => serde_json::to_string(value)
+                .map(SqlValue::Text)
+                .map_err(|e| Error::from_reason(e.to_string())),
+        }
+    }
+
+    fn json_to_sql_typed(column: &RelationalColumn, value: &Value) -> Result<SqlValue> {
+        if value.is_null() {
+            return if column.nullable {
+                Ok(SqlValue::Null)
+            } else {
+                Err(Error::from_reason(
+                    "REL_TYPE_MISMATCH: null supplied for required column",
+                ))
+            };
+        }
+        if !Self::relational_value_matches(&column.column_type, value) {
+            return Err(Error::from_reason(
+                "REL_TYPE_MISMATCH: relational value does not match column type",
+            ));
+        }
+        match column.column_type {
+            RelationalColumnType::Blob => Ok(SqlValue::Blob(
+                value
+                    .as_array()
+                    .expect("validated blob")
+                    .iter()
+                    .map(|byte| byte.as_u64().expect("validated byte") as u8)
+                    .collect(),
+            )),
+            RelationalColumnType::Json => serde_json::to_string(value)
+                .map(SqlValue::Text)
+                .map_err(|e| Error::from_reason(e.to_string())),
+            _ => Self::json_to_sql(value),
+        }
+    }
+
+    fn validate_row_mutation(
+        schema: &RelationalSchemaPackage,
+        mutation: &RelationalRowMutation,
+    ) -> Result<()> {
+        let table = schema
+            .tables
+            .iter()
+            .find(|table| table.name == mutation.table)
+            .ok_or_else(|| Error::from_reason("relational mutation references unknown table"))?;
+        let object = match mutation.kind {
+            RelationalMutationKind::Insert
+            | RelationalMutationKind::Upsert
+            | RelationalMutationKind::Update => mutation.values.as_object(),
+            RelationalMutationKind::Delete => mutation.key.as_ref().and_then(Value::as_object),
+        }
+        .ok_or_else(|| Error::from_reason("relational mutation requires an object payload"))?;
+        if object
+            .keys()
+            .any(|key| !table.columns.iter().any(|column| column.name == *key))
+        {
+            return Err(Error::from_reason(
+                "relational mutation contains unknown column",
+            ));
+        }
+        match mutation.kind {
+            RelationalMutationKind::Insert | RelationalMutationKind::Upsert => {
+                if table.columns.iter().any(|column| {
+                    !column.nullable
+                        && column.default.is_none()
+                        && !object.contains_key(&column.name)
+                }) {
+                    return Err(Error::from_reason(
+                        "relational upsert omits a required column",
+                    ));
+                }
+            }
+            RelationalMutationKind::Update => {
+                let key = mutation
+                    .key
+                    .as_ref()
+                    .and_then(Value::as_object)
+                    .ok_or_else(|| {
+                        Error::from_reason("relational update requires a primary-key object")
+                    })?;
+                if object.is_empty()
+                    || table
+                        .primary_key
+                        .iter()
+                        .any(|column| !key.contains_key(column))
+                    || object
+                        .keys()
+                        .any(|column| table.primary_key.contains(column))
+                {
+                    return Err(Error::from_reason(
+                        "relational update requires a complete key and cannot change it",
+                    ));
+                }
+            }
+            RelationalMutationKind::Delete => {
+                if table
+                    .primary_key
+                    .iter()
+                    .any(|column| !object.contains_key(column))
+                {
+                    return Err(Error::from_reason(
+                        "relational delete requires every primary-key column",
+                    ));
+                }
+            }
+        }
+        for (name, value) in object {
+            let column = table
+                .columns
+                .iter()
+                .find(|column| column.name == *name)
+                .expect("validated column");
+            Self::json_to_sql_typed(column, value)?;
+        }
+        if let Some(key) = mutation.key.as_ref().and_then(Value::as_object) {
+            for name in &table.primary_key {
+                if let Some(value) = key.get(name) {
+                    let column = table
+                        .columns
+                        .iter()
+                        .find(|column| column.name == *name)
+                        .expect("validated primary key");
+                    Self::json_to_sql_typed(column, value)?;
+                }
+            }
+        }
+        Ok(())
+    }
+
+    fn projection_apply_rows_tx(
+        tx: &rusqlite::Transaction<'_>,
+        schema: &RelationalSchemaPackage,
+        mutations: &[RelationalRowMutation],
+    ) -> Result<u32> {
+        let mut affected = 0u32;
+        for mutation in mutations {
+            Self::validate_row_mutation(schema, mutation)?;
+            let table = schema
+                .tables
+                .iter()
+                .find(|table| table.name == mutation.table)
+                .expect("validated relational mutation");
+            let physical = Self::physical_table(&schema.namespace, &table.name)?;
+            match mutation.kind {
+                RelationalMutationKind::Insert | RelationalMutationKind::Upsert => {
+                    let object = mutation.values.as_object().expect("validated object");
+                    let columns: Vec<&String> = table
+                        .columns
+                        .iter()
+                        .filter_map(|column| {
+                            object.contains_key(&column.name).then_some(&column.name)
+                        })
+                        .collect();
+                    let values = columns
+                        .iter()
+                        .map(|column| {
+                            let definition = table
+                                .columns
+                                .iter()
+                                .find(|definition| definition.name == column.as_str())
+                                .expect("validated column");
+                            Self::json_to_sql_typed(definition, &object[*column])
+                        })
+                        .collect::<Result<Vec<_>>>()?;
+                    let updates: Vec<String> = columns
+                        .iter()
+                        .filter(|column| !table.primary_key.contains(column))
+                        .map(|column| format!("\"{column}\" = excluded.\"{column}\""))
+                        .collect();
+                    let conflict = if matches!(mutation.kind, RelationalMutationKind::Insert) {
+                        String::new()
+                    } else if updates.is_empty() {
+                        " ON CONFLICT DO NOTHING".to_string()
+                    } else {
+                        format!(
+                            " ON CONFLICT ({}) DO UPDATE SET {}",
+                            table
+                                .primary_key
+                                .iter()
+                                .map(|column| format!("\"{column}\""))
+                                .collect::<Vec<_>>()
+                                .join(", "),
+                            updates.join(", ")
+                        )
+                    };
+                    let sql = format!(
+                        "INSERT INTO \"{physical}\" ({}) VALUES ({}){conflict}",
+                        columns
+                            .iter()
+                            .map(|column| format!("\"{column}\""))
+                            .collect::<Vec<_>>()
+                            .join(", "),
+                        vec!["?"; columns.len()].join(", ")
+                    );
+                    affected = affected.saturating_add(
+                        tx.execute(&sql, params_from_iter(values))
+                            .map_err(|e| Error::from_reason(e.to_string()))?
+                            as u32,
+                    );
+                }
+                RelationalMutationKind::Update => {
+                    let object = mutation.values.as_object().expect("validated object");
+                    let key = mutation
+                        .key
+                        .as_ref()
+                        .and_then(Value::as_object)
+                        .expect("validated key");
+                    let set_columns = object.keys().collect::<Vec<_>>();
+                    let mut values = set_columns
+                        .iter()
+                        .map(|name| {
+                            let column = table
+                                .columns
+                                .iter()
+                                .find(|column| column.name == name.as_str())
+                                .expect("validated column");
+                            Self::json_to_sql_typed(column, &object[name.as_str()])
+                        })
+                        .collect::<Result<Vec<_>>>()?;
+                    values.extend(
+                        table
+                            .primary_key
+                            .iter()
+                            .map(|name| {
+                                let column = table
+                                    .columns
+                                    .iter()
+                                    .find(|column| column.name == *name)
+                                    .expect("validated key column");
+                                Self::json_to_sql_typed(column, &key[name])
+                            })
+                            .collect::<Result<Vec<_>>>()?,
+                    );
+                    let sql = format!(
+                        "UPDATE \"{physical}\" SET {} WHERE {}",
+                        set_columns
+                            .iter()
+                            .map(|column| format!("\"{column}\" = ?"))
+                            .collect::<Vec<_>>()
+                            .join(", "),
+                        table
+                            .primary_key
+                            .iter()
+                            .map(|column| format!("\"{column}\" = ?"))
+                            .collect::<Vec<_>>()
+                            .join(" AND ")
+                    );
+                    affected = affected.saturating_add(
+                        tx.execute(&sql, params_from_iter(values))
+                            .map_err(|e| Error::from_reason(e.to_string()))?
+                            as u32,
+                    );
+                }
+                RelationalMutationKind::Delete => {
+                    let object = mutation
+                        .key
+                        .as_ref()
+                        .and_then(Value::as_object)
+                        .expect("validated object");
+                    let values = table
+                        .primary_key
+                        .iter()
+                        .map(|name| {
+                            let column = table
+                                .columns
+                                .iter()
+                                .find(|column| column.name == *name)
+                                .expect("validated key column");
+                            Self::json_to_sql_typed(column, &object[name])
+                        })
+                        .collect::<Result<Vec<_>>>()?;
+                    let sql = format!(
+                        "DELETE FROM \"{physical}\" WHERE {}",
+                        table
+                            .primary_key
+                            .iter()
+                            .map(|column| format!("\"{column}\" = ?"))
+                            .collect::<Vec<_>>()
+                            .join(" AND ")
+                    );
+                    affected = affected.saturating_add(
+                        tx.execute(&sql, params_from_iter(values))
+                            .map_err(|e| Error::from_reason(e.to_string()))?
+                            as u32,
+                    );
+                }
+            }
+        }
+        Ok(affected)
+    }
+
+    fn projection_state_set<C>(conn: &C, key: &str, value: &str) -> Result<()>
+    where
+        C: std::ops::Deref<Target = Connection>,
+    {
+        conn.execute(
+            "INSERT INTO projection_state(key, value) VALUES(?1, ?2)
+             ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+            params![key, value],
+        )
+        .map_err(|e| Error::from_reason(e.to_string()))?;
+        Ok(())
+    }
+
+    fn projection_apply_node_conn(
+        conn: &mut Connection,
+        node_u32: u32,
+        node: &NodeOutput,
+    ) -> Result<()> {
+        let tx = conn
+            .transaction()
+            .map_err(|e| Error::from_reason(e.to_string()))?;
+        Self::projection_apply_node_tx(&tx, node_u32, node)?;
+        Self::projection_state_set(&tx, "node_clock", &node.clock.time.to_string())?;
+        tx.commit().map_err(|e| Error::from_reason(e.to_string()))?;
+        Ok(())
+    }
+
+    fn projection_apply_node_tx(
+        tx: &rusqlite::Transaction<'_>,
+        node_u32: u32,
+        node: &NodeOutput,
+    ) -> Result<()> {
+        let current_clock: Option<(u32, String)> = tx
+            .query_row(
+                "SELECT clock_time, clock_peer FROM props WHERE node_u32 = ?1",
+                [node_u32],
+                |row| Ok((row.get(0)?, row.get(1)?)),
+            )
+            .optional()
+            .map_err(|e| Error::from_reason(e.to_string()))?;
+        if current_clock.is_some_and(|seen| seen > (node.clock.time, node.clock.peer_id.clone())) {
+            return Ok(());
+        }
+
+        let payload =
+            serde_json::to_string(&node.props).map_err(|e| Error::from_reason(e.to_string()))?;
+        tx.execute(
+            "INSERT INTO props(node_u32, payload, clock_time, clock_peer, valid_from, valid_to)
+             VALUES(?1, ?2, ?3, ?4, ?5, ?6)
+             ON CONFLICT(node_u32) DO UPDATE SET
+                 payload = excluded.payload,
+                 clock_time = excluded.clock_time,
+                 clock_peer = excluded.clock_peer,
+                 valid_from = excluded.valid_from,
+                 valid_to = excluded.valid_to
+             WHERE excluded.clock_time > props.clock_time
+                OR (excluded.clock_time = props.clock_time
+                    AND excluded.clock_peer >= props.clock_peer)",
+            params![
+                node_u32,
+                payload,
+                node.clock.time,
+                node.clock.peer_id,
+                node.valid_from,
+                node.valid_to
+            ],
+        )
+        .map_err(|e| Error::from_reason(e.to_string()))?;
+        tx.execute("DELETE FROM node_labels WHERE node_u32 = ?1", [node_u32])
+            .map_err(|e| Error::from_reason(e.to_string()))?;
+        for label in &node.labels {
+            tx.execute(
+                "INSERT OR REPLACE INTO node_labels(node_u32, label) VALUES(?1, ?2)",
+                params![node_u32, label],
+            )
+            .map_err(|e| Error::from_reason(e.to_string()))?;
+        }
+        Ok(())
+    }
+
+    fn projection_apply_event(&self, event: &Event) -> Result<()> {
+        if self.read_only {
+            return Ok(());
+        }
+        let mut conn = self.projection_db.lock();
+        match event {
+            Event::Node(node) => {
+                let node_u32 = self.get_or_intern_id(&node.id);
+                Self::projection_apply_node_conn(&mut conn, node_u32, node)?;
+            }
+            Event::RelationalSchema(package) => {
+                let tx = conn
+                    .transaction()
+                    .map_err(|e| Error::from_reason(e.to_string()))?;
+                Self::projection_apply_schema_conn(&tx, package)?;
+                tx.commit().map_err(|e| Error::from_reason(e.to_string()))?;
+            }
+            Event::RelationalRows {
+                namespace,
+                schema_version,
+                mutation_id,
+                payload_hash,
+                affected_rows,
+                mutations,
+            } => {
+                let schema = Self::load_relational_schema_conn(&conn, namespace)?
+                    .ok_or_else(|| Error::from_reason("relational schema is not registered"))?;
+                if *schema_version != 0 && *schema_version != schema.schema_version {
+                    return Err(Error::from_reason(
+                        "REL_SCHEMA_VERSION_CONFLICT: mutation schema version is not current",
+                    ));
+                }
+                if !mutation_id.is_empty() {
+                    let existing: Option<String> = conn
+                        .query_row(
+                            "SELECT payload_hash FROM applied_relational_mutations WHERE mutation_id = ?1",
+                            [mutation_id],
+                            |row| row.get(0),
+                        )
+                        .optional()
+                        .map_err(|e| Error::from_reason(e.to_string()))?;
+                    if let Some(existing) = existing {
+                        return if existing == *payload_hash {
+                            Ok(())
+                        } else {
+                            Err(Error::from_reason(
+                                "REL_MUTATION_CONFLICT: mutation identity reused with different payload",
+                            ))
+                        };
+                    }
+                }
+                let tx = conn
+                    .transaction()
+                    .map_err(|e| Error::from_reason(e.to_string()))?;
+                let applied = Self::projection_apply_rows_tx(&tx, &schema, mutations)?;
+                let recorded_affected = if mutations.is_empty() {
+                    *affected_rows
+                } else {
+                    applied
+                };
+                if !mutation_id.is_empty() {
+                    tx.execute(
+                        "INSERT INTO applied_relational_mutations(mutation_id, namespace, schema_version, payload_hash, affected_rows) VALUES(?1, ?2, ?3, ?4, ?5)",
+                        params![mutation_id, namespace, schema.schema_version, payload_hash, recorded_affected],
+                    )
+                    .map_err(|e| Error::from_reason(e.to_string()))?;
+                }
+                tx.commit().map_err(|e| Error::from_reason(e.to_string()))?;
+            }
+            Event::Transaction(transaction) => {
+                let existing: Option<(u64, String)> = conn
+                    .query_row(
+                        "SELECT commit_sequence, payload_hash FROM applied_transactions WHERE transaction_id = ?1",
+                        [&transaction.transaction_id],
+                        |row| Ok((row.get(0)?, row.get(1)?)),
+                    )
+                    .optional()
+                    .map_err(|e| Error::from_reason(e.to_string()))?;
+                if let Some((sequence, hash)) = existing {
+                    if sequence == transaction.commit_sequence && hash == transaction.payload_hash {
+                        return Ok(());
+                    }
+                    return Err(Error::from_reason("transaction identity conflict"));
+                }
+                let tx = conn
+                    .transaction()
+                    .map_err(|e| Error::from_reason(e.to_string()))?;
+                for node in &transaction.nodes {
+                    let node_u32 = self.get_or_intern_id(&node.id);
+                    Self::projection_apply_node_tx(&tx, node_u32, node)?;
+                }
+                for group in &transaction.relational {
+                    let schema = Self::load_relational_schema_conn(&tx, &group.namespace)?
+                        .ok_or_else(|| Error::from_reason("relational schema is not registered"))?;
+                    let _ = Self::projection_apply_rows_tx(&tx, &schema, &group.mutations)?;
+                }
+                tx.execute(
+                    "INSERT INTO applied_transactions(transaction_id, commit_sequence, payload_hash) VALUES(?1, ?2, ?3)",
+                    params![transaction.transaction_id, transaction.commit_sequence, transaction.payload_hash],
+                )
+                .map_err(|e| Error::from_reason(e.to_string()))?;
+                Self::projection_state_set(
+                    &tx,
+                    "stable_frontier",
+                    &transaction.commit_sequence.to_string(),
+                )?;
+                tx.commit().map_err(|e| Error::from_reason(e.to_string()))?;
+            }
+            Event::Batch(events) => {
+                let tx = conn
+                    .transaction()
+                    .map_err(|e| Error::from_reason(e.to_string()))?;
+                let mut max_clock = 0;
+                for inner in events {
+                    if let Event::Node(node) = inner {
+                        let node_u32 = self.get_or_intern_id(&node.id);
+                        if node.clock.time > max_clock {
+                            max_clock = node.clock.time;
+                        }
+                        Self::projection_apply_node_tx(&tx, node_u32, node)?;
+                    }
+                }
+                if max_clock > 0 {
+                    Self::projection_state_set(&tx, "node_clock", &max_clock.to_string())?;
+                }
+                tx.commit().map_err(|e| Error::from_reason(e.to_string()))?;
+            }
+            _ => {}
+        }
+        Ok(())
+    }
+
+    fn projection_snapshot(&self, target: &std::path::Path) -> Result<()> {
+        if self.read_only {
+            return Ok(());
+        }
+        if target.exists() {
+            let _ = fs::remove_file(target);
+        }
+        let escaped = target.to_string_lossy().replace('\'', "''");
+        let conn = self.projection_db.lock();
+        conn.execute_batch("PRAGMA wal_checkpoint(FULL);")
+            .map_err(|e| Error::from_reason(e.to_string()))?;
+        conn.execute_batch(&format!("VACUUM INTO '{}';", escaped))
+            .map_err(|e| Error::from_reason(e.to_string()))?;
+        Ok(())
+    }
+
+    fn projection_reopen_fresh(&self) -> Result<()> {
+        if self.read_only {
+            return Ok(());
+        }
+        if self.projection_path.exists() {
+            let _ = fs::remove_file(&self.projection_path);
+        }
+        let conn = Self::open_projection(&self.projection_path, false)?;
+        Self::init_projection_schema(&conn)?;
+        *self.projection_db.lock() = conn;
+        Ok(())
+    }
+
+    fn projection_replay_wal(&self) -> Result<()> {
+        if !self.log_path.exists() {
+            let projection_complete = self
+                .nodes
+                .iter()
+                .all(|entry| self.projection_props(*entry.key()).ok().flatten().is_some());
+            if projection_complete {
+                return Ok(());
+            }
+            return Err(Error::from_reason(
+                "projection recovery requires genesis-graph.wal when node props are missing",
+            ));
+        }
+        use std::io::BufRead;
+        let file = File::open(&self.log_path).map_err(|e| Error::from_reason(e.to_string()))?;
+        let reader = std::io::BufReader::new(file);
+        for line in reader.lines() {
+            let line = line.map_err(|e| Error::from_reason(e.to_string()))?;
+            if line.trim().is_empty() {
+                continue;
+            }
+            let Ok(signed_event) = serde_json::from_str::<SignedEvent>(&line) else {
+                continue;
+            };
+            match signed_event.event {
+                Event::Node(node) => {
+                    self.projection_apply_event(&Event::Node(node))?;
+                }
+                Event::RelationalSchema(package) => {
+                    self.projection_apply_event(&Event::RelationalSchema(package))?;
+                }
+                Event::RelationalRows {
+                    namespace,
+                    schema_version,
+                    mutation_id,
+                    payload_hash,
+                    affected_rows,
+                    mutations,
+                } => {
+                    self.projection_apply_event(&Event::RelationalRows {
+                        namespace,
+                        schema_version,
+                        mutation_id,
+                        payload_hash,
+                        affected_rows,
+                        mutations,
+                    })?;
+                }
+                Event::Transaction(transaction) => {
+                    self.projection_apply_event(&Event::Transaction(transaction))?;
+                }
+                Event::Batch(events) => {
+                    let pending: Vec<Event> = events
+                        .into_iter()
+                        .filter_map(|event| match event {
+                            Event::Node(node) => Some(Event::Node(node)),
+                            Event::RelationalSchema(package) => {
+                                Some(Event::RelationalSchema(package))
+                            }
+                            Event::RelationalRows {
+                                namespace,
+                                schema_version,
+                                mutation_id,
+                                payload_hash,
+                                affected_rows,
+                                mutations,
+                            } => Some(Event::RelationalRows {
+                                namespace,
+                                schema_version,
+                                mutation_id,
+                                payload_hash,
+                                affected_rows,
+                                mutations,
+                            }),
+                            Event::Transaction(transaction) => {
+                                Some(Event::Transaction(transaction))
+                            }
+                            _ => None,
+                        })
+                        .collect();
+                    for event in pending {
+                        self.projection_apply_event(&event)?;
+                    }
+                }
+                _ => {}
+            }
+        }
+        let projection_complete = self
+            .nodes
+            .iter()
+            .all(|entry| self.projection_props(*entry.key()).ok().flatten().is_some());
+        if !projection_complete {
+            return Err(Error::from_reason(
+                "WAL replay did not recover props for every resident node",
+            ));
+        }
+        Ok(())
+    }
+
+    fn projection_sync_on_open(&self) -> Result<()> {
+        if self.read_only {
+            return Ok(());
+        }
+        // Lamport time is not a WAL cursor: distinct peers may emit equal clocks,
+        // and compaction rewrites the WAL. Scan the authoritative WAL on open and
+        // rely on full-clock LWW upserts for idempotence. A durable sequence cursor
+        // belongs to the unified transaction protocol, not this S0/S1 projection.
+        if self.projection_replay_wal().is_err() {
+            self.projection_reopen_fresh()?;
+            self.projection_replay_wal()?;
+        }
+        Ok(())
+    }
+
+    pub fn projection_props(&self, node_u32: u32) -> Result<Option<Value>> {
+        let conn = self.projection_db.lock();
+        let payload: Option<String> = conn
+            .query_row(
+                "SELECT payload FROM props WHERE node_u32 = ?1",
+                [node_u32],
+                |row| row.get(0),
+            )
+            .optional()
+            .map_err(|e| Error::from_reason(e.to_string()))?;
+        match payload {
+            Some(raw) => serde_json::from_str(&raw)
+                .map(Some)
+                .map_err(|e| Error::from_reason(e.to_string())),
+            None => Ok(None),
+        }
+    }
+
+    pub fn register_relational_schema(&self, package: RelationalSchemaPackage) -> Result<u32> {
+        self.ensure_writable()?;
+        let package = Self::normalize_schema_package(package)?;
+        Self::validate_relational_schema(&package)?;
+        let _commit_guard = self.commit_lock.lock();
+        let mut conn = self.projection_db.lock();
+        if let Some(previous) = Self::load_relational_schema_conn(&conn, &package.namespace)? {
+            if previous == package {
+                return Ok(package.schema_version);
+            }
+            Self::validate_schema_upgrade(&previous, &package)?;
+        } else if package.schema_version != 1 || package.previous_version.is_some() {
+            return Err(Error::from_reason(
+                "REL_SCHEMA_VERSION_CONFLICT: initial schema must be version 1",
+            ));
+        }
+        let tx = conn
+            .transaction()
+            .map_err(|e| Error::from_reason(e.to_string()))?;
+        Self::projection_apply_schema_conn(&tx, &package)?;
+        self.append_wal_event(&Event::RelationalSchema(package.clone()))?;
+        tx.commit().map_err(|e| Error::from_reason(e.to_string()))?;
+        Ok(package.schema_version)
+    }
+
+    pub fn get_relational_schema(
+        &self,
+        namespace: &str,
+    ) -> Result<Option<RelationalSchemaPackage>> {
+        Self::validate_namespace(namespace)?;
+        let conn = self.projection_db.lock();
+        Self::load_relational_schema_conn(&conn, namespace)
+    }
+
+    pub fn list_relational_schemas(&self) -> Result<Vec<RelationalSchemaPackage>> {
+        let conn = self.projection_db.lock();
+        let mut statement = conn
+            .prepare("SELECT package_json FROM relational_schema_registry ORDER BY namespace")
+            .map_err(|e| Error::from_reason(e.to_string()))?;
+        let schemas = statement
+            .query_map([], |row| row.get::<_, String>(0))
+            .map_err(|e| Error::from_reason(e.to_string()))?
+            .map(|row| {
+                let raw = row.map_err(|e| Error::from_reason(e.to_string()))?;
+                serde_json::from_str(&raw).map_err(|e| Error::from_reason(e.to_string()))
+            })
+            .collect();
+        schemas
+    }
+
+    pub fn apply_relational_batch(
+        &self,
+        batch: RelationalMutationBatch,
+    ) -> Result<RelationalMutationResult> {
+        self.ensure_writable()?;
+        Self::validate_namespace(&batch.namespace)?;
+        if Uuid::parse_str(&batch.mutation_id).is_err()
+            || batch.operations.is_empty()
+            || batch.operations.len() > 1000
+        {
+            return Err(Error::from_reason(
+                "REL_SCHEMA_VALIDATION_FAILED: invalid relational mutation batch",
+            ));
+        }
+        let encoded = serde_json::to_vec(&batch).map_err(|e| Error::from_reason(e.to_string()))?;
+        if encoded.len() > 8 * 1024 * 1024 {
+            return Err(Error::from_reason(
+                "REL_QUERY_LIMIT_EXCEEDED: mutation batch exceeds 8 MiB",
+            ));
+        }
+        let payload_hash = hex::encode(Sha256::digest(&encoded));
+        let _commit_guard = self.commit_lock.lock();
+        let mut conn = self.projection_db.lock();
+        let schema = Self::load_relational_schema_conn(&conn, &batch.namespace)?
+            .ok_or_else(|| Error::from_reason("REL_SCHEMA_NOT_FOUND"))?;
+        if schema.schema_version != batch.schema_version {
+            return Err(Error::from_reason(
+                "REL_SCHEMA_VERSION_CONFLICT: mutation schema version is not current",
+            ));
+        }
+        for mutation in &batch.operations {
+            Self::validate_row_mutation(&schema, mutation)?;
+        }
+        let existing: Option<(String, u32)> = conn
+            .query_row(
+                "SELECT payload_hash, affected_rows FROM applied_relational_mutations WHERE mutation_id = ?1",
+                [&batch.mutation_id],
+                |row| Ok((row.get(0)?, row.get(1)?)),
+            )
+            .optional()
+            .map_err(|e| Error::from_reason(e.to_string()))?;
+        if let Some((existing_hash, affected_rows)) = existing {
+            if existing_hash != payload_hash {
+                return Err(Error::from_reason(
+                    "REL_MUTATION_CONFLICT: mutation identity reused with different payload",
+                ));
+            }
+            return Ok(RelationalMutationResult {
+                mutation_id: batch.mutation_id,
+                namespace: batch.namespace,
+                schema_version: batch.schema_version,
+                wal_committed: true,
+                projection_applied: true,
+                affected_rows,
+            });
+        }
+        let tx = conn
+            .transaction()
+            .map_err(|e| Error::from_reason(e.to_string()))?;
+        let affected_rows = Self::projection_apply_rows_tx(&tx, &schema, &batch.operations)?;
+        self.append_wal_event(&Event::RelationalRows {
+            namespace: batch.namespace.clone(),
+            schema_version: batch.schema_version,
+            mutation_id: batch.mutation_id.clone(),
+            payload_hash: payload_hash.clone(),
+            affected_rows,
+            mutations: batch.operations.clone(),
+        })?;
+        tx.execute(
+            "INSERT INTO applied_relational_mutations(mutation_id, namespace, schema_version, payload_hash, affected_rows) VALUES(?1, ?2, ?3, ?4, ?5)",
+            params![
+                batch.mutation_id,
+                batch.namespace,
+                batch.schema_version,
+                payload_hash,
+                affected_rows
+            ],
+        )
+        .map_err(|e| Error::from_reason(e.to_string()))?;
+        tx.commit().map_err(|e| Error::from_reason(e.to_string()))?;
+        Ok(RelationalMutationResult {
+            mutation_id: batch.mutation_id,
+            namespace: batch.namespace,
+            schema_version: batch.schema_version,
+            wal_committed: true,
+            projection_applied: true,
+            affected_rows,
+        })
+    }
+
+    pub fn apply_relational_rows(
+        &self,
+        namespace: &str,
+        mutations: Vec<RelationalRowMutation>,
+    ) -> Result<()> {
+        self.ensure_writable()?;
+        Self::validate_namespace(namespace)?;
+        if mutations.is_empty() {
+            return Ok(());
+        }
+        {
+            let conn = self.projection_db.lock();
+            let schema = Self::load_relational_schema_conn(&conn, namespace)?
+                .ok_or_else(|| Error::from_reason("relational schema is not registered"))?;
+            for mutation in &mutations {
+                Self::validate_row_mutation(&schema, mutation)?;
+            }
+        }
+        let schema_version = {
+            let conn = self.projection_db.lock();
+            Self::load_relational_schema_conn(&conn, namespace)?
+                .ok_or_else(|| Error::from_reason("REL_SCHEMA_NOT_FOUND"))?
+                .schema_version
+        };
+        self.apply_relational_batch(RelationalMutationBatch {
+            mutation_id: Uuid::new_v4().to_string(),
+            namespace: namespace.to_string(),
+            schema_version,
+            operations: mutations,
+        })
+        .map(|_| ())
+    }
+
+    fn resolve_query_column(
+        schema: &RelationalSchemaPackage,
+        available_tables: &HashSet<String>,
+        column: &str,
+    ) -> Result<(String, String)> {
+        let parts: Vec<&str> = column.split('.').collect();
+        if parts.len() != 2 {
+            return Err(Error::from_reason(
+                "relational query columns must be table-qualified",
+            ));
+        }
+        let table_name = parts[0];
+        let column_name = parts[1];
+        Self::validate_identifier(table_name)?;
+        Self::validate_identifier(column_name)?;
+        if !available_tables.contains(table_name) {
+            return Err(Error::from_reason(
+                "relational query references unavailable table",
+            ));
+        }
+        let table = schema
+            .tables
+            .iter()
+            .find(|table| table.name == table_name)
+            .ok_or_else(|| Error::from_reason("relational query references unknown table"))?;
+        if !table
+            .columns
+            .iter()
+            .any(|column| column.name == column_name)
+        {
+            return Err(Error::from_reason(
+                "relational query references unknown column",
+            ));
+        }
+        Ok((
+            Self::physical_table(&schema.namespace, table_name)?,
+            column_name.to_string(),
+        ))
+    }
+
+    fn query_column_definition<'a>(
+        schema: &'a RelationalSchemaPackage,
+        available_tables: &HashSet<String>,
+        column: &str,
+    ) -> Result<&'a RelationalColumn> {
+        Self::resolve_query_column(schema, available_tables, column)?;
+        let (table_name, column_name) = column
+            .split_once('.')
+            .expect("validated qualified relational column");
+        schema
+            .tables
+            .iter()
+            .find(|table| table.name == table_name)
+            .and_then(|table| {
+                table
+                    .columns
+                    .iter()
+                    .find(|candidate| candidate.name == column_name)
+            })
+            .ok_or_else(|| Error::from_reason("relational query references unknown column"))
+    }
+
+    pub fn query_relational(&self, query: RelationalQuery) -> Result<Vec<Value>> {
+        Self::validate_namespace(&query.namespace)?;
+        Self::validate_identifier(&query.table)?;
+        if query.columns.is_empty() {
+            return Err(Error::from_reason(
+                "relational query requires at least one selected column",
+            ));
+        }
+        if query.joins.len() > 8 || query.filters.len() > 128 {
+            return Err(Error::from_reason(
+                "REL_QUERY_LIMIT_EXCEEDED: query shape exceeds U2 bounds",
+            ));
+        }
+        let limit = query.limit.unwrap_or(100);
+        if limit == 0 || limit > 1000 {
+            return Err(Error::from_reason(
+                "REL_QUERY_LIMIT_EXCEEDED: query row limit must be 1..1000",
+            ));
+        }
+        let conn = self.projection_db.lock();
+        let schema = Self::load_relational_schema_conn(&conn, &query.namespace)?
+            .ok_or_else(|| Error::from_reason("relational schema is not registered"))?;
+        if !schema.tables.iter().any(|table| table.name == query.table) {
+            return Err(Error::from_reason(
+                "relational query references unknown table",
+            ));
+        }
+        let mut available_tables = HashSet::from([query.table.clone()]);
+        for join in &query.joins {
+            Self::validate_identifier(&join.table)?;
+            if !schema.tables.iter().any(|table| table.name == join.table)
+                || !available_tables.insert(join.table.clone())
+            {
+                return Err(Error::from_reason("invalid relational join table"));
+            }
+        }
+        let selected = query
+            .columns
+            .iter()
+            .map(|column| Self::resolve_query_column(&schema, &available_tables, column))
+            .collect::<Result<Vec<_>>>()?;
+        let selected_types = query
+            .columns
+            .iter()
+            .map(|column| {
+                Self::query_column_definition(&schema, &available_tables, column)
+                    .map(|definition| definition.column_type.clone())
+            })
+            .collect::<Result<Vec<_>>>()?;
+        let base = Self::physical_table(&query.namespace, &query.table)?;
+        let mut sql = format!(
+            "SELECT {} FROM \"{}\"",
+            selected
+                .iter()
+                .map(|(table, column)| format!("\"{table}\".\"{column}\""))
+                .collect::<Vec<_>>()
+                .join(", "),
+            base
+        );
+        for join in &query.joins {
+            let physical = Self::physical_table(&query.namespace, &join.table)?;
+            let (left_table, left_column) =
+                Self::resolve_query_column(&schema, &available_tables, &join.left_column)?;
+            let (right_table, right_column) =
+                Self::resolve_query_column(&schema, &available_tables, &join.right_column)?;
+            if physical != left_table && physical != right_table {
+                return Err(Error::from_reason(
+                    "relational join condition must reference the joined table",
+                ));
+            }
+            sql.push_str(&format!(
+                " {} JOIN \"{physical}\" ON \"{left_table}\".\"{left_column}\" = \"{right_table}\".\"{right_column}\"",
+                match join.kind {
+                    RelationalJoinKind::Inner => "INNER",
+                    RelationalJoinKind::Left => "LEFT",
+                }
+            ));
+        }
+        let mut parameters = Vec::new();
+        if !query.filters.is_empty() {
+            let predicates = query
+                .filters
+                .iter()
+                .map(|filter| {
+                    let (table, column) =
+                        Self::resolve_query_column(&schema, &available_tables, &filter.column)?;
+                    let definition =
+                        Self::query_column_definition(&schema, &available_tables, &filter.column)?;
+                    parameters.push(Self::json_to_sql_typed(definition, &filter.value)?);
+                    Ok(format!("\"{table}\".\"{column}\" = ?"))
+                })
+                .collect::<Result<Vec<_>>>()?;
+            sql.push_str(&format!(" WHERE {}", predicates.join(" AND ")));
+        }
+        sql.push_str(&format!(" LIMIT {limit}"));
+        let mut statement = conn
+            .prepare(&sql)
+            .map_err(|e| Error::from_reason(e.to_string()))?;
+        let rows = statement
+            .query_map(params_from_iter(parameters), |row| {
+                let mut object = serde_json::Map::new();
+                for (index, name) in query.columns.iter().enumerate() {
+                    let value = match (&selected_types[index], row.get_ref(index)?) {
+                        (RelationalColumnType::Boolean, ValueRef::Integer(value)) => {
+                            Value::Bool(value != 0)
+                        }
+                        (RelationalColumnType::Json, ValueRef::Text(value)) => {
+                            serde_json::from_slice(value).unwrap_or_else(|_| {
+                                Value::String(String::from_utf8_lossy(value).into_owned())
+                            })
+                        }
+                        (_, ValueRef::Null) => Value::Null,
+                        (_, ValueRef::Integer(value)) => Value::from(value),
+                        (_, ValueRef::Real(value)) => Value::from(value),
+                        (_, ValueRef::Text(value)) => {
+                            Value::String(String::from_utf8_lossy(value).into_owned())
+                        }
+                        (_, ValueRef::Blob(value)) => {
+                            Value::Array(value.iter().copied().map(Value::from).collect())
+                        }
+                    };
+                    object.insert(name.clone(), value);
+                }
+                Ok(Value::Object(object))
+            })
+            .map_err(|e| Error::from_reason(e.to_string()))?;
+        rows.collect::<std::result::Result<Vec<_>, _>>()
+            .map_err(|e| Error::from_reason(e.to_string()))
+    }
+
+    pub fn execute_named_query(&self, request: NamedQueryRequest) -> Result<Vec<Value>> {
+        Self::validate_namespace(&request.namespace)?;
+        Self::validate_identifier(&request.query_name)?;
+        let definition = {
+            let conn = self.projection_db.lock();
+            let schema = Self::load_relational_schema_conn(&conn, &request.namespace)?
+                .ok_or_else(|| Error::from_reason("REL_SCHEMA_NOT_FOUND"))?;
+            if schema.schema_version != request.schema_version {
+                return Err(Error::from_reason(
+                    "REL_SCHEMA_VERSION_CONFLICT: query schema version is not current",
+                ));
+            }
+            schema
+                .named_queries
+                .iter()
+                .find(|query| query.name == request.query_name)
+                .cloned()
+                .ok_or_else(|| Error::from_reason("REL_QUERY_NOT_FOUND"))?
+        };
+        let parameters = request.parameters.as_object().ok_or_else(|| {
+            Error::from_reason("REL_TYPE_MISMATCH: named-query parameters must be an object")
+        })?;
+        if parameters.len() != definition.parameters.len() {
+            return Err(Error::from_reason(
+                "REL_TYPE_MISMATCH: missing or extra named-query parameter",
+            ));
+        }
+        for parameter in &definition.parameters {
+            let value = parameters.get(&parameter.name).ok_or_else(|| {
+                Error::from_reason("REL_TYPE_MISMATCH: missing named-query parameter")
+            })?;
+            if !Self::relational_value_matches(&parameter.column_type, value) {
+                return Err(Error::from_reason(
+                    "REL_TYPE_MISMATCH: named-query parameter type mismatch",
+                ));
+            }
+        }
+        if parameters
+            .keys()
+            .any(|name| !definition.parameters.iter().any(|item| item.name == *name))
+        {
+            return Err(Error::from_reason(
+                "REL_TYPE_MISMATCH: unknown named-query parameter",
+            ));
+        }
+        let mut query = definition.query;
+        for filter in &mut query.filters {
+            if let Some(parameter) = filter
+                .value
+                .as_object()
+                .and_then(|marker| marker.get("$param"))
+                .and_then(Value::as_str)
+            {
+                filter.value = parameters
+                    .get(parameter)
+                    .expect("validated named-query parameter")
+                    .clone();
+            }
+        }
+        let limit = request.limit.unwrap_or(definition.default_limit);
+        if limit == 0 || limit > definition.max_limit {
+            return Err(Error::from_reason(
+                "REL_QUERY_LIMIT_EXCEEDED: named-query limit exceeds definition",
+            ));
+        }
+        query.limit = Some(limit);
+        self.query_relational(query)
+    }
+
+    fn relational_snapshot_events(&self) -> Result<Vec<Event>> {
+        let conn = self.projection_db.lock();
+        let mut registry = conn
+            .prepare("SELECT package_json FROM relational_schema_registry ORDER BY namespace")
+            .map_err(|e| Error::from_reason(e.to_string()))?;
+        let packages = registry
+            .query_map([], |row| row.get::<_, String>(0))
+            .map_err(|e| Error::from_reason(e.to_string()))?
+            .map(|row| {
+                let json = row.map_err(|e| Error::from_reason(e.to_string()))?;
+                serde_json::from_str::<RelationalSchemaPackage>(&json)
+                    .map_err(|e| Error::from_reason(e.to_string()))
+            })
+            .collect::<Result<Vec<_>>>()?;
+        drop(registry);
+
+        let mut events = Vec::new();
+        for package in packages {
+            events.push(Event::RelationalSchema(package.clone()));
+            for table in &package.tables {
+                let physical = Self::physical_table(&package.namespace, &table.name)?;
+                let sql = format!(
+                    "SELECT {} FROM \"{physical}\"",
+                    table
+                        .columns
+                        .iter()
+                        .map(|column| format!("\"{}\"", column.name))
+                        .collect::<Vec<_>>()
+                        .join(", ")
+                );
+                let mut statement = conn
+                    .prepare(&sql)
+                    .map_err(|e| Error::from_reason(e.to_string()))?;
+                let rows = statement
+                    .query_map([], |row| {
+                        let mut object = serde_json::Map::new();
+                        for (index, column) in table.columns.iter().enumerate() {
+                            let value = match (&column.column_type, row.get_ref(index)?) {
+                                (RelationalColumnType::Boolean, ValueRef::Integer(value)) => {
+                                    Value::Bool(value != 0)
+                                }
+                                (RelationalColumnType::Json, ValueRef::Text(value)) => {
+                                    serde_json::from_slice(value).unwrap_or_else(|_| {
+                                        Value::String(String::from_utf8_lossy(value).into_owned())
+                                    })
+                                }
+                                (_, ValueRef::Null) => Value::Null,
+                                (_, ValueRef::Integer(value)) => Value::from(value),
+                                (_, ValueRef::Real(value)) => Value::from(value),
+                                (_, ValueRef::Text(value)) => {
+                                    Value::String(String::from_utf8_lossy(value).into_owned())
+                                }
+                                (_, ValueRef::Blob(value)) => {
+                                    Value::Array(value.iter().copied().map(Value::from).collect())
+                                }
+                            };
+                            object.insert(column.name.clone(), value);
+                        }
+                        Ok(RelationalRowMutation {
+                            table: table.name.clone(),
+                            kind: RelationalMutationKind::Upsert,
+                            values: Value::Object(object),
+                            key: None,
+                        })
+                    })
+                    .map_err(|e| Error::from_reason(e.to_string()))?
+                    .collect::<std::result::Result<Vec<_>, _>>()
+                    .map_err(|e| Error::from_reason(e.to_string()))?;
+                if !rows.is_empty() {
+                    events.push(Event::RelationalRows {
+                        namespace: package.namespace.clone(),
+                        schema_version: package.schema_version,
+                        mutation_id: String::new(),
+                        payload_hash: String::new(),
+                        affected_rows: 0,
+                        mutations: rows,
+                    });
+                }
+            }
+        }
+        let mut applied = conn
+            .prepare(
+                "SELECT mutation_id, namespace, schema_version, payload_hash, affected_rows FROM applied_relational_mutations ORDER BY mutation_id",
+            )
+            .map_err(|e| Error::from_reason(e.to_string()))?;
+        let markers = applied
+            .query_map([], |row| {
+                Ok(Event::RelationalRows {
+                    mutation_id: row.get(0)?,
+                    namespace: row.get(1)?,
+                    schema_version: row.get(2)?,
+                    payload_hash: row.get(3)?,
+                    affected_rows: row.get(4)?,
+                    mutations: vec![],
+                })
+            })
+            .map_err(|e| Error::from_reason(e.to_string()))?
+            .collect::<std::result::Result<Vec<_>, _>>()
+            .map_err(|e| Error::from_reason(e.to_string()))?;
+        events.extend(markers);
+        Ok(events)
+    }
+
+    fn transaction_checkpoint_events(&self) -> Result<Vec<Event>> {
+        let conn = self.projection_db.lock();
+        let mut statement = conn
+            .prepare(
+                "SELECT transaction_id, commit_sequence, payload_hash FROM applied_transactions ORDER BY commit_sequence",
+            )
+            .map_err(|e| Error::from_reason(e.to_string()))?;
+        let events = statement
+            .query_map([], |row| {
+                Ok(Event::Transaction(GenesisTransactionEvent {
+                    transaction_id: row.get(0)?,
+                    commit_sequence: row.get(1)?,
+                    payload_hash: row.get(2)?,
+                    relational: vec![],
+                    nodes: vec![],
+                    edges: vec![],
+                    vectors: vec![],
+                }))
+            })
+            .map_err(|e| Error::from_reason(e.to_string()))?
+            .collect::<std::result::Result<Vec<_>, _>>()
+            .map_err(|e| Error::from_reason(e.to_string()))?;
+        Ok(events)
+    }
+
+    fn hydrated_props(&self, node_u32: u32, node: &NodeOutput) -> Value {
+        if !node.props.is_null() {
+            return node.props.clone();
+        }
+        self.projection_props(node_u32)
+            .ok()
+            .flatten()
+            .unwrap_or_else(|| Value::Object(Default::default()))
+    }
+
+    fn hydrated_node(&self, node_u32: u32, node: &NodeOutput) -> NodeOutput {
+        if !node.props.is_null() {
+            return node.clone();
+        }
+        let mut hydrated = node.clone();
+        hydrated.props = self.hydrated_props(node_u32, node);
+        hydrated
+    }
+
+    pub fn node_view(&self, id: &str) -> Option<NodeOutput> {
+        let u32_id = self.get_u32(id)?;
+        self.node_view_u32(u32_id)
+    }
+
+    pub fn node_view_u32(&self, u32_id: u32) -> Option<NodeOutput> {
+        let node = self.nodes.get(&u32_id)?;
+        Some(self.hydrated_node(u32_id, node.value()))
+    }
+
     pub fn open(opts: OpenOptions) -> Result<Self> {
         let root = PathBuf::from(opts.path.clone());
         if !root.exists() {
             fs::create_dir_all(&root).ok();
         }
+        let lock_path = root.join("genesis.lock");
+        let lock_file = FileOpenOptions::new()
+            .read(true)
+            .write(true)
+            .create(true)
+            .truncate(false)
+            .open(&lock_path)
+            .map_err(|e| {
+                Error::from_reason(format!(
+                    "failed to open database ownership lock {}: {}",
+                    lock_path.display(),
+                    e
+                ))
+            })?;
+        fs2::FileExt::try_lock_exclusive(&lock_file).map_err(|_| {
+            Error::from_reason(format!(
+                "database is already open by another GenesisBlockDB process: {}",
+                root.display()
+            ))
+        })?;
         let read_only = opts.read_only.unwrap_or(false);
         let vector_dim = opts.vector_dim.unwrap_or(1536) as u16;
 
@@ -2033,68 +4352,106 @@ impl Storage {
         let local_peer_id = hex::encode(Sha256::digest(verifying_key.as_bytes()))[..16].to_string();
 
         let log_path = root.join("genesis-graph.wal");
+        let projection_path = root.join(PROJECTION_DB_FILE);
+        let projection_conn = if read_only {
+            Self::open_projection(&projection_path, true)?
+        } else {
+            match Self::open_projection(&projection_path, false) {
+                Ok(conn) if Self::init_projection_schema(&conn).is_ok() => conn,
+                Ok(conn) => {
+                    drop(conn);
+                    if projection_path.exists() {
+                        fs::remove_file(&projection_path)
+                            .map_err(|e| Error::from_reason(e.to_string()))?;
+                    }
+                    let conn = Self::open_projection(&projection_path, false)?;
+                    Self::init_projection_schema(&conn)?;
+                    conn
+                }
+                Err(_) => {
+                    if projection_path.exists() {
+                        fs::remove_file(&projection_path)
+                            .map_err(|e| Error::from_reason(e.to_string()))?;
+                    }
+                    let conn = Self::open_projection(&projection_path, false)?;
+                    Self::init_projection_schema(&conn)?;
+                    conn
+                }
+            }
+        };
         let (wal_sender, wal_receiver): (Sender<WalMsg>, Receiver<WalMsg>) = unbounded();
         let log_path_clone = log_path.clone();
 
-        let wal_handle = std::thread::spawn(move || {
-            if let Ok(file) = FileOpenOptions::new()
-                .append(true)
-                .create(true)
-                .open(&log_path_clone)
-            {
-                let mut writer = std::io::BufWriter::with_capacity(128 * 1024, file);
-                let mut batch: Vec<crossbeam_channel::Sender<bool>> = Vec::with_capacity(1024);
-                // A checkpoint pulled out of the micro-batch drain is stashed here
-                // and applied only after the in-flight append batch is flushed +
-                // acked, so the new (live-state) WAL never loses a just-acked write.
-                let mut pending_ckpt: Option<(Vec<u8>, crossbeam_channel::Sender<bool>)> = None;
-                loop {
-                    match wal_receiver.recv() {
-                        Ok(WalMsg::Append(signed_event, ack_tx)) => {
-                            batch.push(ack_tx);
-                            if let Ok(json) = serde_json::to_string(&signed_event) {
-                                let _ = writer.write_all(json.as_bytes());
-                                let _ = writer.write_all(b"\n");
-                            }
-                            let timeout = Duration::from_millis(5);
-                            let start = Instant::now();
-                            while batch.len() < 1024 && start.elapsed() < timeout {
-                                match wal_receiver.try_recv() {
-                                    Ok(WalMsg::Append(se, tx)) => {
-                                        batch.push(tx);
-                                        if let Ok(j) = serde_json::to_string(&se) {
-                                            let _ = writer.write_all(j.as_bytes());
-                                            let _ = writer.write_all(b"\n");
+        let wal_handle = if read_only {
+            std::thread::spawn(move || {
+                while let Ok(message) = wal_receiver.recv() {
+                    let ack = match message {
+                        WalMsg::Append(_, ack) | WalMsg::Checkpoint { ack, .. } => ack,
+                    };
+                    let _ = ack.send(false);
+                }
+            })
+        } else {
+            std::thread::spawn(move || {
+                if let Ok(file) = FileOpenOptions::new()
+                    .append(true)
+                    .create(true)
+                    .open(&log_path_clone)
+                {
+                    let mut writer = std::io::BufWriter::with_capacity(128 * 1024, file);
+                    let mut batch: Vec<crossbeam_channel::Sender<bool>> = Vec::with_capacity(1024);
+                    // A checkpoint pulled out of the micro-batch drain is stashed here
+                    // and applied only after the in-flight append batch is flushed +
+                    // acked, so the new (live-state) WAL never loses a just-acked write.
+                    let mut pending_ckpt: Option<(Vec<u8>, crossbeam_channel::Sender<bool>)> = None;
+                    loop {
+                        match wal_receiver.recv() {
+                            Ok(WalMsg::Append(signed_event, ack_tx)) => {
+                                batch.push(ack_tx);
+                                if let Ok(json) = serde_json::to_string(&signed_event) {
+                                    let _ = writer.write_all(json.as_bytes());
+                                    let _ = writer.write_all(b"\n");
+                                }
+                                let timeout = Duration::from_millis(5);
+                                let start = Instant::now();
+                                while batch.len() < 1024 && start.elapsed() < timeout {
+                                    match wal_receiver.try_recv() {
+                                        Ok(WalMsg::Append(se, tx)) => {
+                                            batch.push(tx);
+                                            if let Ok(j) = serde_json::to_string(&se) {
+                                                let _ = writer.write_all(j.as_bytes());
+                                                let _ = writer.write_all(b"\n");
+                                            }
                                         }
+                                        // Defer the checkpoint: drain ends so the current
+                                        // append batch is durably flushed + acked first.
+                                        Ok(WalMsg::Checkpoint { data, ack }) => {
+                                            pending_ckpt = Some((data, ack));
+                                            break;
+                                        }
+                                        Err(_) => break,
                                     }
-                                    // Defer the checkpoint: drain ends so the current
-                                    // append batch is durably flushed + acked first.
-                                    Ok(WalMsg::Checkpoint { data, ack }) => {
-                                        pending_ckpt = Some((data, ack));
-                                        break;
-                                    }
-                                    Err(_) => break,
+                                }
+                                let _ = writer.flush();
+                                let _ = writer.get_mut().sync_all();
+                                for ack in batch.drain(..) {
+                                    let _ = ack.send(true);
+                                }
+                                if let Some((data, ack)) = pending_ckpt.take() {
+                                    Self::wal_checkpoint(&mut writer, &log_path_clone, &data);
+                                    let _ = ack.send(true);
                                 }
                             }
-                            let _ = writer.flush();
-                            let _ = writer.get_mut().sync_all();
-                            for ack in batch.drain(..) {
-                                let _ = ack.send(true);
-                            }
-                            if let Some((data, ack)) = pending_ckpt.take() {
+                            Ok(WalMsg::Checkpoint { data, ack }) => {
                                 Self::wal_checkpoint(&mut writer, &log_path_clone, &data);
                                 let _ = ack.send(true);
                             }
+                            Err(_) => break,
                         }
-                        Ok(WalMsg::Checkpoint { data, ack }) => {
-                            Self::wal_checkpoint(&mut writer, &log_path_clone, &data);
-                            let _ = ack.send(true);
-                        }
-                        Err(_) => break,
                     }
                 }
-            }
-        });
+            })
+        };
 
         // --- Deferred-indexing thread (ADR--GENESISDB-ASYNC-INDEXING) ---
         // Drains HNSW insert jobs off the write hot path. Bounded for
@@ -2182,6 +4539,10 @@ impl Storage {
         let storage = Self {
             path: root,
             read_only,
+            projection_path,
+            projection_db: Mutex::new(projection_conn),
+            commit_lock: Mutex::new(()),
+            commit_sequence: AtomicU64::new(0),
             nodes: DashMap::new(),
             edges: DashMap::new(),
             out_idx: DashMap::new(),
@@ -2190,7 +4551,7 @@ impl Storage {
             default_collection: "default".to_string(),
             log_path,
             bin_path: PathBuf::from(""),
-            _lock_file: None,
+            _lock_file: Some(lock_file),
             id_to_u32: DashMap::new(),
             next_u32: AtomicU32::new(0),
             is_rebuilding: AtomicBool::new(false),
@@ -2278,6 +4639,12 @@ impl Storage {
                                     }
                                 }
                             }
+                            Event::RelationalSchema(_) | Event::RelationalRows { .. } => {
+                                // Relational state is rebuilt by projection_sync_on_open.
+                            }
+                            Event::Transaction(transaction) => {
+                                storage.apply_transaction_memory(&transaction, false);
+                            }
                         }
                     }
                 }
@@ -2288,6 +4655,20 @@ impl Storage {
         // arenas but never rehydrates HNSW, leaving semantic search broken
         // until a manual rebuild).
         storage.rehydrate_hnsw_index();
+        storage.projection_sync_on_open()?;
+        let frontier = storage
+            .projection_db
+            .lock()
+            .query_row(
+                "SELECT value FROM projection_state WHERE key = 'stable_frontier'",
+                [],
+                |row| row.get::<_, String>(0),
+            )
+            .optional()
+            .map_err(|e| Error::from_reason(e.to_string()))?
+            .and_then(|value| value.parse::<u64>().ok())
+            .unwrap_or(0);
+        storage.commit_sequence.store(frontier, Ordering::SeqCst);
         Ok(storage)
     }
 
@@ -2323,14 +4704,196 @@ impl Storage {
         }
     }
 
-    pub fn persist(&self, event: &Event) -> Result<()> {
+    fn append_wal_event(&self, event: &Event) -> Result<()> {
         let (ack_tx, ack_rx) = unbounded();
         let signed_event = self.sign_event(event);
         self.wal_sender
             .send(WalMsg::Append(Box::new(signed_event), ack_tx))
             .map_err(|_| Error::from_reason("wal disconnected"))?;
-        let _ = ack_rx.recv();
+        if !ack_rx.recv().unwrap_or(false) {
+            return Err(Error::from_reason("wal append failed"));
+        }
         Ok(())
+    }
+
+    pub fn persist(&self, event: &Event) -> Result<()> {
+        self.append_wal_event(event)?;
+        self.projection_apply_event(event)?;
+        Ok(())
+    }
+
+    fn apply_transaction_memory(&self, transaction: &GenesisTransactionEvent, index: bool) {
+        for node in &transaction.nodes {
+            let node_u32 = self.get_or_intern_id(&node.id);
+            if let Some(embedding) = &node.embedding {
+                self.replay_vector(
+                    &node.collection,
+                    &node.id,
+                    embedding.clone(),
+                    node.lang.clone().unwrap_or_else(|| "en".to_string()),
+                    index,
+                );
+            }
+            self.insert_node_lean(node_u32, node.clone());
+        }
+        for edge in &transaction.edges {
+            let edge_key = self.index_edge_internal(&edge.id, &edge.from, &edge.to);
+            self.edges.insert(edge_key, edge.clone());
+        }
+        for vector in &transaction.vectors {
+            self.replay_vector(
+                &vector.collection,
+                &vector.node_id,
+                vector.embedding.clone(),
+                vector.lang.clone().unwrap_or_else(|| "en".to_string()),
+                index,
+            );
+        }
+    }
+
+    pub fn stable_frontier(&self) -> u64 {
+        self.commit_sequence.load(Ordering::SeqCst)
+    }
+
+    pub fn commit_transaction(&self, input: GenesisTransaction) -> Result<CommitResult> {
+        self.ensure_writable()?;
+        if input.transaction_id.is_empty() || input.transaction_id.len() > 128 {
+            return Err(Error::from_reason("invalid transaction id"));
+        }
+        let payload = serde_json::to_vec(&input).map_err(|e| Error::from_reason(e.to_string()))?;
+        let payload_hash = hex::encode(Sha256::digest(&payload));
+        let _commit_guard = self.commit_lock.lock();
+        {
+            let conn = self.projection_db.lock();
+            let existing: Option<(u64, String)> = conn
+                .query_row(
+                    "SELECT commit_sequence, payload_hash FROM applied_transactions WHERE transaction_id = ?1",
+                    [&input.transaction_id],
+                    |row| Ok((row.get(0)?, row.get(1)?)),
+                )
+                .optional()
+                .map_err(|e| Error::from_reason(e.to_string()))?;
+            if let Some((commit_sequence, existing_hash)) = existing {
+                if existing_hash != payload_hash {
+                    return Err(Error::from_reason("transaction identity conflict"));
+                }
+                return Ok(CommitResult {
+                    transaction_id: input.transaction_id,
+                    commit_sequence,
+                    stable: true,
+                });
+            }
+        }
+        let frontier = self.stable_frontier();
+        if input
+            .expected_frontier
+            .is_some_and(|expected| expected != frontier)
+        {
+            return Err(Error::from_reason("expected frontier conflict"));
+        }
+        for group in &input.relational {
+            Self::validate_identifier(&group.namespace)?;
+            let conn = self.projection_db.lock();
+            let schema = Self::load_relational_schema_conn(&conn, &group.namespace)?
+                .ok_or_else(|| Error::from_reason("relational schema is not registered"))?;
+            for mutation in &group.mutations {
+                Self::validate_row_mutation(&schema, mutation)?;
+            }
+        }
+        for node in &input.graph.nodes {
+            self.validate_governance(&node.labels, false)?;
+            if let Some(embedding) = &node.embedding {
+                let collection = self.resolve_collection(&node.collection)?;
+                if embedding.len() != collection.dim as usize {
+                    return Err(Error::from_reason("embedding dimension mismatch"));
+                }
+            }
+        }
+        for vector in &input.vectors {
+            let collection = self.resolve_collection(&Some(vector.collection.clone()))?;
+            if vector.embedding.len() != collection.dim as usize {
+                return Err(Error::from_reason("embedding dimension mismatch"));
+            }
+        }
+
+        let now = Utc::now();
+        let nodes = input
+            .graph
+            .nodes
+            .into_iter()
+            .map(|node| {
+                let collection = node
+                    .embedding
+                    .as_ref()
+                    .and_then(|_| self.resolve_collection(&node.collection).ok())
+                    .map(|collection| collection.name.clone());
+                NodeOutput {
+                    id: node.id.unwrap_or_else(|| format!("N-{}", Uuid::new_v4())),
+                    labels: node.labels,
+                    props: node.props.unwrap_or(Value::Object(Default::default())),
+                    impact: Some(0.7),
+                    embedding: node.embedding,
+                    lang: Some(node.lang.unwrap_or_else(|| "en".to_string())),
+                    valid_from: node.valid_from.unwrap_or_else(|| now.to_rfc3339()),
+                    valid_to: None,
+                    caused_by: node.caused_by,
+                    expires_at: node.ttl.map(|seconds| {
+                        (now + chrono::Duration::seconds(seconds as i64)).to_rfc3339()
+                    }),
+                    clock: self.next_clock(),
+                    collection,
+                }
+            })
+            .collect::<Vec<_>>();
+        let edges = input
+            .graph
+            .edges
+            .into_iter()
+            .map(|edge| EdgeOutput {
+                id: edge.id.unwrap_or_else(|| Uuid::new_v4().to_string()),
+                from: edge.from,
+                to: edge.to,
+                rel: edge.rel,
+                props: edge.props.unwrap_or(Value::Object(Default::default())),
+                valid_from: edge.valid_from.unwrap_or_else(|| now.to_rfc3339()),
+                valid_to: None,
+                recorded_at: now.to_rfc3339(),
+                superseded_by: None,
+                impact: edge.impact,
+                caused_by: edge.caused_by,
+                clock: self.next_clock(),
+            })
+            .collect::<Vec<_>>();
+        let vectors = input
+            .vectors
+            .into_iter()
+            .map(|vector| VectorEvent {
+                node_id: vector.node_id,
+                collection: Some(vector.collection),
+                embedding: vector.embedding,
+                lang: None,
+                clock: self.next_clock(),
+            })
+            .collect::<Vec<_>>();
+        let commit_sequence = frontier + 1;
+        let event = GenesisTransactionEvent {
+            transaction_id: input.transaction_id.clone(),
+            commit_sequence,
+            payload_hash,
+            relational: input.relational,
+            nodes,
+            edges,
+            vectors,
+        };
+        self.persist(&Event::Transaction(event.clone()))?;
+        self.apply_transaction_memory(&event, true);
+        self.commit_sequence
+            .store(commit_sequence, Ordering::SeqCst);
+        Ok(CommitResult {
+            transaction_id: input.transaction_id,
+            commit_sequence,
+            stable: true,
+        })
     }
 
     pub fn find_fuzzy_id(&self, id: &str) -> Option<String> {
@@ -2409,6 +4972,15 @@ impl Storage {
             Event::Edge(_) => Ok(true),
             // A vector attachment carries no governance/axiom implication.
             Event::Vector(_) => Ok(true),
+            Event::RelationalSchema(_) | Event::RelationalRows { .. } => Ok(true),
+            Event::Transaction(transaction) => {
+                for node in &transaction.nodes {
+                    if !self.semantic_verify(&Event::Node(node.clone()))? {
+                        return Ok(false);
+                    }
+                }
+                Ok(true)
+            }
             Event::Batch(events) => {
                 for e in events {
                     if !self.semantic_verify(e)? {
@@ -2616,6 +5188,15 @@ impl Storage {
                     );
                     self.persist_signed(signed_event.clone())?;
                 }
+                Event::RelationalSchema(_) | Event::RelationalRows { .. } => {
+                    self.persist_signed(signed_event.clone())?;
+                }
+                Event::Transaction(transaction) => {
+                    self.persist_signed(signed_event.clone())?;
+                    self.apply_transaction_memory(transaction, true);
+                    self.commit_sequence
+                        .fetch_max(transaction.commit_sequence, Ordering::SeqCst);
+                }
             }
             proposal.committed = true;
             return Ok(true);
@@ -2624,9 +5205,14 @@ impl Storage {
     }
 
     pub fn calculate_sc(&self, node: &NodeOutput) -> f64 {
+        let props = self
+            .get_u32(&node.id)
+            .map(|u32_id| self.hydrated_props(u32_id, node))
+            .unwrap_or_else(|| node.props.clone());
         let stability = node
             .props
             .get("stability")
+            .or_else(|| props.get("stability"))
             .and_then(|v| v.as_str())
             .unwrap_or("active");
         match stability {
@@ -2643,6 +5229,7 @@ impl Storage {
             Some(id) => id,
             None => return 0.7,
         };
+        let hydrated = self.hydrated_node(u32_id, node);
         let incoming_count = self
             .in_idx
             .get(&u32_id)
@@ -2656,7 +5243,7 @@ impl Storage {
             Tier::ADR => 0.6,
             Tier::USER => 0.3,
         };
-        let sc = self.calculate_sc(node);
+        let sc = self.calculate_sc(&hydrated);
         (dd * 0.5) + (as_score * 0.3) + (sc * 0.2)
     }
 
@@ -2706,6 +5293,7 @@ impl Storage {
     /// still persisted in the WAL `Event::Node` for replay/arena rebuild.
     fn insert_node_lean(&self, u32_id: u32, mut node: NodeOutput) {
         node.embedding = None;
+        node.props = Value::Null;
         self.nodes.insert(u32_id, node);
     }
 
@@ -2789,7 +5377,7 @@ impl Storage {
         let now = Utc::now().to_rfc3339();
 
         let mut old_node = match self.nodes.get(&u32_id) {
-            Some(node) => node.value().clone(),
+            Some(node) => self.hydrated_node(u32_id, node.value()),
             None => return Err(Error::from_reason("Node not in memory index")),
         };
 
@@ -2991,12 +5579,18 @@ impl Storage {
     // --- Cypher pattern matching (ADR--GENESISDB-HQL-CYPHER-PATTERNS, path 1) ---
 
     /// Does a node satisfy a pattern node's `:Label` and `{k:v}` constraints?
-    fn node_matches(node: &NodeOutput, pat: &query::ast::NodePattern) -> bool {
+    fn node_matches(
+        &self,
+        node_u32: u32,
+        node: &NodeOutput,
+        pat: &query::ast::NodePattern,
+    ) -> bool {
         if let Some(label) = &pat.label {
             if !node.labels.iter().any(|l| l == label) {
                 return false;
             }
         }
+        let props = self.hydrated_props(node_u32, node);
         for (k, v) in &pat.props {
             // `{id:"..."}` addresses the node's top-level id (there is no `:id`
             // syntax and anchoring a pattern by a known id is the common case);
@@ -3011,7 +5605,7 @@ impl Storage {
                 }
                 continue;
             }
-            match node.props.get(k) {
+            match props.get(k) {
                 Some(av) => {
                     if !Self::json_eq_hqlvalue(av, v) {
                         return false;
@@ -3045,39 +5639,34 @@ impl Storage {
             Error::from_reason(format!("HQL result serialization failed: {e}"))
         };
         type Row = serde_json::Map<String, serde_json::Value>;
-        // One consistent "current instant" for the whole query instead of a
-        // timestamp that drifts per edge visited (hoisted out of the hop loop).
-        let now_rfc3339 = Utc::now().to_rfc3339();
 
-        // 1. Anchor: an exact-id string constraint (`{id:"..."}`) resolves in
-        // O(1) via the id->u32 index instead of scanning every live node;
-        // everything else (label-only, numeric id, unconstrained) keeps the
-        // scan (a numeric id can't be looked up by the string-keyed index, and
-        // label indexing is P2-T3). The id fast path still runs the exact same
-        // `is_valid_as_of` + `node_matches` checks the scan would, so an id
-        // that resolves but fails those checks yields an empty frontier, not
-        // an error — identical to what the scan produces for a non-match.
-        let id_anchor: Option<&str> = pattern.start.props.iter().find_map(|(k, v)| {
-            if k == "id" {
-                if let query::ast::HqlValue::Str(s) = v {
-                    return Some(s.as_str());
-                }
-            }
-            None
-        });
+        let now = Utc::now().to_rfc3339();
+        // 1. Anchor: if the anchor has an exact `id` constraint, skip the full
+        // scan and seed directly from the interned id; otherwise fall back to
+        // the existing live-node scan.
         let mut frontier: Vec<(u32, Row)> = Vec::new();
-        if let Some(id) = id_anchor {
-            if let Some(u32_id) = self.get_u32(id) {
-                if let Some(entry) = self.nodes.get(&u32_id) {
+        let anchor_id =
+            pattern
+                .start
+                .props
+                .iter()
+                .find_map(|(key, value)| match (key.as_str(), value) {
+                    ("id", query::ast::HqlValue::Str(id)) => Some(id.clone()),
+                    _ => None,
+                });
+        if let Some(anchor_id) = anchor_id {
+            if let Some(anchor_u32) = self.get_u32(&anchor_id) {
+                if let Some(entry) = self.nodes.get(&anchor_u32) {
                     let node = entry.value();
                     if Self::is_valid_as_of(&node.valid_from, &node.valid_to, as_of)
-                        && Self::node_matches(node, &pattern.start)
+                        && self.node_matches(anchor_u32, node, &pattern.start)
                     {
+                        let node = self.hydrated_node(anchor_u32, node);
                         let mut row = Row::new();
                         if let Some(v) = &pattern.start.var {
                             row.insert(v.clone(), serde_json::to_value(node).map_err(ser_err)?);
                         }
-                        frontier.push((u32_id, row));
+                        frontier.push((anchor_u32, row));
                     }
                 }
             }
@@ -3087,9 +5676,10 @@ impl Storage {
                 if !Self::is_valid_as_of(&node.valid_from, &node.valid_to, as_of) {
                     continue;
                 }
-                if !Self::node_matches(node, &pattern.start) {
+                if !self.node_matches(*entry.key(), node, &pattern.start) {
                     continue;
                 }
+                let node = self.hydrated_node(*entry.key(), node);
                 let mut row = Row::new();
                 if let Some(v) = &pattern.start.var {
                     row.insert(v.clone(), serde_json::to_value(node).map_err(ser_err)?);
@@ -3130,7 +5720,7 @@ impl Storage {
                     // Hide retracted edges in the current view (mirror `neighbors`).
                     if as_of.is_none() {
                         if let Some(to) = &edge.valid_to {
-                            if now_rfc3339.as_str() >= to.as_str() {
+                            if now.as_str() >= to.as_str() {
                                 continue;
                             }
                         }
@@ -3158,9 +5748,10 @@ impl Storage {
                     if !Self::is_valid_as_of(&far_node.valid_from, &far_node.valid_to, as_of) {
                         continue;
                     }
-                    if !Self::node_matches(far_node, node_pat) {
+                    if !self.node_matches(far_u32, far_node, node_pat) {
                         continue;
                     }
+                    let far_node = self.hydrated_node(far_u32, far_node);
                     let mut nb = row.clone();
                     if let Some(v) = &edge_pat.var {
                         nb.insert(v.clone(), serde_json::to_value(edge).map_err(ser_err)?);
@@ -3358,90 +5949,79 @@ impl Storage {
         }
     }
 
-    /// Search-by-node target resolution (DESIGN--HQL-P0-DECISIONS §1, P0-T1):
-    /// when a HQL SEARCH/hybrid query omits `SIMILAR TO [vector]`, resolve the
-    /// (fuzzy-)target to a live node and use ITS stored embedding as the query
-    /// vector, searched in the node's own collection. Returns
-    /// `(query_vector, collection_to_use)`. `requested_collection` is the
-    /// query's explicit `IN <collection>` (if any); it must equal the node's
-    /// collection or this errors (never silently searches the wrong space).
-    fn resolve_search_by_node(
-        &self,
-        target: &str,
-        fuzzy: bool,
-        requested_collection: &Option<String>,
-    ) -> Result<(Vec<f64>, Option<String>)> {
-        let id = if fuzzy {
-            self.find_fuzzy_id(target).ok_or_else(|| {
-                Error::from_reason(format!(
-                    "HQL: target '{}' does not resolve to a node and no vector was given",
-                    target
-                ))
-            })?
-        } else {
-            target.to_string()
-        };
-        let u32_id = self.get_u32(&id).ok_or_else(|| {
-            Error::from_reason(format!(
-                "HQL: target '{}' does not resolve to a node and no vector was given",
-                target
-            ))
-        })?;
-        let node = self
-            .nodes
-            .get(&u32_id)
-            .ok_or_else(|| {
-                Error::from_reason(format!(
-                    "HQL: target '{}' does not resolve to a node and no vector was given",
-                    target
-                ))
-            })?
-            .value()
-            .clone();
-        if let Some(requested) = requested_collection {
-            let node_coll = node
-                .collection
-                .clone()
-                .unwrap_or_else(|| self.default_collection.clone());
-            if requested != &node_coll {
-                return Err(Error::from_reason(format!(
-                    "HQL: node '{}' lives in collection '{}' but IN '{}' was given; omit IN or match the node's collection",
-                    id, node_coll, requested
-                )));
-            }
-        }
-        let qvec = self.reconstruct_embedding(&node, u32_id).ok_or_else(|| {
-            Error::from_reason(format!(
-                "HQL: node '{}' has no stored embedding and no vector was given",
-                id
-            ))
-        })?;
-        Ok((qvec, node.collection.clone()))
-    }
-
     pub fn execute_hql(&self, query: &str) -> Result<serde_json::Value> {
         fn to_value<T: serde::Serialize>(res: T) -> Result<serde_json::Value> {
             serde_json::to_value(res)
                 .map_err(|e| Error::from_reason(format!("HQL result serialization failed: {e}")))
+        }
+        fn resolved_target_id(storage: &Storage, target: &str, fuzzy: bool) -> Result<String> {
+            if fuzzy {
+                storage.find_fuzzy_id(target).ok_or_else(|| {
+                    Error::from_reason(format!(
+                        "HQL: target '{target}' does not resolve to a node and no vector was given"
+                    ))
+                })
+            } else {
+                Ok(target.to_string())
+            }
+        }
+        fn hql_query_vector(
+            storage: &Storage,
+            target: &str,
+            fuzzy: bool,
+            vector: Option<Vec<f64>>,
+            requested_collection: &Option<String>,
+        ) -> Result<(Vec<f64>, Option<String>)> {
+            if let Some(vector) = vector {
+                return Ok((vector, requested_collection.clone()));
+            }
+            let resolved = resolved_target_id(storage, target, fuzzy)?;
+            let node_u32 = storage.get_u32(&resolved).ok_or_else(|| {
+                Error::from_reason(format!(
+                    "HQL: target '{target}' does not resolve to a node and no vector was given"
+                ))
+            })?;
+            let node = storage.nodes.get(&node_u32).ok_or_else(|| {
+                Error::from_reason(format!(
+                    "HQL: target '{resolved}' does not resolve to a live node and no vector was given"
+                ))
+            })?;
+            let node_collection = node
+                .collection
+                .clone()
+                .unwrap_or_else(|| storage.default_collection.clone());
+            if let Some(requested) = requested_collection {
+                if requested != &node_collection {
+                    return Err(Error::from_reason(format!(
+                        "HQL: node '{resolved}' lives in collection '{node_collection}' but IN '{requested}' was given; omit IN or match the node's collection"
+                    )));
+                }
+            }
+            let query_vector = storage
+                .reconstruct_embedding(node.value(), node_u32)
+                .ok_or_else(|| {
+                    Error::from_reason(format!(
+                        "HQL: target '{resolved}' has no stored embedding and no vector was given"
+                    ))
+                })?;
+            Ok((query_vector, node.collection.clone()))
         }
         let command = HqlCommand::try_from(query).map_err(Error::from_reason)?;
         match command {
             HqlCommand::Search {
                 vector,
                 k,
+                ef_search,
+                oversample,
                 fuzzy,
                 target,
                 lang,
                 as_of,
                 collection,
-                ef_search,
-                oversample,
                 clauses,
             } => {
-                let (query_vector, resolved_collection) = match vector {
-                    Some(v) => (v, collection),
-                    None => self.resolve_search_by_node(&target, fuzzy, &collection)?,
-                };
+                let (query_vector, resolved_collection) =
+                    hql_query_vector(self, &target, fuzzy, vector, &collection)?;
                 let res = self.hybrid_search(HybridSearchInput {
                     query_vector,
                     k,
@@ -3458,6 +6038,7 @@ impl Storage {
                 seed,
                 depth,
                 rel,
+                rels,
                 direction,
                 fuzzy,
                 as_of,
@@ -3468,20 +6049,17 @@ impl Storage {
                 } else {
                     seed
                 };
-                let (rels, is_inferred) = match rel {
-                    query::ast::HqlRel::Physical(r) if r.len() == 1 && r[0] == "ANY" => {
-                        (None, false)
-                    }
-                    query::ast::HqlRel::Physical(r) => (Some(r), false),
-                    query::ast::HqlRel::Inferred(r) => (Some(vec![r]), true),
+                let (target_rel, is_inferred) = match rel {
+                    query::ast::HqlRel::Physical(r) => (r, false),
+                    query::ast::HqlRel::Inferred(r) => (r, true),
                 };
                 let res = self.neighbors(
                     resolved_seed,
                     NeighborInput {
                         depth: Some(depth),
-                        rel: None,
+                        rel: Some(target_rel),
                         rels,
-                        direction: Some(direction.unwrap_or_else(|| "out".to_string())),
+                        direction: direction.or_else(|| Some("out".to_string())),
                         as_of,
                         include_invalid: Some(false),
                         limit: None,
@@ -3494,22 +6072,20 @@ impl Storage {
                 vector,
                 alpha,
                 k,
+                ef_search,
+                oversample,
                 fuzzy,
                 target,
                 lang,
                 as_of,
                 collection,
-                ef_search,
-                oversample,
                 clauses,
             } => {
-                let (query_vector, resolved_collection) = match vector {
-                    Some(v) => (v, collection),
-                    None => self.resolve_search_by_node(&target, fuzzy, &collection)?,
-                };
+                let (query_vector, resolved_collection) =
+                    hql_query_vector(self, &target, fuzzy, vector, &collection)?;
                 let res = self.hybrid_search(HybridSearchInput {
                     query_vector,
-                    k: k.unwrap_or(10),
+                    k,
                     alpha: Some(alpha),
                     lang,
                     as_of,
@@ -3536,6 +6112,296 @@ impl Storage {
         }
     }
 
+    pub fn execute_hql_read_only(&self, query: &str) -> Result<serde_json::Value> {
+        let command = HqlCommand::try_from(query).map_err(Error::from_reason)?;
+        match command {
+            HqlCommand::Search { .. }
+            | HqlCommand::Traverse { .. }
+            | HqlCommand::Hybrid { .. }
+            | HqlCommand::Context { .. }
+            | HqlCommand::MatchPattern { .. } => self.execute_hql(query),
+        }
+    }
+
+    fn studio_graph_node(&self, node_u32: u32, node: &NodeOutput) -> StudioGraphNode {
+        let hydrated = self.hydrated_node(node_u32, node);
+        let label = hydrated
+            .props
+            .get("title")
+            .or_else(|| hydrated.props.get("name"))
+            .and_then(Value::as_str)
+            .unwrap_or(&hydrated.id)
+            .to_string();
+        StudioGraphNode {
+            id: hydrated.id,
+            label,
+            labels: hydrated.labels,
+            collection: hydrated.collection,
+            valid_from: hydrated.valid_from,
+            valid_to: hydrated.valid_to,
+            caused_by: hydrated.caused_by,
+            impact: hydrated.impact,
+        }
+    }
+
+    fn studio_graph_edge(edge: &EdgeOutput) -> StudioGraphEdge {
+        StudioGraphEdge {
+            id: edge.id.clone(),
+            from: edge.from.clone(),
+            to: edge.to.clone(),
+            relation: edge.rel.clone(),
+            valid_from: edge.valid_from.clone(),
+            valid_to: edge.valid_to.clone(),
+            caused_by: edge.caused_by.clone(),
+        }
+    }
+
+    pub fn studio_capabilities(
+        &self,
+        mode: &str,
+        auth_features: Vec<String>,
+    ) -> StudioCapabilities {
+        StudioCapabilities {
+            protocol_version: STUDIO_PROTOCOL_VERSION.to_string(),
+            engine_version: ENGINE_VERSION.to_string(),
+            mode: mode.to_string(),
+            read_features: vec![
+                "status.read".to_string(),
+                "relational.read".to_string(),
+                "graph.scene.read".to_string(),
+                "graph.scene.expand".to_string(),
+                "vector.read".to_string(),
+                "hql.read".to_string(),
+                "entity.inspect".to_string(),
+            ],
+            write_features: Vec::new(),
+            auth_features,
+            limits: StudioLimits {
+                initial_scene_nodes: STUDIO_SCENE_PAGE_LIMIT,
+                scene_node_ceiling: STUDIO_SCENE_NODE_CEILING,
+                scene_edge_ceiling: STUDIO_SCENE_EDGE_CEILING,
+                expansion_nodes: 100,
+            },
+            consistency: "stable-frontier".to_string(),
+        }
+    }
+
+    pub fn studio_graph_scene(&self, request: StudioGraphSceneRequest) -> Result<StudioGraphScene> {
+        let limit = request.limit.unwrap_or(240);
+        if limit == 0 || limit > STUDIO_SCENE_PAGE_LIMIT {
+            return Err(Error::from_reason(format!(
+                "STUDIO_SCENE_LIMIT_EXCEEDED: limit must be 1..{}",
+                STUDIO_SCENE_PAGE_LIMIT
+            )));
+        }
+        let offset = request.offset.unwrap_or(0);
+        if offset >= STUDIO_SCENE_NODE_CEILING {
+            return Err(Error::from_reason(format!(
+                "STUDIO_SCENE_LIMIT_EXCEEDED: offset must be below {}",
+                STUDIO_SCENE_NODE_CEILING
+            )));
+        }
+        let direction = request
+            .direction
+            .clone()
+            .unwrap_or_else(|| "both".to_string())
+            .to_ascii_lowercase();
+        if !matches!(direction.as_str(), "out" | "in" | "both") {
+            return Err(Error::from_reason(
+                "STUDIO_SCENE_INVALID_DIRECTION: expected out, in, or both",
+            ));
+        }
+        let now = Utc::now().to_rfc3339();
+        let mut candidates: Vec<(u32, NodeOutput)> = if let Some(seed) = request.seed.as_ref() {
+            let seed_u32 = self
+                .get_u32(seed)
+                .ok_or_else(|| Error::from_reason("STUDIO_ENTITY_NOT_FOUND"))?;
+            let seed_node = self
+                .nodes
+                .get(&seed_u32)
+                .map(|node| self.hydrated_node(seed_u32, node.value()))
+                .ok_or_else(|| Error::from_reason("STUDIO_ENTITY_NOT_FOUND"))?;
+            if !Self::is_currently_visible(
+                &seed_node.valid_from,
+                &seed_node.valid_to,
+                &request.as_of,
+                false,
+                &now,
+            ) {
+                return Err(Error::from_reason("STUDIO_ENTITY_NOT_FOUND_AT_VIEW"));
+            }
+            let mut selected = vec![(seed_u32, seed_node)];
+            selected.extend(
+                self.neighbors(
+                    seed.clone(),
+                    NeighborInput {
+                        depth: Some(1),
+                        rel: None,
+                        rels: None,
+                        direction: Some(direction),
+                        as_of: request.as_of.clone(),
+                        include_invalid: Some(false),
+                        limit: Some(STUDIO_SCENE_NODE_CEILING as u32),
+                    },
+                    false,
+                )?
+                .into_iter()
+                .filter_map(|result| {
+                    self.get_u32(&result.node.id)
+                        .map(|node_u32| (node_u32, result.node))
+                }),
+            );
+            selected
+        } else {
+            self.nodes
+                .iter()
+                .filter(|entry| {
+                    Self::is_currently_visible(
+                        &entry.valid_from,
+                        &entry.valid_to,
+                        &request.as_of,
+                        false,
+                        &now,
+                    )
+                })
+                .map(|entry| {
+                    (
+                        *entry.key(),
+                        self.hydrated_node(*entry.key(), entry.value()),
+                    )
+                })
+                .collect()
+        };
+        candidates.sort_by(|left, right| left.1.id.cmp(&right.1.id));
+        candidates.dedup_by(|left, right| left.1.id == right.1.id);
+        let candidate_count = candidates.len().min(STUDIO_SCENE_NODE_CEILING);
+        let page: Vec<(u32, NodeOutput)> = candidates
+            .into_iter()
+            .take(STUDIO_SCENE_NODE_CEILING)
+            .skip(offset)
+            .take(limit)
+            .collect();
+        let selected_ids: HashSet<String> = page.iter().map(|(_, node)| node.id.clone()).collect();
+        let nodes: Vec<StudioGraphNode> = page
+            .iter()
+            .map(|(node_u32, node)| self.studio_graph_node(*node_u32, node))
+            .collect();
+        let mut all_edges: Vec<StudioGraphEdge> = self
+            .edges
+            .iter()
+            .filter(|entry| {
+                let edge = entry.value();
+                selected_ids.contains(&edge.from)
+                    && selected_ids.contains(&edge.to)
+                    && Self::is_currently_visible(
+                        &edge.valid_from,
+                        &edge.valid_to,
+                        &request.as_of,
+                        false,
+                        &now,
+                    )
+            })
+            .map(|entry| Self::studio_graph_edge(entry.value()))
+            .collect();
+        all_edges.sort_by(|left, right| left.id.cmp(&right.id));
+        let edges_truncated = all_edges.len() > STUDIO_SCENE_EDGE_CEILING;
+        all_edges.truncate(STUDIO_SCENE_EDGE_CEILING);
+        let next_offset = offset.saturating_add(nodes.len());
+        let nodes_truncated = next_offset < candidate_count;
+        let mut groups: Vec<String> = nodes
+            .iter()
+            .flat_map(|node| node.labels.iter().cloned())
+            .collect();
+        groups.sort();
+        groups.dedup();
+        let mut warnings = Vec::new();
+        if edges_truncated {
+            warnings.push("STUDIO_SCENE_EDGE_CEILING_REACHED".to_string());
+        }
+        Ok(StudioGraphScene {
+            scene_id: Uuid::new_v4().to_string(),
+            frontier: self.stable_frontier(),
+            nodes,
+            edges: all_edges,
+            groups,
+            truncated: nodes_truncated || edges_truncated,
+            continuation: nodes_truncated.then(|| next_offset.to_string()),
+            warnings,
+        })
+    }
+
+    pub fn studio_inspect_entity(&self, entity_id: &str) -> Result<StudioEntityInspection> {
+        let node_u32 = self
+            .get_u32(entity_id)
+            .ok_or_else(|| Error::from_reason("STUDIO_ENTITY_NOT_FOUND"))?;
+        let hydrated = self
+            .node_view_u32(node_u32)
+            .ok_or_else(|| Error::from_reason("STUDIO_ENTITY_NOT_FOUND"))?;
+        let now = Utc::now().to_rfc3339();
+        let mut incident_edges: Vec<StudioGraphEdge> = self
+            .edges
+            .iter()
+            .filter(|entry| {
+                let edge = entry.value();
+                (edge.from == entity_id || edge.to == entity_id)
+                    && Self::is_currently_visible(
+                        &edge.valid_from,
+                        &edge.valid_to,
+                        &None,
+                        false,
+                        &now,
+                    )
+                    && self.endpoint_currently_visible(&edge.from, &None)
+                    && self.endpoint_currently_visible(&edge.to, &None)
+            })
+            .map(|entry| Self::studio_graph_edge(entry.value()))
+            .collect();
+        incident_edges.sort_by(|left, right| left.id.cmp(&right.id));
+        incident_edges.truncate(1000);
+        let collection_name = hydrated
+            .collection
+            .clone()
+            .unwrap_or_else(|| self.default_collection.clone());
+        let vector_present = self
+            .collections
+            .get(&collection_name)
+            .map(|collection| {
+                collection
+                    .metadata
+                    .read()
+                    .iter()
+                    .any(|metadata| metadata.node_u32 == node_u32)
+            })
+            .unwrap_or(false);
+        let index_lag = self.index_lag();
+        let mut availability = HashMap::new();
+        availability.insert("relational".to_string(), "available".to_string());
+        availability.insert("graph".to_string(), "available".to_string());
+        availability.insert(
+            "vector".to_string(),
+            if vector_present && index_lag > 0 {
+                "stale"
+            } else if vector_present {
+                "available"
+            } else {
+                "not_present"
+            }
+            .to_string(),
+        );
+        availability.insert("temporal".to_string(), "available".to_string());
+        Ok(StudioEntityInspection {
+            entity_id: entity_id.to_string(),
+            frontier: self.stable_frontier(),
+            node: self.studio_graph_node(node_u32, &hydrated),
+            properties: hydrated.props,
+            incident_edges,
+            vector_collection: vector_present.then_some(collection_name),
+            vector_present,
+            index_lag,
+            availability,
+        })
+    }
+
     fn is_valid_as_of(valid_from: &str, valid_to: &Option<String>, as_of: &Option<String>) -> bool {
         if let Some(as_of_str) = as_of {
             if valid_from > as_of_str.as_str() {
@@ -3543,6 +6409,39 @@ impl Storage {
             }
             if let Some(to) = valid_to {
                 if as_of_str.as_str() >= to.as_str() {
+                    return false;
+                }
+            }
+        }
+        true
+    }
+
+    /// Shared bitemporal current-view rule, used by every read path that walks
+    /// live nodes/edges (`neighbors`, `query`): a node/edge is visible when
+    /// `is_valid_as_of` bounds its window relative to `as_of` AND, when no
+    /// `as_of` is given (the "now" / current view), it hasn't been retracted
+    /// or superseded in the past. `is_valid_as_of` alone doesn't cover the
+    /// no-`as_of` case: a `valid_to` set at some point in the past is still
+    /// "valid" by that check when `as_of` is `None`, so the retraction check
+    /// below is what actually hides it from the current view. `include_invalid`
+    /// is the caller's opt-in escape hatch to see retracted/superseded items
+    /// even in the current view (mirrors `neighbors`' `include_invalid`).
+    /// `now` is the caller's RFC3339 clock reading, taken ONCE per query —
+    /// this helper sits on per-edge hot loops, so it must not allocate a
+    /// fresh timestamp per call.
+    fn is_currently_visible(
+        valid_from: &str,
+        valid_to: &Option<String>,
+        as_of: &Option<String>,
+        include_invalid: bool,
+        now: &str,
+    ) -> bool {
+        if !Self::is_valid_as_of(valid_from, valid_to, as_of) {
+            return false;
+        }
+        if as_of.is_none() && !include_invalid {
+            if let Some(to) = valid_to {
+                if now >= to.as_str() {
                     return false;
                 }
             }
@@ -3665,7 +6564,7 @@ impl Storage {
                 {
                     let u32_id = meta.node_u32; // A2: id interned in metadata
                     if let Some(node) = self.nodes.get(&u32_id) {
-                        let node_out = node.value().clone();
+                        let node_out = self.hydrated_node(u32_id, node.value());
 
                         if !Self::is_valid_as_of(
                             &node_out.valid_from,
@@ -3759,9 +6658,7 @@ impl Storage {
         // Retraction visibility: by default a retracted edge (valid_to passed) is
         // hidden from the current view; `include_invalid = true` surfaces it.
         let include_invalid = args.include_invalid.unwrap_or(false);
-        // One consistent "current instant" for the whole query instead of a
-        // timestamp that drifts per edge visited (hoisted out of the BFS loop).
-        let now_rfc3339 = Utc::now().to_rfc3339();
+        let now = Utc::now().to_rfc3339();
         let mut results = Vec::new();
         let mut visited = HashSet::new();
         visited.insert(u32_seed);
@@ -3789,20 +6686,16 @@ impl Storage {
                 if let Some(edge_ref) = self.edges.get(eid) {
                     let edge = edge_ref.value();
 
-                    // Time-travel check for Edges
-                    if !Self::is_valid_as_of(&edge.valid_from, &edge.valid_to, &args.as_of) {
+                    // Bitemporal current-view check for Edges (time-travel bound +
+                    // retraction hiding); see `is_currently_visible`.
+                    if !Self::is_currently_visible(
+                        &edge.valid_from,
+                        &edge.valid_to,
+                        &args.as_of,
+                        include_invalid,
+                        &now,
+                    ) {
                         continue;
-                    }
-                    // Retraction filter for the current view: `is_valid_as_of` only
-                    // bounds valid_to when `as_of` is set, so with no as_of an edge
-                    // retracted in the past is still "valid" there. Hide it unless
-                    // the caller opted into invalidated edges.
-                    if args.as_of.is_none() && !include_invalid {
-                        if let Some(to) = &edge.valid_to {
-                            if now_rfc3339.as_str() >= to.as_str() {
-                                continue;
-                            }
-                        }
                     }
                     if !rel_allowed(&edge.rel) {
                         continue;
@@ -3836,7 +6729,7 @@ impl Storage {
                                 let mut new_path = path.clone();
                                 new_path.push(edge.clone());
                                 results.push(NeighborOutput {
-                                    node: node.clone(),
+                                    node: self.hydrated_node(next_u32, node),
                                     path: new_path.clone(),
                                     depth: curr_depth + 1,
                                     score: None,
@@ -3858,7 +6751,28 @@ impl Storage {
         Ok(results)
     }
 
+    /// Bitemporal current-view semantics (mirrors `neighbors` / HQL
+    /// `TRAVERSE ... AS OF`). By default (`as_of` and `include_invalid` both
+    /// absent) this returns only edges that are valid *now*: a retracted edge
+    /// (`retract_edge` set its `valid_to` in the past) is excluded, and so is
+    /// an edge whose `from`/`to` node is currently out of its bitemporal
+    /// window — e.g. a node that was `supersede_node`d, whose live version's
+    /// `valid_from` has advanced past the requested view. This closes a
+    /// correctness gap where the old raw scan returned every edge ever
+    /// written, regardless of retraction/supersession.
+    ///
+    /// Two optional `QueryInput` fields change that, backward-compatibly:
+    ///   - `as_of` (RFC3339 timestamp): evaluate visibility at that point in
+    ///     time instead of "now" — same time-travel semantics used elsewhere
+    ///     (HQL `AS OF`, `neighbors`'s `as_of`).
+    ///   - `include_invalid: true`: escape hatch that restores the historical
+    ///     raw-scan behavior, surfacing retracted/superseded items too.
+    ///
+    /// Absent both fields, behavior for data that was never retracted or
+    /// superseded is unchanged from before this method enforced visibility.
     pub fn query(&self, args: QueryInput) -> Result<Vec<EdgeOutput>> {
+        let include_invalid = args.include_invalid.unwrap_or(false);
+        let now = Utc::now().to_rfc3339();
         let mut res = Vec::new();
         for r in self.edges.iter() {
             let e = r.value();
@@ -3872,9 +6786,48 @@ impl Storage {
                     continue;
                 }
             }
+            if !Self::is_currently_visible(
+                &e.valid_from,
+                &e.valid_to,
+                &args.as_of,
+                include_invalid,
+                &now,
+            ) {
+                continue;
+            }
+            // Endpoint nodes must also be in view: a node superseded after
+            // `as_of` (or, in the current view, one whose live `valid_from`
+            // is still ahead of "now" post-supersession) hides the edge too —
+            // same rule `neighbors` applies to the far node on each hop.
+            if !self.endpoint_currently_visible(&e.from, &args.as_of)
+                || !self.endpoint_currently_visible(&e.to, &args.as_of)
+            {
+                continue;
+            }
             res.push(e.clone());
         }
         Ok(res)
+    }
+
+    /// Is the node named `id` within its bitemporal window as of `as_of` (or
+    /// "now" when `as_of` is `None`)? A dangling reference (no such node in
+    /// the live index) is treated as visible — existence isn't `query`'s
+    /// concern, only bitemporal validity of nodes that DO exist, matching the
+    /// node time-travel check `neighbors` runs on the far endpoint of a hop.
+    fn endpoint_currently_visible(&self, id: &str, as_of: &Option<String>) -> bool {
+        match self.get_u32(id).and_then(|u32_id| self.nodes.get(&u32_id)) {
+            Some(node_ref) => {
+                let now = Utc::now().to_rfc3339();
+                Self::is_currently_visible(
+                    &node_ref.valid_from,
+                    &node_ref.valid_to,
+                    as_of,
+                    false,
+                    &now,
+                )
+            }
+            None => true,
+        }
     }
 
     pub fn detect_communities(&self) -> Result<()> {
@@ -4262,6 +7215,15 @@ impl Storage {
                     );
                     self.persist_signed(signed_event.clone())?;
                 }
+                Event::RelationalSchema(_) | Event::RelationalRows { .. } => {
+                    self.persist_signed(signed_event.clone())?;
+                }
+                Event::Transaction(transaction) => {
+                    self.persist_signed(signed_event.clone())?;
+                    self.apply_transaction_memory(transaction, true);
+                    self.commit_sequence
+                        .fetch_max(transaction.commit_sequence, Ordering::SeqCst);
+                }
                 Event::Batch(inner_events) => {
                     // Recursive call needs SignedEvent wrapping, but for now we handle batches as single signed units
                     // To keep it simple, we wrap inner events or just apply them since the batch itself is verified.
@@ -4282,10 +7244,14 @@ impl Storage {
 
     pub fn persist_signed(&self, signed_event: SignedEvent) -> Result<()> {
         let (ack_tx, ack_rx) = unbounded();
+        let event = signed_event.event.clone();
         self.wal_sender
             .send(WalMsg::Append(Box::new(signed_event), ack_tx))
             .map_err(|_| Error::from_reason("wal disconnected"))?;
-        let _ = ack_rx.recv();
+        if !ack_rx.recv().unwrap_or(false) {
+            return Err(Error::from_reason("wal append failed"));
+        }
+        self.projection_apply_event(&event)?;
         Ok(())
     }
 
@@ -4317,7 +7283,7 @@ impl Storage {
         if let Some(u32_id) = self.get_u32(&target_id_resolved) {
             queue.push_back((u32_id, 0));
             if let Some(node) = self.nodes.get(&u32_id) {
-                nodes.insert(u32_id, node.value().clone());
+                nodes.insert(u32_id, self.hydrated_node(u32_id, node.value()));
             }
         }
 
@@ -4338,7 +7304,7 @@ impl Storage {
                                 nodes.entry(next_u32)
                             {
                                 if let Some(node) = self.nodes.get(&next_u32) {
-                                    e.insert(node.value().clone());
+                                    e.insert(self.hydrated_node(next_u32, node.value()));
                                     queue.push_back((next_u32, curr_depth + 1));
                                 }
                             }
@@ -4357,7 +7323,7 @@ impl Storage {
                                 nodes.entry(prev_u32)
                             {
                                 if let Some(node) = self.nodes.get(&prev_u32) {
-                                    e.insert(node.value().clone());
+                                    e.insert(self.hydrated_node(prev_u32, node.value()));
                                     queue.push_back((prev_u32, curr_depth + 1));
                                 }
                             }
@@ -4594,8 +7560,7 @@ impl Storage {
             )
             .map_err(|e| Error::from_reason(e.to_string()))?;
             let meta = coll.metadata.read();
-            let meta_data =
-                bincode::serialize(&*meta).map_err(|e| Error::from_reason(e.to_string()))?;
+            let meta_data = encode_metadata_snapshot(&meta)?;
             fs::write(temp_dir.join(format!("meta_{}.bin", coll.name)), meta_data)
                 .map_err(|e| Error::from_reason(e.to_string()))?;
             // Rerank sidecar (exact f32) — only when the collection carries one.
@@ -4682,6 +7647,7 @@ impl Storage {
         if let Ok(bytes) = serde_json::to_vec(&edges) {
             fs::write(temp_dir.join("edges.bin"), bytes).ok();
         }
+        self.projection_snapshot(&temp_dir.join(PROJECTION_DB_FILE))?;
 
         // 3. Save Global Metadata (incl. collections manifest)
         let state = serde_json::json!({
@@ -4845,15 +7811,35 @@ impl Storage {
                     }
                 }
                 if let Ok(data) = fs::read(self.path.join(format!("meta_{}.bin", name))) {
-                    if cm["mv"].as_u64().unwrap_or(0) >= 1 {
-                        if let Ok(meta) = bincode::deserialize::<Vec<NodeMetadata>>(&data) {
+                    match decode_metadata_snapshot(&data) {
+                        Some(Ok(meta)) => {
                             coll.count.store(meta.len(), Ordering::Relaxed);
                             *coll.metadata.write() = meta;
                         }
-                    } else if let Ok(v0) = bincode::deserialize::<Vec<NodeMetadataV0>>(&data) {
-                        // Pre-A2 String layout — migrate to interned u32 in step 3.
-                        coll.count.store(v0.len(), Ordering::Relaxed);
-                        legacy_meta.insert(name.clone(), v0);
+                        Some(Err(e)) => {
+                            // GBP1 magic present but the postcard body didn't decode:
+                            // corruption, not an unrecognized legacy format. Fail
+                            // loudly rather than silently falling through to the
+                            // bincode arms below (ADR--GENESISDB-BINCODE-EXIT).
+                            panic!(
+                                "corrupt metadata snapshot meta_{}.bin: GBP1 magic \
+                                 present but postcard body failed to decode: {}",
+                                name, e
+                            );
+                        }
+                        None if cm["mv"].as_u64().unwrap_or(0) >= 1 => {
+                            if let Ok(meta) = bincode::deserialize::<Vec<NodeMetadata>>(&data) {
+                                coll.count.store(meta.len(), Ordering::Relaxed);
+                                *coll.metadata.write() = meta;
+                            }
+                        }
+                        None => {
+                            if let Ok(v0) = bincode::deserialize::<Vec<NodeMetadataV0>>(&data) {
+                                // Pre-A2 String layout — migrate to interned u32 in step 3.
+                                coll.count.store(v0.len(), Ordering::Relaxed);
+                                legacy_meta.insert(name.clone(), v0);
+                            }
+                        }
                     }
                 }
                 self.collections.insert(name, Arc::new(coll));
@@ -4875,10 +7861,25 @@ impl Storage {
             );
             *coll.arena.write() = ArenaStore::from_bytes(&data, Quant::None, dim as usize);
             if let Ok(md) = fs::read(self.path.join("meta.bin")) {
-                // Legacy single-space snapshots always predate A2 (String layout).
-                if let Ok(v0) = bincode::deserialize::<Vec<NodeMetadataV0>>(&md) {
-                    coll.count.store(v0.len(), Ordering::Relaxed);
-                    legacy_meta.insert("default".to_string(), v0);
+                match decode_metadata_snapshot(&md) {
+                    Some(Ok(meta)) => {
+                        coll.count.store(meta.len(), Ordering::Relaxed);
+                        *coll.metadata.write() = meta;
+                    }
+                    Some(Err(e)) => {
+                        panic!(
+                            "corrupt metadata snapshot meta.bin: GBP1 magic present \
+                             but postcard body failed to decode: {}",
+                            e
+                        );
+                    }
+                    None => {
+                        // Legacy single-space snapshots always predate A2 (String layout).
+                        if let Ok(v0) = bincode::deserialize::<Vec<NodeMetadataV0>>(&md) {
+                            coll.count.store(v0.len(), Ordering::Relaxed);
+                            legacy_meta.insert("default".to_string(), v0);
+                        }
+                    }
                 }
             }
             self.collections
@@ -5416,6 +8417,14 @@ impl Storage {
             Event::Edge(ed) => Some(ed.clock.time),
             Event::Batch(v) => v.iter().filter_map(Self::event_time).max(),
             Event::Vector(v) => Some(v.clock.time),
+            Event::RelationalSchema(_) | Event::RelationalRows { .. } => None,
+            Event::Transaction(transaction) => transaction
+                .nodes
+                .iter()
+                .map(|node| node.clock.time)
+                .chain(transaction.edges.iter().map(|edge| edge.clock.time))
+                .chain(transaction.vectors.iter().map(|vector| vector.clock.time))
+                .max(),
         }
     }
 
@@ -5535,6 +8544,7 @@ impl Storage {
             }
             if node.valid_to.is_none() {
                 let mut node = node.clone();
+                node.props = self.hydrated_props(*entry.key(), &node);
                 if node.embedding.is_none() {
                     node.embedding = self.reconstruct_embedding(&node, *entry.key());
                 }
@@ -5598,6 +8608,26 @@ impl Storage {
                     count += 1;
                 }
             }
+        }
+
+        // 4. Checkpoint the current relational state as Genesis events. SQLite is
+        // a rebuildable projection, so compaction must never make it the only copy.
+        for event in self.relational_snapshot_events()? {
+            let json = serde_json::to_string(&self.sign_event(&event))
+                .map_err(|e| Error::from_reason(e.to_string()))?;
+            buf.extend_from_slice(json.as_bytes());
+            buf.push(b'\n');
+            count += 1;
+        }
+
+        // 5. Preserve transaction identities and stable frontier across WAL
+        // compaction without replaying their logical mutations a second time.
+        for event in self.transaction_checkpoint_events()? {
+            let json = serde_json::to_string(&self.sign_event(&event))
+                .map_err(|e| Error::from_reason(e.to_string()))?;
+            buf.extend_from_slice(json.as_bytes());
+            buf.push(b'\n');
+            count += 1;
         }
 
         // Hand the rebuilt WAL to the writer thread and block until it has
@@ -5831,6 +8861,62 @@ impl GenesisDatabase {
             .map_err(|e| Error::from_reason(e.to_string()))?
     }
     #[napi]
+    pub async fn register_relational_schema(&self, package_json: String) -> Result<u32> {
+        let package = serde_json::from_str::<RelationalSchemaPackage>(&package_json)
+            .map_err(|e| Error::from_reason(e.to_string()))?;
+        let i = Arc::clone(&self.inner);
+        tokio::task::spawn_blocking(move || i.register_relational_schema(package))
+            .await
+            .map_err(|e| Error::from_reason(e.to_string()))?
+    }
+    #[napi]
+    pub async fn get_relational_schema(&self, namespace: String) -> Result<String> {
+        let i = Arc::clone(&self.inner);
+        tokio::task::spawn_blocking(move || {
+            let package = i.get_relational_schema(&namespace)?;
+            serde_json::to_string(&package).map_err(|e| Error::from_reason(e.to_string()))
+        })
+        .await
+        .map_err(|e| Error::from_reason(e.to_string()))?
+    }
+    #[napi]
+    pub async fn apply_relational_batch(&self, batch_json: String) -> Result<String> {
+        let batch = serde_json::from_str::<RelationalMutationBatch>(&batch_json)
+            .map_err(|e| Error::from_reason(e.to_string()))?;
+        let i = Arc::clone(&self.inner);
+        tokio::task::spawn_blocking(move || {
+            let result = i.apply_relational_batch(batch)?;
+            serde_json::to_string(&result).map_err(|e| Error::from_reason(e.to_string()))
+        })
+        .await
+        .map_err(|e| Error::from_reason(e.to_string()))?
+    }
+    #[napi]
+    pub async fn apply_relational_rows(
+        &self,
+        namespace: String,
+        mutations_json: String,
+    ) -> Result<()> {
+        let mutations = serde_json::from_str::<Vec<RelationalRowMutation>>(&mutations_json)
+            .map_err(|e| Error::from_reason(e.to_string()))?;
+        let i = Arc::clone(&self.inner);
+        tokio::task::spawn_blocking(move || i.apply_relational_rows(&namespace, mutations))
+            .await
+            .map_err(|e| Error::from_reason(e.to_string()))?
+    }
+    #[napi]
+    pub async fn query_relational(&self, query_json: String) -> Result<String> {
+        let query = serde_json::from_str::<RelationalQuery>(&query_json)
+            .map_err(|e| Error::from_reason(e.to_string()))?;
+        let i = Arc::clone(&self.inner);
+        tokio::task::spawn_blocking(move || {
+            let rows = i.query_relational(query)?;
+            serde_json::to_string(&rows).map_err(|e| Error::from_reason(e.to_string()))
+        })
+        .await
+        .map_err(|e| Error::from_reason(e.to_string()))?
+    }
+    #[napi]
     pub async fn supersede_node(
         &self,
         id: String,
@@ -5841,6 +8927,34 @@ impl GenesisDatabase {
         tokio::task::spawn_blocking(move || i.supersede_node(id, new_props, caused_by))
             .await
             .map_err(|e| Error::from_reason(e.to_string()))?
+    }
+    #[napi]
+    pub async fn execute_named_query(&self, request_json: String) -> Result<String> {
+        let request = serde_json::from_str::<NamedQueryRequest>(&request_json)
+            .map_err(|e| Error::from_reason(e.to_string()))?;
+        let i = Arc::clone(&self.inner);
+        tokio::task::spawn_blocking(move || {
+            let rows = i.execute_named_query(request)?;
+            serde_json::to_string(&rows).map_err(|e| Error::from_reason(e.to_string()))
+        })
+        .await
+        .map_err(|e| Error::from_reason(e.to_string()))?
+    }
+    #[napi]
+    pub async fn commit_transaction(&self, transaction_json: String) -> Result<String> {
+        let transaction = serde_json::from_str::<GenesisTransaction>(&transaction_json)
+            .map_err(|e| Error::from_reason(e.to_string()))?;
+        let i = Arc::clone(&self.inner);
+        tokio::task::spawn_blocking(move || {
+            let result = i.commit_transaction(transaction)?;
+            serde_json::to_string(&result).map_err(|e| Error::from_reason(e.to_string()))
+        })
+        .await
+        .map_err(|e| Error::from_reason(e.to_string()))?
+    }
+    #[napi]
+    pub fn stable_frontier(&self) -> i64 {
+        self.inner.stable_frontier().min(i64::MAX as u64) as i64
     }
     #[napi]
     pub async fn retract_edge(&self, id: String, at: Option<String>) -> Result<Option<EdgeOutput>> {
@@ -5862,15 +8976,6 @@ impl GenesisDatabase {
             .await
             .map_err(|e| Error::from_reason(e.to_string()))?
     }
-    /// Executes an HQL query and returns the command result as JSON.
-    /// Supports SEARCH, TRAVERSE, MATCH graph patterns, MATCH ... SIMILAR
-    /// hybrid search, and CONTEXT retrieval forms.
-    /// SEARCH/MATCH hybrid may omit `SIMILAR TO [vector]` to search by the
-    /// target node's stored embedding.
-    /// Hybrid MATCH accepts `K <n>`; SEARCH and hybrid accept `EF <n>` and
-    /// `OVERSAMPLE <n>` tuning clauses.
-    /// TRAVERSE supports `DIRECTION in|out|both` and `REL a|b` alternation.
-    /// Seed and target ids may contain unquoted colons, such as `user:5`.
     #[napi]
     pub async fn execute_hql(&self, query: String) -> Result<Value> {
         let i = Arc::clone(&self.inner);

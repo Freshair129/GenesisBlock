@@ -1,7 +1,7 @@
 ---
 proposed_id: ADR--GENESISDB-COMPETITIVE-SUPERIORITY
 type: adr
-status: proposed
+status: current
 tier: strategy
 cluster: implementation_flow
 role: "ADR — competitive-superiority audit & refinement plan: >=20% head-to-head vs same-tier, enterprise-parity floor, evidence-gated"

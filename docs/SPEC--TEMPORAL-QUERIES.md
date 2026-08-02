@@ -1,3 +1,7 @@
+---
+status: current
+---
+
 # Software Requirements Document (SRD): Multi-Dimensional Temporal Queries
 
 ## 1. Introduction

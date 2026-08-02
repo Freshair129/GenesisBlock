@@ -91,8 +91,7 @@ fn open_close_reopen_node_persists() {
     } // drop
 
     let s = open(&p);
-    let uid = s.get_u32("n1").expect("n1 should be interned after reopen");
-    let n = s.nodes.get(&uid).expect("node should exist in DashMap");
+    let n = s.node_view("n1").expect("node should exist after reopen");
     assert_eq!(n.id, "n1");
     assert!(n.labels.contains(&"Person".to_string()));
     assert_eq!(n.props["name"], "Alice");
@@ -366,7 +365,7 @@ fn duplicate_node_id_behavior() {
 
     // The engine silently overwrites (last-write-wins for same id).
     let uid = s.get_u32("dup").expect("dup should be interned");
-    let n = s.nodes.get(&uid).expect("node should exist");
+    let n = s.node_view("dup").expect("node should exist");
     // The latest write's data should be visible.
     assert_eq!(
         n.props["version"], 2,
@@ -450,8 +449,7 @@ fn large_props_preserved() {
     }
 
     let s = open(&p);
-    let uid = s.get_u32("big").expect("big node should be interned");
-    let n = s.nodes.get(&uid).expect("big node should exist");
+    let n = s.node_view("big").expect("big node should exist");
     let obj = n.props.as_object().expect("props should be an object");
     assert_eq!(obj.len(), 50, "all 50 keys must survive round-trip");
     for i in 0..50 {

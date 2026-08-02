@@ -79,7 +79,7 @@ fn chunk_node_props_preserved() {
 
     let db = open(&path);
     let uid = db.get_u32("chunk-full").expect("node must survive reopen");
-    let node = db.nodes.get(&uid).unwrap();
+    let node = db.node_view_u32(uid).unwrap();
 
     assert_eq!(node.id, "chunk-full");
     assert!(node.labels.contains(&"Chunk".to_string()));
@@ -132,7 +132,7 @@ fn source_pointer_sql_row() {
     let uid = db
         .get_u32("chunk-sql")
         .expect("sql-pointer node must survive");
-    let node = db.nodes.get(&uid).unwrap();
+    let node = db.node_view_u32(uid).unwrap();
     assert_eq!(node.props["source_type"], "postgresql");
     assert_eq!(node.props["source_table"], "articles");
     assert_eq!(node.props["source_id"], "12345");
@@ -170,7 +170,7 @@ fn source_pointer_file_path() {
     let uid = db
         .get_u32("chunk-file")
         .expect("file-pointer node must survive");
-    let node = db.nodes.get(&uid).unwrap();
+    let node = db.node_view_u32(uid).unwrap();
     assert_eq!(node.props["source_type"], "filesystem");
     assert_eq!(node.props["file_path"], "/data/docs/readme.md");
     assert_eq!(node.props["byte_offset"], 1024);
@@ -416,8 +416,8 @@ fn duplicate_content_hash_both_stored() {
     let uid_b = db.get_u32("dup-b").expect("dup-b must exist");
     assert_ne!(uid_a, uid_b, "nodes must have distinct internal IDs");
 
-    let node_a = db.nodes.get(&uid_a).unwrap();
-    let node_b = db.nodes.get(&uid_b).unwrap();
+    let node_a = db.node_view("dup-a").unwrap();
+    let node_b = db.node_view("dup-b").unwrap();
     assert_eq!(node_a.props["content_hash"], shared_hash);
     assert_eq!(node_b.props["content_hash"], shared_hash);
     assert_eq!(node_a.props["chunk_index"], 0);
@@ -463,7 +463,7 @@ fn chunk_node_count() {
         let uid = db
             .get_u32(&key)
             .unwrap_or_else(|| panic!("{} must be interned", key));
-        let node = db.nodes.get(&uid).unwrap();
+        let node = db.node_view_u32(uid).unwrap();
         assert_eq!(node.props["chunk_index"], idx);
     }
 }

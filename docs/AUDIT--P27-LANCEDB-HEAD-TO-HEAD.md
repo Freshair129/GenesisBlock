@@ -1,7 +1,7 @@
 ---
 proposed_id: AUDIT--P27-LANCEDB-HEAD-TO-HEAD
 type: audit
-status: complete
+status: historical
 aliases:
   - AUDIT
   - P27

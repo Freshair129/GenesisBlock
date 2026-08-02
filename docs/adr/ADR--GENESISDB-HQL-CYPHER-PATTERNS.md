@@ -1,7 +1,7 @@
 ---
 proposed_id: ADR--GENESISDB-HQL-CYPHER-PATTERNS
 type: adr
-status: shipped
+status: current
 aliases:
   - ADR
 phase: 1
@@ -15,7 +15,8 @@ proposed_by: agent
 
 # ADR--GENESISDB-HQL-CYPHER-PATTERNS
 
-Shipped/merged via PR #60 (2026-07-03).
+> Status note (2026-07-20): shipped in the current codebase as the planner-free
+> linear-path `MATCH (<pattern>)` command family.
 
 ## Context
 

@@ -1,0 +1,92 @@
+# Tier B Competitive Sweep: DIY Default + Direct Engine Rivals for Local Multi-Agent Orchestration Memory
+
+Research date: 2026-07-06. All URLs accessed 2026-07-06 via web search/fetch. Claims marked UNVERIFIED where I could not confirm from a primary source.
+
+---
+
+## 1. The DIY default: Redis + SQLite + flat JSON
+
+**What orchestrator devs actually reach for today.** The evidence is unambiguous that this is the ecosystem default, not a strawman:
+
+- **LangGraph checkpointers** — the canonical agent-state persistence pattern — ship as `MemorySaver` (in-memory), **SQLite**, Postgres, **Redis**, and MongoDB backends ([LangGraph persistence docs](https://docs.langchain.com/oss/javascript/langgraph/persistence), [langgraphjs.guide/persistence](https://langgraphjs.guide/persistence/), accessed 2026-07-06). SQLite is explicitly positioned as the "simple persistence, survives restarts" single-workstation option; Redis as the "fast, distributed" production option.
+- Redis maintains an official first-party integration: [redis-developer/langgraph-redis](https://github.com/redis-developer/langgraph-redis) provides `RedisSaver` (thread-level checkpoints) plus `RedisStore` for **cross-thread shared memory with vector search** ([Redis blog announcement](https://redis.io/blog/langgraph-redis-checkpoint-010/), accessed 2026-07-06). So the "shared state graph for a fleet" use case is being served today by RediSearch vector + JSON, at least at the KV/vector level.
+- Redis has gone further and now ships a dedicated **[Agent Memory Server](https://github.com/redis/agent-memory-server)** ([docs](https://redis.github.io/agent-memory-server/), [redis.io/agent-memory](https://redis.io/agent-memory/), accessed 2026-07-06): background LLM-based fact extraction, short-term→long-term promotion, vector recall, exposed over MCP. This is Redis explicitly colonizing the agent-memory category on top of the DIY stack.
+
+**What the stack genuinely lacks** (assessed against the Tier B orchestrator needs — this is my analysis; the gap claims below are grounded in what the docs *don't* offer):
+
+- **No point-in-time state.** Redis has no versioning; a LangGraph SQLite checkpointer gives you *per-thread checkpoint history* (LangGraph markets this as "time travel"), but that is thread-scoped replay of one graph run, not a queryable bitemporal view across the whole shared store ("what did the fleet's shared state look like when run #412 failed?"). Reconstructing cross-agent state at time T from Redis + per-thread checkpoints is manual archaeology.
+- **No cross-agent graph queries.** RediSearch does vector + filter; it has no traversal. "Which agents touched artifacts derived from task X" is a join/graph question the stack answers only with application code over flat JSON.
+- **No unified audit.** Audit trails are whatever the orchestrator logs. There's no engine-enforced provenance; a worker can clobber shared state with no causal record. Notably, the checkpointer layer itself is now an attack surface: Check Point published a **SQLi-to-RCE exploit in LangGraph's checkpointer** in 2026 ([research.checkpoint.com](https://research.checkpoint.com/2026/from-sqli-to-rce-exploiting-langgraphs-checkpointer/), accessed 2026-07-06) — evidence that "durable checkpoints bolted onto SQLite" is a real, fragile production pattern.
+- **No DB-side fusion.** Hybrid dense+graph+recency ranking must be composed client-side (multiple round trips, worker tokens spent re-assembling context).
+
+**Why it's "good enough" anyway (be honest):** zero learning curve, every framework has an adapter, Redis vector search is genuinely fast on one box, SQLite is unkillable, and most orchestrators' actual state needs are a dict + a queue. The Redis Agent Memory Server closes the "memory extraction/recall" gap for the median user. The DIY stack loses only when the buyer *specifically* values point-in-time reconstruction, causal audit, and graph traversal over shared state — which is exactly the Tier B hypothesis, but it is a minority need today.
+
+---
+
+## 2. FalkorDB + FalkorDB Lite — the closest "graph+vector near-embedded" rival
+
+- **FalkorDB (full):** Redis-module graph DB (GraphBLAS sparse-matrix engine), Cypher-family query language, **vector index support built in**, positioned hard at GraphRAG/agent memory ([falkordb.com](https://www.falkordb.com/), [docs.falkordb.com](https://docs.falkordb.com/), accessed 2026-07-06). **License: SSPLv1** — not OSI open source; fine for internal use and non-service redistribution, viral for anyone offering it as a service ([license docs](https://docs.falkordb.com/References/license.html), accessed 2026-07-06). SSPL matters for an embedded-substrate buyer comparing against MIT/Apache alternatives.
+- **FalkorDB Lite (`falkordblite`):** announced ~2025-11-26 ([blog post](https://www.falkordb.com/blog/falkordblite-embedded-python-graph-database/), accessed 2026-07-06). Crucially it is **not in-process embedded**: it *forks a subprocess* next to your Python app and talks over a **Unix domain socket** — "embedded library experience" with process isolation. Constraints reported: **Python-only** (pip), **Python 3.12+**, **Linux x86-64 and macOS only — no Windows**, **single-process access per database file**, and FalkorDB's own FAQ scopes it to "local development, prototyping, and testing," not production ([blog](https://www.falkordb.com/blog/falkordblite-embedded-python-graph-database/); platform/single-process constraints per the Graphiti integration discussion, [getzep/graphiti#1240](https://github.com/getzep/graphiti/issues/1240), accessed 2026-07-06). Vector index availability in Lite specifically: not documented in the announcement — UNVERIFIED (full FalkorDB has it; Lite is the same engine so likely yes, but unconfirmed).
+- **Graphiti integration:** full FalkorDB is a supported Graphiti backend ([Zep blog](https://blog.getzep.com/graphiti-knowledge-graphs-falkordb-support/), [FalkorDB Graphiti docs](https://docs.falkordb.com/agentic-memory/graphiti.html), accessed 2026-07-06), and FalkorDB markets the pairing for multi-agent systems ([blog](https://www.falkordb.com/blog/graphiti-falkordb-multi-agent-performance/)). But **Graphiti-on-Lite is still an open feature request** (Feb 2026, [issue #1240](https://github.com/getzep/graphiti/issues/1240)) — the "temporal knowledge graph, fully local, zero server" combo does not ship today.
+
+**Skeptic's read:** the closest rival on paper (graph + vector + agent-memory positioning + near-embedded), but Lite today is a dev-tool subprocess with no Windows support, no stated production posture, no temporal model of its own (temporality comes from Graphiti's app-layer schema, and that integration doesn't exist for Lite yet), and an SSPL license.
+
+---
+
+## 3. LadybugDB v0.18 (Kuzu successor)
+
+- Confirmed the fork story: Kuzu archived Oct 2025, LadybugDB continues it as "DuckDB for graphs" ([ladybugdb.com](https://ladybugdb.com/), [blog: Spreading its Wings](https://blog.ladybugdb.com/post/ladybug-spreading-its-wings/), [gdotv landscape piece](https://gdotv.com/blog/kuzu-legacy-embedded-graph-database-landscape/), accessed 2026-07-06).
+- **Latest release: v0.18.0, 2026-07-01** ([GitHub releases](https://github.com/LadybugDB/ladybug/releases), fetched 2026-07-06). Cadence is healthy: v0.16.0 (Apr), v0.16.1 (May), v0.17.0/0.17.1 (May–Jun), v0.18.0 (Jul).
+- **What shipped recently:** WAL group commits, non-blocking concurrent checkpoint (WAL rotation + MVCC snapshot, v0.15.4.2), ART indexes (v0.17.0), Arrow/DuckDB/Parquet attach, multi-label patterns, MVCC/buffer-manager fixes ([releases page](https://github.com/LadybugDB/ladybug/releases), fetched 2026-07-06).
+- **The answer to the axis-parity question: NO temporal/versioning/time-travel/sync feature has shipped or been publicly roadmapped through v0.18.0.** The release notes are storage-robustness and interop work. Multi-writer remains single-process MVCC (embedded model), no CRDT/sync story. Interestingly there is a third-party book "[LadybugDB for Edge Agent AI memory](https://leanpub.com/ladybugdb)" — the community is pointing it at exactly the Tier B/C use case, without the engine having temporal features. Vector index: inherited from Kuzu's HNSW extension; no new vector work in v0.16–0.18 notes (inheritance claim UNVERIFIED against current docs).
+
+**Skeptic's read:** still one temporal extension away, and three releases since mid-2026 show no movement toward it. It remains the strongest *embedded graph query* rival (real Cypher, columnar perf, MIT-licensed Kuzu lineage) with zero bitemporal/sync answer.
+
+---
+
+## 4. SurrealDB in 2026
+
+- **SurrealDB 3.0** is shipping and is explicitly marketed as "the context layer for AI agents" / "the agent's memory — multi-model, ACID, queryable in a single round trip" ([surrealdb.com/3.0](https://surrealdb.com/3.0), [surrealdb.com](https://github.com/surrealdb/surrealdb), accessed 2026-07-06). 3.0 headline items: native WASM extensions, first-class file storage, **indexing overhaul**, client-side transactions, computed fields, stable GraphQL, 150+ bug closes ([surrealdb.com/3.0](https://surrealdb.com/3.0)). Latest tag observed on the releases page: **v3.1.5** ([GitHub releases](https://github.com/surrealdb/surrealdb/releases), fetched 2026-07-06; the fetch returned an ambiguous date — exact 3.0 GA date UNVERIFIED, but the 3.x line plus a v2 JS SDK with 3.0 support confirms 3.x is current).
+- **SurrealKV (embedded engine):** a versioned, embedded, ACID KV store in Rust — LSM, MVCC snapshot isolation, **built-in versioning with time-travel / point-in-time reads**, checkpoint/restore — built to replace RocksDB as SurrealDB's native backend ([github.com/surrealdb/surrealkv](https://github.com/surrealdb/surrealkv), [SurrealKV run docs](https://surrealdb.com/docs/surrealdb/installation/running/surrealkv), accessed 2026-07-06). SurrealQL's `VERSION` clause exposes point-in-time reads when running on SurrealKV. Embedded SDK bindings exist across languages (e.g. [SurrealDb.Embedded.SurrealKv on NuGet](https://www.nuget.org/packages/SurrealDb.Embedded.SurrealKv/0.7.0)). **Maturity caveat:** SurrealKV has long been labeled beta/not-default; whether 3.x has made it the production-default embedded engine is UNVERIFIED — I found no statement that it has, and RocksDB remained the recommended durable backend as of 2.x.
+- **Live queries:** real and shipped, with diff/patch streaming; JS SDK v2 redesigned the live-query API for 3.0 ([surrealdb.com/features](https://surrealdb.com/features), [surrealdb.js releases](https://github.com/surrealdb/surrealdb.js/releases), accessed 2026-07-06). Genuinely useful for a fleet monitor.
+- **SurrealML / time-series:** announced over the years; I found no evidence of SurrealML being a load-bearing shipped feature in 3.0 marketing — UNVERIFIED / apparently deprioritized.
+- **CRDT sync:** still nothing shipped (consistent with the 2026-H2 landscape memo). Multi-writer = run the server; embedded mode is single-process.
+
+**Skeptic's read:** SurrealDB is the most feature-complete rival on paper — multi-model (doc+graph+vector), live queries, and *actual shipped point-in-time versioning* via SurrealKV — and it is now marketing itself directly at agent memory. Honest weaknesses: the versioning is KV-level time-travel (no bitemporal valid-time model, no per-row supersession semantics), embedded-mode maturity has historically lagged the server, graph traversal performance is not its strength, and the sync story is server-replication, not conflict-free offline merge.
+
+## 5. "Agent memory database" category sweep (2025–2026)
+
+The category has exploded, but almost all of it is **app-layer memory frameworks over commodity stores**, not new database engines:
+
+- **Mem0** — ~41–47K stars, 14M downloads, hybrid vector+graph+KV over pluggable backends; **AWS picked it as exclusive memory provider for their Agent SDK** ([particula.tech comparison](https://particula.tech/blog/agent-memory-frameworks-tested-mem0-zep-letta-cognee-2026), [mem0 state-of-memory report](https://mem0.ai/blog/state-of-ai-agent-memory-2026), accessed 2026-07-06).
+- **Zep/Graphiti** — temporal knowledge graph with fact-validity windows; 63.8% LongMemEval vs Mem0's 49.0% on temporal retrieval ([particula.tech](https://particula.tech/blog/agent-memory-frameworks-tested-mem0-zep-letta-cognee-2026)). Confirms the memory note: **Graphiti already ships bitemporal semantics at the app layer** — but it *requires a graph DB server* (Neo4j/FalkorDB); no embedded backend yet ([graphiti#1240](https://github.com/getzep/graphiti/issues/1240)).
+- **Letta** (MemGPT lineage, OS-style memory runtime, server product) and **Cognee** (ECL pipeline → typed knowledge graph) round out the big four ([dev.to guide](https://dev.to/agdex_ai/ai-agent-memory-in-2026-mem0-vs-zep-vs-letta-vs-cognee-a-practical-guide-cfa), accessed 2026-07-06).
+- **Redis Agent Memory Server** (first-party, MCP-exposed, background extraction — see §1) and **Hindsight** (Vectorize's open-source MCP memory server, [hindsight.vectorize.io](https://hindsight.vectorize.io/blog/2026/03/04/mcp-agent-memory), accessed 2026-07-06) are the infra-vendor entries. **Memvid** and **EverMind** also appear in 2026 roundups ([devgenius comparison](https://blog.devgenius.io/ai-agent-memory-systems-in-2026-mem0-zep-hindsight-memvid-and-everything-in-between-compared-96e35b818da8), [evermind.ai](https://evermind.ai/blogs/best-open-source-agent-memory-frameworks-2026)) — shallow verification only.
+- **"Hyperspace" / "Cortex" as agent-memory databases: NOT FOUND / UNVERIFIED.** No credible 2025–2026 product under those names surfaced in this sweep.
+- Academic signal that the category is real: arXiv papers on agent-memory formalisms, e.g. [rate-distortion agent memory](https://arxiv.org/pdf/2605.10870) and [Eywa: provenance-grounded long-term memory](https://arxiv.org/pdf/2605.30771) (accessed 2026-07-06) — note the second is *provenance/audit*-framed, i.e., the Tier B audit need is now a named research problem.
+
+**Key structural fact:** nobody in this wave ships a new *engine*. They all sit on Neo4j/FalkorDB/Redis/Postgres/pgvector. The engine slot under an agent-memory framework is exactly the substrate position GenesisBlockDB is pivoting toward — and Graphiti's open request for an embedded backend (#1240) is the clearest single data point that the slot is currently empty.
+
+---
+
+## Who would an orchestrator builder actually pick today, and why
+
+Honestly: **Redis (or just SQLite) plus their framework's built-in checkpointer** — because it's the path of zero resistance. LangGraph/CrewAI/AutoGen all ship adapters; Redis now gives them vector recall, cross-thread stores, and a first-party MCP memory server; SQLite gives durable per-run checkpoints with "time travel" that is good enough for replaying a single failed run. The needs the DIY stack can't meet — fleet-wide point-in-time snapshots, engine-enforced audit/provenance, cross-agent graph traversal, DB-side fusion to save worker tokens — are real but latent: most builders discover them only after their first serious multi-agent debugging incident, and until then they don't shop for an engine. A builder who *has* felt that pain and wants a knowledge-graph memory picks **Zep/Graphiti over Neo4j or FalkorDB** (accepting a server) — Graphiti's app-layer bitemporality is the strongest shipped answer to "versioned agent memory" today. A builder who insists on embedded picks **LadybugDB** (best embedded graph queries, no temporal/sync/vector-freshness story) or **SurrealDB embedded** (broadest multi-model + real KV time-travel, but unproven embedded maturity, no bitemporal semantics, no CRDT). Nobody today gets bitemporal + graph + vector + audit + CRDT sync in one embedded engine — that combination is genuinely unoccupied, but the burden is on the new entrant to prove the pain is felt before Redis's and Graphiti's convenience wins by default, and Graphiti issue #1240 suggests the window (embedded backend under the leading temporal-memory framework) is both open and being noticed.
+
+### Source list
+- https://docs.langchain.com/oss/javascript/langgraph/persistence (2026-07-06)
+- https://langgraphjs.guide/persistence/ (2026-07-06)
+- https://github.com/redis-developer/langgraph-redis (2026-07-06)
+- https://redis.io/blog/langgraph-redis-checkpoint-010/ (2026-07-06)
+- https://github.com/redis/agent-memory-server ; https://redis.github.io/agent-memory-server/ ; https://redis.io/agent-memory/ (2026-07-06)
+- https://research.checkpoint.com/2026/from-sqli-to-rce-exploiting-langgraphs-checkpointer/ (2026-07-06)
+- https://www.falkordb.com/blog/falkordblite-embedded-python-graph-database/ (2026-07-06)
+- https://github.com/getzep/graphiti/issues/1240 (2026-07-06)
+- https://docs.falkordb.com/agentic-memory/graphiti.html ; https://docs.falkordb.com/References/license.html (2026-07-06)
+- https://blog.getzep.com/graphiti-knowledge-graphs-falkordb-support/ (2026-07-06)
+- https://github.com/LadybugDB/ladybug/releases (fetched 2026-07-06; v0.18.0 dated 2026-07-01)
+- https://ladybugdb.com/ ; https://blog.ladybugdb.com/post/ladybug-spreading-its-wings/ ; https://gdotv.com/blog/kuzu-legacy-embedded-graph-database-landscape/ ; https://leanpub.com/ladybugdb (2026-07-06)
+- https://surrealdb.com/3.0 ; https://github.com/surrealdb/surrealdb/releases ; https://github.com/surrealdb/surrealkv ; https://surrealdb.com/docs/surrealdb/installation/running/surrealkv ; https://github.com/surrealdb/surrealdb.js/releases ; https://www.nuget.org/packages/SurrealDb.Embedded.SurrealKv/0.7.0 (2026-07-06)
+- https://particula.tech/blog/agent-memory-frameworks-tested-mem0-zep-letta-cognee-2026 ; https://mem0.ai/blog/state-of-ai-agent-memory-2026 ; https://dev.to/agdex_ai/ai-agent-memory-in-2026-mem0-vs-zep-vs-letta-vs-cognee-a-practical-guide-cfa ; https://blog.devgenius.io/ai-agent-memory-systems-in-2026-mem0-zep-hindsight-memvid-and-everything-in-between-compared-96e35b818da8 ; https://evermind.ai/blogs/best-open-source-agent-memory-frameworks-2026 (2026-07-06)
+- https://hindsight.vectorize.io/blog/2026/03/04/mcp-agent-memory (2026-07-06)
+- https://arxiv.org/pdf/2605.10870 ; https://arxiv.org/pdf/2605.30771 (2026-07-06)

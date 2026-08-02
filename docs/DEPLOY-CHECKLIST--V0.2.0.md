@@ -1,3 +1,7 @@
+---
+status: current
+---
+
 # Deploy Checklist: GenesisBlockDB v0.2.0 (First Public Release)
 
 **Date:** 2026-06-29 | **Version:** 0.2.0 | **Registry:** npm (`@freshair129` scope)

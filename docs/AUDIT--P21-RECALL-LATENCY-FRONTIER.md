@@ -1,7 +1,7 @@
 ---
 proposed_id: AUDIT--P21-RECALL-LATENCY-FRONTIER
 type: audit
-status: complete
+status: historical
 aliases:
   - AUDIT
   - P21
