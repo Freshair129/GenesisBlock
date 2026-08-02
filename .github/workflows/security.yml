@@ -13,6 +13,8 @@ on:
       - '**/Cargo.toml'
       - '**/Cargo.lock'
       - '.github/workflows/security.yml'
+      - '.github/security-advisory-exceptions.json'
+      - 'scripts/validate_security_exceptions.py'
   pull_request:
     branches: [ main ]
   schedule:
@@ -28,17 +30,14 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - name: Validate advisory exception policy
+        run: python scripts/validate_security_exceptions.py
       - name: RustSec advisory audit
         uses: rustsec/audit-check@v2
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
-          # Ignored advisories are UNMAINTAINED-type only — never real vulnerabilities.
-          # Review this list on every security failure. If an entry is missing a justification
-          # below, treat it as expired and revalidate before adding it back.
-          #
-          # RUSTSEC-2025-0141  bincode 1.3.3 — team ceased development (doxxing incident 2025-12).
-          #                    Replacement is a large refactor (WAL encoding + snapshots + tests);
-          #                    tracked as a follow-up. See docs/adr/ADR--ENGINE-WEDGE-FIRST.md.
-          # RUSTSEC-2026-0204  crossbeam-epoch 0.9.18 — transitive (dashmap/crossbeam-channel);
-          #                    unmaintained flag, not a vulnerability; upstream migration pending.
+          # Ignore IDs must exactly match .github/security-advisory-exceptions.json.
+          # The validation step fails when an exception expires, lacks ownership,
+          # or survives beyond its declared package-version removal gate.
+          # Real vulnerabilities must never be placed in this list.
           ignore: RUSTSEC-2025-0141,RUSTSEC-2026-0204

@@ -157,13 +157,18 @@ fn seeded_scene_respects_the_requested_temporal_view() {
         })
         .unwrap();
 
+    let view = Some("2026-08-01T00:00:00Z".to_string());
     let global = storage
-        .studio_graph_scene(StudioGraphSceneRequest::default())
+        .studio_graph_scene(StudioGraphSceneRequest {
+            as_of: view.clone(),
+            ..Default::default()
+        })
         .unwrap();
     assert!(global.nodes.is_empty());
     assert!(storage
         .studio_graph_scene(StudioGraphSceneRequest {
             seed: Some("future".to_string()),
+            as_of: view,
             ..Default::default()
         })
         .is_err());

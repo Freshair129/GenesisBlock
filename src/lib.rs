@@ -4290,6 +4290,7 @@ impl Storage {
             .read(true)
             .write(true)
             .create(true)
+            .truncate(false)
             .open(&lock_path)
             .map_err(|e| {
                 Error::from_reason(format!(

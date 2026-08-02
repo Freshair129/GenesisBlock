@@ -6,6 +6,7 @@ import assert from 'node:assert';
 import os from 'node:os';
 import fs from 'node:fs';
 import path from 'node:path';
+import { execFileSync } from 'node:child_process';
 import { GenesisDatabase } from '../index.js';
 
 function tempDb(suffix) {
@@ -145,19 +146,26 @@ test('NAPI: collection isolation — node in alpha invisible from beta search', 
 test('NAPI: edge survives saveState + reopen', async () => {
   const dbPath = tempDb('edge-persist');
   try {
-    {
-      const db = GenesisDatabase.open({ path: dbPath });
+    const addonUrl = new URL('../index.js', import.meta.url).href;
+    const writer = `
+      import { GenesisDatabase } from ${JSON.stringify(addonUrl)};
+      const db = GenesisDatabase.open({ path: ${JSON.stringify(dbPath)} });
       await db.addNode({ id: 'src', labels: [] });
       await db.addNode({ id: 'dst', labels: [] });
       await db.addEdge({ from: 'src', to: 'dst', rel: 'LINKS' });
       await db.saveState();
-    }
-    {
-      const db = GenesisDatabase.open({ path: dbPath });
-      const neighbors = await db.neighbors('src', { depth: 1, rel: 'LINKS', direction: 'out' });
-      assert.strictEqual(neighbors.length, 1, 'edge must survive saveState + reopen');
-      assert.strictEqual(neighbors[0].node.id, 'dst');
-    }
+    `;
+
+    // Process exit deterministically drops the native handle and releases the
+    // ownership lock; JavaScript block scope does not guarantee finalization.
+    execFileSync(process.execPath, ['--input-type=module', '--eval', writer], {
+      stdio: 'inherit',
+    });
+
+    const db = GenesisDatabase.open({ path: dbPath });
+    const neighbors = await db.neighbors('src', { depth: 1, rel: 'LINKS', direction: 'out' });
+    assert.strictEqual(neighbors.length, 1, 'edge must survive saveState + reopen');
+    assert.strictEqual(neighbors[0].node.id, 'dst');
   } finally {
     cleanup(dbPath);
   }

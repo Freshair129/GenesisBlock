@@ -56,10 +56,10 @@ fn node_with_id(id: &str) -> NodeInput {
 #[test]
 fn unicode_thai_node() {
     let path = fresh("robust_thai");
-    let thai_id = "à¸—à¸”à¸ªà¸­à¸š-à¹„à¸—à¸¢";
-    let thai_label = "à¸‚à¹‰à¸­à¸¡à¸¹à¸¥";
-    let thai_key = "à¸Šà¸·à¹ˆà¸­";
-    let thai_value = "à¸„à¹ˆà¸²";
+    let thai_id = "\u{0e17}\u{0e14}\u{0e2a}\u{0e2d}\u{0e1a}-\u{0e44}\u{0e17}\u{0e22}";
+    let thai_label = "\u{0e02}\u{0e49}\u{0e2d}\u{0e21}\u{0e39}\u{0e25}";
+    let thai_key = "\u{0e0a}\u{0e37}\u{0e48}\u{0e2d}";
+    let thai_value = "\u{0e04}\u{0e48}\u{0e32}";
 
     {
         let db = open(&path);
@@ -96,7 +96,10 @@ fn emoji_in_props() {
         db.add_node(NodeInput {
             id: Some("emoji-node".to_string()),
             labels: vec!["Test".to_string()],
-            props: Some(json!({"mood": "ðŸ˜ŠðŸŽ‰", "flag": "ðŸ‡¹ðŸ‡­"})),
+            props: Some(json!({
+                "mood": "\u{1f60a}\u{1f389}",
+                "flag": "\u{1f1f9}\u{1f1ed}"
+            })),
             embedding: Some(vec![0.0, 1.0, 0.0, 0.0]),
             lang: None,
             valid_from: None,
@@ -113,8 +116,8 @@ fn emoji_in_props() {
             .get_u32("emoji-node")
             .expect("node should exist after reopen");
         let node = db.node_view_u32(uid).unwrap();
-        assert_eq!(node.props["mood"], "ðŸ˜ŠðŸŽ‰");
-        assert_eq!(node.props["flag"], "ðŸ‡¹ðŸ‡­");
+        assert_eq!(node.props["mood"], "\u{1f60a}\u{1f389}");
+        assert_eq!(node.props["flag"], "\u{1f1f9}\u{1f1ed}");
     }
 }
 
