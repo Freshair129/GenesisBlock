@@ -1,3 +1,7 @@
+---
+status: historical
+---
+
 # AUDIT--REBUILD-FROM-TRUTH: Source-of-Truth Rebuild Tests
 
 **Date:** 2026-06-28

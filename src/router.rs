@@ -1,5 +1,5 @@
 use axum::{
-    extract::{DefaultBodyLimit, Json, State},
+    extract::{DefaultBodyLimit, Json, Path, Query, State},
     http::{header, HeaderValue, StatusCode},
     middleware::{self, Next},
     response::IntoResponse,
@@ -14,7 +14,9 @@ use tower_http::limit::RequestBodyLimitLayer;
 use tower_http::trace::TraceLayer;
 
 use crate::{
-    CollectionInfo, EdgeInput, Event, HybridSearchInput, NodeInput, QueryInput, Storage, SyncPeer,
+    BatchInput, CollectionInfo, EdgeInput, Event, GenesisTransaction, HybridSearchInput,
+    NamedQueryRequest, NodeInput, QueryInput, RelationalMutationBatch, RelationalSchemaPackage,
+    Storage, StudioGraphSceneRequest, SyncPeer,
 };
 
 // ---------------------------------------------------------------------------
@@ -92,7 +94,19 @@ struct SupersedeInput {
 struct SwarmStatus {
     pub peer_id: String,
     pub logical_clock: u32,
+    pub merkle_root: String,
     pub peers: Vec<SyncPeer>,
+}
+
+/// Body for `POST /v1/context/retrieve` — mirrors the NAPI `retrieve_context`
+/// signature (GRL tiered retrieval), not `HybridSearchInput` (which backs the
+/// separate `/v1/reason/context` ranked-context route).
+#[derive(serde::Deserialize)]
+struct RetrieveContextInput {
+    pub target_id: String,
+    pub tier: String,
+    pub budget: Option<u32>,
+    pub fuzzy: Option<bool>,
 }
 
 #[derive(serde::Serialize)]
@@ -192,6 +206,140 @@ async fn rebuild_index_handler(State(state): State<AppState>) -> impl IntoRespon
     match storage.rebuild_index_parallel() {
         Ok(_) => StatusCode::OK.into_response(),
         Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
+    }
+}
+
+/// `Storage::execute_batch` is the core primitive `/v1/bulk/nodes` and
+/// `/v1/bulk/edges` are each built on top of internally (mixed nodes+edges in
+/// ONE all-or-nothing WAL write / `Event::Batch`) — it previously had no direct
+/// REST route (documented gotcha in CLAUDE.md). Mirrors `bulk_add_nodes_handler`'s
+/// shape: same error mapping (`INTERNAL_SERVER_ERROR` on a `Result::Err`, since
+/// `execute_batch` surfaces both governance and dimension-validation failures
+/// through the same `Error` type as `add_node`/`bulk_add_nodes`).
+async fn execute_batch_handler(
+    State(state): State<AppState>,
+    Json(input): Json<BatchInput>,
+) -> impl IntoResponse {
+    let storage = state.storage.write();
+    match storage.execute_batch(input) {
+        Ok(output) => (StatusCode::OK, Json(output)).into_response(),
+        Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
+    }
+}
+
+async fn relational_schema_handler(
+    State(state): State<AppState>,
+    Json(package): Json<RelationalSchemaPackage>,
+) -> impl IntoResponse {
+    let storage = state.storage.read();
+    match storage.register_relational_schema(package) {
+        Ok(version) => (StatusCode::OK, Json(version)).into_response(),
+        Err(e) => (StatusCode::BAD_REQUEST, e.to_string()).into_response(),
+    }
+}
+
+async fn relational_schema_get_handler(
+    State(state): State<AppState>,
+    Path(namespace): Path<String>,
+) -> impl IntoResponse {
+    let storage = state.storage.read();
+    match storage.get_relational_schema(&namespace) {
+        Ok(Some(package)) => (StatusCode::OK, Json(package)).into_response(),
+        Ok(None) => StatusCode::NOT_FOUND.into_response(),
+        Err(e) => (StatusCode::NOT_FOUND, e.to_string()).into_response(),
+    }
+}
+
+async fn relational_mutate_handler(
+    State(state): State<AppState>,
+    Json(batch): Json<RelationalMutationBatch>,
+) -> impl IntoResponse {
+    let storage = state.storage.read();
+    match storage.apply_relational_batch(batch) {
+        Ok(result) => (StatusCode::OK, Json(result)).into_response(),
+        Err(e) => (StatusCode::BAD_REQUEST, e.to_string()).into_response(),
+    }
+}
+
+async fn relational_query_handler(
+    State(state): State<AppState>,
+    Json(request): Json<NamedQueryRequest>,
+) -> impl IntoResponse {
+    let storage = state.storage.read();
+    match storage.execute_named_query(request) {
+        Ok(rows) => (StatusCode::OK, Json(rows)).into_response(),
+        Err(e) => (StatusCode::BAD_REQUEST, e.to_string()).into_response(),
+    }
+}
+
+async fn transaction_commit_handler(
+    State(state): State<AppState>,
+    Json(transaction): Json<GenesisTransaction>,
+) -> impl IntoResponse {
+    let storage = state.storage.read();
+    match storage.commit_transaction(transaction) {
+        Ok(result) => (StatusCode::OK, Json(result)).into_response(),
+        Err(e) => (StatusCode::CONFLICT, e.to_string()).into_response(),
+    }
+}
+
+async fn stable_frontier_handler(State(state): State<AppState>) -> impl IntoResponse {
+    let storage = state.storage.read();
+    (StatusCode::OK, Json(storage.stable_frontier())).into_response()
+}
+
+async fn studio_capabilities_handler(State(state): State<AppState>) -> impl IntoResponse {
+    let storage = state.storage.read();
+    let auth_features = if state.api_key.is_some() {
+        vec!["api-key".to_string()]
+    } else {
+        Vec::new()
+    };
+    Json(storage.studio_capabilities("remote", auth_features))
+}
+
+async fn studio_graph_scene_handler(
+    State(state): State<AppState>,
+    Query(request): Query<StudioGraphSceneRequest>,
+) -> impl IntoResponse {
+    let storage = state.storage.read();
+    match storage.studio_graph_scene(request) {
+        Ok(scene) => (StatusCode::OK, Json(scene)).into_response(),
+        Err(error) => (StatusCode::BAD_REQUEST, error.to_string()).into_response(),
+    }
+}
+
+async fn studio_entity_handler(
+    State(state): State<AppState>,
+    Path(entity_id): Path<String>,
+) -> impl IntoResponse {
+    let storage = state.storage.read();
+    match storage.studio_inspect_entity(&entity_id) {
+        Ok(inspection) => (StatusCode::OK, Json(inspection)).into_response(),
+        Err(error) if error.to_string().contains("NOT_FOUND") => {
+            (StatusCode::NOT_FOUND, error.to_string()).into_response()
+        }
+        Err(error) => (StatusCode::BAD_REQUEST, error.to_string()).into_response(),
+    }
+}
+
+async fn studio_read_hql_handler(
+    State(state): State<AppState>,
+    Json(body): Json<HqlBody>,
+) -> impl IntoResponse {
+    let query = body.into_query();
+    let storage = state.storage.read();
+    match storage.execute_hql_read_only(&query) {
+        Ok(result) => (StatusCode::OK, Json(result)).into_response(),
+        Err(error) => (StatusCode::BAD_REQUEST, error.to_string()).into_response(),
+    }
+}
+
+async fn studio_relational_schemas_handler(State(state): State<AppState>) -> impl IntoResponse {
+    let storage = state.storage.read();
+    match storage.list_relational_schemas() {
+        Ok(schemas) => (StatusCode::OK, Json(schemas)).into_response(),
+        Err(error) => (StatusCode::INTERNAL_SERVER_ERROR, error.to_string()).into_response(),
     }
 }
 
@@ -361,6 +509,17 @@ async fn execute_hql_handler(
     }
 }
 
+/// `POST /v1/query` — filter edges by `from`/`to`, bitemporal **current-view
+/// by default**: retracted edges (`/v1/edge/retract`) and edges whose
+/// endpoint node has been superseded (`/v1/node/supersede`) out of view are
+/// excluded, same visibility rule `TRAVERSE`/`neighbors` use (see
+/// `Storage::query` for the exact semantics). Two optional body fields
+/// change that, backward-compatibly (absent = current view, unchanged from
+/// before this endpoint enforced visibility):
+///   - `as_of` (RFC3339 timestamp): time-travel — evaluate visibility at that
+///     point in time instead of "now".
+///   - `include_invalid: true`: escape hatch that restores the historical
+///     raw-scan behavior, surfacing retracted/superseded edges too.
 async fn query_handler(
     State(state): State<AppState>,
     Json(input): Json<QueryInput>,
@@ -415,11 +574,35 @@ async fn ranked_context_handler(
     }
 }
 
+async fn retrieve_context_handler(
+    State(state): State<AppState>,
+    Json(input): Json<RetrieveContextInput>,
+) -> impl IntoResponse {
+    let storage = state.storage.read();
+    if storage.is_rebuilding.load(Ordering::SeqCst) {
+        return (
+            StatusCode::SERVICE_UNAVAILABLE,
+            "Engine is rebuilding index...",
+        )
+            .into_response();
+    }
+    match storage.retrieve_context(
+        &input.target_id,
+        &input.tier,
+        input.budget,
+        input.fuzzy.unwrap_or(false),
+    ) {
+        Ok(pkg) => (StatusCode::OK, Json(pkg)).into_response(),
+        Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
+    }
+}
+
 async fn swarm_status_handler(State(state): State<AppState>) -> impl IntoResponse {
     let storage = state.storage.read();
     let status = SwarmStatus {
         peer_id: storage.local_peer_id.clone(),
         logical_clock: storage.get_logical_clock(),
+        merkle_root: storage.get_merkle_root(),
         peers: storage.peers.iter().map(|e| e.value().clone()).collect(),
     };
     Json(status)
@@ -621,6 +804,31 @@ pub fn build_router(state: AppState) -> Router {
         .route("/v1/bulk/nodes", post(bulk_add_nodes_handler))
         .route("/v1/bulk/edges", post(bulk_add_edges_handler))
         .route("/v1/bulk/rebuild", post(rebuild_index_handler))
+        .route("/v1/batch", post(execute_batch_handler))
+        .route("/v1/relational/schema", post(relational_schema_handler))
+        .route(
+            "/v1/relational/schema/register",
+            post(relational_schema_handler),
+        )
+        .route(
+            "/v1/relational/schema/:namespace",
+            get(relational_schema_get_handler),
+        )
+        .route("/v1/relational/mutate", post(relational_mutate_handler))
+        .route("/v1/relational/query", post(relational_query_handler))
+        .route("/v1/transaction/commit", post(transaction_commit_handler))
+        .route("/v1/frontier", get(stable_frontier_handler))
+        .route("/v1/studio/capabilities", get(studio_capabilities_handler))
+        .route("/v1/studio/graph", get(studio_graph_scene_handler))
+        .route("/v1/studio/entity/:entity_id", get(studio_entity_handler))
+        .route(
+            "/v1/studio/query/read",
+            post(studio_read_hql_handler).layer(DefaultBodyLimit::max(256 * 1024)),
+        )
+        .route(
+            "/v1/studio/relational/schemas",
+            get(studio_relational_schemas_handler),
+        )
         // HQL is a query string; cap the body at 256 KiB so a malformed/huge
         // request can't force a large allocation (defense-in-depth — the bulk
         // routes that legitimately carry embeddings keep the default limit).
@@ -645,6 +853,7 @@ pub fn build_router(state: AppState) -> Router {
         .route("/v1/query", post(query_handler))
         .route("/v1/search/hybrid", post(hybrid_search_handler))
         .route("/v1/reason/context", post(ranked_context_handler))
+        .route("/v1/context/retrieve", post(retrieve_context_handler))
         .route("/v1/status", get(status_handler))
         .route("/v1/version", get(version_handler))
         .route("/v1/swarm/status", get(swarm_status_handler))

@@ -1,3 +1,7 @@
+---
+status: current
+---
+
 # GenesisBlock DB: Master Specification (v2.0.0)
 
 ## 1. Abstract
@@ -9,8 +13,10 @@ GenesisBlock DB (GenesisBlockDB) is a high-performance, embedded hybrid semantic
 GenesisBlockDB uses a **Log-Structured Merge-Friendly** architecture based on a Write-Ahead Log (WAL).
 - **Primary Log:** `genesis-graph.wal` (JSONL format) stores all mutation events.
 - **Persistence:** High-durability append-only logic with batched group commits.
+- **Unified operational boundary:** applications open, mutate, query, back up, and restore GenesisBlockDB as one database. SQLite is an internal relational projection; native graph/vector indexes are not separate application-managed databases.
+- **Relational projection:** embedded SQLite (`rusqlite`, bundled) stores node properties, normalized labels, and U2 app-defined tables. Versioned additive schemas, idempotent typed mutation batches, and bounded named joins are available through Genesis APIs; SQLite remains internal and rebuildable from the signed WAL. Unified cross-domain commit sequencing remains U3.
 - **In-Memory State:**
-    - `DashMap<u32, NodeOutput>`: Primary node storage (nodes interned to `u32`).
+    - `DashMap<u32, NodeOutput>`: Lean primary node records (nodes interned to `u32`); `props` are hydrated from SQLite rather than retained on the traversal path.
     - `DashMap<u128, EdgeOutput>`: Primary edge storage. Edges are keyed by a
       deterministic `u128 = trunc128(SHA256(id))` (`Storage::edge_key`); the key is
       derived from `EdgeOutput.id`, never stored authoritatively (legacy u64-keyed
@@ -95,7 +101,7 @@ GenesisBlockDB ensures eventual consistency across distributed agents using:
 
 ## 7. HQL (Hybrid Query Language)
 
-GenesisBlockDB exposes a specialized language for reasoning over graph and vector data.
+GenesisBlockDB exposes HQL as a compatibility/query frontend for graph, vector, and context operations. The canonical future public contract is typed Query IR; HQL is not the storage authority and is not required to grow into general-purpose SQL/Cypher.
 
 ### 7.1 Search (Lexical/Vector)
 ```sql
@@ -115,6 +121,9 @@ MATCH target SIMILAR TO [...] ALPHA 0.4 LANGUAGE "en"
 ```
 
 ## 8. Deployment & Connectivity
+### 8.1 Deployment modes
+The same Rust core supports in-process mobile embedding and a single-node self-hosted Axum server. Multi-node HA, distributed SQL, and automatic failover are not v1 claims.
+
 ### 8.2 Model Context Protocol (MCP)
 GenesisBlock provides a native MCP server for seamless integration with LLMs.
 - **Transport:** Stdio (Local) and SSE (Swarm).

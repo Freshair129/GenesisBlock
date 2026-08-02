@@ -5,7 +5,8 @@ fuzzy_prefix = { "~" }
 target = { fuzzy_prefix? ~ (identifier | string_lit) }
 seed = { fuzzy_prefix? ~ (identifier | string_lit) }
 
-rel_type = { identifier }
+rel_name = { identifier }
+rel_type = { rel_name ~ ("|" ~ rel_name)* }
 infer_rel = { ^"INFER" ~ "(" ~ identifier ~ ")" }
 rel = { infer_rel | rel_type }
 
@@ -18,9 +19,15 @@ vector = { number ~ ("," ~ number)* }
 k = @{ ASCII_DIGIT+ }
 depth = @{ ASCII_DIGIT+ }
 alpha = { number }
+ef = @{ ASCII_DIGIT+ }
+oversample = @{ ASCII_DIGIT+ }
 lang_spec = { ^"LANGUAGE" ~ string_lit }
 as_of = { ^"AS" ~ ^"OF" ~ string_lit }
 collection_spec = { ^"IN" ~ (identifier | string_lit) }
+ef_spec = { ^"EF" ~ ef }
+oversample_spec = { ^"OVERSAMPLE" ~ oversample }
+direction = { ^"in" | ^"out" | ^"both" }
+direction_spec = { ^"DIRECTION" ~ direction }
 
 // --- filter / projection / ergonomics clauses (ADR--GENESISDB-HQL-FILTER-PROJECTION) ---
 // All four are optional and post-process the command's result list in order:
@@ -40,9 +47,10 @@ return_clause = { ^"RETURN" ~ (return_all | field ~ ("," ~ field)*) }
 // Whole group is nullable, so existing clause-free queries still parse unchanged.
 clauses = { where_clause? ~ order_clause? ~ limit_clause? ~ return_clause? }
 
-search = { ^"SEARCH" ~ target ~ ^"SIMILAR" ~ ^"TO" ~ "[" ~ vector ~ "]" ~ ^"K" ~ k ~ collection_spec? ~ lang_spec? ~ as_of? ~ clauses }
-traverse = { ^"TRAVERSE" ~ ^"FROM" ~ seed ~ ^"DEPTH" ~ depth ~ ^"REL" ~ rel ~ as_of? ~ clauses }
-hybrid = { ^"MATCH" ~ target ~ ^"SIMILAR" ~ ^"TO" ~ "[" ~ vector ~ "]" ~ ^"ALPHA" ~ alpha ~ collection_spec? ~ lang_spec? ~ as_of? ~ clauses }
+similar_clause = { ^"SIMILAR" ~ ^"TO" ~ "[" ~ vector ~ "]" }
+search = { ^"SEARCH" ~ target ~ similar_clause? ~ ^"K" ~ k ~ ef_spec? ~ oversample_spec? ~ collection_spec? ~ lang_spec? ~ as_of? ~ clauses }
+traverse = { ^"TRAVERSE" ~ ^"FROM" ~ seed ~ ^"DEPTH" ~ depth ~ ^"REL" ~ rel ~ direction_spec? ~ as_of? ~ clauses }
+hybrid = { ^"MATCH" ~ target ~ similar_clause? ~ ^"ALPHA" ~ alpha ~ (^"K" ~ k)? ~ ef_spec? ~ oversample_spec? ~ collection_spec? ~ lang_spec? ~ as_of? ~ clauses }
 
 // --- Cypher-style graph pattern matching (ADR--GENESISDB-HQL-CYPHER-PATTERNS, path 1) ---
 // A linear path pattern: an anchor node followed by zero+ (edge, node) hops.

@@ -1,7 +1,7 @@
 ---
 proposed_id: CR--EDGE-ENDPOINTS-STRING-AND-EMBEDDING-DEDUP
 type: change-request
-status: merged
+status: current
 aliases:
   - CR
 tier: process

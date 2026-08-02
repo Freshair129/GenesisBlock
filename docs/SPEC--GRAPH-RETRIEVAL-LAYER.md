@@ -1,3 +1,7 @@
+---
+status: current
+---
+
 # Software Requirements Document (SRD): Graph Retrieval Layer (GRL)
 
 ## 1. Introduction

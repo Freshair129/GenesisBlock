@@ -1,3 +1,7 @@
+---
+status: current
+---
+
 # GenesisBlock Python SDK Guide
 
 ## 1. Installation

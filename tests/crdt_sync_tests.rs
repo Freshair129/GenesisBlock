@@ -75,7 +75,10 @@ fn test_crdt_conflict_resolution() {
     storage_b
         .reconcile_state(vec![valid_event_a.clone()])
         .unwrap();
-    assert_eq!(storage_b.nodes.get(&0).unwrap().props["name"], "Initial");
+    assert_eq!(
+        storage_b.node_view("node-1").unwrap().props["name"],
+        "Initial"
+    );
 
     // 3. Concurrent Edits
     let node_a_v2 = storage_a
@@ -118,11 +121,17 @@ fn test_crdt_conflict_resolution() {
 
     // 4. B applies its own Version B locally first
     storage_b.reconcile_state(vec![signed_b.clone()]).unwrap();
-    assert_eq!(storage_b.nodes.get(&0).unwrap().props["name"], "Version B");
+    assert_eq!(
+        storage_b.node_view("node-1").unwrap().props["name"],
+        "Version B"
+    );
 
     // 5. A receives B's update (10 > 2)
     storage_a.reconcile_state(vec![signed_b.clone()]).unwrap();
-    assert_eq!(storage_a.nodes.get(&0).unwrap().props["name"], "Version B");
+    assert_eq!(
+        storage_a.node_view("node-1").unwrap().props["name"],
+        "Version B"
+    );
 
     // 6. B receives A's update (2 < 10)
     let sig_a2 = storage_a
@@ -137,7 +146,7 @@ fn test_crdt_conflict_resolution() {
     };
     storage_b.reconcile_state(vec![signed_a2]).unwrap();
     assert_eq!(
-        storage_b.nodes.get(&0).unwrap().props["name"],
+        storage_b.node_view("node-1").unwrap().props["name"],
         "Version B",
         "B should reject A's older update"
     );

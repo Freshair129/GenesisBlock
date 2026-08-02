@@ -1,7 +1,7 @@
 ---
 version: "1.0.0"
 created_at: "2026-06-29"
-status: "phase-0-complete"
+status: current
 mark: "XVI"
 complexity: "C-3"
 doc_type: "spec"
@@ -30,7 +30,7 @@ The current mobile story is zero. The Obsidian plugin calls the Axum REST server
 it requires a running server process, which is a non-starter on mobile. Every other surface
 (Node NAPI, Python SDK, Go SDK, REST server) targets desktop or server.
 
-**Target:** GenesisBlockDB runs embedded in a mobile process the same way SQLite does.
+**Target:** GenesisBlockDB runs embedded in a mobile process as one application-facing database boundary. SQLite is bundled inside that boundary for relational projection; applications do not maintain a separate SQLite database for Genesis-owned data.
 No network. No server. WAL + HNSW + GRL available in-process on iOS and Android.
 
 **Comparators this closes:**

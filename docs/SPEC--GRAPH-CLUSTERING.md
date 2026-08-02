@@ -1,3 +1,7 @@
+---
+status: current
+---
+
 # Functional Specification: Automatic Graph Clustering (Mark V)
 
 ## 1. Objective

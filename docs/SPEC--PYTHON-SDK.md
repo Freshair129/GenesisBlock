@@ -1,3 +1,7 @@
+---
+status: current
+---
+
 # Software Requirements Document (SRD): Python Client Binding (Mark XI, Step 2)
 
 ## 1. Introduction

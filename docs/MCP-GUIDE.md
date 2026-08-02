@@ -1,3 +1,7 @@
+---
+status: current
+---
+
 # GenesisBlock: Model Context Protocol (MCP) Guide
 
 ## 1. Introduction

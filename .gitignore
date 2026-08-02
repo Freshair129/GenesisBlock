@@ -11,6 +11,16 @@ npm-debug.log
 dashboard/playwright-report/
 dashboard/test-results/
 dashboard/dist/
+studio/dist/
+studio/node_modules/
+studio/playwright-report/
+studio/test-results/
+studio/src-tauri/gen/
+studio/src-tauri/target-verify/
+studio/src-tauri/icons/android/
+studio/src-tauri/icons/ios/
+studio/src-tauri/icons/StoreLogo.png
+studio/src-tauri/icons/Square*Logo.png
 
 # Auto-generated index.js / index.d.ts are committed (P3.1) so callers
 # can require('@freshair129/gks-genesis-block-native') even before a
@@ -29,6 +39,8 @@ dashboard/dist/
 **/*.lock
 # ...but track the root Cargo.lock for reproducible binary/addon builds
 !/Cargo.lock
+# The Studio desktop shell is an independent Cargo package and ships its lockfile.
+!studio/src-tauri/Cargo.lock
 **/*.bin
 .brain/
 **/temp_db/
@@ -50,3 +62,6 @@ __pycache__/
 
 # Local doc/audit export artifacts (generated, not source)
 docs/audit.zip
+
+# stray doc archives in repo root
+/docs.zip

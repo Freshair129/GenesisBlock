@@ -382,7 +382,7 @@ fn valid_search_parses() {
     }) = HqlCommand::try_from(VALID_SEARCH)
     {
         assert_eq!(target, "mynode");
-        assert_eq!(vector, vec![1.0, 2.0, 3.0]);
+        assert_eq!(vector, Some(vec![1.0, 2.0, 3.0]));
         assert_eq!(k, 10);
     } else {
         panic!("Expected Search variant");

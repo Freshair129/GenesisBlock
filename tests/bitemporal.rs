@@ -69,8 +69,7 @@ fn supersede_updates_current() {
     assert_eq!(updated.props["name"], "new", "supersede must update props");
 
     // Also verify via the nodes map.
-    let uid = s.get_u32("s1").unwrap();
-    let stored = s.nodes.get(&uid).unwrap();
+    let stored = s.node_view("s1").unwrap();
     assert_eq!(stored.props["name"], "new");
 }
 

@@ -53,19 +53,20 @@ fn node_with_id(id: &str) -> NodeInput {
     }
 }
 
-// ---------------------------------------------------------------------------
-// 1. unicode_thai_node
-//    Thai script in id, labels, and props survives save + reopen.
-// ---------------------------------------------------------------------------
 #[test]
 fn unicode_thai_node() {
     let path = fresh("robust_thai");
+    let thai_id = "\u{0e17}\u{0e14}\u{0e2a}\u{0e2d}\u{0e1a}-\u{0e44}\u{0e17}\u{0e22}";
+    let thai_label = "\u{0e02}\u{0e49}\u{0e2d}\u{0e21}\u{0e39}\u{0e25}";
+    let thai_key = "\u{0e0a}\u{0e37}\u{0e48}\u{0e2d}";
+    let thai_value = "\u{0e04}\u{0e48}\u{0e32}";
+
     {
         let db = open(&path);
         db.add_node(NodeInput {
-            id: Some("ทดสอบ-ไทย".to_string()),
-            labels: vec!["ข้อมูล".to_string()],
-            props: Some(json!({"ชื่อ": "ค่า"})),
+            id: Some(thai_id.to_string()),
+            labels: vec![thai_label.to_string()],
+            props: Some(json!({ thai_key: thai_value })),
             embedding: Some(vec![1.0, 0.0, 0.0, 0.0]),
             lang: None,
             valid_from: None,
@@ -76,22 +77,17 @@ fn unicode_thai_node() {
         .unwrap();
         db.save_state().unwrap();
     }
+
     {
         let db = reopen(&path);
-        let uid = db
-            .get_u32("ทดสอบ-ไทย")
-            .expect("Thai ID should survive reopen");
-        let node = db.nodes.get(&uid).expect("node should exist");
-        assert_eq!(node.id, "ทดสอบ-ไทย");
-        assert_eq!(node.labels, vec!["ข้อมูล".to_string()]);
-        assert_eq!(node.props["ชื่อ"], "ค่า");
+        let uid = db.get_u32(thai_id).expect("Thai ID should survive reopen");
+        let node = db.node_view_u32(uid).expect("node should exist");
+        assert_eq!(node.id, thai_id);
+        assert_eq!(node.labels, vec![thai_label.to_string()]);
+        assert_eq!(node.props[thai_key], thai_value);
     }
 }
 
-// ---------------------------------------------------------------------------
-// 2. emoji_in_props
-//    Emoji in property values survives persistence round-trip.
-// ---------------------------------------------------------------------------
 #[test]
 fn emoji_in_props() {
     let path = fresh("robust_emoji");
@@ -100,7 +96,10 @@ fn emoji_in_props() {
         db.add_node(NodeInput {
             id: Some("emoji-node".to_string()),
             labels: vec!["Test".to_string()],
-            props: Some(json!({"mood": "😊🎉", "flag": "🇹🇭"})),
+            props: Some(json!({
+                "mood": "\u{1f60a}\u{1f389}",
+                "flag": "\u{1f1f9}\u{1f1ed}"
+            })),
             embedding: Some(vec![0.0, 1.0, 0.0, 0.0]),
             lang: None,
             valid_from: None,
@@ -116,16 +115,12 @@ fn emoji_in_props() {
         let uid = db
             .get_u32("emoji-node")
             .expect("node should exist after reopen");
-        let node = db.nodes.get(&uid).unwrap();
-        assert_eq!(node.props["mood"], "😊🎉");
-        assert_eq!(node.props["flag"], "🇹🇭");
+        let node = db.node_view_u32(uid).unwrap();
+        assert_eq!(node.props["mood"], "\u{1f60a}\u{1f389}");
+        assert_eq!(node.props["flag"], "\u{1f1f9}\u{1f1ed}");
     }
 }
 
-// ---------------------------------------------------------------------------
-// 3. large_props_100kb
-//    A single property value ~100 KB. Should succeed and survive reopen.
-// ---------------------------------------------------------------------------
 #[test]
 fn large_props_100kb() {
     let path = fresh("robust_large_props");
@@ -144,11 +139,8 @@ fn large_props_100kb() {
             collection: None,
         });
         match result {
-            Ok(_) => {
-                db.save_state().unwrap();
-            }
+            Ok(_) => db.save_state().unwrap(),
             Err(e) => {
-                // Clean error is acceptable for very large props.
                 eprintln!(
                     "large_props_100kb: engine rejected large props cleanly: {}",
                     e
@@ -162,16 +154,12 @@ fn large_props_100kb() {
         let uid = db
             .get_u32("big-props")
             .expect("large-props node should survive");
-        let node = db.nodes.get(&uid).unwrap();
+        let node = db.node_view_u32(uid).unwrap();
         let payload = node.props["payload"].as_str().unwrap();
         assert_eq!(payload.len(), 100_000);
     }
 }
 
-// ---------------------------------------------------------------------------
-// 4. huge_vector_wrong_dim
-//    Open with dim=4, attempt dim=10000 embedding. Must error, not panic/OOM.
-// ---------------------------------------------------------------------------
 #[test]
 fn huge_vector_wrong_dim() {
     let db = open(&fresh("robust_wrong_dim"));
@@ -193,10 +181,6 @@ fn huge_vector_wrong_dim() {
     );
 }
 
-// ---------------------------------------------------------------------------
-// 5. zero_dim_vector
-//    Empty embedding vec should error.
-// ---------------------------------------------------------------------------
 #[test]
 fn zero_dim_vector() {
     let db = open(&fresh("robust_zero_dim"));
@@ -214,10 +198,6 @@ fn zero_dim_vector() {
     assert!(result.is_err(), "empty embedding should be rejected");
 }
 
-// ---------------------------------------------------------------------------
-// 6. empty_node_id
-//    id = Some(""). Documents engine behavior (succeed or clean error).
-// ---------------------------------------------------------------------------
 #[test]
 fn empty_node_id() {
     let db = open(&fresh("robust_empty_id"));
@@ -232,22 +212,12 @@ fn empty_node_id() {
         ttl: None,
         collection: None,
     });
-    // Either succeeds (empty string is a valid key) or errors cleanly.
     match result {
-        Ok(node) => {
-            assert_eq!(node.id, "", "empty id should be preserved if accepted");
-        }
-        Err(e) => {
-            // Clean error — no panic, no corruption.
-            eprintln!("empty_node_id: engine rejected empty id: {}", e);
-        }
+        Ok(node) => assert_eq!(node.id, "", "empty id should be preserved if accepted"),
+        Err(e) => eprintln!("empty_node_id: engine rejected empty id: {}", e),
     }
 }
 
-// ---------------------------------------------------------------------------
-// 7. empty_edge_rel
-//    rel = "". Documents engine behavior.
-// ---------------------------------------------------------------------------
 #[test]
 fn empty_edge_rel() {
     let db = open(&fresh("robust_empty_rel"));
@@ -265,19 +235,11 @@ fn empty_edge_rel() {
         caused_by: None,
     });
     match result {
-        Ok(edge) => {
-            assert_eq!(edge.rel, "", "empty rel should be preserved if accepted");
-        }
-        Err(e) => {
-            eprintln!("empty_edge_rel: engine rejected empty rel: {}", e);
-        }
+        Ok(edge) => assert_eq!(edge.rel, "", "empty rel should be preserved if accepted"),
+        Err(e) => eprintln!("empty_edge_rel: engine rejected empty rel: {}", e),
     }
 }
 
-// ---------------------------------------------------------------------------
-// 8. missing_labels
-//    labels = vec![] — should succeed (labels not required to be non-empty).
-// ---------------------------------------------------------------------------
 #[test]
 fn missing_labels() {
     let db = open(&fresh("robust_no_labels"));
@@ -297,10 +259,6 @@ fn missing_labels() {
     assert!(node.labels.is_empty(), "labels should be empty");
 }
 
-// ---------------------------------------------------------------------------
-// 9. special_chars_in_id
-//    ID with colons, slashes, spaces, parens. Survives save + reopen.
-// ---------------------------------------------------------------------------
 #[test]
 fn special_chars_in_id() {
     let path = fresh("robust_special_id");
@@ -326,15 +284,11 @@ fn special_chars_in_id() {
         let uid = db
             .get_u32(id)
             .expect("special-chars ID should survive reopen");
-        let node = db.nodes.get(&uid).unwrap();
+        let node = db.node_view_u32(uid).unwrap();
         assert_eq!(node.id, id);
     }
 }
 
-// ---------------------------------------------------------------------------
-// 10. null_props_fields
-//     JSON null values in props survive round-trip.
-// ---------------------------------------------------------------------------
 #[test]
 fn null_props_fields() {
     let path = fresh("robust_null_props");
@@ -359,7 +313,7 @@ fn null_props_fields() {
         let uid = db
             .get_u32("null-props")
             .expect("null-props node should survive reopen");
-        let node = db.nodes.get(&uid).unwrap();
+        let node = db.node_view_u32(uid).unwrap();
         assert!(
             node.props["key"].is_null(),
             "top-level null should be preserved"
@@ -371,10 +325,6 @@ fn null_props_fields() {
     }
 }
 
-// ---------------------------------------------------------------------------
-// 11. very_long_id
-//     10000-char id. Should either succeed or error cleanly. No panic.
-// ---------------------------------------------------------------------------
 #[test]
 fn very_long_id() {
     let db = open(&fresh("robust_long_id"));
@@ -391,27 +341,16 @@ fn very_long_id() {
         collection: None,
     });
     match result {
-        Ok(node) => {
-            assert_eq!(node.id.len(), 10_000, "long id should be preserved");
-        }
-        Err(e) => {
-            eprintln!("very_long_id: engine rejected long id cleanly: {}", e);
-        }
+        Ok(node) => assert_eq!(node.id.len(), 10_000, "long id should be preserved"),
+        Err(e) => eprintln!("very_long_id: engine rejected long id cleanly: {}", e),
     }
 }
 
-// ---------------------------------------------------------------------------
-// 12. concurrent_save_state
-//     Two threads call save_state() simultaneously. No corruption; data
-//     survives reopen.
-// ---------------------------------------------------------------------------
 #[test]
 fn concurrent_save_state() {
     let path = fresh("robust_conc_save");
     {
         let db = Arc::new(open(&path));
-
-        // Insert some data first
         for i in 0..50 {
             db.add_node(node_with_id(&format!("save-{}", i))).unwrap();
         }
@@ -424,22 +363,18 @@ fn concurrent_save_state() {
 
         let r1 = t1.join().expect("save_state thread 1 panicked");
         let r2 = t2.join().expect("save_state thread 2 panicked");
-
-        // At least one should succeed; both succeeding is also fine.
         assert!(
             r1.is_ok() || r2.is_ok(),
             "at least one concurrent save_state should succeed"
         );
     }
     {
-        // Reopen and verify integrity
         let db = reopen(&path);
         assert!(
             db.nodes.len() >= 50,
             "all 50 nodes should survive concurrent save: got {}",
             db.nodes.len()
         );
-        // Spot-check a few nodes
         assert!(db.get_u32("save-0").is_some(), "save-0 should exist");
         assert!(db.get_u32("save-49").is_some(), "save-49 should exist");
     }

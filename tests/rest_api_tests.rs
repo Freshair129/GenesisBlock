@@ -1,4 +1,4 @@
-//! REST API integration tests — exercises all 24 /v1/* routes via in-process
+//! REST API integration tests — exercises all 25 /v1/* routes via in-process
 //! Axum oneshot calls (no TCP socket). Each test gets its own TempDir so
 //! there is no shared state between tests.
 //!
@@ -143,6 +143,91 @@ async fn test_status_returns_open() {
     assert_eq!(body["read_only"], json!(false));
 }
 
+#[tokio::test]
+async fn test_relational_u2_canonical_routes() {
+    let (app, _dir) = make_app();
+    let package = json!({
+        "namespace": "restapp",
+        "schema_version": 1,
+        "previous_version": null,
+        "package_id": "00000000-0000-4000-8000-000000000301",
+        "schema_hash": "",
+        "tables": [{
+            "name": "notes",
+            "columns": [
+                {"name": "id", "column_type": "EntityId", "nullable": false},
+                {"name": "title", "column_type": "Text", "nullable": false}
+            ],
+            "primary_key": ["id"],
+            "foreign_keys": [],
+            "indexes": []
+        }],
+        "named_queries": [{
+            "name": "note_by_id",
+            "parameters": [{"name": "note_id", "column_type": "EntityId"}],
+            "query": {
+                "namespace": "restapp",
+                "table": "notes",
+                "columns": ["notes.title"],
+                "joins": [],
+                "filters": [{"column": "notes.id", "value": {"$param": "note_id"}}],
+                "limit": null
+            },
+            "default_limit": 1,
+            "max_limit": 10
+        }]
+    });
+    let (status, version) = post_json(&app, "/v1/relational/schema/register", package).await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(version, json!(1));
+
+    let (status, registered) = get_json(&app, "/v1/relational/schema/restapp").await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(registered["schema_hash"].as_str().unwrap().len(), 64);
+
+    let (status, receipt) = post_json(
+        &app,
+        "/v1/relational/mutate",
+        json!({
+            "mutation_id": "00000000-0000-4000-8000-000000000302",
+            "namespace": "restapp",
+            "schema_version": 1,
+            "operations": [{
+                "table": "notes",
+                "kind": "Upsert",
+                "values": {"id": "note-1", "title": "Canonical"},
+                "key": null
+            }]
+        }),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(receipt["affected_rows"], json!(1));
+
+    let (status, rows) = post_json(
+        &app,
+        "/v1/relational/query",
+        json!({
+            "namespace": "restapp",
+            "schema_version": 1,
+            "query_name": "note_by_id",
+            "parameters": {"note_id": "note-1"},
+            "limit": 1
+        }),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(rows, json!([{"notes.title": "Canonical"}]));
+
+    let (status, _) = post_json(
+        &app,
+        "/v1/relational/query",
+        json!({"namespace": "restapp", "table": "notes", "columns": ["notes.title"]}),
+    )
+    .await;
+    assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY);
+}
+
 /// P2c: `/v1/status` exposes per-collection quant ops. For a quantized+rerank
 /// collection the sidecar is on-disk (post-P0), so `sidecar_resident_bytes` must
 /// be ≈0 (asserted == 0) — the field exists to PROVE the RAM win. `quant` and
@@ -234,6 +319,41 @@ async fn test_swarm_status_has_peer_id() {
     assert!(
         !body["peer_id"].as_str().unwrap_or("").is_empty(),
         "peer_id must be non-empty"
+    );
+}
+
+#[tokio::test]
+async fn test_swarm_status_has_merkle_root() {
+    let (app, _dir) = make_app();
+    let (status, body) = get_json(&app, "/v1/swarm/status").await;
+    assert_eq!(status, StatusCode::OK);
+    assert!(
+        body["merkle_root"].is_string(),
+        "merkle_root must be present (folded get_merkle_root); got: {body}"
+    );
+}
+
+#[tokio::test]
+async fn test_retrieve_context_tiered() {
+    let (app, _dir) = make_app();
+    let (st, _) = post_json(
+        &app,
+        "/v1/node/add",
+        serde_json::json!({"id": "ctx_root", "labels": ["Doc"]}),
+    )
+    .await;
+    assert_eq!(st, StatusCode::OK);
+
+    let (status, body) = post_json(
+        &app,
+        "/v1/context/retrieve",
+        serde_json::json!({"target_id": "ctx_root", "tier": "H1"}),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK, "retrieve_context failed: {body}");
+    assert!(
+        body["nodes"].is_array() && body["token_estimate"].is_number(),
+        "ContextPackage shape expected; got: {body}"
     );
 }
 
@@ -368,6 +488,214 @@ async fn test_retract_unknown_edge_returns_404() {
 }
 
 // ---------------------------------------------------------------------------
+// Bitemporal current-view semantics for /v1/query
+// ---------------------------------------------------------------------------
+//
+// `/v1/query` used to be a raw scan over every edge ever written, ignoring
+// retraction and node supersession entirely. It now defaults to a
+// current-view (bitemporally-valid-now) filter, with `as_of` (time travel)
+// and `include_invalid: true` (escape hatch back to the old raw-scan
+// behavior) as opt-ins — mirroring the visibility rule `TRAVERSE`/`neighbors`
+// already use. See `Storage::query` / `Storage::is_currently_visible`.
+
+#[tokio::test]
+async fn v1_query_bitemporal_retracted_edge_as_of_and_current_view() {
+    let (app, _dir) = make_app();
+    post_json(
+        &app,
+        "/v1/node/add",
+        json!({ "id": "bt_a", "labels": [], "valid_from": "2020-01-01T00:00:00Z" }),
+    )
+    .await;
+    post_json(
+        &app,
+        "/v1/node/add",
+        json!({ "id": "bt_b", "labels": [], "valid_from": "2020-01-01T00:00:00Z" }),
+    )
+    .await;
+    post_json(
+        &app,
+        "/v1/edge/add",
+        json!({
+            "id": "bte1", "from": "bt_a", "to": "bt_b", "rel": "LINKS",
+            "valid_from": "2020-01-01T00:00:00Z"
+        }),
+    )
+    .await;
+
+    // Before retraction: an as_of in the past still finds the edge.
+    let (s1, r1) = post_json(
+        &app,
+        "/v1/query",
+        json!({ "from": "bt_a", "as_of": "2021-01-01T00:00:00Z" }),
+    )
+    .await;
+    assert_eq!(s1, StatusCode::OK);
+    assert!(
+        !r1.as_array().unwrap().is_empty(),
+        "edge must be visible via as_of before retraction"
+    );
+
+    // Retract it.
+    let (ret_status, _) = post_json(&app, "/v1/edge/retract", json!({ "id": "bte1" })).await;
+    assert_eq!(ret_status, StatusCode::OK);
+
+    // Default current view (no as_of, no include_invalid): hidden.
+    let (s2, r2) = post_json(&app, "/v1/query", json!({ "from": "bt_a" })).await;
+    assert_eq!(s2, StatusCode::OK);
+    assert!(
+        r2.as_array().unwrap().is_empty(),
+        "retracted edge must be hidden from the default current-view /v1/query"
+    );
+
+    // Time travel to before the retraction: still visible (retraction hasn't
+    // happened yet as of that timestamp).
+    let (s3, r3) = post_json(
+        &app,
+        "/v1/query",
+        json!({ "from": "bt_a", "as_of": "2021-01-01T00:00:00Z" }),
+    )
+    .await;
+    assert_eq!(s3, StatusCode::OK);
+    assert!(
+        !r3.as_array().unwrap().is_empty(),
+        "as_of before the retraction must still find the edge, even after it was retracted"
+    );
+
+    // Escape hatch: include_invalid=true restores the old raw-scan behavior.
+    let (s4, r4) = post_json(
+        &app,
+        "/v1/query",
+        json!({ "from": "bt_a", "include_invalid": true }),
+    )
+    .await;
+    assert_eq!(s4, StatusCode::OK);
+    assert!(
+        !r4.as_array().unwrap().is_empty(),
+        "include_invalid=true must restore visibility of the retracted edge"
+    );
+}
+
+#[tokio::test]
+async fn v1_query_bitemporal_superseded_node_default_latest() {
+    let (app, _dir) = make_app();
+    post_json(
+        &app,
+        "/v1/node/add",
+        json!({ "id": "bt_hub", "labels": [], "valid_from": "2020-01-01T00:00:00Z" }),
+    )
+    .await;
+    post_json(
+        &app,
+        "/v1/node/add",
+        json!({
+            "id": "bt_target", "labels": [], "props": {"version": 1},
+            "valid_from": "2020-01-01T00:00:00Z"
+        }),
+    )
+    .await;
+    post_json(
+        &app,
+        "/v1/edge/add",
+        json!({
+            "id": "bte2", "from": "bt_hub", "to": "bt_target", "rel": "LINKS",
+            "valid_from": "2020-01-01T00:00:00Z"
+        }),
+    )
+    .await;
+
+    // Pre-supersession: as_of in the past sees the edge.
+    let (s0, r0) = post_json(
+        &app,
+        "/v1/query",
+        json!({ "from": "bt_hub", "as_of": "2021-01-01T00:00:00Z" }),
+    )
+    .await;
+    assert_eq!(s0, StatusCode::OK);
+    assert!(
+        !r0.as_array().unwrap().is_empty(),
+        "edge must be visible before supersession via as_of"
+    );
+
+    // Supersede the target node: its live version now has valid_from ~ "now".
+    let (sup_status, sup_body) = post_json(
+        &app,
+        "/v1/node/supersede",
+        json!({ "id": "bt_target", "new_props": {"version": 2} }),
+    )
+    .await;
+    assert_eq!(sup_status, StatusCode::OK);
+    assert_eq!(sup_body["props"]["version"], json!(2));
+
+    // Default (current) view: the engine keeps only the latest node version
+    // in memory, so the edge naming that node is still reachable — this is
+    // what "default view returns only the latest version" means in practice.
+    let (s1, r1) = post_json(&app, "/v1/query", json!({ "from": "bt_hub" })).await;
+    assert_eq!(s1, StatusCode::OK);
+    assert!(
+        !r1.as_array().unwrap().is_empty(),
+        "edge must still be visible in the current view after supersession"
+    );
+
+    // Time travel to before the supersession now excludes the edge: the
+    // live node's valid_from advanced to ~now (after 2021), so it — and any
+    // edge naming it — falls out of view for a 2021 as_of.
+    let (s2, r2) = post_json(
+        &app,
+        "/v1/query",
+        json!({ "from": "bt_hub", "as_of": "2021-01-01T00:00:00Z" }),
+    )
+    .await;
+    assert_eq!(s2, StatusCode::OK);
+    assert!(
+        r2.as_array().unwrap().is_empty(),
+        "post-supersession, a pre-supersession as_of must no longer see the \
+         (now-advanced) node, hiding the edge too"
+    );
+}
+
+#[tokio::test]
+async fn v1_query_bitemporal_no_flags_backward_compat() {
+    let (app, _dir) = make_app();
+    post_json(
+        &app,
+        "/v1/node/add",
+        json!({ "id": "bt_src", "labels": [] }),
+    )
+    .await;
+    post_json(
+        &app,
+        "/v1/node/add",
+        json!({ "id": "bt_dst", "labels": [] }),
+    )
+    .await;
+    let (e_status, _edge) = post_json(
+        &app,
+        "/v1/edge/add",
+        json!({ "id": "bte3", "from": "bt_src", "to": "bt_dst", "rel": "LINKS" }),
+    )
+    .await;
+    assert_eq!(e_status, StatusCode::OK);
+
+    // No as_of, no include_invalid, nothing retracted or superseded: behaves
+    // exactly like the old raw scan.
+    let (q_status, rows) = post_json(
+        &app,
+        "/v1/query",
+        json!({ "from": "bt_src", "rel": "LINKS" }),
+    )
+    .await;
+    assert_eq!(q_status, StatusCode::OK);
+    let arr = rows.as_array().unwrap();
+    assert_eq!(
+        arr.len(),
+        1,
+        "unflagged query on a fresh DB returns the edge exactly as before"
+    );
+    assert_eq!(arr[0]["to"], json!("bt_dst"));
+}
+
+// ---------------------------------------------------------------------------
 // Bulk operations
 // ---------------------------------------------------------------------------
 
@@ -400,6 +728,69 @@ async fn test_bulk_add_nodes() {
     assert_eq!(rows2.as_array().unwrap()[0]["to"], json!("bulk2"));
     // suppress unused warning
     let _ = rows;
+}
+
+// ---------------------------------------------------------------------------
+// Batch (Storage::execute_batch — mixed nodes+edges, one all-or-nothing write)
+// ---------------------------------------------------------------------------
+
+#[tokio::test]
+async fn test_batch_round_trip_nodes_and_edges() {
+    let (app, _dir) = make_app();
+    let (status, body) = post_json(
+        &app,
+        "/v1/batch",
+        json!({
+            "nodes": [
+                { "id": "batch_a", "labels": ["Tag"] },
+                { "id": "batch_b", "labels": ["Tag"] }
+            ],
+            "edges": [
+                { "id": "batch_e1", "from": "batch_a", "to": "batch_b", "rel": "LINKS" }
+            ]
+        }),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+
+    let nodes = body["nodes"].as_array().expect("batch response has nodes");
+    assert_eq!(nodes.len(), 2);
+    assert_eq!(nodes[0]["id"], json!("batch_a"));
+    assert_eq!(nodes[1]["id"], json!("batch_b"));
+
+    let edges = body["edges"].as_array().expect("batch response has edges");
+    assert_eq!(edges.len(), 1);
+    assert_eq!(edges[0]["rel"], json!("LINKS"));
+
+    // The edge must be immediately queryable — same transaction as the nodes.
+    let (q_status, rows) = post_json(
+        &app,
+        "/v1/query",
+        json!({ "from": "batch_a", "rel": "LINKS" }),
+    )
+    .await;
+    assert_eq!(q_status, StatusCode::OK);
+    assert_eq!(rows.as_array().unwrap()[0]["to"], json!("batch_b"));
+}
+
+#[tokio::test]
+async fn test_batch_malformed_body_rejected() {
+    let (app, _dir) = make_app();
+    // `edges` is required (no #[serde(default)]) — omitting it must fail
+    // deserialization rather than silently defaulting to an empty batch.
+    let (status, _) = post_json(
+        &app,
+        "/v1/batch",
+        json!({
+            "nodes": [{ "id": "malformed_a", "labels": [] }]
+        }),
+    )
+    .await;
+    assert_ne!(
+        status,
+        StatusCode::OK,
+        "a batch body missing the required `edges` field must not succeed"
+    );
 }
 
 // ---------------------------------------------------------------------------
@@ -1002,6 +1393,11 @@ async fn test_all_v1_routes_are_wired() {
         "/v1/bulk/nodes",
         "/v1/bulk/edges",
         "/v1/bulk/rebuild",
+        "/v1/batch",
+        "/v1/relational/schema",
+        "/v1/relational/schema/register",
+        "/v1/relational/mutate",
+        "/v1/relational/query",
         "/v1/query/hql",
         "/v1/node/add",
         "/v1/node/supersede",
@@ -1013,6 +1409,7 @@ async fn test_all_v1_routes_are_wired() {
         "/v1/query",
         "/v1/search/hybrid",
         "/v1/reason/context",
+        "/v1/context/retrieve",
         "/v1/consensus/propose",
         "/v1/consensus/vote",
         "/v1/consensus/sign-vote",

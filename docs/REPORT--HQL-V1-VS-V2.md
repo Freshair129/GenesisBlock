@@ -1,7 +1,7 @@
 ---
 proposed_id: REPORT--HQL-V1-VS-V2
 type: report
-status: complete
+status: historical
 tier: process
 cluster: implementation_flow
 role: "Comparison report HQL v1 → v2: what each change fixes, Definition of Done, TDD workflow, benchmark measurement protocol"

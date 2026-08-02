@@ -1,4 +1,8 @@
-﻿# FLOW--LDBC-SNB-BENCHMARK
+---
+status: current
+---
+
+# FLOW--LDBC-SNB-BENCHMARK
 
 ## 1. Process Workflow
 The end-to-end process from initiation to certification.

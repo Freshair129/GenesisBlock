@@ -1,3 +1,7 @@
+---
+status: current
+---
+
 # Whitepaper: Genesis Knowledge System (GKS)
 **Version:** 2.0.0 (Mark VIII) · evidence-backed revision 2026-06-21
 **Status:** Embedded agent-memory engine — benchmarked (audits P14–P25)

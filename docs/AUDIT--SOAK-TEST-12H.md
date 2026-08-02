@@ -1,3 +1,7 @@
+---
+status: historical
+---
+
 # AUDIT--SOAK-TEST-12H: 12-Hour Duration Soak Test
 
 **Date:** 2026-06-29

@@ -1,3 +1,7 @@
+---
+status: current
+---
+
 # Software Requirements Document (SRD): Index Compaction & Cleanup (Mark IX, Step 3)
 
 ## 1. Introduction

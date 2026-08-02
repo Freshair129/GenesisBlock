@@ -1,4 +1,8 @@
-﻿# AUDIT--P9-GENESISBLOCKDB-TURBO-CORE-PERFORMANCE-REPORT
+---
+status: historical
+---
+
+# AUDIT--P9-GENESISBLOCKDB-TURBO-CORE-PERFORMANCE-REPORT
 
 ## 1. Executive Summary
 Phase 9.1 represents the most significant architectural overhaul of GenesisBlockDB to date. By transitioning from a "Rich-Object Prototype" to a **"High-Density Sharded Engine"**, we have achieved a **22x increase in ingestion throughput** and established a foundation for 50,000+ QPS high-concurrency workloads.
