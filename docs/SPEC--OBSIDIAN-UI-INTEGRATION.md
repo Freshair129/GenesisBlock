@@ -1,3 +1,7 @@
+---
+status: current
+---
+
 # Functional Specification: Obsidian UI Integration (The Bridge)
 
 ## 1. Objective

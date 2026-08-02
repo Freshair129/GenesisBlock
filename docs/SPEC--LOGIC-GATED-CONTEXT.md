@@ -1,3 +1,7 @@
+---
+status: current
+---
+
 # Functional Specification: Logic-Gated Context Windows (Mark V)
 
 ## 1. Objective

@@ -1,3 +1,7 @@
+---
+status: current
+---
+
 # Software Requirements Document (SRD): Transaction / Batch Atomicity (Mark IX, Step 2)
 
 ## 1. Introduction

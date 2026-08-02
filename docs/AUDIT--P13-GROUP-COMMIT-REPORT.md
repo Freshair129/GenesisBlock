@@ -1,4 +1,8 @@
-﻿# AUDIT--P13-GROUP-COMMIT-VERIFICATION-REPORT
+---
+status: historical
+---
+
+# AUDIT--P13-GROUP-COMMIT-VERIFICATION-REPORT
 
 ## 1. Executive Summary
 Phase 13 implemented the **WAL Group Commit** architecture, upgrading the write-ahead log from JSONL to a binary format (\incode\) and routing writes through a lock-free channel to a dedicated background flusher thread. This design aims to amortize the high cost of NVMe \sync()\ operations across batches of concurrent writes.

@@ -13,6 +13,8 @@ on:
       - '**/Cargo.toml'
       - '**/Cargo.lock'
       - '.github/workflows/security.yml'
+      - '.github/security-advisory-exceptions.json'
+      - 'scripts/validate_security_exceptions.py'
   pull_request:
     branches: [ main ]
   schedule:
@@ -28,7 +30,14 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - name: Validate advisory exception policy
+        run: python scripts/validate_security_exceptions.py
       - name: RustSec advisory audit
         uses: rustsec/audit-check@v2
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
+          # Ignore IDs must exactly match .github/security-advisory-exceptions.json.
+          # The validation step fails when an exception expires, lacks ownership,
+          # or survives beyond its declared package-version removal gate.
+          # Real vulnerabilities must never be placed in this list.
+          ignore: RUSTSEC-2025-0141,RUSTSEC-2026-0204

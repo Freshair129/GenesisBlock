@@ -36,7 +36,7 @@ const server = new Server(
 const TOOLS = [
   {
     name: "query_hql",
-    description: "Executes a raw HQL (Hybrid Query Language) command on the knowledge graph.",
+    description: "Executes a raw HQL command on the knowledge graph (SEARCH, TRAVERSE, MATCH pattern, MATCH ... SIMILAR, CONTEXT). Colon-bearing ids such as user:5 must be quoted.",
     inputSchema: {
       type: "object",
       properties: {

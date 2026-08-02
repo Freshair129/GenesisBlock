@@ -1,7 +1,7 @@
 ---
 proposed_id: INCIDENT--EDGE-U32-BUILD-BREAK-AND-RAM-MISDIAGNOSIS
 type: incident
-status: resolved
+status: historical
 aliases:
   - INCIDENT
   - RCA

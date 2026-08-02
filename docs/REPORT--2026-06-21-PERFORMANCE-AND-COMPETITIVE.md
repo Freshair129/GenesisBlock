@@ -1,7 +1,7 @@
 ---
 proposed_id: REPORT--2026-06-21-PERFORMANCE-AND-COMPETITIVE
 type: report
-status: complete
+status: historical
 aliases:
   - REPORT
 tier: process

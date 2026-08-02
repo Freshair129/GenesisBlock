@@ -1,7 +1,7 @@
 ---
 proposed_id: PLAN--P34-HELIXDB-BENCH-SCOPE
 type: plan
-status: proposed
+status: current
 aliases:
   - PLAN
   - P34

@@ -1,3 +1,7 @@
+---
+status: current
+---
+
 # Architecture Blueprint: P2P Gossip Protocol (Mark VIII, Step 3)
 
 ## 1. Introduction

@@ -1,7 +1,7 @@
 ---
 proposed_id: ADR--GENESISDB-EMBEDDED-SQLITE-SUBSTRATE
 type: adr
-status: proposed
+status: accepted
 tier: strategy
 cluster: implementation_flow
 role: "ADR — embed SQLite inside the engine as the relational/FTS projection under WAL authority; fold HQL P2/P3 and Wave 2.5 into one substrate program"
@@ -17,7 +17,7 @@ related:
 
 # ADR: Embedded SQLite Substrate (one engine, two storages, one WAL authority)
 
-**Status:** Proposed · **Date:** 2026-07-03 · **Deciders:** Boss
+**Status:** Accepted · **Date:** 2026-07-03 · **Accepted:** 2026-07-20 · **Deciders:** Boss
 
 ## 1. Context
 
@@ -53,7 +53,7 @@ The one hard problem is two durability domains in one process. Rules (each is a 
 
 1. **Every write enters the signed WAL first** (existing path, unchanged). SQLite is a **derived projection**, never a source of truth.
 2. SQLite apply happens **after** WAL ack, through the same single-writer application path (compatible with SQLite's single-writer model).
-3. The projection records the **last applied WAL sequence number** (a `projection_state` row). On open: if SQLite lags the WAL, **replay the gap idempotently**; if SQLite is corrupt/missing, rebuild it entirely from WAL+snapshot. Recovery never trusts SQLite over the WAL.
+3. During S0/S1, startup scans the authoritative WAL and applies node events idempotently using the full LWW clock `(time, peer_id)`. A Lamport scalar is metadata, not a WAL cursor. A durable commit sequence and missing-suffix optimization move to unified transaction phase U3; until then recovery favors correctness over replay speed. If SQLite is corrupt/missing, rebuild it from the WAL. Recovery never trusts SQLite over the WAL.
 4. Snapshot = existing snapshot set + the SQLite file, captured through the same atomic temp-dir swap. One backup unit.
 5. **No direct external writes to SQLite.** Read-only SQL access may be exposed later (a diagnostics/query surface); any write bypassing the WAL is a corruption bug by definition.
 6. Crash tests must cover the torn window: WAL committed + SQLite not yet applied (→ replay heals), and mid-SQLite-transaction crash (→ SQLite's own journal rolls back, replay reapplies).
@@ -91,7 +91,7 @@ The one hard problem is two durability domains in one process. Rules (each is a 
 - **S3 — Text & hybrid (own PR; resolves old P3 AND Wave 2.5 together):** FTS5 (trigram, BM25) over designated text props + `SEARCH TEXT "…"` + RRF fusion with vector results when both signals present. The P3-T0 design fork is hereby **decided by substrate choice**: option (b) in-engine lexical, on proven FTS5 rather than hand-rolled BM25; the P3 ADR shrinks to documenting ranking/fusion semantics. One lexical engine serves both HQL and the REST/NAPI hybrid surface — the Wave 2.5 duplication risk is closed.
 - **S4 — MSP schemas (with the MSP product, own ADR):** episodic/semantic/sensory tables, hypothesis-hold state convention, consolidation hooks. Out of scope here; this ADR only guarantees the substrate supports it.
 
-Ordering: S0 → S1 → S2/S3 (parallelizable after S1) — S2/S3 wait only on HQL-P0's grammar-hygiene fixes, not on P1.
+Ordering after approval of `SPEC--GENESISDB-UNIFIED-OPERATIONAL-BOUNDARY-V1`: S0 → S1 → U2 relational contract → U3 unified transaction → U4/U5 artifact proof. S2/S3 are renamed to demand-gated U6 and no longer block the database product path. HQL P0 remains independent.
 
 ## 5. Consequences
 
@@ -105,9 +105,10 @@ Ordering: S0 → S1 → S2/S3 (parallelizable after S1) — S2/S3 wait only on H
 
 ## 6. Action items
 
-1. [ ] S0: rusqlite + schema v1 + WAL-authority projection + crash tests (own PR)
-2. [ ] S1: props → SQLite projection + RSS/graph-bench gates (own PR)
-3. [ ] S2: HQL WHERE/OR/count/label over SQL (own PR; cancels old P2-T1/T2/T3 execution plans)
-4. [ ] S3: FTS5+BM25+RRF `SEARCH TEXT` (own PR; resolves HQL-P3 + Wave 2.5)
-5. [ ] Amend SPEC--HQL-V2 execution notes on acceptance; keep grammar contract unchanged
-6. [ ] HQL P0 + P1 proceed unchanged and independently
+1. [x] S0: rusqlite + projection schema + WAL-authority replay/rebuild tests
+2. [x] S1: props → SQLite projection + RSS/traversal evidence
+3. [ ] U2: app-defined relational schema and named-query contract
+4. [ ] U3: durable commit sequence and unified cross-domain transaction protocol
+5. [ ] U6 (demand-gated): SQL-backed HQL and FTS5+BM25+RRF
+6. [x] Amend SPEC--HQL-V2 positioning; keep grammar contract unchanged
+7. [x] HQL P0 remains separate and independently shippable

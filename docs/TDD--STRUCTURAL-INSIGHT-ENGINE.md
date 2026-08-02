@@ -1,3 +1,7 @@
+---
+status: current
+---
+
 # Software Requirements Document (SRD): Structural Insight Engine
 
 ## 1. Introduction

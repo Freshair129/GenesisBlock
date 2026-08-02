@@ -27,7 +27,17 @@ use std::sync::Arc;
 
 use serde::Deserialize;
 
-use crate::{HybridSearchInput, NodeInput, OpenOptions, Storage};
+use crate::{
+    GenesisTransaction, HybridSearchInput, NamedQueryRequest, NodeInput, OpenOptions,
+    RelationalMutationBatch, RelationalQuery, RelationalRowMutation, RelationalSchemaPackage,
+    Storage,
+};
+
+#[derive(Deserialize)]
+struct RelationalRowsInput {
+    namespace: String,
+    mutations: Vec<RelationalRowMutation>,
+}
 
 /// Opaque handle handed back to C. Wraps an `Arc<Storage>` so the engine's
 /// internal background threads (WAL writer, async HNSW indexer) keep their
@@ -272,6 +282,170 @@ pub extern "C" fn genesisdb_retrieve_context(
         match storage.retrieve_context(&input.target_id, &input.tier, input.budget, input.fuzzy) {
             Ok(pkg) => match serde_json::to_string(&pkg) {
                 Ok(s) => string_to_cstr(s),
+                Err(_) => std::ptr::null(),
+            },
+            Err(_) => std::ptr::null(),
+        }
+    })
+}
+
+/// Register a versioned relational schema package encoded as JSON.
+#[no_mangle]
+pub extern "C" fn genesisdb_register_relational_schema(
+    handle: *mut GenesisHandle,
+    json_input: *const c_char,
+) -> *const c_char {
+    guard_json(|| {
+        let storage = match unsafe { handle_storage(handle) } {
+            Some(storage) => storage,
+            None => return std::ptr::null(),
+        };
+        let json = match unsafe { cstr_to_str(json_input) } {
+            Some(json) => json,
+            None => return std::ptr::null(),
+        };
+        let package = match serde_json::from_str::<RelationalSchemaPackage>(json) {
+            Ok(package) => package,
+            Err(_) => return std::ptr::null(),
+        };
+        match storage.register_relational_schema(package) {
+            Ok(version) => string_to_cstr(version.to_string()),
+            Err(_) => std::ptr::null(),
+        }
+    })
+}
+
+/// Return the current relational schema package for a namespace.
+#[no_mangle]
+pub extern "C" fn genesisdb_get_relational_schema(
+    handle: *mut GenesisHandle,
+    namespace: *const c_char,
+) -> *const c_char {
+    guard_json(|| {
+        let output = (|| -> Option<String> {
+            let storage = unsafe { handle_storage(handle) }?;
+            let namespace = unsafe { cstr_to_str(namespace) }?;
+            let package = storage.get_relational_schema(namespace).ok()?;
+            serde_json::to_string(&package).ok()
+        })();
+        output.map(string_to_cstr).unwrap_or(std::ptr::null())
+    })
+}
+
+/// Apply an idempotent U2 mutation batch encoded as JSON.
+#[no_mangle]
+pub extern "C" fn genesisdb_apply_relational_batch(
+    handle: *mut GenesisHandle,
+    json_input: *const c_char,
+) -> *const c_char {
+    guard_json(|| {
+        let output = (|| -> Option<String> {
+            let storage = unsafe { handle_storage(handle) }?;
+            let json = unsafe { cstr_to_str(json_input) }?;
+            let batch = serde_json::from_str::<RelationalMutationBatch>(json).ok()?;
+            let result = storage.apply_relational_batch(batch).ok()?;
+            serde_json::to_string(&result).ok()
+        })();
+        output.map(string_to_cstr).unwrap_or(std::ptr::null())
+    })
+}
+
+/// Apply a typed relational mutation batch encoded as JSON.
+#[no_mangle]
+pub extern "C" fn genesisdb_apply_relational_rows(
+    handle: *mut GenesisHandle,
+    json_input: *const c_char,
+) -> i32 {
+    catch_unwind(AssertUnwindSafe(|| {
+        let storage = match unsafe { handle_storage(handle) } {
+            Some(storage) => storage,
+            None => return 1,
+        };
+        let json = match unsafe { cstr_to_str(json_input) } {
+            Some(json) => json,
+            None => return 1,
+        };
+        let input = match serde_json::from_str::<RelationalRowsInput>(json) {
+            Ok(input) => input,
+            Err(_) => return 1,
+        };
+        match storage.apply_relational_rows(&input.namespace, input.mutations) {
+            Ok(()) => 0,
+            Err(_) => 1,
+        }
+    }))
+    .unwrap_or(2)
+}
+
+/// Execute a bounded relational query encoded as JSON.
+#[no_mangle]
+pub extern "C" fn genesisdb_query_relational(
+    handle: *mut GenesisHandle,
+    json_input: *const c_char,
+) -> *const c_char {
+    guard_json(|| {
+        let storage = match unsafe { handle_storage(handle) } {
+            Some(storage) => storage,
+            None => return std::ptr::null(),
+        };
+        let json = match unsafe { cstr_to_str(json_input) } {
+            Some(json) => json,
+            None => return std::ptr::null(),
+        };
+        let query = match serde_json::from_str::<RelationalQuery>(json) {
+            Ok(query) => query,
+            Err(_) => return std::ptr::null(),
+        };
+        match storage.query_relational(query) {
+            Ok(rows) => match serde_json::to_string(&rows) {
+                Ok(json) => string_to_cstr(json),
+                Err(_) => std::ptr::null(),
+            },
+            Err(_) => std::ptr::null(),
+        }
+    })
+}
+
+/// Execute a registered named query encoded as JSON.
+#[no_mangle]
+pub extern "C" fn genesisdb_execute_named_query(
+    handle: *mut GenesisHandle,
+    json_input: *const c_char,
+) -> *const c_char {
+    guard_json(|| {
+        let output = (|| -> Option<String> {
+            let storage = unsafe { handle_storage(handle) }?;
+            let json = unsafe { cstr_to_str(json_input) }?;
+            let request = serde_json::from_str::<NamedQueryRequest>(json).ok()?;
+            let rows = storage.execute_named_query(request).ok()?;
+            serde_json::to_string(&rows).ok()
+        })();
+        output.map(string_to_cstr).unwrap_or(std::ptr::null())
+    })
+}
+
+/// Commit one canonical cross-domain transaction encoded as JSON.
+#[no_mangle]
+pub extern "C" fn genesisdb_commit_transaction(
+    handle: *mut GenesisHandle,
+    json_input: *const c_char,
+) -> *const c_char {
+    guard_json(|| {
+        let storage = match unsafe { handle_storage(handle) } {
+            Some(storage) => storage,
+            None => return std::ptr::null(),
+        };
+        let json = match unsafe { cstr_to_str(json_input) } {
+            Some(json) => json,
+            None => return std::ptr::null(),
+        };
+        let transaction = match serde_json::from_str::<GenesisTransaction>(json) {
+            Ok(transaction) => transaction,
+            Err(_) => return std::ptr::null(),
+        };
+        match storage.commit_transaction(transaction) {
+            Ok(result) => match serde_json::to_string(&result) {
+                Ok(json) => string_to_cstr(json),
                 Err(_) => std::ptr::null(),
             },
             Err(_) => std::ptr::null(),

@@ -1,7 +1,7 @@
 ---
 proposed_id: AUDIT--P17-BULK-WAL-BATCH
 type: audit
-status: complete
+status: historical
 aliases:
   - AUDIT
   - P17

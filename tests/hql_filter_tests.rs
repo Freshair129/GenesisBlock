@@ -596,3 +596,79 @@ fn limit_overflow_saturates_not_drops() {
         "oversized LIMIT saturates, not dropped to None"
     );
 }
+
+#[test]
+fn strict_numeric_parse_errors_surface_in_ast() {
+    use genesis_block_native::query::ast::HqlCommand;
+    use std::convert::TryFrom;
+
+    let k_err =
+        HqlCommand::try_from("SEARCH q SIMILAR TO [1.0] K 99999999999999999999").unwrap_err();
+    assert!(k_err.contains("K value out of range"));
+
+    let depth_err =
+        HqlCommand::try_from("TRAVERSE FROM a DEPTH 99999999999999999999 REL R").unwrap_err();
+    assert!(depth_err.contains("DEPTH value out of range"));
+
+    let alpha_err = HqlCommand::try_from(
+        "MATCH q SIMILAR TO [1.0] ALPHA 9999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999",
+    )
+    .unwrap_err();
+    assert!(alpha_err.contains("ALPHA value out of range"));
+
+    let budget_err =
+        HqlCommand::try_from("CONTEXT FOR x TIER H1 BUDGET 99999999999999999999").unwrap_err();
+    assert!(budget_err.contains("BUDGET value out of range"));
+}
+
+#[test]
+fn hybrid_and_search_parse_new_exposed_knobs() {
+    use genesis_block_native::query::ast::HqlCommand;
+    use std::convert::TryFrom;
+
+    let search = HqlCommand::try_from("SEARCH q K 7 EF 128 OVERSAMPLE 9").unwrap();
+    assert!(matches!(
+        search,
+        HqlCommand::Search {
+            k: 7,
+            ef_search: Some(128),
+            oversample: Some(9),
+            vector: None,
+            ..
+        }
+    ));
+
+    let hybrid = HqlCommand::try_from("MATCH q ALPHA 0.5 K 50 EF 256 OVERSAMPLE 11").unwrap();
+    assert!(matches!(
+        hybrid,
+        HqlCommand::Hybrid {
+            k: 50,
+            ef_search: Some(256),
+            oversample: Some(11),
+            vector: None,
+            ..
+        }
+    ));
+}
+
+#[test]
+fn traverse_parse_direction_and_rel_union() {
+    use genesis_block_native::query::ast::{HqlCommand, HqlRel};
+    use std::convert::TryFrom;
+
+    let cmd =
+        HqlCommand::try_from("TRAVERSE FROM a DEPTH 1 REL KNOWS|LIKES DIRECTION both").unwrap();
+    match cmd {
+        HqlCommand::Traverse {
+            rel,
+            rels,
+            direction,
+            ..
+        } => {
+            assert!(matches!(rel, HqlRel::Physical(ref r) if r == "KNOWS"));
+            assert_eq!(rels, Some(vec!["KNOWS".to_string(), "LIKES".to_string()]));
+            assert_eq!(direction, Some("both".to_string()));
+        }
+        _ => panic!("expected Traverse"),
+    }
+}

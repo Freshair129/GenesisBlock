@@ -1,7 +1,7 @@
 ---
 proposed_id: AUDIT--P32-RECALL-500K-FRONTIER
 type: audit
-status: complete
+status: historical
 aliases:
   - AUDIT
   - P32

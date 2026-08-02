@@ -1,7 +1,7 @@
 ---
 proposed_id: RCA--VECTOR-QUANTIZATION
 type: rca
-status: accepted
+status: historical
 tier: process
 proposed_at: 2026-06-30
 proposed_by: agent

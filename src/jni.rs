@@ -36,7 +36,17 @@ use jni::sys::{jint, jlong, jstring};
 use jni::JNIEnv;
 use serde::Deserialize;
 
-use crate::{HybridSearchInput, NodeInput, OpenOptions, Storage};
+use crate::{
+    GenesisTransaction, HybridSearchInput, NamedQueryRequest, NodeInput, OpenOptions,
+    RelationalMutationBatch, RelationalQuery, RelationalRowMutation, RelationalSchemaPackage,
+    Storage,
+};
+
+#[derive(Deserialize)]
+struct RelationalRowsInput {
+    namespace: String,
+    mutations: Vec<RelationalRowMutation>,
+}
 
 /// Input shape for `nativeRetrieveContext`. `Storage::retrieve_context` takes
 /// scalar args rather than a struct, so the JSON contract is defined here.
@@ -226,6 +236,102 @@ pub extern "system" fn Java_dev_genesisblock_GenesisDB_nativeRetrieveContext(
             .retrieve_context(&input.target_id, &input.tier, input.budget, input.fuzzy)
             .ok()?;
         serde_json::to_string(&pkg).ok()
+    })
+}
+
+#[no_mangle]
+pub extern "system" fn Java_dev_genesisblock_GenesisDB_nativeRegisterRelationalSchema(
+    mut env: JNIEnv,
+    _class: JClass,
+    handle: jlong,
+    json_input: JString,
+) -> jstring {
+    json_op(&mut env, handle, &json_input, |storage, json| {
+        let package = serde_json::from_str::<RelationalSchemaPackage>(json).ok()?;
+        storage
+            .register_relational_schema(package)
+            .ok()
+            .map(|version| version.to_string())
+    })
+}
+
+#[no_mangle]
+pub extern "system" fn Java_dev_genesisblock_GenesisDB_nativeGetRelationalSchema(
+    mut env: JNIEnv,
+    _class: JClass,
+    handle: jlong,
+    namespace: JString,
+) -> jstring {
+    json_op(&mut env, handle, &namespace, |storage, namespace| {
+        serde_json::to_string(&storage.get_relational_schema(namespace).ok()?).ok()
+    })
+}
+
+#[no_mangle]
+pub extern "system" fn Java_dev_genesisblock_GenesisDB_nativeApplyRelationalBatch(
+    mut env: JNIEnv,
+    _class: JClass,
+    handle: jlong,
+    json_input: JString,
+) -> jstring {
+    json_op(&mut env, handle, &json_input, |storage, json| {
+        let batch = serde_json::from_str::<RelationalMutationBatch>(json).ok()?;
+        serde_json::to_string(&storage.apply_relational_batch(batch).ok()?).ok()
+    })
+}
+
+#[no_mangle]
+pub extern "system" fn Java_dev_genesisblock_GenesisDB_nativeApplyRelationalRows(
+    mut env: JNIEnv,
+    _class: JClass,
+    handle: jlong,
+    json_input: JString,
+) -> jstring {
+    json_op(&mut env, handle, &json_input, |storage, json| {
+        let input = serde_json::from_str::<RelationalRowsInput>(json).ok()?;
+        storage
+            .apply_relational_rows(&input.namespace, input.mutations)
+            .ok()?;
+        Some("null".to_string())
+    })
+}
+
+#[no_mangle]
+pub extern "system" fn Java_dev_genesisblock_GenesisDB_nativeQueryRelational(
+    mut env: JNIEnv,
+    _class: JClass,
+    handle: jlong,
+    json_input: JString,
+) -> jstring {
+    json_op(&mut env, handle, &json_input, |storage, json| {
+        let query = serde_json::from_str::<RelationalQuery>(json).ok()?;
+        serde_json::to_string(&storage.query_relational(query).ok()?).ok()
+    })
+}
+
+#[no_mangle]
+pub extern "system" fn Java_dev_genesisblock_GenesisDB_nativeExecuteNamedQuery(
+    mut env: JNIEnv,
+    _class: JClass,
+    handle: jlong,
+    json_input: JString,
+) -> jstring {
+    json_op(&mut env, handle, &json_input, |storage, json| {
+        let request = serde_json::from_str::<NamedQueryRequest>(json).ok()?;
+        serde_json::to_string(&storage.execute_named_query(request).ok()?).ok()
+    })
+}
+
+#[no_mangle]
+pub extern "system" fn Java_dev_genesisblock_GenesisDB_nativeCommitTransaction(
+    mut env: JNIEnv,
+    _class: JClass,
+    handle: jlong,
+    json_input: JString,
+) -> jstring {
+    json_op(&mut env, handle, &json_input, |storage, json| {
+        let transaction = serde_json::from_str::<GenesisTransaction>(json).ok()?;
+        serde_json::to_string(&storage.commit_transaction(transaction).ok()?).ok()
     })
 }
 

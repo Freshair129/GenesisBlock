@@ -1,0 +1,55 @@
+# Embedded-Tier Engine Axis Coverage: vector ANN x graph x bitemporal (research date 2026-07-06)
+
+Claim under test: "we are the only embedded engine doing all three (vector ANN + graph traversal + row-level bitemporal)."
+
+## 1. LanceDB (embedded)
+
+- **Vector: YES.** Index types include IVF_PQ (IVF + product quantization) and HNSW variants (IVF_HNSW_FLAT, IVF_HNSW_PQ, IVF_HNSW_SQ — HNSW inside IVF partitions). Sources: [LanceDB indexing docs](https://www.lancedb.com/documentation/concepts/indexing.html), [Vector Indexes](https://docs.lancedb.com/indexing/vector-index). Note: IVF_HNSW_FLAT was documented but missing from the Python SDK at one point ([issue #3331](https://github.com/lancedb/lancedb/issues/3331)).
+- **Time-travel: DATASET-LEVEL ONLY, confirmed NOT row-level bitemporal.** Per [LanceDB versioning docs](https://docs.lancedb.com/tables/versioning): every update/delete/add auto-creates a new *table version*; you `checkout` a past version (read-only view) by version number or tag, or `restore`. It is a linear MVCC history of the whole table — there is no per-row valid-time vs transaction-time distinction. 2026 marketing adds "Git-style branching" ([lancedb.com](https://www.lancedb.com/)) — still dataset-granularity version control, not bitemporality.
+- **Graph: NO.** No graph traversal capability appears in any LanceDB docs surveyed (UNVERIFIED as an absence claim, but no graph feature exists in their index/query documentation).
+
+## 2. Kuzu / LadybugDB
+
+- **Kuzu status: dead upstream.** Apple acquired Kuzu Inc.; the GitHub repo was **archived 2025-10-10**; acquisition publicly confirmed via EU DMA filing 2026-02-11 ([MacRumors](https://www.macrumors.com/2026/02/11/apple-acquires-new-database-app/), [9to5Mac](https://9to5mac.com/2026/02/11/kuzu-database-company-joins-apples-list-of-recent-acquisitions/), [gdotv retrospective](https://gdotv.com/blog/kuzu-legacy-embedded-graph-database-landscape/)). Last-era Kuzu (0.11) had single-file storage (`data.kz`), FTS and vector indices.
+- **LadybugDB (community successor): alive.** Latest release **v0.18.0, 2026-07-01** ([releases](https://github.com/LadybugDB/ladybug/releases)) — WAL group commits, secondary ART indexes, stats-aware optimization.
+- **Vector + FTS extensions: SURVIVE.** [Official extensions page](https://docs.ladybugdb.com/extensions/) lists vector search (disk-based HNSW ANN), full-text search (BM25), JSON, graph algorithms, and more. Independent confirmation of the HNSW vector extension: [Pavlyshyn, "Vector Search in LadybugDB"](https://volodymyrpavlyshyn.substack.com/p/vector-search-in-ladybugdb). Caveat: real-world consumers hit platform gaps — "VECTOR is disabled on this platform" on some targets ([GitNexus issue #1365](https://github.com/abhigyanpatwari/GitNexus/issues/1365)) and Windows FTS segfaults ([#1217](https://github.com/abhigyanpatwari/GitNexus/issues/1217)).
+- **Temporal/bitemporal: NONE.** No temporal/time-travel/bitemporal feature appears anywhere in LadybugDB extension or core docs ([docs.ladybugdb.com/extensions](https://docs.ladybugdb.com/extensions/)). Absence claim — UNVERIFIED against the full doc set, but consistent with Kuzu's history.
+
+## 3. DuckDB (embedded)
+
+- **Vector: PARTIAL (experimental).** The `vss` extension provides HNSW, but the index can only be created in in-memory databases unless `SET hnsw_enable_experimental_persistence = true` — explicitly experimental because **WAL recovery is not implemented for custom indexes**; crash with uncommitted changes can corrupt/lose the index; serialization is non-incremental (whole index rewritten at checkpoint, fully deserialized into RAM on first access). Source: [DuckDB vss docs](https://duckdb.org/docs/current/core_extensions/vss) (caveats unchanged as of 2026 per current docs page). Also brute-force-friendly writeups: [dataengineerthings blog](https://blog.dataengineerthings.org/from-scrolls-to-similarity-search-building-a-movie-recommender-with-duckdb-vss-8122e4d2e486).
+- **Graph: NO** native traversal (recursive CTEs only; the old SQL/PGQ `duckpgq` community extension exists but is not core — UNVERIFIED current status, not checked this pass).
+- **Time-travel: NO at row level in DuckDB proper.** DuckLake (1.0, April 2026) adds Iceberg-style **snapshot** time travel — attach at a snapshot version/timestamp, `ducklake_table_insertions/deletions` between snapshots ([DuckLake time travel](https://ducklake.select/docs/stable/duckdb/usage/time_travel), [snapshots](https://ducklake.select/docs/stable/duckdb/usage/snapshots)). That is transaction-time snapshot history of a lake catalog, not per-row valid-time bitemporality, and DuckLake is a lake format layered on DuckDB, not the embedded engine itself.
+
+## 4. Chroma and pgvector (one paragraph each)
+
+- **Chroma (embedded):** Vector yes, graph no, temporal no. 2025-2026 change: core rewritten in Rust — local Chroma ~4x faster writes/queries, true multithreading past the GIL ([Chroma 1.0.0 announcement](https://www.trychroma.com/project/1.0.0), [repo](https://github.com/chroma-core/chroma)). `PersistentClient` remains the embedded/in-process deployment path, explicitly positioned for shipping Chroma bundled inside applications ([Chroma cookbook clients](https://cookbook.chromadb.dev/core/clients/)). No graph traversal or temporal/versioning features exist in its API.
+- **Postgres + pgvector (local):** Vector yes, graph no (recursive CTEs only; Apache AGE is a separate extension), temporal no (no built-in bitemporal; requires app-layer or `temporal_tables`-style extensions). 2026 state: pgvector 0.8.x (0.8.0 → 0.8.2 by mid-2026) with HNSW + IVFFlat, iterative index scans (`hnsw.iterative_scan`) fixing overfiltering, faster HNSW builds ([pgvector 0.8.0 release](https://www.postgresql.org/about/news/pgvector-080-released-2952/), [dbi-services index guide, updated 2026-03](https://www.dbi-services.com/blog/pgvector-a-guide-for-dba-part-2-indexes-update-march-2026/)). Also, Postgres is a local *server process*, not an in-process library — it fails the embedded axis strictly.
+
+## 5. Graphiti (closest bitemporal-agent-memory precedent)
+
+- Still a Python **framework**, not an engine; bitemporal validity (valid_from/valid_until per edge/fact) is implemented at the application layer over a graph backend. Supported backends per [getzep/graphiti README](https://github.com/getzep/graphiti): Neo4j 5.26+, FalkorDB 1.1.2+, Amazon Neptune, and Kuzu 0.11.2 — but **Kuzu support is explicitly deprecated ("upstream project unmaintained") and will be removed**.
+- **Embedded backend is arriving: FalkorDB Lite** (`pip install graphiti-core[falkordblite]`) — an embedded FalkorDB variant running **as a subprocess with file-based storage** (no server/Docker) ([graphiti issue #1240](https://github.com/getzep/graphiti/issues/1240), README). This is the biggest threat to the uniqueness claim: Graphiti(bitemporal, app-layer) + FalkorDB Lite(graph + vector index, near-embedded) approximates all three axes — but it is a Python framework + subprocess DB, not a single in-process embedded engine, and its bitemporality is not enforced in the storage engine.
+
+## 6. Qdrant
+
+- **No official embedded/in-process mode of the Rust engine exists.** Qdrant's "local mode" is a **pure-Python re-implementation** inside `qdrant-client` — same API, but brute-force search (no HNSW), SQLite persistence, single-process only, recommended for ≤~20k points ([qdrant-client repo](https://github.com/qdrant/qdrant-client), [DeepWiki Local Mode](https://deepwiki.com/qdrant/qdrant-client/2.2-local-mode), [qdrant_local source](https://python-client.qdrant.tech/_modules/qdrant_client/local/qdrant_local)). The production Rust engine still requires a server (Docker/binary/Cloud). A "Qdrant EDGE" deployment tier is referenced in Qdrant deployment-guidance material — whether it is a true in-process embedded engine and whether it is GA is **UNVERIFIED** (not confirmed from a primary Qdrant doc this pass).
+
+## Axis-coverage table
+
+| Engine | Vector ANN | Graph traversal | Bitemporal (row-level valid+tx time) | Embedded in-process | Key citations |
+|---|---|---|---|---|---|
+| **LanceDB** | Yes (IVF_PQ, IVF_HNSW_*) | No | No — dataset-level version checkout only | Yes | [indexing](https://www.lancedb.com/documentation/concepts/indexing.html), [versioning](https://docs.lancedb.com/tables/versioning) |
+| **Kuzu** | Yes (0.11, frozen) | Yes | No | Yes | archived 2025-10-10 ([gdotv](https://gdotv.com/blog/kuzu-legacy-embedded-graph-database-landscape/), [MacRumors](https://www.macrumors.com/2026/02/11/apple-acquires-new-database-app/)) — dead |
+| **LadybugDB v0.18.0** | Yes (HNSW ext; platform caveats) | Yes | No | Yes | [releases](https://github.com/LadybugDB/ladybug/releases), [extensions](https://docs.ladybugdb.com/extensions/) |
+| **DuckDB + vss** | Partial (HNSW experimental persistence, WAL-unsafe) | No (core) | No (DuckLake = catalog snapshots, not row bitemporal) | Yes | [vss docs](https://duckdb.org/docs/current/core_extensions/vss), [DuckLake](https://ducklake.select/docs/stable/duckdb/usage/time_travel) |
+| **Chroma** | Yes (Rust core, 1.x) | No | No | Yes (PersistentClient) | [1.0.0](https://www.trychroma.com/project/1.0.0), [cookbook](https://cookbook.chromadb.dev/core/clients/) |
+| **Postgres+pgvector 0.8.x** | Yes (HNSW/IVFFlat) | No (native) | No (native) | No — local server, not in-process | [0.8.0 release](https://www.postgresql.org/about/news/pgvector-080-released-2952/) |
+| **Qdrant** | Yes (server) / Partial (local mode = pure-Python brute force) | No | No | No (Rust engine not embeddable; EDGE tier UNVERIFIED) | [qdrant-client](https://github.com/qdrant/qdrant-client), [Local Mode](https://deepwiki.com/qdrant/qdrant-client/2.2-local-mode) |
+| **Graphiti + FalkorDB Lite** | Yes (via backend vector index) | Yes | Partial — app-layer valid_from/valid_until, not engine-enforced | Partial — subprocess w/ file storage, not in-process lib | [README](https://github.com/getzep/graphiti), [issue #1240](https://github.com/getzep/graphiti/issues/1240) |
+
+## Verdict on the claim
+
+The claim **survives in its strict form**: no surveyed embedded, in-process engine ships all three axes natively; specifically none offers row-level bitemporality (LanceDB and DuckLake are snapshot/version time-travel; LadybugDB has none). The **nearest challengers** are (a) LadybugDB — embedded + graph + HNSW vector + FTS, missing only temporal; one temporal extension away from parity; and (b) Graphiti + FalkorDB Lite — bitemporal + graph + vector, but as a Python-framework-over-subprocess stack, not an embedded engine. Positioning should say "the only embedded **engine** with **engine-enforced** row-level bitemporality alongside vector ANN and graph traversal," and should name Graphiti (app-layer bitemporal precedent) and LadybugDB (closest engine) explicitly.
+
+UNVERIFIED items: LadybugDB temporal absence (checked extensions docs only, not full core docs); Qdrant EDGE embedded status; duckpgq current state; LanceDB graph absence (no positive evidence of any graph feature found).

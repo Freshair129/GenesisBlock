@@ -1,3 +1,7 @@
+---
+status: current
+---
+
 # Software Requirements Document (SRD): Self-Optimizing Substrate
 
 ## 1. Introduction

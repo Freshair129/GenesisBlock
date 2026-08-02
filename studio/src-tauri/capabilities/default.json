@@ -1,0 +1,7 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "default",
+  "description": "Minimum S0 capability set for the Genesis Studio shell.",
+  "windows": ["main"],
+  "permissions": ["core:default"]
+}

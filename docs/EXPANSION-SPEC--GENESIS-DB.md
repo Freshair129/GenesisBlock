@@ -1,3 +1,7 @@
+---
+status: superseded-by: MASTER-SPEC--GENESIS-DB.md
+---
+
 > **DEPRECATED (Mark III Pivot):** This document refers to the Phase 1-7 architecture and positioning. Please refer to ARCHITECTURE.md for the current Mark III system design.\n\n# GenesisBlockDB: Deep Technical Expansion Specification (v1.x)
 **Document Status:** MASTER SPECIFICATION  
 **Version:** 1.0.1  

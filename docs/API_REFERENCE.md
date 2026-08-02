@@ -1,17 +1,26 @@
+---
+status: current
+---
+
 # GenesisBlockDB REST API Reference
 
-**Generated from `src/router.rs` (Axum server) — 2026-06-28.** This replaces the
+**Generated from `src/router.rs` (Axum server) — 2026-07-22.** This replaces the
 prior corrupted file. The server is the SSOT; update this when routes change.
 
 - **Base URL:** `http://localhost:3000` (port via `GENESIS_PORT`, bind `0.0.0.0`)
 - **Data dir:** `.brain/gks/storage` (via `GENESIS_DATA_DIR`)
-- **Bodies:** JSON. **Errors:** `500 Internal Server Error` with a plain-text
-  message. CORS: permissive.
+- **Bodies:** JSON. Errors use the route-appropriate HTTP status with a plain-text
+  message. CORS defaults to localhost origins; `GENESIS_CORS_ORIGIN` selects one
+  origin, while `*` explicitly enables permissive mode.
+- **Authentication:** when `GENESIS_API_KEY` is set, all `/v1/*` routes require
+  `Authorization: Bearer <key>`. This is a bootstrap shared secret, not scoped
+  OIDC/JWT authorization. `/metrics` remains unguarded.
 - **Run:** `cargo run --features bins --bin genesis-db-server`
 
 > ⚠️ Two contract gotchas that have bitten SDKs:
-> 1. `POST /v1/query/hql` takes a **raw JSON string** body (e.g. `"SEARCH …"`),
->    **not** `{"query":"…"}`.
+> 1. `POST /v1/query/hql` accepts both a **raw JSON string** body (e.g. `"SEARCH …"`)
+>    and `{"query":"…"}`. `POST /v1/studio/query/read` accepts the same two shapes
+>    but enforces the read-only HQL command family.
 > 2. Edge `from`/`to` are **node string ids** (e.g. `"N-…"`), not integers.
 
 ## Routes
@@ -28,7 +37,18 @@ prior corrupted file. The server is the SSOT; update this when routes change.
 | POST | `/v1/bulk/nodes` | `NodeInput[]` | `200` (empty) |
 | POST | `/v1/bulk/edges` | `EdgeInput[]` | `200` (empty) |
 | POST | `/v1/bulk/rebuild` | _none_ | `200` (empty) |
-| POST | `/v1/query/hql` | **raw JSON string** (HQL) | `JSON` (shape depends on command) |
+| POST | `/v1/relational/schema/register` | `RelationalSchemaPackage` | current `schema_version` |
+| GET | `/v1/relational/schema/:namespace` | _none_ | normalized `RelationalSchemaPackage` or `404` |
+| POST | `/v1/relational/mutate` | `RelationalMutationBatch` | `RelationalMutationResult` |
+| POST | `/v1/relational/query` | `NamedQueryRequest` | JSON row array |
+| POST | `/v1/transaction/commit` | `GenesisTransaction` | `TransactionCommitResult` |
+| GET | `/v1/frontier` | _none_ | stable frontier `u64` |
+| GET | `/v1/studio/capabilities` | _none_ | negotiated Studio protocol/features/limits |
+| GET | `/v1/studio/graph` | query `seed?`, `limit?`, `offset?`, `direction?`, `as_of?` | bounded `StudioGraphScene` without embeddings |
+| GET | `/v1/studio/entity/:entity_id` | path id | `StudioEntityInspection` without embeddings |
+| POST | `/v1/studio/query/read` | raw JSON string or `{ query }` | read-only HQL result; 256 KiB body ceiling |
+| GET | `/v1/studio/relational/schemas` | _none_ | logical `RelationalSchemaPackage[]` |
+| POST | `/v1/query/hql` | raw JSON string or `{ query }` | `JSON` (shape depends on command) |
 | POST | `/v1/query` | `QueryInput` | `EdgeOutput[]` |
 | POST | `/v1/search/hybrid` | `HybridSearchInput` | `NeighborOutput[]` |
 | POST | `/v1/reason/context` | `HybridSearchInput` | `NeighborOutput[]` (alpha forced 0.4) |
@@ -44,10 +64,43 @@ prior corrupted file. The server is the SSOT; update this when routes change.
 | POST | `/v1/consensus/vote` | `{ proposal_id, peer_id, approve, signature: u8[] }` | `bool` (quorum reached) |
 | POST | `/v1/consensus/verify` | `Event` | `bool` |
 
-**Engine capabilities NOT exposed over REST** (NAPI/embedded only): `execute_batch`,
-tiered `retrieve_context` / HQL `CONTEXT` end-to-end, `neighbors` (graph
-traversal), `compact`, `set_language_centroid`,
-`set_index_params`, `reconcile_state`, `flush_index`, `index_lag`.
+**Engine capabilities NOT exposed over REST** (NAPI/embedded only) include
+`compact`, `set_language_centroid`, `set_index_params`, `reconcile_state`, and
+`flush_index`. REST exposes batch/transaction commit, tiered context, index lag,
+and bounded graph traversal through their guarded logical routes; it never
+exposes a raw SQLite connection or projection file.
+
+## Relational U2 contract
+
+Applications never receive a SQLite handle and cannot submit raw SQL. Schema
+registration and mutation events enter the signed Genesis WAL before the staged
+SQLite transaction commits. Network reads execute only named queries registered
+in the current schema package; the ad hoc `query_relational` method remains an
+embedded compatibility API and is not a REST route.
+
+```jsonc
+// RelationalMutationBatch
+{
+  "mutation_id": "UUID",
+  "namespace": "app_namespace",
+  "schema_version": 1,
+  "operations": [{ "table": "notes", "kind": "Upsert", "values": {}, "key": null }]
+}
+
+// NamedQueryRequest
+{
+  "namespace": "app_namespace",
+  "schema_version": 1,
+  "query_name": "note_by_id",
+  "parameters": { "note_id": "note-1" },
+  "limit": 10
+}
+```
+
+`mutation_id` retries are idempotent only when the complete payload is identical;
+reuse with another payload returns `REL_MUTATION_CONFLICT`. Schema versions must
+advance exactly by one and additive migrations cannot remove or incompatibly
+change existing tables, columns, or primary keys.
 
 > **Async vector indexing.** HNSW insertion runs off the write path on a
 > dedicated indexing thread — a vector is durable (WAL) and in its collection's
