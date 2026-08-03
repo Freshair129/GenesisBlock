@@ -10,7 +10,7 @@ Nearest comparators are embedded engines such as Kuzu, DuckDB combined with grap
 
 **Benchmarked, not narrated** — see the [consolidated performance report](docs/REPORT--2026-06-21-PERFORMANCE-AND-COMPETITIVE.md) and the [interactive benchmark dashboard](docs/perf-comparison-dashboard.html).
 
-**New here?** → [5-minute Quickstart (Node.js)](QUICKSTART.md) · [Why GenesisBlockDB](docs/POSITIONING.md)
+**New here?** → [Documentation Hub](docs/README.md) · [5-minute Quickstart (Node.js)](QUICKSTART.md) · [Why GenesisBlockDB](docs/POSITIONING.md)
 
 ## Product Boundary
 
@@ -51,6 +51,12 @@ Do not reuse these values outside the report's workload, hardware, configuration
 
 ## Documentation Entrypoints
 
+### Navigation and ownership
+
+- Documentation hub: [docs/README.md](docs/README.md)
+- Active document registry: [docs/DOC-REGISTRY.md](docs/DOC-REGISTRY.md)
+- Historical 2026-06-21 implementation-status snapshot: [docs/DOC-STATUS.md](docs/DOC-STATUS.md)
+
 ### Product and requirements
 
 - Business requirements: [docs/BRD--GENESISBLOCKDB.md](docs/BRD--GENESISBLOCKDB.md)
@@ -66,10 +72,10 @@ Do not reuse these values outside the report's workload, hardware, configuration
 - Architecture index / C4 map: [docs/C4--GENESISDB-ARCHITECTURE.md](docs/C4--GENESISDB-ARCHITECTURE.md)
 - Technical architecture composition: [docs/MASTER-SPEC--GENESIS-DB.md](docs/MASTER-SPEC--GENESIS-DB.md)
 - GenesisBlockDB semantic-substrate whitepaper: [docs/WHITEPAPER--GENESISBLOCKDB-SEMANTIC-SUBSTRATE.md](docs/WHITEPAPER--GENESISBLOCKDB-SEMANTIC-SUBSTRATE.md)
+- Historical GKS terminology whitepaper: [docs/WHITEPAPER--GENESIS-KNOWLEDGE-SYSTEM.md](docs/WHITEPAPER--GENESIS-KNOWLEDGE-SYSTEM.md)
 - Database whitepaper: [docs/WHITEPAPER--GENESIS-DB.md](docs/WHITEPAPER--GENESIS-DB.md)
 - API reference: [docs/API_REFERENCE.md](docs/API_REFERENCE.md)
 - Version SSOT: [docs/VERSION.md](docs/VERSION.md)
-- Documentation status: [docs/DOC-STATUS.md](docs/DOC-STATUS.md)
 - Performance and competitive report: [docs/REPORT--2026-06-21-PERFORMANCE-AND-COMPETITIVE.md](docs/REPORT--2026-06-21-PERFORMANCE-AND-COMPETITIVE.md)
 - Benchmark dashboard: [docs/perf-comparison-dashboard.html](docs/perf-comparison-dashboard.html)
 
@@ -138,5 +144,6 @@ npm run build
 - Start implementation requirements from the SRS.
 - Start architecture work from the C4 index and Master Spec, then follow ADRs, feature specs and code anchors.
 - Client schemas belong to clients or adapters; do not add GoVibe or NotiKeeper ontology to the database core.
+- Use `docs/DOC-REGISTRY.md` for current document ownership; `docs/DOC-STATUS.md` is historical only.
 - This repository follows Documentation-Driven Development and Root Cause Analysis.
 - Generated artifacts such as dashboard build output and Playwright reports are ignored.
