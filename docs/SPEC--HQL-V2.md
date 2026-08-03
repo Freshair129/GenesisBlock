@@ -81,9 +81,11 @@ Any numeric token whose value-parse fails (u32/f64 overflow, etc.) is a parse er
 
 Recommended: `qualified_id = identifier (":" identifier)+` accepted for `seed`/`target` **only** (never inside pattern syntax, where `:` introduces labels), so `TRAVERSE FROM user:5 …` parses. If the gate rejects (PEG risk), the fallback decision is: quoting is mandatory and all docs/examples are corrected (P0-T9). Either way the v1 broken-example state ends.
 
-Implementation note (2026-07-20): the current repo keeps colon-bearing ids quoted-only in
-command positions. The grammar does not implement an unquoted `qualified_id` form for
-`user:5`; callers must write string literals such as `TRAVERSE FROM "user:5" DEPTH 2 REL SENT_BY`.
+Implementation note (2026-08-04): the recommended form shipped; the fallback was not taken.
+`src/query/hql.pest` defines `qualified_id = @{ identifier ~ (":" ~ identifier)+ }` and admits it in
+`target`/`seed` only, so `TRAVERSE FROM user:5 DEPTH 2 REL SENT_BY` parses unquoted. Quoted string
+ids such as `"user:5"` remain accepted, so existing callers are unaffected. Pattern positions are
+unchanged: inside `(a:Label)` the colon still introduces a label, not a qualified id.
 
 ### 2.7 Executor guarantees (no syntax)
 
