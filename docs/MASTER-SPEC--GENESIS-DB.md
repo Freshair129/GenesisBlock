@@ -1,151 +1,291 @@
 ---
+title: "GenesisBlockDB Technical Architecture and Capability Composition"
+doc_id: "MASTER-SPEC-GENESISBLOCKDB"
 status: current
+version: "2.1.0"
+updated: "2026-08-03"
+owner: "GenesisBlockDB Architecture"
+source_of_truth: true
+related_issue: 84
+related_docs:
+  - "docs/BRD--GENESISBLOCKDB.md"
+  - "docs/PRD--GENESISBLOCKDB-PLATFORM.md"
+  - "docs/SRS--GENESISBLOCKDB.md"
+  - "docs/contracts/CONTRACT--CLIENT-NAMESPACE-AND-SCHEMA.md"
+  - "docs/adr/ADR--GENESISBLOCKDB-DOMAIN-NEUTRAL-CORE.md"
 ---
 
-# GenesisBlock DB: Master Specification (v2.0.0)
+# GenesisBlockDB Technical Architecture and Capability Composition
 
-## 1. Abstract
-GenesisBlock DB (GenesisBlockDB) is a high-performance, embedded hybrid semantic-graph database engine written in Rust. It is designed as the "Shadow Brain" for human-machine collaboration, providing a unified substrate for structured graph relationships, unstructured vector embeddings, and bitemporal event sourcing.
+## 1. Role of this document
 
-## 2. Core Architecture
+This document is the authoritative technical architecture composition for GenesisBlockDB. It explains how implemented and declared product capabilities fit together.
 
-### 2.1 Storage Model
+It is not the Business Requirements Document, Product Requirements Document, or Software Requirements Specification. Those are maintained separately:
+
+```text
+BRD--GENESISBLOCKDB
+  -> PRD--GENESISBLOCKDB-PLATFORM
+  -> SRS--GENESISBLOCKDB
+  -> MASTER-SPEC / C4 / ADR / feature specs
+  -> code, tests and benchmarks
+```
+
+## 2. Abstract
+
+GenesisBlockDB is a high-performance, embedded, local-first hybrid graph and vector database engine written in Rust. It provides a unified substrate for structured graph relationships, vector embeddings, lexical retrieval, temporal/event history, generic provenance, and durability.
+
+GenesisBlockDB is a standalone product with multiple independent clients. GoVibe, NotiKeeper, and future applications own their own ontology, authority, workflow, and projection semantics. The database core stores and executes generic client-defined records through namespaces, schema references, typed graph records, vector collections, temporal metadata, and query contracts.
+
+The architecture SHALL remain valid if GoVibe or NotiKeeper is removed from the ecosystem.
+
+## 3. Product-neutral architecture boundary
+
+```text
+Client application
+  -> client-owned domain/schema/authority
+  -> client adapter or SDK
+  -> GenesisBlockDB typed API / Query IR
+  -> generic graph, vector, lexical, temporal, provenance and durability core
+```
+
+### 3.1 Core ownership
+
+GenesisBlockDB owns:
+
+- generic nodes, edges, labels, properties and client identifiers;
+- client namespaces and schema references;
+- vector collections, embeddings and retrieval indexes;
+- lexical indexes;
+- temporal versions, event order, supersession and generic causality references;
+- WAL, snapshots, backup, restore, replay and recovery;
+- query, mutation, capability and SDK contracts;
+- optional generic governance-supporting and consensus primitives.
+
+Clients own:
+
+- atom or record taxonomy;
+- relation business meaning;
+- canonical identity policy;
+- authority, promotion and context rules;
+- planning, notification or other workflows;
+- application validation and user-facing views.
+
+GoVibe-specific GKS/MSP/planning contracts and NotiKeeper-specific notification contracts SHALL NOT become mandatory database-core ontology.
+
+## 4. Core Architecture
+
+### 4.1 Storage Model
+
 GenesisBlockDB uses a **Log-Structured Merge-Friendly** architecture based on a Write-Ahead Log (WAL).
-- **Primary Log:** `genesis-graph.wal` (JSONL format) stores all mutation events.
-- **Persistence:** High-durability append-only logic with batched group commits.
-- **Unified operational boundary:** applications open, mutate, query, back up, and restore GenesisBlockDB as one database. SQLite is an internal relational projection; native graph/vector indexes are not separate application-managed databases.
-- **Relational projection:** embedded SQLite (`rusqlite`, bundled) stores node properties, normalized labels, and U2 app-defined tables. Versioned additive schemas, idempotent typed mutation batches, and bounded named joins are available through Genesis APIs; SQLite remains internal and rebuildable from the signed WAL. Unified cross-domain commit sequencing remains U3.
-- **In-Memory State:**
-    - `DashMap<u32, NodeOutput>`: Lean primary node records (nodes interned to `u32`); `props` are hydrated from SQLite rather than retained on the traversal path.
-    - `DashMap<u128, EdgeOutput>`: Primary edge storage. Edges are keyed by a
-      deterministic `u128 = trunc128(SHA256(id))` (`Storage::edge_key`); the key is
-      derived from `EdgeOutput.id`, never stored authoritatively (legacy u64-keyed
-      snapshots load transparently). Edge id strings are **not** interned into
-      `id_to_u32` (ADR--GENESISDB-EDGE-NUMERIC-KEYS).
-    - `Adjacency Indices`: Forward (`out_idx`) and Backward (`in_idx`),
-      `DashMap<u32, HashSet<u128>>` (node `u32` → set of edge `u128` keys), for $O(1)$ traversal.
 
-### 2.2 Semantic Hybrid Indexing
-GenesisBlockDB bridges lexical and semantic search via a dual-indexing strategy:
-1.  **Lexical Index (Trigrams/Bigrams):** Thai-aware tokenization that strips combining marks (vowels/tones) to provide high-recall fuzzy matching for terms like "บ้าน" vs "บาน".
-2.  **Vector Index (HNSW), per collection:** vectors live in named
-    `VectorCollection`s — each with its own model, dim, metric, arena, and HNSW
-    index — not one global space (ADR--GENESISDB-MULTI-COLLECTION). A `default`
-    collection always exists. HNSW insertion is **asynchronous** (off the write
-    hot path; eventually searchable — `flush_index` forces a drain;
-    ADR--GENESISDB-ASYNC-INDEXING).
-3.  **Neural Bridge:** Multi-lingual support via language centroids and mean-centering, allowing English queries to match Thai contexts.
+- **Primary Log:** `genesis-graph.wal` (JSONL format) stores mutation events.
+- **Persistence:** high-durability append-only logic with batched group commits.
+- **Unified operational boundary:** applications open, mutate, query, back up and restore GenesisBlockDB as one database. SQLite is an internal relational projection; native graph/vector indexes are not separate application-managed databases.
+- **Relational projection:** embedded SQLite (`rusqlite`, bundled) stores node properties, normalized labels and U2 app-defined tables. Versioned additive schemas, idempotent typed mutation batches and bounded named joins are available through Genesis APIs. SQLite remains internal and rebuildable from the signed WAL. Unified cross-domain commit sequencing remains U3.
+- **In-memory state:**
+  - `DashMap<u32, NodeOutput>`: lean primary node records; `props` are hydrated from SQLite rather than retained on the traversal path.
+  - `DashMap<u128, EdgeOutput>`: primary edge storage. Edges are keyed by deterministic `u128 = trunc128(SHA256(id))`; the key is derived from `EdgeOutput.id` and is not client identity.
+  - `Adjacency Indices`: forward (`out_idx`) and backward (`in_idx`) indexes for O(1)-class adjacency access.
 
-### 2.3 Graph Retrieval Layer (GRL)
-The GRL implements the **Context Scaling Tier (H0-H5)** protocol to govern agent context acquisition:
-- **Resolver:** Maps tiers (H0=Self, H1=Neighbors, H2=Feature, H3=Module, H4=Arch, H5=System) to graph hops.
-- **Budget Manager:** Estimates token usage and automatically compresses results to **SuperNodes** if the agent's `BUDGET` is exceeded.
-- **Orchestrator:** Combines vector anchors with tiered graph expansion in a single reasoning pipeline.
+Internal numeric or hashed keys are implementation details. Public contracts preserve client-provided IDs.
 
-## 3. Data Model & Bitemporality
+### 4.2 Client namespace and schema metadata
 
-### 3.1 Node Schema
+Generic client records may carry:
+
+```yaml
+client_namespace: string
+schema_ref: string
+schema_version: string
+client_record_id: string
+client_mutation_id: string | null
+```
+
+The database preserves and indexes this metadata according to the client namespace/schema contract. Validation may be performed by the client, adapter, or optional hook. The core does not hard-code one client ontology.
+
+### 4.3 Semantic Hybrid Indexing
+
+GenesisBlockDB bridges lexical and semantic search through:
+
+1. **Lexical Index:** Thai-aware trigram/bigram behavior that strips combining marks for high-recall fuzzy matching.
+2. **Vector Index:** named `VectorCollection`s, each with its own model, dimension, metric, arena and HNSW index. A `default` collection exists. HNSW insertion is asynchronous; `flush_index` forces a drain.
+3. **Neural Bridge:** multilingual support using language centroids and mean-centering.
+
+Embeddings and similarity are retrieval data. They do not define client canonical identity by themselves.
+
+### 4.4 Graph Retrieval Layer
+
+The Graph Retrieval Layer (GRL) provides generic tiered or bounded graph retrieval:
+
+- a resolver maps configured tiers or scopes to graph expansion;
+- a budget manager estimates result size/token cost and may compress results;
+- an orchestrator combines vector anchors with bounded graph expansion.
+
+A client may map these primitives to its own context policy. The GRL does not make GoVibe MSP rules mandatory for NotiKeeper or other clients.
+
+## 5. Data Model and Bitemporality
+
+### 5.1 Generic node schema
+
 | Field | Type | Description |
-| :--- | :--- | :--- |
-| `id` | String | Unique Identifier (supports Trigram indexing). |
-| `labels` | Vec<String> | Governance and classification tags. |
-| `props` | JSON | Arbitrary metadata payload. |
-| `impact` | f64 | Reasoned importance score (K-Impact). |
-| `embedding`| Vec<f64> | 1536-dim vector (optional). |
-| `valid_from`| RFC3339 | Logical start time. |
-| `valid_to` | Option<RFC3339>| Logical end time (for retractions/supersessions). |
-| `expires_at`| Option<RFC3339>| TTL expiration time. |
-| `caused_by` | Option<String> | Link to triggering event (Causality Chain). |
-| `clock` | LogicalClock | Lamport timestamp (CRDT support). |
+|---|---|---|
+| `id` | String | Stable external/client-facing identifier. |
+| `labels` | Vec<String> | Client-defined classification labels. |
+| `props` | JSON | Generic client properties. |
+| `impact` | f64 | Optional derived importance score. |
+| `embedding` | Vec<f64> | Optional vector data; collection metadata applies. |
+| `valid_from` | RFC3339 | Logical start time. |
+| `valid_to` | Option<RFC3339> | Logical end time. |
+| `expires_at` | Option<RFC3339> | Optional TTL expiration. |
+| `caused_by` | Option<String> | Generic causality/provenance reference. |
+| `clock` | LogicalClock | Lamport timestamp where CRDT behavior applies. |
+| `client_namespace` | String/optional by deployment contract | Client/domain namespace. |
+| `schema_ref` | String/optional by validation mode | Client-controlled schema reference. |
+| `schema_version` | String/optional | Schema version metadata. |
 
-### 3.2 Bitemporal Philosophy
-GenesisBlockDB follows an **immutable-by-default** update pattern. Updates use the `supersede_node` logic:
-1.  The existing node version is marked with `valid_to = now`.
-2.  A new node version is inserted with `valid_from = now` and the updated properties.
-3.  The `caused_by` field links the mutation to its causal context (e.g., an ADR document).
+### 5.2 Generic edge schema
 
-## 4. Reasoning & Autonomic Substrate
+A generic edge preserves:
 
-### 4.1 K-Impact Model
-Node importance is calculated via the formula:
-$$ R(n) = (DD(n) \cdot 0.5) + (AS(n) \cdot 0.3) + (SC(n) \cdot 0.2) $$
-- **DD (Dependency Depth):** Incoming link count.
-- **AS (Axiomatic Strictness):** Governance tier weight.
-- **SC (Stability Confidence):** Reliability of the data source.
+- stable external edge ID;
+- source and target external IDs;
+- client-defined relation type;
+- namespace and schema metadata;
+- generic properties;
+- provenance/causality metadata;
+- temporal validity;
+- internal numeric/hash key as a private optimization only.
 
-### 4.2 Structural Insight Engine
-The autonomic maintenance loop runs periodically to:
-1.  **Community Detection:** Group nodes into clusters using the Label Propagation Algorithm (LPA).
-2.  **SuperNode Generation:** Synthesize cluster centroids and themes.
-3.  **Gap Detection:** Identify semantically close but physically disconnected knowledge clusters.
-4.  **Vector Drift:** Track the movement of cluster centroids over time to detect "Semantic Shift".
+### 5.3 Bitemporal philosophy
 
-## 5. Governance & Consensus
+GenesisBlockDB follows an immutable-by-default update pattern. Updates use supersession:
 
-### 5.1 Axiomatic Guards
-Access control is enforced via governance tiers:
-- **MASTER (Tier 0):** Read-only for external agents. Mutated only via consensus.
-- **SPEC (Tier 1):** Mandatory temporal fields and audit logs.
-- **ADR (Tier 2):** Architecture decisions linking to SPEC.
-- **USER (Tier 3):** Unstructured user data.
+1. mark the existing version with `valid_to`;
+2. insert a new version with `valid_from` and updated properties;
+3. link the mutation to generic causality/provenance metadata where supplied.
 
-### 5.2 Multi-Agent Consensus
-The `ConsensusProposal` protocol allows agents to vote on promoting USER data to MASTER axioms based on quorum and semantic verification.
+Clients decide whether a supersession is a semantic correction, business update, notification state change, or another domain event.
 
-## 6. Distributed Synchronization (CRDT)
+## 6. Reasoning and Autonomic Substrate
 
-GenesisBlockDB ensures eventual consistency across distributed agents using:
-- **Lamport Timestamps:** `LogicalClock { time, peer_id }` for global event ordering.
-- **LWW (Last-Write-Wins):** Deterministic conflict resolution during `reconcile_state`.
-- **Clock Jump:** Local clocks synchronize with the maximum known global time upon replication.
+### 6.1 K-Impact Model
 
-## 7. HQL (Hybrid Query Language)
+Node importance may be calculated through the documented K-Impact formula and inputs such as dependency depth, configured strictness/governance metadata and source stability.
 
-GenesisBlockDB exposes HQL as a compatibility/query frontend for graph, vector, and context operations. The canonical future public contract is typed Query IR; HQL is not the storage authority and is not required to grow into general-purpose SQL/Cypher.
+The core may compute generic scores. Clients decide how or whether those scores affect authority or workflows.
 
-### 7.1 Search (Lexical/Vector)
+### 6.2 Structural Insight Engine
+
+The maintenance loop may perform:
+
+- community detection;
+- supernode or cluster-summary generation;
+- structural gap detection;
+- vector/centroid drift tracking.
+
+Outputs are analytical candidates or derived data. They do not automatically become client canonical truth.
+
+## 7. Governance-Supporting and Consensus Primitives
+
+GenesisBlockDB may expose generic tiers, guards, signatures, proposals and votes. These are database/runtime primitives, not a universal application authority model.
+
+A client may map them to:
+
+- GoVibe canonical promotion;
+- NotiKeeper notification approval;
+- a future client's independent governance policy.
+
+The core SHALL not require one mapping for all clients.
+
+## 8. Distributed Synchronization
+
+Where enabled, synchronization uses documented logical-clock, reconciliation and CRDT behavior.
+
+- Lamport timestamps provide deterministic event ordering inputs.
+- LWW or other configured reconciliation behavior must be documented as a storage conflict rule, not a substitute for client semantic conflict policy.
+- Local clock advancement follows the documented protocol.
+
+Client-level semantic conflicts may require review even when storage-level reconciliation succeeds.
+
+## 9. HQL and Typed Query IR
+
+GenesisBlockDB exposes HQL as a compatibility/query frontend for graph, vector and context operations. The canonical future public contract is typed Query IR. HQL is not storage authority and is not required to grow into general-purpose SQL or Cypher.
+
+### 9.1 Search
+
 ```sql
 SEARCH ~target SIMILAR TO [v1, v2, ...] K 5 IN "code" LANGUAGE "th" AS OF "2026-01-01T00:00:00Z"
 ```
-The optional `IN <collection>` clause (quoted or bare identifier) scopes the
-search to a named vector collection; omitted → the `default` collection.
 
-### 7.2 Traverse (Graph)
+The optional `IN <collection>` clause scopes search to a named vector collection; omitted means `default`.
+
+### 9.2 Traverse
+
 ```sql
 TRAVERSE FROM seed DEPTH 2 REL INFER(depends_on) AS OF "..."
 ```
 
-### 7.3 Hybrid (Ranked Context)
+Relation labels are client-defined data. Query execution does not grant them universal business meaning.
+
+### 9.3 Hybrid
+
 ```sql
 MATCH target SIMILAR TO [...] ALPHA 0.4 LANGUAGE "en"
 ```
 
-## 8. Deployment & Connectivity
-### 8.1 Deployment modes
-The same Rust core supports in-process mobile embedding and a single-node self-hosted Axum server. Multi-node HA, distributed SQL, and automatic failover are not v1 claims.
+Query contracts should support namespace, collection, temporal/revision and bounded traversal scope where implemented.
 
-### 8.2 Model Context Protocol (MCP)
-GenesisBlock provides a native MCP server for seamless integration with LLMs.
-- **Transport:** Stdio (Local) and SSE (Swarm).
-- **Tools Exposed:**
-    - `query_hql`: Direct execution of hybrid queries.
-    - `retrieve_tiered_context`: Access to the GRL scaling protocol (H0-H5).
-    - `add_knowledge`: Dynamic knowledge injection with provenance.
-- **Usage:** Run `npm run mcp:start` and configure the client with the resulting stdio stream.
+## 10. Deployment and Connectivity
 
-### 8.3 Python SDK
-The official Python library provides high-level bindings for AI and Data Science research.
-- **Installation:** `pip install genesisdb-python/`
-- **Features:** 
-    - Typed models for Nodes and Edges.
-    - Tiered Context Retrieval (H0-H5).
-    - Support for NumPy-compatible vector injection.
+### 10.1 Deployment modes
 
-### 8.4 Go SDK
-The official Go client enables high-performance, cloud-native backend integration.
-- **Module:** `github.com/freshair129/genesisblock-go`
-- **Features:**
-    - Context-aware methods (`context.Context`).
-    - Concurrent-safe execution.
-    - Full mapping of GKS schemas to Go structs.
+The same Rust core supports in-process embedding and a single-node self-hosted Axum server. Multi-node HA, distributed SQL and automatic failover are not v1 claims unless separately implemented and evidenced.
 
+### 10.2 Model Context Protocol
+
+GenesisBlockDB may provide a native MCP server for bounded database operations.
+
+Current tools include or may expose:
+
+- HQL/query execution;
+- bounded/tiered context retrieval;
+- generic knowledge/record insertion with provenance.
+
+MCP tools SHALL not assume GoVibe canonical authority or NotiKeeper workflow semantics.
+
+### 10.3 Python SDK
+
+The Python SDK provides typed generic node, edge, query and retrieval bindings. Client-specific schema wrappers belong in client packages or adapters.
+
+### 10.4 Go SDK
+
+The Go SDK provides concurrent-safe generic database access. References to “full mapping of GKS schemas” should be interpreted or revised as optional client adapters, not the product-neutral core contract.
+
+## 11. Conformance and evidence
+
+The architecture is conformant when:
+
+- GoVibe and NotiKeeper adapters run against one unmodified core;
+- a third client namespace/schema can be added without recompilation;
+- public IDs survive WAL/snapshot/restore/query paths;
+- internal key changes do not alter client identity;
+- client-specific validation is outside mandatory core ontology;
+- implemented/partial/proposed status remains evidence-backed;
+- benchmark claims include workload and environment.
+
+## 12. Document responsibility
+
+- BRD defines business need and product independence.
+- PRD defines user-facing product scope and major capabilities.
+- SRS defines SHALL requirements.
+- This Master Spec defines technical architecture composition.
+- ADRs define significant decisions.
+- Feature specs and code/tests define implementation detail and evidence.
+
+## Changelog
+
+| Version | Date | Owner | Summary |
+|---|---|---|---|
+| 2.1.0 | 2026-08-03 | GenesisBlockDB Architecture | Separated BRD/PRD/SRS roles, established standalone client-neutral boundary, added client namespace/schema metadata, and removed GoVibe-specific authority from the core definition. |
+| 2.0.0 | previous | GenesisBlockDB Architecture | Previous master specification. |
