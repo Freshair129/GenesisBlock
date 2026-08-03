@@ -1,65 +1,70 @@
 ---
-status: current
+title: "Historical Whitepaper: Genesis Knowledge System"
+doc_id: "WHITEPAPER-GENESIS-KNOWLEDGE-SYSTEM-HISTORICAL"
+status: superseded
+version: "2.1.0-superseded"
+updated: "2026-08-03"
+owner: "GenesisBlockDB Architecture"
+source_of_truth: false
+superseded_by:
+  - "docs/WHITEPAPER--GENESISBLOCKDB-SEMANTIC-SUBSTRATE.md"
+  - "docs/PRD--GENESISBLOCKDB-PLATFORM.md"
+related_issue: 84
 ---
 
-# Whitepaper: Genesis Knowledge System (GKS)
-**Version:** 2.0.0 (Mark VIII) · evidence-backed revision 2026-06-21
-**Status:** Embedded agent-memory engine — benchmarked (audits P14–P25)
-**Architect:** Rwang (อาหวัง)
+# Historical Whitepaper: Genesis Knowledge System
 
-## 1. Executive Summary
-The Genesis Knowledge System (GKS) is a high-performance distributed semantic substrate designed for **Human-Machine Autonomy**. It serves as the unified "Shadow Brain" where human thought (Obsidian) and machine reasoning (AI Agents) merge. By Mark VIII, GKS has evolved from a local engine into a decentralized, bitemporal ecosystem capable of collective consensus and eventual consistency across high-latency networks.
+## Supersession notice
 
-## 2. Core Architecture: The "Mechanical Sympathy" Engine
+This document is retained as historical evidence but is no longer the canonical product definition for GenesisBlockDB.
 
-### 2.1 Storage Model (WAL & CRDT)
-- **L0 Durability:** JSONL Write-Ahead Log with **Group Commit** logic (< 5ms latency).
-- **L3 Collaboration:** Conflict-free Replicated Data Types (**CRDT**) using **Lamport Timestamps**. Every mutation is deterministically ordered across agents, enabling masterless synchronization.
+The previous version used **Genesis Knowledge System (GKS)** as a broad name for the database engine, distributed semantic substrate, governance model, memory engine, and client-facing knowledge system. That wording creates an ownership collision with client architectures such as GoVibe, where GKS is a logical canonical knowledge and relation authority above a swappable persistence backend.
 
-### 2.2 Neural-Hybrid Indexing
-- **Vector substrate:** HNSW similarity search. Measured (bge-m3 1024-dim, 100k):
-  recall@10 0.984 at ~1.1 ms p50 — at parity with Chroma on the same
-  recall↔latency frontier (audit P21/P20). *(The earlier "P95 < 30 µs" was a
-  measurement artifact and is retracted; 30 µs is closer to a 1-hop graph
-  lookup — see below.)*
-- **Graph substrate:** index-backed traversal; 1-hop p50 ~22 µs, O(neighborhood)
-  not O(N), and 7–185× faster than server Neo4j on k-hop (audit P22/P23).
-- **Lexical substrate:** **Thai-aware Tokenization** filtering combining marks (vowels/tones) to unify fuzzy lookups (e.g., "บ้าน" vs "บาน").
-- **Neural Bridge:** Cross-lingual English-Thai mean-centering for language-agnostic retrieval.
+GenesisBlockDB is now defined independently as a standalone, client-neutral database product.
 
-## 3. Distributed Reasoning Pillars (Mark VI - VIII)
+Use these current documents:
 
-### 3.1 K-Impact Score ($R(n)$)
-Evaluates the authority of knowledge atoms based on graph topology (Dependency Depth), governance tier (Axiomatic Strictness), and stability metadata.
+- `docs/BRD--GENESISBLOCKDB.md`
+- `docs/PRD--GENESISBLOCKDB-PLATFORM.md`
+- `docs/SRS--GENESISBLOCKDB.md`
+- `docs/MASTER-SPEC--GENESIS-DB.md`
+- `docs/WHITEPAPER--GENESISBLOCKDB-SEMANTIC-SUBSTRATE.md`
+- `docs/contracts/CONTRACT--CLIENT-NAMESPACE-AND-SCHEMA.md`
+- `docs/adr/ADR--GENESISBLOCKDB-DOMAIN-NEUTRAL-CORE.md`
 
-### 3.2 Structural Insight Engine
-A proactive reasoning loop that analyzes the meta-graph to:
-- **Detect Community Centroids:** Grouping atoms into emergent themes.
-- **Identify Logical Gaps:** Prompting agents to bridge semantically close but disconnected ideas.
-- **Track Semantic Drift:** Measuring vector drift of themes over time to observe the evolution of knowledge consensus.
+## Current terminology
 
-### 3.3 Bitemporal Event Sourcing
-Absolute auditability via the **Causality Chain**. Updates follow a "supersession" pattern where the history of every node is preserved. The `caused_by` field links mutations to triggering events like ADRs or Consensus Votes.
+### GenesisBlockDB
 
-## 4. Governance: The Axiomatic Guard Protocol
-A strict hierarchy of truth:
-- **MASTER (Tier 0):** Immutable system axioms. Can only be modified via **Multi-Agent Neural Consensus**.
-- **SPEC / ADR (Tier 1-2):** Formal specifications and architecture decisions.
-- **USER (Tier 3):** Exploratory data and personal notes.
+A standalone embedded, local-first hybrid graph and vector database product. It owns generic storage, graph, vector, lexical, temporal, provenance, durability, query, recovery, and integration capabilities.
 
-## 5. Deployment: The Collaborative Swarm
-- **Shadow Sync:** The Obsidian plugin provides human-centric visualization and real-time vault indexing.
-- **Agentic API:** Axum REST and NAPI bindings for seamless LLM context injection.
-- **P2P Gossip:** Future-ready infrastructure for decentralized knowledge replication across agent swarms.
+### Client knowledge systems
 
-## 6. Conclusion
-The Genesis Knowledge System is the infrastructure for **Collective Intelligence**. It provides the speed of local hardware, the flexibility of neural models, and the rigor of axiomatic governance, forming a resilient and evolving memory for the future of AI.
+A client application may define a logical knowledge system, canonical identity model, authority model, context policy, or workflow above GenesisBlockDB.
 
-## 7. Evidence
-Performance and competitive claims are measured and reproducible — see
-`REPORT--2026-06-21-PERFORMANCE-AND-COMPETITIVE.md` and audits P14–P25
-(vector frontier vs Chroma/Qdrant, graph traversal 10k–1M, Neo4j head-to-head,
-governance & incremental K-Impact cost). Harnesses live in `benches/`.
+Examples:
 
----
-**Benchmarked, not narrated. Hardened for Thai. Embedded by design.**
+- GoVibe may use GenesisBlockDB through an adapter while retaining GoVibe-owned GKS/MSP semantics.
+- NotiKeeper may use GenesisBlockDB through its own adapter and notification/event schema.
+- Future clients may define unrelated ontologies.
+
+## Historical claims
+
+Performance claims from the previous document remain governed by their original benchmark reports and audit evidence. Supersession of terminology does not validate, invalidate, or update benchmark results.
+
+The previous detailed narrative is available through repository history at revisions before this supersession. It should not be copied into new architecture or product documents as current terminology.
+
+## Reason for supersession
+
+- separate the database product from individual client authority models;
+- prevent GoVibe-specific semantics from becoming mandatory database ontology;
+- allow NotiKeeper and future clients to evolve independently;
+- distinguish product requirements, technical architecture, and application semantics;
+- remove the implication that GenesisBlockDB and every client knowledge system are the same thing.
+
+## Changelog
+
+| Version | Date | Owner | Summary |
+|---|---|---|---|
+| 2.1.0-superseded | 2026-08-03 | GenesisBlockDB Architecture | Superseded the GKS/database product terminology collision and redirected to client-neutral product documents. |
+| 2.0.0 | 2026-06-21 | Rwang | Previous Mark VIII evidence-backed whitepaper. |

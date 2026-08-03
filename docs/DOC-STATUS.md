@@ -1,24 +1,44 @@
 ---
-status: historical
+title: "Historical GenesisBlockDB Documentation Status Snapshot"
+doc_id: "DOC-STATUS-GENESISBLOCKDB-HISTORICAL"
+status: superseded
+version: "2026.06.21+archived"
+updated: "2026-08-03"
+owner: "GenesisBlockDB Architecture"
+source_of_truth: false
+superseded_by: "docs/DOC-REGISTRY.md"
+related_issue: 84
 ---
 
-# Documentation Status Index (SSOT)
+# Historical GenesisBlockDB Documentation Status Snapshot
 
-Central status manifest (best-effort from code evidence, 2026-06-21) — a single
-index instead of editing 40+ spec frontmatters. Status legend:
+## Supersession notice
 
-- **Implemented** — present in `src/lib.rs` and exercised by tests/benchmarks.
-- **Partial** — core present, with documented stubs/gaps.
-- **Proposed** — design/spec not (fully) built.
-- **Superseded** — historical; replaced by newer evidence/decisions.
-- **Reference** — process/record docs (audits, ADRs, guides, reports).
+This file preserves the best-effort implementation-status snapshot recorded on 2026-06-21. It is not the active document registry and must not be used as the current product-definition source of truth.
 
-> Caveat: most `SPEC--*`/`TDD--*` files end with "review and approve" and were
-> authored as proposals; the classification below reflects what the **code**
-> actually does, not the doc's own claim.
+Use:
 
-## Implemented (verified)
-| Doc | Evidence |
+- `docs/DOC-REGISTRY.md` for active document ownership and lifecycle;
+- `docs/BRD--GENESISBLOCKDB.md` for business requirements;
+- `docs/PRD--GENESISBLOCKDB-PLATFORM.md` for product requirements;
+- `docs/SRS--GENESISBLOCKDB.md` for software requirements;
+- current code, tests, audits, benchmarks, and release evidence for implementation status.
+
+The historical classifications below are retained for traceability. They may be stale after 2026-06-21.
+
+## Historical status legend
+
+- **Implemented** — present in `src/lib.rs` and exercised by tests/benchmarks at the snapshot date.
+- **Partial** — core present, with documented stubs/gaps at the snapshot date.
+- **Proposed** — design/spec not fully built at the snapshot date.
+- **Superseded** — historical and replaced by newer evidence/decisions.
+- **Reference** — process/record documents rather than feature specifications.
+
+> Caveat: most `SPEC--*` and `TDD--*` files ended with review/approval language and were authored as proposals. The historical classification reflected observed code evidence rather than the document's own claim.
+
+## Implemented at snapshot date
+
+| Doc | Evidence recorded on 2026-06-21 |
 |---|---|
 | SPEC--AXIOMATIC-GUARDS, SPEC--MARK-IV-MASTER | `validate_governance`, `Tier` (P24) |
 | SPEC--BATCH-ATOMICITY | `execute_batch` (`batch_atomicity_tests`) |
@@ -30,47 +50,55 @@ index instead of editing 40+ spec frontmatters. Status legend:
 | SPEC--INDEX-COMPACTION | `compact` / `perform_index_compaction` (`compaction_tests`) |
 | SPEC--CROSS-LINGUAL-MAPPING | `set_language_centroid`, centroid mean-centering (`thai_fuzzy_tests`) |
 | SPEC--CRYPTOGRAPHIC-SWARM | ed25519 identity, signed events |
-| DESIGN--HNSW-HYBRID-INDEX | `hnsw_rs` per-collection index, **async indexing** (P14–P21; ADR--GENESISDB-ASYNC-INDEXING) |
-| SPEC--MULTI-COLLECTION-VECTOR-SPACE | per-collection vector spaces P-C/P-D (`multi_collection_tests`; ADR--GENESISDB-MULTI-COLLECTION) |
-| ADR--GENESISDB-EDGE-ID-INTERNING, ADR--GENESISDB-EDGE-NUMERIC-KEYS | lean + numeric `u64` edge keys, −44% edge RAM (`edge_interning_tests`) |
-| ADR--GENESISDB-ASYNC-INDEXING | deferred HNSW indexing, P95 6.31→0.60 ms (`async_indexing_tests`) |
+| DESIGN--HNSW-HYBRID-INDEX | `hnsw_rs` per-collection index, async indexing (P14–P21) |
+| SPEC--MULTI-COLLECTION-VECTOR-SPACE | per-collection vector spaces P-C/P-D (`multi_collection_tests`) |
+| ADR--GENESISDB-EDGE-ID-INTERNING, ADR--GENESISDB-EDGE-NUMERIC-KEYS | lean numeric edge keys and recorded RAM reduction |
+| ADR--GENESISDB-ASYNC-INDEXING | deferred HNSW indexing and recorded latency change |
 | DESIGN--TRANSITIVE-INFERENCE | `INFER(...)` unbounded traversal |
-| TDD--GENESISDB-DUAL-TRACK | WAL + binary snapshot, instant-load + replay (P14) |
-| TDD--NEURAL-CONSENSUS-PROTOCOL | `propose_consensus`/`submit_vote` quorum (`crdt_sync_tests`) |
-| TDD--STRUCTURAL-INSIGHT-ENGINE | `calculate_structural_gaps` |
-| SPEC--MCP-SERVER | `mcp/server.js` (3 tools; the doc's 4-tool list is drift) |
+| TDD--GENESISDB-DUAL-TRACK | WAL plus binary snapshot, load and replay |
+| TDD--NEURAL-CONSENSUS-PROTOCOL | proposal/vote quorum paths |
+| TDD--STRUCTURAL-INSIGHT-ENGINE | structural-gap calculation |
+| SPEC--MCP-SERVER | `mcp/server.js`; historical note recorded tool-list drift |
 
-## Partial (core present, gaps)
-| Doc | Gap |
+## Partial at snapshot date
+
+| Doc | Gap recorded on 2026-06-21 |
 |---|---|
-| SPEC--COLLABORATIVE-SYNC, SPEC--P2P-GOSSIP-PROTOCOL | gossip discovery + PushDelta work; **anti-entropy PullRequest is a stub** |
-| SPEC--PYTHON-SDK, SPEC--GO-SDK + guides | SDKs exist but send `{"query":…}` to `/v1/query/hql` (server wants a raw string) |
-| SPEC--SELF-OPTIMIZING-SUBSTRATE | autonomic loop runs; per-cluster `ef` tuning not wired (ef is now global-configurable via `set_index_params`) |
-| ADR--PHASE-13-QUERY-PLANNER | `LogicalPlanner` exists but is **dead code** (`execute_hql` matches directly) |
-| SPEC--OBSIDIAN-UI-INTEGRATION | plugin present; `503`/maintenance contract not implemented |
+| SPEC--COLLABORATIVE-SYNC, SPEC--P2P-GOSSIP-PROTOCOL | discovery and PushDelta work; anti-entropy PullRequest stub |
+| SPEC--PYTHON-SDK, SPEC--GO-SDK plus guides | SDK/server request-shape mismatch |
+| SPEC--SELF-OPTIMIZING-SUBSTRATE | autonomic loop present; per-cluster `ef` tuning not wired |
+| ADR--PHASE-13-QUERY-PLANNER | `LogicalPlanner` existed but was not connected to `execute_hql` |
+| SPEC--OBSIDIAN-UI-INTEGRATION | plugin present; maintenance/503 contract not implemented |
 
-## Proposed (not built)
-- _(none currently — SPEC--MULTI-COLLECTION-VECTOR-SPACE P-C/P-D shipped 2026-06-22; see Implemented. Deferred follow-ups: HQL `IN <collection>` clause + same-node multi-vector `add_vector`.)_
+## Proposed at snapshot date
 
-## Superseded
-- **EXPANSION-SPEC--GENESIS-DB** — explicitly DEPRECATED.
-- **AUDIT--P7…P12**, AUDIT--P13 — pre-correction numbers (P12 retracted artifacts);
-  superseded by **AUDIT--P14–P25** + `REPORT--2026-06-21`.
-- **ADR--GENESISDB-COMPETITIVE-ROADMAP, ADR--GENESISDB-SCALABILITY-VALIDATION,
-  ADR--GENESISDB-BENCHMARK-SUITE** — pre-pivot/aspirational; superseded by the
-  measured P14–P25 program and `ADR--GENESISDB-MARKET-POSITIONING` (refined).
+The snapshot recorded no active proposed item after multi-collection vector support shipped. It listed HQL collection scoping and same-node multi-vector follow-ups as deferred.
 
-## Reference / process (not feature specs)
-WHITEPAPER--GENESIS-DB, WHITEPAPER--GENESIS-KNOWLEDGE-SYSTEM, MASTER-SPEC--GENESIS-DB,
-C4--GENESISDB-ARCHITECTURE, API_REFERENCE, VERSION, REPORT--2026-06-21,
-INCIDENT--*, CR--*, MCP-GUIDE, PYTHON-SDK-GUIDE, FLOW--*, FRAMEWORK--*,
-TDD--DOCUMENTATION-GOVERNANCE-SSOT-ENFORCEMENT, AUDIT--P14…P26,
-ADR--GENESISDB-{GOVERNANCE-LOGIC,HNSW-HYBRID-INDEXING,KIMPACT-ALGORITHM,
-TEMPORAL-MODEL,SEGREGATION-STRATEGY,CSR-MUTATION-STRATEGY,MARKET-POSITIONING},
-ADR--PHASE-11-INDUSTRIAL-HARDENING, ADR--PHASE-13-WAL-GROUP-COMMIT.
+## Superseded at snapshot date
 
-## Known dangling references (fix in doc-governance pass)
-- `docs/MASTER-SPEC--GENESIS-DB.md` cited as authoritative parent — verify it is current.
-- Root `hql.pest`, `src/query/planner.rs`, `src/sync/mod.rs`, `AGENTS.md`,
-  `docs/specs/SPEC-Genesis-Block.md`, `docs/GO-SDK-GUIDE.md` are referenced but
-  do not exist.
+- `EXPANSION-SPEC--GENESIS-DB` was explicitly deprecated.
+- Audits P7–P13 were superseded by the later measured audit/report program.
+- Earlier competitive-roadmap, scalability-validation, and benchmark-suite ADRs were superseded by measured evidence and refined positioning.
+
+## Historical reference set
+
+The snapshot treated whitepapers, Master Spec, C4, API reference, version record, performance report, incidents, change requests, guides, flows, frameworks, TDD governance documents, audits, and architecture ADRs as reference/process records rather than feature-status proof by themselves.
+
+## Historical dangling references
+
+The snapshot recorded these references for later governance repair:
+
+- root `hql.pest`;
+- `src/query/planner.rs`;
+- `src/sync/mod.rs`;
+- `AGENTS.md`;
+- `docs/specs/SPEC-Genesis-Block.md`;
+- `docs/GO-SDK-GUIDE.md`.
+
+Their current status must be verified against the present branch rather than inferred from this historical file.
+
+## Changelog
+
+| Version | Date | Owner | Summary |
+|---|---|---|---|
+| 2026.06.21+archived | 2026-08-03 | GenesisBlockDB Architecture | Converted the 2026-06-21 implementation-status SSOT claim into an explicitly superseded historical snapshot and redirected active ownership to DOC-REGISTRY. |
