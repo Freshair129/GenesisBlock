@@ -2,6 +2,8 @@
 
 GenesisBlockDB is a **standalone, embedded, local-first hybrid graph + vector database product** for AI, agent, knowledge, notification, analytics, and other relationship-heavy applications.
 
+Applications should treat GenesisBlockDB as the only database handle or endpoint they open for Genesis-owned data — an embedded SQLite relational projection (properties, labels, joins) lives inside the engine's WAL-durable boundary, not as a caller-managed store. Do not dual-write to separate SQLite, graph, or vector stores behind the engine.
+
 A single in-process Rust core combines storage + WAL, HNSW vector indexes, an index-backed property graph, bitemporal/event-sourced history, generic provenance/governance-supporting primitives, and optional CRDT synchronization. The core compiles to a Node.js N-API addon and an Axum REST server.
 
 GenesisBlockDB is client neutral. **GoVibe is one client, NotiKeeper is another, and future clients may use independent namespaces, schemas, ontologies, and policies without recompiling the database core.** GoVibe-specific GKS/MSP/planning semantics and NotiKeeper-specific notification semantics remain client-owned.
@@ -83,15 +85,28 @@ Agent context: [AGENT.md](AGENT.md) · Contributor workflow: [CONTRIBUTING.md](C
 
 ## Core Capabilities
 
-- Durable generic node and edge ingestion through WAL-backed storage.
+- Durable generic node and edge ingestion through signed-WAL-backed storage.
+- One application-facing database boundary over WAL, SQLite projection, and native graph/vector indexes — clients should not dual-write to separate stores.
 - Client-defined namespaces, labels, relation types, properties and schema references.
 - HNSW-backed semantic search with per-model/dimension vector collections and asynchronous indexing.
 - Thai-aware lexical matching and documented cross-lingual behavior.
 - HQL query execution for search, traversal, hybrid retrieval and context; typed Query IR is the long-term public boundary.
 - Graph Retrieval Layer for tiered or bounded context packages without requiring one client authority model.
 - Bitemporal node evolution through supersession rather than destructive overwrite.
+- Embedded SQLite projection for node properties, labels, app-defined relational schemas, joins, and SQL-backed filtering/text retrieval.
 - Generic provenance, causality, governance-supporting and consensus primitives.
 - REST, N-API, MCP, Python SDK and Go SDK interfaces over the Rust engine.
+
+## Storage Model
+
+- `genesis-graph.wal` is the internal durability authority and mutation source of truth.
+- Snapshot/state files such as `state.json`, `nodes.bin`, `edges.bin`, `vec_<name>.bin`,
+  and `fvec_<name>.bin` are materialized on-disk state used for fast reload and recovery.
+- `projection.sqlite` is an engine-owned, rebuildable relational projection. It is not a
+  caller-owned database and should not be written directly.
+- If GenesisBlockDB gains more internal stores in the future, they should join the same
+  Genesis transaction and replay model rather than forcing applications to manage an
+  extra external database.
 
 ## Quick Start
 
