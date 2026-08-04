@@ -6,7 +6,7 @@
 //! keyword disambiguation vs. the existing hybrid `MATCH ... SIMILAR`, and
 //! bitemporal `AS OF`.
 
-use genesis_block_native::{EdgeInput, NodeInput, OpenOptions, Storage};
+use genesis_block_native::{BatchInput, EdgeInput, NodeInput, OpenOptions, Storage};
 use serde_json::{json, Value};
 use std::fs;
 use std::path::Path;
@@ -367,4 +367,241 @@ fn cypher_as_of_temporal() {
         .execute_hql("MATCH (a)-[:KNOWS]->(b) AS OF \"1970-01-01T00:00:00Z\" RETURN a.id, b.id")
         .unwrap();
     assert_eq!(rows(&past).len(), 0, "nothing valid before it existed");
+}
+
+// -----------------------------------------------------------------------
+// P0-T7: id-anchored pattern fast path.
+// -----------------------------------------------------------------------
+
+/// Build a fixture of `n` fan-out nodes off a single hub, each connected via
+/// a REL edge, plus a bunch of unrelated decoy nodes so the id-anchor really
+/// has to pick the right node out of a large table (not just be the only one).
+/// Uses `execute_batch` (one atomic WAL write) rather than per-node `add_node`
+/// calls so a >=1000-node fixture builds in one shot instead of one fsync per row.
+fn build_fanout_fixture(s: &Storage, n: usize) {
+    let mut nodes = vec![NodeInput {
+        id: Some("hub".to_string()),
+        labels: vec!["Hub".to_string()],
+        props: None,
+        embedding: None,
+        lang: None,
+        valid_from: None,
+        caused_by: None,
+        ttl: None,
+        collection: None,
+    }];
+    let mut edges = Vec::with_capacity(n);
+    for i in 0..n {
+        let id = format!("leaf{i}");
+        nodes.push(NodeInput {
+            id: Some(id.clone()),
+            labels: vec!["Leaf".to_string()],
+            props: Some(json!({ "n": i })),
+            embedding: None,
+            lang: None,
+            valid_from: None,
+            caused_by: None,
+            ttl: None,
+            collection: None,
+        });
+        edges.push(EdgeInput {
+            id: None,
+            from: "hub".to_string(),
+            to: id,
+            rel: "REL".to_string(),
+            props: None,
+            valid_from: None,
+            supersede: None,
+            impact: None,
+            caused_by: None,
+        });
+    }
+    // Decoys: plain nodes with no edges, padding the node table past 1000
+    // total rows so an id-anchored query that fell back to the O(N) scan
+    // would still have to walk through them.
+    for i in 0..(1000usize.saturating_sub(n)) {
+        nodes.push(NodeInput {
+            id: Some(format!("decoy{i}")),
+            labels: vec!["Decoy".to_string()],
+            props: None,
+            embedding: None,
+            lang: None,
+            valid_from: None,
+            caused_by: None,
+            ttl: None,
+            collection: None,
+        });
+    }
+    s.execute_batch(BatchInput { nodes, edges }).unwrap();
+}
+
+// 14. Id-anchored pattern on a >=1000-node fixture returns exactly the
+//     expected row set (full assertion, not just a count).
+#[test]
+fn cypher_id_anchor_fast_path_full_rows() {
+    let p = fresh("cypher_id_anchor_fast_path_full_rows");
+    let s = open(&p);
+    build_fanout_fixture(&s, 50); // 50 leaves + hub + 950 decoys = 1001 nodes
+
+    let res = s
+        .execute_hql(r#"MATCH (a {id:"hub"})-[:REL]->(b) RETURN a.id, b.id"#)
+        .unwrap();
+    let mut got: Vec<(String, String)> = rows(&res)
+        .iter()
+        .map(|r| {
+            (
+                r["a.id"].as_str().unwrap().to_string(),
+                r["b.id"].as_str().unwrap().to_string(),
+            )
+        })
+        .collect();
+    got.sort();
+
+    let mut want: Vec<(String, String)> = (0..50)
+        .map(|i| ("hub".to_string(), format!("leaf{i}")))
+        .collect();
+    want.sort();
+
+    assert_eq!(
+        got, want,
+        "id-anchored pattern returns exactly the expected rows"
+    );
+}
+
+// 15. Id-anchored anchor with an additional label constraint the node FAILS
+//     yields an empty result (node_matches still runs after the id lookup).
+#[test]
+fn cypher_id_anchor_label_mismatch_is_empty() {
+    let p = fresh("cypher_id_anchor_label_mismatch_is_empty");
+    let s = open(&p);
+    build_fanout_fixture(&s, 20);
+
+    // "hub" is labeled Hub, not User -> anchor lookup resolves the id but
+    // node_matches must reject it on the label constraint.
+    let res = s
+        .execute_hql(r#"MATCH (a:User {id:"hub"})-[:REL]->(b) RETURN a.id, b.id"#)
+        .unwrap();
+    assert_eq!(
+        rows(&res).len(),
+        0,
+        "id resolves but label constraint fails"
+    );
+}
+
+// 16. Id-anchored with a nonexistent id yields an empty result, not an error.
+#[test]
+fn cypher_id_anchor_nonexistent_id_is_empty() {
+    let p = fresh("cypher_id_anchor_nonexistent_id_is_empty");
+    let s = open(&p);
+    build_fanout_fixture(&s, 20);
+
+    let res = s
+        .execute_hql(r#"MATCH (a {id:"does-not-exist"})-[:REL]->(b) RETURN a.id, b.id"#)
+        .unwrap();
+    assert_eq!(
+        rows(&res).len(),
+        0,
+        "unknown id -> empty frontier, no error"
+    );
+}
+
+// 17. A numeric id constraint falls through to the full scan and still works.
+#[test]
+fn cypher_id_anchor_numeric_falls_back_to_scan() {
+    let p = fresh("cypher_id_anchor_numeric_falls_back_to_scan");
+    let s = open(&p);
+    // Node whose *string* id happens to be the digits "42": {id:42} in HQL
+    // parses as a numeric HqlValue, exercising node_matches' `n.to_string()`
+    // comparison against the scan path (the id fast path must NOT engage).
+    node(&s, "42", vec![], None);
+    node(&s, "other", vec![], None);
+    edge(&s, "42", "other", "REL");
+
+    let res = s
+        .execute_hql("MATCH (a {id:42})-[:REL]->(b) RETURN a.id, b.id")
+        .unwrap();
+    let r = rows(&res);
+    assert_eq!(r.len(), 1, "numeric id constraint still matches via scan");
+    assert_eq!(r[0]["a.id"], json!("42"));
+    assert_eq!(r[0]["b.id"], json!("other"));
+}
+
+// 18. Retraction semantics survive the id-anchor fast path and the hoisted
+//     per-edge timestamp (P0-T6): a retracted edge is hidden from the current
+//     view but visible AS OF a time before the retraction.
+#[test]
+fn cypher_id_anchor_retracted_edge_visibility() {
+    let p = fresh("cypher_id_anchor_retracted_edge_visibility");
+    let s = open(&p);
+    s.add_node(NodeInput {
+        id: Some("hub".to_string()),
+        labels: vec![],
+        props: None,
+        embedding: None,
+        lang: None,
+        valid_from: Some("2024-01-01T00:00:00Z".to_string()),
+        caused_by: None,
+        ttl: None,
+        collection: None,
+    })
+    .unwrap();
+    s.add_node(NodeInput {
+        id: Some("leaf".to_string()),
+        labels: vec![],
+        props: None,
+        embedding: None,
+        lang: None,
+        valid_from: Some("2024-01-01T00:00:00Z".to_string()),
+        caused_by: None,
+        ttl: None,
+        collection: None,
+    })
+    .unwrap();
+    let edge_out = s
+        .add_edge(EdgeInput {
+            id: Some("e1".to_string()),
+            from: "hub".to_string(),
+            to: "leaf".to_string(),
+            rel: "REL".to_string(),
+            props: None,
+            valid_from: Some("2024-02-01T00:00:00Z".to_string()),
+            supersede: None,
+            impact: None,
+            caused_by: None,
+        })
+        .unwrap();
+
+    // Visible before retraction.
+    let before = s
+        .execute_hql(r#"MATCH (a {id:"hub"})-[:REL]->(b) RETURN a.id, b.id"#)
+        .unwrap();
+    assert_eq!(rows(&before).len(), 1, "edge visible before retraction");
+
+    // Retract at an explicit, past timestamp.
+    s.retract_edge(
+        edge_out.id.clone(),
+        Some("2024-03-01T00:00:00Z".to_string()),
+    )
+    .unwrap();
+
+    // Current view: hidden.
+    let current = s
+        .execute_hql(r#"MATCH (a {id:"hub"})-[:REL]->(b) RETURN a.id, b.id"#)
+        .unwrap();
+    assert_eq!(
+        rows(&current).len(),
+        0,
+        "id-anchored pattern hides the retracted edge in the current view"
+    );
+
+    // AS OF before the retraction: still visible.
+    let past = s
+        .execute_hql(
+            r#"MATCH (a {id:"hub"})-[:REL]->(b) AS OF "2024-02-15T00:00:00Z" RETURN a.id, b.id"#,
+        )
+        .unwrap();
+    let r = rows(&past);
+    assert_eq!(r.len(), 1, "AS OF before retraction still shows the edge");
+    assert_eq!(r[0]["a.id"], json!("hub"));
+    assert_eq!(r[0]["b.id"], json!("leaf"));
 }

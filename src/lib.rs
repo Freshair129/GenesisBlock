@@ -5970,9 +5970,10 @@ impl Storage {
             target: &str,
             fuzzy: bool,
             vector: Option<Vec<f64>>,
-        ) -> Result<Vec<f64>> {
+            requested_collection: &Option<String>,
+        ) -> Result<(Vec<f64>, Option<String>)> {
             if let Some(vector) = vector {
-                return Ok(vector);
+                return Ok((vector, requested_collection.clone()));
             }
             let resolved = resolved_target_id(storage, target, fuzzy)?;
             let node_u32 = storage.get_u32(&resolved).ok_or_else(|| {
@@ -5985,13 +5986,25 @@ impl Storage {
                     "HQL: target '{resolved}' does not resolve to a live node and no vector was given"
                 ))
             })?;
-            storage
+            let node_collection = node
+                .collection
+                .clone()
+                .unwrap_or_else(|| storage.default_collection.clone());
+            if let Some(requested) = requested_collection {
+                if requested != &node_collection {
+                    return Err(Error::from_reason(format!(
+                        "HQL: node '{resolved}' lives in collection '{node_collection}' but IN '{requested}' was given; omit IN or match the node's collection"
+                    )));
+                }
+            }
+            let query_vector = storage
                 .reconstruct_embedding(node.value(), node_u32)
                 .ok_or_else(|| {
                     Error::from_reason(format!(
                         "HQL: target '{resolved}' has no stored embedding and no vector was given"
                     ))
-                })
+                })?;
+            Ok((query_vector, node.collection.clone()))
         }
         let command = HqlCommand::try_from(query).map_err(Error::from_reason)?;
         match command {
@@ -6007,14 +6020,15 @@ impl Storage {
                 collection,
                 clauses,
             } => {
-                let query_vector = hql_query_vector(self, &target, fuzzy, vector)?;
+                let (query_vector, resolved_collection) =
+                    hql_query_vector(self, &target, fuzzy, vector, &collection)?;
                 let res = self.hybrid_search(HybridSearchInput {
                     query_vector,
                     k,
                     alpha: Some(0.0),
                     lang,
                     as_of,
-                    collection,
+                    collection: resolved_collection,
                     ef_search,
                     oversample,
                 })?;
@@ -6067,14 +6081,15 @@ impl Storage {
                 collection,
                 clauses,
             } => {
-                let query_vector = hql_query_vector(self, &target, fuzzy, vector)?;
+                let (query_vector, resolved_collection) =
+                    hql_query_vector(self, &target, fuzzy, vector, &collection)?;
                 let res = self.hybrid_search(HybridSearchInput {
                     query_vector,
                     k,
                     alpha: Some(alpha),
                     lang,
                     as_of,
-                    collection,
+                    collection: resolved_collection,
                     ef_search,
                     oversample,
                 })?;
@@ -8961,6 +8976,15 @@ impl GenesisDatabase {
             .await
             .map_err(|e| Error::from_reason(e.to_string()))?
     }
+    /// Executes an HQL query and returns the command result as JSON.
+    /// Supports SEARCH, TRAVERSE, MATCH graph patterns, MATCH ... SIMILAR
+    /// hybrid search, and CONTEXT retrieval forms.
+    /// SEARCH/MATCH hybrid may omit `SIMILAR TO [vector]` to search by the
+    /// target node's stored embedding.
+    /// Hybrid MATCH accepts `K <n>`; SEARCH and hybrid accept `EF <n>` and
+    /// `OVERSAMPLE <n>` tuning clauses.
+    /// TRAVERSE supports `DIRECTION in|out|both` and `REL a|b` alternation.
+    /// Seed and target ids may contain unquoted colons, such as `user:5`.
     #[napi]
     pub async fn execute_hql(&self, query: String) -> Result<Value> {
         let i = Arc::clone(&self.inner);

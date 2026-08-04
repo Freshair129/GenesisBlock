@@ -2,8 +2,11 @@ WHITESPACE = _{ " " | "\t" | "\r" | "\n" }
 identifier = @{ (ASCII_ALPHANUMERIC | "_" | "-")+ }
 string_lit = @{ "\"" ~ (!"\"" ~ ANY)* ~ "\"" }
 fuzzy_prefix = { "~" }
-target = { fuzzy_prefix? ~ (identifier | string_lit) }
-seed = { fuzzy_prefix? ~ (identifier | string_lit) }
+// Colon-qualified ids are allowed only in command target/seed positions.
+// Pattern labels keep their existing `(node:Label)` grammar.
+qualified_id = @{ identifier ~ (":" ~ identifier)+ }
+target = { fuzzy_prefix? ~ (qualified_id | identifier | string_lit) }
+seed = { fuzzy_prefix? ~ (qualified_id | identifier | string_lit) }
 
 rel_name = { identifier }
 rel_type = { rel_name ~ ("|" ~ rel_name)* }

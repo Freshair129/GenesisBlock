@@ -36,7 +36,7 @@ const server = new Server(
 const TOOLS = [
   {
     name: "query_hql",
-    description: "Executes a raw HQL command on the knowledge graph (SEARCH, TRAVERSE, MATCH pattern, MATCH ... SIMILAR, CONTEXT). Colon-bearing ids such as user:5 must be quoted.",
+    description: "Executes a raw HQL command on the knowledge graph (SEARCH, TRAVERSE, MATCH pattern, MATCH ... SIMILAR, CONTEXT). SEARCH and hybrid MATCH may use a target node's stored embedding and accept EF/OVERSAMPLE tuning; TRAVERSE accepts DIRECTION and relation alternation. Colon-bearing target/seed ids such as user:5 may be unquoted.",
     inputSchema: {
       type: "object",
       properties: {

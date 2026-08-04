@@ -49,7 +49,7 @@ MATCH  [~]<target> [SIMILAR TO [ <vector> ]] ALPHA <a> [K <k>] [EF <n>] [OVERSAM
 
 - **Literal vector present** → exactly v1 behavior (vector wins; target is documentation-only). Byte-identical results.
 - **`SIMILAR TO` omitted** → *search-by-node*: the (fuzzy-)resolved target must name a live node; its **stored embedding** becomes the query vector (fetched via the collection resolution rule below). "More like this node" without any client-side embedding.
-  - Collection resolution: the node's embedding lives in the collection it was ingested into; an explicit `IN <collection>` must match that collection's dimension or the query errors.
+  - Collection resolution: the node's embedding lives in the collection it was ingested into, and the search runs in **that same collection**; an explicit `IN <collection>` naming a *different* collection is an error even if dimensions match (same-dim-different-space would be a silently-wrong ranking — the class §1 forbids). *(Tightened from dim-match to collection-identity at the P0-T0 design gate, DESIGN--HQL-P0-DECISIONS §1.)*
   - Target resolves to nothing (even after fuzzy) → **error** `"HQL: target '<t>' does not resolve to a node and no vector was given"`. Never an empty-result silent success.
   - Resolved node has no stored embedding → same error class, naming the cause.
 - The dead `_resolved` binding is gone: resolution output is always consumed or surfaced as an error.
@@ -81,9 +81,11 @@ Any numeric token whose value-parse fails (u32/f64 overflow, etc.) is a parse er
 
 Recommended: `qualified_id = identifier (":" identifier)+` accepted for `seed`/`target` **only** (never inside pattern syntax, where `:` introduces labels), so `TRAVERSE FROM user:5 …` parses. If the gate rejects (PEG risk), the fallback decision is: quoting is mandatory and all docs/examples are corrected (P0-T9). Either way the v1 broken-example state ends.
 
-Implementation note (2026-07-20): the current repo keeps colon-bearing ids quoted-only in
-command positions. The grammar does not implement an unquoted `qualified_id` form for
-`user:5`; callers must write string literals such as `TRAVERSE FROM "user:5" DEPTH 2 REL SENT_BY`.
+Implementation note (2026-08-04): the recommended form shipped; the fallback was not taken.
+`src/query/hql.pest` defines `qualified_id = @{ identifier ~ (":" ~ identifier)+ }` and admits it in
+`target`/`seed` only, so `TRAVERSE FROM user:5 DEPTH 2 REL SENT_BY` parses unquoted. Quoted string
+ids such as `"user:5"` remain accepted, so existing callers are unaffected. Pattern positions are
+unchanged: inside `(a:Label)` the colon still introduces a label, not a qualified id.
 
 ### 2.7 Executor guarantees (no syntax)
 

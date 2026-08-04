@@ -176,6 +176,7 @@ fn main() {
                 as_of: None,
                 collection: None,
                 ef_search: Some(ef),
+                oversample: None,
             })
             .unwrap();
         lats.push(t0.elapsed().as_nanos() as f64 / 1_000_000.0); // ms
