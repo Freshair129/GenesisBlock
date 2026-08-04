@@ -29,7 +29,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
       # Fails if Cargo.toml / package.json / modules.json disagree on the engine
       # version. Keeps the x.y.z[-prerelease] across surfaces in lock-step.
       - name: Check version SSOT
@@ -76,7 +76,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
       # --ignore-scripts so `prepare` doesn't double-build; we build explicitly.
