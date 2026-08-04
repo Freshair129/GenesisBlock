@@ -95,6 +95,27 @@ fn ids(v: &serde_json::Value) -> Vec<String> {
 // P0-T1 — search-by-node target semantics
 // =========================================================================
 
+/// Seed `q` and three candidates at increasing, non-collinear distance, plus
+/// enough far-away filler nodes to clear HNSW's `max_nb_connection` (16) by a
+/// comfortable margin. RCA--HQL-P0-SEARCH-BY-NODE-FLAKE: an exactly-collinear
+/// 4-point graph is the documented degenerate case for `hnsw_rs`'s
+/// neighbor-pruning heuristic (same hazard class as
+/// RCA--BULK-PARALLEL-INSERT-UNREACHABLE); breaking collinearity and growing
+/// past the tiny-graph regime removes that hazard without loosening what the
+/// tests assert. Filler nodes sit far past `far` so they can never enter a
+/// top-3 result.
+fn seed_search_by_node_fixture(s: &Storage) {
+    add(s, "q", Some(vec![0.0, 0.0]), None);
+    add(s, "near", Some(vec![0.1, 0.01]), None);
+    add(s, "mid", Some(vec![1.0, -0.02]), None);
+    add(s, "far", Some(vec![10.0, 0.03]), None);
+    for i in 0..20 {
+        let x = 50.0 + i as f64;
+        let y = (i as f64 % 7.0) - 3.0;
+        add(s, &format!("filler{i}"), Some(vec![x, y]), None);
+    }
+}
+
 /// `SEARCH <known-node-id> K 3` (no vector) returns nearest-by-that-node's
 /// embedding. Fixture: seed `q` and three candidates at increasing distance;
 /// top-1 (other than `q` itself, k excludes nothing but we assert the closest
@@ -103,15 +124,17 @@ fn ids(v: &serde_json::Value) -> Vec<String> {
 fn search_by_node_no_vector_returns_nearest_by_embedding() {
     let p = fresh("p0_search_by_node");
     let s = open_dim(&p, 2);
-    add(&s, "q", Some(vec![0.0, 0.0]), None);
-    add(&s, "near", Some(vec![0.1, 0.0]), None);
-    add(&s, "mid", Some(vec![1.0, 0.0]), None);
-    add(&s, "far", Some(vec![10.0, 0.0]), None);
+    seed_search_by_node_fixture(&s);
     s.flush_index();
 
     let res = s.execute_hql("SEARCH q K 3").unwrap();
     let hits = ids(&res);
-    assert!(!hits.is_empty(), "search-by-node must return results");
+    assert_eq!(
+        hits.len(),
+        3,
+        "SEARCH q K 3 must return exactly 3 hits (q, near, mid), got {:?}",
+        hits
+    );
     assert_eq!(
         hits[0], "q",
         "top-1 must be q itself (distance 0 to its own embedding), got {:?}",
@@ -129,15 +152,20 @@ fn search_by_node_no_vector_returns_nearest_by_embedding() {
 fn hybrid_by_node_no_vector_returns_nearest_by_embedding() {
     let p = fresh("p0_hybrid_by_node");
     let s = open_dim(&p, 2);
-    add(&s, "q", Some(vec![0.0, 0.0]), None);
-    add(&s, "near", Some(vec![0.1, 0.0]), None);
-    add(&s, "mid", Some(vec![1.0, 0.0]), None);
-    add(&s, "far", Some(vec![10.0, 0.0]), None);
+    seed_search_by_node_fixture(&s);
     s.flush_index();
 
     let res = s.execute_hql("MATCH q ALPHA 0.0").unwrap();
     let hits = ids(&res);
-    assert!(!hits.is_empty(), "hybrid-by-node must return results");
+    // MATCH's default K is 10 (src/query/ast.rs); the fixture's 24 total nodes
+    // comfortably cover that, so a short result set is a real regression, not
+    // just "K wasn't reached" — assert the exact count before indexing.
+    assert_eq!(
+        hits.len(),
+        10,
+        "MATCH q ALPHA 0.0 must return exactly 10 hits (default K), got {:?}",
+        hits
+    );
     assert_eq!(
         hits[0], "q",
         "top-1 must be q itself (distance 0 to its own embedding), got {:?}",
