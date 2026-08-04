@@ -74,7 +74,40 @@ export const enum ScalingTier {
   H2 = 2,
   H3 = 3,
   H4 = 4,
-  H5 = 5
+  H5 = 5,
+  /**
+   * 6 hops — the maximum retrieval radius the engine resolves. This is a
+   * hop count and nothing more: what a caller does on reaching the ceiling
+   * is the caller's policy, not the engine's.
+   */
+  H6 = 6
+}
+/**
+ * Factual retrieval-coverage report for a `ContextPackage`: how much of the
+ * requested radius the engine actually served, whether it stopped at the tier
+ * boundary with graph still beyond it, and whether budget compression replaced
+ * atoms. Every field is a measurement. The engine states facts and never
+ * policy — what a consumer does about incomplete coverage (compact, delegate,
+ * decompose, re-query) is that consumer's decision, made above the database.
+ *
+ * Nested as its own object so additional coverage measurements can be added
+ * here without changing the `ContextPackage` surface.
+ */
+export interface CoverageReport {
+  /** The requested tier's hop radius (`tier.hops()`). */
+  hopsRequested: number
+  /** The deepest BFS depth actually reached among nodes included in this package. */
+  hopsServed: number
+  /**
+   * True if traversal stopped at the requested radius while at least one
+   * boundary node still had an incident edge leading outside the package —
+   * i.e. reachable graph genuinely exists beyond the tier. False when the
+   * reachable subgraph was exhausted at or before the tier limit, including
+   * the isolated-node and boundary-leaf cases.
+   */
+  ceilingHit: boolean
+  /** True if budget/SuperNode compression replaced atoms in this package. */
+  truncated: boolean
 }
 export interface ContextPackage {
   nodes: Array<NodeOutput>
@@ -82,6 +115,8 @@ export interface ContextPackage {
   superNodes: Array<SuperNode>
   tokenEstimate: number
   reasoningPath: string
+  /** Factual retrieval-coverage signal. See `CoverageReport`. */
+  coverage: CoverageReport
 }
 export interface QueryInput {
   from?: string
