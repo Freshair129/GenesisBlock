@@ -47,12 +47,12 @@ const TOOLS = [
   },
   {
     name: "retrieve_tiered_context",
-    description: "Retrieves a knowledge fragment based on the H0-H5 Context Scaling Tier protocol.",
+    description: "Retrieves a knowledge fragment based on the H0-H6 Context Scaling Tier protocol.",
     inputSchema: {
       type: "object",
       properties: {
         target: { type: "string", description: "Node ID or search term." },
-        tier: { type: "string", enum: ["H0", "H1", "H2", "H3", "H4", "H5"], description: "The reasoning tier (radius)." },
+        tier: { type: "string", enum: ["H0", "H1", "H2", "H3", "H4", "H5", "H6"], description: "The reasoning tier (radius)." },
         budget: { type: "number", description: "Token budget for compression/SuperNode fallback." },
         fuzzy: { type: "boolean", description: "Enable Thai-aware fuzzy matching." },
       },

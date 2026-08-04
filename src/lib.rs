@@ -181,6 +181,10 @@ pub enum ScalingTier {
     H3 = 3,
     H4 = 4,
     H5 = 5,
+    /// 6 hops — the maximum retrieval radius the engine resolves. This is a
+    /// hop count and nothing more: what a caller does on reaching the ceiling
+    /// is the caller's policy, not the engine's.
+    H6 = 6,
 }
 
 impl ScalingTier {
@@ -192,6 +196,7 @@ impl ScalingTier {
             "H3" => ScalingTier::H3,
             "H4" => ScalingTier::H4,
             "H5" => ScalingTier::H5,
+            "H6" => ScalingTier::H6,
             _ => ScalingTier::H1,
         }
     }
@@ -203,8 +208,35 @@ impl ScalingTier {
             ScalingTier::H3 => 3,
             ScalingTier::H4 => 4,
             ScalingTier::H5 => 5,
+            ScalingTier::H6 => 6,
         }
     }
+}
+
+/// Factual retrieval-coverage report for a `ContextPackage`: how much of the
+/// requested radius the engine actually served, whether it stopped at the tier
+/// boundary with graph still beyond it, and whether budget compression replaced
+/// atoms. Every field is a measurement. The engine states facts and never
+/// policy — what a consumer does about incomplete coverage (compact, delegate,
+/// decompose, re-query) is that consumer's decision, made above the database.
+///
+/// Nested as its own object so additional coverage measurements can be added
+/// here without changing the `ContextPackage` surface.
+#[cfg_attr(feature = "napi-bindings", napi(object))]
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct CoverageReport {
+    /// The requested tier's hop radius (`tier.hops()`).
+    pub hops_requested: u32,
+    /// The deepest BFS depth actually reached among nodes included in this package.
+    pub hops_served: u32,
+    /// True if traversal stopped at the requested radius while at least one
+    /// boundary node still had an incident edge leading outside the package —
+    /// i.e. reachable graph genuinely exists beyond the tier. False when the
+    /// reachable subgraph was exhausted at or before the tier limit, including
+    /// the isolated-node and boundary-leaf cases.
+    pub ceiling_hit: bool,
+    /// True if budget/SuperNode compression replaced atoms in this package.
+    pub truncated: bool,
 }
 
 #[cfg_attr(feature = "napi-bindings", napi(object))]
@@ -215,6 +247,8 @@ pub struct ContextPackage {
     pub super_nodes: Vec<SuperNode>,
     pub token_estimate: u32,
     pub reasoning_path: String,
+    /// Factual retrieval-coverage signal. See `CoverageReport`.
+    pub coverage: CoverageReport,
 }
 
 #[cfg_attr(feature = "napi-bindings", napi(object))]
@@ -7279,6 +7313,11 @@ impl Storage {
         let mut nodes = HashMap::new();
         let mut edges = Vec::new();
         let mut queue = VecDeque::new();
+        // Coverage instrumentation: deepest depth of any node actually placed
+        // in the package, and whether traversal stopped at the tier boundary
+        // with reachable graph still beyond it.
+        let mut hops_served: u32 = 0;
+        let mut ceiling_hit = false;
 
         if let Some(u32_id) = self.get_u32(&target_id_resolved) {
             queue.push_back((u32_id, 0));
@@ -7289,7 +7328,23 @@ impl Storage {
 
         let mut visited = HashSet::new();
         while let Some((curr_u32, curr_depth)) = queue.pop_front() {
-            if curr_depth >= hops || visited.contains(&curr_u32) {
+            if curr_depth >= hops {
+                // Boundary node: discovered but never expanded. Report a
+                // ceiling only when the graph genuinely continues past it —
+                // i.e. it still has an incident edge whose far endpoint is not
+                // already in the package. A boundary leaf, or an isolated node
+                // at H0, is *complete* coverage, not a truncated frontier.
+                // BFS is level-order, so by the time the first depth==hops node
+                // is popped, every node within the radius is already in `nodes`.
+                if !ceiling_hit
+                    && !visited.contains(&curr_u32)
+                    && self.has_edge_beyond(curr_u32, &nodes)
+                {
+                    ceiling_hit = true;
+                }
+                continue;
+            }
+            if visited.contains(&curr_u32) {
                 continue;
             }
             visited.insert(curr_u32);
@@ -7305,6 +7360,7 @@ impl Storage {
                             {
                                 if let Some(node) = self.nodes.get(&next_u32) {
                                     e.insert(self.hydrated_node(next_u32, node.value()));
+                                    hops_served = hops_served.max(curr_depth + 1);
                                     queue.push_back((next_u32, curr_depth + 1));
                                 }
                             }
@@ -7324,6 +7380,7 @@ impl Storage {
                             {
                                 if let Some(node) = self.nodes.get(&prev_u32) {
                                     e.insert(self.hydrated_node(prev_u32, node.value()));
+                                    hops_served = hops_served.max(curr_depth + 1);
                                     queue.push_back((prev_u32, curr_depth + 1));
                                 }
                             }
@@ -7340,6 +7397,7 @@ impl Storage {
 
         let mut super_nodes = Vec::new();
         let mut final_nodes = node_list;
+        let mut truncated = false;
 
         if let Some(b) = budget {
             if token_estimate > b {
@@ -7353,6 +7411,7 @@ impl Storage {
                 }
                 final_nodes.clear(); // Prune atoms
                 edges.clear();
+                truncated = true;
             }
         }
 
@@ -7365,7 +7424,44 @@ impl Storage {
                 "Resolved {} as of Tier {} ({} hops)",
                 target_id_resolved, tier_str, hops
             ),
+            coverage: CoverageReport {
+                hops_requested: hops,
+                hops_served,
+                ceiling_hit,
+                truncated,
+            },
         })
+    }
+
+    /// True if `u32_id` has at least one incident edge, in either direction,
+    /// whose far endpoint is not already in `included`. Distinguishes a real
+    /// truncated frontier from the edge of a fully-served subgraph, so
+    /// `CoverageReport::ceiling_hit` reports a fact rather than merely
+    /// "traversal stopped here".
+    fn has_edge_beyond(&self, u32_id: u32, included: &HashMap<u32, NodeOutput>) -> bool {
+        if let Some(eids) = self.out_idx.get(&u32_id) {
+            for eid in eids.iter() {
+                if let Some(edge_ref) = self.edges.get(eid) {
+                    if let Some(next) = self.get_u32(&edge_ref.value().to) {
+                        if !included.contains_key(&next) {
+                            return true;
+                        }
+                    }
+                }
+            }
+        }
+        if let Some(eids) = self.in_idx.get(&u32_id) {
+            for eid in eids.iter() {
+                if let Some(edge_ref) = self.edges.get(eid) {
+                    if let Some(prev) = self.get_u32(&edge_ref.value().from) {
+                        if !included.contains_key(&prev) {
+                            return true;
+                        }
+                    }
+                }
+            }
+        }
+        false
     }
 
     pub fn start_gossip_manager(storage: Arc<Self>) {

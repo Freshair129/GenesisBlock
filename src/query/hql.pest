@@ -87,7 +87,7 @@ pat_clauses = { pat_where? ~ pat_order? ~ limit_clause? ~ pat_return? }
 match_pattern = { ^"MATCH" ~ graph_pattern ~ as_of? ~ pat_clauses }
 
 budget = @{ ASCII_DIGIT+ }
-tier = { "H0" | "H1" | "H2" | "H3" | "H4" | "H5" }
+tier = { "H0" | "H1" | "H2" | "H3" | "H4" | "H5" | "H6" }
 context = { ^"CONTEXT" ~ ^"FOR" ~ target ~ ^"TIER" ~ tier ~ (^"BUDGET" ~ budget)? }
 
 // `match_pattern` MUST precede `hybrid`: both start with MATCH, and ordered-choice

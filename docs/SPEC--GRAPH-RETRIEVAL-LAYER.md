@@ -5,18 +5,24 @@ status: current
 # Software Requirements Document (SRD): Graph Retrieval Layer (GRL)
 
 ## 1. Introduction
-The **Graph Retrieval Layer (GRL)** transforms GenesisBlockDB from a hybrid database into a **Cognitive Retrieval Engine (CRE)**. Instead of raw queries, AI agents interact with the GRL via the **Context Scaling Tier (H0-H5)** protocol. The GRL acts as an intelligent orchestrator that resolves the optimal knowledge radius (Hops), prioritizes high-impact nodes, and compresses context to fit within the agent's token budget.
+The **Graph Retrieval Layer (GRL)** transforms GenesisBlockDB from a hybrid database into a **Cognitive Retrieval Engine (CRE)**. Instead of raw queries, AI agents interact with the GRL via the **Context Scaling Tier (H0-H6)** protocol. The GRL acts as an intelligent orchestrator that resolves the optimal knowledge radius (Hops), prioritizes high-impact nodes, and compresses context to fit within the agent's token budget.
+
+> Tiers are hop counts and nothing more. Work-scope interpretation — what a given
+> radius "means" for a task, and what to do on reaching the ceiling — is a
+> **consumer governance concern** owned above the database, not engine semantics.
+> The engine resolves hops, budget, and compression, and reports what it covered.
 
 ## 2. Functional Requirements
 
 ### FR1: Context Resolver (Tier Mapping)
 - The system must map semantic tiers to physical graph hops:
-    - **H0 (Self):** 0 Hops. Only the target node.
-    - **H1 (Neighbors):** 1 Hop. Direct imports/exports and parent/child.
-    - **H2 (Feature):** 2 Hops. Local functional grouping.
-    - **H3 (Module):** 3 Hops. Integration-level context.
-    - **H4 (Architecture):** 4 Hops. High-level system design.
-    - **H5 (Enterprise):** 5 Hops. Full knowledge base scan.
+    - **H0:** 0 hops.
+    - **H1:** 1 hop.
+    - **H2:** 2 hops.
+    - **H3:** 3 hops.
+    - **H4:** 4 hops.
+    - **H5:** 5 hops.
+    - **H6:** 6 hops — the maximum retrieval radius.
 
 ### FR2: Hybrid Semantic Expansion
 - Retrieval must combine **Vector Similarity** (find relevant concepts) with **Graph Traversal** (expand into related knowledge) to build a coherent Sub-graph.
@@ -44,6 +50,22 @@ pub struct ContextPackage {
     pub super_nodes: Vec<SuperNode>,
     pub token_estimate: u32,
     pub reasoning_path: String, // Traceability: "Found via Vector -> Expanded 2 Hops"
+    pub coverage: CoverageReport, // factual retrieval-coverage signal
+}
+
+// Facts only: how deep the engine actually went, whether reachable graph
+// remained beyond the tier boundary, and whether budget compression replaced
+// atoms. What to do about incomplete coverage is the consumer's decision.
+// Nested so further coverage measurements can be added without changing
+// ContextPackage.
+pub struct CoverageReport {
+    pub hops_requested: u32,
+    pub hops_served: u32,
+    // True only when a boundary node still had an incident edge leading
+    // outside the package. A boundary leaf, or an isolated node at H0, is
+    // complete coverage and reports false.
+    pub ceiling_hit: bool,
+    pub truncated: bool,
 }
 ```
 
@@ -51,12 +73,13 @@ pub struct ContextPackage {
 ```rust
 #[napi]
 pub enum ScalingTier {
-    H0 = 0, // Self
-    H1 = 1, // Neighbors
-    H2 = 2, // Feature
-    H3 = 3, // Module
-    H4 = 4, // Architecture
-    H5 = 5, // Enterprise
+    H0 = 0, // 0 hops
+    H1 = 1, // 1 hop
+    H2 = 2, // 2 hops
+    H3 = 3, // 3 hops
+    H4 = 4, // 4 hops
+    H5 = 5, // 5 hops
+    H6 = 6, // 6 hops (maximum retrieval radius)
 }
 ```
 
@@ -75,7 +98,7 @@ pub enum ScalingTier {
 ## 3. HQL Grammar Update (`hql.pest`)
 ```pest
 context = { ^"CONTEXT" ~ ^"FOR" ~ target ~ ^"TIER" ~ tier ~ (^"BUDGET" ~ budget)? }
-tier = { "H0" | "H1" | "H2" | "H3" | "H4" | "H5" }
+tier = { "H0" | "H1" | "H2" | "H3" | "H4" | "H5" | "H6" }
 ```
 
 ---
