@@ -3,11 +3,11 @@ id: ADR--GENESISDB-TYPED-QUERY-IR-AGENT-BOUNDARY
 doc_id: ADR--GENESISDB-TYPED-QUERY-IR-AGENT-BOUNDARY
 type: adr
 status: accepted
-version: "1.0.0"
+version: "1.0.1"
 decided: 2026-08-14
 deciders: Boss (Founder / Product Authority)
 owner: Product Authority
-implementation_status: planned
+implementation_status: partial
 amends:
   - docs/adr/ADR--ENGINE-WEDGE-FIRST.md
 supersedes:
@@ -135,3 +135,4 @@ the implementation plan; it does not claim that Query IR or the NL adapter is al
 | Version | Date | Status | Summary | Commit Hash | Agent |
 |---|---|---|---|---|---|
 | 1.0.0 | 2026-08-14 | accepted | Established typed Query IR as primary, HQL as compatibility and NL conversion as a separate adapter. | working-tree | ATHER |
+| 1.0.1 | 2026-08-14 | accepted | Recorded the partial search/traverse implementation while retaining planned status for remaining V1 operations and the NL adapter. | working-tree | ATHER |

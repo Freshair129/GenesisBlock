@@ -1,6 +1,6 @@
 ---
 status: current
-version: "0.2.0"
+version: "0.2.1"
 updated: "2026-08-14"
 owner: "Boss (Founder / Product Authority)"
 approval: "Approved in-session 2026-08-14"
@@ -36,7 +36,7 @@ adapter as implemented. The governing decisions are:
 | HQL P0 correctness work | Implemented and merged on `main`; retained as compatibility baseline. |
 | HQL P1/P2/P3 expansion | Deferred; not required for the primary public contract. |
 | Typed Query IR ADR/spec | Accepted by owner on 2026-08-14. |
-| Typed Query IR executor/API | Planned; not implemented. |
+| Typed Query IR executor/API | Partial: `search` and `traverse` implemented across core, REST and N-API; remaining operation kinds planned. |
 | NL-to-Query-IR adapter | Planned outside the engine; not implemented. |
 | Engine package/release | Remains a productization gate; acceptance requires registry/install evidence. |
 
@@ -119,7 +119,8 @@ own closed schemas and acceptance tests before being reported as implemented.
 
 ## 8. Scope boundaries
 
-In scope now: architecture docs, V1 contract, master-plan alignment and later W1 implementation.
+In scope now: architecture docs, V1 contract, master-plan alignment and the completed W1
+`search`/`traverse` vertical slice. Remaining V1 operations require separate slices.
 
 Out of scope until its wave is approved/executed:
 
@@ -152,4 +153,5 @@ replacement queue/graph for review. Until that happens, no old `ready: true` fla
 | Version | Date | Status | Summary | Commit Hash | Agent |
 |---|---|---|---|---|---|
 | 0.2.0 | 2026-08-14 | current | Approved Typed Query IR as pre-publish contract, retained HQL compatibility and moved NL conversion to an external post-publish adapter wave. | working-tree | ATHER |
+| 0.2.1 | 2026-08-14 | current | Recorded completion of the W1 search/traverse vertical slice across core, REST and N-API while retaining remaining V1 operations as planned. | working-tree | ATHER |
 | 0.1.0 | 2026-07-07 | superseded | Initial engine-wedge distribution plan centered on HQL P0 and four distribution waves. | historical | ATHER |

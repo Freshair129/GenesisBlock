@@ -2,7 +2,7 @@
 doc_id: C4--GENESISDB-ARCHITECTURE
 type: architecture-index
 status: current
-version: 0.1.9b
+version: 0.1.10b
 owner: GenesisBlockDB Architecture
 created_at: 2026-06-13T22:50:11+07:00,ATHER,9b1ced3
 last_update: 2026-08-14T04:01:51+07:00,ATHER
@@ -152,7 +152,7 @@ flowchart TB
 | Vector Collections | Per-model/dim isolated vector spaces (`collections: DashMap<String, Arc<VectorCollection>>`, each with its own arena + metadata + HNSW + metric); a `default` collection always exists. Async indexing thread (off the write path). | `src/lib.rs` | master spec, HNSW hybrid index design, `ADR--GENESISDB-MULTI-COLLECTION`, `ADR--GENESISDB-ASYNC-INDEXING` |
 | Hybrid Search | Per-collection vector + lexical retrieval with ranking; query dim validated against the collection | `src/lib.rs`, HNSW design | HNSW hybrid index design |
 | Graph Retrieval Layer | Tiered context retrieval by hop budget and fuzzy matching | `src/lib.rs::retrieve_context` | `SPEC--GRAPH-RETRIEVAL-LAYER.md` |
-| Typed Query IR Boundary (planned) | Validate and dispatch versioned structured queries consistently across public surfaces | No runtime source yet; implementation is W1 in `MASTER_PLAN.md` | `ADR--GENESISDB-TYPED-QUERY-IR-AGENT-BOUNDARY`, `SPEC--GENESISDB-TYPED-QUERY-IR-V1` |
+| Typed Query IR Boundary (partial) | Validate and dispatch versioned structured search/traverse queries consistently across public surfaces | `src/lib.rs::execute_query_ir`, `src/router.rs` `/v1/query/ir`; remaining V1 operations are planned | `ADR--GENESISDB-TYPED-QUERY-IR-AGENT-BOUNDARY`, `SPEC--GENESISDB-TYPED-QUERY-IR-V1` |
 | HQL Compatibility Frontend | Parse and execute current search/traverse/context queries without owning storage semantics | `src/lib.rs::execute_hql`, `src/query/*` | HQL section in master spec, API docs |
 | Symbolic Graph / AST Boundary | Symbolic relationships, query grammar, and structured traversal semantics | `src/lib.rs`, `hql.pest` | master spec, HQL docs |
 | K-Impact / Reasoning | Impact scoring, inference, structural insight, drift | `src/lib.rs` | K-impact specs, transitive inference design |
@@ -167,7 +167,7 @@ flowchart TB
 |---|---|---|
 | Bulk ingest | `/v1/bulk/nodes`, `/v1/bulk/edges`, `/v1/bulk/rebuild` | `src/router.rs` |
 | Query | `/v1/query/hql`, `/v1/query` | `src/router.rs` |
-| Typed Query IR (planned) | No public route yet; route name is implementation-gated | W1 in `docs/MASTER_PLAN.md` |
+| Typed Query IR | `/v1/query/ir`, `/v1/query/ir/capabilities` | `src/router.rs` |
 | Mutation | `/v1/node/add`, `/v1/node/supersede`, `/v1/edge/add`, `/v1/edge/retract`, `/v1/vector/add` | `src/router.rs` |
 | Relational | `/v1/relational/schema/register`, `/v1/relational/schema/:namespace`, `/v1/relational/mutate`, `/v1/relational/query` | `src/router.rs` |
 | Collections | `/v1/collection/create`, `/v1/collections` | `src/router.rs` |
@@ -190,7 +190,7 @@ The C4 code level is intentionally anchored to source files instead of duplicati
 |---|---|---|---|
 | Core database type and exported N-API class | `src/lib.rs` | `index.d.ts` | High |
 | HQL execution | `src/lib.rs::execute_hql`, `hql.pest` | REST `/v1/query/hql`, SDK `query()` methods | High |
-| Typed Query IR (planned) | No code anchor until W1 | `SPEC--GENESISDB-TYPED-QUERY-IR-V1` | High |
+| Typed Query IR (partial) | `src/lib.rs::execute_query_ir`, `src/router.rs` `/v1/query/ir` | `SPEC--GENESISDB-TYPED-QUERY-IR-V1`, `index.d.ts` | High |
 | REST route surface | `src/router.rs` route table | `docs/API_REFERENCE.md`, SDK clients | High |
 | MCP tool surface | `mcp/server.js` tool definitions | `docs/MCP-GUIDE.md` | Medium |
 | SDK request/response shapes | Python and Go SDK clients | API reference and REST handlers | High |
@@ -210,7 +210,7 @@ These findings are intentionally listed here until the governance validator can 
 | Some specs retain open DoD/review text while code exists | Multiple `SPEC--*.md` files | Baseline audit, then update status/changelog |
 | Low-level C4 view is source-anchored only | No generated module map or symbol index | Add validator/report that extracts code anchors |
 | Genesis Studio production operations remain gated | S1 read paths, bounded graph DTOs, capability negotiation and exclusive process ownership exist; lifecycle backup/restore and OIDC/JWT scoped authorization do not | Keep mutation/operations UI disabled until server-side scopes and operator contracts pass their S2-S4 reviews |
-| Typed Query IR is accepted but not implemented | ADR/spec accepted on 2026-08-14; no typed executor or public route exists yet | Keep implementation status `planned` until W1 conformance evidence passes; HQL remains compatibility frontend |
+| Typed Query IR V1 is partially implemented | Search/traverse exist in core, REST and N-API; match-path/context/named-query and external NL adapter remain planned | Keep capability reporting operation-specific and complete remaining operations only through separate reviewed slices |
 
 ## 8. Change Rules
 
@@ -242,6 +242,7 @@ Expected checks:
 | Version | Date | Status | Summary | Commit Hash | Agent |
 |---------|------|--------|---------|-------------|-------|
 | 0.1.9b | 2026-08-14 | beta | Registered the accepted Typed Query IR boundary as planned, retained HQL compatibility, and kept NL interpretation outside the engine. | working-tree | ATHER |
+| 0.1.10b | 2026-08-14 | beta | Truth-synced partial Query IR search/traverse implementation across core, REST and N-API. | working-tree | ATHER |
 | 0.1.8b | 2026-08-14 | beta | Added embedded opaque U9 backup/clean-target restore to the storage-model contract; REST/N-API lifecycle endpoints remain out of scope. | working-tree | ATHER |
 | 0.1.7b | 2026-07-22 | beta | Truth-synced Studio S1 read-only local/remote adapters, bounded core APIs and process ownership while retaining S2-S4 gates. | working-tree | ATHER |
 | 0.1.6b | 2026-07-21 | beta | Truth-synced the verified fixture-only Studio S0 shell while retaining S1+ API gaps. | working-tree | ATHER |

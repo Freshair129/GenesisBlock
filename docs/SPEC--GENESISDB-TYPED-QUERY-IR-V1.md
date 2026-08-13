@@ -2,10 +2,10 @@
 title: "GenesisBlockDB Typed Query IR V1"
 doc_id: "SPEC-GENESISDB-TYPED-QUERY-IR-V1"
 status: accepted
-version: "1.0.0"
+version: "1.0.1"
 updated: "2026-08-14"
 owner: "GenesisBlockDB Architecture"
-implementation_status: planned
+implementation_status: partial
 source_of_truth: true
 related_docs:
   - "docs/adr/ADR--GENESISDB-TYPED-QUERY-IR-AGENT-BOUNDARY.md"
@@ -18,8 +18,9 @@ related_docs:
 ## 1. Purpose and status
 
 This specification defines the approved transport-neutral query boundary for new GenesisBlockDB
-integrations. It is normative design, but its implementation status is `planned`. Existing HQL and
-typed operation-specific APIs remain the shipped surfaces until the V1 conformance gate passes.
+integrations. Its implementation status is `partial`: `search` and `traverse` are implemented in the
+core, N-API and REST vertical slice with compatibility tests. The reserved `match_path`, `context`
+and `relational_named_query` operations remain planned.
 
 ## 2. Contract principles
 
@@ -201,4 +202,5 @@ The contract is considered shipped only when all gates pass:
 
 | Version | Date | Status | Summary | Commit Hash | Agent |
 |---|---|---|---|---|---|
-| 1.0.0 | 2026-08-14 | accepted | Approved Query IR V1 envelope, compatibility posture and external NL adapter boundary; implementation remains planned. | working-tree | ATHER |
+| 1.0.0 | 2026-08-14 | accepted | Approved Query IR V1 envelope, compatibility posture and external NL adapter boundary. | 84f2553 | ATHER |
+| 1.0.1 | 2026-08-14 | current | Recorded partial implementation of search/traverse across core, REST and N-API with HQL parity; remaining V1 operations stay planned. | working-tree | ATHER |

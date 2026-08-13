@@ -176,6 +176,64 @@ export interface HybridSearchInput {
    */
   oversample?: number
 }
+export type QueryIrIndexConsistency = 'eventual' | 'read_your_write'
+export type QueryIrSearchMode = 'vector' | 'hybrid' | 'lexical'
+export type QueryIrDirection = 'out' | 'in' | 'both'
+export interface QueryIrRequest {
+  contract_version: 'query-ir.v1'
+  request_id: string
+  namespace?: string
+  temporal?: { valid_at?: string }
+  consistency?: { index: QueryIrIndexConsistency }
+  operation: QueryIrSearchOperation | QueryIrTraverseOperation
+}
+export interface QueryIrSearchOperation {
+  kind: 'search'
+  mode: QueryIrSearchMode
+  target_id?: string
+  query_vector?: Array<number>
+  collection?: string
+  k: number
+  alpha?: number
+  language?: string
+  ef_search?: number
+  oversample?: number
+}
+export interface QueryIrTraverseOperation {
+  kind: 'traverse'
+  seed_id: string
+  depth: number
+  relations: Array<string>
+  direction: QueryIrDirection
+  limit?: number
+}
+export interface QueryIrResponse {
+  contract_version: 'query-ir.v1'
+  request_id: string
+  status: 'ok'
+  operation_kind: 'search' | 'traverse'
+  data: Array<NeighborOutput>
+  meta: {
+    capability_version: string
+    index_lag: number
+    warnings: Array<string>
+  }
+}
+export interface QueryIrCapabilities {
+  contract_version: 'query-ir.v1'
+  implementation_status: 'partial'
+  operations: {
+    search: 'implemented'
+    traverse: 'implemented'
+    match_path: 'planned'
+    context: 'planned'
+    relational_named_query: 'planned'
+  }
+  limits: {
+    max_k: number
+    max_depth: number
+  }
+}
 export interface DatabaseStatus {
   open: boolean
   readOnly: boolean
@@ -278,6 +336,12 @@ export declare class GenesisDatabase {
   stableFrontier(): number
   retractEdge(id: string, at?: string | undefined | null): Promise<EdgeOutput | null>
   retrieveContext(targetId: string, tier: string, budget: number | undefined | null, fuzzy: boolean): Promise<ContextPackage>
+  /**
+   * Executes a versioned Typed Query IR request. Query IR is the primary
+   * machine contract; HQL remains available as a compatibility frontend.
+   */
+  executeQueryIr(request: QueryIrRequest): Promise<QueryIrResponse>
+  queryIrCapabilities(): QueryIrCapabilities
   /**
    * Executes an HQL query and returns the command result as JSON.
    * Supports SEARCH, TRAVERSE, MATCH graph patterns, MATCH ... SIMILAR
