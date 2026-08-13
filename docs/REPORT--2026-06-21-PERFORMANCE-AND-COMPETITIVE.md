@@ -1,7 +1,10 @@
 ---
 proposed_id: REPORT--2026-06-21-PERFORMANCE-AND-COMPETITIVE
+doc_id: REPORT--2026-06-21-PERFORMANCE-AND-COMPETITIVE
 type: report
 status: historical
+version: n/a
+owner: GenesisBlockDB Engineering
 aliases:
   - REPORT
 tier: process

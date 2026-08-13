@@ -1,5 +1,8 @@
 ---
+doc_id: WHITEPAPER--GENESIS-DB
 status: current
+version: n/a
+owner: GenesisBlockDB Architecture
 ---
 
 # GenesisBlockDB: An Embedded Semantic-Graph Engine for AI Agent Memory

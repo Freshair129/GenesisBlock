@@ -1,5 +1,8 @@
 ---
+doc_id: API_REFERENCE
 status: current
+version: generated
+owner: GenesisBlockDB Engineering
 ---
 
 # GenesisBlockDB REST API Reference

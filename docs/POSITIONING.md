@@ -1,5 +1,8 @@
 ---
+doc_id: POSITIONING-GENESISBLOCKDB
 status: current
+version: n/a
+owner: GenesisBlockDB Product
 ---
 
 # GenesisBlockDB — Positioning

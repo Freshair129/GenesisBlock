@@ -1,124 +1,230 @@
 #!/usr/bin/env python3
-import sys
-import re
+"""Validate GenesisBlockDB documentation metadata and local links.
+
+The repository intentionally contains legacy/interview Markdown without
+frontmatter. Those files are allowed to remain outside the canonical registry;
+registered documents and any document that declares frontmatter are checked.
+"""
+
 import pathlib
+import re
+import sys
 import tempfile
-import shutil
 
-def parse_frontmatter(content: str) -> str | None:
-    """Extract the status field from YAML frontmatter.
 
-    Frontmatter is a block between the first line '---' and the next line '---'.
-    Returns the status string if found, None otherwise.
-    """
-    # Find the frontmatter block
-    fm_match = re.match(r'---\s*\n', content)
-    if not fm_match:
+VALID_STATUSES = {
+    "active",
+    "accepted",
+    "beta",
+    "candidate",
+    "canonical",
+    "current",
+    "deprecated",
+    "draft",
+    "evidence",
+    "historical",
+    "need review",
+    "proposed",
+    "reference",
+    "stable",
+    "superseded",
+    "under review",
+    "unstable",
+}
+
+
+def _clean_scalar(value: str) -> str:
+    value = value.strip()
+    if len(value) >= 2 and value[0] == value[-1] and value[0] in {'"', "'"}:
+        return value[1:-1]
+    return value
+
+
+def parse_frontmatter(content: str) -> dict[str, str] | None:
+    """Extract top-level scalar frontmatter fields from a Markdown file."""
+    opening = re.match(r"^---\s*\n", content)
+    if not opening:
         return None
 
-    start = fm_match.end()
-    end_match = re.compile(r'^---\s*$', re.MULTILINE).search(content, start)
-    if not end_match:
+    closing = re.compile(r"^---\s*$", re.MULTILINE).search(content, opening.end())
+    if not closing:
         return None
 
-    fm_block = content[start:end_match.start()].strip()
+    fields: dict[str, str] = {}
+    for line in content[opening.end() : closing.start()].splitlines():
+        match = re.match(r"^([A-Za-z_][\w-]*):\s*(.*?)\s*$", line)
+        if match:
+            fields[match.group(1)] = _clean_scalar(match.group(2))
+    return fields
 
-    # Look for a line starting with 'status:'
-    status_match = re.search(r'^status:\s*(.+)$', fm_block, re.MULTILINE)
-    if not status_match:
-        return None
 
-    return status_match.group(1).strip()
+def _code_cell(value: str) -> str:
+    value = value.strip()
+    if value.startswith("`") and value.endswith("`"):
+        return value[1:-1]
+    return _clean_scalar(value)
 
-def validate_file(path: pathlib.Path) -> list[str]:
-    """Validate a single Markdown file. Returns list of violation strings."""
-    violations = []
 
-    try:
-        content = path.read_text(encoding="utf-8", errors="replace")
-    except Exception as e:
-        return [f"read error: {e}"]
+def parse_registry(root: pathlib.Path) -> list[dict[str, str]]:
+    registry = root / "DOC-REGISTRY.md"
+    if not registry.is_file():
+        return []
 
-    status = parse_frontmatter(content)
+    rows: list[dict[str, str]] = []
+    headers: list[str] = []
+    for line in registry.read_text(encoding="utf-8", errors="replace").splitlines():
+        if not line.startswith("|"):
+            continue
+        cells = [cell.strip() for cell in line.strip().strip("|").split("|")]
+        if cells and cells[0].lower() == "role":
+            headers = [cell.lower() for cell in cells]
+            continue
+        if len(cells) < 6 or not cells[1].startswith("`") or not cells[-1].startswith("`"):
+            continue
+        owner = ""
+        if "owner" in headers:
+            owner = _clean_scalar(cells[headers.index("owner")])
+        rows.append(
+            {
+                "doc_id": _code_cell(cells[1]),
+                "version": _code_cell(cells[2]),
+                "status": _clean_scalar(cells[3]).lower(),
+                "owner": owner,
+                "path": _code_cell(cells[-1]),
+            }
+        )
+    return rows
 
+
+def _validate_status(path: pathlib.Path, fields: dict[str, str], violations: list[str]) -> None:
+    status = fields.get("status")
     if status is None:
-        if re.search(r'^---\s*$', content, re.MULTILINE):
-            violations.append("no status key in frontmatter")
-        else:
-            violations.append("no frontmatter block")
-        return violations
+        violations.append("no status key in frontmatter")
+        return
 
-    # Check if status is one of the valid forms
-    if status == "current":
-        return violations
-    if status == "historical":
-        return violations
+    normalized = status.strip().lower()
+    if normalized.startswith("superseded-by:"):
+        target_name = status.split(":", 1)[1].strip()
+        target_path = path.parent / target_name
+        if not target_path.is_file():
+            violations.append(f"superseded-by target missing: {target_name}")
+        return
 
-    m = re.match(r"^superseded-by:\s*(.+)$", status)
-    if not m:
+    if normalized not in VALID_STATUSES:
         violations.append(f"invalid status value: {status}")
-        return violations
+        return
 
-    target_name = m.group(1).strip()
-    target_path = path.parent / target_name
+    if normalized == "superseded":
+        target_name = fields.get("superseded_by")
+        if target_name:
+            target_path = path.parent / target_name
+            if not target_path.is_file():
+                violations.append(f"superseded_by target missing: {target_name}")
 
-    if not target_path.is_file():
-        violations.append(f"superseded-by target missing: {target_name}")
 
-    return violations
+MARKDOWN_LINK = re.compile(r"(?<!!)\[[^\]]*\]\(([^)\s]+)(?:\s+[^)]*)?\)")
+
+
+def _validate_links(path: pathlib.Path, content: str, violations: list[str]) -> None:
+    for raw_target in MARKDOWN_LINK.findall(content):
+        target = raw_target.strip("<>")
+        if not target or target.startswith(("#", "http://", "https://", "mailto:", "tel:", "file:")):
+            continue
+        if re.match(r"^[A-Za-z]:[\\/]", target):
+            continue
+        target = target.split("#", 1)[0].split("?", 1)[0]
+        if not target:
+            continue
+        if not (path.parent / target).resolve().exists():
+            violations.append(f"broken relative link: {raw_target}")
+
 
 def validate_dir(root: pathlib.Path) -> tuple[list[tuple[pathlib.Path, str]], int]:
-    """Validate all .md files in root. Returns (violations, count)."""
-    violations = []
-    count = 0
+    violations: list[tuple[pathlib.Path, str]] = []
+    paths = sorted(root.rglob("*.md"))
+    fields_by_path: dict[pathlib.Path, dict[str, str]] = {}
+    doc_ids: dict[str, pathlib.Path] = {}
 
-    for path in root.rglob("*.md"):
-        count += 1
-        for v in validate_file(path):
-            violations.append((path, v))
+    for path in paths:
+        try:
+            content = path.read_text(encoding="utf-8", errors="replace")
+        except Exception as exc:
+            violations.append((path, f"read error: {exc}"))
+            continue
 
-    return violations, count
+        fields = parse_frontmatter(content)
+        if fields is None:
+            continue
+        fields_by_path[path] = fields
+        local: list[str] = []
+        _validate_status(path, fields, local)
+        _validate_links(path, content, local)
+        for violation in local:
+            violations.append((path, violation))
+
+        doc_id = fields.get("doc_id")
+        if doc_id:
+            previous = doc_ids.get(doc_id)
+            if previous:
+                violations.append((path, f"duplicate doc_id: {doc_id} (also {previous})"))
+            else:
+                doc_ids[doc_id] = path
+
+    registry_path = root / "DOC-REGISTRY.md"
+    if not registry_path.is_file():
+        violations.append((root, "DOC-REGISTRY.md is missing"))
+    else:
+        registry_ids: set[str] = set()
+        for row in parse_registry(root):
+            # Registry paths are repository-root-relative (for example
+            # docs/API_REFERENCE.md), while this validator receives docs/.
+            path = root.parent / row["path"]
+            if row["doc_id"] in registry_ids:
+                violations.append((registry_path, f"duplicate registry doc_id: {row['doc_id']}"))
+            registry_ids.add(row["doc_id"])
+            if not path.is_file():
+                violations.append((registry_path, f"registered path missing: {row['path']}"))
+                continue
+            fields = fields_by_path.get(path)
+            if fields is None:
+                violations.append((path, "registered document has no frontmatter"))
+                continue
+            keys = ("doc_id", "version", "status")
+            if row["owner"]:
+                keys += ("owner",)
+            for key in keys:
+                actual = fields.get(key)
+                expected = row[key]
+                if actual is None:
+                    violations.append((path, f"frontmatter missing {key}; registry expects {expected}"))
+                elif actual.strip().lower() != expected.strip().lower():
+                    violations.append((path, f"frontmatter {key}={actual!r} disagrees with registry {expected!r}"))
+
+    return violations, len(paths)
+
 
 def self_test() -> int:
-    """Run self-test with 4 fixture files."""
     with tempfile.TemporaryDirectory() as tmpdir:
         root = pathlib.Path(tmpdir)
-
-        # Fixture a: valid current
-        (root / "a.md").write_text("---\nstatus: current\n---\n", encoding="utf-8")
-
-        # Fixture b: valid superseded-by a.md
-        (root / "b.md").write_text("---\nstatus: superseded-by: a.md\n---\n", encoding="utf-8")
-
-        # Fixture c: frontmatter but no status
-        (root / "c.md").write_text("---\nauthor: alice\n---\n", encoding="utf-8")
-
-        # Fixture d: no frontmatter
-        (root / "d.md").write_text("# No frontmatter\n", encoding="utf-8")
-
+        (root / "target.md").write_text("---\nstatus: current\n---\n", encoding="utf-8")
+        (root / "valid.md").write_text(
+            "---\nstatus: accepted\ndoc_id: VALID\n---\n[Target](target.md)\n",
+            encoding="utf-8",
+        )
+        (root / "bad.md").write_text("---\nstatus: invalid\n---\n[Missing](missing.md)\n", encoding="utf-8")
         violations, count = validate_dir(root)
-
-        # Expect exactly 2 violations: c and d
-        if len(violations) != 2:
-            print(f"SELF-TEST FAIL: expected 2 violations, got {len(violations)}")
+        if count != 3 or len(violations) != 3:
+            print(f"SELF-TEST FAIL: expected 3 violations in 3 files, got {len(violations)}")
             return 1
-
-        # Files a and b should be clean
-        a_violations = [v for v in violations if v[0].name == "a.md"]
-        b_violations = [v for v in violations if v[0].name == "b.md"]
-        if a_violations or b_violations:
-            print("SELF-TEST FAIL: a.md or b.md has violations")
-            return 1
-
         print("SELF-TEST PASS")
         return 0
+
 
 def main() -> int:
     if len(sys.argv) == 2 and sys.argv[1] == "--self-test":
         return self_test()
-
     if len(sys.argv) != 2:
-        print(f"Usage: {sys.argv[0]} <docs_dir> [--self-test]", file=sys.stderr)
+        print(f"Usage: {sys.argv[0]} <docs_dir> or --self-test", file=sys.stderr)
         return 1
 
     root = pathlib.Path(sys.argv[1])
@@ -127,14 +233,11 @@ def main() -> int:
         return 1
 
     violations, count = validate_dir(root)
-
     for path, reason in violations:
-        rel = path.relative_to(root)
-        print(f"VIOLATION {rel}: {reason}")
-
+        print(f"VIOLATION {path.relative_to(root)}: {reason}")
     print(f"{len(violations)} violations in {count} files")
-
     return 1 if violations else 0
+
 
 if __name__ == "__main__":
     sys.exit(main())

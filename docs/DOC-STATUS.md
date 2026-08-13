@@ -6,7 +6,7 @@ version: "2026.06.21+archived"
 updated: "2026-08-03"
 owner: "GenesisBlockDB Architecture"
 source_of_truth: false
-superseded_by: "docs/DOC-REGISTRY.md"
+superseded_by: "DOC-REGISTRY.md"
 related_issue: 84
 ---
 
