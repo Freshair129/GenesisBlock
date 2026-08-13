@@ -10,7 +10,7 @@ use rand::Rng;
 use sha2::{Digest, Sha256};
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::fs::{self, File, OpenOptions as FileOpenOptions};
-use std::io::Write;
+use std::io::{Read, Write};
 // Positioned (offset) reads for the on-disk rerank sidecar. Both are gated by
 // `#[cfg]` so the crate builds on either platform; NEVER mmap (Windows rename /
 // atomic-swap safety — see ADR--GENESISDB-ONDISK-RERANK-SIDECAR).
@@ -18,7 +18,7 @@ use std::io::Write;
 use std::os::unix::fs::FileExt;
 #[cfg(windows)]
 use std::os::windows::fs::FileExt;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, AtomicU32, AtomicU64, AtomicUsize, Ordering};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
@@ -320,6 +320,57 @@ pub struct DatabaseStatus {
     pub read_only: bool,
     pub page_cache_mb: u32,
 }
+
+/// One opaque, engine-owned backup file. Callers may encrypt or transport this
+/// file, but must not copy Genesis projection files individually.
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct BackupExportRequest {
+    pub destination: PathBuf,
+}
+
+/// Restores only to a target path that does not yet exist.
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct BackupRestoreRequest {
+    pub bundle_path: PathBuf,
+    pub target_root: PathBuf,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+pub struct BackupBundleInfo {
+    pub format_version: u32,
+    pub engine_name: String,
+    pub engine_version: String,
+    pub schema_version: u32,
+    pub stable_frontier: u64,
+    pub logical_clock: u32,
+    pub created_at: String,
+    pub bundle_path: PathBuf,
+    pub byte_count: u64,
+    pub sha256: String,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+struct BackupArtifact {
+    path: String,
+    byte_count: u64,
+    sha256: String,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+struct BackupManifest {
+    format_version: u32,
+    engine_name: String,
+    engine_version: String,
+    schema_version: u32,
+    stable_frontier: u64,
+    logical_clock: u32,
+    created_at: String,
+    artifacts: Vec<BackupArtifact>,
+}
+
+const BACKUP_FORMAT_VERSION: u32 = 1;
+const BACKUP_MAGIC: &[u8] = b"GENESIS-BACKUP-V1\0";
+const BACKUP_MANIFEST_NAME: &[u8] = b"manifest.json";
 
 pub const STUDIO_PROTOCOL_VERSION: &str = "1";
 pub const STUDIO_SCENE_NODE_CEILING: usize = 1000;
@@ -2149,6 +2200,7 @@ impl Storage {
         rerank: Option<bool>,
     ) -> Result<()> {
         self.ensure_writable()?;
+        let _commit_guard = self.commit_lock.lock();
         if self.collections.contains_key(&name) {
             return Err(Error::from_reason(format!(
                 "collection '{}' already exists",
@@ -2239,6 +2291,7 @@ impl Storage {
         embedding: Vec<f64>,
     ) -> Result<()> {
         self.ensure_writable()?;
+        let _commit_guard = self.commit_lock.lock();
         // A vector attaches to a node — the node must exist.
         let exists = self
             .get_u32(&node_id)
@@ -5333,6 +5386,7 @@ impl Storage {
 
     pub fn add_node(&self, args: NodeInput) -> Result<NodeOutput> {
         self.ensure_writable()?;
+        let _commit_guard = self.commit_lock.lock();
         self.validate_governance(&args.labels, false)?;
         let id = args.id.unwrap_or_else(|| format!("N-{}", Uuid::new_v4()));
         let u32_id = self.get_or_intern_id(&id);
@@ -5375,6 +5429,7 @@ impl Storage {
 
     pub fn add_edge(&self, args: EdgeInput) -> Result<EdgeOutput> {
         self.ensure_writable()?;
+        let _commit_guard = self.commit_lock.lock();
         let edge = EdgeOutput {
             id: args.id.unwrap_or_else(|| Uuid::new_v4().to_string()),
             from: args.from,
@@ -5403,6 +5458,7 @@ impl Storage {
         caused_by: Option<String>,
     ) -> Result<NodeOutput> {
         self.ensure_writable()?;
+        let _commit_guard = self.commit_lock.lock();
         let u32_id = match self.get_u32(&id) {
             Some(i) => i,
             None => return Err(Error::from_reason(format!("Node {} not found", id))),
@@ -5434,6 +5490,7 @@ impl Storage {
     }
 
     pub fn rebuild_index_parallel(&self) -> Result<()> {
+        let _commit_guard = self.commit_lock.lock();
         self.is_rebuilding.store(true, Ordering::SeqCst);
         self.flush_index();
         let result = {
@@ -7084,6 +7141,7 @@ impl Storage {
 
     pub fn retract_node(&self, id: &str) -> Result<()> {
         self.ensure_writable()?;
+        let _commit_guard = self.commit_lock.lock();
         let u32_id = match self.get_u32(id) {
             Some(i) => i,
             None => return Ok(()),
@@ -7140,6 +7198,11 @@ impl Storage {
 
     pub fn reconcile_state(&self, signed_events: Vec<SignedEvent>) -> Result<()> {
         self.ensure_writable()?;
+        let _commit_guard = self.commit_lock.lock();
+        self.reconcile_state_unlocked(signed_events)
+    }
+
+    fn reconcile_state_unlocked(&self, signed_events: Vec<SignedEvent>) -> Result<()> {
         for signed_event in signed_events {
             let event = &signed_event.event;
             let signer_id = &signed_event.signer_peer_id;
@@ -7269,7 +7332,7 @@ impl Storage {
                             signer_peer_id: signer_id.clone(),
                         })
                         .collect();
-                    let _ = self.reconcile_state(wrapped_inners);
+                    let _ = self.reconcile_state_unlocked(wrapped_inners);
                 }
             }
         }
@@ -7637,6 +7700,12 @@ impl Storage {
 
     pub fn save_state(&self) -> Result<()> {
         self.ensure_writable()?;
+        let _commit_guard = self.commit_lock.lock();
+        self.save_state_unlocked()
+    }
+
+    fn save_state_unlocked(&self) -> Result<()> {
+        self.ensure_writable()?;
         let temp_dir = self.path.join("temp_save");
         if temp_dir.exists() {
             let _ = fs::remove_dir_all(&temp_dir);
@@ -7783,13 +7852,407 @@ impl Storage {
         // ~20 GB at 1M nodes). compact-to-live-state (not truncate-to-empty) keeps
         // the WAL a complete, independent recovery source. Best-effort: a failed
         // compaction only leaves a larger WAL, never a corrupt one.
-        let _ = self.compact();
+        let _ = self.compact_unlocked();
 
         println!(
             "Mark IX: State persisted successfully to {}",
             self.path.display()
         );
         Ok(())
+    }
+
+    fn is_backup_artifact_name(name: &str) -> bool {
+        matches!(
+            name,
+            "identity.bin"
+                | "genesis-graph.wal"
+                | "state.json"
+                | "nodes.bin"
+                | "edges.bin"
+                | PROJECTION_DB_FILE
+        ) || ((name.starts_with("vec_")
+            || name.starts_with("meta_")
+            || name.starts_with("fvec_")
+            || name.starts_with("bqmean_")
+            || name.starts_with("sq8scale_"))
+            && name.ends_with(".bin"))
+    }
+
+    fn sha256_file(path: &Path) -> Result<(u64, String)> {
+        let mut file = File::open(path).map_err(|e| Error::from_reason(e.to_string()))?;
+        let mut hasher = Sha256::new();
+        let mut byte_count = 0u64;
+        let mut buffer = [0u8; 64 * 1024];
+        loop {
+            let read = file
+                .read(&mut buffer)
+                .map_err(|e| Error::from_reason(e.to_string()))?;
+            if read == 0 {
+                break;
+            }
+            hasher.update(&buffer[..read]);
+            byte_count += read as u64;
+        }
+        Ok((byte_count, hex::encode(hasher.finalize())))
+    }
+
+    fn write_u32(writer: &mut File, value: u32) -> Result<()> {
+        writer
+            .write_all(&value.to_le_bytes())
+            .map_err(|e| Error::from_reason(e.to_string()))
+    }
+
+    fn write_u64(writer: &mut File, value: u64) -> Result<()> {
+        writer
+            .write_all(&value.to_le_bytes())
+            .map_err(|e| Error::from_reason(e.to_string()))
+    }
+
+    fn read_u32(reader: &mut File) -> Result<u32> {
+        let mut bytes = [0u8; 4];
+        reader
+            .read_exact(&mut bytes)
+            .map_err(|e| Error::from_reason(e.to_string()))?;
+        Ok(u32::from_le_bytes(bytes))
+    }
+
+    fn read_u64(reader: &mut File) -> Result<u64> {
+        let mut bytes = [0u8; 8];
+        reader
+            .read_exact(&mut bytes)
+            .map_err(|e| Error::from_reason(e.to_string()))?;
+        Ok(u64::from_le_bytes(bytes))
+    }
+
+    fn backup_info(manifest: &BackupManifest, bundle_path: PathBuf) -> Result<BackupBundleInfo> {
+        let (byte_count, sha256) = Self::sha256_file(&bundle_path)?;
+        Ok(BackupBundleInfo {
+            format_version: manifest.format_version,
+            engine_name: manifest.engine_name.clone(),
+            engine_version: manifest.engine_version.clone(),
+            schema_version: manifest.schema_version,
+            stable_frontier: manifest.stable_frontier,
+            logical_clock: manifest.logical_clock,
+            created_at: manifest.created_at.clone(),
+            bundle_path,
+            byte_count,
+            sha256,
+        })
+    }
+
+    fn validate_backup_manifest(manifest: &BackupManifest) -> Result<()> {
+        if manifest.format_version != BACKUP_FORMAT_VERSION {
+            return Err(Error::from_reason("unsupported Genesis backup format"));
+        }
+        if manifest.engine_name != ENGINE_NAME || manifest.engine_version != ENGINE_VERSION {
+            return Err(Error::from_reason("incompatible Genesis engine backup"));
+        }
+        if manifest.schema_version > SCHEMA_VERSION {
+            return Err(Error::from_reason(
+                "backup schema requires a newer Genesis engine",
+            ));
+        }
+
+        let mut names = HashSet::new();
+        for artifact in &manifest.artifacts {
+            if !Self::is_backup_artifact_name(&artifact.path)
+                || Path::new(&artifact.path)
+                    .file_name()
+                    .and_then(|name| name.to_str())
+                    != Some(artifact.path.as_str())
+                || artifact.sha256.len() != 64
+                || hex::decode(&artifact.sha256).is_err()
+                || !names.insert(artifact.path.clone())
+            {
+                return Err(Error::from_reason(
+                    "invalid Genesis backup manifest artifact",
+                ));
+            }
+        }
+        for required in [
+            "identity.bin",
+            "genesis-graph.wal",
+            "state.json",
+            PROJECTION_DB_FILE,
+        ] {
+            if !names.contains(required) {
+                return Err(Error::from_reason("Genesis backup manifest is incomplete"));
+            }
+        }
+        Ok(())
+    }
+
+    /// Creates one opaque, integrity-checked backup bundle. The caller never
+    /// receives individual projection files.
+    pub fn export_backup(&self, request: BackupExportRequest) -> Result<BackupBundleInfo> {
+        self.ensure_writable()?;
+        // Public write paths share this barrier so the captured files represent
+        // one declared frontier rather than a mix of concurrent mutations.
+        let _commit_guard = self.commit_lock.lock();
+        if request.destination.exists() {
+            return Err(Error::from_reason("backup destination already exists"));
+        }
+        let parent = request
+            .destination
+            .parent()
+            .ok_or_else(|| Error::from_reason("backup destination has no parent"))?;
+        let file_name = request
+            .destination
+            .file_name()
+            .and_then(|name| name.to_str())
+            .filter(|name| !name.is_empty())
+            .ok_or_else(|| Error::from_reason("backup destination has no file name"))?;
+        fs::create_dir_all(parent).map_err(|e| Error::from_reason(e.to_string()))?;
+        let parent = fs::canonicalize(parent).map_err(|e| Error::from_reason(e.to_string()))?;
+        let destination = parent.join(file_name);
+        let live_root =
+            fs::canonicalize(&self.path).map_err(|e| Error::from_reason(e.to_string()))?;
+        if destination.starts_with(&live_root) {
+            return Err(Error::from_reason(
+                "backup destination must be outside the live Genesis root",
+            ));
+        }
+
+        self.flush_index();
+        self.save_state_unlocked()?;
+
+        let mut artifacts = Vec::new();
+        for entry in fs::read_dir(&self.path).map_err(|e| Error::from_reason(e.to_string()))? {
+            let entry = entry.map_err(|e| Error::from_reason(e.to_string()))?;
+            if !entry
+                .file_type()
+                .map_err(|e| Error::from_reason(e.to_string()))?
+                .is_file()
+            {
+                continue;
+            }
+            let Some(name) = entry.file_name().to_str().map(str::to_owned) else {
+                continue;
+            };
+            if Self::is_backup_artifact_name(&name) {
+                let (byte_count, sha256) = Self::sha256_file(&entry.path())?;
+                artifacts.push(BackupArtifact {
+                    path: name,
+                    byte_count,
+                    sha256,
+                });
+            }
+        }
+        artifacts.sort_by(|left, right| left.path.cmp(&right.path));
+        let manifest = BackupManifest {
+            format_version: BACKUP_FORMAT_VERSION,
+            engine_name: ENGINE_NAME.to_string(),
+            engine_version: ENGINE_VERSION.to_string(),
+            schema_version: SCHEMA_VERSION,
+            stable_frontier: self.stable_frontier(),
+            logical_clock: self.get_logical_clock(),
+            created_at: Utc::now().to_rfc3339(),
+            artifacts,
+        };
+        Self::validate_backup_manifest(&manifest)?;
+
+        let temporary = parent.join(format!(".{file_name}.{}.partial", Uuid::new_v4()));
+        let result = (|| -> Result<()> {
+            let mut output = FileOpenOptions::new()
+                .write(true)
+                .create_new(true)
+                .open(&temporary)
+                .map_err(|e| Error::from_reason(e.to_string()))?;
+            output
+                .write_all(BACKUP_MAGIC)
+                .map_err(|e| Error::from_reason(e.to_string()))?;
+            let manifest_bytes =
+                serde_json::to_vec(&manifest).map_err(|e| Error::from_reason(e.to_string()))?;
+            Self::write_u32(&mut output, BACKUP_MANIFEST_NAME.len() as u32)?;
+            output
+                .write_all(BACKUP_MANIFEST_NAME)
+                .map_err(|e| Error::from_reason(e.to_string()))?;
+            Self::write_u64(&mut output, manifest_bytes.len() as u64)?;
+            output
+                .write_all(&manifest_bytes)
+                .map_err(|e| Error::from_reason(e.to_string()))?;
+            for artifact in &manifest.artifacts {
+                let path_bytes = artifact.path.as_bytes();
+                Self::write_u32(&mut output, path_bytes.len() as u32)?;
+                output
+                    .write_all(path_bytes)
+                    .map_err(|e| Error::from_reason(e.to_string()))?;
+                Self::write_u64(&mut output, artifact.byte_count)?;
+                let mut input = File::open(self.path.join(&artifact.path))
+                    .map_err(|e| Error::from_reason(e.to_string()))?;
+                let mut copied = 0u64;
+                let mut hasher = Sha256::new();
+                let mut buffer = [0u8; 64 * 1024];
+                loop {
+                    let read = input
+                        .read(&mut buffer)
+                        .map_err(|e| Error::from_reason(e.to_string()))?;
+                    if read == 0 {
+                        break;
+                    }
+                    output
+                        .write_all(&buffer[..read])
+                        .map_err(|e| Error::from_reason(e.to_string()))?;
+                    hasher.update(&buffer[..read]);
+                    copied += read as u64;
+                }
+                if copied != artifact.byte_count
+                    || hex::encode(hasher.finalize()) != artifact.sha256
+                {
+                    return Err(Error::from_reason(
+                        "Genesis backup source artifact changed during export",
+                    ));
+                }
+            }
+            output
+                .sync_all()
+                .map_err(|e| Error::from_reason(e.to_string()))?;
+            fs::rename(&temporary, &destination).map_err(|e| Error::from_reason(e.to_string()))?;
+            Ok(())
+        })();
+        if result.is_err() {
+            let _ = fs::remove_file(&temporary);
+        }
+        result?;
+        Self::backup_info(&manifest, destination)
+    }
+
+    /// Verifies one opaque bundle before publishing it as a non-existing root.
+    pub fn restore_backup(request: BackupRestoreRequest) -> Result<BackupBundleInfo> {
+        if request.target_root.exists() {
+            return Err(Error::from_reason("restore target must not already exist"));
+        }
+        let parent = request
+            .target_root
+            .parent()
+            .ok_or_else(|| Error::from_reason("restore target has no parent"))?;
+        let parent = fs::canonicalize(parent).map_err(|e| Error::from_reason(e.to_string()))?;
+        let target_name = request
+            .target_root
+            .file_name()
+            .and_then(|name| name.to_str())
+            .filter(|name| !name.is_empty())
+            .ok_or_else(|| Error::from_reason("restore target has no name"))?;
+        let target_root = parent.join(target_name);
+        let staging = parent.join(format!(".genesis-restore-{}", Uuid::new_v4()));
+        let bundle_path = fs::canonicalize(&request.bundle_path)
+            .map_err(|e| Error::from_reason(e.to_string()))?;
+
+        let result = (|| -> Result<BackupManifest> {
+            let mut input =
+                File::open(&bundle_path).map_err(|e| Error::from_reason(e.to_string()))?;
+            let mut magic = vec![0u8; BACKUP_MAGIC.len()];
+            input
+                .read_exact(&mut magic)
+                .map_err(|e| Error::from_reason(e.to_string()))?;
+            if magic.as_slice() != BACKUP_MAGIC {
+                return Err(Error::from_reason("invalid Genesis backup bundle"));
+            }
+            let manifest_name_len = Self::read_u32(&mut input)? as usize;
+            if manifest_name_len != BACKUP_MANIFEST_NAME.len() {
+                return Err(Error::from_reason(
+                    "Genesis backup manifest name is invalid",
+                ));
+            }
+            let mut manifest_name = vec![0u8; manifest_name_len];
+            input
+                .read_exact(&mut manifest_name)
+                .map_err(|e| Error::from_reason(e.to_string()))?;
+            if manifest_name.as_slice() != BACKUP_MANIFEST_NAME {
+                return Err(Error::from_reason(
+                    "Genesis backup manifest name is invalid",
+                ));
+            }
+            let manifest_len = Self::read_u64(&mut input)?;
+            if manifest_len == 0 || manifest_len > 4 * 1024 * 1024 {
+                return Err(Error::from_reason("invalid Genesis backup manifest length"));
+            }
+            let mut manifest_bytes = vec![0u8; manifest_len as usize];
+            input
+                .read_exact(&mut manifest_bytes)
+                .map_err(|e| Error::from_reason(e.to_string()))?;
+            let manifest: BackupManifest = serde_json::from_slice(&manifest_bytes)
+                .map_err(|_| Error::from_reason("invalid Genesis backup manifest"))?;
+            Self::validate_backup_manifest(&manifest)?;
+
+            fs::create_dir(&staging).map_err(|e| Error::from_reason(e.to_string()))?;
+            for artifact in &manifest.artifacts {
+                let path_len = Self::read_u32(&mut input)? as usize;
+                if path_len == 0 || path_len > 1024 {
+                    return Err(Error::from_reason("invalid Genesis backup artifact path"));
+                }
+                let mut path_bytes = vec![0u8; path_len];
+                input
+                    .read_exact(&mut path_bytes)
+                    .map_err(|e| Error::from_reason(e.to_string()))?;
+                let path = String::from_utf8(path_bytes)
+                    .map_err(|_| Error::from_reason("invalid Genesis backup artifact encoding"))?;
+                let byte_count = Self::read_u64(&mut input)?;
+                if path != artifact.path || byte_count != artifact.byte_count {
+                    return Err(Error::from_reason(
+                        "Genesis backup artifact does not match manifest",
+                    ));
+                }
+                let output_path = staging.join(&path);
+                let mut output = FileOpenOptions::new()
+                    .write(true)
+                    .create_new(true)
+                    .open(&output_path)
+                    .map_err(|e| Error::from_reason(e.to_string()))?;
+                let mut remaining = byte_count;
+                let mut buffer = [0u8; 64 * 1024];
+                while remaining > 0 {
+                    let wanted = remaining.min(buffer.len() as u64) as usize;
+                    input
+                        .read_exact(&mut buffer[..wanted])
+                        .map_err(|e| Error::from_reason(e.to_string()))?;
+                    output
+                        .write_all(&buffer[..wanted])
+                        .map_err(|e| Error::from_reason(e.to_string()))?;
+                    remaining -= wanted as u64;
+                }
+                output
+                    .sync_all()
+                    .map_err(|e| Error::from_reason(e.to_string()))?;
+                let (_, sha256) = Self::sha256_file(&output_path)?;
+                if sha256 != artifact.sha256 {
+                    return Err(Error::from_reason(
+                        "Genesis backup artifact digest mismatch",
+                    ));
+                }
+            }
+            let mut trailing = [0u8; 1];
+            if input
+                .read(&mut trailing)
+                .map_err(|e| Error::from_reason(e.to_string()))?
+                != 0
+            {
+                return Err(Error::from_reason(
+                    "Genesis backup bundle has trailing data",
+                ));
+            }
+
+            // A fresh open validates the engine's own snapshot/WAL compatibility
+            // before the staging directory becomes the caller-visible target.
+            drop(Storage::open(OpenOptions {
+                path: staging.display().to_string(),
+                page_cache_mb: Some(16),
+                read_only: Some(false),
+                vector_dim: Some(0),
+            })?);
+            Ok(manifest)
+        })();
+        match result {
+            Ok(manifest) => {
+                fs::rename(&staging, &target_root)
+                    .map_err(|e| Error::from_reason(e.to_string()))?;
+                Self::backup_info(&manifest, bundle_path)
+            }
+            Err(error) => {
+                let _ = fs::remove_dir_all(&staging);
+                Err(error)
+            }
+        }
     }
 
     fn try_load_state(&self) -> bool {
@@ -8106,6 +8569,7 @@ impl Storage {
 
     pub fn execute_batch(&self, input: BatchInput) -> Result<BatchOutput> {
         self.ensure_writable()?;
+        let _commit_guard = self.commit_lock.lock();
 
         // 1. Validation Phase (All-or-Nothing)
         for node in &input.nodes {
@@ -8621,6 +9085,12 @@ impl Storage {
 
     pub fn compact(&self) -> Result<()> {
         self.ensure_writable()?;
+        let _commit_guard = self.commit_lock.lock();
+        self.compact_unlocked()
+    }
+
+    fn compact_unlocked(&self) -> Result<()> {
+        self.ensure_writable()?;
         // Build the live-state snapshot in memory, then hand it to the WAL thread
         // to atomically replace the file (serialized with appends; see WalMsg).
         let mut buf: Vec<u8> = Vec::new();
@@ -8747,6 +9217,7 @@ impl Storage {
     /// just moves `valid_to`.
     pub fn retract_edge(&self, id: String, at: Option<String>) -> Result<Option<EdgeOutput>> {
         self.ensure_writable()?;
+        let _commit_guard = self.commit_lock.lock();
         let ekey = Self::edge_key(&id);
         let mut edge = match self.edges.get(&ekey) {
             Some(e) => e.value().clone(),

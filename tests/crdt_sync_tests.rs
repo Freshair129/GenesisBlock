@@ -201,6 +201,43 @@ fn test_logical_clock_convergence() {
 }
 
 #[test]
+fn test_reconcile_batch_remains_reentrant_under_lifecycle_barrier() {
+    let dir = tempdir().unwrap();
+    let storage = Storage::open(OpenOptions {
+        path: dir.path().to_str().unwrap().to_string(),
+        page_cache_mb: Some(64),
+        read_only: Some(false),
+        vector_dim: None,
+    })
+    .unwrap();
+
+    let nested = storage
+        .add_node(NodeInput {
+            id: Some("nested-event".to_string()),
+            labels: vec!["SYNC".to_string()],
+            props: Some(json!({"source": "batch"})),
+            embedding: None,
+            lang: Some("en".to_string()),
+            valid_from: None,
+            caused_by: None,
+            ttl: None,
+            collection: None,
+        })
+        .unwrap();
+    storage.retract_node("nested-event").unwrap();
+
+    storage
+        .reconcile_state(vec![SignedEvent {
+            event: Event::Batch(vec![Event::Node(nested)]),
+            signature: vec![0; 64],
+            signer_peer_id: storage.local_peer_id.clone(),
+        }])
+        .unwrap();
+
+    assert!(storage.node_view("nested-event").is_some());
+}
+
+#[test]
 fn test_cryptographic_forgery_rejection() {
     let dir_a = tempdir().unwrap();
     let dir_b = tempdir().unwrap();
