@@ -31,13 +31,39 @@ test('MCP Server: Life-cycle and Tools', async (t) => {
 
   await client.connect(transport);
 
-  await t.test('list tools returns all three tools', async () => {
+  await t.test('list tools returns all four tools', async () => {
     const result = await client.listTools();
     const toolNames = result.tools.map(t => t.name);
     assert.ok(toolNames.includes('query_hql'), 'query_hql tool must be listed');
     assert.ok(toolNames.includes('retrieve_tiered_context'), 'retrieve_tiered_context tool must be listed');
     assert.ok(toolNames.includes('add_knowledge'), 'add_knowledge tool must be listed');
-    assert.strictEqual(result.tools.length, 3, 'exactly 3 tools should be listed');
+    assert.ok(toolNames.includes('gks_knowledge_promote'), 'gks_knowledge_promote tool must be listed');
+    assert.strictEqual(result.tools.length, 4, 'exactly 4 tools should be listed');
+  });
+
+  await t.test('gks_knowledge_promote is idempotent and returns structured canonical evidence', async () => {
+    const request = {
+      schema_version: 'govibe-knowledge-candidate/v1',
+      idempotency_key: 'mcp-promotion-1',
+      run_id: 'run-mcp-1',
+      stage: 1,
+      source_snapshot_hash: 'a'.repeat(64),
+      provenance_ref: 'msp:proof/mcp-1',
+      candidate: { atoms: [{ id: 'candidate-1' }] },
+    };
+    const first = await client.callTool({ name: 'gks_knowledge_promote', arguments: request });
+    assert.strictEqual(first.isError, undefined);
+    assert.match(first.structuredContent.knowledge_ref, /^gks:knowledge\/gks_knowledge_/);
+    assert.strictEqual(first.structuredContent.source_hash, request.source_snapshot_hash);
+    assert.strictEqual(first.structuredContent.idempotent, false);
+
+    const retry = await client.callTool({ name: 'gks_knowledge_promote', arguments: request });
+    assert.strictEqual(retry.isError, undefined);
+    assert.deepStrictEqual(retry.structuredContent, { ...first.structuredContent, idempotent: true });
+
+    const conflict = await client.callTool({ name: 'gks_knowledge_promote', arguments: { ...request, source_snapshot_hash: 'b'.repeat(64) } });
+    assert.strictEqual(conflict.isError, true);
+    assert.match(conflict.content[0].text, /different source_snapshot_hash/);
   });
 
   await t.test('add_knowledge with explicit ID', async () => {
