@@ -7,6 +7,12 @@ const {
 const { z } = require("zod");
 const { GenesisDatabase } = require("../index.js");
 const path = require("path");
+const { createHash } = require("crypto");
+
+// Native gossip writes operational text to stdout. MCP reserves stdout for
+// Content-Length JSON-RPC frames, so select the engine's stdio-safe mode
+// before opening the database.
+process.env.GENESIS_MCP_STDIO = "1";
 
 // 1. Initialize Database
 const dbPath = process.env.GENESIS_DB_PATH || path.join(process.cwd(), ".brain/mcp_db");
@@ -74,7 +80,38 @@ const TOOLS = [
       required: ["labels"],
     },
   },
+  {
+    name: "gks_knowledge_promote",
+    description: "Promotes one MSP-governed knowledge candidate with restart-safe idempotency.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        schema_version: { type: "string", const: "govibe-knowledge-candidate/v1" },
+        idempotency_key: { type: "string" },
+        run_id: { type: "string" },
+        stage: { type: "integer", minimum: 1, maximum: 12 },
+        source_snapshot_hash: { type: "string", pattern: "^[a-fA-F0-9]{64}$" },
+        provenance_ref: { type: "string", pattern: "^msp:proof/" },
+        candidate: { type: "object" },
+      },
+      required: ["schema_version", "idempotency_key", "run_id", "stage", "source_snapshot_hash", "provenance_ref", "candidate"],
+    },
+  },
 ];
+
+function promotionNodeId(idempotencyKey) {
+  return `gks_knowledge_${createHash("sha256").update(idempotencyKey, "utf8").digest("hex").slice(0, 32)}`;
+}
+
+function validatePromotionArguments(arguments_) {
+  if (arguments_.schema_version !== "govibe-knowledge-candidate/v1") throw new Error("Invalid knowledge candidate schema version.");
+  if (typeof arguments_.idempotency_key !== "string" || !arguments_.idempotency_key.trim()) throw new Error("idempotency_key is required.");
+  if (typeof arguments_.run_id !== "string" || !arguments_.run_id.trim()) throw new Error("run_id is required.");
+  if (!Number.isInteger(arguments_.stage) || arguments_.stage < 1 || arguments_.stage > 12) throw new Error("stage must be 1-12.");
+  if (!/^[a-f0-9]{64}$/i.test(arguments_.source_snapshot_hash ?? "")) throw new Error("source_snapshot_hash is invalid.");
+  if (typeof arguments_.provenance_ref !== "string" || !arguments_.provenance_ref.startsWith("msp:proof/")) throw new Error("provenance_ref must be an msp:proof reference.");
+  if (!arguments_.candidate || typeof arguments_.candidate !== "object" || Array.isArray(arguments_.candidate)) throw new Error("candidate must be an object.");
+}
 
 // 4. Handle Tool Listing
 server.setRequestHandler(ListToolsRequestSchema, async () => {
@@ -117,6 +154,43 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 
         const result = await db.addNode(input);
         return { content: [{ type: "text", text: `Knowledge atom added: ${result.id}` }] };
+      }
+
+      case "gks_knowledge_promote": {
+        validatePromotionArguments(arguments);
+        const sourceHash = arguments.source_snapshot_hash.toLowerCase();
+        const nodeId = promotionNodeId(arguments.idempotency_key);
+        let existing;
+        try {
+          const context = await db.retrieveContext(nodeId, "H0", null, false);
+          existing = context.nodes?.find((node) => node.id === nodeId) ?? null;
+        } catch {
+          existing = null;
+        }
+        if (existing) {
+          if (existing.props?.source_snapshot_hash !== sourceHash) {
+            throw new Error("idempotency_key is already bound to a different source_snapshot_hash.");
+          }
+          const structuredContent = { knowledge_ref: `gks:knowledge/${nodeId}`, source_hash: sourceHash, idempotent: true };
+          return { content: [{ type: "text", text: JSON.stringify(structuredContent) }], structuredContent };
+        }
+        await db.addNode({
+          id: nodeId,
+          labels: ["GKS_KNOWLEDGE_CANDIDATE"],
+          lang: "en",
+          causedBy: "msp:gks_knowledge_promote",
+          props: {
+            schema_version: arguments.schema_version,
+            idempotency_key: arguments.idempotency_key,
+            run_id: arguments.run_id,
+            stage: arguments.stage,
+            source_snapshot_hash: sourceHash,
+            provenance_ref: arguments.provenance_ref,
+            candidate: arguments.candidate,
+          },
+        });
+        const structuredContent = { knowledge_ref: `gks:knowledge/${nodeId}`, source_hash: sourceHash, idempotent: false };
+        return { content: [{ type: "text", text: JSON.stringify(structuredContent) }], structuredContent };
       }
 
       default:

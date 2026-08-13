@@ -7528,6 +7528,13 @@ impl Storage {
     }
 
     pub fn start_gossip_manager(storage: Arc<Self>) {
+        // An MCP stdio process has a protocol-exclusive stdout channel. The
+        // gossip manager emits operational text through native stdout, which
+        // would corrupt Content-Length MCP frames, so the MCP launcher opts
+        // out explicitly. Normal engine/server processes keep gossip enabled.
+        if std::env::var_os("GENESIS_MCP_STDIO").is_some() {
+            return;
+        }
         let _peer_id = storage.local_peer_id.clone();
         let _verifying_key_bytes = storage.verifying_key.to_bytes().to_vec();
 
