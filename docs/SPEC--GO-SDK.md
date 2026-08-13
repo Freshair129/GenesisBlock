@@ -30,7 +30,7 @@ To support cloud-native infrastructures and high-performance backend systems, we
 ```text
 genesisdb-go/
 ├── client.go      # Main Client struct and logic
-├── models.go      # GKS Schema types (Node, Edge, ContextPackage)
+├── models.go      # Generic GenesisBlockDB types (Node, Edge, ContextPackage)
 ├── hql_types.go   # Type definitions for HQL results
 ├── go.mod
 └── tests/

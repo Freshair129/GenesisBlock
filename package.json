@@ -37,6 +37,7 @@
     "build": "napi build --platform --release",
     "build:debug": "napi build --platform",
     "agents:validate": "node .agents/validate-agent-registry.mjs",
+    "docs:validate": "node scripts/docs-validate.mjs",
     "prepublishOnly": "napi prepublish -t npm",
     "test": "node --test __test__/mcp.test.mjs __test__/sanity.test.mjs __test__/db.test.mjs",
     "version:get": "node scripts/version.mjs get",

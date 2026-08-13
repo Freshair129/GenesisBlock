@@ -60,7 +60,7 @@ results = client.query("TRAVERSE FROM 'Neural Bridge' DEPTH 2 REL ANY")
 
 ## 3. Implementation Strategy
 1.  **Transport:** Use the `httpx` or `requests` library for robust async/sync communication.
-2.  **Typing:** Use `TypedDict` or `dataclasses` to provide IDE auto-completion for GKS schemas.
+2.  **Typing:** Use `TypedDict` or `dataclasses` to provide IDE auto-completion for generic GenesisBlockDB response and mutation types.
 3.  **Deployment:** Prepare a `setup.py` or `pyproject.toml` for future PyPI publishing.
 
 ---

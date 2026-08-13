@@ -39,8 +39,8 @@ GenesisBlockDB prioritizes in-memory dominance and ultra-low-latency traversal. 
 
 ### 3.1 Functional Requirements (FR)
 *   **FR 1.0 Vector Ingestion:** Support indexing of high-dimensional embeddings (up to 768 or 1536 dims).
-*   **FR 2.0 Hybrid Query:** Execute queries combining vector similarity (HNSW) and metadata filtering (GKS Attributes).
-*   **FR 3.0 Re-ranking:** Implement a scoring function that balances Vector Similarity with K-Impact.
+*   **FR 2.0 Hybrid Query:** Execute queries combining vector similarity (HNSW) and generic property filtering.
+*   **FR 3.0 Re-ranking:** Implement a caller-configured scoring function that combines vector similarity with available engine or client-provided signals.
 
 ### 3.2 Non-Functional Requirements (NFR)
 *   **NFR 1.0 Performance:** P95 Search Latency < 50ms for 1M vectors.

@@ -5,7 +5,7 @@ status: current
 # Architecture Blueprint: P2P Gossip Protocol (Mark VIII, Step 3)
 
 ## 1. Introduction
-The **P2P Gossip Protocol** is the communication layer of the Genesis Knowledge System (GKS). It enables distributed AI agents to discover each other, exchange knowledge fragments, and maintain a globally consistent state without a central server. This design adheres to the **C-3 (Architecture-Driven)** workflow.
+The **P2P Gossip Protocol** is GenesisBlockDB's optional synchronization layer. It enables independent database instances to discover each other, exchange signed state events, and reconcile graph state without a central server. Client applications may use this capability for their own domain records; the engine does not own any client's ontology or authority policy. This design adheres to the **C-3 (Architecture-Driven)** workflow.
 
 ## 2. Software Requirements Document (SRD)
 

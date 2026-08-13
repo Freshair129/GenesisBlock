@@ -5,8 +5,8 @@ doc_id: GVDOC-1003
 created: "2026-06-02T19:40:00+07:00,Boss(CEO)"
 updated: "2026-06-07T12:20:00+07:00,Boss(CEO),98db9a5"
 version: "1.3.0b"
-state: active
-type: framework
+state: historical
+type: historical-reference
 vault_id: default
 source_type: axiomatic
 tags:
@@ -19,14 +19,12 @@ aliases:
   - "FRAMEWORK--"
   - "FRAMEWORK::"
   - "FRAMEWORK::HIERARCHY-COMPACTION-STANDARDS"
-role: Governance / architectural framework
-block_manifest:
-    genesisblock: [[GENESIS::GoVibe-CoDev-Standard-FRAMEWORK]]
-    masterblock: [[MASTER::Multi-Platform-ARCHITECTURE-FRAMEWORK]]
+role: Historical client-specific governance reference; not a GenesisBlockDB standard
+source_of_truth: false
 wikilink:  
 crosslink:
 
-status: current
+status: historical
 ---
 
 # FRAMEWORK::HIERARCHY-COMPACTION-STANDARDS

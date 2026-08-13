@@ -1,5 +1,8 @@
 ---
+doc_id: VERSION
 status: current
+version: current
+owner: GenesisBlockDB Engineering
 ---
 
 # GenesisBlockDB — Canonical Version (SSOT)

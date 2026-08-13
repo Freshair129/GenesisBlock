@@ -21,24 +21,19 @@ jobs:
       - name: Rust Cache
         uses: Swatinem/rust-cache@v2
 
-      - name: Build Benchmark (Release)
-        # The audit bins link the napi lib, so they cannot link as standalone
-        # executables on Linux (undefined napi_* symbols). Tracked in
-        # cognitive_system#161 (separate core from napi bindings). Don't fail the
-        # job on the link error; downstream steps skip gracefully if the binary
-        # isn't produced, and run the real audit once it can link.
-        continue-on-error: true
-        run: cargo build --release --features bins --bin scientific-audit
+      - name: Build Benchmark (Standalone Release)
+        # The storage core has a no-napi feature mode so audit bins link as
+        # standalone Linux executables. A failed build must fail this required
+        # performance check rather than silently producing no evidence.
+        run: cargo build --release --no-default-features --features bins --bin scientific-audit
 
       - name: Run Scientific Audit (15s Durable fsync)
         run: |
-          if [ ! -x ./target/release/scientific-audit ]; then
-            echo "⏭  scientific-audit not built (napi bin can't link standalone on Linux); skipping. See cognitive_system#161."
-            exit 0
-          fi
+          test -x ./target/release/scientific-audit || { echo "❌ scientific-audit was not built"; exit 1; }
           mkdir -p benches/scientific_audit_db
           ./target/release/scientific-audit > audit_result.txt
           cat audit_result.txt
+          test -s audit_result.txt || { echo "❌ scientific audit produced no result"; exit 1; }
 
       - name: Upload Audit Artifact
         if: hashFiles('audit_result.txt') != ''
@@ -49,13 +44,11 @@ jobs:
 
       - name: Performance Regression Check
         run: |
-          if [ ! -f audit_result.txt ]; then
-            echo "⏭  no audit result (benchmark skipped); nothing to check."
-            exit 0
-          fi
-          TPS=$(grep "Throughput:" audit_result.txt | awk '{print $2}' | cut -d'.' -f1)
-          if [ "$TPS" -lt 100 ]; then
-            echo "❌ Performance Regression Detected! Throughput dropped below 100 TPS durable."
+          test -s audit_result.txt || { echo "❌ benchmark result is missing"; exit 1; }
+          RATE=$(awk '/Ingestion rate:/ {print int($3); exit}' audit_result.txt)
+          test -n "$RATE" || { echo "❌ benchmark result has no ingestion-rate measurement"; exit 1; }
+          if [ "$RATE" -lt 100 ]; then
+            echo "❌ Performance Regression Detected! Ingestion rate dropped below 100 nodes/sec."
             exit 1
           fi
-          echo "✅ Performance verified: $TPS TPS (Durable)"
+          echo "✅ Performance verified: $RATE nodes/sec (Durable)"

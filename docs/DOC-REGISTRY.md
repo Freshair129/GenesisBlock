@@ -2,8 +2,8 @@
 title: "GenesisBlockDB Document Registry"
 doc_id: "DOC-REGISTRY-GENESISBLOCKDB"
 status: draft
-version: "0.1.0+draft"
-updated: "2026-08-03"
+version: "0.2.0+draft"
+updated: "2026-08-13"
 owner: "GenesisBlockDB Architecture"
 source_of_truth: true
 related_issue: 84
@@ -29,6 +29,12 @@ It does not replace code and test evidence. Product documents define intent and 
 - Performance claims must point to reproducible evidence.
 - A path in this registry must exist at the registered revision.
 
+The registry is an index of canonical entrypoints, not an exhaustive catalog
+of every historical, exploratory, benchmark, interview, or ADR document under
+`docs/`. Unregistered documents remain reviewable references, but they do not
+claim product-definition or implementation-status authority unless a current
+registry row explicitly names them.
+
 ## 3. Product and requirements
 
 | Role | Doc ID | Version | Status | Owner | Path |
@@ -42,20 +48,20 @@ It does not replace code and test evidence. Product documents define intent and 
 | Role | Doc ID | Version | Status | Owner | Path |
 |---|---|---|---|---|---|
 | Architecture composition | `MASTER-SPEC-GENESISBLOCKDB` | `2.1.0` | current | GenesisBlockDB Architecture | `docs/MASTER-SPEC--GENESIS-DB.md` |
-| Architecture index | `C4--GENESISDB-ARCHITECTURE` | n/a | reference | GenesisBlockDB Architecture | `docs/C4--GENESISDB-ARCHITECTURE.md` |
+| Architecture index | `C4--GENESISDB-ARCHITECTURE` | `0.1.7b` | current | GenesisBlockDB Architecture | `docs/C4--GENESISDB-ARCHITECTURE.md` |
 | ADR | `ADR-GENESISBLOCKDB-DOMAIN-NEUTRAL-CORE` | `0.1.0+draft` | proposed | GenesisBlockDB Architecture | `docs/adr/ADR--GENESISBLOCKDB-DOMAIN-NEUTRAL-CORE.md` |
 | Client contract | `CONTRACT-CLIENT-NAMESPACE-AND-SCHEMA` | `0.1.0+draft` | draft | GenesisBlockDB Engineering | `docs/contracts/CONTRACT--CLIENT-NAMESPACE-AND-SCHEMA.md` |
-| API reference | `API_REFERENCE` | generated | reference | GenesisBlockDB Engineering | `docs/API_REFERENCE.md` |
+| API reference | `API_REFERENCE` | generated | current | GenesisBlockDB Engineering | `docs/API_REFERENCE.md` |
 
 ## 5. Product narrative and evidence
 
 | Role | Doc ID | Version | Status | Owner | Path |
 |---|---|---|---|---|---|
-| Positioning | `POSITIONING-GENESISBLOCKDB` | n/a | reference | GenesisBlockDB Product | `docs/POSITIONING.md` |
+| Positioning | `POSITIONING-GENESISBLOCKDB` | n/a | current | GenesisBlockDB Product | `docs/POSITIONING.md` |
 | Whitepaper | `WHITEPAPER-GENESISBLOCKDB-SEMANTIC-SUBSTRATE` | `0.1.0+draft` | draft | GenesisBlockDB Architecture | `docs/WHITEPAPER--GENESISBLOCKDB-SEMANTIC-SUBSTRATE.md` |
-| Database whitepaper | `WHITEPAPER--GENESIS-DB` | n/a | reference | GenesisBlockDB Architecture | `docs/WHITEPAPER--GENESIS-DB.md` |
-| Performance report | `REPORT--2026-06-21-PERFORMANCE-AND-COMPETITIVE` | n/a | evidence | GenesisBlockDB Engineering | `docs/REPORT--2026-06-21-PERFORMANCE-AND-COMPETITIVE.md` |
-| Product version | `VERSION` | current | canonical | GenesisBlockDB Engineering | `docs/VERSION.md` |
+| Database whitepaper | `WHITEPAPER--GENESIS-DB` | n/a | current | GenesisBlockDB Architecture | `docs/WHITEPAPER--GENESIS-DB.md` |
+| Performance report | `REPORT--2026-06-21-PERFORMANCE-AND-COMPETITIVE` | n/a | historical | GenesisBlockDB Engineering | `docs/REPORT--2026-06-21-PERFORMANCE-AND-COMPETITIVE.md` |
+| Product version | `VERSION` | current | current | GenesisBlockDB Engineering | `docs/VERSION.md` |
 
 ## 6. Historical and superseded documents
 
@@ -92,4 +98,5 @@ The following documents should be created only when implementation work requires
 
 | Version | Date | Owner | Summary |
 |---|---|---|---|
+| 0.2.0+draft | 2026-08-13 | GenesisBlockDB Architecture | Reconciled registered frontmatter and defined canonical-entrypoint scope for automated validation. |
 | 0.1.0+draft | 2026-08-03 | GenesisBlockDB Architecture | Established the active standalone-product registry and separated historical status snapshots. |

@@ -1,8 +1,9 @@
 ---
-proposed_id: C4--GENESISDB-ARCHITECTURE
+doc_id: C4--GENESISDB-ARCHITECTURE
 type: architecture-index
 status: current
 version: 0.1.7b
+owner: GenesisBlockDB Architecture
 created_at: 2026-06-13T22:50:11+07:00,ATHER,9b1ced3
 last_update: 2026-07-22T00:22:00+07:00,ATHER
 attributes:
