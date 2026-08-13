@@ -3,10 +3,12 @@
   "type": "implementation_queue",
   "title": "Engine-Wedge-First — dispatchable tasks (Waves W1-W4)",
   "version": "1.0.0",
-  "source_of_truth": true,
+  "status": "superseded",
+  "source_of_truth": false,
+  "superseded_by": "docs/MASTER_PLAN.md#5-first-implementation-slice-w1",
   "adr": "docs/adr/ADR--ENGINE-WEDGE-FIRST.md",
   "created_at": "2026-07-07T12:15:00+07:00",
-  "updated_at": "2026-07-07T12:15:00+07:00",
+  "updated_at": "2026-08-14T04:01:51+07:00",
   "frozen_constraints": "Do NOT change: Storage core methods, public NAPI/REST/FFI signatures, on-disk/WAL format. HQL grammar semantics: P1/P2/P3 remain frozen; P0 narrowly unfrozen per docs/ARCHITECTURE_CHANGE_REQUEST--HQL-P0-BUGFIXES.md (approved). Any further change requires a new ARCHITECTURE_CHANGE_REQUEST.",
   "amendments": [
     {"id":"ACR-HQL-P0","doc":"docs/ARCHITECTURE_CHANGE_REQUEST--HQL-P0-BUGFIXES.md","effect":"adds W0 pre-publish with TASK-0000a/b/c; narrowly unfreezes HQL P0 grammar; preserves ADR wedge-first discipline","approved_at":null}

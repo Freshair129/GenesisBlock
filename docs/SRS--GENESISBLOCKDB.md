@@ -2,8 +2,8 @@
 title: "Software Requirements Specification: GenesisBlockDB"
 doc_id: "SRS-GENESISBLOCKDB"
 status: draft
-version: "0.1.0+draft"
-updated: "2026-08-03"
+version: "0.1.1+draft"
+updated: "2026-08-14"
 owner: "GenesisBlockDB Engineering"
 source_of_truth: true
 related_issue: 84
@@ -105,12 +105,14 @@ Client application and client-owned schema
 
 | ID | Requirement | Priority |
 |---|---|---|
-| GB-SRS-QRY-001 | The long-term public query boundary SHALL be representable as typed Query IR. | SHOULD |
+| GB-SRS-QRY-001 | The primary public query boundary SHALL be a versioned typed Query IR. | MUST |
 | GB-SRS-QRY-002 | HQL MAY provide a compatibility frontend but SHALL NOT define storage authority. | MUST |
 | GB-SRS-QRY-003 | Queries SHALL expose namespace and revision/temporal scope where supported. | MUST |
 | GB-SRS-QRY-004 | Unsupported query capabilities SHALL fail explicitly. | MUST |
 | GB-SRS-QRY-005 | Query results SHALL preserve client IDs and declared schema metadata. | MUST |
 | GB-SRS-QRY-006 | Bounded joins or relational projections SHALL remain inside the unified database boundary when exposed. | SHOULD |
+| GB-SRS-QRY-007 | The database core SHALL NOT interpret free-form Natural Language or depend on an LLM/model provider. | MUST |
+| GB-SRS-QRY-008 | An NL adapter SHALL submit schema-validated Query IR and fail explicitly on ambiguous, unsupported or unauthorized intent. | MUST |
 
 ### 3.8 Interfaces and SDKs
 
@@ -183,3 +185,4 @@ Requirements SHALL be verified through:
 | Version | Date | Owner | Summary |
 |---|---|---|---|
 | 0.1.0+draft | 2026-08-03 | GenesisBlockDB Engineering | Initial standalone and client-neutral SRS. |
+| 0.1.1+draft | 2026-08-14 | GenesisBlockDB Engineering | Made typed Query IR mandatory, retained HQL compatibility, and constrained NL conversion to a validated external adapter. |

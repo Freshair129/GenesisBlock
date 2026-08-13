@@ -1,117 +1,155 @@
 ---
 status: current
+version: "0.2.0"
+updated: "2026-08-14"
+owner: "Boss (Founder / Product Authority)"
+approval: "Approved in-session 2026-08-14"
 ---
 
-# MASTER_PLAN — GenesisBlock Engine-Wedge-First Distribution Program
+# MASTER_PLAN — GenesisBlock Engine-Wedge and Typed Query Boundary
 
-> Phase 0 deliverable. **Status: draft until the owner approves Phase 0.**
-> Source of truth for scope: [`docs/adr/ADR--ENGINE-WEDGE-FIRST.md`](adr/ADR--ENGINE-WEDGE-FIRST.md)
-> (accepted 2026-07-07). Per RWANG §10, no further document is generated until this plan is approved.
+## 0. Approved direction
 
-## 0. Framing — this is a right-sized RWANG application (read first)
+GenesisBlockDB remains an engine-wedge-first product. The approved query architecture is now:
 
-**Decision:** run RWANG as a *distribution / productization* program over an **existing,
-architecturally-frozen engine**, NOT as a greenfield 0→7 architecture build.
-- **Reason:** the engine (`genesis-block-native`, ~6k-line Rust core + NAPI/REST/mobile-FFI) is
-  already built, tested (34+ test binaries), and its architecture is fixed by the existing
-  codebase + prior ADRs/specs. The ADR froze the *strategic* decision. The gap is **packaging +
-  distribution**, not architecture.
-- **Consequence:** RWANG **Phases 1–5** (System Architecture, Contracts, Multi-Agent Arch,
-  Implementation Spec, QA) are **INHERITED-FROZEN** — satisfied by existing artifacts, cited not
-  regenerated: `CLAUDE.md`, `docs/C4--GENESISDB-ARCHITECTURE.md`, the `docs/adr/*` set,
-  `PROTOCOL--GENESIS-GRAPH-FFI`, `SPEC--MOBILE-SDK`, `BENCH-SPEC--HQL-MOAT-AND-EXPRESSIVENESS`,
-  `SPEC--SQLITE-SUBSTRATE-S0-S1`. Any change to them requires an `ARCHITECTURE_CHANGE_REQUEST` (§11.2).
-- **Approved amendment:** [`ARCHITECTURE_CHANGE_REQUEST--HQL-P0-BUGFIXES`](ARCHITECTURE_CHANGE_REQUEST--HQL-P0-BUGFIXES.md)
-  narrowly unfreezes HQL **P0 grammar** (correctness+exposure defects) for pre-publish landing.
-  P1/P2/P3 remain frozen behind GATE-DEMAND-1. Rationale: shipping documented-but-broken behavior
-  under GATE-DEMAND-1 would poison the demand signal, and the pre-P0 v1 baseline window closes
-  on the next merge to `main`.
-- **Rejected alternative:** regenerate all 38 canonical docs for the existing system — rejected as
-  over-process on a frozen codebase (violates Operating Principle #1; adds no architectural value).
-- **The real path:** Phase 0 (this plan) → **Phase 6** (decompose the ADR's 4 steps into tasks +
-  queue) → **Phase 7** (execute wave-by-wave) with one **hard demand gate** after Wave 1.
+```mermaid
+flowchart LR
+    nl["NL intent"] --> adapter["External Agent Query Adapter"]
+    adapter --> ir["Typed Query IR V1"]
+    ir --> engine["GenesisBlockDB Engine"]
+    hql["HQL compatibility"] --> ir
+    engine --> distribution["N-API / REST / SDK / MCP distribution"]
+```
 
-## 1. Roadmap (RWANG phases mapped to reality)
+This plan is approved at the architecture/document level. It does not mark the typed executor or NL
+adapter as implemented. The governing decisions are:
 
-| RWANG Phase | This program |
+- `ADR--ENGINE-WEDGE-FIRST`: productization and distribution remain the commercial sequence.
+- `ADR--GENESISDB-TYPED-QUERY-IR-AGENT-BOUNDARY`: Typed Query IR is primary; HQL is compatibility;
+  NL conversion is a separate adapter.
+- `SPEC--GENESISDB-TYPED-QUERY-IR-V1`: normative V1 request, result, validation and conformance gates.
+
+## 1. Current baseline
+
+| Item | Truth status |
 |---|---|
-| 0 Discovery | **ACTIVE** — this MASTER_PLAN + scope binding (below). |
-| 1–5 Architecture→QA | **INHERITED-FROZEN** — cite existing engine + ADRs/specs; no regeneration. |
-| 6 Handoff / Task Decomposition | Decompose ADR steps 1–4 into `TASK-####` (§12.2) → `queue/IMPLEMENTATION_QUEUE.json` + `PROJECT_GRAPH.json` + waves. |
-| 7 Implementation | Execute waves; each compiles/verifies/reviewed before the next. **Wave 1 → GATE → Waves 2–4.** |
+| HQL P0 correctness work | Implemented and merged on `main`; retained as compatibility baseline. |
+| HQL P1/P2/P3 expansion | Deferred; not required for the primary public contract. |
+| Typed Query IR ADR/spec | Accepted by owner on 2026-08-14. |
+| Typed Query IR executor/API | Planned; not implemented. |
+| NL-to-Query-IR adapter | Planned outside the engine; not implemented. |
+| Engine package/release | Remains a productization gate; acceptance requires registry/install evidence. |
 
-## 2. Dependency Graph
+## 2. Dependency and critical path
 
+```mermaid
+flowchart LR
+    W0["W0 Boundary docs\naccepted"] --> W1["W1 Typed Query IR\nexecutor + parity"]
+    W1 --> W2["W2 Publish engine"]
+    W2 --> G["GATE-DEMAND-1\nfirst 10 external installs"]
+    G --> W3["W3 External NL adapter\n+ MCP ergonomics"]
+    G --> W4["W4 REST binary\nDocker + SDK auth"]
+    W3 --> W5["W5 Graphiti/LangGraph adapter"]
+    W4 --> W5
 ```
-W0 HQL-P0 (baseline→merge→bench) ──▶ W1 Publish engine ──▶ [DEMAND GATE: first-10-installs ~1mo] ──▶ W2 Adapter+MCP ──▶ W4 Graphiti driver
-                                            │                                                            │                    ▲
-                                            └────────────────────────────────────────────▶ W3 REST binary/Docker/SDK-auth ───┘
-```
-- **W0** (from ACR-HQL-P0): TASK-0000a baseline **MUST** precede TASK-0000b code-merge; TASK-0000c re-benches.
-- Baseline window closes on next merge to `main` — W0 is time-critical.
-- W2 (adapter) requires W1 (published engine to depend on).
-- W4 (Graphiti driver) requires W3 (REST/SDK, since the Python/Graphiti channel rides REST) **and**
-  an external check of Graphiti's `GraphDriver` contract vs the HQL subset (adapter-vs-translator).
-- **Everything past W1 is gated on the demand signal** — no funding of W2–W4's expensive halves
-  until the install signal clears.
-- External deps: npm registry + `NPM_TOKEN`; GitHub release matrix (5 target triples); Graphiti
-  issue #1240 window; Docker Hub/GHCR.
 
-## 3. Phase Breakdown & Deliverables
+W1 is a pre-publish public-contract gate: a new package should lead with the typed boundary rather
+than establish HQL as the preferred integration. W3 remains after publishing and the demand gate so
+model/provider work cannot block the database engine or leak into its core.
 
-| Phase | Deliverables ([domain] slot bound) | Exit criteria |
-|---|---|---|
-| **0 Discovery** | `MASTER_PLAN.md` (this); scope = ADR--ENGINE-WEDGE-FIRST; **[domain] bind: `22_<PIPELINE>` → `22_DISTRIBUTION_AND_RELEASE_PIPELINE`**; architecture declared inherited-frozen with citations | Scope frozen; domain slot bound; owner approves this plan |
-| **1–5** | *(inherited-frozen — citations in §0; not regenerated)* | N/A — frozen baseline |
-| **6 Handoff** | `33_TASK_BREAKDOWN.md` (ADR steps→tasks, §12.2 template), `36_TASK_EXECUTION_ORDER.md` (4 waves), `queue/IMPLEMENTATION_QUEUE.json`, `queue/PROJECT_GRAPH.json`, `37_REVIEW_CHECKLIST.md` | Every task independently executable, capability-assigned, no open architectural decisions |
-| **7 Implementation** | `src/`/packaging changes per wave; `state/progress.jsonl` + `events.jsonl` | Each wave compiles, verifies, reviewed; **W1 gate decision recorded** before W2 |
+## 3. Work waves
 
-**Wave→ADR-step mapping (Phase 7):**
-- **W0 = amendment ACR-HQL-P0** — capture v1 baseline; merge HQL P0 defect fixes (SEARCH target meaningful, hybrid `K` exposed, `EF`/`OVERSAMPLE`/`DIRECTION` grammar, rel alternation); re-bench.
-- **W1 = ADR step 1** — publish engine: verify `NPM_TOKEN`, tag `v0.2.0`, fire 5-triple release matrix, fix QUICKSTART/dist-tag(`beta`→correct)/SECURITY.md(0.1.0→0.2.0), publish prebuild `optionalDependencies`.
-- **W2 = ADR step 2** — extract Rwang `store/genesis-sidecar.mjs`+`knowledge.mjs` → first published path-independent consumer package; make `mcp/server.js` npx-able (bin entry; fix `vectorDim:1536`→1024).
-- **W3 = ADR step 3** — REST server as binary + Docker image; SDK auth header support (Python/Go clients vs `api_key_guard`); unauth `/health`; SIGTERM `save_state()`.
-- **W4 = ADR step 4** — Graphiti driver, gated on `GraphDriver` contract check (adapter vs translator).
-
-## 4. Milestones
-
-- **M1 (W1):** `npm install @freshair129/gks-genesis-block-native` works for a stranger → embedded bitemporal graph+vector store, no methodology, no orchestrator.
-- **GATE (post-M1, ~1 month):** first-10-external-installs signal. *Owner decision:* proceed / pivot / stop before funding W2–W4.
-- **M2 (W2):** path-independent adapter package + `npx` MCP memory server usable in any MCP client.
-- **M3 (W3):** `docker run` REST server; authed SDKs.
-- **M4 (W4):** GenesisBlock as a Graphiti/LangGraph backend (channel live).
-
-## 5. Estimated Complexity (per wave)
-
-| Wave | Complexity | Rationale |
-|---|---|---|
-| **W0 HQL-P0** | **S/M** | P0 code is already authored in the working tree; W0 work = baseline capture + merge + re-bench; ≤3 working days |
-| W1 Publish | **M** | pure packaging/release plumbing; no engine code change; NPM_TOKEN/matrix unverified = the risk |
-| W2 Adapter+MCP | **M** | ~600 lines already exist in Rwang; work is de-`G:/`-ing + packaging + npx bin |
-| W3 REST/Docker/SDK | **M/L** | Dockerfile (none exists) + graceful shutdown + SDK auth + health route |
-| W4 Graphiti driver | **M → L if translator** | adapter if HQL subset fits `GraphDriver`; L if it demands full Cypher |
-
-## 6. Risks
-
-| Risk | Likelihood | Impact | Mitigation |
+| Wave | Scope | Deliverable | Exit criteria |
 |---|---|---|---|
-| **W0 baseline captured on dirty tree** (P0 already applied) | Med | High | ACR-HQL-P0 §4 mandatory ordering; verify `git status` clean at capture; TASK-0000a `hazard` flag in queue |
-| **Post-P0 regression on existing benches** | Low | Med | ACR-HQL-P0 §4 rollback path (revert if p50/recall regress >5% at equal semantic input) |
-| **HQL P1/P2/P3 scope creep into W0** | Med | Med | ACR-HQL-P0 §1 scope is explicit; P1 fold requires a new ACR; track-boundary notes in PLAN & SPEC |
-| **No external demand** (nobody installs) | Med | High | The whole point of the GATE — publish is cheap; measure before spending |
-| `NPM_TOKEN`/release matrix never validated | Med | Med | W1 first sub-task = dry-run the release workflow end-to-end |
-| Graphiti `GraphDriver` needs full Cypher (adapter→translator) | Med | Med | Check contract **before** W4 commit; W4 gated |
-| Private MSP/GKS runtime repo the audit missed (D: spot-checked only) | Low | High | Owner confirms; if it exists, re-weight (could revive platform path) |
-| Methodology (12-stage/H0-6) leaks into the shipped slice | Low | Med | Design invariant: install-and-go slice carries ZERO methodology |
-| Snapshot-isolation gap vs SQLite WAL surfaces in a real fleet | Med | Med | Conceded in ADR; expose shipped `events_since`/Merkle, not build MVCC |
-| LYRA ROUND4 (falsification of "we have the layer") still pending | Low | Low | Fold in when written; unlikely to reverse the disk audit |
+| W0 | Architecture boundary | Accepted ADR/spec, registry/C4/parent-doc alignment, this plan | Documentation validators pass; implementation status remains truthful. |
+| W1 | Typed Query IR | Closed V1 schema, Rust typed executor, N-API/REST bindings, capability reporting, HQL mapping | Search/traverse vertical slice passes core, REST and N-API parity; HQL compatibility fixtures pass. |
+| W2 | Publish engine | Release tag/matrix, platform prebuilds, package docs/security/version alignment | Clean-machine install and smoke evidence; no path-dependent dependency. |
+| GATE-DEMAND-1 | Demand evidence | First-10-external-installs record over an owner-defined measurement window | Owner records proceed, pivot or stop before expensive adapter/channel work. |
+| W3 | External NL adapter | Separate provider-neutral adapter package producing `QueryRequestV1`; MCP prefers typed operations | Schema/capability/auth rejection and ambiguous-intent fail-closed tests pass; engine has no LLM dependency. |
+| W4 | Server distribution | REST binary, Docker image, SDK auth, health and graceful shutdown | Container and authenticated SDK smoke tests pass. |
+| W5 | Channel adapters | Graphiti/LangGraph adapter based on verified upstream contract | Contract fit documented; conformance tests pass without expanding HQL by default. |
 
-## 7. Review Checkpoints (owner gates)
+## 4. Requirement mapping
 
-1. **Approve this MASTER_PLAN** (RWANG §10) → unlocks Phase 6 task decomposition.
-2. **Approve `33_TASK_BREAKDOWN` + queue** (Phase 6 review) → unlocks Phase 7 W1.
-3. **The DEMAND GATE after W1** — the single most important business decision: real install signal → fund W2–W4, or pivot/stop. Recorded in `state/events.jsonl`.
-4. Per-wave review (W2–W4): compiles, verifies, reviewed before next wave.
+| Work | Requirement IDs | Notes |
+|---|---|---|
+| W1 typed envelope and executor | `GB-SRS-QRY-001`, `GB-SRS-QRY-003..005`, `TQIR-001..008` | Primary machine contract. |
+| W1 HQL compatibility | `GB-SRS-QRY-002`, `TQIR-010` | Preserve P0 behavior; no P1/P2/P3 dependency. |
+| W1 cross-surface parity | `GB-SRS-API-001..004`, `TQIR-008` | Rust, N-API, REST first; SDK/MCP by declared support. |
+| W3 NL adapter | `TQIR-009`, ADR agent-boundary rules | Outside engine, schema-validated and fail closed. |
+| W2/W4 distribution | `GB-SRS-NFR-005`, `GB-SRS-NFR-007..008` | Installability, compatibility and security evidence. |
 
----
-*Owner: approve this plan to proceed to Phase 6 (task decomposition of Waves 1–4). Or flag the private-MSP/GKS-repo caveat first — it is the one input that could re-open the platform path.*
+## 5. First implementation slice (W1)
+
+The first slice is deliberately bounded:
+
+1. Freeze JSON Schema plus Rust request/result enums for `search` and `traverse`.
+2. Add RED tests for validation, unsupported versions, bounds and collection mismatch.
+3. Implement one typed core dispatcher over existing storage methods.
+4. Expose N-API and REST routes with equivalent envelopes.
+5. Map HQL `SEARCH` and `TRAVERSE` to the typed dispatcher and run parity fixtures.
+6. Report operation support through capability/version output.
+
+`match_path`, `context` and `relational_named_query` are reserved V1 operation kinds but require their
+own closed schemas and acceptance tests before being reported as implemented.
+
+## 6. Milestones
+
+| ID | Milestone | Gate |
+|---|---|---|
+| M0 | Query boundary approved | ADR/spec current, plan aligned, docs validation passes. |
+| M1 | Typed vertical slice | `search` + `traverse` work through core/N-API/REST; HQL parity passes. |
+| M2 | Installable engine | Stranger can install the package on a clean supported machine. |
+| M3 | Demand decision | First-10-install evidence reviewed by owner. |
+| M4 | NL adapter | NL produces validated Query IR without engine model/provider dependencies. |
+| M5 | Self-hosted channel | Docker/authed SDK surface and channel adapter pass conformance. |
+
+## 7. Risk register
+
+| ID | Risk | Prob. | Impact | Score | Mitigation |
+|---|---|---:|---:|---:|---|
+| R1 | Query IR duplicates existing operation types and drifts | 3 | 4 | 12 | One typed dispatcher; generate or share transport fixtures. |
+| R2 | HQL compatibility changes observable behavior | 3 | 4 | 12 | Golden parity tests; retain direct path until equivalent. |
+| R3 | NL model emits valid-looking unauthorized queries | 4 | 5 | 20 | Treat output as untrusted; schema, capability and caller-policy validation; fail closed. |
+| R4 | V1 becomes an unrestricted JSON escape hatch | 3 | 5 | 15 | Closed discriminated types; reject unknown fields; no generic payload. |
+| R5 | Cross-surface contract version drift | 3 | 4 | 12 | Shared fixtures and capability-version conformance in CI. |
+| R6 | Query-contract work delays installability indefinitely | 3 | 4 | 12 | Limit W1 to search/traverse vertical slice; reserve other operations. |
+| R7 | No external demand after publish | 3 | 5 | 15 | Preserve GATE-DEMAND-1 before expensive adapter/channel work. |
+| R8 | Graphiti requires broader Cypher semantics | 3 | 3 | 9 | Inspect upstream contract before W5; adapt typed IR rather than expanding HQL automatically. |
+
+## 8. Scope boundaries
+
+In scope now: architecture docs, V1 contract, master-plan alignment and later W1 implementation.
+
+Out of scope until its wave is approved/executed:
+
+- embedding an LLM/provider in the Rust engine;
+- removing HQL or breaking existing HQL callers;
+- HQL P1/P2/P3 language expansion;
+- arbitrary SQL/Cypher/JSON execution;
+- client ontology or authority policy in GenesisBlockDB;
+- claiming Query IR or the NL adapter shipped from document approval alone.
+
+## 9. Review gates
+
+1. M0 document validation closes the approved documentation slice.
+2. W1 implementation requires tests before code and an architecture review before merge.
+3. W2 requires clean-install and release evidence.
+4. GATE-DEMAND-1 requires an explicit owner decision before W3-W5 investment.
+5. Each public-surface addition requires API/SDK/MCP parity review proportional to declared support.
+
+## 10. Planning artifact state
+
+The previous `33_TASK_BREAKDOWN.md`, `36_TASK_EXECUTION_ORDER.md`, `PHASE_6_REVIEW.md`,
+`queue/IMPLEMENTATION_QUEUE.json` and `queue/PROJECT_GRAPH.json` describe the superseded HQL-first
+sequence. They are retained as historical evidence with `source_of_truth: false` where machine-readable.
+
+The next planning action is to decompose W1 from the accepted Query IR V1 requirements and submit the
+replacement queue/graph for review. Until that happens, no old `ready: true` flag authorizes dispatch.
+
+## CHANGELOG
+
+| Version | Date | Status | Summary | Commit Hash | Agent |
+|---|---|---|---|---|---|
+| 0.2.0 | 2026-08-14 | current | Approved Typed Query IR as pre-publish contract, retained HQL compatibility and moved NL conversion to an external post-publish adapter wave. | working-tree | ATHER |
+| 0.1.0 | 2026-07-07 | superseded | Initial engine-wedge distribution plan centered on HQL P0 and four distribution waves. | historical | ATHER |

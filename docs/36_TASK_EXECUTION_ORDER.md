@@ -1,8 +1,14 @@
 ---
-status: current
+status: superseded
+superseded_by: MASTER_PLAN.md
+updated: 2026-08-14
 ---
 
 # 36 — Task Execution Order (Waves)
+
+> **Superseded 2026-08-14:** this ordering predates the accepted Typed Query IR boundary. The current
+> critical path is defined in `MASTER_PLAN.md` v0.2.0; a replacement machine queue has not yet been
+> generated or approved.
 
 > Machine SSOT: `queue/PROJECT_GRAPH.json` (`waves[]`). This doc is the human-readable view.
 

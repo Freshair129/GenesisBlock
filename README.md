@@ -90,7 +90,7 @@ Agent context: [AGENT.md](AGENT.md) · Contributor workflow: [CONTRIBUTING.md](C
 - Client-defined namespaces, labels, relation types, properties and schema references.
 - HNSW-backed semantic search with per-model/dimension vector collections and asynchronous indexing.
 - Thai-aware lexical matching and documented cross-lingual behavior.
-- HQL query execution for search, traversal, hybrid retrieval and context; typed Query IR is the long-term public boundary.
+- Typed Query IR is the approved primary query boundary (implementation planned); current HQL search, traversal, hybrid retrieval and context remain compatibility surfaces.
 - Graph Retrieval Layer for tiered or bounded context packages without requiring one client authority model.
 - Bitemporal node evolution through supersession rather than destructive overwrite.
 - Embedded SQLite projection for node properties, labels, app-defined relational schemas, joins, and SQL-backed filtering/text retrieval.

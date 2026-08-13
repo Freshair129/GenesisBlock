@@ -1,8 +1,14 @@
 ---
-status: current
+status: superseded
+superseded_by: MASTER_PLAN.md
+updated: 2026-08-14
 ---
 
 # 33 — Task Breakdown (Waves W0–W4)
+
+> **Superseded 2026-08-14:** retained as the historical engine-wedge task decomposition. Do not
+> dispatch these readiness flags. `MASTER_PLAN.md` v0.2.0 requires a new W1 Typed Query IR
+> decomposition before implementation.
 
 > **Machine SSOT:** `queue/IMPLEMENTATION_QUEUE.json`. Titles/status here MUST match; JSON is authoritative (RWANG §8).
 > **Local dispatch:** every task carries `LOCAL_SAFE` or `CLOUD_REQUIRED` (§12.4). The dispatcher (Rwang / manual) reads the JSON.
