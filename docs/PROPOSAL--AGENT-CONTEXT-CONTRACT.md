@@ -1,9 +1,9 @@
 ---
-version: "0.1.0b"
+version: "0.2.0b"
 created_at: "2026-07-20T18:52:13+07:00,ATHER,working-tree"
-last_update: "2026-07-20T18:52:13+07:00,ATHER"
-status: candidate
-superseded_by: null
+last_update: "2026-08-14T04:01:51+07:00,ATHER"
+status: superseded
+superseded_by: "SPEC--GENESISDB-TYPED-QUERY-IR-V1.md"
 attributes:
   domain: "agent-context"
   scope: "GRL typed API, SDK, and MCP contract"
@@ -12,6 +12,9 @@ attributes:
 ---
 
 # Proposal - Agent Context Contract
+
+> Superseded on 2026-08-14 by the accepted Typed Query IR V1 specification. Its hard-budget,
+> relevant-compression and evidence requirements remain inputs to the `context` operation design.
 
 ## Decision request
 
@@ -151,3 +154,4 @@ query-language architecture. The main risk is packet-version drift between trans
 | Version | Date | Status | Summary | Commit Hash | Agent |
 |---|---|---|---|---|---|
 | `0.1.0b` | 2026-07-20 | candidate | Initial separated agent-context contract proposal; no implementation authorized. | working-tree | ATHER |
+| `0.2.0b` | 2026-08-14 | superseded | Replaced by the accepted Typed Query IR V1 contract and agent-adapter boundary. | working-tree | ATHER |

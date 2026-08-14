@@ -79,6 +79,8 @@ const NAPI_TO_REST: &[(&str, Option<&str>)] = &[
     // (HybridSearchInput-based) — the two routes coexist deliberately.
     ("retrieve_context", Some("/v1/context/retrieve")),
     ("execute_hql", Some("/v1/query/hql")),
+    ("execute_query_ir", Some("/v1/query/ir")),
+    ("query_ir_capabilities", Some("/v1/query/ir/capabilities")),
     ("hybrid_search", Some("/v1/search/hybrid")),
     // No direct REST route; graph traversal is reachable via HQL TRAVERSE
     // through /v1/query/hql (see tests/rest_api_tests.rs::test_hql_traverse_finds_neighbor).

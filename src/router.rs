@@ -509,6 +509,54 @@ async fn execute_hql_handler(
     }
 }
 
+fn query_ir_error_response(error: impl std::fmt::Display) -> axum::response::Response {
+    let message = error.to_string();
+    let candidate = message.split(':').next().unwrap_or("");
+    let code = if candidate.starts_with("QUERY_") {
+        candidate
+    } else {
+        "QUERY_EXECUTION_FAILED"
+    };
+    let status = if code == "QUERY_EXECUTION_FAILED" {
+        StatusCode::INTERNAL_SERVER_ERROR
+    } else {
+        StatusCode::BAD_REQUEST
+    };
+    (
+        status,
+        Json(serde_json::json!({
+            "code": code,
+            "message": message
+        })),
+    )
+        .into_response()
+}
+
+async fn execute_query_ir_handler(
+    State(state): State<AppState>,
+    Json(request): Json<serde_json::Value>,
+) -> impl IntoResponse {
+    let storage = state.storage.read();
+    if storage.is_rebuilding.load(Ordering::SeqCst) {
+        return (
+            StatusCode::SERVICE_UNAVAILABLE,
+            Json(serde_json::json!({
+                "code": "QUERY_EXECUTION_FAILED",
+                "message": "Engine is rebuilding index..."
+            })),
+        )
+            .into_response();
+    }
+    match storage.execute_query_ir_json(request) {
+        Ok(response) => (StatusCode::OK, Json(response)).into_response(),
+        Err(error) => query_ir_error_response(error),
+    }
+}
+
+async fn query_ir_capabilities_handler(State(state): State<AppState>) -> impl IntoResponse {
+    Json(state.storage.read().query_ir_capabilities())
+}
+
 /// `POST /v1/query` — filter edges by `from`/`to`, bitemporal **current-view
 /// by default**: retracted edges (`/v1/edge/retract`) and edges whose
 /// endpoint node has been superseded (`/v1/node/supersede`) out of view are
@@ -835,6 +883,14 @@ pub fn build_router(state: AppState) -> Router {
         .route(
             "/v1/query/hql",
             post(execute_hql_handler).layer(DefaultBodyLimit::max(256 * 1024)),
+        )
+        .route(
+            "/v1/query/ir",
+            post(execute_query_ir_handler).layer(DefaultBodyLimit::max(256 * 1024)),
+        )
+        .route(
+            "/v1/query/ir/capabilities",
+            get(query_ir_capabilities_handler),
         )
         .route("/v1/node/add", post(add_node_handler))
         .route("/v1/node/supersede", post(supersede_node_handler))

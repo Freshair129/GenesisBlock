@@ -1,8 +1,13 @@
 ---
-status: current
+status: superseded
+superseded_by: MASTER_PLAN.md
+updated: 2026-08-14
 ---
 
 # Phase 6 Review — Handoff & Task Decomposition
+
+> **Superseded 2026-08-14:** this review covers the historical HQL-first queue. A new Phase 6 review
+> is required after W1 Typed Query IR tasks are decomposed from `MASTER_PLAN.md` v0.2.0.
 
 **Status:** awaiting_approval (2026-07-07)
 

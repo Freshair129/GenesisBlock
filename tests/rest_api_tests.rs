@@ -1086,6 +1086,125 @@ async fn test_hql_traverse_finds_neighbor() {
 }
 
 // ---------------------------------------------------------------------------
+// Typed Query IR V1 — primary machine contract
+// ---------------------------------------------------------------------------
+
+#[tokio::test]
+async fn test_query_ir_search_and_traverse() {
+    let (app, _dir) = make_app();
+
+    post_json(
+        &app,
+        "/v1/collection/create",
+        json!({ "name": "query-ir", "model": "test", "dim": 2, "metric": "cosine" }),
+    )
+    .await;
+    post_json(
+        &app,
+        "/v1/node/add",
+        json!({
+            "id": "query-ir-rest-src",
+            "labels": [],
+            "embedding": [1.0, 0.0],
+            "collection": "query-ir"
+        }),
+    )
+    .await;
+    post_json(
+        &app,
+        "/v1/node/add",
+        json!({ "id": "query-ir-rest-dst", "labels": [] }),
+    )
+    .await;
+    post_json(
+        &app,
+        "/v1/edge/add",
+        json!({
+            "id": "query-ir-rest-edge",
+            "from": "query-ir-rest-src",
+            "to": "query-ir-rest-dst",
+            "rel": "KNOWS"
+        }),
+    )
+    .await;
+    post_json(&app, "/v1/bulk/rebuild", json!({})).await;
+
+    let (search_status, search) = post_json(
+        &app,
+        "/v1/query/ir",
+        json!({
+            "contract_version": "query-ir.v1",
+            "request_id": "rest-search",
+            "operation": {
+                "kind": "search",
+                "mode": "vector",
+                "query_vector": [1.0, 0.0],
+                "collection": "query-ir",
+                "k": 1
+            }
+        }),
+    )
+    .await;
+    assert_eq!(search_status, StatusCode::OK);
+    assert_eq!(search["data"][0]["node"]["id"], "query-ir-rest-src");
+
+    let (traverse_status, traverse) = post_json(
+        &app,
+        "/v1/query/ir",
+        json!({
+            "contract_version": "query-ir.v1",
+            "request_id": "rest-traverse",
+            "operation": {
+                "kind": "traverse",
+                "seed_id": "query-ir-rest-src",
+                "depth": 1,
+                "relations": ["KNOWS"],
+                "direction": "out"
+            }
+        }),
+    )
+    .await;
+    assert_eq!(traverse_status, StatusCode::OK);
+    assert_eq!(traverse["data"][0]["node"]["id"], "query-ir-rest-dst");
+}
+
+#[tokio::test]
+async fn test_query_ir_validation_error_is_structured() {
+    let (app, _dir) = make_app();
+    let (status, body) = post_json(
+        &app,
+        "/v1/query/ir",
+        json!({
+            "contract_version": "query-ir.v1",
+            "request_id": "rest-invalid",
+            "unknown": true,
+            "operation": {
+                "kind": "traverse",
+                "seed_id": "missing",
+                "depth": 1,
+                "relations": ["KNOWS"],
+                "direction": "out"
+            }
+        }),
+    )
+    .await;
+    assert_eq!(status, StatusCode::BAD_REQUEST);
+    assert_eq!(body["code"], "QUERY_IR_VALIDATION_FAILED");
+}
+
+#[tokio::test]
+async fn test_query_ir_capabilities_report_partial_v1_support() {
+    let (app, _dir) = make_app();
+    let (status, body) = get_json(&app, "/v1/query/ir/capabilities").await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(body["contract_version"], "query-ir.v1");
+    assert_eq!(body["implementation_status"], "partial");
+    assert_eq!(body["operations"]["search"], "implemented");
+    assert_eq!(body["operations"]["traverse"], "implemented");
+    assert_eq!(body["operations"]["context"], "planned");
+}
+
+// ---------------------------------------------------------------------------
 // Insight surface
 // ---------------------------------------------------------------------------
 

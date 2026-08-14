@@ -1,12 +1,18 @@
 ---
-status: current
+status: superseded
+superseded_by: adr/ADR--GENESISDB-TYPED-QUERY-IR-AGENT-BOUNDARY.md
+updated: 2026-08-14
 ---
 
 # ARCHITECTURE_CHANGE_REQUEST — Fold HQL P0 bugfixes into Wave 0 (pre-publish)
 
-**Status:** proposed · **Requested:** 2026-07-07 · **Requester:** Boss (CEO)
+**Status:** implemented historical amendment; superseded for future query planning · **Requested:** 2026-07-07 · **Requester:** Boss (CEO)
 **Amends:** [MASTER_PLAN.md](MASTER_PLAN.md) §0 (frozen constraints), §1 (roadmap), §2 (dependency graph); [PHASE_6_REVIEW.md](PHASE_6_REVIEW.md); [queue/IMPLEMENTATION_QUEUE.json](../queue/IMPLEMENTATION_QUEUE.json).
 **Preserves:** [ADR--ENGINE-WEDGE-FIRST](adr/ADR--ENGINE-WEDGE-FIRST.md) — the wedge-first discipline is not reversed; only its pre-publish scope is widened by ≤3 tasks to avoid shipping known defects.
+
+> **Truth sync (2026-08-14):** HQL P0 landed on `main` and is now the compatibility baseline.
+> The pre-merge baseline window described below is historical and cannot be scheduled again. Future
+> primary-query work is governed by the Typed Query IR ADR/spec; HQL P1/P2/P3 remain deferred.
 
 ---
 
@@ -115,6 +121,6 @@ same user intent) are not measured as regressions.
 
 ## 7. Approval
 
-Owner: pending. On approval, MASTER_PLAN.md §1 gets a W0 row; queue/IMPLEMENTATION_QUEUE.json
-adds TASK-0000a/b/c; docs/33_TASK_BREAKDOWN.md and docs/36_TASK_EXECUTION_ORDER.md are updated
-in the same PR; state/events.jsonl records the approval.
+Implemented and merged before this truth-sync. The old W0 queue artifacts are retained as historical
+planning evidence but are superseded by `MASTER_PLAN.md` v0.2.0. This status does not claim that the
+original pre-P0 benchmark baseline was captured unless a committed artifact independently proves it.

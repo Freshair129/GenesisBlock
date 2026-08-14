@@ -7,7 +7,7 @@ owner: GenesisBlockDB Engineering
 
 # GenesisBlockDB REST API Reference
 
-**Generated from `src/router.rs` (Axum server) — 2026-07-22.** This replaces the
+**Generated from `src/router.rs` (Axum server) — 2026-08-14.** This replaces the
 prior corrupted file. The server is the SSOT; update this when routes change.
 
 - **Base URL:** `http://localhost:3000` (port via `GENESIS_PORT`, bind `0.0.0.0`)
@@ -52,6 +52,8 @@ prior corrupted file. The server is the SSOT; update this when routes change.
 | POST | `/v1/studio/query/read` | raw JSON string or `{ query }` | read-only HQL result; 256 KiB body ceiling |
 | GET | `/v1/studio/relational/schemas` | _none_ | logical `RelationalSchemaPackage[]` |
 | POST | `/v1/query/hql` | raw JSON string or `{ query }` | `JSON` (shape depends on command) |
+| POST | `/v1/query/ir` | `QueryIrRequestV1` | versioned Query IR response envelope |
+| GET | `/v1/query/ir/capabilities` | _none_ | operation-specific Query IR capability manifest |
 | POST | `/v1/query` | `QueryInput` | `EdgeOutput[]` |
 | POST | `/v1/search/hybrid` | `HybridSearchInput` | `NeighborOutput[]` |
 | POST | `/v1/reason/context` | `HybridSearchInput` | `NeighborOutput[]` (alpha forced 0.4) |
@@ -111,7 +113,34 @@ change existing tables, columns, or primary keys.
 > `flushIndex()` (drain the queue — read-your-write) and `indexLag()` (staged but
 > not-yet-indexed count). See `ADR--GENESISDB-ASYNC-INDEXING`.
 
+## Typed Query IR V1
+
+`POST /v1/query/ir` accepts a closed versioned envelope. The current partial implementation supports
+`operation.kind = "search"` and `operation.kind = "traverse"`. Unknown fields and unsupported
+versions return HTTP `400` with `{ "code", "message" }`; execution failures return HTTP `500`.
+
+```json
+{
+  "contract_version": "query-ir.v1",
+  "request_id": "client-correlation-id",
+  "operation": {
+    "kind": "traverse",
+    "seed_id": "entity:42",
+    "depth": 2,
+    "relations": ["depends_on"],
+    "direction": "out"
+  }
+}
+```
+
+`search` requires exactly one of `target_id` or `query_vector`, plus `mode` and `k`. Supported modes
+are `vector` and `hybrid`; lexical mode remains planned. `GET /v1/query/ir/capabilities` is the
+runtime authority for implemented operation kinds and current bounds.
+
 ## HQL (`/v1/query/hql`, raw string body)
+
+HQL remains a compatibility frontend. New machine integrations should prefer Typed Query IR for
+implemented operations.
 ```
 SEARCH <target> SIMILAR TO [v1, v2, …] K <k> [IN <collection>] [LANGUAGE "th"] [AS OF "<rfc3339>"]
 TRAVERSE FROM <seed> DEPTH <n> REL <rel|INFER(rel)|ANY> [AS OF "…"]

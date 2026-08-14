@@ -313,6 +313,89 @@ pub struct HybridSearchInput {
     pub oversample: Option<u32>,
 }
 
+pub const QUERY_IR_V1: &str = "query-ir.v1";
+const QUERY_IR_MAX_K: u32 = 1_000;
+const QUERY_IR_MAX_DEPTH: u32 = 32;
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+#[serde(deny_unknown_fields)]
+pub struct QueryIrRequest {
+    pub contract_version: String,
+    pub request_id: String,
+    pub namespace: Option<String>,
+    pub temporal: Option<QueryIrTemporal>,
+    pub consistency: Option<QueryIrConsistency>,
+    pub operation: QueryIrOperation,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+#[serde(deny_unknown_fields)]
+pub struct QueryIrTemporal {
+    pub valid_at: Option<String>,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+#[serde(deny_unknown_fields)]
+pub struct QueryIrConsistency {
+    pub index: QueryIrIndexConsistency,
+}
+
+#[derive(Serialize, Deserialize, Clone, Copy, Debug)]
+#[serde(rename_all = "snake_case")]
+pub enum QueryIrIndexConsistency {
+    Eventual,
+    ReadYourWrite,
+}
+
+#[derive(Serialize, Deserialize, Clone, Copy, Debug)]
+#[serde(rename_all = "snake_case")]
+pub enum QueryIrSearchMode {
+    Vector,
+    Hybrid,
+    Lexical,
+}
+
+#[derive(Serialize, Deserialize, Clone, Copy, Debug)]
+#[serde(rename_all = "snake_case")]
+pub enum QueryIrDirection {
+    Out,
+    In,
+    Both,
+}
+
+impl QueryIrDirection {
+    fn as_str(self) -> &'static str {
+        match self {
+            Self::Out => "out",
+            Self::In => "in",
+            Self::Both => "both",
+        }
+    }
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+#[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
+pub enum QueryIrOperation {
+    Search {
+        mode: QueryIrSearchMode,
+        target_id: Option<String>,
+        query_vector: Option<Vec<f64>>,
+        collection: Option<String>,
+        k: u32,
+        alpha: Option<f64>,
+        language: Option<String>,
+        ef_search: Option<u32>,
+        oversample: Option<u32>,
+    },
+    Traverse {
+        seed_id: String,
+        depth: u32,
+        relations: Vec<String>,
+        direction: QueryIrDirection,
+        limit: Option<u32>,
+    },
+}
+
 #[cfg_attr(feature = "napi-bindings", napi(object))]
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct DatabaseStatus {
@@ -6040,6 +6123,233 @@ impl Storage {
         }
     }
 
+    pub fn query_ir_capabilities(&self) -> serde_json::Value {
+        serde_json::json!({
+            "contract_version": QUERY_IR_V1,
+            "implementation_status": "partial",
+            "operations": {
+                "search": "implemented",
+                "traverse": "implemented",
+                "match_path": "planned",
+                "context": "planned",
+                "relational_named_query": "planned"
+            },
+            "limits": {
+                "max_k": QUERY_IR_MAX_K,
+                "max_depth": QUERY_IR_MAX_DEPTH
+            }
+        })
+    }
+
+    pub fn execute_query_ir_json(
+        &self,
+        request_json: serde_json::Value,
+    ) -> Result<serde_json::Value> {
+        let request = serde_json::from_value::<QueryIrRequest>(request_json)
+            .map_err(|error| Error::from_reason(format!("QUERY_IR_VALIDATION_FAILED: {error}")))?;
+        self.execute_query_ir(request)
+    }
+
+    pub fn execute_query_ir(&self, request: QueryIrRequest) -> Result<serde_json::Value> {
+        if request.contract_version != QUERY_IR_V1 {
+            return Err(Error::from_reason(format!(
+                "QUERY_IR_VERSION_UNSUPPORTED: expected '{QUERY_IR_V1}', got '{}'",
+                request.contract_version
+            )));
+        }
+        if request.request_id.trim().is_empty() {
+            return Err(Error::from_reason(
+                "QUERY_IR_VALIDATION_FAILED: request_id must not be empty",
+            ));
+        }
+        if request.namespace.is_some() {
+            return Err(Error::from_reason(
+                "QUERY_CAPABILITY_UNSUPPORTED: namespace-scoped Query IR is not implemented",
+            ));
+        }
+        if matches!(
+            request.consistency.as_ref().map(|value| value.index),
+            Some(QueryIrIndexConsistency::ReadYourWrite)
+        ) {
+            self.flush_index();
+        }
+
+        let as_of = request
+            .temporal
+            .as_ref()
+            .and_then(|temporal| temporal.valid_at.clone());
+        let (operation_kind, data) = match request.operation {
+            QueryIrOperation::Search {
+                mode,
+                target_id,
+                query_vector,
+                collection,
+                k,
+                alpha,
+                language,
+                ef_search,
+                oversample,
+            } => {
+                if k == 0 || k > QUERY_IR_MAX_K {
+                    return Err(Error::from_reason(format!(
+                        "QUERY_RESOURCE_LIMIT_EXCEEDED: search.k must be between 1 and {QUERY_IR_MAX_K}"
+                    )));
+                }
+                if matches!(mode, QueryIrSearchMode::Lexical) {
+                    return Err(Error::from_reason(
+                        "QUERY_CAPABILITY_UNSUPPORTED: lexical Query IR search is planned",
+                    ));
+                }
+                if let Some(value) = alpha {
+                    if !value.is_finite() || !(0.0..=1.0).contains(&value) {
+                        return Err(Error::from_reason(
+                            "QUERY_IR_VALIDATION_FAILED: search.alpha must be between 0 and 1",
+                        ));
+                    }
+                }
+                if ef_search == Some(0) || oversample == Some(0) {
+                    return Err(Error::from_reason(
+                        "QUERY_IR_VALIDATION_FAILED: ef_search and oversample must be positive",
+                    ));
+                }
+
+                let (query_vector, resolved_collection) =
+                    self.query_ir_search_vector(target_id, query_vector, collection)?;
+                let results = self
+                    .hybrid_search(HybridSearchInput {
+                        query_vector,
+                        k,
+                        alpha: Some(match mode {
+                            QueryIrSearchMode::Vector => 0.0,
+                            QueryIrSearchMode::Hybrid => alpha.unwrap_or(0.5),
+                            QueryIrSearchMode::Lexical => unreachable!(),
+                        }),
+                        lang: language,
+                        as_of,
+                        collection: resolved_collection,
+                        ef_search,
+                        oversample,
+                    })
+                    .map_err(|error| {
+                        Error::from_reason(format!("QUERY_EXECUTION_FAILED: {error}"))
+                    })?;
+                let data = serde_json::to_value(results).map_err(|error| {
+                    Error::from_reason(format!("QUERY_EXECUTION_FAILED: {error}"))
+                })?;
+                ("search", data)
+            }
+            QueryIrOperation::Traverse {
+                seed_id,
+                depth,
+                relations,
+                direction,
+                limit,
+            } => {
+                if seed_id.trim().is_empty() {
+                    return Err(Error::from_reason(
+                        "QUERY_IR_VALIDATION_FAILED: traverse.seed_id must not be empty",
+                    ));
+                }
+                if depth == 0 || depth > QUERY_IR_MAX_DEPTH {
+                    return Err(Error::from_reason(format!(
+                        "QUERY_RESOURCE_LIMIT_EXCEEDED: traverse.depth must be between 1 and {QUERY_IR_MAX_DEPTH}"
+                    )));
+                }
+                if relations.is_empty() || relations.iter().any(|rel| rel.trim().is_empty()) {
+                    return Err(Error::from_reason(
+                        "QUERY_IR_VALIDATION_FAILED: traverse.relations must contain non-empty relation names",
+                    ));
+                }
+                let results = self
+                    .neighbors(
+                        seed_id,
+                        NeighborInput {
+                            depth: Some(depth),
+                            rel: None,
+                            rels: Some(relations),
+                            direction: Some(direction.as_str().to_string()),
+                            as_of,
+                            include_invalid: Some(false),
+                            limit,
+                        },
+                        false,
+                    )
+                    .map_err(|error| {
+                        Error::from_reason(format!("QUERY_EXECUTION_FAILED: {error}"))
+                    })?;
+                let data = serde_json::to_value(results).map_err(|error| {
+                    Error::from_reason(format!("QUERY_EXECUTION_FAILED: {error}"))
+                })?;
+                ("traverse", data)
+            }
+        };
+
+        Ok(serde_json::json!({
+            "contract_version": QUERY_IR_V1,
+            "request_id": request.request_id,
+            "status": "ok",
+            "operation_kind": operation_kind,
+            "data": data,
+            "meta": {
+                "capability_version": ENGINE_VERSION,
+                "index_lag": self.index_lag(),
+                "warnings": []
+            }
+        }))
+    }
+
+    fn query_ir_search_vector(
+        &self,
+        target_id: Option<String>,
+        query_vector: Option<Vec<f64>>,
+        collection: Option<String>,
+    ) -> Result<(Vec<f64>, Option<String>)> {
+        match (target_id, query_vector) {
+            (Some(_), Some(_)) | (None, None) => Err(Error::from_reason(
+                "QUERY_IR_VALIDATION_FAILED: search requires exactly one of target_id or query_vector",
+            )),
+            (None, Some(vector)) => {
+                if vector.is_empty() || vector.iter().any(|value| !value.is_finite()) {
+                    return Err(Error::from_reason(
+                        "QUERY_IR_VALIDATION_FAILED: query_vector must contain finite values",
+                    ));
+                }
+                Ok((vector, collection))
+            }
+            (Some(target_id), None) => {
+                let node_u32 = self.get_u32(&target_id).ok_or_else(|| {
+                    Error::from_reason(format!(
+                        "QUERY_TARGET_NOT_FOUND: node '{target_id}' does not exist"
+                    ))
+                })?;
+                let node = self.nodes.get(&node_u32).ok_or_else(|| {
+                    Error::from_reason(format!(
+                        "QUERY_TARGET_NOT_FOUND: node '{target_id}' is not live"
+                    ))
+                })?;
+                let node_collection = node
+                    .collection
+                    .clone()
+                    .unwrap_or_else(|| self.default_collection.clone());
+                if let Some(requested) = collection.as_ref() {
+                    if requested != &node_collection {
+                        return Err(Error::from_reason(format!(
+                            "QUERY_COLLECTION_MISMATCH: node '{target_id}' belongs to '{node_collection}', requested '{requested}'"
+                        )));
+                    }
+                }
+                let vector = self
+                    .reconstruct_embedding(node.value(), node_u32)
+                    .ok_or_else(|| {
+                        Error::from_reason(format!(
+                            "QUERY_TARGET_NOT_FOUND: node '{target_id}' has no stored embedding"
+                        ))
+                    })?;
+                Ok((vector, node.collection.clone()))
+            }
+        }
+    }
+
     pub fn execute_hql(&self, query: &str) -> Result<serde_json::Value> {
         fn to_value<T: serde::Serialize>(res: T) -> Result<serde_json::Value> {
             serde_json::to_value(res)
@@ -6097,6 +6407,15 @@ impl Storage {
                 })?;
             Ok((query_vector, node.collection.clone()))
         }
+        fn query_ir_neighbors(
+            storage: &Storage,
+            request: QueryIrRequest,
+        ) -> Result<Vec<NeighborOutput>> {
+            let response = storage.execute_query_ir(request)?;
+            serde_json::from_value(response["data"].clone()).map_err(|error| {
+                Error::from_reason(format!("HQL compatibility decode failed: {error}"))
+            })
+        }
         let command = HqlCommand::try_from(query).map_err(Error::from_reason)?;
         match command {
             HqlCommand::Search {
@@ -6113,16 +6432,40 @@ impl Storage {
             } => {
                 let (query_vector, resolved_collection) =
                     hql_query_vector(self, &target, fuzzy, vector, &collection)?;
-                let res = self.hybrid_search(HybridSearchInput {
-                    query_vector,
-                    k,
-                    alpha: Some(0.0),
-                    lang,
-                    as_of,
-                    collection: resolved_collection,
-                    ef_search,
-                    oversample,
-                })?;
+                let res = if (1..=QUERY_IR_MAX_K).contains(&k) {
+                    query_ir_neighbors(
+                        self,
+                        QueryIrRequest {
+                            contract_version: QUERY_IR_V1.to_string(),
+                            request_id: "hql-compat".to_string(),
+                            namespace: None,
+                            temporal: Some(QueryIrTemporal { valid_at: as_of }),
+                            consistency: None,
+                            operation: QueryIrOperation::Search {
+                                mode: QueryIrSearchMode::Vector,
+                                target_id: None,
+                                query_vector: Some(query_vector),
+                                collection: resolved_collection,
+                                k,
+                                alpha: Some(0.0),
+                                language: lang,
+                                ef_search,
+                                oversample,
+                            },
+                        },
+                    )?
+                } else {
+                    self.hybrid_search(HybridSearchInput {
+                        query_vector,
+                        k,
+                        alpha: Some(0.0),
+                        lang,
+                        as_of,
+                        collection: resolved_collection,
+                        ef_search,
+                        oversample,
+                    })?
+                };
                 Self::apply_hql_clauses(res, &clauses)
             }
             HqlCommand::Traverse {
@@ -6144,19 +6487,50 @@ impl Storage {
                     query::ast::HqlRel::Physical(r) => (r, false),
                     query::ast::HqlRel::Inferred(r) => (r, true),
                 };
-                let res = self.neighbors(
-                    resolved_seed,
-                    NeighborInput {
-                        depth: Some(depth),
-                        rel: Some(target_rel),
-                        rels,
-                        direction: direction.or_else(|| Some("out".to_string())),
-                        as_of,
-                        include_invalid: Some(false),
-                        limit: None,
-                    },
-                    is_inferred,
-                )?;
+                let direction = direction.unwrap_or_else(|| "out".to_string());
+                let res = if is_inferred
+                    || target_rel == "ANY"
+                    || depth == 0
+                    || depth > QUERY_IR_MAX_DEPTH
+                {
+                    self.neighbors(
+                        resolved_seed,
+                        NeighborInput {
+                            depth: Some(depth),
+                            rel: Some(target_rel),
+                            rels,
+                            direction: Some(direction),
+                            as_of,
+                            include_invalid: Some(false),
+                            limit: None,
+                        },
+                        is_inferred,
+                    )?
+                } else {
+                    let relations = rels.unwrap_or_else(|| vec![target_rel]);
+                    let direction = match direction.as_str() {
+                        "in" => QueryIrDirection::In,
+                        "both" => QueryIrDirection::Both,
+                        _ => QueryIrDirection::Out,
+                    };
+                    query_ir_neighbors(
+                        self,
+                        QueryIrRequest {
+                            contract_version: QUERY_IR_V1.to_string(),
+                            request_id: "hql-compat".to_string(),
+                            namespace: None,
+                            temporal: Some(QueryIrTemporal { valid_at: as_of }),
+                            consistency: None,
+                            operation: QueryIrOperation::Traverse {
+                                seed_id: resolved_seed,
+                                depth,
+                                relations,
+                                direction,
+                                limit: None,
+                            },
+                        },
+                    )?
+                };
                 Self::apply_hql_clauses(res, &clauses)
             }
             HqlCommand::Hybrid {
@@ -6174,16 +6548,40 @@ impl Storage {
             } => {
                 let (query_vector, resolved_collection) =
                     hql_query_vector(self, &target, fuzzy, vector, &collection)?;
-                let res = self.hybrid_search(HybridSearchInput {
-                    query_vector,
-                    k,
-                    alpha: Some(alpha),
-                    lang,
-                    as_of,
-                    collection: resolved_collection,
-                    ef_search,
-                    oversample,
-                })?;
+                let res = if (1..=QUERY_IR_MAX_K).contains(&k) {
+                    query_ir_neighbors(
+                        self,
+                        QueryIrRequest {
+                            contract_version: QUERY_IR_V1.to_string(),
+                            request_id: "hql-compat".to_string(),
+                            namespace: None,
+                            temporal: Some(QueryIrTemporal { valid_at: as_of }),
+                            consistency: None,
+                            operation: QueryIrOperation::Search {
+                                mode: QueryIrSearchMode::Hybrid,
+                                target_id: None,
+                                query_vector: Some(query_vector),
+                                collection: resolved_collection,
+                                k,
+                                alpha: Some(alpha),
+                                language: lang,
+                                ef_search,
+                                oversample,
+                            },
+                        },
+                    )?
+                } else {
+                    self.hybrid_search(HybridSearchInput {
+                        query_vector,
+                        k,
+                        alpha: Some(alpha),
+                        lang,
+                        as_of,
+                        collection: resolved_collection,
+                        ef_search,
+                        oversample,
+                    })?
+                };
                 Self::apply_hql_clauses(res, &clauses)
             }
             HqlCommand::Context {
@@ -9549,6 +9947,19 @@ impl GenesisDatabase {
         tokio::task::spawn_blocking(move || i.retrieve_context(&target_id, &tier, budget, fuzzy))
             .await
             .map_err(|e| Error::from_reason(e.to_string()))?
+    }
+    /// Executes a versioned Typed Query IR request. Query IR is the primary
+    /// machine contract; HQL remains available as a compatibility frontend.
+    #[napi]
+    pub async fn execute_query_ir(&self, request: Value) -> Result<Value> {
+        let i = Arc::clone(&self.inner);
+        tokio::task::spawn_blocking(move || i.execute_query_ir_json(request))
+            .await
+            .map_err(|e| Error::from_reason(e.to_string()))?
+    }
+    #[napi]
+    pub fn query_ir_capabilities(&self) -> Value {
+        self.inner.query_ir_capabilities()
     }
     /// Executes an HQL query and returns the command result as JSON.
     /// Supports SEARCH, TRAVERSE, MATCH graph patterns, MATCH ... SIMILAR

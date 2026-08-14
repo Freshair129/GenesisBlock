@@ -2,8 +2,8 @@
 title: "GenesisBlockDB Technical Architecture and Capability Composition"
 doc_id: "MASTER-SPEC-GENESISBLOCKDB"
 status: current
-version: "2.1.0"
-updated: "2026-08-03"
+version: "2.2.0"
+updated: "2026-08-14"
 owner: "GenesisBlockDB Architecture"
 source_of_truth: true
 related_issue: 84
@@ -13,6 +13,8 @@ related_docs:
   - "docs/SRS--GENESISBLOCKDB.md"
   - "docs/contracts/CONTRACT--CLIENT-NAMESPACE-AND-SCHEMA.md"
   - "docs/adr/ADR--GENESISBLOCKDB-DOMAIN-NEUTRAL-CORE.md"
+  - "docs/adr/ADR--GENESISDB-TYPED-QUERY-IR-AGENT-BOUNDARY.md"
+  - "docs/SPEC--GENESISDB-TYPED-QUERY-IR-V1.md"
 ---
 
 # GenesisBlockDB Technical Architecture and Capability Composition
@@ -210,7 +212,19 @@ Client-level semantic conflicts may require review even when storage-level recon
 
 ## 9. HQL and Typed Query IR
 
-GenesisBlockDB exposes HQL as a compatibility/query frontend for graph, vector and context operations. The canonical future public contract is typed Query IR. HQL is not storage authority and is not required to grow into general-purpose SQL or Cypher.
+The accepted public-query architecture is a versioned typed Query IR. Its first executor/API slice is
+planned and must pass the conformance gates in `SPEC--GENESISDB-TYPED-QUERY-IR-V1` before it is
+reported as shipped.
+
+GenesisBlockDB currently exposes HQL as a compatibility frontend for graph, vector and context
+operations. HQL is not storage authority and is not required to grow into general-purpose SQL or
+Cypher. Free-form NL interpretation belongs in a separate client-owned Agent Query Adapter, which
+must produce validated Query IR before invoking the engine.
+
+```text
+NL intent -> external agent adapter -> typed Query IR -> GenesisBlockDB typed executor
+HQL text -> compatibility parser --------------------^
+```
 
 ### 9.1 Search
 
@@ -287,5 +301,6 @@ The architecture is conformant when:
 
 | Version | Date | Owner | Summary |
 |---|---|---|---|
+| 2.2.0 | 2026-08-14 | GenesisBlockDB Architecture | Approved typed Query IR as the primary query boundary, retained HQL compatibility, and placed NL conversion outside the engine. |
 | 2.1.0 | 2026-08-03 | GenesisBlockDB Architecture | Separated BRD/PRD/SRS roles, established standalone client-neutral boundary, added client namespace/schema metadata, and removed GoVibe-specific authority from the core definition. |
 | 2.0.0 | previous | GenesisBlockDB Architecture | Previous master specification. |

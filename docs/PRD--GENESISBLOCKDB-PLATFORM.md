@@ -2,8 +2,8 @@
 title: "GenesisBlockDB Product Requirements Document"
 doc_id: "PRD-GENESISBLOCKDB-PLATFORM"
 status: draft
-version: "0.1.0+draft"
-updated: "2026-08-03"
+version: "0.1.1+draft"
+updated: "2026-08-14"
 owner: "Freshair129 / Product Authority"
 source_of_truth: true
 related_issue: 84
@@ -75,6 +75,7 @@ These examples are integrations, not mandatory product modules.
 - replacing every relational, distributed, or cloud database category;
 - claiming multi-node HA or distributed SQL unless implemented and evidenced;
 - turning HQL into a mandatory general-purpose language when typed Query IR is sufficient.
+- interpreting free-form Natural Language or owning LLM/provider configuration inside the database core.
 
 ## 7. Core capabilities
 
@@ -118,8 +119,9 @@ These examples are integrations, not mandatory product modules.
 
 ### 7.6 Query and integration surfaces
 
-- typed Query IR as the long-term public contract;
-- HQL as a compatibility/query frontend;
+- typed Query IR as the approved primary public query contract, with implementation status reported separately;
+- HQL as a maintained compatibility/query frontend;
+- NL-to-Query-IR conversion through a separate client adapter rather than the database core;
 - embedded Rust and Node bindings;
 - REST server mode;
 - optional MCP tools;
@@ -188,3 +190,4 @@ Each release SHALL publish or link:
 | Version | Date | Owner | Summary |
 |---|---|---|---|
 | 0.1.0+draft | 2026-08-03 | Product Authority | Initial standalone, client-neutral GenesisBlockDB PRD. |
+| 0.1.1+draft | 2026-08-14 | Product Authority | Established typed Query IR as the primary query contract, HQL compatibility, and the external NL adapter boundary. |

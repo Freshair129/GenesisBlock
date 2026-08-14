@@ -2,6 +2,9 @@
   "id": "GRAPH-ENGINE-WEDGE",
   "type": "project_graph",
   "version": "1.0.0",
+  "status": "superseded",
+  "source_of_truth": false,
+  "superseded_by": "docs/MASTER_PLAN.md#2-dependency-and-critical-path",
   "modules": [
     {"id":"MOD-ENGINE","name":"genesis-block-native (Rust core + NAPI)","status":"frozen","cite":"CLAUDE.md, src/lib.rs"},
     {"id":"MOD-REST","name":"genesis-db-server (Axum)","status":"frozen","cite":"src/main.rs, src/router.rs"},
