@@ -333,7 +333,19 @@ export declare class GenesisDatabase {
   supersedeNode(id: string, newProps?: any | undefined | null, causedBy?: string | undefined | null): Promise<NodeOutput>
   executeNamedQuery(requestJson: string): Promise<string>
   commitTransaction(transactionJson: string): Promise<string>
+  /**
+   * WP-1.2 REDEFINITION (ADR D2.3, GBP1-noted): the FRAME frontier — the
+   * commit_seq of the last durable journal frame, advancing on EVERY
+   * mutation (previously: last transaction commit_sequence, which is now
+   * `txn_frontier`). SDKs that fed this into `expected_frontier` must switch
+   * to `txn_frontier`.
+   */
   stableFrontier(): number
+  /**
+   * Frame seq of the last transaction frame — the value
+   * `GenesisTransaction.expected_frontier` CASes against (WP-1.2).
+   */
+  txnFrontier(): number
   retractEdge(id: string, at?: string | undefined | null): Promise<EdgeOutput | null>
   retrieveContext(targetId: string, tier: string, budget: number | undefined | null, fuzzy: boolean): Promise<ContextPackage>
   /**
