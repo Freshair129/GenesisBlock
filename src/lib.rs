@@ -2074,6 +2074,23 @@ pub enum WalMsg {
     Checkpoint { data: Vec<u8>, ack: Sender<bool> },
 }
 
+/// How open() must consult the WAL relative to the snapshot, decided by
+/// `wal_tail_plan` from the snapshot's recorded `wal_frontier`
+/// (RCA--WAL-TAIL-REPLAY).
+enum WalTailPlan {
+    /// No snapshot, or a pre-frontier (legacy) snapshot, or no WAL: nothing
+    /// positional to replay — try_load_state alone decides the load path.
+    None,
+    /// Frontier validated against the on-disk WAL prefix: after the snapshot
+    /// instant-load, replay events from this byte offset (the acked writes
+    /// newer than the snapshot).
+    Tail(u64),
+    /// Frontier recorded but the WAL prefix does not match it (e.g. crash
+    /// between the state.json rename and the WAL checkpoint): the snapshot is
+    /// stale relative to the WAL — skip it and fully replay the WAL.
+    SnapshotStale,
+}
+
 pub struct Storage {
     pub path: PathBuf,
     pub read_only: bool,
@@ -4748,77 +4765,24 @@ impl Storage {
             verifying_key,
         };
 
-        if !storage.try_load_state() && storage.log_path.exists() {
-            if let Ok(file) = File::open(&storage.log_path) {
-                let reader = std::io::BufReader::new(file);
-                use std::io::BufRead;
-                for line in reader.lines().map_while(|r| r.ok()) {
-                    if let Ok(signed_event) = serde_json::from_str::<SignedEvent>(&line) {
-                        let event = signed_event.event;
-                        match event {
-                            Event::Node(n) => {
-                                let u32_id = storage.get_or_intern_id(&n.id);
-                                if let Some(emb) = n.embedding.clone() {
-                                    storage.replay_vector(
-                                        &n.collection,
-                                        &n.id,
-                                        emb,
-                                        n.lang.clone().unwrap_or("en".to_string()),
-                                        false,
-                                    );
-                                }
-                                storage.insert_node_lean(u32_id, n);
-                            }
-                            Event::Edge(e) => {
-                                let u32_id = storage.index_edge_internal(&e.id, &e.from, &e.to);
-                                storage.edges.insert(u32_id, e);
-                            }
-                            Event::Vector(v) => {
-                                // Stage only (index=false): rehydrate_hnsw_index
-                                // after load builds every index once.
-                                storage.replay_vector(
-                                    &v.collection,
-                                    &v.node_id,
-                                    v.embedding,
-                                    v.lang.clone().unwrap_or_else(|| "en".to_string()),
-                                    false,
-                                );
-                            }
-                            Event::Batch(events) => {
-                                for batch_event in events {
-                                    match batch_event {
-                                        Event::Node(n) => {
-                                            let u32_id = storage.get_or_intern_id(&n.id);
-                                            if let Some(emb) = n.embedding.clone() {
-                                                storage.replay_vector(
-                                                    &n.collection,
-                                                    &n.id,
-                                                    emb,
-                                                    n.lang.clone().unwrap_or("en".to_string()),
-                                                    false,
-                                                );
-                                            }
-                                            storage.insert_node_lean(u32_id, n);
-                                        }
-                                        Event::Edge(e) => {
-                                            let u32_id =
-                                                storage.index_edge_internal(&e.id, &e.from, &e.to);
-                                            storage.edges.insert(u32_id, e);
-                                        }
-                                        _ => {}
-                                    }
-                                }
-                            }
-                            Event::RelationalSchema(_) | Event::RelationalRows { .. } => {
-                                // Relational state is rebuilt by projection_sync_on_open.
-                            }
-                            Event::Transaction(transaction) => {
-                                storage.apply_transaction_memory(&transaction, false);
-                            }
-                        }
-                    }
-                }
-            }
+        // --- Recovery (RCA--WAL-TAIL-REPLAY): the WAL is the durability
+        // authority. Loading used to be either/or — a parseable snapshot
+        // meant the WAL was never read, silently dropping every write acked
+        // after the last save_state. The snapshot now records the exact
+        // compacted-WAL payload it was saved with (`wal_frontier`: byte
+        // length + sha256); when that prefix still matches the on-disk WAL,
+        // instant-load the snapshot and replay only the tail beyond it. A
+        // mismatched prefix means snapshot and WAL disagree (crash between
+        // the state.json rename and the WAL checkpoint) — skip the snapshot
+        // and replay the whole (compact-to-live-state, self-sufficient) WAL.
+        // Snapshots without a frontier (pre-upgrade) instant-load as before.
+        let plan = storage.wal_tail_plan();
+        let snapshot_loaded =
+            !matches!(plan, WalTailPlan::SnapshotStale) && storage.try_load_state();
+        match plan {
+            WalTailPlan::Tail(offset) if snapshot_loaded => storage.replay_wal_from(offset),
+            _ if !snapshot_loaded && storage.log_path.exists() => storage.replay_wal_from(0),
+            _ => {}
         }
         // Rebuild the HNSW index for BOTH load paths: WAL replay and the
         // instant snapshot load (try_load_state populates the vector/metadata
@@ -8111,6 +8075,14 @@ impl Storage {
 
     fn save_state_unlocked(&self) -> Result<()> {
         self.ensure_writable()?;
+        // Build the compacted-WAL payload BEFORE the snapshot so state.json
+        // can record the exact WAL prefix this snapshot corresponds to
+        // (`wal_frontier`) — open() replays only the WAL tail beyond it
+        // (RCA--WAL-TAIL-REPLAY). Writers serialize on commit_lock (held by
+        // save_state), so live state cannot move between this build and the
+        // checkpoint below. Best-effort like the checkpoint itself: a failed
+        // build omits the frontier and the snapshot loads as legacy.
+        let wal_payload = self.build_compacted_wal().ok();
         let temp_dir = self.path.join("temp_save");
         if temp_dir.exists() {
             let _ = fs::remove_dir_all(&temp_dir);
@@ -8220,13 +8192,23 @@ impl Storage {
         self.projection_snapshot(&temp_dir.join(PROJECTION_DB_FILE))?;
 
         // 3. Save Global Metadata (incl. collections manifest)
-        let state = serde_json::json!({
+        let mut state = serde_json::json!({
             "logical_clock": self.get_logical_clock(),
             "peer_id": self.local_peer_id,
             "collections": manifest,
             "schema_version": SCHEMA_VERSION,
             "timestamp": Utc::now().to_rfc3339(),
         });
+        if let Some((payload, _)) = &wal_payload {
+            // The tail-replay cursor: the WAL checkpointed below starts with
+            // exactly these bytes, so anything past this offset on the next
+            // open is a write acked AFTER this snapshot. The hash lets open()
+            // detect a crash that landed state.json but not the checkpoint.
+            state["wal_frontier"] = serde_json::json!({
+                "bytes": payload.len(),
+                "sha256": hex::encode(Sha256::digest(payload)),
+            });
+        }
         fs::write(temp_dir.join("state.json"), state.to_string()).ok();
 
         // Atomic-ish swap: per-collection filenames are dynamic, so move every
@@ -8252,12 +8234,18 @@ impl Storage {
         }
         let _ = fs::remove_dir_all(&temp_dir);
 
-        // Snapshot is durable and authoritative; compact the WAL down to live
-        // state so it stays bounded instead of growing without limit (AUDIT--P33:
-        // ~20 GB at 1M nodes). compact-to-live-state (not truncate-to-empty) keeps
-        // the WAL a complete, independent recovery source. Best-effort: a failed
-        // compaction only leaves a larger WAL, never a corrupt one.
-        let _ = self.compact_unlocked();
+        // Snapshot is durable; compact the WAL down to live state so it stays
+        // bounded instead of growing without limit (AUDIT--P33: ~20 GB at 1M
+        // nodes). compact-to-live-state (not truncate-to-empty) keeps the WAL a
+        // complete, independent recovery source. The checkpoint reuses the SAME
+        // payload the frontier above was computed from — that identity is what
+        // makes the frontier a valid replay cursor. Best-effort: a failed (or
+        // crashed-before) checkpoint leaves the OLD WAL on disk, which fails
+        // the frontier's prefix hash on the next open and safely falls back to
+        // full WAL replay.
+        if let Some((payload, count)) = wal_payload {
+            let _ = self.checkpoint_wal_payload(payload, count);
+        }
 
         println!(
             "Mark IX: State persisted successfully to {}",
@@ -8656,6 +8644,149 @@ impl Storage {
             Err(error) => {
                 let _ = fs::remove_dir_all(&staging);
                 Err(error)
+            }
+        }
+    }
+
+    /// Decide how open() must consult the WAL, from the snapshot's recorded
+    /// `wal_frontier` (RCA--WAL-TAIL-REPLAY). Plain WAL lines carry no
+    /// sequence number, so the cursor is positional: the snapshot stores the
+    /// byte length + sha256 of the exact compacted payload its checkpoint
+    /// wrote, and we re-hash the on-disk WAL's prefix to verify the file
+    /// still starts with that payload before trusting the offset.
+    fn wal_tail_plan(&self) -> WalTailPlan {
+        let state = match fs::read_to_string(self.path.join("state.json"))
+            .ok()
+            .and_then(|c| serde_json::from_str::<serde_json::Value>(&c).ok())
+        {
+            Some(v) => v,
+            // No/unparseable snapshot: try_load_state fails on its own and
+            // open() falls back to full WAL replay — nothing to plan here.
+            None => return WalTailPlan::None,
+        };
+        let frontier = &state["wal_frontier"];
+        let (Some(bytes), Some(expected)) =
+            (frontier["bytes"].as_u64(), frontier["sha256"].as_str())
+        else {
+            // Pre-upgrade snapshot (no frontier recorded): legacy behavior,
+            // instant load only. The next save_state writes a frontier.
+            return WalTailPlan::None;
+        };
+        if !self.log_path.exists() {
+            // Snapshot present but the WAL was (manually) removed: nothing to
+            // validate or replay.
+            return WalTailPlan::None;
+        }
+        let wal_len = match fs::metadata(&self.log_path) {
+            Ok(m) => m.len(),
+            Err(_) => return WalTailPlan::None,
+        };
+        if wal_len < bytes {
+            return WalTailPlan::SnapshotStale;
+        }
+        let mut file = match File::open(&self.log_path) {
+            Ok(f) => f,
+            Err(_) => return WalTailPlan::SnapshotStale,
+        };
+        let mut hasher = Sha256::new();
+        let mut remaining = bytes;
+        let mut buf = [0u8; 64 * 1024];
+        while remaining > 0 {
+            let want = remaining.min(buf.len() as u64) as usize;
+            match file.read(&mut buf[..want]) {
+                Ok(0) | Err(_) => return WalTailPlan::SnapshotStale,
+                Ok(n) => {
+                    hasher.update(&buf[..n]);
+                    remaining -= n as u64;
+                }
+            }
+        }
+        if hex::encode(hasher.finalize()) == expected {
+            WalTailPlan::Tail(bytes)
+        } else {
+            println!(
+                "Mark IX: snapshot/WAL frontier mismatch — snapshot skipped, \
+                 replaying full WAL (WAL authority)"
+            );
+            WalTailPlan::SnapshotStale
+        }
+    }
+
+    /// Apply WAL events into memory starting at byte `offset` (0 = full
+    /// replay, a frontier offset = tail replay over a loaded snapshot).
+    /// Vectors are staged only (index=false): rehydrate_hnsw_index after
+    /// load builds every index once, for all recovery paths.
+    fn replay_wal_from(&self, offset: u64) {
+        use std::io::{BufRead, Seek, SeekFrom};
+        let mut file = match File::open(&self.log_path) {
+            Ok(f) => f,
+            Err(_) => return,
+        };
+        if offset > 0 && file.seek(SeekFrom::Start(offset)).is_err() {
+            return;
+        }
+        let reader = std::io::BufReader::new(file);
+        for line in reader.lines().map_while(|r| r.ok()) {
+            if let Ok(signed_event) = serde_json::from_str::<SignedEvent>(&line) {
+                let event = signed_event.event;
+                match event {
+                    Event::Node(n) => {
+                        let u32_id = self.get_or_intern_id(&n.id);
+                        if let Some(emb) = n.embedding.clone() {
+                            self.replay_vector(
+                                &n.collection,
+                                &n.id,
+                                emb,
+                                n.lang.clone().unwrap_or("en".to_string()),
+                                false,
+                            );
+                        }
+                        self.insert_node_lean(u32_id, n);
+                    }
+                    Event::Edge(e) => {
+                        let u32_id = self.index_edge_internal(&e.id, &e.from, &e.to);
+                        self.edges.insert(u32_id, e);
+                    }
+                    Event::Vector(v) => {
+                        self.replay_vector(
+                            &v.collection,
+                            &v.node_id,
+                            v.embedding,
+                            v.lang.clone().unwrap_or_else(|| "en".to_string()),
+                            false,
+                        );
+                    }
+                    Event::Batch(events) => {
+                        for batch_event in events {
+                            match batch_event {
+                                Event::Node(n) => {
+                                    let u32_id = self.get_or_intern_id(&n.id);
+                                    if let Some(emb) = n.embedding.clone() {
+                                        self.replay_vector(
+                                            &n.collection,
+                                            &n.id,
+                                            emb,
+                                            n.lang.clone().unwrap_or("en".to_string()),
+                                            false,
+                                        );
+                                    }
+                                    self.insert_node_lean(u32_id, n);
+                                }
+                                Event::Edge(e) => {
+                                    let u32_id = self.index_edge_internal(&e.id, &e.from, &e.to);
+                                    self.edges.insert(u32_id, e);
+                                }
+                                _ => {}
+                            }
+                        }
+                    }
+                    Event::RelationalSchema(_) | Event::RelationalRows { .. } => {
+                        // Relational state is rebuilt by projection_sync_on_open.
+                    }
+                    Event::Transaction(transaction) => {
+                        self.apply_transaction_memory(&transaction, false);
+                    }
+                }
             }
         }
     }
@@ -9495,6 +9626,19 @@ impl Storage {
     }
 
     fn compact_unlocked(&self) -> Result<()> {
+        let (buf, count) = self.build_compacted_wal()?;
+        self.checkpoint_wal_payload(buf, count)
+    }
+
+    /// Serialize current live state as the compacted-WAL payload (the
+    /// `SignedEvent` lines a checkpoint rewrites the WAL to). Split out of
+    /// `compact_unlocked` so `save_state_unlocked` can build the payload
+    /// BEFORE writing state.json — its byte length + sha256 become the
+    /// snapshot's `wal_frontier`, the tail-replay cursor for crash recovery
+    /// (RCA--WAL-TAIL-REPLAY) — and then checkpoint that SAME payload.
+    /// Callers must hold `commit_lock` (writers serialize on it, so live
+    /// state cannot move between the build and the checkpoint).
+    fn build_compacted_wal(&self) -> Result<(Vec<u8>, usize)> {
         self.ensure_writable()?;
         // Build the live-state snapshot in memory, then hand it to the WAL thread
         // to atomically replace the file (serialized with appends; see WalMsg).
@@ -9601,14 +9745,15 @@ impl Storage {
             count += 1;
         }
 
-        // Hand the rebuilt WAL to the writer thread and block until it has
-        // truncated + rewritten + fsynced through its own handle.
+        Ok((buf, count))
+    }
+
+    /// Hand a rebuilt WAL payload to the writer thread and block until it has
+    /// truncated + rewritten + fsynced through its own handle.
+    fn checkpoint_wal_payload(&self, data: Vec<u8>, count: usize) -> Result<()> {
         let (ack_tx, ack_rx) = unbounded();
         self.wal_sender
-            .send(WalMsg::Checkpoint {
-                data: buf,
-                ack: ack_tx,
-            })
+            .send(WalMsg::Checkpoint { data, ack: ack_tx })
             .map_err(|_| Error::from_reason("wal disconnected"))?;
         let _ = ack_rx.recv();
         println!("Mark IX: WAL Compacted. {} live events preserved.", count);
