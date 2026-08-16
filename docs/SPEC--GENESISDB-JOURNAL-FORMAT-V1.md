@@ -97,8 +97,18 @@ On first open at bumped `SCHEMA_VERSION`: (1) verify/produce a durable snapshot 
 | Mobile targets build with zstd in tree (**merge-blocking**, ADR D1) | `mobile-build.yml` green on all targets |
 | Compression ratio measured vs JSONL baseline (ADR D3 estimate → number) | `cargo run --release --features bins --bin industrial-audit` + journal size report in PR |
 
+## 8. Implementation deviations (WP-1.2, recorded per the same-PR rule)
+
+Implementation revealed four places where draft-1 was over- or under-specified; the code follows THESE rules:
+
+1. **Prefix-integrity fallback superseded, not kept.** Draft-1 carried PR #100's sha256-prefix `SnapshotStale` machinery forward. With per-frame `commit_seq` stamps the cursor is position-independent: recovery = `try_load_state` + replay frames `> frontier_seq`, and replay is idempotent (LWW upserts), so every crash window — including state.json-renamed-but-fold-crashed — merely re-applies frames the snapshot already covers. No prefix hash, no stale-detection branch. Frame CRCs + segment sha256 footers still catch corruption (torn tails truncate, unreadable segments fail explicitly).
+2. **No `segments[]` list in the manifest.** Segments are self-describing (header carries kind/min/max) and are discovered by directory scan — a manifest list could only diverge from the directory. `state.json.journal` holds `{frontier_seq, txn_frontier, tx_epoch_start, format_version}` only.
+3. **Checkpoint = fold-to-base (interim `frontier_only` profile).** WP-1.2 ships the fold machinery with the degenerate profile as default: every checkpoint folds the whole journal into one base segment (`B<seq>.gseg`, kind=base, frames stamped at the fold frontier). This keeps the journal a complete standalone recovery source at every instant (I8) and preserves today's bounded-disk behavior; budget profiles (partial folds, retention floors) land in WP-1.3 and flip the default. Fold order (I7/I9): base segment durable → drop old journal files → reset active → snapshot files → `state.json` renamed last.
+4. **Migration needs no prior snapshot.** The snapshot-first rule in §6 guards *folds* (which discard); sealing the legacy WAL as segment 0 is lossless (exact bytes, streamed sha256 + zstd, bounded memory), so migration runs unconditionally at first open. Read-only opens skip migration and read the legacy file in place. Also: no `WalMsg::Seal` message — threshold seals run inline on the writer thread after a batch fsync.
+
 ## CHANGELOG
 
 | Version | Date | Summary |
 |---|---|---|
+| draft-2 | 2026-08-17 | §8 implementation deviations: seq-cursor supersedes prefix-hash; directory-scanned segments (no manifest list); interim fold-to-base checkpoint; lossless migration without prior snapshot |
 | draft-1 | 2026-08-17 | Initial format spec elaborating accepted ADR--GENESISDB-JOURNAL-HISTORY |

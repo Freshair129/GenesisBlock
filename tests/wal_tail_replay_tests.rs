@@ -86,21 +86,33 @@ fn crash_copy(src: &str, dst: &str) {
             continue;
         }
         if entry.path().is_dir() {
+            // WP-1.2: the journal lives in wal/ and journal/ — a crash image
+            // must include them (one level deep is the whole layout).
+            let sub_dst = Path::new(dst).join(&name);
+            fs::create_dir_all(&sub_dst).unwrap();
+            for sub in fs::read_dir(entry.path()).unwrap().flatten() {
+                if sub.path().is_file() {
+                    copy_with_retry(&sub.path(), &sub_dst.join(sub.file_name()));
+                }
+            }
             continue;
         }
-        let mut attempts = 0;
-        loop {
-            match fs::copy(entry.path(), Path::new(dst).join(&name)) {
-                Ok(_) => break,
-                Err(e)
-                    if attempts < 100
-                        && matches!(e.raw_os_error(), Some(5) | Some(32) | Some(33)) =>
-                {
-                    attempts += 1;
-                    std::thread::sleep(std::time::Duration::from_millis(20));
-                }
-                Err(e) => panic!("crash_copy of {:?} failed: {e}", name),
+        copy_with_retry(&entry.path(), &Path::new(dst).join(&name));
+    }
+}
+
+fn copy_with_retry(src: &Path, dst: &Path) {
+    let mut attempts = 0;
+    loop {
+        match fs::copy(src, dst) {
+            Ok(_) => break,
+            Err(e)
+                if attempts < 100 && matches!(e.raw_os_error(), Some(5) | Some(32) | Some(33)) =>
+            {
+                attempts += 1;
+                std::thread::sleep(std::time::Duration::from_millis(20));
             }
+            Err(e) => panic!("crash_copy of {:?} failed: {e}", src),
         }
     }
 }
@@ -210,10 +222,12 @@ fn acked_writes_after_snapshot_survive_crash_reopen() {
     );
 }
 
-/// Crash BETWEEN the state.json rename and the WAL checkpoint: the new
-/// snapshot landed but the on-disk WAL is still the OLD one, so the recorded
-/// frontier does not match the WAL prefix. The WAL is the authority — recovery
-/// must skip the snapshot and fully replay the WAL, without duplicating state.
+/// Crash around the fold/snapshot boundary: the image carries the NEW
+/// state.json (frontier F) but the OLD pre-fold active file (frames ≤ F) on
+/// top of the folded base segment. WP-1.2's seq-filtered cursor makes this
+/// safe by construction — frames ≤ F are skipped, nothing duplicates, no
+/// stale-detection needed (SPEC §8.1: idempotent replay supersedes the old
+/// prefix-hash SnapshotStale fallback).
 #[test]
 fn stale_wal_prefix_falls_back_to_full_replay() {
     let path = fresh("test_wal_tail_replay_stale");
@@ -223,36 +237,40 @@ fn stale_wal_prefix_falls_back_to_full_replay() {
     for i in 0..10 {
         add_node(&s, &format!("N{i}"));
     }
-    // The WAL as it stood BEFORE the checkpoint — what a crash right before
-    // the checkpoint rewrite would leave behind.
-    let old_wal = fs::read(Path::new(&path).join("genesis-graph.wal")).unwrap();
+    // The active journal as it stood BEFORE the fold — what a crash right
+    // before the checkpoint would leave alongside the new snapshot.
+    let old_wal = fs::read(Path::new(&path).join("wal").join("active.gwal")).unwrap();
     s.save_state().unwrap();
 
     crash_copy(&path, &crash);
     drop(s);
-    fs::write(Path::new(&crash).join("genesis-graph.wal"), &old_wal).unwrap();
+    fs::write(
+        Path::new(&crash).join("wal").join("active.gwal"),
+        &old_wal,
+    )
+    .unwrap();
 
     let s2 = open(&crash);
     s2.flush_index();
     for i in 0..10 {
         assert!(
             s2.get_u32(&format!("N{i}")).is_some(),
-            "N{i} recovered from the (old) WAL"
+            "N{i} recovered despite the pre-fold active file"
         );
     }
     assert_eq!(
         s2.nodes.len(),
         10,
-        "full WAL replay reconstructs exactly the live set"
+        "seq-filtered recovery reconstructs exactly the live set"
     );
     assert_eq!(
         default_arena_rows(&s2),
         10,
-        "snapshot was skipped: vectors staged once by WAL replay, not twice"
+        "frames at-or-below the frontier are skipped: vectors staged once, not twice"
     );
     assert!(
         !search_ids(&s2, 5).is_empty(),
-        "embeddings searchable after fallback"
+        "embeddings searchable after crash recovery"
     );
 }
 
@@ -272,6 +290,9 @@ fn snapshot_without_frontier_still_loads() {
     let mut state: serde_json::Value =
         serde_json::from_str(&fs::read_to_string(&sj).unwrap()).unwrap();
     if let Some(obj) = state.as_object_mut() {
+        // Pre-frontier snapshot: neither the WP-1.2 `journal` cursor nor the
+        // legacy `wal_frontier` byte cursor.
+        obj.remove("journal");
         obj.remove("wal_frontier");
     }
     fs::write(&sj, state.to_string()).unwrap();

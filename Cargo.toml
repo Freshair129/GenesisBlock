@@ -96,6 +96,17 @@ hex = "0.4"
 unicode-general-category = "1.1.0"
 ed25519-dalek = { version = "2.2.0", features = ["serde"] }
 roaring = "0.10"
+# WP-1.2 framed journal (ADR--GENESISDB-JOURNAL-HISTORY / SPEC--GENESISDB-JOURNAL-FORMAT-V1).
+# zstd is the second C dependency after bundled SQLite; it is an UNCONDITIONAL
+# storage-core dep (sealing runs under `--no-default-features --features mobile`)
+# and must never be gated behind napi-bindings/bins. mobile-build.yml green on
+# all targets is merge-blocking for any change touching these.
+zstd = "0.13"
+# Pure-Rust fallback codec (segment header carries a codec byte, so switching
+# codecs is not a format break if zstd-sys ever fails a mobile target).
+lz4_flex = "0.11"
+# CRC32C (Castagnoli) per frame — hardware-accelerated where available.
+crc32c = "0.6"
 
 [build-dependencies]
 napi-build = "2.1"

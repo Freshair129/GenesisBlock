@@ -64,6 +64,44 @@ fn node_exists(s: &Storage, id: &str) -> bool {
     s.get_u32(id).is_some()
 }
 
+// --- WP-1.2 framed-journal helpers -----------------------------------------
+// The active journal is wal/active.gwal: a 14-byte GWA1 header followed by
+// frames [u32 len | u64 seq | u32 crc | payload]. These helpers capture the
+// file while the Storage is open (frames are fsynced before each ack) and
+// rebuild corrupted images after drop (Drop's save_state folds the journal,
+// so corruption must be reconstructed from a live capture).
+
+fn active_path(path: &str) -> std::path::PathBuf {
+    Path::new(path).join("wal").join("active.gwal")
+}
+
+/// Byte offsets of each frame boundary (after the header), plus the header end.
+fn frame_offsets(bytes: &[u8]) -> Vec<usize> {
+    let mut offsets = Vec::new();
+    let mut off = 14usize;
+    while off + 16 <= bytes.len() {
+        let len = u32::from_le_bytes(bytes[off..off + 4].try_into().unwrap()) as usize;
+        if off + 16 + len > bytes.len() {
+            break;
+        }
+        offsets.push(off);
+        off = off + 16 + len;
+    }
+    offsets.push(off);
+    offsets
+}
+
+/// Reset the DB dir to "journal only": drop snapshot + sealed segments and
+/// install `active_bytes` as the sole recovery source.
+fn install_active_only(path: &str, active_bytes: &[u8]) {
+    let _ = fs::remove_file(Path::new(path).join("state.json"));
+    let _ = fs::remove_file(Path::new(path).join("nodes.bin"));
+    let _ = fs::remove_file(Path::new(path).join("edges.bin"));
+    let _ = fs::remove_dir_all(Path::new(path).join("journal"));
+    fs::create_dir_all(Path::new(path).join("wal")).unwrap();
+    fs::write(active_path(path), active_bytes).unwrap();
+}
+
 fn search_returns(s: &Storage, query: [f64; 4], expected_id: &str) -> bool {
     s.flush_index();
     let results = s
@@ -87,46 +125,33 @@ fn search_returns(s: &Storage, query: [f64; 4], expected_id: &str) -> bool {
 #[test]
 fn truncated_wal_recovers_intact_entries() {
     let path = fresh("crash_truncated_wal");
-    let wal_file = Path::new(&path).join("genesis-graph.wal");
 
-    // Write 10 nodes. Drop calls save_state which compacts the WAL, so we
-    // need to read the WAL BEFORE drop, then simulate corruption after drop
-    // by rebuilding the WAL from scratch and deleting the snapshot.
-    let wal_lines: Vec<String>;
+    // Write 10 nodes and capture the framed active journal while open (each
+    // frame is fsynced before the write returns). Drop's save_state folds the
+    // journal, so the corrupted image is rebuilt from this capture.
+    let active_bytes: Vec<u8>;
     {
         let s = open(&path);
         for i in 0..10 {
             add_node(&s, &format!("node_{i}"), [i as f64, 0.0, 0.0, 0.0]);
         }
-        std::thread::sleep(std::time::Duration::from_millis(50));
-
-        // Capture WAL content before Drop compacts it.
-        wal_lines = fs::read_to_string(&wal_file)
-            .unwrap()
-            .lines()
-            .map(|l| l.to_string())
-            .collect();
+        active_bytes = fs::read(active_path(&path)).unwrap();
     }
 
+    let offsets = frame_offsets(&active_bytes);
     assert!(
-        wal_lines.len() >= 10,
-        "expected ≥10 WAL lines, got {}",
-        wal_lines.len()
+        offsets.len() > 10,
+        "expected ≥10 frames, got {}",
+        offsets.len() - 1
     );
 
-    // Rebuild WAL with lines 0..7 intact + a truncated line 7.
-    let keep: String = wal_lines[..7].join("\n") + "\n";
-    let partial_line = &wal_lines[7][..wal_lines[7].len() / 2];
-    let corrupted = format!("{keep}{partial_line}");
-    fs::write(&wal_file, corrupted).unwrap();
+    // Keep 7 whole frames + half of the 8th (a torn tail).
+    let keep_end = offsets[7];
+    let torn_mid = keep_end + (offsets[8] - keep_end) / 2;
+    install_active_only(&path, &active_bytes[..torn_mid]);
 
-    // Delete snapshot so recovery goes through WAL only.
-    let state_json = Path::new(&path).join("state.json");
-    if state_json.exists() {
-        fs::remove_file(&state_json).unwrap();
-    }
-
-    // Re-open — must not panic, must recover first 7 nodes.
+    // Re-open — must not panic, must recover first 7 nodes (I9: torn tail
+    // truncates away).
     let s = open(&path);
     for i in 0..7 {
         assert!(
@@ -142,36 +167,34 @@ fn truncated_wal_recovers_intact_entries() {
 #[test]
 fn garbage_wal_entry_skipped_gracefully() {
     let path = fresh("crash_garbage_wal");
-    let wal_file = Path::new(&path).join("genesis-graph.wal");
 
+    let active_bytes: Vec<u8>;
     {
         let s = open(&path);
         for i in 0..6 {
             add_node(&s, &format!("gnode_{i}"), [i as f64, 1.0, 0.0, 0.0]);
         }
-        std::thread::sleep(std::time::Duration::from_millis(50));
+        active_bytes = fs::read(active_path(&path)).unwrap();
     }
 
-    // Inject garbage after line 3.
-    let wal_data = fs::read_to_string(&wal_file).unwrap();
-    let mut lines: Vec<String> = wal_data.lines().map(|l| l.to_string()).collect();
-    assert!(lines.len() >= 6);
-    lines.insert(3, "THIS IS NOT VALID JSON {{{garbage!!!".to_string());
-    fs::write(&wal_file, lines.join("\n") + "\n").unwrap();
+    // Inject garbage after the 3rd frame. WP-1.2 contract change: the framed
+    // journal is prefix-valid — the CRC walk STOPS at the first corrupt frame
+    // (mid-file garbage cannot arise from an append-only crash; a tear is
+    // always a tail). Frames before the garbage recover; the old JSONL
+    // skip-bad-lines behavior is gone by design (I9).
+    let offsets = frame_offsets(&active_bytes);
+    assert!(offsets.len() > 6);
+    let mut corrupted = active_bytes[..offsets[3]].to_vec();
+    corrupted.extend_from_slice(b"THIS IS NOT A VALID FRAME {{{garbage!!!");
+    corrupted.extend_from_slice(&active_bytes[offsets[3]..]);
+    install_active_only(&path, &corrupted);
 
-    // Delete snapshot.
-    let state_json = Path::new(&path).join("state.json");
-    if state_json.exists() {
-        fs::remove_file(&state_json).unwrap();
-    }
-
-    // Re-open — no panic, nodes 0–2 (before garbage) and 3–5 (after) all recover
-    // because the WAL reader skips unparseable lines.
+    // Re-open — no panic; the pre-garbage prefix recovers.
     let s = open(&path);
-    for i in 0..6 {
+    for i in 0..3 {
         assert!(
             node_exists(&s, &format!("gnode_{i}")),
-            "gnode_{i} should survive garbage injection"
+            "gnode_{i} (before the tear) should survive"
         );
     }
 }
@@ -349,11 +372,8 @@ fn empty_wal_no_panic() {
         std::thread::sleep(std::time::Duration::from_millis(50));
     }
 
-    // Truncate WAL to zero bytes.
-    let wal_file = Path::new(&path).join("genesis-graph.wal");
-    fs::write(&wal_file, b"").unwrap();
-    // Remove snapshot.
-    let _ = fs::remove_file(Path::new(&path).join("state.json"));
+    // Truncate the whole journal to nothing.
+    install_active_only(&path, b"");
 
     // Re-open — no data but no panic.
     let s = open(&path);
@@ -367,30 +387,27 @@ fn empty_wal_no_panic() {
 #[test]
 fn double_crash_recovery() {
     let path = fresh("crash_double");
-    let wal_file = Path::new(&path).join("genesis-graph.wal");
 
-    // Phase 1: write 5 nodes.
+    // Phase 1: write 5 nodes; capture the framed active file while open.
+    let phase1_bytes: Vec<u8>;
     {
         let s = open(&path);
         for i in 0..5 {
             add_node(&s, &format!("d1_node_{i}"), [i as f64, 0.0, 0.0, 0.0]);
         }
-        std::thread::sleep(std::time::Duration::from_millis(50));
+        phase1_bytes = fs::read(active_path(&path)).unwrap();
     }
 
-    // Crash 1: truncate last WAL line.
+    // Crash 1: tear the last frame in half.
     {
-        let wal_data = fs::read_to_string(&wal_file).unwrap();
-        let mut lines: Vec<&str> = wal_data.lines().collect();
-        if let Some(last) = lines.last_mut() {
-            let truncated = &last[..last.len() / 2];
-            *last = truncated;
-        }
-        fs::write(&wal_file, lines.join("\n") + "\n").unwrap();
-        let _ = fs::remove_file(Path::new(&path).join("state.json"));
+        let offsets = frame_offsets(&phase1_bytes);
+        let last_start = offsets[offsets.len() - 2];
+        let torn = last_start + (offsets[offsets.len() - 1] - last_start) / 2;
+        install_active_only(&path, &phase1_bytes[..torn]);
     }
 
     // Phase 2: recover + write 5 more nodes.
+    let phase2_bytes: Vec<u8>;
     {
         let s = open(&path);
         // At least 4 of the first 5 should be there (last line was truncated).
@@ -405,19 +422,15 @@ fn double_crash_recovery() {
         for i in 0..5 {
             add_node(&s, &format!("d2_node_{i}"), [0.0, i as f64, 0.0, 0.0]);
         }
-        std::thread::sleep(std::time::Duration::from_millis(50));
+        phase2_bytes = fs::read(active_path(&path)).unwrap();
     }
 
-    // Crash 2: truncate last WAL line again.
+    // Crash 2: tear the last frame of the phase-2 image in half.
     {
-        let wal_data = fs::read_to_string(&wal_file).unwrap();
-        let mut lines: Vec<&str> = wal_data.lines().collect();
-        if let Some(last) = lines.last_mut() {
-            let truncated = &last[..last.len() / 2];
-            *last = truncated;
-        }
-        fs::write(&wal_file, lines.join("\n") + "\n").unwrap();
-        let _ = fs::remove_file(Path::new(&path).join("state.json"));
+        let offsets = frame_offsets(&phase2_bytes);
+        let last_start = offsets[offsets.len() - 2];
+        let torn = last_start + (offsets[offsets.len() - 1] - last_start) / 2;
+        install_active_only(&path, &phase2_bytes[..torn]);
     }
 
     // Final recovery.
