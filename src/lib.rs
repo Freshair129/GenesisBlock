@@ -4760,9 +4760,11 @@ impl Storage {
         if !read_only {
             fs::create_dir_all(root.join("wal")).ok();
             fs::create_dir_all(root.join("journal")).ok();
+            // I9 hygiene: crashed seals leave *.tmp — delete them before
+            // scanning. Skipped on read-only opens (which must not mutate the
+            // database): a stray .tmp is never listed as a segment anyway.
+            Self::journal_cleanup(&root);
         }
-        // I9 hygiene: crashed seals leave *.tmp — delete them before scanning.
-        Self::journal_cleanup(&root);
         // One-way migration (ADR §4): seal the legacy JSONL WAL as segment 0
         // (kind=legacy_jsonl, recovery-only, not tx-addressable) and remove it.
         // Lossless — the segment stores the exact legacy bytes — so it needs no
@@ -4774,8 +4776,12 @@ impl Storage {
         }
         // I9: truncate a torn active-file tail (crash mid-append) BEFORE the
         // writer thread opens it for append, then seed the frame counter from
-        // the journal itself (ADR D2.4 — never from the projection).
-        Self::journal_truncate_torn_active(&log_path);
+        // the journal itself (ADR D2.4 — never from the projection). Read-only
+        // opens skip the truncation (no mutation) — replay stops at the tear
+        // either way, since `walk_frames` refuses the first invalid frame.
+        if !read_only {
+            Self::journal_truncate_torn_active(&log_path);
+        }
         let initial_next_seq = Self::journal_max_seq(&root, &log_path) + 1;
         let projection_path = root.join(PROJECTION_DB_FILE);
         let projection_conn = if read_only {

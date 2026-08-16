@@ -3,7 +3,7 @@
   "engine": {
     "name": "genesis-block-native",
     "version": "0.2.0",
-    "schemaVersion": 1,
+    "schemaVersion": 2,
     "artifacts": [
       "cdylib (npm native addon)",
       "rlib (Axum REST server)"
@@ -15,7 +15,7 @@
       "path": ".",
       "type": "npm-native-addon",
       "version": "0.2.0",
-      "targetsSchemaVersion": 1,
+      "targetsSchemaVersion": 2,
       "minEngineVersion": "0.2.0"
     },
     {
@@ -23,7 +23,7 @@
       "path": "genesisdb-python",
       "type": "rest-client-sdk",
       "version": "0.1.0",
-      "targetsSchemaVersion": 1,
+      "targetsSchemaVersion": 2,
       "minEngineVersion": "0.1.0-beta.1"
     },
     {
@@ -31,7 +31,7 @@
       "path": "genesisdb-go",
       "type": "rest-client-sdk",
       "version": "0.1.0",
-      "targetsSchemaVersion": 1,
+      "targetsSchemaVersion": 2,
       "minEngineVersion": "0.1.0-beta.1"
     },
     {
@@ -39,7 +39,7 @@
       "path": "mcp",
       "type": "mcp-server",
       "version": "0.1.0-beta.1",
-      "targetsSchemaVersion": 1,
+      "targetsSchemaVersion": 2,
       "minEngineVersion": "0.1.0-beta.1"
     },
     {
@@ -47,7 +47,7 @@
       "path": "dashboard",
       "type": "web-dashboard",
       "version": "0.0.0",
-      "targetsSchemaVersion": 1,
+      "targetsSchemaVersion": 2,
       "minEngineVersion": "0.1.0-beta.1"
     },
     {
@@ -55,7 +55,7 @@
       "path": "obsidian-plugin",
       "type": "obsidian-plugin",
       "version": "0.1.0",
-      "targetsSchemaVersion": 1,
+      "targetsSchemaVersion": 2,
       "minEngineVersion": "0.1.0-beta.1"
     },
     {
@@ -63,7 +63,7 @@
       "path": "android/genesisdb",
       "type": "mobile-sdk-android",
       "version": "0.1.0",
-      "targetsSchemaVersion": 1,
+      "targetsSchemaVersion": 2,
       "minEngineVersion": "0.2.0"
     },
     {
@@ -71,7 +71,7 @@
       "path": "react-native-genesisdb",
       "type": "mobile-sdk-react-native",
       "version": "0.1.0",
-      "targetsSchemaVersion": 1,
+      "targetsSchemaVersion": 2,
       "minEngineVersion": "0.2.0"
     }
   ]

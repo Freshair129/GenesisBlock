@@ -54,10 +54,12 @@ fn make_legacy_db(dir: &str, ids: &[&str]) {
     for id in ids {
         add(&s, id);
     }
-    drop(s);
+    // Capture the framed active file WHILE OPEN — Drop runs save_state, which
+    // folds the frames into a base segment and resets the active file.
     let root = Path::new(dir);
     let active = root.join("wal").join("active.gwal");
     let bytes = fs::read(&active).expect("active journal exists");
+    drop(s);
     // Decode frames: [u32 len][u64 seq][u32 crc][payload] after the 14-byte header.
     let mut lines: Vec<Vec<u8>> = Vec::new();
     let mut off = 14usize;

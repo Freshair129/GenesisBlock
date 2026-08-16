@@ -7,6 +7,38 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed — BREAKING (on-disk + API), WP-1.2 framed journal
+- **On-disk journal format (SCHEMA_VERSION 1 → 2).** `genesis-graph.wal` (JSONL)
+  is replaced by a framed journal: `wal/active.gwal` (GWA1 header + frames
+  `[u32 len | u64 commit_seq | u32 crc32c | SignedEvent JSON]`) plus sealed,
+  zstd-compressed `journal/*.gseg` segments. Frames wrap the **original**
+  event bytes, so peer signatures now survive checkpointing (previously
+  compaction re-signed every event with the local key). Migration is automatic
+  and **one-way**: on first open the legacy WAL is sealed as segment 0
+  (`kind=legacy_jsonl`, recovery-only). An engine older than the on-disk
+  version now fails closed with `SCHEMA_VERSION_UNSUPPORTED` — never a partial
+  read. See [ADR--GENESISDB-JOURNAL-HISTORY](docs/adr/ADR--GENESISDB-JOURNAL-HISTORY.md)
+  and [SPEC--GENESISDB-JOURNAL-FORMAT-V1](docs/SPEC--GENESISDB-JOURNAL-FORMAT-V1.md).
+- **Checkpoint folds instead of truncating.** `save_state()` now folds the
+  journal into a base segment (live state) rather than rewriting the WAL file,
+  so the journal remains a complete standalone recovery source at every instant
+  and the seal is durable *before* the snapshot manifest advances (invariants
+  I7/I9). Disk stays bounded exactly as before (interim `frontier_only`
+  retention profile; budget profiles land in WP-1.3).
+- **`stableFrontier()` / `GET /v1/frontier` semantics changed.**
+  `stable_frontier` is now the **frame** frontier — the commit sequence of the
+  last durable journal frame, advancing on *every* mutation. The previous
+  meaning (sequence of the last transaction) is now `txnFrontier()`, and that
+  is the value `GenesisTransaction.expected_frontier` must be CAS'd against.
+  `GET /v1/frontier` returns `{"frame": N, "txn": M}` instead of a bare number;
+  SDKs reading the old scalar should read `.txn`. `CommitResult.commit_sequence`
+  is now the transaction's frame stamp.
+- **Transaction sequences are replica-local.** `GenesisTransactionEvent.commit_sequence`
+  is demoted to `origin_commit_seq` (serde alias keeps old WAL lines parsing);
+  a replica no longer merges a peer's sequence into its own counter, which also
+  removes a `applied_transactions` uniqueness collision that could abort a whole
+  reconcile batch.
+
 ### Added
 - **HQL Cypher-style graph patterns (path 1):** a fifth HQL command,
   `MATCH (a:Label {k:v})-[r:REL]->(b) ...`, matching linear path patterns by

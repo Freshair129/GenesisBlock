@@ -335,7 +335,8 @@ fn restore_rejects_duplicate_traversal_and_trailing_entries() {
 fn restore_rejects_incompatible_engine_and_schema_without_creating_target() {
     for (name, from, to) in [
         ("u9-engine", "genesis-block", "other-genesis"),
-        ("u9-schema", "\"schema_version\":1", "\"schema_version\":2"),
+        // WP-1.2 bumped SCHEMA_VERSION to 2; a manifest claiming 3 is "newer".
+        ("u9-schema", "\"schema_version\":2", "\"schema_version\":3"),
     ] {
         let source_root = fresh(&format!("{name}-source"));
         let bundle_path = format!("{}/backup.genesis", fresh(&format!("{name}-bundle")));

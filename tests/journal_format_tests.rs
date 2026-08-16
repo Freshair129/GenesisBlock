@@ -274,6 +274,76 @@ fn frame_and_txn_frontier_split() {
     assert_eq!(replayed.commit_sequence, commit2.commit_sequence);
 }
 
+/// Measured compression ratio vs the pre-WP-1.2 JSONL baseline (SPEC §7 —
+/// the ADR's estimate had to become a number). Run with `--nocapture` to read
+/// the figures; the assertion is the contract: a checkpointed journal must not
+/// be larger than the JSONL WAL it replaces.
+#[test]
+fn journal_is_smaller_than_jsonl_baseline() {
+    let dir = fresh("ratio");
+    let s = open(&dir);
+    // Realistic agent-memory-ish payloads (the workload the ratio matters for).
+    for i in 0..2000 {
+        s.add_node(NodeInput {
+            id: Some(format!("mem:{i}")),
+            labels: vec!["Memory".to_string(), "Episodic".to_string()],
+            props: Some(json!({
+                "text": format!("observation {i}: the user asked about journal segment retention and folding"),
+                "source": "session-2026-08-17",
+                "confidence": 0.87,
+                "tags": ["journal", "retention", "wp-1.2"],
+            })),
+            embedding: None,
+            lang: Some("en".to_string()),
+            valid_from: None,
+            caused_by: None,
+            ttl: None,
+            collection: None,
+        })
+        .unwrap();
+    }
+
+    // Uncompressed framed active file, pre-fold: payload bytes + 16B/frame.
+    let active = fs::read(Path::new(&dir).join("wal").join("active.gwal")).unwrap();
+    let mut frames = 0usize;
+    let mut payload_bytes = 0usize;
+    let mut off = 14usize;
+    while off + 16 <= active.len() {
+        let len = u32::from_le_bytes(active[off..off + 4].try_into().unwrap()) as usize;
+        if off + 16 + len > active.len() {
+            break;
+        }
+        frames += 1;
+        payload_bytes += len;
+        off += 16 + len;
+    }
+    // What the old format would have written for the same events: one JSON
+    // line + newline each (frames wrap the identical payload bytes).
+    let jsonl_baseline = payload_bytes + frames;
+
+    s.save_state().unwrap();
+    drop(s);
+
+    let mut journal_bytes = 0u64;
+    for entry in fs::read_dir(Path::new(&dir).join("journal")).unwrap().flatten() {
+        journal_bytes += entry.metadata().unwrap().len();
+    }
+    journal_bytes += fs::metadata(Path::new(&dir).join("wal").join("active.gwal"))
+        .map(|m| m.len())
+        .unwrap_or(0);
+
+    println!(
+        "WP-1.2 journal size: {frames} frames · JSONL baseline {jsonl_baseline} B \
+         · checkpointed journal {journal_bytes} B · ratio {:.2}x smaller",
+        jsonl_baseline as f64 / journal_bytes.max(1) as f64
+    );
+    assert!(
+        journal_bytes < jsonl_baseline as u64,
+        "checkpointed journal ({journal_bytes} B) must not exceed the JSONL \
+         baseline it replaces ({jsonl_baseline} B)"
+    );
+}
+
 /// Sealed segments carry the GSG1 magic and appear under journal/ after a
 /// checkpoint; frames keep flowing into a fresh active file afterward.
 #[test]
