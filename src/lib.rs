@@ -5230,6 +5230,23 @@ impl Storage {
         vkey.verify(&payload, &sig)
             .map_err(|_| Error::from_reason("invalid vote signature"))?;
 
+        // Serialize the vote-commit section with every other writer and with
+        // save_state/compact (RCA--PERSIST-SIGNED-CHECKPOINT-RACE). Committing
+        // mutates in-memory state and then appends to the WAL; without this lock
+        // a checkpoint could build its payload from memory BEFORE the mutation
+        // and truncate the WAL AFTER the append was fsynced and acked, erasing a
+        // commit this method already reported as durable. Holding the lock means
+        // the commit either lands wholly before the payload build, or wholly
+        // after the checkpoint (on the new WAL, past the frontier, where tail
+        // replay recovers it).
+        //
+        // Taken BEFORE `proposals.get_mut` so the lock order is
+        // commit_lock -> proposals. `self.proposals` is touched only here and in
+        // `propose_consensus` (which takes no commit_lock), so no path acquires
+        // them in the opposite order and no cycle exists. The signature checks
+        // above touch only `self.peers`, so they stay off this global lock.
+        let _commit_guard = self.commit_lock.lock();
+
         if let Some(mut proposal_ref) = self.proposals.get_mut(&proposal_id) {
             let proposal = proposal_ref.value_mut();
             // Already-committed guard: once quorum is crossed and the event applied,
@@ -7701,7 +7718,23 @@ impl Storage {
         Ok(())
     }
 
+    /// Append an already-signed event to the WAL and apply it to the projection.
+    ///
+    /// **The caller must hold `commit_lock`.** This appends to the WAL, and a
+    /// concurrent `save_state`/`compact` checkpoint rewrites the WAL from a
+    /// payload built off live memory — an append that is acked between that
+    /// payload build and the truncation is erased despite being fsynced
+    /// (RCA--PERSIST-SIGNED-CHECKPOINT-RACE). Callers: `submit_vote` and
+    /// `reconcile_state_unlocked`, both under the lock.
     pub fn persist_signed(&self, signed_event: SignedEvent) -> Result<()> {
+        // If nobody holds the lock, `try_lock` succeeds and the invariant was
+        // violated; if WE hold it, `try_lock` always fails (not reentrant), so
+        // this never false-positives on a correct caller.
+        debug_assert!(
+            self.commit_lock.try_lock().is_none(),
+            "persist_signed requires the caller to hold commit_lock \
+             (see RCA--PERSIST-SIGNED-CHECKPOINT-RACE)"
+        );
         let (ack_tx, ack_rx) = unbounded();
         let event = signed_event.event.clone();
         self.wal_sender
