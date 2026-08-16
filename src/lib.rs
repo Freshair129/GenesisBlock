@@ -4016,7 +4016,7 @@ impl Storage {
             ));
         }
         let mut first_err: Option<Error> = None;
-        self.scan_journal(0, true, &mut |seq, signed_event| {
+        self.scan_journal(None, true, &mut |seq, signed_event| {
             if first_err.is_some() {
                 return;
             }
@@ -5104,18 +5104,18 @@ impl Storage {
         let snapshot_loaded = storage.try_load_state();
         match (snapshot_loaded, journal_frontier) {
             // Framed snapshot: replay only frames past the seq frontier.
-            (true, Some(frontier)) => storage.replay_journal(frontier, false),
+            (true, Some(frontier)) => storage.replay_journal(Some(frontier), false),
             // Pre-WP-1.2 snapshot carrying the byte-positional cursor: the
             // cursor is meaningless against the migrated journal, and the
             // legacy WAL tail may hold acked writes newer than the snapshot —
             // full replay, once (idempotent for graph state; duplicate vector
             // arena rows are reclaimed by the next index compaction).
-            (true, None) if legacy_byte_frontier => storage.replay_journal(0, true),
+            (true, None) if legacy_byte_frontier => storage.replay_journal(None, true),
             // Pre-frontier snapshot (no cursor of either kind): legacy
             // behavior — instant load only, no replay (back-compat).
             (true, None) => {}
             // No snapshot: the journal alone is the recovery source.
-            (false, _) => storage.replay_journal(0, true),
+            (false, _) => storage.replay_journal(None, true),
         }
         // Rebuild the HNSW index for BOTH load paths: journal replay and the
         // instant snapshot load (try_load_state populates the vector/metadata
@@ -9847,7 +9847,7 @@ impl Storage {
     /// re-sync on their own — re-`add_vector` re-stamps them with a live clock.)
     pub fn events_since(&self, from_clock: u32) -> Vec<SignedEvent> {
         let mut out: Vec<(u32, SignedEvent)> = Vec::new();
-        self.scan_journal(0, true, &mut |_, se| {
+        self.scan_journal(None, true, &mut |_, se| {
             if let Some(t) = Self::event_time(&se.event) {
                 if t > from_clock {
                     out.push((t, se));
@@ -9863,8 +9863,11 @@ impl Storage {
     /// serves relational-only transactions (every frame has a seq), closing the
     /// `event_time = None` gap. Frame order IS local order, so no re-sort.
     pub fn events_since_seq(&self, from_seq: u64) -> Vec<SignedEvent> {
+        // Cursor 0 = the peer has nothing, so send everything (including a base
+        // segment folded at seq 0); any other value is an exclusive cursor.
+        let cursor = if from_seq == 0 { None } else { Some(from_seq) };
         let mut out: Vec<SignedEvent> = Vec::new();
-        self.scan_journal(from_seq, false, &mut |_, se| {
+        self.scan_journal(cursor, false, &mut |_, se| {
             out.push(se);
         });
         out
@@ -9974,7 +9977,7 @@ impl Storage {
             // Pre-fold journal scan (segments + active; legacy too — secondary
             // vectors may predate migration): keep the latest per (node,
             // collection) for still-live nodes.
-            self.scan_journal(0, true, &mut |_, se| {
+            self.scan_journal(None, true, &mut |_, se| {
                 if let Event::Vector(v) = se.event {
                     let live = self
                         .get_u32(&v.node_id)
@@ -10352,9 +10355,15 @@ impl Storage {
     /// file — invoking `f(seq, event)` for frames with seq > `from_seq`.
     /// `include_legacy=false` on tail replay: the snapshot already covers the
     /// pre-epoch content (legacy events carry no stamp to filter by).
+    /// `from_seq`: `None` = the caller has applied nothing, send everything;
+    /// `Some(f)` = the caller is current through frame `f`, send frames after
+    /// it. The distinction matters because a fold on a journal that never
+    /// stamped a frame (e.g. a legacy DB migrated but not yet written to)
+    /// produces a base segment at seq 0 holding real live state — under a bare
+    /// `u64` cursor, `0 > 0` is false and that state would be silently skipped.
     fn scan_journal(
         &self,
-        from_seq: u64,
+        from_seq: Option<u64>,
         include_legacy: bool,
         f: &mut dyn FnMut(u64, SignedEvent),
     ) {
@@ -10388,12 +10397,12 @@ impl Storage {
                 }
                 continue;
             }
-            if seg.max_seq <= from_seq {
+            if from_seq.is_some_and(|cursor| seg.max_seq <= cursor) {
                 continue;
             }
             if let Some((_, body)) = read_segment_body(&seg.path) {
                 walk_frames(&body, 0, |seq, payload| {
-                    if seq > from_seq {
+                    if from_seq.is_none_or(|cursor| seq > cursor) {
                         if let Ok(se) = serde_json::from_slice::<SignedEvent>(payload) {
                             f(seq, se);
                         }
@@ -10404,7 +10413,7 @@ impl Storage {
         if let Ok(bytes) = fs::read(&self.log_path) {
             if bytes.len() > ACTIVE_HEADER_LEN && bytes[0..4] == ACTIVE_MAGIC {
                 walk_frames(&bytes, ACTIVE_HEADER_LEN, |seq, payload| {
-                    if seq > from_seq {
+                    if from_seq.is_none_or(|cursor| seq > cursor) {
                         if let Ok(se) = serde_json::from_slice::<SignedEvent>(payload) {
                             f(seq, se);
                         }
@@ -10414,11 +10423,11 @@ impl Storage {
         }
     }
 
-    /// Apply journal events into memory from `from_seq` (0 = full replay over
-    /// nothing/whatever loaded; a snapshot frontier = tail replay). Vectors are
-    /// staged only (index=false): rehydrate_hnsw_index after load builds every
-    /// index once for all recovery paths. Idempotent: LWW upserts.
-    fn replay_journal(&self, from_seq: u64, include_legacy: bool) {
+    /// Apply journal events into memory (`None` = full replay, `Some(f)` =
+    /// tail replay past a snapshot frontier). Vectors are staged only
+    /// (index=false): rehydrate_hnsw_index after load builds every index once
+    /// for all recovery paths. Idempotent: LWW upserts.
+    fn replay_journal(&self, from_seq: Option<u64>, include_legacy: bool) {
         self.scan_journal(from_seq, include_legacy, &mut |seq, signed_event| {
             self.apply_replay_event(seq, signed_event.event);
         });
