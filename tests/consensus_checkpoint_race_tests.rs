@@ -25,6 +25,10 @@ use std::path::Path;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 
+/// Proposals each test commits. Fixed so the assertions never depend on how
+/// many commits happened to win the race on this machine.
+const COMMITS: usize = 40;
+
 fn fresh(name: &str) -> String {
     let p = format!("{}/{}", env!("CARGO_TARGET_TMPDIR"), name);
     if Path::new(&p).exists() {
@@ -111,42 +115,55 @@ fn consensus_commits_survive_concurrent_save_state() {
     let crash = fresh("test_consensus_ckpt_race_img");
     let s = Arc::new(open(&path));
 
+    // The voter does a FIXED amount of work and the checkpointer runs for
+    // exactly as long as the voter is alive. Do NOT invert this (fixed
+    // checkpoint count + "commit until stopped"): post-fix the voter contends
+    // for commit_lock with save_state, so its throughput is machine-dependent
+    // — that shape asserted on a race-derived count and failed CI at 8/10/12
+    // commits while passing locally at 440.
+    //
     // A committed proposal is reported durable, so record the id only once
     // submit_vote has returned true — every id in `committed` is a write the
     // engine promised to keep.
-    let stop = Arc::new(AtomicBool::new(false));
+    let done = Arc::new(AtomicBool::new(false));
     let voter = {
         let s = Arc::clone(&s);
-        let stop = Arc::clone(&stop);
+        let done = Arc::clone(&done);
         std::thread::spawn(move || {
             let mut committed = Vec::new();
-            let mut i = 0;
-            while !stop.load(Ordering::Relaxed) {
+            for i in 0..COMMITS {
                 let id = format!("AXIOM{i}");
                 if propose_and_commit(&s, &id) {
                     committed.push(id);
                 }
-                i += 1;
             }
+            done.store(true, Ordering::Release);
             committed
         })
     };
 
-    // Checkpoint repeatedly underneath the voter. Each save_state spans build
-    // payload -> write snapshot -> checkpoint, so commits land in the window.
-    for _ in 0..25 {
+    // Checkpoint continuously underneath the voter, so every commit races a
+    // checkpoint no matter how fast the machine is. Each save_state spans
+    // build payload -> write snapshot -> checkpoint, and a commit landing in
+    // that window is exactly the lost-write case.
+    let mut checkpoints = 0;
+    while !done.load(Ordering::Acquire) {
         s.save_state().unwrap();
+        checkpoints += 1;
     }
-    stop.store(true, Ordering::Relaxed);
     let committed = voter.join().unwrap();
 
     // Image the DB *before* any further save_state: the lost writes are still
     // in RAM, so another snapshot would silently heal them.
     crash_copy(&path, &crash);
     assert!(
-        committed.len() > 20,
-        "expected many committed proposals to race the checkpoints, got {}",
-        committed.len()
+        checkpoints > 0,
+        "the checkpointer must have run at least once"
+    );
+    assert_eq!(
+        committed.len(),
+        COMMITS,
+        "every proposal should reach quorum and commit"
     );
 
     let s2 = open(&crash);
@@ -169,42 +186,50 @@ fn consensus_commits_survive_concurrent_save_state() {
 
 /// The same commit path under a concurrent `compact()` (checkpoint without a
 /// snapshot). Here there is no nodes.bin to accidentally carry the write, so
-/// the WAL is the only thing standing between an acked commit and data loss.
+/// the WAL is the only thing standing between an acked commit and data loss,
+/// and this asserts against the crashed WAL directly — a future loader change
+/// cannot make it vacuously pass.
+///
+/// Both tests were verified to still detect the defect after the workload was
+/// reshaped: with the `commit_lock` removed from `submit_vote` (and the
+/// `persist_signed` debug_assert disabled so the durability assertion is what
+/// fires), this loses 1 of 40 and the save_state test above loses 40 of 40.
 #[test]
 fn consensus_commits_survive_concurrent_compact() {
     let path = fresh("test_consensus_compact_race");
     let crash = fresh("test_consensus_compact_race_img");
     let s = Arc::new(open(&path));
 
-    let stop = Arc::new(AtomicBool::new(false));
+    // Fixed voter workload + checkpointer running for the voter's lifetime;
+    // see the note in the save_state test for why the inverse shape is not
+    // portable across machines.
+    let done = Arc::new(AtomicBool::new(false));
     let voter = {
         let s = Arc::clone(&s);
-        let stop = Arc::clone(&stop);
+        let done = Arc::clone(&done);
         std::thread::spawn(move || {
             let mut committed = Vec::new();
-            let mut i = 0;
-            while !stop.load(Ordering::Relaxed) {
+            for i in 0..COMMITS {
                 let id = format!("CAX{i}");
                 if propose_and_commit(&s, &id) {
                     committed.push(id);
                 }
-                i += 1;
             }
+            done.store(true, Ordering::Release);
             committed
         })
     };
 
-    for _ in 0..60 {
+    while !done.load(Ordering::Acquire) {
         s.compact().unwrap();
     }
-    stop.store(true, Ordering::Relaxed);
     let committed = voter.join().unwrap();
 
     crash_copy(&path, &crash);
-    assert!(
-        committed.len() > 20,
-        "expected many committed proposals, got {}",
-        committed.len()
+    assert_eq!(
+        committed.len(),
+        COMMITS,
+        "every proposal should reach quorum and commit"
     );
 
     // Read the crash image's WAL directly: this pins the defect at the WAL
