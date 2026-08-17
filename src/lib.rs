@@ -2133,8 +2133,36 @@ const SEG_KIND_BASE: u8 = 2;
 const SEG_KIND_LEGACY_JSONL: u8 = 3;
 
 const CODEC_NONE: u8 = 0;
-const CODEC_ZSTD: u8 = 1;
+// 1 was zstd — dropped in this same PR (SPEC §8): zstd-sys's vendored C
+// fails to link for aarch64-apple-ios ("Undefined symbols... ___chkstk_darwin",
+// mobile-build.yml run 31982222256). Reserved/unreadable — `read_segment_body`
+// falls through to its `_ => None` arm for byte 1, so an old segment
+// (none exist outside this branch) fails closed rather than silently misreading.
 const CODEC_LZ4: u8 = 2;
+
+/// LZ4 frame format (not the size-prepended block API) so the SAME encoder
+/// type serves both a fully-in-memory body (`write_segment`) and a true
+/// bounded-memory stream from a `Read` source (`migrate_legacy_wal` — the
+/// legacy WAL can be tens of GB and must not be materialized whole).
+fn lz4_frame_compress(body: &[u8]) -> std::io::Result<Vec<u8>> {
+    use std::io::Write;
+    let mut out = Vec::new();
+    {
+        let mut enc = lz4_flex::frame::FrameEncoder::new(&mut out);
+        enc.write_all(body)?;
+        enc.finish()
+            .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e.to_string()))?;
+    }
+    Ok(out)
+}
+
+fn lz4_frame_decompress(compressed: &[u8]) -> std::io::Result<Vec<u8>> {
+    use std::io::Read;
+    let mut dec = lz4_flex::frame::FrameDecoder::new(compressed);
+    let mut out = Vec::new();
+    dec.read_to_end(&mut out)?;
+    Ok(out)
+}
 
 fn frame_crc(seq: u64, payload: &[u8]) -> u32 {
     crc32c::crc32c_append(crc32c::crc32c(&seq.to_le_bytes()), payload)
@@ -2229,8 +2257,7 @@ fn read_segment_body(path: &std::path::Path) -> Option<(u8, Vec<u8>)> {
     }
     let compressed = &bytes[SEG_HEADER_LEN..footer_start];
     let body = match codec {
-        CODEC_ZSTD => zstd::stream::decode_all(compressed).ok()?,
-        CODEC_LZ4 => lz4_flex::decompress_size_prepended(compressed).ok()?,
+        CODEC_LZ4 => lz4_frame_decompress(compressed).ok()?,
         CODEC_NONE => compressed.to_vec(),
         _ => return None,
     };
@@ -2254,8 +2281,7 @@ fn write_segment(
     body: &[u8],
 ) -> std::io::Result<()> {
     let compressed = match codec {
-        CODEC_ZSTD => zstd::stream::encode_all(body, 3)?,
-        CODEC_LZ4 => lz4_flex::compress_prepend_size(body),
+        CODEC_LZ4 => lz4_frame_compress(body)?,
         _ => body.to_vec(),
     };
     let mut header = Vec::with_capacity(SEG_HEADER_LEN);
@@ -10215,7 +10241,7 @@ impl Storage {
         if write_segment(
             &seg_path,
             SEG_KIND_HISTORY,
-            CODEC_ZSTD,
+            CODEC_LZ4,
             min_seq,
             max_seq,
             count,
@@ -10257,7 +10283,7 @@ impl Storage {
         if write_segment(
             &seg_path,
             SEG_KIND_BASE,
-            CODEC_ZSTD,
+            CODEC_LZ4,
             frontier_seq,
             frontier_seq,
             count,
@@ -10280,8 +10306,9 @@ impl Storage {
 
     /// One-way migration (ADR §4): seal the legacy JSONL WAL as segment 0
     /// (kind=legacy_jsonl — recovery-only, pre-epoch, not tx-addressable) with
-    /// bounded memory (two streaming passes: sha256, then zstd), then remove
-    /// the legacy file. Lossless: the segment stores the exact legacy bytes.
+    /// bounded memory (two streaming passes: sha256, then lz4 frame), then
+    /// remove the legacy file. Lossless: the segment stores the exact legacy
+    /// bytes.
     fn migrate_legacy_wal(root: &std::path::Path, legacy: &std::path::Path) -> Result<()> {
         let seg_dir = Self::journal_seg_dir(root);
         fs::create_dir_all(&seg_dir).map_err(|e| Error::from_reason(e.to_string()))?;
@@ -10302,12 +10329,12 @@ impl Storage {
             }
         }
         let sha: [u8; 32] = hasher.finalize().into();
-        // Header/footer identical to write_segment, body zstd-streamed.
+        // Header/footer identical to write_segment, body lz4-frame-streamed.
         let mut header = Vec::with_capacity(SEG_HEADER_LEN);
         header.extend_from_slice(&SEG_MAGIC);
         header.extend_from_slice(&JOURNAL_FORMAT_VERSION.to_le_bytes());
         header.push(SEG_KIND_LEGACY_JSONL);
-        header.push(CODEC_ZSTD);
+        header.push(CODEC_LZ4);
         header.extend_from_slice(&0u64.to_le_bytes());
         header.extend_from_slice(&0u64.to_le_bytes());
         header.extend_from_slice(&0u32.to_le_bytes());
@@ -10324,11 +10351,15 @@ impl Storage {
             out.write_all(&header)
                 .map_err(|e| Error::from_reason(e.to_string()))?;
             {
-                let mut enc = zstd::stream::Encoder::new(&mut out, 3)
-                    .map_err(|e| Error::from_reason(e.to_string()))?;
+                // True streaming: FrameEncoder wraps the destination file
+                // directly, so `std::io::copy` moves the legacy WAL through in
+                // fixed-size chunks — the multi-GB legacy file is never
+                // materialized whole (bounded memory, ADR §4/mobile budget).
+                let mut enc = lz4_flex::frame::FrameEncoder::new(&mut out);
                 let mut src = File::open(legacy).map_err(|e| Error::from_reason(e.to_string()))?;
                 std::io::copy(&mut src, &mut enc).map_err(|e| Error::from_reason(e.to_string()))?;
-                enc.finish().map_err(|e| Error::from_reason(e.to_string()))?;
+                enc.finish()
+                    .map_err(|e| Error::from_reason(e.to_string()))?;
             }
             out.write_all(&sha)
                 .map_err(|e| Error::from_reason(e.to_string()))?;

@@ -97,14 +97,17 @@ unicode-general-category = "1.1.0"
 ed25519-dalek = { version = "2.2.0", features = ["serde"] }
 roaring = "0.10"
 # WP-1.2 framed journal (ADR--GENESISDB-JOURNAL-HISTORY / SPEC--GENESISDB-JOURNAL-FORMAT-V1).
-# zstd is the second C dependency after bundled SQLite; it is an UNCONDITIONAL
-# storage-core dep (sealing runs under `--no-default-features --features mobile`)
-# and must never be gated behind napi-bindings/bins. mobile-build.yml green on
-# all targets is merge-blocking for any change touching these.
-zstd = "0.13"
-# Pure-Rust fallback codec (segment header carries a codec byte, so switching
-# codecs is not a format break if zstd-sys ever fails a mobile target).
-lz4_flex = "0.11"
+# `zstd`/`zstd-sys` was the originally planned primary codec but was DROPPED
+# (SPEC §8): its vendored C sources fail to link for aarch64-apple-ios
+# ("Undefined symbols... ___chkstk_darwin" — a Darwin stack-probe symbol
+# zstd's C emits that iOS cross-linking can't resolve; confirmed via
+# mobile-build.yml run 31982222256, Android was unaffected). `lz4_flex` — the
+# pure-Rust fallback the ADR/SPEC already named for exactly this contingency —
+# is now the SOLE codec, `frame` feature enabled for the streaming API the
+# legacy-WAL migration needs (bounded memory; see `migrate_legacy_wal`). A
+# segment header still carries a codec byte, so reintroducing zstd later
+# (desktop-only, behind a feature) would not be a format break.
+lz4_flex = { version = "0.11", features = ["frame"] }
 # CRC32C (Castagnoli) per frame — hardware-accelerated where available.
 crc32c = "0.6"
 
