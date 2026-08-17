@@ -1204,6 +1204,15 @@ fn bq_unpack(words: &[u64], dim: usize) -> Vec<f32> {
 /// Bigger = better recall, more f32 distance work. BQ (1 bit/dim) benefits most.
 const RERANK_OVERFETCH: usize = 8;
 
+/// Slot-count ceiling for the exact-scan recall floor in `hybrid_search`: when
+/// the HNSW returns fewer candidates than the collection holds and the
+/// collection is no larger than this, the candidate set is rebuilt by exhaustive
+/// scan instead (RCA--HNSW-UNDER-RETURN-SMALL-GRAPH). Sized so the fallback stays
+/// cheap — a scan of this many vectors is a few ms even at large dims — while
+/// leaving real corpora, where a short return can be legitimate and a scan would
+/// be ruinous, entirely on the graph path.
+const EXACT_SCAN_MAX_SLOTS: usize = 4096;
+
 /// Exact Euclidean distance between two prepared f32 vectors. Used by the rerank
 /// stage; reuses the same geometry as the F32 HNSW (`DistL2`). For Cosine
 /// collections both the query and the sidecar vector are unit-normalized, so this
@@ -1930,6 +1939,32 @@ impl VectorCollection {
     /// many DBs open at once, e.g. parallel tests) those reservations stacked and
     /// aborted on OOM. Size to the data instead (ADR--GENESISDB-HNSW-CAPACITY).
     const HNSW_MIN_CAP: usize = 1024;
+
+    /// Exhaustive exact-distance scan over every slot, nearest-first, capped at
+    /// `k`. This is the recall floor beneath the approximate index — see
+    /// `EXACT_SCAN_MAX_SLOTS` and RCA--HNSW-UNDER-RETURN-SMALL-GRAPH.
+    ///
+    /// Distances come from `ArenaStore::f32_at`, which dequantizes for every
+    /// `Quant` mode, so a caller must REPLACE the candidate set with this rather
+    /// than merge into it — mixing these with raw graph distances (Hamming for
+    /// `Binary`) would rank two different scales against each other.
+    fn exact_candidates(&self, query: &[f32], k: usize) -> Vec<(usize, f32)> {
+        let meta = self.metadata.read();
+        let arena = self.arena.read();
+        let mut out: Vec<(usize, f32)> = Vec::with_capacity(meta.len());
+        for (i, m) in meta.iter().enumerate() {
+            let (start, len) = (m.embedding_offset as usize, m.vector_dim as usize);
+            // Skip a slot the arena can't serve (dim mismatch / truncated
+            // arena) rather than panicking on the slice.
+            if len == 0 || len != query.len() || start + len > arena.len() {
+                continue;
+            }
+            out.push((i, exact_l2(query, &arena.f32_at(start, len))));
+        }
+        out.sort_by(|a, b| a.1.partial_cmp(&b.1).unwrap_or(std::cmp::Ordering::Equal));
+        out.truncate(k);
+        out
+    }
 
     fn ensure_hnsw(&self, ef_construction: usize) {
         if self.hnsw.read().is_none() {
@@ -5611,6 +5646,23 @@ impl Storage {
         vkey.verify(&payload, &sig)
             .map_err(|_| Error::from_reason("invalid vote signature"))?;
 
+        // Serialize the vote-commit section with every other writer and with
+        // save_state/compact (RCA--PERSIST-SIGNED-CHECKPOINT-RACE). Committing
+        // mutates in-memory state and then appends to the WAL; without this lock
+        // a checkpoint could build its payload from memory BEFORE the mutation
+        // and truncate the WAL AFTER the append was fsynced and acked, erasing a
+        // commit this method already reported as durable. Holding the lock means
+        // the commit either lands wholly before the payload build, or wholly
+        // after the checkpoint (on the new WAL, past the frontier, where tail
+        // replay recovers it).
+        //
+        // Taken BEFORE `proposals.get_mut` so the lock order is
+        // commit_lock -> proposals. `self.proposals` is touched only here and in
+        // `propose_consensus` (which takes no commit_lock), so no path acquires
+        // them in the opposite order and no cycle exists. The signature checks
+        // above touch only `self.peers`, so they stay off this global lock.
+        let _commit_guard = self.commit_lock.lock();
+
         if let Some(mut proposal_ref) = self.proposals.get_mut(&proposal_id) {
             let proposal = proposal_ref.value_mut();
             // Already-committed guard: once quorum is crossed and the event applied,
@@ -7362,10 +7414,31 @@ impl Storage {
             // SQ8: pack the query with the collection's scale (calibrated or fixed),
             // matching the indexed codes. Non-SQ8 ⇒ SQ8_FIXED, ignored by the arm.
             let sq8 = coll.sq8_snapshot();
-            let hnsw_lock = coll.hnsw.read();
-            match &*hnsw_lock {
-                Some(idx) => idx.search_f32(&query_f32, fetch, ef, center.as_deref(), sq8),
-                None => return Err(Error::from_reason("HNSW not init")),
+            let hits = {
+                let hnsw_lock = coll.hnsw.read();
+                match &*hnsw_lock {
+                    Some(idx) => idx.search_f32(&query_f32, fetch, ef, center.as_deref(), sq8),
+                    None => return Err(Error::from_reason("HNSW not init")),
+                }
+            };
+            // Recall floor (RCA--HNSW-UNDER-RETURN-SMALL-GRAPH). On a small
+            // graph hnsw_rs can return ONLY the entry point — measured 2/150 on
+            // a 24-vector collection, always exactly 1 hit — when that entry
+            // point's layer-0 neighbour list was pruned empty. Recall then
+            // collapses (1 of 10 asked for) instead of degrading, and the
+            // caller cannot tell. When the index demonstrably under-delivers
+            // AND the collection is small enough to scan outright, rebuild the
+            // candidates exactly.
+            //
+            // Both conditions are load-bearing: a short return on a large
+            // collection can be legitimate, and scanning one would be ruinous.
+            // On a healthy graph `hits.len() == fetch.min(slots)`, so this
+            // costs one length read and a compare — the scan never runs.
+            let slots = { coll.metadata.read().len() };
+            if hits.len() < fetch.min(slots) && slots <= EXACT_SCAN_MAX_SLOTS {
+                coll.exact_candidates(&query_f32, fetch)
+            } else {
+                hits
             }
         };
         // f32-sidecar rerank: replace each candidate's quantized distance with the
@@ -8090,7 +8163,23 @@ impl Storage {
     /// Append an already-signed (peer) event verbatim — original signature
     /// preserved (I4) — stamped with a FRESH LOCAL frame seq (ADR D2.1: a frame
     /// ingested from a peer is local history; its origin sequence is metadata).
+    ///
+    /// **The caller must hold `commit_lock`.** This appends to the journal, and
+    /// a concurrent `save_state`/fold checkpoint builds its payload from live
+    /// memory — an append that is acked between that read and the fold is
+    /// erased despite being fsynced (RCA--PERSIST-SIGNED-CHECKPOINT-RACE).
+    /// Callers: `submit_vote` and `reconcile_state_unlocked`, both under the
+    /// lock (save_state/compact hold the SAME mutex, so this fully serializes
+    /// them against a concurrent fold regardless of the journal format).
     pub fn persist_signed(&self, signed_event: SignedEvent) -> Result<u64> {
+        // If nobody holds the lock, `try_lock` succeeds and the invariant was
+        // violated; if WE hold it, `try_lock` always fails (not reentrant), so
+        // this never false-positives on a correct caller.
+        debug_assert!(
+            self.commit_lock.try_lock().is_none(),
+            "persist_signed requires the caller to hold commit_lock \
+             (see RCA--PERSIST-SIGNED-CHECKPOINT-RACE)"
+        );
         let (ack_tx, ack_rx) = unbounded();
         let event = signed_event.event.clone();
         self.wal_sender
