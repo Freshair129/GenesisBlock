@@ -30,6 +30,26 @@ fn open(path: &str) -> Storage {
     .unwrap()
 }
 
+/// WP-1.2: the journal is framed (`wal/active.gwal`: 14-byte GWA1 header, then
+/// [u32 len | u64 seq | u32 crc | payload]). Frames wrap the ORIGINAL
+/// `SignedEvent` JSON bytes, so concatenating payloads gives text with the same
+/// `contains` semantics the old JSONL WAL had.
+fn journal_text(path: &str) -> String {
+    let bytes = fs::read(Path::new(path).join("wal").join("active.gwal")).unwrap_or_default();
+    let mut out = String::new();
+    let mut off = 14usize;
+    while off + 16 <= bytes.len() {
+        let len = u32::from_le_bytes(bytes[off..off + 4].try_into().unwrap()) as usize;
+        if off + 16 + len > bytes.len() {
+            break;
+        }
+        out.push_str(&String::from_utf8_lossy(&bytes[off + 16..off + 16 + len]));
+        out.push('\n');
+        off += 16 + len;
+    }
+    out
+}
+
 fn schema() -> RelationalSchemaPackage {
     RelationalSchemaPackage {
         namespace: "appdata".to_string(),
@@ -218,7 +238,7 @@ fn typed_insert_update_and_named_left_join_are_bounded() {
             operations: vec![insert],
         })
         .is_err());
-    let wal = fs::read_to_string(Path::new(&path).join("genesis-graph.wal")).unwrap();
+    let wal = journal_text(&path);
     assert!(!wal.contains("00000000-0000-4000-8000-000000000203"));
 
     storage
@@ -280,7 +300,7 @@ fn concurrent_mutation_identity_commits_only_one_payload() {
     assert_eq!(results.iter().filter(|result| result.is_ok()).count(), 1);
     assert_eq!(results.iter().filter(|result| result.is_err()).count(), 1);
 
-    let wal = fs::read_to_string(Path::new(&path).join("genesis-graph.wal")).unwrap();
+    let wal = journal_text(&path);
     assert_eq!(wal.matches(MUTATION_ID).count(), 1);
 }
 

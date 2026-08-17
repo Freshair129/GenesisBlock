@@ -131,6 +131,60 @@ fn events_since_filters_by_clock() {
     assert!(a.events_since(a.get_logical_clock()).is_empty());
 }
 
+/// WP-1.2 (ADR D4): the commit_seq cursor serves frames strictly newer than a
+/// responder-domain sequence, across sealed segments AND the active file.
+#[test]
+fn events_since_seq_filters_by_frame_cursor() {
+    let a = open(&fresh("test_ae_seq"));
+    node(&a, "S1");
+    let mid = a.stable_frontier(); // frame seq of S1
+    node(&a, "S2");
+
+    let delta = a.events_since_seq(mid);
+    assert_eq!(delta.len(), 1, "only the post-`mid` frame is returned");
+    match &delta[0].event {
+        Event::Node(n) => assert_eq!(n.id, "S2"),
+        other => panic!("expected the S2 node event, got {other:?}"),
+    }
+    assert!(
+        a.events_since_seq(a.stable_frontier()).is_empty(),
+        "a cursor at the frame frontier yields nothing"
+    );
+
+    // Across a fold: a cursor of 0 must still serve the whole live state out of
+    // the sealed base segment (the seal is not a hole in the delta stream).
+    a.save_state().unwrap();
+    let ids: Vec<String> = a
+        .events_since_seq(0)
+        .into_iter()
+        .filter_map(|se| match se.event {
+            Event::Node(n) => Some(n.id),
+            _ => None,
+        })
+        .collect();
+    assert!(
+        ids.contains(&"S1".to_string()) && ids.contains(&"S2".to_string()),
+        "sealed segments are served by the frame cursor, got {ids:?}"
+    );
+}
+
+/// WP-1.2 (ADR D4): the history horizon is 0 until a fold discards history, and
+/// tracks the folded frontier afterward — the value a responder compares an
+/// incoming cursor against before answering `BeyondHorizon`.
+#[test]
+fn history_horizon_tracks_folds() {
+    let a = open(&fresh("test_ae_horizon"));
+    assert_eq!(a.history_horizon(), 0, "no fold yet: nothing is beyond it");
+    node(&a, "H1");
+    let before = a.stable_frontier();
+    a.save_state().unwrap();
+    assert_eq!(
+        a.history_horizon(),
+        before,
+        "after a fold the horizon is the folded frontier"
+    );
+}
+
 /// Re-applying an already-seen delta is non-fatal and leaves state intact
 /// (reconcile is LWW by clock).
 #[test]

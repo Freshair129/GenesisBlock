@@ -60,10 +60,18 @@ fn add_edge(s: &Storage, id: &str, from: &str, to: &str) {
     .unwrap();
 }
 
+/// WP-1.2: total journal bytes = active file + every sealed segment. The
+/// boundedness contract now covers the whole journal directory, not one file.
 fn wal_len(path: &str) -> u64 {
-    fs::metadata(Path::new(path).join("genesis-graph.wal"))
+    let mut total = fs::metadata(Path::new(path).join("wal").join("active.gwal"))
         .map(|m| m.len())
-        .unwrap_or(0)
+        .unwrap_or(0);
+    if let Ok(entries) = fs::read_dir(Path::new(path).join("journal")) {
+        for entry in entries.flatten() {
+            total += entry.metadata().map(|m| m.len()).unwrap_or(0);
+        }
+    }
+    total
 }
 
 /// `save_state()` checkpoints the WAL down to live state: a workload that

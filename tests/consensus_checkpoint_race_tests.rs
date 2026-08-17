@@ -81,28 +81,107 @@ fn propose_and_commit(s: &Storage, id: &str) -> bool {
 
 /// Byte-copy the DB directory while the source Storage is still open: the disk
 /// image a kill -9 would leave. `genesis.lock` is exclusively locked by the live
-/// process (and recreated by open()); `temp_save/` is snapshot scratch.
+/// process (and recreated by open()); `temp_save/` is snapshot scratch. WP-1.2:
+/// the journal lives in subdirectories (`wal/`, `journal/`) — copy one level
+/// deep so the framed active file and any sealed segments come along too.
 fn crash_copy(src: &str, dst: &str) {
     fs::create_dir_all(dst).unwrap();
     for entry in fs::read_dir(src).unwrap().flatten() {
         let name = entry.file_name();
-        if name == "genesis.lock" || name == "temp_save" || entry.path().is_dir() {
+        if name == "genesis.lock" || name == "temp_save" {
             continue;
         }
-        let mut attempts = 0;
-        loop {
-            match fs::copy(entry.path(), Path::new(dst).join(&name)) {
-                Ok(_) => break,
-                Err(e)
-                    if attempts < 100
-                        && matches!(e.raw_os_error(), Some(5) | Some(32) | Some(33)) =>
-                {
-                    attempts += 1;
-                    std::thread::sleep(std::time::Duration::from_millis(20));
+        if entry.path().is_dir() {
+            let sub_dst = Path::new(dst).join(&name);
+            fs::create_dir_all(&sub_dst).unwrap();
+            for sub in fs::read_dir(entry.path()).unwrap().flatten() {
+                if sub.path().is_file() {
+                    copy_with_retry(&sub.path(), &sub_dst.join(sub.file_name()));
                 }
-                Err(e) => panic!("crash_copy of {:?} failed: {e}", name),
+            }
+            continue;
+        }
+        copy_with_retry(&entry.path(), &Path::new(dst).join(&name));
+    }
+}
+
+fn copy_with_retry(src: &Path, dst: &Path) {
+    let mut attempts = 0;
+    loop {
+        match fs::copy(src, dst) {
+            Ok(_) => break,
+            Err(e)
+                if attempts < 100 && matches!(e.raw_os_error(), Some(5) | Some(32) | Some(33)) =>
+            {
+                attempts += 1;
+                std::thread::sleep(std::time::Duration::from_millis(20));
+            }
+            Err(e) => panic!("crash_copy of {:?} failed: {e}", src),
+        }
+    }
+}
+
+/// WP-1.2: concatenate every frame's payload text from the ENTIRE journal —
+/// the active file PLUS every sealed segment. `compact()`/`save_state()` fold
+/// live state into a sealed, compressed base segment (`journal/B*.gseg`) and
+/// reset the active file to empty (I8) — reading `wal/active.gwal` alone right
+/// after a fold sees none of the just-folded data, which is exactly the false
+/// positive this helper must not produce (frames wrap the ORIGINAL
+/// `SignedEvent` JSON bytes unmodified, so `.contains()` against the result
+/// has the same semantics the old raw-JSONL read had).
+fn journal_text(path: &str) -> String {
+    let mut out = String::new();
+    if let Ok(bytes) = fs::read(Path::new(path).join("wal").join("active.gwal")) {
+        append_frames_text(&bytes, 14, &mut out);
+    }
+    if let Ok(entries) = fs::read_dir(Path::new(path).join("journal")) {
+        for entry in entries.flatten() {
+            let p = entry.path();
+            if p.extension().is_some_and(|e| e == "gseg") {
+                if let Some(body) = read_segment_body(&p) {
+                    append_frames_text(&body, 0, &mut out);
+                }
             }
         }
+    }
+    out
+}
+
+fn append_frames_text(bytes: &[u8], start: usize, out: &mut String) {
+    let mut off = start;
+    while off + 16 <= bytes.len() {
+        let len = u32::from_le_bytes(bytes[off..off + 4].try_into().unwrap()) as usize;
+        if off + 16 + len > bytes.len() {
+            break;
+        }
+        out.push_str(&String::from_utf8_lossy(&bytes[off + 16..off + 16 + len]));
+        off += 16 + len;
+    }
+}
+
+/// Read + decompress a sealed segment's body. Magic/CRC/sha are not
+/// re-verified here — this is a test helper reading a file this same process
+/// just wrote, not the crate's integrity-checked reader.
+fn read_segment_body(path: &Path) -> Option<Vec<u8>> {
+    use std::io::Read;
+    const SEG_HEADER_LEN: usize = 28;
+    const SEG_FOOTER_LEN: usize = 44;
+    let bytes = fs::read(path).ok()?;
+    if bytes.len() < SEG_HEADER_LEN + SEG_FOOTER_LEN || &bytes[0..4] != b"GSG1" {
+        return None;
+    }
+    let codec = bytes[7];
+    let footer_start = bytes.len() - SEG_FOOTER_LEN;
+    let compressed = &bytes[SEG_HEADER_LEN..footer_start];
+    match codec {
+        2 => {
+            let mut dec = lz4_flex::frame::FrameDecoder::new(compressed);
+            let mut body = Vec::new();
+            dec.read_to_end(&mut body).ok()?;
+            Some(body)
+        }
+        0 => Some(compressed.to_vec()),
+        _ => None,
     }
 }
 
@@ -232,10 +311,10 @@ fn consensus_commits_survive_concurrent_compact() {
         "every proposal should reach quorum and commit"
     );
 
-    // Read the crash image's WAL directly: this pins the defect at the WAL
-    // itself rather than at the loader, so a future loader change cannot make
-    // this test vacuously pass.
-    let wal = fs::read_to_string(Path::new(&crash).join("genesis-graph.wal")).unwrap_or_default();
+    // Read the crash image's journal directly: this pins the defect at the
+    // journal itself rather than at the loader, so a future loader change
+    // cannot make this test vacuously pass.
+    let wal = journal_text(&crash);
     let absent: Vec<&String> = committed
         .iter()
         .filter(|id| !wal.contains(&format!("\"{id}\"")))

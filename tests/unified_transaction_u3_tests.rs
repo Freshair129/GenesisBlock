@@ -82,8 +82,13 @@ fn one_wal_transaction_advances_stable_frontier_for_row_and_graph() {
     };
     let committed = storage.commit_transaction(transaction.clone()).unwrap();
 
-    assert_eq!(committed.commit_sequence, 1);
-    assert_eq!(storage.stable_frontier(), 1);
+    // WP-1.2 (ADR D2.3): commit_sequence is the transaction's FRAME seq. The
+    // schema registration above already wrote a frame, so absolute values are
+    // not stable — assert the frontier relationships instead: the txn frontier
+    // IS this commit, and no frame landed after it.
+    assert!(committed.commit_sequence >= 1);
+    assert_eq!(committed.commit_sequence, storage.txn_frontier());
+    assert_eq!(storage.stable_frontier(), committed.commit_sequence);
     assert!(storage.node_view("note-1").is_some());
     let rows = storage
         .query_relational(RelationalQuery {
@@ -98,8 +103,8 @@ fn one_wal_transaction_advances_stable_frontier_for_row_and_graph() {
     assert_eq!(rows, vec![json!({"notes.title": "Unified"})]);
 
     let retry = storage.commit_transaction(transaction).unwrap();
-    assert_eq!(retry.commit_sequence, 1);
-    assert_eq!(storage.stable_frontier(), 1);
+    assert_eq!(retry.commit_sequence, committed.commit_sequence);
+    assert_eq!(storage.stable_frontier(), committed.commit_sequence);
 }
 
 #[test]

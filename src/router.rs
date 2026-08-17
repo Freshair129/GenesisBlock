@@ -283,9 +283,21 @@ async fn transaction_commit_handler(
     }
 }
 
+/// WP-1.2 (ADR D2.3): `/v1/frontier` returns BOTH frontiers as an object —
+/// `frame` (last durable journal frame; advances on every mutation) and `txn`
+/// (last transaction frame; the `expected_frontier` CAS value). Additive JSON:
+/// pre-WP-1.2 the body was the bare txn scalar, so SDKs reading the old shape
+/// must move to `.txn` (GBP1-noted breaking change).
 async fn stable_frontier_handler(State(state): State<AppState>) -> impl IntoResponse {
     let storage = state.storage.read();
-    (StatusCode::OK, Json(storage.stable_frontier())).into_response()
+    (
+        StatusCode::OK,
+        Json(serde_json::json!({
+            "frame": storage.stable_frontier(),
+            "txn": storage.txn_frontier(),
+        })),
+    )
+        .into_response()
 }
 
 async fn studio_capabilities_handler(State(state): State<AppState>) -> impl IntoResponse {

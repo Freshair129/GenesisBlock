@@ -113,12 +113,25 @@ fn approve(s: &Storage, pid: &str) -> bool {
     s.submit_vote(pid.to_string(), me, true, sig).unwrap()
 }
 
+/// WP-1.2: count FRAMES in the framed active journal (`wal/active.gwal`:
+/// 14-byte GWA1 header, then [u32 len | u64 seq | u32 crc | payload]) — the
+/// successor of counting JSONL lines.
 fn wal_lines(path: &str) -> usize {
-    let wal = format!("{}/genesis-graph.wal", path);
-    match fs::read_to_string(&wal) {
-        Ok(s) => s.lines().filter(|l| !l.trim().is_empty()).count(),
-        Err(_) => 0,
+    let bytes = match fs::read(Path::new(path).join("wal").join("active.gwal")) {
+        Ok(b) => b,
+        Err(_) => return 0,
+    };
+    let mut count = 0usize;
+    let mut off = 14usize;
+    while off + 16 <= bytes.len() {
+        let len = u32::from_le_bytes(bytes[off..off + 4].try_into().unwrap()) as usize;
+        if off + 16 + len > bytes.len() {
+            break;
+        }
+        count += 1;
+        off += 16 + len;
     }
+    count
 }
 
 /// An Edge committed through consensus is indexed into the adjacency maps, so it

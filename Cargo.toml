@@ -96,6 +96,20 @@ hex = "0.4"
 unicode-general-category = "1.1.0"
 ed25519-dalek = { version = "2.2.0", features = ["serde"] }
 roaring = "0.10"
+# WP-1.2 framed journal (ADR--GENESISDB-JOURNAL-HISTORY / SPEC--GENESISDB-JOURNAL-FORMAT-V1).
+# `zstd`/`zstd-sys` was the originally planned primary codec but was DROPPED
+# (SPEC §8): its vendored C sources fail to link for aarch64-apple-ios
+# ("Undefined symbols... ___chkstk_darwin" — a Darwin stack-probe symbol
+# zstd's C emits that iOS cross-linking can't resolve; confirmed via
+# mobile-build.yml run 31982222256, Android was unaffected). `lz4_flex` — the
+# pure-Rust fallback the ADR/SPEC already named for exactly this contingency —
+# is now the SOLE codec, `frame` feature enabled for the streaming API the
+# legacy-WAL migration needs (bounded memory; see `migrate_legacy_wal`). A
+# segment header still carries a codec byte, so reintroducing zstd later
+# (desktop-only, behind a feature) would not be a format break.
+lz4_flex = { version = "0.11", features = ["frame"] }
+# CRC32C (Castagnoli) per frame — hardware-accelerated where available.
+crc32c = "0.6"
 
 [build-dependencies]
 napi-build = "2.1"
@@ -125,6 +139,11 @@ http-body-util = "0.1"
 # bincode-encoded `meta_<name>.bin` fixture (ADR--GENESISDB-BINCODE-EXIT).
 bincode = "1.3"
 postcard = { version = "1.1", features = ["use-std"] }
+# tests/consensus_checkpoint_race_tests.rs deliberately bypasses Storage::open
+# and reads the on-disk journal directly (so a loader bug can't mask a write-
+# path durability bug) — needs the same lz4 frame decoder the crate uses to
+# decompress sealed segments (journal/*.gseg).
+lz4_flex = { version = "0.11", features = ["frame"] }
 
 [[bin]]
 name = "snb-ingestion"

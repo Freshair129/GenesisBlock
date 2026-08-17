@@ -24,7 +24,10 @@ test('versionSync matches package.json version (single source of truth)', () => 
 })
 
 test('schemaVersionSync matches the TypeScript-side CURRENT_SCHEMA_VERSION major byte', () => {
-  // packages/gks/src/lib/schema-version.ts → CURRENT_SCHEMA_VERSION = '1.0.0'
+  // packages/gks/src/lib/schema-version.ts → CURRENT_SCHEMA_VERSION = '2.0.0'
   // The Rust crate encodes only the major byte (PROTOCOL--GENESIS-GRAPH-FFI §6).
-  assert.equal(schemaVersionSync(), 1)
+  // Bumped to 2 by WP-1.2 (framed journal): the on-disk format changed, so a
+  // client built against v1 must not silently open a migrated database
+  // (ADR--GENESISDB-JOURNAL-HISTORY §4 — downgrade fails closed).
+  assert.equal(schemaVersionSync(), 2)
 })

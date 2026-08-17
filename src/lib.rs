@@ -77,7 +77,7 @@ pub mod query;
 pub mod router;
 use query::HqlCommand;
 
-pub const SCHEMA_VERSION: u32 = 1;
+pub const SCHEMA_VERSION: u32 = 2;
 const PROJECTION_SCHEMA_VERSION: u32 = 2;
 const PROJECTION_DB_FILE: &str = "projection.sqlite";
 /// Stable engine identifier (independent of package version).
@@ -602,10 +602,23 @@ pub enum GossipMessage {
     PullRequest {
         from_clock: u32,
         target_peer_id: String,
+        /// WP-1.2 (ADR D4): commit_seq/segment cursor alongside the Lamport
+        /// cursor. When present, the responder serves frames with a LOCAL
+        /// commit_seq greater than this value (the requester tracks the
+        /// responder-domain cursor; replica sequences are never comparable
+        /// across peers). `default` keeps pre-WP-1.2 peers deserializing.
+        #[serde(default)]
+        from_commit_seq: Option<u64>,
     },
     PushDelta {
         events: Vec<SignedEvent>,
     },
+    /// WP-1.2 (ADR D4): the requester's commit_seq cursor predates this
+    /// responder's history horizon — delta pull cannot serve it. The requester
+    /// must abandon delta-pull for this peer and re-bootstrap (transfer channel
+    /// lands in WP-1.3; until retention folds can advance the horizon past a
+    /// live cursor this variant is wire-defined but not triggered in practice).
+    BeyondHorizon { horizon: u64 },
     ConsensusPropose {
         proposal: Box<ConsensusProposal>,
     },
@@ -663,7 +676,14 @@ pub struct GenesisTransaction {
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct GenesisTransactionEvent {
     pub transaction_id: String,
-    pub commit_sequence: u64,
+    /// ADR--GENESISDB-JOURNAL-HISTORY D2.2: demoted from "the" commit sequence
+    /// to origin metadata. The authoritative transaction sequence is the LOCAL
+    /// frame stamp (`commit_seq` in the unsigned frame header) — never this
+    /// signed payload field, which a receiving replica must NOT merge into its
+    /// own counter. Locally-created events write 0; ingested peer events keep
+    /// whatever the origin wrote. `alias` keeps pre-WP-1.2 WAL lines parsing.
+    #[serde(alias = "commit_sequence")]
+    pub origin_commit_seq: u64,
     pub payload_hash: String,
     pub relational: Vec<RelationalMutationGroup>,
     pub nodes: Vec<NodeOutput>,
@@ -2103,27 +2123,235 @@ enum IndexJob {
 /// checkpoint payload (already-serialized live-state `SignedEvent` lines) is
 /// handed to it and the file is truncated + rewritten there (see `wal_checkpoint`).
 pub enum WalMsg {
-    /// Append one signed event; `ack` fires once it is flushed + fsynced.
-    Append(Box<SignedEvent>, Sender<bool>),
-    /// Replace the entire WAL with `data` (live-state snapshot), then ack.
-    Checkpoint { data: Vec<u8>, ack: Sender<bool> },
+    /// Append one signed event; `ack` fires with the stamped `commit_seq` once
+    /// the frame is flushed + fsynced (WP-1.2, ADR D2.4: the ack returns the
+    /// stamp so `CommitResult` and the projection consume the local frame seq).
+    /// `None` = append failed (read-only, or writer error).
+    Append(Box<SignedEvent>, Sender<Option<u64>>),
+    /// Fold-to-base checkpoint (ADR D3 `frontier_only` profile — the WP-1.2
+    /// interim default until WP-1.3 lands budget profiles): frame each
+    /// `payload_lines` JSONL line at `frontier_seq` into a base segment
+    /// (kind=base, derived/materialized), then drop all older journal files and
+    /// start a fresh active file. The journal stays a complete recovery source
+    /// at every instant (I8): the base segment IS the folded history's live
+    /// effect. Executed on the writer thread — only the handle owner can rotate
+    /// the active file (Windows; same constraint PR #28 hit).
+    Checkpoint {
+        payload_lines: Vec<u8>,
+        frontier_seq: u64,
+        ack: Sender<bool>,
+    },
 }
 
-/// How open() must consult the WAL relative to the snapshot, decided by
-/// `wal_tail_plan` from the snapshot's recorded `wal_frontier`
-/// (RCA--WAL-TAIL-REPLAY).
-enum WalTailPlan {
-    /// No snapshot, or a pre-frontier (legacy) snapshot, or no WAL: nothing
-    /// positional to replay — try_load_state alone decides the load path.
-    None,
-    /// Frontier validated against the on-disk WAL prefix: after the snapshot
-    /// instant-load, replay events from this byte offset (the acked writes
-    /// newer than the snapshot).
-    Tail(u64),
-    /// Frontier recorded but the WAL prefix does not match it (e.g. crash
-    /// between the state.json rename and the WAL checkpoint): the snapshot is
-    /// stale relative to the WAL — skip it and fully replay the WAL.
-    SnapshotStale,
+// === WP-1.2 framed journal codec (SPEC--GENESISDB-JOURNAL-FORMAT-V1) ===
+// Frame:   [u32 len | u64 commit_seq | u32 crc32c(seq||payload) | payload]
+//          payload = the ORIGINAL serde_json SignedEvent bytes (I4: frames wrap,
+//          never rewrite — signatures verify over stored bytes).
+// Active:  wal/active.gwal = GWA1 header (magic4 + ver2 + first_seq8), then
+//          uncompressed frames (append + group-commit fsync).
+// Segment: journal/<J|B><min_seq>.gseg = GSG1 header (magic4 + ver2 + kind1 +
+//          codec1 + min8 + max8 + count4), codec-compressed frame body, footer
+//          (sha256(body)32 + body_len8 + crc32c(header||sha||len)4).
+
+const ACTIVE_MAGIC: [u8; 4] = *b"GWA1";
+const SEG_MAGIC: [u8; 4] = *b"GSG1";
+const JOURNAL_FORMAT_VERSION: u16 = 1;
+const ACTIVE_HEADER_LEN: usize = 14;
+const FRAME_HEADER_LEN: usize = 16;
+const SEG_HEADER_LEN: usize = 28;
+const SEG_FOOTER_LEN: usize = 44;
+/// Active-file seal threshold (spec §2; mobile profile tightens this in WP-1.3).
+const ACTIVE_SEAL_THRESHOLD: u64 = 64 * 1024 * 1024;
+
+const SEG_KIND_HISTORY: u8 = 1;
+const SEG_KIND_BASE: u8 = 2;
+const SEG_KIND_LEGACY_JSONL: u8 = 3;
+
+const CODEC_NONE: u8 = 0;
+// 1 was zstd — dropped in this same PR (SPEC §8): zstd-sys's vendored C
+// fails to link for aarch64-apple-ios ("Undefined symbols... ___chkstk_darwin",
+// mobile-build.yml run 31982222256). Reserved/unreadable — `read_segment_body`
+// falls through to its `_ => None` arm for byte 1, so an old segment
+// (none exist outside this branch) fails closed rather than silently misreading.
+const CODEC_LZ4: u8 = 2;
+
+/// LZ4 frame format (not the size-prepended block API) so the SAME encoder
+/// type serves both a fully-in-memory body (`write_segment`) and a true
+/// bounded-memory stream from a `Read` source (`migrate_legacy_wal` — the
+/// legacy WAL can be tens of GB and must not be materialized whole).
+fn lz4_frame_compress(body: &[u8]) -> std::io::Result<Vec<u8>> {
+    use std::io::Write;
+    let mut out = Vec::new();
+    {
+        let mut enc = lz4_flex::frame::FrameEncoder::new(&mut out);
+        enc.write_all(body)?;
+        enc.finish()
+            .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e.to_string()))?;
+    }
+    Ok(out)
+}
+
+fn lz4_frame_decompress(compressed: &[u8]) -> std::io::Result<Vec<u8>> {
+    use std::io::Read;
+    let mut dec = lz4_flex::frame::FrameDecoder::new(compressed);
+    let mut out = Vec::new();
+    dec.read_to_end(&mut out)?;
+    Ok(out)
+}
+
+fn frame_crc(seq: u64, payload: &[u8]) -> u32 {
+    crc32c::crc32c_append(crc32c::crc32c(&seq.to_le_bytes()), payload)
+}
+
+fn encode_frame(out: &mut Vec<u8>, seq: u64, payload: &[u8]) {
+    out.extend_from_slice(&(payload.len() as u32).to_le_bytes());
+    out.extend_from_slice(&seq.to_le_bytes());
+    out.extend_from_slice(&frame_crc(seq, payload).to_le_bytes());
+    out.extend_from_slice(payload);
+}
+
+fn active_header(first_seq: u64) -> [u8; ACTIVE_HEADER_LEN] {
+    let mut h = [0u8; ACTIVE_HEADER_LEN];
+    h[0..4].copy_from_slice(&ACTIVE_MAGIC);
+    h[4..6].copy_from_slice(&JOURNAL_FORMAT_VERSION.to_le_bytes());
+    h[6..14].copy_from_slice(&first_seq.to_le_bytes());
+    h
+}
+
+/// Walk frames in `bytes` starting at `start`; call `f(seq, payload)` for each
+/// valid frame. Returns the byte offset of the first torn/corrupt frame
+/// (== `bytes.len()` when everything parsed clean) so callers can truncate the
+/// tear away (I9: a crash leaves at most a torn tail, never a poisoned file).
+fn walk_frames(bytes: &[u8], start: usize, mut f: impl FnMut(u64, &[u8])) -> usize {
+    let mut off = start;
+    loop {
+        if off + FRAME_HEADER_LEN > bytes.len() {
+            return off;
+        }
+        let len = u32::from_le_bytes(bytes[off..off + 4].try_into().unwrap()) as usize;
+        let seq = u64::from_le_bytes(bytes[off + 4..off + 12].try_into().unwrap());
+        let crc = u32::from_le_bytes(bytes[off + 12..off + 16].try_into().unwrap());
+        let ps = off + FRAME_HEADER_LEN;
+        if ps + len > bytes.len() {
+            return off;
+        }
+        let payload = &bytes[ps..ps + len];
+        if frame_crc(seq, payload) != crc {
+            return off;
+        }
+        f(seq, payload);
+        off = ps + len;
+    }
+}
+
+/// Sealed-segment identity read off the fixed-size header (no body decode).
+struct SegmentInfo {
+    path: PathBuf,
+    kind: u8,
+    min_seq: u64,
+    max_seq: u64,
+}
+
+fn read_segment_header(path: &std::path::Path) -> Option<SegmentInfo> {
+    let mut file = File::open(path).ok()?;
+    let mut h = [0u8; SEG_HEADER_LEN];
+    file.read_exact(&mut h).ok()?;
+    if h[0..4] != SEG_MAGIC {
+        return None;
+    }
+    Some(SegmentInfo {
+        path: path.to_path_buf(),
+        kind: h[6],
+        min_seq: u64::from_le_bytes(h[8..16].try_into().unwrap()),
+        max_seq: u64::from_le_bytes(h[16..24].try_into().unwrap()),
+    })
+}
+
+/// Read + verify a sealed segment; returns (kind, uncompressed body). `None`
+/// on any integrity failure (magic/sha/crc/codec) — the caller treats the
+/// segment as unreadable and recovery degrades explicitly, never silently.
+fn read_segment_body(path: &std::path::Path) -> Option<(u8, Vec<u8>)> {
+    let bytes = fs::read(path).ok()?;
+    if bytes.len() < SEG_HEADER_LEN + SEG_FOOTER_LEN || bytes[0..4] != SEG_MAGIC {
+        return None;
+    }
+    let kind = bytes[6];
+    let codec = bytes[7];
+    let footer_start = bytes.len() - SEG_FOOTER_LEN;
+    let sha_expected = &bytes[footer_start..footer_start + 32];
+    let body_len =
+        u64::from_le_bytes(bytes[footer_start + 32..footer_start + 40].try_into().unwrap());
+    let crc_expected =
+        u32::from_le_bytes(bytes[footer_start + 40..footer_start + 44].try_into().unwrap());
+    let mut crc_input = Vec::with_capacity(SEG_HEADER_LEN + 40);
+    crc_input.extend_from_slice(&bytes[0..SEG_HEADER_LEN]);
+    crc_input.extend_from_slice(sha_expected);
+    crc_input.extend_from_slice(&body_len.to_le_bytes());
+    if crc32c::crc32c(&crc_input) != crc_expected {
+        return None;
+    }
+    let compressed = &bytes[SEG_HEADER_LEN..footer_start];
+    let body = match codec {
+        CODEC_LZ4 => lz4_frame_decompress(compressed).ok()?,
+        CODEC_NONE => compressed.to_vec(),
+        _ => return None,
+    };
+    if body.len() as u64 != body_len || Sha256::digest(&body)[..] != sha_expected[..] {
+        return None;
+    }
+    Some((kind, body))
+}
+
+/// Seal `body` (uncompressed frame bytes, or raw JSONL for legacy segments)
+/// into `final_path` with I9 atomicity: tmp → fsync → rename → best-effort
+/// directory fsync (Windows has no directory fsync; rename durability there is
+/// best-effort, per ADR D1).
+fn write_segment(
+    final_path: &std::path::Path,
+    kind: u8,
+    codec: u8,
+    min_seq: u64,
+    max_seq: u64,
+    frame_count: u32,
+    body: &[u8],
+) -> std::io::Result<()> {
+    let compressed = match codec {
+        CODEC_LZ4 => lz4_frame_compress(body)?,
+        _ => body.to_vec(),
+    };
+    let mut header = Vec::with_capacity(SEG_HEADER_LEN);
+    header.extend_from_slice(&SEG_MAGIC);
+    header.extend_from_slice(&JOURNAL_FORMAT_VERSION.to_le_bytes());
+    header.push(kind);
+    header.push(codec);
+    header.extend_from_slice(&min_seq.to_le_bytes());
+    header.extend_from_slice(&max_seq.to_le_bytes());
+    header.extend_from_slice(&frame_count.to_le_bytes());
+    let sha = Sha256::digest(body);
+    let mut crc_input = Vec::with_capacity(SEG_HEADER_LEN + 40);
+    crc_input.extend_from_slice(&header);
+    crc_input.extend_from_slice(&sha);
+    crc_input.extend_from_slice(&(body.len() as u64).to_le_bytes());
+    let crc = crc32c::crc32c(&crc_input);
+
+    let tmp_path = final_path.with_extension("gseg.tmp");
+    {
+        let mut f = File::create(&tmp_path)?;
+        f.write_all(&header)?;
+        f.write_all(&compressed)?;
+        f.write_all(&sha)?;
+        f.write_all(&(body.len() as u64).to_le_bytes())?;
+        f.write_all(&crc.to_le_bytes())?;
+        f.sync_all()?;
+    }
+    fs::rename(&tmp_path, final_path)?;
+    #[cfg(unix)]
+    if let Some(dir) = final_path.parent() {
+        if let Ok(d) = File::open(dir) {
+            let _ = d.sync_all();
+        }
+    }
+    Ok(())
 }
 
 pub struct Storage {
@@ -2132,7 +2360,18 @@ pub struct Storage {
     projection_path: PathBuf,
     projection_db: Mutex<Connection>,
     commit_lock: Mutex<()>,
+    /// WP-1.2 (ADR D2.3): the FRAME frontier — commit_seq of the last durable
+    /// journal frame, advancing on every mutation. Replica-local; never
+    /// comparable across peers. `stable_frontier()` reports this.
     commit_sequence: AtomicU64,
+    /// Frame seq of the last `Event::Transaction` frame (the transaction-lineage
+    /// frontier `expected_frontier` CASes against — a frame-level CAS would
+    /// spuriously fail on any interleaved ordinary write).
+    txn_frontier: AtomicU64,
+    /// Pre-WP-1.2 JSONL WAL path (`genesis-graph.wal`). Exists only until the
+    /// one-way migration seals it as segment 0, or indefinitely in read-only
+    /// opens of a legacy database.
+    legacy_log_path: PathBuf,
     pub nodes: DashMap<u32, NodeOutput>,
     pub edges: DashMap<u128, EdgeOutput>,
     pub out_idx: DashMap<u32, HashSet<u128>>,
@@ -2611,12 +2850,48 @@ impl Storage {
             );
             CREATE TABLE IF NOT EXISTS applied_transactions (
                 transaction_id TEXT PRIMARY KEY,
-                commit_sequence INTEGER NOT NULL UNIQUE,
-                payload_hash TEXT NOT NULL
+                commit_sequence INTEGER NOT NULL,
+                payload_hash TEXT NOT NULL,
+                frame_seq INTEGER
             );
             ",
         )
         .map_err(|e| Error::from_reason(e.to_string()))?;
+        // WP-1.2 (ADR D2.2): uniqueness re-keys from the origin commit_sequence
+        // to the LOCAL frame seq. Two replicas each committing their own
+        // transaction N and then syncing used to collide on the old UNIQUE
+        // constraint and abort the whole reconcile batch. SQLite cannot drop a
+        // constraint, so pre-WP-1.2 tables are rebuilt in place.
+        let txn_needs_rebuild = conn
+            .prepare("PRAGMA table_info(applied_transactions)")
+            .and_then(|mut stmt| {
+                let rows = stmt.query_map([], |row| row.get::<_, String>(1))?;
+                let mut has_frame_seq = false;
+                for name in rows {
+                    if name? == "frame_seq" {
+                        has_frame_seq = true;
+                    }
+                }
+                Ok(!has_frame_seq)
+            })
+            .map_err(|e| Error::from_reason(e.to_string()))?;
+        if txn_needs_rebuild {
+            conn.execute_batch(
+                "
+                CREATE TABLE applied_transactions_v2 (
+                    transaction_id TEXT PRIMARY KEY,
+                    commit_sequence INTEGER NOT NULL,
+                    payload_hash TEXT NOT NULL,
+                    frame_seq INTEGER
+                );
+                INSERT INTO applied_transactions_v2(transaction_id, commit_sequence, payload_hash)
+                    SELECT transaction_id, commit_sequence, payload_hash FROM applied_transactions;
+                DROP TABLE applied_transactions;
+                ALTER TABLE applied_transactions_v2 RENAME TO applied_transactions;
+                ",
+            )
+            .map_err(|e| Error::from_reason(e.to_string()))?;
+        }
         let has_clock_peer = conn
             .prepare("PRAGMA table_info(props)")
             .and_then(|mut stmt| {
@@ -3618,7 +3893,10 @@ impl Storage {
         Ok(())
     }
 
-    fn projection_apply_event(&self, event: &Event) -> Result<()> {
+    /// Apply one journal event to the SQLite projection. `frame_seq` is the
+    /// event's LOCAL frame stamp (WP-1.2) — the authoritative sequence for
+    /// transaction identity and the frontier keys.
+    fn projection_apply_event(&self, event: &Event, frame_seq: u64) -> Result<()> {
         if self.read_only {
             return Ok(());
         }
@@ -3688,16 +3966,20 @@ impl Storage {
                 tx.commit().map_err(|e| Error::from_reason(e.to_string()))?;
             }
             Event::Transaction(transaction) => {
-                let existing: Option<(u64, String)> = conn
+                // Identity = (transaction_id, payload_hash). The origin sequence
+                // is metadata (ADR D2.2) and is deliberately NOT part of the
+                // identity check — two replicas legitimately assign different
+                // sequences to the same transaction.
+                let existing: Option<String> = conn
                     .query_row(
-                        "SELECT commit_sequence, payload_hash FROM applied_transactions WHERE transaction_id = ?1",
+                        "SELECT payload_hash FROM applied_transactions WHERE transaction_id = ?1",
                         [&transaction.transaction_id],
-                        |row| Ok((row.get(0)?, row.get(1)?)),
+                        |row| row.get(0),
                     )
                     .optional()
                     .map_err(|e| Error::from_reason(e.to_string()))?;
-                if let Some((sequence, hash)) = existing {
-                    if sequence == transaction.commit_sequence && hash == transaction.payload_hash {
+                if let Some(hash) = existing {
+                    if hash == transaction.payload_hash {
                         return Ok(());
                     }
                     return Err(Error::from_reason("transaction identity conflict"));
@@ -3715,15 +3997,14 @@ impl Storage {
                     let _ = Self::projection_apply_rows_tx(&tx, &schema, &group.mutations)?;
                 }
                 tx.execute(
-                    "INSERT INTO applied_transactions(transaction_id, commit_sequence, payload_hash) VALUES(?1, ?2, ?3)",
-                    params![transaction.transaction_id, transaction.commit_sequence, transaction.payload_hash],
+                    "INSERT INTO applied_transactions(transaction_id, commit_sequence, payload_hash, frame_seq) VALUES(?1, ?2, ?3, ?4)",
+                    params![transaction.transaction_id, transaction.origin_commit_seq, transaction.payload_hash, frame_seq],
                 )
                 .map_err(|e| Error::from_reason(e.to_string()))?;
-                Self::projection_state_set(
-                    &tx,
-                    "stable_frontier",
-                    &transaction.commit_sequence.to_string(),
-                )?;
+                // Informational only since WP-1.2 — the counters re-seed from
+                // the journal itself on open, never from the projection.
+                Self::projection_state_set(&tx, "stable_frontier", &frame_seq.to_string())?;
+                Self::projection_state_set(&tx, "txn_frontier", &frame_seq.to_string())?;
                 tx.commit().map_err(|e| Error::from_reason(e.to_string()))?;
             }
             Event::Batch(events) => {
@@ -3780,7 +4061,10 @@ impl Storage {
     }
 
     fn projection_replay_wal(&self) -> Result<()> {
-        if !self.log_path.exists() {
+        let journal_present = self.log_path.exists()
+            || self.legacy_log_path.exists()
+            || !Self::journal_list_segments(&self.path).is_empty();
+        if !journal_present {
             let projection_complete = self
                 .nodes
                 .iter()
@@ -3789,82 +4073,40 @@ impl Storage {
                 return Ok(());
             }
             return Err(Error::from_reason(
-                "projection recovery requires genesis-graph.wal when node props are missing",
+                "projection recovery requires the journal when node props are missing",
             ));
         }
-        use std::io::BufRead;
-        let file = File::open(&self.log_path).map_err(|e| Error::from_reason(e.to_string()))?;
-        let reader = std::io::BufReader::new(file);
-        for line in reader.lines() {
-            let line = line.map_err(|e| Error::from_reason(e.to_string()))?;
-            if line.trim().is_empty() {
-                continue;
+        let mut first_err: Option<Error> = None;
+        self.scan_journal(None, true, &mut |seq, signed_event| {
+            if first_err.is_some() {
+                return;
             }
-            let Ok(signed_event) = serde_json::from_str::<SignedEvent>(&line) else {
-                continue;
+            let mut apply = |event: Event| {
+                if let Err(e) = self.projection_apply_event(&event, seq) {
+                    first_err = Some(e);
+                }
             };
             match signed_event.event {
-                Event::Node(node) => {
-                    self.projection_apply_event(&Event::Node(node))?;
-                }
-                Event::RelationalSchema(package) => {
-                    self.projection_apply_event(&Event::RelationalSchema(package))?;
-                }
-                Event::RelationalRows {
-                    namespace,
-                    schema_version,
-                    mutation_id,
-                    payload_hash,
-                    affected_rows,
-                    mutations,
-                } => {
-                    self.projection_apply_event(&Event::RelationalRows {
-                        namespace,
-                        schema_version,
-                        mutation_id,
-                        payload_hash,
-                        affected_rows,
-                        mutations,
-                    })?;
-                }
-                Event::Transaction(transaction) => {
-                    self.projection_apply_event(&Event::Transaction(transaction))?;
-                }
+                Event::Node(node) => apply(Event::Node(node)),
+                Event::RelationalSchema(package) => apply(Event::RelationalSchema(package)),
+                rows @ Event::RelationalRows { .. } => apply(rows),
+                Event::Transaction(transaction) => apply(Event::Transaction(transaction)),
                 Event::Batch(events) => {
-                    let pending: Vec<Event> = events
-                        .into_iter()
-                        .filter_map(|event| match event {
-                            Event::Node(node) => Some(Event::Node(node)),
-                            Event::RelationalSchema(package) => {
-                                Some(Event::RelationalSchema(package))
-                            }
-                            Event::RelationalRows {
-                                namespace,
-                                schema_version,
-                                mutation_id,
-                                payload_hash,
-                                affected_rows,
-                                mutations,
-                            } => Some(Event::RelationalRows {
-                                namespace,
-                                schema_version,
-                                mutation_id,
-                                payload_hash,
-                                affected_rows,
-                                mutations,
-                            }),
-                            Event::Transaction(transaction) => {
-                                Some(Event::Transaction(transaction))
-                            }
-                            _ => None,
-                        })
-                        .collect();
-                    for event in pending {
-                        self.projection_apply_event(&event)?;
+                    for event in events {
+                        match event {
+                            Event::Node(_)
+                            | Event::RelationalSchema(_)
+                            | Event::RelationalRows { .. }
+                            | Event::Transaction(_) => apply(event),
+                            _ => {}
+                        }
                     }
                 }
                 _ => {}
             }
+        });
+        if let Some(e) = first_err {
+            return Err(e);
         }
         let projection_complete = self
             .nodes
@@ -3872,7 +4114,7 @@ impl Storage {
             .all(|entry| self.projection_props(*entry.key()).ok().flatten().is_some());
         if !projection_complete {
             return Err(Error::from_reason(
-                "WAL replay did not recover props for every resident node",
+                "journal replay did not recover props for every resident node",
             ));
         }
         Ok(())
@@ -4452,14 +4694,14 @@ impl Storage {
         let conn = self.projection_db.lock();
         let mut statement = conn
             .prepare(
-                "SELECT transaction_id, commit_sequence, payload_hash FROM applied_transactions ORDER BY commit_sequence",
+                "SELECT transaction_id, commit_sequence, payload_hash FROM applied_transactions ORDER BY COALESCE(frame_seq, commit_sequence)",
             )
             .map_err(|e| Error::from_reason(e.to_string()))?;
         let events = statement
             .query_map([], |row| {
                 Ok(Event::Transaction(GenesisTransactionEvent {
                     transaction_id: row.get(0)?,
-                    commit_sequence: row.get(1)?,
+                    origin_commit_seq: row.get(1)?,
                     payload_hash: row.get(2)?,
                     relational: vec![],
                     nodes: vec![],
@@ -4540,7 +4782,7 @@ impl Storage {
         if let Some(on_disk) = Self::read_ondisk_schema_version(&root) {
             if on_disk > SCHEMA_VERSION {
                 return Err(Error::from_reason(format!(
-                    "database schema v{} was written by a newer engine; this engine supports up to v{}. Upgrade the engine to open this database.",
+                    "SCHEMA_VERSION_UNSUPPORTED: database schema v{} was written by a newer engine; this engine supports up to v{}. Upgrade the engine to open this database (never partial-read, never rewrite — ADR--GENESISDB-JOURNAL-HISTORY §4).",
                     on_disk, SCHEMA_VERSION
                 )));
             }
@@ -4573,7 +4815,35 @@ impl Storage {
         let verifying_key = signing_key.verifying_key();
         let local_peer_id = hex::encode(Sha256::digest(verifying_key.as_bytes()))[..16].to_string();
 
-        let log_path = root.join("genesis-graph.wal");
+        // WP-1.2 framed journal layout: wal/active.gwal + journal/*.gseg.
+        let legacy_log_path = root.join("genesis-graph.wal");
+        let log_path = root.join("wal").join("active.gwal");
+        if !read_only {
+            fs::create_dir_all(root.join("wal")).ok();
+            fs::create_dir_all(root.join("journal")).ok();
+            // I9 hygiene: crashed seals leave *.tmp — delete them before
+            // scanning. Skipped on read-only opens (which must not mutate the
+            // database): a stray .tmp is never listed as a segment anyway.
+            Self::journal_cleanup(&root);
+        }
+        // One-way migration (ADR §4): seal the legacy JSONL WAL as segment 0
+        // (kind=legacy_jsonl, recovery-only, not tx-addressable) and remove it.
+        // Lossless — the segment stores the exact legacy bytes — so it needs no
+        // prior snapshot (the snapshot-first rule guards FOLDS, which discard;
+        // seals discard nothing). Read-only opens skip migration and read the
+        // legacy file in place.
+        if !read_only && legacy_log_path.exists() {
+            Self::migrate_legacy_wal(&root, &legacy_log_path)?;
+        }
+        // I9: truncate a torn active-file tail (crash mid-append) BEFORE the
+        // writer thread opens it for append, then seed the frame counter from
+        // the journal itself (ADR D2.4 — never from the projection). Read-only
+        // opens skip the truncation (no mutation) — replay stops at the tear
+        // either way, since `walk_frames` refuses the first invalid frame.
+        if !read_only {
+            Self::journal_truncate_torn_active(&log_path);
+        }
+        let initial_next_seq = Self::journal_max_seq(&root, &log_path) + 1;
         let projection_path = root.join(PROJECTION_DB_FILE);
         let projection_conn = if read_only {
             Self::open_projection(&projection_path, true)?
@@ -4607,69 +4877,131 @@ impl Storage {
         let wal_handle = if read_only {
             std::thread::spawn(move || {
                 while let Ok(message) = wal_receiver.recv() {
-                    let ack = match message {
-                        WalMsg::Append(_, ack) | WalMsg::Checkpoint { ack, .. } => ack,
-                    };
-                    let _ = ack.send(false);
+                    match message {
+                        WalMsg::Append(_, ack) => {
+                            let _ = ack.send(None);
+                        }
+                        WalMsg::Checkpoint { ack, .. } => {
+                            let _ = ack.send(false);
+                        }
+                    }
                 }
             })
         } else {
+            let seg_root = root.clone();
             std::thread::spawn(move || {
-                if let Ok(file) = FileOpenOptions::new()
-                    .append(true)
-                    .create(true)
-                    .open(&log_path_clone)
-                {
-                    let mut writer = std::io::BufWriter::with_capacity(128 * 1024, file);
-                    let mut batch: Vec<crossbeam_channel::Sender<bool>> = Vec::with_capacity(1024);
-                    // A checkpoint pulled out of the micro-batch drain is stashed here
-                    // and applied only after the in-flight append batch is flushed +
-                    // acked, so the new (live-state) WAL never loses a just-acked write.
-                    let mut pending_ckpt: Option<(Vec<u8>, crossbeam_channel::Sender<bool>)> = None;
-                    loop {
-                        match wal_receiver.recv() {
-                            Ok(WalMsg::Append(signed_event, ack_tx)) => {
-                                batch.push(ack_tx);
-                                if let Ok(json) = serde_json::to_string(&signed_event) {
-                                    let _ = writer.write_all(json.as_bytes());
-                                    let _ = writer.write_all(b"\n");
-                                }
-                                let timeout = Duration::from_millis(5);
-                                let start = Instant::now();
-                                while batch.len() < 1024 && start.elapsed() < timeout {
-                                    match wal_receiver.try_recv() {
-                                        Ok(WalMsg::Append(se, tx)) => {
-                                            batch.push(tx);
-                                            if let Ok(j) = serde_json::to_string(&se) {
-                                                let _ = writer.write_all(j.as_bytes());
-                                                let _ = writer.write_all(b"\n");
-                                            }
-                                        }
-                                        // Defer the checkpoint: drain ends so the current
-                                        // append batch is durably flushed + acked first.
-                                        Ok(WalMsg::Checkpoint { data, ack }) => {
-                                            pending_ckpt = Some((data, ack));
-                                            break;
-                                        }
-                                        Err(_) => break,
-                                    }
-                                }
-                                let _ = writer.flush();
-                                let _ = writer.get_mut().sync_all();
-                                for ack in batch.drain(..) {
-                                    let _ = ack.send(true);
-                                }
-                                if let Some((data, ack)) = pending_ckpt.take() {
-                                    Self::wal_checkpoint(&mut writer, &log_path_clone, &data);
-                                    let _ = ack.send(true);
-                                }
+                // The writer thread owns the active-file handle for the whole
+                // Storage lifetime — every rotation (seal/fold) happens HERE,
+                // because only the handle owner can replace the file on Windows
+                // (the PR #28 lesson; see wal_checkpoint history in git).
+                let Some(mut writer) =
+                    Self::journal_open_active(&log_path_clone, initial_next_seq)
+                else {
+                    // Can't open the journal: refuse every append so no caller
+                    // ever gets a false durability ack.
+                    while let Ok(message) = wal_receiver.recv() {
+                        match message {
+                            WalMsg::Append(_, ack) => {
+                                let _ = ack.send(None);
                             }
-                            Ok(WalMsg::Checkpoint { data, ack }) => {
-                                Self::wal_checkpoint(&mut writer, &log_path_clone, &data);
-                                let _ = ack.send(true);
+                            WalMsg::Checkpoint { ack, .. } => {
+                                let _ = ack.send(false);
                             }
-                            Err(_) => break,
                         }
+                    }
+                    return;
+                };
+                let mut next_seq = initial_next_seq;
+                let mut frame_buf: Vec<u8> = Vec::with_capacity(4096);
+                let mut batch: Vec<(crossbeam_channel::Sender<Option<u64>>, u64)> =
+                    Vec::with_capacity(1024);
+                // A fold pulled out of the micro-batch drain is stashed here and
+                // applied only after the in-flight append batch is flushed +
+                // acked, so the folded journal never loses a just-acked write.
+                let mut pending_ckpt: Option<(Vec<u8>, u64, crossbeam_channel::Sender<bool>)> =
+                    None;
+                loop {
+                    match wal_receiver.recv() {
+                        Ok(WalMsg::Append(signed_event, ack_tx)) => {
+                            if let Ok(json) = serde_json::to_vec(&signed_event) {
+                                let seq = next_seq;
+                                next_seq += 1;
+                                frame_buf.clear();
+                                encode_frame(&mut frame_buf, seq, &json);
+                                let _ = writer.write_all(&frame_buf);
+                                batch.push((ack_tx, seq));
+                            } else {
+                                let _ = ack_tx.send(None);
+                            }
+                            let timeout = Duration::from_millis(5);
+                            let start = Instant::now();
+                            while batch.len() < 1024 && start.elapsed() < timeout {
+                                match wal_receiver.try_recv() {
+                                    Ok(WalMsg::Append(se, tx)) => {
+                                        if let Ok(j) = serde_json::to_vec(&se) {
+                                            let seq = next_seq;
+                                            next_seq += 1;
+                                            frame_buf.clear();
+                                            encode_frame(&mut frame_buf, seq, &j);
+                                            let _ = writer.write_all(&frame_buf);
+                                            batch.push((tx, seq));
+                                        } else {
+                                            let _ = tx.send(None);
+                                        }
+                                    }
+                                    // Defer the fold: drain ends so the current
+                                    // append batch is durably flushed + acked first.
+                                    Ok(WalMsg::Checkpoint {
+                                        payload_lines,
+                                        frontier_seq,
+                                        ack,
+                                    }) => {
+                                        pending_ckpt = Some((payload_lines, frontier_seq, ack));
+                                        break;
+                                    }
+                                    Err(_) => break,
+                                }
+                            }
+                            let _ = writer.flush();
+                            let ok = writer.get_mut().sync_all().is_ok();
+                            for (ack, seq) in batch.drain(..) {
+                                let _ = ack.send(if ok { Some(seq) } else { None });
+                            }
+                            if let Some((lines, frontier, ack)) = pending_ckpt.take() {
+                                let ok = Self::journal_fold(
+                                    &mut writer,
+                                    &seg_root,
+                                    &log_path_clone,
+                                    &lines,
+                                    frontier,
+                                    next_seq,
+                                );
+                                let _ = ack.send(ok);
+                            } else if Self::journal_active_len(&writer) > ACTIVE_SEAL_THRESHOLD {
+                                Self::journal_seal_active(
+                                    &mut writer,
+                                    &seg_root,
+                                    &log_path_clone,
+                                    next_seq,
+                                );
+                            }
+                        }
+                        Ok(WalMsg::Checkpoint {
+                            payload_lines,
+                            frontier_seq,
+                            ack,
+                        }) => {
+                            let ok = Self::journal_fold(
+                                &mut writer,
+                                &seg_root,
+                                &log_path_clone,
+                                &payload_lines,
+                                frontier_seq,
+                                next_seq,
+                            );
+                            let _ = ack.send(ok);
+                        }
+                        Err(_) => break,
                     }
                 }
             })
@@ -4789,6 +5121,8 @@ impl Storage {
             index_pending,
             wal_handle: Some(wal_handle),
             index_handle: Some(index_handle),
+            txn_frontier: AtomicU64::new(0),
+            legacy_log_path,
             local_peer_id,
             logical_clock: AtomicU32::new(0),
             gossip_port: AtomicU32::new(0),
@@ -4800,44 +5134,56 @@ impl Storage {
             verifying_key,
         };
 
-        // --- Recovery (RCA--WAL-TAIL-REPLAY): the WAL is the durability
-        // authority. Loading used to be either/or — a parseable snapshot
-        // meant the WAL was never read, silently dropping every write acked
-        // after the last save_state. The snapshot now records the exact
-        // compacted-WAL payload it was saved with (`wal_frontier`: byte
-        // length + sha256); when that prefix still matches the on-disk WAL,
-        // instant-load the snapshot and replay only the tail beyond it. A
-        // mismatched prefix means snapshot and WAL disagree (crash between
-        // the state.json rename and the WAL checkpoint) — skip the snapshot
-        // and replay the whole (compact-to-live-state, self-sufficient) WAL.
-        // Snapshots without a frontier (pre-upgrade) instant-load as before.
-        let plan = storage.wal_tail_plan();
-        let snapshot_loaded =
-            !matches!(plan, WalTailPlan::SnapshotStale) && storage.try_load_state();
-        match plan {
-            WalTailPlan::Tail(offset) if snapshot_loaded => storage.replay_wal_from(offset),
-            _ if !snapshot_loaded && storage.log_path.exists() => storage.replay_wal_from(0),
-            _ => {}
+        // --- Recovery (ADR--GENESISDB-JOURNAL-HISTORY D5): snapshot@frontier +
+        // replay journal frames > frontier. The frame stamps make the cursor
+        // position-independent, which retires PR #100's byte-positional
+        // prefix-hash: replay is seq-filtered and idempotent (LWW upserts), so
+        // a crash between the state.json rename and the fold merely re-applies
+        // frames the snapshot already contains — correct either way, no
+        // SnapshotStale machinery needed. Snapshots without a journal frontier
+        // (pre-WP-1.2, or never saved) get a full journal replay, which is also
+        // idempotent over whatever try_load_state loaded.
+        storage
+            .commit_sequence
+            .store(initial_next_seq.saturating_sub(1), Ordering::SeqCst);
+        let journal_frontier = fs::read_to_string(storage.path.join("state.json"))
+            .ok()
+            .and_then(|c| serde_json::from_str::<serde_json::Value>(&c).ok())
+            .and_then(|v| v["journal"]["frontier_seq"].as_u64());
+        let saved_txn_frontier = fs::read_to_string(storage.path.join("state.json"))
+            .ok()
+            .and_then(|c| serde_json::from_str::<serde_json::Value>(&c).ok())
+            .and_then(|v| v["journal"]["txn_frontier"].as_u64())
+            .unwrap_or(0);
+        storage
+            .txn_frontier
+            .store(saved_txn_frontier, Ordering::SeqCst);
+        let legacy_byte_frontier = fs::read_to_string(storage.path.join("state.json"))
+            .ok()
+            .and_then(|c| serde_json::from_str::<serde_json::Value>(&c).ok())
+            .is_some_and(|v| v.get("wal_frontier").is_some());
+        let snapshot_loaded = storage.try_load_state();
+        match (snapshot_loaded, journal_frontier) {
+            // Framed snapshot: replay only frames past the seq frontier.
+            (true, Some(frontier)) => storage.replay_journal(Some(frontier), false),
+            // Pre-WP-1.2 snapshot carrying the byte-positional cursor: the
+            // cursor is meaningless against the migrated journal, and the
+            // legacy WAL tail may hold acked writes newer than the snapshot —
+            // full replay, once (idempotent for graph state; duplicate vector
+            // arena rows are reclaimed by the next index compaction).
+            (true, None) if legacy_byte_frontier => storage.replay_journal(None, true),
+            // Pre-frontier snapshot (no cursor of either kind): legacy
+            // behavior — instant load only, no replay (back-compat).
+            (true, None) => {}
+            // No snapshot: the journal alone is the recovery source.
+            (false, _) => storage.replay_journal(None, true),
         }
-        // Rebuild the HNSW index for BOTH load paths: WAL replay and the
+        // Rebuild the HNSW index for BOTH load paths: journal replay and the
         // instant snapshot load (try_load_state populates the vector/metadata
         // arenas but never rehydrates HNSW, leaving semantic search broken
         // until a manual rebuild).
         storage.rehydrate_hnsw_index();
         storage.projection_sync_on_open()?;
-        let frontier = storage
-            .projection_db
-            .lock()
-            .query_row(
-                "SELECT value FROM projection_state WHERE key = 'stable_frontier'",
-                [],
-                |row| row.get::<_, String>(0),
-            )
-            .optional()
-            .map_err(|e| Error::from_reason(e.to_string()))?
-            .and_then(|value| value.parse::<u64>().ok())
-            .unwrap_or(0);
-        storage.commit_sequence.store(frontier, Ordering::SeqCst);
         Ok(storage)
     }
 
@@ -4873,22 +5219,27 @@ impl Storage {
         }
     }
 
-    fn append_wal_event(&self, event: &Event) -> Result<()> {
+    /// Append + fsync one event; returns the stamped frame `commit_seq`
+    /// (WP-1.2, ADR D2.4). The frame frontier (`stable_frontier`) advances here.
+    fn append_wal_event(&self, event: &Event) -> Result<u64> {
         let (ack_tx, ack_rx) = unbounded();
         let signed_event = self.sign_event(event);
         self.wal_sender
             .send(WalMsg::Append(Box::new(signed_event), ack_tx))
             .map_err(|_| Error::from_reason("wal disconnected"))?;
-        if !ack_rx.recv().unwrap_or(false) {
-            return Err(Error::from_reason("wal append failed"));
-        }
-        Ok(())
+        let seq = ack_rx
+            .recv()
+            .ok()
+            .flatten()
+            .ok_or_else(|| Error::from_reason("wal append failed"))?;
+        self.commit_sequence.fetch_max(seq, Ordering::SeqCst);
+        Ok(seq)
     }
 
-    pub fn persist(&self, event: &Event) -> Result<()> {
-        self.append_wal_event(event)?;
-        self.projection_apply_event(event)?;
-        Ok(())
+    pub fn persist(&self, event: &Event) -> Result<u64> {
+        let seq = self.append_wal_event(event)?;
+        self.projection_apply_event(event, seq)?;
+        Ok(seq)
     }
 
     fn apply_transaction_memory(&self, transaction: &GenesisTransactionEvent, index: bool) {
@@ -4920,8 +5271,31 @@ impl Storage {
         }
     }
 
+    /// The FRAME frontier: commit_seq of the last durable journal frame
+    /// (WP-1.2 REDEFINITION, ADR D2.3 — previously "last transaction
+    /// commit_sequence", which is now `txn_frontier()`). Advances on every
+    /// mutation; replica-local.
     pub fn stable_frontier(&self) -> u64 {
         self.commit_sequence.load(Ordering::SeqCst)
+    }
+
+    /// Frame seq of the last `Event::Transaction` frame — the value
+    /// `GenesisTransaction.expected_frontier` CASes against.
+    pub fn txn_frontier(&self) -> u64 {
+        self.txn_frontier.load(Ordering::SeqCst)
+    }
+
+    /// ADR D4: oldest history boundary — the max seq folded into a base
+    /// segment (0 = no fold has ever discarded history). tx-time queries below
+    /// this fail `beyond_horizon`; delta-pull cursors below it get
+    /// `GossipMessage::BeyondHorizon`.
+    pub fn history_horizon(&self) -> u64 {
+        Self::journal_list_segments(&self.path)
+            .into_iter()
+            .filter(|s| s.kind == SEG_KIND_BASE)
+            .map(|s| s.max_seq)
+            .max()
+            .unwrap_or(0)
     }
 
     pub fn commit_transaction(&self, input: GenesisTransaction) -> Result<CommitResult> {
@@ -4934,9 +5308,11 @@ impl Storage {
         let _commit_guard = self.commit_lock.lock();
         {
             let conn = self.projection_db.lock();
+            // Idempotent replay returns the stored LOCAL frame seq; legacy rows
+            // (pre-WP-1.2, frame_seq NULL) fall back to their origin sequence.
             let existing: Option<(u64, String)> = conn
                 .query_row(
-                    "SELECT commit_sequence, payload_hash FROM applied_transactions WHERE transaction_id = ?1",
+                    "SELECT COALESCE(frame_seq, commit_sequence), payload_hash FROM applied_transactions WHERE transaction_id = ?1",
                     [&input.transaction_id],
                     |row| Ok((row.get(0)?, row.get(1)?)),
                 )
@@ -4953,7 +5329,10 @@ impl Storage {
                 });
             }
         }
-        let frontier = self.stable_frontier();
+        // WP-1.2 (ADR D2.3): the CAS is re-based to the TRANSACTION-lineage
+        // frontier. stable_frontier() now advances on every mutation, so a
+        // frame-level CAS would spuriously fail on any interleaved add_node.
+        let frontier = self.txn_frontier();
         if input
             .expected_frontier
             .is_some_and(|expected| expected != frontier)
@@ -5044,20 +5423,22 @@ impl Storage {
                 clock: self.next_clock(),
             })
             .collect::<Vec<_>>();
-        let commit_sequence = frontier + 1;
         let event = GenesisTransactionEvent {
             transaction_id: input.transaction_id.clone(),
-            commit_sequence,
+            // ADR D2.2: origin metadata only. 0 for locally-created events; the
+            // authoritative sequence is the unsigned frame stamp below (it
+            // cannot live in this signed payload — peer frames keep original
+            // signatures, I4).
+            origin_commit_seq: 0,
             payload_hash,
             relational: input.relational,
             nodes,
             edges,
             vectors,
         };
-        self.persist(&Event::Transaction(event.clone()))?;
+        let commit_sequence = self.persist(&Event::Transaction(event.clone()))?;
         self.apply_transaction_memory(&event, true);
-        self.commit_sequence
-            .store(commit_sequence, Ordering::SeqCst);
+        self.txn_frontier.store(commit_sequence, Ordering::SeqCst);
         Ok(CommitResult {
             transaction_id: input.transaction_id,
             commit_sequence,
@@ -5378,10 +5759,14 @@ impl Storage {
                     self.persist_signed(signed_event.clone())?;
                 }
                 Event::Transaction(transaction) => {
-                    self.persist_signed(signed_event.clone())?;
+                    // ADR D2.2: the peer's origin_commit_seq is metadata — it
+                    // must NOT be merged into the local counter (the retired
+                    // fetch_max contaminated the replica-local clock and could
+                    // collide the projection's uniqueness). The local frame
+                    // stamp from persist_signed IS this transaction's sequence.
+                    let seq = self.persist_signed(signed_event.clone())?;
                     self.apply_transaction_memory(transaction, true);
-                    self.commit_sequence
-                        .fetch_max(transaction.commit_sequence, Ordering::SeqCst);
+                    self.txn_frontier.fetch_max(seq, Ordering::SeqCst);
                 }
             }
             proposal.committed = true;
@@ -7751,10 +8136,11 @@ impl Storage {
                     self.persist_signed(signed_event.clone())?;
                 }
                 Event::Transaction(transaction) => {
-                    self.persist_signed(signed_event.clone())?;
+                    // ADR D2.2: no fetch_max of the peer's origin sequence —
+                    // see the consensus-commit arm for the rationale.
+                    let seq = self.persist_signed(signed_event.clone())?;
                     self.apply_transaction_memory(transaction, true);
-                    self.commit_sequence
-                        .fetch_max(transaction.commit_sequence, Ordering::SeqCst);
+                    self.txn_frontier.fetch_max(seq, Ordering::SeqCst);
                 }
                 Event::Batch(inner_events) => {
                     // Recursive call needs SignedEvent wrapping, but for now we handle batches as single signed units
@@ -7774,15 +8160,18 @@ impl Storage {
         Ok(())
     }
 
-    /// Append an already-signed event to the WAL and apply it to the projection.
+    /// Append an already-signed (peer) event verbatim — original signature
+    /// preserved (I4) — stamped with a FRESH LOCAL frame seq (ADR D2.1: a frame
+    /// ingested from a peer is local history; its origin sequence is metadata).
     ///
-    /// **The caller must hold `commit_lock`.** This appends to the WAL, and a
-    /// concurrent `save_state`/`compact` checkpoint rewrites the WAL from a
-    /// payload built off live memory — an append that is acked between that
-    /// payload build and the truncation is erased despite being fsynced
-    /// (RCA--PERSIST-SIGNED-CHECKPOINT-RACE). Callers: `submit_vote` and
-    /// `reconcile_state_unlocked`, both under the lock.
-    pub fn persist_signed(&self, signed_event: SignedEvent) -> Result<()> {
+    /// **The caller must hold `commit_lock`.** This appends to the journal, and
+    /// a concurrent `save_state`/fold checkpoint builds its payload from live
+    /// memory — an append that is acked between that read and the fold is
+    /// erased despite being fsynced (RCA--PERSIST-SIGNED-CHECKPOINT-RACE).
+    /// Callers: `submit_vote` and `reconcile_state_unlocked`, both under the
+    /// lock (save_state/compact hold the SAME mutex, so this fully serializes
+    /// them against a concurrent fold regardless of the journal format).
+    pub fn persist_signed(&self, signed_event: SignedEvent) -> Result<u64> {
         // If nobody holds the lock, `try_lock` succeeds and the invariant was
         // violated; if WE hold it, `try_lock` always fails (not reentrant), so
         // this never false-positives on a correct caller.
@@ -7796,11 +8185,14 @@ impl Storage {
         self.wal_sender
             .send(WalMsg::Append(Box::new(signed_event), ack_tx))
             .map_err(|_| Error::from_reason("wal disconnected"))?;
-        if !ack_rx.recv().unwrap_or(false) {
-            return Err(Error::from_reason("wal append failed"));
-        }
-        self.projection_apply_event(&event)?;
-        Ok(())
+        let seq = ack_rx
+            .recv()
+            .ok()
+            .flatten()
+            .ok_or_else(|| Error::from_reason("wal append failed"))?;
+        self.commit_sequence.fetch_max(seq, Ordering::SeqCst);
+        self.projection_apply_event(&event, seq)?;
+        Ok(seq)
     }
 
     pub fn get_logical_clock(&self) -> u32 {
@@ -8050,6 +8442,12 @@ impl Storage {
                                                 let req = GossipMessage::PullRequest {
                                                     from_clock: storage.get_logical_clock(),
                                                     target_peer_id: storage.local_peer_id.clone(),
+                                                    // WP-1.2: per-peer responder-domain
+                                                    // cursor tracking lands with the
+                                                    // bootstrap channel (WP-1.3); until
+                                                    // then requesters stay on the
+                                                    // Lamport cursor.
+                                                    from_commit_seq: None,
                                                 };
                                                 if let Ok(data) = serde_json::to_vec(&req) {
                                                     let _ = socket.send_to(&data, peer_addr).await;
@@ -8057,7 +8455,22 @@ impl Storage {
                                             }
                                         }
                                     }
-                                    GossipMessage::PullRequest { from_clock, target_peer_id } => {
+                                    GossipMessage::PullRequest { from_clock, target_peer_id, from_commit_seq } => {
+                                        // WP-1.2 (ADR D4): a commit_seq cursor below our
+                                        // history horizon cannot be served by delta —
+                                        // answer BeyondHorizon so the requester abandons
+                                        // delta-pull (bootstrap channel lands in WP-1.3).
+                                        if let Some(cursor) = from_commit_seq {
+                                            let horizon = storage.history_horizon();
+                                            if cursor < horizon {
+                                                if let Some(reply_addr) = storage.peers.get(&target_peer_id).map(|p| p.addr.clone()) {
+                                                    if let Ok(data) = serde_json::to_vec(&GossipMessage::BeyondHorizon { horizon }) {
+                                                        let _ = socket.send_to(&data, reply_addr).await;
+                                                    }
+                                                }
+                                                continue;
+                                            }
+                                        }
                                         // Anti-entropy: reply with our events newer than the
                                         // requester's clock, addressed to its registered gossip
                                         // addr (the heartbeat port, not the ephemeral src port).
@@ -8067,7 +8480,13 @@ impl Storage {
                                         if let Some(reply_addr) = storage.peers.get(&target_peer_id).map(|p| p.addr.clone()) {
                                             let mut batch = Vec::new();
                                             let mut bytes = 0usize;
-                                            for ev in storage.events_since(from_clock) {
+                                            let events = match from_commit_seq {
+                                                // Frame-cursor path (WP-1.2): serves every
+                                                // frame incl. relational-only transactions.
+                                                Some(cursor) => storage.events_since_seq(cursor),
+                                                None => storage.events_since(from_clock),
+                                            };
+                                            for ev in events {
                                                 let sz = serde_json::to_vec(&ev).map(|v| v.len()).unwrap_or(0) + 2;
                                                 if !batch.is_empty() && bytes + sz > 60_000 { break; }
                                                 bytes += sz;
@@ -8082,6 +8501,18 @@ impl Storage {
                                     }
                                     GossipMessage::PushDelta { events } => {
                                         let _ = storage.reconcile_state(events);
+                                    }
+                                    GossipMessage::BeyondHorizon { horizon } => {
+                                        // WP-1.2 requester handling: delta-pull cannot
+                                        // proceed — mark and stop. The snapshot-bootstrap
+                                        // transfer channel is WP-1.3; until retention can
+                                        // advance a horizon past a live cursor this arm
+                                        // is wire-defined but not triggered in practice.
+                                        println!(
+                                            "Sync: peer horizon {} exceeds our cursor — \
+                                             delta-pull abandoned, awaiting bootstrap (WP-1.3).",
+                                            horizon
+                                        );
                                     }
                                     GossipMessage::ConsensusPropose { proposal } => {
                                         // Verify the proposal's event is authentically signed by
@@ -8164,14 +8595,21 @@ impl Storage {
 
     fn save_state_unlocked(&self) -> Result<()> {
         self.ensure_writable()?;
-        // Build the compacted-WAL payload BEFORE the snapshot so state.json
-        // can record the exact WAL prefix this snapshot corresponds to
-        // (`wal_frontier`) — open() replays only the WAL tail beyond it
-        // (RCA--WAL-TAIL-REPLAY). Writers serialize on commit_lock (held by
-        // save_state), so live state cannot move between this build and the
-        // checkpoint below. Best-effort like the checkpoint itself: a failed
-        // build omits the frontier and the snapshot loads as legacy.
+        // WP-1.2 ordering (I7/I9: seal durability strictly precedes manifest
+        // advance): build the live-state payload, FOLD the journal first (base
+        // segment durable via the writer thread), then write snapshot files
+        // with state.json renamed last. The frame-seq cursor makes every crash
+        // window safe: replay is seq-filtered and idempotent, and the folded
+        // journal remains a complete recovery source on its own (I8), so a
+        // crash between the fold and the state.json rename merely re-applies
+        // frames the snapshot would have covered. Writers serialize on
+        // commit_lock (held by save_state), so live state cannot move between
+        // the build and the fold.
+        let frontier_seq = self.stable_frontier();
         let wal_payload = self.build_compacted_wal().ok();
+        if let Some((payload, count)) = &wal_payload {
+            let _ = self.checkpoint_wal_payload(payload.clone(), frontier_seq, *count);
+        }
         let temp_dir = self.path.join("temp_save");
         if temp_dir.exists() {
             let _ = fs::remove_dir_all(&temp_dir);
@@ -8288,14 +8726,16 @@ impl Storage {
             "schema_version": SCHEMA_VERSION,
             "timestamp": Utc::now().to_rfc3339(),
         });
-        if let Some((payload, _)) = &wal_payload {
-            // The tail-replay cursor: the WAL checkpointed below starts with
-            // exactly these bytes, so anything past this offset on the next
-            // open is a write acked AFTER this snapshot. The hash lets open()
-            // detect a crash that landed state.json but not the checkpoint.
-            state["wal_frontier"] = serde_json::json!({
-                "bytes": payload.len(),
-                "sha256": hex::encode(Sha256::digest(payload)),
+        if wal_payload.is_some() {
+            // The tail-replay cursor (SPEC §3): frames with seq > frontier_seq
+            // on the next open are writes acked AFTER this snapshot. Position-
+            // independent, so no prefix hash is needed (supersedes PR #100's
+            // byte cursor — spec updated in this PR).
+            state["journal"] = serde_json::json!({
+                "frontier_seq": frontier_seq,
+                "txn_frontier": self.txn_frontier(),
+                "tx_epoch_start": 1,
+                "format_version": JOURNAL_FORMAT_VERSION,
             });
         }
         fs::write(temp_dir.join("state.json"), state.to_string()).ok();
@@ -8323,18 +8763,8 @@ impl Storage {
         }
         let _ = fs::remove_dir_all(&temp_dir);
 
-        // Snapshot is durable; compact the WAL down to live state so it stays
-        // bounded instead of growing without limit (AUDIT--P33: ~20 GB at 1M
-        // nodes). compact-to-live-state (not truncate-to-empty) keeps the WAL a
-        // complete, independent recovery source. The checkpoint reuses the SAME
-        // payload the frontier above was computed from — that identity is what
-        // makes the frontier a valid replay cursor. Best-effort: a failed (or
-        // crashed-before) checkpoint leaves the OLD WAL on disk, which fails
-        // the frontier's prefix hash on the next open and safely falls back to
-        // full WAL replay.
-        if let Some((payload, count)) = wal_payload {
-            let _ = self.checkpoint_wal_payload(payload, count);
-        }
+        // The journal fold already ran BEFORE the snapshot swap (see the top of
+        // this function — I7/I9 ordering). Nothing to do here.
 
         println!(
             "Mark IX: State persisted successfully to {}",
@@ -8344,10 +8774,23 @@ impl Storage {
     }
 
     fn is_backup_artifact_name(name: &str) -> bool {
+        // WP-1.2: the journal lives in subdirectories. Manifest paths use '/'
+        // only; the two allowed subdir shapes are exact-prefix whitelisted and
+        // their file component may not contain separators or dots-only names
+        // (path-traversal is structurally impossible).
+        if name == "wal/active.gwal" {
+            return true;
+        }
+        if let Some(seg) = name.strip_prefix("journal/") {
+            return seg.ends_with(".gseg")
+                && !seg.contains(['/', '\\'])
+                && !seg.starts_with('.')
+                && seg.len() > ".gseg".len();
+        }
         matches!(
             name,
             "identity.bin"
-                | "genesis-graph.wal"
+                | "genesis-graph.wal" // legacy bundles (pre-WP-1.2) still restore
                 | "state.json"
                 | "nodes.bin"
                 | "edges.bin"
@@ -8437,11 +8880,17 @@ impl Storage {
 
         let mut names = HashSet::new();
         for artifact in &manifest.artifacts {
+            // Whitelisted subdir artifacts (wal/, journal/) legitimately carry
+            // one '/'; everything else must be a bare file name. Either way the
+            // whitelist itself forbids traversal components.
+            let flat_ok = Path::new(&artifact.path)
+                .file_name()
+                .and_then(|name| name.to_str())
+                == Some(artifact.path.as_str());
+            let subdir_ok =
+                artifact.path.starts_with("wal/") || artifact.path.starts_with("journal/");
             if !Self::is_backup_artifact_name(&artifact.path)
-                || Path::new(&artifact.path)
-                    .file_name()
-                    .and_then(|name| name.to_str())
-                    != Some(artifact.path.as_str())
+                || !(flat_ok || subdir_ok)
                 || artifact.sha256.len() != 64
                 || hex::decode(&artifact.sha256).is_err()
                 || !names.insert(artifact.path.clone())
@@ -8451,15 +8900,15 @@ impl Storage {
                 ));
             }
         }
-        for required in [
-            "identity.bin",
-            "genesis-graph.wal",
-            "state.json",
-            PROJECTION_DB_FILE,
-        ] {
+        for required in ["identity.bin", "state.json", PROJECTION_DB_FILE] {
             if !names.contains(required) {
                 return Err(Error::from_reason("Genesis backup manifest is incomplete"));
             }
+        }
+        // The journal: framed bundles carry wal/active.gwal; pre-WP-1.2 bundles
+        // carry genesis-graph.wal (restore migrates it at the verification open).
+        if !names.contains("wal/active.gwal") && !names.contains("genesis-graph.wal") {
+            return Err(Error::from_reason("Genesis backup manifest is incomplete"));
         }
         Ok(())
     }
@@ -8518,6 +8967,32 @@ impl Storage {
                     byte_count,
                     sha256,
                 });
+            }
+        }
+        // WP-1.2: the journal lives in subdirectories — one bundle must carry
+        // it (manifest paths use '/', platform-independent).
+        let active = self.path.join("wal").join("active.gwal");
+        if active.is_file() {
+            let (byte_count, sha256) = Self::sha256_file(&active)?;
+            artifacts.push(BackupArtifact {
+                path: "wal/active.gwal".to_string(),
+                byte_count,
+                sha256,
+            });
+        }
+        if let Ok(entries) = fs::read_dir(Self::journal_seg_dir(&self.path)) {
+            for entry in entries.flatten() {
+                let p = entry.path();
+                if p.extension().is_some_and(|e| e == "gseg") {
+                    if let Some(name) = p.file_name().and_then(|n| n.to_str()) {
+                        let (byte_count, sha256) = Self::sha256_file(&p)?;
+                        artifacts.push(BackupArtifact {
+                            path: format!("journal/{name}"),
+                            byte_count,
+                            sha256,
+                        });
+                    }
+                }
             }
         }
         artifacts.sort_by(|left, right| left.path.cmp(&right.path));
@@ -8676,6 +9151,11 @@ impl Storage {
                     ));
                 }
                 let output_path = staging.join(&path);
+                // Subdir artifacts (wal/, journal/) need their parent created;
+                // the manifest whitelist already forbids traversal components.
+                if let Some(parent) = output_path.parent() {
+                    fs::create_dir_all(parent).map_err(|e| Error::from_reason(e.to_string()))?;
+                }
                 let mut output = FileOpenOptions::new()
                     .write(true)
                     .create_new(true)
@@ -8733,149 +9213,6 @@ impl Storage {
             Err(error) => {
                 let _ = fs::remove_dir_all(&staging);
                 Err(error)
-            }
-        }
-    }
-
-    /// Decide how open() must consult the WAL, from the snapshot's recorded
-    /// `wal_frontier` (RCA--WAL-TAIL-REPLAY). Plain WAL lines carry no
-    /// sequence number, so the cursor is positional: the snapshot stores the
-    /// byte length + sha256 of the exact compacted payload its checkpoint
-    /// wrote, and we re-hash the on-disk WAL's prefix to verify the file
-    /// still starts with that payload before trusting the offset.
-    fn wal_tail_plan(&self) -> WalTailPlan {
-        let state = match fs::read_to_string(self.path.join("state.json"))
-            .ok()
-            .and_then(|c| serde_json::from_str::<serde_json::Value>(&c).ok())
-        {
-            Some(v) => v,
-            // No/unparseable snapshot: try_load_state fails on its own and
-            // open() falls back to full WAL replay — nothing to plan here.
-            None => return WalTailPlan::None,
-        };
-        let frontier = &state["wal_frontier"];
-        let (Some(bytes), Some(expected)) =
-            (frontier["bytes"].as_u64(), frontier["sha256"].as_str())
-        else {
-            // Pre-upgrade snapshot (no frontier recorded): legacy behavior,
-            // instant load only. The next save_state writes a frontier.
-            return WalTailPlan::None;
-        };
-        if !self.log_path.exists() {
-            // Snapshot present but the WAL was (manually) removed: nothing to
-            // validate or replay.
-            return WalTailPlan::None;
-        }
-        let wal_len = match fs::metadata(&self.log_path) {
-            Ok(m) => m.len(),
-            Err(_) => return WalTailPlan::None,
-        };
-        if wal_len < bytes {
-            return WalTailPlan::SnapshotStale;
-        }
-        let mut file = match File::open(&self.log_path) {
-            Ok(f) => f,
-            Err(_) => return WalTailPlan::SnapshotStale,
-        };
-        let mut hasher = Sha256::new();
-        let mut remaining = bytes;
-        let mut buf = [0u8; 64 * 1024];
-        while remaining > 0 {
-            let want = remaining.min(buf.len() as u64) as usize;
-            match file.read(&mut buf[..want]) {
-                Ok(0) | Err(_) => return WalTailPlan::SnapshotStale,
-                Ok(n) => {
-                    hasher.update(&buf[..n]);
-                    remaining -= n as u64;
-                }
-            }
-        }
-        if hex::encode(hasher.finalize()) == expected {
-            WalTailPlan::Tail(bytes)
-        } else {
-            println!(
-                "Mark IX: snapshot/WAL frontier mismatch — snapshot skipped, \
-                 replaying full WAL (WAL authority)"
-            );
-            WalTailPlan::SnapshotStale
-        }
-    }
-
-    /// Apply WAL events into memory starting at byte `offset` (0 = full
-    /// replay, a frontier offset = tail replay over a loaded snapshot).
-    /// Vectors are staged only (index=false): rehydrate_hnsw_index after
-    /// load builds every index once, for all recovery paths.
-    fn replay_wal_from(&self, offset: u64) {
-        use std::io::{BufRead, Seek, SeekFrom};
-        let mut file = match File::open(&self.log_path) {
-            Ok(f) => f,
-            Err(_) => return,
-        };
-        if offset > 0 && file.seek(SeekFrom::Start(offset)).is_err() {
-            return;
-        }
-        let reader = std::io::BufReader::new(file);
-        for line in reader.lines().map_while(|r| r.ok()) {
-            if let Ok(signed_event) = serde_json::from_str::<SignedEvent>(&line) {
-                let event = signed_event.event;
-                match event {
-                    Event::Node(n) => {
-                        let u32_id = self.get_or_intern_id(&n.id);
-                        if let Some(emb) = n.embedding.clone() {
-                            self.replay_vector(
-                                &n.collection,
-                                &n.id,
-                                emb,
-                                n.lang.clone().unwrap_or("en".to_string()),
-                                false,
-                            );
-                        }
-                        self.insert_node_lean(u32_id, n);
-                    }
-                    Event::Edge(e) => {
-                        let u32_id = self.index_edge_internal(&e.id, &e.from, &e.to);
-                        self.edges.insert(u32_id, e);
-                    }
-                    Event::Vector(v) => {
-                        self.replay_vector(
-                            &v.collection,
-                            &v.node_id,
-                            v.embedding,
-                            v.lang.clone().unwrap_or_else(|| "en".to_string()),
-                            false,
-                        );
-                    }
-                    Event::Batch(events) => {
-                        for batch_event in events {
-                            match batch_event {
-                                Event::Node(n) => {
-                                    let u32_id = self.get_or_intern_id(&n.id);
-                                    if let Some(emb) = n.embedding.clone() {
-                                        self.replay_vector(
-                                            &n.collection,
-                                            &n.id,
-                                            emb,
-                                            n.lang.clone().unwrap_or("en".to_string()),
-                                            false,
-                                        );
-                                    }
-                                    self.insert_node_lean(u32_id, n);
-                                }
-                                Event::Edge(e) => {
-                                    let u32_id = self.index_edge_internal(&e.id, &e.from, &e.to);
-                                    self.edges.insert(u32_id, e);
-                                }
-                                _ => {}
-                            }
-                        }
-                    }
-                    Event::RelationalSchema(_) | Event::RelationalRows { .. } => {
-                        // Relational state is rebuilt by projection_sync_on_open.
-                    }
-                    Event::Transaction(transaction) => {
-                        self.apply_transaction_memory(&transaction, false);
-                    }
-                }
             }
         }
     }
@@ -9624,25 +9961,31 @@ impl Storage {
     /// entries deserialize to a zero clock and are not `> from_clock`, so they don't
     /// re-sync on their own — re-`add_vector` re-stamps them with a live clock.)
     pub fn events_since(&self, from_clock: u32) -> Vec<SignedEvent> {
-        if !self.log_path.exists() {
-            return Vec::new();
-        }
         let mut out: Vec<(u32, SignedEvent)> = Vec::new();
-        if let Ok(file) = File::open(&self.log_path) {
-            let reader = std::io::BufReader::new(file);
-            use std::io::BufRead;
-            for line in reader.lines().map_while(|r| r.ok()) {
-                if let Ok(se) = serde_json::from_str::<SignedEvent>(&line) {
-                    if let Some(t) = Self::event_time(&se.event) {
-                        if t > from_clock {
-                            out.push((t, se));
-                        }
-                    }
+        self.scan_journal(None, true, &mut |_, se| {
+            if let Some(t) = Self::event_time(&se.event) {
+                if t > from_clock {
+                    out.push((t, se));
                 }
             }
-        }
+        });
         out.sort_by_key(|(t, _)| *t);
         out.into_iter().map(|(_, se)| se).collect()
+    }
+
+    /// WP-1.2 (ADR D4): serve frames newer than a responder-domain commit_seq
+    /// cursor — the new sync path. Unlike the Lamport filter above this also
+    /// serves relational-only transactions (every frame has a seq), closing the
+    /// `event_time = None` gap. Frame order IS local order, so no re-sort.
+    pub fn events_since_seq(&self, from_seq: u64) -> Vec<SignedEvent> {
+        // Cursor 0 = the peer has nothing, so send everything (including a base
+        // segment folded at seq 0); any other value is an exclusive cursor.
+        let cursor = if from_seq == 0 { None } else { Some(from_seq) };
+        let mut out: Vec<SignedEvent> = Vec::new();
+        self.scan_journal(cursor, false, &mut |_, se| {
+            out.push(se);
+        });
+        out
     }
 
     /// Reconstruct a live node's primary embedding from its collection arena, at
@@ -9673,41 +10016,6 @@ impl Storage {
         )
     }
 
-    /// Replace the open WAL's contents with `data`, executed ON the WAL-writer
-    /// thread so it owns the file handle being swapped. The old `compact()` wrote a
-    /// `.new` file and `fs::rename`d it over the WAL from the caller thread — but
-    /// the writer thread keeps `genesis-graph.wal` open for the whole `Storage`
-    /// lifetime and Windows refuses to rename over a file with a live handle, so
-    /// that rename silently failed (`.ok()`) and the WAL never shrank (AUDIT--P33).
-    ///
-    /// Truncation is done by REOPENING the file, not `set_len(0)`: a Rust
-    /// append-mode handle is granted `FILE_GENERIC_WRITE & !FILE_WRITE_DATA` on
-    /// Windows, so `SetEndOfFile` (what `set_len` calls) is refused on it — the
-    /// truncate fails silently and the new events just get appended to the old log.
-    /// A fresh `write+truncate` handle starts the file at length 0; afterward we
-    /// reopen in append mode for subsequent writes. Both opens succeed alongside
-    /// the handle being replaced because Rust opens files share-read/write/delete.
-    fn wal_checkpoint(writer: &mut std::io::BufWriter<File>, path: &std::path::Path, data: &[u8]) {
-        let _ = writer.flush();
-        let _ = writer.get_mut().sync_all();
-        // Truncate-to-zero + write the live-state snapshot through a fresh handle.
-        if let Ok(f) = FileOpenOptions::new()
-            .write(true)
-            .create(true)
-            .truncate(true)
-            .open(path)
-        {
-            *writer = std::io::BufWriter::with_capacity(128 * 1024, f); // old append handle dropped
-            let _ = writer.write_all(data);
-            let _ = writer.flush();
-            let _ = writer.get_mut().sync_all();
-        }
-        // Restore an append-mode handle for the steady-state append path.
-        if let Ok(f) = FileOpenOptions::new().append(true).create(true).open(path) {
-            *writer = std::io::BufWriter::with_capacity(128 * 1024, f); // truncate handle dropped
-        }
-    }
-
     pub fn compact(&self) -> Result<()> {
         self.ensure_writable()?;
         let _commit_guard = self.commit_lock.lock();
@@ -9715,18 +10023,17 @@ impl Storage {
     }
 
     fn compact_unlocked(&self) -> Result<()> {
+        let frontier_seq = self.stable_frontier();
         let (buf, count) = self.build_compacted_wal()?;
-        self.checkpoint_wal_payload(buf, count)
+        self.checkpoint_wal_payload(buf, frontier_seq, count)
     }
 
-    /// Serialize current live state as the compacted-WAL payload (the
-    /// `SignedEvent` lines a checkpoint rewrites the WAL to). Split out of
-    /// `compact_unlocked` so `save_state_unlocked` can build the payload
-    /// BEFORE writing state.json — its byte length + sha256 become the
-    /// snapshot's `wal_frontier`, the tail-replay cursor for crash recovery
-    /// (RCA--WAL-TAIL-REPLAY) — and then checkpoint that SAME payload.
-    /// Callers must hold `commit_lock` (writers serialize on it, so live
-    /// state cannot move between the build and the checkpoint).
+    /// Serialize current live state as the fold payload (the `SignedEvent`
+    /// JSONL lines the writer thread frames into a base segment at the fold
+    /// frontier — WP-1.2). Split out of `compact_unlocked` so
+    /// `save_state_unlocked` can build the payload, fold FIRST (I7/I9), then
+    /// snapshot. Callers must hold `commit_lock` (writers serialize on it, so
+    /// live state cannot move between the build and the fold).
     fn build_compacted_wal(&self) -> Result<(Vec<u8>, usize)> {
         self.ensure_writable()?;
         // Build the live-state snapshot in memory, then hand it to the WAL thread
@@ -9781,30 +10088,27 @@ impl Storage {
         // the arena. Keep the latest (highest-clock) vector per (node, collection)
         // for still-live nodes; drop the rest.
         {
-            use std::io::BufRead;
             let mut latest: HashMap<(String, Option<String>), VectorEvent> = HashMap::new();
-            if let Ok(file) = File::open(&self.log_path) {
-                let reader = std::io::BufReader::new(file);
-                for line in reader.lines().map_while(|r| r.ok()) {
-                    if let Ok(se) = serde_json::from_str::<SignedEvent>(&line) {
-                        if let Event::Vector(v) = se.event {
-                            let live = self
-                                .get_u32(&v.node_id)
-                                .is_some_and(|u| self.nodes.contains_key(&u));
-                            if !live {
-                                continue;
-                            }
-                            let key = (v.node_id.clone(), v.collection.clone());
-                            match latest.get(&key) {
-                                Some(prev) if prev.clock.time >= v.clock.time => {}
-                                _ => {
-                                    latest.insert(key, v);
-                                }
-                            }
+            // Pre-fold journal scan (segments + active; legacy too — secondary
+            // vectors may predate migration): keep the latest per (node,
+            // collection) for still-live nodes.
+            self.scan_journal(None, true, &mut |_, se| {
+                if let Event::Vector(v) = se.event {
+                    let live = self
+                        .get_u32(&v.node_id)
+                        .is_some_and(|u| self.nodes.contains_key(&u));
+                    if !live {
+                        return;
+                    }
+                    let key = (v.node_id.clone(), v.collection.clone());
+                    match latest.get(&key) {
+                        Some(prev) if prev.clock.time >= v.clock.time => {}
+                        _ => {
+                            latest.insert(key, v);
                         }
                     }
                 }
-            }
+            });
             for v in latest.into_values() {
                 if let Ok(json) = serde_json::to_string(&self.sign_event(&Event::Vector(v))) {
                     buf.extend_from_slice(json.as_bytes());
@@ -9837,16 +10141,459 @@ impl Storage {
         Ok((buf, count))
     }
 
-    /// Hand a rebuilt WAL payload to the writer thread and block until it has
-    /// truncated + rewritten + fsynced through its own handle.
-    fn checkpoint_wal_payload(&self, data: Vec<u8>, count: usize) -> Result<()> {
+    /// Hand a live-state payload (JSONL SignedEvent lines) to the writer thread
+    /// for a fold-to-base checkpoint and block until the base segment is
+    /// durable and the journal rotated (I9; executes on the handle owner).
+    fn checkpoint_wal_payload(
+        &self,
+        payload_lines: Vec<u8>,
+        frontier_seq: u64,
+        count: usize,
+    ) -> Result<()> {
         let (ack_tx, ack_rx) = unbounded();
         self.wal_sender
-            .send(WalMsg::Checkpoint { data, ack: ack_tx })
+            .send(WalMsg::Checkpoint {
+                payload_lines,
+                frontier_seq,
+                ack: ack_tx,
+            })
             .map_err(|_| Error::from_reason("wal disconnected"))?;
-        let _ = ack_rx.recv();
-        println!("Mark IX: WAL Compacted. {} live events preserved.", count);
+        if !ack_rx.recv().unwrap_or(false) {
+            return Err(Error::from_reason("journal fold failed"));
+        }
+        println!(
+            "Journal folded to base segment @seq {} ({} live events).",
+            frontier_seq, count
+        );
         Ok(())
+    }
+
+    // === WP-1.2 journal machinery (SPEC--GENESISDB-JOURNAL-FORMAT-V1) ===
+
+    fn journal_seg_dir(root: &std::path::Path) -> PathBuf {
+        root.join("journal")
+    }
+
+    /// I9 hygiene at open: crashed seals leave `*.tmp` — delete them. Their
+    /// frames are still in the (untruncated) active file or older segments.
+    fn journal_cleanup(root: &std::path::Path) {
+        let seg_dir = Self::journal_seg_dir(root);
+        if let Ok(entries) = fs::read_dir(&seg_dir) {
+            for entry in entries.flatten() {
+                let p = entry.path();
+                if p.extension().is_some_and(|e| e == "tmp") {
+                    let _ = fs::remove_file(&p);
+                }
+            }
+        }
+    }
+
+    /// I9: truncate a torn active-file tail (crash mid-append) so the writer
+    /// thread appends after the last VALID frame. A partial header truncates to
+    /// zero (the writer rewrites it).
+    fn journal_truncate_torn_active(active: &std::path::Path) {
+        let Ok(bytes) = fs::read(active) else {
+            return;
+        };
+        let valid_end = if bytes.len() < ACTIVE_HEADER_LEN || bytes[0..4] != ACTIVE_MAGIC {
+            0
+        } else {
+            walk_frames(&bytes, ACTIVE_HEADER_LEN, |_, _| {})
+        };
+        if (valid_end as u64) < bytes.len() as u64 {
+            if let Ok(f) = FileOpenOptions::new().write(true).open(active) {
+                let _ = f.set_len(valid_end as u64);
+                let _ = f.sync_all();
+            }
+        }
+    }
+
+    /// All sealed segments, sorted by (min_seq, max_seq). Unreadable headers
+    /// are skipped (recovery degrades explicitly at read time, never silently).
+    fn journal_list_segments(root: &std::path::Path) -> Vec<SegmentInfo> {
+        let mut out: Vec<SegmentInfo> = Vec::new();
+        if let Ok(entries) = fs::read_dir(Self::journal_seg_dir(root)) {
+            for entry in entries.flatten() {
+                let p = entry.path();
+                if p.extension().is_some_and(|e| e == "gseg") {
+                    if let Some(info) = read_segment_header(&p) {
+                        out.push(info);
+                    }
+                }
+            }
+        }
+        out.sort_by_key(|s| (s.min_seq, s.max_seq));
+        out
+    }
+
+    /// Seed for the writer thread's frame counter: max stamped seq across
+    /// sealed segments and the (already tear-truncated) active file. Never read
+    /// from the projection (ADR D2.4).
+    fn journal_max_seq(root: &std::path::Path, active: &std::path::Path) -> u64 {
+        let mut max_seq = Self::journal_list_segments(root)
+            .into_iter()
+            .map(|s| s.max_seq)
+            .max()
+            .unwrap_or(0);
+        if let Ok(bytes) = fs::read(active) {
+            if bytes.len() >= ACTIVE_HEADER_LEN && bytes[0..4] == ACTIVE_MAGIC {
+                walk_frames(&bytes, ACTIVE_HEADER_LEN, |seq, _| {
+                    if seq > max_seq {
+                        max_seq = seq;
+                    }
+                });
+            }
+        }
+        max_seq
+    }
+
+    /// Writer-thread helper: open (or create+header) the active journal file
+    /// for append.
+    fn journal_open_active(
+        active: &std::path::Path,
+        next_seq: u64,
+    ) -> Option<std::io::BufWriter<File>> {
+        let file = FileOpenOptions::new()
+            .append(true)
+            .create(true)
+            .open(active)
+            .ok()?;
+        let mut writer = std::io::BufWriter::with_capacity(128 * 1024, file);
+        let len = writer.get_ref().metadata().map(|m| m.len()).unwrap_or(0);
+        if len == 0 {
+            writer.write_all(&active_header(next_seq)).ok()?;
+            writer.flush().ok()?;
+            writer.get_mut().sync_all().ok()?;
+        }
+        Some(writer)
+    }
+
+    fn journal_active_len(writer: &std::io::BufWriter<File>) -> u64 {
+        writer.get_ref().metadata().map(|m| m.len()).unwrap_or(0)
+    }
+
+    /// Writer-thread helper: replace the active file with a fresh header-only
+    /// file through a truncate handle, then restore an append handle (the
+    /// PR #28 dance — only the handle owner can do this on Windows).
+    fn journal_reset_active(
+        writer: &mut std::io::BufWriter<File>,
+        active: &std::path::Path,
+        next_seq: u64,
+    ) -> bool {
+        let Ok(f) = FileOpenOptions::new()
+            .write(true)
+            .create(true)
+            .truncate(true)
+            .open(active)
+        else {
+            return false;
+        };
+        *writer = std::io::BufWriter::with_capacity(128 * 1024, f);
+        let ok = writer.write_all(&active_header(next_seq)).is_ok()
+            && writer.flush().is_ok()
+            && writer.get_mut().sync_all().is_ok();
+        if let Ok(f) = FileOpenOptions::new().append(true).create(true).open(active) {
+            *writer = std::io::BufWriter::with_capacity(128 * 1024, f);
+        }
+        ok
+    }
+
+    /// Writer-thread helper: seal the current active file's frames into a
+    /// history segment (size-threshold seal, spec §2), then start a fresh
+    /// active file. Seal durability strictly precedes the reset (I9).
+    fn journal_seal_active(
+        writer: &mut std::io::BufWriter<File>,
+        root: &std::path::Path,
+        active: &std::path::Path,
+        next_seq: u64,
+    ) -> bool {
+        let _ = writer.flush();
+        let _ = writer.get_mut().sync_all();
+        let Ok(bytes) = fs::read(active) else {
+            return false;
+        };
+        if bytes.len() <= ACTIVE_HEADER_LEN || bytes[0..4] != ACTIVE_MAGIC {
+            return true; // nothing to seal
+        }
+        let mut min_seq = u64::MAX;
+        let mut max_seq = 0u64;
+        let mut count: u32 = 0;
+        let valid_end = walk_frames(&bytes, ACTIVE_HEADER_LEN, |seq, _| {
+            min_seq = min_seq.min(seq);
+            max_seq = max_seq.max(seq);
+            count += 1;
+        });
+        if count == 0 {
+            return true;
+        }
+        let seg_path = Self::journal_seg_dir(root).join(format!("J{min_seq:012}.gseg"));
+        if write_segment(
+            &seg_path,
+            SEG_KIND_HISTORY,
+            CODEC_LZ4,
+            min_seq,
+            max_seq,
+            count,
+            &bytes[ACTIVE_HEADER_LEN..valid_end],
+        )
+        .is_err()
+        {
+            return false;
+        }
+        Self::journal_reset_active(writer, active, next_seq)
+    }
+
+    /// Writer-thread helper: fold-to-base checkpoint (ADR D3 `frontier_only`
+    /// interim profile). Frames every payload JSONL line at `frontier_seq` into
+    /// a base segment, then drops all other journal files and resets the active
+    /// file. Order (I9): base durable → drop olds → reset active. A crash at
+    /// any point leaves a journal that fully recovers live state (frames ≤
+    /// frontier re-apply idempotently under LWW).
+    fn journal_fold(
+        writer: &mut std::io::BufWriter<File>,
+        root: &std::path::Path,
+        active: &std::path::Path,
+        payload_lines: &[u8],
+        frontier_seq: u64,
+        next_seq: u64,
+    ) -> bool {
+        let _ = writer.flush();
+        let _ = writer.get_mut().sync_all();
+        let mut body: Vec<u8> = Vec::with_capacity(payload_lines.len() + 4096);
+        let mut count: u32 = 0;
+        for line in payload_lines.split(|b| *b == b'\n') {
+            if line.is_empty() {
+                continue;
+            }
+            encode_frame(&mut body, frontier_seq, line);
+            count += 1;
+        }
+        let seg_path = Self::journal_seg_dir(root).join(format!("B{frontier_seq:012}.gseg"));
+        if write_segment(
+            &seg_path,
+            SEG_KIND_BASE,
+            CODEC_LZ4,
+            frontier_seq,
+            frontier_seq,
+            count,
+            &body,
+        )
+        .is_err()
+        {
+            return false;
+        }
+        if let Ok(entries) = fs::read_dir(Self::journal_seg_dir(root)) {
+            for entry in entries.flatten() {
+                let p = entry.path();
+                if p != seg_path && p.extension().is_some_and(|e| e == "gseg") {
+                    let _ = fs::remove_file(&p);
+                }
+            }
+        }
+        Self::journal_reset_active(writer, active, next_seq)
+    }
+
+    /// One-way migration (ADR §4): seal the legacy JSONL WAL as segment 0
+    /// (kind=legacy_jsonl — recovery-only, pre-epoch, not tx-addressable) with
+    /// bounded memory (two streaming passes: sha256, then lz4 frame), then
+    /// remove the legacy file. Lossless: the segment stores the exact legacy
+    /// bytes.
+    fn migrate_legacy_wal(root: &std::path::Path, legacy: &std::path::Path) -> Result<()> {
+        let seg_dir = Self::journal_seg_dir(root);
+        fs::create_dir_all(&seg_dir).map_err(|e| Error::from_reason(e.to_string()))?;
+        let body_len = fs::metadata(legacy)
+            .map_err(|e| Error::from_reason(e.to_string()))?
+            .len();
+        // Pass 1: sha256 over the raw legacy bytes.
+        let mut hasher = Sha256::new();
+        {
+            let mut f = File::open(legacy).map_err(|e| Error::from_reason(e.to_string()))?;
+            let mut buf = vec![0u8; 1024 * 1024];
+            loop {
+                match f.read(&mut buf) {
+                    Ok(0) => break,
+                    Ok(n) => hasher.update(&buf[..n]),
+                    Err(e) => return Err(Error::from_reason(e.to_string())),
+                }
+            }
+        }
+        let sha: [u8; 32] = hasher.finalize().into();
+        // Header/footer identical to write_segment, body lz4-frame-streamed.
+        let mut header = Vec::with_capacity(SEG_HEADER_LEN);
+        header.extend_from_slice(&SEG_MAGIC);
+        header.extend_from_slice(&JOURNAL_FORMAT_VERSION.to_le_bytes());
+        header.push(SEG_KIND_LEGACY_JSONL);
+        header.push(CODEC_LZ4);
+        header.extend_from_slice(&0u64.to_le_bytes());
+        header.extend_from_slice(&0u64.to_le_bytes());
+        header.extend_from_slice(&0u32.to_le_bytes());
+        let mut crc_input = Vec::with_capacity(SEG_HEADER_LEN + 40);
+        crc_input.extend_from_slice(&header);
+        crc_input.extend_from_slice(&sha);
+        crc_input.extend_from_slice(&body_len.to_le_bytes());
+        let crc = crc32c::crc32c(&crc_input);
+
+        let final_path = seg_dir.join("J000000000000.gseg");
+        let tmp_path = final_path.with_extension("gseg.tmp");
+        {
+            let mut out = File::create(&tmp_path).map_err(|e| Error::from_reason(e.to_string()))?;
+            out.write_all(&header)
+                .map_err(|e| Error::from_reason(e.to_string()))?;
+            {
+                // True streaming: FrameEncoder wraps the destination file
+                // directly, so `std::io::copy` moves the legacy WAL through in
+                // fixed-size chunks — the multi-GB legacy file is never
+                // materialized whole (bounded memory, ADR §4/mobile budget).
+                let mut enc = lz4_flex::frame::FrameEncoder::new(&mut out);
+                let mut src = File::open(legacy).map_err(|e| Error::from_reason(e.to_string()))?;
+                std::io::copy(&mut src, &mut enc).map_err(|e| Error::from_reason(e.to_string()))?;
+                enc.finish()
+                    .map_err(|e| Error::from_reason(e.to_string()))?;
+            }
+            out.write_all(&sha)
+                .map_err(|e| Error::from_reason(e.to_string()))?;
+            out.write_all(&body_len.to_le_bytes())
+                .map_err(|e| Error::from_reason(e.to_string()))?;
+            out.write_all(&crc.to_le_bytes())
+                .map_err(|e| Error::from_reason(e.to_string()))?;
+            out.sync_all().map_err(|e| Error::from_reason(e.to_string()))?;
+        }
+        if final_path.exists() {
+            fs::remove_file(&final_path).map_err(|e| Error::from_reason(e.to_string()))?;
+        }
+        fs::rename(&tmp_path, &final_path).map_err(|e| Error::from_reason(e.to_string()))?;
+        fs::remove_file(legacy).map_err(|e| Error::from_reason(e.to_string()))?;
+        println!(
+            "Journal migration: legacy WAL sealed as segment 0 ({} bytes raw).",
+            body_len
+        );
+        Ok(())
+    }
+
+    /// Walk every journal event in recovery order — legacy sources (seq 0,
+    /// pre-epoch) first, then sealed segments by seq range, then the active
+    /// file — invoking `f(seq, event)` for frames with seq > `from_seq`.
+    /// `include_legacy=false` on tail replay: the snapshot already covers the
+    /// pre-epoch content (legacy events carry no stamp to filter by).
+    /// `from_seq`: `None` = the caller has applied nothing, send everything;
+    /// `Some(f)` = the caller is current through frame `f`, send frames after
+    /// it. The distinction matters because a fold on a journal that never
+    /// stamped a frame (e.g. a legacy DB migrated but not yet written to)
+    /// produces a base segment at seq 0 holding real live state — under a bare
+    /// `u64` cursor, `0 > 0` is false and that state would be silently skipped.
+    fn scan_journal(
+        &self,
+        from_seq: Option<u64>,
+        include_legacy: bool,
+        f: &mut dyn FnMut(u64, SignedEvent),
+    ) {
+        use std::io::BufRead;
+        let emit_lines = |bytes: &[u8], f: &mut dyn FnMut(u64, SignedEvent)| {
+            for line in bytes.split(|b| *b == b'\n') {
+                if line.is_empty() {
+                    continue;
+                }
+                if let Ok(se) = serde_json::from_slice::<SignedEvent>(line) {
+                    f(0, se);
+                }
+            }
+        };
+        // Pre-migration / read-only legacy file, in place.
+        if include_legacy && self.legacy_log_path.exists() {
+            if let Ok(file) = File::open(&self.legacy_log_path) {
+                for line in std::io::BufReader::new(file).lines().map_while(|r| r.ok()) {
+                    if let Ok(se) = serde_json::from_str::<SignedEvent>(&line) {
+                        f(0, se);
+                    }
+                }
+            }
+        }
+        for seg in Self::journal_list_segments(&self.path) {
+            if seg.kind == SEG_KIND_LEGACY_JSONL {
+                if include_legacy {
+                    if let Some((_, body)) = read_segment_body(&seg.path) {
+                        emit_lines(&body, f);
+                    }
+                }
+                continue;
+            }
+            if from_seq.is_some_and(|cursor| seg.max_seq <= cursor) {
+                continue;
+            }
+            if let Some((_, body)) = read_segment_body(&seg.path) {
+                walk_frames(&body, 0, |seq, payload| {
+                    if from_seq.is_none_or(|cursor| seq > cursor) {
+                        if let Ok(se) = serde_json::from_slice::<SignedEvent>(payload) {
+                            f(seq, se);
+                        }
+                    }
+                });
+            }
+        }
+        if let Ok(bytes) = fs::read(&self.log_path) {
+            if bytes.len() > ACTIVE_HEADER_LEN && bytes[0..4] == ACTIVE_MAGIC {
+                walk_frames(&bytes, ACTIVE_HEADER_LEN, |seq, payload| {
+                    if from_seq.is_none_or(|cursor| seq > cursor) {
+                        if let Ok(se) = serde_json::from_slice::<SignedEvent>(payload) {
+                            f(seq, se);
+                        }
+                    }
+                });
+            }
+        }
+    }
+
+    /// Apply journal events into memory (`None` = full replay, `Some(f)` =
+    /// tail replay past a snapshot frontier). Vectors are staged only
+    /// (index=false): rehydrate_hnsw_index after load builds every index once
+    /// for all recovery paths. Idempotent: LWW upserts.
+    fn replay_journal(&self, from_seq: Option<u64>, include_legacy: bool) {
+        self.scan_journal(from_seq, include_legacy, &mut |seq, signed_event| {
+            self.apply_replay_event(seq, signed_event.event);
+        });
+    }
+
+    fn apply_replay_event(&self, seq: u64, event: Event) {
+        match event {
+            Event::Node(n) => {
+                let u32_id = self.get_or_intern_id(&n.id);
+                if let Some(emb) = n.embedding.clone() {
+                    self.replay_vector(
+                        &n.collection,
+                        &n.id,
+                        emb,
+                        n.lang.clone().unwrap_or("en".to_string()),
+                        false,
+                    );
+                }
+                self.insert_node_lean(u32_id, n);
+            }
+            Event::Edge(e) => {
+                let u32_id = self.index_edge_internal(&e.id, &e.from, &e.to);
+                self.edges.insert(u32_id, e);
+            }
+            Event::Vector(v) => {
+                self.replay_vector(
+                    &v.collection,
+                    &v.node_id,
+                    v.embedding,
+                    v.lang.clone().unwrap_or_else(|| "en".to_string()),
+                    false,
+                );
+            }
+            Event::Batch(events) => {
+                for batch_event in events {
+                    self.apply_replay_event(seq, batch_event);
+                }
+            }
+            Event::RelationalSchema(_) | Event::RelationalRows { .. } => {
+                // Relational state is rebuilt by projection_sync_on_open.
+            }
+            Event::Transaction(transaction) => {
+                self.apply_transaction_memory(&transaction, false);
+                self.txn_frontier.fetch_max(seq, Ordering::SeqCst);
+            }
+        }
     }
     /// Bitemporal retraction (soft-delete): set the edge's `valid_to` so it is no
     /// longer live in the current view, while preserving the relationship for
@@ -10158,9 +10905,20 @@ impl GenesisDatabase {
         .await
         .map_err(|e| Error::from_reason(e.to_string()))?
     }
+    /// WP-1.2 REDEFINITION (ADR D2.3, GBP1-noted): the FRAME frontier — the
+    /// commit_seq of the last durable journal frame, advancing on EVERY
+    /// mutation (previously: last transaction commit_sequence, which is now
+    /// `txn_frontier`). SDKs that fed this into `expected_frontier` must switch
+    /// to `txn_frontier`.
     #[napi]
     pub fn stable_frontier(&self) -> i64 {
         self.inner.stable_frontier().min(i64::MAX as u64) as i64
+    }
+    /// Frame seq of the last transaction frame — the value
+    /// `GenesisTransaction.expected_frontier` CASes against (WP-1.2).
+    #[napi]
+    pub fn txn_frontier(&self) -> i64 {
+        self.inner.txn_frontier().min(i64::MAX as u64) as i64
     }
     #[napi]
     pub async fn retract_edge(&self, id: String, at: Option<String>) -> Result<Option<EdgeOutput>> {

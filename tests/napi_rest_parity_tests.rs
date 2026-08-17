@@ -72,6 +72,9 @@ const NAPI_TO_REST: &[(&str, Option<&str>)] = &[
     ("execute_named_query", Some("/v1/relational/query")),
     ("commit_transaction", Some("/v1/transaction/commit")),
     ("stable_frontier", Some("/v1/frontier")),
+    // WP-1.2 frontier split (ADR D2.3): txn frontier rides the same REST route
+    // (the `/v1/frontier` body now returns {frame, txn}).
+    ("txn_frontier", Some("/v1/frontier")),
     ("supersede_node", Some("/v1/node/supersede")),
     ("retract_edge", Some("/v1/edge/retract")),
     // GRL tiered retrieval (target_id/tier/budget/fuzzy). NOT the same as
