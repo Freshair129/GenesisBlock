@@ -7,6 +7,13 @@ const GROUPS = [
   { name: 'Artifacts', color: '#4d7c0f', kind: 'artifact' as const },
 ];
 
+function singularLabel(groupName: string): string {
+  if (groupName.endsWith('s')) {
+    return groupName.slice(0, -1);
+  }
+  return groupName;
+}
+
 function seededUnit(index: number, salt: number): number {
   const value = Math.sin(index * 12.9898 + salt * 78.233) * 43758.5453;
   return value - Math.floor(value);
@@ -23,7 +30,7 @@ export function createFixtureScene(requestedNodes = 240): GraphScene {
     const angle = index * 2.39996 + seededUnit(index, 2) * 0.4;
     nodes.push({
       id: `entity-${index + 1}`,
-      label: `${group.name.slice(0, -1)} ${String(index + 1).padStart(3, '0')}`,
+      label: `${singularLabel(group.name)} ${String(index + 1).padStart(3, '0')}`,
       kind: group.kind,
       group: group.name,
       x: Math.cos(angle) * ring + (seededUnit(index, 3) - 0.5) * 2,
