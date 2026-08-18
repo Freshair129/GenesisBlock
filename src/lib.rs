@@ -618,7 +618,9 @@ pub enum GossipMessage {
     /// must abandon delta-pull for this peer and re-bootstrap (transfer channel
     /// lands in WP-1.3; until retention folds can advance the horizon past a
     /// live cursor this variant is wire-defined but not triggered in practice).
-    BeyondHorizon { horizon: u64 },
+    BeyondHorizon {
+        horizon: u64,
+    },
     ConsensusPropose {
         proposal: Box<ConsensusProposal>,
     },
@@ -2186,7 +2188,7 @@ fn lz4_frame_compress(body: &[u8]) -> std::io::Result<Vec<u8>> {
         let mut enc = lz4_flex::frame::FrameEncoder::new(&mut out);
         enc.write_all(body)?;
         enc.finish()
-            .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e.to_string()))?;
+            .map_err(|e| std::io::Error::other(e.to_string()))?;
     }
     Ok(out)
 }
@@ -2279,10 +2281,16 @@ fn read_segment_body(path: &std::path::Path) -> Option<(u8, Vec<u8>)> {
     let codec = bytes[7];
     let footer_start = bytes.len() - SEG_FOOTER_LEN;
     let sha_expected = &bytes[footer_start..footer_start + 32];
-    let body_len =
-        u64::from_le_bytes(bytes[footer_start + 32..footer_start + 40].try_into().unwrap());
-    let crc_expected =
-        u32::from_le_bytes(bytes[footer_start + 40..footer_start + 44].try_into().unwrap());
+    let body_len = u64::from_le_bytes(
+        bytes[footer_start + 32..footer_start + 40]
+            .try_into()
+            .unwrap(),
+    );
+    let crc_expected = u32::from_le_bytes(
+        bytes[footer_start + 40..footer_start + 44]
+            .try_into()
+            .unwrap(),
+    );
     let mut crc_input = Vec::with_capacity(SEG_HEADER_LEN + 40);
     crc_input.extend_from_slice(&bytes[0..SEG_HEADER_LEN]);
     crc_input.extend_from_slice(sha_expected);
@@ -4894,8 +4902,7 @@ impl Storage {
                 // Storage lifetime — every rotation (seal/fold) happens HERE,
                 // because only the handle owner can replace the file on Windows
                 // (the PR #28 lesson; see wal_checkpoint history in git).
-                let Some(mut writer) =
-                    Self::journal_open_active(&log_path_clone, initial_next_seq)
+                let Some(mut writer) = Self::journal_open_active(&log_path_clone, initial_next_seq)
                 else {
                     // Can't open the journal: refuse every append so no caller
                     // ever gets a false durability ack.
@@ -10292,7 +10299,11 @@ impl Storage {
         let ok = writer.write_all(&active_header(next_seq)).is_ok()
             && writer.flush().is_ok()
             && writer.get_mut().sync_all().is_ok();
-        if let Ok(f) = FileOpenOptions::new().append(true).create(true).open(active) {
+        if let Ok(f) = FileOpenOptions::new()
+            .append(true)
+            .create(true)
+            .open(active)
+        {
             *writer = std::io::BufWriter::with_capacity(128 * 1024, f);
         }
         ok
@@ -10456,7 +10467,8 @@ impl Storage {
                 .map_err(|e| Error::from_reason(e.to_string()))?;
             out.write_all(&crc.to_le_bytes())
                 .map_err(|e| Error::from_reason(e.to_string()))?;
-            out.sync_all().map_err(|e| Error::from_reason(e.to_string()))?;
+            out.sync_all()
+                .map_err(|e| Error::from_reason(e.to_string()))?;
         }
         if final_path.exists() {
             fs::remove_file(&final_path).map_err(|e| Error::from_reason(e.to_string()))?;
