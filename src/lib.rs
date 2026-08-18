@@ -2188,7 +2188,7 @@ fn lz4_frame_compress(body: &[u8]) -> std::io::Result<Vec<u8>> {
         let mut enc = lz4_flex::frame::FrameEncoder::new(&mut out);
         enc.write_all(body)?;
         enc.finish()
-            .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e.to_string()))?;
+            .map_err(|e| std::io::Error::other(e.to_string()))?;
     }
     Ok(out)
 }
