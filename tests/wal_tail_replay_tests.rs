@@ -244,11 +244,7 @@ fn stale_wal_prefix_falls_back_to_full_replay() {
 
     crash_copy(&path, &crash);
     drop(s);
-    fs::write(
-        Path::new(&crash).join("wal").join("active.gwal"),
-        &old_wal,
-    )
-    .unwrap();
+    fs::write(Path::new(&crash).join("wal").join("active.gwal"), &old_wal).unwrap();
 
     let s2 = open(&crash);
     s2.flush_index();

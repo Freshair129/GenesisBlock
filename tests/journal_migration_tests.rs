@@ -130,7 +130,10 @@ fn migrated_db_reopens_identically() {
     drop(s);
     let s2 = open(&dir);
     for id in ["m1", "m2", "m3"] {
-        assert!(s2.get_u32(id).is_some(), "{id} survives post-migration reopen");
+        assert!(
+            s2.get_u32(id).is_some(),
+            "{id} survives post-migration reopen"
+        );
     }
 }
 

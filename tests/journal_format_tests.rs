@@ -202,7 +202,10 @@ fn frame_and_txn_frontier_split() {
     let s = open(&dir);
     add_nodes(&s, &["f1"]);
     let after_node = s.stable_frontier();
-    assert!(after_node >= 1, "ordinary writes advance the frame frontier");
+    assert!(
+        after_node >= 1,
+        "ordinary writes advance the frame frontier"
+    );
     assert_eq!(s.txn_frontier(), 0, "no transaction committed yet");
 
     let commit = s
@@ -325,7 +328,10 @@ fn journal_is_smaller_than_jsonl_baseline() {
     drop(s);
 
     let mut journal_bytes = 0u64;
-    for entry in fs::read_dir(Path::new(&dir).join("journal")).unwrap().flatten() {
+    for entry in fs::read_dir(Path::new(&dir).join("journal"))
+        .unwrap()
+        .flatten()
+    {
         journal_bytes += entry.metadata().unwrap().len();
     }
     journal_bytes += fs::metadata(Path::new(&dir).join("wal").join("active.gwal"))
