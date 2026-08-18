@@ -1,7 +1,7 @@
 use genesis_block_native::{
     BackupExportRequest, BackupRestoreRequest, EdgeInput, HybridSearchInput, NodeInput,
     OpenOptions, RelationalColumn, RelationalColumnType, RelationalMutationKind, RelationalQuery,
-    RelationalRowMutation, RelationalSchemaPackage, RelationalTable, Storage,
+    RelationalRowMutation, RelationalSchemaPackage, RelationalTable, Storage, SCHEMA_VERSION,
 };
 use serde_json::json;
 use std::fs;
@@ -333,10 +333,16 @@ fn restore_rejects_duplicate_traversal_and_trailing_entries() {
 
 #[test]
 fn restore_rejects_incompatible_engine_and_schema_without_creating_target() {
+    // Derive the "newer schema" rewrite from the live constant: a hardcoded
+    // v2→v3 literal silently became a no-op when Slice 0 bumped
+    // SCHEMA_VERSION to 3 — the rewrite no longer matched, the manifest
+    // stayed valid, and the "rejected" assertion failed against a restore
+    // that correctly succeeded.
+    let schema_from = format!("\"schema_version\":{}", SCHEMA_VERSION);
+    let schema_to = format!("\"schema_version\":{}", SCHEMA_VERSION + 1);
     for (name, from, to) in [
         ("u9-engine", "genesis-block", "other-genesis"),
-        // WP-1.2 bumped SCHEMA_VERSION to 2; a manifest claiming 3 is "newer".
-        ("u9-schema", "\"schema_version\":2", "\"schema_version\":3"),
+        ("u9-schema", schema_from.as_str(), schema_to.as_str()),
     ] {
         let source_root = fresh(&format!("{name}-source"));
         let bundle_path = format!("{}/backup.genesis", fresh(&format!("{name}-bundle")));
@@ -348,8 +354,14 @@ fn restore_rejects_incompatible_engine_and_schema_without_creating_target() {
             })
             .unwrap();
 
-        let mut bytes = fs::read(&bundle_path).unwrap();
+        let original = fs::read(&bundle_path).unwrap();
+        let mut bytes = original.clone();
         replace_manifest_value(&mut bytes, from, to);
+        assert_ne!(
+            bytes, original,
+            "{name}: the manifest rewrite must actually match — a no-op here \
+             means the fixture drifted from the real manifest shape"
+        );
         fs::write(&bundle_path, bytes).unwrap();
 
         assert!(

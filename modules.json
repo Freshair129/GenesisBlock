@@ -3,7 +3,7 @@
   "engine": {
     "name": "genesis-block-native",
     "version": "0.2.0",
-    "schemaVersion": 2,
+    "schemaVersion": 3,
     "artifacts": [
       "cdylib (npm native addon)",
       "rlib (Axum REST server)"
@@ -15,7 +15,7 @@
       "path": ".",
       "type": "npm-native-addon",
       "version": "0.2.0",
-      "targetsSchemaVersion": 2,
+      "targetsSchemaVersion": 3,
       "minEngineVersion": "0.2.0"
     },
     {
@@ -63,7 +63,7 @@
       "path": "android/genesisdb",
       "type": "mobile-sdk-android",
       "version": "0.1.0",
-      "targetsSchemaVersion": 2,
+      "targetsSchemaVersion": 3,
       "minEngineVersion": "0.2.0"
     },
     {
@@ -71,7 +71,7 @@
       "path": "react-native-genesisdb",
       "type": "mobile-sdk-react-native",
       "version": "0.1.0",
-      "targetsSchemaVersion": 2,
+      "targetsSchemaVersion": 3,
       "minEngineVersion": "0.2.0"
     }
   ]

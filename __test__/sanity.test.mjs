@@ -23,11 +23,18 @@ test('versionSync matches package.json version (single source of truth)', () => 
   assert.equal(versionSync(), pkg.version)
 })
 
-test('schemaVersionSync matches the TypeScript-side CURRENT_SCHEMA_VERSION major byte', () => {
-  // packages/gks/src/lib/schema-version.ts → CURRENT_SCHEMA_VERSION = '2.0.0'
-  // The Rust crate encodes only the major byte (PROTOCOL--GENESIS-GRAPH-FFI §6).
-  // Bumped to 2 by WP-1.2 (framed journal): the on-disk format changed, so a
-  // client built against v1 must not silently open a migrated database
-  // (ADR--GENESISDB-JOURNAL-HISTORY §4 — downgrade fails closed).
-  assert.equal(schemaVersionSync(), 2)
+test('schemaVersionSync matches modules.json engine.schemaVersion', () => {
+  // The engine's on-disk format version must move in lock-step with the repo
+  // version manifest — an accidental SCHEMA_VERSION bump (or a manifest left
+  // behind) fails here. History: v2 = WP-1.2 framed journal; v3 = Slice-0
+  // Event::NodeRetract journal frames (RCA--SLICE0-DURABILITY — older engines
+  // silently skip unknown event kinds, so downgrade fails closed instead of
+  // silently resurrecting deletions; ADR--GENESISDB-JOURNAL-HISTORY §4).
+  // TypeScript-side consumers (packages/gks schema-version.ts) track the same
+  // major byte (PROTOCOL--GENESIS-GRAPH-FFI §6).
+  const manifest = JSON.parse(
+    readFileSync(fileURLToPath(new URL('../modules.json', import.meta.url)), 'utf8'),
+  )
+  assert.equal(schemaVersionSync(), manifest.engine.schemaVersion)
+  assert.equal(schemaVersionSync(), 3)
 })

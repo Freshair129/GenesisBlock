@@ -270,8 +270,14 @@ fn stale_wal_prefix_falls_back_to_full_replay() {
     );
 }
 
-/// Pre-upgrade snapshots carry no `wal_frontier` field. They must keep loading
-/// exactly as before (instant load, no tail replay) — back-compat.
+/// Pre-upgrade snapshots carry no `wal_frontier` field. They still load — and
+/// since RCA--SLICE0-DURABILITY defect 3, a cursor-less snapshot additionally
+/// gets a full journal replay on top: without a cursor, tail replay is
+/// impossible, and the journal may hold writes acked after the snapshot (the
+/// exact shape a failed checkpoint used to produce). Graph state is LWW-
+/// idempotent; the replay re-stages vector arena rows once (same documented
+/// one-time tradeoff as the legacy `wal_frontier` branch — reclaimed by the
+/// next index compaction).
 #[test]
 fn snapshot_without_frontier_still_loads() {
     let path = fresh("test_wal_tail_replay_legacy");
@@ -295,11 +301,16 @@ fn snapshot_without_frontier_still_loads() {
 
     let s2 = open(&path);
     s2.flush_index();
-    assert_eq!(s2.nodes.len(), 10, "legacy snapshot loads intact");
+    assert_eq!(
+        s2.nodes.len(),
+        10,
+        "legacy snapshot loads intact (LWW replay)"
+    );
     assert_eq!(
         default_arena_rows(&s2),
-        10,
-        "no double-staging on legacy load"
+        20,
+        "cursor-less snapshot replays the journal on top: arena rows double once \
+         (10 snapshot + 10 replayed), reclaimed by the next index compaction"
     );
 }
 
