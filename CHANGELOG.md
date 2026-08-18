@@ -7,6 +7,50 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed — Slice-0 durability (SCHEMA_VERSION 2 → 3)
+
+Four acked-write-loss / resurrection defects from the 2026-08-19 storage-
+readiness audit (RCA--SLICE0-DURABILITY). All four were silent — no test
+injected I/O errors or crashed inside the checkpoint window.
+
+- **Journal write errors are no longer swallowed.** The WAL writer thread
+  previously discarded `write_all`/`flush` results and acked on `sync_all()`
+  alone, so an ENOSPC/EIO frame was acknowledged as durable. The ack now
+  requires the whole batch's write + flush + fsync to succeed, and after any
+  I/O failure the writer is poisoned (every append refused with a failed ack)
+  until a successful fold rebuilds a clean active file — a torn tail can no
+  longer sit under later "successful" appends that replay would never reach.
+- **`retract_node` is journaled.** Node retraction (including the hourly
+  autonomic TTL/orphan prune) used to mutate memory only; a crash before the
+  next checkpoint resurrected the node and its cascaded edges on replay, and
+  CRDT peers re-pushed it. A new `Event::NodeRetract` frame is now persisted
+  *before* the in-memory removal, replayed as a removal, applied to the SQLite
+  projection (props/labels rows deleted, including on rebuild), replicated via
+  `events_since` (clock-stamped), and applied with node-style LWW on
+  `reconcile_state`. **This new frame kind is why SCHEMA_VERSION bumps to 3:**
+  older engines silently skip unknown journal events — a downgrade would
+  silently resurrect deletions — so it fails closed instead.
+- **A checkpoint can no longer write a snapshot without its journal cursor.**
+  If `build_compacted_wal()` failed, `save_state` used to write `state.json`
+  with no `journal` cursor; the next open then skipped replay entirely,
+  silently dropping every write acked after the save. `save_state` now aborts
+  loudly on a failed payload build (the previous snapshot + full journal
+  remain a complete recovery source), propagates `state.json` write errors,
+  and the cursor-less recovery branch — still reachable for pre-frontier
+  snapshots — now replays the full journal on top of the instant load
+  (idempotent LWW; same one-time duplicate-arena-rows tradeoff as the legacy
+  `wal_frontier` branch).
+- **A stale snapshot older than a completed fold is no longer trusted.** In
+  the crash window between `journal_fold` and the `state.json` rename, the old
+  snapshot still holds state that was deleted and folded away; base-segment
+  replay can only add, so recovery resurrected it. Open now detects
+  `history_horizon() > snapshot frontier` and recovers from the journal alone
+  (the base segment is a complete recovery source, invariant I8).
+
+New regression suite: `tests/durability_slice0_tests.rs` (crash-image and
+clean-reopen retraction survival, stale-snapshot-vs-fold, cursor-less
+snapshot tail recovery).
+
 ### Changed — BREAKING (on-disk + API), WP-1.2 framed journal
 - **On-disk journal format (SCHEMA_VERSION 1 → 2).** `genesis-graph.wal` (JSONL)
   is replaced by a framed journal: `wal/active.gwal` (GWA1 header + frames

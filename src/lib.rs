@@ -77,7 +77,10 @@ pub mod query;
 pub mod router;
 use query::HqlCommand;
 
-pub const SCHEMA_VERSION: u32 = 2;
+// v3: Event::NodeRetract journal frames (RCA--SLICE0-DURABILITY defect 2).
+// Older engines silently skip unknown event variants on replay, which would
+// resurrect deleted nodes — the bump makes downgrade fail closed instead.
+pub const SCHEMA_VERSION: u32 = 3;
 const PROJECTION_SCHEMA_VERSION: u32 = 2;
 const PROJECTION_DB_FILE: &str = "projection.sqlite";
 /// Stable engine identifier (independent of package version).
@@ -728,6 +731,20 @@ pub enum Event {
     },
     /// One canonical cross-domain commit with a single durable sequence.
     Transaction(GenesisTransactionEvent),
+    /// Hard node retraction (RCA--SLICE0-DURABILITY defect 2): removes the node,
+    /// its incident edges, and its vector mappings from the live view. Journaled
+    /// so deletions survive crash replay (previously the delete existed only in
+    /// RAM until the next fold — replay and CRDT peers resurrected it). Carries
+    /// the retraction's logical clock so `events_since` replicates it and
+    /// `reconcile_state` can apply node-style LWW. Older engines silently skip
+    /// unknown variants on replay, which would resurrect deletions on downgrade
+    /// — hence the SCHEMA_VERSION 2 → 3 fail-closed bump that ships with this
+    /// variant.
+    NodeRetract {
+        id: String,
+        #[serde(default)]
+        clock: LogicalClock,
+    },
 }
 
 /// Payload of `Event::Vector`: a standalone vector attached to a node, routed to
@@ -4034,6 +4051,21 @@ impl Storage {
                 }
                 tx.commit().map_err(|e| Error::from_reason(e.to_string()))?;
             }
+            // Drop the retracted node's projection rows. On the live path this
+            // runs from `persist` while `id` still resolves (memory removal
+            // happens after); on projection rebuild the preceding Node frame's
+            // re-intern makes the id resolve again, so the delete still lands.
+            Event::NodeRetract { id, .. } => {
+                if let Some(node_u32) = self.get_u32(id) {
+                    conn.execute("DELETE FROM props WHERE node_u32 = ?1", params![node_u32])
+                        .map_err(|e| Error::from_reason(e.to_string()))?;
+                    conn.execute(
+                        "DELETE FROM node_labels WHERE node_u32 = ?1",
+                        params![node_u32],
+                    )
+                    .map_err(|e| Error::from_reason(e.to_string()))?;
+                }
+            }
             _ => {}
         }
         Ok(())
@@ -4099,13 +4131,17 @@ impl Storage {
                 Event::RelationalSchema(package) => apply(Event::RelationalSchema(package)),
                 rows @ Event::RelationalRows { .. } => apply(rows),
                 Event::Transaction(transaction) => apply(Event::Transaction(transaction)),
+                // A rebuild must re-delete the rows the retracted node's own
+                // earlier Node frame just re-inserted.
+                retract @ Event::NodeRetract { .. } => apply(retract),
                 Event::Batch(events) => {
                     for event in events {
                         match event {
                             Event::Node(_)
                             | Event::RelationalSchema(_)
                             | Event::RelationalRows { .. }
-                            | Event::Transaction(_) => apply(event),
+                            | Event::Transaction(_)
+                            | Event::NodeRetract { .. } => apply(event),
                             _ => {}
                         }
                     }
@@ -4927,15 +4963,27 @@ impl Storage {
                 // acked, so the folded journal never loses a just-acked write.
                 let mut pending_ckpt: Option<(Vec<u8>, u64, crossbeam_channel::Sender<bool>)> =
                     None;
+                // I1 (RCA--SLICE0-DURABILITY defect 1): once ANY frame write,
+                // flush, or fsync fails, the active file may hold a torn frame —
+                // replay stops at the tear, so even a later successfully-synced
+                // append would be unrecoverable. Poison the writer: every append
+                // is acked None (no false durability ack) until a successful
+                // fold rebuilds a clean active file.
+                let mut poisoned = false;
                 loop {
                     match wal_receiver.recv() {
                         Ok(WalMsg::Append(signed_event, ack_tx)) => {
-                            if let Ok(json) = serde_json::to_vec(&signed_event) {
+                            // Any I/O failure in this batch fails the WHOLE batch:
+                            // frames after a torn write are unrecoverable too.
+                            let mut io_ok = !poisoned;
+                            if poisoned {
+                                let _ = ack_tx.send(None);
+                            } else if let Ok(json) = serde_json::to_vec(&signed_event) {
                                 let seq = next_seq;
                                 next_seq += 1;
                                 frame_buf.clear();
                                 encode_frame(&mut frame_buf, seq, &json);
-                                let _ = writer.write_all(&frame_buf);
+                                io_ok &= writer.write_all(&frame_buf).is_ok();
                                 batch.push((ack_tx, seq));
                             } else {
                                 let _ = ack_tx.send(None);
@@ -4945,12 +4993,16 @@ impl Storage {
                             while batch.len() < 1024 && start.elapsed() < timeout {
                                 match wal_receiver.try_recv() {
                                     Ok(WalMsg::Append(se, tx)) => {
-                                        if let Ok(j) = serde_json::to_vec(&se) {
+                                        if !io_ok {
+                                            // Torn batch: refuse instead of appending
+                                            // past the tear.
+                                            let _ = tx.send(None);
+                                        } else if let Ok(j) = serde_json::to_vec(&se) {
                                             let seq = next_seq;
                                             next_seq += 1;
                                             frame_buf.clear();
                                             encode_frame(&mut frame_buf, seq, &j);
-                                            let _ = writer.write_all(&frame_buf);
+                                            io_ok &= writer.write_all(&frame_buf).is_ok();
                                             batch.push((tx, seq));
                                         } else {
                                             let _ = tx.send(None);
@@ -4969,8 +5021,17 @@ impl Storage {
                                     Err(_) => break,
                                 }
                             }
-                            let _ = writer.flush();
-                            let ok = writer.get_mut().sync_all().is_ok();
+                            // I1: the ack is Some(seq) only if write_all AND
+                            // flush AND sync_all all succeeded for the batch.
+                            let ok = io_ok
+                                && writer.flush().is_ok()
+                                && writer.get_mut().sync_all().is_ok();
+                            if !ok && !batch.is_empty() {
+                                poisoned = true;
+                                println!(
+                                    "Mark IX: journal append I/O failure — refusing further appends until a successful checkpoint rebuilds the active file."
+                                );
+                            }
                             for (ack, seq) in batch.drain(..) {
                                 let _ = ack.send(if ok { Some(seq) } else { None });
                             }
@@ -4983,6 +5044,12 @@ impl Storage {
                                     frontier,
                                     next_seq,
                                 );
+                                if ok {
+                                    // A successful fold wrote + fsynced a fresh
+                                    // base segment and reset the active file —
+                                    // the torn tail (if any) is gone.
+                                    poisoned = false;
+                                }
                                 let _ = ack.send(ok);
                             } else if Self::journal_active_len(&writer) > ACTIVE_SEAL_THRESHOLD {
                                 Self::journal_seal_active(
@@ -5006,6 +5073,9 @@ impl Storage {
                                 frontier_seq,
                                 next_seq,
                             );
+                            if ok {
+                                poisoned = false;
+                            }
                             let _ = ack.send(ok);
                         }
                         Err(_) => break,
@@ -5169,7 +5239,25 @@ impl Storage {
             .ok()
             .and_then(|c| serde_json::from_str::<serde_json::Value>(&c).ok())
             .is_some_and(|v| v.get("wal_frontier").is_some());
-        let snapshot_loaded = storage.try_load_state();
+        // RCA--SLICE0-DURABILITY defect 4: a base segment folded at a seq
+        // STRICTLY NEWER than the snapshot's cursor means the snapshot predates
+        // a completed checkpoint (the fold-vs-state.json-rename crash window).
+        // That fold already erased the history between the two cursors —
+        // including any NodeRetract frames — and a base-segment replay can only
+        // add, so trusting the stale snapshot would resurrect state deleted
+        // between them. The base segment is a complete recovery source on its
+        // own (I8): skip the snapshot and recover from the journal alone.
+        let fold_horizon = storage.history_horizon();
+        let snapshot_stale_vs_fold =
+            journal_frontier.is_some_and(|frontier| fold_horizon > frontier);
+        if snapshot_stale_vs_fold {
+            println!(
+                "Mark IX: snapshot cursor {} predates journal fold @{} — ignoring stale snapshot, recovering from the journal.",
+                journal_frontier.unwrap_or(0),
+                fold_horizon
+            );
+        }
+        let snapshot_loaded = !snapshot_stale_vs_fold && storage.try_load_state();
         match (snapshot_loaded, journal_frontier) {
             // Framed snapshot: replay only frames past the seq frontier.
             (true, Some(frontier)) => storage.replay_journal(Some(frontier), false),
@@ -5179,10 +5267,14 @@ impl Storage {
             // full replay, once (idempotent for graph state; duplicate vector
             // arena rows are reclaimed by the next index compaction).
             (true, None) if legacy_byte_frontier => storage.replay_journal(None, true),
-            // Pre-frontier snapshot (no cursor of either kind): legacy
-            // behavior — instant load only, no replay (back-compat).
-            (true, None) => {}
-            // No snapshot: the journal alone is the recovery source.
+            // Pre-frontier snapshot (no cursor of either kind): tail replay is
+            // impossible, and the journal may hold acked writes newer than the
+            // snapshot (RCA--SLICE0-DURABILITY defect 3) — full replay on top
+            // of the instant load, exactly like the legacy-cursor branch above
+            // (idempotent LWW; same one-time duplicate-arena-rows tradeoff).
+            (true, None) => storage.replay_journal(None, true),
+            // No snapshot (or a stale one skipped above): the journal alone is
+            // the recovery source.
             (false, _) => storage.replay_journal(None, true),
         }
         // Rebuild the HNSW index for BOTH load paths: journal replay and the
@@ -5529,6 +5621,9 @@ impl Storage {
             Event::Edge(_) => Ok(true),
             // A vector attachment carries no governance/axiom implication.
             Event::Vector(_) => Ok(true),
+            // Retraction proposals carry no axiom-creation implication (the
+            // MASTER-immutability breadth question is tracked separately).
+            Event::NodeRetract { .. } => Ok(true),
             Event::RelationalSchema(_) | Event::RelationalRows { .. } => Ok(true),
             Event::Transaction(transaction) => {
                 for node in &transaction.nodes {
@@ -5774,6 +5869,14 @@ impl Storage {
                     let seq = self.persist_signed(signed_event.clone())?;
                     self.apply_transaction_memory(transaction, true);
                     self.txn_frontier.fetch_max(seq, Ordering::SeqCst);
+                }
+                // A committed retraction applies like the replay path and is
+                // persisted with its original proposal signature.
+                Event::NodeRetract { id, .. } => {
+                    if let Some(u32_id) = self.get_u32(id) {
+                        self.retract_node_memory(id, u32_id);
+                    }
+                    self.persist_signed(signed_event.clone())?;
                 }
             }
             proposal.committed = true;
@@ -7973,7 +8076,29 @@ impl Storage {
             Some(i) => i,
             None => return Ok(()),
         };
+        // RCA--SLICE0-DURABILITY defect 2: the retraction must be durable
+        // BEFORE the live view mutates — a crash after this call returns must
+        // not resurrect the node on replay (the hourly autonomic TTL/orphan
+        // prune goes through here too). Persist-first also means a failed
+        // persist leaves the node fully intact: no phantom delete. The
+        // projection arm deletes the node's props/label rows while `id` still
+        // resolves in `id_to_u32`.
+        let event = Event::NodeRetract {
+            id: id.to_string(),
+            clock: self.next_clock(),
+        };
+        self.persist(&event)?;
+        self.retract_node_memory(id, u32_id);
+        Ok(())
+    }
 
+    /// In-memory half of a node retraction: unwire incident edges from both
+    /// adjacency indexes, drop the edges, the interning entry, the per-collection
+    /// arena mappings, and the node itself. Shared by `retract_node` (under
+    /// `commit_lock`, after the NodeRetract frame is durable), journal replay,
+    /// and CRDT reconcile. (Arena slots are reclaimed lazily by compaction;
+    /// trigram postings are not swept — pre-existing behavior.)
+    fn retract_node_memory(&self, id: &str, u32_id: u32) {
         // 1. Collect all edges to remove
         let mut edges_to_remove = Vec::new();
         if let Some(eids) = self.out_idx.get(&u32_id) {
@@ -8019,8 +8144,6 @@ impl Storage {
             c.value().node_to_arena.remove(&u32_id);
         }
         self.nodes.remove(&u32_id);
-
-        Ok(())
     }
 
     pub fn reconcile_state(&self, signed_events: Vec<SignedEvent>) -> Result<()> {
@@ -8161,6 +8284,34 @@ impl Storage {
                         })
                         .collect();
                     let _ = self.reconcile_state_unlocked(wrapped_inners);
+                }
+                Event::NodeRetract { id, clock } => {
+                    // Node-style LWW: the retraction applies unless the local
+                    // copy is strictly newer (same rule as the Node arm above).
+                    // No resident node ⇒ nothing to remove and nothing to
+                    // re-persist (the retraction is already in the sender's
+                    // journal; without a persistent tombstone store, ignoring
+                    // it here is idempotent — pulls just keep offering it).
+                    let apply = self
+                        .get_u32(id)
+                        .and_then(|u| self.nodes.get(&u).map(|n| (u, n.value().clock.clone())))
+                        .filter(|(_, local_clock)| !(clock < local_clock));
+                    if let Some((u32_id, _)) = apply {
+                        let mut current = self.logical_clock.load(Ordering::SeqCst);
+                        while clock.time > current {
+                            match self.logical_clock.compare_exchange_weak(
+                                current,
+                                clock.time,
+                                Ordering::SeqCst,
+                                Ordering::SeqCst,
+                            ) {
+                                Ok(_) => break,
+                                Err(actual) => current = actual,
+                            }
+                        }
+                        self.retract_node_memory(id, u32_id);
+                        self.persist_signed(signed_event.clone())?;
+                    }
                 }
             }
         }
@@ -8613,9 +8764,25 @@ impl Storage {
         // commit_lock (held by save_state), so live state cannot move between
         // the build and the fold.
         let frontier_seq = self.stable_frontier();
-        let wal_payload = self.build_compacted_wal().ok();
-        if let Some((payload, count)) = &wal_payload {
-            let _ = self.checkpoint_wal_payload(payload.clone(), frontier_seq, *count);
+        // RCA--SLICE0-DURABILITY defect 3: a snapshot written WITHOUT a journal
+        // cursor would make the next open skip tail replay entirely — silently
+        // dropping every write acked after this point. If the payload build
+        // fails, abort the checkpoint loudly instead: the previous snapshot +
+        // the (unfolded) journal remain a complete recovery source (I8).
+        let wal_payload = self.build_compacted_wal()?;
+        {
+            let (payload, count) = &wal_payload;
+            // A failed FOLD is safe (the journal keeps full history and the
+            // cursor below still filters correctly) — but it must not be
+            // silent: the journal will regrow until a fold succeeds.
+            if self
+                .checkpoint_wal_payload(payload.clone(), frontier_seq, *count)
+                .is_err()
+            {
+                println!(
+                    "Mark IX: journal fold failed — snapshot proceeding; journal retains full history until the next successful fold."
+                );
+            }
         }
         let temp_dir = self.path.join("temp_save");
         if temp_dir.exists() {
@@ -8733,19 +8900,22 @@ impl Storage {
             "schema_version": SCHEMA_VERSION,
             "timestamp": Utc::now().to_rfc3339(),
         });
-        if wal_payload.is_some() {
-            // The tail-replay cursor (SPEC §3): frames with seq > frontier_seq
-            // on the next open are writes acked AFTER this snapshot. Position-
-            // independent, so no prefix hash is needed (supersedes PR #100's
-            // byte cursor — spec updated in this PR).
-            state["journal"] = serde_json::json!({
-                "frontier_seq": frontier_seq,
-                "txn_frontier": self.txn_frontier(),
-                "tx_epoch_start": 1,
-                "format_version": JOURNAL_FORMAT_VERSION,
-            });
-        }
-        fs::write(temp_dir.join("state.json"), state.to_string()).ok();
+        // The tail-replay cursor (SPEC §3): frames with seq > frontier_seq
+        // on the next open are writes acked AFTER this snapshot. Position-
+        // independent, so no prefix hash is needed (supersedes PR #100's
+        // byte cursor — spec updated in this PR). Always present: save_state
+        // aborts before this point if the payload build fails, so a snapshot
+        // can no longer exist without its cursor (RCA--SLICE0-DURABILITY
+        // defect 3). The write error is propagated for the same reason — a
+        // half-written state.json must fail the save, not limp into the swap.
+        state["journal"] = serde_json::json!({
+            "frontier_seq": frontier_seq,
+            "txn_frontier": self.txn_frontier(),
+            "tx_epoch_start": 1,
+            "format_version": JOURNAL_FORMAT_VERSION,
+        });
+        fs::write(temp_dir.join("state.json"), state.to_string())
+            .map_err(|e| Error::from_reason(format!("state.json write failed: {}", e)))?;
 
         // Atomic-ish swap: per-collection filenames are dynamic, so move every
         // file produced into the db root instead of a fixed list. `state.json` is
@@ -9946,6 +10116,8 @@ impl Storage {
             Event::Edge(ed) => Some(ed.clock.time),
             Event::Batch(v) => v.iter().filter_map(Self::event_time).max(),
             Event::Vector(v) => Some(v.clock.time),
+            // Retractions replicate like node upserts (clock-stamped LWW).
+            Event::NodeRetract { clock, .. } => Some(clock.time),
             Event::RelationalSchema(_) | Event::RelationalRows { .. } => None,
             Event::Transaction(transaction) => transaction
                 .nodes
@@ -10604,6 +10776,15 @@ impl Storage {
             Event::Transaction(transaction) => {
                 self.apply_transaction_memory(&transaction, false);
                 self.txn_frontier.fetch_max(seq, Ordering::SeqCst);
+            }
+            // Durable retraction (RCA--SLICE0-DURABILITY defect 2): replay the
+            // removal so a crash after the retraction ack no longer resurrects
+            // the node. Frame order guarantees this runs after the node's own
+            // upsert frames.
+            Event::NodeRetract { id, .. } => {
+                if let Some(u32_id) = self.get_u32(&id) {
+                    self.retract_node_memory(&id, u32_id);
+                }
             }
         }
     }
