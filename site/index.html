@@ -1,0 +1,1561 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>GenesisBlockDB | Live Demo Landing</title>
+  <style>
+    :root {
+      --paper: #f7f2e8;
+      --paper-strong: #fbf8f1;
+      --ink: #12383d;
+      --ink-soft: #2b4f53;
+      --muted: #5f6761;
+      --line: rgba(18, 56, 61, 0.14);
+      --teal: #0d5d66;
+      --teal-deep: #073b41;
+      --amber: #b87419;
+      --amber-soft: #eec98f;
+      --white: #ffffff;
+      --shadow: 0 26px 50px rgba(18, 56, 61, 0.08);
+      --radius-xl: 34px;
+      --radius-lg: 24px;
+      --radius-md: 18px;
+      --radius-sm: 12px;
+      --mono: "Cascadia Code", "IBM Plex Mono", monospace;
+      --serif: "Iowan Old Style", "Georgia", serif;
+      --sans: "Aptos", "Segoe UI", sans-serif;
+    }
+
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: var(--sans);
+      color: var(--ink);
+      background:
+        radial-gradient(circle at 20% 10%, rgba(184, 116, 25, 0.10), transparent 24%),
+        radial-gradient(circle at 88% 22%, rgba(13, 93, 102, 0.08), transparent 30%),
+        linear-gradient(rgba(18, 56, 61, 0.03) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(18, 56, 61, 0.03) 1px, transparent 1px),
+        var(--paper);
+      background-size: auto, auto, 30px 30px, 30px 30px, auto;
+      transition: background-color 200ms ease, color 200ms ease;
+    }
+
+    body[data-theme="dark"] {
+      --paper: #0d1317;
+      --paper-strong: #131b21;
+      --ink: #edf2f3;
+      --ink-soft: #d1dde0;
+      --muted: #98a7ab;
+      --line: rgba(237, 242, 243, 0.14);
+      --teal: #77c3c4;
+      --teal-deep: #0d5d66;
+      --amber: #efb253;
+      --amber-soft: #f4d39e;
+      --white: #182328;
+      --shadow: 0 26px 50px rgba(0, 0, 0, 0.28);
+      background:
+        radial-gradient(circle at 20% 10%, rgba(239, 178, 83, 0.12), transparent 24%),
+        radial-gradient(circle at 88% 22%, rgba(119, 195, 196, 0.10), transparent 30%),
+        linear-gradient(rgba(237, 242, 243, 0.035) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(237, 242, 243, 0.035) 1px, transparent 1px),
+        var(--paper);
+      background-size: auto, auto, 30px 30px, 30px 30px, auto;
+    }
+
+    a { color: inherit; }
+
+    .page {
+      width: min(1240px, calc(100% - 40px));
+      margin: 0 auto;
+      padding: 26px 0 64px;
+    }
+
+    .site-nav {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 18px;
+      padding: 14px 0 22px;
+    }
+
+    .brand {
+      display: inline-flex;
+      align-items: center;
+      gap: 14px;
+      text-decoration: none;
+      font-family: var(--serif);
+      font-size: 24px;
+      font-weight: 600;
+      letter-spacing: -0.03em;
+    }
+
+    .brand-mark {
+      width: 40px;
+      height: 40px;
+      border-radius: 14px;
+      background:
+        linear-gradient(135deg, rgba(13, 93, 102, 0.15), rgba(184, 116, 25, 0.16)),
+        var(--white);
+      border: 1px solid rgba(13, 93, 102, 0.18);
+      position: relative;
+      box-shadow: inset 0 0 0 1px rgba(255,255,255,0.3);
+    }
+
+    .brand-mark::before,
+    .brand-mark::after {
+      content: "";
+      position: absolute;
+      inset: 8px;
+      border: 2px solid var(--teal);
+      clip-path: polygon(50% 0%, 100% 28%, 100% 72%, 50% 100%, 0% 72%, 0% 28%);
+      opacity: 0.9;
+    }
+
+    .brand-mark::after {
+      inset: 14px;
+      border-color: var(--amber);
+    }
+
+    .header-actions {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+    }
+
+    .nav-links {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .nav-links a {
+      text-decoration: none;
+      color: var(--ink-soft);
+      font-size: 14px;
+      padding: 10px 12px;
+      border-radius: 999px;
+    }
+
+    .nav-links a:hover,
+    .toggle-button:hover {
+      background: rgba(255,255,255,0.55);
+    }
+
+    body[data-theme="dark"] .nav-links a:hover,
+    body[data-theme="dark"] .toggle-button:hover {
+      background: rgba(255,255,255,0.08);
+    }
+
+    .toggle-group {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px;
+      border-radius: 999px;
+      border: 1px solid var(--line);
+      background: rgba(255,255,255,0.72);
+      backdrop-filter: blur(12px);
+    }
+
+    .toggle-button {
+      border: 0;
+      background: transparent;
+      color: var(--ink-soft);
+      font: 700 12px/1 var(--mono);
+      letter-spacing: 0.08em;
+      padding: 10px 12px;
+      border-radius: 999px;
+      cursor: pointer;
+      transition: background-color 160ms ease, color 160ms ease, transform 160ms ease;
+    }
+
+    .toggle-button:hover { transform: translateY(-1px); }
+
+    .toggle-button.active {
+      background: var(--teal-deep);
+      color: #f7f3ea;
+    }
+
+    .theme-toggle {
+      min-width: 128px;
+      justify-content: center;
+    }
+
+    .hero {
+      display: grid;
+      grid-template-columns: minmax(0, 1.2fr) minmax(360px, 0.8fr);
+      gap: 26px;
+      align-items: stretch;
+    }
+
+    .hero-panel,
+    .hero-rail,
+    .surface,
+    .metric-card,
+    .footer-links a {
+      background: rgba(255,255,255,0.72);
+      border: 1px solid var(--line);
+      backdrop-filter: blur(12px);
+    }
+
+    body[data-theme="dark"] .hero-panel,
+    body[data-theme="dark"] .hero-rail,
+    body[data-theme="dark"] .surface,
+    body[data-theme="dark"] .metric-card,
+    body[data-theme="dark"] .footer-links a,
+    body[data-theme="dark"] .toggle-group {
+      background: rgba(24, 35, 40, 0.78);
+    }
+
+    .hero-panel {
+      padding: 42px;
+      border-radius: var(--radius-xl);
+      box-shadow: var(--shadow);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .hero-panel::after {
+      content: "";
+      position: absolute;
+      right: -90px;
+      bottom: -110px;
+      width: 300px;
+      height: 300px;
+      border-radius: 50%;
+      border: 1px solid rgba(13, 93, 102, 0.12);
+      opacity: 0.6;
+    }
+
+    h1 {
+      margin: 0 0 18px;
+      font-family: var(--serif);
+      font-size: clamp(56px, 8vw, 96px);
+      line-height: 0.9;
+      letter-spacing: -0.075em;
+      max-width: 720px;
+    }
+
+    h1 em {
+      color: var(--amber);
+      font-style: normal;
+      font-weight: 500;
+    }
+
+    .lede {
+      max-width: 690px;
+      margin: 0;
+      font-size: 20px;
+      line-height: 1.72;
+      color: var(--ink-soft);
+    }
+
+    .proof-list {
+      display: grid;
+      gap: 14px;
+      margin: 28px 0 0;
+    }
+
+    .proof-row {
+      display: grid;
+      grid-template-columns: 46px minmax(0, 1fr);
+      gap: 14px;
+      align-items: start;
+    }
+
+    .proof-icon {
+      width: 46px;
+      height: 46px;
+      border-radius: 14px;
+      border: 1px solid rgba(13, 93, 102, 0.16);
+      background: rgba(255,255,255,0.72);
+      display: grid;
+      place-items: center;
+      color: var(--teal);
+      font: 700 18px/1 var(--mono);
+    }
+
+    body[data-theme="dark"] .proof-icon {
+      background: rgba(255,255,255,0.05);
+    }
+
+    .proof-row strong {
+      display: block;
+      margin-bottom: 5px;
+      font-size: 18px;
+      letter-spacing: -0.02em;
+    }
+
+    .proof-row span {
+      color: var(--muted);
+      line-height: 1.65;
+      font-size: 15px;
+    }
+
+    .hero-actions {
+      display: flex;
+      gap: 14px;
+      flex-wrap: wrap;
+      margin-top: 30px;
+    }
+
+    .button {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      min-height: 54px;
+      padding: 0 20px;
+      text-decoration: none;
+      border-radius: 999px;
+      font-weight: 700;
+      font-size: 15px;
+      border: 1px solid var(--line);
+      transition: transform 160ms ease, box-shadow 160ms ease, border-color 160ms ease;
+    }
+
+    .button:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 12px 24px rgba(18, 56, 61, 0.08);
+    }
+
+    .button.primary {
+      background: var(--teal-deep);
+      color: #f7f3ea;
+      border-color: var(--teal-deep);
+    }
+
+    .button.secondary {
+      background: rgba(255,255,255,0.9);
+      color: var(--ink);
+    }
+
+    .button.ghost {
+      background: transparent;
+      color: var(--ink-soft);
+    }
+
+    body[data-theme="dark"] .button.secondary {
+      background: rgba(255,255,255,0.08);
+      color: var(--ink);
+    }
+
+    .hero-rail {
+      border-radius: var(--radius-xl);
+      padding: 28px 26px;
+      display: grid;
+      gap: 18px;
+      box-shadow: var(--shadow);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .hero-rail::before {
+      content: "";
+      position: absolute;
+      left: 34px;
+      top: 110px;
+      bottom: 78px;
+      border-left: 2px dashed rgba(184, 116, 25, 0.5);
+    }
+
+    .rail-heading {
+      display: grid;
+      gap: 6px;
+      padding-bottom: 8px;
+    }
+
+    .rail-heading strong,
+    .surface h2,
+    .headline-block h2 {
+      font-family: var(--serif);
+      letter-spacing: -0.04em;
+    }
+
+    .rail-heading strong {
+      font-size: 36px;
+      line-height: 1.02;
+    }
+
+    .rail-heading span,
+    .section-tag {
+      color: var(--teal);
+      font: 700 11px/1.4 var(--mono);
+      text-transform: uppercase;
+      letter-spacing: 0.16em;
+    }
+
+    .rail-step {
+      position: relative;
+      display: grid;
+      grid-template-columns: 54px minmax(0, 1fr);
+      gap: 16px;
+      align-items: start;
+      padding: 8px 0 10px;
+    }
+
+    .rail-index {
+      width: 44px;
+      height: 44px;
+      border-radius: 50%;
+      background: var(--amber);
+      color: #fffdf6;
+      display: grid;
+      place-items: center;
+      font: 700 18px/1 var(--mono);
+      z-index: 1;
+    }
+
+    .rail-step strong {
+      display: block;
+      margin-bottom: 5px;
+      font-size: 24px;
+    }
+
+    .rail-step p {
+      margin: 0;
+      color: var(--muted);
+      line-height: 1.72;
+      font-size: 15px;
+    }
+
+    .main {
+      display: grid;
+      gap: 22px;
+      margin-top: 24px;
+    }
+
+    .surface {
+      border-radius: var(--radius-xl);
+      padding: 30px;
+      box-shadow: var(--shadow);
+      scroll-margin-top: 24px;
+    }
+
+    .headline-block {
+      display: grid;
+      gap: 10px;
+      max-width: 860px;
+      margin-bottom: 22px;
+    }
+
+    .headline-block h2 {
+      margin: 0;
+      font-size: clamp(38px, 5vw, 58px);
+      line-height: 0.97;
+    }
+
+    .headline-block p {
+      margin: 0;
+      color: var(--muted);
+      font-size: 17px;
+      line-height: 1.75;
+    }
+
+    .talk-grid,
+    .audit-grid,
+    .proof-grid,
+    .footer-links {
+      display: grid;
+      gap: 16px;
+    }
+
+    .talk-grid {
+      grid-template-columns: 1fr 1fr 1fr;
+    }
+
+    .talk-card,
+    .metric-card,
+    .proof-block {
+      border-radius: var(--radius-lg);
+      border: 1px solid var(--line);
+      background: rgba(255,255,255,0.86);
+    }
+
+    body[data-theme="dark"] .talk-card,
+    body[data-theme="dark"] .proof-block {
+      background: rgba(255,255,255,0.04);
+    }
+
+    .talk-card {
+      padding: 22px;
+      display: grid;
+      gap: 12px;
+    }
+
+    .talk-number {
+      color: var(--amber);
+      font: 700 15px/1 var(--mono);
+      letter-spacing: 0.08em;
+    }
+
+    .talk-card strong {
+      font-size: 26px;
+      letter-spacing: -0.03em;
+    }
+
+    .say {
+      display: grid;
+      gap: 6px;
+      padding-top: 8px;
+      border-top: 1px solid rgba(18,56,61,0.09);
+    }
+
+    .say span {
+      color: var(--teal);
+      font: 700 10px/1.5 var(--mono);
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+    }
+
+    .say p,
+    .caveat-list li,
+    .footnote p {
+      margin: 0;
+      color: var(--muted);
+      line-height: 1.72;
+    }
+
+    #demo-flow:target {
+      outline: 2px solid rgba(184, 116, 25, 0.35);
+      outline-offset: 6px;
+    }
+
+    .demo-shell {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 320px;
+      gap: 18px;
+      align-items: stretch;
+    }
+
+    .flow-steps {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 14px;
+    }
+
+    .flow-card {
+      padding: 20px;
+      border-radius: var(--radius-lg);
+      background: linear-gradient(180deg, rgba(255,255,255,0.95), rgba(247,242,232,0.94));
+      border: 1px solid var(--line);
+      display: grid;
+      gap: 10px;
+    }
+
+    body[data-theme="dark"] .flow-card {
+      background: linear-gradient(180deg, rgba(255,255,255,0.04), rgba(255,255,255,0.02));
+    }
+
+    .flow-card strong {
+      font-size: 22px;
+      letter-spacing: -0.03em;
+    }
+
+    .flow-card p,
+    .flow-card ul,
+    .metric-meta,
+    .demo-box p {
+      margin: 0;
+      color: var(--muted);
+      line-height: 1.7;
+      font-size: 15px;
+    }
+
+    .flow-card ul {
+      padding-left: 18px;
+    }
+
+    .demo-box {
+      padding: 22px;
+      border-radius: var(--radius-lg);
+      background: var(--teal-deep);
+      color: #f7f3ea;
+      display: grid;
+      gap: 12px;
+      align-content: start;
+    }
+
+    .demo-box span {
+      color: rgba(247,243,234,0.72);
+      font: 700 10px/1.5 var(--mono);
+      text-transform: uppercase;
+      letter-spacing: 0.14em;
+    }
+
+    .demo-box strong {
+      font-size: 28px;
+      line-height: 1.05;
+      letter-spacing: -0.04em;
+      font-family: var(--serif);
+    }
+
+    .demo-box .button {
+      background: #f7f3ea;
+      color: var(--teal-deep);
+      border-color: rgba(247,243,234,0.18);
+      width: 100%;
+    }
+
+    .audit-surface {
+      background:
+        radial-gradient(circle at top left, rgba(238, 201, 143, 0.06), transparent 30%),
+        linear-gradient(135deg, var(--teal-deep), #0b4f56);
+      color: #f7f3ea;
+      border-color: rgba(255,255,255,0.12);
+    }
+
+    body[data-theme="dark"] .audit-surface {
+      background:
+        radial-gradient(circle at top left, rgba(239, 178, 83, 0.08), transparent 30%),
+        linear-gradient(135deg, #062c31, #0b4148);
+    }
+
+    .audit-surface .headline-block p,
+    .audit-surface .footnote p,
+    .audit-surface .caveat-list li {
+      color: rgba(247,243,234,0.8);
+    }
+
+    .audit-surface .section-tag { color: var(--amber-soft); }
+    .audit-surface h2 { color: #fffaf0; }
+    .audit-surface .metric-card .metric-meta { color: var(--muted); }
+
+    .audit-grid {
+      grid-template-columns: 1.1fr repeat(4, minmax(0, 1fr));
+      align-items: stretch;
+    }
+
+    .audit-intro {
+      padding: 18px 8px 18px 4px;
+      display: grid;
+      gap: 14px;
+      align-content: start;
+    }
+
+    .audit-intro strong {
+      font-family: var(--serif);
+      font-size: 48px;
+      line-height: 0.95;
+      letter-spacing: -0.05em;
+    }
+
+    .metric-card {
+      padding: 18px;
+      color: var(--ink);
+      display: grid;
+      gap: 12px;
+      align-content: start;
+    }
+
+    .metric-topline {
+      color: var(--teal);
+      font: 700 11px/1.4 var(--mono);
+      text-transform: uppercase;
+      letter-spacing: 0.14em;
+    }
+
+    .metric-card strong {
+      font-family: var(--serif);
+      font-size: 54px;
+      line-height: 0.95;
+      letter-spacing: -0.06em;
+      color: var(--teal-deep);
+    }
+
+    .metric-card b {
+      font-size: 27px;
+      line-height: 1.1;
+      letter-spacing: -0.04em;
+    }
+
+    .metric-card em {
+      font-style: normal;
+      color: var(--amber);
+      font-weight: 700;
+    }
+
+    .proof-grid {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      margin-top: 18px;
+    }
+
+    .proof-block {
+      padding: 20px;
+      display: grid;
+      gap: 10px;
+    }
+
+    .proof-block strong {
+      font-size: 22px;
+      letter-spacing: -0.03em;
+    }
+
+    .proof-block span {
+      color: var(--teal);
+      font: 700 10px/1.5 var(--mono);
+      text-transform: uppercase;
+      letter-spacing: 0.14em;
+    }
+
+    .caveat-list {
+      margin: 16px 0 0;
+      padding-left: 20px;
+      display: grid;
+      gap: 8px;
+    }
+
+    .footer-links {
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+    }
+
+    .footer-links a {
+      text-decoration: none;
+      padding: 20px;
+      border-radius: var(--radius-lg);
+      display: grid;
+      gap: 8px;
+      transition: transform 160ms ease, box-shadow 160ms ease;
+    }
+
+    .footer-links a:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 18px 34px rgba(18, 56, 61, 0.08);
+    }
+
+    .footer-links strong {
+      font-size: 22px;
+      letter-spacing: -0.03em;
+    }
+
+    .footer-links span {
+      color: var(--teal);
+      font: 700 10px/1.5 var(--mono);
+      text-transform: uppercase;
+      letter-spacing: 0.14em;
+    }
+
+    .footer-links p {
+      margin: 0;
+      color: var(--muted);
+      line-height: 1.7;
+    }
+
+    .footnote {
+      margin-top: 16px;
+      padding-top: 14px;
+      border-top: 1px solid rgba(18,56,61,0.08);
+      display: grid;
+      gap: 8px;
+    }
+
+    .footer-bar {
+      display: flex;
+      justify-content: space-between;
+      gap: 18px;
+      flex-wrap: wrap;
+      padding: 22px 6px 0;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    @media (max-width: 1120px) {
+      .hero,
+      .demo-shell,
+      .audit-grid,
+      .footer-links,
+      .talk-grid,
+      .proof-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .flow-steps {
+        grid-template-columns: 1fr;
+      }
+
+      .site-nav {
+        align-items: flex-start;
+        flex-direction: column;
+      }
+
+      .header-actions {
+        width: 100%;
+        justify-content: space-between;
+      }
+    }
+
+    @media (max-width: 720px) {
+      .page { width: min(100% - 24px, 1240px); }
+      .hero-panel,
+      .hero-rail,
+      .surface { padding: 24px; }
+      h1 { font-size: clamp(48px, 17vw, 78px); }
+      .lede { font-size: 18px; }
+      .proof-row { grid-template-columns: 1fr; }
+      .hero-actions { flex-direction: column; }
+      .button { width: 100%; }
+      .rail-heading strong { font-size: 30px; }
+      .hero-rail::before { left: 21px; top: 126px; bottom: 104px; }
+      .rail-step { grid-template-columns: 44px minmax(0, 1fr); }
+      .metric-card strong { font-size: 46px; }
+      .audit-intro strong { font-size: 40px; }
+      .header-actions,
+      .nav-links { width: 100%; }
+      .nav-links {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+      }
+      .toggle-group {
+        width: 100%;
+        justify-content: center;
+      }
+      .theme-toggle {
+        min-width: 0;
+      }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      html { scroll-behavior: auto; }
+      .button,
+      .footer-links a,
+      .toggle-button { transition: none; }
+    }
+  </style>
+</head>
+<body data-theme="light" data-lang="en">
+  <main class="page">
+    <header class="site-nav">
+      <a class="brand" href="#top">
+        <span class="brand-mark" aria-hidden="true"></span>
+        <span>GenesisBlockDB</span>
+      </a>
+      <div class="header-actions">
+        <nav class="nav-links" aria-label="Sections">
+          <a href="#demo-flow" id="nav-demo">Demo flow</a>
+          <a href="#talk-track" id="nav-stage">Stage copy</a>
+          <a href="#audit" id="nav-audit">Head to head</a>
+          <a href="#proof" id="nav-proof">Proof and caveats</a>
+          <a href="#docs" id="nav-docs">Docs</a>
+        </nav>
+        <div class="toggle-group" aria-label="Language toggle">
+          <button class="toggle-button" id="lang-en" type="button" data-lang-option="en">EN</button>
+          <button class="toggle-button" id="lang-th" type="button" data-lang-option="th">TH</button>
+        </div>
+        <div class="toggle-group" aria-label="Theme toggle">
+          <button class="toggle-button theme-toggle" id="theme-toggle" type="button">Dark mode</button>
+        </div>
+      </div>
+    </header>
+
+    <section class="hero" id="top">
+      <article class="hero-panel">
+        <h1 id="hero-title">One handle.<br>Three evidence <em>spaces.</em></h1>
+        <p class="lede" id="hero-lede">
+          GenesisBlockDB gives you one operational boundary over signed WAL authority,
+          embedded SQLite projection, native graph execution, and vector retrieval.
+          This page is built to get you from opening the story to running the demo in minutes.
+        </p>
+
+        <div class="proof-list">
+          <div class="proof-row">
+            <div class="proof-icon">R</div>
+            <div>
+              <strong id="proof-r-title">Relational stays inside the boundary</strong>
+              <span id="proof-r-body">SQLite is engine-owned and rebuildable. The pitch is not "we ship SQLite." The pitch is "you stop maintaining a second relational database yourself."</span>
+            </div>
+          </div>
+          <div class="proof-row">
+            <div class="proof-icon">G</div>
+            <div>
+              <strong id="proof-g-title">Graph is the explainer surface</strong>
+              <span id="proof-g-body">Studio turns one selected entity into relational, graph, vector, and temporal evidence in one inspector instead of three disconnected tools.</span>
+            </div>
+          </div>
+          <div class="proof-row">
+            <div class="proof-icon">V</div>
+            <div>
+              <strong id="proof-v-title">Vector belongs to the same truth model</strong>
+              <span id="proof-v-body">Collections, nearest neighbors, and freshness are attached to the same entity identity and durability contract as the rest of the database.</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="hero-actions">
+          <a class="button primary" href="#demo-flow" id="cta-demo">Start live demo flow</a>
+          <a class="button secondary" href="../studio/src-tauri/target/debug/genesis-studio.exe" id="cta-app">Open desktop app</a>
+          <a class="button ghost" href="#audit" id="cta-audit">Jump to measured head to head</a>
+        </div>
+      </article>
+
+      <aside class="hero-rail">
+        <div class="rail-heading">
+          <span id="rail-label">Guided demo</span>
+          <strong id="rail-title">Click once. Present with a script.</strong>
+        </div>
+
+        <div class="rail-step">
+          <div class="rail-index">1</div>
+          <div>
+            <strong id="rail-1-title">Present mode</strong>
+            <p id="rail-1-body">Start with the built-in fixture path so you can show the product shape immediately without asking anyone to prepare a database first.</p>
+          </div>
+        </div>
+
+        <div class="rail-step">
+          <div class="rail-index">2</div>
+          <div>
+            <strong id="rail-2-title">Local proof</strong>
+            <p id="rail-2-body">Reconnect with a presentation preset to prove the same UI flow over a real Genesis data root and signed WAL-backed storage.</p>
+          </div>
+        </div>
+
+        <div class="rail-step">
+          <div class="rail-index">3</div>
+          <div>
+            <strong id="rail-3-title">Remote self-host</strong>
+            <p id="rail-3-body">Only switch here when the room asks about deployment topology, auth, or operating GenesisBlockDB as a self-hosted service.</p>
+          </div>
+        </div>
+      </aside>
+    </section>
+
+    <section class="main">
+      <section class="surface" id="demo-flow">
+        <div class="headline-block">
+          <span class="section-tag" id="demo-tag">Demo flow</span>
+          <h2 id="demo-title">Make the page lead directly into the desktop demo.</h2>
+          <p id="demo-body">
+            The fastest path is fixture first, local preset second, remote mode last. That gives you a clean story,
+            a proof step, and a self-host answer without making the audience do setup on your behalf.
+          </p>
+        </div>
+
+        <div class="demo-shell">
+          <div class="flow-steps">
+            <article class="flow-card">
+              <span class="section-tag" id="step-1-tag">Step 01</span>
+              <strong id="step-1-title">Open Studio and click presentation mode</strong>
+              <p id="step-1-body">The current desktop build already includes a `Launch presentation mode` entry point and demo presets for local roots.</p>
+              <ul id="step-1-list">
+                <li>Show Overview first.</li>
+                <li>Say "one operational boundary" before any graph view.</li>
+                <li>Do not start by talking about raw SQLite.</li>
+              </ul>
+            </article>
+
+            <article class="flow-card">
+              <span class="section-tag" id="step-2-tag">Step 02</span>
+              <strong id="step-2-title">Move to Graph and click a spotlight entity</strong>
+              <p id="step-2-body">That is the moment where GenesisBlockDB stops sounding abstract: one entity, one identity, three evidence spaces, one inspector.</p>
+              <ul id="step-2-list">
+                <li>Call out relational, graph, vector, and time in one sentence.</li>
+                <li>Use the inspector as your proof surface.</li>
+              </ul>
+            </article>
+
+            <article class="flow-card">
+              <span class="section-tag" id="step-3-tag">Step 03</span>
+              <strong id="step-3-title">Escalate only if the room asks for proof</strong>
+              <p id="step-3-body">Disconnect and reconnect with the local presentation preset. Keep remote mode reserved for self-host questions.</p>
+              <ul id="step-3-list">
+                <li>Fixture first for clarity.</li>
+                <li>Local preset for proof.</li>
+                <li>Remote for operations and topology.</li>
+              </ul>
+            </article>
+          </div>
+
+          <aside class="demo-box">
+            <span id="demo-box-tag">Primary action</span>
+            <strong id="demo-box-title">Open the desktop app, then follow the flow on this page.</strong>
+            <p id="demo-box-body">The app binary is already built locally. The page tells you what to click and what to say next.</p>
+            <a class="button" href="../studio/src-tauri/target/debug/genesis-studio.exe" id="demo-box-cta">Open Genesis Studio</a>
+            <p id="demo-box-foot">Backup assets: benchmark report, Studio desktop spec, and the interactive benchmark page are linked below.</p>
+          </aside>
+        </div>
+      </section>
+
+      <section class="surface" id="talk-track">
+        <div class="headline-block">
+          <span class="section-tag" id="talk-tag">Stage copy</span>
+          <h2 id="talk-title">Three beats you can say on stage without improvising.</h2>
+          <p id="talk-body">
+            These are presenter cues, not marketing filler. Each card gives you the core message and one usable sentence
+            so you can keep moving even if the room interrupts or drills into technical details.
+          </p>
+        </div>
+
+        <div class="talk-grid">
+          <article class="talk-card">
+            <div class="talk-number">01</div>
+            <strong id="talk-1-title">Why it matters</strong>
+            <p id="talk-1-body">Teams keep maintaining SQLite, graph, and vector systems separately, then lose consistency between them.</p>
+            <div class="say">
+              <span id="talk-1-say-label">Say this</span>
+              <p id="talk-1-say">"GenesisBlockDB gives us one database boundary instead of three disconnected operational surfaces."</p>
+            </div>
+          </article>
+
+          <article class="talk-card">
+            <div class="talk-number">02</div>
+            <strong id="talk-2-title">What it is</strong>
+            <p id="talk-2-body">A Rust core with signed WAL authority, an embedded SQLite projection, native graph execution, and vector retrieval under one engine contract.</p>
+            <div class="say">
+              <span id="talk-2-say-label">Say this</span>
+              <p id="talk-2-say">"SQLite is not the product. It is an internal projection under a Genesis-owned durability and identity model."</p>
+            </div>
+          </article>
+
+          <article class="talk-card">
+            <div class="talk-number">03</div>
+            <strong id="talk-3-title">How to use it</strong>
+            <p id="talk-3-body">Open Studio, show the bounded Overview, click a graph entity, then prove local embedded or self-hosted flow only when needed.</p>
+            <div class="say">
+              <span id="talk-3-say-label">Say this</span>
+              <p id="talk-3-say">"I can start with a guided fixture, then reconnect to a real local root without changing the product story."</p>
+            </div>
+          </article>
+        </div>
+      </section>
+
+      <section class="surface audit-surface" id="audit">
+        <div class="headline-block">
+          <span class="section-tag" id="audit-tag">Measured head to head</span>
+          <h2 id="audit-title">Real numbers. Real comparators. No hand-wavy category claims.</h2>
+          <p id="audit-body">
+            These highlights come from the repository's measured audit pack, not generic positioning copy.
+            Use them as sharp proof points, then keep the caveats visible when a comparison is not perfectly apples to apples.
+          </p>
+        </div>
+
+        <div class="audit-grid">
+          <div class="audit-intro">
+            <strong id="audit-intro-title">Head to head audit.<br>Use the sharpest facts.</strong>
+            <p id="audit-intro-body">
+              The strongest story is not "we win everywhere." The strongest story is "we know exactly where we are strong,
+              where we are tied, and where we still lose today."
+            </p>
+            <a class="button secondary" href="../docs/REPORT--2026-06-21-PERFORMANCE-AND-COMPETITIVE.md" id="audit-intro-cta">Open full benchmark report</a>
+          </div>
+
+          <article class="metric-card">
+            <span class="metric-topline" id="metric-1-topline">Graph latency / embedded graph+vector</span>
+            <strong>~168x</strong>
+            <b>vs LadybugDB</b>
+            <p class="metric-meta" id="metric-1-body">Measured on hop1 latency with full node payload at 100k. This is the closest on-niche head-to-head in the current report.</p>
+          </article>
+
+          <article class="metric-card">
+            <span class="metric-topline" id="metric-2-topline">Traversal / server graph</span>
+            <strong>7-185x</strong>
+            <b>vs Neo4j</b>
+            <p class="metric-meta" id="metric-2-body">Use this when the room frames Neo4j as the reference point, but be clear that part of the gap is the embedded-versus-server tax.</p>
+          </article>
+
+          <article class="metric-card">
+            <span class="metric-topline" id="metric-3-topline">Vector point-query p50 / embedded vector</span>
+            <strong>~9x</strong>
+            <b>vs LanceDB</b>
+            <p class="metric-meta" id="metric-3-body">The current repo report records 935.6 us vs 8,392 us at matched recall bands in the 100k vector setup.</p>
+          </article>
+
+          <article class="metric-card">
+            <span class="metric-topline" id="metric-4-topline">Vector search / industry references</span>
+            <b id="metric-4-label"><em>Recall parity</em> with Chroma</b>
+            <strong>~3.4x</strong>
+            <p class="metric-meta" id="metric-4-body">Recall@10 is 0.979 vs 0.981 for Chroma, while query p50 is 974 us vs Qdrant's 3,301 us in the 100k three-way audit.</p>
+          </article>
+        </div>
+      </section>
+
+      <section class="surface" id="proof">
+        <div class="headline-block">
+          <span class="section-tag" id="proof-tag">Proof and caveats</span>
+          <h2 id="proof-title">Say the wins cleanly. Keep the caveats visible.</h2>
+          <p id="proof-body">
+            The audit already gives you both. That makes the story stronger, especially in technical rooms that will immediately ask what the comparison leaves out.
+          </p>
+        </div>
+
+        <div class="proof-grid">
+          <article class="proof-block">
+            <span id="proof-block-1-tag">Measured wins</span>
+            <strong id="proof-block-1-title">GenesisBlockDB is strongest when the job is low-latency agent memory across graph and vector semantics.</strong>
+            <p id="proof-block-1-body">That is where the embedded architecture and one-boundary model show up as real user-facing speed, not just elegant architecture slides.</p>
+          </article>
+
+          <article class="proof-block">
+            <span id="proof-block-2-tag">Honest caveats</span>
+            <strong id="proof-block-2-title">Bulk ingest and RAM efficiency are still weaker than the columnar or KV-heavy comparators.</strong>
+            <p id="proof-block-2-body">Today the report explicitly shows losses on bulk ingest versus Kuzu, LadybugDB, DuckDB, and RocksDB-oriented baselines.</p>
+          </article>
+
+          <article class="proof-block">
+            <span id="proof-block-3-tag">What to emphasize</span>
+            <strong id="proof-block-3-title">The differentiator is not any one subsystem. It is the combined boundary.</strong>
+            <p id="proof-block-3-body">Relational projection, graph identity, vector retrieval, provenance, and a governed durability model all stay attached to one engine contract.</p>
+          </article>
+        </div>
+
+        <ul class="caveat-list" id="caveat-list">
+          <li>Use `7-185x vs Neo4j` only with the note that Neo4j is a server graph comparison, not an embedded-embedded comparison.</li>
+          <li>Use `~9x vs LanceDB` specifically for point-query vector p50 at the measured recall band, not as a broad blanket claim.</li>
+          <li>Use `Recall parity with Chroma` for quality framing and `~3.4x p50 vs Qdrant` for latency framing; they answer different questions.</li>
+          <li>Avoid claiming RocksDB is a broad loss or broad win. The clean statement in the report is that hop1 is effectively tied while the deeper payload comparison is not apples to apples.</li>
+        </ul>
+      </section>
+
+      <section class="surface" id="docs">
+        <div class="headline-block">
+          <span class="section-tag" id="docs-tag">Evidence and docs</span>
+          <h2 id="docs-title">Everything you need to keep the demo grounded.</h2>
+          <p id="docs-body">
+            These are the links you can keep open in the background if the room asks for architecture, methodology, or where the desktop controller fits in the product.
+          </p>
+        </div>
+
+        <div class="footer-links">
+          <a href="../docs/REPORT--2026-06-21-PERFORMANCE-AND-COMPETITIVE.md">
+            <span id="doc-link-1-tag">Benchmark report</span>
+            <strong id="doc-link-1-title">Open the audit source</strong>
+            <p id="doc-link-1-body">Full methodology, comparator notes, and the head-to-head sections that back the numbers on this page.</p>
+          </a>
+
+          <a href="../studio/src-tauri/target/debug/genesis-studio.exe">
+            <span id="doc-link-2-tag">Desktop demo</span>
+            <strong id="doc-link-2-title">Launch Genesis Studio</strong>
+            <p id="doc-link-2-body">Run the local desktop controller, then use presentation mode and the local presets already built into the app.</p>
+          </a>
+
+          <a href="../docs/SPEC--GENESIS-STUDIO-DESKTOP.md">
+            <span id="doc-link-3-tag">Studio spec</span>
+            <strong id="doc-link-3-title">Explain the controller boundary</strong>
+            <p id="doc-link-3-body">The approved desktop-controller shape, including local embedded, remote self-hosted, and three-space inspection intent.</p>
+          </a>
+
+          <a href="./benchmarks.html">
+            <span id="doc-link-4-tag">Interactive page</span>
+            <strong id="doc-link-4-title">Open benchmark visuals</strong>
+            <p id="doc-link-4-body">Use this when you want a more visual backup surface behind the sharper narrative on the main landing page.</p>
+          </a>
+        </div>
+
+        <div class="footnote">
+          <p id="footnote-1">This landing page is intentionally optimized for a live presentation flow: story first, demo second, proof third, self-host last.</p>
+          <p id="footnote-2">The copy on the head-to-head section is derived from the measured report in this repository as of July 24, 2026.</p>
+        </div>
+      </section>
+    </section>
+
+    <footer class="footer-bar">
+      <span id="footer-left">GenesisBlockDB presentation surface for local demo use</span>
+      <span id="footer-right">Fixture first -> local preset -> remote self-host</span>
+    </footer>
+  </main>
+
+  <script>
+    const translations = {
+      en: {
+        navDemo: "Demo flow",
+        navStage: "Stage copy",
+        navAudit: "Head to head",
+        navProof: "Proof and caveats",
+        navDocs: "Docs",
+        themeLight: "Light mode",
+        themeDark: "Dark mode",
+        heroTitle: "One handle.<br>Three evidence <em>spaces.</em>",
+        heroLede: "GenesisBlockDB gives you one operational boundary over signed WAL authority, embedded SQLite projection, native graph execution, and vector retrieval. This page is built to get you from opening the story to running the demo in minutes.",
+        proofRTitle: "Relational stays inside the boundary",
+        proofRBody: "SQLite is engine-owned and rebuildable. The pitch is not \"we ship SQLite.\" The pitch is \"you stop maintaining a second relational database yourself.\"",
+        proofGTitle: "Graph is the explainer surface",
+        proofGBody: "Studio turns one selected entity into relational, graph, vector, and temporal evidence in one inspector instead of three disconnected tools.",
+        proofVTitle: "Vector belongs to the same truth model",
+        proofVBody: "Collections, nearest neighbors, and freshness are attached to the same entity identity and durability contract as the rest of the database.",
+        ctaDemo: "Start live demo flow",
+        ctaApp: "Open desktop app",
+        ctaAudit: "Jump to measured head to head",
+        railLabel: "Guided demo",
+        railTitle: "Click once. Present with a script.",
+        rail1Title: "Present mode",
+        rail1Body: "Start with the built-in fixture path so you can show the product shape immediately without asking anyone to prepare a database first.",
+        rail2Title: "Local proof",
+        rail2Body: "Reconnect with a presentation preset to prove the same UI flow over a real Genesis data root and signed WAL-backed storage.",
+        rail3Title: "Remote self-host",
+        rail3Body: "Only switch here when the room asks about deployment topology, auth, or operating GenesisBlockDB as a self-hosted service.",
+        demoTag: "Demo flow",
+        demoTitle: "Make the page lead directly into the desktop demo.",
+        demoBody: "The fastest path is fixture first, local preset second, remote mode last. That gives you a clean story, a proof step, and a self-host answer without making the audience do setup on your behalf.",
+        step1Tag: "Step 01",
+        step1Title: "Open Studio and click presentation mode",
+        step1Body: "The current desktop build already includes a `Launch presentation mode` entry point and demo presets for local roots.",
+        step1List: "<li>Show Overview first.</li><li>Say \"one operational boundary\" before any graph view.</li><li>Do not start by talking about raw SQLite.</li>",
+        step2Tag: "Step 02",
+        step2Title: "Move to Graph and click a spotlight entity",
+        step2Body: "That is the moment where GenesisBlockDB stops sounding abstract: one entity, one identity, three evidence spaces, one inspector.",
+        step2List: "<li>Call out relational, graph, vector, and time in one sentence.</li><li>Use the inspector as your proof surface.</li>",
+        step3Tag: "Step 03",
+        step3Title: "Escalate only if the room asks for proof",
+        step3Body: "Disconnect and reconnect with the local presentation preset. Keep remote mode reserved for self-host questions.",
+        step3List: "<li>Fixture first for clarity.</li><li>Local preset for proof.</li><li>Remote for operations and topology.</li>",
+        demoBoxTag: "Primary action",
+        demoBoxTitle: "Open the desktop app, then follow the flow on this page.",
+        demoBoxBody: "The app binary is already built locally. The page tells you what to click and what to say next.",
+        demoBoxCta: "Open Genesis Studio",
+        demoBoxFoot: "Backup assets: benchmark report, Studio desktop spec, and the interactive benchmark page are linked below.",
+        talkTag: "Stage copy",
+        talkTitle: "Three beats you can say on stage without improvising.",
+        talkBody: "These are presenter cues, not marketing filler. Each card gives you the core message and one usable sentence so you can keep moving even if the room interrupts or drills into technical details.",
+        talk1Title: "Why it matters",
+        talk1Body: "Teams keep maintaining SQLite, graph, and vector systems separately, then lose consistency between them.",
+        talkSayLabel: "Say this",
+        talk1Say: "\"GenesisBlockDB gives us one database boundary instead of three disconnected operational surfaces.\"",
+        talk2Title: "What it is",
+        talk2Body: "A Rust core with signed WAL authority, an embedded SQLite projection, native graph execution, and vector retrieval under one engine contract.",
+        talk2Say: "\"SQLite is not the product. It is an internal projection under a Genesis-owned durability and identity model.\"",
+        talk3Title: "How to use it",
+        talk3Body: "Open Studio, show the bounded Overview, click a graph entity, then prove local embedded or self-hosted flow only when needed.",
+        talk3Say: "\"I can start with a guided fixture, then reconnect to a real local root without changing the product story.\"",
+        auditTag: "Measured head to head",
+        auditTitle: "Real numbers. Real comparators. No hand-wavy category claims.",
+        auditBody: "These highlights come from the repository's measured audit pack, not generic positioning copy. Use them as sharp proof points, then keep the caveats visible when a comparison is not perfectly apples to apples.",
+        auditIntroTitle: "Head to head audit.<br>Use the sharpest facts.",
+        auditIntroBody: "The strongest story is not \"we win everywhere.\" The strongest story is \"we know exactly where we are strong, where we are tied, and where we still lose today.\"",
+        auditIntroCta: "Open full benchmark report",
+        metric1Topline: "Graph latency / embedded graph+vector",
+        metric1Body: "Measured on hop1 latency with full node payload at 100k. This is the closest on-niche head-to-head in the current report.",
+        metric2Topline: "Traversal / server graph",
+        metric2Body: "Use this when the room frames Neo4j as the reference point, but be clear that part of the gap is the embedded-versus-server tax.",
+        metric3Topline: "Vector point-query p50 / embedded vector",
+        metric3Body: "The current repo report records 935.6 us vs 8,392 us at matched recall bands in the 100k vector setup.",
+        metric4Topline: "Vector search / industry references",
+        metric4Label: "<em>Recall parity</em> with Chroma",
+        metric4Body: "Recall@10 is 0.979 vs 0.981 for Chroma, while query p50 is 974 us vs Qdrant's 3,301 us in the 100k three-way audit.",
+        proofTag: "Proof and caveats",
+        proofTitle: "Say the wins cleanly. Keep the caveats visible.",
+        proofBody: "The audit already gives you both. That makes the story stronger, especially in technical rooms that will immediately ask what the comparison leaves out.",
+        proofBlock1Tag: "Measured wins",
+        proofBlock1Title: "GenesisBlockDB is strongest when the job is low-latency agent memory across graph and vector semantics.",
+        proofBlock1Body: "That is where the embedded architecture and one-boundary model show up as real user-facing speed, not just elegant architecture slides.",
+        proofBlock2Tag: "Honest caveats",
+        proofBlock2Title: "Bulk ingest and RAM efficiency are still weaker than the columnar or KV-heavy comparators.",
+        proofBlock2Body: "Today the report explicitly shows losses on bulk ingest versus Kuzu, LadybugDB, DuckDB, and RocksDB-oriented baselines.",
+        proofBlock3Tag: "What to emphasize",
+        proofBlock3Title: "The differentiator is not any one subsystem. It is the combined boundary.",
+        proofBlock3Body: "Relational projection, graph identity, vector retrieval, provenance, and a governed durability model all stay attached to one engine contract.",
+        caveatList: "<li>Use `7-185x vs Neo4j` only with the note that Neo4j is a server graph comparison, not an embedded-embedded comparison.</li><li>Use `~9x vs LanceDB` specifically for point-query vector p50 at the measured recall band, not as a broad blanket claim.</li><li>Use `Recall parity with Chroma` for quality framing and `~3.4x p50 vs Qdrant` for latency framing; they answer different questions.</li><li>Avoid claiming RocksDB is a broad loss or broad win. The clean statement in the report is that hop1 is effectively tied while the deeper payload comparison is not apples to apples.</li>",
+        docsTag: "Evidence and docs",
+        docsTitle: "Everything you need to keep the demo grounded.",
+        docsBody: "These are the links you can keep open in the background if the room asks for architecture, methodology, or where the desktop controller fits in the product.",
+        docLink1Tag: "Benchmark report",
+        docLink1Title: "Open the audit source",
+        docLink1Body: "Full methodology, comparator notes, and the head-to-head sections that back the numbers on this page.",
+        docLink2Tag: "Desktop demo",
+        docLink2Title: "Launch Genesis Studio",
+        docLink2Body: "Run the local desktop controller, then use presentation mode and the local presets already built into the app.",
+        docLink3Tag: "Studio spec",
+        docLink3Title: "Explain the controller boundary",
+        docLink3Body: "The approved desktop-controller shape, including local embedded, remote self-hosted, and three-space inspection intent.",
+        docLink4Tag: "Interactive page",
+        docLink4Title: "Open benchmark visuals",
+        docLink4Body: "Use this when you want a more visual backup surface behind the sharper narrative on the main landing page.",
+        footnote1: "This landing page is intentionally optimized for a live presentation flow: story first, demo second, proof third, self-host last.",
+        footnote2: "The copy on the head-to-head section is derived from the measured report in this repository as of July 24, 2026.",
+        footerLeft: "GenesisBlockDB presentation surface for local demo use",
+        footerRight: "Fixture first -> local preset -> remote self-host"
+      },
+      th: {
+        navDemo: "ลำดับเดโม",
+        navStage: "สคริปต์พูด",
+        navAudit: "เทียบตัวจริง",
+        navProof: "จุดชนะและข้อควรพูด",
+        navDocs: "เอกสาร",
+        themeLight: "โหมดสว่าง",
+        themeDark: "โหมดมืด",
+        heroTitle: "หนึ่งจุดเชื่อมต่อ<br>สามพื้นที่ของ <em>หลักฐาน</em>",
+        heroLede: "GenesisBlockDB ให้ขอบเขตการทำงานหนึ่งเดียวเหนือ signed WAL, SQLite projection แบบฝัง, graph execution แบบ native และ vector retrieval หน้านี้ถูกทำมาเพื่อพาคุณจากการเล่าเรื่องไปสู่การเดโมจริงได้ภายในไม่กี่นาที",
+        proofRTitle: "Relational อยู่ภายใน boundary เดียวกัน",
+        proofRBody: "SQLite เป็น projection ภายในที่ engine ควบคุมและ rebuild ได้ ประเด็นขายไม่ใช่ \"เราแถม SQLite\" แต่คือ \"คุณไม่ต้องดูแล relational database อีกก้อนแยกเอง\"",
+        proofGTitle: "Graph คือพื้นผิวที่ใช้เล่าและอธิบาย",
+        proofGBody: "Studio ทำให้หนึ่ง entity เปิด relational, graph, vector และ temporal evidence ใน inspector เดียว แทนที่จะใช้สามเครื่องมือแยกกัน",
+        proofVTitle: "Vector อยู่บน truth model เดียวกัน",
+        proofVBody: "Collection, nearest neighbors และ freshness ถูกผูกกับ identity และ durability contract เดียวกับข้อมูลส่วนที่เหลือทั้งหมด",
+        ctaDemo: "เริ่ม flow เดโม",
+        ctaApp: "เปิด desktop app",
+        ctaAudit: "ข้ามไปดู head-to-head",
+        railLabel: "เดโมนำทาง",
+        railTitle: "กดครั้งเดียว แล้วพรีเซนต์ตามสคริปต์ได้เลย",
+        rail1Title: "โหมดพรีเซนต์",
+        rail1Body: "เริ่มด้วย fixture ในตัวเพื่อโชว์รูปร่างของโปรดักต์ได้ทันที โดยไม่ต้องให้คนดูเตรียมฐานข้อมูลก่อน",
+        rail2Title: "พิสูจน์ด้วย local",
+        rail2Body: "ค่อย reconnect ด้วย presentation preset เพื่อพิสูจน์ flow เดิมบน Genesis data root จริงและ signed WAL-backed storage",
+        rail3Title: "self-host ระยะท้าย",
+        rail3Body: "ค่อยสลับมาจุดนี้เมื่อห้องถามเรื่อง topology การ deploy, auth หรือการรัน GenesisBlockDB แบบ self-hosted จริง",
+        demoTag: "ลำดับเดโม",
+        demoTitle: "ทำให้หน้าเว็บพาคนดูเข้าสู่ desktop demo ได้ตรง ๆ",
+        demoBody: "ลำดับที่เร็วที่สุดคือ fixture ก่อน, local preset เป็นชั้นพิสูจน์, แล้ว remote mode ไว้ตอบคำถามเรื่อง self-host วิธีนี้ทำให้เรื่องเล่าชัดและไม่โยนภาระ setup ไปที่ผู้ชม",
+        step1Tag: "ขั้น 01",
+        step1Title: "เปิด Studio แล้วกด presentation mode",
+        step1Body: "ตัว desktop build ตอนนี้มีจุดเข้า `Launch presentation mode` และ preset สำหรับ local roots อยู่แล้ว",
+        step1List: "<li>เริ่มจากหน้า Overview ก่อน</li><li>พูดคำว่า \"one operational boundary\" ก่อนเข้า graph view</li><li>อย่าเริ่มด้วยการพูดเรื่อง raw SQLite</li>",
+        step2Tag: "ขั้น 02",
+        step2Title: "ไปหน้า Graph แล้วกด spotlight entity",
+        step2Body: "จุดนี้คือช่วงที่ GenesisBlockDB หยุดเป็นของ abstract: หนึ่ง entity, หนึ่ง identity, สาม evidence spaces, inspector เดียว",
+        step2List: "<li>เรียก relational, graph, vector และ time ในประโยคเดียว</li><li>ใช้ inspector เป็น proof surface หลัก</li>",
+        step3Tag: "ขั้น 03",
+        step3Title: "ค่อยยกระดับเมื่อห้องขอ proof",
+        step3Body: "disconnect แล้ว reconnect ด้วย local presentation preset โดยเก็บ remote mode ไว้ตอบเรื่อง self-host และ operations",
+        step3List: "<li>fixture เพื่อความชัด</li><li>local preset เพื่อพิสูจน์</li><li>remote เพื่อเรื่อง topology และ operations</li>",
+        demoBoxTag: "จุดกดหลัก",
+        demoBoxTitle: "เปิด desktop app แล้วเดินตาม flow บนหน้านี้ต่อได้เลย",
+        demoBoxBody: "binary ของแอปถูก build ไว้แล้วในเครื่อง หน้านี้มีทั้งสิ่งที่ต้องกดและสิ่งที่ควรพูดต่อทันที",
+        demoBoxCta: "เปิด Genesis Studio",
+        demoBoxFoot: "ลิงก์สำรองด้านล่างมี benchmark report, Studio desktop spec และหน้า benchmark visuals",
+        talkTag: "สคริปต์พูด",
+        talkTitle: "สามช่วงที่คุณพูดบนเวทีได้โดยไม่ต้องด้นสด",
+        talkBody: "นี่คือ presenter cues ไม่ใช่ marketing filler แต่ละการ์ดให้ทั้งแก่นของเรื่องและประโยคที่หยิบไปพูดได้เลย แม้ห้องจะขัดหรือถามลึกกลางทาง",
+        talk1Title: "ทำไมมันสำคัญ",
+        talk1Body: "ทีมจำนวนมากยังต้องดูแล SQLite, graph และ vector แยกกัน แล้วสุดท้ายก็เสีย consistency ระหว่างกัน",
+        talkSayLabel: "พูดแบบนี้",
+        talk1Say: "\"GenesisBlockDB ทำให้เรามี database boundary เดียว แทนการถือ operational surface สามก้อนที่ไม่ตรงกัน\"",
+        talk2Title: "มันคืออะไร",
+        talk2Body: "Rust core ที่ถือ signed WAL authority, มี SQLite projection แบบฝัง, graph execution แบบ native และ vector retrieval ภายใต้ contract เดียวของ engine",
+        talk2Say: "\"SQLite ไม่ใช่ตัวโปรดักต์ แต่มันคือ projection ภายในที่อยู่ใต้ durability และ identity model ของ Genesis\"",
+        talk3Title: "ใช้อย่างไร",
+        talk3Body: "เปิด Studio, เริ่มด้วย Overview แบบ bounded, กด entity ใน graph แล้วค่อยพิสูจน์ด้วย local embedded หรือ self-hosted flow เมื่อจำเป็น",
+        talk3Say: "\"ผมเริ่มด้วย guided fixture ได้ แล้วค่อย reconnect ไป local root จริงโดยไม่ต้องเปลี่ยน product story\"",
+        auditTag: "ตัวเลขที่วัดจริง",
+        auditTitle: "มีตัวเลขจริง มีคู่เทียบจริง และไม่ต้องพึ่งคำอ้างลอย ๆ",
+        auditBody: "ไฮไลต์เหล่านี้มาจาก measured audit ใน repo โดยตรง ไม่ใช่ positioning copy แบบกว้าง ๆ ใช้มันเป็น proof points ได้ แต่ควรพูด caveat คู่กันเมื่อ comparison ยังไม่ apples to apples",
+        auditIntroTitle: "head-to-head audit<br>เอาแต่ fact ที่คมที่สุด",
+        auditIntroBody: "เรื่องที่แข็งแรงที่สุดไม่ใช่ \"เราชนะทุกด้าน\" แต่คือ \"เรารู้ชัดว่าเราชนะตรงไหน เสมอตรงไหน และยังแพ้อะไรอยู่บ้าง\"",
+        auditIntroCta: "เปิด benchmark report เต็ม",
+        metric1Topline: "graph latency / embedded graph+vector",
+        metric1Body: "วัดจาก hop1 latency พร้อม full node payload ที่ 100k และนี่คือคู่เทียบที่ใกล้เคียง niche ของเรามากที่สุดในรายงานปัจจุบัน",
+        metric2Topline: "traversal / server graph",
+        metric2Body: "ใช้ตัวนี้เมื่อห้องยก Neo4j เป็น reference แต่ควรพูดกำกับด้วยว่าบางส่วนของ gap มาจาก embedded-versus-server tax",
+        metric3Topline: "vector point-query p50 / embedded vector",
+        metric3Body: "รายงานปัจจุบันบันทึก 935.6 us เทียบกับ 8,392 us ที่ช่วง recall ใกล้กันในชุด 100k vectors",
+        metric4Topline: "vector search / industry references",
+        metric4Label: "<em>Recall ใกล้เคียง</em> Chroma",
+        metric4Body: "Recall@10 คือ 0.979 เทียบกับ 0.981 ของ Chroma ขณะที่ query p50 คือ 974 us เทียบกับ 3,301 us ของ Qdrant ใน audit สามทางที่ 100k",
+        proofTag: "จุดชนะและข้อควรพูด",
+        proofTitle: "พูดจุดชนะให้คม แล้วเปิด caveat ไว้ให้เห็น",
+        proofBody: "ข้อดีคือ audit ให้ทั้งสองอย่างมาแล้ว ซึ่งทำให้เรื่องเล่าน่าเชื่อถือขึ้นมาก โดยเฉพาะเวลาอยู่ในห้องเทคนิคที่พร้อมถามต่อทันทีว่าตัวเลขนี้แลกมากับอะไร",
+        proofBlock1Tag: "สิ่งที่ชนะจริง",
+        proofBlock1Title: "GenesisBlockDB เด่นสุดเมื่อโจทย์คือ low-latency agent memory ที่กินทั้ง graph และ vector semantics",
+        proofBlock1Body: "ตรงนี้คือจุดที่ embedded architecture และ one-boundary model แปลเป็นความเร็วที่คนใช้สัมผัสได้จริง ไม่ใช่แค่สไลด์สถาปัตยกรรมที่สวย",
+        proofBlock2Tag: "ข้อยอมรับตรงไปตรงมา",
+        proofBlock2Title: "bulk ingest และ RAM efficiency ยังด้อยกว่ากลุ่ม columnar หรือ KV-heavy comparators",
+        proofBlock2Body: "รายงานตอนนี้ชี้ตรง ๆ ว่ายังแพ้เรื่อง bulk ingest ให้ Kuzu, LadybugDB, DuckDB และ RocksDB-oriented baselines",
+        proofBlock3Tag: "สิ่งที่ควรเน้น",
+        proofBlock3Title: "ตัวต่างจริงไม่ใช่ subsystem ตัวใดตัวหนึ่ง แต่คือ boundary ที่ถูกรวมเข้าด้วยกัน",
+        proofBlock3Body: "relational projection, graph identity, vector retrieval, provenance และ governed durability model ทั้งหมดถูกผูกกับ engine contract เดียวกัน",
+        caveatList: "<li>ใช้ `7-185x vs Neo4j` พร้อมคำกำกับว่า Neo4j เป็น comparison ฝั่ง server graph ไม่ใช่ embedded-to-embedded</li><li>ใช้ `~9x vs LanceDB` เฉพาะในบริบท point-query vector p50 ที่ measured recall band เดียวกัน ไม่ใช่ claim กว้างครอบทุกกรณี</li><li>ใช้ `Recall parity with Chroma` เพื่อตอบเรื่องคุณภาพ และ `~3.4x p50 vs Qdrant` เพื่อตอบเรื่อง latency เพราะมันตอบคนละคำถาม</li><li>อย่าพูดว่า RocksDB แพ้หรือชนะกว้าง ๆ ประโยคที่ตรงกับรายงานคือ hop1 ใกล้เคียงกัน ส่วน deep payload comparison ยังไม่ apples to apples</li>",
+        docsTag: "หลักฐานและเอกสาร",
+        docsTitle: "ทุกอย่างที่ควรเปิดค้างไว้เพื่อรองรับเดโม",
+        docsBody: "ลิงก์เหล่านี้เหมาะสำหรับเปิดค้างไว้เบื้องหลัง เมื่อห้องถามต่อเรื่อง architecture, methodology หรือว่า desktop controller อยู่ตรงไหนของ product จริง",
+        docLink1Tag: "benchmark report",
+        docLink1Title: "เปิด source ของ audit",
+        docLink1Body: "มี methodology เต็ม, comparator notes และ head-to-head sections ที่รองรับตัวเลขบนหน้านี้",
+        docLink2Tag: "desktop demo",
+        docLink2Title: "เปิด Genesis Studio",
+        docLink2Body: "รัน local desktop controller แล้วใช้ presentation mode กับ local presets ที่ถูกใส่ไว้ในแอปแล้ว",
+        docLink3Tag: "studio spec",
+        docLink3Title: "อธิบาย controller boundary",
+        docLink3Body: "อธิบาย desktop-controller shape ที่ approve แล้ว รวมทั้ง local embedded, remote self-hosted และแนวคิด three-space inspection",
+        docLink4Tag: "interactive page",
+        docLink4Title: "เปิด benchmark visuals",
+        docLink4Body: "เหมาะเป็นหน้า backup แบบ visual มากขึ้นในกรณีที่ต้องเสริมเรื่องเล่าหลักของ landing page นี้",
+        footnote1: "หน้า landing นี้ถูก optimize มาเพื่อ live presentation โดยเจตนา: story ก่อน, demo ต่อ, proof ตาม, self-host เป็นลำดับท้าย",
+        footnote2: "copy ในส่วน head-to-head อ้างอิงจาก measured report ใน repository นี้ ณ วันที่ 24 กรกฎาคม 2026",
+        footerLeft: "พื้นผิวสำหรับพรีเซนต์ GenesisBlockDB ในเดโม local",
+        footerRight: "fixture ก่อน -> local preset -> remote self-host"
+      }
+    };
+
+    const themeToggle = document.getElementById("theme-toggle");
+    const langButtons = {
+      en: document.getElementById("lang-en"),
+      th: document.getElementById("lang-th")
+    };
+
+    const contentMap = {
+      navDemo: "nav-demo",
+      navStage: "nav-stage",
+      navAudit: "nav-audit",
+      navProof: "nav-proof",
+      navDocs: "nav-docs",
+      heroTitle: "hero-title",
+      heroLede: "hero-lede",
+      proofRTitle: "proof-r-title",
+      proofRBody: "proof-r-body",
+      proofGTitle: "proof-g-title",
+      proofGBody: "proof-g-body",
+      proofVTitle: "proof-v-title",
+      proofVBody: "proof-v-body",
+      ctaDemo: "cta-demo",
+      ctaApp: "cta-app",
+      ctaAudit: "cta-audit",
+      railLabel: "rail-label",
+      railTitle: "rail-title",
+      rail1Title: "rail-1-title",
+      rail1Body: "rail-1-body",
+      rail2Title: "rail-2-title",
+      rail2Body: "rail-2-body",
+      rail3Title: "rail-3-title",
+      rail3Body: "rail-3-body",
+      demoTag: "demo-tag",
+      demoTitle: "demo-title",
+      demoBody: "demo-body",
+      step1Tag: "step-1-tag",
+      step1Title: "step-1-title",
+      step1Body: "step-1-body",
+      step1List: "step-1-list",
+      step2Tag: "step-2-tag",
+      step2Title: "step-2-title",
+      step2Body: "step-2-body",
+      step2List: "step-2-list",
+      step3Tag: "step-3-tag",
+      step3Title: "step-3-title",
+      step3Body: "step-3-body",
+      step3List: "step-3-list",
+      demoBoxTag: "demo-box-tag",
+      demoBoxTitle: "demo-box-title",
+      demoBoxBody: "demo-box-body",
+      demoBoxCta: "demo-box-cta",
+      demoBoxFoot: "demo-box-foot",
+      talkTag: "talk-tag",
+      talkTitle: "talk-title",
+      talkBody: "talk-body",
+      talk1Title: "talk-1-title",
+      talk1Body: "talk-1-body",
+      talkSayLabel: ["talk-1-say-label", "talk-2-say-label", "talk-3-say-label"],
+      talk1Say: "talk-1-say",
+      talk2Title: "talk-2-title",
+      talk2Body: "talk-2-body",
+      talk2Say: "talk-2-say",
+      talk3Title: "talk-3-title",
+      talk3Body: "talk-3-body",
+      talk3Say: "talk-3-say",
+      auditTag: "audit-tag",
+      auditTitle: "audit-title",
+      auditBody: "audit-body",
+      auditIntroTitle: "audit-intro-title",
+      auditIntroBody: "audit-intro-body",
+      auditIntroCta: "audit-intro-cta",
+      metric1Topline: "metric-1-topline",
+      metric1Body: "metric-1-body",
+      metric2Topline: "metric-2-topline",
+      metric2Body: "metric-2-body",
+      metric3Topline: "metric-3-topline",
+      metric3Body: "metric-3-body",
+      metric4Topline: "metric-4-topline",
+      metric4Label: "metric-4-label",
+      metric4Body: "metric-4-body",
+      proofTag: "proof-tag",
+      proofTitle: "proof-title",
+      proofBody: "proof-body",
+      proofBlock1Tag: "proof-block-1-tag",
+      proofBlock1Title: "proof-block-1-title",
+      proofBlock1Body: "proof-block-1-body",
+      proofBlock2Tag: "proof-block-2-tag",
+      proofBlock2Title: "proof-block-2-title",
+      proofBlock2Body: "proof-block-2-body",
+      proofBlock3Tag: "proof-block-3-tag",
+      proofBlock3Title: "proof-block-3-title",
+      proofBlock3Body: "proof-block-3-body",
+      caveatList: "caveat-list",
+      docsTag: "docs-tag",
+      docsTitle: "docs-title",
+      docsBody: "docs-body",
+      docLink1Tag: "doc-link-1-tag",
+      docLink1Title: "doc-link-1-title",
+      docLink1Body: "doc-link-1-body",
+      docLink2Tag: "doc-link-2-tag",
+      docLink2Title: "doc-link-2-title",
+      docLink2Body: "doc-link-2-body",
+      docLink3Tag: "doc-link-3-tag",
+      docLink3Title: "doc-link-3-title",
+      docLink3Body: "doc-link-3-body",
+      docLink4Tag: "doc-link-4-tag",
+      docLink4Title: "doc-link-4-title",
+      docLink4Body: "doc-link-4-body",
+      footnote1: "footnote-1",
+      footnote2: "footnote-2",
+      footerLeft: "footer-left",
+      footerRight: "footer-right"
+    };
+
+    function setContent(target, value) {
+      if (!target) return;
+      if (typeof value !== "string") return;
+      target.innerHTML = value;
+    }
+
+    function applyLanguage(lang) {
+      const locale = translations[lang] ? lang : "en";
+      const bundle = translations[locale];
+
+      Object.entries(contentMap).forEach(([key, targetId]) => {
+        const value = bundle[key];
+        if (Array.isArray(targetId)) {
+          targetId.forEach((id) => setContent(document.getElementById(id), value));
+          return;
+        }
+        setContent(document.getElementById(targetId), value);
+      });
+
+      document.body.dataset.lang = locale;
+      document.documentElement.lang = locale === "th" ? "th" : "en";
+      localStorage.setItem("genesis-landing-lang", locale);
+
+      Object.entries(langButtons).forEach(([code, button]) => {
+        button.classList.toggle("active", code === locale);
+        button.setAttribute("aria-pressed", String(code === locale));
+      });
+
+      updateThemeButton();
+    }
+
+    function applyTheme(theme) {
+      const nextTheme = theme === "dark" ? "dark" : "light";
+      document.body.dataset.theme = nextTheme;
+      localStorage.setItem("genesis-landing-theme", nextTheme);
+      updateThemeButton();
+    }
+
+    function updateThemeButton() {
+      const lang = document.body.dataset.lang || "en";
+      const isDark = document.body.dataset.theme === "dark";
+      themeToggle.textContent = isDark ? translations[lang].themeLight : translations[lang].themeDark;
+      themeToggle.setAttribute("aria-pressed", String(isDark));
+    }
+
+    themeToggle.addEventListener("click", () => {
+      applyTheme(document.body.dataset.theme === "dark" ? "light" : "dark");
+    });
+
+    Object.entries(langButtons).forEach(([code, button]) => {
+      button.addEventListener("click", () => applyLanguage(code));
+    });
+
+    const savedLang = localStorage.getItem("genesis-landing-lang");
+    const prefersThai = (navigator.language || "").toLowerCase().startsWith("th");
+    const initialLang = savedLang || (prefersThai ? "th" : "en");
+    const prefersDark = window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches;
+    const savedTheme = localStorage.getItem("genesis-landing-theme");
+    const initialTheme = savedTheme || (prefersDark ? "dark" : "light");
+
+    applyTheme(initialTheme);
+    applyLanguage(initialLang);
+  </script>
+</body>
+</html>

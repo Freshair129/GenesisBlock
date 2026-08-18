@@ -30,6 +30,11 @@ import { GraphCanvas } from './features/graph/GraphCanvas';
 import { createLocalTransport, createRemoteTransport } from './transports/backend';
 import { createMockTransport } from './transports/mock';
 
+const presentationRoots = [
+  { label: 'SQLite substrate sample', path: 'G:\\GenesisBlock_Dev\\GenesisBlock\\target\\tmp\\sqlite_projection_bootstrap' },
+  { label: 'Persistence sample', path: 'G:\\GenesisBlock_Dev\\GenesisBlock\\tests\\test_persistence_db' },
+];
+
 const navigation = [
   { label: 'Overview', icon: Activity },
   { label: 'Data', icon: Table2 },
@@ -83,10 +88,22 @@ function ConnectionScreen({ onConnect }: { onConnect: (transport: StudioTranspor
           <button className={mode === 'remote' ? 'active' : ''} onClick={() => setMode('remote')}>Remote server</button>
         </div>
         {mode === 'local' ? (
-          <label className="connection-field">
-            <span>GENESIS DATA ROOT</span>
-            <input value={path} onChange={(event) => setPath(event.target.value)} placeholder="C:\\data\\my-genesis-db" />
-          </label>
+          <>
+            <label className="connection-field">
+              <span>GENESIS DATA ROOT</span>
+              <input value={path} onChange={(event) => setPath(event.target.value)} placeholder="C:\\data\\my-genesis-db" />
+            </label>
+            <div className="demo-presets">
+              <span>Presentation presets</span>
+              <div>
+                {presentationRoots.map((preset) => (
+                  <button key={preset.path} type="button" onClick={() => setPath(preset.path)}>
+                    {preset.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </>
         ) : (
           <div className="connection-fields">
             <label className="connection-field"><span>SERVER URL</span><input value={baseUrl} onChange={(event) => setBaseUrl(event.target.value)} /></label>
@@ -98,11 +115,39 @@ function ConnectionScreen({ onConnect }: { onConnect: (transport: StudioTranspor
           <button className="primary-action" onClick={() => void connect()} disabled={connecting || (mode === 'local' && !path.trim())}>
             {connecting ? 'Negotiating capabilities...' : `Connect ${mode}`} <ChevronRight size={18} />
           </button>
+          <button className="presentation-action" onClick={() => onConnect(createMockTransport())}>
+            <Play size={16} /> Launch presentation mode
+          </button>
           <button className="fixture-action" onClick={() => onConnect(createMockTransport())}>Open fixture workspace</button>
         </div>
         <div className="connection-options">
           <div><Database size={18} /><span><strong>Local embedded</strong>Read-only core + exclusive data-root lock</span></div>
           <div><Unplug size={18} /><span><strong>Remote self-hosted</strong>REST capability negotiation + bearer auth</span></div>
+        </div>
+        <div className="demo-sop">
+          <span>DEMO SOP</span>
+          <ol>
+            <li>Start with presentation mode when you need a no-setup visual walkthrough.</li>
+            <li>Switch to a presentation preset to prove the local embedded path over a real Genesis data root.</li>
+            <li>Use remote mode only when you want to show self-hosted topology and auth negotiation.</li>
+          </ol>
+        </div>
+        <div className="presentation-rail">
+          <article>
+            <span>01 / SHOW THE BOUNDARY</span>
+            <strong>One handle, three spaces</strong>
+            <small>Lead with a single Genesis connection instead of separate SQLite, graph, and vector tools.</small>
+          </article>
+          <article>
+            <span>02 / CLICK THE GRAPH</span>
+            <strong>Entity-first inspection</strong>
+            <small>Select one node to reveal relational, graph, vector, and temporal evidence in one inspector.</small>
+          </article>
+          <article>
+            <span>03 / CLOSE WITH QUERY</span>
+            <strong>Registered reads only</strong>
+            <small>Use named queries and read-only HQL to show governance and bounded access, not raw database internals.</small>
+          </article>
         </div>
       </section>
       <aside className="truth-card">
@@ -228,6 +273,13 @@ function Workspace({ transport, onDisconnect }: WorkspaceProps) {
     if (active === 'Graph') {
       return (
         <>
+          <section className="story-banner">
+            <div>
+              <span>DEMO STORY</span>
+              <strong>Open one bounded scene, then click a node to walk across relational, graph, vector, and time.</strong>
+            </div>
+            <small>{transport.kind === 'mock' ? 'Fixture mode is ideal for a visual first-look.' : 'Live mode proves the engine shape without exposing internal files.'}</small>
+          </section>
           <section className="metric-strip">
             <div><span>SCENE</span><strong>{scene ? formatNumber(scene.nodes.length) : '---'}</strong><small>of {capabilities?.limits.sceneNodeCeiling ?? '---'} nodes</small></div>
             <div><span>DATABASE</span><strong>{status ? formatNumber(status.nodeCount) : '---'}</strong><small>visible entities</small></div>
@@ -239,6 +291,18 @@ function Workspace({ transport, onDisconnect }: WorkspaceProps) {
               <label><Search size={16} /><input value={filter} onChange={(event) => setFilter(event.target.value)} placeholder="Filter this bounded scene" /></label>
               <div className="legend">{scene?.groups.slice(0, 4).map((group) => <span key={group}><i /> {group}</span>)}</div>
             </div>
+            {scene && (
+              <div className="spotlight-strip">
+                <span>Spotlight entities</span>
+                <div>
+                  {scene.nodes.slice(0, 5).map((node) => (
+                    <button key={node.id} type="button" onClick={() => selectNode(node)}>
+                      {node.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
             <div className="graph-frame">
               {scene ? <GraphCanvas scene={scene} filter={filter} selectedId={selected?.id ?? null} onSelect={selectNode} /> : <div className="graph-loading">Composing bounded scene...</div>}
               <div className="scene-stamp"><Network size={15} /><span>{transport.kind.toUpperCase()} SCENE<br /><b>{scene?.nodes.length ?? 0} / {capabilities?.limits.sceneNodeCeiling ?? '---'} node budget</b></span></div>
@@ -249,13 +313,32 @@ function Workspace({ transport, onDisconnect }: WorkspaceProps) {
     }
     if (active === 'Overview' || active === 'Operations') {
       return (
-        <section className="card-grid">
-          {[
-            ['Nodes', status?.nodeCount], ['Edges', status?.edgeCount], ['Collections', status?.collectionCount],
-            ['Index lag', status?.indexLag], ['Logical clock', status?.logicalClock], ['Mode', capabilities?.mode],
-          ].map(([label, value]) => <article key={label}><span>{label}</span><strong>{typeof value === 'number' ? formatNumber(value) : value ?? '---'}</strong></article>)}
-          {active === 'Operations' && <p className="read-only-notice"><ShieldCheck size={18} /> Lifecycle actions remain disabled until scoped admin authorization is negotiated.</p>}
-        </section>
+        <>
+          <section className="story-banner">
+            <div>
+              <span>PRODUCT SHAPE</span>
+              <strong>Genesis Studio presents one operational boundary over WAL authority, SQLite projection, and native graph or vector execution.</strong>
+            </div>
+            <small>Use this screen to frame the architecture before diving into graph exploration.</small>
+          </section>
+          <section className="card-grid">
+            {[
+              ['Nodes', status?.nodeCount], ['Edges', status?.edgeCount], ['Collections', status?.collectionCount],
+              ['Index lag', status?.indexLag], ['Logical clock', status?.logicalClock], ['Mode', capabilities?.mode],
+            ].map(([label, value]) => <article key={label}><span>{label}</span><strong>{typeof value === 'number' ? formatNumber(value) : value ?? '---'}</strong></article>)}
+            <article className="narrative-card">
+              <span>PRESENTER NOTE</span>
+              <strong>No raw SQLite surface</strong>
+              <small>The app speaks to GenesisBlockDB as one boundary; SQLite stays an internal projection.</small>
+            </article>
+            <article className="narrative-card">
+              <span>PRESENTER NOTE</span>
+              <strong>WAL-first durability</strong>
+              <small>Mutations are durable when the signed WAL says they are; projections and indexes can lag and heal.</small>
+            </article>
+            {active === 'Operations' && <p className="read-only-notice"><ShieldCheck size={18} /> Lifecycle actions remain disabled until scoped admin authorization is negotiated.</p>}
+          </section>
+        </>
       );
     }
     if (active === 'Data') {
@@ -296,7 +379,7 @@ function Workspace({ transport, onDisconnect }: WorkspaceProps) {
         <button className="disconnect" onClick={() => void disconnect()}><ArrowLeft size={16} /> Connections</button>
       </aside>
       <main className="workspace">
-        <header className="workspace-header"><div><span className="breadcrumb">WORKSPACES /</span><h1>{active}</h1></div><div className="truth-badge"><ShieldCheck size={14} /> {transport.kind.toUpperCase()} / READ ONLY</div></header>
+        <header className="workspace-header"><div><span className="breadcrumb">WORKSPACES /</span><h1>{active}</h1></div><div className="truth-badge"><ShieldCheck size={14} /> {transport.kind.toUpperCase()} / READ ONLY / {capabilities?.consistency ?? 'NEGOTIATING'}</div></header>
         {error && <p className="workspace-error" role="alert">{error}</p>}
         {renderWorkspace()}
       </main>
