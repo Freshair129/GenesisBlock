@@ -22,6 +22,7 @@ fn open(path: &str) -> Storage {
         page_cache_mb: Some(32),
         read_only: Some(false),
         vector_dim: Some(4),
+        retention: None,
     })
     .unwrap()
 }
@@ -181,6 +182,7 @@ fn newer_schema_version_fails_closed() {
         page_cache_mb: Some(32),
         read_only: Some(false),
         vector_dim: Some(4),
+        retention: None,
     })
     .err()
     .expect("open must fail on newer on-disk schema");

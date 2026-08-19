@@ -16,6 +16,7 @@ fn test_mark_ix_instant_load_persistence() {
             page_cache_mb: Some(64),
             read_only: Some(false),
             vector_dim: Some(1536),
+            retention: None,
         })
         .unwrap();
 
@@ -46,6 +47,7 @@ fn test_mark_ix_instant_load_persistence() {
             page_cache_mb: Some(64),
             read_only: Some(false),
             vector_dim: Some(1536),
+            retention: None,
         })
         .unwrap();
 

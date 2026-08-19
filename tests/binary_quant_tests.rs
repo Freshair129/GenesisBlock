@@ -24,6 +24,7 @@ fn open(path: &str, dim: u32) -> Storage {
         page_cache_mb: Some(32),
         read_only: Some(false),
         vector_dim: Some(dim),
+        retention: None,
     })
     .unwrap()
 }

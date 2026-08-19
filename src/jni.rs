@@ -143,6 +143,7 @@ pub extern "system" fn Java_dev_genesisblock_GenesisDB_nativeOpen(
             page_cache_mb: None,
             read_only: None,
             vector_dim: None,
+            retention: None,
         };
         match Storage::open(opts) {
             Ok(storage) => Box::into_raw(Box::new(Arc::new(storage))) as jlong,

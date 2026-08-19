@@ -15,6 +15,7 @@ fn test_crdt_conflict_resolution() {
             page_cache_mb: Some(64),
             read_only: Some(false),
             vector_dim: None,
+            retention: None,
         })
         .unwrap(),
     );
@@ -25,6 +26,7 @@ fn test_crdt_conflict_resolution() {
             page_cache_mb: Some(64),
             read_only: Some(false),
             vector_dim: None,
+            retention: None,
         })
         .unwrap(),
     );
@@ -160,6 +162,7 @@ fn test_logical_clock_convergence() {
         page_cache_mb: Some(64),
         read_only: Some(false),
         vector_dim: None,
+        retention: None,
     })
     .unwrap();
 
@@ -208,6 +211,7 @@ fn test_reconcile_batch_remains_reentrant_under_lifecycle_barrier() {
         page_cache_mb: Some(64),
         read_only: Some(false),
         vector_dim: None,
+        retention: None,
     })
     .unwrap();
 
@@ -270,6 +274,7 @@ fn test_cryptographic_forgery_rejection() {
         page_cache_mb: Some(64),
         read_only: Some(false),
         vector_dim: None,
+        retention: None,
     })
     .unwrap();
 
@@ -278,6 +283,7 @@ fn test_cryptographic_forgery_rejection() {
         page_cache_mb: Some(64),
         read_only: Some(false),
         vector_dim: None,
+        retention: None,
     })
     .unwrap();
 

@@ -57,6 +57,7 @@ fn main() {
         page_cache_mb: Some(256),
         read_only: Some(false),
         vector_dim: Some(8),
+        retention: None,
     })
     .expect("open");
 

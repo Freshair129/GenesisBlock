@@ -99,6 +99,97 @@ pub struct OpenOptions {
     pub page_cache_mb: Option<u32>,
     pub read_only: Option<bool>,
     pub vector_dim: Option<u32>,
+    /// WP-1.3 retention profile (ADR--GENESISDB-JOURNAL-HISTORY D3):
+    /// `"frontier_only"` (default — fold at every checkpoint, forfeits
+    /// tx-time history), `"full"` (never fold at checkpoints; history
+    /// accumulates as sealed segments), or `"budget:<bytes>"` (fold only when
+    /// sealed history exceeds the byte budget — retains up to that much
+    /// tx-time history between folds). Unrecognized values fail `open`
+    /// loudly. `#[serde(default)]` keeps FFI/JNI wire compat.
+    #[serde(default)]
+    pub retention: Option<String>,
+}
+
+/// WP-1.3 journal retention profile (ADR D3). Parsed from
+/// `OpenOptions.retention`; drives whether `save_state`'s checkpoint folds
+/// the journal and how aggressively the active file seals.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum RetentionProfile {
+    /// Never fold at a checkpoint: sealed history segments accumulate and the
+    /// journal retains full (post-adoption) tx-time history. An explicit
+    /// `compact()` still folds. Journal-only recovery replays every retained
+    /// frame (duplicate vector arena rows from superseded versions are
+    /// reclaimed by index compaction).
+    Full,
+    /// Fold only when sealed history bytes exceed the budget — the bounded-
+    /// disk contract. Interim semantics: a tripped budget folds the WHOLE
+    /// history window (the ADR's partial oldest-first fold needs a
+    /// state-as-of-boundary materializer — deferred), so up to `budget` bytes
+    /// of history are retained between folds. The active-file seal threshold
+    /// derives from the budget so small budgets actually trip.
+    Budget(u64),
+    /// Fold at every checkpoint — the WP-1.2 interim behavior and current
+    /// default. Forfeits tx-time history; capabilities discloses it.
+    FrontierOnly,
+}
+
+impl RetentionProfile {
+    fn parse(raw: Option<&str>) -> Result<RetentionProfile> {
+        let Some(raw) = raw else {
+            return Ok(RetentionProfile::FrontierOnly);
+        };
+        let v = raw.trim().to_ascii_lowercase();
+        if v.is_empty() || v == "frontier_only" {
+            return Ok(RetentionProfile::FrontierOnly);
+        }
+        if v == "full" {
+            return Ok(RetentionProfile::Full);
+        }
+        if let Some(bytes) = v.strip_prefix("budget:") {
+            return match bytes.parse::<u64>() {
+                Ok(n) if n > 0 => Ok(RetentionProfile::Budget(n)),
+                _ => Err(Error::from_reason(format!(
+                    "invalid retention budget '{raw}': expected budget:<positive bytes>"
+                ))),
+            };
+        }
+        // Fail loudly — a typo silently degrading to a different retention
+        // profile is exactly the Metric::parse-style trap we must not repeat.
+        Err(Error::from_reason(format!(
+            "unrecognized retention profile '{raw}': expected full | frontier_only | budget:<bytes>"
+        )))
+    }
+
+    fn as_str(&self) -> String {
+        match self {
+            RetentionProfile::Full => "full".to_string(),
+            RetentionProfile::FrontierOnly => "frontier_only".to_string(),
+            RetentionProfile::Budget(n) => format!("budget:{n}"),
+        }
+    }
+
+    /// What the profile means for tx-time history, disclosed via the Query IR
+    /// capabilities surface (ADR I6 "horizon honesty" / D3 "capabilities says
+    /// so" for `frontier_only`).
+    fn tx_time_retention(&self) -> &'static str {
+        match self {
+            RetentionProfile::Full => "full",
+            RetentionProfile::Budget(_) => "windowed",
+            RetentionProfile::FrontierOnly => "none",
+        }
+    }
+
+    /// Active-file seal threshold for this profile. A byte budget smaller
+    /// than the desktop 64 MiB seal threshold would otherwise never see a
+    /// sealed segment and never trip; deriving the threshold from the budget
+    /// (N/4, clamped to [64 KiB, 64 MiB]) keeps the disk contract real on
+    /// small (mobile) budgets.
+    fn seal_threshold(&self) -> u64 {
+        match self {
+            RetentionProfile::Budget(n) => (n / 4).clamp(64 * 1024, ACTIVE_SEAL_THRESHOLD),
+            _ => ACTIVE_SEAL_THRESHOLD,
+        }
+    }
 }
 
 #[cfg_attr(feature = "napi-bindings", napi(object))]
@@ -2404,6 +2495,9 @@ fn write_segment(
 pub struct Storage {
     pub path: PathBuf,
     pub read_only: bool,
+    /// WP-1.3 retention profile (ADR D3) — drives checkpoint folding and the
+    /// active-file seal threshold. See `RetentionProfile`.
+    pub retention: RetentionProfile,
     projection_path: PathBuf,
     projection_db: Mutex<Connection>,
     commit_lock: Mutex<()>,
@@ -4846,6 +4940,11 @@ impl Storage {
         })?;
         let read_only = opts.read_only.unwrap_or(false);
         let vector_dim = opts.vector_dim.unwrap_or(1536) as u16;
+        // WP-1.3: parse the retention profile up front (fail-loud on typos)
+        // so the writer thread can be spawned with the profile's derived
+        // active-file seal threshold.
+        let retention = RetentionProfile::parse(opts.retention.as_deref())?;
+        let seal_threshold = retention.seal_threshold();
 
         // --- Schema-version compatibility gate (forward-incompat protection) ---
         // A database written by a NEWER engine must not be silently misread.
@@ -5082,7 +5181,10 @@ impl Storage {
                                     poisoned = false;
                                 }
                                 let _ = ack.send(ok);
-                            } else if Self::journal_active_len(&writer) > ACTIVE_SEAL_THRESHOLD {
+                            } else if Self::journal_active_len(&writer) > seal_threshold {
+                                // WP-1.3: threshold derives from the retention
+                                // profile (budget/4, clamped) so small budgets
+                                // actually produce sealed segments to count.
                                 Self::journal_seal_active(
                                     &mut writer,
                                     &seg_root,
@@ -5201,6 +5303,7 @@ impl Storage {
         let storage = Self {
             path: root,
             read_only,
+            retention,
             projection_path,
             projection_db: Mutex::new(projection_conn),
             commit_lock: Mutex::new(()),
@@ -5427,6 +5530,18 @@ impl Storage {
             .map(|s| s.max_seq)
             .max()
             .unwrap_or(0)
+    }
+
+    /// WP-1.3: bytes of sealed HISTORY on disk (history + legacy segments;
+    /// base segments are materializations below the horizon, not history).
+    /// This is the quantity `RetentionProfile::Budget` bounds.
+    pub fn sealed_history_bytes(&self) -> u64 {
+        Self::journal_list_segments(&self.path)
+            .into_iter()
+            .filter(|s| s.kind != SEG_KIND_BASE)
+            .filter_map(|s| fs::metadata(&s.path).ok())
+            .map(|m| m.len())
+            .sum()
     }
 
     pub fn commit_transaction(&self, input: GenesisTransaction) -> Result<CommitResult> {
@@ -6697,6 +6812,16 @@ impl Storage {
             "limits": {
                 "max_k": QUERY_IR_MAX_K,
                 "max_depth": QUERY_IR_MAX_DEPTH
+            },
+            // WP-1.3 horizon honesty (ADR I6/D4): the oldest boundary any
+            // history question can be answered past, the tx-time epoch, and
+            // what the active retention profile does to tx-time history
+            // ("none" = frontier_only forfeits it — D3's required disclosure).
+            "temporal": {
+                "history_horizon": self.history_horizon(),
+                "tx_epoch_start": 1,
+                "retention_profile": self.retention.as_str(),
+                "tx_time_retention": self.retention.tx_time_retention(),
             }
         })
     }
@@ -8857,24 +8982,54 @@ impl Storage {
         // commit_lock (held by save_state), so live state cannot move between
         // the build and the fold.
         let frontier_seq = self.stable_frontier();
-        // RCA--SLICE0-DURABILITY defect 3: a snapshot written WITHOUT a journal
-        // cursor would make the next open skip tail replay entirely — silently
-        // dropping every write acked after this point. If the payload build
-        // fails, abort the checkpoint loudly instead: the previous snapshot +
-        // the (unfolded) journal remain a complete recovery source (I8).
-        let wal_payload = self.build_compacted_wal()?;
-        {
-            let (payload, count) = &wal_payload;
+        // WP-1.3 (ADR D3): whether this checkpoint FOLDS the journal is a
+        // retention decision. `frontier_only` folds every time (the WP-1.2
+        // interim behavior and current default); `full` never folds at a
+        // checkpoint (history accumulates as sealed segments — an explicit
+        // `compact()` still folds); `budget(N)` folds only once sealed
+        // history exceeds the byte budget, retaining up to N bytes of
+        // tx-time history between folds. Snapshot + cursor are written
+        // either way: recovery is snapshot + replay frames > frontier, and
+        // sealed segments at-or-below the cursor are skipped by seq.
+        let should_fold = match &self.retention {
+            RetentionProfile::FrontierOnly => true,
+            RetentionProfile::Full => false,
+            RetentionProfile::Budget(n) => self.sealed_history_bytes() > *n,
+        };
+        if should_fold {
+            // RCA--SLICE0-DURABILITY defect 3: a snapshot written WITHOUT a
+            // journal cursor would make the next open skip tail replay
+            // entirely — silently dropping every write acked after this
+            // point. If the payload build fails, abort the checkpoint loudly
+            // instead: the previous snapshot + the (unfolded) journal remain
+            // a complete recovery source (I8).
+            let (payload, count) = self.build_compacted_wal()?;
             // A failed FOLD is safe (the journal keeps full history and the
             // cursor below still filters correctly) — but it must not be
             // silent: the journal will regrow until a fold succeeds.
             if self
-                .checkpoint_wal_payload(payload.clone(), frontier_seq, *count)
+                .checkpoint_wal_payload(payload, frontier_seq, count)
                 .is_err()
             {
                 println!(
                     "Mark IX: journal fold failed — snapshot proceeding; journal retains full history until the next successful fold."
                 );
+            }
+        } else {
+            // Non-folding checkpoint: the fold is normally the tombstone-GC
+            // boundary (build_compacted_wal), so sweep the registry here —
+            // otherwise state.json grows without bound under full/budget.
+            // The journal-side NodeRetract frames stay (that IS the retained
+            // history); only the resident registry and snapshot are swept.
+            let now = Utc::now().to_rfc3339();
+            let expired: Vec<String> = self
+                .tombstones
+                .iter()
+                .filter(|t| Self::retention_expired(&t.value().retracted_at, &now))
+                .map(|t| t.key().clone())
+                .collect();
+            for id in expired {
+                self.tombstones.remove(&id);
             }
         }
         let temp_dir = self.path.join("temp_save");
@@ -9488,6 +9643,7 @@ impl Storage {
                 page_cache_mb: Some(16),
                 read_only: Some(false),
                 vector_dim: Some(0),
+                retention: None,
             })?);
             Ok(manifest)
         })();
@@ -11308,6 +11464,17 @@ impl GenesisDatabase {
     #[napi]
     pub fn txn_frontier(&self) -> i64 {
         self.inner.txn_frontier().min(i64::MAX as u64) as i64
+    }
+    /// WP-1.3 (ADR I6): oldest seq still covered by retained history — 0 when
+    /// no fold has ever discarded history. Async (unlike the frontier pair):
+    /// it scans the journal directory rather than reading an atomic.
+    #[napi]
+    pub async fn history_horizon(&self) -> Result<i64> {
+        let i = Arc::clone(&self.inner);
+        let h = tokio::task::spawn_blocking(move || i.history_horizon())
+            .await
+            .map_err(|e| Error::from_reason(e.to_string()))?;
+        Ok(h.min(i64::MAX as u64) as i64)
     }
     #[napi]
     pub async fn retract_edge(&self, id: String, at: Option<String>) -> Result<Option<EdgeOutput>> {

@@ -17,6 +17,7 @@ fn setup_test_db(name: &str) -> Storage {
         page_cache_mb: Some(64),
         read_only: Some(false),
         vector_dim: None,
+        retention: None,
     })
     .unwrap()
 }
@@ -110,6 +111,7 @@ fn test_vector_arena_and_hybrid_search() {
         page_cache_mb: Some(64),
         read_only: Some(false),
         vector_dim: Some(3),
+        retention: None,
     })
     .unwrap();
 
@@ -164,6 +166,7 @@ fn test_wal_group_commit_durability() {
             page_cache_mb: None,
             read_only: Some(false),
             vector_dim: None,
+            retention: None,
         })
         .unwrap();
         storage
@@ -187,6 +190,7 @@ fn test_wal_group_commit_durability() {
             page_cache_mb: None,
             read_only: Some(false),
             vector_dim: None,
+            retention: None,
         })
         .unwrap();
         let u32_id = storage
@@ -212,6 +216,7 @@ fn test_edge_wal_durability_without_snapshot() {
             page_cache_mb: None,
             read_only: Some(false),
             vector_dim: None,
+            retention: None,
         })
         .unwrap();
         storage
@@ -262,6 +267,7 @@ fn test_edge_wal_durability_without_snapshot() {
             page_cache_mb: None,
             read_only: Some(false),
             vector_dim: None,
+            retention: None,
         })
         .unwrap();
         let res = storage

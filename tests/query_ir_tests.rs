@@ -9,6 +9,7 @@ fn storage(dim: u32) -> (Storage, TempDir) {
         page_cache_mb: Some(16),
         read_only: Some(false),
         vector_dim: Some(dim),
+        retention: None,
     })
     .unwrap();
     (storage, dir)

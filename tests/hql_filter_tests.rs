@@ -22,6 +22,7 @@ fn open(path: &str) -> Storage {
         page_cache_mb: Some(32),
         read_only: Some(false),
         vector_dim: None,
+        retention: None,
     })
     .unwrap()
 }
@@ -259,6 +260,7 @@ fn search_order_by_score_desc_projects_numeric_score() {
         page_cache_mb: Some(32),
         read_only: Some(false),
         vector_dim: Some(2),
+        retention: None,
     })
     .unwrap();
     for (id, emb) in [
@@ -467,6 +469,7 @@ fn hybrid_match_carries_clauses() {
         page_cache_mb: Some(32),
         read_only: Some(false),
         vector_dim: Some(2),
+        retention: None,
     })
     .unwrap();
     for (id, emb) in [
@@ -514,6 +517,7 @@ fn search_no_return_keeps_neighboroutput_shape() {
         page_cache_mb: Some(32),
         read_only: Some(false),
         vector_dim: Some(2),
+        retention: None,
     })
     .unwrap();
     s.add_node(NodeInput {

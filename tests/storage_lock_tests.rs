@@ -9,6 +9,7 @@ fn options(dir: &TempDir) -> OpenOptions {
         page_cache_mb: Some(16),
         read_only: Some(false),
         vector_dim: Some(8),
+        retention: None,
     }
 }
 

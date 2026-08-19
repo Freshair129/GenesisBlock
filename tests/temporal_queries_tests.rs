@@ -13,6 +13,7 @@ fn test_temporal_time_travel() {
         page_cache_mb: Some(10),
         read_only: Some(false),
         vector_dim: None,
+        retention: None,
     };
     let _ = std::fs::remove_dir_all(path);
     let db = Storage::open(opts).unwrap();
@@ -132,6 +133,7 @@ fn test_supersede_node_bitemporal_as_of() {
         page_cache_mb: Some(10),
         read_only: Some(false),
         vector_dim: None,
+        retention: None,
     })
     .unwrap();
 

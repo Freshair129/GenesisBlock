@@ -14,6 +14,7 @@ fn test_mark_ix_batch_atomicity() {
         page_cache_mb: Some(64),
         read_only: Some(false),
         vector_dim: Some(1536),
+        retention: None,
     })
     .unwrap();
 

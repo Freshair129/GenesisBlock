@@ -18,6 +18,7 @@ fn main() {
             page_cache_mb: Some(512),
             read_only: Some(false),
             vector_dim: None,
+            retention: None,
         })
         .expect("Failed to open storage"),
     );
@@ -121,6 +122,7 @@ fn main() {
         page_cache_mb: Some(64),
         read_only: Some(true),
         vector_dim: None,
+        retention: None,
     })
     .expect("Failed to reopen storage for verification");
 

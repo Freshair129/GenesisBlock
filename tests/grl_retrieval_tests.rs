@@ -10,6 +10,7 @@ fn test_grl_context_retrieval_tiered() {
         page_cache_mb: Some(64),
         read_only: Some(false),
         vector_dim: Some(1536),
+        retention: None,
     })
     .unwrap();
 
@@ -111,6 +112,7 @@ fn test_grl_budget_compression() {
         page_cache_mb: Some(64),
         read_only: Some(false),
         vector_dim: Some(1536),
+        retention: None,
     })
     .unwrap();
 
@@ -155,6 +157,7 @@ fn test_hql_context_command() {
         page_cache_mb: Some(64),
         read_only: Some(false),
         vector_dim: Some(1536),
+        retention: None,
     })
     .unwrap();
 
@@ -195,6 +198,7 @@ fn coverage_storage(dir: &tempfile::TempDir) -> Storage {
         page_cache_mb: Some(64),
         read_only: Some(false),
         vector_dim: Some(1536),
+        retention: None,
     })
     .unwrap()
 }
