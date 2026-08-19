@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added — WP-3.2 G3 moat bench + PROCEED verdict
+
+- **`moat-bench`** (`benches/moat_bench.rs`, bins-gated `[[bin]]`;
+  wrappers `benchmark/run_moat_bench.{sh,ps1}`): the engine's fused
+  vector+graph+AS-OF jobs vs the DIY single-SQLite-file assembly ROUND2
+  named as the primary embedded competitor (brute f32 scan =
+  sqlite-vec-stable model, recursive-CTE hops, shared Rust RRF glue,
+  audit-history temporal pattern). Both sides in-process in one Rust
+  binary — reported wins are lower bounds. Deterministic seeded corpus,
+  clone-and-run, trust-gated through `verify_report.py`.
+- **Verdict: PROCEED** (`docs/REPORT--G3-MOAT-VERDICT.md`, consumed by the
+  WP-3.3 decision gate). At 100k×1024: Q1 fused 187.9×, Q3 114.9×,
+  controls 92×/83.9× — every cross-dimension query clears the ROUND2
+  G3-e ≥5× bar by an order of magnitude, and the advantage grows with
+  dimension span (Q1 > Q3 > controls). The baseline structurally fails
+  2/5 WP-3.1 bitemporal correctness scenarios (no tx axis; no provenance
+  identity). Disclosed honestly: ingest stays the engine's weak side
+  (141.9 s vs 33.1 s bulk), Q2 skipped until the FTS axis (S3) ships,
+  synthetic corpus carries no recall claim.
+
 ### Added — WP-3.1 bitemporal correctness suite
 
 `tests/bitemporal_matrix_wp31_tests.rs` — the correctness matrix the DIY
