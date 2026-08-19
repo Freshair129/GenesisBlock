@@ -7,6 +7,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added — WP-3.1 bitemporal correctness suite
+
+`tests/bitemporal_matrix_wp31_tests.rs` — the correctness matrix the DIY
+SQLite assembly must also pass in the moat bench (interview ROUND2 G3-e bar;
+GNSE plan Phase 3 "Prove or kill"). Tests only, no engine changes:
+
+- **valid×tx four-quadrant matrix** on a superseded node — including the
+  two-axis case: "at commit S1 the recorded belief about 2022 had an OPEN
+  validity window" vs today's closed one.
+- **Retraction across tx time** — current view and at-or-after beliefs drop
+  the node. The belief-BEFORE half is a deliberate `#[ignore]`d TDD RED
+  test: the disclosed `implemented_post_resolution` semantics (WP-2.2)
+  cannot resurrect a retracted node from current indexes; un-ignore when
+  epoch-segmented indexes land (WP-3.3 gate). Not rewritten to assert the
+  gap as expected behavior.
+- **Correction-after-the-fact** — a retroactive `retract_edge` changes the
+  answer to the same valid-time question across tx time.
+- **Interval-overlap boundaries** — `valid_from <= as_of < valid_to`
+  (start inclusive, end exclusive) probed at all four boundary points.
+- **Audit reconstruction** — create → 2 supersessions → retract fully
+  reconstructed from the `node_versions` chain; the WP-2.3 `caused_by`
+  auto-chain walked backwards v3→v2→v1 purely from stored identities.
+- **Reopen survival** — chain length and both temporal axes re-verified
+  after a process restart.
+
 ### Added — WP-2.3 caused_by auto-chain + queryable recorded_at
 
 - **`caused_by` auto-chain on supersede** (`supersede_node`): when the caller
