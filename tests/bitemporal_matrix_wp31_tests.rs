@@ -177,17 +177,13 @@ fn matrix_retraction_current_and_after_tx() {
     );
 }
 
-/// TDD RED (phase-scale, per plan §Phase 3): `tx_as_of` BEFORE a retraction
-/// should still serve the node — "what did we believe at commit N" must not
-/// depend on what happened after N. Today it cannot: the disclosed
-/// "implemented_post_resolution" semantics (WP-2.2, capabilities
-/// `tx_as_of`) enumerates candidates from CURRENT indexes, and a retracted
-/// node is absent from them, so the chain never gets a chance to resurrect
-/// it. Un-ignore when epoch-segmented indexes land (GNSE backlog, WP-3.3
-/// decision gate). Deliberately NOT rewritten to assert the current
-/// behavior — that would codify the gap (storage-readiness audit rule).
+/// Was the phase-scale TDD RED test: `tx_as_of` BEFORE a retraction must
+/// still serve the node — "what did we believe at commit N" must not depend
+/// on what happened after N. GREEN since E1 (SPEC--GENESISDB-EPOCH-HNSW
+/// §3.2): the retired-adjacency overlay keeps the unwired edges as
+/// tx-candidates, and `neighbors_tx_view` resolves the retracted node
+/// through its `node_versions` chain at N.
 #[test]
-#[ignore = "known WP-2.2 disclosed gap: tx_as_of cannot resurrect retracted nodes until epoch-segmented indexes (WP-3.3 gate)"]
 fn matrix_retraction_belief_before_still_serves() {
     let path = fresh("wp31_retract_tx_red");
     let s = open_full(&path);

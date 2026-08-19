@@ -9,10 +9,13 @@ export interface OpenOptions {
   readOnly?: boolean
   vectorDim?: number
   /**
-   * WP-1.3 retention profile (ADR D3): "frontier_only" (default — fold at
-   * every checkpoint, forfeits tx-time history), "full" (never fold at
-   * checkpoints), or "budget:<bytes>" (fold only when sealed history exceeds
-   * the budget). Unrecognized values fail open() loudly.
+   * WP-1.3 retention profile (ADR--GENESISDB-JOURNAL-HISTORY D3):
+   * `"frontier_only"` (default — fold at every checkpoint, forfeits
+   * tx-time history), `"full"` (never fold at checkpoints; history
+   * accumulates as sealed segments), or `"budget:<bytes>"` (fold only when
+   * sealed history exceeds the byte budget — retains up to that much
+   * tx-time history between folds). Unrecognized values fail `open`
+   * loudly. `#[serde(default)]` keeps FFI/JNI wire compat.
    */
   retention?: string
 }
@@ -359,17 +362,18 @@ export declare class GenesisDatabase {
    */
   txnFrontier(): number
   /**
-   * WP-1.3 (ADR I6): oldest seq still covered by retained history — 0 when no
-   * fold has ever discarded history. Async: scans the journal directory.
-   */
-  historyHorizon(): Promise<number>
-  /**
-   * WP-2.1: the tx-time version chain for a node id (frame-ordered versions +
-   * retraction markers) with optional resolve-at-commit. atSeq below the
-   * history horizon rejects with beyond_horizon (ADR D4); versions below the
-   * horizon are never served.
+   * WP-2.1: the tx-time version chain for a node id (frame-ordered Node
+   * frames + retraction markers), with optional resolve-at-commit via
+   * `at_seq`. `at_seq` below the history horizon fails `beyond_horizon`
+   * (ADR D4); rows below the horizon are never served.
    */
   nodeVersions(id: string, atSeq?: number | undefined | null): Promise<any>
+  /**
+   * WP-1.3 (ADR I6): oldest seq still covered by retained history — 0 when
+   * no fold has ever discarded history. Async (unlike the frontier pair):
+   * it scans the journal directory rather than reading an atomic.
+   */
+  historyHorizon(): Promise<number>
   retractEdge(id: string, at?: string | undefined | null): Promise<EdgeOutput | null>
   retrieveContext(targetId: string, tier: string, budget: number | undefined | null, fuzzy: boolean): Promise<ContextPackage>
   /**

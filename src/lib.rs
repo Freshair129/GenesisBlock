@@ -429,11 +429,12 @@ pub struct QueryIrTemporal {
     pub valid_at: Option<String>,
     /// WP-2.2 (ADR D2/D4): replica-local tx-time selector — "what did THIS
     /// replica believe at ITS commit N". Values below `history_horizon()`
-    /// fail explicitly with `beyond_horizon`. Interim semantics (documented
-    /// in capabilities): results are found against current indexes, then
-    /// each node is re-resolved through the WP-2.1 version chain at N —
-    /// nodes absent or retracted at N are dropped (epoch-segmented indexes
-    /// are gated GNSE backlog, WP-3.3).
+    /// fail explicitly with `beyond_horizon`. TRAVERSE (E1,
+    /// SPEC--GENESISDB-EPOCH-HNSW): epoch-complete candidates via the
+    /// retired-adjacency overlay — nodes retracted after N still resolve
+    /// through the WP-2.1 version chain at N. SEARCH (interim, documented in
+    /// capabilities): results are found against current indexes, then each
+    /// node is re-resolved at N — vector epoch candidates are phase E2.
     #[serde(default)]
     pub tx_as_of: Option<u64>,
 }
@@ -861,6 +862,21 @@ pub struct NodeTombstone {
     pub clock: LogicalClock,
     #[serde(default)]
     pub retracted_at: String,
+}
+
+/// E1 (SPEC--GENESISDB-EPOCH-HNSW §3.2): an edge unwired by a node retraction,
+/// retained so `tx_as_of` queries before the retraction can still traverse it.
+/// `retired_seq` = the frame seq of the NodeRetract that unwired it — the edge
+/// is a tx-candidate iff `retired_seq > t`. Derived state: rebuilt by journal
+/// replay / CRDT reconcile, persisted in `edges_retired.bin`, and cleared
+/// whenever a fold advances `history_horizon()` past every retained seq (the
+/// fold is the single destruction boundary — ADR--JOURNAL-HISTORY I6). If the
+/// same edge id is re-created and retired again, the newer retirement replaces
+/// the older one under the same u128 key (disclosed narrow-window limitation).
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct RetiredEdge {
+    pub edge: EdgeOutput,
+    pub retired_seq: u64,
 }
 
 /// Interim tombstone/retracted-edge retention window (30 days) until WP-1.3
@@ -2527,6 +2543,15 @@ pub struct Storage {
     pub edges: DashMap<u128, EdgeOutput>,
     pub out_idx: DashMap<u32, HashSet<u128>>,
     pub in_idx: DashMap<u32, HashSet<u128>>,
+    /// E1 retired-adjacency overlay (SPEC--GENESISDB-EPOCH-HNSW §3.2): edges
+    /// unwired by node retractions, keyed like `edges`; adjacency keyed by
+    /// node id STRING (a retracted endpoint has no `id_to_u32` entry, and the
+    /// same id re-created later legitimately re-attaches to its own history).
+    /// Never consulted by current-view reads; only `tx_as_of` candidate
+    /// enumeration (`neighbors_tx_view`). Cleared on every successful fold.
+    pub edges_retired: DashMap<u128, RetiredEdge>,
+    pub out_idx_retired: DashMap<String, HashSet<u128>>,
+    pub in_idx_retired: DashMap<String, HashSet<u128>>,
     /// Per-model/per-dim isolated vector spaces, keyed by collection name.
     /// Replaces the former single global arena/metadata/hnsw/u32_to_arena_id.
     pub collections: DashMap<String, Arc<VectorCollection>>,
@@ -5423,6 +5448,9 @@ impl Storage {
             edges: DashMap::new(),
             out_idx: DashMap::new(),
             in_idx: DashMap::new(),
+            edges_retired: DashMap::new(),
+            out_idx_retired: DashMap::new(),
+            in_idx_retired: DashMap::new(),
             collections,
             default_collection: "default".to_string(),
             log_path,
@@ -5769,8 +5797,9 @@ impl Storage {
     /// below `t`, or whose resolved version is a retraction marker, is
     /// dropped; otherwise the result carries that version's fields. Interim
     /// semantics (capabilities: "implemented_post_resolution"): candidates
-    /// come from CURRENT indexes — epoch-segmented indexes are gated GNSE
-    /// backlog (WP-3.3).
+    /// come from CURRENT indexes. Since E1, TRAVERSE no longer routes here
+    /// (`neighbors_tx_view` enumerates epoch-complete candidates); SEARCH
+    /// still does until vector epoch candidates land (SPEC--EPOCH-HNSW E2).
     fn apply_tx_view(&self, results: Vec<NeighborOutput>, t: u64) -> Vec<NeighborOutput> {
         let horizon = self.history_horizon();
         let conn = self.projection_db.lock();
@@ -6306,8 +6335,12 @@ impl Storage {
                     clock,
                     retracted_at,
                 } => {
+                    // Persist-first (RCA--SLICE0-DURABILITY defect 2 rationale),
+                    // which also yields the frame seq the retired-adjacency
+                    // overlay stamps (E1).
+                    let retract_seq = self.persist_signed(signed_event.clone())?;
                     if let Some(u32_id) = self.get_u32(id) {
-                        self.retract_node_memory(id, u32_id);
+                        self.retract_node_memory(id, u32_id, retract_seq);
                     }
                     self.tombstones.insert(
                         id.clone(),
@@ -6316,7 +6349,6 @@ impl Storage {
                             retracted_at: retracted_at.clone(),
                         },
                     );
-                    self.persist_signed(signed_event.clone())?;
                 }
             }
             proposal.committed = true;
@@ -7115,10 +7147,15 @@ impl Storage {
                 "tx_epoch_start": 1,
                 "retention_profile": self.retention.as_str(),
                 "tx_time_retention": self.retention.tx_time_retention(),
-                // WP-2.2: candidates come from CURRENT indexes and are
-                // re-resolved through the version chain at the selector —
-                // epoch-segmented indexes are gated GNSE backlog (WP-3.3).
+                // WP-2.2: for SEARCH, candidates still come from CURRENT
+                // indexes and are re-resolved through the version chain at
+                // the selector (vector epoch candidates = SPEC--EPOCH-HNSW
+                // phase E2). Key kept for consumer compatibility.
                 "tx_as_of": "implemented_post_resolution",
+                // E1 (SPEC--GENESISDB-EPOCH-HNSW §3.2): TRAVERSE enumerates
+                // epoch-complete candidates via the retired-adjacency
+                // overlay — nodes retracted after the selector still resolve.
+                "tx_as_of_traverse": "epoch_candidates",
             }
         })
     }
@@ -7261,27 +7298,24 @@ impl Storage {
                         "QUERY_IR_VALIDATION_FAILED: traverse.relations must contain non-empty relation names",
                     ));
                 }
-                let results = self
-                    .neighbors(
-                        seed_id,
-                        NeighborInput {
-                            depth: Some(depth),
-                            rel: None,
-                            rels: Some(relations),
-                            direction: Some(direction.as_str().to_string()),
-                            as_of,
-                            include_invalid: Some(false),
-                            limit,
-                        },
-                        false,
-                    )
-                    .map_err(|error| {
-                        Error::from_reason(format!("QUERY_EXECUTION_FAILED: {error}"))
-                    })?;
-                let results = match tx_as_of {
-                    Some(t) => self.apply_tx_view(results, t),
-                    None => results,
+                let input = NeighborInput {
+                    depth: Some(depth),
+                    rel: None,
+                    rels: Some(relations),
+                    direction: Some(direction.as_str().to_string()),
+                    as_of,
+                    include_invalid: Some(false),
+                    limit,
                 };
+                // E1: with a tx selector, candidates must be epoch-complete —
+                // `neighbors_tx_view` unions the retired-adjacency overlay so
+                // nodes retracted after t still resolve (SPEC--EPOCH-HNSW C1).
+                // Without one, the current-view path is unchanged.
+                let results = match tx_as_of {
+                    Some(t) => self.neighbors_tx_view(seed_id, input, t),
+                    None => self.neighbors(seed_id, input, false),
+                }
+                .map_err(|error| Error::from_reason(format!("QUERY_EXECUTION_FAILED: {error}")))?;
                 let data = serde_json::to_value(results).map_err(|error| {
                     Error::from_reason(format!("QUERY_EXECUTION_FAILED: {error}"))
                 })?;
@@ -8297,6 +8331,257 @@ impl Storage {
         Ok(results)
     }
 
+    /// One chain-row lookup for the tx view: the latest committed version of
+    /// `node_id` at-or-below frame `t` (and at-or-above the fold horizon).
+    /// `None` when the node had no committed version at `t` or its resolved
+    /// version is a retraction marker. Short-scoped lock: callers may hydrate
+    /// props (which locks the projection again) only AFTER this returns.
+    fn node_version_row_at(
+        &self,
+        node_id: &str,
+        t: u64,
+        horizon: u64,
+    ) -> Option<(
+        String,
+        Option<String>,
+        String,
+        Option<String>,
+        Option<String>,
+        i64,
+        String,
+    )> {
+        let conn = self.projection_db.lock();
+        conn.query_row(
+            "SELECT labels, payload, valid_from, valid_to, caused_by, clock_time, clock_peer
+             FROM node_versions
+             WHERE id = ?1 AND frame_seq >= ?2 AND frame_seq <= ?3 AND retracted = 0
+             ORDER BY frame_seq DESC LIMIT 1",
+            params![node_id, horizon, t],
+            |row| {
+                Ok((
+                    row.get::<_, String>(0)?,
+                    row.get::<_, Option<String>>(1)?,
+                    row.get::<_, String>(2)?,
+                    row.get::<_, Option<String>>(3)?,
+                    row.get::<_, Option<String>>(4)?,
+                    row.get::<_, i64>(5)?,
+                    row.get::<_, String>(6)?,
+                ))
+            },
+        )
+        .optional()
+        .ok()
+        .flatten()
+        .filter(|_| {
+            // A retraction marker AFTER the resolved version but still <= t
+            // means the belief at t is "retracted" — the `retracted = 0`
+            // predicate above already skips markers, so also reject when the
+            // LATEST row at t (marker included) is a retraction.
+            conn.query_row(
+                "SELECT retracted FROM node_versions
+                 WHERE id = ?1 AND frame_seq >= ?2 AND frame_seq <= ?3
+                 ORDER BY frame_seq DESC LIMIT 1",
+                params![node_id, horizon, t],
+                |row| row.get::<_, i64>(0),
+            )
+            .optional()
+            .ok()
+            .flatten()
+            .map(|r| r == 0)
+            .unwrap_or(false)
+        })
+    }
+
+    /// E1 (SPEC--GENESISDB-EPOCH-HNSW §3.2): tx-view traverse with
+    /// epoch-complete candidate enumeration. Unlike `neighbors` +
+    /// `apply_tx_view` (post-resolution: candidates limited to CURRENT
+    /// indexes), this BFS walks node id STRINGS and unions the retired-
+    /// adjacency overlay — so a node retracted AFTER `t` is still served,
+    /// resolved through its `node_versions` chain at `t` ("what did we
+    /// believe at commit N must not depend on what happened after N").
+    /// Edge tx-fidelity stays interim: edges carry no frame-seq chain, so an
+    /// edge's visibility uses its current valid window (same disclosed
+    /// limitation as the post-resolution path); the overlay only adds the
+    /// `retired_seq > t` cut for edges unwired by node retractions.
+    fn neighbors_tx_view(
+        &self,
+        seed: String,
+        args: NeighborInput,
+        t: u64,
+    ) -> Result<Vec<NeighborOutput>> {
+        let horizon = self.history_horizon();
+        let depth = args.depth.unwrap_or(1);
+        let rels_filter: Option<HashSet<String>> = match args.rels.as_ref() {
+            Some(v) if !v.is_empty() => Some(v.iter().cloned().collect()),
+            _ => match args.rel.as_deref() {
+                None | Some("ANY") => None,
+                Some(r) => {
+                    let mut s = HashSet::new();
+                    s.insert(r.to_string());
+                    Some(s)
+                }
+            },
+        };
+        let rel_allowed = |rel: &str| -> bool {
+            match &rels_filter {
+                None => true,
+                Some(s) => s.contains(rel),
+            }
+        };
+        let dir = args
+            .direction
+            .as_deref()
+            .map(|s| s.to_ascii_lowercase())
+            .unwrap_or_else(|| "out".to_string());
+        let walk_out = dir == "out" || dir == "both";
+        let walk_in = dir == "in" || dir == "both";
+        let lim = args.limit.map(|l| l as usize);
+        let now = Utc::now().to_rfc3339();
+
+        let mut results = Vec::new();
+        let mut visited: HashSet<String> = HashSet::new();
+        visited.insert(seed.clone());
+        let mut queue: VecDeque<(String, Vec<EdgeOutput>, u32)> = VecDeque::new();
+        queue.push_back((seed, Vec::new(), 0));
+        while let Some((curr_id, path, curr_depth)) = queue.pop_front() {
+            if curr_depth >= depth {
+                continue;
+            }
+
+            // Candidates: live adjacency (when the node is live) ∪ the retired
+            // overlay (keyed by id string — works for retracted hops too).
+            let mut eid_set: HashSet<u128> = HashSet::new();
+            if let Some(curr_u32) = self.get_u32(&curr_id) {
+                if walk_out {
+                    if let Some(out_eids) = self.out_idx.get(&curr_u32) {
+                        eid_set.extend(out_eids.iter().copied());
+                    }
+                }
+                if walk_in {
+                    if let Some(in_eids) = self.in_idx.get(&curr_u32) {
+                        eid_set.extend(in_eids.iter().copied());
+                    }
+                }
+            }
+            if walk_out {
+                if let Some(out_eids) = self.out_idx_retired.get(&curr_id) {
+                    eid_set.extend(out_eids.iter().copied());
+                }
+            }
+            if walk_in {
+                if let Some(in_eids) = self.in_idx_retired.get(&curr_id) {
+                    eid_set.extend(in_eids.iter().copied());
+                }
+            }
+
+            for eid in eid_set.iter() {
+                let edge: EdgeOutput = if let Some(edge_ref) = self.edges.get(eid) {
+                    edge_ref.value().clone()
+                } else if let Some(retired) = self.edges_retired.get(eid) {
+                    // Existed at t only if the retraction came after t.
+                    if retired.value().retired_seq <= t {
+                        continue;
+                    }
+                    retired.value().edge.clone()
+                } else {
+                    continue;
+                };
+                if !Self::is_currently_visible(
+                    &edge.valid_from,
+                    &edge.valid_to,
+                    &args.as_of,
+                    false,
+                    &now,
+                ) {
+                    continue;
+                }
+                if !rel_allowed(&edge.rel) {
+                    continue;
+                }
+                let next_id = if edge.from == curr_id {
+                    edge.to.clone()
+                } else {
+                    edge.from.clone()
+                };
+                if visited.contains(&next_id) {
+                    continue;
+                }
+                visited.insert(next_id.clone());
+
+                // Resolve the far node through the chain at t. Live nodes keep
+                // their hydrated live fields and take the t-row's versioned
+                // fields (same rewrite `apply_tx_view` performs); nodes absent
+                // from current indexes (retracted after t) are reconstructed
+                // from the row alone — the resurrection this path exists for.
+                let Some((
+                    labels,
+                    payload,
+                    valid_from,
+                    valid_to,
+                    caused_by,
+                    clock_time,
+                    clock_peer,
+                )) = self.node_version_row_at(&next_id, t, horizon)
+                else {
+                    continue;
+                };
+                let mut out_node = match self
+                    .get_u32(&next_id)
+                    .and_then(|u| self.nodes.get(&u).map(|n| self.hydrated_node(u, n.value())))
+                {
+                    Some(live) => live,
+                    None => NodeOutput {
+                        id: next_id.clone(),
+                        labels: Vec::new(),
+                        props: Value::Null,
+                        impact: None,
+                        embedding: None,
+                        lang: None,
+                        valid_from: String::new(),
+                        valid_to: None,
+                        caused_by: None,
+                        expires_at: None,
+                        clock: LogicalClock {
+                            time: clock_time.max(0) as u32,
+                            peer_id: clock_peer,
+                        },
+                        collection: None,
+                    },
+                };
+                out_node.labels = serde_json::from_str(&labels).unwrap_or_default();
+                out_node.props = payload
+                    .and_then(|p| serde_json::from_str(&p).ok())
+                    .unwrap_or(Value::Null);
+                out_node.valid_from = valid_from;
+                out_node.valid_to = valid_to;
+                out_node.caused_by = caused_by;
+                // valid-time window per the belief at t (two-axis rule:
+                // valid_at selects the window, tx_as_of selects the belief).
+                if !Self::is_valid_as_of(&out_node.valid_from, &out_node.valid_to, &args.as_of) {
+                    continue;
+                }
+
+                let mut new_path = path.clone();
+                new_path.push(edge);
+                results.push(NeighborOutput {
+                    node: out_node,
+                    path: new_path.clone(),
+                    depth: curr_depth + 1,
+                    score: None,
+                });
+                if let Some(l) = lim {
+                    if results.len() >= l {
+                        return Ok(results);
+                    }
+                }
+                if curr_depth + 1 < depth {
+                    queue.push_back((next_id, new_path, curr_depth + 1));
+                }
+            }
+        }
+        Ok(results)
+    }
+
     /// Bitemporal current-view semantics (mirrors `neighbors` / HQL
     /// `TRAVERSE ... AS OF`). By default (`as_of` and `include_invalid` both
     /// absent) this returns only edges that are valid *now*: a retracted edge
@@ -8615,8 +8900,8 @@ impl Storage {
             clock: clock.clone(),
             retracted_at: retracted_at.clone(),
         };
-        self.persist(&event)?;
-        self.retract_node_memory(id, u32_id);
+        let retract_seq = self.persist(&event)?;
+        self.retract_node_memory(id, u32_id, retract_seq);
         // Slice-1 tombstone: lets the deletion win LWW against stale peer
         // re-pushes and survive folds/snapshots (see `tombstones` field doc).
         self.tombstones.insert(
@@ -8630,13 +8915,17 @@ impl Storage {
     }
 
     /// In-memory half of a node retraction: unwire incident edges from both
-    /// adjacency indexes, drop the edges, the interning entry, the per-collection
-    /// arena mappings, and the node itself. Shared by `retract_node` (under
-    /// `commit_lock`, after the NodeRetract frame is durable), journal replay,
-    /// and CRDT reconcile. (Arena slots are reclaimed lazily by compaction;
-    /// trigram postings are not swept — pre-existing behavior.)
-    fn retract_node_memory(&self, id: &str, u32_id: u32) {
-        // 1. Collect all edges to remove
+    /// adjacency indexes, move the edges into the retired overlay (E1,
+    /// SPEC--GENESISDB-EPOCH-HNSW §3.2 — stamped with `retired_seq` so
+    /// `tx_as_of` before the retraction can still traverse them), drop the
+    /// interning entry, the per-collection arena mappings, and the node itself.
+    /// Shared by `retract_node` (under `commit_lock`, after the NodeRetract
+    /// frame is durable), journal replay, and CRDT reconcile — `retired_seq`
+    /// is the NodeRetract frame's own seq at every call site. (Arena slots are
+    /// reclaimed lazily by compaction; trigram postings are not swept —
+    /// pre-existing behavior.)
+    fn retract_node_memory(&self, id: &str, u32_id: u32, retired_seq: u64) {
+        // 1. Collect all edges to unwire
         let mut edges_to_remove = Vec::new();
         if let Some(eids) = self.out_idx.get(&u32_id) {
             for eid in eids.iter() {
@@ -8649,7 +8938,9 @@ impl Storage {
             }
         }
 
-        // 2. Comprehensive bi-directional index cleanup
+        // 2. Comprehensive bi-directional index cleanup, then move each edge
+        //    into the retired overlay (keyed by endpoint id STRINGS — after
+        //    this function the retracted endpoint has no u32 mapping left).
         for eid in edges_to_remove {
             if let Some(edge_ref) = self.edges.get(&eid) {
                 let edge = edge_ref.value();
@@ -8668,7 +8959,18 @@ impl Storage {
                 // Edges carry no `id_to_u32` entry under numeric edge keys
                 // (ADR--GENESISDB-EDGE-NUMERIC-KEYS) — nothing to sweep there.
             }
-            self.edges.remove(&eid);
+            if let Some((_, edge)) = self.edges.remove(&eid) {
+                self.out_idx_retired
+                    .entry(edge.from.clone())
+                    .or_default()
+                    .insert(eid);
+                self.in_idx_retired
+                    .entry(edge.to.clone())
+                    .or_default()
+                    .insert(eid);
+                self.edges_retired
+                    .insert(eid, RetiredEdge { edge, retired_seq });
+            }
         }
 
         // 3. Remove node and primary indices
@@ -8849,14 +9151,19 @@ impl Storage {
                     }
                     // Node-style LWW against the live copy: a strictly newer
                     // local upsert wins over the remote retraction.
-                    if let Some((u32_id, local_clock)) = self
+                    let lww_target = self
                         .get_u32(id)
-                        .and_then(|u| self.nodes.get(&u).map(|n| (u, n.value().clock.clone())))
-                    {
-                        if *clock < local_clock {
+                        .and_then(|u| self.nodes.get(&u).map(|n| (u, n.value().clock.clone())));
+                    if let Some((_, local_clock)) = &lww_target {
+                        if *clock < *local_clock {
                             continue;
                         }
-                        self.retract_node_memory(id, u32_id);
+                    }
+                    // Persist-first (RCA--SLICE0-DURABILITY defect 2 rationale);
+                    // the frame seq stamps the retired-adjacency overlay (E1).
+                    let retract_seq = self.persist_signed(signed_event.clone())?;
+                    if let Some((u32_id, _)) = lww_target {
+                        self.retract_node_memory(id, u32_id, retract_seq);
                     }
                     // Record the tombstone even when no node is resident —
                     // Slice-1: the deletion must survive here so a third peer
@@ -8880,7 +9187,6 @@ impl Storage {
                             retracted_at: retracted_at.clone(),
                         },
                     );
-                    self.persist_signed(signed_event.clone())?;
                 }
             }
         }
@@ -9489,6 +9795,20 @@ impl Storage {
         if let Ok(bytes) = serde_json::to_vec(&edges) {
             fs::write(temp_dir.join("edges.bin"), bytes).ok();
         }
+        // E1: the retired-adjacency overlay must survive a snapshot load —
+        // the instant-load path replays only frames PAST the frontier, so the
+        // NodeRetract frames that built it are skipped (same rationale as the
+        // tombstone registry below). Adjacency is rebuilt from the edges'
+        // endpoint id strings on load. Written even when empty so a load
+        // never inherits a stale file from an earlier snapshot.
+        let retired: Vec<(u128, RetiredEdge)> = self
+            .edges_retired
+            .iter()
+            .map(|e| (*e.key(), e.value().clone()))
+            .collect();
+        if let Ok(bytes) = serde_json::to_vec(&retired) {
+            fs::write(temp_dir.join("edges_retired.bin"), bytes).ok();
+        }
         self.projection_snapshot(&temp_dir.join(PROJECTION_DB_FILE))?;
 
         // 3. Save Global Metadata (incl. collections manifest). Slice-1: the
@@ -9587,6 +9907,7 @@ impl Storage {
                 | "state.json"
                 | "nodes.bin"
                 | "edges.bin"
+                | "edges_retired.bin"
                 | PROJECTION_DB_FILE
         ) || ((name.starts_with("vec_")
             || name.starts_with("meta_")
@@ -10297,6 +10618,26 @@ impl Storage {
                     self.out_idx.entry(from_u32).or_default().insert(k);
                     self.in_idx.entry(to_u32).or_default().insert(k);
                     self.edges.insert(k, v);
+                }
+            }
+        }
+
+        // E1: reload the retired-adjacency overlay (see save_state). Absent
+        // file = empty overlay (pre-E1 snapshots load unchanged). Adjacency is
+        // rebuilt from endpoint id strings — retracted endpoints have no u32.
+        if let Ok(data) = fs::read(self.path.join("edges_retired.bin")) {
+            if let Ok(retired) = serde_json::from_slice::<Vec<(u128, RetiredEdge)>>(&data) {
+                for (_saved_k, r) in retired {
+                    let k = Self::edge_key(&r.edge.id);
+                    self.out_idx_retired
+                        .entry(r.edge.from.clone())
+                        .or_default()
+                        .insert(k);
+                    self.in_idx_retired
+                        .entry(r.edge.to.clone())
+                        .or_default()
+                        .insert(k);
+                    self.edges_retired.insert(k, r);
                 }
             }
         }
@@ -11035,6 +11376,14 @@ impl Storage {
             "Journal folded to base segment @seq {} ({} live events).",
             frontier_seq, count
         );
+        // E1: a successful fold advances `history_horizon()` to this frontier,
+        // so every retired-adjacency entry (retired_seq <= frontier by
+        // construction) is now below the horizon and unreachable by any legal
+        // `tx_as_of` — sweep the overlay with the history it belonged to
+        // (single destruction boundary, ADR--JOURNAL-HISTORY I6).
+        self.edges_retired.clear();
+        self.out_idx_retired.clear();
+        self.in_idx_retired.clear();
         Ok(())
     }
 
@@ -11479,7 +11828,7 @@ impl Storage {
                 retracted_at,
             } => {
                 if let Some(u32_id) = self.get_u32(&id) {
-                    self.retract_node_memory(&id, u32_id);
+                    self.retract_node_memory(&id, u32_id, seq);
                 }
                 self.tombstones.insert(
                     id,

@@ -7,6 +7,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added — E1 retired-adjacency overlay (epoch-complete tx_as_of traverse)
+
+- **`tx_as_of` can now resurrect retracted nodes on TRAVERSE** (SPEC--GENESISDB-
+  EPOCH-HNSW §3.2, phase E1): `retract_node` moves incident edges into a
+  retired-adjacency overlay (`edges_retired` + string-keyed adjacency, stamped
+  with the NodeRetract frame seq) instead of destroying them; a new
+  `neighbors_tx_view` BFS unions the overlay and resolves every candidate —
+  including nodes absent from current indexes — through the `node_versions`
+  chain at the selector. The formerly `#[ignore]`d WP-3.1 RED test
+  (`matrix_retraction_belief_before_still_serves`) is un-ignored and green.
+- Overlay lifecycle: persisted in `edges_retired.bin` (snapshot instant-load),
+  rebuilt by journal replay and CRDT reconcile (retraction paths are now
+  persist-first everywhere, extending the Slice-0 rationale), and **cleared on
+  every successful fold** — the fold stays the single history-destruction
+  boundary (I6), so `frontier_only` keeps its exact cost profile.
+- Capabilities: additive `temporal.tx_as_of_traverse = "epoch_candidates"`;
+  the existing `tx_as_of` key is unchanged (SEARCH stays post-resolution
+  until E2 vector epoch candidates).
+- New `tests/epoch_e1_tests.rs`: multi-hop through a retracted intermediate,
+  snapshot-reopen + journal-replay overlay rebuild, fold-clears + loud
+  `beyond_horizon`, retract-then-recreate view separation.
+
 ### Added — epoch-HNSW spec (draft)
 
 - **`docs/SPEC--GENESISDB-EPOCH-HNSW.md`**: design spec for the WP-3.3-funded
