@@ -7,6 +7,38 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added — Slice-1 tombstone retention
+
+Closes the two documented Slice-0 residuals (deletion convergence and the
+fold's destruction of retraction history), within an interim 30-day retention
+window (`TOMBSTONE_RETENTION_SECS`; policy moves to WP-1.3 retention profiles):
+
+- **Node tombstone registry** (`Storage.tombstones`): every retraction records
+  `{clock, retracted_at}`, persisted in `state.json` and re-emitted into the
+  fold payload as `NodeRetract` frames — so the deletion survives snapshots,
+  folds, and journal-only recovery.
+- **CRDT deletion convergence:** `reconcile_state` now gates `Node` upserts by
+  tombstone LWW — a stale peer re-push can no longer resurrect a retracted
+  node after the origin folds (previously guaranteed resurrection: no local
+  copy remained to win LWW). Remote `NodeRetract` events are recorded even
+  when no local node is resident, with clock-idempotent re-offer handling.
+  A genuinely newer upsert clears the tombstone (legitimate re-create).
+- **Retracted edges survive the fold** within the retention window, restoring
+  `retract_edge`'s documented time-travel contract (`as_of` before the
+  retraction / `include_invalid`) after a checkpoint when the journal is the
+  only surviving copy. Retention comparisons parse RFC3339 (no lexicographic
+  string compare); unparseable stamps are conservatively retained.
+- **GC at the fold boundary:** tombstones and retracted edges older than the
+  window leave the fold payload; expired tombstones are dropped from the
+  registry and the snapshot. Known residual: a peer partitioned longer than
+  the window can still resurrect a delete — WP-1.3 territory.
+- `Event::NodeRetract` gains a `retracted_at` field (`serde(default)`;
+  additive within the unreleased v3 format — no schema bump).
+
+New regression suite: `tests/durability_slice1_tests.rs` (stale-push LWW,
+fold/snapshot/journal-only tombstone survival, legitimate re-create,
+retracted-edge time travel after fold, GC at the window).
+
 ### Fixed — Slice-0 durability (SCHEMA_VERSION 2 → 3)
 
 Four acked-write-loss / resurrection defects from the 2026-08-19 storage-
