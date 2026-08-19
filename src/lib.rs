@@ -6512,12 +6512,15 @@ impl Storage {
         };
 
         old_node.valid_to = Some(now.clone());
-        self.persist(&Event::Node(old_node.clone()))?;
+        let closed_seq = self.persist(&Event::Node(old_node.clone()))?;
 
         let mut new_node = old_node.clone();
         new_node.valid_from = now.clone();
         new_node.valid_to = None;
-        new_node.caused_by = caused_by;
+        // WP-2.3: when the caller supplies no provenance, chain to the version
+        // this supersession closed — `<id>@<frame_seq>` of the closing frame,
+        // resolvable back through the node_versions tx-time chain (WP-2.1).
+        new_node.caused_by = caused_by.or_else(|| Some(format!("{id}@{closed_seq}")));
         if let Some(props) = new_props {
             new_node.props = props;
         }
@@ -6555,6 +6558,8 @@ impl Storage {
                 None => serde_json::Value::Null,
             },
             HqlField::Depth => serde_json::json!(n.depth),
+            // Tx-time lives on edges; neighbor rows expose only the node.
+            HqlField::RecordedAt => serde_json::Value::Null,
             HqlField::Prop(k) => n
                 .node
                 .props
@@ -6973,6 +6978,12 @@ impl Storage {
                     serde_json::Value::Null
                 }
             }
+            // Edge bindings carry `recorded_at` (tx-time); node bindings don't
+            // and resolve to null, mirroring the score/depth convention.
+            Some(HqlField::RecordedAt) => entity
+                .get("recorded_at")
+                .cloned()
+                .unwrap_or(serde_json::Value::Null),
             Some(HqlField::Prop(k)) => entity
                 .get("props")
                 .and_then(|p| p.get(k))

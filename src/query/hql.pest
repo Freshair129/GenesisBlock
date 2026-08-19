@@ -75,9 +75,11 @@ edge_pattern = { edge_in | edge_out | edge_both }
 hop = { edge_pattern ~ node_pattern }
 graph_pattern = { node_pattern ~ hop* }
 // Variable-qualified clause fields: `a` (whole bound entity) | `a.id` | `a.label`
-// | `a.prop.<key>`. Distinct from the unqualified `field` used by the other
-// commands' `clauses`, so pattern rows can address multiple variables.
-qual_tail = { prop_field | ^"id" | ^"label" }
+// | `a.recorded_at` | `a.prop.<key>`. Distinct from the unqualified `field` used
+// by the other commands' `clauses`, so pattern rows can address multiple
+// variables. `recorded_at` is the tx-time ingestion timestamp: edges carry it,
+// node bindings resolve it to null (NodeOutput has no such field).
+qual_tail = { prop_field | ^"recorded_at" | ^"id" | ^"label" }
 qual_field = { identifier ~ ("." ~ qual_tail)? }
 pat_predicate = { qual_field ~ op ~ filter_value }
 pat_where = { ^"WHERE" ~ pat_predicate ~ (^"AND" ~ pat_predicate)* }

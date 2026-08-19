@@ -7,6 +7,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added — WP-2.3 caused_by auto-chain + queryable recorded_at
+
+- **`caused_by` auto-chain on supersede** (`supersede_node`): when the caller
+  passes no provenance, the new version's `caused_by` now defaults to the
+  identity of the version the supersession closed — `<id>@<frame_seq>` of
+  the closing frame — instead of staying empty. The embedded frame seq
+  resolves that exact version back through the WP-2.1 `node_versions`
+  tx-time chain, so every unannotated supersession is self-documenting.
+  An explicit caller-provided `caused_by` always wins, unchanged.
+- **`recorded_at` queryable in HQL pattern clauses**: `qual_tail` (grammar
+  `src/query/hql.pest`, kept in sync with `src/query/ast.rs`) gains a
+  `recorded_at` accessor — `e.recorded_at` works in WHERE, ORDER BY, and
+  RETURN of `MATCH` patterns. Edge bindings project their tx-time ingestion
+  timestamp (RFC3339, so string comparison is chronological); node bindings
+  resolve to null (NodeOutput carries no `recorded_at`), mirroring the
+  `score`/`depth` convention. First time tx-time is reachable from query
+  text rather than only via the `node_versions` API.
+
+New suite: `tests/wp23_semantics_tests.rs` (auto-chain resolves through the
+version chain, explicit provenance wins, RETURN projection, WHERE filtering
+incl. the null-on-node case).
+
 ### Added — WP-2.2 tx_as_of + the as_of semantics fix
 
 - **`temporal.tx_as_of` on the Typed Query IR** (search + traverse; NAPI,
