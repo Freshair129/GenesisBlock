@@ -220,6 +220,48 @@ pub extern "system" fn Java_dev_genesisblock_GenesisDB_nativeExecuteHql(
     })
 }
 
+/// `external fun nativeExecuteQueryIr(handle: Long, jsonInput: String):
+/// String?` — WP-2.2: execute a versioned Typed Query IR request
+/// (`QueryIrRequest` JSON, contract `query-ir.v1`; supports
+/// `temporal.valid_at` and the replica-local `temporal.tx_as_of`); returns
+/// the IR response envelope as JSON or `null` on error.
+#[no_mangle]
+pub extern "system" fn Java_dev_genesisblock_GenesisDB_nativeExecuteQueryIr(
+    mut env: JNIEnv,
+    _class: JClass,
+    handle: jlong,
+    json_input: JString,
+) -> jstring {
+    json_op(&mut env, handle, &json_input, |storage, json| {
+        let request: serde_json::Value = serde_json::from_str(json).ok()?;
+        let value = storage.execute_query_ir_json(request).ok()?;
+        serde_json::to_string(&value).ok()
+    })
+}
+
+/// `external fun nativeQueryIrCapabilities(handle: Long): String?` — WP-2.2:
+/// the Query IR capability manifest (incl. `temporal.history_horizon` and
+/// the retention profile — ADR I6) as JSON, or `null` on error.
+#[no_mangle]
+pub extern "system" fn Java_dev_genesisblock_GenesisDB_nativeQueryIrCapabilities(
+    mut env: JNIEnv,
+    _class: JClass,
+    handle: jlong,
+) -> jstring {
+    use std::panic::{catch_unwind, AssertUnwindSafe};
+    let result = catch_unwind(AssertUnwindSafe(|| {
+        let storage = unsafe { handle_storage(handle) }?;
+        serde_json::to_string(&storage.query_ir_capabilities()).ok()
+    }));
+    match result {
+        Ok(Some(s)) => env
+            .new_string(s)
+            .map(|j| j.into_raw())
+            .unwrap_or(std::ptr::null_mut()),
+        _ => std::ptr::null_mut(),
+    }
+}
+
 /// `external fun nativeRetrieveContext(handle: Long, jsonInput: String):
 /// String?` — retrieve a tiered context package from a `RetrieveContextInput`
 /// JSON string (`{ "target_id", "tier", "budget", "fuzzy" }`); returns a

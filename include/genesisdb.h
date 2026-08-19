@@ -77,6 +77,27 @@ const char *genesisdb_search(GenesisHandle *handle, const char *json_input);
 const char *genesisdb_execute_hql(GenesisHandle *handle, const char *hql);
 
 /*
+ WP-2.2: execute a versioned Typed Query IR request (`QueryIrRequest`
+ JSON, contract `query-ir.v1` — supports `temporal.valid_at` and the
+ replica-local `temporal.tx_as_of`). Returns the IR response envelope as a
+ JSON string (free with [`genesisdb_free_string`]) or null on error.
+
+ # Safety
+ `handle` must be a live handle; `json_input` a valid C string.
+ */
+const char *genesisdb_execute_query_ir(GenesisHandle *handle, const char *json_input);
+
+/*
+ WP-2.2: the Query IR capability manifest (incl. `temporal.history_horizon`
+ and the retention profile — ADR I6). Returns a JSON string (free with
+ [`genesisdb_free_string`]) or null on error.
+
+ # Safety
+ `handle` must be a live handle.
+ */
+const char *genesisdb_query_ir_capabilities(GenesisHandle *handle);
+
+/*
  Retrieve a tiered context package. `json_input` is a `RetrieveContextInput`
  JSON string: `{ "target_id": "...", "tier": "H1", "budget": null, "fuzzy":
  false }`. Returns a [`crate::ContextPackage`] JSON string (free with
