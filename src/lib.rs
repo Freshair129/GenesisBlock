@@ -427,6 +427,15 @@ pub struct QueryIrRequest {
 #[serde(deny_unknown_fields)]
 pub struct QueryIrTemporal {
     pub valid_at: Option<String>,
+    /// WP-2.2 (ADR D2/D4): replica-local tx-time selector — "what did THIS
+    /// replica believe at ITS commit N". Values below `history_horizon()`
+    /// fail explicitly with `beyond_horizon`. Interim semantics (documented
+    /// in capabilities): results are found against current indexes, then
+    /// each node is re-resolved through the WP-2.1 version chain at N —
+    /// nodes absent or retracted at N are dropped (epoch-segmented indexes
+    /// are gated GNSE backlog, WP-3.3).
+    #[serde(default)]
+    pub tx_as_of: Option<u64>,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
@@ -5702,6 +5711,109 @@ impl Storage {
         }))
     }
 
+    /// WP-2.2 as_of semantics fix (the "superseded nodes vanish" defect the
+    /// GNSE review found and `temporal_queries_tests` used to codify): a node
+    /// whose CURRENT version postdates `as_of` was silently hidden even
+    /// though an older version was valid then. Resolve the historical
+    /// version from the WP-2.1 chain by VALID time (latest non-retracted
+    /// chain row with `valid_from <= as_of < valid_to`) and serve it instead.
+    /// Only consulted when the current version fails the as_of check (cold
+    /// path — no chain lookup on ordinary queries). Chain rows below the
+    /// fold horizon are unavailable (D4): the node then stays hidden, which
+    /// is the pre-WP-2.2 behavior and exactly the retention forfeit the
+    /// capabilities surface discloses.
+    fn resolve_node_as_of(&self, current: &NodeOutput, as_of: &str) -> Option<NodeOutput> {
+        let horizon = self.history_horizon();
+        let conn = self.projection_db.lock();
+        let row = conn
+            .query_row(
+                "SELECT labels, payload, valid_from, valid_to, caused_by, clock_time, clock_peer
+                 FROM node_versions
+                 WHERE id = ?1 AND frame_seq >= ?2 AND retracted = 0
+                   AND valid_from <= ?3 AND (valid_to IS NULL OR valid_to > ?3)
+                 ORDER BY frame_seq DESC LIMIT 1",
+                params![current.id, horizon, as_of],
+                |row| {
+                    Ok((
+                        row.get::<_, String>(0)?,
+                        row.get::<_, Option<String>>(1)?,
+                        row.get::<_, String>(2)?,
+                        row.get::<_, Option<String>>(3)?,
+                        row.get::<_, Option<String>>(4)?,
+                        row.get::<_, i64>(5)?,
+                        row.get::<_, String>(6)?,
+                    ))
+                },
+            )
+            .optional()
+            .ok()
+            .flatten()?;
+        let (labels, payload, valid_from, valid_to, caused_by, clock_time, clock_peer) = row;
+        let mut node = current.clone();
+        node.labels = serde_json::from_str(&labels).unwrap_or_default();
+        node.props = payload
+            .and_then(|p| serde_json::from_str(&p).ok())
+            .unwrap_or(Value::Null);
+        node.valid_from = valid_from;
+        node.valid_to = valid_to;
+        node.caused_by = caused_by;
+        node.clock = LogicalClock {
+            time: clock_time.max(0) as u32,
+            peer_id: clock_peer,
+        };
+        Some(node)
+    }
+
+    /// WP-2.2 tx-time view: re-resolve result nodes through the WP-2.1 chain
+    /// at replica-local commit `t`. A node with no committed version at-or-
+    /// below `t`, or whose resolved version is a retraction marker, is
+    /// dropped; otherwise the result carries that version's fields. Interim
+    /// semantics (capabilities: "implemented_post_resolution"): candidates
+    /// come from CURRENT indexes — epoch-segmented indexes are gated GNSE
+    /// backlog (WP-3.3).
+    fn apply_tx_view(&self, results: Vec<NeighborOutput>, t: u64) -> Vec<NeighborOutput> {
+        let horizon = self.history_horizon();
+        let conn = self.projection_db.lock();
+        results
+            .into_iter()
+            .filter_map(|mut nb| {
+                let row = conn
+                    .query_row(
+                        "SELECT labels, payload, valid_from, valid_to, caused_by, retracted
+                         FROM node_versions
+                         WHERE id = ?1 AND frame_seq >= ?2 AND frame_seq <= ?3
+                         ORDER BY frame_seq DESC LIMIT 1",
+                        params![nb.node.id, horizon, t],
+                        |row| {
+                            Ok((
+                                row.get::<_, String>(0)?,
+                                row.get::<_, Option<String>>(1)?,
+                                row.get::<_, String>(2)?,
+                                row.get::<_, Option<String>>(3)?,
+                                row.get::<_, Option<String>>(4)?,
+                                row.get::<_, i64>(5)? != 0,
+                            ))
+                        },
+                    )
+                    .optional()
+                    .ok()
+                    .flatten()?;
+                let (labels, payload, valid_from, valid_to, caused_by, retracted) = row;
+                if retracted {
+                    return None;
+                }
+                nb.node.labels = serde_json::from_str(&labels).unwrap_or_default();
+                nb.node.props = payload
+                    .and_then(|p| serde_json::from_str(&p).ok())
+                    .unwrap_or(Value::Null);
+                nb.node.valid_from = valid_from;
+                nb.node.valid_to = valid_to;
+                nb.node.caused_by = caused_by;
+                Some(nb)
+            })
+            .collect()
+    }
+
     /// WP-1.3: bytes of sealed HISTORY on disk (history + legacy segments;
     /// base segments are materializations below the horizon, not history).
     /// This is the quantity `RetentionProfile::Budget` bounds.
@@ -6992,6 +7104,10 @@ impl Storage {
                 "tx_epoch_start": 1,
                 "retention_profile": self.retention.as_str(),
                 "tx_time_retention": self.retention.tx_time_retention(),
+                // WP-2.2: candidates come from CURRENT indexes and are
+                // re-resolved through the version chain at the selector —
+                // epoch-segmented indexes are gated GNSE backlog (WP-3.3).
+                "tx_as_of": "implemented_post_resolution",
             }
         })
     }
@@ -7033,6 +7149,21 @@ impl Storage {
             .temporal
             .as_ref()
             .and_then(|temporal| temporal.valid_at.clone());
+        // WP-2.2 (ADR D4 rule 2): a tx-time selector below the retained
+        // horizon fails explicitly — never silently the current state.
+        let tx_as_of = request
+            .temporal
+            .as_ref()
+            .and_then(|temporal| temporal.tx_as_of);
+        if let Some(t) = tx_as_of {
+            let horizon = self.history_horizon();
+            if t < horizon {
+                return Err(Error::from_reason(format!(
+                    "beyond_horizon: tx_as_of {t} predates the retained history horizon {horizon} (retention profile {})",
+                    self.retention.as_str()
+                )));
+            }
+        }
         let (operation_kind, data) = match request.operation {
             QueryIrOperation::Search {
                 mode,
@@ -7088,6 +7219,10 @@ impl Storage {
                     .map_err(|error| {
                         Error::from_reason(format!("QUERY_EXECUTION_FAILED: {error}"))
                     })?;
+                let results = match tx_as_of {
+                    Some(t) => self.apply_tx_view(results, t),
+                    None => results,
+                };
                 let data = serde_json::to_value(results).map_err(|error| {
                     Error::from_reason(format!("QUERY_EXECUTION_FAILED: {error}"))
                 })?;
@@ -7132,6 +7267,10 @@ impl Storage {
                     .map_err(|error| {
                         Error::from_reason(format!("QUERY_EXECUTION_FAILED: {error}"))
                     })?;
+                let results = match tx_as_of {
+                    Some(t) => self.apply_tx_view(results, t),
+                    None => results,
+                };
                 let data = serde_json::to_value(results).map_err(|error| {
                     Error::from_reason(format!("QUERY_EXECUTION_FAILED: {error}"))
                 })?;
@@ -7294,7 +7433,10 @@ impl Storage {
                             contract_version: QUERY_IR_V1.to_string(),
                             request_id: "hql-compat".to_string(),
                             namespace: None,
-                            temporal: Some(QueryIrTemporal { valid_at: as_of }),
+                            temporal: Some(QueryIrTemporal {
+                                valid_at: as_of,
+                                tx_as_of: None,
+                            }),
                             consistency: None,
                             operation: QueryIrOperation::Search {
                                 mode: QueryIrSearchMode::Vector,
@@ -7374,7 +7516,10 @@ impl Storage {
                             contract_version: QUERY_IR_V1.to_string(),
                             request_id: "hql-compat".to_string(),
                             namespace: None,
-                            temporal: Some(QueryIrTemporal { valid_at: as_of }),
+                            temporal: Some(QueryIrTemporal {
+                                valid_at: as_of,
+                                tx_as_of: None,
+                            }),
                             consistency: None,
                             operation: QueryIrOperation::Traverse {
                                 seed_id: resolved_seed,
@@ -7410,7 +7555,10 @@ impl Storage {
                             contract_version: QUERY_IR_V1.to_string(),
                             request_id: "hql-compat".to_string(),
                             namespace: None,
-                            temporal: Some(QueryIrTemporal { valid_at: as_of }),
+                            temporal: Some(QueryIrTemporal {
+                                valid_at: as_of,
+                                tx_as_of: None,
+                            }),
                             consistency: None,
                             operation: QueryIrOperation::Search {
                                 mode: QueryIrSearchMode::Hybrid,
@@ -7931,13 +8079,24 @@ impl Storage {
                     if let Some(node) = self.nodes.get(&u32_id) {
                         let node_out = self.hydrated_node(u32_id, node.value());
 
-                        if !Self::is_valid_as_of(
+                        let node_out = if Self::is_valid_as_of(
                             &node_out.valid_from,
                             &node_out.valid_to,
                             &args.as_of,
                         ) {
+                            node_out
+                        } else if let Some(hist) = args
+                            .as_of
+                            .as_deref()
+                            .and_then(|t| self.resolve_node_as_of(&node_out, t))
+                        {
+                            // WP-2.2: the current version postdates as_of but an
+                            // older version was valid then — serve it instead of
+                            // hiding the entity.
+                            hist
+                        } else {
                             continue;
-                        }
+                        };
 
                         let similarity = 1.0 - distance as f64;
                         let reasoning_score =
@@ -8082,19 +8241,30 @@ impl Storage {
                             if let Some(node_ref) = self.nodes.get(&next_u32) {
                                 let node = node_ref.value();
 
-                                // Time-travel check for Nodes
-                                if !Self::is_valid_as_of(
+                                // Time-travel check for Nodes. WP-2.2: when the
+                                // current version postdates as_of, resolve the
+                                // historically valid version from the chain
+                                // instead of hiding the node.
+                                let out_node = if Self::is_valid_as_of(
                                     &node.valid_from,
                                     &node.valid_to,
                                     &args.as_of,
                                 ) {
+                                    self.hydrated_node(next_u32, node)
+                                } else if let Some(hist) = args
+                                    .as_of
+                                    .as_deref()
+                                    .and_then(|t| self.resolve_node_as_of(node, t))
+                                {
+                                    hist
+                                } else {
                                     continue;
-                                }
+                                };
 
                                 let mut new_path = path.clone();
                                 new_path.push(edge.clone());
                                 results.push(NeighborOutput {
-                                    node: self.hydrated_node(next_u32, node),
+                                    node: out_node,
                                     path: new_path.clone(),
                                     depth: curr_depth + 1,
                                     score: None,

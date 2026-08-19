@@ -204,16 +204,29 @@ fn test_supersede_node_bitemporal_as_of() {
     assert_eq!(cur.len(), 1, "target still reachable in current view");
     assert_eq!(cur[0].node.props["version"], 2, "current view has v2 props");
 
-    // AS OF 2022 after supersession: in-memory node has valid_from ~now (2026)
-    // which is after 2022, so it is filtered out.
+    // AS OF 2022 after supersession — WP-2.2 semantics fix. The current
+    // version's valid_from is ~now (2026), after 2022, so it fails the
+    // window; pre-WP-2.2 the node was then silently HIDDEN (this test used
+    // to assert `past.is_empty()`, codifying the defect the GNSE review
+    // flagged). Now the historically valid v1 version is resolved from the
+    // WP-2.1 chain and served: as_of answers what was TRUE at 2022.
     let past: Vec<NeighborOutput> = from_value(
         db.execute_hql("TRAVERSE FROM hub DEPTH 1 REL ANY AS OF \"2022-01-01T00:00:00Z\"")
             .unwrap(),
     )
     .unwrap();
+    assert_eq!(
+        past.len(),
+        1,
+        "superseded node must resolve its 2022-valid version, not vanish"
+    );
+    assert_eq!(
+        past[0].node.props["version"], 1,
+        "AS OF 2022 must serve the v1 props, not v2"
+    );
     assert!(
-        past.is_empty(),
-        "superseded node has valid_from=now; must not appear in a 2022 AS OF query"
+        past[0].node.valid_to.is_some(),
+        "the resolved historical version carries its closed validity window"
     );
 
     // AS OF far future: valid_from ~now < 2099, valid_to = None → visible.

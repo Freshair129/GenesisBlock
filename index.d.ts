@@ -190,7 +190,12 @@ export interface QueryIrRequest {
   contract_version: 'query-ir.v1'
   request_id: string
   namespace?: string
-  temporal?: { valid_at?: string }
+  /**
+   * valid_at: RFC3339 valid-time selector. tx_as_of (WP-2.2): replica-local
+   * commit-seq selector — values below historyHorizon() reject with
+   * beyond_horizon; results are re-resolved through the node_versions chain.
+   */
+  temporal?: { valid_at?: string; tx_as_of?: number }
   consistency?: { index: QueryIrIndexConsistency }
   operation: QueryIrSearchOperation | QueryIrTraverseOperation
 }

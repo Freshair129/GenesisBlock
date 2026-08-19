@@ -255,6 +255,61 @@ pub extern "C" fn genesisdb_execute_hql(
     })
 }
 
+/// WP-2.2: execute a versioned Typed Query IR request (`QueryIrRequest`
+/// JSON, contract `query-ir.v1` — supports `temporal.valid_at` and the
+/// replica-local `temporal.tx_as_of`). Returns the IR response envelope as a
+/// JSON string (free with [`genesisdb_free_string`]) or null on error.
+///
+/// # Safety
+/// `handle` must be a live handle; `json_input` a valid C string.
+#[no_mangle]
+pub extern "C" fn genesisdb_execute_query_ir(
+    handle: *mut GenesisHandle,
+    json_input: *const c_char,
+) -> *const c_char {
+    guard_json(|| {
+        let storage = match unsafe { handle_storage(handle) } {
+            Some(s) => s,
+            None => return std::ptr::null(),
+        };
+        let json = match unsafe { cstr_to_str(json_input) } {
+            Some(j) => j,
+            None => return std::ptr::null(),
+        };
+        let request: serde_json::Value = match serde_json::from_str(json) {
+            Ok(v) => v,
+            Err(_) => return std::ptr::null(),
+        };
+        match storage.execute_query_ir_json(request) {
+            Ok(value) => match serde_json::to_string(&value) {
+                Ok(s) => string_to_cstr(s),
+                Err(_) => std::ptr::null(),
+            },
+            Err(_) => std::ptr::null(),
+        }
+    })
+}
+
+/// WP-2.2: the Query IR capability manifest (incl. `temporal.history_horizon`
+/// and the retention profile — ADR I6). Returns a JSON string (free with
+/// [`genesisdb_free_string`]) or null on error.
+///
+/// # Safety
+/// `handle` must be a live handle.
+#[no_mangle]
+pub extern "C" fn genesisdb_query_ir_capabilities(handle: *mut GenesisHandle) -> *const c_char {
+    guard_json(|| {
+        let storage = match unsafe { handle_storage(handle) } {
+            Some(s) => s,
+            None => return std::ptr::null(),
+        };
+        match serde_json::to_string(&storage.query_ir_capabilities()) {
+            Ok(s) => string_to_cstr(s),
+            Err(_) => std::ptr::null(),
+        }
+    })
+}
+
 /// Retrieve a tiered context package. `json_input` is a `RetrieveContextInput`
 /// JSON string: `{ "target_id": "...", "tier": "H1", "budget": null, "fuzzy":
 /// false }`. Returns a [`crate::ContextPackage`] JSON string (free with

@@ -7,6 +7,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added — WP-2.2 tx_as_of + the as_of semantics fix
+
+- **`temporal.tx_as_of` on the Typed Query IR** (search + traverse; NAPI,
+  REST, and new FFI/JNI surfaces `genesisdb_execute_query_ir` /
+  `genesisdb_query_ir_capabilities` + JNI mirrors; `include/genesisdb.h`
+  regenerated): a replica-local commit-seq selector — "what did this replica
+  believe at its commit N". Selectors below `history_horizon()` fail
+  explicitly with `beyond_horizon` (ADR D4 rule 2). Interim semantics,
+  disclosed by capabilities as `tx_as_of: "implemented_post_resolution"`:
+  candidates come from current indexes, then each result node is re-resolved
+  through the WP-2.1 version chain at N — nodes with no committed version
+  at-or-below N, or retracted at N, are dropped (epoch-segmented indexes
+  remain gated GNSE backlog).
+- **`as_of` (valid-time) semantics fix** in `hybrid_search` and `neighbors`:
+  a node whose current version postdates the selector now resolves its
+  historically valid version from the chain (with its closed validity
+  window) instead of being silently hidden — closing the superseded-node
+  defect the GNSE review flagged, which `temporal_queries_tests` had
+  codified as expected behavior (that assertion is now inverted). Chain
+  lookup runs only when the current version fails the window (cold path);
+  below the fold horizon the node stays hidden, matching the disclosed
+  retention forfeit.
+
+New suite: `tests/tx_as_of_wp22_tests.rs` (historical resolution,
+not-yet-committed drop, beyond-horizon rejection, superseded-version
+resolution on the search path).
+
 ### Added — WP-2.1 node_versions (tx-time version chain)
 
 The first queryable tx-time surface (GNSE plan Phase 2): a per-entity version
