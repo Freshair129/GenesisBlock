@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added — epoch-HNSW spec (draft)
+
+- **`docs/SPEC--GENESISDB-EPOCH-HNSW.md`**: design spec for the WP-3.3-funded
+  epoch-segmented indexes / vector time-travel line. Three mechanisms, no journal
+  format change: epoch stamps on vector metadata (`meta` snapshot v2, migrate
+  ladder), a retired-adjacency overlay that turns the WP-3.1 RED test green
+  (tx_as_of resurrection of retracted nodes), and filtered-ANN + exact-scan-floor
+  vector time-travel with horizon-aware compaction. Phased E1/E2 with per-phase
+  DoD; true per-epoch HNSW sub-indexes stay evidence-gated (E3).
+
 ### Decided — WP-3.3 GNSE backlog gate (USER)
 
 - **Fund selectively** (`docs/DECISION--WP33-GNSE-BACKLOG.md`): epoch-segmented
