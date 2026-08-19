@@ -134,10 +134,12 @@ Verify-gate fail → Verifier files Verification Artifact with re-runnable evide
 
 ## 8. Deferred backlog (evidence-gated — do NOT schedule)
 
+> **WP-3.3 gate outcome (2026-08-19, USER):** see [DECISION--WP33-GNSE-BACKLOG](DECISION--WP33-GNSE-BACKLOG.md) — **epoch-segmented HNSW / vector time-travel FUNDED** (activated by the WP-3.2 PROCEED verdict; also un-ignores the WP-3.1 RED test); the other three items stay deferred on their original triggers below.
+
 | Item | Trigger to activate |
 |---|---|
 | Native segment stores + 16KiB page cache (GNSE T2/T3) | a real consumer (NotiKeeper/MSP) exceeds measured RAM budget, or mobile GA requires paging below 300MB–2GB envelope |
-| Epoch-segmented HNSW / vector time-travel | a consumer demands "vector search as of commit N" (none does today); until then: version-stamp vector metadata + brute-force rerank for historical |
+| ~~Epoch-segmented HNSW / vector time-travel~~ **FUNDED per WP-3.3** | a consumer demands "vector search as of commit N" (none does today); until then: version-stamp vector metadata + brute-force rerank for historical |
 | Full CommitFrame prev-hash chain across CRDT sync | History ADR follow-up after 1.2 stabilizes; requires sync-wire redesign decision |
 | SQLite property demotion (GNSE T6) | only after segment property store exists; CRM tier actively wants the relational projection — keep it |
 
@@ -148,3 +150,4 @@ Verify-gate fail → Verifier files Verification Artifact with re-runnable evide
 | Version | Date | Summary |
 |---|---|---|
 | draft-1 | 2026-08-17 | Initial multi-agent remediation roadmap mapping GNSE thin slice onto GoVibe C/H/R/D/W/Budget/Risk orchestration |
+| final | 2026-08-19 | Line complete: WP-0.1→3.2 merged (PRs #107–#114); WP-3.3 USER gate decided — fund epoch-HNSW selectively, see DECISION--WP33-GNSE-BACKLOG |
