@@ -59,6 +59,7 @@ fn stats(mut us: Vec<f64>) -> serde_json::Value {
     serde_json::json!({
         "runs": us.len(),
         "p50_us": percentile(&us, 50.0),
+        "p95_us": percentile(&us, 95.0),
         "p99_us": percentile(&us, 99.0),
         "mean_us": mean,
         "ci95_us": ci95,
@@ -888,6 +889,12 @@ fn main() {
             // correctness gate; the verdict itself is a judgement, not a
             // pass/fail of the harness.
             "pass": engine_all_pass,
+            // Envelope summary fields (verify_report.py common checks): the
+            // flagship fused query (q1), engine side, in ms.
+            "total_nodes": n + 2,
+            "query_latency_p50_ms": report["q1"]["engine"]["p50_us"].as_f64().unwrap_or(0.0) / 1000.0,
+            "query_latency_p95_ms": report["q1"]["engine"]["p95_us"].as_f64().unwrap_or(0.0) / 1000.0,
+            "query_latency_p99_ms": report["q1"]["engine"]["p99_us"].as_f64().unwrap_or(0.0) / 1000.0,
             "ingest": { "engine_s": engine_ingest_s, "sqlite_s": sqlite_ingest_s },
             "queries": report,
             "correctness": scenarios.iter().map(|s| serde_json::json!({
