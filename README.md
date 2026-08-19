@@ -14,6 +14,25 @@ Nearest comparators are embedded engines such as Kuzu, DuckDB combined with grap
 
 **New here?** → [Documentation Hub](docs/README.md) · [5-minute Quickstart (Node.js)](QUICKSTART.md) · [Why GenesisBlockDB](docs/POSITIONING.md)
 
+## Current Version
+
+| Field | Value |
+|---|---|
+| **Version** | `0.2.0` (crate, npm, and `modules.json` in lock-step; `npm run version:check` gates CI) |
+| **Milestone** | Mark XVI — mobile SDK & embedded core; GNSE bitemporal line complete (WP-0.1 → WP-3.3) |
+| **Status** | Advanced prototype — durable, benchmarked, full Rust + Node suites green |
+
+Version SSOT: [docs/VERSION.md](docs/VERSION.md) · Detailed history: [CHANGELOG.md](CHANGELOG.md)
+
+### What it can do today
+
+- **Hybrid queries in one engine**: HNSW vector search, index-backed graph traversal, and SQL-projected property filtering fused in-process — no cross-store glue code.
+- **Bitemporal time travel on two axes**: `valid_at` (when a fact was true in the world) and `tx_as_of` (what the database believed at a past commit) over a framed, signed journal; `recorded_at` is queryable and `caused_by` provenance chains automatically on supersede. Correctness is pinned by a dedicated matrix suite (`tests/bitemporal_matrix_wp31_tests.rs`).
+- **Retention profiles**: `frontier_only` (default — folds history at every checkpoint, cost-neutral) or `full` (keeps the replayable journal for time travel); the fold is the single history-destruction boundary, and questions beyond the retained horizon fail loudly (`beyond_horizon`) instead of returning silently wrong answers.
+- **Measured cross-dimension advantage**: fused vector+graph+AS-OF queries run **115–188× faster** than the equivalent DIY single-file SQLite assembly at 100k nodes × 1024 dims ([moat verdict](docs/REPORT--G3-MOAT-VERDICT.md)) — disclosed honestly: bulk ingest is currently slower than SQLite's, and the corpus is synthetic (real-corpus run scheduled).
+- **Vector memory that scales down**: per-collection vector spaces (own model/dim/metric), asynchronous HNSW indexing, F16/SQ8/BQ quantization with an off-RAM rerank sidecar, and WAL compaction/checkpointing.
+- **Embedded everywhere**: Node.js N-API addon, standalone Axum REST server, MCP server, Python and Go SDKs — plus a C FFI (`genesisdb_*`) with Android `.aar` and React Native bindings from the same crate.
+
 ## Product Boundary
 
 ```text
@@ -48,6 +67,7 @@ The current evidence-backed report records, on its documented SSD environment:
 - **Graph traversal**: 1-hop p50 approximately 22 µs, O(neighborhood) rather than O(N), and 7–185× faster than server Neo4j on the measured k-hop workloads.
 - **Incremental K-Impact**: O(V_affected), approximately 1.7 µs flat on the measured workload.
 - **Durable ingest**: approximately 2,000 vectors/second bulk and 839 TPS in the measured concurrent write scenario.
+- **Cross-dimension moat bench** (2026-08, 100k×1024 synthetic): fused vector+graph+AS-OF queries 114.9–187.9× versus the DIY single-file SQLite assembly, both sides in-process — see [docs/REPORT--G3-MOAT-VERDICT.md](docs/REPORT--G3-MOAT-VERDICT.md) for the honest caveats (ingest, synthetic corpus, skipped FTS axis).
 
 Do not reuse these values outside the report's workload, hardware, configuration, and caveats.
 
@@ -92,7 +112,7 @@ Agent context: [AGENT.md](AGENT.md) · Contributor workflow: [CONTRIBUTING.md](C
 - Thai-aware lexical matching and documented cross-lingual behavior.
 - Typed Query IR is the approved primary query boundary (`search` and `traverse` implemented across core, REST and N-API); current HQL remains a compatibility surface.
 - Graph Retrieval Layer for tiered or bounded context packages without requiring one client authority model.
-- Bitemporal node evolution through supersession rather than destructive overwrite.
+- Bitemporal node evolution through supersession rather than destructive overwrite, with two-axis time travel (`valid_at` + `tx_as_of`) and configurable retention profiles.
 - Embedded SQLite projection for node properties, labels, app-defined relational schemas, joins, and SQL-backed filtering/text retrieval.
 - Generic provenance, causality, governance-supporting and consensus primitives.
 - REST, N-API, MCP, Python SDK and Go SDK interfaces over the Rust engine.
