@@ -7,6 +7,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added — WP-2.1 node_versions (tx-time version chain)
+
+The first queryable tx-time surface (GNSE plan Phase 2): a per-entity version
+chain in the SQLite projection, keyed by the LOCAL frame seq (ADR D2 —
+replica-local commit order; PROJECTION_SCHEMA_VERSION 2 → 3, additive
+migration).
+
+- Every committed `Node` frame appends a chain row (deliberately NOT
+  clock-LWW-gated — the chain records what was committed, in frame order);
+  `NodeRetract` frames append retraction markers, so resolve-at-commit past a
+  retraction answers "retracted", not the last live version. Supersede
+  naturally yields close+new row pairs.
+- Read API `node_versions(id, at_seq?)` on Storage, NAPI (`nodeVersions`),
+  and REST (`GET /v1/node/versions?id=..&at_seq=..`): frame-ordered chain +
+  optional resolve-at-commit. Lookup is by id string, so a retracted node's
+  chain stays addressable after its interning entry is gone.
+- **ADR D4 enforced:** rows below `history_horizon()` are never served (a
+  projection rebuild would not recover them — the chain stays strictly
+  rebuildable, proven by test), and `at_seq` below the horizon fails
+  explicitly with `beyond_horizon` — never silently the current state. Under
+  `frontier_only` this means the chain collapses at every fold, exactly the
+  forfeit the capabilities surface discloses; under `full`/`budget` (WP-1.3)
+  real history accumulates.
+
+New suite: `tests/node_versions_wp21_tests.rs` (chain shape across
+supersede, resolve-at-commit, retraction resolution, journal rebuild
+identity, beyond-horizon behavior after a fold).
+
 ### Added — WP-1.3 retention profiles (ADR D3)
 
 Journal retention is now a per-database setting: `OpenOptions.retention`

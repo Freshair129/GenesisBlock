@@ -305,6 +305,26 @@ async fn stable_frontier_handler(State(state): State<AppState>) -> impl IntoResp
         .into_response()
 }
 
+#[derive(serde::Deserialize)]
+struct NodeVersionsQuery {
+    id: String,
+    at_seq: Option<u64>,
+}
+
+/// WP-2.1: tx-time version chain for a node id, optional resolve-at-commit.
+/// `at_seq` below the history horizon is a client error (`beyond_horizon`,
+/// ADR D4 — explicit failure, never silently the current state).
+async fn node_versions_handler(
+    State(state): State<AppState>,
+    Query(request): Query<NodeVersionsQuery>,
+) -> impl IntoResponse {
+    let storage = state.storage.read();
+    match storage.node_versions(&request.id, request.at_seq) {
+        Ok(v) => (StatusCode::OK, Json(v)).into_response(),
+        Err(e) => (StatusCode::BAD_REQUEST, e.to_string()).into_response(),
+    }
+}
+
 async fn studio_capabilities_handler(State(state): State<AppState>) -> impl IntoResponse {
     let storage = state.storage.read();
     let auth_features = if state.api_key.is_some() {
@@ -883,6 +903,7 @@ pub fn build_router(state: AppState) -> Router {
         .route("/v1/relational/query", post(relational_query_handler))
         .route("/v1/transaction/commit", post(transaction_commit_handler))
         .route("/v1/frontier", get(stable_frontier_handler))
+        .route("/v1/node/versions", get(node_versions_handler))
         .route("/v1/studio/capabilities", get(studio_capabilities_handler))
         .route("/v1/studio/graph", get(studio_graph_scene_handler))
         .route("/v1/studio/entity/:entity_id", get(studio_entity_handler))

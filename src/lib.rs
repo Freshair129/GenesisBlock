@@ -81,7 +81,8 @@ use query::HqlCommand;
 // Older engines silently skip unknown event variants on replay, which would
 // resurrect deleted nodes — the bump makes downgrade fail closed instead.
 pub const SCHEMA_VERSION: u32 = 3;
-const PROJECTION_SCHEMA_VERSION: u32 = 2;
+// v3: WP-2.1 node_versions chain (additive CREATE IF NOT EXISTS migration).
+const PROJECTION_SCHEMA_VERSION: u32 = 3;
 const PROJECTION_DB_FILE: &str = "projection.sqlite";
 /// Stable engine identifier (independent of package version).
 pub const ENGINE_NAME: &str = "genesis-block";
@@ -3004,6 +3005,29 @@ impl Storage {
                 payload_hash TEXT NOT NULL,
                 frame_seq INTEGER
             );
+            -- WP-2.1: per-entity version chain keyed by the LOCAL frame seq
+            -- (tx-time axis, ADR D2). One row per Node frame this replica
+            -- committed (NOT clock-LWW-gated: the chain records what was
+            -- committed, in commit order), plus retraction markers. Strictly
+            -- rebuildable from the journal; rows below the fold horizon are
+            -- never served (D4 rule 1) because a rebuild would not recover
+            -- them.
+            CREATE TABLE IF NOT EXISTS node_versions (
+                node_u32 INTEGER NOT NULL,
+                frame_seq INTEGER NOT NULL,
+                id TEXT NOT NULL,
+                labels TEXT NOT NULL DEFAULT '[]',
+                payload TEXT,
+                valid_from TEXT NOT NULL DEFAULT '',
+                valid_to TEXT,
+                caused_by TEXT,
+                clock_time INTEGER NOT NULL DEFAULT 0,
+                clock_peer TEXT NOT NULL DEFAULT '',
+                retracted INTEGER NOT NULL DEFAULT 0,
+                PRIMARY KEY (node_u32, frame_seq)
+            );
+            CREATE INDEX IF NOT EXISTS idx_node_versions_id
+                ON node_versions(id, frame_seq);
             ",
         )
         .map_err(|e| Error::from_reason(e.to_string()))?;
@@ -4043,6 +4067,66 @@ impl Storage {
         Ok(())
     }
 
+    /// WP-2.1: append one row to the node version chain. Keyed
+    /// (node_u32, frame_seq) with INSERT OR REPLACE so journal replay is
+    /// idempotent. Deliberately NOT clock-LWW-gated (unlike the `props`
+    /// upsert): the chain records what this replica committed, in frame
+    /// order — tx-time, not valid-time.
+    fn projection_append_node_version(
+        conn: &Connection,
+        node_u32: u32,
+        node: &NodeOutput,
+        frame_seq: u64,
+    ) -> Result<()> {
+        let labels =
+            serde_json::to_string(&node.labels).map_err(|e| Error::from_reason(e.to_string()))?;
+        let payload =
+            serde_json::to_string(&node.props).map_err(|e| Error::from_reason(e.to_string()))?;
+        conn.execute(
+            "INSERT OR REPLACE INTO node_versions(node_u32, frame_seq, id, labels, payload, valid_from, valid_to, caused_by, clock_time, clock_peer, retracted)
+             VALUES(?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, 0)",
+            params![
+                node_u32,
+                frame_seq,
+                node.id,
+                labels,
+                payload,
+                node.valid_from,
+                node.valid_to,
+                node.caused_by,
+                node.clock.time,
+                node.clock.peer_id,
+            ],
+        )
+        .map_err(|e| Error::from_reason(e.to_string()))?;
+        Ok(())
+    }
+
+    /// WP-2.1: append a retraction marker to the version chain.
+    fn projection_append_retract_version(
+        conn: &Connection,
+        node_u32: u32,
+        id: &str,
+        frame_seq: u64,
+        clock: &LogicalClock,
+        retracted_at: &str,
+    ) -> Result<()> {
+        conn.execute(
+            "INSERT OR REPLACE INTO node_versions(node_u32, frame_seq, id, labels, payload, valid_from, valid_to, caused_by, clock_time, clock_peer, retracted)
+             VALUES(?1, ?2, ?3, '[]', NULL, '', ?4, NULL, ?5, ?6, 1)",
+            params![
+                node_u32,
+                frame_seq,
+                id,
+                retracted_at,
+                clock.time,
+                clock.peer_id,
+            ],
+        )
+        .map_err(|e| Error::from_reason(e.to_string()))?;
+        Ok(())
+    }
+
     /// Apply one journal event to the SQLite projection. `frame_seq` is the
     /// event's LOCAL frame stamp (WP-1.2) — the authoritative sequence for
     /// transaction identity and the frontier keys.
@@ -4055,6 +4139,7 @@ impl Storage {
             Event::Node(node) => {
                 let node_u32 = self.get_or_intern_id(&node.id);
                 Self::projection_apply_node_conn(&mut conn, node_u32, node)?;
+                Self::projection_append_node_version(&conn, node_u32, node, frame_seq)?;
             }
             Event::RelationalSchema(package) => {
                 let tx = conn
@@ -4140,6 +4225,7 @@ impl Storage {
                 for node in &transaction.nodes {
                     let node_u32 = self.get_or_intern_id(&node.id);
                     Self::projection_apply_node_tx(&tx, node_u32, node)?;
+                    Self::projection_append_node_version(&tx, node_u32, node, frame_seq)?;
                 }
                 for group in &transaction.relational {
                     let schema = Self::load_relational_schema_conn(&tx, &group.namespace)?
@@ -4169,6 +4255,7 @@ impl Storage {
                             max_clock = node.clock.time;
                         }
                         Self::projection_apply_node_tx(&tx, node_u32, node)?;
+                        Self::projection_append_node_version(&tx, node_u32, node, frame_seq)?;
                     }
                 }
                 if max_clock > 0 {
@@ -4180,7 +4267,11 @@ impl Storage {
             // runs from `persist` while `id` still resolves (memory removal
             // happens after); on projection rebuild the preceding Node frame's
             // re-intern makes the id resolve again, so the delete still lands.
-            Event::NodeRetract { id, .. } => {
+            Event::NodeRetract {
+                id,
+                clock,
+                retracted_at,
+            } => {
                 if let Some(node_u32) = self.get_u32(id) {
                     conn.execute("DELETE FROM props WHERE node_u32 = ?1", params![node_u32])
                         .map_err(|e| Error::from_reason(e.to_string()))?;
@@ -4189,6 +4280,17 @@ impl Storage {
                         params![node_u32],
                     )
                     .map_err(|e| Error::from_reason(e.to_string()))?;
+                    // WP-2.1: the retraction is itself a version-chain entry —
+                    // resolve-at-commit past this point answers "retracted",
+                    // not the last live version.
+                    Self::projection_append_retract_version(
+                        &conn,
+                        node_u32,
+                        id,
+                        frame_seq,
+                        clock,
+                        retracted_at,
+                    )?;
                 }
             }
             _ => {}
@@ -5530,6 +5632,74 @@ impl Storage {
             .map(|s| s.max_seq)
             .max()
             .unwrap_or(0)
+    }
+
+    /// WP-2.1: the tx-time version chain for `id` — every Node frame this
+    /// replica committed for the entity (in frame order) plus retraction
+    /// markers, with optional resolve-at-commit.
+    ///
+    /// ADR D4 rules enforced here:
+    /// 1. Rows below `history_horizon()` are never served, even if still
+    ///    resident in the projection — a rebuild would not recover them, and
+    ///    a queryable surface must not outlive its recovery source.
+    /// 2. `at_seq` older than the horizon fails explicitly (`beyond_horizon`),
+    ///    never silently returns current state.
+    ///
+    /// Lookup is by the id STRING (not `id_to_u32`): a retracted node keeps
+    /// its chain addressable after the interning entry is gone.
+    pub fn node_versions(&self, id: &str, at_seq: Option<u64>) -> Result<serde_json::Value> {
+        let horizon = self.history_horizon();
+        if let Some(seq) = at_seq {
+            if seq < horizon {
+                return Err(Error::from_reason(format!(
+                    "beyond_horizon: tx-time {seq} predates the retained history horizon {horizon} (retention profile {})",
+                    self.retention.as_str()
+                )));
+            }
+        }
+        let conn = self.projection_db.lock();
+        let mut stmt = conn
+            .prepare(
+                "SELECT frame_seq, labels, payload, valid_from, valid_to, caused_by, clock_time, clock_peer, retracted
+                 FROM node_versions WHERE id = ?1 AND frame_seq >= ?2 ORDER BY frame_seq ASC",
+            )
+            .map_err(|e| Error::from_reason(e.to_string()))?;
+        let rows: Vec<serde_json::Value> = stmt
+            .query_map(params![id, horizon], |row| {
+                let labels: String = row.get(1)?;
+                let payload: Option<String> = row.get(2)?;
+                Ok(serde_json::json!({
+                    "frame_seq": row.get::<_, i64>(0)?,
+                    "labels": serde_json::from_str::<serde_json::Value>(&labels)
+                        .unwrap_or(serde_json::Value::Array(vec![])),
+                    "props": payload
+                        .and_then(|p| serde_json::from_str::<serde_json::Value>(&p).ok()),
+                    "valid_from": row.get::<_, String>(3)?,
+                    "valid_to": row.get::<_, Option<String>>(4)?,
+                    "caused_by": row.get::<_, Option<String>>(5)?,
+                    "clock_time": row.get::<_, i64>(6)?,
+                    "clock_peer": row.get::<_, String>(7)?,
+                    "retracted": row.get::<_, i64>(8)? != 0,
+                }))
+            })
+            .map_err(|e| Error::from_reason(e.to_string()))?
+            .filter_map(|r| r.ok())
+            .collect();
+        let resolved = at_seq.map(|seq| {
+            rows.iter()
+                .rev()
+                .find(|v| v["frame_seq"].as_u64().is_some_and(|f| f <= seq))
+                .cloned()
+                .unwrap_or(serde_json::Value::Null)
+        });
+        Ok(serde_json::json!({
+            "id": id,
+            "history_horizon": horizon,
+            "tx_epoch_start": 1,
+            "retention_profile": self.retention.as_str(),
+            "versions": rows,
+            "resolved": resolved,
+        }))
     }
 
     /// WP-1.3: bytes of sealed HISTORY on disk (history + legacy segments;
@@ -11464,6 +11634,19 @@ impl GenesisDatabase {
     #[napi]
     pub fn txn_frontier(&self) -> i64 {
         self.inner.txn_frontier().min(i64::MAX as u64) as i64
+    }
+    /// WP-2.1: the tx-time version chain for a node id (frame-ordered Node
+    /// frames + retraction markers), with optional resolve-at-commit via
+    /// `at_seq`. `at_seq` below the history horizon fails `beyond_horizon`
+    /// (ADR D4); rows below the horizon are never served.
+    #[napi]
+    pub async fn node_versions(&self, id: String, at_seq: Option<i64>) -> Result<Value> {
+        let i = Arc::clone(&self.inner);
+        tokio::task::spawn_blocking(move || {
+            i.node_versions(&id, at_seq.and_then(|s| u64::try_from(s).ok()))
+        })
+        .await
+        .map_err(|e| Error::from_reason(e.to_string()))?
     }
     /// WP-1.3 (ADR I6): oldest seq still covered by retained history — 0 when
     /// no fold has ever discarded history. Async (unlike the frontier pair):
