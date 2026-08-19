@@ -77,6 +77,8 @@ const NAPI_TO_REST: &[(&str, Option<&str>)] = &[
     ("txn_frontier", Some("/v1/frontier")),
     // WP-1.3: history horizon rides the same frontier surface on REST.
     ("history_horizon", Some("/v1/frontier")),
+    // WP-2.1: tx-time version chain + resolve-at-commit.
+    ("node_versions", Some("/v1/node/versions")),
     ("supersede_node", Some("/v1/node/supersede")),
     ("retract_edge", Some("/v1/edge/retract")),
     // GRL tiered retrieval (target_id/tier/budget/fuzzy). NOT the same as

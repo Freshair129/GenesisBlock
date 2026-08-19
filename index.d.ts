@@ -358,6 +358,13 @@ export declare class GenesisDatabase {
    * fold has ever discarded history. Async: scans the journal directory.
    */
   historyHorizon(): Promise<number>
+  /**
+   * WP-2.1: the tx-time version chain for a node id (frame-ordered versions +
+   * retraction markers) with optional resolve-at-commit. atSeq below the
+   * history horizon rejects with beyond_horizon (ADR D4); versions below the
+   * horizon are never served.
+   */
+  nodeVersions(id: string, atSeq?: number | undefined | null): Promise<any>
   retractEdge(id: string, at?: string | undefined | null): Promise<EdgeOutput | null>
   retrieveContext(targetId: string, tier: string, budget: number | undefined | null, fuzzy: boolean): Promise<ContextPackage>
   /**
