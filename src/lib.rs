@@ -744,8 +744,30 @@ pub enum Event {
         id: String,
         #[serde(default)]
         clock: LogicalClock,
+        /// Wall-clock RFC3339 stamp of the retraction — drives the Slice-1
+        /// tombstone-retention GC window (`TOMBSTONE_RETENTION_SECS`).
+        /// `#[serde(default)]` ⇒ frames written before this field carry an
+        /// empty string, which the GC treats as unparseable and retains.
+        #[serde(default)]
+        retracted_at: String,
     },
 }
+
+/// Slice-1 node tombstone: what remains of a retracted node so the deletion
+/// can win LWW against stale peer re-pushes and survive folds/snapshots.
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct NodeTombstone {
+    pub clock: LogicalClock,
+    #[serde(default)]
+    pub retracted_at: String,
+}
+
+/// Interim tombstone/retracted-edge retention window (30 days) until WP-1.3
+/// retention profiles make this policy-driven. Within the window, folds carry
+/// NodeRetract frames and retracted edges forward; beyond it they are GC'd
+/// from the fold payload (a peer partitioned longer than the window can
+/// resurrect a delete — the documented Slice-1 residual).
+const TOMBSTONE_RETENTION_SECS: i64 = 30 * 24 * 3600;
 
 /// Payload of `Event::Vector`: a standalone vector attached to a node, routed to
 /// `collection` (None = default). `lang` defaults to "en" on replay if absent.
@@ -2420,6 +2442,15 @@ pub struct Storage {
     // overhead at scale, union/iter stay fast (ADR--GENESISDB-NODE-ID-INTERNING,
     // A3). Only `find_fuzzy_id` reads this; nodes only (edges skip trigram).
     pub trigram_index: DashMap<String, RoaringBitmap>,
+    /// Slice-1 tombstone registry (RCA--SLICE0-DURABILITY residual): retracted
+    /// node ids with the clock that retracted them. Survives folds (emitted
+    /// into the fold payload) and snapshots (persisted in state.json), so a
+    /// peer that never pulled the NodeRetract frame cannot resurrect the node
+    /// via anti-entropy after the origin folds. GC'd at fold time after
+    /// `TOMBSTONE_RETENTION_SECS` (interim policy until WP-1.3 retention
+    /// profiles). Cleared for an id when a NEWER node upsert legitimately
+    /// re-creates it (`insert_node_lean`).
+    pub tombstones: DashMap<String, NodeTombstone>,
     pub lang_centroids: DashMap<String, Vec<f32>>,
     pub peers: DashMap<String, SyncPeer>,
     pub proposals: DashMap<String, ConsensusProposal>,
@@ -5187,6 +5218,7 @@ impl Storage {
             next_u32: AtomicU32::new(0),
             is_rebuilding: AtomicBool::new(false),
             trigram_index: DashMap::new(),
+            tombstones: DashMap::new(),
             lang_centroids: DashMap::new(),
             peers: DashMap::new(),
             proposals: DashMap::new(),
@@ -5872,10 +5904,21 @@ impl Storage {
                 }
                 // A committed retraction applies like the replay path and is
                 // persisted with its original proposal signature.
-                Event::NodeRetract { id, .. } => {
+                Event::NodeRetract {
+                    id,
+                    clock,
+                    retracted_at,
+                } => {
                     if let Some(u32_id) = self.get_u32(id) {
                         self.retract_node_memory(id, u32_id);
                     }
+                    self.tombstones.insert(
+                        id.clone(),
+                        NodeTombstone {
+                            clock: clock.clone(),
+                            retracted_at: retracted_at.clone(),
+                        },
+                    );
                     self.persist_signed(signed_event.clone())?;
                 }
             }
@@ -5973,6 +6016,12 @@ impl Storage {
     /// per node (the largest avoidable per-node cost). The full embedding is
     /// still persisted in the WAL `Event::Node` for replay/arena rebuild.
     fn insert_node_lean(&self, u32_id: u32, mut node: NodeOutput) {
+        // A node upsert that reaches this point re-creates the id: clear any
+        // Slice-1 tombstone. Every path that must NOT resurrect a tombstoned
+        // node (CRDT reconcile) LWW-gates against the tombstone BEFORE calling
+        // here; local writes and journal replay are ordered after the
+        // retraction by construction (commit_lock / frame order).
+        self.tombstones.remove(&node.id);
         node.embedding = None;
         node.props = Value::Null;
         self.nodes.insert(u32_id, node);
@@ -8083,12 +8132,24 @@ impl Storage {
         // persist leaves the node fully intact: no phantom delete. The
         // projection arm deletes the node's props/label rows while `id` still
         // resolves in `id_to_u32`.
+        let clock = self.next_clock();
+        let retracted_at = Utc::now().to_rfc3339();
         let event = Event::NodeRetract {
             id: id.to_string(),
-            clock: self.next_clock(),
+            clock: clock.clone(),
+            retracted_at: retracted_at.clone(),
         };
         self.persist(&event)?;
         self.retract_node_memory(id, u32_id);
+        // Slice-1 tombstone: lets the deletion win LWW against stale peer
+        // re-pushes and survive folds/snapshots (see `tombstones` field doc).
+        self.tombstones.insert(
+            id.to_string(),
+            NodeTombstone {
+                clock,
+                retracted_at,
+            },
+        );
         Ok(())
     }
 
@@ -8174,6 +8235,16 @@ impl Storage {
                     let mut apply = true;
                     if let Some(local_node) = self.nodes.get(&u32_id) {
                         if remote_node.clock < local_node.value().clock {
+                            apply = false;
+                        }
+                    }
+                    // Slice-1 tombstone gate: a local deletion that is not
+                    // strictly older than the remote upsert wins — a stale
+                    // peer re-push must not resurrect a retracted node. A
+                    // genuinely newer upsert clears the tombstone inside
+                    // insert_node_lean (legitimate re-create).
+                    if let Some(t) = self.tombstones.get(&remote_node.id) {
+                        if !(t.value().clock < remote_node.clock) {
                             apply = false;
                         }
                     }
@@ -8285,33 +8356,55 @@ impl Storage {
                         .collect();
                     let _ = self.reconcile_state_unlocked(wrapped_inners);
                 }
-                Event::NodeRetract { id, clock } => {
-                    // Node-style LWW: the retraction applies unless the local
-                    // copy is strictly newer (same rule as the Node arm above).
-                    // No resident node ⇒ nothing to remove and nothing to
-                    // re-persist (the retraction is already in the sender's
-                    // journal; without a persistent tombstone store, ignoring
-                    // it here is idempotent — pulls just keep offering it).
-                    let apply = self
+                Event::NodeRetract {
+                    id,
+                    clock,
+                    retracted_at,
+                } => {
+                    // Idempotency: a tombstone at (or past) this clock is
+                    // already recorded — repeated anti-entropy offers of the
+                    // same retraction must not re-persist a frame each pull.
+                    if self
+                        .tombstones
+                        .get(id)
+                        .is_some_and(|t| !(t.value().clock < *clock))
+                    {
+                        continue;
+                    }
+                    // Node-style LWW against the live copy: a strictly newer
+                    // local upsert wins over the remote retraction.
+                    if let Some((u32_id, local_clock)) = self
                         .get_u32(id)
                         .and_then(|u| self.nodes.get(&u).map(|n| (u, n.value().clock.clone())))
-                        .filter(|(_, local_clock)| !(clock < local_clock));
-                    if let Some((u32_id, _)) = apply {
-                        let mut current = self.logical_clock.load(Ordering::SeqCst);
-                        while clock.time > current {
-                            match self.logical_clock.compare_exchange_weak(
-                                current,
-                                clock.time,
-                                Ordering::SeqCst,
-                                Ordering::SeqCst,
-                            ) {
-                                Ok(_) => break,
-                                Err(actual) => current = actual,
-                            }
+                    {
+                        if *clock < local_clock {
+                            continue;
                         }
                         self.retract_node_memory(id, u32_id);
-                        self.persist_signed(signed_event.clone())?;
                     }
+                    // Record the tombstone even when no node is resident —
+                    // Slice-1: the deletion must survive here so a third peer
+                    // pushing the (older) node later still loses LWW.
+                    let mut current = self.logical_clock.load(Ordering::SeqCst);
+                    while clock.time > current {
+                        match self.logical_clock.compare_exchange_weak(
+                            current,
+                            clock.time,
+                            Ordering::SeqCst,
+                            Ordering::SeqCst,
+                        ) {
+                            Ok(_) => break,
+                            Err(actual) => current = actual,
+                        }
+                    }
+                    self.tombstones.insert(
+                        id.clone(),
+                        NodeTombstone {
+                            clock: clock.clone(),
+                            retracted_at: retracted_at.clone(),
+                        },
+                    );
+                    self.persist_signed(signed_event.clone())?;
                 }
             }
         }
@@ -8892,13 +8985,30 @@ impl Storage {
         }
         self.projection_snapshot(&temp_dir.join(PROJECTION_DB_FILE))?;
 
-        // 3. Save Global Metadata (incl. collections manifest)
+        // 3. Save Global Metadata (incl. collections manifest). Slice-1: the
+        //    tombstone registry rides in state.json because the instant-load
+        //    path replays only frames PAST the frontier — the base segment's
+        //    NodeRetract frames (seq == frontier) are skipped, so without this
+        //    the registry would be empty after every snapshot load. The fold
+        //    above already GC'd expired entries, so this is the post-GC set.
+        let tombstones_json: Vec<serde_json::Value> = self
+            .tombstones
+            .iter()
+            .map(|t| {
+                serde_json::json!({
+                    "id": t.key(),
+                    "clock": t.value().clock,
+                    "retracted_at": t.value().retracted_at,
+                })
+            })
+            .collect();
         let mut state = serde_json::json!({
             "logical_clock": self.get_logical_clock(),
             "peer_id": self.local_peer_id,
             "collections": manifest,
             "schema_version": SCHEMA_VERSION,
             "timestamp": Utc::now().to_rfc3339(),
+            "tombstones": tombstones_json,
         });
         // The tail-replay cursor (SPEC §3): frames with seq > frontier_seq
         // on the next open are writes acked AFTER this snapshot. Position-
@@ -9410,6 +9520,27 @@ impl Storage {
             Some(v) => v,
             None => return false,
         };
+
+        // 0. Slice-1 tombstone registry (absent in pre-Slice-1 snapshots ⇒
+        //    empty). Loaded before anything else: harmless if a later step
+        //    fails into full replay, which re-derives it from the journal.
+        self.tombstones.clear();
+        if let Some(entries) = state_val["tombstones"].as_array() {
+            for t in entries {
+                if let (Some(id), Ok(clock)) = (
+                    t["id"].as_str(),
+                    serde_json::from_value::<LogicalClock>(t["clock"].clone()),
+                ) {
+                    self.tombstones.insert(
+                        id.to_string(),
+                        NodeTombstone {
+                            clock,
+                            retracted_at: t["retracted_at"].as_str().unwrap_or("").to_string(),
+                        },
+                    );
+                }
+            }
+        }
 
         // 1. Load vector collections. New format: `collections` manifest +
         //    vec_<name>.bin / meta_<name>.bin. Legacy: a single vector.bin /
@@ -10207,6 +10338,21 @@ impl Storage {
         self.checkpoint_wal_payload(buf, frontier_seq, count)
     }
 
+    /// Slice-1 retention check: true when `stamp` (RFC3339) is older than
+    /// `TOMBSTONE_RETENTION_SECS` relative to `now`. Comparison is on PARSED
+    /// datetimes, not raw strings (offset-bearing stamps compare correctly).
+    /// Unparseable stamps — including the empty `#[serde(default)]` of frames
+    /// written before `retracted_at` existed — are conservatively RETAINED.
+    fn retention_expired(stamp: &str, now: &str) -> bool {
+        match (
+            chrono::DateTime::parse_from_rfc3339(stamp),
+            chrono::DateTime::parse_from_rfc3339(now),
+        ) {
+            (Ok(s), Ok(n)) => n.signed_duration_since(s).num_seconds() > TOMBSTONE_RETENTION_SECS,
+            _ => false,
+        }
+    }
+
     /// Serialize current live state as the fold payload (the `SignedEvent`
     /// JSONL lines the writer thread frames into a base segment at the fold
     /// frontier — WP-1.2). Split out of `compact_unlocked` so
@@ -10246,10 +10392,20 @@ impl Storage {
             }
         }
 
-        // 2. Write current live edges
+        // 2. Write current live edges — and, Slice-1, RETRACTED edges whose
+        //    `valid_to` is still inside the retention window. Pre-Slice-1 the
+        //    fold dropped every retracted edge, so `retract_edge`'s documented
+        //    time-travel contract (`as_of` before the retraction /
+        //    `include_invalid`) silently broke as soon as a checkpoint ran and
+        //    the snapshot was the only surviving copy. Beyond the window the
+        //    retracted edge leaves the fold (interim policy until WP-1.3).
         for entry in self.edges.iter() {
             let edge = entry.value();
-            if edge.valid_to.is_none() {
+            let keep = match &edge.valid_to {
+                None => true,
+                Some(retired) => !Self::retention_expired(retired, &now),
+            };
+            if keep {
                 if let Ok(json) =
                     serde_json::to_string(&self.sign_event(&Event::Edge(edge.clone())))
                 {
@@ -10257,6 +10413,34 @@ impl Storage {
                     buf.push(b'\n');
                     count += 1;
                 }
+            }
+        }
+
+        // 2b. Slice-1 tombstones: carry node retractions across the fold so
+        //     (a) journal-only recovery keeps the deletion and (b) anti-entropy
+        //     peers that never pulled the original NodeRetract frame still
+        //     lose LWW against it. Expired tombstones are GC'd here — the fold
+        //     is the retention boundary.
+        {
+            let mut expired: Vec<String> = Vec::new();
+            for t in self.tombstones.iter() {
+                if Self::retention_expired(&t.value().retracted_at, &now) {
+                    expired.push(t.key().clone());
+                    continue;
+                }
+                let event = Event::NodeRetract {
+                    id: t.key().clone(),
+                    clock: t.value().clock.clone(),
+                    retracted_at: t.value().retracted_at.clone(),
+                };
+                if let Ok(json) = serde_json::to_string(&self.sign_event(&event)) {
+                    buf.extend_from_slice(json.as_bytes());
+                    buf.push(b'\n');
+                    count += 1;
+                }
+            }
+            for id in expired {
+                self.tombstones.remove(&id);
             }
         }
 
@@ -10780,11 +10964,23 @@ impl Storage {
             // Durable retraction (RCA--SLICE0-DURABILITY defect 2): replay the
             // removal so a crash after the retraction ack no longer resurrects
             // the node. Frame order guarantees this runs after the node's own
-            // upsert frames.
-            Event::NodeRetract { id, .. } => {
+            // upsert frames (a LATER Node frame re-creating the id clears the
+            // tombstone again via insert_node_lean).
+            Event::NodeRetract {
+                id,
+                clock,
+                retracted_at,
+            } => {
                 if let Some(u32_id) = self.get_u32(&id) {
                     self.retract_node_memory(&id, u32_id);
                 }
+                self.tombstones.insert(
+                    id,
+                    NodeTombstone {
+                        clock,
+                        retracted_at,
+                    },
+                );
             }
         }
     }

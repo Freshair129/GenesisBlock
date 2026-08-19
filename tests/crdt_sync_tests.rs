@@ -211,7 +211,7 @@ fn test_reconcile_batch_remains_reentrant_under_lifecycle_barrier() {
     })
     .unwrap();
 
-    let nested = storage
+    let mut nested = storage
         .add_node(NodeInput {
             id: Some("nested-event".to_string()),
             labels: vec!["SYNC".to_string()],
@@ -226,15 +226,38 @@ fn test_reconcile_batch_remains_reentrant_under_lifecycle_barrier() {
         .unwrap();
     storage.retract_node("nested-event").unwrap();
 
+    // Slice-1 tombstones: a re-push carrying the ORIGINAL (pre-retraction)
+    // clock now correctly loses LWW to the retraction and must NOT resurrect.
+    // What this test pins is the Batch arm's reentrancy under the lifecycle
+    // barrier, so re-create with a clock NEWER than the retraction's — a
+    // legitimate re-create that clears the tombstone on apply.
+    nested.clock = LogicalClock {
+        time: nested.clock.time + 2, // retraction consumed +1
+        peer_id: storage.local_peer_id.clone(),
+    };
     storage
         .reconcile_state(vec![SignedEvent {
-            event: Event::Batch(vec![Event::Node(nested)]),
+            event: Event::Batch(vec![Event::Node(nested.clone())]),
             signature: vec![0; 64],
             signer_peer_id: storage.local_peer_id.clone(),
         }])
         .unwrap();
 
     assert!(storage.node_view("nested-event").is_some());
+
+    // And the inverse: the SAME batch shape with the stale pre-retraction
+    // clock stays dead after a fresh retraction (tombstone wins LWW).
+    storage.retract_node("nested-event").unwrap();
+    let stale = SignedEvent {
+        event: Event::Batch(vec![Event::Node(nested)]),
+        signature: vec![0; 64],
+        signer_peer_id: storage.local_peer_id.clone(),
+    };
+    storage.reconcile_state(vec![stale]).unwrap();
+    assert!(
+        storage.node_view("nested-event").is_none(),
+        "stale batched re-push must not resurrect a retracted node"
+    );
 }
 
 #[test]
