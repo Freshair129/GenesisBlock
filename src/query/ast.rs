@@ -20,6 +20,9 @@ pub enum HqlField {
     Label,
     Score,
     Depth,
+    /// Tx-time ingestion timestamp. Only bound-edge rows carry it; node rows
+    /// resolve to null. Reachable only through `qual_tail` (pattern clauses).
+    RecordedAt,
     Prop(String),
 }
 
@@ -32,6 +35,7 @@ impl HqlField {
             HqlField::Label => "label".to_string(),
             HqlField::Score => "score".to_string(),
             HqlField::Depth => "depth".to_string(),
+            HqlField::RecordedAt => "recorded_at".to_string(),
             HqlField::Prop(k) => k.clone(),
         }
     }
@@ -132,6 +136,7 @@ impl QualField {
             Some(HqlField::Label) => format!("{}.label", self.var),
             Some(HqlField::Score) => format!("{}.score", self.var),
             Some(HqlField::Depth) => format!("{}.depth", self.var),
+            Some(HqlField::RecordedAt) => format!("{}.recorded_at", self.var),
             Some(HqlField::Prop(k)) => format!("{}.{}", self.var, k),
         }
     }
@@ -815,6 +820,7 @@ impl HqlCommand {
         match pair.as_str().to_lowercase().as_str() {
             "id" => HqlField::Id,
             "label" => HqlField::Label,
+            "recorded_at" => HqlField::RecordedAt,
             other => HqlField::Prop(other.to_string()),
         }
     }
