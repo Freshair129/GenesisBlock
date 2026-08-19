@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Decided — WP-3.3 GNSE backlog gate (USER)
+
+- **Fund selectively** (`docs/DECISION--WP33-GNSE-BACKLOG.md`): epoch-segmented
+  HNSW / vector time-travel is FUNDED off the WP-3.2 PROCEED evidence (it also
+  un-ignores the WP-3.1 RED test — `tx_as_of` resurrection of retracted nodes);
+  segment stores + page cache, CommitFrame prev-hash chain, and SQLite property
+  demotion stay deferred on their original §8 triggers. Scheduled follow-ups
+  before any public moat positioning: libSQL DiskANN baseline row + real-corpus
+  (bge-m3) moat run. This closes the GNSE remediation line (WP-0.1 → WP-3.3).
+
 ### Added — WP-3.2 G3 moat bench + PROCEED verdict
 
 - **`moat-bench`** (`benches/moat_bench.rs`, bins-gated `[[bin]]`;
