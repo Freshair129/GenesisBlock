@@ -879,6 +879,18 @@ pub struct RetiredEdge {
     pub retired_seq: u64,
 }
 
+/// One `node_versions` chain row as selected by `node_version_row_at`:
+/// (labels, payload, valid_from, valid_to, caused_by, clock_time, clock_peer).
+type NodeVersionRow = (
+    String,
+    Option<String>,
+    String,
+    Option<String>,
+    Option<String>,
+    i64,
+    String,
+);
+
 /// Interim tombstone/retracted-edge retention window (30 days) until WP-1.3
 /// retention profiles make this policy-driven. Within the window, folds carry
 /// NodeRetract frames and retracted edges forward; beyond it they are GC'd
@@ -8336,20 +8348,7 @@ impl Storage {
     /// `None` when the node had no committed version at `t` or its resolved
     /// version is a retraction marker. Short-scoped lock: callers may hydrate
     /// props (which locks the projection again) only AFTER this returns.
-    fn node_version_row_at(
-        &self,
-        node_id: &str,
-        t: u64,
-        horizon: u64,
-    ) -> Option<(
-        String,
-        Option<String>,
-        String,
-        Option<String>,
-        Option<String>,
-        i64,
-        String,
-    )> {
+    fn node_version_row_at(&self, node_id: &str, t: u64, horizon: u64) -> Option<NodeVersionRow> {
         let conn = self.projection_db.lock();
         conn.query_row(
             "SELECT labels, payload, valid_from, valid_to, caused_by, clock_time, clock_peer
