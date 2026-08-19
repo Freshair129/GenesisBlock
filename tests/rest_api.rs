@@ -35,6 +35,7 @@ fn app_with_dim(_name: &str, dim: Option<u32>) -> (Router, Arc<RwLock<Storage>>,
         page_cache_mb: Some(16),
         read_only: Some(false),
         vector_dim: dim,
+        retention: None,
     })
     .expect("Storage::open in test");
     let storage = Arc::new(RwLock::new(storage));

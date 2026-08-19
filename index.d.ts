@@ -8,6 +8,13 @@ export interface OpenOptions {
   pageCacheMb?: number
   readOnly?: boolean
   vectorDim?: number
+  /**
+   * WP-1.3 retention profile (ADR D3): "frontier_only" (default — fold at
+   * every checkpoint, forfeits tx-time history), "full" (never fold at
+   * checkpoints), or "budget:<bytes>" (fold only when sealed history exceeds
+   * the budget). Unrecognized values fail open() loudly.
+   */
+  retention?: string
 }
 export interface NodeInput {
   id?: string
@@ -346,6 +353,11 @@ export declare class GenesisDatabase {
    * `GenesisTransaction.expected_frontier` CASes against (WP-1.2).
    */
   txnFrontier(): number
+  /**
+   * WP-1.3 (ADR I6): oldest seq still covered by retained history — 0 when no
+   * fold has ever discarded history. Async: scans the journal directory.
+   */
+  historyHorizon(): Promise<number>
   retractEdge(id: string, at?: string | undefined | null): Promise<EdgeOutput | null>
   retrieveContext(targetId: string, tier: string, budget: number | undefined | null, fuzzy: boolean): Promise<ContextPackage>
   /**

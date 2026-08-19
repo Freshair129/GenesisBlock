@@ -102,6 +102,7 @@ fn main() {
         page_cache_mb: Some(256),
         read_only: Some(false),
         vector_dim: Some(dim as u32),
+        retention: None,
     })
     .expect("open storage");
     storage.set_index_params(ef, 100);

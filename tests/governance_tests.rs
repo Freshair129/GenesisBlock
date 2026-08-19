@@ -13,6 +13,7 @@ fn test_axiomatic_guards_enforcement() {
         page_cache_mb: Some(64),
         read_only: Some(false),
         vector_dim: None,
+        retention: None,
     })
     .expect("Failed to open storage");
 

@@ -14,6 +14,7 @@ fn test_mark_ix_memory_reclamation_compaction() {
         page_cache_mb: Some(64),
         read_only: Some(false),
         vector_dim: Some(3),
+        retention: None,
     })
     .unwrap();
 

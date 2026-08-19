@@ -28,6 +28,7 @@ fn make_app() -> (Router, TempDir) {
         page_cache_mb: Some(16),
         read_only: Some(false),
         vector_dim: None,
+        retention: None,
     })
     .expect("Storage::open in test");
     let state = AppState {
@@ -44,6 +45,7 @@ fn make_app_with_key(key: &str) -> (Router, TempDir) {
         page_cache_mb: Some(16),
         read_only: Some(false),
         vector_dim: None,
+        retention: None,
     })
     .expect("Storage::open in test");
     let state = AppState {

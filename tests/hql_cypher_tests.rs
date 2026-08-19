@@ -25,6 +25,7 @@ fn open(path: &str) -> Storage {
         page_cache_mb: Some(32),
         read_only: Some(false),
         vector_dim: None,
+        retention: None,
     })
     .unwrap()
 }
@@ -313,6 +314,7 @@ fn cypher_does_not_break_hybrid_match() {
         page_cache_mb: Some(32),
         read_only: Some(false),
         vector_dim: Some(2),
+        retention: None,
     })
     .unwrap();
     s.add_node(NodeInput {

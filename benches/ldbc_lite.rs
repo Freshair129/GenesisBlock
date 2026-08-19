@@ -48,6 +48,7 @@ fn bench_traversal(c: &mut Criterion) {
         page_cache_mb: Some(128),
         read_only: Some(false),
         vector_dim: None,
+        retention: None,
     };
     let mut storage = Storage::open(opts).unwrap();
 

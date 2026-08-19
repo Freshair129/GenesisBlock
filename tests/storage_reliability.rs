@@ -26,6 +26,7 @@ fn open(path: &str) -> Storage {
         page_cache_mb: Some(64),
         read_only: Some(false),
         vector_dim: None,
+        retention: None,
     })
     .unwrap()
 }
@@ -36,6 +37,7 @@ fn open_vec(path: &str, dim: u32) -> Storage {
         page_cache_mb: Some(64),
         read_only: Some(false),
         vector_dim: Some(dim),
+        retention: None,
     })
     .unwrap()
 }
@@ -46,6 +48,7 @@ fn open_ro(path: &str) -> Storage {
         page_cache_mb: Some(64),
         read_only: Some(true),
         vector_dim: None,
+        retention: None,
     })
     .unwrap()
 }

@@ -7,6 +7,41 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added — WP-1.3 retention profiles (ADR D3)
+
+Journal retention is now a per-database setting: `OpenOptions.retention`
+(`"frontier_only"` | `"full"` | `"budget:<bytes>"`; REST server env
+`GENESIS_RETENTION`; unrecognized values fail `open` loudly — no
+silent-default trap).
+
+- **`frontier_only`** (default, unchanged behavior): fold at every
+  checkpoint; forfeits tx-time history — and the capabilities surface now
+  says so.
+- **`full`**: checkpoints never fold; history accumulates as sealed segments
+  and the journal retains full post-adoption history. Explicit `compact()`
+  still folds.
+- **`budget:<bytes>`**: checkpoints fold only when sealed history exceeds the
+  byte budget — the bounded-disk contract, retaining up to the budget of
+  tx-time history between folds. The active-file seal threshold derives from
+  the budget (N/4, clamped to [64 KiB, 64 MiB]) so small (mobile-sized)
+  budgets actually seal and trip. Interim semantics: a tripped budget folds
+  the whole history window (the ADR's oldest-first partial fold needs a
+  state-as-of-boundary materializer — deferred), which still bounds disk.
+- **Horizon honesty (ADR I6, previously unreachable from any surface):**
+  `query_ir_capabilities` gains `temporal.{history_horizon, tx_epoch_start,
+  retention_profile, tx_time_retention}`; `GET /v1/frontier` gains
+  `history_horizon` + `retention_profile` (additive); new NAPI
+  `historyHorizon()`.
+- Tombstone GC (Slice 1) now also runs on non-folding checkpoints, so the
+  registry/snapshot stay bounded under `full`/`budget`.
+- Deferred, per plan: default flip to `budget:4GiB` (belongs with the WP-2.x
+  tx-time landing), the peer-aware retention floor (the sync commit-seq
+  cursor is not yet used by requesters), and the archive hook.
+
+New suite: `tests/retention_wp13_tests.rs` (fail-loud parsing, per-profile
+fold behavior, bounded-disk under churn with journal-only recovery, horizon/
+retention disclosure).
+
 ### Added — Slice-1 tombstone retention
 
 Closes the two documented Slice-0 residuals (deletion convergence and the

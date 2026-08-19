@@ -295,6 +295,11 @@ async fn stable_frontier_handler(State(state): State<AppState>) -> impl IntoResp
         Json(serde_json::json!({
             "frame": storage.stable_frontier(),
             "txn": storage.txn_frontier(),
+            // WP-1.3 (ADR I6 horizon honesty): the oldest seq still covered
+            // by retained history (0 = no fold has discarded any), plus the
+            // active retention profile. Additive fields.
+            "history_horizon": storage.history_horizon(),
+            "retention_profile": storage.retention.as_str(),
         })),
     )
         .into_response()

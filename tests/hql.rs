@@ -28,6 +28,7 @@ fn open_dim(path: &str, vector_dim: Option<u32>) -> Storage {
         page_cache_mb: Some(32),
         read_only: Some(false),
         vector_dim,
+        retention: None,
     })
     .unwrap()
 }

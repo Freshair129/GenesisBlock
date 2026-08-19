@@ -75,6 +75,8 @@ const NAPI_TO_REST: &[(&str, Option<&str>)] = &[
     // WP-1.2 frontier split (ADR D2.3): txn frontier rides the same REST route
     // (the `/v1/frontier` body now returns {frame, txn}).
     ("txn_frontier", Some("/v1/frontier")),
+    // WP-1.3: history horizon rides the same frontier surface on REST.
+    ("history_horizon", Some("/v1/frontier")),
     ("supersede_node", Some("/v1/node/supersede")),
     ("retract_edge", Some("/v1/edge/retract")),
     // GRL tiered retrieval (target_id/tier/budget/fuzzy). NOT the same as

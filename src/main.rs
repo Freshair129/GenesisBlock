@@ -32,6 +32,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         page_cache_mb: Some(64),
         read_only: Some(false),
         vector_dim: None,
+        retention: std::env::var("GENESIS_RETENTION").ok(),
     })?;
 
     let api_key = std::env::var("GENESIS_API_KEY").ok();

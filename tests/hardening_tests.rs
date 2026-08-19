@@ -10,6 +10,7 @@ fn test_bi_directional_edge_cleanup() {
         page_cache_mb: Some(64),
         read_only: Some(false),
         vector_dim: Some(1536),
+        retention: None,
     })
     .unwrap();
 
@@ -93,6 +94,7 @@ fn test_configurable_vector_dim() {
         page_cache_mb: Some(64),
         read_only: Some(false),
         vector_dim: Some(768),
+        retention: None,
     })
     .unwrap();
 
@@ -134,6 +136,7 @@ fn test_concurrent_node_writes_are_safe() {
             page_cache_mb: Some(64),
             read_only: Some(false),
             vector_dim: None,
+            retention: None,
         })
         .unwrap(),
     );

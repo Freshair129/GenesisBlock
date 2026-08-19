@@ -125,6 +125,7 @@ pub extern "C" fn genesisdb_open(path: *const c_char) -> *mut GenesisHandle {
             page_cache_mb: None,
             read_only: None,
             vector_dim: None,
+            retention: None,
         };
         match Storage::open(opts) {
             Ok(storage) => {

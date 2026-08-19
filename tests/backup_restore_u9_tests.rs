@@ -39,6 +39,7 @@ fn open(path: &str) -> Storage {
         page_cache_mb: Some(16),
         read_only: Some(false),
         vector_dim: Some(4),
+        retention: None,
     })
     .unwrap()
 }
