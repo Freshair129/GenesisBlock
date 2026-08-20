@@ -28,15 +28,29 @@ The gate spec reads "bench evidence **+ first-10-installs signal**". The bench h
 real embedded consumer to date. The selective scope is sized to the evidence that exists:
 the full-backlog option was explicitly declined as running ahead of the install signal.
 
-## Follow-ups (scheduled — prerequisites for public positioning)
+## Follow-ups (DONE 2026-08-20 — see [REPORT--MOAT-FOLLOWUPS](REPORT--MOAT-FOLLOWUPS.md))
 
-Per the verdict's recommendation, both are scheduled as the next bench work, and the
-moat claim does not ship publicly until they land:
+Per the verdict's recommendation, both were scheduled as the next bench work, and the
+moat claim did not ship publicly until they landed. **Both are now measured, and
+neither caveat was hiding a weakness:**
 
-1. **libSQL DiskANN baseline row** in the moat bench — attacks Q4 (the brute scan);
-   expected to narrow the single-axis control, not the fused shapes or the correctness gate.
-2. **Real-corpus (bge-m3) moat run** — replaces the synthetic-vectors caveat with a
-   measured real-embedding result.
+1. ~~**libSQL DiskANN baseline row** in the moat bench — attacks Q4 (the brute scan);
+   expected to narrow the single-axis control, not the fused shapes or the correctness gate.~~
+   **MEASURED.** The prediction held on the fused shape (engine still 45.7×/46.9× ahead)
+   but understated the single-axis result: DiskANN beat the brute scan by only
+   1.21×/1.88×, leaving the engine ~12–13× ahead on the vector axis it indexes — while
+   costing 8.5×–11.8× the engine's ingest. Measured at N=11,266 (a 100k libSQL run is
+   hours of ingest); do not quote it at 100k.
+2. ~~**Real-corpus (bge-m3) moat run** — replaces the synthetic-vectors caveat with a
+   measured real-embedding result.~~ **MEASURED, and the caveat was conservative.**
+   At matched N, real embeddings *raise* every vector-touching ratio (q1 52.3× → 67.2×,
+   q4 16.2× → 22.8×) because clustered vectors navigate the HNSW graph better while the
+   baseline's O(N) scan is distribution-blind. The graph-only control moves −4% (noise),
+   which is what makes the causal read credible.
+
+Public positioning is therefore unblocked, with the guidance in the report: quote the
+100k synthetic figures as the conservative headline, always with N stated, and label the
+libSQL numbers as 11k-scale.
 
 ## Consequences
 

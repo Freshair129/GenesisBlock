@@ -101,3 +101,20 @@ ANN and graph traversal* — naming LadybugDB (graph+HNSW, no temporal) and Grap
 Fund the read-side moat line (G3 positioning + the deferred GNSE items it gates); keep the
 ingest-throughput caveat disclosed. The libSQL-DiskANN row and a real-corpus (bge-m3) run
 are the two follow-ups worth scheduling before public positioning ships.
+
+## Follow-up outcome (2026-08-20)
+
+Both follow-ups were run — see [REPORT--MOAT-FOLLOWUPS](REPORT--MOAT-FOLLOWUPS.md).
+This verdict **stands and is strengthened**:
+
+- **The synthetic-corpus caveat was conservative.** On real bge-m3 embeddings at matched
+  N, every vector-touching ratio *improved* (q1 52.3× → 67.2×, q4 16.2× → 22.8×); the
+  graph-only control moved −4%. Random unit vectors are near-isotropic and are the
+  hostile case for the HNSW walk, while a brute scan is distribution-blind.
+- **libSQL/DiskANN does not close the gap.** The strongest embedded ANN competitor beat
+  the brute scan by only 1.21×/1.88× and left the engine ~12–13× ahead on the vector axis,
+  ~47× on the fused shape, at 8.5×–11.8× the engine's ingest cost.
+- The ingest weakness against *plain* SQLite stands as disclosed.
+
+Scale caveat unchanged: the follow-ups are at N=11,266 (set by the real corpus), and
+ratios against an O(N) baseline grow with N — quote no ratio without its N.

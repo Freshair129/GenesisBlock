@@ -21,6 +21,12 @@ set -uo pipefail
 source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/_lib.sh"
 
 N="${GB_MOAT_N:-100000}"; DIM="${GB_MOAT_DIM:-1024}"; RUNS="${GB_MOAT_RUNS:-30}"
+# Real-corpus mode is passed through the environment (the binaries read it with
+# std::env::var). Export rather than inlining it into the command prefix: a
+# `${VAR:+VAR=...}` expansion is NOT parsed as an assignment, it is parsed as a
+# command. On Windows use a path the *binary* can open (a Git Bash `/g/...`
+# path is not resolvable by a native exe) — a repo-relative path works for both.
+[ -n "${GB_MOAT_VECTORS:-}" ] && export GB_MOAT_VECTORS
 dir="$(gb_resultdir moat)"
 echo "==> run dir: $dir (N=$N dim=$DIM runs=$RUNS)"
 
@@ -33,7 +39,6 @@ BIN="$GB_REPO_ROOT/target/release/moat-bench"; [ -x "$BIN.exe" ] && BIN="$BIN.ex
 GB_MOAT_OUT="$dir" GB_MOAT_N="$N" GB_MOAT_DIM="$DIM" GB_MOAT_RUNS="$RUNS" \
   GB_MOAT_K="${GB_MOAT_K:-10}" GB_MOAT_SEED="${GB_MOAT_SEED:-42}" \
   GB_MOAT_EDGES_PER_NODE="${GB_MOAT_EDGES_PER_NODE:-5}" \
-  ${GB_MOAT_VECTORS:+GB_MOAT_VECTORS="$GB_MOAT_VECTORS"} \
   "$BIN" > "$dir/raw.log" 2> "$dir/stderr.log"
 rc=$?
 cat "$dir/raw.log"
@@ -56,7 +61,6 @@ if [ "${GB_MOAT_LIBSQL:-0}" = "1" ]; then
   GB_MOAT_OUT="$dir" GB_MOAT_N="$N" GB_MOAT_DIM="$DIM" GB_MOAT_RUNS="$RUNS" \
     GB_MOAT_K="${GB_MOAT_K:-10}" GB_MOAT_SEED="${GB_MOAT_SEED:-42}" \
     GB_MOAT_EDGES_PER_NODE="${GB_MOAT_EDGES_PER_NODE:-5}" \
-    ${GB_MOAT_VECTORS:+GB_MOAT_VECTORS="$GB_MOAT_VECTORS"} \
     "$LBIN" > "$dir/raw_libsql.log" 2> "$dir/stderr_libsql.log"
   lrc=$?
   cat "$dir/raw_libsql.log"

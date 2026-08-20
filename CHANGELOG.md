@@ -7,6 +7,40 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added — WP-3.3 moat follow-ups measured (libSQL/DiskANN + real bge-m3 corpus)
+
+- **`docs/REPORT--MOAT-FOLLOWUPS.md`**: both follow-ups the WP-3.3 decision made
+  prerequisites for public moat positioning are now measured, and **neither
+  caveat was hiding a weakness**.
+- **Real embeddings are conservative, not flattering.** At matched N (11,266 ×
+  1024), real bge-m3 vectors *raise* every vector-touching ratio versus the DIY
+  SQLite assembly — q1 52.3× → 67.2×, q3 28.7× → 36.9×, q4 16.2× → 22.8× — while
+  the graph-only control moves −4% (noise) and the baseline's O(N) scan barely
+  moves. Clustered vectors navigate the HNSW graph in fewer hops; a brute scan
+  is distribution-blind.
+- **libSQL 0.9 + native DiskANN does not close the gap.** It beat the brute scan
+  by only 1.21× (synthetic) / 1.88× (real) and left the engine ~12–13× ahead on
+  the vector axis and ~47× on the fused shape, at **8.5×–11.8× the engine's
+  ingest cost**. The decision doc's prediction held for the fused shapes and
+  understated the single-axis result.
+- **New `moat-libsql` binary** (`benches/moat_libsql.rs`, gated behind the
+  `libsql-baseline` feature, kept out of `bins`). It is a separate process by
+  necessity: `libsql-ffi` and `rusqlite` both export the bundled `sqlite3_*`
+  symbols, so one binary either fails to link (LNK2005) or silently resolves
+  every call into one implementation — which would have run the engine's own
+  `projection.sqlite` and the competitor on the same accidental SQLite.
+  Comparability is preserved by identical seed/corpus/protocol/host instead, and
+  the deviation is disclosed in the report.
+- **New `benchmark/gen_corpus_bge_m3.py`**: builds a real-embedding corpus
+  deterministically from this repository's own prose via a local Ollama bge-m3,
+  L2-normalized, with a provenance manifest (model, dim, count, sha256, source
+  commit, extraction rules) that the bench copies into `result.json`. Resumable:
+  embeddings append row-by-row so an interrupted run continues.
+- moat-bench gains `GB_MOAT_VECTORS` (real-corpus mode); both runs pass
+  `verify_report.py`. `DECISION--WP33-GNSE-BACKLOG` and `REPORT--G3-MOAT-VERDICT`
+  updated with the outcome — public positioning is unblocked, with the standing
+  rule that no ratio is quoted without its N.
+
 ### Added — E2 vector time-travel (epoch stamps + filtered ANN + horizon-aware compaction)
 
 - **`tx_as_of` now works on vector SEARCH with epoch-complete candidates**
