@@ -117,7 +117,13 @@ impl Baseline {
                  id TEXT PRIMARY KEY, src TEXT NOT NULL, dst TEXT NOT NULL,
                  rel TEXT NOT NULL, valid_from TEXT NOT NULL, valid_to TEXT);
              CREATE INDEX idx_edges_src ON edges(src);
-             CREATE INDEX idx_edges_dst ON edges(dst);",
+             CREATE INDEX idx_edges_dst ON edges(dst);
+             -- q6 (vector time-travel, SPEC--EPOCH-HNSW E2): the DIY emulation
+             -- of the engine's epoch stamps — commit-seq columns beside the
+             -- vector so a brute scan can answer 'top-k as believed at T'.
+             CREATE TABLE tx_nodes(
+                 id TEXT PRIMARY KEY, vec BLOB NOT NULL,
+                 created_seq INTEGER NOT NULL, retired_seq INTEGER);",
         )
         .unwrap();
         Baseline {
@@ -170,6 +176,35 @@ impl Baseline {
                     walk(row).unwrap();
                 }
             }
+        }
+        self.bump(); // app-side rank pass
+        scored.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap());
+        scored.truncate(k);
+        scored
+    }
+
+    /// q6: vector top-k as believed at commit T — brute f32 scan under the tx
+    /// predicate `created_seq <= T AND (retired_seq IS NULL OR retired_seq > T)`,
+    /// the natural SQLite emulation of the engine's epoch stamps.
+    fn vector_topk_at_tx(&self, q: &[f32], k: usize, t: i64) -> Vec<(String, f32)> {
+        self.bump();
+        let mut stmt = self
+            .conn
+            .prepare_cached(
+                "SELECT id, vec FROM tx_nodes
+                 WHERE created_seq <= ?1 AND (retired_seq IS NULL OR retired_seq > ?1)",
+            )
+            .unwrap();
+        let mut scored: Vec<(String, f32)> = Vec::new();
+        let mut rows = stmt.query(params![t]).unwrap();
+        while let Some(row) = rows.next().unwrap() {
+            let id: String = row.get(0).unwrap();
+            let blob: Vec<u8> = row.get(1).unwrap();
+            let vec: Vec<f32> = blob
+                .chunks_exact(4)
+                .map(|c| f32::from_le_bytes([c[0], c[1], c[2], c[3]]))
+                .collect();
+            scored.push((id, dot(q, &vec)));
         }
         self.bump(); // app-side rank pass
         scored.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap());
@@ -628,6 +663,72 @@ fn main() {
     let sqlite_ingest_s = t0.elapsed().as_secs_f64();
     println!("  sqlite ingest: {sqlite_ingest_s:.1}s");
 
+    // --- q6 tx cohort (vector time-travel, SPEC--EPOCH-HNSW E2) ---
+    // Its own engine collection + baseline table so the main corpus (q1–q5)
+    // is untouched: 1000 nodes exist at tx_mark, half are retracted after it.
+    // Both sides then answer "vector top-k as believed at tx_mark".
+    let txn = 1000.min(n);
+    storage
+        .create_collection(
+            "txbench".to_string(),
+            "synthetic".to_string(),
+            dim as u32,
+            None,
+            None,
+            None,
+            None,
+        )
+        .unwrap();
+    for chunk_start in (0..txn).step_by(500) {
+        let end = (chunk_start + 500).min(txn);
+        let nodes: Vec<NodeInput> = (chunk_start..end)
+            .map(|i| NodeInput {
+                id: Some(format!("tx{i}")),
+                labels: vec!["THING".to_string()],
+                props: Some(serde_json::json!({ "v": i })),
+                embedding: Some(vectors[i].iter().map(|x| *x as f64).collect()),
+                lang: Some("en".to_string()),
+                valid_from: Some(valid_from_for(i)),
+                caused_by: None,
+                ttl: None,
+                collection: Some("txbench".to_string()),
+            })
+            .collect();
+        storage
+            .execute_batch(BatchInput {
+                nodes,
+                edges: Vec::new(),
+            })
+            .unwrap();
+    }
+    let tx_mark = storage.stable_frontier();
+    for i in (1..txn).step_by(2) {
+        storage.retract_node(&format!("tx{i}")).unwrap();
+    }
+    storage.flush_index();
+    {
+        let tx = baseline.conn.unchecked_transaction().unwrap();
+        {
+            let mut ins = tx
+                .prepare(
+                    "INSERT INTO tx_nodes(id, vec, created_seq, retired_seq)
+                     VALUES (?1, ?2, ?3, ?4)",
+                )
+                .unwrap();
+            for (i, v) in vectors.iter().take(txn).enumerate() {
+                let blob: Vec<u8> = v.iter().flat_map(|x| x.to_le_bytes()).collect();
+                let retired: Option<i64> = (i % 2 == 1).then_some(tx_mark as i64 + 1 + i as i64);
+                ins.execute(params![format!("tx{i}"), blob, (i + 1) as i64, retired])
+                    .unwrap();
+            }
+        }
+        tx.commit().unwrap();
+    }
+    println!(
+        "  q6 tx cohort: {txn} nodes, {} retracted after tx_mark={tx_mark}",
+        txn / 2
+    );
+
     // --- correctness gate ---
     let scenarios = correctness_gate(&storage, &baseline);
     for sc in &scenarios {
@@ -760,6 +861,31 @@ fn main() {
         (top.len(), baseline.calls.get())
     };
 
+    // q6 (E2): vector top-k as believed at commit tx_mark — the engine's
+    // epoch-stamped tx path vs the baseline's stamped brute scan. A capability
+    // row (excluded from min_cross): the baseline emulates the stamps but the
+    // correctness gate already shows it lacks the two-axis semantics around them.
+    let engine_q6 = |q: &[f32]| -> (usize, u32) {
+        let resp = storage
+            .execute_query_ir_json(serde_json::json!({
+                "contract_version": "query-ir.v1",
+                "request_id": "moat-q6",
+                "operation": {
+                    "kind": "search", "mode": "vector",
+                    "query_vector": q.iter().map(|x| *x as f64).collect::<Vec<f64>>(),
+                    "collection": "txbench", "k": k
+                },
+                "temporal": { "tx_as_of": tx_mark }
+            }))
+            .unwrap();
+        (resp["data"].as_array().map(|a| a.len()).unwrap_or(0), 1)
+    };
+    let sqlite_q6 = |q: &[f32]| -> (usize, u32) {
+        baseline.calls.set(0);
+        let top = baseline.vector_topk_at_tx(q, k, tx_mark as i64);
+        (top.len(), baseline.calls.get())
+    };
+
     let engine_q5 = |seed: &str| -> (usize, u32) {
         let nb = storage
             .neighbors(
@@ -846,6 +972,9 @@ fn main() {
     bench_pair!("q5", |r: usize| engine_q5(&seeds[r]), |r: usize| sqlite_q5(
         &seeds[r]
     ));
+    bench_pair!("q6", |r: usize| engine_q6(&queries[r]), |r: usize| {
+        sqlite_q6(&queries[r])
+    });
 
     // --- verdict (mechanical application of the STOP numbers) ---
     // §3.6 uses round-trips for the service-composed baseline; embedded vs
@@ -883,6 +1012,7 @@ fn main() {
             "baseline": "single SQLite file: brute f32 scan (sqlite-vec-stable model) + recursive CTE + shared Rust RRF glue + audit-history temporal pattern",
             "process_model": "both stores in-process in one Rust binary (baseline glue faster than its real TS/Python - reported wins are lower bounds)",
             "q2_status": "skipped: engine lexical/FTS axis (S3) not shipped - hybrid vec+lex shape not comparable yet",
+            "q6_status": "vector time-travel row (SPEC--EPOCH-HNSW E2): 1000-node tx cohort in its own collection/table, half retracted after tx_mark; capability row, excluded from min_cross",
         },
         "results": {
             // The run is trustworthy iff the engine passed its own

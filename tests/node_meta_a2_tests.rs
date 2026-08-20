@@ -141,7 +141,8 @@ fn legacy_string_meta_migrates() {
         "legacy String metadata migrated and is searchable"
     );
 
-    // 4. Re-saving upgrades the on-disk format back to mv=1.
+    // 4. Re-saving upgrades the on-disk format to the current meta version
+    //    (mv=2 since the E2 epoch stamps — SPEC--EPOCH-HNSW §3.1).
     s2.save_state().unwrap();
     let restate: serde_json::Value =
         serde_json::from_str(&fs::read_to_string(&sp).unwrap()).unwrap();
@@ -153,7 +154,7 @@ fn legacy_string_meta_migrates() {
         .unwrap();
     assert_eq!(
         dflt["mv"].as_u64(),
-        Some(1),
-        "re-save writes the new meta format"
+        Some(2),
+        "re-save writes the current meta format"
     );
 }
