@@ -516,9 +516,58 @@ fn main() {
     println!("moat-bench: N={n} dim={dim} runs={runs} k={k} seed={seed} edges/node={edges_per}");
     let ts_start = chrono::Utc::now();
 
-    // --- deterministic corpus ---
+    // --- corpus ---
+    // Default: deterministic synthetic unit vectors. With GB_MOAT_VECTORS set
+    // (WP-3.3 follow-up 2) the vectors are REAL embeddings loaded from a flat
+    // little-endian f32 file — see benchmark/gen_corpus_bge_m3.py, which also
+    // writes a manifest recording the model, dim, count and sha256. Everything
+    // else (queries, seeds, edges, protocol) is identical, so synthetic-vs-real
+    // at matched N is a controlled A/B on the one variable the moat verdict
+    // caveated: vector DISTRIBUTION (random unit vectors are isotropic; real
+    // embeddings are anisotropic and clustered, which changes ANN graph quality
+    // but not a full scan's cost).
     let mut rng = StdRng::seed_from_u64(seed);
-    let vectors: Vec<Vec<f32>> = (0..n).map(|_| gen_vec(&mut rng, dim)).collect();
+    let corpus_path = std::env::var("GB_MOAT_VECTORS").ok();
+    let (vectors, n, dim, corpus_kind) = match corpus_path.as_deref() {
+        Some(p) => {
+            let raw = fs::read(p).unwrap_or_else(|e| panic!("GB_MOAT_VECTORS {p}: {e}"));
+            let per = dim * 4;
+            assert!(
+                raw.len() >= per,
+                "GB_MOAT_VECTORS {p}: {} bytes is less than one {dim}-dim vector",
+                raw.len()
+            );
+            assert_eq!(
+                raw.len() % per,
+                0,
+                "GB_MOAT_VECTORS {p}: {} bytes is not a multiple of dim {dim} * 4 — \
+                 pass GB_MOAT_DIM matching the corpus manifest",
+                raw.len()
+            );
+            let available = raw.len() / per;
+            let take = n.min(available);
+            let v: Vec<Vec<f32>> = (0..take)
+                .map(|i| {
+                    raw[i * per..(i + 1) * per]
+                        .chunks_exact(4)
+                        .map(|c| f32::from_le_bytes([c[0], c[1], c[2], c[3]]))
+                        .collect()
+                })
+                .collect();
+            println!("  corpus: REAL embeddings from {p} ({take} of {available} available)");
+            (v, take, dim, format!("real:{p}"))
+        }
+        None => {
+            let v: Vec<Vec<f32>> = (0..n).map(|_| gen_vec(&mut rng, dim)).collect();
+            (
+                v,
+                n,
+                dim,
+                "synthetic seeded unit vectors (NOT bge-m3; latency-comparable, recall-inert)"
+                    .to_string(),
+            )
+        }
+    };
     // Edges: mildly preferential targets (rng^2 skew), ~10% closed windows.
     let mut edge_list: Vec<(usize, usize, Option<String>)> = Vec::with_capacity(n * edges_per);
     for i in 0..n {
@@ -958,6 +1007,9 @@ fn main() {
         }};
     }
 
+    // Engine vs libSQL/DiskANN. Recorded under its own keys so the primary
+    // verdict (engine vs the ROUND2-named single-SQLite-file baseline) is not
+    // silently redefined by a second competitor.
     bench_pair!("q1", |r: usize| engine_q1(&queries[r]), |r: usize| {
         sqlite_q1(&queries[r])
     });
@@ -999,6 +1051,25 @@ fn main() {
     };
     println!("  verdict: {verdict} (min cross-dim ratio {min_cross:.2}x, sqlite fails {sqlite_fail_count}/{} scenarios)", scenarios.len());
 
+    let ingest_json = serde_json::json!({
+        "engine_s": engine_ingest_s, "sqlite_s": sqlite_ingest_s,
+    });
+    // WP-3.3 follow-up 1 does NOT run in this process. libsql-ffi and
+    // rusqlite both define the `sqlite3_*` symbols, so a binary linking both
+    // either fails to link (LNK2005) or — worse — silently resolves every
+    // call to ONE of the two implementations, which would put the engine's own
+    // projection database and the competitor on the same accidental SQLite and
+    // invalidate both sides. The libSQL/DiskANN rows are therefore produced by
+    // the separate `moat-libsql` binary from the SAME seeded corpus and the
+    // same measurement protocol; `benchmark/run_moat_bench.sh` runs both and
+    // the report pairs them.
+    let libsql_json = serde_json::json!({
+        "status": "measured out-of-process by the `moat-libsql` binary",
+        "reason": "libsql-ffi and rusqlite export the same sqlite3_* symbols; \
+                   linking both into one binary is unsound (see moat_libsql.rs)",
+        "metrics_file": "moat_libsql_metrics.json",
+    });
+
     let ts_end = chrono::Utc::now();
     let metrics = serde_json::json!({
         "benchmark_id": "moat",
@@ -1008,7 +1079,11 @@ fn main() {
         "config": {
             "n": n, "dim": dim, "runs": runs, "warmup": warmup, "k": k,
             "seed": seed, "edges_per_node": edges_per, "as_of": AS_OF_T,
-            "corpus": "synthetic seeded unit vectors (NOT bge-m3; latency-comparable, recall-inert)",
+            "corpus": corpus_kind,
+            "corpus_manifest": corpus_path.as_ref().and_then(|p| {
+                let m = std::path::Path::new(p).with_extension("manifest.json");
+                fs::read_to_string(m).ok().and_then(|s| serde_json::from_str::<serde_json::Value>(&s).ok())
+            }),
             "baseline": "single SQLite file: brute f32 scan (sqlite-vec-stable model) + recursive CTE + shared Rust RRF glue + audit-history temporal pattern",
             "process_model": "both stores in-process in one Rust binary (baseline glue faster than its real TS/Python - reported wins are lower bounds)",
             "q2_status": "skipped: engine lexical/FTS axis (S3) not shipped - hybrid vec+lex shape not comparable yet",
@@ -1025,7 +1100,8 @@ fn main() {
             "query_latency_p50_ms": report["q1"]["engine"]["p50_us"].as_f64().unwrap_or(0.0) / 1000.0,
             "query_latency_p95_ms": report["q1"]["engine"]["p95_us"].as_f64().unwrap_or(0.0) / 1000.0,
             "query_latency_p99_ms": report["q1"]["engine"]["p99_us"].as_f64().unwrap_or(0.0) / 1000.0,
-            "ingest": { "engine_s": engine_ingest_s, "sqlite_s": sqlite_ingest_s },
+            "ingest": ingest_json,
+            "libsql_baseline": libsql_json,
             "queries": report,
             "correctness": scenarios.iter().map(|s| serde_json::json!({
                 "scenario": s.name, "engine": s.engine, "sqlite": s.sqlite, "note": s.note,
