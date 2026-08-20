@@ -5,17 +5,21 @@
 //! used to be a bare `bincode::serialize(&Vec<NodeMetadata>)` blob: no magic,
 //! not self-describing, and bincode 1.3 is unmaintained (RUSTSEC-2025-0141).
 //!
-//! The new format prepends a 4-byte `GBP1` magic and encodes the body with
-//! `postcard` (maintained, serde-based, alloc-only). The read path sniffs the
+//! The magic-tagged format prepends a 4-byte magic and encodes the body with
+//! `postcard` (maintained, serde-based, alloc-only): `GBP2` = the current
+//! layout with epoch stamps (SPEC--EPOCH-HNSW §3.1), `GBP1` = the pre-epoch
+//! layout, migrated on load with zeroed stamps. The read path sniffs the
 //! magic first; its absence falls back to the existing (unchanged) legacy
 //! bincode try-chain, so old snapshots still open. This file guards three
 //! things:
 //!   1. A DB saved by the current engine round-trips through postcard and is
-//!      byte-tagged `GBP1` on disk.
-//!   2. A hand-built *legacy* bincode blob (no magic) still loads correctly,
-//!      and gets rewritten as postcard on the very next `save_state()` — i.e.
-//!      legacy snapshots migrate for free, with no dedicated migration step.
-//!   3. A blob that *has* the `GBP1` magic but a corrupt postcard body fails
+//!      byte-tagged `GBP2` on disk.
+//!   2. A hand-built *legacy* bincode blob (no magic, v1 field layout) still
+//!      loads correctly, and gets rewritten as postcard on the very next
+//!      `save_state()` — i.e. legacy snapshots migrate for free, with no
+//!      dedicated migration step. (The GBP1 → GBP2 postcard migration is
+//!      covered in tests/epoch_e2_tests.rs.)
+//!   3. A blob that *has* the magic but a corrupt postcard body fails
 //!      loudly (panics) instead of being silently misread as bincode garbage
 //!      or silently dropped.
 
@@ -24,7 +28,7 @@ use std::fs;
 use std::path::Path;
 use tempfile::TempDir;
 
-const META_MAGIC: &[u8; 4] = b"GBP1";
+const META_MAGIC: &[u8; 4] = b"GBP2";
 
 fn open(path: &str) -> Storage {
     Storage::open(OpenOptions {
@@ -100,7 +104,7 @@ fn postcard_roundtrip_survives_save_and_reload() {
     assert_eq!(
         &bytes[..META_MAGIC.len()],
         META_MAGIC,
-        "a snapshot written by the current engine must be GBP1-tagged"
+        "a snapshot written by the current engine must be GBP2-tagged"
     );
 
     // Reopen fresh and confirm the arena_id/node_u32 mapping (the payload of
@@ -144,19 +148,37 @@ fn legacy_bincode_blob_loads_and_rewrites_as_postcard() {
         s.save_state().unwrap();
     }
 
-    // Decode the real GBP1+postcard body the engine just wrote, so the
+    // Decode the real GBP2+postcard body the engine just wrote, so the
     // legacy fixture we build carries the actual arena_id/node_u32 mapping
     // (not hand-guessed values that could drift from reality).
-    let gbp1_bytes = fs::read(meta_path(&path)).unwrap();
-    assert_eq!(&gbp1_bytes[..META_MAGIC.len()], META_MAGIC);
+    let gbp2_bytes = fs::read(meta_path(&path)).unwrap();
+    assert_eq!(&gbp2_bytes[..META_MAGIC.len()], META_MAGIC);
     let real_meta: Vec<NodeMetadata> =
-        postcard::from_bytes(&gbp1_bytes[META_MAGIC.len()..]).unwrap();
+        postcard::from_bytes(&gbp2_bytes[META_MAGIC.len()..]).unwrap();
     assert_eq!(real_meta.len(), 2);
 
-    // Re-encode that same data as a bare (no magic) bincode 1.x blob — this
-    // is exactly what every `meta_<name>.bin` on disk looked like before
-    // this ADR shipped.
-    let legacy_bytes = bincode::serialize(&real_meta).unwrap();
+    // Re-encode that same data as a bare (no magic) bincode 1.x blob in the
+    // v1 field layout (no epoch stamps) — this is exactly what every
+    // `meta_<name>.bin` on disk looked like before the BINCODE-EXIT ADR
+    // shipped. bincode encodes struct fields positionally, so a tuple in the
+    // same order is byte-identical to the old struct.
+    #[allow(clippy::type_complexity)]
+    let v1_meta: Vec<(u32, u32, u64, u16, u64, Vec<u8>, String, u32)> = real_meta
+        .iter()
+        .map(|m| {
+            (
+                m.arena_id,
+                m.node_u32,
+                m.timestamp,
+                m.vector_dim,
+                m.embedding_offset,
+                m.gks_attributes.clone(),
+                m.lang.clone(),
+                m.cluster_id,
+            )
+        })
+        .collect();
+    let legacy_bytes = bincode::serialize(&v1_meta).unwrap();
     assert_ne!(
         &legacy_bytes[..META_MAGIC.len().min(legacy_bytes.len())],
         META_MAGIC,

@@ -7,6 +7,50 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added — E2 vector time-travel (epoch stamps + filtered ANN + horizon-aware compaction)
+
+- **`tx_as_of` now works on vector SEARCH with epoch-complete candidates**
+  (SPEC--GENESISDB-EPOCH-HNSW §3.1/§3.3): `NodeMetadata` gains
+  `created_seq`/`retired_seq` stamps (meta snapshot **v2, `GBP2` magic,
+  manifest `mv: 2`** — GBP1/bincode/V0 snapshots migrate on load with zeroed
+  stamps, "always existed"), and `hybrid_search` under a tx selector
+  enumerates candidates by the epoch predicate instead of gating on the live
+  map: retracted nodes resurrect, not-yet-committed nodes drop, and a
+  re-embedded node resolves to the embedding that was current at t (the
+  displaced row is stamped at re-embed time, making the dedupe epoch-correct).
+- Candidate generation: `hnsw_rs::search_filter` (first use — the plain
+  `search()` was already a `filter: None` wrapper) with an **exact-arena-scan
+  fallback** when the predicate's survivor fraction falls below 10% or the
+  collection is small — the standard filtered-ANN failure handled correct-by-
+  construction; historical queries are audit-shaped. Resolution goes through
+  the `node_versions` chain at t (`tx_view_node`, shared with the E1 graph
+  path); the old post-resolution `apply_tx_view` pass is removed.
+- **Every staging path is persist-first** so the frame's own seq stamps
+  `created_seq` (add_node/add_vector reordered; consensus/sync Vector and
+  Node arms reordered — extending the Slice-0 rationale); journal replay and
+  transactions stamp with the replayed frame's seq.
+- **Compaction respects the horizon** (§3.4): a non-live row survives iff
+  `retired_seq >= history_horizon()` under a history-retaining profile —
+  compaction no longer destroys history the journal still retains. Under
+  `frontier_only` the filter reduces to the old live-set behavior exactly
+  (C4 cost neutrality); as a side effect, re-embed orphan rows are now
+  reclaimed there instead of lingering until the node dies.
+- **Fixed (current view)**: a re-embedded node can no longer be ranked by its
+  ORPHANED old embedding — pre-E2 the stale HNSW slot could outrank the
+  node's current vector until compaction reclaimed it; the current view now
+  skips stamped (historical) rows. Pre-epoch migrated rows keep the old
+  last-writer-wins behavior.
+- Capabilities (C5): `temporal.tx_as_of` upgrades to `"epoch_candidates"`;
+  new `temporal.vector_tx_as_of` advertises the implementation + the active
+  retention profile.
+- moat-bench gains **q6, the vector-time-travel row** (1000-node tx cohort in
+  its own collection vs a stamped brute-scan SQLite table; capability row,
+  excluded from `min_cross`).
+- New `tests/epoch_e2_tests.rs` (quadrants, historical-embedding re-embed,
+  snapshot reopen + journal replay, compact-then-query under full vs
+  frontier_only, GBP1→GBP2 migration, SEARCH/TRAVERSE agreement);
+  `meta_format_migration_tests` updated to the GBP2 container.
+
 ### Added — E1 retired-adjacency overlay (epoch-complete tx_as_of traverse)
 
 - **`tx_as_of` can now resurrect retracted nodes on TRAVERSE** (SPEC--GENESISDB-

@@ -429,12 +429,12 @@ pub struct QueryIrTemporal {
     pub valid_at: Option<String>,
     /// WP-2.2 (ADR D2/D4): replica-local tx-time selector — "what did THIS
     /// replica believe at ITS commit N". Values below `history_horizon()`
-    /// fail explicitly with `beyond_horizon`. TRAVERSE (E1,
-    /// SPEC--GENESISDB-EPOCH-HNSW): epoch-complete candidates via the
-    /// retired-adjacency overlay — nodes retracted after N still resolve
-    /// through the WP-2.1 version chain at N. SEARCH (interim, documented in
-    /// capabilities): results are found against current indexes, then each
-    /// node is re-resolved at N — vector epoch candidates are phase E2.
+    /// fail explicitly with `beyond_horizon`. Both operations enumerate
+    /// epoch-complete candidates (SPEC--GENESISDB-EPOCH-HNSW): TRAVERSE via
+    /// the retired-adjacency overlay (E1/§3.2), SEARCH via the metadata
+    /// epoch stamps with filtered-ANN or an exact scan under selective
+    /// filters (E2/§3.3) — nodes retracted after N still resolve through
+    /// the WP-2.1 version chain at N on both paths.
     #[serde(default)]
     pub tx_as_of: Option<u64>,
 }
@@ -1099,6 +1099,48 @@ pub struct NodeMetadata {
     pub gks_attributes: Vec<u8>,
     pub lang: String,
     pub cluster_id: u32,
+    /// Tx-time epoch stamps (SPEC--GENESISDB-EPOCH-HNSW §3.1, meta v2).
+    /// `created_seq` = frame seq of the commit that staged this row; 0 for
+    /// rows migrated from pre-epoch snapshots ("always existed", consistent
+    /// with the `tx_epoch_start` floor). `retired_seq` = 0 while the row is
+    /// the node's current vector in this collection; else the frame seq of
+    /// the retraction (or of the re-embed that orphaned it). The tx predicate
+    /// is `created_seq <= t && (retired_seq == 0 || retired_seq > t)`.
+    pub created_seq: u64,
+    pub retired_seq: u64,
+}
+
+/// v1 on-disk layout of `NodeMetadata` (interned u32 id, no epoch stamps).
+/// Used ONLY to read `GBP1` postcard snapshots and `mv: 1` bincode snapshots,
+/// which are migrated on load with `created_seq = 0, retired_seq = 0`
+/// (pre-epoch rows are addressable as "always existed").
+#[derive(Deserialize)]
+struct NodeMetadataV1 {
+    arena_id: u32,
+    node_u32: u32,
+    timestamp: u64,
+    vector_dim: u16,
+    embedding_offset: u64,
+    gks_attributes: Vec<u8>,
+    lang: String,
+    cluster_id: u32,
+}
+
+impl From<NodeMetadataV1> for NodeMetadata {
+    fn from(v1: NodeMetadataV1) -> Self {
+        NodeMetadata {
+            arena_id: v1.arena_id,
+            node_u32: v1.node_u32,
+            timestamp: v1.timestamp,
+            vector_dim: v1.vector_dim,
+            embedding_offset: v1.embedding_offset,
+            gks_attributes: v1.gks_attributes,
+            lang: v1.lang,
+            cluster_id: v1.cluster_id,
+            created_seq: 0,
+            retired_seq: 0,
+        }
+    }
 }
 
 /// Pre-A2 on-disk layout of `NodeMetadata` (node id as a String). Used ONLY to
@@ -1128,33 +1170,49 @@ struct NodeMetadataV0 {
 /// doc comment above).
 const META_MAGIC: &[u8; 4] = b"GBP1";
 
-/// Encode a metadata snapshot in the current on-disk format: `GBP1` magic +
+/// 4-byte magic for the v2 metadata layout (epoch stamps, meta `mv: 2` —
+/// SPEC--GENESISDB-EPOCH-HNSW §3.1). Same postcard container as `GBP1`, one
+/// more rung on the sniff ladder: `GBP2` ⇒ current shape, `GBP1` ⇒ v1 shape
+/// migrated with zero stamps, no magic ⇒ legacy bincode (per manifest `mv`).
+const META_MAGIC_V2: &[u8; 4] = b"GBP2";
+
+/// Encode a metadata snapshot in the current on-disk format: `GBP2` magic +
 /// `postcard::to_allocvec(&Vec<NodeMetadata>)`. Every `save_state()` call
-/// writes this format, so a legacy (bincode) snapshot loaded via
-/// `decode_metadata_snapshot`'s fallback path is transparently rewritten as
-/// postcard the next time the DB saves — no separate migration step needed.
+/// writes this format, so a legacy (GBP1 postcard or bincode) snapshot loaded
+/// via `decode_metadata_snapshot`'s fallback paths is transparently rewritten
+/// in the current format the next time the DB saves — no separate migration
+/// step needed.
 fn encode_metadata_snapshot(meta: &[NodeMetadata]) -> Result<Vec<u8>> {
     let mut out = Vec::with_capacity(4 + meta.len() * 32);
-    out.extend_from_slice(META_MAGIC);
+    out.extend_from_slice(META_MAGIC_V2);
     let body = postcard::to_allocvec(meta).map_err(|e| Error::from_reason(e.to_string()))?;
     out.extend_from_slice(&body);
     Ok(out)
 }
 
 /// Sniff-first decode of a `meta_<name>.bin` / `meta.bin` blob:
-///   - `GBP1` magic present -> `Some(postcard::from_bytes(..))`. A magic hit
-///     whose body fails to decode is corruption (not "unrecognized format"),
-///     so the caller must treat `Some(Err(_))` as a loud failure rather than
-///     falling through to the legacy bincode arms — bincode is non-self-
-///     describing, so silently trying it against postcard bytes risks
-///     "successfully" misparsing garbage into a bogus-but-valid result.
+///   - `GBP2` magic present -> `Some(postcard::from_bytes::<Vec<NodeMetadata>>)`.
+///   - `GBP1` magic present -> decode as `Vec<NodeMetadataV1>` and migrate
+///     (epoch stamps zeroed — pre-epoch rows "always existed").
+///   - Either magic hit whose body fails to decode is corruption (not
+///     "unrecognized format"), so the caller must treat `Some(Err(_))` as a
+///     loud failure rather than falling through to the legacy bincode arms —
+///     bincode is non-self-describing, so silently trying it against postcard
+///     bytes risks "successfully" misparsing garbage into a bogus-but-valid
+///     result.
 ///   - no magic -> `None`, meaning "fall back to the existing legacy bincode
 ///     try-chain" (unchanged: V1 vs V0 is still resolved by the manifest `mv`
 ///     flag, never by trial deserialization).
 fn decode_metadata_snapshot(data: &[u8]) -> Option<std::result::Result<Vec<NodeMetadata>, String>> {
-    if data.len() >= META_MAGIC.len() && &data[..META_MAGIC.len()] == META_MAGIC {
+    if data.len() >= META_MAGIC_V2.len() && &data[..META_MAGIC_V2.len()] == META_MAGIC_V2 {
         Some(
-            postcard::from_bytes::<Vec<NodeMetadata>>(&data[META_MAGIC.len()..])
+            postcard::from_bytes::<Vec<NodeMetadata>>(&data[META_MAGIC_V2.len()..])
+                .map_err(|e| e.to_string()),
+        )
+    } else if data.len() >= META_MAGIC.len() && &data[..META_MAGIC.len()] == META_MAGIC {
+        Some(
+            postcard::from_bytes::<Vec<NodeMetadataV1>>(&data[META_MAGIC.len()..])
+                .map(|v1| v1.into_iter().map(NodeMetadata::from).collect())
                 .map_err(|e| e.to_string()),
         )
     } else {
@@ -1714,6 +1772,10 @@ impl VecIndex {
     /// spaces. It centers a local copy of the query for packing only — the
     /// caller's `query` slice is untouched, so the exact-f32 rerank stage still
     /// sees the raw (uncentered) query.
+    /// `filter` (SPEC--EPOCH-HNSW §3.3): optional per-candidate predicate over
+    /// the arena id (= HNSW `DataId`), evaluated INSIDE the graph walk via
+    /// `search_possible_filter` — `None` compiles to the plain search (that is
+    /// literally what hnsw_rs's `search()` delegates to).
     fn search_f32(
         &self,
         query: &[f32],
@@ -1721,16 +1783,17 @@ impl VecIndex {
         ef: usize,
         center: Option<&[f32]>,
         sq8: (f32, f32),
+        filter: Option<&dyn FilterT>,
     ) -> Vec<(usize, f32)> {
         match self {
             VecIndex::F32(h) => h
-                .search(query, k, ef)
+                .search_possible_filter(query, k, ef, filter)
                 .into_iter()
                 .map(|n| (n.d_id, n.distance))
                 .collect(),
             VecIndex::U8(h) => {
                 let q: Vec<u8> = query.iter().map(|&x| sq8_q(x, sq8.0, sq8.1)).collect();
-                h.search(&q, k, ef)
+                h.search_possible_filter(&q, k, ef, filter)
                     .into_iter()
                     .map(|n| (n.d_id, n.distance))
                     .collect()
@@ -1740,13 +1803,13 @@ impl VecIndex {
                 // sane similarity for the hybrid score blend.
                 let c = bq_pack_centered(query, center);
                 let dim = query.len().max(1) as f32;
-                h.search(&c, k, ef)
+                h.search_possible_filter(&c, k, ef, filter)
                     .into_iter()
                     .map(|n| (n.d_id, n.distance / dim))
                     .collect()
             }
             VecIndex::F16(h) => h
-                .search(query, k, ef)
+                .search_possible_filter(query, k, ef, filter)
                 .into_iter()
                 .map(|n| (n.d_id, n.distance))
                 .collect(),
@@ -2119,10 +2182,25 @@ impl VectorCollection {
     /// than merge into it — mixing these with raw graph distances (Hamming for
     /// `Binary`) would rank two different scales against each other.
     fn exact_candidates(&self, query: &[f32], k: usize) -> Vec<(usize, f32)> {
+        self.exact_candidates_where(query, k, &|_| true)
+    }
+
+    /// `exact_candidates` under a metadata predicate — the §3.3 exact-scan
+    /// fallback for selective epoch filters (correct by construction where
+    /// filtered ANN would degrade). Same distance-scale caveat as above.
+    fn exact_candidates_where(
+        &self,
+        query: &[f32],
+        k: usize,
+        pred: &dyn Fn(&NodeMetadata) -> bool,
+    ) -> Vec<(usize, f32)> {
         let meta = self.metadata.read();
         let arena = self.arena.read();
         let mut out: Vec<(usize, f32)> = Vec::with_capacity(meta.len());
         for (i, m) in meta.iter().enumerate() {
+            if !pred(m) {
+                continue;
+            }
             let (start, len) = (m.embedding_offset as usize, m.vector_dim as usize);
             // Skip a slot the arena can't serve (dim mismatch / truncated
             // arena) rather than panicking on the slice.
@@ -2167,7 +2245,13 @@ impl VectorCollection {
 
     /// Push a prepared vector into the arena/metadata, return its arena_id.
     /// Does NOT touch HNSW. Short critical section: only the Vec pushes.
-    fn stage(&self, node_u32: u32, emb: &[f32], lang: String) -> u32 {
+    /// `created_seq` is the frame seq of the committing write (every caller is
+    /// persist-first since E2, so the seq is always in hand); it stamps the new
+    /// row AND retires the row this stage displaces — a re-embed orphans the
+    /// node's previous vector in this collection, and stamping that orphan with
+    /// the same seq is what makes historical searches pick the embedding that
+    /// was current at t (SPEC--EPOCH-HNSW §3.1).
+    fn stage(&self, node_u32: u32, emb: &[f32], lang: String, created_seq: u64) -> u32 {
         // BQ centering: the arena stores centered sign codes (`sign(x-center)`),
         // but the sidecar below keeps the RAW f32 (rerank re-scores exactly and
         // the next compaction recomputes the mean from raw). `None` ⇒ uncentered.
@@ -2200,12 +2284,35 @@ impl VectorCollection {
                 gks_attributes: Vec::new(),
                 lang,
                 cluster_id: arena_id,
+                created_seq,
+                retired_seq: 0,
             });
             arena_id
         };
-        self.node_to_arena.insert(node_u32, arena_id);
+        if let Some(old_arena_id) = self.node_to_arena.insert(node_u32, arena_id) {
+            // Re-embed: the displaced row becomes historical as of this commit.
+            let mut meta = self.metadata.write();
+            if let Some(old) = meta.get_mut(old_arena_id as usize) {
+                if old.retired_seq == 0 {
+                    old.retired_seq = created_seq;
+                }
+            }
+        }
         self.count.fetch_add(1, Ordering::Relaxed);
         arena_id
+    }
+
+    /// Retraction path (SPEC--EPOCH-HNSW §3.1): stamp every un-retired row of
+    /// `node_u32` with the retracting frame's seq. Full scan — retraction is
+    /// rare and admin-shaped, and pre-epoch orphan rows (migrated with zero
+    /// stamps) must be swept too, which the reverse map alone can't find.
+    fn stamp_retired(&self, node_u32: u32, retired_seq: u64) {
+        let mut meta = self.metadata.write();
+        for m in meta.iter_mut() {
+            if m.node_u32 == node_u32 && m.retired_seq == 0 {
+                m.retired_seq = retired_seq;
+            }
+        }
     }
 
     /// Rebuild this collection's HNSW from its arena (the source of truth).
@@ -2822,13 +2929,15 @@ impl Storage {
     /// Insert one vector into the named (or default) collection. Validates the
     /// embedding length against the collection dim, stages it into the arena
     /// (durable, immediately in-memory), and defers the HNSW insert to the
-    /// indexing thread (ADR--GENESISDB-ASYNC-INDEXING).
+    /// indexing thread (ADR--GENESISDB-ASYNC-INDEXING). `created_seq` = the
+    /// frame seq of the committing write (callers persist first since E2).
     fn add_vector_internal(
         &self,
         collection: &Option<String>,
         node_id: &str,
         emb_64: Vec<f64>,
         lang: String,
+        created_seq: u64,
     ) -> Result<()> {
         let coll = self.resolve_collection(collection)?;
         if emb_64.len() != coll.dim as usize {
@@ -2841,7 +2950,7 @@ impl Storage {
         }
         let node_u32 = self.get_or_intern_id(node_id);
         let emb = coll.prep(emb_64);
-        let arena_id = coll.stage(node_u32, &emb, lang);
+        let arena_id = coll.stage(node_u32, &emb, lang, created_seq);
         self.enqueue_one(&coll, arena_id, emb);
         Ok(())
     }
@@ -2872,19 +2981,33 @@ impl Storage {
         }
         let lang = "en".to_string();
         let coll = Some(collection);
-        // Validates dim, stages into the arena, enqueues the deferred HNSW insert.
-        self.add_vector_internal(&coll, &node_id, embedding.clone(), lang.clone())?;
+        // Validate the dim BEFORE the WAL write so a bad vector never persists;
+        // staging itself is persist-first (E2) so the metadata row carries the
+        // frame's own seq as created_seq.
+        {
+            let c = self.resolve_collection(&coll)?;
+            if embedding.len() != c.dim as usize {
+                return Err(Error::from_reason(format!(
+                    "embedding dim {} != collection '{}' dim {}",
+                    embedding.len(),
+                    c.name,
+                    c.dim
+                )));
+            }
+        }
         // Stamp a logical clock so the vector is time-orderable for anti-entropy
         // (events_since) — secondary embeddings now sync across peers like nodes.
         let clock = self.next_clock();
         // Durability: replayed by the WAL `Event::Vector` arm.
-        self.persist(&Event::Vector(VectorEvent {
-            node_id,
-            collection: coll,
-            embedding,
-            lang: Some(lang),
+        let seq = self.persist(&Event::Vector(VectorEvent {
+            node_id: node_id.clone(),
+            collection: coll.clone(),
+            embedding: embedding.clone(),
+            lang: Some(lang.clone()),
             clock,
         }))?;
+        // Stages into the arena, enqueues the deferred HNSW insert.
+        self.add_vector_internal(&coll, &node_id, embedding, lang, seq)?;
         Ok(())
     }
 
@@ -2936,6 +3059,8 @@ impl Storage {
     /// post-load `rehydrate_hnsw_index` builds every index once, so enqueuing
     /// here would double-insert. `index = true` (runtime CRDT sync): stage AND
     /// enqueue the deferred HNSW insert, since no rehydrate follows.
+    /// `created_seq` = the frame seq the vector was committed under (the replayed
+    /// frame's own seq, or the just-persisted signed frame's seq on sync paths).
     fn replay_vector(
         &self,
         collection: &Option<String>,
@@ -2943,6 +3068,7 @@ impl Storage {
         emb: Vec<f64>,
         lang: String,
         index: bool,
+        created_seq: u64,
     ) {
         let name = collection
             .clone()
@@ -2970,7 +3096,7 @@ impl Storage {
             }
             let node_u32 = self.get_or_intern_id(node_id);
             let e = coll.prep(emb);
-            let arena_id = coll.stage(node_u32, &e, lang);
+            let arena_id = coll.stage(node_u32, &e, lang, created_seq);
             if index {
                 self.enqueue_one(&coll, arena_id, e);
             }
@@ -5627,7 +5753,14 @@ impl Storage {
         Ok(seq)
     }
 
-    fn apply_transaction_memory(&self, transaction: &GenesisTransactionEvent, index: bool) {
+    /// `commit_seq` = the transaction frame's seq — every vector in the frame
+    /// shares it as `created_seq` (one commit, one epoch stamp).
+    fn apply_transaction_memory(
+        &self,
+        transaction: &GenesisTransactionEvent,
+        index: bool,
+        commit_seq: u64,
+    ) {
         for node in &transaction.nodes {
             let node_u32 = self.get_or_intern_id(&node.id);
             if let Some(embedding) = &node.embedding {
@@ -5637,6 +5770,7 @@ impl Storage {
                     embedding.clone(),
                     node.lang.clone().unwrap_or_else(|| "en".to_string()),
                     index,
+                    commit_seq,
                 );
             }
             self.insert_node_lean(node_u32, node.clone());
@@ -5652,6 +5786,7 @@ impl Storage {
                 vector.embedding.clone(),
                 vector.lang.clone().unwrap_or_else(|| "en".to_string()),
                 index,
+                commit_seq,
             );
         }
     }
@@ -5802,57 +5937,6 @@ impl Storage {
             peer_id: clock_peer,
         };
         Some(node)
-    }
-
-    /// WP-2.2 tx-time view: re-resolve result nodes through the WP-2.1 chain
-    /// at replica-local commit `t`. A node with no committed version at-or-
-    /// below `t`, or whose resolved version is a retraction marker, is
-    /// dropped; otherwise the result carries that version's fields. Interim
-    /// semantics (capabilities: "implemented_post_resolution"): candidates
-    /// come from CURRENT indexes. Since E1, TRAVERSE no longer routes here
-    /// (`neighbors_tx_view` enumerates epoch-complete candidates); SEARCH
-    /// still does until vector epoch candidates land (SPEC--EPOCH-HNSW E2).
-    fn apply_tx_view(&self, results: Vec<NeighborOutput>, t: u64) -> Vec<NeighborOutput> {
-        let horizon = self.history_horizon();
-        let conn = self.projection_db.lock();
-        results
-            .into_iter()
-            .filter_map(|mut nb| {
-                let row = conn
-                    .query_row(
-                        "SELECT labels, payload, valid_from, valid_to, caused_by, retracted
-                         FROM node_versions
-                         WHERE id = ?1 AND frame_seq >= ?2 AND frame_seq <= ?3
-                         ORDER BY frame_seq DESC LIMIT 1",
-                        params![nb.node.id, horizon, t],
-                        |row| {
-                            Ok((
-                                row.get::<_, String>(0)?,
-                                row.get::<_, Option<String>>(1)?,
-                                row.get::<_, String>(2)?,
-                                row.get::<_, Option<String>>(3)?,
-                                row.get::<_, Option<String>>(4)?,
-                                row.get::<_, i64>(5)? != 0,
-                            ))
-                        },
-                    )
-                    .optional()
-                    .ok()
-                    .flatten()?;
-                let (labels, payload, valid_from, valid_to, caused_by, retracted) = row;
-                if retracted {
-                    return None;
-                }
-                nb.node.labels = serde_json::from_str(&labels).unwrap_or_default();
-                nb.node.props = payload
-                    .and_then(|p| serde_json::from_str(&p).ok())
-                    .unwrap_or(Value::Null);
-                nb.node.valid_from = valid_from;
-                nb.node.valid_to = valid_to;
-                nb.node.caused_by = caused_by;
-                Some(nb)
-            })
-            .collect()
     }
 
     /// WP-1.3: bytes of sealed HISTORY on disk (history + legacy segments;
@@ -6006,7 +6090,7 @@ impl Storage {
             vectors,
         };
         let commit_sequence = self.persist(&Event::Transaction(event.clone()))?;
-        self.apply_transaction_memory(&event, true);
+        self.apply_transaction_memory(&event, true, commit_sequence);
         self.txn_frontier.store(commit_sequence, Ordering::SeqCst);
         Ok(CommitResult {
             transaction_id: input.transaction_id,
@@ -6316,16 +6400,18 @@ impl Storage {
                 }
                 // A committed vector is staged + enqueued (index=true) so it is
                 // searchable in this process, matching the CRDT-sync path — not
-                // merely persisted for a future replay.
+                // merely persisted for a future replay. Persist-first (E2): the
+                // frame's seq stamps the metadata row's created_seq.
                 Event::Vector(v) => {
+                    let seq = self.persist_signed(signed_event.clone())?;
                     self.replay_vector(
                         &v.collection,
                         &v.node_id,
                         v.embedding.clone(),
                         v.lang.clone().unwrap_or_else(|| "en".to_string()),
                         true,
+                        seq,
                     );
-                    self.persist_signed(signed_event.clone())?;
                 }
                 Event::RelationalSchema(_) | Event::RelationalRows { .. } => {
                     self.persist_signed(signed_event.clone())?;
@@ -6337,7 +6423,7 @@ impl Storage {
                     // collide the projection's uniqueness). The local frame
                     // stamp from persist_signed IS this transaction's sequence.
                     let seq = self.persist_signed(signed_event.clone())?;
-                    self.apply_transaction_memory(transaction, true);
+                    self.apply_transaction_memory(transaction, true, seq);
                     self.txn_frontier.fetch_max(seq, Ordering::SeqCst);
                 }
                 // A committed retraction applies like the replay path and is
@@ -6495,19 +6581,29 @@ impl Storage {
             clock: self.next_clock(),
             collection: None,
         };
-        if let Some(emb) = args.embedding {
-            // Validate + stage BEFORE recording the collection on the node, so a
-            // dim mismatch fails the add instead of persisting a bad reference.
-            self.add_vector_internal(&args.collection, &id, emb.clone(), lang)?;
-            node.embedding = Some(emb);
-            node.collection = Some(
-                args.collection
-                    .clone()
-                    .unwrap_or_else(|| self.default_collection.clone()),
-            );
+        if let Some(emb) = &args.embedding {
+            // Validate BEFORE recording the collection on the node, so a dim
+            // mismatch fails the add instead of persisting a bad reference.
+            // Staging itself moved AFTER persist (E2): the metadata row is
+            // stamped with the frame's own seq (created_seq), so the write is
+            // persist-first like every other epoch-stamped path.
+            let coll = self.resolve_collection(&args.collection)?;
+            if emb.len() != coll.dim as usize {
+                return Err(Error::from_reason(format!(
+                    "embedding dim {} != collection '{}' dim {}",
+                    emb.len(),
+                    coll.name,
+                    coll.dim
+                )));
+            }
+            node.embedding = Some(emb.clone());
+            node.collection = Some(coll.name.clone());
         }
         self.insert_node_lean(u32_id, node.clone());
-        self.persist(&Event::Node(node.clone()))?;
+        let seq = self.persist(&Event::Node(node.clone()))?;
+        if let Some(emb) = args.embedding {
+            self.add_vector_internal(&args.collection, &id, emb, lang, seq)?;
+        }
         Ok(node)
     }
 
@@ -7159,15 +7255,21 @@ impl Storage {
                 "tx_epoch_start": 1,
                 "retention_profile": self.retention.as_str(),
                 "tx_time_retention": self.retention.tx_time_retention(),
-                // WP-2.2: for SEARCH, candidates still come from CURRENT
-                // indexes and are re-resolved through the version chain at
-                // the selector (vector epoch candidates = SPEC--EPOCH-HNSW
-                // phase E2). Key kept for consumer compatibility.
-                "tx_as_of": "implemented_post_resolution",
-                // E1 (SPEC--GENESISDB-EPOCH-HNSW §3.2): TRAVERSE enumerates
-                // epoch-complete candidates via the retired-adjacency
-                // overlay — nodes retracted after the selector still resolve.
+                // E2 (SPEC--GENESISDB-EPOCH-HNSW, C5): both SEARCH and
+                // TRAVERSE now enumerate epoch-complete candidates — the
+                // retired-adjacency overlay on the graph side (E1/§3.2) and
+                // the metadata epoch stamps + filtered-ANN/exact-scan on the
+                // vector side (§3.3). Nodes retracted after the selector
+                // resurrect on both paths.
+                "tx_as_of": "epoch_candidates",
                 "tx_as_of_traverse": "epoch_candidates",
+                // C5: vector time-travel availability + the profile that
+                // bounds it (frontier_only folds history at every checkpoint,
+                // so its usable tx window is only frontier-to-last-fold).
+                "vector_tx_as_of": {
+                    "status": "implemented",
+                    "retention_profile": self.retention.as_str(),
+                },
             }
         })
     }
@@ -7261,28 +7363,30 @@ impl Storage {
 
                 let (query_vector, resolved_collection) =
                     self.query_ir_search_vector(target_id, query_vector, collection)?;
+                // E2: tx_as_of rides INTO the search (epoch candidates from the
+                // metadata stamps + chain resolution, SPEC--EPOCH-HNSW §3.3) —
+                // no post-resolution rewrite pass anymore.
                 let results = self
-                    .hybrid_search(HybridSearchInput {
-                        query_vector,
-                        k,
-                        alpha: Some(match mode {
-                            QueryIrSearchMode::Vector => 0.0,
-                            QueryIrSearchMode::Hybrid => alpha.unwrap_or(0.5),
-                            QueryIrSearchMode::Lexical => unreachable!(),
-                        }),
-                        lang: language,
-                        as_of,
-                        collection: resolved_collection,
-                        ef_search,
-                        oversample,
-                    })
+                    .hybrid_search_impl(
+                        HybridSearchInput {
+                            query_vector,
+                            k,
+                            alpha: Some(match mode {
+                                QueryIrSearchMode::Vector => 0.0,
+                                QueryIrSearchMode::Hybrid => alpha.unwrap_or(0.5),
+                                QueryIrSearchMode::Lexical => unreachable!(),
+                            }),
+                            lang: language,
+                            as_of,
+                            collection: resolved_collection,
+                            ef_search,
+                            oversample,
+                        },
+                        tx_as_of,
+                    )
                     .map_err(|error| {
                         Error::from_reason(format!("QUERY_EXECUTION_FAILED: {error}"))
                     })?;
-                let results = match tx_as_of {
-                    Some(t) => self.apply_tx_view(results, t),
-                    None => results,
-                };
                 let data = serde_json::to_value(results).map_err(|error| {
                     Error::from_reason(format!("QUERY_EXECUTION_FAILED: {error}"))
                 })?;
@@ -7999,6 +8103,23 @@ impl Storage {
     }
 
     pub fn hybrid_search(&self, args: HybridSearchInput) -> Result<Vec<NeighborOutput>> {
+        self.hybrid_search_impl(args, None)
+    }
+
+    /// The one search body (SPEC--EPOCH-HNSW §3.3). `tx_as_of = None` is the
+    /// current view — byte-identical behavior to the pre-E2 `hybrid_search`.
+    /// `Some(t)` is vector time-travel: candidates come from the epoch
+    /// predicate `created_seq <= t && (retired_seq == 0 || retired_seq > t)`
+    /// over the metadata rows (filtered ANN, or an exact arena scan when the
+    /// filter is selective / the collection is small), and each survivor is
+    /// resolved through the `node_versions` chain at t instead of the live-map
+    /// gate — retracted nodes resurrect. Callers guard the horizon
+    /// (`execute_query_ir` rejects `t < history_horizon()` as beyond_horizon).
+    fn hybrid_search_impl(
+        &self,
+        args: HybridSearchInput,
+        tx_as_of: Option<u64>,
+    ) -> Result<Vec<NeighborOutput>> {
         let coll = self.resolve_collection(&args.collection)?;
         // Dim validation closes the silent cross-space bug: a query from a
         // different model/dim is rejected, not ranked into garbage.
@@ -8062,7 +8183,45 @@ impl Storage {
             let n = s.read().len_rows();
             (n > 0 && fetch >= n).then_some(n)
         });
-        let mut results = if let Some(n) = exact_rerank_slots {
+        let mut results = if let Some(t) = tx_as_of {
+            // §3.3 epoch candidates. Selective filters are the standard
+            // filtered-ANN failure mode, so measure the survivor fraction
+            // first: below the floor (or on a small collection) run the exact
+            // arena scan under the predicate — correct by construction, and
+            // historical queries are audit-shaped (rare, latency-tolerant).
+            let pred =
+                |m: &NodeMetadata| m.created_seq <= t && (m.retired_seq == 0 || m.retired_seq > t);
+            let (total, survivors) = {
+                let meta_guard = coll.metadata.read();
+                (
+                    meta_guard.len(),
+                    meta_guard.iter().filter(|m| pred(m)).count(),
+                )
+            };
+            if survivors == 0 {
+                return Ok(Vec::new());
+            }
+            if total <= EXACT_SCAN_MAX_SLOTS || survivors * 10 < total {
+                coll.exact_candidates_where(&query_f32, fetch, &pred)
+            } else {
+                let center = coll.center_snapshot();
+                let sq8 = coll.sq8_snapshot();
+                let meta_guard = coll.metadata.read();
+                let flt = |did: &usize| meta_guard.get(*did).map(&pred).unwrap_or(false);
+                let hnsw_lock = coll.hnsw.read();
+                match &*hnsw_lock {
+                    Some(idx) => idx.search_f32(
+                        &query_f32,
+                        fetch,
+                        ef,
+                        center.as_deref(),
+                        sq8,
+                        Some(&flt as &dyn FilterT),
+                    ),
+                    None => return Err(Error::from_reason("HNSW not init")),
+                }
+            }
+        } else if let Some(n) = exact_rerank_slots {
             (0..n).map(|i| (i, 0.0f32)).collect()
         } else {
             // BQ centering: pack the query with the SAME center the index used.
@@ -8076,7 +8235,9 @@ impl Storage {
             let hits = {
                 let hnsw_lock = coll.hnsw.read();
                 match &*hnsw_lock {
-                    Some(idx) => idx.search_f32(&query_f32, fetch, ef, center.as_deref(), sq8),
+                    Some(idx) => {
+                        idx.search_f32(&query_f32, fetch, ef, center.as_deref(), sq8, None)
+                    }
                     None => return Err(Error::from_reason("HNSW not init")),
                 }
             };
@@ -8128,15 +8289,46 @@ impl Storage {
         // explicit `alpha > 0` — see ADR--GENESISDB-KIMPACT-AS-SIGNAL. (Was 0.5,
         // which silently mixed graph-authority into every query.)
         let alpha = args.alpha.unwrap_or(0.0);
+        // history_horizon() scans the journal directory — only pay for it on
+        // the tx path (the current-view hot path never needs it).
+        let horizon = if tx_as_of.is_some() {
+            self.history_horizon()
+        } else {
+            0
+        };
 
         for (d_id, distance) in results {
             if let Some(meta) = meta_arena.get(d_id) {
                 {
                     let u32_id = meta.node_u32; // A2: id interned in metadata
-                    if let Some(node) = self.nodes.get(&u32_id) {
+                    let node_out = if let Some(t) = tx_as_of {
+                        // §3.3: chain resolution replaces the live-map gate on
+                        // the tx path. The id may be gone from the live maps
+                        // (retracted) — recover it from the chain, which stores
+                        // both the u32 and the id string.
+                        let id_str = match self.nodes.get(&u32_id).map(|n| n.value().id.clone()) {
+                            Some(s) => s,
+                            None => match self.node_id_for_u32(u32_id) {
+                                Some(s) => s,
+                                None => continue,
+                            },
+                        };
+                        match self.tx_view_node(&id_str, t, horizon, &args.as_of) {
+                            Some(n) => n,
+                            None => continue,
+                        }
+                    } else if meta.retired_seq != 0 {
+                        // §3.1: a stamped row is historical (retraction or
+                        // re-embed orphan) — the current view never serves it.
+                        // Pre-E2 an orphan could outrank the node's CURRENT
+                        // embedding until compaction reclaimed it; the stamp
+                        // closes that wart. (Migrated pre-epoch rows carry 0
+                        // and keep the old last-writer-wins behavior.)
+                        continue;
+                    } else if let Some(node) = self.nodes.get(&u32_id) {
                         let node_out = self.hydrated_node(u32_id, node.value());
 
-                        let node_out = if Self::is_valid_as_of(
+                        if Self::is_valid_as_of(
                             &node_out.valid_from,
                             &node_out.valid_to,
                             &args.as_of,
@@ -8153,21 +8345,23 @@ impl Storage {
                             hist
                         } else {
                             continue;
-                        };
+                        }
+                    } else {
+                        continue;
+                    };
 
-                        let similarity = 1.0 - distance as f64;
-                        let reasoning_score =
-                            (similarity * (1.0 - alpha)) + (node_out.impact.unwrap_or(0.0) * alpha);
-                        // Carry the ranking score in `score`; leave `node.impact`
-                        // as the node's true graph-authority signal (don't clobber
-                        // it) so the caller can fuse it itself.
-                        hybrid_results.push(NeighborOutput {
-                            node: node_out,
-                            path: Vec::new(),
-                            depth: 0,
-                            score: Some(reasoning_score),
-                        });
-                    }
+                    let similarity = 1.0 - distance as f64;
+                    let reasoning_score =
+                        (similarity * (1.0 - alpha)) + (node_out.impact.unwrap_or(0.0) * alpha);
+                    // Carry the ranking score in `score`; leave `node.impact`
+                    // as the node's true graph-authority signal (don't clobber
+                    // it) so the caller can fuse it itself.
+                    hybrid_results.push(NeighborOutput {
+                        node: node_out,
+                        path: Vec::new(),
+                        depth: 0,
+                        score: Some(reasoning_score),
+                    });
                 }
             }
         }
@@ -8391,17 +8585,85 @@ impl Storage {
         })
     }
 
+    /// Recover the id STRING for an interned u32 from the `node_versions`
+    /// chain — the live maps lose the mapping on retraction, but the chain
+    /// stores both halves (the `(node_u32, frame_seq)` PK serves this prefix
+    /// lookup). Newest row wins; the id for a given u32 never changes.
+    fn node_id_for_u32(&self, node_u32: u32) -> Option<String> {
+        let conn = self.projection_db.lock();
+        conn.query_row(
+            "SELECT id FROM node_versions WHERE node_u32 = ?1 ORDER BY frame_seq DESC LIMIT 1",
+            params![node_u32],
+            |row| row.get::<_, String>(0),
+        )
+        .ok()
+    }
+
+    /// Resolve `id` as believed at commit `t` (tx-time), shared by the graph
+    /// (`neighbors_tx_view`) and vector (`hybrid_search` §3.3) epoch paths.
+    /// Live nodes keep their hydrated live fields and take the t-row's
+    /// versioned fields (the rewrite WP-2.2's post-resolution pass did); nodes
+    /// absent from current indexes (retracted after t) are reconstructed from
+    /// the row alone — the resurrection these paths exist for. `None` when the
+    /// node had no committed version at t, was retracted at t, or the resolved
+    /// valid-time window fails `valid_as_of` (two-axis rule: valid_at selects
+    /// the window, tx_as_of selects the belief).
+    fn tx_view_node(
+        &self,
+        id: &str,
+        t: u64,
+        horizon: u64,
+        valid_as_of: &Option<String>,
+    ) -> Option<NodeOutput> {
+        let (labels, payload, valid_from, valid_to, caused_by, clock_time, clock_peer) =
+            self.node_version_row_at(id, t, horizon)?;
+        let mut out_node = match self
+            .get_u32(id)
+            .and_then(|u| self.nodes.get(&u).map(|n| self.hydrated_node(u, n.value())))
+        {
+            Some(live) => live,
+            None => NodeOutput {
+                id: id.to_string(),
+                labels: Vec::new(),
+                props: Value::Null,
+                impact: None,
+                embedding: None,
+                lang: None,
+                valid_from: String::new(),
+                valid_to: None,
+                caused_by: None,
+                expires_at: None,
+                clock: LogicalClock {
+                    time: clock_time.max(0) as u32,
+                    peer_id: clock_peer,
+                },
+                collection: None,
+            },
+        };
+        out_node.labels = serde_json::from_str(&labels).unwrap_or_default();
+        out_node.props = payload
+            .and_then(|p| serde_json::from_str(&p).ok())
+            .unwrap_or(Value::Null);
+        out_node.valid_from = valid_from;
+        out_node.valid_to = valid_to;
+        out_node.caused_by = caused_by;
+        if !Self::is_valid_as_of(&out_node.valid_from, &out_node.valid_to, valid_as_of) {
+            return None;
+        }
+        Some(out_node)
+    }
+
     /// E1 (SPEC--GENESISDB-EPOCH-HNSW §3.2): tx-view traverse with
-    /// epoch-complete candidate enumeration. Unlike `neighbors` +
-    /// `apply_tx_view` (post-resolution: candidates limited to CURRENT
-    /// indexes), this BFS walks node id STRINGS and unions the retired-
-    /// adjacency overlay — so a node retracted AFTER `t` is still served,
-    /// resolved through its `node_versions` chain at `t` ("what did we
-    /// believe at commit N must not depend on what happened after N").
+    /// epoch-complete candidate enumeration. Unlike the retired
+    /// post-resolution rewrite (candidates limited to CURRENT indexes), this
+    /// BFS walks node id STRINGS and unions the retired-adjacency overlay —
+    /// so a node retracted AFTER `t` is still served, resolved through its
+    /// `node_versions` chain at `t` ("what did we believe at commit N must
+    /// not depend on what happened after N").
     /// Edge tx-fidelity stays interim: edges carry no frame-seq chain, so an
-    /// edge's visibility uses its current valid window (same disclosed
-    /// limitation as the post-resolution path); the overlay only adds the
-    /// `retired_seq > t` cut for edges unwired by node retractions.
+    /// edge's visibility uses its current valid window (disclosed
+    /// limitation); the overlay only adds the `retired_seq > t` cut for
+    /// edges unwired by node retractions.
     fn neighbors_tx_view(
         &self,
         seed: String,
@@ -8507,58 +8769,11 @@ impl Storage {
                 }
                 visited.insert(next_id.clone());
 
-                // Resolve the far node through the chain at t. Live nodes keep
-                // their hydrated live fields and take the t-row's versioned
-                // fields (same rewrite `apply_tx_view` performs); nodes absent
-                // from current indexes (retracted after t) are reconstructed
-                // from the row alone — the resurrection this path exists for.
-                let Some((
-                    labels,
-                    payload,
-                    valid_from,
-                    valid_to,
-                    caused_by,
-                    clock_time,
-                    clock_peer,
-                )) = self.node_version_row_at(&next_id, t, horizon)
-                else {
+                // Resolve the far node through the chain at t (shared with the
+                // vector tx path — see `tx_view_node` for the two-axis rule).
+                let Some(out_node) = self.tx_view_node(&next_id, t, horizon, &args.as_of) else {
                     continue;
                 };
-                let mut out_node = match self
-                    .get_u32(&next_id)
-                    .and_then(|u| self.nodes.get(&u).map(|n| self.hydrated_node(u, n.value())))
-                {
-                    Some(live) => live,
-                    None => NodeOutput {
-                        id: next_id.clone(),
-                        labels: Vec::new(),
-                        props: Value::Null,
-                        impact: None,
-                        embedding: None,
-                        lang: None,
-                        valid_from: String::new(),
-                        valid_to: None,
-                        caused_by: None,
-                        expires_at: None,
-                        clock: LogicalClock {
-                            time: clock_time.max(0) as u32,
-                            peer_id: clock_peer,
-                        },
-                        collection: None,
-                    },
-                };
-                out_node.labels = serde_json::from_str(&labels).unwrap_or_default();
-                out_node.props = payload
-                    .and_then(|p| serde_json::from_str(&p).ok())
-                    .unwrap_or(Value::Null);
-                out_node.valid_from = valid_from;
-                out_node.valid_to = valid_to;
-                out_node.caused_by = caused_by;
-                // valid-time window per the belief at t (two-axis rule:
-                // valid_at selects the window, tx_as_of selects the belief).
-                if !Self::is_valid_as_of(&out_node.valid_from, &out_node.valid_to, &args.as_of) {
-                    continue;
-                }
 
                 let mut new_path = path.clone();
                 new_path.push(edge);
@@ -8976,10 +9191,13 @@ impl Storage {
         self.id_to_u32.remove(id);
         self.out_idx.remove(&u32_id);
         self.in_idx.remove(&u32_id);
-        // The node may have a vector in any collection — drop the mapping in all.
-        // (Arena slots are reclaimed lazily by compaction, as before.)
+        // The node may have a vector in any collection — drop the mapping in all
+        // and stamp its metadata rows with the retracting frame's seq, so the
+        // vector tx path can resurrect them (SPEC--EPOCH-HNSW §3.1). Arena slots
+        // are still reclaimed lazily by compaction — now horizon-aware (§3.4).
         for c in self.collections.iter() {
             c.value().node_to_arena.remove(&u32_id);
+            c.value().stamp_retired(u32_id, retired_seq);
         }
         self.nodes.remove(&u32_id);
     }
@@ -9040,6 +9258,9 @@ impl Storage {
                             }
                         }
 
+                        // Persist-first (E2): the local frame's seq stamps the
+                        // vector metadata row's created_seq.
+                        let seq = self.persist_signed(signed_event.clone())?;
                         if let Some(emb) = &remote_node.embedding {
                             self.replay_vector(
                                 &remote_node.collection,
@@ -9047,10 +9268,10 @@ impl Storage {
                                 emb.clone(),
                                 remote_node.lang.clone().unwrap_or("en".to_string()),
                                 true,
+                                seq,
                             );
                         }
                         self.insert_node_lean(u32_id, remote_node.clone());
-                        self.persist_signed(signed_event.clone())?;
                     }
                 }
                 Event::Edge(remote_edge) => {
@@ -9100,15 +9321,17 @@ impl Storage {
                     // Runtime sync: stage AND enqueue (index=true) — no rehydrate
                     // follows. Auto-provisions the collection if this peer lacks it.
                     // Vectors are append-applied (no LWW): a node holds at most one
-                    // vector per collection, deduped at query time.
+                    // vector per collection, deduped at query time. Persist-first
+                    // (E2): the local frame's seq stamps created_seq.
+                    let seq = self.persist_signed(signed_event.clone())?;
                     self.replay_vector(
                         &remote_vec.collection,
                         &remote_vec.node_id,
                         remote_vec.embedding.clone(),
                         remote_vec.lang.clone().unwrap_or_else(|| "en".to_string()),
                         true,
+                        seq,
                     );
-                    self.persist_signed(signed_event.clone())?;
                 }
                 Event::RelationalSchema(_) | Event::RelationalRows { .. } => {
                     self.persist_signed(signed_event.clone())?;
@@ -9117,7 +9340,7 @@ impl Storage {
                     // ADR D2.2: no fetch_max of the peer's origin sequence —
                     // see the consensus-commit arm for the rationale.
                     let seq = self.persist_signed(signed_event.clone())?;
-                    self.apply_transaction_memory(transaction, true);
+                    self.apply_transaction_memory(transaction, true, seq);
                     self.txn_frontier.fetch_max(seq, Ordering::SeqCst);
                 }
                 Event::Batch(inner_events) => {
@@ -9771,9 +9994,11 @@ impl Storage {
                 "rerank": coll.f32_sidecar.is_some(),
                 // SQ8 calibrated-scale opt-in; absent ⇒ false (fixed scale).
                 "sq8_calibrate": coll.sq8_calibrate,
-                // meta format version: 1 = NodeMetadata.node_u32 (A2). Absent ⇒ 0
-                // (pre-A2 String layout), migrated on load.
-                "mv": 1
+                // meta format version: 2 = epoch stamps (created_seq/retired_seq,
+                // GBP2 postcard — SPEC--EPOCH-HNSW §3.1); 1 = NodeMetadata.node_u32
+                // (A2, GBP1/bincode). Absent ⇒ 0 (pre-A2 String layout). Older
+                // shapes migrate on load with zeroed stamps.
+                "mv": 2
             }));
         }
 
@@ -10473,18 +10698,22 @@ impl Storage {
                             *coll.metadata.write() = meta;
                         }
                         Some(Err(e)) => {
-                            // GBP1 magic present but the postcard body didn't decode:
-                            // corruption, not an unrecognized legacy format. Fail
-                            // loudly rather than silently falling through to the
-                            // bincode arms below (ADR--GENESISDB-BINCODE-EXIT).
+                            // GBP1/GBP2 magic present but the postcard body didn't
+                            // decode: corruption, not an unrecognized legacy format.
+                            // Fail loudly rather than silently falling through to
+                            // the bincode arms below (ADR--GENESISDB-BINCODE-EXIT).
                             panic!(
-                                "corrupt metadata snapshot meta_{}.bin: GBP1 magic \
-                                 present but postcard body failed to decode: {}",
+                                "corrupt metadata snapshot meta_{}.bin: GBP1/GBP2 \
+                                 magic present but postcard body failed to decode: {}",
                                 name, e
                             );
                         }
                         None if cm["mv"].as_u64().unwrap_or(0) >= 1 => {
-                            if let Ok(meta) = bincode::deserialize::<Vec<NodeMetadata>>(&data) {
+                            // mv:1 bincode blobs predate the epoch stamps — decode
+                            // the v1 shape and migrate (stamps zeroed).
+                            if let Ok(v1) = bincode::deserialize::<Vec<NodeMetadataV1>>(&data) {
+                                let meta: Vec<NodeMetadata> =
+                                    v1.into_iter().map(NodeMetadata::from).collect();
                                 coll.count.store(meta.len(), Ordering::Relaxed);
                                 *coll.metadata.write() = meta;
                             }
@@ -10524,8 +10753,8 @@ impl Storage {
                     }
                     Some(Err(e)) => {
                         panic!(
-                            "corrupt metadata snapshot meta.bin: GBP1 magic present \
-                             but postcard body failed to decode: {}",
+                            "corrupt metadata snapshot meta.bin: GBP1/GBP2 magic \
+                             present but postcard body failed to decode: {}",
                             e
                         );
                     }
@@ -10664,13 +10893,19 @@ impl Storage {
                         gks_attributes: v0.gks_attributes,
                         lang: v0.lang,
                         cluster_id: v0.cluster_id,
+                        created_seq: 0,
+                        retired_seq: 0,
                     });
                 }
                 *coll.metadata.write() = migrated;
             } else {
                 let meta = coll.metadata.read();
                 for m in meta.iter() {
-                    coll.node_to_arena.insert(m.node_u32, m.arena_id);
+                    // Retired rows are historical (tx-only) — they must not
+                    // shadow the node's current vector in the reverse map.
+                    if m.retired_seq == 0 {
+                        coll.node_to_arena.insert(m.node_u32, m.arena_id);
+                    }
                 }
             }
         }
@@ -10762,8 +10997,9 @@ impl Storage {
             output_edges.push(edge);
         }
 
-        // 3. Persistence Phase (Atomic WAL Write)
-        self.persist(&Event::Batch(events.clone()))?;
+        // 3. Persistence Phase (Atomic WAL Write). The batch frame's seq stamps
+        //    every staged row's created_seq (one frame, one epoch stamp).
+        let batch_seq = self.persist(&Event::Batch(events.clone()))?;
 
         // 4. Memory Index Phase — collect vectors per collection and build each
         //    HNSW graph once via parallel_insert instead of N single inserts.
@@ -10803,7 +11039,7 @@ impl Storage {
                     .into_iter()
                     .map(|(nu, _id, emb, lang)| {
                         let e = coll.prep(emb);
-                        let aid = coll.stage(nu, &e, lang);
+                        let aid = coll.stage(nu, &e, lang, batch_seq);
                         (e, aid)
                     })
                     .collect();
@@ -10826,6 +11062,14 @@ impl Storage {
 
         // 1. Identify Live Set
         let live_nodes: HashSet<u32> = self.nodes.iter().map(|e| *e.key()).collect();
+        // §3.4 (SPEC--EPOCH-HNSW): compaction respects the horizon. A non-live
+        // row survives iff its retirement is still inside retained history
+        // (`retired_seq >= history_horizon()`) AND the profile retains history
+        // at all — under FrontierOnly this reduces to today's live-set filter
+        // exactly (C4 cost neutrality), because that profile's fold has already
+        // forfeited the history those rows belong to.
+        let horizon = self.history_horizon();
+        let retains_history = !matches!(self.retention, RetentionProfile::FrontierOnly);
 
         // 2. Compact each collection's arena independently (drop dead-node slots,
         //    rebuild node_to_arena), then rehydrate its HNSW.
@@ -10854,7 +11098,18 @@ impl Storage {
             for meta in meta_arena.iter() {
                 {
                     let u32_id = meta.node_u32; // A2: id interned in metadata
-                    if live_nodes.contains(&u32_id) {
+                                                // Current rows (retired_seq == 0) survive iff the node is
+                                                // live; historical rows survive iff still inside retained
+                                                // history under a history-retaining profile (§3.4). Note a
+                                                // live node's ORPHANED rows (re-embed superseded them) are
+                                                // historical too — under FrontierOnly they are now dropped
+                                                // here instead of lingering until the node dies.
+                    let keep = if meta.retired_seq == 0 {
+                        live_nodes.contains(&u32_id)
+                    } else {
+                        retains_history && meta.retired_seq >= horizon
+                    };
+                    if keep {
                         let start_off = meta.embedding_offset as usize;
                         let len = meta.vector_dim as usize;
                         if start_off + len <= vec_arena.len() {
@@ -10867,7 +11122,11 @@ impl Storage {
                             let mut meta_clone = meta.clone();
                             meta_clone.arena_id = new_arena_id;
                             meta_clone.embedding_offset = new_offset;
-                            coll.node_to_arena.insert(u32_id, new_arena_id);
+                            // Only the node's CURRENT row maps in the reverse
+                            // index — historical rows are tx-only candidates.
+                            if meta.retired_seq == 0 {
+                                coll.node_to_arena.insert(u32_id, new_arena_id);
+                            }
                             new_meta.push(meta_clone);
                         }
                     }
@@ -11787,6 +12046,7 @@ impl Storage {
                         emb,
                         n.lang.clone().unwrap_or("en".to_string()),
                         false,
+                        seq,
                     );
                 }
                 self.insert_node_lean(u32_id, n);
@@ -11802,6 +12062,7 @@ impl Storage {
                     v.embedding,
                     v.lang.clone().unwrap_or_else(|| "en".to_string()),
                     false,
+                    seq,
                 );
             }
             Event::Batch(events) => {
@@ -11813,7 +12074,7 @@ impl Storage {
                 // Relational state is rebuilt by projection_sync_on_open.
             }
             Event::Transaction(transaction) => {
-                self.apply_transaction_memory(&transaction, false);
+                self.apply_transaction_memory(&transaction, false, seq);
                 self.txn_frontier.fetch_max(seq, Ordering::SeqCst);
             }
             // Durable retraction (RCA--SLICE0-DURABILITY defect 2): replay the

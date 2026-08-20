@@ -196,7 +196,9 @@ export interface QueryIrRequest {
   /**
    * valid_at: RFC3339 valid-time selector. tx_as_of (WP-2.2): replica-local
    * commit-seq selector — values below historyHorizon() reject with
-   * beyond_horizon; results are re-resolved through the node_versions chain.
+   * beyond_horizon; both operations enumerate epoch-complete candidates
+   * (SPEC--EPOCH-HNSW E1/E2): nodes retracted after the selector resurrect,
+   * resolved through the node_versions chain.
    */
   temporal?: { valid_at?: string; tx_as_of?: number }
   consistency?: { index: QueryIrIndexConsistency }
