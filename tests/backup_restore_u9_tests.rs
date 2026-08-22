@@ -1,7 +1,8 @@
 use genesis_block_native::{
     BackupExportRequest, BackupRestoreRequest, EdgeInput, HybridSearchInput, NodeInput,
     OpenOptions, RelationalColumn, RelationalColumnType, RelationalMutationKind, RelationalQuery,
-    RelationalRowMutation, RelationalSchemaPackage, RelationalTable, Storage, SCHEMA_VERSION,
+    RelationalRowMutation, RelationalSchemaPackage, RelationalTable, Storage, ENGINE_VERSION,
+    SCHEMA_VERSION,
 };
 use serde_json::json;
 use std::fs;
@@ -375,6 +376,63 @@ fn restore_rejects_incompatible_engine_and_schema_without_creating_target() {
         );
         assert!(!Path::new(&restore_root).exists());
     }
+}
+
+/// The inverse of the rejection test above, and the bug it used to hide:
+/// restore demanded EXACT `engine_version` equality, so every backup became
+/// unrestorable after any release at all. Compatibility is the SCHEMA
+/// version's job (gated above); a bundle from an older engine build with the
+/// same schema must restore, and the graph inside it must be intact.
+#[test]
+fn restore_accepts_older_engine_version_with_same_schema() {
+    let source_root = fresh("u9-oldver-source");
+    let bundle_path = format!("{}/backup.genesis", fresh("u9-oldver-bundle"));
+    let restore_root = fresh("u9-oldver-restore");
+    let source = open(&source_root);
+    source
+        .add_node(node("survivor", [1.0, 0.0, 0.0, 0.0], None))
+        .unwrap();
+    source.flush_index();
+    source
+        .export_backup(BackupExportRequest {
+            destination: bundle_path.clone().into(),
+        })
+        .unwrap();
+    drop(source);
+
+    // Rewrite the manifest to claim an older engine build. The replacement is
+    // length-matched so the archive offsets after the manifest stay valid.
+    let original = fs::read(&bundle_path).unwrap();
+    let mut bytes = original.clone();
+    let from = format!("\"engine_version\":\"{ENGINE_VERSION}\"");
+    let older = format!(
+        "0.0.{}",
+        "9".repeat(ENGINE_VERSION.len().saturating_sub(4).max(1))
+    );
+    let to = format!("\"engine_version\":\"{older}\"");
+    assert_eq!(
+        from.len(),
+        to.len(),
+        "fixture must be length-matched: {from} vs {to}"
+    );
+    replace_manifest_value(&mut bytes, &from, &to);
+    assert_ne!(
+        bytes, original,
+        "engine_version rewrite must match the manifest"
+    );
+    fs::write(&bundle_path, bytes).unwrap();
+
+    Storage::restore_backup(BackupRestoreRequest {
+        bundle_path: bundle_path.into(),
+        target_root: restore_root.clone().into(),
+    })
+    .expect("a same-schema bundle from an older engine version must restore");
+
+    let restored = open(&restore_root);
+    assert!(
+        restored.node_view("survivor").is_some(),
+        "restored graph must carry the exported node"
+    );
 }
 
 #[test]

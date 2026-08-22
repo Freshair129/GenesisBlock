@@ -14,10 +14,18 @@
 use genesis_block_native::query::ast::HqlCommand;
 use std::convert::TryFrom;
 
+/// The suite's core property: the parser may REJECT anything, but it must
+/// never panic. `catch_unwind`'s result is asserted, not discarded — a
+/// discarded result silently swallows the very panic this exists to catch,
+/// which made every "must not panic" case here vacuous.
 fn must_not_panic(input: &str) {
-    let _ = std::panic::catch_unwind(|| {
+    let result = std::panic::catch_unwind(|| {
         let _ = HqlCommand::try_from(input);
     });
+    assert!(
+        result.is_ok(),
+        "HQL parser PANICKED (it may reject, never panic) on input: {input:?}"
+    );
 }
 
 fn parses_ok(input: &str) {
@@ -597,12 +605,11 @@ fn random_mutations_of_valid_queries() {
                 let mut mutated = bytes.clone();
                 mutated[pos] = replacement;
                 if let Ok(s) = String::from_utf8(mutated) {
-                    let _ = std::panic::catch_unwind(|| {
-                        let _ = HqlCommand::try_from(s.as_str());
-                    });
+                    must_not_panic(&s);
                 }
             }
         }
     }
-    // If we get here without panic, the parser is robust against single-byte mutations.
+    // Reaching here means every single-byte mutation was handled without a
+    // panic — now actually enforced by must_not_panic's assertion.
 }
