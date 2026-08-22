@@ -31,6 +31,13 @@ napi-bindings = ["dep:napi", "dep:napi-derive"]
 # `sysinfo` is only used by the bench harnesses (RSS/mem probes), so it is pulled
 # in here rather than as a hard dependency — that keeps it out of mobile builds.
 bins = ["dep:sysinfo"]
+# `libsql-baseline` adds the libSQL/DiskANN competitor row to the moat bench
+# (WP-3.3 follow-up 1). Kept OUT of `bins` on purpose: libSQL bundles a SQLite
+# fork and costs ~2 min of compile, which every server/bench build would
+# otherwise pay. moat-bench compiles without it (the row is simply absent and
+# the metrics JSON says so); the follow-up run enables it explicitly:
+#   cargo run --release --no-default-features --features "bins,libsql-baseline" --bin moat-bench
+libsql-baseline = ["dep:libsql"]
 # `mobile` builds the storage core for iOS/Android targets: no napi, no bins,
 # no sysinfo (the RSS probe relies on OS APIs that fail in mobile sandboxes).
 # Build: cargo build --no-default-features --features mobile --target aarch64-apple-ios
@@ -59,6 +66,11 @@ dashmap = "6.0"
 once_cell = "1.19"
 parking_lot = "0.12"
 rusqlite = { version = "0.32", features = ["bundled"] }
+# WP-3.3 follow-up 1: the libSQL/DiskANN baseline row in the moat bench. Local
+# (embedded) core only — no replication/remote/tls — so the comparison stays
+# embedded-vs-embedded like the rest of the bench. Optional; see the
+# `libsql-baseline` feature.
+libsql = { version = "0.9", default-features = false, features = ["core"], optional = true }
 fs2 = "0.4.3"
 sysinfo = { version = "0.30", optional = true }
 # Android JNI bridge (src/jni.rs); only enabled by the `android-jni` feature.
@@ -203,6 +215,16 @@ required-features = ["bins"]
 name = "moat-bench"
 path = "benches/moat_bench.rs"
 required-features = ["bins"]
+
+# WP-3.3 follow-up 1. A SEPARATE binary on purpose: libsql-ffi and rusqlite both
+# export the bundled `sqlite3_*` symbols, so linking both is either a hard
+# LNK2005 or a silent single-implementation resolution that would corrupt both
+# sides of the comparison. This target links libSQL and never the engine; see
+# the header of benches/moat_libsql.rs.
+[[bin]]
+name = "moat-libsql"
+path = "benches/moat_libsql.rs"
+required-features = ["bins", "libsql-baseline"]
 
 
 [[bin]]

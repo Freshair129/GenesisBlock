@@ -1,0 +1,34 @@
+{
+  "model": "bge-m3",
+  "model_host": "ollama",
+  "dim": 1024,
+  "count": 11266,
+  "normalized": "l2",
+  "sha256": "20978d757c33a29dcd8e89e5708762738b10fc8da0f01358bcb325741f2f6057",
+  "bytes": 46145536,
+  "source_commit": "35800f3fddd6d97dcb9cfcd87b565074e875d322",
+  "corpus": "prose extracted from this repository (markdown + source comments)",
+  "extraction": {
+    "roots": [
+      "docs",
+      "src",
+      "tests",
+      "benches",
+      "mcp",
+      "benchmark",
+      "sdk",
+      "dashboard/src"
+    ],
+    "extensions": [
+      ".md",
+      ".mjs",
+      ".py",
+      ".rs",
+      ".ts",
+      ".tsx"
+    ],
+    "min_words": 8,
+    "max_words": 120,
+    "dedupe": "first-seen order preserved"
+  }
+}

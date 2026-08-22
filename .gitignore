@@ -55,6 +55,11 @@ tests/test_*/
 # issues manually (see BENCHMARKING.md §8). Keep the directory, ignore the runs.
 /benchmark/results/*
 !/benchmark/results/.gitkeep
+# Generated real-embedding corpora for the moat bench (tens of MB, rebuildable
+# from the repo by benchmark/gen_corpus_bge_m3.py). The .manifest.json IS
+# tracked: it is the provenance record (model, dim, count, sha256, commit) that
+# a reported real-corpus number must be reproducible from.
+/benchmark/fixtures/*.f32
 
 # Python bytecode cache
 __pycache__/
