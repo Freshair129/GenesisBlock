@@ -1640,8 +1640,10 @@ impl ArenaStore {
     fn from_bytes(data: &[u8], q: Quant, dim: usize) -> Self {
         match q {
             Quant::None => ArenaStore::F32(
-                data.chunks_exact(4)
-                    .map(|c| f32::from_le_bytes(c.try_into().unwrap()))
+                data.as_chunks::<4>()
+                    .0
+                    .iter()
+                    .map(|c| f32::from_le_bytes(*c))
                     .collect(),
             ),
             // Scale defaults to fixed; load() injects a persisted calibrated scale
@@ -1653,8 +1655,10 @@ impl ArenaStore {
             },
             Quant::Binary => {
                 let words: Vec<u64> = data
-                    .chunks_exact(8)
-                    .map(|c| u64::from_le_bytes(c.try_into().unwrap()))
+                    .as_chunks::<8>()
+                    .0
+                    .iter()
+                    .map(|c| u64::from_le_bytes(*c))
                     .collect();
                 let wpv = bq_words(dim).max(1);
                 ArenaStore::Binary {
@@ -1664,8 +1668,10 @@ impl ArenaStore {
                 }
             }
             Quant::F16 => ArenaStore::F16(
-                data.chunks_exact(2)
-                    .map(|c| u16::from_le_bytes(c.try_into().unwrap()))
+                data.as_chunks::<2>()
+                    .0
+                    .iter()
+                    .map(|c| u16::from_le_bytes(*c))
                     .collect(),
             ),
         }
@@ -1942,8 +1948,10 @@ impl SidecarReader {
         }
 
         let row: Vec<f32> = buf
-            .chunks_exact(4)
-            .map(|c| f32::from_le_bytes(c.try_into().unwrap()))
+            .as_chunks::<4>()
+            .0
+            .iter()
+            .map(|c| f32::from_le_bytes(*c))
             .collect();
         self.cache.lock().put(d_id, row.clone());
         Some(row)
@@ -10722,8 +10730,10 @@ impl Storage {
                     if let Ok(bytes) = fs::read(self.path.join(format!("bqmean_{}.bin", name))) {
                         if bytes.len() == dim as usize * 4 {
                             let center: Vec<f32> = bytes
-                                .chunks_exact(4)
-                                .map(|c| f32::from_le_bytes(c.try_into().unwrap()))
+                                .as_chunks::<4>()
+                                .0
+                                .iter()
+                                .map(|c| f32::from_le_bytes(*c))
                                 .collect();
                             *coll.bq_center.write() = Some(center);
                         }
