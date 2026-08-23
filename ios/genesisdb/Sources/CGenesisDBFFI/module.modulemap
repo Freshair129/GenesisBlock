@@ -1,0 +1,17 @@
+// System-library module map exposing the GenesisBlockDB C ABI (src/ffi.rs)
+// to Swift. `genesisdb.h` itself is NOT committed here — see the note below.
+//
+// Single source of truth: this repo's root `include/genesisdb.h`, generated
+// from src/ffi.rs by cbindgen and gated fresh by the `c-header-freshness` CI
+// job (see .github/workflows/mobile-build.yml). Rather than commit a second,
+// driftable copy under `ios/`, the build/CI steps copy it into
+// `include/genesisdb.h` (this directory) immediately before `swift build`/
+// `swift test` — see ios/README.md "Building" and the `ios-swift-tests` /
+// `ios-xcframework` CI jobs. The copied file is gitignored on purpose: if it
+// were committed, nothing would fail when it drifted from the real header,
+// which is exactly the silent-drift failure mode this avoids.
+module CGenesisDBFFI [system] {
+    header "include/genesisdb.h"
+    link "genesis_block_native"
+    export *
+}

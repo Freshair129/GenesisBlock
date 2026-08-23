@@ -19,6 +19,14 @@
 # The `android-jni` build also type-checks on the host (the `jni` crate is pure
 # Rust), so host-mobile-check exercises it without a device.
 #
+# B-1 (ios/genesisdb, the Swift wrapper) has two more gates:
+#   ios-xcframework   — assembles the real GenesisBlockDB.xcframework on top
+#                       of ios-build's staticlib output (mirrors android-aar).
+#   ios-swift-tests   — GenesisDBTypesTests (pure Codable wire-format tests,
+#                       no native lib, mirrors android-jvm-tests) plus
+#                       GenesisDBTests, a REAL addNode/retrieveContext/search
+#                       round trip against a host-arch build of the engine.
+#
 # B-2 (android/genesisdb, the Kotlin wrapper + .aar) has two more gates:
 #   android-jvm-tests — pure-JVM kotlinx.serialization tests for the wire
 #                       contract (android/README.md "Wire format gotcha").
@@ -46,6 +54,7 @@ on:
       - 'scripts/gen-header.sh'
       - 'scripts/gen-android-jnilibs.sh'
       - 'android/**'
+      - 'ios/**'
       - 'react-native-genesisdb/**'
       - 'Cargo.toml'
       - '.github/workflows/mobile-build.yml'
@@ -58,6 +67,7 @@ on:
       - 'scripts/gen-header.sh'
       - 'scripts/gen-android-jnilibs.sh'
       - 'android/**'
+      - 'ios/**'
       - 'react-native-genesisdb/**'
       - 'Cargo.toml'
       - '.github/workflows/mobile-build.yml'
@@ -99,6 +109,87 @@ jobs:
       # slice is actually produced for the device target.
       - name: Verify iOS staticlib (.a) was produced
         run: test -f target/aarch64-apple-ios/debug/libgenesis_block_native.a
+
+      # Stage both slices for ios-xcframework so it doesn't repeat this build.
+      - name: Stage staticlibs for ios-xcframework
+        run: |
+          mkdir -p ios-libs/aarch64-apple-ios ios-libs/aarch64-apple-ios-sim
+          cp target/aarch64-apple-ios/debug/libgenesis_block_native.a ios-libs/aarch64-apple-ios/
+          cp target/aarch64-apple-ios-sim/debug/libgenesis_block_native.a ios-libs/aarch64-apple-ios-sim/
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ios-staticlibs
+          path: ios-libs/
+          retention-days: 7
+
+  # B-1: assemble the real xcframework on top of ios-build's staticlib
+  # output — proves the two slices actually combine into a working xcframework,
+  # not just that they individually compile. Mirrors android-aar's role for B-2.
+  ios-xcframework:
+    name: iOS xcframework assembly
+    needs: ios-build
+    runs-on: macos-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: ios-staticlibs
+          path: ios-libs
+
+      - name: Assemble GenesisBlockDB.xcframework
+        run: >
+          xcodebuild -create-xcframework
+          -library ios-libs/aarch64-apple-ios/libgenesis_block_native.a
+          -headers include/
+          -library ios-libs/aarch64-apple-ios-sim/libgenesis_block_native.a
+          -headers include/
+          -output GenesisBlockDB.xcframework
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: GenesisBlockDB-xcframework
+          path: GenesisBlockDB.xcframework
+          retention-days: 14
+
+  # B-1: the Swift SDK (ios/genesisdb). Two independent properties, like
+  # android-jvm-tests proves for Types.kt:
+  #   - GenesisDBTypesTests needs no native lib at all (pure Codable wire
+  #     types) — always runs.
+  #   - GenesisDBTests links a HOST-arch build of libgenesis_block_native.a
+  #     (deliberately not the cross-compiled iOS slices, which cannot execute
+  #     on the build machine) and runs a REAL addNode/retrieveContext/search
+  #     round trip against the compiled engine — see ios/README.md "Building".
+  ios-swift-tests:
+    name: iOS Swift SDK tests
+    runs-on: macos-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: mobile-ios-swift-tests
+
+      # No --target: build for the runner's own host triple so the resulting
+      # .a can actually link into (and run inside) the Swift test binary.
+      - name: Build SDK core for host
+        run: cargo build --no-default-features --features "mobile ffi"
+
+      - name: Copy C header for CGenesisDBFFI (see module.modulemap)
+        run: |
+          mkdir -p ios/genesisdb/Sources/CGenesisDBFFI/include
+          cp include/genesisdb.h ios/genesisdb/Sources/CGenesisDBFFI/include/genesisdb.h
+
+      - name: swift test
+        working-directory: ios/genesisdb
+        env:
+          GENESISDB_RUST_LIB_DIR: ${{ github.workspace }}/target/debug
+        run: swift test
 
   # Android arm64 + armv7 via cargo-ndk. nttld/setup-ndk provisions the NDK;
   # cargo-ndk wires the right clang linker per target so no manual
