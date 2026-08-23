@@ -56,15 +56,23 @@ final class RoundTripTests: XCTestCase {
     func testAddNodeWithEmbeddingIsSearchable() async throws {
         let db = try GenesisDB.open(path: tempDir)
 
+        // `genesisdb_open` (src/ffi.rs) always opens with `vector_dim: None`,
+        // and `Storage::open` resolves that to a **1536**-dim `default`
+        // collection (`opts.vector_dim.unwrap_or(1536)`), not auto-detected
+        // from the first embedding — a smaller vector is a dim mismatch, not
+        // silently accepted. `queryVector`/`embedding` below are therefore
+        // full 1536-length vectors, not a short hand-typed one.
+        var embedding = [Double](repeating: 0.0, count: 1536)
+        embedding[0] = 1.0
         _ = try await db.addNode(
-            NodeInput(id: "vec1", labels: ["Doc"], embedding: [1.0, 0.0, 0.0, 0.0])
+            NodeInput(id: "vec1", labels: ["Doc"], embedding: embedding)
         )
         // Async HNSW indexing (ADR--GENESISDB-ASYNC-INDEXING): a just-staged
         // vector is only *eventually* searchable, so flush before asserting.
         try await db.flushIndex()
 
         let hits = try await db.search(
-            HybridSearchInput(queryVector: [1.0, 0.0, 0.0, 0.0], k: 1, alpha: 0.0)
+            HybridSearchInput(queryVector: embedding, k: 1, alpha: 0.0)
         )
         XCTAssertEqual(hits.first?.node.id, "vec1")
 
