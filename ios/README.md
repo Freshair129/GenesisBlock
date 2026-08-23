@@ -95,6 +95,10 @@ leniency was silently dropping it for every Android caller.)
   monorepo's CI, the same host-only carve-out `android/README.md` and
   `react-native-genesisdb`'s iOS stub already document for their own
   device-only checks.
-- `react-native-genesisdb`'s iOS module (`../react-native-genesisdb/ios/`) is
-  still the B-1-pending stub — wiring it to this package is the natural next
-  step once the above lands.
+- `react-native-genesisdb`'s iOS module (`../react-native-genesisdb/ios/`) now
+  calls this package's `GenesisDB` actor for real (no longer a stub) — but
+  actually running it in a real RN app still needs both items above (the
+  published xcframework, and the consumer adding this package as a Swift
+  Package dependency alongside `pod install` — CocoaPods can't express an SPM
+  dependency itself). See `react-native-genesisdb/README.md` "iOS integration
+  status".

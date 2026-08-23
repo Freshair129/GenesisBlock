@@ -7,6 +7,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added — `react-native-genesisdb`'s iOS module wired to the B-1 Swift SDK
+
+- **`GenesisDbModule.swift` is real code, no longer a stub.** Every method
+  (open/close/addNode/search/executeHql/retrieveContext/flushIndex) now calls
+  the `GenesisDB` actor from `ios/genesisdb`, mirroring
+  `GenesisDbModule.kt`'s structure exactly: a small `InstanceRegistry` — its
+  own tiny `actor`, the Swift-native equivalent of Kotlin's
+  `ConcurrentHashMap` + `AtomicInteger` — maps an opaque `dbId` int to the
+  live actor instance (handles never cross the RN bridge as raw pointers,
+  same precision-loss rationale as the Android side). No changes needed to
+  the existing `@objc`/`.m` bridge signatures or the TS layer — the RN-facing
+  contract was already correct, only the Swift method bodies were stubs.
+- **Two things this wiring genuinely cannot solve alone** (documented in
+  `react-native-genesisdb/README.md` "iOS integration status" and the
+  podspec, mirroring `android/build.gradle`'s identical "references an
+  unpublished artifact" shape for `genesisdb-android`): the
+  `GenesisBlockDB.xcframework` isn't published as a release asset yet, and
+  CocoaPods has no mechanism to depend on a Swift Package — a consuming app
+  must add `ios/genesisdb` as an Xcode-level SPM dependency alongside
+  `pod install`. Neither is verified by this monorepo's CI (no real RN host
+  app exists here to resolve either dependency against) — the same
+  host-only carve-out already established for the rest of the mobile SDK.
+
 ### Added — MARK XVI Phase B-1: iOS Swift SDK
 
 - **`ios/genesisdb/`**: a real SwiftPM package wrapping the C ABI (`src/ffi.rs`)
