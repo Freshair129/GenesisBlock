@@ -82,6 +82,21 @@ data class SuperNode(
     val drift: Double? = null,
 )
 
+/**
+ * Factual retrieval-coverage report for a [ContextPackage]: how much of the
+ * requested radius the engine actually served, whether it stopped at the
+ * tier boundary with graph still beyond it, and whether budget compression
+ * replaced atoms. Mirrors `CoverageReport` in src/lib.rs exactly — every
+ * field is a measurement, not policy (see the Rust doc comment).
+ */
+@Serializable
+data class CoverageReport(
+    @SerialName("hops_requested") val hopsRequested: Int,
+    @SerialName("hops_served") val hopsServed: Int,
+    @SerialName("ceiling_hit") val ceilingHit: Boolean,
+    val truncated: Boolean,
+)
+
 @Serializable
 data class ContextPackage(
     val nodes: List<NodeOutput>,
@@ -89,6 +104,16 @@ data class ContextPackage(
     @SerialName("super_nodes") val superNodes: List<SuperNode>,
     @SerialName("token_estimate") val tokenEstimate: Int,
     @SerialName("reasoning_path") val reasoningPath: String,
+    /**
+     * Factual retrieval-coverage signal. See [CoverageReport]. Was missing
+     * entirely until the iOS SDK (B-1) added the Rust struct's `coverage`
+     * field to the wire types on both platforms — the Rust field carries no
+     * `#[serde(default)]`, so it is always present on the wire; a caller
+     * decoding an engine response before this fix silently never saw it
+     * (kotlinx.serialization's `ignoreUnknownKeys` swallowed the key rather
+     * than failing).
+     */
+    val coverage: CoverageReport,
 )
 
 @Serializable

@@ -386,6 +386,25 @@ The SDK is extracted from the proven Phase A core.
 >   host, and gates header freshness. (Previously it built only `--features mobile`, so the
 >   FFI/JNI surface was never cross-compiled.)
 
+> **B-1 landed (2026-08-23).** `ios/genesisdb/` is a real SwiftPM package:
+> `Types.swift` (Codable structs with explicit `CodingKeys` snake_case wire
+> mapping — the same FFI wire contract as Android's `Types.kt`, including a
+> `coverage: CoverageReport` field that was missing from `Types.kt`
+> until this change ported the fix there too) and `GenesisDB.swift` (an
+> `actor` wrapping all 16 `src/ffi.rs` symbols — full parity with the Android
+> JNI surface, not just the 4-method snippet below). `WireFormatTests.swift`
+> proves the wire contract on pure Swift (no native lib, mirrors
+> `WireFormatTest.kt`); `RoundTripTests.swift` is a REAL executed
+> `addNode`/`retrieveContext`/`search` round trip against a host-arch build of
+> the engine (CI: `ios-swift-tests`, `macos-latest`) — stronger verification
+> than B-2 has, since Android has no accessible on-host JNI execution path.
+> `ios-xcframework` (CI) assembles the actual `GenesisBlockDB.xcframework`
+> from `ios-build`'s staticlib output. Not yet done: publishing the
+> xcframework as a release asset + swapping `Package.swift` to the
+> `.binaryTarget(url:, checksum:)` form; on-device/Xcode-project acceptance
+> (same host-only carve-out as B-2/B-3's device-only checks); wiring
+> `react-native-genesisdb`'s iOS stub to this package.
+
 ### B-1: iOS xcframework + Swift wrapper (~2 weeks)
 
 ```bash

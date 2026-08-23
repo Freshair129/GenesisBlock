@@ -72,7 +72,10 @@ class WireFormatTest {
     }
 
     @Test
-    fun `ContextPackage decodes nested nodes edges and superNodes`() {
+    fun `ContextPackage decodes nested nodes edges superNodes and coverage`() {
+        // `coverage` carries no #[serde(default)] on the Rust struct, so it
+        // is always present on the wire — this fixture pins that (see the
+        // doc comment on ContextPackage.coverage in Types.kt).
         val wire = """
             {
               "nodes": [],
@@ -82,7 +85,11 @@ class WireFormatTest {
                  "centroid": [0.1, 0.2], "timestamp": "2026-07-03T00:00:00Z"}
               ],
               "token_estimate": 42,
-              "reasoning_path": "H1"
+              "reasoning_path": "H1",
+              "coverage": {
+                "hops_requested": 1, "hops_served": 1,
+                "ceiling_hit": false, "truncated": false
+              }
             }
         """.trimIndent()
 
@@ -93,6 +100,8 @@ class WireFormatTest {
         assertEquals(1, pkg.superNodes.size)
         assertEquals(1, pkg.superNodes[0].clusterId)
         assertEquals(2, pkg.superNodes[0].memberCount)
+        assertEquals(1, pkg.coverage.hopsRequested)
+        assertTrue(!pkg.coverage.ceilingHit)
     }
 
     @Test

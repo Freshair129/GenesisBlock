@@ -70,3 +70,13 @@ docs/audit.zip
 
 # stray doc archives in repo root
 /docs.zip
+
+# iOS SDK (MARK XVI Phase B-1). SwiftPM build output, and the C header copied
+# into CGenesisDBFFI/include/ at build time — the committed source of truth is
+# the repo-root include/genesisdb.h (gated by the c-header-freshness CI job);
+# see ios/genesisdb/Sources/CGenesisDBFFI/module.modulemap for why a second,
+# driftable copy is deliberately never committed.
+ios/genesisdb/.build/
+ios/genesisdb/.swiftpm/
+ios/genesisdb/Sources/CGenesisDBFFI/include/genesisdb.h
+/GenesisBlockDB.xcframework/

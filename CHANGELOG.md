@@ -7,6 +7,49 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added — MARK XVI Phase B-1: iOS Swift SDK
+
+- **`ios/genesisdb/`**: a real SwiftPM package wrapping the C ABI (`src/ffi.rs`)
+  — full parity with the Android SDK (B-2), not the 4-method spec snippet:
+  `GenesisDB` is an `actor` covering all 16 `genesisdb_*` symbols (add_node,
+  search, execute_hql, execute_query_ir, query_ir_capabilities,
+  retrieve_context, the 6 relational-surface calls, commit_transaction,
+  flush_index), and `Types.swift` mirrors `Types.kt`'s `CodingKeys`/wire
+  contract exactly (the C ABI serializes the same un-renamed `serde_json`
+  structs as the REST server and the Android JNI bridge — **snake_case**, not
+  the napi-rs camelCase in `index.d.ts`).
+- Modeled as a Swift `actor` rather than a plain class: every call is
+  serialized onto the actor's executor, so — unlike `GenesisDB.kt`, which
+  documents "not thread-safe to call concurrently" as a caller obligation —
+  a caller here cannot race `close()` against another method by construction.
+- **Fixed a cross-platform bug found while porting**: the Rust `ContextPackage`
+  struct's `coverage: CoverageReport` field (no `#[serde(default)]`, always on
+  the wire) was missing entirely from the Android SDK's `Types.kt`, so every
+  Android caller of `retrieveContext` silently lost that data to
+  `ignoreUnknownKeys`. Added `CoverageReport` + the field to `Types.kt` and
+  its `WireFormatTest.kt` fixture, alongside the Swift version that has it
+  from the start.
+- **`WireFormatTests.swift`**: pure-Swift, zero-C-dependency tests proving the
+  wire contract (mirrors `WireFormatTest.kt` test-for-test) — the same
+  no-native-lib property `android-jvm-tests` has.
+- **`RoundTripTests.swift`**: a REAL, executed `addNode`/`retrieveContext`/
+  `search` round trip against a host-architecture build of the compiled
+  engine (not a cross-compiled iOS slice, which can't execute on the build
+  machine) — stronger verification than B-2 has today, since Android has no
+  accessible on-host JNI execution path in this CI.
+- New CI jobs in `mobile-build.yml`: **`ios-xcframework`** assembles the real
+  `GenesisBlockDB.xcframework` from `ios-build`'s staticlib output via
+  `xcodebuild -create-xcframework` (mirrors `android-aar`); **`ios-swift-tests`**
+  runs both Swift test targets. `ios/**` added to the workflow's path triggers.
+- `Package.swift` links directly against a locally-built
+  `libgenesis_block_native.a` via `unsafeFlags` — explicitly documented as the
+  CI/local-dev shape, not the eventual published package (which swaps to a
+  `.binaryTarget(url:, checksum:)` pointing at a release xcframework asset,
+  same as the spec's original plan).
+- Not yet done (same host-only carve-out already established for B-2/B-3):
+  publishing the xcframework as a release asset, on-device/Xcode-project
+  acceptance, and wiring `react-native-genesisdb`'s iOS stub to this package.
+
 ### Fixed — four storage-readiness-audit items (security + ops)
 
 - **Collection-name path traversal closed.** A collection name becomes part of
