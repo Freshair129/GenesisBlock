@@ -1640,8 +1640,10 @@ impl ArenaStore {
     fn from_bytes(data: &[u8], q: Quant, dim: usize) -> Self {
         match q {
             Quant::None => ArenaStore::F32(
-                data.chunks_exact(4)
-                    .map(|c| f32::from_le_bytes(c.try_into().unwrap()))
+                data.as_chunks::<4>()
+                    .0
+                    .iter()
+                    .map(|c| f32::from_le_bytes(*c))
                     .collect(),
             ),
             // Scale defaults to fixed; load() injects a persisted calibrated scale
@@ -1653,8 +1655,10 @@ impl ArenaStore {
             },
             Quant::Binary => {
                 let words: Vec<u64> = data
-                    .chunks_exact(8)
-                    .map(|c| u64::from_le_bytes(c.try_into().unwrap()))
+                    .as_chunks::<8>()
+                    .0
+                    .iter()
+                    .map(|c| u64::from_le_bytes(*c))
                     .collect();
                 let wpv = bq_words(dim).max(1);
                 ArenaStore::Binary {
@@ -1664,8 +1668,10 @@ impl ArenaStore {
                 }
             }
             Quant::F16 => ArenaStore::F16(
-                data.chunks_exact(2)
-                    .map(|c| u16::from_le_bytes(c.try_into().unwrap()))
+                data.as_chunks::<2>()
+                    .0
+                    .iter()
+                    .map(|c| u16::from_le_bytes(*c))
                     .collect(),
             ),
         }
@@ -1942,8 +1948,10 @@ impl SidecarReader {
         }
 
         let row: Vec<f32> = buf
-            .chunks_exact(4)
-            .map(|c| f32::from_le_bytes(c.try_into().unwrap()))
+            .as_chunks::<4>()
+            .0
+            .iter()
+            .map(|c| f32::from_le_bytes(*c))
             .collect();
         self.cache.lock().put(d_id, row.clone());
         Some(row)
@@ -2864,6 +2872,50 @@ impl Storage {
             .ok_or_else(|| Error::from_reason(format!("collection '{}' not found", n)))
     }
 
+    /// A collection name becomes part of SIX on-disk filenames — `vec_<n>.bin`,
+    /// `meta_<n>.bin`, `fvec_<n>.bin`, `bqmean_<n>.bin`, `sq8scale_<n>.bin` (and
+    /// the snapshot temp-dir copies) — every one of them `path.join`ed to the
+    /// database directory. An unvalidated name is therefore a path traversal:
+    /// `../../evil` escapes the DB root, and on Windows so do `..\evil`, a
+    /// drive-qualified `C:x`, and reserved device names. The name also has to
+    /// survive a manifest round-trip, so the allowlist is deliberately narrow
+    /// rather than a blocklist of the tricks we happened to think of.
+    ///
+    /// Applied to the two paths that accept an OUTSIDE name — `create_collection`
+    /// (caller) and `replay_vector`'s auto-provision (WAL / CRDT peer, i.e.
+    /// remote-triggered). Loading our own manifest is left alone: a pre-existing
+    /// collection must not become unreadable because the rule tightened.
+    fn validate_collection_name(name: &str) -> Result<()> {
+        const MAX_COLLECTION_NAME: usize = 64;
+        if name.is_empty() {
+            return Err(Error::from_reason("collection name must not be empty"));
+        }
+        if name.len() > MAX_COLLECTION_NAME {
+            return Err(Error::from_reason(format!(
+                "collection name too long ({} > {MAX_COLLECTION_NAME})",
+                name.len()
+            )));
+        }
+        if let Some(bad) = name
+            .chars()
+            .find(|c| !(c.is_ascii_alphanumeric() || *c == '_' || *c == '-'))
+        {
+            return Err(Error::from_reason(format!(
+                "collection name '{name}' contains disallowed character {bad:?} — \
+                 only ASCII letters, digits, '_' and '-' are permitted (the name \
+                 becomes part of on-disk filenames)"
+            )));
+        }
+        // `-` is allowed above, so a leading one would still be a valid file
+        // name — but it reads as a CLI flag everywhere else, so reject it.
+        if name.starts_with('-') {
+            return Err(Error::from_reason(format!(
+                "collection name '{name}' must not start with '-'"
+            )));
+        }
+        Ok(())
+    }
+
     /// Create an isolated vector collection. Idempotent-erroring: fails if a
     /// collection with this name already exists.
     #[allow(clippy::too_many_arguments)]
@@ -2878,6 +2930,7 @@ impl Storage {
         rerank: Option<bool>,
     ) -> Result<()> {
         self.ensure_writable()?;
+        Self::validate_collection_name(&name)?;
         let _commit_guard = self.commit_lock.lock();
         if self.collections.contains_key(&name) {
             return Err(Error::from_reason(format!(
@@ -3074,6 +3127,14 @@ impl Storage {
             .clone()
             .unwrap_or_else(|| self.default_collection.clone());
         if !self.collections.contains_key(&name) {
+            // Auto-provision from an OUTSIDE name (WAL replay or a CRDT peer).
+            // A traversal name would land in `vec_<n>.bin` & friends at the next
+            // checkpoint, so drop the event instead — inert, not fatal: replay
+            // and sync must not be abortable by one malformed remote event.
+            if let Err(e) = Self::validate_collection_name(&name) {
+                eprintln!("replay_vector: refusing collection name — {e}");
+                return;
+            }
             self.collections.insert(
                 name.clone(),
                 Arc::new(VectorCollection::new(
@@ -10207,13 +10268,23 @@ impl Storage {
         if manifest.format_version != BACKUP_FORMAT_VERSION {
             return Err(Error::from_reason("unsupported Genesis backup format"));
         }
-        if manifest.engine_name != ENGINE_NAME || manifest.engine_version != ENGINE_VERSION {
+        if manifest.engine_name != ENGINE_NAME {
             return Err(Error::from_reason("incompatible Genesis engine backup"));
         }
+        // Compatibility is governed by the SCHEMA version, not the engine
+        // version string (storage-readiness audit): requiring exact
+        // `engine_version` equality made every backup unrestorable after any
+        // release at all — a 0.2.0 bundle could not restore on 0.2.1 even with
+        // an identical on-disk schema, which defeats the point of a backup.
+        // The schema gate below is the real compatibility contract: a bundle
+        // written by a NEWER schema is rejected (we can't read it), an older
+        // one is accepted and migrated on the normal open path. The engine
+        // version is still recorded and surfaced in `backup_info` for audit.
         if manifest.schema_version > SCHEMA_VERSION {
-            return Err(Error::from_reason(
-                "backup schema requires a newer Genesis engine",
-            ));
+            return Err(Error::from_reason(format!(
+                "backup schema v{} requires a newer Genesis engine (this engine reads up to v{})",
+                manifest.schema_version, SCHEMA_VERSION
+            )));
         }
 
         let mut names = HashSet::new();
@@ -10659,8 +10730,10 @@ impl Storage {
                     if let Ok(bytes) = fs::read(self.path.join(format!("bqmean_{}.bin", name))) {
                         if bytes.len() == dim as usize * 4 {
                             let center: Vec<f32> = bytes
-                                .chunks_exact(4)
-                                .map(|c| f32::from_le_bytes(c.try_into().unwrap()))
+                                .as_chunks::<4>()
+                                .0
+                                .iter()
+                                .map(|c| f32::from_le_bytes(*c))
                                 .collect();
                             *coll.bq_center.write() = Some(center);
                         }

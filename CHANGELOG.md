@@ -7,6 +7,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed — four storage-readiness-audit items (security + ops)
+
+- **Collection-name path traversal closed.** A collection name becomes part of
+  six on-disk filenames (`vec_`, `meta_`, `fvec_`, `bqmean_`, `sq8scale_`)
+  joined to the DB directory and was never validated. Worse than the audit
+  recorded: besides `create_collection`, the CRDT/WAL `replay_vector` path
+  auto-provisions a collection from a **peer-supplied** name. Names are now an
+  ASCII `[A-Za-z0-9_-]` allowlist, ≤64 chars, no leading `-`. The caller path
+  fails loudly; the remote path drops the event as inert (one malformed peer
+  event must not abort recovery). Tests pin the *filesystem* outcome — a
+  sentinel directory beside the DB stays empty — not just the error string.
+  Loading an existing manifest is deliberately not re-validated.
+- **HQL fuzz suite was vacuous.** `must_not_panic` called `catch_unwind` and
+  discarded the result, so a genuinely panicking parser still passed every
+  "must not panic" case. The result is now asserted; the whole suite still
+  passes, which is the first time that has actually been demonstrated.
+- **REST server graceful shutdown + final checkpoint.** `genesis-db-server`
+  ran `axum::serve` with no shutdown handling: Ctrl-C/SIGTERM killed the
+  process mid-flight and `Drop` never ran. It now drains in-flight requests on
+  SIGINT (and SIGTERM on Unix — what every container runtime sends), then
+  `save_state()`s on the quiescent engine. Durability never depended on this
+  (the journal holds every acked write); the checkpoint buys an instant next
+  start and, under `frontier_only`, the fold that bounds journal growth. A
+  failed final checkpoint is logged, never hidden, never fatal.
+- **Backup restore no longer demands exact `engine_version` equality**, which
+  made every bundle unrestorable after any release (0.2.0 → 0.2.1 refused even
+  with an identical on-disk schema). Compatibility is governed by the existing
+  `schema_version` gate — newer schema still rejected, older still migrated on
+  open. New test restores a same-schema bundle stamped with an older engine
+  version and checks the graph inside it.
+
 ### Added — WP-3.3 moat follow-ups measured (libSQL/DiskANN + real bge-m3 corpus)
 
 - **`docs/REPORT--MOAT-FOLLOWUPS.md`**: both follow-ups the WP-3.3 decision made
