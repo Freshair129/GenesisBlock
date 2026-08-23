@@ -85,20 +85,42 @@ CoverageReport` — that field was missing from the Android SDK's `Types.kt`
 until this same change added it there too, since `ignoreUnknownKeys`-style
 leniency was silently dropping it for every Android caller.)
 
+## Prebuilt xcframework
+
+A real, CI-built `GenesisBlockDB.xcframework` (device + simulator slices, from
+the exact `xcodebuild -create-xcframework` command the `ios-xcframework` CI
+job runs) is attached to the
+[v0.2.0 GitHub Release](https://github.com/Freshair129/GenesisBlock/releases/tag/v0.2.0)
+as `GenesisBlockDB.xcframework.zip`
+(SHA256 `8359846a8e668770816e0d84940aead0a85812f5aa67f91e7c2ff8308d37bc72`).
+
+This `Package.swift` deliberately does **not** consume it yet: swapping the
+`GenesisDB` target's local-`.a`-plus-`unsafeFlags` linking for a
+`.binaryTarget(url:, checksum:)` pointing at that zip would drop
+`GenesisDBTests`' ability to actually execute — the xcframework's two slices
+are cross-compiled for `aarch64-apple-ios`/`-sim`, neither of which can run on
+the build host, whereas the current setup links a HOST-arch build so the
+round-trip test is genuinely exercised, not just compiled. That swap is real
+future work, not an oversight — see the Phase B DoD checklist in
+`docs/SPEC--MOBILE-SDK.md`.
+
 ## Not yet done
 
-- Publishing `GenesisBlockDB.xcframework` as a versioned GitHub release asset
-  and swapping `Package.swift` to the `.binaryTarget(url:, checksum:)` form a
-  real external consumer would use.
 - Literal on-device/Xcode-project acceptance (`import GenesisBlockDB` in a
   blank Xcode project, running on a physical device) — out of scope for this
   monorepo's CI, the same host-only carve-out `android/README.md` and
   `react-native-genesisdb`'s iOS stub already document for their own
   device-only checks.
+- **The podspec doesn't wire the published xcframework in yet.** The zip
+  above exists, but `react-native-genesisdb.podspec` still has no
+  `s.vendored_frameworks`/`prepare_command` step to fetch and unpack it —
+  CocoaPods has no remote-URL binary-target mechanism the way SPM does, so
+  that needs its own `prepare_command` (download + unzip during
+  `pod install`), not yet written.
 - `react-native-genesisdb`'s iOS module (`../react-native-genesisdb/ios/`) now
   calls this package's `GenesisDB` actor for real (no longer a stub) — but
-  actually running it in a real RN app still needs both items above (the
-  published xcframework, and the consumer adding this package as a Swift
-  Package dependency alongside `pod install` — CocoaPods can't express an SPM
+  actually running it in a real RN app still needs the item above (the
+  podspec wiring) AND the consumer adding this package as a Swift Package
+  dependency alongside `pod install` (CocoaPods can't express an SPM
   dependency itself). See `react-native-genesisdb/README.md` "iOS integration
   status".

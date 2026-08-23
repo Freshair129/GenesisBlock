@@ -22,12 +22,15 @@ Pod::Spec.new do |s|
   # alone (mirrors android/build.gradle's identical "not published yet"
   # caveat for genesisdb-android):
   #
-  #   1. `GenesisBlockDB.xcframework` (the compiled C ABI, src/ffi.rs) is not
-  #      yet published as a release asset — until it is, there is nothing
-  #      for `s.vendored_frameworks` to point at, so it is deliberately
-  #      absent below. A local monorepo build can assemble one itself:
-  #      `.github/workflows/mobile-build.yml`'s `ios-xcframework` job shows
-  #      the exact `xcodebuild -create-xcframework` invocation.
+  #   1. `GenesisBlockDB.xcframework` (the compiled C ABI, src/ffi.rs) IS now
+  #      published as a v0.2.0 release asset:
+  #      https://github.com/Freshair129/GenesisBlock/releases/download/v0.2.0/GenesisBlockDB.xcframework.zip
+  #      (SHA256 8359846a8e668770816e0d84940aead0a85812f5aa67f91e7c2ff8308d37bc72)
+  #      — but `s.vendored_frameworks` still needs a *local* path, not a URL;
+  #      CocoaPods has no remote-binary-target mechanism the way SPM's
+  #      `.binaryTarget(url:, checksum:)` does. Wiring this in means adding a
+  #      `prepare_command` that downloads + unzips that URL during
+  #      `pod install`, not yet written here.
   #   2. CocoaPods has no mechanism to depend on a Swift Package (`ios/
   #      genesisdb`'s `GenesisDB`/`GenesisDBTypes` modules that
   #      GenesisDbModule.swift imports) from inside a .podspec — that
@@ -36,7 +39,4 @@ Pod::Spec.new do |s|
   #      `../ios/genesisdb` or its eventual published Git URL), alongside
   #      running `pod install` for this package. This is a real, standard
   #      CocoaPods+SPM coexistence pattern, not a workaround.
-  #
-  # Once (1) is published, add `s.vendored_frameworks = "GenesisBlockDB.xcframework"`
-  # here so the C ABI itself is included without a manual local build step.
 end
