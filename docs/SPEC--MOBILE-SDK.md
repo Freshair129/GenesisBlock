@@ -409,10 +409,26 @@ The SDK is extracted from the proven Phase A core.
 > asset yet, and CocoaPods has no mechanism to depend on a Swift Package —
 > a consumer must add `ios/genesisdb` as an Xcode-level SPM dependency
 > alongside `pod install` (see `react-native-genesisdb/README.md` "iOS
-> integration status"). Not yet done: publishing the xcframework as a
-> release asset + swapping `Package.swift` to the `.binaryTarget(url:,
-> checksum:)` form; on-device/Xcode-project acceptance (same host-only
-> carve-out as B-2/B-3's device-only checks).
+> integration status").
+>
+> **xcframework published (2026-08-24).** `GenesisBlockDB.xcframework.zip`
+> (built from the `ios-xcframework` CI job's output on main, device +
+> simulator slices) is attached to the
+> [v0.2.0 GitHub Release](https://github.com/Freshair129/GenesisBlock/releases/tag/v0.2.0)
+> — SHA256 `8359846a8e668770816e0d84940aead0a85812f5aa67f91e7c2ff8308d37bc72`.
+> The `genesisdb-android` `.aar` (v0.1.0) is attached to the same release.
+> Still not done: `Package.swift` deliberately has NOT been swapped to the
+> `.binaryTarget(url:, checksum:)` form — that would replace the current
+> host-arch build (which lets `GenesisDBTests` actually execute) with the
+> cross-compiled `aarch64-apple-ios`/`-sim` slices (which cannot run on the
+> build host), regressing test coverage for a distribution convenience; see
+> `ios/README.md` "Prebuilt xcframework". The podspec's `s.vendored_frameworks`
+> wiring (a `prepare_command` to download+unzip the release zip during `pod
+> install`) is also not yet written. Neither Maven Central/GitHub Packages
+> (for the `.aar`) nor an SPM registry/CocoaPods Trunk entry exist — both
+> artifacts are raw release-asset downloads only. On-device/Xcode-project
+> acceptance remains the same host-only carve-out as B-2/B-3's device-only
+> checks.
 
 ### B-1: iOS xcframework + Swift wrapper (~2 weeks)
 
@@ -458,9 +474,16 @@ references the release URL + checksum.
 > runs those tests on every PR; `android-aar` assembles a real `.aar` on top
 > of `android-build`'s cargo-ndk `.so` output and uploads it as a build
 > artifact. `scripts/gen-android-jnilibs.sh` mirrors the CI staging step for
-> local dev (still host-only — no NDK on the Windows dev box). Not yet done:
-> publishing the `.aar` to Maven Central/GitHub Packages (still `0.1.0`,
-> unpublished) and the on-device/Gradle-project acceptance checks below.
+> local dev (still host-only — no NDK on the Windows dev box).
+>
+> **`.aar` published as a release asset (2026-08-24).**
+> `genesisdb-android-0.1.0.aar` is attached to the
+> [v0.2.0 GitHub Release](https://github.com/Freshair129/GenesisBlock/releases/tag/v0.2.0)
+> (SHA256 `7c3733065c2fe936d50b5e69e50a4bd958a851f322d48676dc7a9700f54bed77`) —
+> a raw file download, not a Maven coordinate. Not yet done: publishing to
+> Maven Central/GitHub Packages so `implementation
+> "dev.genesisblock:genesisdb-android:0.1.0"` actually resolves, and the
+> on-device/Gradle-project acceptance checks below.
 
 ### B-2: Android .aar + Kotlin wrapper (~2 weeks)
 
@@ -554,12 +577,19 @@ for the initial SDK release; added when there is demonstrated user demand.
 ### Phase B definition of done:
 
 **iOS SDK:**
-- [ ] `GenesisBlockDB.xcframework` builds for `aarch64-apple-ios` + `aarch64-apple-ios-sim`
+- [x] `GenesisBlockDB.xcframework` builds for `aarch64-apple-ios` + `aarch64-apple-ios-sim`
+      (CI: `ios-xcframework`) and is published as a v0.2.0 release asset
 - [ ] Swift Package Manager `import GenesisBlockDB` works in a blank Xcode project
-- [ ] `addNode` + `retrieveContext` round-trip in a Swift test target
+      (`Package.swift` still links a local host-arch build, not the published
+      binary target — see `ios/README.md` "Prebuilt xcframework")
+- [x] `addNode` + `retrieveContext` round-trip in a Swift test target
+      (`RoundTripTests.swift`, CI: `ios-swift-tests`)
 
 **Android SDK:**
-- [ ] `.aar` installs via Gradle in a blank Android Studio project
+- [ ] `.aar` installs via Gradle in a blank Android Studio project (the
+      release asset exists, but no Maven coordinate resolves yet and this
+      hasn't been exercised against a real project — see
+      `android/README.md` "Building")
 - [ ] `GenesisDB(filesDir).executeHQL(...)` runs on a physical arm64 device
 - [ ] JNI `UnsatisfiedLinkError` does not occur at runtime
 

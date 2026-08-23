@@ -28,11 +28,16 @@ for the same reason `android/build.gradle` currently references a
 `genesisdb-android` Maven coordinate that isn't published either — two
 pieces this package doesn't (and structurally can't) solve on its own:
 
-1. **`GenesisBlockDB.xcframework` isn't published as a release asset yet.**
-   The podspec has nothing to `s.vendored_frameworks` against until it is —
-   see `docs/SPEC--MOBILE-SDK.md` §B-1's "Not yet done". A local monorepo
-   build can assemble one via the `ios-xcframework` CI job's
-   `xcodebuild -create-xcframework` command.
+1. **`GenesisBlockDB.xcframework` IS now published as a release asset**
+   ([v0.2.0](https://github.com/Freshair129/GenesisBlock/releases/tag/v0.2.0),
+   `GenesisBlockDB.xcframework.zip`, SHA256
+   `8359846a8e668770816e0d84940aead0a85812f5aa67f91e7c2ff8308d37bc72`) — but
+   the podspec still has no `s.vendored_frameworks`/`prepare_command` step to
+   fetch and unpack it during `pod install`; CocoaPods has no remote-URL
+   binary-target mechanism the way SPM's `.binaryTarget(url:, checksum:)`
+   does, so that wiring needs its own `prepare_command`, not yet written. A
+   local monorepo build can still assemble one via the `ios-xcframework` CI
+   job's `xcodebuild -create-xcframework` command.
 2. **CocoaPods cannot express a dependency on a Swift Package.**
    `GenesisDbModule.swift` does `import GenesisDB` / `import GenesisDBTypes`
    (the `ios/genesisdb` package's products) — a podspec has no mechanism to

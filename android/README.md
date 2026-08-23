@@ -24,6 +24,15 @@ This module never invokes `cargo` itself — it links a prebuilt
   be exercised on the Windows dev host): run
   `ANDROID_NDK_HOME=<path> ./scripts/gen-android-jnilibs.sh [debug|release]`
   from the repo root, then `gradle :genesisdb:assembleRelease` from `android/`.
+- **Prebuilt `.aar`**: a real, CI-built `.aar` (version 0.1.0, engine 0.2.0) is
+  attached to the [v0.2.0 GitHub Release](https://github.com/Freshair129/GenesisBlock/releases/tag/v0.2.0)
+  as `genesisdb-android-0.1.0.aar`. This is a raw file download, **not** a
+  Maven coordinate — `implementation "dev.genesisblock:genesisdb-android:0.1.0"`
+  in `../react-native-genesisdb/android/build.gradle` still won't resolve
+  anywhere until this is actually published to Maven Central/GitHub Packages.
+  To use the release asset directly: download it into a local
+  `flatDir`-style repo, or reference it via Gradle's URL-download mechanism —
+  neither is wired up here yet.
 
 ## Wire format gotcha
 

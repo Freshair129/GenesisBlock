@@ -7,6 +7,43 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added — v0.2.0 GitHub Release: mobile SDK binary assets published
+
+- **`GenesisBlockDB.xcframework.zip` and `genesisdb-android-0.1.0.aar` are
+  now real, downloadable release assets** on the
+  [v0.2.0 GitHub Release](https://github.com/Freshair129/GenesisBlock/releases/tag/v0.2.0)
+  (tagged from main; also the engine's first non-beta release — no `v0.2.0`
+  tag/release existed before this despite the engine being at `0.2.0` for
+  some time). Both were built by CI (`.github/workflows/mobile-build.yml`'s
+  `ios-xcframework`/`android-aar` jobs) from the same main commit, then
+  downloaded, packaged, and re-downloaded to independently verify their
+  checksums end-to-end before upload:
+  - `GenesisBlockDB.xcframework.zip` — device + simulator slices, SHA256
+    `8359846a8e668770816e0d84940aead0a85812f5aa67f91e7c2ff8308d37bc72`.
+  - `genesisdb-android-0.1.0.aar` — SHA256
+    `7c3733065c2fe936d50b5e69e50a4bd958a851f322d48676dc7a9700f54bed77`.
+  - **What this unblocks:** `s.vendored_frameworks`/a Gradle `flatDir`
+    reference now has a concrete URL + checksum to point at, instead of
+    nothing.
+  - **What this deliberately does NOT unblock** (documented in
+    `ios/README.md`, `android/README.md`,
+    `react-native-genesisdb/react-native-genesisdb.podspec`, and
+    `react-native-genesisdb/README.md`): no Maven Central/GitHub Packages
+    entry for the `.aar`, no CocoaPods Trunk/SPM registry entry for the
+    xcframework, no npm publish of `react-native-genesisdb`, no
+    `prepare_command` wiring the xcframework into the podspec, and
+    `ios/genesisdb/Package.swift` deliberately still links a local host-arch
+    build rather than the published binary target — swapping to
+    `.binaryTarget(url:, checksum:)` would drop `GenesisDBTests`' ability to
+    actually execute, since the xcframework's slices are cross-compiled for
+    `aarch64-apple-ios`/`-sim` and cannot run on the build host.
+- **Fixed a registration gap in `modules.json`**: `genesisdb-ios` (the
+  iOS SwiftPM package shipped in Phase B-1, PR #122) had no surface entry at
+  all — only `genesisdb-android` and `react-native-genesisdb` were listed.
+  Added it (`path: ios/genesisdb`, `version: 0.1.0`,
+  `targetsSchemaVersion: 3`, `minEngineVersion: 0.2.0`), matching the
+  Android entry's shape.
+
 ### Added — `react-native-genesisdb`'s iOS module wired to the B-1 Swift SDK
 
 - **`GenesisDbModule.swift` is real code, no longer a stub.** Every method
