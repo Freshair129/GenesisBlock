@@ -18,7 +18,35 @@ await db.close();
 | Platform | Status |
 |---|---|
 | Android | Working — bridges to `dev.genesisblock:genesisdb-android` (Phase B-2). |
-| iOS | Stub only. Every method rejects with a `GENESISDB_IOS_NOT_IMPLEMENTED` error until Phase B-1 (the `GenesisBlockDB.xcframework` + Swift wrapper) ships. `pod install` and autolinking still succeed — the package just isn't functional on iOS yet. |
+| iOS | `GenesisDbModule.swift` now calls the real `ios/genesisdb` Swift package (Phase B-1) instead of stub-rejecting every method — but see "iOS integration status" below before assuming `pod install` alone is enough. |
+
+## iOS integration status
+
+`GenesisDbModule.swift` is real code, not a stub, and its logic mirrors the
+Android bridge method-for-method. It is **not yet a drop-in `pod install`**,
+for the same reason `android/build.gradle` currently references a
+`genesisdb-android` Maven coordinate that isn't published either — two
+pieces this package doesn't (and structurally can't) solve on its own:
+
+1. **`GenesisBlockDB.xcframework` isn't published as a release asset yet.**
+   The podspec has nothing to `s.vendored_frameworks` against until it is —
+   see `docs/SPEC--MOBILE-SDK.md` §B-1's "Not yet done". A local monorepo
+   build can assemble one via the `ios-xcframework` CI job's
+   `xcodebuild -create-xcframework` command.
+2. **CocoaPods cannot express a dependency on a Swift Package.**
+   `GenesisDbModule.swift` does `import GenesisDB` / `import GenesisDBTypes`
+   (the `ios/genesisdb` package's products) — a podspec has no mechanism to
+   pull those in itself. A consuming app must add `ios/genesisdb` as a Swift
+   Package dependency directly in its own Xcode project (Xcode's "Add
+   Package Dependency", pointing at `../ios/genesisdb` for now, or the
+   package's eventual published Git URL), **in addition to** running
+   `pod install` for `react-native-genesisdb`. This is a standard, documented
+   CocoaPods+SPM coexistence pattern — not a workaround — but it is a real
+   extra manual step any integrator needs to know about today.
+
+Neither of these is verified by this monorepo's CI: there is no real RN host
+app here to resolve either dependency against, the same host-only carve-out
+already documented for the Android side and for `ios/genesisdb` itself.
 
 ## Wire format
 

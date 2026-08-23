@@ -399,11 +399,20 @@ The SDK is extracted from the proven Phase A core.
 > the engine (CI: `ios-swift-tests`, `macos-latest`) — stronger verification
 > than B-2 has, since Android has no accessible on-host JNI execution path.
 > `ios-xcframework` (CI) assembles the actual `GenesisBlockDB.xcframework`
-> from `ios-build`'s staticlib output. Not yet done: publishing the
-> xcframework as a release asset + swapping `Package.swift` to the
-> `.binaryTarget(url:, checksum:)` form; on-device/Xcode-project acceptance
-> (same host-only carve-out as B-2/B-3's device-only checks); wiring
-> `react-native-genesisdb`'s iOS stub to this package.
+> from `ios-build`'s staticlib output. **`react-native-genesisdb`'s iOS
+> module wired to this package (2026-08-23)**: `GenesisDbModule.swift` now
+> calls the real `GenesisDB` actor (dbId registry as its own tiny actor,
+> mirroring `GenesisDbModule.kt`'s `ConcurrentHashMap`), no longer stub-
+> rejecting. Two things this wiring cannot solve by itself, same
+> "references an unpublished artifact" shape `android/build.gradle` already
+> has for `genesisdb-android`: the xcframework isn't published as a release
+> asset yet, and CocoaPods has no mechanism to depend on a Swift Package —
+> a consumer must add `ios/genesisdb` as an Xcode-level SPM dependency
+> alongside `pod install` (see `react-native-genesisdb/README.md` "iOS
+> integration status"). Not yet done: publishing the xcframework as a
+> release asset + swapping `Package.swift` to the `.binaryTarget(url:,
+> checksum:)` form; on-device/Xcode-project acceptance (same host-only
+> carve-out as B-2/B-3's device-only checks).
 
 ### B-1: iOS xcframework + Swift wrapper (~2 weeks)
 
