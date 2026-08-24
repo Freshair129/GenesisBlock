@@ -422,12 +422,21 @@ The SDK is extracted from the proven Phase A core.
 > host-arch build (which lets `GenesisDBTests` actually execute) with the
 > cross-compiled `aarch64-apple-ios`/`-sim` slices (which cannot run on the
 > build host), regressing test coverage for a distribution convenience; see
-> `ios/README.md` "Prebuilt xcframework". The podspec's `s.vendored_frameworks`
-> wiring (a `prepare_command` to download+unzip the release zip during `pod
-> install`) is also not yet written. Neither Maven Central/GitHub Packages
-> (for the `.aar`) nor an SPM registry/CocoaPods Trunk entry exist — both
-> artifacts are raw release-asset downloads only. On-device/Xcode-project
-> acceptance remains the same host-only carve-out as B-2/B-3's device-only
+> `ios/README.md` "Prebuilt xcframework".
+>
+> **podspec wired to fetch it automatically (issue #125).**
+> `react-native-genesisdb.podspec`'s `prepare_command` now downloads +
+> SHA256-verifies + unzips the release zip during `pod install`; no CocoaPods
+> Trunk publish was ever needed for this (RN autolinking picks the podspec up
+> straight from `node_modules` — an earlier version of this doc's B-1 callout
+> assumed otherwise). A standalone-SPM-outside-RN registry path for
+> `ios/genesisdb` (which would need its own root-level repo, since
+> `.package(url:)` requires `Package.swift` at the repo root) is deliberately
+> deferred per issue #125 — smaller audience than the RN+CocoaPods path.
+> Maven Central/GitHub Packages for the `.aar` and npm for
+> `react-native-genesisdb` are addressed below and in B-2/B-3's callouts.
+> On-device/Xcode-project acceptance remains the same host-only carve-out as
+> B-2/B-3's device-only
 > checks.
 
 ### B-1: iOS xcframework + Swift wrapper (~2 weeks)
@@ -480,10 +489,21 @@ references the release URL + checksum.
 > `genesisdb-android-0.1.0.aar` is attached to the
 > [v0.2.0 GitHub Release](https://github.com/Freshair129/GenesisBlock/releases/tag/v0.2.0)
 > (SHA256 `7c3733065c2fe936d50b5e69e50a4bd958a851f322d48676dc7a9700f54bed77`) —
-> a raw file download, not a Maven coordinate. Not yet done: publishing to
-> Maven Central/GitHub Packages so `implementation
-> "dev.genesisblock:genesisdb-android:0.1.0"` actually resolves, and the
-> on-device/Gradle-project acceptance checks below.
+> a raw file download, not a Maven coordinate.
+>
+> **Maven publish wired to GitHub Packages (issue #125).**
+> `genesisdb/build.gradle.kts`'s `publishing {}` block +
+> `.github/workflows/release.yml`'s `android-publish` job publish
+> `dev.genesisblock:genesisdb-android:0.1.0` there on every `v*` tag push —
+> chosen over Maven Central because it needs zero new account/GPG-signing
+> setup (reuses the workflow's own `GITHUB_TOKEN`); the tradeoff is consumers
+> need a GitHub PAT with `read:packages` in their own Gradle config, since
+> GitHub Packages requires auth for every read even on a public repo — see
+> `android/README.md` "Building". As of this writing that job exists but
+> hasn't run yet (no tag pushed since it landed) — the coordinate doesn't
+> resolve until the next one does. Maven Central remains a documented future
+> option once the `dev.genesisblock` namespace is verified there. The
+> on-device/Gradle-project acceptance checks below are still open.
 
 ### B-2: Android .aar + Kotlin wrapper (~2 weeks)
 
@@ -586,15 +606,18 @@ for the initial SDK release; added when there is demonstrated user demand.
       (`RoundTripTests.swift`, CI: `ios-swift-tests`)
 
 **Android SDK:**
-- [ ] `.aar` installs via Gradle in a blank Android Studio project (the
-      release asset exists, but no Maven coordinate resolves yet and this
-      hasn't been exercised against a real project — see
-      `android/README.md` "Building")
+- [ ] `.aar` installs via Gradle in a blank Android Studio project (Maven
+      publish to GitHub Packages is wired — `android-publish` job — but
+      hasn't run against a real tag yet, and this hasn't been exercised
+      against a real project — see `android/README.md` "Building")
 - [ ] `GenesisDB(filesDir).executeHQL(...)` runs on a physical arm64 device
 - [ ] JNI `UnsatisfiedLinkError` does not occur at runtime
 
 **React Native package:**
 - [ ] `npm install react-native-genesisdb` + `npx pod-install` works on iOS
+      (npm publish is wired — `rn-npm-publish` job — but hasn't run against a
+      real tag yet; the podspec's `prepare_command` fetching the xcframework
+      IS done and CI-unverified only for the same host-app reason as always)
 - [ ] `npm install react-native-genesisdb` + Gradle sync works on Android
 - [ ] TypeScript types have zero `any` — full inference on all public methods
 

@@ -27,12 +27,37 @@ This module never invokes `cargo` itself — it links a prebuilt
 - **Prebuilt `.aar`**: a real, CI-built `.aar` (version 0.1.0, engine 0.2.0) is
   attached to the [v0.2.0 GitHub Release](https://github.com/Freshair129/GenesisBlock/releases/tag/v0.2.0)
   as `genesisdb-android-0.1.0.aar`. This is a raw file download, **not** a
-  Maven coordinate — `implementation "dev.genesisblock:genesisdb-android:0.1.0"`
-  in `../react-native-genesisdb/android/build.gradle` still won't resolve
-  anywhere until this is actually published to Maven Central/GitHub Packages.
-  To use the release asset directly: download it into a local
-  `flatDir`-style repo, or reference it via Gradle's URL-download mechanism —
-  neither is wired up here yet.
+  Maven coordinate — useful for a manual `flatDir`-style local repo, but not
+  what a real dependency declaration should point at.
+- **Maven publish (issue #125)**: `genesisdb/build.gradle.kts`'s
+  `publishing {}` block + `.github/workflows/release.yml`'s `android-publish`
+  job publish `dev.genesisblock:genesisdb-android:0.1.0` to **GitHub
+  Packages** (not Maven Central — no new account/GPG-signing setup needed,
+  reuses the workflow's own `GITHUB_TOKEN`) on every `v*` tag push. As of this
+  writing that job exists but hasn't run yet — the coordinate doesn't resolve
+  until the next tag push triggers it. Once it has, consumers add:
+  ```kotlin
+  // settings.gradle.kts
+  dependencyResolutionManagement {
+      repositories {
+          maven {
+              url = uri("https://maven.pkg.github.com/Freshair129/GenesisBlock")
+              credentials {
+                  // GitHub Packages requires auth for EVERY read, even on a
+                  // public repo — unlike Maven Central. A PAT with just
+                  // `read:packages` scope is enough; it does not need to be
+                  // yours specifically, any account with repo read access works.
+                  username = "<your-github-username>"
+                  password = "<a GitHub PAT with read:packages>"
+              }
+          }
+      }
+  }
+  ```
+  and then `implementation("dev.genesisblock:genesisdb-android:0.1.0")` as
+  normal. Maven Central (fully anonymous resolution, no consumer PAT needed)
+  remains a documented future option once `dev.genesisblock`'s Central Portal
+  namespace is verified — see issue #125.
 
 ## Wire format gotcha
 

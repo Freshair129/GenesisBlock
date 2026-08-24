@@ -23,35 +23,44 @@ await db.close();
 ## iOS integration status
 
 `GenesisDbModule.swift` is real code, not a stub, and its logic mirrors the
-Android bridge method-for-method. It is **not yet a drop-in `pod install`**,
-for the same reason `android/build.gradle` currently references a
-`genesisdb-android` Maven coordinate that isn't published either — two
-pieces this package doesn't (and structurally can't) solve on its own:
+Android bridge method-for-method. It is **not yet a drop-in `pod install`**
+— one piece this package doesn't (and structurally can't) solve on its own:
 
-1. **`GenesisBlockDB.xcframework` IS now published as a release asset**
-   ([v0.2.0](https://github.com/Freshair129/GenesisBlock/releases/tag/v0.2.0),
-   `GenesisBlockDB.xcframework.zip`, SHA256
-   `8359846a8e668770816e0d84940aead0a85812f5aa67f91e7c2ff8308d37bc72`) — but
-   the podspec still has no `s.vendored_frameworks`/`prepare_command` step to
-   fetch and unpack it during `pod install`; CocoaPods has no remote-URL
-   binary-target mechanism the way SPM's `.binaryTarget(url:, checksum:)`
-   does, so that wiring needs its own `prepare_command`, not yet written. A
-   local monorepo build can still assemble one via the `ios-xcframework` CI
-   job's `xcodebuild -create-xcframework` command.
+1. ~~`GenesisBlockDB.xcframework` needs a `prepare_command` to fetch it during
+   `pod install`.~~ **Done (issue #125)**: `react-native-genesisdb.podspec`'s
+   `prepare_command` now downloads, SHA256-verifies, and unzips the
+   [v0.2.0 release](https://github.com/Freshair129/GenesisBlock/releases/tag/v0.2.0)'s
+   `GenesisBlockDB.xcframework.zip` automatically — no manual step. (An
+   earlier version of this doc also said the podspec would need a CocoaPods
+   Trunk publish first; that was wrong — RN autolinking's
+   `use_native_modules!` picks up this podspec directly from `node_modules`,
+   the same way virtually every third-party RN native module ships its iOS
+   half, with zero Trunk publish involved.)
 2. **CocoaPods cannot express a dependency on a Swift Package.**
    `GenesisDbModule.swift` does `import GenesisDB` / `import GenesisDBTypes`
    (the `ios/genesisdb` package's products) — a podspec has no mechanism to
    pull those in itself. A consuming app must add `ios/genesisdb` as a Swift
    Package dependency directly in its own Xcode project (Xcode's "Add
-   Package Dependency", pointing at `../ios/genesisdb` for now, or the
-   package's eventual published Git URL), **in addition to** running
-   `pod install` for `react-native-genesisdb`. This is a standard, documented
-   CocoaPods+SPM coexistence pattern — not a workaround — but it is a real
-   extra manual step any integrator needs to know about today.
+   Package Dependency", pointing at `../ios/genesisdb` for now — issue #125
+   deliberately defers giving `ios/genesisdb` its own root-level repo for a
+   "real" published SPM URL), **in addition to** running `pod install` for
+   `react-native-genesisdb`. This is a standard, documented CocoaPods+SPM
+   coexistence pattern — not a workaround — but it is a real extra manual
+   step any integrator needs to know about today.
 
-Neither of these is verified by this monorepo's CI: there is no real RN host
-app here to resolve either dependency against, the same host-only carve-out
-already documented for the Android side and for `ios/genesisdb` itself.
+Neither this package's own `pod install`+SPM combination nor `android/build.gradle`'s
+Maven resolution is verified by this monorepo's CI: there is no real RN host
+app here to resolve any of them against, the same host-only carve-out already
+documented for the Android side and for `ios/genesisdb` itself.
+
+## Publishing
+
+`.github/workflows/release.yml`'s `rn-npm-publish` job publishes this package
+to npm (unscoped `react-native-genesisdb`, `--tag beta`) on every `v*` tag
+push, reusing the same `NPM_TOKEN` secret the main native-addon package
+publishes with (issue #125). As of this writing that job exists but hasn't
+run yet — `npm install react-native-genesisdb` doesn't resolve anywhere until
+the next tag push triggers it.
 
 ## Wire format
 

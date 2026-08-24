@@ -111,16 +111,19 @@ future work, not an oversight — see the Phase B DoD checklist in
   monorepo's CI, the same host-only carve-out `android/README.md` and
   `react-native-genesisdb`'s iOS stub already document for their own
   device-only checks.
-- **The podspec doesn't wire the published xcframework in yet.** The zip
-  above exists, but `react-native-genesisdb.podspec` still has no
-  `s.vendored_frameworks`/`prepare_command` step to fetch and unpack it —
-  CocoaPods has no remote-URL binary-target mechanism the way SPM does, so
-  that needs its own `prepare_command` (download + unzip during
-  `pod install`), not yet written.
+- ~~The podspec doesn't wire the published xcframework in yet.~~ **Done
+  (issue #125)**: `react-native-genesisdb.podspec` now has a `prepare_command`
+  that downloads + SHA256-verifies + unzips the release zip above during
+  `pod install`, and `s.vendored_frameworks` points at the result. No manual
+  step needed — see that podspec's comments for the full rationale, including
+  the correction that this never needed a CocoaPods Trunk publish at all (RN
+  autolinking picks up the podspec straight from `node_modules`).
 - `react-native-genesisdb`'s iOS module (`../react-native-genesisdb/ios/`) now
-  calls this package's `GenesisDB` actor for real (no longer a stub) — but
-  actually running it in a real RN app still needs the item above (the
-  podspec wiring) AND the consumer adding this package as a Swift Package
-  dependency alongside `pod install` (CocoaPods can't express an SPM
-  dependency itself). See `react-native-genesisdb/README.md` "iOS integration
+  calls this package's `GenesisDB` actor for real (no longer a stub), and
+  `pod install` now fetches the compiled xcframework automatically — but the
+  consumer must still add `ios/genesisdb` as a Swift Package dependency
+  directly in their Xcode project (CocoaPods can't express an SPM dependency
+  itself; issue #125 deliberately defers giving `ios/genesisdb` its own
+  root-level repo for a "real" published SPM URL, so today that's a local
+  monorepo path). See `react-native-genesisdb/README.md` "iOS integration
   status".
