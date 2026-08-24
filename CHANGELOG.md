@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.1] - 2026-08-24
+
+Patch release — no engine/runtime code changed. Cuts a real release tag so
+the mobile SDK publish-infrastructure work (issue #125) and the two docs-only
+release-asset PRs actually run through the release pipeline: `v0.2.0` was
+already tagged (pointing at an earlier commit) before this infrastructure
+existed, and tags don't move, so a new patch version is the correct way to
+get CI to build+publish with today's `release.yml`.
+
 ### Added — mobile SDK package-manager publishing infrastructure (issue #125)
 
 - **`genesisdb-android` → GitHub Packages**: `android/genesisdb/build.gradle.kts`
