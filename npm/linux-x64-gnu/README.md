@@ -1,0 +1,3 @@
+# `@freshair129/gks-genesis-block-native-linux-x64-gnu`
+
+This is the **x86_64-unknown-linux-gnu** binary for `@freshair129/gks-genesis-block-native`

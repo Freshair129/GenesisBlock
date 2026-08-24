@@ -1,0 +1,22 @@
+{
+  "name": "@freshair129/gks-genesis-block-native-linux-x64-gnu",
+  "version": "0.2.1",
+  "os": [
+    "linux"
+  ],
+  "cpu": [
+    "x64"
+  ],
+  "main": "index.linux-x64-gnu.node",
+  "files": [
+    "index.linux-x64-gnu.node"
+  ],
+  "description": "Genesis Block — native Rust embedded graph engine for GKS (P3.1 scaffold)",
+  "license": "MIT",
+  "engines": {
+    "node": ">=20"
+  },
+  "libc": [
+    "glibc"
+  ]
+}

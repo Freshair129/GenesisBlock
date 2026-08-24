@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed — `napi artifacts` silently dropped Apple Silicon macOS from every npm release
+
+Found by actually pushing the `v0.2.1` tag and watching `release.yml`'s `publish` job run for real for the first time ever (every prior tag either got stuck on a dead `macos-13` runner or was cancelled before reaching this job) — it failed with `TypeError: No dist dir found for .../bindings-aarch64-apple-darwin/index.darwin-arm64.node`.
+
+Root cause: `package.json`'s `napi` config declared `aarch64-apple-darwin` under `targets` (used for cross-compilation), but napi-rs's packaging tooling (`napi create-npm-dir`, `napi artifacts`) doesn't read that key at all — it reads `napi.triples.additional`, which was never set. Without it, only the three napi-rs *default* platforms (`x86_64-unknown-linux-gnu`, `x86_64-pc-windows-msvc`, `x86_64-apple-darwin`) got a per-platform npm package; Apple Silicon macOS was silently excluded from `napi create-npm-dir`'s output, so `napi artifacts` had nowhere to write the arm64 macOS binary and threw. `optionalDependencies` in the root `package.json` already listed a `-darwin-arm64` package (pinned to a stale `0.2.0`, expecting this to work) — so this was an unintentional regression/oversight, not a deliberate exclusion.
+
+- Added `napi.triples.additional: ["aarch64-apple-darwin"]` to `package.json`.
+- Ran `napi create-npm-dir -t .` and committed the resulting `npm/{darwin-arm64,darwin-x64,linux-x64-gnu,win32-x64-msvc}/{package.json,README.md}` skeletons — these are the standard napi-rs per-platform package placeholders CI fills the compiled `.node` binary into at publish time; they had never existed in this repo at all before.
+- Verified the fix locally: simulated the full `napi artifacts` step with dummy per-platform `.node` files matching the real CI artifact layout — confirmed all 4 platforms now resolve and write correctly (previously 3 succeeded silently and the 4th threw, aborting the whole step).
+
+Not fixed here (separate, non-blocking, no behavioral impact): `napi.binaryName: "genesis-block"` in `package.json` is also not a key napi-rs's tooling reads (it reads `napi.name`, defaulting to `"index"` when absent) — every actual build artifact is already consistently named `index.<platform>.node` on both the build and packaging sides, so there's no naming mismatch today, just a misleading/dead config key. Left alone to keep this fix minimal; renaming would touch the binary file name itself and `index.js`'s loader.
+
 ## [0.2.1] - 2026-08-24
 
 Patch release — no engine/runtime code changed. Cuts a real release tag so
