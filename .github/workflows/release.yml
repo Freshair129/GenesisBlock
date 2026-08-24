@@ -1,15 +1,28 @@
 # Build the NAPI native addon for every published target and publish to npm.
+# Also publishes the two other mobile-SDK package-manager surfaces on the same
+# tag (issue #125): genesisdb-android to GitHub Packages, react-native-genesisdb
+# to npm. GenesisBlockDB.xcframework is NOT published here — it ships as a raw
+# GitHub Release asset via a manual step (see ios/README.md "Prebuilt
+# xcframework"), not through a package-manager job, since CocoaPods needs no
+# Trunk publish for it (react-native-genesisdb's podspec fetches it directly —
+# see that podspec's comment) and a real SPM-registry path is deferred.
 #
 # Triggered by pushing a version tag (e.g. v0.1.0-beta.1) or manually.
 #
 # PREREQUISITES (must be set up once before this can actually publish):
 #   1. Repo secret NPM_TOKEN — an npm automation token with publish rights to
-#      the @freshair129 scope. Settings → Secrets and variables → Actions.
+#      the @freshair129 scope AND to the unscoped `react-native-genesisdb`
+#      name (rn-npm-publish reuses this same secret). Settings → Secrets and
+#      variables → Actions.
 #   2. package.json `install: npm run build` forces a Rust compile on EVERY
 #      consumer `npm install`. Before the first real publish, change it so
 #      consumers receive the prebuilt platform addon instead of recompiling
 #      (the napi optionalDependencies + index.js resolver already handle
 #      runtime selection). CI here uses `--ignore-scripts` to avoid recompiling.
+#   3. android-publish needs NO new secret — it authenticates to GitHub
+#      Packages with the workflow's own auto-issued GITHUB_TOKEN (job-level
+#      `packages: write` permission below), the same way every other job here
+#      already gets `contents: read` for free.
 #
 # Flow (napi-rs v2): each matrix host builds one target's .node and uploads it;
 # the publish job downloads them all, `napi artifacts` lays them into npm/<target>/
@@ -41,7 +54,13 @@ jobs:
             target: x86_64-unknown-linux-gnu
           - host: windows-latest
             target: x86_64-pc-windows-msvc
-          - host: macos-13
+          # Was macos-13: found stuck queued (no runner ever assigned) for 9+
+          # hours on the v0.2.0 tag push while working on issue #125 — GitHub
+          # has been winding down macos-13 hosted-runner capacity. macos-14 is
+          # Apple Silicon but still cross-compiles x86_64-apple-darwin fine
+          # (same cross-compile approach the aarch64-apple-ios/-sim jobs
+          # already rely on in mobile-build.yml).
+          - host: macos-14
             target: x86_64-apple-darwin
           - host: macos-latest
             target: aarch64-apple-darwin
@@ -104,6 +123,115 @@ jobs:
       # prepublishOnly (napi prepublish -t npm) fires here: publishes the
       # per-platform packages and updates the main package optionalDependencies.
       # --tag beta keeps this prerelease off the npm `latest` dist-tag.
+      - name: Publish to npm
+        run: |
+          npm config set provenance true
+          npm publish --access public --tag beta
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+  # Issue #125: genesisdb-android → GitHub Packages. Self-contained (does not
+  # depend on mobile-build.yml's android-build/android-aar jobs — release
+  # workflows in this repo build their own artifacts fresh rather than
+  # cross-workflow `needs:`, matching how the napi `build`/`publish` jobs
+  # above already work independently of test.yml). Uses a release cargo-ndk
+  # build (mobile-build.yml's android-build is deliberately debug, for CI
+  # speed — a published artifact should be release).
+  android-publish:
+    name: publish genesisdb-android to GitHub Packages
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-linux-android, armv7-linux-androideabi
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: mobile-android-publish
+
+      - name: Install Android NDK
+        uses: nttld/setup-ndk@v1
+        id: setup-ndk
+        with:
+          ndk-version: r26d
+          add-to-path: true
+
+      - name: Install cargo-ndk
+        run: cargo install cargo-ndk --locked
+
+      - name: Build SDK core for Android (arm64 + armv7, release)
+        env:
+          ANDROID_NDK_HOME: ${{ steps.setup-ndk.outputs.ndk-path }}
+        run: |
+          cargo ndk \
+            --target aarch64-linux-android \
+            --target armv7-linux-androideabi \
+            build --release --no-default-features --features "mobile ffi android-jni"
+
+      - name: Stage jniLibs
+        run: |
+          mkdir -p android/genesisdb/src/main/jniLibs/arm64-v8a android/genesisdb/src/main/jniLibs/armeabi-v7a
+          cp target/aarch64-linux-android/release/libgenesis_block_native.so android/genesisdb/src/main/jniLibs/arm64-v8a/
+          cp target/armv7-linux-androideabi/release/libgenesis_block_native.so android/genesisdb/src/main/jniLibs/armeabi-v7a/
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: android-actions/setup-android@v3
+
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: 8.7
+
+      # See android/genesisdb/build.gradle.kts's `publishing {}` block for the
+      # coordinate + GitHub Packages repository config. GITHUB_TOKEN here is
+      # the workflow's own auto-issued token — no repo secret needed.
+      - name: gradle :genesisdb:publish
+        working-directory: android
+        run: gradle :genesisdb:publish
+        env:
+          GITHUB_ACTOR: ${{ github.actor }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # Issue #125: react-native-genesisdb → npm. Independent package (its own
+  # package-lock.json, not an npm workspace member of the repo root — see
+  # react-native-genesisdb/package.json), so it gets its own install/build/
+  # publish steps rather than reusing the root `npm ci` above.
+  rn-npm-publish:
+    name: publish react-native-genesisdb to npm
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write # npm provenance
+    defaults:
+      run:
+        working-directory: react-native-genesisdb
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          registry-url: 'https://registry.npmjs.org'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run tests
+        run: npm test
+
+      - name: Build
+        run: npm run build
+
+      # --tag beta matches the main package's convention above — keeps this
+      # pre-1.0 package off the npm `latest` dist-tag.
       - name: Publish to npm
         run: |
           npm config set provenance true

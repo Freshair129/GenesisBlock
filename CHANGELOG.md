@@ -7,6 +7,44 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added — mobile SDK package-manager publishing infrastructure (issue #125)
+
+- **`genesisdb-android` → GitHub Packages**: `android/genesisdb/build.gradle.kts`
+  gained a `maven-publish`-backed `publishing {}` block (AGP `singleVariant`
+  release component + sources jar) publishing `dev.genesisblock:genesisdb-android:0.1.0`
+  to `https://maven.pkg.github.com/Freshair129/GenesisBlock`. Chosen over
+  Maven Central: zero new account/GPG-signing setup, authenticates with the
+  workflow's own `GITHUB_TOKEN` (no new repo secret). Tradeoff documented in
+  `android/README.md`: unlike Maven Central, GitHub Packages requires
+  authentication for every read of a Maven artifact, even on a public repo.
+- **`GenesisBlockDB.xcframework` → wired into `react-native-genesisdb`'s
+  podspec automatically**: `react-native-genesisdb.podspec` gained a
+  `prepare_command` that downloads, SHA256-verifies, and unzips the v0.2.0
+  release zip during `pod install`, plus `s.vendored_frameworks` pointing at
+  the result. **Correction to prior docs**: this never needed a CocoaPods
+  Trunk publish — RN autolinking (`use_native_modules!`) picks the podspec up
+  directly from `node_modules`, the same mechanism virtually every
+  third-party RN native module already relies on for its iOS half. A true
+  standalone-SPM-outside-RN registry path for `ios/genesisdb` (which would
+  need its own root-level repo, since `.package(url:)` requires
+  `Package.swift` at the repo root) is deliberately deferred — smaller
+  audience than the RN+CocoaPods path this PR unblocks.
+- **`react-native-genesisdb` → npm**: `.github/workflows/release.yml` gained
+  an `rn-npm-publish` job publishing the package (unscoped, `--tag beta`) on
+  every `v*` tag push, reusing the existing `NPM_TOKEN` secret.
+- **Found + fixed while touching `release.yml`**: the `x86_64-apple-darwin`
+  build leg was pinned to `macos-13`, and the v0.2.0 tag's run had been stuck
+  `queued` with no runner assigned for 9+ hours — GitHub has been winding
+  down `macos-13` hosted-runner capacity. Switched to `macos-14` (still
+  cross-compiles `x86_64-apple-darwin` fine, same approach the iOS
+  device/simulator jobs already use in `mobile-build.yml`).
+- **None of this has actually published anything yet** — all three jobs are
+  infrastructure gated on the next `v*` tag push; `implementation
+  "dev.genesisblock:genesisdb-android:0.1.0"` and `npm install
+  react-native-genesisdb` still don't resolve until that happens. See
+  `docs/SPEC--MOBILE-SDK.md`'s Phase B DoD checklist and issue #125 for what
+  remains (Maven Central, a real SPM registry path, on-device acceptance).
+
 ### Added — v0.2.0 GitHub Release: mobile SDK binary assets published
 
 - **`GenesisBlockDB.xcframework.zip` and `genesisdb-android-0.1.0.aar` are
