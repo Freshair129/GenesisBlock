@@ -1,6 +1,6 @@
 {
   "name": "@freshair129/gks-genesis-block-native",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Genesis Block — native Rust embedded graph engine for GKS (P3.1 scaffold)",
   "main": "index.js",
   "types": "index.d.ts",
