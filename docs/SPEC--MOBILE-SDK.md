@@ -499,11 +499,12 @@ references the release URL + checksum.
 > setup (reuses the workflow's own `GITHUB_TOKEN`); the tradeoff is consumers
 > need a GitHub PAT with `read:packages` in their own Gradle config, since
 > GitHub Packages requires auth for every read even on a public repo — see
-> `android/README.md` "Building". As of this writing that job exists but
-> hasn't run yet (no tag pushed since it landed) — the coordinate doesn't
-> resolve until the next one does. Maven Central remains a documented future
-> option once the `dev.genesisblock` namespace is verified there. The
-> on-device/Gradle-project acceptance checks below are still open.
+> `android/README.md` "Building". **Published for real on the `v0.2.1` tag
+> (2026-08-24)** — `dev.genesisblock:genesisdb-android:0.1.0` is genuinely
+> live on GitHub Packages (verified via the public packages page). Maven
+> Central remains a documented future option once the `dev.genesisblock`
+> namespace is verified there. The on-device/Gradle-project acceptance
+> checks below are still open.
 
 ### B-2: Android .aar + Kotlin wrapper (~2 weeks)
 
@@ -606,19 +607,21 @@ for the initial SDK release; added when there is demonstrated user demand.
       (`RoundTripTests.swift`, CI: `ios-swift-tests`)
 
 **Android SDK:**
-- [ ] `.aar` installs via Gradle in a blank Android Studio project (Maven
-      publish to GitHub Packages is wired — `android-publish` job — but
-      hasn't run against a real tag yet, and this hasn't been exercised
-      against a real project — see `android/README.md` "Building")
+- [x] `.aar` publishes to Maven (GitHub Packages) — `genesisdb-android:0.1.0`
+      confirmed live via `android-publish` (issue #125). Not yet done: actually
+      resolving it via Gradle in a blank Android Studio project (a consumer
+      needs a GitHub PAT with `read:packages` — see `android/README.md`
+      "Building" — that manual-project acceptance step is still open)
 - [ ] `GenesisDB(filesDir).executeHQL(...)` runs on a physical arm64 device
 - [ ] JNI `UnsatisfiedLinkError` does not occur at runtime
 
 **React Native package:**
-- [ ] `npm install react-native-genesisdb` + `npx pod-install` works on iOS
-      (npm publish is wired — `rn-npm-publish` job — but hasn't run against a
-      real tag yet; the podspec's `prepare_command` fetching the xcframework
-      IS done and CI-unverified only for the same host-app reason as always)
-- [ ] `npm install react-native-genesisdb` + Gradle sync works on Android
+- [x] `react-native-genesisdb@0.1.0` publishes to npm — confirmed live
+      (issue #125). Not yet done: actually running `npm install
+      react-native-genesisdb` + `npx pod-install` (iOS) or Gradle sync
+      (Android) in a blank RN project — the podspec's `prepare_command`
+      fetching the xcframework is done and CI-unverified only for the same
+      host-app reason as always
 - [ ] TypeScript types have zero `any` — full inference on all public methods
 
 ---
