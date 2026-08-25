@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.3] - 2026-08-25
+
+Patch release — no engine/runtime code changed since v0.2.2. Cuts a real
+release tag now that the missing `package.json` `repository` field (0.2.2)
+is fixed, so the main native-addon npm publish — which failed on `v0.2.2`
+with a provenance/repository-URL verification error — can finally succeed.
+`genesisdb-android` and `react-native-genesisdb` are already confirmed live
+from prior tags; this tag's only job left to prove out is the main package.
+
 ### Fixed — npm provenance rejected the main native-addon publish: missing `repository.url`
 
 Found by actually pushing the `v0.2.2` tag: with `NPM_TOKEN` set and the

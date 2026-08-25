@@ -2,7 +2,7 @@
   "$comment": "Version manifest for the GenesisBlockDB multi-surface repo. The engine (Rust core) is the anchor; every client surface declares the engine SCHEMA_VERSION it targets. SCHEMA_VERSION is the on-disk/data-format version (src/lib.rs: SCHEMA_VERSION), independent of package semver. Bump a surface's `version` on release; bump `engine.schemaVersion` only on a breaking on-disk format change.",
   "engine": {
     "name": "genesis-block-native",
-    "version": "0.2.2",
+    "version": "0.2.3",
     "schemaVersion": 3,
     "artifacts": [
       "cdylib (npm native addon)",
@@ -14,9 +14,9 @@
       "name": "@freshair129/gks-genesis-block-native",
       "path": ".",
       "type": "npm-native-addon",
-      "version": "0.2.2",
+      "version": "0.2.3",
       "targetsSchemaVersion": 3,
-      "minEngineVersion": "0.2.2"
+      "minEngineVersion": "0.2.3"
     },
     {
       "name": "genesisdb-python",
