@@ -1,6 +1,6 @@
 {
   "name": "@freshair129/gks-genesis-block-native-darwin-x64",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "os": [
     "darwin"
   ],
@@ -15,5 +15,9 @@
   "license": "MIT",
   "engines": {
     "node": ">=20"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Freshair129/GenesisBlock"
   }
 }
