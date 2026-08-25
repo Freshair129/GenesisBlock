@@ -7,6 +7,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added — iOS on-device acceptance test (issue #125 follow-up)
+
+- **`mobile-acceptance/ios/`**: a genuinely independent, blank SPM package
+  (not a dependency on `ios/genesisdb`) that consumes the *published*
+  `v0.2.0` `GenesisBlockDB.xcframework` release asset via
+  `.binaryTarget(url:, checksum:)` — the actual distribution mechanism a
+  real external consumer uses, which `ios/genesisdb`'s own `Package.swift`
+  deliberately does not exercise (it links a local host-arch build instead,
+  to keep its own tests executable).
+- `RoundTripTests.swift` calls the raw `genesisdb_*` C functions directly
+  (`open`/`add_node`/`retrieve_context`/`flush_index`) and runs for real
+  inside the iOS Simulator — the xcframework's `aarch64-apple-ios-sim` slice
+  executes natively there on an Apple Silicon macOS runner, unlike the
+  device slice.
+- New CI job `.github/workflows/mobile-build.yml`'s `ios-acceptance-test`:
+  finds an available iPhone simulator dynamically (not hardcoded, since the
+  default device list shifts with the runner's Xcode version) and runs
+  `xcodebuild test` against it.
+- Updates `docs/SPEC--MOBILE-SDK.md`'s Phase B DoD checklist (new item,
+  pending its first CI run before being checked off) and `ios/README.md`'s
+  "Not yet done" section.
+
 ## [0.2.3] - 2026-08-25
 
 Patch release — no engine/runtime code changed since v0.2.2. Cuts a real

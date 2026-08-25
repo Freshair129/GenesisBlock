@@ -601,8 +601,18 @@ for the initial SDK release; added when there is demonstrated user demand.
 - [x] `GenesisBlockDB.xcframework` builds for `aarch64-apple-ios` + `aarch64-apple-ios-sim`
       (CI: `ios-xcframework`) and is published as a v0.2.0 release asset
 - [ ] Swift Package Manager `import GenesisBlockDB` works in a blank Xcode project
-      (`Package.swift` still links a local host-arch build, not the published
-      binary target — see `ios/README.md` "Prebuilt xcframework")
+      (`ios/genesisdb`'s own `Package.swift` still links a local host-arch
+      build, not the published binary target, deliberately — see
+      `ios/README.md` "Prebuilt xcframework". `mobile-acceptance/ios/` now
+      exercises the published binaryTarget path instead — see the item
+      below — but that's a separate blank package, not `ios/genesisdb`
+      itself, so this specific checkbox stays honest)
+- [ ] MARK XVI on-device acceptance (issue #125 follow-up): a genuinely
+      blank SPM package consumes the *published* `GenesisBlockDB.xcframework`
+      via `.binaryTarget` and runs a real round trip in the iOS Simulator —
+      `mobile-acceptance/ios/`, CI job `ios-acceptance-test`. Written blind
+      like every other iOS piece in this repo; pending its first CI run to
+      confirm before checking this off.
 - [x] `addNode` + `retrieveContext` round-trip in a Swift test target
       (`RoundTripTests.swift`, CI: `ios-swift-tests`)
 

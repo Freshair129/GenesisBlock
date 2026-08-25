@@ -35,6 +35,15 @@
 #                       .so slices, proving the Gradle module links against
 #                       real cargo-ndk output end to end.
 #
+# On-device acceptance (issue #125 follow-up, MARK XVI Phase B DoD):
+#   ios-acceptance-test — mobile-acceptance/ios/ is a genuinely independent
+#                         "blank consumer" SPM package (NOT ios/genesisdb)
+#                         that depends ONLY on the *published* v0.2.0
+#                         GenesisBlockDB.xcframework release asset via
+#                         `.binaryTarget(url:, checksum:)` — proving the real
+#                         external-consumer distribution path, executed for
+#                         real inside the iOS Simulator via `xcodebuild test`.
+#
 # Targets (from SPEC §0-B):
 #   aarch64-apple-ios          — iOS device
 #   aarch64-apple-ios-sim      — iOS Simulator (Apple Silicon)
@@ -56,6 +65,7 @@ on:
       - 'android/**'
       - 'ios/**'
       - 'react-native-genesisdb/**'
+      - 'mobile-acceptance/**'
       - 'Cargo.toml'
       - '.github/workflows/mobile-build.yml'
   pull_request:
@@ -69,6 +79,7 @@ on:
       - 'android/**'
       - 'ios/**'
       - 'react-native-genesisdb/**'
+      - 'mobile-acceptance/**'
       - 'Cargo.toml'
       - '.github/workflows/mobile-build.yml'
 
@@ -190,6 +201,39 @@ jobs:
         env:
           GENESISDB_RUST_LIB_DIR: ${{ github.workspace }}/target/debug
         run: swift test
+
+  # MARK XVI on-device acceptance (issue #125 follow-up). Independent of
+  # ios-swift-tests above: that job proves the local host-arch build works;
+  # this one proves the *published* GenesisBlockDB.xcframework release asset
+  # is consumable by a genuinely blank SPM package (mobile-acceptance/ios/,
+  # not ios/genesisdb) via `.binaryTarget(url:, checksum:)` — the actual
+  # distribution mechanism a real external consumer uses — and that the
+  # linked C ABI genuinely executes inside the iOS Simulator, not just
+  # compiles. No local Rust build needed here; the whole point is testing
+  # what's already live on the release.
+  ios-acceptance-test:
+    name: iOS acceptance test (published xcframework via SPM)
+    runs-on: macos-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      # Pick the first available iPhone simulator dynamically rather than
+      # hardcoding a model name — the exact default device list shifts with
+      # every Xcode version GitHub bumps the macos-latest image to.
+      - name: Find an available iPhone simulator
+        id: sim
+        run: |
+          DEVICE_ID=$(xcrun simctl list devices available -j \
+            | python3 -c "import json,sys; d=json.load(sys.stdin); print(next(dev['udid'] for runtime in d['devices'].values() for dev in runtime if dev['name'].startswith('iPhone')))")
+          echo "device_id=$DEVICE_ID" >> "$GITHUB_OUTPUT"
+
+      - name: xcodebuild test (iOS Simulator)
+        working-directory: mobile-acceptance/ios
+        run: |
+          xcodebuild test \
+            -scheme GenesisAcceptance \
+            -destination "id=${{ steps.sim.outputs.device_id }}"
 
   # Android arm64 + armv7 via cargo-ndk. nttld/setup-ndk provisions the NDK;
   # cargo-ndk wires the right clang linker per target so no manual

@@ -106,11 +106,16 @@ future work, not an oversight — see the Phase B DoD checklist in
 
 ## Not yet done
 
-- Literal on-device/Xcode-project acceptance (`import GenesisBlockDB` in a
-  blank Xcode project, running on a physical device) — out of scope for this
-  monorepo's CI, the same host-only carve-out `android/README.md` and
-  `react-native-genesisdb`'s iOS stub already document for their own
-  device-only checks.
+- ~~Literal on-device/Xcode-project acceptance...~~ **Partially done**:
+  [`mobile-acceptance/ios/`](../mobile-acceptance/ios) is a genuinely blank
+  SPM package that depends only on the *published* xcframework release asset
+  (not this local build) and runs a real `addNode`/`retrieveContext` round
+  trip inside the iOS Simulator via CI (`ios-acceptance-test` job) — proving
+  the actual external-consumer distribution path, not just that `ios/genesisdb`
+  compiles locally. Genuine physical-device testing (as opposed to Simulator)
+  remains out of scope for this monorepo's CI, the same host-only carve-out
+  `android/README.md` and `react-native-genesisdb`'s iOS stub document for
+  their own device-only checks.
 - ~~The podspec doesn't wire the published xcframework in yet.~~ **Done
   (issue #125)**: `react-native-genesisdb.podspec` now has a `prepare_command`
   that downloads + SHA256-verifies + unzips the release zip above during
