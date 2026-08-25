@@ -1,6 +1,6 @@
 [package]
 name = "genesis-block-native"
-version = "0.2.1"
+version = "0.2.2"
 edition = "2021"
 description = "Genesis Block — high-performance hybrid semantic-graph engine"
 license = "MIT"

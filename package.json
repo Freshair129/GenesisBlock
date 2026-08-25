@@ -1,6 +1,6 @@
 {
   "name": "@freshair129/gks-genesis-block-native",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "description": "Genesis Block — native Rust embedded graph engine for GKS (P3.1 scaffold)",
   "main": "index.js",
   "types": "index.d.ts",
@@ -33,7 +33,9 @@
       "aarch64-apple-darwin"
     ],
     "triples": {
-      "additional": ["aarch64-apple-darwin"]
+      "additional": [
+        "aarch64-apple-darwin"
+      ]
     }
   },
   "scripts": {

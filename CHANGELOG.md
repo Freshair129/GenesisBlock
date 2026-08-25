@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.2] - 2026-08-25
+
+Patch release — no engine/runtime code changed since v0.2.1. Cuts a real
+release tag now that the `NPM_TOKEN` repo secret (the last missing
+prerequisite from `release.yml`'s own header comment) has been added, so the
+`v0.2.1` npm-publish attempts that failed with `ENEEDAUTH` can finally
+succeed for real: the main native-addon package, `genesisdb-android` (already
+live on GitHub Packages since v0.2.1 and expected to re-publish harmlessly),
+and `react-native-genesisdb`.
+
 ### Fixed — `napi artifacts` silently dropped Apple Silicon macOS from every npm release
 
 Found by actually pushing the `v0.2.1` tag and watching `release.yml`'s `publish` job run for real for the first time ever (every prior tag either got stuck on a dead `macos-13` runner or was cancelled before reaching this job) — it failed with `TypeError: No dist dir found for .../bindings-aarch64-apple-darwin/index.darwin-arm64.node`.
