@@ -29,6 +29,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   pending its first CI run before being checked off) and `ios/README.md`'s
   "Not yet done" section.
 
+### Fixed — v0.2.0 xcframework.zip release asset was corrupt for SwiftPM
+
+- Found by `ios-acceptance-test`'s first real run: the published `v0.2.0`
+  `GenesisBlockDB.xcframework.zip` release asset had been zipped by hand on
+  the Windows dev box (per `release.yml`'s header comment, this asset ships
+  as a manual step, not a package-manager publish). Windows zip tools write
+  the zip "version made by" host byte as 0 (MS-DOS/FAT); macOS's
+  Info-ZIP-based unzip — what SwiftPM's `binaryTarget` extraction shells out
+  to — treats a non-Unix host byte as a signal to distrust the archive's
+  path separators and aborts with `"appears to use backslashes as path
+  separators"`, even though every entry inside the archive was already
+  forward-slash (confirmed via Python's `zipfile` module: zero backslashes
+  in any of the 5 entry names — the host-attribute byte alone tripped it).
+- `.github/workflows/mobile-build.yml`'s `ios-xcframework` job now zips its
+  own output with BSD `zip` on the macOS runner, which writes the Unix host
+  byte and extracts cleanly (new `GenesisBlockDB-xcframework-zip` artifact).
+  Future re-publishes of this asset should always come from that job's
+  output, never a manual Windows-side zip.
+- Replaced the `v0.2.0` release asset in place (same URL) with a correctly
+  zipped rebuild from the same staticlibs/headers — new SHA256
+  `a4d2b0f267a15c1b8b82c349655b0fe2bc521fd2b1905c7c2bd6714e3f8db97f`
+  (old, broken: `8359846a8e668770816e0d84940aead0a85812f5aa67f91e7c2ff8308d37bc72`).
+  Updated the pinned checksum everywhere it's referenced:
+  `react-native-genesisdb.podspec`, `ios/README.md`,
+  `mobile-acceptance/ios/{Package.swift,README.md}`,
+  `docs/SPEC--MOBILE-SDK.md`.
+
 ## [0.2.3] - 2026-08-25
 
 Patch release — no engine/runtime code changed since v0.2.2. Cuts a real

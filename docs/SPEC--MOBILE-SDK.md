@@ -415,7 +415,7 @@ The SDK is extracted from the proven Phase A core.
 > (built from the `ios-xcframework` CI job's output on main, device +
 > simulator slices) is attached to the
 > [v0.2.0 GitHub Release](https://github.com/Freshair129/GenesisBlock/releases/tag/v0.2.0)
-> — SHA256 `8359846a8e668770816e0d84940aead0a85812f5aa67f91e7c2ff8308d37bc72`.
+> — SHA256 `a4d2b0f267a15c1b8b82c349655b0fe2bc521fd2b1905c7c2bd6714e3f8db97f`.
 > The `genesisdb-android` `.aar` (v0.1.0) is attached to the same release.
 > Still not done: `Package.swift` deliberately has NOT been swapped to the
 > `.binaryTarget(url:, checksum:)` form — that would replace the current

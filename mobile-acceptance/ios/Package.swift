@@ -25,7 +25,7 @@ let package = Package(
         .binaryTarget(
             name: "GenesisBlockDB",
             url: "https://github.com/Freshair129/GenesisBlock/releases/download/v0.2.0/GenesisBlockDB.xcframework.zip",
-            checksum: "8359846a8e668770816e0d84940aead0a85812f5aa67f91e7c2ff8308d37bc72"
+            checksum: "a4d2b0f267a15c1b8b82c349655b0fe2bc521fd2b1905c7c2bd6714e3f8db97f"
         ),
         .testTarget(
             name: "GenesisAcceptanceTests",
