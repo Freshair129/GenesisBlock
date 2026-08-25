@@ -1,6 +1,6 @@
 {
   "name": "@freshair129/gks-genesis-block-native-linux-x64-gnu",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "os": [
     "linux"
   ],
@@ -15,6 +15,10 @@
   "license": "MIT",
   "engines": {
     "node": ">=20"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Freshair129/GenesisBlock"
   },
   "libc": [
     "glibc"

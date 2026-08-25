@@ -7,6 +7,45 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed — npm provenance rejected the main native-addon publish: missing `repository.url`
+
+Found by actually pushing the `v0.2.2` tag: with `NPM_TOKEN` set and the
+`napi.triples.additional` fix (0.2.2) in place, `napi artifacts` succeeded
+for the first time ever, but the subsequent `npm publish` step failed:
+
+```
+npm error code E422
+npm error 422 Unprocessable Entity - PUT .../@freshair129%2fgks-genesis-block-native-win32-x64-msvc
+npm error Error verifying sigstore provenance bundle: Failed to validate
+repository information: package.json: "repository.url" is "", expected to
+match "https://github.com/Freshair129/GenesisBlock" from provenance
+```
+
+Root cause: root `package.json` had no top-level `repository` field at
+all. `release.yml`'s publish step runs with npm provenance enabled (`npm
+config set provenance true`), which cryptographically ties the publish to
+this exact GitHub repo/workflow run — npm's registry then requires
+`package.json`'s `repository.url` to match, and an empty/missing field
+fails verification outright. `react-native-genesisdb/package.json` already
+had this field (its own publish succeeded cleanly); the root package.json
+was the one surface missing it.
+
+- Added a `repository: { type: "git", url: "https://github.com/Freshair129/GenesisBlock" }`
+  field to `package.json`.
+- Re-ran `napi create-npm-dir -t .` to regenerate the committed
+  `npm/{linux-x64-gnu,win32-x64-msvc,darwin-x64,darwin-arm64}/package.json`
+  skeletons (added in 0.2.2's `napi.triples.additional` fix) so they pick up
+  the `repository` field too — `napi`'s own scaffolder copies `repository`
+  from the root package.json into each per-platform package. Also
+  incidentally caught these skeletons up from a stale `0.2.1` to the
+  current `0.2.2` version string.
+
+Separately, not a bug: the same `v0.2.2` tag's `android-publish` job failed
+with a `409 Conflict` — expected, not a defect. `genesisdb-android:0.1.0`
+was already published successfully during the `v0.2.1` run and is still
+live; GitHub Packages correctly rejects re-publishing an unchanged version
+at the same coordinate. Nothing to fix there.
+
 ## [0.2.2] - 2026-08-25
 
 Patch release — no engine/runtime code changed since v0.2.1. Cuts a real
