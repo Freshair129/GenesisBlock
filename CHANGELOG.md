@@ -56,6 +56,39 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `mobile-acceptance/ios/{Package.swift,README.md}`,
   `docs/SPEC--MOBILE-SDK.md`.
 
+### Fixed — two more `ios-acceptance-test` bugs found iterating past the zip fix
+
+- **Wrong scheme name.** `mobile-acceptance/ios/Package.swift` declares no
+  `products:` (only a `binaryTarget` + a `testTarget`), so `xcodebuild`'s
+  implicit-workspace scheme generation doesn't produce a scheme matching the
+  package name — it auto-vends one whole-package scheme named
+  `"<PackageName>-Package"` instead. `-scheme GenesisAcceptance` and a
+  follow-up guess, `-scheme GenesisAcceptanceTests`, both don't exist; only
+  `GenesisAcceptance-Package` does (confirmed via an added `xcodebuild -list`
+  diagnostic step, now kept in the CI job for future naming drift). Fixed in
+  `.github/workflows/mobile-build.yml` and `mobile-acceptance/ios/README.md`'s
+  two documented local-run commands.
+- **Missing Clang module map.** With the scheme name fixed, the build
+  actually compiled `RoundTripTests.swift` and failed for real:
+  `error: unable to resolve module dependency: 'GenesisBlockDB'` on `import
+  GenesisBlockDB`. Root cause: `GenesisBlockDB.xcframework` wraps a plain C
+  static library + `genesisdb.h` with no Clang module map, so Swift has no
+  module named `GenesisBlockDB` to import — independent of scheme or zip
+  correctness. `ios/genesisdb`'s own package sidesteps this with a *local*
+  `CGenesisDBFFI` system-library target + module map, but a `binaryTarget`
+  consumer of the published xcframework (this package, and any real
+  external consumer) has no such local target to lean on — the module map
+  has to live inside the xcframework itself. Added `include/module.modulemap`
+  (`module GenesisBlockDB { header "genesisdb.h" export * }`);
+  `ios-xcframework`'s existing `-headers include/` step already copies the
+  whole directory into each library slice's `Headers/`, so no CI change was
+  needed beyond that file.
+- Rebuilt and re-published the `v0.2.0` `GenesisBlockDB.xcframework.zip`
+  release asset again to pick up the module map — new SHA256
+  `607df0d82d68550a20927ae171928ad1decd7253fb647da450dec87deea1c26d`
+  (previous: `a4d2b0f267a15c1b8b82c349655b0fe2bc521fd2b1905c7c2bd6714e3f8db97f`),
+  repinned in the same five files as the previous fix.
+
 ## [0.2.3] - 2026-08-25
 
 Patch release — no engine/runtime code changed since v0.2.2. Cuts a real

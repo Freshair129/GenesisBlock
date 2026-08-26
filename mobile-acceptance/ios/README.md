@@ -20,7 +20,7 @@ This package does exactly that:
 .binaryTarget(
     name: "GenesisBlockDB",
     url: "https://github.com/Freshair129/GenesisBlock/releases/download/v0.2.0/GenesisBlockDB.xcframework.zip",
-    checksum: "a4d2b0f267a15c1b8b82c349655b0fe2bc521fd2b1905c7c2bd6714e3f8db97f"
+    checksum: "607df0d82d68550a20927ae171928ad1decd7253fb647da450dec87deea1c26d"
 )
 ```
 
