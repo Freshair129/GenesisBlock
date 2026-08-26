@@ -18,8 +18,8 @@ Nearest comparators are embedded engines such as Kuzu, DuckDB combined with grap
 
 | Field | Value |
 |---|---|
-| **Version** | `0.2.0` (crate, npm, and `modules.json` in lock-step; `npm run version:check` gates CI) |
-| **Milestone** | Mark XVI — mobile SDK & embedded core; GNSE bitemporal line complete (WP-0.1 → WP-3.3) |
+| **Version** | `0.2.3` (crate, npm, and `modules.json` in lock-step; `npm run version:check` gates CI) |
+| **Milestone** | Mark XVI — mobile SDK; iOS/Android/React Native SDKs published and live (GitHub Releases, GitHub Packages, npm), iOS on-device acceptance verified in CI; GNSE bitemporal line complete (WP-0.1 → WP-3.3) |
 | **Status** | Advanced prototype — durable, benchmarked, full Rust + Node suites green |
 
 Version SSOT: [docs/VERSION.md](docs/VERSION.md) · Detailed history: [CHANGELOG.md](CHANGELOG.md)
@@ -31,7 +31,7 @@ Version SSOT: [docs/VERSION.md](docs/VERSION.md) · Detailed history: [CHANGELOG
 - **Retention profiles**: `frontier_only` (default — folds history at every checkpoint, cost-neutral) or `full` (keeps the replayable journal for time travel); the fold is the single history-destruction boundary, and questions beyond the retained horizon fail loudly (`beyond_horizon`) instead of returning silently wrong answers.
 - **Measured cross-dimension advantage**: fused vector+graph+AS-OF queries run **115–188× faster** than the equivalent DIY single-file SQLite assembly at 100k nodes × 1024 dims ([moat verdict](docs/REPORT--G3-MOAT-VERDICT.md)) — disclosed honestly: bulk ingest is currently slower than SQLite's, and the corpus is synthetic (real-corpus run scheduled).
 - **Vector memory that scales down**: per-collection vector spaces (own model/dim/metric), asynchronous HNSW indexing, F16/SQ8/BQ quantization with an off-RAM rerank sidecar, and WAL compaction/checkpointing.
-- **Embedded everywhere**: Node.js N-API addon, standalone Axum REST server, MCP server, Python and Go SDKs — plus a C FFI (`genesisdb_*`) with Android `.aar` and React Native bindings from the same crate.
+- **Embedded everywhere**: Node.js N-API addon, standalone Axum REST server, MCP server, Python and Go SDKs — plus a C FFI (`genesisdb_*`) powering a published iOS `GenesisBlockDB.xcframework` (Swift, GitHub Release asset), an Android `genesisdb-android` `.aar` (GitHub Packages), and a React Native package (npm), all from the same crate. iOS on-device acceptance — the published xcframework consumed via `.binaryTarget` and executed in the iOS Simulator — is CI-verified (see [docs/SPEC--MOBILE-SDK.md](docs/SPEC--MOBILE-SDK.md)).
 
 ## Product Boundary
 

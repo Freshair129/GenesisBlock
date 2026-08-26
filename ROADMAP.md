@@ -1,4 +1,4 @@
-# GENESISDB ROADMAP (current milestone: MARK XVI — Mobile, v0.2.0)
+# GENESISDB ROADMAP (current milestone: MARK XVI — Mobile, v0.2.3)
 **Positioning:** Embedded analytics / agent-memory graph + vector engine —
 the only embedded database with graph + vector + bitemporal + CRDT + governance
 in a single binary. Nearest comparators: Kuzu, DuckDB+graph, LanceDB, LadybugDB.
@@ -250,7 +250,7 @@ in a single binary. Nearest comparators: Kuzu, DuckDB+graph, LanceDB, LadybugDB.
 
 ---
 
-## MARK XVI: Mobile SDK & Embedded App (Phase 0 COMPLETE 2026-06-29 — PR #37, v0.2.0)
+## MARK XVI: Mobile SDK & Embedded App (Phase B SDKs published + iOS on-device acceptance verified — v0.2.3)
 
 > **Theme:** GenesisBlockDB as a first-class embedded mobile engine — local-first,
 > in-process, no server required. Two artifacts: a standalone mobile app with graph +
@@ -260,9 +260,18 @@ in a single binary. Nearest comparators: Kuzu, DuckDB+graph, LanceDB, LadybugDB.
 >
 > **Complexity:** C-3. Phase 0 is a prerequisite for all subsequent phases.
 >
-> **Status:** Phase 0 **merged to main** via [PR #37](https://github.com/Freshair129/GenesisBlock/pull/37)
-> (engine `0.1.0-beta.2` → **`0.2.0`**, first non-beta). All 13 CI jobs green, incl.
-> iOS + Android cross-compile on GitHub runners. Phase A is next.
+> **Status:** Phase 0 merged via [PR #37](https://github.com/Freshair129/GenesisBlock/pull/37)
+> (engine `0.1.0-beta.2` → `0.2.0`, first non-beta). Phase B is now feature-complete
+> and **published** across all three mobile surfaces (iOS xcframework, Android `.aar`,
+> React Native package — [issue #125](https://github.com/Freshair129/GenesisBlock/issues/125),
+> closed 2026-08-25). iOS on-device acceptance (a genuinely blank SPM package
+> consuming the published xcframework, executed for real in the iOS Simulator via
+> CI) went green and merged via [PR #133](https://github.com/Freshair129/GenesisBlock/pull/133)
+> on 2026-08-26. Phase A (the Tauri mobile app) has not been started — the user
+> prioritized Phase B (embeddable SDK) first. Remaining gaps: Android/React Native
+> on-device acceptance (ARM-emulator-on-x86-CI feasibility not yet assessed), Maven
+> Central (Android currently ships via GitHub Packages only), the SPM `binaryTarget`
+> swap for `ios/genesisdb`'s own package, and Flutter (B-4, deferred pending demand).
 
 ### Phase 0 — Foundation (~1 week) ✅ DONE
 - [x] **`mobile` Cargo feature:** added `mobile` + `ffi` features; `sysinfo` made optional and owned by `bins` (it is bench-only, not used in `src/`). `cargo build --no-default-features --features mobile` exits 0 with no `sysinfo` compiled in
@@ -281,9 +290,9 @@ in a single binary. Nearest comparators: Kuzu, DuckDB+graph, LanceDB, LadybugDB.
 - [ ] **Device validation:** installs + runs on physical iPhone (arm64) and physical Android (arm64); WAL persists across app restarts
 
 ### Phase B — SDK for Other Apps, Level B (~6 weeks)
-- [ ] **iOS xcframework + Swift wrapper:** static `.a` for `aarch64-apple-ios` + sim slice; `actor GenesisDB` async/await API; distributed via Swift Package Manager — not started
-- [x] **Android `.aar` + Kotlin wrapper (written, unpublished):** `android/genesisdb/` — JNI bridge (`src/jni.rs`) wrapped by coroutine `class GenesisDB` (`GenesisDB.kt`); wire-format data classes carry explicit `@SerialName`s because the JNI/FFI JSON contract is the engine's raw snake_case `serde_json`, not `index.d.ts`'s napi-only camelCase. CI: `android-jvm-tests` (pure-JVM wire tests) + `android-aar` (assembles a real `.aar` from cargo-ndk output) in `mobile-build.yml`. Not yet published to Maven
-- [x] **React Native package (Android side written, unpublished):** `react-native-genesisdb/` — `src/index.ts` is JSON pass-through (snake_case wire types, matching the `genesisdb-python`/`genesisdb-go` precedent — no camelCase conversion, which would corrupt caller keys inside the opaque `props` field); `android/GenesisDbModule.kt` bridges to the `.aar` above via an opaque `dbId` (never the raw native pointer, to dodge JS-number precision loss). `ios/` is a stub that compiles and rejects every call pending the Swift wrapper above. `rn-genesisdb-tests` CI job covers the TS layer under Jest
+- [x] **iOS xcframework + Swift wrapper:** static `.a`+`.a`-sim slices assembled into `GenesisBlockDB.xcframework` (CI job `ios-xcframework`); `actor GenesisDB` async/await API in `ios/genesisdb/`. **Published** as a `v0.2.0` GitHub Release asset (issue #125) with a Clang module map (`include/module.modulemap`) so it resolves as `import GenesisBlockDB` for a real SPM `.binaryTarget` consumer — proven by `mobile-acceptance/ios/`, a genuinely blank SPM package executed for real in the iOS Simulator via CI job `ios-acceptance-test` (PR #133, merged 2026-08-26). `ios/genesisdb`'s own package still links a local host-arch build rather than the published binary (deliberate, keeps its own test suite executable — see `ios/README.md`); the SPM `binaryTarget` swap for that package specifically remains open.
+- [x] **Android `.aar` + Kotlin wrapper — published:** `android/genesisdb/` — JNI bridge (`src/jni.rs`) wrapped by coroutine `class GenesisDB` (`GenesisDB.kt`); wire-format data classes carry explicit `@SerialName`s because the JNI/FFI JSON contract is the engine's raw snake_case `serde_json`, not `index.d.ts`'s napi-only camelCase. CI: `android-jvm-tests` (pure-JVM wire tests) + `android-aar` (assembles a real `.aar` from cargo-ndk output) in `mobile-build.yml`. **Live on GitHub Packages** as `dev.genesisblock:genesisdb-android:0.1.0` (issue #125). Not on Maven Central; on-device/emulator acceptance not yet started (ARM-emulator-on-x86-CI feasibility unassessed).
+- [x] **React Native package — published, both platforms wired:** `react-native-genesisdb/` — `src/index.ts` is JSON pass-through (snake_case wire types, matching the `genesisdb-python`/`genesisdb-go` precedent — no camelCase conversion, which would corrupt caller keys inside the opaque `props` field); `android/GenesisDbModule.kt` and `ios/GenesisDbModule.swift` both bridge to their respective native SDKs via an opaque `dbId` (never the raw native pointer, to dodge JS-number precision loss); the podspec's `prepare_command` downloads + verifies + unzips the published xcframework during `pod install`. **Live on npm** as `react-native-genesisdb@0.1.0` (issue #125). `rn-genesisdb-tests` CI job covers the TS layer under Jest; a real blank-RN-app install/build acceptance (mirroring the iOS SPM acceptance test) has not been done.
 - [ ] **Flutter plugin:** deferred — `flutter_rust_bridge` auto-generated Dart bindings; added when user demand confirmed
 ---
 
