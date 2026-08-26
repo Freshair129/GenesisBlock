@@ -44,6 +44,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Packages is produced by `android-publish`'s `--release` build and is
   expected to be correct. This could not be verified directly — reading it
   requires a token with `read:packages`, which the available token lacks.
+- **Confirmed by the first repair run:** the release build's slices are
+  `arm64-v8a` **7 MiB** and `armeabi-v7a` **5 MiB** — against 141.9 MiB and
+  126.3 MiB for the debug asset, a ~20× reduction — and the new DWARF guard
+  passed, so the diagnosis and the guard both hold.
+
+### Fixed — repair mode could not repair a tag older than itself
+
+The first `repair_tag: v0.2.0` run built correctly and then failed on the very
+last step: it read the surface version from `android/genesisdb/build.gradle.kts`,
+but repair mode checks out the *tag's* source, and at `v0.2.0` that file has
+neither the `genesisdbAndroidVersion` val nor a `publishing {}` block — both
+arrived later with the issue-#125 publish work. A repair mechanism that reads
+its own configuration out of the old tree can therefore be older than the tree
+it is repairing.
+
+- The asset name now comes from `modules.json`, which has carried
+  `genesisdb-android`'s version since well before that tag and is the declared
+  SSOT for surface versions, with the `build.gradle.kts` lookup kept as a
+  fallback. Verified against both `main` and `v0.2.0`'s `modules.json`.
+- The `build`, `publish`, and `rn-npm-publish` jobs are now skipped in repair
+  mode too. Previously only the `gradle :genesisdb:publish` *step* was gated,
+  so a repair dispatch still fired every registry publish and collected
+  expected-but-noisy 403/409 "already published" failures.
+- No asset was lost: the upload runs last, so the failed run left the existing
+  (defective) asset untouched.
 
 ### Fixed — `react-native-genesisdb@0.1.0`'s documented integration path did not work
 

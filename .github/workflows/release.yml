@@ -66,6 +66,10 @@ permissions:
 jobs:
   build:
     name: build ${{ matrix.target }}
+    # Skipped in repair mode: a repair run only rebuilds and replaces an
+    # existing release's ASSETS. Registry publishes would fail with 403 /
+    # 409 (that version is already live) and turn a clean repair red.
+    if: ${{ inputs.repair_tag == '' }}
     runs-on: ${{ matrix.host }}
     strategy:
       fail-fast: false
@@ -117,6 +121,10 @@ jobs:
 
   publish:
     name: publish to npm
+    # Skipped in repair mode: a repair run only rebuilds and replaces an
+    # existing release's ASSETS. Registry publishes would fail with 403 /
+    # 409 (that version is already live) and turn a clean repair red.
+    if: ${{ inputs.repair_tag == '' }}
     runs-on: ubuntu-latest
     needs: build
     steps:
@@ -272,11 +280,26 @@ jobs:
         run: |
           set -euo pipefail
           TAG="${{ inputs.repair_tag || github.ref_name }}"
-          VERSION=$(sed -n 's/.*val genesisdbAndroidVersion = "\([^"]*\)".*/\1/p' android/genesisdb/build.gradle.kts)
+          # Read the surface version from modules.json, NOT from
+          # build.gradle.kts. Repair mode checks out an OLD tag's source, which
+          # can predate the packaging machinery doing the repair: at v0.2.0
+          # `android/genesisdb/build.gradle.kts` has neither the
+          # `genesisdbAndroidVersion` val nor a `publishing {}` block at all —
+          # both arrived later with the issue-#125 publish work — so the
+          # gradle-file lookup failed there and killed the first repair run.
+          # modules.json has carried `genesisdb-android`'s version since well
+          # before that tag and is the declared SSOT for surface versions, so
+          # it is the stable source across the whole tag range.
+          VERSION=$(python3 -c "import json;d=json.load(open('modules.json'));print(next(s['version'] for s in d['surfaces'] if s['name']=='genesisdb-android'))" 2>/dev/null || true)
           if [ -z "$VERSION" ]; then
-            echo "::error::could not read genesisdbAndroidVersion from android/genesisdb/build.gradle.kts"
+            # Fallback for any future tree that drops the modules.json entry.
+            VERSION=$(sed -n 's/.*val genesisdbAndroidVersion = "\([^"]*\)".*/\1/p' android/genesisdb/build.gradle.kts)
+          fi
+          if [ -z "$VERSION" ]; then
+            echo "::error::could not determine the genesisdb-android version from modules.json or android/genesisdb/build.gradle.kts"
             exit 1
           fi
+          echo "genesisdb-android version: $VERSION"
           SRC=$(ls android/genesisdb/build/outputs/aar/*.aar | head -1)
           ASSET="genesisdb-android-${VERSION}.aar"
           cp "$SRC" "$ASSET"
@@ -289,6 +312,10 @@ jobs:
   # publish steps rather than reusing the root `npm ci` above.
   rn-npm-publish:
     name: publish react-native-genesisdb to npm
+    # Skipped in repair mode: a repair run only rebuilds and replaces an
+    # existing release's ASSETS. Registry publishes would fail with 403 /
+    # 409 (that version is already live) and turn a clean repair red.
+    if: ${{ inputs.repair_tag == '' }}
     runs-on: ubuntu-latest
     permissions:
       contents: read
