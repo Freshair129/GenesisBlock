@@ -592,8 +592,43 @@ npm install react-native-genesisdb
 
 ### B-4: Flutter plugin (deferred — demand-dependent)
 
-Uses `flutter_rust_bridge` to auto-generate Dart bindings from `src/ffi.rs`. Not in scope
-for the initial SDK release; added when there is demonstrated user demand.
+Not in scope for the initial SDK release; added when there is demonstrated user demand.
+
+> **Correction (2026-08-27).** This section previously said "uses
+> `flutter_rust_bridge` to auto-generate Dart bindings from `src/ffi.rs`".
+> **That approach does not work as described.** `flutter_rust_bridge` consumes
+> *idiomatic* Rust (`String`, `Vec<T>`, `#[derive(Serialize)]` structs) and
+> generates both a Dart side and a `frb_generated.rs` glue module. It cannot
+> consume a `#[no_mangle] extern "C"` module of `*const c_char` and opaque
+> pointers — which is exactly what `src/ffi.rs` is. Pointing it at that file
+> produces nothing usable; a real `frb` route would need a *new*
+> `src/frb_api.rs` written in idiomatic Rust over `Storage`, i.e. a second
+> engine-facing binding surface to maintain, plus a Rust-side dependency on
+> `flutter_rust_bridge` and a Flutter SDK in the Rust CI path — which inverts
+> the whole point of the `mobile` feature (shedding dependencies so the core
+> links in a mobile sandbox).
+>
+> **The approach to use instead is `dart:ffi` + `package:ffigen` over
+> `include/genesisdb.h`.** That header is already cbindgen-generated,
+> committed, and freshness-gated in CI (`c-header-freshness`), and `ffigen`
+> consumes exactly that — making Dart a third consumer of an artifact that
+> already exists and is already policed, with **zero Rust changes**. It is the
+> direct analogue of how iOS already wraps the same header
+> (`ios/genesisdb/Sources/CGenesisDBFFI/module.modulemap`).
+>
+> Two gotchas to budget for if this is ever built, neither generic: (1) the
+> xcframework ships a *static* library, and Dart resolves symbols at runtime
+> via `DynamicLibrary.process()`, so Xcode dead-strips every `genesisdb_*`
+> symbol before Dart looks — an explicit `-force_load` is required, and no
+> compile-only CI job will catch it; (2) Flutter-Android cannot ask a
+> `flutter pub add` user for the GitHub Packages token the `.aar` currently
+> requires, so it needs either Maven Central or bundled `jniLibs`.
+>
+> Rough scope if the gate is lifted: ~4.5 weeks of engineering, 6–8 weeks
+> wall-clock allowing for the blind-CI tax this repo has measured repeatedly.
+> Prerequisites first: Android on-device acceptance and a token-free Android
+> distribution path — both are needed for a usable Flutter-Android plugin
+> anyway, so that work is not wasted either way.
 
 ### Phase B definition of done:
 

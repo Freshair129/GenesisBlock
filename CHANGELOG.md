@@ -7,6 +7,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed — two docs described the code inaccurately
+
+Both surfaced during the 2026-08-26/27 research pass, neither is a code change.
+
+- **`CLAUDE.md` / `AGENTS.md` said the C ABI has "8 `genesisdb_*` symbols".**
+  It has **17** — the count grew as the relational and QueryIr surface landed,
+  and the guidance files never caught up. These two files describe the
+  codebase as it *is*, so a stale count actively misleads. Corrected, and
+  reworded to point at `include/genesisdb.h` as the authority rather than
+  inviting trust in a number in prose. Also dropped "for the *future* iOS
+  xcframework / Android JNI bridge" — both shipped and are published.
+  - Deliberately **not** changed: `CHANGELOG.md`'s `[0.2.0]` entry and
+    `ROADMAP.md`'s Phase 0 checklist item, which also say 8. Those are
+    historical records of what that milestone delivered, and 8 was correct
+    then — same reasoning that keeps the `MARK N` backreferences intact.
+- **`docs/SPEC--MOBILE-SDK.md` §B-4 prescribed an unimplementable approach.**
+  It said the Flutter plugin "uses `flutter_rust_bridge` to auto-generate Dart
+  bindings from `src/ffi.rs`". `flutter_rust_bridge` consumes idiomatic Rust,
+  not a `#[no_mangle] extern "C"` module of `*const c_char` and opaque
+  pointers — pointing it at `src/ffi.rs` produces nothing usable, and a real
+  frb route would require a whole second binding surface (`src/frb_api.rs`)
+  plus a Rust-side dependency that inverts the `mobile` feature's purpose.
+  Replaced with the approach that does work — `dart:ffi` + `ffigen` over the
+  already-CI-gated `include/genesisdb.h`, zero Rust changes — plus the two
+  non-obvious gotchas (iOS static-lib dead-stripping needs `-force_load`;
+  Flutter-Android cannot ask a `pub add` user for a GitHub Packages token) and
+  a scope estimate. The item remains deferred; only its description changed.
+
 ### Fixed — `react-native-genesisdb`'s iOS half is now installable from npm
 
 The remaining half of the `0.1.0` breakage. `GenesisDbModule.swift` imported
