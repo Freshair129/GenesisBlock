@@ -7,6 +7,52 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed — `react-native-genesisdb`'s iOS half is now installable from npm
+
+The remaining half of the `0.1.0` breakage. `GenesisDbModule.swift` imported
+`GenesisDB` / `GenesisDBTypes` — SPM products of `ios/genesisdb`, which sits
+above this package's root and so can never be in the npm tarball. `pod install`
+succeeded and the build then failed with **`no such module 'GenesisDB'`** for
+everyone who installed from npm; only a monorepo checkout worked, via a manual
+"Add Package Dependency" step in Xcode.
+
+CocoaPods cannot express a dependency on a Swift Package, so there is no
+podspec-level fix, and giving `ios/genesisdb` its own repo would not have
+helped either — the consumer would still need that manual Xcode step.
+
+- **The SDK sources are vendored into the pod** (`react-native-genesisdb/ios/vendor/`)
+  by the new `scripts/vendor-rn-ios-sdk.mjs`. The podspec's existing
+  `s.source_files = "ios/**/*.{h,m,mm,swift}"` compiles them into the pod's own
+  module, so `GenesisDbModule.swift` needs no import at all and the pod is
+  self-contained. **`pod install` is now sufficient** — the manual Xcode step
+  is gone.
+- The script rewrites the SPM module imports: `import GenesisDBTypes` is
+  dropped (same module now) and `import CGenesisDBFFI` becomes
+  `import GenesisBlockDB` — the Clang module the published xcframework vends
+  via `include/module.modulemap`, which is what made this approach possible at
+  all. Rewrites are asserted to match exactly once; a silent no-op would ship a
+  pod that cannot compile, which is the bug being fixed.
+- The copies are **committed**, unlike the gitignored `include/genesisdb.h`
+  copy under `ios/`, because they must be in the npm tarball and in a fresh
+  checkout. Drift is prevented the same way the header's is: new CI job
+  **`rn-ios-vendor-freshness`** re-runs the script and fails on
+  `git diff --exit-code`. `.gitattributes` pins them to `eol=lf` so a CRLF
+  checkout on the Windows dev box cannot flake that gate — the same reason the
+  header is pinned.
+- New CI job **`rn-ios-pod-typecheck`** compiles the vendored sources for the
+  iOS Simulator **against the published xcframework the podspec actually
+  downloads**, reading the URL and checksum out of the podspec rather than
+  pinning them a seventh time. This is the gate that would have caught the
+  original bug: `ios-swift-tests` covers HEAD Swift against a HEAD engine
+  build, but nothing covered HEAD's Swift against the *released* binary a real
+  `pod install` links.
+- Corrected the README's Platform status row, the "not yet a drop-in
+  `pod install`" claim, and the Testing section's coverage statement.
+
+Still not covered: a full `pod install` in a real RN host app, and
+`android/build.gradle`'s Maven resolution — this monorepo has no RN host app,
+which is why both `0.1.0` breakages shipped unnoticed.
+
 ### Fixed — the published Android `.aar` release asset was a debug build
 
 - `genesisdb-android-0.1.0.aar`, attached to the `v0.2.0` GitHub Release,
