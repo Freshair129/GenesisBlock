@@ -1,8 +1,15 @@
 import Foundation
-import GenesisDB
-import GenesisDBTypes
 
-/// RN bridge for `ios/genesisdb`'s `GenesisDB` actor (MARK XVI Phase B-1/B-3).
+// No `import GenesisDB` / `import GenesisDBTypes` here: those are SPM module
+// names, and npm cannot ship `ios/genesisdb` (it sits above this package's
+// root), so those modules do not exist for anyone who installed from npm —
+// `pod install` succeeded and the build then failed with
+// "no such module 'GenesisDB'". The sources are vendored into `ios/vendor/`
+// by `scripts/vendor-rn-ios-sdk.mjs` instead, which puts them in THIS pod's
+// module, so the types below resolve with no import at all. See that script's
+// header for the full rationale and the CI freshness gate that guards the copy.
+
+/// RN bridge for the vendored `GenesisDB` actor (MARK XVI Phase B-1/B-3).
 /// Every method takes/returns the exact snake_case JSON wire shape documented
 /// in ../src/types.ts — this module's only job is: decode into GenesisDBTypes,
 /// call the actor's `async throws` API, encode the result back to a string.

@@ -487,3 +487,83 @@ jobs:
             echo "::error::include/genesisdb.h is out of date with src/ffi.rs. Run scripts/gen-header.sh and commit the result." >&2
             exit 1
           fi
+
+  # Same shape as c-header-freshness above, for the same reason. The iOS Swift
+  # SDK sources are copied into react-native-genesisdb's pod (npm cannot ship
+  # `ios/genesisdb` — it sits above the package root — so the pod has to carry
+  # its own copy or it fails with "no such module 'GenesisDB'"). Committed
+  # copies can drift silently from the originals; this gate makes that a hard
+  # failure instead. See scripts/vendor-rn-ios-sdk.mjs for the full rationale.
+  rn-ios-vendor-freshness:
+    name: RN iOS vendored sources freshness
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Re-vendor the iOS SDK sources
+        run: node scripts/vendor-rn-ios-sdk.mjs
+
+      - name: Fail if the vendored copies are stale
+        run: |
+          if ! git diff --exit-code react-native-genesisdb/ios/vendor/; then
+            echo "::error::react-native-genesisdb/ios/vendor/ is out of date with ios/genesisdb/Sources/. Run 'node scripts/vendor-rn-ios-sdk.mjs' and commit the result." >&2
+            exit 1
+          fi
+
+  # The gate that would actually have caught the original bug. Freshness above
+  # only proves the copies match their originals; this proves they COMPILE in
+  # the shape the pod builds them: one module, against the PUBLISHED
+  # xcframework the podspec downloads — not against a local HEAD build.
+  #
+  # That distinction is the point. `ios-swift-tests` already covers HEAD Swift
+  # vs HEAD engine. What nothing covered was HEAD's vendored Swift against the
+  # RELEASED binary a real `pod install` actually links, which is where an
+  # `src/ffi.rs` addition that hasn't been re-published would surface.
+  #
+  # Only the vendored SDK sources are type-checked. GenesisDbModule.swift needs
+  # React headers to compile and is out of scope here; its dependency on the
+  # SDK is now same-module type references, which a full pod build resolves.
+  rn-ios-pod-typecheck:
+    name: RN iOS pod sources typecheck (vs published xcframework)
+    runs-on: macos-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      # Read the URL + checksum straight out of the podspec rather than pinning
+      # them a seventh time: the podspec's values are the ones a real consumer
+      # resolves, so this job cannot silently drift away from what ships.
+      - name: Fetch the xcframework the podspec pins
+        working-directory: react-native-genesisdb
+        run: |
+          set -euo pipefail
+          URL=$(sed -n 's/.*xcframework_zip_url = "\([^"]*\)".*/\1/p' react-native-genesisdb.podspec)
+          SHA=$(sed -n 's/.*xcframework_zip_sha256 = "\([^"]*\)".*/\1/p' react-native-genesisdb.podspec)
+          if [ -z "$URL" ] || [ -z "$SHA" ]; then
+            echo "::error::could not read xcframework_zip_url / xcframework_zip_sha256 from the podspec"
+            exit 1
+          fi
+          echo "url: $URL"
+          curl -fsSL "$URL" -o xcf.zip
+          echo "$SHA  xcf.zip" | shasum -a 256 -c -
+          unzip -q xcf.zip
+
+      - name: Typecheck the vendored SDK sources against it
+        working-directory: react-native-genesisdb
+        run: |
+          set -euo pipefail
+          HEADERS=GenesisBlockDB.xcframework/ios-arm64-simulator/Headers
+          test -f "$HEADERS/module.modulemap" || {
+            echo "::error::$HEADERS/module.modulemap is missing — the xcframework does not vend a Clang module, so 'import GenesisBlockDB' cannot resolve."
+            exit 1
+          }
+          xcrun swiftc -typecheck \
+            -target arm64-apple-ios15.0-simulator \
+            -sdk "$(xcrun --sdk iphonesimulator --show-sdk-path)" \
+            -I "$HEADERS" \
+            ios/vendor/*.swift
