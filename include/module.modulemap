@@ -1,0 +1,24 @@
+// Clang module map for GenesisBlockDB.xcframework's binaryTarget consumers.
+//
+// GenesisBlockDB.xcframework wraps a plain C static library + genesisdb.h —
+// with no module map, Swift's `import GenesisBlockDB` cannot resolve against
+// it (found on mobile-acceptance/ios's ios-acceptance-test CI job: builds
+// failed with "unable to resolve module dependency: 'GenesisBlockDB'" even
+// after the zip/scheme-name fixes were in place). ios/genesisdb sidesteps
+// this by declaring its own local CGenesisDBFFI system-library target with
+// its own module map (see ios/genesisdb/Sources/CGenesisDBFFI/module.modulemap)
+// — but a binaryTarget consumer (mobile-acceptance/ios, and any future real
+// external consumer of the published xcframework) has no such local target
+// to lean on, so the module map has to live inside the xcframework itself.
+//
+// `xcodebuild -create-xcframework -headers include/` (see
+// .github/workflows/mobile-build.yml's ios-xcframework job) copies this
+// entire directory — this file included — into each library slice's
+// Headers/ folder, which is the documented way to make an xcframework's C
+// library importable as a Clang module from Swift. The module name here
+// (GenesisBlockDB) must match Package.swift's `.binaryTarget(name:
+// "GenesisBlockDB", ...)` for `import GenesisBlockDB` to resolve.
+module GenesisBlockDB {
+    header "genesisdb.h"
+    export *
+}
