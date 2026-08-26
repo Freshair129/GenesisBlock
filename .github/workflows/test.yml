@@ -60,8 +60,16 @@ jobs:
       - uses: Swatinem/rust-cache@v2
       - name: cargo fmt --check
         run: cargo fmt --check
+      # Both feature configurations are linted. `--no-default-features` covers
+      # the storage core / REST server path (no napi_* symbols); the default
+      # build additionally compiles the `#[cfg(feature = "napi-bindings")]`
+      # cdylib surface, which the core-only run never sees. Linting only one of
+      # them let two clippy errors sit undetected in napi-gated code on main
+      # (`src/lib.rs` has `#![deny(clippy::all)]`, so they were hard errors).
       - name: cargo clippy (core, no napi)
         run: cargo clippy --no-default-features --all-targets -- -D warnings
+      - name: cargo clippy (default, napi bindings on)
+        run: cargo clippy --all-targets -- -D warnings
 
   rust-tests:
     name: cargo test (${{ matrix.host }})
