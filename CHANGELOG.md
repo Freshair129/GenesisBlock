@@ -7,6 +7,88 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added — iOS on-device acceptance test (issue #125 follow-up)
+
+- **`mobile-acceptance/ios/`**: a genuinely independent, blank SPM package
+  (not a dependency on `ios/genesisdb`) that consumes the *published*
+  `v0.2.0` `GenesisBlockDB.xcframework` release asset via
+  `.binaryTarget(url:, checksum:)` — the actual distribution mechanism a
+  real external consumer uses, which `ios/genesisdb`'s own `Package.swift`
+  deliberately does not exercise (it links a local host-arch build instead,
+  to keep its own tests executable).
+- `RoundTripTests.swift` calls the raw `genesisdb_*` C functions directly
+  (`open`/`add_node`/`retrieve_context`/`flush_index`) and runs for real
+  inside the iOS Simulator — the xcframework's `aarch64-apple-ios-sim` slice
+  executes natively there on an Apple Silicon macOS runner, unlike the
+  device slice.
+- New CI job `.github/workflows/mobile-build.yml`'s `ios-acceptance-test`:
+  finds an available iPhone simulator dynamically (not hardcoded, since the
+  default device list shifts with the runner's Xcode version) and runs
+  `xcodebuild test` against it.
+- Updates `docs/SPEC--MOBILE-SDK.md`'s Phase B DoD checklist (new item,
+  pending its first CI run before being checked off) and `ios/README.md`'s
+  "Not yet done" section.
+
+### Fixed — v0.2.0 xcframework.zip release asset was corrupt for SwiftPM
+
+- Found by `ios-acceptance-test`'s first real run: the published `v0.2.0`
+  `GenesisBlockDB.xcframework.zip` release asset had been zipped by hand on
+  the Windows dev box (per `release.yml`'s header comment, this asset ships
+  as a manual step, not a package-manager publish). Windows zip tools write
+  the zip "version made by" host byte as 0 (MS-DOS/FAT); macOS's
+  Info-ZIP-based unzip — what SwiftPM's `binaryTarget` extraction shells out
+  to — treats a non-Unix host byte as a signal to distrust the archive's
+  path separators and aborts with `"appears to use backslashes as path
+  separators"`, even though every entry inside the archive was already
+  forward-slash (confirmed via Python's `zipfile` module: zero backslashes
+  in any of the 5 entry names — the host-attribute byte alone tripped it).
+- `.github/workflows/mobile-build.yml`'s `ios-xcframework` job now zips its
+  own output with BSD `zip` on the macOS runner, which writes the Unix host
+  byte and extracts cleanly (new `GenesisBlockDB-xcframework-zip` artifact).
+  Future re-publishes of this asset should always come from that job's
+  output, never a manual Windows-side zip.
+- Replaced the `v0.2.0` release asset in place (same URL) with a correctly
+  zipped rebuild from the same staticlibs/headers — new SHA256
+  `a4d2b0f267a15c1b8b82c349655b0fe2bc521fd2b1905c7c2bd6714e3f8db97f`
+  (old, broken: `8359846a8e668770816e0d84940aead0a85812f5aa67f91e7c2ff8308d37bc72`).
+  Updated the pinned checksum everywhere it's referenced:
+  `react-native-genesisdb.podspec`, `ios/README.md`,
+  `mobile-acceptance/ios/{Package.swift,README.md}`,
+  `docs/SPEC--MOBILE-SDK.md`.
+
+### Fixed — two more `ios-acceptance-test` bugs found iterating past the zip fix
+
+- **Wrong scheme name.** `mobile-acceptance/ios/Package.swift` declares no
+  `products:` (only a `binaryTarget` + a `testTarget`), so `xcodebuild`'s
+  implicit-workspace scheme generation doesn't produce a scheme matching the
+  package name — it auto-vends one whole-package scheme named
+  `"<PackageName>-Package"` instead. `-scheme GenesisAcceptance` and a
+  follow-up guess, `-scheme GenesisAcceptanceTests`, both don't exist; only
+  `GenesisAcceptance-Package` does (confirmed via an added `xcodebuild -list`
+  diagnostic step, now kept in the CI job for future naming drift). Fixed in
+  `.github/workflows/mobile-build.yml` and `mobile-acceptance/ios/README.md`'s
+  two documented local-run commands.
+- **Missing Clang module map.** With the scheme name fixed, the build
+  actually compiled `RoundTripTests.swift` and failed for real:
+  `error: unable to resolve module dependency: 'GenesisBlockDB'` on `import
+  GenesisBlockDB`. Root cause: `GenesisBlockDB.xcframework` wraps a plain C
+  static library + `genesisdb.h` with no Clang module map, so Swift has no
+  module named `GenesisBlockDB` to import — independent of scheme or zip
+  correctness. `ios/genesisdb`'s own package sidesteps this with a *local*
+  `CGenesisDBFFI` system-library target + module map, but a `binaryTarget`
+  consumer of the published xcframework (this package, and any real
+  external consumer) has no such local target to lean on — the module map
+  has to live inside the xcframework itself. Added `include/module.modulemap`
+  (`module GenesisBlockDB { header "genesisdb.h" export * }`);
+  `ios-xcframework`'s existing `-headers include/` step already copies the
+  whole directory into each library slice's `Headers/`, so no CI change was
+  needed beyond that file.
+- Rebuilt and re-published the `v0.2.0` `GenesisBlockDB.xcframework.zip`
+  release asset again to pick up the module map — new SHA256
+  `607df0d82d68550a20927ae171928ad1decd7253fb647da450dec87deea1c26d`
+  (previous: `a4d2b0f267a15c1b8b82c349655b0fe2bc521fd2b1905c7c2bd6714e3f8db97f`),
+  repinned in the same five files as the previous fix.
+
 ## [0.2.3] - 2026-08-25
 
 Patch release — no engine/runtime code changed since v0.2.2. Cuts a real

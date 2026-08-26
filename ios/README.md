@@ -92,7 +92,7 @@ the exact `xcodebuild -create-xcframework` command the `ios-xcframework` CI
 job runs) is attached to the
 [v0.2.0 GitHub Release](https://github.com/Freshair129/GenesisBlock/releases/tag/v0.2.0)
 as `GenesisBlockDB.xcframework.zip`
-(SHA256 `8359846a8e668770816e0d84940aead0a85812f5aa67f91e7c2ff8308d37bc72`).
+(SHA256 `607df0d82d68550a20927ae171928ad1decd7253fb647da450dec87deea1c26d`).
 
 This `Package.swift` deliberately does **not** consume it yet: swapping the
 `GenesisDB` target's local-`.a`-plus-`unsafeFlags` linking for a
@@ -106,11 +106,16 @@ future work, not an oversight — see the Phase B DoD checklist in
 
 ## Not yet done
 
-- Literal on-device/Xcode-project acceptance (`import GenesisBlockDB` in a
-  blank Xcode project, running on a physical device) — out of scope for this
-  monorepo's CI, the same host-only carve-out `android/README.md` and
-  `react-native-genesisdb`'s iOS stub already document for their own
-  device-only checks.
+- ~~Literal on-device/Xcode-project acceptance...~~ **Partially done**:
+  [`mobile-acceptance/ios/`](../mobile-acceptance/ios) is a genuinely blank
+  SPM package that depends only on the *published* xcframework release asset
+  (not this local build) and runs a real `addNode`/`retrieveContext` round
+  trip inside the iOS Simulator via CI (`ios-acceptance-test` job) — proving
+  the actual external-consumer distribution path, not just that `ios/genesisdb`
+  compiles locally. Genuine physical-device testing (as opposed to Simulator)
+  remains out of scope for this monorepo's CI, the same host-only carve-out
+  `android/README.md` and `react-native-genesisdb`'s iOS stub document for
+  their own device-only checks.
 - ~~The podspec doesn't wire the published xcframework in yet.~~ **Done
   (issue #125)**: `react-native-genesisdb.podspec` now has a `prepare_command`
   that downloads + SHA256-verifies + unzips the release zip above during

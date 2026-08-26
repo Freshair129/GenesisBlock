@@ -415,7 +415,7 @@ The SDK is extracted from the proven Phase A core.
 > (built from the `ios-xcframework` CI job's output on main, device +
 > simulator slices) is attached to the
 > [v0.2.0 GitHub Release](https://github.com/Freshair129/GenesisBlock/releases/tag/v0.2.0)
-> — SHA256 `8359846a8e668770816e0d84940aead0a85812f5aa67f91e7c2ff8308d37bc72`.
+> — SHA256 `607df0d82d68550a20927ae171928ad1decd7253fb647da450dec87deea1c26d`.
 > The `genesisdb-android` `.aar` (v0.1.0) is attached to the same release.
 > Still not done: `Package.swift` deliberately has NOT been swapped to the
 > `.binaryTarget(url:, checksum:)` form — that would replace the current
@@ -601,8 +601,25 @@ for the initial SDK release; added when there is demonstrated user demand.
 - [x] `GenesisBlockDB.xcframework` builds for `aarch64-apple-ios` + `aarch64-apple-ios-sim`
       (CI: `ios-xcframework`) and is published as a v0.2.0 release asset
 - [ ] Swift Package Manager `import GenesisBlockDB` works in a blank Xcode project
-      (`Package.swift` still links a local host-arch build, not the published
-      binary target — see `ios/README.md` "Prebuilt xcframework")
+      (`ios/genesisdb`'s own `Package.swift` still links a local host-arch
+      build, not the published binary target, deliberately — see
+      `ios/README.md` "Prebuilt xcframework". `mobile-acceptance/ios/` now
+      exercises the published binaryTarget path instead — see the item
+      below — but that's a separate blank package, not `ios/genesisdb`
+      itself, so this specific checkbox stays honest)
+- [x] MARK XVI on-device acceptance (issue #125 follow-up): a genuinely
+      blank SPM package consumes the *published* `GenesisBlockDB.xcframework`
+      via `.binaryTarget` and runs a real round trip in the iOS Simulator —
+      `mobile-acceptance/ios/`, CI job `ios-acceptance-test`. Written blind
+      like every other iOS piece in this repo; its first few real CI runs
+      surfaced three genuine bugs (not test-writing errors) before going
+      green — see CHANGELOG.md `[Unreleased]` "Fixed" entries: the v0.2.0
+      release asset's zip had a Windows-tool host-attribute byte that broke
+      SwiftPM's `binaryTarget` extraction, the auto-generated Xcode scheme
+      name wasn't what either of two reasonable guesses assumed
+      (`GenesisAcceptance-Package`, found via `xcodebuild -list`), and the
+      xcframework itself needed a Clang module map (`include/module.modulemap`)
+      before `import GenesisBlockDB` could resolve at all. Confirmed green.
 - [x] `addNode` + `retrieveContext` round-trip in a Swift test target
       (`RoundTripTests.swift`, CI: `ios-swift-tests`)
 

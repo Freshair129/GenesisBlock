@@ -21,7 +21,11 @@
 #
 # B-1 (ios/genesisdb, the Swift wrapper) has two more gates:
 #   ios-xcframework   — assembles the real GenesisBlockDB.xcframework on top
-#                       of ios-build's staticlib output (mirrors android-aar).
+#                       of ios-build's staticlib output (mirrors android-aar),
+#                       then zips it with BSD zip (Unix "made by" attribute) —
+#                       the only way to produce a .xcframework.zip that
+#                       SwiftPM's binaryTarget extraction accepts; see that
+#                       step's comment for the Windows-zip bug this replaces.
 #   ios-swift-tests   — GenesisDBTypesTests (pure Codable wire-format tests,
 #                       no native lib, mirrors android-jvm-tests) plus
 #                       GenesisDBTests, a REAL addNode/retrieveContext/search
@@ -34,6 +38,15 @@
 #   android-aar       — assembles the actual .aar on top of android-build's
 #                       .so slices, proving the Gradle module links against
 #                       real cargo-ndk output end to end.
+#
+# On-device acceptance (issue #125 follow-up, MARK XVI Phase B DoD):
+#   ios-acceptance-test — mobile-acceptance/ios/ is a genuinely independent
+#                         "blank consumer" SPM package (NOT ios/genesisdb)
+#                         that depends ONLY on the *published* v0.2.0
+#                         GenesisBlockDB.xcframework release asset via
+#                         `.binaryTarget(url:, checksum:)` — proving the real
+#                         external-consumer distribution path, executed for
+#                         real inside the iOS Simulator via `xcodebuild test`.
 #
 # Targets (from SPEC §0-B):
 #   aarch64-apple-ios          — iOS device
@@ -56,6 +69,7 @@ on:
       - 'android/**'
       - 'ios/**'
       - 'react-native-genesisdb/**'
+      - 'mobile-acceptance/**'
       - 'Cargo.toml'
       - '.github/workflows/mobile-build.yml'
   pull_request:
@@ -69,6 +83,7 @@ on:
       - 'android/**'
       - 'ios/**'
       - 'react-native-genesisdb/**'
+      - 'mobile-acceptance/**'
       - 'Cargo.toml'
       - '.github/workflows/mobile-build.yml'
 
@@ -154,6 +169,34 @@ jobs:
           path: GenesisBlockDB.xcframework
           retention-days: 14
 
+      # The actual v0.2.0 release asset (GenesisBlockDB.xcframework.zip,
+      # consumed by react-native-genesisdb.podspec's prepare_command and by
+      # mobile-acceptance/ios/Package.swift's .binaryTarget) was zipped by
+      # hand on the Windows dev box (release.yml deliberately ships it as a
+      # manual step, not a package-manager publish — see that workflow's
+      # header comment) — found+fixed by the ios-acceptance-test job's first
+      # real run: Windows zip tools (PowerShell Compress-Archive, .NET
+      # ZipFile, ...) write the zip "version made by" host byte as 0
+      # (MS-DOS/FAT) instead of 3 (Unix), and macOS's Info-ZIP-based unzip
+      # (what SwiftPM's binaryTarget extraction shells out to) treats a
+      # non-Unix host byte as a signal to distrust the archive's path
+      # separators — it aborts with "appears to use backslashes as path
+      # separators" even though every entry inside is already forward-slash
+      # (verified: the actual entry names have zero backslashes; it's the
+      # host-attribute byte alone that trips the check). BSD zip (this step,
+      # running on a real macOS runner) writes host=3, which extracts cleanly.
+      # This step exists so future xcframework re-publishes never repeat the
+      # manual-Windows-zip mistake — always zip (and, when replacing the
+      # release asset, always re-upload) from here, not by hand.
+      - name: Zip xcframework with a Unix-attributed zip (portable for SwiftPM binaryTarget)
+        run: zip -r -X --symlinks GenesisBlockDB.xcframework.zip GenesisBlockDB.xcframework
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: GenesisBlockDB-xcframework-zip
+          path: GenesisBlockDB.xcframework.zip
+          retention-days: 14
+
   # B-1: the Swift SDK (ios/genesisdb). Two independent properties, like
   # android-jvm-tests proves for Types.kt:
   #   - GenesisDBTypesTests needs no native lib at all (pure Codable wire
@@ -190,6 +233,53 @@ jobs:
         env:
           GENESISDB_RUST_LIB_DIR: ${{ github.workspace }}/target/debug
         run: swift test
+
+  # MARK XVI on-device acceptance (issue #125 follow-up). Independent of
+  # ios-swift-tests above: that job proves the local host-arch build works;
+  # this one proves the *published* GenesisBlockDB.xcframework release asset
+  # is consumable by a genuinely blank SPM package (mobile-acceptance/ios/,
+  # not ios/genesisdb) via `.binaryTarget(url:, checksum:)` — the actual
+  # distribution mechanism a real external consumer uses — and that the
+  # linked C ABI genuinely executes inside the iOS Simulator, not just
+  # compiles. No local Rust build needed here; the whole point is testing
+  # what's already live on the release.
+  ios-acceptance-test:
+    name: iOS acceptance test (published xcframework via SPM)
+    runs-on: macos-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      # Pick the first available iPhone simulator dynamically rather than
+      # hardcoding a model name — the exact default device list shifts with
+      # every Xcode version GitHub bumps the macos-latest image to.
+      - name: Find an available iPhone simulator
+        id: sim
+        run: |
+          DEVICE_ID=$(xcrun simctl list devices available -j \
+            | python3 -c "import json,sys; d=json.load(sys.stdin); print(next(dev['udid'] for runtime in d['devices'].values() for dev in runtime if dev['name'].startswith('iPhone')))")
+          echo "device_id=$DEVICE_ID" >> "$GITHUB_OUTPUT"
+
+      # Diagnostic: Package.swift declares no `products:` (only a binaryTarget
+      # + a testTarget), so xcodebuild's implicit-workspace scheme generation
+      # doesn't produce a scheme matching the package name — it auto-vends
+      # one whole-package scheme named "<PackageName>-Package" instead
+      # (confirmed via this step's own output: neither `-scheme
+      # GenesisAcceptance` nor `-scheme GenesisAcceptanceTests` exist; only
+      # `GenesisAcceptance-Package` does). Keeping `-list` here means the
+      # next naming drift (e.g. a future Xcode version changing this
+      # convention) shows up in the log instead of as a bare "no such scheme"
+      # failure.
+      - name: List available schemes (diagnostic)
+        working-directory: mobile-acceptance/ios
+        run: xcodebuild -list
+
+      - name: xcodebuild test (iOS Simulator)
+        working-directory: mobile-acceptance/ios
+        run: |
+          xcodebuild test \
+            -scheme GenesisAcceptance-Package \
+            -destination "id=${{ steps.sim.outputs.device_id }}"
 
   # Android arm64 + armv7 via cargo-ndk. nttld/setup-ndk provisions the NDK;
   # cargo-ndk wires the right clang linker per target so no manual

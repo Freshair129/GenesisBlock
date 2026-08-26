@@ -39,7 +39,7 @@ Pod::Spec.new do |s|
   # in lockstep with the xcframework's release tag yet) — bump both together
   # by hand whenever a new xcframework is published.
   xcframework_zip_url = "https://github.com/Freshair129/GenesisBlock/releases/download/v0.2.0/GenesisBlockDB.xcframework.zip"
-  xcframework_zip_sha256 = "8359846a8e668770816e0d84940aead0a85812f5aa67f91e7c2ff8308d37bc72"
+  xcframework_zip_sha256 = "607df0d82d68550a20927ae171928ad1decd7253fb647da450dec87deea1c26d"
 
   s.prepare_command = <<-CMD
     set -e
