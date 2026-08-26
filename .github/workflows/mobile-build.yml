@@ -260,11 +260,23 @@ jobs:
             | python3 -c "import json,sys; d=json.load(sys.stdin); print(next(dev['udid'] for runtime in d['devices'].values() for dev in runtime if dev['name'].startswith('iPhone')))")
           echo "device_id=$DEVICE_ID" >> "$GITHUB_OUTPUT"
 
+      # Diagnostic: Package.swift declares no `products:` (only a binaryTarget
+      # + a testTarget), so xcodebuild's implicit-workspace scheme generation
+      # names the scheme after the TEST target, not the package — `-scheme
+      # GenesisAcceptance` doesn't exist ("workspace named 'ios' does not
+      # contain a scheme named GenesisAcceptance", found on this job's second
+      # real run). Listing schemes here means the next naming drift (e.g. a
+      # future Xcode version generating a `-Package` suffixed scheme) shows up
+      # in the log instead of as a bare "no such scheme" failure.
+      - name: List available schemes (diagnostic)
+        working-directory: mobile-acceptance/ios
+        run: xcodebuild -list
+
       - name: xcodebuild test (iOS Simulator)
         working-directory: mobile-acceptance/ios
         run: |
           xcodebuild test \
-            -scheme GenesisAcceptance \
+            -scheme GenesisAcceptanceTests \
             -destination "id=${{ steps.sim.outputs.device_id }}"
 
   # Android arm64 + armv7 via cargo-ndk. nttld/setup-ndk provisions the NDK;
