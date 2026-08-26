@@ -7,6 +7,42 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed — runtime log prefixes now name subsystems, not MARK milestones
+
+- Engine log and error strings previously carried internal product-milestone
+  prefixes (`Mark IX:`, `Mark X:`, `Mark VI:`, `Mark VII:`). These told an
+  operator nothing: `Mark IX` does not match any version they installed, and
+  the numeral silently encoded a subsystem they had no way to decode. Renamed
+  to the subsystem the message actually comes from — which is what every
+  comparable engine (PostgreSQL, RocksDB, SQLite) prints:
+
+  | was | now |
+  |---|---|
+  | `Mark IX:` (journal append/fold) | `wal:` |
+  | `Mark IX:` (stale snapshot cursor) | `recovery:` |
+  | `Mark IX:` (state persist / instant load) | `snapshot:` |
+  | `Mark IX:` (index compaction) | `compaction:` |
+  | `Mark IX:` (graceful shutdown) | `shutdown:` |
+  | `Mark X:` (event/proposal rejection) | `consensus:` |
+  | `Mark VI:` (autonomic maintenance, pruning) | `maintenance:` |
+  | `Mark VII:` (TTL expiry) | `ttl:` |
+
+  This is an information upgrade, not cosmetic de-quirking: the prefix now
+  identifies the failing subsystem at a glance. 18 strings in `src/lib.rs`.
+- The 4 existing `Gossip:` prefixes were lowercased to `gossip:` so every
+  subsystem prefix in the engine now shares one casing convention (matching
+  the pre-existing `replay_vector:`).
+- Crate-level rustdoc header dropped its `Mark VI:` milestone subtitle (it is
+  public-facing via `cargo doc`, and the engine long outgrew that milestone's
+  theme).
+- **Deliberately unchanged:** the ~180 `MARK N` backreferences across `docs/`
+  and the one code comment at `src/lib.rs:5306`. Those are historical
+  provenance — for work predating this project's semver discipline the MARK
+  tag is the only surviving record of when something landed, and rewriting
+  them would fabricate history for no reader benefit.
+- No behavioral change; no test asserts on engine log text (verified — the
+  `Mark`-prefixed lines under `tests/` are the tests' own `println!`s).
+
 ### Fixed — CI linted only one of the two feature configurations
 
 - `.github/workflows/test.yml`'s `lint` job ran clippy **only** under

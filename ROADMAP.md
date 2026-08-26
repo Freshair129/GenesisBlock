@@ -1,4 +1,4 @@
-# GENESISDB ROADMAP (current milestone: MARK XVI — Mobile, v0.2.3)
+# GENESISDB ROADMAP (current milestone: Mobile SDK, v0.2.3)
 **Positioning:** Embedded analytics / agent-memory graph + vector engine —
 the only embedded database with graph + vector + bitemporal + CRDT + governance
 in a single binary. Nearest comparators: Kuzu, DuckDB+graph, LanceDB, LadybugDB.
@@ -23,6 +23,58 @@ in a single binary. Nearest comparators: Kuzu, DuckDB+graph, LanceDB, LadybugDB.
   per node (PR #4); async HNSW indexing (10× P95 improvement); configurable `ef`.
 - **Graph:** u128 edge keys (collision rate 9e-26, PR #7); edge-id numeric
   interning Layer A+B (−44% RAM on edges).
+
+---
+
+## Milestone naming: the MARK series is frozen at XVI
+
+**Do not open a MARK XVII.** `MARK N` was a second, hand-maintained counter
+running alongside the real engine version, and it earned its keep in exactly
+one place — pointing backwards at work that predates this project's semver
+discipline. Everywhere else it cost more than it gave: nothing in CI checked
+it (`npm run version:check` guards semver only), so every "current milestone"
+line carrying a MARK numeral drifted out of date, and no comparable embedded
+database (SQLite, DuckDB, RocksDB, Kuzu, LanceDB) publishes a second codename
+counter at all.
+
+The rules now:
+
+- **Current status** is expressed as the engine version plus a plain theme —
+  `v0.2.3 — Mobile SDK`. `docs/VERSION.md` remains the SSOT.
+- **Future epics** are named `v0.<minor> — <theme>`, pinned to the semver
+  minor they land in.
+- **Past `## MARK N:` headings below stay exactly as they are.** They are the
+  historical record, not a live label. Likewise the ~180 `(Mark V)` /
+  `since Mark XIII` backreferences across `docs/` — rewriting those into
+  invented semver references would fabricate history for no reader benefit.
+- **Runtime log prefixes are subsystem names, never milestones** (`wal:`,
+  `consensus:`, `snapshot:`, …) — see `CHANGELOG.md`, "runtime log prefixes
+  now name subsystems".
+
+### MARK → date → version concordance
+
+So that existing backreferences stay decodable. Dates come from the `## MARK N:`
+headings below plus `git log` evidence; **gaps are left blank rather than
+guessed.** MARK I–XIV all predate `0.1.0-beta.1` (2026-06-25), the first
+release with a recorded version — which is precisely why the MARK tag is the
+only handle those references have.
+
+| MARK | when (evidenced) | engine version |
+|---|---|---|
+| I – VI | not separately dated; earliest MARK-tagged commit is MARK III, 2026-06-01 | pre-`0.1.0-beta.1` (no version SSOT yet) |
+| VII | 2026-06-06 | pre-`0.1.0-beta.1` |
+| VIII | 2026-06-06 → 06-07 | pre-`0.1.0-beta.1` |
+| IX – X | undated; fall between VIII and XI | pre-`0.1.0-beta.1` |
+| XI | 2026-06-07 → 06-23 | pre-`0.1.0-beta.1` |
+| XII | completed 2026-06-21 | pre-`0.1.0-beta.1` |
+| XIII | completed 2026-06-22 | pre-`0.1.0-beta.1` |
+| XIV | completed 2026-06-23 | pre-`0.1.0-beta.1` |
+| XV | from 2026-06-23 | `0.1.0-beta.1` → `0.1.0-beta.2` |
+| XVI | from 2026-06-29 | `0.2.0` → `0.2.3` |
+
+> Caveat on dating: MARK VI, IX and X appear in commits dated 2026-08-26, but
+> only because the log-prefix refactor of that date *mentions* them — those are
+> not milestone-activity dates, which is why they are recorded as undated above.
 
 ---
 

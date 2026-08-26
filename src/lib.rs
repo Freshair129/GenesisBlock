@@ -1,6 +1,6 @@
 //! Genesis Block — high-performance hybrid semantic-graph engine.
 //!
-//! Mark VI: Collective Intelligence & Autonomic Substrate
+//! Collective intelligence and autonomic substrate.
 
 #![deny(clippy::all)]
 
@@ -5494,7 +5494,7 @@ impl Storage {
                             if !ok && !batch.is_empty() {
                                 poisoned = true;
                                 println!(
-                                    "Mark IX: journal append I/O failure — refusing further appends until a successful checkpoint rebuilds the active file."
+                                    "wal: journal append I/O failure — refusing further appends until a successful checkpoint rebuilds the active file."
                                 );
                             }
                             for (ack, seq) in batch.drain(..) {
@@ -5725,7 +5725,7 @@ impl Storage {
             journal_frontier.is_some_and(|frontier| fold_horizon > frontier);
         if snapshot_stale_vs_fold {
             println!(
-                "Mark IX: snapshot cursor {} predates journal fold @{} — ignoring stale snapshot, recovering from the journal.",
+                "recovery: snapshot cursor {} predates journal fold @{} — ignoring stale snapshot, recovering from the journal.",
                 journal_frontier.unwrap_or(0),
                 fold_horizon
             );
@@ -9113,7 +9113,7 @@ impl Storage {
     }
 
     pub fn perform_autonomic_optimization(&self) -> Result<()> {
-        println!("Mark VI: Executing Autonomic Maintenance...");
+        println!("maintenance: executing autonomic maintenance...");
         self.prune_orphaned_nodes()?;
         self.generate_meta_graph()?;
         Ok(())
@@ -9131,7 +9131,7 @@ impl Storage {
             if let Some(expires_at) = &node.expires_at {
                 if now > *expires_at {
                     to_delete.push(node.id.clone());
-                    println!("Mark VII: TTL Expired for node '{}'", node.id);
+                    println!("ttl: expired for node '{}'", node.id);
                     continue;
                 }
             }
@@ -9143,7 +9143,7 @@ impl Storage {
                 let has_out = self.out_idx.contains_key(u32_id);
                 if !has_in && !has_out {
                     to_delete.push(node.id.clone());
-                    println!("Mark VI: Pruning orphaned node '{}'", node.id);
+                    println!("maintenance: pruning orphaned node '{}'", node.id);
                 }
             }
         }
@@ -9278,7 +9278,7 @@ impl Storage {
             // must carry an authentic signature from their registered peer key).
             if signer_id != &self.local_peer_id && !self.verify_event_signature(&signed_event) {
                 println!(
-                    "Mark X: REJECTED event from {}. Invalid signature or unknown peer.",
+                    "consensus: rejected event from {}. Invalid signature or unknown peer.",
                     signer_id
                 );
                 continue;
@@ -9703,23 +9703,23 @@ impl Storage {
                     let addr = match s.local_addr() {
                         Ok(a) => a,
                         Err(e) => {
-                            println!("Gossip: Failed to read local socket addr: {}", e);
+                            println!("gossip: failed to read local socket addr: {}", e);
                             return;
                         }
                     };
                     storage
                         .gossip_port
                         .store(addr.port() as u32, Ordering::SeqCst);
-                    println!("Gossip: Bound to UDP port {}", addr.port());
+                    println!("gossip: bound to UDP port {}", addr.port());
                     s
                 }
                 Err(e) => {
-                    println!("Gossip: Failed to bind UDP socket: {}", e);
+                    println!("gossip: failed to bind UDP socket: {}", e);
                     return;
                 }
             };
             if let Err(e) = socket.set_broadcast(true) {
-                println!("Gossip: Failed to enable broadcast: {}", e);
+                println!("gossip: failed to enable broadcast: {}", e);
                 return;
             }
 
@@ -9838,7 +9838,7 @@ impl Storage {
                                         if storage.verify_event_signature(&proposal.signed_event) {
                                             storage.proposals.insert(proposal.proposal_id.clone(), *proposal);
                                         } else {
-                                            println!("Mark X: REJECTED proposal {} — invalid event signature or unknown signer.", proposal.proposal_id);
+                                            println!("consensus: rejected proposal {} — invalid event signature or unknown signer.", proposal.proposal_id);
                                         }
                                     }
                                     GossipMessage::ConsensusVote { proposal_id, voter_peer_id, approve, signature } => {
@@ -9952,7 +9952,7 @@ impl Storage {
                 .is_err()
             {
                 println!(
-                    "Mark IX: journal fold failed — snapshot proceeding; journal retains full history until the next successful fold."
+                    "wal: journal fold failed — snapshot proceeding; journal retains full history until the next successful fold."
                 );
             }
         } else {
@@ -10165,7 +10165,7 @@ impl Storage {
         // this function — I7/I9 ordering). Nothing to do here.
 
         println!(
-            "Mark IX: State persisted successfully to {}",
+            "snapshot: state persisted successfully to {}",
             self.path.display()
         );
         Ok(())
@@ -10633,7 +10633,7 @@ impl Storage {
             return false;
         }
 
-        println!("Mark IX: Attempting instant load from binary state...");
+        println!("snapshot: attempting instant load from binary state...");
 
         let start = Instant::now();
         let state_val: serde_json::Value = match fs::read_to_string(&state_path)
@@ -10868,7 +10868,7 @@ impl Storage {
         if let Ok(data) = fs::read(self.path.join("nodes.bin")) {
             match serde_json::from_slice::<Vec<(u32, NodeOutput)>>(&data) {
                 Ok(nodes) => {
-                    println!("Mark IX: Loading {} nodes from snapshot", nodes.len());
+                    println!("snapshot: loading {} nodes", nodes.len());
                     let mut max_u32 = 0;
                     for (k, v) in nodes {
                         if k > max_u32 {
@@ -10891,12 +10891,12 @@ impl Storage {
                     self.next_u32.store(max_u32 + 1, Ordering::SeqCst);
                 }
                 Err(e) => {
-                    println!("Mark IX: Failed to deserialize nodes: {}", e);
+                    println!("snapshot: failed to deserialize nodes: {}", e);
                     return false;
                 }
             }
         } else {
-            println!("Mark IX: nodes.bin not found");
+            println!("snapshot: nodes.bin not found");
         }
 
         if let Ok(data) = fs::read(self.path.join("edges.bin")) {
@@ -10904,7 +10904,7 @@ impl Storage {
             // numbers widen into u128 fine, and the saved key is ignored anyway
             // (re-derived below), so all widths load transparently.
             if let Ok(edges) = serde_json::from_slice::<Vec<(u128, EdgeOutput)>>(&data) {
-                println!("Mark IX: Loading {} edges from snapshot", edges.len());
+                println!("snapshot: loading {} edges", edges.len());
                 for (_saved_k, v) in edges {
                     // Re-derive the edge key deterministically from the edge id
                     // (ADR--GENESISDB-EDGE-NUMERIC-KEYS). This reproduces the
@@ -10988,7 +10988,7 @@ impl Storage {
             self.logical_clock.store(clock as u32, Ordering::SeqCst);
         }
 
-        println!("Mark IX: Instant load complete in {:?}", start.elapsed());
+        println!("snapshot: instant load complete in {:?}", start.elapsed());
         true
     }
 
@@ -11127,7 +11127,7 @@ impl Storage {
     }
 
     pub fn perform_index_compaction(&self) -> Result<()> {
-        println!("Mark IX: Starting Index Compaction...");
+        println!("compaction: starting index compaction...");
         let start = Instant::now();
         // Drain pending HNSW inserts first — compaction reassigns arena ids, so
         // a queued insert with a stale id must not run against the new arena.
@@ -11329,7 +11329,7 @@ impl Storage {
         }
 
         println!(
-            "Mark IX: Index Compaction complete in {:?}. Arenas resized to {} nodes.",
+            "compaction: index compaction complete in {:?}. Arenas resized to {} nodes.",
             start.elapsed(),
             live_nodes.len()
         );
@@ -12326,7 +12326,7 @@ impl Drop for Storage {
             let _ = h.join();
         }
         if !self.read_only {
-            println!("Mark IX: Graceful shutdown. State saved.");
+            println!("shutdown: graceful shutdown, state saved.");
         }
     }
 }
