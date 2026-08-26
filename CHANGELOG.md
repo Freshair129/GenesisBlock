@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed — `react-native-genesisdb` bumped to 0.1.1 so its fixes actually ship
+
+`0.1.0` is what is on npm, and it is the version carrying **both** integration
+breakages. The Android repository declaration (#138) and the iOS module
+imports (#140) were fixed on `main` *after* it shipped — and `rn-npm-publish`
+no-ops on an unchanged version (npm returns `403`), so those fixes reach zero
+consumers until a tag publishes a new version. Bumping `package.json` (and the
+matching `modules.json` surface) is the delivery mechanism, not bookkeeping.
+Also corrected the README's Publishing section, which asserted `0.1.0` "is
+live" as a standing fact.
+
 ### Added — the Android `.aar` now ships an `x86_64` slice (emulator support)
 
 `genesisdb-android` built only `arm64-v8a` and `armeabi-v7a`, so the published

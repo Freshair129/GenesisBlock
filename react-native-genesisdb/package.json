@@ -1,6 +1,6 @@
 {
   "name": "react-native-genesisdb",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Embedded GenesisBlockDB for React Native (MARK XVI Phase B-3) — local-first hybrid semantic-graph engine, no server required.",
   "main": "lib/commonjs/index.js",
   "module": "lib/module/index.js",
