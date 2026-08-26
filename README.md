@@ -19,7 +19,7 @@ Nearest comparators are embedded engines such as Kuzu, DuckDB combined with grap
 | Field | Value |
 |---|---|
 | **Version** | `0.2.3` (crate, npm, and `modules.json` in lock-step; `npm run version:check` gates CI) |
-| **Milestone** | Mark XVI — mobile SDK; iOS/Android/React Native SDKs published and live (GitHub Releases, GitHub Packages, npm), iOS on-device acceptance verified in CI; GNSE bitemporal line complete (WP-0.1 → WP-3.3) |
+| **Milestone** | Mobile SDK — iOS/Android/React Native SDKs published and live (GitHub Releases, GitHub Packages, npm), iOS on-device acceptance verified in CI; GNSE bitemporal line complete (WP-0.1 → WP-3.3) |
 | **Status** | Advanced prototype — durable, benchmarked, full Rust + Node suites green |
 
 Version SSOT: [docs/VERSION.md](docs/VERSION.md) · Detailed history: [CHANGELOG.md](CHANGELOG.md)
