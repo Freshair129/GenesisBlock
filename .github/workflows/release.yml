@@ -7,7 +7,19 @@
 # Trunk publish for it (react-native-genesisdb's podspec fetches it directly —
 # see that podspec's comment) and a real SPM-registry path is deferred.
 #
-# Triggered by pushing a version tag (e.g. v0.1.0-beta.1) or manually.
+# The genesisdb-android `.aar` IS attached here, by the same `android-publish`
+# job that builds it with `--release` (see that job's "Attach .aar" step). It
+# used to be uploaded by hand, which is how a DEBUG .aar — 281 MB of native
+# libs, 78% DWARF — ended up on the v0.2.0 release. A guard step now fails the
+# job if any `.so` still carries `.debug_*` sections. The xcframework has the
+# same manual-upload exposure and the same history (a Windows-zipped asset
+# broke SwiftPM extraction); `mobile-build.yml`'s `ios-xcframework` job now
+# produces a correctly-attributed zip artifact for it, but attaching it is
+# still manual — worth closing the same way.
+#
+# Triggered by pushing a version tag (e.g. v0.1.0-beta.1) or manually. A manual
+# run accepts a `repair_tag` input to rebuild and replace an EXISTING release's
+# assets from that tag's own source, without republishing to any registry.
 #
 # PREREQUISITES (must be set up once before this can actually publish):
 #   1. Repo secret NPM_TOKEN — an npm automation token with publish rights to
@@ -37,6 +49,15 @@ on:
     tags:
       - 'v*'
   workflow_dispatch:
+    inputs:
+      repair_tag:
+        description: >-
+          Existing tag whose release ASSETS should be rebuilt and replaced
+          (e.g. v0.2.0). The job checks out that tag's source, so the asset
+          matches the code it claims to be. Registry publishes are skipped in
+          this mode — the version is already live. Leave empty for a normal run.
+        required: false
+        default: ''
 
 permissions:
   contents: read
@@ -141,10 +162,17 @@ jobs:
     name: publish genesisdb-android to GitHub Packages
     runs-on: ubuntu-latest
     permissions:
-      contents: read
+      # contents: write — this job now attaches the .aar it builds as a
+      # release asset (see "Attach .aar" below), instead of that asset being
+      # uploaded by hand.
+      contents: write
       packages: write
     steps:
       - uses: actions/checkout@v4
+        with:
+          # In repair mode, build from the tag being repaired so the asset
+          # matches the code it claims to be — not from whatever main is now.
+          ref: ${{ inputs.repair_tag || github.ref }}
 
       - uses: dtolnay/rust-toolchain@stable
         with:
@@ -194,11 +222,66 @@ jobs:
       # coordinate + GitHub Packages repository config. GITHUB_TOKEN here is
       # the workflow's own auto-issued token — no repo secret needed.
       - name: gradle :genesisdb:publish
+        # Skipped in repair mode: that version is already on GitHub Packages
+        # and republishing an unchanged version returns 409 Conflict, which
+        # would fail the job before it could replace the release asset.
+        if: ${{ inputs.repair_tag == '' }}
         working-directory: android
         run: gradle :genesisdb:publish
         env:
           GITHUB_ACTOR: ${{ github.actor }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: gradle :genesisdb:assembleRelease
+        working-directory: android
+        run: gradle :genesisdb:assembleRelease
+
+      # Guard against the exact defect this step exists to fix: the v0.2.0
+      # release asset was a DEBUG .aar uploaded by hand from mobile-build.yml's
+      # artifact (that workflow builds without --release on purpose, for CI
+      # speed). It shipped 281 MB of native libs where only ~12 MB was .text —
+      # 78% DWARF, 10% symbol tables. `[profile.release]` sets
+      # `strip = "symbols"`, so a correct release .so carries NO .debug_*
+      # sections at all. Assert that, and a size ceiling, so a debug build can
+      # never be published as a release asset again.
+      - name: Verify .so slices are release-built (no DWARF)
+        run: |
+          set -euo pipefail
+          fail=0
+          for so in android/genesisdb/src/main/jniLibs/*/libgenesis_block_native.so; do
+            size=$(stat -c%s "$so")
+            mib=$(( size / 1048576 ))
+            if readelf -S "$so" | grep -q '\.debug_'; then
+              echo "::error::$so contains .debug_* sections — this is a DEBUG build, not a release build."
+              fail=1
+            fi
+            if [ "$mib" -gt 40 ]; then
+              echo "::error::$so is ${mib} MiB — far above the ~10 MiB expected for a stripped release build."
+              fail=1
+            fi
+            echo "$so: ${mib} MiB"
+          done
+          exit $fail
+
+      # Attaching the asset here — from the job that actually builds with
+      # --release — is the root-cause fix. Previously nothing attached it, so
+      # it was uploaded by hand and the wrong (debug) artifact got picked.
+      - name: Attach .aar to the GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          TAG="${{ inputs.repair_tag || github.ref_name }}"
+          VERSION=$(sed -n 's/.*val genesisdbAndroidVersion = "\([^"]*\)".*/\1/p' android/genesisdb/build.gradle.kts)
+          if [ -z "$VERSION" ]; then
+            echo "::error::could not read genesisdbAndroidVersion from android/genesisdb/build.gradle.kts"
+            exit 1
+          fi
+          SRC=$(ls android/genesisdb/build/outputs/aar/*.aar | head -1)
+          ASSET="genesisdb-android-${VERSION}.aar"
+          cp "$SRC" "$ASSET"
+          ls -la "$ASSET"
+          gh release upload "$TAG" "$ASSET" --clobber --repo "${{ github.repository }}"
 
   # Issue #125: react-native-genesisdb → npm. Independent package (its own
   # package-lock.json, not an npm workspace member of the repo root — see

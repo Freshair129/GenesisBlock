@@ -7,6 +7,44 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed — the published Android `.aar` release asset was a debug build
+
+- `genesisdb-android-0.1.0.aar`, attached to the `v0.2.0` GitHub Release,
+  ships **281 MB of native libraries** — `arm64-v8a` 141.9 MiB and
+  `armeabi-v7a` 126.3 MiB. Parsing the ELF section table of the arm64 slice:
+
+  | section | bytes | share of file |
+  |---|---|---|
+  | `.text` (the code that runs) | 12,185,948 | **8.2%** |
+  | `.debug_*` (DWARF) | 116,129,829 | 78.0% |
+  | `.symtab` + `.strtab` | 15,413,407 | 10.4% |
+
+  `[profile.release]` in `Cargo.toml` sets `strip = "symbols"`, so a release
+  build emits no DWARF at all — 116 MB of it proves this asset was built
+  without `--release`. For calibration the release/LTO/stripped `linux-x64`
+  cdylib on npm is 9.2 MB *including* napi.
+- **Root cause:** `release.yml`'s `android-publish` job builds correctly with
+  `--release` but only published to GitHub Packages — it never attached the
+  `.aar` to the Release. So that asset was uploaded by hand, and the artifact
+  picked came from `mobile-build.yml`'s `android-build`, which omits
+  `--release` deliberately for CI speed (its own comment says so). Same class
+  of manual-upload defect as the Windows-zipped xcframework fixed earlier.
+- **Fix:** `android-publish` now runs `assembleRelease` and attaches the
+  `.aar` itself (`contents: write`), so the asset can only ever come from the
+  job that builds it with `--release`.
+- **Guard:** a new step fails the job if any staged `.so` still carries
+  `.debug_*` sections, or exceeds a 40 MiB ceiling. A debug build can no
+  longer reach a release asset silently.
+- **Repair path:** `workflow_dispatch` gained a `repair_tag` input. Running
+  the workflow manually with e.g. `repair_tag: v0.2.0` checks out *that tag's*
+  source, rebuilds, and replaces the release's assets — so a repaired asset
+  matches the code it claims to be — while skipping the registry publishes
+  (that version is already live; republishing returns 409).
+- **Not affected:** `dev.genesisblock:genesisdb-android:0.1.0` on GitHub
+  Packages is produced by `android-publish`'s `--release` build and is
+  expected to be correct. This could not be verified directly — reading it
+  requires a token with `read:packages`, which the available token lacks.
+
 ### Fixed — `react-native-genesisdb@0.1.0`'s documented integration path did not work
 
 Both halves of the published RN package were broken for anyone who installed
