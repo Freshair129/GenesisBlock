@@ -25,7 +25,9 @@ await db.close();
 `npm install react-native-genesisdb` is not sufficient on its own: the native
 `.aar` this package bridges to lives in **GitHub Packages**, which requires
 authentication even though the repository is public. Without a token, the
-Android build fails to resolve `dev.genesisblock:genesisdb-android:0.1.0`.
+Android build fails to resolve `dev.genesisblock:genesisdb-android:0.1.1`
+(0.1.1 is the first version carrying the `x86_64` slice the standard Android
+Studio emulator needs — see [`android/README.md`](../android/README.md#abis)).
 
 Create a GitHub personal access token with **only the `read:packages` scope**,
 then add it to `~/.gradle/gradle.properties` (user-level — do not commit it to

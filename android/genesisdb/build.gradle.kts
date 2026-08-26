@@ -9,7 +9,7 @@ plugins {
 // sync with modules.json's `genesisdb-android` surface entry by hand
 // (per-surface versions are intentionally not SSOT-gated, see
 // docs/SPEC--MOBILE-SDK.md "Versioning model").
-val genesisdbAndroidVersion = "0.1.0"
+val genesisdbAndroidVersion = "0.1.1"
 
 android {
     namespace = "dev.genesisblock"
@@ -17,11 +17,20 @@ android {
 
     defaultConfig {
         minSdk = 24
-        // arm64-v8a + armeabi-v7a match the two targets built by
-        // .github/workflows/mobile-build.yml (aarch64-linux-android,
-        // armv7-linux-androideabi) — see docs/SPEC--MOBILE-SDK.md §0-B.
+        // These three ABI names match the three Rust targets built by
+        // .github/workflows/mobile-build.yml and release.yml
+        // (aarch64-linux-android, armv7-linux-androideabi,
+        // x86_64-linux-android) — see docs/SPEC--MOBILE-SDK.md §0-B. Note the
+        // spellings differ: abiFilters and jniLibs/ take the Android ABI name,
+        // cargo-ndk takes the Rust triple.
+        //
+        // x86_64 is the emulator ABI. The default Android Studio AVD on a
+        // Windows or Linux dev machine is x86_64, so an .aar carrying only
+        // the two ARM slices cannot be run in an emulator at all —
+        // System.loadLibrary finds no matching slice and the consumer is
+        // limited to physical hardware. Worth roughly +7-10 MiB uncompressed.
         ndk {
-            abiFilters += listOf("arm64-v8a", "armeabi-v7a")
+            abiFilters += listOf("arm64-v8a", "armeabi-v7a", "x86_64")
         }
     }
 

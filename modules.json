@@ -62,7 +62,7 @@
       "name": "genesisdb-android",
       "path": "android/genesisdb",
       "type": "mobile-sdk-android",
-      "version": "0.1.0",
+      "version": "0.1.1",
       "targetsSchemaVersion": 3,
       "minEngineVersion": "0.2.0"
     },

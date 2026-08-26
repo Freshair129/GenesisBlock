@@ -68,6 +68,9 @@ dependencies {
     // that comment). For local monorepo development you can skip the token
     // entirely: `./gradlew :genesisdb:publishToMavenLocal` from ../../android
     // and add `mavenLocal()` to the consuming app's repositories.
-    implementation "dev.genesisblock:genesisdb-android:0.1.0"
+    // 0.1.1 added the x86_64 slice, which is what makes this package usable
+    // in an Android Studio emulator on a Windows or Linux host — 0.1.0 shipped
+    // only the two ARM ABIs.
+    implementation "dev.genesisblock:genesisdb-android:0.1.1"
     implementation "org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.3"
 }

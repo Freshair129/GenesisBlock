@@ -113,6 +113,14 @@ exits 0 with no `sysinfo` compiled in.
 **only** place iOS/Android linking is exercised — the dev host is Windows (no macOS/Xcode,
 no local NDK), so cross-compile cannot be reproduced locally.
 
+**Addendum (`x86_64-linux-android`, genesisdb-android 0.1.1).** A third Android target was
+added to `mobile-build.yml`, `release.yml`, and `scripts/gen-android-jnilibs.sh`. It is the
+emulator ABI, not a device ABI: the standard Android Studio AVD on a Windows or Linux host
+is x86_64, so an `.aar` carrying only the two ARM slices could not be run in an emulator at
+all — `System.loadLibrary` found no matching slice. Note the two spellings are not the same:
+the Rust triple is `x86_64-linux-android`, the Android ABI directory / `abiFilters` name is
+`x86_64`. See `android/README.md` for the full ABI table.
+
 ```bash
 rustup target add aarch64-apple-ios
 rustup target add aarch64-apple-ios-sim
@@ -548,7 +556,7 @@ Distribution: `.aar` published to Maven Central or GitHub Packages.
 
 ```gradle
 dependencies {
-    implementation("dev.genesisblock:genesisdb-android:0.1.0")
+    implementation("dev.genesisblock:genesisdb-android:0.1.1")
 }
 ```
 

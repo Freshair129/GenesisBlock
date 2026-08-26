@@ -7,6 +7,39 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added — the Android `.aar` now ships an `x86_64` slice (emulator support)
+
+`genesisdb-android` built only `arm64-v8a` and `armeabi-v7a`, so the published
+`.aar` had no slice for the ABI that the standard Android Studio AVD runs as on
+a Windows or Linux dev machine: **x86_64**. A consumer on either host could not
+run their app in an emulator at all — `System.loadLibrary("genesis_block_native")`
+found no matching slice and the app died at load with `UnsatisfiedLinkError`.
+Only physical ARM hardware worked. It also blocked any emulator-based
+acceptance job, since GitHub's runners are x86_64.
+
+- **`x86_64-linux-android` is now built and staged everywhere the two ARM
+  targets were**: `mobile-build.yml`'s `android-build` job, `release.yml`'s
+  `android-publish` job, and `scripts/gen-android-jnilibs.sh` (the local-dev
+  mirror of the CI staging step). `abiFilters` in
+  `android/genesisdb/build.gradle.kts` lists the matching ABI name, `x86_64`.
+  The Rust triple and the Android ABI name are deliberately different spellings
+  (`x86_64-linux-android` vs `x86_64`); `cargo ndk` takes the triple, `jniLibs/`
+  and `abiFilters` take the ABI name.
+- **`genesisdb-android` is bumped 0.1.0 → 0.1.1** (a new ABI is a new
+  artifact), in `build.gradle.kts`, `modules.json`'s `genesisdb-android`
+  surface entry, and `react-native-genesisdb/android/build.gradle`'s dependency
+  coordinate. The already-published 0.1.0 asset on the v0.2.0 release stays
+  two-ABI; 0.1.1 is what the next `v*` tag push produces.
+- **Size stays bounded.** The third slice adds roughly +7-10 MiB uncompressed,
+  next to arm64-v8a's 7 MiB and armeabi-v7a's 5 MiB. That is only acceptable
+  because the debug-build defect below was fixed first — `android-publish`'s
+  DWARF guard already globs `jniLibs/*/`, so the new slice is checked with no
+  list to keep in sync, and its 40 MiB ceiling is **per slice**, not for the
+  `.aar` as a whole, so a third ABI does not move anything toward it.
+
+Not verifiable on the Windows dev host (no NDK): the cross-compile, the
+staging, and the resulting `.aar` are proven only by CI.
+
 ### Fixed — `react-native-genesisdb`'s iOS half is now installable from npm
 
 The remaining half of the `0.1.0` breakage. `GenesisDbModule.swift` imported
