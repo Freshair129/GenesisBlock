@@ -37,6 +37,25 @@ android {
 repositories {
     google()
     mavenCentral()
+
+    // `dev.genesisblock:genesisdb-android` is published to GitHub Packages,
+    // NOT to Maven Central — declaring only google()/mavenCentral() here (as
+    // this file did until now) made the dependency below unresolvable for
+    // every consumer who installed this package from npm rather than from a
+    // monorepo checkout with a mavenLocal() publish.
+    //
+    // GitHub Packages requires authentication even for public repositories,
+    // so consumers must supply a token. See this package's README
+    // ("Installation — Android") for the two-line gradle.properties setup.
+    // A PAT needs only the `read:packages` scope.
+    maven {
+        name = "GenesisBlockDBGitHubPackages"
+        url = uri("https://maven.pkg.github.com/Freshair129/GenesisBlock")
+        credentials {
+            username = project.findProperty("gpr.user") ?: System.getenv("GITHUB_ACTOR")
+            password = project.findProperty("gpr.key") ?: System.getenv("GITHUB_TOKEN")
+        }
+    }
 }
 
 dependencies {
@@ -44,10 +63,11 @@ dependencies {
     // pulling a second copy into the final APK.
     compileOnly "com.facebook.react:react-android:+"
 
-    // The genesisdb-android .aar (Phase B-2). Once published this resolves
-    // from Maven Central/GitHub Packages; for local monorepo development,
-    // `./gradlew :genesisdb:publishToMavenLocal` from ../../android and add
-    // `mavenLocal()` to the consuming app's repositories.
+    // The genesisdb-android .aar (Phase B-2), resolved from the GitHub
+    // Packages repository declared above (it is NOT on Maven Central — see
+    // that comment). For local monorepo development you can skip the token
+    // entirely: `./gradlew :genesisdb:publishToMavenLocal` from ../../android
+    // and add `mavenLocal()` to the consuming app's repositories.
     implementation "dev.genesisblock:genesisdb-android:0.1.0"
     implementation "org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.3"
 }

@@ -7,6 +7,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed — `react-native-genesisdb@0.1.0`'s documented integration path did not work
+
+Both halves of the published RN package were broken for anyone who installed
+it from npm rather than from a monorepo checkout. Neither is covered by CI —
+there is no RN host app in this repo to resolve against — which is why both
+shipped unnoticed.
+
+- **Android: the `.aar` was unresolvable.** `react-native-genesisdb/android/build.gradle`
+  declared `repositories { google(); mavenCentral() }` but depends on
+  `dev.genesisblock:genesisdb-android:0.1.0`, which is published to **GitHub
+  Packages**, not Maven Central. Every npm consumer's Android build failed to
+  resolve it. Added the GitHub Packages repository (reading `gpr.user`/`gpr.key`
+  properties, falling back to `GITHUB_ACTOR`/`GITHUB_TOKEN`) and a new
+  README "Installation — Android" section documenting the `read:packages`
+  token requirement, which the README had never mentioned at all.
+- **iOS: the module imported is not shipped.** `GenesisDbModule.swift` does
+  `import GenesisDB` / `import GenesisDBTypes` — products of the monorepo's
+  `ios/genesisdb` package, which sits above this package's root and therefore
+  cannot be included in the npm tarball. The podspec's `prepare_command`
+  fetches `GenesisBlockDB.xcframework` (module `GenesisBlockDB`, the raw C
+  ABI) — a *different* module. So `pod install` succeeds and the build then
+  fails with "no such module 'GenesisDB'". **Not fixed** — there is no
+  podspec-level fix; documented honestly instead, with the two candidate
+  structural fixes named (root-level SPM repo per issue #125, or vendoring
+  the Swift sources into this package at publish time).
+- Corrected the "Platform status" table, which claimed Android was simply
+  "Working" and implied iOS needed only an extra manual step, and refreshed
+  the stale "Publishing" section that still said the npm job "hasn't run yet"
+  (it has — `0.1.0` is live).
+
 ### Changed — runtime log prefixes now name subsystems, not MARK milestones
 
 - Engine log and error strings previously carried internal product-milestone
