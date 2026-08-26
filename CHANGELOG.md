@@ -7,6 +7,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed — CI linted only one of the two feature configurations
+
+- `.github/workflows/test.yml`'s `lint` job ran clippy **only** under
+  `--no-default-features`, which builds the storage core with the
+  `napi-bindings` feature **off**. The default build — the one that actually
+  compiles the `#[cfg(feature = "napi-bindings")]` cdylib surface — was never
+  linted, so two clippy errors sat undetected on `main`. Because `src/lib.rs`
+  carries `#![deny(clippy::all)]`, they were hard **errors**, not warnings:
+  - `clippy::needless_question_mark` in `GenesisDatabase::execute_hql` — an
+    `Ok(... ?)` wrapper that just re-wraps what `?` unwrapped. Now returns the
+    `map_err` result directly, matching how the sibling `flush_index` wrapper
+    already ends.
+  - `clippy::too_many_arguments` (8/7) on the `GenesisDatabase::create_collection`
+    napi wrapper. Silenced with `#[allow]` — the same attribute the core
+    `Storage::create_collection` already carries for the identical signature.
+    An options struct was rejected deliberately: `createCollection` is
+    **positional** in the generated `index.d.ts`, so a `#[napi(object)]`
+    parameter would be a breaking change for every JS caller.
+- The `lint` job now runs a second `cargo clippy --all-targets -- -D warnings`
+  step covering the default (napi-on) build, so this gap cannot regress.
+  Linting the napi build on the `ubuntu-latest` lint runner is safe: clippy is
+  check-only (every target compiles with `--emit=metadata`, never `link`), so
+  it does not hit the napi-symbol link problem that forces `cargo test` to use
+  `--no-default-features` on Linux.
+
 ### Added — iOS on-device acceptance test (issue #125 follow-up)
 
 - **`mobile-acceptance/ios/`**: a genuinely independent, blank SPM package

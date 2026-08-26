@@ -12570,7 +12570,7 @@ impl GenesisDatabase {
         let res = tokio::task::spawn_blocking(move || i.execute_hql(&query))
             .await
             .map_err(|e| Error::from_reason(e.to_string()))??;
-        Ok(serde_json::to_value(res).map_err(|e| Error::from_reason(e.to_string()))?)
+        serde_json::to_value(res).map_err(|e| Error::from_reason(e.to_string()))
     }
     #[napi]
     pub async fn hybrid_search(&self, args: HybridSearchInput) -> Result<Vec<NeighborOutput>> {
@@ -12604,6 +12604,13 @@ impl GenesisDatabase {
             .await
             .map_err(|e| Error::from_reason(e.to_string()))?
     }
+    // Mirrors `Storage::create_collection` 1:1. The arity is fixed by the
+    // published JS surface: `createCollection` is positional in the generated
+    // `index.d.ts`, so folding these into a `#[napi(object)]` options struct
+    // would be a breaking change for every JS caller. The core method carries
+    // the same allow for the same signature. Kept as `//` (not `///`) so this
+    // internal note does not leak into the generated `index.d.ts`.
+    #[allow(clippy::too_many_arguments)]
     #[napi]
     pub async fn create_collection(
         &self,
