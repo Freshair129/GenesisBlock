@@ -39,7 +39,7 @@ that's a native arm64 execution environment. CI (`.github/workflows/mobile-build
 job `ios-acceptance-test`) runs:
 
 ```bash
-xcodebuild test -scheme GenesisAcceptanceTests -destination "id=<a real simulator udid>"
+xcodebuild test -scheme GenesisAcceptance-Package -destination "id=<a real simulator udid>"
 ```
 
 which builds this package for the Simulator destination and genuinely
@@ -54,7 +54,7 @@ host (same carve-out as every other iOS piece in this repo):
 
 ```bash
 cd mobile-acceptance/ios
-xcodebuild test -scheme GenesisAcceptanceTests -destination 'platform=iOS Simulator,name=<any available iPhone>'
+xcodebuild test -scheme GenesisAcceptance-Package -destination 'platform=iOS Simulator,name=<any available iPhone>'
 ```
 
 ## Keeping this in sync

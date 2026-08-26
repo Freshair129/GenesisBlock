@@ -262,12 +262,14 @@ jobs:
 
       # Diagnostic: Package.swift declares no `products:` (only a binaryTarget
       # + a testTarget), so xcodebuild's implicit-workspace scheme generation
-      # names the scheme after the TEST target, not the package — `-scheme
-      # GenesisAcceptance` doesn't exist ("workspace named 'ios' does not
-      # contain a scheme named GenesisAcceptance", found on this job's second
-      # real run). Listing schemes here means the next naming drift (e.g. a
-      # future Xcode version generating a `-Package` suffixed scheme) shows up
-      # in the log instead of as a bare "no such scheme" failure.
+      # doesn't produce a scheme matching the package name — it auto-vends
+      # one whole-package scheme named "<PackageName>-Package" instead
+      # (confirmed via this step's own output: neither `-scheme
+      # GenesisAcceptance` nor `-scheme GenesisAcceptanceTests` exist; only
+      # `GenesisAcceptance-Package` does). Keeping `-list` here means the
+      # next naming drift (e.g. a future Xcode version changing this
+      # convention) shows up in the log instead of as a bare "no such scheme"
+      # failure.
       - name: List available schemes (diagnostic)
         working-directory: mobile-acceptance/ios
         run: xcodebuild -list
@@ -276,7 +278,7 @@ jobs:
         working-directory: mobile-acceptance/ios
         run: |
           xcodebuild test \
-            -scheme GenesisAcceptanceTests \
+            -scheme GenesisAcceptance-Package \
             -destination "id=${{ steps.sim.outputs.device_id }}"
 
   # Android arm64 + armv7 via cargo-ndk. nttld/setup-ndk provisions the NDK;
