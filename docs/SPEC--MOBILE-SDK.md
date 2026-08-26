@@ -607,12 +607,19 @@ for the initial SDK release; added when there is demonstrated user demand.
       exercises the published binaryTarget path instead — see the item
       below — but that's a separate blank package, not `ios/genesisdb`
       itself, so this specific checkbox stays honest)
-- [ ] MARK XVI on-device acceptance (issue #125 follow-up): a genuinely
+- [x] MARK XVI on-device acceptance (issue #125 follow-up): a genuinely
       blank SPM package consumes the *published* `GenesisBlockDB.xcframework`
       via `.binaryTarget` and runs a real round trip in the iOS Simulator —
       `mobile-acceptance/ios/`, CI job `ios-acceptance-test`. Written blind
-      like every other iOS piece in this repo; pending its first CI run to
-      confirm before checking this off.
+      like every other iOS piece in this repo; its first few real CI runs
+      surfaced three genuine bugs (not test-writing errors) before going
+      green — see CHANGELOG.md `[Unreleased]` "Fixed" entries: the v0.2.0
+      release asset's zip had a Windows-tool host-attribute byte that broke
+      SwiftPM's `binaryTarget` extraction, the auto-generated Xcode scheme
+      name wasn't what either of two reasonable guesses assumed
+      (`GenesisAcceptance-Package`, found via `xcodebuild -list`), and the
+      xcframework itself needed a Clang module map (`include/module.modulemap`)
+      before `import GenesisBlockDB` could resolve at all. Confirmed green.
 - [x] `addNode` + `retrieveContext` round-trip in a Swift test target
       (`RoundTripTests.swift`, CI: `ios-swift-tests`)
 
