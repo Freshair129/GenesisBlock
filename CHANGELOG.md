@@ -7,6 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed — the release workflow could not attach an asset to a fresh tag
+
+Found on the `v0.2.4` run — the first time the `Attach .aar` step ran in
+normal (non-repair) mode. Every publish succeeded; only the attach went red:
+
+```
+release not found
+```
+
+Pushing a tag creates a **tag**, not a GitHub **Release**, and
+`gh release upload` fails against a tag that has no Release. Repair mode never
+hit this because it targets a tag whose Release exists by definition — so the
+step worked when it was first exercised and broke the first time it was used
+for its actual purpose.
+
+The step now creates the Release if it is missing, then uploads. `--verify-tag`
+is passed so a typo'd `repair_tag` still fails loudly rather than silently
+creating a Release for a tag that does not exist.
+
 ## [0.2.4] - 2026-08-27
 
 Patch release — **no engine/runtime behaviour changed**. This tag exists to
