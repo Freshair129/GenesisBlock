@@ -328,6 +328,27 @@ jobs:
           ASSET="genesisdb-android-${VERSION}.aar"
           cp "$SRC" "$ASSET"
           ls -la "$ASSET"
+
+          # Pushing a tag creates a TAG, not a GitHub Release — and
+          # `gh release upload` fails with "release not found" against a tag
+          # that has no Release. This bit on the very first normal-mode run
+          # (v0.2.4): every publish succeeded and only the attach step went
+          # red. Repair mode never hit it because it targets a tag whose
+          # Release already exists by definition.
+          #
+          # Create the Release if it is missing, then upload. `--verify-tag`
+          # refuses to invent a Release for a tag that does not exist, so a
+          # typo'd repair_tag still fails loudly instead of silently creating
+          # a bogus Release.
+          if ! gh release view "$TAG" --repo "${{ github.repository }}" >/dev/null 2>&1; then
+            echo "no GitHub Release for $TAG yet — creating one"
+            gh release create "$TAG" \
+              --repo "${{ github.repository }}" \
+              --title "$TAG" \
+              --verify-tag \
+              --generate-notes
+          fi
+
           gh release upload "$TAG" "$ASSET" --clobber --repo "${{ github.repository }}"
 
   # Issue #125: react-native-genesisdb → npm. Independent package (its own
