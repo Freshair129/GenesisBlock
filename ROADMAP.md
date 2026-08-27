@@ -1,4 +1,4 @@
-# GENESISDB ROADMAP (current milestone: Mobile SDK, v0.2.3)
+# GENESISDB ROADMAP (current milestone: Mobile SDK, v0.2.4)
 **Positioning:** Embedded analytics / agent-memory graph + vector engine —
 the only embedded database with graph + vector + bitemporal + CRDT + governance
 in a single binary. Nearest comparators: Kuzu, DuckDB+graph, LanceDB, LadybugDB.
@@ -40,7 +40,9 @@ counter at all.
 The rules now:
 
 - **Current status** is expressed as the engine version plus a plain theme —
-  `v0.2.3 — Mobile SDK`. `docs/VERSION.md` remains the SSOT.
+  `v<engine version> — <theme>`, as in this file's title line.
+  `docs/VERSION.md` remains the SSOT; do not restate a version number here
+  where it would have to be hand-maintained in two places.
 - **Future epics** are named `v0.<minor> — <theme>`, pinned to the semver
   minor they land in.
 - **Past `## MARK N:` headings below stay exactly as they are.** They are the

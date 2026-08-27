@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.4] - 2026-08-27
+
+Patch release — **no engine/runtime behaviour changed**. This tag exists to
+publish two mobile-SDK surfaces that have been finished on `main` but could
+not reach anyone: `rn-npm-publish` and `android-publish` no-op on an unchanged
+version, so a version bump is the only delivery mechanism.
+
+- **`react-native-genesisdb` 0.1.0 → 0.1.1.** The published `0.1.0` is broken
+  on *both* platforms — its Android `build.gradle` pointed at a repository the
+  artifact is not in, and its iOS module imported a Swift package npm cannot
+  ship. Both were fixed on `main` weeks of work ago; this tag is what actually
+  delivers them.
+- **`genesisdb-android` 0.1.0 → 0.1.1.** Adds the `x86_64` ABI, without which
+  the SDK cannot run in a standard Android Studio emulator on a Windows or
+  Linux host at all.
+
+The rest of this release is CI hardening, artifact-integrity guards, and
+documentation corrections — including replacing a published release asset that
+turned out to be a 281 MB debug build. Everything below shipped since `v0.2.3`.
+
 ### Fixed — two docs described the code inaccurately
 
 Both surfaced during the 2026-08-26/27 research pass, neither is a code change.
