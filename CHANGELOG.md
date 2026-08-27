@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed — the dist-tag verifier failed on moves that had actually succeeded
+
+`npm-dist-tag.yml`'s verify step read the tag back immediately after writing it.
+The npm registry serves packuments through a CDN and is eventually consistent,
+so a read a second later still returns the old tag. Both real moves —
+`react-native-genesisdb@0.1.1` and `@freshair129/gks-genesis-block-native@0.2.4`
+— landed correctly and the workflow reported failure anyway.
+
+The step now polls to a ~2 minute deadline and fails only if the tag never
+converges. A verifier that cries wolf on every success is worse than no
+verifier: it trains you to ignore it.
+
 ### Fixed — every npm release stranded `latest` on the first version ever published
 
 `release.yml` published both npm packages with an unconditional

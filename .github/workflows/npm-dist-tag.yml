@@ -72,17 +72,31 @@ jobs:
       # Don't trust the exit code — read the tag back and assert. A publish
       # step reporting success while the artifact users actually receive is
       # something else is the exact failure mode this whole workflow repairs.
+      #
+      # POLL, don't read once. The npm registry serves packuments through a CDN
+      # and is eventually consistent: a read a second after `dist-tag add`
+      # legitimately still returns the OLD tag. The first version of this step
+      # read once and failed both real moves — `react-native-genesisdb` 0.1.1
+      # and `@freshair129/gks-genesis-block-native` 0.2.4 had both landed
+      # correctly, and the workflow reported failure anyway. A verifier that
+      # cries wolf on every success is worse than none: it trains you to ignore
+      # it. Retry to a deadline and only fail if the tag never converges.
       - name: Verify the dist-tag moved
         run: |
           set -euo pipefail
           PKG='${{ inputs.package }}'
           TAG='${{ inputs.tag }}'
           WANT='${{ inputs.version }}'
-          echo "dist-tags after:"
+          for attempt in $(seq 1 12); do
+            GOT=$(npm view "$PKG@$TAG" version 2>/dev/null || true)
+            if [ "$GOT" = "$WANT" ]; then
+              echo "confirmed after ${attempt} attempt(s): npm install $PKG resolves to $GOT"
+              npm view "$PKG" dist-tags --json
+              exit 0
+            fi
+            echo "attempt ${attempt}: '$TAG' still reads as '${GOT:-<none>}', want $WANT — waiting for CDN propagation"
+            sleep 10
+          done
+          echo "::error::'$TAG' never converged to $WANT after ~2 minutes (last read: '${GOT:-<none>}')"
           npm view "$PKG" dist-tags --json
-          GOT=$(npm view "$PKG@$TAG" version)
-          if [ "$GOT" != "$WANT" ]; then
-            echo "::error::'$TAG' resolves to $GOT, expected $WANT"
-            exit 1
-          fi
-          echo "confirmed: npm install $PKG now resolves to $GOT"
+          exit 1
