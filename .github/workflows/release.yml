@@ -151,11 +151,24 @@ jobs:
 
       # prepublishOnly (napi prepublish -t npm) fires here: publishes the
       # per-platform packages and updates the main package optionalDependencies.
-      # --tag beta keeps this prerelease off the npm `latest` dist-tag.
+      #
+      # The dist-tag is DERIVED from the version, not hard-coded. This was an
+      # unconditional `--tag beta`, which silently froze `latest` at the first
+      # version ever published: every later release landed on `beta`, so plain
+      # `npm install <pkg>` kept serving the old one. Under semver a PRERELEASE
+      # is a version carrying a `-` identifier (`0.1.0-beta.1`) — not merely any
+      # pre-1.0 version. `0.2.4` is a normal release and belongs on `latest`.
       - name: Publish to npm
         run: |
+          set -euo pipefail
+          VERSION=$(node -p "require('./package.json').version")
+          case "$VERSION" in
+            *-*) NPM_TAG=beta ;;
+            *)   NPM_TAG=latest ;;
+          esac
+          echo "publishing $VERSION under dist-tag '$NPM_TAG'"
           npm config set provenance true
-          npm publish --access public --tag beta
+          npm publish --access public --tag "$NPM_TAG"
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
@@ -385,11 +398,22 @@ jobs:
       - name: Build
         run: npm run build
 
-      # --tag beta matches the main package's convention above — keeps this
-      # pre-1.0 package off the npm `latest` dist-tag.
+      # Same version-derived dist-tag as the main package above. The comment
+      # here used to read "keeps this pre-1.0 package off `latest`", conflating
+      # pre-1.0 with prerelease — a reading that pins `latest` to 0.1.0 until
+      # some 1.0.0 exists. It did exactly that: 0.1.1 carried the Android AND
+      # iOS integration fixes while plain `npm install react-native-genesisdb`
+      # still served the 0.1.0 that was broken on both platforms.
       - name: Publish to npm
         run: |
+          set -euo pipefail
+          VERSION=$(node -p "require('./package.json').version")
+          case "$VERSION" in
+            *-*) NPM_TAG=beta ;;
+            *)   NPM_TAG=latest ;;
+          esac
+          echo "publishing $VERSION under dist-tag '$NPM_TAG'"
           npm config set provenance true
-          npm publish --access public --tag beta
+          npm publish --access public --tag "$NPM_TAG"
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

@@ -1,0 +1,88 @@
+# Move an npm dist-tag (normally `latest`) onto an ALREADY-PUBLISHED version.
+#
+# Why this exists as a workflow rather than a local command: the npm credential
+# that can write to these packages lives only in the NPM_TOKEN Actions secret.
+# Publishing has always happened from CI, so retagging has to as well.
+#
+# The situation that motivated it: release.yml published every version under
+# `--tag beta` unconditionally, so `latest` never moved off the first version
+# ever published. react-native-genesisdb@0.1.1 fixed the package's Android and
+# iOS integration, but `npm install react-native-genesisdb` still resolved to
+# the broken 0.1.0. release.yml now derives the tag from the version, which
+# stops NEW releases from stranding `latest` — this workflow is how you repair
+# the ones already published under the old behaviour.
+name: npm dist-tag
+
+on:
+  workflow_dispatch:
+    inputs:
+      package:
+        description: 'npm package name'
+        required: true
+        type: choice
+        options:
+          - react-native-genesisdb
+          - '@freshair129/gks-genesis-block-native'
+      version:
+        description: 'Already-published version to point the tag at (e.g. 0.1.1)'
+        required: true
+        type: string
+      tag:
+        description: 'dist-tag to move'
+        required: true
+        default: latest
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  dist-tag:
+    name: ${{ inputs.package }}@${{ inputs.version }} -> ${{ inputs.tag }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          registry-url: 'https://registry.npmjs.org'
+
+      # Fail early and legibly on a typo'd version. `npm dist-tag add` does
+      # reject an unpublished version, but pointing at the registry first says
+      # WHICH versions exist, which is what you actually need at that moment.
+      - name: Verify the version is published
+        run: |
+          set -euo pipefail
+          PKG='${{ inputs.package }}'
+          VERSION='${{ inputs.version }}'
+          echo "published versions of $PKG:"
+          npm view "$PKG" versions --json
+          if ! npm view "$PKG@$VERSION" version >/dev/null 2>&1; then
+            echo "::error::$PKG@$VERSION is not published — refusing to move '${{ inputs.tag }}' to it"
+            exit 1
+          fi
+
+      - name: Show dist-tags before
+        run: npm view '${{ inputs.package }}' dist-tags --json
+
+      - name: Move the dist-tag
+        run: npm dist-tag add '${{ inputs.package }}@${{ inputs.version }}' '${{ inputs.tag }}'
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      # Don't trust the exit code — read the tag back and assert. A publish
+      # step reporting success while the artifact users actually receive is
+      # something else is the exact failure mode this whole workflow repairs.
+      - name: Verify the dist-tag moved
+        run: |
+          set -euo pipefail
+          PKG='${{ inputs.package }}'
+          TAG='${{ inputs.tag }}'
+          WANT='${{ inputs.version }}'
+          echo "dist-tags after:"
+          npm view "$PKG" dist-tags --json
+          GOT=$(npm view "$PKG@$TAG" version)
+          if [ "$GOT" != "$WANT" ]; then
+            echo "::error::'$TAG' resolves to $GOT, expected $WANT"
+            exit 1
+          fi
+          echo "confirmed: npm install $PKG now resolves to $GOT"

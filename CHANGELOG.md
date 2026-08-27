@@ -7,6 +7,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed — every npm release stranded `latest` on the first version ever published
+
+`release.yml` published both npm packages with an unconditional
+`npm publish --tag beta`. The comments justified it as keeping a "prerelease"
+(and, for `react-native-genesisdb`, a "pre-1.0 package") off `latest` — but
+under semver a prerelease is a version carrying a `-` identifier
+(`0.1.0-beta.1`), not any version below 1.0.0. Reading it the second way pins
+`latest` until some 1.0.0 exists, and that is what happened:
+
+| package | `beta` | `latest` (what `npm install` served) |
+|---|---|---|
+| `react-native-genesisdb` | 0.1.1 | **0.1.0** |
+| `@freshair129/gks-genesis-block-native` | 0.2.4 | **0.2.3** |
+
+So `0.2.4` — the tag cut for the sole purpose of delivering
+`react-native-genesisdb`'s Android and iOS integration fixes — published
+successfully and still did not reach anyone typing
+`npm install react-native-genesisdb`. Merging was not shipping; publishing
+turned out not to be shipping either.
+
+Both publish steps now derive the dist-tag from the version (`*-*` → `beta`,
+otherwise `latest`). New workflow `npm-dist-tag.yml` retags an
+already-published version, for repairing releases published under the old
+behaviour; it reads the tag back from the registry afterwards and fails if it
+did not move, rather than trusting the command's exit code.
+
 ### Fixed — the release workflow could not attach an asset to a fresh tag
 
 Found on the `v0.2.4` run — the first time the `Attach .aar` step ran in
