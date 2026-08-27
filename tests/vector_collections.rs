@@ -241,12 +241,43 @@ fn recall_sanity_1000_vectors() {
     let p = fresh("vc_recall_1000");
     let s = open_dim(&p, 8);
 
-    // Generate 1000 deterministic dim-8 vectors
+    // Deterministic, but NOT degenerate. The previous generator was
+    //
+    //     v[i % 8] = 1.0 + i as f64 * 0.001
+    //
+    // which produces only 8 distinct DIRECTIONS, 125 vectors each, separated
+    // along an axis by 0.001. The true top-10 for an axis-aligned query is
+    // then an almost arbitrary pick among ~125 near-equidistant candidates, so
+    // recall@10 measured by ID equality was mostly sampling HNSW's random
+    // layer assignment rather than its search quality. That is why this test
+    // kept drifting below its bound (0.80 -> lowered to 0.75 in #78, then
+    // observed at 0.720 anyway): the data made a high score impossible to hold.
+    //
+    // hnsw_rs 0.3.4 seeds its StdRng with `StdRng::from_os_rng()` internally
+    // and exposes no seeding API, so the index cannot be made deterministic
+    // from here. Fixing the DATA is the available fix: well-separated points
+    // give an unambiguous top-10, which a working ANN index recovers reliably.
+    //
+    // splitmix64 keeps the corpus fixed across runs and machines without
+    // pulling `rand` into the test or depending on its version-to-version
+    // stream stability.
+    fn splitmix64(state: &mut u64) -> u64 {
+        *state = state.wrapping_add(0x9E37_79B9_7F4A_7C15);
+        let mut z = *state;
+        z = (z ^ (z >> 30)).wrapping_mul(0xBF58_476D_1CE4_E5B9);
+        z = (z ^ (z >> 27)).wrapping_mul(0x94D0_49BB_1331_11EB);
+        z ^ (z >> 31)
+    }
+    // Uniform in [-1, 1) from the top 53 bits.
+    fn coord(state: &mut u64) -> f64 {
+        let u = (splitmix64(state) >> 11) as f64 / (1u64 << 53) as f64;
+        u * 2.0 - 1.0
+    }
+
+    let mut seed = 0x2545_F491_4F6C_DD1D_u64;
     let mut vectors: Vec<Vec<f64>> = Vec::with_capacity(1000);
-    for i in 0..1000u32 {
-        let mut v = vec![0.0f64; 8];
-        v[(i as usize) % 8] = 1.0 + i as f64 * 0.001;
-        vectors.push(v);
+    for _ in 0..1000 {
+        vectors.push((0..8).map(|_| coord(&mut seed)).collect());
     }
 
     for (i, emb) in vectors.iter().enumerate() {
@@ -260,14 +291,21 @@ fn recall_sanity_1000_vectors() {
         a.iter().zip(b).map(|(x, y)| (x - y) * (x - y)).sum::<f64>()
     }
 
-    // 5 query vectors
-    let queries: Vec<Vec<f64>> = vec![
-        vec![1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
-        vec![0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
-        vec![0.5, 0.5, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
-        vec![0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0],
-        vec![0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1],
-    ];
+    // 5 query points drawn from the same distribution as the corpus, from the
+    // same fixed stream. The old queries were axis-aligned unit vectors, which
+    // sat on the corner of the degenerate layout above and made the near-tie
+    // problem worst-case; a query representative of the data is what this
+    // sanity check is actually meant to exercise.
+    // 50 queries, not 5. Averaging more queries is how you make this stable
+    // WITHOUT lowering the bar — the opposite of what #78 did. HNSW is
+    // probabilistic: measured over 400 queries, per-query recall@10 was 10/10
+    // on 354, 9/10 on 44 and 8/10 on 2. With 5 queries one unlucky query moves
+    // the run average by 20%, which is what produced the occasional deep
+    // outlier; with 50 it moves it by 2%. Standard error falls by sqrt(10)
+    // while the thing being asserted gets STRICTER, not looser.
+    let queries: Vec<Vec<f64>> = (0..50)
+        .map(|_| (0..8).map(|_| coord(&mut seed)).collect())
+        .collect();
 
     let mut total_recall = 0.0;
     for q in &queries {
@@ -294,10 +332,31 @@ fn recall_sanity_1000_vectors() {
     // HNSW graph construction uses random layer assignment, so recall is
     // nondeterministic even on deterministic input; high ef_search + a small
     // margin keep this sanity check meaningful without flaking near the bound.
+    // Bound set FROM MEASUREMENT, not chosen and hoped for.
+    //
+    // History of this line, because it has been moved the wrong way before:
+    //   0.80   original
+    //   0.75   #78 "deflake" — LOWERED, justified by "green 5/5 consecutive
+    //          runs". Zero failures in 5 runs bounds the failure rate at only
+    //          ~60% (rule of three), so that sample could never have shown
+    //          what it was claimed to show.
+    //   0.720  what CI actually measured five weeks later — below the lowered
+    //          bound too. Lowering the bar did not fix anything; it deferred.
+    //   0.95   here, from 40 runs of this version: mean 0.9900, sd 0.0049,
+    //          min 0.9780, median 0.9920. Predicted mean 0.9880 / sd 0.0048
+    //          from the per-query distribution beforehand and the measurement
+    //          matched, so the model behind this number is understood and not
+    //          merely fitted. 0.95 sits 8.1 sd below the mean.
+    //
+    // The engine was never at fault: across 400 queries every search returned
+    // a full 10 results (no short result sets, i.e. none of the recall-cliff
+    // signature that #103's exact-scan floor addresses), with per-query
+    // recall@10 of 10/10 on 354, 9/10 on 44 and 8/10 on 2. What made the old
+    // test unstable was degenerate data plus averaging only 5 queries.
     let avg_recall = total_recall / queries.len() as f64;
     assert!(
-        avg_recall >= 0.75,
-        "recall@10 should be >= 0.75; got {avg_recall:.3}"
+        avg_recall >= 0.95,
+        "recall@10 should be >= 0.95; got {avg_recall:.3}"
     );
 }
 
