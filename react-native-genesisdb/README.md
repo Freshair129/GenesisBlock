@@ -25,7 +25,9 @@ await db.close();
 `npm install react-native-genesisdb` is not sufficient on its own: the native
 `.aar` this package bridges to lives in **GitHub Packages**, which requires
 authentication even though the repository is public. Without a token, the
-Android build fails to resolve `dev.genesisblock:genesisdb-android:0.1.0`.
+Android build fails to resolve `dev.genesisblock:genesisdb-android:0.1.1`
+(0.1.1 is the first version carrying the `x86_64` slice the standard Android
+Studio emulator needs — see [`android/README.md`](../android/README.md#abis)).
 
 Create a GitHub personal access token with **only the `read:packages` scope**,
 then add it to `~/.gradle/gradle.properties` (user-level — do not commit it to
@@ -105,11 +107,17 @@ to npm (unscoped `react-native-genesisdb`, `--tag beta`) on every `v*` tag
 push, reusing the same `NPM_TOKEN` secret the main native-addon package
 publishes with (issue #125).
 
-That job has run: **`react-native-genesisdb@0.1.0` is live on npm** (first
-published from the `v0.2.2` tag). Re-publishing an unchanged version is
-correctly rejected by the registry with `403 You cannot publish over the
-previously published versions`, so later tags no-op unless the version in
-`package.json` is bumped.
+That job has run: `react-native-genesisdb@0.1.0` was published from the
+`v0.2.2` tag. Re-publishing an unchanged version is correctly rejected by the
+registry with `403 You cannot publish over the previously published
+versions`, so later tags no-op unless the version in `package.json` is bumped.
+
+**That is why this package is at `0.1.1`.** `0.1.0` is the version currently
+on npm, and it is the one with both integration breakages — the Android
+repository declaration and the iOS module imports were fixed on `main` after
+it shipped, so those fixes do not reach a single npm consumer until a tag
+push publishes `0.1.1`. Bumping the version is the delivery mechanism, not
+bookkeeping.
 
 ## Wire format
 

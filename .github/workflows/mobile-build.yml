@@ -51,8 +51,16 @@
 # Targets (from SPEC §0-B):
 #   aarch64-apple-ios          — iOS device
 #   aarch64-apple-ios-sim      — iOS Simulator (Apple Silicon)
-#   aarch64-linux-android      — Android arm64
-#   armv7-linux-androideabi    — Android 32-bit ABI
+#   aarch64-linux-android      — Android arm64 (every modern physical device)
+#   armv7-linux-androideabi    — Android 32-bit ABI (older physical devices)
+#   x86_64-linux-android       — Android x86_64. NOT a phone ABI: it is what the
+#                                standard Android Studio AVD runs as on a
+#                                Windows or Linux dev machine, and the only
+#                                Android ABI GitHub's x86_64 runners can
+#                                emulate. Without this slice
+#                                System.loadLibrary finds no match and a
+#                                consumer cannot run their app in an emulator
+#                                at all.
 
 name: Mobile Build
 
@@ -281,11 +289,17 @@ jobs:
             -scheme GenesisAcceptance-Package \
             -destination "id=${{ steps.sim.outputs.device_id }}"
 
-  # Android arm64 + armv7 via cargo-ndk. nttld/setup-ndk provisions the NDK;
-  # cargo-ndk wires the right clang linker per target so no manual
+  # Android arm64 + armv7 + x86_64 via cargo-ndk. nttld/setup-ndk provisions
+  # the NDK; cargo-ndk wires the right clang linker per target so no manual
   # --config target.<triple>.linker is needed (cf. SPEC §0-B note).
+  #
+  # x86_64 exists for the emulator, not for devices: the default Android
+  # Studio AVD on a Windows/Linux host is x86_64, so building only the two ARM
+  # ABIs left every consumer on those hosts unable to run the SDK anywhere but
+  # on real hardware. It is also the prerequisite for any future
+  # emulator-based acceptance job on GitHub's x86_64 runners.
   android-build:
-    name: Android cross-compile (arm64 + armv7)
+    name: Android cross-compile (arm64 + armv7 + x86_64)
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -293,14 +307,14 @@ jobs:
 
       - uses: dtolnay/rust-toolchain@stable
         with:
-          targets: aarch64-linux-android, armv7-linux-androideabi
+          targets: aarch64-linux-android, armv7-linux-androideabi, x86_64-linux-android
 
       - uses: Swatinem/rust-cache@v2
         with:
           key: mobile-android
 
       - name: Ensure Android targets installed
-        run: rustup target add aarch64-linux-android armv7-linux-androideabi
+        run: rustup target add aarch64-linux-android armv7-linux-androideabi x86_64-linux-android
 
       # Pinned to an LTS NDK. cargo-ndk expects ANDROID_NDK_HOME / ANDROID_NDK_ROOT,
       # which this action exports.
@@ -315,30 +329,40 @@ jobs:
         run: cargo install cargo-ndk --locked
 
       # cargo-ndk selects the NDK clang linker for each --target; `build` then
-      # invokes cargo build with the mobile feature for both ABIs.
+      # invokes cargo build with the mobile feature for all three ABIs.
       # `mobile ffi android-jni` → the cdylib `.so` exporting the JNI bridge
       # (src/jni.rs) that the .aar's Kotlin wrapper binds via System.loadLibrary.
-      - name: Build SDK core for Android (arm64 + armv7)
+      - name: Build SDK core for Android (arm64 + armv7 + x86_64)
         env:
           ANDROID_NDK_HOME: ${{ steps.setup-ndk.outputs.ndk-path }}
         run: |
           cargo ndk \
             --target aarch64-linux-android \
             --target armv7-linux-androideabi \
+            --target x86_64-linux-android \
             build --no-default-features --features "mobile ffi android-jni"
 
       # System.loadLibrary("genesis_block_native") needs the .so — confirm the
-      # cdylib slice exists for arm64.
-      - name: Verify Android shared lib (.so) was produced
-        run: test -f target/aarch64-linux-android/debug/libgenesis_block_native.so
+      # cdylib slice exists for arm64 (the device ABI) and for x86_64 (the
+      # emulator ABI), so a mistyped or dropped target fails here with a clear
+      # message rather than further down in the staging copy.
+      - name: Verify Android shared libs (.so) were produced
+        run: |
+          test -f target/aarch64-linux-android/debug/libgenesis_block_native.so
+          test -f target/x86_64-linux-android/debug/libgenesis_block_native.so
 
-      # Stage both ABI slices for the android-aar job (same layout
-      # scripts/gen-android-jnilibs.sh produces for local dev).
+      # Stage all three ABI slices for the android-aar job (same layout
+      # scripts/gen-android-jnilibs.sh produces for local dev). Note the two
+      # spellings: the source paths are Rust target TRIPLES, the destination
+      # directories are Android ABI names, and for x86_64 they differ
+      # (x86_64-linux-android → x86_64). jniLibs/ and abiFilters only ever
+      # take the ABI name.
       - name: Stage jniLibs for android-aar
         run: |
-          mkdir -p jnilibs-out/arm64-v8a jnilibs-out/armeabi-v7a
+          mkdir -p jnilibs-out/arm64-v8a jnilibs-out/armeabi-v7a jnilibs-out/x86_64
           cp target/aarch64-linux-android/debug/libgenesis_block_native.so jnilibs-out/arm64-v8a/
           cp target/armv7-linux-androideabi/debug/libgenesis_block_native.so jnilibs-out/armeabi-v7a/
+          cp target/x86_64-linux-android/debug/libgenesis_block_native.so jnilibs-out/x86_64/
 
       - uses: actions/upload-artifact@v4
         with:
