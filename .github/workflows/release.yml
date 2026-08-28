@@ -48,6 +48,20 @@ on:
   push:
     tags:
       - 'v*'
+  # Dry run on PRs that touch release machinery or the things it packages.
+  # Before this, release.yml had no non-mutating path: 30 of its 34 steps do
+  # work that is safe on any commit, but the only trigger was a version tag, so
+  # they were first executed at the moment of release. The record was 0 green
+  # runs out of 5 tag pushes. A dry run cannot write to any registry (see
+  # IS_RELEASE below) but exercises everything up to the write.
+  pull_request:
+    paths:
+      - '.github/workflows/release.yml'
+      - 'package.json'
+      - 'modules.json'
+      - 'Cargo.toml'
+      - 'android/**'
+      - 'react-native-genesisdb/**'
   workflow_dispatch:
     inputs:
       repair_tag:
@@ -62,6 +76,15 @@ on:
 permissions:
   contents: read
   id-token: write # npm provenance
+
+env:
+  # THE one switch that separates a real release from a dry run. Computed once,
+  # here, rather than re-derived per step: the two conditional defects this file
+  # has already produced both came from a mode's semantics being decided in more
+  # than one place. Every irreversible step below guards on this being exactly
+  # the string "true", so an unset or misspelled value fails CLOSED - it does
+  # not publish.
+  IS_RELEASE: ${{ github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v') }}
 
 jobs:
   build:
@@ -167,6 +190,14 @@ jobs:
             *)   NPM_TAG=latest ;;
           esac
           echo "publishing $VERSION under dist-tag '$NPM_TAG'"
+          if [ "${IS_RELEASE:-}" != "true" ]; then
+            # --dry-run still resolves the manifest, runs prepublishOnly and
+            # lists the exact file set, so the packaging is really checked;
+            # it just does not write to the registry.
+            echo "DRY RUN: would publish $VERSION to dist-tag '$NPM_TAG'"
+            npm publish --access public --tag "$NPM_TAG" --dry-run
+            exit 0
+          fi
           npm config set provenance true
           npm publish --access public --tag "$NPM_TAG"
         env:
@@ -262,7 +293,18 @@ jobs:
         # would fail the job before it could replace the release asset.
         if: ${{ inputs.repair_tag == '' }}
         working-directory: android
-        run: gradle :genesisdb:publish
+        run: |
+          set -euo pipefail
+          if [ "${IS_RELEASE:-}" != "true" ]; then
+            # publishToMavenLocal exercises the whole publishing configuration
+            # - POM generation, coordinates, artifact wiring - against a local
+            # repository instead of GitHub Packages. Same code path, no remote
+            # write, and no 409 on a version that already exists.
+            echo "DRY RUN: publishing to the local Maven repository instead"
+            gradle :genesisdb:publishToMavenLocal
+            exit 0
+          fi
+          gradle :genesisdb:publish
         env:
           GITHUB_ACTOR: ${{ github.actor }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -353,6 +395,20 @@ jobs:
           # refuses to invent a Release for a tag that does not exist, so a
           # typo'd repair_tag still fails loudly instead of silently creating
           # a bogus Release.
+          # Everything above this line runs in a dry run: the version lookup
+          # from modules.json, the asset naming, the copy, the size listing.
+          # That is deliberate - the defect this step shipped with in #139 was
+          # in the version lookup, and a dry run would have caught it.
+          #
+          # Honest limit: the release-not-found defect of #144 lived in the
+          # upload itself, and no dry run can exercise a write. This narrows
+          # the unexercised surface to the two gh calls below; it does not
+          # eliminate it.
+          if [ "${IS_RELEASE:-}" != "true" ]; then
+            echo "DRY RUN: would attach $ASSET to the GitHub Release for $TAG"
+            exit 0
+          fi
+
           if ! gh release view "$TAG" --repo "${{ github.repository }}" >/dev/null 2>&1; then
             echo "no GitHub Release for $TAG yet — creating one"
             gh release create "$TAG" \
@@ -413,6 +469,14 @@ jobs:
             *)   NPM_TAG=latest ;;
           esac
           echo "publishing $VERSION under dist-tag '$NPM_TAG'"
+          if [ "${IS_RELEASE:-}" != "true" ]; then
+            # --dry-run still resolves the manifest, runs prepublishOnly and
+            # lists the exact file set, so the packaging is really checked;
+            # it just does not write to the registry.
+            echo "DRY RUN: would publish $VERSION to dist-tag '$NPM_TAG'"
+            npm publish --access public --tag "$NPM_TAG" --dry-run
+            exit 0
+          fi
           npm config set provenance true
           npm publish --access public --tag "$NPM_TAG"
         env:
