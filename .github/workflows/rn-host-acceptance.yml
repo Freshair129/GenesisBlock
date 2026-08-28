@@ -131,16 +131,43 @@ jobs:
           set -euo pipefail
           pod install --verbose 2>&1 | tail -60
 
+      # Assertions state what was CHECKED, and dump the layout on failure. An
+      # earlier version looked for `Pods/react-native-genesisdb/` and reported
+      # "autolinking did not pick up the podspec" when it was missing - a
+      # confident diagnosis of the wrong cause. Autolinking had worked fine;
+      # `:path`-based pods are DEVELOPMENT pods, and CocoaPods does not copy
+      # those into `Pods/<name>/` at all. It records the resolved podspec under
+      # `Pods/Local Podspecs/` and references the sources where they already
+      # live, in node_modules. An assertion that names a cause it never tested
+      # costs a whole CI round to disprove.
       - name: Assert the pod and its xcframework actually landed
         working-directory: rn-host/ios
         run: |
           set -euo pipefail
-          POD=Pods/react-native-genesisdb
-          test -d "$POD" || { echo "::error::CocoaPods did not install react-native-genesisdb — autolinking did not pick up the podspec"; exit 1; }
+          fail() {
+            echo "::error::$1"
+            echo "--- Pods/Local Podspecs ---"; ls -la "Pods/Local Podspecs" 2>&1 || true
+            echo "--- pod root in node_modules ---"; ls -la ../node_modules/react-native-genesisdb 2>&1 || true
+            exit 1
+          }
+
+          # Autolinking discovered the podspec and CocoaPods resolved it.
+          test -f "Pods/Local Podspecs/react-native-genesisdb.podspec.json" \
+            || fail "react-native-genesisdb is not in Pods/Local Podspecs - RN autolinking did not discover the podspec in node_modules"
+
+          # It reached the resolved graph, not merely parsed.
+          grep -q 'react-native-genesisdb' Podfile.lock \
+            || fail "react-native-genesisdb is absent from Podfile.lock - it was not resolved into the build"
+
           # vendored_frameworks is the half a green `pod install` can still get
-          # wrong: the pod installs, the binary never arrives, and the failure
-          # only shows up as a link error in someone else's app.
-          find "$POD" -name 'GenesisBlockDB.xcframework' -maxdepth 3 -print -quit | grep -q . \
-            || { echo "::error::react-native-genesisdb installed but GenesisBlockDB.xcframework is absent — prepare_command did not deliver the binary"; exit 1; }
-          echo "pod + xcframework present:"
-          ls -la "$POD"
+          # wrong: the pod resolves, the binary never arrives, and the failure
+          # surfaces only as a link error in someone else's app. prepare_command
+          # runs in the podspec's own directory, which for a development pod is
+          # the package root inside node_modules.
+          XCF=../node_modules/react-native-genesisdb/GenesisBlockDB.xcframework
+          test -d "$XCF" \
+            || fail "GenesisBlockDB.xcframework is absent - the podspec's prepare_command did not deliver the binary"
+
+          echo "resolved podspec, Podfile.lock entry, and xcframework all present"
+          echo "xcframework slices:"
+          ls "$XCF"
