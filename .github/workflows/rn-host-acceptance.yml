@@ -1,0 +1,173 @@
+# The gate that would have caught BOTH of react-native-genesisdb@0.1.0's
+# shipped breakages.
+#
+# Nothing in this monorepo consumes react-native-genesisdb the way a user does.
+# `rn-ts-tests` runs the TS layer against a stubbed react-native; `ios-swift-tests`
+# builds HEAD Swift against a HEAD engine; `rn-ios-pod-typecheck` compiles the
+# vendored sources against the published xcframework. All useful, all green —
+# and 0.1.0 still shipped with an Android `build.gradle` pointing at a
+# repository the artifact was not in, and an iOS module importing a Swift
+# package npm cannot ship. Both were consumer-path defects, and the consumer
+# path had no gate.
+#
+# This installs the package into a host project and resolves it the way an app
+# does. Two sources, because they answer different questions:
+#
+#   packed    — `npm pack` of the working tree. Runs on PRs: catches a break
+#               BEFORE it is published.
+#   published — whatever `npm install react-native-genesisdb` gives a user
+#               right now. Runs on a schedule: catches a break that is already
+#               live, including one caused by something outside this repo (a
+#               deleted release asset, a moved dist-tag, a yanked dependency).
+#
+# A PR-only gate would have caught 0.1.0 before release. A schedule-only gate
+# would have caught it afterwards. Both are worth having, so both run.
+name: RN host acceptance
+
+on:
+  pull_request:
+    paths:
+      - 'react-native-genesisdb/**'
+      - '.github/workflows/rn-host-acceptance.yml'
+  schedule:
+    # Weekly, Mondays 06:00 UTC — against the PUBLISHED package.
+    - cron: '0 6 * * 1'
+  workflow_dispatch:
+    inputs:
+      source:
+        description: 'Which package to consume'
+        required: true
+        default: packed
+        type: choice
+        options:
+          - packed
+          - published
+      published_version:
+        description: 'dist-tag or version for source=published (default: latest)'
+        required: false
+        default: latest
+        type: string
+
+permissions:
+  contents: read
+  packages: read
+
+env:
+  # schedule has no inputs, so it must fall through to `published`.
+  PKG_SOURCE: ${{ inputs.source || (github.event_name == 'schedule' && 'published') || 'packed' }}
+  PKG_VERSION: ${{ inputs.published_version || 'latest' }}
+
+jobs:
+  android-host:
+    name: Android host resolves the package (${{ inputs.source || (github.event_name == 'schedule' && 'published') || 'packed' }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: android-actions/setup-android@v3
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: Stage the package into a host project
+        run: bash scripts/rn-host-fixture.sh android "$PKG_SOURCE" "$PKG_VERSION"
+
+      # The real 0.1.0 defect was pure dependency resolution: the shipped
+      # build.gradle declared google()/mavenCentral() while the .aar lives on
+      # GitHub Packages, so `implementation "dev.genesisblock:genesisdb-android"`
+      # was unresolvable for everyone who installed from npm. assembleRelease
+      # resolves that AND compiles the Kotlin bridge, so a source-level break
+      # fails here too.
+      #
+      # GITHUB_ACTOR/GITHUB_TOKEN are what the shipped build.gradle falls back
+      # to when the gpr.* properties are absent — so this also exercises the
+      # credential path the package's README tells consumers to set up.
+      - name: gradle assembleRelease in the host project
+        working-directory: rn-host/android
+        env:
+          GITHUB_ACTOR: ${{ github.actor }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gradle :react-native-genesisdb:assembleRelease --stacktrace
+
+      - name: Show what resolved
+        if: always()
+        working-directory: rn-host/android
+        env:
+          GITHUB_ACTOR: ${{ github.actor }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gradle :react-native-genesisdb:dependencies --configuration releaseCompileClasspath || true
+
+  ios-host:
+    name: iOS host pod-installs the package (${{ inputs.source || (github.event_name == 'schedule' && 'published') || 'packed' }})
+    runs-on: macos-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Stage the package into a host project
+        run: bash scripts/rn-host-fixture.sh ios "$PKG_SOURCE" "$PKG_VERSION"
+
+      # `:integrate_targets => false` is what lets this run without a real
+      # .xcodeproj: CocoaPods still parses the podspec, resolves autolinking
+      # through use_native_modules!, and — the part that matters — runs the
+      # podspec's prepare_command, which downloads and checksum-verifies the
+      # xcframework. A dead release asset or a bad checksum fails right here.
+      - name: pod install
+        working-directory: rn-host/ios
+        run: |
+          set -euo pipefail
+          pod install --verbose 2>&1 | tail -60
+
+      # Assertions state what was CHECKED, and dump the layout on failure. An
+      # earlier version looked for `Pods/react-native-genesisdb/` and reported
+      # "autolinking did not pick up the podspec" when it was missing - a
+      # confident diagnosis of the wrong cause. Autolinking had worked fine;
+      # `:path`-based pods are DEVELOPMENT pods, and CocoaPods does not copy
+      # those into `Pods/<name>/` at all. It records the resolved podspec under
+      # `Pods/Local Podspecs/` and references the sources where they already
+      # live, in node_modules. An assertion that names a cause it never tested
+      # costs a whole CI round to disprove.
+      - name: Assert the pod and its xcframework actually landed
+        working-directory: rn-host/ios
+        run: |
+          set -euo pipefail
+          fail() {
+            echo "::error::$1"
+            echo "--- Pods/Local Podspecs ---"; ls -la "Pods/Local Podspecs" 2>&1 || true
+            echo "--- pod root in node_modules ---"; ls -la ../node_modules/react-native-genesisdb 2>&1 || true
+            exit 1
+          }
+
+          # Autolinking discovered the podspec and CocoaPods resolved it.
+          test -f "Pods/Local Podspecs/react-native-genesisdb.podspec.json" \
+            || fail "react-native-genesisdb is not in Pods/Local Podspecs - RN autolinking did not discover the podspec in node_modules"
+
+          # It reached the resolved graph, not merely parsed.
+          grep -q 'react-native-genesisdb' Podfile.lock \
+            || fail "react-native-genesisdb is absent from Podfile.lock - it was not resolved into the build"
+
+          # vendored_frameworks is the half a green `pod install` can still get
+          # wrong: the pod resolves, the binary never arrives, and the failure
+          # surfaces only as a link error in someone else's app. prepare_command
+          # runs in the podspec's own directory, which for a development pod is
+          # the package root inside node_modules.
+          XCF=../node_modules/react-native-genesisdb/GenesisBlockDB.xcframework
+          test -d "$XCF" \
+            || fail "GenesisBlockDB.xcframework is absent - the podspec's prepare_command did not deliver the binary"
+
+          echo "resolved podspec, Podfile.lock entry, and xcframework all present"
+          echo "xcframework slices:"
+          ls "$XCF"

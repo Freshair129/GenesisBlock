@@ -13,3 +13,9 @@ benchmark/*.sh text eol=lf
 # (mobile-build.yml "rn-ios-vendor-freshness"). Same reason as the header
 # above: pin LF so a CRLF checkout on the Windows dev box can't fail the gate.
 react-native-genesisdb/ios/vendor/*.swift text eol=lf
+
+# Same reason as benchmark/*.sh above: these run on Linux/macOS CI runners, and
+# a CRLF checkout on the Windows dev box breaks bash (`\r` in the shebang and
+# at every line end). scripts/rn-host-fixture.sh is executed by the RN host
+# acceptance workflow.
+scripts/*.sh text eol=lf

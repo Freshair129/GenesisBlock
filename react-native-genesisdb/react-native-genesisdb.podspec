@@ -13,6 +13,20 @@ Pod::Spec.new do |s|
   s.source       = { :git => "https://github.com/Freshair129/GenesisBlock.git" }
   s.source_files = "ios/**/*.{h,m,mm,swift}"
 
+  # Required because this pod compiles Swift. Without it CocoaPods falls back to
+  # the SWIFT_VERSION of whichever target integrates the pod, and fails outright
+  # when no integrating target defines one:
+  #
+  #   [!] Unable to determine Swift version for the following pods:
+  #   - `react-native-genesisdb` does not specify a Swift version and none of
+  #     the targets integrating it have the `SWIFT_VERSION` attribute set.
+  #
+  # A stock RN app template happens to set it, which is why the omission stayed
+  # invisible; a consumer whose target does not is simply blocked. 5.0 is the
+  # language mode React Native's own pods declare, and ios/genesisdb builds with
+  # swift-tools-version 5.9, which compiles 5.0 language mode.
+  s.swift_version = "5.0"
+
   s.dependency "React-Core"
 
   # GenesisDbModule.swift now calls the real ios/genesisdb Swift package
