@@ -591,3 +591,83 @@ jobs:
             -sdk "$(xcrun --sdk iphonesimulator --show-sdk-path)" \
             -I "$HEADERS" \
             ios/vendor/*.swift
+
+  # The Android counterpart to ios-acceptance-test, and the only job that runs
+  # this SDK's native code on an Android runtime at all.
+  #
+  # What was missing: android-jvm-tests is pure JVM and says so in its own
+  # header - it loads no native library and exercises no JNI call. So
+  # System.loadLibrary("genesis_block_native"), the JNI symbol binding, and
+  # every native* entry point had never executed on Android in CI. Only the
+  # JSON shapes around them were checked. iOS has had an acceptance test since
+  # PR #133, where it found three real bugs on its first outing.
+  #
+  # This was deliberately deferred before, for two reasons that have since
+  # expired: the .aar was a 281 MB debug build (PR #139 cut it to ~12 MB), and
+  # it carried only the two ARM slices, so it could not run in an emulator at
+  # all - the default AVD on a Linux or Windows host is x86_64 (PR #142 added
+  # that slice). Both are fixed, so the deferral no longer holds.
+  android-acceptance-test:
+    name: Android acceptance test (JNI on an x86_64 emulator)
+    needs: android-build
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      # The same jniLibs the .aar is assembled from, so this exercises the
+      # artifact's own slices rather than a separately-built copy.
+      - uses: actions/download-artifact@v4
+        with:
+          name: android-jnilibs
+          path: android/genesisdb/src/main/jniLibs
+
+      - name: Show which ABI slices are present
+        run: |
+          set -euo pipefail
+          ls -la android/genesisdb/src/main/jniLibs/*/
+          test -f android/genesisdb/src/main/jniLibs/x86_64/libgenesis_block_native.so \
+            || { echo "::error::no x86_64 slice - an emulator cannot load this library (System.loadLibrary would fail with UnsatisfiedLinkError)"; exit 1; }
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: android-actions/setup-android@v3
+
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: 8.7
+
+      # Hardware acceleration. Without it the emulator falls back to software
+      # rendering and typically exceeds the job timeout rather than failing
+      # outright, which reads as a flake instead of a misconfiguration.
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' \
+            | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      - name: connectedAndroidTest on an x86_64 AVD
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 30
+          arch: x86_64
+          target: default
+          force-avd-creation: false
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
+          disable-animations: true
+          working-directory: android
+          script: gradle :genesisdb:connectedAndroidTest
+
+      # Instrumented results are otherwise only visible by scrolling the
+      # emulator log, and a failing assertion's message is the useful part.
+      - name: Upload instrumented test report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-instrumented-report
+          path: android/genesisdb/build/reports/androidTests/
+          retention-days: 14
