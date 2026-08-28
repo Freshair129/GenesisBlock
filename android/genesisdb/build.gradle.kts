@@ -32,6 +32,12 @@ android {
         ndk {
             abiFilters += listOf("arm64-v8a", "armeabi-v7a", "x86_64")
         }
+
+        // Required for the src/androidTest instrumented suite. Until it was
+        // added, the only Kotlin tests here were pure-JVM and loaded no native
+        // library at all, so System.loadLibrary and every JNI entry point were
+        // unexercised on an Android runtime.
+        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
     compileOptions {
@@ -70,6 +76,11 @@ dependencies {
 
     testImplementation("junit:junit:4.13.2")
     testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.8.1")
+
+    // Instrumented (on-device / emulator) suite - src/androidTest.
+    androidTestImplementation("androidx.test.ext:junit:1.1.5")
+    androidTestImplementation("androidx.test:runner:1.5.2")
+    androidTestImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.8.1")
 }
 
 // Publishes to GitHub Packages (not Maven Central — see issue #125): zero new
