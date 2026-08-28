@@ -122,11 +122,32 @@ GRADLE
 
     # Versions match android/build.gradle.kts so the host resolves the module
     # with the same toolchain the SDK itself is built with.
-    cat > "$HOST/android/build.gradle" <<'GRADLE'
+    #
+    # The force() is not a workaround, it is fidelity. A real RN app pins
+    # com.facebook.react:react-android to the app's own RN version — the RN
+    # Gradle plugin does that. This host has no RN plugin, so the module's
+    #
+    #     compileOnly "com.facebook.react:react-android:+"
+    #
+    # resolved to whatever was newest on Maven Central. The first run of this
+    # gate pulled 0.87.1, whose Kotlin metadata is 2.2.0, against a module
+    # compiled with Kotlin 1.9.24, and compileReleaseKotlin failed on every
+    # transitive Fresco jar. Pinning to the host's RN version is what an app
+    # actually does; without it this gate would have re-broken on its own the
+    # next time React Native published a release.
+    cat > "$HOST/android/build.gradle" <<GRADLE
 plugins {
     id 'com.android.library' version '8.5.2' apply false
     id 'org.jetbrains.kotlin.android' version '1.9.24' apply false
     id 'org.jetbrains.kotlin.plugin.serialization' version '1.9.24' apply false
+}
+
+subprojects {
+    configurations.configureEach {
+        resolutionStrategy {
+            force "com.facebook.react:react-android:$RN_VERSION"
+        }
+    }
 }
 GRADLE
 
@@ -141,23 +162,42 @@ PROPS
   ios)
     mkdir -p "$HOST/ios"
 
-    # `:integrate_targets => false` is what lets this run with no .xcodeproj.
-    # CocoaPods still parses the podspec, resolves React-Core, and runs the
-    # prepare_command that downloads and checksum-verifies the xcframework.
+    # This is the React Native template Podfile, not a hand-rolled imitation.
     #
-    # Trade-off, stated plainly: this declares the pod by path rather than
-    # discovering it through RN's `use_native_modules!` autolinking. The full
-    # RN pod graph (use_react_native! + codegen) is heavy and flaky in CI, and
-    # what broke in 0.1.0 was the podspec and its binary delivery, not
-    # autolinking. Autolinking discovery is asserted separately below by
-    # checking the podspec sits where the RN CLI scans for it.
+    # An earlier version declared `pod 'React-Core', :path => ...` directly, to
+    # avoid the weight of the full RN pod graph. That does not work and the
+    # reason is worth keeping: React-Core's own podspec calls helpers that only
+    # exist once RN's `react_native_pods.rb` has been loaded, so pod install
+    # died with
+    #
+    #     Invalid `React-Core.podspec` file: undefined method 'get_folly_config'
+    #
+    # Loading the real helpers is also strictly more faithful: it brings
+    # `use_native_modules!`, so this now exercises RN AUTOLINKING — the actual
+    # mechanism by which an app discovers this package's podspec inside
+    # node_modules — rather than being handed the path.
+    #
+    # `:integrate_targets => false` is what still lets it run with no
+    # .xcodeproj, while CocoaPods parses the podspec and runs the
+    # prepare_command that downloads and checksum-verifies the xcframework.
     cat > "$HOST/ios/Podfile" <<'RUBY'
-platform :ios, '13.0'
+require Pod::Executable.execute_command('node', ['-p',
+  'require.resolve(
+    "react-native/scripts/react_native_pods.rb",
+    {paths: [process.argv[1]]},
+  )', __dir__]).strip
+
+platform :ios, min_ios_version_supported
+prepare_react_native_project!
 install! 'cocoapods', :integrate_targets => false
 
 target 'RNHostAcceptance' do
-  pod 'React-Core', :path => '../node_modules/react-native'
-  pod 'react-native-genesisdb', :path => '../node_modules/react-native-genesisdb'
+  config = use_native_modules!
+
+  use_react_native!(
+    :path => config[:reactNativePath],
+    :app_path => "#{Pod::Config.instance.installation_root}/.."
+  )
 end
 RUBY
 
