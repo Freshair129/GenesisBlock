@@ -123,9 +123,24 @@ GRADLE
     # Versions match android/build.gradle.kts so the host resolves the module
     # with the same toolchain the SDK itself is built with.
     #
-    # The force() is not a workaround, it is fidelity. A real RN app pins
-    # com.facebook.react:react-android to the app's own RN version — the RN
-    # Gradle plugin does that. This host has no RN plugin, so the module's
+    # The force() is not a workaround, it is fidelity, and that is verified
+    # rather than assumed. React Native's own Gradle plugin makes exactly this
+    # call, in DependencyUtils.kt (v0.74.5):
+    #
+    #     project.rootProject.allprojects { eachProject ->
+    #       eachProject.configurations.all { configuration ->
+    #         configuration.resolutionStrategy.force(
+    #             "${groupString}:react-android:${versionString}")
+    #
+    # documented there as "Forcing the react-android/hermes-android version to
+    # the one specified in the package.json", applied to "both the app and all
+    # the 3rd party libraries which are auto-linked". So a real app pins this
+    # coordinate for every autolinked module, this package included.
+    #
+    # That is what distinguishes this from the Android repositories case, where
+    # declaring them host-side was refused: there, a host-side fix would HIDE
+    # something broken for real consumers; here it REPRODUCES what real
+    # consumers already have. This host has no RN plugin, so the module's
     #
     #     compileOnly "com.facebook.react:react-android:+"
     #
