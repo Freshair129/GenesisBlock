@@ -172,6 +172,14 @@ jobs:
       - name: Show what will be published
         run: ls -R ./npm || true
 
+      # Ungated, like maven-central-publish.yml's guard self-test and for the
+      # same reason: this decides whether an irreversible publish is SKIPPED,
+      # and its first version got that wrong (it accepted only HTTP 200, so
+      # GitHub Packages' 302-for-an-existing-object read as "absent"). Logic
+      # that only runs on the release path is logic nobody has run.
+      - name: Self-test the already-published check
+        run: bash scripts/registry-has-version.sh --self-test
+
       # prepublishOnly (napi prepublish -t npm) fires here: publishes the
       # per-platform packages and updates the main package optionalDependencies.
       #

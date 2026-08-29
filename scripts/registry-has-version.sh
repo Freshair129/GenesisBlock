@@ -36,12 +36,32 @@ classify_npm() { # <rc> <stdout> <wanted-version>
   [ "$(printf '%s' "$2" | tr -d ' \n\r')" = "$3" ] && echo YES || echo NO
 }
 
-# HTTP: only a 200 for the artifact's own POM proves it is there. 404 is the
-# ordinary "not yet". 401/403 mean we could not look - which must NOT be read
-# as absent-and-skip, and is not: NO means publish, and the publish itself will
-# then fail loudly if the version really was taken.
+# HTTP for a Maven artifact's own POM.
+#
+# 3xx counts as present. GitHub Packages answers an existing object with a 302
+# to signed blob storage, never a 200 - the first version of this accepted only
+# 200, so it reported the already-published genesisdb-android 0.1.1 as ABSENT
+# and would have republished it into the very 409 this change exists to avoid.
+# Measured, not assumed: this PR's dry run printed `-> 302`.
+#
+# 404 is the ordinary "not yet". 401/403/5xx/000 mean we could not look, which
+# must NOT be read as absent-and-skip, and is not: NO means publish, and the
+# publish then fails loudly if the version really was taken.
 classify_http() { # <code>
-  [ "$1" = "200" ] && echo YES || echo NO
+  case "$1" in
+    2??|3??) echo YES ;;
+    *)       echo NO ;;
+  esac
+}
+
+# Guard the guard. Reading a 3xx as "present" is only sound if this registry
+# also answers DIFFERENTLY for a version that is absent; a server redirecting
+# everything would make every version look published and skip every publish -
+# the fail-open case. So a positive is trusted only when a control probe for a
+# version that cannot exist comes back 404.
+classify_ghp() { # <code-for-wanted> <code-for-absent-control>
+  [ "$(classify_http "$1")" = YES ] || { echo NO; return; }
+  [ "$2" = "404" ] && echo YES || echo INCONCLUSIVE
 }
 
 npm_has() { # <package> <version>
@@ -50,14 +70,31 @@ npm_has() { # <package> <version>
   [ "$(classify_npm "$rc" "$out" "$2")" = YES ]
 }
 
-ghp_maven_has() { # <owner/repo> <group/path> <artifact> <version>
+# The version no artifact can carry, used as the control probe.
+ABSENT_CONTROL="0.0.0-absent-control-probe"
+
+ghp_probe() { # <owner/repo> <group/path> <artifact> <version>
   local url code
   url="https://maven.pkg.github.com/$1/$2/$3/$4/$3-$4.pom"
   # GitHub Packages requires auth for every read, even on a public repo.
-  code=$(curl -sS -o /dev/null -w '%{http_code}' \
-           -u "${GITHUB_ACTOR:-}:${GITHUB_TOKEN:-}" "$url" 2>/dev/null) || code=000
+  code=$(curl -sS -o /dev/null -w '%{http_code}' -u "${GITHUB_ACTOR:-}:${GITHUB_TOKEN:-}" "$url" 2>/dev/null) || code=000
   echo "  GET $url -> $code" >&2
-  [ "$(classify_http "$code")" = YES ]
+  printf '%s' "$code"
+}
+
+ghp_maven_has() { # <owner/repo> <group/path> <artifact> <version>
+  local code control verdict
+  code=$(ghp_probe "$1" "$2" "$3" "$4")
+  [ "$(classify_http "$code")" = YES ] || return 1
+
+  control=$(ghp_probe "$1" "$2" "$3" "$ABSENT_CONTROL")
+  verdict=$(classify_ghp "$code" "$control")
+  if [ "$verdict" != YES ]; then
+    echo "  control probe returned $control, not 404 - this registry is not" >&2
+    echo "  distinguishing absent versions, so the positive is not trusted" >&2
+    return 1
+  fi
+  return 0
 }
 
 self_test() {
@@ -82,11 +119,27 @@ self_test() {
   echo
   echo "classify_http():"
   check "200 = present"          YES "$(classify_http 200)"
+  # GitHub Packages answers an existing object with a redirect, never a 200.
+  # Accepting only 200 was the real bug; the dry run measured `-> 302`.
+  check "302 = present"          YES "$(classify_http 302)"
+  check "301 = present"          YES "$(classify_http 301)"
   check "404 = absent"           NO  "$(classify_http 404)"
   check "401 cannot look"        NO  "$(classify_http 401)"
   check "403 cannot look"        NO  "$(classify_http 403)"
   check "500 cannot look"        NO  "$(classify_http 500)"
   check "000 no connection"      NO  "$(classify_http 000)"
+
+  echo
+  echo "classify_ghp() - a positive needs a 404 on the control probe:"
+  check "302 + control 404"      YES          "$(classify_ghp 302 404)"
+  check "200 + control 404"      YES          "$(classify_ghp 200 404)"
+  # A registry that redirects everything would make every version look
+  # published and skip every publish. None of these may come back YES.
+  check "302 + control 302"      INCONCLUSIVE "$(classify_ghp 302 302)"
+  check "302 + control 200"      INCONCLUSIVE "$(classify_ghp 302 200)"
+  check "302 + control 401"      INCONCLUSIVE "$(classify_ghp 302 401)"
+  check "404 + control 404"      NO           "$(classify_ghp 404 404)"
+  check "401 + control 404"      NO           "$(classify_ghp 401 404)"
 
   echo
   if [ "$failures" -ne 0 ]; then
