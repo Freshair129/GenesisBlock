@@ -64,6 +64,15 @@ jobs:
             exit 1
           fi
 
+      # Ungated on purpose. Both defects this workflow has shipped lived behind
+      # `if: ${{ !inputs.dry_run }}`, so the logic that decides whether a
+      # deployment passed is kept where a dry run executes it - on canned
+      # responses including ones that must fail. Runs first because a broken
+      # decision function should stop the job before it spends ten minutes
+      # building an .aar.
+      - name: Self-test the deployment-status guard
+        run: bash scripts/central-await-validation.sh --self-test
+
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
@@ -225,9 +234,30 @@ jobs:
           cat /tmp/central-response.txt
           echo
           case "$code" in
-            2??) echo "uploaded - finish the release in the Central Portal UI" ;;
+            2??) ;;
             *)   echo "::error::Central rejected the upload with HTTP $code"; exit 1 ;;
           esac
+
+          # A 2xx means Central ACCEPTED the bundle, not that it is any good -
+          # validation runs afterwards, asynchronously. Hand the deployment id
+          # to the next step, which is what turns "accepted" into an answer.
+          # tr -dc keeps only the characters a deployment id can contain, so
+          # quotes, whitespace and any trailing newline go without needing a
+          # single backslash escape. The next step rejects anything that is
+          # not UUID-shaped rather than polling Central about garbage.
+          echo "DEPLOYMENT_ID=$(tr -dc 'a-fA-F0-9-' < /tmp/central-response.txt)" >> "$GITHUB_ENV"
+
+      # The other half of the upload: a deployment can go FAILED minutes after
+      # the 201 (bad signature, bad checksum, POM problem), and without this the
+      # job would already have reported success. Gated because it needs a real
+      # deployment; the decision logic it runs is exercised on the dry-run path
+      # by the self-test step above.
+      - name: Wait for Central to validate the deployment
+        if: ${{ !inputs.dry_run }}
+        env:
+          CENTRAL_TOKEN_USERNAME: ${{ secrets.CENTRAL_TOKEN_USERNAME }}
+          CENTRAL_TOKEN_PASSWORD: ${{ secrets.CENTRAL_TOKEN_PASSWORD }}
+        run: bash scripts/central-await-validation.sh "$DEPLOYMENT_ID"
 
       - name: Dry run notice
         if: ${{ inputs.dry_run }}
