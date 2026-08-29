@@ -143,11 +143,11 @@ jobs:
       - name: Validate against Central's requirements
         run: bash scripts/verify-maven-central-pom.sh
 
-      - name: Upload the bundle to Central
-        if: ${{ !inputs.dry_run }}
-        env:
-          CENTRAL_TOKEN_USERNAME: ${{ secrets.CENTRAL_TOKEN_USERNAME }}
-          CENTRAL_TOKEN_PASSWORD: ${{ secrets.CENTRAL_TOKEN_PASSWORD }}
+      # Deliberately NOT gated on dry_run. Everything here is inert - it only
+      # reads the local repo and writes a zip - so keeping it on the dry-run
+      # path shrinks the untestable surface to the single curl below, and lets
+      # a dry run print exactly what a real publish would send.
+      - name: Build the upload bundle
         run: |
           set -euo pipefail
           DIR=$(find "$HOME/.m2/repository/io/github/freshair129/genesisdb-android" -mindepth 1 -maxdepth 1 -type d | head -1)
@@ -157,14 +157,50 @@ jobs:
           mkdir -p "$BUNDLE_ROOT/io/github/freshair129/genesisdb-android/$VERSION"
           cp "$DIR"/* "$BUNDLE_ROOT/io/github/freshair129/genesisdb-android/$VERSION/"
           ( cd "$BUNDLE_ROOT" && zip -qr bundle.zip io )
+          echo "BUNDLE=$BUNDLE_ROOT/bundle.zip" >> "$GITHUB_ENV"
+          echo "--- bundle contents ---"
+          unzip -l "$BUNDLE_ROOT/bundle.zip"
+
+      - name: Upload the bundle to Central
+        if: ${{ !inputs.dry_run }}
+        env:
+          CENTRAL_TOKEN_USERNAME: ${{ secrets.CENTRAL_TOKEN_USERNAME }}
+          CENTRAL_TOKEN_PASSWORD: ${{ secrets.CENTRAL_TOKEN_PASSWORD }}
+        run: |
+          set -euo pipefail
           AUTH=$(printf '%s:%s' "$CENTRAL_TOKEN_USERNAME" "$CENTRAL_TOKEN_PASSWORD" | base64 -w0)
           # AUTOMATIC publishes on successful validation; use USER_MANAGED to
           # review in the Portal first. Central publications are IMMUTABLE.
-          curl -fsSL --fail-with-body \
+          #
+          # No -f/--fail here. The first real publish attempt used
+          # `curl -fsSL --fail-with-body`, and -f IS --fail. The runner's curl
+          # rejected that argv before opening a connection ("option
+          # --fail-with-body: is badly used here", exit 2), so nothing was
+          # uploaded. Note the combination is NOT universally rejected - curl
+          # 8.18 on the dev host accepts it silently - so this was a defect
+          # that only appeared on the runner, in the one step a dry run cannot
+          # reach by construction. Depending on a version-specific flag
+          # interaction is the actual mistake; the fix is to need neither flag.
+          #
+          # So: let curl succeed on any HTTP response, capture the status
+          # ourselves, and always print the body - on success it is the
+          # deployment id, on failure it is Central's reason. Anything but 2xx
+          # fails the job, and a 2xx we misclassified would be the one error
+          # that reports failure AFTER a real upload, so the check is a range,
+          # not an equality on 201.
+          code=$(curl -sS \
+            -o /tmp/central-response.txt \
+            -w '%{http_code}' \
             -H "Authorization: Bearer $AUTH" \
-            -F "bundle=@$BUNDLE_ROOT/bundle.zip" \
-            "https://central.sonatype.com/api/v1/publisher/upload?publishingType=USER_MANAGED" \
-            && echo "uploaded - finish the release in the Central Portal UI"
+            -F "bundle=@$BUNDLE" \
+            "https://central.sonatype.com/api/v1/publisher/upload?publishingType=USER_MANAGED")
+          echo "HTTP $code"
+          cat /tmp/central-response.txt
+          echo
+          case "$code" in
+            2??) echo "uploaded - finish the release in the Central Portal UI" ;;
+            *)   echo "::error::Central rejected the upload with HTTP $code"; exit 1 ;;
+          esac
 
       - name: Dry run notice
         if: ${{ inputs.dry_run }}
