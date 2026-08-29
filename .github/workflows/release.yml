@@ -255,6 +255,14 @@ jobs:
           # matches the code it claims to be — not from whatever main is now.
           ref: ${{ inputs.repair_tag || github.ref }}
 
+      # Ungated, and first, for the reason this file keeps relearning: this
+      # resolves the version an artifact is published and attached under, and a
+      # wrong answer there is invisible until a release. Its own self-test
+      # caught the primary lookup failing silently into the fallback when
+      # python3 was absent.
+      - name: Self-test the android version lookup
+        run: bash scripts/android-sdk-version.sh --self-test
+
       - uses: dtolnay/rust-toolchain@stable
         with:
           targets: aarch64-linux-android, armv7-linux-androideabi, x86_64-linux-android
@@ -316,7 +324,7 @@ jobs:
         working-directory: android
         run: |
           set -euo pipefail
-          VERSION=$(python3 -c "import json;d=json.load(open('../modules.json'));print(next(s['version'] for s in d['surfaces'] if s['name']=='genesisdb-android'))")
+          VERSION=$(bash "$GITHUB_WORKSPACE/scripts/android-sdk-version.sh")
           echo "genesisdb-android version: $VERSION"
 
           # Same reason as the npm steps: a `v*` tag publishes every surface,
@@ -326,7 +334,8 @@ jobs:
           # what a release would skip. The group here is the DEFAULT
           # dev.genesisblock coordinate this job publishes, not the
           # io.github.freshair129 one used for Maven Central.
-          if bash "$GITHUB_WORKSPACE/scripts/registry-has-version.sh"                ghp-maven "${{ github.repository }}" dev/genesisblock genesisdb-android "$VERSION"; then
+          if bash "$GITHUB_WORKSPACE/scripts/registry-has-version.sh" ghp-maven \
+               "${{ github.repository }}" dev/genesisblock genesisdb-android "$VERSION"; then
             echo "dev.genesisblock:genesisdb-android:$VERSION is already on GitHub Packages - nothing to publish"
             exit 0
           fi
@@ -395,25 +404,12 @@ jobs:
         run: |
           set -euo pipefail
           TAG="${{ inputs.repair_tag || github.ref_name }}"
-          # Read the surface version from modules.json, NOT from
-          # build.gradle.kts. Repair mode checks out an OLD tag's source, which
-          # can predate the packaging machinery doing the repair: at v0.2.0
-          # `android/genesisdb/build.gradle.kts` has neither the
-          # `genesisdbAndroidVersion` val nor a `publishing {}` block at all —
-          # both arrived later with the issue-#125 publish work — so the
-          # gradle-file lookup failed there and killed the first repair run.
-          # modules.json has carried `genesisdb-android`'s version since well
-          # before that tag and is the declared SSOT for surface versions, so
-          # it is the stable source across the whole tag range.
-          VERSION=$(python3 -c "import json;d=json.load(open('modules.json'));print(next(s['version'] for s in d['surfaces'] if s['name']=='genesisdb-android'))" 2>/dev/null || true)
-          if [ -z "$VERSION" ]; then
-            # Fallback for any future tree that drops the modules.json entry.
-            VERSION=$(sed -n 's/.*val genesisdbAndroidVersion = "\([^"]*\)".*/\1/p' android/genesisdb/build.gradle.kts)
-          fi
-          if [ -z "$VERSION" ]; then
-            echo "::error::could not determine the genesisdb-android version from modules.json or android/genesisdb/build.gradle.kts"
-            exit 1
-          fi
+          # Version lookup lives in scripts/android-sdk-version.sh, shared with
+          # the publish step above. It used to be duplicated, and the two copies
+          # had already diverged: this one carried the build.gradle.kts fallback
+          # repair mode needs on old tags, the other did not. #139 records that
+          # the version lookup is exactly where a defect lived.
+          VERSION=$(bash "$GITHUB_WORKSPACE/scripts/android-sdk-version.sh")
           echo "genesisdb-android version: $VERSION"
           SRC=$(ls android/genesisdb/build/outputs/aar/*.aar | head -1)
           ASSET="genesisdb-android-${VERSION}.aar"
