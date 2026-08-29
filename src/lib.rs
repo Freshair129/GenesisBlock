@@ -4898,6 +4898,94 @@ impl Storage {
             .ok_or_else(|| Error::from_reason("relational query references unknown column"))
     }
 
+    /// Advances past whitespace, `--` line comments and `/* */` block comments,
+    /// returning the index of the first byte that is none of those.
+    ///
+    /// Scanning bytes is safe for UTF-8 input: every continuation byte is
+    /// >= 0x80, so it can never be mistaken for one of the ASCII delimiters.
+    fn sql_skip_blank(bytes: &[u8], mut i: usize) -> usize {
+        loop {
+            while i < bytes.len() && bytes[i].is_ascii_whitespace() {
+                i += 1;
+            }
+            if bytes[i..].starts_with(b"--") {
+                i += 2;
+                while i < bytes.len() && bytes[i] != b'\n' {
+                    i += 1;
+                }
+                continue;
+            }
+            if bytes[i..].starts_with(b"/*") {
+                i += 2;
+                while i < bytes.len() && !bytes[i..].starts_with(b"*/") {
+                    i += 1;
+                }
+                // An unterminated block comment swallows the rest of the input.
+                i = if i < bytes.len() { i + 2 } else { bytes.len() };
+                continue;
+            }
+            return i;
+        }
+    }
+
+    /// The offset of the first `;` that ends a statement, or `None` when the
+    /// input holds a single one. String literals, quoted identifiers (`"`,
+    /// backtick and `[...]`) and both comment forms are skipped, so a `;` inside
+    /// them does not count.
+    ///
+    /// This is a scanner, not a parser, and its failure modes are bounded in one
+    /// direction: seeing a terminator that is not there rejects a legitimate
+    /// query, which the caller is told about, while missing one lands back on
+    /// SQLite's own behaviour of compiling the first statement and ignoring the
+    /// rest - already safe, since layers 1 and 2 stop the ignored text from ever
+    /// executing. It cannot widen what runs.
+    fn sql_first_terminator(bytes: &[u8]) -> Option<usize> {
+        let mut i = 0;
+        while i < bytes.len() {
+            match bytes[i] {
+                b'\'' | b'"' | b'`' => {
+                    let quote = bytes[i];
+                    i += 1;
+                    while i < bytes.len() {
+                        if bytes[i] == quote {
+                            // A doubled quote is an escaped one, not the end.
+                            if bytes.get(i + 1) == Some(&quote) {
+                                i += 2;
+                                continue;
+                            }
+                            break;
+                        }
+                        i += 1;
+                    }
+                }
+                b'[' => {
+                    while i < bytes.len() && bytes[i] != b']' {
+                        i += 1;
+                    }
+                }
+                b'-' if bytes.get(i + 1) == Some(&b'-') => {
+                    while i < bytes.len() && bytes[i] != b'\n' {
+                        i += 1;
+                    }
+                }
+                b'/' if bytes.get(i + 1) == Some(&b'*') => {
+                    i += 2;
+                    while i < bytes.len() && !bytes[i..].starts_with(b"*/") {
+                        i += 1;
+                    }
+                    if i >= bytes.len() {
+                        return None;
+                    }
+                    i += 1;
+                }
+                b';' => return Some(i),
+                _ => {}
+            }
+            i += 1;
+        }
+        None
+    }
+
     /// Read-only SQL over the relational projection.
     ///
     /// Sanctioned by ADR--GENESISDB-EMBEDDED-SQLITE-SUBSTRATE §2.2 rule 5,
@@ -4923,6 +5011,13 @@ impl Storage {
     ///
     /// Every bound value goes through `json_to_sql`; SQL text is never built
     /// by concatenating caller input.
+    ///
+    /// Two rejections exist for a different reason than safety. SQLite compiles
+    /// only the FIRST statement of the input and silently drops the rest, and
+    /// two result columns sharing a name collapse into one JSON key. Both were
+    /// measured, not assumed, and both answer `Ok` to a question that was only
+    /// partly asked - the same class of wrong-answer-that-looks-right as a
+    /// silently truncated result set. See `sql_first_terminator`.
     pub fn query_sql(&self, sql: &str, params: Vec<Value>) -> Result<Vec<Value>> {
         use rusqlite::hooks::{AuthAction, AuthContext, Authorization};
         use rusqlite::limits::Limit;
@@ -4940,6 +5035,24 @@ impl Storage {
         let deadline = Instant::now() + Duration::from_millis(SQL_QUERY_TIMEOUT_MS);
         conn.progress_handler(1_000, Some(move || Instant::now() >= deadline));
 
+        // Reject before preparing, so a caller who passes two statements hears
+        // about it rather than receiving the first one's rows as if that were
+        // the whole answer.
+        let bytes = sql.as_bytes();
+        let first = Self::sql_skip_blank(bytes, 0);
+        if first >= bytes.len() || bytes[first] == b';' {
+            return Err(Error::from_reason(
+                "SQL_REJECTED: no statement to run (empty, or only comments)",
+            ));
+        }
+        if let Some(at) = Self::sql_first_terminator(bytes) {
+            if Self::sql_skip_blank(bytes, at + 1) < bytes.len() {
+                return Err(Error::from_reason(
+                    "SQL_REJECTED: one statement per call; text follows the first `;`",
+                ));
+            }
+        }
+
         let bound = params
             .iter()
             .map(Self::json_to_sql)
@@ -4953,6 +5066,17 @@ impl Storage {
             .into_iter()
             .map(|name| name.to_string())
             .collect();
+        // A JSON object cannot hold the same key twice, so duplicate result
+        // column names lose a column without saying so. Measured: `SELECT id,
+        // price AS id` returned `{"id": <the price>}` - not a missing field the
+        // caller could notice, but the WRONG value under an expected name.
+        for (index, name) in names.iter().enumerate() {
+            if names[..index].contains(name) {
+                return Err(Error::from_reason(format!(
+                    "SQL_REJECTED: result column `{name}` appears more than once; alias them apart"
+                )));
+            }
+        }
         let mut rows = statement
             .query(params_from_iter(bound))
             .map_err(|e| Error::from_reason(format!("SQL_REJECTED: {e}")))?;
@@ -4989,7 +5113,9 @@ impl Storage {
                 object.insert(name.clone(), value);
             }
             let row_value = Value::Object(object);
-            bytes += serde_json::to_string(&row_value).map(|s| s.len()).unwrap_or(0);
+            bytes += serde_json::to_string(&row_value)
+                .map(|s| s.len())
+                .unwrap_or(0);
             if bytes > SQL_QUERY_MAX_BYTES {
                 return Err(Error::from_reason(
                     "SQL_LIMIT_EXCEEDED: result exceeds the byte budget",

@@ -278,3 +278,125 @@ fn a_parameter_containing_sql_is_bound_not_executed() {
         "the table survives a parameter that looks like SQL"
     );
 }
+
+// 9. SQLite compiles only the FIRST statement of its input and silently drops
+//    the rest, so `SELECT ...; DROP TABLE ...` used to return the SELECT's rows
+//    and an Ok. The DROP never ran - measured, with the table still present
+//    afterwards - but answering Ok to a question that was only half asked is
+//    the same wrong-answer-that-looks-right as a truncated result set.
+//
+//    The second half of this test matters as much as the first: a scanner that
+//    rejects too eagerly would break every legitimate query carrying a `;`
+//    inside a string, a comment or a quoted identifier.
+#[test]
+fn a_second_statement_is_refused_rather_than_silently_dropped() {
+    let storage = seeded(&fresh("rosql_multi_statement"));
+    let before = item_count(&storage);
+
+    let refused = [
+        "SELECT id FROM app_shop__items; DROP TABLE app_shop__items",
+        "SELECT id FROM app_shop__items;;",
+        "SELECT 1 AS c; SELECT 2 AS c",
+    ];
+    for statement in refused {
+        let reason = storage
+            .query_sql(statement, vec![])
+            .err()
+            .map(|e| e.to_string())
+            .unwrap_or_else(|| panic!("a second statement must be refused: {statement}"));
+        assert!(
+            reason.contains("one statement per call"),
+            "refused for the wrong reason: [{statement}] -> {reason}"
+        );
+    }
+    assert_eq!(item_count(&storage), before, "nothing was executed");
+
+    // A terminator with nothing meaningful after it is still one statement.
+    for statement in [
+        "SELECT id FROM app_shop__items;",
+        "SELECT id FROM app_shop__items;   \n  ",
+        "SELECT id FROM app_shop__items; -- bye",
+        "SELECT id FROM app_shop__items; /* bye */",
+    ] {
+        assert!(
+            storage.query_sql(statement, vec![]).is_ok(),
+            "a bare terminator must not be read as a second statement: {statement}"
+        );
+    }
+
+    // A `;` that is data, an identifier or a comment is not a terminator. The
+    // Thai case also covers the byte scan against multi-byte UTF-8.
+    let hidden = [
+        ("SELECT ';' AS c", json!(";")),
+        ("SELECT 'it''s; fine' AS c", json!("it's; fine")),
+        ("SELECT /* ; */ ';' AS c", json!(";")),
+        ("SELECT 'กาแฟ; เอสเปรสโซ' AS c", json!("กาแฟ; เอสเปรสโซ")),
+    ];
+    for (statement, expected) in hidden {
+        let rows = storage
+            .query_sql(statement, vec![])
+            .unwrap_or_else(|e| panic!("must not be read as two statements: [{statement}] -> {e}"));
+        assert_eq!(rows[0]["c"], expected, "value mangled: {statement}");
+    }
+    for statement in [
+        "SELECT 1 AS c -- ; not a statement",
+        "SELECT 1 AS \"we;ird\"",
+        "SELECT 1 AS [we;ird]",
+    ] {
+        assert!(
+            storage.query_sql(statement, vec![]).is_ok(),
+            "a `;` inside a comment or a quoted identifier is not a terminator: {statement}"
+        );
+    }
+}
+
+// 10. Two result columns sharing a name cannot both survive into a JSON object.
+//     Measured before the guard: `SELECT id, price AS id` returned
+//     `{"id": 100}` - the PRICE under the name `id`. Not a field the caller
+//     notices missing, but the wrong value under an expected name.
+#[test]
+fn duplicate_result_column_names_are_refused_rather_than_collapsed() {
+    let storage = seeded(&fresh("rosql_dup_columns"));
+
+    for statement in [
+        "SELECT id, id FROM app_shop__items",
+        "SELECT id, price AS id FROM app_shop__items",
+    ] {
+        let reason = storage
+            .query_sql(statement, vec![])
+            .err()
+            .map(|e| e.to_string())
+            .unwrap_or_else(|| panic!("a collapsing result shape must be refused: {statement}"));
+        assert!(
+            reason.contains("appears more than once"),
+            "refused for the wrong reason: [{statement}] -> {reason}"
+        );
+    }
+
+    // Aliased apart, both columns come back - so this is a guard against an
+    // ambiguous shape, not a blanket refusal of repeated columns.
+    let rows = storage
+        .query_sql("SELECT id, price AS p FROM app_shop__items", vec![])
+        .unwrap();
+    assert_eq!(rows[0]["id"], json!("i1"));
+    assert_eq!(rows[0]["p"], json!(25000));
+}
+
+// 11. Input carrying no statement gets a reason that says so. It already
+//     failed before this, with SQLite's bare "not an error".
+#[test]
+fn input_with_no_statement_says_so() {
+    let storage = seeded(&fresh("rosql_empty"));
+
+    for statement in ["", "   ", "-- nothing", "/* nothing */", ";"] {
+        let reason = storage
+            .query_sql(statement, vec![])
+            .err()
+            .map(|e| e.to_string())
+            .unwrap_or_else(|| panic!("empty input must be refused: {statement:?}"));
+        assert!(
+            reason.contains("no statement to run"),
+            "refused for the wrong reason: [{statement:?}] -> {reason}"
+        );
+    }
+}
