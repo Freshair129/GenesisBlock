@@ -7,6 +7,45 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added - Maven Central publishing prepared (additive; nothing published yet)
+
+Every Android consumer currently needs a GitHub PAT with `read:packages` in
+their own `gradle.properties` just to resolve the `.aar`, because GitHub
+Packages requires authentication for every Maven read even from a public
+repository. Maven Central requires none. This lands everything for that move
+that does not need a credential.
+
+- `android/genesisdb/build.gradle.kts`: the Central-required POM metadata
+  (`name`, `description`, `url`, `licenses`, `developers`, `scm`), a javadoc
+  jar alongside the existing sources jar, and conditional PGP signing that is a
+  no-op without `GPG_SIGNING_KEY` so ordinary builds still work.
+- The Maven groupId is now `-PgenesisdbGroup`-overridable and **still defaults
+  to `dev.genesisblock`**, so `release.yml`'s GitHub Packages publish is
+  unchanged. Hard-coding the Central group would have been an invisible
+  breaking change: the next release would publish under a new coordinate while
+  `react-native-genesisdb` still asks for the old one, breaking every consumer's
+  resolve. A consumer cannot be pointed at an artifact that is not published
+  yet, so adoption is additive until it is.
+- `scripts/verify-maven-central-pom.sh` + a `maven-central-requirements` CI job
+  validate a generated publication against Central's rules with no credential
+  and no key. Central only validates after upload and rejects for things
+  knowable in advance; this makes those a PR-time failure instead.
+- `.github/workflows/maven-central-publish.yml` (`workflow_dispatch`, dry-run by
+  default) builds release `.so` slices, runs the same DWARF guard as
+  `release.yml`, signs, validates, and uploads. Deliberately its own workflow:
+  attaching an untested irreversible publish to `release.yml` is how that file
+  earned 0 green runs out of 5 tag pushes.
+
+The Kotlin package stays `dev.genesisblock` and must: JNI symbol names derive
+from the fully-qualified class name, so the entry points are literally
+`Java_dev_genesisblock_GenesisDB_native*`. A groupId and a JVM package are
+independent identifiers.
+
+Still required, and not automatable from here: a Sonatype Central Portal
+account, verification of the `io.github.freshair129` namespace (`dev.genesisblock`
+is unobtainable - genesisblock.dev belongs to an unrelated business), a GPG key,
+and four repository secrets. The publish workflow's header documents each.
+
 ### Fixed — the dist-tag verifier failed on moves that had actually succeeded
 
 `npm-dist-tag.yml`'s verify step read the tag back immediately after writing it.
