@@ -57,35 +57,29 @@ This module never invokes `cargo` itself — it links a prebuilt
   what a real dependency declaration should point at. Note that this published
   0.1.0 asset is **arm64-v8a + armeabi-v7a only**; the x86_64 emulator slice
   lands with 0.1.1 on the next `v*` tag push.
-- **Maven publish (issue #125)**: `genesisdb/build.gradle.kts`'s
-  `publishing {}` block + `.github/workflows/release.yml`'s `android-publish`
-  job publish `dev.genesisblock:genesisdb-android:0.1.1` to **GitHub
-  Packages** (not Maven Central — no new account/GPG-signing setup needed,
-  reuses the workflow's own `GITHUB_TOKEN`) on every `v*` tag push. As of this
-  writing that job exists but hasn't run yet — the coordinate doesn't resolve
-  until the next tag push triggers it. Once it has, consumers add:
+- **Maven publish**: the `.aar` is on **Maven Central** as
+  `io.github.freshair129:genesisdb-android:0.1.1`, published by
+  `.github/workflows/maven-central-publish.yml`. Consumers need nothing beyond
+  the `mavenCentral()` every Android project already declares:
   ```kotlin
-  // settings.gradle.kts
-  dependencyResolutionManagement {
-      repositories {
-          maven {
-              url = uri("https://maven.pkg.github.com/Freshair129/GenesisBlock")
-              credentials {
-                  // GitHub Packages requires auth for EVERY read, even on a
-                  // public repo — unlike Maven Central. A PAT with just
-                  // `read:packages` scope is enough; it does not need to be
-                  // yours specifically, any account with repo read access works.
-                  username = "<your-github-username>"
-                  password = "<a GitHub PAT with read:packages>"
-              }
-          }
-      }
-  }
+  implementation("io.github.freshair129:genesisdb-android:0.1.1")
   ```
-  and then `implementation("dev.genesisblock:genesisdb-android:0.1.1")` as
-  normal. Maven Central (fully anonymous resolution, no consumer PAT needed)
-  remains a documented future option once `dev.genesisblock`'s Central Portal
-  namespace is verified — see issue #125.
+  The groupId is **not** `dev.genesisblock`: Central requires a namespace whose
+  ownership can be proven and `genesisblock.dev` belongs to an unrelated
+  business, so the coordinate uses the GitHub account that owns this repo. The
+  Kotlin package is still `dev.genesisblock` and must stay that way — JNI
+  symbols mangle from the class's fully-qualified name
+  (`Java_dev_genesisblock_GenesisDB_native*`), so a groupId and a JVM package
+  are independent identifiers here.
+
+- **GitHub Packages (legacy)**: `release.yml`'s `android-publish` job still
+  publishes `dev.genesisblock:genesisdb-android` there on every `v*` tag, for
+  consumers already pointing at it. Prefer Central: GitHub Packages requires
+  authentication for **every** Maven read even on a public repo, so that
+  coordinate costs each consumer a PAT with `read:packages` in their own
+  `~/.gradle/gradle.properties`. Do not declare both coordinates in one build —
+  they are different modules carrying the same classes, and the app fails on
+  duplicate classes rather than on a resolvable version conflict.
 
 ## Wire format gotcha
 

@@ -1,7 +1,7 @@
 // react-native-genesisdb Android module (MARK XVI Phase B-3).
 //
-// Thin RN bridge over dev.genesisblock:genesisdb-android (Phase B-2) — this
-// module holds NO JNI declarations of its own. It cannot bind directly to the
+// Thin RN bridge over io.github.freshair129:genesisdb-android (Phase B-2) —
+// this module holds NO JNI declarations of its own. It cannot bind directly to the
 // `Java_dev_genesisblock_GenesisDB_native*` symbols (those are resolved by
 // the calling class's fully-qualified name, `dev.genesisblock.GenesisDB`),
 // so it depends on that real class and never touches the native handle
@@ -38,24 +38,16 @@ repositories {
     google()
     mavenCentral()
 
-    // `dev.genesisblock:genesisdb-android` is published to GitHub Packages,
-    // NOT to Maven Central — declaring only google()/mavenCentral() here (as
-    // this file did until now) made the dependency below unresolvable for
-    // every consumer who installed this package from npm rather than from a
-    // monorepo checkout with a mavenLocal() publish.
+    // mavenCentral() is now enough. genesisdb-android is published to Maven
+    // Central under io.github.freshair129, so it resolves anonymously.
     //
-    // GitHub Packages requires authentication even for public repositories,
-    // so consumers must supply a token. See this package's README
-    // ("Installation — Android") for the two-line gradle.properties setup.
-    // A PAT needs only the `read:packages` scope.
-    maven {
-        name = "GenesisBlockDBGitHubPackages"
-        url = uri("https://maven.pkg.github.com/Freshair129/GenesisBlock")
-        credentials {
-            username = project.findProperty("gpr.user") ?: System.getenv("GITHUB_ACTOR")
-            password = project.findProperty("gpr.key") ?: System.getenv("GITHUB_TOKEN")
-        }
-    }
+    // The GitHub Packages repository this file used to declare (with
+    // `gpr.user`/`gpr.key` credentials) is deliberately GONE rather than kept
+    // as a fallback: GitHub Packages requires authentication for every read
+    // even on a public repo, which was the entire problem, and leaving it here
+    // would let a broken Central resolution pass silently on a machine that
+    // happens to have a token. Central is the only source now, so
+    // rn-host-acceptance proves a consumer needs no credential at all.
 }
 
 dependencies {
@@ -63,14 +55,26 @@ dependencies {
     // pulling a second copy into the final APK.
     compileOnly "com.facebook.react:react-android:+"
 
-    // The genesisdb-android .aar (Phase B-2), resolved from the GitHub
-    // Packages repository declared above (it is NOT on Maven Central — see
-    // that comment). For local monorepo development you can skip the token
-    // entirely: `./gradlew :genesisdb:publishToMavenLocal` from ../../android
-    // and add `mavenLocal()` to the consuming app's repositories.
+    // The genesisdb-android .aar (Phase B-2), from Maven Central.
+    //
+    // Note the groupId is io.github.freshair129 while the Kotlin package
+    // stays dev.genesisblock: a Maven coordinate and a JVM package are
+    // independent, and renaming the package would break every JNI entry
+    // point, since those symbols mangle from the class's FQCN
+    // (`Java_dev_genesisblock_GenesisDB_native*`). So the import in
+    // GenesisDbModule.kt is unchanged by this move.
+    //
+    // Do NOT also declare dev.genesisblock:genesisdb-android (the GitHub
+    // Packages coordinate, still published by release.yml for existing
+    // consumers): Gradle sees two different modules carrying the same
+    // classes, and the app fails on duplicate classes rather than on a
+    // version conflict it could resolve.
+    //
+    // For local monorepo development: `./gradlew :genesisdb:publishToMavenLocal`
+    // from ../../android and add `mavenLocal()` to the consuming app.
     // 0.1.1 added the x86_64 slice, which is what makes this package usable
     // in an Android Studio emulator on a Windows or Linux host — 0.1.0 shipped
     // only the two ARM ABIs.
-    implementation "dev.genesisblock:genesisdb-android:0.1.1"
+    implementation "io.github.freshair129:genesisdb-android:0.1.1"
     implementation "org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.3"
 }

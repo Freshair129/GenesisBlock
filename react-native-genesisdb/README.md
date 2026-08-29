@@ -17,35 +17,33 @@ await db.close();
 
 | Platform | Status |
 |---|---|
-| Android | **Working, but needs a GitHub token.** Bridges to `dev.genesisblock:genesisdb-android` (Phase B-2), which is published to GitHub Packages — authenticated even for public repos. See [Installation — Android](#installation--android). |
+| Android | **Working — `npm install` is enough.** Bridges to `io.github.freshair129:genesisdb-android` (Phase B-2) on Maven Central, which resolves anonymously. No GitHub token, no extra repository declaration. |
 | iOS | **Working — `pod install` is enough.** The Swift SDK sources are vendored into this pod (`ios/vendor/`), so it is self-contained: no Swift Package to add in Xcode, no monorepo checkout required. See [iOS integration status](#ios-integration-status). |
 
 ## Installation — Android
 
-`npm install react-native-genesisdb` is not sufficient on its own: the native
-`.aar` this package bridges to lives in **GitHub Packages**, which requires
-authentication even though the repository is public. Without a token, the
-Android build fails to resolve `dev.genesisblock:genesisdb-android:0.1.1`
+`npm install react-native-genesisdb` is all it takes. The native `.aar` this
+package bridges to is on **Maven Central**
+(`io.github.freshair129:genesisdb-android:0.1.1`), which resolves anonymously,
+so `mavenCentral()` — already in every React Native app's Gradle setup — is
+enough. There is nothing to add to `gradle.properties`.
+
 (0.1.1 is the first version carrying the `x86_64` slice the standard Android
-Studio emulator needs — see [`android/README.md`](../android/README.md#abis)).
+Studio emulator needs — see [`android/README.md`](../android/README.md#abis).)
 
-Create a GitHub personal access token with **only the `read:packages` scope**,
-then add it to `~/.gradle/gradle.properties` (user-level — do not commit it to
-your app's repo):
-
-```properties
-gpr.user=YOUR_GITHUB_USERNAME
-gpr.key=ghp_yourTokenHere
-```
-
-`android/build.gradle` reads those two properties (falling back to the
-`GITHUB_ACTOR` / `GITHUB_TOKEN` environment variables, which CI already sets).
-
-> **Why a token at all?** GitHub Packages was chosen over Maven Central
-> because it needed no new account or GPG signing setup — the tradeoff, noted
-> in [`android/README.md`](../android/README.md), is exactly this consumer-side
-> token requirement. Removing it means either publishing to Maven Central or
-> bundling the `.so` slices into this package directly; both are open items.
+> **This used to require a GitHub personal access token.** Until 0.1.1 was
+> published to Central, the `.aar` was only on GitHub Packages, which demands
+> authentication for every read even from a public repository — so every
+> consumer had to create a `read:packages` PAT and put `gpr.user`/`gpr.key` in
+> `~/.gradle/gradle.properties`. If you set that up for an earlier version you
+> can delete both lines; this package no longer declares that repository.
+>
+> The Maven groupId (`io.github.freshair129`) differs from the Kotlin package
+> (`dev.genesisblock`) because Central requires a namespace whose ownership can
+> be proven, and `genesisblock.dev` belongs to an unrelated business. The two
+> are independent identifiers — renaming the package to match would break the
+> JNI symbols, which mangle from the class's fully-qualified name. Your imports
+> are unaffected.
 
 ## iOS integration status
 
