@@ -154,8 +154,35 @@ jobs:
           VERSION=$(basename "$DIR")
           echo "bundling $VERSION"
           BUNDLE_ROOT=$(mktemp -d)
-          mkdir -p "$BUNDLE_ROOT/io/github/freshair129/genesisdb-android/$VERSION"
-          cp "$DIR"/* "$BUNDLE_ROOT/io/github/freshair129/genesisdb-android/$VERSION/"
+          STAGE="$BUNDLE_ROOT/io/github/freshair129/genesisdb-android/$VERSION"
+          mkdir -p "$STAGE"
+          cp "$DIR"/* "$STAGE/"
+
+          # publishToMavenLocal deliberately writes no checksums - the local
+          # repo does not need them - but a Central bundle follows the full
+          # Maven layout and wants .md5/.sha1 beside every artifact. Nothing
+          # upstream produces them and verify-maven-central-pom.sh never looked
+          # for them, so this gap was invisible until the bundle listing below
+          # was put on the dry-run path. Signature files do not get their own
+          # checksums.
+          for f in "$STAGE"/*; do
+            case "$f" in *.asc|*.md5|*.sha1) continue ;; esac
+            md5sum "$f" | cut -d' ' -f1 > "$f.md5"
+            sha1sum "$f" | cut -d' ' -f1 > "$f.sha1"
+          done
+
+          # Assert it rather than trust the loop: every artifact needs a
+          # signature and both checksums, and a bundle that is missing one is
+          # rejected only AFTER upload.
+          missing=0
+          for f in "$STAGE"/*; do
+            case "$f" in *.asc|*.md5|*.sha1) continue ;; esac
+            for ext in asc md5 sha1; do
+              [ -f "$f.$ext" ] || { echo "::error::$(basename "$f") has no .$ext"; missing=1; }
+            done
+          done
+          [ "$missing" -eq 0 ] || exit 1
+
           ( cd "$BUNDLE_ROOT" && zip -qr bundle.zip io )
           echo "BUNDLE=$BUNDLE_ROOT/bundle.zip" >> "$GITHUB_ENV"
           echo "--- bundle contents ---"
