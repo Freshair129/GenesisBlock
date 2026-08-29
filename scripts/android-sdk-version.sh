@@ -49,10 +49,17 @@ resolve() { # <repo-root>
   # Falling back is legitimate on an old tag, and a silent failure of the
   # primary source otherwise. Say which happened - a release that quietly
   # switched sources is a release nobody can explain later.
+  # ::warning:: rather than a plain echo, deliberately. Printing a fact only
+  # helps if someone reads it, and nobody opens the log of a green run - the
+  # first version of this wrote to stderr and would have been invisible in
+  # exactly the case it exists to surface. An annotation shows up on the run
+  # summary without changing pass/fail, because falling back is LEGITIMATE in
+  # repair mode (old tags predate modules.json's entry) and a hard failure
+  # there would break the repair path this fallback was written for.
   if [ -z "$py" ]; then
-    echo "  no python on PATH; reading the version from build.gradle.kts instead" >&2
+    echo "::warning::android-sdk-version: no python on PATH; read the version from build.gradle.kts instead of modules.json" >&2
   else
-    echo "  $root/modules.json did not yield genesisdb-android; falling back to build.gradle.kts" >&2
+    echo "::warning::android-sdk-version: $root/modules.json did not yield genesisdb-android; fell back to build.gradle.kts" >&2
   fi
 
   # grep + cut, not a sed backreference: no backslashes to lose in any layer
