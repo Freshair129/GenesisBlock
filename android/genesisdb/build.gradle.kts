@@ -3,6 +3,7 @@ plugins {
     id("org.jetbrains.kotlin.android")
     id("org.jetbrains.kotlin.plugin.serialization")
     id("maven-publish")
+    id("signing")
 }
 
 // Single source of truth for the published coordinate's version — keep in
@@ -10,6 +11,30 @@ plugins {
 // (per-surface versions are intentionally not SSOT-gated, see
 // docs/SPEC--MOBILE-SDK.md "Versioning model").
 val genesisdbAndroidVersion = "0.1.1"
+
+// Maven COORDINATE group, overridable with -PgenesisdbGroup.
+//
+// DEFAULTS to the existing `dev.genesisblock` so the GitHub Packages publish in
+// release.yml is completely unchanged. Hard-coding the Central group here
+// instead would have been an invisible breaking change: the next release would
+// publish to GitHub Packages under a new coordinate while
+// react-native-genesisdb still asks for `dev.genesisblock:genesisdb-android`,
+// and every Android consumer's resolve would fail. Central adoption is additive
+// until the artifact actually exists there and consumers have been migrated -
+// you cannot point a consumer at an artifact that is not published yet.
+//
+// Maven Central needs a namespace you can prove you own. `dev.genesisblock` is
+// not obtainable (genesisblock.dev belongs to an unrelated business), so the
+// Central workflow passes -PgenesisdbGroup=io.github.freshair129, which IS
+// verifiable from the GitHub account owning this repo.
+//
+// None of this touches the Kotlin package, and it must not: JNI symbol names
+// derive from a class's fully-qualified name, so the native entry points are
+// literally `Java_dev_genesisblock_GenesisDB_native*`. A Maven groupId and a
+// JVM package are independent identifiers; renaming the package to match a
+// groupId would break every native binding at load time.
+val genesisdbAndroidGroup: String =
+    (findProperty("genesisdbGroup") as String?) ?: "dev.genesisblock"
 
 android {
     namespace = "dev.genesisblock"
@@ -65,7 +90,11 @@ android {
     // to publish without this).
     publishing {
         singleVariant("release") {
+            // Maven Central REQUIRES both a sources and a javadoc jar; a
+            // publication missing either is rejected at validation, after
+            // upload. Only the sources jar was produced before.
             withSourcesJar()
+            withJavadocJar()
         }
     }
 }
@@ -93,9 +122,41 @@ dependencies {
 publishing {
     publications {
         register<MavenPublication>("release") {
-            groupId = "dev.genesisblock"
+            groupId = genesisdbAndroidGroup
             artifactId = "genesisdb-android"
             version = genesisdbAndroidVersion
+
+            // Maven Central rejects a publication missing any of these. They
+            // are cheap to add and impossible to add retroactively to a
+            // version that is already released, so they go in before the
+            // first Central publish rather than after the first rejection.
+            pom {
+                name.set("GenesisDB Android")
+                description.set(
+                    "Embedded GenesisBlockDB for Android - a local-first hybrid " +
+                        "semantic-graph and vector engine that runs in-process, with no server.",
+                )
+                url.set("https://github.com/Freshair129/GenesisBlock")
+                licenses {
+                    license {
+                        name.set("MIT License")
+                        url.set("https://github.com/Freshair129/GenesisBlock/blob/main/LICENSE")
+                        distribution.set("repo")
+                    }
+                }
+                developers {
+                    developer {
+                        id.set("Freshair129")
+                        name.set("Freshair129")
+                        url.set("https://github.com/Freshair129")
+                    }
+                }
+                scm {
+                    url.set("https://github.com/Freshair129/GenesisBlock")
+                    connection.set("scm:git:https://github.com/Freshair129/GenesisBlock.git")
+                    developerConnection.set("scm:git:ssh://git@github.com/Freshair129/GenesisBlock.git")
+                }
+            }
 
             // AGP creates the "release" component asynchronously — reading
             // components["release"] before project evaluation finishes
@@ -115,5 +176,28 @@ publishing {
                 password = System.getenv("GITHUB_TOKEN")
             }
         }
+    }
+}
+
+// Central requires every artifact to carry a detached PGP signature. Signing is
+// CONDITIONAL on the key being present so that an ordinary build, a
+// publishToMavenLocal, or CI without secrets all still work - the alternative
+// is a module that cannot be built at all without a private key on the machine.
+//
+// The key lives only in CI, as the GPG_SIGNING_KEY / GPG_SIGNING_PASSWORD
+// secrets, exactly like NPM_TOKEN. `useInMemoryPgpKeys` takes an ASCII-armored
+// private key so nothing has to be written to a keyring on the runner.
+//
+// The Central publish workflow asserts the key is present before it starts, so
+// a missing secret fails loudly there rather than silently producing an
+// unsigned publication that Central rejects after upload.
+signing {
+    val signingKey: String? = System.getenv("GPG_SIGNING_KEY")
+    val signingPassword: String? = System.getenv("GPG_SIGNING_PASSWORD")
+    if (!signingKey.isNullOrBlank()) {
+        useInMemoryPgpKeys(signingKey, signingPassword)
+        sign(publishing.publications)
+    } else {
+        logger.lifecycle("signing: GPG_SIGNING_KEY not set - publications will be UNSIGNED (fine locally, rejected by Maven Central)")
     }
 }

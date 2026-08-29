@@ -1,0 +1,163 @@
+# Publish genesisdb-android to Maven Central.
+#
+# Deliberately its OWN workflow rather than a step in release.yml. release.yml
+# had 0 green runs out of 5 real tag pushes before #149 gave it a dry-run path;
+# bolting an untested, irreversible publish onto the file that must work on the
+# next release is how that record got made. This stays separate until it has
+# actually published successfully at least once, then it can be folded in.
+#
+# WHY Central at all: GitHub Packages requires authentication for EVERY Maven
+# read, even from a public repo. Today every Android consumer must create a
+# GitHub PAT with `read:packages` and put it in their own gradle.properties
+# just to resolve the .aar. Central needs nothing.
+#
+# WHAT YOU MUST SET UP FIRST (none of it can be automated from here):
+#   1. A Sonatype Central Portal account - central.sonatype.com, sign in with
+#      GitHub.
+#   2. Verify the `io.github.freshair129` namespace. Because the account signs
+#      in as the GitHub user that owns this repo, Central offers automatic
+#      verification. `dev.genesisblock` is NOT obtainable - Central requires
+#      namespace ownership and genesisblock.dev belongs to an unrelated party.
+#   3. A GPG key:
+#         gpg --full-generate-key
+#         gpg --keyserver keyserver.ubuntu.com --send-keys <KEY_ID>
+#         gpg --armor --export-secret-keys <KEY_ID>   # -> GPG_SIGNING_KEY
+#   4. Repo secrets: CENTRAL_TOKEN_USERNAME, CENTRAL_TOKEN_PASSWORD (from the
+#      Portal's "Generate User Token"), GPG_SIGNING_KEY, GPG_SIGNING_PASSWORD.
+name: Publish to Maven Central
+
+on:
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Build and validate the bundle without uploading'
+        required: true
+        default: true
+        type: boolean
+
+permissions:
+  contents: read
+
+jobs:
+  central:
+    name: genesisdb-android -> Maven Central
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+
+      # Fail before doing any work if a secret is missing, rather than after
+      # producing an unsigned bundle that Central rejects post-upload.
+      - name: Preflight - required secrets
+        env:
+          CENTRAL_TOKEN_USERNAME: ${{ secrets.CENTRAL_TOKEN_USERNAME }}
+          CENTRAL_TOKEN_PASSWORD: ${{ secrets.CENTRAL_TOKEN_PASSWORD }}
+          GPG_SIGNING_KEY: ${{ secrets.GPG_SIGNING_KEY }}
+        run: |
+          set -euo pipefail
+          missing=0
+          for v in CENTRAL_TOKEN_USERNAME CENTRAL_TOKEN_PASSWORD GPG_SIGNING_KEY; do
+            if [ -z "${!v:-}" ]; then echo "missing secret: $v"; missing=1; else echo "present: $v"; fi
+          done
+          if [ "$missing" -ne 0 ]; then
+            echo "::error::set the missing secrets before running this - see the header of this workflow file for how to obtain each one"
+            exit 1
+          fi
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-linux-android, armv7-linux-androideabi, x86_64-linux-android
+
+      - uses: android-actions/setup-android@v3
+
+      - name: Install Android NDK
+        uses: nttld/setup-ndk@v1
+        with:
+          ndk-version: r26d
+          add-to-path: true
+
+      - name: Install cargo-ndk
+        run: cargo install cargo-ndk --locked
+
+      # A release build, for the same reason release.yml uses one: what ships
+      # must be stripped. mobile-build.yml's android-build is debug on purpose.
+      - name: Build SDK core for Android (release)
+        run: |
+          cargo ndk \
+            --target aarch64-linux-android \
+            --target armv7-linux-androideabi \
+            --target x86_64-linux-android \
+            --no-default-features --features "mobile ffi android-jni" \
+            build --release
+
+      - name: Stage jniLibs
+        run: |
+          set -euo pipefail
+          mkdir -p android/genesisdb/src/main/jniLibs/{arm64-v8a,armeabi-v7a,x86_64}
+          cp target/aarch64-linux-android/release/libgenesis_block_native.so android/genesisdb/src/main/jniLibs/arm64-v8a/
+          cp target/armv7-linux-androideabi/release/libgenesis_block_native.so android/genesisdb/src/main/jniLibs/armeabi-v7a/
+          cp target/x86_64-linux-android/release/libgenesis_block_native.so android/genesisdb/src/main/jniLibs/x86_64/
+
+      # The same guard release.yml runs. A debug .so shipped once already
+      # (v0.2.0, 281 MB); Central publications are immutable, so a bad artifact
+      # there cannot be replaced the way a GitHub release asset can.
+      - name: Verify .so slices are release-built (no DWARF)
+        run: |
+          set -euo pipefail
+          fail=0
+          for so in android/genesisdb/src/main/jniLibs/*/libgenesis_block_native.so; do
+            mib=$(( $(stat -c%s "$so") / 1048576 ))
+            if readelf -S "$so" | grep -q '\.debug_'; then
+              echo "::error::$so carries .debug_* sections - this is a debug build"
+              fail=1
+            else
+              echo "$so: ${mib} MiB, no DWARF"
+            fi
+          done
+          exit $fail
+
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: 8.7
+
+      - name: Build and sign the publication
+        working-directory: android
+        env:
+          GPG_SIGNING_KEY: ${{ secrets.GPG_SIGNING_KEY }}
+          GPG_SIGNING_PASSWORD: ${{ secrets.GPG_SIGNING_PASSWORD }}
+        run: gradle :genesisdb:publishToMavenLocal -PgenesisdbGroup=io.github.freshair129
+
+      - name: Validate against Central's requirements
+        run: bash scripts/verify-maven-central-pom.sh
+
+      - name: Upload the bundle to Central
+        if: ${{ !inputs.dry_run }}
+        env:
+          CENTRAL_TOKEN_USERNAME: ${{ secrets.CENTRAL_TOKEN_USERNAME }}
+          CENTRAL_TOKEN_PASSWORD: ${{ secrets.CENTRAL_TOKEN_PASSWORD }}
+        run: |
+          set -euo pipefail
+          DIR=$(find "$HOME/.m2/repository/io/github/freshair129/genesisdb-android" -mindepth 1 -maxdepth 1 -type d | head -1)
+          VERSION=$(basename "$DIR")
+          echo "bundling $VERSION"
+          BUNDLE_ROOT=$(mktemp -d)
+          mkdir -p "$BUNDLE_ROOT/io/github/freshair129/genesisdb-android/$VERSION"
+          cp "$DIR"/* "$BUNDLE_ROOT/io/github/freshair129/genesisdb-android/$VERSION/"
+          ( cd "$BUNDLE_ROOT" && zip -qr bundle.zip io )
+          AUTH=$(printf '%s:%s' "$CENTRAL_TOKEN_USERNAME" "$CENTRAL_TOKEN_PASSWORD" | base64 -w0)
+          # AUTOMATIC publishes on successful validation; use USER_MANAGED to
+          # review in the Portal first. Central publications are IMMUTABLE.
+          curl -fsSL --fail-with-body \
+            -H "Authorization: Bearer $AUTH" \
+            -F "bundle=@$BUNDLE_ROOT/bundle.zip" \
+            "https://central.sonatype.com/api/v1/publisher/upload?publishingType=USER_MANAGED" \
+            && echo "uploaded - finish the release in the Central Portal UI"
+
+      - name: Dry run notice
+        if: ${{ inputs.dry_run }}
+        run: echo "DRY RUN - bundle built, signed and validated; nothing uploaded. Re-run with dry_run=false to publish."
