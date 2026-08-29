@@ -7,6 +7,43 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed - the Android SDK is on Maven Central, and a release can now ship it
+
+`genesisdb-android` 0.1.1 is published to Maven Central as
+`io.github.freshair129:genesisdb-android`, verified anonymously against
+`repo1.maven.org` with byte sizes matching what CI bundled. Android consumers
+no longer need a GitHub PAT.
+
+- `react-native-genesisdb` 0.1.2 resolves the `.aar` from Central. The GitHub
+  Packages repository and its `gpr.user`/`gpr.key` credentials are **removed**,
+  not kept as a fallback - a fallback would let a broken Central resolution
+  pass on any machine that happens to hold a token, which is the failure mode
+  this package already shipped once. `npm install react-native-genesisdb` is
+  now enough. The fix merged in 0.1.1's wake but 0.1.1 was already on npm, so
+  it stayed undelivered until this version: merged is not shipped.
+- Release publishes are **idempotent**. A `v*` tag publishes every surface, but
+  the surfaces carry independent versions and rarely all change together;
+  republishing an unchanged one returned 409 and turned the whole release red,
+  so a release shipping one fixed surface failed because the others had nothing
+  to do. `scripts/registry-has-version.sh` now answers "is this exact version
+  already published" for npm and GitHub Packages, and each publish step skips
+  on an unambiguous yes. It fails toward publishing: a network error, an auth
+  failure or an unparseable answer all mean publish, because wrongly skipping
+  would go green having shipped nothing, while wrongly publishing costs a loud
+  409. The check runs in dry runs too, so a dry run reports what a release
+  would skip.
+- `maven-central-publish.yml` waits for Central's verdict instead of its 201.
+  An upload returning 201 only means Central ACCEPTED the bundle; validation is
+  asynchronous and a deployment can go FAILED afterwards while the job stays
+  green. `scripts/central-await-validation.sh` polls the status endpoint until
+  the deployment settles, and was proven against real Central: a deliberate
+  re-upload of the published 0.1.1 returned 201 and then FAILED 15 seconds
+  later, turning the job red as intended.
+- `react-native-genesisdb`'s lockfile recorded version `0.1.0` while its
+  `package.json` said `0.1.1`. Harmless to `npm ci`, which only enforces
+  dependency agreement, but wrong; both now say `0.1.2`.
+
+
 ### Added - Maven Central publishing prepared (additive; nothing published yet)
 
 Every Android consumer currently needs a GitHub PAT with `read:packages` in
