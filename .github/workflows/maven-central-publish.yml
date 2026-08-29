@@ -77,6 +77,7 @@ jobs:
 
       - name: Install Android NDK
         uses: nttld/setup-ndk@v1
+        id: setup-ndk
         with:
           ndk-version: r26d
           add-to-path: true
@@ -86,14 +87,21 @@ jobs:
 
       # A release build, for the same reason release.yml uses one: what ships
       # must be stripped. mobile-build.yml's android-build is debug on purpose.
+      # Invocation copied verbatim from release.yml. cargo-ndk forwards
+      # everything after `build` to cargo, so --no-default-features and
+      # --features belong THERE, not before it. Writing this from memory
+      # instead of copying the working one produced
+      # `error: unexpected argument '--no-default-features' found` on the
+      # first dry run - and dropped ANDROID_NDK_HOME with it.
       - name: Build SDK core for Android (release)
+        env:
+          ANDROID_NDK_HOME: ${{ steps.setup-ndk.outputs.ndk-path }}
         run: |
           cargo ndk \
             --target aarch64-linux-android \
             --target armv7-linux-androideabi \
             --target x86_64-linux-android \
-            --no-default-features --features "mobile ffi android-jni" \
-            build --release
+            build --release --no-default-features --features "mobile ffi android-jni"
 
       - name: Stage jniLibs
         run: |
