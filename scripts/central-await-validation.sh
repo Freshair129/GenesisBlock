@@ -197,6 +197,13 @@ self_test() {
   check "VALIDATED"                 OK      200 '{"deploymentState":"VALIDATED"}'
   check "PUBLISHED"                 OK      201 '{"deploymentState":"PUBLISHED"}'
   check "FAILED"                    FAIL    200 '{"deploymentState":"FAILED","errors":{"x":["bad sig"]}}'
+  # Not invented: this is Central's verbatim answer to run 33240771927, which
+  # re-uploaded an already-published version on purpose to see the real
+  # failure. Note `errors` is a map keyed by package URL - nothing like the
+  # shape guessed above, which is why failures print the whole body instead
+  # of reaching into it. Keeping the real payload here means the parser is
+  # tested against what Sonatype actually sends, not against my idea of it.
+  check "real FAILED body from Central" FAIL 200 "{\"deploymentId\":\"a39a020f-e337-4243-91ed-aaf084ba3f26\",\"deploymentName\":\"bundle.zip\",\"deploymentState\":\"FAILED\",\"purls\":[\"pkg:maven/io.github.freshair129/genesisdb-android@0.1.1?type=aar\",\"pkg:maven/io.github.freshair129/genesisdb-android@0.1.1\"],\"errors\":{\"pkg:maven/io.github.freshair129/genesisdb-android@0.1.1?type=aar\":[\"Component with package url: 'pkg:maven/io.github.freshair129/genesisdb-android@0.1.1?type=aar' already exists\"]}}"
   # These decide whether the guard is worth having: none of them may be OK.
   check "state Sonatype adds later" UNKNOWN 200 '{"deploymentState":"QUARANTINED"}'
   check "no deploymentState"        UNKNOWN 200 '{"deploymentId":"abc"}'
