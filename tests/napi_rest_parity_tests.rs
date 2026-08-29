@@ -69,6 +69,13 @@ const NAPI_TO_REST: &[(&str, Option<&str>)] = &[
     ("apply_relational_rows", None),
     // Compatibility-only embedded API; REST intentionally permits named queries only.
     ("query_relational", None),
+    // Deliberately in-process only, for now. Network-reachable SQL is a
+    // different class of exposure from an embedded call: the surface can read
+    // the whole projection, including every node's props, with no per-caller
+    // separation (SPEC--GENESISDB-READONLY-SQL-SURFACE §5, §8). Exposing it
+    // over REST is a separate decision to take once the embedded surface has
+    // been used in anger, not a step to skip quietly.
+    ("query_sql", None),
     ("execute_named_query", Some("/v1/relational/query")),
     ("commit_transaction", Some("/v1/transaction/commit")),
     ("stable_frontier", Some("/v1/frontier")),

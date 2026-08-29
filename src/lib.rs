@@ -83,6 +83,12 @@ use query::HqlCommand;
 pub const SCHEMA_VERSION: u32 = 3;
 // v3: WP-2.1 node_versions chain (additive CREATE IF NOT EXISTS migration).
 const PROJECTION_SCHEMA_VERSION: u32 = 3;
+
+/// Bounds for the read-only SQL surface. Exceeding one is an ERROR, never a
+/// silent truncation.
+const SQL_QUERY_TIMEOUT_MS: u64 = 5_000;
+const SQL_QUERY_MAX_ROWS: usize = 10_000;
+const SQL_QUERY_MAX_BYTES: usize = 32 * 1024 * 1024;
 const PROJECTION_DB_FILE: &str = "projection.sqlite";
 /// Stable engine identifier (independent of package version).
 pub const ENGINE_NAME: &str = "genesis-block";
@@ -4890,6 +4896,108 @@ impl Storage {
                     .find(|candidate| candidate.name == column_name)
             })
             .ok_or_else(|| Error::from_reason("relational query references unknown column"))
+    }
+
+    /// Read-only SQL over the relational projection.
+    ///
+    /// Sanctioned by ADR--GENESISDB-EMBEDDED-SQLITE-SUBSTRATE §2.2 rule 5,
+    /// which reserves a diagnostics/query surface provided it cannot write.
+    /// The relational IR (`query_relational`) cannot express >, LIKE, OR,
+    /// GROUP BY or ORDER BY - `RelationalFilter` carries a column and a value
+    /// and nothing else - so reporting work either gets this or leaves the
+    /// engine, and leaving the engine is how dual-write starts.
+    ///
+    /// Read-only is enforced in four places, strongest first:
+    ///
+    /// 1. A SEPARATE connection opened `SQLITE_OPEN_READ_ONLY`. SQLite itself
+    ///    refuses the write, so correctness does not depend on this code
+    ///    telling SELECT from INSERT correctly. The shared writable connection
+    ///    is deliberately not reused: an authorizer or a limit left behind on
+    ///    it would change how the engine's own writes behave.
+    /// 2. An ALLOW-LIST authorizer. Anything not positively recognised as a
+    ///    read is denied, including action variants SQLite may add later. A
+    ///    deny-list would be blind to whatever it did not think of.
+    /// 3. `SQLITE_LIMIT_ATTACHED = 0`, so ATTACH cannot reach another file.
+    /// 4. A progress handler that interrupts past the deadline, because a
+    ///    read-only query can still burn a core forever.
+    ///
+    /// Every bound value goes through `json_to_sql`; SQL text is never built
+    /// by concatenating caller input.
+    pub fn query_sql(&self, sql: &str, params: Vec<Value>) -> Result<Vec<Value>> {
+        use rusqlite::hooks::{AuthAction, AuthContext, Authorization};
+        use rusqlite::limits::Limit;
+
+        let conn = Self::open_projection(&self.projection_path, true)?;
+        conn.set_limit(Limit::SQLITE_LIMIT_ATTACHED, 0);
+        conn.authorizer(Some(|context: AuthContext<'_>| match context.action {
+            AuthAction::Select
+            | AuthAction::Read { .. }
+            | AuthAction::Function { .. }
+            | AuthAction::Recursive => Authorization::Allow,
+            _ => Authorization::Deny,
+        }));
+
+        let deadline = Instant::now() + Duration::from_millis(SQL_QUERY_TIMEOUT_MS);
+        conn.progress_handler(1_000, Some(move || Instant::now() >= deadline));
+
+        let bound = params
+            .iter()
+            .map(Self::json_to_sql)
+            .collect::<Result<Vec<_>>>()?;
+
+        let mut statement = conn
+            .prepare(sql)
+            .map_err(|e| Error::from_reason(format!("SQL_REJECTED: {e}")))?;
+        let names: Vec<String> = statement
+            .column_names()
+            .into_iter()
+            .map(|name| name.to_string())
+            .collect();
+        let mut rows = statement
+            .query(params_from_iter(bound))
+            .map_err(|e| Error::from_reason(format!("SQL_REJECTED: {e}")))?;
+
+        let mut out: Vec<Value> = Vec::new();
+        let mut bytes = 0usize;
+        while let Some(row) = rows
+            .next()
+            .map_err(|e| Error::from_reason(format!("SQL_REJECTED: {e}")))?
+        {
+            // Refuse rather than truncate. A result silently cut at the cap is
+            // a wrong answer that looks like a right one.
+            if out.len() >= SQL_QUERY_MAX_ROWS {
+                return Err(Error::from_reason(format!(
+                    "SQL_LIMIT_EXCEEDED: more than {SQL_QUERY_MAX_ROWS} rows; narrow the query"
+                )));
+            }
+            let mut object = serde_json::Map::new();
+            for (index, name) in names.iter().enumerate() {
+                let value = match row
+                    .get_ref(index)
+                    .map_err(|e| Error::from_reason(e.to_string()))?
+                {
+                    ValueRef::Null => Value::Null,
+                    ValueRef::Integer(value) => Value::from(value),
+                    ValueRef::Real(value) => Value::from(value),
+                    ValueRef::Text(value) => {
+                        Value::String(String::from_utf8_lossy(value).into_owned())
+                    }
+                    ValueRef::Blob(value) => {
+                        Value::Array(value.iter().copied().map(Value::from).collect())
+                    }
+                };
+                object.insert(name.clone(), value);
+            }
+            let row_value = Value::Object(object);
+            bytes += serde_json::to_string(&row_value).map(|s| s.len()).unwrap_or(0);
+            if bytes > SQL_QUERY_MAX_BYTES {
+                return Err(Error::from_reason(
+                    "SQL_LIMIT_EXCEEDED: result exceeds the byte budget",
+                ));
+            }
+            out.push(row_value);
+        }
+        Ok(out)
     }
 
     pub fn query_relational(&self, query: RelationalQuery) -> Result<Vec<Value>> {
@@ -12442,6 +12550,25 @@ impl GenesisDatabase {
         let i = Arc::clone(&self.inner);
         tokio::task::spawn_blocking(move || {
             let rows = i.query_relational(query)?;
+            serde_json::to_string(&rows).map_err(|e| Error::from_reason(e.to_string()))
+        })
+        .await
+        .map_err(|e| Error::from_reason(e.to_string()))?
+    }
+    /// Read-only SQL over the relational projection - see `Storage::query_sql`
+    /// for what enforces the "read-only" half. `params_json` is a JSON array
+    /// bound positionally as ?1, ?2, ...; caller input must arrive that way and
+    /// never be concatenated into `sql`.
+    #[napi]
+    pub async fn query_sql(&self, sql: String, params_json: Option<String>) -> Result<String> {
+        let params = match params_json {
+            Some(text) => serde_json::from_str::<Vec<Value>>(&text)
+                .map_err(|e| Error::from_reason(format!("params must be a JSON array: {e}")))?,
+            None => Vec::new(),
+        };
+        let i = Arc::clone(&self.inner);
+        tokio::task::spawn_blocking(move || {
+            let rows = i.query_sql(&sql, params)?;
             serde_json::to_string(&rows).map_err(|e| Error::from_reason(e.to_string()))
         })
         .await
