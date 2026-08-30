@@ -108,14 +108,19 @@ jobs:
       # (a fresh clone and every registry consumer must be able to require() the
       # package before any local build), so keep the committed copies aside now —
       # after the build they are gone.
+      #
+      # ubuntu only, matching the check below that consumes the snapshot. Running
+      # it on all three hosts is not just waste: the default shell on
+      # windows-latest is pwsh, where `cp a b dir/` is a hard error.
       - name: Snapshot the committed napi artifacts
+        if: matrix.host == 'ubuntu-latest'
         run: |
           mkdir -p .dts-committed
           cp index.d.ts index.js .dts-committed/
       - name: Build native addon
         run: npm run build
-      # Only on one host: the committed files must match ONE canonical generator
-      # output, and comparing three would turn any per-platform generation
+      # One host, because the committed files must match ONE canonical generator
+      # output and comparing three would turn any per-platform generation
       # difference into three red jobs. That also means a platform-specific
       # difference in what napi emits is NOT covered here — index.js enumerates
       # every target from package.json rather than the build host, so it is not
