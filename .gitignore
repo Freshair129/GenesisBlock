@@ -85,3 +85,7 @@ ios/genesisdb/Sources/CGenesisDBFFI/include/genesisdb.h
 # Never committed: a checked-in host fixture drifts from what a real app looks
 # like exactly as silently as the bugs that gate exists to catch.
 rn-host/
+
+# CI snapshot of the committed napi artifacts, taken before `napi build`
+# overwrites them so scripts/check-dts-freshness.mjs can compare the two.
+/.dts-committed/

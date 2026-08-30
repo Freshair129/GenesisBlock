@@ -348,9 +348,10 @@ export declare class GenesisDatabase {
   applyRelationalRows(namespace: string, mutationsJson: string): Promise<void>
   queryRelational(queryJson: string): Promise<string>
   /**
-   * Read-only SQL over the relational projection. `paramsJson` is a JSON array
+   * Read-only SQL over the relational projection - see `Storage::query_sql`
+   * for what enforces the "read-only" half. `params_json` is a JSON array
    * bound positionally as ?1, ?2, ...; caller input must arrive that way and
-   * must never be concatenated into `sql`. Resolves to a JSON array of rows.
+   * never be concatenated into `sql`.
    */
   querySql(sql: string, paramsJson?: string | undefined | null): Promise<string>
   supersedeNode(id: string, newProps?: any | undefined | null, causedBy?: string | undefined | null): Promise<NodeOutput>
