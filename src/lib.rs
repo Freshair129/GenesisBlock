@@ -4339,19 +4339,12 @@ impl Storage {
     {
         let from_u32 = self.get_or_intern_id(&edge.from);
         let to_u32 = self.get_or_intern_id(&edge.to);
-        // `prepare_cached`, not `execute`: `execute` re-prepares the statement on
-        // every call. Measured over a 40,000-edge bulk insert, re-preparing cost
-        // 173 us/edge - a 4x ingestion regression - and the cache removes it.
-        let mut stmt = conn
-            .prepare_cached(
-                "INSERT OR REPLACE INTO edges(
+        conn.execute(
+            "INSERT OR REPLACE INTO edges(
                  id, from_u32, to_u32, from_id, to_id, rel, props,
                  valid_from, valid_to, recorded_at, superseded_by,
                  impact, caused_by, clock_time, clock_peer)
              VALUES(?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15)",
-            )
-            .map_err(|e| Error::from_reason(e.to_string()))?;
-        stmt.execute(
             params![
                 edge.id,
                 from_u32,
