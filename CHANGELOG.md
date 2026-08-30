@@ -70,6 +70,56 @@ class of exposure, and the surface reads the whole projection with no
 per-caller separation; `napi_rest_parity_tests` carries that as a documented
 `None` entry rather than an omission.
 
+### Added - edges in the relational projection
+
+`projection.sqlite` now carries an `edges` table and an `edges_current` view, so
+the read-only SQL surface can join across relationships. Designed in
+`SPEC--GENESISDB-EDGE-PROJECTION`; `PROJECTION_SCHEMA_VERSION` goes to 4.
+
+The projection was node-only **by construction**, not by omission: `Event::Edge`
+fell through the `_ => {}` arm of `projection_apply_event`. Edges were being
+dropped in four places, and only one of them was that arm — `Event::Batch`
+matched `Node` alone, `Event::Transaction` projected `nodes` while ignoring its
+own `edges` field, and `Event::NodeRetract` deleted a node's rows while leaving
+its incident edges behind, which would have made `edges_current` claim
+relationships `neighbors` no longer returns.
+
+`retract_edge` is a bitemporal soft-delete, so a bare `SELECT * FROM edges`
+includes retracted edges and disagrees with the graph API about what exists now.
+Both truths are kept and the one matching `neighbors` is the one with a name.
+`edges_current_agrees_with_the_graph_api` is the load-bearing test: two surfaces
+that disagree are worse than one that cannot answer.
+
+Existing databases are backfilled on open. Their edges live only in `edges.bin`
+and the live map — compaction folds the WAL to live state, so replay does not
+reach them. The trigger is "the table is empty while the live map is not" rather
+than a version comparison, which would miss a projection that was deleted and
+rebuilt. Measured on a real 15,393-edge store: backfill plus the whole open took
+6.6 s.
+
+The write cost was measured rather than asserted, because the spec asked for
+numbers and not for "shouldn't matter" — 40,000 edges via `bulk_add_edges`,
+release build, n=3 per side, medians: **91 µs/edge before, 240 µs after**. That
+is 2.6×, not the 4× a single run per side suggested; the baseline that produced
+4× happened to be the fastest sample of its distribution. Splitting it,
++51 µs is the INSERT and **+98 µs is the two secondary indexes** — the indexes
+cost more than the write. They are kept, because a projection that exists for
+querying is not improved by removing its indexes.
+
+Two hypotheses were wrong and are recorded so nobody re-walks them:
+`prepare_cached` changed nothing, and there is no per-edge fsync because
+`execute_batch` already writes a whole chunk in one transaction.
+
+In use-case terms rather than ratios: rebuilding the real RAG store costs
+**+2.3 s** on a pipeline that already spends minutes embedding, single-edge
+writes pay 0.25% because that path fsyncs at 58.8 ms/edge regardless, and disk
+grows **11.7 → 15.6 MB** (+2.4% of the whole 163 MB store). Bulk loads of
+millions are where it would hurt: 1M edges goes 91 s → 240 s.
+
+`snb-bulk-ingestion` cannot guard this, confirmed by running it: it never times
+the edge phase, and even timed externally its 747 ms expected effect sits under
+its own 2,316 ms run-to-run spread — a signal-to-noise of 0.32.
+
 ### Documented - the SQL surface cannot see edges
 
 Measured on the same real store: the engine loads 15,393 edges and the SQL

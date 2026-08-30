@@ -141,6 +141,9 @@ codegen-units = 1
 strip = "symbols"
 
 [dev-dependencies]
+# Already a normal dependency; declared here too so integration tests (their own
+# crates) can open projection.sqlite directly to simulate a pre-v4 database.
+rusqlite = { version = "0.32", features = ["bundled"] }
 anyhow = "1.0.103"  # RUSTSEC-2026-0190 fix (Error::downcast_mut unsoundness)
 criterion = "0.8.2"
 rand = "0.8"
