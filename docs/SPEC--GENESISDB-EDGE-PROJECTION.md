@@ -1,8 +1,8 @@
 ---
 version: "0.1.0"
 created_at: "2026-08-30T21:00:00+07:00,Claude Opus 5,working-tree"
-last_update: "2026-08-30T21:00:00+07:00,Claude Opus 5"
-status: proposed
+last_update: "2026-08-31T02:00:00+07:00,Claude Opus 5"
+status: accepted
 superseded_by: null
 attributes:
   doc_type: "spec"
@@ -21,7 +21,9 @@ attributes:
 (`SPEC--GENESISDB-READONLY-SQL-SURFACE`, ship แล้วใน #160/#161) เขียน query
 ที่ join ตามความสัมพันธ์ได้
 
-เอกสารนี้ยังไม่ใช่การอนุมัติ ต้องได้รับ approval ก่อนแตะโค้ด (C-2)
+**อนุมัติแล้ว 2026-08-31** implementation อยู่ใน `projection_apply_edge_tx` +
+`projection_backfill_edges` ดู §5 สำหรับต้นทุนที่วัดได้จริง และ §8 สำหรับคำตอบ
+ของคำถามทั้งสี่ข้อ
 
 ## 2. ปัญหา — วัดจากฐานจริง ไม่ใช่จากการอ่านโค้ด
 
@@ -70,27 +72,37 @@ projection อยู่ดี ไม่ได้แทนกัน
 ข้อมูล แต่ต้องเขียน vtab module เอง และผูก lifetime ของ read-only connection
 เข้ากับ live map ที่เขียนอยู่ ซับซ้อนกว่าและอันตรายกว่าการฉายลงตาราง
 
-## 4. รูปร่างที่เสนอ
+## 4. รูปร่างที่สร้างจริง
 
     CREATE TABLE IF NOT EXISTS edges (
-        edge_key   TEXT PRIMARY KEY,   -- hex ของ u128 (ดู §4.1)
-        id         TEXT NOT NULL,
+        id         TEXT PRIMARY KEY,   -- ไม่ใช่ edge_key ดู §4.1
         from_u32   INTEGER NOT NULL,
         to_u32     INTEGER NOT NULL,
+        from_id    TEXT NOT NULL,      -- เพิ่มจากที่เสนอ ดู §4.2
+        to_id      TEXT NOT NULL,
         rel        TEXT NOT NULL,
-        props      TEXT,
+        props      TEXT NOT NULL DEFAULT '{}',
         valid_from TEXT NOT NULL,
         valid_to   TEXT,
+        recorded_at   TEXT NOT NULL DEFAULT '',
+        superseded_by TEXT,
         impact     REAL,
         caused_by  TEXT,
-        clock_time INTEGER NOT NULL,
+        clock_time INTEGER NOT NULL DEFAULT 0,
         clock_peer TEXT NOT NULL DEFAULT ''
     );
     CREATE INDEX IF NOT EXISTS idx_edges_from ON edges(from_u32, rel);
     CREATE INDEX IF NOT EXISTS idx_edges_to   ON edges(to_u32, rel);
+    CREATE VIEW  IF NOT EXISTS edges_current AS
+        SELECT * FROM edges WHERE valid_to IS NULL;
 
 additive `CREATE TABLE IF NOT EXISTS` ตามแบบเดียวกับ migration v3 ของ
-`node_versions` และต้องขึ้น `PROJECTION_SCHEMA_VERSION` เป็น 4
+`node_versions` และขึ้น `PROJECTION_SCHEMA_VERSION` เป็น 4
+
+ต่างจากที่เสนอไว้สามจุด: ใช้ `id` เป็น PK แทน `edge_key` (§4.1),
+เพิ่ม `from_id`/`to_id` (§4.2) และเก็บ `recorded_at`/`superseded_by` ที่ร่างแรก
+ตกไป — `EdgeOutput` มีสองฟิลด์นั้น การฉายแบบขาดฟิลด์คือ projection ที่ทำให้
+คำถามบางข้อตอบไม่ได้โดยไม่มีเหตุผล
 
 ### 4.1 u128 key ไม่พอดีกับ SQLite
 
@@ -102,7 +114,9 @@ u128 ใส่ไม่ได้ ทางเลือก:
 - **ใช้ `id` เป็น PK ไปเลย** — `edge_key` derive จาก `id` เสมออยู่แล้ว
   (`trunc128(SHA256(id))`, ADR--GENESISDB-EDGE-NUMERIC-KEYS) จึงไม่ต้องเก็บซ้ำ
 
-ข้อสามดูตรงที่สุด แต่ต้องยืนยันก่อนว่า `id` unique จริงในทุก path
+**เลือกข้อสาม** ยืนยันแล้วว่า `id` เป็น identity จริง: live map คือ
+`DashMap<u128, EdgeOutput>` ที่ key มาจาก `edge_key(id)` เสมอ การชนกันของ `id`
+จึงเป็นบั๊กที่มีอยู่แล้วก่อนหน้านี้ ไม่ใช่ความเสี่ยงที่การเลือกนี้สร้างขึ้นใหม่
 
 ### 4.2 join กลับไปหา node ต้องผ่าน node_versions
 
@@ -110,7 +124,10 @@ u128 ใส่ไม่ได้ ทางเลือก:
 `node_labels.node_u32` ได้ตรง ๆ — ดี แต่ผู้เรียกคิดเป็น **id string** และ
 `props` ไม่มีคอลัมน์ `id` เลย ต้องผ่าน `node_versions.id`
 
-ควรพิจารณา VIEW ที่ทำ join นั้นให้ เพื่อไม่ให้ทุกคนเขียนเองแล้วเขียนผิด
+**แก้ด้วยการเก็บทั้งสองสะกด** `from_id`/`to_id` อยู่ในตารางเลย ไม่ต้องมี VIEW
+เพิ่ม — ถ้าไม่มี string ทุก query จะต้องวิ่งผ่าน `node_versions` เพียงเพื่อเรียก
+ชื่อ endpoint ของตัวเอง ต้นทุนคือความซ้ำซ้อนของข้อมูลใน projection ที่สร้างใหม่
+ได้อยู่แล้ว ซึ่งถูกกว่าการให้ทุกคนเขียน join สามทางเอง
 
 ### 4.3 bitemporal — ข้อที่ต้องตัดสินใจ ไม่ใช่ข้อที่ต้อง implement
 
@@ -129,14 +146,45 @@ log และ time-travel เห็น แต่ `neighbors` ซ่อนจา�
 
 ## 5. ต้นทุนที่ต้องยอมรับ
 
-- **ขนาด** ฐานตัวอย่างนี้ 15,393 edges → ตาราง + 2 index น่าจะ ~2-4 MB บน
-  projection ที่ตอนนี้ 12.3 MB **ยังไม่ได้วัด** ต้องวัดก่อนตัดสินใจ
-- **write amplification** ทุก `add_edge` / `retract_edge` เพิ่มการเขียน SQLite
-  หนึ่งครั้ง — กระทบ ingestion throughput ที่ `snb-bulk-ingestion` วัดอยู่
-  ต้อง bench ก่อน/หลัง
-- **backfill** ฐานที่มีอยู่แล้ว (เช่นฐาน RAG นี้) มี edges ใน `edges.bin` แต่ไม่มี
-  ใน projection — migration ต้อง backfill ตอน open ครั้งแรก ซึ่งสำหรับ 15k edges
-  น่าจะเร็ว แต่ต้องมีขอบเขตที่วัดแล้วสำหรับฐานใหญ่
+**วัดแล้ว** — 40,000 edges ผ่าน `bulk_add_edges`, release build, n=3 ต่อฝั่ง
+ค่าที่รายงานคือมัธยฐาน:
+
+| สถานะ | us/edge | edges/sec | ทั้งสามรอบ |
+|---|---|---|---|
+| ก่อน (node-only) | **91** | ~11,000 | 87.6 · 100.3 · 91.1 |
+| หลัง ไม่มี secondary index | 142 | ~7,040 | 134.1 · 177.1 · 142.0 |
+| หลัง + 2 index (ที่เลือก) | **240** | ~4,160 | 240.5 · 252.2 · 225.3 |
+
+**2.6× ไม่ใช่ 4×** — เลข 4× ที่เห็นตอนแรกมาจากรันเดียวต่อฝั่ง และฐานที่ใช้บังเอิญ
+เป็นค่าเร็วสุดของการกระจาย ต้อง n=3 ถึงเห็น
+
+แยกส่วนได้ว่า **index แพงกว่าตัว INSERT**: +51 us เป็นตัว INSERT เอง (91→142)
+และ +98 us เป็น secondary index สองตัว (142→240) เลือกเก็บ index ไว้เพราะ
+projection นี้มีไว้เพื่อ query — ตัดทิ้งคือบั่นทอนเหตุผลที่มันมีอยู่
+
+สมมติฐานสองข้อที่ **ผิด** และวัดจนตกไป (บันทึกไว้กันคนถัดไปเดินซ้ำ):
+`prepare_cached` ไม่ช่วยเลย (225-252 us เท่าเดิม) และไม่มี fsync ต่อ edge เพราะ
+`execute_batch` เขียนทั้ง chunk ใน transaction เดียวอยู่แล้ว
+
+**ผลกระทบต่อ use case จริง** ซึ่งเป็นหน่วยที่ถูกกว่าอัตราส่วน:
+
+- rebuild ฐาน RAG (15,393 edges): 1.40 s → 3.69 s = **+2.3 วินาที** บน pipeline
+  ที่ embed 4,701 nodes ด้วย bge-m3 อยู่แล้ว
+- เขียนทีละ edge (per-op path): path นั้น fsync ทุกครั้งที่ **58.8 ms/edge**
+  projection เพิ่ม ~149 us = **0.25%** มองไม่เห็น
+- **ดิสก์ วัดจากฐานจริง**: projection.sqlite 11.7 → 15.6 MB = **+3.9 MB (+33%)**
+  หรือ +2.4% ของทั้ง store (163 MB) เนื้อคอลัมน์ดิบ 2.64 MB ที่เหลือคือ
+  row overhead + index สามตัว
+- ที่จะเจ็บคือ bulk load หลักล้าน: 1M edges 91 s → 240 s
+
+**`snb-bulk-ingestion` เฝ้าเรื่องนี้ไม่ได้** — รันจริงแล้วยืนยันสองชั้น: มันไม่จับ
+เวลาเฟส edge เลย (พิมพ์แค่ `nodes/sec` แล้ว `Bulk Chain Linking Complete.`) และ
+ต่อให้จับเวลาทั้งโปรเซสจากข้างนอก 4,999 edges × 149 us = 747 ms ยังเล็กกว่า
+ความแกว่งของ wall time บน build เดียวกัน (2,316 ms, n=3) สามเท่า — signal/noise
+= 0.32 การเพิ่มจับเวลาเฟส edge ใน harness นั้นเป็นงานแยก
+
+- **backfill** ฐานที่มีอยู่แล้วมี edges ใน `edges.bin` แต่ไม่มีใน projection —
+  วัดจากฐานจริง: backfill 15,393 edges รวมกับการเปิดฐานทั้งหมด 6.6 วินาที
 - **WAL ยังเป็นเจ้าของความจริง** projection เป็น derived rebuildable ตามเดิม
   ข้อนี้ไม่เปลี่ยน และเป็นเหตุผลที่ backfill ทำได้อย่างปลอดภัย
 
@@ -168,10 +216,16 @@ log และ time-travel เห็น แต่ `neighbors` ซ่อนจา�
 - ไม่ทำ variable-length path ใน SQL — recursive CTE ทำได้แต่ช้ากว่า
   `TRAVERSE` มาก ไม่ใช่เป้าหมายของงานนี้
 
-## 8. คำถามที่ต้องการคำตอบก่อนเริ่ม
+## 8. คำถามก่อนเริ่ม และคำตอบที่ได้
 
-1. §3.1 ไม่ทำเลยดีกว่าไหม — ช่องว่างจริงคือการผสม traversal กับ aggregation
-   ในคำสั่งเดียว คุ้มกับ write amplification + ขนาดหรือเปล่า
-2. bitemporal เอาแบบ (ก) ตาราง + `edges_current` view ไหม
-3. u128 key เก็บเป็นอะไร — หรือใช้ `id` เป็น PK ไปเลย (§4.1)
-4. ต้องวัดขนาดกับ ingestion ก่อนตัดสินใจ หรืออนุมัติให้ลงมือแล้ววัดระหว่างทาง
+1. **ทำ** — ตัดสินใจ 2026-08-31 ช่องว่างคือการผสม traversal กับ aggregation
+   ในคำสั่งเดียว และมันคุ้ม: ต้นทุนจริงบนงานที่ใช้อยู่คือ +2.3 วินาที กับ +3.9 MB
+   (§5) แลกกับรายงานที่เดิมเขียนไม่ได้เลย พิสูจน์ทันทีหลัง merge — matrix query
+   ที่วินิจฉัยโครงสร้าง catalog ทั้งชุดรันใน 64 ms
+2. **(ก)** ตาราง `edges` เก็บครบ + view `edges_current` ตามที่เสนอ
+   `edges_current_agrees_with_the_graph_api` เป็นเทสต์ที่รับน้ำหนักของข้อนี้
+3. **ใช้ `id` เป็น PK** เพราะ `edge_key` derive จาก `id` เสมอและไม่เคยถูกเก็บ
+   (`trunc128(SHA256(id))`) — `id` คือ identity อยู่แล้ว เก็บ hash ซ้ำคือการ
+   สะกดข้อเท็จจริงเดิมด้วยวิธีที่อ่อนกว่า และ SQLite ไม่มีชนิดที่กว้างพอ
+4. **วัดก่อน merge** ตัวเลขทั้งหมดอยู่ใน §5 รวมถึงข้อที่วัดแล้วพบว่า
+   `snb-bulk-ingestion` เฝ้าเรื่องนี้ไม่ได้

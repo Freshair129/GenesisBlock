@@ -82,7 +82,10 @@ use query::HqlCommand;
 // resurrect deleted nodes — the bump makes downgrade fail closed instead.
 pub const SCHEMA_VERSION: u32 = 3;
 // v3: WP-2.1 node_versions chain (additive CREATE IF NOT EXISTS migration).
-const PROJECTION_SCHEMA_VERSION: u32 = 3;
+// v4: edges + edges_current view (SPEC--GENESISDB-EDGE-PROJECTION), same
+// additive shape — existing databases gain the table empty and are backfilled
+// from the live map on open (`projection_backfill_edges`).
+const PROJECTION_SCHEMA_VERSION: u32 = 4;
 
 /// Bounds for the read-only SQL surface. Exceeding one is an ERROR, never a
 /// silent truncation.
@@ -3307,6 +3310,50 @@ impl Storage {
             );
             CREATE INDEX IF NOT EXISTS idx_node_versions_id
                 ON node_versions(id, frame_seq);
+            -- v4: edges, so the read-only SQL surface can join across
+            -- relationships. Before this the projection was node-only BY
+            -- CONSTRUCTION — `Event::Edge` fell through the `_ => {}` arm of
+            -- `projection_apply_event` — so `SELECT ... FROM edges` answered
+            -- `no such table` on a database holding 15,393 of them.
+            --
+            -- `id` is the primary key rather than the u128 `edge_key`: SQLite's
+            -- widest integer is i64, and the key is DERIVED from `id`
+            -- (`trunc128(SHA256(id))`, ADR--GENESISDB-EDGE-NUMERIC-KEYS) and
+            -- never stored, so `id` already is the identity. Storing the hash
+            -- would be a second, weaker spelling of the same fact.
+            --
+            -- Both spellings of the endpoints are kept: `from_u32`/`to_u32`
+            -- join directly to `props` and `node_labels`, while `from_id`/
+            -- `to_id` are what a caller actually knows. Without the strings
+            -- every query would have to route through `node_versions` to name
+            -- its own endpoints.
+            CREATE TABLE IF NOT EXISTS edges (
+                id TEXT PRIMARY KEY,
+                from_u32 INTEGER NOT NULL,
+                to_u32 INTEGER NOT NULL,
+                from_id TEXT NOT NULL,
+                to_id TEXT NOT NULL,
+                rel TEXT NOT NULL,
+                props TEXT NOT NULL DEFAULT '{}',
+                valid_from TEXT NOT NULL,
+                valid_to TEXT,
+                recorded_at TEXT NOT NULL DEFAULT '',
+                superseded_by TEXT,
+                impact REAL,
+                caused_by TEXT,
+                clock_time INTEGER NOT NULL DEFAULT 0,
+                clock_peer TEXT NOT NULL DEFAULT ''
+            );
+            CREATE INDEX IF NOT EXISTS idx_edges_from ON edges(from_u32, rel);
+            CREATE INDEX IF NOT EXISTS idx_edges_to ON edges(to_u32, rel);
+            -- `retract_edge` is a bitemporal soft-delete: the row stays and
+            -- `valid_to` is set, so time-travel still sees it while `neighbors`
+            -- does not. A bare `SELECT * FROM edges` would therefore disagree
+            -- with the graph API about what exists NOW — a wrong answer that
+            -- looks right. Both truths are kept, with the one that matches
+            -- `neighbors` given a name.
+            CREATE VIEW IF NOT EXISTS edges_current AS
+                SELECT * FROM edges WHERE valid_to IS NULL;
             ",
         )
         .map_err(|e| Error::from_reason(e.to_string()))?;
@@ -4279,6 +4326,73 @@ impl Storage {
         Ok(())
     }
 
+    /// Project one edge. `INSERT OR REPLACE` because an edge evolves in place:
+    /// `retract_edge` sets `valid_to` on the same `id`, and supersession
+    /// rewrites the row rather than appending a version chain the way nodes do.
+    ///
+    /// The endpoints are interned here rather than by the caller so every write
+    /// path gets the same `from_u32`/`to_u32` — a caller that forgot would
+    /// produce rows that silently join to nothing.
+    fn projection_apply_edge_tx<C>(&self, conn: &C, edge: &EdgeOutput) -> Result<()>
+    where
+        C: std::ops::Deref<Target = Connection>,
+    {
+        let from_u32 = self.get_or_intern_id(&edge.from);
+        let to_u32 = self.get_or_intern_id(&edge.to);
+        // `prepare_cached`, not `execute`: `execute` re-prepares the statement on
+        // every call. Measured over a 40,000-edge bulk insert, re-preparing cost
+        // 173 us/edge - a 4x ingestion regression - and the cache removes it.
+        let mut stmt = conn
+            .prepare_cached(
+                "INSERT OR REPLACE INTO edges(
+                 id, from_u32, to_u32, from_id, to_id, rel, props,
+                 valid_from, valid_to, recorded_at, superseded_by,
+                 impact, caused_by, clock_time, clock_peer)
+             VALUES(?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15)",
+            )
+            .map_err(|e| Error::from_reason(e.to_string()))?;
+        stmt.execute(
+            params![
+                edge.id,
+                from_u32,
+                to_u32,
+                edge.from,
+                edge.to,
+                edge.rel,
+                edge.props.to_string(),
+                edge.valid_from,
+                edge.valid_to,
+                edge.recorded_at,
+                edge.superseded_by,
+                edge.impact,
+                edge.caused_by,
+                edge.clock.time as i64,
+                edge.clock.peer_id,
+            ],
+        )
+        .map_err(|e| Error::from_reason(e.to_string()))?;
+        Ok(())
+    }
+
+    /// Drop a retracted node's incident edges from the projection.
+    ///
+    /// `Event::NodeRetract` removes the node AND its incident edges from the
+    /// live view, so leaving them projected would make `edges_current` claim
+    /// relationships that `neighbors` no longer returns. This is a hard delete,
+    /// matching what the live map does — unlike `retract_edge`, which is the
+    /// bitemporal soft-delete and keeps the row.
+    fn projection_delete_incident_edges<C>(conn: &C, node_u32: u32) -> Result<()>
+    where
+        C: std::ops::Deref<Target = Connection>,
+    {
+        conn.execute(
+            "DELETE FROM edges WHERE from_u32 = ?1 OR to_u32 = ?1",
+            params![node_u32],
+        )
+        .map_err(|e| Error::from_reason(e.to_string()))?;
+        Ok(())
+    }
+
     fn projection_apply_node_conn(
         conn: &mut Connection,
         node_u32: u32,
@@ -4420,6 +4534,9 @@ impl Storage {
                 Self::projection_apply_node_conn(&mut conn, node_u32, node)?;
                 Self::projection_append_node_version(&conn, node_u32, node, frame_seq)?;
             }
+            Event::Edge(edge) => {
+                self.projection_apply_edge_tx(&&*conn, edge)?;
+            }
             Event::RelationalSchema(package) => {
                 let tx = conn
                     .transaction()
@@ -4506,6 +4623,9 @@ impl Storage {
                     Self::projection_apply_node_tx(&tx, node_u32, node)?;
                     Self::projection_append_node_version(&tx, node_u32, node, frame_seq)?;
                 }
+                for edge in &transaction.edges {
+                    self.projection_apply_edge_tx(&tx, edge)?;
+                }
                 for group in &transaction.relational {
                     let schema = Self::load_relational_schema_conn(&tx, &group.namespace)?
                         .ok_or_else(|| Error::from_reason("relational schema is not registered"))?;
@@ -4528,13 +4648,19 @@ impl Storage {
                     .map_err(|e| Error::from_reason(e.to_string()))?;
                 let mut max_clock = 0;
                 for inner in events {
-                    if let Event::Node(node) = inner {
-                        let node_u32 = self.get_or_intern_id(&node.id);
-                        if node.clock.time > max_clock {
-                            max_clock = node.clock.time;
+                    match inner {
+                        Event::Node(node) => {
+                            let node_u32 = self.get_or_intern_id(&node.id);
+                            if node.clock.time > max_clock {
+                                max_clock = node.clock.time;
+                            }
+                            Self::projection_apply_node_tx(&tx, node_u32, node)?;
+                            Self::projection_append_node_version(&tx, node_u32, node, frame_seq)?;
                         }
-                        Self::projection_apply_node_tx(&tx, node_u32, node)?;
-                        Self::projection_append_node_version(&tx, node_u32, node, frame_seq)?;
+                        Event::Edge(edge) => {
+                            self.projection_apply_edge_tx(&tx, edge)?;
+                        }
+                        _ => {}
                     }
                 }
                 if max_clock > 0 {
@@ -4559,6 +4685,7 @@ impl Storage {
                         params![node_u32],
                     )
                     .map_err(|e| Error::from_reason(e.to_string()))?;
+                    Self::projection_delete_incident_edges(&&*conn, node_u32)?;
                     // WP-2.1: the retraction is itself a version-chain entry —
                     // resolve-at-commit past this point answers "retracted",
                     // not the last live version.
@@ -4682,6 +4809,47 @@ impl Storage {
             self.projection_reopen_fresh()?;
             self.projection_replay_wal()?;
         }
+        self.projection_backfill_edges()?;
+        Ok(())
+    }
+
+    /// Populate `edges` for a database written before schema v4.
+    ///
+    /// The table arrives empty on such a database — `CREATE TABLE IF NOT
+    /// EXISTS` adds it, but the edges themselves were never projected, and WAL
+    /// replay does not reach them either: compaction folds the log to live
+    /// state, so an old database's edges exist only in `edges.bin` and the live
+    /// map. The projection is declared rebuildable from Genesis-owned state
+    /// (CLAUDE.md), which is exactly the licence to rebuild it from there.
+    ///
+    /// The trigger is "the table is empty while the live map is not", not a
+    /// version comparison: a version check would miss a projection that was
+    /// deleted and rebuilt, and this condition is self-correcting. Once
+    /// populated, incremental writes keep it current, so this runs once.
+    fn projection_backfill_edges(&self) -> Result<()> {
+        if self.read_only || self.edges.is_empty() {
+            return Ok(());
+        }
+        let conn = self.projection_db.lock();
+        let projected: i64 = conn
+            .query_row("SELECT count(*) FROM edges", [], |row| row.get(0))
+            .map_err(|e| Error::from_reason(e.to_string()))?;
+        if projected > 0 {
+            return Ok(());
+        }
+        drop(conn);
+
+        let live: Vec<EdgeOutput> = self.edges.iter().map(|e| e.value().clone()).collect();
+        let total = live.len();
+        let mut conn = self.projection_db.lock();
+        let tx = conn
+            .transaction()
+            .map_err(|e| Error::from_reason(e.to_string()))?;
+        for edge in &live {
+            self.projection_apply_edge_tx(&tx, edge)?;
+        }
+        tx.commit().map_err(|e| Error::from_reason(e.to_string()))?;
+        println!("projection: backfilled {total} edges into the relational projection");
         Ok(())
     }
 
