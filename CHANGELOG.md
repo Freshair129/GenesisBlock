@@ -70,6 +70,24 @@ class of exposure, and the surface reads the whole projection with no
 per-caller separation; `napi_rest_parity_tests` carries that as a documented
 `None` entry rather than an omission.
 
+### Documented - the SQL surface cannot see edges
+
+Measured on the same real store: the engine loads 15,393 edges and the SQL
+surface can reach exactly none of them. `SELECT ... FROM edges` answers `no such
+table`, because the projection is node-only by construction — `props`,
+`node_labels`, `node_versions` and the bookkeeping tables, with no edge write
+path anywhere in `src/lib.rs`.
+
+So a report that joins across relationships cannot be written at all — not
+slowly, not awkwardly. For a catalog shaped SKU → Variant → Offer that is most
+reports, which means the motivation in the surface's own spec ("reporting work
+had to leave the engine") is still half true. Stated in
+`SPEC--GENESISDB-READONLY-SQL-SURFACE` §8 rather than left for someone to
+discover, and `SPEC--GENESISDB-EDGE-PROJECTION` proposes the fix — including
+"do nothing" as a serious option, since the graph API already answers graph
+questions and the real gap is narrower than it looks: combining traversal with
+aggregation in one statement.
+
 ### Added - schema introspection through the read-only SQL surface
 
 Running the surface against a real 4,701-node RAG store turned up a gap the
