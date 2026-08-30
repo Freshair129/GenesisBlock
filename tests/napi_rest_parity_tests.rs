@@ -69,6 +69,13 @@ const NAPI_TO_REST: &[(&str, Option<&str>)] = &[
     ("apply_relational_rows", None),
     // Compatibility-only embedded API; REST intentionally permits named queries only.
     ("query_relational", None),
+    // Deliberately in-process only, for now. Network-reachable SQL is a
+    // different class of exposure from an embedded call: the surface can read
+    // the whole projection, including every node's props, with no per-caller
+    // separation (SPEC--GENESISDB-READONLY-SQL-SURFACE §5, §8). Exposing it
+    // over REST is a separate decision to take once the embedded surface has
+    // been used in anger, not a step to skip quietly.
+    ("query_sql", None),
     ("execute_named_query", Some("/v1/relational/query")),
     ("commit_transaction", Some("/v1/transaction/commit")),
     ("stable_frontier", Some("/v1/frontier")),
@@ -400,5 +407,312 @@ fn every_none_entry_has_a_justifying_comment() {
         unjustified.is_empty(),
         "NAPI_TO_REST line(s) map to None without a `//` justification \
          comment (inline or on the preceding line): {unjustified:?}"
+    );
+}
+
+// ---------------------------------------------------------------------------
+// NAPI <-> index.d.ts parity.
+//
+// `index.d.ts` and `index.js` are napi-generated but COMMITTED, so a fresh
+// clone and every registry consumer can `require()` the package before any
+// local build. `.gitignore` says in as many words that they must be kept in
+// sync with src/lib.rs by hand, and nothing enforced it: PR #160 added
+// `#[napi] pub async fn query_sql` and very nearly shipped without `querySql`
+// in the declarations, which would have left a TypeScript consumer of the
+// published package unable to see that the method exists. It was caught by
+// reading the file, which is not a mechanism.
+//
+// Why this is a source-text test and not a "regenerate and diff" CI job, which
+// is the obvious shape and the one the C header gate uses:
+//
+//   index.d.ts is NOT purely generated. `QueryIrRequest`, `QueryIrResponse`,
+//   `QueryIrCapabilities` and friends are hand-written interfaces, and
+//   `executeQueryIr` / `queryIrCapabilities` carry hand-written signatures that
+//   refer to them. napi cannot generate any of it: the Rust types are plain
+//   serde structs (`QueryIrOperation` is an enum with struct variants, which
+//   `#[napi(object)]` cannot express), and the NAPI methods take and return
+//   `serde_json::Value`, which napi renders as `any`. A regenerate-and-diff
+//   gate would therefore go red on a CLEAN tree, and the way to make it green
+//   would be to commit a regeneration that DELETES those declarations - turning
+//   a freshness gate into the cause of the drift it exists to catch.
+//
+// So this compares NAMES, in both directions, and deliberately says nothing
+// about signatures. What it catches: a NAPI method, top-level function or
+// `#[napi(object)]` struct that is not declared, and a declaration left behind
+// for something that no longer exists. What it does NOT catch, stated plainly
+// rather than left to be discovered: a signature that drifts while the name
+// stays - a parameter added, a type changed. Closing that gap means generating,
+// and generating stays unsafe until the QueryIr declarations are either emitted
+// by napi or moved out of the generated file.
+// ---------------------------------------------------------------------------
+
+fn read_index_dts() -> String {
+    fs::read_to_string(concat!(env!("CARGO_MANIFEST_DIR"), "/index.d.ts"))
+        .expect("failed to read index.d.ts")
+}
+
+/// napi's default JS name for a Rust item: `add_node` -> `addNode`.
+fn to_camel_case(snake: &str) -> String {
+    let mut out = String::with_capacity(snake.len());
+    let mut upper_next = false;
+    for c in snake.chars() {
+        if c == '_' {
+            upper_next = true;
+        } else if upper_next {
+            out.extend(c.to_uppercase());
+            upper_next = false;
+        } else {
+            out.push(c);
+        }
+    }
+    out
+}
+
+/// The body of `export declare class GenesisDatabase { ... }`.
+fn dts_class_body(dts: &str) -> &str {
+    let marker = "export declare class GenesisDatabase {";
+    let start = dts
+        .find(marker)
+        .expect("`export declare class GenesisDatabase {` not found in index.d.ts")
+        + marker.len();
+    let end = dts[start..]
+        .find("\n}")
+        .map(|i| start + i)
+        .expect("GenesisDatabase class block never closed in index.d.ts");
+    &dts[start..end]
+}
+
+/// Method names declared on the class. Members are two-space indented; doc
+/// comment lines and blank lines are skipped.
+fn dts_declared_methods(dts: &str) -> HashSet<String> {
+    let mut names = HashSet::new();
+    for line in dts_class_body(dts).lines() {
+        let Some(rest) = line.strip_prefix("  ") else {
+            continue;
+        };
+        if rest.starts_with(' ') || rest.starts_with('*') || rest.starts_with('/') {
+            continue;
+        }
+        // `static open(opts: OpenOptions): GenesisDatabase` -> `open`
+        let rest = rest.strip_prefix("static ").unwrap_or(rest);
+        let name: String = rest
+            .chars()
+            .take_while(|c| c.is_alphanumeric() || *c == '_')
+            .collect();
+        if !name.is_empty() && rest[name.len()..].starts_with('(') {
+            names.insert(name);
+        }
+    }
+    names
+}
+
+/// Names declared as `export declare function <name>(`.
+fn dts_declared_functions(dts: &str) -> HashSet<String> {
+    dts.lines()
+        .filter_map(|line| {
+            let rest = line.strip_prefix("export declare function ")?;
+            let name: String = rest
+                .chars()
+                .take_while(|c| c.is_alphanumeric() || *c == '_')
+                .collect();
+            (!name.is_empty()).then_some(name)
+        })
+        .collect()
+}
+
+/// Names declared as `export interface <name> {`.
+fn dts_declared_interfaces(dts: &str) -> HashSet<String> {
+    dts.lines()
+        .filter_map(|line| {
+            let rest = line.strip_prefix("export interface ")?;
+            let name: String = rest
+                .chars()
+                .take_while(|c| c.is_alphanumeric() || *c == '_')
+                .collect();
+            (!name.is_empty()).then_some(name)
+        })
+        .collect()
+}
+
+/// Every `#[napi]` free function in src/lib.rs - one whose attribute sits at
+/// column 0, outside any impl block.
+fn extract_napi_free_functions(src: &str) -> Vec<String> {
+    let mut names = Vec::new();
+    let mut pending = false;
+    for line in src.lines() {
+        if line.starts_with("#[napi") {
+            pending = true;
+            continue;
+        }
+        if pending {
+            if line.starts_with("pub fn ") || line.starts_with("pub async fn ") {
+                if let Some(name) = extract_fn_name(line) {
+                    names.push(name);
+                }
+            }
+            pending = false;
+        }
+    }
+    names
+}
+
+/// Struct names carrying `#[napi(object)]`, however that attribute is gated -
+/// they are written `#[cfg_attr(feature = "napi-bindings", napi(object))]` here
+/// so the core still builds with the bindings off.
+fn extract_napi_object_structs(src: &str) -> Vec<String> {
+    let mut names = Vec::new();
+    let mut pending = false;
+    for line in src.lines() {
+        let trimmed = line.trim();
+        if trimmed.contains("napi(object)") {
+            pending = true;
+            continue;
+        }
+        if trimmed.starts_with("#[") || trimmed.starts_with("//") || trimmed.is_empty() {
+            continue;
+        }
+        if pending {
+            if let Some(rest) = trimmed.strip_prefix("pub struct ") {
+                let name: String = rest
+                    .chars()
+                    .take_while(|c| c.is_alphanumeric() || *c == '_')
+                    .collect();
+                if !name.is_empty() {
+                    names.push(name);
+                }
+            }
+            pending = false;
+        }
+    }
+    names
+}
+
+// Sanity first: if any extractor silently returns nothing, every assertion
+// below passes vacuously and the gate is decoration.
+#[test]
+fn dts_extraction_sanity() {
+    let dts = read_index_dts();
+    let lib = read_lib_rs();
+
+    let methods = dts_declared_methods(&dts);
+    let functions = dts_declared_functions(&dts);
+    let interfaces = dts_declared_interfaces(&dts);
+    let structs = extract_napi_object_structs(&lib);
+    let free = extract_napi_free_functions(&lib);
+
+    assert!(
+        methods.len() > 40,
+        "expected the GenesisDatabase class to declare many methods, found {}: {methods:?}",
+        methods.len()
+    );
+    for known in ["open", "addNode", "executeHql", "queryRelational"] {
+        assert!(methods.contains(known), "class parsing missed {known:?}");
+    }
+    for known in ["engineNameSync", "versionSync"] {
+        assert!(
+            functions.contains(known),
+            "function parsing missed {known:?}"
+        );
+    }
+    for known in ["NodeInput", "EdgeOutput", "OpenOptions"] {
+        assert!(
+            interfaces.contains(known),
+            "interface parsing missed {known:?}"
+        );
+    }
+    for known in ["NodeInput", "OpenOptions"] {
+        assert!(
+            structs.iter().any(|s| s == known),
+            "napi(object) struct parsing missed {known:?}; found: {structs:?}"
+        );
+    }
+    assert!(
+        free.iter().any(|f| f == "version_sync"),
+        "free-function parsing missed version_sync; found: {free:?}"
+    );
+
+    assert_eq!(
+        to_camel_case("query_sql"),
+        "querySql",
+        "camelCase conversion is what maps Rust names onto declared ones"
+    );
+    assert_eq!(to_camel_case("open"), "open");
+}
+
+#[test]
+fn every_napi_method_is_declared_in_index_dts() {
+    let dts = read_index_dts();
+    let declared = dts_declared_methods(&dts);
+
+    let missing: Vec<String> = extracted_napi_methods()
+        .iter()
+        .map(|m| to_camel_case(m))
+        .filter(|m| !declared.contains(m))
+        .collect();
+
+    assert!(
+        missing.is_empty(),
+        "NAPI method(s) on GenesisDatabase with no declaration in index.d.ts: {missing:?}. \
+         Consumers of the published package would not see these methods exist. Add them by \
+         hand - do NOT regenerate index.d.ts, which deletes the hand-written QueryIr* \
+         declarations (see the note above this test)."
+    );
+}
+
+#[test]
+fn every_declared_method_still_exists_in_the_rust_source() {
+    let dts = read_index_dts();
+    let live: HashSet<String> = extracted_napi_methods()
+        .iter()
+        .map(|m| to_camel_case(m))
+        .collect();
+
+    let stale: Vec<String> = dts_declared_methods(&dts)
+        .into_iter()
+        .filter(|m| !live.contains(m))
+        .collect();
+
+    assert!(
+        stale.is_empty(),
+        "index.d.ts declares method(s) that no longer exist as `#[napi]` on \
+         GenesisDatabase: {stale:?}. A declaration for a method that is gone is exactly \
+         the runtime TypeError the type checker promises cannot happen."
+    );
+}
+
+#[test]
+fn every_napi_free_function_is_declared_in_index_dts() {
+    let dts = read_index_dts();
+    let declared = dts_declared_functions(&dts);
+    let lib = read_lib_rs();
+
+    let missing: Vec<String> = extract_napi_free_functions(&lib)
+        .iter()
+        .map(|f| to_camel_case(f))
+        .filter(|f| !declared.contains(f))
+        .collect();
+
+    assert!(
+        missing.is_empty(),
+        "`#[napi]` free function(s) with no declaration in index.d.ts: {missing:?}"
+    );
+}
+
+#[test]
+fn every_napi_object_struct_is_declared_in_index_dts() {
+    let dts = read_index_dts();
+    let declared = dts_declared_interfaces(&dts);
+    let lib = read_lib_rs();
+
+    let missing: Vec<String> = extract_napi_object_structs(&lib)
+        .into_iter()
+        .filter(|s| !declared.contains(s))
+        .collect();
+
+    assert!(
+        missing.is_empty(),
+        "`#[napi(object)]` struct(s) with no `export interface` in index.d.ts: {missing:?}. \
+         A method signature mentioning one of these would reference a type the consumer's \
+         compiler cannot resolve."
     );
 }

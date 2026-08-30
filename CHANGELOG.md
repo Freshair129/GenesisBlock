@@ -5,6 +5,71 @@ All notable changes to GenesisBlockDB are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added - read-only SQL over the relational projection
+
+`Storage::query_sql` and the `querySql` NAPI method run caller-supplied SELECT
+against `projection.sqlite`. Sanctioned by
+`ADR--GENESISDB-EMBEDDED-SQLITE-SUBSTRATE` §2.2 rule 5; designed in
+`SPEC--GENESISDB-READONLY-SQL-SURFACE`.
+
+The relational IR could not express `>`, `LIKE`, `IN`, `OR`, `GROUP BY`,
+`ORDER BY` or a subquery - `RelationalFilter` has two fields and one
+constructor, `equal` - so reporting work had to leave the engine, which is how
+dual-write starts. SQLite could already do all of it; what was missing was a
+way to ask.
+
+Read-only is enforced in four places, not by inspecting the SQL text:
+
+- a **separate** `SQLITE_OPEN_READ_ONLY` connection, so SQLite refuses writes
+  itself and correctness does not depend on this code telling SELECT from
+  INSERT. The shared writable connection is not reused: an authorizer or limit
+  left on it would change how the engine's own writes behave.
+- an **allow-list** authorizer - anything not positively recognised as a read
+  is denied, including action variants SQLite may add later. A deny-list would
+  be blind to whatever it did not enumerate.
+- `SQLITE_LIMIT_ATTACHED = 0`, so ATTACH cannot reach another file.
+- a progress handler that interrupts past a 5s deadline, because a read-only
+  query can still burn a core forever.
+
+Over the row cap (10,000) or byte budget is an **error**, never a silent
+truncation: a result cut without saying so is a wrong answer that looks right.
+
+Two further rejections exist for a reason other than safety, both found by
+measuring the finished implementation rather than by reading it. SQLite compiles
+only the **first** statement of its input and silently drops the rest, so
+`SELECT ...; DROP TABLE ...` returned the SELECT's rows and an `Ok` (the DROP
+provably never ran - the table was still there afterwards). And two result
+columns sharing a name collapse into one JSON key: `SELECT id, price AS id`
+returned `{"id": <the price>}` - not a field the caller notices missing, but the
+wrong value under an expected name. Neither could write anything; both answered
+`Ok` to a question that was only half asked, which is the same class of
+wrong-answer-that-looks-right as a silently truncated result set, so both get the
+same treatment. The multi-statement check is a scanner rather than a parser, and
+its failure modes are bounded in one direction: over-reading rejects a legitimate
+query out loud, while under-reading lands back on SQLite's own behaviour, which
+is already safe. Tests cover the cases that must *not* be rejected too - a `;`
+inside a string, a comment, a quoted identifier, and Thai text, the last of which
+pins the byte scan against multi-byte UTF-8.
+
+Nine tests, each proven by execution, and every guard was proven to FAIL by
+planting the defect rather than by reading the code. Disabling the authorizer
+turns two of them red - and doing that exposed a test that would otherwise have
+passed for the wrong reason: with the authorizer gone, an `INSERT` written with
+placeholders was rejected for having the wrong parameter count, not for being
+a write. The cases now assert *why* a statement was refused, and
+`a_read_only_pragma_is_denied_by_the_authorizer_alone` exists specifically
+because every other case is also caught by the read-only connection or the
+attach limit, so none of them can detect the authorizer going missing. Removing
+the multi-statement and duplicate-column checks turns their two tests red as
+well.
+
+Deliberately **not** exposed over REST. Network-reachable SQL is a different
+class of exposure, and the surface reads the whole projection with no
+per-caller separation; `napi_rest_parity_tests` carries that as a documented
+`None` entry rather than an omission.
+
 ## [0.2.5] - 2026-08-29
 
 ### Fixed - the Android SDK is on Maven Central, and a release can now ship it

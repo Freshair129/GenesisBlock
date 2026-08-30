@@ -104,7 +104,29 @@ jobs:
       # --ignore-scripts so `prepare` doesn't double-build; we build explicitly.
       - name: Install deps (no build)
         run: npm ci --ignore-scripts
+      # `napi build` REWRITES index.d.ts / index.js in place. Both are committed
+      # (a fresh clone and every registry consumer must be able to require() the
+      # package before any local build), so keep the committed copies aside now —
+      # after the build they are gone.
+      #
+      # ubuntu only, matching the check below that consumes the snapshot. Running
+      # it on all three hosts is not just waste: the default shell on
+      # windows-latest is pwsh, where `cp a b dir/` is a hard error.
+      - name: Snapshot the committed napi artifacts
+        if: matrix.host == 'ubuntu-latest'
+        run: |
+          mkdir -p .dts-committed
+          cp index.d.ts index.js .dts-committed/
       - name: Build native addon
         run: npm run build
+      # One host, because the committed files must match ONE canonical generator
+      # output and comparing three would turn any per-platform generation
+      # difference into three red jobs. That also means a platform-specific
+      # difference in what napi emits is NOT covered here — index.js enumerates
+      # every target from package.json rather than the build host, so it is not
+      # expected to vary, but that is reasoning, not a measurement.
+      - name: index.d.ts / index.js freshness
+        if: matrix.host == 'ubuntu-latest'
+        run: node scripts/check-dts-freshness.mjs .dts-committed .
       - name: npm test
         run: npm test
