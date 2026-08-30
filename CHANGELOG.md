@@ -70,6 +70,43 @@ class of exposure, and the surface reads the whole projection with no
 per-caller separation; `napi_rest_parity_tests` carries that as a documented
 `None` entry rather than an omission.
 
+### Added - schema introspection through the read-only SQL surface
+
+Running the surface against a real 4,701-node RAG store turned up a gap the
+tests could not: `pragma_table_info` was denied, so a surface whose stated
+purpose includes diagnostics could not describe its own tables. Callers were
+left reading `sqlite_master.sql` and parsing DDL text.
+
+Seven pragma names are now allowed - `table_info`, `table_xinfo`, `table_list`,
+`index_list`, `index_info`, `index_xinfo`, `foreign_key_list` - reachable both
+as `PRAGMA table_info(t)` and as `SELECT ... FROM pragma_table_info('t')`.
+
+The discriminator is the pragma NAME, and the reason it cannot be anything else
+was measured rather than reasoned about. The intuitive rule - a bare pragma
+reads, a `= value` pragma writes - is wrong in **both** directions at once:
+
+    SELECT * FROM pragma_table_info('props')  ->  name=table_info    value=Some("props")
+    PRAGMA journal_mode = DELETE              ->  name=journal_mode  value=Some("DELETE")
+    PRAGMA optimize                           ->  name=optimize      value=None
+
+The table-valued form passes its target table in the very slot a setter uses for
+its new value, so "has a value" would deny exactly the introspection this exists
+to permit - while `PRAGMA optimize`, carrying no value at all, runs ANALYZE and
+writes. Implementing that rule and running the tests turns **three** of them red,
+which is what the claim rests on rather than the argument above: introspection
+denied, the authorizer sentinel silently allowed, and `PRAGMA optimize` allowed.
+Emptying the allow-list instead turns one red.
+
+Every allowed name has no writing form in either syntax. Read-only pragmas that
+are not schema introspection stay denied: `compile_options`, and `database_list`
+which also discloses file paths. The authorizer sentinel moves from `PRAGMA
+table_list` (now allowed) to `PRAGMA compile_options`, keeping its property of
+being catchable by no layer other than the authorizer itself.
+
+The statement and function forms are indistinguishable to the authorizer - same
+name, same value - so allowing one allows the other. That is stated in the code
+and asserted in a test rather than left as an implicit consequence.
+
 ## [0.2.5] - 2026-08-29
 
 ### Fixed - the Android SDK is on Maven Central, and a release can now ship it

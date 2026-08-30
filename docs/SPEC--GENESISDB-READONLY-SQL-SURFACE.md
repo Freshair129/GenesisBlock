@@ -68,7 +68,7 @@ aggregation (count, future group-by)" และตั้งใจให้ HQL c
 | ชั้น | กลไก | ยืนยัน |
 |---|---|---|
 | 1. connection | `OpenFlags::SQLITE_OPEN_READ_ONLY` แยก connection ต่างหาก | `open_projection()` มีอยู่แล้ว `src/lib.rs:3189` |
-| 2. authorizer | `Connection::authorizer()` ปฏิเสธทุก action ที่ไม่ใช่การอ่าน | `hooks/mod.rs:405` |
+| 2. authorizer | `Connection::authorizer()` ปฏิเสธทุก action ที่ไม่ใช่การอ่าน + allow-list ของ pragma introspection (§4.1) | `hooks/mod.rs:405` |
 | 3. limits | `set_limit(Limit::SQLITE_LIMIT_ATTACHED, 0)` ทำให้ ATTACH เป็นไปไม่ได้ | `limits.rs:62` |
 | 4. เวลา | `progress_handler()` + `InterruptHandle` ตัด query ที่เกินงบเวลา | `hooks/mod.rs:395`, `lib.rs:1011` |
 
@@ -79,13 +79,43 @@ feature ที่ต้องเปิดใน `Cargo.toml`: `rusqlite = { feat
 "hooks", "limits"] }` - ทั้ง `hooks` และ `limits` เป็น `[]` เปล่าใน rusqlite
 ไม่ดึง dependency เพิ่มเลย
 
+### 4.1 pragma introspection (เพิ่มหลังใช้งานจริง)
+
+ตอนลองกับฐาน RAG จริง (4,701 nodes) พบว่า `pragma_table_info` ถูกปฏิเสธ ทำให้
+ผิวที่อ้างตัวว่าเป็น diagnostics **บรรยายตารางของตัวเองไม่ได้** ต้องไปอ่าน
+`sqlite_master.sql` แล้ว parse ข้อความเอา
+
+`SQL_INTROSPECTION_PRAGMAS` จึงอนุญาต 7 ชื่อ: `table_info` `table_xinfo`
+`table_list` `index_list` `index_info` `index_xinfo` `foreign_key_list`
+
+**ตัวแยกคือ "ชื่อ" เท่านั้น ไม่ใช่ "มี value หรือไม่"** — ข้อนี้วัดจาก authorizer
+จริง ไม่ได้ใช้เหตุผล:
+
+    SELECT * FROM pragma_table_info('props')  ->  name=table_info    value=Some("props")
+    PRAGMA journal_mode = DELETE              ->  name=journal_mode  value=Some("DELETE")
+    PRAGMA optimize                           ->  name=optimize      value=None
+
+รูปแบบ table-valued function ส่ง "ชื่อตาราง" มาในช่องเดียวกับที่ setter ส่ง
+"ค่าใหม่" กฎ "ไม่มี value = อ่านอย่างเดียว" จึงผิด**สองทางพร้อมกัน**: ปฏิเสธ
+`table_info` ที่ต้องการอนุญาต และอนุญาต `PRAGMA optimize` ซึ่งรัน ANALYZE คือเขียน
+
+ทุกชื่อในรายการไม่มีรูปแบบที่เขียนได้เลย ส่วน pragma ที่อ่านอย่างเดียวแต่ไม่ใช่
+schema introspection ยังถูกปฏิเสธ — `compile_options` และ `database_list`
+(ซึ่งเปิดเผย path ของไฟล์ด้วย) `compile_options` คือตัวที่ sentinel test ใช้
+พิสูจน์ว่าชั้นที่ 2 ยังทำงาน
+
+หมายเหตุ: รูปแบบ statement (`PRAGMA table_info(x)`) กับรูปแบบ function
+(`pragma_table_info('x')`) มาถึง authorizer เหมือนกันทุกประการ **แยกไม่ได้**
+อนุญาตอันหนึ่งคืออนุญาตทั้งคู่ ยอมรับได้เพราะชื่อเหล่านี้เขียนไม่ได้ทั้งสองรูป
+
 ## 5. Threat model
 
 | ผู้เรียกลอง | สิ่งที่หยุด | ถ้าชั้นนั้นพัง |
 |---|---|---|
 | `INSERT` / `UPDATE` / `DELETE` / `DROP` | ชั้น 1 (SQLite ปฏิเสธ) | ชั้น 2 ปฏิเสธซ้ำ |
 | `ATTACH 'other.db'` | ชั้น 3 (limit = 0) | ชั้น 2 ปฏิเสธ action `Attach` |
-| `PRAGMA` ที่เปลี่ยนสถานะ | ชั้น 2 | ชั้น 1 กันเฉพาะที่เขียนจริง |
+| `PRAGMA` ที่เปลี่ยนสถานะ | ชั้น 2 (ไม่อยู่ใน allow-list §4.1) | ชั้น 1 กันเฉพาะที่เขียนจริง |
+| `PRAGMA optimize` (ไม่มี value แต่รัน ANALYZE) | ชั้น 2 — ชื่อไม่อยู่ใน allow-list | ชั้น 1 (เขียนจริง) |
 | cartesian join / recursive CTE ไม่รู้จบ | ชั้น 4 + row cap | ไม่มี - ต้องพึ่งชั้นนี้ |
 | อ่านตารางภายใน (`relational_schema_registry`) | **ไม่หยุด** | ยอมรับ: เป็น diagnostics surface |
 | SQL injection จากค่าที่ผู้ใช้ป้อน | bound parameters เท่านั้น ห้ามต่อสตริง | - |
@@ -131,6 +161,20 @@ feature ที่ต้องเปิดใน `Cargo.toml`: `rusqlite = { feat
     ใต้ชื่อของคอลัมน์แรก** ไม่ใช่แค่ field หาย แต่เป็นค่าผิดใต้ชื่อที่ถูก
 11. input ที่ไม่มี statement (ว่าง / มีแต่ comment / `;` เปล่า) — เดิมล้มอยู่แล้ว
     แต่ด้วยข้อความ `not an error` ของ SQLite ตอนนี้บอกเหตุผลตรง ๆ
+
+**เพิ่มหลังลองกับฐาน RAG จริง (§4.1):**
+
+12. pragma introspection ทำงานทั้งสองรูปแบบ และคืน **คอลัมน์จริง** ไม่ใช่ผลว่าง
+    (ผลว่างจะทำให้เทสต์ผ่านด้วยเหตุผลที่ผิด)
+13. `PRAGMA optimize` / `writable_schema` / `journal_mode = ...` /
+    `database_list` ยังถูกปฏิเสธ และฐานไม่เปลี่ยน — ข้อนี้คือตัวที่กัน
+    ไม่ให้ใครสรุปกฎ "ไม่มี value = ปลอดภัย" ขึ้นมาใหม่
+14. sentinel ย้ายจาก `PRAGMA table_list` (อนุญาตแล้ว) ไปเป็น `compile_options`
+
+การปลูกจุดบกพร่องรอบนี้ให้ผลที่อ่านออกได้ทันที: เปลี่ยนไปใช้กฎ
+`pragma_value.is_none()` → **แดง 3 ตัว** (introspection ถูกปฏิเสธ, sentinel
+กลายเป็นอนุญาต, `optimize` กลายเป็นอนุญาต) คือหลักฐานว่ากฎนั้นผิดสองทางพร้อมกัน
+ส่วนการล้าง allow-list ให้ว่าง → แดง 1 ตัว
 
 ทุก guard ในแผนนี้พิสูจน์ด้วยการ **ปลูกจุดบกพร่อง** แล้วดูว่าเทสต์แดง ไม่ใช่
 ดูว่าเทสต์เขียว: ถอด authorizer → แดง 2 ตัว, ถอด tail check + dup check → แดง 2 ตัว

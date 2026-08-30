@@ -192,23 +192,109 @@ fn every_write_shaped_statement_is_refused_and_changes_nothing() {
 // Every statement in the list above is also caught by the read-only connection
 // or by SQLITE_LIMIT_ATTACHED, so that test keeps passing even with the
 // authorizer removed - measured, not assumed. This one cannot: `PRAGMA
-// table_list` only READS, so layers 1 and 3 have no opinion about it and the
-// allow-list is the sole thing standing in its way. If this test ever goes
+// compile_options` only READS, so layers 1 and 3 have no opinion about it and
+// the allow-list is the sole thing standing in its way. If this test ever goes
 // green after a change to the authorizer, layer 2 is gone.
+//
+// It used to be `PRAGMA table_list`, which is now allowed as schema
+// introspection. `compile_options` is the deliberate replacement: read-only, so
+// no other layer can catch it, and outside `SQL_INTROSPECTION_PRAGMAS` because
+// build flags are not schema introspection.
 #[test]
 fn a_read_only_pragma_is_denied_by_the_authorizer_alone() {
     let storage = seeded(&fresh("rosql_pragma_sentinel"));
 
     let reason = storage
-        .query_sql("PRAGMA table_list", vec![])
+        .query_sql("PRAGMA compile_options", vec![])
         .err()
         .map(|e| e.to_string())
-        .expect("a read-only PRAGMA must still be refused");
+        .expect("a read-only PRAGMA outside the allow-list must still be refused");
 
     assert!(
         reason.contains("not authorized") || reason.contains("authorization denied"),
         "only the authorizer can refuse this; got: {reason}"
     );
+}
+
+// The introspection allow-list: a diagnostics surface has to be able to
+// describe its own tables.
+#[test]
+fn schema_introspection_pragmas_are_allowed_in_both_forms() {
+    let storage = seeded(&fresh("rosql_pragma_introspection"));
+
+    // The table-valued function form, which is the one that composes with SQL.
+    let columns = storage
+        .query_sql(
+            "SELECT name FROM pragma_table_info('app_shop__items') ORDER BY name",
+            vec![],
+        )
+        .expect("pragma_table_info must be readable");
+    let names: Vec<&str> = columns
+        .iter()
+        .map(|row| row["name"].as_str().unwrap())
+        .collect();
+    assert_eq!(
+        names,
+        vec!["id", "name", "price"],
+        "introspection must return the real columns, not an empty set that would \
+         make this test pass for the wrong reason"
+    );
+
+    // The statement form reaches the authorizer as the identical action - same
+    // name, same value - so allowing one necessarily allows the other. Asserted
+    // rather than assumed, because "necessarily" is where mistakes hide.
+    assert!(
+        storage
+            .query_sql("PRAGMA table_info(app_shop__items)", vec![])
+            .is_ok(),
+        "the statement form is indistinguishable from the function form here"
+    );
+
+    for statement in [
+        "SELECT count(*) AS n FROM pragma_table_list",
+        "SELECT count(*) AS n FROM pragma_index_list('app_shop__items')",
+        "SELECT count(*) AS n FROM pragma_foreign_key_list('app_shop__items')",
+    ] {
+        assert!(
+            storage.query_sql(statement, vec![]).is_ok(),
+            "introspection must be allowed: {statement}"
+        );
+    }
+}
+
+// The case that proves the allow-list keys on the NAME and not on whether a
+// value is present.
+//
+// `PRAGMA optimize` carries no value and RUNS ANALYZE - it writes. Meanwhile
+// `pragma_table_info('props')` carries its target table in the very slot a
+// setter uses for its new value. So the intuitive rule "no value means it only
+// reads" is wrong in both directions at once, and this test is what stops
+// someone re-deriving it.
+#[test]
+fn a_valueless_pragma_that_writes_is_still_denied() {
+    let storage = seeded(&fresh("rosql_pragma_optimize"));
+    let before = item_count(&storage);
+
+    for statement in [
+        "PRAGMA optimize",
+        "PRAGMA writable_schema = ON",
+        "PRAGMA journal_mode = DELETE",
+        "PRAGMA database_list",
+    ] {
+        let reason = storage
+            .query_sql(statement, vec![])
+            .err()
+            .map(|e| e.to_string())
+            .unwrap_or_else(|| panic!("must be refused: {statement}"));
+        assert!(
+            reason.contains("not authorized")
+                || reason.contains("authorization denied")
+                || reason.contains("readonly database"),
+            "refused for the wrong reason: [{statement}] -> {reason}"
+        );
+    }
+
+    assert_eq!(item_count(&storage), before, "nothing was executed");
 }
 
 // 5. A read-only query can still burn a core forever. Only the deadline stops
