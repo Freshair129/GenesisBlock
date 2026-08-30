@@ -89,6 +89,46 @@ const PROJECTION_SCHEMA_VERSION: u32 = 3;
 const SQL_QUERY_TIMEOUT_MS: u64 = 5_000;
 const SQL_QUERY_MAX_ROWS: usize = 10_000;
 const SQL_QUERY_MAX_BYTES: usize = 32 * 1024 * 1024;
+
+/// Schema-introspection pragmas the read-only SQL surface allows, reachable
+/// both as `PRAGMA table_info(props)` and as `SELECT * FROM
+/// pragma_table_info('props')`. A diagnostics surface that cannot describe its
+/// own tables sends callers to `sqlite_master.sql` and a text parser.
+///
+/// The discriminator is the NAME, and only the name. It is tempting to allow
+/// any pragma with no `= value` on the theory that a bare pragma reads while a
+/// valued one writes; that rule is wrong in both directions, measured against
+/// the authorizer rather than reasoned about:
+///
+///   SELECT * FROM pragma_table_info('props')  ->  name=table_info    value=Some("props")
+///   PRAGMA journal_mode = DELETE              ->  name=journal_mode  value=Some("DELETE")
+///   PRAGMA optimize                           ->  name=optimize      value=None
+///
+/// The table-valued form passes its target table in the same slot a setter
+/// passes its new value, so "has a value" would deny exactly the introspection
+/// this list exists to permit — while `PRAGMA optimize`, which carries no value
+/// at all, RUNS ANALYZE and writes.
+///
+/// So every name here is one with no writing form whatsoever. Read-only pragmas
+/// that are not schema introspection stay out: `compile_options` and
+/// `database_list` (which also discloses file paths) are denied, and
+/// `compile_options` is what
+/// `a_read_only_pragma_is_denied_by_the_authorizer_alone` uses to prove this
+/// layer is still the only thing standing between a read-only pragma and the
+/// database.
+///
+/// Note that the statement form and the function form are indistinguishable
+/// here — same name, same value — so allowing one allows the other. That is
+/// acceptable precisely because these names cannot write in either form.
+const SQL_INTROSPECTION_PRAGMAS: &[&str] = &[
+    "table_info",
+    "table_xinfo",
+    "table_list",
+    "index_list",
+    "index_info",
+    "index_xinfo",
+    "foreign_key_list",
+];
 const PROJECTION_DB_FILE: &str = "projection.sqlite";
 /// Stable engine identifier (independent of package version).
 pub const ENGINE_NAME: &str = "genesis-block";
@@ -5004,7 +5044,9 @@ impl Storage {
     ///    it would change how the engine's own writes behave.
     /// 2. An ALLOW-LIST authorizer. Anything not positively recognised as a
     ///    read is denied, including action variants SQLite may add later. A
-    ///    deny-list would be blind to whatever it did not think of.
+    ///    deny-list would be blind to whatever it did not think of. Pragmas are
+    ///    denied except for the schema-introspection names in
+    ///    `SQL_INTROSPECTION_PRAGMAS`, which is itself an allow-list.
     /// 3. `SQLITE_LIMIT_ATTACHED = 0`, so ATTACH cannot reach another file.
     /// 4. A progress handler that interrupts past the deadline, because a
     ///    read-only query can still burn a core forever.
@@ -5029,6 +5071,13 @@ impl Storage {
             | AuthAction::Read { .. }
             | AuthAction::Function { .. }
             | AuthAction::Recursive => Authorization::Allow,
+            AuthAction::Pragma { pragma_name, .. } => {
+                if SQL_INTROSPECTION_PRAGMAS.contains(&pragma_name) {
+                    Authorization::Allow
+                } else {
+                    Authorization::Deny
+                }
+            }
             _ => Authorization::Deny,
         }));
 
