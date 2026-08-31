@@ -1107,6 +1107,12 @@ pub struct RelationalQuery {
     pub joins: Vec<RelationalJoin>,
     pub filters: Vec<RelationalFilter>,
     pub limit: Option<u32>,
+    /// Rows to skip before the first returned row. `Some(_)` also orders the
+    /// result by the base table's primary key, so consecutive pages partition
+    /// the result set deterministically instead of sampling an unordered scan.
+    /// `None` preserves the historical unordered single-read behavior.
+    #[serde(default)]
+    pub offset: Option<u32>,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
@@ -5430,7 +5436,35 @@ impl Storage {
                 .collect::<Result<Vec<_>>>()?;
             sql.push_str(&format!(" WHERE {}", predicates.join(" AND ")));
         }
-        sql.push_str(&format!(" LIMIT {limit}"));
+        if let Some(offset) = query.offset {
+            // An OFFSET against an unordered scan samples rows instead of
+            // paging them, so an offset query is always ordered by the base
+            // table's primary key. Primary-key names were validated when the
+            // schema was registered, but they are interpolated into SQL here,
+            // so they are re-validated defensively.
+            let base_table = schema
+                .tables
+                .iter()
+                .find(|table| table.name == query.table)
+                .ok_or_else(|| Error::from_reason("relational query references unknown table"))?;
+            if base_table.primary_key.is_empty() {
+                return Err(Error::from_reason(
+                    "relational offset query requires a primary key to order by",
+                ));
+            }
+            let order = base_table
+                .primary_key
+                .iter()
+                .map(|column| {
+                    Self::validate_identifier(column)?;
+                    Ok(format!("\"{base}\".\"{column}\""))
+                })
+                .collect::<Result<Vec<_>>>()?
+                .join(", ");
+            sql.push_str(&format!(" ORDER BY {order} LIMIT {limit} OFFSET {offset}"));
+        } else {
+            sql.push_str(&format!(" LIMIT {limit}"));
+        }
         let mut statement = conn
             .prepare(&sql)
             .map_err(|e| Error::from_reason(e.to_string()))?;

@@ -106,6 +106,7 @@ fn relational_schema_rows_and_join_use_one_genesis_handle() {
             }],
             filters: vec![RelationalFilter::equal("notes.id", json!("note-1"))],
             limit: Some(10),
+            offset: None,
         })
         .unwrap();
 
@@ -144,6 +145,7 @@ fn relational_projection_rebuilds_from_genesis_wal() {
             joins: vec![],
             filters: vec![RelationalFilter::equal("projects.id", json!("project-1"))],
             limit: Some(1),
+            offset: None,
         })
         .unwrap();
     assert_eq!(rows, vec![json!({"projects.name": "Recovered"})]);
@@ -197,7 +199,85 @@ fn relational_batch_validation_prevents_partial_write() {
             joins: vec![],
             filters: vec![],
             limit: Some(10),
+            offset: None,
         })
         .unwrap();
     assert!(rows.is_empty());
+}
+
+#[test]
+fn relational_offset_pages_partition_the_result_set() {
+    let path = fresh("relational_u2_offset");
+    let storage = open(&path);
+    storage.register_relational_schema(fung_schema()).unwrap();
+
+    let mut mutations = vec![RelationalRowMutation {
+        table: "projects".to_string(),
+        kind: RelationalMutationKind::Upsert,
+        values: json!({"id": "project-1", "name": "FUNG Mobile"}),
+        key: None,
+    }];
+    for index in 0..25 {
+        mutations.push(RelationalRowMutation {
+            table: "notes".to_string(),
+            kind: RelationalMutationKind::Upsert,
+            values: json!({
+                "id": format!("note-{index:03}"),
+                "project_id": "project-1",
+                "title": format!("segment {index}"),
+            }),
+            key: None,
+        });
+    }
+    storage.apply_relational_rows("fung", mutations).unwrap();
+
+    let page = |offset: u32| {
+        storage
+            .query_relational(RelationalQuery {
+                namespace: "fung".to_string(),
+                table: "notes".to_string(),
+                columns: vec!["notes.id".to_string()],
+                joins: vec![],
+                filters: vec![RelationalFilter::equal(
+                    "notes.project_id",
+                    json!("project-1"),
+                )],
+                limit: Some(10),
+                offset: Some(offset),
+            })
+            .unwrap()
+            .into_iter()
+            .map(|row| row["notes.id"].as_str().unwrap().to_string())
+            .collect::<Vec<_>>()
+    };
+
+    // Three consecutive pages partition all 25 rows in primary-key order,
+    // with no duplicates and no gaps.
+    let mut collected = page(0);
+    assert_eq!(collected.len(), 10);
+    collected.extend(page(10));
+    collected.extend(page(20));
+    assert_eq!(
+        collected,
+        (0..25)
+            .map(|index| format!("note-{index:03}"))
+            .collect::<Vec<_>>()
+    );
+
+    // An offset past the result set is an empty page, not an error.
+    assert!(page(25).is_empty());
+
+    // The pre-offset shape still works untouched.
+    let unpaged = storage
+        .query_relational(RelationalQuery {
+            namespace: "fung".to_string(),
+            table: "notes".to_string(),
+            columns: vec!["notes.id".to_string()],
+            joins: vec![],
+            filters: vec![],
+            limit: Some(1000),
+            offset: None,
+        })
+        .unwrap();
+    assert_eq!(unpaged.len(), 25);
 }

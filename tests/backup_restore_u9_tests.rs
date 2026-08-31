@@ -196,6 +196,7 @@ fn export_then_clean_restore_preserves_graph_vector_and_manifest_identity() {
                 joins: vec![],
                 filters: vec![],
                 limit: Some(10),
+                offset: None,
             })
             .unwrap(),
         vec![json!({"records.value": "coherent"})]
