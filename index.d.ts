@@ -263,6 +263,14 @@ export interface CollectionInfo {
   metric: string
   quant: string
   count: number
+  /**
+   * Vectors actually present in the navigable HNSW graph, as opposed to
+   * `count` (arena rows) and `index_lag` (queue backlog). Under normal
+   * operation `indexed == count` once the queue drains; a persistent gap
+   * means vectors were staged and dequeued but never became searchable,
+   * which no other field can express.
+   */
+  indexed: number
   /** Per-collection default HNSW `ef_search`. `None` ⇒ uses the engine-global default. */
   efSearch?: number
   /** Whether this (quantized) collection keeps an f32 sidecar for exact rerank. */

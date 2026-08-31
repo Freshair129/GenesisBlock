@@ -700,6 +700,12 @@ pub struct CollectionInfo {
     pub metric: String,
     pub quant: String,
     pub count: u32,
+    /// Vectors actually present in the navigable HNSW graph, as opposed to
+    /// `count` (arena rows) and `index_lag` (queue backlog). Under normal
+    /// operation `indexed == count` once the queue drains; a persistent gap
+    /// means vectors were staged and dequeued but never became searchable,
+    /// which no other field can express.
+    pub indexed: u32,
     /// Per-collection default HNSW `ef_search`. `None` ⇒ uses the engine-global default.
     pub ef_search: Option<u32>,
     /// Whether this (quantized) collection keeps an f32 sidecar for exact rerank.
@@ -1740,6 +1746,23 @@ enum VecIndex {
 }
 
 impl VecIndex {
+    /// Points actually wired into the navigable graph.
+    ///
+    /// This is NOT `count` (arena rows staged) and NOT `index_lag` (queue
+    /// backlog). A vector can be staged, dequeued, and still fail to land in
+    /// the graph - `parallel_insert` is documented right here in this file as
+    /// able to leave nodes unreachable - and neither of the existing numbers
+    /// can see that: the queue is empty and the arena row exists, so both
+    /// report health while search cannot find the vector.
+    fn point_count(&self) -> usize {
+        match self {
+            VecIndex::F32(h) => h.get_nb_point(),
+            VecIndex::U8(h) => h.get_nb_point(),
+            VecIndex::Binary(h) => h.get_nb_point(),
+            VecIndex::F16(h) => h.get_nb_point(),
+        }
+    }
+
     fn build(q: Quant, ef_c: usize, cap: usize) -> Self {
         let cap = cap.max(VectorCollection::HNSW_MIN_CAP);
         match q {
@@ -2417,6 +2440,12 @@ impl VectorCollection {
             metric: self.metric.as_str().to_string(),
             quant: self.quant.as_str().to_string(),
             count: self.count.load(Ordering::Relaxed) as u32,
+            indexed: self
+                .hnsw
+                .read()
+                .as_ref()
+                .map(|h| h.point_count() as u32)
+                .unwrap_or(0),
             ef_search: self.ef_search,
             rerank: self.f32_sidecar.is_some(),
             sidecar_resident_bytes,
