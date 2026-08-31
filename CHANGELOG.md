@@ -70,6 +70,50 @@ class of exposure, and the surface reads the whole projection with no
 per-caller separation; `napi_rest_parity_tests` carries that as a documented
 `None` entry rather than an omission.
 
+### Fixed - snb-bulk-ingestion can now detect an edge regression, and the published cost was optimistic
+
+The harness CLAUDE.md names for "before claiming no perf regression" never timed
+its edge phase. It ran `bulk_add_edges` and printed `Bulk Chain Linking
+Complete.` — the whole measurement was node-side. That blindness was not
+theoretical: the edge projection moved edge ingestion by a factor of several and
+this harness reported nothing.
+
+Timing the phase was the easy half. The harder question was whether the harness
+could resolve a regression at its size, and measured, it could not: at 4,999
+edges its own rate spans 192.7-354.5 us/edge across five runs of ONE build, a
+162 us spread against a ~149 us effect. Raised to 40,000, where ten settled runs
+span 326.6-431.2 (sd ~35).
+
+Proven by planting the defect rather than by argument: built with the
+`Event::Edge` arms removed — the pre-#163 node-only projection — the same
+harness reports 40.6-60.2 us/edge over ten runs. The ranges do not touch, and
+the worst run without the projection is 5.4x faster than the best run with it.
+
+**The measurement also corrected a number already merged in #163.** That spec
+reported 91 -> 240 us/edge, a 2.6x cost. Its benchmark supplied sorted ids
+(`e0, e1, ...`), while the API default is `id: None`, which mints a random
+`Uuid::new_v4()`. The `edges` table has a TEXT primary key, so sorted ids append
+to the B-tree while random ids scatter across it. Isolating that one variable —
+same build, same harness, n=8 each, no overlap:
+
+    no edge projection            ~50 us/edge   (40.6-60.2, n=10)
+    projection, sorted ids       ~141 us/edge   (134.8-152.1)     2.8x
+    projection, random ids       ~343 us/edge   (310.0-377.6)     6.9x
+
+2.8x confirms the earlier 2.6x for sorted ids, so that measurement was not
+wrong — it answered a narrower question than it appeared to. **The cost a
+default caller pays is 6.9x.** The sorted-id choice was made because it was the
+easiest thing to write, not to flatter the result, which is exactly why it went
+unnoticed until a second harness measured the same thing differently.
+
+Usefully, that makes it actionable: a caller who supplies sorted edge ids pays
+less than half the projection cost of one who lets the engine mint them.
+
+Sizes are env-overridable (`SNB_NODES`, `SNB_EDGES`, `SNB_EDGE_IDS`) because a
+rebuild here costs ~13 minutes, which is enough to stop anyone characterising a
+noise floor at all. The id default stays random, since that is what a caller
+gets.
+
 ### Added - edges in the relational projection
 
 `projection.sqlite` now carries an `edges` table and an `edges_current` view, so
