@@ -93,6 +93,7 @@ fn one_wal_transaction_advances_stable_frontier_for_row_and_graph() {
             joins: vec![],
             filters: vec![RelationalFilter::equal("notes.id", json!("note-1"))],
             limit: Some(1),
+            offset: None,
         })
         .unwrap();
     assert_eq!(rows, vec![json!({"notes.title": "Unified"})]);

@@ -107,6 +107,7 @@ fn schema() -> RelationalSchemaPackage {
                     json!({"$param": "note_id"}),
                 )],
                 limit: None,
+                offset: None,
             },
             default_limit: 10,
             max_limit: 50,
