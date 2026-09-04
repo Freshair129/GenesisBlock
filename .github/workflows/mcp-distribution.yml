@@ -42,3 +42,42 @@ jobs:
 
       - name: Run MCP tests
         run: node --test __test__/mcp.test.mjs
+
+      - name: Install the packed artifact in a clean external consumer
+        shell: bash
+        run: |
+          set -euo pipefail
+          PACK_FILE=$(npm pack --json | node -e '
+            let s = "";
+            process.stdin.on("data", d => s += d);
+            process.stdin.on("end", () => console.log(JSON.parse(s)[0].filename));
+          ')
+          PACK_PATH="$PWD/$PACK_FILE"
+          CONSUMER="$RUNNER_TEMP/npm-consumer"
+          mkdir -p "$CONSUMER"
+          cd "$CONSUMER"
+          npm init -y >/dev/null
+          npm install "$PACK_PATH" --ignore-scripts
+
+          test -x node_modules/.bin/genesisblock-mcp
+
+          node --input-type=module <<'NODE'
+          import binding from '@freshair129/gks-genesis-block-native';
+          import path from 'node:path';
+
+          const { GenesisDatabase } = binding;
+          const db = GenesisDatabase.open({
+            path: path.resolve('./consumer-db'),
+            vectorDim: 4,
+          });
+          const node = await db.addNode({
+            id: 'npm-consumer-smoke',
+            labels: ['DistributionSmoke'],
+            embedding: [1, 0, 0, 0],
+          });
+          if (node.id !== 'npm-consumer-smoke') {
+            throw new Error(`unexpected node id: ${node.id}`);
+          }
+          await db.saveState();
+          console.log('clean npm consumer round trip:', node.id);
+          NODE
