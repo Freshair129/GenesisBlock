@@ -13,6 +13,14 @@ on:
 permissions:
   contents: read
 
+env:
+  MODULE: github.com/Freshair129/GenesisBlock/genesisdb-go
+  # pull_request runs check out a synthetic refs/pull/*/merge commit. That SHA
+  # is not a public repository revision `go get` can resolve. Use the actual PR
+  # head commit for external-consumer resolution; fall back to github.sha for
+  # manual runs.
+  RESOLVE_REF: ${{ github.event.pull_request.head.sha || github.sha }}
+
 jobs:
   module:
     name: module tests + clean external resolution
@@ -31,15 +39,13 @@ jobs:
 
       - name: Resolve this PR commit from a clean external module
         shell: bash
-        env:
-          MODULE: github.com/Freshair129/GenesisBlock/genesisdb-go
         run: |
           set -euo pipefail
           CONSUMER="$RUNNER_TEMP/go-consumer"
           mkdir -p "$CONSUMER"
           cd "$CONSUMER"
           go mod init example.com/genesis-consumer
-          GOPROXY=direct GONOSUMDB="$MODULE" go get "$MODULE@$GITHUB_SHA"
+          GOPROXY=direct GONOSUMDB="$MODULE" go get "$MODULE@$RESOLVE_REF"
           cat > main.go <<'GO'
           package main
 
@@ -97,15 +103,13 @@ jobs:
 
       - name: Resolve module remotely and create a node
         shell: bash
-        env:
-          MODULE: github.com/Freshair129/GenesisBlock/genesisdb-go
         run: |
           set -euo pipefail
           CONSUMER="$RUNNER_TEMP/go-live-consumer"
           mkdir -p "$CONSUMER"
           cd "$CONSUMER"
           go mod init example.com/genesis-live-consumer
-          GOPROXY=direct GONOSUMDB="$MODULE" go get "$MODULE@$GITHUB_SHA"
+          GOPROXY=direct GONOSUMDB="$MODULE" go get "$MODULE@$RESOLVE_REF"
           cat > main.go <<'GO'
           package main
 
