@@ -38,7 +38,7 @@ VOLUME ["/data"]
 EXPOSE 3000
 USER genesis
 
-HEALTHCHECK --interval=10s --timeout=3s --start-period=10s --retries=5 CMD-SHELL \
-  'if [ -n "${GENESIS_API_KEY:-}" ]; then curl -fsS -H "Authorization: Bearer ${GENESIS_API_KEY}" "http://127.0.0.1:${GENESIS_PORT:-3000}/v1/status" >/dev/null; else curl -fsS "http://127.0.0.1:${GENESIS_PORT:-3000}/v1/status" >/dev/null; fi'
+HEALTHCHECK --interval=10s --timeout=3s --start-period=10s --retries=5 CMD \
+  if [ -n "${GENESIS_API_KEY:-}" ]; then curl -fsS -H "Authorization: Bearer ${GENESIS_API_KEY}" "http://127.0.0.1:${GENESIS_PORT:-3000}/v1/status" >/dev/null; else curl -fsS "http://127.0.0.1:${GENESIS_PORT:-3000}/v1/status" >/dev/null; fi
 
 ENTRYPOINT ["/usr/local/bin/genesis-db-server"]
