@@ -9,7 +9,7 @@
   "main": "index.js",
   "types": "index.d.ts",
   "bin": {
-    "genesisblock-mcp": "mcp/server.js"
+    "genesisblock-mcp": "mcp/cli.js"
   },
   "exports": {
     ".": {
@@ -22,7 +22,7 @@
     "index.js",
     "index.d.ts",
     "*.node",
-    "mcp/server.js",
+    "mcp/*.js",
     "README.md",
     "QUICKSTART.md",
     "LICENSE"
