@@ -1,0 +1,148 @@
+name: Go SDK Distribution
+
+on:
+  pull_request:
+    paths:
+      - 'genesisdb-go/**'
+      - 'src/**'
+      - 'Cargo.toml'
+      - 'Cargo.lock'
+      - '.github/workflows/go-distribution.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  MODULE: github.com/Freshair129/GenesisBlock/genesisdb-go
+  # pull_request runs check out a synthetic refs/pull/*/merge commit. That SHA
+  # is not a public repository revision `go get` can resolve. Use the actual PR
+  # head commit for external-consumer resolution; fall back to github.sha for
+  # manual runs.
+  RESOLVE_REF: ${{ github.event.pull_request.head.sha || github.sha }}
+
+jobs:
+  module:
+    name: module tests + clean external resolution
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.20.x'
+          cache-dependency-path: genesisdb-go/go.mod
+
+      - name: Test submodule
+        working-directory: genesisdb-go
+        run: go test ./...
+
+      - name: Resolve this PR commit from a clean external module
+        shell: bash
+        run: |
+          set -euo pipefail
+          CONSUMER="$RUNNER_TEMP/go-consumer"
+          mkdir -p "$CONSUMER"
+          cd "$CONSUMER"
+          go mod init example.com/genesis-consumer
+          GOPROXY=direct GONOSUMDB="$MODULE" go get "$MODULE@$RESOLVE_REF"
+          cat > main.go <<'GO'
+          package main
+
+          import (
+              "fmt"
+              genesisdb "github.com/Freshair129/GenesisBlock/genesisdb-go"
+          )
+
+          func main() {
+              c := genesisdb.NewClient("http://127.0.0.1:3000")
+              fmt.Println(c.BaseURL)
+          }
+          GO
+          go run .
+
+  live-server-integration:
+    name: clean Go consumer against live Rust server
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.20.x'
+          cache: false
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: go-sdk-live-server
+
+      - name: Build standalone server
+        run: cargo build --locked --release --no-default-features --features bins --bin genesis-db-server
+
+      - name: Start GenesisBlockDB
+        shell: bash
+        run: |
+          set -euo pipefail
+          DATA_DIR="$RUNNER_TEMP/genesis-go-integration"
+          mkdir -p "$DATA_DIR"
+          GENESIS_DATA_DIR="$DATA_DIR" \
+          GENESIS_HOST=127.0.0.1 \
+          GENESIS_PORT=3000 \
+          ./target/release/genesis-db-server >"$RUNNER_TEMP/genesis-server.log" 2>&1 &
+          echo $! >"$RUNNER_TEMP/genesis-server.pid"
+          for _ in $(seq 1 60); do
+            if curl -fsS http://127.0.0.1:3000/v1/status >/dev/null; then
+              exit 0
+            fi
+            sleep 1
+          done
+          cat "$RUNNER_TEMP/genesis-server.log"
+          exit 1
+
+      - name: Resolve module remotely and create a node
+        shell: bash
+        run: |
+          set -euo pipefail
+          CONSUMER="$RUNNER_TEMP/go-live-consumer"
+          mkdir -p "$CONSUMER"
+          cd "$CONSUMER"
+          go mod init example.com/genesis-live-consumer
+          GOPROXY=direct GONOSUMDB="$MODULE" go get "$MODULE@$RESOLVE_REF"
+          cat > main.go <<'GO'
+          package main
+
+          import (
+              "context"
+              "fmt"
+              genesisdb "github.com/Freshair129/GenesisBlock/genesisdb-go"
+          )
+
+          func main() {
+              client := genesisdb.NewClient("http://127.0.0.1:3000")
+              node, err := client.AddNode(context.Background(), genesisdb.NodeInput{
+                  ID: "go-distribution-smoke",
+                  Labels: []string{"GoDistributionSmoke"},
+                  Props: map[string]interface{}{"source": "remote-module"},
+              })
+              if err != nil {
+                  panic(err)
+              }
+              if node.ID != "go-distribution-smoke" {
+                  panic("unexpected node id")
+              }
+              fmt.Println("live server round trip:", node.ID)
+          }
+          GO
+          go run .
+
+      - name: Stop server gracefully
+        if: always()
+        shell: bash
+        run: |
+          if [ -f "$RUNNER_TEMP/genesis-server.pid" ]; then
+            kill -TERM "$(cat "$RUNNER_TEMP/genesis-server.pid")" || true
+            wait "$(cat "$RUNNER_TEMP/genesis-server.pid")" || true
+          fi
+          cat "$RUNNER_TEMP/genesis-server.log" 2>/dev/null || true

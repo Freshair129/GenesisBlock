@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"log"
 
-	"github.com/freshair129/genesisblock-go"
+	genesisdb "github.com/Freshair129/GenesisBlock/genesisdb-go"
 )
 
 func main() {
