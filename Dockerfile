@@ -5,6 +5,10 @@ WORKDIR /src
 
 COPY Cargo.toml Cargo.lock build.rs ./
 COPY src ./src
+# Cargo validates every declared [[bin]]/[[bench]] path while parsing the
+# manifest even when we build only the standalone server. Copy only the Rust
+# harness source files, not the large benchmark datasets.
+COPY benches/*.rs ./benches/
 
 RUN cargo build --locked --release --no-default-features --features bins --bin genesis-db-server
 
