@@ -13,7 +13,8 @@ android
 ios
 mobile-acceptance
 obsidian-plugin
-benches
+benches/**
+!benches/*.rs
 benchmark
 site
 docs
