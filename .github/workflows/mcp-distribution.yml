@@ -6,6 +6,9 @@ on:
       - 'package.json'
       - 'mcp/**'
       - 'scripts/check-mcp-package.mjs'
+      - 'Cargo.toml'
+      - 'Cargo.lock'
+      - 'src/**'
       - '.github/workflows/mcp-distribution.yml'
   workflow_dispatch:
 
@@ -22,11 +25,20 @@ jobs:
         with:
           node-version: 20
 
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: mcp-distribution
+
       - name: Install JavaScript dependencies without native build hooks
         run: npm ci --ignore-scripts
 
       - name: Verify npm payload contains the MCP executable and implementation
         run: node scripts/check-mcp-package.mjs
+
+      - name: Build native addon for MCP tests
+        run: npm run build
 
       - name: Run MCP tests
         run: node --test __test__/mcp.test.mjs
