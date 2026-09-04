@@ -14,8 +14,8 @@ those as legacy labels superseded by this file.
 
 | Field | Value |
 |---|---|
-| **Engine crate** (`Cargo.toml`, `package.json`, `modules.json`) | `0.2.4` |
-| **Product milestone** | **Mobile SDK** — Phase B (iOS/Android/React Native) shipped and published; on-device acceptance verified for iOS |
+| **Engine crate** (`Cargo.toml`, `package.json`, `modules.json`) | `0.2.5` |
+| **Product milestone** | **Distribution hardening** — mobile SDKs shipped; server/container distribution is being added under issue #166 |
 | **Status** | Advanced prototype (durable, benchmarked, suite green) |
 | **Evidence baseline** | 2026-06-21 — audits P14–P30, `REPORT--2026-06-21-PERFORMANCE-AND-COMPETITIVE.md` |
 | **Positioning** | Embedded analytics / agent-memory graph + vector engine |
@@ -25,16 +25,21 @@ those as legacy labels superseded by this file.
 `mobile`/`ffi` Cargo features, C FFI layer, cross-compile CI) → `0.2.1`/`0.2.2` →
 `0.2.3` (issue #125 publish cycle: `genesisdb-android` live on GitHub
 Packages, `react-native-genesisdb` + the native addon's 4 platform packages
-live on npm) → **`0.2.4`** (no engine change; cut to publish
-`genesisdb-android` 0.1.1 with the new `x86_64` emulator ABI and
-`react-native-genesisdb` 0.1.1, which finally delivers that package's Android
-and iOS integration fixes — see `CHANGELOG.md`). The crate
-version is kept in lock-step across `Cargo.toml`, `package.json`, and
+live on npm) → `0.2.4` (delivery release for Android 0.1.1 + React Native
+0.1.1 integration fixes) → **`0.2.5`** (current engine release; release pipeline
+and consumer-distribution fixes including Maven Central/registry delivery
+hardening).
+
+The crate version is kept in lock-step across `Cargo.toml`, `package.json`, and
 `modules.json` by `scripts/version.mjs` (`npm run version:check` is a CI gate).
+This document is the human-facing canonical status record and MUST be updated
+as part of every engine release so it does not lag the machine-checked version
+surfaces.
 
 **Versioning policy (going forward):** the crate version in `Cargo.toml` is
 authoritative for the build; the product milestone is a plain theme named after
 the semver minor it lands in (`v0.<minor> — <theme>`) — the `MARK N` series is
 frozen at XVI and is now only a historical tag, see `ROADMAP.md`'s "Milestone
-naming" section; this file pins both. New/updated docs should reference this file rather than restate a
-version. Legacy frontmatter is not retroactively edited (see `DOC-STATUS.md`).
+naming" section; this file pins both. New/updated docs should reference this
+file rather than restate a version. Legacy frontmatter is not retroactively
+edited (see `DOC-STATUS.md`).
