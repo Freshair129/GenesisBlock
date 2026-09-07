@@ -490,6 +490,24 @@ Do not reuse these values outside the report's workload, hardware, configuration
 - Performance and competitive report: [docs/REPORT--2026-06-21-PERFORMANCE-AND-COMPETITIVE.md](docs/REPORT--2026-06-21-PERFORMANCE-AND-COMPETITIVE.md)
 - Benchmark dashboard: [docs/perf-comparison-dashboard.html](docs/perf-comparison-dashboard.html)
 
+### GenesisRAG17 TEST integration
+
+GenesisRAG17 is a separate client integration around the client-neutral
+GenesisBlockDB engine. The [separate-worker/publication ADR](docs/ADR--GENESISRAG17-SEPARATE-WORKER-PUBLICATION.md),
+[pipeline flow](docs/FLOW--GENESISRAG17-PIPELINE.md) and
+[extension map](docs/GENESISRAG17-EXTENSION-MAP.md) document the TEST boundary:
+MSP relays authenticated calls, GKS remains the passive semantic and quality
+authority, and the worker owns physical Stage 13/15/16 writes plus atomic
+publication. The native engine remains pinned to
+`e15e35b0093394e0a8880af7f4e6f63cf81223b7`; the worker uses the pinned CPU
+`intfloat/multilingual-e5-small` revision
+`614241f622f53c4eeff9890bdc4f31cfecc418b3`.
+
+- Worker setup and runtime/model manifest: [genesisrag17-worker/README.md](genesisrag17-worker/README.md)
+- Product [17-stage source specification](https://github.com/Freshair129/zuri.ai/blob/codex/ki17-integration/docs/KNOWLEDGE-INGESTION-17-STAGE-SPEC.md)
+- Product [17-stage execution flow](https://github.com/Freshair129/zuri.ai/blob/codex/ki17-integration/docs/KNOWLEDGE-INGESTION-17-STAGE-FLOW.md)
+- [Pinned historical acceptance report](https://github.com/Freshair129/zuri.ai/blob/b64b46df057d3160c659afa3c34628ee86520257/.brain/reports/GENESISRAG17-ACCEPTANCE.md)
+
 Agent context: [AGENT.md](AGENT.md) · Contributor workflow: [CONTRIBUTING.md](CONTRIBUTING.md)
 
 ## Core Capabilities
