@@ -64,7 +64,7 @@ mod core_error {
 #[cfg(not(feature = "napi-bindings"))]
 use core_error::{Error, Result};
 use crossbeam_channel::{bounded, unbounded, Receiver, Sender};
-use parking_lot::{Mutex, RwLock};
+use parking_lot::{Mutex, ReentrantMutex, RwLock};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use uuid::Uuid;
@@ -2737,7 +2737,10 @@ pub struct Storage {
     pub retention: RetentionProfile,
     projection_path: PathBuf,
     projection_db: Mutex<Connection>,
-    commit_lock: Mutex<()>,
+    // One publication boundary across graph memory and the SQLite projection.
+    // Reentrant for composed queries (HQL -> neighbors -> hydrated properties).
+    commit_lock: ReentrantMutex<()>,
+    recovery_required: AtomicBool,
     /// WP-1.2 (ADR D2.3): the FRAME frontier — commit_seq of the last durable
     /// journal frame, advancing on every mutation. Replica-local; never
     /// comparable across peers. `stable_frontier()` reports this.
@@ -3016,6 +3019,7 @@ impl Storage {
         self.ensure_writable()?;
         Self::validate_collection_name(&name)?;
         let _commit_guard = self.commit_lock.lock();
+        self.ensure_readable()?;
         if self.collections.contains_key(&name) {
             return Err(Error::from_reason(format!(
                 "collection '{}' already exists",
@@ -3055,6 +3059,8 @@ impl Storage {
     }
 
     pub fn list_collections(&self) -> Vec<CollectionInfo> {
+        let _read_guard = self.commit_lock.lock();
+
         // `index_lag` is engine-global; snapshot it once and stamp every entry.
         let lag = self.index_lag();
         self.collections
@@ -3109,6 +3115,7 @@ impl Storage {
     ) -> Result<()> {
         self.ensure_writable()?;
         let _commit_guard = self.commit_lock.lock();
+        self.ensure_readable()?;
         // A vector attaches to a node — the node must exist.
         let exists = self
             .get_u32(&node_id)
@@ -3144,7 +3151,8 @@ impl Storage {
             clock,
         }))?;
         // Stages into the arena, enqueues the deferred HNSW insert.
-        self.add_vector_internal(&coll, &node_id, embedding, lang, seq)?;
+        self.add_vector_internal(&coll, &node_id, embedding, lang, seq)
+            .map_err(|e| self.durable_apply_error(seq, e))?;
         Ok(())
     }
 
@@ -4882,6 +4890,9 @@ impl Storage {
     }
 
     pub fn projection_props(&self, node_u32: u32) -> Result<Option<Value>> {
+        let _read_guard = self.commit_lock.lock();
+        self.ensure_readable()?;
+
         let conn = self.projection_db.lock();
         let payload: Option<String> = conn
             .query_row(
@@ -4904,6 +4915,7 @@ impl Storage {
         let package = Self::normalize_schema_package(package)?;
         Self::validate_relational_schema(&package)?;
         let _commit_guard = self.commit_lock.lock();
+        self.ensure_readable()?;
         let mut conn = self.projection_db.lock();
         if let Some(previous) = Self::load_relational_schema_conn(&conn, &package.namespace)? {
             if previous == package {
@@ -4919,8 +4931,8 @@ impl Storage {
             .transaction()
             .map_err(|e| Error::from_reason(e.to_string()))?;
         Self::projection_apply_schema_conn(&tx, &package)?;
-        self.append_wal_event(&Event::RelationalSchema(package.clone()))?;
-        tx.commit().map_err(|e| Error::from_reason(e.to_string()))?;
+        let seq = self.append_wal_event(&Event::RelationalSchema(package.clone()))?;
+        tx.commit().map_err(|e| self.durable_apply_error(seq, e))?;
         Ok(package.schema_version)
     }
 
@@ -4928,12 +4940,18 @@ impl Storage {
         &self,
         namespace: &str,
     ) -> Result<Option<RelationalSchemaPackage>> {
+        let _read_guard = self.commit_lock.lock();
+        self.ensure_readable()?;
+
         Self::validate_namespace(namespace)?;
         let conn = self.projection_db.lock();
         Self::load_relational_schema_conn(&conn, namespace)
     }
 
     pub fn list_relational_schemas(&self) -> Result<Vec<RelationalSchemaPackage>> {
+        let _read_guard = self.commit_lock.lock();
+        self.ensure_readable()?;
+
         let conn = self.projection_db.lock();
         let mut statement = conn
             .prepare("SELECT package_json FROM relational_schema_registry ORDER BY namespace")
@@ -4971,6 +4989,7 @@ impl Storage {
         }
         let payload_hash = hex::encode(Sha256::digest(&encoded));
         let _commit_guard = self.commit_lock.lock();
+        self.ensure_readable()?;
         let mut conn = self.projection_db.lock();
         let schema = Self::load_relational_schema_conn(&conn, &batch.namespace)?
             .ok_or_else(|| Error::from_reason("REL_SCHEMA_NOT_FOUND"))?;
@@ -5009,7 +5028,7 @@ impl Storage {
             .transaction()
             .map_err(|e| Error::from_reason(e.to_string()))?;
         let affected_rows = Self::projection_apply_rows_tx(&tx, &schema, &batch.operations)?;
-        self.append_wal_event(&Event::RelationalRows {
+        let seq = self.append_wal_event(&Event::RelationalRows {
             namespace: batch.namespace.clone(),
             schema_version: batch.schema_version,
             mutation_id: batch.mutation_id.clone(),
@@ -5027,8 +5046,8 @@ impl Storage {
                 affected_rows
             ],
         )
-        .map_err(|e| Error::from_reason(e.to_string()))?;
-        tx.commit().map_err(|e| Error::from_reason(e.to_string()))?;
+        .map_err(|e| self.durable_apply_error(seq, e))?;
+        tx.commit().map_err(|e| self.durable_apply_error(seq, e))?;
         Ok(RelationalMutationResult {
             mutation_id: batch.mutation_id,
             namespace: batch.namespace,
@@ -5257,6 +5276,9 @@ impl Storage {
     /// partly asked - the same class of wrong-answer-that-looks-right as a
     /// silently truncated result set. See `sql_first_terminator`.
     pub fn query_sql(&self, sql: &str, params: Vec<Value>) -> Result<Vec<Value>> {
+        let _read_guard = self.commit_lock.lock();
+        self.ensure_readable()?;
+
         use rusqlite::hooks::{AuthAction, AuthContext, Authorization};
         use rusqlite::limits::Limit;
 
@@ -5372,6 +5394,9 @@ impl Storage {
     }
 
     pub fn query_relational(&self, query: RelationalQuery) -> Result<Vec<Value>> {
+        let _read_guard = self.commit_lock.lock();
+        self.ensure_readable()?;
+
         Self::validate_namespace(&query.namespace)?;
         Self::validate_identifier(&query.table)?;
         if query.columns.is_empty() {
@@ -5530,6 +5555,9 @@ impl Storage {
     }
 
     pub fn execute_named_query(&self, request: NamedQueryRequest) -> Result<Vec<Value>> {
+        let _read_guard = self.commit_lock.lock();
+        self.ensure_readable()?;
+
         Self::validate_namespace(&request.namespace)?;
         Self::validate_identifier(&request.query_name)?;
         let definition = {
@@ -5746,11 +5774,17 @@ impl Storage {
     }
 
     pub fn node_view(&self, id: &str) -> Option<NodeOutput> {
+        let _read_guard = self.commit_lock.lock();
+        self.ensure_readable().ok()?;
+
         let u32_id = self.get_u32(id)?;
         self.node_view_u32(u32_id)
     }
 
     pub fn node_view_u32(&self, u32_id: u32) -> Option<NodeOutput> {
+        let _read_guard = self.commit_lock.lock();
+        self.ensure_readable().ok()?;
+
         let node = self.nodes.get(&u32_id)?;
         Some(self.hydrated_node(u32_id, node.value()))
     }
@@ -6148,7 +6182,8 @@ impl Storage {
             retention,
             projection_path,
             projection_db: Mutex::new(projection_conn),
-            commit_lock: Mutex::new(()),
+            commit_lock: ReentrantMutex::new(()),
+            recovery_required: AtomicBool::new(false),
             commit_sequence: AtomicU64::new(0),
             nodes: DashMap::new(),
             edges: DashMap::new(),
@@ -6277,9 +6312,62 @@ impl Storage {
     }
 
     pub fn ensure_writable(&self) -> Result<()> {
+        self.ensure_readable()?;
         if self.read_only {
             return Err(Error::from_reason("read-only"));
         }
+        Ok(())
+    }
+
+    fn ensure_readable(&self) -> Result<()> {
+        if self.recovery_required.load(Ordering::SeqCst) {
+            return Err(Error::from_reason(
+                "RECOVERY_REQUIRED: reopen database before reading, writing or checkpointing",
+            ));
+        }
+        Ok(())
+    }
+
+    fn durable_apply_error(&self, seq: u64, error: impl std::fmt::Display) -> Error {
+        self.recovery_required.store(true, Ordering::SeqCst);
+        Error::from_reason(format!(
+            "DURABLE_COMMIT_APPLY_FAILED: commit_sequence={seq}; reopen required; {error}"
+        ))
+    }
+
+    // All relational groups share a rollback transaction, so cross-group
+    // constraints are checked before append. commit_lock stays held through
+    // WAL/apply; another engine writer cannot invalidate the preflight.
+    fn preflight_relational_event(&self, event: &Event) -> Result<()> {
+        let Event::Transaction(transaction) = event else {
+            return Ok(());
+        };
+        let mut conn = self.projection_db.lock();
+        let existing: Option<String> = conn
+            .query_row(
+                "SELECT payload_hash FROM applied_transactions WHERE transaction_id = ?1",
+                [&transaction.transaction_id],
+                |row| row.get(0),
+            )
+            .optional()
+            .map_err(|e| Error::from_reason(e.to_string()))?;
+        if let Some(hash) = existing {
+            return if hash == transaction.payload_hash {
+                Ok(())
+            } else {
+                Err(Error::from_reason("transaction identity conflict"))
+            };
+        }
+        let tx = conn
+            .transaction()
+            .map_err(|e| Error::from_reason(e.to_string()))?;
+        for group in &transaction.relational {
+            let schema = Self::load_relational_schema_conn(&tx, &group.namespace)?
+                .ok_or_else(|| Error::from_reason("relational schema is not registered"))?;
+            Self::projection_apply_rows_tx(&tx, &schema, &group.mutations)?;
+        }
+        tx.rollback()
+            .map_err(|e| Error::from_reason(e.to_string()))?;
         Ok(())
     }
 
@@ -6306,18 +6394,24 @@ impl Storage {
         self.wal_sender
             .send(WalMsg::Append(Box::new(signed_event), ack_tx))
             .map_err(|_| Error::from_reason("wal disconnected"))?;
-        let seq = ack_rx
-            .recv()
-            .ok()
-            .flatten()
-            .ok_or_else(|| Error::from_reason("wal append failed"))?;
+        let seq = ack_rx.recv().ok().flatten().ok_or_else(|| {
+            self.recovery_required.store(true, Ordering::SeqCst);
+            Error::from_reason(
+                "COMMIT_OUTCOME_UNKNOWN: WAL acknowledgement failed; reopen required",
+            )
+        })?;
         self.commit_sequence.fetch_max(seq, Ordering::SeqCst);
         Ok(seq)
     }
 
     pub fn persist(&self, event: &Event) -> Result<u64> {
+        let _commit_guard = self.commit_lock.lock();
+        self.ensure_readable()?;
+        self.ensure_writable()?;
+        self.preflight_relational_event(event)?;
         let seq = self.append_wal_event(event)?;
-        self.projection_apply_event(event, seq)?;
+        self.projection_apply_event(event, seq)
+            .map_err(|e| self.durable_apply_error(seq, e))?;
         Ok(seq)
     }
 
@@ -6364,12 +6458,16 @@ impl Storage {
     /// commit_sequence", which is now `txn_frontier()`). Advances on every
     /// mutation; replica-local.
     pub fn stable_frontier(&self) -> u64 {
+        let _read_guard = self.commit_lock.lock();
+
         self.commit_sequence.load(Ordering::SeqCst)
     }
 
     /// Frame seq of the last `Event::Transaction` frame — the value
     /// `GenesisTransaction.expected_frontier` CASes against.
     pub fn txn_frontier(&self) -> u64 {
+        let _read_guard = self.commit_lock.lock();
+
         self.txn_frontier.load(Ordering::SeqCst)
     }
 
@@ -6378,6 +6476,8 @@ impl Storage {
     /// this fail `beyond_horizon`; delta-pull cursors below it get
     /// `GossipMessage::BeyondHorizon`.
     pub fn history_horizon(&self) -> u64 {
+        let _read_guard = self.commit_lock.lock();
+
         Self::journal_list_segments(&self.path)
             .into_iter()
             .filter(|s| s.kind == SEG_KIND_BASE)
@@ -6400,6 +6500,9 @@ impl Storage {
     /// Lookup is by the id STRING (not `id_to_u32`): a retracted node keeps
     /// its chain addressable after the interning entry is gone.
     pub fn node_versions(&self, id: &str, at_seq: Option<u64>) -> Result<serde_json::Value> {
+        let _read_guard = self.commit_lock.lock();
+        self.ensure_readable()?;
+
         let horizon = self.history_horizon();
         if let Some(seq) = at_seq {
             if seq < horizon {
@@ -6527,6 +6630,7 @@ impl Storage {
         let payload = serde_json::to_vec(&input).map_err(|e| Error::from_reason(e.to_string()))?;
         let payload_hash = hex::encode(Sha256::digest(&payload));
         let _commit_guard = self.commit_lock.lock();
+        self.ensure_readable()?;
         {
             let conn = self.projection_db.lock();
             // Idempotent replay returns the stored LOCAL frame seq; legacy rows
@@ -6668,6 +6772,9 @@ impl Storage {
     }
 
     pub fn find_fuzzy_id(&self, id: &str) -> Option<String> {
+        let _read_guard = self.commit_lock.lock();
+        self.ensure_readable().ok()?;
+
         // 1. Exact Match
         if self.get_u32(id).is_some() {
             return Some(id.to_string());
@@ -6715,6 +6822,9 @@ impl Storage {
     }
 
     pub fn semantic_verify(&self, event: &Event) -> Result<bool> {
+        let _read_guard = self.commit_lock.lock();
+        self.ensure_readable()?;
+
         match event {
             Event::Node(node) => {
                 if let Some(emb) = &node.embedding {
@@ -6872,7 +6982,7 @@ impl Storage {
 
         // Serialize the vote-commit section with every other writer and with
         // save_state/compact (RCA--PERSIST-SIGNED-CHECKPOINT-RACE). Committing
-        // mutates in-memory state and then appends to the WAL; without this lock
+        // persists before publishing memory; without this lock
         // a checkpoint could build its payload from memory BEFORE the mutation
         // and truncate the WAL AFTER the append was fsynced and acked, erasing a
         // commit this method already reported as durable. Holding the lock means
@@ -6886,6 +6996,7 @@ impl Storage {
         // them in the opposite order and no cycle exists. The signature checks
         // above touch only `self.peers`, so they stay off this global lock.
         let _commit_guard = self.commit_lock.lock();
+        self.ensure_readable()?;
 
         if let Some(mut proposal_ref) = self.proposals.get_mut(&proposal_id) {
             let proposal = proposal_ref.value_mut();
@@ -6929,24 +7040,25 @@ impl Storage {
                     if !n_axiom.labels.contains(&"MASTER".to_string()) {
                         n_axiom.labels.push("MASTER".to_string());
                     }
-                    let u32_id = self.get_or_intern_id(&n_axiom.id);
-                    self.insert_node_lean(u32_id, n_axiom.clone());
                     self.persist_signed(SignedEvent {
-                        event: Event::Node(n_axiom),
+                        event: Event::Node(n_axiom.clone()),
                         signature: signed_event.signature.clone(),
                         signer_peer_id: signed_event.signer_peer_id.clone(),
                     })?;
+                    let u32_id = self.get_or_intern_id(&n_axiom.id);
+                    self.insert_node_lean(u32_id, n_axiom);
                 }
                 Event::Edge(e) => {
+                    self.persist_signed(signed_event.clone())?;
                     // Index into the adjacency maps (out_idx/in_idx) so the
                     // committed edge is traversable in this process — not just
                     // present in `edges` until the next reload.
                     let ekey = self.index_edge_internal(&e.id, &e.from, &e.to);
                     self.edges.insert(ekey, e.clone());
                     self.refresh_impacts(Some(vec![e.to.clone()]));
-                    self.persist_signed(signed_event.clone())?;
                 }
                 Event::Batch(events) => {
+                    self.persist_signed(signed_event.clone())?;
                     for e in events {
                         match e {
                             Event::Node(n) => {
@@ -6964,7 +7076,6 @@ impl Storage {
                             _ => {}
                         }
                     }
-                    self.persist_signed(signed_event.clone())?;
                 }
                 // A committed vector is staged + enqueued (index=true) so it is
                 // searchable in this process, matching the CRDT-sync path — not
@@ -7125,9 +7236,9 @@ impl Storage {
     pub fn add_node(&self, args: NodeInput) -> Result<NodeOutput> {
         self.ensure_writable()?;
         let _commit_guard = self.commit_lock.lock();
+        self.ensure_readable()?;
         self.validate_governance(&args.labels, false)?;
         let id = args.id.unwrap_or_else(|| format!("N-{}", Uuid::new_v4()));
-        let u32_id = self.get_or_intern_id(&id);
         let lang = args.lang.clone().unwrap_or("en".to_string());
 
         let now = Utc::now();
@@ -7167,10 +7278,12 @@ impl Storage {
             node.embedding = Some(emb.clone());
             node.collection = Some(coll.name.clone());
         }
-        self.insert_node_lean(u32_id, node.clone());
         let seq = self.persist(&Event::Node(node.clone()))?;
+        let u32_id = self.get_or_intern_id(&id);
+        self.insert_node_lean(u32_id, node.clone());
         if let Some(emb) = args.embedding {
-            self.add_vector_internal(&args.collection, &id, emb, lang, seq)?;
+            self.add_vector_internal(&args.collection, &id, emb, lang, seq)
+                .map_err(|e| self.durable_apply_error(seq, e))?;
         }
         Ok(node)
     }
@@ -7178,6 +7291,7 @@ impl Storage {
     pub fn add_edge(&self, args: EdgeInput) -> Result<EdgeOutput> {
         self.ensure_writable()?;
         let _commit_guard = self.commit_lock.lock();
+        self.ensure_readable()?;
         let edge = EdgeOutput {
             id: args.id.unwrap_or_else(|| Uuid::new_v4().to_string()),
             from: args.from,
@@ -7192,10 +7306,10 @@ impl Storage {
             caused_by: args.caused_by,
             clock: self.next_clock(),
         };
+        self.persist(&Event::Edge(edge.clone()))?;
         let u32_id = self.index_edge_internal(&edge.id, &edge.from, &edge.to);
         self.edges.insert(u32_id, edge.clone());
         self.refresh_impacts(Some(vec![edge.to.clone()]));
-        self.persist(&Event::Edge(edge.clone()))?;
         Ok(edge)
     }
 
@@ -7207,6 +7321,7 @@ impl Storage {
     ) -> Result<NodeOutput> {
         self.ensure_writable()?;
         let _commit_guard = self.commit_lock.lock();
+        self.ensure_readable()?;
         let u32_id = match self.get_u32(&id) {
             Some(i) => i,
             None => return Err(Error::from_reason(format!("Node {} not found", id))),
@@ -7234,14 +7349,19 @@ impl Storage {
         }
         new_node.clock = self.next_clock();
 
+        // Preserve the existing two-frame temporal contract. If the second
+        // write fails, the closing frame is already durable: do not checkpoint
+        // the old live memory over it or report this as a rejected operation.
+        self.persist(&Event::Node(new_node.clone()))
+            .map_err(|e| self.durable_apply_error(closed_seq, e))?;
         self.insert_node_lean(u32_id, new_node.clone());
-        self.persist(&Event::Node(new_node.clone()))?;
 
         Ok(new_node)
     }
 
     pub fn rebuild_index_parallel(&self) -> Result<()> {
         let _commit_guard = self.commit_lock.lock();
+        self.ensure_readable()?;
         self.is_rebuilding.store(true, Ordering::SeqCst);
         self.flush_index();
         let result = {
@@ -7852,6 +7972,9 @@ impl Storage {
     }
 
     pub fn execute_query_ir(&self, request: QueryIrRequest) -> Result<serde_json::Value> {
+        let _read_guard = self.commit_lock.lock();
+        self.ensure_readable()?;
+
         if request.contract_version != QUERY_IR_V1 {
             return Err(Error::from_reason(format!(
                 "QUERY_IR_VERSION_UNSUPPORTED: expected '{QUERY_IR_V1}', got '{}'",
@@ -8074,6 +8197,9 @@ impl Storage {
     }
 
     pub fn execute_hql(&self, query: &str) -> Result<serde_json::Value> {
+        let _read_guard = self.commit_lock.lock();
+        self.ensure_readable()?;
+
         fn to_value<T: serde::Serialize>(res: T) -> Result<serde_json::Value> {
             serde_json::to_value(res)
                 .map_err(|e| Error::from_reason(format!("HQL result serialization failed: {e}")))
@@ -8334,6 +8460,9 @@ impl Storage {
     }
 
     pub fn execute_hql_read_only(&self, query: &str) -> Result<serde_json::Value> {
+        let _read_guard = self.commit_lock.lock();
+        self.ensure_readable()?;
+
         let command = HqlCommand::try_from(query).map_err(Error::from_reason)?;
         match command {
             HqlCommand::Search { .. }
@@ -8408,6 +8537,9 @@ impl Storage {
     }
 
     pub fn studio_graph_scene(&self, request: StudioGraphSceneRequest) -> Result<StudioGraphScene> {
+        let _read_guard = self.commit_lock.lock();
+        self.ensure_readable()?;
+
         let limit = request.limit.unwrap_or(240);
         if limit == 0 || limit > STUDIO_SCENE_PAGE_LIMIT {
             return Err(Error::from_reason(format!(
@@ -8552,6 +8684,9 @@ impl Storage {
     }
 
     pub fn studio_inspect_entity(&self, entity_id: &str) -> Result<StudioEntityInspection> {
+        let _read_guard = self.commit_lock.lock();
+        self.ensure_readable()?;
+
         let node_u32 = self
             .get_u32(entity_id)
             .ok_or_else(|| Error::from_reason("STUDIO_ENTITY_NOT_FOUND"))?;
@@ -8671,6 +8806,9 @@ impl Storage {
     }
 
     pub fn hybrid_search(&self, args: HybridSearchInput) -> Result<Vec<NeighborOutput>> {
+        let _read_guard = self.commit_lock.lock();
+        self.ensure_readable()?;
+
         self.hybrid_search_impl(args, None)
     }
 
@@ -8952,6 +9090,9 @@ impl Storage {
     }
 
     pub fn get_ranked_context(&self, args: HybridSearchInput) -> Result<Vec<NeighborOutput>> {
+        let _read_guard = self.commit_lock.lock();
+        self.ensure_readable()?;
+
         let mut context_args = args;
         context_args.alpha = Some(0.4);
         self.hybrid_search(context_args)
@@ -8963,6 +9104,9 @@ impl Storage {
         args: NeighborInput,
         is_inferred: bool,
     ) -> Result<Vec<NeighborOutput>> {
+        let _read_guard = self.commit_lock.lock();
+        self.ensure_readable()?;
+
         let u32_seed = match self.get_u32(&seed) {
             Some(id) => id,
             None => return Ok(Vec::new()),
@@ -9384,6 +9528,9 @@ impl Storage {
     /// Absent both fields, behavior for data that was never retracted or
     /// superseded is unchanged from before this method enforced visibility.
     pub fn query(&self, args: QueryInput) -> Result<Vec<EdgeOutput>> {
+        let _read_guard = self.commit_lock.lock();
+        self.ensure_readable()?;
+
         let include_invalid = args.include_invalid.unwrap_or(false);
         let now = Utc::now().to_rfc3339();
         let mut res = Vec::new();
@@ -9444,6 +9591,9 @@ impl Storage {
     }
 
     pub fn detect_communities(&self) -> Result<()> {
+        let _read_guard = self.commit_lock.lock();
+        self.ensure_readable()?;
+
         // Community detection runs over the default collection's vector space.
         let coll = self.default_coll();
         let mut meta_arena = coll.metadata.write();
@@ -9526,6 +9676,9 @@ impl Storage {
     }
 
     pub fn generate_meta_graph(&self) -> Result<()> {
+        let _read_guard = self.commit_lock.lock();
+        self.ensure_readable()?;
+
         // Meta-graph is built over the default collection's vector space.
         let coll = self.default_coll();
         let dim = coll.dim as usize;
@@ -9627,6 +9780,9 @@ impl Storage {
     }
 
     pub fn prune_orphaned_nodes(&self) -> Result<()> {
+        let _read_guard = self.commit_lock.lock();
+        self.ensure_readable()?;
+
         let mut to_delete = Vec::new();
         let now = Utc::now().to_rfc3339();
 
@@ -9664,6 +9820,7 @@ impl Storage {
     pub fn retract_node(&self, id: &str) -> Result<()> {
         self.ensure_writable()?;
         let _commit_guard = self.commit_lock.lock();
+        self.ensure_readable()?;
         let u32_id = match self.get_u32(id) {
             Some(i) => i,
             None => return Ok(()),
@@ -9773,6 +9930,7 @@ impl Storage {
     pub fn reconcile_state(&self, signed_events: Vec<SignedEvent>) -> Result<()> {
         self.ensure_writable()?;
         let _commit_guard = self.commit_lock.lock();
+        self.ensure_readable()?;
         self.reconcile_state_unlocked(signed_events)
     }
 
@@ -9794,9 +9952,11 @@ impl Storage {
             // 2. Apply Event logic
             match event {
                 Event::Node(remote_node) => {
-                    let u32_id = self.get_or_intern_id(&remote_node.id);
                     let mut apply = true;
-                    if let Some(local_node) = self.nodes.get(&u32_id) {
+                    if let Some(local_node) = self
+                        .get_u32(&remote_node.id)
+                        .and_then(|u| self.nodes.get(&u))
+                    {
                         if remote_node.clock < local_node.value().clock {
                             apply = false;
                         }
@@ -9839,6 +9999,7 @@ impl Storage {
                                 seq,
                             );
                         }
+                        let u32_id = self.get_or_intern_id(&remote_node.id);
                         self.insert_node_lean(u32_id, remote_node.clone());
                     }
                 }
@@ -9862,13 +10023,13 @@ impl Storage {
                                 Err(actual) => current = actual,
                             }
                         }
+                        self.persist_signed(signed_event.clone())?;
                         let u32_id = self.index_edge_internal(
                             &remote_edge.id,
                             &remote_edge.from,
                             &remote_edge.to,
                         );
                         self.edges.insert(u32_id, remote_edge.clone());
-                        self.persist_signed(signed_event.clone())?;
                     }
                 }
                 Event::Vector(remote_vec) => {
@@ -9995,26 +10156,27 @@ impl Storage {
     /// lock (save_state/compact hold the SAME mutex, so this fully serializes
     /// them against a concurrent fold regardless of the journal format).
     pub fn persist_signed(&self, signed_event: SignedEvent) -> Result<u64> {
-        // If nobody holds the lock, `try_lock` succeeds and the invariant was
-        // violated; if WE hold it, `try_lock` always fails (not reentrant), so
-        // this never false-positives on a correct caller.
         debug_assert!(
-            self.commit_lock.try_lock().is_none(),
+            self.commit_lock.is_owned_by_current_thread(),
             "persist_signed requires the caller to hold commit_lock \
              (see RCA--PERSIST-SIGNED-CHECKPOINT-RACE)"
         );
+        self.ensure_writable()?;
+        self.preflight_relational_event(&signed_event.event)?;
         let (ack_tx, ack_rx) = unbounded();
         let event = signed_event.event.clone();
         self.wal_sender
             .send(WalMsg::Append(Box::new(signed_event), ack_tx))
             .map_err(|_| Error::from_reason("wal disconnected"))?;
-        let seq = ack_rx
-            .recv()
-            .ok()
-            .flatten()
-            .ok_or_else(|| Error::from_reason("wal append failed"))?;
+        let seq = ack_rx.recv().ok().flatten().ok_or_else(|| {
+            self.recovery_required.store(true, Ordering::SeqCst);
+            Error::from_reason(
+                "COMMIT_OUTCOME_UNKNOWN: WAL acknowledgement failed; reopen required",
+            )
+        })?;
         self.commit_sequence.fetch_max(seq, Ordering::SeqCst);
-        self.projection_apply_event(&event, seq)?;
+        self.projection_apply_event(&event, seq)
+            .map_err(|e| self.durable_apply_error(seq, e))?;
         Ok(seq)
     }
 
@@ -10029,6 +10191,9 @@ impl Storage {
         budget: Option<u32>,
         fuzzy: bool,
     ) -> Result<ContextPackage> {
+        let _read_guard = self.commit_lock.lock();
+        self.ensure_readable()?;
+
         let tier = ScalingTier::parse(tier_str);
         let hops = tier.hops();
         let target_id_resolved = if fuzzy {
@@ -10413,6 +10578,7 @@ impl Storage {
     pub fn save_state(&self) -> Result<()> {
         self.ensure_writable()?;
         let _commit_guard = self.commit_lock.lock();
+        self.ensure_readable()?;
         self.save_state_unlocked()
     }
 
@@ -10836,6 +11002,7 @@ impl Storage {
         // Public write paths share this barrier so the captured files represent
         // one declared frontier rather than a mix of concurrent mutations.
         let _commit_guard = self.commit_lock.lock();
+        self.ensure_readable()?;
         if request.destination.exists() {
             return Err(Error::from_reason("backup destination already exists"));
         }
@@ -11502,6 +11669,7 @@ impl Storage {
     pub fn execute_batch(&self, input: BatchInput) -> Result<BatchOutput> {
         self.ensure_writable()?;
         let _commit_guard = self.commit_lock.lock();
+        self.ensure_readable()?;
 
         // 1. Validation Phase (All-or-Nothing)
         for node in &input.nodes {
@@ -11634,6 +11802,10 @@ impl Storage {
     }
 
     pub fn perform_index_compaction(&self) -> Result<()> {
+        let _commit_guard = self.commit_lock.lock();
+        self.ensure_readable()?;
+        let _commit_guard = self.commit_lock.lock();
+        self.ensure_readable()?;
         println!("compaction: starting index compaction...");
         let start = Instant::now();
         // Drain pending HNSW inserts first — compaction reassigns arena ids, so
@@ -11868,6 +12040,8 @@ impl Storage {
     /// signal). Presence only: a re-`add_vector` superseding the same
     /// (node, collection) with a different embedding is not distinguished here.
     pub fn get_merkle_root(&self) -> String {
+        let _read_guard = self.commit_lock.lock();
+
         // Unambiguous entry encoding: each field is `u32 little-endian length ++ bytes`.
         fn entry(parts: &[&[u8]]) -> Vec<u8> {
             let mut b = Vec::new();
@@ -11957,6 +12131,8 @@ impl Storage {
     /// entries deserialize to a zero clock and are not `> from_clock`, so they don't
     /// re-sync on their own — re-`add_vector` re-stamps them with a live clock.)
     pub fn events_since(&self, from_clock: u32) -> Vec<SignedEvent> {
+        let _read_guard = self.commit_lock.lock();
+
         let mut out: Vec<(u32, SignedEvent)> = Vec::new();
         self.scan_journal(None, true, &mut |_, se| {
             if let Some(t) = Self::event_time(&se.event) {
@@ -11974,6 +12150,8 @@ impl Storage {
     /// serves relational-only transactions (every frame has a seq), closing the
     /// `event_time = None` gap. Frame order IS local order, so no re-sort.
     pub fn events_since_seq(&self, from_seq: u64) -> Vec<SignedEvent> {
+        let _read_guard = self.commit_lock.lock();
+
         // Cursor 0 = the peer has nothing, so send everything (including a base
         // segment folded at seq 0); any other value is an exclusive cursor.
         let cursor = if from_seq == 0 { None } else { Some(from_seq) };
@@ -12015,6 +12193,7 @@ impl Storage {
     pub fn compact(&self) -> Result<()> {
         self.ensure_writable()?;
         let _commit_guard = self.commit_lock.lock();
+        self.ensure_readable()?;
         self.compact_unlocked()
     }
 
@@ -12689,6 +12868,7 @@ impl Storage {
     pub fn retract_edge(&self, id: String, at: Option<String>) -> Result<Option<EdgeOutput>> {
         self.ensure_writable()?;
         let _commit_guard = self.commit_lock.lock();
+        self.ensure_readable()?;
         let ekey = Self::edge_key(&id);
         let mut edge = match self.edges.get(&ekey) {
             Some(e) => e.value().clone(),
@@ -12696,9 +12876,9 @@ impl Storage {
         };
         edge.valid_to = Some(at.unwrap_or_else(|| Utc::now().to_rfc3339()));
         edge.clock = self.next_clock(); // advance for CRDT LWW: the retraction must win
+        self.persist(&Event::Edge(edge.clone()))?;
         self.edges.insert(ekey, edge.clone());
         self.refresh_impacts(Some(vec![edge.to.clone()]));
-        self.persist(&Event::Edge(edge.clone()))?;
         Ok(Some(edge))
     }
     pub fn status_sync(&self) -> DatabaseStatus {
@@ -12742,6 +12922,9 @@ impl Storage {
     }
 
     pub fn calculate_structural_gaps(&self) -> Result<Vec<GapSuggestion>> {
+        let _read_guard = self.commit_lock.lock();
+        self.ensure_readable()?;
+
         let mut gaps = Vec::new();
         let mut cluster_centroids: HashMap<u32, Vec<f32>> = HashMap::new();
         let mut cluster_member_count: HashMap<u32, u32> = HashMap::new();
@@ -12802,6 +12985,8 @@ impl Storage {
     }
 
     pub fn get_meta_history(&self, cluster_id: u32) -> Vec<SuperNode> {
+        let _read_guard = self.commit_lock.lock();
+
         self.meta_history
             .get(&cluster_id)
             .map(|v| v.value().clone())

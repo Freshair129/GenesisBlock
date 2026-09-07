@@ -2,8 +2,8 @@
 title: "GenesisBlockDB Technical Architecture and Capability Composition"
 doc_id: "MASTER-SPEC-GENESISBLOCKDB"
 status: current
-version: "2.2.0"
-updated: "2026-08-14"
+version: "2.2.1"
+updated: "2026-09-08"
 owner: "GenesisBlockDB Architecture"
 source_of_truth: true
 related_issue: 84
@@ -15,6 +15,7 @@ related_docs:
   - "docs/adr/ADR--GENESISBLOCKDB-DOMAIN-NEUTRAL-CORE.md"
   - "docs/adr/ADR--GENESISDB-TYPED-QUERY-IR-AGENT-BOUNDARY.md"
   - "docs/SPEC--GENESISDB-TYPED-QUERY-IR-V1.md"
+  - "docs/SPEC--WAVE-A-COMMIT-CORRECTNESS.md"
 ---
 
 # GenesisBlockDB Technical Architecture and Capability Composition
@@ -84,7 +85,7 @@ GenesisBlockDB uses a **Log-Structured Merge-Friendly** architecture based on a 
 - **Primary Log:** `genesis-graph.wal` (JSONL format) stores mutation events.
 - **Persistence:** high-durability append-only logic with batched group commits.
 - **Unified operational boundary:** applications open, mutate, query, back up and restore GenesisBlockDB as one database. SQLite is an internal relational projection; native graph/vector indexes are not separate application-managed databases.
-- **Relational projection:** embedded SQLite (`rusqlite`, bundled) stores node properties, normalized labels and U2 app-defined tables. Versioned additive schemas, idempotent typed mutation batches and bounded named joins are available through Genesis APIs. SQLite remains internal and rebuildable from the signed WAL. Unified cross-domain commit sequencing remains U3.
+- **Relational projection:** embedded SQLite (`rusqlite`, bundled) stores node properties, normalized labels and U2 app-defined tables. Versioned additive schemas, idempotent typed mutation batches and bounded named joins are available through Genesis APIs. SQLite remains internal and rebuildable from the signed WAL. Unified cross-domain transactions preflight relational constraints before WAL append. Supported query reads and graph/projection publication share a reentrant commit boundary; failed durable apply requires reopen before further queries, writes or checkpoint. Concurrent reads serialize; ANN visibility still requires the existing flush barrier. See [Wave A contract and verification limits](SPEC--WAVE-A-COMMIT-CORRECTNESS.md).
 - **In-memory state:**
   - `DashMap<u32, NodeOutput>`: lean primary node records; `props` are hydrated from SQLite rather than retained on the traversal path.
   - `DashMap<u128, EdgeOutput>`: primary edge storage. Edges are keyed by deterministic `u128 = trunc128(SHA256(id))`; the key is derived from `EdgeOutput.id` and is not client identity.
@@ -301,6 +302,7 @@ The architecture is conformant when:
 
 | Version | Date | Owner | Summary |
 |---|---|---|---|
+| 2.2.1 | 2026-09-08 | GenesisBlockDB Architecture | Reflected approved Wave A preflight, publication and recovery-required behavior with verification limits. |
 | 2.2.0 | 2026-08-14 | GenesisBlockDB Architecture | Approved typed Query IR as the primary query boundary, retained HQL compatibility, and placed NL conversion outside the engine. |
 | 2.1.0 | 2026-08-03 | GenesisBlockDB Architecture | Separated BRD/PRD/SRS roles, established standalone client-neutral boundary, added client namespace/schema metadata, and removed GoVibe-specific authority from the core definition. |
 | 2.0.0 | previous | GenesisBlockDB Architecture | Previous master specification. |

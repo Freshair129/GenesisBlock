@@ -3,6 +3,7 @@ doc_id: API_REFERENCE
 status: current
 version: generated
 owner: GenesisBlockDB Engineering
+updated: "2026-09-08"
 ---
 
 # GenesisBlockDB REST API Reference
@@ -26,6 +27,28 @@ prior corrupted file. The server is the SSOT; update this when routes change.
 >    but enforces the read-only HQL command family.
 > 2. Edge `from`/`to` are **node string ids** (e.g. `"N-…"`), not integers.
 
+## Write outcomes and recovery (Wave A)
+
+The core distinguishes rejection from a durable or uncertain write. REST retains
+its route-specific HTTP status and plain-text error body; NAPI exposes the same
+message through promise rejection. Inspect the message prefix rather than
+assuming that every non-success status means no write occurred.
+
+| Error prefix / outcome | Client action |
+|---|---|
+| Unified input/PK/unique/FK rejection | No WAL frame or graph/vector/row publication; correct the payload and retry the same transaction ID |
+| `COMMIT_OUTCOME_UNKNOWN` | The request was sent but the WAL acknowledgement failed; reopen and inspect durable state; retry the same identity only for APIs with an idempotency contract |
+| `DURABLE_COMMIT_APPLY_FAILED` | The message includes a durable frame sequence; address the underlying error and reopen to replay, rather than issuing a new mutation identity |
+| `RECOVERY_REQUIRED` | Query/write/checkpoint access is stopped on this Storage instance; reopen is required |
+
+Superseding a node retains its two-frame history. If its second write fails, the
+closing frame is already durable; this is partial durable completion, not full
+rejection. Supported query calls see a complete publication boundary, and
+concurrent reads serialize. ANN remains eventual until its existing flush or
+read-your-write barrier. Diagnostic getters are not a readiness signal during
+recovery-required state. See [Wave A](SPEC--WAVE-A-COMMIT-CORRECTNESS.md) for the
+exact boundary, tests and performance limitations.
+
 ## Routes
 
 | Method | Path | Request body | Response |
@@ -45,7 +68,7 @@ prior corrupted file. The server is the SSOT; update this when routes change.
 | POST | `/v1/relational/mutate` | `RelationalMutationBatch` | `RelationalMutationResult` |
 | POST | `/v1/relational/query` | `NamedQueryRequest` | JSON row array |
 | POST | `/v1/transaction/commit` | `GenesisTransaction` | `TransactionCommitResult` |
-| GET | `/v1/frontier` | _none_ | stable frontier `u64` |
+| GET | `/v1/frontier` | _none_ | `{ frame: u64, txn: u64 }` — durable frame and transaction lineage frontiers |
 | GET | `/v1/studio/capabilities` | _none_ | negotiated Studio protocol/features/limits |
 | GET | `/v1/studio/graph` | query `seed?`, `limit?`, `offset?`, `direction?`, `as_of?` | bounded `StudioGraphScene` without embeddings |
 | GET | `/v1/studio/entity/:entity_id` | path id | `StudioEntityInspection` without embeddings |
