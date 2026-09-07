@@ -3,7 +3,7 @@
   "engine": {
     "name": "genesis-block-native",
     "version": "0.2.5",
-    "schemaVersion": 3,
+    "schemaVersion": 4,
     "artifacts": [
       "cdylib (npm native addon)",
       "rlib (Axum REST server)"
@@ -15,7 +15,7 @@
       "path": ".",
       "type": "npm-native-addon",
       "version": "0.2.5",
-      "targetsSchemaVersion": 3,
+      "targetsSchemaVersion": 4,
       "minEngineVersion": "0.2.5"
     },
     {

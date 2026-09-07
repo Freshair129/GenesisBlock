@@ -239,6 +239,18 @@ export interface QueryIrResponse {
 export interface QueryIrCapabilities {
   contract_version: 'query-ir.v1'
   implementation_status: 'partial'
+  storage_schema_version: number
+  collection_definition: {
+    version: number
+    durable: boolean
+    conflict_policy: 'reject'
+    sync_schema_version: number
+  }
+  edge_history: {
+    availability: 'implemented' | 'unavailable'
+    floor: number | null
+    selection: 'replica_local_frame_intervals'
+  }
   operations: {
     search: 'implemented'
     traverse: 'implemented'

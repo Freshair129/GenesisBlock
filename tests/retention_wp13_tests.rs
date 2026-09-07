@@ -129,23 +129,29 @@ fn frontier_only_default_folds_every_checkpoint() {
 #[test]
 fn full_profile_never_folds_and_recovers_journal_only() {
     let path = fresh("wp13_full");
+    let genesis_path = Path::new(&path).join("journal/B000000000000.gseg");
+    let genesis;
     {
         let s = open_with(&path, Some("full"));
+        genesis = fs::read(&genesis_path).unwrap();
+        assert_eq!(s.stable_frontier(), 0);
         for i in 0..20 {
             add_node(&s, &format!("N{i}"));
         }
         s.save_state().unwrap();
         let (base, _) = seg_counts(&path);
-        assert_eq!(base, 0, "full profile must not fold at a checkpoint");
+        assert_eq!(base, 1, "only the schema-4 genesis base may exist");
+        assert_eq!(fs::read(&genesis_path).unwrap(), genesis);
         assert_eq!(s.history_horizon(), 0, "no fold ⇒ no history discarded");
         let caps = s.query_ir_capabilities();
         assert_eq!(caps["temporal"]["retention_profile"], "full");
         assert_eq!(caps["temporal"]["tx_time_retention"], "full");
     } // Drop -> save_state: still no fold.
     let (base, _) = seg_counts(&path);
-    assert_eq!(base, 0, "clean shutdown under full must not fold either");
+    assert_eq!(base, 1, "clean shutdown must retain only the genesis base");
+    assert_eq!(fs::read(&genesis_path).unwrap(), genesis);
 
-    // The journal alone (active file, no base segment) is a complete
+    // The journal alone (active file plus the genesis definition base) is a complete
     // recovery source — I8 with history retained.
     delete_snapshot(&path);
     let s = open_with(&path, Some("full"));
@@ -163,12 +169,19 @@ fn budget_profile_folds_only_when_exceeded() {
     let budget: u64 = 64 * 1024;
     let spec = format!("budget:{budget}");
     let s = open_with(&path, Some(&spec));
+    let genesis_path = Path::new(&path).join("journal/B000000000000.gseg");
+    let genesis = fs::read(&genesis_path).unwrap();
 
     // Below budget: checkpoints must NOT fold.
     add_node(&s, "early");
     s.save_state().unwrap();
     let (base, _) = seg_counts(&path);
-    assert_eq!(base, 0, "budget profile folded below its budget");
+    assert_eq!(
+        base, 1,
+        "only the schema-4 genesis base may exist below budget"
+    );
+    assert_eq!(fs::read(&genesis_path).unwrap(), genesis);
+    assert_eq!(s.history_horizon(), 0, "no user history was discarded");
 
     // Churn until sealed history exceeds the budget (the derived seal
     // threshold guarantees segments appear long before the 64 MiB default).

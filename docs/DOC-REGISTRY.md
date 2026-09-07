@@ -2,7 +2,7 @@
 title: "GenesisBlockDB Document Registry"
 doc_id: "DOC-REGISTRY-GENESISBLOCKDB"
 status: draft
-version: "0.3.3+draft"
+version: "0.3.4+draft"
 updated: "2026-09-08"
 owner: "GenesisBlockDB Architecture"
 source_of_truth: true
@@ -47,10 +47,10 @@ registry row explicitly names them.
 
 | Role | Doc ID | Version | Status | Owner | Path |
 |---|---|---|---|---|---|
-| Architecture composition | `MASTER-SPEC-GENESISBLOCKDB` | `2.2.1` | current | GenesisBlockDB Architecture | `docs/MASTER-SPEC--GENESIS-DB.md` |
-| Architecture index | `C4--GENESISDB-ARCHITECTURE` | `0.1.11b` | current | GenesisBlockDB Architecture | `docs/C4--GENESISDB-ARCHITECTURE.md` |
+| Architecture composition | `MASTER-SPEC-GENESISBLOCKDB` | `2.2.2` | current | GenesisBlockDB Architecture | `docs/MASTER-SPEC--GENESIS-DB.md` |
+| Architecture index | `C4--GENESISDB-ARCHITECTURE` | `0.1.12b` | current | GenesisBlockDB Architecture | `docs/C4--GENESISDB-ARCHITECTURE.md` |
 | Commit correctness | `SPEC--WAVE-A-COMMIT-CORRECTNESS` | `0.1.0b` | beta | GenesisBlockDB Engineering | `docs/SPEC--WAVE-A-COMMIT-CORRECTNESS.md` |
-| Durable collections and edge history | `SPEC--WAVE-B-DURABLE-COLLECTIONS-EDGE-HISTORY` | `0.1.0b` | candidate | GenesisBlockDB Engineering | `docs/SPEC--WAVE-B-DURABLE-COLLECTIONS-EDGE-HISTORY.md` |
+| Durable collections and edge history | `SPEC--WAVE-B-DURABLE-COLLECTIONS-EDGE-HISTORY` | `0.1.1b` | beta | GenesisBlockDB Engineering | `docs/SPEC--WAVE-B-DURABLE-COLLECTIONS-EDGE-HISTORY.md` |
 | ADR | `ADR-GENESISBLOCKDB-DOMAIN-NEUTRAL-CORE` | `0.1.0+draft` | proposed | GenesisBlockDB Architecture | `docs/adr/ADR--GENESISBLOCKDB-DOMAIN-NEUTRAL-CORE.md` |
 | ADR | `ADR--GENESISDB-TYPED-QUERY-IR-AGENT-BOUNDARY` | `1.0.1` | accepted | Product Authority | `docs/adr/ADR--GENESISDB-TYPED-QUERY-IR-AGENT-BOUNDARY.md` |
 | Query contract | `SPEC-GENESISDB-TYPED-QUERY-IR-V1` | `1.0.1` | accepted | GenesisBlockDB Architecture | `docs/SPEC--GENESISDB-TYPED-QUERY-IR-V1.md` |
@@ -101,6 +101,7 @@ The following documents should be created only when implementation work requires
 
 | Version | Date | Owner | Summary |
 |---|---|---|---|
+| 0.3.4+draft | 2026-09-08 | GenesisBlockDB Engineering | Recorded Wave B approval, implementation and synchronized parent versions. |
 | 0.3.3+draft | 2026-09-08 | GenesisBlockDB Engineering | Registered Wave B candidate design; implementation remains unapproved. |
 | 0.3.2+draft | 2026-09-08 | GenesisBlockDB Architecture | Registered approved Wave A commit contract and synchronized parent architecture versions. |
 | 0.3.0+draft | 2026-08-14 | GenesisBlockDB Architecture | Registered the accepted Typed Query IR ADR/spec and removed it from the follow-up list. |

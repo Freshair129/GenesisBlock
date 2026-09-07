@@ -1,10 +1,10 @@
 ---
 doc_id: SPEC--WAVE-B-DURABLE-COLLECTIONS-EDGE-HISTORY
 owner: GenesisBlockDB Engineering
-version: "0.1.0b"
+version: "0.1.1b"
 created_at: "2026-09-08T00:37:57+07:00,ATHER,61d30c0"
-last_update: "2026-09-08T00:37:57+07:00,ATHER"
-status: candidate
+last_update: "2026-09-08T03:25:41+07:00,ATHER"
+status: beta
 superseded_by: null
 attributes:
   domain: storage-correctness
@@ -20,7 +20,8 @@ attributes:
 เสนอแก้ R-02 และ R-03 ต่อจาก Wave A ที่ commit `61d30c0` โดยให้ collection
 config อยู่ใน journal และให้การเปลี่ยน endpoints ของ edge ID เดิมถูกต้องทั้ง
 current view และ transaction-time history ภายใน horizon ที่ยังเก็บอยู่
-เอกสารนี้เป็น **candidate**; ยังไม่มีการแก้ runtime หรือ migration ฐานผู้ใช้
+ผู้ใช้อนุมัติ B0–B4 เมื่อ 2026-09-08; กำลัง implementation และ local verification
+ยังไม่มีการ migration ฐานผู้ใช้
 
 Complexity **C-3**, risk **HIGH**: new event schema, internal projection migration,
 replay/sync/fold compatibility. Approval covers B0–B4 below, including the narrowly
@@ -89,7 +90,7 @@ Before the first v4-only event, create a verified upgrade snapshot and atomicall
 publish a durable `state.json` schema=4 marker. No schema event may be appended
 before this guard. Existing v3 engines reject the intact upgraded bundle through
 their existing schema gate. Backup manifests carry schema=4 and old restore rejects.
-New engines preflight every journal source before opening a writable handle:
+New engines preflight every journal source before opening journal/projection writers:
 validate format versions and every event payload, and propagate unknown versions,
 unknown variants and corruption as explicit errors. A failed preflight must not
 truncate, fold, checkpoint, or rewrite source files.
@@ -273,17 +274,113 @@ changing retention defaults, and fixes to consumer data. Related failures found
 during implementation must be recorded and resolved within approved dependencies
 or returned as specific remaining blockers, never silently marked passed.
 
-## 10. Version diff
+## 10. Implementation refinements
 
-| Artifact | Before | This proposal |
+- Fresh stores publish the schema-4 guard before a derived default definition in
+  a base at sequence/clock zero. The first user mutation remains sequence one.
+- Preflight reads bounded segments. A torn final active frame remains an
+  unacknowledged tail; a complete frame with bad CRC/unknown payload is rejected
+  without repair. Corrupt disposable snapshots can recover from verified journal.
+  The process ownership lock is acquired first; it is coordination metadata and
+  is excluded from durable-payload hash comparisons on rejected opens.
+- A v3 manifest supplies evidenced migration definitions. Their later journaled
+  migration records also authorize earlier legacy vectors during journal-only
+  replay. Ordinary new definitions cannot authorize earlier missing dependencies.
+- Missing/truncated exact sidecars invalidate the partial snapshot and recover
+  from canonical vectors. Definitions never silently switch rerank off.
+- Signed batches are persisted as their original signed outer frame. Derived
+  collection bootstrap assertions are signed separately and prepended to deltas;
+  consumers must not assume every returned dependency is newer than their cursor.
+- Gossip negotiates schema 4, advances responder-local cursors after successful
+  application, and returns `UpgradeRequired`, `BeyondHorizon` or
+  `BootstrapRequired` explicitly. Oversized frames/bases require a separate
+  bootstrap transfer; this change does not implement a chunked UDP snapshot.
+- The Merkle root includes collection semantics. A fresh default collection
+  contributes to the root; empty stores no longer use the all-zero sentinel.
+- Edge replay ignores losing legacy clocks, tracks repeated replacements and
+  hard retractions, and reports an honest floor when snapshot-only edges require
+  backfill. Read-only legacy projections lacking this metadata report unavailable.
+
+## 11. Verification record
+
+Authoritative local evidence is retained at
+`G:/GenesisBlock_Dev/GenesisBlock/.brain/audit/wave-b-2026-09-08/verification.json`.
+Working evidence and RED outputs are under this worktree's `.brain/wave-b/`.
+
+The final engine SHA-256 is
+`f20d9dcfc509ab49dfb668802132e3d77d089b0f52fee1e49fb5bcff99514732`.
+The complete Rust invocation ran 91 suites: 610 passed, four failed and three
+were ignored (exit 101). All four failures were obsolete schema-3 test
+expectations: two sync delta lengths omitted bootstrap definitions, and two
+retention tests expected no genesis base. The corrected anti-entropy suite
+passed seven tests and the corrected retention suite passed four on the unchanged
+engine. Retention checks require the genesis base bytes to remain unchanged,
+horizon zero below budget, and journal-only recovery. The additional edge-history
+projection fault test passed separately. The combined evidence covers 615 passing
+Rust tests, with three ignored; the raw full invocation is not represented as an
+exit-zero run.
+
+The rebuilt NAPI/MCP suite passed 26 tests. Clippy (all targets, warnings denied),
+fmt, and the host mobile+FFI check passed. Documentation validation used the bundled
+Python directly (zero violations in 213 files): the host's `py` launcher has no installed interpreter, so the
+`npm run docs:validate` wrapper exits 112 before trying another interpreter.
+The engine/package version remains 0.2.5; this branch assigns no release version.
+
+### Controlled graph measurements
+
+Two sequential repetitions per build used seed 20260908, 500 nodes, 1,500 edges,
+100 endpoint replacements and 100 two-hop query samples. Baseline: Wave A
+`61d30c0`, release with no default features. Candidate: the final engine above,
+release with no default features plus `bins` (audit/sysinfo dependencies). Both
+used rustc 1.97.1, LTO and one codegen unit on this Windows x64 host. Binary and
+workload hashes are recorded in the evidence JSON.
+
+| Measurement (range of two runs) | Wave A | Wave B |
+|---|---:|---:|
+| Current result count (sum of samples) | 1,328, incorrect | 796 |
+| Historical result count (sum of samples) | 1,328, incorrect | 1,178 |
+| Current p95, microseconds | 1,263.9–1,367.0 | 212.6–400.4 |
+| Historical p95, microseconds | 816.6–908.7 | 1,195.9–1,219.5 |
+| 100 replacement writes, milliseconds | 4,619.4–5,105.8 | 3,763.6–4,070.6 |
+| Cold reopen, milliseconds | 1,143.2–1,224.6 | 2,893.4–2,912.5 |
+| Projection bytes | 421,888 | 1,032,192 |
+
+A separate Python graph model reproduced the expected 796 current and 1,178
+historical results for both candidate runs. The baseline's stale adjacency/history
+answers do not perform equivalent work. History retention increased projection
+size by about 2.45 times here. The harness also removed `identity.bin` in each
+fresh fixture (its preserved filename was obsolete), so `replay_ms` includes
+identity regeneration. The cold-reopen numbers above are retained transparently
+but do not isolate identity-preserving replay cost. These measurements are not a
+no-regression claim. Two runs do not establish production
+capacity or a statistically robust latency comparison.
+
+The supplementary LDBC-Lite quick run measured 1/2/3-hop central estimates of
+43.418 microseconds, 318.09 microseconds and 1.0990 milliseconds. It uses a random
+graph and is not the controlled before/after verdict.
+
+The scientific harness completed 5,000 vectors of dimension 1,536 at 21.24
+nodes/second, followed by 4,999 edges. Independent read-only artifact checks found
+5,000 SQL nodes, 4,999 SQL edges, 30,720,000 vector bytes, schema 4 and journal
+frontier 9,999. These counts verify the harness result despite its unchecked edge
+return values; the rate is a single host-local run, not a throughput guarantee.
+
+No production crash/power-loss certification, consumer migration, release,
+merge or mobile cross-compilation is implied by host-local results.
+
+## 12. Version diff
+
+| Artifact | Before | Implemented |
 |---|---|---|
-| Wave B spec | absent | 0.1.0b candidate |
-| Document registry | 0.3.2+draft | 0.3.3+draft; candidate entry only |
-| Engine / disk schema | Wave A / schema 3 | unchanged; schema 4 is proposed |
-| SQLite projection | schema 4 | unchanged; schema 5 is proposed |
+| Wave B spec | 0.1.0b candidate | 0.1.1b beta, approved B0–B4 |
+| Master / C4 | 2.2.1 / 0.1.11b | 2.2.2 / 0.1.12b |
+| Document registry | 0.3.3+draft | 0.3.4+draft |
+| Engine package | 0.2.5 | 0.2.5, no release assigned |
+| Disk / projection schema | 3 / 4 | 4 / 5 |
 
 ## CHANGELOG
 
 | Version | Date | Status | Summary | Commit Hash | Agent |
 |---|---|---|---|---|---|
+| 0.1.1b | 2026-09-08 | beta | Implemented approved B0–B4 contracts; recorded refinements and local evidence boundary | working-tree | ATHER |
 | 0.1.0b | 2026-09-08 | candidate | Evidence-backed Wave B design for approval | base 61d30c0 | ATHER |

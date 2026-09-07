@@ -2,7 +2,7 @@
 title: "GenesisBlockDB Technical Architecture and Capability Composition"
 doc_id: "MASTER-SPEC-GENESISBLOCKDB"
 status: current
-version: "2.2.1"
+version: "2.2.2"
 updated: "2026-09-08"
 owner: "GenesisBlockDB Architecture"
 source_of_truth: true
@@ -298,10 +298,21 @@ The architecture is conformant when:
 - ADRs define significant decisions.
 - Feature specs and code/tests define implementation detail and evidence.
 
+Wave B (R-02/R-03, approved 2026-09-08) journals immutable collection definitions
+including empty/default spaces and preserves calibration and exact rerank rows
+through fold/recovery. Disk schema is 4; derived SQLite projection schema is 5.
+Edge replacement rewires both adjacency directions and `edge_versions` selects
+replica-local transaction intervals. History is available only from the reported
+edge-history floor. New-reader preflight rejects unsupported complete frames;
+old-engine use of a manually stripped journal-only v4 copy is unsupported.
+See [Wave B contract and verification record](SPEC--WAVE-B-DURABLE-COLLECTIONS-EDGE-HISTORY.md).
+These are local implementation contracts, not deployment or consumer migration evidence.
+
 ## Changelog
 
 | Version | Date | Owner | Summary |
 |---|---|---|---|
+| 2.2.2 | 2026-09-08 | GenesisBlockDB Architecture | Reflected approved Wave B durable collections, schema compatibility and edge version intervals. |
 | 2.2.1 | 2026-09-08 | GenesisBlockDB Architecture | Reflected approved Wave A preflight, publication and recovery-required behavior with verification limits. |
 | 2.2.0 | 2026-08-14 | GenesisBlockDB Architecture | Approved typed Query IR as the primary query boundary, retained HQL compatibility, and placed NL conversion outside the engine. |
 | 2.1.0 | 2026-08-03 | GenesisBlockDB Architecture | Separated BRD/PRD/SRS roles, established standalone client-neutral boundary, added client namespace/schema metadata, and removed GoVibe-specific authority from the core definition. |

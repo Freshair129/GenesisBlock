@@ -2,10 +2,10 @@
 doc_id: C4--GENESISDB-ARCHITECTURE
 type: architecture-index
 status: current
-version: 0.1.11b
+version: 0.1.12b
 owner: GenesisBlockDB Architecture
 created_at: 2026-06-13T22:50:11+07:00,ATHER,9b1ced3
-last_update: 2026-09-08T00:16:00+07:00,ATHER
+last_update: "2026-09-08T03:25:41+07:00,ATHER"
 attributes:
   domain: architecture
   scope: repository
@@ -243,10 +243,21 @@ preflighted before WAL append; uncertain or durable-but-unapplied writes require
 reopen and block query/write/checkpoint paths. Concurrent reads serialize; this
 is not MVCC. Validation and limitations: [Wave A](SPEC--WAVE-A-COMMIT-CORRECTNESS.md).
 
+Wave B (R-02/R-03, approved 2026-09-08) journals immutable collection definitions
+including empty/default spaces and preserves calibration and exact rerank rows
+through fold/recovery. Disk schema is 4; derived SQLite projection schema is 5.
+Edge replacement rewires both adjacency directions and `edge_versions` selects
+replica-local transaction intervals. History is available only from the reported
+edge-history floor. New-reader preflight rejects unsupported complete frames;
+old-engine use of a manually stripped journal-only v4 copy is unsupported.
+See [Wave B contract and verification record](SPEC--WAVE-B-DURABLE-COLLECTIONS-EDGE-HISTORY.md).
+These are local implementation contracts, not deployment or consumer migration evidence.
+
 ## CHANGELOG
 
 | Version | Date | Status | Summary | Commit Hash | Agent |
 |---------|------|--------|---------|-------------|-------|
+| 0.1.12b | 2026-09-08 | beta | Registered Wave B collection journal and edge history contracts. | working-tree | ATHER |
 | 0.1.11b | 2026-09-08 | beta | Registered Wave A commit publication, preflight and recovery-required contracts with validation limits. | working-tree | ATHER |
 | 0.1.9b | 2026-08-14 | beta | Registered the accepted Typed Query IR boundary as planned, retained HQL compatibility, and kept NL interpretation outside the engine. | working-tree | ATHER |
 | 0.1.10b | 2026-08-14 | beta | Truth-synced partial Query IR search/traverse implementation across core, REST and N-API. | working-tree | ATHER |
