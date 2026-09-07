@@ -1,9 +1,9 @@
 ---
 doc_id: SPEC--WAVE-B-DURABLE-COLLECTIONS-EDGE-HISTORY
 owner: GenesisBlockDB Engineering
-version: "0.1.1b"
+version: "0.1.2b"
 created_at: "2026-09-08T00:37:57+07:00,ATHER,61d30c0"
-last_update: "2026-09-08T03:25:41+07:00,ATHER"
+last_update: "2026-09-08T03:53:36+07:00,ATHER"
 status: beta
 superseded_by: null
 attributes:
@@ -303,6 +303,14 @@ or returned as specific remaining blockers, never silently marked passed.
 
 ## 11. Verification record
 
+B4 correction authorized by the user's follow-up: the tracked replay harness must
+remove only explicitly named disposable snapshot/projection files in a newly
+created fixture, preserve identity and journal bytes, and require identical
+normalized current/historical query answers after replay. Baseline and candidate
+must use matching build features. Replacement measurements supersede only the
+original graph benchmark; engine, NAPI/MCP and other harness evidence remain valid.
+
+
 Authoritative local evidence is retained at
 `G:/GenesisBlock_Dev/GenesisBlock/.brain/audit/wave-b-2026-09-08/verification.json`.
 Working evidence and RED outputs are under this worktree's `.brain/wave-b/`.
@@ -326,34 +334,55 @@ Python directly (zero violations in 213 files): the host's `py` launcher has no 
 `npm run docs:validate` wrapper exits 112 before trying another interpreter.
 The engine/package version remains 0.2.5; this branch assigns no release version.
 
-### Controlled graph measurements
+### Controlled graph measurements (corrected harness)
+
+The original graph measurements in the first audit are superseded because its
+cleanup removed identity.bin. Their raw files remain unchanged. Replacement
+results, binary/source hashes, RED evidence and the independent graph-count check
+are retained at
+`G:/GenesisBlock_Dev/GenesisBlock/.brain/audit/wave-b-replay-fix-2026-09-08/verification.json`.
+
+The tracked [replay harness](../benches/wave_b_replay.rs) deletes only named
+disposable files, checks that identity bytes and WAL/journal bytes survive cleanup,
+and requires identical sorted node IDs for each current/historical query before
+and after replay. It rejects an existing fixture path before opening the engine;
+the rejection check preserved a marker file and directory contents. Reproduce on
+a new fixture with:
+
+```powershell
+cargo run --release --no-default-features --features bins --bin wave-b-replay -- <new-fixture-path>
+```
 
 Two sequential repetitions per build used seed 20260908, 500 nodes, 1,500 edges,
 100 endpoint replacements and 100 two-hop query samples. Baseline: Wave A
-`61d30c0`, release with no default features. Candidate: the final engine above,
-release with no default features plus `bins` (audit/sysinfo dependencies). Both
-used rustc 1.97.1, LTO and one codegen unit on this Windows x64 host. Binary and
-workload hashes are recorded in the evidence JSON.
+`61d30c0`. Candidate engine: `28b58cb`, with the unchanged SHA-256 above. Both core
+builds used `--no-default-features --features bins`; both harness binaries used
+rustc 1.97.1, opt-level 3, LTO, one codegen unit and stripped symbols on Windows
+x64. The candidate harness was built with Cargo; the same harness source was
+linked with rustc against the baseline rlib, without editing the baseline tree.
 
 | Measurement (range of two runs) | Wave A | Wave B |
 |---|---:|---:|
 | Current result count (sum of samples) | 1,328, incorrect | 796 |
 | Historical result count (sum of samples) | 1,328, incorrect | 1,178 |
-| Current p95, microseconds | 1,263.9–1,367.0 | 212.6–400.4 |
-| Historical p95, microseconds | 816.6–908.7 | 1,195.9–1,219.5 |
-| 100 replacement writes, milliseconds | 4,619.4–5,105.8 | 3,763.6–4,070.6 |
-| Cold reopen, milliseconds | 1,143.2–1,224.6 | 2,893.4–2,912.5 |
+| Current p95, microseconds | 344.2–374.3 | 190.5–233.9 |
+| Historical p95, microseconds | 806.2–882.2 | 1,135.2–1,168.4 |
+| 100 replacement writes, milliseconds | 3,754.3–3,851.0 | 4,406.6–4,919.5 |
+| Identity-preserving replay, milliseconds | 997.0–1,123.6 | 2,313.8–3,352.6 |
 | Projection bytes | 421,888 | 1,032,192 |
+| Identity, journal and replay-answer invariants | 2/2 passed | 2/2 passed |
 
-A separate Python graph model reproduced the expected 796 current and 1,178
-historical results for both candidate runs. The baseline's stale adjacency/history
-answers do not perform equivalent work. History retention increased projection
-size by about 2.45 times here. The harness also removed `identity.bin` in each
-fresh fixture (its preserved filename was obsolete), so `replay_ms` includes
-identity regeneration. The cold-reopen numbers above are retained transparently
-but do not isolate identity-preserving replay cost. These measurements are not a
-no-regression claim. Two runs do not establish production
-capacity or a statistically robust latency comparison.
+An independent Python graph model reproduced the expected 796 current and 1,178
+historical results before and after candidate replay. The baseline retains its
+known incorrect answers, so latency compares unequal work. Projection size is
+about 2.45 times the baseline; historical queries, replacement writes and replay
+also cost more in these runs. The harness fix validates the measurement and does
+not optimize those engine costs. Two repetitions do not establish production
+capacity or a statistically robust latency comparison. No no-regression claim.
+The unchanged engine's prior Rust/NAPI gates and LDBC/scientific audits are reused;
+this follow-up validates the new harness and its build target. Harness clippy
+(warnings denied), rustfmt, documentation validation (213 files) and version check
+passed.
 
 The supplementary LDBC-Lite quick run measured 1/2/3-hop central estimates of
 43.418 microseconds, 318.09 microseconds and 1.0990 milliseconds. It uses a random
@@ -372,9 +401,9 @@ merge or mobile cross-compilation is implied by host-local results.
 
 | Artifact | Before | Implemented |
 |---|---|---|
-| Wave B spec | 0.1.0b candidate | 0.1.1b beta, approved B0–B4 |
+| Wave B spec | 0.1.1b beta | 0.1.2b beta, B4 replay harness correction |
 | Master / C4 | 2.2.1 / 0.1.11b | 2.2.2 / 0.1.12b |
-| Document registry | 0.3.3+draft | 0.3.4+draft |
+| Document registry | 0.3.4+draft | 0.3.5+draft |
 | Engine package | 0.2.5 | 0.2.5, no release assigned |
 | Disk / projection schema | 3 / 4 | 4 / 5 |
 
@@ -382,5 +411,6 @@ merge or mobile cross-compilation is implied by host-local results.
 
 | Version | Date | Status | Summary | Commit Hash | Agent |
 |---|---|---|---|---|---|
+| 0.1.2b | 2026-09-08 | beta | Corrected B4 replay benchmark identity and result invariants | working-tree | ATHER |
 | 0.1.1b | 2026-09-08 | beta | Implemented approved B0–B4 contracts; recorded refinements and local evidence boundary | working-tree | ATHER |
 | 0.1.0b | 2026-09-08 | candidate | Evidence-backed Wave B design for approval | base 61d30c0 | ATHER |
