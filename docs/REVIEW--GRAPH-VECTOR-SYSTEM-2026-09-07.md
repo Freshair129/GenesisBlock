@@ -1,7 +1,7 @@
 ---
-version: "0.1.4b"
+version: "0.1.5b"
 created_at: "2026-09-07T23:08:51+07:00,ATHER,79b41a3"
-last_update: "2026-09-08T18:15:00+07:00,ATHER,d8ef9af"
+last_update: "2026-09-08T18:30:00+07:00,ATHER,5463296"
 status: beta
 attributes:
   domain: architecture
@@ -17,7 +17,8 @@ verification และ benchmark correction ใน branch `codex/wave-b-durable-
 ที่ commits `28b58cb` และ `44d0252`. Wave C (R-04/R-05/R-06/R-07) มี local
 implementation checkpoint `d8ef9af` และอยู่สถานะ beta; exact filtered-oracle churn
 matrix, rebuilt N-API/MCP runtime campaign และ full Rust sweep ผ่าน local evidence
-แล้ว เหลือ quality interpretation ของ BQ. Wave D–E ยังเป็นข้อเสนอ ไม่ใช่
+แล้ว เหลือ quality interpretation ของ BQ. Wave D (R-09/R-11) มี candidate spec
+ลงทะเบียนแล้ว แต่ยังไม่มี implementation approval; Wave E ยังเป็นข้อเสนอ ไม่ใช่
 production/release claim.
 
 
@@ -357,8 +358,8 @@ flowchart LR
 |---|---|---|---|
 | A | rejected transaction, WAL failure, publication/isolation | HIGH | ไม่มี poisoned WAL/partial rejected state; restart และ retry ผ่าน fault matrix |
 | B | durable collection schema, edge identity/adjacency | HIGH | crash/replay/sync/backup คืน schema และ graph เดิม |
-| C | candidate eligibility, temporal/GRL parity, input bounds, batch fields | MEDIUM–HIGH | implementation checkpoint `cbe5a04`; focused conformance passes, exact oracle/runtime campaign pending |
-| D | query budgets, REST execution control, per-build quality evidence | MEDIUM | bounded failure + measured latency/recall/memory envelopes |
+| C | candidate eligibility, temporal/GRL parity, input bounds, batch fields | MEDIUM–HIGH | checkpoint `d8ef9af`; full Rust/NAPI/mobile evidence passes, BQ quality interpretation remains |
+| D | query budgets, REST execution control, per-build quality evidence | MEDIUM–HIGH | candidate spec `SPEC--WAVE-D-BUDGETS-QUALITY-GATES`; approval required before implementation |
 | E | product-specific hybrid retrieval และ SDK/distribution integration | MEDIUM | clean external consumer ใช้ published capability ได้ตาม contract |
 
 ให้เริ่ม Wave A ก่อน และทำแต่ละ ID เป็น scoped change พร้อม RCA/RED test
@@ -415,9 +416,10 @@ Peer: batch atomicity, multi-collection, epoch HNSW, temporal, GRL, backup/journ
 | 0.1.1b | 0.1.2b | Record verified Wave B delivery and register the Wave C query-correctness candidate |
 | 0.1.2b | 0.1.3b | Record approved Wave C checkpoint `cbe5a04`, focused conformance evidence and remaining beta gates |
 | 0.1.3b | 0.1.4b | Record large-collection refill fix `d8ef9af`, 28-cell oracle evidence and rebuilt N-API/MCP pass |
+| 0.1.4b | 0.1.5b | Register candidate Wave D spec for query budgets, REST execution control and per-index quality evidence |
 
 ผู้ใช้อนุมัติ Wave A (R-01 และ R-08) เมื่อ 2026-09-07, Wave B (R-02/R-03)
 และ Wave C (R-04/R-05/R-06/R-07) เมื่อ 2026-09-08; implementation/verification
-อยู่ในสเปกของแต่ละ wave. Wave C อยู่ beta ตาม checkpoint `d8ef9af`; Wave D–E
-ยังไม่เริ่ม.
+อยู่ในสเปกของแต่ละ wave. Wave C อยู่ beta ตาม checkpoint `d8ef9af`; Wave D มี
+candidate spec แล้วและรออนุมัติ implementation; Wave E ยังไม่เริ่ม.
 
