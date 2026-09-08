@@ -1,7 +1,7 @@
 ---
-version: "0.1.2b"
+version: "0.1.3b"
 created_at: "2026-09-07T23:08:51+07:00,ATHER,79b41a3"
-last_update: "2026-09-08T11:30:00+07:00,ATHER"
+last_update: "2026-09-08T16:30:00+07:00,ATHER,cbe5a04"
 status: beta
 attributes:
   domain: architecture
@@ -14,8 +14,10 @@ attributes:
 สถานะ 2026-09-08: findings ด้านล่างเริ่มจาก baseline ของ 79b41a3. Wave A (R-01/R-08)
 ผ่านใน branch `codex/wave-a-commit-correctness`; Wave B (R-02/R-03) ผ่าน local
 verification และ benchmark correction ใน branch `codex/wave-b-durable-index-design`
-ที่ commits `28b58cb` และ `44d0252`. Wave C เป็น candidate proposal ใน branch
-`codex/wave-c-query-correctness`; Wave D–E ยังเป็นข้อเสนอ ไม่ใช่ production/release claim.
+ที่ commits `28b58cb` และ `44d0252`. Wave C (R-04/R-05/R-06/R-07) มี local
+implementation checkpoint `cbe5a04` และอยู่สถานะ beta; exact filtered-oracle churn
+matrix กับ rebuilt N-API/MCP runtime campaign ยังเหลือเป็น exit evidence. Wave D–E
+ยังเป็นข้อเสนอ ไม่ใช่ production/release claim.
 
 
 ตรวจจาก source commit `79b41a3f4ae4026d086b634c631f4f4a7ccbd142`, engine 0.2.5, Windows x64
@@ -176,6 +178,10 @@ shortfall fallback เช็กจำนวน raw ANN hits ก่อน visibil
 หากมี eligible vectors ≥ k ต้องไม่คืนศูนย์เพราะ tombstone shortlist;
 ตรวจ recall เทียบ exact filtered oracle พร้อม latency budget
 
+**สถานะ Wave C:** implemented in `cbe5a04`; focused None/SQ8-rerank churn
+regressions pass. The full churn/quantizer oracle and latency campaign remains
+open evidence.
+
 ### R-05 — P1: Temporal visibility ต่างกันระหว่าง search/traversal/GRL
 
 **หลักฐานสามกรณี:**
@@ -198,6 +204,11 @@ GRL/metadata summaries ต้องใช้ eligibility เดียวกั�
 entities ไม่เข้าผล current view; historical query ยังเห็นเมื่ออยู่ใน window;
 ทดสอบ nodes, edges, vectors, MATCH และ GRL ข้าม NAPI/REST/FFI
 
+**สถานะ Wave C:** normalized RFC3339, current/future/expiry predicate, GRL
+edge filtering and malformed selector errors are implemented in `cbe5a04`.
+Core and REST regression suites pass; rebuilt NAPI/MCP/FFI runtime evidence is
+still pending.
+
 ### R-06 — P2: Collection input ถูกเปลี่ยนความหมายเงียบ
 
 **หลักฐาน:** create dim=65537, metric=`bogus`, quant=`bogus` ตอบ Ok;
@@ -214,6 +225,10 @@ NaN/Infinity ยังไม่ได้พิสูจน์ runtime ใน aud
 **Acceptance:** dim 0/65536/65537 และ unknown metric/quant ถูกปฏิเสธก่อน mutation;
 ค่าที่รองรับ round-trip ตรง; ปฏิเสธ vector ที่ไม่ finite โดยไม่ poison WAL/index
 
+**สถานะ Wave C:** strict finite vector/query controls and frontier-preserving
+rejection are implemented in `cbe5a04`; collection boundary behavior remains
+covered by Wave B plus Wave C core/REST tests.
+
 ### R-07 — P2: Batch ทิ้ง valid_from ของ edge
 
 **หลักฐาน:** EdgeInput valid_from=2030 แต่ execute_batch output เป็นเวลาปัจจุบัน
@@ -227,6 +242,10 @@ NaN/Infinity ยังไม่ได้พิสูจน์ runtime ใน aud
 
 **Acceptance:** ส่ง EdgeInput เดียวกันทาง add/batch/transaction ได้ temporal semantics เดียวกัน;
 replay และ snapshot รักษา valid_from ที่ caller ให้
+
+**สถานะ Wave C:** batch `valid_from` preservation is implemented and covered by
+core and REST regressions in `cbe5a04`. Existing `supersede` input behavior was
+left unchanged and is recorded as out of scope for this checkpoint.
 
 ### R-08 — P1: WAL failure ทิ้ง uncommitted node ใน memory
 
@@ -317,7 +336,7 @@ FFI มี Query IR และ flush_index แต่ต้องแยก mobile 
 | Query IR | Versioned envelope, unknown-field/version rejection, capability disclosure, read-your-write option | Source + Query IR suite |
 | SQL/projection | Read-only connection, authorizer, parameter binding, query budget; edges projected | Source + extended SQL/edge suites |
 | Backup | Isolated restore, manifest/schema checks, checksums and path checks | 7 backup tests; ไม่ใช่ power-loss proof |
-| Temporal history | Retention horizon และ explicit beyond_horizon; node/vector/retired-edge epoch paths | Epoch E1/E2 suites; R-05 ยังคงอยู่ |
+| Temporal history | Retention horizon, explicit beyond_horizon, normalized current/valid-time visibility and node/vector/retired-edge epoch paths | Epoch E1/E2 plus Wave C temporal/GRL suites; exact cross-surface runtime campaign remains |
 | Transport | Loopback default, optional API key, request size/CORS guards, /metrics | REST tests; ไม่ได้ตรวจ internet deployment |
 | Governance/sync | Signed peer events, LWW/tombstones, vote verification มี implementation/tests | Extended suites; ไม่ใช่ HA/partition/security certification |
 | CI | Security fix ที่อนุมัติมี local tests/audit/lint ผ่านจากรอบก่อน | ยังไม่ push หรือ hosted acceptance |
@@ -336,7 +355,7 @@ flowchart LR
 |---|---|---|---|
 | A | rejected transaction, WAL failure, publication/isolation | HIGH | ไม่มี poisoned WAL/partial rejected state; restart และ retry ผ่าน fault matrix |
 | B | durable collection schema, edge identity/adjacency | HIGH | crash/replay/sync/backup คืน schema และ graph เดิม |
-| C | candidate eligibility, temporal/GRL parity, input bounds, batch fields | MEDIUM–HIGH | exact oracle + cross-surface conformance ผ่าน |
+| C | candidate eligibility, temporal/GRL parity, input bounds, batch fields | MEDIUM–HIGH | implementation checkpoint `cbe5a04`; focused conformance passes, exact oracle/runtime campaign pending |
 | D | query budgets, REST execution control, per-build quality evidence | MEDIUM | bounded failure + measured latency/recall/memory envelopes |
 | E | product-specific hybrid retrieval และ SDK/distribution integration | MEDIUM | clean external consumer ใช้ published capability ได้ตาม contract |
 
@@ -364,9 +383,18 @@ read-only SQL, edge projection, GRL — **46 tests ผ่านทั้งห�
 รวม **21 suites / 183 tests ผ่าน**; vector_collections ใช้ 335.75s ใน debug profile
 เวลานี้ไม่ใช่ production latency benchmark; diagnostic probe outcomes แยกจาก test pass count
 
-ไม่รัน full cargo/npm suite, real mobile artifacts, long soak, competitor benchmarks,
+ไม่รัน full npm suite, real mobile artifacts, long soak, competitor benchmarks,
 power-cut หรือ network-partition campaign ในรอบนี้; จึงไม่อ้าง production readiness,
 HA, performance superiority หรือไม่มี regression ทุกส่วน
+
+Wave C local checkpoint `cbe5a04` adds six focused core tests and one REST parity
+regression. The final relevant run passed bitemporal (10), GRL (10), HQL/Cypher
+(18), Query IR (5), REST (46), vector collections (14), and Wave C (6), plus
+`cargo check`, clippy with warnings denied and fmt/diff checks. A complete
+`cargo test --no-default-features` run also passed before the final malformed
+selector validation tightening. The exact filtered-oracle churn/latency matrix
+and rebuilt N-API/MCP/FFI runtime checks are still beta exit evidence, so this
+does not promote the system to production readiness.
 
 ## 9. Parent / peer impact
 
@@ -385,8 +413,10 @@ Peer: batch atomicity, multi-collection, epoch HNSW, temporal, GRL, backup/journ
 | none | 0.1.0b | System review, runtime evidence, 8 confirmed defect groups, 4 refinement/gap groups and acceptance roadmap |
 | 0.1.0b | 0.1.1b | Record user approval of Wave A; other waves remain proposed |
 | 0.1.1b | 0.1.2b | Record verified Wave B delivery and register the Wave C query-correctness candidate |
+| 0.1.2b | 0.1.3b | Record approved Wave C checkpoint `cbe5a04`, focused conformance evidence and remaining beta gates |
 
-ผู้ใช้อนุมัติ Wave A (R-01 และ R-08) เมื่อ 2026-09-07 และ Wave B (R-02/R-03)
-เมื่อ 2026-09-08; implementation/verification อยู่ในสเปกของแต่ละ wave. เอกสาร
-Wave C นี้เป็นข้อเสนอสำหรับ review; Wave D–E ยังไม่เริ่ม.
+ผู้ใช้อนุมัติ Wave A (R-01 และ R-08) เมื่อ 2026-09-07, Wave B (R-02/R-03)
+และ Wave C (R-04/R-05/R-06/R-07) เมื่อ 2026-09-08; implementation/verification
+อยู่ในสเปกของแต่ละ wave. Wave C อยู่ beta ตาม checkpoint `cbe5a04`; Wave D–E
+ยังไม่เริ่ม.
 

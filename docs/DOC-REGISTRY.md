@@ -51,7 +51,7 @@ registry row explicitly names them.
 | Architecture index | `C4--GENESISDB-ARCHITECTURE` | `0.1.12b` | current | GenesisBlockDB Architecture | `docs/C4--GENESISDB-ARCHITECTURE.md` |
 | Commit correctness | `SPEC--WAVE-A-COMMIT-CORRECTNESS` | `0.1.0b` | beta | GenesisBlockDB Engineering | `docs/SPEC--WAVE-A-COMMIT-CORRECTNESS.md` |
 | Durable collections and edge history | `SPEC--WAVE-B-DURABLE-COLLECTIONS-EDGE-HISTORY` | `0.1.2b` | beta | GenesisBlockDB Engineering | `docs/SPEC--WAVE-B-DURABLE-COLLECTIONS-EDGE-HISTORY.md` |
-| Query correctness | `SPEC--WAVE-C-QUERY-CORRECTNESS` | `0.1.0b` | candidate | GenesisBlockDB Engineering | `docs/SPEC--WAVE-C-QUERY-CORRECTNESS.md` |
+| Query correctness | `SPEC--WAVE-C-QUERY-CORRECTNESS` | `0.2.0b` | beta | GenesisBlockDB Engineering | `docs/SPEC--WAVE-C-QUERY-CORRECTNESS.md` |
 | ADR | `ADR-GENESISBLOCKDB-DOMAIN-NEUTRAL-CORE` | `0.1.0+draft` | proposed | GenesisBlockDB Architecture | `docs/adr/ADR--GENESISBLOCKDB-DOMAIN-NEUTRAL-CORE.md` |
 | ADR | `ADR--GENESISDB-TYPED-QUERY-IR-AGENT-BOUNDARY` | `1.0.1` | accepted | Product Authority | `docs/adr/ADR--GENESISDB-TYPED-QUERY-IR-AGENT-BOUNDARY.md` |
 | Query contract | `SPEC-GENESISDB-TYPED-QUERY-IR-V1` | `1.0.1` | accepted | GenesisBlockDB Architecture | `docs/SPEC--GENESISDB-TYPED-QUERY-IR-V1.md` |
@@ -102,6 +102,7 @@ The following documents should be created only when implementation work requires
 
 | Version | Date | Owner | Summary |
 |---|---|---|---|
+| 0.3.7+draft | 2026-09-08 | GenesisBlockDB Engineering | Recorded approved Wave C implementation checkpoint `cbe5a04` and beta exit evidence. |
 | 0.3.6+draft | 2026-09-08 | GenesisBlockDB Engineering | Registered the Wave C query-correctness candidate packet. |
 | 0.3.5+draft | 2026-09-08 | GenesisBlockDB Engineering | Registered the B4 identity-preserving replay benchmark correction. |
 | 0.3.4+draft | 2026-09-08 | GenesisBlockDB Engineering | Recorded Wave B approval, implementation and synchronized parent versions. |
