@@ -504,7 +504,7 @@ publication. The native engine remains pinned to
 `614241f622f53c4eeff9890bdc4f31cfecc418b3`.
 
 - Worker setup and runtime/model manifest: [genesisrag17-worker/README.md](genesisrag17-worker/README.md)
-- Product [GenesisRAG17 architecture decision ADR-071](https://github.com/Freshair129/zuri.ai/blob/codex/ki17-integration/docs/decisions/ADR-071-GENESISRAG17-ISOLATED-EXECUTION-AND-PUBLICATION.md)
+- Product [GenesisRAG17 architecture decision ADR-073](https://github.com/Freshair129/zuri.ai/blob/codex/ki17-integration/docs/decisions/ADR-073-GENESISRAG17-ISOLATED-EXECUTION-AND-PUBLICATION.md)
 - Product [17-stage source specification](https://github.com/Freshair129/zuri.ai/blob/codex/ki17-integration/docs/KNOWLEDGE-INGESTION-17-STAGE-SPEC.md)
 - Product [17-stage execution flow](https://github.com/Freshair129/zuri.ai/blob/codex/ki17-integration/docs/KNOWLEDGE-INGESTION-17-STAGE-FLOW.md)
 - [Pinned historical acceptance report](https://github.com/Freshair129/zuri.ai/blob/b64b46df057d3160c659afa3c34628ee86520257/.brain/reports/GENESISRAG17-ACCEPTANCE.md)

@@ -2,7 +2,7 @@
 title: "GenesisRAG17 TEST pipeline flow"
 doc_id: "FLOW-GENESISRAG17-PIPELINE"
 status: beta
-version: "1.0.2b"
+version: "1.0.3b"
 updated: "2026-09-08"
 owner: "GenesisBlockDB Architecture"
 source_of_truth: true
@@ -19,7 +19,7 @@ related_docs:
 
 This document describes the executable cross-repository flow for the isolated
 GenesisRAG17 TEST worker. The product [GenesisRAG17 architecture decision
-ADR-071](https://github.com/Freshair129/zuri.ai/blob/codex/ki17-integration/docs/decisions/ADR-071-GENESISRAG17-ISOLATED-EXECUTION-AND-PUBLICATION.md)
+ADR-073](https://github.com/Freshair129/zuri.ai/blob/codex/ki17-integration/docs/decisions/ADR-073-GENESISRAG17-ISOLATED-EXECUTION-AND-PUBLICATION.md)
 sets the profile; the [17-stage source
 specification](https://github.com/Freshair129/zuri.ai/blob/codex/ki17-integration/docs/KNOWLEDGE-INGESTION-17-STAGE-SPEC.md)
 defines the logical pipeline. The [source execution
@@ -277,3 +277,7 @@ API, or a production temporal index.
 | 1.0.2b | 2026-09-08 | beta | Reconciled the live zuri GenesisRAG17 architecture reference to ADR-071 after the identifier collision; retained the pinned historical acceptance report. | working-tree | RWANG |
 | 1.0.1b | 2026-09-08 | beta | Synced audit remediation: pre-commit native intents and collection checkpoint recovery, graph accepted-state ordering, Stage 16 lexical indexing, PASS-only publication and no-fallback pointer replacement. | working-tree | RWANG |
 | 1.0.0b | 2026-09-08 | beta | Added the stage-by-stage ownership, physical 13 -> 14 -> 15 -> 16 -> 17 sequence, receipt lifecycle, visibility rules and recovery flow. | working-tree | RWANG |
+
+## Reference version diff — 2026-09-08
+
+"1.0.2b → 1.0.3b: follow zuri's pre-merge ADR-071 → ADR-073 collision repair because published main owns ADR-071 for CRM. Historical revision rows and pinned acceptance reports retain their original identifiers. Protocol and runtime behavior are unchanged.

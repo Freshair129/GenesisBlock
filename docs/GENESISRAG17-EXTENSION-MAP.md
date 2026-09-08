@@ -2,7 +2,7 @@
 title: "GenesisRAG17 extension map"
 doc_id: "MAP-GENESISRAG17-EXTENSIONS"
 status: beta
-version: "1.0.2b"
+version: "1.0.3b"
 updated: "2026-09-08"
 owner: "GenesisBlockDB Architecture"
 source_of_truth: true
@@ -20,7 +20,7 @@ related_docs:
 Use this map before extending a stage. It separates the logical seventeen-stage
 product contract from the current physical implementation and identifies the
 documents and evidence that must move together. The product [GenesisRAG17
-architecture decision ADR-071](https://github.com/Freshair129/zuri.ai/blob/codex/ki17-integration/docs/decisions/ADR-071-GENESISRAG17-ISOLATED-EXECUTION-AND-PUBLICATION.md)
+architecture decision ADR-073](https://github.com/Freshair129/zuri.ai/blob/codex/ki17-integration/docs/decisions/ADR-073-GENESISRAG17-ISOLATED-EXECUTION-AND-PUBLICATION.md)
 and the [17-stage source
 specification](https://github.com/Freshair129/zuri.ai/blob/codex/ki17-integration/docs/KNOWLEDGE-INGESTION-17-STAGE-SPEC.md)
 remain the product-level authorities. The [17-stage execution
@@ -188,3 +188,7 @@ by editing only the worker README or a lane flag:
 | 1.0.2b | 2026-09-08 | beta | Reconciled the live zuri GenesisRAG17 architecture reference to ADR-071 after the identifier collision; retained the pinned historical acceptance report. | working-tree | RWANG |
 | 1.0.1b | 2026-09-08 | beta | Synced audit remediation: exact native intent filenames/frontiers and collection checkpoint recovery, graph accepted-state ordering, Stage 16 lexical indexing, PASS-only publication and no-fallback pointer replacement. | working-tree | RWANG |
 | 1.0.0b | 2026-09-08 | beta | Added stage ownership, safe extension seams, coordinated evidence requirements and boundaries requiring a new ADR. | working-tree | RWANG |
+
+## Reference version diff — 2026-09-08
+
+"1.0.2b → 1.0.3b: follow zuri's pre-merge ADR-071 → ADR-073 collision repair because published main owns ADR-071 for CRM. Historical revision rows and pinned acceptance reports retain their original identifiers. Protocol and runtime behavior are unchanged.

@@ -13,7 +13,7 @@ specification](https://github.com/Freshair129/zuri.ai/blob/codex/ki17-integratio
 [17-stage execution
 flow](https://github.com/Freshair129/zuri.ai/blob/codex/ki17-integration/docs/KNOWLEDGE-INGESTION-17-STAGE-FLOW.md)
 and the product [GenesisRAG17 architecture decision
-ADR-071](https://github.com/Freshair129/zuri.ai/blob/codex/ki17-integration/docs/decisions/ADR-071-GENESISRAG17-ISOLATED-EXECUTION-AND-PUBLICATION.md)
+ADR-073](https://github.com/Freshair129/zuri.ai/blob/codex/ki17-integration/docs/decisions/ADR-073-GENESISRAG17-ISOLATED-EXECUTION-AND-PUBLICATION.md)
 and the local [separate-worker/publication ADR](../docs/ADR--GENESISRAG17-SEPARATE-WORKER-PUBLICATION.md)
 define the boundary. The worker persists source, parsed artifact, chunk,
 mention, entity, fact, held-fact, derived-object and citation lineage in the
