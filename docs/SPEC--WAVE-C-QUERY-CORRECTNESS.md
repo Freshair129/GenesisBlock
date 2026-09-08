@@ -1,9 +1,9 @@
 ---
 doc_id: SPEC--WAVE-C-QUERY-CORRECTNESS
 owner: GenesisBlockDB Engineering
-version: "0.2.0b"
+version: "0.2.1b"
 created_at: "2026-09-08T11:30:00+07:00,ATHER,44d0252"
-last_update: "2026-09-08T16:30:00+07:00,ATHER,cbe5a04"
+last_update: "2026-09-08T18:15:00+07:00,ATHER,d8ef9af"
 status: beta
 superseded_by: null
 attributes:
@@ -19,8 +19,9 @@ attributes:
 
 Wave C continues from the verified Wave B delivery commit `44d0252` on
 `codex/wave-c-query-correctness`. The user approved implementation of R-04,
-R-05, R-06 and R-07. The engine and regression checkpoint is
-`cbe5a04` (`fix: close wave c query correctness gaps`). This beta document
+R-05, R-06 and R-07. The engine and regression checkpoint is now
+`d8ef9af` (`fix: close large filtered ann shortfall`), following the initial
+`cbe5a04` implementation checkpoint. This beta document
 records local implementation evidence; it does not authorize push, merge,
 release, deployment, schema migration or consumer migration.
 
@@ -29,8 +30,9 @@ graph retrieval and multiple public surfaces must share one observable contract.
 Risk is **MEDIUM-HIGH**: incorrect filtering can return false knowledge while
 being difficult to detect from latency or a single surface.
 
-The implementation remains beta pending the exact filtered-oracle churn matrix
-and rebuilt N-API/MCP runtime campaign described in the exit gates.
+The exact filtered-oracle churn matrix, rebuilt N-API/MCP runtime campaign and
+full cross-feature regression are now recorded locally; the document remains
+beta pending Wave D quality interpretation for lossy BQ modes.
 
 ## 2. Parent and peer alignment
 
@@ -97,10 +99,11 @@ Assumptions for this implementation:
 
 ## 3.1 Implementation evidence
 
-Checkpoint `cbe5a04` implements the approved core contract:
+Checkpoint `d8ef9af` completes the approved core contract:
 
-- filtered ANN refills by eligible distinct node IDs and reaches the exact
-  fallback for bounded collections, including quantized rerank candidates;
+- filtered ANN refills by eligible distinct node IDs, raises HNSW exploration
+  with each refill and falls back to the exact oracle after exhausting slots,
+  including large collections and quantized rerank candidates;
 - RFC3339 instants are compared as UTC values, current/future/expiry checks use
   one query timestamp, and the same node/edge predicate is applied to vector,
   graph, HQL/MATCH and GRL reads;
@@ -111,13 +114,14 @@ Checkpoint `cbe5a04` implements the approved core contract:
   core coverage. Existing `EdgeInput.supersede` behavior remains unchanged and
   is intentionally outside this checkpoint.
 
-RED reproduced five baseline failures. GREEN passes six Wave C core tests and
-the REST parity regression. The full `cargo test --no-default-features` run
-passed before the final selector-validation tightening; the final relevant
-regression run passed bitemporal (10), GRL (10), HQL/Cypher (18), Query IR (5),
-REST (46), vector collections (14), and Wave C (6). `cargo check`, clippy with
-warnings denied, fmt and diff checks pass. The exact 0/10/50/90% filtered-oracle
-latency campaign and rebuilt N-API/MCP runtime campaign remain beta exit work.
+RED reproduced five baseline failures plus the large-collection fixed-
+`ef_search` shortfall. GREEN passes seven Wave C core tests, the REST capability
+regression and the 28-cell oracle matrix documented in
+[`AUDIT--WAVE-C-FILTERED-ORACLE-2026-09-08.md`](AUDIT--WAVE-C-FILTERED-ORACLE-2026-09-08.md).
+Rebuilt N-API/MCP passes 26/26; host mobile and mobile+FFI checks pass. The
+final `cargo test --no-default-features` sweep passes all suites with the three
+pre-existing ignored soak tests unchanged. BQ recall remains a separate
+lossy-quality axis for Wave D.
 
 ## 4. Scope and acceptance contract
 
@@ -256,9 +260,9 @@ large-scale soak, power-loss certification and network-partition certification.
 
 | Artifact | Before | After |
 |---|---|---|
-| Wave C spec | 0.1.0b, candidate | 0.2.0b, beta |
+| Wave C spec | 0.2.0b, beta | 0.2.1b, beta |
 | Document registry | 0.3.6+draft | 0.3.7+draft |
-| Engine/schema | 0.2.5 / disk schema 4 | engine checkpoint `cbe5a04`; schema unchanged |
+| Engine/schema | 0.2.5 / disk schema 4 | engine checkpoint `d8ef9af`; schema unchanged |
 | Wave B | 0.1.2b, beta | unchanged |
 
 ## CHANGELOG
@@ -267,3 +271,4 @@ large-scale soak, power-loss certification and network-partition certification.
 |---|---|---|---|---|---|
 | 0.1.0b | 2026-09-08 | candidate | Proposed R-04/R-05/R-06/R-07 query correctness packet after Wave B | 44d0252 | ATHER |
 | 0.2.0b | 2026-09-08 | beta | Approved implementation checkpoint with RED/GREEN evidence; exact filtered-oracle and rebuilt N-API/MCP campaigns remain | cbe5a04 | ATHER |
+| 0.2.1b | 2026-09-08 | beta | Closed large-collection refill shortfall; recorded 28-cell oracle and 26/26 N-API/MCP runtime evidence | d8ef9af | ATHER |

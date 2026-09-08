@@ -1,7 +1,7 @@
 ---
-version: "0.1.3b"
+version: "0.1.4b"
 created_at: "2026-09-07T23:08:51+07:00,ATHER,79b41a3"
-last_update: "2026-09-08T16:30:00+07:00,ATHER,cbe5a04"
+last_update: "2026-09-08T18:15:00+07:00,ATHER,d8ef9af"
 status: beta
 attributes:
   domain: architecture
@@ -15,9 +15,10 @@ attributes:
 ผ่านใน branch `codex/wave-a-commit-correctness`; Wave B (R-02/R-03) ผ่าน local
 verification และ benchmark correction ใน branch `codex/wave-b-durable-index-design`
 ที่ commits `28b58cb` และ `44d0252`. Wave C (R-04/R-05/R-06/R-07) มี local
-implementation checkpoint `cbe5a04` และอยู่สถานะ beta; exact filtered-oracle churn
-matrix กับ rebuilt N-API/MCP runtime campaign ยังเหลือเป็น exit evidence. Wave D–E
-ยังเป็นข้อเสนอ ไม่ใช่ production/release claim.
+implementation checkpoint `d8ef9af` และอยู่สถานะ beta; exact filtered-oracle churn
+matrix, rebuilt N-API/MCP runtime campaign และ full Rust sweep ผ่าน local evidence
+แล้ว เหลือ quality interpretation ของ BQ. Wave D–E ยังเป็นข้อเสนอ ไม่ใช่
+production/release claim.
 
 
 ตรวจจาก source commit `79b41a3f4ae4026d086b634c631f4f4a7ccbd142`, engine 0.2.5, Windows x64
@@ -178,9 +179,10 @@ shortfall fallback เช็กจำนวน raw ANN hits ก่อน visibil
 หากมี eligible vectors ≥ k ต้องไม่คืนศูนย์เพราะ tombstone shortlist;
 ตรวจ recall เทียบ exact filtered oracle พร้อม latency budget
 
-**สถานะ Wave C:** implemented in `cbe5a04`; focused None/SQ8-rerank churn
-regressions pass. The full churn/quantizer oracle and latency campaign remains
-open evidence.
+**สถานะ Wave C:** implemented in `d8ef9af`; the 28-cell 0/10/50/90% churn ×
+quantizer oracle matrix returns the requested eligible rows in every cell. The
+matrix is recorded in [`AUDIT--WAVE-C-FILTERED-ORACLE-2026-09-08.md`](AUDIT--WAVE-C-FILTERED-ORACLE-2026-09-08.md).
+Lossy BQ recall remains a separate Wave D quality-gate decision.
 
 ### R-05 — P1: Temporal visibility ต่างกันระหว่าง search/traversal/GRL
 
@@ -387,14 +389,12 @@ read-only SQL, edge projection, GRL — **46 tests ผ่านทั้งห�
 power-cut หรือ network-partition campaign ในรอบนี้; จึงไม่อ้าง production readiness,
 HA, performance superiority หรือไม่มี regression ทุกส่วน
 
-Wave C local checkpoint `cbe5a04` adds six focused core tests and one REST parity
-regression. The final relevant run passed bitemporal (10), GRL (10), HQL/Cypher
-(18), Query IR (5), REST (46), vector collections (14), and Wave C (6), plus
-`cargo check`, clippy with warnings denied and fmt/diff checks. A complete
-`cargo test --no-default-features` run also passed before the final malformed
-selector validation tightening. The exact filtered-oracle churn/latency matrix
-and rebuilt N-API/MCP/FFI runtime checks are still beta exit evidence, so this
-does not promote the system to production readiness.
+Wave C local checkpoint `d8ef9af` adds the large-collection refill regression,
+capability disclosure and the final 28-cell oracle evidence. Rebuilt N-API/MCP
+passes 26/26; host mobile and mobile+FFI checks pass; the final
+`cargo test --no-default-features` sweep passes with three pre-existing ignored
+soak tests. BQ recall/latency still needs explicit Wave D quality limits, so
+this does not promote the system to production readiness.
 
 ## 9. Parent / peer impact
 
@@ -414,9 +414,10 @@ Peer: batch atomicity, multi-collection, epoch HNSW, temporal, GRL, backup/journ
 | 0.1.0b | 0.1.1b | Record user approval of Wave A; other waves remain proposed |
 | 0.1.1b | 0.1.2b | Record verified Wave B delivery and register the Wave C query-correctness candidate |
 | 0.1.2b | 0.1.3b | Record approved Wave C checkpoint `cbe5a04`, focused conformance evidence and remaining beta gates |
+| 0.1.3b | 0.1.4b | Record large-collection refill fix `d8ef9af`, 28-cell oracle evidence and rebuilt N-API/MCP pass |
 
 ผู้ใช้อนุมัติ Wave A (R-01 และ R-08) เมื่อ 2026-09-07, Wave B (R-02/R-03)
 และ Wave C (R-04/R-05/R-06/R-07) เมื่อ 2026-09-08; implementation/verification
-อยู่ในสเปกของแต่ละ wave. Wave C อยู่ beta ตาม checkpoint `cbe5a04`; Wave D–E
+อยู่ในสเปกของแต่ละ wave. Wave C อยู่ beta ตาม checkpoint `d8ef9af`; Wave D–E
 ยังไม่เริ่ม.
 
