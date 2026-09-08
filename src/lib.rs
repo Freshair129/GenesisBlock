@@ -8854,6 +8854,7 @@ impl Storage {
                 "tx_epoch_start": 1,
                 "retention_profile": self.retention.as_str(),
                 "tx_time_retention": self.retention.tx_time_retention(),
+                "valid_at_selector": "rfc3339_normalized",
                 // E2 (SPEC--GENESISDB-EPOCH-HNSW, C5): both SEARCH and
                 // TRAVERSE now enumerate epoch-complete candidates — the
                 // retired-adjacency overlay on the graph side (E1/§3.2) and
@@ -8869,7 +8870,13 @@ impl Storage {
                     "status": "implemented",
                     "retention_profile": self.retention.as_str(),
                 },
-            }
+            },
+            "query_correctness": {
+                "current_visibility": "shared_validity_and_ttl",
+                "filtered_ann": "eligibility_refill",
+                "malformed_as_of": "rejected",
+                "non_finite_vectors": "rejected",
+            },
         })
     }
 
@@ -9916,19 +9923,32 @@ impl Storage {
             } else {
                 let center = coll.center_snapshot();
                 let sq8 = coll.sq8_snapshot();
-                let meta_guard = coll.metadata.read();
-                let flt = |did: &usize| meta_guard.get(*did).map(&pred).unwrap_or(false);
-                let hnsw_lock = coll.hnsw.read();
-                match &*hnsw_lock {
-                    Some(idx) => idx.search_f32(
-                        &query_f32,
-                        fetch,
-                        ef,
-                        center.as_deref(),
-                        sq8,
-                        Some(&flt as &dyn FilterT),
-                    ),
-                    None => return Err(Error::from_reason("HNSW not init")),
+                let run_filtered = |limit: usize| -> Result<Vec<(usize, f32)>> {
+                    let meta_guard = coll.metadata.read();
+                    let flt = |did: &usize| meta_guard.get(*did).map(&pred).unwrap_or(false);
+                    let hnsw_lock = coll.hnsw.read();
+                    match &*hnsw_lock {
+                        Some(idx) => Ok(idx.search_f32(
+                            &query_f32,
+                            limit,
+                            ef.max(limit),
+                            center.as_deref(),
+                            sq8,
+                            Some(&flt as &dyn FilterT),
+                        )),
+                        None => Err(Error::from_reason("HNSW not init")),
+                    }
+                };
+                let mut requested = fetch.min(total).max(1);
+                let mut hits = run_filtered(requested)?;
+                while hits.len() < args.k as usize && requested < total {
+                    requested = requested.saturating_mul(2).min(total);
+                    hits = run_filtered(requested)?;
+                }
+                if hits.len() < args.k as usize && requested >= total {
+                    coll.exact_candidates_where(&query_f32, total, &pred)
+                } else {
+                    hits
                 }
             }
         } else if let Some(n) = exact_rerank_slots {
@@ -9950,7 +9970,18 @@ impl Storage {
                     let hnsw_lock = coll.hnsw.read();
                     match &*hnsw_lock {
                         Some(idx) => {
-                            Ok(idx.search_f32(&query_f32, limit, ef, center.as_deref(), sq8, None))
+                            // A refill raises the result limit as well as the
+                            // graph exploration budget. Keeping `ef` fixed
+                            // can leave every expanded shortlist inside a
+                            // retired prefix on large collections.
+                            Ok(idx.search_f32(
+                                &query_f32,
+                                limit,
+                                ef.max(limit),
+                                center.as_deref(),
+                                sq8,
+                                None,
+                            ))
                         }
                         None => Err(Error::from_reason("HNSW not init")),
                     }
@@ -9985,9 +10016,11 @@ impl Storage {
                         hits = coll.exact_candidates(&query_f32, requested);
                     }
                 }
-                if eligible_count(&hits) < args.k as usize && slots <= EXACT_SCAN_MAX_SLOTS {
-                    // A bounded exact oracle is the correctness floor when ANN
-                    // spends its shortlist on ineligible rows.
+                if eligible_count(&hits) < args.k as usize && requested >= slots {
+                    // Once the ANN budget has exhausted every slot, use the
+                    // exact oracle if HNSW still under-returns. This is rare,
+                    // but it preserves the eligibility contract for large
+                    // collections with heavy tombstone churn too.
                     coll.exact_candidates(&query_f32, slots)
                 } else {
                     hits

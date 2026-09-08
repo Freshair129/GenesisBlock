@@ -92,6 +92,46 @@ fn filtered_ann_refills_after_retired_shortlist() {
 }
 
 #[test]
+fn filtered_ann_refills_large_collection_when_ef_is_smaller_than_fetch() {
+    let (storage, _dir) = storage(2);
+    const NODES: usize = 4097;
+    for i in 0..NODES {
+        storage
+            .add_node(node(
+                &format!("large-{i}"),
+                vec![i as f64 / NODES as f64, 0.0],
+                None,
+            ))
+            .unwrap();
+    }
+    for i in 0..(NODES / 10) {
+        storage.retract_node(&format!("large-{i}")).unwrap();
+    }
+
+    let ids = search(
+        &storage,
+        HybridSearchInput {
+            query_vector: vec![0.0, 0.0],
+            k: 3,
+            alpha: Some(0.0),
+            lang: None,
+            as_of: None,
+            collection: None,
+            ef_search: Some(64),
+            oversample: None,
+        },
+    );
+    assert_eq!(
+        ids,
+        vec![
+            "large-409".to_string(),
+            "large-410".to_string(),
+            "large-411".to_string()
+        ]
+    );
+}
+
+#[test]
 fn filtered_ann_refills_quantized_rerank_candidates() {
     let (storage, _dir) = storage(2);
     storage

@@ -25,6 +25,8 @@ test('NAPI: executeQueryIr supports search and traverse envelopes', async () => 
     assert.equal(capabilities.contract_version, 'query-ir.v1');
     assert.equal(capabilities.operations.search, 'implemented');
     assert.equal(capabilities.operations.traverse, 'implemented');
+    assert.equal(capabilities.temporal.valid_at_selector, 'rfc3339_normalized');
+    assert.equal(capabilities.query_correctness.filtered_ann, 'eligibility_refill');
     await db.addNode({ id: 'query-ir-napi-src', labels: [], embedding: [1.0, 0.0, 0.0] });
     await db.addNode({ id: 'query-ir-napi-dst', labels: [] });
     await db.addEdge({
