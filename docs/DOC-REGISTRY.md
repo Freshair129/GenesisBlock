@@ -2,14 +2,17 @@
 title: "GenesisBlockDB Document Registry"
 doc_id: "DOC-REGISTRY-GENESISBLOCKDB"
 status: draft
-version: "0.3.1+draft"
-updated: "2026-08-14"
+version: "0.4.2+draft"
+updated: "2026-09-08"
 owner: "GenesisBlockDB Architecture"
 source_of_truth: true
 related_issue: 84
 related_docs:
   - "docs/README.md"
   - "docs/DOC-STATUS.md"
+  - "docs/ADR--GENESISRAG17-SEPARATE-WORKER-PUBLICATION.md"
+  - "docs/FLOW--GENESISRAG17-PIPELINE.md"
+  - "docs/GENESISRAG17-EXTENSION-MAP.md"
 ---
 
 # GenesisBlockDB Document Registry
@@ -47,13 +50,16 @@ registry row explicitly names them.
 
 | Role | Doc ID | Version | Status | Owner | Path |
 |---|---|---|---|---|---|
-| Architecture composition | `MASTER-SPEC-GENESISBLOCKDB` | `2.2.0` | current | GenesisBlockDB Architecture | `docs/MASTER-SPEC--GENESIS-DB.md` |
-| Architecture index | `C4--GENESISDB-ARCHITECTURE` | `0.1.10b` | current | GenesisBlockDB Architecture | `docs/C4--GENESISDB-ARCHITECTURE.md` |
+| Architecture composition | `MASTER-SPEC-GENESISBLOCKDB` | `2.3.0b` | current | GenesisBlockDB Architecture | `docs/MASTER-SPEC--GENESIS-DB.md` |
+| Architecture index | `C4--GENESISDB-ARCHITECTURE` | `0.1.11b` | current | GenesisBlockDB Architecture | `docs/C4--GENESISDB-ARCHITECTURE.md` |
 | ADR | `ADR-GENESISBLOCKDB-DOMAIN-NEUTRAL-CORE` | `0.1.0+draft` | proposed | GenesisBlockDB Architecture | `docs/adr/ADR--GENESISBLOCKDB-DOMAIN-NEUTRAL-CORE.md` |
 | ADR | `ADR--GENESISDB-TYPED-QUERY-IR-AGENT-BOUNDARY` | `1.0.1` | accepted | Product Authority | `docs/adr/ADR--GENESISDB-TYPED-QUERY-IR-AGENT-BOUNDARY.md` |
 | Query contract | `SPEC-GENESISDB-TYPED-QUERY-IR-V1` | `1.0.1` | accepted | GenesisBlockDB Architecture | `docs/SPEC--GENESISDB-TYPED-QUERY-IR-V1.md` |
 | Client contract | `CONTRACT-CLIENT-NAMESPACE-AND-SCHEMA` | `0.1.0+draft` | draft | GenesisBlockDB Engineering | `docs/contracts/CONTRACT--CLIENT-NAMESPACE-AND-SCHEMA.md` |
 | API reference | `API_REFERENCE` | generated | current | GenesisBlockDB Engineering | `docs/API_REFERENCE.md` |
+| GenesisRAG17 integration ADR | `ADR-GENESISRAG17-SEPARATE-WORKER-PUBLICATION` | `1.0.3b` | beta | GenesisBlockDB Architecture | `docs/ADR--GENESISRAG17-SEPARATE-WORKER-PUBLICATION.md` |
+| GenesisRAG17 execution flow | `FLOW-GENESISRAG17-PIPELINE` | `1.0.3b` | beta | GenesisBlockDB Architecture | `docs/FLOW--GENESISRAG17-PIPELINE.md` |
+| GenesisRAG17 extension map | `MAP-GENESISRAG17-EXTENSIONS` | `1.0.3b` | beta | GenesisBlockDB Architecture | `docs/GENESISRAG17-EXTENSION-MAP.md` |
 
 ## 5. Product narrative and evidence
 
@@ -99,6 +105,9 @@ The following documents should be created only when implementation work requires
 
 | Version | Date | Owner | Summary |
 |---|---|---|---|
+| 0.4.2+draft | 2026-09-08 | RWANG | Reconcile GenesisRAG17 document versions 1.0.3b after zuri's pre-merge ADR-071 to ADR-073 collision repair; preserve historical rows. |
+| 0.4.1+draft | 2026-09-08 | GenesisBlockDB Architecture | Reconciled the GenesisRAG17 registry entries with the live zuri ADR-071 reference and retained historical report links. |
+| 0.4.0+draft | 2026-09-08 | GenesisBlockDB Architecture | Registered the GenesisRAG17 TEST worker/publication ADR, execution flow and extension map. |
 | 0.3.0+draft | 2026-08-14 | GenesisBlockDB Architecture | Registered the accepted Typed Query IR ADR/spec and removed it from the follow-up list. |
 | 0.3.1+draft | 2026-08-14 | GenesisBlockDB Architecture | Truth-synced Query IR spec, ADR and C4 versions after the partial search/traverse implementation. |
 | 0.2.0+draft | 2026-08-13 | GenesisBlockDB Architecture | Reconciled registered frontmatter and defined canonical-entrypoint scope for automated validation. |

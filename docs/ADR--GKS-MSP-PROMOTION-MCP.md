@@ -1,12 +1,19 @@
 ---
 title: "ADR: Typed GKS MCP promotion for MSP"
 status: "accepted"
-version: "1.0.0"
-updated: "2026-08-10"
+version: "1.0.1"
+updated: "2026-09-08"
 owner: "Boss (CEO)"
 ---
 
 # ADR: Typed GKS MCP promotion for MSP
+
+> **Compatibility boundary:** This accepted ADR describes the legacy
+> `gks_knowledge_promote` MCP compatibility path. It is separate from the
+> current isolated GenesisRAG17 worker flow, which is documented in
+> [ADR--GENESISRAG17-SEPARATE-WORKER-PUBLICATION.md](ADR--GENESISRAG17-SEPARATE-WORKER-PUBLICATION.md).
+> The legacy tool does not define the GenesisRAG17 graph receipt, six-lane
+> write receipt, Stage 17 gate or publication receipt.
 
 ## Decision
 
@@ -30,3 +37,10 @@ flowchart LR
 
 Cover first write, same-key retry, conflicting retry, missing fields, and the
 structured response shape through the real MCP stdio server.
+
+## Changelog
+
+| Version | Date | Status | Summary | Commit Hash | Agent |
+|---|---|---|---|---|---|
+| 1.0.1 | 2026-09-08 | accepted | Clarified that this is the legacy compatibility path and linked the separate GenesisRAG17 publication ADR. | working-tree | RWANG |
+| 1.0.0 | 2026-08-10 | accepted | Added the typed `gks_knowledge_promote` MCP path for MSP-only promotion. | working-tree | Boss |
