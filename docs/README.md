@@ -2,7 +2,7 @@
 title: "GenesisBlockDB Documentation Hub"
 doc_id: "DOCS-NAVIGATION-HUB-GENESISBLOCKDB"
 status: draft
-version: "0.2.0+draft"
+version: "0.2.1+draft"
 updated: "2026-09-08"
 owner: "GenesisBlockDB Architecture"
 source_of_truth: true
@@ -62,6 +62,7 @@ GKS remains the passive canonical and quality authority.
 - Executable sequence, lifecycle and recovery: [FLOW--GENESISRAG17-PIPELINE.md](FLOW--GENESISRAG17-PIPELINE.md)
 - Future-stage extension seams: [GENESISRAG17-EXTENSION-MAP.md](GENESISRAG17-EXTENSION-MAP.md)
 - Worker setup and exact model/runtime manifest: [genesisrag17-worker/README.md](../genesisrag17-worker/README.md)
+- Product [GenesisRAG17 architecture decision ADR-071](https://github.com/Freshair129/zuri.ai/blob/codex/ki17-integration/docs/decisions/ADR-071-GENESISRAG17-ISOLATED-EXECUTION-AND-PUBLICATION.md)
 - Product [17-stage source specification](https://github.com/Freshair129/zuri.ai/blob/codex/ki17-integration/docs/KNOWLEDGE-INGESTION-17-STAGE-SPEC.md)
 - Product [17-stage execution flow](https://github.com/Freshair129/zuri.ai/blob/codex/ki17-integration/docs/KNOWLEDGE-INGESTION-17-STAGE-FLOW.md)
 - [Pinned historical acceptance report](https://github.com/Freshair129/zuri.ai/blob/b64b46df057d3160c659afa3c34628ee86520257/.brain/reports/GENESISRAG17-ACCEPTANCE.md)
@@ -90,5 +91,6 @@ GKS remains the passive canonical and quality authority.
 
 | Version | Date | Owner | Summary |
 |---|---|---|---|
+| 0.2.1+draft | 2026-09-08 | GenesisBlockDB Architecture | Linked the live zuri GenesisRAG17 ADR-071 and retained the pinned historical acceptance report. |
 | 0.2.0+draft | 2026-09-08 | GenesisBlockDB Architecture | Added the GenesisRAG17 TEST integration entrypoints, ownership boundary and external source links. |
 | 0.1.0+draft | 2026-08-03 | GenesisBlockDB Architecture | Added the standalone-product documentation entrypoint and client-neutral boundary navigation. |

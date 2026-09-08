@@ -2,7 +2,7 @@
 title: "ADR: GenesisRAG17 separate worker and atomic publication"
 doc_id: "ADR-GENESISRAG17-SEPARATE-WORKER-PUBLICATION"
 status: beta
-version: "1.0.1b"
+version: "1.0.2b"
 updated: "2026-09-08"
 owner: "GenesisBlockDB Architecture"
 source_of_truth: true
@@ -28,7 +28,9 @@ GenesisRAG17 TEST integration. It records the boundary that the worker package
 and the cross-repository acceptance run implement. It is not a production
 deployment approval and it does not change the client-neutral native engine.
 
-The product-level source documents are the [17-stage source
+The product-level source documents are the [GenesisRAG17 architecture
+decision ADR-071](https://github.com/Freshair129/zuri.ai/blob/codex/ki17-integration/docs/decisions/ADR-071-GENESISRAG17-ISOLATED-EXECUTION-AND-PUBLICATION.md),
+the [17-stage source
 specification](https://github.com/Freshair129/zuri.ai/blob/codex/ki17-integration/docs/KNOWLEDGE-INGESTION-17-STAGE-SPEC.md),
 the [17-stage execution
 flow](https://github.com/Freshair129/zuri.ai/blob/codex/ki17-integration/docs/KNOWLEDGE-INGESTION-17-STAGE-FLOW.md),
@@ -257,5 +259,6 @@ its explicit non-production limits.
 
 | Version | Date | Status | Summary | Commit Hash | Agent |
 |---|---|---|---|---|---|
+| 1.0.2b | 2026-09-08 | beta | Reconciled the live zuri GenesisRAG17 architecture reference to ADR-071 after the identifier collision; retained the pinned historical acceptance report. | working-tree | RWANG |
 | 1.0.1b | 2026-09-08 | beta | Synced audit remediation: exact pre-commit native intents and collection checkpoint recovery, accepted graph-state ordering, Stage 16 lexical indexing, PASS-only publication and no-fallback pointer replacement. | working-tree | RWANG |
 | 1.0.0b | 2026-09-08 | beta | Recorded the separate TEST worker, MSP-only relay, ordered physical execution, six-lane evidence and receipt-bound atomic publication. | working-tree | RWANG |
