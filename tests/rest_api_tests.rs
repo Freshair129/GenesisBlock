@@ -97,6 +97,49 @@ async fn wave_b_collection_validation_and_edge_history_parity() {
     );
 }
 
+#[tokio::test]
+async fn wave_c_core_query_and_batch_contract_reaches_rest_surface() {
+    let (app, _dir) = make_app();
+
+    let (status, _) = post_json(
+        &app,
+        "/v1/search/hybrid",
+        json!({"query_vector": [], "k": 0}),
+    )
+    .await;
+    assert_eq!(
+        status,
+        StatusCode::INTERNAL_SERVER_ERROR,
+        "REST must expose the core k validation rather than silently returning an empty page"
+    );
+
+    for id in ["wave-c-a", "wave-c-b"] {
+        assert_eq!(
+            post_json(&app, "/v1/node/add", json!({"id": id, "labels": []}))
+                .await
+                .0,
+            StatusCode::OK
+        );
+    }
+    let (status, body) = post_json(
+        &app,
+        "/v1/batch",
+        json!({
+            "nodes": [],
+            "edges": [{
+                "id": "wave-c-edge",
+                "from": "wave-c-a",
+                "to": "wave-c-b",
+                "rel": "LINK",
+                "valid_from": "2020-01-02T03:04:05+07:00"
+            }]
+        }),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(body["edges"][0]["valid_from"], "2020-01-02T03:04:05+07:00");
+}
+
 fn make_app() -> (Router, TempDir) {
     let dir = TempDir::new().unwrap();
     let storage = Storage::open(OpenOptions {

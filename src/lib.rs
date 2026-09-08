@@ -23,7 +23,7 @@ use std::sync::atomic::{AtomicBool, AtomicU32, AtomicU64, AtomicUsize, Ordering}
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
-use chrono::Utc;
+use chrono::{DateTime, Utc};
 use dashmap::DashMap;
 use half::f16;
 use hnsw_rs::prelude::*;
@@ -3330,6 +3330,11 @@ impl Storage {
         if vector.len() != d.dim as usize {
             return Err(Error::from_reason("COLLECTION_DIM_MISMATCH"));
         }
+        if vector.iter().any(|value| !value.is_finite()) {
+            return Err(Error::from_reason(
+                "VECTOR_VALUES_INVALID: embedding must contain only finite values",
+            ));
+        }
         Ok(())
     }
     fn preflight_collection_event(&self, event: &Event) -> Result<()> {
@@ -3389,6 +3394,11 @@ impl Storage {
                 coll.dim
             )));
         }
+        if emb_64.iter().any(|value| !value.is_finite()) {
+            return Err(Error::from_reason(
+                "VECTOR_VALUES_INVALID: embedding must contain only finite values",
+            ));
+        }
         let node_u32 = self.get_or_intern_id(node_id);
         let emb = coll.prep(emb_64);
         let arena_id = coll.stage(node_u32, &emb, lang, created_seq)?;
@@ -3435,6 +3445,11 @@ impl Storage {
                     c.name,
                     c.dim
                 )));
+            }
+            if embedding.iter().any(|value| !value.is_finite()) {
+                return Err(Error::from_reason(
+                    "VECTOR_VALUES_INVALID: embedding must contain only finite values",
+                ));
             }
         }
         // Stamp a logical clock so the vector is time-orderable for anti-entropy
@@ -8144,6 +8159,11 @@ impl Storage {
                     coll.dim
                 )));
             }
+            if emb.iter().any(|value| !value.is_finite()) {
+                return Err(Error::from_reason(
+                    "VECTOR_VALUES_INVALID: embedding must contain only finite values",
+                ));
+            }
             node.embedding = Some(emb.clone());
             node.collection = Some(coll.name.clone());
         }
@@ -8471,6 +8491,7 @@ impl Storage {
         let ser_err = |e: serde_json::Error| {
             Error::from_reason(format!("HQL result serialization failed: {e}"))
         };
+        Self::validate_temporal_selector(as_of)?;
         type Row = serde_json::Map<String, serde_json::Value>;
 
         let now = Utc::now().to_rfc3339();
@@ -8491,7 +8512,7 @@ impl Storage {
             if let Some(anchor_u32) = self.get_u32(&anchor_id) {
                 if let Some(entry) = self.nodes.get(&anchor_u32) {
                     let node = entry.value();
-                    if Self::is_valid_as_of(&node.valid_from, &node.valid_to, as_of)
+                    if Self::is_node_visible(node, as_of, false, &now)
                         && self.node_matches(anchor_u32, node, &pattern.start)
                     {
                         let node = self.hydrated_node(anchor_u32, node);
@@ -8506,7 +8527,7 @@ impl Storage {
         } else {
             for entry in self.nodes.iter() {
                 let node = entry.value();
-                if !Self::is_valid_as_of(&node.valid_from, &node.valid_to, as_of) {
+                if !Self::is_node_visible(node, as_of, false, &now) {
                     continue;
                 }
                 if !self.node_matches(*entry.key(), node, &pattern.start) {
@@ -8552,16 +8573,14 @@ impl Storage {
                     {
                         continue;
                     }
-                    if !Self::is_valid_as_of(&edge.valid_from, &edge.valid_to, as_of) {
+                    if !Self::is_currently_visible(
+                        &edge.valid_from,
+                        &edge.valid_to,
+                        as_of,
+                        false,
+                        &now,
+                    ) {
                         continue;
-                    }
-                    // Hide retracted edges in the current view (mirror `neighbors`).
-                    if as_of.is_none() {
-                        if let Some(to) = &edge.valid_to {
-                            if now.as_str() >= to.as_str() {
-                                continue;
-                            }
-                        }
                     }
                     if let Some(rt) = &edge_pat.rel_type {
                         if &edge.rel != rt {
@@ -8583,7 +8602,7 @@ impl Storage {
                         None => continue,
                     };
                     let far_node = far_ref.value();
-                    if !Self::is_valid_as_of(&far_node.valid_from, &far_node.valid_to, as_of) {
+                    if !Self::is_node_visible(far_node, as_of, false, &now) {
                         continue;
                     }
                     if !self.node_matches(far_u32, far_node, node_pat) {
@@ -9431,6 +9450,7 @@ impl Storage {
     pub fn studio_graph_scene(&self, request: StudioGraphSceneRequest) -> Result<StudioGraphScene> {
         let _read_guard = self.commit_lock.lock();
         self.ensure_readable()?;
+        Self::validate_temporal_selector(&request.as_of)?;
 
         let limit = request.limit.unwrap_or(240);
         if limit == 0 || limit > STUDIO_SCENE_PAGE_LIMIT {
@@ -9650,13 +9670,53 @@ impl Storage {
         })
     }
 
+    fn parse_temporal_instant(value: &str) -> Option<DateTime<Utc>> {
+        DateTime::parse_from_rfc3339(value)
+            .ok()
+            .map(|instant| instant.with_timezone(&Utc))
+    }
+
+    fn validate_temporal_selector(as_of: &Option<String>) -> Result<()> {
+        if as_of
+            .as_deref()
+            .is_some_and(|value| Self::parse_temporal_instant(value).is_none())
+        {
+            return Err(Error::from_reason(
+                "TEMPORAL_SELECTOR_INVALID: as_of must be an RFC3339 instant",
+            ));
+        }
+        Ok(())
+    }
+
+    fn instant_after(left: &str, right: &str) -> bool {
+        match (
+            Self::parse_temporal_instant(left),
+            Self::parse_temporal_instant(right),
+        ) {
+            (Some(left), Some(right)) => left > right,
+            // Legacy snapshots may contain an empty timestamp. Preserve their
+            // old lexical behavior until they are rewritten by a checkpoint.
+            _ => left > right,
+        }
+    }
+
+    fn instant_at_or_after(left: &str, right: &str) -> bool {
+        match (
+            Self::parse_temporal_instant(left),
+            Self::parse_temporal_instant(right),
+        ) {
+            (Some(left), Some(right)) => left >= right,
+            _ => left >= right,
+        }
+    }
+
     fn is_valid_as_of(valid_from: &str, valid_to: &Option<String>, as_of: &Option<String>) -> bool {
         if let Some(as_of_str) = as_of {
-            if valid_from > as_of_str.as_str() {
+            if Self::instant_after(valid_from, as_of_str) {
                 return false;
             }
             if let Some(to) = valid_to {
-                if as_of_str.as_str() >= to.as_str() {
+                if Self::instant_at_or_after(as_of_str, to) {
                     return false;
                 }
             }
@@ -9687,14 +9747,41 @@ impl Storage {
         if !Self::is_valid_as_of(valid_from, valid_to, as_of) {
             return false;
         }
-        if as_of.is_none() && !include_invalid {
-            if let Some(to) = valid_to {
-                if now >= to.as_str() {
-                    return false;
+        if as_of.is_none() {
+            if Self::instant_after(valid_from, now) {
+                return false;
+            }
+            if !include_invalid {
+                if let Some(to) = valid_to {
+                    if Self::instant_at_or_after(now, to) {
+                        return false;
+                    }
                 }
             }
         }
         true
+    }
+
+    fn is_node_visible(
+        node: &NodeOutput,
+        as_of: &Option<String>,
+        include_invalid: bool,
+        now: &str,
+    ) -> bool {
+        if !Self::is_currently_visible(
+            &node.valid_from,
+            &node.valid_to,
+            as_of,
+            include_invalid,
+            now,
+        ) {
+            return false;
+        }
+        let reference = as_of.as_deref().unwrap_or(now);
+        node.expires_at
+            .as_deref()
+            .map(|expires_at| !Self::instant_at_or_after(reference, expires_at))
+            .unwrap_or(true)
     }
 
     pub fn hybrid_search(&self, args: HybridSearchInput) -> Result<Vec<NeighborOutput>> {
@@ -9718,6 +9805,30 @@ impl Storage {
         args: HybridSearchInput,
         tx_as_of: Option<u64>,
     ) -> Result<Vec<NeighborOutput>> {
+        Self::validate_temporal_selector(&args.as_of)?;
+        if args.k == 0 {
+            return Err(Error::from_reason(
+                "QUERY_VALIDATION_FAILED: k must be positive",
+            ));
+        }
+        if args.query_vector.iter().any(|value| !value.is_finite()) {
+            return Err(Error::from_reason(
+                "QUERY_VALIDATION_FAILED: query_vector must contain only finite values",
+            ));
+        }
+        if args
+            .alpha
+            .is_some_and(|value| !value.is_finite() || !(0.0..=1.0).contains(&value))
+        {
+            return Err(Error::from_reason(
+                "QUERY_VALIDATION_FAILED: alpha must be between 0 and 1",
+            ));
+        }
+        if args.ef_search == Some(0) || args.oversample == Some(0) {
+            return Err(Error::from_reason(
+                "QUERY_VALIDATION_FAILED: ef_search and oversample must be positive",
+            ));
+        }
         let coll = self.resolve_collection(&args.collection)?;
         // Dim validation closes the silent cross-space bug: a query from a
         // different model/dim is rejected, not ranked into garbage.
@@ -9781,6 +9892,7 @@ impl Storage {
             let n = s.read().len_rows();
             (n > 0 && fetch >= n).then_some(n)
         });
+        let now = Utc::now().to_rfc3339();
         let mut results = if let Some(t) = tx_as_of {
             // §3.3 epoch candidates. Selective filters are the standard
             // filtered-ANN failure mode, so measure the survivor fraction
@@ -9830,38 +9942,63 @@ impl Storage {
             // SQ8: pack the query with the collection's scale (calibrated or fixed),
             // matching the indexed codes. Non-SQ8 ⇒ SQ8_FIXED, ignored by the arm.
             let sq8 = coll.sq8_snapshot();
-            let hits = {
-                let hnsw_lock = coll.hnsw.read();
-                match &*hnsw_lock {
-                    Some(idx) => {
-                        idx.search_f32(&query_f32, fetch, ef, center.as_deref(), sq8, None)
-                    }
-                    None => return Err(Error::from_reason("HNSW not init")),
-                }
-            };
-            // Recall floor (RCA--HNSW-UNDER-RETURN-SMALL-GRAPH). On a small
-            // graph hnsw_rs can return ONLY the entry point — measured 2/150 on
-            // a 24-vector collection, always exactly 1 hit — when that entry
-            // point's layer-0 neighbour list was pruned empty. Recall then
-            // collapses (1 of 10 asked for) instead of degrading, and the
-            // caller cannot tell. When the index demonstrably under-delivers
-            // AND the collection is small enough to scan outright, rebuild the
-            // candidates exactly.
-            //
-            // Both conditions are load-bearing: a short return on a large
-            // collection can be legitimate, and scanning one would be ruinous.
-            // On a healthy graph `hits.len() == fetch.min(slots)`, so this
-            // costs one length read and a compare — the scan never runs.
-            let slots = { coll.metadata.read().len() };
-            if hits.len() < fetch.min(slots) && slots <= EXACT_SCAN_MAX_SLOTS {
-                coll.exact_candidates(&query_f32, fetch)
+            let slots = coll.metadata.read().len();
+            if slots == 0 {
+                Vec::new()
             } else {
-                hits
+                let run_search = |limit: usize| -> Result<Vec<(usize, f32)>> {
+                    let hnsw_lock = coll.hnsw.read();
+                    match &*hnsw_lock {
+                        Some(idx) => {
+                            Ok(idx.search_f32(&query_f32, limit, ef, center.as_deref(), sq8, None))
+                        }
+                        None => Err(Error::from_reason("HNSW not init")),
+                    }
+                };
+                let eligible_count = |candidates: &[(usize, f32)]| -> usize {
+                    let meta_guard = coll.metadata.read();
+                    let mut seen = HashSet::new();
+                    candidates
+                        .iter()
+                        .filter_map(|(d_id, _)| meta_guard.get(*d_id))
+                        .filter(|meta| meta.retired_seq == 0)
+                        .filter(|meta| {
+                            self.nodes
+                                .get(&meta.node_u32)
+                                .map(|node| {
+                                    Self::is_node_visible(node.value(), &args.as_of, false, &now)
+                                })
+                                .unwrap_or(false)
+                        })
+                        .filter(|meta| seen.insert(meta.node_u32))
+                        .count()
+                };
+                let mut requested = fetch.min(slots).max(1);
+                let mut hits = run_search(requested)?;
+                if hits.len() < requested && slots <= EXACT_SCAN_MAX_SLOTS {
+                    hits = coll.exact_candidates(&query_f32, requested);
+                }
+                while eligible_count(&hits) < args.k as usize && requested < slots {
+                    requested = requested.saturating_mul(2).min(slots);
+                    hits = run_search(requested)?;
+                    if hits.len() < requested && slots <= EXACT_SCAN_MAX_SLOTS {
+                        hits = coll.exact_candidates(&query_f32, requested);
+                    }
+                }
+                if eligible_count(&hits) < args.k as usize && slots <= EXACT_SCAN_MAX_SLOTS {
+                    // A bounded exact oracle is the correctness floor when ANN
+                    // spends its shortlist on ineligible rows.
+                    coll.exact_candidates(&query_f32, slots)
+                } else {
+                    hits
+                }
             }
         };
         // f32-sidecar rerank: replace each candidate's quantized distance with the
-        // exact f32 distance, re-sort ascending, and keep the best k*2 for the
-        // hybrid blend below. The arena_id (d_id) indexes the sidecar at d_id*dim.
+        // exact f32 distance and re-sort ascending for the hybrid blend below.
+        // Keep the full filtered candidate pool here: truncating before the live
+        // visibility pass can spend the entire rerank window on retired rows.
+        // The arena_id (d_id) indexes the sidecar at d_id*dim.
         // A candidate the sidecar is missing keeps its quantized distance, so an
         // absent/truncated `fvec_<name>.bin` degrades to quantized-only search
         // rather than silently dropping every hit (it would otherwise return empty).
@@ -9879,7 +10016,6 @@ impl Storage {
                 })
                 .collect();
             results.sort_by(|a, b| a.1.partial_cmp(&b.1).unwrap_or(std::cmp::Ordering::Equal));
-            results.truncate(k2);
         }
         let mut hybrid_results = Vec::new();
         let meta_arena = coll.metadata.read();
@@ -9926,11 +10062,7 @@ impl Storage {
                     } else if let Some(node) = self.nodes.get(&u32_id) {
                         let node_out = self.hydrated_node(u32_id, node.value());
 
-                        if Self::is_valid_as_of(
-                            &node_out.valid_from,
-                            &node_out.valid_to,
-                            &args.as_of,
-                        ) {
+                        if Self::is_node_visible(&node_out, &args.as_of, false, &now) {
                             node_out
                         } else if let Some(hist) = args
                             .as_of
@@ -9998,6 +10130,7 @@ impl Storage {
     ) -> Result<Vec<NeighborOutput>> {
         let _read_guard = self.commit_lock.lock();
         self.ensure_readable()?;
+        Self::validate_temporal_selector(&args.as_of)?;
 
         let u32_seed = match self.get_u32(&seed) {
             Some(id) => id,
@@ -10105,12 +10238,14 @@ impl Storage {
                                 // current version postdates as_of, resolve the
                                 // historically valid version from the chain
                                 // instead of hiding the node.
-                                let out_node = if Self::is_valid_as_of(
-                                    &node.valid_from,
-                                    &node.valid_to,
+                                let hydrated = self.hydrated_node(next_u32, node);
+                                let out_node = if Self::is_node_visible(
+                                    &hydrated,
                                     &args.as_of,
+                                    include_invalid,
+                                    &now,
                                 ) {
-                                    self.hydrated_node(next_u32, node)
+                                    hydrated
                                 } else if let Some(hist) = args
                                     .as_of
                                     .as_deref()
@@ -10279,6 +10414,7 @@ impl Storage {
         args: NeighborInput,
         t: u64,
     ) -> Result<Vec<NeighborOutput>> {
+        Self::validate_temporal_selector(&args.as_of)?;
         let edge_floor = self.edge_history_floor().ok_or_else(|| {
             Error::from_reason(
                 "QUERY_IR_HISTORY_UNAVAILABLE: rebuild edge projection with a writable v4 engine",
@@ -10422,6 +10558,7 @@ impl Storage {
     pub fn query(&self, args: QueryInput) -> Result<Vec<EdgeOutput>> {
         let _read_guard = self.commit_lock.lock();
         self.ensure_readable()?;
+        Self::validate_temporal_selector(&args.as_of)?;
 
         let include_invalid = args.include_invalid.unwrap_or(false);
         let now = Utc::now().to_rfc3339();
@@ -11108,6 +11245,7 @@ impl Storage {
         } else {
             target_id.to_string()
         };
+        let now = Utc::now().to_rfc3339();
 
         // 1. Graph Expansion (BFS)
         let mut nodes = HashMap::new();
@@ -11120,9 +11258,12 @@ impl Storage {
         let mut ceiling_hit = false;
 
         if let Some(u32_id) = self.get_u32(&target_id_resolved) {
-            queue.push_back((u32_id, 0));
             if let Some(node) = self.nodes.get(&u32_id) {
-                nodes.insert(u32_id, self.hydrated_node(u32_id, node.value()));
+                let hydrated = self.hydrated_node(u32_id, node.value());
+                if Self::is_node_visible(&hydrated, &None, false, &now) {
+                    nodes.insert(u32_id, hydrated);
+                    queue.push_back((u32_id, 0));
+                }
             }
         }
 
@@ -11156,13 +11297,34 @@ impl Storage {
                         if self.get_u32(&edge.from) != Some(curr_u32) {
                             continue;
                         }
+                        if !Self::is_currently_visible(
+                            &edge.valid_from,
+                            &edge.valid_to,
+                            &None,
+                            false,
+                            &now,
+                        ) {
+                            continue;
+                        }
+                        if let Some(next_u32) = self.get_u32(&edge.to) {
+                            if let Some(node) = self.nodes.get(&next_u32) {
+                                let hydrated = self.hydrated_node(next_u32, node.value());
+                                if !Self::is_node_visible(&hydrated, &None, false, &now) {
+                                    continue;
+                                }
+                            }
+                        }
                         edges.push(edge.clone());
                         if let Some(next_u32) = self.get_u32(&edge.to) {
                             if let std::collections::hash_map::Entry::Vacant(e) =
                                 nodes.entry(next_u32)
                             {
                                 if let Some(node) = self.nodes.get(&next_u32) {
-                                    e.insert(self.hydrated_node(next_u32, node.value()));
+                                    let hydrated = self.hydrated_node(next_u32, node.value());
+                                    if !Self::is_node_visible(&hydrated, &None, false, &now) {
+                                        continue;
+                                    }
+                                    e.insert(hydrated);
                                     hops_served = hops_served.max(curr_depth + 1);
                                     queue.push_back((next_u32, curr_depth + 1));
                                 }
@@ -11179,13 +11341,34 @@ impl Storage {
                         if self.get_u32(&edge.to) != Some(curr_u32) {
                             continue;
                         }
+                        if !Self::is_currently_visible(
+                            &edge.valid_from,
+                            &edge.valid_to,
+                            &None,
+                            false,
+                            &now,
+                        ) {
+                            continue;
+                        }
+                        if let Some(prev_u32) = self.get_u32(&edge.from) {
+                            if let Some(node) = self.nodes.get(&prev_u32) {
+                                let hydrated = self.hydrated_node(prev_u32, node.value());
+                                if !Self::is_node_visible(&hydrated, &None, false, &now) {
+                                    continue;
+                                }
+                            }
+                        }
                         edges.push(edge.clone());
                         if let Some(prev_u32) = self.get_u32(&edge.from) {
                             if let std::collections::hash_map::Entry::Vacant(e) =
                                 nodes.entry(prev_u32)
                             {
                                 if let Some(node) = self.nodes.get(&prev_u32) {
-                                    e.insert(self.hydrated_node(prev_u32, node.value()));
+                                    let hydrated = self.hydrated_node(prev_u32, node.value());
+                                    if !Self::is_node_visible(&hydrated, &None, false, &now) {
+                                        continue;
+                                    }
+                                    e.insert(hydrated);
                                     hops_served = hops_served.max(curr_depth + 1);
                                     queue.push_back((prev_u32, curr_depth + 1));
                                 }
@@ -11245,14 +11428,33 @@ impl Storage {
     /// `CoverageReport::ceiling_hit` reports a fact rather than merely
     /// "traversal stopped here".
     fn has_edge_beyond(&self, u32_id: u32, included: &HashMap<u32, NodeOutput>) -> bool {
+        let now = Utc::now().to_rfc3339();
         if let Some(eids) = self.out_idx.get(&u32_id) {
             for eid in eids.iter() {
                 if let Some(edge_ref) = self.edges.get(eid) {
-                    if self.get_u32(&edge_ref.value().from) != Some(u32_id) {
+                    let edge = edge_ref.value();
+                    if self.get_u32(&edge.from) != Some(u32_id)
+                        || !Self::is_currently_visible(
+                            &edge.valid_from,
+                            &edge.valid_to,
+                            &None,
+                            false,
+                            &now,
+                        )
+                    {
                         continue;
                     }
-                    if let Some(next) = self.get_u32(&edge_ref.value().to) {
-                        if !included.contains_key(&next) {
+                    if let Some(next) = self.get_u32(&edge.to) {
+                        if !included.contains_key(&next)
+                            && self
+                                .nodes
+                                .get(&next)
+                                .map(|node| {
+                                    let hydrated = self.hydrated_node(next, node.value());
+                                    Self::is_node_visible(&hydrated, &None, false, &now)
+                                })
+                                .unwrap_or(true)
+                        {
                             return true;
                         }
                     }
@@ -11262,11 +11464,29 @@ impl Storage {
         if let Some(eids) = self.in_idx.get(&u32_id) {
             for eid in eids.iter() {
                 if let Some(edge_ref) = self.edges.get(eid) {
-                    if self.get_u32(&edge_ref.value().to) != Some(u32_id) {
+                    let edge = edge_ref.value();
+                    if self.get_u32(&edge.to) != Some(u32_id)
+                        || !Self::is_currently_visible(
+                            &edge.valid_from,
+                            &edge.valid_to,
+                            &None,
+                            false,
+                            &now,
+                        )
+                    {
                         continue;
                     }
-                    if let Some(prev) = self.get_u32(&edge_ref.value().from) {
-                        if !included.contains_key(&prev) {
+                    if let Some(prev) = self.get_u32(&edge.from) {
+                        if !included.contains_key(&prev)
+                            && self
+                                .nodes
+                                .get(&prev)
+                                .map(|node| {
+                                    let hydrated = self.hydrated_node(prev, node.value());
+                                    Self::is_node_visible(&hydrated, &None, false, &now)
+                                })
+                                .unwrap_or(true)
+                        {
                             return true;
                         }
                     }
@@ -12667,15 +12887,16 @@ impl Storage {
         }
 
         for args in input.edges {
+            let valid_from = args.valid_from.unwrap_or_else(|| now.to_rfc3339());
             let edge = EdgeOutput {
                 id: args.id.unwrap_or_else(|| Uuid::new_v4().to_string()),
                 from: args.from,
                 to: args.to,
                 rel: args.rel,
                 props: args.props.unwrap_or(Value::Object(Default::default())),
-                valid_from: Utc::now().to_rfc3339(),
+                valid_from,
                 valid_to: None,
-                recorded_at: Utc::now().to_rfc3339(),
+                recorded_at: now.to_rfc3339(),
                 superseded_by: None,
                 impact: args.impact,
                 caused_by: args.caused_by,
