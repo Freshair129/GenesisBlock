@@ -109,6 +109,57 @@ function workerOptions(dbPath, mspCall, extra = {}) {
   };
 }
 
+function makeSingleChunkDecision({
+  decisionId,
+  batchId,
+  runId,
+  sourceId,
+  documentId,
+  version,
+  rawArtifactId,
+  parsedArtifactId,
+  chunkId,
+  text,
+}) {
+  const source = {
+    sourceId,
+    rawArtifactId,
+    parsedArtifactId,
+    documentId,
+    version,
+    content: text,
+    contentHash: hashText(text),
+  };
+  const decision = {
+    schemaVersion: SCHEMA_VERSION,
+    decisionId,
+    batchId,
+    scope,
+    runId,
+    stages: stages(runId),
+    source,
+    chunks: [{
+      chunkId,
+      parsedArtifactId,
+      ordinal: 0,
+      text,
+      contentHash: hashText(text),
+      startOffset: 0,
+      endOffset: text.length,
+    }],
+    mentions: [],
+    entities: [],
+    facts: [],
+    held: [],
+    derived: [],
+    policy: { allowEmbedding: true, allowPublication: true },
+    ontologyVersion: 'ontology_v1',
+    pipelineVersion: SCHEMA_VERSION,
+  };
+  decision.decisionHash = hashObject(decision);
+  return decision;
+}
+
 test('worker verifies pinned model artifacts and performs native publish/query', async () => {
   assert.ok(fs.existsSync(modelDir), 'pinned model snapshot must be present for the real integration test');
   const artifactHashes = verifyModelArtifacts(modelDir);
@@ -777,6 +828,182 @@ test('atomic pointer replacement failure preserves the existing pointer', () => 
     assert.equal(fs.readFileSync(pointer, 'utf8'), 'old-pointer\n');
   } finally {
     try { fs.rmSync(root, { recursive: true, force: true }); } catch { /* test directory is disposable. */ }
+  }
+});
+
+test('worker publishes two queued documents and retains versioned historical snapshots after correction', async () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'genesisrag17-two-documents-'));
+  const dbPath = path.join(root, 'db');
+  const aliceV1 = makeSingleChunkDecision({
+    decisionId: 'decision-alice-v1',
+    batchId: 'batch-alice-v1',
+    runId: 'run-alice-v1',
+    sourceId: 'source-alice',
+    documentId: 'doc-alice',
+    version: '1',
+    rawArtifactId: 'raw-alice-v1',
+    parsedArtifactId: 'parsed-alice-v1',
+    chunkId: 'chunk-alice-v1',
+    text: 'Alice works for Acme Ltd.',
+  });
+  const bobV1 = makeSingleChunkDecision({
+    decisionId: 'decision-bob-v1',
+    batchId: 'batch-bob-v1',
+    runId: 'run-bob-v1',
+    sourceId: 'source-bob',
+    documentId: 'doc-bob',
+    version: '1',
+    rawArtifactId: 'raw-bob-v1',
+    parsedArtifactId: 'parsed-bob-v1',
+    chunkId: 'chunk-bob-v1',
+    text: 'Bob purchased Nimbus.',
+  });
+  const aliceV2 = makeSingleChunkDecision({
+    decisionId: 'decision-alice-v2',
+    batchId: 'batch-alice-v2',
+    runId: 'run-alice-v2',
+    sourceId: 'source-alice',
+    documentId: 'doc-alice',
+    version: '2',
+    rawArtifactId: 'raw-alice-v2',
+    parsedArtifactId: 'parsed-alice-v2',
+    chunkId: 'chunk-alice-v2',
+    text: 'Alice works for Globex Corp.',
+  });
+  const decisions = new Map([aliceV1, bobV1, aliceV2].map((decision) => [decision.decisionId, decision]));
+  const pending = [aliceV1, bobV1];
+  const receipts = new Map();
+  const published = [];
+  const response = (body) => ({ schemaVersion: SCHEMA_VERSION, scope, ...body });
+  const passDimensions = {
+    data: { result: 'PASS', critical: false, reasons: [] },
+    graph: { result: 'PASS', critical: false, reasons: [] },
+    knowledge: { result: 'PASS', critical: false, reasons: [] },
+    security: { result: 'PASS', critical: false, reasons: [] },
+    retrieval: { result: 'PASS', critical: false, reasons: [] },
+  };
+  const mspCall = async (name, args) => {
+    if (name === 'msp_pipeline_claim') {
+      assert.equal(args.limit, 1, 'the worker must claim one document at a time');
+      return response({ decisions: pending.length > 0 ? [pending.shift()] : [] });
+    }
+    if (name === 'msp_pipeline_graph_receipt') {
+      const decision = decisions.get(args.receipt.decisionId);
+      assert.ok(decision, 'graph receipt must reference a queued decision');
+      assert.equal(args.receipt.readback.ok, true, 'graph receipt must contain native readback evidence');
+      return response({
+        accepted: true,
+        graphReceiptHash: hashObject(args.receipt),
+        derived: decision.derived,
+        derivedHash: hashObject(decision.derived),
+      });
+    }
+    if (name === 'msp_pipeline_write_receipt') {
+      const decision = decisions.get(args.receipt.decisionId);
+      assert.ok(decision, 'write receipt must reference a queued decision');
+      assert.equal(args.receipt.readback.ok, true, 'write receipt must contain native readback evidence');
+      assert.equal(args.receipt.laneManifest.vector.status, 'ready');
+      assert.equal(args.receipt.laneManifest.lexical.status, 'ready');
+      assert.equal(args.receipt.laneManifest.graph.status, 'ready');
+      assert.equal(args.receipt.laneManifest.sqlite.status, 'ready');
+      assert.equal(args.receipt.laneManifest.provenance.status, 'ready');
+      assert.equal(args.receipt.benchmark.citationCorrectness, 1);
+      receipts.set(decision.decisionId, structuredClone(args.receipt));
+      return response({ accepted: true, receiptHash: hashObject(args.receipt) });
+    }
+    if (name === 'msp_pipeline_gate') {
+      const decision = decisions.get(args.decisionId);
+      const receipt = receipts.get(args.decisionId);
+      assert.ok(decision && receipt, 'quality gate must use the accepted native receipt');
+      return response({ verdict: {
+        schemaVersion: SCHEMA_VERSION,
+        scope,
+        runId: decision.runId,
+        decisionId: decision.decisionId,
+        decisionHash: decision.decisionHash,
+        snapshotId: receipt.snapshotId,
+        generation: receipt.generation,
+        receiptHash: hashObject(receipt),
+        verdict: 'PASS',
+        allowPublication: true,
+        dimensions: passDimensions,
+      } });
+    }
+    if (name === 'msp_pipeline_publication_receipt') {
+      const decision = decisions.get(args.receipt.decisionId);
+      assert.ok(decision, 'publication receipt must reference a queued decision');
+      published.push(structuredClone(args.receipt));
+      return response({ accepted: true });
+    }
+    throw new Error(`unexpected MSP tool ${name}`);
+  };
+  const benchmarkFixture = {
+    fixtureVersion: 'worker-two-document-v1',
+    queries: [{
+      query: 'What does this document say?',
+      relevantTexts: [aliceV1.source.content, bobV1.source.content, aliceV2.source.content],
+    }],
+  };
+  const worker = GenesisRag17Worker.create(workerOptions(dbPath, mspCall, { benchmarkFixture }));
+  const sourceRows = async () => JSON.parse(await worker.db.querySql('SELECT payload FROM props', '[]'))
+    .map(({ payload }) => typeof payload === 'string' ? JSON.parse(payload) : payload)
+    .filter((row) => row.objectType === 'source');
+  const assertVersionedHit = async (result, decision) => {
+    assert.equal(result.results.length, 1, 'a generation-scoped query must return only its document');
+    const hit = result.results[0];
+    assert.equal(hit.text, decision.source.content);
+    assert.equal(hit.citation.sourceId, decision.source.sourceId);
+    assert.equal(hit.citation.chunkId, decision.chunks[0].chunkId);
+    assert.equal(hit.citation.contentHash, decision.chunks[0].contentHash);
+    const source = (await sourceRows()).find((row) => row.generation === result.generation
+      && row.sourceId === decision.source.sourceId);
+    assert.ok(source, `native source row for ${decision.source.documentId} must be present`);
+    assert.equal(source.documentId, decision.source.documentId);
+    assert.equal(source.version, decision.source.version, 'citation content must resolve to the source version');
+    assert.equal(source.contentHash, decision.source.contentHash);
+  };
+  try {
+    const first = await worker.runOnce();
+    assert.equal(first.status, 'published');
+    const second = await worker.runOnce();
+    assert.equal(second.status, 'published');
+    pending.push(aliceV2);
+    const correction = await worker.runOnce();
+    assert.equal(correction.status, 'published');
+    assert.equal(published.length, 3, 'each document version must receive one publication receipt');
+
+    const pointer = worker.readPointer();
+    assert.equal(pointer.snapshotId, correction.snapshotId);
+    assert.deepEqual(pointer.publishedSnapshotIds, [first.snapshotId, second.snapshotId, correction.snapshotId]);
+
+    const aliceOld = await worker.queryPublished({
+      scope,
+      query: 'Where does Alice work?',
+      topK: 5,
+      snapshotId: first.snapshotId,
+    });
+    const bobHistorical = await worker.queryPublished({
+      scope,
+      query: 'What product did Bob purchase?',
+      topK: 5,
+      snapshotId: second.snapshotId,
+    });
+    const aliceCurrent = await worker.queryPublished({
+      scope,
+      query: 'Where does Alice work?',
+      topK: 5,
+      snapshotId: correction.snapshotId,
+    });
+    await assertVersionedHit(aliceOld, aliceV1);
+    await assertVersionedHit(bobHistorical, bobV1);
+    await assertVersionedHit(aliceCurrent, aliceV2);
+
+    const latest = await worker.queryPublished({ scope, query: 'Where does Alice work?', topK: 5 });
+    assert.equal(latest.snapshotId, correction.snapshotId);
+    await assertVersionedHit(latest, aliceV2);
+  } finally {
+    await worker.close();
+    try { fs.rmSync(root, { recursive: true, force: true }); } catch { /* native handles are released at process exit. */ }
   }
 });
 
