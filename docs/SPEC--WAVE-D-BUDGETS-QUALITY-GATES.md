@@ -153,4 +153,4 @@ artifacts, schema migration or production deployment.
 
 | Version | Date | Status | Summary | Commit Hash | Agent |
 |---|---|---|---|---|---|
-| 0.1.0b | 2026-09-08 | beta | Approved scope; bounded query budgets, REST admission control, and per-index quality evidence implemented locally | 3751881 + Wave-D | ATHER |
+| 0.1.0b | 2026-09-08 | beta | Approved scope; bounded query budgets, REST admission control, and per-index quality evidence implemented locally | 3751881, ce41d5e | ATHER |
