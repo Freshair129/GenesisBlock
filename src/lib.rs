@@ -461,6 +461,199 @@ pub const QUERY_IR_V1: &str = "query-ir.v1";
 const QUERY_IR_MAX_K: u32 = 1_000;
 const QUERY_IR_MAX_DEPTH: u32 = 32;
 
+const QUERY_BUDGET_DEFAULT_NODES: u64 = 100_000;
+const QUERY_BUDGET_DEFAULT_EDGES: u64 = 200_000;
+const QUERY_BUDGET_DEFAULT_CANDIDATES: u64 = 100_000;
+const QUERY_BUDGET_DEFAULT_ROWS: u64 = 10_000;
+const QUERY_BUDGET_DEFAULT_BYTES: u64 = 32 * 1024 * 1024;
+const QUERY_BUDGET_DEFAULT_ELAPSED_MS: u64 = 5_000;
+
+/// Optional caller-provided query limits. `None` uses the engine's safe default
+/// and every supplied value must be positive. The object is deliberately shared
+/// by Query IR and the REST HQL envelope; the HQL grammar stays unchanged.
+#[derive(Serialize, Deserialize, Clone, Debug, Default, PartialEq)]
+#[serde(deny_unknown_fields)]
+pub struct QueryBudget {
+    pub max_expanded_nodes: Option<u64>,
+    pub max_expanded_edges: Option<u64>,
+    pub max_vector_candidates: Option<u64>,
+    pub max_result_rows: Option<u64>,
+    pub max_serialized_bytes: Option<u64>,
+    pub max_elapsed_ms: Option<u64>,
+}
+
+#[derive(Clone, Copy, Debug, Serialize)]
+struct ResolvedQueryBudget {
+    max_expanded_nodes: u64,
+    max_expanded_edges: u64,
+    max_vector_candidates: u64,
+    max_result_rows: u64,
+    max_serialized_bytes: u64,
+    max_elapsed_ms: u64,
+}
+
+impl ResolvedQueryBudget {
+    fn as_input(self) -> QueryBudget {
+        QueryBudget {
+            max_expanded_nodes: Some(self.max_expanded_nodes),
+            max_expanded_edges: Some(self.max_expanded_edges),
+            max_vector_candidates: Some(self.max_vector_candidates),
+            max_result_rows: Some(self.max_result_rows),
+            max_serialized_bytes: Some(self.max_serialized_bytes),
+            max_elapsed_ms: Some(self.max_elapsed_ms),
+        }
+    }
+}
+
+impl QueryBudget {
+    fn resolve(&self) -> Result<ResolvedQueryBudget> {
+        fn positive(name: &str, value: Option<u64>, default: u64) -> Result<u64> {
+            match value {
+                Some(0) => Err(Error::from_reason(format!(
+                    "QUERY_BUDGET_INVALID: {name} must be positive"
+                ))),
+                Some(value) => Ok(value),
+                None => Ok(default),
+            }
+        }
+
+        Ok(ResolvedQueryBudget {
+            max_expanded_nodes: positive(
+                "max_expanded_nodes",
+                self.max_expanded_nodes,
+                QUERY_BUDGET_DEFAULT_NODES,
+            )?,
+            max_expanded_edges: positive(
+                "max_expanded_edges",
+                self.max_expanded_edges,
+                QUERY_BUDGET_DEFAULT_EDGES,
+            )?,
+            max_vector_candidates: positive(
+                "max_vector_candidates",
+                self.max_vector_candidates,
+                QUERY_BUDGET_DEFAULT_CANDIDATES,
+            )?,
+            max_result_rows: positive(
+                "max_result_rows",
+                self.max_result_rows,
+                QUERY_BUDGET_DEFAULT_ROWS,
+            )?,
+            max_serialized_bytes: positive(
+                "max_serialized_bytes",
+                self.max_serialized_bytes,
+                QUERY_BUDGET_DEFAULT_BYTES,
+            )?,
+            max_elapsed_ms: positive(
+                "max_elapsed_ms",
+                self.max_elapsed_ms,
+                QUERY_BUDGET_DEFAULT_ELAPSED_MS,
+            )?,
+        })
+    }
+}
+
+struct QueryBudgetState {
+    limits: ResolvedQueryBudget,
+    started: Instant,
+    expanded_nodes: u64,
+    expanded_edges: u64,
+    vector_candidates: u64,
+    result_rows: u64,
+}
+
+impl QueryBudgetState {
+    fn new(limits: ResolvedQueryBudget) -> Self {
+        Self {
+            limits,
+            started: Instant::now(),
+            expanded_nodes: 0,
+            expanded_edges: 0,
+            vector_candidates: 0,
+            result_rows: 0,
+        }
+    }
+
+    fn check_deadline(&self) -> Result<()> {
+        if self.started.elapsed() > Duration::from_millis(self.limits.max_elapsed_ms) {
+            return Err(Error::from_reason("QUERY_BUDGET_EXCEEDED: reason=deadline"));
+        }
+        Ok(())
+    }
+
+    fn consume(
+        &mut self,
+        kind: &'static str,
+        amount: u64,
+        limit: u64,
+        total: &mut u64,
+    ) -> Result<()> {
+        self.check_deadline()?;
+        *total = total
+            .checked_add(amount)
+            .ok_or_else(|| Error::from_reason(format!("QUERY_BUDGET_EXCEEDED: reason={kind}")))?;
+        if *total > limit {
+            return Err(Error::from_reason(format!(
+                "QUERY_BUDGET_EXCEEDED: reason={kind}"
+            )));
+        }
+        Ok(())
+    }
+
+    fn node(&mut self) -> Result<()> {
+        let limit = self.limits.max_expanded_nodes;
+        let mut total = self.expanded_nodes;
+        self.consume("nodes", 1, limit, &mut total)?;
+        self.expanded_nodes = total;
+        Ok(())
+    }
+
+    fn edge(&mut self) -> Result<()> {
+        let limit = self.limits.max_expanded_edges;
+        let mut total = self.expanded_edges;
+        self.consume("edges", 1, limit, &mut total)?;
+        self.expanded_edges = total;
+        Ok(())
+    }
+
+    fn candidate(&mut self) -> Result<()> {
+        let limit = self.limits.max_vector_candidates;
+        let mut total = self.vector_candidates;
+        self.consume("candidates", 1, limit, &mut total)?;
+        self.vector_candidates = total;
+        Ok(())
+    }
+
+    fn row(&mut self) -> Result<()> {
+        let limit = self.limits.max_result_rows;
+        let mut total = self.result_rows;
+        self.consume("rows", 1, limit, &mut total)?;
+        self.result_rows = total;
+        Ok(())
+    }
+
+    fn serialized<T: serde::Serialize>(&self, value: &T) -> Result<()> {
+        self.check_deadline()?;
+        let bytes = serde_json::to_vec(value)
+            .map_err(|error| Error::from_reason(format!("QUERY_EXECUTION_FAILED: {error}")))?;
+        if bytes.len() as u64 > self.limits.max_serialized_bytes {
+            return Err(Error::from_reason("QUERY_BUDGET_EXCEEDED: reason=bytes"));
+        }
+        Ok(())
+    }
+}
+
+fn preserve_query_error(error: Error) -> Error {
+    let message = error.to_string();
+    if message.starts_with("QUERY_BUDGET_")
+        || message.starts_with("QUERY_RESOURCE_LIMIT_EXCEEDED")
+        || message.starts_with("QUERY_IR_VALIDATION_FAILED")
+    {
+        Error::from_reason(message)
+    } else {
+        Error::from_reason(format!("QUERY_EXECUTION_FAILED: {message}"))
+    }
+}
+
 #[derive(Serialize, Deserialize, Clone, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct QueryIrRequest {
@@ -469,6 +662,7 @@ pub struct QueryIrRequest {
     pub namespace: Option<String>,
     pub temporal: Option<QueryIrTemporal>,
     pub consistency: Option<QueryIrConsistency>,
+    pub budget: Option<QueryBudget>,
     pub operation: QueryIrOperation,
 }
 
@@ -8486,12 +8680,14 @@ impl Storage {
         pattern: &query::ast::GraphPattern,
         as_of: &Option<String>,
         clauses: &query::ast::PatternClauses,
+        budget: &mut QueryBudgetState,
     ) -> Result<serde_json::Value> {
         use query::ast::PatternDirection;
         let ser_err = |e: serde_json::Error| {
             Error::from_reason(format!("HQL result serialization failed: {e}"))
         };
         Self::validate_temporal_selector(as_of)?;
+        budget.check_deadline()?;
         type Row = serde_json::Map<String, serde_json::Value>;
 
         let now = Utc::now().to_rfc3339();
@@ -8515,6 +8711,7 @@ impl Storage {
                     if Self::is_node_visible(node, as_of, false, &now)
                         && self.node_matches(anchor_u32, node, &pattern.start)
                     {
+                        budget.node()?;
                         let node = self.hydrated_node(anchor_u32, node);
                         let mut row = Row::new();
                         if let Some(v) = &pattern.start.var {
@@ -8526,6 +8723,7 @@ impl Storage {
             }
         } else {
             for entry in self.nodes.iter() {
+                budget.check_deadline()?;
                 let node = entry.value();
                 if !Self::is_node_visible(node, as_of, false, &now) {
                     continue;
@@ -8533,6 +8731,7 @@ impl Storage {
                 if !self.node_matches(*entry.key(), node, &pattern.start) {
                     continue;
                 }
+                budget.node()?;
                 let node = self.hydrated_node(*entry.key(), node);
                 let mut row = Row::new();
                 if let Some(v) = &pattern.start.var {
@@ -8551,6 +8750,7 @@ impl Storage {
             };
             let mut next: Vec<(u32, Row)> = Vec::new();
             for (curr, row) in &frontier {
+                budget.check_deadline()?;
                 let mut eids: HashSet<u128> = HashSet::new();
                 if walk_out {
                     if let Some(s) = self.out_idx.get(curr) {
@@ -8563,6 +8763,7 @@ impl Storage {
                     }
                 }
                 for eid in &eids {
+                    budget.edge()?;
                     let edge_ref = match self.edges.get(eid) {
                         Some(e) => e,
                         None => continue,
@@ -8608,6 +8809,7 @@ impl Storage {
                     if !self.node_matches(far_u32, far_node, node_pat) {
                         continue;
                     }
+                    budget.node()?;
                     let far_node = self.hydrated_node(far_u32, far_node);
                     let mut nb = row.clone();
                     if let Some(v) = &edge_pat.var {
@@ -8616,6 +8818,7 @@ impl Storage {
                     if let Some(v) = &node_pat.var {
                         nb.insert(v.clone(), serde_json::to_value(far_node).map_err(ser_err)?);
                     }
+                    budget.row()?;
                     next.push((far_u32, nb));
                 }
             }
@@ -8843,7 +9046,16 @@ impl Storage {
             },
             "limits": {
                 "max_k": QUERY_IR_MAX_K,
-                "max_depth": QUERY_IR_MAX_DEPTH
+                "max_depth": QUERY_IR_MAX_DEPTH,
+                "budget_defaults": {
+                    "max_expanded_nodes": QUERY_BUDGET_DEFAULT_NODES,
+                    "max_expanded_edges": QUERY_BUDGET_DEFAULT_EDGES,
+                    "max_vector_candidates": QUERY_BUDGET_DEFAULT_CANDIDATES,
+                    "max_result_rows": QUERY_BUDGET_DEFAULT_ROWS,
+                    "max_serialized_bytes": QUERY_BUDGET_DEFAULT_BYTES,
+                    "max_elapsed_ms": QUERY_BUDGET_DEFAULT_ELAPSED_MS
+                },
+                "budget_exhaustion_reasons": ["nodes", "edges", "candidates", "rows", "bytes", "deadline"]
             },
             // WP-1.3 horizon honesty (ADR I6/D4): the oldest boundary any
             // history question can be answered past, the tx-time epoch, and
@@ -8909,6 +9121,8 @@ impl Storage {
                 "QUERY_CAPABILITY_UNSUPPORTED: namespace-scoped Query IR is not implemented",
             ));
         }
+        let budget_limits = request.budget.clone().unwrap_or_default().resolve()?;
+        let mut budget = QueryBudgetState::new(budget_limits);
         if matches!(
             request.consistency.as_ref().map(|value| value.index),
             Some(QueryIrIndexConsistency::ReadYourWrite)
@@ -8992,10 +9206,9 @@ impl Storage {
                             oversample,
                         },
                         tx_as_of,
+                        &mut budget,
                     )
-                    .map_err(|error| {
-                        Error::from_reason(format!("QUERY_EXECUTION_FAILED: {error}"))
-                    })?;
+                    .map_err(preserve_query_error)?;
                 let data = serde_json::to_value(results).map_err(|error| {
                     Error::from_reason(format!("QUERY_EXECUTION_FAILED: {error}"))
                 })?;
@@ -9037,10 +9250,10 @@ impl Storage {
                 // nodes retracted after t still resolve (SPEC--EPOCH-HNSW C1).
                 // Without one, the current-view path is unchanged.
                 let results = match tx_as_of {
-                    Some(t) => self.neighbors_tx_view(seed_id, input, t),
-                    None => self.neighbors(seed_id, input, false),
+                    Some(t) => self.neighbors_tx_view(seed_id, input, t, &mut budget),
+                    None => self.neighbors_with_budget(seed_id, input, false, &mut budget),
                 }
-                .map_err(|error| Error::from_reason(format!("QUERY_EXECUTION_FAILED: {error}")))?;
+                .map_err(preserve_query_error)?;
                 let data = serde_json::to_value(results).map_err(|error| {
                     Error::from_reason(format!("QUERY_EXECUTION_FAILED: {error}"))
                 })?;
@@ -9048,7 +9261,7 @@ impl Storage {
             }
         };
 
-        Ok(serde_json::json!({
+        let response = serde_json::json!({
             "contract_version": QUERY_IR_V1,
             "request_id": request.request_id,
             "status": "ok",
@@ -9057,9 +9270,12 @@ impl Storage {
             "meta": {
                 "capability_version": ENGINE_VERSION,
                 "index_lag": self.index_lag(),
+                "budget": budget.limits,
                 "warnings": []
             }
-        }))
+        });
+        budget.serialized(&response)?;
+        Ok(response)
     }
 
     fn query_ir_search_vector(
@@ -9115,8 +9331,18 @@ impl Storage {
     }
 
     pub fn execute_hql(&self, query: &str) -> Result<serde_json::Value> {
+        self.execute_hql_with_budget(query, None)
+    }
+
+    pub fn execute_hql_with_budget(
+        &self,
+        query: &str,
+        requested_budget: Option<QueryBudget>,
+    ) -> Result<serde_json::Value> {
         let _read_guard = self.commit_lock.lock();
         self.ensure_readable()?;
+        let budget_limits = requested_budget.unwrap_or_default().resolve()?;
+        let mut budget_state = QueryBudgetState::new(budget_limits);
 
         fn to_value<T: serde::Serialize>(res: T) -> Result<serde_json::Value> {
             serde_json::to_value(res)
@@ -9177,14 +9403,17 @@ impl Storage {
         fn query_ir_neighbors(
             storage: &Storage,
             request: QueryIrRequest,
+            budget: Option<QueryBudget>,
         ) -> Result<Vec<NeighborOutput>> {
+            let mut request = request;
+            request.budget = budget;
             let response = storage.execute_query_ir(request)?;
             serde_json::from_value(response["data"].clone()).map_err(|error| {
                 Error::from_reason(format!("HQL compatibility decode failed: {error}"))
             })
         }
         let command = HqlCommand::try_from(query).map_err(Error::from_reason)?;
-        match command {
+        let result = match command {
             HqlCommand::Search {
                 vector,
                 k,
@@ -9211,6 +9440,7 @@ impl Storage {
                                 tx_as_of: None,
                             }),
                             consistency: None,
+                            budget: None,
                             operation: QueryIrOperation::Search {
                                 mode: QueryIrSearchMode::Vector,
                                 target_id: None,
@@ -9223,18 +9453,22 @@ impl Storage {
                                 oversample,
                             },
                         },
+                        Some(budget_state.limits.as_input()),
                     )?
                 } else {
-                    self.hybrid_search(HybridSearchInput {
-                        query_vector,
-                        k,
-                        alpha: Some(0.0),
-                        lang,
-                        as_of,
-                        collection: resolved_collection,
-                        ef_search,
-                        oversample,
-                    })?
+                    self.hybrid_search_with_budget(
+                        HybridSearchInput {
+                            query_vector,
+                            k,
+                            alpha: Some(0.0),
+                            lang,
+                            as_of,
+                            collection: resolved_collection,
+                            ef_search,
+                            oversample,
+                        },
+                        &mut budget_state,
+                    )?
                 };
                 Self::apply_hql_clauses(res, &clauses)
             }
@@ -9263,7 +9497,7 @@ impl Storage {
                     || depth == 0
                     || depth > QUERY_IR_MAX_DEPTH
                 {
-                    self.neighbors(
+                    self.neighbors_with_budget(
                         resolved_seed,
                         NeighborInput {
                             depth: Some(depth),
@@ -9275,6 +9509,7 @@ impl Storage {
                             limit: None,
                         },
                         is_inferred,
+                        &mut budget_state,
                     )?
                 } else {
                     let relations = rels.unwrap_or_else(|| vec![target_rel]);
@@ -9294,6 +9529,7 @@ impl Storage {
                                 tx_as_of: None,
                             }),
                             consistency: None,
+                            budget: None,
                             operation: QueryIrOperation::Traverse {
                                 seed_id: resolved_seed,
                                 depth,
@@ -9302,6 +9538,7 @@ impl Storage {
                                 limit: None,
                             },
                         },
+                        Some(budget_state.limits.as_input()),
                     )?
                 };
                 Self::apply_hql_clauses(res, &clauses)
@@ -9333,6 +9570,7 @@ impl Storage {
                                 tx_as_of: None,
                             }),
                             consistency: None,
+                            budget: None,
                             operation: QueryIrOperation::Search {
                                 mode: QueryIrSearchMode::Hybrid,
                                 target_id: None,
@@ -9345,18 +9583,22 @@ impl Storage {
                                 oversample,
                             },
                         },
+                        Some(budget_state.limits.as_input()),
                     )?
                 } else {
-                    self.hybrid_search(HybridSearchInput {
-                        query_vector,
-                        k,
-                        alpha: Some(alpha),
-                        lang,
-                        as_of,
-                        collection: resolved_collection,
-                        ef_search,
-                        oversample,
-                    })?
+                    self.hybrid_search_with_budget(
+                        HybridSearchInput {
+                            query_vector,
+                            k,
+                            alpha: Some(alpha),
+                            lang,
+                            as_of,
+                            collection: resolved_collection,
+                            ef_search,
+                            oversample,
+                        },
+                        &mut budget_state,
+                    )?
                 };
                 Self::apply_hql_clauses(res, &clauses)
             }
@@ -9373,11 +9615,21 @@ impl Storage {
                 pattern,
                 as_of,
                 clauses,
-            } => self.match_pattern(&pattern, &as_of, &clauses),
-        }
+            } => self.match_pattern(&pattern, &as_of, &clauses, &mut budget_state),
+        }?;
+        budget_state.serialized(&result)?;
+        Ok(result)
     }
 
     pub fn execute_hql_read_only(&self, query: &str) -> Result<serde_json::Value> {
+        self.execute_hql_read_only_with_budget(query, None)
+    }
+
+    pub fn execute_hql_read_only_with_budget(
+        &self,
+        query: &str,
+        budget: Option<QueryBudget>,
+    ) -> Result<serde_json::Value> {
         let _read_guard = self.commit_lock.lock();
         self.ensure_readable()?;
 
@@ -9387,7 +9639,7 @@ impl Storage {
             | HqlCommand::Traverse { .. }
             | HqlCommand::Hybrid { .. }
             | HqlCommand::Context { .. }
-            | HqlCommand::MatchPattern { .. } => self.execute_hql(query),
+            | HqlCommand::MatchPattern { .. } => self.execute_hql_with_budget(query, budget),
         }
     }
 
@@ -9795,7 +10047,11 @@ impl Storage {
         let _read_guard = self.commit_lock.lock();
         self.ensure_readable()?;
 
-        self.hybrid_search_impl(args, None)
+        let limits = QueryBudget::default().resolve()?;
+        let mut budget = QueryBudgetState::new(limits);
+        let results = self.hybrid_search_impl(args, None, &mut budget)?;
+        budget.serialized(&results)?;
+        Ok(results)
     }
 
     /// The one search body (SPEC--EPOCH-HNSW §3.3). `tx_as_of = None` is the
@@ -9811,7 +10067,9 @@ impl Storage {
         &self,
         args: HybridSearchInput,
         tx_as_of: Option<u64>,
+        budget: &mut QueryBudgetState,
     ) -> Result<Vec<NeighborOutput>> {
+        budget.check_deadline()?;
         Self::validate_temporal_selector(&args.as_of)?;
         if args.k == 0 {
             return Err(Error::from_reason(
@@ -9887,6 +10145,11 @@ impl Storage {
         } else {
             k2
         };
+        if fetch as u64 > budget.limits.max_vector_candidates {
+            return Err(Error::from_reason(
+                "QUERY_BUDGET_EXCEEDED: reason=candidates",
+            ));
+        }
         // When a rerank sidecar is present and the over-fetch would already pull
         // ~every slot, skip the approximate HNSW prefilter and score the full
         // sidecar exactly. The HNSW prefilter can nondeterministically drop a
@@ -10027,6 +10290,9 @@ impl Storage {
                 }
             }
         };
+        for _ in &results {
+            budget.candidate()?;
+        }
         // f32-sidecar rerank: replace each candidate's quantized distance with the
         // exact f32 distance and re-sort ascending for the hybrid blend below.
         // Keep the full filtered candidate pool here: truncating before the live
@@ -10065,6 +10331,7 @@ impl Storage {
         };
 
         for (d_id, distance) in results {
+            budget.check_deadline()?;
             if let Some(meta) = meta_arena.get(d_id) {
                 {
                     let u32_id = meta.node_u32; // A2: id interned in metadata
@@ -10119,6 +10386,7 @@ impl Storage {
                     // Carry the ranking score in `score`; leave `node.impact`
                     // as the node's true graph-authority signal (don't clobber
                     // it) so the caller can fuse it itself.
+                    budget.row()?;
                     hybrid_results.push(NeighborOutput {
                         node: node_out,
                         path: Vec::new(),
@@ -10161,9 +10429,37 @@ impl Storage {
         args: NeighborInput,
         is_inferred: bool,
     ) -> Result<Vec<NeighborOutput>> {
+        let limits = QueryBudget::default().resolve()?;
+        let mut budget = QueryBudgetState::new(limits);
+        let results = self.neighbors_with_budget(seed, args, is_inferred, &mut budget)?;
+        budget.serialized(&results)?;
+        Ok(results)
+    }
+
+    fn hybrid_search_with_budget(
+        &self,
+        args: HybridSearchInput,
+        budget: &mut QueryBudgetState,
+    ) -> Result<Vec<NeighborOutput>> {
+        self.hybrid_search_impl(args, None, budget)
+    }
+
+    fn neighbors_with_budget(
+        &self,
+        seed: String,
+        args: NeighborInput,
+        is_inferred: bool,
+        budget: &mut QueryBudgetState,
+    ) -> Result<Vec<NeighborOutput>> {
         let _read_guard = self.commit_lock.lock();
         self.ensure_readable()?;
         Self::validate_temporal_selector(&args.as_of)?;
+        if args.limit == Some(0) {
+            return Err(Error::from_reason(
+                "QUERY_RESOURCE_LIMIT_EXCEEDED: limit must be positive",
+            ));
+        }
+        budget.check_deadline()?;
 
         let u32_seed = match self.get_u32(&seed) {
             Some(id) => id,
@@ -10210,6 +10506,7 @@ impl Storage {
         let mut queue = VecDeque::new();
         queue.push_back((u32_seed, Vec::new(), 0));
         while let Some((curr_u32, path, curr_depth)) = queue.pop_front() {
+            budget.check_deadline()?;
             if curr_depth >= depth && !is_inferred {
                 continue;
             }
@@ -10228,6 +10525,7 @@ impl Storage {
             }
 
             for eid in eid_set.iter() {
+                budget.edge()?;
                 if let Some(edge_ref) = self.edges.get(eid) {
                     let edge = edge_ref.value();
                     if !(walk_out && self.get_u32(&edge.from) == Some(curr_u32)
@@ -10263,6 +10561,7 @@ impl Storage {
                     };
                     if let Some(next_u32) = self.get_u32(next_id) {
                         if !visited.contains(&next_u32) {
+                            budget.node()?;
                             visited.insert(next_u32);
                             if let Some(node_ref) = self.nodes.get(&next_u32) {
                                 let node = node_ref.value();
@@ -10291,6 +10590,7 @@ impl Storage {
 
                                 let mut new_path = path.clone();
                                 new_path.push(edge.clone());
+                                budget.row()?;
                                 results.push(NeighborOutput {
                                     node: out_node,
                                     path: new_path.clone(),
@@ -10446,8 +10746,15 @@ impl Storage {
         seed: String,
         args: NeighborInput,
         t: u64,
+        budget: &mut QueryBudgetState,
     ) -> Result<Vec<NeighborOutput>> {
         Self::validate_temporal_selector(&args.as_of)?;
+        if args.limit == Some(0) {
+            return Err(Error::from_reason(
+                "QUERY_RESOURCE_LIMIT_EXCEEDED: limit must be positive",
+            ));
+        }
+        budget.check_deadline()?;
         let edge_floor = self.edge_history_floor().ok_or_else(|| {
             Error::from_reason(
                 "QUERY_IR_HISTORY_UNAVAILABLE: rebuild edge projection with a writable v4 engine",
@@ -10493,6 +10800,7 @@ impl Storage {
         let mut queue: VecDeque<(String, Vec<EdgeOutput>, u32)> = VecDeque::new();
         queue.push_back((seed, Vec::new(), 0));
         while let Some((curr_id, path, curr_depth)) = queue.pop_front() {
+            budget.check_deadline()?;
             if curr_depth >= depth {
                 continue;
             }
@@ -10517,6 +10825,7 @@ impl Storage {
                 edges
             };
             for edge in historical {
+                budget.edge()?;
                 if !(walk_out && edge.from == curr_id || walk_in && edge.to == curr_id) {
                     continue;
                 }
@@ -10540,6 +10849,7 @@ impl Storage {
                 if visited.contains(&next_id) {
                     continue;
                 }
+                budget.node()?;
                 visited.insert(next_id.clone());
 
                 // Resolve the far node through the chain at t (shared with the
@@ -10550,6 +10860,7 @@ impl Storage {
 
                 let mut new_path = path.clone();
                 new_path.push(edge);
+                budget.row()?;
                 results.push(NeighborOutput {
                     node: out_node,
                     path: new_path.clone(),

@@ -190,6 +190,7 @@ async fn studio_rest_routes_are_bounded_and_api_key_guarded() {
     let app = build_router(AppState {
         storage: Arc::new(RwLock::new(storage)),
         api_key: Some("studio-secret".to_string()),
+        query_admission: Arc::new(tokio::sync::Semaphore::new(8)),
     });
 
     let unauthorized = app

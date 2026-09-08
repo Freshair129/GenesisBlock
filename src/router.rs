@@ -2,26 +2,29 @@ use axum::{
     extract::{DefaultBodyLimit, Json, Path, Query, State},
     http::{header, HeaderValue, StatusCode},
     middleware::{self, Next},
-    response::IntoResponse,
+    response::{IntoResponse, Response},
     routing::{get, post},
     Router,
 };
 use parking_lot::RwLock;
 use std::sync::atomic::Ordering;
 use std::sync::Arc;
+use tokio::sync::Semaphore;
 use tower_http::cors::{AllowOrigin, CorsLayer};
 use tower_http::limit::RequestBodyLimitLayer;
 use tower_http::trace::TraceLayer;
 
 use crate::{
     BatchInput, CollectionInfo, EdgeInput, Event, GenesisTransaction, HybridSearchInput,
-    NamedQueryRequest, NodeInput, QueryInput, RelationalMutationBatch, RelationalSchemaPackage,
-    Storage, StudioGraphSceneRequest, SyncPeer,
+    NamedQueryRequest, NodeInput, QueryBudget, QueryInput, RelationalMutationBatch,
+    RelationalSchemaPackage, Storage, StudioGraphSceneRequest, SyncPeer,
 };
 
 // ---------------------------------------------------------------------------
 // App state
 // ---------------------------------------------------------------------------
+
+pub const DEFAULT_QUERY_ADMISSION: usize = 8;
 
 #[derive(Clone)]
 pub struct AppState {
@@ -29,6 +32,9 @@ pub struct AppState {
     /// When set, every request must carry `Authorization: Bearer <key>`.
     /// Leave `None` (the default) for unauthenticated local-only use.
     pub api_key: Option<String>,
+    /// Bounds the number of blocking query jobs admitted to Tokio's blocking
+    /// pool. Status/health routes do not acquire this permit.
+    pub query_admission: Arc<Semaphore>,
 }
 
 // ---------------------------------------------------------------------------
@@ -364,11 +370,21 @@ async fn studio_read_hql_handler(
     State(state): State<AppState>,
     Json(body): Json<HqlBody>,
 ) -> impl IntoResponse {
-    let query = body.into_query();
-    let storage = state.storage.read();
-    match storage.execute_hql_read_only(&query) {
-        Ok(result) => (StatusCode::OK, Json(result)).into_response(),
-        Err(error) => (StatusCode::BAD_REQUEST, error.to_string()).into_response(),
+    let _permit = match acquire_query_permit(&state) {
+        Some(permit) => permit,
+        None => return query_admission_rejected(),
+    };
+    let (query, budget) = body.into_parts();
+    let storage = Arc::clone(&state.storage);
+    let result = tokio::task::spawn_blocking(move || {
+        let storage = storage.read();
+        storage.execute_hql_read_only_with_budget(&query, budget)
+    })
+    .await;
+    match result {
+        Ok(Ok(result)) => (StatusCode::OK, Json(result)).into_response(),
+        Ok(Err(error)) => (StatusCode::BAD_REQUEST, error.to_string()).into_response(),
+        Err(error) => blocking_query_failure(error),
     }
 }
 
@@ -515,34 +531,87 @@ async fn insight_rebuild_handler(State(state): State<AppState>) -> impl IntoResp
 #[serde(untagged)]
 enum HqlBody {
     Raw(String),
-    Wrapped { query: String },
+    Wrapped {
+        query: String,
+        #[serde(default)]
+        budget: Option<QueryBudget>,
+    },
 }
 
 impl HqlBody {
-    fn into_query(self) -> String {
+    fn into_parts(self) -> (String, Option<QueryBudget>) {
         match self {
-            HqlBody::Raw(q) => q,
-            HqlBody::Wrapped { query } => query,
+            HqlBody::Raw(q) => (q, None),
+            HqlBody::Wrapped { query, budget } => (query, budget),
         }
     }
+}
+
+fn acquire_query_permit(state: &AppState) -> Option<tokio::sync::OwnedSemaphorePermit> {
+    state.query_admission.clone().try_acquire_owned().ok()
+}
+
+fn query_admission_rejected() -> Response {
+    (
+        StatusCode::TOO_MANY_REQUESTS,
+        Json(serde_json::json!({
+            "code": "QUERY_ADMISSION_REJECTED",
+            "message": "query admission capacity is exhausted"
+        })),
+    )
+        .into_response()
+}
+
+fn blocking_query_failure(error: impl std::fmt::Display) -> Response {
+    (
+        StatusCode::INTERNAL_SERVER_ERROR,
+        Json(serde_json::json!({
+            "code": "QUERY_EXECUTION_FAILED",
+            "message": error.to_string()
+        })),
+    )
+        .into_response()
+}
+
+fn query_storage_error_response(error: impl std::fmt::Display) -> Response {
+    let message = error.to_string();
+    if message.starts_with("QUERY_BUDGET_") {
+        let code = message.split(':').next().unwrap_or("QUERY_BUDGET_EXCEEDED");
+        return (
+            StatusCode::BAD_REQUEST,
+            Json(serde_json::json!({ "code": code, "message": message })),
+        )
+            .into_response();
+    }
+    (StatusCode::INTERNAL_SERVER_ERROR, message).into_response()
 }
 
 async fn execute_hql_handler(
     State(state): State<AppState>,
     Json(body): Json<HqlBody>,
 ) -> impl IntoResponse {
-    let query = body.into_query();
-    let storage = state.storage.read();
-    if storage.is_rebuilding.load(Ordering::SeqCst) {
+    let _permit = match acquire_query_permit(&state) {
+        Some(permit) => permit,
+        None => return query_admission_rejected(),
+    };
+    let (query, budget) = body.into_parts();
+    if state.storage.read().is_rebuilding.load(Ordering::SeqCst) {
         return (
             StatusCode::SERVICE_UNAVAILABLE,
             "Engine is rebuilding index...",
         )
             .into_response();
     }
-    match storage.execute_hql(&query) {
-        Ok(results) => (StatusCode::OK, Json(results)).into_response(),
-        Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
+    let storage = Arc::clone(&state.storage);
+    let result = tokio::task::spawn_blocking(move || {
+        let storage = storage.read();
+        storage.execute_hql_with_budget(&query, budget)
+    })
+    .await;
+    match result {
+        Ok(Ok(results)) => (StatusCode::OK, Json(results)).into_response(),
+        Ok(Err(error)) => query_storage_error_response(error),
+        Err(error) => blocking_query_failure(error),
     }
 }
 
@@ -573,8 +642,11 @@ async fn execute_query_ir_handler(
     State(state): State<AppState>,
     Json(request): Json<serde_json::Value>,
 ) -> impl IntoResponse {
-    let storage = state.storage.read();
-    if storage.is_rebuilding.load(Ordering::SeqCst) {
+    let _permit = match acquire_query_permit(&state) {
+        Some(permit) => permit,
+        None => return query_admission_rejected(),
+    };
+    if state.storage.read().is_rebuilding.load(Ordering::SeqCst) {
         return (
             StatusCode::SERVICE_UNAVAILABLE,
             Json(serde_json::json!({
@@ -584,9 +656,16 @@ async fn execute_query_ir_handler(
         )
             .into_response();
     }
-    match storage.execute_query_ir_json(request) {
-        Ok(response) => (StatusCode::OK, Json(response)).into_response(),
-        Err(error) => query_ir_error_response(error),
+    let storage = Arc::clone(&state.storage);
+    let result = tokio::task::spawn_blocking(move || {
+        let storage = storage.read();
+        storage.execute_query_ir_json(request)
+    })
+    .await;
+    match result {
+        Ok(Ok(response)) => (StatusCode::OK, Json(response)).into_response(),
+        Ok(Err(error)) => query_ir_error_response(error),
+        Err(error) => blocking_query_failure(error),
     }
 }
 
@@ -609,17 +688,23 @@ async fn query_handler(
     State(state): State<AppState>,
     Json(input): Json<QueryInput>,
 ) -> impl IntoResponse {
-    let storage = state.storage.read();
-    if storage.is_rebuilding.load(Ordering::SeqCst) {
+    let _permit = match acquire_query_permit(&state) {
+        Some(permit) => permit,
+        None => return query_admission_rejected(),
+    };
+    if state.storage.read().is_rebuilding.load(Ordering::SeqCst) {
         return (
             StatusCode::SERVICE_UNAVAILABLE,
             "Engine is rebuilding index...",
         )
             .into_response();
     }
-    match storage.query(input) {
-        Ok(results) => (StatusCode::OK, Json(results)).into_response(),
-        Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
+    let storage = Arc::clone(&state.storage);
+    let result = tokio::task::spawn_blocking(move || storage.read().query(input)).await;
+    match result {
+        Ok(Ok(results)) => (StatusCode::OK, Json(results)).into_response(),
+        Ok(Err(error)) => query_storage_error_response(error),
+        Err(error) => blocking_query_failure(error),
     }
 }
 
@@ -627,17 +712,23 @@ async fn hybrid_search_handler(
     State(state): State<AppState>,
     Json(input): Json<HybridSearchInput>,
 ) -> impl IntoResponse {
-    let storage = state.storage.read();
-    if storage.is_rebuilding.load(Ordering::SeqCst) {
+    let _permit = match acquire_query_permit(&state) {
+        Some(permit) => permit,
+        None => return query_admission_rejected(),
+    };
+    if state.storage.read().is_rebuilding.load(Ordering::SeqCst) {
         return (
             StatusCode::SERVICE_UNAVAILABLE,
             "Engine is rebuilding index...",
         )
             .into_response();
     }
-    match storage.hybrid_search(input) {
-        Ok(results) => (StatusCode::OK, Json(results)).into_response(),
-        Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
+    let storage = Arc::clone(&state.storage);
+    let result = tokio::task::spawn_blocking(move || storage.read().hybrid_search(input)).await;
+    match result {
+        Ok(Ok(results)) => (StatusCode::OK, Json(results)).into_response(),
+        Ok(Err(error)) => query_storage_error_response(error),
+        Err(error) => blocking_query_failure(error),
     }
 }
 
@@ -645,17 +736,24 @@ async fn ranked_context_handler(
     State(state): State<AppState>,
     Json(input): Json<HybridSearchInput>,
 ) -> impl IntoResponse {
-    let storage = state.storage.read();
-    if storage.is_rebuilding.load(Ordering::SeqCst) {
+    let _permit = match acquire_query_permit(&state) {
+        Some(permit) => permit,
+        None => return query_admission_rejected(),
+    };
+    if state.storage.read().is_rebuilding.load(Ordering::SeqCst) {
         return (
             StatusCode::SERVICE_UNAVAILABLE,
             "Engine is rebuilding index...",
         )
             .into_response();
     }
-    match storage.get_ranked_context(input) {
-        Ok(results) => (StatusCode::OK, Json(results)).into_response(),
-        Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
+    let storage = Arc::clone(&state.storage);
+    let result =
+        tokio::task::spawn_blocking(move || storage.read().get_ranked_context(input)).await;
+    match result {
+        Ok(Ok(results)) => (StatusCode::OK, Json(results)).into_response(),
+        Ok(Err(error)) => query_storage_error_response(error),
+        Err(error) => blocking_query_failure(error),
     }
 }
 
@@ -663,22 +761,31 @@ async fn retrieve_context_handler(
     State(state): State<AppState>,
     Json(input): Json<RetrieveContextInput>,
 ) -> impl IntoResponse {
-    let storage = state.storage.read();
-    if storage.is_rebuilding.load(Ordering::SeqCst) {
+    let _permit = match acquire_query_permit(&state) {
+        Some(permit) => permit,
+        None => return query_admission_rejected(),
+    };
+    if state.storage.read().is_rebuilding.load(Ordering::SeqCst) {
         return (
             StatusCode::SERVICE_UNAVAILABLE,
             "Engine is rebuilding index...",
         )
             .into_response();
     }
-    match storage.retrieve_context(
-        &input.target_id,
-        &input.tier,
-        input.budget,
-        input.fuzzy.unwrap_or(false),
-    ) {
-        Ok(pkg) => (StatusCode::OK, Json(pkg)).into_response(),
-        Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
+    let storage = Arc::clone(&state.storage);
+    let result = tokio::task::spawn_blocking(move || {
+        storage.read().retrieve_context(
+            &input.target_id,
+            &input.tier,
+            input.budget,
+            input.fuzzy.unwrap_or(false),
+        )
+    })
+    .await;
+    match result {
+        Ok(Ok(pkg)) => (StatusCode::OK, Json(pkg)).into_response(),
+        Ok(Err(error)) => query_storage_error_response(error),
+        Err(error) => blocking_query_failure(error),
     }
 }
 

@@ -36,6 +36,7 @@ async fn wave_b_collection_validation_and_edge_history_parity() {
     let app = build_router(AppState {
         storage: storage.clone(),
         api_key: None,
+        query_admission: Arc::new(tokio::sync::Semaphore::new(8)),
     });
     let (status, _) = post_json(
         &app,
@@ -153,6 +154,7 @@ fn make_app() -> (Router, TempDir) {
     let state = AppState {
         storage: Arc::new(RwLock::new(storage)),
         api_key: None,
+        query_admission: Arc::new(tokio::sync::Semaphore::new(8)),
     };
     (build_router(state), dir)
 }
@@ -170,6 +172,7 @@ fn make_app_with_key(key: &str) -> (Router, TempDir) {
     let state = AppState {
         storage: Arc::new(RwLock::new(storage)),
         api_key: Some(key.to_string()),
+        query_admission: Arc::new(tokio::sync::Semaphore::new(8)),
     };
     (build_router(state), dir)
 }

@@ -325,6 +325,7 @@ async fn rest_rejection_preserves_frontier_and_corrected_retry_succeeds() {
     let app = build_router(AppState {
         storage: storage.clone(),
         api_key: None,
+        query_admission: Arc::new(tokio::sync::Semaphore::new(8)),
     });
     let invalid = txn("rest-retry", vec![json!({"id":"a","name":"x"}); 2]);
     let valid = txn("rest-retry", vec![json!({"id":"a","name":"x"})]);

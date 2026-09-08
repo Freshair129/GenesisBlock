@@ -189,6 +189,14 @@ export interface HybridSearchInput {
 export type QueryIrIndexConsistency = 'eventual' | 'read_your_write'
 export type QueryIrSearchMode = 'vector' | 'hybrid' | 'lexical'
 export type QueryIrDirection = 'out' | 'in' | 'both'
+export interface QueryBudget {
+  max_expanded_nodes?: number
+  max_expanded_edges?: number
+  max_vector_candidates?: number
+  max_result_rows?: number
+  max_serialized_bytes?: number
+  max_elapsed_ms?: number
+}
 export interface QueryIrRequest {
   contract_version: 'query-ir.v1'
   request_id: string
@@ -202,6 +210,7 @@ export interface QueryIrRequest {
    */
   temporal?: { valid_at?: string; tx_as_of?: number }
   consistency?: { index: QueryIrIndexConsistency }
+  budget?: QueryBudget
   operation: QueryIrSearchOperation | QueryIrTraverseOperation
 }
 export interface QueryIrSearchOperation {
@@ -233,6 +242,14 @@ export interface QueryIrResponse {
   meta: {
     capability_version: string
     index_lag: number
+    budget: {
+      max_expanded_nodes: number
+      max_expanded_edges: number
+      max_vector_candidates: number
+      max_result_rows: number
+      max_serialized_bytes: number
+      max_elapsed_ms: number
+    }
     warnings: Array<string>
   }
 }
@@ -261,6 +278,15 @@ export interface QueryIrCapabilities {
   limits: {
     max_k: number
     max_depth: number
+    budget_defaults: {
+      max_expanded_nodes: number
+      max_expanded_edges: number
+      max_vector_candidates: number
+      max_result_rows: number
+      max_serialized_bytes: number
+      max_elapsed_ms: number
+    }
+    budget_exhaustion_reasons: Array<'nodes' | 'edges' | 'candidates' | 'rows' | 'bytes' | 'deadline'>
   }
 }
 export interface DatabaseStatus {
