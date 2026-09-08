@@ -1,7 +1,7 @@
 ---
-version: "0.1.1b"
+version: "0.1.2b"
 created_at: "2026-09-07T23:08:51+07:00,ATHER,79b41a3"
-last_update: "2026-09-08T00:25:09+07:00,ATHER"
+last_update: "2026-09-08T11:30:00+07:00,ATHER"
 status: beta
 attributes:
   domain: architecture
@@ -11,10 +11,11 @@ attributes:
 
 # GenesisBlockDB — Graph / Vector System Review and Refinement
 
-สถานะ 2026-09-08: findings ด้านล่างเป็น baseline ของ 79b41a3. Wave A (R-01/R-08)
-แก้และตรวจใน branch `codex/wave-a-commit-correctness` แล้ว: Rust 598 ผ่าน / 3 soak tests ถูกข้าม,
-NAPI/MCP 24 ผ่าน ดู [contract และหลักฐาน Wave A](SPEC--WAVE-A-COMMIT-CORRECTNESS.md).
-Wave B–E ยังเป็นข้อเสนอ; ผลนี้เป็น local verification ก่อน merge/release.
+สถานะ 2026-09-08: findings ด้านล่างเริ่มจาก baseline ของ 79b41a3. Wave A (R-01/R-08)
+ผ่านใน branch `codex/wave-a-commit-correctness`; Wave B (R-02/R-03) ผ่าน local
+verification และ benchmark correction ใน branch `codex/wave-b-durable-index-design`
+ที่ commits `28b58cb` และ `44d0252`. Wave C เป็น candidate proposal ใน branch
+`codex/wave-c-query-correctness`; Wave D–E ยังเป็นข้อเสนอ ไม่ใช่ production/release claim.
 
 
 ตรวจจาก source commit `79b41a3f4ae4026d086b634c631f4f4a7ccbd142`, engine 0.2.5, Windows x64
@@ -383,7 +384,9 @@ Peer: batch atomicity, multi-collection, epoch HNSW, temporal, GRL, backup/journ
 |---|---|---|
 | none | 0.1.0b | System review, runtime evidence, 8 confirmed defect groups, 4 refinement/gap groups and acceptance roadmap |
 | 0.1.0b | 0.1.1b | Record user approval of Wave A; other waves remain proposed |
+| 0.1.1b | 0.1.2b | Record verified Wave B delivery and register the Wave C query-correctness candidate |
 
-ผู้ใช้อนุมัติ Wave A (R-01 และ R-08) เมื่อ 2026-09-07; implementation และ verification อยู่ใน
-`SPEC--WAVE-A-COMMIT-CORRECTNESS.md` ส่วน Wave B–E ยังเป็นข้อเสนอสำหรับ review.
+ผู้ใช้อนุมัติ Wave A (R-01 และ R-08) เมื่อ 2026-09-07 และ Wave B (R-02/R-03)
+เมื่อ 2026-09-08; implementation/verification อยู่ในสเปกของแต่ละ wave. เอกสาร
+Wave C นี้เป็นข้อเสนอสำหรับ review; Wave D–E ยังไม่เริ่ม.
 
