@@ -2,8 +2,8 @@
 title: "GenesisBlockDB Typed Query IR V1"
 doc_id: "SPEC-GENESISDB-TYPED-QUERY-IR-V1"
 status: accepted
-version: "1.0.1"
-updated: "2026-08-14"
+version: "1.0.2"
+updated: "2026-09-08"
 owner: "GenesisBlockDB Architecture"
 implementation_status: partial
 source_of_truth: true
@@ -18,9 +18,10 @@ related_docs:
 ## 1. Purpose and status
 
 This specification defines the approved transport-neutral query boundary for new GenesisBlockDB
-integrations. Its implementation status is `partial`: `search` and `traverse` are implemented in the
-core, N-API and REST vertical slice with compatibility tests. The reserved `match_path`, `context`
-and `relational_named_query` operations remain planned.
+integrations. Its implementation status is `partial`: `search`, `traverse` and the target-id
+`context` slice are implemented in the core, N-API and REST vertical slice with compatibility tests.
+Query-vector/temporal context, `match_path` and `relational_named_query` remain unsupported or
+planned as disclosed by the runtime capability manifest.
 
 ## 2. Contract principles
 
@@ -82,7 +83,7 @@ V1 reserves these operation discriminators because they map to existing engine c
 | `search` | `mode`, one of `target_id` or `query_vector`, `k` | Vector, lexical or hybrid retrieval using declared capability fields. |
 | `traverse` | `seed_id`, `depth`, `relations`, `direction` | Bounded forward, reverse or bidirectional graph traversal. |
 | `match_path` | `pattern`, `limit` | Typed bounded linear path matching; the final typed pattern schema is frozen during implementation design. |
-| `context` | `target_id` or `query_vector`, `tier`, `budget` | Versioned agent-context assembly without adding HQL grammar. |
+| `context` | `target_id`, `tier`, optional `budget`/`fuzzy` | Versioned target-id agent-context assembly without adding HQL grammar. Query-vector and temporal context fail closed until a later contract. |
 | `relational_named_query` | `query_name`, `parameters` | Execute a pre-registered bounded named query; arbitrary SQL is forbidden. |
 
 Operation-specific schemas SHALL be closed/discriminated types. Implementers SHALL NOT use a generic
@@ -103,8 +104,10 @@ must preserve the current HQL P0 correctness rules.
 ### 4.3 Context result contract
 
 The `context` operation SHALL return a versioned packet with selected records, evidence, omissions,
-budget accounting and index lag. Hard budget, relevant compression and evidence requirements from
-the superseded context proposal remain requirements of the operation-specific implementation design.
+budget accounting and index lag. The first implementation is target-id based and returns the existing
+`ContextPackage`, including factual `coverage` fields. Query-vector and temporal selectors fail closed
+until a later contract. Budget compression is successful only when `coverage.truncated` is true and
+`meta.warnings` contains `context_truncated`.
 
 ## 5. Result envelope
 
@@ -183,11 +186,13 @@ The adapter SHALL:
 The contract is considered shipped only when all gates pass:
 
 1. JSON Schema and native typed structures are frozen for the first implementation slice.
-2. Core typed executor validates and executes at least `search` and `traverse`.
+2. Core typed executor validates and executes `search`, `traverse` and the
+   target-id `context` slice.
 3. N-API and REST expose the same request/result semantics.
 4. HQL parity fixtures pass through compatibility mapping.
 5. Capability/version reporting distinguishes implemented operations.
-6. SDK and MCP conformance tests cover supported operations.
+6. SDK and MCP conformance tests cover supported operations, API-key
+   propagation, finite timeouts and structured errors.
 7. NL adapter tests prove schema rejection, capability rejection and fail-closed ambiguity behavior.
 
 ## 10. Non-goals
@@ -203,4 +208,5 @@ The contract is considered shipped only when all gates pass:
 | Version | Date | Status | Summary | Commit Hash | Agent |
 |---|---|---|---|---|---|
 | 1.0.0 | 2026-08-14 | accepted | Approved Query IR V1 envelope, compatibility posture and external NL adapter boundary. | 84f2553 | ATHER |
-| 1.0.1 | 2026-08-14 | current | Recorded partial implementation of search/traverse across core, REST and N-API with HQL parity; remaining V1 operations stay planned. | working-tree | ATHER |
+| 1.0.1 | 2026-08-14 | superseded | Recorded partial implementation of search/traverse across core, REST and N-API with HQL parity; remaining V1 operations stay planned. | working-tree | ATHER |
+| 1.0.2 | 2026-09-08 | current | Recorded target-id context implementation and explicit unsupported/planned boundaries for the Wave E slice. | pending | ATHER |

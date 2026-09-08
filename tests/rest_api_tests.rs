@@ -1325,7 +1325,15 @@ async fn test_query_ir_capabilities_report_partial_v1_support() {
     assert_eq!(body["implementation_status"], "partial");
     assert_eq!(body["operations"]["search"], "implemented");
     assert_eq!(body["operations"]["traverse"], "implemented");
-    assert_eq!(body["operations"]["context"], "planned");
+    assert_eq!(body["operations"]["context"], "implemented");
+    assert_eq!(
+        body["operation_details"]["context"]["target_id"],
+        "implemented"
+    );
+    assert_eq!(
+        body["operation_details"]["search"]["filters"],
+        "unsupported"
+    );
     assert_eq!(body["temporal"]["valid_at_selector"], "rfc3339_normalized");
     assert_eq!(
         body["query_correctness"]["filtered_ann"],

@@ -211,7 +211,7 @@ export interface QueryIrRequest {
   temporal?: { valid_at?: string; tx_as_of?: number }
   consistency?: { index: QueryIrIndexConsistency }
   budget?: QueryBudget
-  operation: QueryIrSearchOperation | QueryIrTraverseOperation
+  operation: QueryIrSearchOperation | QueryIrTraverseOperation | QueryIrContextOperation
 }
 export interface QueryIrSearchOperation {
   kind: 'search'
@@ -233,12 +233,20 @@ export interface QueryIrTraverseOperation {
   direction: QueryIrDirection
   limit?: number
 }
+export interface QueryIrContextOperation {
+  kind: 'context'
+  target_id?: string
+  query_vector?: Array<number>
+  tier: string
+  budget?: number
+  fuzzy?: boolean
+}
 export interface QueryIrResponse {
   contract_version: 'query-ir.v1'
   request_id: string
   status: 'ok'
-  operation_kind: 'search' | 'traverse'
-  data: Array<NeighborOutput>
+  operation_kind: 'search' | 'traverse' | 'context'
+  data: Array<NeighborOutput> | ContextPackage
   meta: {
     capability_version: string
     index_lag: number
@@ -272,7 +280,24 @@ export interface QueryIrCapabilities {
     search: 'implemented'
     traverse: 'implemented'
     match_path: 'planned'
-    context: 'planned'
+    context: 'implemented'
+    relational_named_query: 'planned'
+  }
+  operation_details: {
+    search: {
+      vector: 'implemented'
+      hybrid: 'implemented'
+      filters: 'unsupported'
+      lexical: 'planned'
+    }
+    traverse: { bounded: 'implemented' }
+    context: {
+      target_id: 'implemented'
+      query_vector: 'unsupported'
+      temporal: 'unsupported'
+      tiers: Array<string>
+    }
+    match_path: 'planned'
     relational_named_query: 'planned'
   }
   limits: {

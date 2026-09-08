@@ -647,6 +647,8 @@ fn preserve_query_error(error: Error) -> Error {
     if message.starts_with("QUERY_BUDGET_")
         || message.starts_with("QUERY_RESOURCE_LIMIT_EXCEEDED")
         || message.starts_with("QUERY_IR_VALIDATION_FAILED")
+        || message.starts_with("QUERY_CAPABILITY_UNSUPPORTED")
+        || message.starts_with("QUERY_TARGET_NOT_FOUND")
     {
         Error::from_reason(message)
     } else {
@@ -741,6 +743,13 @@ pub enum QueryIrOperation {
         relations: Vec<String>,
         direction: QueryIrDirection,
         limit: Option<u32>,
+    },
+    Context {
+        target_id: Option<String>,
+        query_vector: Option<Vec<f64>>,
+        tier: String,
+        budget: Option<u32>,
+        fuzzy: Option<bool>,
     },
 }
 
@@ -9041,7 +9050,26 @@ impl Storage {
                 "search": "implemented",
                 "traverse": "implemented",
                 "match_path": "planned",
-                "context": "planned",
+                "context": "implemented",
+                "relational_named_query": "planned"
+            },
+            "operation_details": {
+                "search": {
+                    "vector": "implemented",
+                    "hybrid": "implemented",
+                    "filters": "unsupported",
+                    "lexical": "planned"
+                },
+                "traverse": {
+                    "bounded": "implemented"
+                },
+                "context": {
+                    "target_id": "implemented",
+                    "query_vector": "unsupported",
+                    "temporal": "unsupported",
+                    "tiers": ["H0", "H1", "H2", "H3", "H4", "H5", "H6"]
+                },
+                "match_path": "planned",
                 "relational_named_query": "planned"
             },
             "limits": {
@@ -9259,8 +9287,68 @@ impl Storage {
                 })?;
                 ("traverse", data)
             }
+            QueryIrOperation::Context {
+                target_id,
+                query_vector,
+                tier,
+                budget: context_budget,
+                fuzzy,
+            } => {
+                if query_vector.is_some() {
+                    return Err(Error::from_reason(
+                        "QUERY_CAPABILITY_UNSUPPORTED: context.query_vector is not implemented",
+                    ));
+                }
+                if as_of.is_some() || tx_as_of.is_some() {
+                    return Err(Error::from_reason(
+                        "QUERY_CAPABILITY_UNSUPPORTED: context temporal selectors are not implemented",
+                    ));
+                }
+                let target_id = target_id.ok_or_else(|| {
+                    Error::from_reason("QUERY_IR_VALIDATION_FAILED: context.target_id is required")
+                })?;
+                if target_id.trim().is_empty() {
+                    return Err(Error::from_reason(
+                        "QUERY_IR_VALIDATION_FAILED: context.target_id must not be empty",
+                    ));
+                }
+                let tier = tier.trim().to_ascii_uppercase();
+                if !matches!(
+                    tier.as_str(),
+                    "H0" | "H1" | "H2" | "H3" | "H4" | "H5" | "H6"
+                ) {
+                    return Err(Error::from_reason(
+                        "QUERY_IR_VALIDATION_FAILED: context.tier must be H0 through H6",
+                    ));
+                }
+                if context_budget == Some(0) {
+                    return Err(Error::from_reason(
+                        "QUERY_IR_VALIDATION_FAILED: context.budget must be positive",
+                    ));
+                }
+                let context = self
+                    .retrieve_context_with_query_budget(
+                        &target_id,
+                        &tier,
+                        context_budget,
+                        fuzzy.unwrap_or(false),
+                        &mut budget,
+                    )
+                    .map_err(preserve_query_error)?;
+                let data = serde_json::to_value(&context).map_err(|error| {
+                    Error::from_reason(format!("QUERY_EXECUTION_FAILED: {error}"))
+                })?;
+                ("context", data)
+            }
         };
 
+        let warnings = if operation_kind == "context"
+            && data["coverage"]["truncated"].as_bool() == Some(true)
+        {
+            vec!["context_truncated"]
+        } else {
+            Vec::new()
+        };
         let response = serde_json::json!({
             "contract_version": QUERY_IR_V1,
             "request_id": request.request_id,
@@ -9271,7 +9359,7 @@ impl Storage {
                 "capability_version": ENGINE_VERSION,
                 "index_lag": self.index_lag(),
                 "budget": budget.limits,
-                "warnings": []
+                "warnings": warnings
             }
         });
         budget.serialized(&response)?;
@@ -11581,6 +11669,31 @@ impl Storage {
         let _read_guard = self.commit_lock.lock();
         self.ensure_readable()?;
 
+        self.retrieve_context_inner(target_id, tier_str, budget, fuzzy, None)
+    }
+
+    fn retrieve_context_with_query_budget(
+        &self,
+        target_id: &str,
+        tier_str: &str,
+        budget: Option<u32>,
+        fuzzy: bool,
+        query_budget: &mut QueryBudgetState,
+    ) -> Result<ContextPackage> {
+        let _read_guard = self.commit_lock.lock();
+        self.ensure_readable()?;
+
+        self.retrieve_context_inner(target_id, tier_str, budget, fuzzy, Some(query_budget))
+    }
+
+    fn retrieve_context_inner(
+        &self,
+        target_id: &str,
+        tier_str: &str,
+        budget: Option<u32>,
+        fuzzy: bool,
+        mut query_budget: Option<&mut QueryBudgetState>,
+    ) -> Result<ContextPackage> {
         let tier = ScalingTier::parse(tier_str);
         let hops = tier.hops();
         let target_id_resolved = if fuzzy {
@@ -11605,6 +11718,9 @@ impl Storage {
             if let Some(node) = self.nodes.get(&u32_id) {
                 let hydrated = self.hydrated_node(u32_id, node.value());
                 if Self::is_node_visible(&hydrated, &None, false, &now) {
+                    if let Some(state) = query_budget.as_deref_mut() {
+                        state.node()?;
+                    }
                     nodes.insert(u32_id, hydrated);
                     queue.push_back((u32_id, 0));
                 }
@@ -11650,6 +11766,9 @@ impl Storage {
                         ) {
                             continue;
                         }
+                        if let Some(state) = query_budget.as_deref_mut() {
+                            state.edge()?;
+                        }
                         if let Some(next_u32) = self.get_u32(&edge.to) {
                             if let Some(node) = self.nodes.get(&next_u32) {
                                 let hydrated = self.hydrated_node(next_u32, node.value());
@@ -11667,6 +11786,9 @@ impl Storage {
                                     let hydrated = self.hydrated_node(next_u32, node.value());
                                     if !Self::is_node_visible(&hydrated, &None, false, &now) {
                                         continue;
+                                    }
+                                    if let Some(state) = query_budget.as_deref_mut() {
+                                        state.node()?;
                                     }
                                     e.insert(hydrated);
                                     hops_served = hops_served.max(curr_depth + 1);
@@ -11694,6 +11816,9 @@ impl Storage {
                         ) {
                             continue;
                         }
+                        if let Some(state) = query_budget.as_deref_mut() {
+                            state.edge()?;
+                        }
                         if let Some(prev_u32) = self.get_u32(&edge.from) {
                             if let Some(node) = self.nodes.get(&prev_u32) {
                                 let hydrated = self.hydrated_node(prev_u32, node.value());
@@ -11711,6 +11836,9 @@ impl Storage {
                                     let hydrated = self.hydrated_node(prev_u32, node.value());
                                     if !Self::is_node_visible(&hydrated, &None, false, &now) {
                                         continue;
+                                    }
+                                    if let Some(state) = query_budget.as_deref_mut() {
+                                        state.node()?;
                                     }
                                     e.insert(hydrated);
                                     hops_served = hops_served.max(curr_depth + 1);
@@ -11746,6 +11874,19 @@ impl Storage {
                 edges.clear();
                 truncated = true;
             }
+        }
+
+        if let Some(state) = query_budget.as_deref_mut() {
+            for _ in &final_nodes {
+                state.row()?;
+            }
+            for _ in &edges {
+                state.row()?;
+            }
+            for _ in &super_nodes {
+                state.row()?;
+            }
+            state.check_deadline()?;
         }
 
         Ok(ContextPackage {

@@ -157,8 +157,12 @@ versions return HTTP `400` with `{ "code", "message" }`; execution failures retu
 ```
 
 `search` requires exactly one of `target_id` or `query_vector`, plus `mode` and `k`. Supported modes
-are `vector` and `hybrid`; lexical mode remains planned. `GET /v1/query/ir/capabilities` is the
-runtime authority for implemented operation kinds and current bounds.
+are `vector` and `hybrid`; lexical mode remains planned and typed metadata filters are unsupported.
+`context` is implemented for a target id with `tier` `H0`–`H6`, optional token `budget` and optional
+`fuzzy`; query-vector and temporal context fail closed with `QUERY_CAPABILITY_UNSUPPORTED`. Its
+`data` is the existing context packet, including `coverage`, and compressed packets carry the
+`context_truncated` warning. `GET /v1/query/ir/capabilities` is the runtime authority for implemented
+operation kinds and current bounds.
 
 ## HQL (`/v1/query/hql`, raw string body)
 

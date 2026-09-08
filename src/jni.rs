@@ -222,9 +222,9 @@ pub extern "system" fn Java_dev_genesisblock_GenesisDB_nativeExecuteHql(
 
 /// `external fun nativeExecuteQueryIr(handle: Long, jsonInput: String):
 /// String?` — WP-2.2: execute a versioned Typed Query IR request
-/// (`QueryIrRequest` JSON, contract `query-ir.v1`; supports
-/// `temporal.valid_at` and the replica-local `temporal.tx_as_of`); returns
-/// the IR response envelope as JSON or `null` on error.
+/// (`QueryIrRequest` JSON, contract `query-ir.v1`; supports search, traverse
+/// and target-id context operations); returns the IR response envelope as JSON
+/// or `null` on error.
 #[no_mangle]
 pub extern "system" fn Java_dev_genesisblock_GenesisDB_nativeExecuteQueryIr(
     mut env: JNIEnv,
