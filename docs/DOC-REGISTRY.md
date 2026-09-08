@@ -57,9 +57,9 @@ registry row explicitly names them.
 | Query contract | `SPEC-GENESISDB-TYPED-QUERY-IR-V1` | `1.0.1` | accepted | GenesisBlockDB Architecture | `docs/SPEC--GENESISDB-TYPED-QUERY-IR-V1.md` |
 | Client contract | `CONTRACT-CLIENT-NAMESPACE-AND-SCHEMA` | `0.1.0+draft` | draft | GenesisBlockDB Engineering | `docs/contracts/CONTRACT--CLIENT-NAMESPACE-AND-SCHEMA.md` |
 | API reference | `API_REFERENCE` | generated | current | GenesisBlockDB Engineering | `docs/API_REFERENCE.md` |
-| GenesisRAG17 integration ADR | `ADR-GENESISRAG17-SEPARATE-WORKER-PUBLICATION` | `1.0.0b` | beta | GenesisBlockDB Architecture | `docs/ADR--GENESISRAG17-SEPARATE-WORKER-PUBLICATION.md` |
-| GenesisRAG17 execution flow | `FLOW-GENESISRAG17-PIPELINE` | `1.0.0b` | beta | GenesisBlockDB Architecture | `docs/FLOW--GENESISRAG17-PIPELINE.md` |
-| GenesisRAG17 extension map | `MAP-GENESISRAG17-EXTENSIONS` | `1.0.0b` | beta | GenesisBlockDB Architecture | `docs/GENESISRAG17-EXTENSION-MAP.md` |
+| GenesisRAG17 integration ADR | `ADR-GENESISRAG17-SEPARATE-WORKER-PUBLICATION` | `1.0.1b` | beta | GenesisBlockDB Architecture | `docs/ADR--GENESISRAG17-SEPARATE-WORKER-PUBLICATION.md` |
+| GenesisRAG17 execution flow | `FLOW-GENESISRAG17-PIPELINE` | `1.0.1b` | beta | GenesisBlockDB Architecture | `docs/FLOW--GENESISRAG17-PIPELINE.md` |
+| GenesisRAG17 extension map | `MAP-GENESISRAG17-EXTENSIONS` | `1.0.1b` | beta | GenesisBlockDB Architecture | `docs/GENESISRAG17-EXTENSION-MAP.md` |
 
 ## 5. Product narrative and evidence
 
