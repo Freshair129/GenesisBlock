@@ -139,7 +139,8 @@ change existing tables, columns, or primary keys.
 ## Typed Query IR V1
 
 `POST /v1/query/ir` accepts a closed versioned envelope. The current partial implementation supports
-`operation.kind = "search"` and `operation.kind = "traverse"`. Unknown fields and unsupported
+`operation.kind = "search"`, `operation.kind = "traverse"` and target-id
+`operation.kind = "context"`. Unknown fields and unsupported
 versions return HTTP `400` with `{ "code", "message" }`; execution failures return HTTP `500`.
 
 ```json
@@ -158,6 +159,8 @@ versions return HTTP `400` with `{ "code", "message" }`; execution failures retu
 
 `search` requires exactly one of `target_id` or `query_vector`, plus `mode` and `k`. Supported modes
 are `vector` and `hybrid`; lexical mode remains planned and typed metadata filters are unsupported.
+Supplying a `filters` object is recognized and rejected with `QUERY_CAPABILITY_UNSUPPORTED` until a
+typed metadata contract exists.
 `context` is implemented for a target id with `tier` `H0`–`H6`, optional token `budget` and optional
 `fuzzy`; query-vector and temporal context fail closed with `QUERY_CAPABILITY_UNSUPPORTED`. Its
 `data` is the existing context packet, including `coverage`, and compressed packets carry the

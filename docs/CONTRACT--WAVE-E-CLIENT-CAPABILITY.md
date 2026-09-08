@@ -22,8 +22,8 @@ or production acceptance claim.
 | N-API | implemented | implemented | implemented | native caller boundary | NAPI tests |
 | C FFI | JSON passthrough | JSON passthrough | JSON passthrough | caller-owned | host compile + parity |
 | Android JNI | JSON passthrough | JSON passthrough | JSON passthrough | caller-owned | host compile + parity |
-| Python SDK | typed methods | typed methods | typed method | finite timeout + bearer key | mocked client tests |
-| Go SDK | typed methods | typed methods | typed method | finite timeout + bearer key | mocked client tests when Go is available |
+| Python SDK | typed methods | typed methods | typed method | finite timeout + bearer key | fixtures added; execution blocked because Python is unavailable |
+| Go SDK | typed methods | typed methods | typed method | finite timeout + bearer key | fixtures added; execution blocked because Go is unavailable |
 | MCP | compatibility tools | `query_ir` tool | via N-API | process-local | MCP integration tests |
 
 Explicit boundaries for this matrix:

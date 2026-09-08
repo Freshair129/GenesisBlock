@@ -106,6 +106,40 @@ fn query_ir_context_rejects_unsupported_seed_and_temporal_modes() {
 }
 
 #[test]
+fn query_ir_context_rejects_unknown_target_and_namespace_scope() {
+    let (storage, _dir) = storage();
+
+    let target_error = storage
+        .execute_query_ir_json(json!({
+            "contract_version": "query-ir.v1",
+            "request_id": "ctx-missing",
+            "operation": {
+                "kind": "context",
+                "target_id": "missing",
+                "tier": "H0"
+            }
+        }))
+        .unwrap_err()
+        .to_string();
+    assert!(target_error.starts_with("QUERY_TARGET_NOT_FOUND:"));
+
+    let namespace_error = storage
+        .execute_query_ir_json(json!({
+            "contract_version": "query-ir.v1",
+            "request_id": "ctx-namespace",
+            "namespace": "tenant-a",
+            "operation": {
+                "kind": "context",
+                "target_id": "missing",
+                "tier": "H0"
+            }
+        }))
+        .unwrap_err()
+        .to_string();
+    assert!(namespace_error.starts_with("QUERY_CAPABILITY_UNSUPPORTED:"));
+}
+
+#[test]
 fn query_ir_context_reports_compression_warning() {
     let (storage, _dir) = storage();
     storage

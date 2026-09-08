@@ -209,4 +209,4 @@ The contract is considered shipped only when all gates pass:
 |---|---|---|---|---|---|
 | 1.0.0 | 2026-08-14 | accepted | Approved Query IR V1 envelope, compatibility posture and external NL adapter boundary. | 84f2553 | ATHER |
 | 1.0.1 | 2026-08-14 | superseded | Recorded partial implementation of search/traverse across core, REST and N-API with HQL parity; remaining V1 operations stay planned. | working-tree | ATHER |
-| 1.0.2 | 2026-09-08 | current | Recorded target-id context implementation and explicit unsupported/planned boundaries for the Wave E slice. | pending | ATHER |
+| 1.0.2 | 2026-09-08 | current | Recorded target-id context implementation and explicit unsupported/planned boundaries for the Wave E slice. | 4c8ca17 | ATHER |

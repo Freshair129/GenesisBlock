@@ -63,6 +63,19 @@ test('NAPI: executeQueryIr supports search and traverse envelopes', async () => 
     });
     assert.equal(traverse.operation_kind, 'traverse');
     assert.equal(traverse.data[0].node.id, 'query-ir-napi-dst');
+
+    const context = await db.executeQueryIr({
+      contract_version: 'query-ir.v1',
+      request_id: 'napi-context',
+      operation: {
+        kind: 'context',
+        target_id: 'query-ir-napi-src',
+        tier: 'H1',
+      },
+    });
+    assert.equal(context.operation_kind, 'context');
+    assert.ok(context.data.nodes.some((node) => node.id === 'query-ir-napi-src'));
+    assert.equal(context.data.coverage.hops_requested, 1);
   } finally {
     cleanup(dbPath);
   }
@@ -86,6 +99,41 @@ test('NAPI: executeQueryIr rejects unknown envelope fields', async () => {
         },
       }),
       /QUERY_IR_VALIDATION_FAILED/,
+    );
+  } finally {
+    cleanup(dbPath);
+  }
+});
+
+test('NAPI: unsupported Query IR capabilities fail closed', async () => {
+  const dbPath = tempDb('unsupported');
+  try {
+    const db = GenesisDatabase.open({ path: dbPath, vectorDim: 3 });
+    await assert.rejects(
+      db.executeQueryIr({
+        contract_version: 'query-ir.v1',
+        request_id: 'napi-filter',
+        operation: {
+          kind: 'search',
+          mode: 'vector',
+          query_vector: [1.0, 0.0, 0.0],
+          filters: { label: 'ENTITY' },
+          k: 1,
+        },
+      }),
+      /QUERY_CAPABILITY_UNSUPPORTED/,
+    );
+    await assert.rejects(
+      db.executeQueryIr({
+        contract_version: 'query-ir.v1',
+        request_id: 'napi-missing-context',
+        operation: {
+          kind: 'context',
+          target_id: 'missing',
+          tier: 'H0',
+        },
+      }),
+      /QUERY_TARGET_NOT_FOUND/,
     );
   } finally {
     cleanup(dbPath);

@@ -219,6 +219,7 @@ export interface QueryIrSearchOperation {
   target_id?: string
   query_vector?: Array<number>
   collection?: string
+  filters?: Record<string, unknown>
   k: number
   alpha?: number
   language?: string

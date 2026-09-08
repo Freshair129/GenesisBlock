@@ -731,6 +731,7 @@ pub enum QueryIrOperation {
         target_id: Option<String>,
         query_vector: Option<Vec<f64>>,
         collection: Option<String>,
+        filters: Option<serde_json::Value>,
         k: u32,
         alpha: Option<f64>,
         language: Option<String>,
@@ -9183,12 +9184,18 @@ impl Storage {
                 target_id,
                 query_vector,
                 collection,
+                filters,
                 k,
                 alpha,
                 language,
                 ef_search,
                 oversample,
             } => {
+                if filters.is_some() {
+                    return Err(Error::from_reason(
+                        "QUERY_CAPABILITY_UNSUPPORTED: search.filters are not implemented",
+                    ));
+                }
                 if k == 0 || k > QUERY_IR_MAX_K {
                     return Err(Error::from_reason(format!(
                         "QUERY_RESOURCE_LIMIT_EXCEEDED: search.k must be between 1 and {QUERY_IR_MAX_K}"
@@ -9326,12 +9333,36 @@ impl Storage {
                         "QUERY_IR_VALIDATION_FAILED: context.budget must be positive",
                     ));
                 }
+                let fuzzy = fuzzy.unwrap_or(false);
+                let resolved_target = if fuzzy {
+                    self.find_fuzzy_id(&target_id)
+                        .unwrap_or_else(|| target_id.clone())
+                } else {
+                    target_id.clone()
+                };
+                let target_u32 = self.get_u32(&resolved_target).ok_or_else(|| {
+                    Error::from_reason(format!(
+                        "QUERY_TARGET_NOT_FOUND: node '{target_id}' does not exist"
+                    ))
+                })?;
+                let target_node = self.nodes.get(&target_u32).ok_or_else(|| {
+                    Error::from_reason(format!(
+                        "QUERY_TARGET_NOT_FOUND: node '{target_id}' is not live"
+                    ))
+                })?;
+                let hydrated_target = self.hydrated_node(target_u32, target_node.value());
+                let now = Utc::now().to_rfc3339();
+                if !Self::is_node_visible(&hydrated_target, &None, false, &now) {
+                    return Err(Error::from_reason(format!(
+                        "QUERY_TARGET_NOT_FOUND: node '{target_id}' is not visible"
+                    )));
+                }
                 let context = self
                     .retrieve_context_with_query_budget(
                         &target_id,
                         &tier,
                         context_budget,
-                        fuzzy.unwrap_or(false),
+                        fuzzy,
                         &mut budget,
                     )
                     .map_err(preserve_query_error)?;
@@ -9534,6 +9565,7 @@ impl Storage {
                                 target_id: None,
                                 query_vector: Some(query_vector),
                                 collection: resolved_collection,
+                                filters: None,
                                 k,
                                 alpha: Some(0.0),
                                 language: lang,
@@ -9664,6 +9696,7 @@ impl Storage {
                                 target_id: None,
                                 query_vector: Some(query_vector),
                                 collection: resolved_collection,
+                                filters: None,
                                 k,
                                 alpha: Some(alpha),
                                 language: lang,
