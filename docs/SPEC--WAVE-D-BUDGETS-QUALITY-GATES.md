@@ -3,8 +3,8 @@ doc_id: SPEC--WAVE-D-BUDGETS-QUALITY-GATES
 owner: GenesisBlockDB Engineering
 version: "0.1.0b"
 created_at: "2026-09-08T18:30:00+07:00,ATHER,5463296"
-last_update: "2026-09-08T18:30:00+07:00,ATHER,5463296"
-status: candidate
+last_update: "2026-09-08T20:35:00+07:00,ATHER"
+status: beta
 superseded_by: null
 attributes:
   domain: query-budgets-quality
@@ -20,8 +20,9 @@ attributes:
 Wave D follows the verified Wave C checkpoint `5463296` on
 `codex/wave-c-query-correctness`. It proposes scoped work for R-09 (query
 budgets and REST execution control) and R-11 (per-index retrieval quality
-evidence). This document is a candidate only: it authorizes no production code,
-API migration, release, push, merge or deployment until approved.
+evidence). This document records the approved Wave D scope. Local
+implementation and evidence are complete on the isolated worktree; it
+authorizes no production release, push, merge or deployment claim.
 
 Complexity is **C-3** because the work crosses core query execution, HQL,
 Query IR, GRL, REST scheduling and benchmark evidence. Risk is
@@ -144,12 +145,12 @@ artifacts, schema migration or production deployment.
 
 | Artifact | Before | Proposed after approval |
 |---|---|---|
-| Wave D spec | absent | 0.1.0b, candidate |
+| Wave D spec | candidate | 0.1.0b, beta |
 | Wave C | 0.2.1b, beta | unchanged |
-| Engine/schema | 0.2.5 / disk schema 4 | unchanged until approval |
+| Engine/schema | 0.2.5 / disk schema 4 | 0.2.5 / disk schema 4, unchanged |
 
 ## CHANGELOG
 
 | Version | Date | Status | Summary | Commit Hash | Agent |
 |---|---|---|---|---|---|
-| 0.1.0b | 2026-09-08 | candidate | Proposed R-09 query budgets/REST control and R-11 per-index quality envelope | pending | ATHER |
+| 0.1.0b | 2026-09-08 | beta | Approved scope; bounded query budgets, REST admission control, and per-index quality evidence implemented locally | 3751881 + Wave-D | ATHER |

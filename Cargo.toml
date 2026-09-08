@@ -131,6 +131,11 @@ name = "genesis-db-server"
 path = "src/main.rs"
 required-features = ["bins"]
 
+[[bin]]
+name = "wave-d-quality-gate"
+path = "benches/wave_d_quality_gate.rs"
+required-features = ["bins"]
+
 [[bench]]
 name = "ldbc_lite"
 harness = false
