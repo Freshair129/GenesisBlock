@@ -31,14 +31,15 @@ test('MCP Server: Life-cycle and Tools', async (t) => {
 
   await client.connect(transport);
 
-  await t.test('list tools returns all four tools', async () => {
+  await t.test('list tools returns all five tools', async () => {
     const result = await client.listTools();
     const toolNames = result.tools.map(t => t.name);
     assert.ok(toolNames.includes('query_hql'), 'query_hql tool must be listed');
+    assert.ok(toolNames.includes('query_ir'), 'query_ir tool must be listed');
     assert.ok(toolNames.includes('retrieve_tiered_context'), 'retrieve_tiered_context tool must be listed');
     assert.ok(toolNames.includes('add_knowledge'), 'add_knowledge tool must be listed');
     assert.ok(toolNames.includes('gks_knowledge_promote'), 'gks_knowledge_promote tool must be listed');
-    assert.strictEqual(result.tools.length, 4, 'exactly 4 tools should be listed');
+    assert.strictEqual(result.tools.length, 5, 'exactly 5 tools should be listed');
   });
 
   await t.test('gks_knowledge_promote is idempotent and returns structured canonical evidence', async () => {
@@ -102,6 +103,46 @@ test('MCP Server: Life-cycle and Tools', async (t) => {
     assert.strictEqual(result.isError, undefined);
     const data = JSON.parse(result.content[0].text);
     assert.ok(Array.isArray(data), 'TRAVERSE result must be an array');
+  });
+
+  await t.test('query_ir context returns a structured envelope', async () => {
+    const result = await client.callTool({
+      name: "query_ir",
+      arguments: {
+        request: {
+          contract_version: "query-ir.v1",
+          request_id: "mcp-context-1",
+          operation: {
+            kind: "context",
+            target_id: "mcp-test-node",
+            tier: "H0"
+          }
+        }
+      }
+    });
+    assert.strictEqual(result.isError, undefined);
+    assert.strictEqual(result.structuredContent.operation_kind, "context");
+    assert.strictEqual(result.structuredContent.data.nodes[0].id, "mcp-test-node");
+  });
+
+  await t.test('query_ir unsupported temporal context returns structured error', async () => {
+    const result = await client.callTool({
+      name: "query_ir",
+      arguments: {
+        request: {
+          contract_version: "query-ir.v1",
+          request_id: "mcp-context-temporal",
+          temporal: { valid_at: "2026-01-01T00:00:00Z" },
+          operation: {
+            kind: "context",
+            target_id: "mcp-test-node",
+            tier: "H0"
+          }
+        }
+      }
+    });
+    assert.strictEqual(result.isError, true);
+    assert.strictEqual(result.structuredContent.code, "QUERY_CAPABILITY_UNSUPPORTED");
   });
 
   await t.test('retrieve_tiered_context H0 returns target node', async () => {

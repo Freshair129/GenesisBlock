@@ -26,6 +26,15 @@ type ContextPackage struct {
 	SuperNodes     []map[string]interface{} `json:"super_nodes"`
 	TokenEstimate  uint32                   `json:"token_estimate"`
 	ReasoningPath  string                   `json:"reasoning_path"`
+	Coverage       CoverageReport           `json:"coverage"`
+}
+
+// CoverageReport records factual context retrieval coverage.
+type CoverageReport struct {
+	HopsRequested uint32 `json:"hops_requested"`
+	HopsServed    uint32 `json:"hops_served"`
+	CeilingHit    bool   `json:"ceiling_hit"`
+	Truncated     bool   `json:"truncated"`
 }
 
 // NodeInput is used for creating new nodes.
