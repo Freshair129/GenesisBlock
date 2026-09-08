@@ -11876,7 +11876,7 @@ impl Storage {
             }
         }
 
-        if let Some(state) = query_budget.as_deref_mut() {
+        if let Some(state) = query_budget {
             for _ in &final_nodes {
                 state.row()?;
             }
