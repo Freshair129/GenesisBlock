@@ -8,17 +8,23 @@ does not read the Edge store, and has no LLM-assisted extraction path.
 
 The wire contract is the [GenesisRAG17 implementation
 contract](https://github.com/Freshair129/zuri.ai/blob/codex/ki17-integration/docs/plans/GENESISRAG17-CONTRACT.md)
-(`genesisrag17.v1`, currently `1.2.1b`). The [17-stage source
+(`genesisrag17.v1`, currently `1.3.0b`). The [17-stage source
 specification](https://github.com/Freshair129/zuri.ai/blob/codex/ki17-integration/docs/KNOWLEDGE-INGESTION-17-STAGE-SPEC.md),
 [17-stage execution
 flow](https://github.com/Freshair129/zuri.ai/blob/codex/ki17-integration/docs/KNOWLEDGE-INGESTION-17-STAGE-FLOW.md)
 and the local [separate-worker/publication ADR](../docs/ADR--GENESISRAG17-SEPARATE-WORKER-PUBLICATION.md)
 define the boundary. The worker persists source, parsed artifact, chunk,
 mention, entity, fact, held-fact, derived-object and citation lineage in the
-native graph/SQLite projections before it reports a receipt. Candidate
-snapshots are prepared on disk but are queryable only after the atomic
-published pointer names their snapshot id. Previous published snapshot ids
-remain queryable for correction and historical tests. The [pinned historical
+native graph/SQLite projections before it reports a receipt. Native transaction
+intents, including the exact `expected_frontier` and serialized payload, are
+fsynced before every native commit so an uncertain retry reuses the same
+transaction id and payload. Before the first vector transaction for a generation,
+the worker checkpoints a newly created native collection manifest with
+`saveState`, preserving its model, dimension and metric metadata across a crash.
+Candidate snapshots are prepared on disk but are queryable only after the atomic
+published pointer names their snapshot id.
+Previous published snapshot ids remain queryable for correction and historical
+tests. The [pinned historical
 acceptance report](https://github.com/Freshair129/zuri.ai/blob/b64b46df057d3160c659afa3c34628ee86520257/.brain/reports/GENESISRAG17-ACCEPTANCE.md)
 records the isolated synthetic evidence and its non-production limits.
 
@@ -122,8 +128,12 @@ node genesisrag17-worker\src\cli.mjs
 `GENESIS_WORKER_SCOPE` is deliberately an exact six-field private scope.
 `GENESIS_WORKER_DB_PATH` must be a new isolated TEST directory for the run.
 The worker creates `genesisrag17/state.json`, durable decision and stage-failure
-records, graph/write/publication outboxes, retained snapshots and the worker
-owned `lexical.sqlite` sidecar below that directory.
+records, graph/write/publication outboxes, native transaction intents under
+`genesisrag17/transactions/<phase>-<decisionId>.json`, retained snapshots and
+the worker-owned `lexical.sqlite` sidecar below that directory. An intent is
+written and fsynced before native commit and retains the exact serialized
+payload, transaction id and expected frontier until the corresponding receipt
+is accepted.
 
 The CLI prints the bound loopback endpoint as one JSON line. Query with the
 bearer token and a scope-matching `genesisrag17.v1` request:
@@ -153,18 +163,20 @@ The worker implements the physical sequence required by the contract:
    The decision initially has no derived summaries.
 2. The worker performs a graph-only native transaction for Stage 13, including
    source, parsed, chunk, mention, entity, verified-fact and held rows. It
-   writes no vectors or derived summaries, then flushes, checkpoints and reads
-   back the native graph/SQLite state.
+   writes no vectors, derived summaries or lexical rows, then flushes,
+   checkpoints and reads back the native graph/SQLite state.
 3. The worker calls `msp_pipeline_graph_receipt`. MSP relays the receipt to
    GKS, which closes Stage 13 once, runs `enrich_v1` Stage 14 and returns a
    separate immutable `derived` result and `derivedHash`.
-4. The worker embeds the allowed chunks with the pinned CPU model for Stage 15,
-   commits derived rows and vectors for the candidate generation, and performs
-   Stage 16 flush/checkpoint, six-lane readback and the independent fixture
-   benchmark. It then sends the final write receipt.
+4. The worker embeds the allowed chunks with the pinned CPU model for Stage 15.
+   It checkpoints a newly created native vector collection before committing
+   derived rows and vectors for the candidate generation. It then performs Stage
+   16 lexical indexing, flush/checkpoint, six-lane readback and the independent
+   fixture benchmark, and sends the final write receipt.
 5. GKS verifies both physical receipts and evaluates the five Stage 17 quality
    dimensions. A quality/policy failure creates actual failure evidence and no
-   publication.
+   publication; only `PASS` with `allowPublication: true` may publish. `WARN`
+   remains held even when its allow flag is true.
 6. For an allowed verdict, the worker writes a prepared snapshot, atomically
    replaces the pointer and retained published-history list, and sends
    `msp_pipeline_publication_receipt`. Only an accepted publication receipt
@@ -206,26 +218,42 @@ explicit input applicability result, not a hidden fallback.
   objects and their lineage, mention, assertion and evidence edges.
 - **Bitemporal** is `ready` only after an actual native Query IR temporal
   readback for mapped valid-time assertions. Facts with GKS's explicit
-  `validFrom: "not_applicable"` and `validTo: "not_applicable"` are reported
-  `not_applicable`; transaction-time stamps alone do not become a fabricated
-  valid-time mapping. Derived summaries are outside the temporal assertion
-  set by contract.
+  `validFrom: "not_applicable"`/`null` and `validTo: "not_applicable"`/`null`
+  without a mapped status are reported `not_applicable`; transaction-time
+  stamps alone do not become a fabricated valid-time mapping. An explicit
+  `status: "unmapped"` remains unsupported evidence until GKS supplies a
+  verified mapping. Derived summaries are outside the temporal assertion set
+  by contract.
 - **Provenance** verifies source/chunk ids, UTF-16 offsets, UTF-8 hashes and
   citation payloads against persisted native rows. A benchmark citation check
   covers every returned row, including non-relevant rows.
 
 Writes follow graph-only stage 13, graph receipt, stage 14 enrichment, stage 15
-embedding, stage 16 final commit/readback and the GKS quality gate. A denied
+embedding, stage 16 final commit/lexical-index/readback and the GKS quality gate.
+A denied
 embedding policy produces an actual persisted Stage 15 failure with six
 metrics; it never reports a zero-vector success. Transport loss leaves a
 durable outbox for retry. Native commits use deterministic transaction ids and
 frontier checks so a lost receipt does not blindly recommit.
 
-The worker accepts fault-injection hooks at native-commit-before-receipt,
-before-pointer-replacement and after-pointer-replacement-before-publication-
-outbox. Recovery reuses the exact candidate snapshot, pointer and publication
-receipt data. A prepared snapshot cannot be queried until its id appears in
-the atomically replaced pointer's retained published-history list.
+The worker accepts fault-injection hooks at the real durability boundaries:
+The acceptance harness may terminate the worker process at any hook (exit code
+`86`) to verify restart behavior.
+
+| Hook | Boundary and restart expectation |
+|---|---|
+| `after-native-commit-before-receipt` | Runs immediately after `commitTransaction` returns and before native flush/state completion or a graph/write receipt is created. The persisted transaction intent is replayed byte-for-byte with the same id. |
+| `after-graph-receipt-accepted-before-local-state` | Runs after MSP/GKS accepts the graph receipt and before the accepted `derived` result is written to local state. The graph outbox remains until that state is durable. |
+| `before-pointer-replacement` | Runs after a prepared snapshot is durable and before the pointer swap. The old pointer remains authoritative if the swap does not happen. |
+| `after-pointer-replacement-before-publication-outbox` | Runs after the pointer/history swap and before publication outbox creation. Restart keeps the new pointer and reconstructs the same publication receipt. |
+
+Recovery reuses the exact candidate snapshot, pointer and publication receipt
+data. Pointer replacement uses an atomic operating-system replace where an old
+pointer exists and retries transient Windows `EPERM`; if replacement cannot
+be completed, it fails while retaining the old pointer. A prepared snapshot
+cannot be queried until its id appears in the atomically replaced pointer's
+retained published-history list.
+
 
 ## Current native limitations
 
@@ -246,9 +274,10 @@ npm test --prefix genesisrag17-worker
 ```
 
 The tests require the pinned model artifacts and the built native addon. They
-exercise native graph/vector writes and readback, real CPU embedding, FTS5
-fusion, scope isolation, policy Stage 15 failure, pointer crash recovery and
-prepared-snapshot visibility.
+exercise native graph/vector writes and readback, durable transaction identity
+and replay, collection-manifest checkpoint recovery, real CPU embedding, Stage
+16-only FTS5 indexing, scope isolation, policy Stage 15 failure, pointer crash
+recovery, WARN fail-closed publication and prepared-snapshot visibility.
 
 For the cross-repository ownership, extension points and recovery matrix, see
 [FLOW--GENESISRAG17-PIPELINE.md](../docs/FLOW--GENESISRAG17-PIPELINE.md),

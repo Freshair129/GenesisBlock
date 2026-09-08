@@ -6,7 +6,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
-import { spawn } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
 import { createInterface } from 'node:readline';
 import { DatabaseSync } from 'node:sqlite';
 
@@ -75,6 +75,10 @@ export const MODEL_ARTIFACTS = Object.freeze({
 function fail(code, detail = '') {
   const suffix = detail ? `:${detail}` : '';
   throw new Error(`${code}${suffix}`);
+}
+
+function isFaultInjection(error) {
+  return error?.faultInjection === true;
 }
 
 function isPlainObject(value) {
@@ -233,7 +237,7 @@ function temporalValue(row, key) {
 
 function temporalValidFrom(row) {
   const value = temporalValue(row, 'validFrom');
-  return typeof value === 'string' && value !== 'not_applicable' && Number.isFinite(Date.parse(value)) ? value : undefined;
+  return typeof value === 'string' && value !== 'not_applicable' && Number.isFinite(Date.parse(value)) ? value : null;
 }
 
 function temporalClassification(row) {
@@ -246,14 +250,11 @@ function temporalClassification(row) {
   // Facts extracted from language that carries no valid-time assertion are
   // still stamped with transaction time by GKS.  That transaction stamp is
   // not a temporal mapping, so the bitemporal lane is explicitly N/A.
-  if (validFrom === 'not_applicable' && (validTo === undefined || validTo === 'not_applicable')) {
+  const noValidTime = (value) => value === undefined || value === null || value === 'not_applicable';
+  if (noValidTime(validFrom) && noValidTime(validTo)
+    && (status === undefined || status === 'not_applicable')) {
     return 'not_applicable';
   }
-  if (status === 'not_applicable' && (validFrom === undefined || validFrom === 'not_applicable')
-    && (validTo === undefined || validTo === 'not_applicable')) {
-    return 'not_applicable';
-  }
-  if (validFrom === undefined && validTo === undefined && status === undefined) return 'not_applicable';
   return 'mapped';
 }
 
@@ -421,10 +422,94 @@ function snapshotRecord(pointer, decision) {
   };
 }
 
-function writeAtomic(filename, content) {
+function fsyncDirectory(directory) {
+  if (process.platform === 'win32') return;
+  let fd;
+  try {
+    fd = fs.openSync(directory, 'r');
+    fs.fsyncSync(fd);
+  } catch (error) {
+    if (!['EINVAL', 'ENOTDIR', 'EPERM'].includes(error?.code)) throw error;
+  } finally {
+    if (fd !== undefined) fs.closeSync(fd);
+  }
+}
+
+function fsyncFile(filename) {
+  let fd;
+  try {
+    fd = fs.openSync(filename, process.platform === 'win32' ? 'r+' : 'r');
+    fs.fsyncSync(fd);
+  } catch (error) {
+    if (!['EINVAL', 'EPERM'].includes(error?.code)) throw error;
+  } finally {
+    if (fd !== undefined) fs.closeSync(fd);
+  }
+}
+
+function powershellLiteral(value) {
+  return `'${String(value).replaceAll("'", "''")}'`;
+}
+
+function replaceFileOnWindows(source, destination) {
+  const backup = `${destination}.backup-${process.pid}-${crypto.randomBytes(4).toString('hex')}`;
+  const command = [
+    '$ErrorActionPreference = "Stop"',
+    `[System.IO.File]::Replace(${powershellLiteral(source)}, ${powershellLiteral(destination)}, ${powershellLiteral(backup)}, $true)`,
+  ].join('; ');
+  const encoded = Buffer.from(command, 'utf16le').toString('base64');
+  const result = spawnSync('powershell.exe', [
+    '-NoProfile',
+    '-NonInteractive',
+    '-EncodedCommand',
+    encoded,
+  ], { windowsHide: true, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
+  if (result.error) throw result.error;
+  if (result.status !== 0) {
+    const error = new Error(`ATOMIC_REPLACE_FAILED:${String(result.stderr ?? '').trim().slice(-500)}`);
+    error.code = 'EPERM';
+    throw error;
+  }
+  try { fs.rmSync(backup, { force: true }); } catch { /* preserve the replaced pointer; cleanup is best effort */ }
+}
+
+function isTransientAtomicReplaceError(error) {
+  return ['EACCES', 'EBUSY', 'EEXIST', 'EPERM', 'ENOTEMPTY'].includes(error?.code);
+}
+
+function waitForAtomicReplaceRetry() {
+  const signal = new Int32Array(new SharedArrayBuffer(4));
+  Atomics.wait(signal, 0, 0, 25);
+}
+
+function replaceFileSafely(source, destination, replaceFile = undefined) {
+  for (let attempt = 0; attempt < 4; attempt += 1) {
+    try {
+      if (replaceFile) {
+        replaceFile(source, destination);
+      } else if (process.platform === 'win32' && fs.existsSync(destination)) {
+        // File.Replace maps to ReplaceFileW: destination remains in place if
+        // the atomic replacement fails, including when a transient sharing
+        // violation/EPERM is returned.
+        replaceFileOnWindows(source, destination);
+      } else {
+        fs.renameSync(source, destination);
+      }
+      break;
+    } catch (error) {
+      if (!isTransientAtomicReplaceError(error) || attempt === 3) throw error;
+      waitForAtomicReplaceRetry();
+    }
+  }
+  fsyncFile(destination);
+  fsyncDirectory(path.dirname(destination));
+}
+
+export function writeAtomic(filename, content, replaceFile = undefined) {
   fs.mkdirSync(path.dirname(filename), { recursive: true });
   const temp = `${filename}.tmp-${process.pid}-${crypto.randomBytes(4).toString('hex')}`;
   const fd = fs.openSync(temp, 'w');
+  let replaced = false;
   try {
     fs.writeFileSync(fd, content, 'utf8');
     fs.fsyncSync(fd);
@@ -432,21 +517,12 @@ function writeAtomic(filename, content) {
     fs.closeSync(fd);
   }
   try {
-    fs.renameSync(temp, filename);
-  } catch (error) {
-    // Windows cannot replace an existing file with rename. Preserve the
-    // rename-based atomic path when possible and use a same-directory backup
-    // replacement only for that platform limitation.
-    if (!['EEXIST', 'EPERM', 'ENOTEMPTY'].includes(error.code) || !fs.existsSync(filename)) throw error;
-    const backup = `${filename}.old-${process.pid}-${crypto.randomBytes(4).toString('hex')}`;
-    fs.renameSync(filename, backup);
-    try {
-      fs.renameSync(temp, filename);
-    } catch (replacementError) {
-      try { fs.renameSync(backup, filename); } catch { /* surface replacement error */ }
-      throw replacementError;
+    replaceFileSafely(temp, filename, replaceFile);
+    replaced = true;
+  } finally {
+    if (!replaced) {
+      try { fs.rmSync(temp, { force: true }); } catch { /* preserve the original replacement error */ }
     }
-    fs.rmSync(backup, { force: true });
   }
 }
 
@@ -780,11 +856,13 @@ export class GenesisRag17Worker {
     this.pollIntervalMs = pollIntervalMs;
     this.root = path.join(dbPath, 'genesisrag17');
     this.decisionsRoot = path.join(this.root, 'decisions');
+    this.transactionsRoot = path.join(this.root, 'transactions');
     this.snapshotsRoot = path.join(this.root, 'snapshots');
     this.outboxRoot = path.join(this.root, 'outbox');
     this.lockPath = path.join(this.root, 'worker.lock');
     fs.mkdirSync(this.root, { recursive: true });
     fs.mkdirSync(this.decisionsRoot, { recursive: true });
+    fs.mkdirSync(this.transactionsRoot, { recursive: true });
     fs.mkdirSync(this.snapshotsRoot, { recursive: true });
     fs.mkdirSync(this.outboxRoot, { recursive: true });
 
@@ -855,6 +933,81 @@ export class GenesisRag17Worker {
 
   removeOutbox(kind, decisionId) {
     fs.rmSync(this.outboxPath(kind, decisionId), { force: true });
+    fsyncDirectory(this.outboxRoot);
+  }
+
+  transactionIntentPath(decisionId, phase) {
+    if (typeof decisionId !== 'string' || decisionId.length === 0) fail('TRANSACTION_DECISION_ID_INVALID');
+    if (phase !== 'graph' && phase !== 'final') fail('TRANSACTION_PHASE_INVALID', phase);
+    return path.join(this.transactionsRoot, `${safeFilePart(phase)}-${safeFilePart(decisionId)}.json`);
+  }
+
+  transactionIdFor(decision, phase) {
+    return `txn-${phase}-${hashObject({ decisionId: decision.decisionId, decisionHash: decision.decisionHash, phase }).slice(0, 44)}`;
+  }
+
+  saveTransactionIntent(decision, phase, payloadJson, candidate) {
+    if (typeof payloadJson !== 'string' || payloadJson.length === 0) fail('TRANSACTION_PAYLOAD_INVALID');
+    const transaction = parseJsonText(payloadJson, 'TRANSACTION_PAYLOAD_INVALID');
+    if (!isPlainObject(transaction) || typeof transaction.transaction_id !== 'string'
+      || !Number.isSafeInteger(transaction.expected_frontier) || transaction.expected_frontier < 0) {
+      fail('TRANSACTION_INTENT_INVALID');
+    }
+    const expectedId = this.transactionIdFor(decision, phase);
+    if (transaction.transaction_id !== expectedId) fail('TRANSACTION_ID_INVALID');
+    const intent = {
+      schemaVersion: SCHEMA_VERSION,
+      scope: cloneJson(this.scope),
+      decisionId: decision.decisionId,
+      decisionHash: decision.decisionHash,
+      phase,
+      transactionId: transaction.transaction_id,
+      transaction_id: transaction.transaction_id,
+      expectedFrontier: transaction.expected_frontier,
+      expected_frontier: transaction.expected_frontier,
+      payloadJson,
+      payloadHash: hashText(payloadJson),
+      generation: candidate.generation,
+      snapshotId: candidate.snapshotId,
+      vectorCollection: candidate.vectorCollection,
+      expectedNodeCount: candidate.expectedNodeCount,
+      expectedEdgeCount: candidate.expectedEdgeCount,
+      expectedVectorCount: candidate.expectedVectorCount,
+      transaction: cloneJson(transaction),
+    };
+    writeAtomic(this.transactionIntentPath(decision.decisionId, phase), `${JSON.stringify(intent)}\n`);
+    return { ...intent, transaction };
+  }
+
+  readTransactionIntent(decision, phase) {
+    const filename = this.transactionIntentPath(decision.decisionId, phase);
+    if (!fs.existsSync(filename)) return undefined;
+    const intent = parseJsonText(fs.readFileSync(filename, 'utf8'), 'TRANSACTION_INTENT_INVALID');
+    if (!isPlainObject(intent) || intent.schemaVersion !== SCHEMA_VERSION
+      || intent.decisionId !== decision.decisionId || intent.decisionHash !== decision.decisionHash
+      || intent.phase !== phase || !sameScopeJson(intent.scope, this.scope)
+      || typeof intent.payloadJson !== 'string' || intent.payloadJson.length === 0
+      || intent.payloadHash !== hashText(intent.payloadJson)
+      || intent.transactionId !== this.transactionIdFor(decision, phase)
+      || (intent.transaction_id !== undefined && intent.transaction_id !== intent.transactionId)
+      || (intent.expected_frontier !== undefined && intent.expected_frontier !== intent.expectedFrontier)
+      || !Number.isSafeInteger(intent.expectedFrontier) || intent.expectedFrontier < 0) {
+      fail('TRANSACTION_INTENT_IDENTITY_INVALID');
+    }
+    const transaction = parseJsonText(intent.payloadJson, 'TRANSACTION_PAYLOAD_INVALID');
+    if (!isPlainObject(transaction) || transaction.transaction_id !== intent.transactionId
+      || transaction.expected_frontier !== intent.expectedFrontier) {
+      fail('TRANSACTION_INTENT_PAYLOAD_MISMATCH');
+    }
+    if (intent.transaction !== undefined && canonicalJson(intent.transaction) !== canonicalJson(transaction)) {
+      fail('TRANSACTION_INTENT_PAYLOAD_MISMATCH');
+    }
+    return { ...intent, transaction };
+  }
+
+  removeTransactionIntent(decisionId, phase) {
+    fs.rmSync(this.transactionIntentPath(decisionId, phase), { force: true });
+    fsyncDirectory(this.transactionsRoot);
   }
 
   async ensureEmbedder(vectorCollection) {
@@ -863,6 +1016,11 @@ export class GenesisRag17Worker {
     const existing = this.db.listCollections().find((collection) => collection.name === vectorCollection);
     if (!existing) {
       await this.db.createCollection(vectorCollection, MODEL_ID, MODEL_DIMENSIONS, MODEL_METRIC, null, 100, false);
+      // Collection declarations live in the native manifest, while a later
+      // vector transaction can replay independently after a crash. Checkpoint
+      // the declaration before that first vector commit so replay cannot
+      // auto-provision the collection with the engine's recovery defaults.
+      await this.db.saveState();
     } else if (existing.dim !== MODEL_DIMENSIONS || existing.metric.toLowerCase() !== MODEL_METRIC) {
       fail('NATIVE_VECTOR_COLLECTION_MISMATCH');
     }
@@ -1126,23 +1284,36 @@ export class GenesisRag17Worker {
   }
 
   async commitCandidate(decision, candidate, phase = 'final') {
-    const transactionId = `txn-${phase}-${hashObject({ decisionId: decision.decisionId, decisionHash: decision.decisionHash, phase }).slice(0, 44)}`;
-    const vectorRows = [...candidate.chunkVectorByPhysical.entries()].map(([nodeId, embedding]) => ({
-      node_id: nodeId,
-      collection: candidate.vectorCollection,
-      embedding,
-    }));
-    const expectedFrontier = Number(this.db.txnFrontier());
-    if (!Number.isSafeInteger(expectedFrontier) || expectedFrontier < 0) fail('NATIVE_FRONTIER_INVALID');
-    const transaction = {
-      transaction_id: transactionId,
-      expected_frontier: expectedFrontier,
-      relational: [],
-      graph: { nodes: candidate.nodes, edges: candidate.edges },
-      vectors: vectorRows,
-    };
-    const nativeResult = parseJsonText(await this.db.commitTransaction(JSON.stringify(transaction)), 'NATIVE_COMMIT_RESULT_INVALID');
+    const persistedIntent = this.readTransactionIntent(decision, phase);
+    let intent = persistedIntent;
+    if (!intent) {
+      const transactionId = this.transactionIdFor(decision, phase);
+      const vectorRows = [...candidate.chunkVectorByPhysical.entries()].map(([nodeId, embedding]) => ({
+        node_id: nodeId,
+        collection: candidate.vectorCollection,
+        embedding,
+      }));
+      const expectedFrontier = Number(this.db.txnFrontier());
+      if (!Number.isSafeInteger(expectedFrontier) || expectedFrontier < 0) fail('NATIVE_FRONTIER_INVALID');
+      const transaction = {
+        transaction_id: transactionId,
+        expected_frontier: expectedFrontier,
+        relational: [],
+        graph: { nodes: candidate.nodes, edges: candidate.edges },
+        vectors: vectorRows,
+      };
+      intent = this.saveTransactionIntent(decision, phase, JSON.stringify(transaction), candidate);
+    }
+    const nativeResult = parseJsonText(await this.db.commitTransaction(intent.payloadJson), 'NATIVE_COMMIT_RESULT_INVALID');
+    const transaction = intent.transaction;
+    const transactionId = intent.transactionId;
     if (nativeResult.transaction_id !== transactionId && nativeResult.transactionId !== transactionId) fail('NATIVE_TRANSACTION_ID_MISMATCH');
+    await this.faultInjector?.('after-native-commit-before-receipt', {
+      phase,
+      decisionId: decision.decisionId,
+      transaction: cloneJson(transaction),
+      payloadJson: intent.payloadJson,
+    });
     await this.db.flushIndex();
     await this.db.saveState();
     const commitSequence = nativeResult.commit_sequence ?? nativeResult.commitSequence;
@@ -1150,7 +1321,7 @@ export class GenesisRag17Worker {
       id: transactionId,
       frontier: parseNativeFrontier(commitSequence),
       checkpoint: parseNativeFrontier(this.db.stableFrontier()),
-      vectorRows,
+      vectorRows: transaction.vectors,
     };
   }
 
@@ -1566,8 +1737,9 @@ export class GenesisRag17Worker {
       this.saveOutbox('write-receipt', decision.decisionId, { receipt });
       const response = await this.callMsp('msp_pipeline_write_receipt', { receipt });
       if (response.accepted !== true || response.receiptHash !== receiptHash) fail('MSP_RECEIPT_NOT_ACCEPTED');
-      this.removeOutbox('write-receipt', decision.decisionId);
       this.recordDecision(decision, 'receipt_written', { receiptHash, receipt });
+      this.removeTransactionIntent(decision.decisionId, 'final');
+      this.removeOutbox('write-receipt', decision.decisionId);
     }
     let verdict = known.verdict;
     if (!verdict || !['PASS', 'WARN', 'FAIL'].includes(verdict.verdict)) {
@@ -1579,7 +1751,7 @@ export class GenesisRag17Worker {
         || verdict.receiptHash !== receiptHash || !sameScopeJson(verdict.scope, this.scope)) fail('MSP_GATE_IDENTITY_MISMATCH');
       this.recordDecision(decision, 'gate_received', { receiptHash, receipt, verdict });
     }
-    const allowed = (verdict.verdict === 'PASS' || verdict.verdict === 'WARN')
+    const allowed = verdict.verdict === 'PASS'
       && verdict.allowPublication === true && decision.policy.allowPublication === true;
     if (!allowed) {
       this.recordDecision(decision, 'held_by_quality_gate', { receiptHash, receipt, verdict });
@@ -1648,11 +1820,11 @@ export class GenesisRag17Worker {
     this.saveOutbox('publication-receipt', decision.decisionId, { receipt: publicationReceipt });
     const published = await this.callMsp('msp_pipeline_publication_receipt', { receipt: publicationReceipt });
     if (published.accepted !== true) fail('MSP_PUBLICATION_NOT_ACCEPTED');
-    this.removeOutbox('publication-receipt', decision.decisionId);
     this.recordDecision(decision, 'published', {
       receiptHash, receipt, verdict, publicationReceipt,
       generation: receipt.generation, snapshotId: receipt.snapshotId,
     });
+    this.removeOutbox('publication-receipt', decision.decisionId);
     return { status: 'published', decisionId: decision.decisionId, snapshotId: receipt.snapshotId, generation: receipt.generation, benchmark: receipt.benchmark };
   }
 
@@ -1682,11 +1854,11 @@ export class GenesisRag17Worker {
       let graphReadback;
       try {
         baseCandidate = this.buildPhysicalCandidate(graphDecision, validated, []);
-        this.lexical.put(baseCandidate.lexicalRows);
         graphTransaction = await this.commitCandidate(graphDecision, baseCandidate, 'graph');
         this.recordDecision(decision, 'graph_native_committed', { transaction: graphTransaction, generation: baseCandidate.generation, snapshotId: baseCandidate.snapshotId });
         graphReadback = await this.nativeReadback(baseCandidate, graphDecision);
       } catch (error) {
+        if (isFaultInjection(error)) throw error;
         return this.reportStageFailure(decision, 13, graphStartedAt, nonNegativeMetrics(
           decision.chunks.length + decision.entities.length + decision.facts.length + decision.held.length,
           baseCandidate?.expectedNodeCount ?? 0,
@@ -1714,11 +1886,19 @@ export class GenesisRag17Worker {
         validateDerivedRows(graphResponse.derived, validated.chunkById);
         derived = graphResponse.derived;
         derivedHash = graphResponse.derivedHash;
-        this.removeOutbox('graph-receipt', decision.decisionId);
+        await this.faultInjector?.('after-graph-receipt-accepted-before-local-state', {
+          phase: 'graph',
+          decisionId: decision.decisionId,
+          receipt: graphReceipt,
+          derived: cloneJson(derived),
+          derivedHash,
+        });
         this.recordDecision(decision, 'graph_receipt_written', {
           graphReceiptHash, graphReceipt, derived, derivedHash,
           generation: baseCandidate.generation, snapshotId: baseCandidate.snapshotId,
         });
+        this.removeTransactionIntent(decision.decisionId, 'graph');
+        this.removeOutbox('graph-receipt', decision.decisionId);
       } catch (error) {
         this.recordDecision(decision, 'graph_receipt_pending', {
           graphReceiptHash, graphReceipt, generation: baseCandidate.generation, snapshotId: baseCandidate.snapshotId,
@@ -1825,11 +2005,13 @@ export class GenesisRag17Worker {
       });
 
       transaction = await this.commitCandidate(enrichedDecision, finalWriteCandidate, 'final');
+      this.lexical.put(candidate.lexicalRows);
       readback = await this.nativeReadback(candidate, enrichedDecision);
       benchmark = await this.benchmark(candidate);
       temporal = await this.verifyTemporalLane(candidate, enrichedDecision);
       laneManifest = this.laneManifest(candidate, enrichedDecision, readback, temporal);
     } catch (error) {
+      if (isFaultInjection(error)) throw error;
       return this.reportStageFailure(decision, 16, indexStartedAt, nonNegativeMetrics(
         candidate?.expectedVectorCount ?? vectors.length,
         candidate?.expectedVectorCount ?? vectors.length,
@@ -1854,16 +2036,16 @@ export class GenesisRag17Worker {
     const receiptHash = hashObject(receipt);
     this.recordDecision(decision, 'receipt_pending', { receiptHash, receipt });
     this.saveOutbox('write-receipt', decision.decisionId, { receipt });
-    await this.faultInjector?.('after-native-commit-before-receipt', { decisionId: decision.decisionId, transaction, receiptHash });
     try {
       const accepted = await this.callMsp('msp_pipeline_write_receipt', { receipt });
       if (accepted.accepted !== true || accepted.receiptHash !== receiptHash) fail('MSP_RECEIPT_NOT_ACCEPTED');
-      this.removeOutbox('write-receipt', decision.decisionId);
     } catch (error) {
       this.recordDecision(decision, 'receipt_pending', { receiptHash, receipt, lastError: error.message });
       throw error;
     }
     this.recordDecision(decision, 'receipt_written', { receiptHash, receipt });
+    this.removeTransactionIntent(decision.decisionId, 'final');
+    this.removeOutbox('write-receipt', decision.decisionId);
 
     const gate = await this.callMsp('msp_pipeline_gate', {
       decisionId: decision.decisionId,
@@ -1877,7 +2059,7 @@ export class GenesisRag17Worker {
       || verdict.receiptHash !== receiptHash || !['PASS', 'WARN', 'FAIL'].includes(verdict.verdict)
       || !sameScopeJson(verdict.scope, this.scope)) fail('MSP_GATE_IDENTITY_MISMATCH');
     this.recordDecision(decision, 'gate_received', { receiptHash, receipt, verdict });
-    const allowed = (verdict.verdict === 'PASS' || verdict.verdict === 'WARN')
+    const allowed = verdict.verdict === 'PASS'
       && verdict.allowPublication === true && decision.policy.allowPublication === true;
     if (!allowed) {
       this.recordDecision(decision, 'held_by_quality_gate', { receiptHash, receipt, verdict });
@@ -1931,7 +2113,6 @@ export class GenesisRag17Worker {
     try {
       const published = await this.callMsp('msp_pipeline_publication_receipt', { receipt: publicationReceipt });
       if (published.accepted !== true) fail('MSP_PUBLICATION_NOT_ACCEPTED');
-      this.removeOutbox('publication-receipt', decision.decisionId);
     } catch (error) {
       this.recordDecision(decision, 'publication_receipt_pending', { receiptHash, receipt, verdict, publicationReceipt, lastError: error.message });
       throw error;
@@ -1945,6 +2126,7 @@ export class GenesisRag17Worker {
       publicationReceipt,
       durationMs: Date.now() - startedAt,
     });
+    this.removeOutbox('publication-receipt', decision.decisionId);
     return { status: 'published', decisionId: decision.decisionId, snapshotId: candidate.snapshotId, generation: candidate.generation, benchmark };
   }
 
@@ -1981,6 +2163,14 @@ export class GenesisRag17Worker {
           || typeof response.derivedHash !== 'string' || response.derivedHash !== hashObject(response.derived)) {
           fail('OUTBOX_GRAPH_RECEIPT_INVALID');
         }
+        await this.faultInjector?.('after-graph-receipt-accepted-before-local-state', {
+          phase: 'graph',
+          decisionId: item.decisionId,
+          receipt: item.payload.receipt,
+          derived: cloneJson(response.derived),
+          derivedHash: response.derivedHash,
+          replay: true,
+        });
         this.recordStored(item.decisionId, 'graph_receipt_written', {
           graphReceiptHash,
           graphReceipt: item.payload.receipt,
@@ -1990,7 +2180,25 @@ export class GenesisRag17Worker {
           snapshotId: this.state.decisions[item.decisionId]?.snapshotId,
         });
       }
-      fs.rmSync(path.join(this.outboxRoot, filename), { force: true });
+      if (item.kind === 'write-receipt') {
+        const receiptHash = hashObject(item.payload.receipt);
+        this.recordStored(item.decisionId, 'receipt_written', {
+          receiptHash,
+          receipt: item.payload.receipt,
+        });
+        this.removeTransactionIntent(item.decisionId, 'final');
+      }
+      if (item.kind === 'publication-receipt') {
+        const receipt = item.payload.receipt;
+        this.recordStored(item.decisionId, 'published', {
+          receiptHash: receipt.receiptHash,
+          publicationReceipt: receipt,
+          generation: receipt.generation,
+          snapshotId: receipt.snapshotId,
+        });
+      }
+      if (item.kind === 'graph-receipt') this.removeTransactionIntent(item.decisionId, 'graph');
+      this.removeOutbox(item.kind, item.decisionId);
     }
   }
 

@@ -2,7 +2,7 @@
 title: "GenesisRAG17 extension map"
 doc_id: "MAP-GENESISRAG17-EXTENSIONS"
 status: beta
-version: "1.0.0b"
+version: "1.0.1b"
 updated: "2026-09-08"
 owner: "GenesisBlockDB Architecture"
 source_of_truth: true
@@ -46,21 +46,39 @@ unless a new architecture decision explicitly changes it.
 | 10 | `DPS-KI-FACT-EXTRACT` | GKS | `rule_v1`, explicit/structured candidates and HELD rows | Extractor version, confidence floor, predicate provenance and negative/HELD fixtures; worker stays LLM-free |
 | 11 | `DPS-KI-ONTOLOGY-MAP` | GKS | `ontology_v1` aliases and endpoint validation | Ontology version, endpoint schema, verified/held distinction, decision hash and gate reasons |
 | 12 | `DPS-KI-TEMPORAL-MAP` | GKS (parity against pinned MSP source) | Mapped valid time or explicit `not_applicable` | Temporal semantics, parity fixture, native temporal readback capability and applicability manifest |
-| 13 | `DPS-KI-GRAPH-BUILD` | GKS decision + worker physical write | Graph-only native transaction, flush/checkpoint, readback and graph receipt | Node/edge classes, physical count formula, graph receipt schema, idempotent frontier and provenance |
+| 13 | `DPS-KI-GRAPH-BUILD` | GKS decision + worker physical write | Fsynced `genesisrag17/transactions/graph-<safeDecisionId>.json` intent with expected frontier; graph-only native transaction, flush/checkpoint, readback and graph receipt | Node/edge classes, physical count formula, graph receipt schema, idempotent frontier and provenance |
 | 14 | `DPS-KI-ENRICH` | GKS | `enrich_v1` derived objects with `derivedHash` | Derived schema, source-reference arrays, enrichment counts, graph receipt response and final receipt |
-| 15 | `DPS-KI-EMBED` | worker | Real CPU E5 embeddings, 384 dimensions, pinned artifacts | New model revision/dimension, artifact hashes, generation/collection identity, policy denial and benchmark |
-| 16 | `DPS-KI-INDEX` | worker | Native graph/vector/SQLite readback plus worker FTS5 | Lane capability, manifest status/reason/objects, per-generation retrieval, transaction frontier and readback |
-| 17 | `DPS-KI-QUALITY-GATE` | GKS authority + worker publication | Five dimensions, policy result and publication receipt | Thresholds, gate evidence, publication policy, historical visibility and source finish guard |
+| 15 | `DPS-KI-EMBED` | worker | Checkpointed native collection manifest; real CPU E5 embeddings, 384 dimensions, pinned artifacts | New model revision/dimension, artifact hashes, generation/collection identity, policy denial and benchmark |
+| 16 | `DPS-KI-INDEX` | worker | Checkpointed vector collection; fsynced `genesisrag17/transactions/final-<safeDecisionId>.json` intent; native graph/vector/SQLite readback plus Stage 16 worker FTS5 | Lane capability, manifest status/reason/objects, per-generation retrieval, transaction frontier and readback |
+| 17 | `DPS-KI-QUALITY-GATE` | GKS authority + worker publication | PASS-only policy result, atomic pointer/history replacement and publication receipt | Thresholds, gate evidence, `allowPublication` policy, historical visibility and source finish guard |
 
 The post-stage publication step is part of the current Stage 17 completion
 contract even though it has no new logical stage number:
 
 | Post-stage boundary | Current owner | Extension seam |
 |---|---|---|
-| Candidate snapshot and pointer | worker | Atomic pointer/history update, prepared-snapshot rejection and one-generation query binding |
+| Candidate snapshot and pointer | worker | Fsynced prepared snapshot plus atomic pointer/history replacement, transient `EPERM` retry, no rename-away fallback, prepared-snapshot rejection and one-generation query binding |
 | Publication receipt | worker -> MSP -> GKS | Exact receipt hash, snapshot/generation, model revision, transaction frontier and stable replay timestamps |
 | Source finish | zuri source | Evidence import and cursor transaction; successful finish requires all 17 terminal successes plus publication receipt |
 | Query | client -> MSP -> worker | Scope, loopback bearer, published-history membership, per-generation six-lane fusion and citations |
+
+The worker's storage and recovery paths use the exact intent filenames shown in
+the Stage 13 and Stage 16 rows. Each file retains the exact serialized native
+payload, transaction id and `expected_frontier` until its matching receipt and
+local state are durable. After graph-receipt acceptance, the worker saves the
+accepted receipt and `derived` result before removing the graph outbox or graph
+intent; `retryOutbox` follows that order. A newly created vector collection is
+checkpointed with `saveState` before its first vector transaction, preserving
+model, dimension and metric metadata through WAL replay. Stage 13 writes no
+lexical rows; worker FTS5 indexing belongs to Stage 16.
+
+In those filenames, `<safeDecisionId>` is the worker's sanitized filename
+component for the decision id; the decision identity and hash remain unchanged.
+
+Publication uses a temp-file fsync and operating-system atomic replacement. If
+replacement fails after transient retries, the old pointer remains
+authoritative. Historical snapshot files and their citations remain available
+after later generations publish.
 
 ## Extension protocol
 
@@ -158,11 +176,12 @@ by editing only the worker README or a lane flag:
 - Native engine checkout: `e15e35b0093394e0a8880af7f4e6f63cf81223b7`.
 - Embedding: `intfloat/multilingual-e5-small`, revision
   `614241f622f53c4eeff9890bdc4f31cfecc418b3`, dimension 384, cosine.
-- Wire: `genesisrag17.v1`, contract `1.2.1b`.
+- Wire: `genesisrag17.v1`, contract `1.3.0b`.
 - Historical isolated acceptance: [pinned report](https://github.com/Freshair129/zuri.ai/blob/b64b46df057d3160c659afa3c34628ee86520257/.brain/reports/GENESISRAG17-ACCEPTANCE.md).
 
 ## Changelog
 
 | Version | Date | Status | Summary | Commit Hash | Agent |
 |---|---|---|---|---|---|
+| 1.0.1b | 2026-09-08 | beta | Synced audit remediation: exact native intent filenames/frontiers and collection checkpoint recovery, graph accepted-state ordering, Stage 16 lexical indexing, PASS-only publication and no-fallback pointer replacement. | working-tree | RWANG |
 | 1.0.0b | 2026-09-08 | beta | Added stage ownership, safe extension seams, coordinated evidence requirements and boundaries requiring a new ADR. | working-tree | RWANG |

@@ -11,5 +11,6 @@ export {
   validateScope,
   validateDecision,
   verifyModelArtifacts,
+  writeAtomic,
 } from './worker.mjs';
 export { createMspStdioCaller } from './msp-stdio.mjs';

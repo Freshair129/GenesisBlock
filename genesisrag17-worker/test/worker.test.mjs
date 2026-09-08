@@ -1,5 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { execFileSync } from 'node:child_process';
+import { createRequire } from 'node:module';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -10,8 +12,13 @@ import {
   STAGE_CATALOG,
   hashObject,
   hashText,
+  validateDecision,
   verifyModelArtifacts,
+  writeAtomic,
 } from '../src/index.mjs';
+
+const require = createRequire(import.meta.url);
+const { GenesisDatabase } = require('../../index.js');
 
 const modelDir = 'C:/Users/pc/.cache/huggingface/hub/models--intfloat--multilingual-e5-small/snapshots/614241f622f53c4eeff9890bdc4f31cfecc418b3';
 const scope = {
@@ -87,6 +94,19 @@ function makeDecision() {
   };
   decision.decisionHash = hashObject(decision);
   return decision;
+}
+
+function workerOptions(dbPath, mspCall, extra = {}) {
+  return {
+    dbPath,
+    scope,
+    credential: 'worker-credential-test',
+    workerToken: 'query-token-test',
+    modelDir,
+    mspCall,
+    port: 0,
+    ...extra,
+  };
 }
 
 test('worker verifies pinned model artifacts and performs native publish/query', async () => {
@@ -492,5 +512,340 @@ test('worker keeps a prepared snapshot private until pointer replacement', async
   } finally {
     await worker.close();
     try { fs.rmSync(root, { recursive: true, force: true }); } catch { /* native handle cleanup is process scoped */ }
+  }
+});
+
+test('worker persists the exact native transaction intent before commit and rejects same-id payload drift', async () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'genesisrag17-native-intent-'));
+  const dbPath = path.join(root, 'db');
+  const worker = GenesisRag17Worker.create(workerOptions(dbPath, async () => ({ decisions: [] })));
+  try {
+    const decision = makeDecision();
+    const graphDecision = { ...decision, derived: [] };
+    const validated = validateDecision(decision, scope);
+    const candidate = worker.buildPhysicalCandidate(graphDecision, validated, []);
+    const committed = await worker.commitCandidate(graphDecision, candidate, 'graph');
+    const intentPath = path.join(dbPath, 'genesisrag17', 'transactions', `graph-${decision.decisionId}.json`);
+    assert.ok(fs.existsSync(intentPath), 'the intent must remain available until receipt acknowledgement');
+    const intent = JSON.parse(fs.readFileSync(intentPath, 'utf8'));
+    assert.equal(intent.phase, 'graph');
+    assert.equal(intent.transaction.transaction_id, committed.id);
+    assert.equal(intent.transaction.expected_frontier, 0);
+    assert.equal(intent.payloadHash, hashText(intent.payloadJson));
+    assert.equal(intent.payloadJson, JSON.stringify(intent.transaction));
+
+    const replay = await worker.commitCandidate(graphDecision, candidate, 'graph');
+    assert.equal(replay.id, committed.id);
+    assert.equal(replay.frontier, committed.frontier);
+
+    const drifted = JSON.parse(intent.payloadJson);
+    drifted.graph.nodes[0].props.text = 'payload drift';
+    await assert.rejects(worker.db.commitTransaction(JSON.stringify(drifted)), /transaction identity conflict/);
+  } finally {
+    await worker.close();
+    try { fs.rmSync(root, { recursive: true, force: true }); } catch { /* native handles are released at process exit. */ }
+  }
+});
+
+test('worker recovers an actual native graph commit after accepted receipt state is interrupted', async () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'genesisrag17-graph-recovery-'));
+  const dbPath = path.join(root, 'db');
+  const decision = makeDecision();
+  decision.policy.allowEmbedding = false;
+  const hashable = { ...decision };
+  delete hashable.decisionHash;
+  decision.decisionHash = hashObject(hashable);
+  let claimed = true;
+  let inject = true;
+  let graphCalls = 0;
+  let firstGraphReceipt;
+  let failureCall = 0;
+  const response = (body) => ({ schemaVersion: SCHEMA_VERSION, scope, ...body });
+  const mspCall = async (name, args) => {
+    if (name === 'msp_pipeline_claim') return response({ decisions: claimed ? [decision] : [] });
+    if (name === 'msp_pipeline_graph_receipt') {
+      graphCalls += 1;
+      if (!firstGraphReceipt) firstGraphReceipt = structuredClone(args.receipt);
+      else assert.deepEqual(args.receipt, firstGraphReceipt, 'graph receipt replay must be byte-equivalent in content');
+      return response({ accepted: true, graphReceiptHash: hashObject(args.receipt), derived: decision.derived, derivedHash: hashObject(decision.derived) });
+    }
+    if (name === 'msp_pipeline_stage_failure') {
+      failureCall += 1;
+      claimed = false;
+      const normalizedFailure = { ...args };
+      delete normalizedFailure.credential;
+      return response({ accepted: true, failureHash: hashObject(normalizedFailure) });
+    }
+    throw new Error(`unexpected MSP tool ${name}`);
+  };
+  const worker = GenesisRag17Worker.create(workerOptions(dbPath, mspCall, {
+    faultInjector: async (point) => {
+      if (point === 'after-graph-receipt-accepted-before-local-state' && inject) {
+        inject = false;
+        const error = new Error('TEST_GRAPH_ACCEPTED_BEFORE_LOCAL_STATE');
+        error.faultInjection = true;
+        throw error;
+      }
+    },
+  }));
+  try {
+    await assert.rejects(worker.runOnce(), /TEST_GRAPH_ACCEPTED_BEFORE_LOCAL_STATE/);
+    const outboxPath = path.join(dbPath, 'genesisrag17', 'outbox', `graph-receipt-${decision.decisionId}.json`);
+    assert.ok(fs.existsSync(outboxPath), 'graph outbox must remain until accepted derived state is durable');
+    assert.equal(worker.lexical.count(
+      `g17-${hashObject({ decisionId: decision.decisionId, decisionHash: decision.decisionHash }).slice(0, 32)}`,
+      scope,
+    ), 0, 'Stage13 must not write lexical rows');
+
+    const result = await worker.runOnce();
+    assert.equal(result.status, 'failed');
+    assert.equal(result.stageNumber, 15);
+    assert.equal(graphCalls, 2, 'the accepted graph receipt must be replayed from the durable outbox');
+    assert.equal(failureCall, 1);
+    assert.ok(!fs.existsSync(outboxPath));
+    assert.ok(!fs.existsSync(path.join(dbPath, 'genesisrag17', 'transactions', `graph-${decision.decisionId}.json`)));
+    const graphTransactionRows = JSON.parse(await worker.db.querySql(
+      'SELECT transaction_id FROM applied_transactions WHERE transaction_id LIKE ?',
+      JSON.stringify([`txn-graph-%`]),
+    ));
+    assert.equal(graphTransactionRows.length, 1, 'native graph transaction must be applied once');
+  } finally {
+    await worker.close();
+    try { fs.rmSync(root, { recursive: true, force: true }); } catch { /* native handles are released at process exit. */ }
+  }
+});
+
+test('worker reuses an actual native final transaction after commit-to-receipt interruption and indexes lexical rows only in Stage16', async () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'genesisrag17-final-recovery-'));
+  const dbPath = path.join(root, 'db');
+  const decision = makeDecision();
+  let claimed = true;
+  let inject = true;
+  let writeCalls = 0;
+  let writeReceipt;
+  let firstFinalIntent;
+  const response = (body) => ({ schemaVersion: SCHEMA_VERSION, scope, ...body });
+  const mspCall = async (name, args) => {
+    if (name === 'msp_pipeline_claim') return response({ decisions: claimed ? [decision] : [] });
+    if (name === 'msp_pipeline_graph_receipt') {
+      return response({ accepted: true, graphReceiptHash: hashObject(args.receipt), derived: decision.derived, derivedHash: hashObject(decision.derived) });
+    }
+    if (name === 'msp_pipeline_write_receipt') {
+      writeCalls += 1;
+      writeReceipt = structuredClone(args.receipt);
+      return response({ accepted: true, receiptHash: hashObject(args.receipt) });
+    }
+    if (name === 'msp_pipeline_gate') {
+      return response({ verdict: {
+        schemaVersion: SCHEMA_VERSION,
+        scope,
+        runId: decision.runId,
+        decisionId: decision.decisionId,
+        decisionHash: decision.decisionHash,
+        snapshotId: writeReceipt.snapshotId,
+        generation: writeReceipt.generation,
+        receiptHash: hashObject(writeReceipt),
+        verdict: 'PASS',
+        allowPublication: true,
+        dimensions: {
+          data: { result: 'PASS', critical: false, reasons: [] },
+          graph: { result: 'PASS', critical: false, reasons: [] },
+          knowledge: { result: 'PASS', critical: false, reasons: [] },
+          security: { result: 'PASS', critical: false, reasons: [] },
+          retrieval: { result: 'PASS', critical: false, reasons: [] },
+        },
+      } });
+    }
+    if (name === 'msp_pipeline_publication_receipt') {
+      claimed = false;
+      return response({ accepted: true });
+    }
+    throw new Error(`unexpected MSP tool ${name}`);
+  };
+  const worker = GenesisRag17Worker.create(workerOptions(dbPath, mspCall, {
+    benchmarkFixture: {
+      fixtureVersion: 'worker-test-v1',
+      queries: [{ query: 'Which company employs Alice?', relevantTexts: ['Alice works for Acme Ltd.'] }],
+    },
+    faultInjector: async (point, details) => {
+      if (point === 'after-native-commit-before-receipt' && details.phase === 'final' && inject) {
+        inject = false;
+        firstFinalIntent = fs.readFileSync(path.join(dbPath, 'genesisrag17', 'transactions', `final-${decision.decisionId}.json`), 'utf8');
+        const error = new Error('TEST_FINAL_NATIVE_COMMIT_BEFORE_RECEIPT');
+        error.faultInjection = true;
+        throw error;
+      }
+    },
+  }));
+  try {
+    await assert.rejects(worker.runOnce(), /TEST_FINAL_NATIVE_COMMIT_BEFORE_RECEIPT/);
+    assert.equal(writeCalls, 0);
+    assert.equal(worker.lexical.count(
+      `g17-${hashObject({ decisionId: decision.decisionId, decisionHash: decision.decisionHash }).slice(0, 32)}`,
+      scope,
+    ), 0, 'lexical indexing must not occur before the final Stage16 boundary');
+    const intentPath = path.join(dbPath, 'genesisrag17', 'transactions', `final-${decision.decisionId}.json`);
+    assert.equal(fs.readFileSync(intentPath, 'utf8'), firstFinalIntent);
+
+    const result = await worker.runOnce();
+    assert.equal(result.status, 'published');
+    assert.equal(writeCalls, 1);
+    assert.ok(worker.lexical.count(result.generation, scope) > 0);
+    const finalTransactionRows = JSON.parse(await worker.db.querySql(
+      'SELECT transaction_id FROM applied_transactions WHERE transaction_id LIKE ?',
+      JSON.stringify([`txn-final-%`]),
+    ));
+    assert.equal(finalTransactionRows.length, 1, 'native final replay must remain one applied transaction');
+    assert.ok(!fs.existsSync(intentPath), 'final intent is removed only after the write receipt is accepted');
+  } finally {
+    await worker.close();
+    try { fs.rmSync(root, { recursive: true, force: true }); } catch { /* native handles are released at process exit. */ }
+  }
+});
+
+test('worker checkpoints a new vector collection before a crash can replay its first vector transaction', async () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'genesisrag17-collection-recovery-'));
+  const dbPath = path.join(root, 'db');
+  const collection = 'genesisrag17_recovery_collection';
+  const workerUrl = new URL('../src/worker.mjs', import.meta.url).href;
+  const childScript = `
+    import { GenesisRag17Worker } from ${JSON.stringify(workerUrl)};
+    const scope = ${JSON.stringify(scope)};
+    const collection = ${JSON.stringify(collection)};
+    const worker = GenesisRag17Worker.create({
+      dbPath: ${JSON.stringify(dbPath)},
+      scope,
+      credential: 'worker-credential-test',
+      workerToken: 'query-token-test',
+      modelDir: ${JSON.stringify(modelDir)},
+      mspCall: async () => ({}),
+      port: 0,
+    });
+    await worker.db.addNode({
+      id: 'collection-recovery-node',
+      labels: ['Chunk'],
+      props: { scope, generation: 'g17-collection-recovery', text: 'recovery' },
+      validFrom: new Date().toISOString(),
+    });
+    await worker.db.saveState();
+    await worker.ensureEmbedder(collection);
+    const transaction = {
+      transaction_id: 'txn-collection-recovery',
+      expected_frontier: Number(worker.db.txnFrontier()),
+      relational: [],
+      graph: {
+        nodes: [],
+        edges: [],
+      },
+      vectors: [{
+        node_id: 'collection-recovery-node',
+        collection,
+        embedding: Array.from({ length: 384 }, (_, index) => index === 0 ? 1 : 0),
+      }],
+    };
+    await worker.db.commitTransaction(JSON.stringify(transaction));
+    process.exit(0);
+  `;
+  try {
+    execFileSync(process.execPath, ['--input-type=module', '--eval', childScript], { stdio: 'inherit' });
+    const db = GenesisDatabase.open({ path: dbPath, vectorDim: 384, retention: 'full' });
+    try {
+      const recovered = db.listCollections().find((entry) => entry.name === collection);
+      assert.ok(recovered, 'the first vector transaction must not auto-provision a replacement collection');
+      assert.equal(recovered.model, 'intfloat/multilingual-e5-small');
+      assert.equal(recovered.dim, 384);
+      assert.equal(recovered.metric.toLowerCase(), 'cosine');
+    } finally {
+      // The pinned N-API binding has no close method; the handle is released at
+      // process exit. Keep this disposable store isolated for that lifetime.
+    }
+  } finally {
+    try { fs.rmSync(root, { recursive: true, force: true }); } catch { /* native handle cleanup is process scoped. */ }
+  }
+});
+
+test('atomic pointer replacement failure preserves the existing pointer', () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'genesisrag17-pointer-failure-'));
+  const pointer = path.join(root, 'published-pointer.json');
+  try {
+    fs.writeFileSync(pointer, 'old-pointer\n', 'utf8');
+    assert.throws(() => writeAtomic(pointer, 'new-pointer\n', () => {
+      const error = new Error('TEST_ATOMIC_REPLACE_FAILURE');
+      error.code = 'EPERM';
+      throw error;
+    }), /TEST_ATOMIC_REPLACE_FAILURE/);
+    assert.equal(fs.readFileSync(pointer, 'utf8'), 'old-pointer\n');
+  } finally {
+    try { fs.rmSync(root, { recursive: true, force: true }); } catch { /* test directory is disposable. */ }
+  }
+});
+
+test('worker fails closed when a quality gate returns WARN with publication allowed', async () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'genesisrag17-warn-gate-'));
+  const dbPath = path.join(root, 'db');
+  const decision = makeDecision();
+  const receipt = {
+    schemaVersion: SCHEMA_VERSION,
+    scope,
+    runId: decision.runId,
+    decisionId: decision.decisionId,
+    decisionHash: decision.decisionHash,
+    snapshotId: 'snap-warn-test',
+    generation: 'g17-warn-test',
+    transaction: { id: 'txn-final-warn-test', frontier: '1', checkpoint: '1' },
+  };
+  const receiptHash = hashObject(receipt);
+  const response = (body) => ({ schemaVersion: SCHEMA_VERSION, scope, ...body });
+  let publicationCalls = 0;
+  const worker = GenesisRag17Worker.create(workerOptions(dbPath, async (name) => {
+    if (name === 'msp_pipeline_gate') return response({ verdict: {
+      schemaVersion: SCHEMA_VERSION,
+      scope,
+      runId: decision.runId,
+      decisionId: decision.decisionId,
+      decisionHash: decision.decisionHash,
+      snapshotId: receipt.snapshotId,
+      generation: receipt.generation,
+      receiptHash,
+      verdict: 'WARN',
+      allowPublication: true,
+    } });
+    if (name === 'msp_pipeline_publication_receipt') publicationCalls += 1;
+    throw new Error(`unexpected MSP tool ${name}`);
+  }));
+  try {
+    const result = await worker.resumeFromReceipt({
+      ...decision,
+      policy: { ...decision.policy, allowPublication: true },
+    }, { status: 'receipt_written', receipt, receiptHash });
+    assert.equal(result.status, 'held');
+    assert.equal(worker.state.decisions[decision.decisionId].status, 'held_by_quality_gate');
+    assert.equal(publicationCalls, 0);
+  } finally {
+    await worker.close();
+    try { fs.rmSync(root, { recursive: true, force: true }); } catch { /* test directory is disposable. */ }
+  }
+});
+
+test('worker keeps explicit unmapped temporal status unsupported while accepting legacy null applicability', async () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'genesisrag17-temporal-status-'));
+  const dbPath = path.join(root, 'db');
+  const worker = GenesisRag17Worker.create(workerOptions(dbPath, async () => ({ decisions: [] })));
+  try {
+    const decision = makeDecision();
+    const candidate = { generation: 'g17-temporal-status-test' };
+    decision.facts = decision.facts.map((fact) => ({
+      ...fact,
+      temporal: { validFrom: null, validTo: null, txFrom: '2026-09-08T00:00:00.000Z', txTo: 'open' },
+    }));
+    const legacy = await worker.verifyTemporalLane(candidate, decision);
+    assert.equal(legacy.status, 'not_applicable');
+    decision.facts[0].temporal.status = 'unmapped';
+    const unmapped = await worker.verifyTemporalLane(candidate, decision);
+    assert.equal(unmapped.status, 'unsupported');
+    assert.equal(unmapped.reason, 'temporal_mapping_missing_valid_from');
+  } finally {
+    await worker.close();
+    try { fs.rmSync(root, { recursive: true, force: true }); } catch { /* test directory is disposable. */ }
   }
 });

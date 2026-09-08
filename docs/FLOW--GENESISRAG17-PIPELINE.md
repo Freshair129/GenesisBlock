@@ -2,7 +2,7 @@
 title: "GenesisRAG17 TEST pipeline flow"
 doc_id: "FLOW-GENESISRAG17-PIPELINE"
 status: beta
-version: "1.0.0b"
+version: "1.0.1b"
 updated: "2026-09-08"
 owner: "GenesisBlockDB Architecture"
 source_of_truth: true
@@ -26,6 +26,8 @@ and [wire contract](https://github.com/Freshair129/zuri.ai/blob/codex/ki17-integ
 are the cross-repository authorities. The [pinned historical acceptance
 report](https://github.com/Freshair129/zuri.ai/blob/b64b46df057d3160c659afa3c34628ee86520257/.brain/reports/GENESISRAG17-ACCEPTANCE.md)
 is evidence for the synthetic isolated run, not a production quality claim.
+The current approved implementation amendment is contract `1.3.0b`; the wire
+schema remains `genesisrag17.v1`.
 
 ## Boundary and ownership
 
@@ -63,14 +65,14 @@ sequenceDiagram
     G->>G: 11 ontology map -> 12 temporal map
     G-->>M: immutable decision, decisionHash
     M-->>W: scoped decision
-    W->>W: 13 graph-only native transaction, flush, checkpoint, readback
+    W->>W: 13 fsynced intent + graph-only native transaction, flush, checkpoint, readback
     W->>M: msp_pipeline_graph_receipt
     M->>G: gks_pipeline_graph_receipt
     G->>G: verify physical 13; terminal 13; run enrich_v1 14
     G-->>M: graphReceiptHash, derived, derivedHash
     M-->>W: scoped enrichment result
-    W->>W: 15 real CPU embeddings
-    W->>W: 16 derived + vectors transaction, six-lane readback/benchmark
+    W->>W: 15 checkpoint new collection manifest; real CPU embeddings
+    W->>W: 16 exact-intent derived + vectors transaction; lexical index/readback/benchmark
     W->>M: msp_pipeline_write_receipt
     M->>G: gks_pipeline_write_receipt
     W->>M: msp_pipeline_gate
@@ -123,10 +125,10 @@ another real execution gets a new FR-071 attempt.
 | 10 | `DPS-KI-FACT-EXTRACT` | GKS | `rule_v1` candidates and held rows | Confidence, predicate and source references |
 | 11 | `DPS-KI-ONTOLOGY-MAP` | GKS | `ontology_v1` verified facts or held rows | Endpoint/type validation |
 | 12 | `DPS-KI-TEMPORAL-MAP` | GKS/MSP | Temporal metadata with explicit applicability | Valid-time semantics or `not_applicable` |
-| 13 | `DPS-KI-GRAPH-BUILD` | GKS decision + worker physical write | Graph-only native transaction and graph receipt | Actual native node/edge readback; closes before 14 |
+| 13 | `DPS-KI-GRAPH-BUILD` | GKS decision + worker physical write | Pre-commit intent with expected frontier; graph-only native transaction and graph receipt | Actual native node/edge readback; closes before 14 |
 | 14 | `DPS-KI-ENRICH` | GKS | `enrich_v1` derived summaries and `derivedHash` | Separate immutable derived result |
-| 15 | `DPS-KI-EMBED` | worker | CPU E5 vectors, 384 dimensions | Verified model artifacts and vector count |
-| 16 | `DPS-KI-INDEX` | worker | Candidate generation, six-lane manifest and readback | Native transaction/frontier, lane evidence, benchmark |
+| 15 | `DPS-KI-EMBED` | worker | Checkpointed native collection manifest; CPU E5 vectors, 384 dimensions | Verified model artifacts and vector count |
+| 16 | `DPS-KI-INDEX` | worker | Checkpointed collection, exact-intent final transaction, Stage 16 lexical index, six-lane manifest and readback | Native transaction/frontier, lane evidence, benchmark |
 | 17 | `DPS-KI-QUALITY-GATE` | GKS + worker publication | Five-dimension verdict, pointer and receipt | Successful only after matching publication receipt |
 
 For the physical acknowledgement, `msp_pipeline_graph_receipt` contains the
@@ -136,6 +138,23 @@ original decision or its `decisionHash`. The final
 `msp_pipeline_write_receipt` adds those hashes and execution times for 13, 15
 and 16. The receipt also contains actual readback, six-lane manifest, measured
 metrics and the frozen fixture benchmark.
+
+Before either native commit, the worker writes and fsyncs the complete intent
+with the exact serialized native payload, transaction id and `expected_frontier`.
+The filenames are fixed under the isolated database root:
+
+| Native phase | Exact intent filename |
+|---|---|
+| Graph | `genesisrag17/transactions/graph-<safeDecisionId>.json` |
+| Final | `genesisrag17/transactions/final-<safeDecisionId>.json` |
+
+`<safeDecisionId>` is the worker's sanitized filename component for the
+decision id; it does not change the decision identity or hash.
+
+The intent remains until the matching receipt is accepted and local state is
+durable. A retry reads that file and passes its unchanged payload and identity
+to the native commit; it never creates a second transaction payload for the
+same phase.
 
 ## Lifecycle, failure and retry
 
@@ -158,17 +177,24 @@ The following states are observable in the isolated implementation:
 (worker-owned physical stages 13, 15 or 16). Embedding policy denial is a
 Stage 15 failure and never a zero-vector success. A quality gate failure does
 not produce a publication receipt. A lost reply retries the original outbox
-payload; it does not create a different terminal attempt.
+payload; it does not create a different terminal attempt. When GKS accepts the
+graph receipt, the worker persists the accepted `derived` result and graph
+receipt in `state.json` before removing `graph-receipt-<safeDecisionId>.json` (and
+the graph intent). `retryOutbox` follows the same ordering after a crash, so a
+remote acceptance cannot be mistaken for durable local state.
 
 ## Publication and query visibility
 
-The worker writes a prepared snapshot before it changes the pointer. The
-authoritative pointer contains the current generation and the retained
-`publishedSnapshotIds` history. A query reads that pointer once, validates the
-requested snapshot's membership and binds one generation for the complete
-query. A known prepared filename is rejected while it is outside published
-history. Previous published generations remain queryable with their original
-citation hashes.
+The worker writes a prepared snapshot before it changes the pointer. It fsyncs
+the temporary file and performs an operating-system atomic replacement, retrying
+transient Windows `EPERM`/sharing failures. If replacement cannot complete, the
+old pointer remains in place; the worker never renames the old pointer away as a
+fallback. The authoritative pointer contains the current generation and the
+retained `publishedSnapshotIds` history. A query reads that pointer once,
+validates the requested snapshot's membership and binds one generation for the
+complete query. A known prepared filename is rejected while it is outside
+published history. Previous published generations remain queryable with their
+original citation hashes.
 
 The query path is:
 
@@ -187,12 +213,20 @@ generation. No GKS query or direct database client is involved.
 
 | Fault point | Required visible result on restart |
 |---|---|
-| Native graph commit before graph-receipt response | Graph transaction is recognized by its deterministic frontier; the original graph receipt is replayed; Stage 13/14 are not duplicated |
-| Final native commit before write-receipt response | Existing Stage 15/16 evidence and exact write receipt are reused; no blind recommit |
+| Native graph commit before graph-receipt response (`after-native-commit-before-receipt`, `phase=graph`) | `genesisrag17/transactions/graph-<safeDecisionId>.json` supplies the exact payload and expected frontier; restart recognizes the committed graph, reuses the same transaction id/payload and replays the graph receipt; Stage 13/14 are not duplicated |
+| Final native commit before write-receipt response (`after-native-commit-before-receipt`, `phase=final`) | `genesisrag17/transactions/final-<safeDecisionId>.json` supplies the exact payload and expected frontier; the collection manifest was checkpointed before the first vector commit, so restart recovers the native final state and reuses the exact write receipt without a blind recommit |
+| Graph receipt accepted before local derived state (`after-graph-receipt-accepted-before-local-state`) | The accepted graph outbox remains present; replay validates the same receipt/derived hash, saves local state first, then removes the outbox and graph intent |
 | Before pointer replacement | Old published pointer remains authoritative; prepared candidate is rejected by query |
 | After pointer replacement before publication outbox delivery | New pointer/history remains authoritative; exact durable publication receipt is replayed with stable timestamps/hash |
 | Lost MSP reply or child-process restart | MSP request timeout kills/restarts the relay child and retries the same idempotency identity |
 | Source evidence cursor interruption | Tier 1 re-reads the page and advances the cursor only after durable ledger import |
+
+The worker exposes the two native commit and graph acknowledgement hooks named
+above at the actual durability boundaries. Publication hooks are
+`before-pointer-replacement` and
+`after-pointer-replacement-before-publication-outbox`; process-kill acceptance
+uses exit code `86` and verifies the old-pointer/new-pointer result at each
+boundary.
 
 The pinned native binding has no `close` method. The worker therefore releases a
 true native store handle by stopping its dedicated child process; its lock
@@ -207,7 +241,7 @@ current TEST interpretation is:
 | Lane | Required status | Evidence |
 |---|---|---|
 | Vector | `ready` | Native HNSW write, flush, per-scope/generation search and model/artifact verification |
-| Lexical | `ready` | Worker-owned SQLite FTS5 query; manifest implementation is `worker_sqlite_fts5` |
+| Lexical | `ready` | Stage 16 worker-owned SQLite FTS5 indexing and query; Stage 13 writes no lexical rows; manifest implementation is `worker_sqlite_fts5` |
 | Graph | `ready` | Native graph commit, flush/checkpoint and node/edge readback |
 | SQLite | `ready` | Engine-owned projection SQL readback; callers never open the file |
 | Bitemporal | `ready` when valid-time Query IR is actually read back; `not_applicable` for fixture facts explicitly lacking valid time | Transaction timestamps alone are not valid-time evidence |
@@ -238,4 +272,5 @@ API, or a production temporal index.
 
 | Version | Date | Status | Summary | Commit Hash | Agent |
 |---|---|---|---|---|---|
+| 1.0.1b | 2026-09-08 | beta | Synced audit remediation: pre-commit native intents and collection checkpoint recovery, graph accepted-state ordering, Stage 16 lexical indexing, PASS-only publication and no-fallback pointer replacement. | working-tree | RWANG |
 | 1.0.0b | 2026-09-08 | beta | Added the stage-by-stage ownership, physical 13 -> 14 -> 15 -> 16 -> 17 sequence, receipt lifecycle, visibility rules and recovery flow. | working-tree | RWANG |
