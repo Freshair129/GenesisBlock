@@ -18,9 +18,9 @@ Nearest comparators are embedded engines such as Kuzu, DuckDB combined with grap
 
 | Field | Value |
 |---|---|
-| **Engine source metadata** | `0.2.5` in `Cargo.toml` and the main `package.json`; release/documentation version drift is tracked in [#166](https://github.com/Freshair129/GenesisBlock/issues/166) |
+| **Engine source metadata** | `0.2.6` in `Cargo.toml` and the main `package.json` |
 | **Milestone** | Mobile SDK — iOS/Android/React Native SDKs shipped; Android and React Native have package-manager distribution, iOS has a published xcframework release artifact |
-| **Status** | Advanced prototype — durable, benchmarked, full Rust + Node suites green |
+| **Status** | Advanced prototype — durable and benchmarked; core Rust + Node suites green, GenesisRAG17 model-backed tests require the pinned external fixture |
 
 Version policy and intended SSOT: [docs/VERSION.md](docs/VERSION.md) · Detailed history: [CHANGELOG.md](CHANGELOG.md)
 
