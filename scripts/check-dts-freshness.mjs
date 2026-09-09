@@ -15,11 +15,12 @@
 // ------------------------------------------------
 // That is the obvious shape, and it is what the C header gate (cbindgen) does.
 // Here it would be WRONG, and this was measured rather than assumed: running
-// `napi build` on a clean tree today deletes 8 declarations -
+// `napi build` on a clean tree today deletes 10 declarations -
 //
 //   QueryIrCapabilities, QueryIrDirection, QueryIrIndexConsistency,
 //   QueryIrRequest, QueryIrResponse, QueryIrSearchMode,
-//   QueryIrSearchOperation, QueryIrTraverseOperation
+//   QueryIrSearchOperation, QueryIrTraverseOperation,
+//   QueryIrContextOperation, QueryBudget
 //
 // - and downgrades two method signatures to `any`. napi cannot generate any of
 // it: the Rust types are plain serde structs (`QueryIrOperation` is an enum with
@@ -48,9 +49,11 @@ import { readFileSync, existsSync } from 'node:fs'
 import { join } from 'node:path'
 
 // Top-level declarations written by hand because napi cannot express them.
-// Matched by name prefix so a new QueryIr* type does not need to be listed.
+// QueryIr* types are matched by prefix; QueryBudget is the shared budget type
+// used by Query IR but does not carry that prefix.
 const HAND_WRITTEN_PREFIX = 'QueryIr'
-const HAND_WRITTEN_EXPECTED = 8
+const HAND_WRITTEN_NAMES = new Set(['QueryBudget'])
+const HAND_WRITTEN_EXPECTED = 10
 
 // Method signatures deliberately narrowed by hand from what napi emits.
 // generated line -> the committed line that replaces it.
@@ -90,7 +93,7 @@ function stripHandWritten(lines, prefix) {
   while (i < lines.length) {
     const line = lines[i]
     const decl = /^export (?:interface|type|const enum|declare class) ([A-Za-z0-9_]+)/.exec(line)
-    if (decl && decl[1].startsWith(prefix)) {
+    if (decl && (decl[1].startsWith(prefix) || HAND_WRITTEN_NAMES.has(decl[1]))) {
       removed += 1
       if (line.includes('{')) {
         // Block form: skip to the closing brace in column 0.
@@ -113,8 +116,9 @@ function reconstructGenerated(committedText) {
 
   if (removed !== HAND_WRITTEN_EXPECTED) {
     fail(
-      `expected to strip ${HAND_WRITTEN_EXPECTED} hand-written ${HAND_WRITTEN_PREFIX}* ` +
-        `declarations from index.d.ts, stripped ${removed}. The exemption list in ` +
+      `expected to strip ${HAND_WRITTEN_EXPECTED} hand-written Query IR declarations ` +
+        `(${HAND_WRITTEN_PREFIX}* plus ${[...HAND_WRITTEN_NAMES].join(', ')}); ` +
+        `stripped ${removed}. The exemption list in ` +
         `scripts/check-dts-freshness.mjs no longer matches the file - update HAND_WRITTEN_EXPECTED ` +
         `deliberately rather than letting the gate exempt the wrong thing.`,
     )
@@ -162,7 +166,7 @@ function reportDiff(label, expected, actual) {
   fail(
     `${label} is out of date with src/lib.rs.\n${shown.join('\n')}\n` +
       `Add or update the declaration BY HAND. Do NOT commit the output of ` +
-      `\`napi build\` wholesale: it deletes the hand-written ${HAND_WRITTEN_PREFIX}* ` +
+      `\`napi build\` wholesale: it deletes the hand-written Query IR ` +
       `declarations. See the note at the top of scripts/check-dts-freshness.mjs.`,
   )
 }
@@ -203,7 +207,7 @@ function main() {
   if (!process.exitCode) {
     console.log(
       `index.d.ts and index.js are in sync with src/lib.rs ` +
-        `(${HAND_WRITTEN_EXPECTED} hand-written ${HAND_WRITTEN_PREFIX}* declarations and ` +
+        `(${HAND_WRITTEN_EXPECTED} hand-written Query IR declarations and ` +
         `${HAND_REFINED.size} hand-refined signatures accounted for).`,
     )
   }
