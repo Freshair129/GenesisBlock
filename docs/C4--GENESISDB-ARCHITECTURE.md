@@ -13,6 +13,10 @@ attributes:
   model: C4
   ssot_role: architecture-index
   authoritative_parent: docs/MASTER-SPEC--GENESIS-DB.md
+related_docs:
+  - docs/ADR--GENESISRAG17-SEPARATE-WORKER-PUBLICATION.md
+  - docs/FLOW--GENESISRAG17-PIPELINE.md
+  - docs/GENESISRAG17-EXTENSION-MAP.md
 ---
 
 # C4--GENESISDB-ARCHITECTURE
@@ -89,6 +93,7 @@ flowchart LR
 | Rust Core Engine | Unified lifecycle, signed WAL, SQLite projection, native graph/vector indexes, HQL compatibility, reasoning, CRDT, consensus primitives | `src/lib.rs`, `src/query/*` | `MASTER-SPEC--GENESIS-DB.md`, unified-boundary spec, feature specs, ADRs |
 | Axum REST Server | HTTP API for bulk ingest, HQL, node/edge mutation, search, context, status | `src/main.rs`, `src/router.rs` | `docs/API_REFERENCE.md` |
 | N-API Package | Native Node/TypeScript bindings over Rust core | `src/lib.rs`, `index.d.ts`, `index.js` | `docs/API_REFERENCE.md`, NPM package metadata |
+| GenesisRAG17 TEST worker | Separate client integration process for physical Stage 13/15/16 writes, six-lane readback, publication and loopback query | `genesisrag17-worker/` | `docs/ADR--GENESISRAG17-SEPARATE-WORKER-PUBLICATION.md`, `docs/FLOW--GENESISRAG17-PIPELINE.md` |
 | MCP Server | Tool interface for LLM clients | `mcp/server.js` | `docs/MCP-GUIDE.md`, `docs/SPEC--MCP-SERVER.md` |
 | Python SDK | Python REST client | `genesisdb-python/genesisdb/client.py` | `docs/PYTHON-SDK-GUIDE.md`, `docs/SPEC--PYTHON-SDK.md` |
 | Go SDK | Go REST client | `genesisdb-go/client.go` | `docs/SPEC--GO-SDK.md` |
@@ -160,6 +165,24 @@ flowchart TB
 | Axiomatic Governance | Tier permissions and logical guardrails | `src/lib.rs` | governance ADR, axiomatic guards spec |
 | CRDT / Sync | Event reconciliation and collaborative state handling | `src/lib.rs` | collaborative sync and gossip specs |
 | Consensus | Proposal/vote/verification primitives | `src/lib.rs`, REST handlers if routed | neural consensus TDD |
+
+### GenesisRAG17 TEST integration component
+
+The GenesisRAG17 worker is an external adapter around the public native
+boundary, not a new GenesisBlockDB core subsystem. It owns one native store
+process and a worker-owned SQLite FTS5 lexical sidecar. MSP authenticates and
+relays pipeline messages; GKS remains the passive semantic and quality
+authority. The physical sequence is graph-only Stage 13 write and receipt,
+GKS Stage 14 enrichment, real Stage 15 embedding, Stage 16 index/readback,
+GKS Stage 17 gate, atomic worker publication and publication receipt.
+
+| Component | Responsibility | Source / Entry Points | Related Docs |
+|---|---|---|---|
+| GenesisRAG17 worker adapter | Native graph/vector/SQLite readback, worker FTS5, per-generation query, durable outboxes and atomic publication for the isolated TEST flow | `genesisrag17-worker/src/worker.mjs`, `genesisrag17-worker/src/index.mjs`, `genesisrag17-worker/src/msp-stdio.mjs` | `docs/ADR--GENESISRAG17-SEPARATE-WORKER-PUBLICATION.md`, `docs/FLOW--GENESISRAG17-PIPELINE.md`, `docs/GENESISRAG17-EXTENSION-MAP.md` |
+
+The native engine remains client-neutral and pinned for this integration to
+`e15e35b0093394e0a8880af7f4e6f63cf81223b7`. This container is TEST evidence;
+it does not grant the worker direct GKS, MSP database or Edge store access.
 
 ### REST API Components
 
@@ -261,6 +284,7 @@ These are local implementation contracts, not deployment or consumer migration e
 | 0.1.11b | 2026-09-08 | beta | Registered Wave A commit publication, preflight and recovery-required contracts with validation limits. | working-tree | ATHER |
 | 0.1.9b | 2026-08-14 | beta | Registered the accepted Typed Query IR boundary as planned, retained HQL compatibility, and kept NL interpretation outside the engine. | working-tree | ATHER |
 | 0.1.10b | 2026-08-14 | beta | Truth-synced partial Query IR search/traverse implementation across core, REST and N-API. | working-tree | ATHER |
+| 0.1.11b | 2026-09-08 | beta | Added the separate GenesisRAG17 TEST worker container, physical publication boundary and extension-map references without changing the neutral core. | working-tree | RWANG |
 | 0.1.8b | 2026-08-14 | beta | Added embedded opaque U9 backup/clean-target restore to the storage-model contract; REST/N-API lifecycle endpoints remain out of scope. | working-tree | ATHER |
 | 0.1.7b | 2026-07-22 | beta | Truth-synced Studio S1 read-only local/remote adapters, bounded core APIs and process ownership while retaining S2-S4 gates. | working-tree | ATHER |
 | 0.1.6b | 2026-07-21 | beta | Truth-synced the verified fixture-only Studio S0 shell while retaining S1+ API gaps. | working-tree | ATHER |

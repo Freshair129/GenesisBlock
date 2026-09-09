@@ -6,6 +6,14 @@ Cargo.lock
 # distributed via per-triple optional-deps packages — not committed)
 *.node
 npm-debug.log
+
+# Local dependency trees for the native checkout and the isolated TEST worker.
+/node_modules/
+/genesisrag17-worker/node_modules/
+/genesisrag17-worker/test-stores/
+/genesisrag17-worker/test-models/
+/genesisrag17-worker/logs/
+/genesisrag17-worker/.venv/
 # Audit/bench/test run logs (e.g. ga_b3_full.log) — never commit run logs
 *.log
 dashboard/playwright-report/
