@@ -50,7 +50,7 @@
     "prepublishOnly": "napi prepublish -t npm",
     "test": "node --test __test__/mcp.test.mjs __test__/sanity.test.mjs __test__/db.test.mjs __test__/query_ir.test.mjs",
     "version:get": "node scripts/version.mjs get",
-    "version:check": "node scripts/version.mjs check",
+    "version:check": "node scripts/version.mjs check && node scripts/version-doc-check.mjs",
     "version:set": "node scripts/version.mjs set",
     "version:bump": "node scripts/version.mjs bump",
     "update:check": "node scripts/check-update.mjs",
