@@ -1,0 +1,125 @@
+name: Python Distribution
+
+on:
+  pull_request:
+    paths:
+      - 'genesisdb-python/**'
+      - 'src/**'
+      - 'Cargo.toml'
+      - 'Cargo.lock'
+      - '.github/workflows/python-distribution.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  package:
+    name: wheel/sdist + clean install (Python ${{ matrix.python }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ['3.10', '3.11', '3.12', '3.13']
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+
+      - name: Build package
+        run: |
+          python -m pip install --upgrade pip build
+          python -m build genesisdb-python
+
+      - name: Install built wheel into clean environment
+        shell: bash
+        run: |
+          python -m venv "$RUNNER_TEMP/consumer"
+          source "$RUNNER_TEMP/consumer/bin/activate"
+          python -m pip install --upgrade pip
+          python -m pip install genesisdb-python/dist/*.whl
+          python - <<'PY'
+          from importlib.metadata import version
+          from genesisdb import GenesisClient
+          assert GenesisClient
+          print('installed distribution version:', version('genesisblockdb-client'))
+          PY
+
+      - name: Run unit tests against installed wheel
+        shell: bash
+        run: |
+          source "$RUNNER_TEMP/consumer/bin/activate"
+          python -m unittest discover -s genesisdb-python/tests -v
+
+  live-server-integration:
+    name: built wheel against live Rust server
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: python-sdk-live-server
+
+      - name: Build standalone server
+        run: cargo build --locked --release --no-default-features --features bins --bin genesis-db-server
+
+      - name: Build and install Python wheel
+        run: |
+          python -m pip install --upgrade pip build
+          python -m build genesisdb-python
+          python -m pip install genesisdb-python/dist/*.whl
+
+      - name: Start GenesisBlockDB
+        shell: bash
+        run: |
+          set -euo pipefail
+          DATA_DIR="$RUNNER_TEMP/genesis-python-integration"
+          mkdir -p "$DATA_DIR"
+          GENESIS_DATA_DIR="$DATA_DIR" \
+          GENESIS_HOST=127.0.0.1 \
+          GENESIS_PORT=3000 \
+          ./target/release/genesis-db-server >"$RUNNER_TEMP/genesis-server.log" 2>&1 &
+          echo $! >"$RUNNER_TEMP/genesis-server.pid"
+          for _ in $(seq 1 60); do
+            if curl -fsS http://127.0.0.1:3000/v1/status >/dev/null; then
+              exit 0
+            fi
+            sleep 1
+          done
+          cat "$RUNNER_TEMP/genesis-server.log"
+          exit 1
+
+      - name: Exercise installed client against live server
+        run: |
+          python - <<'PY'
+          from genesisdb import GenesisClient
+
+          client = GenesisClient('http://127.0.0.1:3000')
+          node = client.add_node(
+              labels=['PythonDistributionSmoke'],
+              id='python-distribution-smoke',
+              props={'source': 'wheel'},
+          )
+          assert node.id == 'python-distribution-smoke'
+          assert node.props['source'] == 'wheel'
+          print('live server round trip:', node.id)
+          PY
+
+      - name: Stop server gracefully
+        if: always()
+        shell: bash
+        run: |
+          if [ -f "$RUNNER_TEMP/genesis-server.pid" ]; then
+            kill -TERM "$(cat "$RUNNER_TEMP/genesis-server.pid")" || true
+            wait "$(cat "$RUNNER_TEMP/genesis-server.pid")" || true
+          fi
+          cat "$RUNNER_TEMP/genesis-server.log" 2>/dev/null || true

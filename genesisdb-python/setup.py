@@ -1,12 +1,5 @@
-from setuptools import setup, find_packages
+from setuptools import setup
 
-setup(
-    name="genesisdb",
-    version="0.1.0",
-    packages=find_packages(),
-    install_requires=[
-        "requests>=2.31.0",
-    ],
-    author="GKS Architects",
-    description="Python SDK for GenesisBlock Hybrid Semantic-Graph Engine",
-)
+# Compatibility shim for older tooling. Canonical package metadata lives in
+# pyproject.toml; do not duplicate version/name/dependencies here.
+setup()
