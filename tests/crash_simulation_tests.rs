@@ -98,7 +98,11 @@ fn install_active_only(path: &str, active_bytes: &[u8]) {
     let _ = fs::remove_file(Path::new(path).join("state.json"));
     let _ = fs::remove_file(Path::new(path).join("nodes.bin"));
     let _ = fs::remove_file(Path::new(path).join("edges.bin"));
-    for name in ["projection.sqlite", "projection.sqlite-wal", "projection.sqlite-shm"] {
+    for name in [
+        "projection.sqlite",
+        "projection.sqlite-wal",
+        "projection.sqlite-shm",
+    ] {
         let _ = fs::remove_file(Path::new(path).join(name));
     }
     let _ = fs::remove_dir_all(Path::new(path).join("journal"));
