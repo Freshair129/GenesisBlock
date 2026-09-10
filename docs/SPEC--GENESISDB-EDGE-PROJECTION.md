@@ -1,7 +1,7 @@
 ---
-version: "0.1.1"
+version: "0.1.2"
 created_at: "2026-08-30T21:00:00+07:00,Claude Opus 5,working-tree"
-last_update: "2026-09-08T03:25:41+07:00,ATHER"
+last_update: "2026-09-10T07:45:10+07:00,ATHER"
 status: accepted
 superseded_by: null
 attributes:
@@ -237,6 +237,16 @@ projection นี้มีไว้เพื่อ query — ตัดทิ้�
          JOIN node_labels  lo ON lo.node_u32 = e.to_u32   AND lo.label = 'CatalogOffer'
         GROUP BY m.id ORDER BY offers DESC LIMIT 10
 
+### 6.1 Snapshot lifetime invariant
+
+`projection_db` remains open for the lifetime of `Storage`. A checkpoint first
+flushes SQLite's WAL and copies the stable main file into the temporary snapshot;
+the temporary `projection.sqlite` is discarded during the swap. The live path is
+never renamed over an open connection, so Unix readers cannot pair a new main
+inode with an old `-wal`/`-shm` sidecar. `edge_projection_tests` exercises this
+invariant by writing after the initial snapshot and querying through a separate
+read-only connection on every CI operating system.
+
 ## 7. สิ่งที่ยังไม่ครอบคลุม
 
 - ไม่แตะ REST — เหมือนเดิม ผิวที่เข้าถึงจากเครือข่ายเป็นการตัดสินใจแยก
@@ -265,3 +275,4 @@ projection นี้มีไว้เพื่อ query — ตัดทิ้�
 | Date | Change |
 |---|---|
 | 2026-09-08 | Linked the approved journal-authoritative collection and complete edge-history extension. |
+| 2026-09-10 | Kept the live SQLite projection path stable across checkpoints after the Unix read-only inode split RCA. |

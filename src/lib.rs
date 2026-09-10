@@ -5610,12 +5610,15 @@ impl Storage {
         if target.exists() {
             let _ = fs::remove_file(target);
         }
-        let escaped = target.to_string_lossy().replace('\'', "''");
         let conn = self.projection_db.lock();
         conn.execute_batch("PRAGMA wal_checkpoint(FULL);")
             .map_err(|e| Error::from_reason(e.to_string()))?;
-        conn.execute_batch(&format!("VACUUM INTO '{}';", escaped))
-            .map_err(|e| Error::from_reason(e.to_string()))?;
+        // The live connection stays open for the lifetime of `Storage`. Copy
+        // the checkpointed main file instead of creating a replacement with
+        // `VACUUM INTO`: swapping that replacement over `projection.sqlite`
+        // would leave Unix writers on an unlinked inode while new readers open
+        // the replacement alongside the old `-wal`/`-shm` sidecars.
+        fs::copy(&self.projection_path, target).map_err(|e| Error::from_reason(e.to_string()))?;
         Ok(())
     }
 
@@ -12499,6 +12502,15 @@ impl Storage {
             for entry in entries.flatten() {
                 let p = entry.path();
                 if p.file_name().is_some_and(|n| n == "state.json") {
+                    continue;
+                }
+                if p.file_name().is_some_and(|n| n == PROJECTION_DB_FILE) {
+                    // `projection_db` remains open for the Storage lifetime;
+                    // replacing its path would split Unix readers and writers
+                    // across inodes. `projection_snapshot` already copied the
+                    // checkpointed live file, so discard the temporary copy and
+                    // keep the live path stable.
+                    let _ = fs::remove_file(&p);
                     continue;
                 }
                 if let Some(name) = p.file_name() {
