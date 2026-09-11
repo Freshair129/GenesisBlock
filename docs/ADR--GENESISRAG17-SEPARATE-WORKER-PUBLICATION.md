@@ -398,6 +398,16 @@ already resolves it. It does not by itself confirm GKS's own expectation
 ("an object for every fact" at GKS `core:410`) — that is a GKS-side
 question, out of scope for this worker-side note.
 
+**Cross-repository consequence (contract item C-10).** GKS expects
+`facts.length` bitemporal objects for any generation that is not entirely
+`not_applicable` (GKS `packages/gks-core/src/pipeline.mjs:404-410`), while
+this worker reports only its `mapped` rows. A mixed generation therefore
+passes here but fails GKS's Stage 17 lane-count comparison (GKS
+`pipeline.mjs:528`). The structured-record profile avoids it, because every
+catalog batch is uniformly dated or uniformly undated (C-5). The fix is
+GKS-side and ships separately; the worker keeps its mapped-only count, and
+its mixed-generation test (C-8) pins that behaviour.
+
 ### Summary
 
 The worker accepts: Option A for tier-qualified pricing; the C-2 vocabulary
