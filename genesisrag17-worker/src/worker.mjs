@@ -22,6 +22,34 @@ export const MODEL_DIMENSIONS = 384;
 export const MODEL_METRIC = 'cosine';
 const VECTOR_COLLECTION_PREFIX = 'genesisrag17_e5_';
 
+/**
+ * Supported ontology versions (ADR-075 Phase 2, contract revision 2, C-3).
+ * The worker is rollout step 1: it accepts both versions before GKS ever
+ * produces ontology_v2. A version outside this set still fails
+ * DECISION_VERSION_INVALID.
+ */
+export const SUPPORTED_ONTOLOGY_VERSIONS = ['ontology_v1', 'ontology_v2'];
+
+/**
+ * One predicate -> {subject kinds, object kinds} table per ontology version
+ * (contract revision 2, C-2/D.1). ontology_v2 is a strict superset of
+ * ontology_v1; v1 behavior is byte-for-byte unchanged. Selected by the
+ * decision's own ontologyVersion, never mixed across versions.
+ */
+const ONTOLOGY_TABLES = {
+  ontology_v1: {
+    WORKS_FOR: { subjects: ['Person'], objects: ['Organization'] },
+    PURCHASED: { subjects: ['Person', 'Organization'], objects: ['Product'] },
+  },
+  ontology_v2: {
+    WORKS_FOR: { subjects: ['Person'], objects: ['Organization'] },
+    PURCHASED: { subjects: ['Person', 'Organization'], objects: ['Product'] },
+    HAS_COMPONENT: { subjects: ['Package'], objects: ['Product'] },
+    PRICED_AT: { subjects: ['Product', 'Package'], objects: ['PriceTier'] },
+    IN_CATEGORY: { subjects: ['Product', 'Package'], objects: ['Category'] },
+  },
+};
+
 const SCOPE_KEYS = ['portfolioId', 'tenantId', 'businessId', 'workspaceId', 'agentId', 'visibility'];
 const STAGE_CATALOG_ENTRIES = [
   [9, 'DPS-KI-ENTITY-RESOLVE', 90],
@@ -277,7 +305,7 @@ export function validateDecision(decision, expectedScope = undefined) {
   validateScope(decision.scope, expectedScope);
   validateStages(decision.stages, decision.runId);
   validatePolicy(decision.policy);
-  if (decision.ontologyVersion !== 'ontology_v1' || decision.pipelineVersion !== SCHEMA_VERSION) fail('DECISION_VERSION_INVALID');
+  if (!SUPPORTED_ONTOLOGY_VERSIONS.includes(decision.ontologyVersion) || decision.pipelineVersion !== SCHEMA_VERSION) fail('DECISION_VERSION_INVALID');
   const hashable = { ...decision };
   delete hashable.decisionHash;
   if (hashObject(hashable) !== decision.decisionHash) fail('DECISION_HASH_MISMATCH');
@@ -291,18 +319,18 @@ export function validateDecision(decision, expectedScope = undefined) {
       || typeof entity.semanticType !== 'string' || !Array.isArray(entity.mentions)) fail('ENTITY_INVALID');
     entityById.set(entity.id, entity);
   }
+  const ontologyTable = ONTOLOGY_TABLES[decision.ontologyVersion];
   const validateFact = (row) => {
     if (!isPlainObject(row) || typeof (row.id ?? row.factId) !== 'string' || typeof row.predicate !== 'string') fail('FACT_INVALID');
-    if (!['WORKS_FOR', 'PURCHASED'].includes(row.predicate)) fail('FACT_PREDICATE_NONCANONICAL', row.predicate);
+    const rule = ontologyTable[row.predicate];
+    if (!rule) fail('FACT_PREDICATE_NONCANONICAL', row.predicate);
     const refs = sourceRefsOf(row);
     if (!chunkById.has(refs.chunkId)) fail('FACT_CHUNK_MISSING', row.id ?? row.factId);
     if (row.subjectId !== undefined && !entityById.has(row.subjectId)) fail('FACT_SUBJECT_MISSING', row.id ?? row.factId);
     if (row.objectId !== undefined && !entityById.has(row.objectId)) fail('FACT_OBJECT_MISSING', row.id ?? row.factId);
     const subject = entityById.get(row.subjectId);
     const object = entityById.get(row.objectId);
-    const endpointsValid = row.predicate === 'WORKS_FOR'
-      ? entityKind(subject) === 'Person' && entityKind(object) === 'Organization'
-      : ['Person', 'Organization'].includes(entityKind(subject)) && entityKind(object) === 'Product';
+    const endpointsValid = rule.subjects.includes(entityKind(subject)) && rule.objects.includes(entityKind(object));
     if (!endpointsValid) fail('FACT_ENDPOINT_INVALID', row.id ?? row.factId);
     if (row.confidence !== undefined && (!Number.isFinite(row.confidence) || row.confidence < 0 || row.confidence > 1)) fail('FACT_CONFIDENCE_INVALID');
     if (Number(row.confidence ?? 0) < 0.8) fail('FACT_CONFIDENCE_BELOW_WRITE_FLOOR', row.id ?? row.factId);
@@ -760,6 +788,9 @@ function entityKind(entity) {
   if (type === 'person') return 'Person';
   if (type === 'organization' || type === 'company') return 'Organization';
   if (type === 'product') return 'Product';
+  if (type === 'package') return 'Package';
+  if (type === 'category') return 'Category';
+  if (type === 'price_tier' || type === 'pricetier') return 'PriceTier';
   return entity?.semanticType ?? '';
 }
 
@@ -1145,6 +1176,7 @@ export class GenesisRag17Worker {
       }
     }
 
+    const ontologyTable = ONTOLOGY_TABLES[decision.ontologyVersion];
     const quarantinedFacts = decision.held.length;
     const acceptedFacts = [];
     for (const fact of decision.facts) {
@@ -1153,11 +1185,8 @@ export class GenesisRag17Worker {
       const confidence = Number(fact.confidence ?? 0);
       const subject = entityById.get(fact.subjectId);
       const object = fact.objectId === undefined ? undefined : entityById.get(fact.objectId);
-      const validEndpoints = predicate === 'WORKS_FOR'
-        ? entityKind(subject) === 'Person' && entityKind(object) === 'Organization'
-        : predicate === 'PURCHASED'
-          ? ['Person', 'Organization'].includes(entityKind(subject)) && entityKind(object) === 'Product'
-          : false;
+      const rule = predicate ? ontologyTable[predicate] : undefined;
+      const validEndpoints = Boolean(rule) && rule.subjects.includes(entityKind(subject)) && rule.objects.includes(entityKind(object));
       if (!predicate || confidence < 0.8 || !validEndpoints) fail('FACT_ENDPOINT_INVALID', factId);
       acceptedFacts.push(fact);
       const refs = sourceRefsOf(fact);
