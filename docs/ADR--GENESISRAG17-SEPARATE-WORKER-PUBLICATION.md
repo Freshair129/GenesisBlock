@@ -2,8 +2,8 @@
 title: "ADR: GenesisRAG17 separate worker and atomic publication"
 doc_id: "ADR-GENESISRAG17-SEPARATE-WORKER-PUBLICATION"
 status: beta
-version: "1.0.3b"
-updated: "2026-09-08"
+version: "1.0.4b"
+updated: "2026-09-11"
 owner: "GenesisBlockDB Architecture"
 source_of_truth: true
 attributes:
@@ -246,6 +246,180 @@ unchanged.
   lanes or model revisions require an additive contract/ADR and new evidence;
   they are not silent worker configuration changes.
 
+## Accepted extension — structured-record profile, contract revision 2 (2026-09-11)
+
+**This is a docs-only acceptance note. No worker code changes accompany it.**
+It records the GenesisBlock worker owner's acceptance of contract revision 2
+of the GenesisRAG17 structured-record ingestion profile (the SmartGift
+catalog use case), one of the four acceptance notes required before Phase 2
+implementation may begin (source of truth: the owner decision record dated
+2026-09-11, `phase2-contract-decisions.md`, itself built on the proposal at
+`zuri.ai:.brain/proposals/2026-09-11-genesisrag17-structured-record-profile.md`,
+branch `docs/adr-075-phase2-gate`). The facts below were re-verified against
+this repository's `origin/main` at `5dc75ff522ee4cc06961fb239afb1c20976d7e7a`
+before this note was written.
+
+### Qualifier shape: Option A accepted, Option B deferred
+
+The owner chose **Option A** — a tier-qualified price is represented as a
+distinct entity (`PRICE_TIER`, resolutionKey `{productCode}:{tier}:{price}`,
+e.g. `PM-BOTTLE-LED:qty100:<satang>`), not as a new field. This keeps the
+`facts[]`/`graph.edges[]` object shape the worker already validates
+byte-for-byte unchanged — no new key crosses the Stage 13 claim boundary for
+pricing.
+
+**Option B** (an optional `qualifiers: Record<string,string>` field on
+facts/edges) is **deferred as a future option, not rejected**. Adopting it
+later changes the frozen decision shape and every `decisionHash` input, so it
+needs its own contract revision and its own four-repo gate — accepting it
+now, bundled with this revision, is explicitly out of scope for this note.
+
+### C-2 vocabulary and the shared predicate → endpoint table
+
+`ontology_v2` is a **superset** of `ontology_v1`. The worker and GKS must
+carry the *same* table content — this worker currently encodes the table as
+two independent hard-coded ternaries (see below) plus an independent
+predicate allowlist, none of which is table-driven:
+
+| Predicate | Subject | Object | Status |
+|---|---|---|---|
+| `WORKS_FOR` | `PERSON` | `ORGANIZATION` | unchanged from v1 |
+| `PURCHASED` | `PERSON` or `ORGANIZATION` | `PRODUCT` | unchanged from v1 |
+| `HAS_COMPONENT` | `PACKAGE` | `PRODUCT` | new |
+| `PRICED_AT` | `PRODUCT` or `PACKAGE` | `PRICE_TIER` | new (Option A) |
+| `IN_CATEGORY` | `PRODUCT` or `PACKAGE` | `CATEGORY` | new |
+
+`PACKAGED_AS` (the reverse of `HAS_COMPONENT`) and `OFFER` (no predicate uses
+it; SmartGift `BundleOffer` records map to `PACKAGE`) are **not** in v2.
+Endpoint types in v2: `PERSON`, `ORGANIZATION`, `PRODUCT`, `PACKAGE`,
+`CATEGORY`, `PRICE_TIER`.
+
+### Supported-version set and accept-before-produce rollout
+
+The worker's Stage 13 claim check and GKS's Stage 17 gate both move from
+accepting the single literal `'ontology_v1'` to accepting the fixed set
+`{ontology_v1, ontology_v2}`, each decision validated against the table for
+its own version. Rollout is strictly ordered and **the worker is step 1**:
+
+1. the worker accepts both versions (this repository's change);
+2. GKS accepts both and starts producing `ontology_v2`;
+3. zuri-ai starts sending parser-2 catalog batches.
+
+The worker must ship its accept-both change before GKS is allowed to produce
+a single `ontology_v2` decision — a worker that still hard-rejects anything
+but `ontology_v1` would fail every such decision at the Stage 13 claim, not
+at Stage 17, which is a worse failure mode (a claimed-but-unwritable
+decision) than declining to claim it at all.
+
+### C-9 required worker implementation, with verified anchors
+
+Re-verified by direct reading at `origin/main` `5dc75ff`, not by memory of
+the earlier review:
+
+| Change | File : line(s) | Current behavior |
+|---|---|---|
+| Version check → supported set | `genesisrag17-worker/src/worker.mjs:280` | `if (decision.ontologyVersion !== 'ontology_v1' \|\| decision.pipelineVersion !== SCHEMA_VERSION) fail('DECISION_VERSION_INVALID');` — the only reference to `ontologyVersion` in the file |
+| `validateFact` endpoint ternary → shared table | `genesisrag17-worker/src/worker.mjs:303-305` | `const endpointsValid = row.predicate === 'WORKS_FOR' ? entityKind(subject)==='Person' && entityKind(object)==='Organization' : ['Person','Organization'].includes(entityKind(subject)) && entityKind(object)==='Product';` |
+| Graph-build endpoint ternary → shared table | `genesisrag17-worker/src/worker.mjs:1156-1160` | The same two-branch shape, duplicated independently in the Stage 13 graph-build loop (`validEndpoints = predicate === 'WORKS_FOR' ? … : predicate === 'PURCHASED' ? … : false`) |
+| `entityKind()` gains package/category/price_tier | `genesisrag17-worker/src/worker.mjs:758-763` | Recognizes only `person` → `Person`, `organization`/`company` → `Organization`, `product` → `Product`; anything else passes through as the raw `semanticType` string |
+| Test fixtures | `genesisrag17-worker/test/worker.test.mjs` (1090 lines) | No `ontology_v2` fixtures exist yet |
+
+**One additional hard-coded gate found during re-verification, not named in
+the C-9 list above and needing the same table-driven fix:** `validateFact`
+also carries an independent predicate allowlist at
+`genesisrag17-worker/src/worker.mjs:296` —
+`if (!['WORKS_FOR', 'PURCHASED'].includes(row.predicate)) fail('FACT_PREDICATE_NONCANONICAL', row.predicate);`
+— which runs *before* the endpoint ternary and would reject
+`HAS_COMPONENT`/`PRICED_AT`/`IN_CATEGORY` outright regardless of endpoint
+types. Implementation must extend this allowlist (or replace it with a
+lookup against the same shared table) alongside the two ternaries; fixing
+only the ternaries and missing this check would leave `ontology_v2` facts
+failing with `FACT_PREDICATE_NONCANONICAL` instead of succeeding.
+
+Confirmed **unaffected** by this profile, so no change is required at those
+points: `generation` keying (`worker.mjs:1059`, `:1912` —
+`` `g17-${hashObject({decisionId, decisionHash}).slice(0,32)}` ``, no
+`ontologyVersion` input) and snapshot/pointer keying, both version-agnostic;
+Stage 14 enrichment and Stage 15/16 embedding/indexing, both driven by
+generic counts and chunk text with no `semanticType`/predicate branch (the
+only four `semanticType` reads in the file are the two `typeof` validation
+checks, `entityKind()` itself, and generic property pass-through into node
+storage).
+
+### Worker tests required (C-8)
+
+Per the contract-decision list, `genesisrag17-worker/test/worker.test.mjs`
+needs, in addition to existing coverage: `ontology_v2` decisions exercising
+each new predicate/endpoint-type pair (including a `PRICE_TIER` object for
+`PRICED_AT`); a `ontology_v1` decision still accepted unchanged (regression);
+and the mixed-temporal bitemporal case described below. None of these tests
+are added by this PR — this note only records that they are required before
+Phase 2 implementation lands.
+
+### Open verification item — the bitemporal lane on a mixed generation
+
+The contract-decision list carries this open item: "the bitemporal lane must
+handle a generation mixing dated facts and `not_applicable` facts (GKS
+core:410 expects an object for every fact)." Read-only finding from
+`verifyTemporalLane()` and its helpers at `origin/main` `5dc75ff`
+(`genesisrag17-worker/src/worker.mjs:1464-1469` for `temporalRows`,
+`:1471-1531` for `verifyTemporalLane`, feeding `laneManifest()`'s
+`bitemporal` entry at `:1557-1561`):
+
+- `temporalRows(decision)` (`:1464-1469`) collects every `fact` and `held`
+  row into one list — it does not separate dated from `not_applicable` rows
+  up front.
+- `temporalClassification()` (`:243-260`) classifies each row independently
+  as `mapped`, `not_applicable`, or `unsupported`, based only on that row's
+  own `temporal` field.
+- `verifyTemporalLane()` then **filters to the `mapped` subset** (`:1480`)
+  and runs the real native Query IR temporal readback (`executeQueryIr`,
+  `:1506-1524`) only against those rows; `not_applicable` rows are excluded
+  from that readback and from the reported `objects` count (`:1530`,
+  `objects: mapped.length`) but do **not** cause the lane to fail.
+- The lane fails (`status: 'unsupported'`) only if a row's classification is
+  itself `unsupported`, or a `mapped` row is missing a parseable
+  `validFrom`, or the native readback disagrees with expected visibility for
+  a `mapped` row. A generation that is a genuine mix of dated and
+  `not_applicable` facts — the case this open item asks about — hits none of
+  those conditions on the `not_applicable` side: those rows are silently
+  excluded from readback, not treated as an error.
+
+**Finding: the worker already handles a mixed generation without failing or
+crashing.** The bitemporal lane reaches `ready` based solely on the dated
+(`mapped`) subset; `not_applicable` facts in the same generation are
+correctly excluded from the lane's `objects` count and from native temporal
+verification, consistent with ADR §5's description of `not_applicable` as
+valid "only when the input has no applicable valid-time assertion" — here
+that test is applied per-row rather than per-generation, which is what makes
+the mix safe. This is a read-only observation; it required no code to
+satisfy the open item, only reading how the existing per-row classification
+already resolves it. It does not by itself confirm GKS's own expectation
+("an object for every fact" at GKS `core:410`) — that is a GKS-side
+question, out of scope for this worker-side note.
+
+**Cross-repository consequence (contract item C-10).** GKS expects
+`facts.length` bitemporal objects for any generation that is not entirely
+`not_applicable` (GKS `packages/gks-core/src/pipeline.mjs:404-410`), while
+this worker reports only its `mapped` rows. A mixed generation therefore
+passes here but fails GKS's Stage 17 lane-count comparison (GKS
+`pipeline.mjs:528`). The structured-record profile avoids it, because every
+catalog batch is uniformly dated or uniformly undated (C-5). The fix is
+GKS-side and ships separately; the worker keeps its mapped-only count, and
+its mixed-generation test (C-8) pins that behaviour.
+
+### Summary
+
+The worker accepts: Option A for tier-qualified pricing; the C-2 vocabulary
+and shared predicate→endpoint table; the supported-version set
+`{ontology_v1, ontology_v2}` with worker-first accept-before-produce
+rollout; the C-9 implementation list above (plus the one additional
+`FACT_PREDICATE_NONCANONICAL` gate found during re-verification); and the
+C-8 test obligations. **No worker code changes accompany this PR** — this is
+acceptance of the contract, to be implemented in a follow-up change once all
+four repositories' acceptance notes are merged per the ADR-075 Phase 2 gate
+rule.
+
 ## Verification evidence
 
 The worker setup, exact model artifact manifest, runtime variables, lifecycle,
@@ -259,6 +433,7 @@ its explicit non-production limits.
 
 | Version | Date | Status | Summary | Commit Hash | Agent |
 |---|---|---|---|---|---|
+| 1.0.4b | 2026-09-11 | beta | Docs-only acceptance of GenesisRAG17 structured-record profile contract revision 2 (ADR-075 Phase 2 gate): Option A tier-qualified pricing, the C-2 predicate/endpoint table, the {ontology_v1, ontology_v2} supported-version set with worker-first accept-before-produce rollout, the C-9 worker implementation list with verified file:line anchors (plus one additional FACT_PREDICATE_NONCANONICAL gate found on re-verification), the C-8 worker tests required, and a read-only finding that the bitemporal lane already handles a mixed dated/not_applicable generation. No worker code changed. | working-tree | Claude Opus 5 |
 | 1.0.2b | 2026-09-08 | beta | Reconciled the live zuri GenesisRAG17 architecture reference to ADR-071 after the identifier collision; retained the pinned historical acceptance report. | working-tree | RWANG |
 | 1.0.1b | 2026-09-08 | beta | Synced audit remediation: exact pre-commit native intents and collection checkpoint recovery, accepted graph-state ordering, Stage 16 lexical indexing, PASS-only publication and no-fallback pointer replacement. | working-tree | RWANG |
 | 1.0.0b | 2026-09-08 | beta | Recorded the separate TEST worker, MSP-only relay, ordered physical execution, six-lane evidence and receipt-bound atomic publication. | working-tree | RWANG |
