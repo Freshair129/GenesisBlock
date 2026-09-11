@@ -2,7 +2,7 @@
 title: "ADR: GenesisRAG17 separate worker and atomic publication"
 doc_id: "ADR-GENESISRAG17-SEPARATE-WORKER-PUBLICATION"
 status: beta
-version: "1.0.4b"
+version: "1.0.5b"
 updated: "2026-09-11"
 owner: "GenesisBlockDB Architecture"
 source_of_truth: true
@@ -420,6 +420,37 @@ acceptance of the contract, to be implemented in a follow-up change once all
 four repositories' acceptance notes are merged per the ADR-075 Phase 2 gate
 rule.
 
+### Implemented (rollout step 1)
+
+`genesisrag17-worker/src/worker.mjs` now implements the C-9 list above:
+
+- the Stage 13 version check accepts the fixed set `{ontology_v1,
+  ontology_v2}` (`SUPPORTED_ONTOLOGY_VERSIONS`), rejecting anything else as
+  `DECISION_VERSION_INVALID`;
+- the predicate allowlist and both endpoint ternaries (`validateFact` and the
+  Stage 13 graph-build loop) are replaced by one `ONTOLOGY_TABLES` map
+  selected by the decision's own `ontologyVersion`, so `ontology_v1`
+  behavior is byte-for-byte unchanged and `ontology_v2` additionally accepts
+  `HAS_COMPONENT`, `PRICED_AT` and `IN_CATEGORY` with the C-2 endpoint types;
+- `entityKind()` gains case-insensitive `package`/`category`/`price_tier`
+  (and `pricetier`) mappings to `Package`/`Category`/`PriceTier`;
+- the bitemporal lane's mapped-only `objects` count (§ "Open verification
+  item" above) is unchanged, as the read-only finding already established it
+  should be.
+
+`genesisrag17-worker/test/worker.test.mjs` adds: an `ontology_v2` decision
+exercising every new predicate/endpoint type through a real Stage 13 native
+graph write; an `ontology_v1` regression; a v2-only predicate inside a v1
+decision failing `FACT_PREDICATE_NONCANONICAL`; a reversed-endpoint v2 fact
+failing `FACT_ENDPOINT_INVALID`; an unsupported version failing
+`DECISION_VERSION_INVALID`; and the C-10 mixed dated/`not_applicable`
+generation, pinning that the bitemporal lane's `objects` count equals the
+mapped count, not `facts.length`.
+
+Per the ordering in "Supported-version set and accept-before-produce
+rollout" above, this is rollout step 1: it must merge before GKS ships the
+change that starts producing `ontology_v2` decisions.
+
 ## Verification evidence
 
 The worker setup, exact model artifact manifest, runtime variables, lifecycle,
@@ -433,6 +464,7 @@ its explicit non-production limits.
 
 | Version | Date | Status | Summary | Commit Hash | Agent |
 |---|---|---|---|---|---|
+| 1.0.5b | 2026-09-11 | beta | implemented: accepts {ontology_v1, ontology_v2}. Stage 13 version check moved to the fixed supported-version set; the predicate allowlist and both endpoint ternaries (`validateFact`, Stage 13 graph-build) replaced by one shared `ONTOLOGY_TABLES` map keyed by `ontologyVersion`; `entityKind()` gained case-insensitive package/category/price_tier mappings; the bitemporal mapped-only lane count kept unchanged. Rollout step 1 of the ADR-075 Phase 2 contract revision 2 accept-before-produce sequence — must merge before GKS starts producing ontology_v2. Six new worker.mjs tests added (ontology_v2 acceptance, v1 regression, v2-predicate-in-v1 rejection, reversed-endpoint rejection, unsupported-version rejection, C-10 mixed-generation lane count); full suite 20/20 passing. | working-tree | Claude Opus 5 |
 | 1.0.4b | 2026-09-11 | beta | Docs-only acceptance of GenesisRAG17 structured-record profile contract revision 2 (ADR-075 Phase 2 gate): Option A tier-qualified pricing, the C-2 predicate/endpoint table, the {ontology_v1, ontology_v2} supported-version set with worker-first accept-before-produce rollout, the C-9 worker implementation list with verified file:line anchors (plus one additional FACT_PREDICATE_NONCANONICAL gate found on re-verification), the C-8 worker tests required, and a read-only finding that the bitemporal lane already handles a mixed dated/not_applicable generation. No worker code changed. | working-tree | Claude Opus 5 |
 | 1.0.2b | 2026-09-08 | beta | Reconciled the live zuri GenesisRAG17 architecture reference to ADR-071 after the identifier collision; retained the pinned historical acceptance report. | working-tree | RWANG |
 | 1.0.1b | 2026-09-08 | beta | Synced audit remediation: exact pre-commit native intents and collection checkpoint recovery, accepted graph-state ordering, Stage 16 lexical indexing, PASS-only publication and no-fallback pointer replacement. | working-tree | RWANG |

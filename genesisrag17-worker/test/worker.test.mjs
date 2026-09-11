@@ -173,6 +173,98 @@ function makeSingleChunkDecision({
   return decision;
 }
 
+/**
+ * ADR-075 Phase 2 (contract revision 2): a decision exercising every
+ * ontology_v2 predicate and every new endpoint type (Package, Category,
+ * PriceTier) alongside the unchanged v1 predicates. Mirrors makeDecision()'s
+ * offset/mention/fact construction, extended to the C-2 vocabulary.
+ */
+function makeOntologyV2Decision() {
+  const segments = [
+    { chunkId: 'chunk-1', text: 'Alice works for Acme Ltd.' },
+    { chunkId: 'chunk-2', text: 'Bob purchased Nimbus.' },
+    { chunkId: 'chunk-3', text: 'BundleX contains Nimbus.' },
+    { chunkId: 'chunk-4', text: 'Nimbus priced at Tier100.' },
+    { chunkId: 'chunk-5', text: 'Nimbus in category Drinkware.' },
+  ];
+  let cursor = 0;
+  const chunks = segments.map(({ chunkId, text }, ordinal) => {
+    const startOffset = cursor;
+    cursor += text.length;
+    return { chunkId, parsedArtifactId: 'parsed-v2', ordinal, text, contentHash: hashText(text), startOffset, endOffset: cursor };
+  });
+  const content = segments.map((segment) => segment.text).join('');
+  const source = {
+    sourceId: 'source-v2', rawArtifactId: 'raw-v2', parsedArtifactId: 'parsed-v2',
+    documentId: 'doc-v2', version: '1', content, contentHash: hashText(content),
+  };
+  const mentionSpec = (sourceMentionId, resolutionKey, semanticType, name, chunkId) => {
+    const chunk = chunks.find((candidate) => candidate.chunkId === chunkId);
+    const startOffset = chunk.text.indexOf(name);
+    return { sourceMentionId, resolutionKey, semanticType, name, chunkId, startOffset, endOffset: startOffset + name.length };
+  };
+  const mentions = [
+    mentionSpec('mention-alice', 'person:alice', 'Person', 'Alice', 'chunk-1'),
+    mentionSpec('mention-acme', 'org:acme', 'Organization', 'Acme', 'chunk-1'),
+    mentionSpec('mention-bob', 'person:bob', 'Person', 'Bob', 'chunk-2'),
+    mentionSpec('mention-nimbus-2', 'product:nimbus', 'Product', 'Nimbus', 'chunk-2'),
+    mentionSpec('mention-bundlex', 'package:bundlex', 'PACKAGE', 'BundleX', 'chunk-3'),
+    mentionSpec('mention-nimbus-3', 'product:nimbus', 'Product', 'Nimbus', 'chunk-3'),
+    mentionSpec('mention-nimbus-4', 'product:nimbus', 'Product', 'Nimbus', 'chunk-4'),
+    mentionSpec('mention-tier100', 'PM-NIMBUS:qty100:100000', 'PRICE_TIER', 'Tier100', 'chunk-4'),
+    mentionSpec('mention-nimbus-5', 'product:nimbus', 'Product', 'Nimbus', 'chunk-5'),
+    mentionSpec('mention-drinkware', 'category:drinkware', 'CATEGORY', 'Drinkware', 'chunk-5'),
+  ];
+  const refsFor = (chunkId, sourceMentionIds) => ({
+    sourceId: source.sourceId, rawArtifactId: source.rawArtifactId, parsedArtifactId: source.parsedArtifactId,
+    chunkId, sourceMentionIds,
+  });
+  const notApplicable = { validFrom: 'not_applicable', validTo: 'not_applicable', txFrom: '2026-09-11T00:00:00.000Z', txTo: 'open' };
+  const runId = 'run-v2-1';
+  const decision = {
+    schemaVersion: SCHEMA_VERSION,
+    decisionId: 'decision-v2-1',
+    batchId: 'batch-v2-1',
+    scope,
+    runId,
+    stages: stages(runId),
+    source,
+    chunks,
+    mentions,
+    entities: [
+      { id: 'person-alice', name: 'Alice', semanticType: 'Person', mentions: ['mention-alice'] },
+      { id: 'org-acme', name: 'Acme Ltd.', semanticType: 'Organization', mentions: ['mention-acme'] },
+      { id: 'person-bob', name: 'Bob', semanticType: 'Person', mentions: ['mention-bob'] },
+      { id: 'product-nimbus', name: 'Nimbus', semanticType: 'Product', mentions: ['mention-nimbus-2', 'mention-nimbus-3', 'mention-nimbus-4', 'mention-nimbus-5'] },
+      // Case-insensitive semanticType matching (like the existing entries): PACKAGE/CATEGORY/PRICE_TIER.
+      { id: 'package-bundlex', name: 'BundleX', semanticType: 'PACKAGE', mentions: ['mention-bundlex'] },
+      { id: 'pricetier-100', name: 'Tier100', semanticType: 'PRICE_TIER', mentions: ['mention-tier100'] },
+      { id: 'category-drinkware', name: 'Drinkware', semanticType: 'CATEGORY', mentions: ['mention-drinkware'] },
+    ],
+    facts: [
+      { id: 'fact-works', subjectId: 'person-alice', predicate: 'WORKS_FOR', objectId: 'org-acme', confidence: 0.9, sourceReferences: refsFor('chunk-1', ['mention-alice', 'mention-acme']), temporal: notApplicable },
+      { id: 'fact-purchased', subjectId: 'person-bob', predicate: 'PURCHASED', objectId: 'product-nimbus', confidence: 0.9, sourceReferences: refsFor('chunk-2', ['mention-bob', 'mention-nimbus-2']), temporal: notApplicable },
+      { id: 'fact-component', subjectId: 'package-bundlex', predicate: 'HAS_COMPONENT', objectId: 'product-nimbus', confidence: 0.9, sourceReferences: refsFor('chunk-3', ['mention-bundlex', 'mention-nimbus-3']), temporal: notApplicable },
+      { id: 'fact-priced', subjectId: 'product-nimbus', predicate: 'PRICED_AT', objectId: 'pricetier-100', confidence: 0.9, sourceReferences: refsFor('chunk-4', ['mention-nimbus-4', 'mention-tier100']), temporal: notApplicable },
+      { id: 'fact-category', subjectId: 'product-nimbus', predicate: 'IN_CATEGORY', objectId: 'category-drinkware', confidence: 0.9, sourceReferences: refsFor('chunk-5', ['mention-nimbus-5', 'mention-drinkware']), temporal: notApplicable },
+    ],
+    held: [],
+    derived: [],
+    policy: { allowEmbedding: true, allowPublication: true },
+    ontologyVersion: 'ontology_v2',
+    pipelineVersion: SCHEMA_VERSION,
+  };
+  decision.decisionHash = hashObject(decision);
+  return decision;
+}
+
+function rehash(decision) {
+  const hashable = { ...decision };
+  delete hashable.decisionHash;
+  decision.decisionHash = hashObject(hashable);
+  return decision;
+}
+
 test('worker verifies pinned model artifacts and performs native publish/query', modelTestOptions, async () => {
   const artifactHashes = verifyModelArtifacts(modelDir);
   assert.equal(artifactHashes['onnx/model.onnx'], 'ca456c06b3a9505ddfd9131408916dd79290368331e7d76bb621f1cba6bc8665');
@@ -1083,6 +1175,114 @@ test('worker keeps explicit unmapped temporal status unsupported while accepting
     const unmapped = await worker.verifyTemporalLane(candidate, decision);
     assert.equal(unmapped.status, 'unsupported');
     assert.equal(unmapped.reason, 'temporal_mapping_missing_valid_from');
+  } finally {
+    await worker.close();
+    try { fs.rmSync(root, { recursive: true, force: true }); } catch { /* test directory is disposable. */ }
+  }
+});
+
+// ---------------------------------------------------------------------------
+// ADR-075 Phase 2 (contract revision 2): worker accepts {ontology_v1, ontology_v2}
+// ---------------------------------------------------------------------------
+
+test('worker Stage13 accepts an ontology_v2 decision exercising each new predicate and endpoint type', async () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'genesisrag17-ontology-v2-'));
+  const dbPath = path.join(root, 'db');
+  const worker = GenesisRag17Worker.create(workerOptions(dbPath, async () => ({ decisions: [] })));
+  try {
+    const decision = makeOntologyV2Decision();
+    const validated = validateDecision(decision, scope);
+    assert.equal(validated.decision.ontologyVersion, 'ontology_v2');
+    assert.equal(validated.decision.facts.length, 5);
+
+    const candidate = worker.buildPhysicalCandidate(decision, validated, []);
+    // entityKind() must map the new semanticType values case-insensitively.
+    const nodeFor = (entityId) => candidate.nodes.find((node) => node.props.entityId === entityId);
+    assert.deepEqual(nodeFor('package-bundlex').labels, ['Entity', 'Package']);
+    assert.deepEqual(nodeFor('pricetier-100').labels, ['Entity', 'PriceTier']);
+    assert.deepEqual(nodeFor('category-drinkware').labels, ['Entity', 'Category']);
+    // All five facts (2 unchanged v1 predicates + 3 new v2 predicates) built without FACT_ENDPOINT_INVALID.
+    const acceptedFactIds = candidate.nodes
+      .filter((node) => node.props.objectType === 'fact')
+      .map((node) => node.props.factId)
+      .sort();
+    assert.deepEqual(acceptedFactIds, ['fact-category', 'fact-component', 'fact-priced', 'fact-purchased', 'fact-works']);
+
+    // Real native Stage13 physical write, not just candidate construction.
+    const committed = await worker.commitCandidate(decision, candidate, 'graph');
+    assert.ok(committed.id);
+    assert.match(committed.frontier, /^\d+$/, 'a real native commit returns a numeric frontier string');
+  } finally {
+    await worker.close();
+    try { fs.rmSync(root, { recursive: true, force: true }); } catch { /* test directory is disposable. */ }
+  }
+});
+
+test('worker Stage13 still accepts an ontology_v1 decision unchanged (regression)', () => {
+  const decision = makeDecision();
+  assert.equal(decision.ontologyVersion, 'ontology_v1');
+  const validated = validateDecision(decision, scope);
+  assert.equal(validated.decision.facts.length, 2);
+  assert.equal(validated.decision.facts[0].predicate, 'WORKS_FOR');
+  assert.equal(validated.decision.facts[1].predicate, 'PURCHASED');
+});
+
+test('worker rejects a v2-only predicate inside a v1 decision as FACT_PREDICATE_NONCANONICAL', () => {
+  const decision = makeDecision();
+  decision.facts.push({
+    id: 'fact-component-in-v1',
+    subjectId: 'org-acme',
+    predicate: 'HAS_COMPONENT',
+    objectId: 'product-nimbus',
+    confidence: 0.9,
+    sourceReferences: {
+      sourceId: decision.source.sourceId, rawArtifactId: decision.source.rawArtifactId,
+      parsedArtifactId: decision.source.parsedArtifactId, chunkId: 'chunk-1', sourceMentionIds: ['mention-acme'],
+    },
+    temporal: { validFrom: 'not_applicable', validTo: 'not_applicable', txFrom: '2026-09-11T00:00:00.000Z', txTo: 'open' },
+  });
+  rehash(decision);
+  assert.throws(() => validateDecision(decision, scope), /FACT_PREDICATE_NONCANONICAL:HAS_COMPONENT/);
+});
+
+test('worker rejects an ontology_v2 fact with reversed endpoints as FACT_ENDPOINT_INVALID', () => {
+  const decision = makeOntologyV2Decision();
+  const categoryFact = decision.facts.find((fact) => fact.id === 'fact-category');
+  // IN_CATEGORY is Product|Package -> Category; swap subject/object so it reads Category -> Product.
+  categoryFact.subjectId = 'category-drinkware';
+  categoryFact.objectId = 'product-nimbus';
+  rehash(decision);
+  assert.throws(() => validateDecision(decision, scope), /FACT_ENDPOINT_INVALID:fact-category/);
+});
+
+test('worker rejects an unsupported ontologyVersion as DECISION_VERSION_INVALID', () => {
+  const decision = makeDecision();
+  decision.ontologyVersion = 'ontology_v3';
+  rehash(decision);
+  assert.throws(() => validateDecision(decision, scope), /DECISION_VERSION_INVALID/);
+});
+
+test('worker bitemporal lane counts only the mapped (dated) fact in a mixed generation (C-10)', async () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'genesisrag17-mixed-temporal-'));
+  const dbPath = path.join(root, 'db');
+  const worker = GenesisRag17Worker.create(workerOptions(dbPath, async () => ({ decisions: [] })));
+  try {
+    const decision = makeDecision();
+    // One dated (mapped) fact and one not_applicable fact in the same generation.
+    decision.facts[0].temporal = {
+      validFrom: '2020-01-01T00:00:00.000Z', validTo: 'not_applicable',
+      txFrom: '2026-09-11T00:00:00.000Z', txTo: 'open',
+    };
+    // decision.facts[1] keeps makeDecision()'s default not_applicable temporal.
+    rehash(decision);
+    const graphDecision = { ...decision, derived: [] };
+    const validated = validateDecision(decision, scope);
+    const candidate = worker.buildPhysicalCandidate(graphDecision, validated, []);
+    await worker.commitCandidate(graphDecision, candidate, 'graph');
+
+    const lane = await worker.verifyTemporalLane(candidate, graphDecision);
+    assert.equal(lane.status, 'ready');
+    assert.equal(lane.objects, 1, 'bitemporal objects must equal the mapped/dated count, not facts.length');
   } finally {
     await worker.close();
     try { fs.rmSync(root, { recursive: true, force: true }); } catch { /* test directory is disposable. */ }
