@@ -5,6 +5,14 @@ Cargo.lock
 # napi-rs build artifacts (per-platform .node files are CI-built and
 # distributed via per-triple optional-deps packages — not committed)
 *.node
+# ONE exception, and it is not part of the npm distribution story above: the
+# GenesisRAG17 Tier 4 worker needs a Linux addon at a pinned commit so the
+# zuri-ai edge image can copy a known-good artifact instead of compiling Rust
+# inside that image (ADR-075 Phase 3 prerequisite P-2). The file, how it was
+# built and what was verified are documented in npm/linux-x64-gnu/README.md, and
+# .github/workflows/genesisrag17-worker-linux.yml re-tests it on every push so
+# it cannot drift silently. Do not widen this negation to other triples.
+!npm/linux-x64-gnu/index.linux-x64-gnu.node
 npm-debug.log
 
 # Local dependency trees for the native checkout and the isolated TEST worker.
