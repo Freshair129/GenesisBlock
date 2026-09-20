@@ -389,6 +389,34 @@ test('worker rejects a second owner for the same store', async () => {
   }
 });
 
+test('worker recovers a legacy lock from a previous process instance', async () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'genesisrag17-legacy-lock-'));
+  const dbPath = path.join(root, 'db');
+  const lockPath = path.join(dbPath, 'genesisrag17', 'worker.lock');
+  const noop = async () => ({ decisions: [] });
+  fs.mkdirSync(path.dirname(lockPath), { recursive: true });
+  fs.writeFileSync(lockPath, `${JSON.stringify({
+    pid: process.pid,
+    dbPath,
+    createdAt: '2000-01-01T00:00:00.000Z',
+    token: 'legacy-stale-lock',
+  })}\n`, 'utf8');
+  const worker = GenesisRag17Worker.create({
+    dbPath,
+    scope,
+    credential: 'worker-credential-test',
+    workerToken: 'query-token-test',
+    modelDir,
+    mspCall: noop,
+  });
+  try {
+    assert.notEqual(worker, undefined);
+  } finally {
+    await worker.close();
+    try { fs.rmSync(root, { recursive: true, force: true }); } catch { /* native handle cleanup is process scoped */ }
+  }
+});
+
 test('worker records embedding policy denial as an actual Stage15 failure', async () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'genesisrag17-failure-'));
   const dbPath = path.join(root, 'db');

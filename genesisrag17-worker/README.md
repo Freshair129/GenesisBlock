@@ -263,7 +263,10 @@ The N-API binding at this pinned commit does not expose a `close` method. The
 worker closes its HTTP server, Python sidecar, FTS5 database and lock, but a
 true native handle restart must be performed by a dedicated child process.
 The worker therefore enforces one store owner with a PID/token lock and never
-deletes a live owner's lock. There is no OS scheduler; `start`, `stop` and
+deletes a live owner's lock. The lock also records the process start identity,
+so a container restart that reuses PID 1 can recover a legacy lock created by
+an older process instance while a live same-instance owner remains rejected.
+There is no OS scheduler; `start`, `stop` and
 `resume` drive the polling loop explicitly. Query `topK` is bounded to 1..100
 at the worker endpoint, while the pipeline acceptance fixture uses top-k 5.
 
