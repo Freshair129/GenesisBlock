@@ -417,6 +417,55 @@ test('worker recovers a legacy lock from a previous process instance', async () 
   }
 });
 
+test('worker accepts and scopes the derived per-record benchmark fixture', async () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'genesisrag17-benchmark-fixture-'));
+  const dbPath = path.join(root, 'db');
+  const text = 'Alice works for Acme Ltd.';
+  const citation = {
+    sourceId: 'source-1',
+    rawArtifactId: 'raw-1',
+    parsedArtifactId: 'parsed-1',
+    chunkId: 'chunk-1',
+    contentHash: hashText(text),
+  };
+  const benchmarkFixture = {
+    fixtureVersion: 'smartgift-catalog-corpus-v1',
+    benchmarks: [
+      {
+        externalId: 'PM-TMB',
+        fixtureVersion: 'smartgift-catalog-corpus-v1:PM-TMB',
+        queries: [{ query: 'Which company employs Alice?', relevantTexts: [text] }],
+      },
+      {
+        externalId: 'unrelated-record',
+        fixtureVersion: 'smartgift-catalog-corpus-v1:unrelated-record',
+        queries: [{ query: 'What product did Bob buy?', relevantTexts: ['Bob purchased Nimbus.'] }],
+      },
+    ],
+  };
+  const worker = GenesisRag17Worker.create(workerOptions(dbPath, async () => ({ decisions: [] }), { benchmarkFixture }));
+  try {
+    worker.searchGeneration = async () => [{ text, citation, score: 1 }];
+    worker.lexical.searchAll = () => [];
+    worker.embedder.embed = async () => [[0]];
+    worker.db.hybridSearch = async () => [];
+    const metrics = await worker.benchmark({
+      generation: 1,
+      snapshotId: 'snapshot-1',
+      vectorCollection: 'collection-1',
+      lexicalRows: [{ chunkId: 'chunk-1', text, citation, contentHash: citation.contentHash }],
+    });
+    assert.equal(metrics.fixtureVersion, 'smartgift-catalog-corpus-v1:PM-TMB');
+    assert.equal(metrics.queryCount, 1);
+    assert.equal(metrics.recallAt5, 1);
+    assert.equal(metrics.citationCorrectness, 1);
+    assert.equal(metrics.crossTenantLeaks, 0);
+  } finally {
+    await worker.close();
+    try { fs.rmSync(root, { recursive: true, force: true }); } catch { /* native handle cleanup is process scoped */ }
+  }
+});
+
 test('worker records embedding policy denial as an actual Stage15 failure', async () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'genesisrag17-failure-'));
   const dbPath = path.join(root, 'db');
