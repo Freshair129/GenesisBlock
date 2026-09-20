@@ -858,17 +858,71 @@ function fixtureFromOption(option) {
 
 function validateBenchmarkFixture(fixture) {
   if (!fixture) return undefined;
-  if (!isPlainObject(fixture) || typeof fixture.fixtureVersion !== 'string' || !Array.isArray(fixture.queries) || fixture.queries.length === 0) {
+  if (!isPlainObject(fixture) || typeof fixture.fixtureVersion !== 'string') {
     fail('BENCHMARK_FIXTURE_INVALID');
   }
-  for (const row of fixture.queries) {
-    if (!isPlainObject(row) || typeof row.query !== 'string' || row.query.trim() === ''
-      || !Array.isArray(row.relevantTexts) || row.relevantTexts.length === 0
-      || row.relevantTexts.some((text) => typeof text !== 'string' || text.length === 0)) {
-      fail('BENCHMARK_FIXTURE_QUERY_INVALID');
+  const validateRows = (rows) => {
+    if (!Array.isArray(rows) || rows.length === 0) fail('BENCHMARK_FIXTURE_INVALID');
+    for (const row of rows) {
+      if (!isPlainObject(row) || typeof row.query !== 'string' || row.query.trim() === ''
+        || !Array.isArray(row.relevantTexts) || row.relevantTexts.length === 0
+        || row.relevantTexts.some((text) => typeof text !== 'string' || text.length === 0)) {
+        fail('BENCHMARK_FIXTURE_QUERY_INVALID');
+      }
+    }
+  };
+  if (Array.isArray(fixture.queries)) validateRows(fixture.queries);
+  if (Array.isArray(fixture.benchmarks)) {
+    if (fixture.benchmarks.length === 0) fail('BENCHMARK_FIXTURE_INVALID');
+    for (const benchmark of fixture.benchmarks) {
+      if (!isPlainObject(benchmark) || typeof benchmark.fixtureVersion !== 'string') {
+        fail('BENCHMARK_FIXTURE_BENCHMARK_INVALID');
+      }
+      validateRows(benchmark.queries);
     }
   }
+  if (!Array.isArray(fixture.queries) && !Array.isArray(fixture.benchmarks)) {
+    fail('BENCHMARK_FIXTURE_INVALID');
+  }
+  if (Array.isArray(fixture.queries) && fixture.queries.length === 0
+    && Array.isArray(fixture.benchmarks) && fixture.benchmarks.length === 0) {
+    fail('BENCHMARK_FIXTURE_INVALID');
+  }
   return fixture;
+}
+
+function scopedBenchmarkFixture(fixture, candidate) {
+  const candidateTexts = new Set((candidate.lexicalRows ?? [])
+    .map((row) => row?.text)
+    .filter((text) => typeof text === 'string' && text.length > 0));
+  if (candidateTexts.size === 0) fail('BENCHMARK_NO_APPLICABLE_QUERIES');
+  const scopeRows = (rows) => rows.map((row) => {
+    const relevantTexts = row.relevantTexts.filter((text) => candidateTexts.has(text));
+    return relevantTexts.length > 0 ? { ...row, relevantTexts } : null;
+  }).filter(Boolean);
+
+  if (Array.isArray(fixture.benchmarks)) {
+    const matched = fixture.benchmarks
+      .map((benchmark) => ({
+        fixtureVersion: benchmark.fixtureVersion,
+        queries: scopeRows(benchmark.queries),
+      }))
+      .filter((benchmark) => benchmark.queries.length > 0);
+    if (matched.length === 0) fail('BENCHMARK_NO_APPLICABLE_QUERIES');
+    const versions = [...new Set(matched.map((benchmark) => benchmark.fixtureVersion))];
+    return {
+      fixtureVersion: versions.length === 1 ? versions[0] : `${fixture.fixtureVersion}:scoped`,
+      queries: matched.flatMap((benchmark) => benchmark.queries),
+    };
+  }
+
+  const queries = scopeRows(fixture.queries);
+  if (queries.length === 0) fail('BENCHMARK_NO_APPLICABLE_QUERIES');
+  const origins = [...new Set(queries.flatMap((row) => Array.isArray(row.fromBenchmarks) ? row.fromBenchmarks : []))];
+  return {
+    fixtureVersion: origins.length === 1 ? `${fixture.fixtureVersion}:${origins[0]}` : fixture.fixtureVersion,
+    queries,
+  };
 }
 
 function citationFor(source, chunk) {
@@ -1484,10 +1538,11 @@ export class GenesisRag17Worker {
   async benchmark(candidate) {
     const fixture = validateBenchmarkFixture(this.benchmarkFixture);
     if (!fixture) fail('BENCHMARK_FIXTURE_REQUIRED');
+    const scopedFixture = scopedBenchmarkFixture(fixture, candidate);
     const queryRows = [];
     const persisted = new Map(candidate.lexicalRows.map((row) => [row.chunkId ?? row.logicalId, row]));
     let crossTenantLeaks = 0;
-    for (const query of fixture.queries) {
+    for (const query of scopedFixture.queries) {
       const results = await this.searchGeneration(candidate.generation, candidate.snapshotId, query.query, 5);
       const relevant = new Set(query.relevantTexts);
       const retrievedRelevant = new Set(results.filter((result) => relevant.has(result.text)).map((result) => result.text));
@@ -1514,7 +1569,7 @@ export class GenesisRag17Worker {
     const mrr = queryRows.reduce((sum, row) => sum + (row.rank >= 0 ? 1 / (row.rank + 1) : 0), 0) / queryRows.length;
     const citationCorrectness = queryRows.every((row) => row.citationCorrect) ? 1 : 0;
     const metrics = {
-      fixtureVersion: fixture.fixtureVersion,
+      fixtureVersion: scopedFixture.fixtureVersion,
       queryCount: queryRows.length,
       recallAt5: totalRelevant > 0 ? retrieved / totalRelevant : 0,
       mrr,
