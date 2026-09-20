@@ -5,6 +5,15 @@ All notable changes to GenesisBlockDB are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed - worker lock recovery after container restart
+
+GenesisRAG17 worker locks now record the process start identity. A restarted
+container that reuses PID 1 can recover a legacy lock from the previous process
+instance, while a live same-instance owner remains rejected. The worker suite
+covers both cases.
+
 ## [0.2.6] - 2026-09-09
 
 ### Added - read-only SQL over the relational projection

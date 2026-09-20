@@ -554,6 +554,9 @@ export function writeAtomic(filename, content, replaceFile = undefined) {
   }
 }
 
+const PROCESS_STARTED_AT_MS = Date.now() - Math.floor(process.uptime() * 1000);
+const PROCESS_START_TOLERANCE_MS = 2000;
+
 function processIsAlive(pid) {
   if (!Number.isInteger(pid) || pid <= 0) return false;
   try {
@@ -564,8 +567,31 @@ function processIsAlive(pid) {
   }
 }
 
+function parseProcessStartTime(value) {
+  if (typeof value !== 'string' || value.length === 0) return undefined;
+  const parsed = Date.parse(value);
+  return Number.isFinite(parsed) ? parsed : undefined;
+}
+
+function isCurrentProcessInstance(lock) {
+  const processStartedAt = parseProcessStartTime(lock.processStartedAt);
+  return processStartedAt !== undefined
+    && Math.abs(processStartedAt - PROCESS_STARTED_AT_MS) <= PROCESS_START_TOLERANCE_MS;
+}
+
+function isLegacyLockFromBeforeCurrentProcess(lock) {
+  const createdAt = parseProcessStartTime(lock.createdAt);
+  return createdAt !== undefined && createdAt < PROCESS_STARTED_AT_MS - PROCESS_START_TOLERANCE_MS;
+}
+
 function acquireWorkerLock(filename, dbPath) {
-  const lock = { pid: process.pid, dbPath, createdAt: nowIso(), token: crypto.randomBytes(16).toString('hex') };
+  const lock = {
+    pid: process.pid,
+    dbPath,
+    createdAt: nowIso(),
+    processStartedAt: new Date(PROCESS_STARTED_AT_MS).toISOString(),
+    token: crypto.randomBytes(16).toString('hex'),
+  };
   fs.mkdirSync(path.dirname(filename), { recursive: true });
   try {
     const fd = fs.openSync(filename, 'wx');
@@ -577,8 +603,17 @@ function acquireWorkerLock(filename, dbPath) {
     if (error.code !== 'EEXIST') throw error;
     let current;
     try { current = parseJsonText(fs.readFileSync(filename, 'utf8'), 'WORKER_LOCK_INVALID'); } catch { fail('WORKER_LOCK_UNPROVABLY_STALE'); }
-    if (current.dbPath !== dbPath || processIsAlive(current.pid)) fail('WORKER_STORE_ALREADY_OWNED', String(current.pid));
-    // A dead owner is the only condition that permits stale-lock recovery.
+    if (current.dbPath !== dbPath) fail('WORKER_STORE_ALREADY_OWNED', String(current.pid));
+    if (processIsAlive(current.pid)) {
+      if (current.pid !== process.pid) fail('WORKER_STORE_ALREADY_OWNED', String(current.pid));
+      if (Object.prototype.hasOwnProperty.call(current, 'processStartedAt')) {
+        if (parseProcessStartTime(current.processStartedAt) === undefined) fail('WORKER_LOCK_UNPROVABLY_STALE');
+        if (isCurrentProcessInstance(current)) fail('WORKER_STORE_ALREADY_OWNED', String(current.pid));
+      } else if (!isLegacyLockFromBeforeCurrentProcess(current)) {
+        fail('WORKER_LOCK_UNPROVABLY_STALE');
+      }
+    }
+    // A dead owner or a reused PID from an older process instance permits stale-lock recovery.
     fs.rmSync(filename, { force: true });
     return acquireWorkerLock(filename, dbPath);
   }
