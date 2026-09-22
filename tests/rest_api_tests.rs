@@ -433,6 +433,18 @@ async fn test_status_exposes_quant_ops() {
         "per-collection index_lag must be a number: {}",
         entry["index_lag"]
     );
+    assert!(
+        entry["coverage"].is_object(),
+        "per-collection structural coverage must be present"
+    );
+    assert!(
+        entry["coverage"]["state"].is_string(),
+        "coverage state must be explicit"
+    );
+    assert!(
+        entry["coverage"]["validated"].is_boolean(),
+        "coverage validation flag must be explicit"
+    );
 }
 
 #[tokio::test]

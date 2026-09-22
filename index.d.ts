@@ -320,6 +320,20 @@ export interface DatabaseStatus {
   readOnly: boolean
   pageCacheMb: number
 }
+export interface IndexCoverageReport {
+  /** Collection to which this validation belongs. */
+  collection: string
+  /** UNVERIFIED, CATCHING_UP, READY, or FAILED. READY is structural only. */
+  state: string
+  sourceCount: number
+  indexedCount: number
+  missingCount: number
+  extraCount: number
+  pendingCount: number
+  sourceFrontier: number
+  builtFrontier: number
+  validated: boolean
+}
 export interface CollectionInfo {
   name: string
   model: string
@@ -369,6 +383,8 @@ export interface CollectionInfo {
    * collections); the SAME value is repeated on every entry for convenience.
    */
   indexLag: number
+  /** Explicit structural source-to-HNSW coverage; not an exactness claim. */
+  coverage: IndexCoverageReport
 }
 export interface SyncPeer {
   id: string

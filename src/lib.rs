@@ -898,6 +898,33 @@ pub struct StudioEntityInspection {
 
 #[cfg_attr(feature = "napi-bindings", napi(object))]
 #[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct IndexCoverageReport {
+    /// Collection to which this validation belongs.
+    pub collection: String,
+    /// Lifecycle state of the last observed structural validation.
+    /// `READY` proves source/graph membership equality only; it does not prove
+    /// exact search or ANN recall.
+    pub state: String,
+    /// Number of durable vector metadata rows in the collection.
+    pub source_count: u32,
+    /// Number of origin IDs observed in the HNSW graph.
+    pub indexed_count: u32,
+    /// Source rows absent from the graph during the last explicit validation.
+    pub missing_count: u32,
+    /// Graph origin IDs absent from the durable source metadata.
+    pub extra_count: u32,
+    /// Engine-global async indexing backlog at validation/report time.
+    pub pending_count: u32,
+    /// Maximum `created_seq` in the source metadata.
+    pub source_frontier: i64,
+    /// Maximum `created_seq` represented by validated graph members.
+    pub built_frontier: i64,
+    /// True only when an explicit validation covered the current source set.
+    pub validated: bool,
+}
+
+#[cfg_attr(feature = "napi-bindings", napi(object))]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct CollectionInfo {
     pub name: String,
     pub model: String,
@@ -937,6 +964,9 @@ pub struct CollectionInfo {
     /// inserted into HNSW. Not per-collection (one indexing thread serves all
     /// collections); the SAME value is repeated on every entry for convenience.
     pub index_lag: u32,
+    /// Explicit structural source-to-HNSW coverage. `READY` is not an exactness
+    /// or ANN-recall claim; callers must inspect the individual fields.
+    pub coverage: IndexCoverageReport,
 }
 
 #[cfg_attr(feature = "napi-bindings", napi(object))]
@@ -2050,6 +2080,39 @@ impl VecIndex {
         }
     }
 
+    /// Origin IDs present in the HNSW graph. `hnsw_rs` stores each point in its
+    /// assigned layer rather than repeating it in every lower layer, so the
+    /// validation must walk the complete point indexation.
+    fn origin_ids(&self) -> HashSet<usize> {
+        let mut ids = HashSet::new();
+        if self.point_count() == 0 {
+            return ids;
+        }
+        match self {
+            VecIndex::F32(h) => {
+                for point in h.get_point_indexation() {
+                    ids.insert(point.get_origin_id());
+                }
+            }
+            VecIndex::U8(h) => {
+                for point in h.get_point_indexation() {
+                    ids.insert(point.get_origin_id());
+                }
+            }
+            VecIndex::Binary(h) => {
+                for point in h.get_point_indexation() {
+                    ids.insert(point.get_origin_id());
+                }
+            }
+            VecIndex::F16(h) => {
+                for point in h.get_point_indexation() {
+                    ids.insert(point.get_origin_id());
+                }
+            }
+        }
+        ids
+    }
+
     fn build(q: Quant, ef_c: usize, cap: usize) -> Self {
         let cap = cap.max(VectorCollection::HNSW_MIN_CAP);
         match q {
@@ -2443,6 +2506,9 @@ pub struct VectorCollection {
     /// with the arena's own `(scale, bias)` (set together at compaction/load) so
     /// the HNSW (threaded this value) and the arena agree on one scale.
     pub sq8_scale: RwLock<Option<(f32, f32)>>,
+    /// Last explicit structural coverage validation. This is derived state and
+    /// is invalidated whenever the source arena changes or the HNSW is rebuilt.
+    coverage: RwLock<Option<IndexCoverageReport>>,
 }
 
 impl VectorCollection {
@@ -2504,6 +2570,7 @@ impl VectorCollection {
             // Fixed scale until a compaction calibrates (opt-in SQ8 only);
             // load() overwrites this from `sq8scale_<name>.bin` when present.
             sq8_scale: RwLock::new(None),
+            coverage: RwLock::new(None),
         }
     }
 
@@ -2658,6 +2725,7 @@ impl VectorCollection {
             });
             arena_id
         };
+        *self.coverage.write() = None;
         if let Some(old_arena_id) = self.node_to_arena.insert(node_u32, arena_id) {
             // Re-embed: the displaced row becomes historical as of this commit.
             let mut meta = self.metadata.write();
@@ -2707,6 +2775,95 @@ impl VectorCollection {
             }
         }
         *self.hnsw.write() = Some(index);
+        *self.coverage.write() = None;
+    }
+
+    fn validate_coverage(&self, pending_count: u32) -> IndexCoverageReport {
+        let source: HashMap<usize, u64> = self
+            .metadata
+            .read()
+            .iter()
+            .map(|metadata| (metadata.arena_id as usize, metadata.created_seq))
+            .collect();
+        let source_frontier = source.values().copied().max().unwrap_or(0);
+        let indexed = self
+            .hnsw
+            .read()
+            .as_ref()
+            .map(VecIndex::origin_ids)
+            .unwrap_or_default();
+        let missing_count = source.keys().filter(|id| !indexed.contains(id)).count() as u32;
+        let extra_count = indexed.iter().filter(|id| !source.contains_key(id)).count() as u32;
+        let built_frontier = indexed
+            .iter()
+            .filter_map(|id| source.get(id))
+            .copied()
+            .max()
+            .unwrap_or(0);
+        let state = if pending_count > 0 {
+            "CATCHING_UP"
+        } else if missing_count == 0 && extra_count == 0 {
+            "READY"
+        } else {
+            "FAILED"
+        };
+        let report = IndexCoverageReport {
+            collection: self.name.clone(),
+            state: state.to_string(),
+            source_count: source.len() as u32,
+            indexed_count: indexed.len() as u32,
+            missing_count,
+            extra_count,
+            pending_count,
+            source_frontier: source_frontier.min(i64::MAX as u64) as i64,
+            built_frontier: built_frontier.min(i64::MAX as u64) as i64,
+            validated: true,
+        };
+        *self.coverage.write() = Some(report.clone());
+        report
+    }
+
+    fn coverage_report(&self, index_lag: u32) -> IndexCoverageReport {
+        let source = self.metadata.read();
+        let source_count = source.len() as u32;
+        let source_frontier = source
+            .iter()
+            .map(|metadata| metadata.created_seq)
+            .max()
+            .unwrap_or(0);
+        let source_frontier_i64 = source_frontier.min(i64::MAX as u64) as i64;
+        let indexed_count = self
+            .hnsw
+            .read()
+            .as_ref()
+            .map(|index| index.point_count() as u32)
+            .unwrap_or(0);
+        if let Some(report) = self.coverage.read().as_ref() {
+            if report.validated
+                && report.source_count == source_count
+                && report.indexed_count == indexed_count
+                && report.source_frontier == source_frontier_i64
+                && index_lag == 0
+            {
+                return report.clone();
+            }
+        }
+        IndexCoverageReport {
+            collection: self.name.clone(),
+            state: if index_lag > 0 {
+                "CATCHING_UP".to_string()
+            } else {
+                "UNVERIFIED".to_string()
+            },
+            source_count,
+            indexed_count,
+            missing_count: 0,
+            extra_count: 0,
+            pending_count: index_lag,
+            source_frontier: source_frontier_i64,
+            built_frontier: 0,
+            validated: false,
+        }
     }
 
     /// `index_lag` is engine-global (`Storage::index_lag()`), passed in by
@@ -2741,6 +2898,7 @@ impl VectorCollection {
             sidecar_disk_bytes,
             arena_resident_bytes: self.arena.read().byte_size() as i64,
             index_lag,
+            coverage: self.coverage_report(index_lag),
         }
     }
 }
@@ -3575,6 +3733,23 @@ impl Storage {
             .iter()
             .map(|c| c.value().info(lag))
             .collect()
+    }
+
+    /// Drain the asynchronous index queue and validate source-to-HNSW graph
+    /// membership for every collection. This is intentionally explicit: the
+    /// membership scan is O(n) and must not be hidden inside every flush or
+    /// query. `READY` proves structural membership only; it is not an exactness
+    /// or ANN-recall guarantee.
+    pub fn validate_index_coverage(&self) -> Result<Vec<IndexCoverageReport>> {
+        self.ensure_readable()?;
+        let _read_guard = self.commit_lock.lock();
+        self.flush_index();
+        let pending = self.index_lag();
+        Ok(self
+            .collections
+            .iter()
+            .map(|collection| collection.value().validate_coverage(pending))
+            .collect())
     }
 
     /// Insert one vector into the named (or default) collection. Validates the

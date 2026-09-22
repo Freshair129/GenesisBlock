@@ -3,7 +3,7 @@ doc_id: API_REFERENCE
 status: current
 version: generated
 owner: GenesisBlockDB Engineering
-updated: "2026-09-08"
+updated: "2026-09-22"
 ---
 
 # GenesisBlockDB REST API Reference
@@ -240,10 +240,24 @@ _(Searches the named collection; query length is validated against the
 collection dim — a mismatch is a typed error, not garbage neighbors.)_
 ### CollectionInfo (`/v1/collections`)
 ```jsonc
-{ "name", "model", "dim": u32, "metric": "L2|Cosine", "count": u32 }
+{
+  "name", "model", "dim": u32, "metric": "L2|Cosine", "quant",
+  "count": u32, "indexed": u32, "ef_search": u32?, "rerank": boolean,
+  "sidecar_resident_bytes": i64, "sidecar_disk_bytes": i64,
+  "arena_resident_bytes": i64, "index_lag": u32,
+  "coverage": {
+    "collection", "state": "UNVERIFIED|CATCHING_UP|READY|FAILED",
+    "source_count": u32, "indexed_count": u32, "missing_count": u32,
+    "extra_count": u32, "pending_count": u32,
+    "source_frontier": i64, "built_frontier": i64, "validated": boolean
+  }
+}
 ```
 _(Create with `POST /v1/collection/create` `{ name, model, dim, metric? }`;
-`metric` defaults to `L2`. A `default` collection always exists.)_
+`metric` defaults to `L2`. A `default` collection always exists. `coverage`
+is structural source-to-HNSW membership only; `READY` is not an exactness or
+ANN-recall claim. The core validation operation is explicit and is not yet a
+REST maintenance route.)_
 ### Attach a vector to a node (`POST /v1/vector/add`)
 ```jsonc
 { "node_id": "N-1", "collection": "code", "embedding": [f64] }
