@@ -2972,6 +2972,13 @@ const SEG_HEADER_LEN: usize = 28;
 const SEG_FOOTER_LEN: usize = 44;
 /// Active-file seal threshold (spec §2; mobile profile tightens this in WP-1.3).
 const ACTIVE_SEAL_THRESHOLD: u64 = 64 * 1024 * 1024;
+/// Defensive reader bounds for the current framed journal. These limits do not
+/// change the v1 wire format; they prevent a malformed length or compressed
+/// body from being classified as a harmless tear or expanded without bound.
+const MAX_JOURNAL_FRAME_PAYLOAD_BYTES: usize = 64 * 1024 * 1024;
+const MAX_JOURNAL_SEGMENT_BODY_BYTES: u64 = 128 * 1024 * 1024;
+const MAX_JOURNAL_SEGMENT_FILE_BYTES: u64 =
+    MAX_JOURNAL_SEGMENT_BODY_BYTES + (SEG_HEADER_LEN + SEG_FOOTER_LEN) as u64;
 
 const SEG_KIND_HISTORY: u8 = 1;
 const SEG_KIND_BASE: u8 = 2;
@@ -3009,6 +3016,23 @@ fn lz4_frame_decompress(compressed: &[u8]) -> std::io::Result<Vec<u8>> {
     Ok(out)
 }
 
+fn lz4_frame_decompress_bounded(
+    compressed: &[u8],
+    max_output_bytes: usize,
+) -> std::io::Result<Vec<u8>> {
+    use std::io::Read;
+    let dec = lz4_flex::frame::FrameDecoder::new(compressed);
+    let mut limited = dec.take(max_output_bytes as u64 + 1);
+    let mut out = Vec::new();
+    limited.read_to_end(&mut out)?;
+    if out.len() > max_output_bytes {
+        return Err(std::io::Error::other(
+            "journal segment exceeds output bound",
+        ));
+    }
+    Ok(out)
+}
+
 fn frame_crc(seq: u64, payload: &[u8]) -> u32 {
     crc32c::crc32c_append(crc32c::crc32c(&seq.to_le_bytes()), payload)
 }
@@ -3042,7 +3066,9 @@ fn walk_frames(bytes: &[u8], start: usize, mut f: impl FnMut(u64, &[u8])) -> usi
         let seq = u64::from_le_bytes(bytes[off + 4..off + 12].try_into().unwrap());
         let crc = u32::from_le_bytes(bytes[off + 12..off + 16].try_into().unwrap());
         let ps = off + FRAME_HEADER_LEN;
-        if ps + len > bytes.len() {
+        if len > MAX_JOURNAL_FRAME_PAYLOAD_BYTES
+            || ps.checked_add(len).is_none_or(|end| end > bytes.len())
+        {
             return off;
         }
         let payload = &bytes[ps..ps + len];
@@ -3081,6 +3107,10 @@ fn read_segment_header(path: &std::path::Path) -> Option<SegmentInfo> {
 /// on any integrity failure (magic/sha/crc/codec) — the caller treats the
 /// segment as unreadable and recovery degrades explicitly, never silently.
 fn read_segment_body(path: &std::path::Path) -> Option<(u8, Vec<u8>)> {
+    let file_len = fs::metadata(path).ok()?.len();
+    if file_len > MAX_JOURNAL_SEGMENT_FILE_BYTES {
+        return None;
+    }
     let bytes = fs::read(path).ok()?;
     if bytes.len() < SEG_HEADER_LEN + SEG_FOOTER_LEN || bytes[0..4] != SEG_MAGIC {
         return None;
@@ -3094,6 +3124,9 @@ fn read_segment_body(path: &std::path::Path) -> Option<(u8, Vec<u8>)> {
             .try_into()
             .unwrap(),
     );
+    if body_len > MAX_JOURNAL_SEGMENT_BODY_BYTES {
+        return None;
+    }
     let crc_expected = u32::from_le_bytes(
         bytes[footer_start + 40..footer_start + 44]
             .try_into()
@@ -3108,7 +3141,10 @@ fn read_segment_body(path: &std::path::Path) -> Option<(u8, Vec<u8>)> {
     }
     let compressed = &bytes[SEG_HEADER_LEN..footer_start];
     let body = match codec {
-        CODEC_LZ4 => lz4_frame_decompress(compressed).ok()?,
+        CODEC_LZ4 => {
+            lz4_frame_decompress_bounded(compressed, MAX_JOURNAL_SEGMENT_BODY_BYTES as usize)
+                .ok()?
+        }
         CODEC_NONE => compressed.to_vec(),
         _ => return None,
     };
@@ -4169,11 +4205,20 @@ impl Storage {
                 return Err(e);
             }
             if end != bytes.len() {
-                let incomplete = bytes.len() - end < FRAME_HEADER_LEN
-                    || end
-                        + FRAME_HEADER_LEN
-                        + u32::from_le_bytes(bytes[end..end + 4].try_into().unwrap()) as usize
-                        > bytes.len();
+                let incomplete = if bytes.len().saturating_sub(end) < FRAME_HEADER_LEN {
+                    true
+                } else {
+                    let declared_len =
+                        u32::from_le_bytes(bytes[end..end + 4].try_into().unwrap()) as u64;
+                    if declared_len > MAX_JOURNAL_FRAME_PAYLOAD_BYTES as u64 {
+                        return Err(Error::from_reason(
+                            "JOURNAL_PREFLIGHT_FAILED: frame payload exceeds reader bound",
+                        ));
+                    }
+                    end.checked_add(FRAME_HEADER_LEN)
+                        .and_then(|header_end| header_end.checked_add(declared_len as usize))
+                        .is_none_or(|frame_end| frame_end > bytes.len())
+                };
                 if !torn_tail || !incomplete {
                     return Err(Error::from_reason(
                         "JOURNAL_PREFLIGHT_FAILED: corrupt journal frame",
