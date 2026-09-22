@@ -1095,6 +1095,12 @@ pub struct GenesisTransactionEvent {
     /// whatever the origin wrote. `alias` keeps pre-WP-1.2 WAL lines parsing.
     #[serde(alias = "commit_sequence")]
     pub origin_commit_seq: u64,
+    /// Local frame sequence preserved only on derived fold receipts. It is
+    /// intentionally separate from `origin_commit_seq`: a peer's origin
+    /// sequence must never seed this replica's local transaction frontier.
+    /// `None` keeps original transaction-event JSON backward-compatible.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub local_frame_seq: Option<u64>,
     pub payload_hash: String,
     pub relational: Vec<RelationalMutationGroup>,
     pub nodes: Vec<NodeOutput>,
@@ -3005,14 +3011,6 @@ fn lz4_frame_compress(body: &[u8]) -> std::io::Result<Vec<u8>> {
         enc.finish()
             .map_err(|e| std::io::Error::other(e.to_string()))?;
     }
-    Ok(out)
-}
-
-fn lz4_frame_decompress(compressed: &[u8]) -> std::io::Result<Vec<u8>> {
-    use std::io::Read;
-    let mut dec = lz4_flex::frame::FrameDecoder::new(compressed);
-    let mut out = Vec::new();
-    dec.read_to_end(&mut out)?;
     Ok(out)
 }
 
@@ -5738,15 +5736,30 @@ impl Storage {
                         .ok_or_else(|| Error::from_reason("relational schema is not registered"))?;
                     let _ = Self::projection_apply_rows_tx(&tx, &schema, &group.mutations)?;
                 }
+                let receipt_frame_seq = transaction.local_frame_seq.unwrap_or(frame_seq);
                 tx.execute(
                     "INSERT INTO applied_transactions(transaction_id, commit_sequence, payload_hash, frame_seq) VALUES(?1, ?2, ?3, ?4)",
-                    params![transaction.transaction_id, transaction.origin_commit_seq, transaction.payload_hash, frame_seq],
+                    params![transaction.transaction_id, transaction.origin_commit_seq, transaction.payload_hash, receipt_frame_seq],
                 )
                 .map_err(|e| Error::from_reason(e.to_string()))?;
                 // Informational only since WP-1.2 — the counters re-seed from
                 // the journal itself on open, never from the projection.
                 Self::projection_state_set(&tx, "stable_frontier", &frame_seq.to_string())?;
-                Self::projection_state_set(&tx, "txn_frontier", &frame_seq.to_string())?;
+                let prior_txn_frontier = tx
+                    .query_row(
+                        "SELECT value FROM projection_state WHERE key='txn_frontier'",
+                        [],
+                        |row| row.get::<_, String>(0),
+                    )
+                    .optional()
+                    .map_err(|e| Error::from_reason(e.to_string()))?
+                    .and_then(|value| value.parse::<u64>().ok())
+                    .unwrap_or(0);
+                Self::projection_state_set(
+                    &tx,
+                    "txn_frontier",
+                    &prior_txn_frontier.max(receipt_frame_seq).to_string(),
+                )?;
                 tx.commit().map_err(|e| Error::from_reason(e.to_string()))?;
             }
             Event::Batch(events) => {
@@ -6913,7 +6926,7 @@ impl Storage {
         let conn = self.projection_db.lock();
         let mut statement = conn
             .prepare(
-                "SELECT transaction_id, commit_sequence, payload_hash FROM applied_transactions ORDER BY COALESCE(frame_seq, commit_sequence)",
+                "SELECT transaction_id, commit_sequence, payload_hash, frame_seq FROM applied_transactions ORDER BY COALESCE(frame_seq, commit_sequence)",
             )
             .map_err(|e| Error::from_reason(e.to_string()))?;
         let events = statement
@@ -6921,6 +6934,7 @@ impl Storage {
                 Ok(Event::Transaction(GenesisTransactionEvent {
                     transaction_id: row.get(0)?,
                     origin_commit_seq: row.get(1)?,
+                    local_frame_seq: row.get(3)?,
                     payload_hash: row.get(2)?,
                     relational: vec![],
                     nodes: vec![],
@@ -8056,6 +8070,7 @@ impl Storage {
             // cannot live in this signed payload — peer frames keep original
             // signatures, I4).
             origin_commit_seq: 0,
+            local_frame_seq: None,
             payload_hash,
             relational: input.relational,
             nodes,
@@ -8064,6 +8079,8 @@ impl Storage {
         };
         let commit_sequence = self.persist(&Event::Transaction(event.clone()))?;
         self.apply_transaction_memory(&event, true, commit_sequence);
+        self.ensure_readable()
+            .map_err(|error| self.durable_apply_error(commit_sequence, error))?;
         self.txn_frontier.store(commit_sequence, Ordering::SeqCst);
         Ok(CommitResult {
             transaction_id: input.transaction_id,
@@ -11897,6 +11914,18 @@ impl Storage {
         self.preflight_relational_event(&signed_event.event)?;
         let (ack_tx, ack_rx) = unbounded();
         let event = signed_event.event.clone();
+        // A folded receipt may carry the source replica's local frame for
+        // local recovery. When ingesting it from a peer, the projection must
+        // stamp the fresh local frame instead; origin-local sequence numbers
+        // are not portable across replicas.
+        let projection_event = match &event {
+            Event::Transaction(transaction) if transaction.local_frame_seq.is_some() => {
+                let mut transaction = transaction.clone();
+                transaction.local_frame_seq = None;
+                Event::Transaction(transaction)
+            }
+            _ => event.clone(),
+        };
         self.wal_sender
             .send(WalMsg::Append(Box::new(signed_event), ack_tx))
             .map_err(|_| Error::from_reason("wal disconnected"))?;
@@ -11907,7 +11936,7 @@ impl Storage {
             )
         })?;
         self.commit_sequence.fetch_max(seq, Ordering::SeqCst);
-        self.projection_apply_event(&event, seq)
+        self.projection_apply_event(&projection_event, seq)
             .map_err(|e| self.durable_apply_error(seq, e))?;
         Ok(seq)
     }
@@ -14900,8 +14929,10 @@ impl Storage {
                 // Relational state is rebuilt by projection_sync_on_open.
             }
             Event::Transaction(transaction) => {
-                self.apply_transaction_memory(&transaction, index, seq);
-                self.txn_frontier.fetch_max(seq, Ordering::SeqCst);
+                let transaction_seq = transaction.local_frame_seq.unwrap_or(seq);
+                self.apply_transaction_memory(&transaction, index, transaction_seq);
+                self.txn_frontier
+                    .fetch_max(transaction_seq, Ordering::SeqCst);
             }
             // Durable retraction (RCA--SLICE0-DURABILITY defect 2): replay the
             // removal so a crash after the retraction ack no longer resurrects

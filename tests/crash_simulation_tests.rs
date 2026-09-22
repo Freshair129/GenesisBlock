@@ -170,10 +170,10 @@ fn truncated_wal_recovers_intact_entries() {
 }
 
 // ---------------------------------------------------------------------------
-// 2. Garbage injected mid-WAL — corrupt entries skipped, rest recovers.
+// 2. Oversized garbage injected mid-WAL — fail closed before replay.
 // ---------------------------------------------------------------------------
 #[test]
-fn garbage_wal_entry_skipped_gracefully() {
+fn oversized_garbage_wal_entry_is_rejected_before_recovery() {
     let path = fresh("crash_garbage_wal");
 
     let active_bytes: Vec<u8>;
@@ -185,11 +185,10 @@ fn garbage_wal_entry_skipped_gracefully() {
         active_bytes = fs::read(active_path(&path)).unwrap();
     }
 
-    // Inject garbage after the 3rd frame. WP-1.2 contract change: the framed
-    // journal is prefix-valid — the CRC walk STOPS at the first corrupt frame
-    // (mid-file garbage cannot arise from an append-only crash; a tear is
-    // always a tail). Frames before the garbage recover; the old JSONL
-    // skip-bad-lines behavior is gone by design (I9).
+    // Inject garbage after the 3rd frame. The bounded reader must not classify
+    // the oversized length prefix as a harmless torn tail: malformed journal
+    // input fails closed before replay. Mid-file garbage cannot arise from an
+    // append-only crash; a tear is always a tail.
     let offsets = frame_offsets(&active_bytes);
     assert!(offsets.len() > 6);
     let mut corrupted = active_bytes[..offsets[3]].to_vec();
@@ -197,14 +196,21 @@ fn garbage_wal_entry_skipped_gracefully() {
     corrupted.extend_from_slice(&active_bytes[offsets[3]..]);
     install_active_only(&path, &corrupted);
 
-    // Re-open — no panic; the pre-garbage prefix recovers.
-    let s = open(&path);
-    for i in 0..3 {
-        assert!(
-            node_exists(&s, &format!("gnode_{i}")),
-            "gnode_{i} (before the tear) should survive"
-        );
-    }
+    let error = match Storage::open(OpenOptions {
+        path: path.clone(),
+        page_cache_mb: Some(32),
+        read_only: Some(false),
+        vector_dim: Some(4),
+        retention: None,
+    }) {
+        Ok(_) => panic!("oversized garbage frame unexpectedly opened"),
+        Err(error) => error.to_string(),
+    };
+    assert!(
+        error.contains("JOURNAL_PREFLIGHT_FAILED")
+            && error.contains("frame payload exceeds reader bound"),
+        "unexpected oversized-garbage error: {error}"
+    );
 }
 
 // ---------------------------------------------------------------------------
