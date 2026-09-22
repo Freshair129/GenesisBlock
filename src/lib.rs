@@ -4626,7 +4626,7 @@ impl Storage {
                 "relational schema requires a positive version and at least one table",
             ));
         }
-        if package.tables.len() > 64 || package.named_queries.len() > 128 {
+        if package.tables.len() > 128 || package.named_queries.len() > 128 {
             return Err(Error::from_reason(
                 "REL_SCHEMA_VALIDATION_FAILED: schema resource limit exceeded",
             ));
