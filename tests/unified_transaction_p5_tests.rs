@@ -2,7 +2,7 @@ use genesis_block_native::{
     BatchInput, EdgeInput, GenesisTransaction, HybridSearchInput, NeighborInput, NodeInput,
     OpenOptions, RelationalColumn, RelationalColumnType, RelationalFilter, RelationalMutationGroup,
     RelationalMutationKind, RelationalQuery, RelationalRowMutation, RelationalSchemaPackage,
-    RelationalTable, SidecarReader, Storage,
+    RelationalTable, SidecarReader, Storage, SyncPeer,
 };
 use parking_lot::RwLock;
 use serde_json::json;
@@ -319,4 +319,57 @@ fn vector_materialization_failure_is_not_reported_as_stable_and_recovers() {
     let retry = storage.commit_transaction(transaction).unwrap();
     assert!(retry.stable);
     assert_eq!(retry.commit_sequence, storage.txn_frontier());
+}
+
+#[test]
+fn replicated_fold_receipt_uses_destination_frame_after_cold_reopen() {
+    let source_path = fresh("unified_transaction_p5_remote_receipt_source");
+    let destination_path = fresh("unified_transaction_p5_remote_receipt_destination");
+    let transaction = transaction();
+    let source = open(&source_path);
+    source.register_relational_schema(schema()).unwrap();
+    let original_sequence = source
+        .commit_transaction(transaction.clone())
+        .unwrap()
+        .commit_sequence;
+    source
+        .add_node(NodeInput {
+            id: Some("source-later-write".to_string()),
+            labels: vec!["Other".to_string()],
+            props: Some(json!({"kind": "later"})),
+            embedding: None,
+            lang: Some("en".to_string()),
+            valid_from: None,
+            caused_by: None,
+            ttl: None,
+            collection: None,
+        })
+        .unwrap();
+    source.compact().unwrap();
+    let delta = source.events_since_seq(0);
+
+    let mut destination = open(&destination_path);
+    destination.peers.insert(
+        source.local_peer_id.clone(),
+        SyncPeer {
+            id: source.local_peer_id.clone(),
+            addr: String::new(),
+            last_seen: 0,
+            verifying_key: source.verifying_key.to_bytes().to_vec(),
+        },
+    );
+    destination.reconcile_state(delta).unwrap();
+    let destination_sequence = destination.txn_frontier();
+    assert!(destination_sequence > original_sequence);
+
+    // Avoid creating a new local fold receipt on drop; the next open must
+    // replay the remote-signed checkpoint from the destination's WAL.
+    destination.read_only = true;
+    drop(destination);
+    remove_rebuildable_projections(&destination_path);
+
+    let destination = open(&destination_path);
+    assert_eq!(destination.txn_frontier(), destination_sequence);
+    let retry = destination.commit_transaction(transaction).unwrap();
+    assert_eq!(retry.commit_sequence, destination_sequence);
 }

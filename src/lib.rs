@@ -1170,6 +1170,22 @@ pub enum Event {
     },
 }
 
+/// Canonical bytes for event signatures. A fold receipt's local frame is a
+/// replica-local recovery hint, not part of the signed logical event, so omit
+/// it from the signature domain. This keeps older readers (which ignore the
+/// optional field) able to verify newer receipts and preserves signatures for
+/// all pre-receipt events byte-for-byte.
+fn canonical_event_bytes(event: &Event) -> serde_json::Result<Vec<u8>> {
+    if let Event::Transaction(transaction) = event {
+        if transaction.local_frame_seq.is_some() {
+            let mut canonical = transaction.clone();
+            canonical.local_frame_seq = None;
+            return serde_json::to_vec(&Event::Transaction(canonical));
+        }
+    }
+    serde_json::to_vec(event)
+}
+
 /// Immutable semantic contract, ordered before every dependent vector.
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct CollectionDefinition {
@@ -5895,7 +5911,7 @@ impl Storage {
                     first_err = Some(e);
                 }
             };
-            match signed_event.event {
+            match self.normalize_replayed_event(signed_event) {
                 Event::Node(node) => apply(Event::Node(node)),
                 Event::RelationalSchema(package) => apply(Event::RelationalSchema(package)),
                 rows @ Event::RelationalRows { .. } => apply(rows),
@@ -7681,7 +7697,7 @@ impl Storage {
     /// uniform and every reader (`try_load_state` replay, `events_since`) can
     /// parse it back.
     fn sign_event(&self, event: &Event) -> SignedEvent {
-        let event_data = serde_json::to_vec(event).unwrap_or_default();
+        let event_data = canonical_event_bytes(event).unwrap_or_default();
         let signature = self.signing_key.sign(&event_data).to_bytes().to_vec();
         SignedEvent {
             event: event.clone(),
@@ -8212,7 +8228,7 @@ impl Storage {
         }
         let proposal_id = Uuid::new_v4().to_string();
         let event_data =
-            serde_json::to_vec(&event).map_err(|e| Error::from_reason(e.to_string()))?;
+            canonical_event_bytes(&event).map_err(|e| Error::from_reason(e.to_string()))?;
         let signature = self.signing_key.sign(&event_data).to_bytes().to_vec();
         let signed_event = SignedEvent {
             event,
@@ -8250,8 +8266,7 @@ impl Storage {
     }
 
     /// Verify that `se.signature` is an authentic ed25519 signature by
-    /// `se.signer_peer_id` over the canonical event bytes (`serde_json::to_vec`,
-    /// the same convention `persist`/`propose` sign with). Unknown signer,
+    /// `se.signer_peer_id` over the canonical event bytes. Unknown signer,
     /// malformed signature, or non-matching signature all return `false`. This is
     /// the single source of truth for event-level signature checks — the WAL sync
     /// (`reconcile_state`), the consensus propose/commit paths all route here.
@@ -8260,7 +8275,7 @@ impl Storage {
             Some(k) => k,
             None => return false,
         };
-        let data = match serde_json::to_vec(&se.event) {
+        let data = match canonical_event_bytes(&se.event) {
             Ok(d) => d,
             Err(_) => return false,
         };
@@ -14840,13 +14855,26 @@ impl Storage {
         }
     }
 
+    /// Remove replica-local receipt metadata from events ingested from peers
+    /// before replay. The signed event remains byte-for-byte intact in the WAL;
+    /// only this replica's recovery view must use its fresh local frame.
+    fn normalize_replayed_event(&self, signed_event: SignedEvent) -> Event {
+        let mut event = signed_event.event;
+        if signed_event.signer_peer_id != self.local_peer_id {
+            if let Event::Transaction(transaction) = &mut event {
+                transaction.local_frame_seq = None;
+            }
+        }
+        event
+    }
+
     /// Apply journal events into memory (`None` = full replay, `Some(f)` =
     /// tail replay past a snapshot frontier). Vectors are staged only
     /// (index=false): rehydrate_hnsw_index after load builds every index once
     /// for all recovery paths. Idempotent: LWW upserts.
     fn replay_journal(&self, from_seq: Option<u64>, include_legacy: bool) {
         self.scan_journal(from_seq, include_legacy, &mut |seq, signed_event| {
-            self.apply_replay_event(seq, signed_event.event);
+            self.apply_replay_event(seq, self.normalize_replayed_event(signed_event));
         });
     }
 

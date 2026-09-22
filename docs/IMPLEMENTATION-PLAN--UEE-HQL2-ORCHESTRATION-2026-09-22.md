@@ -1,7 +1,7 @@
 ---
-version: "0.1.2b"
+version: "0.1.3b"
 created_at: "2026-09-22T00:00:00+07:00,ATHER,working-tree"
-last_update: "2026-09-22T00:00:00+07:00,ATHER"
+last_update: "2026-09-22T22:53:33+07:00,ATHER"
 status: candidate
 superseded_by: null
 attributes:
@@ -15,9 +15,9 @@ attributes:
 
 # UEE-HQL2 Orchestration Plan
 
-สถานะเอกสารนี้คือ `candidate` และเป็น workflow/แผนงานเท่านั้น ยังไม่อนุญาตให้แก้โค้ด,
-เปลี่ยน storage format, เปลี่ยน public API, migrate, merge หรือ deploy จนกว่า owner จะอนุมัติ
-เอกสารและ ADR ที่ระบุใน P2/P3
+สถานะเอกสารนี้คือ `candidate` และเป็น workflow/แผนงานที่ใช้กำกับ execution แบบมี gate
+เท่านั้น P4 ได้รับ owner approval แล้ว ส่วน P5 อยู่ในขอบเขต implementation ที่รอ owner
+รับรองหลัง Final Gate; P6-P16, merge และ deploy ยังไม่ถูกอนุญาต
 
 ## 1. Decision ที่เสนอ
 
@@ -204,10 +204,39 @@ its deterministic verify command, independent review, and an explicit dispositio
 
 ## 7. Approval boundary
 
-This document proposes planning only. After owner approval, orchestration may begin at P1. Before
-approval, no worker may implement P4-P16 and no branch may be merged into the caller checkout.
+The initial plan required owner approval before orchestration. That approval has been recorded for
+P4. The current execution boundary is narrower: P5 evidence may be reviewed, but P6-P16 and any
+merge/deploy action remain blocked until the owner explicitly approves the corresponding gate.
 
-**Please review and approve this documentation. I will generate the code once approved.**
+## 8. P5 execution evidence
+
+วันที่ `2026-09-22` ดำเนินการ P5 ในขอบเขต U2/U3 unified transaction, recovery และ
+stable-frontier semantics โดยจัดเป็นงานความเสี่ยงสูงด้าน durability/recovery และ signed-WAL
+compatibility การเปลี่ยนแปลงที่ตรวจแล้วมีดังนี้:
+
+- รักษา `local_frame_seq` ของ derived transaction checkpoint เพื่อให้ retry หลัง fold และ cold
+  reopen ใช้ local receipt sequence เดิม โดยไม่ปะปนกับ `origin_commit_seq`.
+- ป้องกันไม่ให้ vector materialization failure ถูกประกาศเป็น `stable: true` และให้ recovery/retry
+  ทำงานต่อได้.
+- normalize remote fold receipt ตอน replay ที่ปลายทาง และใช้ canonical signature bytes ที่ไม่รวม
+  derived local metadata เพื่อคง compatibility กับ WAL/signature เดิม.
+- เพิ่ม regression สำหรับ local retry, vector failure/recovery และ replicated cold-reopen receipt;
+  ไม่ขยาย scope เข้า P6 snapshot หรือ P8 planner.
+
+หลักฐานเครื่องที่ทำซ้ำได้:
+
+```text
+cargo test --no-default-features --test relational_u2_tests --test relational_u2_contract_tests --test unified_transaction_u3_tests --test unified_transaction_p5_tests --test wave_a_commit_tests
+=> 29 passed, 0 failed
+cargo fmt --all -- --check                         => pass
+git diff --check                                  => pass
+```
+
+RED evidence ของ compacted-retry regression คือ `left: 3, right: 2`; หลังแก้ไขแล้ว focused
+test และ full P5 gate เป็น GREEN Verify Gate รายงาน `VERIFY_PASS` และ Review Gate v2 รายงาน
+`REVIEW_PASS` โดยยังคง `tests/zz_probe_discriminates.rs` เป็น protected untracked WIP.
+
+สถานะปัจจุบันคือ **P5 ready for Final Gate and owner acceptance**; ยังไม่อนุญาตให้เริ่ม P6.
 
 ## CHANGELOG
 
@@ -216,3 +245,4 @@ approval, no worker may implement P4-P16 and no branch may be merged into the ca
 | 0.1.0b | 2026-09-22 | candidate | Initial staged UEE-HQL2 dependency DAG, conflict domains, merge order and gate workflow | working-tree | ATHER |
 | 0.1.1b | 2026-09-22 | candidate | Added explicit path ownership, exact verification commands, merge barriers, and corrected topology evidence scope after Verify Gate FAIL | working-tree | ATHER |
 | 0.1.2b | 2026-09-22 | candidate | Recorded dirty-checkout preservation and task-owned plan boundary after Review Gate returned unverified | working-tree | ATHER |
+| 0.1.3b | 2026-09-22 | candidate | Recorded P5 implementation evidence, RED/GREEN result, and Verify/Review gate outcomes; Final Gate and owner acceptance remain pending | working-tree | ATHER |
