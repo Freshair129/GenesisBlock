@@ -2,8 +2,8 @@
 title: "GenesisBlockDB Document Registry"
 doc_id: "DOC-REGISTRY-GENESISBLOCKDB"
 status: draft
-version: "0.4.3+draft"
-updated: "2026-09-08"
+version: "0.4.4+draft"
+updated: "2026-09-22"
 owner: "GenesisBlockDB Architecture"
 source_of_truth: true
 related_issue: 84
@@ -56,6 +56,7 @@ registry row explicitly names them.
 | Durable collections and edge history | `SPEC--WAVE-B-DURABLE-COLLECTIONS-EDGE-HISTORY` | `0.1.2b` | beta | GenesisBlockDB Engineering | `docs/SPEC--WAVE-B-DURABLE-COLLECTIONS-EDGE-HISTORY.md` |
 | Query correctness | `SPEC--WAVE-C-QUERY-CORRECTNESS` | `0.2.1b` | beta | GenesisBlockDB Engineering | `docs/SPEC--WAVE-C-QUERY-CORRECTNESS.md` |
 | Query budgets and quality gates | `SPEC--WAVE-D-BUDGETS-QUALITY-GATES` | `0.1.0b` | beta | GenesisBlockDB Engineering | `docs/SPEC--WAVE-D-BUDGETS-QUALITY-GATES.md` |
+| Query context and client capability | `SPEC--WAVE-E-QUERY-CONTEXT-CLIENT-CAPABILITY` | `0.1.1b` | beta | GenesisBlockDB Engineering | `docs/SPEC--WAVE-E-QUERY-CONTEXT-CLIENT-CAPABILITY.md` |
 | ADR | `ADR-GENESISBLOCKDB-DOMAIN-NEUTRAL-CORE` | `0.1.0+draft` | proposed | GenesisBlockDB Architecture | `docs/adr/ADR--GENESISBLOCKDB-DOMAIN-NEUTRAL-CORE.md` |
 | ADR | `ADR--GENESISDB-TYPED-QUERY-IR-AGENT-BOUNDARY` | `1.0.1` | accepted | Product Authority | `docs/adr/ADR--GENESISDB-TYPED-QUERY-IR-AGENT-BOUNDARY.md` |
 | Query contract | `SPEC-GENESISDB-TYPED-QUERY-IR-V1` | `1.0.2` | accepted | GenesisBlockDB Architecture | `docs/SPEC--GENESISDB-TYPED-QUERY-IR-V1.md` |
@@ -109,6 +110,7 @@ The following documents should be created only when implementation work requires
 
 | Version | Date | Owner | Summary |
 |---|---|---|---|
+| 0.4.4+draft | 2026-09-22 | GenesisBlockDB Architecture | Registered the approved Wave E query context and client capability implementation record. |
 | 0.4.3+draft | 2026-09-10 | GenesisBlockDB Architecture | Truth-synced the Wave D beta status and Typed Query IR 1.0.2 registry entries after release verification. |
 | 0.4.2+draft | 2026-09-08 | RWANG | Reconcile GenesisRAG17 document versions 1.0.3b after zuri's pre-merge ADR-071 to ADR-073 collision repair; preserve historical rows. |
 | 0.4.1+draft | 2026-09-08 | GenesisBlockDB Architecture | Reconciled the GenesisRAG17 registry entries with the live zuri ADR-071 reference and retained historical report links. |
