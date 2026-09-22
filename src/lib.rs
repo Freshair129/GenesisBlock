@@ -75,6 +75,7 @@ mod ffi;
 mod jni;
 pub mod query;
 pub mod router;
+pub mod uee_v2;
 use query::HqlCommand;
 
 // v3: Event::NodeRetract journal frames (RCA--SLICE0-DURABILITY defect 2).
