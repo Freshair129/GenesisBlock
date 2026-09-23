@@ -8,6 +8,9 @@
   },
   "main": "index.js",
   "types": "index.d.ts",
+  "bin": {
+    "genesisblock-mcp": "mcp/cli.js"
+  },
   "exports": {
     ".": {
       "types": "./index.d.ts",
@@ -19,6 +22,7 @@
     "index.js",
     "index.d.ts",
     "*.node",
+    "mcp/*.js",
     "README.md",
     "QUICKSTART.md",
     "LICENSE"
