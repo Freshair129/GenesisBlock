@@ -81,7 +81,10 @@ use query::HqlCommand;
 // v3: Event::NodeRetract journal frames (RCA--SLICE0-DURABILITY defect 2).
 // Older engines silently skip unknown event variants on replay, which would
 // resurrect deleted nodes — the bump makes downgrade fail closed instead.
-pub const SCHEMA_VERSION: u32 = 4;
+// v5: P6 generation receipts and signed access-policy events. Older engines
+// must refuse these snapshots/journals rather than replaying without the
+// enforcement state.
+pub const SCHEMA_VERSION: u32 = 5;
 // v3: WP-2.1 node_versions chain (additive CREATE IF NOT EXISTS migration).
 // v4: edges + edges_current view (SPEC--GENESISDB-EDGE-PROJECTION), same
 // additive shape — existing databases gain the table empty and are backfilled
@@ -986,6 +989,17 @@ pub struct SignedEvent {
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct SyncProgressReceipt {
+    pub version: u32,
+    pub responder_peer_id: String,
+    pub requester_peer_id: String,
+    pub request_nonce: String,
+    pub from_seq: u64,
+    pub through_seq: u64,
+    pub signature: Vec<u8>,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub enum GossipMessage {
     Heartbeat {
         #[serde(default)]
@@ -1008,6 +1022,8 @@ pub enum GossipMessage {
         /// across peers). `default` keeps pre-WP-1.2 peers deserializing.
         #[serde(default)]
         from_commit_seq: Option<u64>,
+        #[serde(default)]
+        request_nonce: Option<String>,
     },
     PushDelta {
         events: Vec<SignedEvent>,
@@ -1015,6 +1031,8 @@ pub enum GossipMessage {
         source_peer_id: String,
         #[serde(default)]
         through_seq: Option<u64>,
+        #[serde(default)]
+        progress_receipt: Option<SyncProgressReceipt>,
     },
     UpgradeRequired {
         schema_version: u32,
@@ -1115,6 +1133,107 @@ pub struct CommitResult {
     pub stable: bool,
 }
 
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+pub struct GenerationInfo {
+    pub generation_id: u64,
+    pub wal_frontier: u64,
+    pub publication_seq: u64,
+    pub txn_frontier: u64,
+    pub history_horizon: u64,
+    pub acl_revision: u64,
+    pub component_manifest_sha256: String,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+pub struct TemporalRead {
+    pub as_of: Option<String>,
+    pub tx_as_of: Option<u64>,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+pub struct AccessContext {
+    pub principal: String,
+    pub namespace: String,
+}
+
+#[derive(Serialize, Deserialize, Clone, Copy, Debug, PartialEq, Eq)]
+pub enum AccessPolicyMode {
+    Disabled,
+    Enforced,
+}
+
+#[derive(Serialize, Deserialize, Clone, Copy, Debug, PartialEq, Eq)]
+pub enum AccessAction {
+    Read,
+    Write,
+    ManagePolicy,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+pub enum AccessResource {
+    Namespace(String),
+    Node(String),
+    Edge(String),
+    Collection(String),
+    Table { namespace: String, table: String },
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+pub struct AccessGrant {
+    pub principal: String,
+    pub action: AccessAction,
+    pub resource: AccessResource,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+pub struct AccessPolicy {
+    pub revision: u64,
+    pub mode: AccessPolicyMode,
+    pub grants: Vec<AccessGrant>,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+pub struct PolicyAdminActor {
+    pub access: AccessContext,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct GenerationPublishedEvent {
+    version: u32,
+    generation: GenerationInfo,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct AccessPolicyChangedEvent {
+    version: u32,
+    expected_revision: u64,
+    policy: AccessPolicy,
+    actor: AccessContext,
+    #[serde(default)]
+    folded: bool,
+}
+
+/// An engine-issued lease. Its owner, fence, expiry, access context and
+/// temporal selectors are intentionally private so callers cannot construct or
+/// mutate a lease that was not issued by this Storage handle.
+#[derive(Clone, Debug)]
+pub struct ReadLease {
+    owner_token: String,
+    generation: GenerationInfo,
+    expires_at: Instant,
+    fencing_epoch: u64,
+    access: AccessContext,
+    temporal: TemporalRead,
+}
+
+/// A scoped read façade. It never exposes the underlying Storage reference and
+/// authorizes each operation explicitly, so a separately captured Storage does
+/// not inherit this view's access context.
+pub struct ReadView<'a> {
+    storage: &'a Storage,
+    lease: &'a ReadLease,
+}
+
 // --- Internal Storage ---
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -1168,6 +1287,11 @@ pub enum Event {
         #[serde(default)]
         retracted_at: String,
     },
+    /// Signed durable statement that a validated snapshot covers the WAL
+    /// frontier immediately before this receipt's frame.
+    GenerationPublished(GenerationPublishedEvent),
+    /// Signed, versioned and revision-CASed access-policy transition.
+    AccessPolicyChanged(AccessPolicyChangedEvent),
 }
 
 /// Canonical bytes for event signatures. A fold receipt's local frame is a
@@ -1184,6 +1308,24 @@ fn canonical_event_bytes(event: &Event) -> serde_json::Result<Vec<u8>> {
         }
     }
     serde_json::to_vec(event)
+}
+
+fn canonical_sync_progress_receipt_bytes(
+    version: u32,
+    responder_peer_id: &str,
+    requester_peer_id: &str,
+    request_nonce: &str,
+    from_seq: u64,
+    through_seq: u64,
+) -> serde_json::Result<Vec<u8>> {
+    serde_json::to_vec(&(
+        version,
+        responder_peer_id,
+        requester_peer_id,
+        request_nonce,
+        from_seq,
+        through_seq,
+    ))
 }
 
 /// Immutable semantic contract, ordered before every dependent vector.
@@ -3241,6 +3383,17 @@ pub struct Storage {
     /// frontier `expected_frontier` CASes against — a frame-level CAS would
     /// spuriously fail on any interleaved ordinary write).
     txn_frontier: AtomicU64,
+    /// P6: process-local ownership token. A reopened Storage handle gets a
+    /// fresh token, so leases cannot cross a restart even if their bytes are
+    /// retained by a caller.
+    owner_token: String,
+    /// P6: storage-wide fencing epoch. Advancing it revokes every lease issued
+    /// by this handle, as required by the approved contract.
+    fencing_epoch: AtomicU64,
+    /// P6: the last durable generation receipt applied to this handle.
+    published_generation: RwLock<Option<GenerationInfo>>,
+    /// P6: durable read/policy state. Disabled is the v4-compatible default.
+    access_policy: RwLock<AccessPolicy>,
     /// Pre-WP-1.2 JSONL WAL path (`genesis-graph.wal`). Exists only until the
     /// one-way migration seals it as segment 0, or indefinitely in read-only
     /// opens of a legacy database.
@@ -3354,6 +3507,435 @@ impl Storage {
         Ok(())
     }
 
+    fn default_access_policy() -> AccessPolicy {
+        AccessPolicy {
+            revision: 0,
+            mode: AccessPolicyMode::Disabled,
+            grants: Vec::new(),
+        }
+    }
+
+    fn validate_temporal_read(temporal: &TemporalRead) -> Result<()> {
+        if let Some(as_of) = &temporal.as_of {
+            DateTime::parse_from_rfc3339(as_of).map_err(|e| {
+                Error::from_reason(format!("TEMPORAL_INVALID: as_of is not RFC3339: {e}"))
+            })?;
+        }
+        Ok(())
+    }
+
+    fn require_unscoped_read(&self) -> Result<()> {
+        if self.access_policy.read().mode == AccessPolicyMode::Enforced {
+            return Err(Error::from_reason("ACCESS_CONTEXT_REQUIRED"));
+        }
+        Ok(())
+    }
+
+    fn grant_matches(
+        policy: &AccessPolicy,
+        access: &AccessContext,
+        action: AccessAction,
+        resource: &AccessResource,
+    ) -> bool {
+        policy.grants.iter().any(|grant| {
+            grant.principal == access.principal
+                && grant.action == action
+                && &grant.resource == resource
+        })
+    }
+
+    fn authorize_namespace_read(&self, access: &AccessContext, namespace: &str) -> Result<()> {
+        if self.access_policy.read().mode == AccessPolicyMode::Disabled {
+            return Ok(());
+        }
+        if access.namespace != namespace
+            || !Self::grant_matches(
+                &self.access_policy.read(),
+                access,
+                AccessAction::Read,
+                &AccessResource::Namespace(namespace.to_string()),
+            )
+        {
+            return Err(Error::from_reason("ACCESS_DENIED"));
+        }
+        Ok(())
+    }
+
+    fn authorize_default_composed_read(&self, access: &AccessContext) -> Result<()> {
+        self.authorize_namespace_read(access, "default")
+    }
+
+    fn authorize_node_read(&self, access: &AccessContext, id: &str) -> Result<()> {
+        if self.access_policy.read().mode == AccessPolicyMode::Disabled {
+            return Ok(());
+        }
+        if access.namespace != "default" {
+            return Err(Error::from_reason("ACCESS_DENIED"));
+        }
+        let policy = self.access_policy.read();
+        if Self::grant_matches(
+            &policy,
+            access,
+            AccessAction::Read,
+            &AccessResource::Namespace("default".into()),
+        ) || Self::grant_matches(
+            &policy,
+            access,
+            AccessAction::Read,
+            &AccessResource::Node(id.to_string()),
+        ) {
+            Ok(())
+        } else {
+            Err(Error::from_reason("ACCESS_DENIED"))
+        }
+    }
+
+    fn authorize_relational_read(
+        &self,
+        access: &AccessContext,
+        query: &RelationalQuery,
+    ) -> Result<()> {
+        if self.access_policy.read().mode == AccessPolicyMode::Disabled {
+            return Ok(());
+        }
+        if access.namespace != query.namespace {
+            return Err(Error::from_reason("ACCESS_DENIED"));
+        }
+        let policy = self.access_policy.read();
+        if Self::grant_matches(
+            &policy,
+            access,
+            AccessAction::Read,
+            &AccessResource::Namespace(query.namespace.clone()),
+        ) {
+            return Ok(());
+        }
+        let mut tables = vec![query.table.clone()];
+        tables.extend(query.joins.iter().map(|join| join.table.clone()));
+        if tables.into_iter().all(|table| {
+            Self::grant_matches(
+                &policy,
+                access,
+                AccessAction::Read,
+                &AccessResource::Table {
+                    namespace: query.namespace.clone(),
+                    table,
+                },
+            )
+        }) {
+            Ok(())
+        } else {
+            Err(Error::from_reason("ACCESS_DENIED"))
+        }
+    }
+
+    fn authorize_policy_admin(&self, actor: &PolicyAdminActor) -> Result<()> {
+        let policy = self.access_policy.read();
+        match policy.mode {
+            AccessPolicyMode::Disabled if actor.access.principal == "local-owner" => Ok(()),
+            AccessPolicyMode::Enforced
+                if Self::grant_matches(
+                    &policy,
+                    &actor.access,
+                    AccessAction::ManagePolicy,
+                    &AccessResource::Namespace(actor.access.namespace.clone()),
+                ) =>
+            {
+                Ok(())
+            }
+            _ => Err(Error::from_reason("ACCESS_DENIED")),
+        }
+    }
+
+    fn validate_access_policy_shape(policy: &AccessPolicy) -> Result<()> {
+        for grant in &policy.grants {
+            if grant.principal.trim().is_empty() {
+                return Err(Error::from_reason("ACCESS_DENIED"));
+            }
+            match &grant.resource {
+                AccessResource::Namespace(namespace)
+                | AccessResource::Node(namespace)
+                | AccessResource::Edge(namespace)
+                | AccessResource::Collection(namespace)
+                    if namespace.trim().is_empty() =>
+                {
+                    return Err(Error::from_reason("ACCESS_DENIED"));
+                }
+                AccessResource::Table { namespace, table }
+                    if namespace.trim().is_empty() || table.trim().is_empty() =>
+                {
+                    return Err(Error::from_reason("ACCESS_DENIED"));
+                }
+                _ => {}
+            }
+        }
+        Ok(())
+    }
+
+    fn apply_generation_event(
+        &self,
+        event: &GenerationPublishedEvent,
+        frame_seq: u64,
+    ) -> Result<()> {
+        if event.version != 1
+            || event.generation.publication_seq != event.generation.wal_frontier.saturating_add(1)
+            || event.generation.component_manifest_sha256.len() != 64
+        {
+            return Err(Error::from_reason(
+                "GENERATION_STALE: invalid publication receipt",
+            ));
+        }
+        // A folded base frame is stamped at the fold frontier, which may be
+        // newer than the receipt's original publication frame. A live receipt
+        // must be exactly at its declared publication sequence.
+        if frame_seq < event.generation.publication_seq {
+            return Err(Error::from_reason(
+                "GENERATION_STALE: receipt frame precedes publication",
+            ));
+        }
+        let mut current = self.published_generation.write();
+        if let Some(existing) = current.as_ref() {
+            if existing.generation_id > event.generation.generation_id {
+                return Ok(());
+            }
+            if existing.generation_id == event.generation.generation_id {
+                if existing != &event.generation {
+                    return Err(Error::from_reason(
+                        "GENERATION_STALE: conflicting publication receipt",
+                    ));
+                }
+                return Ok(());
+            }
+        }
+        *current = Some(event.generation.clone());
+        Ok(())
+    }
+
+    fn apply_access_policy_event(&self, event: &AccessPolicyChangedEvent) -> Result<()> {
+        if event.version != 1 {
+            return Err(Error::from_reason(
+                "ACCESS_DENIED: unsupported policy event version",
+            ));
+        }
+        Self::validate_access_policy_shape(&event.policy)?;
+        if event.policy.revision != event.expected_revision.saturating_add(1) {
+            return Err(Error::from_reason("ACCESS_POLICY_REVISION_CONFLICT"));
+        }
+        let mut current = self.access_policy.write();
+        if event.folded {
+            // A fold is a signed materialization of the current policy, not a
+            // new user transition. It may collapse revisions that preceded the
+            // retained base segment, but never regresses an equal/newer state.
+            if current.revision > event.policy.revision {
+                return Ok(());
+            }
+            if current.revision == event.policy.revision {
+                if *current != event.policy {
+                    return Err(Error::from_reason("ACCESS_POLICY_REVISION_CONFLICT"));
+                }
+                return Ok(());
+            }
+            *current = event.policy.clone();
+            return Ok(());
+        }
+        if current.revision == event.policy.revision && *current == event.policy {
+            return Ok(());
+        }
+        if current.revision != event.expected_revision {
+            return Err(Error::from_reason("ACCESS_POLICY_REVISION_CONFLICT"));
+        }
+        *current = event.policy.clone();
+        Ok(())
+    }
+
+    fn validate_lease_unlocked(&self, lease: &ReadLease) -> Result<()> {
+        if lease.owner_token != self.owner_token {
+            return Err(Error::from_reason("LEASE_OWNER_MISMATCH"));
+        }
+        if Instant::now() >= lease.expires_at {
+            return Err(Error::from_reason("LEASE_EXPIRED"));
+        }
+        if lease.fencing_epoch != self.fencing_epoch.load(Ordering::SeqCst) {
+            return Err(Error::from_reason("LEASE_REVOKED"));
+        }
+        if lease.generation.acl_revision != self.access_policy.read().revision {
+            return Err(Error::from_reason("LEASE_REVOKED"));
+        }
+        let frontier = self.commit_sequence.load(Ordering::SeqCst);
+        if frontier != lease.generation.publication_seq
+            || self
+                .published_generation
+                .read()
+                .as_ref()
+                .is_none_or(|generation| generation != &lease.generation)
+        {
+            return Err(Error::from_reason("GENERATION_STALE"));
+        }
+        Ok(())
+    }
+
+    pub fn validate_lease(&self, lease: &ReadLease) -> Result<()> {
+        let _read_guard = self.commit_lock.lock();
+        self.ensure_readable()?;
+        self.validate_lease_unlocked(lease)
+    }
+
+    fn publish_generation_unlocked(&self) -> Result<GenerationInfo> {
+        self.ensure_writable()?;
+        let wal_frontier = self.commit_sequence.load(Ordering::SeqCst);
+        if let Some(existing) = self.published_generation.read().as_ref() {
+            if existing.publication_seq == wal_frontier {
+                return Ok(existing.clone());
+            }
+        }
+        self.flush_index();
+        self.save_state_checkpoint(false)?;
+        let component_manifest_sha256 = self.validated_snapshot_manifest_digest()?;
+        let publication_seq = wal_frontier
+            .checked_add(1)
+            .ok_or_else(|| Error::from_reason("GENERATION_STALE: WAL frontier overflow"))?;
+        let generation = GenerationInfo {
+            generation_id: self
+                .published_generation
+                .read()
+                .as_ref()
+                .map(|old| old.generation_id.saturating_add(1))
+                .unwrap_or(1),
+            wal_frontier,
+            publication_seq,
+            txn_frontier: self.txn_frontier.load(Ordering::SeqCst),
+            // The journal reports zero before the first fold. P6 leases use
+            // epoch one as the first queryable transaction boundary.
+            history_horizon: self.history_horizon().max(1),
+            acl_revision: self.access_policy.read().revision,
+            component_manifest_sha256,
+        };
+        let event = Event::GenerationPublished(GenerationPublishedEvent {
+            version: 1,
+            generation: generation.clone(),
+        });
+        let actual_seq = self.append_wal_event(&event)?;
+        if actual_seq != publication_seq {
+            self.recovery_required.store(true, Ordering::SeqCst);
+            return Err(Error::from_reason(format!(
+                "GENERATION_STALE: publication sequence expected {publication_seq}, got {actual_seq}; reopen required"
+            )));
+        }
+        self.apply_generation_event(
+            match &event {
+                Event::GenerationPublished(event) => event,
+                _ => unreachable!(),
+            },
+            actual_seq,
+        )?;
+        Ok(generation)
+    }
+
+    pub fn publish_generation(&self) -> Result<GenerationInfo> {
+        let _commit_guard = self.commit_lock.lock();
+        self.ensure_readable()?;
+        self.publish_generation_unlocked()
+    }
+
+    pub fn pin_generation(
+        &self,
+        access: AccessContext,
+        temporal: TemporalRead,
+        ttl: Duration,
+    ) -> Result<ReadLease> {
+        let _commit_guard = self.commit_lock.lock();
+        self.ensure_readable()?;
+        if ttl.is_zero() {
+            return Err(Error::from_reason("LEASE_EXPIRED: ttl must be positive"));
+        }
+        if access.principal.trim().is_empty() || access.namespace.trim().is_empty() {
+            return Err(Error::from_reason("ACCESS_DENIED"));
+        }
+        Self::validate_temporal_read(&temporal)?;
+        let published_generation = { self.published_generation.read().clone() };
+        let generation = match published_generation {
+            Some(generation)
+                if generation.publication_seq == self.commit_sequence.load(Ordering::SeqCst) =>
+            {
+                generation
+            }
+            _ => self.publish_generation_unlocked()?,
+        };
+        if temporal
+            .tx_as_of
+            .is_some_and(|tx| tx < generation.history_horizon)
+        {
+            return Err(Error::from_reason("TEMPORAL_BEYOND_HORIZON"));
+        }
+        Ok(ReadLease {
+            owner_token: self.owner_token.clone(),
+            generation,
+            expires_at: Instant::now() + ttl,
+            fencing_epoch: self.fencing_epoch.load(Ordering::SeqCst),
+            access,
+            temporal,
+        })
+    }
+
+    pub fn revoke_lease(&self, lease: &ReadLease) -> Result<()> {
+        let _commit_guard = self.commit_lock.lock();
+        self.ensure_readable()?;
+        if lease.owner_token != self.owner_token {
+            return Err(Error::from_reason("LEASE_OWNER_MISMATCH"));
+        }
+        self.fencing_epoch.fetch_add(1, Ordering::SeqCst);
+        Ok(())
+    }
+
+    pub fn with_read_lease<T, F>(&self, lease: &ReadLease, callback: F) -> Result<T>
+    where
+        F: FnOnce(&ReadView<'_>) -> Result<T>,
+    {
+        let _commit_guard = self.commit_lock.lock();
+        self.ensure_readable()?;
+        self.validate_lease_unlocked(lease)?;
+        let view = ReadView {
+            storage: self,
+            lease,
+        };
+        let result = callback(&view);
+        self.validate_lease_unlocked(lease)?;
+        result
+    }
+
+    pub fn replace_access_policy(
+        &self,
+        actor: PolicyAdminActor,
+        expected_revision: u64,
+        policy: AccessPolicy,
+    ) -> Result<()> {
+        self.ensure_writable()?;
+        let _commit_guard = self.commit_lock.lock();
+        self.ensure_readable()?;
+        let current = self.access_policy.read().clone();
+        if current.revision != expected_revision
+            || policy.revision != expected_revision.saturating_add(1)
+        {
+            return Err(Error::from_reason("ACCESS_POLICY_REVISION_CONFLICT"));
+        }
+        self.authorize_policy_admin(&actor)?;
+        Self::validate_access_policy_shape(&policy)?;
+        let event = Event::AccessPolicyChanged(AccessPolicyChangedEvent {
+            version: 1,
+            expected_revision,
+            policy,
+            actor: actor.access,
+            folded: false,
+        });
+        let seq = self.append_wal_event(&event)?;
+        self.apply_access_policy_event(match &event {
+            Event::AccessPolicyChanged(event) => event,
+            _ => unreachable!(),
+        })
+        .map_err(|error| self.durable_apply_error(seq, error))?;
+        Ok(())
+    }
+
     fn tokenize_id(id: &str) -> Vec<String> {
         let base_chars: String = id
             .chars()
@@ -3417,6 +3999,13 @@ impl Storage {
     }
 
     pub fn get_u32(&self, id: &str) -> Option<u32> {
+        let _read_guard = self.commit_lock.lock();
+        self.ensure_readable().ok()?;
+        self.require_unscoped_read().ok()?;
+        self.get_u32_unlocked(id)
+    }
+
+    fn get_u32_unlocked(&self, id: &str) -> Option<u32> {
         self.id_to_u32.get(id).map(|v| *v)
     }
 
@@ -3776,6 +4365,9 @@ impl Storage {
 
     pub fn list_collections(&self) -> Vec<CollectionInfo> {
         let _read_guard = self.commit_lock.lock();
+        if self.access_policy.read().mode == AccessPolicyMode::Enforced {
+            return Vec::new();
+        }
 
         // `index_lag` is engine-global; snapshot it once and stamp every entry.
         let lag = self.index_lag();
@@ -5813,7 +6405,7 @@ impl Storage {
                 clock,
                 retracted_at,
             } => {
-                if let Some(node_u32) = self.get_u32(id) {
+                if let Some(node_u32) = self.get_u32_unlocked(id) {
                     let latest: Option<(u32, String)> = conn.query_row(
                         "SELECT clock_time,clock_peer FROM node_versions WHERE node_u32=?1 ORDER BY frame_seq DESC LIMIT 1",
                         [node_u32], |r| Ok((r.get(0)?, r.get(1)?)),
@@ -5890,10 +6482,12 @@ impl Storage {
             || self.legacy_log_path.exists()
             || !Self::journal_list_segments(&self.path).is_empty();
         if !journal_present {
-            let projection_complete = self
-                .nodes
-                .iter()
-                .all(|entry| self.projection_props(*entry.key()).ok().flatten().is_some());
+            let projection_complete = self.nodes.iter().all(|entry| {
+                self.projection_props_unlocked(*entry.key())
+                    .ok()
+                    .flatten()
+                    .is_some()
+            });
             if projection_complete {
                 return Ok(());
             }
@@ -5937,10 +6531,12 @@ impl Storage {
         if let Some(e) = first_err {
             return Err(e);
         }
-        let projection_complete = self
-            .nodes
-            .iter()
-            .all(|entry| self.projection_props(*entry.key()).ok().flatten().is_some());
+        let projection_complete = self.nodes.iter().all(|entry| {
+            self.projection_props_unlocked(*entry.key())
+                .ok()
+                .flatten()
+                .is_some()
+        });
         if !projection_complete {
             return Err(Error::from_reason(
                 "journal replay did not recover props for every resident node",
@@ -6101,7 +6697,12 @@ impl Storage {
     pub fn projection_props(&self, node_u32: u32) -> Result<Option<Value>> {
         let _read_guard = self.commit_lock.lock();
         self.ensure_readable()?;
+        self.require_unscoped_read()?;
 
+        self.projection_props_unlocked(node_u32)
+    }
+
+    fn projection_props_unlocked(&self, node_u32: u32) -> Result<Option<Value>> {
         let conn = self.projection_db.lock();
         let payload: Option<String> = conn
             .query_row(
@@ -6151,6 +6752,7 @@ impl Storage {
     ) -> Result<Option<RelationalSchemaPackage>> {
         let _read_guard = self.commit_lock.lock();
         self.ensure_readable()?;
+        self.require_unscoped_read()?;
 
         Self::validate_namespace(namespace)?;
         let conn = self.projection_db.lock();
@@ -6160,6 +6762,7 @@ impl Storage {
     pub fn list_relational_schemas(&self) -> Result<Vec<RelationalSchemaPackage>> {
         let _read_guard = self.commit_lock.lock();
         self.ensure_readable()?;
+        self.require_unscoped_read()?;
 
         let conn = self.projection_db.lock();
         let mut statement = conn
@@ -6487,6 +7090,7 @@ impl Storage {
     pub fn query_sql(&self, sql: &str, params: Vec<Value>) -> Result<Vec<Value>> {
         let _read_guard = self.commit_lock.lock();
         self.ensure_readable()?;
+        self.require_unscoped_read()?;
 
         use rusqlite::hooks::{AuthAction, AuthContext, Authorization};
         use rusqlite::limits::Limit;
@@ -6605,7 +7209,11 @@ impl Storage {
     pub fn query_relational(&self, query: RelationalQuery) -> Result<Vec<Value>> {
         let _read_guard = self.commit_lock.lock();
         self.ensure_readable()?;
+        self.require_unscoped_read()?;
+        self.query_relational_unlocked(query)
+    }
 
+    fn query_relational_unlocked(&self, query: RelationalQuery) -> Result<Vec<Value>> {
         Self::validate_namespace(&query.namespace)?;
         Self::validate_identifier(&query.table)?;
         if query.columns.is_empty() {
@@ -6766,6 +7374,7 @@ impl Storage {
     pub fn execute_named_query(&self, request: NamedQueryRequest) -> Result<Vec<Value>> {
         let _read_guard = self.commit_lock.lock();
         self.ensure_readable()?;
+        self.require_unscoped_read()?;
 
         Self::validate_namespace(&request.namespace)?;
         Self::validate_identifier(&request.query_name)?;
@@ -6968,7 +7577,7 @@ impl Storage {
         if !node.props.is_null() {
             return node.props.clone();
         }
-        self.projection_props(node_u32)
+        self.projection_props_unlocked(node_u32)
             .ok()
             .flatten()
             .unwrap_or_else(|| Value::Object(Default::default()))
@@ -6986,15 +7595,26 @@ impl Storage {
     pub fn node_view(&self, id: &str) -> Option<NodeOutput> {
         let _read_guard = self.commit_lock.lock();
         self.ensure_readable().ok()?;
+        self.require_unscoped_read().ok()?;
 
-        let u32_id = self.get_u32(id)?;
-        self.node_view_u32(u32_id)
+        let u32_id = self.get_u32_unlocked(id)?;
+        self.node_view_u32_unlocked(u32_id)
     }
 
     pub fn node_view_u32(&self, u32_id: u32) -> Option<NodeOutput> {
         let _read_guard = self.commit_lock.lock();
         self.ensure_readable().ok()?;
+        self.require_unscoped_read().ok()?;
 
+        self.node_view_u32_unlocked(u32_id)
+    }
+
+    fn node_view_unlocked(&self, id: &str) -> Option<NodeOutput> {
+        let u32_id = self.get_u32_unlocked(id)?;
+        self.node_view_u32_unlocked(u32_id)
+    }
+
+    fn node_view_u32_unlocked(&self, u32_id: u32) -> Option<NodeOutput> {
         let node = self.nodes.get(&u32_id)?;
         Some(self.hydrated_node(u32_id, node.value()))
     }
@@ -7403,6 +8023,14 @@ impl Storage {
             recovery_required: AtomicBool::new(false),
             collection_definitions: DashMap::new(),
             commit_sequence: AtomicU64::new(0),
+            owner_token: Uuid::new_v4().to_string(),
+            fencing_epoch: AtomicU64::new(0),
+            published_generation: RwLock::new(None),
+            access_policy: RwLock::new(AccessPolicy {
+                revision: 0,
+                mode: AccessPolicyMode::Disabled,
+                grants: Vec::new(),
+            }),
             nodes: DashMap::new(),
             edges: DashMap::new(),
             out_idx: DashMap::new(),
@@ -7498,8 +8126,8 @@ impl Storage {
                 && recovery_definitions.iter().any(|d| d.rerank);
             let mut snapshot_loaded =
                 !snapshot_stale_vs_fold && !sidecar_tail && storage.try_load_state();
-            if snapshot_loaded
-                && storage.collections.iter().any(|c| {
+            if !snapshot_loaded
+                || storage.collections.iter().any(|c| {
                     let meta = c.metadata.read();
                     let arena = c.arena.read();
                     recovery_definitions
@@ -7525,6 +8153,8 @@ impl Storage {
                 storage.edges_retired.clear();
                 storage.out_idx_retired.clear();
                 storage.in_idx_retired.clear();
+                *storage.access_policy.write() = Self::default_access_policy();
+                *storage.published_generation.write() = None;
                 storage.collections.clear();
                 storage.collection_definitions.clear();
                 storage.collections.insert(
@@ -7833,7 +8463,11 @@ impl Storage {
     pub fn node_versions(&self, id: &str, at_seq: Option<u64>) -> Result<serde_json::Value> {
         let _read_guard = self.commit_lock.lock();
         self.ensure_readable()?;
+        self.require_unscoped_read()?;
+        self.node_versions_unlocked(id, at_seq)
+    }
 
+    fn node_versions_unlocked(&self, id: &str, at_seq: Option<u64>) -> Result<serde_json::Value> {
         let horizon = self.history_horizon();
         if let Some(seq) = at_seq {
             if seq < horizon {
@@ -8108,9 +8742,14 @@ impl Storage {
     pub fn find_fuzzy_id(&self, id: &str) -> Option<String> {
         let _read_guard = self.commit_lock.lock();
         self.ensure_readable().ok()?;
+        self.require_unscoped_read().ok()?;
 
+        self.find_fuzzy_id_unlocked(id)
+    }
+
+    fn find_fuzzy_id_unlocked(&self, id: &str) -> Option<String> {
         // 1. Exact Match
-        if self.get_u32(id).is_some() {
+        if self.get_u32_unlocked(id).is_some() {
             return Some(id.to_string());
         }
 
@@ -8194,6 +8833,14 @@ impl Storage {
             // MASTER-immutability breadth question is tracked separately).
             Event::NodeRetract { .. } => Ok(true),
             Event::RelationalSchema(_) | Event::RelationalRows { .. } => Ok(true),
+            Event::GenerationPublished(receipt) => Ok(receipt.version == 1
+                && receipt.generation.publication_seq
+                    == receipt.generation.wal_frontier.saturating_add(1)
+                && receipt.generation.component_manifest_sha256.len() == 64),
+            Event::AccessPolicyChanged(policy) => Ok(policy.version == 1
+                && (policy.folded
+                    || policy.policy.revision == policy.expected_revision.saturating_add(1))
+                && Self::validate_access_policy_shape(&policy.policy).is_ok()),
             Event::Transaction(transaction) => {
                 for node in &transaction.nodes {
                     if !self.semantic_verify(&Event::Node(node.clone()))? {
@@ -8221,6 +8868,9 @@ impl Storage {
     /// proposal that conflicts with an existing high-impact MASTER axiom is
     /// rejected up front rather than slipping through to quorum.
     pub fn propose_consensus(&self, event: Event, _signature: Vec<u8>) -> Result<String> {
+        if Self::contains_p6_control_event(&event) {
+            return Err(Error::from_reason("P6_LOCAL_ONLY"));
+        }
         if !self.semantic_verify(&event)? {
             return Err(Error::from_reason(
                 "proposal rejected by semantic_verify (conflicts with a governing axiom)",
@@ -8263,6 +8913,69 @@ impl Storage {
         let bytes = self.peers.get(peer_id)?.verifying_key.clone();
         let arr: [u8; 32] = bytes.as_slice().try_into().ok()?;
         VerifyingKey::from_bytes(&arr).ok()
+    }
+
+    fn sign_sync_progress_receipt(
+        &self,
+        requester_peer_id: &str,
+        request_nonce: &str,
+        from_seq: u64,
+        through_seq: u64,
+    ) -> Result<SyncProgressReceipt> {
+        let version = 1;
+        let payload = canonical_sync_progress_receipt_bytes(
+            version,
+            &self.local_peer_id,
+            requester_peer_id,
+            request_nonce,
+            from_seq,
+            through_seq,
+        )
+        .map_err(|e| Error::from_reason(e.to_string()))?;
+        Ok(SyncProgressReceipt {
+            version,
+            responder_peer_id: self.local_peer_id.clone(),
+            requester_peer_id: requester_peer_id.to_string(),
+            request_nonce: request_nonce.to_string(),
+            from_seq,
+            through_seq,
+            signature: self.signing_key.sign(&payload).to_bytes().to_vec(),
+        })
+    }
+
+    fn verify_sync_progress_receipt(
+        &self,
+        receipt: &SyncProgressReceipt,
+        source_peer_id: &str,
+        request_nonce: &str,
+        from_seq: u64,
+    ) -> bool {
+        if receipt.version != 1
+            || receipt.responder_peer_id != source_peer_id
+            || receipt.requester_peer_id != self.local_peer_id
+            || receipt.request_nonce != request_nonce
+            || receipt.from_seq != from_seq
+            || receipt.through_seq < receipt.from_seq
+        {
+            return false;
+        }
+        let Some(vkey) = self.peer_verifying_key(source_peer_id) else {
+            return false;
+        };
+        let Ok(payload) = canonical_sync_progress_receipt_bytes(
+            receipt.version,
+            &receipt.responder_peer_id,
+            &receipt.requester_peer_id,
+            &receipt.request_nonce,
+            receipt.from_seq,
+            receipt.through_seq,
+        ) else {
+            return false;
+        };
+        let Ok(signature) = Signature::from_slice(&receipt.signature) else {
+            return false;
+        };
+        vkey.verify(&payload, &signature).is_ok()
     }
 
     /// Verify that `se.signature` is an authentic ed25519 signature by
@@ -8336,6 +9049,9 @@ impl Storage {
 
         if let Some(mut proposal_ref) = self.proposals.get_mut(&proposal_id) {
             let proposal = proposal_ref.value_mut();
+            if Self::contains_p6_control_event(&proposal.signed_event.event) {
+                return Err(Error::from_reason("P6_LOCAL_ONLY"));
+            }
             // Already-committed guard: once quorum is crossed and the event applied,
             // later approving votes must not re-apply or re-persist it.
             if proposal.committed {
@@ -8359,6 +9075,9 @@ impl Storage {
             // proposal's own event signature (a gossiped proposal is verified on
             // receipt, but defense-in-depth) and re-run the governance check.
             let signed_event = proposal.signed_event.clone();
+            if Self::contains_p6_control_event(&signed_event.event) {
+                return Err(Error::from_reason("P6_LOCAL_ONLY"));
+            }
             if !self.verify_event_signature(&signed_event) {
                 return Err(Error::from_reason(
                     "proposal event signature invalid at commit",
@@ -8459,6 +9178,10 @@ impl Storage {
                     let retract_seq = self.persist_signed(signed_event.clone())?;
                     self.apply_event_memory(retract_seq, signed_event.event.clone(), true);
                 }
+                Event::GenerationPublished(_) | Event::AccessPolicyChanged(_) => {
+                    let seq = self.persist_signed(signed_event.clone())?;
+                    self.apply_event_memory(seq, signed_event.event.clone(), true);
+                }
             }
             proposal.committed = true;
             return Ok(true);
@@ -8487,7 +9210,7 @@ impl Storage {
     }
 
     pub fn compute_impact(&self, node: &NodeOutput) -> f64 {
-        let u32_id = match self.get_u32(&node.id) {
+        let u32_id = match self.get_u32_unlocked(&node.id) {
             Some(id) => id,
             None => return 0.7,
         };
@@ -8519,7 +9242,7 @@ impl Storage {
                 .collect(),
         };
         for id in ids_to_process {
-            if let Some(u32_id) = self.get_u32(&id) {
+            if let Some(u32_id) = self.get_u32_unlocked(&id) {
                 if let Some(mut node_ref) = self.nodes.get_mut(&u32_id) {
                     let new_impact = self.compute_impact(node_ref.value());
                     node_ref.value_mut().impact = Some(new_impact);
@@ -8534,12 +9257,12 @@ impl Storage {
     pub fn index_edge_internal(&self, id: &str, from: &str, to: &str) -> u128 {
         let ekey = Self::edge_key(id);
         if let Some(old) = self.edges.get(&ekey) {
-            if let Some(u) = self.get_u32(&old.from) {
+            if let Some(u) = self.get_u32_unlocked(&old.from) {
                 if let Some(mut ids) = self.out_idx.get_mut(&u) {
                     ids.remove(&ekey);
                 }
             }
-            if let Some(u) = self.get_u32(&old.to) {
+            if let Some(u) = self.get_u32_unlocked(&old.to) {
                 if let Some(mut ids) = self.in_idx.get_mut(&u) {
                     ids.remove(&ekey);
                 }
@@ -8671,7 +9394,7 @@ impl Storage {
         self.ensure_writable()?;
         let _commit_guard = self.commit_lock.lock();
         self.ensure_readable()?;
-        let u32_id = match self.get_u32(&id) {
+        let u32_id = match self.get_u32_unlocked(&id) {
             Some(i) => i,
             None => return Err(Error::from_reason(format!("Node {} not found", id))),
         };
@@ -8971,7 +9694,7 @@ impl Storage {
                     _ => None,
                 });
         if let Some(anchor_id) = anchor_id {
-            if let Some(anchor_u32) = self.get_u32(&anchor_id) {
+            if let Some(anchor_u32) = self.get_u32_unlocked(&anchor_id) {
                 if let Some(entry) = self.nodes.get(&anchor_u32) {
                     let node = entry.value();
                     if Self::is_node_visible(node, as_of, false, &now)
@@ -9035,8 +9758,8 @@ impl Storage {
                         None => continue,
                     };
                     let edge = edge_ref.value();
-                    if !(walk_out && self.get_u32(&edge.from) == Some(*curr)
-                        || walk_in && self.get_u32(&edge.to) == Some(*curr))
+                    if !(walk_out && self.get_u32_unlocked(&edge.from) == Some(*curr)
+                        || walk_in && self.get_u32_unlocked(&edge.to) == Some(*curr))
                     {
                         continue;
                     }
@@ -9055,12 +9778,12 @@ impl Storage {
                         }
                     }
                     // Far endpoint = the one that is not the current node.
-                    let far_id = if self.get_u32(&edge.from) == Some(*curr) {
+                    let far_id = if self.get_u32_unlocked(&edge.from) == Some(*curr) {
                         &edge.to
                     } else {
                         &edge.from
                     };
-                    let far_u32 = match self.get_u32(far_id) {
+                    let far_u32 = match self.get_u32_unlocked(far_id) {
                         Some(x) => x,
                         None => continue,
                     };
@@ -9389,7 +10112,11 @@ impl Storage {
     pub fn execute_query_ir(&self, request: QueryIrRequest) -> Result<serde_json::Value> {
         let _read_guard = self.commit_lock.lock();
         self.ensure_readable()?;
+        self.require_unscoped_read()?;
+        self.execute_query_ir_unlocked(request)
+    }
 
+    fn execute_query_ir_unlocked(&self, request: QueryIrRequest) -> Result<serde_json::Value> {
         if request.contract_version != QUERY_IR_V1 {
             return Err(Error::from_reason(format!(
                 "QUERY_IR_VERSION_UNSUPPORTED: expected '{QUERY_IR_V1}', got '{}'",
@@ -9591,12 +10318,12 @@ impl Storage {
                 }
                 let fuzzy = fuzzy.unwrap_or(false);
                 let resolved_target = if fuzzy {
-                    self.find_fuzzy_id(&target_id)
+                    self.find_fuzzy_id_unlocked(&target_id)
                         .unwrap_or_else(|| target_id.clone())
                 } else {
                     target_id.clone()
                 };
-                let target_u32 = self.get_u32(&resolved_target).ok_or_else(|| {
+                let target_u32 = self.get_u32_unlocked(&resolved_target).ok_or_else(|| {
                     Error::from_reason(format!(
                         "QUERY_TARGET_NOT_FOUND: node '{target_id}' does not exist"
                     ))
@@ -9672,7 +10399,7 @@ impl Storage {
                 Ok((vector, collection))
             }
             (Some(target_id), None) => {
-                let node_u32 = self.get_u32(&target_id).ok_or_else(|| {
+                let node_u32 = self.get_u32_unlocked(&target_id).ok_or_else(|| {
                     Error::from_reason(format!(
                         "QUERY_TARGET_NOT_FOUND: node '{target_id}' does not exist"
                     ))
@@ -9716,6 +10443,15 @@ impl Storage {
     ) -> Result<serde_json::Value> {
         let _read_guard = self.commit_lock.lock();
         self.ensure_readable()?;
+        self.require_unscoped_read()?;
+        self.execute_hql_with_budget_unlocked(query, requested_budget)
+    }
+
+    fn execute_hql_with_budget_unlocked(
+        &self,
+        query: &str,
+        requested_budget: Option<QueryBudget>,
+    ) -> Result<serde_json::Value> {
         let budget_limits = requested_budget.unwrap_or_default().resolve()?;
         let mut budget_state = QueryBudgetState::new(budget_limits);
 
@@ -9725,7 +10461,7 @@ impl Storage {
         }
         fn resolved_target_id(storage: &Storage, target: &str, fuzzy: bool) -> Result<String> {
             if fuzzy {
-                storage.find_fuzzy_id(target).ok_or_else(|| {
+                storage.find_fuzzy_id_unlocked(target).ok_or_else(|| {
                     Error::from_reason(format!(
                         "HQL: target '{target}' does not resolve to a node and no vector was given"
                     ))
@@ -9745,7 +10481,7 @@ impl Storage {
                 return Ok((vector, requested_collection.clone()));
             }
             let resolved = resolved_target_id(storage, target, fuzzy)?;
-            let node_u32 = storage.get_u32(&resolved).ok_or_else(|| {
+            let node_u32 = storage.get_u32_unlocked(&resolved).ok_or_else(|| {
                 Error::from_reason(format!(
                     "HQL: target '{target}' does not resolve to a node and no vector was given"
                 ))
@@ -9782,7 +10518,7 @@ impl Storage {
         ) -> Result<Vec<NeighborOutput>> {
             let mut request = request;
             request.budget = budget;
-            let response = storage.execute_query_ir(request)?;
+            let response = storage.execute_query_ir_unlocked(request)?;
             serde_json::from_value(response["data"].clone()).map_err(|error| {
                 Error::from_reason(format!("HQL compatibility decode failed: {error}"))
             })
@@ -9859,7 +10595,7 @@ impl Storage {
                 clauses,
             } => {
                 let resolved_seed = if fuzzy {
-                    self.find_fuzzy_id(&seed).unwrap_or(seed)
+                    self.find_fuzzy_id_unlocked(&seed).unwrap_or(seed)
                 } else {
                     seed
                 };
@@ -9985,7 +10721,7 @@ impl Storage {
                 budget,
                 fuzzy,
             } => {
-                let res = self.retrieve_context(&target, &tier, budget, fuzzy)?;
+                let res = self.retrieve_context_inner(&target, &tier, budget, fuzzy, None)?;
                 to_value(res)
             }
             HqlCommand::MatchPattern {
@@ -10009,6 +10745,7 @@ impl Storage {
     ) -> Result<serde_json::Value> {
         let _read_guard = self.commit_lock.lock();
         self.ensure_readable()?;
+        self.require_unscoped_read()?;
 
         let command = HqlCommand::try_from(query).map_err(Error::from_reason)?;
         match command {
@@ -10086,6 +10823,7 @@ impl Storage {
     pub fn studio_graph_scene(&self, request: StudioGraphSceneRequest) -> Result<StudioGraphScene> {
         let _read_guard = self.commit_lock.lock();
         self.ensure_readable()?;
+        self.require_unscoped_read()?;
         Self::validate_temporal_selector(&request.as_of)?;
 
         let limit = request.limit.unwrap_or(240);
@@ -10148,7 +10886,7 @@ impl Storage {
                 )?
                 .into_iter()
                 .filter_map(|result| {
-                    self.get_u32(&result.node.id)
+                    self.get_u32_unlocked(&result.node.id)
                         .map(|node_u32| (node_u32, result.node))
                 }),
             );
@@ -10234,6 +10972,7 @@ impl Storage {
     pub fn studio_inspect_entity(&self, entity_id: &str) -> Result<StudioEntityInspection> {
         let _read_guard = self.commit_lock.lock();
         self.ensure_readable()?;
+        self.require_unscoped_read()?;
 
         let node_u32 = self
             .get_u32(entity_id)
@@ -10423,6 +11162,7 @@ impl Storage {
     pub fn hybrid_search(&self, args: HybridSearchInput) -> Result<Vec<NeighborOutput>> {
         let _read_guard = self.commit_lock.lock();
         self.ensure_readable()?;
+        self.require_unscoped_read()?;
 
         let limits = QueryBudget::default().resolve()?;
         let mut budget = QueryBudgetState::new(limits);
@@ -10806,6 +11546,7 @@ impl Storage {
         args: NeighborInput,
         is_inferred: bool,
     ) -> Result<Vec<NeighborOutput>> {
+        self.require_unscoped_read()?;
         let limits = QueryBudget::default().resolve()?;
         let mut budget = QueryBudgetState::new(limits);
         let results = self.neighbors_with_budget(seed, args, is_inferred, &mut budget)?;
@@ -10838,7 +11579,7 @@ impl Storage {
         }
         budget.check_deadline()?;
 
-        let u32_seed = match self.get_u32(&seed) {
+        let u32_seed = match self.get_u32_unlocked(&seed) {
             Some(id) => id,
             None => return Ok(Vec::new()),
         };
@@ -10905,8 +11646,8 @@ impl Storage {
                 budget.edge()?;
                 if let Some(edge_ref) = self.edges.get(eid) {
                     let edge = edge_ref.value();
-                    if !(walk_out && self.get_u32(&edge.from) == Some(curr_u32)
-                        || walk_in && self.get_u32(&edge.to) == Some(curr_u32))
+                    if !(walk_out && self.get_u32_unlocked(&edge.from) == Some(curr_u32)
+                        || walk_in && self.get_u32_unlocked(&edge.to) == Some(curr_u32))
                     {
                         continue;
                     }
@@ -10931,12 +11672,12 @@ impl Storage {
                     // endpoint is whichever of from/to interns to curr_u32. This
                     // needs no u32->id reverse map and avoids a per-edge string
                     // clone (ADR--GENESISDB-NODE-ID-INTERNING, Layer A).
-                    let next_id = if self.get_u32(&edge.from) == Some(curr_u32) {
+                    let next_id = if self.get_u32_unlocked(&edge.from) == Some(curr_u32) {
                         &edge.to
                     } else {
                         &edge.from
                     };
-                    if let Some(next_u32) = self.get_u32(next_id) {
+                    if let Some(next_u32) = self.get_u32_unlocked(next_id) {
                         if !visited.contains(&next_u32) {
                             budget.node()?;
                             visited.insert(next_u32);
@@ -11279,6 +12020,7 @@ impl Storage {
     pub fn query(&self, args: QueryInput) -> Result<Vec<EdgeOutput>> {
         let _read_guard = self.commit_lock.lock();
         self.ensure_readable()?;
+        self.require_unscoped_read()?;
         Self::validate_temporal_selector(&args.as_of)?;
 
         let include_invalid = args.include_invalid.unwrap_or(false);
@@ -11325,7 +12067,10 @@ impl Storage {
     /// concern, only bitemporal validity of nodes that DO exist, matching the
     /// node time-travel check `neighbors` runs on the far endpoint of a hop.
     fn endpoint_currently_visible(&self, id: &str, as_of: &Option<String>) -> bool {
-        match self.get_u32(id).and_then(|u32_id| self.nodes.get(&u32_id)) {
+        match self
+            .get_u32_unlocked(id)
+            .and_then(|u32_id| self.nodes.get(&u32_id))
+        {
             Some(node_ref) => {
                 let now = Utc::now().to_rfc3339();
                 Self::is_currently_visible(
@@ -11359,12 +12104,12 @@ impl Storage {
                     .unwrap_or_default();
                 for eid in out_eids {
                     if let Some(edge) = self.edges.get(&eid) {
-                        let other_id = if self.get_u32(&edge.from) == Some(meta.node_u32) {
+                        let other_id = if self.get_u32_unlocked(&edge.from) == Some(meta.node_u32) {
                             &edge.to
                         } else {
                             &edge.from
                         };
-                        if let Some(to_u32) = self.get_u32(other_id) {
+                        if let Some(to_u32) = self.get_u32_unlocked(other_id) {
                             if let Some(a_id) = coll.node_to_arena.get(&to_u32) {
                                 if let Some(other_meta) = meta_arena.get(*a_id as usize) {
                                     *freq.entry(other_meta.cluster_id).or_insert(0) += 1;
@@ -11380,12 +12125,12 @@ impl Storage {
                     .unwrap_or_default();
                 for eid in in_eids {
                     if let Some(edge) = self.edges.get(&eid) {
-                        let other_id = if self.get_u32(&edge.from) == Some(meta.node_u32) {
+                        let other_id = if self.get_u32_unlocked(&edge.from) == Some(meta.node_u32) {
                             &edge.to
                         } else {
                             &edge.from
                         };
-                        if let Some(to_u32) = self.get_u32(other_id) {
+                        if let Some(to_u32) = self.get_u32_unlocked(other_id) {
                             if let Some(a_id) = coll.node_to_arena.get(&to_u32) {
                                 if let Some(other_meta) = meta_arena.get(*a_id as usize) {
                                     *freq.entry(other_meta.cluster_id).or_insert(0) += 1;
@@ -11497,9 +12242,10 @@ impl Storage {
         }
         for entry in self.edges.iter() {
             let edge = entry.value();
-            if let (Some(from_u32), Some(to_u32)) =
-                (self.get_u32(&edge.from), self.get_u32(&edge.to))
-            {
+            if let (Some(from_u32), Some(to_u32)) = (
+                self.get_u32_unlocked(&edge.from),
+                self.get_u32_unlocked(&edge.to),
+            ) {
                 if let (Some(from_cid), Some(to_id)) = (
                     coll.node_to_arena.get(&from_u32),
                     coll.node_to_arena.get(&to_u32),
@@ -11571,7 +12317,7 @@ impl Storage {
         self.ensure_writable()?;
         let _commit_guard = self.commit_lock.lock();
         self.ensure_readable()?;
-        let u32_id = match self.get_u32(id) {
+        let u32_id = match self.get_u32_unlocked(id) {
             Some(i) => i,
             None => return Ok(()),
         };
@@ -11633,9 +12379,10 @@ impl Storage {
         for eid in edges_to_remove {
             if let Some(edge_ref) = self.edges.get(&eid) {
                 let edge = edge_ref.value();
-                if let (Some(from_u32), Some(to_u32)) =
-                    (self.get_u32(&edge.from), self.get_u32(&edge.to))
-                {
+                if let (Some(from_u32), Some(to_u32)) = (
+                    self.get_u32_unlocked(&edge.from),
+                    self.get_u32_unlocked(&edge.to),
+                ) {
                     // Remove from source node's out-index
                     if let Some(mut out_set) = self.out_idx.get_mut(&from_u32) {
                         out_set.remove(&eid);
@@ -11685,6 +12432,12 @@ impl Storage {
     }
 
     fn reconcile_state_unlocked(&self, signed_events: Vec<SignedEvent>) -> Result<()> {
+        if signed_events
+            .iter()
+            .any(|signed_event| Self::contains_p6_control_event(&signed_event.event))
+        {
+            return Err(Error::from_reason("P6_LOCAL_ONLY"));
+        }
         for signed_event in signed_events {
             let event = &signed_event.event;
             let signer_id = &signed_event.signer_peer_id;
@@ -11722,7 +12475,7 @@ impl Storage {
                 Event::Node(remote_node) => {
                     let mut apply = true;
                     if let Some(local_node) = self
-                        .get_u32(&remote_node.id)
+                        .get_u32_unlocked(&remote_node.id)
                         .and_then(|u| self.nodes.get(&u))
                     {
                         if remote_node.clock < local_node.value().clock {
@@ -11866,7 +12619,7 @@ impl Storage {
                     // Node-style LWW against the live copy: a strictly newer
                     // local upsert wins over the remote retraction.
                     let lww_target = self
-                        .get_u32(id)
+                        .get_u32_unlocked(id)
                         .and_then(|u| self.nodes.get(&u).map(|n| (u, n.value().clock.clone())));
                     if let Some((_, local_clock)) = &lww_target {
                         if *clock < *local_clock {
@@ -11901,6 +12654,12 @@ impl Storage {
                             retracted_at: retracted_at.clone(),
                         },
                     );
+                }
+                Event::GenerationPublished(_) | Event::AccessPolicyChanged(_) => {
+                    let seq = self.persist_signed(signed_event.clone())?;
+                    self.apply_event_memory(seq, event.clone(), true);
+                    self.ensure_readable()
+                        .map_err(|e| self.durable_apply_error(seq, e))?;
                 }
             }
         }
@@ -11969,6 +12728,7 @@ impl Storage {
     ) -> Result<ContextPackage> {
         let _read_guard = self.commit_lock.lock();
         self.ensure_readable()?;
+        self.require_unscoped_read()?;
 
         self.retrieve_context_inner(target_id, tier_str, budget, fuzzy, None)
     }
@@ -11998,7 +12758,7 @@ impl Storage {
         let tier = ScalingTier::parse(tier_str);
         let hops = tier.hops();
         let target_id_resolved = if fuzzy {
-            self.find_fuzzy_id(target_id)
+            self.find_fuzzy_id_unlocked(target_id)
                 .unwrap_or(target_id.to_string())
         } else {
             target_id.to_string()
@@ -12015,7 +12775,7 @@ impl Storage {
         let mut hops_served: u32 = 0;
         let mut ceiling_hit = false;
 
-        if let Some(u32_id) = self.get_u32(&target_id_resolved) {
+        if let Some(u32_id) = self.get_u32_unlocked(&target_id_resolved) {
             if let Some(node) = self.nodes.get(&u32_id) {
                 let hydrated = self.hydrated_node(u32_id, node.value());
                 if Self::is_node_visible(&hydrated, &None, false, &now) {
@@ -12055,7 +12815,7 @@ impl Storage {
                 for eid in eids.iter() {
                     if let Some(edge_ref) = self.edges.get(eid) {
                         let edge = edge_ref.value();
-                        if self.get_u32(&edge.from) != Some(curr_u32) {
+                        if self.get_u32_unlocked(&edge.from) != Some(curr_u32) {
                             continue;
                         }
                         if !Self::is_currently_visible(
@@ -12070,7 +12830,7 @@ impl Storage {
                         if let Some(state) = query_budget.as_deref_mut() {
                             state.edge()?;
                         }
-                        if let Some(next_u32) = self.get_u32(&edge.to) {
+                        if let Some(next_u32) = self.get_u32_unlocked(&edge.to) {
                             if let Some(node) = self.nodes.get(&next_u32) {
                                 let hydrated = self.hydrated_node(next_u32, node.value());
                                 if !Self::is_node_visible(&hydrated, &None, false, &now) {
@@ -12079,7 +12839,7 @@ impl Storage {
                             }
                         }
                         edges.push(edge.clone());
-                        if let Some(next_u32) = self.get_u32(&edge.to) {
+                        if let Some(next_u32) = self.get_u32_unlocked(&edge.to) {
                             if let std::collections::hash_map::Entry::Vacant(e) =
                                 nodes.entry(next_u32)
                             {
@@ -12105,7 +12865,7 @@ impl Storage {
                 for eid in eids.iter() {
                     if let Some(edge_ref) = self.edges.get(eid) {
                         let edge = edge_ref.value();
-                        if self.get_u32(&edge.to) != Some(curr_u32) {
+                        if self.get_u32_unlocked(&edge.to) != Some(curr_u32) {
                             continue;
                         }
                         if !Self::is_currently_visible(
@@ -12120,7 +12880,7 @@ impl Storage {
                         if let Some(state) = query_budget.as_deref_mut() {
                             state.edge()?;
                         }
-                        if let Some(prev_u32) = self.get_u32(&edge.from) {
+                        if let Some(prev_u32) = self.get_u32_unlocked(&edge.from) {
                             if let Some(node) = self.nodes.get(&prev_u32) {
                                 let hydrated = self.hydrated_node(prev_u32, node.value());
                                 if !Self::is_node_visible(&hydrated, &None, false, &now) {
@@ -12129,7 +12889,7 @@ impl Storage {
                             }
                         }
                         edges.push(edge.clone());
-                        if let Some(prev_u32) = self.get_u32(&edge.from) {
+                        if let Some(prev_u32) = self.get_u32_unlocked(&edge.from) {
                             if let std::collections::hash_map::Entry::Vacant(e) =
                                 nodes.entry(prev_u32)
                             {
@@ -12219,7 +12979,7 @@ impl Storage {
             for eid in eids.iter() {
                 if let Some(edge_ref) = self.edges.get(eid) {
                     let edge = edge_ref.value();
-                    if self.get_u32(&edge.from) != Some(u32_id)
+                    if self.get_u32_unlocked(&edge.from) != Some(u32_id)
                         || !Self::is_currently_visible(
                             &edge.valid_from,
                             &edge.valid_to,
@@ -12230,7 +12990,7 @@ impl Storage {
                     {
                         continue;
                     }
-                    if let Some(next) = self.get_u32(&edge.to) {
+                    if let Some(next) = self.get_u32_unlocked(&edge.to) {
                         if !included.contains_key(&next)
                             && self
                                 .nodes
@@ -12251,7 +13011,7 @@ impl Storage {
             for eid in eids.iter() {
                 if let Some(edge_ref) = self.edges.get(eid) {
                     let edge = edge_ref.value();
-                    if self.get_u32(&edge.to) != Some(u32_id)
+                    if self.get_u32_unlocked(&edge.to) != Some(u32_id)
                         || !Self::is_currently_visible(
                             &edge.valid_from,
                             &edge.valid_to,
@@ -12262,7 +13022,7 @@ impl Storage {
                     {
                         continue;
                     }
-                    if let Some(prev) = self.get_u32(&edge.from) {
+                    if let Some(prev) = self.get_u32_unlocked(&edge.from) {
                         if !included.contains_key(&prev)
                             && self
                                 .nodes
@@ -12295,6 +13055,7 @@ impl Storage {
 
         tokio::spawn(async move {
             let mut sync_cursors: HashMap<String, u64> = HashMap::new();
+            let mut pending_sync_requests: HashMap<String, (String, u64)> = HashMap::new();
             let socket = match tokio::net::UdpSocket::bind("0.0.0.0:0").await {
                 Ok(s) => {
                     let addr = match s.local_addr() {
@@ -12357,6 +13118,12 @@ impl Storage {
                                                 continue;
                                             }
                                             if merkle_root != storage.get_merkle_root() {
+                                                let from_commit_seq = *sync_cursors.get(&p_id).unwrap_or(&0);
+                                                let request_nonce = Uuid::new_v4().to_string();
+                                                pending_sync_requests.insert(
+                                                    p_id.clone(),
+                                                    (request_nonce.clone(), from_commit_seq),
+                                                );
                                                 let req = GossipMessage::PullRequest {
                                                     schema_version:SCHEMA_VERSION,
                                                     from_clock: storage.get_logical_clock(),
@@ -12366,7 +13133,8 @@ impl Storage {
                                                     // bootstrap channel (WP-1.3); until
                                                     // then requesters stay on the
                                                     // Lamport cursor.
-                                                    from_commit_seq: Some(*sync_cursors.get(&p_id).unwrap_or(&0)),
+                                                    from_commit_seq: Some(from_commit_seq),
+                                                    request_nonce: Some(request_nonce),
                                                 };
                                                 if let Ok(data) = serde_json::to_vec(&req) {
                                                     let _ = socket.send_to(&data, peer_addr).await;
@@ -12374,7 +13142,7 @@ impl Storage {
                                             }
                                         }
                                     }
-                                    GossipMessage::PullRequest { schema_version, from_clock, target_peer_id, from_commit_seq } => {
+                                    GossipMessage::PullRequest { schema_version, from_clock, target_peer_id, from_commit_seq, request_nonce } => {
                                         if schema_version != SCHEMA_VERSION {
                                             if let Ok(data)=serde_json::to_vec(&GossipMessage::UpgradeRequired{schema_version:SCHEMA_VERSION}) {
                                                 let _=socket.send_to(&data,addr).await;
@@ -12405,8 +13173,20 @@ impl Storage {
                                         if let Some(reply_addr) = storage.peers.get(&target_peer_id).map(|p| p.addr.clone()) {
                                             let _=from_clock; // v4 sync uses responder-local frame cursors.
                                             match storage.sync_delta(from_commit_seq.unwrap_or(0)) {
-                                                Ok((events,through_seq)) if !events.is_empty() => {
-                                                    if let Ok(data)=serde_json::to_vec(&GossipMessage::PushDelta {events,source_peer_id:storage.local_peer_id.clone(),through_seq:Some(through_seq)}) {
+                                                Ok((events,through_seq,filtered_local_only)) if !events.is_empty() || filtered_local_only => {
+                                                    let progress_receipt = request_nonce
+                                                        .as_deref()
+                                                        .and_then(|nonce| {
+                                                            storage
+                                                                .sign_sync_progress_receipt(
+                                                                    &target_peer_id,
+                                                                    nonce,
+                                                                    from_commit_seq.unwrap_or(0),
+                                                                    through_seq,
+                                                                )
+                                                                .ok()
+                                                        });
+                                                    if let Ok(data)=serde_json::to_vec(&GossipMessage::PushDelta {events,source_peer_id:storage.local_peer_id.clone(),through_seq:Some(through_seq),progress_receipt}) {
                                                         let _=socket.send_to(&data,reply_addr).await;
                                                     }
                                                 }
@@ -12420,11 +13200,33 @@ impl Storage {
                                             }
                                         }
                                     }
-                                    GossipMessage::PushDelta { events,source_peer_id,through_seq } => {
+                                    GossipMessage::PushDelta { events,source_peer_id,through_seq,progress_receipt } => {
                                         // No cursor advancement on a rejected signature/schema/dependency.
                                         if events.iter().all(|e|storage.verify_event_signature(e)) {
+                                            let pending = pending_sync_requests.get(&source_peer_id).cloned();
+                                            let verified_receipt = pending.as_ref().is_some_and(|(nonce, from_seq)| {
+                                                progress_receipt.as_ref().is_some_and(|receipt| {
+                                                    storage.verify_sync_progress_receipt(
+                                                        receipt,
+                                                        &source_peer_id,
+                                                        nonce,
+                                                        *from_seq,
+                                                        )
+                                                })
+                                            });
+                                            if through_seq.is_some() && !verified_receipt {
+                                                eprintln!(
+                                                    "SYNC_AUTH_REQUIRED: cursor receipt missing or untrusted for peer {}",
+                                                    source_peer_id
+                                                );
+                                            }
                                             match storage.reconcile_state(events) {
-                                                Ok(())=>if let Some(seq)=through_seq { sync_cursors.insert(source_peer_id,seq); },
+                                                Ok(())=>if let Some(seq)=through_seq {
+                                                    if verified_receipt {
+                                                        sync_cursors.insert(source_peer_id.clone(),seq);
+                                                        pending_sync_requests.remove(&source_peer_id);
+                                                    }
+                                                },
                                                 Err(e)=>eprintln!("sync: {e}"),
                                             }
                                         }
@@ -12448,7 +13250,12 @@ impl Storage {
                                         // its claimed originator before storing it. An unsigned or
                                         // forged proposal could otherwise be driven to quorum and
                                         // applied as a MASTER axiom, bypassing governance.
-                                        if storage.verify_event_signature(&proposal.signed_event) {
+                                        if Storage::contains_p6_control_event(&proposal.signed_event.event) {
+                                            println!(
+                                                "consensus: rejected local-only P6 proposal {}",
+                                                proposal.proposal_id
+                                            );
+                                        } else if storage.verify_event_signature(&proposal.signed_event) {
                                             storage.proposals.insert(proposal.proposal_id.clone(), *proposal);
                                         } else {
                                             println!("consensus: rejected proposal {} — invalid event signature or unknown signer.", proposal.proposal_id);
@@ -12503,17 +13310,305 @@ impl Storage {
     /// to fall back to a (correct but slower) full WAL replay. Best-effort: a final
     /// failure returns `false` rather than erroring, since the snapshot is only an
     /// instant-load optimization layered on the authoritative WAL.
-    fn rename_with_retry(from: &std::path::Path, to: &std::path::Path) -> bool {
+    fn rename_with_retry(from: &std::path::Path, to: &std::path::Path) -> Result<()> {
         for _ in 0..50 {
             match fs::rename(from, to) {
-                Ok(_) => return true,
+                Ok(_) => return Ok(()),
                 Err(e) if matches!(e.raw_os_error(), Some(5) | Some(32) | Some(33)) => {
+                    if to.exists() {
+                        let _ = fs::remove_file(to);
+                    }
                     std::thread::sleep(Duration::from_millis(20));
                 }
-                Err(_) => return false,
+                Err(e) => return Err(Error::from_reason(e.to_string())),
             }
         }
-        fs::rename(from, to).is_ok()
+        fs::rename(from, to).map_err(|e| Error::from_reason(e.to_string()))
+    }
+
+    fn validate_p6_snapshot_at(root: &Path, state: &serde_json::Value) -> Result<Option<String>> {
+        let schema_version = state["schema_version"].as_u64().unwrap_or(0) as u32;
+        let Some(p6) = state.get("p6") else {
+            if schema_version >= SCHEMA_VERSION {
+                return Err(Error::from_reason(
+                    "SNAPSHOT_MANIFEST_INVALID: P6 manifest missing",
+                ));
+            }
+            // v4 and older snapshots remain on the legacy load path and are
+            // upgraded only after complete WAL recovery is available.
+            return Ok(None);
+        };
+        let manifest = p6.get("manifest").ok_or_else(|| {
+            Error::from_reason("SNAPSHOT_MANIFEST_INVALID: manifest object missing")
+        })?;
+        let version = manifest["version"]
+            .as_u64()
+            .ok_or_else(|| Error::from_reason("SNAPSHOT_MANIFEST_INVALID: version missing"))?
+            as u32;
+        if version != 1 {
+            return Err(Error::from_reason(
+                "SNAPSHOT_MANIFEST_INVALID: unsupported manifest version",
+            ));
+        }
+        let snapshot_frontier = manifest["snapshot_frontier"].as_u64().ok_or_else(|| {
+            Error::from_reason("SNAPSHOT_MANIFEST_INVALID: snapshot frontier missing")
+        })?;
+        let journal_frontier = state["journal"]["frontier_seq"].as_u64().ok_or_else(|| {
+            Error::from_reason("SNAPSHOT_MANIFEST_INVALID: journal frontier missing")
+        })?;
+        if snapshot_frontier != journal_frontier {
+            return Err(Error::from_reason(
+                "SNAPSHOT_MANIFEST_INVALID: frontier mismatch",
+            ));
+        }
+        let components = manifest["components"]
+            .as_array()
+            .ok_or_else(|| Error::from_reason("SNAPSHOT_MANIFEST_INVALID: components missing"))?;
+        if components.is_empty() {
+            return Err(Error::from_reason(
+                "SNAPSHOT_MANIFEST_INVALID: empty component set",
+            ));
+        }
+        let mut canonical_components = Vec::with_capacity(components.len());
+        let mut seen = HashSet::new();
+        for component in components {
+            let path = component["path"].as_str().ok_or_else(|| {
+                Error::from_reason("SNAPSHOT_MANIFEST_INVALID: component path missing")
+            })?;
+            let relative = Path::new(path);
+            if path.is_empty()
+                || relative.is_absolute()
+                || path.contains('\\')
+                || relative
+                    .components()
+                    .any(|part| !matches!(part, std::path::Component::Normal(_)))
+                || !seen.insert(path.to_string())
+            {
+                return Err(Error::from_reason(
+                    "SNAPSHOT_MANIFEST_INVALID: unsafe or duplicate component path",
+                ));
+            }
+            let bytes = component["bytes"].as_u64().ok_or_else(|| {
+                Error::from_reason("SNAPSHOT_MANIFEST_INVALID: component byte count missing")
+            })?;
+            let expected_hash = component["sha256"].as_str().ok_or_else(|| {
+                Error::from_reason("SNAPSHOT_MANIFEST_INVALID: component digest missing")
+            })?;
+            if expected_hash.len() != 64
+                || !expected_hash.bytes().all(|byte| byte.is_ascii_hexdigit())
+            {
+                return Err(Error::from_reason(
+                    "SNAPSHOT_MANIFEST_INVALID: component digest malformed",
+                ));
+            }
+            let full_path = root.join(relative);
+            let (actual_bytes, actual_hash) = Self::sha256_file(&full_path).map_err(|_| {
+                Error::from_reason(format!(
+                    "SNAPSHOT_COMPONENT_INVALID: missing or unreadable component {path}"
+                ))
+            })?;
+            if actual_bytes != bytes || actual_hash != expected_hash {
+                return Err(Error::from_reason(format!(
+                    "SNAPSHOT_COMPONENT_INVALID: byte count or digest mismatch for {path}"
+                )));
+            }
+            canonical_components.push(serde_json::json!({
+                "path": path,
+                "bytes": bytes,
+                "sha256": expected_hash,
+            }));
+        }
+        canonical_components
+            .sort_by(|left, right| left["path"].as_str().cmp(&right["path"].as_str()));
+        let mut required = HashSet::from([
+            "nodes.bin".to_string(),
+            "edges.bin".to_string(),
+            "edges_retired.bin".to_string(),
+            PROJECTION_DB_FILE.to_string(),
+        ]);
+        for collection in state["collections"].as_array().ok_or_else(|| {
+            Error::from_reason("SNAPSHOT_MANIFEST_INVALID: collection manifest missing")
+        })? {
+            let name = collection["name"].as_str().ok_or_else(|| {
+                Error::from_reason("SNAPSHOT_MANIFEST_INVALID: collection name missing")
+            })?;
+            Self::validate_collection_name(name)?;
+            required.insert(format!("vec_{name}.bin"));
+            required.insert(format!("meta_{name}.bin"));
+            if collection["rerank"].as_bool().unwrap_or(false) {
+                required.insert(format!("fvec_{name}.bin"));
+            }
+            if collection["bqmean_present"].as_bool().unwrap_or(false) {
+                required.insert(format!("bqmean_{name}.bin"));
+            }
+            if collection["sq8scale_present"].as_bool().unwrap_or(false) {
+                required.insert(format!("sq8scale_{name}.bin"));
+            }
+        }
+        if required.iter().any(|path| !seen.contains(path)) {
+            return Err(Error::from_reason(
+                "SNAPSHOT_MANIFEST_INVALID: required component missing from manifest",
+            ));
+        }
+        let canonical = serde_json::to_vec(&serde_json::json!({
+            "version": version,
+            "snapshot_frontier": snapshot_frontier,
+            "components": canonical_components,
+        }))
+        .map_err(|e| Error::from_reason(e.to_string()))?;
+        let digest = hex::encode(Sha256::digest(canonical));
+        if manifest["manifest_sha256"].as_str() != Some(digest.as_str()) {
+            return Err(Error::from_reason(
+                "SNAPSHOT_MANIFEST_INVALID: manifest digest mismatch",
+            ));
+        }
+        if let Some(policy) = p6.get("access_policy").filter(|value| !value.is_null()) {
+            serde_json::from_value::<AccessPolicy>(policy.clone()).map_err(|_| {
+                Error::from_reason("SNAPSHOT_MANIFEST_INVALID: access policy is malformed")
+            })?;
+        }
+        if let Some(generation) = p6.get("generation").filter(|value| !value.is_null()) {
+            serde_json::from_value::<GenerationInfo>(generation.clone()).map_err(|_| {
+                Error::from_reason("SNAPSHOT_MANIFEST_INVALID: generation is malformed")
+            })?;
+        }
+        Ok(Some(digest))
+    }
+
+    fn validate_p6_snapshot_authority(&self, state: &serde_json::Value) -> Result<()> {
+        let Some(p6) = state.get("p6") else {
+            return Ok(());
+        };
+        let snapshot_frontier = p6
+            .get("manifest")
+            .and_then(|manifest| manifest.get("snapshot_frontier"))
+            .and_then(serde_json::Value::as_u64)
+            .ok_or_else(|| {
+                Error::from_reason("SNAPSHOT_MANIFEST_INVALID: snapshot frontier missing")
+            })?;
+        let snapshot_policy = p6
+            .get("access_policy")
+            .filter(|value| !value.is_null())
+            .map(|value| serde_json::from_value::<AccessPolicy>(value.clone()))
+            .transpose()
+            .map_err(|_| Error::from_reason("SNAPSHOT_MANIFEST_INVALID: access policy malformed"))?
+            .unwrap_or_else(Self::default_access_policy);
+        Self::validate_access_policy_shape(&snapshot_policy)?;
+        let snapshot_generation = p6
+            .get("generation")
+            .filter(|value| !value.is_null())
+            .map(|value| serde_json::from_value::<GenerationInfo>(value.clone()))
+            .transpose()
+            .map_err(|_| Error::from_reason("SNAPSHOT_MANIFEST_INVALID: generation malformed"))?;
+
+        let mut latest_policy = None;
+        let mut latest_generation: Option<GenerationInfo> = None;
+        let mut has_policy_event = false;
+        let mut invalid_signature = false;
+        let mut foreign_provenance = false;
+        let mut invalid_materialization = false;
+
+        self.scan_journal(None, true, &mut |seq, signed_event| {
+            let mut p6_events = Vec::new();
+            Self::collect_p6_control_events(&signed_event.event, &mut p6_events);
+            if p6_events.is_empty() {
+                return;
+            }
+            if seq > snapshot_frontier {
+                return;
+            }
+            if signed_event.signer_peer_id != self.local_peer_id {
+                foreign_provenance = true;
+                return;
+            }
+            if !self.verify_event_signature(&signed_event) {
+                invalid_signature = true;
+                return;
+            }
+
+            for event in p6_events {
+                match event {
+                    Event::AccessPolicyChanged(event) => {
+                        has_policy_event = true;
+                        if event.version != 1
+                            || event.policy.revision != event.expected_revision.saturating_add(1)
+                            || Self::validate_access_policy_shape(&event.policy).is_err()
+                        {
+                            invalid_materialization = true;
+                            continue;
+                        }
+                        latest_policy = Some(event.policy.clone());
+                    }
+                    Event::GenerationPublished(event) => {
+                        if event.version != 1
+                            || event.generation.publication_seq
+                                != event.generation.wal_frontier.saturating_add(1)
+                            || event.generation.component_manifest_sha256.len() != 64
+                            || seq < event.generation.publication_seq
+                        {
+                            invalid_materialization = true;
+                            continue;
+                        }
+                        match latest_generation.as_ref() {
+                            Some(current)
+                                if current.generation_id > event.generation.generation_id => {}
+                            Some(current)
+                                if current.generation_id == event.generation.generation_id
+                                    && current != &event.generation =>
+                            {
+                                invalid_materialization = true;
+                            }
+                            _ => latest_generation = Some(event.generation.clone()),
+                        }
+                    }
+                    _ => unreachable!(),
+                }
+            }
+        });
+
+        if invalid_signature {
+            return Err(Error::from_reason(
+                "RECOVERY_REQUIRED: invalid P6 signature covered by snapshot",
+            ));
+        }
+        if foreign_provenance {
+            return Err(Error::from_reason(
+                "RECOVERY_REQUIRED: foreign P6 provenance covered by snapshot",
+            ));
+        }
+        if invalid_materialization {
+            return Err(Error::from_reason(
+                "SNAPSHOT_MANIFEST_INVALID: invalid signed P6 materialization",
+            ));
+        }
+        let journal_policy = latest_policy.unwrap_or_else(Self::default_access_policy);
+        if snapshot_policy != Self::default_access_policy() && !has_policy_event {
+            self.recovery_required.store(true, Ordering::SeqCst);
+            return Err(Error::from_reason(
+                "RECOVERY_REQUIRED: non-default snapshot policy has no signed WAL provenance",
+            ));
+        }
+        if snapshot_policy != journal_policy {
+            return Err(Error::from_reason(
+                "SNAPSHOT_MANIFEST_INVALID: access policy disagrees with signed WAL",
+            ));
+        }
+        if snapshot_generation != latest_generation {
+            return Err(Error::from_reason(
+                "SNAPSHOT_MANIFEST_INVALID: generation disagrees with signed WAL",
+            ));
+        }
+        Ok(())
+    }
+
+    fn validated_snapshot_manifest_digest(&self) -> Result<String> {
+        let state_path = self.path.join("state.json");
+        let state: serde_json::Value = serde_json::from_slice(
+            &fs::read(&state_path).map_err(|e| Error::from_reason(e.to_string()))?,
+        )
+        .map_err(|e| Error::from_reason(e.to_string()))?;
+        Self::validate_p6_snapshot_at(&self.path, &state)?
+            .ok_or_else(|| Error::from_reason("SNAPSHOT_MANIFEST_INVALID: P6 manifest is absent"))
     }
 
     pub fn save_state(&self) -> Result<()> {
@@ -12592,9 +13687,9 @@ impl Storage {
         }
         let temp_dir = self.path.join("temp_save");
         if temp_dir.exists() {
-            let _ = fs::remove_dir_all(&temp_dir);
+            fs::remove_dir_all(&temp_dir).map_err(|e| Error::from_reason(e.to_string()))?;
         }
-        fs::create_dir_all(&temp_dir).ok();
+        fs::create_dir_all(&temp_dir).map_err(|e| Error::from_reason(e.to_string()))?;
 
         // 1. Per-collection arenas + metadata + a manifest. HNSW is NOT dumped —
         //    it rehydrates cheaply from each arena on load (the arena is the
@@ -12673,6 +13768,8 @@ impl Storage {
                 "rerank": coll.f32_sidecar.is_some(),
                 // SQ8 calibrated-scale opt-in; absent ⇒ false (fixed scale).
                 "sq8_calibrate": coll.sq8_calibrate,
+                "bqmean_present": coll.bq_center.read().is_some(),
+                "sq8scale_present": coll.sq8_scale.read().is_some(),
                 "definition": self.definition_for(coll),
                 // meta format version: 2 = epoch stamps (created_seq/retired_seq,
                 // GBP2 postcard — SPEC--EPOCH-HNSW §3.1); 1 = NodeMetadata.node_u32
@@ -12693,12 +13790,14 @@ impl Storage {
             .iter()
             .map(|e| (*e.key(), e.value().clone()))
             .collect();
-        if let Ok(bytes) = serde_json::to_vec(&nodes) {
-            fs::write(temp_dir.join("nodes.bin"), bytes).ok();
-        }
-        if let Ok(bytes) = serde_json::to_vec(&edges) {
-            fs::write(temp_dir.join("edges.bin"), bytes).ok();
-        }
+        let node_bytes = serde_json::to_vec(&nodes)
+            .map_err(|e| Error::from_reason(format!("nodes snapshot encode failed: {e}")))?;
+        fs::write(temp_dir.join("nodes.bin"), node_bytes)
+            .map_err(|e| Error::from_reason(format!("nodes snapshot write failed: {e}")))?;
+        let edge_bytes = serde_json::to_vec(&edges)
+            .map_err(|e| Error::from_reason(format!("edges snapshot encode failed: {e}")))?;
+        fs::write(temp_dir.join("edges.bin"), edge_bytes)
+            .map_err(|e| Error::from_reason(format!("edges snapshot write failed: {e}")))?;
         // E1: the retired-adjacency overlay must survive a snapshot load —
         // the instant-load path replays only frames PAST the frontier, so the
         // NodeRetract frames that built it are skipped (same rationale as the
@@ -12710,9 +13809,10 @@ impl Storage {
             .iter()
             .map(|e| (*e.key(), e.value().clone()))
             .collect();
-        if let Ok(bytes) = serde_json::to_vec(&retired) {
-            fs::write(temp_dir.join("edges_retired.bin"), bytes).ok();
-        }
+        let retired_bytes = serde_json::to_vec(&retired)
+            .map_err(|e| Error::from_reason(format!("retired-edge snapshot encode failed: {e}")))?;
+        fs::write(temp_dir.join("edges_retired.bin"), retired_bytes)
+            .map_err(|e| Error::from_reason(format!("retired-edge snapshot write failed: {e}")))?;
         self.projection_snapshot(&temp_dir.join(PROJECTION_DB_FILE))?;
 
         // 3. Save Global Metadata (incl. collections manifest). Slice-1: the
@@ -12754,6 +13854,51 @@ impl Storage {
             "tx_epoch_start": 1,
             "format_version": JOURNAL_FORMAT_VERSION,
         });
+        let mut components = Vec::new();
+        for entry in fs::read_dir(&temp_dir).map_err(|e| Error::from_reason(e.to_string()))? {
+            let entry = entry.map_err(|e| Error::from_reason(e.to_string()))?;
+            let path = entry.path();
+            if !entry
+                .file_type()
+                .map_err(|e| Error::from_reason(e.to_string()))?
+                .is_file()
+            {
+                continue;
+            }
+            let name = path
+                .file_name()
+                .and_then(|value| value.to_str())
+                .ok_or_else(|| Error::from_reason("SNAPSHOT_MANIFEST_INVALID: non-UTF8 path"))?;
+            if name == "state.json" {
+                continue;
+            }
+            let (bytes, sha256) = Self::sha256_file(&path)?;
+            components.push(serde_json::json!({
+                "path": name,
+                "bytes": bytes,
+                "sha256": sha256,
+            }));
+        }
+        components.sort_by(|left, right| left["path"].as_str().cmp(&right["path"].as_str()));
+        let canonical = serde_json::to_vec(&serde_json::json!({
+            "version": 1,
+            "snapshot_frontier": frontier_seq,
+            "components": components,
+        }))
+        .map_err(|e| Error::from_reason(e.to_string()))?;
+        let manifest_sha256 = hex::encode(Sha256::digest(canonical));
+        state["p6"] = serde_json::json!({
+            "version": 1,
+            "manifest": {
+                "version": 1,
+                "snapshot_frontier": frontier_seq,
+                "components": components,
+                "manifest_sha256": manifest_sha256,
+            },
+            "generation": self.published_generation.read().clone(),
+            "access_policy": self.access_policy.read().clone(),
+        });
+        Self::validate_p6_snapshot_at(&temp_dir, &state)?;
         fs::write(temp_dir.join("state.json"), state.to_string())
             .map_err(|e| Error::from_reason(format!("state.json write failed: {}", e)))?;
 
@@ -12763,30 +13908,33 @@ impl Storage {
         // state.json exists, so renaming it last means a crash mid-swap leaves no
         // state.json → reload falls back to the (still-intact) WAL. Truncating the
         // WAL below is therefore safe only after state.json is durably in place.
-        if let Ok(entries) = fs::read_dir(&temp_dir) {
-            for entry in entries.flatten() {
-                let p = entry.path();
-                if p.file_name().is_some_and(|n| n == "state.json") {
-                    continue;
-                }
-                if p.file_name().is_some_and(|n| n == PROJECTION_DB_FILE) {
-                    // `projection_db` remains open for the Storage lifetime;
-                    // replacing its path would split Unix readers and writers
-                    // across inodes. `projection_snapshot` already copied the
-                    // checkpointed live file, so discard the temporary copy and
-                    // keep the live path stable.
-                    let _ = fs::remove_file(&p);
-                    continue;
-                }
-                if let Some(name) = p.file_name() {
-                    Self::rename_with_retry(&p, &self.path.join(name));
-                }
+        for entry in fs::read_dir(&temp_dir).map_err(|e| Error::from_reason(e.to_string()))? {
+            let entry = entry.map_err(|e| Error::from_reason(e.to_string()))?;
+            let p = entry.path();
+            if p.file_name().is_some_and(|n| n == "state.json") {
+                continue;
             }
+            if p.file_name().is_some_and(|n| n == PROJECTION_DB_FILE) {
+                // `projection_db` remains open for the Storage lifetime;
+                // replacing its path would split Unix readers and writers
+                // across inodes. `projection_snapshot` already copied the
+                // checkpointed live file, so discard the temporary copy and
+                // keep the live path stable.
+                fs::remove_file(&p).map_err(|e| Error::from_reason(e.to_string()))?;
+                continue;
+            }
+            let name = p
+                .file_name()
+                .ok_or_else(|| Error::from_reason("snapshot component has no name"))?;
+            Self::rename_with_retry(&p, &self.path.join(name))?;
         }
         let state_tmp = temp_dir.join("state.json");
-        if state_tmp.exists() {
-            Self::rename_with_retry(&state_tmp, &self.path.join("state.json"));
+        if !state_tmp.exists() {
+            return Err(Error::from_reason(
+                "SNAPSHOT_MANIFEST_INVALID: state.json marker was not written",
+            ));
         }
+        Self::rename_with_retry(&state_tmp, &self.path.join("state.json"))?;
         let _ = fs::remove_dir_all(&temp_dir);
 
         // The journal fold already ran BEFORE the snapshot swap (see the top of
@@ -13272,6 +14420,37 @@ impl Storage {
             Some(v) => v,
             None => return false,
         };
+        match Self::validate_p6_snapshot_at(&self.path, &state_val) {
+            Err(error) => {
+                println!("snapshot: rejecting candidate state: {error}");
+                // No in-memory state has been touched yet. Recovery will replay
+                // the complete WAL and will not retain a partial candidate load.
+                return false;
+            }
+            Ok(Some(_)) => {
+                if let Err(error) = self.validate_p6_snapshot_authority(&state_val) {
+                    println!("snapshot: rejecting candidate P6 authority: {error}");
+                    return false;
+                }
+            }
+            Ok(None) => {}
+        }
+
+        if let Some(policy) = state_val
+            .get("p6")
+            .and_then(|p6| p6.get("access_policy"))
+            .filter(|value| !value.is_null())
+            .and_then(|value| serde_json::from_value::<AccessPolicy>(value.clone()).ok())
+        {
+            *self.access_policy.write() = policy;
+        } else {
+            *self.access_policy.write() = Self::default_access_policy();
+        }
+        *self.published_generation.write() = state_val
+            .get("p6")
+            .and_then(|p6| p6.get("generation"))
+            .filter(|value| !value.is_null())
+            .and_then(|value| serde_json::from_value::<GenerationInfo>(value.clone()).ok());
 
         // 0. Slice-1 tombstone registry (absent in pre-Slice-1 snapshots ⇒
         //    empty). Loaded before anything else: harmless if a later step
@@ -14077,6 +15256,7 @@ impl Storage {
             Event::Vector(v) => Some(v.clock.time),
             // Retractions replicate like node upserts (clock-stamped LWW).
             Event::NodeRetract { clock, .. } => Some(clock.time),
+            Event::GenerationPublished(_) | Event::AccessPolicyChanged(_) => None,
             Event::RelationalSchema(_) | Event::RelationalRows { .. } => None,
             Event::Transaction(transaction) => transaction
                 .nodes
@@ -14085,6 +15265,32 @@ impl Storage {
                 .chain(transaction.edges.iter().map(|edge| edge.clock.time))
                 .chain(transaction.vectors.iter().map(|vector| vector.clock.time))
                 .max(),
+        }
+    }
+
+    fn collect_p6_control_events<'a>(event: &'a Event, out: &mut Vec<&'a Event>) {
+        match event {
+            Event::GenerationPublished(_) | Event::AccessPolicyChanged(_) => out.push(event),
+            Event::Batch(events) => {
+                for event in events {
+                    Self::collect_p6_control_events(event, out);
+                }
+            }
+            _ => {}
+        }
+    }
+
+    fn contains_p6_control_event(event: &Event) -> bool {
+        let mut events = Vec::new();
+        Self::collect_p6_control_events(event, &mut events);
+        !events.is_empty()
+    }
+
+    fn contains_transferable_event(event: &Event) -> bool {
+        match event {
+            Event::GenerationPublished(_) | Event::AccessPolicyChanged(_) => false,
+            Event::Batch(events) => events.iter().any(Self::contains_transferable_event),
+            _ => true,
         }
     }
 
@@ -14102,13 +15308,26 @@ impl Storage {
         let _read_guard = self.commit_lock.lock();
 
         let mut out: Vec<(u32, SignedEvent)> = Vec::new();
+        let mut mixed = false;
         self.scan_journal(None, true, &mut |_, se| {
-            if let Some(t) = Self::event_time(&se.event) {
-                if t > from_clock {
-                    out.push((t, se));
+            if Self::contains_p6_control_event(&se.event)
+                && Self::contains_transferable_event(&se.event)
+            {
+                mixed = true;
+                return;
+            }
+            if !Self::contains_p6_control_event(&se.event) {
+                if let Some(t) = Self::event_time(&se.event) {
+                    if t > from_clock {
+                        out.push((t, se));
+                    }
                 }
             }
         });
+        if mixed {
+            eprintln!("P6_MIXED_BATCH_UNEXPORTABLE: Lamport sync request blocked");
+            return Vec::new();
+        }
         out.sort_by_key(|(t, _)| *t);
         self.with_collection_dependencies(out.into_iter().map(|(_, se)| se).collect())
     }
@@ -14134,36 +15353,72 @@ impl Storage {
         out
     }
 
-    fn sync_delta(&self, cursor: u64) -> Result<(Vec<SignedEvent>, u64)> {
+    fn sync_delta(&self, cursor: u64) -> Result<(Vec<SignedEvent>, u64, bool)> {
         let _guard = self.commit_lock.lock();
         self.ensure_readable()?;
+        let mut frames = Vec::new();
+        self.scan_journal((cursor != 0).then_some(cursor), false, &mut |seq, e| {
+            frames.push((seq, e));
+        });
+
         let mut events = Vec::new();
         let mut through = cursor;
         let mut bytes = 0;
-        let mut full = false;
         let mut oversized = false;
-        self.scan_journal((cursor != 0).then_some(cursor), false, &mut |seq, e| {
-            if full {
-                return;
+        let mut filtered_local_only = false;
+        let mut index = 0;
+        while index < frames.len() {
+            let seq = frames[index].0;
+            let end = frames[index..]
+                .iter()
+                .position(|(frame_seq, _)| *frame_seq != seq)
+                .map(|offset| index + offset)
+                .unwrap_or(frames.len());
+            let group = &frames[index..end];
+
+            for (_, signed_event) in group {
+                if Self::contains_p6_control_event(&signed_event.event)
+                    && Self::contains_transferable_event(&signed_event.event)
+                {
+                    return Err(Error::from_reason("P6_MIXED_BATCH_UNEXPORTABLE"));
+                }
             }
-            let size = serde_json::to_vec(&e)
-                .map(|v| v.len())
-                .unwrap_or(usize::MAX);
-            if size > 40_000 {
-                oversized = true;
-                full = true;
-                return;
+
+            let mut group_bytes = 0;
+            for (_, signed_event) in group {
+                if Self::contains_p6_control_event(&signed_event.event) {
+                    filtered_local_only = true;
+                    continue;
+                }
+                let size = serde_json::to_vec(signed_event)
+                    .map(|v| v.len())
+                    .unwrap_or(usize::MAX);
+                if size > 40_000 {
+                    oversized = true;
+                    break;
+                }
+                group_bytes += size;
             }
-            if bytes + size > 40_000 && seq != through {
-                full = true;
-                return;
+            if oversized {
+                break;
             }
+            if bytes + group_bytes > 40_000 && seq != through {
+                break;
+            }
+
             // A folded base shares a single sequence: never cut that sequence
-            // in half and advance past unsent members.
-            bytes += size;
-            events.push(e);
+            // in half and advance past unsent members. Local-only P6 frames are
+            // intentionally omitted, but the signed ordinary members remain
+            // byte-for-byte intact.
+            for (_, signed_event) in group {
+                if !Self::contains_p6_control_event(&signed_event.event) {
+                    events.push(signed_event.clone());
+                }
+            }
+            bytes += group_bytes;
             through = seq;
-        });
+            index = end;
+        }
         if oversized {
             return Err(Error::from_reason(
                 "SYNC_BOOTSTRAP_REQUIRED: frame exceeds datagram budget",
@@ -14179,7 +15434,7 @@ impl Storage {
                 "SYNC_BOOTSTRAP_REQUIRED: base/dependencies exceed datagram budget",
             ));
         }
-        Ok((events, through))
+        Ok((events, through, filtered_local_only))
     }
 
     /// WP-1.2 (ADR D4): serve frames newer than a responder-domain commit_seq
@@ -14193,9 +15448,20 @@ impl Storage {
         // segment folded at seq 0); any other value is an exclusive cursor.
         let cursor = if from_seq == 0 { None } else { Some(from_seq) };
         let mut out: Vec<SignedEvent> = Vec::new();
+        let mut mixed = false;
         self.scan_journal(cursor, false, &mut |_, se| {
-            out.push(se);
+            if Self::contains_p6_control_event(&se.event)
+                && Self::contains_transferable_event(&se.event)
+            {
+                mixed = true;
+            } else if !Self::contains_p6_control_event(&se.event) {
+                out.push(se);
+            }
         });
+        if mixed {
+            eprintln!("P6_MIXED_BATCH_UNEXPORTABLE: sequence sync request blocked");
+            return Vec::new();
+        }
         self.with_collection_dependencies(out)
     }
 
@@ -14421,6 +15687,37 @@ impl Storage {
             let json = serde_json::to_string(&self.sign_event(&event))
                 .map_err(|e| Error::from_reason(e.to_string()))?;
             buf.extend_from_slice(json.as_bytes());
+            buf.push(b'\n');
+            count += 1;
+        }
+
+        if let Some(generation) = self.published_generation.read().clone() {
+            let event = Event::GenerationPublished(GenerationPublishedEvent {
+                version: 1,
+                generation,
+            });
+            let json = serde_json::to_vec(&self.sign_event(&event))
+                .map_err(|e| Error::from_reason(e.to_string()))?;
+            buf.extend_from_slice(&json);
+            buf.push(b'\n');
+            count += 1;
+        }
+
+        let policy = self.access_policy.read().clone();
+        if policy.revision > 0 {
+            let event = Event::AccessPolicyChanged(AccessPolicyChangedEvent {
+                version: 1,
+                expected_revision: policy.revision.saturating_sub(1),
+                policy,
+                actor: AccessContext {
+                    principal: "local-owner".into(),
+                    namespace: "default".into(),
+                },
+                folded: true,
+            });
+            let json = serde_json::to_vec(&self.sign_event(&event))
+                .map_err(|e| Error::from_reason(e.to_string()))?;
+            buf.extend_from_slice(&json);
             buf.push(b'\n');
             count += 1;
         }
@@ -14874,6 +16171,14 @@ impl Storage {
     /// for all recovery paths. Idempotent: LWW upserts.
     fn replay_journal(&self, from_seq: Option<u64>, include_legacy: bool) {
         self.scan_journal(from_seq, include_legacy, &mut |seq, signed_event| {
+            if Self::contains_p6_control_event(&signed_event.event) {
+                if signed_event.signer_peer_id != self.local_peer_id
+                    || !self.verify_event_signature(&signed_event)
+                {
+                    self.recovery_required.store(true, Ordering::SeqCst);
+                    return;
+                }
+            }
             self.apply_replay_event(seq, self.normalize_replayed_event(signed_event));
         });
     }
@@ -14904,7 +16209,7 @@ impl Storage {
             }
             Event::Node(n) => {
                 if self
-                    .get_u32(&n.id)
+                    .get_u32_unlocked(&n.id)
                     .and_then(|u| self.nodes.get(&u))
                     .is_some_and(|old| old.clock > n.clock)
                     || self
@@ -14973,14 +16278,14 @@ impl Storage {
                 retracted_at,
             } => {
                 if self
-                    .get_u32(&id)
+                    .get_u32_unlocked(&id)
                     .and_then(|u| self.nodes.get(&u))
                     .is_some_and(|n| n.clock > clock)
                     || self.tombstones.get(&id).is_some_and(|t| t.clock >= clock)
                 {
                     return;
                 }
-                if let Some(u32_id) = self.get_u32(&id) {
+                if let Some(u32_id) = self.get_u32_unlocked(&id) {
                     self.retract_node_memory(&id, u32_id, seq);
                 }
                 self.tombstones.insert(
@@ -14990,6 +16295,16 @@ impl Storage {
                         retracted_at,
                     },
                 );
+            }
+            Event::GenerationPublished(receipt) => {
+                if self.apply_generation_event(&receipt, seq).is_err() {
+                    self.recovery_required.store(true, Ordering::SeqCst);
+                }
+            }
+            Event::AccessPolicyChanged(policy) => {
+                if self.apply_access_policy_event(&policy).is_err() {
+                    self.recovery_required.store(true, Ordering::SeqCst);
+                }
             }
         }
     }
@@ -15058,6 +16373,7 @@ impl Storage {
     pub fn calculate_structural_gaps(&self) -> Result<Vec<GapSuggestion>> {
         let _read_guard = self.commit_lock.lock();
         self.ensure_readable()?;
+        self.require_unscoped_read()?;
 
         let mut gaps = Vec::new();
         let mut cluster_centroids: HashMap<u32, Vec<f32>> = HashMap::new();
@@ -15120,11 +16436,178 @@ impl Storage {
 
     pub fn get_meta_history(&self, cluster_id: u32) -> Vec<SuperNode> {
         let _read_guard = self.commit_lock.lock();
+        if self.access_policy.read().mode == AccessPolicyMode::Enforced {
+            return Vec::new();
+        }
 
         self.meta_history
             .get(&cluster_id)
             .map(|v| v.value().clone())
             .unwrap_or_default()
+    }
+}
+
+impl<'a> ReadView<'a> {
+    fn validate(&self) -> Result<()> {
+        self.storage.ensure_readable()?;
+        self.storage.validate_lease_unlocked(self.lease)
+    }
+
+    fn merge_as_of(&self, requested: Option<String>) -> Result<Option<String>> {
+        Storage::validate_temporal_read(&TemporalRead {
+            as_of: requested.clone(),
+            tx_as_of: None,
+        })?;
+        if let (Some(lease), Some(requested)) = (&self.lease.temporal.as_of, &requested) {
+            if lease != requested {
+                return Err(Error::from_reason("TEMPORAL_SELECTOR_CONFLICT"));
+            }
+        }
+        Ok(requested.or_else(|| self.lease.temporal.as_of.clone()))
+    }
+
+    fn merge_tx_as_of(&self, requested: Option<u64>) -> Result<Option<u64>> {
+        if let (Some(lease), Some(requested)) = (self.lease.temporal.tx_as_of, requested) {
+            if lease != requested {
+                return Err(Error::from_reason("TEMPORAL_SELECTOR_CONFLICT"));
+            }
+        }
+        Ok(requested.or(self.lease.temporal.tx_as_of))
+    }
+
+    fn ensure_tx_horizon(&self, tx_as_of: Option<u64>) -> Result<()> {
+        if let Some(tx_as_of) = tx_as_of {
+            if tx_as_of < self.storage.history_horizon() {
+                return Err(Error::from_reason("TEMPORAL_BEYOND_HORIZON"));
+            }
+        }
+        Ok(())
+    }
+
+    fn reject_temporal(&self, operation: &str) -> Result<()> {
+        if self.lease.temporal.as_of.is_some() || self.lease.temporal.tx_as_of.is_some() {
+            return Err(Error::from_reason(format!(
+                "TEMPORAL_SELECTOR_UNSUPPORTED: {operation} cannot bind lease temporal selectors"
+            )));
+        }
+        Ok(())
+    }
+
+    fn reject_lease_tx_as_of(&self, operation: &str) -> Result<()> {
+        if self.lease.temporal.tx_as_of.is_some() {
+            return Err(Error::from_reason(format!(
+                "TEMPORAL_SELECTOR_UNSUPPORTED: {operation} cannot bind lease tx_as_of"
+            )));
+        }
+        Ok(())
+    }
+
+    pub fn node_view(&self, id: &str) -> Result<Option<NodeOutput>> {
+        self.validate()?;
+        self.storage.authorize_node_read(&self.lease.access, id)?;
+        self.reject_temporal("node_view")?;
+        Ok(self.storage.node_view_unlocked(id))
+    }
+
+    pub fn node_versions(&self, id: &str, at_seq: Option<u64>) -> Result<serde_json::Value> {
+        self.validate()?;
+        self.storage.authorize_node_read(&self.lease.access, id)?;
+        self.reject_temporal("node_versions")?;
+        let at_seq = self.merge_tx_as_of(at_seq)?;
+        self.ensure_tx_horizon(at_seq)?;
+        self.storage.node_versions_unlocked(id, at_seq)
+    }
+
+    pub fn neighbors(
+        &self,
+        seed: String,
+        mut args: NeighborInput,
+        is_inferred: bool,
+    ) -> Result<Vec<NeighborOutput>> {
+        self.validate()?;
+        self.storage
+            .authorize_default_composed_read(&self.lease.access)?;
+        self.reject_lease_tx_as_of("neighbors")?;
+        let requested_as_of = args.as_of.take();
+        args.as_of = self.merge_as_of(requested_as_of)?;
+        let tx_as_of = self.merge_tx_as_of(None)?;
+        self.ensure_tx_horizon(tx_as_of)?;
+        if tx_as_of.is_some() && is_inferred {
+            return Err(Error::from_reason(
+                "TEMPORAL_SELECTOR_UNSUPPORTED: inferred neighbors cannot bind tx-time selectors",
+            ));
+        }
+        let limits = QueryBudget::default().resolve()?;
+        let mut budget = QueryBudgetState::new(limits);
+        let results = match tx_as_of {
+            Some(tx_as_of) => self
+                .storage
+                .neighbors_tx_view(seed, args, tx_as_of, &mut budget)?,
+            None => self
+                .storage
+                .neighbors_with_budget(seed, args, is_inferred, &mut budget)?,
+        };
+        budget.serialized(&results)?;
+        Ok(results)
+    }
+
+    pub fn hybrid_search(&self, mut args: HybridSearchInput) -> Result<Vec<NeighborOutput>> {
+        self.validate()?;
+        self.storage
+            .authorize_default_composed_read(&self.lease.access)?;
+        self.reject_lease_tx_as_of("hybrid_search")?;
+        let requested_as_of = args.as_of.take();
+        args.as_of = self.merge_as_of(requested_as_of)?;
+        let tx_as_of = self.merge_tx_as_of(None)?;
+        self.ensure_tx_horizon(tx_as_of)?;
+        let limits = QueryBudget::default().resolve()?;
+        let mut budget = QueryBudgetState::new(limits);
+        let results = self
+            .storage
+            .hybrid_search_impl(args, tx_as_of, &mut budget)?;
+        budget.serialized(&results)?;
+        Ok(results)
+    }
+
+    pub fn execute_query_ir(&self, mut request: QueryIrRequest) -> Result<serde_json::Value> {
+        self.validate()?;
+        self.storage
+            .authorize_default_composed_read(&self.lease.access)?;
+        let request_temporal = request.temporal.take();
+        let requested_as_of = request_temporal
+            .as_ref()
+            .and_then(|temporal| temporal.valid_at.clone());
+        let requested_tx_as_of = request_temporal
+            .as_ref()
+            .and_then(|temporal| temporal.tx_as_of);
+        let as_of = self.merge_as_of(requested_as_of)?;
+        let tx_as_of = self.merge_tx_as_of(requested_tx_as_of)?;
+        self.ensure_tx_horizon(tx_as_of)?;
+        request.temporal = if as_of.is_some() || tx_as_of.is_some() {
+            Some(QueryIrTemporal {
+                valid_at: as_of,
+                tx_as_of,
+            })
+        } else {
+            None
+        };
+        self.storage.execute_query_ir_unlocked(request)
+    }
+
+    pub fn execute_hql(&self, query: &str) -> Result<serde_json::Value> {
+        self.validate()?;
+        self.storage
+            .authorize_default_composed_read(&self.lease.access)?;
+        self.reject_temporal("execute_hql")?;
+        self.storage.execute_hql_with_budget_unlocked(query, None)
+    }
+
+    pub fn query_relational(&self, query: RelationalQuery) -> Result<Vec<Value>> {
+        self.validate()?;
+        self.storage
+            .authorize_relational_read(&self.lease.access, &query)?;
+        self.reject_temporal("query_relational")?;
+        self.storage.query_relational_unlocked(query)
     }
 }
 

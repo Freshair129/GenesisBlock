@@ -2,10 +2,10 @@
 doc_id: C4--GENESISDB-ARCHITECTURE
 type: architecture-index
 status: current
-version: 0.1.12b
+version: 0.1.13b
 owner: GenesisBlockDB Architecture
 created_at: 2026-06-13T22:50:11+07:00,ATHER,9b1ced3
-last_update: "2026-09-08T03:25:41+07:00,ATHER"
+last_update: "2026-09-22T23:00:00+07:00,ATHER"
 attributes:
   domain: architecture
   scope: repository
@@ -17,6 +17,7 @@ related_docs:
   - docs/ADR--GENESISRAG17-SEPARATE-WORKER-PUBLICATION.md
   - docs/FLOW--GENESISRAG17-PIPELINE.md
   - docs/GENESISRAG17-EXTENSION-MAP.md
+  - docs/SPEC--GENESISDB-P6-GENERATIONS-LEASES-ACL.md
 ---
 
 # C4--GENESISDB-ARCHITECTURE
@@ -277,10 +278,18 @@ old-engine use of a manually stripped journal-only v4 copy is unsupported.
 See [Wave B contract and verification record](SPEC--WAVE-B-DURABLE-COLLECTIONS-EDGE-HISTORY.md).
 These are local implementation contracts, not deployment or consumer migration evidence.
 
+P6 (architecture correction approved 2026-09-22) specifies signed generation publication after
+HNSW flush and validated snapshot, opaque fenced read leases, explicit temporal binding, signed
+revision-checked ACL policy events, and schema-v5 fail-closed snapshot recovery. This is the
+approved implementation target; it is not evidence that code or external consumers have passed
+the P6 gates. Graph/vector records remain in the logical default namespace until an independent
+entity namespace migration is approved. See [P6 generation/lease/ACL specification](SPEC--GENESISDB-P6-GENERATIONS-LEASES-ACL.md).
+
 ## CHANGELOG
 
 | Version | Date | Status | Summary | Commit Hash | Agent |
 |---------|------|--------|---------|-------------|-------|
+| 0.1.13b | 2026-09-22 | beta | Registered the owner-approved P6 generation, lease, temporal, ACL and snapshot integrity target without claiming implementation completion. | working-tree | ATHER |
 | 0.1.12b | 2026-09-08 | beta | Registered Wave B collection journal and edge history contracts. | working-tree | ATHER |
 | 0.1.11b | 2026-09-08 | beta | Registered Wave A commit publication, preflight and recovery-required contracts with validation limits. | working-tree | ATHER |
 | 0.1.9b | 2026-08-14 | beta | Registered the accepted Typed Query IR boundary as planned, retained HQL compatibility, and kept NL interpretation outside the engine. | working-tree | ATHER |

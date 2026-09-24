@@ -186,6 +186,7 @@ async fn gossip_rejects_old_schema_before_sending_delta() {
         from_clock: 0,
         target_peer_id: "old".into(),
         from_commit_seq: Some(0),
+        request_nonce: None,
     };
     socket
         .send_to(&serde_json::to_vec(&request).unwrap(), &addr)
@@ -198,7 +199,9 @@ async fn gossip_rejects_old_schema_before_sending_delta() {
         .unwrap();
     assert!(matches!(
         serde_json::from_slice::<GossipMessage>(&buf[..len]).unwrap(),
-        GossipMessage::UpgradeRequired { schema_version: 4 }
+        GossipMessage::UpgradeRequired {
+            schema_version: SCHEMA_VERSION
+        }
     ));
     s.peers.insert(
         "new".into(),
@@ -210,10 +213,11 @@ async fn gossip_rejects_old_schema_before_sending_delta() {
         },
     );
     let request = GossipMessage::PullRequest {
-        schema_version: 4,
+        schema_version: SCHEMA_VERSION,
         from_clock: 0,
         target_peer_id: "new".into(),
         from_commit_seq: Some(0),
+        request_nonce: None,
     };
     socket
         .send_to(&serde_json::to_vec(&request).unwrap(), &addr)
