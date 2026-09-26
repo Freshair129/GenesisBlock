@@ -62,6 +62,32 @@ jobs:
           test -x node_modules/.bin/genesisblock-mcp
 
           node --input-type=module <<'NODE'
+          import { Client } from '@modelcontextprotocol/sdk/client/index.js';
+          import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
+          import path from 'node:path';
+
+          const transport = new StdioClientTransport({
+            command: path.resolve('node_modules/.bin/genesisblock-mcp'),
+            env: {
+              ...process.env,
+              GENESIS_DB_PATH: path.resolve('./mcp-consumer-db'),
+            },
+          });
+          const client = new Client({ name: 'npm-consumer', version: '1.0.0' }, { capabilities: {} });
+          try {
+            await client.connect(transport);
+            const { tools } = await client.listTools();
+            const names = new Set(tools.map(({ name }) => name));
+            for (const required of ['query_hql', 'retrieve_tiered_context', 'add_knowledge', 'gks_knowledge_promote']) {
+              if (!names.has(required)) throw new Error(`MCP CLI did not expose ${required}`);
+            }
+            console.log('clean npm consumer MCP handshake:', tools.length, 'tools');
+          } finally {
+            await transport.close();
+          }
+          NODE
+
+          node --input-type=module <<'NODE'
           import binding from '@freshair129/gks-genesis-block-native';
           import path from 'node:path';
 
