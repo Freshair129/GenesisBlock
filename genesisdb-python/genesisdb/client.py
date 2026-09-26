@@ -1,12 +1,20 @@
 import requests
-import json
 from typing import List, Dict, Any, Optional, Union
-from .models import Node, Edge, ContextPackage
+from .models import CoverageReport, Node, Edge, ContextPackage
 from .exceptions import ConnectionError, QueryError
 
 class GenesisClient:
-    def __init__(self, base_url: str = "http://localhost:3000"):
+    def __init__(
+        self,
+        base_url: str = "http://localhost:3000",
+        timeout: float = 10.0,
+        api_key: Optional[str] = None,
+    ):
         self.base_url = base_url.rstrip("/")
+        if timeout <= 0:
+            raise ValueError("timeout must be positive")
+        self.timeout = timeout
+        self.api_key = api_key
         self._check_connection()
 
     def _check_connection(self):
@@ -17,13 +25,50 @@ class GenesisClient:
         except Exception as e:
             raise ConnectionError(f"Could not connect to GenesisBlockDB at {self.base_url}: {e}")
 
+    def _headers(self) -> Dict[str, str]:
+        headers = {"Content-Type": "application/json"}
+        if self.api_key:
+            headers["Authorization"] = f"Bearer {self.api_key}"
+        return headers
+
+    def _request(self, method: str, path: str, payload: Optional[Any] = None) -> Any:
+        url = f"{self.base_url}{path}"
+        request = requests.post if method == "POST" else requests.get
+        kwargs = {"headers": self._headers(), "timeout": self.timeout}
+        if payload is not None:
+            kwargs["json"] = payload
+        try:
+            response = request(url, **kwargs)
+        except requests.RequestException as exc:
+            raise ConnectionError(f"Request to GenesisBlockDB failed: {exc}") from exc
+        if response.status_code < 200 or response.status_code >= 300:
+            try:
+                error_body = response.json()
+            except ValueError:
+                error_body = {}
+            code = error_body.get("code", "QUERY_EXECUTION_FAILED")
+            message = error_body.get("message", response.text)
+            raise QueryError(message, status_code=response.status_code, code=code)
+        try:
+            return response.json()
+        except ValueError as exc:
+            raise QueryError(
+                "Server returned invalid JSON",
+                status_code=response.status_code,
+                code="QUERY_EXECUTION_FAILED",
+            ) from exc
+
     def query(self, hql: str) -> Any:
         """Executes a raw HQL command."""
-        url = f"{self.base_url}/v1/query/hql"
-        response = requests.post(url, json={"query": hql})
-        if response.status_code != 200:
-            raise QueryError(f"HQL Error: {response.text}")
-        return response.json()
+        return self._request("POST", "/v1/query/hql", {"query": hql})
+
+    def execute_query_ir(self, request: Dict[str, Any]) -> Dict[str, Any]:
+        """Executes a closed, versioned Query IR request."""
+        return self._request("POST", "/v1/query/ir", request)
+
+    def query_ir_capabilities(self) -> Dict[str, Any]:
+        """Returns the server's operation and boundary capability manifest."""
+        return self._request("GET", "/v1/query/ir/capabilities")
 
     def add_node(
         self, 
@@ -35,7 +80,6 @@ class GenesisClient:
         caused_by: Optional[str] = "python-sdk"
     ) -> Node:
         """Adds a new knowledge atom to the graph."""
-        url = f"{self.base_url}/v1/node/add"
         payload = {
             "id": id,
             "labels": labels,
@@ -44,11 +88,7 @@ class GenesisClient:
             "ttl": ttl,
             "caused_by": caused_by
         }
-        response = requests.post(url, json=payload)
-        if response.status_code != 200:
-            raise QueryError(f"Add Node Error: {response.text}")
-        
-        data = response.json()
+        data = self._request("POST", "/v1/node/add", payload)
         return Node(
             id=data["id"],
             labels=data["labels"],
@@ -84,5 +124,6 @@ class GenesisClient:
             edges=edges,
             super_nodes=res.get("super_nodes", []),
             token_estimate=res.get("token_estimate", 0),
-            reasoning_path=res.get("reasoning_path", "")
+            reasoning_path=res.get("reasoning_path", ""),
+            coverage=CoverageReport(**res["coverage"]) if res.get("coverage") else None,
         )

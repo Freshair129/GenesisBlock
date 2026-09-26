@@ -19,3 +19,10 @@ react-native-genesisdb/ios/vendor/*.swift text eol=lf
 # at every line end). scripts/rn-host-fixture.sh is executed by the RN host
 # acceptance workflow.
 scripts/*.sh text eol=lf
+
+# The one committed native addon (see npm/linux-x64-gnu/README.md). Git's
+# auto-detection would almost certainly classify a stripped ELF as binary
+# anyway, but "almost certainly" is not a guarantee worth taking on a 9.5 MiB
+# artifact that a Docker image stage copies verbatim — one CRLF substitution
+# inside it and it stops loading, with nothing in the diff to show why.
+*.node binary

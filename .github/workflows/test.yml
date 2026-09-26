@@ -130,3 +130,56 @@ jobs:
         run: node scripts/check-dts-freshness.mjs .dts-committed .
       - name: npm test
         run: npm test
+
+  worker-tests:
+    name: npm test (genesisrag17-worker, ${{ matrix.host }})
+    runs-on: ${{ matrix.host }}
+    strategy:
+      fail-fast: false
+      matrix:
+        host: [ ubuntu-latest, windows-latest, macos-latest ]
+    steps:
+      - uses: actions/checkout@v4
+      # genesisrag17-worker/package.json pins `"node": ">=24.18"` — one major
+      # ahead of node-tests above, which only needs the addon to load.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      # Same build as node-tests: ignore-scripts on install, build the addon
+      # explicitly. genesisrag17-worker's test/worker.test.mjs requires
+      # ../../index.js (this package's root export), so the addon has to exist
+      # before the worker's own tests can run.
+      - name: Install deps (no build)
+        run: npm ci --ignore-scripts
+      - name: Build native addon
+        run: npm run build
+      # genesisrag17-worker declares no dependencies today (no committed
+      # package-lock.json there), so this is a no-op now and a real install
+      # if that ever changes — `npm ci` would hard-fail without a lockfile.
+      - name: Install genesisrag17-worker deps
+        run: npm install --prefix genesisrag17-worker --no-audit --no-fund
+      # The pinned intfloat/multilingual-e5-small snapshot (see
+      # genesisrag17-worker/README.md) is not provisioned in CI. The tests
+      # that need it detect the missing snapshot themselves and report as
+      # skipped rather than failed (`modelTestOptions` in worker.test.mjs) —
+      # this job asserts the rest of the suite (MSP mock, native transaction
+      # intents, receipt recovery, pointer replacement) on every PR.
+      #
+      # GENESIS_WORKER_MODEL_DIR must still point at *some* absolute path: the
+      # test file's own fallback default is a Windows path, and every
+      # GenesisRag17Worker.create() call (not only the model-gated tests)
+      # rejects a non-absolute modelDir at construction time
+      # (`MODEL_DIR_MUST_BE_ABSOLUTE`) before any model file is touched.
+      # `path.isAbsolute` is platform-aware, so that hardcoded Windows default
+      # is absolute on windows-latest but not on ubuntu-latest/macos-latest,
+      # which failed every non-model-gated test on those two hosts the first
+      # time this job ran. runner.temp is absolute on all three OSes and the
+      # directory need not exist — the constructor only checks path shape;
+      # actually reading the (nonexistent) snapshot only happens inside the
+      # model-gated tests, which already treat that as a skip condition.
+      - name: npm test (genesisrag17-worker)
+        env:
+          GENESIS_WORKER_MODEL_DIR: ${{ runner.temp }}/genesisrag17-model-not-provisioned
+        run: npm test --prefix genesisrag17-worker

@@ -1,5 +1,5 @@
 ---
-version: "0.1.0b"
+version: "0.1.1b"
 created_at: "2026-06-21,ATHER"
 status: current
 attributes:
@@ -9,6 +9,9 @@ attributes:
   complexity: "C-3"
   target_path: "G:\\GenesisBlock_Dev\\GenesisBlock\\docs\\SPEC--MULTI-COLLECTION-VECTOR-SPACE.md"
 ---
+
+> Current durability/history extension (2026-09-08): [approved Wave B](SPEC--WAVE-B-DURABLE-COLLECTIONS-EDGE-HISTORY.md). Collection configuration is now journal-authoritative; edge history uses replica-local version intervals. Earlier snapshot-only provisioning and current-row-only descriptions below are historical context for the original slice.
+
 
 # SPEC — Multi-Collection Vector Space
 
@@ -232,3 +235,10 @@ well within the `< 2 GB` budget.
   keep a single `DistL2` index type. Decide before P-C.
 - Recommended default local stack: `code → jina-code-embeddings-1.5b (1536)`,
   `text → bge-m3 (1024)`, rerank with `bge-reranker-v2-m3`.
+
+
+## Wave B document change
+
+| Date | Change |
+|---|---|
+| 2026-09-08 | Linked the approved journal-authoritative collection and complete edge-history extension. |

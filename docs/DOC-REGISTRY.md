@@ -2,14 +2,17 @@
 title: "GenesisBlockDB Document Registry"
 doc_id: "DOC-REGISTRY-GENESISBLOCKDB"
 status: draft
-version: "0.3.1+draft"
-updated: "2026-08-14"
+version: "0.4.4+draft"
+updated: "2026-09-22"
 owner: "GenesisBlockDB Architecture"
 source_of_truth: true
 related_issue: 84
 related_docs:
   - "docs/README.md"
   - "docs/DOC-STATUS.md"
+  - "docs/ADR--GENESISRAG17-SEPARATE-WORKER-PUBLICATION.md"
+  - "docs/FLOW--GENESISRAG17-PIPELINE.md"
+  - "docs/GENESISRAG17-EXTENSION-MAP.md"
 ---
 
 # GenesisBlockDB Document Registry
@@ -47,13 +50,21 @@ registry row explicitly names them.
 
 | Role | Doc ID | Version | Status | Owner | Path |
 |---|---|---|---|---|---|
-| Architecture composition | `MASTER-SPEC-GENESISBLOCKDB` | `2.2.0` | current | GenesisBlockDB Architecture | `docs/MASTER-SPEC--GENESIS-DB.md` |
-| Architecture index | `C4--GENESISDB-ARCHITECTURE` | `0.1.10b` | current | GenesisBlockDB Architecture | `docs/C4--GENESISDB-ARCHITECTURE.md` |
+| Architecture composition | `MASTER-SPEC-GENESISBLOCKDB` | `2.3.0b` | current | GenesisBlockDB Architecture | `docs/MASTER-SPEC--GENESIS-DB.md` |
+| Architecture index | `C4--GENESISDB-ARCHITECTURE` | `0.1.12b` | current | GenesisBlockDB Architecture | `docs/C4--GENESISDB-ARCHITECTURE.md` |
+| Commit correctness | `SPEC--WAVE-A-COMMIT-CORRECTNESS` | `0.1.0b` | beta | GenesisBlockDB Engineering | `docs/SPEC--WAVE-A-COMMIT-CORRECTNESS.md` |
+| Durable collections and edge history | `SPEC--WAVE-B-DURABLE-COLLECTIONS-EDGE-HISTORY` | `0.1.2b` | beta | GenesisBlockDB Engineering | `docs/SPEC--WAVE-B-DURABLE-COLLECTIONS-EDGE-HISTORY.md` |
+| Query correctness | `SPEC--WAVE-C-QUERY-CORRECTNESS` | `0.2.1b` | beta | GenesisBlockDB Engineering | `docs/SPEC--WAVE-C-QUERY-CORRECTNESS.md` |
+| Query budgets and quality gates | `SPEC--WAVE-D-BUDGETS-QUALITY-GATES` | `0.1.0b` | beta | GenesisBlockDB Engineering | `docs/SPEC--WAVE-D-BUDGETS-QUALITY-GATES.md` |
+| Query context and client capability | `SPEC--WAVE-E-QUERY-CONTEXT-CLIENT-CAPABILITY` | `0.1.1b` | beta | GenesisBlockDB Engineering | `docs/SPEC--WAVE-E-QUERY-CONTEXT-CLIENT-CAPABILITY.md` |
 | ADR | `ADR-GENESISBLOCKDB-DOMAIN-NEUTRAL-CORE` | `0.1.0+draft` | proposed | GenesisBlockDB Architecture | `docs/adr/ADR--GENESISBLOCKDB-DOMAIN-NEUTRAL-CORE.md` |
 | ADR | `ADR--GENESISDB-TYPED-QUERY-IR-AGENT-BOUNDARY` | `1.0.1` | accepted | Product Authority | `docs/adr/ADR--GENESISDB-TYPED-QUERY-IR-AGENT-BOUNDARY.md` |
-| Query contract | `SPEC-GENESISDB-TYPED-QUERY-IR-V1` | `1.0.1` | accepted | GenesisBlockDB Architecture | `docs/SPEC--GENESISDB-TYPED-QUERY-IR-V1.md` |
+| Query contract | `SPEC-GENESISDB-TYPED-QUERY-IR-V1` | `1.0.2` | accepted | GenesisBlockDB Architecture | `docs/SPEC--GENESISDB-TYPED-QUERY-IR-V1.md` |
 | Client contract | `CONTRACT-CLIENT-NAMESPACE-AND-SCHEMA` | `0.1.0+draft` | draft | GenesisBlockDB Engineering | `docs/contracts/CONTRACT--CLIENT-NAMESPACE-AND-SCHEMA.md` |
 | API reference | `API_REFERENCE` | generated | current | GenesisBlockDB Engineering | `docs/API_REFERENCE.md` |
+| GenesisRAG17 integration ADR | `ADR-GENESISRAG17-SEPARATE-WORKER-PUBLICATION` | `1.0.5b` | beta | GenesisBlockDB Architecture | `docs/ADR--GENESISRAG17-SEPARATE-WORKER-PUBLICATION.md` |
+| GenesisRAG17 execution flow | `FLOW-GENESISRAG17-PIPELINE` | `1.0.3b` | beta | GenesisBlockDB Architecture | `docs/FLOW--GENESISRAG17-PIPELINE.md` |
+| GenesisRAG17 extension map | `MAP-GENESISRAG17-EXTENSIONS` | `1.0.3b` | beta | GenesisBlockDB Architecture | `docs/GENESISRAG17-EXTENSION-MAP.md` |
 
 ## 5. Product narrative and evidence
 
@@ -99,6 +110,19 @@ The following documents should be created only when implementation work requires
 
 | Version | Date | Owner | Summary |
 |---|---|---|---|
+| 0.4.4+draft | 2026-09-22 | GenesisBlockDB Architecture | Registered the approved Wave E query context and client capability implementation record. |
+| 0.4.3+draft | 2026-09-10 | GenesisBlockDB Architecture | Truth-synced the Wave D beta status and Typed Query IR 1.0.2 registry entries after release verification. |
+| 0.4.2+draft | 2026-09-08 | RWANG | Reconcile GenesisRAG17 document versions 1.0.3b after zuri's pre-merge ADR-071 to ADR-073 collision repair; preserve historical rows. |
+| 0.4.1+draft | 2026-09-08 | GenesisBlockDB Architecture | Reconciled the GenesisRAG17 registry entries with the live zuri ADR-071 reference and retained historical report links. |
+| 0.4.0+draft | 2026-09-08 | GenesisBlockDB Architecture | Registered the GenesisRAG17 TEST worker/publication ADR, execution flow and extension map. |
+| 0.3.9+draft | 2026-09-08 | GenesisBlockDB Engineering | Registered the Wave D candidate for query budgets, REST execution control and per-index quality evidence. |
+| 0.3.8+draft | 2026-09-08 | GenesisBlockDB Engineering | Recorded large-collection filtered-ANN fix `d8ef9af`, 28-cell oracle evidence and rebuilt N-API/MCP runtime pass. |
+| 0.3.7+draft | 2026-09-08 | GenesisBlockDB Engineering | Recorded approved Wave C implementation checkpoint `cbe5a04` and beta exit evidence. |
+| 0.3.6+draft | 2026-09-08 | GenesisBlockDB Engineering | Registered the Wave C query-correctness candidate packet. |
+| 0.3.5+draft | 2026-09-08 | GenesisBlockDB Engineering | Registered the B4 identity-preserving replay benchmark correction. |
+| 0.3.4+draft | 2026-09-08 | GenesisBlockDB Engineering | Recorded Wave B approval, implementation and synchronized parent versions. |
+| 0.3.3+draft | 2026-09-08 | GenesisBlockDB Engineering | Registered Wave B candidate design; implementation remains unapproved. |
+| 0.3.2+draft | 2026-09-08 | GenesisBlockDB Architecture | Registered approved Wave A commit contract and synchronized parent architecture versions. |
 | 0.3.0+draft | 2026-08-14 | GenesisBlockDB Architecture | Registered the accepted Typed Query IR ADR/spec and removed it from the follow-up list. |
 | 0.3.1+draft | 2026-08-14 | GenesisBlockDB Architecture | Truth-synced Query IR spec, ADR and C4 versions after the partial search/traverse implementation. |
 | 0.2.0+draft | 2026-08-13 | GenesisBlockDB Architecture | Reconciled registered frontmatter and defined canonical-entrypoint scope for automated validation. |

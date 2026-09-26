@@ -1,0 +1,125 @@
+# Linux drift gate for the committed GenesisRAG17 worker addon.
+#
+# `npm/linux-x64-gnu/index.linux-x64-gnu.node` is committed (the one `.gitignore`
+# exception; see that directory's README) so the zuri-ai edge image's `ki17`
+# build stage can copy a known-good Linux addon instead of compiling Rust inside
+# the image. A committed binary that nothing re-checks goes stale silently, so
+# this workflow does two things on every push and pull request:
+#
+#   1. rebuilds the addon for x86_64-unknown-linux-gnu from the current source
+#      and runs the worker suite against the fresh build — proves the source
+#      still produces a working Linux addon;
+#   2. runs the same suite against the COMMITTED file — proves the artifact a
+#      consumer would actually copy still loads and passes on Linux.
+#
+# What it deliberately does NOT do is compare the two byte-for-byte. A different
+# `rustc` patch release, a different build path or a different LTO run changes
+# the bytes without changing the behaviour, and a check that goes red for that
+# reason is a check that gets ignored.
+#
+# Model note: the pinned `intfloat/multilingual-e5-small` snapshot (~490 MB) is
+# not provisioned in CI, so the Stage 15/16 model-gated tests report as skipped,
+# exactly as they do in test.yml's `worker-tests` job. This workflow asserts the
+# rest of the suite (MSP mock, native transaction intents, receipt recovery,
+# pointer replacement) on Linux.
+#
+# Actions are pinned to major-version tags (`@v4`), matching every other
+# workflow in this repository.
+
+name: GenesisRAG17 worker (linux-x64-gnu)
+
+on:
+  push:
+    branches:
+      - main
+      - 'feat/genesisrag17-worker-linux-x64'
+  pull_request:
+    branches: [ main ]
+
+permissions:
+  contents: read
+
+env:
+  ADDON: index.linux-x64-gnu.node
+  COMMITTED_ADDON: npm/linux-x64-gnu/index.linux-x64-gnu.node
+
+jobs:
+  linux-addon:
+    name: rebuild addon + worker tests (ubuntu-latest)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # genesisrag17-worker/package.json pins `"node": ">=24.18"`. 24.18.0 is the
+      # version the worker README and the MSP GenesisRAG17 runbook name.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24.18.0'
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-unknown-linux-gnu
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Assert the committed Linux addon is present
+        run: |
+          test -f "$COMMITTED_ADDON" || {
+            echo "::error::$COMMITTED_ADDON is missing — the committed Linux addon is the whole point of this job"
+            exit 1
+          }
+          ls -l "$COMMITTED_ADDON"
+          sha256sum "$COMMITTED_ADDON"
+
+      # ---------- pass 1: the COMMITTED artifact, exactly as a consumer gets it
+      - name: Load + test the committed addon
+        env:
+          # Every GenesisRag17Worker.create() call rejects a non-absolute
+          # modelDir before any model file is touched, so this must be absolute
+          # even though the snapshot is intentionally absent.
+          GENESIS_WORKER_MODEL_DIR: ${{ runner.temp }}/genesisrag17-model-not-provisioned
+        run: |
+          cp "$COMMITTED_ADDON" "./$ADDON"
+          node -e "require('./index.js'); console.log('committed addon loaded')"
+          npm install --prefix genesisrag17-worker --no-audit --no-fund
+          npm test --prefix genesisrag17-worker
+
+      # ---------- pass 2: rebuild from source and test that
+      # `napi build` rewrites index.js / index.d.ts in place and both are
+      # committed, so keep the committed copies aside the way test.yml does.
+      - name: Snapshot the committed napi artifacts
+        run: |
+          mkdir -p .dts-committed
+          cp index.d.ts index.js .dts-committed/
+
+      - name: Install deps (no build)
+        run: npm ci --ignore-scripts
+
+      - name: Rebuild the addon for x86_64-unknown-linux-gnu
+        run: |
+          rm -f "./$ADDON"
+          npm run build
+          test -f "./$ADDON" || {
+            echo "::error::napi build produced no $ADDON"
+            exit 1
+          }
+          ls -l "./$ADDON"
+          sha256sum "./$ADDON"
+
+      - name: index.d.ts / index.js freshness
+        run: node scripts/check-dts-freshness.mjs .dts-committed .
+
+      - name: Test the freshly built addon
+        env:
+          GENESIS_WORKER_MODEL_DIR: ${{ runner.temp }}/genesisrag17-model-not-provisioned
+        run: |
+          node -e "require('./index.js'); console.log('rebuilt addon loaded')"
+          npm test --prefix genesisrag17-worker
+
+      # Kept for whoever builds the zuri-ai ki17 image stage: the artifact from
+      # the exact commit under test, without having to run a container locally.
+      - name: Upload the rebuilt addon
+        uses: actions/upload-artifact@v4
+        with:
+          name: genesisrag17-addon-linux-x64-gnu-${{ github.sha }}
+          path: ${{ env.ADDON }}
+          if-no-files-found: error
+          retention-days: 14

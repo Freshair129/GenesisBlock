@@ -9,6 +9,7 @@ const candidates = process.platform === "win32"
 for (const [command, commandArgs] of candidates) {
   const result = spawnSync(command, commandArgs, { stdio: "inherit" });
   if (result.error?.code === "ENOENT") continue;
+  if (process.platform === "win32" && command === "py" && result.status === 112) continue;
   process.exit(result.status ?? 1);
 }
 

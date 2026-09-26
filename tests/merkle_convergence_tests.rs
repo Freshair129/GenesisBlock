@@ -145,12 +145,17 @@ fn divergent_state_differs() {
     );
 }
 
-/// An empty store has the all-zero sentinel root (back-compat with the prior
-/// empty-WAL behaviour).
+/// Empty graph state still includes collection semantics in its root, so a
+/// peer missing an empty collection can discover the difference.
 #[test]
-fn empty_state_is_zero_root() {
+fn empty_state_hashes_default_collection_configuration() {
     let a = open(&fresh("test_mk_empty"));
-    assert_eq!(a.get_merkle_root(), "0".repeat(64));
+    let b = open(&fresh("test_mk_empty_peer"));
+    assert_eq!(a.get_merkle_root(), b.get_merkle_root());
+    assert_ne!(a.get_merkle_root(), "0".repeat(64));
+    b.create_collection("empty".into(), "m".into(), 4, None, None, None, None)
+        .unwrap();
+    assert_ne!(a.get_merkle_root(), b.get_merkle_root());
 }
 
 /// A secondary vector flips the root: `add_vector` changes no node/edge field, so

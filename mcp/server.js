@@ -52,6 +52,35 @@ const TOOLS = [
     },
   },
   {
+    name: "query_ir",
+    description: "Executes a closed query-ir.v1 request. Search, traverse and target-id context are supported; unsupported capabilities return structured errors.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        request: {
+          type: "object",
+          additionalProperties: false,
+          properties: {
+            contract_version: { type: "string", const: "query-ir.v1" },
+            request_id: { type: "string", minLength: 1 },
+            namespace: { type: "string" },
+            temporal: { type: "object" },
+            consistency: { type: "object" },
+            budget: { type: "object" },
+            operation: {
+              type: "object",
+              additionalProperties: true,
+              properties: { kind: { type: "string" } },
+              required: ["kind"],
+            },
+          },
+          required: ["contract_version", "request_id", "operation"],
+        },
+      },
+      required: ["request"],
+    },
+  },
+  {
     name: "retrieve_tiered_context",
     description: "Retrieves a knowledge fragment based on the H0-H6 Context Scaling Tier protocol.",
     inputSchema: {
@@ -131,6 +160,14 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
       }
 
+      case "query_ir": {
+        const result = await db.executeQueryIr(arguments.request);
+        return {
+          content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
+          structuredContent: result,
+        };
+      }
+
       case "retrieve_tiered_context": {
         const result = await db.retrieveContext(
           arguments.target,
@@ -197,9 +234,14 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         throw new Error(`Unknown tool: ${name}`);
     }
   } catch (error) {
+    const message = error.message;
+    const code = name === "query_ir" && /^QUERY_[A-Z_]+:/.test(message)
+      ? message.split(":", 1)[0]
+      : undefined;
     return {
       isError: true,
-      content: [{ type: "text", text: `Error executing ${name}: ${error.message}` }],
+      content: [{ type: "text", text: `Error executing ${name}: ${message}` }],
+      ...(code ? { structuredContent: { code, message } } : {}),
     };
   }
 });

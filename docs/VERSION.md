@@ -14,7 +14,7 @@ those as legacy labels superseded by this file.
 
 | Field | Value |
 |---|---|
-| **Engine crate** (`Cargo.toml`, `package.json`, `modules.json`) | `0.2.4` |
+| **Engine crate** (`Cargo.toml`, `package.json`, `modules.json`) | `0.2.6` |
 | **Product milestone** | **Mobile SDK** — Phase B (iOS/Android/React Native) shipped and published; on-device acceptance verified for iOS |
 | **Status** | Advanced prototype (durable, benchmarked, suite green) |
 | **Evidence baseline** | 2026-06-21 — audits P14–P30, `REPORT--2026-06-21-PERFORMANCE-AND-COMPETITIVE.md` |
@@ -28,7 +28,9 @@ Packages, `react-native-genesisdb` + the native addon's 4 platform packages
 live on npm) → **`0.2.4`** (no engine change; cut to publish
 `genesisdb-android` 0.1.1 with the new `x86_64` emulator ABI and
 `react-native-genesisdb` 0.1.1, which finally delivers that package's Android
-and iOS integration fixes — see `CHANGELOG.md`). The crate
+and iOS integration fixes — see `CHANGELOG.md`). Version `0.2.5` delivered
+the Maven Central/RN distribution release; `0.2.6` delivers the typed context
+query contracts and isolated GenesisRAG17 worker integration. The crate
 version is kept in lock-step across `Cargo.toml`, `package.json`, and
 `modules.json` by `scripts/version.mjs` (`npm run version:check` is a CI gate).
 

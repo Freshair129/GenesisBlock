@@ -1,0 +1,15 @@
+{
+  "name": "@freshair129/genesisrag17-worker",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Isolated GenesisRAG17 Tier 4 worker for the GenesisBlock native store",
+  "main": "src/index.mjs",
+  "scripts": {
+    "test": "node --test test/*.mjs",
+    "start": "node src/cli.mjs"
+  },
+  "engines": {
+    "node": ">=24.18"
+  }
+}

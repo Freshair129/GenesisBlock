@@ -189,6 +189,14 @@ export interface HybridSearchInput {
 export type QueryIrIndexConsistency = 'eventual' | 'read_your_write'
 export type QueryIrSearchMode = 'vector' | 'hybrid' | 'lexical'
 export type QueryIrDirection = 'out' | 'in' | 'both'
+export interface QueryBudget {
+  max_expanded_nodes?: number
+  max_expanded_edges?: number
+  max_vector_candidates?: number
+  max_result_rows?: number
+  max_serialized_bytes?: number
+  max_elapsed_ms?: number
+}
 export interface QueryIrRequest {
   contract_version: 'query-ir.v1'
   request_id: string
@@ -202,7 +210,8 @@ export interface QueryIrRequest {
    */
   temporal?: { valid_at?: string; tx_as_of?: number }
   consistency?: { index: QueryIrIndexConsistency }
-  operation: QueryIrSearchOperation | QueryIrTraverseOperation
+  budget?: QueryBudget
+  operation: QueryIrSearchOperation | QueryIrTraverseOperation | QueryIrContextOperation
 }
 export interface QueryIrSearchOperation {
   kind: 'search'
@@ -210,6 +219,7 @@ export interface QueryIrSearchOperation {
   target_id?: string
   query_vector?: Array<number>
   collection?: string
+  filters?: Record<string, unknown>
   k: number
   alpha?: number
   language?: string
@@ -224,37 +234,117 @@ export interface QueryIrTraverseOperation {
   direction: QueryIrDirection
   limit?: number
 }
+export interface QueryIrContextOperation {
+  kind: 'context'
+  target_id?: string
+  query_vector?: Array<number>
+  tier: string
+  budget?: number
+  fuzzy?: boolean
+}
 export interface QueryIrResponse {
   contract_version: 'query-ir.v1'
   request_id: string
   status: 'ok'
-  operation_kind: 'search' | 'traverse'
-  data: Array<NeighborOutput>
+  operation_kind: 'search' | 'traverse' | 'context'
+  data: Array<NeighborOutput> | ContextPackage
   meta: {
     capability_version: string
     index_lag: number
+    budget: {
+      max_expanded_nodes: number
+      max_expanded_edges: number
+      max_vector_candidates: number
+      max_result_rows: number
+      max_serialized_bytes: number
+      max_elapsed_ms: number
+    }
     warnings: Array<string>
   }
 }
 export interface QueryIrCapabilities {
   contract_version: 'query-ir.v1'
   implementation_status: 'partial'
+  storage_schema_version: number
+  collection_definition: {
+    version: number
+    durable: boolean
+    conflict_policy: 'reject'
+    sync_schema_version: number
+  }
+  edge_history: {
+    availability: 'implemented' | 'unavailable'
+    floor: number | null
+    selection: 'replica_local_frame_intervals'
+  }
   operations: {
     search: 'implemented'
     traverse: 'implemented'
     match_path: 'planned'
-    context: 'planned'
+    context: 'implemented'
+    relational_named_query: 'planned'
+  }
+  operation_details: {
+    search: {
+      vector: 'implemented'
+      hybrid: 'implemented'
+      filters: 'unsupported'
+      lexical: 'planned'
+    }
+    traverse: { bounded: 'implemented' }
+    context: {
+      target_id: 'implemented'
+      query_vector: 'unsupported'
+      temporal: 'unsupported'
+      tiers: Array<string>
+    }
+    match_path: 'planned'
     relational_named_query: 'planned'
   }
   limits: {
     max_k: number
     max_depth: number
+    budget_defaults: {
+      max_expanded_nodes: number
+      max_expanded_edges: number
+      max_vector_candidates: number
+      max_result_rows: number
+      max_serialized_bytes: number
+      max_elapsed_ms: number
+    }
+    budget_exhaustion_reasons: Array<'nodes' | 'edges' | 'candidates' | 'rows' | 'bytes' | 'deadline'>
   }
 }
 export interface DatabaseStatus {
   open: boolean
   readOnly: boolean
   pageCacheMb: number
+}
+export interface IndexCoverageReport {
+  /** Collection to which this validation belongs. */
+  collection: string
+  /**
+   * Lifecycle state of the last observed structural validation.
+   * `READY` proves source/graph membership equality only; it does not prove
+   * exact search or ANN recall.
+   */
+  state: string
+  /** Number of durable vector metadata rows in the collection. */
+  sourceCount: number
+  /** Number of origin IDs observed in the HNSW graph. */
+  indexedCount: number
+  /** Source rows absent from the graph during the last explicit validation. */
+  missingCount: number
+  /** Graph origin IDs absent from the durable source metadata. */
+  extraCount: number
+  /** Engine-global async indexing backlog at validation/report time. */
+  pendingCount: number
+  /** Maximum `created_seq` in the source metadata. */
+  sourceFrontier: number
+  /** Maximum `created_seq` represented by validated graph members. */
+  builtFrontier: number
+  /** True only when an explicit validation covered the current source set. */
+  validated: boolean
 }
 export interface CollectionInfo {
   name: string
@@ -305,6 +395,11 @@ export interface CollectionInfo {
    * collections); the SAME value is repeated on every entry for convenience.
    */
   indexLag: number
+  /**
+   * Explicit structural source-to-HNSW coverage. `READY` is not an exactness
+   * or ANN-recall claim; callers must inspect the individual fields.
+   */
+  coverage: IndexCoverageReport
 }
 export interface SyncPeer {
   id: string
