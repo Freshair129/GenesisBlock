@@ -2,8 +2,8 @@
 title: "GenesisBlockDB Technical Architecture and Capability Composition"
 doc_id: "MASTER-SPEC-GENESISBLOCKDB"
 status: current
-version: "2.2.0"
-updated: "2026-08-14"
+version: "2.3.0b"
+updated: "2026-09-08"
 owner: "GenesisBlockDB Architecture"
 source_of_truth: true
 related_issue: 84
@@ -15,6 +15,10 @@ related_docs:
   - "docs/adr/ADR--GENESISBLOCKDB-DOMAIN-NEUTRAL-CORE.md"
   - "docs/adr/ADR--GENESISDB-TYPED-QUERY-IR-AGENT-BOUNDARY.md"
   - "docs/SPEC--GENESISDB-TYPED-QUERY-IR-V1.md"
+  - "docs/SPEC--WAVE-A-COMMIT-CORRECTNESS.md"
+  - "docs/ADR--GENESISRAG17-SEPARATE-WORKER-PUBLICATION.md"
+  - "docs/FLOW--GENESISRAG17-PIPELINE.md"
+  - "docs/GENESISRAG17-EXTENSION-MAP.md"
 ---
 
 # GenesisBlockDB Technical Architecture and Capability Composition
@@ -84,7 +88,7 @@ GenesisBlockDB uses a **Log-Structured Merge-Friendly** architecture based on a 
 - **Primary Log:** `genesis-graph.wal` (JSONL format) stores mutation events.
 - **Persistence:** high-durability append-only logic with batched group commits.
 - **Unified operational boundary:** applications open, mutate, query, back up and restore GenesisBlockDB as one database. SQLite is an internal relational projection; native graph/vector indexes are not separate application-managed databases.
-- **Relational projection:** embedded SQLite (`rusqlite`, bundled) stores node properties, normalized labels and U2 app-defined tables. Versioned additive schemas, idempotent typed mutation batches and bounded named joins are available through Genesis APIs. SQLite remains internal and rebuildable from the signed WAL. Unified cross-domain commit sequencing remains U3.
+- **Relational projection:** embedded SQLite (`rusqlite`, bundled) stores node properties, normalized labels and U2 app-defined tables. Versioned additive schemas, idempotent typed mutation batches and bounded named joins are available through Genesis APIs. SQLite remains internal and rebuildable from the signed WAL. Unified cross-domain transactions preflight relational constraints before WAL append. Supported query reads and graph/projection publication share a reentrant commit boundary; failed durable apply requires reopen before further queries, writes or checkpoint. Concurrent reads serialize; ANN visibility still requires the existing flush barrier. See [Wave A contract and verification limits](SPEC--WAVE-A-COMMIT-CORRECTNESS.md).
 - **In-memory state:**
   - `DashMap<u32, NodeOutput>`: lean primary node records; `props` are hydrated from SQLite rather than retained on the traversal path.
   - `DashMap<u128, EdgeOutput>`: primary edge storage. Edges are keyed by deterministic `u128 = trunc128(SHA256(id))`; the key is derived from `EdgeOutput.id` and is not client identity.
@@ -125,6 +129,28 @@ The Graph Retrieval Layer (GRL) provides generic tiered or bounded graph retriev
 - an orchestrator combines vector anchors with bounded graph expansion.
 
 A client may map these primitives to its own context policy. The GRL does not make GoVibe MSP rules mandatory for NotiKeeper or other clients.
+
+### 4.5 GenesisRAG17 TEST integration boundary
+
+The isolated GenesisRAG17 integration is a client adapter around this public
+engine boundary. The separate `genesisrag17-worker/` process owns physical
+Stage 13 graph writes, Stage 15 CPU embeddings, Stage 16 index/readback and
+atomic publication. It uses one native store owner and a worker-owned SQLite
+FTS5 lexical sidecar; the sidecar is an adapter implementation, not a new
+engine authority. MSP authenticates and relays pipeline calls, while GKS owns
+canonical decisions, Stage 14 enrichment and the Stage 17 quality verdict.
+
+The physical sequence is graph-only write and receipt -> GKS enrichment ->
+embedding -> six-lane index/readback -> quality gate -> atomic pointer update ->
+publication receipt. A prepared snapshot is not query-visible, and a gate
+without a matching publication receipt cannot finish a source run. This TEST
+adapter does not add GKS ontology, MSP policy, source schemas or a second
+database to GenesisBlockDB. Its native engine pin is
+`e15e35b0093394e0a8880af7f4e6f63cf81223b7`; its model and contract pins,
+runtime variables, lane statuses and extension seams are recorded in the
+[GenesisRAG17 ADR](ADR--GENESISRAG17-SEPARATE-WORKER-PUBLICATION.md),
+[pipeline flow](FLOW--GENESISRAG17-PIPELINE.md), [extension
+map](GENESISRAG17-EXTENSION-MAP.md) and [worker README](../genesisrag17-worker/README.md).
 
 ## 5. Data Model and Bitemporality
 
@@ -297,10 +323,23 @@ The architecture is conformant when:
 - ADRs define significant decisions.
 - Feature specs and code/tests define implementation detail and evidence.
 
+Wave B (R-02/R-03, approved 2026-09-08) journals immutable collection definitions
+including empty/default spaces and preserves calibration and exact rerank rows
+through fold/recovery. Disk schema is 4; derived SQLite projection schema is 5.
+Edge replacement rewires both adjacency directions and `edge_versions` selects
+replica-local transaction intervals. History is available only from the reported
+edge-history floor. New-reader preflight rejects unsupported complete frames;
+old-engine use of a manually stripped journal-only v4 copy is unsupported.
+See [Wave B contract and verification record](SPEC--WAVE-B-DURABLE-COLLECTIONS-EDGE-HISTORY.md).
+These are local implementation contracts, not deployment or consumer migration evidence.
+
 ## Changelog
 
 | Version | Date | Owner | Summary |
 |---|---|---|---|
+| 2.3.0b | 2026-09-08 | GenesisBlockDB Architecture | Added the separate GenesisRAG17 TEST adapter boundary, ordered publication flow and extension references while retaining the client-neutral core. |
+| 2.2.2 | 2026-09-08 | GenesisBlockDB Architecture | Reflected approved Wave B durable collections, schema compatibility and edge version intervals. |
+| 2.2.1 | 2026-09-08 | GenesisBlockDB Architecture | Reflected approved Wave A preflight, publication and recovery-required behavior with verification limits. |
 | 2.2.0 | 2026-08-14 | GenesisBlockDB Architecture | Approved typed Query IR as the primary query boundary, retained HQL compatibility, and placed NL conversion outside the engine. |
 | 2.1.0 | 2026-08-03 | GenesisBlockDB Architecture | Separated BRD/PRD/SRS roles, established standalone client-neutral boundary, added client namespace/schema metadata, and removed GoVibe-specific authority from the core definition. |
 | 2.0.0 | previous | GenesisBlockDB Architecture | Previous master specification. |

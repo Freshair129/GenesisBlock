@@ -23,7 +23,7 @@ use std::sync::atomic::{AtomicBool, AtomicU32, AtomicU64, AtomicUsize, Ordering}
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
-use chrono::Utc;
+use chrono::{DateTime, Utc};
 use dashmap::DashMap;
 use half::f16;
 use hnsw_rs::prelude::*;
@@ -64,7 +64,7 @@ mod core_error {
 #[cfg(not(feature = "napi-bindings"))]
 use core_error::{Error, Result};
 use crossbeam_channel::{bounded, unbounded, Receiver, Sender};
-use parking_lot::{Mutex, RwLock};
+use parking_lot::{Mutex, ReentrantMutex, RwLock};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use uuid::Uuid;
@@ -75,17 +75,18 @@ mod ffi;
 mod jni;
 pub mod query;
 pub mod router;
+pub mod uee_v2;
 use query::HqlCommand;
 
 // v3: Event::NodeRetract journal frames (RCA--SLICE0-DURABILITY defect 2).
 // Older engines silently skip unknown event variants on replay, which would
 // resurrect deleted nodes — the bump makes downgrade fail closed instead.
-pub const SCHEMA_VERSION: u32 = 3;
+pub const SCHEMA_VERSION: u32 = 4;
 // v3: WP-2.1 node_versions chain (additive CREATE IF NOT EXISTS migration).
 // v4: edges + edges_current view (SPEC--GENESISDB-EDGE-PROJECTION), same
 // additive shape — existing databases gain the table empty and are backfilled
 // from the live map on open (`projection_backfill_edges`).
-const PROJECTION_SCHEMA_VERSION: u32 = 4;
+const PROJECTION_SCHEMA_VERSION: u32 = 5;
 
 /// Bounds for the read-only SQL surface. Exceeding one is an ERROR, never a
 /// silent truncation.
@@ -461,6 +462,201 @@ pub const QUERY_IR_V1: &str = "query-ir.v1";
 const QUERY_IR_MAX_K: u32 = 1_000;
 const QUERY_IR_MAX_DEPTH: u32 = 32;
 
+const QUERY_BUDGET_DEFAULT_NODES: u64 = 100_000;
+const QUERY_BUDGET_DEFAULT_EDGES: u64 = 200_000;
+const QUERY_BUDGET_DEFAULT_CANDIDATES: u64 = 100_000;
+const QUERY_BUDGET_DEFAULT_ROWS: u64 = 10_000;
+const QUERY_BUDGET_DEFAULT_BYTES: u64 = 32 * 1024 * 1024;
+const QUERY_BUDGET_DEFAULT_ELAPSED_MS: u64 = 5_000;
+
+/// Optional caller-provided query limits. `None` uses the engine's safe default
+/// and every supplied value must be positive. The object is deliberately shared
+/// by Query IR and the REST HQL envelope; the HQL grammar stays unchanged.
+#[derive(Serialize, Deserialize, Clone, Debug, Default, PartialEq)]
+#[serde(deny_unknown_fields)]
+pub struct QueryBudget {
+    pub max_expanded_nodes: Option<u64>,
+    pub max_expanded_edges: Option<u64>,
+    pub max_vector_candidates: Option<u64>,
+    pub max_result_rows: Option<u64>,
+    pub max_serialized_bytes: Option<u64>,
+    pub max_elapsed_ms: Option<u64>,
+}
+
+#[derive(Clone, Copy, Debug, Serialize)]
+struct ResolvedQueryBudget {
+    max_expanded_nodes: u64,
+    max_expanded_edges: u64,
+    max_vector_candidates: u64,
+    max_result_rows: u64,
+    max_serialized_bytes: u64,
+    max_elapsed_ms: u64,
+}
+
+impl ResolvedQueryBudget {
+    fn as_input(self) -> QueryBudget {
+        QueryBudget {
+            max_expanded_nodes: Some(self.max_expanded_nodes),
+            max_expanded_edges: Some(self.max_expanded_edges),
+            max_vector_candidates: Some(self.max_vector_candidates),
+            max_result_rows: Some(self.max_result_rows),
+            max_serialized_bytes: Some(self.max_serialized_bytes),
+            max_elapsed_ms: Some(self.max_elapsed_ms),
+        }
+    }
+}
+
+impl QueryBudget {
+    fn resolve(&self) -> Result<ResolvedQueryBudget> {
+        fn positive(name: &str, value: Option<u64>, default: u64) -> Result<u64> {
+            match value {
+                Some(0) => Err(Error::from_reason(format!(
+                    "QUERY_BUDGET_INVALID: {name} must be positive"
+                ))),
+                Some(value) => Ok(value),
+                None => Ok(default),
+            }
+        }
+
+        Ok(ResolvedQueryBudget {
+            max_expanded_nodes: positive(
+                "max_expanded_nodes",
+                self.max_expanded_nodes,
+                QUERY_BUDGET_DEFAULT_NODES,
+            )?,
+            max_expanded_edges: positive(
+                "max_expanded_edges",
+                self.max_expanded_edges,
+                QUERY_BUDGET_DEFAULT_EDGES,
+            )?,
+            max_vector_candidates: positive(
+                "max_vector_candidates",
+                self.max_vector_candidates,
+                QUERY_BUDGET_DEFAULT_CANDIDATES,
+            )?,
+            max_result_rows: positive(
+                "max_result_rows",
+                self.max_result_rows,
+                QUERY_BUDGET_DEFAULT_ROWS,
+            )?,
+            max_serialized_bytes: positive(
+                "max_serialized_bytes",
+                self.max_serialized_bytes,
+                QUERY_BUDGET_DEFAULT_BYTES,
+            )?,
+            max_elapsed_ms: positive(
+                "max_elapsed_ms",
+                self.max_elapsed_ms,
+                QUERY_BUDGET_DEFAULT_ELAPSED_MS,
+            )?,
+        })
+    }
+}
+
+struct QueryBudgetState {
+    limits: ResolvedQueryBudget,
+    started: Instant,
+    expanded_nodes: u64,
+    expanded_edges: u64,
+    vector_candidates: u64,
+    result_rows: u64,
+}
+
+impl QueryBudgetState {
+    fn new(limits: ResolvedQueryBudget) -> Self {
+        Self {
+            limits,
+            started: Instant::now(),
+            expanded_nodes: 0,
+            expanded_edges: 0,
+            vector_candidates: 0,
+            result_rows: 0,
+        }
+    }
+
+    fn check_deadline(&self) -> Result<()> {
+        if self.started.elapsed() > Duration::from_millis(self.limits.max_elapsed_ms) {
+            return Err(Error::from_reason("QUERY_BUDGET_EXCEEDED: reason=deadline"));
+        }
+        Ok(())
+    }
+
+    fn consume(
+        &mut self,
+        kind: &'static str,
+        amount: u64,
+        limit: u64,
+        total: &mut u64,
+    ) -> Result<()> {
+        self.check_deadline()?;
+        *total = total
+            .checked_add(amount)
+            .ok_or_else(|| Error::from_reason(format!("QUERY_BUDGET_EXCEEDED: reason={kind}")))?;
+        if *total > limit {
+            return Err(Error::from_reason(format!(
+                "QUERY_BUDGET_EXCEEDED: reason={kind}"
+            )));
+        }
+        Ok(())
+    }
+
+    fn node(&mut self) -> Result<()> {
+        let limit = self.limits.max_expanded_nodes;
+        let mut total = self.expanded_nodes;
+        self.consume("nodes", 1, limit, &mut total)?;
+        self.expanded_nodes = total;
+        Ok(())
+    }
+
+    fn edge(&mut self) -> Result<()> {
+        let limit = self.limits.max_expanded_edges;
+        let mut total = self.expanded_edges;
+        self.consume("edges", 1, limit, &mut total)?;
+        self.expanded_edges = total;
+        Ok(())
+    }
+
+    fn candidate(&mut self) -> Result<()> {
+        let limit = self.limits.max_vector_candidates;
+        let mut total = self.vector_candidates;
+        self.consume("candidates", 1, limit, &mut total)?;
+        self.vector_candidates = total;
+        Ok(())
+    }
+
+    fn row(&mut self) -> Result<()> {
+        let limit = self.limits.max_result_rows;
+        let mut total = self.result_rows;
+        self.consume("rows", 1, limit, &mut total)?;
+        self.result_rows = total;
+        Ok(())
+    }
+
+    fn serialized<T: serde::Serialize>(&self, value: &T) -> Result<()> {
+        self.check_deadline()?;
+        let bytes = serde_json::to_vec(value)
+            .map_err(|error| Error::from_reason(format!("QUERY_EXECUTION_FAILED: {error}")))?;
+        if bytes.len() as u64 > self.limits.max_serialized_bytes {
+            return Err(Error::from_reason("QUERY_BUDGET_EXCEEDED: reason=bytes"));
+        }
+        Ok(())
+    }
+}
+
+fn preserve_query_error(error: Error) -> Error {
+    let message = error.to_string();
+    if message.starts_with("QUERY_BUDGET_")
+        || message.starts_with("QUERY_RESOURCE_LIMIT_EXCEEDED")
+        || message.starts_with("QUERY_IR_VALIDATION_FAILED")
+        || message.starts_with("QUERY_CAPABILITY_UNSUPPORTED")
+        || message.starts_with("QUERY_TARGET_NOT_FOUND")
+    {
+        Error::from_reason(message)
+    } else {
+        Error::from_reason(format!("QUERY_EXECUTION_FAILED: {message}"))
+    }
+}
+
 #[derive(Serialize, Deserialize, Clone, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct QueryIrRequest {
@@ -469,6 +665,7 @@ pub struct QueryIrRequest {
     pub namespace: Option<String>,
     pub temporal: Option<QueryIrTemporal>,
     pub consistency: Option<QueryIrConsistency>,
+    pub budget: Option<QueryBudget>,
     pub operation: QueryIrOperation,
 }
 
@@ -535,6 +732,7 @@ pub enum QueryIrOperation {
         target_id: Option<String>,
         query_vector: Option<Vec<f64>>,
         collection: Option<String>,
+        filters: Option<serde_json::Value>,
         k: u32,
         alpha: Option<f64>,
         language: Option<String>,
@@ -547,6 +745,13 @@ pub enum QueryIrOperation {
         relations: Vec<String>,
         direction: QueryIrDirection,
         limit: Option<u32>,
+    },
+    Context {
+        target_id: Option<String>,
+        query_vector: Option<Vec<f64>>,
+        tier: String,
+        budget: Option<u32>,
+        fuzzy: Option<bool>,
     },
 }
 
@@ -693,6 +898,33 @@ pub struct StudioEntityInspection {
 
 #[cfg_attr(feature = "napi-bindings", napi(object))]
 #[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct IndexCoverageReport {
+    /// Collection to which this validation belongs.
+    pub collection: String,
+    /// Lifecycle state of the last observed structural validation.
+    /// `READY` proves source/graph membership equality only; it does not prove
+    /// exact search or ANN recall.
+    pub state: String,
+    /// Number of durable vector metadata rows in the collection.
+    pub source_count: u32,
+    /// Number of origin IDs observed in the HNSW graph.
+    pub indexed_count: u32,
+    /// Source rows absent from the graph during the last explicit validation.
+    pub missing_count: u32,
+    /// Graph origin IDs absent from the durable source metadata.
+    pub extra_count: u32,
+    /// Engine-global async indexing backlog at validation/report time.
+    pub pending_count: u32,
+    /// Maximum `created_seq` in the source metadata.
+    pub source_frontier: i64,
+    /// Maximum `created_seq` represented by validated graph members.
+    pub built_frontier: i64,
+    /// True only when an explicit validation covered the current source set.
+    pub validated: bool,
+}
+
+#[cfg_attr(feature = "napi-bindings", napi(object))]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct CollectionInfo {
     pub name: String,
     pub model: String,
@@ -732,6 +964,9 @@ pub struct CollectionInfo {
     /// inserted into HNSW. Not per-collection (one indexing thread serves all
     /// collections); the SAME value is repeated on every entry for convenience.
     pub index_lag: u32,
+    /// Explicit structural source-to-HNSW coverage. `READY` is not an exactness
+    /// or ANN-recall claim; callers must inspect the individual fields.
+    pub coverage: IndexCoverageReport,
 }
 
 #[cfg_attr(feature = "napi-bindings", napi(object))]
@@ -753,6 +988,8 @@ pub struct SignedEvent {
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub enum GossipMessage {
     Heartbeat {
+        #[serde(default)]
+        schema_version: u32,
         peer_id: String,
         merkle_root: String,
         logical_time: u32,
@@ -760,6 +997,8 @@ pub enum GossipMessage {
         verifying_key: Vec<u8>,
     },
     PullRequest {
+        #[serde(default)]
+        schema_version: u32,
         from_clock: u32,
         target_peer_id: String,
         /// WP-1.2 (ADR D4): commit_seq/segment cursor alongside the Lamport
@@ -772,6 +1011,16 @@ pub enum GossipMessage {
     },
     PushDelta {
         events: Vec<SignedEvent>,
+        #[serde(default)]
+        source_peer_id: String,
+        #[serde(default)]
+        through_seq: Option<u64>,
+    },
+    UpgradeRequired {
+        schema_version: u32,
+    },
+    BootstrapRequired {
+        reason: String,
     },
     /// WP-1.2 (ADR D4): the requester's commit_seq cursor predates this
     /// responder's history horizon — delta pull cannot serve it. The requester
@@ -846,6 +1095,12 @@ pub struct GenesisTransactionEvent {
     /// whatever the origin wrote. `alias` keeps pre-WP-1.2 WAL lines parsing.
     #[serde(alias = "commit_sequence")]
     pub origin_commit_seq: u64,
+    /// Local frame sequence preserved only on derived fold receipts. It is
+    /// intentionally separate from `origin_commit_seq`: a peer's origin
+    /// sequence must never seed this replica's local transaction frontier.
+    /// `None` keeps original transaction-event JSON backward-compatible.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub local_frame_seq: Option<u64>,
     pub payload_hash: String,
     pub relational: Vec<RelationalMutationGroup>,
     pub nodes: Vec<NodeOutput>,
@@ -864,6 +1119,11 @@ pub struct CommitResult {
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub enum Event {
+    CollectionDefinition(CollectionDefinition),
+    /// Derived fold state. Never represents original signed mutation history.
+    CollectionMaterialization(CollectionMaterialization),
+    /// Values are already prepared at the collection's resident/sidecar fidelity.
+    VectorMaterialized(VectorEvent),
     Node(NodeOutput),
     Edge(EdgeOutput),
     Batch(Vec<Event>),
@@ -908,6 +1168,79 @@ pub enum Event {
         #[serde(default)]
         retracted_at: String,
     },
+}
+
+/// Canonical bytes for event signatures. A fold receipt's local frame is a
+/// replica-local recovery hint, not part of the signed logical event, so omit
+/// it from the signature domain. This keeps older readers (which ignore the
+/// optional field) able to verify newer receipts and preserves signatures for
+/// all pre-receipt events byte-for-byte.
+fn canonical_event_bytes(event: &Event) -> serde_json::Result<Vec<u8>> {
+    if let Event::Transaction(transaction) = event {
+        if transaction.local_frame_seq.is_some() {
+            let mut canonical = transaction.clone();
+            canonical.local_frame_seq = None;
+            return serde_json::to_vec(&Event::Transaction(canonical));
+        }
+    }
+    serde_json::to_vec(event)
+}
+
+/// Immutable semantic contract, ordered before every dependent vector.
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct CollectionDefinition {
+    pub version: u32,
+    pub name: String,
+    pub model: String,
+    pub dim: u32,
+    pub metric: Metric,
+    pub quant: Quant,
+    pub ef_search: Option<u32>,
+    pub rerank: bool,
+    pub sq8_calibrate: bool,
+    pub definition_hash: String,
+    pub clock: LogicalClock,
+    pub provenance: String,
+}
+
+impl CollectionDefinition {
+    fn hash(&self) -> String {
+        // Hash only semantic fields, not replica clocks or migration provenance.
+        let bytes = serde_json::to_vec(&(
+            self.version,
+            &self.name,
+            &self.model,
+            self.dim,
+            self.metric,
+            self.quant,
+            self.ef_search,
+            self.rerank,
+            self.sq8_calibrate,
+        ))
+        .expect("serializable definition");
+        hex::encode(Sha256::digest(bytes))
+    }
+    fn validate(&self) -> Result<()> {
+        Storage::validate_collection_name(&self.name)?;
+        if self.version != 1
+            || self.dim == 0
+            || self.dim > u16::MAX as u32
+            || self.sq8_calibrate && self.quant != Quant::ScalarU8
+            || self.rerank && !matches!(self.quant, Quant::ScalarU8 | Quant::Binary)
+            || self.hash() != self.definition_hash
+        {
+            return Err(Error::from_reason("COLLECTION_DEFINITION_INVALID"));
+        }
+        Ok(())
+    }
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct CollectionMaterialization {
+    pub version: u32,
+    pub definition: CollectionDefinition,
+    pub bq_center: Option<Vec<f32>>,
+    pub sq8_scale: Option<(f32, f32)>,
 }
 
 /// Slice-1 node tombstone: what remains of a retracted node so the deletion
@@ -1769,6 +2102,39 @@ impl VecIndex {
         }
     }
 
+    /// Origin IDs present in the HNSW graph. `hnsw_rs` stores each point in its
+    /// assigned layer rather than repeating it in every lower layer, so the
+    /// validation must walk the complete point indexation.
+    fn origin_ids(&self) -> HashSet<usize> {
+        let mut ids = HashSet::new();
+        if self.point_count() == 0 {
+            return ids;
+        }
+        match self {
+            VecIndex::F32(h) => {
+                for point in h.get_point_indexation() {
+                    ids.insert(point.get_origin_id());
+                }
+            }
+            VecIndex::U8(h) => {
+                for point in h.get_point_indexation() {
+                    ids.insert(point.get_origin_id());
+                }
+            }
+            VecIndex::Binary(h) => {
+                for point in h.get_point_indexation() {
+                    ids.insert(point.get_origin_id());
+                }
+            }
+            VecIndex::F16(h) => {
+                for point in h.get_point_indexation() {
+                    ids.insert(point.get_origin_id());
+                }
+            }
+        }
+        ids
+    }
+
     fn build(q: Quant, ef_c: usize, cap: usize) -> Self {
         let cap = cap.max(VectorCollection::HNSW_MIN_CAP);
         match q {
@@ -2162,6 +2528,9 @@ pub struct VectorCollection {
     /// with the arena's own `(scale, bias)` (set together at compaction/load) so
     /// the HNSW (threaded this value) and the arena agree on one scale.
     pub sq8_scale: RwLock<Option<(f32, f32)>>,
+    /// Last explicit structural coverage validation. This is derived state and
+    /// is invalidated whenever the source arena changes or the HNSW is rebuilt.
+    coverage: RwLock<Option<IndexCoverageReport>>,
 }
 
 impl VectorCollection {
@@ -2223,6 +2592,7 @@ impl VectorCollection {
             // Fixed scale until a compaction calibrates (opt-in SQ8 only);
             // load() overwrites this from `sq8scale_<name>.bin` when present.
             sq8_scale: RwLock::new(None),
+            coverage: RwLock::new(None),
         }
     }
 
@@ -2337,7 +2707,7 @@ impl VectorCollection {
     /// node's previous vector in this collection, and stamping that orphan with
     /// the same seq is what makes historical searches pick the embedding that
     /// was current at t (SPEC--EPOCH-HNSW §3.1).
-    fn stage(&self, node_u32: u32, emb: &[f32], lang: String, created_seq: u64) -> u32 {
+    fn stage(&self, node_u32: u32, emb: &[f32], lang: String, created_seq: u64) -> Result<u32> {
         // BQ centering: the arena stores centered sign codes (`sign(x-center)`),
         // but the sidecar below keeps the RAW f32 (rerank re-scores exactly and
         // the next compaction recomputes the mean from raw). `None` ⇒ uncentered.
@@ -2358,7 +2728,9 @@ impl VectorCollection {
             // rather than leave the file half-written (a short row would desync the
             // whole tail). Load/compaction/save all guard len_rows == arena_rows.
             if let Some(sidecar) = &self.f32_sidecar {
-                let _ = sidecar.write().write_rows(emb);
+                sidecar.write().write_rows(emb).map_err(|e| {
+                    Error::from_reason(format!("COLLECTION_MATERIALIZATION_FAILED: {e}"))
+                })?;
             }
             let arena_id = meta.len() as u32;
             meta.push(NodeMetadata {
@@ -2375,6 +2747,7 @@ impl VectorCollection {
             });
             arena_id
         };
+        *self.coverage.write() = None;
         if let Some(old_arena_id) = self.node_to_arena.insert(node_u32, arena_id) {
             // Re-embed: the displaced row becomes historical as of this commit.
             let mut meta = self.metadata.write();
@@ -2385,7 +2758,7 @@ impl VectorCollection {
             }
         }
         self.count.fetch_add(1, Ordering::Relaxed);
-        arena_id
+        Ok(arena_id)
     }
 
     /// Retraction path (SPEC--EPOCH-HNSW §3.1): stamp every un-retired row of
@@ -2424,6 +2797,95 @@ impl VectorCollection {
             }
         }
         *self.hnsw.write() = Some(index);
+        *self.coverage.write() = None;
+    }
+
+    fn validate_coverage(&self, pending_count: u32) -> IndexCoverageReport {
+        let source: HashMap<usize, u64> = self
+            .metadata
+            .read()
+            .iter()
+            .map(|metadata| (metadata.arena_id as usize, metadata.created_seq))
+            .collect();
+        let source_frontier = source.values().copied().max().unwrap_or(0);
+        let indexed = self
+            .hnsw
+            .read()
+            .as_ref()
+            .map(VecIndex::origin_ids)
+            .unwrap_or_default();
+        let missing_count = source.keys().filter(|id| !indexed.contains(id)).count() as u32;
+        let extra_count = indexed.iter().filter(|id| !source.contains_key(id)).count() as u32;
+        let built_frontier = indexed
+            .iter()
+            .filter_map(|id| source.get(id))
+            .copied()
+            .max()
+            .unwrap_or(0);
+        let state = if pending_count > 0 {
+            "CATCHING_UP"
+        } else if missing_count == 0 && extra_count == 0 {
+            "READY"
+        } else {
+            "FAILED"
+        };
+        let report = IndexCoverageReport {
+            collection: self.name.clone(),
+            state: state.to_string(),
+            source_count: source.len() as u32,
+            indexed_count: indexed.len() as u32,
+            missing_count,
+            extra_count,
+            pending_count,
+            source_frontier: source_frontier.min(i64::MAX as u64) as i64,
+            built_frontier: built_frontier.min(i64::MAX as u64) as i64,
+            validated: true,
+        };
+        *self.coverage.write() = Some(report.clone());
+        report
+    }
+
+    fn coverage_report(&self, index_lag: u32) -> IndexCoverageReport {
+        let source = self.metadata.read();
+        let source_count = source.len() as u32;
+        let source_frontier = source
+            .iter()
+            .map(|metadata| metadata.created_seq)
+            .max()
+            .unwrap_or(0);
+        let source_frontier_i64 = source_frontier.min(i64::MAX as u64) as i64;
+        let indexed_count = self
+            .hnsw
+            .read()
+            .as_ref()
+            .map(|index| index.point_count() as u32)
+            .unwrap_or(0);
+        if let Some(report) = self.coverage.read().as_ref() {
+            if report.validated
+                && report.source_count == source_count
+                && report.indexed_count == indexed_count
+                && report.source_frontier == source_frontier_i64
+                && index_lag == 0
+            {
+                return report.clone();
+            }
+        }
+        IndexCoverageReport {
+            collection: self.name.clone(),
+            state: if index_lag > 0 {
+                "CATCHING_UP".to_string()
+            } else {
+                "UNVERIFIED".to_string()
+            },
+            source_count,
+            indexed_count,
+            missing_count: 0,
+            extra_count: 0,
+            pending_count: index_lag,
+            source_frontier: source_frontier_i64,
+            built_frontier: 0,
+            validated: false,
+        }
     }
 
     /// `index_lag` is engine-global (`Storage::index_lag()`), passed in by
@@ -2458,6 +2920,7 @@ impl VectorCollection {
             sidecar_disk_bytes,
             arena_resident_bytes: self.arena.read().byte_size() as i64,
             index_lag,
+            coverage: self.coverage_report(index_lag),
         }
     }
 }
@@ -2531,6 +2994,13 @@ const SEG_HEADER_LEN: usize = 28;
 const SEG_FOOTER_LEN: usize = 44;
 /// Active-file seal threshold (spec §2; mobile profile tightens this in WP-1.3).
 const ACTIVE_SEAL_THRESHOLD: u64 = 64 * 1024 * 1024;
+/// Defensive reader bounds for the current framed journal. These limits do not
+/// change the v1 wire format; they prevent a malformed length or compressed
+/// body from being classified as a harmless tear or expanded without bound.
+const MAX_JOURNAL_FRAME_PAYLOAD_BYTES: usize = 64 * 1024 * 1024;
+const MAX_JOURNAL_SEGMENT_BODY_BYTES: u64 = 128 * 1024 * 1024;
+const MAX_JOURNAL_SEGMENT_FILE_BYTES: u64 =
+    MAX_JOURNAL_SEGMENT_BODY_BYTES + (SEG_HEADER_LEN + SEG_FOOTER_LEN) as u64;
 
 const SEG_KIND_HISTORY: u8 = 1;
 const SEG_KIND_BASE: u8 = 2;
@@ -2560,11 +3030,20 @@ fn lz4_frame_compress(body: &[u8]) -> std::io::Result<Vec<u8>> {
     Ok(out)
 }
 
-fn lz4_frame_decompress(compressed: &[u8]) -> std::io::Result<Vec<u8>> {
+fn lz4_frame_decompress_bounded(
+    compressed: &[u8],
+    max_output_bytes: usize,
+) -> std::io::Result<Vec<u8>> {
     use std::io::Read;
-    let mut dec = lz4_flex::frame::FrameDecoder::new(compressed);
+    let dec = lz4_flex::frame::FrameDecoder::new(compressed);
+    let mut limited = dec.take(max_output_bytes as u64 + 1);
     let mut out = Vec::new();
-    dec.read_to_end(&mut out)?;
+    limited.read_to_end(&mut out)?;
+    if out.len() > max_output_bytes {
+        return Err(std::io::Error::other(
+            "journal segment exceeds output bound",
+        ));
+    }
     Ok(out)
 }
 
@@ -2601,7 +3080,9 @@ fn walk_frames(bytes: &[u8], start: usize, mut f: impl FnMut(u64, &[u8])) -> usi
         let seq = u64::from_le_bytes(bytes[off + 4..off + 12].try_into().unwrap());
         let crc = u32::from_le_bytes(bytes[off + 12..off + 16].try_into().unwrap());
         let ps = off + FRAME_HEADER_LEN;
-        if ps + len > bytes.len() {
+        if len > MAX_JOURNAL_FRAME_PAYLOAD_BYTES
+            || ps.checked_add(len).is_none_or(|end| end > bytes.len())
+        {
             return off;
         }
         let payload = &bytes[ps..ps + len];
@@ -2640,6 +3121,10 @@ fn read_segment_header(path: &std::path::Path) -> Option<SegmentInfo> {
 /// on any integrity failure (magic/sha/crc/codec) — the caller treats the
 /// segment as unreadable and recovery degrades explicitly, never silently.
 fn read_segment_body(path: &std::path::Path) -> Option<(u8, Vec<u8>)> {
+    let file_len = fs::metadata(path).ok()?.len();
+    if file_len > MAX_JOURNAL_SEGMENT_FILE_BYTES {
+        return None;
+    }
     let bytes = fs::read(path).ok()?;
     if bytes.len() < SEG_HEADER_LEN + SEG_FOOTER_LEN || bytes[0..4] != SEG_MAGIC {
         return None;
@@ -2653,6 +3138,9 @@ fn read_segment_body(path: &std::path::Path) -> Option<(u8, Vec<u8>)> {
             .try_into()
             .unwrap(),
     );
+    if body_len > MAX_JOURNAL_SEGMENT_BODY_BYTES {
+        return None;
+    }
     let crc_expected = u32::from_le_bytes(
         bytes[footer_start + 40..footer_start + 44]
             .try_into()
@@ -2667,7 +3155,10 @@ fn read_segment_body(path: &std::path::Path) -> Option<(u8, Vec<u8>)> {
     }
     let compressed = &bytes[SEG_HEADER_LEN..footer_start];
     let body = match codec {
-        CODEC_LZ4 => lz4_frame_decompress(compressed).ok()?,
+        CODEC_LZ4 => {
+            lz4_frame_decompress_bounded(compressed, MAX_JOURNAL_SEGMENT_BODY_BYTES as usize)
+                .ok()?
+        }
         CODEC_NONE => compressed.to_vec(),
         _ => return None,
     };
@@ -2737,7 +3228,11 @@ pub struct Storage {
     pub retention: RetentionProfile,
     projection_path: PathBuf,
     projection_db: Mutex<Connection>,
-    commit_lock: Mutex<()>,
+    // One publication boundary across graph memory and the SQLite projection.
+    // Reentrant for composed queries (HQL -> neighbors -> hydrated properties).
+    commit_lock: ReentrantMutex<()>,
+    recovery_required: AtomicBool,
+    collection_definitions: DashMap<String, CollectionDefinition>,
     /// WP-1.2 (ADR D2.3): the FRAME frontier — commit_seq of the last durable
     /// journal frame, advancing on every mutation. Replica-local; never
     /// comparable across peers. `stable_frontier()` reports this.
@@ -3016,51 +3511,295 @@ impl Storage {
         self.ensure_writable()?;
         Self::validate_collection_name(&name)?;
         let _commit_guard = self.commit_lock.lock();
+        self.ensure_readable()?;
         if self.collections.contains_key(&name) {
             return Err(Error::from_reason(format!(
                 "collection '{}' already exists",
                 name
             )));
         }
+        if dim == 0 || dim > u16::MAX as u32 {
+            return Err(Error::from_reason(
+                "COLLECTION_DIM_INVALID: expected 1..65535",
+            ));
+        }
+        if metric
+            .as_deref()
+            .is_some_and(|m| !m.eq_ignore_ascii_case("l2") && !m.eq_ignore_ascii_case("cosine"))
+        {
+            return Err(Error::from_reason("COLLECTION_METRIC_INVALID"));
+        }
+        if quant
+            .as_deref()
+            .is_some_and(|q| Quant::parse(q) == Quant::None && !q.eq_ignore_ascii_case("none"))
+        {
+            return Err(Error::from_reason("COLLECTION_QUANT_INVALID"));
+        }
         let m = metric.as_deref().map(Metric::parse).unwrap_or(Metric::L2);
         let q = quant.as_deref().map(Quant::parse).unwrap_or(Quant::None);
-        // SQ8 calibrated-scale opt-in, encoded in the quant string ("sq8c") so it
-        // needs no new create_collection arg (automatic NAPI+REST parity).
-        let sq8_calibrate =
-            q == Quant::ScalarU8 && quant.as_deref().is_some_and(Quant::sq8_calibrate_requested);
-        let rerank = rerank.unwrap_or(false);
-        // Fresh collection: truncate-create an empty fvec so on-disk rows start
-        // lock-step with the (empty) arena. Path only matters when rerank+quant.
-        let sidecar_path = if rerank && q != Quant::None {
-            Some(self.path.join(format!("fvec_{}.bin", name)))
-        } else {
-            None
+        let mut definition = CollectionDefinition {
+            version: 1,
+            name,
+            model,
+            dim,
+            metric: m,
+            quant: q,
+            ef_search,
+            rerank: rerank.unwrap_or(false) && matches!(q, Quant::ScalarU8 | Quant::Binary),
+            sq8_calibrate: quant.as_deref().is_some_and(Quant::sq8_calibrate_requested),
+            definition_hash: String::new(),
+            clock: self.next_clock(),
+            provenance: "created".into(),
         };
-        self.collections.insert(
-            name.clone(),
-            Arc::new(VectorCollection::new(
-                name,
-                model,
-                dim as u16,
-                m,
-                q,
-                ef_search,
-                rerank,
-                sidecar_path,
-                true, // fresh collection: start empty
-                sq8_calibrate,
-            )),
-        );
+        definition.definition_hash = definition.hash();
+        definition.validate()?;
+        if definition.rerank {
+            let path = self.path.join(format!("fvec_{}.bin", definition.name));
+            let file = FileOpenOptions::new()
+                .write(true)
+                .create(true)
+                .truncate(false)
+                .open(path)
+                .map_err(|e| Error::from_reason(format!("COLLECTION_RESOURCE_UNAVAILABLE: {e}")))?;
+            if file
+                .metadata()
+                .map_err(|e| Error::from_reason(e.to_string()))?
+                .len()
+                != 0
+            {
+                return Err(Error::from_reason(
+                    "COLLECTION_RESOURCE_CONFLICT: existing nonempty sidecar",
+                ));
+            }
+        }
+        let seq = self.persist(&Event::CollectionDefinition(definition.clone()))?;
+        self.apply_collection_definition(&definition)
+            .map_err(|e| self.durable_apply_error(seq, e))?;
+        Ok(())
+    }
+
+    fn definition_for(&self, coll: &VectorCollection) -> CollectionDefinition {
+        if let Some(d) = self.collection_definitions.get(&coll.name) {
+            return d.clone();
+        }
+        let mut d = CollectionDefinition {
+            version: 1,
+            name: coll.name.clone(),
+            model: coll.model.clone(),
+            dim: coll.dim as u32,
+            metric: coll.metric,
+            quant: coll.quant,
+            ef_search: coll.ef_search,
+            rerank: coll.f32_sidecar.is_some(),
+            sq8_calibrate: coll.sq8_calibrate,
+            definition_hash: String::new(),
+            clock: LogicalClock {
+                time: 0,
+                peer_id: self.local_peer_id.clone(),
+            },
+            provenance: "legacy-manifest".into(),
+        };
+        d.definition_hash = d.hash();
+        d
+    }
+
+    fn apply_collection_definition(&self, d: &CollectionDefinition) -> Result<()> {
+        d.validate()?;
+        if let Some(existing) = self.collection_definitions.get(&d.name) {
+            if existing.definition_hash != d.definition_hash {
+                return Err(Error::from_reason(format!(
+                    "COLLECTION_DEFINITION_CONFLICT: {}",
+                    d.name
+                )));
+            }
+            let newer = d.clock.time > existing.clock.time;
+            drop(existing);
+            if newer {
+                self.collection_definitions
+                    .insert(d.name.clone(), d.clone());
+            }
+            return Ok(());
+        }
+        let needs_create = self
+            .collections
+            .get(&d.name)
+            .is_none_or(|c| self.definition_for(&c).hash() != d.hash());
+        if needs_create {
+            if self
+                .collections
+                .get(&d.name)
+                .is_some_and(|c| c.count.load(Ordering::SeqCst) > 0)
+            {
+                return Err(Error::from_reason(format!(
+                    "COLLECTION_DEFINITION_CONFLICT: {}",
+                    d.name
+                )));
+            }
+            let sidecar = d
+                .rerank
+                .then(|| self.path.join(format!("fvec_{}.bin", d.name)));
+            let c = VectorCollection::new(
+                d.name.clone(),
+                d.model.clone(),
+                d.dim as u16,
+                d.metric,
+                d.quant,
+                d.ef_search,
+                d.rerank,
+                sidecar,
+                true,
+                d.sq8_calibrate,
+            );
+            if d.rerank && c.f32_sidecar.is_none() {
+                return Err(Error::from_reason(
+                    "COLLECTION_MATERIALIZATION_FAILED: sidecar unavailable",
+                ));
+            }
+            self.collections.insert(d.name.clone(), Arc::new(c));
+        }
+        self.logical_clock.fetch_max(d.clock.time, Ordering::SeqCst);
+        self.collection_definitions
+            .insert(d.name.clone(), d.clone());
+        Ok(())
+    }
+
+    fn validate_collection_event(
+        event: &Event,
+        definitions: &mut HashMap<String, CollectionDefinition>,
+    ) -> Result<()> {
+        match event {
+            Event::CollectionDefinition(d) => {
+                d.validate()?;
+                if definitions
+                    .get(&d.name)
+                    .is_some_and(|old| old.hash() != d.hash())
+                {
+                    return Err(Error::from_reason(format!(
+                        "COLLECTION_DEFINITION_CONFLICT: {}",
+                        d.name
+                    )));
+                }
+                definitions.insert(d.name.clone(), d.clone());
+            }
+            Event::CollectionMaterialization(m) => {
+                Self::validate_collection_event(
+                    &Event::CollectionDefinition(m.definition.clone()),
+                    definitions,
+                )?;
+                if m.version != 1
+                    || m.bq_center.as_ref().is_some_and(|v| {
+                        m.definition.quant != Quant::Binary
+                            || v.len() != m.definition.dim as usize
+                            || v.iter().any(|x| !x.is_finite())
+                    })
+                    || m.sq8_scale.is_some_and(|(a, b)| {
+                        m.definition.quant != Quant::ScalarU8
+                            || !a.is_finite()
+                            || a <= 0.
+                            || !b.is_finite()
+                    })
+                {
+                    return Err(Error::from_reason("COLLECTION_MATERIALIZATION_INVALID"));
+                }
+            }
+            Event::Node(n) => {
+                if let Some(v) = &n.embedding {
+                    Self::validate_vector_definition(&n.collection, v, definitions)?;
+                }
+            }
+            Event::Vector(v) | Event::VectorMaterialized(v) => {
+                Self::validate_vector_definition(&v.collection, &v.embedding, definitions)?
+            }
+            Event::Batch(events) => {
+                for e in events {
+                    Self::validate_collection_event(e, definitions)?;
+                }
+            }
+            Event::Transaction(t) => {
+                for n in &t.nodes {
+                    if let Some(v) = &n.embedding {
+                        Self::validate_vector_definition(&n.collection, v, definitions)?;
+                    }
+                }
+                for v in &t.vectors {
+                    Self::validate_vector_definition(&v.collection, &v.embedding, definitions)?;
+                }
+            }
+            _ => {}
+        }
+        Ok(())
+    }
+    fn validate_vector_definition(
+        name: &Option<String>,
+        vector: &[f64],
+        defs: &HashMap<String, CollectionDefinition>,
+    ) -> Result<()> {
+        let name = name.as_deref().unwrap_or("default");
+        let d = defs.get(name).ok_or_else(|| {
+            Error::from_reason(format!(
+                "COLLECTION_CONFIGURATION_REQUIRED: {name}; provide verified definition/bootstrap"
+            ))
+        })?;
+        if vector.len() != d.dim as usize {
+            return Err(Error::from_reason("COLLECTION_DIM_MISMATCH"));
+        }
+        if vector.iter().any(|value| !value.is_finite()) {
+            return Err(Error::from_reason(
+                "VECTOR_VALUES_INVALID: embedding must contain only finite values",
+            ));
+        }
+        Ok(())
+    }
+    fn preflight_collection_event(&self, event: &Event) -> Result<()> {
+        let mut defs = self
+            .collections
+            .iter()
+            .map(|c| (c.key().clone(), self.definition_for(c.value())))
+            .collect();
+        Self::validate_collection_event(event, &mut defs)
+    }
+
+    fn apply_collection_materialization(&self, m: &CollectionMaterialization) -> Result<()> {
+        self.apply_collection_definition(&m.definition)?;
+        let c = self.resolve_collection(&Some(m.definition.name.clone()))?;
+        // Incoming normalized values are repacked with the receiver's calibration
+        // when it already contains rows; changing its quantizer would reinterpret them.
+        if c.count.load(Ordering::SeqCst) == 0 {
+            *c.bq_center.write() = m.bq_center.clone();
+            *c.sq8_scale.write() = m.sq8_scale;
+            if let Some((a, b)) = m.sq8_scale {
+                c.arena.write().set_sq8_scale(a, b);
+            }
+        }
         Ok(())
     }
 
     pub fn list_collections(&self) -> Vec<CollectionInfo> {
+        let _read_guard = self.commit_lock.lock();
+
         // `index_lag` is engine-global; snapshot it once and stamp every entry.
         let lag = self.index_lag();
         self.collections
             .iter()
             .map(|c| c.value().info(lag))
             .collect()
+    }
+
+    /// Drain the asynchronous index queue and validate source-to-HNSW graph
+    /// membership for every collection. This is intentionally explicit: the
+    /// membership scan is O(n) and must not be hidden inside every flush or
+    /// query. `READY` proves structural membership only; it is not an exactness
+    /// or ANN-recall guarantee.
+    pub fn validate_index_coverage(&self) -> Result<Vec<IndexCoverageReport>> {
+        self.ensure_readable()?;
+        let _read_guard = self.commit_lock.lock();
+        self.flush_index();
+        let pending = self.index_lag();
+        Ok(self
+            .collections
+            .iter()
+            .map(|collection| collection.value().validate_coverage(pending))
+            .collect())
     }
 
     /// Insert one vector into the named (or default) collection. Validates the
@@ -3085,9 +3824,14 @@ impl Storage {
                 coll.dim
             )));
         }
+        if emb_64.iter().any(|value| !value.is_finite()) {
+            return Err(Error::from_reason(
+                "VECTOR_VALUES_INVALID: embedding must contain only finite values",
+            ));
+        }
         let node_u32 = self.get_or_intern_id(node_id);
         let emb = coll.prep(emb_64);
-        let arena_id = coll.stage(node_u32, &emb, lang, created_seq);
+        let arena_id = coll.stage(node_u32, &emb, lang, created_seq)?;
         self.enqueue_one(&coll, arena_id, emb);
         Ok(())
     }
@@ -3109,6 +3853,7 @@ impl Storage {
     ) -> Result<()> {
         self.ensure_writable()?;
         let _commit_guard = self.commit_lock.lock();
+        self.ensure_readable()?;
         // A vector attaches to a node — the node must exist.
         let exists = self
             .get_u32(&node_id)
@@ -3131,6 +3876,11 @@ impl Storage {
                     c.dim
                 )));
             }
+            if embedding.iter().any(|value| !value.is_finite()) {
+                return Err(Error::from_reason(
+                    "VECTOR_VALUES_INVALID: embedding must contain only finite values",
+                ));
+            }
         }
         // Stamp a logical clock so the vector is time-orderable for anti-entropy
         // (events_since) — secondary embeddings now sync across peers like nodes.
@@ -3144,7 +3894,8 @@ impl Storage {
             clock,
         }))?;
         // Stages into the arena, enqueues the deferred HNSW insert.
-        self.add_vector_internal(&coll, &node_id, embedding, lang, seq)?;
+        self.add_vector_internal(&coll, &node_id, embedding, lang, seq)
+            .map_err(|e| self.durable_apply_error(seq, e))?;
         Ok(())
     }
 
@@ -3211,41 +3962,45 @@ impl Storage {
             .clone()
             .unwrap_or_else(|| self.default_collection.clone());
         if !self.collections.contains_key(&name) {
-            // Auto-provision from an OUTSIDE name (WAL replay or a CRDT peer).
-            // A traversal name would land in `vec_<n>.bin` & friends at the next
-            // checkpoint, so drop the event instead — inert, not fatal: replay
-            // and sync must not be abortable by one malformed remote event.
-            if let Err(e) = Self::validate_collection_name(&name) {
-                eprintln!("replay_vector: refusing collection name — {e}");
-                return;
-            }
-            self.collections.insert(
-                name.clone(),
-                Arc::new(VectorCollection::new(
-                    name.clone(),
-                    "recovered".to_string(),
-                    emb.len() as u16,
-                    Metric::L2,
-                    Quant::None,
-                    None,
-                    false,
-                    None, // recovered collections are Quant::None + no rerank
-                    true,
-                    false, // Quant::None ⇒ no SQ8 calibration
-                )),
-            );
+            // Definitions are validated before publication/replay. Never invent
+            // a metric or dimension when a required definition is missing.
+            self.recovery_required.store(true, Ordering::SeqCst);
+            return;
         }
         if let Ok(coll) = self.resolve_collection(&Some(name)) {
             if emb.len() != coll.dim as usize {
+                self.recovery_required.store(true, Ordering::SeqCst);
                 return;
             }
             let node_u32 = self.get_or_intern_id(node_id);
             let e = coll.prep(emb);
-            let arena_id = coll.stage(node_u32, &e, lang, created_seq);
+            let arena_id = match coll.stage(node_u32, &e, lang, created_seq) {
+                Ok(id) => id,
+                Err(_) => {
+                    self.recovery_required.store(true, Ordering::SeqCst);
+                    return;
+                }
+            };
             if index {
                 self.enqueue_one(&coll, arena_id, e);
             }
         }
+    }
+
+    fn replay_materialized_vector(&self, v: &VectorEvent, index: bool, seq: u64) -> Result<()> {
+        let c = self.resolve_collection(&v.collection)?;
+        let node = self.get_or_intern_id(&v.node_id);
+        let values: Vec<f32> = v.embedding.iter().map(|x| *x as f32).collect();
+        let aid = c.stage(
+            node,
+            &values,
+            v.lang.clone().unwrap_or_else(|| "en".into()),
+            seq,
+        )?;
+        if index {
+            self.enqueue_one(&c, aid, values);
+        }
+        Ok(())
     }
 
     /// Rebuild every collection's HNSW from its arena (both load paths).
@@ -3260,6 +4015,289 @@ impl Storage {
     /// `Some(0)` for a pre-versioned snapshot lacking the field; `None` when no
     /// snapshot exists yet (fresh database). Used by the open-time compatibility
     /// gate to refuse databases written by a newer engine.
+    fn preflight_journal(
+        root: &std::path::Path,
+        requested_dim: Option<u32>,
+    ) -> Result<(Vec<CollectionDefinition>, HashSet<String>)> {
+        let err = |msg: String| Error::from_reason(format!("JOURNAL_PREFLIGHT_FAILED: {msg}"));
+        let state_path = root.join("state.json");
+        let mut definitions = HashMap::new();
+        if state_path.exists() {
+            // A snapshot is disposable. Its corruption may fall back to a
+            // self-contained journal, whose definitions are validated below.
+            let state: Value =
+                serde_json::from_slice(&fs::read(&state_path).map_err(|e| err(e.to_string()))?)
+                    .unwrap_or(Value::Null);
+            if let Some(colls) = state["collections"].as_array() {
+                for c in colls {
+                    let name = c["name"]
+                        .as_str()
+                        .ok_or_else(|| err("collection name missing".into()))?
+                        .to_string();
+                    let model = c["model"].as_str().unwrap_or("default").to_string();
+                    if model == "recovered" && c["definition"].is_null() {
+                        return Err(err(format!("COLLECTION_CONFIGURATION_REQUIRED: {name}")));
+                    }
+                    let dim = c["dim"]
+                        .as_u64()
+                        .filter(|x| *x > 0 && *x <= u16::MAX as u64)
+                        .ok_or_else(|| err("invalid collection dimension".into()))?
+                        as u32;
+                    let metric = c["metric"].as_str().unwrap_or("L2");
+                    let quant = c["quant"].as_str().unwrap_or("none");
+                    if !metric.eq_ignore_ascii_case("l2") && !metric.eq_ignore_ascii_case("cosine")
+                        || Quant::parse(quant) == Quant::None && !quant.eq_ignore_ascii_case("none")
+                    {
+                        return Err(err("unknown collection metric/quant".into()));
+                    }
+                    let mut d = CollectionDefinition {
+                        version: 1,
+                        name: name.clone(),
+                        model,
+                        dim,
+                        metric: Metric::parse(metric),
+                        quant: Quant::parse(quant),
+                        ef_search: c["ef_search"].as_u64().map(|v| v as u32),
+                        rerank: c["rerank"].as_bool().unwrap_or(false),
+                        sq8_calibrate: c["sq8_calibrate"].as_bool().unwrap_or(false),
+                        definition_hash: String::new(),
+                        clock: LogicalClock {
+                            time: 0,
+                            peer_id: String::new(),
+                        },
+                        provenance: "legacy-manifest".into(),
+                    };
+                    d.definition_hash = d.hash();
+                    d.validate()?;
+                    if !c["definition"].is_null() {
+                        let recorded: CollectionDefinition =
+                            serde_json::from_value(c["definition"].clone())
+                                .map_err(|e| err(e.to_string()))?;
+                        recorded.validate()?;
+                        if recorded.hash() != d.hash() {
+                            return Err(err("manifest definition mismatch".into()));
+                        }
+                        d = recorded;
+                    }
+                    definitions.insert(name, d);
+                }
+            }
+        }
+        // Upgrade definitions may follow immutable legacy frames. Discover
+        // only explicitly evidenced migration definitions before the ordered
+        // validation pass; ordinary creations never authorize earlier vectors.
+        let mut journal_definitions = HashSet::new();
+        Self::visit_verified_journal(root, &mut |se| {
+            fn discover(
+                e: &Event,
+                defs: &mut HashMap<String, CollectionDefinition>,
+                names: &mut HashSet<String>,
+            ) -> Result<()> {
+                match e {
+                    Event::CollectionDefinition(d) => {
+                        d.validate()?;
+                        names.insert(d.name.clone());
+                        if matches!(
+                            d.provenance.as_str(),
+                            "legacy-manifest" | "legacy-default-options"
+                        ) {
+                            if defs.get(&d.name).is_some_and(|old| old.hash() != d.hash()) {
+                                return Err(Error::from_reason("COLLECTION_DEFINITION_CONFLICT"));
+                            }
+                            defs.insert(d.name.clone(), d.clone());
+                        }
+                    }
+                    Event::CollectionMaterialization(m) => discover(
+                        &Event::CollectionDefinition(m.definition.clone()),
+                        defs,
+                        names,
+                    )?,
+                    Event::Batch(v) => {
+                        for e in v {
+                            discover(e, defs, names)?;
+                        }
+                    }
+                    _ => {}
+                }
+                Ok(())
+            }
+            discover(&se.event, &mut definitions, &mut journal_definitions)
+        })?;
+        let recovery_definitions = definitions.values().cloned().collect::<Vec<_>>();
+        if !definitions.contains_key("default") {
+            let mut d = CollectionDefinition {
+                version: 1,
+                name: "default".into(),
+                model: "default".into(),
+                dim: requested_dim.unwrap_or(1536),
+                metric: Metric::L2,
+                quant: Quant::None,
+                ef_search: None,
+                rerank: false,
+                sq8_calibrate: false,
+                definition_hash: String::new(),
+                clock: LogicalClock {
+                    time: 0,
+                    peer_id: String::new(),
+                },
+                provenance: "legacy-default-options".into(),
+            };
+            d.definition_hash = d.hash();
+            definitions.insert("default".into(), d);
+        }
+        Self::visit_verified_journal(root, &mut |se| {
+            let declared = match &se.event {
+                Event::CollectionDefinition(d) => Some(d),
+                Event::CollectionMaterialization(m) => Some(&m.definition),
+                _ => None,
+            };
+            if let Some(d) = declared {
+                if d.name == "default"
+                    && definitions.get("default").is_some_and(|old| {
+                        old.provenance == "legacy-default-options" && old.clock.time == 0
+                    })
+                {
+                    definitions.remove("default");
+                }
+            }
+            Self::validate_collection_event(&se.event, &mut definitions)
+        })?;
+        if let (Some(dim), Some(d)) = (requested_dim, definitions.get("default")) {
+            if dim != d.dim {
+                return Err(err(
+                    "COLLECTION_DEFINITION_CONFLICT: default dimension differs from open options"
+                        .into(),
+                ));
+            }
+        }
+        Ok((recovery_definitions, journal_definitions))
+    }
+
+    /// Bound preflight memory to one segment, not the retained journal size.
+    fn visit_verified_journal(
+        root: &std::path::Path,
+        visit: &mut dyn FnMut(SignedEvent) -> Result<()>,
+    ) -> Result<()> {
+        let error = |msg: &str| Error::from_reason(format!("JOURNAL_PREFLIGHT_FAILED: {msg}"));
+        fn lines(bytes: &[u8], visit: &mut dyn FnMut(SignedEvent) -> Result<()>) -> Result<()> {
+            for line in bytes
+                .split(|b| *b == b'\n')
+                .filter(|l| !l.iter().all(u8::is_ascii_whitespace))
+            {
+                let e = serde_json::from_slice(line).map_err(|e| {
+                    Error::from_reason(format!(
+                        "JOURNAL_PREFLIGHT_FAILED: invalid legacy event: {e}"
+                    ))
+                })?;
+                visit(e)?;
+            }
+            Ok(())
+        }
+        fn frames(
+            bytes: &[u8],
+            offset: usize,
+            torn_tail: bool,
+            visit: &mut dyn FnMut(SignedEvent) -> Result<()>,
+        ) -> Result<()> {
+            let mut error = None;
+            let end = walk_frames(bytes, offset, |_, payload| {
+                if error.is_none() {
+                    match serde_json::from_slice(payload)
+                        .map_err(|e| {
+                            Error::from_reason(format!(
+                                "JOURNAL_PREFLIGHT_FAILED: unsupported/invalid event: {e}"
+                            ))
+                        })
+                        .and_then(&mut *visit)
+                    {
+                        Ok(()) => {}
+                        Err(e) => error = Some(e),
+                    }
+                }
+            });
+            if let Some(e) = error {
+                return Err(e);
+            }
+            if end != bytes.len() {
+                let incomplete = if bytes.len().saturating_sub(end) < FRAME_HEADER_LEN {
+                    true
+                } else {
+                    let declared_len =
+                        u32::from_le_bytes(bytes[end..end + 4].try_into().unwrap()) as u64;
+                    if declared_len > MAX_JOURNAL_FRAME_PAYLOAD_BYTES as u64 {
+                        return Err(Error::from_reason(
+                            "JOURNAL_PREFLIGHT_FAILED: frame payload exceeds reader bound",
+                        ));
+                    }
+                    end.checked_add(FRAME_HEADER_LEN)
+                        .and_then(|header_end| header_end.checked_add(declared_len as usize))
+                        .is_none_or(|frame_end| frame_end > bytes.len())
+                };
+                if !torn_tail || !incomplete {
+                    return Err(Error::from_reason(
+                        "JOURNAL_PREFLIGHT_FAILED: corrupt journal frame",
+                    ));
+                }
+            }
+            Ok(())
+        }
+        let legacy = root.join("genesis-graph.wal");
+        if legacy.exists() {
+            lines(
+                &fs::read(legacy).map_err(|e| Error::from_reason(e.to_string()))?,
+                visit,
+            )?;
+        }
+        let mut segments = Vec::new();
+        let dir = root.join("journal");
+        if dir.exists() {
+            for e in fs::read_dir(dir).map_err(|e| Error::from_reason(e.to_string()))? {
+                let path = e.map_err(|e| Error::from_reason(e.to_string()))?.path();
+                if path.extension().is_none_or(|x| x != "gseg") {
+                    continue;
+                }
+                let mut file = File::open(&path).map_err(|e| Error::from_reason(e.to_string()))?;
+                let mut h = [0u8; SEG_HEADER_LEN];
+                file.read_exact(&mut h)
+                    .map_err(|_| error("truncated segment header"))?;
+                if h[0..4] != SEG_MAGIC
+                    || u16::from_le_bytes([h[4], h[5]]) != JOURNAL_FORMAT_VERSION
+                    || !matches!(
+                        h[6],
+                        SEG_KIND_LEGACY_JSONL | SEG_KIND_BASE | SEG_KIND_HISTORY
+                    )
+                {
+                    return Err(error("unsupported segment header"));
+                }
+                segments.push(read_segment_header(&path).ok_or_else(|| error("invalid segment"))?);
+            }
+        }
+        segments.sort_by_key(|s| (s.kind != SEG_KIND_LEGACY_JSONL, s.min_seq));
+        for segment in segments {
+            let (kind, body) =
+                read_segment_body(&segment.path).ok_or_else(|| error("corrupt segment"))?;
+            if kind == SEG_KIND_LEGACY_JSONL {
+                lines(&body, visit)?;
+            } else {
+                frames(&body, 0, false, visit)?;
+            }
+        }
+        let active = root.join("wal/active.gwal");
+        if active.exists() {
+            let body = fs::read(active).map_err(|e| Error::from_reason(e.to_string()))?;
+            if !body.is_empty() {
+                if body.len() < ACTIVE_HEADER_LEN
+                    || body[0..4] != ACTIVE_MAGIC
+                    || u16::from_le_bytes([body[4], body[5]]) != JOURNAL_FORMAT_VERSION
+                {
+                    return Err(error("unsupported active header"));
+                }
+                frames(&body, ACTIVE_HEADER_LEN, true, visit)?;
+            }
+        }
+        Ok(())
+    }
+
     fn read_ondisk_schema_version(root: &std::path::Path) -> Option<u32> {
         let state_path = root.join("state.json");
         if !state_path.exists() {
@@ -3285,6 +4323,13 @@ impl Storage {
             PRAGMA foreign_keys = ON;
             PRAGMA journal_mode = WAL;
             PRAGMA synchronous = NORMAL;
+            CREATE TABLE IF NOT EXISTS edge_versions (
+                id TEXT NOT NULL, tx_from INTEGER NOT NULL, tx_to INTEGER,
+                from_id TEXT NOT NULL, to_id TEXT NOT NULL, payload TEXT NOT NULL,
+                PRIMARY KEY(id, tx_from)
+            );
+            CREATE INDEX IF NOT EXISTS edge_versions_from ON edge_versions(from_id, tx_from, tx_to);
+            CREATE INDEX IF NOT EXISTS edge_versions_to ON edge_versions(to_id, tx_from, tx_to);
             CREATE TABLE IF NOT EXISTS props (
                 node_u32 INTEGER PRIMARY KEY,
                 payload TEXT NOT NULL,
@@ -3581,7 +4626,7 @@ impl Storage {
                 "relational schema requires a positive version and at least one table",
             ));
         }
-        if package.tables.len() > 64 || package.named_queries.len() > 128 {
+        if package.tables.len() > 128 || package.named_queries.len() > 128 {
             return Err(Error::from_reason(
                 "REL_SCHEMA_VALIDATION_FAILED: schema resource limit exceeded",
             ));
@@ -4368,10 +5413,41 @@ impl Storage {
     /// The endpoints are interned here rather than by the caller so every write
     /// path gets the same `from_u32`/`to_u32` — a caller that forgot would
     /// produce rows that silently join to nothing.
-    fn projection_apply_edge_tx<C>(&self, conn: &C, edge: &EdgeOutput) -> Result<()>
+    fn projection_apply_edge_tx<C>(
+        &self,
+        conn: &C,
+        edge: &EdgeOutput,
+        frame_seq: Option<u64>,
+    ) -> Result<()>
     where
         C: std::ops::Deref<Target = Connection>,
     {
+        if let Some(seq) = frame_seq {
+            let previous: Option<(u64, String)> = conn.query_row(
+                "SELECT tx_from, payload FROM edge_versions WHERE id=?1 ORDER BY tx_from DESC LIMIT 1",
+                [&edge.id], |r| Ok((r.get(0)?, r.get(1)?)),
+            ).optional().map_err(|e| Error::from_reason(e.to_string()))?;
+            if let Some((prev_seq, payload)) = previous {
+                let prev: EdgeOutput = serde_json::from_str(&payload)
+                    .map_err(|e| Error::from_reason(e.to_string()))?;
+                if prev_seq > seq
+                    || (prev_seq < seq
+                        && (prev.clock.time, &prev.clock.peer_id)
+                            > (edge.clock.time, &edge.clock.peer_id))
+                {
+                    return Ok(());
+                }
+            }
+            conn.execute(
+                "UPDATE edge_versions SET tx_to=?2 WHERE id=?1 AND tx_from<?2 AND tx_to IS NULL",
+                params![edge.id, seq],
+            )
+            .map_err(|e| Error::from_reason(e.to_string()))?;
+            let payload =
+                serde_json::to_string(edge).map_err(|e| Error::from_reason(e.to_string()))?;
+            conn.execute("INSERT OR REPLACE INTO edge_versions(id,tx_from,tx_to,from_id,to_id,payload) VALUES(?1,?2,NULL,?3,?4,?5)",
+                params![edge.id,seq,edge.from,edge.to,payload]).map_err(|e| Error::from_reason(e.to_string()))?;
+        }
         let from_u32 = self.get_or_intern_id(&edge.from);
         let to_u32 = self.get_or_intern_id(&edge.to);
         conn.execute(
@@ -4499,6 +5575,19 @@ impl Storage {
         node: &NodeOutput,
         frame_seq: u64,
     ) -> Result<()> {
+        let current: Option<(u32, String)> = conn
+            .query_row(
+                "SELECT clock_time,clock_peer FROM props WHERE node_u32=?1",
+                [node_u32],
+                |r| Ok((r.get(0)?, r.get(1)?)),
+            )
+            .optional()
+            .map_err(|e| Error::from_reason(e.to_string()))?;
+        if current.is_some_and(|(time, peer)| {
+            (time, peer) > (node.clock.time, node.clock.peer_id.clone())
+        }) {
+            return Ok(());
+        }
         let labels =
             serde_json::to_string(&node.labels).map_err(|e| Error::from_reason(e.to_string()))?;
         let payload =
@@ -4563,7 +5652,11 @@ impl Storage {
                 Self::projection_append_node_version(&conn, node_u32, node, frame_seq)?;
             }
             Event::Edge(edge) => {
-                self.projection_apply_edge_tx(&&*conn, edge)?;
+                let tx = conn
+                    .transaction()
+                    .map_err(|e| Error::from_reason(e.to_string()))?;
+                self.projection_apply_edge_tx(&tx, edge, Some(frame_seq))?;
+                tx.commit().map_err(|e| Error::from_reason(e.to_string()))?;
             }
             Event::RelationalSchema(package) => {
                 let tx = conn
@@ -4652,22 +5745,37 @@ impl Storage {
                     Self::projection_append_node_version(&tx, node_u32, node, frame_seq)?;
                 }
                 for edge in &transaction.edges {
-                    self.projection_apply_edge_tx(&tx, edge)?;
+                    self.projection_apply_edge_tx(&tx, edge, Some(frame_seq))?;
                 }
                 for group in &transaction.relational {
                     let schema = Self::load_relational_schema_conn(&tx, &group.namespace)?
                         .ok_or_else(|| Error::from_reason("relational schema is not registered"))?;
                     let _ = Self::projection_apply_rows_tx(&tx, &schema, &group.mutations)?;
                 }
+                let receipt_frame_seq = transaction.local_frame_seq.unwrap_or(frame_seq);
                 tx.execute(
                     "INSERT INTO applied_transactions(transaction_id, commit_sequence, payload_hash, frame_seq) VALUES(?1, ?2, ?3, ?4)",
-                    params![transaction.transaction_id, transaction.origin_commit_seq, transaction.payload_hash, frame_seq],
+                    params![transaction.transaction_id, transaction.origin_commit_seq, transaction.payload_hash, receipt_frame_seq],
                 )
                 .map_err(|e| Error::from_reason(e.to_string()))?;
                 // Informational only since WP-1.2 — the counters re-seed from
                 // the journal itself on open, never from the projection.
                 Self::projection_state_set(&tx, "stable_frontier", &frame_seq.to_string())?;
-                Self::projection_state_set(&tx, "txn_frontier", &frame_seq.to_string())?;
+                let prior_txn_frontier = tx
+                    .query_row(
+                        "SELECT value FROM projection_state WHERE key='txn_frontier'",
+                        [],
+                        |row| row.get::<_, String>(0),
+                    )
+                    .optional()
+                    .map_err(|e| Error::from_reason(e.to_string()))?
+                    .and_then(|value| value.parse::<u64>().ok())
+                    .unwrap_or(0);
+                Self::projection_state_set(
+                    &tx,
+                    "txn_frontier",
+                    &prior_txn_frontier.max(receipt_frame_seq).to_string(),
+                )?;
                 tx.commit().map_err(|e| Error::from_reason(e.to_string()))?;
             }
             Event::Batch(events) => {
@@ -4686,7 +5794,7 @@ impl Storage {
                             Self::projection_append_node_version(&tx, node_u32, node, frame_seq)?;
                         }
                         Event::Edge(edge) => {
-                            self.projection_apply_edge_tx(&tx, edge)?;
+                            self.projection_apply_edge_tx(&tx, edge, Some(frame_seq))?;
                         }
                         _ => {}
                     }
@@ -4706,25 +5814,38 @@ impl Storage {
                 retracted_at,
             } => {
                 if let Some(node_u32) = self.get_u32(id) {
-                    conn.execute("DELETE FROM props WHERE node_u32 = ?1", params![node_u32])
+                    let latest: Option<(u32, String)> = conn.query_row(
+                        "SELECT clock_time,clock_peer FROM node_versions WHERE node_u32=?1 ORDER BY frame_seq DESC LIMIT 1",
+                        [node_u32], |r| Ok((r.get(0)?, r.get(1)?)),
+                    ).optional().map_err(|e| Error::from_reason(e.to_string()))?;
+                    if latest.is_some_and(|c| c > (clock.time, clock.peer_id.clone())) {
+                        return Ok(());
+                    }
+                    let tx = conn
+                        .transaction()
                         .map_err(|e| Error::from_reason(e.to_string()))?;
-                    conn.execute(
+                    tx.execute("DELETE FROM props WHERE node_u32 = ?1", params![node_u32])
+                        .map_err(|e| Error::from_reason(e.to_string()))?;
+                    tx.execute(
                         "DELETE FROM node_labels WHERE node_u32 = ?1",
                         params![node_u32],
                     )
                     .map_err(|e| Error::from_reason(e.to_string()))?;
-                    Self::projection_delete_incident_edges(&&*conn, node_u32)?;
+                    tx.execute("UPDATE edge_versions SET tx_to=?2 WHERE (from_id=?1 OR to_id=?1) AND tx_to IS NULL", params![id,frame_seq])
+                        .map_err(|e| Error::from_reason(e.to_string()))?;
+                    Self::projection_delete_incident_edges(&tx, node_u32)?;
                     // WP-2.1: the retraction is itself a version-chain entry —
                     // resolve-at-commit past this point answers "retracted",
                     // not the last live version.
                     Self::projection_append_retract_version(
-                        &conn,
+                        &tx,
                         node_u32,
                         id,
                         frame_seq,
                         clock,
                         retracted_at,
                     )?;
+                    tx.commit().map_err(|e| Error::from_reason(e.to_string()))?;
                 }
             }
             _ => {}
@@ -4739,12 +5860,15 @@ impl Storage {
         if target.exists() {
             let _ = fs::remove_file(target);
         }
-        let escaped = target.to_string_lossy().replace('\'', "''");
         let conn = self.projection_db.lock();
         conn.execute_batch("PRAGMA wal_checkpoint(FULL);")
             .map_err(|e| Error::from_reason(e.to_string()))?;
-        conn.execute_batch(&format!("VACUUM INTO '{}';", escaped))
-            .map_err(|e| Error::from_reason(e.to_string()))?;
+        // The live connection stays open for the lifetime of `Storage`. Copy
+        // the checkpointed main file instead of creating a replacement with
+        // `VACUUM INTO`: swapping that replacement over `projection.sqlite`
+        // would leave Unix writers on an unlinked inode while new readers open
+        // the replacement alongside the old `-wal`/`-shm` sidecars.
+        fs::copy(&self.projection_path, target).map_err(|e| Error::from_reason(e.to_string()))?;
         Ok(())
     }
 
@@ -4787,7 +5911,7 @@ impl Storage {
                     first_err = Some(e);
                 }
             };
-            match signed_event.event {
+            match self.normalize_replayed_event(signed_event) {
                 Event::Node(node) => apply(Event::Node(node)),
                 Event::RelationalSchema(package) => apply(Event::RelationalSchema(package)),
                 rows @ Event::RelationalRows { .. } => apply(rows),
@@ -4837,7 +5961,86 @@ impl Storage {
             self.projection_reopen_fresh()?;
             self.projection_replay_wal()?;
         }
+        self.rebuild_edge_history()?;
         self.projection_backfill_edges()?;
+        Ok(())
+    }
+
+    fn rebuild_edge_history(&self) -> Result<()> {
+        let mut conn = self.projection_db.lock();
+        let tx = conn
+            .transaction()
+            .map_err(|e| Error::from_reason(e.to_string()))?;
+        tx.execute_batch("DELETE FROM edge_versions; DELETE FROM edges;")
+            .map_err(|e| Error::from_reason(e.to_string()))?;
+        let mut error = None;
+        let mut node_clocks = HashMap::new();
+        self.scan_journal(None, true, &mut |seq, se| {
+            if error.is_none() {
+                if let Err(e) = self.rebuild_edge_event(&tx, &se.event, seq, &mut node_clocks) {
+                    error = Some(e);
+                }
+            }
+        });
+        if let Some(e) = error {
+            return Err(e);
+        }
+        Self::projection_state_set(
+            &tx,
+            "edge_history_floor",
+            &self.history_horizon().to_string(),
+        )?;
+        tx.commit().map_err(|e| Error::from_reason(e.to_string()))?;
+        Ok(())
+    }
+
+    fn rebuild_edge_event(
+        &self,
+        tx: &rusqlite::Transaction<'_>,
+        event: &Event,
+        seq: u64,
+        node_clocks: &mut HashMap<String, LogicalClock>,
+    ) -> Result<()> {
+        match event {
+            Event::Node(n) => {
+                let old = node_clocks
+                    .entry(n.id.clone())
+                    .or_insert_with(|| n.clock.clone());
+                if n.clock > *old {
+                    *old = n.clock.clone();
+                }
+            }
+            Event::Edge(e) => self.projection_apply_edge_tx(tx, e, Some(seq))?,
+            Event::Batch(events) => {
+                for e in events {
+                    self.rebuild_edge_event(tx, e, seq, node_clocks)?;
+                }
+            }
+            Event::Transaction(t) => {
+                for n in &t.nodes {
+                    let old = node_clocks
+                        .entry(n.id.clone())
+                        .or_insert_with(|| n.clock.clone());
+                    if n.clock > *old {
+                        *old = n.clock.clone();
+                    }
+                }
+                for e in &t.edges {
+                    self.projection_apply_edge_tx(tx, e, Some(seq))?;
+                }
+            }
+            Event::NodeRetract { id, clock, .. } => {
+                if node_clocks.get(id).is_some_and(|old| old > clock) {
+                    return Ok(());
+                }
+                node_clocks.insert(id.clone(), clock.clone());
+                tx.execute("UPDATE edge_versions SET tx_to=?2 WHERE (from_id=?1 OR to_id=?1) AND tx_to IS NULL",params![id,seq])
+                    .map_err(|e| Error::from_reason(e.to_string()))?;
+                tx.execute("DELETE FROM edges WHERE from_id=?1 OR to_id=?1", [id])
+                    .map_err(|e| Error::from_reason(e.to_string()))?;
+            }
+            _ => {}
+        }
         Ok(())
     }
 
@@ -4859,29 +6062,46 @@ impl Storage {
             return Ok(());
         }
         let conn = self.projection_db.lock();
-        let projected: i64 = conn
-            .query_row("SELECT count(*) FROM edges", [], |row| row.get(0))
+        let projected: HashSet<String> = conn
+            .prepare("SELECT id FROM edges")
+            .map_err(|e| Error::from_reason(e.to_string()))?
+            .query_map([], |row| row.get(0))
+            .map_err(|e| Error::from_reason(e.to_string()))?
+            .collect::<std::result::Result<_, _>>()
             .map_err(|e| Error::from_reason(e.to_string()))?;
-        if projected > 0 {
+        drop(conn);
+        let live: Vec<EdgeOutput> = self
+            .edges
+            .iter()
+            .filter(|e| !projected.contains(&e.id))
+            .map(|e| e.value().clone())
+            .collect();
+        if live.is_empty() {
             return Ok(());
         }
-        drop(conn);
-
-        let live: Vec<EdgeOutput> = self.edges.iter().map(|e| e.value().clone()).collect();
         let total = live.len();
         let mut conn = self.projection_db.lock();
         let tx = conn
             .transaction()
             .map_err(|e| Error::from_reason(e.to_string()))?;
         for edge in &live {
-            self.projection_apply_edge_tx(&tx, edge)?;
+            self.projection_apply_edge_tx(&tx, edge, Some(self.stable_frontier()))?;
         }
+        // Snapshot-only legacy state is known at this frontier, not before it.
+        Self::projection_state_set(
+            &tx,
+            "edge_history_floor",
+            &self.stable_frontier().to_string(),
+        )?;
         tx.commit().map_err(|e| Error::from_reason(e.to_string()))?;
         println!("projection: backfilled {total} edges into the relational projection");
         Ok(())
     }
 
     pub fn projection_props(&self, node_u32: u32) -> Result<Option<Value>> {
+        let _read_guard = self.commit_lock.lock();
+        self.ensure_readable()?;
+
         let conn = self.projection_db.lock();
         let payload: Option<String> = conn
             .query_row(
@@ -4904,6 +6124,7 @@ impl Storage {
         let package = Self::normalize_schema_package(package)?;
         Self::validate_relational_schema(&package)?;
         let _commit_guard = self.commit_lock.lock();
+        self.ensure_readable()?;
         let mut conn = self.projection_db.lock();
         if let Some(previous) = Self::load_relational_schema_conn(&conn, &package.namespace)? {
             if previous == package {
@@ -4919,8 +6140,8 @@ impl Storage {
             .transaction()
             .map_err(|e| Error::from_reason(e.to_string()))?;
         Self::projection_apply_schema_conn(&tx, &package)?;
-        self.append_wal_event(&Event::RelationalSchema(package.clone()))?;
-        tx.commit().map_err(|e| Error::from_reason(e.to_string()))?;
+        let seq = self.append_wal_event(&Event::RelationalSchema(package.clone()))?;
+        tx.commit().map_err(|e| self.durable_apply_error(seq, e))?;
         Ok(package.schema_version)
     }
 
@@ -4928,12 +6149,18 @@ impl Storage {
         &self,
         namespace: &str,
     ) -> Result<Option<RelationalSchemaPackage>> {
+        let _read_guard = self.commit_lock.lock();
+        self.ensure_readable()?;
+
         Self::validate_namespace(namespace)?;
         let conn = self.projection_db.lock();
         Self::load_relational_schema_conn(&conn, namespace)
     }
 
     pub fn list_relational_schemas(&self) -> Result<Vec<RelationalSchemaPackage>> {
+        let _read_guard = self.commit_lock.lock();
+        self.ensure_readable()?;
+
         let conn = self.projection_db.lock();
         let mut statement = conn
             .prepare("SELECT package_json FROM relational_schema_registry ORDER BY namespace")
@@ -4971,6 +6198,7 @@ impl Storage {
         }
         let payload_hash = hex::encode(Sha256::digest(&encoded));
         let _commit_guard = self.commit_lock.lock();
+        self.ensure_readable()?;
         let mut conn = self.projection_db.lock();
         let schema = Self::load_relational_schema_conn(&conn, &batch.namespace)?
             .ok_or_else(|| Error::from_reason("REL_SCHEMA_NOT_FOUND"))?;
@@ -5009,7 +6237,7 @@ impl Storage {
             .transaction()
             .map_err(|e| Error::from_reason(e.to_string()))?;
         let affected_rows = Self::projection_apply_rows_tx(&tx, &schema, &batch.operations)?;
-        self.append_wal_event(&Event::RelationalRows {
+        let seq = self.append_wal_event(&Event::RelationalRows {
             namespace: batch.namespace.clone(),
             schema_version: batch.schema_version,
             mutation_id: batch.mutation_id.clone(),
@@ -5027,8 +6255,8 @@ impl Storage {
                 affected_rows
             ],
         )
-        .map_err(|e| Error::from_reason(e.to_string()))?;
-        tx.commit().map_err(|e| Error::from_reason(e.to_string()))?;
+        .map_err(|e| self.durable_apply_error(seq, e))?;
+        tx.commit().map_err(|e| self.durable_apply_error(seq, e))?;
         Ok(RelationalMutationResult {
             mutation_id: batch.mutation_id,
             namespace: batch.namespace,
@@ -5257,6 +6485,9 @@ impl Storage {
     /// partly asked - the same class of wrong-answer-that-looks-right as a
     /// silently truncated result set. See `sql_first_terminator`.
     pub fn query_sql(&self, sql: &str, params: Vec<Value>) -> Result<Vec<Value>> {
+        let _read_guard = self.commit_lock.lock();
+        self.ensure_readable()?;
+
         use rusqlite::hooks::{AuthAction, AuthContext, Authorization};
         use rusqlite::limits::Limit;
 
@@ -5372,6 +6603,9 @@ impl Storage {
     }
 
     pub fn query_relational(&self, query: RelationalQuery) -> Result<Vec<Value>> {
+        let _read_guard = self.commit_lock.lock();
+        self.ensure_readable()?;
+
         Self::validate_namespace(&query.namespace)?;
         Self::validate_identifier(&query.table)?;
         if query.columns.is_empty() {
@@ -5530,6 +6764,9 @@ impl Storage {
     }
 
     pub fn execute_named_query(&self, request: NamedQueryRequest) -> Result<Vec<Value>> {
+        let _read_guard = self.commit_lock.lock();
+        self.ensure_readable()?;
+
         Self::validate_namespace(&request.namespace)?;
         Self::validate_identifier(&request.query_name)?;
         let definition = {
@@ -5705,7 +6942,7 @@ impl Storage {
         let conn = self.projection_db.lock();
         let mut statement = conn
             .prepare(
-                "SELECT transaction_id, commit_sequence, payload_hash FROM applied_transactions ORDER BY COALESCE(frame_seq, commit_sequence)",
+                "SELECT transaction_id, commit_sequence, payload_hash, frame_seq FROM applied_transactions ORDER BY COALESCE(frame_seq, commit_sequence)",
             )
             .map_err(|e| Error::from_reason(e.to_string()))?;
         let events = statement
@@ -5713,6 +6950,7 @@ impl Storage {
                 Ok(Event::Transaction(GenesisTransactionEvent {
                     transaction_id: row.get(0)?,
                     origin_commit_seq: row.get(1)?,
+                    local_frame_seq: row.get(3)?,
                     payload_hash: row.get(2)?,
                     relational: vec![],
                     nodes: vec![],
@@ -5746,11 +6984,17 @@ impl Storage {
     }
 
     pub fn node_view(&self, id: &str) -> Option<NodeOutput> {
+        let _read_guard = self.commit_lock.lock();
+        self.ensure_readable().ok()?;
+
         let u32_id = self.get_u32(id)?;
         self.node_view_u32(u32_id)
     }
 
     pub fn node_view_u32(&self, u32_id: u32) -> Option<NodeOutput> {
+        let _read_guard = self.commit_lock.lock();
+        self.ensure_readable().ok()?;
+
         let node = self.nodes.get(&u32_id)?;
         Some(self.hydrated_node(u32_id, node.value()))
     }
@@ -5781,7 +7025,11 @@ impl Storage {
             ))
         })?;
         let read_only = opts.read_only.unwrap_or(false);
-        let vector_dim = opts.vector_dim.unwrap_or(1536) as u16;
+        let requested_dim = opts.vector_dim.unwrap_or(1536);
+        if requested_dim == 0 || requested_dim > u16::MAX as u32 {
+            return Err(Error::from_reason("COLLECTION_DIM_INVALID"));
+        }
+        let vector_dim = requested_dim as u16;
         // WP-1.3: parse the retention profile up front (fail-loud on typos)
         // so the writer thread can be spawned with the profile's derived
         // active-file seal threshold.
@@ -5809,6 +7057,9 @@ impl Storage {
                 );
             }
         }
+
+        let (recovery_definitions, journal_definitions) =
+            Self::preflight_journal(&root, opts.vector_dim)?;
 
         // --- Cryptographic Identity (Mark X) ---
         let identity_path = root.join("identity.bin");
@@ -6148,7 +7399,9 @@ impl Storage {
             retention,
             projection_path,
             projection_db: Mutex::new(projection_conn),
-            commit_lock: Mutex::new(()),
+            commit_lock: ReentrantMutex::new(()),
+            recovery_required: AtomicBool::new(false),
+            collection_definitions: DashMap::new(),
             commit_sequence: AtomicU64::new(0),
             nodes: DashMap::new(),
             edges: DashMap::new(),
@@ -6200,69 +7453,171 @@ impl Storage {
         // SnapshotStale machinery needed. Snapshots without a journal frontier
         // (pre-WP-1.2, or never saved) get a full journal replay, which is also
         // idempotent over whatever try_load_state loaded.
-        storage
-            .commit_sequence
-            .store(initial_next_seq.saturating_sub(1), Ordering::SeqCst);
-        let journal_frontier = fs::read_to_string(storage.path.join("state.json"))
-            .ok()
-            .and_then(|c| serde_json::from_str::<serde_json::Value>(&c).ok())
-            .and_then(|v| v["journal"]["frontier_seq"].as_u64());
-        let saved_txn_frontier = fs::read_to_string(storage.path.join("state.json"))
-            .ok()
-            .and_then(|c| serde_json::from_str::<serde_json::Value>(&c).ok())
-            .and_then(|v| v["journal"]["txn_frontier"].as_u64())
-            .unwrap_or(0);
-        storage
-            .txn_frontier
-            .store(saved_txn_frontier, Ordering::SeqCst);
-        let legacy_byte_frontier = fs::read_to_string(storage.path.join("state.json"))
-            .ok()
-            .and_then(|c| serde_json::from_str::<serde_json::Value>(&c).ok())
-            .is_some_and(|v| v.get("wal_frontier").is_some());
-        // RCA--SLICE0-DURABILITY defect 4: a base segment folded at a seq
-        // STRICTLY NEWER than the snapshot's cursor means the snapshot predates
-        // a completed checkpoint (the fold-vs-state.json-rename crash window).
-        // That fold already erased the history between the two cursors —
-        // including any NodeRetract frames — and a base-segment replay can only
-        // add, so trusting the stale snapshot would resurrect state deleted
-        // between them. The base segment is a complete recovery source on its
-        // own (I8): skip the snapshot and recover from the journal alone.
-        let fold_horizon = storage.history_horizon();
-        let snapshot_stale_vs_fold =
-            journal_frontier.is_some_and(|frontier| fold_horizon > frontier);
-        if snapshot_stale_vs_fold {
-            println!(
+        let recovery_result = (|| -> Result<()> {
+            storage
+                .commit_sequence
+                .store(initial_next_seq.saturating_sub(1), Ordering::SeqCst);
+            let journal_frontier = fs::read_to_string(storage.path.join("state.json"))
+                .ok()
+                .and_then(|c| serde_json::from_str::<serde_json::Value>(&c).ok())
+                .and_then(|v| v["journal"]["frontier_seq"].as_u64());
+            let saved_txn_frontier = fs::read_to_string(storage.path.join("state.json"))
+                .ok()
+                .and_then(|c| serde_json::from_str::<serde_json::Value>(&c).ok())
+                .and_then(|v| v["journal"]["txn_frontier"].as_u64())
+                .unwrap_or(0);
+            storage
+                .txn_frontier
+                .store(saved_txn_frontier, Ordering::SeqCst);
+            let legacy_byte_frontier = fs::read_to_string(storage.path.join("state.json"))
+                .ok()
+                .and_then(|c| serde_json::from_str::<serde_json::Value>(&c).ok())
+                .is_some_and(|v| v.get("wal_frontier").is_some());
+            // RCA--SLICE0-DURABILITY defect 4: a base segment folded at a seq
+            // STRICTLY NEWER than the snapshot's cursor means the snapshot predates
+            // a completed checkpoint (the fold-vs-state.json-rename crash window).
+            // That fold already erased the history between the two cursors —
+            // including any NodeRetract frames — and a base-segment replay can only
+            // add, so trusting the stale snapshot would resurrect state deleted
+            // between them. The base segment is a complete recovery source on its
+            // own (I8): skip the snapshot and recover from the journal alone.
+            let fold_horizon = storage.history_horizon();
+            let snapshot_stale_vs_fold =
+                journal_frontier.is_some_and(|frontier| fold_horizon > frontier);
+            if snapshot_stale_vs_fold {
+                println!(
                 "recovery: snapshot cursor {} predates journal fold @{} — ignoring stale snapshot, recovering from the journal.",
                 journal_frontier.unwrap_or(0),
                 fold_horizon
             );
+            }
+            // A live sidecar may contain post-snapshot rows. Rebuild that case
+            // from the journal rather than appending over an incompatible row layout.
+            let sidecar_tail = journal_frontier
+                .is_some_and(|f| f < initial_next_seq.saturating_sub(1))
+                && recovery_definitions.iter().any(|d| d.rerank);
+            let mut snapshot_loaded =
+                !snapshot_stale_vs_fold && !sidecar_tail && storage.try_load_state();
+            if snapshot_loaded
+                && storage.collections.iter().any(|c| {
+                    let meta = c.metadata.read();
+                    let arena = c.arena.read();
+                    recovery_definitions
+                        .iter()
+                        .any(|d| d.name == c.name && d.rerank && c.f32_sidecar.is_none())
+                        || meta.iter().any(|m| {
+                            m.embedding_offset.saturating_add(m.vector_dim as u64)
+                                > arena.len() as u64
+                        })
+                })
+            {
+                // Discard the whole partial memtable, not just the broken arena.
+                // The canonical journal must rebuild node/vector identity together.
+                snapshot_loaded = false;
+                storage.nodes.clear();
+                storage.edges.clear();
+                storage.out_idx.clear();
+                storage.in_idx.clear();
+                storage.id_to_u32.clear();
+                storage.next_u32.store(0, Ordering::SeqCst);
+                storage.trigram_index.clear();
+                storage.tombstones.clear();
+                storage.edges_retired.clear();
+                storage.out_idx_retired.clear();
+                storage.in_idx_retired.clear();
+                storage.collections.clear();
+                storage.collection_definitions.clear();
+                storage.collections.insert(
+                    "default".into(),
+                    Arc::new(VectorCollection::new(
+                        "default".into(),
+                        "default".into(),
+                        vector_dim,
+                        Metric::L2,
+                        Quant::None,
+                        None,
+                        false,
+                        None,
+                        true,
+                        false,
+                    )),
+                );
+            }
+            for d in &recovery_definitions {
+                storage.apply_collection_definition(d)?;
+            }
+            match (snapshot_loaded, journal_frontier) {
+                // Framed snapshot: replay only frames past the seq frontier.
+                (true, Some(frontier)) => storage.replay_journal(Some(frontier), false),
+                // Pre-WP-1.2 snapshot carrying the byte-positional cursor: the
+                // cursor is meaningless against the migrated journal, and the
+                // legacy WAL tail may hold acked writes newer than the snapshot —
+                // full replay, once (idempotent for graph state; duplicate vector
+                // arena rows are reclaimed by the next index compaction).
+                (true, None) if legacy_byte_frontier => storage.replay_journal(None, true),
+                // Pre-frontier snapshot (no cursor of either kind): tail replay is
+                // impossible, and the journal may hold acked writes newer than the
+                // snapshot (RCA--SLICE0-DURABILITY defect 3) — full replay on top
+                // of the instant load, exactly like the legacy-cursor branch above
+                // (idempotent LWW; same one-time duplicate-arena-rows tradeoff).
+                (true, None) => storage.replay_journal(None, true),
+                // No snapshot (or a stale one skipped above): the journal alone is
+                // the recovery source.
+                (false, _) => storage.replay_journal(None, true),
+            }
+            // Rebuild the HNSW index for BOTH load paths: journal replay and the
+            // instant snapshot load (try_load_state populates the vector/metadata
+            // arenas but never rehydrates HNSW, leaving semantic search broken
+            // until a manual rebuild).
+            storage.rehydrate_hnsw_index();
+            storage.projection_sync_on_open()?;
+            storage.ensure_readable()?;
+            if !read_only {
+                // A complete snapshot guard precedes any new event variant, even
+                // when recovering a journal-only bundle whose marker was removed.
+                if Self::read_ondisk_schema_version(&storage.path) != Some(SCHEMA_VERSION) {
+                    storage.save_state_checkpoint(false)?;
+                }
+                let missing: Vec<_> = storage
+                    .collections
+                    .iter()
+                    .filter(|c| !journal_definitions.contains(c.key()))
+                    .map(|c| storage.definition_for(c.value()))
+                    .collect();
+                for mut d in missing {
+                    if storage.stable_frontier() == 0
+                        && storage.nodes.is_empty()
+                        && d.name == "default"
+                    {
+                        // Genesis state is a derived base at sequence zero, not a
+                        // user mutation. Preserve the established first-write clock.
+                        d.clock = LogicalClock {
+                            time: 0,
+                            peer_id: storage.local_peer_id.clone(),
+                        };
+                        d.provenance = "genesis-base".into();
+                        let mut bytes = serde_json::to_vec(
+                            &storage.sign_event(&Event::CollectionDefinition(d.clone())),
+                        )
+                        .map_err(|e| Error::from_reason(e.to_string()))?;
+                        bytes.push(b'\n');
+                        storage.checkpoint_wal_payload(bytes, 0, 1)?;
+                        storage.apply_collection_definition(&d)?;
+                        continue;
+                    }
+                    d.clock = storage.next_clock();
+                    let seq = storage.persist(&Event::CollectionDefinition(d.clone()))?;
+                    storage
+                        .apply_collection_definition(&d)
+                        .map_err(|e| storage.durable_apply_error(seq, e))?;
+                }
+            }
+            Ok(())
+        })();
+        if let Err(error) = recovery_result {
+            storage.recovery_required.store(true, Ordering::SeqCst);
+            return Err(error);
         }
-        let snapshot_loaded = !snapshot_stale_vs_fold && storage.try_load_state();
-        match (snapshot_loaded, journal_frontier) {
-            // Framed snapshot: replay only frames past the seq frontier.
-            (true, Some(frontier)) => storage.replay_journal(Some(frontier), false),
-            // Pre-WP-1.2 snapshot carrying the byte-positional cursor: the
-            // cursor is meaningless against the migrated journal, and the
-            // legacy WAL tail may hold acked writes newer than the snapshot —
-            // full replay, once (idempotent for graph state; duplicate vector
-            // arena rows are reclaimed by the next index compaction).
-            (true, None) if legacy_byte_frontier => storage.replay_journal(None, true),
-            // Pre-frontier snapshot (no cursor of either kind): tail replay is
-            // impossible, and the journal may hold acked writes newer than the
-            // snapshot (RCA--SLICE0-DURABILITY defect 3) — full replay on top
-            // of the instant load, exactly like the legacy-cursor branch above
-            // (idempotent LWW; same one-time duplicate-arena-rows tradeoff).
-            (true, None) => storage.replay_journal(None, true),
-            // No snapshot (or a stale one skipped above): the journal alone is
-            // the recovery source.
-            (false, _) => storage.replay_journal(None, true),
-        }
-        // Rebuild the HNSW index for BOTH load paths: journal replay and the
-        // instant snapshot load (try_load_state populates the vector/metadata
-        // arenas but never rehydrates HNSW, leaving semantic search broken
-        // until a manual rebuild).
-        storage.rehydrate_hnsw_index();
-        storage.projection_sync_on_open()?;
         Ok(storage)
     }
 
@@ -6277,9 +7632,62 @@ impl Storage {
     }
 
     pub fn ensure_writable(&self) -> Result<()> {
+        self.ensure_readable()?;
         if self.read_only {
             return Err(Error::from_reason("read-only"));
         }
+        Ok(())
+    }
+
+    fn ensure_readable(&self) -> Result<()> {
+        if self.recovery_required.load(Ordering::SeqCst) {
+            return Err(Error::from_reason(
+                "RECOVERY_REQUIRED: reopen database before reading, writing or checkpointing",
+            ));
+        }
+        Ok(())
+    }
+
+    fn durable_apply_error(&self, seq: u64, error: impl std::fmt::Display) -> Error {
+        self.recovery_required.store(true, Ordering::SeqCst);
+        Error::from_reason(format!(
+            "DURABLE_COMMIT_APPLY_FAILED: commit_sequence={seq}; reopen required; {error}"
+        ))
+    }
+
+    // All relational groups share a rollback transaction, so cross-group
+    // constraints are checked before append. commit_lock stays held through
+    // WAL/apply; another engine writer cannot invalidate the preflight.
+    fn preflight_relational_event(&self, event: &Event) -> Result<()> {
+        let Event::Transaction(transaction) = event else {
+            return Ok(());
+        };
+        let mut conn = self.projection_db.lock();
+        let existing: Option<String> = conn
+            .query_row(
+                "SELECT payload_hash FROM applied_transactions WHERE transaction_id = ?1",
+                [&transaction.transaction_id],
+                |row| row.get(0),
+            )
+            .optional()
+            .map_err(|e| Error::from_reason(e.to_string()))?;
+        if let Some(hash) = existing {
+            return if hash == transaction.payload_hash {
+                Ok(())
+            } else {
+                Err(Error::from_reason("transaction identity conflict"))
+            };
+        }
+        let tx = conn
+            .transaction()
+            .map_err(|e| Error::from_reason(e.to_string()))?;
+        for group in &transaction.relational {
+            let schema = Self::load_relational_schema_conn(&tx, &group.namespace)?
+                .ok_or_else(|| Error::from_reason("relational schema is not registered"))?;
+            Self::projection_apply_rows_tx(&tx, &schema, &group.mutations)?;
+        }
+        tx.rollback()
+            .map_err(|e| Error::from_reason(e.to_string()))?;
         Ok(())
     }
 
@@ -6289,7 +7697,7 @@ impl Storage {
     /// uniform and every reader (`try_load_state` replay, `events_since`) can
     /// parse it back.
     fn sign_event(&self, event: &Event) -> SignedEvent {
-        let event_data = serde_json::to_vec(event).unwrap_or_default();
+        let event_data = canonical_event_bytes(event).unwrap_or_default();
         let signature = self.signing_key.sign(&event_data).to_bytes().to_vec();
         SignedEvent {
             event: event.clone(),
@@ -6306,18 +7714,25 @@ impl Storage {
         self.wal_sender
             .send(WalMsg::Append(Box::new(signed_event), ack_tx))
             .map_err(|_| Error::from_reason("wal disconnected"))?;
-        let seq = ack_rx
-            .recv()
-            .ok()
-            .flatten()
-            .ok_or_else(|| Error::from_reason("wal append failed"))?;
+        let seq = ack_rx.recv().ok().flatten().ok_or_else(|| {
+            self.recovery_required.store(true, Ordering::SeqCst);
+            Error::from_reason(
+                "COMMIT_OUTCOME_UNKNOWN: WAL acknowledgement failed; reopen required",
+            )
+        })?;
         self.commit_sequence.fetch_max(seq, Ordering::SeqCst);
         Ok(seq)
     }
 
     pub fn persist(&self, event: &Event) -> Result<u64> {
+        let _commit_guard = self.commit_lock.lock();
+        self.ensure_readable()?;
+        self.ensure_writable()?;
+        self.preflight_collection_event(event)?;
+        self.preflight_relational_event(event)?;
         let seq = self.append_wal_event(event)?;
-        self.projection_apply_event(event, seq)?;
+        self.projection_apply_event(event, seq)
+            .map_err(|e| self.durable_apply_error(seq, e))?;
         Ok(seq)
     }
 
@@ -6343,7 +7758,17 @@ impl Storage {
             }
             self.insert_node_lean(node_u32, node.clone());
         }
+        if let Some(clock) = Self::event_time(&Event::Transaction(transaction.clone())) {
+            self.logical_clock.fetch_max(clock, Ordering::SeqCst);
+        }
         for edge in &transaction.edges {
+            if self
+                .edges
+                .get(&Self::edge_key(&edge.id))
+                .is_some_and(|old| old.clock > edge.clock)
+            {
+                continue;
+            }
             let edge_key = self.index_edge_internal(&edge.id, &edge.from, &edge.to);
             self.edges.insert(edge_key, edge.clone());
         }
@@ -6364,12 +7789,16 @@ impl Storage {
     /// commit_sequence", which is now `txn_frontier()`). Advances on every
     /// mutation; replica-local.
     pub fn stable_frontier(&self) -> u64 {
+        let _read_guard = self.commit_lock.lock();
+
         self.commit_sequence.load(Ordering::SeqCst)
     }
 
     /// Frame seq of the last `Event::Transaction` frame — the value
     /// `GenesisTransaction.expected_frontier` CASes against.
     pub fn txn_frontier(&self) -> u64 {
+        let _read_guard = self.commit_lock.lock();
+
         self.txn_frontier.load(Ordering::SeqCst)
     }
 
@@ -6378,6 +7807,8 @@ impl Storage {
     /// this fail `beyond_horizon`; delta-pull cursors below it get
     /// `GossipMessage::BeyondHorizon`.
     pub fn history_horizon(&self) -> u64 {
+        let _read_guard = self.commit_lock.lock();
+
         Self::journal_list_segments(&self.path)
             .into_iter()
             .filter(|s| s.kind == SEG_KIND_BASE)
@@ -6400,6 +7831,9 @@ impl Storage {
     /// Lookup is by the id STRING (not `id_to_u32`): a retracted node keeps
     /// its chain addressable after the interning entry is gone.
     pub fn node_versions(&self, id: &str, at_seq: Option<u64>) -> Result<serde_json::Value> {
+        let _read_guard = self.commit_lock.lock();
+        self.ensure_readable()?;
+
         let horizon = self.history_horizon();
         if let Some(seq) = at_seq {
             if seq < horizon {
@@ -6527,6 +7961,7 @@ impl Storage {
         let payload = serde_json::to_vec(&input).map_err(|e| Error::from_reason(e.to_string()))?;
         let payload_hash = hex::encode(Sha256::digest(&payload));
         let _commit_guard = self.commit_lock.lock();
+        self.ensure_readable()?;
         {
             let conn = self.projection_db.lock();
             // Idempotent replay returns the stored LOCAL frame seq; legacy rows
@@ -6651,6 +8086,7 @@ impl Storage {
             // cannot live in this signed payload — peer frames keep original
             // signatures, I4).
             origin_commit_seq: 0,
+            local_frame_seq: None,
             payload_hash,
             relational: input.relational,
             nodes,
@@ -6659,6 +8095,8 @@ impl Storage {
         };
         let commit_sequence = self.persist(&Event::Transaction(event.clone()))?;
         self.apply_transaction_memory(&event, true, commit_sequence);
+        self.ensure_readable()
+            .map_err(|error| self.durable_apply_error(commit_sequence, error))?;
         self.txn_frontier.store(commit_sequence, Ordering::SeqCst);
         Ok(CommitResult {
             transaction_id: input.transaction_id,
@@ -6668,6 +8106,9 @@ impl Storage {
     }
 
     pub fn find_fuzzy_id(&self, id: &str) -> Option<String> {
+        let _read_guard = self.commit_lock.lock();
+        self.ensure_readable().ok()?;
+
         // 1. Exact Match
         if self.get_u32(id).is_some() {
             return Some(id.to_string());
@@ -6715,6 +8156,9 @@ impl Storage {
     }
 
     pub fn semantic_verify(&self, event: &Event) -> Result<bool> {
+        let _read_guard = self.commit_lock.lock();
+        self.ensure_readable()?;
+
         match event {
             Event::Node(node) => {
                 if let Some(emb) = &node.embedding {
@@ -6740,6 +8184,9 @@ impl Storage {
                 }
                 Ok(true)
             }
+            Event::CollectionDefinition(_)
+            | Event::CollectionMaterialization(_)
+            | Event::VectorMaterialized(_) => Ok(true),
             Event::Edge(_) => Ok(true),
             // A vector attachment carries no governance/axiom implication.
             Event::Vector(_) => Ok(true),
@@ -6781,7 +8228,7 @@ impl Storage {
         }
         let proposal_id = Uuid::new_v4().to_string();
         let event_data =
-            serde_json::to_vec(&event).map_err(|e| Error::from_reason(e.to_string()))?;
+            canonical_event_bytes(&event).map_err(|e| Error::from_reason(e.to_string()))?;
         let signature = self.signing_key.sign(&event_data).to_bytes().to_vec();
         let signed_event = SignedEvent {
             event,
@@ -6819,8 +8266,7 @@ impl Storage {
     }
 
     /// Verify that `se.signature` is an authentic ed25519 signature by
-    /// `se.signer_peer_id` over the canonical event bytes (`serde_json::to_vec`,
-    /// the same convention `persist`/`propose` sign with). Unknown signer,
+    /// `se.signer_peer_id` over the canonical event bytes. Unknown signer,
     /// malformed signature, or non-matching signature all return `false`. This is
     /// the single source of truth for event-level signature checks — the WAL sync
     /// (`reconcile_state`), the consensus propose/commit paths all route here.
@@ -6829,7 +8275,7 @@ impl Storage {
             Some(k) => k,
             None => return false,
         };
-        let data = match serde_json::to_vec(&se.event) {
+        let data = match canonical_event_bytes(&se.event) {
             Ok(d) => d,
             Err(_) => return false,
         };
@@ -6872,7 +8318,7 @@ impl Storage {
 
         // Serialize the vote-commit section with every other writer and with
         // save_state/compact (RCA--PERSIST-SIGNED-CHECKPOINT-RACE). Committing
-        // mutates in-memory state and then appends to the WAL; without this lock
+        // persists before publishing memory; without this lock
         // a checkpoint could build its payload from memory BEFORE the mutation
         // and truncate the WAL AFTER the append was fsynced and acked, erasing a
         // commit this method already reported as durable. Holding the lock means
@@ -6886,6 +8332,7 @@ impl Storage {
         // them in the opposite order and no cycle exists. The signature checks
         // above touch only `self.peers`, so they stay off this global lock.
         let _commit_guard = self.commit_lock.lock();
+        self.ensure_readable()?;
 
         if let Some(mut proposal_ref) = self.proposals.get_mut(&proposal_id) {
             let proposal = proposal_ref.value_mut();
@@ -6924,29 +8371,43 @@ impl Storage {
             }
 
             match &signed_event.event {
+                Event::CollectionDefinition(d) => {
+                    let seq = self.persist_signed(signed_event.clone())?;
+                    self.apply_collection_definition(d)
+                        .map_err(|e| self.durable_apply_error(seq, e))?;
+                }
+                Event::CollectionMaterialization(m) => {
+                    let seq = self.persist_signed(signed_event.clone())?;
+                    self.apply_collection_materialization(m)
+                        .map_err(|e| self.durable_apply_error(seq, e))?;
+                }
+                Event::VectorMaterialized(v) => {
+                    let seq = self.persist_signed(signed_event.clone())?;
+                    self.replay_materialized_vector(v, true, seq)
+                        .map_err(|e| self.durable_apply_error(seq, e))?;
+                }
                 Event::Node(n) => {
                     let mut n_axiom = n.clone();
                     if !n_axiom.labels.contains(&"MASTER".to_string()) {
                         n_axiom.labels.push("MASTER".to_string());
                     }
-                    let u32_id = self.get_or_intern_id(&n_axiom.id);
-                    self.insert_node_lean(u32_id, n_axiom.clone());
                     self.persist_signed(SignedEvent {
-                        event: Event::Node(n_axiom),
+                        event: Event::Node(n_axiom.clone()),
                         signature: signed_event.signature.clone(),
                         signer_peer_id: signed_event.signer_peer_id.clone(),
                     })?;
+                    let u32_id = self.get_or_intern_id(&n_axiom.id);
+                    self.insert_node_lean(u32_id, n_axiom);
                 }
                 Event::Edge(e) => {
-                    // Index into the adjacency maps (out_idx/in_idx) so the
-                    // committed edge is traversable in this process — not just
-                    // present in `edges` until the next reload.
-                    let ekey = self.index_edge_internal(&e.id, &e.from, &e.to);
-                    self.edges.insert(ekey, e.clone());
+                    let seq = self.persist_signed(signed_event.clone())?;
+                    // Match projection/replay LWW selection, including stale
+                    // proposals that reach quorum after a newer edge version.
+                    self.apply_event_memory(seq, Event::Edge(e.clone()), true);
                     self.refresh_impacts(Some(vec![e.to.clone()]));
-                    self.persist_signed(signed_event.clone())?;
                 }
                 Event::Batch(events) => {
+                    let seq = self.persist_signed(signed_event.clone())?;
                     for e in events {
                         match e {
                             Event::Node(n) => {
@@ -6958,13 +8419,11 @@ impl Storage {
                                 self.insert_node_lean(u32_id, n_axiom);
                             }
                             Event::Edge(edge) => {
-                                let ekey = self.index_edge_internal(&edge.id, &edge.from, &edge.to);
-                                self.edges.insert(ekey, edge.clone());
+                                self.apply_event_memory(seq, Event::Edge(edge.clone()), true);
                             }
                             _ => {}
                         }
                     }
-                    self.persist_signed(signed_event.clone())?;
                 }
                 // A committed vector is staged + enqueued (index=true) so it is
                 // searchable in this process, matching the CRDT-sync path — not
@@ -6996,25 +8455,9 @@ impl Storage {
                 }
                 // A committed retraction applies like the replay path and is
                 // persisted with its original proposal signature.
-                Event::NodeRetract {
-                    id,
-                    clock,
-                    retracted_at,
-                } => {
-                    // Persist-first (RCA--SLICE0-DURABILITY defect 2 rationale),
-                    // which also yields the frame seq the retired-adjacency
-                    // overlay stamps (E1).
+                Event::NodeRetract { .. } => {
                     let retract_seq = self.persist_signed(signed_event.clone())?;
-                    if let Some(u32_id) = self.get_u32(id) {
-                        self.retract_node_memory(id, u32_id, retract_seq);
-                    }
-                    self.tombstones.insert(
-                        id.clone(),
-                        NodeTombstone {
-                            clock: clock.clone(),
-                            retracted_at: retracted_at.clone(),
-                        },
-                    );
+                    self.apply_event_memory(retract_seq, signed_event.event.clone(), true);
                 }
             }
             proposal.committed = true;
@@ -7090,6 +8533,18 @@ impl Storage {
     /// `from`/`to` are node ids and keep the full node intern (they are searchable).
     pub fn index_edge_internal(&self, id: &str, from: &str, to: &str) -> u128 {
         let ekey = Self::edge_key(id);
+        if let Some(old) = self.edges.get(&ekey) {
+            if let Some(u) = self.get_u32(&old.from) {
+                if let Some(mut ids) = self.out_idx.get_mut(&u) {
+                    ids.remove(&ekey);
+                }
+            }
+            if let Some(u) = self.get_u32(&old.to) {
+                if let Some(mut ids) = self.in_idx.get_mut(&u) {
+                    ids.remove(&ekey);
+                }
+            }
+        }
         let u32_from = self.get_or_intern_id(from);
         let u32_to = self.get_or_intern_id(to);
         self.out_idx.entry(u32_from).or_default().insert(ekey);
@@ -7125,9 +8580,9 @@ impl Storage {
     pub fn add_node(&self, args: NodeInput) -> Result<NodeOutput> {
         self.ensure_writable()?;
         let _commit_guard = self.commit_lock.lock();
+        self.ensure_readable()?;
         self.validate_governance(&args.labels, false)?;
         let id = args.id.unwrap_or_else(|| format!("N-{}", Uuid::new_v4()));
-        let u32_id = self.get_or_intern_id(&id);
         let lang = args.lang.clone().unwrap_or("en".to_string());
 
         let now = Utc::now();
@@ -7164,13 +8619,20 @@ impl Storage {
                     coll.dim
                 )));
             }
+            if emb.iter().any(|value| !value.is_finite()) {
+                return Err(Error::from_reason(
+                    "VECTOR_VALUES_INVALID: embedding must contain only finite values",
+                ));
+            }
             node.embedding = Some(emb.clone());
             node.collection = Some(coll.name.clone());
         }
-        self.insert_node_lean(u32_id, node.clone());
         let seq = self.persist(&Event::Node(node.clone()))?;
+        let u32_id = self.get_or_intern_id(&id);
+        self.insert_node_lean(u32_id, node.clone());
         if let Some(emb) = args.embedding {
-            self.add_vector_internal(&args.collection, &id, emb, lang, seq)?;
+            self.add_vector_internal(&args.collection, &id, emb, lang, seq)
+                .map_err(|e| self.durable_apply_error(seq, e))?;
         }
         Ok(node)
     }
@@ -7178,6 +8640,7 @@ impl Storage {
     pub fn add_edge(&self, args: EdgeInput) -> Result<EdgeOutput> {
         self.ensure_writable()?;
         let _commit_guard = self.commit_lock.lock();
+        self.ensure_readable()?;
         let edge = EdgeOutput {
             id: args.id.unwrap_or_else(|| Uuid::new_v4().to_string()),
             from: args.from,
@@ -7192,10 +8655,10 @@ impl Storage {
             caused_by: args.caused_by,
             clock: self.next_clock(),
         };
+        self.persist(&Event::Edge(edge.clone()))?;
         let u32_id = self.index_edge_internal(&edge.id, &edge.from, &edge.to);
         self.edges.insert(u32_id, edge.clone());
         self.refresh_impacts(Some(vec![edge.to.clone()]));
-        self.persist(&Event::Edge(edge.clone()))?;
         Ok(edge)
     }
 
@@ -7207,6 +8670,7 @@ impl Storage {
     ) -> Result<NodeOutput> {
         self.ensure_writable()?;
         let _commit_guard = self.commit_lock.lock();
+        self.ensure_readable()?;
         let u32_id = match self.get_u32(&id) {
             Some(i) => i,
             None => return Err(Error::from_reason(format!("Node {} not found", id))),
@@ -7234,14 +8698,19 @@ impl Storage {
         }
         new_node.clock = self.next_clock();
 
+        // Preserve the existing two-frame temporal contract. If the second
+        // write fails, the closing frame is already durable: do not checkpoint
+        // the old live memory over it or report this as a rejected operation.
+        self.persist(&Event::Node(new_node.clone()))
+            .map_err(|e| self.durable_apply_error(closed_seq, e))?;
         self.insert_node_lean(u32_id, new_node.clone());
-        self.persist(&Event::Node(new_node.clone()))?;
 
         Ok(new_node)
     }
 
     pub fn rebuild_index_parallel(&self) -> Result<()> {
         let _commit_guard = self.commit_lock.lock();
+        self.ensure_readable()?;
         self.is_rebuilding.store(true, Ordering::SeqCst);
         self.flush_index();
         let result = {
@@ -7477,11 +8946,14 @@ impl Storage {
         pattern: &query::ast::GraphPattern,
         as_of: &Option<String>,
         clauses: &query::ast::PatternClauses,
+        budget: &mut QueryBudgetState,
     ) -> Result<serde_json::Value> {
         use query::ast::PatternDirection;
         let ser_err = |e: serde_json::Error| {
             Error::from_reason(format!("HQL result serialization failed: {e}"))
         };
+        Self::validate_temporal_selector(as_of)?;
+        budget.check_deadline()?;
         type Row = serde_json::Map<String, serde_json::Value>;
 
         let now = Utc::now().to_rfc3339();
@@ -7502,9 +8974,10 @@ impl Storage {
             if let Some(anchor_u32) = self.get_u32(&anchor_id) {
                 if let Some(entry) = self.nodes.get(&anchor_u32) {
                     let node = entry.value();
-                    if Self::is_valid_as_of(&node.valid_from, &node.valid_to, as_of)
+                    if Self::is_node_visible(node, as_of, false, &now)
                         && self.node_matches(anchor_u32, node, &pattern.start)
                     {
+                        budget.node()?;
                         let node = self.hydrated_node(anchor_u32, node);
                         let mut row = Row::new();
                         if let Some(v) = &pattern.start.var {
@@ -7516,13 +8989,15 @@ impl Storage {
             }
         } else {
             for entry in self.nodes.iter() {
+                budget.check_deadline()?;
                 let node = entry.value();
-                if !Self::is_valid_as_of(&node.valid_from, &node.valid_to, as_of) {
+                if !Self::is_node_visible(node, as_of, false, &now) {
                     continue;
                 }
                 if !self.node_matches(*entry.key(), node, &pattern.start) {
                     continue;
                 }
+                budget.node()?;
                 let node = self.hydrated_node(*entry.key(), node);
                 let mut row = Row::new();
                 if let Some(v) = &pattern.start.var {
@@ -7541,6 +9016,7 @@ impl Storage {
             };
             let mut next: Vec<(u32, Row)> = Vec::new();
             for (curr, row) in &frontier {
+                budget.check_deadline()?;
                 let mut eids: HashSet<u128> = HashSet::new();
                 if walk_out {
                     if let Some(s) = self.out_idx.get(curr) {
@@ -7553,21 +9029,25 @@ impl Storage {
                     }
                 }
                 for eid in &eids {
+                    budget.edge()?;
                     let edge_ref = match self.edges.get(eid) {
                         Some(e) => e,
                         None => continue,
                     };
                     let edge = edge_ref.value();
-                    if !Self::is_valid_as_of(&edge.valid_from, &edge.valid_to, as_of) {
+                    if !(walk_out && self.get_u32(&edge.from) == Some(*curr)
+                        || walk_in && self.get_u32(&edge.to) == Some(*curr))
+                    {
                         continue;
                     }
-                    // Hide retracted edges in the current view (mirror `neighbors`).
-                    if as_of.is_none() {
-                        if let Some(to) = &edge.valid_to {
-                            if now.as_str() >= to.as_str() {
-                                continue;
-                            }
-                        }
+                    if !Self::is_currently_visible(
+                        &edge.valid_from,
+                        &edge.valid_to,
+                        as_of,
+                        false,
+                        &now,
+                    ) {
+                        continue;
                     }
                     if let Some(rt) = &edge_pat.rel_type {
                         if &edge.rel != rt {
@@ -7589,12 +9069,13 @@ impl Storage {
                         None => continue,
                     };
                     let far_node = far_ref.value();
-                    if !Self::is_valid_as_of(&far_node.valid_from, &far_node.valid_to, as_of) {
+                    if !Self::is_node_visible(far_node, as_of, false, &now) {
                         continue;
                     }
                     if !self.node_matches(far_u32, far_node, node_pat) {
                         continue;
                     }
+                    budget.node()?;
                     let far_node = self.hydrated_node(far_u32, far_node);
                     let mut nb = row.clone();
                     if let Some(v) = &edge_pat.var {
@@ -7603,6 +9084,7 @@ impl Storage {
                     if let Some(v) = &node_pat.var {
                         nb.insert(v.clone(), serde_json::to_value(far_node).map_err(ser_err)?);
                     }
+                    budget.row()?;
                     next.push((far_u32, nb));
                 }
             }
@@ -7799,20 +9281,66 @@ impl Storage {
         }
     }
 
+    fn edge_history_floor(&self) -> Option<u64> {
+        let conn = self.projection_db.lock();
+        let floor: Option<String> = conn
+            .query_row(
+                "SELECT value FROM projection_state WHERE key='edge_history_floor'",
+                [],
+                |r| r.get(0),
+            )
+            .optional()
+            .ok()?;
+        floor
+            .and_then(|v| v.parse::<u64>().ok())
+            .map(|v| v.max(self.history_horizon()))
+    }
+
     pub fn query_ir_capabilities(&self) -> serde_json::Value {
         serde_json::json!({
             "contract_version": QUERY_IR_V1,
             "implementation_status": "partial",
+            "storage_schema_version": SCHEMA_VERSION,
+            "collection_definition": { "version":1, "durable":true, "conflict_policy":"reject", "sync_schema_version":SCHEMA_VERSION },
+            "edge_history": {"availability":if self.edge_history_floor().is_some(){"implemented"}else{"unavailable"}, "floor":self.edge_history_floor(), "selection":"replica_local_frame_intervals"},
             "operations": {
                 "search": "implemented",
                 "traverse": "implemented",
                 "match_path": "planned",
-                "context": "planned",
+                "context": "implemented",
+                "relational_named_query": "planned"
+            },
+            "operation_details": {
+                "search": {
+                    "vector": "implemented",
+                    "hybrid": "implemented",
+                    "filters": "unsupported",
+                    "lexical": "planned"
+                },
+                "traverse": {
+                    "bounded": "implemented"
+                },
+                "context": {
+                    "target_id": "implemented",
+                    "query_vector": "unsupported",
+                    "temporal": "unsupported",
+                    "tiers": ["H0", "H1", "H2", "H3", "H4", "H5", "H6"]
+                },
+                "match_path": "planned",
                 "relational_named_query": "planned"
             },
             "limits": {
                 "max_k": QUERY_IR_MAX_K,
-                "max_depth": QUERY_IR_MAX_DEPTH
+                "max_depth": QUERY_IR_MAX_DEPTH,
+                "budget_defaults": {
+                    "max_expanded_nodes": QUERY_BUDGET_DEFAULT_NODES,
+                    "max_expanded_edges": QUERY_BUDGET_DEFAULT_EDGES,
+                    "max_vector_candidates": QUERY_BUDGET_DEFAULT_CANDIDATES,
+                    "max_result_rows": QUERY_BUDGET_DEFAULT_ROWS,
+                    "max_serialized_bytes": QUERY_BUDGET_DEFAULT_BYTES,
+                    "max_elapsed_ms": QUERY_BUDGET_DEFAULT_ELAPSED_MS
+                },
+                "budget_exhaustion_reasons": ["nodes", "edges", "candidates", "rows", "bytes", "deadline"]
             },
             // WP-1.3 horizon honesty (ADR I6/D4): the oldest boundary any
             // history question can be answered past, the tx-time epoch, and
@@ -7823,6 +9351,7 @@ impl Storage {
                 "tx_epoch_start": 1,
                 "retention_profile": self.retention.as_str(),
                 "tx_time_retention": self.retention.tx_time_retention(),
+                "valid_at_selector": "rfc3339_normalized",
                 // E2 (SPEC--GENESISDB-EPOCH-HNSW, C5): both SEARCH and
                 // TRAVERSE now enumerate epoch-complete candidates — the
                 // retired-adjacency overlay on the graph side (E1/§3.2) and
@@ -7838,7 +9367,13 @@ impl Storage {
                     "status": "implemented",
                     "retention_profile": self.retention.as_str(),
                 },
-            }
+            },
+            "query_correctness": {
+                "current_visibility": "shared_validity_and_ttl",
+                "filtered_ann": "eligibility_refill",
+                "malformed_as_of": "rejected",
+                "non_finite_vectors": "rejected",
+            },
         })
     }
 
@@ -7852,6 +9387,9 @@ impl Storage {
     }
 
     pub fn execute_query_ir(&self, request: QueryIrRequest) -> Result<serde_json::Value> {
+        let _read_guard = self.commit_lock.lock();
+        self.ensure_readable()?;
+
         if request.contract_version != QUERY_IR_V1 {
             return Err(Error::from_reason(format!(
                 "QUERY_IR_VERSION_UNSUPPORTED: expected '{QUERY_IR_V1}', got '{}'",
@@ -7868,6 +9406,8 @@ impl Storage {
                 "QUERY_CAPABILITY_UNSUPPORTED: namespace-scoped Query IR is not implemented",
             ));
         }
+        let budget_limits = request.budget.clone().unwrap_or_default().resolve()?;
+        let mut budget = QueryBudgetState::new(budget_limits);
         if matches!(
             request.consistency.as_ref().map(|value| value.index),
             Some(QueryIrIndexConsistency::ReadYourWrite)
@@ -7900,12 +9440,18 @@ impl Storage {
                 target_id,
                 query_vector,
                 collection,
+                filters,
                 k,
                 alpha,
                 language,
                 ef_search,
                 oversample,
             } => {
+                if filters.is_some() {
+                    return Err(Error::from_reason(
+                        "QUERY_CAPABILITY_UNSUPPORTED: search.filters are not implemented",
+                    ));
+                }
                 if k == 0 || k > QUERY_IR_MAX_K {
                     return Err(Error::from_reason(format!(
                         "QUERY_RESOURCE_LIMIT_EXCEEDED: search.k must be between 1 and {QUERY_IR_MAX_K}"
@@ -7951,10 +9497,9 @@ impl Storage {
                             oversample,
                         },
                         tx_as_of,
+                        &mut budget,
                     )
-                    .map_err(|error| {
-                        Error::from_reason(format!("QUERY_EXECUTION_FAILED: {error}"))
-                    })?;
+                    .map_err(preserve_query_error)?;
                 let data = serde_json::to_value(results).map_err(|error| {
                     Error::from_reason(format!("QUERY_EXECUTION_FAILED: {error}"))
                 })?;
@@ -7996,18 +9541,102 @@ impl Storage {
                 // nodes retracted after t still resolve (SPEC--EPOCH-HNSW C1).
                 // Without one, the current-view path is unchanged.
                 let results = match tx_as_of {
-                    Some(t) => self.neighbors_tx_view(seed_id, input, t),
-                    None => self.neighbors(seed_id, input, false),
+                    Some(t) => self.neighbors_tx_view(seed_id, input, t, &mut budget),
+                    None => self.neighbors_with_budget(seed_id, input, false, &mut budget),
                 }
-                .map_err(|error| Error::from_reason(format!("QUERY_EXECUTION_FAILED: {error}")))?;
+                .map_err(preserve_query_error)?;
                 let data = serde_json::to_value(results).map_err(|error| {
                     Error::from_reason(format!("QUERY_EXECUTION_FAILED: {error}"))
                 })?;
                 ("traverse", data)
             }
+            QueryIrOperation::Context {
+                target_id,
+                query_vector,
+                tier,
+                budget: context_budget,
+                fuzzy,
+            } => {
+                if query_vector.is_some() {
+                    return Err(Error::from_reason(
+                        "QUERY_CAPABILITY_UNSUPPORTED: context.query_vector is not implemented",
+                    ));
+                }
+                if as_of.is_some() || tx_as_of.is_some() {
+                    return Err(Error::from_reason(
+                        "QUERY_CAPABILITY_UNSUPPORTED: context temporal selectors are not implemented",
+                    ));
+                }
+                let target_id = target_id.ok_or_else(|| {
+                    Error::from_reason("QUERY_IR_VALIDATION_FAILED: context.target_id is required")
+                })?;
+                if target_id.trim().is_empty() {
+                    return Err(Error::from_reason(
+                        "QUERY_IR_VALIDATION_FAILED: context.target_id must not be empty",
+                    ));
+                }
+                let tier = tier.trim().to_ascii_uppercase();
+                if !matches!(
+                    tier.as_str(),
+                    "H0" | "H1" | "H2" | "H3" | "H4" | "H5" | "H6"
+                ) {
+                    return Err(Error::from_reason(
+                        "QUERY_IR_VALIDATION_FAILED: context.tier must be H0 through H6",
+                    ));
+                }
+                if context_budget == Some(0) {
+                    return Err(Error::from_reason(
+                        "QUERY_IR_VALIDATION_FAILED: context.budget must be positive",
+                    ));
+                }
+                let fuzzy = fuzzy.unwrap_or(false);
+                let resolved_target = if fuzzy {
+                    self.find_fuzzy_id(&target_id)
+                        .unwrap_or_else(|| target_id.clone())
+                } else {
+                    target_id.clone()
+                };
+                let target_u32 = self.get_u32(&resolved_target).ok_or_else(|| {
+                    Error::from_reason(format!(
+                        "QUERY_TARGET_NOT_FOUND: node '{target_id}' does not exist"
+                    ))
+                })?;
+                let target_node = self.nodes.get(&target_u32).ok_or_else(|| {
+                    Error::from_reason(format!(
+                        "QUERY_TARGET_NOT_FOUND: node '{target_id}' is not live"
+                    ))
+                })?;
+                let hydrated_target = self.hydrated_node(target_u32, target_node.value());
+                let now = Utc::now().to_rfc3339();
+                if !Self::is_node_visible(&hydrated_target, &None, false, &now) {
+                    return Err(Error::from_reason(format!(
+                        "QUERY_TARGET_NOT_FOUND: node '{target_id}' is not visible"
+                    )));
+                }
+                let context = self
+                    .retrieve_context_with_query_budget(
+                        &target_id,
+                        &tier,
+                        context_budget,
+                        fuzzy,
+                        &mut budget,
+                    )
+                    .map_err(preserve_query_error)?;
+                let data = serde_json::to_value(&context).map_err(|error| {
+                    Error::from_reason(format!("QUERY_EXECUTION_FAILED: {error}"))
+                })?;
+                ("context", data)
+            }
         };
 
-        Ok(serde_json::json!({
+        let warnings = if operation_kind == "context"
+            && data["coverage"]["truncated"].as_bool() == Some(true)
+        {
+            vec!["context_truncated"]
+        } else {
+            Vec::new()
+        };
+        let response = serde_json::json!({
             "contract_version": QUERY_IR_V1,
             "request_id": request.request_id,
             "status": "ok",
@@ -8016,9 +9645,12 @@ impl Storage {
             "meta": {
                 "capability_version": ENGINE_VERSION,
                 "index_lag": self.index_lag(),
-                "warnings": []
+                "budget": budget.limits,
+                "warnings": warnings
             }
-        }))
+        });
+        budget.serialized(&response)?;
+        Ok(response)
     }
 
     fn query_ir_search_vector(
@@ -8074,6 +9706,19 @@ impl Storage {
     }
 
     pub fn execute_hql(&self, query: &str) -> Result<serde_json::Value> {
+        self.execute_hql_with_budget(query, None)
+    }
+
+    pub fn execute_hql_with_budget(
+        &self,
+        query: &str,
+        requested_budget: Option<QueryBudget>,
+    ) -> Result<serde_json::Value> {
+        let _read_guard = self.commit_lock.lock();
+        self.ensure_readable()?;
+        let budget_limits = requested_budget.unwrap_or_default().resolve()?;
+        let mut budget_state = QueryBudgetState::new(budget_limits);
+
         fn to_value<T: serde::Serialize>(res: T) -> Result<serde_json::Value> {
             serde_json::to_value(res)
                 .map_err(|e| Error::from_reason(format!("HQL result serialization failed: {e}")))
@@ -8133,14 +9778,17 @@ impl Storage {
         fn query_ir_neighbors(
             storage: &Storage,
             request: QueryIrRequest,
+            budget: Option<QueryBudget>,
         ) -> Result<Vec<NeighborOutput>> {
+            let mut request = request;
+            request.budget = budget;
             let response = storage.execute_query_ir(request)?;
             serde_json::from_value(response["data"].clone()).map_err(|error| {
                 Error::from_reason(format!("HQL compatibility decode failed: {error}"))
             })
         }
         let command = HqlCommand::try_from(query).map_err(Error::from_reason)?;
-        match command {
+        let result = match command {
             HqlCommand::Search {
                 vector,
                 k,
@@ -8167,11 +9815,13 @@ impl Storage {
                                 tx_as_of: None,
                             }),
                             consistency: None,
+                            budget: None,
                             operation: QueryIrOperation::Search {
                                 mode: QueryIrSearchMode::Vector,
                                 target_id: None,
                                 query_vector: Some(query_vector),
                                 collection: resolved_collection,
+                                filters: None,
                                 k,
                                 alpha: Some(0.0),
                                 language: lang,
@@ -8179,18 +9829,22 @@ impl Storage {
                                 oversample,
                             },
                         },
+                        Some(budget_state.limits.as_input()),
                     )?
                 } else {
-                    self.hybrid_search(HybridSearchInput {
-                        query_vector,
-                        k,
-                        alpha: Some(0.0),
-                        lang,
-                        as_of,
-                        collection: resolved_collection,
-                        ef_search,
-                        oversample,
-                    })?
+                    self.hybrid_search_with_budget(
+                        HybridSearchInput {
+                            query_vector,
+                            k,
+                            alpha: Some(0.0),
+                            lang,
+                            as_of,
+                            collection: resolved_collection,
+                            ef_search,
+                            oversample,
+                        },
+                        &mut budget_state,
+                    )?
                 };
                 Self::apply_hql_clauses(res, &clauses)
             }
@@ -8219,7 +9873,7 @@ impl Storage {
                     || depth == 0
                     || depth > QUERY_IR_MAX_DEPTH
                 {
-                    self.neighbors(
+                    self.neighbors_with_budget(
                         resolved_seed,
                         NeighborInput {
                             depth: Some(depth),
@@ -8231,6 +9885,7 @@ impl Storage {
                             limit: None,
                         },
                         is_inferred,
+                        &mut budget_state,
                     )?
                 } else {
                     let relations = rels.unwrap_or_else(|| vec![target_rel]);
@@ -8250,6 +9905,7 @@ impl Storage {
                                 tx_as_of: None,
                             }),
                             consistency: None,
+                            budget: None,
                             operation: QueryIrOperation::Traverse {
                                 seed_id: resolved_seed,
                                 depth,
@@ -8258,6 +9914,7 @@ impl Storage {
                                 limit: None,
                             },
                         },
+                        Some(budget_state.limits.as_input()),
                     )?
                 };
                 Self::apply_hql_clauses(res, &clauses)
@@ -8289,11 +9946,13 @@ impl Storage {
                                 tx_as_of: None,
                             }),
                             consistency: None,
+                            budget: None,
                             operation: QueryIrOperation::Search {
                                 mode: QueryIrSearchMode::Hybrid,
                                 target_id: None,
                                 query_vector: Some(query_vector),
                                 collection: resolved_collection,
+                                filters: None,
                                 k,
                                 alpha: Some(alpha),
                                 language: lang,
@@ -8301,18 +9960,22 @@ impl Storage {
                                 oversample,
                             },
                         },
+                        Some(budget_state.limits.as_input()),
                     )?
                 } else {
-                    self.hybrid_search(HybridSearchInput {
-                        query_vector,
-                        k,
-                        alpha: Some(alpha),
-                        lang,
-                        as_of,
-                        collection: resolved_collection,
-                        ef_search,
-                        oversample,
-                    })?
+                    self.hybrid_search_with_budget(
+                        HybridSearchInput {
+                            query_vector,
+                            k,
+                            alpha: Some(alpha),
+                            lang,
+                            as_of,
+                            collection: resolved_collection,
+                            ef_search,
+                            oversample,
+                        },
+                        &mut budget_state,
+                    )?
                 };
                 Self::apply_hql_clauses(res, &clauses)
             }
@@ -8329,18 +9992,31 @@ impl Storage {
                 pattern,
                 as_of,
                 clauses,
-            } => self.match_pattern(&pattern, &as_of, &clauses),
-        }
+            } => self.match_pattern(&pattern, &as_of, &clauses, &mut budget_state),
+        }?;
+        budget_state.serialized(&result)?;
+        Ok(result)
     }
 
     pub fn execute_hql_read_only(&self, query: &str) -> Result<serde_json::Value> {
+        self.execute_hql_read_only_with_budget(query, None)
+    }
+
+    pub fn execute_hql_read_only_with_budget(
+        &self,
+        query: &str,
+        budget: Option<QueryBudget>,
+    ) -> Result<serde_json::Value> {
+        let _read_guard = self.commit_lock.lock();
+        self.ensure_readable()?;
+
         let command = HqlCommand::try_from(query).map_err(Error::from_reason)?;
         match command {
             HqlCommand::Search { .. }
             | HqlCommand::Traverse { .. }
             | HqlCommand::Hybrid { .. }
             | HqlCommand::Context { .. }
-            | HqlCommand::MatchPattern { .. } => self.execute_hql(query),
+            | HqlCommand::MatchPattern { .. } => self.execute_hql_with_budget(query, budget),
         }
     }
 
@@ -8408,6 +10084,10 @@ impl Storage {
     }
 
     pub fn studio_graph_scene(&self, request: StudioGraphSceneRequest) -> Result<StudioGraphScene> {
+        let _read_guard = self.commit_lock.lock();
+        self.ensure_readable()?;
+        Self::validate_temporal_selector(&request.as_of)?;
+
         let limit = request.limit.unwrap_or(240);
         if limit == 0 || limit > STUDIO_SCENE_PAGE_LIMIT {
             return Err(Error::from_reason(format!(
@@ -8552,6 +10232,9 @@ impl Storage {
     }
 
     pub fn studio_inspect_entity(&self, entity_id: &str) -> Result<StudioEntityInspection> {
+        let _read_guard = self.commit_lock.lock();
+        self.ensure_readable()?;
+
         let node_u32 = self
             .get_u32(entity_id)
             .ok_or_else(|| Error::from_reason("STUDIO_ENTITY_NOT_FOUND"))?;
@@ -8623,13 +10306,53 @@ impl Storage {
         })
     }
 
+    fn parse_temporal_instant(value: &str) -> Option<DateTime<Utc>> {
+        DateTime::parse_from_rfc3339(value)
+            .ok()
+            .map(|instant| instant.with_timezone(&Utc))
+    }
+
+    fn validate_temporal_selector(as_of: &Option<String>) -> Result<()> {
+        if as_of
+            .as_deref()
+            .is_some_and(|value| Self::parse_temporal_instant(value).is_none())
+        {
+            return Err(Error::from_reason(
+                "TEMPORAL_SELECTOR_INVALID: as_of must be an RFC3339 instant",
+            ));
+        }
+        Ok(())
+    }
+
+    fn instant_after(left: &str, right: &str) -> bool {
+        match (
+            Self::parse_temporal_instant(left),
+            Self::parse_temporal_instant(right),
+        ) {
+            (Some(left), Some(right)) => left > right,
+            // Legacy snapshots may contain an empty timestamp. Preserve their
+            // old lexical behavior until they are rewritten by a checkpoint.
+            _ => left > right,
+        }
+    }
+
+    fn instant_at_or_after(left: &str, right: &str) -> bool {
+        match (
+            Self::parse_temporal_instant(left),
+            Self::parse_temporal_instant(right),
+        ) {
+            (Some(left), Some(right)) => left >= right,
+            _ => left >= right,
+        }
+    }
+
     fn is_valid_as_of(valid_from: &str, valid_to: &Option<String>, as_of: &Option<String>) -> bool {
         if let Some(as_of_str) = as_of {
-            if valid_from > as_of_str.as_str() {
+            if Self::instant_after(valid_from, as_of_str) {
                 return false;
             }
             if let Some(to) = valid_to {
-                if as_of_str.as_str() >= to.as_str() {
+                if Self::instant_at_or_after(as_of_str, to) {
                     return false;
                 }
             }
@@ -8660,18 +10383,52 @@ impl Storage {
         if !Self::is_valid_as_of(valid_from, valid_to, as_of) {
             return false;
         }
-        if as_of.is_none() && !include_invalid {
-            if let Some(to) = valid_to {
-                if now >= to.as_str() {
-                    return false;
+        if as_of.is_none() {
+            if Self::instant_after(valid_from, now) {
+                return false;
+            }
+            if !include_invalid {
+                if let Some(to) = valid_to {
+                    if Self::instant_at_or_after(now, to) {
+                        return false;
+                    }
                 }
             }
         }
         true
     }
 
+    fn is_node_visible(
+        node: &NodeOutput,
+        as_of: &Option<String>,
+        include_invalid: bool,
+        now: &str,
+    ) -> bool {
+        if !Self::is_currently_visible(
+            &node.valid_from,
+            &node.valid_to,
+            as_of,
+            include_invalid,
+            now,
+        ) {
+            return false;
+        }
+        let reference = as_of.as_deref().unwrap_or(now);
+        node.expires_at
+            .as_deref()
+            .map(|expires_at| !Self::instant_at_or_after(reference, expires_at))
+            .unwrap_or(true)
+    }
+
     pub fn hybrid_search(&self, args: HybridSearchInput) -> Result<Vec<NeighborOutput>> {
-        self.hybrid_search_impl(args, None)
+        let _read_guard = self.commit_lock.lock();
+        self.ensure_readable()?;
+
+        let limits = QueryBudget::default().resolve()?;
+        let mut budget = QueryBudgetState::new(limits);
+        let results = self.hybrid_search_impl(args, None, &mut budget)?;
+        budget.serialized(&results)?;
+        Ok(results)
     }
 
     /// The one search body (SPEC--EPOCH-HNSW §3.3). `tx_as_of = None` is the
@@ -8687,7 +10444,33 @@ impl Storage {
         &self,
         args: HybridSearchInput,
         tx_as_of: Option<u64>,
+        budget: &mut QueryBudgetState,
     ) -> Result<Vec<NeighborOutput>> {
+        budget.check_deadline()?;
+        Self::validate_temporal_selector(&args.as_of)?;
+        if args.k == 0 {
+            return Err(Error::from_reason(
+                "QUERY_VALIDATION_FAILED: k must be positive",
+            ));
+        }
+        if args.query_vector.iter().any(|value| !value.is_finite()) {
+            return Err(Error::from_reason(
+                "QUERY_VALIDATION_FAILED: query_vector must contain only finite values",
+            ));
+        }
+        if args
+            .alpha
+            .is_some_and(|value| !value.is_finite() || !(0.0..=1.0).contains(&value))
+        {
+            return Err(Error::from_reason(
+                "QUERY_VALIDATION_FAILED: alpha must be between 0 and 1",
+            ));
+        }
+        if args.ef_search == Some(0) || args.oversample == Some(0) {
+            return Err(Error::from_reason(
+                "QUERY_VALIDATION_FAILED: ef_search and oversample must be positive",
+            ));
+        }
         let coll = self.resolve_collection(&args.collection)?;
         // Dim validation closes the silent cross-space bug: a query from a
         // different model/dim is rejected, not ranked into garbage.
@@ -8739,6 +10522,11 @@ impl Storage {
         } else {
             k2
         };
+        if fetch as u64 > budget.limits.max_vector_candidates {
+            return Err(Error::from_reason(
+                "QUERY_BUDGET_EXCEEDED: reason=candidates",
+            ));
+        }
         // When a rerank sidecar is present and the over-fetch would already pull
         // ~every slot, skip the approximate HNSW prefilter and score the full
         // sidecar exactly. The HNSW prefilter can nondeterministically drop a
@@ -8751,6 +10539,7 @@ impl Storage {
             let n = s.read().len_rows();
             (n > 0 && fetch >= n).then_some(n)
         });
+        let now = Utc::now().to_rfc3339();
         let mut results = if let Some(t) = tx_as_of {
             // §3.3 epoch candidates. Selective filters are the standard
             // filtered-ANN failure mode, so measure the survivor fraction
@@ -8774,19 +10563,32 @@ impl Storage {
             } else {
                 let center = coll.center_snapshot();
                 let sq8 = coll.sq8_snapshot();
-                let meta_guard = coll.metadata.read();
-                let flt = |did: &usize| meta_guard.get(*did).map(&pred).unwrap_or(false);
-                let hnsw_lock = coll.hnsw.read();
-                match &*hnsw_lock {
-                    Some(idx) => idx.search_f32(
-                        &query_f32,
-                        fetch,
-                        ef,
-                        center.as_deref(),
-                        sq8,
-                        Some(&flt as &dyn FilterT),
-                    ),
-                    None => return Err(Error::from_reason("HNSW not init")),
+                let run_filtered = |limit: usize| -> Result<Vec<(usize, f32)>> {
+                    let meta_guard = coll.metadata.read();
+                    let flt = |did: &usize| meta_guard.get(*did).map(&pred).unwrap_or(false);
+                    let hnsw_lock = coll.hnsw.read();
+                    match &*hnsw_lock {
+                        Some(idx) => Ok(idx.search_f32(
+                            &query_f32,
+                            limit,
+                            ef.max(limit),
+                            center.as_deref(),
+                            sq8,
+                            Some(&flt as &dyn FilterT),
+                        )),
+                        None => Err(Error::from_reason("HNSW not init")),
+                    }
+                };
+                let mut requested = fetch.min(total).max(1);
+                let mut hits = run_filtered(requested)?;
+                while hits.len() < args.k as usize && requested < total {
+                    requested = requested.saturating_mul(2).min(total);
+                    hits = run_filtered(requested)?;
+                }
+                if hits.len() < args.k as usize && requested >= total {
+                    coll.exact_candidates_where(&query_f32, total, &pred)
+                } else {
+                    hits
                 }
             }
         } else if let Some(n) = exact_rerank_slots {
@@ -8800,38 +10602,79 @@ impl Storage {
             // SQ8: pack the query with the collection's scale (calibrated or fixed),
             // matching the indexed codes. Non-SQ8 ⇒ SQ8_FIXED, ignored by the arm.
             let sq8 = coll.sq8_snapshot();
-            let hits = {
-                let hnsw_lock = coll.hnsw.read();
-                match &*hnsw_lock {
-                    Some(idx) => {
-                        idx.search_f32(&query_f32, fetch, ef, center.as_deref(), sq8, None)
-                    }
-                    None => return Err(Error::from_reason("HNSW not init")),
-                }
-            };
-            // Recall floor (RCA--HNSW-UNDER-RETURN-SMALL-GRAPH). On a small
-            // graph hnsw_rs can return ONLY the entry point — measured 2/150 on
-            // a 24-vector collection, always exactly 1 hit — when that entry
-            // point's layer-0 neighbour list was pruned empty. Recall then
-            // collapses (1 of 10 asked for) instead of degrading, and the
-            // caller cannot tell. When the index demonstrably under-delivers
-            // AND the collection is small enough to scan outright, rebuild the
-            // candidates exactly.
-            //
-            // Both conditions are load-bearing: a short return on a large
-            // collection can be legitimate, and scanning one would be ruinous.
-            // On a healthy graph `hits.len() == fetch.min(slots)`, so this
-            // costs one length read and a compare — the scan never runs.
-            let slots = { coll.metadata.read().len() };
-            if hits.len() < fetch.min(slots) && slots <= EXACT_SCAN_MAX_SLOTS {
-                coll.exact_candidates(&query_f32, fetch)
+            let slots = coll.metadata.read().len();
+            if slots == 0 {
+                Vec::new()
             } else {
-                hits
+                let run_search = |limit: usize| -> Result<Vec<(usize, f32)>> {
+                    let hnsw_lock = coll.hnsw.read();
+                    match &*hnsw_lock {
+                        Some(idx) => {
+                            // A refill raises the result limit as well as the
+                            // graph exploration budget. Keeping `ef` fixed
+                            // can leave every expanded shortlist inside a
+                            // retired prefix on large collections.
+                            Ok(idx.search_f32(
+                                &query_f32,
+                                limit,
+                                ef.max(limit),
+                                center.as_deref(),
+                                sq8,
+                                None,
+                            ))
+                        }
+                        None => Err(Error::from_reason("HNSW not init")),
+                    }
+                };
+                let eligible_count = |candidates: &[(usize, f32)]| -> usize {
+                    let meta_guard = coll.metadata.read();
+                    let mut seen = HashSet::new();
+                    candidates
+                        .iter()
+                        .filter_map(|(d_id, _)| meta_guard.get(*d_id))
+                        .filter(|meta| meta.retired_seq == 0)
+                        .filter(|meta| {
+                            self.nodes
+                                .get(&meta.node_u32)
+                                .map(|node| {
+                                    Self::is_node_visible(node.value(), &args.as_of, false, &now)
+                                })
+                                .unwrap_or(false)
+                        })
+                        .filter(|meta| seen.insert(meta.node_u32))
+                        .count()
+                };
+                let mut requested = fetch.min(slots).max(1);
+                let mut hits = run_search(requested)?;
+                if hits.len() < requested && slots <= EXACT_SCAN_MAX_SLOTS {
+                    hits = coll.exact_candidates(&query_f32, requested);
+                }
+                while eligible_count(&hits) < args.k as usize && requested < slots {
+                    requested = requested.saturating_mul(2).min(slots);
+                    hits = run_search(requested)?;
+                    if hits.len() < requested && slots <= EXACT_SCAN_MAX_SLOTS {
+                        hits = coll.exact_candidates(&query_f32, requested);
+                    }
+                }
+                if eligible_count(&hits) < args.k as usize && requested >= slots {
+                    // Once the ANN budget has exhausted every slot, use the
+                    // exact oracle if HNSW still under-returns. This is rare,
+                    // but it preserves the eligibility contract for large
+                    // collections with heavy tombstone churn too.
+                    coll.exact_candidates(&query_f32, slots)
+                } else {
+                    hits
+                }
             }
         };
+        for _ in &results {
+            budget.candidate()?;
+        }
         // f32-sidecar rerank: replace each candidate's quantized distance with the
-        // exact f32 distance, re-sort ascending, and keep the best k*2 for the
-        // hybrid blend below. The arena_id (d_id) indexes the sidecar at d_id*dim.
+        // exact f32 distance and re-sort ascending for the hybrid blend below.
+        // Keep the full filtered candidate pool here: truncating before the live
+        // visibility pass can spend the entire rerank window on retired rows.
+        // The arena_id (d_id) indexes the sidecar at d_id*dim.
         // A candidate the sidecar is missing keeps its quantized distance, so an
         // absent/truncated `fvec_<name>.bin` degrades to quantized-only search
         // rather than silently dropping every hit (it would otherwise return empty).
@@ -8849,7 +10692,6 @@ impl Storage {
                 })
                 .collect();
             results.sort_by(|a, b| a.1.partial_cmp(&b.1).unwrap_or(std::cmp::Ordering::Equal));
-            results.truncate(k2);
         }
         let mut hybrid_results = Vec::new();
         let meta_arena = coll.metadata.read();
@@ -8866,6 +10708,7 @@ impl Storage {
         };
 
         for (d_id, distance) in results {
+            budget.check_deadline()?;
             if let Some(meta) = meta_arena.get(d_id) {
                 {
                     let u32_id = meta.node_u32; // A2: id interned in metadata
@@ -8896,11 +10739,7 @@ impl Storage {
                     } else if let Some(node) = self.nodes.get(&u32_id) {
                         let node_out = self.hydrated_node(u32_id, node.value());
 
-                        if Self::is_valid_as_of(
-                            &node_out.valid_from,
-                            &node_out.valid_to,
-                            &args.as_of,
-                        ) {
+                        if Self::is_node_visible(&node_out, &args.as_of, false, &now) {
                             node_out
                         } else if let Some(hist) = args
                             .as_of
@@ -8924,6 +10763,7 @@ impl Storage {
                     // Carry the ranking score in `score`; leave `node.impact`
                     // as the node's true graph-authority signal (don't clobber
                     // it) so the caller can fuse it itself.
+                    budget.row()?;
                     hybrid_results.push(NeighborOutput {
                         node: node_out,
                         path: Vec::new(),
@@ -8952,6 +10792,9 @@ impl Storage {
     }
 
     pub fn get_ranked_context(&self, args: HybridSearchInput) -> Result<Vec<NeighborOutput>> {
+        let _read_guard = self.commit_lock.lock();
+        self.ensure_readable()?;
+
         let mut context_args = args;
         context_args.alpha = Some(0.4);
         self.hybrid_search(context_args)
@@ -8963,6 +10806,38 @@ impl Storage {
         args: NeighborInput,
         is_inferred: bool,
     ) -> Result<Vec<NeighborOutput>> {
+        let limits = QueryBudget::default().resolve()?;
+        let mut budget = QueryBudgetState::new(limits);
+        let results = self.neighbors_with_budget(seed, args, is_inferred, &mut budget)?;
+        budget.serialized(&results)?;
+        Ok(results)
+    }
+
+    fn hybrid_search_with_budget(
+        &self,
+        args: HybridSearchInput,
+        budget: &mut QueryBudgetState,
+    ) -> Result<Vec<NeighborOutput>> {
+        self.hybrid_search_impl(args, None, budget)
+    }
+
+    fn neighbors_with_budget(
+        &self,
+        seed: String,
+        args: NeighborInput,
+        is_inferred: bool,
+        budget: &mut QueryBudgetState,
+    ) -> Result<Vec<NeighborOutput>> {
+        let _read_guard = self.commit_lock.lock();
+        self.ensure_readable()?;
+        Self::validate_temporal_selector(&args.as_of)?;
+        if args.limit == Some(0) {
+            return Err(Error::from_reason(
+                "QUERY_RESOURCE_LIMIT_EXCEEDED: limit must be positive",
+            ));
+        }
+        budget.check_deadline()?;
+
         let u32_seed = match self.get_u32(&seed) {
             Some(id) => id,
             None => return Ok(Vec::new()),
@@ -9008,6 +10883,7 @@ impl Storage {
         let mut queue = VecDeque::new();
         queue.push_back((u32_seed, Vec::new(), 0));
         while let Some((curr_u32, path, curr_depth)) = queue.pop_front() {
+            budget.check_deadline()?;
             if curr_depth >= depth && !is_inferred {
                 continue;
             }
@@ -9026,8 +10902,14 @@ impl Storage {
             }
 
             for eid in eid_set.iter() {
+                budget.edge()?;
                 if let Some(edge_ref) = self.edges.get(eid) {
                     let edge = edge_ref.value();
+                    if !(walk_out && self.get_u32(&edge.from) == Some(curr_u32)
+                        || walk_in && self.get_u32(&edge.to) == Some(curr_u32))
+                    {
+                        continue;
+                    }
 
                     // Bitemporal current-view check for Edges (time-travel bound +
                     // retraction hiding); see `is_currently_visible`.
@@ -9056,6 +10938,7 @@ impl Storage {
                     };
                     if let Some(next_u32) = self.get_u32(next_id) {
                         if !visited.contains(&next_u32) {
+                            budget.node()?;
                             visited.insert(next_u32);
                             if let Some(node_ref) = self.nodes.get(&next_u32) {
                                 let node = node_ref.value();
@@ -9064,12 +10947,14 @@ impl Storage {
                                 // current version postdates as_of, resolve the
                                 // historically valid version from the chain
                                 // instead of hiding the node.
-                                let out_node = if Self::is_valid_as_of(
-                                    &node.valid_from,
-                                    &node.valid_to,
+                                let hydrated = self.hydrated_node(next_u32, node);
+                                let out_node = if Self::is_node_visible(
+                                    &hydrated,
                                     &args.as_of,
+                                    include_invalid,
+                                    &now,
                                 ) {
-                                    self.hydrated_node(next_u32, node)
+                                    hydrated
                                 } else if let Some(hist) = args
                                     .as_of
                                     .as_deref()
@@ -9082,6 +10967,7 @@ impl Storage {
 
                                 let mut new_path = path.clone();
                                 new_path.push(edge.clone());
+                                budget.row()?;
                                 results.push(NeighborOutput {
                                     node: out_node,
                                     path: new_path.clone(),
@@ -9237,7 +11123,25 @@ impl Storage {
         seed: String,
         args: NeighborInput,
         t: u64,
+        budget: &mut QueryBudgetState,
     ) -> Result<Vec<NeighborOutput>> {
+        Self::validate_temporal_selector(&args.as_of)?;
+        if args.limit == Some(0) {
+            return Err(Error::from_reason(
+                "QUERY_RESOURCE_LIMIT_EXCEEDED: limit must be positive",
+            ));
+        }
+        budget.check_deadline()?;
+        let edge_floor = self.edge_history_floor().ok_or_else(|| {
+            Error::from_reason(
+                "QUERY_IR_HISTORY_UNAVAILABLE: rebuild edge projection with a writable v4 engine",
+            )
+        })?;
+        if t < edge_floor {
+            return Err(Error::from_reason(format!(
+                "QUERY_IR_HISTORY_UNAVAILABLE: edge history floor is {edge_floor}"
+            )));
+        }
         let horizon = self.history_horizon();
         let depth = args.depth.unwrap_or(1);
         let rels_filter: Option<HashSet<String>> = match args.rels.as_ref() {
@@ -9273,48 +11177,35 @@ impl Storage {
         let mut queue: VecDeque<(String, Vec<EdgeOutput>, u32)> = VecDeque::new();
         queue.push_back((seed, Vec::new(), 0));
         while let Some((curr_id, path, curr_depth)) = queue.pop_front() {
+            budget.check_deadline()?;
             if curr_depth >= depth {
                 continue;
             }
 
-            // Candidates: live adjacency (when the node is live) ∪ the retired
-            // overlay (keyed by id string — works for retracted hops too).
-            let mut eid_set: HashSet<u128> = HashSet::new();
-            if let Some(curr_u32) = self.get_u32(&curr_id) {
-                if walk_out {
-                    if let Some(out_eids) = self.out_idx.get(&curr_u32) {
-                        eid_set.extend(out_eids.iter().copied());
-                    }
+            let historical = {
+                let conn = self.projection_db.lock();
+                let mut stmt = conn.prepare("SELECT payload FROM edge_versions WHERE tx_from<=?2 AND (tx_to IS NULL OR tx_to>?2) AND ((?3 AND from_id=?1) OR (?4 AND to_id=?1)) ORDER BY id")
+                    .map_err(|e| Error::from_reason(e.to_string()))?;
+                let rows = stmt
+                    .query_map(params![curr_id, t, walk_out, walk_in], |r| {
+                        r.get::<_, String>(0)
+                    })
+                    .map_err(|e| Error::from_reason(e.to_string()))?;
+                let mut edges = Vec::new();
+                for row in rows {
+                    let payload = row.map_err(|e| Error::from_reason(e.to_string()))?;
+                    edges.push(
+                        serde_json::from_str::<EdgeOutput>(&payload)
+                            .map_err(|e| Error::from_reason(e.to_string()))?,
+                    );
                 }
-                if walk_in {
-                    if let Some(in_eids) = self.in_idx.get(&curr_u32) {
-                        eid_set.extend(in_eids.iter().copied());
-                    }
-                }
-            }
-            if walk_out {
-                if let Some(out_eids) = self.out_idx_retired.get(&curr_id) {
-                    eid_set.extend(out_eids.iter().copied());
-                }
-            }
-            if walk_in {
-                if let Some(in_eids) = self.in_idx_retired.get(&curr_id) {
-                    eid_set.extend(in_eids.iter().copied());
-                }
-            }
-
-            for eid in eid_set.iter() {
-                let edge: EdgeOutput = if let Some(edge_ref) = self.edges.get(eid) {
-                    edge_ref.value().clone()
-                } else if let Some(retired) = self.edges_retired.get(eid) {
-                    // Existed at t only if the retraction came after t.
-                    if retired.value().retired_seq <= t {
-                        continue;
-                    }
-                    retired.value().edge.clone()
-                } else {
+                edges
+            };
+            for edge in historical {
+                budget.edge()?;
+                if !(walk_out && edge.from == curr_id || walk_in && edge.to == curr_id) {
                     continue;
-                };
+                }
                 if !Self::is_currently_visible(
                     &edge.valid_from,
                     &edge.valid_to,
@@ -9335,6 +11226,7 @@ impl Storage {
                 if visited.contains(&next_id) {
                     continue;
                 }
+                budget.node()?;
                 visited.insert(next_id.clone());
 
                 // Resolve the far node through the chain at t (shared with the
@@ -9345,6 +11237,7 @@ impl Storage {
 
                 let mut new_path = path.clone();
                 new_path.push(edge);
+                budget.row()?;
                 results.push(NeighborOutput {
                     node: out_node,
                     path: new_path.clone(),
@@ -9384,6 +11277,10 @@ impl Storage {
     /// Absent both fields, behavior for data that was never retracted or
     /// superseded is unchanged from before this method enforced visibility.
     pub fn query(&self, args: QueryInput) -> Result<Vec<EdgeOutput>> {
+        let _read_guard = self.commit_lock.lock();
+        self.ensure_readable()?;
+        Self::validate_temporal_selector(&args.as_of)?;
+
         let include_invalid = args.include_invalid.unwrap_or(false);
         let now = Utc::now().to_rfc3339();
         let mut res = Vec::new();
@@ -9444,6 +11341,9 @@ impl Storage {
     }
 
     pub fn detect_communities(&self) -> Result<()> {
+        let _read_guard = self.commit_lock.lock();
+        self.ensure_readable()?;
+
         // Community detection runs over the default collection's vector space.
         let coll = self.default_coll();
         let mut meta_arena = coll.metadata.write();
@@ -9526,6 +11426,9 @@ impl Storage {
     }
 
     pub fn generate_meta_graph(&self) -> Result<()> {
+        let _read_guard = self.commit_lock.lock();
+        self.ensure_readable()?;
+
         // Meta-graph is built over the default collection's vector space.
         let coll = self.default_coll();
         let dim = coll.dim as usize;
@@ -9627,6 +11530,9 @@ impl Storage {
     }
 
     pub fn prune_orphaned_nodes(&self) -> Result<()> {
+        let _read_guard = self.commit_lock.lock();
+        self.ensure_readable()?;
+
         let mut to_delete = Vec::new();
         let now = Utc::now().to_rfc3339();
 
@@ -9664,6 +11570,7 @@ impl Storage {
     pub fn retract_node(&self, id: &str) -> Result<()> {
         self.ensure_writable()?;
         let _commit_guard = self.commit_lock.lock();
+        self.ensure_readable()?;
         let u32_id = match self.get_u32(id) {
             Some(i) => i,
             None => return Ok(()),
@@ -9773,6 +11680,7 @@ impl Storage {
     pub fn reconcile_state(&self, signed_events: Vec<SignedEvent>) -> Result<()> {
         self.ensure_writable()?;
         let _commit_guard = self.commit_lock.lock();
+        self.ensure_readable()?;
         self.reconcile_state_unlocked(signed_events)
     }
 
@@ -9793,10 +11701,30 @@ impl Storage {
 
             // 2. Apply Event logic
             match event {
+                Event::CollectionDefinition(d) => {
+                    self.preflight_collection_event(event)?;
+                    if !self.collection_definitions.contains_key(&d.name) {
+                        let seq = self.persist_signed(signed_event.clone())?;
+                        self.apply_collection_definition(d)
+                            .map_err(|e| self.durable_apply_error(seq, e))?;
+                    }
+                }
+                Event::CollectionMaterialization(m) => {
+                    let seq = self.persist_signed(signed_event.clone())?;
+                    self.apply_collection_materialization(m)
+                        .map_err(|e| self.durable_apply_error(seq, e))?;
+                }
+                Event::VectorMaterialized(v) => {
+                    let seq = self.persist_signed(signed_event.clone())?;
+                    self.replay_materialized_vector(v, true, seq)
+                        .map_err(|e| self.durable_apply_error(seq, e))?;
+                }
                 Event::Node(remote_node) => {
-                    let u32_id = self.get_or_intern_id(&remote_node.id);
                     let mut apply = true;
-                    if let Some(local_node) = self.nodes.get(&u32_id) {
+                    if let Some(local_node) = self
+                        .get_u32(&remote_node.id)
+                        .and_then(|u| self.nodes.get(&u))
+                    {
                         if remote_node.clock < local_node.value().clock {
                             apply = false;
                         }
@@ -9839,6 +11767,7 @@ impl Storage {
                                 seq,
                             );
                         }
+                        let u32_id = self.get_or_intern_id(&remote_node.id);
                         self.insert_node_lean(u32_id, remote_node.clone());
                     }
                 }
@@ -9862,13 +11791,13 @@ impl Storage {
                                 Err(actual) => current = actual,
                             }
                         }
+                        self.persist_signed(signed_event.clone())?;
                         let u32_id = self.index_edge_internal(
                             &remote_edge.id,
                             &remote_edge.from,
                             &remote_edge.to,
                         );
                         self.edges.insert(u32_id, remote_edge.clone());
-                        self.persist_signed(signed_event.clone())?;
                     }
                 }
                 Event::Vector(remote_vec) => {
@@ -9911,18 +11840,13 @@ impl Storage {
                     self.apply_transaction_memory(transaction, true, seq);
                     self.txn_frontier.fetch_max(seq, Ordering::SeqCst);
                 }
-                Event::Batch(inner_events) => {
-                    // Recursive call needs SignedEvent wrapping, but for now we handle batches as single signed units
-                    // To keep it simple, we wrap inner events or just apply them since the batch itself is verified.
-                    let wrapped_inners: Vec<SignedEvent> = inner_events
-                        .iter()
-                        .map(|e| SignedEvent {
-                            event: e.clone(),
-                            signature: signed_event.signature.clone(), // Reuse batch signature
-                            signer_peer_id: signer_id.clone(),
-                        })
-                        .collect();
-                    let _ = self.reconcile_state_unlocked(wrapped_inners);
+                Event::Batch(_) => {
+                    // The signature belongs to the original outer batch. Keep
+                    // those bytes and one local frame; never forge inner signatures.
+                    let seq = self.persist_signed(signed_event.clone())?;
+                    self.apply_event_memory(seq, event.clone(), true);
+                    self.ensure_readable()
+                        .map_err(|e| self.durable_apply_error(seq, e))?;
                 }
                 Event::NodeRetract {
                     id,
@@ -9995,26 +11919,40 @@ impl Storage {
     /// lock (save_state/compact hold the SAME mutex, so this fully serializes
     /// them against a concurrent fold regardless of the journal format).
     pub fn persist_signed(&self, signed_event: SignedEvent) -> Result<u64> {
-        // If nobody holds the lock, `try_lock` succeeds and the invariant was
-        // violated; if WE hold it, `try_lock` always fails (not reentrant), so
-        // this never false-positives on a correct caller.
         debug_assert!(
-            self.commit_lock.try_lock().is_none(),
+            self.commit_lock.is_owned_by_current_thread(),
             "persist_signed requires the caller to hold commit_lock \
              (see RCA--PERSIST-SIGNED-CHECKPOINT-RACE)"
         );
+        self.ensure_writable()?;
+        self.preflight_collection_event(&signed_event.event)?;
+        self.preflight_relational_event(&signed_event.event)?;
         let (ack_tx, ack_rx) = unbounded();
         let event = signed_event.event.clone();
+        // A folded receipt may carry the source replica's local frame for
+        // local recovery. When ingesting it from a peer, the projection must
+        // stamp the fresh local frame instead; origin-local sequence numbers
+        // are not portable across replicas.
+        let projection_event = match &event {
+            Event::Transaction(transaction) if transaction.local_frame_seq.is_some() => {
+                let mut transaction = transaction.clone();
+                transaction.local_frame_seq = None;
+                Event::Transaction(transaction)
+            }
+            _ => event.clone(),
+        };
         self.wal_sender
             .send(WalMsg::Append(Box::new(signed_event), ack_tx))
             .map_err(|_| Error::from_reason("wal disconnected"))?;
-        let seq = ack_rx
-            .recv()
-            .ok()
-            .flatten()
-            .ok_or_else(|| Error::from_reason("wal append failed"))?;
+        let seq = ack_rx.recv().ok().flatten().ok_or_else(|| {
+            self.recovery_required.store(true, Ordering::SeqCst);
+            Error::from_reason(
+                "COMMIT_OUTCOME_UNKNOWN: WAL acknowledgement failed; reopen required",
+            )
+        })?;
         self.commit_sequence.fetch_max(seq, Ordering::SeqCst);
-        self.projection_apply_event(&event, seq)?;
+        self.projection_apply_event(&projection_event, seq)
+            .map_err(|e| self.durable_apply_error(seq, e))?;
         Ok(seq)
     }
 
@@ -10029,6 +11967,34 @@ impl Storage {
         budget: Option<u32>,
         fuzzy: bool,
     ) -> Result<ContextPackage> {
+        let _read_guard = self.commit_lock.lock();
+        self.ensure_readable()?;
+
+        self.retrieve_context_inner(target_id, tier_str, budget, fuzzy, None)
+    }
+
+    fn retrieve_context_with_query_budget(
+        &self,
+        target_id: &str,
+        tier_str: &str,
+        budget: Option<u32>,
+        fuzzy: bool,
+        query_budget: &mut QueryBudgetState,
+    ) -> Result<ContextPackage> {
+        let _read_guard = self.commit_lock.lock();
+        self.ensure_readable()?;
+
+        self.retrieve_context_inner(target_id, tier_str, budget, fuzzy, Some(query_budget))
+    }
+
+    fn retrieve_context_inner(
+        &self,
+        target_id: &str,
+        tier_str: &str,
+        budget: Option<u32>,
+        fuzzy: bool,
+        mut query_budget: Option<&mut QueryBudgetState>,
+    ) -> Result<ContextPackage> {
         let tier = ScalingTier::parse(tier_str);
         let hops = tier.hops();
         let target_id_resolved = if fuzzy {
@@ -10037,6 +12003,7 @@ impl Storage {
         } else {
             target_id.to_string()
         };
+        let now = Utc::now().to_rfc3339();
 
         // 1. Graph Expansion (BFS)
         let mut nodes = HashMap::new();
@@ -10049,9 +12016,15 @@ impl Storage {
         let mut ceiling_hit = false;
 
         if let Some(u32_id) = self.get_u32(&target_id_resolved) {
-            queue.push_back((u32_id, 0));
             if let Some(node) = self.nodes.get(&u32_id) {
-                nodes.insert(u32_id, self.hydrated_node(u32_id, node.value()));
+                let hydrated = self.hydrated_node(u32_id, node.value());
+                if Self::is_node_visible(&hydrated, &None, false, &now) {
+                    if let Some(state) = query_budget.as_deref_mut() {
+                        state.node()?;
+                    }
+                    nodes.insert(u32_id, hydrated);
+                    queue.push_back((u32_id, 0));
+                }
             }
         }
 
@@ -10082,13 +12055,43 @@ impl Storage {
                 for eid in eids.iter() {
                     if let Some(edge_ref) = self.edges.get(eid) {
                         let edge = edge_ref.value();
+                        if self.get_u32(&edge.from) != Some(curr_u32) {
+                            continue;
+                        }
+                        if !Self::is_currently_visible(
+                            &edge.valid_from,
+                            &edge.valid_to,
+                            &None,
+                            false,
+                            &now,
+                        ) {
+                            continue;
+                        }
+                        if let Some(state) = query_budget.as_deref_mut() {
+                            state.edge()?;
+                        }
+                        if let Some(next_u32) = self.get_u32(&edge.to) {
+                            if let Some(node) = self.nodes.get(&next_u32) {
+                                let hydrated = self.hydrated_node(next_u32, node.value());
+                                if !Self::is_node_visible(&hydrated, &None, false, &now) {
+                                    continue;
+                                }
+                            }
+                        }
                         edges.push(edge.clone());
                         if let Some(next_u32) = self.get_u32(&edge.to) {
                             if let std::collections::hash_map::Entry::Vacant(e) =
                                 nodes.entry(next_u32)
                             {
                                 if let Some(node) = self.nodes.get(&next_u32) {
-                                    e.insert(self.hydrated_node(next_u32, node.value()));
+                                    let hydrated = self.hydrated_node(next_u32, node.value());
+                                    if !Self::is_node_visible(&hydrated, &None, false, &now) {
+                                        continue;
+                                    }
+                                    if let Some(state) = query_budget.as_deref_mut() {
+                                        state.node()?;
+                                    }
+                                    e.insert(hydrated);
                                     hops_served = hops_served.max(curr_depth + 1);
                                     queue.push_back((next_u32, curr_depth + 1));
                                 }
@@ -10102,13 +12105,43 @@ impl Storage {
                 for eid in eids.iter() {
                     if let Some(edge_ref) = self.edges.get(eid) {
                         let edge = edge_ref.value();
+                        if self.get_u32(&edge.to) != Some(curr_u32) {
+                            continue;
+                        }
+                        if !Self::is_currently_visible(
+                            &edge.valid_from,
+                            &edge.valid_to,
+                            &None,
+                            false,
+                            &now,
+                        ) {
+                            continue;
+                        }
+                        if let Some(state) = query_budget.as_deref_mut() {
+                            state.edge()?;
+                        }
+                        if let Some(prev_u32) = self.get_u32(&edge.from) {
+                            if let Some(node) = self.nodes.get(&prev_u32) {
+                                let hydrated = self.hydrated_node(prev_u32, node.value());
+                                if !Self::is_node_visible(&hydrated, &None, false, &now) {
+                                    continue;
+                                }
+                            }
+                        }
                         edges.push(edge.clone());
                         if let Some(prev_u32) = self.get_u32(&edge.from) {
                             if let std::collections::hash_map::Entry::Vacant(e) =
                                 nodes.entry(prev_u32)
                             {
                                 if let Some(node) = self.nodes.get(&prev_u32) {
-                                    e.insert(self.hydrated_node(prev_u32, node.value()));
+                                    let hydrated = self.hydrated_node(prev_u32, node.value());
+                                    if !Self::is_node_visible(&hydrated, &None, false, &now) {
+                                        continue;
+                                    }
+                                    if let Some(state) = query_budget.as_deref_mut() {
+                                        state.node()?;
+                                    }
+                                    e.insert(hydrated);
                                     hops_served = hops_served.max(curr_depth + 1);
                                     queue.push_back((prev_u32, curr_depth + 1));
                                 }
@@ -10144,6 +12177,19 @@ impl Storage {
             }
         }
 
+        if let Some(state) = query_budget {
+            for _ in &final_nodes {
+                state.row()?;
+            }
+            for _ in &edges {
+                state.row()?;
+            }
+            for _ in &super_nodes {
+                state.row()?;
+            }
+            state.check_deadline()?;
+        }
+
         Ok(ContextPackage {
             nodes: final_nodes,
             edges,
@@ -10168,11 +12214,33 @@ impl Storage {
     /// `CoverageReport::ceiling_hit` reports a fact rather than merely
     /// "traversal stopped here".
     fn has_edge_beyond(&self, u32_id: u32, included: &HashMap<u32, NodeOutput>) -> bool {
+        let now = Utc::now().to_rfc3339();
         if let Some(eids) = self.out_idx.get(&u32_id) {
             for eid in eids.iter() {
                 if let Some(edge_ref) = self.edges.get(eid) {
-                    if let Some(next) = self.get_u32(&edge_ref.value().to) {
-                        if !included.contains_key(&next) {
+                    let edge = edge_ref.value();
+                    if self.get_u32(&edge.from) != Some(u32_id)
+                        || !Self::is_currently_visible(
+                            &edge.valid_from,
+                            &edge.valid_to,
+                            &None,
+                            false,
+                            &now,
+                        )
+                    {
+                        continue;
+                    }
+                    if let Some(next) = self.get_u32(&edge.to) {
+                        if !included.contains_key(&next)
+                            && self
+                                .nodes
+                                .get(&next)
+                                .map(|node| {
+                                    let hydrated = self.hydrated_node(next, node.value());
+                                    Self::is_node_visible(&hydrated, &None, false, &now)
+                                })
+                                .unwrap_or(true)
+                        {
                             return true;
                         }
                     }
@@ -10182,8 +12250,29 @@ impl Storage {
         if let Some(eids) = self.in_idx.get(&u32_id) {
             for eid in eids.iter() {
                 if let Some(edge_ref) = self.edges.get(eid) {
-                    if let Some(prev) = self.get_u32(&edge_ref.value().from) {
-                        if !included.contains_key(&prev) {
+                    let edge = edge_ref.value();
+                    if self.get_u32(&edge.to) != Some(u32_id)
+                        || !Self::is_currently_visible(
+                            &edge.valid_from,
+                            &edge.valid_to,
+                            &None,
+                            false,
+                            &now,
+                        )
+                    {
+                        continue;
+                    }
+                    if let Some(prev) = self.get_u32(&edge.from) {
+                        if !included.contains_key(&prev)
+                            && self
+                                .nodes
+                                .get(&prev)
+                                .map(|node| {
+                                    let hydrated = self.hydrated_node(prev, node.value());
+                                    Self::is_node_visible(&hydrated, &None, false, &now)
+                                })
+                                .unwrap_or(true)
+                        {
                             return true;
                         }
                     }
@@ -10205,6 +12294,7 @@ impl Storage {
         let _verifying_key_bytes = storage.verifying_key.to_bytes().to_vec();
 
         tokio::spawn(async move {
+            let mut sync_cursors: HashMap<String, u64> = HashMap::new();
             let socket = match tokio::net::UdpSocket::bind("0.0.0.0:0").await {
                 Ok(s) => {
                     let addr = match s.local_addr() {
@@ -10237,6 +12327,7 @@ impl Storage {
                 tokio::select! {
                     _ = heartbeat_interval.tick() => {
                         let msg = GossipMessage::Heartbeat {
+                            schema_version: SCHEMA_VERSION,
                             peer_id: storage.local_peer_id.clone(),
                             merkle_root: storage.get_merkle_root(),
                             logical_time: storage.get_logical_clock(),
@@ -10251,7 +12342,7 @@ impl Storage {
                         if let Ok((len, addr)) = result {
                             if let Ok(msg) = serde_json::from_slice::<GossipMessage>(&buf[..len]) {
                                 match msg {
-                                    GossipMessage::Heartbeat { peer_id: p_id, merkle_root, logical_time: _, port, verifying_key } => {
+                                    GossipMessage::Heartbeat { schema_version, peer_id: p_id, merkle_root, logical_time: _, port, verifying_key } => {
                                         if p_id != storage.local_peer_id {
                                             let peer_addr = format!("{}:{}", addr.ip(), port);
                                             storage.peers.insert(p_id.clone(), SyncPeer {
@@ -10261,8 +12352,13 @@ impl Storage {
                                                 verifying_key,
                                             });
 
+                                            if schema_version != SCHEMA_VERSION {
+                                                eprintln!("SYNC_UPGRADE_REQUIRED: peer {} supports schema {}",p_id,schema_version);
+                                                continue;
+                                            }
                                             if merkle_root != storage.get_merkle_root() {
                                                 let req = GossipMessage::PullRequest {
+                                                    schema_version:SCHEMA_VERSION,
                                                     from_clock: storage.get_logical_clock(),
                                                     target_peer_id: storage.local_peer_id.clone(),
                                                     // WP-1.2: per-peer responder-domain
@@ -10270,7 +12366,7 @@ impl Storage {
                                                     // bootstrap channel (WP-1.3); until
                                                     // then requesters stay on the
                                                     // Lamport cursor.
-                                                    from_commit_seq: None,
+                                                    from_commit_seq: Some(*sync_cursors.get(&p_id).unwrap_or(&0)),
                                                 };
                                                 if let Ok(data) = serde_json::to_vec(&req) {
                                                     let _ = socket.send_to(&data, peer_addr).await;
@@ -10278,14 +12374,20 @@ impl Storage {
                                             }
                                         }
                                     }
-                                    GossipMessage::PullRequest { from_clock, target_peer_id, from_commit_seq } => {
+                                    GossipMessage::PullRequest { schema_version, from_clock, target_peer_id, from_commit_seq } => {
+                                        if schema_version != SCHEMA_VERSION {
+                                            if let Ok(data)=serde_json::to_vec(&GossipMessage::UpgradeRequired{schema_version:SCHEMA_VERSION}) {
+                                                let _=socket.send_to(&data,addr).await;
+                                            }
+                                            continue;
+                                        }
                                         // WP-1.2 (ADR D4): a commit_seq cursor below our
                                         // history horizon cannot be served by delta —
                                         // answer BeyondHorizon so the requester abandons
                                         // delta-pull (bootstrap channel lands in WP-1.3).
                                         if let Some(cursor) = from_commit_seq {
                                             let horizon = storage.history_horizon();
-                                            if cursor < horizon {
+                                            if cursor != 0 && cursor < horizon {
                                                 if let Some(reply_addr) = storage.peers.get(&target_peer_id).map(|p| p.addr.clone()) {
                                                     if let Ok(data) = serde_json::to_vec(&GossipMessage::BeyondHorizon { horizon }) {
                                                         let _ = socket.send_to(&data, reply_addr).await;
@@ -10301,30 +12403,34 @@ impl Storage {
                                         // clock advances on apply, so the next heartbeat round
                                         // pulls the remainder until the roots stop differing.
                                         if let Some(reply_addr) = storage.peers.get(&target_peer_id).map(|p| p.addr.clone()) {
-                                            let mut batch = Vec::new();
-                                            let mut bytes = 0usize;
-                                            let events = match from_commit_seq {
-                                                // Frame-cursor path (WP-1.2): serves every
-                                                // frame incl. relational-only transactions.
-                                                Some(cursor) => storage.events_since_seq(cursor),
-                                                None => storage.events_since(from_clock),
-                                            };
-                                            for ev in events {
-                                                let sz = serde_json::to_vec(&ev).map(|v| v.len()).unwrap_or(0) + 2;
-                                                if !batch.is_empty() && bytes + sz > 60_000 { break; }
-                                                bytes += sz;
-                                                batch.push(ev);
-                                            }
-                                            if !batch.is_empty() {
-                                                if let Ok(data) = serde_json::to_vec(&GossipMessage::PushDelta { events: batch }) {
-                                                    let _ = socket.send_to(&data, reply_addr).await;
+                                            let _=from_clock; // v4 sync uses responder-local frame cursors.
+                                            match storage.sync_delta(from_commit_seq.unwrap_or(0)) {
+                                                Ok((events,through_seq)) if !events.is_empty() => {
+                                                    if let Ok(data)=serde_json::to_vec(&GossipMessage::PushDelta {events,source_peer_id:storage.local_peer_id.clone(),through_seq:Some(through_seq)}) {
+                                                        let _=socket.send_to(&data,reply_addr).await;
+                                                    }
                                                 }
+                                                Err(e)=> {
+                                                    let reply=GossipMessage::BootstrapRequired{reason:e.to_string()};
+                                                    if let Ok(data)=serde_json::to_vec(&reply) {
+                                                        let _=socket.send_to(&data,reply_addr).await;
+                                                    }
+                                                },
+                                                _=>{}
                                             }
                                         }
                                     }
-                                    GossipMessage::PushDelta { events } => {
-                                        let _ = storage.reconcile_state(events);
+                                    GossipMessage::PushDelta { events,source_peer_id,through_seq } => {
+                                        // No cursor advancement on a rejected signature/schema/dependency.
+                                        if events.iter().all(|e|storage.verify_event_signature(e)) {
+                                            match storage.reconcile_state(events) {
+                                                Ok(())=>if let Some(seq)=through_seq { sync_cursors.insert(source_peer_id,seq); },
+                                                Err(e)=>eprintln!("sync: {e}"),
+                                            }
+                                        }
                                     }
+                                    GossipMessage::UpgradeRequired{schema_version} => eprintln!("SYNC_UPGRADE_REQUIRED: schema {schema_version}"),
+                                    GossipMessage::BootstrapRequired{reason} => eprintln!("Sync: {reason}; bootstrap required before cursor advancement"),
                                     GossipMessage::BeyondHorizon { horizon } => {
                                         // WP-1.2 requester handling: delta-pull cannot
                                         // proceed — mark and stop. The snapshot-bootstrap
@@ -10413,10 +12519,15 @@ impl Storage {
     pub fn save_state(&self) -> Result<()> {
         self.ensure_writable()?;
         let _commit_guard = self.commit_lock.lock();
+        self.ensure_readable()?;
         self.save_state_unlocked()
     }
 
     fn save_state_unlocked(&self) -> Result<()> {
+        self.save_state_checkpoint(true)
+    }
+
+    fn save_state_checkpoint(&self, checkpoint: bool) -> Result<()> {
         self.ensure_writable()?;
         // WP-1.2 ordering (I7/I9: seal durability strictly precedes manifest
         // advance): build the live-state payload, FOLD the journal first (base
@@ -10443,7 +12554,7 @@ impl Storage {
             RetentionProfile::Full => false,
             RetentionProfile::Budget(n) => self.sealed_history_bytes() > *n,
         };
-        if should_fold {
+        if should_fold && checkpoint {
             // RCA--SLICE0-DURABILITY defect 3: a snapshot written WITHOUT a
             // journal cursor would make the next open skip tail replay
             // entirely — silently dropping every write acked after this
@@ -10562,6 +12673,7 @@ impl Storage {
                 "rerank": coll.f32_sidecar.is_some(),
                 // SQ8 calibrated-scale opt-in; absent ⇒ false (fixed scale).
                 "sq8_calibrate": coll.sq8_calibrate,
+                "definition": self.definition_for(coll),
                 // meta format version: 2 = epoch stamps (created_seq/retired_seq,
                 // GBP2 postcard — SPEC--EPOCH-HNSW §3.1); 1 = NodeMetadata.node_u32
                 // (A2, GBP1/bincode). Absent ⇒ 0 (pre-A2 String layout). Older
@@ -10655,6 +12767,15 @@ impl Storage {
             for entry in entries.flatten() {
                 let p = entry.path();
                 if p.file_name().is_some_and(|n| n == "state.json") {
+                    continue;
+                }
+                if p.file_name().is_some_and(|n| n == PROJECTION_DB_FILE) {
+                    // `projection_db` remains open for the Storage lifetime;
+                    // replacing its path would split Unix readers and writers
+                    // across inodes. `projection_snapshot` already copied the
+                    // checkpointed live file, so discard the temporary copy and
+                    // keep the live path stable.
+                    let _ = fs::remove_file(&p);
                     continue;
                 }
                 if let Some(name) = p.file_name() {
@@ -10836,6 +12957,7 @@ impl Storage {
         // Public write paths share this barrier so the captured files represent
         // one declared frontier rather than a mix of concurrent mutations.
         let _commit_guard = self.commit_lock.lock();
+        self.ensure_readable()?;
         if request.destination.exists() {
             return Err(Error::from_reason("backup destination already exists"));
         }
@@ -11116,7 +13238,7 @@ impl Storage {
                 path: staging.display().to_string(),
                 page_cache_mb: Some(16),
                 read_only: Some(false),
-                vector_dim: Some(0),
+                vector_dim: None,
                 retention: None,
             })?);
             Ok(manifest)
@@ -11502,6 +13624,7 @@ impl Storage {
     pub fn execute_batch(&self, input: BatchInput) -> Result<BatchOutput> {
         self.ensure_writable()?;
         let _commit_guard = self.commit_lock.lock();
+        self.ensure_readable()?;
 
         // 1. Validation Phase (All-or-Nothing)
         for node in &input.nodes {
@@ -11559,15 +13682,16 @@ impl Storage {
         }
 
         for args in input.edges {
+            let valid_from = args.valid_from.unwrap_or_else(|| now.to_rfc3339());
             let edge = EdgeOutput {
                 id: args.id.unwrap_or_else(|| Uuid::new_v4().to_string()),
                 from: args.from,
                 to: args.to,
                 rel: args.rel,
                 props: args.props.unwrap_or(Value::Object(Default::default())),
-                valid_from: Utc::now().to_rfc3339(),
+                valid_from,
                 valid_to: None,
-                recorded_at: Utc::now().to_rfc3339(),
+                recorded_at: now.to_rfc3339(),
                 superseded_by: None,
                 impact: args.impact,
                 caused_by: args.caused_by,
@@ -11619,10 +13743,11 @@ impl Storage {
                     .into_iter()
                     .map(|(nu, _id, emb, lang)| {
                         let e = coll.prep(emb);
-                        let aid = coll.stage(nu, &e, lang, batch_seq);
-                        (e, aid)
+                        let aid = coll.stage(nu, &e, lang, batch_seq)?;
+                        Ok((e, aid))
                     })
-                    .collect();
+                    .collect::<Result<_>>()
+                    .map_err(|e| self.durable_apply_error(batch_seq, e))?;
                 self.enqueue_batch(&coll, staged);
             }
         }
@@ -11634,6 +13759,10 @@ impl Storage {
     }
 
     pub fn perform_index_compaction(&self) -> Result<()> {
+        let _commit_guard = self.commit_lock.lock();
+        self.ensure_readable()?;
+        let _commit_guard = self.commit_lock.lock();
+        self.ensure_readable()?;
         println!("compaction: starting index compaction...");
         let start = Instant::now();
         // Drain pending HNSW inserts first — compaction reassigns arena ids, so
@@ -11868,6 +13997,8 @@ impl Storage {
     /// signal). Presence only: a re-`add_vector` superseding the same
     /// (node, collection) with a different embedding is not distinguished here.
     pub fn get_merkle_root(&self) -> String {
+        let _read_guard = self.commit_lock.lock();
+
         // Unambiguous entry encoding: each field is `u32 little-endian length ++ bytes`.
         fn entry(parts: &[&[u8]]) -> Vec<u8> {
             let mut b = Vec::new();
@@ -11878,6 +14009,14 @@ impl Storage {
             b
         }
         let mut entries: Vec<Vec<u8>> = Vec::with_capacity(self.nodes.len() + self.edges.len());
+        for c in self.collections.iter() {
+            let d = self.definition_for(c.value());
+            entries.push(entry(&[
+                b"C",
+                d.name.as_bytes(),
+                d.definition_hash.as_bytes(),
+            ]));
+        }
         for e in self.nodes.iter() {
             let n = e.value();
             let t = n.clock.time.to_le_bytes();
@@ -11929,6 +14068,9 @@ impl Storage {
     /// clock, so it is time-filterable and included in anti-entropy pull deltas.
     fn event_time(e: &Event) -> Option<u32> {
         match e {
+            Event::CollectionDefinition(d) => Some(d.clock.time),
+            Event::CollectionMaterialization(m) => Some(m.definition.clock.time),
+            Event::VectorMaterialized(v) => Some(v.clock.time),
             Event::Node(n) => Some(n.clock.time),
             Event::Edge(ed) => Some(ed.clock.time),
             Event::Batch(v) => v.iter().filter_map(Self::event_time).max(),
@@ -11957,6 +14099,8 @@ impl Storage {
     /// entries deserialize to a zero clock and are not `> from_clock`, so they don't
     /// re-sync on their own — re-`add_vector` re-stamps them with a live clock.)
     pub fn events_since(&self, from_clock: u32) -> Vec<SignedEvent> {
+        let _read_guard = self.commit_lock.lock();
+
         let mut out: Vec<(u32, SignedEvent)> = Vec::new();
         self.scan_journal(None, true, &mut |_, se| {
             if let Some(t) = Self::event_time(&se.event) {
@@ -11966,7 +14110,76 @@ impl Storage {
             }
         });
         out.sort_by_key(|(t, _)| *t);
-        out.into_iter().map(|(_, se)| se).collect()
+        self.with_collection_dependencies(out.into_iter().map(|(_, se)| se).collect())
+    }
+
+    fn with_collection_dependencies(&self, events: Vec<SignedEvent>) -> Vec<SignedEvent> {
+        if events.is_empty() {
+            return events;
+        }
+        let mut out = Vec::new();
+        let mut defs: Vec<_> = self
+            .collections
+            .iter()
+            .map(|c| self.definition_for(c.value()))
+            .collect();
+        defs.sort_by(|a, b| a.name.cmp(&b.name));
+        for mut d in defs {
+            // A bootstrap definition is a derived assertion of current schema,
+            // not a rewritten original history frame.
+            d.provenance = "bootstrap".into();
+            out.push(self.sign_event(&Event::CollectionDefinition(d)));
+        }
+        out.extend(events);
+        out
+    }
+
+    fn sync_delta(&self, cursor: u64) -> Result<(Vec<SignedEvent>, u64)> {
+        let _guard = self.commit_lock.lock();
+        self.ensure_readable()?;
+        let mut events = Vec::new();
+        let mut through = cursor;
+        let mut bytes = 0;
+        let mut full = false;
+        let mut oversized = false;
+        self.scan_journal((cursor != 0).then_some(cursor), false, &mut |seq, e| {
+            if full {
+                return;
+            }
+            let size = serde_json::to_vec(&e)
+                .map(|v| v.len())
+                .unwrap_or(usize::MAX);
+            if size > 40_000 {
+                oversized = true;
+                full = true;
+                return;
+            }
+            if bytes + size > 40_000 && seq != through {
+                full = true;
+                return;
+            }
+            // A folded base shares a single sequence: never cut that sequence
+            // in half and advance past unsent members.
+            bytes += size;
+            events.push(e);
+            through = seq;
+        });
+        if oversized {
+            return Err(Error::from_reason(
+                "SYNC_BOOTSTRAP_REQUIRED: frame exceeds datagram budget",
+            ));
+        }
+        let events = self.with_collection_dependencies(events);
+        if serde_json::to_vec(&events)
+            .map_err(|e| Error::from_reason(e.to_string()))?
+            .len()
+            > 55_000
+        {
+            return Err(Error::from_reason(
+                "SYNC_BOOTSTRAP_REQUIRED: base/dependencies exceed datagram budget",
+            ));
+        }
+        Ok((events, through))
     }
 
     /// WP-1.2 (ADR D4): serve frames newer than a responder-domain commit_seq
@@ -11974,6 +14187,8 @@ impl Storage {
     /// serves relational-only transactions (every frame has a seq), closing the
     /// `event_time = None` gap. Frame order IS local order, so no re-sort.
     pub fn events_since_seq(&self, from_seq: u64) -> Vec<SignedEvent> {
+        let _read_guard = self.commit_lock.lock();
+
         // Cursor 0 = the peer has nothing, so send everything (including a base
         // segment folded at seq 0); any other value is an exclusive cursor.
         let cursor = if from_seq == 0 { None } else { Some(from_seq) };
@@ -11981,7 +14196,7 @@ impl Storage {
         self.scan_journal(cursor, false, &mut |_, se| {
             out.push(se);
         });
-        out
+        self.with_collection_dependencies(out)
     }
 
     /// Reconstruct a live node's primary embedding from its collection arena, at
@@ -12015,6 +14230,7 @@ impl Storage {
     pub fn compact(&self) -> Result<()> {
         self.ensure_writable()?;
         let _commit_guard = self.commit_lock.lock();
+        self.ensure_readable()?;
         self.compact_unlocked()
     }
 
@@ -12054,6 +14270,22 @@ impl Storage {
         let now = Utc::now().to_rfc3339();
         let mut count = 0;
 
+        // Definitions and calibrated packing state precede every vector, even
+        // for empty collections. These are derived base materializations.
+        for c in self.collections.iter() {
+            let event = Event::CollectionMaterialization(CollectionMaterialization {
+                version: 1,
+                definition: self.definition_for(c.value()),
+                bq_center: c.bq_center.read().clone(),
+                sq8_scale: *c.sq8_scale.read(),
+            });
+            let json = serde_json::to_vec(&self.sign_event(&event))
+                .map_err(|e| Error::from_reason(e.to_string()))?;
+            buf.extend_from_slice(&json);
+            buf.push(b'\n');
+            count += 1;
+        }
+
         // 1. Write current live nodes. The resident node is lean (no embedding),
         //    so re-attach its vector from the arena — otherwise a WAL-only reload
         //    (no snapshot) would reconstruct the graph but lose every embedding.
@@ -12067,9 +14299,9 @@ impl Storage {
             if node.valid_to.is_none() {
                 let mut node = node.clone();
                 node.props = self.hydrated_props(*entry.key(), &node);
-                if node.embedding.is_none() {
-                    node.embedding = self.reconstruct_embedding(&node, *entry.key());
-                }
+                // Both primary and secondary vectors are emitted below with
+                // an explicit already-prepared representation.
+                node.embedding = None;
                 if let Ok(json) = serde_json::to_string(&self.sign_event(&Event::Node(node))) {
                     buf.extend_from_slice(json.as_bytes());
                     buf.push(b'\n');
@@ -12130,40 +14362,46 @@ impl Storage {
             }
         }
 
-        // 3. Carry forward live secondary vectors (Event::Vector from add_vector).
-        // Primary embeddings ride on Event::Node (written above, lossless); secondary
-        // ones live only in the WAL, and the resident arena is potentially quantized
-        // — so reconstructing them losslessly means reading the pre-compact WAL, not
-        // the arena. Keep the latest (highest-clock) vector per (node, collection)
-        // for still-live nodes; drop the rest.
-        {
-            let mut latest: HashMap<(String, Option<String>), VectorEvent> = HashMap::new();
-            // Pre-fold journal scan (segments + active; legacy too — secondary
-            // vectors may predate migration): keep the latest per (node,
-            // collection) for still-live nodes.
-            self.scan_journal(None, true, &mut |_, se| {
-                if let Event::Vector(v) = se.event {
-                    let live = self
-                        .get_u32(&v.node_id)
-                        .is_some_and(|u| self.nodes.contains_key(&u));
-                    if !live {
-                        return;
-                    }
-                    let key = (v.node_id.clone(), v.collection.clone());
-                    match latest.get(&key) {
-                        Some(prev) if prev.clock.time >= v.clock.time => {}
-                        _ => {
-                            latest.insert(key, v);
-                        }
-                    }
+        // Materialize all live vector mappings, including secondary vectors
+        // from unified transactions. Sidecar values retain exact f32 rerank.
+        for c in self.collections.iter() {
+            for mapping in c.node_to_arena.iter() {
+                let Some(node) = self.nodes.get(mapping.key()) else {
+                    continue;
+                };
+                if node.valid_to.is_some() || node.expires_at.as_ref().is_some_and(|e| now > *e) {
+                    continue;
                 }
-            });
-            for v in latest.into_values() {
-                if let Ok(json) = serde_json::to_string(&self.sign_event(&Event::Vector(v))) {
-                    buf.extend_from_slice(json.as_bytes());
-                    buf.push(b'\n');
-                    count += 1;
-                }
+                let aid = *mapping.value() as usize;
+                let meta = c.metadata.read();
+                let m = meta.get(aid).ok_or_else(|| {
+                    Error::from_reason("COLLECTION_MATERIALIZATION_FAILED: missing metadata")
+                })?;
+                let values = if let Some(sc) = &c.f32_sidecar {
+                    sc.read().row(aid).ok_or_else(|| {
+                        Error::from_reason("COLLECTION_MATERIALIZATION_FAILED: missing rerank row")
+                    })?
+                } else {
+                    let arena = c.arena.read();
+                    if m.embedding_offset.saturating_add(m.vector_dim as u64) > arena.len() as u64 {
+                        return Err(Error::from_reason(
+                            "COLLECTION_MATERIALIZATION_FAILED: truncated arena",
+                        ));
+                    }
+                    arena.f32_at(m.embedding_offset as usize, m.vector_dim as usize)
+                };
+                let event = Event::VectorMaterialized(VectorEvent {
+                    node_id: node.id.clone(),
+                    collection: Some(c.name.clone()),
+                    embedding: values.into_iter().map(|v| v as f64).collect(),
+                    lang: Some(m.lang.clone()),
+                    clock: node.clock.clone(),
+                });
+                let json = serde_json::to_vec(&self.sign_event(&event))
+                    .map_err(|e| Error::from_reason(e.to_string()))?;
+                buf.extend_from_slice(&json);
+                buf.push(b'\n');
+                count += 1;
             }
         }
 
@@ -12219,6 +14457,18 @@ impl Storage {
         // construction) is now below the horizon and unreachable by any legal
         // `tx_as_of` — sweep the overlay with the history it belonged to
         // (single destruction boundary, ADR--JOURNAL-HISTORY I6).
+        {
+            let conn = self.projection_db.lock();
+            conn.execute(
+                "DELETE FROM edge_versions WHERE tx_to IS NOT NULL AND tx_to<=?1",
+                [frontier_seq],
+            )
+            .map_err(|e| {
+                self.durable_apply_error(frontier_seq, Error::from_reason(e.to_string()))
+            })?;
+            conn.execute("UPDATE edge_versions SET tx_from=?1 WHERE tx_from<?1 AND (tx_to IS NULL OR tx_to>?1)",[frontier_seq])
+                .map_err(|e|self.durable_apply_error(frontier_seq,Error::from_reason(e.to_string())))?;
+        }
         self.edges_retired.clear();
         self.out_idx_retired.clear();
         self.in_idx_retired.clear();
@@ -12605,19 +14855,65 @@ impl Storage {
         }
     }
 
+    /// Remove replica-local receipt metadata from events ingested from peers
+    /// before replay. The signed event remains byte-for-byte intact in the WAL;
+    /// only this replica's recovery view must use its fresh local frame.
+    fn normalize_replayed_event(&self, signed_event: SignedEvent) -> Event {
+        let mut event = signed_event.event;
+        if signed_event.signer_peer_id != self.local_peer_id {
+            if let Event::Transaction(transaction) = &mut event {
+                transaction.local_frame_seq = None;
+            }
+        }
+        event
+    }
+
     /// Apply journal events into memory (`None` = full replay, `Some(f)` =
     /// tail replay past a snapshot frontier). Vectors are staged only
     /// (index=false): rehydrate_hnsw_index after load builds every index once
     /// for all recovery paths. Idempotent: LWW upserts.
     fn replay_journal(&self, from_seq: Option<u64>, include_legacy: bool) {
         self.scan_journal(from_seq, include_legacy, &mut |seq, signed_event| {
-            self.apply_replay_event(seq, signed_event.event);
+            self.apply_replay_event(seq, self.normalize_replayed_event(signed_event));
         });
     }
 
     fn apply_replay_event(&self, seq: u64, event: Event) {
+        self.apply_event_memory(seq, event, false);
+    }
+
+    fn apply_event_memory(&self, seq: u64, event: Event, index: bool) {
+        if let Some(clock) = Self::event_time(&event) {
+            self.logical_clock.fetch_max(clock, Ordering::SeqCst);
+        }
         match event {
+            Event::CollectionDefinition(d) => {
+                if self.apply_collection_definition(&d).is_err() {
+                    self.recovery_required.store(true, Ordering::SeqCst);
+                }
+            }
+            Event::CollectionMaterialization(m) => {
+                if self.apply_collection_materialization(&m).is_err() {
+                    self.recovery_required.store(true, Ordering::SeqCst);
+                }
+            }
+            Event::VectorMaterialized(v) => {
+                if self.replay_materialized_vector(&v, index, seq).is_err() {
+                    self.recovery_required.store(true, Ordering::SeqCst);
+                }
+            }
             Event::Node(n) => {
+                if self
+                    .get_u32(&n.id)
+                    .and_then(|u| self.nodes.get(&u))
+                    .is_some_and(|old| old.clock > n.clock)
+                    || self
+                        .tombstones
+                        .get(&n.id)
+                        .is_some_and(|old| old.clock >= n.clock)
+                {
+                    return;
+                }
                 let u32_id = self.get_or_intern_id(&n.id);
                 if let Some(emb) = n.embedding.clone() {
                     self.replay_vector(
@@ -12625,13 +14921,20 @@ impl Storage {
                         &n.id,
                         emb,
                         n.lang.clone().unwrap_or("en".to_string()),
-                        false,
+                        index,
                         seq,
                     );
                 }
                 self.insert_node_lean(u32_id, n);
             }
             Event::Edge(e) => {
+                if self
+                    .edges
+                    .get(&Self::edge_key(&e.id))
+                    .is_some_and(|old| old.clock > e.clock)
+                {
+                    return;
+                }
                 let u32_id = self.index_edge_internal(&e.id, &e.from, &e.to);
                 self.edges.insert(u32_id, e);
             }
@@ -12641,21 +14944,23 @@ impl Storage {
                     &v.node_id,
                     v.embedding,
                     v.lang.clone().unwrap_or_else(|| "en".to_string()),
-                    false,
+                    index,
                     seq,
                 );
             }
             Event::Batch(events) => {
                 for batch_event in events {
-                    self.apply_replay_event(seq, batch_event);
+                    self.apply_event_memory(seq, batch_event, index);
                 }
             }
             Event::RelationalSchema(_) | Event::RelationalRows { .. } => {
                 // Relational state is rebuilt by projection_sync_on_open.
             }
             Event::Transaction(transaction) => {
-                self.apply_transaction_memory(&transaction, false, seq);
-                self.txn_frontier.fetch_max(seq, Ordering::SeqCst);
+                let transaction_seq = transaction.local_frame_seq.unwrap_or(seq);
+                self.apply_transaction_memory(&transaction, index, transaction_seq);
+                self.txn_frontier
+                    .fetch_max(transaction_seq, Ordering::SeqCst);
             }
             // Durable retraction (RCA--SLICE0-DURABILITY defect 2): replay the
             // removal so a crash after the retraction ack no longer resurrects
@@ -12667,6 +14972,14 @@ impl Storage {
                 clock,
                 retracted_at,
             } => {
+                if self
+                    .get_u32(&id)
+                    .and_then(|u| self.nodes.get(&u))
+                    .is_some_and(|n| n.clock > clock)
+                    || self.tombstones.get(&id).is_some_and(|t| t.clock >= clock)
+                {
+                    return;
+                }
                 if let Some(u32_id) = self.get_u32(&id) {
                     self.retract_node_memory(&id, u32_id, seq);
                 }
@@ -12689,6 +15002,7 @@ impl Storage {
     pub fn retract_edge(&self, id: String, at: Option<String>) -> Result<Option<EdgeOutput>> {
         self.ensure_writable()?;
         let _commit_guard = self.commit_lock.lock();
+        self.ensure_readable()?;
         let ekey = Self::edge_key(&id);
         let mut edge = match self.edges.get(&ekey) {
             Some(e) => e.value().clone(),
@@ -12696,9 +15010,9 @@ impl Storage {
         };
         edge.valid_to = Some(at.unwrap_or_else(|| Utc::now().to_rfc3339()));
         edge.clock = self.next_clock(); // advance for CRDT LWW: the retraction must win
+        self.persist(&Event::Edge(edge.clone()))?;
         self.edges.insert(ekey, edge.clone());
         self.refresh_impacts(Some(vec![edge.to.clone()]));
-        self.persist(&Event::Edge(edge.clone()))?;
         Ok(Some(edge))
     }
     pub fn status_sync(&self) -> DatabaseStatus {
@@ -12742,6 +15056,9 @@ impl Storage {
     }
 
     pub fn calculate_structural_gaps(&self) -> Result<Vec<GapSuggestion>> {
+        let _read_guard = self.commit_lock.lock();
+        self.ensure_readable()?;
+
         let mut gaps = Vec::new();
         let mut cluster_centroids: HashMap<u32, Vec<f32>> = HashMap::new();
         let mut cluster_member_count: HashMap<u32, u32> = HashMap::new();
@@ -12802,6 +15119,8 @@ impl Storage {
     }
 
     pub fn get_meta_history(&self, cluster_id: u32) -> Vec<SuperNode> {
+        let _read_guard = self.commit_lock.lock();
+
         self.meta_history
             .get(&cluster_id)
             .map(|v| v.value().clone())

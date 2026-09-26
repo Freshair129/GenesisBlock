@@ -238,11 +238,10 @@ fn no_rerank_writes_no_sidecar() {
 }
 
 /// A rerank collection whose `fvec_<name>.bin` is missing on reload (partial /
-/// corrupt snapshot) degrades to quantized-only search — it must still return
-/// hits, never silently empty. SQ8's exact-match query quantizes to the same
-/// codes, so the top-1 is still correct without the sidecar.
+/// corrupt snapshot) recovers the exact sidecar from the canonical journal.
+/// The durable collection definition and nearest-neighbor result both survive.
 #[test]
-fn missing_sidecar_degrades_not_empties() {
+fn missing_sidecar_recovers_from_journal() {
     let path = fresh("test_rr_missing");
     {
         let s = open(&path);
@@ -264,9 +263,13 @@ fn missing_sidecar_degrades_not_empties() {
     // Simulate a partial/corrupt snapshot: drop the sidecar file but keep the manifest.
     fs::remove_file(Path::new(&path).join("fvec_c.bin")).unwrap();
     let s = open(&path);
+    assert!(
+        info(&s, "c").rerank,
+        "journal restores the configured sidecar"
+    );
     assert_eq!(
         top1(&s, vec![1.0, 0.0, 0.0, 0.0], "c").as_deref(),
         Some("A"),
-        "missing sidecar degrades to quantized-only search, not empty results"
+        "missing sidecar recovers the original search result from the journal"
     );
 }

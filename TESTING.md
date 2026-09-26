@@ -37,8 +37,9 @@ This suite converts historical audit findings (HNSW-not-rehydrated, edge-panic, 
 | JIT/chunk schema | `jit_chunk_schema.rs` | 7 | chunk node props, source pointers, document hierarchy, content hash |
 | MCP tools | `__test__/mcp.test.mjs` | 8 | tool listing, add_knowledge, query_hql, context retrieval, errors |
 | NAPI bindings | `__test__/sanity.test.mjs` | 3 | engineName, version, schemaVersion |
+| GenesisRAG17 worker (`genesisrag17-worker/`) | `genesisrag17-worker/test/worker.test.mjs` | 14 | MSP-mocked claim/receipt/failure cycle, native transaction intent persistence + crash recovery, pointer-replacement snapshot isolation, quality-gate WARN handling; run by the `worker-tests` job in `.github/workflows/test.yml` against the addon this package builds. The pinned `intfloat/multilingual-e5-small` snapshot is not provisioned in CI, so the subset that needs it (`modelTestOptions` in the test file) self-reports skipped rather than failed |
 
-**Total: ~300+ deterministic automated test cases across 48 Rust + 2 Node.js test files**
+**Total: ~300+ deterministic automated test cases across 48 Rust + 2 Node.js test files**, plus the 14 in `genesisrag17-worker/` (a separate package, not counted above).
 
 ## Commands
 

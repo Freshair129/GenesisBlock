@@ -1,7 +1,7 @@
 ---
-version: "0.1.0"
+version: "0.1.2"
 created_at: "2026-08-30T21:00:00+07:00,Claude Opus 5,working-tree"
-last_update: "2026-08-31T02:00:00+07:00,Claude Opus 5"
+last_update: "2026-09-10T07:45:10+07:00,ATHER"
 status: accepted
 superseded_by: null
 attributes:
@@ -12,6 +12,9 @@ attributes:
   risk: "HIGH"
   owner: "Boss (Founder)"
 ---
+
+> Current durability/history extension (2026-09-08): [approved Wave B](SPEC--WAVE-B-DURABLE-COLLECTIONS-EDGE-HISTORY.md). Collection configuration is now journal-authoritative; edge history uses replica-local version intervals. Earlier snapshot-only provisioning and current-row-only descriptions below are historical context for the original slice.
+
 
 # SPEC - Edge Projection
 
@@ -234,6 +237,16 @@ projection นี้มีไว้เพื่อ query — ตัดทิ้�
          JOIN node_labels  lo ON lo.node_u32 = e.to_u32   AND lo.label = 'CatalogOffer'
         GROUP BY m.id ORDER BY offers DESC LIMIT 10
 
+### 6.1 Snapshot lifetime invariant
+
+`projection_db` remains open for the lifetime of `Storage`. A checkpoint first
+flushes SQLite's WAL and copies the stable main file into the temporary snapshot;
+the temporary `projection.sqlite` is discarded during the swap. The live path is
+never renamed over an open connection, so Unix readers cannot pair a new main
+inode with an old `-wal`/`-shm` sidecar. `edge_projection_tests` exercises this
+invariant by writing after the initial snapshot and querying through a separate
+read-only connection on every CI operating system.
+
 ## 7. สิ่งที่ยังไม่ครอบคลุม
 
 - ไม่แตะ REST — เหมือนเดิม ผิวที่เข้าถึงจากเครือข่ายเป็นการตัดสินใจแยก
@@ -255,3 +268,11 @@ projection นี้มีไว้เพื่อ query — ตัดทิ้�
    สะกดข้อเท็จจริงเดิมด้วยวิธีที่อ่อนกว่า และ SQLite ไม่มีชนิดที่กว้างพอ
 4. **วัดก่อน merge** ตัวเลขทั้งหมดอยู่ใน §5 รวมถึงข้อที่วัดแล้วพบว่า
    `snb-bulk-ingestion` เฝ้าเรื่องนี้ไม่ได้
+
+
+## Wave B document change
+
+| Date | Change |
+|---|---|
+| 2026-09-08 | Linked the approved journal-authoritative collection and complete edge-history extension. |
+| 2026-09-10 | Kept the live SQLite projection path stable across checkpoints after the Unix read-only inode split RCA. |

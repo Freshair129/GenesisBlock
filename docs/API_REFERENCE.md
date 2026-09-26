@@ -3,6 +3,7 @@ doc_id: API_REFERENCE
 status: current
 version: generated
 owner: GenesisBlockDB Engineering
+updated: "2026-09-22"
 ---
 
 # GenesisBlockDB REST API Reference
@@ -26,6 +27,28 @@ prior corrupted file. The server is the SSOT; update this when routes change.
 >    but enforces the read-only HQL command family.
 > 2. Edge `from`/`to` are **node string ids** (e.g. `"N-…"`), not integers.
 
+## Write outcomes and recovery (Wave A)
+
+The core distinguishes rejection from a durable or uncertain write. REST retains
+its route-specific HTTP status and plain-text error body; NAPI exposes the same
+message through promise rejection. Inspect the message prefix rather than
+assuming that every non-success status means no write occurred.
+
+| Error prefix / outcome | Client action |
+|---|---|
+| Unified input/PK/unique/FK rejection | No WAL frame or graph/vector/row publication; correct the payload and retry the same transaction ID |
+| `COMMIT_OUTCOME_UNKNOWN` | The request was sent but the WAL acknowledgement failed; reopen and inspect durable state; retry the same identity only for APIs with an idempotency contract |
+| `DURABLE_COMMIT_APPLY_FAILED` | The message includes a durable frame sequence; address the underlying error and reopen to replay, rather than issuing a new mutation identity |
+| `RECOVERY_REQUIRED` | Query/write/checkpoint access is stopped on this Storage instance; reopen is required |
+
+Superseding a node retains its two-frame history. If its second write fails, the
+closing frame is already durable; this is partial durable completion, not full
+rejection. Supported query calls see a complete publication boundary, and
+concurrent reads serialize. ANN remains eventual until its existing flush or
+read-your-write barrier. Diagnostic getters are not a readiness signal during
+recovery-required state. See [Wave A](SPEC--WAVE-A-COMMIT-CORRECTNESS.md) for the
+exact boundary, tests and performance limitations.
+
 ## Routes
 
 | Method | Path | Request body | Response |
@@ -45,7 +68,7 @@ prior corrupted file. The server is the SSOT; update this when routes change.
 | POST | `/v1/relational/mutate` | `RelationalMutationBatch` | `RelationalMutationResult` |
 | POST | `/v1/relational/query` | `NamedQueryRequest` | JSON row array |
 | POST | `/v1/transaction/commit` | `GenesisTransaction` | `TransactionCommitResult` |
-| GET | `/v1/frontier` | _none_ | stable frontier `u64` |
+| GET | `/v1/frontier` | _none_ | `{ frame: u64, txn: u64 }` — durable frame and transaction lineage frontiers |
 | GET | `/v1/studio/capabilities` | _none_ | negotiated Studio protocol/features/limits |
 | GET | `/v1/studio/graph` | query `seed?`, `limit?`, `offset?`, `direction?`, `as_of?` | bounded `StudioGraphScene` without embeddings |
 | GET | `/v1/studio/entity/:entity_id` | path id | `StudioEntityInspection` without embeddings |
@@ -116,7 +139,8 @@ change existing tables, columns, or primary keys.
 ## Typed Query IR V1
 
 `POST /v1/query/ir` accepts a closed versioned envelope. The current partial implementation supports
-`operation.kind = "search"` and `operation.kind = "traverse"`. Unknown fields and unsupported
+`operation.kind = "search"`, `operation.kind = "traverse"` and target-id
+`operation.kind = "context"`. Unknown fields and unsupported
 versions return HTTP `400` with `{ "code", "message" }`; execution failures return HTTP `500`.
 
 ```json
@@ -134,8 +158,14 @@ versions return HTTP `400` with `{ "code", "message" }`; execution failures retu
 ```
 
 `search` requires exactly one of `target_id` or `query_vector`, plus `mode` and `k`. Supported modes
-are `vector` and `hybrid`; lexical mode remains planned. `GET /v1/query/ir/capabilities` is the
-runtime authority for implemented operation kinds and current bounds.
+are `vector` and `hybrid`; lexical mode remains planned and typed metadata filters are unsupported.
+Supplying a `filters` object is recognized and rejected with `QUERY_CAPABILITY_UNSUPPORTED` until a
+typed metadata contract exists.
+`context` is implemented for a target id with `tier` `H0`–`H6`, optional token `budget` and optional
+`fuzzy`; query-vector and temporal context fail closed with `QUERY_CAPABILITY_UNSUPPORTED`. Its
+`data` is the existing context packet, including `coverage`, and compressed packets carry the
+`context_truncated` warning. `GET /v1/query/ir/capabilities` is the runtime authority for implemented
+operation kinds and current bounds.
 
 ## HQL (`/v1/query/hql`, raw string body)
 
@@ -210,10 +240,24 @@ _(Searches the named collection; query length is validated against the
 collection dim — a mismatch is a typed error, not garbage neighbors.)_
 ### CollectionInfo (`/v1/collections`)
 ```jsonc
-{ "name", "model", "dim": u32, "metric": "L2|Cosine", "count": u32 }
+{
+  "name", "model", "dim": u32, "metric": "L2|Cosine", "quant",
+  "count": u32, "indexed": u32, "ef_search": u32?, "rerank": boolean,
+  "sidecar_resident_bytes": i64, "sidecar_disk_bytes": i64,
+  "arena_resident_bytes": i64, "index_lag": u32,
+  "coverage": {
+    "collection", "state": "UNVERIFIED|CATCHING_UP|READY|FAILED",
+    "source_count": u32, "indexed_count": u32, "missing_count": u32,
+    "extra_count": u32, "pending_count": u32,
+    "source_frontier": i64, "built_frontier": i64, "validated": boolean
+  }
+}
 ```
 _(Create with `POST /v1/collection/create` `{ name, model, dim, metric? }`;
-`metric` defaults to `L2`. A `default` collection always exists.)_
+`metric` defaults to `L2`. A `default` collection always exists. `coverage`
+is structural source-to-HNSW membership only; `READY` is not an exactness or
+ANN-recall claim. The core validation operation is explicit and is not yet a
+REST maintenance route.)_
 ### Attach a vector to a node (`POST /v1/vector/add`)
 ```jsonc
 { "node_id": "N-1", "collection": "code", "embedding": [f64] }

@@ -17,6 +17,8 @@
 
 #define STUDIO_SCENE_PAGE_LIMIT 500
 
+#define DEFAULT_QUERY_ADMISSION 8
+
 /*
  Opaque handle handed back to C. Wraps an `Arc<Storage>` so the engine's
  internal background threads (WAL writer, async HNSW indexer) keep their
@@ -78,9 +80,10 @@ const char *genesisdb_execute_hql(GenesisHandle *handle, const char *hql);
 
 /*
  WP-2.2: execute a versioned Typed Query IR request (`QueryIrRequest`
- JSON, contract `query-ir.v1` — supports `temporal.valid_at` and the
- replica-local `temporal.tx_as_of`). Returns the IR response envelope as a
- JSON string (free with [`genesisdb_free_string`]) or null on error.
+ JSON, contract `query-ir.v1` — supports search, traverse and target-id
+ context operations. Temporal selectors remain operation-specific and the
+ context slice rejects them explicitly. Returns the IR response envelope as
+ a JSON string (free with [`genesisdb_free_string`]) or null on error.
 
  # Safety
  `handle` must be a live handle; `json_input` a valid C string.

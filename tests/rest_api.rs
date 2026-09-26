@@ -42,6 +42,7 @@ fn app_with_dim(_name: &str, dim: Option<u32>) -> (Router, Arc<RwLock<Storage>>,
     let state = AppState {
         storage: Arc::clone(&storage),
         api_key: None,
+        query_admission: Arc::new(tokio::sync::Semaphore::new(8)),
     };
     (build_router(state), storage, dir)
 }

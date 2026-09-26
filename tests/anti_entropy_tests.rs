@@ -1,6 +1,7 @@
 // Gossip PullRequest anti-entropy (MARK XIV P5). The pull path was a no-op
 // (`// TODO`). `events_since(from_clock)` is the source side: signed WAL events
-// strictly newer than the requester's clock, sorted by logical time; a peer
+// strictly newer than the requester's clock, sorted by logical time, preceded
+// by separately signed collection bootstrap dependencies; a peer
 // applies them with `reconcile_state` and converges. Tested at the Storage API
 // level (the UDP loop just wires these two calls together).
 
@@ -113,7 +114,7 @@ fn pull_delta_converges_graph_state() {
     );
 }
 
-/// `events_since` returns only events strictly newer than the given clock.
+/// Payload events are strictly newer; schema bootstrap dependencies precede them.
 #[test]
 fn events_since_filters_by_clock() {
     let a = open(&fresh("test_ae_filter"));
@@ -122,9 +123,14 @@ fn events_since_filters_by_clock() {
     node(&a, "N2");
 
     let delta = a.events_since(mid);
-    assert_eq!(delta.len(), 1, "only the post-`mid` event is returned");
-    match &delta[0].event {
-        Event::Node(n) => assert_eq!(n.id, "N2"),
+    assert_eq!(delta.len(), 2, "one dependency and one post-`mid` event");
+    assert!(matches!(&delta[0].event, Event::CollectionDefinition(d)
+        if d.name == "default" && d.provenance == "bootstrap"));
+    match &delta[1].event {
+        Event::Node(n) => {
+            assert_eq!(n.id, "N2");
+            assert!(n.clock.time > mid);
+        }
         _ => panic!("expected the N2 node event"),
     }
 
@@ -142,8 +148,10 @@ fn events_since_seq_filters_by_frame_cursor() {
     node(&a, "S2");
 
     let delta = a.events_since_seq(mid);
-    assert_eq!(delta.len(), 1, "only the post-`mid` frame is returned");
-    match &delta[0].event {
+    assert_eq!(delta.len(), 2, "one dependency and one post-`mid` frame");
+    assert!(matches!(&delta[0].event, Event::CollectionDefinition(d)
+        if d.name == "default" && d.provenance == "bootstrap"));
+    match &delta[1].event {
         Event::Node(n) => assert_eq!(n.id, "S2"),
         other => panic!("expected the S2 node event, got {other:?}"),
     }
@@ -211,7 +219,7 @@ fn reapplying_delta_is_safe() {
 
 /// Secondary embeddings (`add_vector`) now carry a clock, so they ride in pull
 /// deltas (`events_since` used to drop them for lack of a clock). A peer that
-/// lacks the collection auto-provisions it on receive, and the synced vector
+/// lacks the collection applies its verified definition first, and the synced vector
 /// becomes searchable there.
 #[test]
 fn pull_delta_syncs_secondary_vectors() {
@@ -270,7 +278,7 @@ fn pull_delta_syncs_secondary_vectors() {
         .collect();
     assert!(
         hits.contains(&"N".to_string()),
-        "the secondary vector synced to B (collection auto-provisioned) and is searchable"
+        "the secondary vector synced to B (collection definition transferred) and is searchable"
     );
 }
 
