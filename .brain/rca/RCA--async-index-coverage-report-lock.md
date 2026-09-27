@@ -2,7 +2,7 @@
 
 ## Status / Date
 
-Root cause confirmed; fix pending / 2026-09-27.
+Root cause confirmed; fix and full CI matrix validated / 2026-09-27.
 
 ## Symptom
 
@@ -34,4 +34,6 @@ Read the HNSW point count in its own statement, letting the read guard drop befo
 
 ## Follow-up Verification
 
-The exact blocked call in the earlier Linux wave-sync timeout was not captured. Verify the full Linux suite after this fix; do not attribute that earlier run to this lock cycle without new evidence.
+- The fix reads the HNSW point count in a separate statement, releasing its read guard before `coverage_report()` reacquires the lock.
+- GitHub Actions run `36289683946` at commit `7f7aa08e38eba037d8022c74ba7d87d388483e83` passed all jobs, including full `cargo test --no-default-features` on Ubuntu, Windows, and macOS; `fmt + clippy`, documentation validation, and version consistency also passed.
+- The earlier Linux Wave B stall on PR #168 was not captured at a statement boundary. Its branch's `info()` has no `coverage_report()` call, so this RCA does not explain that separate stall.
