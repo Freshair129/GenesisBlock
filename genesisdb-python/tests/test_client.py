@@ -17,6 +17,8 @@ class GenesisClientTests(unittest.TestCase):
         self.assertEqual(result, {"nodes": [], "edges": []})
         post.assert_called_once_with(
             "http://localhost:3000/v1/query/hql",
+            headers={"Content-Type": "application/json"},
+            timeout=10.0,
             json={"query": "MATCH (n) RETURN n"},
         )
 
