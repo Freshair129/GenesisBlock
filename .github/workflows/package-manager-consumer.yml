@@ -63,6 +63,11 @@ jobs:
         run: |
           Set-ExecutionPolicy RemoteSigned -Scope CurrentUser -Force
           Invoke-RestMethod -Uri https://get.scoop.sh | Invoke-Expression
+          $scoopShims = Join-Path $env:USERPROFILE 'scoop\shims'
+          if (-not (Test-Path $scoopShims)) {
+            throw "Scoop shim directory was not created: $scoopShims"
+          }
+          Add-Content -Path $env:GITHUB_PATH -Value $scoopShims
 
       - name: Install from the public manifest URL and smoke-test the server
         shell: pwsh

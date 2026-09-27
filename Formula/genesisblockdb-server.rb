@@ -21,7 +21,9 @@ class GenesisblockdbServer < Formula
   end
 
   def install
-    binary = Dir["genesisblockdb-server-v#{version}-*/genesis-db-server"].first
+    binary = Dir["**/genesis-db-server"].first
+    odie "release archive is missing genesis-db-server" unless binary
+
     bin.install binary
   end
 
