@@ -51,7 +51,8 @@ jobs:
 
       - name: Report workflow_dispatch dry run
         if: ${{ github.event_name == 'workflow_dispatch' }}
-        run: echo "DRY RUN: wheel and sdist built and checked; PyPI publishing is enabled only for python-v* tag pushes."
+        run: |
+          echo "DRY RUN: wheel and sdist built and checked; PyPI publishing is enabled only for python-v* tag pushes."
 
       # Requires a one-time PyPI Trusted Publisher binding for this repository,
       # workflow filename, and the `pypi` GitHub Environment. No long-lived API
