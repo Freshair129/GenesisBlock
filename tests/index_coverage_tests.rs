@@ -1,3 +1,52 @@
+use genesis_block_native::{IndexCoverageReport, NodeInput, OpenOptions, Storage};
+use std::fs;
+use std::path::Path;
+
+fn fresh(name: &str) -> String {
+    let path = format!("{}/{}", env!("CARGO_TARGET_TMPDIR"), name);
+    if Path::new(&path).exists() {
+        fs::remove_dir_all(&path).unwrap();
+    }
+    path
+}
+
+fn open(path: &str) -> Storage {
+    Storage::open(OpenOptions {
+        path: path.to_string(),
+        page_cache_mb: Some(64),
+        read_only: Some(false),
+        vector_dim: Some(3),
+        retention: None,
+    })
+    .unwrap()
+}
+
+fn add(storage: &Storage, id: &str, vector: Vec<f64>) {
+    storage
+        .add_node(NodeInput {
+            id: Some(id.to_string()),
+            labels: vec![],
+            props: None,
+            embedding: Some(vector),
+            lang: None,
+            valid_from: None,
+            caused_by: None,
+            ttl: None,
+            collection: None,
+        })
+        .unwrap();
+}
+
+fn default_report(storage: &Storage) -> IndexCoverageReport {
+    storage
+        .list_collections()
+        .into_iter()
+        .find(|collection| collection.name == "default")
+        .unwrap()
+        .coverage
+}
+
+#[test]
 fn coverage_requires_explicit_validation_and_tracks_frontiers() {
     let storage = open(&fresh("index_coverage_validation"));
     eprintln!("ci-progress: coverage opened storage");
