@@ -1,6 +1,6 @@
 [package]
 name = "genesis-block-native"
-version = "0.2.5"
+version = "0.2.6"
 edition = "2021"
 description = "Genesis Block — high-performance hybrid semantic-graph engine"
 license = "MIT"
@@ -131,6 +131,11 @@ name = "genesis-db-server"
 path = "src/main.rs"
 required-features = ["bins"]
 
+[[bin]]
+name = "wave-d-quality-gate"
+path = "benches/wave_d_quality_gate.rs"
+required-features = ["bins"]
+
 [[bench]]
 name = "ldbc_lite"
 harness = false
@@ -244,5 +249,10 @@ required-features = ["bins"]
 [[bin]]
 name = "sqlite-props-audit"
 path = "benches/sqlite_props_audit.rs"
+required-features = ["bins"]
+
+[[bin]]
+name = "wave-b-replay"
+path = "benches/wave_b_replay.rs"
 required-features = ["bins"]
 

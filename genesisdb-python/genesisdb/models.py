@@ -22,9 +22,17 @@ class Edge:
     impact: Optional[float] = None
 
 @dataclass
+class CoverageReport:
+    hops_requested: int
+    hops_served: int
+    ceiling_hit: bool
+    truncated: bool
+
+@dataclass
 class ContextPackage:
     nodes: List[Node]
     edges: List[Edge]
     super_nodes: List[Dict[str, Any]]
     token_estimate: int
     reasoning_path: str
+    coverage: Optional[CoverageReport] = None

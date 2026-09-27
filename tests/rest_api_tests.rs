@@ -21,6 +21,126 @@ use tower::ServiceExt;
 // Helpers
 // ---------------------------------------------------------------------------
 
+#[tokio::test]
+async fn wave_b_collection_validation_and_edge_history_parity() {
+    let dir = TempDir::new().unwrap();
+    let storage = Storage::open(OpenOptions {
+        path: dir.path().to_string_lossy().into_owned(),
+        page_cache_mb: Some(16),
+        read_only: Some(false),
+        vector_dim: Some(2),
+        retention: Some("full".into()),
+    })
+    .unwrap();
+    let storage = Arc::new(RwLock::new(storage));
+    let app = build_router(AppState {
+        storage: storage.clone(),
+        api_key: None,
+        query_admission: Arc::new(tokio::sync::Semaphore::new(8)),
+    });
+    let (status, _) = post_json(
+        &app,
+        "/v1/collection/create",
+        json!({"name":"bad","model":"m","dim":65537}),
+    )
+    .await;
+    assert_eq!(status, StatusCode::BAD_REQUEST);
+    assert_eq!(storage.read().stable_frontier(), 0);
+    let (status, _) = post_json(
+        &app,
+        "/v1/collection/create",
+        json!({"name":"empty","model":"m","dim":2,"metric":"cosine","quant":"f16","ef_search":123}),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+    let (_, collections) = get_json(&app, "/v1/collections").await;
+    assert!(collections
+        .as_array()
+        .unwrap()
+        .iter()
+        .any(|c| c["name"] == "empty" && c["ef_search"] == 123));
+    for id in ["A", "B", "C", "D"] {
+        assert_eq!(
+            post_json(&app, "/v1/node/add", json!({"id":id,"labels":[]}))
+                .await
+                .0,
+            StatusCode::OK
+        );
+    }
+    assert_eq!(
+        post_json(
+            &app,
+            "/v1/edge/add",
+            json!({"id":"e","from":"A","to":"B","rel":"R"})
+        )
+        .await
+        .0,
+        StatusCode::OK
+    );
+    let first = storage.read().stable_frontier();
+    assert_eq!(
+        post_json(
+            &app,
+            "/v1/edge/add",
+            json!({"id":"e","from":"C","to":"D","rel":"R"})
+        )
+        .await
+        .0,
+        StatusCode::OK
+    );
+    let query = json!({"contract_version":"query-ir.v1","request_id":"wave-b","operation":{"kind":"traverse","seed_id":"A","depth":1,"relations":["R"],"direction":"out"},"temporal":{"tx_as_of":first}});
+    let (status, body) = post_json(&app, "/v1/query/ir", query).await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(body["data"][0]["node"]["id"], "B");
+    assert_eq!(
+        storage.read().query_ir_capabilities()["collection_definition"]["durable"],
+        true
+    );
+}
+
+#[tokio::test]
+async fn wave_c_core_query_and_batch_contract_reaches_rest_surface() {
+    let (app, _dir) = make_app();
+
+    let (status, _) = post_json(
+        &app,
+        "/v1/search/hybrid",
+        json!({"query_vector": [], "k": 0}),
+    )
+    .await;
+    assert_eq!(
+        status,
+        StatusCode::INTERNAL_SERVER_ERROR,
+        "REST must expose the core k validation rather than silently returning an empty page"
+    );
+
+    for id in ["wave-c-a", "wave-c-b"] {
+        assert_eq!(
+            post_json(&app, "/v1/node/add", json!({"id": id, "labels": []}))
+                .await
+                .0,
+            StatusCode::OK
+        );
+    }
+    let (status, body) = post_json(
+        &app,
+        "/v1/batch",
+        json!({
+            "nodes": [],
+            "edges": [{
+                "id": "wave-c-edge",
+                "from": "wave-c-a",
+                "to": "wave-c-b",
+                "rel": "LINK",
+                "valid_from": "2020-01-02T03:04:05+07:00"
+            }]
+        }),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(body["edges"][0]["valid_from"], "2020-01-02T03:04:05+07:00");
+}
+
 fn make_app() -> (Router, TempDir) {
     let dir = TempDir::new().unwrap();
     let storage = Storage::open(OpenOptions {
@@ -34,6 +154,7 @@ fn make_app() -> (Router, TempDir) {
     let state = AppState {
         storage: Arc::new(RwLock::new(storage)),
         api_key: None,
+        query_admission: Arc::new(tokio::sync::Semaphore::new(8)),
     };
     (build_router(state), dir)
 }
@@ -51,6 +172,7 @@ fn make_app_with_key(key: &str) -> (Router, TempDir) {
     let state = AppState {
         storage: Arc::new(RwLock::new(storage)),
         api_key: Some(key.to_string()),
+        query_admission: Arc::new(tokio::sync::Semaphore::new(8)),
     };
     (build_router(state), dir)
 }
@@ -310,6 +432,18 @@ async fn test_status_exposes_quant_ops() {
         entry["index_lag"].is_u64(),
         "per-collection index_lag must be a number: {}",
         entry["index_lag"]
+    );
+    assert!(
+        entry["coverage"].is_object(),
+        "per-collection structural coverage must be present"
+    );
+    assert!(
+        entry["coverage"]["state"].is_string(),
+        "coverage state must be explicit"
+    );
+    assert!(
+        entry["coverage"]["validated"].is_boolean(),
+        "coverage validation flag must be explicit"
     );
 }
 
@@ -1203,7 +1337,20 @@ async fn test_query_ir_capabilities_report_partial_v1_support() {
     assert_eq!(body["implementation_status"], "partial");
     assert_eq!(body["operations"]["search"], "implemented");
     assert_eq!(body["operations"]["traverse"], "implemented");
-    assert_eq!(body["operations"]["context"], "planned");
+    assert_eq!(body["operations"]["context"], "implemented");
+    assert_eq!(
+        body["operation_details"]["context"]["target_id"],
+        "implemented"
+    );
+    assert_eq!(
+        body["operation_details"]["search"]["filters"],
+        "unsupported"
+    );
+    assert_eq!(body["temporal"]["valid_at_selector"], "rfc3339_normalized");
+    assert_eq!(
+        body["query_correctness"]["filtered_ann"],
+        "eligibility_refill"
+    );
 }
 
 // ---------------------------------------------------------------------------

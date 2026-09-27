@@ -1,0 +1,223 @@
+{
+  "fixture_manifest_version": "uee-hql2.p3.fixtures.v1",
+  "contract_freeze": "docs/contracts/UEE-HQL2-CONTRACT-FREEZE-2026-09-22.md",
+  "status": "candidate",
+  "expected_status": "candidate",
+  "engine_evidence_status": "not_run_engine",
+  "current_boundaries": [
+    "query-ir.v1",
+    "hql.v1",
+    "/v1/query/hql"
+  ],
+  "candidate_boundaries": [
+    "genesis.api.v2",
+    "query-ir.v2",
+    "hql.v2"
+  ],
+  "provenance": [
+    "docs/adr/ADR--GENESISDB-UEE-HQL2-STAGED-ADOPTION.md",
+    "docs/SPEC--GENESISDB-TYPED-QUERY-IR-V1.md",
+    "docs/SPEC--HQL-V1.md",
+    "extracted Blueprint/contracts/query-request.schema.json",
+    "extracted Blueprint/contracts/query-result.schema.json",
+    "extracted Blueprint/contracts/error.schema.json"
+  ],
+  "fixtures": [
+    {
+      "id": "P3-CURRENT-001",
+      "kind": "current_query_ir_v1_envelope",
+      "boundary": "current",
+      "engine_evidence_status": "not_run_engine",
+      "expected_status": "candidate",
+      "request": {
+        "contract_version": "query-ir.v1",
+        "request_id": "p3-current-001",
+        "namespace": "example_client",
+        "operation": {
+          "kind": "traverse",
+          "seed_id": "entity-42",
+          "depth": 2,
+          "relations": ["depends_on"],
+          "direction": "out"
+        }
+      },
+      "expected": {
+        "classification": "current_boundary_preserved",
+        "must_not_upgrade_to": "query-ir.v2"
+      },
+      "source_refs": [
+        "docs/SPEC--GENESISDB-TYPED-QUERY-IR-V1.md#3-request-envelope",
+        "docs/SPEC--GENESISDB-TYPED-QUERY-IR-V1.md#4-v1-operation-union"
+      ]
+    },
+    {
+      "id": "P3-COMPAT-002",
+      "kind": "rest_hql_raw_object_equivalence",
+      "boundary": "current",
+      "engine_evidence_status": "not_run_engine",
+      "expected_status": "candidate",
+      "route": "/v1/query/hql",
+      "representations": [
+        {
+          "label": "raw_json_string",
+          "body": "SEARCH [0.1,0.2,0.3] K 3"
+        },
+        {
+          "label": "query_object",
+          "body": {
+            "query": "SEARCH [0.1,0.2,0.3] K 3"
+          }
+        }
+      ],
+      "expected": {
+        "normalization": "same_logical_hql_request",
+        "semantic_comparison": "required",
+        "implementation_claim": "none"
+      },
+      "source_refs": [
+        "docs/SPEC--HQL-V1.md#11-surfaces-one-funnel",
+        "docs/adr/ADR--GENESISDB-UEE-HQL2-STAGED-ADOPTION.md#hql-ir-and-planner-boundary"
+      ]
+    },
+    {
+      "id": "P3-CANDIDATE-003",
+      "kind": "blueprint_v2_hql_request",
+      "boundary": "candidate",
+      "engine_evidence_status": "not_run_engine",
+      "expected_status": "candidate",
+      "request": {
+        "contract_version": "genesis.api.v2",
+        "request_id": "p3-candidate-003",
+        "namespace": "kb",
+        "language_version": "hql.v2",
+        "hql": "USE kb FROM NODES Document AS d |> RETURN d.id;",
+        "params": {}
+      },
+      "expected": {
+        "classification": "candidate_only",
+        "current_runtime_action": "do_not_silently_enable"
+      },
+      "source_refs": [
+        "extracted Blueprint/contracts/query-request.schema.json",
+        "extracted Blueprint/examples/query-request.json"
+      ]
+    },
+    {
+      "id": "P3-NEGATIVE-004",
+      "kind": "unsupported_planner_explain_fail_closed",
+      "boundary": "candidate",
+      "engine_evidence_status": "not_run_engine",
+      "expected_status": "candidate",
+      "request": {
+        "contract_version": "genesis.api.v2",
+        "request_id": "p3-negative-004",
+        "namespace": "kb",
+        "language_version": "hql.v2",
+        "hql": "EXPLAIN SELECT * FROM Document;",
+        "params": {}
+      },
+      "expected": {
+        "classification": "reject_or_explicitly_unsupported",
+        "silent_planner_execution": false,
+        "required_follow_up": "separate_approved_planner_adr"
+      },
+      "source_refs": [
+        "docs/adr/ADR--GENESISDB-UEE-HQL2-STAGED-ADOPTION.md#hql-ir-and-planner-boundary",
+        "docs/IMPLEMENTATION-PLAN--UEE-HQL2-ORCHESTRATION-2026-09-22.md#task-definitions"
+      ]
+    },
+    {
+      "id": "P3-NEGATIVE-005",
+      "kind": "unknown_field_and_mixed_request_rejection",
+      "boundary": "candidate",
+      "engine_evidence_status": "not_run_engine",
+      "expected_status": "candidate",
+      "request": {
+        "contract_version": "genesis.api.v2",
+        "request_id": "p3-negative-005",
+        "namespace": "kb",
+        "language_version": "hql.v2",
+        "hql": "USE kb FROM NODES Document AS d |> RETURN d.id;",
+        "ir": {
+          "contract_version": "query-ir.v2",
+          "root": "scan"
+        },
+        "params": {},
+        "unknown_field": true
+      },
+      "expected": {
+        "classification": "validation_failed",
+        "reason_codes": [
+          "MIXED_HQL_AND_IR",
+          "UNKNOWN_FIELD"
+        ],
+        "fail_closed": true
+      },
+      "source_refs": [
+        "extracted Blueprint/contracts/query-request.schema.json",
+        "docs/SPEC--GENESISDB-TYPED-QUERY-IR-V1.md#2-contract-principles"
+      ]
+    },
+    {
+      "id": "P3-RESULT-006",
+      "kind": "result_completeness_and_error_outcome",
+      "boundary": "candidate",
+      "engine_evidence_status": "not_run_engine",
+      "expected_status": "candidate",
+      "expected_result": {
+        "request_id": "p3-result-006",
+        "snapshot": {
+          "database_id": "fixture-db",
+          "tx": "12",
+          "valid_at": "2026-09-22T00:00:00Z",
+          "catalog_generation": "4",
+          "policy_version": "1"
+        },
+        "columns": [
+          {
+            "name": "id",
+            "type": "utf8",
+            "nullable": false
+          }
+        ],
+        "rows": [
+          {
+            "id": "entity-42"
+          }
+        ],
+        "semantics": {
+          "candidate_search": "approximate",
+          "distance_fidelity": "original",
+          "index_coverage": "lagging",
+          "scope": "whole_input"
+        },
+        "completeness": {
+          "status": "truncated",
+          "reason": "max_result_rows",
+          "eligible_count_known": false
+        },
+        "index_frontiers": {
+          "default": "11"
+        },
+        "cursor": null
+      },
+      "expected_error": {
+        "code": "QUERY_RESOURCE_LIMIT_EXCEEDED",
+        "stage": "execution",
+        "message": "result row budget exceeded",
+        "retryable": true,
+        "outcome": "none"
+      },
+      "expected": {
+        "row_count_is_not_completeness_proof": true,
+        "approximation_and_lag_are_disclosed": true,
+        "durable_publication_is_not_inferred": true
+      },
+      "source_refs": [
+        "extracted Blueprint/contracts/query-result.schema.json",
+        "extracted Blueprint/contracts/error.schema.json",
+        "docs/SPEC--GENESISDB-TYPED-QUERY-IR-V1.md#5-result-envelope"
+      ]
+    }
+  ]
+}

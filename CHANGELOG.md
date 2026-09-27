@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed - deployed benchmark fixture compatibility
+
+GenesisRAG17 workers now accept the deployed per-record `benchmarks[].queries`
+fixture shape as well as the legacy root `queries` shape. Benchmark rows are
+scoped to the candidate generation before metrics are calculated, preserving
+the fixture contract used by the production-like Compose worker.
+
+### Fixed - worker lock recovery after container restart
+
+GenesisRAG17 worker locks now record the process start identity. A restarted
+container that reuses PID 1 can recover a legacy lock from the previous process
+instance, while a live same-instance owner remains rejected. The worker suite
+covers both cases.
+
+## [0.2.6] - 2026-09-09
+
 ### Added - read-only SQL over the relational projection
 
 `Storage::query_sql` and the `querySql` NAPI method run caller-supplied SELECT

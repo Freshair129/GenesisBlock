@@ -159,6 +159,42 @@ fn query_ir_rejects_unknown_version_and_fields() {
 }
 
 #[test]
+fn query_ir_rejects_unsupported_filter_and_lexical_modes() {
+    let (storage, _dir) = storage(3);
+
+    let filter_error = storage
+        .execute_query_ir_json(json!({
+            "contract_version": "query-ir.v1",
+            "request_id": "req-filter",
+            "operation": {
+                "kind": "search",
+                "mode": "vector",
+                "query_vector": [1.0, 0.0, 0.0],
+                "filters": {"label": "ENTITY"},
+                "k": 1
+            }
+        }))
+        .unwrap_err()
+        .to_string();
+    assert!(filter_error.starts_with("QUERY_CAPABILITY_UNSUPPORTED:"));
+
+    let lexical_error = storage
+        .execute_query_ir_json(json!({
+            "contract_version": "query-ir.v1",
+            "request_id": "req-lexical",
+            "operation": {
+                "kind": "search",
+                "mode": "lexical",
+                "query_vector": [1.0, 0.0, 0.0],
+                "k": 1
+            }
+        }))
+        .unwrap_err()
+        .to_string();
+    assert!(lexical_error.starts_with("QUERY_CAPABILITY_UNSUPPORTED:"));
+}
+
+#[test]
 fn hql_and_query_ir_preserve_search_and_traverse_results() {
     let (storage, _dir) = storage(3);
     storage

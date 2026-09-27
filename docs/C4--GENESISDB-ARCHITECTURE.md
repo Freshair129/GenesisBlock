@@ -2,10 +2,10 @@
 doc_id: C4--GENESISDB-ARCHITECTURE
 type: architecture-index
 status: current
-version: 0.1.10b
+version: 0.1.12b
 owner: GenesisBlockDB Architecture
 created_at: 2026-06-13T22:50:11+07:00,ATHER,9b1ced3
-last_update: 2026-08-14T04:01:51+07:00,ATHER
+last_update: "2026-09-08T03:25:41+07:00,ATHER"
 attributes:
   domain: architecture
   scope: repository
@@ -13,6 +13,10 @@ attributes:
   model: C4
   ssot_role: architecture-index
   authoritative_parent: docs/MASTER-SPEC--GENESIS-DB.md
+related_docs:
+  - docs/ADR--GENESISRAG17-SEPARATE-WORKER-PUBLICATION.md
+  - docs/FLOW--GENESISRAG17-PIPELINE.md
+  - docs/GENESISRAG17-EXTENSION-MAP.md
 ---
 
 # C4--GENESISDB-ARCHITECTURE
@@ -89,6 +93,7 @@ flowchart LR
 | Rust Core Engine | Unified lifecycle, signed WAL, SQLite projection, native graph/vector indexes, HQL compatibility, reasoning, CRDT, consensus primitives | `src/lib.rs`, `src/query/*` | `MASTER-SPEC--GENESIS-DB.md`, unified-boundary spec, feature specs, ADRs |
 | Axum REST Server | HTTP API for bulk ingest, HQL, node/edge mutation, search, context, status | `src/main.rs`, `src/router.rs` | `docs/API_REFERENCE.md` |
 | N-API Package | Native Node/TypeScript bindings over Rust core | `src/lib.rs`, `index.d.ts`, `index.js` | `docs/API_REFERENCE.md`, NPM package metadata |
+| GenesisRAG17 TEST worker | Separate client integration process for physical Stage 13/15/16 writes, six-lane readback, publication and loopback query | `genesisrag17-worker/` | `docs/ADR--GENESISRAG17-SEPARATE-WORKER-PUBLICATION.md`, `docs/FLOW--GENESISRAG17-PIPELINE.md` |
 | MCP Server | Tool interface for LLM clients | `mcp/server.js` | `docs/MCP-GUIDE.md`, `docs/SPEC--MCP-SERVER.md` |
 | Python SDK | Python REST client | `genesisdb-python/genesisdb/client.py` | `docs/PYTHON-SDK-GUIDE.md`, `docs/SPEC--PYTHON-SDK.md` |
 | Go SDK | Go REST client | `genesisdb-go/client.go` | `docs/SPEC--GO-SDK.md` |
@@ -147,9 +152,9 @@ flowchart TB
 
 | Component | Responsibility | Source / Entry Points | Related Docs |
 |---|---|---|---|
-| Storage Model | One operational boundary over signed WAL, SQLite projection, native snapshots, replay/recovery, and embedded opaque backup/clean-target restore | `src/lib.rs` | master spec, unified-boundary spec, SQLite substrate ADR, `SPEC--GENESISDB-BACKUP-RESTORE-U9` |
+| Storage Model | One operational boundary over signed WAL, SQLite projection, native snapshots, replay/recovery, commit publication and embedded opaque backup/clean-target restore | `src/lib.rs` | master spec, unified-boundary spec, SQLite substrate ADR, `SPEC--GENESISDB-BACKUP-RESTORE-U9`, [Wave A commit contract](SPEC--WAVE-A-COMMIT-CORRECTNESS.md) |
 | Relational Projection | Paged node properties, normalized labels, versioned app schemas, typed mutation batches and bounded named joins; SQLite remains a WAL-rebuildable internal projection | `src/lib.rs` (`projection_*`, `register_relational_schema`, `apply_relational_batch`, `execute_named_query`) | `SPEC--SQLITE-SUBSTRATE-S0-S1`, `SPEC--GENESISDB-RELATIONAL-APPLICATION-CONTRACT-U2` |
-| Vector Collections | Per-model/dim isolated vector spaces (`collections: DashMap<String, Arc<VectorCollection>>`, each with its own arena + metadata + HNSW + metric); a `default` collection always exists. Async indexing thread (off the write path). | `src/lib.rs` | master spec, HNSW hybrid index design, `ADR--GENESISDB-MULTI-COLLECTION`, `ADR--GENESISDB-ASYNC-INDEXING` |
+| Vector Collections | Per-model/dim isolated vector spaces (`collections: DashMap<String, Arc<VectorCollection>>`, each with its own arena + metadata + HNSW + metric); a `default` collection always exists. Async indexing thread (off the write path), plus explicit structural source-to-HNSW coverage validation. | `src/lib.rs` | master spec, HNSW hybrid index design, `ADR--GENESISDB-MULTI-COLLECTION`, `ADR--GENESISDB-ASYNC-INDEXING`, `ADR--GENESISDB-INDEX-COVERAGE-LIFECYCLE` |
 | Hybrid Search | Per-collection vector + lexical retrieval with ranking; query dim validated against the collection | `src/lib.rs`, HNSW design | HNSW hybrid index design |
 | Graph Retrieval Layer | Tiered context retrieval by hop budget and fuzzy matching | `src/lib.rs::retrieve_context` | `SPEC--GRAPH-RETRIEVAL-LAYER.md` |
 | Typed Query IR Boundary (partial) | Validate and dispatch versioned structured search/traverse queries consistently across public surfaces | `src/lib.rs::execute_query_ir`, `src/router.rs` `/v1/query/ir`; remaining V1 operations are planned | `ADR--GENESISDB-TYPED-QUERY-IR-AGENT-BOUNDARY`, `SPEC--GENESISDB-TYPED-QUERY-IR-V1` |
@@ -160,6 +165,24 @@ flowchart TB
 | Axiomatic Governance | Tier permissions and logical guardrails | `src/lib.rs` | governance ADR, axiomatic guards spec |
 | CRDT / Sync | Event reconciliation and collaborative state handling | `src/lib.rs` | collaborative sync and gossip specs |
 | Consensus | Proposal/vote/verification primitives | `src/lib.rs`, REST handlers if routed | neural consensus TDD |
+
+### GenesisRAG17 TEST integration component
+
+The GenesisRAG17 worker is an external adapter around the public native
+boundary, not a new GenesisBlockDB core subsystem. It owns one native store
+process and a worker-owned SQLite FTS5 lexical sidecar. MSP authenticates and
+relays pipeline messages; GKS remains the passive semantic and quality
+authority. The physical sequence is graph-only Stage 13 write and receipt,
+GKS Stage 14 enrichment, real Stage 15 embedding, Stage 16 index/readback,
+GKS Stage 17 gate, atomic worker publication and publication receipt.
+
+| Component | Responsibility | Source / Entry Points | Related Docs |
+|---|---|---|---|
+| GenesisRAG17 worker adapter | Native graph/vector/SQLite readback, worker FTS5, per-generation query, durable outboxes and atomic publication for the isolated TEST flow | `genesisrag17-worker/src/worker.mjs`, `genesisrag17-worker/src/index.mjs`, `genesisrag17-worker/src/msp-stdio.mjs` | `docs/ADR--GENESISRAG17-SEPARATE-WORKER-PUBLICATION.md`, `docs/FLOW--GENESISRAG17-PIPELINE.md`, `docs/GENESISRAG17-EXTENSION-MAP.md` |
+
+The native engine remains client-neutral and pinned for this integration to
+`e15e35b0093394e0a8880af7f4e6f63cf81223b7`. This container is TEST evidence;
+it does not grant the worker direct GKS, MSP database or Edge store access.
 
 ### REST API Components
 
@@ -195,6 +218,7 @@ The C4 code level is intentionally anchored to source files instead of duplicati
 | MCP tool surface | `mcp/server.js` tool definitions | `docs/MCP-GUIDE.md` | Medium |
 | SDK request/response shapes | Python and Go SDK clients | API reference and REST handlers | High |
 | Persistence safety | WAL/snapshot code in `src/lib.rs` | WAL ADR, audit reports | High |
+| HNSW structural coverage | `Storage::validate_index_coverage`, `CollectionInfo.coverage` | `ADR--GENESISDB-INDEX-COVERAGE-LIFECYCLE` | High |
 | Optional dashboard status contract | `dashboard/` hooks/components and REST status routes | dashboard audit docs | Medium |
 | Studio S1 transport, scene and ownership contracts | `studio/src/domain/*`, `studio/src/transports/*`, `studio/src-tauri/*`, `src/lib.rs`, `src/router.rs` | `SPEC--GENESIS-STUDIO-DESKTOP` | High |
 
@@ -237,12 +261,31 @@ Expected checks:
 - known drift entries are either open, waived, or closed with evidence
 - public interface changes include docs and SDK updates
 
+Wave A (R-01/R-08) uses a reentrant commit boundary across supported query reads,
+projection/graph publication and maintenance. Unified relational constraints are
+preflighted before WAL append; uncertain or durable-but-unapplied writes require
+reopen and block query/write/checkpoint paths. Concurrent reads serialize; this
+is not MVCC. Validation and limitations: [Wave A](SPEC--WAVE-A-COMMIT-CORRECTNESS.md).
+
+Wave B (R-02/R-03, approved 2026-09-08) journals immutable collection definitions
+including empty/default spaces and preserves calibration and exact rerank rows
+through fold/recovery. Disk schema is 4; derived SQLite projection schema is 5.
+Edge replacement rewires both adjacency directions and `edge_versions` selects
+replica-local transaction intervals. History is available only from the reported
+edge-history floor. New-reader preflight rejects unsupported complete frames;
+old-engine use of a manually stripped journal-only v4 copy is unsupported.
+See [Wave B contract and verification record](SPEC--WAVE-B-DURABLE-COLLECTIONS-EDGE-HISTORY.md).
+These are local implementation contracts, not deployment or consumer migration evidence.
+
 ## CHANGELOG
 
 | Version | Date | Status | Summary | Commit Hash | Agent |
 |---------|------|--------|---------|-------------|-------|
+| 0.1.12b | 2026-09-08 | beta | Registered Wave B collection journal and edge history contracts. | working-tree | ATHER |
+| 0.1.11b | 2026-09-08 | beta | Registered Wave A commit publication, preflight and recovery-required contracts with validation limits. | working-tree | ATHER |
 | 0.1.9b | 2026-08-14 | beta | Registered the accepted Typed Query IR boundary as planned, retained HQL compatibility, and kept NL interpretation outside the engine. | working-tree | ATHER |
 | 0.1.10b | 2026-08-14 | beta | Truth-synced partial Query IR search/traverse implementation across core, REST and N-API. | working-tree | ATHER |
+| 0.1.11b | 2026-09-08 | beta | Added the separate GenesisRAG17 TEST worker container, physical publication boundary and extension-map references without changing the neutral core. | working-tree | RWANG |
 | 0.1.8b | 2026-08-14 | beta | Added embedded opaque U9 backup/clean-target restore to the storage-model contract; REST/N-API lifecycle endpoints remain out of scope. | working-tree | ATHER |
 | 0.1.7b | 2026-07-22 | beta | Truth-synced Studio S1 read-only local/remote adapters, bounded core APIs and process ownership while retaining S2-S4 gates. | working-tree | ATHER |
 | 0.1.6b | 2026-07-21 | beta | Truth-synced the verified fixture-only Studio S0 shell while retaining S1+ API gaps. | working-tree | ATHER |

@@ -3,7 +3,7 @@ use std::net::SocketAddr;
 use std::sync::Arc;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
-use genesis_block_native::router::{build_router, AppState};
+use genesis_block_native::router::{build_router, AppState, DEFAULT_QUERY_ADMISSION};
 use genesis_block_native::{OpenOptions, Storage};
 
 #[tokio::main]
@@ -45,6 +45,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let state = AppState {
         storage: Arc::clone(&storage),
         api_key,
+        query_admission: Arc::new(tokio::sync::Semaphore::new(DEFAULT_QUERY_ADMISSION)),
     };
 
     let app = build_router(state);
