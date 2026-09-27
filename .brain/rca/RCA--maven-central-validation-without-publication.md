@@ -2,7 +2,7 @@
 
 ## Status / Date
 
-Root cause confirmed; release-workflow correction pending / 2026-09-27.
+Root cause confirmed; release-workflow correction implemented / 2026-09-27.
 
 ## Symptom
 
@@ -73,7 +73,7 @@ tests also assumed Central continued to return PURLs during publishing.
 - Clean Android Maven Central consumer run
   [36316221124](https://github.com/Freshair129/GenesisBlock/actions/runs/36316221124)
   passed, including its x86_64 emulator job.
-- Hosted validation of this recovery regression change: pending PR CI.
+- Hosted recovery regression checks are tracked by PR #190.
 
 ## Version Diff
 
