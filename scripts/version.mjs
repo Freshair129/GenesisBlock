@@ -1,9 +1,9 @@
 #!/usr/bin/env node
 // Single-source-of-truth version control for the GenesisBlockDB multi-surface
 // repo. The engine version (x.y.z[-prerelease]) lives in Cargo.toml and is
-// mirrored to package.json, modules.json (engine + the npm-native-addon
-// surface). This CLI keeps them in lock-step and a CI gate (`check`) fails the
-// build if they ever drift.
+// mirrored to Cargo.lock, package.json, and modules.json (engine + the
+// npm-native-addon surface). This CLI keeps them in lock-step and a CI gate
+// (`check`) fails the build if they ever drift.
 //
 //   node scripts/version.mjs get                 # print engine version
 //   node scripts/version.mjs check               # verify all surfaces agree (CI gate)
@@ -18,6 +18,7 @@ import { dirname, join } from 'node:path';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const CARGO = join(ROOT, 'Cargo.toml');
+const CARGO_LOCK = join(ROOT, 'Cargo.lock');
 const PKG = join(ROOT, 'package.json');
 const MODULES = join(ROOT, 'modules.json');
 
@@ -45,17 +46,41 @@ function readCargoVersion() {
   return m[1];
 }
 
+function findLockPackage(text) {
+  const headers = [...text.matchAll(/^\[\[package\]\]\r?$/gm)];
+  const matches = headers.flatMap((header, i) => {
+    const start = header.index;
+    const end = headers[i + 1]?.index ?? text.length;
+    const block = text.slice(start, end);
+    return /^name\s*=\s*"genesis-block-native"\s*$/m.test(block)
+      ? [{ start, end, block }]
+      : [];
+  });
+  if (matches.length !== 1) {
+    throw new Error(`expected one genesis-block-native package in Cargo.lock, found ${matches.length}`);
+  }
+  return matches[0];
+}
+
+function readCargoLockVersion() {
+  const { block } = findLockPackage(readFileSync(CARGO_LOCK, 'utf8'));
+  const m = /^version\s*=\s*"([^"]+)"/m.exec(block);
+  if (!m) throw new Error('could not find genesis-block-native version in Cargo.lock');
+  return m[1];
+}
+
 function readJson(path) {
   return JSON.parse(readFileSync(path, 'utf8'));
 }
 
 function collectVersions() {
   const cargo = readCargoVersion();
+  const lock = readCargoLockVersion();
   const pkg = readJson(PKG).version;
   const mods = readJson(MODULES);
   const engine = mods.engine.version;
   const surface = (mods.surfaces.find((s) => s.name === NPM_SURFACE) || {}).version;
-  return { cargo, pkg, engine, surface };
+  return { cargo, lock, pkg, engine, surface };
 }
 
 // --- writers ----------------------------------------------------------------
@@ -76,6 +101,18 @@ function writeCargoVersion(version) {
   writeFileSync(CARGO, head + rest);
 }
 
+function writeCargoLockVersion(version) {
+  const text = readFileSync(CARGO_LOCK, 'utf8');
+  const { start, end, block } = findLockPackage(text);
+  let replaced = false;
+  const updated = block.replace(/^(version\s*=\s*)"[^"]+"/m, (_, prefix) => {
+    replaced = true;
+    return `${prefix}"${version}"`;
+  });
+  if (!replaced) throw new Error('failed to rewrite genesis-block-native version in Cargo.lock');
+  writeFileSync(CARGO_LOCK, text.slice(0, start) + updated + text.slice(end));
+}
+
 function writeJsonVersion(path, mutate) {
   const raw = readFileSync(path, 'utf8');
   const obj = JSON.parse(raw);
@@ -88,6 +125,7 @@ function writeJsonVersion(path, mutate) {
 function setVersion(version) {
   parseSemver(version); // validate or throw
   writeCargoVersion(version);
+  writeCargoLockVersion(version);
   writeJsonVersion(PKG, (o) => {
     o.version = version;
   });
@@ -99,7 +137,7 @@ function setVersion(version) {
       s.minEngineVersion = version;
     }
   });
-  console.log(`✓ version set to ${version} across Cargo.toml, package.json, modules.json`);
+  console.log(`✓ version set to ${version} across Cargo.toml, Cargo.lock, package.json, modules.json`);
 }
 
 function nextVersion(current, kind) {
@@ -129,12 +167,13 @@ function nextVersion(current, kind) {
 
 function cmdCheck() {
   const v = collectVersions();
-  const all = [v.cargo, v.pkg, v.engine, v.surface];
+  const all = [v.cargo, v.lock, v.pkg, v.engine, v.surface];
   for (const ver of all) parseSemver(ver); // each must be valid semver
   const agree = all.every((x) => x === v.cargo);
   if (!agree) {
     console.error('✗ version drift detected:');
     console.error(`    Cargo.toml [package].version : ${v.cargo}`);
+    console.error(`    Cargo.lock package version   : ${v.lock}`);
     console.error(`    package.json .version        : ${v.pkg}`);
     console.error(`    modules.json engine.version  : ${v.engine}`);
     console.error(`    modules.json npm surface     : ${v.surface}`);
