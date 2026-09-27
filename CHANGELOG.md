@@ -21,6 +21,23 @@ container that reuses PID 1 can recover a legacy lock from the previous process
 instance, while a live same-instance owner remains rejected. The worker suite
 covers both cases.
 
+## [0.2.7] - 2026-09-27
+
+### Added
+
+- Add standalone REST server binaries and a GHCR image release path with a
+  container persistence smoke check.
+- Package the MCP server as the `genesisblock-mcp` command in the main npm
+  package; add Python wheel/sdist and Go submodule distribution workflows.
+
+### Fixed
+
+- Remove the `atomic-polyfill` dependency from the Rust test dependency graph.
+
+The registry publications for this release remain gated on the matching
+version-tag workflows and clean-consumer checks; see the root README for the
+verified channel status.
+
 ## [0.2.6] - 2026-09-09
 
 ### Added - read-only SQL over the relational projection

@@ -146,6 +146,46 @@ flowchart TB
     core --> index
 ```
 
+### Distribution and Release Flow
+
+The distribution boundary packages the same engine through independent
+release channels. The engine version is anchored by `docs/VERSION.md`; each
+channel is considered published only after its tag workflow and consumer
+check succeed. The Python SDK has its own `python-v*` tag, the Go submodule
+uses `genesisdb-go/v*`, and the mobile SDK versions remain independent.
+
+```mermaid
+flowchart LR
+    main["Verified main commit"] --> engineTag["v* engine release tag"]
+    engineTag --> releaseActions["GitHub Actions release workflows"]
+    releaseActions --> napiBuild["N-API target builds"]
+    napiBuild --> npm["npm main + platform packages"]
+    releaseActions --> serverBuild["Standalone server target builds"]
+    serverBuild --> ghRelease["GitHub Release binaries + SHA-256"]
+    releaseActions --> containerSmoke["Container build + volume persistence smoke"]
+    containerSmoke --> ghcr["GHCR image + provenance + SBOM"]
+    engineTag --> android["Android release artifact / registry checks"]
+    engineTag --> rn["React Native npm registry check"]
+
+    pythonCi["Wheel/sdist + clean consumer CI"] --> pythonTag["python-v* tag"]
+    pythonTag --> pypiBuild["Release wheel + sdist"]
+    pypiBuild --> pypi["PyPI via Trusted Publishing"]
+    goTag["genesisdb-go/v* tag"] --> goProxy["Go module proxy"]
+    goProxy --> goConsumer["Clean versioned consumer"]
+
+    consumerNpm["Node / MCP consumer"] --> npm
+    consumerServer["REST deployment consumer"] --> ghRelease
+    consumerServer --> ghcr
+    consumerPython["Python REST client"] --> pypi
+    consumerGo["Go REST client"] --> goConsumer
+```
+
+The root Rust crate remains source-only by the accepted crates.io ADR. The
+iOS binary remains a GitHub Release asset until a same-version public SwiftPM
+release path passes the accepted iOS distribution gate. Homebrew and the
+Windows package-manager manifest consume checksummed server assets after the
+first stable server release.
+
 ## 5. C3 - Components
 
 ### Rust Core Engine Components

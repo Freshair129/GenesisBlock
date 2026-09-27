@@ -26,11 +26,9 @@
 #      the @freshair129 scope AND to the unscoped `react-native-genesisdb`
 #      name (rn-npm-publish reuses this same secret). Settings → Secrets and
 #      variables → Actions.
-#   2. package.json `install: npm run build` forces a Rust compile on EVERY
-#      consumer `npm install`. Before the first real publish, change it so
-#      consumers receive the prebuilt platform addon instead of recompiling
-#      (the napi optionalDependencies + index.js resolver already handle
-#      runtime selection). CI here uses `--ignore-scripts` to avoid recompiling.
+#   2. The published package has no install hook: consumers resolve the
+#      prebuilt platform addon through napi optionalDependencies and index.js.
+#      Keep that contract; this workflow explicitly builds each release target.
 #   3. android-publish needs NO new secret — it authenticates to GitHub
 #      Packages with the workflow's own auto-issued GITHUB_TOKEN (job-level
 #      `packages: write` permission below), the same way every other job here
@@ -127,8 +125,8 @@ jobs:
         with:
           key: ${{ matrix.target }}
 
-      # --ignore-scripts: skip the `install` script so npm does not kick off a
-      # second (platform-default) Rust build before we build the real target.
+      # Skip install lifecycle scripts; the explicit target build below is the
+      # only native addon build in this job.
       - name: Install dependencies
         run: npm ci --ignore-scripts
 

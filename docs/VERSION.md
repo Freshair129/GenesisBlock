@@ -14,7 +14,7 @@ those as legacy labels superseded by this file.
 
 | Field | Value |
 |---|---|
-| **Engine crate** (`Cargo.toml`, `package.json`, `modules.json`) | `0.2.6` |
+| **Engine crate** (`Cargo.toml`, `package.json`, `modules.json`) | `0.2.7` |
 | **Product milestone** | **Mobile SDK** — Phase B (iOS/Android/React Native) shipped and published; on-device acceptance verified for iOS |
 | **Status** | Advanced prototype (durable, benchmarked, suite green) |
 | **Evidence baseline** | 2026-06-21 — audits P14–P30, `REPORT--2026-06-21-PERFORMANCE-AND-COMPETITIVE.md` |
@@ -33,6 +33,8 @@ the Maven Central/RN distribution release; `0.2.6` delivers the typed context
 query contracts and isolated GenesisRAG17 worker integration. The crate
 version is kept in lock-step across `Cargo.toml`, `package.json`, and
 `modules.json` by `scripts/version.mjs` (`npm run version:check` is a CI gate).
+Version `0.2.7` is prepared for the next distribution release; its public
+availability remains gated on the version-tag workflows passing.
 
 **Versioning policy (going forward):** the crate version in `Cargo.toml` is
 authoritative for the build; the product milestone is a plain theme named after
