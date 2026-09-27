@@ -28,7 +28,10 @@ By default, the server initializes a database at `.brain/mcp_db`. You can overri
 ### 2.4 Registry installation
 The `genesisblock-mcp` executable is bundled in the main npm package, `@freshair129/gks-genesis-block-native`; it is not a separate package. The CLI and native engine binding are shipped in the same package release, so a pinned CLI uses the engine version bundled with it. The MCP surface has no independent version.
 
-The published `0.2.5` package predates this executable and does not include it. Until a package version containing `genesisblock-mcp` is published, use the repository-based installation above.
+The published `0.2.6` package predates this executable and does not include it.
+The `0.2.7` source adds the CLI, but the registry install path is not available
+until that version is published and the clean-consumer release check passes.
+Until then, use the repository-based installation above.
 
 After that version is published, an MCP client can run the registry package without a repository checkout. For example, in Claude Desktop, replace `<version-with-mcp-cli>` with the published package version and set `GENESIS_DB_PATH` to the directory where this server should keep its database:
 

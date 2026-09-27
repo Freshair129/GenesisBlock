@@ -7,8 +7,11 @@ owner: GenesisBlockDB Engineering
 
 # GenesisBlockDB — Canonical Version (SSOT)
 
-This file is the **single source of truth for version/status**. Per-document
-`version:` frontmatter across `docs/` is historically inconsistent (whitepaper
+This file is the **canonical human-readable version/status record**. The
+engine build version is anchored by `Cargo.toml`; `scripts/version.mjs` checks
+that this record, `package.json`, and `modules.json` stay synchronized.
+Per-document `version:` frontmatter across `docs/` is historically inconsistent
+(whitepaper
 "v2.0.0", GEMINI "1.2.0", AGENT "0.2.2b", C4 "0.1.2b", registry "0.2.1b") — treat
 those as legacy labels superseded by this file.
 
