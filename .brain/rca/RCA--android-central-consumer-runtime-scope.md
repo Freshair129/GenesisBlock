@@ -2,7 +2,7 @@
 
 ## Status / Date
 
-Root cause confirmed; fixture dependency-scope correction pending hosted rerun / 2026-09-27.
+Root cause confirmed; fixture dependency-scope correction verified / 2026-09-27.
 
 ## Symptom
 
@@ -44,3 +44,11 @@ round trip from a clean app whose dependency came from Maven Central.
 Declare the published SDK with the app's `implementation` configuration so the
 consumer app packages the AAR and native slices as a real application would.
 Keep the clean Maven Central emulator test as the runtime distribution gate.
+
+## Outcome (Measured)
+
+Hosted run [36311724941](https://github.com/Freshair129/GenesisBlock/actions/runs/36311724941),
+job [108598834274](https://github.com/Freshair129/GenesisBlock/actions/runs/36311724941/job/108598834274),
+passed both `publishedArtifactOpensAndWrites` and
+`publishedArtifactPersistsAcrossHandles` on the x86_64 emulator using the
+published Maven Central `0.1.1` AAR.
