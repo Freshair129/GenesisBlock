@@ -66,6 +66,12 @@ name: Mobile Build
 
 on:
   workflow_dispatch:
+    inputs:
+      central_version:
+        description: Published genesisdb-android version to test on the emulator
+        required: false
+        default: '0.1.2'
+        type: string
   push:
     branches: [ main ]
     paths:
@@ -385,7 +391,9 @@ jobs:
           distribution: temurin
           java-version: '17'
 
-      - uses: android-actions/setup-android@v3
+      - uses: android-actions/setup-android@v4
+        with:
+          packages: platform-tools
 
       - uses: gradle/actions/setup-gradle@v4
         with:
@@ -416,7 +424,9 @@ jobs:
           distribution: temurin
           java-version: '17'
 
-      - uses: android-actions/setup-android@v3
+      - uses: android-actions/setup-android@v4
+        with:
+          packages: platform-tools
 
       - uses: gradle/actions/setup-gradle@v4
         with:
@@ -634,7 +644,9 @@ jobs:
           distribution: temurin
           java-version: '17'
 
-      - uses: android-actions/setup-android@v3
+      - uses: android-actions/setup-android@v4
+        with:
+          packages: platform-tools
 
       - uses: gradle/actions/setup-gradle@v4
         with:
@@ -686,12 +698,17 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Self-test Maven Central publish guards
+        run: bash scripts/central-await-validation.sh --self-test
+
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: '17'
 
-      - uses: android-actions/setup-android@v3
+      - uses: android-actions/setup-android@v4
+        with:
+          packages: platform-tools
 
       - uses: gradle/actions/setup-gradle@v4
         with:
@@ -708,3 +725,55 @@ jobs:
 
       - name: Validate the publication against Central's requirements
         run: bash scripts/verify-maven-central-pom.sh
+
+  # Exercises the actual Maven Central AAR from a blank Android app. The app
+  # has no local jniLibs or project dependency, so both class/JNI loading and
+  # persistence run through the artifact anonymous consumers install.
+  android-central-consumer:
+    name: Android Maven Central consumer (x86_64 emulator)
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: android-actions/setup-android@v4
+        with:
+          packages: platform-tools
+
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: 8.7
+
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' \
+            | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      - name: Run the published Central artifact on an x86_64 AVD
+        uses: reactivecircus/android-emulator-runner@v2
+        env:
+          CENTRAL_VERSION: ${{ github.event.inputs.central_version || '0.1.2' }}
+        with:
+          api-level: 30
+          arch: x86_64
+          target: default
+          force-avd-creation: false
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
+          disable-animations: true
+          working-directory: mobile-acceptance/android-central
+          script: gradle :app:connectedAndroidTest -PcentralArtifactVersion="$CENTRAL_VERSION"
+
+      - name: Upload Maven Central consumer test report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-central-consumer-report
+          path: mobile-acceptance/android-central/app/build/reports/androidTests/
+          retention-days: 14

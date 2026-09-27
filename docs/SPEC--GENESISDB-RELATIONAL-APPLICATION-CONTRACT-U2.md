@@ -1,7 +1,7 @@
 ---
-version: "0.1.1b"
+version: "0.2.0b"
 created_at: "2026-07-20T22:45:00+07:00,ATHER,working-tree"
-last_update: "2026-07-21T05:00:00+07:00,ATHER"
+last_update: "2026-09-23T02:38:46+07:00,RWANG"
 status: beta
 superseded_by: null
 attributes:
@@ -405,7 +405,7 @@ Public error ห้าม leak physical table name, raw SQL text หรือ fi
 | Resource | Default | U2 hard maximum |
 |---|---:|---:|
 | Schema package bytes | 256 KiB | 1 MiB |
-| Tables per namespace | 32 | 64 |
+| Tables per namespace | 32 | 128 |
 | Columns per table | 64 | 128 |
 | Indexes per namespace | 32 | 64 |
 | Named queries per namespace | 64 | 128 |
@@ -628,6 +628,7 @@ U2 เสร็จเมื่อ:
 |---|---|---|
 | none | `0.1.0b` | Candidate U2 contract for versioned schemas, additive migrations, typed relational mutations and named parameterized joins under signed-WAL authority. |
 | `0.1.0b` | `0.1.1b` | Approved by Boss; promoted to beta and opened U2 implementation/review gate. |
+| `0.1.1b` | `0.2.0b` | Raised the hard maximum for tables per namespace from 64 to 128 while retaining bounded schema resources and added boundary regression coverage. |
 
 ## CHANGELOG
 
@@ -635,3 +636,4 @@ U2 เสร็จเมื่อ:
 |---|---|---|---|---|---|
 | `0.1.0b` | 2026-07-20 | candidate | Initial doc-first U2 requirements, architecture, API, migration, security, recovery and verification contract; no code authorized. | working-tree | ATHER |
 | `0.1.1b` | 2026-07-21 | beta | Approved by Boss; implementation authorized. | c2ad8de+working-tree | ATHER |
+| `0.2.0b` | 2026-09-23 | beta | Raised the tables-per-namespace hard maximum to 128 and added regression coverage for accepted/rejected resource boundaries and state preservation. | working-tree | RWANG |

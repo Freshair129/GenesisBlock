@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 #
-# Wait for Maven Central to finish validating a deployment, and fail if it does
-# not reach a good state.
+# Wait for Maven Central to finish publishing a deployment, and fail if it does
+# not reach PUBLISHED.
 #
 # Why this exists: POSTing a bundle to /api/v1/publisher/upload returns 201 as
 # soon as Central ACCEPTS it. Validation happens afterwards, asynchronously, and
@@ -27,13 +27,15 @@
 # POST https://central.sonatype.com/api/v1/publisher/status?id=<uuid>, no body,
 # no Content-Type, "Authorization: Bearer <base64 user:pass>"; the response
 # carries deploymentState, one of PENDING / VALIDATING / VALIDATED /
-# PUBLISHING / PUBLISHED / FAILED. A FAILED deployment carries an "errors"
-# field whose shape the docs do NOT specify - which is why failures print the
-# whole body rather than picking fields out of it.
+# PUBLISHING / PUBLISHED / FAILED. VALIDATED is not published; only PUBLISHED
+# is a successful release. A FAILED deployment carries an "errors" field whose
+# shape the docs do NOT specify - which is why failures print the whole body
+# rather than picking fields out of it.
 
 set -uo pipefail
 
 STATUS_URL="https://central.sonatype.com/api/v1/publisher/status"
+PUBLISH_URL="https://central.sonatype.com/api/v1/publisher/deployment"
 POLL_INTERVAL="${POLL_INTERVAL:-15}"
 POLL_TIMEOUT="${POLL_TIMEOUT:-1200}"
 # Clamped to >=1 so elapsed time always advances. With an interval of 0 the
@@ -41,6 +43,8 @@ POLL_TIMEOUT="${POLL_TIMEOUT:-1200}"
 # self-test, which had set 0 to keep the canned cases fast.
 [ "$POLL_INTERVAL" -ge 1 ] 2>/dev/null || POLL_INTERVAL=1
 TAB=$(printf '\t')
+STUB_LINE=1
+PUBLISH_STUB_LINE=1
 
 # Pull deploymentState out of the response.
 #
@@ -84,8 +88,8 @@ classify() {
   state=$(parse_state "$body")
 
   case "$state" in
-    VALIDATED|PUBLISHED)           echo OK ;;
-    PENDING|VALIDATING|PUBLISHING) echo WAIT ;;
+    PUBLISHED)                     echo OK ;;
+    PENDING|VALIDATING|VALIDATED|PUBLISHING) echo WAIT ;;
     FAILED)                        echo FAIL ;;
     *)                             echo UNKNOWN ;;
   esac
@@ -124,12 +128,128 @@ fetch_status() {
     "$STATUS_URL?id=$id")
 }
 
+fetch_publish() {
+  local id="$1" body_file="$2"
+
+  if [ -n "${CENTRAL_PUBLISH_STUB:-}" ]; then
+    local line
+    line=$(sed -n "${PUBLISH_STUB_LINE}p" "$CENTRAL_PUBLISH_STUB")
+    PUBLISH_STUB_LINE=$((PUBLISH_STUB_LINE + 1))
+    if [ -z "$line" ]; then
+      : > "$body_file"; FETCH_CODE=000; return
+    fi
+    printf '%s' "${line#*${TAB}}" > "$body_file"
+    FETCH_CODE="${line%%${TAB}*}"
+    return
+  fi
+
+  local auth
+  auth=$(printf '%s:%s' "${CENTRAL_TOKEN_USERNAME:-}" "${CENTRAL_TOKEN_PASSWORD:-}" | base64 -w0)
+  FETCH_CODE=$(curl -sS --request POST \
+    -o "$body_file" \
+    -w '%{http_code}' \
+    --header "Authorization: Bearer $auth" \
+    "$PUBLISH_URL/$id")
+}
+
+read_deployment_state() {
+  local id="$1" body_file code body
+  body_file=$(mktemp)
+  fetch_status "$id" "$body_file"
+  code="$FETCH_CODE"
+  body=$(cat "$body_file")
+  rm -f "$body_file"
+  case "$code" in
+    401|403)
+      echo "::error::Central rejected the status request (HTTP $code)"
+      return 1 ;;
+    2??) ;;
+    *)
+      echo "::error::Central status request failed (HTTP $code)"
+      echo "$body"
+      return 1 ;;
+  esac
+  DEPLOYMENT_STATE=$(parse_state "$body")
+  DEPLOYMENT_BODY="$body"
+  if [ -z "$DEPLOYMENT_STATE" ]; then
+    echo "::error::Central returned no deploymentState"
+    echo "$body"
+    return 1
+  fi
+}
+
+validate_target_deployment() {
+  if ! printf '%s' "$DEPLOYMENT_BODY" | grep -Fq 'pkg:maven/io.github.freshair129/genesisdb-android@'; then
+    echo "::error::deployment is not a GenesisBlock Android Maven Central artifact"
+    echo "$DEPLOYMENT_BODY"
+    return 1
+  fi
+}
+
+check_existing() {
+  local id="$1"
+  if ! read_deployment_state "$id"; then return 1; fi
+  case "$DEPLOYMENT_STATE" in
+    VALIDATED)
+      if ! validate_target_deployment; then return 1; fi
+      echo "deployment $id is VALIDATED and ready for the guarded publish step" ;;
+    PUBLISHING|PUBLISHED)
+      # Central can temporarily return purls=[] with "Deployment components
+      # info not found" after a publish request. These are read-only states
+      # here; coordinate validation is required before a publish POST.
+      echo "deployment $id is $DEPLOYMENT_STATE" ;;
+    *)
+      echo "::error::deployment $id is $DEPLOYMENT_STATE; expected VALIDATED, PUBLISHING, or PUBLISHED"
+      echo "$DEPLOYMENT_BODY"
+      return 1 ;;
+  esac
+}
+
+publish_existing() {
+  local id="$1" body_file code
+  if ! read_deployment_state "$id"; then return 1; fi
+  case "$DEPLOYMENT_STATE" in
+    VALIDATED)
+      if ! validate_target_deployment; then return 1; fi
+      body_file=$(mktemp)
+      fetch_publish "$id" "$body_file"
+      code="$FETCH_CODE"
+      rm -f "$body_file"
+      if ! [[ "$code" =~ ^2[0-9][0-9]$ ]]; then
+        # Another Portal user may have started publishing between the status
+        # read and POST. Accept that race only if a fresh status confirms it.
+        if ! read_deployment_state "$id"; then return 1; fi
+        case "$DEPLOYMENT_STATE" in
+          PUBLISHING|PUBLISHED) ;;
+          *)
+            echo "::error::Central publish request failed (HTTP $code)"
+            echo "$DEPLOYMENT_BODY"
+            return 1 ;;
+        esac
+      else
+        echo "Central accepted publish request (HTTP $code)"
+      fi
+      await "$id" ;;
+    PUBLISHING)
+      echo "deployment $id is already PUBLISHING; waiting for PUBLISHED"
+      await "$id" ;;
+    PUBLISHED)
+      echo "deployment $id is already PUBLISHED" ;;
+    *)
+      echo "::error::deployment $id is $DEPLOYMENT_STATE; only VALIDATED deployments can be published"
+      echo "$DEPLOYMENT_BODY"
+      return 1 ;;
+  esac
+}
+
+valid_id() {
+  printf '%s' "$1" | grep -Eq '^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$'
+}
+
 await() {
   local id="$1"
   local body_file waited=0 verdict code
   body_file=$(mktemp)
-  STUB_LINE=1
-
   echo "polling Central for deployment $id (interval ${POLL_INTERVAL}s, timeout ${POLL_TIMEOUT}s)"
 
   while :; do
@@ -194,7 +314,7 @@ self_test() {
   check "PENDING"                   WAIT    200 '{"deploymentState":"PENDING"}'
   check "VALIDATING"                WAIT    200 '{"deploymentState":"VALIDATING"}'
   check "PUBLISHING"                WAIT    200 '{"deploymentState":"PUBLISHING"}'
-  check "VALIDATED"                 OK      200 '{"deploymentState":"VALIDATED"}'
+  check "VALIDATED is not published" WAIT 200 '{"deploymentState":"VALIDATED"}'
   check "PUBLISHED"                 OK      201 '{"deploymentState":"PUBLISHED"}'
   check "FAILED"                    FAIL    200 '{"deploymentState":"FAILED","errors":{"x":["bad sig"]}}'
   # Not invented: this is Central's verbatim answer to run 33240771927, which
@@ -220,7 +340,7 @@ self_test() {
   stub=$(mktemp)
 
   run_case() { # <expected-rc> <label>
-    out=$(CENTRAL_STATUS_STUB="$stub" POLL_INTERVAL=1 POLL_TIMEOUT=2 await \
+    out=$(CENTRAL_STATUS_STUB="$stub" POLL_INTERVAL=1 POLL_TIMEOUT=5 await \
           00000000-0000-4000-8000-000000000000 2>&1)
     rc=$?
     if [ "$rc" -eq "$1" ]; then
@@ -232,8 +352,13 @@ self_test() {
     fi
   }
 
-  printf '200\t{"deploymentState":"PENDING"}\n200\t{"deploymentState":"VALIDATING"}\n200\t{"deploymentState":"VALIDATED","purls":["pkg:maven/io.github.freshair129/genesisdb-android@0.1.1"]}\n' > "$stub"
-  run_case 0 "waits, then VALIDATED"
+  printf '200\t{"deploymentState":"PENDING"}\n200\t{"deploymentState":"VALIDATING"}\n200\t{"deploymentState":"VALIDATED"}\n200\t{"deploymentState":"PUBLISHING"}\n201\t{"deploymentState":"PUBLISHED","purls":["pkg:maven/io.github.freshair129/genesisdb-android@0.1.2"]}\n' > "$stub"
+  run_case 0 "waits until PUBLISHED"
+
+  # A user-managed deployment that remains VALIDATED must not pass.
+  : > "$stub"
+  for i in $(seq 1 60); do printf '200\t{"deploymentState":"VALIDATED"}\n' >> "$stub"; done
+  run_case 1 "VALIDATED alone times out"
 
   printf '200\t{"deploymentState":"VALIDATING"}\n200\t{"deploymentState":"FAILED","errors":{"a":["no .asc"]}}\n' > "$stub"
   run_case 1 "waits, then FAILED"
@@ -253,6 +378,75 @@ self_test() {
   run_case 1 "auth lost mid-poll"
 
   echo
+  echo "publish_existing():"
+  local publish_stub
+  publish_stub=$(mktemp)
+  printf '200\t{"deploymentState":"VALIDATED","purls":["pkg:maven/io.github.freshair129/genesisdb-android@0.1.2"]}\n200\t{"deploymentState":"PUBLISHING","purls":[],"errors":{"common":["Deployment components info not found"]}}\n201\t{"deploymentState":"PUBLISHED","purls":[],"errors":{"common":["Deployment components info not found"]}}\n' > "$stub"
+  printf '204\t\n' > "$publish_stub"
+  out=$(CENTRAL_STATUS_STUB="$stub" CENTRAL_PUBLISH_STUB="$publish_stub" \
+        POLL_INTERVAL=1 POLL_TIMEOUT=5 publish_existing \
+        00000000-0000-4000-8000-000000000000 2>&1)
+  rc=$?
+  if [ "$rc" -eq 0 ]; then
+    echo "  ok    VALIDATED deployment is published and awaited"
+  else
+    echo "  FAIL  validated publish (exit $rc)"
+    printf '%s\n' "$out" | sed 's/^/          /'
+    failures=$((failures + 1))
+  fi
+
+  printf '200\t{"deploymentState":"FAILED","purls":["pkg:maven/io.github.freshair129/genesisdb-android@0.1.2"],"errors":{}}\n' > "$stub"
+  : > "$publish_stub"
+  out=$(CENTRAL_STATUS_STUB="$stub" CENTRAL_PUBLISH_STUB="$publish_stub" \
+        publish_existing 00000000-0000-4000-8000-000000000000 2>&1)
+  rc=$?
+  if [ "$rc" -ne 0 ]; then
+    echo "  ok    FAILED deployment is rejected before publish"
+  else
+    echo "  FAIL  FAILED deployment was accepted for publish"
+    failures=$((failures + 1))
+  fi
+
+  printf '200\t{"deploymentState":"VALIDATED","purls":["pkg:maven/org.example/other@1.0.0"]}\n' > "$stub"
+  printf '204\t\n' > "$publish_stub"
+  out=$(CENTRAL_STATUS_STUB="$stub" CENTRAL_PUBLISH_STUB="$publish_stub" \
+        publish_existing 00000000-0000-4000-8000-000000000000 2>&1)
+  rc=$?
+  if [ "$rc" -ne 0 ] && printf '%s' "$out" | grep -Fq 'not a GenesisBlock Android Maven Central artifact'; then
+    echo "  ok    wrong coordinate is rejected before publish"
+  else
+    echo "  FAIL  wrong Maven coordinate was accepted for publish"
+    failures=$((failures + 1))
+  fi
+
+  printf '200\t{"deploymentState":"PUBLISHING","purls":[],"errors":{"common":["Deployment components info not found"]}}\n' > "$stub"
+  out=$(CENTRAL_STATUS_STUB="$stub" check_existing \
+        00000000-0000-4000-8000-000000000000 2>&1)
+  rc=$?
+  if [ "$rc" -eq 0 ] && printf '%s' "$out" | grep -Fq 'is PUBLISHING'; then
+    echo "  ok    PUBLISHING without purls passes read-only check"
+  else
+    echo "  FAIL  PUBLISHING without purls was rejected"
+    printf '%s\n' "$out" | sed 's/^/          /'
+    failures=$((failures + 1))
+  fi
+
+  printf '200\t{"deploymentState":"PUBLISHING","purls":[],"errors":{"common":["Deployment components info not found"]}}\n200\t{"deploymentState":"PUBLISHING","purls":[],"errors":{"common":["Deployment components info not found"]}}\n201\t{"deploymentState":"PUBLISHED","purls":[],"errors":{"common":["Deployment components info not found"]}}\n' > "$stub"
+  : > "$publish_stub"
+  out=$(CENTRAL_STATUS_STUB="$stub" CENTRAL_PUBLISH_STUB="$publish_stub" \
+        POLL_INTERVAL=1 POLL_TIMEOUT=5 publish_existing \
+        00000000-0000-4000-8000-000000000000 2>&1)
+  rc=$?
+  if [ "$rc" -eq 0 ]; then
+    echo "  ok    PUBLISHING without purls resumes without a second publish request"
+  else
+    echo "  FAIL  PUBLISHING resume (exit $rc)"
+    printf '%s\n' "$out" | sed 's/^/          /'
+    failures=$((failures + 1))
+  fi
+  rm -f "$publish_stub"
+
+  echo
   if [ "$failures" -ne 0 ]; then
     echo "::error::central-await-validation self-test: $failures failure(s)"
     return 1
@@ -265,15 +459,22 @@ self_test() {
 case "${1:-}" in
   --self-test)
     self_test ;;
+  --check|--publish)
+    if [ "$#" -ne 2 ]; then echo "::error::usage: $(basename "$0") $1 <deployment-id>"; exit 2; fi
+    if ! valid_id "$2"; then echo "::error::not a deployment id: '$2'"; exit 2; fi
+    case "$1" in
+      --check) check_existing "$2" ;;
+      --publish) publish_existing "$2" ;;
+    esac ;;
   "")
-    echo "::error::usage: $(basename "$0") <deployment-id> | --self-test"
+    echo "::error::usage: $(basename "$0") <deployment-id> | --check <deployment-id> | --publish <deployment-id> | --self-test"
     exit 2 ;;
   *)
     # Refuse to poll on a malformed id rather than burn the whole timeout asking
     # Central about garbage. The upload step captures this from the response
     # body, so a change in that body's shape surfaces here as an immediate
     # error instead of a 20-minute wait.
-    if ! printf '%s' "$1" | grep -Eq '^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$'; then
+    if ! valid_id "$1"; then
       echo "::error::not a deployment id: '$1'"
       exit 2
     fi

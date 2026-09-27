@@ -21,6 +21,47 @@ container that reuses PID 1 can recover a legacy lock from the previous process
 instance, while a live same-instance owner remains rejected. The worker suite
 covers both cases.
 
+## [0.2.9] - 2026-09-27
+
+### Updated - published Python distribution status
+
+- Refresh the npm README and Python SDK guides to document the published
+  `genesisblockdb-client` 0.1.0 package and its clean PyPI consumer verification.
+  No engine behavior changed.
+
+## [0.2.8] - 2026-09-27
+
+### Fixed - npm release distribution guide
+
+- Refresh the README embedded in the npm package so its installation matrix
+  matches the registry, Maven Central, Go proxy, GHCR, GitHub Release, Homebrew,
+  and Scoop consumer evidence recorded for issue #166. No engine behavior
+  changed.
+
+## [0.2.7] - 2026-09-27
+
+### Published - Android SDK 0.1.2
+
+- Publish `io.github.freshair129:genesisdb-android:0.1.2` to Maven Central with
+  `kotlinx-serialization-json` available on the consumer compile classpath. The
+  clean x86_64 emulator consumer passed against the public artifact in
+  [Mobile Build run 36316221124](https://github.com/Freshair129/GenesisBlock/actions/runs/36316221124).
+
+### Added
+
+- Add standalone REST server binaries and a GHCR image release path with a
+  container persistence smoke check.
+- Package the MCP server as the `genesisblock-mcp` command in the main npm
+  package; add Python wheel/sdist and Go submodule distribution workflows.
+
+### Fixed
+
+- Remove the `atomic-polyfill` dependency from the Rust test dependency graph.
+
+The registry publications for this release remain gated on the matching
+version-tag workflows and clean-consumer checks; see the root README for the
+verified channel status.
+
 ## [0.2.6] - 2026-09-09
 
 ### Added - read-only SQL over the relational projection

@@ -10,7 +10,7 @@ plugins {
 // sync with modules.json's `genesisdb-android` surface entry by hand
 // (per-surface versions are intentionally not SSOT-gated, see
 // docs/SPEC--MOBILE-SDK.md "Versioning model").
-val genesisdbAndroidVersion = "0.1.1"
+val genesisdbAndroidVersion = "0.1.2"
 
 // Maven COORDINATE group, overridable with -PgenesisdbGroup.
 //
@@ -101,7 +101,7 @@ android {
 
 dependencies {
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.1")
-    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.3")
+    api("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.3")
 
     testImplementation("junit:junit:4.13.2")
     testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.8.1")

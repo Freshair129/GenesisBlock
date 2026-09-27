@@ -26,11 +26,9 @@
 #      the @freshair129 scope AND to the unscoped `react-native-genesisdb`
 #      name (rn-npm-publish reuses this same secret). Settings → Secrets and
 #      variables → Actions.
-#   2. package.json `install: npm run build` forces a Rust compile on EVERY
-#      consumer `npm install`. Before the first real publish, change it so
-#      consumers receive the prebuilt platform addon instead of recompiling
-#      (the napi optionalDependencies + index.js resolver already handle
-#      runtime selection). CI here uses `--ignore-scripts` to avoid recompiling.
+#   2. The published package has no install hook: consumers resolve the
+#      prebuilt platform addon through napi optionalDependencies and index.js.
+#      Keep that contract; this workflow explicitly builds each release target.
 #   3. android-publish needs NO new secret — it authenticates to GitHub
 #      Packages with the workflow's own auto-issued GITHUB_TOKEN (job-level
 #      `packages: write` permission below), the same way every other job here
@@ -60,6 +58,9 @@ on:
       - 'package.json'
       - 'modules.json'
       - 'Cargo.toml'
+      - 'docs/VERSION.md'
+      - 'scripts/version.mjs'
+      - 'scripts/version-doc-check.mjs'
       - 'android/**'
       - 'react-native-genesisdb/**'
   workflow_dispatch:
@@ -87,12 +88,44 @@ env:
   IS_RELEASE: ${{ github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v') }}
 
 jobs:
+  release-version-check:
+    name: verify release version contract
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.repair_tag || github.ref }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Verify lock-step version files
+        run: npm run version:check
+
+      - name: Verify release tag matches engine version
+        if: ${{ (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')) || inputs.repair_tag != '' }}
+        shell: bash
+        env:
+          REPAIR_TAG: ${{ inputs.repair_tag }}
+        run: |
+          set -euo pipefail
+          TAG="$REPAIR_TAG"
+          if [ -z "$TAG" ]; then TAG="$GITHUB_REF_NAME"; fi
+          EXPECTED="v$(node scripts/version.mjs get)"
+          if [ "$TAG" != "$EXPECTED" ]; then
+            echo "release tag/package mismatch: tag=$TAG expected=$EXPECTED" >&2
+            exit 1
+          fi
+          echo "release tag matches engine version $EXPECTED"
+
   build:
     name: build ${{ matrix.target }}
     # Skipped in repair mode: a repair run only rebuilds and replaces an
     # existing release's ASSETS. Registry publishes would fail with 403 /
     # 409 (that version is already live) and turn a clean repair red.
     if: ${{ inputs.repair_tag == '' }}
+    needs: release-version-check
     runs-on: ${{ matrix.host }}
     strategy:
       fail-fast: false
@@ -127,8 +160,8 @@ jobs:
         with:
           key: ${{ matrix.target }}
 
-      # --ignore-scripts: skip the `install` script so npm does not kick off a
-      # second (platform-default) Rust build before we build the real target.
+      # Skip install lifecycle scripts; the explicit target build below is the
+      # only native addon build in this job.
       - name: Install dependencies
         run: npm ci --ignore-scripts
 
@@ -149,7 +182,7 @@ jobs:
     # 409 (that version is already live) and turn a clean repair red.
     if: ${{ inputs.repair_tag == '' }}
     runs-on: ubuntu-latest
-    needs: build
+    needs: [build, release-version-check]
     steps:
       - uses: actions/checkout@v4
 
@@ -241,6 +274,7 @@ jobs:
   # builds; see the DWARF/size guard below for the defect that made that true.
   android-publish:
     name: publish genesisdb-android to GitHub Packages
+    needs: release-version-check
     runs-on: ubuntu-latest
     permissions:
       # contents: write — this job now attaches the .aar it builds as a
@@ -307,7 +341,9 @@ jobs:
           distribution: temurin
           java-version: '17'
 
-      - uses: android-actions/setup-android@v3
+      - uses: android-actions/setup-android@v4
+        with:
+          packages: platform-tools
 
       - uses: gradle/actions/setup-gradle@v4
         with:
@@ -462,6 +498,7 @@ jobs:
     # existing release's ASSETS. Registry publishes would fail with 403 /
     # 409 (that version is already live) and turn a clean repair red.
     if: ${{ inputs.repair_tag == '' }}
+    needs: release-version-check
     runs-on: ubuntu-latest
     permissions:
       contents: read

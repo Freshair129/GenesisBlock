@@ -72,6 +72,7 @@ jobs:
         run: cargo clippy --all-targets -- -D warnings
 
   rust-tests:
+    timeout-minutes: 15
     name: cargo test (${{ matrix.host }})
     runs-on: ${{ matrix.host }}
     strategy:

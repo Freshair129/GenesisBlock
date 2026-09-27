@@ -152,6 +152,59 @@ flowchart TB
     core --> index
 ```
 
+### Distribution and Release Flow
+
+The distribution boundary packages one engine through independent release
+channels. `Cargo.toml` anchors the engine build version. `scripts/version.mjs`
+checks `Cargo.lock`, `package.json`, `package-lock.json`, and `modules.json`;
+`docs/VERSION.md` is the human-readable record maintained alongside them. The
+Python SDK has its own `python-v*` tag, the Go submodule uses
+`genesisdb-go/v*`, and mobile SDK versions remain independent.
+
+```mermaid
+flowchart LR
+    main["Verified main commit"] --> engineTag["v* tag matching version contract"]
+    engineTag --> releaseActions["GitHub Actions release workflows"]
+    releaseActions --> napiBuild["N-API target builds"]
+    napiBuild --> npm["npm main + platform packages"]
+    releaseActions --> serverBuild["Standalone server target builds"]
+    serverBuild --> ghRelease["GitHub Release binaries + SHA-256"]
+    releaseActions --> containerSmoke["Container build + volume persistence smoke"]
+    containerSmoke --> ghcr["GHCR image + provenance + SBOM"]
+    engineTag --> android["Android release artifact / registry checks"]
+    engineTag --> rn["React Native npm registry check"]
+    ghRelease --> packageManagers["Homebrew + Scoop clean consumers"]
+
+    pythonCi["Wheel/sdist + clean consumer CI"] -. release policy .-> pythonTag["python-v* tag"]
+    pythonTag --> pypiBuild["Release wheel + sdist"]
+    pypiBuild --> pypi["PyPI via Trusted Publishing"]
+    goTag["genesisdb-go/v* tag"] --> goProxy["Go module proxy"]
+    goProxy --> goCheck["Versioned clean-consumer + live-server CI"]
+
+    npm --> consumerNpm["Node / MCP registry consumer"]
+    ghRelease --> consumerServer["REST deployment consumer"]
+    ghcr --> consumerServer
+    pypi --> consumerPython["Python registry consumer"]
+    goProxy --> consumerGo["Go REST client"]
+```
+
+The diagram shows the artifact routes, while release status is verified
+separately against the hosted registries. The `v0.2.7` release publishes the
+main npm package (including the MCP CLI), standalone server binaries with
+SHA-256 sidecars, and the public GHCR image. The GHCR image was anonymously
+pulled and passed a volume persistence smoke. Homebrew and Scoop install those
+checksummed release binaries in clean consumer jobs. The Go submodule tag
+`genesisdb-go/v0.1.0` passed proxy resolution and a live-server consumer check.
+
+The Python package `genesisblockdb-client==0.1.0` is now published on PyPI.
+After the pending publisher was configured, the `python-v0.1.0` tag publish
+passed in [run 36305930749](https://github.com/Freshair129/GenesisBlock/actions/runs/36305930749).
+A clean public registry consumer passed in
+[run 36322437144](https://github.com/Freshair129/GenesisBlock/actions/runs/36322437144).
+The root Rust crate remains source-only by the accepted crates.io ADR. The iOS
+release-asset path remains the published binary path; no root-level SwiftPM
+package is claimed.
+
 ## 5. C3 - Components
 
 ### Rust Core Engine Components

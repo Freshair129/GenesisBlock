@@ -323,15 +323,27 @@ export interface DatabaseStatus {
 export interface IndexCoverageReport {
   /** Collection to which this validation belongs. */
   collection: string
-  /** UNVERIFIED, CATCHING_UP, READY, or FAILED. READY is structural only. */
+  /**
+   * Lifecycle state of the last observed structural validation.
+   * `READY` proves source/graph membership equality only; it does not prove
+   * exact search or ANN recall.
+   */
   state: string
+  /** Number of durable vector metadata rows in the collection. */
   sourceCount: number
+  /** Number of origin IDs observed in the HNSW graph. */
   indexedCount: number
+  /** Source rows absent from the graph during the last explicit validation. */
   missingCount: number
+  /** Graph origin IDs absent from the durable source metadata. */
   extraCount: number
+  /** Engine-global async indexing backlog at validation/report time. */
   pendingCount: number
+  /** Maximum `created_seq` in the source metadata. */
   sourceFrontier: number
+  /** Maximum `created_seq` represented by validated graph members. */
   builtFrontier: number
+  /** True only when an explicit validation covered the current source set. */
   validated: boolean
 }
 export interface CollectionInfo {
@@ -383,7 +395,10 @@ export interface CollectionInfo {
    * collections); the SAME value is repeated on every entry for convenience.
    */
   indexLag: number
-  /** Explicit structural source-to-HNSW coverage; not an exactness claim. */
+  /**
+   * Explicit structural source-to-HNSW coverage. `READY` is not an exactness
+   * or ANN-recall claim; callers must inspect the individual fields.
+   */
   coverage: IndexCoverageReport
 }
 export interface SyncPeer {
