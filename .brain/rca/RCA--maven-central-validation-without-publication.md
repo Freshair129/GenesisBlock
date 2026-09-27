@@ -27,20 +27,29 @@ Central.
   defines `VALIDATED` as awaiting manual publication and `PUBLISHED` as
   successfully available on Maven Central. A validated user-managed deployment
   must be published with `POST /api/v1/publisher/deployment/{deploymentId}`.
+- After recovery run [36315684077](https://github.com/Freshair129/GenesisBlock/actions/runs/36315684077)
+  reached `PUBLISHED`, Sonatype's status response had `purls: []` and
+  `Deployment components info not found`. Direct Maven Central `HEAD` requests
+  for both the `0.1.2` POM and AAR returned HTTP 200.
 
 ## Root Cause
 
 The workflow uploaded a user-managed deployment but treated validation as the
 release's terminal success state. It never called Sonatype's publish endpoint,
 so `0.1.2` remained validated in the Portal and absent from the public Maven
-repository.
+repository. During recovery, the status API also omitted PURLs while the
+deployment was publishing and after publication. Coordinate validation belongs
+before the publish request, when Central reports the validated components; a
+resume check must allow `PUBLISHING`/`PUBLISHED` by deployment ID without
+sending another publish request.
 
 ## Why the Issue Escaped Detection
 
 The status guard's self-test explicitly expected `VALIDATED` to pass. The
 publishing workflow therefore went green at the validation boundary. The
 consumer test was subsequently dispatched against `0.1.2`; the regular PR
-consumer test defaulted to the already-published `0.1.1` artifact.
+consumer test defaulted to the already-published `0.1.1` artifact. Recovery
+tests also assumed Central continued to return PURLs during publishing.
 
 ## Proposed Prevention
 
@@ -48,13 +57,26 @@ consumer test defaulted to the already-published `0.1.1` artifact.
   guard to wait for `PUBLISHED` before succeeding.
 - Add a guarded manual recovery workflow for an existing deployment: verify its
   Maven coordinate, publish only from `VALIDATED`, then wait for `PUBLISHED`.
+- Resume `PUBLISHING`/`PUBLISHED` by deployment ID when the status API omits
+  PURLs; verify availability through the clean public consumer and direct
+  artifact checks.
 - Run the state-guard self-test in pull-request CI so the publishing boundary
   is exercised before any release dispatch.
 - Keep the clean public Central consumer check as evidence separate from
   upload and validation.
 
+## Outcome (Measured)
+
+- The local self-test passes all publisher-state, wrong-coordinate, missing-PURL,
+  and no-duplicate-publish cases.
+- The published `0.1.2` POM and AAR each return HTTP 200 from Maven Central.
+- Clean Android Maven Central consumer run
+  [36316221124](https://github.com/Freshair129/GenesisBlock/actions/runs/36316221124)
+  passed, including its x86_64 emulator job.
+- Hosted validation of this recovery regression change: pending PR CI.
+
 ## Version Diff
 
 | From | To | Change |
 |---|---|---|
-| Current Maven release guard | Published-state guard | Require `PUBLISHED` instead of accepting `VALIDATED`; add a coordinate-checked recovery path for deployment `6147063c-4cbb-4b3e-aa94-ec442dcdf71e`. |
+| Current Maven release guard | Published-state guard | Require `PUBLISHED` instead of accepting `VALIDATED`; check coordinates before publish and allow read-only recovery/resume states when the API omits PURLs. |

@@ -70,7 +70,7 @@ on:
       central_version:
         description: Published genesisdb-android version to test on the emulator
         required: false
-        default: '0.1.1'
+        default: '0.1.2'
         type: string
   push:
     branches: [ main ]
@@ -759,7 +759,7 @@ jobs:
       - name: Run the published Central artifact on an x86_64 AVD
         uses: reactivecircus/android-emulator-runner@v2
         env:
-          CENTRAL_VERSION: ${{ github.event.inputs.central_version || '0.1.1' }}
+          CENTRAL_VERSION: ${{ github.event.inputs.central_version || '0.1.2' }}
         with:
           api-level: 30
           arch: x86_64
