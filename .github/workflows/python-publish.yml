@@ -49,10 +49,15 @@ jobs:
       - name: Inspect artifacts
         run: ls -lh genesisdb-python/dist
 
+      - name: Report workflow_dispatch dry run
+        if: ${{ github.event_name == 'workflow_dispatch' }}
+        run: echo "DRY RUN: wheel and sdist built and checked; PyPI publishing is enabled only for python-v* tag pushes."
+
       # Requires a one-time PyPI Trusted Publisher binding for this repository,
       # workflow filename, and the `pypi` GitHub Environment. No long-lived API
       # token is stored in GitHub.
       - name: Publish to PyPI with Trusted Publishing
+        if: ${{ github.event_name == 'push' && startsWith(github.ref, 'refs/tags/python-v') }}
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
           packages-dir: genesisdb-python/dist/
