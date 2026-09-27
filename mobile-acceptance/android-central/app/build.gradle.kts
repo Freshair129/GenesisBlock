@@ -28,4 +28,5 @@ dependencies {
     androidTestImplementation("io.github.freshair129:genesisdb-android:0.1.1")
     androidTestImplementation("androidx.test.ext:junit:1.1.5")
     androidTestImplementation("androidx.test:runner:1.5.2")
+    androidTestImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.8.1")
 }

@@ -2,7 +2,7 @@
 
 ## Status / Date
 
-Root cause confirmed; fixture target alignment pending hosted consumer rerun / 2026-09-27.
+Root cause confirmed; target alignment verified; separate coroutine test dependency defect found / 2026-09-27.
 
 ## Symptom
 
@@ -47,3 +47,10 @@ own module, whose Java and Kotlin targets are already aligned.
 Keep the clean consumer fixture's Java and Kotlin targets aligned with the
 published Android artifact, and retain the emulator test as a distribution
 acceptance gate.
+
+## Outcome (Measured)
+
+Hosted run [36309590832](https://github.com/Freshair129/GenesisBlock/actions/runs/36309590832)
+passed JVM target validation and reached Kotlin source compilation. The
+compiler then reported an unresolved coroutine test dependency, recorded in
+`RCA--android-central-consumer-test-coroutines.md`.
