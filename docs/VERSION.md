@@ -19,7 +19,7 @@ those as legacy labels superseded by this file.
 
 | Field | Value |
 |---|---|
-| **Engine crate** (`Cargo.toml`, `Cargo.lock`, `package.json`, `package-lock.json`, `modules.json`) | `0.2.7` |
+| **Engine crate** (`Cargo.toml`, `Cargo.lock`, `package.json`, `package-lock.json`, `modules.json`) | `0.2.8` |
 | **Product milestone** | **Mobile SDK** — Phase B (iOS/Android/React Native) shipped and published; on-device acceptance verified for iOS |
 | **Status** | Advanced prototype (durable, benchmarked, suite green) |
 | **Evidence baseline** | 2026-06-21 — audits P14–P30, `REPORT--2026-06-21-PERFORMANCE-AND-COMPETITIVE.md` |
@@ -39,7 +39,9 @@ query contracts and isolated GenesisRAG17 worker integration. **`0.2.7`
 (2026-09-27)** publishes the main npm package and MCP CLI, standalone server
 archives with SHA-256 sidecars, GHCR image, and Go SDK `v0.1.0`. The same-repo
 Homebrew formula and Scoop manifest install the checksummed server archives; a
-winget manifest is not published. Android SDK `0.1.2` was
+winget manifest is not published. **`0.2.8` (2026-09-27)** refreshes the README
+embedded in the npm release so its install matrix reflects the verified public
+channels; no engine behavior changed. Android SDK `0.1.2` was
 published independently to Maven Central on 2026-09-27 with its public compile
 dependency included; a clean x86_64 emulator consumer passed in Mobile Build
 run 36316221124. Python package version

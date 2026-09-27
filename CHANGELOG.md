@@ -21,6 +21,15 @@ container that reuses PID 1 can recover a legacy lock from the previous process
 instance, while a live same-instance owner remains rejected. The worker suite
 covers both cases.
 
+## [0.2.8] - 2026-09-27
+
+### Fixed - npm release distribution guide
+
+- Refresh the README embedded in the npm package so its installation matrix
+  matches the registry, Maven Central, Go proxy, GHCR, GitHub Release, Homebrew,
+  and Scoop consumer evidence recorded for issue #166. No engine behavior
+  changed.
+
 ## [0.2.7] - 2026-09-27
 
 ### Published - Android SDK 0.1.2
