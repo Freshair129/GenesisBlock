@@ -2,7 +2,7 @@
 title: "GenesisBlockDB Technical Architecture and Capability Composition"
 doc_id: "MASTER-SPEC-GENESISBLOCKDB"
 status: current
-version: "2.3.2b"
+version: "2.3.3b"
 updated: "2026-09-28"
 owner: "GenesisBlockDB Architecture"
 source_of_truth: true
@@ -28,6 +28,9 @@ The owner-approved [HQL2 execution boundary](adr/ADR--GENESISDB-HQL2-EXECUTION-B
 adds a staged, explicitly selected v2 query pipeline. Existing HQL, Query IR v1,
 storage and transport contracts remain the current compatibility surfaces.
 P7 reference-interpreter evidence does not imply P8 production execution.
+The [P8 core checkpoint](REPORT--HQL2-P8-CORE-2026-09-28.md) records the
+separately approved Rust scalar pipeline and its explicit storage/surface gaps;
+neither this slice nor parser/config coverage closes the full HQL2 gate.
 
 ## 1. Role of this document
 
@@ -352,6 +355,7 @@ P6 ACL contract does not claim migrated tenant isolation. See [P6 specification]
 | Version | Date | Owner | Summary |
 |---|---|---|---|
 | 2.3.2b | 2026-09-28 | GenesisBlockDB Architecture | Register accepted explicit HQL2 execution boundary; P7 fixtures do not imply production completion. |
+| 2.3.3b | 2026-09-28 | GenesisBlockDB Architecture | Register the approved P8 scalar/core checkpoint and remaining storage/surface gates. |
 | 2.3.1b | 2026-09-22 | GenesisBlockDB Architecture | Registered the owner-approved P6 durability, generation/lease, temporal and ACL target with explicit schema-compatibility and implementation-status limits. |
 | 2.3.0b | 2026-09-08 | GenesisBlockDB Architecture | Added the separate GenesisRAG17 TEST adapter boundary, ordered publication flow and extension references while retaining the client-neutral core. |
 | 2.2.2 | 2026-09-08 | GenesisBlockDB Architecture | Reflected approved Wave B durable collections, schema compatibility and edge version intervals. |

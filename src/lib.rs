@@ -3834,6 +3834,306 @@ impl Storage {
         Ok(generation)
     }
 
+    // Called only while commit_lock is held. Reads authorized schema metadata,
+    // never user rows, HNSW, a snapshot publisher, or a data operator.
+    fn hql2_catalog_stamp(
+        &self,
+        access: &AccessContext,
+    ) -> std::result::Result<query::hql2::result::CatalogStampV2, query::hql2::QueryErrorV2> {
+        use query::hql2::{result::CatalogStampV2, QueryErrorV2};
+        use std::collections::BTreeMap;
+        self.ensure_readable().map_err(hql2_storage_error)?;
+        if access.principal.trim().is_empty() || access.namespace.trim().is_empty() {
+            return Err(QueryErrorV2::new(
+                "AUTH_REQUIRED",
+                "authorize",
+                "access_context",
+            ));
+        }
+        self.authorize_namespace_read(access, &access.namespace)
+            .map_err(hql2_storage_error)?;
+        if access.namespace != "default" {
+            return Err(QueryErrorV2::new(
+                "CAPABILITY_UNSUPPORTED",
+                "bind",
+                "namespace_storage",
+            ));
+        }
+        let schema =
+            Self::load_relational_schema_conn(&self.projection_db.lock(), &access.namespace)
+                .map_err(hql2_storage_error)?;
+        let mut definitions = BTreeMap::<String, Value>::new();
+        if let Some(schema) = schema {
+            for table in schema.tables {
+                let columns: BTreeMap<_, _> = table
+                    .columns
+                    .into_iter()
+                    .map(|c| {
+                        (
+                            c.name,
+                            serde_json::json!({"type":c.column_type,"nullable":c.nullable}),
+                        )
+                    })
+                    .collect();
+                definitions.insert(
+                    format!("table:{}", table.name),
+                    serde_json::json!({
+                        "columns":columns,"primary_key":table.primary_key
+                    }),
+                );
+            }
+        }
+        for collection in self.collections.iter() {
+            let definition = self.collection_definitions.get(collection.key());
+            definitions.insert(format!("collection:{}", collection.key()), serde_json::json!({
+                "model":collection.model,"dim":collection.dim,"metric":collection.metric.as_str(),
+                "definition_hash":definition.as_ref().map(|d|d.definition_hash.as_str())
+            }));
+        }
+        let bytes = serde_json::to_vec(&definitions)
+            .map_err(|_| QueryErrorV2::new("BIND_ERROR", "bind", "catalog_encoding"))?;
+        Ok(CatalogStampV2 {
+            observed_frontier: self.commit_sequence.load(Ordering::SeqCst),
+            policy_revision: self.access_policy.read().revision,
+            schema_fingerprint: hex::encode(Sha256::digest(bytes)),
+        })
+    }
+
+    fn with_hql2_catalog<T>(
+        &self,
+        access: &AccessContext,
+        callback: impl for<'catalog> FnOnce(
+            &query::hql2::catalog::AuthorizedCatalogV2<'catalog>,
+        )
+            -> std::result::Result<T, query::hql2::QueryErrorV2>,
+    ) -> std::result::Result<T, query::hql2::QueryErrorV2> {
+        let guard = self.commit_lock.lock();
+        let stamp = self.hql2_catalog_stamp(access)?;
+        let catalog = query::hql2::catalog::AuthorizedCatalogV2::new(stamp.clone(), &guard);
+        let result = callback(&catalog);
+        self.ensure_readable().map_err(hql2_storage_error)?;
+        self.authorize_namespace_read(access, &access.namespace)
+            .map_err(hql2_storage_error)?;
+        if self.access_policy.read().revision != stamp.policy_revision {
+            return Err(query::hql2::QueryErrorV2::new(
+                "FORBIDDEN",
+                "authorize",
+                "policy_changed",
+            ));
+        }
+        result
+    }
+
+    /// Explicit HQL2/IR-v2 Rust boundary. Existing HQL and transports are unchanged.
+    pub fn query_v2(
+        &self,
+        access: AccessContext,
+        mut request: uee_v2::QueryRequestV2,
+    ) -> std::result::Result<query::hql2::QueryOutcomeV2, query::hql2::QueryErrorV2> {
+        use query::hql2::{
+            bind, exec, lower, plan, request as policy, result::*, wire, QueryErrorV2,
+        };
+        use std::collections::BTreeMap;
+        let started = Instant::now();
+        let result = (|| {
+            // The outer guard survives catalog acquisition, binding, pinning,
+            // execution, final lease validation and boundary result construction.
+            let _query_guard = self.commit_lock.lock();
+            self.ensure_readable().map_err(hql2_storage_error)?;
+            if access.principal.trim().is_empty() || access.namespace.trim().is_empty() {
+                return Err(QueryErrorV2::new(
+                    "AUTH_REQUIRED",
+                    "authorize",
+                    "access_context",
+                ));
+            }
+            self.authorize_namespace_read(&access, &access.namespace)
+                .map_err(hql2_storage_error)?;
+            if request.namespace != access.namespace {
+                return Err(QueryErrorV2::new(
+                    "FORBIDDEN",
+                    "authorize",
+                    "namespace_mismatch",
+                ));
+            }
+            let mut budget = exec::ExecutionBudgetV2::new(&request.budget)?;
+            budget.account_elapsed_since(started);
+            budget.reserve(policy::input_bytes(&request)?)?;
+            // Reserve before loading/decoding a schema package. Only metadata length
+            // is read here; no user relation or index is opened.
+            let catalog_bytes: u64 = self.projection_db.lock().query_row(
+            "SELECT COALESCE(SUM(length(CAST(package_json AS BLOB))),0) FROM relational_schema_registry WHERE namespace=?1",
+            [&access.namespace], |row| row.get(0),
+        ).map_err(|_|QueryErrorV2::new("DATA_CORRUPTION","execute","catalog_unavailable"))?;
+            budget.reserve(catalog_bytes.saturating_mul(32).saturating_add(4096))?;
+            for collection in self.collections.iter() {
+                budget.reserve(
+                    (collection.key().len() as u64)
+                        .saturating_add(collection.model.len() as u64)
+                        .saturating_mul(32)
+                        .saturating_add(1024),
+                )?;
+            }
+            self.with_hql2_catalog(&access, |catalog| {
+                if request.namespace != access.namespace {
+                    return Err(QueryErrorV2::new(
+                        "FORBIDDEN",
+                        "authorize",
+                        "namespace_mismatch",
+                    ));
+                }
+                // Validate source/version before choosing a parser. Authorization has
+                // already run, so invalid requests cannot probe inaccessible metadata.
+                if request.contract_version != "genesis.api.v2"
+                    || request
+                        .ir
+                        .as_ref()
+                        .is_some_and(|ir| ir.contract_version != "query-ir.v2")
+                {
+                    return Err(QueryErrorV2::new(
+                        "VERSION_UNSUPPORTED",
+                        "contract",
+                        "contract_version",
+                    ));
+                }
+                policy::validate_envelope(&request)?;
+                if request.language_version == Some(uee_v2::HqlLanguageVersionV2::HqlV1) {
+                    return Err(QueryErrorV2::new(
+                        "CAPABILITY_UNSUPPORTED",
+                        "bind",
+                        "legacy_lowering",
+                    ));
+                }
+                if let Some(source) = request.hql.as_deref() {
+                    budget.reserve(query::hql2::required_heap_bytes(source)?)?;
+                    budget.reserve(query::hql2::required_stack_bytes(source)?)?;
+                }
+                let statement = request
+                    .hql
+                    .as_deref()
+                    .map(query::hql2::parse_hql2)
+                    .transpose()?;
+                let options = policy::normalize(
+                    &request,
+                    statement.as_ref(),
+                    catalog.stamp.observed_frontier,
+                    self.history_horizon().max(1),
+                    Utc::now(),
+                )?;
+                let params = bind::BoundParametersV2::decode(&request.params)?;
+                let logical = if let Some(statement) = statement {
+                    lower::lower_hql2(statement)?
+                } else {
+                    wire::decode_ir_v2(request.ir.take().ok_or_else(|| {
+                        QueryErrorV2::new("BIND_ERROR", "bind", "missing_source")
+                    })?)?
+                };
+                budget.reserve(policy::planning_bytes(&logical, &request))?;
+                let physical = plan::plan_v2(bind::bind_v2(logical, &params, catalog)?)?;
+                budget.check()?;
+                if options.mode == uee_v2::ExplainV2::Plan {
+                    let result = ExplainResultV2 {
+                        request_id: request.request_id.clone(),
+                        catalog: catalog.stamp.clone(),
+                        plan: physical.explain_nodes(),
+                        root: physical.root().into(),
+                    };
+                    hql2_check_output(&result, 0, &budget)?;
+                    return Ok(QueryOutcomeV2::Plan(result));
+                }
+                let lease = self
+                    .pin_generation(
+                        access.clone(),
+                        TemporalRead {
+                            as_of: Some(options.valid_at.to_rfc3339()),
+                            tx_as_of: options.tx,
+                        },
+                        Duration::from_secs(5),
+                    )
+                    .map_err(hql2_storage_error)?;
+                // Nested Result preserves typed query errors while allowing the P6
+                // callback to enforce its mandatory post-callback lease validation.
+                let execution = self
+                    .with_read_lease(&lease, |view| {
+                        Ok((|| {
+                            let leased_catalog = view.hql2_catalog()?;
+                            if leased_catalog.stamp.schema_fingerprint
+                                != catalog.stamp.schema_fingerprint
+                                || leased_catalog.stamp.policy_revision
+                                    != catalog.stamp.policy_revision
+                            {
+                                return Err(QueryErrorV2::new(
+                                    "BIND_ERROR",
+                                    "bind",
+                                    "catalog_changed",
+                                ));
+                            }
+                            exec::execute_v2(&physical, &mut budget)
+                        })())
+                    })
+                    .map_err(hql2_storage_error)??;
+                let columns = physical.columns();
+                let mut rows = Vec::new();
+                for row in execution.rows {
+                    budget.reserve((columns.len() as u64).saturating_mul(128).saturating_add(
+                        columns.iter().map(|c| c.name.len() as u64).sum::<u64>(),
+                    ))?;
+                    rows.push(
+                        columns
+                            .iter()
+                            .zip(row)
+                            .map(|(column, value)| (column.name.clone(), value))
+                            .collect(),
+                    );
+                }
+                let mut identity = Sha256::new();
+                identity.update(b"genesis.api.v2.database:");
+                identity.update(self.verifying_key.as_bytes());
+                let result = QueryResultV2 {
+                    request_id: request.request_id.clone(),
+                    snapshot: SnapshotV2 {
+                        database_id: hex::encode(identity.finalize()),
+                        tx: lease.generation.wal_frontier.to_string(),
+                        valid_at: options.valid_at.to_rfc3339(),
+                        catalog_generation: lease.generation.generation_id.to_string(),
+                        policy_version: lease.generation.acl_revision.to_string(),
+                    },
+                    columns,
+                    rows,
+                    semantics: SemanticsV2 {
+                        candidate_search: CandidateSearchV2::Exact,
+                        distance_fidelity: DistanceFidelityV2::NotApplicable,
+                        index_coverage: IndexCoverageV2::NotApplicable,
+                        scope: ResultScopeV2::WholeInput,
+                    },
+                    completeness: CompletenessV2 {
+                        status: CompletionStatusV2::Complete,
+                        reason: None,
+                        eligible_count_known: true,
+                    },
+                    index_frontiers: BTreeMap::new(),
+                    cursor: None,
+                    explain: if options.mode == uee_v2::ExplainV2::Analyze {
+                        Some(ExplainResultV2 {
+                            request_id: request.request_id.clone(),
+                            catalog: catalog.stamp.clone(),
+                            plan: execution.nodes,
+                            root: physical.root().into(),
+                        })
+                    } else {
+                        None
+                    },
+                };
+                hql2_check_output(&result, result.rows.len() as u64, &budget)?;
+                self.validate_lease_unlocked(&lease)
+                    .map_err(hql2_storage_error)?;
+                Ok(QueryOutcomeV2::Rows(result))
+            })
+        })();
+        policy::discard_request(request);
+        result
+    }
+
     pub fn publish_generation(&self) -> Result<GenerationInfo> {
         let _commit_guard = self.commit_lock.lock();
         self.ensure_readable()?;
@@ -16450,7 +16750,73 @@ impl Storage {
     }
 }
 
+fn hql2_storage_error(error: Error) -> query::hql2::QueryErrorV2 {
+    let reason = error.reason;
+    let (code, stage, safe) = if reason.contains("ACCESS_CONTEXT_REQUIRED") {
+        ("AUTH_REQUIRED", "authorize", "access_context")
+    } else if reason.contains("ACCESS_DENIED") {
+        ("FORBIDDEN", "authorize", "access_denied")
+    } else if reason.contains("TEMPORAL_BEYOND_HORIZON") {
+        ("BEYOND_HORIZON", "bind", "retention_horizon")
+    } else if reason.contains("LEASE_") || reason.contains("GENERATION_STALE") {
+        ("SNAPSHOT_EXPIRED", "execute", "lease_invalid")
+    } else if reason == "read-only" {
+        (
+            "CAPABILITY_UNSUPPORTED",
+            "bind",
+            "read_only_generation_unavailable",
+        )
+    } else {
+        ("DATA_CORRUPTION", "execute", "storage_unavailable")
+    };
+    query::hql2::QueryErrorV2::new(code, stage, safe)
+}
+
+fn hql2_check_output(
+    value: &impl Serialize,
+    rows: u64,
+    budget: &query::hql2::exec::ExecutionBudgetV2,
+) -> std::result::Result<(), query::hql2::QueryErrorV2> {
+    struct Counter<'a> {
+        bytes: u64,
+        rows: u64,
+        budget: &'a query::hql2::exec::ExecutionBudgetV2,
+    }
+    impl std::io::Write for Counter<'_> {
+        fn write(&mut self, bytes: &[u8]) -> std::io::Result<usize> {
+            self.bytes = self.bytes.saturating_add(bytes.len() as u64);
+            self.budget
+                .check_output(self.rows, self.bytes)
+                .map_err(std::io::Error::other)?;
+            Ok(bytes.len())
+        }
+        fn flush(&mut self) -> std::io::Result<()> {
+            Ok(())
+        }
+    }
+    let mut counter = Counter {
+        bytes: 0,
+        rows,
+        budget,
+    };
+    serde_json::to_writer(&mut counter, value).map_err(|_| {
+        query::hql2::QueryErrorV2::new("QUERY_BUDGET_EXCEEDED", "execute", "output_limit")
+    })?;
+    budget.check_output(rows, counter.bytes)
+}
+
 impl<'a> ReadView<'a> {
+    pub(crate) fn hql2_catalog(
+        &self,
+    ) -> std::result::Result<query::hql2::catalog::AuthorizedCatalogV2<'_>, query::hql2::QueryErrorV2>
+    {
+        self.storage.ensure_readable().map_err(hql2_storage_error)?;
+        self.storage
+            .validate_lease_unlocked(self.lease)
+            .map_err(hql2_storage_error)?;
+        let stamp = self.storage.hql2_catalog_stamp(&self.lease.access)?;
+        Ok(query::hql2::catalog::AuthorizedCatalogV2::new(stamp, self))
+    }
     fn validate(&self) -> Result<()> {
         self.storage.ensure_readable()?;
         self.storage.validate_lease_unlocked(self.lease)

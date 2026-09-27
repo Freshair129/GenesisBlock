@@ -1,9 +1,9 @@
 ---
 doc_id: SPEC--GENESISDB-HQL2-P8-TYPED-BOUNDARY
-version: "0.1.1b"
+version: "0.1.2b"
 created_at: "2026-09-28T01:25:00+07:00,ATHER,fc851e9"
-last_update: "2026-09-28T01:49:00+07:00,ATHER"
-status: candidate
+last_update: "2026-09-28T04:30:00+07:00,ATHER"
+status: beta
 superseded_by: null
 owner: "Boss (Founder / Product Authority)"
 attributes:
@@ -14,13 +14,15 @@ attributes:
   complexity: C-3
 ---
 
-# P8 typed boundary — concrete contract for review
+# P8 typed boundary — approved concrete contract
 
 ## Status
 
 The owner approved the architecture in
 [HQL2 execution ADR](adr/ADR--GENESISDB-HQL2-EXECUTION-BOUNDARY.md).
-This candidate freezes the exact interface/config/result decisions that the
+The owner approved version 0.1.1b with "approve" on 2026-09-28, including
+integration of upstream into the isolated HQL2 worktree while preserving P6/P7.
+This approved contract freezes the exact interface/config/result decisions that the
 ADR requires before P8 source changes. It is not evidence of an implemented
 parser, binder, storage adapter or endpoint. No engine version is changed.
 
@@ -30,7 +32,7 @@ Peers: [P6 read contract](SPEC--GENESISDB-P6-GENERATIONS-LEASES-ACL.md),
 [legacy typed IR](SPEC--GENESISDB-TYPED-QUERY-IR-V1.md), and
 [compatibility HQL](SPEC--HQL-V2.md).
 
-## Decisions needing acceptance
+## Accepted decisions
 
 1. Add a **nonpublishing catalog-only authorization boundary** for EXPLAIN.
    It holds the commit lock, validates current policy, reads schema/capability
@@ -226,7 +228,7 @@ CAPABILITY_UNSUPPORTED, AUTH_REQUIRED, FORBIDDEN, COLLECTION_SPACE_MISMATCH,
 EXACT_ORIGINAL_UNAVAILABLE, BEYOND_HORIZON, SNAPSHOT_EXPIRED,
 QUERY_BUDGET_EXCEEDED, CANCELLED. Preserve P6 error causes without exposing IDs.
 
-## Reviewed contract details (proposed, not implemented)
+## Reviewed and approved contract details
 
 ### Authorization, lifetime and bind/execute consistency
 
@@ -395,7 +397,7 @@ SHA-256 of the persisted **public** verifying-key bytes, domain-separated by
 UTF-8 `genesis.api.v2.database:`. This identifies the existing identity lineage;
 cloned/restored identity has the same ID. No private key or filesystem path is
 returned and no new identity file is created. This mapping is an explicit
-owner decision in this candidate, not an existing wire guarantee.
+owner-approved decision; it does not alter legacy wire identity guarantees.
 
 ColumnV2 fields exactly `{name:String,type:String,nullable:bool}`. Plan estimates
 are `EstimateV2 {rows_min:u64,rows_max:Option<u64>,confidence:LowOrMediumOrHigh}`;
@@ -452,6 +454,36 @@ vendored error schema carries only a starting line/column. Errors omit spans
 for IR without source text. No row/embedding/hidden-name content appears in
 safe messages; stable reason codes appear in the detail object.
 
+## Implementation checkpoint (not P8 closure)
+
+On integrated base `22bc11e` (upstream engine 0.2.9 plus preserved local P6/P7),
+the Rust-only implementation begins with the grammar frontend, all 23 closed
+IR config shapes, one scalar binder/planner and the authenticated query_v2
+boundary. See [P8 evidence](REPORT--HQL2-P8-CORE-2026-09-28.md) for exact tests
+and remaining gates. The approved target above is unchanged.
+
+The current exact kernel covers Values, Filter, Project, Distinct, Sort, Take,
+Offset, UnionAll, Aggregate and Join. All 13 other operators are explicitly
+unavailable at binding pending source/revision/space/tokenizer qualification.
+HQL lowering is also partial: untyped NULL/list/object literals, parameterized
+limits, implicit null ordering, remainder, quoted non-ASCII symbols and the
+non-scalar stages reject explicitly rather than inventing semantics. Typed IR
+nullable/list payloads and explicit scalar ordering execute. These are open
+implementation tasks, not amendments reducing final acceptance.
+
+Only the catalog ReadView extension is implemented in this checkpoint; scan,
+hydrate and vectors remain gated. No REST, NAPI, FFI, SDK or MCP adapter is
+added. New query execution may invoke existing P6 generation publication;
+plan-only EXPLAIN cannot. SQLite's volatile shared-memory read marks are not
+durable query effects; tests separately compare signed WAL and snapshot bytes.
+
+Parser admission is budgeted before the PEG allocates: source length at most
+262144 Unicode scalars, at most 2048 lexical units, and a conservative pinned-
+grammar heap plus optional worker-stack reservation within the default 64 MiB.
+The request budget can only reduce this allowance. Grammar-valid wide queries
+may return QUERY_BUDGET_EXCEEDED; post-parse depth128/node10000 checks remain
+separate shape limits. No process-global Pest setting is changed.
+
 ## Acceptance checklist
 
 - 35 positive and 6 negative pinned syntax fixtures; trailing statements,
@@ -476,8 +508,12 @@ safe messages; stable reason codes appear in the detail object.
 | From | To | Effect |
 |---|---|---|
 | none | 0.1.1b candidate | Proposed typed P8 API/config/result boundary, concrete policy/type mappings and P6 catalog/read extensions; no implementation approval inferred |
+| 0.1.1b candidate | 0.1.1b beta | Owner approved the unchanged contract and isolated upstream integration; no push, PR merge, deployment or user database migration authorized |
+| 0.1.1b beta | 0.1.2b beta | Record the partial implementation matrix and evidence link without narrowing the approved target |
 
 | Version | Date | Status | Summary | Commit Hash | Agent |
 |---|---|---|---|---|---|
 | 0.1.0b | 2026-09-28 | candidate | Freeze concrete choices for review before P8 production source | working-tree | ATHER |
 | 0.1.1b | 2026-09-28 | candidate | Address independent review with grant/lifetime/locking contracts, ReadView methods, request policy matrix and exact result/type/error definitions | working-tree | ATHER |
+| 0.1.1b | 2026-09-28 | beta | Owner approved with "approve"; begin implementation and verification without claiming P8 completion | working-tree | ATHER |
+| 0.1.2b | 2026-09-28 | beta | Truth-sync scalar/core implementation limits and distinguish remaining storage and surface gates | working-tree | ATHER |

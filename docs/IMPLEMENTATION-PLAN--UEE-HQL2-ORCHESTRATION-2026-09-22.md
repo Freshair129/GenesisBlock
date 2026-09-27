@@ -1,7 +1,7 @@
 ---
-version: "0.2.2b"
+version: "0.2.3b"
 created_at: "2026-09-22T00:00:00+07:00,ATHER,working-tree"
-last_update: "2026-09-28T01:34:00+07:00,ATHER"
+last_update: "2026-09-28T04:49:00+07:00,ATHER"
 status: candidate
 superseded_by: null
 attributes:
@@ -211,9 +211,12 @@ its deterministic verify command, independent review, and an explicit dispositio
 
 Historical phase decisions below remain an audit trail. The 2026-09-28 owner-approved
 HQL2 execution ADR now authorizes P7 and explicit-v2 continuation within its stated
-gates. New P8 API/read-boundary decisions are proposed in
-`SPEC--GENESISDB-HQL2-P8-TYPED-BOUNDARY.md`; this does not authorize their unreviewed
-implementation or any merge/deploy/user-database migration.
+gates. The owner subsequently approved P8 typed-boundary version 0.1.1b and
+isolated upstream integration with `approve`. The initial scalar/core checkpoint
+is recorded in `REPORT--HQL2-P8-CORE-2026-09-28.md`; P8 remains partial and P9-P16
+are not qualified by that checkpoint. No push, main-branch merge, deployment or
+user-database migration is authorized. Durable revision/annotation extensions
+still require the concrete storage contract review mandated by ADR H2-D11.
 
 ## 8. P5 execution evidence
 
@@ -477,6 +480,7 @@ explicit owner acceptance of the final P6 result. Do not start P7 or merge.
 |---|---|---|---|---|---|
 | 0.2.1b | 2026-09-23 | candidate | Recorded P6 revision-0 fail-closed correction, 45/45 Verify, gpt-5.6-luna Max Review, local audit evidence and remaining peer-authority owner decision | working-tree | ATHER |
 | 0.2.2b | 2026-09-28 | candidate | Reconcile approved HQL2 continuation and replace helper-only P7 gate with four composed Rust oracle targets; retain unapproved P8 concrete-boundary gate | working-tree | ATHER |
+| 0.2.3b | 2026-09-28 | candidate | Record subsequent P8 contract and isolated integration approval; distinguish partial scalar evidence from P8-P16 closure | working-tree | ATHER |
 | 0.2.0b | 2026-09-23 | candidate | Returned P6 to source after Luna Review; clarified signed snapshot authority, pre-parse ACL and legacy JSONL coverage gates | working-tree | ATHER |
 | 0.1.0b | 2026-09-22 | candidate | Initial staged UEE-HQL2 dependency DAG, conflict domains, merge order and gate workflow | working-tree | ATHER |
 | 0.1.1b | 2026-09-22 | candidate | Added explicit path ownership, exact verification commands, merge barriers, and corrected topology evidence scope after Verify Gate FAIL | working-tree | ATHER |

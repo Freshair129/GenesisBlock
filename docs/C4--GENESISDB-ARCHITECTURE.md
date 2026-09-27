@@ -2,7 +2,7 @@
 doc_id: C4--GENESISDB-ARCHITECTURE
 type: architecture-index
 status: current
-version: 0.1.14b
+version: 0.1.15b
 owner: GenesisBlockDB Architecture
 created_at: 2026-06-13T22:50:11+07:00,ATHER,9b1ced3
 last_update: "2026-09-28T00:00:00+07:00,ATHER"
@@ -26,6 +26,9 @@ The staged UEE-HQL2 query architecture is governed by the owner-approved
 [HQL2 execution ADR](adr/ADR--GENESISDB-HQL2-EXECUTION-BOUNDARY.md).
 The reference interpreter is test-only; explicit v2 production binding,
 planning and execution require their own verified phase evidence.
+The [P8 core checkpoint](REPORT--HQL2-P8-CORE-2026-09-28.md) introduces
+`src/query/hql2/` plus one serialized Storage boundary. Its initial runtime is
+scalar-only; storage adapters and transport parity remain separate open gates.
 
 > **Positioning & evidence (2026-06-21):** GenesisBlockDB is an **embedded
 > analytics / agent-memory graph + vector engine** (comparators: Kuzu,
@@ -351,6 +354,7 @@ entity namespace migration is approved. See [P6 generation/lease/ACL specificati
 | 0.1.12b | 2026-09-08 | beta | Registered Wave B collection journal and edge history contracts. | working-tree | ATHER |
 | 0.1.11b | 2026-09-08 | beta | Registered Wave A commit publication, preflight and recovery-required contracts with validation limits. | working-tree | ATHER |
 | 0.1.14b | 2026-09-28 | beta | Register accepted HQL2 execution ADR; implementation and qualification remain stage-gated. | working-tree | ATHER |
+| 0.1.15b | 2026-09-28 | beta | Record explicit-v2 scalar/core module ownership and checkpoint evidence without promoting storage or surface completion. | working-tree | ATHER |
 | 0.1.9b | 2026-08-14 | beta | Registered the accepted Typed Query IR boundary as planned, retained HQL compatibility, and kept NL interpretation outside the engine. | working-tree | ATHER |
 | 0.1.10b | 2026-08-14 | beta | Truth-synced partial Query IR search/traverse implementation across core, REST and N-API. | working-tree | ATHER |
 | 0.1.11b | 2026-09-08 | beta | Added the separate GenesisRAG17 TEST worker container, physical publication boundary and extension-map references without changing the neutral core. | working-tree | RWANG |

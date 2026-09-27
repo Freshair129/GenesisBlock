@@ -1,9 +1,9 @@
 ---
 doc_id: SPEC--GENESISDB-P6-GENERATIONS-LEASES-ACL
 owner: GenesisBlockDB Engineering
-version: 0.2.0b
+version: 0.2.1b
 created_at: "2026-09-22T22:55:00+07:00,ATHER,working-tree"
-last_update: "2026-09-23T06:42:00+07:00,ATHER"
+last_update: "2026-09-28T04:30:00+07:00,ATHER"
 status: beta
 attributes:
   domain: storage-correctness
@@ -101,9 +101,19 @@ TemporalRead is { as_of: Option<String>, tx_as_of: Option<u64> }.
 
 ### Scoped read operations
 
-ReadView exposes exactly node_view(id), node_versions(id, at_seq), neighbors(seed, args,
+The original P6 ReadView operations are node_view(id), node_versions(id, at_seq), neighbors(seed, args,
 is_inferred), hybrid_search(args), execute_query_ir(request), execute_hql(query), and
 query_relational(query). Each returns the existing result type wrapped in Result.
+
+The owner-approved [P8 boundary](SPEC--GENESISDB-HQL2-P8-TYPED-BOUNDARY.md)
+adds crate-private typed catalog/scan/hydrate/vector operations without exposing
+Storage. At the current scalar checkpoint only `hql2_catalog` is implemented;
+the other three require proven identity/schema/source adapters before enabling.
+Its catalog is query-private, namespace-authorized and borrowed under the
+continuous commit guard. Plan-only catalog access does not pin or publish a
+generation. Executed queries still pin one lease and validate it after execution
+and before returning the encoded boundary result. Existing seven operations and
+grant semantics are unchanged.
 
 The view carries its engine-validated lease, access context and selectors, but never exposes
 Storage. In Enforced mode Result-returning direct data reads fail with ACCESS_CONTEXT_REQUIRED;
@@ -230,6 +240,7 @@ not approve P7, merge, release, deployment or external readiness.
 
 | Version | Date | Status | Summary | Commit | Agent |
 |---|---|---|---|---|---|
+| 0.2.1b | 2026-09-28 | beta | Record the owner-approved P8 catalog/read extension; only catalog is implemented and legacy grants remain unchanged | working-tree | ATHER |
 | 0.2.0b | 2026-09-23 | beta | Bind instant-loaded P6 state to signed WAL materializations; require HQL ACL checks before parsing | working-tree | ATHER |
 | 0.1.2b | 2026-09-23 | beta | Classify fail-closed lookup/list accessors and separate operational/transport reads from record ACL | working-tree | ATHER |
 | 0.1.1b | 2026-09-23 | beta | Clarify signed fold materialization, replay verification and fail-closed legacy read accessors | working-tree | ATHER |
