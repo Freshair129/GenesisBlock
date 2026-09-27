@@ -64,10 +64,13 @@ fn coverage_requires_explicit_validation_and_tracks_frontiers() {
     add(&storage, "a", vec![1.0, 0.0, 0.0]);
     eprintln!("ci-progress: coverage added first vector");
 
+    eprintln!("ci-progress: coverage before default report");
     let before = default_report(&storage);
+    eprintln!("ci-progress: coverage after default report");
     assert!(!before.validated);
     assert_ne!(before.state, "READY");
     assert_eq!(before.source_count, 1);
+    eprintln!("ci-progress: coverage after report assertions");
 
     eprintln!("ci-progress: coverage before first flush");
     storage.flush_index();

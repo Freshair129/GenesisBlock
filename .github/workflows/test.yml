@@ -86,7 +86,12 @@ jobs:
       # --no-default-features drops the napi bindings so the integration tests
       # link as plain native binaries (no napi_* symbols) — works on Linux too.
       - name: cargo test (core, no napi)
+        if: matrix.host != 'macos-latest'
         run: cargo test --no-default-features -- --nocapture
+      - name: macOS index coverage diagnostic
+        if: matrix.host == 'macos-latest'
+        timeout-minutes: 3
+        run: cargo test --no-default-features --test index_coverage_tests coverage_requires_explicit_validation_and_tracks_frontiers -- --nocapture
 
   node-tests:
     name: npm test (${{ matrix.host }})
