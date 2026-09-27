@@ -2,7 +2,7 @@
 
 ## Status / Date
 
-Root cause confirmed; PR #168 fix in progress / 2026-09-27.
+Root cause confirmed; PR #168 Rust CI fix validated / 2026-09-27.
 
 ## Symptom
 
@@ -36,5 +36,6 @@ Read the HNSW point count in its own statement, letting the read guard drop befo
 ## Follow-up Verification
 
 - The fix reads the HNSW point count in a separate statement, releasing its read guard before `coverage_report()` reacquires the lock.
-- GitHub Actions run `36289683946` at commit `7f7aa08e38eba037d8022c74ba7d87d388483e83` passed all jobs, including full `cargo test --no-default-features` on Ubuntu, Windows, and macOS. This confirms the fix across the full matrix, but is not yet a passing run on PR #168.
-- The older Wave B timeout (run `35781128316`) remains a separate symptom; its exact blocked statement was not captured.
+- GitHub Actions Tests run `36290607874` at PR #168 head `0865249417ed3c30a7d764c927b8264add405fd5` completed successfully. The full `cargo test --no-default-features` suite passed on Ubuntu, Windows, and macOS; formatting, clippy, docs, version consistency, npm, and worker tests also passed.
+- The previously stalled coverage test and Wave B test both completed in that full run. The old canceled run `35781128316` still has no call-level trace, so its precise blocking statement remains unproven.
+- MCP Distribution run `36290607881` passed at the same PR head.
