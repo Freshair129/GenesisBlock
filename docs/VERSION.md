@@ -19,7 +19,7 @@ those as legacy labels superseded by this file.
 
 | Field | Value |
 |---|---|
-| **Engine crate** (`Cargo.toml`, `Cargo.lock`, `package.json`, `package-lock.json`, `modules.json`) | `0.2.8` |
+| **Engine crate** (`Cargo.toml`, `Cargo.lock`, `package.json`, `package-lock.json`, `modules.json`) | `0.2.9` |
 | **Product milestone** | **Mobile SDK** — Phase B (iOS/Android/React Native) shipped and published; on-device acceptance verified for iOS |
 | **Status** | Advanced prototype (durable, benchmarked, suite green) |
 | **Evidence baseline** | 2026-06-21 — audits P14–P30, `REPORT--2026-06-21-PERFORMANCE-AND-COMPETITIVE.md` |
@@ -44,9 +44,12 @@ embedded in the npm release so its install matrix reflects the verified public
 channels; no engine behavior changed. Android SDK `0.1.2` was
 published independently to Maven Central on 2026-09-27 with its public compile
 dependency included; a clean x86_64 emulator consumer passed in Mobile Build
-run 36316221124. Python package version
-`0.1.0` is built, but the first PyPI Trusted Publishing request was rejected;
-the external publisher binding or service-side OIDC state is not yet confirmed.
+run 36316221124. **`0.2.9` (2026-09-27)** refreshes the npm README and Python
+SDK guides after the first PyPI release; no engine behavior changed. Python
+package `genesisblockdb-client==0.1.0` is published via Trusted Publishing;
+the tag publish passed in [run 36305930749](https://github.com/Freshair129/GenesisBlock/actions/runs/36305930749)
+and the clean public registry consumer passed in
+[run 36322437144](https://github.com/Freshair129/GenesisBlock/actions/runs/36322437144).
 The crate version is kept in lock-step across
 `Cargo.toml`, `Cargo.lock`, `package.json`, `package-lock.json`, and `modules.json`
 by `scripts/version.mjs` (`npm run version:check` is a CI gate).

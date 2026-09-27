@@ -190,13 +190,14 @@ pulled and passed a volume persistence smoke. Homebrew and Scoop install those
 checksummed release binaries in clean consumer jobs. The Go submodule tag
 `genesisdb-go/v0.1.0` passed proxy resolution and a live-server consumer check.
 
-The first PyPI publish attempt built and validated its artifacts, then the
-Trusted Publishing request was rejected. The account-side publisher binding is
-not visible from this repository, so a binding mismatch or service-side OIDC
-error remains unconfirmed. The workflow now performs a clean registry install
-after a future successful upload. The root Rust crate remains source-only by
-the accepted crates.io ADR. The iOS release-asset path remains the published
-binary path; no root-level SwiftPM package is claimed.
+The Python package `genesisblockdb-client==0.1.0` is now published on PyPI.
+After the pending publisher was configured, the `python-v0.1.0` tag publish
+passed in [run 36305930749](https://github.com/Freshair129/GenesisBlock/actions/runs/36305930749).
+A clean public registry consumer passed in
+[run 36322437144](https://github.com/Freshair129/GenesisBlock/actions/runs/36322437144).
+The root Rust crate remains source-only by the accepted crates.io ADR. The iOS
+release-asset path remains the published binary path; no root-level SwiftPM
+package is claimed.
 
 ## 5. C3 - Components
 

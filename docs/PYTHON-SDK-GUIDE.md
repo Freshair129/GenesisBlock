@@ -6,7 +6,13 @@ status: current
 
 ## 1. Installation
 
-Install from the repository source:
+Install the published package from PyPI:
+
+~~~bash
+python -m pip install genesisblockdb-client
+~~~
+
+For repository development, install from source:
 
 ~~~bash
 python -m pip install ./genesisdb-python
@@ -14,7 +20,7 @@ python -m pip install ./genesisdb-python
 
 The distribution name is genesisblockdb-client and the import namespace remains genesisdb. The package requires Python 3.10 or newer and uses requests to call a separately running GenesisBlockDB server.
 
-The repository includes a PyPI Trusted Publishing workflow. A release requires a python-v<version> tag matching pyproject.toml and a configured PyPI Trusted Publisher bound to the pypi GitHub Environment. Do not treat the registry install command as available until a release has been published and verified from a clean environment.
+The public distribution is `genesisblockdb-client==0.1.0`; imports remain under `genesisdb`. The package requires Python 3.10 or newer and uses requests to call a separately running GenesisBlockDB server. The `python-v0.1.0` Trusted Publishing run passed, and the clean public registry consumer passed in [run 36322437144](https://github.com/Freshair129/GenesisBlock/actions/runs/36322437144). Later `python-v<version>` tags are checked against pyproject.toml and verified with a clean PyPI install.
 
 ## 2. Getting Started
 
