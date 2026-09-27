@@ -2,7 +2,7 @@
 
 ## Status / Date
 
-Root cause confirmed; fixture correction pending hosted consumer rerun / 2026-09-27.
+Root cause confirmed; AndroidX correction verified; separate JVM target defect found / 2026-09-27.
 
 ## Symptom
 
@@ -46,3 +46,9 @@ publication metadata without running this blank-app AndroidX test classpath.
 Keep this blank-project emulator job as a required distribution consumer gate,
 and configure Gradle properties in the fixture itself instead of relying on
 settings from the repository's Android SDK project.
+## Outcome (Measured)
+
+Hosted run [36309301502](https://github.com/Freshair129/GenesisBlock/actions/runs/36309301502)
+passed AndroidX/AAR metadata validation and advanced to Kotlin test compilation.
+That later compile failed on a separate Java/Kotlin JVM target mismatch,
+recorded in `RCA--android-central-consumer-jvm-target.md`.
