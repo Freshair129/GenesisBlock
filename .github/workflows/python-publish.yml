@@ -5,6 +5,11 @@ on:
     tags:
       - 'python-v*'
   workflow_dispatch:
+    inputs:
+      verify_version:
+        description: "Optional already-published genesisblockdb-client version to install in a clean consumer"
+        required: false
+        type: string
 
 permissions:
   contents: read
@@ -62,3 +67,41 @@ jobs:
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
           packages-dir: genesisdb-python/dist/
+
+
+      - name: Verify the published package from a clean PyPI consumer
+        if: ${{ github.event_name == 'push' && startsWith(github.ref, 'refs/tags/python-v') || github.event_name == 'workflow_dispatch' && inputs.verify_version != '' }}
+        shell: bash
+        env:
+          REQUESTED_VERSION: ${{ inputs.verify_version }}
+        run: |
+          set -euo pipefail
+          if [[ "$GITHUB_EVENT_NAME" == "push" ]]; then
+            VERSION="${GITHUB_REF_NAME#python-v}"
+          else
+            VERSION="$REQUESTED_VERSION"
+          fi
+          CONSUMER="$RUNNER_TEMP/pypi-registry-consumer"
+          python -m venv "$CONSUMER"
+          source "$CONSUMER/bin/activate"
+          python -m pip install --upgrade pip
+          for attempt in $(seq 1 12); do
+            if python -m pip install --no-cache-dir "genesisblockdb-client==$VERSION"; then
+              break
+            fi
+            if [[ "$attempt" -eq 12 ]]; then
+              echo "could not install genesisblockdb-client==$VERSION from PyPI" >&2
+              exit 1
+            fi
+            sleep 5
+          done
+          EXPECTED_VERSION="$VERSION" python - <<'PY'
+          import os
+          from importlib.metadata import version
+          from genesisdb import GenesisClient
+
+          actual = version('genesisblockdb-client')
+          assert actual == os.environ['EXPECTED_VERSION'], (actual, os.environ['EXPECTED_VERSION'])
+          assert GenesisClient
+          print('clean PyPI registry consumer installed:', actual)
+          PY

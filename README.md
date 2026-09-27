@@ -40,21 +40,21 @@ GenesisBlockDB can be used in three broad modes:
 |---|---|---|---|
 | **Node.js / TypeScript embedded** | ✅ Published | `npm install @freshair129/gks-genesis-block-native` | Primary embedded desktop/server package; Node.js `>=20` |
 | **Rust core** | ✅ Source only | clone repo + `cargo build --release` | Root crate intentionally remains `publish = false` until a stable public Rust API exists; see the accepted [crates.io ADR](docs/adr/ADR--GENESISDB-RUST-CRATES-IO-DISTRIBUTION.md) |
-| **Standalone REST server** | ✅ Source only | clone repo + Cargo server command | Binary and container release workflows are merged, but no server binary or GHCR image has been published yet |
-| **MCP server** | ✅ Source only | clone repo + `npm install` + `npm run mcp:start` | The merged CLI payload change is not in the currently published npm release yet |
-| **Python SDK** | ✅ Source only | `python -m pip install ./genesisdb-python` | REST client SDK; wheel/sdist and live-server CI are merged, but no PyPI release is published |
-| **Go SDK** | ✅ Source only | use `genesisdb-go/` from the monorepo | Canonical module path resolves at commits in CI; no versioned submodule tag has been published |
+| **Standalone REST server** | ✅ Published | GitHub Release binaries or `docker run -p 3000:3000 -v genesisdb-data:/data ghcr.io/freshair129/genesisblock:0.2.7` | Linux x64, Windows x64, macOS x64/arm64 binaries include SHA-256 sidecars; GHCR image is public |
+| **MCP server** | ✅ Published | `npx --yes --package @freshair129/gks-genesis-block-native@0.2.7 genesisblock-mcp` | Set `GENESIS_DB_PATH` for the database directory; distributed with the main npm package |
+| **Python SDK** | ✅ Source only | `python -m pip install ./genesisdb-python` | REST client; its first PyPI upload was rejected during OIDC publishing, and the account-side binding is not visible to this repository |
+| **Go SDK** | ✅ Published | `go get github.com/Freshair129/GenesisBlock/genesisdb-go@v0.1.0` | Version tag resolves through the public Go module proxy; REST client for the standalone server |
 | **Android** | ✅ Published | Maven Central: `io.github.freshair129:genesisdb-android:0.1.1` | Preferred Android path; resolves anonymously |
 | **Android raw `.aar`** | ✅ Published | GitHub Releases | Manual/fallback integration path |
 | **React Native** | ✅ Published | `npm install react-native-genesisdb` | Android uses Maven Central; iOS uses CocoaPods + published xcframework during install |
 | **iOS binary** | ✅ Published | `GenesisBlockDB.xcframework.zip` from GitHub Releases | General public SPM package URL is not yet the canonical path |
 | **C FFI** | ✅ Source only | build Rust with `ffi` feature + use `include/genesisdb.h` | Suitable for C/C++/Swift/other FFI hosts |
-| **Docker / OCI** | 🟡 Pipeline ready; not published | — | Docker build and persistence CI pass, but no server release asset or GHCR package is published |
-| **PyPI** | 🟡 Packaging ready; not published | — | Clean wheel and live-server checks pass in CI; no registry release exists yet |
+| **Docker / OCI** | ✅ Published | `ghcr.io/freshair129/genesisblock:0.2.7` | Public GHCR image; data persists at `/data` when mounted to a named volume |
+| **PyPI** | 🟡 Package built; not published | — | The first tag built successfully, but PyPI rejected the Trusted Publishing request; the account-side publisher binding has not been verified |
 | **crates.io** | 🟡 Not published; decision resolved | — | Root crate remains `publish = false` until a stable public Rust API exists; see the accepted [ADR](docs/adr/ADR--GENESISDB-RUST-CRATES-IO-DISTRIBUTION.md) |
-| **Public Go module distribution** | 🟡 Commit resolution verified; versioned release pending | — | External CI resolves a commit, but no `genesisdb-go/v...` version tag exists yet |
-| **Homebrew** | 🟡 Planned | — | Gated on stable server binaries appearing in a published release |
-| **winget / Scoop** | 🟡 Planned | — | Gated on stable Windows server binaries appearing in a published release |
+| **Public Go module distribution** | ✅ Published | `go get github.com/Freshair129/GenesisBlock/genesisdb-go@v0.1.0` | Clean Go consumer and live-server integration passed on the versioned tag |
+| **Homebrew** | ✅ Published | `brew tap Freshair129/GenesisBlock https://github.com/Freshair129/GenesisBlock.git` then `brew install Freshair129/GenesisBlock/genesisblockdb-server` | Tap formula installs checksummed macOS x64/arm64 or Linux x64 release binaries |
+| **Windows / Scoop** | ✅ Published | `scoop install https://raw.githubusercontent.com/Freshair129/GenesisBlock/main/bucket/genesisblockdb-server.json` | Manifest installs the checksummed Windows x64 release binary; no winget manifest is published |
 
 Distribution completion and acceptance requirements are tracked in **[Issue #166 — Distribution & Installation](https://github.com/Freshair129/GenesisBlock/issues/166)**.
 
@@ -142,13 +142,19 @@ GenesisBlockDB REST server
    Rust engine
 ```
 
-The Dockerfile, standalone server release workflow, and GHCR publishing workflow are implemented. CI validates target builds and the persistence restart smoke, but no server binaries are attached to a published release and no GHCR package is available yet. Continue using the source build above until a release publishes those artifacts.
+Stable server binaries are available from [GitHub Releases](https://github.com/Freshair129/GenesisBlock/releases/tag/v0.2.7), with SHA-256 sidecars for Linux x64, Windows x64, macOS x64, and macOS arm64. The public GHCR image is `ghcr.io/freshair129/genesisblock:0.2.7`; mount a named volume at `/data` so database state survives container replacement. The release image was pulled without credentials and passed a write/restart persistence smoke.
 
 ### 4. MCP server — AI agents
 
-GenesisBlockDB includes an MCP server in this repository.
+Install and run the published CLI without cloning the repository:
 
-Current source installation:
+```bash
+npx --yes --package @freshair129/gks-genesis-block-native@0.2.7 genesisblock-mcp
+```
+
+Set `GENESIS_DB_PATH` in the MCP host process to choose the database directory. The CLI is included in the main npm package, and a clean consumer installed the public npm version, completed the MCP handshake with five tools, and wrote through the native addon. See the [MCP guide](docs/MCP-GUIDE.md) for client configuration.
+
+The source checkout remains available for development:
 
 ```bash
 git clone https://github.com/Freshair129/GenesisBlock.git
@@ -156,16 +162,6 @@ cd GenesisBlock
 npm install
 npm run mcp:start
 ```
-
-Equivalent entrypoint:
-
-```bash
-node mcp/server.js
-```
-
-The `genesisblock-mcp` executable is declared in the main npm package, and CI verifies the CLI and server files in the packed payload. The currently published npm release predates that change, so registry installation is not available yet; use the repository command above until a package version containing the CLI is published.
-
-The CLI is versioned with the main package; there is no separate MCP npm package. See the [MCP guide](docs/MCP-GUIDE.md) for the registry-based client configuration to use after publication.
 
 ### 5. Python SDK — source install, REST client
 
@@ -195,40 +191,17 @@ client = GenesisClient("http://localhost:3000")
 
 See [Python SDK Guide](docs/PYTHON-SDK-GUIDE.md).
 
-The merged packaging workflow builds a wheel and sdist, installs the wheel in a clean environment, and exercises it against a live server. A Trusted Publishing workflow exists, but no `genesisblockdb-client` release is published to PyPI yet. Continue using the source installation above; see the [Python SDK Guide](docs/PYTHON-SDK-GUIDE.md) for release requirements.
+The wheel and sdist build cleanly, and the built wheel passes a live-server integration job. The first `python-v0.1.0` release attempt built and validated its artifacts, but PyPI rejected the Trusted Publishing request. The account-side publisher registration cannot be inspected from this repository, so a binding mismatch or service-side OIDC issue is not confirmed. No registry package is available; confirm the external binding and rerun the tag workflow. See the [Python SDK Guide](docs/PYTHON-SDK-GUIDE.md).
 
-### 6. Go SDK — source/monorepo use
+### 6. Go SDK — public version
 
-The Go REST client currently lives under:
-
-```text
-genesisdb-go/
-```
-
-For development and tests:
+Install the versioned submodule from the public Go module proxy:
 
 ```bash
-git clone https://github.com/Freshair129/GenesisBlock.git
-cd GenesisBlock/genesisdb-go
-go test ./...
+go get github.com/Freshair129/GenesisBlock/genesisdb-go@v0.1.0
 ```
 
-The canonical module path is:
-
-```text
-github.com/Freshair129/GenesisBlock/genesisdb-go
-```
-
-A clean external consumer resolves this module from a commit in CI and completes a live-server round trip. No `genesisdb-go/v...` release tag exists yet, so a versioned `go get` path is not published.
-
-For local development from another Go module, use a local replacement deliberately:
-
-```bash
-go mod edit -replace github.com/Freshair129/GenesisBlock/genesisdb-go=../GenesisBlock/genesisdb-go
-go get github.com/Freshair129/GenesisBlock/genesisdb-go
-```
-
-See the [Go SDK specification](docs/SPEC--GO-SDK.md) for the canonical path and version-tag requirements.
+The canonical module path is `github.com/Freshair129/GenesisBlock/genesisdb-go`. Tag `genesisdb-go/v0.1.0` passed module tests, proxy resolution from a clean Go module, and a live-server round trip. The source also remains under `genesisdb-go/` for repository development. See the [Go SDK specification](docs/SPEC--GO-SDK.md).
 
 ### 7. Android — Maven Central (preferred)
 
@@ -347,21 +320,22 @@ include/genesisdb.h
 
 This is the underlying path used by the iOS native SDK and can also be integrated from C/C++ or other languages capable of calling a C ABI.
 
-### 12. Docker / GHCR — pipeline ready; not published
+### 12. Docker / GHCR — published server image
 
-The production Dockerfile, server release workflow, GHCR workflow, and persistence restart smoke are implemented and CI-tested. No server binaries are attached to the latest release and no GHCR package is published, so this is not yet a released install path.
+Pull and run the public v0.2.7 image with persistent storage:
 
-The intended GHCR image reference (not yet published) is:
-
-```text
-ghcr.io/freshair129/genesisblock:<version>
+```bash
+docker run --rm \
+  -p 3000:3000 \
+  -v genesisdb-data:/data \
+  ghcr.io/freshair129/genesisblock:0.2.7
 ```
 
-The release workflow publishes server artifacts only on qualifying release tags. PR CI validates builds and persistence behavior but does not publish an image; use the source build above until an actual release contains the server artifact.
+The image listens on port `3000` and stores database files under `/data`. Back up the mounted volume while the server is stopped, or after taking an application-consistent copy. An anonymous GHCR pull and a write/restart smoke using the same volume both passed. Binary archives and SHA-256 sidecars are attached to the [v0.2.7 release](https://github.com/Freshair129/GenesisBlock/releases/tag/v0.2.7).
 
 ### 13. PyPI — package-ready; not published
 
-The Python SDK installs from source today. The merged distribution package is named `genesisblockdb-client`; CI builds a wheel and sdist, tests a clean install, and runs a live-server integration job. No PyPI package release is published yet.
+The Python SDK remains source-installable; its distribution name is `genesisblockdb-client` and import namespace is `genesisdb`. CI builds a wheel and sdist, installs a clean wheel, and runs a live-server integration job. The first public upload was rejected during the Trusted Publishing exchange; the external publisher binding or service-side OIDC state still needs confirmation.
 
 Implemented packaging and validation:
 
@@ -369,7 +343,7 @@ Implemented packaging and validation:
 - wheel + sdist builds and clean-environment install tests
 - live-server integration tests
 
-Publishing still requires a PyPI Trusted Publisher binding, a `python-v<version>` tag, and a successful upload followed by a clean registry install. No PyPI release is published yet. See the [Python SDK Guide](docs/PYTHON-SDK-GUIDE.md).
+The `python-v0.1.0` tag passes version validation and the package build, but PyPI rejected the OIDC identity `repo:Freshair129/GenesisBlock:environment:pypi`. Confirm the project-scoped Trusted Publisher for repository `Freshair129/GenesisBlock`, workflow `python-publish.yml`, and environment `pypi` matches the observed OIDC identity, then rerun the tag workflow. The workflow now verifies a clean public PyPI install after upload. See the [Python SDK Guide](docs/PYTHON-SDK-GUIDE.md).
 
 ### 14. crates.io — decision resolved; unpublished
 
@@ -383,15 +357,22 @@ Therefore there is no supported crates.io install command today.
 
 The accepted [crates.io ADR](docs/adr/ADR--GENESISDB-RUST-CRATES-IO-DISTRIBUTION.md) decides to keep the root crate unpublished until a stable public Rust consumer boundary exists.
 
-### 15. Homebrew / Windows package managers — planned
+### 15. Homebrew / Windows package managers — published
 
-Homebrew and `winget`/Scoop remain planned. The release workflow exists, but no stable server/CLI binaries are present in a published release; wrappers remain gated on actual checksummed release assets.
+The same-repository Homebrew tap installs the checksummed v0.2.7 server binary for macOS x64/arm64 and Linux x64:
 
-Planned order:
+```bash
+brew tap Freshair129/GenesisBlock https://github.com/Freshair129/GenesisBlock.git
+brew install Freshair129/GenesisBlock/genesisblockdb-server
+```
 
-1. Homebrew formula/tap for macOS/Linux.
-2. Windows `winget` manifest or Scoop bucket.
-3. Debian/RPM packages only if operational demand justifies them.
+On Windows, install from the public Scoop manifest:
+
+```powershell
+scoop install https://raw.githubusercontent.com/Freshair129/GenesisBlock/main/bucket/genesisblockdb-server.json
+```
+
+Clean Homebrew and Scoop consumers install the release binaries and run a server status/write/restart smoke in CI. There is no winget manifest. Debian/RPM packages remain out of scope unless demand justifies them.
 
 Tracked in [#166](https://github.com/Freshair129/GenesisBlock/issues/166).
 
@@ -402,14 +383,14 @@ Tracked in [#166](https://github.com/Freshair129/GenesisBlock/issues/166).
 | Node.js / TypeScript app with local embedded DB | npm embedded package |
 | Rust application / engine development | source + Cargo |
 | Multi-language backend or shared DB process | standalone REST server |
-| AI agent / MCP client integration | MCP server from repo today |
+| AI agent / MCP client integration | published npm MCP CLI |
 | Python backend | Python SDK + REST server |
-| Go backend | Go SDK + REST server; source/monorepo until public module distribution is fixed |
+| Go backend | versioned public Go SDK + REST server |
 | Native Android app | Maven Central |
 | React Native app | npm `react-native-genesisdb` |
 | Native iOS app | published xcframework / source SDK depending on integration needs |
 | C/C++ or custom native binding | C FFI build |
-| Containerized deployment | wait for official Docker/GHCR distribution or build a private image from source knowingly |
+| Containerized deployment | public GHCR image with a persistent `/data` volume |
 
 ### What it can do today
 

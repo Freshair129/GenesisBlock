@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed - Android SDK public compile dependency
+
+`genesisdb-android` exposes `kotlinx.serialization.json.JsonElement` in public
+signatures, so the next Maven Central patch release (0.1.2) will export
+`kotlinx-serialization-json` on the consumer compile classpath. The published
+0.1.1 artifact remains immutable; CI will validate the new publication metadata
+and then run the clean emulator consumer against 0.1.2.
+
 ### Fixed - deployed benchmark fixture compatibility
 
 GenesisRAG17 workers now accept the deployed per-record `benchmarks[].queries`
