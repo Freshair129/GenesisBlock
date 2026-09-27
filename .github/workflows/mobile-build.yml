@@ -698,6 +698,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Self-test Maven Central publish guards
+        run: bash scripts/central-await-validation.sh --self-test
+
       - uses: actions/setup-java@v4
         with:
           distribution: temurin

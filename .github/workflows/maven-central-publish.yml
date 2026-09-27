@@ -34,12 +34,17 @@ on:
         required: true
         default: true
         type: boolean
+      publish_deployment_id:
+        description: 'Publish an existing VALIDATED deployment instead of uploading a new bundle'
+        required: false
+        type: string
 
 permissions:
   contents: read
 
 jobs:
   central:
+    if: ${{ !inputs.publish_deployment_id }}
     name: genesisdb-android -> Maven Central
     runs-on: ubuntu-latest
     timeout-minutes: 40
@@ -207,8 +212,9 @@ jobs:
         run: |
           set -euo pipefail
           AUTH=$(printf '%s:%s' "$CENTRAL_TOKEN_USERNAME" "$CENTRAL_TOKEN_PASSWORD" | base64 -w0)
-          # AUTOMATIC publishes on successful validation; use USER_MANAGED to
-          # review in the Portal first. Central publications are IMMUTABLE.
+          # AUTOMATIC publishes after successful validation. A separate
+          # dispatch path below handles an already-validated user-managed
+          # deployment. Central publications are IMMUTABLE.
           #
           # No -f/--fail here. The first real publish attempt used
           # `curl -fsSL --fail-with-body`, and -f IS --fail. The runner's curl
@@ -231,7 +237,7 @@ jobs:
             -w '%{http_code}' \
             -H "Authorization: Bearer $AUTH" \
             -F "bundle=@$BUNDLE" \
-            "https://central.sonatype.com/api/v1/publisher/upload?publishingType=USER_MANAGED")
+            "https://central.sonatype.com/api/v1/publisher/upload?publishingType=AUTOMATIC")
           echo "HTTP $code"
           cat /tmp/central-response.txt
           echo
@@ -249,12 +255,10 @@ jobs:
           # not UUID-shaped rather than polling Central about garbage.
           echo "DEPLOYMENT_ID=$(tr -dc 'a-fA-F0-9-' < /tmp/central-response.txt)" >> "$GITHUB_ENV"
 
-      # The other half of the upload: a deployment can go FAILED minutes after
-      # the 201 (bad signature, bad checksum, POM problem), and without this the
-      # job would already have reported success. Gated because it needs a real
-      # deployment; the decision logic it runs is exercised on the dry-run path
-      # by the self-test step above.
-      - name: Wait for Central to validate the deployment
+      # A 201 only accepts the bundle. The status guard now requires PUBLISHED,
+      # so validation failure, a stalled publication, or any unknown state
+      # cannot report a successful release.
+      - name: Wait for Central to publish the deployment
         if: ${{ !inputs.dry_run }}
         env:
           CENTRAL_TOKEN_USERNAME: ${{ secrets.CENTRAL_TOKEN_USERNAME }}
@@ -264,3 +268,43 @@ jobs:
       - name: Dry run notice
         if: ${{ inputs.dry_run }}
         run: echo "DRY RUN - bundle built, signed and validated; nothing uploaded. Re-run with dry_run=false to publish."
+
+  publish-existing:
+    if: ${{ inputs.publish_deployment_id }}
+    name: Publish existing Maven Central deployment
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Self-test the deployment state and publish guard
+        run: bash scripts/central-await-validation.sh --self-test
+
+      - name: Preflight - required secrets
+        env:
+          CENTRAL_TOKEN_USERNAME: ${{ secrets.CENTRAL_TOKEN_USERNAME }}
+          CENTRAL_TOKEN_PASSWORD: ${{ secrets.CENTRAL_TOKEN_PASSWORD }}
+        run: |
+          set -euo pipefail
+          for v in CENTRAL_TOKEN_USERNAME CENTRAL_TOKEN_PASSWORD; do
+            if [ -z "${!v:-}" ]; then
+              echo "::error::missing secret: $v"
+              exit 1
+            fi
+          done
+
+      - name: Confirm existing deployment is eligible
+        if: ${{ inputs.dry_run }}
+        env:
+          CENTRAL_TOKEN_USERNAME: ${{ secrets.CENTRAL_TOKEN_USERNAME }}
+          CENTRAL_TOKEN_PASSWORD: ${{ secrets.CENTRAL_TOKEN_PASSWORD }}
+          DEPLOYMENT_ID: ${{ inputs.publish_deployment_id }}
+        run: bash scripts/central-await-validation.sh --check "$DEPLOYMENT_ID"
+
+      - name: Publish existing deployment and wait for PUBLISHED
+        if: ${{ !inputs.dry_run }}
+        env:
+          CENTRAL_TOKEN_USERNAME: ${{ secrets.CENTRAL_TOKEN_USERNAME }}
+          CENTRAL_TOKEN_PASSWORD: ${{ secrets.CENTRAL_TOKEN_PASSWORD }}
+          DEPLOYMENT_ID: ${{ inputs.publish_deployment_id }}
+        run: bash scripts/central-await-validation.sh --publish "$DEPLOYMENT_ID"
