@@ -27,9 +27,7 @@ fn empty_collection_and_dependent_delta_sync_and_reopen() {
     let a_dir = tempfile::tempdir().unwrap();
     let b_dir = tempfile::tempdir().unwrap();
     let a = open(a_dir.path());
-    eprintln!("ci-progress: wave opened source storage");
     let b = open(b_dir.path());
-    eprintln!("ci-progress: wave opened replica storage");
     peer(&a, &b);
     a.create_collection(
         "empty".into(),
@@ -41,9 +39,7 @@ fn empty_collection_and_dependent_delta_sync_and_reopen() {
         None,
     )
     .unwrap();
-    eprintln!("ci-progress: wave before initial reconcile");
     b.reconcile_state(a.events_since(0)).unwrap();
-    eprintln!("ci-progress: wave after initial reconcile");
     assert!(b
         .list_collections()
         .iter()
@@ -59,7 +55,6 @@ fn empty_collection_and_dependent_delta_sync_and_reopen() {
     )
     .unwrap();
     let cursor = a.stable_frontier();
-    eprintln!("ci-progress: wave before source vector insert");
     a.add_node(NodeInput {
         id: Some("n".into()),
         labels: vec![],
@@ -72,9 +67,7 @@ fn empty_collection_and_dependent_delta_sync_and_reopen() {
         collection: Some("vectors".into()),
     })
     .unwrap();
-    eprintln!("ci-progress: wave before delta reconcile");
     b.reconcile_state(a.events_since_seq(cursor)).unwrap();
-    eprintln!("ci-progress: wave after delta reconcile");
     assert_eq!(
         b.list_collections()
             .iter()
@@ -83,11 +76,8 @@ fn empty_collection_and_dependent_delta_sync_and_reopen() {
             .metric,
         "Cosine"
     );
-    eprintln!("ci-progress: wave before replica drop");
     drop(b);
-    eprintln!("ci-progress: wave after replica drop");
     let b = open(b_dir.path());
-    eprintln!("ci-progress: wave reopened replica");
     assert!(b.node_view("n").is_some());
 }
 #[test]
