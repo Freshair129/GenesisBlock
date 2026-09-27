@@ -2,7 +2,7 @@
 
 ## Status / Date
 
-Root cause confirmed; workflow correction pending hosted rerun / 2026-09-27.
+Root cause confirmed; workflow correction verified; separate manifest defect found / 2026-09-27.
 
 ## Symptom
 
@@ -43,8 +43,12 @@ installation so subsequent steps can resolve the command.
 
 ## Outcome (Measured)
 
-Pending: rerun the Windows consumer job; it must install the manifest, launch
-the published server binary, and pass the persistence smoke.
+Hosted run [36308660672](https://github.com/Freshair129/GenesisBlock/actions/runs/36308660672)
+resolved Scoop in the later PowerShell step, fetched the manifest from the PR
+SHA, downloaded the v0.2.7 ZIP, and verified its hash. This confirms the
+`GITHUB_PATH` correction. The job then exposed a separate literal `extract_dir`
+mismatch, recorded in `RCA--scoop-extract-dir-literal.md`; full installation
+and persistence remain pending.
 
 ## Proposed Prevention
 

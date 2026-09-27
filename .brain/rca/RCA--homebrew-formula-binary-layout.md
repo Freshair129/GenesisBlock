@@ -2,7 +2,7 @@
 
 ## Status / Date
 
-Root cause confirmed; formula correction pending hosted rerun / 2026-09-27.
+Root cause confirmed; formula correction verified in hosted consumers / 2026-09-27.
 
 ## Symptom
 
@@ -51,8 +51,9 @@ archive and fail with an explicit message if it is absent before calling
 
 ## Outcome (Measured)
 
-Pending: rerun the Homebrew consumer on macOS ARM, macOS Intel, and Linux; each
-must install and pass the server persistence smoke.
+Hosted run [36308660672](https://github.com/Freshair129/GenesisBlock/actions/runs/36308660672)
+passed the clean consumer and persistence smoke on macos-15 (Apple Silicon),
+macos-15-intel, and ubuntu-latest.
 
 ## Proposed Prevention
 

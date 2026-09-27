@@ -2,7 +2,7 @@
 
 ## Status / Date
 
-Root cause confirmed; upgrade to the upstream action fix pending hosted validation / 2026-09-27.
+Root cause confirmed; Android action upgrade verified; separate consumer-fixture failure remains / 2026-09-27.
 
 ## Symptom
 
@@ -50,9 +50,12 @@ consumer path and dependency assertions.
 
 ## Outcome (Measured)
 
-Pending: rerun the published React Native Android host and Android emulator
-acceptance jobs and confirm SDK setup, package resolution, and native tests
-succeed.
+Hosted run [36308660627](https://github.com/Freshair129/GenesisBlock/actions/runs/36308660627)
+completed the Android SDK v4 setup and emulator boot; RN host run
+[36308660648](https://github.com/Freshair129/GenesisBlock/actions/runs/36308660648)
+passed the packed Android consumer. The separate Maven Central consumer then
+failed before its tests because its blank fixture omitted AndroidX Gradle
+configuration; see `RCA--android-central-consumer-androidx.md`.
 
 ## Proposed Prevention
 
