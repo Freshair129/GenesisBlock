@@ -75,7 +75,7 @@ results = client.query("TRAVERSE FROM 'Neural Bridge' DEPTH 2 REL ANY")
 | Embeddings | add_node accepts a list of float values. | No NumPy dependency or NumPy-specific conversion is provided. |
 | Package metadata | Distribution is genesisblockdb-client 0.1.0; imports remain under genesisdb; Python requirement is 3.10 or newer. | genesisdb-python/pyproject.toml is authoritative and setup.py delegates to it. |
 | Package validation | The Python Distribution workflow passed on the pre-merge head e524c323. | That run covered wheel and source distribution builds, clean installs, and unit tests on Python 3.10-3.13. This is prior-head evidence; read the merged head's hosted checks at their exact SHA. The live smoke test adds a node and checks its fields but does not retrieve a node. |
-| Publishing | A Trusted Publishing workflow accepts python-v* tags and checks the tag against the package version. | Publication still requires the PyPI Trusted Publisher binding and the pypi GitHub Environment. No first registry release is claimed. |
+| Publishing | A Trusted Publishing workflow accepts python-v* tags and checks the tag against the package version. | `genesisblockdb-client==0.1.0` is published on PyPI. The tag publish passed in [run 36305930749](https://github.com/Freshair129/GenesisBlock/actions/runs/36305930749); a clean public registry consumer passed in [run 36322437144](https://github.com/Freshair129/GenesisBlock/actions/runs/36322437144). |
 
 ## 5. Definition of Done (DoD)
 

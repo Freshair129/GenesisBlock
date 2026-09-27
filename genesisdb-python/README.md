@@ -12,13 +12,13 @@ python -m pip install ./genesisdb-python
 
 ## Registry install
 
-The intended PyPI distribution name is:
+The PyPI distribution is `genesisblockdb-client` (version `0.1.0`):
 
 ```bash
 pip install genesisblockdb-client
 ```
 
-Do not advertise that command as live until the first PyPI release has been published and verified from a clean environment.
+The published package was installed from PyPI and imported successfully in a clean consumer. The import namespace remains `genesisdb`.
 
 The Python import namespace remains `genesisdb`:
 

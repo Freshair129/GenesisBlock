@@ -21,6 +21,14 @@ container that reuses PID 1 can recover a legacy lock from the previous process
 instance, while a live same-instance owner remains rejected. The worker suite
 covers both cases.
 
+## [0.2.9] - 2026-09-27
+
+### Updated - published Python distribution status
+
+- Refresh the npm README and Python SDK guides to document the published
+  `genesisblockdb-client` 0.1.0 package and its clean PyPI consumer verification.
+  No engine behavior changed.
+
 ## [0.2.8] - 2026-09-27
 
 ### Fixed - npm release distribution guide
