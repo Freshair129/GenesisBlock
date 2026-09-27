@@ -1,54 +1,6 @@
-use genesis_block_native::{IndexCoverageReport, NodeInput, OpenOptions, Storage};
-use std::fs;
-use std::path::Path;
-
-fn fresh(name: &str) -> String {
-    let path = format!("{}/{}", env!("CARGO_TARGET_TMPDIR"), name);
-    if Path::new(&path).exists() {
-        fs::remove_dir_all(&path).unwrap();
-    }
-    path
-}
-
-fn open(path: &str) -> Storage {
-    Storage::open(OpenOptions {
-        path: path.to_string(),
-        page_cache_mb: Some(64),
-        read_only: Some(false),
-        vector_dim: Some(3),
-        retention: None,
-    })
-    .unwrap()
-}
-
-fn add(storage: &Storage, id: &str, vector: Vec<f64>) {
-    storage
-        .add_node(NodeInput {
-            id: Some(id.to_string()),
-            labels: vec![],
-            props: None,
-            embedding: Some(vector),
-            lang: None,
-            valid_from: None,
-            caused_by: None,
-            ttl: None,
-            collection: None,
-        })
-        .unwrap();
-}
-
-fn default_report(storage: &Storage) -> IndexCoverageReport {
-    storage
-        .list_collections()
-        .into_iter()
-        .find(|collection| collection.name == "default")
-        .unwrap()
-        .coverage
-}
-
-#[test]
 fn coverage_requires_explicit_validation_and_tracks_frontiers() {
     let storage = open(&fresh("index_coverage_validation"));
+    eprintln!("ci-progress: coverage opened storage");
     storage
         .create_collection(
             "empty".to_string(),
@@ -61,18 +13,23 @@ fn coverage_requires_explicit_validation_and_tracks_frontiers() {
         )
         .unwrap();
     add(&storage, "a", vec![1.0, 0.0, 0.0]);
+    eprintln!("ci-progress: coverage added first vector");
 
     let before = default_report(&storage);
     assert!(!before.validated);
     assert_ne!(before.state, "READY");
     assert_eq!(before.source_count, 1);
 
+    eprintln!("ci-progress: coverage before first flush");
     storage.flush_index();
+    eprintln!("ci-progress: coverage after first flush");
     let after_flush = default_report(&storage);
     assert!(!after_flush.validated);
     assert_ne!(after_flush.state, "READY");
 
+    eprintln!("ci-progress: coverage before validation");
     let reports = storage.validate_index_coverage().unwrap();
+    eprintln!("ci-progress: coverage after validation");
     let report = reports
         .into_iter()
         .find(|coverage| coverage.collection == "default")
@@ -100,9 +57,14 @@ fn coverage_requires_explicit_validation_and_tracks_frontiers() {
     assert!(ready.validated);
 
     add(&storage, "b", vec![0.0, 1.0, 0.0]);
+    eprintln!("ci-progress: coverage before second flush");
     storage.flush_index();
+    eprintln!("ci-progress: coverage after second flush");
     let stale = default_report(&storage);
     assert!(!stale.validated);
     assert_ne!(stale.state, "READY");
     assert_eq!(stale.source_count, 2);
+    eprintln!("ci-progress: coverage before storage drop");
+    drop(storage);
+    eprintln!("ci-progress: coverage after storage drop");
 }

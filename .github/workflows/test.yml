@@ -72,6 +72,7 @@ jobs:
         run: cargo clippy --all-targets -- -D warnings
 
   rust-tests:
+    timeout-minutes: 15
     name: cargo test (${{ matrix.host }})
     runs-on: ${{ matrix.host }}
     strategy:
@@ -85,7 +86,7 @@ jobs:
       # --no-default-features drops the napi bindings so the integration tests
       # link as plain native binaries (no napi_* symbols) — works on Linux too.
       - name: cargo test (core, no napi)
-        run: cargo test --no-default-features
+        run: cargo test --no-default-features -- --nocapture
 
   node-tests:
     name: npm test (${{ matrix.host }})
