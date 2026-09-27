@@ -27,7 +27,7 @@ android {
 }
 
 dependencies {
-    androidTestImplementation("io.github.freshair129:genesisdb-android:$centralArtifactVersion")
+    implementation("io.github.freshair129:genesisdb-android:$centralArtifactVersion")
     androidTestImplementation("androidx.test.ext:junit:1.1.5")
     androidTestImplementation("androidx.test:runner:1.5.2")
     // 0.1.1 published JsonElement APIs but kept serialization JSON runtime-only.
