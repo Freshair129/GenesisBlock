@@ -31,14 +31,15 @@ To support cloud-native infrastructures and high-performance backend systems, we
 genesisdb-go/
 ├── client.go      # Main Client struct and logic
 ├── models.go      # Generic GenesisBlockDB types (Node, Edge, ContextPackage)
-├── hql_types.go   # Type definitions for HQL results
+├── client_test.go # HTTP client unit tests
 ├── go.mod
-└── tests/
+├── README.md      # Module path, install, and usage
+└── examples/main.go
 ```
 
 ## 2. API Design (Example Usage)
 ```go
-import "github.com/freshair129/genesisdb-go"
+import "github.com/Freshair129/GenesisBlock/genesisdb-go"
 
 client := genesisdb.NewClient("http://localhost:3000")
 
@@ -58,15 +59,26 @@ res, err := client.Query(ctx, "SEARCH Node SIMILAR TO [0.1, 0.2] K 1")
 ## 3. Implementation Strategy
 1.  **Transport:** Use the standard `net/http` package for zero-dependency core communication.
 2.  **Serialization:** Use `encoding/json` for schema mapping.
-3.  **Error Handling:** Define specific error types for connection failures and query syntax errors.
+3.  **Error Handling:** Return request and decoding errors to callers.
+4.  **Distribution:** Keep the module in the monorepo at github.com/Freshair129/GenesisBlock/genesisdb-go. Use a Go submodule tag such as genesisdb-go/v0.1.0 only after the distribution slice is merged and the external consumer resolves it.
 
 ---
 
-## 4. Definition of Done (DoD)
-1.  [ ] Go library structure and `go.mod` initialized.
-2.  [ ] Core methods (`AddNode`, `Query`, `GetContext`) implemented and tested.
-3.  [ ] **Integration Test:** A Go test suite successfully interacts with a live GenesisBlockDB server.
-4.  [ ] Documentation updated in `docs/GO-SDK-GUIDE.md`.
+## 4. Current Implementation Status (PR #170)
 
----
-**Please review and approve this Go Binding Specification. I will begin implementation once approved.**
+| Area | Status at PR head ec7e027a | Evidence and limits |
+|---|---|---|
+| Module identity | Canonical path is github.com/Freshair129/GenesisBlock/genesisdb-go. | genesisdb-go/go.mod matches its monorepo directory. |
+| Client operations | Query, AddNode, and GetContext are implemented. | httptest coverage exercises AddNode and Query; GetContext has no dedicated test. AddEdge is not implemented. |
+| Request handling | Requests use net/http and accept context.Context. | The client uses a 30-second HTTP timeout and returns request/decoding errors. |
+| Distribution validation | Go 1.20 CI tests the module and resolves the PR head from a clean external module; a live-server consumer creates a node. | Both Go SDK Distribution jobs passed at PR head ec7e027a. |
+| Release | No semantic-version tag is created by PR #170. | After merge, the documented submodule tag form is genesisdb-go/v0.1.0. Do not describe it as released until external resolution is verified. |
+
+## 5. Definition of Done (DoD)
+
+1.  [x] Go library structure and go.mod initialized at the canonical module path.
+2.  [ ] Core methods AddNode, Query, and GetContext implemented and tested. GetContext is implemented but has no dedicated test; AddEdge remains outside the current client.
+3.  [x] Live-server integration resolves the module from the PR head and creates a node through an external consumer.
+4.  [x] Distribution and usage documentation updated in genesisdb-go/README.md and this specification.
+
+PR #170 implements the monorepo distribution slice. It does not create a release tag or complete the remaining SDK test coverage.
