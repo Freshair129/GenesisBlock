@@ -2901,6 +2901,14 @@ impl VectorCollection {
             }
             None => (0i64, 0i64),
         };
+        let indexed = self
+            .hnsw
+            .read()
+            .as_ref()
+            .map(|h| h.point_count() as u32)
+            .unwrap_or(0);
+        let coverage = self.coverage_report(index_lag);
+
         CollectionInfo {
             name: self.name.clone(),
             model: self.model.clone(),
@@ -2908,19 +2916,14 @@ impl VectorCollection {
             metric: self.metric.as_str().to_string(),
             quant: self.quant.as_str().to_string(),
             count: self.count.load(Ordering::Relaxed) as u32,
-            indexed: self
-                .hnsw
-                .read()
-                .as_ref()
-                .map(|h| h.point_count() as u32)
-                .unwrap_or(0),
+            indexed,
             ef_search: self.ef_search,
             rerank: self.f32_sidecar.is_some(),
             sidecar_resident_bytes,
             sidecar_disk_bytes,
             arena_resident_bytes: self.arena.read().byte_size() as i64,
             index_lag,
-            coverage: self.coverage_report(index_lag),
+            coverage,
         }
     }
 }
