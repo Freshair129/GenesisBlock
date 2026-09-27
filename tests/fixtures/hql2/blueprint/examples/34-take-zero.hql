@@ -1,0 +1,1 @@
+USE kb FROM NODES AS d |> TAKE 0 |> RETURN d.id;

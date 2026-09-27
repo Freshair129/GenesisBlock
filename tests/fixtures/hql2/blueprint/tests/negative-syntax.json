@@ -1,0 +1,26 @@
+[
+  {
+    "name": "missing-return",
+    "query": "USE kb FROM NODES Document AS d;"
+  },
+  {
+    "name": "unclosed-string",
+    "query": "USE kb FROM NODES Document AS d |> FILTER d.language = \"th |> RETURN d.id;"
+  },
+  {
+    "name": "unbounded-expand",
+    "query": "USE kb FROM NODES Document AS d |> EXPAND d -[:REFERENCES*]->(x) |> RETURN x.id;"
+  },
+  {
+    "name": "unsupported-statement",
+    "query": "SELECT EVERY POSSIBLE THING;"
+  },
+  {
+    "name": "two-queries-in-one-request",
+    "query": "USE kb FROM NODES Document AS d |> RETURN d.id; USE kb FROM NODES Document AS e |> RETURN e.id;"
+  },
+  {
+    "name": "missing-knn-vector",
+    "query": "USE kb FROM NODES Document AS d |> KNN d IN docs USING TOP 10 EXACT AS hit |> RETURN d.id;"
+  }
+]

@@ -1,0 +1,3 @@
+USE kb CHANGES SINCE 120 AS event
+|> TAKE 100
+|> RETURN event;

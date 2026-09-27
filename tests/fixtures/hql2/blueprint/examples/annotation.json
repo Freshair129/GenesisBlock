@@ -1,0 +1,30 @@
+{
+  "id": "review:1",
+  "namespace": "kb",
+  "kind": "review",
+  "targets": [
+    {
+      "ref": {
+        "namespace": "kb",
+        "kind": "node",
+        "id": "doc:one",
+        "revision_id": "00000000-0000-4000-8000-000000000001"
+      },
+      "binding": "frozen",
+      "selector": {
+        "type": "whole"
+      }
+    }
+  ],
+  "body": {
+    "type": "text",
+    "text": "Reviewed against source revision.",
+    "language": "en"
+  },
+  "author": "user:reviewer",
+  "created_at": "2026-09-22T00:00:00Z",
+  "valid_from": "2026-09-22T00:00:00Z",
+  "valid_to": null,
+  "confidence": 0.9,
+  "status": "approved"
+}

@@ -1,0 +1,103 @@
+// HQL 2 syntax reference v0.1.0. Semantic constraints are normative in specs/06.
+// A portable parser oracle, not a production execution engine.
+start: statement ";"?
+?statement: explain | query | ddl | mutate | transaction | apply_batch | admin
+explain: "EXPLAIN"i ["ANALYZE"i] query
+query: [scope] query_body
+scope: "USE"i name [tx_selector] [valid_selector]
+tx_selector: "AT"i "TX"i unsigned
+valid_selector: "AT"i "VALID"i string
+query_body: source ("|>" stage)* "|>" return_stage
+?source: node_source | edge_source | row_source | ann_source | match_source | history_source | changes_source | values_source | union_source
+node_source: "FROM"i "NODES"i [name] "AS"i name
+edge_source: "FROM"i "EDGES"i [name] "AS"i name
+row_source: "FROM"i "TABLE"i name "AS"i name
+ann_source: "FROM"i "ANNOTATIONS"i "AS"i name
+match_source: "MATCH"i ["SHORTEST"i] pattern ["AS"i name] [path_mode]
+history_source: "HISTORY"i kind id_value "AS"i name
+changes_source: "CHANGES"i "SINCE"i unsigned "AS"i name
+values_source: "VALUES"i parameter "AS"i name
+union_source: "UNION"i "ALL"i "{" query_body "}" "{" query_body "}"
+?stage: filter_stage | knn_stage | lexical_stage | expand_stage | ann_stage | join_stage | project_stage | distinct_stage | group_stage | aggregate_stage | order_stage | take_stage | skip_stage | pack_stage | rerank_stage
+filter_stage: "FILTER"i expr
+knn_stage: "KNN"i name "IN"i name "USING"i expr "TOP"i unsigned mode "AS"i name
+mode: "EXACT"i | "APPROX"i
+lexical_stage: "LEXICAL"i name "FIELD"i name "QUERY"i expr "USING"i "INDEX"i name "TOP"i unsigned "AS"i name
+expand_stage: ["OPTIONAL"i] "EXPAND"i pattern ["AS"i name] [path_mode]
+ann_stage: ["OPTIONAL"i] "ANNOTATIONS"i "OF"i name "AS"i name
+join_stage: [join_kind] "JOIN"i "TABLE"i name "AS"i name "ON"i expr
+join_kind: "INNER"i | "LEFT"i | "SEMI"i | "ANTI"i
+project_stage: "PROJECT"i select_list
+distinct_stage: "DISTINCT"i
+group_stage: "GROUP"i "BY"i select_list "AGG"i select_list
+aggregate_stage: "AGG"i select_list
+order_stage: "ORDER"i "BY"i order_item ("," order_item)*
+order_item: expr [sort_direction] [null_order]
+sort_direction: "ASC"i | "DESC"i
+null_order: "NULLS"i ("FIRST"i | "LAST"i)
+take_stage: "TAKE"i unsigned
+skip_stage: "SKIP"i unsigned
+pack_stage: "PACK"i "CONTEXT"i "TEXT"i expr "EVIDENCE"i expr "TOKENS"i unsigned "TOKENIZER"i string "AS"i name
+rerank_stage: "RERANK"i name "IN"i name "USING"i expr "TOP"i unsigned "EXACT"i "AS"i name
+return_stage: "RETURN"i select_list
+select_list: select_item ("," select_item)*
+?select_item: "*" -> star | expr ["AS"i name]
+pattern: node_pattern (edge_pattern node_pattern)*
+node_pattern: "(" [name] [":" name] [object] ")"
+edge_pattern: "-" [edge_detail] "->" | "<-" [edge_detail] "-" | "-" [edge_detail] "-"
+edge_detail: "[" [name] [":" relation_list] [hop_range] "]"
+relation_list: name ("|" name)*
+hop_range: "*" UINT ".." UINT
+path_mode: "TRAIL"i | "SIMPLE"i | "WALK"i
+?ddl: create_type | create_table | create_collection | create_index | drop_index
+create_type: "CREATE"i ("NODE"i | "EDGE"i | "ANNOTATION"i) "TYPE"i name "SCHEMA"i parameter
+create_table: "CREATE"i "TABLE"i name "SCHEMA"i parameter
+create_collection: "CREATE"i "COLLECTION"i name "DIM"i UINT "METRIC"i metric "MODEL"i string "QUANT"i quant
+metric: "COSINE"i | "L2_SQUARED"i | "NEG_DOT"i
+quant: "F32"i | "F16"i | "SQ8"i | "BQ"i
+create_index: "CREATE"i ["UNIQUE"i] "INDEX"i name "ON"i index_target ["(" name ("," name)* ")"] "USING"i index_method ["INCLUDE"i "(" name ("," name)* ")"] ["WHERE"i expr] ["WITH"i parameter]
+index_target: "NODE"i name | "EDGE"i name | "TABLE"i name | "ANNOTATION"i | "COLLECTION"i name
+index_method: "BTREE"i | "HNSW"i | "INVERTED"i
+drop_index: "DROP"i "INDEX"i name
+?mutate: upsert_node | upsert_edge | upsert_row | upsert_vector | annotate | retract
+upsert_node: "UPSERT"i "NODE"i id_value "LABELS"i array "PROPS"i value [valid_window]
+upsert_edge: "UPSERT"i "EDGE"i id_value "FROM"i id_value "TO"i id_value "TYPE"i string "PROPS"i value [valid_window]
+upsert_row: "UPSERT"i "ROW"i name "KEY"i value "VALUES"i value [valid_window]
+upsert_vector: "UPSERT"i "VECTOR"i "ON"i "NODE"i id_value "IN"i name "USING"i value [valid_window]
+annotate: "ANNOTATE"i kind id_value "WITH"i parameter
+retract: "RETRACT"i kind id_value ["EXPECT"i "REVISION"i id_value]
+valid_window: "VALID"i "FROM"i value "TO"i value
+kind: "NODE"i | "EDGE"i | "ROW"i | "ANNOTATION"i | "ARTIFACT"i
+transaction: "TRANSACTION"i "ID"i id_value "{" (mutate ";")+ "}"
+apply_batch: "APPLY"i parameter
+admin: "SHOW"i show_kind | "REBUILD"i "INDEX"i name | "ANALYZE"i "INDEX"i name | "CHECK"i "DATABASE"i | "CHECKPOINT"i | "COMPACT"i
+show_kind: "CAPABILITIES"i | "INDEXES"i | "COLLECTIONS"i | "SCHEMAS"i
+?expr: or_expr
+?or_expr: and_expr ("OR"i and_expr)*
+?and_expr: not_expr ("AND"i not_expr)*
+?not_expr: "NOT"i not_expr -> negate | comparison
+?comparison: sum_expr [comp_op sum_expr | "IS"i ["NOT"i] "NULL"i | ["NOT"i] "IN"i array | "BETWEEN"i sum_expr "AND"i sum_expr]
+comp_op: "=" | "!=" | "<>" | "<=" | ">=" | "<" | ">" | "CONTAINS"i | "STARTSWITH"i
+?sum_expr: term (("+" | "-") term)*
+?term: atom (("*" | "/" | "%") atom)*
+?atom: function | field_ref | value | "(" expr ")"
+function: name "(" [function_args] ")"
+function_args: "*" | expr ("," expr)*
+field_ref: name ("." name)*
+?value: parameter | string | SIGNED_NUMBER -> number | "true"i -> true | "false"i -> false | "null"i -> null | array | object
+array: "[" [expr ("," expr)*] "]"
+object: "{" [pair ("," pair)*] "}"
+pair: (name | string) ":" expr
+id_value: string | parameter
+unsigned: UINT | parameter
+parameter: "$" CNAME
+name: CNAME | QUOTED_NAME
+string: ESCAPED_STRING
+QUOTED_NAME: /`[^`\r\n]+`/
+UINT: /0|[1-9][0-9]*/
+%import common.CNAME
+%import common.SIGNED_NUMBER
+%import common.ESCAPED_STRING
+%import common.WS
+%ignore WS
+%ignore /\/\/[^\r\n]*/

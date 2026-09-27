@@ -1,0 +1,165 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "contract_version": {
+      "const": "genesis.api.v2"
+    },
+    "request_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "namespace": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_]{0,62}$"
+    },
+    "hql": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 262144
+    },
+    "ir": {
+      "$ref": "query-ir.schema.json"
+    },
+    "language_version": {
+      "enum": [
+        "hql.v1",
+        "hql.v2"
+      ]
+    },
+    "params": {
+      "type": "object",
+      "additionalProperties": {}
+    },
+    "temporal": {
+      "type": "object",
+      "properties": {
+        "tx_as_of": {
+          "type": "string",
+          "pattern": "^(0|[1-9][0-9]*)$"
+        },
+        "valid_at": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [],
+      "additionalProperties": false
+    },
+    "index_policy": {
+      "enum": [
+        "merge_delta",
+        "wait",
+        "eventual"
+      ]
+    },
+    "required_frontier": {
+      "type": "string",
+      "pattern": "^(0|[1-9][0-9]*)$"
+    },
+    "transaction_id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "budget": {
+      "type": "object",
+      "properties": {
+        "max_memory_bytes": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "max_spill_bytes": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "max_elapsed_ms": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "max_expanded_nodes": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "max_expanded_edges": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "max_vector_candidates": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "max_distance_evaluations": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "max_result_rows": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "max_result_bytes": {
+          "type": "integer",
+          "minimum": 1
+        }
+      },
+      "required": [],
+      "additionalProperties": false
+    },
+    "allow_partial": {
+      "type": "boolean"
+    },
+    "explain": {
+      "enum": [
+        "none",
+        "plan",
+        "analyze"
+      ]
+    },
+    "format": {
+      "enum": [
+        "json",
+        "stream"
+      ]
+    }
+  },
+  "required": [
+    "contract_version",
+    "request_id",
+    "namespace",
+    "params"
+  ],
+  "additionalProperties": false,
+  "oneOf": [
+    {
+      "required": [
+        "hql",
+        "language_version"
+      ],
+      "not": {
+        "required": [
+          "ir"
+        ]
+      }
+    },
+    {
+      "required": [
+        "ir"
+      ],
+      "not": {
+        "anyOf": [
+          {
+            "required": [
+              "hql"
+            ]
+          },
+          {
+            "required": [
+              "language_version"
+            ]
+          }
+        ]
+      }
+    }
+  ],
+  "$id": "https://schemas.genesis.invalid/blueprint/v2/query-request.schema.json"
+}

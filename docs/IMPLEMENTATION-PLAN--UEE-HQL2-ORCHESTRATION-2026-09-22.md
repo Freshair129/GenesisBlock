@@ -1,7 +1,7 @@
 ---
-version: "0.2.1b"
+version: "0.2.2b"
 created_at: "2026-09-22T00:00:00+07:00,ATHER,working-tree"
-last_update: "2026-09-23T08:09:18+07:00,ATHER"
+last_update: "2026-09-28T01:34:00+07:00,ATHER"
 status: candidate
 superseded_by: null
 attributes:
@@ -17,7 +17,10 @@ attributes:
 
 สถานะเอกสารนี้คือ `candidate` และเป็น workflow/แผนงานที่ใช้กำกับ execution แบบมี gate
 เท่านั้น P4/P5 ได้รับ owner approval แล้ว และ P6 contract พร้อม architecture correction ได้รับ
-อนุมัติให้เริ่ม implementation แล้ว; P6 Final Gate, P7-P16, merge และ deploy ยังไม่ผ่าน approval
+อนุมัติให้เริ่ม implementation แล้ว รายการ approval เก่าด้านล่างเป็นประวัติของแต่ละช่วง
+เมื่อ 2026-09-28 owner อนุมัติ [HQL2 execution ADR](adr/ADR--GENESISDB-HQL2-EXECUTION-BOUNDARY.md)
+ให้ทำ P7 และ explicit-v2 execution ต่อในขอบเขตที่กำหนด โดยยังรักษา Verify/Review/Final gates
+ส่วน merge, deploy และการ migrate ฐานข้อมูลผู้ใช้ต้องได้รับอนุญาตแยก
 
 ## 1. Decision ที่เสนอ
 
@@ -167,7 +170,9 @@ Gate checks and exact commands:
 - P4: `cargo test --no-default-features --test journal_format_tests --test journal_migration_tests --test sqlite_substrate_s0_tests --test durability_slice0_tests --test durability_slice1_tests`
 - P5: `cargo test --no-default-features --test relational_u2_tests --test relational_u2_contract_tests --test unified_transaction_u3_tests --test wave_a_commit_tests`
 - P6: `cargo test --no-default-features --test wave_a_commit_tests --test temporal_queries_tests --test tx_as_of_wp22_tests --test governance_tests`
-- P7: `uv run --with-requirements tools/requirements.txt python -m unittest discover -s tests -p 'test_reference*.py'`
+- P7: `cargo test --locked --no-default-features --test hql2_oracle_tests --test hql2_graph_oracle_tests --test hql2_rank_oracle_tests --test hql2_pipeline_oracle_tests`;
+  package reference Python helpers remain supporting evidence only. P7 closes only after
+  composed interpreter coverage, golden expected results and independent review pass.
 - P8-P10: `cargo test --no-default-features --test query_ir_tests --test hql_p0_tests --test hql_filter_tests --test hql_cypher_tests --test wave_c_query_correctness_tests --test napi_rest_parity_tests --test rest_api_tests`
 - P11: `cargo test --no-default-features --test async_indexing_tests --test hnsw_capacity_tests --test hnsw_recall_floor_tests --test multi_collection_tests --test wave_d_quality_artifact_tests`
 - P12: `cargo test --no-default-features --test wave_d_budget_tests --test wave_d_rest_tests`
@@ -204,9 +209,11 @@ its deterministic verify command, independent review, and an explicit dispositio
 
 ## 7. Approval boundary
 
-The initial plan required owner approval before orchestration. P4 and P5 final-gate acceptance are
-now recorded. P6 source implementation remains blocked until the contract decisions in the next
-section are explicitly approved; P7-P16 and any merge/deploy action remain blocked as well.
+Historical phase decisions below remain an audit trail. The 2026-09-28 owner-approved
+HQL2 execution ADR now authorizes P7 and explicit-v2 continuation within its stated
+gates. New P8 API/read-boundary decisions are proposed in
+`SPEC--GENESISDB-HQL2-P8-TYPED-BOUNDARY.md`; this does not authorize their unreviewed
+implementation or any merge/deploy/user-database migration.
 
 ## 8. P5 execution evidence
 
@@ -469,6 +476,7 @@ explicit owner acceptance of the final P6 result. Do not start P7 or merge.
 | Version | Date | Status | Summary | Commit Hash | Agent |
 |---|---|---|---|---|---|
 | 0.2.1b | 2026-09-23 | candidate | Recorded P6 revision-0 fail-closed correction, 45/45 Verify, gpt-5.6-luna Max Review, local audit evidence and remaining peer-authority owner decision | working-tree | ATHER |
+| 0.2.2b | 2026-09-28 | candidate | Reconcile approved HQL2 continuation and replace helper-only P7 gate with four composed Rust oracle targets; retain unapproved P8 concrete-boundary gate | working-tree | ATHER |
 | 0.2.0b | 2026-09-23 | candidate | Returned P6 to source after Luna Review; clarified signed snapshot authority, pre-parse ACL and legacy JSONL coverage gates | working-tree | ATHER |
 | 0.1.0b | 2026-09-22 | candidate | Initial staged UEE-HQL2 dependency DAG, conflict domains, merge order and gate workflow | working-tree | ATHER |
 | 0.1.1b | 2026-09-22 | candidate | Added explicit path ownership, exact verification commands, merge barriers, and corrected topology evidence scope after Verify Gate FAIL | working-tree | ATHER |
