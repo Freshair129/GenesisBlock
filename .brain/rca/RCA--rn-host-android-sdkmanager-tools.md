@@ -2,7 +2,7 @@
 
 ## Status / Date
 
-Root cause confirmed; Android action upgrade verified; separate consumer-fixture failure remains / 2026-09-27.
+Root cause confirmed; v4 verified on consumers; release workflow upgrades pending / 2026-09-27.
 
 ## Symptom
 
@@ -19,16 +19,20 @@ failed before it staged the Android host. The failing step was
 - The `Show what resolved` diagnostic then failed with `No such file or
   directory` for its configured `rn-host/android` working directory. This is a
   cascade from the missing fixture, not the initial cause.
-- The current workflow uses `android-actions/setup-android@v3` in
+- The consumer workflows used `android-actions/setup-android@v3`; PR #188 upgrades
   `.github/workflows/rn-host-acceptance.yml` and
-  `.github/workflows/mobile-build.yml`.
+  `.github/workflows/mobile-build.yml` to v4.
+- The same v3 action remained in `.github/workflows/release.yml` and
+  `.github/workflows/maven-central-publish.yml`, so the release workflows need
+  the same correction before their next run.
 - Upstream `android-actions/setup-android` documents that the legacy `tools`
   SDK package is no longer served and that v4 no longer requests it.
 
 ## Root Cause
 
-The Android SDK setup action version in both consumer and mobile acceptance
-workflows requests the obsolete SDK package `tools`. Google no longer serves
+The v3 Android SDK setup action requests the obsolete SDK package `tools`.
+The recorded consumer failure confirms this behavior; any remaining workflow
+using v3 will hit the same removed-package failure when run. Google no longer serves
 that package, so SDK setup exits before either Android fixture or emulator job
 can run. The absent working directory is a later diagnostic failure caused by
 the fixture step being skipped.
@@ -51,11 +55,13 @@ consumer path and dependency assertions.
 ## Outcome (Measured)
 
 Hosted run [36308660627](https://github.com/Freshair129/GenesisBlock/actions/runs/36308660627)
-completed the Android SDK v4 setup and emulator boot; RN host run
+completed Android SDK v4 setup and emulator boot; RN host run
 [36308660648](https://github.com/Freshair129/GenesisBlock/actions/runs/36308660648)
-passed the packed Android consumer. The separate Maven Central consumer then
-failed before its tests because its blank fixture omitted AndroidX Gradle
-configuration; see `RCA--android-central-consumer-androidx.md`.
+passed the packed Android consumer. In PR run
+[36309923402](https://github.com/Freshair129/GenesisBlock/actions/runs/36309923402),
+v4 setup also passed and the Android Central job reached Kotlin compilation;
+its remaining public `JsonElement` compile error is tracked separately in
+`RCA--android-central-serialization-api-scope.md`.
 
 ## Proposed Prevention
 

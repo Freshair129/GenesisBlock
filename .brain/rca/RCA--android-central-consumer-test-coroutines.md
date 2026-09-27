@@ -2,7 +2,7 @@
 
 ## Status / Date
 
-Root cause confirmed; test-fixture dependency correction pending hosted rerun / 2026-09-27.
+Root cause confirmed; coroutine test dependency correction verified; separate public serialization API defect found / 2026-09-27.
 
 ## Symptom
 
@@ -48,3 +48,10 @@ from appearing.
 
 Declare coroutine helpers explicitly in the fixture's `androidTestImplementation`
 configuration and retain the clean Maven Central compile-and-run acceptance job.
+
+## Outcome (Measured)
+
+Hosted run [36309923402](https://github.com/Freshair129/GenesisBlock/actions/runs/36309923402)
+no longer reported unresolved `kotlinx` or `runBlocking` symbols and advanced
+to SDK signature checking. It then failed on public `JsonElement` exposure,
+tracked in `RCA--android-central-serialization-api-scope.md`.

@@ -66,6 +66,12 @@ name: Mobile Build
 
 on:
   workflow_dispatch:
+    inputs:
+      central_version:
+        description: Published genesisdb-android version to test on the emulator
+        required: false
+        default: '0.1.1'
+        type: string
   push:
     branches: [ main ]
     paths:
@@ -749,6 +755,8 @@ jobs:
 
       - name: Run the published Central artifact on an x86_64 AVD
         uses: reactivecircus/android-emulator-runner@v2
+        env:
+          CENTRAL_VERSION: ${{ github.event.inputs.central_version || '0.1.1' }}
         with:
           api-level: 30
           arch: x86_64
@@ -757,7 +765,7 @@ jobs:
           emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
           disable-animations: true
           working-directory: mobile-acceptance/android-central
-          script: gradle :app:connectedAndroidTest
+          script: gradle :app:connectedAndroidTest -PcentralArtifactVersion="$CENTRAL_VERSION"
 
       - name: Upload Maven Central consumer test report
         if: always()
