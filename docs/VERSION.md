@@ -7,14 +7,19 @@ owner: GenesisBlockDB Engineering
 
 # GenesisBlockDB — Canonical Version (SSOT)
 
-This file is the **single source of truth for version/status**. Per-document
-`version:` frontmatter across `docs/` is historically inconsistent (whitepaper
+This file is the **canonical human-readable version/status record**. The
+engine build version is anchored by `Cargo.toml`; `scripts/version.mjs`
+synchronizes and checks `Cargo.lock`, `package.json`, `package-lock.json`, and
+`modules.json` against it. The record in this document is maintained alongside
+those files.
+Per-document `version:` frontmatter across `docs/` is historically inconsistent
+(whitepaper
 "v2.0.0", GEMINI "1.2.0", AGENT "0.2.2b", C4 "0.1.2b", registry "0.2.1b") — treat
 those as legacy labels superseded by this file.
 
 | Field | Value |
 |---|---|
-| **Engine crate** (`Cargo.toml`, `package.json`, `modules.json`) | `0.2.6` |
+| **Engine crate** (`Cargo.toml`, `Cargo.lock`, `package.json`, `package-lock.json`, `modules.json`) | `0.2.7` |
 | **Product milestone** | **Mobile SDK** — Phase B (iOS/Android/React Native) shipped and published; on-device acceptance verified for iOS |
 | **Status** | Advanced prototype (durable, benchmarked, suite green) |
 | **Evidence baseline** | 2026-06-21 — audits P14–P30, `REPORT--2026-06-21-PERFORMANCE-AND-COMPETITIVE.md` |
@@ -31,8 +36,11 @@ live on npm) → **`0.2.4`** (no engine change; cut to publish
 and iOS integration fixes — see `CHANGELOG.md`). Version `0.2.5` delivered
 the Maven Central/RN distribution release; `0.2.6` delivers the typed context
 query contracts and isolated GenesisRAG17 worker integration. The crate
-version is kept in lock-step across `Cargo.toml`, `package.json`, and
-`modules.json` by `scripts/version.mjs` (`npm run version:check` is a CI gate).
+version is kept in lock-step across `Cargo.toml`, `Cargo.lock`, `package.json`,
+`package-lock.json`, and `modules.json` by `scripts/version.mjs`
+(`npm run version:check` is a CI gate). Version `0.2.7` is prepared for the
+next distribution release; its public availability remains gated on the
+version-tag workflows passing.
 
 **Versioning policy (going forward):** the crate version in `Cargo.toml` is
 authoritative for the build; the product milestone is a plain theme named after
