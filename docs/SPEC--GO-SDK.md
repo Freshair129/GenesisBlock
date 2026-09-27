@@ -72,7 +72,7 @@ res, err := client.Query(ctx, "SEARCH Node SIMILAR TO [0.1, 0.2] K 1")
 | Client operations | Query, AddNode, and GetContext are implemented. | httptest coverage exercises AddNode and Query; GetContext has no dedicated test. AddEdge is not implemented. |
 | Request handling | Requests use net/http and accept context.Context. | The client uses a 30-second HTTP timeout and returns request/decoding errors. |
 | Distribution validation | Go 1.20 CI tests the module and resolves the PR head from a clean external module; a live-server consumer creates a node. | Both Go SDK Distribution jobs passed at PR head ec7e027a. |
-| Release | No semantic-version tag is created by PR #170. | After merge, the documented submodule tag form is genesisdb-go/v0.1.0. Do not describe it as released until external resolution is verified. |
+| Release verification | A pushed Go submodule tag runs clean external resolution through the public Go proxy and a live-server consumer. | The workflow accepts only `genesisdb-go/vMAJOR.MINOR.PATCH` matching the Go surface version in `modules.json`; the first expected tag is `genesisdb-go/v0.1.0`. CI verifies a tag but does not create or publish one. |
 
 ## 5. Definition of Done (DoD)
 
@@ -81,4 +81,4 @@ res, err := client.Query(ctx, "SEARCH Node SIMILAR TO [0.1, 0.2] K 1")
 3.  [x] Live-server integration resolves the module from the PR head and creates a node through an external consumer.
 4.  [x] Distribution and usage documentation updated in genesisdb-go/README.md and this specification.
 
-PR #170 implements the monorepo distribution slice. It does not create a release tag or complete the remaining SDK test coverage.
+PR #170 implements the monorepo distribution slice. A separate tag push is still required for release verification, and the remaining SDK test coverage is incomplete.

@@ -8,6 +8,9 @@ on:
       - 'Cargo.toml'
       - 'Cargo.lock'
       - '.github/workflows/go-distribution.yml'
+  push:
+    tags:
+      - 'genesisdb-go/v*'
   workflow_dispatch:
 
 permissions:
@@ -22,9 +25,50 @@ env:
   RESOLVE_REF: ${{ github.event.pull_request.head.sha || github.sha }}
 
 jobs:
+  validate_release_tag:
+    name: validate Go submodule release tag
+    runs-on: ubuntu-latest
+    outputs:
+      module_version: ${{ steps.validate.outputs.module_version }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Verify tag shape and Go surface version
+        id: validate
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ "$GITHUB_EVENT_NAME" != "push" ]]; then
+            exit 0
+          fi
+
+          tag="$GITHUB_REF_NAME"
+          prefix="genesisdb-go/"
+          if [[ "$tag" != "$prefix"* ]]; then
+            echo "Expected a Go submodule tag beginning with $prefix; got $tag" >&2
+            exit 1
+          fi
+
+          version="${tag#"$prefix"}"
+          if ! [[ "$version" =~ ^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]]; then
+            echo "Expected a stable vMAJOR.MINOR.PATCH version; got $version" >&2
+            exit 1
+          fi
+
+          manifest_version="$(jq -er '.surfaces[] | select(.path == "genesisdb-go") | .version' modules.json)"
+          if [[ "$version" != "v$manifest_version" ]]; then
+            echo "Tag version $version does not match modules.json version v$manifest_version" >&2
+            exit 1
+          fi
+
+          echo "module_version=$version" >> "$GITHUB_OUTPUT"
+
   module:
+    needs: validate_release_tag
     name: module tests + clean external resolution
     runs-on: ubuntu-latest
+    env:
+      RELEASE_VERSION: ${{ needs.validate_release_tag.outputs.module_version }}
     steps:
       - uses: actions/checkout@v4
 
@@ -37,7 +81,7 @@ jobs:
         working-directory: genesisdb-go
         run: go test ./...
 
-      - name: Resolve this PR commit from a clean external module
+      - name: Resolve the PR commit or release version from a clean external module
         shell: bash
         run: |
           set -euo pipefail
@@ -45,7 +89,11 @@ jobs:
           mkdir -p "$CONSUMER"
           cd "$CONSUMER"
           go mod init example.com/genesis-consumer
-          GOPROXY=direct GONOSUMDB="$MODULE" go get "$MODULE@$RESOLVE_REF"
+          if [[ -n "$RELEASE_VERSION" ]]; then
+            GOPROXY=https://proxy.golang.org go get "$MODULE@$RELEASE_VERSION"
+          else
+            GOPROXY=direct GONOSUMDB="$MODULE" go get "$MODULE@$RESOLVE_REF"
+          fi
           cat > main.go <<'GO'
           package main
 
@@ -62,8 +110,11 @@ jobs:
           go run .
 
   live-server-integration:
+    needs: validate_release_tag
     name: clean Go consumer against live Rust server
     runs-on: ubuntu-latest
+    env:
+      RELEASE_VERSION: ${{ needs.validate_release_tag.outputs.module_version }}
     steps:
       - uses: actions/checkout@v4
 
@@ -101,7 +152,7 @@ jobs:
           cat "$RUNNER_TEMP/genesis-server.log"
           exit 1
 
-      - name: Resolve module remotely and create a node
+      - name: Resolve PR commit or release version and create a node
         shell: bash
         run: |
           set -euo pipefail
@@ -109,7 +160,11 @@ jobs:
           mkdir -p "$CONSUMER"
           cd "$CONSUMER"
           go mod init example.com/genesis-live-consumer
-          GOPROXY=direct GONOSUMDB="$MODULE" go get "$MODULE@$RESOLVE_REF"
+          if [[ -n "$RELEASE_VERSION" ]]; then
+            GOPROXY=https://proxy.golang.org go get "$MODULE@$RELEASE_VERSION"
+          else
+            GOPROXY=direct GONOSUMDB="$MODULE" go get "$MODULE@$RESOLVE_REF"
+          fi
           cat > main.go <<'GO'
           package main
 
