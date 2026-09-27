@@ -1,9 +1,9 @@
 #!/usr/bin/env node
 // Single-source-of-truth version control for the GenesisBlockDB multi-surface
 // repo. The engine version (x.y.z[-prerelease]) lives in Cargo.toml and is
-// mirrored to Cargo.lock, package.json, and modules.json (engine + the
-// npm-native-addon surface). This CLI keeps them in lock-step and a CI gate
-// (`check`) fails the build if they ever drift.
+// mirrored to Cargo.lock, package.json, package-lock.json, and modules.json
+// (engine + the npm-native-addon surface). This CLI keeps them in lock-step
+// and a CI gate (`check`) fails the build if they ever drift.
 //
 //   node scripts/version.mjs get                 # print engine version
 //   node scripts/version.mjs check               # verify all surfaces agree (CI gate)
@@ -20,6 +20,7 @@ const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const CARGO = join(ROOT, 'Cargo.toml');
 const CARGO_LOCK = join(ROOT, 'Cargo.lock');
 const PKG = join(ROOT, 'package.json');
+const NPM_LOCK = join(ROOT, 'package-lock.json');
 const MODULES = join(ROOT, 'modules.json');
 
 // The npm surface in modules.json is the package itself — derive its name from
@@ -73,14 +74,32 @@ function readJson(path) {
   return JSON.parse(readFileSync(path, 'utf8'));
 }
 
+function readNpmLockVersions() {
+  const lock = readJson(NPM_LOCK);
+  const rootVersion = lock.packages?.['']?.version;
+  if (typeof lock.version !== 'string' || typeof rootVersion !== 'string') {
+    throw new Error('could not find package-lock.json root package versions');
+  }
+  return { version: lock.version, rootVersion };
+}
+
 function collectVersions() {
   const cargo = readCargoVersion();
   const lock = readCargoLockVersion();
   const pkg = readJson(PKG).version;
+  const npmLock = readNpmLockVersions();
   const mods = readJson(MODULES);
   const engine = mods.engine.version;
   const surface = (mods.surfaces.find((s) => s.name === NPM_SURFACE) || {}).version;
-  return { cargo, lock, pkg, engine, surface };
+  return {
+    cargo,
+    lock,
+    pkg,
+    npmLock: npmLock.version,
+    npmLockRoot: npmLock.rootVersion,
+    engine,
+    surface,
+  };
 }
 
 // --- writers ----------------------------------------------------------------
@@ -129,6 +148,11 @@ function setVersion(version) {
   writeJsonVersion(PKG, (o) => {
     o.version = version;
   });
+  writeJsonVersion(NPM_LOCK, (o) => {
+    if (!o.packages?.['']) throw new Error('could not find package-lock.json root package');
+    o.version = version;
+    o.packages[''].version = version;
+  });
   writeJsonVersion(MODULES, (o) => {
     o.engine.version = version;
     const s = o.surfaces.find((x) => x.name === NPM_SURFACE);
@@ -137,7 +161,7 @@ function setVersion(version) {
       s.minEngineVersion = version;
     }
   });
-  console.log(`✓ version set to ${version} across Cargo.toml, Cargo.lock, package.json, modules.json`);
+  console.log(`✓ version set to ${version} across Cargo.toml, Cargo.lock, package.json, package-lock.json, modules.json`);
 }
 
 function nextVersion(current, kind) {
@@ -167,7 +191,7 @@ function nextVersion(current, kind) {
 
 function cmdCheck() {
   const v = collectVersions();
-  const all = [v.cargo, v.lock, v.pkg, v.engine, v.surface];
+  const all = [v.cargo, v.lock, v.pkg, v.npmLock, v.npmLockRoot, v.engine, v.surface];
   for (const ver of all) parseSemver(ver); // each must be valid semver
   const agree = all.every((x) => x === v.cargo);
   if (!agree) {
@@ -175,6 +199,8 @@ function cmdCheck() {
     console.error(`    Cargo.toml [package].version : ${v.cargo}`);
     console.error(`    Cargo.lock package version   : ${v.lock}`);
     console.error(`    package.json .version        : ${v.pkg}`);
+    console.error(`    package-lock.json .version   : ${v.npmLock}`);
+    console.error(`    package-lock.json root       : ${v.npmLockRoot}`);
     console.error(`    modules.json engine.version  : ${v.engine}`);
     console.error(`    modules.json npm surface     : ${v.surface}`);
     console.error('  Run `npm run version:set <x.y.z>` to resync.');
