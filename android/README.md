@@ -55,14 +55,14 @@ This module never invokes `cargo` itself — it links a prebuilt
   as `genesisdb-android-0.1.0.aar`. This is a raw file download, **not** a
   Maven coordinate — useful for a manual `flatDir`-style local repo, but not
   what a real dependency declaration should point at. Note that this published
-  0.1.0 asset is **arm64-v8a + armeabi-v7a only**; the x86_64 emulator slice
-  lands with 0.1.1 on the next `v*` tag push.
+  0.1.0 asset is **arm64-v8a + armeabi-v7a only**. The x86_64 emulator slice
+  was added to the Maven Central artifact in 0.1.1.
 - **Maven publish**: the `.aar` is on **Maven Central** as
-  `io.github.freshair129:genesisdb-android:0.1.1`, published by
+  `io.github.freshair129:genesisdb-android:0.1.2`, published by
   `.github/workflows/maven-central-publish.yml`. Consumers need nothing beyond
   the `mavenCentral()` every Android project already declares:
   ```kotlin
-  implementation("io.github.freshair129:genesisdb-android:0.1.1")
+  implementation("io.github.freshair129:genesisdb-android:0.1.2")
   ```
   The groupId is **not** `dev.genesisblock`: Central requires a namespace whose
   ownership can be proven and `genesisblock.dev` belongs to an unrelated

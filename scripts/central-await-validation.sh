@@ -189,9 +189,14 @@ validate_target_deployment() {
 check_existing() {
   local id="$1"
   if ! read_deployment_state "$id"; then return 1; fi
-  if ! validate_target_deployment; then return 1; fi
   case "$DEPLOYMENT_STATE" in
-    VALIDATED|PUBLISHING|PUBLISHED)
+    VALIDATED)
+      if ! validate_target_deployment; then return 1; fi
+      echo "deployment $id is VALIDATED and ready for the guarded publish step" ;;
+    PUBLISHING|PUBLISHED)
+      # Central can temporarily return purls=[] with "Deployment components
+      # info not found" after a publish request. These are read-only states
+      # here; coordinate validation is required before a publish POST.
       echo "deployment $id is $DEPLOYMENT_STATE" ;;
     *)
       echo "::error::deployment $id is $DEPLOYMENT_STATE; expected VALIDATED, PUBLISHING, or PUBLISHED"
@@ -203,9 +208,9 @@ check_existing() {
 publish_existing() {
   local id="$1" body_file code
   if ! read_deployment_state "$id"; then return 1; fi
-  if ! validate_target_deployment; then return 1; fi
   case "$DEPLOYMENT_STATE" in
     VALIDATED)
+      if ! validate_target_deployment; then return 1; fi
       body_file=$(mktemp)
       fetch_publish "$id" "$body_file"
       code="$FETCH_CODE"
@@ -214,7 +219,6 @@ publish_existing() {
         # Another Portal user may have started publishing between the status
         # read and POST. Accept that race only if a fresh status confirms it.
         if ! read_deployment_state "$id"; then return 1; fi
-        if ! validate_target_deployment; then return 1; fi
         case "$DEPLOYMENT_STATE" in
           PUBLISHING|PUBLISHED) ;;
           *)
@@ -377,7 +381,7 @@ self_test() {
   echo "publish_existing():"
   local publish_stub
   publish_stub=$(mktemp)
-  printf '200\t{"deploymentState":"VALIDATED","purls":["pkg:maven/io.github.freshair129/genesisdb-android@0.1.2"]}\n200\t{"deploymentState":"PUBLISHING","purls":["pkg:maven/io.github.freshair129/genesisdb-android@0.1.2"]}\n201\t{"deploymentState":"PUBLISHED","purls":["pkg:maven/io.github.freshair129/genesisdb-android@0.1.2"]}\n' > "$stub"
+  printf '200\t{"deploymentState":"VALIDATED","purls":["pkg:maven/io.github.freshair129/genesisdb-android@0.1.2"]}\n200\t{"deploymentState":"PUBLISHING","purls":[],"errors":{"common":["Deployment components info not found"]}}\n201\t{"deploymentState":"PUBLISHED","purls":[],"errors":{"common":["Deployment components info not found"]}}\n' > "$stub"
   printf '204\t\n' > "$publish_stub"
   out=$(CENTRAL_STATUS_STUB="$stub" CENTRAL_PUBLISH_STUB="$publish_stub" \
         POLL_INTERVAL=1 POLL_TIMEOUT=5 publish_existing \
@@ -403,14 +407,38 @@ self_test() {
     failures=$((failures + 1))
   fi
 
-  printf '200\t{"deploymentState":"PUBLISHING","purls":["pkg:maven/io.github.freshair129/genesisdb-android@0.1.2"]}\n200\t{"deploymentState":"PUBLISHING","purls":["pkg:maven/io.github.freshair129/genesisdb-android@0.1.2"]}\n201\t{"deploymentState":"PUBLISHED","purls":["pkg:maven/io.github.freshair129/genesisdb-android@0.1.2"]}\n' > "$stub"
+  printf '200\t{"deploymentState":"VALIDATED","purls":["pkg:maven/org.example/other@1.0.0"]}\n' > "$stub"
+  printf '204\t\n' > "$publish_stub"
+  out=$(CENTRAL_STATUS_STUB="$stub" CENTRAL_PUBLISH_STUB="$publish_stub" \
+        publish_existing 00000000-0000-4000-8000-000000000000 2>&1)
+  rc=$?
+  if [ "$rc" -ne 0 ] && printf '%s' "$out" | grep -Fq 'not a GenesisBlock Android Maven Central artifact'; then
+    echo "  ok    wrong coordinate is rejected before publish"
+  else
+    echo "  FAIL  wrong Maven coordinate was accepted for publish"
+    failures=$((failures + 1))
+  fi
+
+  printf '200\t{"deploymentState":"PUBLISHING","purls":[],"errors":{"common":["Deployment components info not found"]}}\n' > "$stub"
+  out=$(CENTRAL_STATUS_STUB="$stub" check_existing \
+        00000000-0000-4000-8000-000000000000 2>&1)
+  rc=$?
+  if [ "$rc" -eq 0 ] && printf '%s' "$out" | grep -Fq 'is PUBLISHING'; then
+    echo "  ok    PUBLISHING without purls passes read-only check"
+  else
+    echo "  FAIL  PUBLISHING without purls was rejected"
+    printf '%s\n' "$out" | sed 's/^/          /'
+    failures=$((failures + 1))
+  fi
+
+  printf '200\t{"deploymentState":"PUBLISHING","purls":[],"errors":{"common":["Deployment components info not found"]}}\n200\t{"deploymentState":"PUBLISHING","purls":[],"errors":{"common":["Deployment components info not found"]}}\n201\t{"deploymentState":"PUBLISHED","purls":[],"errors":{"common":["Deployment components info not found"]}}\n' > "$stub"
   : > "$publish_stub"
   out=$(CENTRAL_STATUS_STUB="$stub" CENTRAL_PUBLISH_STUB="$publish_stub" \
         POLL_INTERVAL=1 POLL_TIMEOUT=5 publish_existing \
         00000000-0000-4000-8000-000000000000 2>&1)
   rc=$?
   if [ "$rc" -eq 0 ]; then
-    echo "  ok    PUBLISHING resumes without a second publish request"
+    echo "  ok    PUBLISHING without purls resumes without a second publish request"
   else
     echo "  FAIL  PUBLISHING resume (exit $rc)"
     printf '%s\n' "$out" | sed 's/^/          /'

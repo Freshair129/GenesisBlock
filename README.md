@@ -44,7 +44,7 @@ GenesisBlockDB can be used in three broad modes:
 | **MCP server** | ✅ Published | `npx --yes --package @freshair129/gks-genesis-block-native@0.2.7 genesisblock-mcp` | Set `GENESIS_DB_PATH` for the database directory; distributed with the main npm package |
 | **Python SDK** | ✅ Source only | `python -m pip install ./genesisdb-python` | REST client; its first PyPI upload was rejected during OIDC publishing, and the account-side binding is not visible to this repository |
 | **Go SDK** | ✅ Published | `go get github.com/Freshair129/GenesisBlock/genesisdb-go@v0.1.0` | Version tag resolves through the public Go module proxy; REST client for the standalone server |
-| **Android** | ✅ Published | Maven Central: `io.github.freshair129:genesisdb-android:0.1.1` | Preferred Android path; resolves anonymously |
+| **Android** | ✅ Published | Maven Central: `io.github.freshair129:genesisdb-android:0.1.2` | Preferred Android path; resolves anonymously |
 | **Android raw `.aar`** | ✅ Published | GitHub Releases | Manual/fallback integration path |
 | **React Native** | ✅ Published | `npm install react-native-genesisdb` | Android uses Maven Central; iOS uses CocoaPods + published xcframework during install |
 | **iOS binary** | ✅ Published | `GenesisBlockDB.xcframework.zip` from GitHub Releases | General public SPM package URL is not yet the canonical path |
@@ -217,7 +217,7 @@ Then add:
 
 ```kotlin
 dependencies {
-    implementation("io.github.freshair129:genesisdb-android:0.1.1")
+    implementation("io.github.freshair129:genesisdb-android:0.1.2")
 }
 ```
 
