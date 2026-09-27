@@ -1,0 +1,14 @@
+{
+  "version": "0.2.7",
+  "description": "Local-first semantic graph and vector database server",
+  "homepage": "https://github.com/Freshair129/GenesisBlock",
+  "license": "MIT",
+  "architecture": {
+    "64bit": {
+      "url": "https://github.com/Freshair129/GenesisBlock/releases/download/v0.2.7/genesisblockdb-server-v0.2.7-x86_64-pc-windows-msvc.zip",
+      "hash": "90d46783662a276e8eee77e90b48dbae44662f71869239ed070d5462c83a360a",
+      "extract_dir": "genesisblockdb-server-v$version-x86_64-pc-windows-msvc"
+    }
+  },
+  "bin": "genesis-db-server.exe"
+}

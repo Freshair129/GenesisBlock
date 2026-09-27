@@ -6,11 +6,18 @@ on:
       - 'package.json'
       - 'mcp/**'
       - 'scripts/check-mcp-package.mjs'
+      - 'scripts/npm-registry-consumer-smoke.mjs'
       - 'Cargo.toml'
       - 'Cargo.lock'
       - 'src/**'
       - '.github/workflows/mcp-distribution.yml'
   workflow_dispatch:
+    inputs:
+      registry_version:
+        description: "Published @freshair129/gks-genesis-block-native version to install in a clean consumer"
+        required: true
+        default: "0.2.7"
+        type: string
 
 permissions:
   contents: read
@@ -107,3 +114,33 @@ jobs:
           await db.saveState();
           console.log('clean npm consumer round trip:', node.id);
           NODE
+
+
+  published-registry-consumer:
+    name: published npm consumer (${{ matrix.target }})
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.registry_version != '' }}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-latest
+            target: linux-x64-gnu
+          - runner: windows-latest
+            target: windows-x64-msvc
+          - runner: macos-15-intel
+            target: macos-x64
+          - runner: macos-15
+            target: macos-arm64
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install the public registry package in a clean consumer
+        env:
+          PACKAGE_VERSION: ${{ inputs.registry_version }}
+        run: node scripts/npm-registry-consumer-smoke.mjs

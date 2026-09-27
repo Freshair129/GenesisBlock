@@ -60,19 +60,19 @@ res, err := client.Query(ctx, "SEARCH Node SIMILAR TO [0.1, 0.2] K 1")
 1.  **Transport:** Use the standard `net/http` package for zero-dependency core communication.
 2.  **Serialization:** Use `encoding/json` for schema mapping.
 3.  **Error Handling:** Return request and decoding errors to callers.
-4.  **Distribution:** Keep the module in the monorepo at github.com/Freshair129/GenesisBlock/genesisdb-go. Use a Go submodule tag such as genesisdb-go/v0.1.0 only after the distribution slice is merged and the external consumer resolves it.
+4.  **Distribution:** Keep the module in the monorepo at github.com/Freshair129/GenesisBlock/genesisdb-go. Publish Go-compatible submodule tags only after version validation and clean external resolution through proxy.golang.org.
 
 ---
 
-## 4. Current Implementation Status (PR #170)
+## 4. Current Implementation Status
 
-| Area | Status at PR head ec7e027a | Evidence and limits |
+| Area | Current status | Evidence and limits |
 |---|---|---|
 | Module identity | Canonical path is github.com/Freshair129/GenesisBlock/genesisdb-go. | genesisdb-go/go.mod matches its monorepo directory. |
 | Client operations | Query, AddNode, and GetContext are implemented. | httptest coverage exercises AddNode and Query; GetContext has no dedicated test. AddEdge is not implemented. |
 | Request handling | Requests use net/http and accept context.Context. | The client uses a 30-second HTTP timeout and returns request/decoding errors. |
-| Distribution validation | Go 1.20 CI tests the module and resolves the PR head from a clean external module; a live-server consumer creates a node. | Both Go SDK Distribution jobs passed at PR head ec7e027a. |
-| Release verification | A pushed Go submodule tag runs clean external resolution through the public Go proxy and a live-server consumer. | The workflow accepts only `genesisdb-go/vMAJOR.MINOR.PATCH` matching the Go surface version in `modules.json`; the first expected tag is `genesisdb-go/v0.1.0`. CI verifies a tag but does not create or publish one. |
+| Distribution validation | The versioned tag resolves from a clean external module through proxy.golang.org; a live-server consumer creates a node. | `genesisdb-go/v0.1.0` passed run [36305930775](https://github.com/Freshair129/GenesisBlock/actions/runs/36305930775) at engine SHA `caff3d4590f0dd1d1a69b6768681107dd403bd42`. |
+| Release verification | A pushed Go submodule tag runs clean external resolution through the public Go proxy and a live-server consumer. | `genesisdb-go/v0.1.0` matches `modules.json` and is published; the tag workflow validates it and exercises versioned resolution. |
 
 ## 5. Definition of Done (DoD)
 

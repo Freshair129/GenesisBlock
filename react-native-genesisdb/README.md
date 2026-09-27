@@ -89,33 +89,29 @@ both of the pieces that previously were not are resolved:
 
 ## What CI does and does not verify
 
-`rn-ios-vendor-freshness` proves the vendored copies match their originals, and
-`rn-ios-pod-typecheck` compiles them for the iOS Simulator **against the
-published xcframework the podspec actually downloads** — the combination that a
-real `pod install` produces, and the gate that would have caught the bug above.
+`rn-host-acceptance` generates a temporary external host and consumes the
+published `react-native-genesisdb` package. Its Android job resolves
+`io.github.freshair129:genesisdb-android:0.1.1` anonymously from Maven Central
+and assembles the Android module. Its iOS job runs `pod install` and checks the
+published xcframework fetched by the podspec. These jobs use public package
+paths and do not require a GitHub Packages token.
 
-Still not covered: a full `pod install` in a real RN host app (there is none in
-this monorepo), and `android/build.gradle`'s Maven resolution. That gap is why
-both `0.1.0` breakages shipped unnoticed.
+`mobile-build` also has a separate blank Android consumer that installs the
+Maven Central AAR in an x86_64 emulator and runs native write/persistence tests.
+The RN host job compiles the native module and resolves the package; it does not
+launch a full React Native app or call the database through JavaScript on a
+device. The direct Android SDK acceptance tests cover native open/write and
+persistence against the published Central artifact.
 
 ## Publishing
 
-`.github/workflows/release.yml`'s `rn-npm-publish` job publishes this package
-to npm (unscoped `react-native-genesisdb`, `--tag beta`) on every `v*` tag
-push, reusing the same `NPM_TOKEN` secret the main native-addon package
-publishes with (issue #125).
-
-That job has run: `react-native-genesisdb@0.1.0` was published from the
-`v0.2.2` tag. Re-publishing an unchanged version is correctly rejected by the
-registry with `403 You cannot publish over the previously published
-versions`, so later tags no-op unless the version in `package.json` is bumped.
-
-**That is why this package is at `0.1.1`.** `0.1.0` is the version currently
-on npm, and it is the one with both integration breakages — the Android
-repository declaration and the iOS module imports were fixed on `main` after
-it shipped, so those fixes do not reach a single npm consumer until a tag
-push publishes `0.1.1`. Bumping the version is the delivery mechanism, not
-bookkeeping.
+The public npm package is `react-native-genesisdb@0.1.2`. Its version is
+independent of the engine's `0.2.x` release version. The release workflow
+publishes changed package versions from engine tags and skips versions that
+already exist; bump `react-native-genesisdb/package.json` and the corresponding
+`modules.json` surface before publishing a new RN package. Android resolves
+its engine dependency from Maven Central at
+`io.github.freshair129:genesisdb-android:0.1.1`.
 
 ## Wire format
 
@@ -132,9 +128,4 @@ opaque `props` field).
 `react-native` module (`src/__mocks__/react-native.ts`) — no native build,
 no simulator/emulator, no RN runtime. Run with `npm test`.
 
-The vendored iOS SDK sources are type-checked against the published
-xcframework by `rn-ios-pod-typecheck` (see "What CI does and does not
-verify" above). Beyond that, the `android/` and `ios/` native module sources
-are validated only by building them inside a real RN host app, which this
-monorepo has none of — the same host-only carve-out as the rest of the
-mobile SDK (see `.github/workflows/mobile-build.yml`).
+The vendored iOS SDK sources are type-checked against the published xcframework by `rn-ios-pod-typecheck`. Registry host acceptance additionally verifies that the published npm package installs, the Android module resolves the public Central dependency and assembles, and CocoaPods downloads the framework. Runtime coverage for the published Android engine artifact is provided by the separate `android-central-consumer` emulator job.

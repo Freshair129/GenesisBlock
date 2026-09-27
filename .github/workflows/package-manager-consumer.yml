@@ -1,0 +1,75 @@
+name: Package Manager Consumer
+
+on:
+  pull_request:
+    paths:
+      - 'Formula/**'
+      - 'bucket/**'
+      - 'scripts/package-manager-consumer-smoke.py'
+      - '.github/workflows/package-manager-consumer.yml'
+      - 'README.md'
+      - 'docs/VERSION.md'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  homebrew-consumer:
+    name: Homebrew clean consumer (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-15, macos-15-intel, ubuntu-latest]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install Homebrew on Linux
+        if: runner.os == 'Linux'
+        run: NONINTERACTIVE=1 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+
+      - name: Install from the tap and smoke-test the server
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ "$RUNNER_OS" == Linux ]]; then
+            eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"
+          fi
+          tap="$RUNNER_TEMP/genesisblockdb-homebrew-tap"
+          git clone "$GITHUB_WORKSPACE" "$tap"
+          brew tap Freshair129/GenesisBlock "$tap"
+          brew install Freshair129/GenesisBlock/genesisblockdb-server
+          python scripts/package-manager-consumer-smoke.py "$(brew --prefix)/bin/genesis-db-server"
+
+  scoop-consumer:
+    name: Scoop clean consumer (Windows x64)
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install Scoop
+        shell: pwsh
+        run: |
+          Set-ExecutionPolicy RemoteSigned -Scope CurrentUser -Force
+          Invoke-RestMethod -Uri https://get.scoop.sh | Invoke-Expression
+
+      - name: Install from the public manifest URL and smoke-test the server
+        shell: pwsh
+        env:
+          MANIFEST_REPOSITORY: ${{ github.event.pull_request.head.repo.full_name || github.repository }}
+          MANIFEST_REF: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          scoop install "https://raw.githubusercontent.com/$env:MANIFEST_REPOSITORY/$env:MANIFEST_REF/bucket/genesisblockdb-server.json"
+          $binary = Join-Path (scoop prefix genesisblockdb-server) 'genesis-db-server.exe'
+          python scripts/package-manager-consumer-smoke.py $binary

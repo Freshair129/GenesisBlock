@@ -148,11 +148,12 @@ flowchart TB
 
 ### Distribution and Release Flow
 
-The distribution boundary packages the same engine through independent
-release channels. `Cargo.toml` anchors the engine build version; the version
-script checks it against `docs/VERSION.md`, `package.json`, and `modules.json`.
-The Python SDK has its own `python-v*` tag, the Go submodule uses
-`genesisdb-go/v*`, and the mobile SDK versions remain independent.
+The distribution boundary packages one engine through independent release
+channels. `Cargo.toml` anchors the engine build version. `scripts/version.mjs`
+checks `Cargo.lock`, `package.json`, `package-lock.json`, and `modules.json`;
+`docs/VERSION.md` is the human-readable record maintained alongside them. The
+Python SDK has its own `python-v*` tag, the Go submodule uses
+`genesisdb-go/v*`, and mobile SDK versions remain independent.
 
 ```mermaid
 flowchart LR
@@ -166,30 +167,36 @@ flowchart LR
     containerSmoke --> ghcr["GHCR image + provenance + SBOM"]
     engineTag --> android["Android release artifact / registry checks"]
     engineTag --> rn["React Native npm registry check"]
+    ghRelease --> packageManagers["Homebrew + Scoop clean consumers"]
 
-    pythonCi["Wheel/sdist + clean consumer CI"] -. must pass before .-> pythonTag["python-v* tag"]
+    pythonCi["Wheel/sdist + clean consumer CI"] -. release policy .-> pythonTag["python-v* tag"]
     pythonTag --> pypiBuild["Release wheel + sdist"]
     pypiBuild --> pypi["PyPI via Trusted Publishing"]
-    goTag["genesisdb-go/v* tag (first tag pending)"] --> goProxy["Go module proxy"]
-    goProxy -. "required; not in current CI" .-> goCheck["Post-tag version resolution check"]
+    goTag["genesisdb-go/v* tag"] --> goProxy["Go module proxy"]
+    goProxy --> goCheck["Versioned clean-consumer + live-server CI"]
 
-    npm --> consumerNpm["Node / MCP consumer"]
+    npm --> consumerNpm["Node / MCP registry consumer"]
     ghRelease --> consumerServer["REST deployment consumer"]
     ghcr --> consumerServer
-    pypi --> consumerPython["Python REST client"]
+    pypi --> consumerPython["Python registry consumer"]
     goProxy --> consumerGo["Go REST client"]
 ```
 
-The diagram shows the artifact routes; it does not assert that all channels
-are already published. PR CI checks package fixtures before release, while a
-tag-triggered publisher is a separate action. Current Go CI resolves a commit
-SHA, not a version tag; PyPI still needs its Trusted Publisher binding; and
-the server pipeline does not install its uploaded archive or pull the published
-GHCR image after release. Its container smoke tests a locally built image. The
-root Rust crate remains source-only by the accepted crates.io ADR. The iOS
-release-asset path has no public SwiftPM package until the accepted same-version
-SPM gate passes. Homebrew and the Windows package-manager manifest require
-checksummed server assets from the first stable server release.
+The diagram shows the artifact routes, while release status is verified
+separately against the hosted registries. The `v0.2.7` release publishes the
+main npm package (including the MCP CLI), standalone server binaries with
+SHA-256 sidecars, and the public GHCR image. The GHCR image was anonymously
+pulled and passed a volume persistence smoke. Homebrew and Scoop install those
+checksummed release binaries in clean consumer jobs. The Go submodule tag
+`genesisdb-go/v0.1.0` passed proxy resolution and a live-server consumer check.
+
+The first PyPI publish attempt built and validated its artifacts, then the
+Trusted Publishing request was rejected. The account-side publisher binding is
+not visible from this repository, so a binding mismatch or service-side OIDC
+error remains unconfirmed. The workflow now performs a clean registry install
+after a future successful upload. The root Rust crate remains source-only by
+the accepted crates.io ADR. The iOS release-asset path remains the published
+binary path; no root-level SwiftPM package is claimed.
 
 ## 5. C3 - Components
 

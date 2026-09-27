@@ -35,12 +35,15 @@ live on npm) → **`0.2.4`** (no engine change; cut to publish
 `react-native-genesisdb` 0.1.1, which finally delivers that package's Android
 and iOS integration fixes — see `CHANGELOG.md`). Version `0.2.5` delivered
 the Maven Central/RN distribution release; `0.2.6` delivers the typed context
-query contracts and isolated GenesisRAG17 worker integration. The crate
-version is kept in lock-step across `Cargo.toml`, `Cargo.lock`, `package.json`,
-`package-lock.json`, and `modules.json` by `scripts/version.mjs`
-(`npm run version:check` is a CI gate). Version `0.2.7` is prepared for the
-next distribution release; its public availability remains gated on the
-version-tag workflows passing.
+query contracts and isolated GenesisRAG17 worker integration. **`0.2.7`
+(2026-09-27)** publishes the main npm package and MCP CLI, standalone server
+archives with SHA-256 sidecars, GHCR image, and Go SDK `v0.1.0`. The Homebrew
+and Scoop manifests consume those release artifacts. Python package version
+`0.1.0` is built, but the first PyPI Trusted Publishing request was rejected;
+the external publisher binding or service-side OIDC state is not yet confirmed.
+The crate version is kept in lock-step across
+`Cargo.toml`, `Cargo.lock`, `package.json`, `package-lock.json`, and `modules.json`
+by `scripts/version.mjs` (`npm run version:check` is a CI gate).
 
 **Versioning policy (going forward):** the crate version in `Cargo.toml` is
 authoritative for the build; the product milestone is a plain theme named after

@@ -50,7 +50,6 @@ on:
 
 permissions:
   contents: read
-  packages: read
 
 env:
   # schedule has no inputs, so it must fall through to `published`.
@@ -74,7 +73,7 @@ jobs:
           distribution: temurin
           java-version: '17'
 
-      - uses: android-actions/setup-android@v3
+      - uses: android-actions/setup-android@v4
         with:
           packages: platform-tools
 
@@ -83,30 +82,23 @@ jobs:
       - name: Stage the package into a host project
         run: bash scripts/rn-host-fixture.sh android "$PKG_SOURCE" "$PKG_VERSION"
 
-      # The real 0.1.0 defect was pure dependency resolution: the shipped
-      # build.gradle declared google()/mavenCentral() while the .aar lives on
-      # GitHub Packages, so `implementation "dev.genesisblock:genesisdb-android"`
-      # was unresolvable for everyone who installed from npm. assembleRelease
-      # resolves that AND compiles the Kotlin bridge, so a source-level break
-      # fails here too.
-      #
-      # GITHUB_ACTOR/GITHUB_TOKEN are what the shipped build.gradle falls back
-      # to when the gpr.* properties are absent — so this also exercises the
-      # credential path the package's README tells consumers to set up.
+      # The current Android dependency resolves only from Maven Central. Do
+      # not pass package credentials here: this must prove the published RN
+      # package builds for a consumer without GitHub Packages access.
       - name: gradle assembleRelease in the host project
         working-directory: rn-host/android
-        env:
-          GITHUB_ACTOR: ${{ github.actor }}
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: gradle :react-native-genesisdb:assembleRelease --stacktrace
 
       - name: Show what resolved
         if: always()
-        working-directory: rn-host/android
-        env:
-          GITHUB_ACTOR: ${{ github.actor }}
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: gradle :react-native-genesisdb:dependencies --configuration releaseCompileClasspath || true
+        shell: bash
+        run: |
+          if [[ -d rn-host/android ]]; then
+            cd rn-host/android
+            gradle :react-native-genesisdb:dependencies --configuration releaseCompileClasspath || true
+          else
+            echo "Android host fixture was not created; inspect the earlier SDK setup or staging step."
+          fi
 
   ios-host:
     name: iOS host pod-installs the package (${{ inputs.source || (github.event_name == 'schedule' && 'published') || 'packed' }})
