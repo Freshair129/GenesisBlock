@@ -211,7 +211,7 @@ export interface QueryIrRequest {
   temporal?: { valid_at?: string; tx_as_of?: number }
   consistency?: { index: QueryIrIndexConsistency }
   budget?: QueryBudget
-  operation: QueryIrSearchOperation | QueryIrTraverseOperation | QueryIrContextOperation
+  operation: QueryIrSearchOperation | QueryIrTraverseOperation | QueryIrContextOperation | QueryIrMatchPathOperation
 }
 export interface QueryIrSearchOperation {
   kind: 'search'
@@ -234,6 +234,53 @@ export interface QueryIrTraverseOperation {
   direction: QueryIrDirection
   limit?: number
 }
+export type QueryIrPatternValue = string | number
+export interface QueryIrPatternProperty {
+  key: string
+  value: QueryIrPatternValue
+}
+export interface QueryIrNodePattern {
+  var?: string | null
+  label?: string | null
+  props?: Array<QueryIrPatternProperty>
+}
+export interface QueryIrEdgePattern {
+  var?: string | null
+  rel_type?: string | null
+  direction: QueryIrDirection
+}
+export interface QueryIrGraphHop {
+  edge: QueryIrEdgePattern
+  node: QueryIrNodePattern
+}
+export interface QueryIrGraphPattern {
+  start: QueryIrNodePattern
+  hops?: Array<QueryIrGraphHop>
+}
+export interface QueryIrPatternField {
+  var: string
+  /** id, label, score, depth, recorded_at, or prop.<key>; omit for the whole binding. */
+  field?: string | null
+}
+export type QueryIrPatternOp = 'eq' | 'ne' | 'lt' | 'le' | 'gt' | 'ge' | 'contains' | 'starts_with'
+export interface QueryIrPatternPredicate {
+  field: QueryIrPatternField
+  op: QueryIrPatternOp
+  value: QueryIrPatternValue
+}
+export interface QueryIrPatternOrder {
+  field: QueryIrPatternField
+  descending?: boolean
+}
+export type QueryIrPatternReturn = { kind: 'all' } | { kind: 'fields'; fields: Array<QueryIrPatternField> }
+export interface QueryIrMatchPathOperation {
+  kind: 'match_path'
+  pattern: QueryIrGraphPattern
+  limit: number
+  where?: Array<QueryIrPatternPredicate>
+  order_by?: QueryIrPatternOrder
+  return?: QueryIrPatternReturn
+}
 export interface QueryIrContextOperation {
   kind: 'context'
   target_id?: string
@@ -246,8 +293,8 @@ export interface QueryIrResponse {
   contract_version: 'query-ir.v1'
   request_id: string
   status: 'ok'
-  operation_kind: 'search' | 'traverse' | 'context'
-  data: Array<NeighborOutput> | ContextPackage
+  operation_kind: 'search' | 'traverse' | 'match_path' | 'context'
+  data: Array<NeighborOutput> | Array<Record<string, unknown>> | ContextPackage
   meta: {
     capability_version: string
     index_lag: number
@@ -280,7 +327,7 @@ export interface QueryIrCapabilities {
   operations: {
     search: 'implemented'
     traverse: 'implemented'
-    match_path: 'planned'
+    match_path: 'implemented'
     context: 'implemented'
     relational_named_query: 'planned'
   }
@@ -298,7 +345,14 @@ export interface QueryIrCapabilities {
       temporal: 'unsupported'
       tiers: Array<string>
     }
-    match_path: 'planned'
+    match_path: {
+      linear: 'implemented'
+      where: 'implemented'
+      order_by: 'implemented'
+      return: 'implemented'
+      valid_at: 'implemented'
+      tx_as_of: 'unsupported'
+    }
     relational_named_query: 'planned'
   }
   limits: {

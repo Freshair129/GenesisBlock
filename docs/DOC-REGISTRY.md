@@ -2,8 +2,8 @@
 title: "GenesisBlockDB Document Registry"
 doc_id: "DOC-REGISTRY-GENESISBLOCKDB"
 status: draft
-version: "0.4.7+draft"
-updated: "2026-09-23"
+version: "0.4.8+draft"
+updated: "2026-09-29"
 owner: "GenesisBlockDB Architecture"
 source_of_truth: true
 related_issue: 84
@@ -52,16 +52,16 @@ registry row explicitly names them.
 | Role | Doc ID | Version | Status | Owner | Path |
 |---|---|---|---|---|---|
 | Architecture composition | `MASTER-SPEC-GENESISBLOCKDB` | `2.3.1b` | current | GenesisBlockDB Architecture | `docs/MASTER-SPEC--GENESIS-DB.md` |
-| Architecture index | `C4--GENESISDB-ARCHITECTURE` | `0.1.13b` | current | GenesisBlockDB Architecture | `docs/C4--GENESISDB-ARCHITECTURE.md` |
+| Architecture index | `C4--GENESISDB-ARCHITECTURE` | `0.1.14b` | current | GenesisBlockDB Architecture | `docs/C4--GENESISDB-ARCHITECTURE.md` |
 | Commit correctness | `SPEC--WAVE-A-COMMIT-CORRECTNESS` | `0.1.0b` | beta | GenesisBlockDB Engineering | `docs/SPEC--WAVE-A-COMMIT-CORRECTNESS.md` |
 | Durable collections and edge history | `SPEC--WAVE-B-DURABLE-COLLECTIONS-EDGE-HISTORY` | `0.1.2b` | beta | GenesisBlockDB Engineering | `docs/SPEC--WAVE-B-DURABLE-COLLECTIONS-EDGE-HISTORY.md` |
 | Generation, lease, temporal and ACL contract | `SPEC--GENESISDB-P6-GENERATIONS-LEASES-ACL` | `0.2.0b` | beta | GenesisBlockDB Engineering | `docs/SPEC--GENESISDB-P6-GENERATIONS-LEASES-ACL.md` |
 | Query correctness | `SPEC--WAVE-C-QUERY-CORRECTNESS` | `0.2.1b` | beta | GenesisBlockDB Engineering | `docs/SPEC--WAVE-C-QUERY-CORRECTNESS.md` |
 | Query budgets and quality gates | `SPEC--WAVE-D-BUDGETS-QUALITY-GATES` | `0.1.0b` | beta | GenesisBlockDB Engineering | `docs/SPEC--WAVE-D-BUDGETS-QUALITY-GATES.md` |
-| Query context and client capability | `SPEC--WAVE-E-QUERY-CONTEXT-CLIENT-CAPABILITY` | `0.1.1b` | beta | GenesisBlockDB Engineering | `docs/SPEC--WAVE-E-QUERY-CONTEXT-CLIENT-CAPABILITY.md` |
+| Query context and client capability | `SPEC--WAVE-E-QUERY-CONTEXT-CLIENT-CAPABILITY` | `0.1.2b` | beta | GenesisBlockDB Engineering | `docs/SPEC--WAVE-E-QUERY-CONTEXT-CLIENT-CAPABILITY.md` |
 | ADR | `ADR-GENESISBLOCKDB-DOMAIN-NEUTRAL-CORE` | `0.1.0+draft` | proposed | GenesisBlockDB Architecture | `docs/adr/ADR--GENESISBLOCKDB-DOMAIN-NEUTRAL-CORE.md` |
 | ADR | `ADR--GENESISDB-TYPED-QUERY-IR-AGENT-BOUNDARY` | `1.0.1` | accepted | Product Authority | `docs/adr/ADR--GENESISDB-TYPED-QUERY-IR-AGENT-BOUNDARY.md` |
-| Query contract | `SPEC-GENESISDB-TYPED-QUERY-IR-V1` | `1.0.2` | accepted | GenesisBlockDB Architecture | `docs/SPEC--GENESISDB-TYPED-QUERY-IR-V1.md` |
+| Query contract | `SPEC-GENESISDB-TYPED-QUERY-IR-V1` | `1.0.3` | accepted | GenesisBlockDB Architecture | `docs/SPEC--GENESISDB-TYPED-QUERY-IR-V1.md` |
 | Client contract | `CONTRACT-CLIENT-NAMESPACE-AND-SCHEMA` | `0.1.0+draft` | draft | GenesisBlockDB Engineering | `docs/contracts/CONTRACT--CLIENT-NAMESPACE-AND-SCHEMA.md` |
 | API reference | `API_REFERENCE` | generated | current | GenesisBlockDB Engineering | `docs/API_REFERENCE.md` |
 | GenesisRAG17 integration ADR | `ADR-GENESISRAG17-SEPARATE-WORKER-PUBLICATION` | `1.0.5b` | beta | GenesisBlockDB Architecture | `docs/ADR--GENESISRAG17-SEPARATE-WORKER-PUBLICATION.md` |
@@ -112,6 +112,7 @@ The following documents should be created only when implementation work requires
 
 | Version | Date | Owner | Summary |
 |---|---|---|---|
+| 0.4.8+draft | 2026-09-29 | GenesisBlockDB Architecture | Registered Typed Query IR V1 1.0.3 and C4 0.1.14b after implementing the typed linear match_path slice. |
 | 0.4.7+draft | 2026-09-23 | GenesisBlockDB Architecture | Sync P6 spec version after snapshot-authority and HQL ACL review corrections. |
 | 0.4.6+draft | 2026-09-23 | GenesisBlockDB Architecture | Classify Enforced-ACL legacy accessors and refresh the P6 specification version. |
 | 0.4.5+draft | 2026-09-22 | GenesisBlockDB Architecture | Registered the owner-approved P6 contract and synchronized Master/C4 document versions. |

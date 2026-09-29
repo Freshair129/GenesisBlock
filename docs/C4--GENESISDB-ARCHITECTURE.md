@@ -2,10 +2,10 @@
 doc_id: C4--GENESISDB-ARCHITECTURE
 type: architecture-index
 status: current
-version: 0.1.13b
+version: 0.1.14b
 owner: GenesisBlockDB Architecture
 created_at: 2026-06-13T22:50:11+07:00,ATHER,9b1ced3
-last_update: "2026-09-22T23:00:00+07:00,ATHER"
+last_update: "2026-09-29T00:00:00+07:00,ATHER"
 attributes:
   domain: architecture
   scope: repository
@@ -158,8 +158,8 @@ flowchart TB
 | Vector Collections | Per-model/dim isolated vector spaces (`collections: DashMap<String, Arc<VectorCollection>>`, each with its own arena + metadata + HNSW + metric); a `default` collection always exists. Async indexing thread (off the write path), plus explicit structural source-to-HNSW coverage validation. | `src/lib.rs` | master spec, HNSW hybrid index design, `ADR--GENESISDB-MULTI-COLLECTION`, `ADR--GENESISDB-ASYNC-INDEXING`, `ADR--GENESISDB-INDEX-COVERAGE-LIFECYCLE` |
 | Hybrid Search | Per-collection vector + lexical retrieval with ranking; query dim validated against the collection | `src/lib.rs`, HNSW design | HNSW hybrid index design |
 | Graph Retrieval Layer | Tiered context retrieval by hop budget and fuzzy matching | `src/lib.rs::retrieve_context` | `SPEC--GRAPH-RETRIEVAL-LAYER.md` |
-| Typed Query IR Boundary (partial) | Validate and dispatch versioned structured search/traverse queries consistently across public surfaces | `src/lib.rs::execute_query_ir`, `src/router.rs` `/v1/query/ir`; remaining V1 operations are planned | `ADR--GENESISDB-TYPED-QUERY-IR-AGENT-BOUNDARY`, `SPEC--GENESISDB-TYPED-QUERY-IR-V1` |
-| HQL Compatibility Frontend | Parse and execute current search/traverse/context queries without owning storage semantics | `src/lib.rs::execute_hql`, `src/query/*` | HQL section in master spec, API docs |
+| Typed Query IR Boundary (partial) | Validate and dispatch versioned structured search/traverse/path/context queries consistently across public surfaces | `src/lib.rs::execute_query_ir`, `src/router.rs` `/v1/query/ir`; query-vector/temporal context and relational named queries remain planned or unsupported | `ADR--GENESISDB-TYPED-QUERY-IR-AGENT-BOUNDARY`, `SPEC--GENESISDB-TYPED-QUERY-IR-V1` |
+| HQL Compatibility Frontend | Parse and execute current search/traverse/path/context queries without owning storage semantics | `src/lib.rs::execute_hql`, `src/query/*` | HQL section in master spec, API docs |
 | Symbolic Graph / AST Boundary | Symbolic relationships, query grammar, and structured traversal semantics | `src/lib.rs`, `hql.pest` | master spec, HQL docs |
 | K-Impact / Reasoning | Impact scoring, inference, structural insight, drift | `src/lib.rs` | K-impact specs, transitive inference design |
 | Community Detection | Cluster/community discovery for graph insight and SuperNode generation | `src/lib.rs` | graph clustering and structural insight specs |
@@ -289,6 +289,7 @@ entity namespace migration is approved. See [P6 generation/lease/ACL specificati
 
 | Version | Date | Status | Summary | Commit Hash | Agent |
 |---------|------|--------|---------|-------------|-------|
+| 0.1.14b | 2026-09-29 | beta | Truth-synced the partial Typed Query IR map for implemented linear match_path and remaining context/relational gaps. | working-tree | ATHER |
 | 0.1.13b | 2026-09-22 | beta | Registered the owner-approved P6 generation, lease, temporal, ACL and snapshot integrity target without claiming implementation completion. | working-tree | ATHER |
 | 0.1.12b | 2026-09-08 | beta | Registered Wave B collection journal and edge history contracts. | working-tree | ATHER |
 | 0.1.11b | 2026-09-08 | beta | Registered Wave A commit publication, preflight and recovery-required contracts with validation limits. | working-tree | ATHER |

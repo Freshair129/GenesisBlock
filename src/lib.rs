@@ -728,6 +728,95 @@ impl QueryIrDirection {
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
+#[serde(deny_unknown_fields)]
+pub struct QueryIrGraphPattern {
+    pub start: QueryIrNodePattern,
+    #[serde(default)]
+    pub hops: Vec<QueryIrGraphHop>,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+#[serde(deny_unknown_fields)]
+pub struct QueryIrNodePattern {
+    pub var: Option<String>,
+    pub label: Option<String>,
+    #[serde(default)]
+    pub props: Vec<QueryIrPatternProperty>,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+#[serde(deny_unknown_fields)]
+pub struct QueryIrGraphHop {
+    pub edge: QueryIrEdgePattern,
+    pub node: QueryIrNodePattern,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+#[serde(deny_unknown_fields)]
+pub struct QueryIrEdgePattern {
+    pub var: Option<String>,
+    pub rel_type: Option<String>,
+    pub direction: QueryIrDirection,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+#[serde(deny_unknown_fields)]
+pub struct QueryIrPatternProperty {
+    pub key: String,
+    pub value: QueryIrPatternValue,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+#[serde(untagged)]
+pub enum QueryIrPatternValue {
+    String(String),
+    Number(f64),
+}
+
+#[derive(Serialize, Deserialize, Clone, Copy, Debug)]
+#[serde(rename_all = "snake_case")]
+pub enum QueryIrPatternOp {
+    Eq,
+    Ne,
+    Lt,
+    Le,
+    Gt,
+    Ge,
+    Contains,
+    StartsWith,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+#[serde(deny_unknown_fields)]
+pub struct QueryIrPatternField {
+    pub var: String,
+    pub field: Option<String>,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+#[serde(deny_unknown_fields)]
+pub struct QueryIrPatternPredicate {
+    pub field: QueryIrPatternField,
+    pub op: QueryIrPatternOp,
+    pub value: QueryIrPatternValue,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+#[serde(deny_unknown_fields)]
+pub struct QueryIrPatternOrder {
+    pub field: QueryIrPatternField,
+    #[serde(default)]
+    pub descending: bool,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+#[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
+pub enum QueryIrPatternReturn {
+    All,
+    Fields { fields: Vec<QueryIrPatternField> },
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
 #[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
 pub enum QueryIrOperation {
     Search {
@@ -756,6 +845,315 @@ pub enum QueryIrOperation {
         budget: Option<u32>,
         fuzzy: Option<bool>,
     },
+    MatchPath {
+        pattern: QueryIrGraphPattern,
+        limit: u32,
+        #[serde(default, rename = "where")]
+        where_preds: Vec<QueryIrPatternPredicate>,
+        #[serde(default)]
+        order_by: Option<QueryIrPatternOrder>,
+        #[serde(default, rename = "return")]
+        ret: Option<QueryIrPatternReturn>,
+    },
+}
+
+fn query_ir_match_path_validation(message: impl Into<String>) -> Error {
+    Error::from_reason(format!(
+        "QUERY_IR_VALIDATION_FAILED: match_path.{}",
+        message.into()
+    ))
+}
+
+impl QueryIrPatternValue {
+    fn into_hql(self) -> query::ast::HqlValue {
+        match self {
+            Self::String(value) => query::ast::HqlValue::Str(value),
+            Self::Number(value) => query::ast::HqlValue::Num(value),
+        }
+    }
+
+    fn from_hql(value: &query::ast::HqlValue) -> Self {
+        match value {
+            query::ast::HqlValue::Str(value) => Self::String(value.clone()),
+            query::ast::HqlValue::Num(value) => Self::Number(*value),
+        }
+    }
+}
+
+impl QueryIrPatternField {
+    fn into_hql(self) -> Result<query::ast::QualField> {
+        let var = self.var;
+        if var.trim().is_empty() {
+            return Err(query_ir_match_path_validation(
+                "field.var must not be empty",
+            ));
+        }
+        let field = match self.field {
+            None => None,
+            Some(raw) => {
+                let normalized = raw.to_ascii_lowercase();
+                Some(match normalized.as_str() {
+                    "id" => query::ast::HqlField::Id,
+                    "label" => query::ast::HqlField::Label,
+                    "score" => query::ast::HqlField::Score,
+                    "depth" => query::ast::HqlField::Depth,
+                    "recorded_at" => query::ast::HqlField::RecordedAt,
+                    value if value.starts_with("prop.") && value.len() > "prop.".len() => {
+                        query::ast::HqlField::Prop(raw["prop.".len()..].to_string())
+                    }
+                    _ => {
+                        return Err(query_ir_match_path_validation(format!(
+                            "field.field '{}' is not supported",
+                            raw
+                        )));
+                    }
+                })
+            }
+        };
+        Ok(query::ast::QualField { var, field })
+    }
+
+    fn from_hql(qual_field: &query::ast::QualField) -> Self {
+        let field = qual_field.field.as_ref().map(|field| match field {
+            query::ast::HqlField::Id => "id".to_string(),
+            query::ast::HqlField::Label => "label".to_string(),
+            query::ast::HqlField::Score => "score".to_string(),
+            query::ast::HqlField::Depth => "depth".to_string(),
+            query::ast::HqlField::RecordedAt => "recorded_at".to_string(),
+            query::ast::HqlField::Prop(key) => format!("prop.{key}"),
+        });
+        Self {
+            var: qual_field.var.clone(),
+            field,
+        }
+    }
+}
+
+impl QueryIrNodePattern {
+    fn into_hql(self) -> Result<query::ast::NodePattern> {
+        if self
+            .var
+            .as_deref()
+            .is_some_and(|value| value.trim().is_empty())
+        {
+            return Err(query_ir_match_path_validation("node.var must not be empty"));
+        }
+        if self
+            .label
+            .as_deref()
+            .is_some_and(|value| value.trim().is_empty())
+        {
+            return Err(query_ir_match_path_validation(
+                "node.label must not be empty",
+            ));
+        }
+        let props = self
+            .props
+            .into_iter()
+            .map(|property| {
+                if property.key.trim().is_empty() {
+                    return Err(query_ir_match_path_validation(
+                        "node.props.key must not be empty",
+                    ));
+                }
+                Ok((property.key, property.value.into_hql()))
+            })
+            .collect::<Result<Vec<_>>>()?;
+        Ok(query::ast::NodePattern {
+            var: self.var,
+            label: self.label,
+            props,
+        })
+    }
+
+    fn from_hql(node: &query::ast::NodePattern) -> Self {
+        Self {
+            var: node.var.clone(),
+            label: node.label.clone(),
+            props: node
+                .props
+                .iter()
+                .map(|(key, value)| QueryIrPatternProperty {
+                    key: key.clone(),
+                    value: QueryIrPatternValue::from_hql(value),
+                })
+                .collect(),
+        }
+    }
+}
+
+impl QueryIrEdgePattern {
+    fn into_hql(self) -> Result<query::ast::EdgePattern> {
+        if self
+            .var
+            .as_deref()
+            .is_some_and(|value| value.trim().is_empty())
+        {
+            return Err(query_ir_match_path_validation("edge.var must not be empty"));
+        }
+        if self
+            .rel_type
+            .as_deref()
+            .is_some_and(|value| value.trim().is_empty())
+        {
+            return Err(query_ir_match_path_validation(
+                "edge.rel_type must not be empty",
+            ));
+        }
+        let direction = match self.direction {
+            QueryIrDirection::Out => query::ast::PatternDirection::Out,
+            QueryIrDirection::In => query::ast::PatternDirection::In,
+            QueryIrDirection::Both => query::ast::PatternDirection::Both,
+        };
+        Ok(query::ast::EdgePattern {
+            var: self.var,
+            rel_type: self.rel_type,
+            direction,
+        })
+    }
+
+    fn from_hql(edge: &query::ast::EdgePattern) -> Self {
+        let direction = match edge.direction {
+            query::ast::PatternDirection::Out => QueryIrDirection::Out,
+            query::ast::PatternDirection::In => QueryIrDirection::In,
+            query::ast::PatternDirection::Both => QueryIrDirection::Both,
+        };
+        Self {
+            var: edge.var.clone(),
+            rel_type: edge.rel_type.clone(),
+            direction,
+        }
+    }
+}
+
+impl QueryIrGraphPattern {
+    fn into_hql(self) -> Result<query::ast::GraphPattern> {
+        let start = self.start.into_hql()?;
+        let hops = self
+            .hops
+            .into_iter()
+            .map(|hop| Ok((hop.edge.into_hql()?, hop.node.into_hql()?)))
+            .collect::<Result<Vec<_>>>()?;
+        Ok(query::ast::GraphPattern { start, hops })
+    }
+
+    fn from_hql(pattern: &query::ast::GraphPattern) -> Self {
+        Self {
+            start: QueryIrNodePattern::from_hql(&pattern.start),
+            hops: pattern
+                .hops
+                .iter()
+                .map(|(edge, node)| QueryIrGraphHop {
+                    edge: QueryIrEdgePattern::from_hql(edge),
+                    node: QueryIrNodePattern::from_hql(node),
+                })
+                .collect(),
+        }
+    }
+}
+
+impl QueryIrPatternOp {
+    fn into_hql(self) -> query::ast::HqlOp {
+        match self {
+            Self::Eq => query::ast::HqlOp::Eq,
+            Self::Ne => query::ast::HqlOp::Ne,
+            Self::Lt => query::ast::HqlOp::Lt,
+            Self::Le => query::ast::HqlOp::Le,
+            Self::Gt => query::ast::HqlOp::Gt,
+            Self::Ge => query::ast::HqlOp::Ge,
+            Self::Contains => query::ast::HqlOp::Contains,
+            Self::StartsWith => query::ast::HqlOp::StartsWith,
+        }
+    }
+
+    fn from_hql(op: query::ast::HqlOp) -> Self {
+        match op {
+            query::ast::HqlOp::Eq => Self::Eq,
+            query::ast::HqlOp::Ne => Self::Ne,
+            query::ast::HqlOp::Lt => Self::Lt,
+            query::ast::HqlOp::Le => Self::Le,
+            query::ast::HqlOp::Gt => Self::Gt,
+            query::ast::HqlOp::Ge => Self::Ge,
+            query::ast::HqlOp::Contains => Self::Contains,
+            query::ast::HqlOp::StartsWith => Self::StartsWith,
+        }
+    }
+}
+
+fn query_ir_match_path_clauses_to_hql(
+    limit: u32,
+    where_preds: Vec<QueryIrPatternPredicate>,
+    order_by: Option<QueryIrPatternOrder>,
+    ret: Option<QueryIrPatternReturn>,
+) -> Result<query::ast::PatternClauses> {
+    let where_preds = where_preds
+        .into_iter()
+        .map(|predicate| {
+            Ok(query::ast::PatternPredicate {
+                field: predicate.field.into_hql()?,
+                op: predicate.op.into_hql(),
+                value: predicate.value.into_hql(),
+            })
+        })
+        .collect::<Result<Vec<_>>>()?;
+    let order_by = match order_by {
+        None => None,
+        Some(order) => Some((order.field.into_hql()?, order.descending)),
+    };
+    let ret = match ret {
+        None => None,
+        Some(QueryIrPatternReturn::All) => Some(query::ast::PatternReturn::All),
+        Some(QueryIrPatternReturn::Fields { fields }) => Some(query::ast::PatternReturn::Fields(
+            fields
+                .into_iter()
+                .map(QueryIrPatternField::into_hql)
+                .collect::<Result<Vec<_>>>()?,
+        )),
+    };
+    Ok(query::ast::PatternClauses {
+        where_preds,
+        order_by,
+        limit: Some(limit as usize),
+        ret,
+    })
+}
+
+fn query_ir_match_path_from_hql(
+    pattern: &query::ast::GraphPattern,
+    clauses: &query::ast::PatternClauses,
+    default_limit: u64,
+) -> QueryIrOperation {
+    let limit = clauses
+        .limit
+        .map(|value| value as u64)
+        .unwrap_or(default_limit)
+        .min(u32::MAX as u64) as u32;
+    QueryIrOperation::MatchPath {
+        pattern: QueryIrGraphPattern::from_hql(pattern),
+        limit,
+        where_preds: clauses
+            .where_preds
+            .iter()
+            .map(|predicate| QueryIrPatternPredicate {
+                field: QueryIrPatternField::from_hql(&predicate.field),
+                op: QueryIrPatternOp::from_hql(predicate.op),
+                value: QueryIrPatternValue::from_hql(&predicate.value),
+            })
+            .collect(),
+        order_by: clauses
+            .order_by
+            .as_ref()
+            .map(|(field, descending)| QueryIrPatternOrder {
+                field: QueryIrPatternField::from_hql(field),
+                descending: *descending,
+            }),
+        ret: clauses.ret.as_ref().map(|ret| match ret {
+            query::ast::PatternReturn::All => QueryIrPatternReturn::All,
+            query::ast::PatternReturn::Fields(fields) => QueryIrPatternReturn::Fields {
+                fields: fields.iter().map(QueryIrPatternField::from_hql).collect(),
+            },
+        }),
+    }
 }
 
 #[cfg_attr(feature = "napi-bindings", napi(object))]
@@ -10029,7 +10427,7 @@ impl Storage {
             "operations": {
                 "search": "implemented",
                 "traverse": "implemented",
-                "match_path": "planned",
+                "match_path": "implemented",
                 "context": "implemented",
                 "relational_named_query": "planned"
             },
@@ -10049,7 +10447,14 @@ impl Storage {
                     "temporal": "unsupported",
                     "tiers": ["H0", "H1", "H2", "H3", "H4", "H5", "H6"]
                 },
-                "match_path": "planned",
+                "match_path": {
+                    "linear": "implemented",
+                    "where": "implemented",
+                    "order_by": "implemented",
+                    "return": "implemented",
+                    "valid_at": "implemented",
+                    "tx_as_of": "unsupported"
+                },
                 "relational_named_query": "planned"
             },
             "limits": {
@@ -10152,6 +10557,11 @@ impl Storage {
             .temporal
             .as_ref()
             .and_then(|temporal| temporal.tx_as_of);
+        if tx_as_of.is_some() && matches!(&request.operation, QueryIrOperation::MatchPath { .. }) {
+            return Err(Error::from_reason(
+                "QUERY_CAPABILITY_UNSUPPORTED: match_path temporal.tx_as_of is not implemented",
+            ));
+        }
         if let Some(t) = tx_as_of {
             let horizon = self.history_horizon();
             if t < horizon {
@@ -10354,6 +10764,26 @@ impl Storage {
                 })?;
                 ("context", data)
             }
+            QueryIrOperation::MatchPath {
+                pattern,
+                limit,
+                where_preds,
+                order_by,
+                ret,
+            } => {
+                if limit == 0 {
+                    return Err(Error::from_reason(
+                        "QUERY_RESOURCE_LIMIT_EXCEEDED: match_path.limit must be positive",
+                    ));
+                }
+                let pattern = pattern.into_hql()?;
+                let clauses =
+                    query_ir_match_path_clauses_to_hql(limit, where_preds, order_by, ret)?;
+                let data = self
+                    .match_pattern(&pattern, &as_of, &clauses, &mut budget)
+                    .map_err(preserve_query_error)?;
+                ("match_path", data)
+            }
         };
 
         let warnings = if operation_kind == "context"
@@ -10455,10 +10885,6 @@ impl Storage {
         let budget_limits = requested_budget.unwrap_or_default().resolve()?;
         let mut budget_state = QueryBudgetState::new(budget_limits);
 
-        fn to_value<T: serde::Serialize>(res: T) -> Result<serde_json::Value> {
-            serde_json::to_value(res)
-                .map_err(|e| Error::from_reason(format!("HQL result serialization failed: {e}")))
-        }
         fn resolved_target_id(storage: &Storage, target: &str, fuzzy: bool) -> Result<String> {
             if fuzzy {
                 storage.find_fuzzy_id_unlocked(target).ok_or_else(|| {
@@ -10511,15 +10937,30 @@ impl Storage {
                 })?;
             Ok((query_vector, node.collection.clone()))
         }
+        fn validate_hql_search_k(k: u32) -> Result<()> {
+            if k == 0 {
+                return Err(Error::from_reason(format!(
+                    "QUERY_RESOURCE_LIMIT_EXCEEDED: search.k must be between 1 and {QUERY_IR_MAX_K}"
+                )));
+            }
+            Ok(())
+        }
+        fn query_ir_data(
+            storage: &Storage,
+            request: QueryIrRequest,
+            budget: Option<QueryBudget>,
+        ) -> Result<serde_json::Value> {
+            let mut request = request;
+            request.budget = budget;
+            let response = storage.execute_query_ir_unlocked(request)?;
+            Ok(response["data"].clone())
+        }
         fn query_ir_neighbors(
             storage: &Storage,
             request: QueryIrRequest,
             budget: Option<QueryBudget>,
         ) -> Result<Vec<NeighborOutput>> {
-            let mut request = request;
-            request.budget = budget;
-            let response = storage.execute_query_ir_unlocked(request)?;
-            serde_json::from_value(response["data"].clone()).map_err(|error| {
+            serde_json::from_value(query_ir_data(storage, request, budget)?).map_err(|error| {
                 Error::from_reason(format!("HQL compatibility decode failed: {error}"))
             })
         }
@@ -10537,6 +10978,7 @@ impl Storage {
                 collection,
                 clauses,
             } => {
+                validate_hql_search_k(k)?;
                 let (query_vector, resolved_collection) =
                     hql_query_vector(self, &target, fuzzy, vector, &collection)?;
                 let res = if (1..=QUERY_IR_MAX_K).contains(&k) {
@@ -10668,6 +11110,7 @@ impl Storage {
                 collection,
                 clauses,
             } => {
+                validate_hql_search_k(k)?;
                 let (query_vector, resolved_collection) =
                     hql_query_vector(self, &target, fuzzy, vector, &collection)?;
                 let res = if (1..=QUERY_IR_MAX_K).contains(&k) {
@@ -10720,15 +11163,49 @@ impl Storage {
                 tier,
                 budget,
                 fuzzy,
-            } => {
-                let res = self.retrieve_context_inner(&target, &tier, budget, fuzzy, None)?;
-                to_value(res)
-            }
+            } => query_ir_data(
+                self,
+                QueryIrRequest {
+                    contract_version: QUERY_IR_V1.to_string(),
+                    request_id: "hql-compat".to_string(),
+                    namespace: None,
+                    temporal: None,
+                    consistency: None,
+                    budget: None,
+                    operation: QueryIrOperation::Context {
+                        target_id: Some(target),
+                        query_vector: None,
+                        tier,
+                        budget,
+                        fuzzy: Some(fuzzy),
+                    },
+                },
+                Some(budget_state.limits.as_input()),
+            ),
             HqlCommand::MatchPattern {
                 pattern,
                 as_of,
                 clauses,
-            } => self.match_pattern(&pattern, &as_of, &clauses, &mut budget_state),
+            } => query_ir_data(
+                self,
+                QueryIrRequest {
+                    contract_version: QUERY_IR_V1.to_string(),
+                    request_id: "hql-compat".to_string(),
+                    namespace: None,
+                    temporal: Some(QueryIrTemporal {
+                        valid_at: as_of,
+                        tx_as_of: None,
+                    }),
+                    consistency: None,
+                    budget: None,
+                    operation: query_ir_match_path_from_hql(
+                        &pattern,
+                        &clauses,
+                        budget_state.limits.max_result_rows,
+                    ),
+                },
+                Some(budget_state.limits.as_input()),
+            ),
         }?;
         budget_state.serialized(&result)?;
         Ok(result)

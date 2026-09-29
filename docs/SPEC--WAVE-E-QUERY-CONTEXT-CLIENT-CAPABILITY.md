@@ -1,9 +1,9 @@
 ---
 doc_id: SPEC--WAVE-E-QUERY-CONTEXT-CLIENT-CAPABILITY
 owner: GenesisBlockDB Engineering
-version: "0.1.1b"
+version: "0.1.2b"
 created_at: "2026-09-08T21:34:45+07:00,ATHER"
-last_update: "2026-09-08T23:02:00+07:00,ATHER"
+last_update: "2026-09-29T00:00:00+07:00,ATHER"
 status: beta
 superseded_by: null
 attributes:
@@ -241,8 +241,12 @@ Keep the existing `operations` string map backward compatible and add a closed
 | `context.target_id` | implemented | H0–H6, token budget, coverage packet |
 | `context.query_vector` | unsupported | target-id slice only |
 | `context.temporal` | unsupported | current-view context only |
-| `match_path` | planned | existing HQL compatibility does not imply typed parity |
+| `match_path` | implemented | G4.3 now provides typed bounded linear parity; outside this Wave E context acceptance slice |
 | `relational_named_query` | planned | remains the relational contract slice |
+
+The `match_path` row records the subsequent cross-wave G4.3 capability update. Wave E's
+implementation and exit evidence remain limited to the target-id context/client slice described
+above.
 
 ### 6.3 Client adapters
 
@@ -327,6 +331,7 @@ Wave E is complete only when:
 
 | Version | Date | Status | Summary | Commit Hash | Agent |
 |---|---|---|---|---|---|
+| 0.1.2b | 2026-09-29 | beta | Recorded the subsequent G4.3 typed match_path capability without expanding Wave E's context/client authorization. | working-tree | ATHER |
 | 0.1.0b | 2026-09-08 | beta | Approved typed context operation and cross-client capability conformance for R-10/R-12 | 6e8d4ea | ATHER |
 
 Implementation was approved for the isolated Wave E worktree; merge, push,
