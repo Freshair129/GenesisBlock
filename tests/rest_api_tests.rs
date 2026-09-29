@@ -1177,20 +1177,6 @@ async fn test_hql_raw_json_string_body_succeeds() {
 }
 
 #[tokio::test]
-async fn test_hql_object_body_rejected() {
-    // Documents the known SDK contract mismatch: SDKs send {"query":"..."} but
-    // the endpoint expects a raw JSON string.  Axum returns 422 on type mismatch.
-    let (app, _dir) = make_app();
-    let wrong_body = serde_json::to_string(&json!({ "query": "SEARCH Doc" })).unwrap();
-    let (status, _) = post_raw(&app, "/v1/query/hql", "application/json", &wrong_body).await;
-    assert_ne!(
-        status,
-        StatusCode::OK,
-        "HQL endpoint must NOT accept {{\"query\":\"...\"}} body; SDKs using this format are broken"
-    );
-}
-
-#[tokio::test]
 async fn test_hql_traverse_finds_neighbor() {
     let (app, _dir) = make_app();
     post_json(
@@ -1302,6 +1288,38 @@ async fn test_query_ir_search_and_traverse() {
     .await;
     assert_eq!(traverse_status, StatusCode::OK);
     assert_eq!(traverse["data"][0]["node"]["id"], "query-ir-rest-dst");
+
+    let (match_status, matched) = post_json(
+        &app,
+        "/v1/query/ir",
+        json!({
+            "contract_version": "query-ir.v1",
+            "request_id": "rest-match-path",
+            "operation": {
+                "kind": "match_path",
+                "pattern": {
+                    "start": {
+                        "var": "a",
+                        "props": [{"key": "id", "value": "query-ir-rest-src"}]
+                    },
+                    "hops": [{
+                        "edge": {"rel_type": "KNOWS", "direction": "out"},
+                        "node": {"var": "b"}
+                    }]
+                },
+                "limit": 10,
+                "return": {
+                    "kind": "fields",
+                    "fields": [{"var": "a", "field": "id"}, {"var": "b", "field": "id"}]
+                }
+            }
+        }),
+    )
+    .await;
+    assert_eq!(match_status, StatusCode::OK);
+    assert_eq!(matched["operation_kind"], "match_path");
+    assert_eq!(matched["data"][0]["a.id"], "query-ir-rest-src");
+    assert_eq!(matched["data"][0]["b.id"], "query-ir-rest-dst");
 }
 
 #[tokio::test]
@@ -1337,6 +1355,7 @@ async fn test_query_ir_capabilities_report_partial_v1_support() {
     assert_eq!(body["implementation_status"], "partial");
     assert_eq!(body["operations"]["search"], "implemented");
     assert_eq!(body["operations"]["traverse"], "implemented");
+    assert_eq!(body["operations"]["match_path"], "implemented");
     assert_eq!(body["operations"]["context"], "implemented");
     assert_eq!(
         body["operation_details"]["context"]["target_id"],

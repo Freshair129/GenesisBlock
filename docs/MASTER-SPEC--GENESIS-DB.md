@@ -2,8 +2,8 @@
 title: "GenesisBlockDB Technical Architecture and Capability Composition"
 doc_id: "MASTER-SPEC-GENESISBLOCKDB"
 status: current
-version: "2.3.0b"
-updated: "2026-09-08"
+version: "2.3.1b"
+updated: "2026-09-22"
 owner: "GenesisBlockDB Architecture"
 source_of_truth: true
 related_issue: 84
@@ -13,6 +13,7 @@ related_docs:
   - "docs/SRS--GENESISBLOCKDB.md"
   - "docs/contracts/CONTRACT--CLIENT-NAMESPACE-AND-SCHEMA.md"
   - "docs/adr/ADR--GENESISBLOCKDB-DOMAIN-NEUTRAL-CORE.md"
+  - "docs/SPEC--GENESISDB-P6-GENERATIONS-LEASES-ACL.md"
   - "docs/adr/ADR--GENESISDB-TYPED-QUERY-IR-AGENT-BOUNDARY.md"
   - "docs/SPEC--GENESISDB-TYPED-QUERY-IR-V1.md"
   - "docs/SPEC--WAVE-A-COMMIT-CORRECTNESS.md"
@@ -333,10 +334,19 @@ old-engine use of a manually stripped journal-only v4 copy is unsupported.
 See [Wave B contract and verification record](SPEC--WAVE-B-DURABLE-COLLECTIONS-EDGE-HISTORY.md).
 These are local implementation contracts, not deployment or consumer migration evidence.
 
+P6 (architecture correction approved 2026-09-22) is the approved target for signed generation
+receipts after index flush and fail-closed snapshot validation, opaque generation-bound read
+leases, explicit temporal selectors, and signed revision-checked access-policy events. Its target
+disk schema is 5 (the documented Wave B baseline is v4); new readers retain v4 compatibility,
+while older readers must reject v5. P6 implementation and consumer compatibility remain pending
+their execution gates. Current graph/vector records still lack entity namespace fields, so the
+P6 ACL contract does not claim migrated tenant isolation. See [P6 specification](SPEC--GENESISDB-P6-GENERATIONS-LEASES-ACL.md).
+
 ## Changelog
 
 | Version | Date | Owner | Summary |
 |---|---|---|---|
+| 2.3.1b | 2026-09-22 | GenesisBlockDB Architecture | Registered the owner-approved P6 durability, generation/lease, temporal and ACL target with explicit schema-compatibility and implementation-status limits. |
 | 2.3.0b | 2026-09-08 | GenesisBlockDB Architecture | Added the separate GenesisRAG17 TEST adapter boundary, ordered publication flow and extension references while retaining the client-neutral core. |
 | 2.2.2 | 2026-09-08 | GenesisBlockDB Architecture | Reflected approved Wave B durable collections, schema compatibility and edge version intervals. |
 | 2.2.1 | 2026-09-08 | GenesisBlockDB Architecture | Reflected approved Wave A preflight, publication and recovery-required behavior with verification limits. |
