@@ -1,9 +1,9 @@
 ---
-version: "0.8.39b"
+version: "0.8.40b"
 doc_id: "IMPLEMENTATION-PLAN--UEE-HQL2-ORCHESTRATION-2026-09-22"
 owner: "Boss (Founder / Product Authority)"
 created_at: "2026-09-22T00:00:00+07:00,ATHER,working-tree"
-last_update: "2026-10-03T01:33:00+07:00,ATHER"
+last_update: "2026-10-03T02:01:19+07:00,ATHER"
 status: beta
 superseded_by: null
 attributes:
@@ -226,13 +226,14 @@ is recorded in `REPORT--HQL2-P8-CORE-2026-09-28.md`; P8 remains partial and P9-P
 are not qualified by that checkpoint. The user explicitly authorized scoped
 branch commit/push and a PR #194 merge attempt on 2026-10-03; this does not
 waive CI/review gates or authorize deployment/user-database migration. At
-hosted head `d4bc870`, Rust/core checks pass on Linux/macOS/Windows but worker
-checks fail across all three OSes and review is pending, so merge remains unmet. P9-P16
+hosted head `484916b`, Rust/core, standard Node, formatting, Clippy, docs and
+version checks pass, but worker checks fail across all three OSes and no PR
+review submissions exist, so merge remains unmet. P9-P16
 retain their existing dependency and approval gates.
 The subsequently approved D7 addendum now has local implementation evidence for
 actor-scoped zero-hop and bounded one-hop HQL1 ID projections through
 `Storage::query_v2`, including one endpoint-ID string equality filter:
-9/9 focused tests, 363/0/1 across 29 root HQL2 targets and
+9/9 focused tests, 364/0/1 across 30 root HQL2 targets and
 190/0/0 across 11 separate P6/schema-v6/compatibility targets. The adapter
 preflights and reserves parser resources before legacy AST construction; other
 HQL1 forms and legacy transports remain unchanged. Independent D7 review and
@@ -242,12 +243,16 @@ The latest local selected sweeps include storage-backed HQL/typed-IR scalar
 and aggregate differentials against independent P7: the scalar target covers
 81 four-value nullable bags (162 executions), and the aggregate target covers
 121 nullable bags of lengths 0-4 across seven functions (242 executions).
-Both pass 1/1; the explicit 29-target HQL2 sweep passes 363/0/1. These bounded
-fixtures do not close broad exact-oracle or P8 acceptance. At hosted head
-`d4bc870`, Rust/core checks pass on Linux/macOS/Windows, while worker tests fail
-across platforms with `RECOVERY_REQUIRED: markerless database identity is
-missing` in the rebuilt Linux addon run; the new aggregate differential is
-not yet in CI. Worker startup correction remains approval-gated.
+Both pass 1/1. The new storage-backed typed-IR Join differential matches P7
+for Inner/Left/Semi/Anti (4/6/2/2 rows) with duplicate, NULL and unmatched
+keys; it does not expand HQL JOIN support. The explicit 30-target HQL2 sweep
+passes 364/0/1. These bounded fixtures do not close broad exact-oracle or P8
+acceptance. At hosted head `484916b`, Rust/core, standard Node, format/Clippy,
+docs and version checks pass, while worker tests fail across platforms with
+`RECOVERY_REQUIRED: markerless database identity is missing` in the rebuilt
+Linux addon run. The new Join differential is not yet in CI, no PR review
+submissions exist, and the PR remains open/unmerged. Worker startup correction
+remains approval-gated.
 
 ## 8. P5 execution evidence
 
@@ -846,6 +851,7 @@ Version diff `0.8.24b -> 0.8.25b`: record the delegated C-3 decision and exact P
 Version diff `0.8.25b -> 0.8.26b`: implement Sequence node ID/labels through HQL and typed IR under P6; record 7 focused passes and 338/0/1 across 25 root HQL2 targets; retain the ACL-hidden fixture, independent review and full P8 gates.
 Version diff `0.8.26b -> 0.8.27b`: record owner approval of P8 addendum D1-D6 and authorize test-first implementation of lexical/context profiles, Sequence properties, contextual literals and the corrected pre-parse ACL fixture; runtime evidence remains pending.
 Version diff `0.8.28b -> 0.8.29b`: add and pass the edge-property-before-SHORTEST regression; record 10/10 P8 completion tests and 349/0/1 across 26 root HQL2 targets plus a separate 190/0/0 across 11 P6/schema-v6/compatibility targets; confirmation review marked the D5 fix complete and independent static review found no concrete defect; retain broad P8/P13 gates.
+Version diff `0.8.39b -> 0.8.40b`: add and pass a storage-backed typed-IR Join differential against independent P7 for all four join kinds; record 364/0/1 across 30 HQL2 targets without expanding HQL JOIN support. At parent head `484916b`, Rust/core and standard Node checks pass but worker checks fail across OSes with `RECOVERY_REQUIRED: markerless database identity is missing`; no PR reviews exist, so retain worker-fix approval, broad exact-oracle, independent-review and P8/P13/release gates.
 Version diff `0.8.38b -> 0.8.39b`: add and pass a storage-backed HQL/typed-IR aggregate differential against independent P7 for 121 nullable bags; record 363/0/1 across 29 HQL2 targets. Refresh hosted evidence at `d4bc870`: Rust/core checks pass on Linux/macOS/Windows, worker checks fail across OSes, and review remains pending; retain worker-fix approval, broad exact-oracle, independent-review and P8/P13/release gates.
 Version diff `0.8.37b -> 0.8.38b`: add and pass a storage-backed HQL/typed-IR scalar differential against independent P7 for 81 nullable bags; record 362/0/1 across 28 HQL2 targets and 190/0/0 across 11 compatibility targets. Update hosted evidence at `cef747a`: worker tests fail across operating systems and Windows Rust reaches its 15m15s timeout; the new test is not in CI yet. Preserve worker-fix/timeout approval gates and broad exact-oracle, independent-review, P8/P13/release gates.
 Version diff `0.8.36b -> 0.8.37b`: refine hosted PR #194 evidence at `cdfb90a`: Windows `cargo test` itself passes, including the protected probe in 225.86s and doc-tests, but the 15-minute job timeout cancels post-cache finalization; retain the probe and propose a Windows-only 20-minute job timeout. Worker CI still fails on all OSes because sidecars make a fresh root nonempty before schema-v6 activation; retain the separate worker docs/code approval gate, independent review, and broad P8/P13/release gates.
@@ -858,6 +864,7 @@ Version diff `0.8.27b -> 0.8.28b`: implement approved D1-D5, record 9 focused pa
 
 | Version | Date | Status | Summary | Commit Hash | Agent |
 |---|---|---|---|---|---|
+| 0.8.40b | 2026-10-03 | beta | Add and pass storage-backed typed-IR Join P7 differential for Inner/Left/Semi/Anti; record 364/0/1 across 30 HQL2 targets without expanding HQL JOIN; at hosted parent head 484916b core checks pass but worker checks fail across OSes and no PR reviews exist; retain merge/P8/P13/review gates | working-tree | ATHER |
 | 0.8.39b | 2026-10-03 | beta | Add and pass storage-backed HQL/typed-IR P7 aggregate differential over 121 nullable bags; record 363/0/1 across 29 HQL2 targets; hosted Rust/core checks pass on Linux/macOS/Windows, worker checks fail across OSes and review remains pending; scoped commit/push/merge requested but CI/review gates remain open | working-tree | ATHER |
 | 0.8.38b | 2026-10-03 | beta | Add and pass storage-backed HQL/typed-IR P7 scalar differential over 81 nullable bags; record 362/0/1 across 28 HQL2 targets and 190/0/0 compatibility targets; update hosted worker failures and Windows timeout; scoped commit/push/merge requested but CI/review gates remain open | working-tree | ATHER |
 | 0.8.37b | 2026-10-02 | beta | Refine hosted PR #194 evidence: Windows Rust test step passes with protected probe but 15-minute job timeout cancels post-cache; propose 20-minute Windows timeout; worker bootstrap errors persist across OS; keep worker code approval, independent review and P8/P13 gates open | working-tree | ATHER |

@@ -1,8 +1,8 @@
 ---
 doc_id: REPORT--HQL2-P8-CORE-2026-09-28
-version: "0.1.35b"
+version: "0.1.36b"
 created_at: "2026-09-28T04:35:00+07:00,ATHER,22bc11e"
-last_update: "2026-10-03T01:33:00+07:00,ATHER"
+last_update: "2026-10-03T02:01:19+07:00,ATHER"
 status: beta
 owner: GenesisBlockDB Engineering
 attributes:
@@ -137,13 +137,14 @@ explicit test targets; the protected probe target was not selected.
 | Exact-KNN and Original Rerank P7 oracle differential | 2 passed, 0 failed | HQL and typed IR both match the independent exact-L2 oracle for KNN and Original Rerank; coverage includes equal-distance identity ordering, missing-KNN-original exclusion, and top-k reranking; two test-only fixtures, not broad P8 oracle acceptance. |
 | All-root-HQL2 sweep after KNN/Original Rerank oracle differential (historical) | 330 passed, 0 failed, 1 ignored across 23 root `hql2_*_tests.rs` targets | Locked/offline/no-default-features/jobs=1; ignored parser child entrypoint is exercised by its parent; protected probe excluded. Regression evidence, not P8 acceptance. |
 | Root `MATCH` P7 oracle differential | 1 passed, 0 failed | HQL root `MATCH` matches the independent P7 bag for parallel `LINK` edges and excludes a non-matching relation; test-only fixture. |
-| Latest explicit all-root-HQL2 target sweep | 331 passed, 0 failed, 1 ignored across 24 root `hql2_*_tests.rs` targets | Locked/offline/no-default-features/jobs=1; ignored parser child entrypoint is exercised by its parent; protected probe excluded from the explicit target set. Regression evidence, not P8 acceptance. |
+| All-root-HQL2 target sweep after root MATCH differential (historical) | 331 passed, 0 failed, 1 ignored across 24 root targets | Locked/offline/no-default-features/jobs=1; ignored parser child entrypoint is exercised by its parent; superseded by the current 30-target sweep. Regression evidence, not P8 acceptance. |
 | Approved P8 addendum D1-D6 focused target | 10 passed, 0 failed | Registered lexical BM25 profile and independent P7 rank parity; ContextPack scalar offsets, exact source hash and independent oracle parity; Sequence node/edge property exactness and no-partial budget behavior; contextual NULL/list/JSON boundaries; authorization-before-parse fixture. |
 | D7 actor-scoped HQL1 adapter | 9 passed, 0 failed | Differential parity for zero-hop and bounded one-hop ID projections across edge directions, relation/wildcard forms, endpoint projections, one endpoint-ID exact string filter and parallel-edge multiplicity; Namespace(Read)/namespace checks before parse; malformed/unlisted behavior; broad legacy pattern fails resource preflight before AST construction. Existing v1 transports are unchanged. |
 | HQL1 parser-resource RCA | Confirmed and corrected | Legacy Pest pairs were materialized before the D7 allowlist without parser-specific heap reservation. The adapter now runs allocation-free parser preflight and reserves the conservative estimate before legacy AST construction; see local RCA `.brain/rca/RCA--HQL1-ADAPTER-PARSER-RESERVATION.md`. No production crash or HQL1 allocator peak is claimed. |
 | Storage-backed HQL/typed-IR scalar P7 differential | 1 passed, 0 failed across 81 four-value nullable bags; 162 Storage executions | Values/Distinct/Sort with NULLS LAST; each frontend independently matches the P7 reference and each other. Test-only scalar evidence, not broad P8 acceptance. |
 | Storage-backed HQL/typed-IR aggregate P7 differential | 1 passed, 0 failed across 121 nullable bags; 242 Storage executions | Covers empty through four-row bags over NULL/-1/2 and count-all/count/sum/avg/min/max/collect; each frontend matches P7 and each other. Test-only aggregate evidence, not broad P8 acceptance. |
-| Latest explicit root-HQL2 target sweep | 363 passed, 0 failed, 1 ignored across 29 root targets | `cargo test --quiet --no-default-features` with all 29 HQL2 targets named explicitly; the ignored parser child is exercised by its parent; protected probe excluded. Regression evidence, not P8 acceptance. |
+| Storage-backed typed-IR Join P7 differential | 1 passed, 0 failed; four join kinds | Inner/Left/Semi/Anti rows match P7 exactly (4/6/2/2) with duplicate keys, NULL non-matches, unmatched left rows and an unused right row. Typed IR only; HQL JOIN remains unsupported and was not expanded. Test-only evidence, not broad P8 acceptance. |
+| Latest explicit root-HQL2 target sweep | 364 passed, 0 failed, 1 ignored across 30 root targets | All 30 HQL2 integration targets explicitly selected with locked/offline/no-default-features/jobs=1; the ignored parser child is exercised by its parent. Regression evidence, not P8 acceptance. |
 | Separate P6/schema-v6/compatibility sweep | 190 passed, 0 failed, 0 ignored across 11 named targets | `p6_generation_tests`, `p6_lease_tests`, `p6_visibility_tests`, `p6_peer_authority_tests`, `schema6_migration_tests`, `query_ir_tests`, `hql_p0_tests`, `hql_filter_tests`, `hql_cypher_tests`, `napi_rest_parity_tests`, `rest_api_tests`; regression evidence only. |
 | Prior explicit HQL2/P6/schema-v6/compatibility sweep | 528 passed, 0 failed, 1 ignored across 37 named targets | Pre-edge-regression checkpoint; protected probe excluded. Superseded for current HQL2 root-target count by 363/0/1; not full P8/P13 acceptance. |
 | Native library check | `cargo check --locked --offline --no-default-features --jobs 1 --target-dir target/hql2-execution` passed | Local core compile only; no NAPI addon runtime, release or cross-platform claim. |
@@ -152,11 +153,11 @@ explicit test targets; the protected probe target was not selected.
 | HQL/IR annotation source and recursive ACL parity | 6 passed, 0 failed, 0 ignored | Separate `targets`/`evidence` properties, nested annotation references, and Edge endpoint access are covered; fixture evidence is independent of P8 operator acceptance. |
 | Long-running soak | Three soak_tests cases remain ignored by the normal suite | No soak qualification inferred |
 | Hosted Rust/core CI, PR #194 head `9344b71` | [Run 37029503800](https://github.com/Freshair129/GenesisBlock/actions/runs/37029503800): Linux/macOS `cargo test`, all three standard `npm test` targets, `fmt + clippy`, docs validation and version consistency passed. Windows `cargo test` reached its 15-minute job limit while `tests/zz_probe_discriminates.rs::probe_vs_recall` was still running; runner canceled the job. | Windows full Rust suite remains incomplete; protected probe source was not changed. |
-| Latest hosted Rust/core CI before this aggregate-test commit, PR #194 head `d4bc870` | [Run 37044466557](https://github.com/Freshair129/GenesisBlock/actions/runs/37044466557): Linux/macOS/Windows `cargo test`, standard `npm test` on all three OSes, `fmt + clippy`, docs validation and version consistency passed. The new aggregate differential in this revision is not part of that run. | Rust/core CI passed on all three OSes; protected probe source was not changed. |
+| Hosted Rust/core CI, PR #194 head `484916b` (parent of this local test/docs-only change) | [Run 37049245946](https://github.com/Freshair129/GenesisBlock/actions/runs/37049245946): Linux/macOS/Windows `cargo test`, standard `npm test` on all three OSes, `fmt + clippy`, docs validation and version consistency passed; worker test jobs failed on all three OSes. The Join differential in this local revision is not included. | Core checks passed; hosted worker checks remain red. |
 | Hosted worker CI, PR #194 head `9344b71` | [Run 37029503800](https://github.com/Freshair129/GenesisBlock/actions/runs/37029503800) and [rebuilt-addon run 37029503808](https://github.com/Freshair129/GenesisBlock/actions/runs/37029503808): worker tests failed on Linux/macOS/Windows and rebuilt Linux addon with `RECOVERY_REQUIRED: markerless database identity is missing`. | Worker startup-order correction remains documentation/approval-gated; no worker code changed. |
-| Latest hosted worker CI before this aggregate-test commit, PR #194 head `d4bc870` | Worker tests fail on Linux/macOS/Windows in [run 37044466557](https://github.com/Freshair129/GenesisBlock/actions/runs/37044466557); rebuilt Linux addon also fails in [run 37044466527](https://github.com/Freshair129/GenesisBlock/actions/runs/37044466527) with `RECOVERY_REQUIRED: markerless database identity is missing`. | Worker startup-order correction remains approval-gated; no worker code changed. |
+| Hosted worker CI, PR #194 head `484916b` (parent of this local test/docs-only change) | Worker tests fail on Linux/macOS/Windows in [run 37049245946](https://github.com/Freshair129/GenesisBlock/actions/runs/37049245946); rebuilt Linux addon also fails in [run 37049246023](https://github.com/Freshair129/GenesisBlock/actions/runs/37049246023) with `RECOVERY_REQUIRED: markerless database identity is missing`. | Worker startup-order correction remains approval-gated; no worker code changed. |
 | Hosted mobile/consumer CI, PR #194 head `9344b71` | [Mobile run 37029503804](https://github.com/Freshair129/GenesisBlock/actions/runs/37029503804): host mobile build/tests, iOS/Android builds and acceptance, C header and SDK checks passed. RustSec, Go/Python consumers and distribution checks passed in their respective runs. | Hosted green jobs do not close P8/P13, security-review, soak or release qualification. |
-| PR #194 merge state before this aggregate-test commit | PR is open and GitHub reports mergeable, but worker checks fail and `reviewDecision` is empty. | Not merged; CI/review conditions remain unmet. |
+| PR #194 merge state at head `484916b` | PR is open and GitHub reports mergeable; checks fail in worker jobs and no review submissions exist. | Not merged; CI/review conditions remain unmet. |
 
 Parser tests include all 35 positive and 6 negative vendored examples. The
 parser harness reports one ignored child entrypoint, explicitly executed twice
@@ -191,10 +192,10 @@ Post-anchor explicit 22-target regression command (protected probe excluded):
 cargo test --locked --offline --no-default-features --jobs 1 --test hql2_annotation_acl_tests --test hql2_annotation_lookup_tests --test hql2_annotation_source_tests --test hql2_durable_revision_tests --test hql2_execution_tests --test hql2_expand_sequence_tests --test hql2_expand_tests --test hql2_graph_oracle_tests --test hql2_history_change_tests --test hql2_key_codec_tests --test hql2_lower_tests --test hql2_oracle_tests --test hql2_parser_tests --test hql2_pipeline_oracle_tests --test hql2_rank_oracle_tests --test hql2_request_tests --test hql2_scalar_execution_tests --test hql2_storage_source_tests --test hql2_value_tests --test hql2_vector_operator_tests --test hql2_vector_revision_tests --test hql2_wire_tests
 ```
 
-Latest guarded 24-target regression command (the protected probe is excluded):
+Latest guarded 30-target regression command (only the named HQL2 targets are selected):
 
 ```powershell
-cargo test --locked --offline --no-default-features --jobs 1 --test hql2_annotation_acl_tests --test hql2_annotation_lookup_tests --test hql2_annotation_source_tests --test hql2_durable_revision_tests --test hql2_execution_tests --test hql2_expand_sequence_tests --test hql2_expand_tests --test hql2_graph_oracle_tests --test hql2_history_change_tests --test hql2_key_codec_tests --test hql2_lower_tests --test hql2_oracle_tests --test hql2_parser_tests --test hql2_pipeline_oracle_tests --test hql2_rank_oracle_tests --test hql2_request_tests --test hql2_root_match_oracle_differential_tests --test hql2_scalar_execution_tests --test hql2_storage_source_tests --test hql2_value_tests --test hql2_vector_operator_tests --test hql2_vector_oracle_differential_tests --test hql2_vector_revision_tests --test hql2_wire_tests --target-dir G:/GenesisBlock_Dev/GenesisBlock/target/hql2-execution
+cargo test --locked --offline --no-default-features --jobs 1 --quiet --test hql2_annotation_acl_tests --test hql2_annotation_lookup_tests --test hql2_annotation_source_tests --test hql2_durable_revision_tests --test hql2_execution_tests --test hql2_expand_sequence_tests --test hql2_expand_tests --test hql2_graph_oracle_tests --test hql2_history_change_tests --test hql2_hql_reference_differential_tests --test hql2_hql1_adapter_tests --test hql2_key_codec_tests --test hql2_lower_tests --test hql2_oracle_tests --test hql2_p8_completion_tests --test hql2_parser_tests --test hql2_pattern_constraint_oracle_tests --test hql2_pipeline_oracle_tests --test hql2_rank_oracle_tests --test hql2_request_tests --test hql2_root_match_oracle_differential_tests --test hql2_scalar_execution_tests --test hql2_storage_aggregate_oracle_differential_tests --test hql2_storage_join_oracle_differential_tests --test hql2_storage_source_tests --test hql2_value_tests --test hql2_vector_operator_tests --test hql2_vector_oracle_differential_tests --test hql2_vector_revision_tests --test hql2_wire_tests --target-dir target/hql2-execution
 ```
 
 First full-suite command (failed at the legacy fixture described above):
@@ -404,14 +405,24 @@ from these local tests.
 
 | Artifact | Before | After |
 |---|---|---|
-| Registry | 0.5.45+draft | 0.5.46+draft |
-| C4 architecture index | 0.1.51b | 0.1.52b |
+| Registry | 0.5.46+draft | 0.5.47+draft |
+| C4 architecture index | 0.1.52b | 0.1.53b |
 | Master specification | 2.3.25b | 2.3.25b |
 | P6 generations/leases/ACL | 0.5.17b | 0.5.17b |
 | H2-D11 durable revisions/annotations | 0.8.9b | 0.8.9b |
-| P8 typed boundary | 0.2.38b | 0.2.39b |
-| Orchestration plan | 0.8.38b | 0.8.39b |
-| This report | 0.1.34b | 0.1.35b |
+| P8 typed boundary | 0.2.39b | 0.2.40b |
+| Orchestration plan | 0.8.39b | 0.8.40b |
+| This report | 0.1.35b | 0.1.36b |
+
+Version diff `0.1.35b -> 0.1.36b`: add and pass a storage-backed typed-IR Join
+P7 differential for Inner/Left/Semi/Anti, including duplicate matches, NULL
+non-matches and unmatched rows; record 364/0/1 across 30 HQL2 targets. This
+does not add HQL JOIN support. At parent head `484916b`, Rust/core, standard
+Node, fmt/clippy, docs and version checks pass, but worker tests fail across
+OSes with `RECOVERY_REQUIRED: markerless database identity is missing`; no PR
+reviews exist, so #194 remains open and unmerged. The new test is not in hosted
+CI yet. Broad exact-oracle, shared-runtime, resource/cancellation and P8/P13
+gates remain open.
 
 Version diff `0.1.34b -> 0.1.35b`: add and pass a storage-backed HQL/typed-IR
 aggregate differential against independent P7 for all 121 nullable bags of
@@ -464,6 +475,7 @@ P8 and release gates.
 
 | Version | Date | Status | Summary | Commit Hash | Agent |
 |---|---|---|---|---|---|
+| 0.1.36b | 2026-10-03 | beta | Add and pass storage-backed typed-IR Join P7 differential for all four kinds; record 364/0/1 across 30 HQL2 targets without expanding HQL JOIN; at parent head 484916b core checks passed but worker checks failed across OSes and no PR review exists; retain merge/P8/P13/review gates | working-tree | ATHER |
 | 0.1.35b | 2026-10-03 | beta | Add and pass storage-backed HQL/typed-IR P7 aggregate differential over 121 nullable bags; record 363/0/1 across 29 HQL2 targets; hosted Rust/core checks pass on Linux/macOS/Windows, worker checks fail across OSes and review remains pending; retain merge/P8/P13/review gates | working-tree | ATHER |
 | 0.1.34b | 2026-10-03 | beta | Add and pass storage-backed HQL/typed-IR P7 scalar differential over 81 nullable bags; record 362/0/1 across 28 HQL2 targets and 190/0/0 across 11 compatibility targets; current hosted worker checks fail; retain merge/P8/P13/review gates | working-tree | ATHER |
 | 0.1.33b | 2026-10-02 | beta | Update hosted PR #194 evidence at cdfb90a: Windows Rust tests including protected probe passed but job timeout canceled cache save; worker tests fail across OS at markerless schema-v6 bootstrap; preserve probe and keep merge/P8/P13/review gates open | working-tree | ATHER |

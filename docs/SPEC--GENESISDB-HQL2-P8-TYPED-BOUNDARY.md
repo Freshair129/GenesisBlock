@@ -1,8 +1,8 @@
 ---
 doc_id: SPEC--GENESISDB-HQL2-P8-TYPED-BOUNDARY
-version: "0.2.39b"
+version: "0.2.40b"
 created_at: "2026-09-28T01:25:00+07:00,ATHER,fc851e9"
-last_update: "2026-10-03T01:33:00+07:00,ATHER"
+last_update: "2026-10-03T02:01:19+07:00,ATHER"
 status: beta
 superseded_by: null
 owner: "Boss (Founder / Product Authority)"
@@ -727,8 +727,13 @@ independent P7 interpreter over all 81 four-value bags formed from NULL, -1
 and 2; both frontends match P7 with NULLS LAST across 162 query executions. The
 storage-backed aggregate differential also passes 1/1 over 121 nullable bags
 of lengths 0-4, comparing HQL and typed IR to independent P7 for count-all,
-count, sum, average, min, max and collect (242 Storage executions). The
-RowScan property-hydration regression and correction are recorded in local RCA
+count, sum, average, min, max and collect (242 Storage executions).
+The storage-backed typed-IR Join differential passes for Inner/Left/Semi/Anti,
+comparing exact rows with independent P7 over duplicate, NULL and unmatched
+keys (4/6/2/2 output rows). This covers the closed JSON-IR Join operator only;
+HQL JOIN remains unsupported in the current AST/lowering, and this test does
+not expand its syntax/runtime contract. The RowScan property-hydration
+regression and correction are recorded in local RCA
 `.brain/rca/RCA--HQL2-ROW-SOURCE-PROPERTY-HYDRATION.md`.
 The ReadView also performs exact vector lookup for KNN/Original Rerank. It
 checks owner identity/revision, namespace/node authorization, collection
@@ -826,6 +831,12 @@ verification of approved H2-D11 R6b markerless schema-v6 WAL recovery; crash
 17/17, migration 19/19 and selected HQL2/durability/authority 40-target
 aggregate pass; retain full P8/P13/review gates and the no-user-migration rule.
 
+Version diff `0.2.39b -> 0.2.40b`: add a storage-backed typed-IR Join differential
+against independent P7 for Inner/Left/Semi/Anti; verify duplicate matches, NULL
+non-matches and unmatched rows; record 364/0/1 across 30 HQL2 targets. HQL JOIN
+remains outside this approved test-only slice. Broad exact-oracle, independent-
+review, shared-runtime, resource/cancellation, transport and P8/P13 gates remain open.
+
 Version diff `0.2.38b -> 0.2.39b`: add a storage-backed HQL/typed-IR aggregate
 differential against independent P7 for all 121 nullable bags of lengths 0-4
 (242 executions); record 1/1 focused and 363/0/1 across 29 HQL2 targets.
@@ -845,6 +856,7 @@ detail with unchanged JSON shape; broader P8/P13/review gates remain open.
 
 | From | To | Effect |
 |---|---|---|
+| 0.2.39b | 0.2.40b | Add and pass storage-backed typed-IR Join P7 differential for Inner/Left/Semi/Anti with duplicate/NULL/unmatched keys; record 364/0/1 across 30 HQL2 targets; do not expand HQL JOIN support or close broad oracle/review/P8/P13 gates |
 | 0.2.38b | 0.2.39b | Add and pass storage-backed HQL/typed-IR P7 aggregate differential over 121 nullable bags; record 363/0/1 across 29 HQL2 targets; retain broad oracle, review, shared-runtime, resource/cancellation and P8/P13 gates |
 | 0.2.37b | 0.2.38b | Add and pass storage-backed HQL/typed-IR P7 scalar differential over 81 nullable bags; record 362/0/1 across 28 HQL2 targets and 190/0/0 across 11 compatibility targets; retain broad oracle, review, shared-runtime, resource/cancellation and P8/P13 gates |
 | 0.2.36b | 0.2.37b | Verify full locked/offline Rust suite and both strict Clippy modes; explicitly retain `probe_vs_recall` as NOT_RUN; box optional error detail internally without changing serialized JSON; keep full P8/P13/review gates open |
@@ -880,6 +892,7 @@ detail with unchanged JSON shape; broader P8/P13/review gates remain open.
 
 | Version | Date | Status | Summary | Commit Hash | Agent |
 |---|---|---|---|---|---|
+| 0.2.40b | 2026-10-03 | beta | Add and pass storage-backed typed-IR Join P7 differential for all four kinds, preserving duplicate/NULL/unmatched semantics; record 364/0/1 across 30 HQL2 targets; retain HQL JOIN boundary and broad oracle, review, shared-runtime, resource/cancellation and P8/P13 gates | working-tree | ATHER |
 | 0.2.39b | 2026-10-03 | beta | Add and pass storage-backed HQL/typed-IR P7 aggregate differential over 121 nullable bags; record 363/0/1 across 29 HQL2 targets; retain broad oracle, review, shared-runtime, resource/cancellation and P8/P13 gates | working-tree | ATHER |
 | 0.2.38b | 2026-10-03 | beta | Add and pass storage-backed HQL/typed-IR P7 scalar differential over 81 nullable bags; record 362/0/1 across 28 HQL2 targets and 190/0/0 across 11 compatibility targets; retain broad oracle, review, shared-runtime, resource/cancellation and P8/P13 gates | working-tree | ATHER |
 | 0.2.37b | 2026-10-02 | beta | Verify full locked/offline Rust suite and default/no-default strict all-target Clippy; `probe_vs_recall` remains NOT_RUN; box optional error detail internally with unchanged JSON; full P8/P13/review gates remain open | working-tree | ATHER |

@@ -2,10 +2,10 @@
 doc_id: C4--GENESISDB-ARCHITECTURE
 type: architecture-index
 status: current
-version: 0.1.52b
+version: 0.1.53b
 owner: GenesisBlockDB Architecture
 created_at: 2026-06-13T22:50:11+07:00,ATHER,9b1ced3
-last_update: "2026-10-03T01:33:00+07:00,ATHER"
+last_update: "2026-10-03T02:01:19+07:00,ATHER"
 attributes:
   domain: architecture
   scope: repository
@@ -93,8 +93,10 @@ The focused adapter target passes 9/9, including one endpoint-ID exact string
 equality filter. A storage-backed HQL/typed-IR scalar differential matches the
 independent P7 interpreter for all 81 four-value nullable bags (1/1 test, 162
 executions). A storage-backed aggregate differential covers 121 nullable bags
-of lengths 0-4 and seven functions (1/1 test, 242 executions). The explicit
-root-HQL2 sweep passes 363/0/1 across 29 targets.
+of lengths 0-4 and seven functions (1/1 test, 242 executions). A storage-backed
+typed-IR Join differential matches P7 for Inner/Left/Semi/Anti with duplicate,
+NULL and unmatched keys (4/6/2/2 output rows). HQL JOIN support was not expanded.
+The explicit root-HQL2 sweep passes 364/0/1 across 30 targets.
 A separate 11-target P6/schema-v6/compatibility
 group passes 190/0/0. The legacy parser preflight correction is recorded in the
 Local RCA: `.brain/rca/RCA--HQL1-ADAPTER-PARSER-RESERVATION.md`.
@@ -430,6 +432,13 @@ v6-only WAL without activation fails closed. See H2-D11 ADR R6b and the P6 recov
 
 ## CHANGELOG
 
+Version diff 0.1.52b -> 0.1.53b: record the storage-backed typed-IR Join P7
+differential for all four join kinds and the 364/0/1 HQL2 regression sweep.
+At parent head `484916b`, Rust/core and standard Node checks pass; worker checks
+fail across OSes with markerless database identity missing, and no PR reviews
+exist. The local Join test is not in hosted CI yet. Preserve broad oracle,
+shared-runtime, resource/cancellation, review and P8/P13 gates.
+
 Version diff 0.1.51b -> 0.1.52b: record the storage-backed HQL/typed-IR P7
 aggregate differential over 121 nullable bags and the 363/0/1 HQL2 regression
 sweep. Hosted Rust/core checks pass on Linux/macOS/Windows at prior head
@@ -449,6 +458,7 @@ full P8/P13 qualification remains open.
 
 | Version | Date | Status | Summary | Commit Hash | Agent |
 |---------|------|--------|---------|-------------|-------|
+| 0.1.53b | 2026-10-03 | current | Record storage-backed typed-IR Join P7 differential for four kinds and 364/0/1 across 30 HQL2 targets without expanding HQL JOIN; parent head 484916b core checks pass but worker CI fails across OSes and review is absent; retain broad oracle, review and P8/P13 gates | working-tree | ATHER |
 | 0.1.52b | 2026-10-03 | current | Record storage-backed HQL/typed-IR P7 aggregate differential over 121 nullable bags and 363/0/1 across 29 HQL2 targets; hosted Rust/core checks pass on Linux/macOS/Windows, worker CI fails across OSes and review remains pending; retain broad oracle, review and P8/P13 gates | working-tree | ATHER |
 | 0.1.51b | 2026-10-03 | current | Record storage-backed HQL/typed-IR P7 scalar differential over 81 nullable bags and 362/0/1 across 28 HQL2 targets; retain broad oracle, worker CI, Windows timeout, review and P8/P13 gates | working-tree | ATHER |
 | 0.1.50b | 2026-10-02 | current | Verify H2-D11 R6b schema-v6 WAL-only recovery and integrate upstream typed linear match_path; 40 selected HQL2/durability/authority targets pass; full P8/P13 gates remain open | 0135c29 | ATHER |
