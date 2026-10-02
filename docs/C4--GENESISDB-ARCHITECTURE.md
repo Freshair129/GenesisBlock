@@ -53,7 +53,7 @@ names and stable row-key alignment are covered; whole JSON payloads are no longe
 retained in query rows. A focused HQL/IR differential confirms Node/Edge/Row
 property hydration: RowScan reads columns from the H2-D11 `after_image`, while
 `r.id` remains the UUIDv4 revision distinct from the relational primary key.
-The regression and correction are recorded in the [row-source RCA](../.brain/rca/RCA--HQL2-ROW-SOURCE-PROPERTY-HYDRATION.md).
+The regression and correction are recorded in local RCA `.brain/rca/RCA--HQL2-ROW-SOURCE-PROPERTY-HYDRATION.md`.
 AnnotationLookup matches targets only, checks
 target/evidence resources under its P6 lease, applies frozen/live revision
 binding and supports optional/required forms. The pre-Match P8/P6/H2-D11 fixture
@@ -93,7 +93,7 @@ The focused adapter target passes 9/9, including one endpoint-ID exact string
 equality filter, and the explicit root-HQL2 sweep passes 361/0/1 across 27
 targets. A separate 11-target P6/schema-v6/compatibility
 group passes 190/0/0. The legacy parser preflight correction is recorded in the
-[D7 parser-resource RCA](../.brain/rca/RCA--HQL1-ADAPTER-PARSER-RESERVATION.md).
+Local RCA: `.brain/rca/RCA--HQL1-ADAPTER-PARSER-RESERVATION.md`.
 The ignored parser
 child entrypoint is exercised by its parent. Independent read-only review found
 no concrete static defect in the earlier D1-D6 slice; D7 independent review

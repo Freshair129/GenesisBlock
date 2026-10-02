@@ -186,6 +186,189 @@ export interface HybridSearchInput {
    */
   oversample?: number
 }
+export type QueryIrIndexConsistency = 'eventual' | 'read_your_write'
+export type QueryIrSearchMode = 'vector' | 'hybrid' | 'lexical'
+export type QueryIrDirection = 'out' | 'in' | 'both'
+export interface QueryBudget {
+  max_expanded_nodes?: number
+  max_expanded_edges?: number
+  max_vector_candidates?: number
+  max_result_rows?: number
+  max_serialized_bytes?: number
+  max_elapsed_ms?: number
+}
+export interface QueryIrRequest {
+  contract_version: 'query-ir.v1'
+  request_id: string
+  namespace?: string
+  /**
+   * valid_at: RFC3339 valid-time selector. tx_as_of (WP-2.2): replica-local
+   * commit-seq selector — values below historyHorizon() reject with
+   * beyond_horizon; both operations enumerate epoch-complete candidates
+   * (SPEC--EPOCH-HNSW E1/E2): nodes retracted after the selector resurrect,
+   * resolved through the node_versions chain.
+   */
+  temporal?: { valid_at?: string; tx_as_of?: number }
+  consistency?: { index: QueryIrIndexConsistency }
+  budget?: QueryBudget
+  operation: QueryIrSearchOperation | QueryIrTraverseOperation | QueryIrContextOperation | QueryIrMatchPathOperation
+}
+export interface QueryIrSearchOperation {
+  kind: 'search'
+  mode: QueryIrSearchMode
+  target_id?: string
+  query_vector?: Array<number>
+  collection?: string
+  filters?: Record<string, unknown>
+  k: number
+  alpha?: number
+  language?: string
+  ef_search?: number
+  oversample?: number
+}
+export interface QueryIrTraverseOperation {
+  kind: 'traverse'
+  seed_id: string
+  depth: number
+  relations: Array<string>
+  direction: QueryIrDirection
+  limit?: number
+}
+export type QueryIrPatternValue = string | number
+export interface QueryIrPatternProperty {
+  key: string
+  value: QueryIrPatternValue
+}
+export interface QueryIrNodePattern {
+  var?: string | null
+  label?: string | null
+  props?: Array<QueryIrPatternProperty>
+}
+export interface QueryIrEdgePattern {
+  var?: string | null
+  rel_type?: string | null
+  direction: QueryIrDirection
+}
+export interface QueryIrGraphHop {
+  edge: QueryIrEdgePattern
+  node: QueryIrNodePattern
+}
+export interface QueryIrGraphPattern {
+  start: QueryIrNodePattern
+  hops?: Array<QueryIrGraphHop>
+}
+export interface QueryIrPatternField {
+  var: string
+  /** id, label, score, depth, recorded_at, or prop.<key>; omit for the whole binding. */
+  field?: string | null
+}
+export type QueryIrPatternOp = 'eq' | 'ne' | 'lt' | 'le' | 'gt' | 'ge' | 'contains' | 'starts_with'
+export interface QueryIrPatternPredicate {
+  field: QueryIrPatternField
+  op: QueryIrPatternOp
+  value: QueryIrPatternValue
+}
+export interface QueryIrPatternOrder {
+  field: QueryIrPatternField
+  descending?: boolean
+}
+export type QueryIrPatternReturn = { kind: 'all' } | { kind: 'fields'; fields: Array<QueryIrPatternField> }
+export interface QueryIrMatchPathOperation {
+  kind: 'match_path'
+  pattern: QueryIrGraphPattern
+  limit: number
+  where?: Array<QueryIrPatternPredicate>
+  order_by?: QueryIrPatternOrder
+  return?: QueryIrPatternReturn
+}
+export interface QueryIrContextOperation {
+  kind: 'context'
+  target_id?: string
+  query_vector?: Array<number>
+  tier: string
+  budget?: number
+  fuzzy?: boolean
+}
+export interface QueryIrResponse {
+  contract_version: 'query-ir.v1'
+  request_id: string
+  status: 'ok'
+  operation_kind: 'search' | 'traverse' | 'match_path' | 'context'
+  data: Array<NeighborOutput> | Array<Record<string, unknown>> | ContextPackage
+  meta: {
+    capability_version: string
+    index_lag: number
+    budget: {
+      max_expanded_nodes: number
+      max_expanded_edges: number
+      max_vector_candidates: number
+      max_result_rows: number
+      max_serialized_bytes: number
+      max_elapsed_ms: number
+    }
+    warnings: Array<string>
+  }
+}
+export interface QueryIrCapabilities {
+  contract_version: 'query-ir.v1'
+  implementation_status: 'partial'
+  storage_schema_version: number
+  collection_definition: {
+    version: number
+    durable: boolean
+    conflict_policy: 'reject'
+    sync_schema_version: number
+  }
+  edge_history: {
+    availability: 'implemented' | 'unavailable'
+    floor: number | null
+    selection: 'replica_local_frame_intervals'
+  }
+  operations: {
+    search: 'implemented'
+    traverse: 'implemented'
+    match_path: 'implemented'
+    context: 'implemented'
+    relational_named_query: 'planned'
+  }
+  operation_details: {
+    search: {
+      vector: 'implemented'
+      hybrid: 'implemented'
+      filters: 'unsupported'
+      lexical: 'planned'
+    }
+    traverse: { bounded: 'implemented' }
+    context: {
+      target_id: 'implemented'
+      query_vector: 'unsupported'
+      temporal: 'unsupported'
+      tiers: Array<string>
+    }
+    match_path: {
+      linear: 'implemented'
+      where: 'implemented'
+      order_by: 'implemented'
+      return: 'implemented'
+      valid_at: 'implemented'
+      tx_as_of: 'unsupported'
+    }
+    relational_named_query: 'planned'
+  }
+  limits: {
+    max_k: number
+    max_depth: number
+    budget_defaults: {
+      max_expanded_nodes: number
+      max_expanded_edges: number
+      max_vector_candidates: number
+      max_result_rows: number
+      max_serialized_bytes: number
+      max_elapsed_ms: number
+    }
+    budget_exhaustion_reasons: Array<'nodes' | 'edges' | 'candidates' | 'rows' | 'bytes' | 'deadline'>
+  }
+}
 export interface DatabaseStatus {
   open: boolean
   readOnly: boolean
@@ -340,7 +523,7 @@ export declare class GenesisDatabase {
    */
   stableFrontier(): number
   /**
-   * Frame seq of the last transaction-API commit — the value
+   * Frame seq of the last transaction frame — the value
    * `GenesisTransaction.expected_frontier` CASes against (WP-1.2).
    */
   txnFrontier(): number
@@ -363,8 +546,8 @@ export declare class GenesisDatabase {
    * Executes a versioned Typed Query IR request. Query IR is the primary
    * machine contract; HQL remains available as a compatibility frontend.
    */
-  executeQueryIr(request: any): Promise<any>
-  queryIrCapabilities(): any
+  executeQueryIr(request: QueryIrRequest): Promise<QueryIrResponse>
+  queryIrCapabilities(): QueryIrCapabilities
   /**
    * Executes an HQL query and returns the command result as JSON.
    * Supports SEARCH, TRAVERSE, MATCH graph patterns, MATCH ... SIMILAR

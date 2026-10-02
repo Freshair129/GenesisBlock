@@ -74,7 +74,8 @@ fn assert_error_prefix<T, E: Display>(result: Result<T, E>, prefix: &str) {
 
 #[test]
 fn peer_ingress_rejects_direct_p6_before_wal_side_effects() {
-    let source = open(&TempDir::new().unwrap());
+    let source_dir = TempDir::new().unwrap();
+    let source = open(&source_dir);
     let event = p6_event(&source);
     let destination_dir = TempDir::new().unwrap();
     let destination = open(&destination_dir);
@@ -86,7 +87,8 @@ fn peer_ingress_rejects_direct_p6_before_wal_side_effects() {
 
 #[test]
 fn peer_ingress_rejects_nested_p6_atomically_before_signature_or_siblings() {
-    let source = open(&TempDir::new().unwrap());
+    let source_dir = TempDir::new().unwrap();
+    let source = open(&source_dir);
     let event = p6_event(&source);
     let destination_dir = TempDir::new().unwrap();
     let destination = open(&destination_dir);
@@ -104,9 +106,11 @@ fn peer_ingress_rejects_nested_p6_atomically_before_signature_or_siblings() {
 
 #[test]
 fn consensus_rejects_p6_control_events_before_proposal_creation() {
-    let source = open(&TempDir::new().unwrap());
+    let source_dir = TempDir::new().unwrap();
+    let source = open(&source_dir);
     let event = p6_event(&source);
-    let destination = open(&TempDir::new().unwrap());
+    let destination_dir = TempDir::new().unwrap();
+    let destination = open(&destination_dir);
 
     assert_error_prefix(
         destination.propose_consensus(event.event, Vec::new()),
@@ -116,7 +120,8 @@ fn consensus_rejects_p6_control_events_before_proposal_creation() {
 
 #[test]
 fn outbound_sequence_sync_excludes_local_p6_control_events() {
-    let source = open(&TempDir::new().unwrap());
+    let source_dir = TempDir::new().unwrap();
+    let source = open(&source_dir);
     add_node(&source, "before");
     p6_event(&source);
     add_node(&source, "after");

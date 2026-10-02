@@ -17360,7 +17360,7 @@ impl Storage {
                 let sq8 = coll.sq8_snapshot();
                 let run_filtered = |limit: usize| -> Result<Vec<(usize, f32)>> {
                     let meta_guard = coll.metadata.read();
-                    let flt = |did: &usize| meta_guard.get(*did).map(&pred).unwrap_or(false);
+                    let flt = |did: &usize| meta_guard.get(*did).map(pred).unwrap_or(false);
                     let hnsw_lock = coll.hnsw.read();
                     match &*hnsw_lock {
                         Some(idx) => Ok(idx.search_f32(

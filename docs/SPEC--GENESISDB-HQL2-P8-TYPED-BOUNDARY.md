@@ -722,7 +722,7 @@ sources, including row-dependent names; whole payloads are not retained in
 operator rows. The Node/Edge/Row HQL/IR differential now passes: RowScan reads
 properties from the H2-D11 `after_image` payload while `r.id` remains the
 durable UUIDv4 revision, distinct from the relational primary key. The
-regression and correction are recorded in [the row-source RCA](../.brain/rca/RCA--HQL2-ROW-SOURCE-PROPERTY-HYDRATION.md).
+regression and correction are recorded in local RCA `.brain/rca/RCA--HQL2-ROW-SOURCE-PROPERTY-HYDRATION.md`.
 The ReadView also performs exact vector lookup for KNN/Original Rerank. It
 checks owner identity/revision, namespace/node authorization, collection
 fingerprint and dimension at the leased frontier/valid-time, and loads only

@@ -817,7 +817,7 @@ offline sweep of all 22 root HQL2 targets: 318 passed, zero failed and one
 ignored parser child entrypoint exercised by its parent. The dedicated vector
 operator target passes 12/12, including HQL/IR parity and lease-bound original-vector behavior.
 The correction is recorded in the
-[RCA](../.brain/rca/RCA--HQL2-ROW-SOURCE-PROPERTY-HYDRATION.md). These local
+local RCA `.brain/rca/RCA--HQL2-ROW-SOURCE-PROPERTY-HYDRATION.md`. These local
 results remain regression evidence, not P8 acceptance.
 
 ## CHANGELOG
