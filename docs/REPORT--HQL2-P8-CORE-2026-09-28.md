@@ -1,8 +1,8 @@
 ---
 doc_id: REPORT--HQL2-P8-CORE-2026-09-28
-version: "0.1.36b"
+version: "0.1.37b"
 created_at: "2026-09-28T04:35:00+07:00,ATHER,22bc11e"
-last_update: "2026-10-03T02:01:19+07:00,ATHER"
+last_update: "2026-10-03T02:38:24+07:00,ATHER"
 status: beta
 owner: GenesisBlockDB Engineering
 attributes:
@@ -102,7 +102,7 @@ their existing compatibility contracts; P13 parity is deliberately not claimed.
 Platform: local Windows MSVC, Rust 1.97.1, `--locked --offline
 --no-default-features`, target directory
 `G:/GenesisBlock_Dev/GenesisBlock/target/hql2-execution`.
-The latest 29-target HQL2 run was executed in the isolated worktree with
+The latest 31-target HQL2 run was executed in the isolated worktree with
 explicit test targets; the protected probe target was not selected.
 
 | Gate | Measured result | Limit |
@@ -143,10 +143,10 @@ explicit test targets; the protected probe target was not selected.
 | HQL1 parser-resource RCA | Confirmed and corrected | Legacy Pest pairs were materialized before the D7 allowlist without parser-specific heap reservation. The adapter now runs allocation-free parser preflight and reserves the conservative estimate before legacy AST construction; see local RCA `.brain/rca/RCA--HQL1-ADAPTER-PARSER-RESERVATION.md`. No production crash or HQL1 allocator peak is claimed. |
 | Storage-backed HQL/typed-IR scalar P7 differential | 1 passed, 0 failed across 81 four-value nullable bags; 162 Storage executions | Values/Distinct/Sort with NULLS LAST; each frontend independently matches the P7 reference and each other. Test-only scalar evidence, not broad P8 acceptance. |
 | Storage-backed HQL/typed-IR aggregate P7 differential | 1 passed, 0 failed across 121 nullable bags; 242 Storage executions | Covers empty through four-row bags over NULL/-1/2 and count-all/count/sum/avg/min/max/collect; each frontend matches P7 and each other. Test-only aggregate evidence, not broad P8 acceptance. |
-| Storage-backed typed-IR Join P7 differential | 1 passed, 0 failed; four join kinds | Inner/Left/Semi/Anti rows match P7 exactly (4/6/2/2) with duplicate keys, NULL non-matches, unmatched left rows and an unused right row. Typed IR only; HQL JOIN remains unsupported and was not expanded. Test-only evidence, not broad P8 acceptance. |
-| Latest explicit root-HQL2 target sweep | 364 passed, 0 failed, 1 ignored across 30 root targets | All 30 HQL2 integration targets explicitly selected with locked/offline/no-default-features/jobs=1; the ignored parser child is exercised by its parent. Regression evidence, not P8 acceptance. |
+| Storage-backed HQL/typed-IR Join P7 differential | 1 passed, 0 failed; four join kinds plus bare JOIN | HQL and typed IR match P7 result bags for Inner/Left/Semi/Anti (5/7/3/2), duplicate keys, missing-property NULL and JSON null; bare JOIN defaults to Inner, and Semi/Anti hide the right scope. A test sentinel preserves JSON-null distinction in P7. Test-only evidence, not broad P8 acceptance. |
+| Latest explicit root-HQL2 target sweep | 365 passed, 0 failed, 1 ignored across 31 root targets | All 31 HQL2 integration targets explicitly selected with locked/offline/no-default-features/jobs=1; the ignored parser child is exercised by its parent. Regression evidence, not P8 acceptance. |
 | Separate P6/schema-v6/compatibility sweep | 190 passed, 0 failed, 0 ignored across 11 named targets | `p6_generation_tests`, `p6_lease_tests`, `p6_visibility_tests`, `p6_peer_authority_tests`, `schema6_migration_tests`, `query_ir_tests`, `hql_p0_tests`, `hql_filter_tests`, `hql_cypher_tests`, `napi_rest_parity_tests`, `rest_api_tests`; regression evidence only. |
-| Prior explicit HQL2/P6/schema-v6/compatibility sweep | 528 passed, 0 failed, 1 ignored across 37 named targets | Pre-edge-regression checkpoint; protected probe excluded. Superseded for current HQL2 root-target count by 363/0/1; not full P8/P13 acceptance. |
+| Prior explicit HQL2/P6/schema-v6/compatibility sweep | 528 passed, 0 failed, 1 ignored across 37 named targets | Pre-edge-regression checkpoint; protected probe excluded. Superseded for current HQL2 root-target count by 365/0/1; not full P8/P13 acceptance. |
 | Native library check | `cargo check --locked --offline --no-default-features --jobs 1 --target-dir target/hql2-execution` passed | Local core compile only; no NAPI addon runtime, release or cross-platform claim. |
 | Documentation and source hygiene | docs validation: 0 violations/239 files; agent registry: 6 agents/12 routes; rustfmt check and `git diff --check` passed | Local structural checks only. |
 | HQL/IR Node/Edge/Row source differential | 1 passed, 0 failed | Node/Edge properties and Row `prop(r, "id")` match across HQL and IR; `r.id` remains the UUIDv4 durable revision. Row properties resolve from H2-D11 `after_image`; see local RCA `.brain/rca/RCA--HQL2-ROW-SOURCE-PROPERTY-HYDRATION.md`. |
@@ -192,10 +192,10 @@ Post-anchor explicit 22-target regression command (protected probe excluded):
 cargo test --locked --offline --no-default-features --jobs 1 --test hql2_annotation_acl_tests --test hql2_annotation_lookup_tests --test hql2_annotation_source_tests --test hql2_durable_revision_tests --test hql2_execution_tests --test hql2_expand_sequence_tests --test hql2_expand_tests --test hql2_graph_oracle_tests --test hql2_history_change_tests --test hql2_key_codec_tests --test hql2_lower_tests --test hql2_oracle_tests --test hql2_parser_tests --test hql2_pipeline_oracle_tests --test hql2_rank_oracle_tests --test hql2_request_tests --test hql2_scalar_execution_tests --test hql2_storage_source_tests --test hql2_value_tests --test hql2_vector_operator_tests --test hql2_vector_revision_tests --test hql2_wire_tests
 ```
 
-Latest guarded 30-target regression command (only the named HQL2 targets are selected):
+Latest guarded 31-target regression command (only the named HQL2 targets are selected):
 
 ```powershell
-cargo test --locked --offline --no-default-features --jobs 1 --quiet --test hql2_annotation_acl_tests --test hql2_annotation_lookup_tests --test hql2_annotation_source_tests --test hql2_durable_revision_tests --test hql2_execution_tests --test hql2_expand_sequence_tests --test hql2_expand_tests --test hql2_graph_oracle_tests --test hql2_history_change_tests --test hql2_hql_reference_differential_tests --test hql2_hql1_adapter_tests --test hql2_key_codec_tests --test hql2_lower_tests --test hql2_oracle_tests --test hql2_p8_completion_tests --test hql2_parser_tests --test hql2_pattern_constraint_oracle_tests --test hql2_pipeline_oracle_tests --test hql2_rank_oracle_tests --test hql2_request_tests --test hql2_root_match_oracle_differential_tests --test hql2_scalar_execution_tests --test hql2_storage_aggregate_oracle_differential_tests --test hql2_storage_join_oracle_differential_tests --test hql2_storage_source_tests --test hql2_value_tests --test hql2_vector_operator_tests --test hql2_vector_oracle_differential_tests --test hql2_vector_revision_tests --test hql2_wire_tests --target-dir target/hql2-execution
+cargo test --locked --offline --no-default-features --jobs 1 --quiet --test hql2_annotation_acl_tests --test hql2_annotation_lookup_tests --test hql2_annotation_source_tests --test hql2_durable_revision_tests --test hql2_execution_tests --test hql2_expand_sequence_tests --test hql2_expand_tests --test hql2_graph_oracle_tests --test hql2_history_change_tests --test hql2_hql_reference_differential_tests --test hql2_hql1_adapter_tests --test hql2_key_codec_tests --test hql2_lower_tests --test hql2_oracle_tests --test hql2_p8_completion_tests --test hql2_parser_tests --test hql2_pattern_constraint_oracle_tests --test hql2_pipeline_oracle_tests --test hql2_rank_oracle_tests --test hql2_request_tests --test hql2_root_match_oracle_differential_tests --test hql2_scalar_execution_tests --test hql2_storage_aggregate_oracle_differential_tests --test hql2_storage_hql_join_oracle_differential_tests --test hql2_storage_join_oracle_differential_tests --test hql2_storage_source_tests --test hql2_value_tests --test hql2_vector_operator_tests --test hql2_vector_oracle_differential_tests --test hql2_vector_revision_tests --test hql2_wire_tests --target-dir target/hql2-execution
 ```
 
 First full-suite command (failed at the legacy fixture described above):
@@ -405,19 +405,20 @@ from these local tests.
 
 | Artifact | Before | After |
 |---|---|---|
-| Registry | 0.5.46+draft | 0.5.47+draft |
-| C4 architecture index | 0.1.52b | 0.1.53b |
-| Master specification | 2.3.25b | 2.3.25b |
+| Registry | 0.5.47+draft | 0.5.48+draft |
+| C4 architecture index | 0.1.53b | 0.1.54b |
+| Master specification | 2.3.25b | 2.3.26b |
 | P6 generations/leases/ACL | 0.5.17b | 0.5.17b |
 | H2-D11 durable revisions/annotations | 0.8.9b | 0.8.9b |
-| P8 typed boundary | 0.2.39b | 0.2.40b |
-| Orchestration plan | 0.8.39b | 0.8.40b |
-| This report | 0.1.35b | 0.1.36b |
+| P8 typed boundary | 0.2.40b | 0.2.41b |
+| Orchestration plan | 0.8.40b | 0.8.41b |
+| This report | 0.1.36b | 0.1.37b |
 
-Version diff `0.1.35b -> 0.1.36b`: add and pass a storage-backed typed-IR Join
-P7 differential for Inner/Left/Semi/Anti, including duplicate matches, NULL
-non-matches and unmatched rows; record 364/0/1 across 30 HQL2 targets. This
-does not add HQL JOIN support. At parent head `484916b`, Rust/core, standard
+Version diff `0.1.36b -> 0.1.37b`: implement HQL `JOIN TABLE` lowering through
+the approved two-input Join contract for Inner/Left/Semi/Anti, default bare
+JOIN to Inner, and add a storage-backed HQL/typed-IR differential against
+independent P7; record 365/0/1 across 31 HQL2 targets. Hosted CI for this local
+revision has not run yet. At parent head `484916b`, Rust/core, standard
 Node, fmt/clippy, docs and version checks pass, but worker tests fail across
 OSes with `RECOVERY_REQUIRED: markerless database identity is missing`; no PR
 reviews exist, so #194 remains open and unmerged. The new test is not in hosted
@@ -475,6 +476,7 @@ P8 and release gates.
 
 | Version | Date | Status | Summary | Commit Hash | Agent |
 |---|---|---|---|---|---|
+| 0.1.37b | 2026-10-03 | beta | Implement HQL Join lowering through the existing RowScan/Join contract for four kinds and bare JOIN default; HQL and typed IR match independent P7; record 365/0/1 across 31 targets; hosted CI for this local revision pending; retain merge/P8/P13/review gates | working-tree | ATHER |
 | 0.1.36b | 2026-10-03 | beta | Add and pass storage-backed typed-IR Join P7 differential for all four kinds; record 364/0/1 across 30 HQL2 targets without expanding HQL JOIN; at parent head 484916b core checks passed but worker checks failed across OSes and no PR review exists; retain merge/P8/P13/review gates | working-tree | ATHER |
 | 0.1.35b | 2026-10-03 | beta | Add and pass storage-backed HQL/typed-IR P7 aggregate differential over 121 nullable bags; record 363/0/1 across 29 HQL2 targets; hosted Rust/core checks pass on Linux/macOS/Windows, worker checks fail across OSes and review remains pending; retain merge/P8/P13/review gates | working-tree | ATHER |
 | 0.1.34b | 2026-10-03 | beta | Add and pass storage-backed HQL/typed-IR P7 scalar differential over 81 nullable bags; record 362/0/1 across 28 HQL2 targets and 190/0/0 across 11 compatibility targets; current hosted worker checks fail; retain merge/P8/P13/review gates | working-tree | ATHER |

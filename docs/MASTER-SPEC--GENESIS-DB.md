@@ -2,8 +2,8 @@
 title: "GenesisBlockDB Technical Architecture and Capability Composition"
 doc_id: "MASTER-SPEC-GENESISBLOCKDB"
 status: current
-version: "2.3.25b"
-updated: "2026-10-02"
+version: "2.3.26b"
+updated: "2026-10-03"
 owner: "GenesisBlockDB Architecture"
 source_of_truth: true
 related_issue: 84
@@ -44,8 +44,11 @@ projections through `Storage::query_v2`, including one endpoint-ID exact string
 equality filter; parser resources are preflighted and reserved before legacy
 AST construction. Its nine focused tests cover legacy and HQL2 differential
 behavior, pre-parse authorization/namespace checks, malformed and unlisted
-forms, and resource rejection. The latest root-HQL2
-regression sweep passes 361/0/1 across 27 targets; a separate 11-target
+forms, and resource rejection. HQL `JOIN TABLE` now lowers to the existing
+closed RowScan/Join pipeline for Inner/Left/Semi/Anti, with bare JOIN defaulting
+to Inner; HQL, typed IR and independent P7 differential results match for
+duplicate, missing-property NULL and JSON-null cases. The latest root-HQL2
+regression sweep passes 365/0/1 across 31 targets; a separate 11-target
 P6/schema-v6/compatibility group passes 190/0/0. Independent review
 of D7 remains pending; earlier read-only review found no concrete static defect,
 and focused re-review confirmed the corrected D5
@@ -393,6 +396,7 @@ user database was migrated, and broader P6/P8/P13 qualification remains open.
 
 | Version | Date | Owner | Summary |
 |---|---|---|---|
+| 2.3.26b | 2026-10-03 | GenesisBlockDB Architecture | Record HQL JOIN lowering through approved RowScan/Join contract, independent HQL/IR/P7 parity and 365/0/1 across 31 HQL2 targets; retain broad P8/P13, review, worker-CI, soak, security and release gates. |
 | 2.3.25b | 2026-10-02 | GenesisBlockDB Architecture | Record full local Rust regression and strict Clippy pass for HQL2/H2-D11 integration; keep `probe_vs_recall` NOT_RUN, no user migration, and independent-review/P8/P13/release gates open. |
 | 2.3.24b | 2026-10-02 | GenesisBlockDB Architecture | Record fixture-verified H2-D11 R6b markerless schema-v6 recovery and upstream Query IR V1 1.0.3 linear match_path; 40 selected HQL2/durability/authority targets pass; no user DB migration, full P8/P13 gates open. |
 | 2.3.23b | 2026-10-02 | GenesisBlockDB Architecture | Synchronize owner-approved H2-D11 R6b/P6 schema-v6 WAL-only recovery authority; implementation and recovery tests pending. |

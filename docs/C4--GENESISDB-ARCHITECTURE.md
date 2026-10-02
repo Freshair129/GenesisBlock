@@ -2,10 +2,10 @@
 doc_id: C4--GENESISDB-ARCHITECTURE
 type: architecture-index
 status: current
-version: 0.1.53b
+version: 0.1.54b
 owner: GenesisBlockDB Architecture
 created_at: 2026-06-13T22:50:11+07:00,ATHER,9b1ced3
-last_update: "2026-10-03T02:01:19+07:00,ATHER"
+last_update: "2026-10-03T02:38:24+07:00,ATHER"
 attributes:
   domain: architecture
   scope: repository
@@ -94,9 +94,11 @@ equality filter. A storage-backed HQL/typed-IR scalar differential matches the
 independent P7 interpreter for all 81 four-value nullable bags (1/1 test, 162
 executions). A storage-backed aggregate differential covers 121 nullable bags
 of lengths 0-4 and seven functions (1/1 test, 242 executions). A storage-backed
-typed-IR Join differential matches P7 for Inner/Left/Semi/Anti with duplicate,
-NULL and unmatched keys (4/6/2/2 output rows). HQL JOIN support was not expanded.
-The explicit root-HQL2 sweep passes 364/0/1 across 30 targets.
+HQL and typed-IR Join differentials match independent P7 for Inner/Left/Semi/Anti
+with duplicate, missing-property NULL and JSON-null keys (5/7/3/2 output rows).
+HQL `JOIN TABLE` lowers to the existing RowScan/Join contract; bare JOIN
+defaults to Inner and Semi/Anti do not export the right scope. The explicit
+root-HQL2 sweep passes 365/0/1 across 31 targets.
 A separate 11-target P6/schema-v6/compatibility
 group passes 190/0/0. The legacy parser preflight correction is recorded in the
 Local RCA: `.brain/rca/RCA--HQL1-ADAPTER-PARSER-RESERVATION.md`.
@@ -458,6 +460,7 @@ full P8/P13 qualification remains open.
 
 | Version | Date | Status | Summary | Commit Hash | Agent |
 |---------|------|--------|---------|-------------|-------|
+| 0.1.54b | 2026-10-03 | current | Implement HQL JOIN lowering through the approved RowScan/Join contract for four kinds and bare JOIN default; HQL/typed IR match independent P7 for duplicate, missing-property NULL and JSON-null result bags; record 365/0/1 across 31 targets; keep P8/P13/review gates open | working-tree | ATHER |
 | 0.1.53b | 2026-10-03 | current | Record storage-backed typed-IR Join P7 differential for four kinds and 364/0/1 across 30 HQL2 targets without expanding HQL JOIN; parent head 484916b core checks pass but worker CI fails across OSes and review is absent; retain broad oracle, review and P8/P13 gates | working-tree | ATHER |
 | 0.1.52b | 2026-10-03 | current | Record storage-backed HQL/typed-IR P7 aggregate differential over 121 nullable bags and 363/0/1 across 29 HQL2 targets; hosted Rust/core checks pass on Linux/macOS/Windows, worker CI fails across OSes and review remains pending; retain broad oracle, review and P8/P13 gates | working-tree | ATHER |
 | 0.1.51b | 2026-10-03 | current | Record storage-backed HQL/typed-IR P7 scalar differential over 81 nullable bags and 362/0/1 across 28 HQL2 targets; retain broad oracle, worker CI, Windows timeout, review and P8/P13 gates | working-tree | ATHER |

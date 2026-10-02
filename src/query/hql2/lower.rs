@@ -788,6 +788,41 @@ impl Lower<'_> {
             _ => return Err(unsupported("source_lowering")),
         };
         for stage in query.stages {
+            if let a::StageKind::Join {
+                table,
+                alias,
+                kind,
+                condition,
+            } = &stage.value
+            {
+                let alias = name(alias)?;
+                let right = self.add(
+                    QueryOpV2::RowScan,
+                    vec![],
+                    w::Config::RowScan {
+                        table: name(table)?,
+                        alias: alias.clone(),
+                    },
+                )?;
+                let kind = match kind {
+                    a::JoinKind::Inner => w::JoinKind::Inner,
+                    a::JoinKind::Left => w::JoinKind::Left,
+                    a::JoinKind::Semi => w::JoinKind::Semi,
+                    a::JoinKind::Anti => w::JoinKind::Anti,
+                };
+                if !matches!(kind, w::JoinKind::Semi | w::JoinKind::Anti) {
+                    scope.push(alias);
+                }
+                root = self.add(
+                    QueryOpV2::Join,
+                    vec![root, right],
+                    w::Config::Join {
+                        kind,
+                        condition: expr(condition)?,
+                    },
+                )?;
+                continue;
+            }
             let (op, config) = match stage.value {
                 a::StageKind::Filter(predicate) => (
                     QueryOpV2::Filter,
@@ -801,6 +836,7 @@ impl Lower<'_> {
                     (QueryOpV2::Project, w::Config::Project { fields })
                 }
                 a::StageKind::Distinct => (QueryOpV2::Distinct, w::Config::Distinct {}),
+                a::StageKind::Join { .. } => unreachable!("join lowering handled above"),
                 a::StageKind::AnnotationLookup {
                     target,
                     alias,

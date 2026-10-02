@@ -882,6 +882,38 @@ fn stage(source: &str, pair: Pair<'_, Rule>) -> Result<Stage, QueryErrorV2> {
             child(source, pair.clone(), Rule::select_list)?,
         )?),
         Rule::distinct_stage => StageKind::Distinct,
+        Rule::join_stage => {
+            let mut names = pair
+                .clone()
+                .into_inner()
+                .filter(|part| part.as_rule() == Rule::name)
+                .map(name);
+            let table = names
+                .next()
+                .ok_or_else(|| invalid(source, &pair, "missing_join_table"))?;
+            let alias = names
+                .next()
+                .ok_or_else(|| invalid(source, &pair, "missing_join_alias"))?;
+            let kind = match pair
+                .clone()
+                .into_inner()
+                .find(|part| part.as_rule() == Rule::join_kind)
+                .and_then(|part| part.into_inner().next())
+                .map(|part| part.as_rule())
+            {
+                None | Some(Rule::k_inner) => JoinKind::Inner,
+                Some(Rule::k_left) => JoinKind::Left,
+                Some(Rule::k_semi) => JoinKind::Semi,
+                Some(Rule::k_anti) => JoinKind::Anti,
+                _ => return Err(invalid(source, &pair, "invalid_join_kind")),
+            };
+            StageKind::Join {
+                table,
+                alias,
+                kind,
+                condition: expression(source, child(source, pair.clone(), Rule::expr)?)?.0,
+            }
+        }
         Rule::ann_stage => {
             let mut names = pair
                 .clone()

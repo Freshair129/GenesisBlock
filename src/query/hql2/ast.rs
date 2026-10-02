@@ -134,6 +134,12 @@ pub enum StageKind {
     Filter(Expr),
     Project(Vec<SelectItem>),
     Distinct,
+    Join {
+        table: Name,
+        alias: Name,
+        kind: JoinKind,
+        condition: Expr,
+    },
     AnnotationLookup {
         target: Name,
         alias: Name,
@@ -199,6 +205,14 @@ pub enum StageKind {
     Take(Unsigned),
     Skip(Unsigned),
     Unsupported(SyntaxNode),
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum JoinKind {
+    Inner,
+    Left,
+    Semi,
+    Anti,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
