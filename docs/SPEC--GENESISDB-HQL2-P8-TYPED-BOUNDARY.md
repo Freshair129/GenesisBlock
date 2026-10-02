@@ -1,8 +1,8 @@
 ---
 doc_id: SPEC--GENESISDB-HQL2-P8-TYPED-BOUNDARY
-version: "0.2.45b"
+version: "0.2.46b"
 created_at: "2026-09-28T01:25:00+07:00,ATHER,fc851e9"
-last_update: "2026-10-03T04:35:05+07:00,ATHER"
+last_update: "2026-10-03T05:34:08+07:00,ATHER"
 status: beta
 superseded_by: null
 owner: "Boss (Founder / Product Authority)"
@@ -76,8 +76,8 @@ Sequence ID, conjunctive labels and D4 node/edge property constraints now run
 for HQL and typed IR against one authorized P6 graph snapshot; candidate IDs
 are never looked up directly. Exact JSON values are selectively hydrated under
 budget and filtered before SHORTEST; Compact constraints remain unavailable
-and fail closed. The 10/10 P8 completion target and latest 373/0/1 root-HQL2
-sweep across 31 targets cover this slice, including edge-property filtering
+and fail closed. The 10/10 P8 completion target and latest 374/0/1 root-HQL2
+sweep across 32 targets cover this slice, including edge-property filtering
 before SHORTEST and the nine-test D7 actor-scoped HQL1 adapter. P6
 D1's exact-record-only fixture denies before parsing; it does not assert
 hidden-vs-absent query results. A read-only review found an undercount in
@@ -92,7 +92,10 @@ under the P6 ReadView. HistoryScan includes H2-D11 Vector revisions identified
 by the compact JSON `(owner_id, collection_id)` tuple, and rejects reads below
 the vector history floor; the existing same-lease owner-node ACL path is used.
 HQL and typed IR return matching typed values. Their focused target passes
-14/14, and the current explicit 31-target HQL2 sweep passes 373/0/1, with the
+14/14. A dedicated storage-backed Row HistoryScan/ChangeScan differential
+also passes 1/1: retained insert/update revisions return their exact historical
+row properties and Row subjects match across HQL and typed IR. The current
+explicit 32-target HQL2 sweep passes 374/0/1, with the
 ignored parser child entrypoint exercised by its parent.
 The accepted transaction-time contract selects one historical frame S for the
 entire query and reports `Snapshot.tx = S`. HQL2 and typed-IR `query_v2` now
@@ -101,8 +104,8 @@ annotation operators, property hydration and result metadata use the same S,
 while the validated P6 generation, catalog and current policy stay pinned.
 Per-source history floors fail closed before reads, and no path falls back to
 current state. Five focused targets pass 56/56; the HistoryScan/ChangeScan
-target passes 14/14; the explicit 31-target HQL2 regression sweep passes
-373/0/1 and the separate P6/schema-v6/compatibility sweep passes 194/0/0.
+target passes 14/14; the explicit 32-target HQL2 regression sweep passes
+374/0/1 and the separate P6/schema-v6/compatibility sweep passes 194/0/0.
 These are local regression results, not broad P8/P13 or transport acceptance.
 LexicalMatch uses only registered `unicode-whitespace-bm25-v1` exact scan;
 ContextPack uses registered `unicode-scalar-v1` with same-revision evidence,
@@ -702,8 +705,8 @@ and the collection space is bound by the H2-D11 fingerprint. Approximate KNN
 remains unsupported. HistoryScan/ChangeScan execute from exact retained
 schema-v6 revisions under the P6 lease, including Vector HistoryScan by the
 H2-D11 tuple ID, current reference ACL, exclusive source floors, typed HQL/IR
-parity and fail-closed budgets. Their focused target passes 12/12; the current
-31-target HQL2 sweep passes 373/0/1, with a separate 11-target
+parity and fail-closed budgets. Their focused target passes 14/14; the current
+32-target HQL2 sweep passes 374/0/1, with a separate 11-target
 P6/schema-v6/compatibility sweep at 194/0/0. HQL2/IR `tx_as_of` now selects
 one no-fallback frontier across scans, operators, hydration and `Snapshot.tx`;
 five focused targets pass 56/56 and HistoryScan/ChangeScan passes 14/14.
@@ -784,8 +787,8 @@ passes 9/9 for zero-hop and one-hop actor-bound differential execution,
 parallel-edge multiplicity, all directions and wildcard relations, endpoint-ID
 string equality on either endpoint, denial/mismatch before parse, malformed
 syntax, fail-closed unlisted syntax and pre-parse resource rejection. The
-latest 31-target root HQL2 sweep passes
-373/0/1; a separate 11-target P6/schema-v6/compatibility group passes 194/0/0.
+latest 32-target root HQL2 sweep passes
+374/0/1; a separate 11-target P6/schema-v6/compatibility group passes 194/0/0.
 The prior combined 37-target run passed 528/0/1 before
 the added edge-property regression; all remain regression evidence, not full
 P8/P13 acceptance.
@@ -830,6 +833,13 @@ separate shape limits. No process-global Pest setting is changed.
   Parser/binder coverage alone does not close the storage-backed runtime gate.
 
 ## Version diff and changelog
+
+Version diff `0.2.45b -> 0.2.46b`: add storage-backed HQL/typed-IR Row
+HistoryScan/ChangeScan parity for retained insert/update revisions, exact
+after-image property hydration and Row subject identity (1/1); refresh the
+explicit HQL2 regression sweep to 374/0/1 across 32 targets and correct the
+stale plan status. Broad exact-oracle, resource/cancellation, independent
+review, shared-runtime and P8/P13 gates remain open.
 
 Version diff `0.2.44b -> 0.2.45b`: implement and locally verify P8 HQL2/IR
 `tx_as_of` selection through one no-fallback frontier S across source scans,
@@ -941,6 +951,7 @@ detail with unchanged JSON shape; broader P8/P13/review gates remain open.
 
 | Version | Date | Status | Summary | Commit Hash | Agent |
 |---|---|---|---|---|---|
+| 0.2.46b | 2026-10-03 | beta | Add HQL/typed-IR Row HistoryScan/ChangeScan parity for retained insert/update revisions and exact property hydration (1/1); refresh explicit HQL2 sweep to 374/0/1 across 32 targets; broad P8/P13, transport, CI and independent-review gates remain open | working-tree | ATHER |
 | 0.2.45b | 2026-10-03 | beta | Implement HQL2/IR `tx_as_of` using one no-fallback frontier across scans, operators, hydration and `Snapshot.tx`; record focused 56/56, History/Change 14/14, HQL2 373/0/1 and P6/compatibility 194/0/0; broad P8/P13, transport, CI and review remain open | working-tree | ATHER |
 | 0.2.44b | 2026-10-03 | beta | Specify the full tx_as_of runtime acceptance and record the current rejection/current-frontier gap; implementation pending under the accepted P8 contract | working-tree | ATHER |
 | 0.2.43b | 2026-10-03 | beta | Implement HQL/typed-IR Vector HistoryScan with compact H2-D11 tuple ID, P6 vector floor and owner-node ACL; record 12/12 focused, 367/0/1 across 31 HQL2 targets and 194/0/0 across 11 P6/compatibility targets; retain tx_as_of and broad acceptance gates | working-tree | ATHER |

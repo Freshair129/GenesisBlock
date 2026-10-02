@@ -1,8 +1,8 @@
 ---
 doc_id: ADR--GENESISDB-HQL2-DURABLE-REVISIONS-ANNOTATIONS
-version: "0.8.12b"
+version: "0.8.13b"
 created_at: "2026-09-28T06:15:00+07:00,ATHER,53078cb"
-last_update: "2026-10-03T04:35:05+07:00,ATHER"
+last_update: "2026-10-03T05:34:08+07:00,ATHER"
 status: beta
 superseded_by: null
 owner: "Boss (Founder / Product Authority)"
@@ -727,13 +727,19 @@ Minimum Verify/Review/Final evidence:
 
 | Artifact | Approved version | Synchronized version/status |
 |---|---|---|
-| This H2-D11 addendum | `0.3.0b` candidate, owner-approved | `0.8.12b` beta, schema-v6 revision envelopes are transformed before signing; Vector HistoryScan uses the canonical tuple/P6 floor; HQL2/IR `tx_as_of` executes through one no-fallback frontier; no schema/migration change |
-| P8 typed boundary | `0.2.0b` beta | `0.2.45b` beta, recursive target/evidence ACL, Vector HistoryScan and end-to-end `tx_as_of` selection implemented; broad P8/P13 qualification remains open |
+| This H2-D11 addendum | `0.3.0b` candidate, owner-approved | `0.8.13b` beta, Row HistoryScan/ChangeScan HQL/IR parity and exact row-property hydration verified (1/1), alongside Vector HistoryScan and no-fallback `tx_as_of`; no schema/migration change |
+| P8 typed boundary | `0.2.0b` beta | `0.2.46b` beta, recursive target/evidence ACL, Vector and Row HistoryScan, Row ChangeScan and end-to-end `tx_as_of` implemented; broad P8/P13 qualification remains open |
 | P6 generations/leases/ACL | `0.5.0b` beta | `0.5.21b` beta, Vector HistoryScan and HQL2 historical reads run under same-lease floors/owner ACL; legacy operation boundaries remain distinct |
-| HQL2 orchestration plan | `0.5.0b` beta | `0.8.45b` beta, transaction-time runtime and local regression evidence recorded; broader qualification remains open |
+| HQL2 orchestration plan | `0.5.0b` beta | `0.8.46b` beta, row-history evidence and current regression count synchronized; broader qualification remains open |
 | C4 architecture index | `0.1.20b` | `0.1.55b`, indexes the current HQL2/P6 architecture and boundaries |
-| DOC registry | `0.5.6+draft` | `0.5.52+draft`, synchronized current HQL2/P6/Query IR entries |
+| DOC registry | `0.5.6+draft` | `0.5.53+draft`, synchronized current HQL2/P6/Query IR entries |
 | Engine/storage | `0.2.9` | remains unchanged until implementation and release gates; no user database is migrated here |
+
+Version diff `0.8.12b -> 0.8.13b`: record storage-backed HQL/typed-IR
+Row HistoryScan/ChangeScan parity for retained insert/update revisions, exact
+row-property hydration and durable Row subject identity (1/1); synchronize P8,
+plan, report and registry versions. No schema or migration change; broader
+P8/P13 and review gates remain open.
 
 Version diff `0.8.11b -> 0.8.12b`: record implementation and local verification
 of the accepted P8 transaction-time contract: one validated frontier `S`
@@ -757,6 +763,7 @@ NOT_RUN and broader acceptance/release gates remain open.
 
 | Version | Date | Status | Summary | Commit Hash | Agent |
 |---|---|---|---|---|---|
+| 0.8.13b | 2026-10-03 | beta | Verify storage-backed HQL/typed-IR Row HistoryScan/ChangeScan parity, exact row-property hydration and durable Row identity (1/1); synchronize HQL2 plan/P8/report/registry evidence; no schema/migration change; broad P8/P13 gates remain open | working-tree | ATHER |
 | 0.8.12b | 2026-10-03 | beta | Implement and locally verify HQL2/IR `tx_as_of` through one no-fallback source/operator/hydration/snapshot frontier under pinned P6 policy; focused 56/56, History/Change 14/14, HQL2 373/0/1, compatibility 194/0/0; no schema/migration change; broad gates open | working-tree | ATHER |
 | 0.8.11b | 2026-10-03 | beta | Synchronize accepted P8 `tx_as_of` selection: one no-fallback frontier across HQL2/IR sources, hydration and snapshot while lease/current policy stay pinned; runtime verification pending, no schema/migration change | working-tree | ATHER |
 | 0.8.10b | 2026-10-03 | beta | Synchronize Vector HistoryScan runtime status and current P8/P6/plan/registry versions; canonical tuple ID, vector floor and owner ACL verified without schema/migration changes; tx_as_of and broad acceptance remain open | working-tree | ATHER |
