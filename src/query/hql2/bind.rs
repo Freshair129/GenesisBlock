@@ -1200,6 +1200,7 @@ pub(crate) fn bind_v2(
                     wire::EntityKind::Node => crate::uee_v2::RecordKindV2::Node,
                     wire::EntityKind::Edge => crate::uee_v2::RecordKindV2::Edge,
                     wire::EntityKind::Row => crate::uee_v2::RecordKindV2::Row,
+                    wire::EntityKind::Vector => crate::uee_v2::RecordKindV2::Vector,
                     wire::EntityKind::Annotation => crate::uee_v2::RecordKindV2::Annotation,
                     wire::EntityKind::Artifact => {
                         return Err(QueryErrorV2::new(

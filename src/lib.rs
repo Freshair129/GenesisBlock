@@ -7489,7 +7489,10 @@ impl Storage {
                     request_id: request.request_id.clone(),
                     snapshot: SnapshotV2 {
                         database_id: self.database_id(),
-                        tx: lease.generation.wal_frontier.to_string(),
+                        tx: options
+                            .tx
+                            .unwrap_or(lease.generation.wal_frontier)
+                            .to_string(),
                         valid_at: options.valid_at.to_rfc3339(),
                         catalog_generation: lease.generation.generation_id.to_string(),
                         policy_version: lease.generation.acl_revision.to_string(),
@@ -23746,6 +23749,31 @@ impl<'a> ReadView<'a> {
             .map_err(|_| QueryErrorV2::new("DATA_CORRUPTION", "execute", "history_floor"))
     }
 
+    fn hql2_transaction_frontier(&self) -> u64 {
+        self.lease
+            .temporal
+            .tx_as_of
+            .unwrap_or(self.lease.generation.wal_frontier)
+    }
+
+    fn hql2_source_history_floor_at(
+        &self,
+        connection: &Connection,
+        namespace: &str,
+        source: &str,
+        frontier: u64,
+    ) -> std::result::Result<u64, query::hql2::QueryErrorV2> {
+        let floor = self.hql2_source_history_floor(connection, namespace, source)?;
+        if floor > frontier {
+            return Err(query::hql2::QueryErrorV2::new(
+                "HISTORY_UNAVAILABLE",
+                "bind",
+                "history_floor",
+            ));
+        }
+        Ok(floor)
+    }
+
     // ACL evaluation needs the subject, snapshot, schema, payload, and budget separately.
     #[allow(clippy::too_many_arguments)]
     fn hql2_revision_subject_readable(
@@ -23870,7 +23898,7 @@ impl<'a> ReadView<'a> {
                 "revision_schema_unavailable",
             ));
         }
-        let frontier = self.lease.generation.wal_frontier;
+        let frontier = self.hql2_transaction_frontier();
         let frontier_sql = i64::try_from(frontier)
             .map_err(|_| QueryErrorV2::new("DATA_CORRUPTION", "execute", "frontier_unavailable"))?;
         let database_id = self.storage.database_id();
@@ -23884,8 +23912,9 @@ impl<'a> ReadView<'a> {
         let source = match kind {
             crate::uee_v2::RecordKindV2::Node | crate::uee_v2::RecordKindV2::Edge => "graph",
             crate::uee_v2::RecordKindV2::Row => "row",
+            crate::uee_v2::RecordKindV2::Vector => "vector",
             crate::uee_v2::RecordKindV2::Annotation => "annotation",
-            crate::uee_v2::RecordKindV2::Vector | crate::uee_v2::RecordKindV2::Artifact => {
+            crate::uee_v2::RecordKindV2::Artifact => {
                 return Err(QueryErrorV2::new(
                     "CAPABILITY_UNSUPPORTED",
                     "bind",
@@ -23896,14 +23925,7 @@ impl<'a> ReadView<'a> {
         let source_kind = Storage::revision_kind_name(kind);
         let policy = self.storage.access_policy.read().clone();
         let connection = self.storage.projection_db.lock();
-        let floor = self.hql2_source_history_floor(&connection, namespace, source)?;
-        if floor > frontier {
-            return Err(QueryErrorV2::new(
-                "HISTORY_UNAVAILABLE",
-                "bind",
-                "history_floor",
-            ));
-        }
+        let floor = self.hql2_source_history_floor_at(&connection, namespace, source, frontier)?;
         if matches!(kind, crate::uee_v2::RecordKindV2::Annotation) {
             self.storage
                 .authorize_annotation_namespace_read(access, namespace)
@@ -24067,7 +24089,7 @@ impl<'a> ReadView<'a> {
                 "revision_schema_unavailable",
             ));
         }
-        let frontier = self.lease.generation.wal_frontier;
+        let frontier = self.hql2_transaction_frontier();
         if after_seq > frontier {
             return Err(QueryErrorV2::new(
                 "BIND_ERROR",
@@ -24090,7 +24112,8 @@ impl<'a> ReadView<'a> {
         let policy = self.storage.access_policy.read().clone();
         let connection = self.storage.projection_db.lock();
         for source in ["graph", "row", "vector", "annotation"] {
-            let floor = self.hql2_source_history_floor(&connection, namespace, source)?;
+            let floor =
+                self.hql2_source_history_floor_at(&connection, namespace, source, frontier)?;
             if after_seq < floor {
                 return Err(QueryErrorV2::new(
                     "HISTORY_UNAVAILABLE",
@@ -24284,7 +24307,7 @@ impl<'a> ReadView<'a> {
                 "annotation_schema_unavailable",
             ));
         }
-        let frontier = self.lease.generation.wal_frontier;
+        let frontier = self.hql2_transaction_frontier();
         let frontier_sql = i64::try_from(frontier)
             .map_err(|_| QueryErrorV2::new("DATA_CORRUPTION", "execute", "frontier_unavailable"))?;
         let database_id = self.storage.database_id();
@@ -24321,6 +24344,20 @@ impl<'a> ReadView<'a> {
             _ => None,
         };
         let connection = self.storage.projection_db.lock();
+        let history_source = match &record_kind {
+            crate::uee_v2::RecordKindV2::Node | crate::uee_v2::RecordKindV2::Edge => "graph",
+            crate::uee_v2::RecordKindV2::Row => "row",
+            crate::uee_v2::RecordKindV2::Vector => "vector",
+            crate::uee_v2::RecordKindV2::Annotation => "annotation",
+            crate::uee_v2::RecordKindV2::Artifact => {
+                return Err(QueryErrorV2::new(
+                    "CAPABILITY_UNSUPPORTED",
+                    "bind",
+                    "revision_source_unavailable",
+                ))
+            }
+        };
+        self.hql2_source_history_floor_at(&connection, namespace, history_source, frontier)?;
         let after_id = after_record.map(|record| record.id.as_str());
         let after_revision = after_record.map(|record| record.revision.as_str());
         let (candidate_count, candidate_text_bytes): (i64, i64) = connection
@@ -24536,7 +24573,7 @@ impl<'a> ReadView<'a> {
         let node_records = self.hql2_scan_all(BoundSourceV2::Node(None), budget)?;
         let edge_records = self.hql2_scan_all(BoundSourceV2::Edge(None), budget)?;
         let mut graph = GraphSnapshotV2::default();
-        let frontier = i64::try_from(self.lease.generation.wal_frontier)
+        let frontier = i64::try_from(self.hql2_transaction_frontier())
             .map_err(|_| QueryErrorV2::new("DATA_CORRUPTION", "execute", "frontier_unavailable"))?;
         let database_id = self.storage.database_id();
         let namespace = access.namespace.as_str();
@@ -24690,7 +24727,8 @@ impl<'a> ReadView<'a> {
                 "annotation_target_source_unavailable",
             ));
         }
-        let frontier = i64::try_from(self.lease.generation.wal_frontier)
+        let transaction_frontier = self.hql2_transaction_frontier();
+        let frontier = i64::try_from(transaction_frontier)
             .map_err(|_| QueryErrorV2::new("DATA_CORRUPTION", "execute", "frontier_unavailable"))?;
         let valid_at = self
             .lease
@@ -24700,6 +24738,30 @@ impl<'a> ReadView<'a> {
             .unwrap_or_else(|| Utc::now().to_rfc3339());
         let policy = self.storage.access_policy.read().clone();
         let connection = self.storage.projection_db.lock();
+        let target_history_source = match &target.kind {
+            crate::uee_v2::RecordKindV2::Node | crate::uee_v2::RecordKindV2::Edge => "graph",
+            crate::uee_v2::RecordKindV2::Row => "row",
+            crate::uee_v2::RecordKindV2::Annotation => "annotation",
+            _ => {
+                return Err(QueryErrorV2::new(
+                    "CAPABILITY_UNSUPPORTED",
+                    "execute",
+                    "annotation_target_source_unavailable",
+                ))
+            }
+        };
+        self.hql2_source_history_floor_at(
+            &connection,
+            namespace,
+            target_history_source,
+            transaction_frontier,
+        )?;
+        self.hql2_source_history_floor_at(
+            &connection,
+            namespace,
+            "annotation",
+            transaction_frontier,
+        )?;
         let kind = Storage::revision_kind_name(&target.kind);
         let target_visible: bool = connection
             .query_row(
@@ -24854,7 +24916,8 @@ impl<'a> ReadView<'a> {
                 "hydration_field",
             ));
         }
-        let frontier = i64::try_from(self.lease.generation.wal_frontier)
+        let transaction_frontier = self.hql2_transaction_frontier();
+        let frontier = i64::try_from(transaction_frontier)
             .map_err(|_| QueryErrorV2::new("DATA_CORRUPTION", "execute", "frontier_unavailable"))?;
         let database_id = self.storage.database_id();
         let namespace = access.namespace.as_str();
@@ -24866,6 +24929,7 @@ impl<'a> ReadView<'a> {
             .unwrap_or_else(|| Utc::now().to_rfc3339());
         let policy = self.storage.access_policy.read().clone();
         let connection = self.storage.projection_db.lock();
+        let mut checked_history_sources = std::collections::BTreeSet::new();
         if records
             .iter()
             .any(|record| record.kind == crate::uee_v2::RecordKindV2::Annotation)
@@ -24908,6 +24972,22 @@ impl<'a> ReadView<'a> {
                 )
             {
                 return Err(QueryErrorV2::new("FORBIDDEN", "authorize", "entity_scope"));
+            }
+            let history_source = match &record.kind {
+                crate::uee_v2::RecordKindV2::Node | crate::uee_v2::RecordKindV2::Edge => "graph",
+                crate::uee_v2::RecordKindV2::Row => "row",
+                crate::uee_v2::RecordKindV2::Annotation => "annotation",
+                crate::uee_v2::RecordKindV2::Vector | crate::uee_v2::RecordKindV2::Artifact => {
+                    return Err(QueryErrorV2::new("FORBIDDEN", "authorize", "entity_scope"))
+                }
+            };
+            if checked_history_sources.insert(history_source) {
+                self.hql2_source_history_floor_at(
+                    &connection,
+                    namespace,
+                    history_source,
+                    transaction_frontier,
+                )?;
             }
             if record.kind == crate::uee_v2::RecordKindV2::Annotation
                 && !self.hql2_annotation_references_authorized(
@@ -25001,7 +25081,8 @@ impl<'a> ReadView<'a> {
             .map_err(|_| QueryErrorV2::new("DATA_CORRUPTION", "execute", "collection_space"))?;
         let dimension = usize::from(collection.dim);
         let metric = collection.metric.as_str();
-        let frontier = i64::try_from(self.lease.generation.wal_frontier)
+        let transaction_frontier = self.hql2_transaction_frontier();
+        let frontier = i64::try_from(transaction_frontier)
             .map_err(|_| QueryErrorV2::new("DATA_CORRUPTION", "execute", "frontier_unavailable"))?;
         let database_id = self.storage.database_id();
         let namespace = access.namespace.as_str();
@@ -25019,6 +25100,7 @@ impl<'a> ReadView<'a> {
                 .saturating_add(64),
         )?;
         let connection = self.storage.projection_db.lock();
+        self.hql2_source_history_floor_at(&connection, namespace, "vector", transaction_frontier)?;
         let mut entries = Vec::with_capacity(records.len());
         for record in records {
             budget.check()?;

@@ -68,12 +68,19 @@ fn run_hql_with_budget(
     }
 }
 
-fn run_ir_history(storage: &Storage, request_id: &str, valid_at: &str) -> QueryResultV2 {
+fn run_ir_history_source(
+    storage: &Storage,
+    request_id: &str,
+    valid_at: &str,
+    kind: &str,
+    record_id: &str,
+    tx_as_of: Option<&str>,
+) -> Result<QueryResultV2, genesis_block_native::query::hql2::QueryErrorV2> {
     let request: QueryRequestV2 = serde_json::from_value(json!({
         "contract_version":"genesis.api.v2",
         "request_id":request_id,
         "namespace":"default",
-        "temporal":{"valid_at":valid_at},
+        "temporal":{"valid_at":valid_at,"tx_as_of":tx_as_of},
         "ir":{
             "contract_version":"query-ir.v2",
             "nodes":[{
@@ -81,8 +88,8 @@ fn run_ir_history(storage: &Storage, request_id: &str, valid_at: &str) -> QueryR
                 "op":"HistoryScan",
                 "inputs":[],
                 "config":{
-                    "kind":"node",
-                    "id":{"literal":"history:one","type":"Utf8"},
+                    "kind":kind,
+                    "id":{"literal":record_id,"type":"Utf8"},
                     "as":"h"
                 }
             }],
@@ -92,10 +99,14 @@ fn run_ir_history(storage: &Storage, request_id: &str, valid_at: &str) -> QueryR
         "params":{}
     }))
     .unwrap();
-    match storage.query_v2(access(), request).unwrap() {
-        QueryOutcomeV2::Rows(result) => result,
+    match storage.query_v2(access(), request)? {
+        QueryOutcomeV2::Rows(result) => Ok(result),
         QueryOutcomeV2::Plan(_) => panic!("read query must return rows"),
     }
+}
+
+fn run_ir_history(storage: &Storage, request_id: &str, valid_at: &str) -> QueryResultV2 {
+    run_ir_history_source(storage, request_id, valid_at, "node", "history:one", None).unwrap()
 }
 
 fn run_ir_changes(storage: &Storage, request_id: &str, after_seq: u64) -> QueryResultV2 {
@@ -207,6 +218,181 @@ fn history_scan_reads_closed_revisions_and_hydrates_the_exact_revision() {
     let ir_typed = run_ir_history(&storage, "history-hql-ir-parity-ir", "2020-01-01T00:00:00Z");
     assert_eq!(hql_typed.columns, ir_typed.columns);
     assert_eq!(hql_typed.rows, ir_typed.rows);
+}
+
+#[test]
+fn transaction_time_uses_one_selected_frontier_for_sources_hydration_and_snapshot() {
+    let dir = TempDir::new().unwrap();
+    let storage = open(dir.path());
+    add_node(&storage);
+
+    let projection = Connection::open(dir.path().join("projection.sqlite")).unwrap();
+    let selected_tx: i64 = projection
+        .query_row(
+            "SELECT tx_from FROM hql2_record_revisions
+             WHERE kind='node' AND record_id='history:one' AND operation='upsert'
+             ORDER BY tx_from LIMIT 1",
+            [],
+            |row| row.get(0),
+        )
+        .unwrap();
+    let selected_tx = u64::try_from(selected_tx).unwrap();
+    let selected_tx_text = selected_tx.to_string();
+    storage
+        .supersede_node(
+            "history:one".into(),
+            Some(json!({"title":"replacement"})),
+            None,
+        )
+        .unwrap();
+
+    let history_hql = format!(
+        "USE default AT TX {selected_tx} AT VALID \"2020-01-01T00:00:00Z\" HISTORY NODE \"history:one\" AS h |> RETURN h"
+    );
+    let history_hql_result = run_hql(&storage, "history-at-tx-hql", &history_hql).unwrap();
+    let history_ir_result = run_ir_history_source(
+        &storage,
+        "history-at-tx-ir",
+        "2020-01-01T00:00:00Z",
+        "node",
+        "history:one",
+        Some(&selected_tx_text),
+    )
+    .unwrap();
+    assert_eq!(history_hql_result.snapshot.tx, selected_tx_text);
+    assert_eq!(history_ir_result.snapshot.tx, selected_tx_text);
+    assert_eq!(history_hql_result.rows, history_ir_result.rows);
+    assert_eq!(history_hql_result.rows.len(), 1);
+
+    let changes_hql =
+        format!("USE default AT TX {selected_tx} CHANGES SINCE {selected_tx} AS c |> RETURN c");
+    let changes_hql_result = run_hql(&storage, "changes-at-tx-hql", &changes_hql).unwrap();
+    let changes_ir_request: QueryRequestV2 = serde_json::from_value(json!({
+        "contract_version":"genesis.api.v2",
+        "request_id":"changes-at-tx-ir",
+        "namespace":"default",
+        "temporal":{"tx_as_of":selected_tx_text},
+        "ir":{
+            "contract_version":"query-ir.v2",
+            "nodes":[{"id":"changes","op":"ChangeScan","inputs":[],"config":{"after_seq":selected_tx_text,"as":"c"}}],
+            "root":"changes",
+            "parameter_types":{}
+        },
+        "params":{}
+    }))
+    .unwrap();
+    let QueryOutcomeV2::Rows(changes_ir_result) =
+        storage.query_v2(access(), changes_ir_request).unwrap()
+    else {
+        panic!("read query must return rows");
+    };
+    assert_eq!(changes_hql_result.snapshot.tx, selected_tx_text);
+    assert_eq!(changes_ir_result.snapshot.tx, selected_tx_text);
+    assert_eq!(changes_hql_result.columns, changes_ir_result.columns);
+    assert_eq!(changes_hql_result.rows, changes_ir_result.rows);
+    assert!(changes_hql_result.rows.is_empty());
+
+    let scan_hql = format!(
+        "USE default AT TX {selected_tx} AT VALID \"2020-01-01T00:00:00Z\" FROM NODES Document AS n |> RETURN n.id AS id, prop(n, \"title\") AS title"
+    );
+    let scan_hql_result = run_hql(&storage, "node-at-tx-hql", &scan_hql).unwrap();
+    let scan_ir_request: QueryRequestV2 = serde_json::from_value(json!({
+        "contract_version":"genesis.api.v2",
+        "request_id":"node-at-tx-ir",
+        "namespace":"default",
+        "temporal":{"valid_at":"2020-01-01T00:00:00Z","tx_as_of":selected_tx_text},
+        "ir":{
+            "contract_version":"query-ir.v2",
+            "nodes":[
+                {"id":"scan","op":"NodeScan","inputs":[],"config":{"as":"n","label":"Document"}},
+                {"id":"project","op":"Project","inputs":["scan"],"config":{"fields":[
+                    {"as":"id","expression":{"field":{"alias":"n","path":["id"]}}},
+                    {"as":"title","expression":{"call":"prop","args":[
+                        {"field":{"alias":"n","path":[]}},
+                        {"type":"Utf8","literal":"title"}
+                    ]}}
+                ]}}
+            ],
+            "root":"project",
+            "parameter_types":{}
+        },
+        "params":{}
+    }))
+    .unwrap();
+    let QueryOutcomeV2::Rows(scan_ir_result) = storage.query_v2(access(), scan_ir_request).unwrap()
+    else {
+        panic!("read query must return rows");
+    };
+    assert_eq!(scan_hql_result.snapshot.tx, selected_tx_text);
+    assert_eq!(scan_ir_result.snapshot.tx, selected_tx_text);
+    assert_eq!(scan_hql_result.columns, scan_ir_result.columns);
+    assert_eq!(scan_hql_result.rows, scan_ir_result.rows);
+    assert_eq!(scan_hql_result.rows.len(), 1);
+    assert_eq!(
+        tagged(&scan_hql_result.rows[0], "title")["value"],
+        "original"
+    );
+
+    let current = run_hql(
+        &storage,
+        "node-at-current-tx-hql",
+        "USE default FROM NODES Document AS n |> RETURN prop(n, \"title\") AS title",
+    )
+    .unwrap();
+    assert_eq!(tagged(&current.rows[0], "title")["value"], "replacement");
+    assert!(current.snapshot.tx.parse::<u64>().unwrap() > selected_tx);
+
+    let future_tx = storage.stable_frontier() + 1;
+    let future_query =
+        format!("USE default AT TX {future_tx} FROM NODES Document AS n |> RETURN n.id AS id");
+    let future_error = run_hql(&storage, "future-transaction-time", &future_query).unwrap_err();
+    assert_eq!(future_error.code, "BIND_ERROR");
+    let horizon_error = run_hql(
+        &storage,
+        "transaction-time-below-horizon",
+        "USE default AT TX 0 FROM NODES Document AS n |> RETURN n.id AS id",
+    )
+    .unwrap_err();
+    assert_eq!(horizon_error.code, "BEYOND_HORIZON");
+}
+
+#[test]
+fn history_scan_reads_vector_revisions_with_hql_and_typed_ir_parity() {
+    let dir = TempDir::new().unwrap();
+    let storage = open(dir.path());
+    add_node(&storage);
+    storage
+        .add_vector("history:one".into(), "default".into(), vec![0.5, 0.75])
+        .unwrap();
+
+    let vector_id = serde_json::to_string(&("history:one", "default")).unwrap();
+    let hql_id = serde_json::to_string(&vector_id).unwrap();
+    let hql = format!(
+        "USE default AT VALID \"2020-01-01T00:00:00Z\" HISTORY VECTOR {hql_id} AS h |> RETURN h"
+    );
+    let hql_result = run_hql(&storage, "history-vector-hql", &hql)
+        .expect("HQL HistoryScan should support durable vector identities");
+    let ir_result = run_ir_history_source(
+        &storage,
+        "history-vector-ir",
+        "2020-01-01T00:00:00Z",
+        "vector",
+        &vector_id,
+        None,
+    )
+    .expect("typed-IR HistoryScan should support durable vector identities");
+
+    assert_eq!(hql_result.columns, ir_result.columns);
+    assert_eq!(hql_result.rows, ir_result.rows);
+    assert_eq!(hql_result.rows.len(), 1);
+    assert_eq!(
+        tagged(&hql_result.rows[0], "h")["value"]["subject"]["kind"],
+        "vector"
+    );
+    assert_eq!(
+        tagged(&hql_result.rows[0], "h")["value"]["subject"]["id"],
+        vector_id
+    );
 }
 
 #[test]
@@ -442,6 +628,93 @@ fn history_scan_rejects_a_source_floor_beyond_the_pinned_frontier() {
     )
     .unwrap_err();
     assert_eq!(error.code, "HISTORY_UNAVAILABLE");
+}
+
+#[test]
+fn vector_history_scan_rejects_a_vector_floor_beyond_the_pinned_frontier() {
+    let dir = TempDir::new().unwrap();
+    let storage = open(dir.path());
+    add_node(&storage);
+    storage
+        .add_vector("history:one".into(), "default".into(), vec![0.5, 0.75])
+        .unwrap();
+    let floor = storage.stable_frontier() + 1;
+    let projection = Connection::open(dir.path().join("projection.sqlite")).unwrap();
+    projection
+        .execute(
+            "UPDATE hql2_source_history_floors SET history_floor=?1
+             WHERE namespace='default' AND source='vector'",
+            [i64::try_from(floor).unwrap()],
+        )
+        .unwrap();
+
+    let vector_id = serde_json::to_string(&("history:one", "default")).unwrap();
+    let hql_id = serde_json::to_string(&vector_id).unwrap();
+    let hql = format!(
+        "USE default AT VALID \"2020-01-01T00:00:00Z\" HISTORY VECTOR {hql_id} AS h |> RETURN h"
+    );
+    let hql_error = run_hql(&storage, "history-vector-floor-hql", &hql).unwrap_err();
+    assert_eq!(hql_error.code, "HISTORY_UNAVAILABLE");
+
+    let ir_error = run_ir_history_source(
+        &storage,
+        "history-vector-floor-ir",
+        "2020-01-01T00:00:00Z",
+        "vector",
+        &vector_id,
+        None,
+    )
+    .unwrap_err();
+    assert_eq!(ir_error.code, "HISTORY_UNAVAILABLE");
+}
+
+#[test]
+fn transaction_time_history_scan_rejects_a_selected_frontier_below_vector_floor() {
+    let dir = TempDir::new().unwrap();
+    let storage = open(dir.path());
+    add_node(&storage);
+    let projection = Connection::open(dir.path().join("projection.sqlite")).unwrap();
+    let selected_tx: i64 = projection
+        .query_row(
+            "SELECT tx_from FROM hql2_record_revisions
+             WHERE kind='node' AND record_id='history:one' AND operation='upsert'
+             ORDER BY tx_from LIMIT 1",
+            [],
+            |row| row.get(0),
+        )
+        .unwrap();
+    storage
+        .add_vector("history:one".into(), "default".into(), vec![0.5, 0.75])
+        .unwrap();
+    let floor = selected_tx + 1;
+    assert!(u64::try_from(floor).unwrap() <= storage.stable_frontier());
+    projection
+        .execute(
+            "UPDATE hql2_source_history_floors SET history_floor=?1
+             WHERE namespace='default' AND source='vector'",
+            [floor],
+        )
+        .unwrap();
+
+    let selected_tx = u64::try_from(selected_tx).unwrap();
+    let selected_tx_text = selected_tx.to_string();
+    let vector_id = serde_json::to_string(&("history:one", "default")).unwrap();
+    let hql_id = serde_json::to_string(&vector_id).unwrap();
+    let hql = format!(
+        "USE default AT TX {selected_tx} AT VALID \"2020-01-01T00:00:00Z\" HISTORY VECTOR {hql_id} AS h |> RETURN h"
+    );
+    let hql_error = run_hql(&storage, "history-vector-at-tx-floor-hql", &hql).unwrap_err();
+    assert_eq!(hql_error.code, "HISTORY_UNAVAILABLE");
+    let ir_error = run_ir_history_source(
+        &storage,
+        "history-vector-at-tx-floor-ir",
+        "2020-01-01T00:00:00Z",
+        "vector",
+        &vector_id,
+        Some(&selected_tx_text),
+    )
+    .unwrap_err();
+    assert_eq!(ir_error.code, "HISTORY_UNAVAILABLE");
 }
 
 #[test]

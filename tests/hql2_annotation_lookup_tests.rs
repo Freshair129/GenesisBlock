@@ -212,6 +212,73 @@ fn hql_lookup(
 }
 
 #[test]
+fn annotation_lookup_uses_the_selected_transaction_frontier() {
+    let dir = TempDir::new().unwrap();
+    let storage = open(dir.path());
+    add_node(&storage, "doc:target");
+    let database_id = database_id(&storage);
+    let selected_tx = storage.stable_frontier();
+    put_annotation(
+        &storage,
+        "review:late",
+        vec![live_ref(&database_id, "doc:target")],
+        vec![],
+    );
+
+    let hql: QueryRequestV2 = serde_json::from_value(json!({
+        "contract_version":"genesis.api.v2",
+        "request_id":"annotation-at-tx-hql",
+        "namespace":"default",
+        "language_version":"hql.v2",
+        "hql":format!("USE default AT TX {selected_tx} FROM NODES Document AS d |> OPTIONAL ANNOTATIONS OF d AS a |> RETURN d.id AS document_id, a.id AS annotation_id"),
+        "params":{}
+    }))
+    .unwrap();
+    let QueryOutcomeV2::Rows(hql_result) = storage.query_v2(actor(), hql).unwrap() else {
+        panic!("annotation lookup must return rows")
+    };
+
+    let ir: QueryRequestV2 = serde_json::from_value(json!({
+        "contract_version":"genesis.api.v2",
+        "request_id":"annotation-at-tx-ir",
+        "namespace":"default",
+        "temporal":{"tx_as_of":selected_tx.to_string()},
+        "ir":{
+            "contract_version":"query-ir.v2",
+            "nodes":[
+                {"id":"scan","op":"NodeScan","inputs":[],"config":{"as":"d","label":"Document"}},
+                {"id":"lookup","op":"AnnotationLookup","inputs":["scan"],"config":{"target":"d","as":"a","optional":true}},
+                {"id":"project","op":"Project","inputs":["lookup"],"config":{"fields":[
+                    {"as":"document_id","expression":{"field":{"alias":"d","path":["id"]}}},
+                    {"as":"annotation_id","expression":{"field":{"alias":"a","path":["id"]}}}
+                ]}}
+            ],
+            "root":"project",
+            "parameter_types":{}
+        },
+        "params":{}
+    }))
+    .unwrap();
+    let QueryOutcomeV2::Rows(ir_result) = storage.query_v2(actor(), ir).unwrap() else {
+        panic!("annotation lookup must return rows")
+    };
+    assert_eq!(hql_result.snapshot.tx, selected_tx.to_string());
+    assert_eq!(ir_result.snapshot.tx, selected_tx.to_string());
+    assert_eq!(hql_result.columns, ir_result.columns);
+    assert_eq!(hql_result.rows, ir_result.rows);
+    assert_eq!(hql_result.rows.len(), 1);
+    assert_eq!(hql_result.rows[0]["annotation_id"], QueryValueV2::Null);
+
+    let current = hql_lookup(&storage, true);
+    assert_eq!(current.rows.len(), 1);
+    assert_eq!(
+        current.rows[0]["annotation_id"],
+        QueryValueV2::Utf8("review:late".into())
+    );
+    assert!(current.snapshot.tx.parse::<u64>().unwrap() > selected_tx);
+}
+
+#[test]
 fn lookup_matches_targets_but_not_evidence_and_keeps_optional_rows() {
     let dir = TempDir::new().unwrap();
     let storage = open(dir.path());

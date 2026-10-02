@@ -185,6 +185,54 @@ fn ir_expand_preserves_parallel_paths_and_orders_by_length_then_edge_identity() 
 }
 
 #[test]
+fn graph_operators_use_the_selected_transaction_frontier() {
+    let dir = TempDir::new().unwrap();
+    let storage = open(dir.path());
+    add_node(&storage, "a");
+    add_node(&storage, "b");
+    let selected_tx = storage.stable_frontier().to_string();
+    add_edge(&storage, "ab", "a", "b", "LINK");
+
+    let hql = format!(
+        "USE default AT TX {selected_tx} MATCH (a)-[e:LINK]->(b) AS p WALK |> RETURN a.id AS from, b.id AS to, e.id AS edge, p AS path"
+    );
+    let hql_request: QueryRequestV2 = serde_json::from_value(json!({
+        "contract_version":"genesis.api.v2",
+        "request_id":"match-at-tx-hql",
+        "namespace":"default",
+        "language_version":"hql.v2",
+        "hql":hql,
+        "params":{}
+    }))
+    .unwrap();
+    let QueryOutcomeV2::Rows(hql_result) = storage.query_v2(access(), hql_request).unwrap() else {
+        panic!("read query must return rows")
+    };
+
+    let ir_request: QueryRequestV2 = serde_json::from_value(json!({
+        "contract_version":"genesis.api.v2",
+        "request_id":"match-at-tx-ir",
+        "namespace":"default",
+        "temporal":{"tx_as_of":selected_tx},
+        "ir":match_ir(false),
+        "params":{}
+    }))
+    .unwrap();
+    let QueryOutcomeV2::Rows(ir_result) = storage.query_v2(access(), ir_request).unwrap() else {
+        panic!("read query must return rows")
+    };
+    assert_eq!(hql_result.snapshot.tx, selected_tx);
+    assert_eq!(ir_result.snapshot.tx, selected_tx);
+    assert_eq!(hql_result.columns, ir_result.columns);
+    assert_eq!(hql_result.rows, ir_result.rows);
+    assert!(hql_result.rows.is_empty());
+
+    let current = run(&storage, "match-at-current-tx-ir", None, match_ir(false));
+    assert_eq!(current.rows.len(), 1);
+    assert!(current.snapshot.tx.parse::<u64>().unwrap() > selected_tx.parse::<u64>().unwrap());
+}
+
+#[test]
 fn ir_root_match_enumerates_structural_paths_and_preserves_parallel_edges() {
     let dir = TempDir::new().unwrap();
     let storage = open(dir.path());

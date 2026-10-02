@@ -645,6 +645,7 @@ impl Lower<'_> {
                     "node" => w::EntityKind::Node,
                     "edge" => w::EntityKind::Edge,
                     "row" => w::EntityKind::Row,
+                    "vector" => w::EntityKind::Vector,
                     "annotation" => w::EntityKind::Annotation,
                     "artifact" => w::EntityKind::Artifact,
                     _ => return Err(invalid("history_kind")),

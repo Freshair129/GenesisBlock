@@ -1,9 +1,9 @@
 ---
 doc_id: SPEC--GENESISDB-P6-GENERATIONS-LEASES-ACL
 owner: GenesisBlockDB Engineering
-version: 0.5.17b
+version: 0.5.21b
 created_at: "2026-09-22T22:55:00+07:00,ATHER,working-tree"
-last_update: "2026-10-02T21:22:00+07:00,ATHER"
+last_update: "2026-10-03T04:35:05+07:00,ATHER"
 status: beta
 attributes:
   domain: storage-correctness
@@ -101,26 +101,37 @@ Cold-open schema selection adds a separate authority gate before projection repl
 TemporalRead is { as_of: Option<String>, tx_as_of: Option<u64> }.
 
 - as_of must parse as RFC3339 and binds to valid_at where the operation supports it.
-- tx_as_of must be at or above the pinned generation history_horizon; otherwise return
-  TEMPORAL_BEYOND_HORIZON.
+- tx_as_of must satisfy generation history_horizon <= tx_as_of <= the pinned generation's
+  WAL frontier. A below-horizon selector returns TEMPORAL_BEYOND_HORIZON; a future selector is
+  rejected before source access.
 - The P6 history_horizon governs retained node/edge history. H2-D11 adds per-source
   row_history_floor, annotation_history_floor and vector_history_floor. A read below its selected
   source floor returns HISTORY_UNAVAILABLE before source access; it never substitutes current data.
-- HQL2 HistoryScan uses the lease frontier as its transaction upper bound and the selected valid
-  instant as its valid-time point. It enumerates retained revisions (including retractions) without
+- HQL2/typed-IR `Storage::query_v2` selects transaction frontier S as `tx_as_of` when supplied,
+  otherwise the pinned generation frontier; every revision-backed source, property hydration,
+  graph/vector/annotation operator and result `Snapshot.tx` must use this same S. The catalog,
+  policy revision and lease remain bound to the validated generation; there is no current-state
+  fallback. HQL2 HistoryScan uses S as its transaction upper bound and the selected valid instant
+  as its valid-time point. It enumerates retained revisions (including retractions) without
   applying `tx_to` as a current-visibility filter, but enforces the relevant source floor first.
-  Artifact history remains unsupported until a durable artifact source and floor are approved.
-- HQL2 ChangeScan uses an exclusive `after_seq` and the lease frontier as its inclusive upper bound.
+  Supported sources are Node/Edge (graph floor), Row (row floor), Vector (vector floor) and
+  Annotation (annotation floor). A Vector logical ID is the compact JSON encoding of the ordered
+  `(owner_id, collection_id)` pair used by H2-D11; the exact current P6 ACL is checked through its
+  owner node under the same lease. Artifact history remains unsupported until a durable artifact
+  source and floor are approved.
+- HQL2 ChangeScan uses an exclusive `after_seq` and selected frontier S as its inclusive upper bound.
   It fails before source access if the cursor is below any participating graph/row/vector/annotation
   floor; equality is valid and only events strictly after the floor are returned. Migration
   baselines at `F` are available through HistoryScan at `F`, not synthesized into a ChangeScan
   whose cursor is `F`. Missing floors or unsupported revision kinds fail closed. It applies the current lease ACL
   to each exact subject, including recursive Edge endpoints, Vector owner, and Annotation
   target/evidence references. It returns no partial feed on budget exhaustion.
-- Query IR inherits pinned selectors; conflicting request selectors fail.
+- Query IR inherits the same pinned `valid_at` and selected transaction frontier as HQL2; conflicting
+  request selectors fail.
 - Neighbors and hybrid search may inherit as_of but reject tx_as_of for P6.
-- node_view, node_versions, HQL and relational query reject a lease with either selector until
-  their contracts can bind those selectors without fallback.
+- The legacy `execute_hql` and relational query operations, `node_view` and `node_versions` still
+  reject temporal leases unless their own operation contracts support those selectors. This does
+  not prohibit the separate P8 HQL2/typed-IR `Storage::query_v2` binding above.
 
 ### Scoped read operations
 
@@ -133,12 +144,21 @@ adds crate-private typed catalog/scan/hydrate/vector operations without exposing
 Storage. `hql2_catalog`, revision-bound Node/Edge/Row/Annotation scans, and the
 current internal property-hydration path are implemented under the continuous
 commit guard. Exact KNN and Original Rerank also read original vector revisions
-through `hql2_vectors` under that same lease. HistoryScan/ChangeScan now execute
-on the same lease and source-floor boundary over exact retained schema-v6
-revisions. Their focused target passes 9/9, including recursive annotation/edge
-reference authorization and budget fail-closed behavior; the explicit 22-target
-HQL2 sweep passes 318/0/1. Broader P6/P8 acceptance, transport parity and
-independent review remain open. Property access uses
+through `hql2_vectors` under that same lease. HistoryScan/ChangeScan execute on
+the same lease and source-floor boundary over exact retained schema-v6
+revisions. Vector HistoryScan uses the H2-D11 compact JSON `(owner_id,
+collection_id)` identity, vector source floor and existing owner-node ACL under
+the same lease; HQL/typed-IR parity and floor-failure tests passed in the
+12-test vector-only checkpoint. The current HistoryScan/ChangeScan target
+passes 14/14, and the 31-target HQL2 regression sweep passes 373/0/1. Broader
+P6/P8 acceptance, transport parity and independent review remain open. Explicit
+HQL2/IR `tx_as_of` is specified above and its cross-source
+runtime path now selects one frontier S across source scans, operators,
+hydration and result metadata while retaining the pinned P6 generation and
+current ACL. Five focused HQL2 targets pass 56/56, the 31-target HQL2 sweep
+passes 373/0/1 and the separate 11-target P6/schema-v6/compatibility sweep
+passes 194/0/0. Broader P6/P8 acceptance, transport parity and independent
+review remain open. Property access uses
 binder-issued `FieldIdV2` and aligned `ExecBatchV2` batches, including
 row-dependent names, without retaining full payloads in query rows. Source
 cursors are opaque and bound to one lease, source and database. Row scans use
@@ -383,6 +403,27 @@ Version diff 0.5.15b -> 0.5.16b: implement and verify signed schema-v6
 activation preflight, markerless v5/v6 WAL selection, fold-preserved migration
 proof and fail-closed ambiguous recovery; no user database was migrated.
 
+Version diff 0.5.17b -> 0.5.18b: synchronize the approved H2-D11 Vector
+HistoryScan identity, source-floor and owner-ACL contract with P8; runtime
+implementation and differential verification remain pending.
+
+Version diff 0.5.18b -> 0.5.19b: implement HQL/typed-IR Vector HistoryScan with
+the canonical H2-D11 tuple ID and P6 vector-floor check; record 12/12 focused
+history/change tests, 367/0/1 across 31 HQL2 targets and 194/0/0 across 11
+P6/schema-v6/compatibility targets. Broader P8/transport/review gates remain open.
+
+Version diff 0.5.20b -> 0.5.21b: implement P8 HQL2/IR transaction-time
+selection through one no-fallback frontier S across scans, graph/vector/
+annotation operators, source floors, hydration and Snapshot.tx while the
+generation/current policy remain pinned; record focused 56/56, HQL2 373/0/1
+and P6/compatibility 194/0/0. Broad P8/P13/transport/review gates remain open.
+
+Version diff 0.5.19b -> 0.5.20b: reconcile P6 HQL2 temporal semantics with the
+accepted P8 snapshot contract: one selected transaction frontier S must govern
+all HQL/IR source reads, hydration and `Snapshot.tx`, while the P6 lease/policy
+generation remains pinned and legacy operations retain their own unsupported
+selectors. Runtime verification is pending.
+
 Version diff 0.5.16b -> 0.5.17b: record final full locked/offline Rust suite
 and default/no-default strict Clippy passes for the integrated HQL2/H2-D11
 path; `probe_vs_recall` remains NOT_RUN and no user database migration or
@@ -390,6 +431,10 @@ broader P6/P8/P13 qualification is claimed.
 
 | Version | Date | Status | Summary | Commit | Agent |
 |---|---|---|---|---|---|
+| 0.5.21b | 2026-10-03 | beta | Implement P8 HQL2/IR `tx_as_of` selection with one no-fallback source/hydration/operator/result frontier and per-source floor checks; record 56/56 focused, 373/0/1 HQL2 and 194/0/0 P6/compatibility; broader gates remain open | working-tree | ATHER |
+| 0.5.20b | 2026-10-03 | beta | Specify P8 HQL2/IR `tx_as_of` selection as one no-fallback frontier across sources, hydration and result Snapshot; distinguish legacy ReadView rejections; runtime verification pending | working-tree | ATHER |
+| 0.5.19b | 2026-10-03 | beta | Implement and verify Vector HistoryScan in HQL/typed IR using the H2-D11 tuple identity, P6 vector floor and existing owner-node ACL; focused 12/12, HQL2 367/0/1 and separate P6/compatibility 194/0/0; broader gates remain open | working-tree | ATHER |
+| 0.5.18b | 2026-10-03 | beta | Synchronize approved Vector HistoryScan semantics: compact JSON `(owner_id, collection_id)` key, vector source floor and same-lease owner-node ACL; implementation/verification pending | working-tree | ATHER |
 | 0.5.17b | 2026-10-02 | beta | Record full locked/offline Rust suite and both default/no-default strict Clippy passes; `probe_vs_recall` NOT_RUN; no user database migration or broader P6/P8/P13 qualification claimed | working-tree | ATHER |
 | 0.5.16b | 2026-10-02 | beta | Implement and verify H2-D11 R6b markerless WAL recovery; crash tests 17/17, migration tests 19/19 and selected 40-target HQL2/durability/authority aggregate pass; fixture-only, no user database migration | 0135c29 | ATHER |
 | 0.5.14b | 2026-10-02 | beta | Verify D1 exact-record-only denial before HQL/IR parsing, D4 P6-bound exact-property hydration, and 528/0/1 across 37 explicit targets; retain broad P6/P8/P13 gates | working-tree | ATHER |

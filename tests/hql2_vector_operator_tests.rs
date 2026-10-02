@@ -3,6 +3,7 @@ use genesis_block_native::{
     uee_v2::QueryRequestV2,
     AccessContext, NodeInput, OpenOptions, Storage,
 };
+use rusqlite::Connection;
 use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
 use std::path::Path;
@@ -145,6 +146,56 @@ fn exact_knn_reads_original_vectors_and_drops_missing_candidates() {
         result.semantics.scope,
         genesis_block_native::query::hql2::result::ResultScopeV2::WholeInput
     );
+}
+
+#[test]
+fn exact_knn_fails_closed_below_the_selected_vector_history_floor() {
+    let dir = TempDir::new().unwrap();
+    let storage = open(dir.path());
+    add_node(&storage, "a", None);
+    let projection = Connection::open(dir.path().join("projection.sqlite")).unwrap();
+    let selected_tx: i64 = projection
+        .query_row(
+            "SELECT tx_from FROM hql2_record_revisions
+             WHERE kind='node' AND record_id='a' AND operation='upsert'
+             ORDER BY tx_from LIMIT 1",
+            [],
+            |row| row.get(0),
+        )
+        .unwrap();
+    storage
+        .add_vector("a".into(), "default".into(), vec![0.1, 0.0])
+        .unwrap();
+    let vector_id = serde_json::to_string(&("a", "default")).unwrap();
+    let vector_tx: i64 = projection
+        .query_row(
+            "SELECT tx_from FROM hql2_record_revisions
+             WHERE kind='vector' AND record_id=?1 ORDER BY tx_from LIMIT 1",
+            [&vector_id],
+            |row| row.get(0),
+        )
+        .unwrap();
+    assert!(vector_tx > selected_tx);
+    assert!(u64::try_from(vector_tx).unwrap() <= storage.stable_frontier());
+    projection
+        .execute(
+            "UPDATE hql2_source_history_floors SET history_floor=?1
+             WHERE namespace='default' AND source='vector'",
+            [vector_tx],
+        )
+        .unwrap();
+
+    let space_id = space_id(&storage);
+    let rank = json!({
+        "id":"rank","op":"Knn","inputs":["scan"],
+        "config":{"entity":"d","collection":"default","query":{"param":"q"},"k":1,"mode":"exact","as":"hit"}
+    });
+    let mut request =
+        serde_json::to_value(ir_request("historical-knn-vector-floor", &space_id, rank)).unwrap();
+    request["temporal"] = json!({"tx_as_of":selected_tx.to_string()});
+    let request: QueryRequestV2 = serde_json::from_value(request).unwrap();
+    let error = storage.query_v2(access(), request).unwrap_err();
+    assert_eq!(error.code, "HISTORY_UNAVAILABLE");
 }
 
 #[test]

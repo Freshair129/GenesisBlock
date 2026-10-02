@@ -1,8 +1,8 @@
 ---
 doc_id: ADR--GENESISDB-HQL2-DURABLE-REVISIONS-ANNOTATIONS
-version: "0.8.9b"
+version: "0.8.12b"
 created_at: "2026-09-28T06:15:00+07:00,ATHER,53078cb"
-last_update: "2026-10-02T21:22:00+07:00,ATHER"
+last_update: "2026-10-03T04:35:05+07:00,ATHER"
 status: beta
 superseded_by: null
 owner: "Boss (Founder / Product Authority)"
@@ -370,20 +370,34 @@ historical selector below that source's recorded floor returns
 `HISTORY_UNAVAILABLE`; an in-range selector with no matching revision returns
 an empty result. No deleted revision is served below its applicable floor.
 
-For HQL2 HistoryScan, the pinned WAL frontier `S` is the transaction upper
+For P8 HQL2 and typed-IR execution through `Storage::query_v2`, let `L` be the
+pinned generation WAL frontier and select transaction frontier `S` as
+`tx_as_of` when supplied, otherwise `L`. Require
+`history_horizon <= S <= L` before source access. The lease, catalog and
+current policy revision remain bound to the validated generation at `L`,
+while every revision-backed source, property hydration, graph/vector/
+annotation operator and result `Snapshot.tx` uses the same selected `S`.
+There is no fallback to current rows. Legacy `execute_hql`, relational query,
+`node_view` and `node_versions` keep their separate selector-rejection
+behavior unless their own contracts change.
+
+For HQL2 HistoryScan, the selected WAL frontier `S` is the transaction upper
 bound and the selected valid time `V` chooses revisions whose valid interval
 contains `V`. Enumeration intentionally includes rows whose `tx_to <= S` and
 includes retract tombstones, while retaining the exact subject revision and
 metadata. Reading properties from a historical upsert resolves that exact
 revision under the same lease/current policy; a tombstone has no user
 properties and no current-state fallback is allowed. Node/Edge use the P6
-graph floor; Row/Annotation use their H2-D11 floors. Artifact remains
+graph floor; Row/Vector/Annotation use their H2-D11 floors, each checked
+against `S`. Vector history is addressed by the compact JSON encoding of the
+ordered `(owner_id, collection_id)` pair, and its current owner-node ACL is
+checked under the same P6 lease. Artifact remains
 unsupported until its storage source and floor have a separate approved
 contract.
 
 HQL2 ChangeScan is a derived query value over revision rows, not a persisted
 `Event` record kind. It returns one event per revision created in
-`(after_seq,S]`, where `S` is the pinned frontier; it does not synthesize an
+`(after_seq,S]`, where `S` is the selected frontier; it does not synthesize an
 event for `tx_to` closure. Upserts with a predecessor are exposed as
 `correct`, first upserts as `upsert`, and tombstones as `retract`. Events carry
 the exact subject `RecordRefV2` and local sequence, sort by
@@ -713,13 +727,26 @@ Minimum Verify/Review/Final evidence:
 
 | Artifact | Approved version | Synchronized version/status |
 |---|---|---|
-| This H2-D11 addendum | `0.3.0b` candidate, owner-approved | `0.8.9b` beta, schema-v6 revision envelopes are transformed before signing; full local Rust/strict Clippy verification recorded |
-| P8 typed boundary | `0.2.0b` beta | `0.2.37b` beta, recursive target/evidence ACL retained; broad P8/P13 qualification remains open |
-| P6 generations/leases/ACL | `0.5.0b` beta | `0.5.17b` beta, full local Rust/strict Clippy verification recorded; no user database migration performed |
-| HQL2 orchestration plan | `0.5.0b` beta | `0.8.35b` beta, implementation evidence recorded; broader acceptance remains open |
-| C4 architecture index | `0.1.20b` | `0.1.50b`, indexes implemented R6b recovery and partial Query IR match_path |
-| DOC registry | `0.5.6+draft` | `0.5.44+draft`, synchronized current HQL2/P6/Query IR entries |
+| This H2-D11 addendum | `0.3.0b` candidate, owner-approved | `0.8.12b` beta, schema-v6 revision envelopes are transformed before signing; Vector HistoryScan uses the canonical tuple/P6 floor; HQL2/IR `tx_as_of` executes through one no-fallback frontier; no schema/migration change |
+| P8 typed boundary | `0.2.0b` beta | `0.2.45b` beta, recursive target/evidence ACL, Vector HistoryScan and end-to-end `tx_as_of` selection implemented; broad P8/P13 qualification remains open |
+| P6 generations/leases/ACL | `0.5.0b` beta | `0.5.21b` beta, Vector HistoryScan and HQL2 historical reads run under same-lease floors/owner ACL; legacy operation boundaries remain distinct |
+| HQL2 orchestration plan | `0.5.0b` beta | `0.8.45b` beta, transaction-time runtime and local regression evidence recorded; broader qualification remains open |
+| C4 architecture index | `0.1.20b` | `0.1.55b`, indexes the current HQL2/P6 architecture and boundaries |
+| DOC registry | `0.5.6+draft` | `0.5.52+draft`, synchronized current HQL2/P6/Query IR entries |
 | Engine/storage | `0.2.9` | remains unchanged until implementation and release gates; no user database is migrated here |
+
+Version diff `0.8.11b -> 0.8.12b`: record implementation and local verification
+of the accepted P8 transaction-time contract: one validated frontier `S`
+governs HQL2/IR source reads, graph/vector/annotation operators, hydration and
+`Snapshot.tx`, while the P6 generation/current policy stays pinned; per-source
+floors fail closed, no current-state fallback is allowed, and no schema or
+migration change is introduced. Focused 56/56, History/Change 14/14, HQL2
+373/0/1 and P6/compatibility 194/0/0 pass; broad P8/P13 and review remain open.
+
+Version diff `0.8.9b -> 0.8.10b`: synchronize Vector HistoryScan's canonical
+H2-D11 tuple ID, P6 vector floor and current owner-node ACL with locally verified
+HQL/typed-IR runtime support; no schema or migration change. `tx_as_of` and full
+P8/P13 qualification remain open.
 
 Version diff `0.8.8b -> 0.8.9b`: record schema-v6 consensus revision
 transformation before signing, stale-CAS rejection before WAL append, and final
@@ -730,6 +757,9 @@ NOT_RUN and broader acceptance/release gates remain open.
 
 | Version | Date | Status | Summary | Commit Hash | Agent |
 |---|---|---|---|---|---|
+| 0.8.12b | 2026-10-03 | beta | Implement and locally verify HQL2/IR `tx_as_of` through one no-fallback source/operator/hydration/snapshot frontier under pinned P6 policy; focused 56/56, History/Change 14/14, HQL2 373/0/1, compatibility 194/0/0; no schema/migration change; broad gates open | working-tree | ATHER |
+| 0.8.11b | 2026-10-03 | beta | Synchronize accepted P8 `tx_as_of` selection: one no-fallback frontier across HQL2/IR sources, hydration and snapshot while lease/current policy stay pinned; runtime verification pending, no schema/migration change | working-tree | ATHER |
+| 0.8.10b | 2026-10-03 | beta | Synchronize Vector HistoryScan runtime status and current P8/P6/plan/registry versions; canonical tuple ID, vector floor and owner ACL verified without schema/migration changes; tx_as_of and broad acceptance remain open | working-tree | ATHER |
 | 0.8.9b | 2026-10-02 | beta | Verify schema-v6 consensus revision envelopes are transformed before signing and stale CAS fails before WAL append; full locked/offline Rust suite and both strict Clippy modes pass, with `probe_vs_recall` NOT_RUN; no user database migration | working-tree | ATHER |
 | 0.8.8b | 2026-10-02 | beta | Implement signed local schema-v6 activation preflight and fold-preserved markerless WAL recovery; crash tests 17/17, migration tests 19/19 and selected 40-target HQL2/durability/authority aggregate pass; fixture-only, no user DB migration | 0135c29 | ATHER |
 | 0.8.6b | 2026-10-02 | beta | Owner-approved clarification: AnnotationPut carries a distinct optional evidence payload, omission means no evidence references, and the existing ACL path covers both arrays; no schema or migration change | working-tree | ATHER |

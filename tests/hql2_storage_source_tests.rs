@@ -5,6 +5,7 @@ use genesis_block_native::{
     RelationalMutationBatch, RelationalMutationKind, RelationalRowMutation,
     RelationalSchemaPackage, RelationalTable, Storage,
 };
+use rusqlite::Connection;
 use serde_json::{json, Value};
 use std::{collections::BTreeMap, path::Path};
 use tempfile::TempDir;
@@ -480,6 +481,83 @@ fn hql_and_ir_source_scans_have_identical_node_edge_and_row_results() {
     };
     assert_eq!(Uuid::parse_str(record_id).unwrap().get_version_num(), 4);
     assert_eq!(row_hql.rows[0]["key"], QueryValueV2::Json(json!("row:one")));
+}
+
+#[test]
+fn row_scan_rejects_a_selected_frontier_below_its_history_floor() {
+    let dir = TempDir::new().unwrap();
+    let storage = open(dir.path());
+    let selected_tx = storage.stable_frontier();
+    storage
+        .register_relational_schema(RelationalSchemaPackage {
+            namespace: "default".into(),
+            schema_version: 1,
+            previous_version: None,
+            package_id: Uuid::new_v4().to_string(),
+            schema_hash: String::new(),
+            tables: vec![RelationalTable {
+                name: "records".into(),
+                columns: vec![RelationalColumn::required("id", RelationalColumnType::Text)],
+                primary_key: vec!["id".into()],
+                foreign_keys: vec![],
+                indexes: vec![],
+            }],
+            named_queries: vec![],
+        })
+        .unwrap();
+    storage
+        .apply_relational_batch(RelationalMutationBatch {
+            mutation_id: Uuid::new_v4().to_string(),
+            namespace: "default".into(),
+            schema_version: 1,
+            operations: vec![RelationalRowMutation {
+                table: "records".into(),
+                kind: RelationalMutationKind::Insert,
+                values: json!({"id":"row:one"}),
+                key: None,
+            }],
+        })
+        .unwrap();
+
+    let floor = selected_tx + 1;
+    assert!(floor <= storage.stable_frontier());
+    let projection = Connection::open(dir.path().join("projection.sqlite")).unwrap();
+    projection
+        .execute(
+            "UPDATE hql2_source_history_floors SET history_floor=?1
+             WHERE namespace='default' AND source='row'",
+            [i64::try_from(floor).unwrap()],
+        )
+        .unwrap();
+
+    let hql_request: QueryRequestV2 = serde_json::from_value(json!({
+        "contract_version":"genesis.api.v2",
+        "request_id":"row-at-tx-floor-hql",
+        "namespace":"default",
+        "language_version":"hql.v2",
+        "hql":format!("USE default AT TX {selected_tx} FROM TABLE records AS r |> RETURN r"),
+        "params":{}
+    }))
+    .unwrap();
+    let hql_error = storage.query_v2(actor(), hql_request).unwrap_err();
+    assert_eq!(hql_error.code, "HISTORY_UNAVAILABLE");
+
+    let ir_request: QueryRequestV2 = serde_json::from_value(json!({
+        "contract_version":"genesis.api.v2",
+        "request_id":"row-at-tx-floor-ir",
+        "namespace":"default",
+        "temporal":{"tx_as_of":selected_tx.to_string()},
+        "ir":{
+            "contract_version":"query-ir.v2",
+            "nodes":[{"id":"rows","op":"RowScan","inputs":[],"config":{"table":"records","as":"r"}}],
+            "root":"rows",
+            "parameter_types":{}
+        },
+        "params":{}
+    }))
+    .unwrap();
+    let ir_error = storage.query_v2(actor(), ir_request).unwrap_err();
+    assert_eq!(ir_error.code, "HISTORY_UNAVAILABLE");
 }
 
 #[test]

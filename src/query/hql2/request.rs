@@ -175,8 +175,6 @@ pub(crate) fn normalize(
         if tx > frontier {
             return Err(bind_error("future_snapshot"));
         }
-        // A current scalar source has no retained storage revision adapter yet.
-        return Err(unsupported("transaction_time_execution"));
     }
     Ok(ReadOptionsV2 {
         mode,

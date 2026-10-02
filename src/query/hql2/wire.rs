@@ -119,6 +119,7 @@ wire_enum!(EntityKind {
     Node,
     Edge,
     Row,
+    Vector,
     Annotation,
     Artifact
 });

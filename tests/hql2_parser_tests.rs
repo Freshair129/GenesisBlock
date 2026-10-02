@@ -52,9 +52,10 @@ fn resource_bound_requires_pinned_grammar_and_layout_review() {
         .fold(0xcbf29ce484222325u64, |hash, byte| {
             (hash ^ u64::from(byte)).wrapping_mul(0x100000001b3)
         });
-    // Reviewed 2026-10-02: edge property objects reuse the bounded object/expression path.
+    // Reviewed 2026-10-03: HistoryScan adds one history-only kind rule, replacing
+    // the existing kind rule on the same path; it does not add a recursive path.
     assert_eq!(
-        hash, 0x2379f9d351018cb4,
+        hash, 0x0557d6cd0ddcfd66,
         "grammar changed: re-audit lexical allocation bound"
     );
     let lock = include_str!("../Cargo.lock").replace("\r\n", "\n");
@@ -103,6 +104,12 @@ fn parser_heap_probe_child() {
     }
     let mut cases = vec![
         ("small", "VALUES $v AS x |> RETURN 1 AS y".into(), true),
+        (
+            "history_vector",
+            "USE default HISTORY VECTOR \"[\\\"node:one\\\",\\\"default\\\"]\" AS h |> RETURN h"
+                .into(),
+            true,
+        ),
         (
             "wide100",
             format!("VALUES $v AS x |> RETURN [{}0] AS y", "0,".repeat(100)),

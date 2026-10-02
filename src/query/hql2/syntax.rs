@@ -820,7 +820,7 @@ fn source_node(source: &str, pair: Pair<'_, Rule>) -> Result<Source, QueryErrorV
             alias: names.remove(0),
         },
         Rule::history_source => {
-            let kind_pair = child(source, pair.clone(), Rule::kind)?;
+            let kind_pair = child(source, pair.clone(), Rule::history_kind)?;
             let kind = kind_pair
                 .clone()
                 .into_inner()
