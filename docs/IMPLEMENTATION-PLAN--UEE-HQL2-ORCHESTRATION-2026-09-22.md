@@ -1,9 +1,9 @@
 ---
-version: "0.8.37b"
+version: "0.8.38b"
 doc_id: "IMPLEMENTATION-PLAN--UEE-HQL2-ORCHESTRATION-2026-09-22"
 owner: "Boss (Founder / Product Authority)"
 created_at: "2026-09-22T00:00:00+07:00,ATHER,working-tree"
-last_update: "2026-10-02T23:55:23+07:00,ATHER"
+last_update: "2026-10-03T00:48:00+07:00,ATHER"
 status: beta
 superseded_by: null
 attributes:
@@ -223,16 +223,27 @@ isolated upstream integration with `approve`, then approved H2-D11 on 2026-09-28
 H2-D11 authorizes P8/P6/plan truth-sync and additive schema-v6 code plus fixture tests;
 it does not authorize running migration on a user database. The initial scalar/core checkpoint
 is recorded in `REPORT--HQL2-P8-CORE-2026-09-28.md`; P8 remains partial and P9-P16
-are not qualified by that checkpoint. No push, main-branch merge, deployment or
-user-database migration is authorized. P9-P16 retain their existing dependency and approval gates.
+are not qualified by that checkpoint. The user explicitly authorized scoped
+branch commit/push and a PR #194 merge attempt on 2026-10-03; this does not
+waive CI/review gates or authorize deployment/user-database migration. Current
+hosted worker failures and the Windows Rust timeout leave merge unmet. P9-P16
+retain their existing dependency and approval gates.
 The subsequently approved D7 addendum now has local implementation evidence for
 actor-scoped zero-hop and bounded one-hop HQL1 ID projections through
 `Storage::query_v2`, including one endpoint-ID string equality filter:
-9/9 focused tests, 361/0/1 across 27 root HQL2 targets and
+9/9 focused tests, 362/0/1 across 28 root HQL2 targets and
 190/0/0 across 11 separate P6/schema-v6/compatibility targets. The adapter
 preflights and reserves parser resources before legacy AST construction; other
 HQL1 forms and legacy transports remain unchanged. Independent D7 review and
 full shared-runtime/P8/P13 qualification remain open.
+
+The latest local selected sweep adds a storage-backed HQL/typed-IR scalar
+differential against the independent P7 interpreter: 81 four-value nullable
+bags, 162 query executions, and 1/1 focused test passed. This bounded fixture
+does not close broad exact-oracle or P8 acceptance. At hosted head `cef747a`
+before this test/doc commit, worker checks failed across platforms and the
+Windows Rust job timed out at 15m15s; worker startup and timeout changes remain
+approval-gated, and this differential has not yet run in CI.
 
 ## 8. P5 execution evidence
 
@@ -764,9 +775,9 @@ Remaining HQL2/P8 acceptance gates stay open.
 | WAL revision event and projections | Partial | Local graph, standalone relational batch, unified transaction, vector writes, annotation CAS writes and supported consensus graph proposals carry revision envelopes; consensus signs the final envelope and stale predecessors fail before append. Graph/row/vector replay and annotation compact/reopen are covered. Folded graph and relational materializations are not yet revision-bound peer-ingress checkpoints and remain fail-closed. |
 | Annotation persistence and ACL | Partial | Annotation payloads and separate target/evidence roles are normalized; frozen refs/cycles are preflighted before WAL; policy event v2 stores `Annotation(namespace)` through compact/reopen. AnnotationScan and hydration check target/evidence refs at the P6 snapshot. Tests exercise the broad namespace grant; exact-grant-only query authorization remains unsupported. |
 | HQL2 storage-backed source adapters and text operators | Partial | Node/Edge/Row/Annotation scans return revision-bound refs with bounded pagination and current ACL under the P6 lease; `FieldIdV2`/`ExecBatchV2` provides aligned selective hydration. LexicalMatch and ContextPack now execute with registered `unicode-whitespace-bm25-v1` and `unicode-scalar-v1` profiles under that source boundary. Transport parity, broad exact-oracle coverage and full P8/P13 qualification remain open. |
-| HQL1 actor-scoped adapter | Partial | `Storage::query_v2` supports only differential-tested zero-hop and bounded one-hop unlabeled/unconstrained node-ID projections after P6 authorization; one hop may include one endpoint-ID exact string equality filter. The legacy parser is preflighted and budgeted before AST construction. Focused target passes 9/9; 361/0/1 across 27 HQL2 targets and 190/0/0 across 11 compatibility targets. Other HQL1 commands/forms, independent review and full shared-runtime/P8/P13 acceptance remain open. |
+| HQL1 actor-scoped adapter | Partial | `Storage::query_v2` supports only differential-tested zero-hop and bounded one-hop unlabeled/unconstrained node-ID projections after P6 authorization; one hop may include one endpoint-ID exact string equality filter. The legacy parser is preflighted and budgeted before AST construction. Focused target passes 9/9; the latest regression sweep passes 362/0/1 across 28 HQL2 targets and 190/0/0 across 11 compatibility targets. Other HQL1 commands/forms, independent review and full shared-runtime/P8/P13 acceptance remain open. |
 | HQL2 structural root Match | Partial | Compact/Sequence graph patterns execute through HQL and typed IR under one P6 graph snapshot; deterministic shortest-per-endpoint results, stable tie order, P6 budget errors and HQL/IR parity are tested. Typed-IR anchors compare full validated RecordRefs with no direct lookup and filter before shortest deduplication. Node/edge properties filter before SHORTEST; the 10-test P8 completion target passes. |
-| HQL2 Sequence node ID, labels and properties | Implemented; local verification passed | Exact UTF-8 IDs, conjunctive labels and node/edge exact-JSON properties execute for HQL/typed-IR Match and Expand under one P6 snapshot; no direct lookup, optional semantics and pre-SHORTEST filtering preserved. Latest root sweep 361/0/1 across 27 targets; a separate 11-target P6/schema-v6/compatibility group passes 190/0/0. Compact remains unsupported; broad P8/P13 acceptance remains open despite no concrete static review finding. |
+| HQL2 Sequence node ID, labels and properties | Implemented; local verification passed | Exact UTF-8 IDs, conjunctive labels and node/edge exact-JSON properties execute for HQL/typed-IR Match and Expand under one P6 snapshot; no direct lookup, optional semantics and pre-SHORTEST filtering preserved. Latest regression sweep 362/0/1 across 28 targets; a separate 11-target P6/schema-v6/compatibility group passes 190/0/0. Compact remains unsupported; broad P8/P13 acceptance remains open despite no concrete static review finding. |
 | Vector query parameter boundary | Partial | Typed IR declarations and HQL contextual parameters validate collection fingerprint/space and dimension with finite values. Exact KNN and Original Rerank execute original vectors with deterministic distance ties; Approx remains fail-closed. The vector target passes 12/12; broader P8 qualification remains open. |
 
 This status supersedes earlier wording that said no migration runner or resume
@@ -831,6 +842,7 @@ Version diff `0.8.24b -> 0.8.25b`: record the delegated C-3 decision and exact P
 Version diff `0.8.25b -> 0.8.26b`: implement Sequence node ID/labels through HQL and typed IR under P6; record 7 focused passes and 338/0/1 across 25 root HQL2 targets; retain the ACL-hidden fixture, independent review and full P8 gates.
 Version diff `0.8.26b -> 0.8.27b`: record owner approval of P8 addendum D1-D6 and authorize test-first implementation of lexical/context profiles, Sequence properties, contextual literals and the corrected pre-parse ACL fixture; runtime evidence remains pending.
 Version diff `0.8.28b -> 0.8.29b`: add and pass the edge-property-before-SHORTEST regression; record 10/10 P8 completion tests and 349/0/1 across 26 root HQL2 targets plus a separate 190/0/0 across 11 P6/schema-v6/compatibility targets; confirmation review marked the D5 fix complete and independent static review found no concrete defect; retain broad P8/P13 gates.
+Version diff `0.8.37b -> 0.8.38b`: add and pass a storage-backed HQL/typed-IR scalar differential against independent P7 for 81 nullable bags; record 362/0/1 across 28 HQL2 targets and 190/0/0 across 11 compatibility targets. Update hosted evidence at `cef747a`: worker tests fail across operating systems and Windows Rust reaches its 15m15s timeout; the new test is not in CI yet. Preserve worker-fix/timeout approval gates and broad exact-oracle, independent-review, P8/P13/release gates.
 Version diff `0.8.36b -> 0.8.37b`: refine hosted PR #194 evidence at `cdfb90a`: Windows `cargo test` itself passes, including the protected probe in 225.86s and doc-tests, but the 15-minute job timeout cancels post-cache finalization; retain the probe and propose a Windows-only 20-minute job timeout. Worker CI still fails on all OSes because sidecars make a fresh root nonempty before schema-v6 activation; retain the separate worker docs/code approval gate, independent review, and broad P8/P13/release gates.
 Version diff `0.8.35b -> 0.8.36b`: synchronize hosted PR #194 evidence at `9344b71`; Linux/macOS Rust and standard Node/mobile/consumer checks pass, Windows Rust exceeds the 15-minute job limit in the protected probe, and worker tests fail cross-platform because sidecars make a fresh database root nonempty before schema-v6 activation. Preserve protected WIP; retain the worker approval gate, independent review, and broad P8/P13/release gates.
 Version diff `0.8.34b -> 0.8.35b`: complete local integration verification for the approved H2-D11 schema-v6/consensus path; full Rust suite and default/no-default strict Clippy pass, with `probe_vs_recall` explicitly NOT_RUN; retain fixture-only scope and broader P8/P13/review/release gates.
@@ -841,6 +853,7 @@ Version diff `0.8.27b -> 0.8.28b`: implement approved D1-D5, record 9 focused pa
 
 | Version | Date | Status | Summary | Commit Hash | Agent |
 |---|---|---|---|---|---|
+| 0.8.38b | 2026-10-03 | beta | Add and pass storage-backed HQL/typed-IR P7 scalar differential over 81 nullable bags; record 362/0/1 across 28 HQL2 targets and 190/0/0 compatibility targets; update hosted worker failures and Windows timeout; scoped commit/push/merge requested but CI/review gates remain open | working-tree | ATHER |
 | 0.8.37b | 2026-10-02 | beta | Refine hosted PR #194 evidence: Windows Rust test step passes with protected probe but 15-minute job timeout cancels post-cache; propose 20-minute Windows timeout; worker bootstrap errors persist across OS; keep worker code approval, independent review and P8/P13 gates open | working-tree | ATHER |
 | 0.8.36b | 2026-10-02 | beta | Synchronize hosted PR #194 evidence: Linux/macOS Rust and standard Node/mobile checks pass; Windows full suite times out in protected probe; worker CI fails at fresh schema-v6 bootstrap; keep all P8/P13/review/release gates open | working-tree | ATHER |
 | 0.8.35b | 2026-10-02 | beta | Full locked/offline no-default-features Rust suite passes with `probe_vs_recall` NOT_RUN; default/no-default strict all-target Clippy passes; consensus signs schema-v6 revision envelopes; broad P8/P13/review/release gates remain open | working-tree | ATHER |

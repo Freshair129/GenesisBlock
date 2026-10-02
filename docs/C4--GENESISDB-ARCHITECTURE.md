@@ -2,10 +2,10 @@
 doc_id: C4--GENESISDB-ARCHITECTURE
 type: architecture-index
 status: current
-version: 0.1.50b
+version: 0.1.51b
 owner: GenesisBlockDB Architecture
 created_at: 2026-06-13T22:50:11+07:00,ATHER,9b1ced3
-last_update: "2026-10-02T15:30:00+07:00,ATHER"
+last_update: "2026-10-03T00:48:00+07:00,ATHER"
 attributes:
   domain: architecture
   scope: repository
@@ -90,8 +90,10 @@ target passes 10/10. The D7 actor-scoped bridge accepts differential-tested
 zero-hop and bounded one-hop HQL1 ID projections through `Storage::query_v2`;
 legacy parser resources are preflighted and reserved before AST construction.
 The focused adapter target passes 9/9, including one endpoint-ID exact string
-equality filter, and the explicit root-HQL2 sweep passes 361/0/1 across 27
-targets. A separate 11-target P6/schema-v6/compatibility
+equality filter. A new storage-backed HQL/typed-IR scalar differential matches
+the independent P7 interpreter for all 81 four-value nullable bags (1/1 test,
+162 executions). The explicit root-HQL2 sweep passes 362/0/1 across 28 targets.
+A separate 11-target P6/schema-v6/compatibility
 group passes 190/0/0. The legacy parser preflight correction is recorded in the
 Local RCA: `.brain/rca/RCA--HQL1-ADAPTER-PARSER-RESERVATION.md`.
 The ignored parser
@@ -426,6 +428,11 @@ v6-only WAL without activation fails closed. See H2-D11 ADR R6b and the P6 recov
 
 ## CHANGELOG
 
+Version diff 0.1.50b -> 0.1.51b: record the storage-backed HQL/typed-IR P7
+scalar differential for 81 nullable bags and the 362/0/1 HQL2 regression
+sweep; preserve broad oracle, worker CI, Windows timeout, review and P8/P13
+gates.
+
 Version diff 0.1.49b -> 0.1.50b: verify the signed schema-v6 activation and
 markerless WAL recovery path, synchronize upstream Query IR V1 1.0.3 linear
 `match_path`, and record 40 passing selected HQL2/durability/authority targets;
@@ -433,6 +440,7 @@ full P8/P13 qualification remains open.
 
 | Version | Date | Status | Summary | Commit Hash | Agent |
 |---------|------|--------|---------|-------------|-------|
+| 0.1.51b | 2026-10-03 | current | Record storage-backed HQL/typed-IR P7 scalar differential over 81 nullable bags and 362/0/1 across 28 HQL2 targets; retain broad oracle, worker CI, Windows timeout, review and P8/P13 gates | working-tree | ATHER |
 | 0.1.50b | 2026-10-02 | current | Verify H2-D11 R6b schema-v6 WAL-only recovery and integrate upstream typed linear match_path; 40 selected HQL2/durability/authority targets pass; full P8/P13 gates remain open | 0135c29 | ATHER |
 | 0.1.49b | 2026-10-02 | current | Index owner-approved H2-D11 R6b schema-v6 activation and WAL-only recovery contract; implementation pending | working-tree | ATHER |
 | 0.1.48b | 2026-10-02 | current | Add D7's differential-proven one-hop endpoint-ID exact string filter; record 9/9 focused tests, 361/0/1 across 27 HQL2 targets and 190/0/0 across 11 compatibility targets; retain shared-runtime/review/P8/P13 gates | working-tree | ATHER |

@@ -1,8 +1,8 @@
 ---
 doc_id: REPORT--HQL2-P8-CORE-2026-09-28
-version: "0.1.33b"
+version: "0.1.34b"
 created_at: "2026-09-28T04:35:00+07:00,ATHER,22bc11e"
-last_update: "2026-10-02T23:55:23+07:00,ATHER"
+last_update: "2026-10-03T00:48:00+07:00,ATHER"
 status: beta
 owner: GenesisBlockDB Engineering
 attributes:
@@ -102,6 +102,8 @@ their existing compatibility contracts; P13 parity is deliberately not claimed.
 Platform: local Windows MSVC, Rust 1.97.1, `--locked --offline
 --no-default-features`, target directory
 `G:/GenesisBlock_Dev/GenesisBlock/target/hql2-execution`.
+The latest 28-target HQL2 run, including the new scalar differential, was run
+in the isolated worktree using `target/hql2-execution` and `--jobs 2`.
 
 | Gate | Measured result | Limit |
 |---|---|---|
@@ -139,26 +141,28 @@ Platform: local Windows MSVC, Rust 1.97.1, `--locked --offline
 | Approved P8 addendum D1-D6 focused target | 10 passed, 0 failed | Registered lexical BM25 profile and independent P7 rank parity; ContextPack scalar offsets, exact source hash and independent oracle parity; Sequence node/edge property exactness and no-partial budget behavior; contextual NULL/list/JSON boundaries; authorization-before-parse fixture. |
 | D7 actor-scoped HQL1 adapter | 9 passed, 0 failed | Differential parity for zero-hop and bounded one-hop ID projections across edge directions, relation/wildcard forms, endpoint projections, one endpoint-ID exact string filter and parallel-edge multiplicity; Namespace(Read)/namespace checks before parse; malformed/unlisted behavior; broad legacy pattern fails resource preflight before AST construction. Existing v1 transports are unchanged. |
 | HQL1 parser-resource RCA | Confirmed and corrected | Legacy Pest pairs were materialized before the D7 allowlist without parser-specific heap reservation. The adapter now runs allocation-free parser preflight and reserves the conservative estimate before legacy AST construction; see local RCA `.brain/rca/RCA--HQL1-ADAPTER-PARSER-RESERVATION.md`. No production crash or HQL1 allocator peak is claimed. |
-| Latest explicit root-HQL2 target sweep | 361 passed, 0 failed, 1 ignored across 27 root targets | Locked/offline/no-default-features/jobs=1; includes the D7 adapter target; ignored parser child is exercised by its parent; protected probe excluded. Regression evidence, not P8 acceptance. |
+| Storage-backed HQL/typed-IR scalar P7 differential | 1 passed, 0 failed across 81 four-value nullable bags; 162 Storage executions | Values/Distinct/Sort with NULLS LAST; each frontend independently matches the P7 reference and each other. Test-only scalar evidence, not broad P8 acceptance. |
+| Latest explicit root-HQL2 target sweep | 362 passed, 0 failed, 1 ignored across 28 root targets | Locked/offline/no-default-features/jobs=2; includes the D7 adapter and new storage-backed scalar differential; ignored parser child is exercised by its parent; protected probe excluded. Regression evidence, not P8 acceptance. |
 | Separate P6/schema-v6/compatibility sweep | 190 passed, 0 failed, 0 ignored across 11 named targets | `p6_generation_tests`, `p6_lease_tests`, `p6_visibility_tests`, `p6_peer_authority_tests`, `schema6_migration_tests`, `query_ir_tests`, `hql_p0_tests`, `hql_filter_tests`, `hql_cypher_tests`, `napi_rest_parity_tests`, `rest_api_tests`; regression evidence only. |
-| Prior explicit HQL2/P6/schema-v6/compatibility sweep | 528 passed, 0 failed, 1 ignored across 37 named targets | Pre-edge-regression checkpoint; protected probe excluded. Superseded for current HQL2 root-target count by 361/0/1; not full P8/P13 acceptance. |
+| Prior explicit HQL2/P6/schema-v6/compatibility sweep | 528 passed, 0 failed, 1 ignored across 37 named targets | Pre-edge-regression checkpoint; protected probe excluded. Superseded for current HQL2 root-target count by 362/0/1; not full P8/P13 acceptance. |
 | Native library check | `cargo check --locked --offline --no-default-features --jobs 1 --target-dir target/hql2-execution` passed | Local core compile only; no NAPI addon runtime, release or cross-platform claim. |
 | Documentation and source hygiene | docs validation: 0 violations/239 files; agent registry: 6 agents/12 routes; rustfmt check and `git diff --check` passed | Local structural checks only. |
 | HQL/IR Node/Edge/Row source differential | 1 passed, 0 failed | Node/Edge properties and Row `prop(r, "id")` match across HQL and IR; `r.id` remains the UUIDv4 durable revision. Row properties resolve from H2-D11 `after_image`; see local RCA `.brain/rca/RCA--HQL2-ROW-SOURCE-PROPERTY-HYDRATION.md`. |
 | HQL/IR annotation source and recursive ACL parity | 6 passed, 0 failed, 0 ignored | Separate `targets`/`evidence` properties, nested annotation references, and Edge endpoint access are covered; fixture evidence is independent of P8 operator acceptance. |
 | Long-running soak | Three soak_tests cases remain ignored by the normal suite | No soak qualification inferred |
 | Hosted Rust/core CI, PR #194 head `9344b71` | [Run 37029503800](https://github.com/Freshair129/GenesisBlock/actions/runs/37029503800): Linux/macOS `cargo test`, all three standard `npm test` targets, `fmt + clippy`, docs validation and version consistency passed. Windows `cargo test` reached its 15-minute job limit while `tests/zz_probe_discriminates.rs::probe_vs_recall` was still running; runner canceled the job. | Windows full Rust suite remains incomplete; protected probe source was not changed. |
-| Latest hosted Rust/core CI, PR #194 head `cdfb90a` | [Run 37034671231](https://github.com/Freshair129/GenesisBlock/actions/runs/37034671231): Linux/macOS `cargo test` and all three standard Node test targets passed. The Windows `cargo test` step itself succeeded, including `probe_vs_recall` (225.86s) and doc-tests (0); the enclosing 15-minute job was canceled only during `Post Run Swatinem/rust-cache`. `fmt + clippy`, docs validation and version consistency passed. | Test suite is green on Windows, but the required job check remains cancelled because the job timeout covers setup, compile, tests and cache save. Protected probe remains unchanged. |
+| Latest hosted Rust/core CI before this test/doc commit, PR #194 head `cef747a` | [Run 37037710321](https://github.com/Freshair129/GenesisBlock/actions/runs/37037710321): Linux/macOS `cargo test` passed; standard package `npm test` passed on all three OSes; `fmt + clippy`, docs validation and version consistency passed. Windows `cargo test` failed at the 15m15s job limit. The HQL2 differential added in this revision is not part of this hosted run. | Windows Rust check remains failed; protected probe source was not changed. |
 | Hosted worker CI, PR #194 head `9344b71` | [Run 37029503800](https://github.com/Freshair129/GenesisBlock/actions/runs/37029503800) and [rebuilt-addon run 37029503808](https://github.com/Freshair129/GenesisBlock/actions/runs/37029503808): worker tests failed on Linux/macOS/Windows and rebuilt Linux addon with `RECOVERY_REQUIRED: markerless database identity is missing`. | Worker startup-order correction remains documentation/approval-gated; no worker code changed. |
-| Latest hosted worker CI, PR #194 head `cdfb90a` | [Run 37034671231](https://github.com/Freshair129/GenesisBlock/actions/runs/37034671231): worker tests failed on Linux/macOS/Windows; Linux/macOS logs repeat `RECOVERY_REQUIRED: markerless database identity is missing`. | Worker startup-order correction remains documentation/approval-gated; no worker code changed. |
+| Latest hosted worker CI before this test/doc commit, PR #194 head `cef747a` | [Run 37037710321](https://github.com/Freshair129/GenesisBlock/actions/runs/37037710321): worker tests fail on Linux/macOS/Windows; [rebuilt-addon run 37037710257](https://github.com/Freshair129/GenesisBlock/actions/runs/37037710257) also fails on Linux with `RECOVERY_REQUIRED: markerless database identity is missing`. | Worker startup-order correction remains approval-gated; no worker code changed. |
 | Hosted mobile/consumer CI, PR #194 head `9344b71` | [Mobile run 37029503804](https://github.com/Freshair129/GenesisBlock/actions/runs/37029503804): host mobile build/tests, iOS/Android builds and acceptance, C header and SDK checks passed. RustSec, Go/Python consumers and distribution checks passed in their respective runs. | Hosted green jobs do not close P8/P13, security-review, soak or release qualification. |
-| PR #194 merge state | PR remains open and mergeable, but worker checks and Windows Rust job fail and `reviewDecision` is empty. | Not merged; required CI/review conditions are unmet. |
+| PR #194 merge state before this test/doc commit | PR is open and GitHub reports mergeable, but worker checks and Windows Rust job fail and `reviewDecision` is empty. | Not merged; CI/review conditions remain unmet. |
 
 Parser tests include all 35 positive and 6 negative vendored examples. The
 parser harness reports one ignored child entrypoint, explicitly executed twice
 by its passing parent (default/detailed diagnostic allocator probes). It is not
-unrun coverage. The scalar differential test enumerates 81 small bags against independent P7
-semantics for ordering/distinct and aggregates. Oracle-only graph/rank tests
+unrun coverage. The storage-backed scalar differential enumerates all 81
+four-value bags over NULL, -1 and 2; HQL and typed IR each execute 81 requests
+and match independent P7 results for distinct/order semantics. Oracle-only graph/rank tests
 remain fixture evidence, not storage-backed operator acceptance.
 
 The existing REST integration tests run in this native suite. Their passing
@@ -370,7 +374,7 @@ passes 6/6; four structural-parameter targets pass 50/50, three null-order
 targets pass 58/58, and four checked-remainder targets pass 79/79. The latest
 all-root-HQL2 sweep includes the KNN, Original Rerank and root `MATCH` oracle
 differentials plus the Sequence pattern oracle and D7 adapter target, and now
-passes 361/0/1 across 27 targets. The 10/10 addendum target covers registered lexical/context profiles,
+passes 362/0/1 across 28 targets. The 10/10 addendum target covers registered lexical/context profiles,
 P7 parity, Sequence node/edge properties, contextual literals and fail-closed
 budget behavior. A separate explicit 11-target P6/schema-v6/compatibility
 group passes 190/0/0. The prior 37-target combined sweep passed 528/0/1 before
@@ -396,14 +400,22 @@ from these local tests.
 
 | Artifact | Before | After |
 |---|---|---|
-| Registry | 0.5.44+draft | 0.5.44+draft |
-| C4 architecture index | 0.1.50b | 0.1.50b |
+| Registry | 0.5.44+draft | 0.5.45+draft |
+| C4 architecture index | 0.1.50b | 0.1.51b |
 | Master specification | 2.3.25b | 2.3.25b |
 | P6 generations/leases/ACL | 0.5.17b | 0.5.17b |
 | H2-D11 durable revisions/annotations | 0.8.9b | 0.8.9b |
-| P8 typed boundary | 0.2.37b | 0.2.37b |
-| Orchestration plan | 0.8.36b | 0.8.37b |
-| This report | 0.1.32b | 0.1.33b |
+| P8 typed boundary | 0.2.37b | 0.2.38b |
+| Orchestration plan | 0.8.37b | 0.8.38b |
+| This report | 0.1.33b | 0.1.34b |
+
+Version diff `0.1.33b -> 0.1.34b`: add and pass a storage-backed HQL/typed-IR
+scalar differential against independent P7 over 81 nullable bags (162 query
+executions); record 362/0/1 across 28 HQL2 targets and 190/0/0 across 11
+P6/schema-v6/compatibility targets. Update hosted evidence at PR head `cef747a`:
+worker checks fail across platforms and Windows Rust times out at 15m15s; the
+current differential is not included in that CI run. Keep merge, worker-fix,
+Windows-timeout, broad P8/P13, shared-runtime and independent-review gates open.
 
 Version diff `0.1.32b -> 0.1.33b`: synchronize hosted PR #194 results at
 `cdfb90a`; record that the Windows Rust test step passed, including the
@@ -440,6 +452,7 @@ P8 and release gates.
 
 | Version | Date | Status | Summary | Commit Hash | Agent |
 |---|---|---|---|---|---|
+| 0.1.34b | 2026-10-03 | beta | Add and pass storage-backed HQL/typed-IR P7 scalar differential over 81 nullable bags; record 362/0/1 across 28 HQL2 targets and 190/0/0 across 11 compatibility targets; current hosted worker checks fail and Windows Rust times out; retain merge/P8/P13/review gates | working-tree | ATHER |
 | 0.1.33b | 2026-10-02 | beta | Update hosted PR #194 evidence at cdfb90a: Windows Rust tests including protected probe passed but job timeout canceled cache save; worker tests fail across OS at markerless schema-v6 bootstrap; preserve probe and keep merge/P8/P13/review gates open | working-tree | ATHER |
 | 0.1.32b | 2026-10-02 | beta | Synchronize hosted PR #194 evidence: Linux/macOS Rust and standard Node pass; Windows Rust hits 15-minute timeout in protected probe; worker tests fail on all OSes at markerless schema-v6 bootstrap; PR remains unmerged with review/P8/P13 gates open | working-tree | ATHER |
 | 0.1.31b | 2026-10-02 | beta | Record full locked/offline Rust suite and both strict Clippy configurations; schema-v6 consensus revision-envelope signing order verified; `probe_vs_recall` remains NOT_RUN and broader P8/P13/review/release gates remain open | working-tree | ATHER |
