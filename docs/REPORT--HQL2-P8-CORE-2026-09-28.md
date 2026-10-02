@@ -1,8 +1,8 @@
 ---
 doc_id: REPORT--HQL2-P8-CORE-2026-09-28
-version: "0.1.31b"
+version: "0.1.32b"
 created_at: "2026-09-28T04:35:00+07:00,ATHER,22bc11e"
-last_update: "2026-10-02T21:22:00+07:00,ATHER"
+last_update: "2026-10-02T23:12:45+07:00,ATHER"
 status: beta
 owner: GenesisBlockDB Engineering
 attributes:
@@ -147,7 +147,10 @@ Platform: local Windows MSVC, Rust 1.97.1, `--locked --offline
 | HQL/IR Node/Edge/Row source differential | 1 passed, 0 failed | Node/Edge properties and Row `prop(r, "id")` match across HQL and IR; `r.id` remains the UUIDv4 durable revision. Row properties resolve from H2-D11 `after_image`; see local RCA `.brain/rca/RCA--HQL2-ROW-SOURCE-PROPERTY-HYDRATION.md`. |
 | HQL/IR annotation source and recursive ACL parity | 6 passed, 0 failed, 0 ignored | Separate `targets`/`evidence` properties, nested annotation references, and Edge endpoint access are covered; fixture evidence is independent of P8 operator acceptance. |
 | Long-running soak | Three soak_tests cases remain ignored by the normal suite | No soak qualification inferred |
-| Node / devices / hosted CI | Not verified in this record | No release, parity or performance claim |
+| Hosted Rust/core CI, PR #194 head `9344b71` | [Run 37029503800](https://github.com/Freshair129/GenesisBlock/actions/runs/37029503800): Linux/macOS `cargo test`, all three standard `npm test` targets, `fmt + clippy`, docs validation and version consistency passed. Windows `cargo test` reached its 15-minute job limit while `tests/zz_probe_discriminates.rs::probe_vs_recall` was still running; runner canceled the job. | Windows full Rust suite remains incomplete; protected probe source was not changed. |
+| Hosted worker CI, PR #194 head `9344b71` | [Run 37029503800](https://github.com/Freshair129/GenesisBlock/actions/runs/37029503800) and [rebuilt-addon run 37029503808](https://github.com/Freshair129/GenesisBlock/actions/runs/37029503808): worker tests failed on Linux/macOS/Windows and rebuilt Linux addon with `RECOVERY_REQUIRED: markerless database identity is missing`. | Worker startup-order correction remains documentation/approval-gated; no worker code changed. |
+| Hosted mobile/consumer CI, PR #194 head `9344b71` | [Mobile run 37029503804](https://github.com/Freshair129/GenesisBlock/actions/runs/37029503804): host mobile build/tests, iOS/Android builds and acceptance, C header and SDK checks passed. RustSec, Go/Python consumers and distribution checks passed in their respective runs. | Hosted green jobs do not close P8/P13, security-review, soak or release qualification. |
+| PR #194 merge state | PR remains open and mergeable, but worker checks and Windows Rust job fail and `reviewDecision` is empty. | Not merged; required CI/review conditions are unmet. |
 
 Parser tests include all 35 positive and 6 negative vendored examples. The
 parser harness reports one ignored child entrypoint, explicitly executed twice
@@ -391,14 +394,20 @@ from these local tests.
 
 | Artifact | Before | After |
 |---|---|---|
-| Registry | 0.5.43+draft | 0.5.44+draft |
+| Registry | 0.5.44+draft | 0.5.44+draft |
 | C4 architecture index | 0.1.50b | 0.1.50b |
-| Master specification | 2.3.24b | 2.3.25b |
-| P6 generations/leases/ACL | 0.5.16b | 0.5.17b |
-| H2-D11 durable revisions/annotations | 0.8.8b | 0.8.9b |
-| P8 typed boundary | 0.2.36b | 0.2.37b |
-| Orchestration plan | 0.8.34b | 0.8.35b |
-| This report | 0.1.30b | 0.1.31b |
+| Master specification | 2.3.25b | 2.3.25b |
+| P6 generations/leases/ACL | 0.5.17b | 0.5.17b |
+| H2-D11 durable revisions/annotations | 0.8.9b | 0.8.9b |
+| P8 typed boundary | 0.2.37b | 0.2.37b |
+| Orchestration plan | 0.8.35b | 0.8.36b |
+| This report | 0.1.31b | 0.1.32b |
+
+Version diff `0.1.31b -> 0.1.32b`: synchronize hosted PR #194 results at
+`9344b71`; record passing Linux/macOS Rust, standard Node and mobile/consumer
+gates, Windows Rust timeout during the protected probe, and cross-platform
+worker startup failures. Keep merge, shared-runtime, broad P8/P13, independent
+review, security, soak/crash/platform and release gates open.
 
 Version diff `0.1.30b -> 0.1.31b`: record final full locked/offline Rust-suite
 and default/no-default strict Clippy results, schema-v6 consensus revision
@@ -428,6 +437,7 @@ P8 and release gates.
 
 | Version | Date | Status | Summary | Commit Hash | Agent |
 |---|---|---|---|---|---|
+| 0.1.32b | 2026-10-02 | beta | Synchronize hosted PR #194 evidence: Linux/macOS Rust and standard Node pass; Windows Rust hits 15-minute timeout in protected probe; worker tests fail on all OSes at markerless schema-v6 bootstrap; PR remains unmerged with review/P8/P13 gates open | working-tree | ATHER |
 | 0.1.31b | 2026-10-02 | beta | Record full locked/offline Rust suite and both strict Clippy configurations; schema-v6 consensus revision-envelope signing order verified; `probe_vs_recall` remains NOT_RUN and broader P8/P13/review/release gates remain open | working-tree | ATHER |
 | 0.1.30b | 2026-10-02 | beta | Implement and verify approved H2-D11 R6b markerless WAL recovery; crash 17/17, migration 19/19, selected 40-target aggregate pass; integrate upstream Query IR match_path; no user DB migration, full P8/P13/review gates remain open | 0135c29 | ATHER |
 | 0.1.29b | 2026-10-02 | beta | Extend D7 with one-hop endpoint-ID exact string filter after legacy/HQL2 differential; record 9/9 focused tests, 361/0/1 across 27 HQL2 targets and 190/0/0 across 11 compatibility targets; retain shared-runtime, independent review and broad P8/P13 gates | working-tree | ATHER |
