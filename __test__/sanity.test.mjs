@@ -32,10 +32,11 @@ test('schemaVersionSync matches modules.json engine.schemaVersion', () => {
   // silently resurrecting deletions; ADR--GENESISDB-JOURNAL-HISTORY §4).
   // TypeScript-side consumers (packages/gks schema-version.ts) track the same
   // major byte (PROTOCOL--GENESIS-GRAPH-FFI §6). Wave B v4 journals immutable
-  // collection definitions and materialized quantizer state.
+  // collection definitions and materialized quantizer state; H2-D11 advances
+  // the on-disk engine schema to v6.
   const manifest = JSON.parse(
     readFileSync(fileURLToPath(new URL('../modules.json', import.meta.url)), 'utf8'),
   )
   assert.equal(schemaVersionSync(), manifest.engine.schemaVersion)
-  assert.equal(schemaVersionSync(), 4)
+  assert.equal(schemaVersionSync(), 6)
 })

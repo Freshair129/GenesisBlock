@@ -26,6 +26,14 @@ use std::{
     time::{Duration, Instant},
 };
 
+type AnnotationLookupFnV2<'a> =
+    dyn FnMut(&RecordRefV2, &mut ExecutionBudgetV2) -> Result<Vec<RecordRefV2>, QueryErrorV2> + 'a;
+type HydrateFnV2<'a> = dyn FnMut(&[RecordRefV2], &[FieldIdV2], &mut ExecutionBudgetV2) -> Result<ExecBatchV2, QueryErrorV2>
+    + 'a;
+type VectorLookupFnV2<'a> = dyn FnMut(&[RecordRefV2], &str, bool, &mut ExecutionBudgetV2) -> Result<VectorBatchV2, QueryErrorV2>
+    + 'a;
+type CompactPathV2 = (Vec<RecordRefV2>, Vec<RecordRefV2>);
+
 fn failure(reason: &str) -> QueryErrorV2 {
     QueryErrorV2::new("BIND_ERROR", "execute", reason)
 }
@@ -1076,11 +1084,7 @@ fn hydrate_for_kernel(
     right: Option<&[Row]>,
     graph: Option<&GraphSnapshotV2>,
     budget: &mut ExecutionBudgetV2,
-    hydrate: &mut dyn FnMut(
-        &[RecordRefV2],
-        &[FieldIdV2],
-        &mut ExecutionBudgetV2,
-    ) -> Result<ExecBatchV2, QueryErrorV2>,
+    hydrate: &mut HydrateFnV2<'_>,
 ) -> Result<HydratedValuesV2, QueryErrorV2> {
     let roots = kernel_expression_roots(kernel, budget)?;
     let needs = property_needs(roots, budget)?;
@@ -1134,8 +1138,8 @@ fn hydrate_for_kernel(
         let record_count = group.records.len() as u64;
         let identity_bytes = group
             .records
-            .iter()
-            .map(|(_, record)| {
+            .values()
+            .map(|record| {
                 (record.database_id.len() as u64)
                     .saturating_add(record.namespace.len() as u64)
                     .saturating_add(record.id.len() as u64)
@@ -1144,8 +1148,8 @@ fn hydrate_for_kernel(
             .fold(0u64, u64::saturating_add);
         let field_name_bytes = group
             .fields
-            .iter()
-            .filter_map(|(_, field)| FieldIdV2::name(field))
+            .values()
+            .filter_map(FieldIdV2::name)
             .map(|name| name.len() as u64)
             .fold(0u64, u64::saturating_add);
         let cells = record_count.saturating_mul(field_count);
@@ -1273,7 +1277,7 @@ fn compact_expand_paths(
     pattern: &super::wire::CompactPattern,
     graph: &GraphSnapshotV2,
     budget: &mut ExecutionBudgetV2,
-) -> Result<Vec<(Vec<RecordRefV2>, Vec<RecordRefV2>)>, QueryErrorV2> {
+) -> Result<Vec<CompactPathV2>, QueryErrorV2> {
     let start = match row.get(start_index) {
         Some(V::Entity(record)) if graph.nodes.get(&record.id) == Some(record) => record.clone(),
         Some(V::Null) => return Ok(Vec::new()),
@@ -1420,6 +1424,8 @@ struct SequencePathV2 {
     step_lengths: Vec<usize>,
 }
 
+// The path matcher consumes separate bound constraints and execution context.
+#[allow(clippy::too_many_arguments)]
 fn sequence_expand_paths(
     row: &[V],
     start_index: usize,
@@ -1616,6 +1622,8 @@ fn unicode_whitespace_tokens(
         .collect())
 }
 
+// Corpus inputs and query budget are separate validated plan values.
+#[allow(clippy::too_many_arguments)]
 fn lexical_match_rows(
     input: &[Row],
     graph: &GraphSnapshotV2,
@@ -1749,6 +1757,8 @@ fn context_evidence(
     }
 }
 
+// Context construction needs each bound expression and its output budget.
+#[allow(clippy::too_many_arguments)]
 fn context_pack_row(
     input: &[Row],
     text: &BoundExpr,
@@ -1859,15 +1869,8 @@ pub(crate) fn execute_v2_with_source_adapters(
     plan: &PhysicalPlanV2,
     budget: &mut ExecutionBudgetV2,
     sources: &BTreeMap<String, Vec<Vec<V>>>,
-    annotation_lookup: &mut dyn FnMut(
-        &RecordRefV2,
-        &mut ExecutionBudgetV2,
-    ) -> Result<Vec<RecordRefV2>, QueryErrorV2>,
-    hydrate: &mut dyn FnMut(
-        &[RecordRefV2],
-        &[FieldIdV2],
-        &mut ExecutionBudgetV2,
-    ) -> Result<ExecBatchV2, QueryErrorV2>,
+    annotation_lookup: &mut AnnotationLookupFnV2<'_>,
+    hydrate: &mut HydrateFnV2<'_>,
 ) -> Result<ExecutionOutputV2, QueryErrorV2> {
     execute_v2_with_graph_adapter(plan, budget, sources, annotation_lookup, hydrate, None)
 }
@@ -1876,15 +1879,8 @@ pub(crate) fn execute_v2_with_graph_adapter(
     plan: &PhysicalPlanV2,
     budget: &mut ExecutionBudgetV2,
     sources: &BTreeMap<String, Vec<Vec<V>>>,
-    annotation_lookup: &mut dyn FnMut(
-        &RecordRefV2,
-        &mut ExecutionBudgetV2,
-    ) -> Result<Vec<RecordRefV2>, QueryErrorV2>,
-    hydrate: &mut dyn FnMut(
-        &[RecordRefV2],
-        &[FieldIdV2],
-        &mut ExecutionBudgetV2,
-    ) -> Result<ExecBatchV2, QueryErrorV2>,
+    annotation_lookup: &mut AnnotationLookupFnV2<'_>,
+    hydrate: &mut HydrateFnV2<'_>,
     graph: Option<&GraphSnapshotV2>,
 ) -> Result<ExecutionOutputV2, QueryErrorV2> {
     let mut no_vector_reader = |_: &[RecordRefV2],
@@ -1913,21 +1909,9 @@ pub(crate) fn execute_v2_with_vector_adapters(
     plan: &PhysicalPlanV2,
     budget: &mut ExecutionBudgetV2,
     sources: &BTreeMap<String, Vec<Vec<V>>>,
-    annotation_lookup: &mut dyn FnMut(
-        &RecordRefV2,
-        &mut ExecutionBudgetV2,
-    ) -> Result<Vec<RecordRefV2>, QueryErrorV2>,
-    hydrate: &mut dyn FnMut(
-        &[RecordRefV2],
-        &[FieldIdV2],
-        &mut ExecutionBudgetV2,
-    ) -> Result<ExecBatchV2, QueryErrorV2>,
-    vector_lookup: &mut dyn FnMut(
-        &[RecordRefV2],
-        &str,
-        bool,
-        &mut ExecutionBudgetV2,
-    ) -> Result<VectorBatchV2, QueryErrorV2>,
+    annotation_lookup: &mut AnnotationLookupFnV2<'_>,
+    hydrate: &mut HydrateFnV2<'_>,
+    vector_lookup: &mut VectorLookupFnV2<'_>,
     graph: Option<&GraphSnapshotV2>,
 ) -> Result<ExecutionOutputV2, QueryErrorV2> {
     budget.check()?;

@@ -567,7 +567,7 @@ fn bind_expr_node(
             };
             (
                 ty,
-                ExprKind::Binary(binary.clone(), Box::new(left), Box::new(right)),
+                ExprKind::Binary(*binary, Box::new(left), Box::new(right)),
             )
         }
         Expr::Unary { unary, arg } => {
@@ -588,7 +588,7 @@ fn bind_expr_node(
                 }
                 UnaryOp::IsNull | UnaryOp::IsNotNull => Ty::Bool,
             };
-            (ty, ExprKind::Unary(unary.clone(), Box::new(arg)))
+            (ty, ExprKind::Unary(*unary, Box::new(arg)))
         }
         Expr::Call { call, args } => {
             if matches!(call.as_str(), "prop" | "has_prop") {
@@ -1024,6 +1024,8 @@ fn bind_match(
     Ok((columns, kernel))
 }
 
+// These are independent validated plan inputs, catalog state, and binder state.
+#[allow(clippy::too_many_arguments)]
 fn bind_vector_rank(
     mut scope: Vec<Column>,
     entity: String,
@@ -1162,7 +1164,6 @@ pub(crate) fn bind_v2(
             | Config::Take { .. }
             | Config::Offset { .. }
             | Config::Aggregate { .. } => 1,
-            _ => return Err(unsupported()),
         };
         if inputs.len() != expected {
             return Err(invalid("input_arity"));
@@ -1405,7 +1406,7 @@ pub(crate) fn bind_v2(
                     .into_iter()
                     .find(|(name, _)| *name == "tokenizer:unicode-scalar-v1")
                     .map(|(_, fingerprint)| fingerprint)
-                    .ok_or_else(|| unsupported())?;
+                    .ok_or_else(unsupported)?;
                 (
                     vec![Column {
                         name: alias,
@@ -1665,7 +1666,6 @@ pub(crate) fn bind_v2(
                     QueryOpV2::Aggregate,
                 )
             }
-            _ => return Err(unsupported()),
         };
         if op != node.op {
             return Err(invalid("operator_config_mismatch"));

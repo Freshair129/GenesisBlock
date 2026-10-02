@@ -1,6 +1,9 @@
 //! Independent P7 composition harness. This is not a production query endpoint.
 //! All 23 logical families dispatch through explicit fixture operators. Domains
 //! share one snapshot and preserve typed references, bag rows and score provenance.
+//! Shared oracle modules are exercised by several integration binaries in subsets.
+#![allow(dead_code)]
+
 #[path = "hql2_reference.rs"]
 pub mod relational;
 pub use relational::{graph, rank, Aggregate, Expr, JoinKind, Row, SortKey, Value};

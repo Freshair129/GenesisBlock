@@ -8,6 +8,7 @@
 //! Owners here have no namespace/kind discriminator: adapters MUST constrain a
 //! batch/corpus to one explicit namespace and Node kind before calling this module.
 //! Other owner kinds and quantized-only vector representations are unsupported.
+//! Shared by integration binaries that exercise different ranking/context subsets.
 use std::collections::{BTreeMap, BTreeSet};
 
 pub type Outcome<T> = Result<T, Error>;

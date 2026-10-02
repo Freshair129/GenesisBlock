@@ -113,9 +113,11 @@ fn one_wal_transaction_advances_stable_frontier_for_row_and_graph() {
 fn stale_expected_frontier_is_rejected_before_commit() {
     let path = fresh("unified_u3_frontier_conflict");
     let storage = open(&path);
+    let stable_before = storage.stable_frontier();
+    let transaction_frontier_before = storage.txn_frontier();
     let result = storage.commit_transaction(GenesisTransaction {
         transaction_id: "tx-stale".to_string(),
-        expected_frontier: Some(4),
+        expected_frontier: Some(transaction_frontier_before + 1),
         relational: vec![],
         graph: BatchInput {
             nodes: vec![],
@@ -124,7 +126,8 @@ fn stale_expected_frontier_is_rejected_before_commit() {
         vectors: vec![],
     });
     assert!(result.is_err());
-    assert_eq!(storage.stable_frontier(), 0);
+    assert_eq!(storage.stable_frontier(), stable_before);
+    assert_eq!(storage.txn_frontier(), transaction_frontier_before);
 }
 
 #[test]
@@ -150,16 +153,22 @@ fn compacted_wal_restores_frontier_and_transaction_identity() {
         },
         vectors: vec![],
     };
-    {
+    let (stable_frontier, transaction_frontier, commit_sequence) = {
         let storage = open(&path);
-        storage.commit_transaction(transaction.clone()).unwrap();
+        let committed = storage.commit_transaction(transaction.clone()).unwrap();
         storage.compact().unwrap();
-    }
+        (
+            storage.stable_frontier(),
+            storage.txn_frontier(),
+            committed.commit_sequence,
+        )
+    };
 
     fs::remove_file(Path::new(&path).join("projection.sqlite")).unwrap();
     let storage = open(&path);
-    assert_eq!(storage.stable_frontier(), 1);
+    assert_eq!(storage.stable_frontier(), stable_frontier);
+    assert_eq!(storage.txn_frontier(), transaction_frontier);
     assert!(storage.node_view("persisted-node").is_some());
     let retry = storage.commit_transaction(transaction).unwrap();
-    assert_eq!(retry.commit_sequence, 1);
+    assert_eq!(retry.commit_sequence, commit_sequence);
 }

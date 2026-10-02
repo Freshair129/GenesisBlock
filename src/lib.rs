@@ -78,6 +78,12 @@ pub mod router;
 pub mod uee_v2;
 use query::HqlCommand;
 
+type Hql2CatalogSnapshotV2 = (
+    query::hql2::result::CatalogStampV2,
+    std::collections::BTreeSet<String>,
+    std::collections::BTreeMap<String, query::hql2::catalog::CollectionSpaceV2>,
+);
+
 // v3: Event::NodeRetract journal frames (RCA--SLICE0-DURABILITY defect 2).
 // Older engines silently skip unknown event variants on replay, which would
 // resurrect deleted nodes — the bump makes downgrade fail closed instead.
@@ -730,6 +736,95 @@ impl QueryIrDirection {
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
+#[serde(deny_unknown_fields)]
+pub struct QueryIrGraphPattern {
+    pub start: QueryIrNodePattern,
+    #[serde(default)]
+    pub hops: Vec<QueryIrGraphHop>,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+#[serde(deny_unknown_fields)]
+pub struct QueryIrNodePattern {
+    pub var: Option<String>,
+    pub label: Option<String>,
+    #[serde(default)]
+    pub props: Vec<QueryIrPatternProperty>,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+#[serde(deny_unknown_fields)]
+pub struct QueryIrGraphHop {
+    pub edge: QueryIrEdgePattern,
+    pub node: QueryIrNodePattern,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+#[serde(deny_unknown_fields)]
+pub struct QueryIrEdgePattern {
+    pub var: Option<String>,
+    pub rel_type: Option<String>,
+    pub direction: QueryIrDirection,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+#[serde(deny_unknown_fields)]
+pub struct QueryIrPatternProperty {
+    pub key: String,
+    pub value: QueryIrPatternValue,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+#[serde(untagged)]
+pub enum QueryIrPatternValue {
+    String(String),
+    Number(f64),
+}
+
+#[derive(Serialize, Deserialize, Clone, Copy, Debug)]
+#[serde(rename_all = "snake_case")]
+pub enum QueryIrPatternOp {
+    Eq,
+    Ne,
+    Lt,
+    Le,
+    Gt,
+    Ge,
+    Contains,
+    StartsWith,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+#[serde(deny_unknown_fields)]
+pub struct QueryIrPatternField {
+    pub var: String,
+    pub field: Option<String>,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+#[serde(deny_unknown_fields)]
+pub struct QueryIrPatternPredicate {
+    pub field: QueryIrPatternField,
+    pub op: QueryIrPatternOp,
+    pub value: QueryIrPatternValue,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+#[serde(deny_unknown_fields)]
+pub struct QueryIrPatternOrder {
+    pub field: QueryIrPatternField,
+    #[serde(default)]
+    pub descending: bool,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+#[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
+pub enum QueryIrPatternReturn {
+    All,
+    Fields { fields: Vec<QueryIrPatternField> },
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
 #[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
 pub enum QueryIrOperation {
     Search {
@@ -758,6 +853,315 @@ pub enum QueryIrOperation {
         budget: Option<u32>,
         fuzzy: Option<bool>,
     },
+    MatchPath {
+        pattern: QueryIrGraphPattern,
+        limit: u32,
+        #[serde(default, rename = "where")]
+        where_preds: Vec<QueryIrPatternPredicate>,
+        #[serde(default)]
+        order_by: Option<QueryIrPatternOrder>,
+        #[serde(default, rename = "return")]
+        ret: Option<QueryIrPatternReturn>,
+    },
+}
+
+fn query_ir_match_path_validation(message: impl Into<String>) -> Error {
+    Error::from_reason(format!(
+        "QUERY_IR_VALIDATION_FAILED: match_path.{}",
+        message.into()
+    ))
+}
+
+impl QueryIrPatternValue {
+    fn into_hql(self) -> query::ast::HqlValue {
+        match self {
+            Self::String(value) => query::ast::HqlValue::Str(value),
+            Self::Number(value) => query::ast::HqlValue::Num(value),
+        }
+    }
+
+    fn from_hql(value: &query::ast::HqlValue) -> Self {
+        match value {
+            query::ast::HqlValue::Str(value) => Self::String(value.clone()),
+            query::ast::HqlValue::Num(value) => Self::Number(*value),
+        }
+    }
+}
+
+impl QueryIrPatternField {
+    fn into_hql(self) -> Result<query::ast::QualField> {
+        let var = self.var;
+        if var.trim().is_empty() {
+            return Err(query_ir_match_path_validation(
+                "field.var must not be empty",
+            ));
+        }
+        let field = match self.field {
+            None => None,
+            Some(raw) => {
+                let normalized = raw.to_ascii_lowercase();
+                Some(match normalized.as_str() {
+                    "id" => query::ast::HqlField::Id,
+                    "label" => query::ast::HqlField::Label,
+                    "score" => query::ast::HqlField::Score,
+                    "depth" => query::ast::HqlField::Depth,
+                    "recorded_at" => query::ast::HqlField::RecordedAt,
+                    value if value.starts_with("prop.") && value.len() > "prop.".len() => {
+                        query::ast::HqlField::Prop(raw["prop.".len()..].to_string())
+                    }
+                    _ => {
+                        return Err(query_ir_match_path_validation(format!(
+                            "field.field '{}' is not supported",
+                            raw
+                        )));
+                    }
+                })
+            }
+        };
+        Ok(query::ast::QualField { var, field })
+    }
+
+    fn from_hql(qual_field: &query::ast::QualField) -> Self {
+        let field = qual_field.field.as_ref().map(|field| match field {
+            query::ast::HqlField::Id => "id".to_string(),
+            query::ast::HqlField::Label => "label".to_string(),
+            query::ast::HqlField::Score => "score".to_string(),
+            query::ast::HqlField::Depth => "depth".to_string(),
+            query::ast::HqlField::RecordedAt => "recorded_at".to_string(),
+            query::ast::HqlField::Prop(key) => format!("prop.{key}"),
+        });
+        Self {
+            var: qual_field.var.clone(),
+            field,
+        }
+    }
+}
+
+impl QueryIrNodePattern {
+    fn into_hql(self) -> Result<query::ast::NodePattern> {
+        if self
+            .var
+            .as_deref()
+            .is_some_and(|value| value.trim().is_empty())
+        {
+            return Err(query_ir_match_path_validation("node.var must not be empty"));
+        }
+        if self
+            .label
+            .as_deref()
+            .is_some_and(|value| value.trim().is_empty())
+        {
+            return Err(query_ir_match_path_validation(
+                "node.label must not be empty",
+            ));
+        }
+        let props = self
+            .props
+            .into_iter()
+            .map(|property| {
+                if property.key.trim().is_empty() {
+                    return Err(query_ir_match_path_validation(
+                        "node.props.key must not be empty",
+                    ));
+                }
+                Ok((property.key, property.value.into_hql()))
+            })
+            .collect::<Result<Vec<_>>>()?;
+        Ok(query::ast::NodePattern {
+            var: self.var,
+            label: self.label,
+            props,
+        })
+    }
+
+    fn from_hql(node: &query::ast::NodePattern) -> Self {
+        Self {
+            var: node.var.clone(),
+            label: node.label.clone(),
+            props: node
+                .props
+                .iter()
+                .map(|(key, value)| QueryIrPatternProperty {
+                    key: key.clone(),
+                    value: QueryIrPatternValue::from_hql(value),
+                })
+                .collect(),
+        }
+    }
+}
+
+impl QueryIrEdgePattern {
+    fn into_hql(self) -> Result<query::ast::EdgePattern> {
+        if self
+            .var
+            .as_deref()
+            .is_some_and(|value| value.trim().is_empty())
+        {
+            return Err(query_ir_match_path_validation("edge.var must not be empty"));
+        }
+        if self
+            .rel_type
+            .as_deref()
+            .is_some_and(|value| value.trim().is_empty())
+        {
+            return Err(query_ir_match_path_validation(
+                "edge.rel_type must not be empty",
+            ));
+        }
+        let direction = match self.direction {
+            QueryIrDirection::Out => query::ast::PatternDirection::Out,
+            QueryIrDirection::In => query::ast::PatternDirection::In,
+            QueryIrDirection::Both => query::ast::PatternDirection::Both,
+        };
+        Ok(query::ast::EdgePattern {
+            var: self.var,
+            rel_type: self.rel_type,
+            direction,
+        })
+    }
+
+    fn from_hql(edge: &query::ast::EdgePattern) -> Self {
+        let direction = match edge.direction {
+            query::ast::PatternDirection::Out => QueryIrDirection::Out,
+            query::ast::PatternDirection::In => QueryIrDirection::In,
+            query::ast::PatternDirection::Both => QueryIrDirection::Both,
+        };
+        Self {
+            var: edge.var.clone(),
+            rel_type: edge.rel_type.clone(),
+            direction,
+        }
+    }
+}
+
+impl QueryIrGraphPattern {
+    fn into_hql(self) -> Result<query::ast::GraphPattern> {
+        let start = self.start.into_hql()?;
+        let hops = self
+            .hops
+            .into_iter()
+            .map(|hop| Ok((hop.edge.into_hql()?, hop.node.into_hql()?)))
+            .collect::<Result<Vec<_>>>()?;
+        Ok(query::ast::GraphPattern { start, hops })
+    }
+
+    fn from_hql(pattern: &query::ast::GraphPattern) -> Self {
+        Self {
+            start: QueryIrNodePattern::from_hql(&pattern.start),
+            hops: pattern
+                .hops
+                .iter()
+                .map(|(edge, node)| QueryIrGraphHop {
+                    edge: QueryIrEdgePattern::from_hql(edge),
+                    node: QueryIrNodePattern::from_hql(node),
+                })
+                .collect(),
+        }
+    }
+}
+
+impl QueryIrPatternOp {
+    fn into_hql(self) -> query::ast::HqlOp {
+        match self {
+            Self::Eq => query::ast::HqlOp::Eq,
+            Self::Ne => query::ast::HqlOp::Ne,
+            Self::Lt => query::ast::HqlOp::Lt,
+            Self::Le => query::ast::HqlOp::Le,
+            Self::Gt => query::ast::HqlOp::Gt,
+            Self::Ge => query::ast::HqlOp::Ge,
+            Self::Contains => query::ast::HqlOp::Contains,
+            Self::StartsWith => query::ast::HqlOp::StartsWith,
+        }
+    }
+
+    fn from_hql(op: query::ast::HqlOp) -> Self {
+        match op {
+            query::ast::HqlOp::Eq => Self::Eq,
+            query::ast::HqlOp::Ne => Self::Ne,
+            query::ast::HqlOp::Lt => Self::Lt,
+            query::ast::HqlOp::Le => Self::Le,
+            query::ast::HqlOp::Gt => Self::Gt,
+            query::ast::HqlOp::Ge => Self::Ge,
+            query::ast::HqlOp::Contains => Self::Contains,
+            query::ast::HqlOp::StartsWith => Self::StartsWith,
+        }
+    }
+}
+
+fn query_ir_match_path_clauses_to_hql(
+    limit: u32,
+    where_preds: Vec<QueryIrPatternPredicate>,
+    order_by: Option<QueryIrPatternOrder>,
+    ret: Option<QueryIrPatternReturn>,
+) -> Result<query::ast::PatternClauses> {
+    let where_preds = where_preds
+        .into_iter()
+        .map(|predicate| {
+            Ok(query::ast::PatternPredicate {
+                field: predicate.field.into_hql()?,
+                op: predicate.op.into_hql(),
+                value: predicate.value.into_hql(),
+            })
+        })
+        .collect::<Result<Vec<_>>>()?;
+    let order_by = match order_by {
+        None => None,
+        Some(order) => Some((order.field.into_hql()?, order.descending)),
+    };
+    let ret = match ret {
+        None => None,
+        Some(QueryIrPatternReturn::All) => Some(query::ast::PatternReturn::All),
+        Some(QueryIrPatternReturn::Fields { fields }) => Some(query::ast::PatternReturn::Fields(
+            fields
+                .into_iter()
+                .map(QueryIrPatternField::into_hql)
+                .collect::<Result<Vec<_>>>()?,
+        )),
+    };
+    Ok(query::ast::PatternClauses {
+        where_preds,
+        order_by,
+        limit: Some(limit as usize),
+        ret,
+    })
+}
+
+fn query_ir_match_path_from_hql(
+    pattern: &query::ast::GraphPattern,
+    clauses: &query::ast::PatternClauses,
+    default_limit: u64,
+) -> QueryIrOperation {
+    let limit = clauses
+        .limit
+        .map(|value| value as u64)
+        .unwrap_or(default_limit)
+        .min(u32::MAX as u64) as u32;
+    QueryIrOperation::MatchPath {
+        pattern: QueryIrGraphPattern::from_hql(pattern),
+        limit,
+        where_preds: clauses
+            .where_preds
+            .iter()
+            .map(|predicate| QueryIrPatternPredicate {
+                field: QueryIrPatternField::from_hql(&predicate.field),
+                op: QueryIrPatternOp::from_hql(predicate.op),
+                value: QueryIrPatternValue::from_hql(&predicate.value),
+            })
+            .collect(),
+        order_by: clauses
+            .order_by
+            .as_ref()
+            .map(|(field, descending)| QueryIrPatternOrder {
+                field: QueryIrPatternField::from_hql(field),
+                descending: *descending,
+            }),
+        ret: clauses.ret.as_ref().map(|ret| match ret {
+            query::ast::PatternReturn::All => QueryIrPatternReturn::All,
+            query::ast::PatternReturn::Fields(fields) => QueryIrPatternReturn::Fields {
+                fields: fields.iter().map(QueryIrPatternField::from_hql).collect(),
+            },
+        }),
+    }
 }
 
 #[cfg_attr(feature = "napi-bindings", napi(object))]
@@ -4157,7 +4561,7 @@ impl Storage {
                 } else {
                     uee_v2::RevisionOperationV1::Upsert
                 },
-                valid_from: valid_from.clone(),
+                valid_from,
                 valid_to,
                 schema_ref: None,
                 schema_version: None,
@@ -4821,7 +5225,17 @@ impl Storage {
         }
 
         let conn = self.projection_db.lock();
-        let stored: Option<(String, i64, i64, i64, String, String, Option<String>, Option<i64>)> = conn
+        type StoredMigrationReceipt = (
+            String,
+            i64,
+            i64,
+            i64,
+            String,
+            String,
+            Option<String>,
+            Option<i64>,
+        );
+        let stored: Option<StoredMigrationReceipt> = conn
             .query_row(
                 "SELECT source_database_id, source_schema, source_frontier, total_chunks, manifest_sha256, status, aggregate_sha256, migration_commit_frame_seq FROM hql2_schema6_migrations WHERE migration_id=?1",
                 [migration_id],
@@ -5996,6 +6410,8 @@ impl Storage {
         Self::parse_annotation_targets(annotation, database_id, namespace)
     }
 
+    // The revision builder consumes separate database, owner, collection, and vector inputs.
+    #[allow(clippy::too_many_arguments)]
     fn build_vector_revision_mutation(
         &self,
         conn: &Connection,
@@ -6670,14 +7086,7 @@ impl Storage {
     fn hql2_catalog_snapshot(
         &self,
         access: &AccessContext,
-    ) -> std::result::Result<
-        (
-            query::hql2::result::CatalogStampV2,
-            std::collections::BTreeSet<String>,
-            std::collections::BTreeMap<String, query::hql2::catalog::CollectionSpaceV2>,
-        ),
-        query::hql2::QueryErrorV2,
-    > {
+    ) -> std::result::Result<Hql2CatalogSnapshotV2, query::hql2::QueryErrorV2> {
         use query::hql2::{result::CatalogStampV2, QueryErrorV2};
         use std::collections::{BTreeMap, BTreeSet};
         self.ensure_readable().map_err(hql2_storage_error)?;
@@ -7793,7 +8202,13 @@ impl Storage {
         };
         if self.storage_schema_version == SCHEMA_VERSION {
             let revisions = self
-                .build_record_revision_transaction(&[], &[], &[], &[], &[vector.clone()])?
+                .build_record_revision_transaction(
+                    &[],
+                    &[],
+                    &[],
+                    &[],
+                    std::slice::from_ref(&vector),
+                )?
                 .ok_or_else(|| Error::from_reason("REVISION_ENVELOPE_REQUIRED"))?;
             let payload = serde_json::to_vec(&(&vector, &revisions))
                 .map_err(|error| Error::from_reason(error.to_string()))?;
@@ -8207,6 +8622,12 @@ impl Storage {
                 segments.push(read_segment_header(&path).ok_or_else(|| error("invalid segment"))?);
             }
         }
+        let base_frontier = segments
+            .iter()
+            .filter(|segment| segment.kind == SEG_KIND_BASE)
+            .map(|segment| segment.max_seq)
+            .max()
+            .unwrap_or(0);
         segments.sort_by_key(|s| (s.kind != SEG_KIND_LEGACY_JSONL, s.min_seq));
         for segment in segments {
             let (kind, body) =
@@ -8227,7 +8648,19 @@ impl Storage {
                 {
                     return Err(error("unsupported active header"));
                 }
-                frames(&body, ACTIVE_HEADER_LEN, true, false, visit)?;
+                frames(
+                    &body,
+                    ACTIVE_HEADER_LEN,
+                    true,
+                    false,
+                    &mut |seq, base_segment, event| {
+                        if seq.is_some_and(|seq| seq <= base_frontier) {
+                            Ok(())
+                        } else {
+                            visit(seq, base_segment, event)
+                        }
+                    },
+                )?;
             }
         }
         Ok(())
@@ -10077,7 +10510,7 @@ impl Storage {
                 (RelationalColumnType::Json, SqlValue::Text(value)) => serde_json::from_str(&value)
                     .map_err(|error| Error::from_reason(error.to_string()))?,
                 (RelationalColumnType::Blob, SqlValue::Blob(value)) => {
-                    Value::Array(value.into_iter().map(|byte| Value::from(byte)).collect())
+                    Value::Array(value.into_iter().map(Value::from).collect())
                 }
                 (RelationalColumnType::Integer, SqlValue::Integer(value)) => Value::from(value),
                 (RelationalColumnType::Real, SqlValue::Real(value)) => Value::Number(
@@ -11136,10 +11569,15 @@ impl Storage {
                 let tx = conn
                     .transaction()
                     .map_err(|e| Error::from_reason(e.to_string()))?;
+                let mut max_node_clock = 0;
                 for node in &transaction.nodes {
                     let node_u32 = self.get_or_intern_id(&node.id);
+                    max_node_clock = max_node_clock.max(node.clock.time);
                     Self::projection_apply_node_tx(&tx, node_u32, node)?;
                     Self::projection_append_node_version(&tx, node_u32, node, frame_seq)?;
+                }
+                if max_node_clock > 0 {
+                    Self::projection_state_set(&tx, "node_clock", &max_node_clock.to_string())?;
                 }
                 for edge in &transaction.edges {
                     self.projection_apply_edge_tx(&tx, edge, Some(frame_seq))?;
@@ -12737,6 +13175,7 @@ impl Storage {
         // either way, since `walk_frames` refuses the first invalid frame.
         if !read_only {
             Self::journal_truncate_torn_active(&log_path);
+            Self::journal_truncate_active_overlap(&root, &log_path);
         }
         let initial_next_seq = Self::journal_max_seq(&root, &log_path) + 1;
         let projection_path = root.join(PROJECTION_DB_FILE);
@@ -14228,6 +14667,166 @@ impl Storage {
         }
     }
 
+    fn collect_consensus_graph_mutations(
+        event: &Event,
+        nodes: &mut Vec<NodeOutput>,
+        edges: &mut Vec<EdgeOutput>,
+        vectors: &mut Vec<VectorEvent>,
+        node_retractions: &mut Vec<NodeRetractionEvent>,
+    ) -> Result<()> {
+        match event {
+            Event::Node(node) => {
+                let mut node = node.clone();
+                if !node.labels.iter().any(|label| label == "MASTER") {
+                    node.labels.push("MASTER".to_string());
+                }
+                nodes.push(node);
+            }
+            Event::Edge(edge) => edges.push(edge.clone()),
+            Event::Vector(vector) => vectors.push(vector.clone()),
+            Event::NodeRetract {
+                id,
+                clock,
+                retracted_at,
+            } => node_retractions.push(NodeRetractionEvent {
+                id: id.clone(),
+                clock: clock.clone(),
+                retracted_at: retracted_at.clone(),
+            }),
+            Event::Batch(events) => {
+                for event in events {
+                    Self::collect_consensus_graph_mutations(
+                        event,
+                        nodes,
+                        edges,
+                        vectors,
+                        node_retractions,
+                    )?;
+                }
+            }
+            _ => {
+                return Err(Error::from_reason(
+                    "CONSENSUS_SCHEMA6_GRAPH_EVENT_UNSUPPORTED",
+                ));
+            }
+        }
+        Ok(())
+    }
+
+    fn revisionize_consensus_event(&self, event: Event) -> Result<Event> {
+        if self.storage_schema_version != SCHEMA_VERSION {
+            return Ok(event);
+        }
+        match event {
+            Event::Node(_)
+            | Event::Edge(_)
+            | Event::Vector(_)
+            | Event::NodeRetract { .. }
+            | Event::Batch(_) => {
+                let mut nodes = Vec::new();
+                let mut edges = Vec::new();
+                let mut vectors = Vec::new();
+                let mut node_retractions = Vec::new();
+                Self::collect_consensus_graph_mutations(
+                    &event,
+                    &mut nodes,
+                    &mut edges,
+                    &mut vectors,
+                    &mut node_retractions,
+                )?;
+                let mut last_edge_index = HashMap::with_capacity(edges.len());
+                for (index, edge) in edges.iter().enumerate() {
+                    last_edge_index.insert(edge.id.as_str(), index);
+                }
+                let effective_edges = edges
+                    .iter()
+                    .enumerate()
+                    .filter(|(index, edge)| last_edge_index.get(edge.id.as_str()) == Some(index))
+                    .map(|(_, edge)| edge.clone())
+                    .collect::<Vec<_>>();
+                let revisions = self
+                    .build_record_revision_transaction(
+                        &nodes,
+                        &effective_edges,
+                        &node_retractions,
+                        &[],
+                        &vectors,
+                    )?
+                    .ok_or_else(|| Error::from_reason("CONSENSUS_EMPTY_GRAPH_PROPOSAL"))?;
+                let payload = serde_json::to_vec(&(
+                    &nodes,
+                    &effective_edges,
+                    &node_retractions,
+                    &vectors,
+                    &revisions,
+                ))
+                .map_err(|error| Error::from_reason(error.to_string()))?;
+                Ok(Event::Transaction(GenesisTransactionEvent {
+                    transaction_id: Uuid::new_v4().to_string(),
+                    origin_commit_seq: 0,
+                    local_frame_seq: None,
+                    payload_hash: hex::encode(Sha256::digest(payload)),
+                    relational: vec![],
+                    nodes,
+                    edges: effective_edges,
+                    vectors,
+                    node_retractions,
+                    advances_txn_frontier: false,
+                    record_revision_transaction: Some(revisions),
+                }))
+            }
+            Event::Transaction(mut transaction) => {
+                if transaction.record_revision_transaction.is_none() {
+                    transaction.record_revision_transaction = self
+                        .build_record_revision_transaction(
+                            &transaction.nodes,
+                            &transaction.edges,
+                            &transaction.node_retractions,
+                            &transaction.relational,
+                            &transaction.vectors,
+                        )?;
+                }
+                Ok(Event::Transaction(transaction))
+            }
+            Event::RelationalRows {
+                namespace,
+                schema_version,
+                mutation_id,
+                payload_hash,
+                affected_rows,
+                mutations,
+                record_revision_transaction,
+            } => {
+                let record_revision_transaction = match record_revision_transaction {
+                    Some(revisions) => Some(revisions),
+                    None => self.build_record_revision_transaction(
+                        &[],
+                        &[],
+                        &[],
+                        &[RelationalMutationGroup {
+                            namespace: namespace.clone(),
+                            mutations: mutations.clone(),
+                        }],
+                        &[],
+                    )?,
+                };
+                Ok(Event::RelationalRows {
+                    namespace,
+                    schema_version,
+                    mutation_id,
+                    payload_hash,
+                    affected_rows,
+                    mutations,
+                    record_revision_transaction,
+                })
+            }
+            Event::VectorMaterialized(_) => Err(Error::from_reason(
+                "UPGRADE_REQUIRED: schema 6 requires revision-bearing graph events",
+            )),
+            other => Ok(other),
+        }
+    }
+
     /// Open a consensus proposal for `event`. The proposal is signed with this
     /// node's own key (the `_signature` param is ignored — an external caller has
     /// no access to the local private key, so a caller-supplied signature could
@@ -14239,6 +14838,9 @@ impl Storage {
         if Self::contains_p6_control_event(&event) {
             return Err(Error::from_reason("P6_LOCAL_ONLY"));
         }
+        let _commit_guard = self.commit_lock.lock();
+        self.ensure_readable()?;
+        let event = self.revisionize_consensus_event(event)?;
         if !self.semantic_verify(&event)? {
             return Err(Error::from_reason(
                 "proposal rejected by semantic_verify (conflicts with a governing axiom)",
@@ -14752,7 +15354,7 @@ impl Storage {
             caused_by: args.caused_by,
             clock: self.next_clock(),
         };
-        self.persist_local_graph_mutations(&[], &[edge.clone()], &[])?;
+        self.persist_local_graph_mutations(&[], std::slice::from_ref(&edge), &[])?;
         let u32_id = self.index_edge_internal(&edge.id, &edge.from, &edge.to);
         self.edges.insert(u32_id, edge.clone());
         self.refresh_impacts(Some(vec![edge.to.clone()]));
@@ -15403,7 +16005,7 @@ impl Storage {
             "operations": {
                 "search": "implemented",
                 "traverse": "implemented",
-                "match_path": "planned",
+                "match_path": "implemented",
                 "context": "implemented",
                 "relational_named_query": "planned"
             },
@@ -15423,7 +16025,14 @@ impl Storage {
                     "temporal": "unsupported",
                     "tiers": ["H0", "H1", "H2", "H3", "H4", "H5", "H6"]
                 },
-                "match_path": "planned",
+                "match_path": {
+                    "linear": "implemented",
+                    "where": "implemented",
+                    "order_by": "implemented",
+                    "return": "implemented",
+                    "valid_at": "implemented",
+                    "tx_as_of": "unsupported"
+                },
                 "relational_named_query": "planned"
             },
             "limits": {
@@ -15526,6 +16135,11 @@ impl Storage {
             .temporal
             .as_ref()
             .and_then(|temporal| temporal.tx_as_of);
+        if tx_as_of.is_some() && matches!(&request.operation, QueryIrOperation::MatchPath { .. }) {
+            return Err(Error::from_reason(
+                "QUERY_CAPABILITY_UNSUPPORTED: match_path temporal.tx_as_of is not implemented",
+            ));
+        }
         if let Some(t) = tx_as_of {
             let horizon = self.history_horizon();
             if t < horizon {
@@ -15728,6 +16342,26 @@ impl Storage {
                 })?;
                 ("context", data)
             }
+            QueryIrOperation::MatchPath {
+                pattern,
+                limit,
+                where_preds,
+                order_by,
+                ret,
+            } => {
+                if limit == 0 {
+                    return Err(Error::from_reason(
+                        "QUERY_RESOURCE_LIMIT_EXCEEDED: match_path.limit must be positive",
+                    ));
+                }
+                let pattern = pattern.into_hql()?;
+                let clauses =
+                    query_ir_match_path_clauses_to_hql(limit, where_preds, order_by, ret)?;
+                let data = self
+                    .match_pattern(&pattern, &as_of, &clauses, &mut budget)
+                    .map_err(preserve_query_error)?;
+                ("match_path", data)
+            }
         };
 
         let warnings = if operation_kind == "context"
@@ -15829,10 +16463,6 @@ impl Storage {
         let budget_limits = requested_budget.unwrap_or_default().resolve()?;
         let mut budget_state = QueryBudgetState::new(budget_limits);
 
-        fn to_value<T: serde::Serialize>(res: T) -> Result<serde_json::Value> {
-            serde_json::to_value(res)
-                .map_err(|e| Error::from_reason(format!("HQL result serialization failed: {e}")))
-        }
         fn resolved_target_id(storage: &Storage, target: &str, fuzzy: bool) -> Result<String> {
             if fuzzy {
                 storage.find_fuzzy_id_unlocked(target).ok_or_else(|| {
@@ -15885,15 +16515,30 @@ impl Storage {
                 })?;
             Ok((query_vector, node.collection.clone()))
         }
+        fn validate_hql_search_k(k: u32) -> Result<()> {
+            if k == 0 {
+                return Err(Error::from_reason(format!(
+                    "QUERY_RESOURCE_LIMIT_EXCEEDED: search.k must be between 1 and {QUERY_IR_MAX_K}"
+                )));
+            }
+            Ok(())
+        }
+        fn query_ir_data(
+            storage: &Storage,
+            request: QueryIrRequest,
+            budget: Option<QueryBudget>,
+        ) -> Result<serde_json::Value> {
+            let mut request = request;
+            request.budget = budget;
+            let response = storage.execute_query_ir_unlocked(request)?;
+            Ok(response["data"].clone())
+        }
         fn query_ir_neighbors(
             storage: &Storage,
             request: QueryIrRequest,
             budget: Option<QueryBudget>,
         ) -> Result<Vec<NeighborOutput>> {
-            let mut request = request;
-            request.budget = budget;
-            let response = storage.execute_query_ir_unlocked(request)?;
-            serde_json::from_value(response["data"].clone()).map_err(|error| {
+            serde_json::from_value(query_ir_data(storage, request, budget)?).map_err(|error| {
                 Error::from_reason(format!("HQL compatibility decode failed: {error}"))
             })
         }
@@ -15911,6 +16556,7 @@ impl Storage {
                 collection,
                 clauses,
             } => {
+                validate_hql_search_k(k)?;
                 let (query_vector, resolved_collection) =
                     hql_query_vector(self, &target, fuzzy, vector, &collection)?;
                 let res = if (1..=QUERY_IR_MAX_K).contains(&k) {
@@ -16042,6 +16688,7 @@ impl Storage {
                 collection,
                 clauses,
             } => {
+                validate_hql_search_k(k)?;
                 let (query_vector, resolved_collection) =
                     hql_query_vector(self, &target, fuzzy, vector, &collection)?;
                 let res = if (1..=QUERY_IR_MAX_K).contains(&k) {
@@ -16094,15 +16741,49 @@ impl Storage {
                 tier,
                 budget,
                 fuzzy,
-            } => {
-                let res = self.retrieve_context_inner(&target, &tier, budget, fuzzy, None)?;
-                to_value(res)
-            }
+            } => query_ir_data(
+                self,
+                QueryIrRequest {
+                    contract_version: QUERY_IR_V1.to_string(),
+                    request_id: "hql-compat".to_string(),
+                    namespace: None,
+                    temporal: None,
+                    consistency: None,
+                    budget: None,
+                    operation: QueryIrOperation::Context {
+                        target_id: Some(target),
+                        query_vector: None,
+                        tier,
+                        budget,
+                        fuzzy: Some(fuzzy),
+                    },
+                },
+                Some(budget_state.limits.as_input()),
+            ),
             HqlCommand::MatchPattern {
                 pattern,
                 as_of,
                 clauses,
-            } => self.match_pattern(&pattern, &as_of, &clauses, &mut budget_state),
+            } => query_ir_data(
+                self,
+                QueryIrRequest {
+                    contract_version: QUERY_IR_V1.to_string(),
+                    request_id: "hql-compat".to_string(),
+                    namespace: None,
+                    temporal: Some(QueryIrTemporal {
+                        valid_at: as_of,
+                        tx_as_of: None,
+                    }),
+                    consistency: None,
+                    budget: None,
+                    operation: query_ir_match_path_from_hql(
+                        &pattern,
+                        &clauses,
+                        budget_state.limits.max_result_rows,
+                    ),
+                },
+                Some(budget_state.limits.as_input()),
+            ),
         }?;
         budget_state.serialized(&result)?;
         Ok(result)
@@ -22175,6 +22856,62 @@ impl Storage {
         }
     }
 
+    /// A fold writes the sealed base before resetting the active file. If a
+    /// crash leaves the pre-fold active prefix beside that base, the base is
+    /// authoritative through its max sequence and only newer active frames
+    /// remain part of the journal tail.
+    fn journal_truncate_active_overlap(root: &std::path::Path, active: &std::path::Path) {
+        let base_frontier = Self::journal_list_segments(root)
+            .into_iter()
+            .filter(|segment| segment.kind == SEG_KIND_BASE)
+            .map(|segment| segment.max_seq)
+            .max()
+            .unwrap_or(0);
+        if base_frontier == 0 {
+            return;
+        }
+        let Ok(bytes) = fs::read(active) else {
+            return;
+        };
+        if bytes.len() < ACTIVE_HEADER_LEN || bytes[0..4] != ACTIVE_MAGIC {
+            return;
+        }
+        let mut replacement = active_header(base_frontier.saturating_add(1)).to_vec();
+        let mut offset = ACTIVE_HEADER_LEN;
+        let mut removed_overlap = false;
+        while offset + FRAME_HEADER_LEN <= bytes.len() {
+            let len = u32::from_le_bytes(bytes[offset..offset + 4].try_into().unwrap()) as usize;
+            let seq = u64::from_le_bytes(bytes[offset + 4..offset + 12].try_into().unwrap());
+            let crc = u32::from_le_bytes(bytes[offset + 12..offset + 16].try_into().unwrap());
+            let payload_start = offset + FRAME_HEADER_LEN;
+            let Some(end) = payload_start.checked_add(len) else {
+                break;
+            };
+            if len > MAX_JOURNAL_FRAME_PAYLOAD_BYTES || end > bytes.len() {
+                break;
+            }
+            if frame_crc(seq, &bytes[payload_start..end]) != crc {
+                break;
+            }
+            if seq <= base_frontier {
+                removed_overlap = true;
+            } else {
+                replacement.extend_from_slice(&bytes[offset..end]);
+            }
+            offset = end;
+        }
+        if removed_overlap {
+            let temporary = active.with_extension("gwal.overlap.tmp");
+            let written = File::create(&temporary).and_then(|mut file| {
+                file.write_all(&replacement)?;
+                file.sync_all()
+            });
+            if written.is_ok() && fs::rename(&temporary, active).is_err() {
+                let _ = fs::remove_file(&temporary);
+            }
+        }
+    }
+
     /// All sealed segments, sorted by (min_seq, max_seq). Unreadable headers
     /// are skipped (recovery degrades explicitly at read time, never silently).
     fn journal_list_segments(root: &std::path::Path) -> Vec<SegmentInfo> {
@@ -22460,6 +23197,12 @@ impl Storage {
         f: &mut dyn FnMut(u64, SignedEvent),
     ) {
         use std::io::BufRead;
+        let base_frontier = Self::journal_list_segments(&self.path)
+            .into_iter()
+            .filter(|segment| segment.kind == SEG_KIND_BASE)
+            .map(|segment| segment.max_seq)
+            .max()
+            .unwrap_or(0);
         let emit_lines = |bytes: &[u8], f: &mut dyn FnMut(u64, SignedEvent)| {
             for line in bytes.split(|b| *b == b'\n') {
                 if line.is_empty() {
@@ -22505,7 +23248,7 @@ impl Storage {
         if let Ok(bytes) = fs::read(&self.log_path) {
             if bytes.len() > ACTIVE_HEADER_LEN && bytes[0..4] == ACTIVE_MAGIC {
                 walk_frames(&bytes, ACTIVE_HEADER_LEN, |seq, payload| {
-                    if from_seq.is_none_or(|cursor| seq > cursor) {
+                    if seq > base_frontier && from_seq.is_none_or(|cursor| seq > cursor) {
                         if let Ok(se) = serde_json::from_slice::<SignedEvent>(payload) {
                             f(seq, se);
                         }
@@ -22534,13 +23277,12 @@ impl Storage {
     /// for all recovery paths. Idempotent: LWW upserts.
     fn replay_journal(&self, from_seq: Option<u64>, include_legacy: bool) {
         self.scan_journal(from_seq, include_legacy, &mut |seq, signed_event| {
-            if Self::contains_p6_control_event(&signed_event.event) {
-                if signed_event.signer_peer_id != self.local_peer_id
-                    || !self.verify_event_signature(&signed_event)
-                {
-                    self.recovery_required.store(true, Ordering::SeqCst);
-                    return;
-                }
+            if Self::contains_p6_control_event(&signed_event.event)
+                && (signed_event.signer_peer_id != self.local_peer_id
+                    || !self.verify_event_signature(&signed_event))
+            {
+                self.recovery_required.store(true, Ordering::SeqCst);
+                return;
             }
             self.apply_replay_event(seq, self.normalize_replayed_event(signed_event));
         });
@@ -22845,6 +23587,8 @@ fn hql2_storage_error(error: Error) -> query::hql2::QueryErrorV2 {
     query::hql2::QueryErrorV2::new(code, stage, safe)
 }
 
+// The reader keeps record identity, temporal selectors, and query budget explicit.
+#[allow(clippy::too_many_arguments)]
 fn hql2_read_revision_payload(
     connection: &Connection,
     database_id: &str,
@@ -23002,6 +23746,8 @@ impl<'a> ReadView<'a> {
             .map_err(|_| QueryErrorV2::new("DATA_CORRUPTION", "execute", "history_floor"))
     }
 
+    // ACL evaluation needs the subject, snapshot, schema, payload, and budget separately.
+    #[allow(clippy::too_many_arguments)]
     fn hql2_revision_subject_readable(
         &self,
         connection: &Connection,
@@ -24430,6 +25176,8 @@ impl<'a> ReadView<'a> {
         Ok(VectorBatchV2 { entries })
     }
 
+    // Annotation ACL checks bind the annotation to the query snapshot and budget.
+    #[allow(clippy::too_many_arguments)]
     fn hql2_annotation_references_authorized(
         &self,
         connection: &Connection,
@@ -24457,6 +25205,8 @@ impl<'a> ReadView<'a> {
         )
     }
 
+    // Recursive reference checks also carry their cycle-detection set explicitly.
+    #[allow(clippy::too_many_arguments)]
     fn hql2_annotation_references_authorized_inner(
         &self,
         connection: &Connection,

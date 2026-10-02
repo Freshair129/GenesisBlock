@@ -44,6 +44,16 @@ fn open(path: &str) -> Storage {
     .unwrap()
 }
 
+fn open_schema(path: &str, schema_version: u32) -> Storage {
+    fs::create_dir_all(path).unwrap();
+    fs::write(
+        Path::new(path).join("state.json"),
+        format!(r#"{{"schema_version":{schema_version}}}"#),
+    )
+    .unwrap();
+    open(path)
+}
+
 fn add_node(s: &Storage, id: &str) {
     s.add_node(NodeInput {
         id: Some(id.to_string()),
@@ -283,7 +293,7 @@ fn stale_wal_prefix_falls_back_to_full_replay() {
 fn snapshot_without_frontier_still_loads() {
     let path = fresh("test_wal_tail_replay_legacy");
     {
-        let s = open(&path);
+        let s = open_schema(&path, 4);
         for i in 0..10 {
             add_node(&s, &format!("N{i}"));
         }
@@ -326,7 +336,7 @@ fn snapshot_without_frontier_still_loads() {
 fn current_manifest_without_frontier_recovers_only_from_wal() {
     let path = fresh("test_wal_tail_replay_p6_missing_frontier");
     {
-        let storage = open(&path);
+        let storage = open_schema(&path, 5);
         for i in 0..10 {
             add_node(&storage, &format!("N{i}"));
         }

@@ -527,21 +527,20 @@ fn pattern_node(
     }))
 }
 
+type ExpandedEdgeV2 = (
+    Option<Name>,
+    Vec<Name>,
+    BTreeMap<String, Expr>,
+    GraphDirection,
+    u32,
+    u32,
+);
+
 fn expand_edge(
     source: &str,
     pattern: &Pair<'_, Rule>,
     pair: Pair<'_, Rule>,
-) -> Result<
-    (
-        Option<Name>,
-        Vec<Name>,
-        BTreeMap<String, Expr>,
-        GraphDirection,
-        u32,
-        u32,
-    ),
-    QueryErrorV2,
-> {
+) -> Result<ExpandedEdgeV2, QueryErrorV2> {
     let raw_edge = pair.as_str().trim_start();
     let direction = if raw_edge.starts_with("<-") {
         GraphDirection::In

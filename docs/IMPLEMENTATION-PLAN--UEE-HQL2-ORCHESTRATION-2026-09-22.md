@@ -1,9 +1,9 @@
 ---
-version: "0.8.33b"
+version: "0.8.35b"
 doc_id: "IMPLEMENTATION-PLAN--UEE-HQL2-ORCHESTRATION-2026-09-22"
 owner: "Boss (Founder / Product Authority)"
 created_at: "2026-09-22T00:00:00+07:00,ATHER,working-tree"
-last_update: "2026-10-02T09:19:00+07:00,ATHER"
+last_update: "2026-10-02T21:22:00+07:00,ATHER"
 status: beta
 superseded_by: null
 attributes:
@@ -519,17 +519,19 @@ P9-P16, merge or deployment is authorized.
    ingress rejects it and peer export excludes it. The receipt covers the final
    migration-commit frame and post-migration manifest digest. A migration-only
    open resumes only the exact migration ID and manifest digest. Unknown signed
-   control events fail closed. The repo's committed baseline is schema 5; a
-   future schema-6 release before this migration requires advancing the disk
-   schema version. ADR 0.4.0b was approved 2026-09-29; implementation and
-   verification remain limited to temporary fixture databases.
+   control events fail closed. The v5-to-v6 migration now advances the disk
+   schema version; its cutover and R6b activation/recovery implementation have
+   been verified with temporary fixtures only. No user database migration is
+   authorized.
    Owner-approved ADR R6b adds a signed local `Schema6ActivationV1` for fresh
    and migrated v6 stores. If `state.json` is absent, preflight every WAL
    source before replay; require complete activation/migration/receipt proof for
    v6, replay only v5-compatible WAL as v5, and return `RECOVERY_REQUIRED` for
    unproven v6-only events. Fold retains activation. Temporary-fixture tests
    cover v5-only, fresh-v6, complete/torn-tail WAL-only, invalid activation,
-   migration proof and fold/cold-reopen parity.
+   migration proof and fold/cold-reopen parity. Crash recovery passes 17/17,
+   migration passes 19/19, and the selected 40-target HQL2/durability/authority
+   aggregate passes; no user database was opened for migration.
 3. **Row/vector revisions:** add registry row IDs and exact KeyCodec v1 while
    preserving nullable SQLite primary-key behavior; version vector values with
    collection-space fingerprints and report unavailable original bytes rather
@@ -757,9 +759,9 @@ Remaining HQL2/P8 acceptance gates stay open.
 | HQL2 checked remainder | Implemented; local verification passed | HQL `%` lowers to the closed `rem` discriminator; exact same-type I64/F64 only, NULL propagation, checked zero-divisor/overflow errors, no coercion. Four focused targets pass 79/79; all 22 root HQL2 targets pass 328/0/1. |
 | HQL2 vector ranking oracle differential | Implemented; local verification passed | HQL and typed IR match the independent P7 exact-L2 rank oracle for KNN and Original Rerank; two test-only fixtures pass 2/2. The all-root-HQL2 sweep passes 331/0/1 across 24 targets. Broad exact-oracle coverage and P8 acceptance remain open. |
 | Typed database-bound identity | Partial | `RecordRefV2` validates lineage/revision syntax; graph, row, vector and annotation writers produce CAS-bound UUID revisions. Node, edge, row and annotation scans return lease-bound refs; HistoryScan enumerates supported retained record revisions and ChangeScan includes graph, row, vector and annotation revision events. Artifact history and remaining source adapters stay open. |
-| Schema-v6 open gate and additive tables | Implemented; fixture-only | Explicit offline v5-to-v6 migration, verified engine backup/manifest binding, resumable signed chunks/commit, ready-marker proof, ordinary reopen, fold/rebuild and recursive peer isolation pass 19/19 dedicated tests. No user database has been migrated. |
+| Schema-v6 open gate and additive tables | Implemented; fixture-only | Explicit offline v5-to-v6 migration, verified engine backup/manifest binding, resumable signed chunks/commit, ready-marker proof, signed local activation, markerless WAL-only reopen, fold/rebuild and recursive peer isolation pass 19/19 migration plus 17/17 crash tests. Selected aggregate: 40 targets pass. No user database has been migrated. |
 | KeyCodec v1 and row registry | Partial | Exact typed key bytes and UUID row IDs are persisted; upsert/update preserve row identity, delete/reinsert allocates a new identity, and nullable-key behavior remains non-unique. RowScan now binds the authorized table catalog and returns the row revision ref; historical row reads remain open. |
-| WAL revision event and projections | Partial | Local graph, standalone relational batch, unified transaction, vector writes and annotation CAS writes carry revision envelopes; graph/row/vector replay and annotation compact/reopen are covered. Eight annotation-focused tests pass. Folded graph and relational materializations are not yet revision-bound peer-ingress checkpoints and remain fail-closed. |
+| WAL revision event and projections | Partial | Local graph, standalone relational batch, unified transaction, vector writes, annotation CAS writes and supported consensus graph proposals carry revision envelopes; consensus signs the final envelope and stale predecessors fail before append. Graph/row/vector replay and annotation compact/reopen are covered. Folded graph and relational materializations are not yet revision-bound peer-ingress checkpoints and remain fail-closed. |
 | Annotation persistence and ACL | Partial | Annotation payloads and separate target/evidence roles are normalized; frozen refs/cycles are preflighted before WAL; policy event v2 stores `Annotation(namespace)` through compact/reopen. AnnotationScan and hydration check target/evidence refs at the P6 snapshot. Tests exercise the broad namespace grant; exact-grant-only query authorization remains unsupported. |
 | HQL2 storage-backed source adapters and text operators | Partial | Node/Edge/Row/Annotation scans return revision-bound refs with bounded pagination and current ACL under the P6 lease; `FieldIdV2`/`ExecBatchV2` provides aligned selective hydration. LexicalMatch and ContextPack now execute with registered `unicode-whitespace-bm25-v1` and `unicode-scalar-v1` profiles under that source boundary. Transport parity, broad exact-oracle coverage and full P8/P13 qualification remain open. |
 | HQL1 actor-scoped adapter | Partial | `Storage::query_v2` supports only differential-tested zero-hop and bounded one-hop unlabeled/unconstrained node-ID projections after P6 authorization; one hop may include one endpoint-ID exact string equality filter. The legacy parser is preflighted and budgeted before AST construction. Focused target passes 9/9; 361/0/1 across 27 HQL2 targets and 190/0/0 across 11 compatibility targets. Other HQL1 commands/forms, independent review and full shared-runtime/P8/P13 acceptance remain open. |
@@ -779,6 +781,13 @@ parser child entrypoint exercised by its parent. It includes typed hydration,
 dynamic property names, annotation source/lookup ACL, nullable entity
 projection, source-payload budgeting and HQL/IR lookup parity.
 Verification is fixture-only; no user database has been opened for migration.
+The final locked/offline no-default-features Rust integration suite passed with
+no failures (`--jobs 4 --no-fail-fast -- --skip probe_vs_recall`). That one
+discriminating probe is NOT_RUN; pre-existing ignored soak cases remain ignored.
+Default and no-default strict all-target Clippy both pass, as do formatting,
+diff checks and `docs:validate` (239 files, 0 violations). Full P8/P13,
+shared-runtime, independent-review, release and consumer-qualification gates
+remain open; no user database was migrated.
 Schema-6 peer ingress still rejects unversioned folded graph and relational
 materializations with `UPGRADE_REQUIRED`. A separate H2-D11 offline sweep now
 passes 62/62 across eight explicit targets: durable revisions 15, annotation
@@ -822,13 +831,17 @@ Version diff `0.8.24b -> 0.8.25b`: record the delegated C-3 decision and exact P
 Version diff `0.8.25b -> 0.8.26b`: implement Sequence node ID/labels through HQL and typed IR under P6; record 7 focused passes and 338/0/1 across 25 root HQL2 targets; retain the ACL-hidden fixture, independent review and full P8 gates.
 Version diff `0.8.26b -> 0.8.27b`: record owner approval of P8 addendum D1-D6 and authorize test-first implementation of lexical/context profiles, Sequence properties, contextual literals and the corrected pre-parse ACL fixture; runtime evidence remains pending.
 Version diff `0.8.28b -> 0.8.29b`: add and pass the edge-property-before-SHORTEST regression; record 10/10 P8 completion tests and 349/0/1 across 26 root HQL2 targets plus a separate 190/0/0 across 11 P6/schema-v6/compatibility targets; confirmation review marked the D5 fix complete and independent static review found no concrete defect; retain broad P8/P13 gates.
-Version diff `0.8.32b -> 0.8.33b`: incorporate owner-approved H2-D11 R6b schema activation and markerless WAL recovery proof/test gates; implementation and tests remain pending.
+Version diff `0.8.34b -> 0.8.35b`: complete local integration verification for the approved H2-D11 schema-v6/consensus path; full Rust suite and default/no-default strict Clippy pass, with `probe_vs_recall` explicitly NOT_RUN; retain fixture-only scope and broader P8/P13/review/release gates.
+Version diff `0.8.33b -> 0.8.34b`: implement approved H2-D11 R6b signed activation preflight and markerless WAL recovery; record 17/17 crash tests, 19/19 migration tests and 40 passing selected HQL2/durability/authority targets; retain fixture-only scope and broader P8/P13 gates.
+Version diff `0.8.32b -> 0.8.33b`: incorporate owner-approved H2-D11 R6b schema activation and markerless WAL recovery proof/test gates.
 Version diff `0.8.31b -> 0.8.32b`: add the differential-proven one-hop endpoint-ID string equality filter to D7; record 9/9 focused adapter tests, 361/0/1 across 27 root HQL2 targets and 190/0/0 across 11 compatibility targets; retain other HQL1, independent-review and P8/P13 gates.
 Version diff `0.8.27b -> 0.8.28b`: implement approved D1-D5, record 9 focused passes, three JSON literal size-preflight unit tests and 528/0/1 across 37 explicit HQL2/P6/schema-v6/compatibility targets; retain reviewer confirmation and broad P8/P13 gates.
 
 | Version | Date | Status | Summary | Commit Hash | Agent |
-| 0.8.33b | 2026-10-02 | beta | Incorporate approved H2-D11 R6b schema activation and markerless WAL recovery gates; implementation and tests remain pending | working-tree | ATHER |
 |---|---|---|---|---|---|
+| 0.8.35b | 2026-10-02 | beta | Full locked/offline no-default-features Rust suite passes with `probe_vs_recall` NOT_RUN; default/no-default strict all-target Clippy passes; consensus signs schema-v6 revision envelopes; broad P8/P13/review/release gates remain open | working-tree | ATHER |
+| 0.8.34b | 2026-10-02 | beta | Implement and locally verify R6b markerless WAL recovery; crash 17/17, migration 19/19 and selected 40-target aggregate pass; fixture-only, no user DB migration, broad P8/P13 gates remain open | 0135c29 | ATHER |
+| 0.8.33b | 2026-10-02 | beta | Incorporate approved H2-D11 R6b schema activation and markerless WAL recovery gates; implementation and tests remain pending | working-tree | ATHER |
 | 0.8.32b | 2026-10-02 | beta | Implement D7's one-hop endpoint-ID exact string filter through the shared HQL2 runtime; record 9/9 focused tests, 361/0/1 across 27 HQL2 targets and 190/0/0 across 11 compatibility targets; retain other HQL1, review, P8/P13 and no-migration gates | working-tree | ATHER |
 | 0.8.31b | 2026-10-02 | beta | Extend D7 with differential-proven one-hop HQL1 forms and pre-parse resource reservation; record 8/8 focused tests, 361/0/1 across 27 HQL2 targets and 190/0/0 across 11 compatibility targets; retain other HQL1, independent review, P8/P13 and no-migration gates | working-tree | ATHER |
 | 0.8.30b | 2026-10-02 | beta | Implement D7's actor-scoped HQL1 zero-hop ID projection; record 5/5 focused tests and 354/0/1 across 27 root HQL2 targets; keep other HQL1 forms, independent review, P8/P13 and no-migration gates | working-tree | ATHER |

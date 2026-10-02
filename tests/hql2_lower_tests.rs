@@ -359,9 +359,7 @@ fn nested_between_source(count: usize) -> String {
 fn between_expansion_is_rejected_before_construction() {
     // 13 levels produce 49,147 wire nodes despite a compact source AST.
     // Use this bounded RED case before testing adversarial depth25.
-    let error = lowered(&nested_between_source(13))
-        .err()
-        .expect("expanded expression exceeds bound");
+    let error = lowered(&nested_between_source(13)).expect_err("expanded expression exceeds bound");
     assert!(matches!(
         error.code.as_str(),
         "BIND_ERROR" | "QUERY_BUDGET_EXCEEDED"
@@ -375,9 +373,7 @@ fn compact_twenty_five_level_between_refuses_without_expansion() {
         .spawn(|| {
             let source = nested_between_source(25);
             let parsed = syntax::parse_hql2(&source).expect("bounded source is valid syntax");
-            let error = lower::lower_hql2(parsed)
-                .err()
-                .expect("expanded expression must refuse");
+            let error = lower::lower_hql2(parsed).expect_err("expanded expression must refuse");
             assert_eq!(error.code, "BIND_ERROR");
             assert_eq!(error.detail.unwrap()["reason"], "expanded_expression_nodes");
         })
@@ -402,9 +398,7 @@ fn between_expansion_small_tree_is_preserved_and_next_bound_refuses() {
         }
     }
     assert_eq!(nodes, 6139);
-    let error = lowered(&nested_between_source(11))
-        .err()
-        .expect("12283 nodes exceeds cap");
+    let error = lowered(&nested_between_source(11)).expect_err("12283 nodes exceeds cap");
     assert_eq!(error.detail.unwrap()["reason"], "expanded_expression_nodes");
 }
 
@@ -433,7 +427,7 @@ fn expanded_depth_is_checked_separately_from_ast_depth() {
         let result = lower::lower_hql2(statement);
         if reject {
             assert_eq!(
-                result.err().expect("expanded depth bound").detail.unwrap()["reason"],
+                result.expect_err("expanded depth bound").detail.unwrap()["reason"],
                 "expanded_expression_depth"
             );
         } else {

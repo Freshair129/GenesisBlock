@@ -256,11 +256,12 @@ fn cross_group_and_foreign_key_constraints_are_checked_before_wal() {
 fn durable_apply_failure_blocks_reads_writes_and_checkpoint_until_reopen() {
     let dir = tempfile::tempdir().unwrap();
     let s = open(dir.path());
+    let before = s.stable_frontier();
     let conn = rusqlite::Connection::open(dir.path().join("projection.sqlite")).unwrap();
     conn.execute_batch("CREATE TRIGGER fail_props BEFORE INSERT ON props BEGIN SELECT RAISE(ABORT, 'injected apply failure'); END;").unwrap();
     let error = s.add_node(node("durable")).unwrap_err().to_string();
     assert!(error.contains("DURABLE_COMMIT_APPLY_FAILED"), "{error}");
-    assert_eq!(s.stable_frontier(), 1);
+    assert_eq!(s.stable_frontier(), before + 1);
     assert!(s
         .query_sql("SELECT * FROM props", vec![])
         .unwrap_err()
@@ -417,6 +418,7 @@ fn failed_consensus_and_sync_writes_do_not_publish_graph() {
 fn lost_ack_after_fsync_is_unknown_and_reopen_recovers_the_write() {
     let dir = tempfile::tempdir().unwrap();
     let mut s = open(dir.path());
+    let before = s.stable_frontier();
     let (proxy, pending) = crossbeam_channel::unbounded();
     let original = std::mem::replace(&mut s.wal_sender, proxy);
     let s = Arc::new(s);
@@ -430,7 +432,7 @@ fn lost_ack_after_fsync_is_unknown_and_reopen_recovers_the_write() {
     original.send(WalMsg::Append(event, ack)).unwrap();
     assert_eq!(
         durable.recv_timeout(Duration::from_secs(10)).unwrap(),
-        Some(1)
+        Some(before + 1)
     );
     drop(client_ack);
     let result = writer.join().unwrap();
@@ -444,5 +446,5 @@ fn lost_ack_after_fsync_is_unknown_and_reopen_recovers_the_write() {
     drop(s);
     let s = open(dir.path());
     assert!(s.node_view("acked-to-proxy").is_some());
-    assert_eq!(s.stable_frontier(), 1);
+    assert_eq!(s.stable_frontier(), before + 1);
 }

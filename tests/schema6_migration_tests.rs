@@ -132,9 +132,10 @@ fn in_progress_schema6_migration_fails_closed_before_projection_open() {
         )
         .unwrap();
 
-        let error = open(dir.path(), read_only)
-            .err()
-            .expect("in-progress upgrade must not open");
+        let error = match open(dir.path(), read_only) {
+            Err(error) => error,
+            Ok(_) => panic!("in-progress upgrade must not open"),
+        };
         assert!(error.contains("SCHEMA_UPGRADE_IN_PROGRESS"), "{error}");
         assert!(!dir.path().join("projection.sqlite").exists());
         assert!(!dir.path().join("wal").exists());
@@ -157,9 +158,10 @@ fn schema6_requires_a_recognized_upgrade_state_marker() {
         )
         .unwrap();
 
-        let error = open(dir.path(), false)
-            .err()
-            .expect("schema 6 without a valid marker must not open");
+        let error = match open(dir.path(), false) {
+            Err(error) => error,
+            Ok(_) => panic!("schema 6 without a valid marker must not open"),
+        };
         assert!(error.contains(expected), "{error}");
         assert!(!dir.path().join("projection.sqlite").exists());
         assert!(!dir.path().join("wal").exists());
@@ -181,9 +183,10 @@ fn unknown_complete_schema_control_event_fails_closed_on_open() {
     )
     .unwrap();
 
-    let error = open(dir.path(), false)
-        .err()
-        .expect("unknown control must fail closed");
+    let error = match open(dir.path(), false) {
+        Err(error) => error,
+        Ok(_) => panic!("unknown control must fail closed"),
+    };
 
     assert!(
         error.contains("JOURNAL_PREFLIGHT_FAILED")
@@ -585,8 +588,7 @@ fn schema6_migration_resume_rejects_a_different_manifest_id() {
     .unwrap();
 
     let error = Storage::migrate_schema5_to6(migration_options(source.path()), second)
-        .err()
-        .expect("a different manifest must not resume this migration")
+        .expect_err("a different manifest must not resume this migration")
         .to_string();
 
     assert!(
@@ -738,9 +740,10 @@ fn schema6_ordinary_open_rejects_ready_state_without_matching_signed_manifest() 
         json!("0000000000000000000000000000000000000000000000000000000000000000");
     fs::write(&state_path, serde_json::to_vec(&state).unwrap()).unwrap();
 
-    let error = open(source.path(), true)
-        .err()
-        .expect("tampered proof must fail open");
+    let error = match open(source.path(), true) {
+        Err(error) => error,
+        Ok(_) => panic!("tampered proof must fail open"),
+    };
 
     assert!(error.contains("RECOVERY_REQUIRED"), "{error}");
 }

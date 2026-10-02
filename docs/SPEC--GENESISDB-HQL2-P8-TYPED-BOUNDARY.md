@@ -1,8 +1,8 @@
 ---
 doc_id: SPEC--GENESISDB-HQL2-P8-TYPED-BOUNDARY
-version: "0.2.35b"
+version: "0.2.37b"
 created_at: "2026-09-28T01:25:00+07:00,ATHER,fc851e9"
-last_update: "2026-10-02T07:41:34+07:00,ATHER"
+last_update: "2026-10-02T21:22:00+07:00,ATHER"
 status: beta
 superseded_by: null
 owner: "Boss (Founder / Product Authority)"
@@ -379,7 +379,9 @@ post-hoc row-count guesses. Plans redact query literals and inaccessible metadat
 QueryErrorV2 follows the vendored
 [error schema](../tests/fixtures/hql2/blueprint/contracts/error.schema.json):
 code, stage, safe message, retryable; optional source span/detail/outcome only
-when applicable. Stages: contract, parse, bind, authorize, plan, execute, encode.
+when applicable. The Rust representation boxes optional detail to keep the
+structured error small; its serialized JSON shape is unchanged. Stages:
+contract, parse, bind, authorize, plan, execute, encode.
 Stable codes: VERSION_UNSUPPORTED, HQL_PARSE_ERROR, BIND_ERROR,
 CAPABILITY_UNSUPPORTED, AUTH_REQUIRED, FORBIDDEN, COLLECTION_SPACE_MISMATCH,
 EXACT_ORIGINAL_UNAVAILABLE, BEYOND_HORIZON, SNAPSHOT_EXPIRED,
@@ -812,8 +814,20 @@ Version diff `0.2.31b -> 0.2.32b`: implement the approved D7 allowlist; record 5
 Version diff `0.2.34b -> 0.2.35b`: implement D7's one-hop endpoint-ID string equality predicate after legacy/HQL2 bag differential; record 9/9 focused adapter tests and the final 361/0/1 root-HQL2 plus 190/0/0 compatibility sweeps; retain the full shared-runtime/P8/P13/review gates.
 Version diff `0.2.28b -> 0.2.29b`: implement approved D1-D5 with 9 focused passes, budget-failure/no-partial coverage, and 528/0/1 across 37 explicit HQL2/P6/schema-v6/compatibility targets; retain independent review and broad P8/P13 gates.
 
+Version diff `0.2.35b -> 0.2.36b`: record implementation and fixture
+verification of approved H2-D11 R6b markerless schema-v6 WAL recovery; crash
+17/17, migration 19/19 and selected HQL2/durability/authority 40-target
+aggregate pass; retain full P8/P13/review gates and the no-user-migration rule.
+
+Version diff `0.2.36b -> 0.2.37b`: record final local HQL2/H2-D11 integration
+verification, including full locked/offline Rust tests (`probe_vs_recall` NOT_RUN),
+both default and no-default strict Clippy passes, and boxed optional error
+detail with unchanged JSON shape; broader P8/P13/review gates remain open.
+
 | From | To | Effect |
 |---|---|---|
+| 0.2.36b | 0.2.37b | Verify full locked/offline Rust suite and both strict Clippy modes; explicitly retain `probe_vs_recall` as NOT_RUN; box optional error detail internally without changing serialized JSON; keep full P8/P13/review gates open |
+| 0.2.35b | 0.2.36b | Implement and verify H2-D11 R6b markerless schema-v6 recovery in temporary fixtures; 17/17 crash and 19/19 migration tests pass; selected aggregate passes 40 targets; full P8/P13/review gates remain open |
 | 0.2.34b | 0.2.35b | Implement the conditionally approved one-hop endpoint-ID string equality filter; record 9/9 adapter tests, 361/0/1 across 27 HQL2 targets and 190/0/0 across 11 compatibility targets; retain shared-runtime/P8/P13 gates |
 | 0.2.32b | 0.2.33b | Extend D7 with differential-proven one-hop HQL1 forms and pre-parse resource reservation; record 8/8 adapter tests, 361/0/1 HQL2 regression and 190/0/0 separate compatibility sweep; retain full shared-runtime/P8/P13 gates |
 | 0.2.31b | 0.2.32b | Implement D7's exact actor-scoped HQL1 allowlist; record 5/5 focused tests and 354/0/1 across 27 root HQL2 targets; retain remaining shared-runtime/P8/P13 gates |
@@ -845,6 +859,8 @@ Version diff `0.2.28b -> 0.2.29b`: implement approved D1-D5 with 9 focused passe
 
 | Version | Date | Status | Summary | Commit Hash | Agent |
 |---|---|---|---|---|---|
+| 0.2.37b | 2026-10-02 | beta | Verify full locked/offline Rust suite and default/no-default strict all-target Clippy; `probe_vs_recall` remains NOT_RUN; box optional error detail internally with unchanged JSON; full P8/P13/review gates remain open | working-tree | ATHER |
+| 0.2.36b | 2026-10-02 | beta | Implement and verify approved H2-D11 R6b markerless WAL recovery; crash 17/17, migration 19/19 and selected 40-target aggregate pass; fixture-only and full P8/P13/review gates remain open | 0135c29 | ATHER |
 | 0.2.35b | 2026-10-02 | beta | Implement D7's one-hop endpoint-ID string equality filter after legacy/HQL2 differential; record 9/9 adapter tests and 361/0/1 across 27 HQL2 targets plus 190/0/0 across 11 compatibility targets; retain shared-runtime, independent review and P8/P13 gates | working-tree | ATHER |
 | 0.2.34b | 2026-10-02 | beta | Record D7's conditional one-hop endpoint-ID string equality extension after test-only legacy/HQL2 differential; implementation and focused verification pending | working-tree | ATHER |
 | 0.2.33b | 2026-10-02 | beta | Extend D7 with differential-proven one-hop HQL1 forms and pre-parse resource reservation; record 8/8 focused tests, 361/0/1 across 27 HQL2 targets and 190/0/0 across 11 separate compatibility targets; retain shared-runtime, independent review and P8/P13 gates | working-tree | ATHER |

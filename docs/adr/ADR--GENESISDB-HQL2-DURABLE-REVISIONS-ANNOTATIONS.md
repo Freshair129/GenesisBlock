@@ -1,8 +1,8 @@
 ---
 doc_id: ADR--GENESISDB-HQL2-DURABLE-REVISIONS-ANNOTATIONS
-version: "0.8.7b"
+version: "0.8.9b"
 created_at: "2026-09-28T06:15:00+07:00,ATHER,53078cb"
-last_update: "2026-10-02T09:19:00+07:00,ATHER"
+last_update: "2026-10-02T21:22:00+07:00,ATHER"
 status: beta
 superseded_by: null
 owner: "Boss (Founder / Product Authority)"
@@ -577,7 +577,7 @@ database may be used for migration tests or execution under this approval.
 
 ### R6b — Authenticated schema selection when `state.json` is absent
 
-**Status: owner-approved addendum, 2026-10-02; implementation and verification pending.**
+**Status: owner-approved addendum, 2026-10-02; implemented and fixture-verified in the isolated worktree.**
 
 R6 requires every schema-6 revision to be recoverable from the authority journal.
 P6 also requires complete WAL replay when a snapshot is invalid. These rules
@@ -713,20 +713,27 @@ Minimum Verify/Review/Final evidence:
 
 | Artifact | Approved version | Synchronized version/status |
 |---|---|---|
-| This H2-D11 addendum | `0.3.0b` candidate, owner-approved | `0.8.7b` beta, add owner-approved authenticated schema selection and WAL-only schema-v6 recovery; implementation pending |
-| P8 typed boundary | `0.2.0b` beta | `0.2.35b` beta, already requires recursive target/evidence authorization under the lease; unchanged by this clarification |
-| P6 generations/leases/ACL | `0.5.0b` beta | `0.5.14b` beta, already defines annotation resource authorization; unchanged by this clarification |
-| HQL2 orchestration plan | `0.5.0b` beta | `0.8.32b` beta, no new implementation or migration task from this documentation-only clarification |
-| C4 architecture index | `0.1.20b` | `0.1.48b`, already indexes the H2-D11 annotation authorization contract; unchanged by this clarification |
-| DOC registry | `0.5.6+draft` | `0.5.41+draft`, register this ADR at `0.8.6b` |
+| This H2-D11 addendum | `0.3.0b` candidate, owner-approved | `0.8.9b` beta, schema-v6 revision envelopes are transformed before signing; full local Rust/strict Clippy verification recorded |
+| P8 typed boundary | `0.2.0b` beta | `0.2.37b` beta, recursive target/evidence ACL retained; broad P8/P13 qualification remains open |
+| P6 generations/leases/ACL | `0.5.0b` beta | `0.5.17b` beta, full local Rust/strict Clippy verification recorded; no user database migration performed |
+| HQL2 orchestration plan | `0.5.0b` beta | `0.8.35b` beta, implementation evidence recorded; broader acceptance remains open |
+| C4 architecture index | `0.1.20b` | `0.1.50b`, indexes implemented R6b recovery and partial Query IR match_path |
+| DOC registry | `0.5.6+draft` | `0.5.44+draft`, synchronized current HQL2/P6/Query IR entries |
 | Engine/storage | `0.2.9` | remains unchanged until implementation and release gates; no user database is migrated here |
+
+Version diff `0.8.8b -> 0.8.9b`: record schema-v6 consensus revision
+transformation before signing, stale-CAS rejection before WAL append, and final
+full locked/offline Rust plus strict Clippy verification; `probe_vs_recall` is
+NOT_RUN and broader acceptance/release gates remain open.
 
 ## CHANGELOG
 
 | Version | Date | Status | Summary | Commit Hash | Agent |
 |---|---|---|---|---|---|
+| 0.8.9b | 2026-10-02 | beta | Verify schema-v6 consensus revision envelopes are transformed before signing and stale CAS fails before WAL append; full locked/offline Rust suite and both strict Clippy modes pass, with `probe_vs_recall` NOT_RUN; no user database migration | working-tree | ATHER |
+| 0.8.8b | 2026-10-02 | beta | Implement signed local schema-v6 activation preflight and fold-preserved markerless WAL recovery; crash tests 17/17, migration tests 19/19 and selected 40-target HQL2/durability/authority aggregate pass; fixture-only, no user DB migration | 0135c29 | ATHER |
 | 0.8.6b | 2026-10-02 | beta | Owner-approved clarification: AnnotationPut carries a distinct optional evidence payload, omission means no evidence references, and the existing ACL path covers both arrays; no schema or migration change | working-tree | ATHER |
-| 0.8.7b | 2026-10-02 | beta | Owner-approved R6b: bind schema-v6 selection to signed local WAL activation and full migration proof when state.json is absent; implementation pending | working-tree | ATHER |
+| 0.8.7b | 2026-10-02 | beta | Owner-approved R6b: bind schema-v6 selection to signed local WAL activation and full migration proof when state.json is absent | working-tree | ATHER |
 | 0.8.5b | 2026-09-30 | beta | Record implemented lease-bound HistoryScan/ChangeScan over exact retained revisions, recursive current reference ACL and 9/9 focused tests; broader P8 and transport gates remain open | working-tree | ATHER |
 | 0.8.4b | 2026-09-29 | beta | Clarify source floors as minimum accepted exclusive ChangeScan cursors; migration baselines remain HistoryScan-only at the cutover cursor | working-tree | ATHER |
 | 0.8.3b | 2026-09-29 | beta | Record delegated HistoryScan/ChangeScan semantics over retained durable revisions; preserve source floors, current ACL and separate transport/release gates | working-tree | ATHER |

@@ -58,6 +58,8 @@ pub(crate) struct SourceKeyV2 {
 }
 
 impl SourceKeyV2 {
+    // Each argument contributes an independent cache identity dimension.
+    #[allow(clippy::too_many_arguments)]
     pub(crate) fn new(
         source: BoundSourceV2,
         owner_token: &str,
@@ -84,6 +86,8 @@ impl SourceKeyV2 {
         }
     }
 
+    // Validation compares the same independent source, lease, ACL, and time dimensions.
+    #[allow(clippy::too_many_arguments)]
     pub(crate) fn validate(
         &self,
         source: &BoundSourceV2,

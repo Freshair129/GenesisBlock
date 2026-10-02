@@ -1,9 +1,9 @@
 ---
 doc_id: SPEC--GENESISDB-P6-GENERATIONS-LEASES-ACL
 owner: GenesisBlockDB Engineering
-version: 0.5.15b
+version: 0.5.17b
 created_at: "2026-09-22T22:55:00+07:00,ATHER,working-tree"
-last_update: "2026-10-02T09:19:00+07:00,ATHER"
+last_update: "2026-10-02T21:22:00+07:00,ATHER"
 status: beta
 attributes:
   domain: storage-correctness
@@ -375,12 +375,25 @@ targets; retain broad P6/P8/P13 gates.
 Version diff 0.5.14b -> 0.5.15b: record owner-approved H2-D11 R6b schema
 selection from signed WAL activation when state.json is absent; require complete
 migration proof and retain fail-closed behavior for ambiguous/v6-only WAL.
-Implementation and tests remain pending.
+The implementation now passes the 17-test crash-recovery and 19-test migration
+targets plus the selected 40-target HQL2/durability/authority aggregate; tests
+use temporary fixtures only.
+
+Version diff 0.5.15b -> 0.5.16b: implement and verify signed schema-v6
+activation preflight, markerless v5/v6 WAL selection, fold-preserved migration
+proof and fail-closed ambiguous recovery; no user database was migrated.
+
+Version diff 0.5.16b -> 0.5.17b: record final full locked/offline Rust suite
+and default/no-default strict Clippy passes for the integrated HQL2/H2-D11
+path; `probe_vs_recall` remains NOT_RUN and no user database migration or
+broader P6/P8/P13 qualification is claimed.
 
 | Version | Date | Status | Summary | Commit | Agent |
 |---|---|---|---|---|---|
+| 0.5.17b | 2026-10-02 | beta | Record full locked/offline Rust suite and both default/no-default strict Clippy passes; `probe_vs_recall` NOT_RUN; no user database migration or broader P6/P8/P13 qualification claimed | working-tree | ATHER |
+| 0.5.16b | 2026-10-02 | beta | Implement and verify H2-D11 R6b markerless WAL recovery; crash tests 17/17, migration tests 19/19 and selected 40-target HQL2/durability/authority aggregate pass; fixture-only, no user database migration | 0135c29 | ATHER |
 | 0.5.14b | 2026-10-02 | beta | Verify D1 exact-record-only denial before HQL/IR parsing, D4 P6-bound exact-property hydration, and 528/0/1 across 37 explicit targets; retain broad P6/P8/P13 gates | working-tree | ATHER |
-| 0.5.15b | 2026-10-02 | beta | Owner-approved H2-D11 R6b: preflight signed schema activation and migration proof before markerless WAL replay; implementation and tests pending | working-tree | ATHER |
+| 0.5.15b | 2026-10-02 | beta | Owner-approved H2-D11 R6b: preflight signed schema activation and migration proof before markerless WAL replay | working-tree | ATHER |
 | 0.5.13b | 2026-10-02 | beta | Synchronize approved P8 D1: retain namespace-wide query grant and assert exact-record-only actors are denied before HQL/IR parsing; implementation evidence pending | working-tree | ATHER |
 | 0.5.12b | 2026-09-30 | beta | Implement conditional label loading from exact P6-visible node revisions; record 7 focused passes and 338/0/1 across 25 HQL2 targets; retain ACL-hidden fixture and broad P6/P8 gates | working-tree | ATHER |
 | 0.5.11b | 2026-09-30 | beta | Freeze P6 boundary for delegated HQL2 Sequence node ID/labels using exact authorized node revisions and budgeted snapshot labels; runtime implementation and verification pending | working-tree | ATHER |

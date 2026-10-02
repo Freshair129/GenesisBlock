@@ -1,3 +1,4 @@
+#[allow(dead_code)]
 #[path = "support/hql2_rank_reference.rs"]
 mod reference;
 

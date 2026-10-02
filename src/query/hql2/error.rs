@@ -16,7 +16,7 @@ pub struct QueryErrorV2 {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub span: Option<SourcePositionV2>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub detail: Option<serde_json::Value>,
+    pub detail: Option<Box<serde_json::Value>>,
 }
 
 impl QueryErrorV2 {
@@ -27,7 +27,7 @@ impl QueryErrorV2 {
             message: "Query could not be completed".into(),
             retryable: matches!(code, "SNAPSHOT_EXPIRED" | "INDEX_COVERAGE_TIMEOUT"),
             span: None,
-            detail: Some(serde_json::json!({"reason": reason})),
+            detail: Some(Box::new(serde_json::json!({"reason": reason}))),
         }
     }
 

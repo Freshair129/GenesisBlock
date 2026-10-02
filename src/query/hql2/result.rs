@@ -147,6 +147,8 @@ pub struct QueryResultV2 {
 }
 
 #[derive(Clone, Debug, PartialEq)]
+// This result enum keeps the public rows/plan variants directly accessible.
+#[allow(clippy::large_enum_variant)]
 pub enum QueryOutcomeV2 {
     Rows(QueryResultV2),
     Plan(ExplainResultV2),

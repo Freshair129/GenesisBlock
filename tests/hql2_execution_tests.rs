@@ -521,8 +521,7 @@ fn explain_reserves_propagated_schema_before_binding() {
     ir.root = parent;
     let error = db
         .query_v2(access(), request)
-        .err()
-        .expect("oversized plan must fail");
+        .expect_err("oversized plan must fail");
     assert_eq!(error.code, "QUERY_BUDGET_EXCEEDED");
     assert_eq!(db.stable_frontier(), before);
 }

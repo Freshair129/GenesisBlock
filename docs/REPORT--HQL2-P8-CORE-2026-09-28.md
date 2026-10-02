@@ -1,8 +1,8 @@
 ---
 doc_id: REPORT--HQL2-P8-CORE-2026-09-28
-version: "0.1.29b"
+version: "0.1.31b"
 created_at: "2026-09-28T04:35:00+07:00,ATHER,22bc11e"
-last_update: "2026-10-02T07:45:00+07:00,ATHER"
+last_update: "2026-10-02T21:22:00+07:00,ATHER"
 status: beta
 owner: GenesisBlockDB Engineering
 attributes:
@@ -18,13 +18,14 @@ attributes:
 
 The owner approved P8 typed-boundary 0.1.1b and isolated upstream integration
 with `approve` on 2026-09-28. Local merge `22bc11e` joins upstream `8091a56`
-with preserved local P6 `fc851e9` and P7 `e20e0e4`. The primary checkout was not
-changed. Protected `tests/zz_probe_discriminates.rs` was not read, changed or
-staged. One malformed target-discovery invocation was interrupted after
+with preserved local P6 `fc851e9` and P7 `e20e0e4`. At the 0.1.29b checkpoint,
+the primary checkout was not changed. Protected `tests/zz_probe_discriminates.rs`
+was not read or changed, and was not part of the HQL2 feature commit. One malformed target-discovery invocation was interrupted after
 invoking Cargo without explicit test filters; whether it began compiling the
 protected probe is unverified, and it contributes no test result. The guarded
 explicit sweep below excludes it; see the [command-selection RCA](../.brain/rca/RCA--HQL2-POWERSHELL-TARGET-SELECTION.md).
-No fetch, push, main-branch merge, PR, deployment or user database migration.
+At that checkpoint there had been no fetch, push, main-branch merge, PR,
+deployment or user database migration.
 Engine version 0.2.6 -> 0.2.9 is inherited from upstream, not a new release here.
 
 On 2026-10-02 the owner approved the P8 completion addendum D1-D6. This
@@ -44,6 +45,24 @@ parse, malformed syntax, fail-closed unlisted forms and pre-parse resource
 rejection. Existing v1
 transports and all other HQL1 forms are unchanged; independent D7 review and
 full shared-runtime/P8/P13 acceptance remain open.
+
+The approved H2-D11 R6b recovery contract is now implemented in the isolated
+worktree: signed local schema-v6 activation is preflighted before WAL replay,
+and migration authority survives fold and markerless projection rebuild.
+Crash recovery passes 17/17, schema-v6 migration passes 19/19, and the selected
+HQL2/durability/authority aggregate passes all 40 targets (one parser probe is
+intentionally ignored). Verification uses temporary fixtures only; no user
+database was migrated. Full P8/P13, shared-runtime and independent-review gates
+remain open.
+
+Final local integration verification completed: the locked/offline
+no-default-features Rust suite passed with no failures using `--jobs 4
+--no-fail-fast -- --skip probe_vs_recall`; the one discriminating probe is
+NOT_RUN, and existing ignored soak/parser-child cases remain ignored. Both
+default and no-default strict all-target Clippy passed. `cargo fmt --check`,
+`git diff --check`, and `npm run docs:validate` passed (239 files, 0
+violations). This remains fixture/local evidence only: independent review,
+full shared-runtime/P8/P13, release and consumer qualification are not claimed.
 
 ## Implemented scope
 
@@ -372,13 +391,26 @@ from these local tests.
 
 | Artifact | Before | After |
 |---|---|---|
-| Registry | 0.5.39+draft | 0.5.40+draft |
-| C4 architecture index | 0.1.47b | 0.1.48b |
-| Master specification | 2.3.21b | 2.3.22b |
-| P8 typed boundary | 0.2.34b | 0.2.35b |
-| Orchestration plan | 0.8.31b | 0.8.32b |
-| P8 completion addendum | 0.1.5b | 0.1.6b |
-| This report | 0.1.28b | 0.1.29b |
+| Registry | 0.5.43+draft | 0.5.44+draft |
+| C4 architecture index | 0.1.50b | 0.1.50b |
+| Master specification | 2.3.24b | 2.3.25b |
+| P6 generations/leases/ACL | 0.5.16b | 0.5.17b |
+| H2-D11 durable revisions/annotations | 0.8.8b | 0.8.9b |
+| P8 typed boundary | 0.2.36b | 0.2.37b |
+| Orchestration plan | 0.8.34b | 0.8.35b |
+| This report | 0.1.30b | 0.1.31b |
+
+Version diff `0.1.30b -> 0.1.31b`: record final full locked/offline Rust-suite
+and default/no-default strict Clippy results, schema-v6 consensus revision
+envelope signing order, and explicit `probe_vs_recall` NOT_RUN boundary;
+synchronize H2-D11, P6, P8, plan, master and registry versions. Broader P8/P13,
+independent-review, security, soak/crash/platform and release gates remain open.
+
+Version diff `0.1.29b -> 0.1.30b`: record implementation and fixture
+verification of H2-D11 R6b markerless schema-v6 WAL recovery; crash 17/17,
+migration 19/19 and the selected 40-target HQL2/durability/authority aggregate
+pass. Integrate Query IR V1 1.0.3 linear `match_path` from upstream; full
+P8/P13, shared-runtime, independent-review and release gates remain open.
 
 Version diff `0.1.28b -> 0.1.29b`: extend D7 only with the differential-proven
 one-hop endpoint-ID exact string filter, reserve parser resources before legacy
@@ -396,6 +428,8 @@ P8 and release gates.
 
 | Version | Date | Status | Summary | Commit Hash | Agent |
 |---|---|---|---|---|---|
+| 0.1.31b | 2026-10-02 | beta | Record full locked/offline Rust suite and both strict Clippy configurations; schema-v6 consensus revision-envelope signing order verified; `probe_vs_recall` remains NOT_RUN and broader P8/P13/review/release gates remain open | working-tree | ATHER |
+| 0.1.30b | 2026-10-02 | beta | Implement and verify approved H2-D11 R6b markerless WAL recovery; crash 17/17, migration 19/19, selected 40-target aggregate pass; integrate upstream Query IR match_path; no user DB migration, full P8/P13/review gates remain open | 0135c29 | ATHER |
 | 0.1.29b | 2026-10-02 | beta | Extend D7 with one-hop endpoint-ID exact string filter after legacy/HQL2 differential; record 9/9 focused tests, 361/0/1 across 27 HQL2 targets and 190/0/0 across 11 compatibility targets; retain shared-runtime, independent review and broad P8/P13 gates | working-tree | ATHER |
 | 0.1.28b | 2026-10-02 | beta | Extend D7 with differential-proven one-hop forms and pre-parse resource reservation; record 8/8 focused tests, 361/0/1 across 27 HQL2 targets and 190/0/0 across 11 compatibility targets; retain shared-runtime, independent review and broad P8/P13 gates | working-tree | ATHER |
 | 0.1.27b | 2026-10-02 | beta | Implement D7's initial actor-scoped HQL1 allowlist; record 5/5 focused tests and 354/0/1 across 27 HQL2 targets; retain other HQL1 forms, independent review and broad P8/P13 gates | working-tree | ATHER |

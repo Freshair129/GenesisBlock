@@ -2,10 +2,10 @@
 doc_id: C4--GENESISDB-ARCHITECTURE
 type: architecture-index
 status: current
-version: 0.1.49b
+version: 0.1.50b
 owner: GenesisBlockDB Architecture
 created_at: 2026-06-13T22:50:11+07:00,ATHER,9b1ced3
-last_update: "2026-10-02T09:19:00+07:00,ATHER"
+last_update: "2026-10-02T15:30:00+07:00,ATHER"
 attributes:
   domain: architecture
   scope: repository
@@ -293,8 +293,8 @@ package is claimed.
 | Vector Collections | Per-model/dim isolated vector spaces (`collections: DashMap<String, Arc<VectorCollection>>`, each with its own arena + metadata + HNSW + metric); a `default` collection always exists. Async indexing thread (off the write path), plus explicit structural source-to-HNSW coverage validation. | `src/lib.rs` | master spec, HNSW hybrid index design, `ADR--GENESISDB-MULTI-COLLECTION`, `ADR--GENESISDB-ASYNC-INDEXING`, `ADR--GENESISDB-INDEX-COVERAGE-LIFECYCLE` |
 | Hybrid Search | Per-collection vector + lexical retrieval with ranking; query dim validated against the collection | `src/lib.rs`, HNSW design | HNSW hybrid index design |
 | Graph Retrieval Layer | Tiered context retrieval by hop budget and fuzzy matching | `src/lib.rs::retrieve_context` | `SPEC--GRAPH-RETRIEVAL-LAYER.md` |
-| Typed Query IR Boundary (partial) | Validate and dispatch versioned structured search/traverse queries consistently across public surfaces | `src/lib.rs::execute_query_ir`, `src/router.rs` `/v1/query/ir`; remaining V1 operations are planned | `ADR--GENESISDB-TYPED-QUERY-IR-AGENT-BOUNDARY`, `SPEC--GENESISDB-TYPED-QUERY-IR-V1` |
-| HQL Compatibility Frontend | Parse and execute current search/traverse/context queries without owning storage semantics | `src/lib.rs::execute_hql`, `src/query/*` | HQL section in master spec, API docs |
+| Typed Query IR Boundary (partial) | Validate and dispatch versioned structured search/traverse, linear `match_path` and target-id context queries consistently across public surfaces | `src/lib.rs::execute_query_ir`, `src/router.rs` `/v1/query/ir`; query-vector/temporal context and relational named queries remain planned or unsupported | `ADR--GENESISDB-TYPED-QUERY-IR-AGENT-BOUNDARY`, `SPEC--GENESISDB-TYPED-QUERY-IR-V1` |
+| HQL Compatibility Frontend | Parse and execute current search/traverse/path/context queries without owning storage semantics | `src/lib.rs::execute_hql`, `src/query/*` | HQL section in master spec, API docs |
 | Symbolic Graph / AST Boundary | Symbolic relationships, query grammar, and structured traversal semantics | `src/lib.rs`, `hql.pest` | master spec, HQL docs |
 | K-Impact / Reasoning | Impact scoring, inference, structural insight, drift | `src/lib.rs` | K-impact specs, transitive inference design |
 | Community Detection | Cluster/community discovery for graph insight and SuperNode generation | `src/lib.rs` | graph clustering and structural insight specs |
@@ -370,7 +370,7 @@ These findings are intentionally listed here until the governance validator can 
 | Some specs retain open DoD/review text while code exists | Multiple `SPEC--*.md` files | Baseline audit, then update status/changelog |
 | Low-level C4 view is source-anchored only | No generated module map or symbol index | Add validator/report that extracts code anchors |
 | Genesis Studio production operations remain gated | S1 read paths, bounded graph DTOs, capability negotiation and exclusive process ownership exist; lifecycle backup/restore and OIDC/JWT scoped authorization do not | Keep mutation/operations UI disabled until server-side scopes and operator contracts pass their S2-S4 reviews |
-| Typed Query IR V1 is partially implemented | Search/traverse exist in core, REST and N-API; match-path/context/named-query and external NL adapter remain planned | Keep capability reporting operation-specific and complete remaining operations only through separate reviewed slices |
+| Typed Query IR V1 is partially implemented | Search/traverse, linear `match_path` and target-id context exist in core, REST and N-API; query-vector/temporal context and relational named-query remain planned; external NL stays outside the engine | Keep capability reporting operation-specific and complete remaining operations only through separate reviewed slices |
 
 ## 8. Change Rules
 
@@ -426,12 +426,14 @@ v6-only WAL without activation fails closed. See H2-D11 ADR R6b and the P6 recov
 
 ## CHANGELOG
 
-Version diff 0.1.48b -> 0.1.49b: index owner-approved H2-D11 R6b and P6
-schema-v6 WAL-only recovery authority; activation/proof implementation and
-recovery verification remain pending.
+Version diff 0.1.49b -> 0.1.50b: verify the signed schema-v6 activation and
+markerless WAL recovery path, synchronize upstream Query IR V1 1.0.3 linear
+`match_path`, and record 40 passing selected HQL2/durability/authority targets;
+full P8/P13 qualification remains open.
 
 | Version | Date | Status | Summary | Commit Hash | Agent |
 |---------|------|--------|---------|-------------|-------|
+| 0.1.50b | 2026-10-02 | current | Verify H2-D11 R6b schema-v6 WAL-only recovery and integrate upstream typed linear match_path; 40 selected HQL2/durability/authority targets pass; full P8/P13 gates remain open | 0135c29 | ATHER |
 | 0.1.49b | 2026-10-02 | current | Index owner-approved H2-D11 R6b schema-v6 activation and WAL-only recovery contract; implementation pending | working-tree | ATHER |
 | 0.1.48b | 2026-10-02 | current | Add D7's differential-proven one-hop endpoint-ID exact string filter; record 9/9 focused tests, 361/0/1 across 27 HQL2 targets and 190/0/0 across 11 compatibility targets; retain shared-runtime/review/P8/P13 gates | working-tree | ATHER |
 | 0.1.47b | 2026-10-02 | current | Extend D7 with differential-proven one-hop HQL1 and pre-parse resource reservation; record 8/8 focused tests, 361/0/1 across 27 HQL2 targets and 190/0/0 across 11 compatibility targets; retain broad shared-runtime/review/P8/P13 gates | working-tree | ATHER |

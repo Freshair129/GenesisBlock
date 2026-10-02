@@ -654,7 +654,10 @@ fn very_deep_constructed_json_is_rejected_and_disposed_without_recursion() {
     assert_eq!(error.code, "BIND_ERROR");
     assert_eq!(error.stage, "bind");
     assert!(error.span.is_none());
-    assert_eq!(error.detail, Some(json!({"reason":"json_depth"})));
+    assert_eq!(
+        error.detail.as_deref(),
+        Some(&json!({"reason":"json_depth"}))
+    );
 }
 
 #[test]

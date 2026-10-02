@@ -2,7 +2,7 @@
 title: "GenesisBlockDB Technical Architecture and Capability Composition"
 doc_id: "MASTER-SPEC-GENESISBLOCKDB"
 status: current
-version: "2.3.23b"
+version: "2.3.25b"
 updated: "2026-10-02"
 owner: "GenesisBlockDB Architecture"
 source_of_truth: true
@@ -51,7 +51,14 @@ of D7 remains pending; earlier read-only review found no concrete static defect,
 and focused re-review confirmed the corrected D5
 JSON-literal size preflight. Compact constraints remain fail-closed. Broad
 exact-oracle, shared HQL1/HQL2/IR, resource/cancellation, P8 and P13 gates
-remain open; these local results do not close the full HQL2/P8 gate.
+remain open; these local results do not close the full HQL2/P8 gate. A separate
+selected HQL2/durability/authority verification now passes 40 targets,
+including schema-v6 WAL-only recovery; this is fixture evidence, not release or
+consumer qualification.
+The final locked/offline no-default-features Rust suite passed with no failures;
+the explicitly selected `probe_vs_recall` test remains NOT_RUN. Strict all-target
+Clippy passed with default and no-default features. These local results do not
+close independent review, full HQL2/P8/P13, release or consumer gates.
 
 ## 1. Role of this document
 
@@ -268,9 +275,11 @@ Client-level semantic conflicts may require review even when storage-level recon
 
 ## 9. HQL and Typed Query IR
 
-The accepted public-query architecture is a versioned typed Query IR. Its first executor/API slice is
-planned and must pass the conformance gates in `SPEC--GENESISDB-TYPED-QUERY-IR-V1` before it is
-reported as shipped.
+The accepted public-query architecture is a versioned typed Query IR. Its
+partial executor/API slice implements `search`, `traverse`, linear `match_path`
+and target-id `context` in core, N-API and REST. Query-vector/temporal context
+and relational named-query remain unsupported or planned; see the capability
+manifest and `SPEC--GENESISDB-TYPED-QUERY-IR-V1`.
 
 GenesisBlockDB currently exposes HQL as a compatibility frontend for graph, vector and context
 operations. HQL is not storage authority and is not required to grow into general-purpose SQL or
@@ -366,9 +375,10 @@ These are local implementation contracts, not deployment or consumer migration e
 P6 (architecture correction approved 2026-09-22) is the approved target for signed generation
 receipts after index flush and fail-closed snapshot validation, opaque generation-bound read
 leases, explicit temporal selectors, and signed revision-checked access-policy events. Its target
-disk schema is 5 (the documented Wave B baseline is v4); new readers retain v4 compatibility,
-while older readers must reject v5. P6 implementation and consumer compatibility remain pending
-their execution gates. Current graph/vector records still lack entity namespace fields, so the
+disk schema is now 6 (the prior documented Wave B/P6 baselines are v4/v5); readers that do not
+understand schema 6 must reject it. Fixture-backed v5-to-v6 migration and markerless WAL recovery
+pass their focused tests, but no user database migration or consumer compatibility qualification
+has been performed. Current graph/vector records still lack entity namespace fields, so the
 P6 ACL contract does not claim migrated tenant isolation. See [P6 specification](SPEC--GENESISDB-P6-GENERATIONS-LEASES-ACL.md).
 
 Schema-v6 selection remains authority-bearing when the snapshot marker is lost. A missing
@@ -376,12 +386,15 @@ Schema-v6 selection remains authority-bearing when the snapshot marker is lost. 
 valid signed local activation record and, for migrated stores, its complete migration and P6
 receipt proof. Schema-5-compatible WAL remains replayable as v5; v6-only events without that
 proof fail with `RECOVERY_REQUIRED` instead of silently downgrading. See H2-D11 ADR R6b and the
-P6 WAL-only recovery contract. Runtime implementation remains pending verification.
+P6 WAL-only recovery contract. Runtime implementation is fixture-verified; no
+user database was migrated, and broader P6/P8/P13 qualification remains open.
 
 ## Changelog
 
 | Version | Date | Owner | Summary |
 |---|---|---|---|
+| 2.3.25b | 2026-10-02 | GenesisBlockDB Architecture | Record full local Rust regression and strict Clippy pass for HQL2/H2-D11 integration; keep `probe_vs_recall` NOT_RUN, no user migration, and independent-review/P8/P13/release gates open. |
+| 2.3.24b | 2026-10-02 | GenesisBlockDB Architecture | Record fixture-verified H2-D11 R6b markerless schema-v6 recovery and upstream Query IR V1 1.0.3 linear match_path; 40 selected HQL2/durability/authority targets pass; no user DB migration, full P8/P13 gates open. |
 | 2.3.23b | 2026-10-02 | GenesisBlockDB Architecture | Synchronize owner-approved H2-D11 R6b/P6 schema-v6 WAL-only recovery authority; implementation and recovery tests pending. |
 | 2.3.22b | 2026-10-02 | GenesisBlockDB Architecture | Add D7's differential-proven one-hop endpoint-ID exact string filter; record 9/9 focused adapter tests, 361/0/1 across 27 HQL2 targets and 190/0/0 across 11 compatibility targets; retain shared-runtime, independent-review and broad P8/P13 gates. |
 | 2.3.21b | 2026-10-02 | GenesisBlockDB Architecture | Extend D7 with differential-proven one-hop HQL1 projections and pre-parse resource reservation; record 8/8 focused tests, 361/0/1 across 27 HQL2 targets and 190/0/0 across 11 compatibility targets; retain shared-runtime, independent-review and broad P8/P13 gates. |
