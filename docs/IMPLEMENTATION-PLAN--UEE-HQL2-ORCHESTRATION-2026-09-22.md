@@ -1,9 +1,9 @@
 ---
-version: "0.8.36b"
+version: "0.8.37b"
 doc_id: "IMPLEMENTATION-PLAN--UEE-HQL2-ORCHESTRATION-2026-09-22"
 owner: "Boss (Founder / Product Authority)"
 created_at: "2026-09-22T00:00:00+07:00,ATHER,working-tree"
-last_update: "2026-10-02T23:12:45+07:00,ATHER"
+last_update: "2026-10-02T23:55:23+07:00,ATHER"
 status: beta
 superseded_by: null
 attributes:
@@ -831,6 +831,7 @@ Version diff `0.8.24b -> 0.8.25b`: record the delegated C-3 decision and exact P
 Version diff `0.8.25b -> 0.8.26b`: implement Sequence node ID/labels through HQL and typed IR under P6; record 7 focused passes and 338/0/1 across 25 root HQL2 targets; retain the ACL-hidden fixture, independent review and full P8 gates.
 Version diff `0.8.26b -> 0.8.27b`: record owner approval of P8 addendum D1-D6 and authorize test-first implementation of lexical/context profiles, Sequence properties, contextual literals and the corrected pre-parse ACL fixture; runtime evidence remains pending.
 Version diff `0.8.28b -> 0.8.29b`: add and pass the edge-property-before-SHORTEST regression; record 10/10 P8 completion tests and 349/0/1 across 26 root HQL2 targets plus a separate 190/0/0 across 11 P6/schema-v6/compatibility targets; confirmation review marked the D5 fix complete and independent static review found no concrete defect; retain broad P8/P13 gates.
+Version diff `0.8.36b -> 0.8.37b`: refine hosted PR #194 evidence at `cdfb90a`: Windows `cargo test` itself passes, including the protected probe in 225.86s and doc-tests, but the 15-minute job timeout cancels post-cache finalization; retain the probe and propose a Windows-only 20-minute job timeout. Worker CI still fails on all OSes because sidecars make a fresh root nonempty before schema-v6 activation; retain the separate worker docs/code approval gate, independent review, and broad P8/P13/release gates.
 Version diff `0.8.35b -> 0.8.36b`: synchronize hosted PR #194 evidence at `9344b71`; Linux/macOS Rust and standard Node/mobile/consumer checks pass, Windows Rust exceeds the 15-minute job limit in the protected probe, and worker tests fail cross-platform because sidecars make a fresh database root nonempty before schema-v6 activation. Preserve protected WIP; retain the worker approval gate, independent review, and broad P8/P13/release gates.
 Version diff `0.8.34b -> 0.8.35b`: complete local integration verification for the approved H2-D11 schema-v6/consensus path; full Rust suite and default/no-default strict Clippy pass, with `probe_vs_recall` explicitly NOT_RUN; retain fixture-only scope and broader P8/P13/review/release gates.
 Version diff `0.8.33b -> 0.8.34b`: implement approved H2-D11 R6b signed activation preflight and markerless WAL recovery; record 17/17 crash tests, 19/19 migration tests and 40 passing selected HQL2/durability/authority targets; retain fixture-only scope and broader P8/P13 gates.
@@ -840,6 +841,7 @@ Version diff `0.8.27b -> 0.8.28b`: implement approved D1-D5, record 9 focused pa
 
 | Version | Date | Status | Summary | Commit Hash | Agent |
 |---|---|---|---|---|---|
+| 0.8.37b | 2026-10-02 | beta | Refine hosted PR #194 evidence: Windows Rust test step passes with protected probe but 15-minute job timeout cancels post-cache; propose 20-minute Windows timeout; worker bootstrap errors persist across OS; keep worker code approval, independent review and P8/P13 gates open | working-tree | ATHER |
 | 0.8.36b | 2026-10-02 | beta | Synchronize hosted PR #194 evidence: Linux/macOS Rust and standard Node/mobile checks pass; Windows full suite times out in protected probe; worker CI fails at fresh schema-v6 bootstrap; keep all P8/P13/review/release gates open | working-tree | ATHER |
 | 0.8.35b | 2026-10-02 | beta | Full locked/offline no-default-features Rust suite passes with `probe_vs_recall` NOT_RUN; default/no-default strict all-target Clippy passes; consensus signs schema-v6 revision envelopes; broad P8/P13/review/release gates remain open | working-tree | ATHER |
 | 0.8.34b | 2026-10-02 | beta | Implement and locally verify R6b markerless WAL recovery; crash 17/17, migration 19/19 and selected 40-target aggregate pass; fixture-only, no user DB migration, broad P8/P13 gates remain open | 0135c29 | ATHER |

@@ -1,8 +1,8 @@
 ---
 doc_id: REPORT--HQL2-P8-CORE-2026-09-28
-version: "0.1.32b"
+version: "0.1.33b"
 created_at: "2026-09-28T04:35:00+07:00,ATHER,22bc11e"
-last_update: "2026-10-02T23:12:45+07:00,ATHER"
+last_update: "2026-10-02T23:55:23+07:00,ATHER"
 status: beta
 owner: GenesisBlockDB Engineering
 attributes:
@@ -148,7 +148,9 @@ Platform: local Windows MSVC, Rust 1.97.1, `--locked --offline
 | HQL/IR annotation source and recursive ACL parity | 6 passed, 0 failed, 0 ignored | Separate `targets`/`evidence` properties, nested annotation references, and Edge endpoint access are covered; fixture evidence is independent of P8 operator acceptance. |
 | Long-running soak | Three soak_tests cases remain ignored by the normal suite | No soak qualification inferred |
 | Hosted Rust/core CI, PR #194 head `9344b71` | [Run 37029503800](https://github.com/Freshair129/GenesisBlock/actions/runs/37029503800): Linux/macOS `cargo test`, all three standard `npm test` targets, `fmt + clippy`, docs validation and version consistency passed. Windows `cargo test` reached its 15-minute job limit while `tests/zz_probe_discriminates.rs::probe_vs_recall` was still running; runner canceled the job. | Windows full Rust suite remains incomplete; protected probe source was not changed. |
+| Latest hosted Rust/core CI, PR #194 head `cdfb90a` | [Run 37034671231](https://github.com/Freshair129/GenesisBlock/actions/runs/37034671231): Linux/macOS `cargo test` and all three standard Node test targets passed. The Windows `cargo test` step itself succeeded, including `probe_vs_recall` (225.86s) and doc-tests (0); the enclosing 15-minute job was canceled only during `Post Run Swatinem/rust-cache`. `fmt + clippy`, docs validation and version consistency passed. | Test suite is green on Windows, but the required job check remains cancelled because the job timeout covers setup, compile, tests and cache save. Protected probe remains unchanged. |
 | Hosted worker CI, PR #194 head `9344b71` | [Run 37029503800](https://github.com/Freshair129/GenesisBlock/actions/runs/37029503800) and [rebuilt-addon run 37029503808](https://github.com/Freshair129/GenesisBlock/actions/runs/37029503808): worker tests failed on Linux/macOS/Windows and rebuilt Linux addon with `RECOVERY_REQUIRED: markerless database identity is missing`. | Worker startup-order correction remains documentation/approval-gated; no worker code changed. |
+| Latest hosted worker CI, PR #194 head `cdfb90a` | [Run 37034671231](https://github.com/Freshair129/GenesisBlock/actions/runs/37034671231): worker tests failed on Linux/macOS/Windows; Linux/macOS logs repeat `RECOVERY_REQUIRED: markerless database identity is missing`. | Worker startup-order correction remains documentation/approval-gated; no worker code changed. |
 | Hosted mobile/consumer CI, PR #194 head `9344b71` | [Mobile run 37029503804](https://github.com/Freshair129/GenesisBlock/actions/runs/37029503804): host mobile build/tests, iOS/Android builds and acceptance, C header and SDK checks passed. RustSec, Go/Python consumers and distribution checks passed in their respective runs. | Hosted green jobs do not close P8/P13, security-review, soak or release qualification. |
 | PR #194 merge state | PR remains open and mergeable, but worker checks and Windows Rust job fail and `reviewDecision` is empty. | Not merged; required CI/review conditions are unmet. |
 
@@ -400,14 +402,15 @@ from these local tests.
 | P6 generations/leases/ACL | 0.5.17b | 0.5.17b |
 | H2-D11 durable revisions/annotations | 0.8.9b | 0.8.9b |
 | P8 typed boundary | 0.2.37b | 0.2.37b |
-| Orchestration plan | 0.8.35b | 0.8.36b |
-| This report | 0.1.31b | 0.1.32b |
+| Orchestration plan | 0.8.36b | 0.8.37b |
+| This report | 0.1.32b | 0.1.33b |
 
-Version diff `0.1.31b -> 0.1.32b`: synchronize hosted PR #194 results at
-`9344b71`; record passing Linux/macOS Rust, standard Node and mobile/consumer
-gates, Windows Rust timeout during the protected probe, and cross-platform
-worker startup failures. Keep merge, shared-runtime, broad P8/P13, independent
-review, security, soak/crash/platform and release gates open.
+Version diff `0.1.32b -> 0.1.33b`: synchronize hosted PR #194 results at
+`cdfb90a`; record that the Windows Rust test step passed, including the
+protected probe, but the 15-minute job timeout canceled cache finalization.
+Record repeated cross-platform worker bootstrap failures and retain merge,
+shared-runtime, broad P8/P13, independent-review, security, soak/crash/platform
+and release gates.
 
 Version diff `0.1.30b -> 0.1.31b`: record final full locked/offline Rust-suite
 and default/no-default strict Clippy results, schema-v6 consensus revision
@@ -437,6 +440,7 @@ P8 and release gates.
 
 | Version | Date | Status | Summary | Commit Hash | Agent |
 |---|---|---|---|---|---|
+| 0.1.33b | 2026-10-02 | beta | Update hosted PR #194 evidence at cdfb90a: Windows Rust tests including protected probe passed but job timeout canceled cache save; worker tests fail across OS at markerless schema-v6 bootstrap; preserve probe and keep merge/P8/P13/review gates open | working-tree | ATHER |
 | 0.1.32b | 2026-10-02 | beta | Synchronize hosted PR #194 evidence: Linux/macOS Rust and standard Node pass; Windows Rust hits 15-minute timeout in protected probe; worker tests fail on all OSes at markerless schema-v6 bootstrap; PR remains unmerged with review/P8/P13 gates open | working-tree | ATHER |
 | 0.1.31b | 2026-10-02 | beta | Record full locked/offline Rust suite and both strict Clippy configurations; schema-v6 consensus revision-envelope signing order verified; `probe_vs_recall` remains NOT_RUN and broader P8/P13/review/release gates remain open | working-tree | ATHER |
 | 0.1.30b | 2026-10-02 | beta | Implement and verify approved H2-D11 R6b markerless WAL recovery; crash 17/17, migration 19/19, selected 40-target aggregate pass; integrate upstream Query IR match_path; no user DB migration, full P8/P13/review gates remain open | 0135c29 | ATHER |
