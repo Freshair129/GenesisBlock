@@ -96,8 +96,9 @@ fn peer_ingress_rejects_nested_p6_atomically_before_signature_or_siblings() {
         signer_peer_id: "forged-peer".into(),
     };
 
+    let before = destination.stable_frontier();
     assert_error_prefix(destination.reconcile_state(vec![nested]), "P6_LOCAL_ONLY");
-    assert_eq!(destination.stable_frontier(), 0);
+    assert_eq!(destination.stable_frontier(), before);
     assert!(destination.node_view("sibling").is_none());
 }
 
@@ -122,12 +123,14 @@ fn outbound_sequence_sync_excludes_local_p6_control_events() {
 
     let events = source.events_since_seq(0);
     assert!(events.iter().all(|event| !is_p6(&event.event)));
-    assert!(events
-        .iter()
-        .any(|event| { matches!(&event.event, Event::Node(node) if node.id == "before") }));
-    assert!(events
-        .iter()
-        .any(|event| { matches!(&event.event, Event::Node(node) if node.id == "after") }));
+    for expected_id in ["before", "after"] {
+        assert!(events.iter().any(|event| match &event.event {
+            Event::Node(node) => node.id == expected_id,
+            Event::Transaction(transaction) =>
+                transaction.nodes.iter().any(|node| node.id == expected_id),
+            _ => false,
+        }));
+    }
 }
 
 #[tokio::test]

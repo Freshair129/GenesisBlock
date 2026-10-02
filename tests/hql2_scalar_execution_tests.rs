@@ -14,6 +14,8 @@ mod plan;
 mod reference;
 #[path = "../src/query/hql2/result.rs"]
 mod result;
+#[path = "../src/query/hql2/source.rs"]
+mod source;
 #[path = "../src/uee_v2.rs"]
 mod uee_v2;
 #[path = "../src/query/hql2/value.rs"]
@@ -57,15 +59,16 @@ fn prepare(
         .collect();
     let ir=serde_json::from_value(json!({"contract_version":"query-ir.v2","nodes":nodes,"root":root,"parameter_types":declarations})).unwrap();
     let logical = wire::decode_ir_v2(ir)?;
-    let parameters = bind::BoundParametersV2::decode(p)?;
+    let parameters = bind::BoundParametersV2::decode(p, None)?;
     let marker = ();
-    let catalog = catalog::AuthorizedCatalogV2::new(
+    let catalog = catalog::AuthorizedCatalogV2::with_tables(
         result::CatalogStampV2 {
             observed_frontier: 0,
             policy_revision: 0,
             schema_fingerprint: "test".into(),
         },
         &marker,
+        std::collections::BTreeSet::new(),
     );
     plan::plan_v2(bind::bind_v2(logical, &parameters, &catalog)?)
 }
@@ -106,7 +109,10 @@ fn closed_parameters_and_declaration_agreement() {
         json!({"type":"I64","value":"1","extra":true}),
         json!({"value":"1"}),
     ] {
-        assert!(bind::BoundParametersV2::decode(&BTreeMap::from([("x".into(), invalid)])).is_err());
+        assert!(
+            bind::BoundParametersV2::decode(&BTreeMap::from([("x".into(), invalid)]), None)
+                .is_err()
+        );
     }
 }
 #[test]
@@ -209,6 +215,128 @@ fn checked_numerics_and_unicode_functions() {
         .unwrap(),
         vec![vec![V::I64(2)]]
     );
+}
+
+#[test]
+fn checked_remainder_uses_truncating_quotient_and_propagates_null() {
+    use reference::{Expr as ReferenceExpr, Plan as ReferencePlan, Value as ReferenceValue};
+    let input = ReferencePlan::Values(
+        [Some(-7), None, Some(7)]
+            .into_iter()
+            .map(|value| {
+                BTreeMap::from([(
+                    "x".into(),
+                    value
+                        .map(ReferenceValue::I64)
+                        .unwrap_or(ReferenceValue::Null),
+                )])
+            })
+            .collect(),
+    );
+    let expected = reference::execute(&ReferencePlan::Project(
+        Box::new(input),
+        vec![(
+            "remainder".into(),
+            ReferenceExpr::Rem(
+                Box::new(ReferenceExpr::Field("x".into())),
+                Box::new(ReferenceExpr::Literal(ReferenceValue::I64(4))),
+            ),
+        )],
+    ))
+    .unwrap();
+    let native = run(
+        vec![
+            source("s", "xs", "x"),
+            project(binary("rem", field("x"), lit("4"))),
+        ],
+        "p",
+        params("Nullable<I64>", json!(["-7", null, "7"])),
+    )
+    .unwrap();
+    assert_eq!(
+        native,
+        expected
+            .iter()
+            .map(|row| {
+                vec![match &row["remainder"] {
+                    ReferenceValue::Null => V::Null,
+                    ReferenceValue::I64(value) => V::I64(*value),
+                    _ => panic!("unexpected reference value"),
+                }]
+            })
+            .collect::<Vec<_>>()
+    );
+
+    assert_eq!(
+        run(
+            vec![
+                source("s", "xs", "x"),
+                project(binary(
+                    "rem",
+                    field("x"),
+                    json!({"type":"F64Finite","literal":2.0}),
+                )),
+            ],
+            "p",
+            params("F64Finite", json!([-4.5, 4.5])),
+        )
+        .unwrap(),
+        vec![vec![V::F64(-0.5)], vec![V::F64(0.5)]]
+    );
+
+    let error = run(
+        vec![
+            source("s", "xs", "x"),
+            project(binary("rem", field("x"), lit("0"))),
+        ],
+        "p",
+        params("I64", json!(["7"])),
+    )
+    .unwrap_err();
+    assert_eq!(error.detail.unwrap()["reason"], "division_by_zero");
+
+    for zero in [json!(0.0), json!(-0.0)] {
+        let error = run(
+            vec![
+                source("s", "xs", "x"),
+                project(binary(
+                    "rem",
+                    field("x"),
+                    json!({"type":"F64Finite","literal":zero}),
+                )),
+            ],
+            "p",
+            params("F64Finite", json!([7.0])),
+        )
+        .unwrap_err();
+        assert_eq!(error.detail.unwrap()["reason"], "division_by_zero");
+    }
+
+    let error = run(
+        vec![
+            source("s", "xs", "x"),
+            project(binary("rem", field("x"), lit("-1"))),
+        ],
+        "p",
+        params("I64", json!([i64::MIN.to_string()])),
+    )
+    .unwrap_err();
+    assert_eq!(error.detail.unwrap()["reason"], "integer_overflow");
+
+    let error = run(
+        vec![
+            source("s", "xs", "x"),
+            project(binary(
+                "rem",
+                lit("7"),
+                json!({"type":"Utf8","literal":"2"}),
+            )),
+        ],
+        "p",
+        params("I64", json!(["1"])),
+    )
+    .unwrap_err();
+    assert_eq!(error.detail.unwrap()["reason"], "numeric_type");
 }
 #[test]
 fn three_valued_boolean_truth_tables() {
@@ -398,17 +526,20 @@ fn aggregates_ignore_null_except_collect_and_group_null_together() {
     );
 }
 #[test]
-fn unsupported_storage_fails_at_bind() {
-    assert_eq!(
-        prepare(
-            vec![node("s", "NodeScan", &[], json!({"as":"n"}))],
+fn change_scan_binds_a_typed_change_event_source() {
+    let plan = prepare(
+        vec![node(
             "s",
-            &BTreeMap::new()
-        )
-        .unwrap_err()
-        .code,
-        "CAPABILITY_UNSUPPORTED"
-    );
+            "ChangeScan",
+            &[],
+            json!({"after_seq":"0","as":"c"}),
+        )],
+        "s",
+        &BTreeMap::new(),
+    )
+    .unwrap();
+    assert_eq!(plan.root(), "s");
+    assert_eq!(plan.columns()[0].data_type, "ChangeEvent");
 }
 #[test]
 fn explain_has_no_actuals_execution_has_measured_counters() {
@@ -461,15 +592,16 @@ fn budgets_error_instead_of_successful_partial_output() {
 #[test]
 fn declarations_hql_inference_and_ir_mismatch() {
     let p = params("I64", json!(["1"]));
-    let params = bind::BoundParametersV2::decode(&p).unwrap();
+    let params = bind::BoundParametersV2::decode(&p, None).unwrap();
     let marker = ();
-    let cat = catalog::AuthorizedCatalogV2::new(
+    let cat = catalog::AuthorizedCatalogV2::with_tables(
         result::CatalogStampV2 {
             observed_frontier: 0,
             policy_revision: 0,
             schema_fingerprint: "test".into(),
         },
         &marker,
+        std::collections::BTreeSet::new(),
     );
     let ir:uee_v2::QueryIrV2=serde_json::from_value(json!({"contract_version":"query-ir.v2","root":"s","nodes":[source("s","xs","x")],"parameter_types":{"xs":"List<Utf8>"}})).unwrap();
     let mut logical = wire::decode_ir_v2(ir).unwrap();
@@ -532,15 +664,16 @@ fn replaced_scopes_duplicate_aliases_and_semi_right_are_rejected() {
 }
 #[test]
 fn binder_defends_internal_hql_graph_invariants() {
-    let p = bind::BoundParametersV2::decode(&params("I64", json!([]))).unwrap();
+    let p = bind::BoundParametersV2::decode(&params("I64", json!([])), None).unwrap();
     let marker = ();
-    let cat = catalog::AuthorizedCatalogV2::new(
+    let cat = catalog::AuthorizedCatalogV2::with_tables(
         result::CatalogStampV2 {
             observed_frontier: 0,
             policy_revision: 0,
             schema_fingerprint: "test".into(),
         },
         &marker,
+        std::collections::BTreeSet::new(),
     );
     let s = wire::LogicalNodeV2 {
         id: "s".into(),

@@ -1,14 +1,17 @@
-//! Explicit v2 frontend and exact scalar execution boundary.
-//! Storage-backed operators remain unavailable until their revision adapters pass.
+//! Explicit v2 frontend and execution boundary.
+//! Storage-backed scans are enabled only for revision-bound sources covered by P8.
 pub mod ast;
 pub(crate) mod bind;
 pub(crate) mod catalog;
 pub mod error;
 pub(crate) mod exec;
+pub(crate) mod key_codec;
+pub(crate) mod legacy;
 pub(crate) mod lower;
 pub(crate) mod plan;
 pub(crate) mod request;
 pub mod result;
+pub(crate) mod source;
 mod syntax;
 pub mod value;
 pub(crate) mod wire;

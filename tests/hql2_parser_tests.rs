@@ -52,8 +52,9 @@ fn resource_bound_requires_pinned_grammar_and_layout_review() {
         .fold(0xcbf29ce484222325u64, |hash, byte| {
             (hash ^ u64::from(byte)).wrapping_mul(0x100000001b3)
         });
+    // Reviewed 2026-10-02: edge property objects reuse the bounded object/expression path.
     assert_eq!(
-        hash, 0xf186ea787dc60e9e,
+        hash, 0x2379f9d351018cb4,
         "grammar changed: re-audit lexical allocation bound"
     );
     let lock = include_str!("../Cargo.lock").replace("\r\n", "\n");

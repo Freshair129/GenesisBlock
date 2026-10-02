@@ -106,9 +106,19 @@ class SemanticOracleTests(unittest.TestCase):
 
     def test_frozen_annotation(self):
         ann=json.loads((ROOT/'examples/annotation.json').read_text())
-        rev=ann['targets'][0]['ref']['revision_id']
-        check_annotation_target(ann,{rev:{'id':'doc:one','namespace':'kb'}})
-        with self.assertRaises(ValueError):check_annotation_target(ann,{rev:{'id':'doc:two','namespace':'kb'}})
+        ref=ann['targets'][0]['ref']; rev=ref['revision']
+        record={'database_id':ref['database_id'],'id':'doc:one','namespace':'kb'}
+        check_annotation_target(ann,{rev:record})
+        with self.assertRaises(ValueError):check_annotation_target(ann,{rev:{**record,'id':'doc:two'}})
+        without_database=copy.deepcopy(ann);del without_database['targets'][0]['ref']['database_id']
+        with self.assertRaises(ValueError):check_annotation_target(without_database,{rev:record})
+
+    def test_frozen_annotation_evidence(self):
+        ann=json.loads((ROOT/'examples/annotation.json').read_text())
+        ref=ann['targets'][0]['ref']; rev=ref['revision']
+        record={'database_id':ref['database_id'],'id':'doc:one','namespace':'kb'}
+        ann['evidence'][0]['ref']['revision']='00000000-0000-4000-8000-000000000002'
+        with self.assertRaises(ValueError):check_annotation_target(ann,{rev:record})
 
     def test_cross_namespace_annotation(self):
         ann=json.loads((ROOT/'examples/annotation.json').read_text())

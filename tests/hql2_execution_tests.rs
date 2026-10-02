@@ -1,5 +1,9 @@
-use genesis_block_native::{query::hql2::QueryOutcomeV2, uee_v2::QueryRequestV2, *};
-use serde_json::json;
+use genesis_block_native::{
+    query::hql2::{value::QueryValueV2, QueryOutcomeV2},
+    uee_v2::QueryRequestV2,
+    *,
+};
+use serde_json::{json, Value};
 use std::{collections::BTreeMap, path::Path};
 use tempfile::TempDir;
 
@@ -125,6 +129,213 @@ fn values_execute_with_real_snapshot_bags_and_closed_encoding() {
 }
 
 #[test]
+fn hql_take_skip_parameters_require_decimal_u64_and_execute() {
+    let dir = TempDir::new().unwrap();
+    let db = open(dir.path());
+    for id in ["c", "a", "b"] {
+        db.add_node(NodeInput {
+            id: Some(id.into()),
+            labels: vec!["Document".into()],
+            props: None,
+            embedding: None,
+            lang: None,
+            valid_from: None,
+            caused_by: None,
+            ttl: None,
+            collection: None,
+        })
+        .unwrap();
+    }
+
+    let request = |params: Value| {
+        serde_json::from_value::<QueryRequestV2>(json!({
+            "contract_version":"genesis.api.v2",
+            "request_id":"hql-u64-limits",
+            "namespace":"default",
+            "language_version":"hql.v2",
+            "hql":"USE default FROM NODES Document AS d |> ORDER BY d.id ASC NULLS LAST |> SKIP $skip |> TAKE $take |> RETURN d.id AS id",
+            "params":params
+        }))
+        .unwrap()
+    };
+    let decimal = |value: &str| json!({"type":"DecimalU64","value":value});
+    let QueryOutcomeV2::Rows(result) = db
+        .query_v2(
+            access(),
+            request(json!({"skip":decimal("1"),"take":decimal("1")})),
+        )
+        .unwrap()
+    else {
+        panic!("read query must return rows")
+    };
+    assert_eq!(
+        serde_json::to_value(result).unwrap()["rows"][0]["id"]["value"],
+        "b"
+    );
+
+    let error = db
+        .query_v2(
+            access(),
+            request(json!({"skip":decimal("0"),"take":{"type":"I64","value":"1"}})),
+        )
+        .unwrap_err();
+    assert_eq!(error.code, "BIND_ERROR");
+    assert_eq!(error.detail.unwrap()["reason"], "parameter_type_mismatch");
+
+    let error = db
+        .query_v2(
+            access(),
+            request(json!({
+                "skip":{"type":"Nullable<DecimalU64>","value":"0"},
+                "take":decimal("1")
+            })),
+        )
+        .unwrap_err();
+    assert_eq!(error.code, "BIND_ERROR");
+    assert_eq!(error.detail.unwrap()["reason"], "parameter_type_mismatch");
+
+    let error = db
+        .query_v2(access(), request(json!({"skip":decimal("0")})))
+        .unwrap_err();
+    assert_eq!(error.code, "BIND_ERROR");
+    assert_eq!(error.detail.unwrap()["reason"], "undeclared_parameter");
+}
+
+#[test]
+fn hql_implicit_null_order_is_last_for_ascending_and_descending() {
+    let dir = TempDir::new().unwrap();
+    let db = open(dir.path());
+    let request = |request_id: &str, direction: &str, nulls: Option<&str>| {
+        let nulls = nulls.map_or_else(String::new, |value| format!(" NULLS {value}"));
+        let hql = format!("VALUES $xs AS x |> ORDER BY x {direction}{nulls} |> RETURN x");
+        serde_json::from_value::<QueryRequestV2>(json!({
+            "contract_version":"genesis.api.v2",
+            "request_id":request_id,
+            "namespace":"default",
+            "language_version":"hql.v2",
+            "hql":hql,
+            "params":{"xs":{"type":"List<Nullable<I64>>","value":[null,"2","1"]}}
+        }))
+        .unwrap()
+    };
+
+    for (direction, expected) in [
+        (
+            "ASC",
+            vec![
+                QueryValueV2::I64(1),
+                QueryValueV2::I64(2),
+                QueryValueV2::Null,
+            ],
+        ),
+        (
+            "DESC",
+            vec![
+                QueryValueV2::I64(2),
+                QueryValueV2::I64(1),
+                QueryValueV2::Null,
+            ],
+        ),
+    ] {
+        let request_id = format!("hql-null-default-{direction}");
+        let QueryOutcomeV2::Rows(result) = db
+            .query_v2(access(), request(&request_id, direction, None))
+            .unwrap()
+        else {
+            panic!("read query must return rows")
+        };
+        assert_eq!(
+            result
+                .rows
+                .into_iter()
+                .map(|row| row["x"].clone())
+                .collect::<Vec<_>>(),
+            expected
+        );
+    }
+
+    let QueryOutcomeV2::Rows(result) = db
+        .query_v2(access(), request("hql-null-explicit", "ASC", Some("FIRST")))
+        .unwrap()
+    else {
+        panic!("read query must return rows")
+    };
+    assert_eq!(result.rows[0]["x"], QueryValueV2::Null);
+}
+
+#[test]
+fn hql_remainder_executes_and_returns_checked_errors() {
+    let dir = TempDir::new().unwrap();
+    let db = open(dir.path());
+    let request = |request_id: &str, divisor: &str, values: Value| {
+        serde_json::from_value::<QueryRequestV2>(json!({
+            "contract_version":"genesis.api.v2",
+            "request_id":request_id,
+            "namespace":"default",
+            "language_version":"hql.v2",
+            "hql":"VALUES $xs AS x |> RETURN x % $divisor AS remainder",
+            "params":{
+                "xs":{"type":"List<I64>","value":values},
+                "divisor":{"type":"I64","value":divisor}
+            }
+        }))
+        .unwrap()
+    };
+    let QueryOutcomeV2::Rows(result) = db
+        .query_v2(access(), request("hql-rem-values", "4", json!(["-7", "7"])))
+        .unwrap()
+    else {
+        panic!("read query must return rows")
+    };
+    assert_eq!(
+        result
+            .rows
+            .iter()
+            .map(|row| row["remainder"].clone())
+            .collect::<Vec<_>>(),
+        [QueryValueV2::I64(-3), QueryValueV2::I64(3)]
+    );
+
+    let mut ir_request =
+        serde_json::to_value(request("hql-rem-ir-parity", "4", json!(["-7", "7"]))).unwrap();
+    ir_request["hql"] = Value::Null;
+    ir_request["language_version"] = Value::Null;
+    ir_request["ir"] = json!({
+        "contract_version":"query-ir.v2",
+        "nodes":[
+            {"id":"values","op":"Values","inputs":[],"config":{"param":"xs","as":"x"}},
+            {"id":"project","op":"Project","inputs":["values"],"config":{"fields":[{
+                "as":"remainder",
+                "expression":{"binary":"rem","left":{"field":{"alias":"x","path":[]}},"right":{"param":"divisor"}}
+            }]}}
+        ],
+        "root":"project",
+        "parameter_types":{"xs":"List<I64>","divisor":"I64"}
+    });
+    let ir_request = serde_json::from_value::<QueryRequestV2>(ir_request).unwrap();
+    let QueryOutcomeV2::Rows(ir_result) = db.query_v2(access(), ir_request).unwrap() else {
+        panic!("typed IR read must return rows")
+    };
+    assert_eq!(ir_result.rows, result.rows);
+    assert_eq!(ir_result.columns, result.columns);
+
+    let error = db
+        .query_v2(access(), request("hql-rem-zero", "0", json!(["7"])))
+        .unwrap_err();
+    assert_eq!(error.stage, "execute");
+    assert_eq!(error.detail.unwrap()["reason"], "division_by_zero");
+
+    let error = db
+        .query_v2(
+            access(),
+            request("hql-rem-overflow", "-1", json!([i64::MIN.to_string()])),
+        )
+        .unwrap_err();
+    assert_eq!(error.stage, "execute");
+    assert_eq!(error.detail.unwrap()["reason"], "integer_overflow");
+}
+
+#[test]
 fn namespace_authorization_precedes_even_malformed_hql_or_ir() {
     let dir = TempDir::new().unwrap();
     let db = open(dir.path());
@@ -160,7 +371,7 @@ fn namespace_authorization_precedes_even_malformed_hql_or_ir() {
 }
 
 #[test]
-fn unsupported_source_and_future_frontier_fail_before_publication() {
+fn future_frontier_fails_before_publication_and_change_source_executes() {
     let dir = TempDir::new().unwrap();
     let db = open(dir.path());
     let before = db.stable_frontier();
@@ -169,14 +380,17 @@ fn unsupported_source_and_future_frontier_fail_before_publication() {
     let error = db.query_v2(access(), request).unwrap_err();
     assert_eq!(error.code, "INDEX_COVERAGE_TIMEOUT");
     assert!(error.retryable);
-    let mut request = values_request();
-    request.ir.as_mut().unwrap().nodes[0].op = uee_v2::QueryOpV2::AnnotationScan;
-    request.ir.as_mut().unwrap().nodes[0].config = BTreeMap::from([("as".into(), json!("a"))]);
-    assert_eq!(
-        db.query_v2(access(), request).unwrap_err().code,
-        "CAPABILITY_UNSUPPORTED"
-    );
     assert_eq!(db.stable_frontier(), before);
+    let mut request = values_request();
+    request.ir.as_mut().unwrap().nodes[0].op = uee_v2::QueryOpV2::ChangeScan;
+    request.ir.as_mut().unwrap().nodes[0].config = BTreeMap::from([
+        ("after_seq".into(), json!("0")),
+        ("as".into(), json!("change")),
+    ]);
+    let QueryOutcomeV2::Rows(changes) = db.query_v2(access(), request).unwrap() else {
+        panic!("ChangeScan should execute")
+    };
+    assert!(changes.rows.is_empty());
 }
 
 #[test]

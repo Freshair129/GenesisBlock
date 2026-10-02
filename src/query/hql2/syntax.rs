@@ -4,6 +4,7 @@ use super::error::QueryErrorV2;
 use pest::iterators::Pair;
 use pest::Parser;
 use pest_derive::Parser;
+use std::collections::BTreeMap;
 
 #[derive(Parser)]
 #[grammar = "query/hql2/hql2.pest"]
@@ -456,6 +457,331 @@ fn query(source: &str, pair: Pair<'_, Rule>) -> Result<Query, QueryErrorV2> {
     })
 }
 
+struct ParsedPatternNode {
+    alias: Name,
+    id: Option<Expr>,
+    labels: Vec<Name>,
+    properties: BTreeMap<String, Expr>,
+}
+
+fn pattern_node(
+    source: &str,
+    pair: Pair<'_, Rule>,
+) -> Result<Option<ParsedPatternNode>, QueryErrorV2> {
+    let mut alias = None;
+    let mut label = None;
+    let mut id = None;
+    let mut properties = BTreeMap::new();
+    for part in pair.clone().into_inner() {
+        match part.as_rule() {
+            Rule::name => {
+                let is_label = source[..part.as_span().start()].trim_end().ends_with(':');
+                if is_label {
+                    if label.is_some() {
+                        return Err(invalid(source, &part, "duplicate_pattern_label"));
+                    }
+                    label = Some(name(part));
+                } else if alias.is_none() {
+                    alias = Some(name(part));
+                } else {
+                    return Err(invalid(source, &part, "pattern_node_shape"));
+                }
+            }
+            Rule::object => {
+                for field in part.into_inner() {
+                    if field.as_rule() != Rule::pair {
+                        continue;
+                    }
+                    let key_pair = field
+                        .clone()
+                        .into_inner()
+                        .next()
+                        .ok_or_else(|| invalid(source, &field, "missing_object_key"))?;
+                    let key = if key_pair.as_rule() == Rule::string {
+                        decode_string(source, &key_pair)?
+                    } else {
+                        key_pair.as_str().to_owned()
+                    };
+                    let value_pair = child(source, field.clone(), Rule::expr)?;
+                    let value = expression(source, value_pair)?.0;
+                    if key == "id" {
+                        if id.replace(value).is_some() {
+                            return Err(invalid(source, &field, "duplicate_pattern_id"));
+                        }
+                    } else if properties.insert(key, value).is_some() {
+                        return Err(invalid(source, &field, "duplicate_pattern_property"));
+                    }
+                }
+            }
+            _ => {}
+        }
+    }
+    let Some(alias) = alias else {
+        return Ok(None);
+    };
+    Ok(Some(ParsedPatternNode {
+        alias,
+        id,
+        labels: label.into_iter().collect(),
+        properties,
+    }))
+}
+
+fn expand_edge(
+    source: &str,
+    pattern: &Pair<'_, Rule>,
+    pair: Pair<'_, Rule>,
+) -> Result<
+    (
+        Option<Name>,
+        Vec<Name>,
+        BTreeMap<String, Expr>,
+        GraphDirection,
+        u32,
+        u32,
+    ),
+    QueryErrorV2,
+> {
+    let raw_edge = pair.as_str().trim_start();
+    let direction = if raw_edge.starts_with("<-") {
+        GraphDirection::In
+    } else if raw_edge.ends_with("->") {
+        GraphDirection::Out
+    } else {
+        GraphDirection::Both
+    };
+    let mut edge_alias = None;
+    let mut relations = Vec::new();
+    let mut properties = BTreeMap::new();
+    let mut min_hops = 1;
+    let mut max_hops = 1;
+    if let Some(detail) = pair
+        .into_inner()
+        .find(|part| part.as_rule() == Rule::edge_detail)
+    {
+        for item in detail.into_inner() {
+            match item.as_rule() {
+                Rule::name if edge_alias.is_none() => edge_alias = Some(name(item)),
+                Rule::relation_list => {
+                    relations.extend(
+                        item.into_inner()
+                            .filter(|part| part.as_rule() == Rule::name)
+                            .map(name),
+                    );
+                }
+                Rule::object => {
+                    for field in item.into_inner() {
+                        if field.as_rule() != Rule::pair {
+                            continue;
+                        }
+                        let key_pair = field
+                            .clone()
+                            .into_inner()
+                            .next()
+                            .ok_or_else(|| invalid(source, &field, "missing_object_key"))?;
+                        let key = if key_pair.as_rule() == Rule::string {
+                            decode_string(source, &key_pair)?
+                        } else {
+                            key_pair.as_str().to_owned()
+                        };
+                        let value =
+                            expression(source, child(source, field.clone(), Rule::expr)?)?.0;
+                        if properties.insert(key, value).is_some() {
+                            return Err(invalid(source, &field, "duplicate_pattern_property"));
+                        }
+                    }
+                }
+                Rule::hop_range => {
+                    let bounds = item
+                        .into_inner()
+                        .map(|part| {
+                            part.as_str()
+                                .parse::<u32>()
+                                .map_err(|_| invalid(source, &part, "hop_range_overflow"))
+                        })
+                        .collect::<Result<Vec<_>, _>>()?;
+                    if bounds.len() != 2 {
+                        return Err(invalid(source, pattern, "hop_range_shape"));
+                    }
+                    min_hops = bounds[0];
+                    max_hops = bounds[1];
+                }
+                _ => {}
+            }
+        }
+    }
+    if min_hops > max_hops || max_hops > 32 {
+        return Err(invalid(source, pattern, "hop_bounds"));
+    }
+    Ok((
+        edge_alias, relations, properties, direction, min_hops, max_hops,
+    ))
+}
+
+fn expand_stage(source: &str, pair: Pair<'_, Rule>) -> Result<Option<StageKind>, QueryErrorV2> {
+    let pattern = child(source, pair.clone(), Rule::pattern)?;
+    let parts: Vec<_> = pattern.clone().into_inner().collect();
+    if parts.len() < 3 || parts.len() % 2 == 0 || parts.len() > 65 {
+        return Ok(None);
+    }
+    if parts.iter().enumerate().any(|(index, part)| {
+        part.as_rule()
+            != if index % 2 == 0 {
+                Rule::node_pattern
+            } else {
+                Rule::edge_pattern
+            }
+    }) {
+        return Ok(None);
+    }
+    let Some(start_node) = pattern_node(source, parts[0].clone())? else {
+        return Ok(None);
+    };
+    let mut path_alias = None;
+    let mut mode = GraphPathMode::Trail;
+    for item in pair.clone().into_inner() {
+        match item.as_rule() {
+            Rule::name => path_alias = Some(name(item)),
+            Rule::path_mode => {
+                mode = match item.as_str().to_ascii_lowercase().as_str() {
+                    "simple" => GraphPathMode::Simple,
+                    "walk" => GraphPathMode::Walk,
+                    _ => GraphPathMode::Trail,
+                }
+            }
+            _ => {}
+        }
+    }
+    let optional = pair
+        .clone()
+        .into_inner()
+        .any(|part| part.as_rule() == Rule::k_optional);
+    let mut steps = Vec::with_capacity((parts.len() - 1) / 2);
+    for index in (1..parts.len()).step_by(2) {
+        let Some(end_node) = pattern_node(source, parts[index + 1].clone())? else {
+            return Ok(None);
+        };
+        let (edge_alias, relations, edge_properties, direction, min_hops, max_hops) =
+            expand_edge(source, &pattern, parts[index].clone())?;
+        steps.push(GraphSequenceStep {
+            end_alias: end_node.alias,
+            node_id: end_node.id,
+            node_labels: end_node.labels,
+            node_properties: end_node.properties,
+            edge_alias,
+            edge_properties,
+            relations,
+            direction,
+            min_hops,
+            max_hops,
+        });
+    }
+    let constrained = start_node.id.is_some()
+        || !start_node.labels.is_empty()
+        || !start_node.properties.is_empty()
+        || steps.iter().any(|step| {
+            step.node_id.is_some()
+                || !step.node_labels.is_empty()
+                || !step.node_properties.is_empty()
+                || !step.edge_properties.is_empty()
+        });
+    if steps.len() > 1 || constrained {
+        return Ok(Some(StageKind::ExpandSequence {
+            start_alias: start_node.alias,
+            start_id: start_node.id,
+            start_labels: start_node.labels,
+            start_properties: start_node.properties,
+            steps,
+            mode,
+            path_alias,
+            optional,
+        }));
+    }
+    let step = steps
+        .pop()
+        .ok_or_else(|| invalid(source, &pattern, "empty_pattern"))?;
+    Ok(Some(StageKind::Expand {
+        start_alias: start_node.alias,
+        end_alias: step.end_alias,
+        edge_alias: step.edge_alias,
+        relations: step.relations,
+        direction: step.direction,
+        min_hops: step.min_hops,
+        max_hops: step.max_hops,
+        mode,
+        path_alias,
+        optional,
+    }))
+}
+
+fn match_source(source: &str, pair: Pair<'_, Rule>) -> Result<Option<SourceKind>, QueryErrorV2> {
+    let pattern = child(source, pair.clone(), Rule::pattern)?;
+    let parts: Vec<_> = pattern.clone().into_inner().collect();
+    if parts.len() < 3 || parts.len() % 2 == 0 || parts.len() > 65 {
+        return Ok(None);
+    }
+    if parts.iter().enumerate().any(|(index, part)| {
+        part.as_rule()
+            != if index % 2 == 0 {
+                Rule::node_pattern
+            } else {
+                Rule::edge_pattern
+            }
+    }) {
+        return Ok(None);
+    }
+    let Some(start_node) = pattern_node(source, parts[0].clone())? else {
+        return Ok(None);
+    };
+    let mut steps = Vec::with_capacity((parts.len() - 1) / 2);
+    for index in (1..parts.len()).step_by(2) {
+        let Some(end_node) = pattern_node(source, parts[index + 1].clone())? else {
+            return Ok(None);
+        };
+        let (edge_alias, relations, edge_properties, direction, min_hops, max_hops) =
+            expand_edge(source, &pattern, parts[index].clone())?;
+        steps.push(GraphSequenceStep {
+            end_alias: end_node.alias,
+            node_id: end_node.id,
+            node_labels: end_node.labels,
+            node_properties: end_node.properties,
+            edge_alias,
+            edge_properties,
+            relations,
+            direction,
+            min_hops,
+            max_hops,
+        });
+    }
+    let mut path_alias = None;
+    let mut mode = GraphPathMode::Trail;
+    let mut shortest = false;
+    for item in pair.into_inner() {
+        match item.as_rule() {
+            Rule::name => path_alias = Some(name(item)),
+            Rule::path_mode => {
+                mode = match item.as_str().to_ascii_lowercase().as_str() {
+                    "simple" => GraphPathMode::Simple,
+                    "walk" => GraphPathMode::Walk,
+                    _ => GraphPathMode::Trail,
+                }
+            }
+            Rule::k_shortest => shortest = true,
+            _ => {}
+        }
+    }
+    Ok(Some(SourceKind::Match {
+        start_alias: start_node.alias,
+        start_id: start_node.id,
+        start_labels: start_node.labels,
+        start_properties: start_node.properties,
+        steps,
+        mode,
+        path_alias,
+        shortest,
+    }))
+}
+
 fn source_node(source: &str, pair: Pair<'_, Rule>) -> Result<Source, QueryErrorV2> {
     let mut names: Vec<_> = pair
         .clone()
@@ -494,6 +820,38 @@ fn source_node(source: &str, pair: Pair<'_, Rule>) -> Result<Source, QueryErrorV
         Rule::ann_source => SourceKind::Annotations {
             alias: names.remove(0),
         },
+        Rule::history_source => {
+            let kind_pair = child(source, pair.clone(), Rule::kind)?;
+            let kind = kind_pair
+                .clone()
+                .into_inner()
+                .next()
+                .ok_or_else(|| invalid(source, &kind_pair, "missing_history_kind"))?;
+            let id_pair = child(source, pair.clone(), Rule::id_value)?;
+            let id_atom = id_pair
+                .clone()
+                .into_inner()
+                .next()
+                .ok_or_else(|| invalid(source, &id_pair, "missing_history_id"))?;
+            let id = match id_atom.as_rule() {
+                Rule::string => at(&id_atom, ExprKind::Utf8(decode_string(source, &id_atom)?)),
+                Rule::parameter => at(&id_atom, ExprKind::Parameter(id_atom.as_str()[1..].into())),
+                _ => return Err(invalid(source, &id_atom, "invalid_history_id")),
+            };
+            SourceKind::History {
+                kind: at(&kind_pair, kind.as_str().to_ascii_lowercase()),
+                id,
+                alias: names.remove(0),
+            }
+        }
+        Rule::changes_source => SourceKind::Changes {
+            after_seq: unsigned(source, child(source, pair.clone(), Rule::unsigned)?)?,
+            alias: names.remove(0),
+        },
+        Rule::match_source => match match_source(source, pair.clone())? {
+            Some(source) => source,
+            None => SourceKind::Unsupported(syntax_tree(pair.clone())),
+        },
         Rule::union_source => {
             let mut bodies = pair
                 .clone()
@@ -525,6 +883,123 @@ fn stage(source: &str, pair: Pair<'_, Rule>) -> Result<Stage, QueryErrorV2> {
             child(source, pair.clone(), Rule::select_list)?,
         )?),
         Rule::distinct_stage => StageKind::Distinct,
+        Rule::ann_stage => {
+            let mut names = pair
+                .clone()
+                .into_inner()
+                .filter(|p| p.as_rule() == Rule::name)
+                .map(name);
+            let target = names
+                .next()
+                .ok_or_else(|| invalid(source, &pair, "missing_annotation_target"))?;
+            let alias = names
+                .next()
+                .ok_or_else(|| invalid(source, &pair, "missing_annotation_alias"))?;
+            StageKind::AnnotationLookup {
+                target,
+                alias,
+                optional: pair
+                    .clone()
+                    .into_inner()
+                    .any(|p| p.as_rule() == Rule::k_optional),
+            }
+        }
+        Rule::knn_stage => {
+            let mut names = pair
+                .clone()
+                .into_inner()
+                .filter(|p| p.as_rule() == Rule::name)
+                .map(name);
+            let entity = names
+                .next()
+                .ok_or_else(|| invalid(source, &pair, "missing_knn_entity"))?;
+            let collection = names
+                .next()
+                .ok_or_else(|| invalid(source, &pair, "missing_knn_collection"))?;
+            let alias = names
+                .next()
+                .ok_or_else(|| invalid(source, &pair, "missing_knn_alias"))?;
+            let mode = child(source, pair.clone(), Rule::mode)?
+                .into_inner()
+                .next()
+                .ok_or_else(|| invalid(source, &pair, "missing_knn_mode"))?;
+            StageKind::Knn {
+                entity,
+                collection,
+                query: expression(source, child(source, pair.clone(), Rule::expr)?)?.0,
+                k: unsigned(source, child(source, pair.clone(), Rule::unsigned)?)?,
+                mode: if mode.as_rule() == Rule::k_exact {
+                    VectorSearchMode::Exact
+                } else {
+                    VectorSearchMode::Approx
+                },
+                alias,
+            }
+        }
+        Rule::rerank_stage => {
+            let mut names = pair
+                .clone()
+                .into_inner()
+                .filter(|p| p.as_rule() == Rule::name)
+                .map(name);
+            let entity = names
+                .next()
+                .ok_or_else(|| invalid(source, &pair, "missing_rerank_entity"))?;
+            let collection = names
+                .next()
+                .ok_or_else(|| invalid(source, &pair, "missing_rerank_collection"))?;
+            let alias = names
+                .next()
+                .ok_or_else(|| invalid(source, &pair, "missing_rerank_alias"))?;
+            StageKind::Rerank {
+                entity,
+                collection,
+                query: expression(source, child(source, pair.clone(), Rule::expr)?)?.0,
+                k: unsigned(source, child(source, pair.clone(), Rule::unsigned)?)?,
+                alias,
+            }
+        }
+        Rule::lexical_stage => {
+            let names = pair
+                .clone()
+                .into_inner()
+                .filter(|part| part.as_rule() == Rule::name)
+                .map(name)
+                .collect::<Vec<_>>();
+            if names.len() != 4 {
+                return Err(invalid(source, &pair, "lexical_stage_shape"));
+            }
+            StageKind::LexicalMatch {
+                entity: names[0].clone(),
+                field: names[1].clone(),
+                index: names[2].clone(),
+                alias: names[3].clone(),
+                query: expression(source, child(source, pair.clone(), Rule::expr)?)?.0,
+                k: unsigned(source, child(source, pair.clone(), Rule::unsigned)?)?,
+            }
+        }
+        Rule::pack_stage => {
+            let tokenizer_pair = child(source, pair.clone(), Rule::string)?;
+            StageKind::ContextPack {
+                text: expression(source, child(source, pair.clone(), Rule::expr)?)?.0,
+                evidence: expression(
+                    source,
+                    pair.clone()
+                        .into_inner()
+                        .filter(|part| part.as_rule() == Rule::expr)
+                        .nth(1)
+                        .ok_or_else(|| invalid(source, &pair, "context_evidence"))?,
+                )?
+                .0,
+                tokens: unsigned(source, child(source, pair.clone(), Rule::unsigned)?)?,
+                tokenizer: at(&tokenizer_pair, decode_string(source, &tokenizer_pair)?),
+                alias: name(child(source, pair.clone(), Rule::name)?),
+            }
+        }
+        Rule::expand_stage => match expand_stage(source, pair.clone())? {
+            Some(stage) => stage,
+            None => StageKind::Unsupported(syntax_tree(pair.clone())),
+        },
         Rule::group_stage | Rule::aggregate_stage => {
             let mut lists = pair
                 .clone()

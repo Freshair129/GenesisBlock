@@ -1,8 +1,8 @@
 ---
 doc_id: ADR--GENESISDB-HQL2-EXECUTION-BOUNDARY
-version: "0.1.0b"
+version: "0.1.1b"
 created_at: "2026-09-28T00:34:13+07:00,ATHER,fc851e9"
-last_update: "2026-09-28T00:34:13+07:00,ATHER"
+last_update: "2026-09-28T10:43:00+07:00,ATHER"
 status: accepted
 superseded_by: null
 owner: "Boss (Founder / Product Authority)"
@@ -101,7 +101,7 @@ engine acceptance retain separate results.
 | H2-D08 | EXPLAIN validates/binds and reports the chosen plan without opening data operators or mutating state. ANALYZE executes a read query and reports measured counters separately from estimates. Write ANALYZE is rejected. |
 | H2-D09 | Parse the entire pinned grammar and validate all examples. Parsing a statement does not advertise execution support. Unsupported operators, mutation families, selectors or policy combinations fail explicitly before effects. |
 | H2-D10 | HQL2 mutations lower to one typed, idempotent transaction path. Transport-provided actor strings never become authenticated principals. No mutation adapter is enabled until authorization, revision identity and atomicity are verified. |
-| H2-D11 | Preserve signed-WAL authority and local-only P6 events. GBF2/GBO2, durable annotation/revision model extensions and migration need their concrete storage contracts reviewed before implementation; do not fabricate missing history/fingerprints. |
+| H2-D11 | Preserve signed-WAL authority and local-only P6 events. The owner-approved [durable revision/annotation contract](ADR--GENESISDB-HQL2-DURABLE-REVISIONS-ANNOTATIONS.md) resolves the revision, row-ID, annotation, history-floor and additive schema-v6 design. Implement only after P8/P6/plan truth-sync; do not run migration on a user database. GBF2/GBO2 remain excluded, and missing source fingerprints/history remain unavailable rather than inferred. |
 | H2-D12 | Completion means verified declared HQL2 semantics and surface parity. Full Blueprint R1 additionally requires all 190 obligations and P16 qualification; grammar-only or core-only completion cannot satisfy that claim. |
 
 ## Execution and trust boundary
@@ -264,3 +264,4 @@ the P7/P8 decision and completion gates without changing the engine's version.
 |---|---|---|---|---|---|
 | 0.1.0b | 2026-09-28 | candidate | Proposed explicit HQL2 execution boundary, P7 oracle, P8 binder/planner contract and remaining completion gates | working-tree | ATHER |
 | 0.1.0b | 2026-09-28 | accepted | Owner approved with "ลุย"; implementation may proceed within this ADR | working-tree | ATHER |
+| 0.1.1b | 2026-09-28 | accepted | Resolve H2-D11 by reference to the owner-approved durable revision/annotation contract; preserve migration and release gates | working-tree | ATHER |

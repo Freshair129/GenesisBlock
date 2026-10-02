@@ -147,7 +147,7 @@ fn expression_type(expr: &Expr, types: &BTreeMap<String, ValueType>) -> Outcome<
             }
             ValueType::Bool
         }
-        Expr::Add(a, b) | Expr::Div(a, b) => {
+        Expr::Add(a, b) | Expr::Div(a, b) | Expr::Rem(a, b) => {
             let a = expression_type(a, types)?;
             let b = expression_type(b, types)?;
             if !matches!(
@@ -612,7 +612,12 @@ fn bind_expr(expr: &Expr, columns: &BTreeSet<String>, depth: usize) -> Outcome<(
     match expr {
         Expr::Field(name) if !columns.contains(name) => Err(Error::Scalar("FIELD_UNKNOWN")),
         Expr::Not(a) => bind_expr(a, columns, depth + 1),
-        Expr::Eq(a, b) | Expr::And(a, b) | Expr::Or(a, b) | Expr::Add(a, b) | Expr::Div(a, b) => {
+        Expr::Eq(a, b)
+        | Expr::And(a, b)
+        | Expr::Or(a, b)
+        | Expr::Add(a, b)
+        | Expr::Div(a, b)
+        | Expr::Rem(a, b) => {
             bind_expr(a, columns, depth + 1)?;
             bind_expr(b, columns, depth + 1)
         }

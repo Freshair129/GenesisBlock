@@ -153,9 +153,10 @@ fn truncated_wal_recovers_intact_entries() {
         offsets.len() - 1
     );
 
-    // Keep 7 whole frames + half of the 8th (a torn tail).
-    let keep_end = offsets[7];
-    let torn_mid = keep_end + (offsets[8] - keep_end) / 2;
+    // Retain the schema and default-collection control frames plus 7 nodes,
+    // then tear the next frame.
+    let keep_end = offsets[9];
+    let torn_mid = keep_end + (offsets[10] - keep_end) / 2;
     install_active_only(&path, &active_bytes[..torn_mid]);
 
     // Re-open — must not panic, must recover first 7 nodes (I9: torn tail
@@ -167,6 +168,53 @@ fn truncated_wal_recovers_intact_entries() {
             "node_{i} should survive truncation"
         );
     }
+}
+
+#[test]
+fn schema6_wal_only_recovery_selects_schema_before_revision_replay() {
+    let path = fresh("crash_schema6_wal_only");
+    let active_bytes: Vec<u8>;
+    {
+        let storage = open(&path);
+        add_node(&storage, "wal-only-schema6-node", [1.0, 0.0, 0.0, 0.0]);
+        active_bytes = fs::read(active_path(&path)).unwrap();
+    }
+
+    install_active_only(&path, &active_bytes);
+
+    let recovered = open(&path);
+    assert_eq!(
+        recovered.query_ir_capabilities()["storage_schema_version"],
+        6
+    );
+    assert!(node_exists(&recovered, "wal-only-schema6-node"));
+}
+
+#[test]
+fn markerless_v5_wal_only_recovery_keeps_legacy_schema() {
+    let path = fresh("crash_schema5_wal_only");
+    fs::create_dir_all(&path).unwrap();
+    fs::write(
+        Path::new(&path).join("state.json"),
+        r#"{"schema_version":5}"#,
+    )
+    .unwrap();
+    let active_bytes: Vec<u8>;
+    {
+        let storage = open(&path);
+        assert_eq!(storage.query_ir_capabilities()["storage_schema_version"], 5);
+        add_node(&storage, "wal-only-schema5-node", [1.0, 0.0, 0.0, 0.0]);
+        active_bytes = fs::read(active_path(&path)).unwrap();
+    }
+
+    install_active_only(&path, &active_bytes);
+
+    let recovered = open(&path);
+    assert_eq!(
+        recovered.query_ir_capabilities()["storage_schema_version"],
+        5
+    );
+    assert!(node_exists(&recovered, "wal-only-schema5-node"));
 }
 
 // ---------------------------------------------------------------------------
@@ -374,10 +422,10 @@ fn corrupt_edges_bin_no_panic() {
 }
 
 // ---------------------------------------------------------------------------
-// 9. Empty WAL file — fresh DB with no data, no panic.
+// 9. Empty WAL file — markerless schema cannot be inferred after WAL loss.
 // ---------------------------------------------------------------------------
 #[test]
-fn empty_wal_no_panic() {
+fn empty_wal_without_schema_evidence_fails_closed() {
     let path = fresh("crash_empty_wal");
 
     {
@@ -389,9 +437,18 @@ fn empty_wal_no_panic() {
     // Truncate the whole journal to nothing.
     install_active_only(&path, b"");
 
-    // Re-open — no data but no panic.
-    let s = open(&path);
-    assert!(!node_exists(&s, "empty_node"), "node lost to empty WAL");
+    // Re-open must not guess a schema after every activation and data frame is lost.
+    let error = match Storage::open(OpenOptions {
+        path: path.clone(),
+        page_cache_mb: Some(32),
+        read_only: Some(false),
+        vector_dim: Some(4),
+        retention: None,
+    }) {
+        Ok(_) => panic!("markerless empty WAL must not select a schema"),
+        Err(error) => error.to_string(),
+    };
+    assert!(error.contains("RECOVERY_REQUIRED"), "{error}");
 }
 
 // ---------------------------------------------------------------------------

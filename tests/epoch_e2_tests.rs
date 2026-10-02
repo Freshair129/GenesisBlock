@@ -324,6 +324,8 @@ fn meta_v1_gbp1_snapshot_migrates() {
     assert_eq!(state["p6"]["access_policy"]["mode"], "Disabled");
     assert_eq!(state["p6"]["access_policy"]["revision"], 0);
     state["schema_version"] = json!(4);
+    // The schema-v4 fixture predates the schema-v6 ready marker.
+    state.as_object_mut().unwrap().remove("upgrade_state");
     state.as_object_mut().unwrap().remove("p6");
     fs::write(&state_path, serde_json::to_vec(&state).unwrap()).unwrap();
 

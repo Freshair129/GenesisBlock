@@ -35,6 +35,7 @@ pub enum Expr {
     Not(Box<Expr>),
     Add(Box<Expr>, Box<Expr>),
     Div(Box<Expr>, Box<Expr>),
+    Rem(Box<Expr>, Box<Expr>),
 }
 #[derive(Clone, Copy, Debug)]
 pub enum JoinKind {
@@ -171,7 +172,7 @@ pub fn eval(expr: &Expr, row: &Row) -> Outcome<Value> {
             };
             Ok(truth(v))
         }
-        Expr::Add(a, b) | Expr::Div(a, b) => {
+        Expr::Add(a, b) | Expr::Div(a, b) | Expr::Rem(a, b) => {
             let (a, b) = (eval(a, row)?, eval(b, row)?);
             if a == Value::Null || b == Value::Null {
                 return Ok(Value::Null);
@@ -180,12 +181,19 @@ pub fn eval(expr: &Expr, row: &Row) -> Outcome<Value> {
                 (Value::I64(a), Value::I64(b)) => {
                     let v = match expr {
                         Expr::Add(..) => a.checked_add(b),
-                        _ => {
+                        Expr::Div(..) => {
                             if b == 0 {
                                 return Err("DIVISION_BY_ZERO");
                             }
                             a.checked_div(b)
                         }
+                        Expr::Rem(..) => {
+                            if b == 0 {
+                                return Err("DIVISION_BY_ZERO");
+                            }
+                            a.checked_rem(b)
+                        }
+                        _ => unreachable!(),
                     };
                     v.map(Value::I64).ok_or("INTEGER_OVERFLOW")
                 }
@@ -195,12 +203,19 @@ pub fn eval(expr: &Expr, row: &Row) -> Outcome<Value> {
                     }
                     let v = match expr {
                         Expr::Add(..) => a + b,
-                        _ => {
+                        Expr::Div(..) => {
                             if b == 0.0 {
                                 return Err("DIVISION_BY_ZERO");
                             }
                             a / b
                         }
+                        Expr::Rem(..) => {
+                            if b == 0.0 {
+                                return Err("DIVISION_BY_ZERO");
+                            }
+                            a % b
+                        }
+                        _ => unreachable!(),
                     };
                     if v.is_finite() {
                         Ok(Value::F64(v))

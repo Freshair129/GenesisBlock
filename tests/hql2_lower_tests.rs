@@ -1,5 +1,6 @@
 //! Parser-to-logical lowering safety, without Storage or shared Cargo builds.
 #![allow(dead_code)]
+use std::collections::BTreeMap;
 #[path = "../src/query/hql2/ast.rs"]
 mod ast;
 #[path = "../src/query/hql2/error.rs"]
@@ -15,6 +16,18 @@ mod wire;
 
 fn lowered(source: &str) -> Result<wire::LogicalRequestV2, error::QueryErrorV2> {
     lower::lower_hql2(syntax::parse_hql2(source)?)
+}
+
+fn lowered_with_unsigned(
+    source: &str,
+    parameters: &BTreeMap<String, u64>,
+) -> Result<wire::LogicalRequestV2, error::QueryErrorV2> {
+    lower::lower_hql2_with_unsigned_resolver(syntax::parse_hql2(source)?, |name| {
+        parameters
+            .get(name)
+            .copied()
+            .ok_or_else(|| error::QueryErrorV2::new("BIND_ERROR", "bind", "undeclared_parameter"))
+    })
 }
 
 #[test]
@@ -63,6 +76,50 @@ fn scalar_pipeline_keeps_shapes_scope_and_parameter_identity() {
 }
 
 #[test]
+fn checked_remainder_lowers_to_typed_ir_rem() {
+    let logical = lowered("VALUES $xs AS x |> RETURN x % 4 AS remainder").unwrap();
+    let wire::Config::Project { fields } = &logical.nodes[1].config else {
+        panic!("project config")
+    };
+    assert!(matches!(
+        &fields[0].expression,
+        wire::Expr::Binary {
+            binary: wire::BinaryOp::Rem,
+            ..
+        }
+    ));
+}
+
+#[test]
+fn optional_annotation_stage_lowers_to_typed_lookup_operator() {
+    let logical = lowered(
+        "USE kb FROM NODES Document AS d |> OPTIONAL ANNOTATIONS OF d AS a |> RETURN d.id AS document_id, a.id AS annotation_id",
+    )
+    .unwrap();
+    use uee_v2::QueryOpV2::*;
+    assert_eq!(
+        logical
+            .nodes
+            .iter()
+            .map(|node| node.op.clone())
+            .collect::<Vec<_>>(),
+        vec![NodeScan, AnnotationLookup, Project]
+    );
+    let wire::Config::AnnotationLookup {
+        target,
+        alias,
+        optional,
+    } = &logical.nodes[1].config
+    else {
+        panic!("annotation lookup config")
+    };
+    assert_eq!(target, "d");
+    assert_eq!(alias, "a");
+    assert!(*optional);
+    assert!(logical.from_hql);
+}
+
+#[test]
 fn aggregate_star_in_and_between_have_closed_wire_shapes() {
     let logical=lowered("VALUES $xs AS x |> FILTER x NOT IN [1,2] |> FILTER x BETWEEN 1 AND 3 |> AGG count(*) AS n |> RETURN n").unwrap();
     assert!(
@@ -87,34 +144,114 @@ fn aggregate_star_in_and_between_have_closed_wire_shapes() {
 
 #[test]
 fn unimplemented_syntax_keeps_explicit_refusal() {
+    let logical = lowered("VALUES $xs AS x |> RETURN null AS n").unwrap();
+    let wire::Config::Project { fields } = &logical.nodes[1].config else {
+        panic!("null projection config")
+    };
+    assert!(matches!(
+        &fields[0].expression,
+        wire::Expr::Literal { literal: serde_json::Value::Null, ty } if ty == "Null"
+    ));
+
     for (query, reason) in [
         (
-            "VALUES $xs AS x |> RETURN null AS n",
-            "untyped_null_literal",
-        ),
-        (
-            "VALUES $xs AS x |> TAKE $n |> RETURN x",
-            "parameterized_limit",
-        ),
-        (
-            "VALUES $xs AS x |> SKIP $n |> RETURN x",
-            "parameterized_limit",
-        ),
-        (
-            "VALUES $xs AS x |> ORDER BY x |> RETURN x",
-            "implicit_null_order",
-        ),
-        (
             "VALUES $xs AS x |> RETURN [1,2] AS v",
-            "constructed_literal",
+            "list_literal_context",
         ),
-        ("VALUES $xs AS x |> RETURN 3 % 2 AS v", "remainder_function"),
         ("SHOW CAPABILITIES", "statement_execution"),
     ] {
         let e = lowered(query).unwrap_err();
         assert_eq!(e.code, "CAPABILITY_UNSUPPORTED", "{query}");
         assert_eq!(e.detail.unwrap()["reason"], reason);
     }
+}
+
+#[test]
+fn hql_order_without_nulls_clause_lowers_to_nulls_last_for_both_directions() {
+    for direction in ["ASC", "DESC"] {
+        let logical = lowered(&format!(
+            "VALUES $xs AS x |> ORDER BY x {direction} |> RETURN x"
+        ))
+        .unwrap();
+        let wire::Config::Sort { keys } = &logical.nodes[1].config else {
+            panic!("sort config")
+        };
+        assert_eq!(keys.len(), 1);
+        assert_eq!(keys[0].nulls, wire::NullOrder::Last);
+    }
+
+    let logical = lowered("VALUES $xs AS x |> ORDER BY x ASC NULLS FIRST |> RETURN x").unwrap();
+    let wire::Config::Sort { keys } = &logical.nodes[1].config else {
+        panic!("sort config")
+    };
+    assert_eq!(keys[0].nulls, wire::NullOrder::First);
+}
+
+#[test]
+fn structural_unsigned_parameters_lower_as_u64_and_checked_u32_ranks() {
+    let parameters = BTreeMap::from([
+        ("floor".into(), u64::MAX),
+        ("skip".into(), u64::MAX),
+        ("take".into(), u64::MAX),
+        ("knn".into(), 3),
+        ("rerank".into(), 1),
+    ]);
+    let logical = lowered_with_unsigned(
+        "USE kb CHANGES SINCE $floor AS c |> SKIP $skip |> TAKE $take |> RETURN c",
+        &parameters,
+    )
+    .unwrap();
+    assert!(matches!(
+        logical.nodes[0].config,
+        wire::Config::ChangeScan {
+            after_seq: u64::MAX,
+            ..
+        }
+    ));
+    assert!(matches!(
+        logical.nodes[1].config,
+        wire::Config::Offset { count: u64::MAX }
+    ));
+    assert!(matches!(
+        logical.nodes[2].config,
+        wire::Config::Take { count: u64::MAX }
+    ));
+
+    let logical = lowered_with_unsigned(
+        "USE kb FROM NODES Document AS d |> KNN d IN docs USING $q TOP $knn EXACT AS hit |> RERANK d IN docs USING $q TOP $rerank EXACT AS fine |> RETURN d.id AS id",
+        &parameters,
+    )
+    .unwrap();
+    assert!(matches!(
+        logical.nodes[1].config,
+        wire::Config::Knn { k: 3, .. }
+    ));
+    assert!(matches!(
+        logical.nodes[2].config,
+        wire::Config::Rerank { k: 1, .. }
+    ));
+
+    let overflow = BTreeMap::from([("knn".into(), u64::from(u32::MAX) + 1)]);
+    let error = lowered_with_unsigned(
+        "USE kb FROM NODES Document AS d |> KNN d IN docs USING $q TOP $knn EXACT AS hit |> RETURN d.id AS id",
+        &overflow,
+    )
+    .unwrap_err();
+    assert_eq!(error.code, "BIND_ERROR");
+    assert_eq!(error.detail.unwrap()["reason"], "ranking_bound");
+
+    let overflow = BTreeMap::from([("rerank".into(), u64::from(u32::MAX) + 1)]);
+    let error = lowered_with_unsigned(
+        "USE kb FROM NODES Document AS d |> RERANK d IN docs USING $q TOP $rerank EXACT AS fine |> RETURN d.id AS id",
+        &overflow,
+    )
+    .unwrap_err();
+    assert_eq!(error.code, "BIND_ERROR");
+    assert_eq!(error.detail.unwrap()["reason"], "ranking_bound");
+
+    let error = lowered("VALUES $xs AS x |> TAKE $missing |> RETURN x").unwrap_err();
+    assert_eq!(error.code, "BIND_ERROR");
+    assert_eq!(error.detail.unwrap()["reason"], "undeclared_parameter");
 }
 
 #[test]
@@ -203,11 +340,11 @@ fn lowering_keeps_noncommutative_operands_and_membership_order() {
 }
 
 #[test]
-fn unsupported_children_keep_left_to_right_refusal_order() {
+fn list_literals_remain_contextual_outside_in_operators() {
     let error = lowered("VALUES $xs AS x |> RETURN null + [1] AS result").unwrap_err();
-    assert_eq!(error.detail.unwrap()["reason"], "untyped_null_literal");
+    assert_eq!(error.detail.unwrap()["reason"], "list_literal_context");
     let error = lowered("VALUES $xs AS x |> RETURN [1] + null AS result").unwrap_err();
-    assert_eq!(error.detail.unwrap()["reason"], "constructed_literal");
+    assert_eq!(error.detail.unwrap()["reason"], "list_literal_context");
 }
 
 fn nested_between_source(count: usize) -> String {

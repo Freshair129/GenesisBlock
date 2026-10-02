@@ -1,6 +1,8 @@
 #![allow(dead_code)]
 #[path = "../src/query/hql2/error.rs"]
 mod error;
+#[path = "../src/uee_v2.rs"]
+mod uee_v2;
 #[path = "../src/query/hql2/value.rs"]
 mod value;
 
@@ -43,6 +45,60 @@ fn nullable_lists_preserve_values_and_declared_types_on_empty_input() {
         .unwrap()
         .decode(&json!(null))
         .is_err());
+}
+
+#[test]
+fn entity_values_are_tagged_and_valid_record_refs_can_be_supplied_as_parameters() {
+    let entity_type = QueryTypeV2::parse("Entity").unwrap();
+    let record_ref = json!({
+        "database_id":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "namespace":"default",
+        "kind":"annotation",
+        "id":"review:1",
+        "revision":"00000000-0000-4000-8000-000000000001"
+    });
+    assert_eq!(
+        entity_type.decode(&record_ref).unwrap(),
+        QueryValueV2::Entity(crate::uee_v2::RecordRefV2 {
+            database_id: "a".repeat(64),
+            namespace: "default".into(),
+            kind: crate::uee_v2::RecordKindV2::Annotation,
+            id: "review:1".into(),
+            revision: "00000000-0000-4000-8000-000000000001".into(),
+        })
+    );
+
+    let error = entity_type
+        .decode(&json!({
+            "database_id":"db",
+            "namespace":"default",
+            "kind":"annotation",
+            "id":"review:1",
+            "revision":"00000000-0000-4000-8000-000000000001"
+        }))
+        .unwrap_err();
+    assert_eq!(error.code, "BIND_ERROR");
+
+    let entity = QueryValueV2::Entity(crate::uee_v2::RecordRefV2 {
+        database_id: "a".repeat(64),
+        namespace: "default".into(),
+        kind: crate::uee_v2::RecordKindV2::Annotation,
+        id: "review:1".into(),
+        revision: "00000000-0000-4000-8000-000000000001".into(),
+    });
+    assert_eq!(
+        serde_json::to_value(entity).unwrap(),
+        json!({
+            "type":"Entity",
+            "value":{
+            "database_id":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                "namespace":"default",
+                "kind":"annotation",
+                "id":"review:1",
+                "revision":"00000000-0000-4000-8000-000000000001"
+            }
+        })
+    );
 }
 
 #[test]

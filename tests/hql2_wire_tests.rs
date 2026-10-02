@@ -450,6 +450,7 @@ fn expression_order_and_all_discriminators_survive_decoding() {
         "sub",
         "mul",
         "div",
+        "rem",
         "contains",
         "startswith",
     ] {

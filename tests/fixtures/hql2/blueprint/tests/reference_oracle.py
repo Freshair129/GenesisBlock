@@ -123,18 +123,23 @@ def validate_dag(plan: dict[str, Any]) -> None:
 
 
 def check_annotation_target(annotation: dict[str, Any], revisions: dict[str, dict[str, Any]]) -> None:
-    for target in annotation['targets']:
-        ref = target['ref']
-        if ref['namespace'] != annotation['namespace']:
-            raise ValueError('CROSS_NAMESPACE_TARGET')
-        if target['binding'] == 'frozen':
-            rev = revisions.get(ref.get('revision_id', ''))
-            if rev is None or rev['id'] != ref['id'] or rev['namespace'] != ref['namespace']:
-                raise ValueError('TARGET_REVISION_MISMATCH')
-        selector = target['selector']
-        if selector['type'] in ('text_position', 'byte_range'):
-            if selector['start'] >= selector['end']:
-                raise ValueError('EMPTY_OR_REVERSED_SELECTOR')
+    for role in ('targets', 'evidence'):
+        for reference in annotation.get(role, []):
+            ref = reference['ref']
+            if ref['namespace'] != annotation['namespace']:
+                raise ValueError('CROSS_NAMESPACE_TARGET')
+            database_id = ref.get('database_id', '')
+            if len(database_id) != 64 or any(c not in '0123456789abcdef' for c in database_id):
+                raise ValueError('INVALID_DATABASE_ID')
+            if reference['binding'] == 'frozen':
+                rev = revisions.get(ref.get('revision', ''))
+                if (rev is None or rev['id'] != ref['id'] or rev['namespace'] != ref['namespace']
+                        or rev.get('database_id') != database_id):
+                    raise ValueError('TARGET_REVISION_MISMATCH')
+            selector = reference['selector']
+            if selector['type'] in ('text_position', 'byte_range'):
+                if selector['start'] >= selector['end']:
+                    raise ValueError('EMPTY_OR_REVERSED_SELECTOR')
 
 
 def authorized_annotation(annotation_id: str, target_id: str, allowed: set[str]) -> bool:

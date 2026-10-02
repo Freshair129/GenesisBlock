@@ -1,5 +1,7 @@
 //! Source syntax, not trusted/bound execution plans. All offsets are UTF-8 bytes.
 
+use std::collections::BTreeMap;
+
 pub use super::syntax::Rule as SyntaxKind;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -93,12 +95,31 @@ pub enum SourceKind {
         relation: Option<Name>,
         alias: Name,
     },
+    History {
+        kind: Spanned<String>,
+        id: Expr,
+        alias: Name,
+    },
+    Changes {
+        after_seq: Unsigned,
+        alias: Name,
+    },
     Rows {
         table: Name,
         alias: Name,
     },
     Annotations {
         alias: Name,
+    },
+    Match {
+        start_alias: Name,
+        start_id: Option<Expr>,
+        start_labels: Vec<Name>,
+        start_properties: BTreeMap<String, Expr>,
+        steps: Vec<GraphSequenceStep>,
+        mode: GraphPathMode,
+        path_alias: Option<Name>,
+        shortest: bool,
     },
     UnionAll {
         left: Box<Query>,
@@ -113,6 +134,63 @@ pub enum StageKind {
     Filter(Expr),
     Project(Vec<SelectItem>),
     Distinct,
+    AnnotationLookup {
+        target: Name,
+        alias: Name,
+        optional: bool,
+    },
+    Knn {
+        entity: Name,
+        collection: Name,
+        query: Expr,
+        k: Unsigned,
+        mode: VectorSearchMode,
+        alias: Name,
+    },
+    Rerank {
+        entity: Name,
+        collection: Name,
+        query: Expr,
+        k: Unsigned,
+        alias: Name,
+    },
+    LexicalMatch {
+        entity: Name,
+        field: Name,
+        query: Expr,
+        index: Name,
+        k: Unsigned,
+        alias: Name,
+    },
+    ContextPack {
+        text: Expr,
+        evidence: Expr,
+        tokens: Unsigned,
+        tokenizer: Spanned<String>,
+        alias: Name,
+    },
+    Expand {
+        start_alias: Name,
+        end_alias: Name,
+        edge_alias: Option<Name>,
+        relations: Vec<Name>,
+        direction: GraphDirection,
+        min_hops: u32,
+        max_hops: u32,
+        mode: GraphPathMode,
+        path_alias: Option<Name>,
+        optional: bool,
+    },
+    ExpandSequence {
+        start_alias: Name,
+        start_id: Option<Expr>,
+        start_labels: Vec<Name>,
+        start_properties: BTreeMap<String, Expr>,
+        steps: Vec<GraphSequenceStep>,
+        mode: GraphPathMode,
+        path_alias: Option<Name>,
+        optional: bool,
+    },
     Aggregate {
         group_by: Vec<SelectItem>,
         aggregates: Vec<SelectItem>,
@@ -121,6 +199,40 @@ pub enum StageKind {
     Take(Unsigned),
     Skip(Unsigned),
     Unsupported(SyntaxNode),
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum VectorSearchMode {
+    Exact,
+    Approx,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum GraphDirection {
+    Out,
+    In,
+    Both,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum GraphPathMode {
+    Trail,
+    Simple,
+    Walk,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct GraphSequenceStep {
+    pub end_alias: Name,
+    pub node_id: Option<Expr>,
+    pub node_labels: Vec<Name>,
+    pub node_properties: BTreeMap<String, Expr>,
+    pub edge_alias: Option<Name>,
+    pub edge_properties: BTreeMap<String, Expr>,
+    pub relations: Vec<Name>,
+    pub direction: GraphDirection,
+    pub min_hops: u32,
+    pub max_hops: u32,
 }
 
 #[derive(Clone, Debug, PartialEq)]

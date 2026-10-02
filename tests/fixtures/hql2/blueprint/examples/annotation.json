@@ -5,10 +5,26 @@
   "targets": [
     {
       "ref": {
+        "database_id": "0000000000000000000000000000000000000000000000000000000000000000",
         "namespace": "kb",
         "kind": "node",
         "id": "doc:one",
-        "revision_id": "00000000-0000-4000-8000-000000000001"
+        "revision": "00000000-0000-4000-8000-000000000001"
+      },
+      "binding": "frozen",
+      "selector": {
+        "type": "whole"
+      }
+    }
+  ],
+  "evidence": [
+    {
+      "ref": {
+        "database_id": "0000000000000000000000000000000000000000000000000000000000000000",
+        "namespace": "kb",
+        "kind": "node",
+        "id": "doc:one",
+        "revision": "00000000-0000-4000-8000-000000000001"
       },
       "binding": "frozen",
       "selector": {

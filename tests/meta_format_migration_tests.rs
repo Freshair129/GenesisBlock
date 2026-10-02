@@ -88,6 +88,8 @@ fn mark_snapshot_as_pre_p6(dir: &str) {
     assert_eq!(state["p6"]["access_policy"]["mode"], "Disabled");
     assert_eq!(state["p6"]["access_policy"]["revision"], 0);
     state["schema_version"] = serde_json::json!(4);
+    // The schema-v4 fixture predates the schema-v6 ready marker.
+    state.as_object_mut().unwrap().remove("upgrade_state");
     state.as_object_mut().unwrap().remove("p6");
     fs::write(path, serde_json::to_vec(&state).unwrap()).unwrap();
 }

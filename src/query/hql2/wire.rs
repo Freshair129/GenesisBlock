@@ -55,6 +55,21 @@ fn name<'de, D: Deserializer<'de>>(d: D) -> Result<String, D::Error> {
     }
 }
 
+fn profile_name<'de, D: Deserializer<'de>>(d: D) -> Result<String, D::Error> {
+    let value = String::deserialize(d)?;
+    let mut chars = value.bytes();
+    if (1..=128).contains(&value.len())
+        && chars
+            .next()
+            .is_some_and(|c| c.is_ascii_alphabetic() || c == b'_')
+        && chars.all(|c| c.is_ascii_alphanumeric() || matches!(c, b'_' | b'-'))
+    {
+        Ok(value)
+    } else {
+        Err(serde::de::Error::custom("invalid_profile_name"))
+    }
+}
+
 // Optional means absent, never an explicit JSON null (schema string/expr).
 fn optional_symbol<'de, D: Deserializer<'de>>(d: D) -> Result<Option<String>, D::Error> {
     symbol(d).map(Some)
@@ -137,6 +152,7 @@ wire_enum!(BinaryOp {
     Sub,
     Mul,
     Div,
+    Rem,
     Contains,
     Startswith
 });
@@ -475,7 +491,7 @@ pub(crate) enum Config {
         entity: String,
         #[serde(deserialize_with = "symbol")]
         field: String,
-        #[serde(deserialize_with = "symbol")]
+        #[serde(deserialize_with = "profile_name")]
         index: String,
         query: Expr,
         k: u32,

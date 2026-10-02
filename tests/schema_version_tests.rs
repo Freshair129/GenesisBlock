@@ -42,6 +42,9 @@ fn set_ondisk_schema_version(dir: &str, v: u64) {
     let mut val: serde_json::Value =
         serde_json::from_str(&fs::read_to_string(&p).unwrap()).unwrap();
     val["schema_version"] = serde_json::json!(v);
+    if v != SCHEMA_VERSION as u64 {
+        val.as_object_mut().unwrap().remove("upgrade_state");
+    }
     fs::write(&p, val.to_string()).unwrap();
 }
 
