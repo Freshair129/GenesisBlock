@@ -1,8 +1,8 @@
 ---
 doc_id: SPEC--GENESISDB-HQL2-P8-TYPED-BOUNDARY
-version: "0.2.38b"
+version: "0.2.39b"
 created_at: "2026-09-28T01:25:00+07:00,ATHER,fc851e9"
-last_update: "2026-10-03T00:48:00+07:00,ATHER"
+last_update: "2026-10-03T01:33:00+07:00,ATHER"
 status: beta
 superseded_by: null
 owner: "Boss (Founder / Product Authority)"
@@ -76,8 +76,8 @@ Sequence ID, conjunctive labels and D4 node/edge property constraints now run
 for HQL and typed IR against one authorized P6 graph snapshot; candidate IDs
 are never looked up directly. Exact JSON values are selectively hydrated under
 budget and filtered before SHORTEST; Compact constraints remain unavailable
-and fail closed. The 10/10 P8 completion target and latest 362/0/1 root-HQL2
-sweep across 28 targets cover this slice, including edge-property filtering
+and fail closed. The 10/10 P8 completion target and latest 363/0/1 root-HQL2
+sweep across 29 targets cover this slice, including edge-property filtering
 before SHORTEST and the nine-test D7 actor-scoped HQL1 adapter. P6
 D1's exact-record-only fixture denies before parsing; it does not assert
 hidden-vs-absent query results. A read-only review found an undercount in
@@ -685,8 +685,8 @@ and the collection space is bound by the H2-D11 fingerprint. Approximate KNN
 remains unsupported. HistoryScan/ChangeScan execute from exact retained
 schema-v6 revisions under the P6 lease, including current reference ACL,
 exclusive source floors, typed HQL/IR parity and fail-closed budgets. Their
-focused D7 adapter target passes 9/9; the current 28-target HQL2 sweep passes
-362/0/1, with a separate 11-target P6/schema-v6/compatibility sweep at 190/0/0.
+focused D7 adapter target passes 9/9; the current 29-target HQL2 sweep passes
+363/0/1, with a separate 11-target P6/schema-v6/compatibility sweep at 190/0/0.
 LexicalMatch uses only the registered `unicode-whitespace-bm25-v1` exact-scan
 profile; ContextPack uses `unicode-scalar-v1` with same-revision evidence,
 SHA-256 and Unicode-scalar spans. Their catalog fingerprints are code-registered
@@ -725,7 +725,11 @@ durable UUIDv4 revision, distinct from the relational primary key. A separate
 storage-backed HQL/typed-IR scalar differential passes 1/1 against the
 independent P7 interpreter over all 81 four-value bags formed from NULL, -1
 and 2; both frontends match P7 with NULLS LAST across 162 query executions. The
-regression and correction are recorded in local RCA `.brain/rca/RCA--HQL2-ROW-SOURCE-PROPERTY-HYDRATION.md`.
+storage-backed aggregate differential also passes 1/1 over 121 nullable bags
+of lengths 0-4, comparing HQL and typed IR to independent P7 for count-all,
+count, sum, average, min, max and collect (242 Storage executions). The
+RowScan property-hydration regression and correction are recorded in local RCA
+`.brain/rca/RCA--HQL2-ROW-SOURCE-PROPERTY-HYDRATION.md`.
 The ReadView also performs exact vector lookup for KNN/Original Rerank. It
 checks owner identity/revision, namespace/node authorization, collection
 fingerprint and dimension at the leased frontier/valid-time, and loads only
@@ -749,8 +753,8 @@ passes 9/9 for zero-hop and one-hop actor-bound differential execution,
 parallel-edge multiplicity, all directions and wildcard relations, endpoint-ID
 string equality on either endpoint, denial/mismatch before parse, malformed
 syntax, fail-closed unlisted syntax and pre-parse resource rejection. The
-latest 28-target root HQL2 sweep passes
-362/0/1; a separate 11-target P6/schema-v6/compatibility group passes 190/0/0.
+latest 29-target root HQL2 sweep passes
+363/0/1; a separate 11-target P6/schema-v6/compatibility group passes 190/0/0.
 The prior combined 37-target run passed 528/0/1 before
 the added edge-property regression; all remain regression evidence, not full
 P8/P13 acceptance.
@@ -822,6 +826,12 @@ verification of approved H2-D11 R6b markerless schema-v6 WAL recovery; crash
 17/17, migration 19/19 and selected HQL2/durability/authority 40-target
 aggregate pass; retain full P8/P13/review gates and the no-user-migration rule.
 
+Version diff `0.2.38b -> 0.2.39b`: add a storage-backed HQL/typed-IR aggregate
+differential against independent P7 for all 121 nullable bags of lengths 0-4
+(242 executions); record 1/1 focused and 363/0/1 across 29 HQL2 targets.
+Broad exact-oracle, independent-review, shared-runtime, resource/cancellation,
+transport and P8/P13 gates remain open.
+
 Version diff `0.2.37b -> 0.2.38b`: add a storage-backed HQL/typed-IR scalar
 differential against the independent P7 interpreter for 81 nullable bags;
 record 1/1 focused, 362/0/1 across 28 HQL2 targets, and 190/0/0 across 11
@@ -835,6 +845,7 @@ detail with unchanged JSON shape; broader P8/P13/review gates remain open.
 
 | From | To | Effect |
 |---|---|---|
+| 0.2.38b | 0.2.39b | Add and pass storage-backed HQL/typed-IR P7 aggregate differential over 121 nullable bags; record 363/0/1 across 29 HQL2 targets; retain broad oracle, review, shared-runtime, resource/cancellation and P8/P13 gates |
 | 0.2.37b | 0.2.38b | Add and pass storage-backed HQL/typed-IR P7 scalar differential over 81 nullable bags; record 362/0/1 across 28 HQL2 targets and 190/0/0 across 11 compatibility targets; retain broad oracle, review, shared-runtime, resource/cancellation and P8/P13 gates |
 | 0.2.36b | 0.2.37b | Verify full locked/offline Rust suite and both strict Clippy modes; explicitly retain `probe_vs_recall` as NOT_RUN; box optional error detail internally without changing serialized JSON; keep full P8/P13/review gates open |
 | 0.2.35b | 0.2.36b | Implement and verify H2-D11 R6b markerless schema-v6 recovery in temporary fixtures; 17/17 crash and 19/19 migration tests pass; selected aggregate passes 40 targets; full P8/P13/review gates remain open |
@@ -869,6 +880,7 @@ detail with unchanged JSON shape; broader P8/P13/review gates remain open.
 
 | Version | Date | Status | Summary | Commit Hash | Agent |
 |---|---|---|---|---|---|
+| 0.2.39b | 2026-10-03 | beta | Add and pass storage-backed HQL/typed-IR P7 aggregate differential over 121 nullable bags; record 363/0/1 across 29 HQL2 targets; retain broad oracle, review, shared-runtime, resource/cancellation and P8/P13 gates | working-tree | ATHER |
 | 0.2.38b | 2026-10-03 | beta | Add and pass storage-backed HQL/typed-IR P7 scalar differential over 81 nullable bags; record 362/0/1 across 28 HQL2 targets and 190/0/0 across 11 compatibility targets; retain broad oracle, review, shared-runtime, resource/cancellation and P8/P13 gates | working-tree | ATHER |
 | 0.2.37b | 2026-10-02 | beta | Verify full locked/offline Rust suite and default/no-default strict all-target Clippy; `probe_vs_recall` remains NOT_RUN; box optional error detail internally with unchanged JSON; full P8/P13/review gates remain open | working-tree | ATHER |
 | 0.2.36b | 2026-10-02 | beta | Implement and verify approved H2-D11 R6b markerless WAL recovery; crash 17/17, migration 19/19 and selected 40-target aggregate pass; fixture-only and full P8/P13/review gates remain open | 0135c29 | ATHER |
