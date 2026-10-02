@@ -523,7 +523,7 @@ export declare class GenesisDatabase {
    */
   stableFrontier(): number
   /**
-   * Frame seq of the last transaction frame — the value
+   * Frame seq of the last transaction-API commit — the value
    * `GenesisTransaction.expected_frontier` CASes against (WP-1.2).
    */
   txnFrontier(): number
