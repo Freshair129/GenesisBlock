@@ -4,6 +4,8 @@ use genesis_block_native::{
     AccessContext, NodeInput, OpenOptions, Storage,
 };
 use serde_json::json;
+#[path = "support/hql2_pipeline_reference.rs"]
+mod p7;
 use std::path::Path;
 use tempfile::TempDir;
 
@@ -209,6 +211,201 @@ fn hql_lookup(
         panic!("HQL annotation lookup must return rows")
     };
     result
+}
+
+fn p7_entity(kind: p7::graph::Kind, id: &str, revision: &str) -> p7::graph::EntityRef {
+    p7::graph::EntityRef {
+        namespace: "default".into(),
+        kind,
+        id: id.into(),
+        revision: revision.into(),
+    }
+}
+
+fn p7_record(entity: p7::graph::EntityRef) -> p7::graph::Revision {
+    p7::graph::Revision {
+        entity,
+        transaction: p7::graph::Interval {
+            start: 1,
+            end: None,
+        },
+        valid: p7::graph::Interval {
+            start: 0,
+            end: None,
+        },
+        retracted: false,
+        fields: Default::default(),
+        data: p7::graph::RecordData::Plain,
+    }
+}
+
+fn p7_environment(target_revision: &str) -> p7::Environment {
+    let target = p7_entity(p7::graph::Kind::Node, "doc:target", target_revision);
+    let evidence = p7_entity(p7::graph::Kind::Node, "doc:evidence", "r1");
+    let annotation = p7_entity(p7::graph::Kind::Annotation, "review:one", "r1");
+    let mut annotation_record = p7_record(annotation.clone());
+    annotation_record.data = p7::graph::RecordData::Annotation {
+        targets: vec![p7::graph::Target {
+            binding: p7::graph::TargetBinding::Frozen(target.clone()),
+            selector: p7::graph::Selector::Whole,
+        }],
+    };
+    let records = vec![p7_record(target), p7_record(evidence), annotation_record];
+    let catalog = p7::graph::Catalog {
+        frontier: 10,
+        history: [p7::graph::Kind::Node, p7::graph::Kind::Annotation]
+            .into_iter()
+            .map(|kind| {
+                (
+                    kind,
+                    p7::graph::HistoryCapability {
+                        horizon: 0,
+                        available: true,
+                    },
+                )
+            })
+            .collect(),
+        revisions: records,
+    };
+    let readable = catalog
+        .revisions
+        .iter()
+        .map(|record| record.entity.identity())
+        .collect();
+    p7::Environment {
+        catalog,
+        view: p7::graph::View {
+            namespace: "default".into(),
+            transaction: 10,
+            valid_at: 5,
+            permissions: p7::graph::Permissions {
+                read: readable,
+                annotation_body: [annotation.identity()].into(),
+            },
+        },
+        ranking: p7::rank::Fixture {
+            space: p7::rank::Space {
+                fingerprint: "fixture".into(),
+                dimension: 1,
+                metric: p7::rank::Metric::L2Squared,
+            },
+            analyzer_fingerprint: String::new(),
+            documents: vec![],
+        },
+        tokenizers: Default::default(),
+        limits: p7::graph::Limits::default(),
+    }
+}
+
+fn p7_lookup_plan(duplicate_input: bool) -> p7::Plan {
+    let scan = || p7::Plan::NodeScan("d".into(), p7::graph::Predicate::default());
+    let input = if duplicate_input {
+        p7::Plan::UnionAll(Box::new(scan()), Box::new(scan()))
+    } else {
+        scan()
+    };
+    let lookup = p7::Plan::AnnotationLookup(
+        Box::new(input),
+        p7::graph::AnnotationLookup {
+            target_alias: "d".into(),
+            alias: "a".into(),
+            predicate: p7::graph::Predicate::default(),
+            optional: true,
+        },
+    );
+    p7::Plan::Project(
+        Box::new(lookup),
+        vec![
+            ("document".into(), p7::Expr::Field("d".into())),
+            ("annotation".into(), p7::Expr::Field("a".into())),
+        ],
+    )
+}
+
+fn p7_ids(result: &p7::ResultSet) -> Vec<(String, Option<String>)> {
+    let mut rows = result
+        .rows
+        .iter()
+        .map(|row| {
+            let document_id = match &row["document"] {
+                p7::Value::Graph(p7::graph::Binding::Entity(entity)) => entity.id.clone(),
+                other => panic!("expected P7 document entity, got {other:?}"),
+            };
+            let annotation_id = match &row["annotation"] {
+                p7::Value::Graph(p7::graph::Binding::Entity(entity)) => Some(entity.id.clone()),
+                p7::Value::Graph(p7::graph::Binding::Null) | p7::Value::Null => None,
+                other => panic!("expected P7 annotation or null, got {other:?}"),
+            };
+            (document_id, annotation_id)
+        })
+        .collect::<Vec<_>>();
+    rows.sort();
+    rows
+}
+
+fn storage_ids(
+    result: &genesis_block_native::query::hql2::QueryResultV2,
+    document_column: &str,
+    annotation_column: &str,
+) -> Vec<(String, Option<String>)> {
+    let mut rows = result
+        .rows
+        .iter()
+        .map(|row| {
+            let document_id = match row.get(document_column).unwrap() {
+                QueryValueV2::Utf8(id) => id.clone(),
+                other => panic!("expected document ID, got {other:?}"),
+            };
+            let annotation_id = match row.get(annotation_column).unwrap() {
+                QueryValueV2::Utf8(id) => Some(id.clone()),
+                QueryValueV2::Null => None,
+                other => panic!("expected annotation ID or null, got {other:?}"),
+            };
+            (document_id, annotation_id)
+        })
+        .collect::<Vec<_>>();
+    rows.sort();
+    rows
+}
+
+#[test]
+fn hql_and_ir_annotation_lookup_match_independent_p7_bags() {
+    let dir = TempDir::new().unwrap();
+    let storage = open(dir.path());
+    add_node(&storage, "doc:target");
+    add_node(&storage, "doc:evidence");
+    let database_id = database_id(&storage);
+    let target_ref = frozen_ref(dir.path(), &database_id, "doc:target");
+    let target_revision = target_ref["ref"]["revision"].as_str().unwrap().to_owned();
+    put_annotation(
+        &storage,
+        "review:one",
+        vec![target_ref],
+        vec![frozen_ref(dir.path(), &database_id, "doc:evidence")],
+    );
+
+    let environment = p7_environment(&target_revision);
+    let expected = p7_ids(&p7::execute(&environment, &p7_lookup_plan(false)).unwrap());
+    assert_eq!(
+        expected,
+        vec![
+            ("doc:evidence".into(), None),
+            ("doc:target".into(), Some("review:one".into())),
+        ]
+    );
+    assert_eq!(
+        storage_ids(&hql_lookup(&storage, true), "document_id", "annotation_id"),
+        expected
+    );
+
+    let duplicate_expected = p7_ids(&p7::execute(&environment, &p7_lookup_plan(true)).unwrap());
+    let mut doubled_expected = [expected.clone(), expected.clone()].concat();
+    doubled_expected.sort();
+    assert_eq!(duplicate_expected, doubled_expected);
+    assert_eq!(
+        storage_ids(&lookup(&storage, true), "document_id", "annotation_id"),
+        duplicate_expected
+    );
 }
 
 #[test]
