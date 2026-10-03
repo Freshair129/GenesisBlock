@@ -5,8 +5,14 @@ use genesis_block_native::{
     RelationalMutationKind, RelationalRowMutation, RelationalSchemaPackage, RelationalTable,
     Storage,
 };
+#[allow(dead_code)]
+#[path = "support/hql2_graph_reference.rs"]
+mod p7_graph;
 use serde_json::{json, Value};
-use std::path::Path;
+use std::{
+    collections::{BTreeMap, BTreeSet},
+    path::Path,
+};
 use tempfile::TempDir;
 use uuid::Uuid;
 
@@ -47,6 +53,25 @@ fn project_field(alias: &str, expression: Value) -> Value {
     json!({"as":alias,"expression":expression})
 }
 
+fn row_revision_mutations(storage: &Storage) -> Vec<Value> {
+    storage
+        .events_since_seq(0)
+        .into_iter()
+        .filter_map(|signed| serde_json::to_value(signed.event).ok())
+        .filter_map(|event| {
+            event
+                .get("Transaction")
+                .or_else(|| event.get("RelationalRows"))
+                .cloned()
+        })
+        .filter_map(|transaction| transaction.get("record_revision_transaction").cloned())
+        .filter_map(|revisions| revisions.get("mutations").cloned())
+        .filter_map(|mutations| mutations.as_array().cloned())
+        .flatten()
+        .filter(|mutation| mutation.get("kind").and_then(Value::as_str) == Some("row"))
+        .collect()
+}
+
 #[test]
 fn hql_and_ir_history_and_change_scans_read_exact_row_revisions() {
     let dir = TempDir::new().unwrap();
@@ -85,6 +110,7 @@ fn hql_and_ir_history_and_change_scans_read_exact_row_revisions() {
             }],
         })
         .unwrap();
+    let first_tx = storage.stable_frontier();
     let row_id: String = rusqlite::Connection::open(dir.path().join("projection.sqlite"))
         .unwrap()
         .query_row(
@@ -108,6 +134,7 @@ fn hql_and_ir_history_and_change_scans_read_exact_row_revisions() {
             }],
         })
         .unwrap();
+    let second_tx = storage.stable_frontier();
 
     let history_hql = execute(
         &storage,
@@ -162,6 +189,102 @@ fn hql_and_ir_history_and_change_scans_read_exact_row_revisions() {
         history_hql.rows[0]["revision"],
         history_hql.rows[1]["revision"]
     );
+
+    let mutations = row_revision_mutations(&storage);
+    assert_eq!(mutations.len(), 2);
+    let p7_revisions = mutations
+        .iter()
+        .enumerate()
+        .map(|(index, mutation)| {
+            let valid_from =
+                chrono::DateTime::parse_from_rfc3339(mutation["valid_from"].as_str().unwrap())
+                    .unwrap()
+                    .timestamp_micros();
+            let valid_to = mutation["valid_to"].as_str().map(|value| {
+                chrono::DateTime::parse_from_rfc3339(value)
+                    .unwrap()
+                    .timestamp_micros()
+            });
+            p7_graph::Revision {
+                entity: p7_graph::EntityRef {
+                    namespace: mutation["namespace"].as_str().unwrap().into(),
+                    kind: p7_graph::Kind::Row,
+                    id: mutation["id"].as_str().unwrap().into(),
+                    revision: mutation["revision_id"].as_str().unwrap().into(),
+                },
+                transaction: p7_graph::Interval {
+                    start: [first_tx, second_tx][index],
+                    end: [Some(second_tx), None][index],
+                },
+                valid: p7_graph::Interval {
+                    start: valid_from,
+                    end: valid_to,
+                },
+                retracted: false,
+                fields: p7_graph::Fields::new(),
+                data: p7_graph::RecordData::Plain,
+            }
+        })
+        .collect();
+    let row = p7_graph::Identity {
+        namespace: "default".into(),
+        kind: p7_graph::Kind::Row,
+        id: row_id.clone(),
+    };
+    let p7_catalog = p7_graph::Catalog {
+        frontier: second_tx,
+        history: BTreeMap::from([(
+            p7_graph::Kind::Row,
+            p7_graph::HistoryCapability {
+                horizon: 0,
+                available: true,
+            },
+        )]),
+        revisions: p7_revisions,
+    };
+    let p7_plan = p7_graph::Plan {
+        source: p7_graph::Source::HistoryScan {
+            kind: p7_graph::Kind::Row,
+            alias: "h".into(),
+            predicate: p7_graph::Predicate {
+                id: Some(row_id.clone()),
+                ..p7_graph::Predicate::default()
+            },
+            transactions: p7_graph::Interval {
+                start: 0,
+                end: second_tx.checked_add(1),
+            },
+            valid: p7_graph::Interval {
+                start: i64::MIN,
+                end: None,
+            },
+        },
+        stages: vec![],
+    };
+    let p7_view = p7_graph::View {
+        namespace: "default".into(),
+        transaction: second_tx,
+        valid_at: 0,
+        permissions: p7_graph::Permissions {
+            read: BTreeSet::from([row]),
+            annotation_body: BTreeSet::new(),
+        },
+    };
+    let p7_result =
+        p7_graph::execute(&p7_catalog, &p7_view, &p7_plan, p7_graph::Limits::default()).unwrap();
+    assert_eq!(history_hql.rows.len(), p7_result.rows.len());
+    for (actual, expected) in history_hql.rows.iter().zip(&p7_result.rows) {
+        let p7_graph::Binding::Entity(entity) = &expected["h"] else {
+            panic!("P7 HistoryScan binds row revision identities")
+        };
+        let QueryValueV2::Utf8(revision) = &actual["revision"] else {
+            panic!("HQL2 row history exposes the exact revision ID")
+        };
+        assert_eq!(entity.namespace, "default");
+        assert_eq!(entity.kind, p7_graph::Kind::Row);
+        assert_eq!(entity.id, row_id);
+        assert_eq!(entity.revision, *revision);
+    }
 
     let changes_hql = execute(
         &storage,

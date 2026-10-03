@@ -1,8 +1,8 @@
 ---
 doc_id: REPORT--HQL2-P7-ORACLE-2026-09-28
-version: "0.1.2b"
+version: "0.1.3b"
 created_at: "2026-09-28T01:38:00+07:00,ATHER,fc851e9"
-last_update: "2026-10-03T12:40:49+07:00,ATHER"
+last_update: "2026-10-03T13:55:00+07:00,ATHER"
 status: beta
 owner: "GenesisBlockDB Engineering"
 attributes:
@@ -98,8 +98,8 @@ Measured RED cases and corrective evidence are retained under `.brain/rca/`:
   explicit immutable fixture revisions/events. These do not create durable
   annotation or transactional storage capability.
 - Vector HistoryScan uses the H2-D11 compact JSON `(owner_id, collection_id)`
-  subject identity and authorizes through its owner Node. The P7 catalog models
-  only this approved HistoryScan capability; it rejects live Vector Scan.
+  subject identity and authorizes through its owner Node. P7 still rejects live
+  Vector Scan; the storage-backed test profile compares its retained histories.
 - The algebra is a typed test representation, not the public JSON wire decoder.
   Scalar support is the declared Bool/I64/F64/UTF-8/vector/list/domain fixture
   profile, not every Blueprint decimal/date/UUID/map/function combination.
@@ -144,15 +144,18 @@ profile on this base. This does not promote unsupported profile cases or any
 production HQL2/Blueprint obligation. Full Rust/Node/mobile/performance/hosted
 qualification was not run for this test-support-only slice.
 
-The approved vector-history differential is derived from retained WAL vector
-revision mutations and the captured transaction frontier, then compares both
-Storage-backed HQL and typed IR history bags with P7's independently assembled
-reference catalog. The graph-oracle target now passes 39 tests; combined P7
-graph/relational/rank/pipeline targets pass 130/130. The storage-backed
-HistoryScan/ChangeScan target passes 14/14, the prescribed 32-target HQL2
-regression passes 377/0/1, and the separate 11-target P6/schema-v6/
+Storage-backed HQL and typed-IR HistoryScan bags for Node, Edge, Row, Vector
+and Annotation now compare against P7 catalogs assembled from signed-WAL
+revision facts and captured transaction/valid-time windows. The fixtures verify
+exact revision identity and temporal intervals, with edge-endpoint, vector-owner
+and annotation target/evidence ACL dependencies represented in P7. Artifact
+HistoryScan remains unsupported. The P7 oracle implementation itself is
+unchanged: its graph target passes 39 tests and combined graph/relational/rank/
+pipeline targets pass 130/130. The HistoryScan/ChangeScan target passes 15/15,
+the Annotation source target passes 7/7, the prescribed 32-target HQL2
+regression passes 379/0/1, and the separate 11-target P6/schema-v6/
 compatibility group passes 194/0/0. These remain local test evidence; hosted
-checks and review are outstanding.
+checks, broad ChangeScan/source-oracle coverage and review are outstanding.
 
 At the original P7 checkpoint, documentation validation reported `0
 violations in 233 files`; scoped rustfmt checks of the eight then-new Rust
@@ -163,9 +166,9 @@ in the updated P8 checkpoint.
 
 [P8 concrete boundary](SPEC--GENESISDB-HQL2-P8-TYPED-BOUNDARY.md) and its
 completion addendum have since been owner-approved and partially implemented.
-This report adds only the bounded P7 vector-HistoryScan reference profile and
-storage-backed differential evidence; it does not expand production capability
-or imply complete P8/R1 acceptance.
+This report records storage-backed test differentials for the already-approved
+HistoryScan kinds; it does not expand production capability or imply complete
+P8/R1 acceptance.
 
 Full HQL2 completion remains open: the full accepted operator/source matrix,
 broad exact-oracle and legacy differential coverage, P13/public-surface parity,
@@ -176,10 +179,12 @@ not been run or claimed.
 
 ## Version diff
 
-Version diff `0.1.1b -> 0.1.2b`: extend the test-only P7 graph reference with
-the approved H2-D11 Vector HistoryScan compact identity and owner-Node ACL;
-record WAL-derived HQL/typed-IR differential evidence and current local sweep
-counts while preserving hosted CI, review and broad P8/P13 gates.
+Version diff `0.1.2b -> 0.1.3b`: record storage-backed P7 HistoryScan
+differentials for all five supported kinds from WAL-derived revisions and
+captured frontiers; record History/Change 15/15, Annotation source 7/7,
+HQL2 379/0/1 and P6/schema-v6/compatibility 194/0/0. P7's own 130/130 result
+is unchanged. Artifact HistoryScan and broad P8/P13/hosted/review gates remain
+open.
 
 | Document | Before | After |
 |---|---|---|
@@ -195,5 +200,7 @@ counts while preserving hosted CI, review and broad P8/P13 gates.
 
 | Version | Date | Status | Summary | Commit Hash | Agent |
 |---|---|---|---|---|---|
+| 0.1.3b | 2026-10-03 | beta | Record WAL-derived storage-backed P7 HistoryScan differentials for Node/Edge/Row/Vector/Annotation; History/Change 15/15, Annotation source 7/7, HQL2 379/0/1 and P6/compatibility 194/0/0; retain Artifact, broad oracle, hosted and review gates | working-tree | ATHER |
+| 0.1.2b | 2026-10-03 | beta | Extend test-only P7 graph reference with approved H2-D11 Vector HistoryScan compact identity and owner-Node ACL; record WAL-derived HQL/typed-IR differential evidence and local sweeps | working-tree | ATHER |
 | 0.1.0b | 2026-09-28 | draft | Record implemented P7 profile, measured corrections and remaining P8/R1 gates | working-tree | ATHER |
 | 0.1.1b | 2026-09-28 | beta | Record final combined Cargo 129/129 and independent bounded-profile acceptance; P8 approval and upstream integration remain open | working-tree | ATHER |

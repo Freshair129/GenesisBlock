@@ -1,7 +1,7 @@
 use genesis_block_native::{
     query::hql2::{QueryOutcomeV2, QueryResultV2},
     uee_v2::QueryRequestV2,
-    AccessContext, NodeInput, OpenOptions, Storage,
+    AccessContext, EdgeInput, NodeInput, OpenOptions, Storage,
 };
 #[allow(dead_code)]
 #[path = "support/hql2_graph_reference.rs"]
@@ -166,7 +166,7 @@ fn tagged(
     serde_json::to_value(&row[field]).unwrap()
 }
 
-fn vector_revision_mutations(storage: &Storage) -> Vec<Value> {
+fn record_revision_mutations(storage: &Storage, kind: &str) -> Vec<Value> {
     storage
         .events_since_seq(0)
         .into_iter()
@@ -176,7 +176,7 @@ fn vector_revision_mutations(storage: &Storage) -> Vec<Value> {
         .filter_map(|revisions| revisions.get("mutations").cloned())
         .filter_map(|mutations| mutations.as_array().cloned())
         .flatten()
-        .filter(|mutation| mutation.get("kind").and_then(Value::as_str) == Some("vector"))
+        .filter(|mutation| mutation.get("kind").and_then(Value::as_str) == Some(kind))
         .collect()
 }
 
@@ -185,6 +185,7 @@ fn history_scan_reads_closed_revisions_and_hydrates_the_exact_revision() {
     let dir = TempDir::new().unwrap();
     let storage = open(dir.path());
     add_node(&storage);
+    let first_tx = storage.stable_frontier();
     storage
         .supersede_node(
             "history:one".into(),
@@ -192,6 +193,7 @@ fn history_scan_reads_closed_revisions_and_hydrates_the_exact_revision() {
             None,
         )
         .unwrap();
+    let second_tx = storage.stable_frontier();
 
     let result = run_hql(
         &storage,
@@ -238,6 +240,396 @@ fn history_scan_reads_closed_revisions_and_hydrates_the_exact_revision() {
     let ir_typed = run_ir_history(&storage, "history-hql-ir-parity-ir", "2020-01-01T00:00:00Z");
     assert_eq!(hql_typed.columns, ir_typed.columns);
     assert_eq!(hql_typed.rows, ir_typed.rows);
+
+    let mutations = record_revision_mutations(&storage, "node");
+    assert_eq!(second_tx - first_tx, 2);
+    assert_eq!(mutations.len(), 3, "WAL mutations: {mutations:#?}");
+    let mut p7_revisions = Vec::with_capacity(mutations.len());
+    for (index, mutation) in mutations.iter().enumerate() {
+        let valid_from =
+            chrono::DateTime::parse_from_rfc3339(mutation["valid_from"].as_str().unwrap())
+                .unwrap()
+                .timestamp_micros();
+        let valid_to = mutation["valid_to"].as_str().map(|value| {
+            chrono::DateTime::parse_from_rfc3339(value)
+                .unwrap()
+                .timestamp_micros()
+        });
+        p7_revisions.push(p7_graph::Revision {
+            entity: p7_graph::EntityRef {
+                namespace: mutation["namespace"].as_str().unwrap().into(),
+                kind: p7_graph::Kind::Node,
+                id: mutation["id"].as_str().unwrap().into(),
+                revision: mutation["revision_id"].as_str().unwrap().into(),
+            },
+            transaction: p7_graph::Interval {
+                start: first_tx + index as u64,
+                end: [Some(first_tx + 1), Some(second_tx), None][index],
+            },
+            valid: p7_graph::Interval {
+                start: valid_from,
+                end: valid_to,
+            },
+            retracted: false,
+            fields: p7_graph::Fields::new(),
+            data: p7_graph::RecordData::Plain,
+        });
+    }
+    let node = p7_graph::Identity {
+        namespace: "default".into(),
+        kind: p7_graph::Kind::Node,
+        id: "history:one".into(),
+    };
+    let p7_catalog = p7_graph::Catalog {
+        frontier: second_tx,
+        history: BTreeMap::from([(
+            p7_graph::Kind::Node,
+            p7_graph::HistoryCapability {
+                horizon: 0,
+                available: true,
+            },
+        )]),
+        revisions: p7_revisions,
+    };
+    let p7_plan = p7_graph::Plan {
+        source: p7_graph::Source::HistoryScan {
+            kind: p7_graph::Kind::Node,
+            alias: "h".into(),
+            predicate: p7_graph::Predicate {
+                id: Some("history:one".into()),
+                ..p7_graph::Predicate::default()
+            },
+            transactions: p7_graph::Interval {
+                start: 0,
+                end: second_tx.checked_add(1),
+            },
+            valid: p7_graph::Interval {
+                start: chrono::DateTime::parse_from_rfc3339("2020-01-01T00:00:00Z")
+                    .unwrap()
+                    .timestamp_micros(),
+                end: Some(
+                    chrono::DateTime::parse_from_rfc3339("2020-01-01T00:00:00Z")
+                        .unwrap()
+                        .timestamp_micros()
+                        + 1,
+                ),
+            },
+        },
+        stages: vec![],
+    };
+    let p7_view = p7_graph::View {
+        namespace: "default".into(),
+        transaction: second_tx,
+        valid_at: chrono::DateTime::parse_from_rfc3339("2020-01-01T00:00:00Z")
+            .unwrap()
+            .timestamp_micros(),
+        permissions: p7_graph::Permissions {
+            read: BTreeSet::from([node]),
+            annotation_body: BTreeSet::new(),
+        },
+    };
+    let p7_result =
+        p7_graph::execute(&p7_catalog, &p7_view, &p7_plan, p7_graph::Limits::default()).unwrap();
+    assert_eq!(hql_typed.rows.len(), p7_result.rows.len());
+    for (actual, expected) in hql_typed.rows.iter().zip(&p7_result.rows) {
+        let p7_graph::Binding::Entity(entity) = &expected["h"] else {
+            panic!("P7 HistoryScan binds node revision identities")
+        };
+        let revision = p7_catalog
+            .revisions
+            .iter()
+            .find(|revision| &revision.entity == entity)
+            .unwrap();
+        let history = tagged(actual, "h")["value"].clone();
+        let subject = &history["subject"];
+        assert_eq!(
+            subject["namespace"].as_str(),
+            Some(entity.namespace.as_str())
+        );
+        assert_eq!(subject["kind"].as_str(), Some("node"));
+        assert_eq!(subject["id"].as_str(), Some(entity.id.as_str()));
+        assert_eq!(subject["revision"].as_str(), Some(entity.revision.as_str()));
+        assert_eq!(history["operation"].as_str(), Some("upsert"));
+        assert_eq!(
+            history["tx_from"].as_str().unwrap().parse::<u64>().unwrap(),
+            revision.transaction.start
+        );
+        assert_eq!(
+            history["tx_to"]
+                .as_str()
+                .map(|value| value.parse::<u64>().unwrap()),
+            revision.transaction.end
+        );
+        assert_eq!(
+            chrono::DateTime::parse_from_rfc3339(history["valid_from"].as_str().unwrap())
+                .unwrap()
+                .timestamp_micros(),
+            revision.valid.start
+        );
+        assert_eq!(
+            history["valid_to"]
+                .as_str()
+                .map(|value| chrono::DateTime::parse_from_rfc3339(value)
+                    .unwrap()
+                    .timestamp_micros()),
+            revision.valid.end
+        );
+    }
+}
+
+#[test]
+fn history_scan_matches_p7_for_edge_revisions_and_endpoint_acl() {
+    let dir = TempDir::new().unwrap();
+    let storage = open(dir.path());
+    add_node(&storage);
+    let source_tx = storage.stable_frontier();
+    storage
+        .add_node(NodeInput {
+            id: Some("history:two".into()),
+            labels: vec!["Document".into()],
+            props: None,
+            embedding: None,
+            lang: None,
+            valid_from: Some("2010-01-01T00:00:00Z".into()),
+            caused_by: None,
+            ttl: None,
+            collection: None,
+        })
+        .unwrap();
+    let target_tx = storage.stable_frontier();
+    storage
+        .add_edge(EdgeInput {
+            id: Some("history:edge".into()),
+            from: "history:one".into(),
+            to: "history:two".into(),
+            rel: "LINK".into(),
+            props: Some(json!({"weight":1})),
+            valid_from: Some("2010-01-01T00:00:00Z".into()),
+            supersede: None,
+            impact: None,
+            caused_by: None,
+        })
+        .unwrap();
+    let edge_from = storage.stable_frontier();
+    storage
+        .retract_edge("history:edge".into(), Some("2020-02-01T00:00:00Z".into()))
+        .unwrap();
+    let frontier = storage.stable_frontier();
+    let valid_at = "2020-01-15T00:00:00Z";
+
+    let hql = format!(
+        "USE default AT VALID \"{valid_at}\" HISTORY EDGE \"history:edge\" AS h |> RETURN h"
+    );
+    let hql_result = run_hql(&storage, "history-edge-p7-hql", &hql).unwrap();
+    let ir_result = run_ir_history_source(
+        &storage,
+        "history-edge-p7-ir",
+        valid_at,
+        "edge",
+        "history:edge",
+        None,
+    )
+    .unwrap();
+    assert_eq!(hql_result.columns, ir_result.columns);
+    assert_eq!(hql_result.rows, ir_result.rows);
+
+    let node_mutations = record_revision_mutations(&storage, "node");
+    assert_eq!(node_mutations.len(), 2);
+    let mut revisions = Vec::with_capacity(4);
+    for (index, mutation) in node_mutations.iter().enumerate() {
+        let valid_from =
+            chrono::DateTime::parse_from_rfc3339(mutation["valid_from"].as_str().unwrap())
+                .unwrap()
+                .timestamp_micros();
+        revisions.push(p7_graph::Revision {
+            entity: p7_graph::EntityRef {
+                namespace: mutation["namespace"].as_str().unwrap().into(),
+                kind: p7_graph::Kind::Node,
+                id: mutation["id"].as_str().unwrap().into(),
+                revision: mutation["revision_id"].as_str().unwrap().into(),
+            },
+            transaction: p7_graph::Interval {
+                start: [source_tx, target_tx][index],
+                end: None,
+            },
+            valid: p7_graph::Interval {
+                start: valid_from,
+                end: mutation["valid_to"].as_str().map(|value| {
+                    chrono::DateTime::parse_from_rfc3339(value)
+                        .unwrap()
+                        .timestamp_micros()
+                }),
+            },
+            retracted: false,
+            fields: p7_graph::Fields::new(),
+            data: p7_graph::RecordData::Plain,
+        });
+    }
+    let edge_mutations = record_revision_mutations(&storage, "edge");
+    assert_eq!(edge_mutations.len(), 2);
+    for (index, mutation) in edge_mutations.iter().enumerate() {
+        let valid_from =
+            chrono::DateTime::parse_from_rfc3339(mutation["valid_from"].as_str().unwrap())
+                .unwrap()
+                .timestamp_micros();
+        let valid_to = mutation["valid_to"].as_str().map(|value| {
+            chrono::DateTime::parse_from_rfc3339(value)
+                .unwrap()
+                .timestamp_micros()
+        });
+        revisions.push(p7_graph::Revision {
+            entity: p7_graph::EntityRef {
+                namespace: mutation["namespace"].as_str().unwrap().into(),
+                kind: p7_graph::Kind::Edge,
+                id: mutation["id"].as_str().unwrap().into(),
+                revision: mutation["revision_id"].as_str().unwrap().into(),
+            },
+            transaction: p7_graph::Interval {
+                start: [edge_from, frontier][index],
+                end: [Some(frontier), None][index],
+            },
+            valid: p7_graph::Interval {
+                start: valid_from,
+                end: valid_to,
+            },
+            retracted: mutation["operation"].as_str() == Some("retract"),
+            fields: p7_graph::Fields::new(),
+            data: p7_graph::RecordData::Edge {
+                source: p7_graph::Identity {
+                    namespace: "default".into(),
+                    kind: p7_graph::Kind::Node,
+                    id: mutation["payload"]["from"].as_str().unwrap().into(),
+                },
+                target: p7_graph::Identity {
+                    namespace: "default".into(),
+                    kind: p7_graph::Kind::Node,
+                    id: mutation["payload"]["to"].as_str().unwrap().into(),
+                },
+                relation: mutation["payload"]["rel"].as_str().unwrap().into(),
+            },
+        });
+    }
+
+    let edge = p7_graph::Identity {
+        namespace: "default".into(),
+        kind: p7_graph::Kind::Edge,
+        id: "history:edge".into(),
+    };
+    let source = p7_graph::Identity {
+        namespace: "default".into(),
+        kind: p7_graph::Kind::Node,
+        id: "history:one".into(),
+    };
+    let target = p7_graph::Identity {
+        namespace: "default".into(),
+        kind: p7_graph::Kind::Node,
+        id: "history:two".into(),
+    };
+    let p7_catalog = p7_graph::Catalog {
+        frontier,
+        history: BTreeMap::from([
+            (
+                p7_graph::Kind::Node,
+                p7_graph::HistoryCapability {
+                    horizon: 0,
+                    available: true,
+                },
+            ),
+            (
+                p7_graph::Kind::Edge,
+                p7_graph::HistoryCapability {
+                    horizon: 0,
+                    available: true,
+                },
+            ),
+        ]),
+        revisions,
+    };
+    let valid_at = chrono::DateTime::parse_from_rfc3339(valid_at)
+        .unwrap()
+        .timestamp_micros();
+    let p7_plan = p7_graph::Plan {
+        source: p7_graph::Source::HistoryScan {
+            kind: p7_graph::Kind::Edge,
+            alias: "h".into(),
+            predicate: p7_graph::Predicate {
+                id: Some("history:edge".into()),
+                ..p7_graph::Predicate::default()
+            },
+            transactions: p7_graph::Interval {
+                start: 0,
+                end: frontier.checked_add(1),
+            },
+            valid: p7_graph::Interval {
+                start: valid_at,
+                end: valid_at.checked_add(1),
+            },
+        },
+        stages: vec![],
+    };
+    let p7_view = p7_graph::View {
+        namespace: "default".into(),
+        transaction: frontier,
+        valid_at,
+        permissions: p7_graph::Permissions {
+            read: BTreeSet::from([source, target, edge]),
+            annotation_body: BTreeSet::new(),
+        },
+    };
+    let p7_result =
+        p7_graph::execute(&p7_catalog, &p7_view, &p7_plan, p7_graph::Limits::default()).unwrap();
+    assert_eq!(hql_result.rows.len(), p7_result.rows.len());
+    for (actual, expected) in hql_result.rows.iter().zip(&p7_result.rows) {
+        let p7_graph::Binding::Entity(entity) = &expected["h"] else {
+            panic!("P7 HistoryScan binds edge revision identities")
+        };
+        let revision = p7_catalog
+            .revisions
+            .iter()
+            .find(|revision| &revision.entity == entity)
+            .unwrap();
+        let history = tagged(actual, "h")["value"].clone();
+        let subject = &history["subject"];
+        assert_eq!(
+            subject["namespace"].as_str(),
+            Some(entity.namespace.as_str())
+        );
+        assert_eq!(subject["kind"].as_str(), Some("edge"));
+        assert_eq!(subject["id"].as_str(), Some(entity.id.as_str()));
+        assert_eq!(subject["revision"].as_str(), Some(entity.revision.as_str()));
+        assert_eq!(
+            history["operation"].as_str(),
+            Some(if revision.retracted {
+                "retract"
+            } else {
+                "upsert"
+            })
+        );
+        assert_eq!(
+            history["tx_from"].as_str().unwrap().parse::<u64>().unwrap(),
+            revision.transaction.start
+        );
+        assert_eq!(
+            history["tx_to"]
+                .as_str()
+                .map(|value| value.parse::<u64>().unwrap()),
+            revision.transaction.end
+        );
+        assert_eq!(
+            chrono::DateTime::parse_from_rfc3339(history["valid_from"].as_str().unwrap())
+                .unwrap()
+                .timestamp_micros(),
+            revision.valid.start
+        );
+        assert_eq!(
+            history["valid_to"]
+                .as_str()
+                .map(|value| chrono::DateTime::parse_from_rfc3339(value)
+                    .unwrap()
+                    .timestamp_micros()),
+            revision.valid.end
+        );
+    }
 }
 
 #[test]
@@ -415,7 +807,7 @@ fn history_scan_reads_vector_revisions_with_hql_ir_and_p7_parity() {
     assert_eq!(hql_result.snapshot.tx, selected_tx_text);
     assert_eq!(hql_result.rows.len(), 2);
 
-    let mutations = vector_revision_mutations(&storage);
+    let mutations = record_revision_mutations(&storage, "vector");
     assert_eq!(mutations.len(), 2);
     assert!(mutations.iter().all(|mutation| mutation["id"] == vector_id));
     let owner = p7_graph::Identity {

@@ -2,7 +2,7 @@
 title: "GenesisBlockDB Technical Architecture and Capability Composition"
 doc_id: "MASTER-SPEC-GENESISBLOCKDB"
 status: current
-version: "2.3.31b"
+version: "2.3.32b"
 updated: "2026-10-03"
 owner: "GenesisBlockDB Architecture"
 source_of_truth: true
@@ -48,10 +48,13 @@ forms, and resource rejection. HQL `JOIN TABLE` now lowers to the existing
 closed RowScan/Join pipeline for Inner/Left/Semi/Anti, with bare JOIN defaulting
 to Inner; HQL, typed IR and independent P7 differential results match for
 duplicate, missing-property NULL and JSON-null cases. The latest root-HQL2
-regression sweep passes 377/0/1 across 32 targets; an earlier separate 11-target
-P6/schema-v6/compatibility group previously passed 194/0/0. H2-D11 Vector
-HistoryScan result bags also match the independent P7 reference using
-WAL-derived retained vector revision facts and the captured frontier. The
+regression sweep passes 379/0/1 across 32 targets; the separate 11-target
+P6/schema-v6/compatibility group passes 194/0/0. Storage-backed HQL/typed-IR
+HistoryScan bags for Node, Edge, Row, Vector and Annotation match independent
+P7 catalogs assembled from WAL-derived revision facts and captured frontiers/
+valid-time windows, including endpoint, vector-owner and annotation-reference
+ACL dependencies. Artifact HistoryScan remains unsupported; broad ChangeScan,
+P8/P13, hosted CI and review remain open. The
 H2-D11 R4/P6 annotation grant regression confirms:
 Annotation subjects require explicit Annotation(Read) separately from the
 Namespace(Read) query grant, while same-namespace target/evidence references
@@ -406,6 +409,7 @@ user database was migrated, and broader P6/P8/P13 qualification remains open.
 
 | Version | Date | Owner | Summary |
 |---|---|---|---|
+| 2.3.32b | 2026-10-03 | GenesisBlockDB Architecture | Record storage-backed P7 HistoryScan differentials for Node/Edge/Row/Vector/Annotation; History/Change 15/15, Annotation source 7/7, P7 130/130, HQL2 379/0/1 and P6/schema-v6/compatibility 194/0/0; Artifact, broad ChangeScan/P8/P13, hosted CI and review remain open |
 | 2.3.31b | 2026-10-03 | GenesisBlockDB Architecture | Record independent P7 differential for H2-D11 Vector HistoryScan from WAL-derived revisions; P7 130/130, History/Change 14/14, HQL2 377/0/1 and P6/schema-v6/compatibility 194/0/0. At prior PR #194 head 9ada855, Windows cargo plus four worker checks fail and reviews are absent; hosted verification of this source revision and full acceptance/merge remain open |
 | 2.3.30b | 2026-10-03 | GenesisBlockDB Architecture | Record H2-D11 R4/P6 annotation ACL conformance and local HQL2 375/0/1 plus selected P6/schema-v6 43/0/0; possible ChangeScan budget side channel, prior PR worker failures and cancelled Windows Rust, hosted checks/review and full acceptance/merge remain open |
 | 2.3.29b | 2026-10-03 | GenesisBlockDB Architecture | Record PR #194 run 37083654705 at docs-only head 43cc6e8: Windows HQL/IR Join budget failure and four worker bootstrap failures; local Join reproduction 5/5, full acceptance and merge remain open |

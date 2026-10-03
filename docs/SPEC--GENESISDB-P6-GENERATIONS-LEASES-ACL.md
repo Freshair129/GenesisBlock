@@ -1,9 +1,9 @@
 ---
 doc_id: SPEC--GENESISDB-P6-GENERATIONS-LEASES-ACL
 owner: GenesisBlockDB Engineering
-version: 0.5.26b
+version: 0.5.27b
 created_at: "2026-09-22T22:55:00+07:00,ATHER,working-tree"
-last_update: "2026-10-03T12:40:49+07:00,ATHER"
+last_update: "2026-10-03T13:55:00+07:00,ATHER"
 status: beta
 attributes:
   domain: storage-correctness
@@ -148,17 +148,18 @@ through `hql2_vectors` under that same lease. HistoryScan/ChangeScan execute on
 the same lease and source-floor boundary over exact retained schema-v6
 revisions. Vector HistoryScan uses the H2-D11 compact JSON `(owner_id,
 collection_id)` identity, vector source floor and existing owner-node ACL under
-the same lease. HQL/typed-IR results now also match the independent P7
-HistoryScan reference, using retained WAL vector revision facts and the
-captured frontier; the current HistoryScan/ChangeScan target passes 14/14,
-the 32-target HQL2 regression sweep passes 377/0/1, and the separate
-11-target P6/schema-v6/compatibility group passes 194/0/0. Broader
+the same lease. Storage-backed HQL/typed-IR HistoryScan bags for Node, Edge,
+Row, Vector and Annotation now match independent P7 references assembled from
+WAL revision facts and captured frontiers/valid-time windows. The HistoryScan/
+ChangeScan target passes 15/15, Annotation source passes 7/7, the 32-target HQL2
+regression sweep passes 379/0/1, and the separate 11-target P6/schema-v6/
+compatibility group passes 194/0/0. Broader
 P6/P8 acceptance, transport parity and independent review remain open. Explicit
 HQL2/IR `tx_as_of` is specified above and its cross-source
 runtime path now selects one frontier S across source scans, operators,
 hydration and result metadata while retaining the pinned P6 generation and
 current ACL. Five focused HQL2 targets pass 56/56, the 32-target HQL2 sweep
-passes 377/0/1 and the earlier separate 11-target P6/schema-v6/compatibility sweep
+passes 379/0/1 and the earlier separate 11-target P6/schema-v6/compatibility sweep
 passes 194/0/0. Broader P6/P8 acceptance, transport parity and independent
 review remain open. Property access uses
 binder-issued `FieldIdV2` and aligned `ExecBatchV2` batches, including
@@ -265,9 +266,10 @@ Annotation(Read). When that grant is absent, Annotation revisions must be
 excluded before candidate counts/bytes are charged to caller-selected budgets or
 materialized. This does not widen authorization to Annotation and does not claim
 timing noninterference. The hidden-revision threshold regression passes with
-ACL 11/11, History/Change 14/14, HQL2 377/0/1 and selected P6/schema-v6 tests
-43/0/0. Hosted validation of this source change, independent review and broader
-P6/P8 acceptance remain open.
+ACL 11/11; the expanded History/Change target passes 15/15, Annotation
+source/ACL passes 7/7, HQL2 passes 379/0/1 and the separate P6/schema-v6/
+compatibility group passes 194/0/0. Hosted validation of this source change,
+independent review and broader P6/P8 acceptance remain open.
 
 P8 AnnotationLookup also runs inside the same ReadView and applies the same
 target/evidence authorization check before returning an annotation reference.
@@ -393,11 +395,13 @@ not approve P7, merge, release, deployment or external readiness.
 
 ## CHANGELOG
 
-Version diff 0.5.25b -> 0.5.26b: add independent P7 result-bag comparison for
-HQL/typed-IR Vector HistoryScan from WAL-derived retained revision facts under
-the H2-D11 tuple identity and owner-Node ACL. Record History/Change 14/14,
-HQL2 377/0/1 and P6/schema-v6/compatibility 194/0/0. No runtime/schema change;
-hosted checks, review and broad P6/P8 acceptance remain open.
+Version diff 0.5.26b -> 0.5.27b: extend storage-backed P7 HistoryScan
+differentials to all five supported kinds using WAL-derived revision facts and
+captured frontiers; verify Edge endpoint, Vector owner and Annotation
+target/evidence ACL dependencies. Record History/Change 15/15, Annotation
+source 7/7, HQL2 379/0/1, P7 130/130 and P6/schema-v6/compatibility 194/0/0.
+No runtime/schema/contract change; Artifact HistoryScan and broad P6/P8
+acceptance remain open.
 
 Version diff 0.5.23b -> 0.5.24b: enforce the already-approved distinction
 between the HQL2 namespace query grant, explicit Annotation(Read) for annotation
@@ -474,6 +478,7 @@ broader P6/P8/P13 qualification is claimed.
 
 | Version | Date | Status | Summary | Commit | Agent |
 |---|---|---|---|---|---|
+| 0.5.27b | 2026-10-03 | beta | Record WAL-derived P7 HistoryScan differentials for Node/Edge/Row/Vector/Annotation under existing P6 ACL semantics; History/Change 15/15, Annotation source 7/7, HQL2 379/0/1, P7 130/130, P6/schema-v6/compatibility 194/0/0; Artifact, broad gates and hosted review remain open | working-tree | ATHER |
 | 0.5.26b | 2026-10-03 | beta | Record independent P7 differential for HQL/typed-IR Vector HistoryScan using WAL-derived revisions and H2-D11 owner ACL; History/Change 14/14, HQL2 377/0/1, P6/schema-v6/compatibility 194/0/0; hosted/review and broader gates open | working-tree | ATHER |
 | 0.5.25b | 2026-10-03 | beta | Implement and verify narrow ChangeScan budget rule: preserve namespace-only reads of other readable kinds; exclude Annotation subjects lacking Annotation(Read) before caller-budget accounting; ACL 11/11, History/Change 14/14, HQL2 376/0/1 and selected P6/schema-v6 43/0/0; hosted CI/review and broad P6/P8 remain open | working-tree | ATHER |
 | 0.5.24b | 2026-10-03 | beta | Enforce explicit Annotation(Read) for annotation subjects in scans and ChangeScan while retaining Namespace(Read) for the query and recursive reference checks; ACL regression passes, HQL2 375/0/1, selected P6/schema-v6 suite 43/0/0; possible ChangeScan budget side channel and hosted worker/Windows Rust gates remain unresolved | working-tree | ATHER |

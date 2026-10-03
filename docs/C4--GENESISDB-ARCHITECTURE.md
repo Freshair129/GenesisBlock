@@ -2,10 +2,10 @@
 doc_id: C4--GENESISDB-ARCHITECTURE
 type: architecture-index
 status: current
-version: 0.1.59b
+version: 0.1.60b
 owner: GenesisBlockDB Architecture
 created_at: 2026-06-13T22:50:11+07:00,ATHER,9b1ced3
-last_update: "2026-10-03T12:40:49+07:00,ATHER"
+last_update: "2026-10-03T13:55:00+07:00,ATHER"
 attributes:
   domain: architecture
   scope: repository
@@ -77,17 +77,20 @@ the P6 ReadView with source floors and recursive current reference ACL.
 Annotation subjects in source scans and ChangeScan additionally require explicit
 Annotation(Read), separate from the Namespace(Read) query grant; the broad
 namespace grant still authorizes same-namespace references. Their
-focused target now passes 14/14, including one selected transaction frontier
+focused target now passes 15/15, including one selected transaction frontier
 across HQL/IR source scans, graph/vector/annotation operators, hydration and
 `Snapshot.tx`. HQL2/IR `tx_as_of` fails closed below history/source floors and
 never falls back to current rows; the validated P6 generation and current
 policy remain pinned. Five focused targets pass 56/56; the 32-target HQL2
-regression sweep passes 377/0/1 and the earlier separate 11-target P6/schema-v6/
+regression sweep passes 379/0/1 and the earlier separate 11-target P6/schema-v6/
 compatibility sweep passes 194/0/0. These are local regression results, not
 broad P8/P13, transport, hosted CI or independent-review acceptance.
-The H2-D11 Vector HistoryScan HQL/typed-IR bags also match an independent P7
-reference assembled from WAL-derived retained revision facts and the captured
-frontier; P7 graph and combined targets pass 39/39 and 130/130.
+Storage-backed HQL/typed-IR HistoryScan bags for Node, Edge, Row, Vector and
+Annotation match independent P7 catalogs assembled from WAL-derived revision
+facts and captured transaction/valid-time windows; endpoint, vector-owner and
+annotation-reference ACL dependencies are covered. Artifact HistoryScan remains
+unsupported. P7 graph and combined targets pass 39/39 and 130/130; the annotation
+source/ACL target passes 7/7.
 Structural unsigned HQL parameters now bind only
 exact typed `DecimalU64` values for TAKE/SKIP/CHANGE/KNN/RERANK, without casts;
 KNN/RERANK bounds are checked before lowering. Omitted HQL2 null placement now
@@ -112,7 +115,7 @@ HQL and typed-IR Join differentials match independent P7 for Inner/Left/Semi/Ant
 with duplicate, missing-property NULL and JSON-null keys (5/7/3/2 output rows).
 HQL `JOIN TABLE` lowers to the existing RowScan/Join contract; bare JOIN
 defaults to Inner and Semi/Anti do not export the right scope. The explicit
-root-HQL2 sweep passes 377/0/1 across 32 targets.
+root-HQL2 sweep passes 379/0/1 across 32 targets.
 A separate earlier 11-target P6/schema-v6/compatibility
 group passes 194/0/0. The legacy parser preflight correction is recorded in the
 Local RCA: `.brain/rca/RCA--HQL1-ADAPTER-PARSER-RESERVATION.md`.
@@ -448,6 +451,13 @@ v6-only WAL without activation fails closed. See H2-D11 ADR R6b and the P6 recov
 
 ## CHANGELOG
 
+Version diff 0.1.59b -> 0.1.60b: record storage-backed P7 HistoryScan
+differentials for all five supported kinds from WAL-derived revision facts;
+verify endpoint, vector-owner and annotation-reference ACL dependencies.
+History/Change passes 15/15, Annotation source 7/7, P7 130/130, HQL2 379/0/1
+and P6/schema-v6/compatibility 194/0/0. Artifact, broad ChangeScan/P8/P13,
+hosted CI and independent review remain open.
+
 Version diff 0.1.58b -> 0.1.59b: add the independent P7 Vector HistoryScan
 differential based on WAL-derived retained revisions and H2-D11 owner ACL;
 record P7 130/130, History/Change 14/14, HQL2 377/0/1 and P6/schema-v6/
@@ -510,6 +520,7 @@ full P8/P13 qualification remains open.
 
 | Version | Date | Status | Summary | Commit Hash | Agent |
 |---------|------|--------|---------|-------------|-------|
+| 0.1.60b | 2026-10-03 | current | Record WAL-derived independent P7 HistoryScan differentials for Node/Edge/Row/Vector/Annotation; History/Change 15/15, Annotation source 7/7, P7 130/130, HQL2 379/0/1, P6/schema-v6/compatibility 194/0/0; Artifact/broad P8/P13/hosted review remain open | working-tree | ATHER |
 | 0.1.59b | 2026-10-03 | current | Add independent P7 Vector HistoryScan differential; P7 130/130, History/Change 14/14, HQL2 377/0/1, P6/schema-v6/compatibility 194/0/0; at prior PR head five checks fail and review is absent; broad P8/P13 open | working-tree | ATHER |
 | 0.1.58b | 2026-10-03 | current | Record H2-D11 R4/P6 annotation ACL conformance for scans and ChangeScan subjects; HQL2 375/0/1 and selected P6/schema-v6 43/0/0 pass locally; possible ChangeScan budget side channel, prior PR worker failures and cancelled Windows Rust remain open | working-tree | ATHER |
 | 0.1.57b | 2026-10-03 | current | Refresh PR #194 run 37083654705 at docs-only head 43cc6e8: Windows Join budget failure and four worker bootstrap failures; local Join target 5/5; PR unmerged, broad P8/P13 gates open | working-tree | ATHER |
