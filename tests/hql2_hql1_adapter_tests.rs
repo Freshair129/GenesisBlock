@@ -177,6 +177,72 @@ fn actor_scoped_hql1_zero_hop_match_matches_legacy_and_hql2() {
 }
 
 #[test]
+fn candidate_zero_hop_label_match_matches_legacy_and_hql2() {
+    let dir = TempDir::new().unwrap();
+    let storage = open(dir.path());
+    for (id, labels) in [
+        ("people:ada", vec!["Person"]),
+        ("people:grace", vec!["Person", "Engineer"]),
+        ("places:lab", vec!["Place"]),
+        ("plain", vec![]),
+    ] {
+        storage
+            .add_node(NodeInput {
+                id: Some(id.into()),
+                labels: labels.into_iter().map(str::to_owned).collect(),
+                props: None,
+                embedding: None,
+                lang: None,
+                valid_from: None,
+                caused_by: None,
+                ttl: None,
+                collection: None,
+            })
+            .unwrap();
+    }
+
+    let legacy_ids = |query: &str| {
+        storage
+            .execute_hql(query)
+            .unwrap()
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|row| row["p.id"].as_str().unwrap().to_owned())
+            .collect::<Vec<_>>()
+    };
+    let legacy_people = legacy_ids("MATCH (p:Person) RETURN p.id");
+    let legacy_missing = legacy_ids("MATCH (p:Missing) RETURN p.id");
+    install_policy(&storage, true);
+
+    for (label, mut legacy) in [("Person", legacy_people), ("Missing", legacy_missing)] {
+        let QueryOutcomeV2::Rows(hql2) = storage
+            .query_v2(
+                actor("legacy-reader"),
+                hql2_request(&format!(
+                    "USE default FROM NODES {label} AS __hql1_node |> RETURN __hql1_node.id AS id"
+                )),
+            )
+            .unwrap()
+        else {
+            panic!("expected canonical HQL2 rows")
+        };
+        let mut hql2 = projected_ids(&hql2, "id");
+        legacy.sort();
+        hql2.sort();
+        assert_eq!(hql2, legacy, "canonical differential for {label}");
+    }
+
+    let error = storage
+        .query_v2(
+            actor("legacy-reader"),
+            request("MATCH (p:Person) RETURN p.id"),
+        )
+        .unwrap_err();
+    assert_eq!(error.code, "CAPABILITY_UNSUPPORTED");
+}
+
+#[test]
 fn actor_scoped_hql1_directed_one_hop_match_preserves_parallel_row_multiplicity() {
     let dir = TempDir::new().unwrap();
     let storage = open(dir.path());
