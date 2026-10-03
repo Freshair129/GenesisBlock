@@ -1,8 +1,8 @@
 ---
 doc_id: SPEC--GENESISDB-HQL2-P8-TYPED-BOUNDARY
-version: "0.2.56b"
+version: "0.2.57b"
 created_at: "2026-09-28T01:25:00+07:00,ATHER,fc851e9"
-last_update: "2026-10-04T02:53:00+07:00,ATHER"
+last_update: "2026-10-04T03:40:00+07:00,ATHER"
 status: beta
 superseded_by: null
 owner: "Boss (Founder / Product Authority)"
@@ -76,7 +76,7 @@ Sequence ID, conjunctive labels and D4 node/edge property constraints now run
 for HQL and typed IR against one authorized P6 graph snapshot; candidate IDs
 are never looked up directly. Exact JSON values are selectively hydrated under
 budget and filtered before SHORTEST; Compact constraints remain unavailable
-and fail closed. The 10/10 P8 completion target and latest 386/0/1 root-HQL2
+and fail closed. The 10/10 P8 completion target and latest 387/0/1 root-HQL2
 sweep across 34 targets cover this slice, including edge-property filtering
 before SHORTEST and the 10/10 D7 actor-scoped HQL1 adapter, now including a
 differential-proven single-label zero-hop form. P6
@@ -99,7 +99,7 @@ The focused History/Change target passes 16/16 and the Annotation source target
 passes 7/7. Artifact HistoryScan remains capability-unsupported under the
 approved contract. Storage-backed P7 ChangeScan differentials now cover all five
 supported revision kinds. The current explicit 34-target HQL2 sweep passes
-386/0/1, with the ignored parser child entrypoint exercised by its parent. A
+387/0/1, with the ignored parser child entrypoint exercised by its parent. A
 storage-backed HQL/typed-IR `Values`/`UnionAll` differential matches independent
 P7 for 169 nullable bag pairs (338 Storage executions), retaining duplicate
 and NULL multiplicity through explicit null-last ordering. The scalar pipeline
@@ -109,7 +109,10 @@ filter/project/distinct/order/take, each matching independent P7 and each
 other. The storage-backed AnnotationLookup differential also matches independent
 P7 for HQL and typed IR across frozen-target match, evidence-only nonmatch,
 optional NULL extension and duplicate-input multiplicity (focused target 6/6).
-These remain focused test evidence, not expanded contract scope.
+The Sequence-property differential additionally matches positive UTF-8 node
+names and integer edge weights against P7 while excluding wrong-value
+candidates (focused pattern target 8/8). These remain focused test evidence,
+not expanded contract scope.
 The accepted transaction-time contract selects one historical frame S for the
 entire query and reports `Snapshot.tx = S`. HQL2 and typed-IR `query_v2` now
 execute this contract end to end: all revision-backed scans, graph/vector/
@@ -118,7 +121,7 @@ while the validated P6 generation, catalog and current policy stay pinned.
 Per-source history floors fail closed before reads, and no path falls back to
 current state. Five focused targets pass 56/56; the HistoryScan/ChangeScan
   target passes 16/16; the explicit 34-target HQL2 regression sweep passes
-  386/0/1 and the separate P6/schema-v6/compatibility sweep passes 194/0/0.
+  387/0/1 and the separate P6/schema-v6/compatibility sweep passes 194/0/0.
 These are local regression results, not broad P8/P13 or transport acceptance.
 PR #196 at head `8ac07f6` was merged at `fb7085a`. Its 16 displayed checks
 include 10 passes, five failures and one skip. Worker tests fail on
@@ -862,6 +865,14 @@ separate shape limits. No process-global Pest setting is changed.
 
 ## Version diff and changelog
 
+Version diff `0.2.56b -> 0.2.57b`: record the test-only HQL/typed-IR Sequence
+node/edge exact-property differential against independent P7 for positive
+UTF-8 and integer values, including exclusion of wrong-value candidates; the
+focused pattern target passes 8/8 and the explicit HQL2 sweep passes 387/0/1
+across 34 targets. No runtime, contract, schema, P6 or transport semantics
+changed; broad exact-oracle, review, resource/cancellation and P8/P13 gates
+remain open.
+
 Version diff `0.2.55b -> 0.2.56b`: record the test-only HQL/typed-IR
 AnnotationLookup differential against independent P7 for frozen-target match,
 evidence-only nonmatch, optional NULL extension and duplicate-input
@@ -1003,6 +1014,7 @@ detail with unchanged JSON shape; broader P8/P13/review gates remain open.
 
 | From | To | Effect |
 |---|---|---|
+| 0.2.56b | 0.2.57b | Record test-only HQL/typed-IR Sequence node/edge exact-property P7 differential for positive UTF-8/integer values and wrong-value exclusion; pattern target 8/8, HQL2 387/0/1 across 34 targets; preserve runtime, contract, schema, P6, transport and broad-acceptance boundaries |
 | 0.2.55b | 0.2.56b | Record test-only storage-backed HQL/typed-IR AnnotationLookup P7 differential for frozen targets, evidence-only nonmatch, optional NULL extension and duplicate-input multiplicity; focused target 6/6 and root-HQL2 386/0/1 across 34 targets; preserve runtime, contract, schema, P6, transport and broad-acceptance boundaries |
 | 0.2.54b | 0.2.55b | Record six test-only storage-backed HQL/typed-IR scalar-pipeline fixtures against P7 with 12 Storage executions and 2/2 focused tests; update root-HQL2 regression to 383/0/1; preserve runtime, contract, schema, transport and broad-acceptance boundaries |
 | 0.2.53b | 0.2.54b | Extend the conditional D7 HQL1 zero-hop node-ID allowlist to include a single plain-ASCII label after legacy/HQL2 differential; adapter 10/10; leave labeled one-hop and unproven forms fail-closed, with broad shared-runtime/P8/P13/review gates open |

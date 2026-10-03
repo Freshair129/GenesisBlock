@@ -118,6 +118,25 @@ fn oracle_environment() -> Environment {
     }
 }
 
+fn oracle_environment_with_properties() -> Environment {
+    let mut environment = oracle_environment();
+    for revision in &mut environment.catalog.revisions {
+        let property = match (revision.entity.kind, revision.entity.id.as_str()) {
+            (graph::Kind::Node, "a") => Some(("name", graph::Scalar::Text("A".into()))),
+            (graph::Kind::Node, "b") => Some(("name", graph::Scalar::Text("B".into()))),
+            (graph::Kind::Node, "d") => Some(("name", graph::Scalar::Text("D".into()))),
+            (graph::Kind::Edge, "ab-1") => Some(("weight", graph::Scalar::Integer(1))),
+            (graph::Kind::Edge, "ab-2") => Some(("weight", graph::Scalar::Integer(2))),
+            (graph::Kind::Edge, _) => Some(("weight", graph::Scalar::Integer(1))),
+            _ => None,
+        };
+        if let Some((name, value)) = property {
+            revision.fields.insert(name.into(), value);
+        }
+    }
+    environment
+}
+
 fn predicate(id: Option<&str>, labels: &[&str]) -> graph::Predicate {
     graph::Predicate {
         id: id.map(str::to_owned),
@@ -173,6 +192,59 @@ fn oracle_rows(
     .collect()
 }
 
+fn predicate_with_property(labels: &[&str], name: &str, value: graph::Scalar) -> graph::Predicate {
+    let mut equals = label_fields(labels);
+    equals.insert(name.into(), value);
+    graph::Predicate { id: None, equals }
+}
+
+fn oracle_property_rows() -> Vec<(String, String, String)> {
+    let expansion = graph::Expand {
+        start_alias: "a".into(),
+        segments: vec![graph::Segment {
+            end_alias: "b".into(),
+            edge_alias: Some("e1".into()),
+            direction: graph::Direction::Out,
+            relations: BTreeSet::from(["LINK".into()]),
+            min_hops: 1,
+            max_hops: 1,
+            node_predicate: predicate_with_property(
+                &["Company"],
+                "name",
+                graph::Scalar::Text("B".into()),
+            ),
+            edge_predicate: predicate_with_property(&[], "weight", graph::Scalar::Integer(1)),
+        }],
+        path_alias: None,
+        mode: graph::PathMode::Walk,
+        optional: false,
+        shortest: false,
+    };
+    reference::execute(
+        &oracle_environment_with_properties(),
+        &Plan::Match {
+            start: "a".into(),
+            predicate: predicate_with_property(
+                &["Person"],
+                "name",
+                graph::Scalar::Text("A".into()),
+            ),
+            expansion,
+        },
+    )
+    .unwrap()
+    .rows
+    .into_iter()
+    .map(|row| {
+        let id = |alias: &str| match &row[alias] {
+            reference::Value::Graph(graph::Binding::Entity(record)) => record.id.clone(),
+            _ => panic!("{alias} must bind an entity"),
+        };
+        (id("a"), id("b"), id("e1"))
+    })
+    .collect()
+}
+
 fn bag(rows: Vec<(String, String, String)>) -> BTreeMap<(String, String, String), usize> {
     let mut result = BTreeMap::new();
     for row in rows {
@@ -199,12 +271,12 @@ fn access() -> AccessContext {
     }
 }
 
-fn add_node(storage: &Storage, id: &str, labels: &[&str]) {
+fn add_node(storage: &Storage, id: &str, labels: &[&str], props: Option<Value>) {
     storage
         .add_node(NodeInput {
             id: Some(id.into()),
             labels: labels.iter().map(|label| (*label).into()).collect(),
-            props: None,
+            props,
             embedding: None,
             lang: None,
             valid_from: Some("2026-09-22T00:00:00Z".into()),
@@ -215,14 +287,14 @@ fn add_node(storage: &Storage, id: &str, labels: &[&str]) {
         .unwrap();
 }
 
-fn add_edge(storage: &Storage, id: &str, from: &str, to: &str) {
+fn add_edge(storage: &Storage, id: &str, from: &str, to: &str, props: Option<Value>) {
     storage
         .add_edge(EdgeInput {
             id: Some(id.into()),
             from: from.into(),
             to: to.into(),
             rel: "LINK".into(),
-            props: None,
+            props,
             valid_from: Some("2026-09-22T00:00:00Z".into()),
             supersede: None,
             impact: None,
@@ -238,7 +310,7 @@ fn storage_fixture(storage: &Storage) {
         ("c", vec!["Person"]),
         ("d", vec!["Company", "Employee"]),
     ] {
-        add_node(storage, id, &labels);
+        add_node(storage, id, &labels, None);
     }
     for (id, from, to) in [
         ("ab-1", "a", "b"),
@@ -247,7 +319,27 @@ fn storage_fixture(storage: &Storage) {
         ("ad", "a", "d"),
         ("dc", "d", "c"),
     ] {
-        add_edge(storage, id, from, to);
+        add_edge(storage, id, from, to, None);
+    }
+}
+
+fn storage_property_fixture(storage: &Storage) {
+    for (id, labels, props) in [
+        ("a", vec!["Person", "Employee"], json!({"name":"A"})),
+        ("b", vec!["Company"], json!({"name":"B"})),
+        ("c", vec!["Person"], json!({})),
+        ("d", vec!["Company", "Employee"], json!({"name":"D"})),
+    ] {
+        add_node(storage, id, &labels, Some(props));
+    }
+    for (id, from, to, weight) in [
+        ("ab-1", "a", "b", 1),
+        ("ab-2", "a", "b", 2),
+        ("bc", "b", "c", 1),
+        ("ad", "a", "d", 1),
+        ("dc", "d", "c", 1),
+    ] {
+        add_edge(storage, id, from, to, Some(json!({"weight":weight})));
     }
 }
 
@@ -450,6 +542,44 @@ fn hql_and_typed_ir_sequence_id_and_labels_match_independent_p7_bag() {
     assert!(case_sensitive_hql.rows.is_empty());
     assert!(case_sensitive_ir.rows.is_empty());
     assert!(oracle_rows(Some("a"), &["person"], &[("b", &["Company"])], false).is_empty());
+}
+
+#[test]
+fn sequence_node_and_edge_properties_match_independent_p7_bag() {
+    let dir = TempDir::new().unwrap();
+    let storage = open(dir.path());
+    storage_property_fixture(&storage);
+
+    let hql = run(
+        &storage,
+        "pattern-property-p7-hql",
+        Some("USE default MATCH (a:Person {name: \"A\"})-[e:LINK {weight: 1}]->(b:Company {name: \"B\"}) AS p WALK |> RETURN a.id AS from, b.id AS to, e.id AS edge"),
+        Value::Null,
+        json!({}),
+    )
+    .unwrap();
+
+    let mut start = pattern_node("a", None, &["Person"]);
+    start["properties"] = json!({"name":{"literal":"A","type":"Json"}});
+    let mut step = pattern_step("b", &["Company"], None);
+    step["edge"]["properties"] = json!({"weight":{"literal":1,"type":"Json"}});
+    step["node"]["properties"] = json!({"name":{"literal":"B","type":"Json"}});
+    let ir = run(
+        &storage,
+        "pattern-property-p7-ir",
+        None,
+        root_ir(start, vec![step], false, "b"),
+        json!({}),
+    )
+    .unwrap();
+
+    let expected = bag(oracle_property_rows());
+    assert_eq!(
+        expected,
+        BTreeMap::from([(("a".into(), "b".into(), "ab-1".into()), 1)])
+    );
+    assert_eq!(bag(text_rows(hql)), expected);
+    assert_eq!(bag(text_rows(ir)), expected);
 }
 
 #[test]
