@@ -558,6 +558,87 @@ fn annotation_scan_requires_annotation_grant_in_addition_to_namespace_query_gran
 }
 
 #[test]
+fn change_scan_budget_ignores_annotation_revisions_hidden_by_acl() {
+    let dir = TempDir::new().unwrap();
+    let storage = open(dir.path());
+    let target_revision = add_target(&storage, dir.path());
+    let database_id = database_id(&storage);
+    let after_seq = storage.stable_frontier();
+
+    for index in 1..=3 {
+        let mut payload = annotation(&database_id, &target_revision);
+        payload["id"] = json!(format!("review:{index}"));
+        put(&storage, payload, None);
+    }
+    storage
+        .add_node(NodeInput {
+            id: Some("visible:node".into()),
+            labels: vec!["Document".into()],
+            props: None,
+            embedding: None,
+            lang: None,
+            valid_from: Some("2026-09-22T00:00:00Z".into()),
+            caused_by: None,
+            ttl: None,
+            collection: None,
+        })
+        .unwrap();
+
+    storage
+        .replace_access_policy(
+            PolicyAdminActor {
+                access: AccessContext {
+                    principal: "local-owner".into(),
+                    namespace: "default".into(),
+                },
+            },
+            0,
+            AccessPolicy {
+                revision: 1,
+                mode: AccessPolicyMode::Enforced,
+                grants: vec![
+                    AccessGrant {
+                        principal: "reviewer".into(),
+                        action: AccessAction::Read,
+                        resource: AccessResource::Namespace("default".into()),
+                    },
+                    AccessGrant {
+                        principal: "local-owner".into(),
+                        action: AccessAction::ManagePolicy,
+                        resource: AccessResource::Namespace("default".into()),
+                    },
+                ],
+            },
+        )
+        .unwrap();
+
+    let request = serde_json::from_value(json!({
+        "contract_version":"genesis.api.v2",
+        "request_id":"annotation-hidden-budget",
+        "namespace":"default",
+        "ir":{
+            "contract_version":"query-ir.v2",
+            "nodes":[{
+                "id":"changes",
+                "op":"ChangeScan",
+                "inputs":[],
+                "config":{"after_seq":after_seq.to_string(),"as":"c"}
+            }],
+            "root":"changes",
+            "parameter_types":{}
+        },
+        "params":{},
+        "budget":{"max_expanded_nodes":1}
+    }))
+    .unwrap();
+
+    let QueryOutcomeV2::Rows(changes) = storage.query_v2(actor(), request).unwrap() else {
+        panic!("change scan must return rows")
+    };
+    assert_eq!(changes.rows.len(), 1);
+}
+
+#[test]
 fn exact_node_grant_does_not_create_hql2_query_and_denial_precedes_parse() {
     let dir = TempDir::new().unwrap();
     let storage = open(dir.path());

@@ -24111,6 +24111,13 @@ impl<'a> ReadView<'a> {
             .clone()
             .unwrap_or_else(|| Utc::now().to_rfc3339());
         let policy = self.storage.access_policy.read().clone();
+        let annotation_readable = policy.mode != AccessPolicyMode::Enforced
+            || Storage::grant_matches(
+                &policy,
+                access,
+                AccessAction::Read,
+                &AccessResource::Annotation(namespace.to_owned()),
+            );
         let connection = self.storage.projection_db.lock();
         for source in ["graph", "row", "vector", "annotation"] {
             let floor =
@@ -24156,8 +24163,15 @@ impl<'a> ReadView<'a> {
                  FROM hql2_record_revisions
                  WHERE database_id=?1 AND namespace=?2
                    AND kind IN ('node','edge','row','vector','annotation')
-                   AND tx_from>?3 AND tx_from<=?4",
-                rusqlite::params![database_id, namespace, after_sql, frontier_sql],
+                   AND tx_from>?3 AND tx_from<=?4
+                   AND (?5 OR kind<>'annotation')",
+                rusqlite::params![
+                    database_id,
+                    namespace,
+                    after_sql,
+                    frontier_sql,
+                    annotation_readable
+                ],
                 |row| Ok((row.get(0)?, row.get(1)?)),
             )
             .map_err(|_| QueryErrorV2::new("DATA_CORRUPTION", "execute", "change_source"))?;
@@ -24179,12 +24193,19 @@ impl<'a> ReadView<'a> {
                  WHERE database_id=?1 AND namespace=?2
                    AND kind IN ('node','edge','row','vector','annotation')
                    AND tx_from>?3 AND tx_from<=?4
+                   AND (?5 OR kind<>'annotation')
                  ORDER BY tx_from, kind, record_id, revision_id",
             )
             .map_err(|_| QueryErrorV2::new("DATA_CORRUPTION", "execute", "change_source"))?;
         let candidates = statement
             .query_map(
-                rusqlite::params![database_id, namespace, after_sql, frontier_sql],
+                rusqlite::params![
+                    database_id,
+                    namespace,
+                    after_sql,
+                    frontier_sql,
+                    annotation_readable
+                ],
                 |row| {
                     Ok((
                         row.get::<_, String>(0)?,

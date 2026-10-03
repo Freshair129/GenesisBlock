@@ -1,9 +1,9 @@
 ---
 doc_id: SPEC--GENESISDB-P6-GENERATIONS-LEASES-ACL
 owner: GenesisBlockDB Engineering
-version: 0.5.24b
+version: 0.5.25b
 created_at: "2026-09-22T22:55:00+07:00,ATHER,working-tree"
-last_update: "2026-10-03T09:18:47+07:00,ATHER"
+last_update: "2026-10-03T09:50:18+07:00,ATHER"
 status: beta
 attributes:
   domain: storage-correctness
@@ -150,13 +150,13 @@ revisions. Vector HistoryScan uses the H2-D11 compact JSON `(owner_id,
 collection_id)` identity, vector source floor and existing owner-node ACL under
 the same lease; HQL/typed-IR parity and floor-failure tests passed in the
 12-test vector-only checkpoint. The current HistoryScan/ChangeScan target
-passes 14/14, and the 32-target HQL2 regression sweep passes 375/0/1. Broader
+passes 14/14, and the 32-target HQL2 regression sweep passes 376/0/1. Broader
 P6/P8 acceptance, transport parity and independent review remain open. Explicit
 HQL2/IR `tx_as_of` is specified above and its cross-source
 runtime path now selects one frontier S across source scans, operators,
 hydration and result metadata while retaining the pinned P6 generation and
 current ACL. Five focused HQL2 targets pass 56/56, the 32-target HQL2 sweep
-passes 375/0/1 and the earlier separate 11-target P6/schema-v6/compatibility sweep
+passes 376/0/1 and the earlier separate 11-target P6/schema-v6/compatibility sweep
 passes 194/0/0. Broader P6/P8 acceptance, transport parity and independent
 review remain open. Property access uses
 binder-issued `FieldIdV2` and aligned `ExecBatchV2` batches, including
@@ -257,11 +257,15 @@ references are checked recursively; the broad namespace grant still covers
 same-namespace references. A regression verifies Namespace-only denial and
 combined-grant success for AnnotationScan and ChangeScan. It does not claim an
 exact-grant-only HQL query surface. Write authorization remains out of scope.
-Residual security gate: ChangeScan currently reserves memory and expanded-node
-budget from all candidate revisions before subject ACL filtering. Caller-selected
-limits may therefore reveal hidden Annotation-event counts through quota errors;
-this possible side channel is not covered by the passing grant regression and
-remains open pending an approved contract decision and adversarial verification.
+ChangeScan budget policy addendum: namespace-only actors retain access to other
+readable ChangeScan subjects, while Annotation subjects still require explicit
+Annotation(Read). When that grant is absent, Annotation revisions must be
+excluded before candidate counts/bytes are charged to caller-selected budgets or
+materialized. This does not widen authorization to Annotation and does not claim
+timing noninterference. The hidden-revision threshold regression passes with
+ACL 11/11, History/Change 14/14, HQL2 376/0/1 and selected P6/schema-v6 tests
+43/0/0. Hosted validation of this source change, independent review and broader
+P6/P8 acceptance remain open.
 
 P8 AnnotationLookup also runs inside the same ReadView and applies the same
 target/evidence authorization check before returning an annotation reference.
@@ -390,7 +394,7 @@ not approve P7, merge, release, deployment or external readiness.
 Version diff 0.5.23b -> 0.5.24b: enforce the already-approved distinction
 between the HQL2 namespace query grant, explicit Annotation(Read) for annotation
 subjects, and recursive target/evidence access under one P6 lease. The new ACL
-regression passes; the complete HQL2 sweep is 375/0/1 across 32 targets and the
+regression passes; the complete HQL2 sweep is 376/0/1 across 32 targets and the
 selected six-target P6/schema-v6 suite is 43/0/0. No contract, schema or
 migration change. Current hosted CI for the prior PR head remains worker-failing
 and Windows Rust-cancelled; this patch awaits hosted checks and review. Broad
@@ -462,6 +466,7 @@ broader P6/P8/P13 qualification is claimed.
 
 | Version | Date | Status | Summary | Commit | Agent |
 |---|---|---|---|---|---|
+| 0.5.25b | 2026-10-03 | beta | Implement and verify narrow ChangeScan budget rule: preserve namespace-only reads of other readable kinds; exclude Annotation subjects lacking Annotation(Read) before caller-budget accounting; ACL 11/11, History/Change 14/14, HQL2 376/0/1 and selected P6/schema-v6 43/0/0; hosted CI/review and broad P6/P8 remain open | working-tree | ATHER |
 | 0.5.24b | 2026-10-03 | beta | Enforce explicit Annotation(Read) for annotation subjects in scans and ChangeScan while retaining Namespace(Read) for the query and recursive reference checks; ACL regression passes, HQL2 375/0/1, selected P6/schema-v6 suite 43/0/0; possible ChangeScan budget side channel and hosted worker/Windows Rust gates remain unresolved | working-tree | ATHER |
 | 0.5.23b | 2026-10-03 | beta | Record PR #194 run 37083654705: four worker bootstrap checks and Windows Join budget check fail; local Join target passes 5/5, exact budget dimension unconfirmed; HQL2 374/0/1, P6/compatibility 194/0/0, P6 contract unchanged, broad gates open | working-tree | ATHER |
 | 0.5.22b | 2026-10-03 | beta | Synchronize HQL2 row-history parity evidence to 374/0/1 across 32 targets and P6/schema-v6/compatibility to 194/0/0 across 11; hosted worker bootstrap checks fail at fresh schema-v6 initialization; P6 contract unchanged, broader gates open | working-tree | ATHER |
