@@ -1,8 +1,8 @@
 ---
 doc_id: ADR--GENESISDB-HQL2-P8-COMPLETION-ADDENDUM
-version: "0.1.9b"
+version: "0.1.10b"
 created_at: "2026-09-30T06:29:47+07:00,ATHER,working-tree"
-last_update: "2026-10-04T02:11:00+07:00,ATHER"
+last_update: "2026-10-04T06:00:00+07:00,ATHER"
 status: accepted
 superseded_by: null
 owner: "Boss (Founder / Product Authority)"
@@ -36,13 +36,17 @@ string equality on either one-hop endpoint, and ordering by the projected
 source or target endpoint ID (default/ASC and DESC). Authorization and
 namespace checks before parse, malformed syntax classification, fail-closed
 rejection of unlisted forms, and pre-parse resource rejection of a broad
-legacy pattern remain covered. The explicit root-HQL2 sweep passes 385/0/1
+legacy pattern remain covered. The explicit root-HQL2 sweep passes 389/0/1
 across 34 targets; the selected P6/schema-v6/ACL regression group passes
 93/0/0 across 11 targets. The prior 11-target P6/schema-v6/compatibility
 record remains 194/0/0. Broader shared-runtime, P8 and P13 acceptance remains
 open. Focused independent review of this ordering slice
 found no semantic or authorization defect and its positive source-alias test
 coverage gap is now closed; broader D7/P8/P13 review and acceptance remain open.
+The test-only D4 differential also compares an optional Sequence edge-property
+miss with independent P7; all four input rows survive and endpoint/edge aliases
+are NULL-extended. The focused pattern target passes 10/10. This does not change
+the approved D4 contract or close broad P8/P13 acceptance.
 
 The objective is to close the currently documented P8 semantic gaps without
 weakening the P6 namespace query grant or changing the closed Query IR v2 wire
@@ -299,6 +303,7 @@ addendum does not authorize migration of a user database, deployment or release.
 
 | Version | Date | Status | Summary | Commit Hash | Agent |
 |---|---|---|---|---|---|
+| 0.1.10b | 2026-10-04 | accepted | Record test-only D4 optional Sequence edge-property-miss differential against P7; all four input rows survive with endpoint/edge aliases NULL-extended; pattern target 10/10 and HQL2 389/0/1 across 34 targets; no contract/runtime change; broad P8/P13 gates remain open | working-tree | ATHER |
 | 0.1.9b | 2026-10-04 | accepted | Close focused D7 ordering-review coverage gap with a source-alias DESC legacy/HQL2 differential; four positive cases cover target default/ASC/DESC and source DESC; ordering 2/2, adapter 10/10, HQL2 385/0/1 across 34 targets; no runtime/P6 contract/schema/transport change; broad D7/P8/P13 gates remain open | working-tree | ATHER |
 | 0.1.8b | 2026-10-04 | accepted | Extend D7 after legacy/HQL2 differential for one-hop ORDER BY on the projected endpoint ID (default/ASC/DESC); ordering 2/2, adapter 10/10, HQL2 385/0/1 across 34 targets, selected P6/schema-v6/ACL tests 93/0/0 across 11 targets; retain fail-closed sort boundaries and broader P8/P13/review gates | working-tree | ATHER |
 | 0.1.7b | 2026-10-03 | accepted | Extend D7 with differential-proven single plain-ASCII label on zero-hop node-ID scans; record 10/10 adapter tests and 382/0/1 across 33 HQL2 targets, preserving unlabeled one-hop and fail-closed boundaries; broader shared-runtime/P8/P13 and independent-review gates remain open | working-tree | ATHER |
