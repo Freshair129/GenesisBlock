@@ -1,8 +1,8 @@
 ---
 doc_id: REPORT--HQL2-P8-CORE-2026-09-28
-version: "0.1.52b"
+version: "0.1.53b"
 created_at: "2026-09-28T04:35:00+07:00,ATHER,22bc11e"
-last_update: "2026-10-03T19:06:00+07:00,ATHER"
+last_update: "2026-10-03T19:45:00+07:00,ATHER"
 status: beta
 owner: GenesisBlockDB Engineering
 attributes:
@@ -37,8 +37,9 @@ read-only implementation review found no concrete static defect, and the D5
 size-accounting fix passed confirmation review. Broader P8/P13 gates remain
 open; this evidence does not close them.
 The owner-approved D7 bridge now supports actor-scoped, differential-tested
-zero-hop and bounded one-hop HQL1 ID projections through `Storage::query_v2`,
-after P6 `Namespace(Read)` and namespace equality checks. Its 9/9 focused target
+zero-hop HQL1 ID projections (unlabeled or with one plain-ASCII label) and
+bounded unlabeled one-hop projections through `Storage::query_v2`, after P6
+`Namespace(Read)` and namespace equality checks. Its 10/10 focused target
 covers legacy/HQL2 differential, parallel-edge multiplicity, directions and
 wildcard relations, endpoint-ID string equality, authorization/mismatch before
 parse, malformed syntax, fail-closed unlisted forms and pre-parse resource
@@ -142,7 +143,7 @@ explicit test targets; the protected probe target was not selected.
 | Root `MATCH` P7 oracle differential | 1 passed, 0 failed | HQL root `MATCH` matches the independent P7 bag for parallel `LINK` edges and excludes a non-matching relation; test-only fixture. |
 | All-root-HQL2 target sweep after root MATCH differential (historical) | 331 passed, 0 failed, 1 ignored across 24 root targets | Locked/offline/no-default-features/jobs=1; ignored parser child entrypoint is exercised by its parent; superseded by the current 30-target sweep. Regression evidence, not P8 acceptance. |
 | Approved P8 addendum D1-D6 focused target | 10 passed, 0 failed | Registered lexical BM25 profile and independent P7 rank parity; ContextPack scalar offsets, exact source hash and independent oracle parity; Sequence node/edge property exactness and no-partial budget behavior; contextual NULL/list/JSON boundaries; authorization-before-parse fixture. |
-| D7 actor-scoped HQL1 adapter | 9 passed, 0 failed | Differential parity for zero-hop and bounded one-hop ID projections across edge directions, relation/wildcard forms, endpoint projections, one endpoint-ID exact string filter and parallel-edge multiplicity; Namespace(Read)/namespace checks before parse; malformed/unlisted behavior; broad legacy pattern fails resource preflight before AST construction. Existing v1 transports are unchanged. |
+| D7 actor-scoped HQL1 adapter | 10 passed, 0 failed | Differential parity for unlabeled or single-label zero-hop and bounded unlabeled one-hop ID projections across edge directions, relation/wildcard forms, endpoint projections, one endpoint-ID exact string filter and parallel-edge multiplicity; Namespace(Read)/namespace checks before parse; malformed/unlisted behavior; broad legacy pattern fails resource preflight before AST construction. Existing v1 transports are unchanged. |
 | HQL1 parser-resource RCA | Confirmed and corrected | Legacy Pest pairs were materialized before the D7 allowlist without parser-specific heap reservation. The adapter now runs allocation-free parser preflight and reserves the conservative estimate before legacy AST construction; see local RCA `.brain/rca/RCA--HQL1-ADAPTER-PARSER-RESERVATION.md`. No production crash or HQL1 allocator peak is claimed. |
 | Storage-backed HQL/typed-IR scalar P7 differential | 1 passed, 0 failed across 81 four-value nullable bags; 162 Storage executions | Values/Distinct/Sort with NULLS LAST; each frontend independently matches the P7 reference and each other. Test-only scalar evidence, not broad P8 acceptance. |
 | Storage-backed HQL/typed-IR aggregate P7 differential | 1 passed, 0 failed across 121 nullable bags; 242 Storage executions | Covers empty through four-row bags over NULL/-1/2 and count-all/count/sum/avg/min/max/collect; each frontend matches P7 and each other. Test-only aggregate evidence, not broad P8 acceptance. |
@@ -426,7 +427,8 @@ remain unavailable. The interrupted unfiltered command remains NOT_RUN; the
 guarded explicit sweeps are the only current results.
 
 HQL2 now has contextual NULL/list/JSON lowering. The differential-tested D7
-zero-hop and bounded one-hop actor-scoped HQL1 forms are lowered through
+zero-hop actor-scoped HQL1 form (unlabeled or single-label) and bounded
+unlabeled one-hop form are lowered through
 `query_v2`; other legacy HQL forms remain on their old runtime and shared
 HQL1/v2/IR binding is not claimed. Checked HQL remainder,
 NULLS LAST defaults and exact DecimalU64 structural parameters remain as recorded
@@ -444,14 +446,22 @@ from these local tests.
 
 | Artifact | Before | After |
 |---|---|---|
-| Registry | 0.5.62+draft | 0.5.63+draft |
-| P6 generations/leases/ACL | 0.5.28b | 0.5.29b |
-| P8 typed boundary | 0.2.52b | 0.2.53b |
+| Registry | 0.5.63+draft | 0.5.64+draft |
+| P8 completion addendum | 0.1.6b | 0.1.7b |
+| P6 generations/leases/ACL | 0.5.29b | 0.5.30b |
+| P8 typed boundary | 0.2.53b | 0.2.54b |
 | P7 oracle report | 0.1.5b | 0.1.6b |
-| Orchestration plan | 0.8.55b | 0.8.56b |
-| C4 architecture index | 0.1.60b | 0.1.61b |
-| Master specification | 2.3.32b | 2.3.33b |
-| This report | 0.1.51b | 0.1.52b |
+| Orchestration plan | 0.8.56b | 0.8.57b |
+| C4 architecture index | 0.1.61b | 0.1.62b |
+| Master specification | 2.3.33b | 2.3.34b |
+| This report | 0.1.52b | 0.1.53b |
+
+Version diff 0.1.52b -> 0.1.53b: synchronize D7's differential-proven
+single plain-ASCII label on zero-hop HQL1 node-ID scans and record the 10/10
+focused adapter result. HQL2 remains 382/0/1 across 33 targets; the separate
+P6/schema-v6/compatibility group remains 194/0/0. This is a narrow adapter
+extension; other legacy forms, shared-runtime, independent review, broad P8/P13
+and qualification gates remain open.
 
 Version diff 0.1.51b -> 0.1.52b: add the storage-backed HQL/typed-IR
 `Values`/`UnionAll` differential against P7 for 169 nullable bag pairs and 338
@@ -593,6 +603,7 @@ P8 and release gates.
 
 | Version | Date | Status | Summary | Commit Hash | Agent |
 |---|---|---|---|---|---|
+| 0.1.53b | 2026-10-03 | beta | Extend D7 with differential-proven single-label zero-hop HQL1 ID projection; adapter 10/10, HQL2 382/0/1 across 33 targets and P6/compatibility 194/0/0; other legacy forms and broad P8/P13 gates remain open | working-tree | ATHER |
 | 0.1.52b | 2026-10-03 | beta | Add test-only HQL/typed-IR Values/UnionAll differential against P7 for 169 nullable bag pairs and 338 Storage executions; HQL2 382/0/1 across 33 targets, P6/compatibility 194/0/0; no runtime/schema/transport change; broad semantics and P8/P13 gates remain open | working-tree | ATHER |
 | 0.1.51b | 2026-10-03 | beta | Synchronize merged PR #196 hosted status: 10 displayed checks pass, five fail, one skips; worker bootstrap failures across OSes and rebuilt Linux addon; Windows Rust failure at 15m16 has unverified cause; local History/Change 16/16 and HQL2 380/0/1 unchanged; worker approval and broad P8/P13 gates remain open | working-tree | ATHER |
 | 0.1.50b | 2026-10-03 | beta | Extend storage-backed P7 ChangeScan differential to Edge/Row/Vector/Annotation alongside Node; seven event revisions match sequence, operation and identity; History/Change 16/16 and HQL2 380/0/1 across 32 targets; broader semantics and P8/P13 remain open | working-tree | ATHER |

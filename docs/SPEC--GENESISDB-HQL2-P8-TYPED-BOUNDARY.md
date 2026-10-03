@@ -1,8 +1,8 @@
 ---
 doc_id: SPEC--GENESISDB-HQL2-P8-TYPED-BOUNDARY
-version: "0.2.53b"
+version: "0.2.54b"
 created_at: "2026-09-28T01:25:00+07:00,ATHER,fc851e9"
-last_update: "2026-10-03T19:06:00+07:00,ATHER"
+last_update: "2026-10-03T19:45:00+07:00,ATHER"
 status: beta
 superseded_by: null
 owner: "Boss (Founder / Product Authority)"
@@ -78,7 +78,8 @@ are never looked up directly. Exact JSON values are selectively hydrated under
 budget and filtered before SHORTEST; Compact constraints remain unavailable
 and fail closed. The 10/10 P8 completion target and latest 382/0/1 root-HQL2
 sweep across 33 targets cover this slice, including edge-property filtering
-before SHORTEST and the nine-test D7 actor-scoped HQL1 adapter. P6
+before SHORTEST and the 10/10 D7 actor-scoped HQL1 adapter, now including a
+differential-proven single-label zero-hop form. P6
 D1's exact-record-only fixture denies before parsing; it does not assert
 hidden-vs-absent query results. A read-only review found an undercount in
 JSON-literal size measurement; the lowerer now performs an iterative checked
@@ -123,7 +124,8 @@ ContextPack uses registered `unicode-scalar-v1` with same-revision evidence,
 source hash and Unicode-scalar offsets. Contextual NULL/list/JSON literal
 typing is implemented with ambiguous or heterogeneous cases failing closed.
 Their 10/10 focused target and budget-exhaustion cases pass. D7 admits the
-differential-tested zero-hop and bounded one-hop HQL1 ID projections through
+differential-tested zero-hop HQL1 ID projection with either no label or one
+plain-ASCII label, plus bounded unlabeled one-hop projections through
 actor-bearing `Storage::query_v2`, including one exact endpoint-ID string
 equality filter on one-hop patterns; the existing v1 transports and all other
 HQL1 forms remain on their prior path. Legacy parser resources are preflighted
@@ -527,7 +529,7 @@ They never expose unscoped Storage or widen grant semantics.
 
 | Request field | Initial v2 behavior |
 |---|---|
-| language | explicit hql.v2 or query-ir.v2; hql.v1 is accepted only by actor-bearing `Storage::query_v2` after `Namespace(Read)` and namespace-equality checks, and only for D7's differential-tested zero-hop or one-hop unlabeled/unconstrained node-ID projection allowlist (one-hop may include one endpoint `.id` string equality filter) lowered into the shared HQL2 pipeline; parser resource/work-limit failures return QUERY_BUDGET_EXCEEDED before legacy AST construction; other valid legacy forms/options return CAPABILITY_UNSUPPORTED; existing v1 endpoints remain unchanged |
+| language | explicit hql.v2 or query-ir.v2; hql.v1 is accepted only by actor-bearing `Storage::query_v2` after `Namespace(Read)` and namespace-equality checks, and only for D7's differential-tested zero-hop node-ID projection (unlabeled or one plain-ASCII label) or one-hop unlabeled/unconstrained node-ID projection allowlist (one-hop may include one endpoint `.id` string equality filter) lowered into the shared HQL2 pipeline; parser resource/work-limit failures return QUERY_BUDGET_EXCEEDED before legacy AST construction; other valid legacy forms/options return CAPABILITY_UNSUPPORTED; existing v1 endpoints remain unchanged |
 | explain | omitted means None; textual EXPLAIN/ANALYZE supplies the mode if the envelope is omitted; if both are supplied they must agree, otherwise BIND_ERROR; no mode silently upgrades plan-only to execution |
 | namespace/temporal | textual/envelope values must agree; omitted valid_at is one UTC instant captured under the query guard; omitted transaction selector is the pinned data frontier L; explicit `tx_as_of` selects S with `history_horizon <= S <= L`; every HQL/IR source, hydration path and `Snapshot.tx` uses S without current-state fallback |
 | index_policy | omitted means MergeDelta; initial exact scan does not consume an index and reports not_applicable coverage; explicit Wait/Eventual and Approx requests return CAPABILITY_UNSUPPORTED until implemented |
@@ -800,7 +802,8 @@ report. The approved addendum completion target passes 10/10, including lexical
 profile/P7-rank parity, ContextPack source/hash/scalar-offset/P7 parity,
 Sequence node/edge exact JSON properties, pre-SHORTEST filtering, contextual
 literal typing and no-partial budget exhaustion. The D7 HQL1 adapter target
-passes 9/9 for zero-hop and one-hop actor-bound differential execution,
+passes 10/10 for unlabeled or single-label zero-hop and unlabeled one-hop
+actor-bound differential execution,
 parallel-edge multiplicity, all directions and wildcard relations, endpoint-ID
 string equality on either endpoint, denial/mismatch before parse, malformed
 syntax, fail-closed unlisted syntax and pre-parse resource rejection. The
@@ -842,7 +845,8 @@ separate shape limits. No process-global Pest setting is changed.
 - All temporary resources/leases released on error/cancel; quotas reserved
   before allocations; tests show a budget error cannot masquerade as completion.
 - Existing HQL/v1 tests pass unchanged. The D7 actor-scoped bridge supports
-  only its exact differential-tested zero-hop/one-hop allowlist; its parser is
+  only its exact differential-tested zero-hop allowlist (unlabeled or one
+  plain-ASCII label) and unlabeled one-hop allowlist; its parser is
   preflighted and budgeted before AST construction. Unproven legacy lowering
   stays on the compatibility path and the shared-runtime completion obligation
   remains open until every declared legacy form has equivalent evidence.
@@ -850,6 +854,14 @@ separate shape limits. No process-global Pest setting is changed.
   Parser/binder coverage alone does not close the storage-backed runtime gate.
 
 ## Version diff and changelog
+
+Version diff `0.2.53b -> 0.2.54b`: extend the conditional D7 HQL1 adapter
+allowlist with one plain-ASCII label on zero-hop node-ID projections after
+legacy/HQL2 differential; record 10/10 focused tests. The HQL2 regression
+sweep remains 382/0/1 across 33 targets and the separate P6/schema-v6/
+compatibility sweep remains 194/0/0. One-hop labels and all other unproven
+forms remain unsupported; shared-runtime, review and broad P8/P13 gates remain
+open. No P6 grant, schema, transport or migration behavior changed.
 
 Version diff `0.2.52b -> 0.2.53b`: add test-only HQL/typed-IR
 `Values`/`UnionAll` differential evidence against P7 for 169 nullable bag pairs
@@ -969,6 +981,7 @@ detail with unchanged JSON shape; broader P8/P13/review gates remain open.
 
 | From | To | Effect |
 |---|---|---|
+| 0.2.53b | 0.2.54b | Extend the conditional D7 HQL1 zero-hop node-ID allowlist to include a single plain-ASCII label after legacy/HQL2 differential; adapter 10/10; leave labeled one-hop and unproven forms fail-closed, with broad shared-runtime/P8/P13/review gates open |
 | 0.2.43b | 0.2.44b | Freeze end-to-end P8 transaction-time selection: explicit `tx_as_of` selects S across HQL/IR sources, hydration and `Snapshot.tx`; enforce `history_horizon <= S <= L`, retain the current P6 lease/policy generation and prohibit fallback; runtime pending |
 | 0.2.42b | 0.2.43b | Implement HQL/typed-IR Vector HistoryScan using H2-D11 compact JSON tuple identity, P6 vector floor and same-lease owner ACL; record focused 12/12, HQL2 367/0/1 and P6/compatibility 194/0/0; retain tx_as_of and broad P8/P13/review gates |
 | 0.2.41b | 0.2.42b | Specify approved Vector HistoryScan using the H2-D11 compact JSON `(owner_id, collection_id)` logical ID, vector history floor and P6 owner-node ACL; implementation and parity evidence pending |
@@ -1009,6 +1022,7 @@ detail with unchanged JSON shape; broader P8/P13/review gates remain open.
 
 | Version | Date | Status | Summary | Commit Hash | Agent |
 |---|---|---|---|---|---|
+| 0.2.54b | 2026-10-03 | beta | Extend D7 with differential-proven single plain-ASCII label on zero-hop HQL1 node-ID scans; adapter 10/10, HQL2 382/0/1 across 33 targets and separate P6/compatibility 194/0/0; preserve fail-closed remaining forms and broad P8/P13 gates | working-tree | ATHER |
 | 0.2.53b | 2026-10-03 | beta | Add test-only HQL/typed-IR Values/UnionAll P7 differential for 169 nullable bag pairs and 338 Storage executions; HQL2 382/0/1 across 33 targets and P6/compatibility 194/0/0; no contract/runtime/schema/transport change; retain broad semantic and acceptance gates | working-tree | ATHER |
 | 0.2.52b | 2026-10-03 | beta | Record merged PR #196 hosted status: 10 displayed checks pass, five fail, one skips; worker bootstrap fails across OSes and Windows Rust failure at 15m16 has no retrievable detail; local History/Change 16/16 and HQL2 380/0/1 unchanged; worker approval and P8/P13 remain open | working-tree | ATHER |
 | 0.2.51b | 2026-10-03 | beta | Extend test-only P7 ChangeScan differential to Edge/Row/Vector/Annotation for HQL/typed IR; seven events match sequence, operation and subject identity; History/Change 16/16 and HQL2 380/0/1 across 32 targets; broader semantic, hosted/review and P8/P13 gates remain open | working-tree | ATHER |

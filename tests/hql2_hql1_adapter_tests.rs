@@ -177,7 +177,7 @@ fn actor_scoped_hql1_zero_hop_match_matches_legacy_and_hql2() {
 }
 
 #[test]
-fn candidate_zero_hop_label_match_matches_legacy_and_hql2() {
+fn actor_scoped_hql1_zero_hop_label_match_matches_legacy_and_hql2() {
     let dir = TempDir::new().unwrap();
     let storage = open(dir.path());
     for (id, labels) in [
@@ -227,19 +227,25 @@ fn candidate_zero_hop_label_match_matches_legacy_and_hql2() {
         else {
             panic!("expected canonical HQL2 rows")
         };
+
+        let QueryOutcomeV2::Rows(hql1) = storage
+            .query_v2(
+                actor("legacy-reader"),
+                request(&format!("MATCH (p:{label}) RETURN p.id")),
+            )
+            .unwrap()
+        else {
+            panic!("expected actor-scoped HQL1 rows")
+        };
+
         let mut hql2 = projected_ids(&hql2, "id");
+        let mut hql1 = projected_ids(&hql1, "p.id");
         legacy.sort();
         hql2.sort();
+        hql1.sort();
         assert_eq!(hql2, legacy, "canonical differential for {label}");
+        assert_eq!(hql1, legacy, "actor-scoped HQL1 differential for {label}");
     }
-
-    let error = storage
-        .query_v2(
-            actor("legacy-reader"),
-            request("MATCH (p:Person) RETURN p.id"),
-        )
-        .unwrap_err();
-    assert_eq!(error.code, "CAPABILITY_UNSUPPORTED");
 }
 
 #[test]
@@ -548,8 +554,9 @@ fn valid_unlisted_hql1_form_fails_closed() {
 
     for query in [
         "MATCH (a) WHERE a.id = \"a\" RETURN a.id",
-        "MATCH (a:Person) RETURN a.id",
         "MATCH (a)-[r:LINK]->(b) RETURN b.id",
+        "MATCH (a:Person)-[:LINK]->(b) RETURN b.id",
+        "MATCH (a)-[:LINK]->(b:Person) RETURN b.id",
         "MATCH (a)-[:LINK]->(b)-[:LINK]->(c) RETURN c.id",
         "MATCH (a)-[:LINK]->(b) RETURN b.label",
         "MATCH (a)-[:LINK]->(b) RETURN a.id, b.id",
