@@ -1,8 +1,8 @@
 ---
 doc_id: REPORT--HQL2-P7-ORACLE-2026-09-28
-version: "0.1.1b"
+version: "0.1.2b"
 created_at: "2026-09-28T01:38:00+07:00,ATHER,fc851e9"
-last_update: "2026-09-28T02:00:00+07:00,ATHER"
+last_update: "2026-10-03T12:40:49+07:00,ATHER"
 status: beta
 owner: "GenesisBlockDB Engineering"
 attributes:
@@ -21,7 +21,9 @@ attributes:
   with “ลุย”. No production source, disk schema, migration or transport changes
   have been made by this P7 implementation.
 - The protected primary-checkout probe was not read, changed, staged or run.
-  Primary user WIP was not copied into this worktree. No merge/push/deploy.
+  Primary user WIP was not copied into this worktree. The original P7
+  test-support checkpoint did not push, merge or deploy; this continuation's
+  branch/PR state is recorded in the current P8 checkpoint.
 - Late read-only status check found the locally stored `origin/main` ref had
   advanced to `8091a56f2592b8cb28bbae12421cacc9352c2cab`; primary main remains
   `fc851e9`, now ahead 1 / behind 79, with common ancestor `4010702`.
@@ -36,7 +38,7 @@ attributes:
 | Test target | Responsibility |
 |---|---|
 | `hql2_oracle_tests` | Independent scalar/relational interpreter: NULL, bag multiplicity, joins, aggregate, explicit sort/null placement, exact vector distances, typed equality, bounded literals |
-| `hql2_graph_oracle_tests` | Namespace/kind/revision identities, current policy, retained temporal versions, annotation targets, path modes, optional/shortest patterns, selector/source hash validation |
+| `hql2_graph_oracle_tests` | Namespace/kind/revision identities, current policy, retained temporal versions, H2-D11 Vector HistoryScan identity/owner ACL, annotation targets, path modes, optional/shortest patterns, selector/source hash validation |
 | `hql2_rank_oracle_tests` | Original-vector fidelity, explicit fingerprints, BM25 fixture corpus, candidate-only lineage, source ranks/RRF, registered fixture tokenizer and evidence packing |
 | `hql2_pipeline_oracle_tests` | Composes all 23 logical families through the independent domain kernels, retaining bag rows, typed references, scope and score provenance |
 
@@ -95,6 +97,9 @@ Measured RED cases and corrective evidence are retained under `.brain/rca/`:
 - Annotation selectors are Whole/TextPosition; history/change/corrections use
   explicit immutable fixture revisions/events. These do not create durable
   annotation or transactional storage capability.
+- Vector HistoryScan uses the H2-D11 compact JSON `(owner_id, collection_id)`
+  subject identity and authorizes through its owner Node. The P7 catalog models
+  only this approved HistoryScan capability; it rejects live Vector Scan.
 - The algebra is a typed test representation, not the public JSON wire decoder.
   Scalar support is the declared Bool/I64/F64/UTF-8/vector/list/domain fixture
   profile, not every Blueprint decimal/date/UUID/map/function combination.
@@ -139,29 +144,42 @@ profile on this base. This does not promote unsupported profile cases or any
 production HQL2/Blueprint obligation. Full Rust/Node/mobile/performance/hosted
 qualification was not run for this test-support-only slice.
 
-Documentation validation reports `0 violations in 233 files`. Scoped rustfmt
-checks of all eight new Rust files and `git diff --check` pass.
+The approved vector-history differential is derived from retained WAL vector
+revision mutations and the captured transaction frontier, then compares both
+Storage-backed HQL and typed IR history bags with P7's independently assembled
+reference catalog. The graph-oracle target now passes 39 tests; combined P7
+graph/relational/rank/pipeline targets pass 130/130. The storage-backed
+HistoryScan/ChangeScan target passes 14/14, the prescribed 32-target HQL2
+regression passes 377/0/1, and the separate 11-target P6/schema-v6/
+compatibility group passes 194/0/0. These remain local test evidence; hosted
+checks and review are outstanding.
+
+At the original P7 checkpoint, documentation validation reported `0
+violations in 233 files`; scoped rustfmt checks of the eight then-new Rust
+files and `git diff --check` passed. Current continuation checks are recorded
+in the updated P8 checkpoint.
 
 ## Remaining work and authority
 
-[P8 concrete boundary](SPEC--GENESISDB-HQL2-P8-TYPED-BOUNDARY.md) is candidate,
-not implemented. It proposes nonpublishing catalog authorization for EXPLAIN,
-separate Rust plan-only results and typed enumeration beneath ReadView. These
-are new concrete P6/public-core contracts requiring review/owner approval
-under the repository doc-first rule; the accepted ADR alone does not define
-their exact fields or grant an unrestricted Storage view.
-The revised candidate `0.1.1b` received independent architecture-review PASS
-for presentation to the owner. This is not implementation approval or P8/R1
-acceptance. No P8 production code was written before that decision.
+[P8 concrete boundary](SPEC--GENESISDB-HQL2-P8-TYPED-BOUNDARY.md) and its
+completion addendum have since been owner-approved and partially implemented.
+This report adds only the bounded P7 vector-HistoryScan reference profile and
+storage-backed differential evidence; it does not expand production capability
+or imply complete P8/R1 acceptance.
 
-Full HQL2 completion remains open: production parser/binder/runtime, legacy
-differential lowering, storage-backed source prerequisites, public surface
-parity, runtime budgets, index lifecycle and P16 qualification. The existing
+Full HQL2 completion remains open: the full accepted operator/source matrix,
+broad exact-oracle and legacy differential coverage, P13/public-surface parity,
+runtime budgets, index lifecycle and P16 qualification. The existing
 190-obligation ledger is not promoted by test-only fixtures. Hosted CI,
 publication, device validation, soak/crash qualification and deployments have
 not been run or claimed.
 
 ## Version diff
+
+Version diff `0.1.1b -> 0.1.2b`: extend the test-only P7 graph reference with
+the approved H2-D11 Vector HistoryScan compact identity and owner-Node ACL;
+record WAL-derived HQL/typed-IR differential evidence and current local sweep
+counts while preserving hosted CI, review and broad P8/P13 gates.
 
 | Document | Before | After |
 |---|---|---|

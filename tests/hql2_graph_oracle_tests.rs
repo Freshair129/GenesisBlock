@@ -47,6 +47,7 @@ fn catalog(revisions: Vec<Revision>) -> Catalog {
             Kind::Node,
             Kind::Edge,
             Kind::Row,
+            Kind::Vector,
             Kind::Annotation,
             Kind::Artifact,
             Kind::Event,
@@ -1924,4 +1925,66 @@ fn exhaustive_tiny_graphs_match_separate_cartesian_baseline() {
             }
         }
     }
+}
+
+#[test]
+fn vector_history_uses_h2_d11_identity_and_owner_read_permission() {
+    let owner = entity(Kind::Node, "owner:one", "owner-r1").identity();
+    let vector_id = r#"["owner:one","default"]"#;
+    let mut first = record(Kind::Vector, vector_id);
+    first.entity.revision = "vector-r1".into();
+    first.transaction = Interval {
+        start: 2,
+        end: Some(4),
+    };
+    first.data = RecordData::Vector {
+        owner: owner.clone(),
+    };
+    let mut second = record(Kind::Vector, vector_id);
+    second.entity.revision = "vector-r2".into();
+    second.transaction.start = 4;
+    second.data = RecordData::Vector {
+        owner: owner.clone(),
+    };
+
+    let c = catalog(vec![record(Kind::Node, "owner:one"), first, second]);
+    let mut v = view(&c);
+    let p = Plan {
+        source: Source::HistoryScan {
+            kind: Kind::Vector,
+            alias: "h".into(),
+            predicate: Predicate {
+                id: Some(vector_id.into()),
+                ..Predicate::default()
+            },
+            transactions: Interval {
+                start: 1,
+                end: Some(10),
+            },
+            valid: Interval {
+                start: 5,
+                end: Some(6),
+            },
+        },
+        stages: vec![],
+    };
+    assert_eq!(
+        execute(&c, &v, &p, Limits::default()).unwrap().rows,
+        vec![
+            row(&[(
+                "h",
+                Binding::Entity(entity(Kind::Vector, vector_id, "vector-r1")),
+            )]),
+            row(&[(
+                "h",
+                Binding::Entity(entity(Kind::Vector, vector_id, "vector-r2")),
+            )]),
+        ]
+    );
+
+    v.permissions.read.remove(&owner);
+    assert!(execute(&c, &v, &p, Limits::default())
+        .unwrap()
+        .rows
+        .is_empty());
 }

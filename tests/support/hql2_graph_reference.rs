@@ -24,6 +24,7 @@ pub enum Kind {
     Node,
     Edge,
     Row,
+    Vector,
     Annotation,
     Artifact,
     Event,
@@ -123,6 +124,10 @@ pub enum RecordData {
     Text(TextSource),
     Annotation {
         targets: Vec<Target>,
+    },
+    /// A durable vector record; its owner identity supplies the P6 read ACL.
+    Vector {
+        owner: Identity,
     },
     /// An explicit fixture event; transaction.start is its local commit sequence.
     Change {
@@ -449,6 +454,9 @@ impl<'a> Runtime<'a> {
         let mut schema = Schema::new();
         match &plan.source {
             Source::Scan { kind, alias, .. } => {
+                if *kind == Kind::Vector {
+                    return Err(Error::InvalidSource);
+                }
                 self.require(*kind)?;
                 add_alias(&mut schema, alias, BindingType::Entity(*kind), false)?;
             }
@@ -620,6 +628,17 @@ impl<'a> Runtime<'a> {
                         }
                     }
                 }
+                RecordData::Vector { owner } => {
+                    if r.entity.kind != Kind::Vector || owner.kind != Kind::Node {
+                        return Err(Error::InvalidCatalog);
+                    }
+                    if owner.namespace != r.entity.namespace {
+                        return Err(Error::NamespaceMismatch);
+                    }
+                    if owner.id.is_empty() {
+                        return Err(Error::InvalidCatalog);
+                    }
+                }
                 RecordData::Change { subject, .. } => {
                     if r.entity.kind != Kind::Event {
                         return Err(Error::InvalidCatalog);
@@ -632,7 +651,10 @@ impl<'a> Runtime<'a> {
                         return Err(Error::InvalidCatalog);
                     }
                 }
-                _ if r.entity.kind == Kind::Edge || r.entity.kind == Kind::Annotation => {
+                _ if r.entity.kind == Kind::Edge
+                    || r.entity.kind == Kind::Vector
+                    || r.entity.kind == Kind::Annotation =>
+                {
                     return Err(Error::InvalidCatalog)
                 }
                 _ => {}
@@ -711,7 +733,11 @@ impl<'a> Runtime<'a> {
         visiting: &mut BTreeSet<EntityRef>,
     ) -> Result<bool, Error> {
         self.tick()?;
-        if !self.permitted(&r.entity.identity()) || r.transaction.start > self.view.transaction {
+        let subject_permitted = match &r.data {
+            RecordData::Vector { owner } => self.permitted(owner),
+            _ => self.permitted(&r.entity.identity()),
+        };
+        if !subject_permitted || r.transaction.start > self.view.transaction {
             return Ok(false);
         }
         // Fail closed on a circular proof of readability, but let the caller try

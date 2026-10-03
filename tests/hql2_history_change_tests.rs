@@ -3,9 +3,15 @@ use genesis_block_native::{
     uee_v2::QueryRequestV2,
     AccessContext, NodeInput, OpenOptions, Storage,
 };
+#[allow(dead_code)]
+#[path = "support/hql2_graph_reference.rs"]
+mod p7_graph;
 use rusqlite::Connection;
 use serde_json::{json, Value};
-use std::path::Path;
+use std::{
+    collections::{BTreeMap, BTreeSet},
+    path::Path,
+};
 use tempfile::TempDir;
 
 fn open(path: &Path) -> Storage {
@@ -158,6 +164,20 @@ fn tagged(
     field: &str,
 ) -> Value {
     serde_json::to_value(&row[field]).unwrap()
+}
+
+fn vector_revision_mutations(storage: &Storage) -> Vec<Value> {
+    storage
+        .events_since_seq(0)
+        .into_iter()
+        .filter_map(|signed| serde_json::to_value(signed.event).ok())
+        .filter_map(|event| event.get("Transaction").cloned())
+        .filter_map(|transaction| transaction.get("record_revision_transaction").cloned())
+        .filter_map(|revisions| revisions.get("mutations").cloned())
+        .filter_map(|mutations| mutations.as_array().cloned())
+        .flatten()
+        .filter(|mutation| mutation.get("kind").and_then(Value::as_str) == Some("vector"))
+        .collect()
 }
 
 #[test]
@@ -357,18 +377,26 @@ fn transaction_time_uses_one_selected_frontier_for_sources_hydration_and_snapsho
 }
 
 #[test]
-fn history_scan_reads_vector_revisions_with_hql_and_typed_ir_parity() {
+fn history_scan_reads_vector_revisions_with_hql_ir_and_p7_parity() {
     let dir = TempDir::new().unwrap();
     let storage = open(dir.path());
     add_node(&storage);
     storage
         .add_vector("history:one".into(), "default".into(), vec![0.5, 0.75])
         .unwrap();
+    let first_tx = storage.stable_frontier();
+    storage
+        .add_vector("history:one".into(), "default".into(), vec![0.25, 0.5])
+        .unwrap();
+    let second_tx = storage.stable_frontier();
+    assert!(first_tx < second_tx);
 
     let vector_id = serde_json::to_string(&("history:one", "default")).unwrap();
     let hql_id = serde_json::to_string(&vector_id).unwrap();
+    let selected_tx = second_tx;
+    let selected_tx_text = selected_tx.to_string();
     let hql = format!(
-        "USE default AT VALID \"2020-01-01T00:00:00Z\" HISTORY VECTOR {hql_id} AS h |> RETURN h"
+        "USE default AT TX {selected_tx} AT VALID \"2020-01-01T00:00:00Z\" HISTORY VECTOR {hql_id} AS h |> RETURN h"
     );
     let hql_result = run_hql(&storage, "history-vector-hql", &hql)
         .expect("HQL HistoryScan should support durable vector identities");
@@ -378,21 +406,170 @@ fn history_scan_reads_vector_revisions_with_hql_and_typed_ir_parity() {
         "2020-01-01T00:00:00Z",
         "vector",
         &vector_id,
-        None,
+        Some(&selected_tx_text),
     )
     .expect("typed-IR HistoryScan should support durable vector identities");
 
     assert_eq!(hql_result.columns, ir_result.columns);
     assert_eq!(hql_result.rows, ir_result.rows);
-    assert_eq!(hql_result.rows.len(), 1);
-    assert_eq!(
-        tagged(&hql_result.rows[0], "h")["value"]["subject"]["kind"],
-        "vector"
-    );
-    assert_eq!(
-        tagged(&hql_result.rows[0], "h")["value"]["subject"]["id"],
-        vector_id
-    );
+    assert_eq!(hql_result.snapshot.tx, selected_tx_text);
+    assert_eq!(hql_result.rows.len(), 2);
+
+    let mutations = vector_revision_mutations(&storage);
+    assert_eq!(mutations.len(), 2);
+    assert!(mutations.iter().all(|mutation| mutation["id"] == vector_id));
+    let owner = p7_graph::Identity {
+        namespace: "default".into(),
+        kind: p7_graph::Kind::Node,
+        id: "history:one".into(),
+    };
+    let mut p7_revisions = vec![p7_graph::Revision {
+        entity: p7_graph::EntityRef {
+            namespace: "default".into(),
+            kind: p7_graph::Kind::Node,
+            id: "history:one".into(),
+            revision: "fixture-owner".into(),
+        },
+        transaction: p7_graph::Interval {
+            start: 0,
+            end: None,
+        },
+        valid: p7_graph::Interval {
+            start: i64::MIN,
+            end: None,
+        },
+        retracted: false,
+        fields: p7_graph::Fields::new(),
+        data: p7_graph::RecordData::Plain,
+    }];
+    for (index, mutation) in mutations.iter().enumerate() {
+        let valid_from =
+            chrono::DateTime::parse_from_rfc3339(mutation["valid_from"].as_str().unwrap())
+                .unwrap()
+                .timestamp_micros();
+        let valid_to = mutation["valid_to"].as_str().map(|value| {
+            chrono::DateTime::parse_from_rfc3339(value)
+                .unwrap()
+                .timestamp_micros()
+        });
+        let tx_from = [first_tx, second_tx][index];
+        p7_revisions.push(p7_graph::Revision {
+            entity: p7_graph::EntityRef {
+                namespace: mutation["namespace"].as_str().unwrap().into(),
+                kind: p7_graph::Kind::Vector,
+                id: mutation["id"].as_str().unwrap().into(),
+                revision: mutation["revision_id"].as_str().unwrap().into(),
+            },
+            transaction: p7_graph::Interval {
+                start: tx_from,
+                end: [Some(second_tx), None][index],
+            },
+            valid: p7_graph::Interval {
+                start: valid_from,
+                end: valid_to,
+            },
+            retracted: false,
+            fields: p7_graph::Fields::new(),
+            data: p7_graph::RecordData::Vector {
+                owner: owner.clone(),
+            },
+        });
+    }
+    let p7_catalog = p7_graph::Catalog {
+        frontier: selected_tx,
+        history: BTreeMap::from([(
+            p7_graph::Kind::Vector,
+            p7_graph::HistoryCapability {
+                horizon: 0,
+                available: true,
+            },
+        )]),
+        revisions: p7_revisions,
+    };
+    let valid_at = chrono::DateTime::parse_from_rfc3339("2020-01-01T00:00:00Z")
+        .unwrap()
+        .timestamp_micros();
+    let p7_view = p7_graph::View {
+        namespace: "default".into(),
+        transaction: selected_tx,
+        valid_at,
+        permissions: p7_graph::Permissions {
+            read: BTreeSet::from([owner]),
+            annotation_body: BTreeSet::new(),
+        },
+    };
+    let p7_plan = p7_graph::Plan {
+        source: p7_graph::Source::HistoryScan {
+            kind: p7_graph::Kind::Vector,
+            alias: "h".into(),
+            predicate: p7_graph::Predicate {
+                id: Some(vector_id.clone()),
+                ..p7_graph::Predicate::default()
+            },
+            transactions: p7_graph::Interval {
+                start: 0,
+                end: selected_tx.checked_add(1),
+            },
+            valid: p7_graph::Interval {
+                start: valid_at,
+                end: valid_at.checked_add(1),
+            },
+        },
+        stages: vec![],
+    };
+    let p7_result =
+        p7_graph::execute(&p7_catalog, &p7_view, &p7_plan, p7_graph::Limits::default()).unwrap();
+    assert_eq!(hql_result.rows.len(), p7_result.rows.len());
+    let database_id = tagged(&hql_result.rows[0], "h")["value"]["subject"]["database_id"]
+        .as_str()
+        .unwrap()
+        .to_owned();
+    assert!(!database_id.is_empty());
+    for (actual, expected) in hql_result.rows.iter().zip(&p7_result.rows) {
+        let p7_graph::Binding::Entity(entity) = &expected["h"] else {
+            panic!("P7 HistoryScan binds vector revision identities")
+        };
+        let revision = p7_catalog
+            .revisions
+            .iter()
+            .find(|revision| &revision.entity == entity)
+            .unwrap();
+        let history = tagged(actual, "h")["value"].clone();
+        let subject = &history["subject"];
+        assert_eq!(subject["database_id"].as_str(), Some(database_id.as_str()));
+        assert_eq!(
+            subject["namespace"].as_str(),
+            Some(entity.namespace.as_str())
+        );
+        assert_eq!(subject["kind"].as_str(), Some("vector"));
+        assert_eq!(subject["id"].as_str(), Some(entity.id.as_str()));
+        assert_eq!(subject["revision"].as_str(), Some(entity.revision.as_str()));
+        assert_eq!(history["operation"].as_str(), Some("upsert"));
+        assert_eq!(
+            history["tx_from"].as_str().unwrap().parse::<u64>().unwrap(),
+            revision.transaction.start
+        );
+        assert_eq!(
+            history["tx_to"]
+                .as_str()
+                .map(|value| value.parse::<u64>().unwrap()),
+            revision.transaction.end
+        );
+        assert_eq!(
+            chrono::DateTime::parse_from_rfc3339(history["valid_from"].as_str().unwrap())
+                .unwrap()
+                .timestamp_micros(),
+            revision.valid.start
+        );
+        assert_eq!(
+            history["valid_to"]
+                .as_str()
+                .map(|value| chrono::DateTime::parse_from_rfc3339(value)
+                    .unwrap()
+                    .timestamp_micros()),
+            revision.valid.end
+        );
+    }
 }
 
 #[test]
