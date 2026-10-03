@@ -144,6 +144,13 @@ fn actor_scoped_hql1_one_hop_order_by_matches_legacy_and_hql2() {
             "id",
             vec!["target:z", "target:m", "target:b", "target:b"],
         ),
+        (
+            "MATCH (a)-[:LINK]->(b) ORDER BY a.id DESC RETURN a.id",
+            "USE default MATCH (__hql1_source)-[:LINK]->(__hql1_target) AS __hql1_path WALK |> ORDER BY __hql1_source.id DESC |> RETURN __hql1_source.id AS id",
+            "a.id",
+            "id",
+            vec!["source:z", "source:z", "source:a", "source:a"],
+        ),
     ];
 
     let expected = cases

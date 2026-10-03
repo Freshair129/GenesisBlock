@@ -2,7 +2,7 @@
 title: "GenesisBlockDB Document Registry"
 doc_id: "DOC-REGISTRY-GENESISBLOCKDB"
 status: draft
-version: "0.5.66+draft"
+version: "0.5.67+draft"
 updated: "2026-10-04"
 owner: "GenesisBlockDB Architecture"
 source_of_truth: true
@@ -54,10 +54,10 @@ registry row explicitly names them.
 | Architecture composition | `MASTER-SPEC-GENESISBLOCKDB` | `2.3.35b` | current | GenesisBlockDB Architecture | `docs/MASTER-SPEC--GENESIS-DB.md` |
 | Architecture index | `C4--GENESISDB-ARCHITECTURE` | `0.1.63b` | current | GenesisBlockDB Architecture | `docs/C4--GENESISDB-ARCHITECTURE.md` |
 | HQL2 execution decision | `ADR--GENESISDB-HQL2-EXECUTION-BOUNDARY` | `0.1.1b` | accepted | Boss (Founder / Product Authority) | `docs/adr/ADR--GENESISDB-HQL2-EXECUTION-BOUNDARY.md` |
-| HQL2 P8 completion addendum | `ADR--GENESISDB-HQL2-P8-COMPLETION-ADDENDUM` | `0.1.8b` | accepted | Boss (Founder / Product Authority) | `docs/adr/ADR--GENESISDB-HQL2-P8-COMPLETION-ADDENDUM.md` |
+| HQL2 P8 completion addendum | `ADR--GENESISDB-HQL2-P8-COMPLETION-ADDENDUM` | `0.1.9b` | accepted | Boss (Founder / Product Authority) | `docs/adr/ADR--GENESISDB-HQL2-P8-COMPLETION-ADDENDUM.md` |
 | HQL2 Sequence pattern constraints | `ADR--GENESISDB-HQL2-PATTERN-CONSTRAINTS` | `0.2.1b` | beta | Boss (Founder / Product Authority) | `docs/adr/ADR--GENESISDB-HQL2-PATTERN-CONSTRAINTS.md` |
 | HQL2 durable revisions and annotations | `ADR--GENESISDB-HQL2-DURABLE-REVISIONS-ANNOTATIONS` | `0.8.17b` | beta | Boss (Founder / Product Authority) | `docs/adr/ADR--GENESISDB-HQL2-DURABLE-REVISIONS-ANNOTATIONS.md` |
-| UEE-HQL2 orchestration plan | `IMPLEMENTATION-PLAN--UEE-HQL2-ORCHESTRATION-2026-09-22` | `0.8.59b` | beta | Boss (Founder / Product Authority) | `docs/IMPLEMENTATION-PLAN--UEE-HQL2-ORCHESTRATION-2026-09-22.md` |
+| UEE-HQL2 orchestration plan | `IMPLEMENTATION-PLAN--UEE-HQL2-ORCHESTRATION-2026-09-22` | `0.8.60b` | beta | Boss (Founder / Product Authority) | `docs/IMPLEMENTATION-PLAN--UEE-HQL2-ORCHESTRATION-2026-09-22.md` |
 | HQL2 typed P8 boundary | `SPEC--GENESISDB-HQL2-P8-TYPED-BOUNDARY` | `0.2.55b` | beta | Boss (Founder / Product Authority) | `docs/SPEC--GENESISDB-HQL2-P8-TYPED-BOUNDARY.md` |
 | HQL2 P8 core checkpoint | `REPORT--HQL2-P8-CORE-2026-09-28` | `0.1.54b` | beta | GenesisBlockDB Engineering | `docs/REPORT--HQL2-P8-CORE-2026-09-28.md` |
 | HQL2 P7 bounded oracle evidence | `REPORT--HQL2-P7-ORACLE-2026-09-28` | `0.1.7b` | beta | GenesisBlockDB Engineering | `docs/REPORT--HQL2-P7-ORACLE-2026-09-28.md` |
@@ -117,6 +117,13 @@ The following documents should be created only when implementation work requires
 - third-client namespace conformance report.
 
 ## 9. Changelog
+
+Version diff 0.5.66+draft -> 0.5.67+draft: synchronize the focused D7 ordering-
+review coverage closure across the accepted P8 addendum and plan; add source-
+alias (`a.id`) DESC differential, bringing positive cases to target
+default/ASC/DESC and source DESC. Ordering 2/2, adapter 10/10, HQL2 385/0/1
+across 34 targets. Focused review found no semantic/authorization defect; no
+runtime/P6 contract/schema/transport change; broader D7/P8/P13 gates remain open.
 
 Version diff 0.5.65+draft -> 0.5.66+draft: synchronize the accepted D7
 one-hop projected-endpoint `ORDER BY` extension across P8/P6/plan; record
@@ -306,6 +313,7 @@ review and full P8 gates remain open.
 
 | Version | Date | Owner | Summary |
 |---|---|---|---|
+| 0.5.67+draft | 2026-10-04 | GenesisBlockDB Architecture | Synchronize focused D7 ordering-review coverage closure across P8/plan; add source-alias DESC differential, four positive ordering cases, ordering 2/2, adapter 10/10, HQL2 385/0/1 across 34 targets; no runtime/P6 contract/schema/transport change; broader D7/P8/P13 gates remain open |
 | 0.5.66+draft | 2026-10-04 | GenesisBlockDB Architecture | Synchronize accepted D7 one-hop projected-endpoint ORDER BY across P8/P6/plan; ordering 2/2, adapter 10/10, HQL2 385/0/1 across 34 targets and selected P6/schema-v6/ACL tests 93/0/0 across 11; no P6 grant/ACL/lease/schema/migration or transport change; broad P8/P13/review remain open |
 | 0.5.65+draft | 2026-10-03 | GenesisBlockDB Architecture | Synchronize P7/P8/plan/C4/master records for test-only HQL/typed-IR scalar-pipeline P7 differential (six fixtures, 12 Storage executions, 2/2 focused, HQL2 383/0/1 across 33 targets); no runtime/contract/schema/transport change; broad gates remain open |
 | 0.5.64+draft | 2026-10-03 | GenesisBlockDB Architecture | Synchronize D7's differential-proven single-label zero-hop HQL1 extension across P8/P6/plan/C4/master; adapter 10/10, HQL2 382/0/1 across 33 targets and P6/compatibility 194/0/0; no P6 contract/schema/transport change; broad gates remain open |

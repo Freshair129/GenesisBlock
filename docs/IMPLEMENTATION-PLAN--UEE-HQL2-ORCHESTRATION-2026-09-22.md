@@ -1,9 +1,9 @@
 ---
-version: "0.8.59b"
+version: "0.8.60b"
 doc_id: "IMPLEMENTATION-PLAN--UEE-HQL2-ORCHESTRATION-2026-09-22"
 owner: "Boss (Founder / Product Authority)"
 created_at: "2026-09-22T00:00:00+07:00,ATHER,working-tree"
-last_update: "2026-10-04T01:22:00+07:00,ATHER"
+last_update: "2026-10-04T02:11:00+07:00,ATHER"
 status: beta
 superseded_by: null
 attributes:
@@ -236,13 +236,16 @@ The subsequently approved D7 addendum now has local implementation evidence for
 actor-scoped zero-hop HQL1 ID projections (unlabeled or with one plain-ASCII
 label) and bounded unlabeled one-hop projections through `Storage::query_v2`,
 including one endpoint-ID string equality filter and one-hop ordering by the
-projected endpoint ID (default/ASC/DESC): 10/10 adapter tests and 2/2 ordering
-tests, 385/0/1 across 34 root HQL2 targets, and 194/0/0 across 11 separate
-P6/schema-v6/compatibility targets. For this change, the selected 11-target
+projected source or target endpoint ID (default/ASC/DESC): 10/10 adapter tests
+and 2/2 ordering tests, with positive differentials for target default/ASC/DESC
+and source DESC; 385/0/1 across 34 root HQL2 targets, and 194/0/0 across 11
+separate P6/schema-v6/compatibility targets. For this change, the selected 11-target
 P6/schema-v6/ACL group passes 93/0/0. The adapter
 preflights and reserves parser resources before legacy AST construction; other
-HQL1 forms and legacy transports remain unchanged. Independent D7 review and
-full shared-runtime/P8/P13 qualification remain open.
+HQL1 forms and legacy transports remain unchanged. Focused independent review of
+the ordering slice found no semantic/authorization defect and its source-alias
+test coverage gap is closed; broader D7 review and full shared-runtime/P8/P13
+qualification remain open.
 
 The approved HistoryScan slice is implemented and locally verified for all
 five supported kinds: Node, Edge, Row, Vector and Annotation. HQL/typed-IR
@@ -847,7 +850,7 @@ Remaining HQL2/P8 acceptance gates stay open.
 | WAL revision event and projections | Partial | Local graph, standalone relational batch, unified transaction, vector writes, annotation CAS writes and supported consensus graph proposals carry revision envelopes; consensus signs the final envelope and stale predecessors fail before append. Graph/row/vector replay and annotation compact/reopen are covered. Folded graph and relational materializations are not yet revision-bound peer-ingress checkpoints and remain fail-closed. |
 | Annotation persistence and ACL | Partial | Annotation payloads and separate target/evidence roles are normalized; frozen refs/cycles are preflighted before WAL; policy event v2 stores `Annotation(namespace)` through compact/reopen. AnnotationScan, hydration and Annotation ChangeScan subjects require explicit Annotation(Read), separately from the Namespace(Read) query grant; unauthorized Annotation revisions are excluded from ChangeScan count/byte budget and row materialization before query-budget charging. Same-namespace refs are checked recursively at the P6 snapshot. Namespace-only denial, combined-grant scan/change, and hidden-revision threshold tests pass. Exact-grant-only query authorization remains unsupported. |
 | HQL2 storage-backed source adapters and text operators | Partial | Node/Edge/Row/Annotation scans return revision-bound refs with bounded pagination and current ACL under the P6 lease; `FieldIdV2`/`ExecBatchV2` provides aligned selective hydration. LexicalMatch and ContextPack now execute with registered `unicode-whitespace-bm25-v1` and `unicode-scalar-v1` profiles under that source boundary. Transport parity, broad exact-oracle coverage and full P8/P13 qualification remain open. |
-| HQL1 actor-scoped adapter | Partial | `Storage::query_v2` supports only differential-tested zero-hop node-ID projections (unlabeled or with one plain-ASCII label) and bounded unlabeled one-hop projections after P6 authorization; one hop may include one endpoint-ID exact string equality filter and `ORDER BY` only on the same projected endpoint ID (default/ASC/DESC). Zero-hop and unprojected ordering remain unsupported. The legacy parser is preflighted and budgeted before AST construction. Focused adapter and ordering targets pass 10/10 and 2/2; the latest HQL2 regression sweep passes 385/0/1 across 34 targets. Other HQL1 commands/forms, independent review and full shared-runtime/P8/P13 acceptance remain open. |
+| HQL1 actor-scoped adapter | Partial | `Storage::query_v2` supports only differential-tested zero-hop node-ID projections (unlabeled or with one plain-ASCII label) and bounded unlabeled one-hop projections after P6 authorization; one hop may include one endpoint-ID exact string equality filter and `ORDER BY` only on the same projected source or target endpoint ID (default/ASC/DESC). Zero-hop and unprojected ordering remain unsupported. The legacy parser is preflighted and budgeted before AST construction. Focused adapter and ordering targets pass 10/10 and 2/2; four positive ordering differentials cover target default/ASC/DESC and source DESC; the latest HQL2 regression sweep passes 385/0/1 across 34 targets. Other HQL1 commands/forms, broader independent review and full shared-runtime/P8/P13 acceptance remain open. |
 | HQL2 structural root Match | Partial | Compact/Sequence graph patterns execute through HQL and typed IR under one P6 graph snapshot; deterministic shortest-per-endpoint results, stable tie order, P6 budget errors and HQL/IR parity are tested. Typed-IR anchors compare full validated RecordRefs with no direct lookup and filter before shortest deduplication. Node/edge properties filter before SHORTEST; the 10-test P8 completion target passes. |
 | HQL2 Sequence node ID, labels and properties | Implemented; local verification passed | Exact UTF-8 IDs, conjunctive labels and node/edge exact-JSON properties execute for HQL/typed-IR Match and Expand under one P6 snapshot; no direct lookup, optional semantics and pre-SHORTEST filtering preserved. Latest regression sweep 385/0/1 across 34 targets; the separate 11-target P6/schema-v6/compatibility group passed 194/0/0. Compact remains unsupported; broad P8/P13 acceptance remains open despite no concrete static review finding. |
 | HQL/typed-IR relational Join | Implemented; local differential passed | HQL `JOIN TABLE` lowers to the existing two-input Join operator for Inner/Left/Semi/Anti; bare JOIN defaults to Inner. HQL and typed IR match independent P7 for duplicate, SQL-NULL and JSON-null values (5/7/3/2); Semi/Anti keep left-only scope. Broad exact-oracle, review and P8/P13 gates remain open. |
@@ -907,6 +910,14 @@ local RCA `.brain/rca/RCA--HQL2-ROW-SOURCE-PROPERTY-HYDRATION.md`. These local
 results remain regression evidence, not P8 acceptance.
 
 ## CHANGELOG
+
+Version diff `0.8.59b -> 0.8.60b`: close the focused D7 ordering-review test-
+coverage gap with a source-alias (`a.id`) DESC legacy/HQL2 differential; four
+positive ordering cases cover target default/ASC/DESC and source DESC. The
+ordering target remains 2/2, the adapter 10/10, and HQL2 385/0/1 across 34
+targets. Focused review found no semantic/authorization defect. No runtime/P6
+contract/schema/transport change; broader D7/shared-runtime/P8/P13 gates remain
+open.
 
 Version diff `0.8.58b -> 0.8.59b`: extend the accepted D7 adapter only after
 legacy/HQL2 differential evidence for one-hop `ORDER BY` on the projected

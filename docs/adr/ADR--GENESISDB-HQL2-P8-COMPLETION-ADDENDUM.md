@@ -1,8 +1,8 @@
 ---
 doc_id: ADR--GENESISDB-HQL2-P8-COMPLETION-ADDENDUM
-version: "0.1.8b"
+version: "0.1.9b"
 created_at: "2026-09-30T06:29:47+07:00,ATHER,working-tree"
-last_update: "2026-10-04T01:22:00+07:00,ATHER"
+last_update: "2026-10-04T02:11:00+07:00,ATHER"
 status: accepted
 superseded_by: null
 owner: "Boss (Founder / Product Authority)"
@@ -33,13 +33,16 @@ The D7 implementation passes 10/10 adapter tests and 2/2 ordering tests:
 legacy/HQL2 differential for zero-hop and bounded one-hop projections,
 including a single plain-ASCII label on zero-hop scans, exact endpoint-ID
 string equality on either one-hop endpoint, and ordering by the projected
-endpoint ID (default/ASC and DESC). Authorization and namespace checks before
-parse, malformed syntax classification, fail-closed rejection of unlisted
-forms, and pre-parse resource rejection of a broad legacy pattern remain
-covered. The explicit root-HQL2 sweep passes 385/0/1 across 34 targets; the
-selected P6/schema-v6/ACL regression group passes 93/0/0 across 11 targets.
-The prior 11-target P6/schema-v6/compatibility record remains 194/0/0. Broader shared-runtime, P8 and
-P13 acceptance remains open, and D7 has not received independent review.
+source or target endpoint ID (default/ASC and DESC). Authorization and
+namespace checks before parse, malformed syntax classification, fail-closed
+rejection of unlisted forms, and pre-parse resource rejection of a broad
+legacy pattern remain covered. The explicit root-HQL2 sweep passes 385/0/1
+across 34 targets; the selected P6/schema-v6/ACL regression group passes
+93/0/0 across 11 targets. The prior 11-target P6/schema-v6/compatibility
+record remains 194/0/0. Broader shared-runtime, P8 and P13 acceptance remains
+open. Focused independent review of this ordering slice
+found no semantic or authorization defect and its positive source-alias test
+coverage gap is now closed; broader D7/P8/P13 review and acceptance remain open.
 
 The objective is to close the currently documented P8 semantic gaps without
 weakening the P6 namespace query grant or changing the closed Query IR v2 wire
@@ -256,8 +259,9 @@ flowchart TD
 - D7 HQL1 tests prove `Namespace(Read)` denial before parsing, zero-hop and
   one-hop direction/relation/wildcard differential parity (including parallel
   row multiplicity, endpoint projections and one exact string-equality filter
-  on either endpoint ID), and one-hop projected-ID ordering parity for default,
-  ASC and DESC while zero-hop/unprojected ordering fails closed; namespace
+  on either endpoint ID), and one-hop projected-ID ordering parity across
+  projected source and target aliases (target default/ASC/DESC and source DESC)
+  while zero-hop/unprojected ordering fails closed; namespace
   mismatch before parsing, malformed syntax
   classification, fail-closed unsupported predicate shapes and valid-unlisted
   behavior, and parser resource rejection before AST allowlist handling;
@@ -295,6 +299,7 @@ addendum does not authorize migration of a user database, deployment or release.
 
 | Version | Date | Status | Summary | Commit Hash | Agent |
 |---|---|---|---|---|---|
+| 0.1.9b | 2026-10-04 | accepted | Close focused D7 ordering-review coverage gap with a source-alias DESC legacy/HQL2 differential; four positive cases cover target default/ASC/DESC and source DESC; ordering 2/2, adapter 10/10, HQL2 385/0/1 across 34 targets; no runtime/P6 contract/schema/transport change; broad D7/P8/P13 gates remain open | working-tree | ATHER |
 | 0.1.8b | 2026-10-04 | accepted | Extend D7 after legacy/HQL2 differential for one-hop ORDER BY on the projected endpoint ID (default/ASC/DESC); ordering 2/2, adapter 10/10, HQL2 385/0/1 across 34 targets, selected P6/schema-v6/ACL tests 93/0/0 across 11 targets; retain fail-closed sort boundaries and broader P8/P13/review gates | working-tree | ATHER |
 | 0.1.7b | 2026-10-03 | accepted | Extend D7 with differential-proven single plain-ASCII label on zero-hop node-ID scans; record 10/10 adapter tests and 382/0/1 across 33 HQL2 targets, preserving unlabeled one-hop and fail-closed boundaries; broader shared-runtime/P8/P13 and independent-review gates remain open | working-tree | ATHER |
 | 0.1.6b | 2026-10-02 | accepted | Implement D7's one-hop endpoint-ID string equality filter after legacy/HQL2 differential; record 9/9 adapter tests and 361/0/1 across 27 root HQL2 targets plus 190/0/0 across 11 compatibility targets; retain shared-runtime/P8/P13 and review gates | working-tree | ATHER |
