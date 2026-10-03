@@ -2,7 +2,7 @@
 doc_id: SPEC--GENESISDB-HQL2-P8-TYPED-BOUNDARY
 version: "0.2.53b"
 created_at: "2026-09-28T01:25:00+07:00,ATHER,fc851e9"
-last_update: "2026-10-03T18:37:00+07:00,ATHER"
+last_update: "2026-10-03T19:06:00+07:00,ATHER"
 status: beta
 superseded_by: null
 owner: "Boss (Founder / Product Authority)"
@@ -76,7 +76,7 @@ Sequence ID, conjunctive labels and D4 node/edge property constraints now run
 for HQL and typed IR against one authorized P6 graph snapshot; candidate IDs
 are never looked up directly. Exact JSON values are selectively hydrated under
 budget and filtered before SHORTEST; Compact constraints remain unavailable
-and fail closed. The 10/10 P8 completion target and latest 381/0/1 root-HQL2
+and fail closed. The 10/10 P8 completion target and latest 382/0/1 root-HQL2
 sweep across 33 targets cover this slice, including edge-property filtering
 before SHORTEST and the nine-test D7 actor-scoped HQL1 adapter. P6
 D1's exact-record-only fixture denies before parsing; it does not assert
@@ -98,7 +98,7 @@ The focused History/Change target passes 16/16 and the Annotation source target
 passes 7/7. Artifact HistoryScan remains capability-unsupported under the
 approved contract. Storage-backed P7 ChangeScan differentials now cover all five
 supported revision kinds. The current explicit 33-target HQL2 sweep passes
-381/0/1, with the ignored parser child entrypoint exercised by its parent. A
+382/0/1, with the ignored parser child entrypoint exercised by its parent. A
 storage-backed HQL/typed-IR `Values`/`UnionAll` differential matches independent
 P7 for 169 nullable bag pairs (338 Storage executions), retaining duplicate
 and NULL multiplicity through explicit null-last ordering.
@@ -110,7 +110,7 @@ while the validated P6 generation, catalog and current policy stay pinned.
 Per-source history floors fail closed before reads, and no path falls back to
 current state. Five focused targets pass 56/56; the HistoryScan/ChangeScan
   target passes 16/16; the explicit 33-target HQL2 regression sweep passes
-  381/0/1 and the separate P6/schema-v6/compatibility sweep passes 194/0/0.
+  382/0/1 and the separate P6/schema-v6/compatibility sweep passes 194/0/0.
 These are local regression results, not broad P8/P13 or transport acceptance.
 PR #196 at head `8ac07f6` was merged at `fb7085a`. Its 16 displayed checks
 include 10 passes, five failures and one skip. Worker tests fail on
@@ -723,7 +723,7 @@ H2-D11 tuple ID, current reference ACL, exclusive source floors, typed HQL/IR
 parity and fail-closed budgets. Storage-backed P7 HistoryScan and ChangeScan
 differentials cover Node, Edge, Row, Vector and Annotation; the focused
 History/Change target passes 16/16 and Annotation source/ACL passes 7/7. The
-current 33-target HQL2 sweep passes 381/0/1, with a separate 11-target
+current 33-target HQL2 sweep passes 382/0/1, with a separate 11-target
 P6/schema-v6/compatibility sweep at 194/0/0. HQL2/IR `tx_as_of` now selects
 one no-fallback frontier across scans, operators, hydration and `Snapshot.tx`;
 five focused targets pass 56/56 and HistoryScan/ChangeScan passes 16/16.
@@ -805,7 +805,7 @@ parallel-edge multiplicity, all directions and wildcard relations, endpoint-ID
 string equality on either endpoint, denial/mismatch before parse, malformed
 syntax, fail-closed unlisted syntax and pre-parse resource rejection. The
 latest 33-target root HQL2 sweep passes
-381/0/1; a separate 11-target P6/schema-v6/compatibility group passes 194/0/0.
+382/0/1; a separate 11-target P6/schema-v6/compatibility group passes 194/0/0.
 The prior combined 37-target run passed 528/0/1 before
 the added edge-property regression; all remain regression evidence, not full
 P8/P13 acceptance.
@@ -854,7 +854,7 @@ separate shape limits. No process-global Pest setting is changed.
 Version diff `0.2.52b -> 0.2.53b`: add test-only HQL/typed-IR
 `Values`/`UnionAll` differential evidence against P7 for 169 nullable bag pairs
 and 338 Storage executions, preserving NULL/duplicate multiplicity through
-explicit null-last ordering. The HQL2 regression sweep is 381/0/1 across 33
+explicit null-last ordering. The HQL2 regression sweep is 382/0/1 across 33
 targets; the separate P6/schema-v6/compatibility sweep remains 194/0/0. No
 contract, runtime, schema or transport behavior changed; broad exact-oracle,
 ChangeScan, review, P8/P13 and qualification gates remain open.
@@ -1009,7 +1009,7 @@ detail with unchanged JSON shape; broader P8/P13/review gates remain open.
 
 | Version | Date | Status | Summary | Commit Hash | Agent |
 |---|---|---|---|---|---|
-| 0.2.53b | 2026-10-03 | beta | Add test-only HQL/typed-IR Values/UnionAll P7 differential for 169 nullable bag pairs and 338 Storage executions; HQL2 381/0/1 across 33 targets and P6/compatibility 194/0/0; no contract/runtime/schema/transport change; retain broad semantic and acceptance gates | working-tree | ATHER |
+| 0.2.53b | 2026-10-03 | beta | Add test-only HQL/typed-IR Values/UnionAll P7 differential for 169 nullable bag pairs and 338 Storage executions; HQL2 382/0/1 across 33 targets and P6/compatibility 194/0/0; no contract/runtime/schema/transport change; retain broad semantic and acceptance gates | working-tree | ATHER |
 | 0.2.52b | 2026-10-03 | beta | Record merged PR #196 hosted status: 10 displayed checks pass, five fail, one skips; worker bootstrap fails across OSes and Windows Rust failure at 15m16 has no retrievable detail; local History/Change 16/16 and HQL2 380/0/1 unchanged; worker approval and P8/P13 remain open | working-tree | ATHER |
 | 0.2.51b | 2026-10-03 | beta | Extend test-only P7 ChangeScan differential to Edge/Row/Vector/Annotation for HQL/typed IR; seven events match sequence, operation and subject identity; History/Change 16/16 and HQL2 380/0/1 across 32 targets; broader semantic, hosted/review and P8/P13 gates remain open | working-tree | ATHER |
 | 0.2.50b | 2026-10-03 | beta | Add test-only P7 ChangeScan Node-revision differential for HQL/typed IR; History/Change 15/15 and HQL2 379/0/1 across 32 targets; other event source kinds, hosted checks/review and broad P8/P13 remain open | working-tree | ATHER |

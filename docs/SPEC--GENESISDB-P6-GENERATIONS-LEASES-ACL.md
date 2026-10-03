@@ -3,7 +3,7 @@ doc_id: SPEC--GENESISDB-P6-GENERATIONS-LEASES-ACL
 owner: GenesisBlockDB Engineering
 version: 0.5.29b
 created_at: "2026-09-22T22:55:00+07:00,ATHER,working-tree"
-last_update: "2026-10-03T18:37:00+07:00,ATHER"
+last_update: "2026-10-03T19:06:00+07:00,ATHER"
 status: beta
 attributes:
   domain: storage-correctness
@@ -152,14 +152,14 @@ the same lease. Storage-backed HQL/typed-IR HistoryScan bags for Node, Edge,
 Row, Vector and Annotation now match independent P7 references assembled from
 WAL revision facts and captured frontiers/valid-time windows. The HistoryScan/
 ChangeScan target passes 16/16, Annotation source passes 7/7, the 33-target HQL2
-regression sweep passes 381/0/1, and the separate 11-target P6/schema-v6/
+regression sweep passes 382/0/1, and the separate 11-target P6/schema-v6/
 compatibility group passes 194/0/0. Broader
 P6/P8 acceptance, transport parity and independent review remain open. Explicit
 HQL2/IR `tx_as_of` is specified above and its cross-source
 runtime path now selects one frontier S across source scans, operators,
 hydration and result metadata while retaining the pinned P6 generation and
 current ACL. Five focused HQL2 targets pass 56/56, the 33-target HQL2 sweep
-passes 381/0/1 and the earlier separate 11-target P6/schema-v6/compatibility sweep
+passes 382/0/1 and the earlier separate 11-target P6/schema-v6/compatibility sweep
 passes 194/0/0. Broader P6/P8 acceptance, transport parity and independent
 review remain open. Property access uses
 binder-issued `FieldIdV2` and aligned `ExecBatchV2` batches, including
@@ -267,7 +267,7 @@ excluded before candidate counts/bytes are charged to caller-selected budgets or
 materialized. This does not widen authorization to Annotation and does not claim
 timing noninterference. The hidden-revision threshold regression passes with
 ACL 11/11; the expanded History/Change target passes 16/16, Annotation
-source/ACL passes 7/7, HQL2 passes 381/0/1 and the separate P6/schema-v6/
+source/ACL passes 7/7, HQL2 passes 382/0/1 and the separate P6/schema-v6/
 compatibility group passes 194/0/0. Hosted validation of this source change,
 independent review and broader P6/P8 acceptance remain open.
 
@@ -397,7 +397,7 @@ not approve P7, merge, release, deployment or external readiness.
 
 Version diff 0.5.28b -> 0.5.29b: synchronize the HQL2/P7 regression record
 with the test-only HQL/typed-IR `Values`/`UnionAll` differential against P7 for
-169 nullable bag pairs and 338 Storage executions. HQL2 passes 381/0/1 across
+169 nullable bag pairs and 338 Storage executions. HQL2 passes 382/0/1 across
 33 targets; P6/schema-v6/compatibility remains 194/0/0 across 11. No P6
 contract, ACL, schema or migration behavior changed. Broad P6/P8/transport and
 independent review remain open.
@@ -493,7 +493,7 @@ broader P6/P8/P13 qualification is claimed.
 
 | Version | Date | Status | Summary | Commit | Agent |
 |---|---|---|---|---|---|
-| 0.5.29b | 2026-10-03 | beta | Synchronize test-only HQL2 Values/UnionAll P7 differential evidence: 169 nullable bag pairs, 338 Storage executions, HQL2 381/0/1 across 33 targets; P6/schema-v6/compatibility 194/0/0; no P6 contract/schema change; broader gates remain open | working-tree | ATHER |
+| 0.5.29b | 2026-10-03 | beta | Synchronize test-only HQL2 Values/UnionAll P7 differential evidence: 169 nullable bag pairs, 338 Storage executions, HQL2 382/0/1 across 33 targets; P6/schema-v6/compatibility 194/0/0; no P6 contract/schema change; broader gates remain open | working-tree | ATHER |
 | 0.5.28b | 2026-10-03 | beta | Synchronize P6 record to current HQL2/P7 evidence: History/Change 16/16, HQL2 380/0/1, P6/schema-v6/compatibility 194/0/0; PR #196 has five failed hosted checks including worker bootstrap and an unverified Windows Rust failure at 15m16; no P6 contract/schema change | working-tree | ATHER |
 | 0.5.27b | 2026-10-03 | beta | Record WAL-derived P7 HistoryScan differentials for Node/Edge/Row/Vector/Annotation under existing P6 ACL semantics; History/Change 15/15, Annotation source 7/7, HQL2 379/0/1, P7 130/130, P6/schema-v6/compatibility 194/0/0; Artifact, broad gates and hosted review remain open | working-tree | ATHER |
 | 0.5.26b | 2026-10-03 | beta | Record independent P7 differential for HQL/typed-IR Vector HistoryScan using WAL-derived revisions and H2-D11 owner ACL; History/Change 14/14, HQL2 377/0/1, P6/schema-v6/compatibility 194/0/0; hosted/review and broader gates open | working-tree | ATHER |

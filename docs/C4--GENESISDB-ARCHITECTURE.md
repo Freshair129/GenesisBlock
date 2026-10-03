@@ -5,7 +5,7 @@ status: current
 version: 0.1.61b
 owner: GenesisBlockDB Architecture
 created_at: 2026-06-13T22:50:11+07:00,ATHER,9b1ced3
-last_update: "2026-10-03T18:37:00+07:00,ATHER"
+last_update: "2026-10-03T19:06:00+07:00,ATHER"
 attributes:
   domain: architecture
   scope: repository
@@ -82,7 +82,7 @@ across HQL/IR source scans, graph/vector/annotation operators, hydration and
 `Snapshot.tx`. HQL2/IR `tx_as_of` fails closed below history/source floors and
 never falls back to current rows; the validated P6 generation and current
 policy remain pinned. Five focused targets pass 56/56; the 33-target HQL2
-regression sweep passes 381/0/1 and the earlier separate 11-target P6/schema-v6/
+regression sweep passes 382/0/1 and the earlier separate 11-target P6/schema-v6/
 compatibility sweep passes 194/0/0. These are local regression results, not
 broad P8/P13, transport, hosted CI or independent-review acceptance.
 Storage-backed HQL/typed-IR HistoryScan bags for Node, Edge, Row, Vector and
@@ -115,7 +115,7 @@ HQL and typed-IR Join differentials match independent P7 for Inner/Left/Semi/Ant
 with duplicate, missing-property NULL and JSON-null keys (5/7/3/2 output rows).
 HQL `JOIN TABLE` lowers to the existing RowScan/Join contract; bare JOIN
 defaults to Inner and Semi/Anti do not export the right scope. The explicit
-root-HQL2 sweep passes 381/0/1 across 33 targets. A test-only HQL/typed-IR
+root-HQL2 sweep passes 382/0/1 across 33 targets. A test-only HQL/typed-IR
 `Values`/`UnionAll` differential matches independent P7 for 169 nullable bag
 pairs (338 Storage executions), retaining NULL and duplicate multiplicity.
 A separate earlier 11-target P6/schema-v6/compatibility
@@ -455,7 +455,7 @@ v6-only WAL without activation fails closed. See H2-D11 ADR R6b and the P6 recov
 
 Version diff 0.1.60b -> 0.1.61b: record the test-only HQL/typed-IR
 `Values`/`UnionAll` differential against P7 for 169 nullable bag pairs and 338
-Storage executions. HQL2 passes 381/0/1 across 33 targets; P6/schema-v6/
+Storage executions. HQL2 passes 382/0/1 across 33 targets; P6/schema-v6/
 compatibility passes 194/0/0 across 11. No runtime, contract, schema or
 transport change; broad exact-oracle, P8/P13, hosted review and qualification
 remain open.
@@ -529,7 +529,7 @@ full P8/P13 qualification remains open.
 
 | Version | Date | Status | Summary | Commit Hash | Agent |
 |---------|------|--------|---------|-------------|-------|
-| 0.1.61b | 2026-10-03 | current | Record test-only HQL/typed-IR Values/UnionAll P7 differential for 169 nullable bag pairs and 338 Storage executions; HQL2 381/0/1 across 33 targets, P6/compatibility 194/0/0; no runtime/contract/schema/transport change; broad P8/P13 and qualification gates remain open | working-tree | ATHER |
+| 0.1.61b | 2026-10-03 | current | Record test-only HQL/typed-IR Values/UnionAll P7 differential for 169 nullable bag pairs and 338 Storage executions; HQL2 382/0/1 across 33 targets, P6/compatibility 194/0/0; no runtime/contract/schema/transport change; broad P8/P13 and qualification gates remain open | working-tree | ATHER |
 | 0.1.60b | 2026-10-03 | current | Record WAL-derived independent P7 HistoryScan differentials for Node/Edge/Row/Vector/Annotation; History/Change 15/15, Annotation source 7/7, P7 130/130, HQL2 379/0/1, P6/schema-v6/compatibility 194/0/0; Artifact/broad P8/P13/hosted review remain open | working-tree | ATHER |
 | 0.1.59b | 2026-10-03 | current | Add independent P7 Vector HistoryScan differential; P7 130/130, History/Change 14/14, HQL2 377/0/1, P6/schema-v6/compatibility 194/0/0; at prior PR head five checks fail and review is absent; broad P8/P13 open | working-tree | ATHER |
 | 0.1.58b | 2026-10-03 | current | Record H2-D11 R4/P6 annotation ACL conformance for scans and ChangeScan subjects; HQL2 375/0/1 and selected P6/schema-v6 43/0/0 pass locally; possible ChangeScan budget side channel, prior PR worker failures and cancelled Windows Rust remain open | working-tree | ATHER |
