@@ -1,8 +1,8 @@
 ---
 doc_id: REPORT--HQL2-P8-CORE-2026-09-28
-version: "0.1.42b"
+version: "0.1.43b"
 created_at: "2026-09-28T04:35:00+07:00,ATHER,22bc11e"
-last_update: "2026-10-03T05:34:08+07:00,ATHER"
+last_update: "2026-10-03T07:37:36+07:00,ATHER"
 status: beta
 owner: GenesisBlockDB Engineering
 attributes:
@@ -155,6 +155,8 @@ explicit test targets; the protected probe target was not selected.
 | HQL/IR Node/Edge/Row source differential | 1 passed, 0 failed | Node/Edge properties and Row `prop(r, "id")` match across HQL and IR; `r.id` remains the UUIDv4 durable revision. Row properties resolve from H2-D11 `after_image`; see local RCA `.brain/rca/RCA--HQL2-ROW-SOURCE-PROPERTY-HYDRATION.md`. |
 | HQL/IR annotation source and recursive ACL parity | 6 passed, 0 failed, 0 ignored | Separate `targets`/`evidence` properties, nested annotation references, and Edge endpoint access are covered; fixture evidence is independent of P8 operator acceptance. |
 | Long-running soak | Three soak_tests cases remain ignored by the normal suite | No soak qualification inferred |
+| Hosted PR #194 CI at head 31168524 | [Tests run 37073380412](https://github.com/Freshair129/GenesisBlock/actions/runs/37073380412): Rust, standard Node, docs, fmt/clippy and non-worker distribution checks pass; worker npm tests fail on Linux/macOS/Windows with RECOVERY_REQUIRED: markerless database identity is missing. [Rebuilt addon/worker run 37073380336](https://github.com/Freshair129/GenesisBlock/actions/runs/37073380336) fails with the same error. | Four worker checks remain red; correction is approval-gated and no worker code changed. |
+| PR #194 current state | GitHub reports OPEN, UNSTABLE at head 31168524; reviews list is empty. | Not merged; passing core checks do not establish P8/P13 acceptance. |
 | Hosted Rust/core CI, PR #194 head `9344b71` | [Run 37029503800](https://github.com/Freshair129/GenesisBlock/actions/runs/37029503800): Linux/macOS `cargo test`, all three standard `npm test` targets, `fmt + clippy`, docs validation and version consistency passed. Windows `cargo test` reached its 15-minute job limit while `tests/zz_probe_discriminates.rs::probe_vs_recall` was still running; runner canceled the job. | Windows full Rust suite remains incomplete; protected probe source was not changed. |
 | Hosted Rust/core CI, PR #194 head `484916b` (parent of this local test/docs-only change) | [Run 37049245946](https://github.com/Freshair129/GenesisBlock/actions/runs/37049245946): Linux/macOS/Windows `cargo test`, standard `npm test` on all three OSes, `fmt + clippy`, docs validation and version consistency passed; worker test jobs failed on all three OSes. The Join differential in this local revision is not included. | Core checks passed; hosted worker checks remain red. |
 | Hosted worker CI, PR #194 head `9344b71` | [Run 37029503800](https://github.com/Freshair129/GenesisBlock/actions/runs/37029503800) and [rebuilt-addon run 37029503808](https://github.com/Freshair129/GenesisBlock/actions/runs/37029503808): worker tests failed on Linux/macOS/Windows and rebuilt Linux addon with `RECOVERY_REQUIRED: markerless database identity is missing`. | Worker startup-order correction remains documentation/approval-gated; no worker code changed. |
@@ -418,15 +420,21 @@ from these local tests.
 
 | Artifact | Before | After |
 |---|---|---|
-| Registry | 0.5.52+draft | 0.5.53+draft |
-| C4 architecture index | 0.1.54b | 0.1.55b |
-| Master specification | 2.3.26b | 2.3.27b |
-| P6 generations/leases/ACL | 0.5.20b | 0.5.21b |
-| H2-D11 durable revisions/annotations | 0.8.12b | 0.8.13b |
-| P8 typed boundary | 0.2.45b | 0.2.46b |
-| Orchestration plan | 0.8.45b | 0.8.46b |
-| This report | 0.1.41b | 0.1.42b |
+| Registry | 0.5.53+draft | 0.5.54+draft |
+| C4 architecture index | 0.1.55b | 0.1.56b |
+| Master specification | 2.3.27b | 2.3.28b |
+| P6 generations/leases/ACL | 0.5.21b | 0.5.22b |
+| H2-D11 durable revisions/annotations | 0.8.13b | 0.8.14b |
+| Orchestration plan | 0.8.46b | 0.8.47b |
+| This report | 0.1.42b | 0.1.43b |
 
+Version diff 0.1.42b -> 0.1.43b: synchronize current P6/C4/master/H2-D11/
+plan/registry versions with the 374/0/1 HQL2 regression sweep across 32
+targets. Refresh hosted PR #194 evidence at head 31168524: core CI passes,
+three worker OS jobs and rebuilt Linux addon/worker fail at fresh schema-v6
+bootstrap. The worker correction remains approval-gated; PR is OPEN/UNSTABLE
+and unmerged. No H2-D11 contract or schema change; broad P8/P13/review gates
+remain open.
 Version diff `0.1.41b -> 0.1.42b`: record storage-backed HQL/typed-IR Row
 HistoryScan/ChangeScan parity and exact retained row-property hydration (1/1);
 record the explicit HQL2 regression sweep at 374/0/1 across 32 targets. No
@@ -514,6 +522,7 @@ P8 and release gates.
 
 | Version | Date | Status | Summary | Commit Hash | Agent |
 |---|---|---|---|---|---|
+| 0.1.43b | 2026-10-03 | beta | Synchronize P6/C4/master/plan/H2-D11/registry with the current 374/0/1 HQL2 regression result; record PR #194 head 31168524 and four worker-CI failures; retain worker-fix approval, unmerged, review and broad P8/P13 gates | working-tree | ATHER |
 | 0.1.42b | 2026-10-03 | beta | Verify HQL/typed-IR Row HistoryScan/ChangeScan parity and exact row-property hydration (1/1); record HQL2 regression 374/0/1 across 32 targets; retain hosted CI/review/broad P8/P13 gates | working-tree | ATHER |
 | 0.1.41b | 2026-10-03 | beta | Implement and locally verify HQL2/IR `tx_as_of` through one no-fallback frontier; focused 56/56, History/Change 14/14, HQL2 373/0/1 and P6/compatibility 194/0/0; retain hosted CI/review/broad P8/P13 gates | working-tree | ATHER |
 | 0.1.40b | 2026-10-03 | beta | Synchronize accepted HQL2 `tx_as_of` snapshot semantics and document the runtime gap (normalizer rejection/current-frontier reads); implementation was pending at that checkpoint; retain hosted CI/review/broad P8/P13 gates | working-tree | ATHER |

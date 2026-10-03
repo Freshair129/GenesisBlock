@@ -1,9 +1,9 @@
 ---
 doc_id: SPEC--GENESISDB-P6-GENERATIONS-LEASES-ACL
 owner: GenesisBlockDB Engineering
-version: 0.5.21b
+version: 0.5.22b
 created_at: "2026-09-22T22:55:00+07:00,ATHER,working-tree"
-last_update: "2026-10-03T04:35:05+07:00,ATHER"
+last_update: "2026-10-03T07:37:36+07:00,ATHER"
 status: beta
 attributes:
   domain: storage-correctness
@@ -150,13 +150,13 @@ revisions. Vector HistoryScan uses the H2-D11 compact JSON `(owner_id,
 collection_id)` identity, vector source floor and existing owner-node ACL under
 the same lease; HQL/typed-IR parity and floor-failure tests passed in the
 12-test vector-only checkpoint. The current HistoryScan/ChangeScan target
-passes 14/14, and the 31-target HQL2 regression sweep passes 373/0/1. Broader
+passes 14/14, and the 32-target HQL2 regression sweep passes 374/0/1. Broader
 P6/P8 acceptance, transport parity and independent review remain open. Explicit
 HQL2/IR `tx_as_of` is specified above and its cross-source
 runtime path now selects one frontier S across source scans, operators,
 hydration and result metadata while retaining the pinned P6 generation and
-current ACL. Five focused HQL2 targets pass 56/56, the 31-target HQL2 sweep
-passes 373/0/1 and the separate 11-target P6/schema-v6/compatibility sweep
+current ACL. Five focused HQL2 targets pass 56/56, the 32-target HQL2 sweep
+passes 374/0/1 and the separate 11-target P6/schema-v6/compatibility sweep
 passes 194/0/0. Broader P6/P8 acceptance, transport parity and independent
 review remain open. Property access uses
 binder-issued `FieldIdV2` and aligned `ExecBatchV2` batches, including
@@ -379,6 +379,12 @@ not approve P7, merge, release, deployment or external readiness.
 
 ## CHANGELOG
 
+Version diff 0.5.21b -> 0.5.22b: synchronize the current HQL2 row-history
+parity checkpoint to 374/0/1 across 32 targets; the separate P6/schema-v6/
+compatibility group remains 194/0/0 across 11 targets. Hosted PR #194 core
+checks pass, but worker bootstrap checks remain red at schema-v6 initialization;
+the P6 contract is unchanged and broader P6/P8/transport/review gates stay open.
+
 Version diff 0.5.10b -> 0.5.11b: record the delegated P6 boundary for
 Sequence node-ID/label predicates: exact revision-bound authorized snapshot,
 no direct lookup, indistinguishable hidden/missing IDs, and budgeted labels.
@@ -431,6 +437,7 @@ broader P6/P8/P13 qualification is claimed.
 
 | Version | Date | Status | Summary | Commit | Agent |
 |---|---|---|---|---|---|
+| 0.5.22b | 2026-10-03 | beta | Synchronize HQL2 row-history parity evidence to 374/0/1 across 32 targets and P6/schema-v6/compatibility to 194/0/0 across 11; hosted worker bootstrap checks fail at fresh schema-v6 initialization; P6 contract unchanged, broader gates open | working-tree | ATHER |
 | 0.5.21b | 2026-10-03 | beta | Implement P8 HQL2/IR `tx_as_of` selection with one no-fallback source/hydration/operator/result frontier and per-source floor checks; record 56/56 focused, 373/0/1 HQL2 and 194/0/0 P6/compatibility; broader gates remain open | working-tree | ATHER |
 | 0.5.20b | 2026-10-03 | beta | Specify P8 HQL2/IR `tx_as_of` selection as one no-fallback frontier across sources, hydration and result Snapshot; distinguish legacy ReadView rejections; runtime verification pending | working-tree | ATHER |
 | 0.5.19b | 2026-10-03 | beta | Implement and verify Vector HistoryScan in HQL/typed IR using the H2-D11 tuple identity, P6 vector floor and existing owner-node ACL; focused 12/12, HQL2 367/0/1 and separate P6/compatibility 194/0/0; broader gates remain open | working-tree | ATHER |

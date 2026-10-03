@@ -2,10 +2,10 @@
 doc_id: C4--GENESISDB-ARCHITECTURE
 type: architecture-index
 status: current
-version: 0.1.55b
+version: 0.1.56b
 owner: GenesisBlockDB Architecture
 created_at: 2026-06-13T22:50:11+07:00,ATHER,9b1ced3
-last_update: "2026-10-03T04:35:05+07:00,ATHER"
+last_update: "2026-10-03T07:37:36+07:00,ATHER"
 attributes:
   domain: architecture
   scope: repository
@@ -78,8 +78,8 @@ focused target now passes 14/14, including one selected transaction frontier
 across HQL/IR source scans, graph/vector/annotation operators, hydration and
 `Snapshot.tx`. HQL2/IR `tx_as_of` fails closed below history/source floors and
 never falls back to current rows; the validated P6 generation and current
-policy remain pinned. Five focused targets pass 56/56; the 31-target HQL2
-regression sweep passes 373/0/1 and the separate 11-target P6/schema-v6/
+policy remain pinned. Five focused targets pass 56/56; the 32-target HQL2
+regression sweep passes 374/0/1 and the separate 11-target P6/schema-v6/
 compatibility sweep passes 194/0/0. These are local regression results, not
 broad P8/P13, transport, hosted CI or independent-review acceptance.
 Structural unsigned HQL parameters now bind only
@@ -106,7 +106,7 @@ HQL and typed-IR Join differentials match independent P7 for Inner/Left/Semi/Ant
 with duplicate, missing-property NULL and JSON-null keys (5/7/3/2 output rows).
 HQL `JOIN TABLE` lowers to the existing RowScan/Join contract; bare JOIN
 defaults to Inner and Semi/Anti do not export the right scope. The explicit
-root-HQL2 sweep passes 373/0/1 across 31 targets.
+root-HQL2 sweep passes 374/0/1 across 32 targets.
 A separate 11-target P6/schema-v6/compatibility
 group passes 194/0/0. The legacy parser preflight correction is recorded in the
 Local RCA: `.brain/rca/RCA--HQL1-ADAPTER-PARSER-RESERVATION.md`.
@@ -442,6 +442,12 @@ v6-only WAL without activation fails closed. See H2-D11 ADR R6b and the P6 recov
 
 ## CHANGELOG
 
+Version diff 0.1.55b -> 0.1.56b: synchronize the current HQL2 regression count
+to 374/0/1 across 32 explicit targets and record PR #194 at head 31168524:
+core CI passes, while three worker OS jobs and the rebuilt Linux addon/worker
+job fail with markerless database identity missing. Keep the worker correction
+approval-gated; PR remains unmerged and broad P8/P13/review gates remain open.
+
 Version diff 0.1.54b -> 0.1.55b: implement and locally verify HQL2/IR
 transaction-time selection through one no-fallback frontier S across scans,
 operators, source floors, hydration and `Snapshot.tx` while retaining the
@@ -475,6 +481,7 @@ full P8/P13 qualification remains open.
 
 | Version | Date | Status | Summary | Commit Hash | Agent |
 |---------|------|--------|---------|-------------|-------|
+| 0.1.56b | 2026-10-03 | current | Synchronize HQL2 regression to 374/0/1 across 32 targets and current PR #194 worker-CI failures; keep worker correction approval-gated and PR unmerged | working-tree | ATHER |
 | 0.1.55b | 2026-10-03 | current | Implement HQL2/IR `tx_as_of` with one no-fallback frontier across scans, operators, hydration and snapshot; focused 56/56, History/Change 14/14, HQL2 373/0/1 and P6/compatibility 194/0/0; broader gates remain open | working-tree | ATHER |
 | 0.1.54b | 2026-10-03 | current | Implement HQL JOIN lowering through the approved RowScan/Join contract for four kinds and bare JOIN default; HQL/typed IR match independent P7 for duplicate, missing-property NULL and JSON-null result bags; record 365/0/1 across 31 targets; keep P8/P13/review gates open | working-tree | ATHER |
 | 0.1.53b | 2026-10-03 | current | Record storage-backed typed-IR Join P7 differential for four kinds and 364/0/1 across 30 HQL2 targets without expanding HQL JOIN; parent head 484916b core checks pass but worker CI fails across OSes and review is absent; retain broad oracle, review and P8/P13 gates | working-tree | ATHER |

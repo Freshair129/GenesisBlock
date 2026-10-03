@@ -1,9 +1,9 @@
 ---
-version: "0.8.46b"
+version: "0.8.47b"
 doc_id: "IMPLEMENTATION-PLAN--UEE-HQL2-ORCHESTRATION-2026-09-22"
 owner: "Boss (Founder / Product Authority)"
 created_at: "2026-09-22T00:00:00+07:00,ATHER,working-tree"
-last_update: "2026-10-03T05:34:08+07:00,ATHER"
+last_update: "2026-10-03T07:37:36+07:00,ATHER"
 status: beta
 superseded_by: null
 attributes:
@@ -867,6 +867,13 @@ results remain regression evidence, not P8 acceptance.
 
 ## CHANGELOG
 
+Version diff 0.8.46b -> 0.8.47b: refresh hosted PR #194 evidence at head
+31168524. The 32-target local HQL2 sweep remains 374/0/1; GitHub reports the
+core Rust/standard Node/docs/fmt checks passing, with three worker OS jobs and
+the rebuilt Linux addon/worker job failing at markerless schema-v6 bootstrap.
+The worker correction remains approval-gated; PR is OPEN/UNSTABLE and not
+merged. Preserve broad P8/P13, independent review, security and release gates.
+
 Version diff `0.8.18b -> 0.8.19b`: implement HQL2 implicit null ordering as NULLS LAST for either direction; preserve explicit placement and typed-IR requirements; record 58 focused passes and 325/0/1 across 22 HQL2 targets.
 Version diff `0.8.19b -> 0.8.20b`: freeze checked HQL `%`/typed Query IR `rem` semantics.
 Version diff `0.8.20b -> 0.8.21b`: implement the frozen HQL `%`/typed-IR `rem` contract through checked scalar execution; record 79/79 focused passes and 328/0/1 across 22 HQL2 targets; retain remaining P8 gates.
@@ -893,6 +900,7 @@ Version diff `0.8.27b -> 0.8.28b`: implement approved D1-D5, record 9 focused pa
 
 | Version | Date | Status | Summary | Commit Hash | Agent |
 |---|---|---|---|---|---|
+| 0.8.47b | 2026-10-03 | beta | Refresh PR #194 hosted evidence at head 31168524: 374/0/1 across 32 local HQL2 targets; core checks pass but three worker OS jobs and rebuilt Linux addon/worker fail at schema-v6 bootstrap; worker correction remains approval-gated, PR unmerged, broad P8/P13/review gates open | working-tree | ATHER |
 | 0.8.46b | 2026-10-03 | beta | Add HQL/typed-IR Row HistoryScan/ChangeScan parity for retained insert/update revisions and exact property hydration (1/1); refresh explicit HQL2 sweep to 374/0/1 across 32 targets; correct stale row-history status; broad P8/P13, transport, CI and independent review remain open | working-tree | ATHER |
 | 0.8.45b | 2026-10-03 | beta | Implement approved HQL2/IR `tx_as_of` with one no-fallback frontier across scans, operators, hydration and snapshot; focused 56/56, History/Change 14/14, HQL2 373/0/1 and P6/compatibility 194/0/0; broad P8/P13, transport, CI and review remain open | working-tree | ATHER |
 | 0.8.44b | 2026-10-03 | beta | Synchronize P8/P6 transaction-time snapshot contract and add C3 HQL2-TX-AS-OF tests-first acceptance; implementation was pending at that checkpoint | working-tree | ATHER |
