@@ -2,7 +2,7 @@
 doc_id: REPORT--HQL2-P7-ORACLE-2026-09-28
 version: "0.1.6b"
 created_at: "2026-09-28T01:38:00+07:00,ATHER,fc851e9"
-last_update: "2026-10-03T18:37:00+07:00,ATHER"
+last_update: "2026-10-03T19:06:00+07:00,ATHER"
 status: beta
 owner: "GenesisBlockDB Engineering"
 attributes:
@@ -153,7 +153,7 @@ HistoryScan remains unsupported. The P7 oracle implementation itself is
 unchanged: its graph target passes 39 tests and combined graph/relational/rank/
 pipeline targets pass 130/130. The HistoryScan/ChangeScan target passes 16/16,
 the Annotation source target passes 7/7, the prescribed 33-target HQL2
-regression passes 381/0/1, and the separate 11-target P6/schema-v6/
+regression passes 382/0/1, and the separate 11-target P6/schema-v6/
 compatibility group passes 194/0/0. These remain local test evidence; hosted
 checks, broad semantic acceptance and review are outstanding.
 
@@ -163,7 +163,7 @@ events built from signed-WAL mutations and projection transaction stamps. The
 new fixture checks seven Edge/Row/Vector/Annotation events, exact sequence,
 operation and full subject identity, including edge endpoints, vector owner and
 annotation target/evidence dependencies. HQL and typed IR agree; the
-History/Change target passes 16/16 and the 33-target HQL2 sweep passes 381/0/1.
+History/Change target passes 16/16 and the 33-target HQL2 sweep passes 382/0/1.
 This closes the supported subject-kind differential gap only; broader
 ChangeScan error/semantic cases and full P8/P13 acceptance remain open.
 
@@ -199,7 +199,7 @@ not been run or claimed.
 Version diff `0.1.5b -> 0.1.6b`: add the storage-backed HQL/typed-IR
 `Values`/`UnionAll` differential against P7 for 169 nullable bag pairs and 338
 Storage executions; explicit null-last ordering preserves duplicate/NULL bag
-semantics. The HQL2 sweep passes 381/0/1 across 33 targets; the separate P6/
+semantics. The HQL2 sweep passes 382/0/1 across 33 targets; the separate P6/
 schema-v6/compatibility sweep remains 194/0/0. No runtime, contract, schema or
 transport behavior changed; broad oracle and P8/P13 gates remain open.
 
@@ -231,7 +231,7 @@ open.
 
 | Version | Date | Status | Summary | Commit Hash | Agent |
 |---|---|---|---|---|---|
-| 0.1.6b | 2026-10-03 | beta | Add storage-backed HQL/typed-IR Values/UnionAll P7 differential for 169 nullable bag pairs and 338 Storage executions; HQL2 381/0/1 across 33 targets, P6/compatibility 194/0/0; no runtime/schema/transport change; broad oracle and P8/P13 remain open | working-tree | ATHER |
+| 0.1.6b | 2026-10-03 | beta | Add storage-backed HQL/typed-IR Values/UnionAll P7 differential for 169 nullable bag pairs and 338 Storage executions; HQL2 382/0/1 across 33 targets, P6/compatibility 194/0/0; no runtime/schema/transport change; broad oracle and P8/P13 remain open | working-tree | ATHER |
 | 0.1.5b | 2026-10-03 | beta | Extend the HQL/typed-IR P7 ChangeScan differential to Edge/Row/Vector/Annotation; seven events match on sequence, operation and subject identity; History/Change 16/16 and HQL2 380/0/1; retain broad semantic and P8/P13 gates | working-tree | ATHER |
 | 0.1.4b | 2026-10-03 | beta | Add the Node-revision ChangeScan HQL/typed-IR differential against P7 for exact sequence, operation and subject revision; History/Change 15/15, HQL2 379/0/1; retain other source-kind and broad P8/P13 gates | working-tree | ATHER |
 | 0.1.3b | 2026-10-03 | beta | Record WAL-derived storage-backed P7 HistoryScan differentials for Node/Edge/Row/Vector/Annotation; History/Change 15/15, Annotation source 7/7, HQL2 379/0/1 and P6/compatibility 194/0/0; retain Artifact, broad oracle, hosted and review gates | working-tree | ATHER |

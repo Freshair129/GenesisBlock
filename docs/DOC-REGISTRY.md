@@ -121,7 +121,7 @@ The following documents should be created only when implementation work requires
 Version diff 0.5.62+draft -> 0.5.63+draft: synchronize HQL2/P7/P8/P6/plan,
 C4 and master evidence for the test-only HQL/typed-IR `Values`/`UnionAll`
 differential against P7: 169 nullable bag pairs and 338 Storage executions.
-Record HQL2 381/0/1 across 33 targets and P6/schema-v6/compatibility 194/0/0.
+Record HQL2 382/0/1 across 33 targets and P6/schema-v6/compatibility 194/0/0.
 No runtime, contract, schema or transport change. Keep broad exact-oracle,
 ChangeScan, P8/P13, independent review and hosted qualification open.
 
@@ -286,7 +286,7 @@ review and full P8 gates remain open.
 
 | Version | Date | Owner | Summary |
 |---|---|---|---|
-| 0.5.63+draft | 2026-10-03 | GenesisBlockDB Architecture | Synchronize P7/P8/P6/plan/C4/master evidence for the test-only Values/UnionAll P7 differential (169 nullable bag pairs, 338 Storage executions); HQL2 381/0/1 across 33 targets, P6/compatibility 194/0/0; no runtime/schema/transport change; broad gates remain open |
+| 0.5.63+draft | 2026-10-03 | GenesisBlockDB Architecture | Synchronize P7/P8/P6/plan/C4/master evidence for the test-only Values/UnionAll P7 differential (169 nullable bag pairs, 338 Storage executions); HQL2 382/0/1 across 33 targets, P6/compatibility 194/0/0; no runtime/schema/transport change; broad gates remain open |
 | 0.5.62+draft | 2026-10-03 | GenesisBlockDB Architecture | Synchronize P6/P8/plan evidence to merged PR #196; hosted checks 10 pass, five fail, one skipped, including worker bootstrap failures and unverified Windows Rust failure at 15m16; retain approval gates and broad P8/P13 |
 | 0.5.61+draft | 2026-10-03 | GenesisBlockDB Architecture | Extend test-only P7 ChangeScan differential to Edge/Row/Vector/Annotation; seven events match sequence, operation and identity for HQL/typed IR; History/Change 16/16 and HQL2 380/0/1; retain broader semantic and full P8/P13 gates |
 | 0.5.60+draft | 2026-10-03 | GenesisBlockDB Architecture | Register the Node-revision ChangeScan P7 differential and updated P7/P8/plan versions; record PR #194 merged with 48 pass, five fail and five skipped; retain other source-kind and broad HQL2 acceptance gates |
