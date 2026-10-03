@@ -1,8 +1,8 @@
 ---
 doc_id: REPORT--HQL2-P8-CORE-2026-09-28
-version: "0.1.43b"
+version: "0.1.44b"
 created_at: "2026-09-28T04:35:00+07:00,ATHER,22bc11e"
-last_update: "2026-10-03T07:37:36+07:00,ATHER"
+last_update: "2026-10-03T08:12:17+07:00,ATHER"
 status: beta
 owner: GenesisBlockDB Engineering
 attributes:
@@ -156,7 +156,9 @@ explicit test targets; the protected probe target was not selected.
 | HQL/IR annotation source and recursive ACL parity | 6 passed, 0 failed, 0 ignored | Separate `targets`/`evidence` properties, nested annotation references, and Edge endpoint access are covered; fixture evidence is independent of P8 operator acceptance. |
 | Long-running soak | Three soak_tests cases remain ignored by the normal suite | No soak qualification inferred |
 | Hosted PR #194 CI at head 31168524 | [Tests run 37073380412](https://github.com/Freshair129/GenesisBlock/actions/runs/37073380412): Rust, standard Node, docs, fmt/clippy and non-worker distribution checks pass; worker npm tests fail on Linux/macOS/Windows with RECOVERY_REQUIRED: markerless database identity is missing. [Rebuilt addon/worker run 37073380336](https://github.com/Freshair129/GenesisBlock/actions/runs/37073380336) fails with the same error. | Four worker checks remain red; correction is approval-gated and no worker code changed. |
-| PR #194 current state | GitHub reports OPEN, UNSTABLE at head 31168524; reviews list is empty. | Not merged; passing core checks do not establish P8/P13 acceptance. |
+| Hosted PR #194 CI at docs-only head 43cc6e8 (engine sources match 31168524) | [Tests run 37083654705](https://github.com/Freshair129/GenesisBlock/actions/runs/37083654705): Linux/macOS Rust, standard Node on all three OSes, docs, fmt/clippy and version consistency pass. Windows Rust fails `storage_hql_join_kinds_match_typed_ir_and_independent_p7` at `tests/hql2_storage_hql_join_oracle_differential_tests.rs:281` with `QUERY_BUDGET_EXCEEDED` / `query_limit`. [Rebuilt-addon run 37083654689](https://github.com/Freshair129/GenesisBlock/actions/runs/37083654689) and worker npm jobs on Linux/macOS/Windows fail with `RECOVERY_REQUIRED: markerless database identity is missing`. | Five CI checks fail. The Join differential target passes locally 5/5 at 0.21–0.22s; the generic error does not identify the budget dimension, so the CI cause remains suspected. No implementation source changed at 43cc6e8. |
+| PR #194 state after run 37083654705 | GitHub reports OPEN, UNSTABLE at head 43cc6e8; 48 checks pass, five fail, five skip; review submissions remain empty. | Not merged; no failed checks were bypassed. Broad P8/P13 acceptance remains open. |
+| Windows Join differential local reproduction | `cargo test --locked --offline --no-default-features --test hql2_storage_hql_join_oracle_differential_tests --target-dir target/hql2-execution`, repeated five times: 5/5 pass, each 0.21–0.22s. | Does not prove which default budget dimension fired on GitHub Actions; do not infer a runtime fix from the local pass. |
 | Hosted Rust/core CI, PR #194 head `9344b71` | [Run 37029503800](https://github.com/Freshair129/GenesisBlock/actions/runs/37029503800): Linux/macOS `cargo test`, all three standard `npm test` targets, `fmt + clippy`, docs validation and version consistency passed. Windows `cargo test` reached its 15-minute job limit while `tests/zz_probe_discriminates.rs::probe_vs_recall` was still running; runner canceled the job. | Windows full Rust suite remains incomplete; protected probe source was not changed. |
 | Hosted Rust/core CI, PR #194 head `484916b` (parent of this local test/docs-only change) | [Run 37049245946](https://github.com/Freshair129/GenesisBlock/actions/runs/37049245946): Linux/macOS/Windows `cargo test`, standard `npm test` on all three OSes, `fmt + clippy`, docs validation and version consistency passed; worker test jobs failed on all three OSes. The Join differential in this local revision is not included. | Core checks passed; hosted worker checks remain red. |
 | Hosted worker CI, PR #194 head `9344b71` | [Run 37029503800](https://github.com/Freshair129/GenesisBlock/actions/runs/37029503800) and [rebuilt-addon run 37029503808](https://github.com/Freshair129/GenesisBlock/actions/runs/37029503808): worker tests failed on Linux/macOS/Windows and rebuilt Linux addon with `RECOVERY_REQUIRED: markerless database identity is missing`. | Worker startup-order correction remains documentation/approval-gated; no worker code changed. |
@@ -420,13 +422,21 @@ from these local tests.
 
 | Artifact | Before | After |
 |---|---|---|
-| Registry | 0.5.53+draft | 0.5.54+draft |
-| C4 architecture index | 0.1.55b | 0.1.56b |
-| Master specification | 2.3.27b | 2.3.28b |
-| P6 generations/leases/ACL | 0.5.21b | 0.5.22b |
-| H2-D11 durable revisions/annotations | 0.8.13b | 0.8.14b |
-| Orchestration plan | 0.8.46b | 0.8.47b |
-| This report | 0.1.42b | 0.1.43b |
+| Registry | 0.5.54+draft | 0.5.55+draft |
+| C4 architecture index | 0.1.56b | 0.1.57b |
+| Master specification | 2.3.28b | 2.3.29b |
+| P6 generations/leases/ACL | 0.5.22b | 0.5.23b |
+| H2-D11 durable revisions/annotations | 0.8.14b | 0.8.15b |
+| Orchestration plan | 0.8.47b | 0.8.48b |
+| This report | 0.1.43b | 0.1.44b |
+
+Version diff 0.1.43b -> 0.1.44b: synchronize P6/C4/master/H2-D11/plan/
+registry versions and record completed PR #194 run 37083654705 at docs-only
+head 43cc6e8. Four worker checks fail at markerless schema-v6 bootstrap and
+Windows Rust fails the Join differential with `query_limit`; the exact budget
+dimension is unconfirmed and local reproduction passes 5/5. No H2-D11 or P6
+contract/schema change. PR remains OPEN/UNSTABLE and unmerged; broad P8/P13,
+independent review and worker-correction approval gates remain open.
 
 Version diff 0.1.42b -> 0.1.43b: synchronize current P6/C4/master/H2-D11/
 plan/registry versions with the 374/0/1 HQL2 regression sweep across 32
@@ -522,6 +532,7 @@ P8 and release gates.
 
 | Version | Date | Status | Summary | Commit Hash | Agent |
 |---|---|---|---|---|---|
+| 0.1.44b | 2026-10-03 | beta | Synchronize current P6/C4/master/H2-D11/plan/registry and record PR #194 run 37083654705 at docs-only head 43cc6e8: four worker bootstrap failures plus one Windows Join budget failure; local Join target 5/5, exact budget dimension unconfirmed; no contract/schema change; PR unmerged, broad gates open | working-tree | ATHER |
 | 0.1.43b | 2026-10-03 | beta | Synchronize P6/C4/master/plan/H2-D11/registry with the current 374/0/1 HQL2 regression result; record PR #194 head 31168524 and four worker-CI failures; retain worker-fix approval, unmerged, review and broad P8/P13 gates | working-tree | ATHER |
 | 0.1.42b | 2026-10-03 | beta | Verify HQL/typed-IR Row HistoryScan/ChangeScan parity and exact row-property hydration (1/1); record HQL2 regression 374/0/1 across 32 targets; retain hosted CI/review/broad P8/P13 gates | working-tree | ATHER |
 | 0.1.41b | 2026-10-03 | beta | Implement and locally verify HQL2/IR `tx_as_of` through one no-fallback frontier; focused 56/56, History/Change 14/14, HQL2 373/0/1 and P6/compatibility 194/0/0; retain hosted CI/review/broad P8/P13 gates | working-tree | ATHER |

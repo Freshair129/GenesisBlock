@@ -1,8 +1,8 @@
 ---
 doc_id: ADR--GENESISDB-HQL2-DURABLE-REVISIONS-ANNOTATIONS
-version: "0.8.14b"
+version: "0.8.15b"
 created_at: "2026-09-28T06:15:00+07:00,ATHER,53078cb"
-last_update: "2026-10-03T07:37:36+07:00,ATHER"
+last_update: "2026-10-03T08:12:17+07:00,ATHER"
 status: beta
 superseded_by: null
 owner: "Boss (Founder / Product Authority)"
@@ -727,19 +727,21 @@ Minimum Verify/Review/Final evidence:
 
 | Artifact | Approved version | Synchronized version/status |
 |---|---|---|
-| This H2-D11 addendum | `0.3.0b` candidate, owner-approved | `0.8.14b` beta, Row HistoryScan/ChangeScan HQL/IR parity and exact row-property hydration verified (1/1); current HQL2 sweep 374/0/1 across 32 targets; no schema/migration change |
+| This H2-D11 addendum | `0.3.0b` candidate, owner-approved | `0.8.15b` beta, Row HistoryScan/ChangeScan HQL/IR parity and exact row-property hydration verified (1/1); HQL2 sweep 374/0/1 across 32 targets; no schema/migration change |
 | P8 typed boundary | `0.2.0b` beta | `0.2.46b` beta, recursive target/evidence ACL, Vector and Row HistoryScan, Row ChangeScan and end-to-end `tx_as_of` implemented; broad P8/P13 qualification remains open |
-| P6 generations/leases/ACL | `0.5.0b` beta | `0.5.22b` beta, same-lease floors/ACL unchanged; current HQL2 regression 374/0/1 and P6/compatibility 194/0/0; worker CI remains red |
-| HQL2 orchestration plan | `0.5.0b` beta | `0.8.47b` beta, current PR #194 worker-CI failure recorded; broader qualification remains open |
-| C4 architecture index | `0.1.20b` | `0.1.56b`, indexes current HQL2/P6 architecture, counts and open gates |
-| DOC registry | `0.5.6+draft` | `0.5.54+draft`, synchronized current HQL2/P6/plan/report entries |
+| P6 generations/leases/ACL | `0.5.0b` beta | `0.5.23b` beta, same-lease floors/ACL unchanged; HQL2 374/0/1 and P6/compatibility 194/0/0; latest hosted run has Windows Join-budget and worker bootstrap failures |
+| HQL2 orchestration plan | `0.5.0b` beta | `0.8.48b` beta, records PR #194 run 37083654705 at docs-only head 43cc6e8; broader qualification remains open |
+| C4 architecture index | `0.1.20b` | `0.1.57b`, indexes current HQL2/P6 architecture, counts and open gates |
+| DOC registry | `0.5.6+draft` | `0.5.55+draft`, synchronized current HQL2/P6/plan/report entries |
 | Engine/storage | `0.2.9` | remains unchanged until implementation and release gates; no user database is migrated here |
 
-Version diff `0.8.13b -> 0.8.14b`: synchronize current HQL2/P6/plan, C4,
-master, report and registry versions; record 374/0/1 across 32 HQL2 targets
-and latest PR #194 head 31168524. Core CI passes, four worker checks fail at
-fresh schema-v6 bootstrap; no H2-D11 contract, schema or migration change.
-The worker correction and broad P8/P13/review gates remain open.
+Version diff `0.8.14b -> 0.8.15b`: synchronize current HQL2/P6/plan, C4,
+master, report and registry versions; record PR #194 run 37083654705 at
+docs-only head 43cc6e8. Four worker checks fail at fresh schema-v6 bootstrap;
+Windows Rust fails the Join differential with `query_limit`, while local
+reproduction passes 5/5 and the exact budget dimension remains unconfirmed.
+No H2-D11 contract, schema or migration change; worker correction and broad
+P8/P13/review gates remain open.
 
 Version diff `0.8.12b -> 0.8.13b`: record storage-backed HQL/typed-IR
 Row HistoryScan/ChangeScan parity for retained insert/update revisions, exact
@@ -769,6 +771,7 @@ NOT_RUN and broader acceptance/release gates remain open.
 
 | Version | Date | Status | Summary | Commit Hash | Agent |
 |---|---|---|---|---|---|
+| 0.8.15b | 2026-10-03 | beta | Synchronize current HQL2/P6/plan/C4/master/report/registry versions; record 374/0/1 across 32 targets and PR #194 run 37083654705 with four worker bootstrap plus one Windows Join-budget failure; no contract/schema/migration change; broad gates remain open | working-tree | ATHER |
 | 0.8.14b | 2026-10-03 | beta | Synchronize current HQL2/P6/plan/C4/master/report/registry versions and record 374/0/1 across 32 targets; PR #194 core CI passes but four worker checks fail at fresh schema-v6 bootstrap; no contract/schema/migration change; broad gates remain open | working-tree | ATHER |
 | 0.8.13b | 2026-10-03 | beta | Verify storage-backed HQL/typed-IR Row HistoryScan/ChangeScan parity, exact row-property hydration and durable Row identity (1/1); synchronize HQL2 plan/P8/report/registry evidence; no schema/migration change; broad P8/P13 gates remain open | working-tree | ATHER |
 | 0.8.12b | 2026-10-03 | beta | Implement and locally verify HQL2/IR `tx_as_of` through one no-fallback source/operator/hydration/snapshot frontier under pinned P6 policy; focused 56/56, History/Change 14/14, HQL2 373/0/1, compatibility 194/0/0; no schema/migration change; broad gates open | working-tree | ATHER |

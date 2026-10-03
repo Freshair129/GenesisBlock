@@ -1,9 +1,9 @@
 ---
 doc_id: SPEC--GENESISDB-P6-GENERATIONS-LEASES-ACL
 owner: GenesisBlockDB Engineering
-version: 0.5.22b
+version: 0.5.23b
 created_at: "2026-09-22T22:55:00+07:00,ATHER,working-tree"
-last_update: "2026-10-03T07:37:36+07:00,ATHER"
+last_update: "2026-10-03T08:12:17+07:00,ATHER"
 status: beta
 attributes:
   domain: storage-correctness
@@ -379,6 +379,14 @@ not approve P7, merge, release, deployment or external readiness.
 
 ## CHANGELOG
 
+Version diff 0.5.22b -> 0.5.23b: record PR #194 run 37083654705 at
+docs-only head 43cc6e8: four worker bootstrap checks fail and Windows Rust
+fails the storage Join differential with `QUERY_BUDGET_EXCEEDED`; local Join
+reproduction passes 5/5, but the budget dimension remains unconfirmed. HQL2
+remains 374/0/1 across 32 targets and the separate P6/schema-v6/compatibility
+group remains 194/0/0 across 11. No P6 contract or schema change; broad
+P6/P8/transport/review gates remain open.
+
 Version diff 0.5.21b -> 0.5.22b: synchronize the current HQL2 row-history
 parity checkpoint to 374/0/1 across 32 targets; the separate P6/schema-v6/
 compatibility group remains 194/0/0 across 11 targets. Hosted PR #194 core
@@ -437,6 +445,7 @@ broader P6/P8/P13 qualification is claimed.
 
 | Version | Date | Status | Summary | Commit | Agent |
 |---|---|---|---|---|---|
+| 0.5.23b | 2026-10-03 | beta | Record PR #194 run 37083654705: four worker bootstrap checks and Windows Join budget check fail; local Join target passes 5/5, exact budget dimension unconfirmed; HQL2 374/0/1, P6/compatibility 194/0/0, P6 contract unchanged, broad gates open | working-tree | ATHER |
 | 0.5.22b | 2026-10-03 | beta | Synchronize HQL2 row-history parity evidence to 374/0/1 across 32 targets and P6/schema-v6/compatibility to 194/0/0 across 11; hosted worker bootstrap checks fail at fresh schema-v6 initialization; P6 contract unchanged, broader gates open | working-tree | ATHER |
 | 0.5.21b | 2026-10-03 | beta | Implement P8 HQL2/IR `tx_as_of` selection with one no-fallback source/hydration/operator/result frontier and per-source floor checks; record 56/56 focused, 373/0/1 HQL2 and 194/0/0 P6/compatibility; broader gates remain open | working-tree | ATHER |
 | 0.5.20b | 2026-10-03 | beta | Specify P8 HQL2/IR `tx_as_of` selection as one no-fallback frontier across sources, hydration and result Snapshot; distinguish legacy ReadView rejections; runtime verification pending | working-tree | ATHER |

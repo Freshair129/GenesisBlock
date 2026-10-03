@@ -2,10 +2,10 @@
 doc_id: C4--GENESISDB-ARCHITECTURE
 type: architecture-index
 status: current
-version: 0.1.56b
+version: 0.1.57b
 owner: GenesisBlockDB Architecture
 created_at: 2026-06-13T22:50:11+07:00,ATHER,9b1ced3
-last_update: "2026-10-03T07:37:36+07:00,ATHER"
+last_update: "2026-10-03T08:12:17+07:00,ATHER"
 attributes:
   domain: architecture
   scope: repository
@@ -442,6 +442,14 @@ v6-only WAL without activation fails closed. See H2-D11 ADR R6b and the P6 recov
 
 ## CHANGELOG
 
+Version diff 0.1.56b -> 0.1.57b: refresh PR #194 evidence at run
+37083654705 on head 43cc6e8 (docs-only over code head 31168524). Linux/macOS
+Rust, standard Node, docs, fmt/clippy and version checks pass; Windows Rust
+fails one HQL/IR Join differential with `QUERY_BUDGET_EXCEEDED`, and all four
+worker jobs fail with markerless database identity missing. The same Join
+target passes locally 5/5; the exact budget dimension remains unconfirmed.
+PR remains OPEN/UNSTABLE and unmerged; retain approval gates and broad P8/P13.
+
 Version diff 0.1.55b -> 0.1.56b: synchronize the current HQL2 regression count
 to 374/0/1 across 32 explicit targets and record PR #194 at head 31168524:
 core CI passes, while three worker OS jobs and the rebuilt Linux addon/worker
@@ -481,6 +489,7 @@ full P8/P13 qualification remains open.
 
 | Version | Date | Status | Summary | Commit Hash | Agent |
 |---------|------|--------|---------|-------------|-------|
+| 0.1.57b | 2026-10-03 | current | Refresh PR #194 run 37083654705 at docs-only head 43cc6e8: Windows Join budget failure and four worker bootstrap failures; local Join target 5/5; PR unmerged, broad P8/P13 gates open | working-tree | ATHER |
 | 0.1.56b | 2026-10-03 | current | Synchronize HQL2 regression to 374/0/1 across 32 targets and current PR #194 worker-CI failures; keep worker correction approval-gated and PR unmerged | working-tree | ATHER |
 | 0.1.55b | 2026-10-03 | current | Implement HQL2/IR `tx_as_of` with one no-fallback frontier across scans, operators, hydration and snapshot; focused 56/56, History/Change 14/14, HQL2 373/0/1 and P6/compatibility 194/0/0; broader gates remain open | working-tree | ATHER |
 | 0.1.54b | 2026-10-03 | current | Implement HQL JOIN lowering through the approved RowScan/Join contract for four kinds and bare JOIN default; HQL/typed IR match independent P7 for duplicate, missing-property NULL and JSON-null result bags; record 365/0/1 across 31 targets; keep P8/P13/review gates open | working-tree | ATHER |

@@ -2,7 +2,7 @@
 title: "GenesisBlockDB Technical Architecture and Capability Composition"
 doc_id: "MASTER-SPEC-GENESISBLOCKDB"
 status: current
-version: "2.3.28b"
+version: "2.3.29b"
 updated: "2026-10-03"
 owner: "GenesisBlockDB Architecture"
 source_of_truth: true
@@ -400,6 +400,7 @@ user database was migrated, and broader P6/P8/P13 qualification remains open.
 
 | Version | Date | Owner | Summary |
 |---|---|---|---|
+| 2.3.29b | 2026-10-03 | GenesisBlockDB Architecture | Record PR #194 run 37083654705 at docs-only head 43cc6e8: Windows HQL/IR Join budget failure and four worker bootstrap failures; local Join reproduction 5/5, full acceptance and merge remain open |
 | 2.3.28b | 2026-10-03 | GenesisBlockDB Architecture | Synchronize the explicit HQL2 regression sweep to 374/0/1 across 32 targets and current PR #194 CI state: core checks pass, four worker checks fail at fresh schema-v6 bootstrap; preserve worker-fix approval, review, broad P8/P13 and release gates. |
 | 2.3.27b | 2026-10-03 | GenesisBlockDB Architecture | Implement HQL2/IR `tx_as_of` across sources, graph/vector/annotation operators, hydration and `Snapshot.tx` using one no-fallback frontier; record focused 56/56, HQL2 373/0/1 and P6/compatibility 194/0/0; retain broad P8/P13, review, worker-CI, soak, security and release gates. |
 | 2.3.26b | 2026-10-03 | GenesisBlockDB Architecture | Record HQL JOIN lowering through approved RowScan/Join contract, independent HQL/IR/P7 parity and 365/0/1 across 31 HQL2 targets; retain broad P8/P13, review, worker-CI, soak, security and release gates. |
