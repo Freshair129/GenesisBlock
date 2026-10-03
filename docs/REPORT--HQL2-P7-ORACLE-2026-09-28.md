@@ -1,8 +1,8 @@
 ---
 doc_id: REPORT--HQL2-P7-ORACLE-2026-09-28
-version: "0.1.4b"
+version: "0.1.5b"
 created_at: "2026-09-28T01:38:00+07:00,ATHER,fc851e9"
-last_update: "2026-10-03T14:38:00+07:00,ATHER"
+last_update: "2026-10-03T16:15:00+07:00,ATHER"
 status: beta
 owner: "GenesisBlockDB Engineering"
 attributes:
@@ -151,19 +151,21 @@ exact revision identity and temporal intervals, with edge-endpoint, vector-owner
 and annotation target/evidence ACL dependencies represented in P7. Artifact
 HistoryScan remains unsupported. The P7 oracle implementation itself is
 unchanged: its graph target passes 39 tests and combined graph/relational/rank/
-pipeline targets pass 130/130. The HistoryScan/ChangeScan target passes 15/15,
+pipeline targets pass 130/130. The HistoryScan/ChangeScan target passes 16/16,
 the Annotation source target passes 7/7, the prescribed 32-target HQL2
-regression passes 379/0/1, and the separate 11-target P6/schema-v6/
+regression passes 380/0/1, and the separate 11-target P6/schema-v6/
 compatibility group passes 194/0/0. These remain local test evidence; hosted
-checks, broad ChangeScan/source-oracle coverage and review are outstanding.
+checks, broad semantic acceptance and review are outstanding.
 
-The History/Change target now also compares the HQL Node-revision ChangeScan
-bag to P7, including exact sequence, upsert/correct/retract operation and
-revision identity. Source mutations come from signed-WAL envelopes; local
-projection transaction stamps provide the event ordering frontier. The target
-passes 15/15 and the explicit 32-target HQL2 sweep passes 379/0/1. This is a
-Node-only ChangeScan oracle slice; Edge/Row/Vector/Annotation event subjects
-and broader source/error/semantic cases remain open.
+Storage-backed HQL and typed-IR ChangeScan bags now compare all five supported
+revision subjects (Node, Edge, Row, Vector and Annotation) against explicit P7
+events built from signed-WAL mutations and projection transaction stamps. The
+new fixture checks seven Edge/Row/Vector/Annotation events, exact sequence,
+operation and full subject identity, including edge endpoints, vector owner and
+annotation target/evidence dependencies. HQL and typed IR agree; the
+History/Change target passes 16/16 and the 32-target HQL2 sweep passes 380/0/1.
+This closes the supported subject-kind differential gap only; broader
+ChangeScan error/semantic cases and full P8/P13 acceptance remain open.
 
 At the original P7 checkpoint, documentation validation reported `0
 violations in 233 files`; scoped rustfmt checks of the eight then-new Rust
@@ -187,11 +189,12 @@ not been run or claimed.
 
 ## Version diff
 
-Version diff `0.1.3b -> 0.1.4b`: record a storage-backed P7 ChangeScan
-Node-revision differential for HQL and typed IR, comparing event sequence,
-operation and exact subject revision; record History/Change 15/15 and HQL2
-379/0/1 across 32 targets. Other ChangeScan event kinds and full P8/P13 remain
-open.
+Version diff `0.1.4b -> 0.1.5b`: extend the storage-backed P7 ChangeScan
+differential from Node to Edge, Row, Vector and Annotation revisions. Compare
+seven events for exact sequence, operation and subject identity while retaining
+recursive endpoint/owner/target/evidence dependencies; HQL and typed IR agree.
+Record History/Change 16/16 and HQL2 380/0/1 across 32 targets. Broader
+ChangeScan semantics and full P8/P13 remain open.
 
 Version diff `0.1.2b -> 0.1.3b`: record storage-backed P7 HistoryScan
 differentials for all five supported kinds from WAL-derived revisions and
@@ -214,6 +217,7 @@ open.
 
 | Version | Date | Status | Summary | Commit Hash | Agent |
 |---|---|---|---|---|---|
+| 0.1.5b | 2026-10-03 | beta | Extend the HQL/typed-IR P7 ChangeScan differential to Edge/Row/Vector/Annotation; seven events match on sequence, operation and subject identity; History/Change 16/16 and HQL2 380/0/1; retain broad semantic and P8/P13 gates | working-tree | ATHER |
 | 0.1.4b | 2026-10-03 | beta | Add the Node-revision ChangeScan HQL/typed-IR differential against P7 for exact sequence, operation and subject revision; History/Change 15/15, HQL2 379/0/1; retain other source-kind and broad P8/P13 gates | working-tree | ATHER |
 | 0.1.3b | 2026-10-03 | beta | Record WAL-derived storage-backed P7 HistoryScan differentials for Node/Edge/Row/Vector/Annotation; History/Change 15/15, Annotation source 7/7, HQL2 379/0/1 and P6/compatibility 194/0/0; retain Artifact, broad oracle, hosted and review gates | working-tree | ATHER |
 | 0.1.2b | 2026-10-03 | beta | Extend test-only P7 graph reference with approved H2-D11 Vector HistoryScan compact identity and owner-Node ACL; record WAL-derived HQL/typed-IR differential evidence and local sweeps | working-tree | ATHER |

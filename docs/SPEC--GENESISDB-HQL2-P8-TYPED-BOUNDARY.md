@@ -1,8 +1,8 @@
 ---
 doc_id: SPEC--GENESISDB-HQL2-P8-TYPED-BOUNDARY
-version: "0.2.50b"
+version: "0.2.51b"
 created_at: "2026-09-28T01:25:00+07:00,ATHER,fc851e9"
-last_update: "2026-10-03T14:38:00+07:00,ATHER"
+last_update: "2026-10-03T16:15:00+07:00,ATHER"
 status: beta
 superseded_by: null
 owner: "Boss (Founder / Product Authority)"
@@ -76,7 +76,7 @@ Sequence ID, conjunctive labels and D4 node/edge property constraints now run
 for HQL and typed IR against one authorized P6 graph snapshot; candidate IDs
 are never looked up directly. Exact JSON values are selectively hydrated under
 budget and filtered before SHORTEST; Compact constraints remain unavailable
-and fail closed. The 10/10 P8 completion target and latest 379/0/1 root-HQL2
+and fail closed. The 10/10 P8 completion target and latest 380/0/1 root-HQL2
 sweep across 32 targets cover this slice, including edge-property filtering
 before SHORTEST and the nine-test D7 actor-scoped HQL1 adapter. P6
 D1's exact-record-only fixture denies before parsing; it does not assert
@@ -94,11 +94,11 @@ catalogs from WAL revision facts and captured frontiers/valid-time windows.
 The fixtures cover Node's close/replacement frames, Edge retraction and endpoint
 ACL, exact Row revision IDs, H2-D11 Vector tuple identity and owner-Node ACL,
 and Annotation target/evidence references with explicit body-read permission.
-The focused History/Change target passes 15/15 and the Annotation source target
+The focused History/Change target passes 16/16 and the Annotation source target
 passes 7/7. Artifact HistoryScan remains capability-unsupported under the
-approved contract. The current explicit 32-target HQL2 sweep passes 379/0/1,
-with the
-ignored parser child entrypoint exercised by its parent.
+approved contract. Storage-backed P7 ChangeScan differentials now cover all five
+supported revision kinds. The current explicit 32-target HQL2 sweep passes
+380/0/1, with the ignored parser child entrypoint exercised by its parent.
 The accepted transaction-time contract selects one historical frame S for the
 entire query and reports `Snapshot.tx = S`. HQL2 and typed-IR `query_v2` now
 execute this contract end to end: all revision-backed scans, graph/vector/
@@ -106,8 +106,8 @@ annotation operators, property hydration and result metadata use the same S,
 while the validated P6 generation, catalog and current policy stay pinned.
 Per-source history floors fail closed before reads, and no path falls back to
 current state. Five focused targets pass 56/56; the HistoryScan/ChangeScan
-  target passes 15/15; the explicit 32-target HQL2 regression sweep passes
-  379/0/1 and the separate P6/schema-v6/compatibility sweep passes 194/0/0.
+  target passes 16/16; the explicit 32-target HQL2 regression sweep passes
+  380/0/1 and the separate P6/schema-v6/compatibility sweep passes 194/0/0.
 These are local regression results, not broad P8/P13 or transport acceptance.
 LexicalMatch uses only registered `unicode-whitespace-bm25-v1` exact scan;
 ContextPack uses registered `unicode-scalar-v1` with same-revision evidence,
@@ -711,13 +711,13 @@ and the collection space is bound by the H2-D11 fingerprint. Approximate KNN
 remains unsupported. HistoryScan/ChangeScan execute from exact retained
 schema-v6 revisions under the P6 lease, including Vector HistoryScan by the
 H2-D11 tuple ID, current reference ACL, exclusive source floors, typed HQL/IR
-parity and fail-closed budgets. Storage-backed P7 HistoryScan differentials
-cover Node, Edge, Row, Vector and Annotation; the focused History/Change target
-passes 15/15 and Annotation source/ACL passes 7/7. The current 32-target HQL2
-sweep passes 379/0/1, with a separate 11-target P6/schema-v6/compatibility
-sweep at 194/0/0. HQL2/IR `tx_as_of` now selects
+parity and fail-closed budgets. Storage-backed P7 HistoryScan and ChangeScan
+differentials cover Node, Edge, Row, Vector and Annotation; the focused
+History/Change target passes 16/16 and Annotation source/ACL passes 7/7. The
+current 32-target HQL2 sweep passes 380/0/1, with a separate 11-target
+P6/schema-v6/compatibility sweep at 194/0/0. HQL2/IR `tx_as_of` now selects
 one no-fallback frontier across scans, operators, hydration and `Snapshot.tx`;
-five focused targets pass 56/56 and HistoryScan/ChangeScan passes 15/15.
+five focused targets pass 56/56 and HistoryScan/ChangeScan passes 16/16.
 Broader exact-oracle, independent-review, transport and P8/P13 gates remain
 open.
 LexicalMatch uses only the registered `unicode-whitespace-bm25-v1` exact-scan
@@ -796,7 +796,7 @@ parallel-edge multiplicity, all directions and wildcard relations, endpoint-ID
 string equality on either endpoint, denial/mismatch before parse, malformed
 syntax, fail-closed unlisted syntax and pre-parse resource rejection. The
 latest 32-target root HQL2 sweep passes
-379/0/1; a separate 11-target P6/schema-v6/compatibility group passes 194/0/0.
+380/0/1; a separate 11-target P6/schema-v6/compatibility group passes 194/0/0.
 The prior combined 37-target run passed 528/0/1 before
 the added edge-property regression; all remain regression evidence, not full
 P8/P13 acceptance.
@@ -842,12 +842,13 @@ separate shape limits. No process-global Pest setting is changed.
 
 ## Version diff and changelog
 
-Version diff `0.2.49b -> 0.2.50b`: add the storage-backed P7 ChangeScan
-Node-revision differential for HQL/typed IR, comparing sequence, operation
-and exact subject revision against an independent P7 expected bag built from
-WAL mutations and captured projection frontiers. Record History/Change 15/15
-and the 32-target HQL2 sweep 379/0/1. ChangeScan differentials for the other
-supported source kinds, broad P8/P13, hosted checks and review remain open.
+Version diff `0.2.50b -> 0.2.51b`: extend the storage-backed P7 ChangeScan
+differential from Node to Edge, Row, Vector and Annotation revisions. Compare
+seven events for exact sequence, operation and subject identity, with recursive
+edge-endpoint, vector-owner and annotation target/evidence dependencies; HQL and
+typed IR agree. Record History/Change 16/16 and the 32-target HQL2 sweep
+380/0/1. Broader ChangeScan semantics, full P8/P13, hosted checks and review
+remain open.
 
 Version diff `0.2.48b -> 0.2.49b`: add storage-backed P7 HistoryScan
 differentials for Node, Edge, Row and Annotation, completing the five supported
@@ -984,6 +985,7 @@ detail with unchanged JSON shape; broader P8/P13/review gates remain open.
 
 | Version | Date | Status | Summary | Commit Hash | Agent |
 |---|---|---|---|---|---|
+| 0.2.51b | 2026-10-03 | beta | Extend test-only P7 ChangeScan differential to Edge/Row/Vector/Annotation for HQL/typed IR; seven events match sequence, operation and subject identity; History/Change 16/16 and HQL2 380/0/1 across 32 targets; broader semantic, hosted/review and P8/P13 gates remain open | working-tree | ATHER |
 | 0.2.50b | 2026-10-03 | beta | Add test-only P7 ChangeScan Node-revision differential for HQL/typed IR; History/Change 15/15 and HQL2 379/0/1 across 32 targets; other event source kinds, hosted checks/review and broad P8/P13 remain open | working-tree | ATHER |
 | 0.2.49b | 2026-10-03 | beta | Add WAL-derived P7 HistoryScan differentials for all five supported kinds: Node, Edge, Row, Vector and Annotation; History/Change 15/15, Annotation source 7/7, P7 130/130, HQL2 379/0/1, P6/schema-v6/compatibility 194/0/0; Artifact HistoryScan, hosted review/checks and broad P8/P13 remain open | working-tree | ATHER |
 | 0.2.48b | 2026-10-03 | beta | Add test-only P7 Vector HistoryScan oracle profile and WAL-derived HQL/typed-IR differential; P7 130/130, History/Change 14/14, HQL2 377/0/1, P6/schema-v6/compatibility 194/0/0; hosted checks/review and broad P8/P13 remain open | working-tree | ATHER |
