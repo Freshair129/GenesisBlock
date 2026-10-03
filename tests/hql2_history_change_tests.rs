@@ -1,18 +1,21 @@
 use genesis_block_native::{
     query::hql2::{QueryOutcomeV2, QueryResultV2},
-    uee_v2::QueryRequestV2,
-    AccessContext, EdgeInput, NodeInput, OpenOptions, Storage,
+    uee_v2::{AnnotationPutMutationV2, QueryRequestV2},
+    AccessContext, EdgeInput, NodeInput, OpenOptions, RelationalColumn, RelationalColumnType,
+    RelationalMutationBatch, RelationalMutationKind, RelationalRowMutation,
+    RelationalSchemaPackage, RelationalTable, Storage,
 };
 #[allow(dead_code)]
 #[path = "support/hql2_graph_reference.rs"]
 mod p7_graph;
-use rusqlite::Connection;
+use rusqlite::{params, Connection};
 use serde_json::{json, Value};
 use std::{
     collections::{BTreeMap, BTreeSet},
     path::Path,
 };
 use tempfile::TempDir;
+use uuid::Uuid;
 
 fn open(path: &Path) -> Storage {
     Storage::open(OpenOptions {
@@ -140,6 +143,26 @@ fn run_ir_changes(storage: &Storage, request_id: &str, after_seq: u64) -> QueryR
     }
 }
 
+fn database_id(storage: &Storage) -> String {
+    let request: QueryRequestV2 = serde_json::from_value(json!({
+        "contract_version":"genesis.api.v2",
+        "request_id":"change-scan-database-id",
+        "namespace":"default",
+        "ir":{
+            "contract_version":"query-ir.v2",
+            "nodes":[{"id":"values","op":"Values","inputs":[],"config":{"param":"items","as":"item"}}],
+            "root":"values",
+            "parameter_types":{"items":"List<I64>"}
+        },
+        "params":{"items":{"type":"List<I64>","value":[]}}
+    }))
+    .unwrap();
+    match storage.query_v2(access(), request).unwrap() {
+        QueryOutcomeV2::Rows(result) => result.snapshot.database_id,
+        QueryOutcomeV2::Plan(_) => panic!("values query must return rows"),
+    }
+}
+
 fn add_node(storage: &Storage) {
     storage
         .add_node(NodeInput {
@@ -171,13 +194,188 @@ fn record_revision_mutations(storage: &Storage, kind: &str) -> Vec<Value> {
         .events_since_seq(0)
         .into_iter()
         .filter_map(|signed| serde_json::to_value(signed.event).ok())
-        .filter_map(|event| event.get("Transaction").cloned())
+        .filter_map(|event| {
+            event
+                .get("Transaction")
+                .or_else(|| event.get("RelationalRows"))
+                .cloned()
+        })
         .filter_map(|transaction| transaction.get("record_revision_transaction").cloned())
         .filter_map(|revisions| revisions.get("mutations").cloned())
         .filter_map(|mutations| mutations.as_array().cloned())
         .flatten()
         .filter(|mutation| mutation.get("kind").and_then(Value::as_str) == Some(kind))
         .collect()
+}
+
+fn p7_kind(kind: &str) -> p7_graph::Kind {
+    match kind {
+        "node" => p7_graph::Kind::Node,
+        "edge" => p7_graph::Kind::Edge,
+        "row" => p7_graph::Kind::Row,
+        "vector" => p7_graph::Kind::Vector,
+        "annotation" => p7_graph::Kind::Annotation,
+        _ => panic!("unexpected revision kind: {kind}"),
+    }
+}
+
+fn p7_change_catalog(storage: &Storage, path: &Path, after: u64) -> p7_graph::Catalog {
+    let projection = Connection::open(path.join("projection.sqlite")).unwrap();
+    let frontier = storage.stable_frontier();
+    let mut revisions = Vec::new();
+    for kind in ["node", "edge", "row", "vector", "annotation"] {
+        for mutation in record_revision_mutations(storage, kind) {
+            let revision_id = mutation["revision_id"].as_str().unwrap();
+            let id = mutation["id"].as_str().unwrap();
+            let namespace = mutation["namespace"].as_str().unwrap();
+            let (tx_from, tx_to): (i64, Option<i64>) = projection
+                .query_row(
+                    "SELECT tx_from, tx_to FROM hql2_record_revisions
+                     WHERE namespace=?1 AND kind=?2 AND record_id=?3 AND revision_id=?4",
+                    params![namespace, kind, id, revision_id],
+                    |row| Ok((row.get(0)?, row.get(1)?)),
+                )
+                .unwrap();
+            let tx_from = u64::try_from(tx_from).unwrap();
+            let tx_to = tx_to.map(|value| u64::try_from(value).unwrap());
+            let valid_from =
+                chrono::DateTime::parse_from_rfc3339(mutation["valid_from"].as_str().unwrap())
+                    .unwrap()
+                    .timestamp_micros();
+            let valid_to = mutation["valid_to"].as_str().map(|value| {
+                chrono::DateTime::parse_from_rfc3339(value)
+                    .unwrap()
+                    .timestamp_micros()
+            });
+            let subject = p7_graph::EntityRef {
+                namespace: namespace.into(),
+                kind: p7_kind(kind),
+                id: id.into(),
+                revision: revision_id.into(),
+            };
+            let operation = match (
+                mutation["operation"].as_str().unwrap(),
+                mutation["predecessor_revision_id"].as_str(),
+            ) {
+                ("retract", _) => p7_graph::ChangeKind::Retract,
+                ("upsert", Some(_)) => p7_graph::ChangeKind::Correct,
+                ("upsert", None) => p7_graph::ChangeKind::Upsert,
+                _ => panic!("unexpected revision operation: {mutation:#?}"),
+            };
+            let data = match kind {
+                "edge" => p7_graph::RecordData::Edge {
+                    source: p7_graph::Identity {
+                        namespace: namespace.into(),
+                        kind: p7_graph::Kind::Node,
+                        id: mutation["payload"]["from"].as_str().unwrap().into(),
+                    },
+                    target: p7_graph::Identity {
+                        namespace: namespace.into(),
+                        kind: p7_graph::Kind::Node,
+                        id: mutation["payload"]["to"].as_str().unwrap().into(),
+                    },
+                    relation: mutation["payload"]["rel"].as_str().unwrap().into(),
+                },
+                "vector" => p7_graph::RecordData::Vector {
+                    owner: p7_graph::Identity {
+                        namespace: namespace.into(),
+                        kind: p7_graph::Kind::Node,
+                        id: mutation["payload"]["owner_id"].as_str().unwrap().into(),
+                    },
+                },
+                "annotation" => {
+                    let mut targets = Vec::new();
+                    for role in ["targets", "evidence"] {
+                        for value in mutation["payload"][role].as_array().unwrap() {
+                            let reference = &value["ref"];
+                            let reference_kind = p7_kind(reference["kind"].as_str().unwrap());
+                            let binding = match value["binding"].as_str().unwrap() {
+                                "frozen" => p7_graph::TargetBinding::Frozen(p7_graph::EntityRef {
+                                    namespace: reference["namespace"].as_str().unwrap().into(),
+                                    kind: reference_kind,
+                                    id: reference["id"].as_str().unwrap().into(),
+                                    revision: reference["revision"].as_str().unwrap().into(),
+                                }),
+                                "live" => p7_graph::TargetBinding::Live(p7_graph::Identity {
+                                    namespace: reference["namespace"].as_str().unwrap().into(),
+                                    kind: reference_kind,
+                                    id: reference["id"].as_str().unwrap().into(),
+                                }),
+                                value => panic!("unexpected annotation binding: {value}"),
+                            };
+                            let selector = match value["selector"]["type"].as_str().unwrap() {
+                                "whole" => p7_graph::Selector::Whole,
+                                value => panic!("unexpected annotation selector: {value}"),
+                            };
+                            let target = p7_graph::Target { binding, selector };
+                            if !targets.contains(&target) {
+                                targets.push(target);
+                            }
+                        }
+                    }
+                    p7_graph::RecordData::Annotation { targets }
+                }
+                _ => p7_graph::RecordData::Plain,
+            };
+            let valid = p7_graph::Interval {
+                start: valid_from,
+                end: valid_to,
+            };
+            revisions.push(p7_graph::Revision {
+                entity: subject.clone(),
+                transaction: p7_graph::Interval {
+                    start: tx_from,
+                    end: tx_to,
+                },
+                valid: valid.clone(),
+                retracted: operation == p7_graph::ChangeKind::Retract,
+                fields: p7_graph::Fields::new(),
+                data,
+            });
+            if tx_from > after {
+                revisions.push(p7_graph::Revision {
+                    entity: p7_graph::EntityRef {
+                        namespace: namespace.into(),
+                        kind: p7_graph::Kind::Event,
+                        id: format!("{kind}:{id}:{revision_id}"),
+                        revision: revision_id.into(),
+                    },
+                    transaction: p7_graph::Interval {
+                        start: tx_from,
+                        end: None,
+                    },
+                    valid,
+                    retracted: false,
+                    fields: p7_graph::Fields::new(),
+                    data: p7_graph::RecordData::Change { subject, operation },
+                });
+            }
+        }
+    }
+    let history = [
+        p7_graph::Kind::Node,
+        p7_graph::Kind::Edge,
+        p7_graph::Kind::Row,
+        p7_graph::Kind::Vector,
+        p7_graph::Kind::Annotation,
+        p7_graph::Kind::Event,
+    ]
+    .into_iter()
+    .map(|kind| {
+        (
+            kind,
+            p7_graph::HistoryCapability {
+                horizon: 0,
+                available: true,
+            },
+        )
+    })
+    .collect();
+    p7_graph::Catalog {
+        frontier,
+        history,
+        revisions,
+    }
 }
 
 #[test]
@@ -1218,6 +1416,236 @@ fn change_scan_emits_ordered_revision_events_with_typed_sequences_and_operations
         let actual_subject = &tagged(actual, "subject")["value"];
         assert_eq!(actual_subject["namespace"], subject.namespace);
         assert_eq!(actual_subject["kind"], "node");
+        assert_eq!(actual_subject["id"], subject.id);
+        assert_eq!(actual_subject["revision"], subject.revision);
+    }
+}
+
+#[test]
+fn change_scan_matches_p7_for_edge_row_vector_and_annotation_revisions() {
+    let dir = TempDir::new().unwrap();
+    let storage = open(dir.path());
+    for id in ["change:node-a", "change:node-b"] {
+        storage
+            .add_node(NodeInput {
+                id: Some(id.into()),
+                labels: vec!["Document".into()],
+                props: None,
+                embedding: None,
+                lang: None,
+                valid_from: Some("2010-01-01T00:00:00Z".into()),
+                caused_by: None,
+                ttl: None,
+                collection: None,
+            })
+            .unwrap();
+    }
+    storage
+        .register_relational_schema(RelationalSchemaPackage {
+            namespace: "default".into(),
+            schema_version: 1,
+            previous_version: None,
+            package_id: Uuid::new_v4().to_string(),
+            schema_hash: String::new(),
+            tables: vec![RelationalTable {
+                name: "change_records".into(),
+                columns: vec![
+                    RelationalColumn::required("id", RelationalColumnType::Text),
+                    RelationalColumn::required("title", RelationalColumnType::Text),
+                ],
+                primary_key: vec!["id".into()],
+                foreign_keys: vec![],
+                indexes: vec![],
+            }],
+            named_queries: vec![],
+        })
+        .unwrap();
+    let after = storage.stable_frontier();
+
+    storage
+        .add_edge(EdgeInput {
+            id: Some("change:edge".into()),
+            from: "change:node-a".into(),
+            to: "change:node-b".into(),
+            rel: "LINK".into(),
+            props: None,
+            valid_from: Some("2010-01-01T00:00:00Z".into()),
+            supersede: None,
+            impact: None,
+            caused_by: None,
+        })
+        .unwrap();
+    storage
+        .retract_edge("change:edge".into(), Some("2020-01-01T00:00:00Z".into()))
+        .unwrap();
+    for (kind, values, key) in [
+        (
+            RelationalMutationKind::Insert,
+            json!({"id":"row:change","title":"original"}),
+            None,
+        ),
+        (
+            RelationalMutationKind::Update,
+            json!({"title":"replacement"}),
+            Some(json!({"id":"row:change"})),
+        ),
+    ] {
+        storage
+            .apply_relational_batch(RelationalMutationBatch {
+                mutation_id: Uuid::new_v4().to_string(),
+                namespace: "default".into(),
+                schema_version: 1,
+                operations: vec![RelationalRowMutation {
+                    table: "change_records".into(),
+                    kind,
+                    values,
+                    key,
+                }],
+            })
+            .unwrap();
+    }
+    storage
+        .add_vector("change:node-a".into(), "default".into(), vec![0.25, 0.5])
+        .unwrap();
+    storage
+        .add_vector("change:node-a".into(), "default".into(), vec![0.5, 0.75])
+        .unwrap();
+
+    let database_id = database_id(&storage);
+    let node_mutations = record_revision_mutations(&storage, "node");
+    let frozen_node = |id: &str| {
+        let revision = node_mutations
+            .iter()
+            .find(|mutation| mutation["id"] == id)
+            .unwrap()["revision_id"]
+            .as_str()
+            .unwrap();
+        json!({
+            "ref":{
+                "database_id":database_id,
+                "namespace":"default",
+                "kind":"node",
+                "id":id,
+                "revision":revision
+            },
+            "binding":"frozen",
+            "selector":{"type":"whole"}
+        })
+    };
+    storage
+        .put_annotation(
+            access(),
+            AnnotationPutMutationV2 {
+                annotation: json!({
+                    "id":"change:annotation",
+                    "namespace":"default",
+                    "kind":"review",
+                    "targets":[frozen_node("change:node-a")],
+                    "evidence":[frozen_node("change:node-b")],
+                    "body":{"type":"text","text":"Change scan oracle fixture."},
+                    "author":"history-change-reader",
+                    "created_at":"2010-01-01T00:00:00Z",
+                    "valid_from":"2010-01-01T00:00:00Z",
+                    "valid_to":null
+                }),
+                expected_revision: None,
+                valid: None,
+            },
+        )
+        .unwrap();
+
+    let hql = run_hql(
+        &storage,
+        "change-multi-source-parity-hql",
+        &format!("USE default CHANGES SINCE {after} AS c |> RETURN c"),
+    )
+    .unwrap();
+    let ir = run_ir_changes(&storage, "change-multi-source-parity-ir", after);
+    assert_eq!(hql.columns, ir.columns);
+    assert_eq!(hql.rows, ir.rows);
+
+    let actual = run_hql(
+        &storage,
+        "change-multi-source-parity-projected",
+        &format!(
+            "USE default CHANGES SINCE {after} AS c |> ORDER BY c.sequence ASC NULLS LAST |> RETURN c.subject AS subject, c.sequence AS sequence, c.operation AS operation"
+        ),
+    )
+    .unwrap();
+    let catalog = p7_change_catalog(&storage, dir.path(), after);
+    let valid_at = chrono::Utc::now().timestamp_micros();
+    let p7 = p7_graph::execute(
+        &catalog,
+        &p7_graph::View {
+            namespace: "default".into(),
+            transaction: catalog.frontier,
+            valid_at,
+            permissions: p7_graph::Permissions {
+                read: catalog
+                    .revisions
+                    .iter()
+                    .map(|revision| revision.entity.identity())
+                    .collect(),
+                annotation_body: catalog
+                    .revisions
+                    .iter()
+                    .filter(|revision| revision.entity.kind == p7_graph::Kind::Annotation)
+                    .map(|revision| revision.entity.identity())
+                    .collect(),
+            },
+        },
+        &p7_graph::Plan {
+            source: p7_graph::Source::ChangeScan {
+                alias: "c".into(),
+                predicate: p7_graph::Predicate::default(),
+                after,
+                through: catalog.frontier,
+            },
+            stages: vec![],
+        },
+        p7_graph::Limits::default(),
+    )
+    .unwrap();
+    assert_eq!(actual.rows.len(), 7);
+    assert_eq!(actual.rows.len(), p7.rows.len());
+    for (actual, expected) in actual.rows.iter().zip(&p7.rows) {
+        let p7_graph::Binding::Entity(event_ref) = &expected["c"] else {
+            panic!("P7 ChangeScan binds event identities")
+        };
+        let event = catalog
+            .revisions
+            .iter()
+            .find(|revision| &revision.entity == event_ref)
+            .unwrap();
+        let p7_graph::RecordData::Change { subject, operation } = &event.data else {
+            panic!("P7 ChangeScan result must resolve to an explicit event")
+        };
+        assert_eq!(
+            tagged(actual, "sequence")["value"],
+            event.transaction.start.to_string()
+        );
+        assert_eq!(
+            tagged(actual, "operation")["value"],
+            match operation {
+                p7_graph::ChangeKind::Upsert => "upsert",
+                p7_graph::ChangeKind::Correct => "correct",
+                p7_graph::ChangeKind::Retract => "retract",
+            }
+        );
+        let actual_subject = &tagged(actual, "subject")["value"];
+        assert_eq!(actual_subject["database_id"], database_id);
+        assert_eq!(actual_subject["namespace"], subject.namespace);
+        assert_eq!(
+            actual_subject["kind"],
+            match subject.kind {
+                p7_graph::Kind::Node => "node",
+                p7_graph::Kind::Edge => "edge",
+                p7_graph::Kind::Row => "row",
+                p7_graph::Kind::Vector => "vector",
+                p7_graph::Kind::Annotation => "annotation",
+                _ => panic!("unexpected P7 ChangeScan subject kind"),
+            }
+        );
         assert_eq!(actual_subject["id"], subject.id);
         assert_eq!(actual_subject["revision"], subject.revision);
     }
