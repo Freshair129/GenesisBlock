@@ -2,10 +2,10 @@
 doc_id: C4--GENESISDB-ARCHITECTURE
 type: architecture-index
 status: current
-version: 0.1.57b
+version: 0.1.58b
 owner: GenesisBlockDB Architecture
 created_at: 2026-06-13T22:50:11+07:00,ATHER,9b1ced3
-last_update: "2026-10-03T08:12:17+07:00,ATHER"
+last_update: "2026-10-03T09:18:47+07:00,ATHER"
 attributes:
   domain: architecture
   scope: repository
@@ -73,13 +73,16 @@ per-candidate work limits are tested, with filtering before deterministic
 SHORTEST selection, including the constrained-edge regression. Compact
 constraints remain unsupported and fail closed.
 HistoryScan and ChangeScan now enumerate exact retained schema-v6 revisions under
-the P6 ReadView with source floors and recursive current reference ACL. Their
+the P6 ReadView with source floors and recursive current reference ACL.
+Annotation subjects in source scans and ChangeScan additionally require explicit
+Annotation(Read), separate from the Namespace(Read) query grant; the broad
+namespace grant still authorizes same-namespace references. Their
 focused target now passes 14/14, including one selected transaction frontier
 across HQL/IR source scans, graph/vector/annotation operators, hydration and
 `Snapshot.tx`. HQL2/IR `tx_as_of` fails closed below history/source floors and
 never falls back to current rows; the validated P6 generation and current
 policy remain pinned. Five focused targets pass 56/56; the 32-target HQL2
-regression sweep passes 374/0/1 and the separate 11-target P6/schema-v6/
+regression sweep passes 375/0/1 and the earlier separate 11-target P6/schema-v6/
 compatibility sweep passes 194/0/0. These are local regression results, not
 broad P8/P13, transport, hosted CI or independent-review acceptance.
 Structural unsigned HQL parameters now bind only
@@ -106,8 +109,8 @@ HQL and typed-IR Join differentials match independent P7 for Inner/Left/Semi/Ant
 with duplicate, missing-property NULL and JSON-null keys (5/7/3/2 output rows).
 HQL `JOIN TABLE` lowers to the existing RowScan/Join contract; bare JOIN
 defaults to Inner and Semi/Anti do not export the right scope. The explicit
-root-HQL2 sweep passes 374/0/1 across 32 targets.
-A separate 11-target P6/schema-v6/compatibility
+root-HQL2 sweep passes 375/0/1 across 32 targets.
+A separate earlier 11-target P6/schema-v6/compatibility
 group passes 194/0/0. The legacy parser preflight correction is recorded in the
 Local RCA: `.brain/rca/RCA--HQL1-ADAPTER-PARSER-RESERVATION.md`.
 The ignored parser
@@ -442,6 +445,14 @@ v6-only WAL without activation fails closed. See H2-D11 ADR R6b and the P6 recov
 
 ## CHANGELOG
 
+Version diff 0.1.57b -> 0.1.58b: record H2-D11 R4/P6 annotation ACL
+conformance for AnnotationScan, hydration and ChangeScan subjects; retain the
+separate Namespace(Read) query boundary and recursive same-lease reference
+checks. Local regression and 375/0/1 across 32 HQL2 targets pass, with selected
+P6/schema-v6 checks at 43/0/0. The prior PR head had four worker failures and a
+cancelled Windows Rust job; current hosted checks/review and broader P8/P13 gates
+remain open. No schema/migration change.
+
 Version diff 0.1.56b -> 0.1.57b: refresh PR #194 evidence at run
 37083654705 on head 43cc6e8 (docs-only over code head 31168524). Linux/macOS
 Rust, standard Node, docs, fmt/clippy and version checks pass; Windows Rust
@@ -489,6 +500,7 @@ full P8/P13 qualification remains open.
 
 | Version | Date | Status | Summary | Commit Hash | Agent |
 |---------|------|--------|---------|-------------|-------|
+| 0.1.58b | 2026-10-03 | current | Record H2-D11 R4/P6 annotation ACL conformance for scans and ChangeScan subjects; HQL2 375/0/1 and selected P6/schema-v6 43/0/0 pass locally; possible ChangeScan budget side channel, prior PR worker failures and cancelled Windows Rust remain open | working-tree | ATHER |
 | 0.1.57b | 2026-10-03 | current | Refresh PR #194 run 37083654705 at docs-only head 43cc6e8: Windows Join budget failure and four worker bootstrap failures; local Join target 5/5; PR unmerged, broad P8/P13 gates open | working-tree | ATHER |
 | 0.1.56b | 2026-10-03 | current | Synchronize HQL2 regression to 374/0/1 across 32 targets and current PR #194 worker-CI failures; keep worker correction approval-gated and PR unmerged | working-tree | ATHER |
 | 0.1.55b | 2026-10-03 | current | Implement HQL2/IR `tx_as_of` with one no-fallback frontier across scans, operators, hydration and snapshot; focused 56/56, History/Change 14/14, HQL2 373/0/1 and P6/compatibility 194/0/0; broader gates remain open | working-tree | ATHER |

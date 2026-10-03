@@ -1,4 +1,5 @@
 use genesis_block_native::{
+    query::hql2::QueryOutcomeV2,
     uee_v2::{AnnotationPutMutationV2, RecordKindV2},
     AccessAction, AccessContext, AccessGrant, AccessPolicy, AccessPolicyMode, AccessResource,
     NodeInput, OpenOptions, PolicyAdminActor, Storage,
@@ -445,6 +446,115 @@ fn annotation_acl_policy_v2_survives_compaction_and_reopen() {
             policy(2),
         )
         .unwrap();
+}
+
+#[test]
+fn annotation_scan_requires_annotation_grant_in_addition_to_namespace_query_grant() {
+    let dir = TempDir::new().unwrap();
+    let storage = open(dir.path());
+    let target_revision = add_target(&storage, dir.path());
+    let database_id = database_id(&storage);
+    let after_seq = storage.stable_frontier();
+    put(&storage, annotation(&database_id, &target_revision), None);
+
+    let policy = |revision, include_annotation| {
+        let mut grants = vec![
+            AccessGrant {
+                principal: "reviewer".into(),
+                action: AccessAction::Read,
+                resource: AccessResource::Namespace("default".into()),
+            },
+            AccessGrant {
+                principal: "local-owner".into(),
+                action: AccessAction::ManagePolicy,
+                resource: AccessResource::Namespace("default".into()),
+            },
+        ];
+        if include_annotation {
+            grants.push(AccessGrant {
+                principal: "reviewer".into(),
+                action: AccessAction::Read,
+                resource: AccessResource::Annotation("default".into()),
+            });
+        }
+        AccessPolicy {
+            revision,
+            mode: AccessPolicyMode::Enforced,
+            grants,
+        }
+    };
+    let admin = || PolicyAdminActor {
+        access: AccessContext {
+            principal: "local-owner".into(),
+            namespace: "default".into(),
+        },
+    };
+    storage
+        .replace_access_policy(admin(), 0, policy(1, false))
+        .unwrap();
+
+    let request = |request_id| {
+        serde_json::from_value(json!({
+            "contract_version":"genesis.api.v2",
+            "request_id":request_id,
+            "namespace":"default",
+            "language_version":"hql.v2",
+            "hql":"USE default FROM ANNOTATIONS AS a |> RETURN a.id AS id",
+            "params":{}
+        }))
+        .unwrap()
+    };
+    let change_request = |request_id| {
+        serde_json::from_value(json!({
+            "contract_version":"genesis.api.v2",
+            "request_id":request_id,
+            "namespace":"default",
+            "ir":{
+                "contract_version":"query-ir.v2",
+                "nodes":[{
+                    "id":"changes",
+                    "op":"ChangeScan",
+                    "inputs":[],
+                    "config":{"after_seq":after_seq.to_string(),"as":"c"}
+                }],
+                "root":"changes",
+                "parameter_types":{}
+            },
+            "params":{}
+        }))
+        .unwrap()
+    };
+    let error = storage
+        .query_v2(actor(), request("annotation-without-grant"))
+        .unwrap_err();
+    assert_eq!(error.code, "FORBIDDEN");
+
+    let QueryOutcomeV2::Rows(changes) = storage
+        .query_v2(actor(), change_request("annotation-change-without-grant"))
+        .unwrap()
+    else {
+        panic!("change scan must return rows")
+    };
+    assert!(changes.rows.is_empty());
+
+    storage
+        .replace_access_policy(admin(), 1, policy(2, true))
+        .unwrap();
+    let QueryOutcomeV2::Rows(result) = storage
+        .query_v2(actor(), request("annotation-with-grant"))
+        .unwrap()
+    else {
+        panic!("annotation scan must return rows")
+    };
+    assert_eq!(result.rows.len(), 1);
+
+    let QueryOutcomeV2::Rows(changes) = storage
+        .query_v2(actor(), change_request("annotation-change-with-grant"))
+        .unwrap()
+    else {
+        panic!("change scan must return rows")
+    };
+    assert_eq!(changes.rows.len(), 1);
 }
 
 #[test]

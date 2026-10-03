@@ -1,9 +1,9 @@
 ---
 doc_id: SPEC--GENESISDB-P6-GENERATIONS-LEASES-ACL
 owner: GenesisBlockDB Engineering
-version: 0.5.23b
+version: 0.5.24b
 created_at: "2026-09-22T22:55:00+07:00,ATHER,working-tree"
-last_update: "2026-10-03T08:12:17+07:00,ATHER"
+last_update: "2026-10-03T09:18:47+07:00,ATHER"
 status: beta
 attributes:
   domain: storage-correctness
@@ -150,13 +150,13 @@ revisions. Vector HistoryScan uses the H2-D11 compact JSON `(owner_id,
 collection_id)` identity, vector source floor and existing owner-node ACL under
 the same lease; HQL/typed-IR parity and floor-failure tests passed in the
 12-test vector-only checkpoint. The current HistoryScan/ChangeScan target
-passes 14/14, and the 32-target HQL2 regression sweep passes 374/0/1. Broader
+passes 14/14, and the 32-target HQL2 regression sweep passes 375/0/1. Broader
 P6/P8 acceptance, transport parity and independent review remain open. Explicit
 HQL2/IR `tx_as_of` is specified above and its cross-source
 runtime path now selects one frontier S across source scans, operators,
 hydration and result metadata while retaining the pinned P6 generation and
 current ACL. Five focused HQL2 targets pass 56/56, the 32-target HQL2 sweep
-passes 374/0/1 and the separate 11-target P6/schema-v6/compatibility sweep
+passes 375/0/1 and the earlier separate 11-target P6/schema-v6/compatibility sweep
 passes 194/0/0. Broader P6/P8 acceptance, transport parity and independent
 review remain open. Property access uses
 binder-issued `FieldIdV2` and aligned `ExecBatchV2` batches, including
@@ -233,9 +233,10 @@ default; P6 does not migrate entity ownership metadata. Authorization is:
 Disabled preserves existing direct-read compatibility. Enforced denies raw unscoped reads. No
 claim is made that exact Edge or Collection grants provide a query surface beyond this matrix.
 The current HQL2 query boundary additionally requires the existing namespace-wide
-query grant. Under P6 semantics, `Namespace(namespace)` Read is a broad grant for
-same-namespace target/evidence resources; HQL2 does not yet expose a query path
-authorized only by exact per-record grants.
+query grant. That grant remains broad for same-namespace target/evidence
+references, but it does not replace `Annotation(namespace)` Read when an
+annotation itself is the source or ChangeScan subject. HQL2 does not yet expose
+a query path authorized only by exact per-record grants.
 
 The owner-approved P8 completion addendum preserves this grant and the
 authorization-before-parse order. Its ACL fixture asserts that an actor with
@@ -249,11 +250,18 @@ P6/P8 acceptance remains open.
 
 H2-D11 implementation checkpoint: `Annotation(namespace)` is accepted by policy
 validation and signed policy-event schema v2; the version is retained across
-replay, snapshot validation and compaction. P8 AnnotationScan now applies that
-grant and checks target/evidence references in the same ReadView. The focused
-source test demonstrates the broad namespace grant covering both reference
-roles; it does not claim an exact-grant-only HQL query surface. Write
-authorization remains out of scope.
+replay, snapshot validation and compaction. P8 AnnotationScan, lookup, history,
+hydration and ChangeScan subject visibility require that explicit grant in the
+same ReadView, in addition to the query's namespace grant. Target/evidence
+references are checked recursively; the broad namespace grant still covers
+same-namespace references. A regression verifies Namespace-only denial and
+combined-grant success for AnnotationScan and ChangeScan. It does not claim an
+exact-grant-only HQL query surface. Write authorization remains out of scope.
+Residual security gate: ChangeScan currently reserves memory and expanded-node
+budget from all candidate revisions before subject ACL filtering. Caller-selected
+limits may therefore reveal hidden Annotation-event counts through quota errors;
+this possible side channel is not covered by the passing grant regression and
+remains open pending an approved contract decision and adversarial verification.
 
 P8 AnnotationLookup also runs inside the same ReadView and applies the same
 target/evidence authorization check before returning an annotation reference.
@@ -379,6 +387,15 @@ not approve P7, merge, release, deployment or external readiness.
 
 ## CHANGELOG
 
+Version diff 0.5.23b -> 0.5.24b: enforce the already-approved distinction
+between the HQL2 namespace query grant, explicit Annotation(Read) for annotation
+subjects, and recursive target/evidence access under one P6 lease. The new ACL
+regression passes; the complete HQL2 sweep is 375/0/1 across 32 targets and the
+selected six-target P6/schema-v6 suite is 43/0/0. No contract, schema or
+migration change. Current hosted CI for the prior PR head remains worker-failing
+and Windows Rust-cancelled; this patch awaits hosted checks and review. Broad
+P6/P8/transport gates remain open.
+
 Version diff 0.5.22b -> 0.5.23b: record PR #194 run 37083654705 at
 docs-only head 43cc6e8: four worker bootstrap checks fail and Windows Rust
 fails the storage Join differential with `QUERY_BUDGET_EXCEEDED`; local Join
@@ -445,6 +462,7 @@ broader P6/P8/P13 qualification is claimed.
 
 | Version | Date | Status | Summary | Commit | Agent |
 |---|---|---|---|---|---|
+| 0.5.24b | 2026-10-03 | beta | Enforce explicit Annotation(Read) for annotation subjects in scans and ChangeScan while retaining Namespace(Read) for the query and recursive reference checks; ACL regression passes, HQL2 375/0/1, selected P6/schema-v6 suite 43/0/0; possible ChangeScan budget side channel and hosted worker/Windows Rust gates remain unresolved | working-tree | ATHER |
 | 0.5.23b | 2026-10-03 | beta | Record PR #194 run 37083654705: four worker bootstrap checks and Windows Join budget check fail; local Join target passes 5/5, exact budget dimension unconfirmed; HQL2 374/0/1, P6/compatibility 194/0/0, P6 contract unchanged, broad gates open | working-tree | ATHER |
 | 0.5.22b | 2026-10-03 | beta | Synchronize HQL2 row-history parity evidence to 374/0/1 across 32 targets and P6/schema-v6/compatibility to 194/0/0 across 11; hosted worker bootstrap checks fail at fresh schema-v6 initialization; P6 contract unchanged, broader gates open | working-tree | ATHER |
 | 0.5.21b | 2026-10-03 | beta | Implement P8 HQL2/IR `tx_as_of` selection with one no-fallback source/hydration/operator/result frontier and per-source floor checks; record 56/56 focused, 373/0/1 HQL2 and 194/0/0 P6/compatibility; broader gates remain open | working-tree | ATHER |

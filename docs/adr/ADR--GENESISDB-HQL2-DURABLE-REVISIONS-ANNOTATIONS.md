@@ -1,8 +1,8 @@
 ---
 doc_id: ADR--GENESISDB-HQL2-DURABLE-REVISIONS-ANNOTATIONS
-version: "0.8.15b"
+version: "0.8.16b"
 created_at: "2026-09-28T06:15:00+07:00,ATHER,53078cb"
-last_update: "2026-10-03T08:12:17+07:00,ATHER"
+last_update: "2026-10-03T09:18:47+07:00,ATHER"
 status: beta
 superseded_by: null
 owner: "Boss (Founder / Product Authority)"
@@ -52,8 +52,16 @@ engine-set `verified_actor`, separate normalized target/evidence rows, local
 lineage and frozen-reference validation; cycle and payload checks run before
 WAL append. Eight focused tests cover these cases and the version-2
 `Annotation(namespace)` policy event through compact/reopen. P8 AnnotationScan
-and AnnotationLookup now check target/evidence access under the same lease;
-Node/Edge/Row/Annotation scans and typed field hydration are also implemented.
+and AnnotationLookup enforce explicit Annotation(Read) for the annotation
+subject and check target/evidence access under the same lease. ChangeScan also
+requires the explicit annotation grant for Annotation subjects; the separate
+Namespace(Read) query grant continues to cover same-namespace references but
+does not substitute for Annotation(Read). Node/Edge/Row/Annotation scans and
+typed field hydration are also implemented. A separate review residual remains:
+ChangeScan reserves budget using all candidate revisions before subject ACL
+filtering, which may expose hidden Annotation-event counts through quota errors.
+This possible side channel is not closed by the grant fix and remains open for
+contract decision and adversarial verification.
 Exact KNN and Original Rerank read original schema-v6 vectors under that P6
 lease after owner-revision, namespace/node ACL, collection and fingerprint
 validation. Explicit History/Change enumeration, additional unsupported P8
@@ -330,6 +338,9 @@ verified provenance.
 Add `AccessResource::Annotation(namespace)` to the P6 grant model. Annotation
 read requires both `Read(Annotation(namespace))` and `Read` access to every
 target and evidence reference exposed, under the same lease/policy revision.
+The HQL2 namespace-wide query grant is a separate query-boundary requirement:
+it may authorize same-namespace target/evidence references, but cannot replace
+the explicit Annotation grant for an annotation source or ChangeScan subject.
 If any reference in an annotation is outside the read scope, hide the whole
 annotation row; do not return a partial target list or leak its cardinality.
 Access to one record does not imply annotation-body access; annotation access
@@ -727,13 +738,27 @@ Minimum Verify/Review/Final evidence:
 
 | Artifact | Approved version | Synchronized version/status |
 |---|---|---|
-| This H2-D11 addendum | `0.3.0b` candidate, owner-approved | `0.8.15b` beta, Row HistoryScan/ChangeScan HQL/IR parity and exact row-property hydration verified (1/1); HQL2 sweep 374/0/1 across 32 targets; no schema/migration change |
+| This H2-D11 addendum | `0.3.0b` candidate, owner-approved | `0.8.16b` beta, annotation-source and ChangeScan subject ACL regression verified; Row HistoryScan/ChangeScan HQL/IR parity and exact row-property hydration remain verified; HQL2 sweep 375/0/1 across 32 targets; no schema/migration change |
 | P8 typed boundary | `0.2.0b` beta | `0.2.46b` beta, recursive target/evidence ACL, Vector and Row HistoryScan, Row ChangeScan and end-to-end `tx_as_of` implemented; broad P8/P13 qualification remains open |
-| P6 generations/leases/ACL | `0.5.0b` beta | `0.5.23b` beta, same-lease floors/ACL unchanged; HQL2 374/0/1 and P6/compatibility 194/0/0; latest hosted run has Windows Join-budget and worker bootstrap failures |
-| HQL2 orchestration plan | `0.5.0b` beta | `0.8.48b` beta, records PR #194 run 37083654705 at docs-only head 43cc6e8; broader qualification remains open |
-| C4 architecture index | `0.1.20b` | `0.1.57b`, indexes current HQL2/P6 architecture, counts and open gates |
-| DOC registry | `0.5.6+draft` | `0.5.55+draft`, synchronized current HQL2/P6/plan/report entries |
+| P6 generations/leases/ACL | `0.5.0b` beta | `0.5.24b` beta, explicit annotation-subject grant and same-lease recursive reference ACL verified; HQL2 375/0/1, selected P6/schema-v6 suite 43/0/0; hosted worker checks and Windows Rust gate unresolved |
+| HQL2 orchestration plan | `0.5.0b` beta | `0.8.49b` beta, records annotation ACL conformance, 375/0/1 HQL2 sweep and current open qualification gates |
+| C4 architecture index | `0.1.20b` | `0.1.58b`, indexes current HQL2/P6 architecture, counts and open gates |
+| DOC registry | `0.5.6+draft` | `0.5.56+draft`, synchronized current HQL2/P6/plan/report entries |
+| Master specification | — | `2.3.30b`, architecture summary synchronized to HQL2 annotation ACL evidence |
+| HQL2 P8 checkpoint | — | `0.1.45b`, local regression evidence synchronized; broad P8/P13 gates remain open |
 | Engine/storage | `0.2.9` | remains unchanged until implementation and release gates; no user database is migrated here |
+
+Version diff `0.8.15b -> 0.8.16b`: record the H2-D11 R4/P6 ACL conformance
+fix: Namespace(Read) remains a separate HQL2 query requirement and broad
+same-namespace reference grant, while annotation subjects require explicit
+Annotation(Read) in AnnotationScan and ChangeScan. The regression passes;
+HQL2 is 375/0/1 across 32 targets and the selected P6/schema-v6 suite is 43/0/0.
+No contract/schema/migration change. A possible ChangeScan budget side channel
+remains outside this fix: candidate count/bytes are reserved before subject ACL
+filtering, so hidden Annotation-event counts may be inferred through quota
+errors. The gate awaits a contract decision and adversarial verification.
+Hosted worker CI and Windows Rust are not green on the prior PR head; broad
+P8/P13 and review remain open.
 
 Version diff `0.8.14b -> 0.8.15b`: synchronize current HQL2/P6/plan, C4,
 master, report and registry versions; record PR #194 run 37083654705 at
@@ -771,6 +796,7 @@ NOT_RUN and broader acceptance/release gates remain open.
 
 | Version | Date | Status | Summary | Commit Hash | Agent |
 |---|---|---|---|---|---|
+| 0.8.16b | 2026-10-03 | beta | Record approved H2-D11 R4/P6 ACL conformance: require Annotation(Read) for annotation scan and ChangeScan subjects separately from Namespace(Read), retain recursive reference access; regression and HQL2 375/0/1 plus selected P6 43/0/0 pass; possible ChangeScan budget side channel and hosted/review/P8/P13 gates remain open | working-tree | ATHER |
 | 0.8.15b | 2026-10-03 | beta | Synchronize current HQL2/P6/plan/C4/master/report/registry versions; record 374/0/1 across 32 targets and PR #194 run 37083654705 with four worker bootstrap plus one Windows Join-budget failure; no contract/schema/migration change; broad gates remain open | working-tree | ATHER |
 | 0.8.14b | 2026-10-03 | beta | Synchronize current HQL2/P6/plan/C4/master/report/registry versions and record 374/0/1 across 32 targets; PR #194 core CI passes but four worker checks fail at fresh schema-v6 bootstrap; no contract/schema/migration change; broad gates remain open | working-tree | ATHER |
 | 0.8.13b | 2026-10-03 | beta | Verify storage-backed HQL/typed-IR Row HistoryScan/ChangeScan parity, exact row-property hydration and durable Row identity (1/1); synchronize HQL2 plan/P8/report/registry evidence; no schema/migration change; broad P8/P13 gates remain open | working-tree | ATHER |

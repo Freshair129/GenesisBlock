@@ -4200,11 +4200,6 @@ impl Storage {
             &policy,
             access,
             AccessAction::Read,
-            &AccessResource::Namespace(namespace.to_string()),
-        ) || Self::grant_matches(
-            &policy,
-            access,
-            AccessAction::Read,
             &AccessResource::Annotation(namespace.to_string()),
         ) {
             Ok(())
@@ -23827,7 +23822,13 @@ impl<'a> ReadView<'a> {
                 || Storage::grant_matches(policy, access, AccessAction::Read, &namespace_resource)
                 || Storage::grant_matches(policy, access, AccessAction::Read, resource)
         };
-        if !can_read(&resource) {
+        let subject_readable = if matches!(&subject.kind, RecordKindV2::Annotation) {
+            policy.mode != AccessPolicyMode::Enforced
+                || Storage::grant_matches(policy, access, AccessAction::Read, &resource)
+        } else {
+            can_read(&resource)
+        };
+        if !subject_readable {
             return Ok(false);
         }
         match &subject.kind {

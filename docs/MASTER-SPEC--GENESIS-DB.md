@@ -2,7 +2,7 @@
 title: "GenesisBlockDB Technical Architecture and Capability Composition"
 doc_id: "MASTER-SPEC-GENESISBLOCKDB"
 status: current
-version: "2.3.29b"
+version: "2.3.30b"
 updated: "2026-10-03"
 owner: "GenesisBlockDB Architecture"
 source_of_truth: true
@@ -48,8 +48,12 @@ forms, and resource rejection. HQL `JOIN TABLE` now lowers to the existing
 closed RowScan/Join pipeline for Inner/Left/Semi/Anti, with bare JOIN defaulting
 to Inner; HQL, typed IR and independent P7 differential results match for
 duplicate, missing-property NULL and JSON-null cases. The latest root-HQL2
-regression sweep passes 374/0/1 across 32 targets; a separate 11-target
-P6/schema-v6/compatibility group passes 194/0/0. HQL2 and typed-IR
+regression sweep passes 375/0/1 across 32 targets; an earlier separate 11-target
+P6/schema-v6/compatibility group previously passed 194/0/0. The H2-D11 R4/P6
+annotation grant regression confirms:
+Annotation subjects require explicit Annotation(Read) separately from the
+Namespace(Read) query grant, while same-namespace target/evidence references
+remain covered by the broad namespace grant. HQL2 and typed-IR
 `tx_as_of` now select one historical frontier across source scans, graph/vector/
 annotation operators, hydration and `Snapshot.tx`, with no current-state
 fallback and the P6 generation/current policy still pinned. Five focused targets
@@ -400,6 +404,7 @@ user database was migrated, and broader P6/P8/P13 qualification remains open.
 
 | Version | Date | Owner | Summary |
 |---|---|---|---|
+| 2.3.30b | 2026-10-03 | GenesisBlockDB Architecture | Record H2-D11 R4/P6 annotation ACL conformance and local HQL2 375/0/1 plus selected P6/schema-v6 43/0/0; possible ChangeScan budget side channel, prior PR worker failures and cancelled Windows Rust, hosted checks/review and full acceptance/merge remain open |
 | 2.3.29b | 2026-10-03 | GenesisBlockDB Architecture | Record PR #194 run 37083654705 at docs-only head 43cc6e8: Windows HQL/IR Join budget failure and four worker bootstrap failures; local Join reproduction 5/5, full acceptance and merge remain open |
 | 2.3.28b | 2026-10-03 | GenesisBlockDB Architecture | Synchronize the explicit HQL2 regression sweep to 374/0/1 across 32 targets and current PR #194 CI state: core checks pass, four worker checks fail at fresh schema-v6 bootstrap; preserve worker-fix approval, review, broad P8/P13 and release gates. |
 | 2.3.27b | 2026-10-03 | GenesisBlockDB Architecture | Implement HQL2/IR `tx_as_of` across sources, graph/vector/annotation operators, hydration and `Snapshot.tx` using one no-fallback frontier; record focused 56/56, HQL2 373/0/1 and P6/compatibility 194/0/0; retain broad P8/P13, review, worker-CI, soak, security and release gates. |
