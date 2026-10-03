@@ -2,10 +2,10 @@
 doc_id: C4--GENESISDB-ARCHITECTURE
 type: architecture-index
 status: current
-version: 0.1.61b
+version: 0.1.62b
 owner: GenesisBlockDB Architecture
 created_at: 2026-06-13T22:50:11+07:00,ATHER,9b1ced3
-last_update: "2026-10-03T19:06:00+07:00,ATHER"
+last_update: "2026-10-03T19:45:00+07:00,ATHER"
 attributes:
   domain: architecture
   scope: repository
@@ -104,10 +104,12 @@ contextual NULL/list/JSON values with exact serialized-size preflight. The
 preflight accounts for JSON syntax, primitive values and escaped UTF-8 strings;
 three lowerer unit tests cover the size boundary. The focused P8 completion
 target passes 10/10. The D7 actor-scoped bridge accepts differential-tested
-zero-hop and bounded one-hop HQL1 ID projections through `Storage::query_v2`;
+zero-hop HQL1 ID projections (unlabeled or with one plain-ASCII label) and
+bounded unlabeled one-hop ID projections through `Storage::query_v2`;
 legacy parser resources are preflighted and reserved before AST construction.
-The focused adapter target passes 9/9, including one endpoint-ID exact string
-equality filter. A storage-backed HQL/typed-IR scalar differential matches the
+The focused adapter target passes 10/10, including the labeled zero-hop
+differential and one endpoint-ID exact string equality filter. A storage-backed
+HQL/typed-IR scalar differential matches the
 independent P7 interpreter for all 81 four-value nullable bags (1/1 test, 162
 executions). A storage-backed aggregate differential covers 121 nullable bags
 of lengths 0-4 and seven functions (1/1 test, 242 executions). A storage-backed
@@ -453,6 +455,12 @@ v6-only WAL without activation fails closed. See H2-D11 ADR R6b and the P6 recov
 
 ## CHANGELOG
 
+Version diff 0.1.61b -> 0.1.62b: record D7's differential-proven
+single plain-ASCII label on zero-hop HQL1 ID projections and 10/10 focused
+adapter tests. HQL2 remains 382/0/1 across 33 targets; the separate P6/schema-v6/
+compatibility result remains 194/0/0. No P6 contract, schema or transport change;
+shared-runtime, independent review and broad P8/P13 gates remain open.
+
 Version diff 0.1.60b -> 0.1.61b: record the test-only HQL/typed-IR
 `Values`/`UnionAll` differential against P7 for 169 nullable bag pairs and 338
 Storage executions. HQL2 passes 382/0/1 across 33 targets; P6/schema-v6/
@@ -529,6 +537,7 @@ full P8/P13 qualification remains open.
 
 | Version | Date | Status | Summary | Commit Hash | Agent |
 |---------|------|--------|---------|-------------|-------|
+| 0.1.62b | 2026-10-03 | current | Record D7's differential-proven single plain-ASCII label on zero-hop HQL1 ID projections; adapter 10/10, HQL2 382/0/1 across 33 targets and separate P6/compatibility 194/0/0; no P6 contract/schema/transport change; broad gates remain open | working-tree | ATHER |
 | 0.1.61b | 2026-10-03 | current | Record test-only HQL/typed-IR Values/UnionAll P7 differential for 169 nullable bag pairs and 338 Storage executions; HQL2 382/0/1 across 33 targets, P6/compatibility 194/0/0; no runtime/contract/schema/transport change; broad P8/P13 and qualification gates remain open | working-tree | ATHER |
 | 0.1.60b | 2026-10-03 | current | Record WAL-derived independent P7 HistoryScan differentials for Node/Edge/Row/Vector/Annotation; History/Change 15/15, Annotation source 7/7, P7 130/130, HQL2 379/0/1, P6/schema-v6/compatibility 194/0/0; Artifact/broad P8/P13/hosted review remain open | working-tree | ATHER |
 | 0.1.59b | 2026-10-03 | current | Add independent P7 Vector HistoryScan differential; P7 130/130, History/Change 14/14, HQL2 377/0/1, P6/schema-v6/compatibility 194/0/0; at prior PR head five checks fail and review is absent; broad P8/P13 open | working-tree | ATHER |

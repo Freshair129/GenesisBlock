@@ -67,7 +67,6 @@ pub(crate) fn lower_hql_v1(
         return Err(unsupported());
     };
     if as_of.is_some()
-        || pattern.start.label.is_some()
         || !pattern.start.props.is_empty()
         || clauses.where_preds.len() > 1
         || clauses.order_by.is_some()
@@ -89,10 +88,19 @@ pub(crate) fn lower_hql_v1(
 
     let source = match pattern.hops.as_slice() {
         [] if projection.var == alias && clauses.where_preds.is_empty() => {
-            "USE default FROM NODES AS __hql1_node |> RETURN __hql1_node.id AS id".into()
+            let label = match pattern.start.label.as_deref() {
+                Some(label) if is_plain_identifier(label) => format!(" {label}"),
+                Some(_) => return Err(unsupported()),
+                None => String::new(),
+            };
+            format!("USE default FROM NODES{label} AS __hql1_node |> RETURN __hql1_node.id AS id")
         }
         [(edge, end)] => {
-            if !end.props.is_empty() || end.label.is_some() || edge.var.is_some() {
+            if pattern.start.label.is_some()
+                || !end.props.is_empty()
+                || end.label.is_some()
+                || edge.var.is_some()
+            {
                 return Err(unsupported());
             }
             let Some(end_alias) = end.var.as_deref() else {

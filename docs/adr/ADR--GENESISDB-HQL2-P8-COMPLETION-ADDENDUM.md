@@ -1,8 +1,8 @@
 ---
 doc_id: ADR--GENESISDB-HQL2-P8-COMPLETION-ADDENDUM
-version: "0.1.6b"
+version: "0.1.7b"
 created_at: "2026-09-30T06:29:47+07:00,ATHER,working-tree"
-last_update: "2026-10-02T07:41:34+07:00,ATHER"
+last_update: "2026-10-03T19:45:00+07:00,ATHER"
 status: accepted
 superseded_by: null
 owner: "Boss (Founder / Product Authority)"
@@ -26,15 +26,17 @@ remain governing parent documents. No H2-D11 WAL/schema/migration change is
 proposed here, and no user database may be migrated.
 
 The owner subsequently approved the actor-scoped HQL1 bridge by replying
-"approve ADR addendum" on 2026-10-02. This authorizes only the initial D7
-allowlist below; it does not claim that all legacy HQL forms share the runtime.
-The D7 implementation now passes nine focused tests: legacy/HQL2 differential
-for zero-hop and bounded one-hop projections, including exact endpoint-ID
-string equality on either endpoint, authorization and namespace checks before
-parse, malformed syntax classification, fail-closed rejection of unlisted
-forms, and pre-parse resource rejection of a broad legacy pattern. The explicit
-root-HQL2 sweep passes 361/0/1 across 27 targets; the separate 11-target
-P6/schema-v6/compatibility sweep passes 190/0/0. Broader shared-runtime, P8 and
+"approve ADR addendum" on 2026-10-02. This authorizes the initial D7 allowlist
+and its stated differential-extension rule below; it does not claim that all
+legacy HQL forms share the runtime.
+The D7 implementation now passes 10/10 focused tests: legacy/HQL2 differential
+for zero-hop and bounded one-hop projections, including a single plain-ASCII
+label on zero-hop scans and exact endpoint-ID string equality on either
+one-hop endpoint, authorization and namespace checks before parse, malformed
+syntax classification, fail-closed rejection of unlisted forms, and pre-parse
+resource rejection of a broad legacy pattern. The explicit root-HQL2 sweep
+passes 382/0/1 across 33 targets; the separate 11-target
+P6/schema-v6/compatibility sweep passes 194/0/0. Broader shared-runtime, P8 and
 P13 acceptance remains open, and D7 has not received independent review.
 
 The objective is to close the currently documented P8 semantic gaps without
@@ -171,25 +173,29 @@ these P8 decisions alone.
    equality before invoking the legacy HQL parser. Never synthesize an actor,
    call the unscoped public `execute_hql`, or route through an existing v1
    transport.
-2. The initial allowlist was the zero-hop, unlabeled, unconstrained
-   `MATCH (<identifier>) RETURN <same-identifier>.id` form. Following the D7
-   differential-extension rule, the verified allowlist now also includes one
-   unlabeled, unconstrained hop with named, distinct endpoint aliases, optional
+2. A zero-hop scan may be unlabeled or carry one plain-ASCII label identifier,
+   with no node properties or predicate, in the
+   `MATCH (<identifier>:<Label>) RETURN <same-identifier>.id` form; the
+   unlabeled form remains supported. Following
+   the D7 differential-extension rule, the verified allowlist also includes
+   one unlabeled, unconstrained hop with named, distinct endpoint aliases, optional
    plain-ASCII relation identifier or wildcard, and exactly one endpoint `.id`
    projection. Direction may be outgoing, incoming or undirected. Zero-hop
    retains the same-alias rule. A one-hop form may additionally contain one
    exact string-equality predicate `WHERE <endpoint>.id = "<string>"` on either
    endpoint; all other predicates remain unsupported. Both forms reject
-   `ORDER BY`, `LIMIT`, `AS OF`, labels, node properties, edge aliases,
-   multi-hop paths and non-ID/multi-column projections. The envelope must have no parameters,
+   `ORDER BY`, `LIMIT`, `AS OF`, node properties, edge aliases, multi-hop paths
+   and non-ID/multi-column projections; one-hop forms also reject labels. The
+   envelope must have no parameters,
    temporal selector, transaction ID, explicit budget or EXPLAIN;
    `allow_partial` may be omitted/false and format may be omitted or JSON. The
    actor/request namespace must be `default` for this graph form.
 3. After actor/envelope validation, run the allocation-free parser preflight
    and reserve its conservative heap estimate before invoking the legacy HQL
    parser. Verify the complete AST against the allowlist, then lower to the
-   equivalent canonical HQL2 node scan or one-hop path and ID projection using
-   fixed internal aliases. Execute only through the existing HQL2 parser,
+   equivalent canonical HQL2 optionally label-scoped node scan or one-hop path
+   and ID projection using fixed internal aliases. Execute only through the
+   existing HQL2 parser,
    binder, planner, runtime and P6 read-lease path; then rename the single typed
    result column to the legacy projection key (`<identifier>.id`). The lowerer
    must construct names from validated AST identifiers, never splice unchecked
@@ -282,6 +288,7 @@ user database, merge, deployment or release action is authorized.
 
 | Version | Date | Status | Summary | Commit Hash | Agent |
 |---|---|---|---|---|---|
+| 0.1.7b | 2026-10-03 | accepted | Extend D7 with differential-proven single plain-ASCII label on zero-hop node-ID scans; record 10/10 adapter tests and 382/0/1 across 33 HQL2 targets, preserving unlabeled one-hop and fail-closed boundaries; broader shared-runtime/P8/P13 and independent-review gates remain open | working-tree | ATHER |
 | 0.1.6b | 2026-10-02 | accepted | Implement D7's one-hop endpoint-ID string equality filter after legacy/HQL2 differential; record 9/9 adapter tests and 361/0/1 across 27 root HQL2 targets plus 190/0/0 across 11 compatibility targets; retain shared-runtime/P8/P13 and review gates | working-tree | ATHER |
 | 0.1.5b | 2026-10-02 | accepted | Extend D7 conditionally with one one-hop endpoint-ID string equality filter after legacy/HQL2 differential evidence; adapter implementation and focused verification pending | working-tree | ATHER |
 | 0.1.4b | 2026-10-02 | accepted | Extend D7 with differential-proven one-hop forms and reserve parser resources before legacy AST construction; record 8/8 focused, 361/0/1 across 27 HQL2 targets and separate 190/0/0 compatibility sweep; retain shared-runtime/P8/P13 and review gates | working-tree | ATHER |

@@ -2,7 +2,7 @@
 title: "GenesisBlockDB Technical Architecture and Capability Composition"
 doc_id: "MASTER-SPEC-GENESISBLOCKDB"
 status: current
-version: "2.3.33b"
+version: "2.3.34b"
 updated: "2026-10-03"
 owner: "GenesisBlockDB Architecture"
 source_of_truth: true
@@ -39,10 +39,11 @@ ACL denial, registered exact-scan lexical and scalar-token ContextPack profiles,
 Sequence node/edge exact-JSON properties under the lease, and contextual
 NULL/list/JSON literals. The focused completion target passes 10/10, including
 an edge-property-before-SHORTEST regression. The approved D7 bridge accepts
-differential-tested actor-scoped zero-hop and bounded one-hop HQL1 ID
-projections through `Storage::query_v2`, including one endpoint-ID exact string
-equality filter; parser resources are preflighted and reserved before legacy
-AST construction. Its nine focused tests cover legacy and HQL2 differential
+differential-tested actor-scoped zero-hop HQL1 ID projections (unlabeled or
+with one plain-ASCII label) and bounded unlabeled one-hop projections through
+`Storage::query_v2`, including one endpoint-ID exact string equality filter;
+parser resources are preflighted and reserved before legacy AST construction.
+Its ten focused tests cover legacy and HQL2 differential
 behavior, pre-parse authorization/namespace checks, malformed and unlisted
 forms, and resource rejection. HQL `JOIN TABLE` now lowers to the existing
 closed RowScan/Join pipeline for Inner/Left/Semi/Anti, with bare JOIN defaulting
@@ -411,6 +412,7 @@ user database was migrated, and broader P6/P8/P13 qualification remains open.
 
 | Version | Date | Owner | Summary |
 |---|---|---|---|
+| 2.3.34b | 2026-10-03 | GenesisBlockDB Architecture | Extend D7 after legacy/HQL2 differential for a single plain-ASCII label on zero-hop HQL1 ID scans; focused adapter 10/10, HQL2 382/0/1 across 33 targets, P6/compatibility 194/0/0; retain other HQL1/shared-runtime, review and P8/P13 gates |
 | 2.3.33b | 2026-10-03 | GenesisBlockDB Architecture | Record test-only HQL/typed-IR Values/UnionAll P7 differential for 169 nullable bag pairs and 338 Storage executions; HQL2 382/0/1 across 33 targets, P6/compatibility 194/0/0; no runtime/schema/transport change; retain broad exact-oracle, P8/P13 and qualification gates |
 | 2.3.32b | 2026-10-03 | GenesisBlockDB Architecture | Record storage-backed P7 HistoryScan differentials for Node/Edge/Row/Vector/Annotation; History/Change 15/15, Annotation source 7/7, P7 130/130, HQL2 379/0/1 and P6/schema-v6/compatibility 194/0/0; Artifact, broad ChangeScan/P8/P13, hosted CI and review remain open |
 | 2.3.31b | 2026-10-03 | GenesisBlockDB Architecture | Record independent P7 differential for H2-D11 Vector HistoryScan from WAL-derived revisions; P7 130/130, History/Change 14/14, HQL2 377/0/1 and P6/schema-v6/compatibility 194/0/0. At prior PR #194 head 9ada855, Windows cargo plus four worker checks fail and reviews are absent; hosted verification of this source revision and full acceptance/merge remain open |
