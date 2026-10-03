@@ -1,8 +1,8 @@
 ---
 doc_id: REPORT--HQL2-P8-CORE-2026-09-28
-version: "0.1.50b"
+version: "0.1.52b"
 created_at: "2026-09-28T04:35:00+07:00,ATHER,22bc11e"
-last_update: "2026-10-03T16:15:00+07:00,ATHER"
+last_update: "2026-10-03T19:06:00+07:00,ATHER"
 status: beta
 owner: GenesisBlockDB Engineering
 attributes:
@@ -105,7 +105,7 @@ their existing compatibility contracts; P13 parity is deliberately not claimed.
 Platform: local Windows MSVC, Rust 1.97.1, `--locked --offline
 --no-default-features`, target directory
 `G:/GenesisBlock_Dev/GenesisBlock/target/hql2-execution`.
-The latest 32-target HQL2 run was executed in the isolated worktree with
+The latest 33-target HQL2 run was executed in the isolated worktree with
 explicit test targets; the protected probe target was not selected.
 
 | Gate | Measured result | Limit |
@@ -146,14 +146,15 @@ explicit test targets; the protected probe target was not selected.
 | HQL1 parser-resource RCA | Confirmed and corrected | Legacy Pest pairs were materialized before the D7 allowlist without parser-specific heap reservation. The adapter now runs allocation-free parser preflight and reserves the conservative estimate before legacy AST construction; see local RCA `.brain/rca/RCA--HQL1-ADAPTER-PARSER-RESERVATION.md`. No production crash or HQL1 allocator peak is claimed. |
 | Storage-backed HQL/typed-IR scalar P7 differential | 1 passed, 0 failed across 81 four-value nullable bags; 162 Storage executions | Values/Distinct/Sort with NULLS LAST; each frontend independently matches the P7 reference and each other. Test-only scalar evidence, not broad P8 acceptance. |
 | Storage-backed HQL/typed-IR aggregate P7 differential | 1 passed, 0 failed across 121 nullable bags; 242 Storage executions | Covers empty through four-row bags over NULL/-1/2 and count-all/count/sum/avg/min/max/collect; each frontend matches P7 and each other. Test-only aggregate evidence, not broad P8 acceptance. |
+| Storage-backed HQL/typed-IR `Values`/`UnionAll` P7 differential | 1 passed, 0 failed across 169 nullable bag pairs; 338 Storage executions | All pairs from 13 empty/length-one/two bags over NULL/-1/2 match the independent P7 plan; explicit null-last ordering preserves duplicate and NULL multiplicity. Test-only evidence, not broad P8 acceptance. |
 | Storage-backed HQL/typed-IR Join P7 differential | 1 passed, 0 failed; four join kinds plus bare JOIN | HQL and typed IR match P7 result bags for Inner/Left/Semi/Anti (5/7/3/2), duplicate keys, missing-property NULL and JSON null; bare JOIN defaults to Inner, and Semi/Anti hide the right scope. A test sentinel preserves JSON-null distinction in P7. Test-only evidence, not broad P8 acceptance. |
 | Approved H2-D11 Vector HistoryScan extension | Implemented; local differential passed | HQL and typed IR read exact revisions using compact JSON `(owner_id, collection_id)` identity under the P6 lease and owner-node ACL; the vector source floor fails closed before access. Its result bags match independent P7 from WAL-derived revision facts and the captured frontier. The expanded five-kind HistoryScan differential passes; HistoryScan/ChangeScan passes 16/16, P7 graph target 39/39 and combined P7 130/130. |
 | HQL/typed-IR Row HistoryScan and ChangeScan parity | 1 passed, 0 failed | Retained insert/update revisions hydrate exact row properties; HQL and typed IR agree on history values, change operations and durable Row identity. Test-only regression coverage; no schema migration. |
 | HQL2/IR transaction-time snapshot (`tx_as_of`) | Implemented; local verification passed | One selected frontier S controls revision-backed scans, graph/vector/annotation operators, source-floor checks, property hydration and `Snapshot.tx`; the validated P6 generation/catalog/current policy remain pinned and no path falls back to current state. Five focused targets pass 56/56. |
-| Latest explicit root-HQL2 target sweep | 380 passed, 0 failed, 1 ignored across 32 root targets | All 32 HQL2 integration targets explicitly selected with `--locked --offline --no-default-features --jobs 1`; includes the hidden-Annotation ChangeScan threshold regression, five-kind HistoryScan differential and five-kind ChangeScan P7 differential; the ignored parser child is exercised by its parent. Regression evidence, not P8 acceptance. |
+| Latest explicit root-HQL2 target sweep | 382 passed, 0 failed, 1 ignored across 33 root targets | All 33 HQL2 integration targets explicitly selected with `--locked --offline --no-default-features --jobs 1`; includes the hidden-Annotation ChangeScan threshold regression, five-kind HistoryScan/ChangeScan P7 differentials and nullable `Values`/`UnionAll` differential; the ignored parser child is exercised by its parent. Regression evidence, not P8 acceptance. |
 | Current selected P6/schema-v6 regression set | 43 passed, 0 failed, 0 ignored across six named targets | `wave_a_commit_tests`, `temporal_queries_tests`, `tx_as_of_wp22_tests`, `governance_tests`, `p6_peer_authority_tests`, `schema6_migration_tests`; focused current rerun, not the broader 11-target group. |
 | Separate P6/schema-v6/compatibility sweep | 194 passed, 0 failed, 0 ignored across 11 named targets | `p6_generation_tests`, `p6_lease_tests`, `p6_visibility_tests`, `p6_peer_authority_tests`, `schema6_migration_tests`, `query_ir_tests`, `hql_p0_tests`, `hql_filter_tests`, `hql_cypher_tests`, `napi_rest_parity_tests`, `rest_api_tests`; rerun in this continuation. |
-| Prior explicit HQL2/P6/schema-v6/compatibility sweep | 528 passed, 0 failed, 1 ignored across 37 named targets | Pre-edge-regression checkpoint; protected probe excluded. Superseded for current HQL2 root-target count by 380/0/1; not full P8/P13 acceptance. |
+| Prior explicit HQL2/P6/schema-v6/compatibility sweep | 528 passed, 0 failed, 1 ignored across 37 named targets | Pre-edge-regression checkpoint; protected probe excluded. Superseded for current HQL2 root-target count by 382/0/1; not full P8/P13 acceptance. |
 | Native library check | `cargo check --locked --offline --no-default-features --jobs 1 --target-dir target/hql2-execution` passed | Local core compile only; no NAPI addon runtime, release or cross-platform claim. |
 | Documentation and source hygiene | docs validation: 0 violations/239 files; agent registry: 6 agents/12 routes; rustfmt check and `git diff --check` passed | Local structural checks only. |
 | HQL/IR Node/Edge/Row source differential | 1 passed, 0 failed | Node/Edge properties and Row `prop(r, "id")` match across HQL and IR; `r.id` remains the UUIDv4 durable revision. Row properties resolve from H2-D11 `after_image`; see local RCA `.brain/rca/RCA--HQL2-ROW-SOURCE-PROPERTY-HYDRATION.md`. |
@@ -163,6 +164,7 @@ explicit test targets; the protected probe target was not selected.
 | Long-running soak | Three soak_tests cases remain ignored by the normal suite | No soak qualification inferred |
 | Storage-backed ChangeScan P7 differentials | 2 passed, 0 failed | Node upsert/correct/retract plus Edge/Row/Vector/Annotation revisions match independent P7 by sequence, operation and exact subject identity; HQL and typed IR agree. Recursive Edge endpoint, Vector owner and Annotation target/evidence dependencies are represented. Broader ChangeScan semantics and full acceptance remain open. |
 | PR #194 final state at head `4f4e298` | [Run 37104811672](https://github.com/Freshair129/GenesisBlock/actions/runs/37104811672): 48 checks passed, five failed and five skipped; three worker OS tests and rebuilt Linux addon/worker fail with `RECOVERY_REQUIRED: markerless database identity is missing`. The Android GitHub Packages check failed during checkout after the PR ref disappeared. | PR #194 was merged at `4f02d6b` on 2026-10-03 despite the five reported failures; no admin bypass was used and reviewDecision is empty. No package publication is inferred from the failed checkout. Worker correction remains approval-gated; broad P8/P13 remains open. |
+| Hosted PR #196 at head `8ac07f6` | [Tests run 37114718266](https://github.com/Freshair129/GenesisBlock/actions/runs/37114718266): 10 displayed checks pass, five fail, one skips. Worker npm tests fail on Linux/macOS/Windows with `RECOVERY_REQUIRED: markerless database identity is missing`; [rebuilt addon/worker run 37114718286](https://github.com/Freshair129/GenesisBlock/actions/runs/37114718286) has the same failure. Windows `cargo test` fails at 15m16; detailed log is unavailable, so its cause is unconfirmed. | PR #196 is merged at `fb7085a` with no review decision recorded. Worker startup and Windows job-time corrections remain open; broad P8/P13 and independent review remain open. |
 | Hosted PR #194 CI at head 31168524 | [Tests run 37073380412](https://github.com/Freshair129/GenesisBlock/actions/runs/37073380412): Rust, standard Node, docs, fmt/clippy and non-worker distribution checks pass; worker npm tests fail on Linux/macOS/Windows with RECOVERY_REQUIRED: markerless database identity is missing. [Rebuilt addon/worker run 37073380336](https://github.com/Freshair129/GenesisBlock/actions/runs/37073380336) fails with the same error. | Four worker checks remain red; correction is approval-gated and no worker code changed. |
 | Hosted PR #194 CI at docs-only head 43cc6e8 (engine sources match 31168524) | [Tests run 37083654705](https://github.com/Freshair129/GenesisBlock/actions/runs/37083654705): Linux/macOS Rust, standard Node on all three OSes, docs, fmt/clippy and version consistency pass. Windows Rust fails `storage_hql_join_kinds_match_typed_ir_and_independent_p7` at `tests/hql2_storage_hql_join_oracle_differential_tests.rs:281` with `QUERY_BUDGET_EXCEEDED` / `query_limit`. [Rebuilt-addon run 37083654689](https://github.com/Freshair129/GenesisBlock/actions/runs/37083654689) and worker npm jobs on Linux/macOS/Windows fail with `RECOVERY_REQUIRED: markerless database identity is missing`. | Five CI checks fail. The Join differential target passes locally 5/5 at 0.21–0.22s; the generic error does not identify the budget dimension, so the CI cause remains suspected. No implementation source changed at 43cc6e8. |
 | PR #194 state after run 37083654705 | GitHub reports OPEN, UNSTABLE at head 43cc6e8; 48 checks pass, five fail, five skip; review submissions remain empty. | Not merged; no failed checks were bypassed. Broad P8/P13 acceptance remains open. |
@@ -209,10 +211,10 @@ Post-anchor explicit 22-target regression command (protected probe excluded):
 cargo test --locked --offline --no-default-features --jobs 1 --test hql2_annotation_acl_tests --test hql2_annotation_lookup_tests --test hql2_annotation_source_tests --test hql2_durable_revision_tests --test hql2_execution_tests --test hql2_expand_sequence_tests --test hql2_expand_tests --test hql2_graph_oracle_tests --test hql2_history_change_tests --test hql2_key_codec_tests --test hql2_lower_tests --test hql2_oracle_tests --test hql2_parser_tests --test hql2_pipeline_oracle_tests --test hql2_rank_oracle_tests --test hql2_request_tests --test hql2_scalar_execution_tests --test hql2_storage_source_tests --test hql2_value_tests --test hql2_vector_operator_tests --test hql2_vector_revision_tests --test hql2_wire_tests
 ```
 
-Latest guarded 32-target regression command (only the named HQL2 targets are selected):
+Latest guarded 33-target regression command (only the named HQL2 targets are selected):
 
 ```powershell
-cargo test --locked --offline --no-default-features --jobs 1 --quiet --test hql2_annotation_acl_tests --test hql2_annotation_lookup_tests --test hql2_annotation_source_tests --test hql2_durable_revision_tests --test hql2_execution_tests --test hql2_expand_sequence_tests --test hql2_expand_tests --test hql2_graph_oracle_tests --test hql2_history_change_tests --test hql2_hql_reference_differential_tests --test hql2_hql1_adapter_tests --test hql2_key_codec_tests --test hql2_lower_tests --test hql2_oracle_tests --test hql2_p8_completion_tests --test hql2_parser_tests --test hql2_pattern_constraint_oracle_tests --test hql2_pipeline_oracle_tests --test hql2_rank_oracle_tests --test hql2_request_tests --test hql2_root_match_oracle_differential_tests --test hql2_scalar_execution_tests --test hql2_storage_aggregate_oracle_differential_tests --test hql2_storage_hql_join_oracle_differential_tests --test hql2_storage_join_oracle_differential_tests --test hql2_storage_source_tests --test hql2_value_tests --test hql2_vector_operator_tests --test hql2_vector_oracle_differential_tests --test hql2_vector_revision_tests --test hql2_wire_tests --test hql2_row_history_tests --target-dir target/hql2-execution
+cargo test --locked --offline --no-default-features --jobs 1 --quiet --test hql2_annotation_acl_tests --test hql2_annotation_lookup_tests --test hql2_annotation_source_tests --test hql2_durable_revision_tests --test hql2_execution_tests --test hql2_expand_sequence_tests --test hql2_expand_tests --test hql2_graph_oracle_tests --test hql2_history_change_tests --test hql2_hql_reference_differential_tests --test hql2_hql1_adapter_tests --test hql2_key_codec_tests --test hql2_lower_tests --test hql2_oracle_tests --test hql2_p8_completion_tests --test hql2_parser_tests --test hql2_pattern_constraint_oracle_tests --test hql2_pipeline_oracle_tests --test hql2_rank_oracle_tests --test hql2_request_tests --test hql2_root_match_oracle_differential_tests --test hql2_scalar_execution_tests --test hql2_storage_aggregate_oracle_differential_tests --test hql2_storage_set_oracle_differential_tests --test hql2_storage_hql_join_oracle_differential_tests --test hql2_storage_join_oracle_differential_tests --test hql2_storage_source_tests --test hql2_value_tests --test hql2_vector_operator_tests --test hql2_vector_oracle_differential_tests --test hql2_vector_revision_tests --test hql2_wire_tests --test hql2_row_history_tests --target-dir target/hql2-execution
 ```
 
 First full-suite command (failed at the legacy fixture described above):
@@ -401,8 +403,10 @@ passes 6/6; four structural-parameter targets pass 50/50, three null-order
 targets pass 58/58, and four checked-remainder targets pass 79/79. The latest
 all-root-HQL2 sweep includes the KNN, Original Rerank and root `MATCH` oracle
 differentials plus the Sequence pattern oracle, D7 adapter and row-history
-parity target, and now passes 380/0/1 across 32 targets. Storage-backed HQL and
-typed-IR HistoryScan and ChangeScan bags for Node, Edge, Row, Vector and Annotation match P7
+parity target, and now passes 382/0/1 across 33 targets. The storage-backed
+HQL/typed-IR `Values`/`UnionAll` differential matches P7 for 169 nullable bag
+pairs (338 Storage executions), preserving NULL and duplicate multiplicity.
+Storage-backed HQL and typed-IR HistoryScan and ChangeScan bags for Node, Edge, Row, Vector and Annotation match P7
 catalogs assembled from signed-WAL revisions and captured frontiers/valid-time
 windows; checks include Edge endpoint ACL, Vector tuple/owner ACL and Annotation
 target/evidence references. Artifact HistoryScan remains unsupported. The
@@ -440,11 +444,30 @@ from these local tests.
 
 | Artifact | Before | After |
 |---|---|---|
-| Registry | 0.5.60+draft | 0.5.61+draft |
-| P8 typed boundary | 0.2.50b | 0.2.51b |
-| Orchestration plan | 0.8.53b | 0.8.54b |
-| P7 oracle report | 0.1.4b | 0.1.5b |
-| This report | 0.1.49b | 0.1.50b |
+| Registry | 0.5.62+draft | 0.5.63+draft |
+| P6 generations/leases/ACL | 0.5.28b | 0.5.29b |
+| P8 typed boundary | 0.2.52b | 0.2.53b |
+| P7 oracle report | 0.1.5b | 0.1.6b |
+| Orchestration plan | 0.8.55b | 0.8.56b |
+| C4 architecture index | 0.1.60b | 0.1.61b |
+| Master specification | 2.3.32b | 2.3.33b |
+| This report | 0.1.51b | 0.1.52b |
+
+Version diff 0.1.51b -> 0.1.52b: add the storage-backed HQL/typed-IR
+`Values`/`UnionAll` differential against P7 for 169 nullable bag pairs and 338
+Storage executions; explicit null-last ordering preserves NULL and duplicate
+multiplicity. The latest HQL2 sweep is 382/0/1 across 33 targets, with the
+separate P6/schema-v6/compatibility sweep at 194/0/0. No runtime, contract,
+schema or transport behavior changed. Broad exact-oracle, ChangeScan semantics,
+P8/P13, independent review and qualification gates remain open.
+
+Version diff 0.1.50b -> 0.1.51b: synchronize PR #196 hosted evidence at
+head `8ac07f6`, merged as `fb7085a`. Ten displayed checks pass, five fail and
+one is skipped; worker failures reproduce across three OSes and rebuilt
+Linux, while the Windows Rust job failed at 15m16 with its cause unverified.
+Local HQL2 380/0/1 and P6/schema-v6/compatibility 194/0/0 are unchanged.
+Worker startup correction, Windows job-time disposition, broad P8/P13 and
+independent review remain open.
 
 Version diff 0.1.49b -> 0.1.50b: extend the P7 ChangeScan differential to
 Edge, Row, Vector and Annotation alongside Node; seven events match on sequence,
@@ -570,6 +593,8 @@ P8 and release gates.
 
 | Version | Date | Status | Summary | Commit Hash | Agent |
 |---|---|---|---|---|---|
+| 0.1.52b | 2026-10-03 | beta | Add test-only HQL/typed-IR Values/UnionAll differential against P7 for 169 nullable bag pairs and 338 Storage executions; HQL2 382/0/1 across 33 targets, P6/compatibility 194/0/0; no runtime/schema/transport change; broad semantics and P8/P13 gates remain open | working-tree | ATHER |
+| 0.1.51b | 2026-10-03 | beta | Synchronize merged PR #196 hosted status: 10 displayed checks pass, five fail, one skips; worker bootstrap failures across OSes and rebuilt Linux addon; Windows Rust failure at 15m16 has unverified cause; local History/Change 16/16 and HQL2 380/0/1 unchanged; worker approval and broad P8/P13 gates remain open | working-tree | ATHER |
 | 0.1.50b | 2026-10-03 | beta | Extend storage-backed P7 ChangeScan differential to Edge/Row/Vector/Annotation alongside Node; seven event revisions match sequence, operation and identity; History/Change 16/16 and HQL2 380/0/1 across 32 targets; broader semantics and P8/P13 remain open | working-tree | ATHER |
 | 0.1.49b | 2026-10-03 | beta | Add storage-backed P7 ChangeScan Node-revision differential; History/Change 15/15 and HQL2 379/0/1 across 32 targets; record PR #194 merged at 4f02d6b with 48 checks passing, five failing and five skipped; other event kinds, worker correction and broad P8/P13 remain open | working-tree | ATHER |
 | 0.1.48b | 2026-10-03 | beta | Add WAL-derived P7 HistoryScan differentials for Node/Edge/Row/Annotation alongside Vector; History/Change 15/15, Annotation source 7/7, P7 130/130, HQL2 379/0/1, P6/schema-v6/compatibility 194/0/0; Artifact, broad ChangeScan, hosted review/checks and P8/P13 remain open | working-tree | ATHER |
