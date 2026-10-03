@@ -69,7 +69,6 @@ pub(crate) fn lower_hql_v1(
     if as_of.is_some()
         || !pattern.start.props.is_empty()
         || clauses.where_preds.len() > 1
-        || clauses.order_by.is_some()
         || clauses.limit.is_some()
     {
         return Err(unsupported());
@@ -87,7 +86,10 @@ pub(crate) fn lower_hql_v1(
     }
 
     let source = match pattern.hops.as_slice() {
-        [] if projection.var == alias && clauses.where_preds.is_empty() => {
+        [] if projection.var == alias
+            && clauses.where_preds.is_empty()
+            && clauses.order_by.is_none() =>
+        {
             let label = match pattern.start.label.as_deref() {
                 Some(label) if is_plain_identifier(label) => format!(" {label}"),
                 Some(_) => return Err(unsupported()),
@@ -150,8 +152,21 @@ pub(crate) fn lower_hql_v1(
             } else {
                 "__hql1_target"
             };
+            let order = match clauses.order_by.as_ref() {
+                Some((field, descending))
+                    if field.var == projection.var
+                        && field.field.as_ref() == Some(&HqlField::Id) =>
+                {
+                    format!(
+                        " |> ORDER BY {projected_alias}.id {}",
+                        if *descending { "DESC" } else { "ASC" }
+                    )
+                }
+                Some(_) => return Err(unsupported()),
+                None => String::new(),
+            };
             format!(
-                "USE default MATCH (__hql1_source){edge_source}(__hql1_target) AS __hql1_path WALK{filter} |> RETURN {projected_alias}.id AS id"
+                "USE default MATCH (__hql1_source){edge_source}(__hql1_target) AS __hql1_path WALK{filter}{order} |> RETURN {projected_alias}.id AS id"
             )
         }
         _ => return Err(unsupported()),
