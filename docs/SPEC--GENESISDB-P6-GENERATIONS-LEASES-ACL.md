@@ -1,9 +1,9 @@
 ---
 doc_id: SPEC--GENESISDB-P6-GENERATIONS-LEASES-ACL
 owner: GenesisBlockDB Engineering
-version: 0.5.30b
+version: 0.5.31b
 created_at: "2026-09-22T22:55:00+07:00,ATHER,working-tree"
-last_update: "2026-10-03T19:45:00+07:00,ATHER"
+last_update: "2026-10-04T01:22:00+07:00,ATHER"
 status: beta
 attributes:
   domain: storage-correctness
@@ -393,14 +393,23 @@ to the serialized owner and require Verify to rerun. Final checks scope, evidenc
 regressions and WIP preservation. Passing the gates supports only the P6 owner decision; it does
 not approve P7, merge, release, deployment or external readiness.
 
-The D7 actor-scoped HQL1 adapter additionally accepts a single plain-ASCII
-label on zero-hop node-ID projections after a legacy/HQL2 differential; its
-focused target passes 10/10. This changes no P6 grant, ACL, lease, schema or
-migration behavior. The HQL2 sweep remains 382/0/1; the separate P6/schema-v6/
-compatibility result remains 194/0/0. Broader P6/P8 and independent-review gates
-remain open.
+The D7 actor-scoped HQL1 adapter additionally accepts one-hop ordering only by
+the projected endpoint ID, after a legacy/HQL2 differential (2/2 ordering tests;
+the existing adapter target passes 10/10). Zero-hop and unprojected ordering
+remain unsupported. This changes no P6 grant, ACL, lease, schema or migration
+behavior. The HQL2 sweep passes 385/0/1 across 34 targets; the selected
+P6/schema-v6/ACL regression group passes 93/0/0 across 11 targets. The prior
+broader 11-target P6/schema-v6/compatibility record remains 194/0/0. Broader
+P6/P8 and independent-review gates remain open.
 
 ## CHANGELOG
+
+Version diff 0.5.30b -> 0.5.31b: record D7's differential-proven one-hop
+`ORDER BY` on the projected endpoint ID (default/ASC/DESC), with the 2/2
+ordering target, 385/0/1 across 34 HQL2 targets, and 93/0/0 across 11 selected
+P6/schema-v6/ACL targets. No P6 contract, ACL, lease, schema or migration
+behavior changed; broader P6/P8, transport and independent-review gates remain
+open.
 
 Version diff 0.5.29b -> 0.5.30b: synchronize D7's differential-proven
 single-label zero-hop HQL1 extension and its 10/10 focused adapter result.
@@ -506,6 +515,7 @@ broader P6/P8/P13 qualification is claimed.
 
 | Version | Date | Status | Summary | Commit | Agent |
 |---|---|---|---|---|---|
+| 0.5.31b | 2026-10-04 | beta | Record D7's differential-proven one-hop ORDER BY on projected endpoint ID; ordering 2/2, HQL2 385/0/1 across 34 targets, selected P6/schema-v6/ACL targets 93/0/0 across 11; no P6 grant/ACL/lease/schema/migration change; broad gates remain open | working-tree | ATHER |
 | 0.5.30b | 2026-10-03 | beta | Record D7's differential-proven single-label zero-hop HQL1 extension and 10/10 adapter tests; HQL2 382/0/1, P6/schema-v6/compatibility 194/0/0; no P6 contract/ACL/schema/migration change; broad gates remain open | working-tree | ATHER |
 | 0.5.29b | 2026-10-03 | beta | Synchronize test-only HQL2 Values/UnionAll P7 differential evidence: 169 nullable bag pairs, 338 Storage executions, HQL2 382/0/1 across 33 targets; P6/schema-v6/compatibility 194/0/0; no P6 contract/schema change; broader gates remain open | working-tree | ATHER |
 | 0.5.28b | 2026-10-03 | beta | Synchronize P6 record to current HQL2/P7 evidence: History/Change 16/16, HQL2 380/0/1, P6/schema-v6/compatibility 194/0/0; PR #196 has five failed hosted checks including worker bootstrap and an unverified Windows Rust failure at 15m16; no P6 contract/schema change | working-tree | ATHER |

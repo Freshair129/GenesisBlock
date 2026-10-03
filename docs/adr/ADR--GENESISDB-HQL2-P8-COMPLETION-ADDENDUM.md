@@ -1,8 +1,8 @@
 ---
 doc_id: ADR--GENESISDB-HQL2-P8-COMPLETION-ADDENDUM
-version: "0.1.7b"
+version: "0.1.8b"
 created_at: "2026-09-30T06:29:47+07:00,ATHER,working-tree"
-last_update: "2026-10-03T19:45:00+07:00,ATHER"
+last_update: "2026-10-04T01:22:00+07:00,ATHER"
 status: accepted
 superseded_by: null
 owner: "Boss (Founder / Product Authority)"
@@ -29,14 +29,16 @@ The owner subsequently approved the actor-scoped HQL1 bridge by replying
 "approve ADR addendum" on 2026-10-02. This authorizes the initial D7 allowlist
 and its stated differential-extension rule below; it does not claim that all
 legacy HQL forms share the runtime.
-The D7 implementation now passes 10/10 focused tests: legacy/HQL2 differential
-for zero-hop and bounded one-hop projections, including a single plain-ASCII
-label on zero-hop scans and exact endpoint-ID string equality on either
-one-hop endpoint, authorization and namespace checks before parse, malformed
-syntax classification, fail-closed rejection of unlisted forms, and pre-parse
-resource rejection of a broad legacy pattern. The explicit root-HQL2 sweep
-passes 382/0/1 across 33 targets; the separate 11-target
-P6/schema-v6/compatibility sweep passes 194/0/0. Broader shared-runtime, P8 and
+The D7 implementation passes 10/10 adapter tests and 2/2 ordering tests:
+legacy/HQL2 differential for zero-hop and bounded one-hop projections,
+including a single plain-ASCII label on zero-hop scans, exact endpoint-ID
+string equality on either one-hop endpoint, and ordering by the projected
+endpoint ID (default/ASC and DESC). Authorization and namespace checks before
+parse, malformed syntax classification, fail-closed rejection of unlisted
+forms, and pre-parse resource rejection of a broad legacy pattern remain
+covered. The explicit root-HQL2 sweep passes 385/0/1 across 34 targets; the
+selected P6/schema-v6/ACL regression group passes 93/0/0 across 11 targets.
+The prior 11-target P6/schema-v6/compatibility record remains 194/0/0. Broader shared-runtime, P8 and
 P13 acceptance remains open, and D7 has not received independent review.
 
 The objective is to close the currently documented P8 semantic gaps without
@@ -183,9 +185,12 @@ these P8 decisions alone.
    projection. Direction may be outgoing, incoming or undirected. Zero-hop
    retains the same-alias rule. A one-hop form may additionally contain one
    exact string-equality predicate `WHERE <endpoint>.id = "<string>"` on either
-   endpoint; all other predicates remain unsupported. Both forms reject
-   `ORDER BY`, `LIMIT`, `AS OF`, node properties, edge aliases, multi-hop paths
-   and non-ID/multi-column projections; one-hop forms also reject labels. The
+   endpoint; all other predicates remain unsupported. A one-hop form may use
+   `ORDER BY` only on the same projected endpoint's `.id`, with the legacy
+   default/ascending or descending direction. Zero-hop ordering, an unprojected
+   sort key and every other sort form remain unsupported. Both forms reject
+   `LIMIT`, `AS OF`, node properties, edge aliases, multi-hop paths and non-ID/
+   multi-column projections; one-hop forms also reject labels. The
    envelope must have no parameters,
    temporal selector, transaction ID, explicit budget or EXPLAIN;
    `allow_partial` may be omitted/false and format may be omitted or JSON. The
@@ -209,8 +214,8 @@ these P8 decisions alone.
    evidence against `execute_hql` verifies row multiplicity, projected values,
    ordering where specified, and observable errors.
 5. Existing `execute_hql`, `/v1/query/hql`, N-API and SDK behavior is unchanged.
-   This first allowlisted form does not close the shared-runtime, broad P8 or
-   P13 parity gates.
+   The current D7 allowlist does not close the shared-runtime, broad P8 or P13
+   parity gates.
 
 ## Data flow
 
@@ -251,7 +256,9 @@ flowchart TD
 - D7 HQL1 tests prove `Namespace(Read)` denial before parsing, zero-hop and
   one-hop direction/relation/wildcard differential parity (including parallel
   row multiplicity, endpoint projections and one exact string-equality filter
-  on either endpoint ID), namespace mismatch before parsing, malformed syntax
+  on either endpoint ID), and one-hop projected-ID ordering parity for default,
+  ASC and DESC while zero-hop/unprojected ordering fails closed; namespace
+  mismatch before parsing, malformed syntax
   classification, fail-closed unsupported predicate shapes and valid-unlisted
   behavior, and parser resource rejection before AST allowlist handling;
   existing v1 transports remain unchanged.
@@ -281,13 +288,14 @@ are not the current document versions.
 | Document registry | 0.5.34+draft | 0.5.35+draft |
 | This addendum | 0.1.1b accepted | 0.1.2b accepted |
 
-Engine version remains unchanged. H2-D11 migration remains fixture-only; no
-user database, merge, deployment or release action is authorized.
+Engine version remains unchanged. H2-D11 migration remains fixture-only; this
+addendum does not authorize migration of a user database, deployment or release.
 
 ## CHANGELOG
 
 | Version | Date | Status | Summary | Commit Hash | Agent |
 |---|---|---|---|---|---|
+| 0.1.8b | 2026-10-04 | accepted | Extend D7 after legacy/HQL2 differential for one-hop ORDER BY on the projected endpoint ID (default/ASC/DESC); ordering 2/2, adapter 10/10, HQL2 385/0/1 across 34 targets, selected P6/schema-v6/ACL tests 93/0/0 across 11 targets; retain fail-closed sort boundaries and broader P8/P13/review gates | working-tree | ATHER |
 | 0.1.7b | 2026-10-03 | accepted | Extend D7 with differential-proven single plain-ASCII label on zero-hop node-ID scans; record 10/10 adapter tests and 382/0/1 across 33 HQL2 targets, preserving unlabeled one-hop and fail-closed boundaries; broader shared-runtime/P8/P13 and independent-review gates remain open | working-tree | ATHER |
 | 0.1.6b | 2026-10-02 | accepted | Implement D7's one-hop endpoint-ID string equality filter after legacy/HQL2 differential; record 9/9 adapter tests and 361/0/1 across 27 root HQL2 targets plus 190/0/0 across 11 compatibility targets; retain shared-runtime/P8/P13 and review gates | working-tree | ATHER |
 | 0.1.5b | 2026-10-02 | accepted | Extend D7 conditionally with one one-hop endpoint-ID string equality filter after legacy/HQL2 differential evidence; adapter implementation and focused verification pending | working-tree | ATHER |
