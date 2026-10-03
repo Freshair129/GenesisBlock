@@ -1,8 +1,8 @@
 ---
 doc_id: SPEC--GENESISDB-HQL2-P8-TYPED-BOUNDARY
-version: "0.2.49b"
+version: "0.2.50b"
 created_at: "2026-09-28T01:25:00+07:00,ATHER,fc851e9"
-last_update: "2026-10-03T13:55:00+07:00,ATHER"
+last_update: "2026-10-03T14:38:00+07:00,ATHER"
 status: beta
 superseded_by: null
 owner: "Boss (Founder / Product Authority)"
@@ -842,6 +842,13 @@ separate shape limits. No process-global Pest setting is changed.
 
 ## Version diff and changelog
 
+Version diff `0.2.49b -> 0.2.50b`: add the storage-backed P7 ChangeScan
+Node-revision differential for HQL/typed IR, comparing sequence, operation
+and exact subject revision against an independent P7 expected bag built from
+WAL mutations and captured projection frontiers. Record History/Change 15/15
+and the 32-target HQL2 sweep 379/0/1. ChangeScan differentials for the other
+supported source kinds, broad P8/P13, hosted checks and review remain open.
+
 Version diff `0.2.48b -> 0.2.49b`: add storage-backed P7 HistoryScan
 differentials for Node, Edge, Row and Annotation, completing the five supported
 HistoryScan kinds with the existing Vector profile. Expected catalogs use
@@ -977,6 +984,7 @@ detail with unchanged JSON shape; broader P8/P13/review gates remain open.
 
 | Version | Date | Status | Summary | Commit Hash | Agent |
 |---|---|---|---|---|---|
+| 0.2.50b | 2026-10-03 | beta | Add test-only P7 ChangeScan Node-revision differential for HQL/typed IR; History/Change 15/15 and HQL2 379/0/1 across 32 targets; other event source kinds, hosted checks/review and broad P8/P13 remain open | working-tree | ATHER |
 | 0.2.49b | 2026-10-03 | beta | Add WAL-derived P7 HistoryScan differentials for all five supported kinds: Node, Edge, Row, Vector and Annotation; History/Change 15/15, Annotation source 7/7, P7 130/130, HQL2 379/0/1, P6/schema-v6/compatibility 194/0/0; Artifact HistoryScan, hosted review/checks and broad P8/P13 remain open | working-tree | ATHER |
 | 0.2.48b | 2026-10-03 | beta | Add test-only P7 Vector HistoryScan oracle profile and WAL-derived HQL/typed-IR differential; P7 130/130, History/Change 14/14, HQL2 377/0/1, P6/schema-v6/compatibility 194/0/0; hosted checks/review and broad P8/P13 remain open | working-tree | ATHER |
 | 0.2.47b | 2026-10-03 | beta | Implement and verify the narrow ChangeScan ACL/budget contract; ACL 11/11, History/Change 14/14, HQL2 376/0/1 and selected P6/schema-v6 43/0/0; broad P8/P13, transport, hosted CI and review remain open | working-tree | ATHER |

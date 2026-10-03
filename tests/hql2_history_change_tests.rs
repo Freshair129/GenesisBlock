@@ -1061,6 +1061,166 @@ fn change_scan_emits_ordered_revision_events_with_typed_sequences_and_operations
     let ir_result = run_ir_changes(&storage, "change-hql-ir-parity-ir", after);
     assert_eq!(hql_result.columns, ir_result.columns);
     assert_eq!(hql_result.rows, ir_result.rows);
+
+    let mutations = record_revision_mutations(&storage, "node");
+    let projection = Connection::open(dir.path().join("projection.sqlite")).unwrap();
+    let mut revisions = Vec::with_capacity(mutations.len() * 2);
+    for mutation in &mutations {
+        let revision_id = mutation["revision_id"].as_str().unwrap();
+        let (tx_from, tx_to): (i64, Option<i64>) = projection
+            .query_row(
+                "SELECT tx_from, tx_to FROM hql2_record_revisions
+                 WHERE namespace='default' AND kind='node' AND record_id='history:one'
+                   AND revision_id=?1",
+                [revision_id],
+                |row| Ok((row.get(0)?, row.get(1)?)),
+            )
+            .unwrap();
+        let tx_from = u64::try_from(tx_from).unwrap();
+        let tx_to = tx_to.map(|value| u64::try_from(value).unwrap());
+        let valid_from =
+            chrono::DateTime::parse_from_rfc3339(mutation["valid_from"].as_str().unwrap())
+                .unwrap()
+                .timestamp_micros();
+        let valid_to = mutation["valid_to"].as_str().map(|value| {
+            chrono::DateTime::parse_from_rfc3339(value)
+                .unwrap()
+                .timestamp_micros()
+        });
+        let subject = p7_graph::EntityRef {
+            namespace: "default".into(),
+            kind: p7_graph::Kind::Node,
+            id: mutation["id"].as_str().unwrap().into(),
+            revision: revision_id.into(),
+        };
+        let operation = match (
+            mutation["operation"].as_str().unwrap(),
+            mutation["predecessor_revision_id"].as_str(),
+        ) {
+            ("retract", _) => p7_graph::ChangeKind::Retract,
+            ("upsert", Some(_)) => p7_graph::ChangeKind::Correct,
+            ("upsert", None) => p7_graph::ChangeKind::Upsert,
+            _ => panic!("unexpected node revision operation: {mutation:#?}"),
+        };
+        let valid = p7_graph::Interval {
+            start: valid_from,
+            end: valid_to,
+        };
+        revisions.push(p7_graph::Revision {
+            entity: subject.clone(),
+            transaction: p7_graph::Interval {
+                start: tx_from,
+                end: tx_to,
+            },
+            valid: valid.clone(),
+            retracted: operation == p7_graph::ChangeKind::Retract,
+            fields: p7_graph::Fields::new(),
+            data: p7_graph::RecordData::Plain,
+        });
+        revisions.push(p7_graph::Revision {
+            entity: p7_graph::EntityRef {
+                namespace: "default".into(),
+                kind: p7_graph::Kind::Event,
+                id: format!("node:{}:{revision_id}", subject.id),
+                revision: revision_id.into(),
+            },
+            transaction: p7_graph::Interval {
+                start: tx_from,
+                end: None,
+            },
+            valid,
+            retracted: false,
+            fields: p7_graph::Fields::new(),
+            data: p7_graph::RecordData::Change { subject, operation },
+        });
+    }
+    let p7_catalog = p7_graph::Catalog {
+        frontier: storage.stable_frontier(),
+        history: BTreeMap::from([
+            (
+                p7_graph::Kind::Node,
+                p7_graph::HistoryCapability {
+                    horizon: 0,
+                    available: true,
+                },
+            ),
+            (
+                p7_graph::Kind::Event,
+                p7_graph::HistoryCapability {
+                    horizon: 0,
+                    available: true,
+                },
+            ),
+        ]),
+        revisions,
+    };
+    let p7_plan = p7_graph::Plan {
+        source: p7_graph::Source::ChangeScan {
+            alias: "c".into(),
+            predicate: p7_graph::Predicate::default(),
+            after,
+            through: p7_catalog.frontier,
+        },
+        stages: vec![],
+    };
+    let p7_view = p7_graph::View {
+        namespace: "default".into(),
+        transaction: p7_catalog.frontier,
+        valid_at: chrono::DateTime::parse_from_rfc3339("2020-01-01T00:00:00Z")
+            .unwrap()
+            .timestamp_micros(),
+        permissions: p7_graph::Permissions {
+            read: p7_catalog
+                .revisions
+                .iter()
+                .filter(|revision| matches!(revision.data, p7_graph::RecordData::Change { .. }))
+                .map(|revision| revision.entity.identity())
+                .chain([p7_graph::Identity {
+                    namespace: "default".into(),
+                    kind: p7_graph::Kind::Node,
+                    id: "history:one".into(),
+                }])
+                .collect(),
+            annotation_body: BTreeSet::new(),
+        },
+    };
+    let p7_result =
+        p7_graph::execute(&p7_catalog, &p7_view, &p7_plan, p7_graph::Limits::default()).unwrap();
+    assert_eq!(
+        result.rows.len(),
+        p7_result.rows.len(),
+        "P7 ChangeScan expected bag must match storage rows"
+    );
+    for (actual, expected) in result.rows.iter().zip(&p7_result.rows) {
+        let p7_graph::Binding::Entity(event_ref) = &expected["c"] else {
+            panic!("P7 ChangeScan binds event identities")
+        };
+        let event = p7_catalog
+            .revisions
+            .iter()
+            .find(|revision| &revision.entity == event_ref)
+            .unwrap();
+        let p7_graph::RecordData::Change { subject, operation } = &event.data else {
+            panic!("P7 ChangeScan output must be an explicit change event")
+        };
+        assert_eq!(
+            tagged(actual, "sequence")["value"],
+            event.transaction.start.to_string()
+        );
+        assert_eq!(
+            tagged(actual, "operation")["value"],
+            match operation {
+                p7_graph::ChangeKind::Upsert => "upsert",
+                p7_graph::ChangeKind::Correct => "correct",
+                p7_graph::ChangeKind::Retract => "retract",
+            }
+        );
+        let actual_subject = &tagged(actual, "subject")["value"];
+        assert_eq!(actual_subject["namespace"], subject.namespace);
+        assert_eq!(actual_subject["kind"], "node");
+        assert_eq!(actual_subject["id"], subject.id);
+        assert_eq!(actual_subject["revision"], subject.revision);
+    }
 }
 
 #[test]

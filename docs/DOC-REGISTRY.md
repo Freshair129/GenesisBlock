@@ -2,7 +2,7 @@
 title: "GenesisBlockDB Document Registry"
 doc_id: "DOC-REGISTRY-GENESISBLOCKDB"
 status: draft
-version: "0.5.59+draft"
+version: "0.5.60+draft"
 updated: "2026-10-03"
 owner: "GenesisBlockDB Architecture"
 source_of_truth: true
@@ -57,10 +57,10 @@ registry row explicitly names them.
 | HQL2 P8 completion addendum | `ADR--GENESISDB-HQL2-P8-COMPLETION-ADDENDUM` | `0.1.6b` | accepted | Boss (Founder / Product Authority) | `docs/adr/ADR--GENESISDB-HQL2-P8-COMPLETION-ADDENDUM.md` |
 | HQL2 Sequence pattern constraints | `ADR--GENESISDB-HQL2-PATTERN-CONSTRAINTS` | `0.2.1b` | beta | Boss (Founder / Product Authority) | `docs/adr/ADR--GENESISDB-HQL2-PATTERN-CONSTRAINTS.md` |
 | HQL2 durable revisions and annotations | `ADR--GENESISDB-HQL2-DURABLE-REVISIONS-ANNOTATIONS` | `0.8.17b` | beta | Boss (Founder / Product Authority) | `docs/adr/ADR--GENESISDB-HQL2-DURABLE-REVISIONS-ANNOTATIONS.md` |
-| UEE-HQL2 orchestration plan | `IMPLEMENTATION-PLAN--UEE-HQL2-ORCHESTRATION-2026-09-22` | `0.8.52b` | beta | Boss (Founder / Product Authority) | `docs/IMPLEMENTATION-PLAN--UEE-HQL2-ORCHESTRATION-2026-09-22.md` |
-| HQL2 typed P8 boundary | `SPEC--GENESISDB-HQL2-P8-TYPED-BOUNDARY` | `0.2.49b` | beta | Boss (Founder / Product Authority) | `docs/SPEC--GENESISDB-HQL2-P8-TYPED-BOUNDARY.md` |
-| HQL2 P8 core checkpoint | `REPORT--HQL2-P8-CORE-2026-09-28` | `0.1.48b` | beta | GenesisBlockDB Engineering | `docs/REPORT--HQL2-P8-CORE-2026-09-28.md` |
-| HQL2 P7 bounded oracle evidence | `REPORT--HQL2-P7-ORACLE-2026-09-28` | `0.1.3b` | beta | GenesisBlockDB Engineering | `docs/REPORT--HQL2-P7-ORACLE-2026-09-28.md` |
+| UEE-HQL2 orchestration plan | `IMPLEMENTATION-PLAN--UEE-HQL2-ORCHESTRATION-2026-09-22` | `0.8.53b` | beta | Boss (Founder / Product Authority) | `docs/IMPLEMENTATION-PLAN--UEE-HQL2-ORCHESTRATION-2026-09-22.md` |
+| HQL2 typed P8 boundary | `SPEC--GENESISDB-HQL2-P8-TYPED-BOUNDARY` | `0.2.50b` | beta | Boss (Founder / Product Authority) | `docs/SPEC--GENESISDB-HQL2-P8-TYPED-BOUNDARY.md` |
+| HQL2 P8 core checkpoint | `REPORT--HQL2-P8-CORE-2026-09-28` | `0.1.49b` | beta | GenesisBlockDB Engineering | `docs/REPORT--HQL2-P8-CORE-2026-09-28.md` |
+| HQL2 P7 bounded oracle evidence | `REPORT--HQL2-P7-ORACLE-2026-09-28` | `0.1.4b` | beta | GenesisBlockDB Engineering | `docs/REPORT--HQL2-P7-ORACLE-2026-09-28.md` |
 | Commit correctness | `SPEC--WAVE-A-COMMIT-CORRECTNESS` | `0.1.0b` | beta | GenesisBlockDB Engineering | `docs/SPEC--WAVE-A-COMMIT-CORRECTNESS.md` |
 | Durable collections and edge history | `SPEC--WAVE-B-DURABLE-COLLECTIONS-EDGE-HISTORY` | `0.1.2b` | beta | GenesisBlockDB Engineering | `docs/SPEC--WAVE-B-DURABLE-COLLECTIONS-EDGE-HISTORY.md` |
 | Generation, lease, temporal and ACL contract | `SPEC--GENESISDB-P6-GENERATIONS-LEASES-ACL` | `0.5.27b` | beta | GenesisBlockDB Engineering | `docs/SPEC--GENESISDB-P6-GENERATIONS-LEASES-ACL.md` |
@@ -117,6 +117,13 @@ The following documents should be created only when implementation work requires
 - third-client namespace conformance report.
 
 ## 9. Changelog
+
+Version diff 0.5.59+draft -> 0.5.60+draft: register the Node-revision
+ChangeScan differential against P7, synchronize P7/P8/plan versions, and
+record PR #194 merged at `4f02d6b` with 48 checks passing, five failing and
+five skipped. History/Change 15/15 and the 32-target HQL2 sweep 379/0/1;
+other ChangeScan source kinds, worker correction and broad acceptance remain
+open.
 
 Version diff 0.5.58+draft -> 0.5.59+draft: register the WAL-derived P7
 HistoryScan differentials for all five supported kinds and synchronize the
@@ -257,6 +264,7 @@ review and full P8 gates remain open.
 
 | Version | Date | Owner | Summary |
 |---|---|---|---|
+| 0.5.60+draft | 2026-10-03 | GenesisBlockDB Architecture | Register the Node-revision ChangeScan P7 differential and updated P7/P8/plan versions; record PR #194 merged with 48 pass, five fail and five skipped; retain other source-kind and broad HQL2 acceptance gates |
 | 0.5.59+draft | 2026-10-03 | GenesisBlockDB Architecture | Register WAL-derived independent P7 HistoryScan differentials for Node/Edge/Row/Vector/Annotation and synchronize HQL2/P7/P8/P6/plan/C4/master versions; History/Change 15/15, Annotation source 7/7, P7 130/130, HQL2 379/0/1, P6/schema-v6/compatibility 194/0/0; Artifact and broad acceptance/hosted review remain open |
 | 0.5.58+draft | 2026-10-03 | GenesisBlockDB Architecture | Register the WAL-derived independent P7 Vector HistoryScan differential and synchronize P7/P8/P6/plan/report/C4/master versions; P7 130/130, History/Change 14/14, HQL2 377/0/1, P6/schema-v6/compatibility 194/0/0; prior PR head has five failed checks and no reviews, new checks pending; broad P8/P13 open |
 | 0.5.56+draft | 2026-10-03 | GenesisBlockDB Architecture | Synchronize HQL2/P6/plan/report/C4/master references for explicit Annotation(Read) on annotation source and ChangeScan subjects; HQL2 375/0/1 and selected P6/schema-v6 43/0/0 pass; possible ChangeScan budget side channel, prior PR worker failures and cancelled Windows Rust remain open |
