@@ -1,8 +1,8 @@
 ---
 doc_id: REPORT--HQL2-P8-CORE-2026-09-28
-version: "0.1.48b"
+version: "0.1.49b"
 created_at: "2026-09-28T04:35:00+07:00,ATHER,22bc11e"
-last_update: "2026-10-03T13:55:00+07:00,ATHER"
+last_update: "2026-10-03T14:38:00+07:00,ATHER"
 status: beta
 owner: GenesisBlockDB Engineering
 attributes:
@@ -161,6 +161,8 @@ explicit test targets; the protected probe target was not selected.
 | Approved ChangeScan budget policy | Implemented; threshold regression passed | Preserve Namespace(Read)-authorized non-annotation subjects; exclude Annotation revisions without Annotation(Read) before caller-budget accounting/materialization. The ACL target passes 11/11; History/Change passes 15/15. Independent review and hosted CI of this source revision remain open. |
 | HQL/IR annotation source and recursive ACL parity | 7 passed, 0 failed, 0 ignored | Separate `targets`/`evidence` properties, nested annotation references, and Edge endpoint access are covered; fixture evidence is independent of P8 operator acceptance. |
 | Long-running soak | Three soak_tests cases remain ignored by the normal suite | No soak qualification inferred |
+| Storage-backed ChangeScan Node P7 differential | 1 passed, 0 failed | HQL output matches independent P7 event bags for Node upsert/correct/retract revisions by sequence, operation and exact subject identity; the existing typed-IR parity assertion agrees. Other ChangeScan source kinds remain without this differential. |
+| PR #194 final state at head `4f4e298` | [Run 37104811672](https://github.com/Freshair129/GenesisBlock/actions/runs/37104811672): 48 checks passed, five failed and five skipped; three worker OS tests and rebuilt Linux addon/worker fail with `RECOVERY_REQUIRED: markerless database identity is missing`. The Android GitHub Packages check failed during checkout after the PR ref disappeared. | PR #194 was merged at `4f02d6b` on 2026-10-03 despite the five reported failures; no admin bypass was used and reviewDecision is empty. No package publication is inferred from the failed checkout. Worker correction remains approval-gated; broad P8/P13 remains open. |
 | Hosted PR #194 CI at head 31168524 | [Tests run 37073380412](https://github.com/Freshair129/GenesisBlock/actions/runs/37073380412): Rust, standard Node, docs, fmt/clippy and non-worker distribution checks pass; worker npm tests fail on Linux/macOS/Windows with RECOVERY_REQUIRED: markerless database identity is missing. [Rebuilt addon/worker run 37073380336](https://github.com/Freshair129/GenesisBlock/actions/runs/37073380336) fails with the same error. | Four worker checks remain red; correction is approval-gated and no worker code changed. |
 | Hosted PR #194 CI at docs-only head 43cc6e8 (engine sources match 31168524) | [Tests run 37083654705](https://github.com/Freshair129/GenesisBlock/actions/runs/37083654705): Linux/macOS Rust, standard Node on all three OSes, docs, fmt/clippy and version consistency pass. Windows Rust fails `storage_hql_join_kinds_match_typed_ir_and_independent_p7` at `tests/hql2_storage_hql_join_oracle_differential_tests.rs:281` with `QUERY_BUDGET_EXCEEDED` / `query_limit`. [Rebuilt-addon run 37083654689](https://github.com/Freshair129/GenesisBlock/actions/runs/37083654689) and worker npm jobs on Linux/macOS/Windows fail with `RECOVERY_REQUIRED: markerless database identity is missing`. | Five CI checks fail. The Join differential target passes locally 5/5 at 0.21–0.22s; the generic error does not identify the budget dimension, so the CI cause remains suspected. No implementation source changed at 43cc6e8. |
 | PR #194 state after run 37083654705 | GitHub reports OPEN, UNSTABLE at head 43cc6e8; 48 checks pass, five fail, five skip; review submissions remain empty. | Not merged; no failed checks were bypassed. Broad P8/P13 acceptance remains open. |
@@ -425,9 +427,12 @@ zero-hop and bounded one-hop actor-scoped HQL1 forms are lowered through
 HQL1/v2/IR binding is not claimed. Checked HQL remainder,
 NULLS LAST defaults and exact DecimalU64 structural parameters remain as recorded
 above. The Blueprint AnnotationPut example keeps separate `evidence` references.
-Cancellation, broad exact-oracle coverage for every source, spill/scheduling/
-index lifecycle, transport parity, independent review, security qualification,
-soak/crash/platform acceptance and the full 190-obligation ledger remain open.
+The Node-revision ChangeScan differential now checks sequence, operation and
+exact subject revision against independent P7 for HQL and typed IR. Equivalent
+ChangeScan oracle coverage for Edge, Row, Vector and Annotation, cancellation,
+broad exact-oracle coverage, spill/scheduling/index lifecycle, transport parity,
+independent review, security qualification, soak/crash/platform acceptance and
+the full 190-obligation ledger remain open.
 No production release, user-database migration or external readiness is inferred
 from these local tests.
 
@@ -435,15 +440,17 @@ from these local tests.
 
 | Artifact | Before | After |
 |---|---|---|
-| Registry | 0.5.58+draft | 0.5.59+draft |
-| C4 architecture index | 0.1.59b | 0.1.60b |
-| Master specification | 2.3.31b | 2.3.32b |
-| P6 generations/leases/ACL | 0.5.26b | 0.5.27b |
-| H2-D11 durable revisions/annotations | 0.8.16b | 0.8.17b |
-| P8 typed boundary | 0.2.48b | 0.2.49b |
-| Orchestration plan | 0.8.51b | 0.8.52b |
-| P7 oracle report | 0.1.2b | 0.1.3b |
-| This report | 0.1.47b | 0.1.48b |
+| Registry | 0.5.59+draft | 0.5.60+draft |
+| P8 typed boundary | 0.2.49b | 0.2.50b |
+| Orchestration plan | 0.8.52b | 0.8.53b |
+| P7 oracle report | 0.1.3b | 0.1.4b |
+| This report | 0.1.48b | 0.1.49b |
+
+Version diff 0.1.48b -> 0.1.49b: add the Node-revision ChangeScan P7
+differential; record History/Change 15/15 and the 32-target HQL2 sweep
+379/0/1. Refresh PR #194 final status: merged at `4f02d6b` with 48 checks
+passing, five failing and five skipped; retain worker correction, other event
+source kinds, independent review and broad P8/P13 gates.
 
 Version diff 0.1.47b -> 0.1.48b: add WAL-derived P7 HistoryScan differentials
 for Node, Edge, Row and Annotation alongside the existing Vector profile;
@@ -562,6 +569,7 @@ P8 and release gates.
 
 | Version | Date | Status | Summary | Commit Hash | Agent |
 |---|---|---|---|---|---|
+| 0.1.49b | 2026-10-03 | beta | Add storage-backed P7 ChangeScan Node-revision differential; History/Change 15/15 and HQL2 379/0/1 across 32 targets; record PR #194 merged at 4f02d6b with 48 checks passing, five failing and five skipped; other event kinds, worker correction and broad P8/P13 remain open | working-tree | ATHER |
 | 0.1.48b | 2026-10-03 | beta | Add WAL-derived P7 HistoryScan differentials for Node/Edge/Row/Annotation alongside Vector; History/Change 15/15, Annotation source 7/7, P7 130/130, HQL2 379/0/1, P6/schema-v6/compatibility 194/0/0; Artifact, broad ChangeScan, hosted review/checks and P8/P13 remain open | working-tree | ATHER |
 | 0.1.47b | 2026-10-03 | beta | Add P7 Vector HistoryScan differential from WAL-derived retained revision facts; P7 130/130, History/Change 14/14, HQL2 377/0/1 and P6/schema-v6/compatibility 194/0/0; prior hosted head 9ada855 has five failed checks and no reviews; broad P8/P13 remains open | working-tree | ATHER |
 | 0.1.45b | 2026-10-03 | beta | Implement and verify H2-D11 R4/P6 annotation ACL conformance for AnnotationScan and ChangeScan subjects; regression passes, HQL2 375/0/1 and current selected P6/schema-v6 43/0/0; prior hosted head c4f5729 retains four worker failures and cancelled Windows Rust; no schema/migration change, hosted/review and broad P8/P13 gates open | working-tree | ATHER |

@@ -1,9 +1,9 @@
 ---
-version: "0.8.52b"
+version: "0.8.53b"
 doc_id: "IMPLEMENTATION-PLAN--UEE-HQL2-ORCHESTRATION-2026-09-22"
 owner: "Boss (Founder / Product Authority)"
 created_at: "2026-09-22T00:00:00+07:00,ATHER,working-tree"
-last_update: "2026-10-03T13:55:00+07:00,ATHER"
+last_update: "2026-10-03T14:38:00+07:00,ATHER"
 status: beta
 superseded_by: null
 attributes:
@@ -224,12 +224,14 @@ H2-D11 authorizes P8/P6/plan truth-sync and additive schema-v6 code plus fixture
 it does not authorize running migration on a user database. The initial scalar/core checkpoint
 is recorded in `REPORT--HQL2-P8-CORE-2026-09-28.md`; P8 remains partial and P9-P16
 are not qualified by that checkpoint. The user explicitly authorized scoped
-branch commit/push and a PR #194 merge attempt on 2026-10-03; this does not
-waive CI/review gates or authorize deployment/user-database migration. At
-hosted head `484916b`, Rust/core, standard Node, formatting, Clippy, docs and
-version checks pass, but worker checks fail across all three OSes and no PR
-review submissions exist, so merge remains unmet. P9-P16
-retain their existing dependency and approval gates.
+branch commit/push and the PR #194 merge. PR #194 is now merged at `4f02d6b`
+from head `4f4e298`; its final hosted snapshot reports 48 checks passed, five
+failed and five skipped, and no review decision. Three worker OS checks and
+the rebuilt Linux addon/worker failed at markerless schema-v6 bootstrap; the
+Android GitHub Packages job failed during checkout after the merged PR ref
+disappeared. The PR was merged despite those failures; no admin bypass was
+used. This does not qualify P8 or authorize deployment/user-database
+migration. P9-P16 retain their existing dependency and approval gates.
 The subsequently approved D7 addendum now has local implementation evidence for
 actor-scoped zero-hop and bounded one-hop HQL1 ID projections through
 `Storage::query_v2`, including one endpoint-ID string equality filter:
@@ -243,7 +245,10 @@ The approved HistoryScan slice is implemented and locally verified for all
 five supported kinds: Node, Edge, Row, Vector and Annotation. HQL/typed-IR
 result bags match independent P7 catalogs assembled from WAL revisions and
 captured frontiers/valid-time windows, including endpoint, vector-owner and
-annotation-reference ACL dependencies. History/Change passes 15/15,
+annotation-reference ACL dependencies. Node-revision ChangeScan now has a
+storage-backed P7 differential for sequence, operation and exact subject
+identity; other event subject kinds remain uncovered by this differential.
+History/Change passes 15/15,
 Annotation source passes 7/7, P7 passes 130/130 and all 32 HQL2 targets pass
 379/0/1. Artifact HistoryScan remains capability-unsupported; broad
 ChangeScan/source-oracle coverage, P8/P13 qualification, hosted CI and
@@ -266,12 +271,13 @@ Both pass 1/1. The storage-backed HQL/typed-IR Join differential matches
 independent P7 for Inner/Left/Semi/Anti (5/7/3/2 rows), including duplicate,
 missing-property NULL and JSON-null keys; bare HQL JOIN defaults to Inner.
 The explicit 32-target HQL2 sweep passes 379/0/1. These bounded fixtures do not close broad exact-oracle or P8
-acceptance. At hosted head `484916b`, Rust/core, standard Node, format/Clippy,
-docs and version checks pass, while worker tests fail across platforms with
-`RECOVERY_REQUIRED: markerless database identity is missing` in the rebuilt
-Linux addon run. The new Join differential is not yet in CI, no PR review
-submissions exist, and the PR remains open/unmerged. Worker startup correction
-remains approval-gated.
+acceptance. PR #194 is merged, but its hosted snapshot reports 48 checks
+passing, five failing and five skipped, with no review decision. Three worker
+OS tests and the rebuilt Linux addon/worker failed with
+`RECOVERY_REQUIRED: markerless database identity is missing`; the Android
+GitHub Packages job failed at checkout after the PR ref disappeared. Worker
+startup correction remains approval-gated; broad P8/P13 and release
+qualification remain open.
 
 H2-D11 R4/P6 ACL conformance is implemented: the namespace-wide grant authorizes
 the HQL2 query boundary and same-namespace target/evidence references, while
@@ -814,7 +820,7 @@ Remaining HQL2/P8 acceptance gates stay open.
 
 | Work item | Status | Local evidence / remaining gate |
 |---|---|---|
-| HQL2 HistoryScan/ChangeScan | Implemented; local verification passed | `HistoryRevision` and `ChangeEvent` use exact retained schema-v6 revisions under one P6 lease. Focused History/Change target: 15 passed; HQL/IR parity, exact historical hydration, transaction-time selection, retract tombstones, source floors, recursive Annotation/Edge authorization, Vector owner ACL and budget exhaustion are covered. HQL/typed-IR Node, Edge, Row, Vector and Annotation HistoryScan bags now match independent P7 catalogs from WAL-derived revision facts; Artifact remains capability-unsupported and broad ChangeScan/P8 oracle coverage is open. |
+| HQL2 HistoryScan/ChangeScan | Implemented; local verification passed | `HistoryRevision` and `ChangeEvent` use exact retained schema-v6 revisions under one P6 lease. Focused History/Change target: 15 passed; HQL/IR parity, exact historical hydration, transaction-time selection, retract tombstones, source floors, recursive Annotation/Edge authorization, Vector owner ACL and budget exhaustion are covered. HQL/typed-IR Node, Edge, Row, Vector and Annotation HistoryScan bags match independent P7; the Node-revision ChangeScan bag now also matches P7 for sequence, operation and exact subject identity. Artifact remains capability-unsupported and other ChangeScan source kinds/broad P8 oracle coverage remain open. |
 | HQL2 Vector HistoryScan | Implemented; local verification passed | HQL and typed IR read exact vector revisions using H2-D11's compact JSON `(owner_id, collection_id)` key under the P6 lease; the vector source floor is enforced before access and owner-node ACL retained. The WAL-derived P7 HistoryScan differential is part of five-kind parity; P7 passes 130/130, Annotation source 7/7, History/Change 15/15 and latest HQL2 sweep 379/0/1 across 32 targets. Broader P8 and independent review remain open. |
 | HQL2 transaction-time snapshot (`tx_as_of`) | Implemented; local verification passed | HQL2 and typed IR `query_v2` select `S = tx_as_of` (or pinned frontier L when omitted) across revision-backed scans, graph/vector/annotation operators, hydration and `Snapshot.tx`; enforce `history_horizon <= S <= L` and each used source floor before access. Keep the validated P6 generation/catalog/current policy pinned and never fall back to current rows. Five focused targets pass 56/56; HQL2 regression passes 379/0/1 across 32 targets; the separate P6/schema-v6/compatibility sweep passed 194/0/0 across 11. Broad P8/P13, transport, hosted CI and independent review remain open. |
 | HQL2 root Match anchors | Implemented; local verification passed | Exact non-null Entity parameter/literal by full `RecordRefV2`; node aliases only; no direct lookup; anchor filtering precedes shortest deduplication. `hql2_expand_tests`: 12/12; `hql2_value_tests`: 6/6; all 22 root HQL2 targets: 319/0/1. |
@@ -887,6 +893,12 @@ results remain regression evidence, not P8 acceptance.
 
 ## CHANGELOG
 
+Version diff `0.8.52b -> 0.8.53b`: add the test-only Node-revision ChangeScan
+P7 differential; record History/Change 15/15 and 379/0/1 across 32 HQL2
+targets. Refresh integration status: PR #194 merged at `4f02d6b` with 48
+checks passing, five failing and five skipped; retain the worker correction,
+other event source kinds, broad P8/P13 and independent-review gates.
+
 Version diff `0.8.51b -> 0.8.52b`: add WAL-derived independent P7 HistoryScan
 differentials for Node, Edge, Row and Annotation alongside Vector; record
 History/Change 15/15, Annotation source 7/7, P7 130/130, HQL2 379/0/1 and
@@ -949,6 +961,7 @@ Version diff `0.8.27b -> 0.8.28b`: implement approved D1-D5, record 9 focused pa
 
 | Version | Date | Status | Summary | Commit Hash | Agent |
 |---|---|---|---|---|---|
+| 0.8.53b | 2026-10-03 | beta | Add Node-revision ChangeScan differential against P7; History/Change 15/15 and HQL2 379/0/1 across 32 targets; record PR #194 merged at 4f02d6b with 48 pass, five fail and five skipped; other event source kinds, worker correction, P8/P13 and independent review remain open | working-tree | ATHER |
 | 0.8.52b | 2026-10-03 | beta | Add WAL-derived P7 HistoryScan differentials for all five supported kinds; verify endpoint/owner/reference ACL and exact temporal identities; History/Change 15/15, Annotation source 7/7, P7 130/130, HQL2 379/0/1 and P6/schema-v6/compatibility 194/0/0; Artifact, broad ChangeScan/P8/P13, hosted review remain open | working-tree | ATHER |
 | 0.8.51b | 2026-10-03 | beta | Add P7 Vector HistoryScan differential using WAL-derived revisions and H2-D11 owner ACL; P7 130/130, History/Change 14/14, HQL2 377/0/1 and P6/schema-v6/compatibility 194/0/0; hosted checks/review and broad P8/P13 remain open | working-tree | ATHER |
 | 0.8.50b | 2026-10-03 | beta | Implement approved narrow ChangeScan budget policy across H2-D11/P6/P8; ACL 11/11, History/Change 14/14, HQL2 376/0/1 and selected P6/schema-v6 43/0/0; source revision awaits hosted CI/review; broad P8/P13 and transport remain open | working-tree | ATHER |
