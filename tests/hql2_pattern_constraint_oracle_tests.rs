@@ -253,6 +253,80 @@ fn bag(rows: Vec<(String, String, String)>) -> BTreeMap<(String, String, String)
     result
 }
 
+fn optional_bag(
+    rows: Vec<(String, Option<String>, Option<String>)>,
+) -> BTreeMap<(String, Option<String>, Option<String>), usize> {
+    let mut result = BTreeMap::new();
+    for row in rows {
+        *result.entry(row).or_insert(0) += 1;
+    }
+    result
+}
+
+fn optional_text_rows(
+    result: genesis_block_native::query::hql2::QueryResultV2,
+) -> Vec<(String, Option<String>, Option<String>)> {
+    result
+        .rows
+        .into_iter()
+        .map(|row| {
+            let field = |name: &str| match &row[name] {
+                QueryValueV2::Utf8(text) => Some(text.clone()),
+                QueryValueV2::Null => None,
+                other => panic!("{name} must be UTF-8 or NULL, got {other:?}"),
+            };
+            (
+                field("from").expect("input entity must be preserved"),
+                field("to"),
+                field("edge"),
+            )
+        })
+        .collect()
+}
+
+fn optional_endpoint_miss_oracle_rows() -> Vec<(String, Option<String>, Option<String>)> {
+    let expansion = graph::Expand {
+        start_alias: "a".into(),
+        segments: vec![graph::Segment {
+            end_alias: "b".into(),
+            edge_alias: Some("e1".into()),
+            direction: graph::Direction::Out,
+            relations: BTreeSet::from(["LINK".into()]),
+            min_hops: 1,
+            max_hops: 1,
+            node_predicate: predicate(Some("absent"), &["Company"]),
+            edge_predicate: graph::Predicate::default(),
+        }],
+        path_alias: None,
+        mode: graph::PathMode::Walk,
+        optional: true,
+        shortest: false,
+    };
+    reference::execute(
+        &oracle_environment(),
+        &Plan::Expand(
+            Box::new(Plan::NodeScan("a".into(), graph::Predicate::default())),
+            expansion,
+        ),
+    )
+    .unwrap()
+    .rows
+    .into_iter()
+    .map(|row| {
+        let id = |alias: &str| match &row[alias] {
+            reference::Value::Graph(graph::Binding::Entity(record)) => Some(record.id.clone()),
+            reference::Value::Null => None,
+            other => panic!("{alias} must be an entity or NULL, got {other:?}"),
+        };
+        (
+            id("a").expect("input entity must be preserved"),
+            id("b"),
+            id("e1"),
+        )
+    })
+    .collect()
+}
+
 fn open(path: &Path) -> Storage {
     Storage::open(OpenOptions {
         path: path.to_string_lossy().into_owned(),
@@ -772,6 +846,18 @@ fn optional_sequence_constraint_miss_preserves_input_and_null_extends_new_aliase
             .collect::<BTreeSet<_>>(),
         BTreeSet::from(["a", "b", "c", "d"])
     );
+
+    let hql = run(
+        &storage,
+        "pattern-optional-step-miss-hql",
+        Some("USE default FROM NODES AS a |> OPTIONAL EXPAND (a)-[e:LINK]->(b:Company {id:\"absent\"}) |> RETURN a.id AS from, b.id AS to, e.id AS edge"),
+        Value::Null,
+        json!({}),
+    )
+    .unwrap();
+    let expected = optional_bag(optional_endpoint_miss_oracle_rows());
+    assert_eq!(optional_bag(optional_text_rows(result)), expected);
+    assert_eq!(optional_bag(optional_text_rows(hql)), expected);
 }
 
 #[test]
