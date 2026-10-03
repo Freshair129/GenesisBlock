@@ -1,8 +1,8 @@
 ---
 doc_id: REPORT--HQL2-P7-ORACLE-2026-09-28
-version: "0.1.8b"
+version: "0.1.9b"
 created_at: "2026-09-28T01:38:00+07:00,ATHER,fc851e9"
-last_update: "2026-10-04T02:53:00+07:00,ATHER"
+last_update: "2026-10-04T03:40:00+07:00,ATHER"
 status: beta
 owner: "GenesisBlockDB Engineering"
 attributes:
@@ -190,6 +190,13 @@ This is test-only differential evidence; the P7 oracle and runtime/contract/
 schema/P6/transport behavior are unchanged, and broad P8/P13 acceptance remains
 open.
 
+Storage-backed HQL and typed-IR Sequence property constraints now also match
+independent P7 for positive exact values: the start/end nodes use UTF-8 `name`
+fields and the edge uses an integer `weight`. Wrong-valued parallel-edge and
+endpoint candidates are excluded; the focused pattern target passes 8/8 and
+the explicit 34-target HQL2 sweep passes 387/0/1. This bounded primitive-scalar
+fixture does not claim nested-JSON oracle coverage or expand runtime behavior.
+
 At the original P7 checkpoint, documentation validation reported `0
 violations in 233 files`; scoped rustfmt checks of the eight then-new Rust
 files and `git diff --check` passed. Current continuation checks are recorded
@@ -211,6 +218,13 @@ publication, device validation, soak/crash qualification and deployments have
 not been run or claimed.
 
 ## Version diff
+
+Version diff `0.1.8b -> 0.1.9b`: add a storage-backed HQL/typed-IR Sequence
+node/edge exact-property differential against independent P7 for positive
+UTF-8 and integer values, including wrong-value candidate exclusion; focused
+pattern target 8/8 and HQL2 387/0/1 across 34 targets. No runtime, contract,
+schema, P6 or transport behavior changed; broad oracle and P8/P13 acceptance
+remain open.
 
 Version diff `0.1.7b -> 0.1.8b`: add a storage-backed HQL/typed-IR
 AnnotationLookup differential against independent P7 for frozen targets,
@@ -261,6 +275,7 @@ open.
 
 | Version | Date | Status | Summary | Commit Hash | Agent |
 |---|---|---|---|---|---|
+| 0.1.9b | 2026-10-04 | beta | Add storage-backed HQL/typed-IR Sequence node/edge exact-property P7 differential for positive UTF-8 and integer values with mismatching candidates excluded; focused pattern target 8/8, HQL2 387/0/1 across 34 targets; no runtime/contract/schema/P6/transport change; broad oracle and P8/P13 remain open | working-tree | ATHER |
 | 0.1.8b | 2026-10-04 | beta | Add test-only HQL/typed-IR AnnotationLookup differential against independent P7 for frozen targets, evidence-only nonmatch, optional NULL extension and duplicate-input multiplicity; focused target 6/6 and HQL2 386/0/1 across 34 targets; no runtime/contract/schema/P6/transport change; broad oracle and P8/P13 remain open | working-tree | ATHER |
 | 0.1.7b | 2026-10-03 | beta | Add test-only HQL/typed-IR scalar pipeline P7 differential for six fixtures and 12 Storage executions; focused target 2/2, HQL2 383/0/1 across 33 targets; no runtime/contract/schema/transport change; broad oracle and P8/P13 remain open | working-tree | ATHER |
 | 0.1.6b | 2026-10-03 | beta | Add storage-backed HQL/typed-IR Values/UnionAll P7 differential for 169 nullable bag pairs and 338 Storage executions; HQL2 382/0/1 across 33 targets, P6/compatibility 194/0/0; no runtime/schema/transport change; broad oracle and P8/P13 remain open | working-tree | ATHER |
