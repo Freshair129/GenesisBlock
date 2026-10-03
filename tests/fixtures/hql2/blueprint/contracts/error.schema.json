@@ -1,0 +1,59 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.genesis.invalid/blueprint/v2/error.schema.json",
+  "type": "object",
+  "properties": {
+    "code": {
+      "type": "string"
+    },
+    "stage": {
+      "type": "string"
+    },
+    "message": {
+      "type": "string"
+    },
+    "retryable": {
+      "type": "boolean"
+    },
+    "transaction_id": {
+      "type": "string"
+    },
+    "outcome": {
+      "enum": [
+        "none",
+        "rejected",
+        "unknown",
+        "durable_recovery_required",
+        "durable_published"
+      ]
+    },
+    "span": {
+      "type": "object",
+      "properties": {
+        "line": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "column": {
+          "type": "integer",
+          "minimum": 1
+        }
+      },
+      "required": [
+        "line",
+        "column"
+      ],
+      "additionalProperties": false
+    },
+    "detail": {
+      "type": "object"
+    }
+  },
+  "required": [
+    "code",
+    "stage",
+    "message",
+    "retryable"
+  ],
+  "additionalProperties": false
+}

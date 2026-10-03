@@ -1,0 +1,776 @@
+#[path = "support/hql2_pipeline_reference.rs"]
+mod reference;
+
+use genesis_block_native::{
+    query::hql2::{value::QueryValueV2, QueryErrorV2, QueryOutcomeV2},
+    uee_v2::QueryRequestV2,
+    AccessContext, EdgeInput, NodeInput, OpenOptions, Storage,
+};
+use reference::{graph, rank, Environment, Plan};
+use serde_json::{json, Value};
+use std::collections::{BTreeMap, BTreeSet};
+use std::path::Path;
+use tempfile::TempDir;
+
+fn entity(kind: graph::Kind, id: &str) -> graph::EntityRef {
+    graph::EntityRef {
+        namespace: "default".into(),
+        kind,
+        id: id.into(),
+        revision: "r1".into(),
+    }
+}
+
+fn label_fields(labels: &[&str]) -> BTreeMap<String, graph::Scalar> {
+    labels
+        .iter()
+        .map(|label| (format!("label:{label}"), graph::Scalar::Boolean(true)))
+        .collect()
+}
+
+fn node_record(id: &str, labels: &[&str]) -> graph::Revision {
+    graph::Revision {
+        entity: entity(graph::Kind::Node, id),
+        transaction: graph::Interval {
+            start: 1,
+            end: None,
+        },
+        valid: graph::Interval {
+            start: 0,
+            end: None,
+        },
+        retracted: false,
+        fields: label_fields(labels),
+        data: graph::RecordData::Plain,
+    }
+}
+
+fn oracle_environment() -> Environment {
+    let nodes = [
+        ("a", ["Person", "Employee"].as_slice()),
+        ("b", ["Company"].as_slice()),
+        ("c", ["Person"].as_slice()),
+        ("d", ["Company", "Employee"].as_slice()),
+    ];
+    let mut revisions = nodes
+        .iter()
+        .map(|(id, labels)| node_record(id, labels))
+        .collect::<Vec<_>>();
+    for (id, from, to) in [
+        ("ab-1", "a", "b"),
+        ("ab-2", "a", "b"),
+        ("bc", "b", "c"),
+        ("ad", "a", "d"),
+        ("dc", "d", "c"),
+    ] {
+        let mut edge = node_record(id, &[]);
+        edge.entity.kind = graph::Kind::Edge;
+        edge.data = graph::RecordData::Edge {
+            source: entity(graph::Kind::Node, from).identity(),
+            target: entity(graph::Kind::Node, to).identity(),
+            relation: "LINK".into(),
+        };
+        revisions.push(edge);
+    }
+    let catalog = graph::Catalog {
+        frontier: 10,
+        history: [graph::Kind::Node, graph::Kind::Edge]
+            .into_iter()
+            .map(|kind| {
+                (
+                    kind,
+                    graph::HistoryCapability {
+                        horizon: 0,
+                        available: true,
+                    },
+                )
+            })
+            .collect(),
+        revisions,
+    };
+    let view = graph::View {
+        namespace: "default".into(),
+        transaction: 10,
+        valid_at: 5,
+        permissions: graph::Permissions {
+            read: catalog
+                .revisions
+                .iter()
+                .map(|revision| revision.entity.identity())
+                .collect(),
+            annotation_body: BTreeSet::new(),
+        },
+    };
+    Environment {
+        catalog,
+        view,
+        ranking: rank::Fixture {
+            space: rank::Space {
+                fingerprint: "unused".into(),
+                dimension: 1,
+                metric: rank::Metric::L2Squared,
+            },
+            analyzer_fingerprint: "unused".into(),
+            documents: vec![],
+        },
+        tokenizers: rank::TokenizerRegistry::default(),
+        limits: graph::Limits::default(),
+    }
+}
+
+fn predicate(id: Option<&str>, labels: &[&str]) -> graph::Predicate {
+    graph::Predicate {
+        id: id.map(str::to_owned),
+        equals: label_fields(labels),
+    }
+}
+
+fn oracle_rows(
+    start_id: Option<&str>,
+    start_labels: &[&str],
+    steps: &[(&str, &[&str])],
+    shortest: bool,
+) -> Vec<(String, String, String)> {
+    let expansion = graph::Expand {
+        start_alias: "a".into(),
+        segments: steps
+            .iter()
+            .enumerate()
+            .map(|(index, (end_alias, labels))| graph::Segment {
+                end_alias: (*end_alias).into(),
+                edge_alias: Some(format!("e{}", index + 1)),
+                direction: graph::Direction::Out,
+                relations: BTreeSet::from(["LINK".into()]),
+                min_hops: 1,
+                max_hops: 1,
+                node_predicate: predicate(None, labels),
+                edge_predicate: graph::Predicate::default(),
+            })
+            .collect(),
+        path_alias: None,
+        mode: graph::PathMode::Walk,
+        optional: false,
+        shortest,
+    };
+    reference::execute(
+        &oracle_environment(),
+        &Plan::Match {
+            start: "a".into(),
+            predicate: predicate(start_id, start_labels),
+            expansion,
+        },
+    )
+    .unwrap()
+    .rows
+    .into_iter()
+    .map(|row| {
+        let id = |alias: &str| match &row[alias] {
+            reference::Value::Graph(graph::Binding::Entity(record)) => record.id.clone(),
+            _ => panic!("{alias} must bind an entity"),
+        };
+        (id("a"), id(steps.last().unwrap().0), id("e1"))
+    })
+    .collect()
+}
+
+fn bag(rows: Vec<(String, String, String)>) -> BTreeMap<(String, String, String), usize> {
+    let mut result = BTreeMap::new();
+    for row in rows {
+        *result.entry(row).or_insert(0) += 1;
+    }
+    result
+}
+
+fn open(path: &Path) -> Storage {
+    Storage::open(OpenOptions {
+        path: path.to_string_lossy().into_owned(),
+        page_cache_mb: Some(16),
+        read_only: Some(false),
+        vector_dim: Some(2),
+        retention: Some("full".into()),
+    })
+    .unwrap()
+}
+
+fn access() -> AccessContext {
+    AccessContext {
+        principal: "graph-reader".into(),
+        namespace: "default".into(),
+    }
+}
+
+fn add_node(storage: &Storage, id: &str, labels: &[&str]) {
+    storage
+        .add_node(NodeInput {
+            id: Some(id.into()),
+            labels: labels.iter().map(|label| (*label).into()).collect(),
+            props: None,
+            embedding: None,
+            lang: None,
+            valid_from: Some("2026-09-22T00:00:00Z".into()),
+            caused_by: None,
+            ttl: None,
+            collection: None,
+        })
+        .unwrap();
+}
+
+fn add_edge(storage: &Storage, id: &str, from: &str, to: &str) {
+    storage
+        .add_edge(EdgeInput {
+            id: Some(id.into()),
+            from: from.into(),
+            to: to.into(),
+            rel: "LINK".into(),
+            props: None,
+            valid_from: Some("2026-09-22T00:00:00Z".into()),
+            supersede: None,
+            impact: None,
+            caused_by: None,
+        })
+        .unwrap();
+}
+
+fn storage_fixture(storage: &Storage) {
+    for (id, labels) in [
+        ("a", vec!["Person", "Employee"]),
+        ("b", vec!["Company"]),
+        ("c", vec!["Person"]),
+        ("d", vec!["Company", "Employee"]),
+    ] {
+        add_node(storage, id, &labels);
+    }
+    for (id, from, to) in [
+        ("ab-1", "a", "b"),
+        ("ab-2", "a", "b"),
+        ("bc", "b", "c"),
+        ("ad", "a", "d"),
+        ("dc", "d", "c"),
+    ] {
+        add_edge(storage, id, from, to);
+    }
+}
+
+fn run(
+    storage: &Storage,
+    request_id: &str,
+    hql: Option<&str>,
+    ir: Value,
+    budget: Value,
+) -> Result<genesis_block_native::query::hql2::QueryResultV2, QueryErrorV2> {
+    run_with_params(storage, request_id, hql, ir, budget, json!({}))
+}
+
+fn run_with_params(
+    storage: &Storage,
+    request_id: &str,
+    hql: Option<&str>,
+    ir: Value,
+    budget: Value,
+    params: Value,
+) -> Result<genesis_block_native::query::hql2::QueryResultV2, QueryErrorV2> {
+    let mut body = json!({
+        "contract_version":"genesis.api.v2",
+        "request_id":request_id,
+        "namespace":"default",
+        "budget":budget,
+        "params":params
+    });
+    if let Some(hql) = hql {
+        body["language_version"] = json!("hql.v2");
+        body["hql"] = json!(hql);
+    } else {
+        body["ir"] = ir;
+    }
+    let request: QueryRequestV2 = serde_json::from_value(body).unwrap();
+    let QueryOutcomeV2::Rows(result) = storage.query_v2(access(), request)? else {
+        panic!("query must return rows")
+    };
+    Ok(result)
+}
+
+fn text_rows(
+    result: genesis_block_native::query::hql2::QueryResultV2,
+) -> Vec<(String, String, String)> {
+    result
+        .rows
+        .into_iter()
+        .map(|row| {
+            let field = |name: &str| match &row[name] {
+                QueryValueV2::Utf8(text) => text.clone(),
+                _ => panic!("{name} must be UTF-8"),
+            };
+            (field("from"), field("to"), field("edge"))
+        })
+        .collect()
+}
+
+fn pattern_node(alias: &str, id: Option<Value>, labels: &[&str]) -> Value {
+    let mut node = json!({
+        "alias":alias,
+        "labels":labels,
+        "properties":{}
+    });
+    if let Some(id) = id {
+        node["id"] = id;
+    }
+    node
+}
+
+fn utf8_id(id: &str) -> Value {
+    json!({"literal":id,"type":"Utf8"})
+}
+
+fn pattern_step(alias: &str, labels: &[&str], id: Option<Value>) -> Value {
+    json!({
+        "edge":{"alias":"e1","relations":["LINK"],"direction":"out","min_hops":1,"max_hops":1,"properties":{}},
+        "node":pattern_node(alias,id,labels)
+    })
+}
+
+fn root_ir(start: Value, steps: Vec<Value>, shortest: bool, end_alias: &str) -> Value {
+    json!({
+        "contract_version":"query-ir.v2",
+        "nodes":[
+            {"id":"match","op":"Match","inputs":[],"config":{
+                "pattern":{"form":"sequence","start":start,"steps":steps,"mode":"walk"},
+                "anchors":{},"shortest":shortest
+            }},
+            {"id":"project","op":"Project","inputs":["match"],"config":{"fields":[
+                {"as":"from","expression":{"field":{"alias":"a","path":["id"]}}},
+                {"as":"to","expression":{"field":{"alias":end_alias,"path":["id"]}}},
+                {"as":"edge","expression":{"field":{"alias":"e1","path":["id"]}}}
+            ]}}
+        ],
+        "root":"project",
+        "parameter_types":{}
+    })
+}
+
+fn root_hql() -> &'static str {
+    "USE default MATCH (a:Person {id:\"a\"})-[e:LINK]->(b:Company) AS p WALK |> RETURN a.id AS from, b.id AS to, e.id AS edge"
+}
+
+#[test]
+fn hql_and_typed_ir_sequence_id_and_labels_match_independent_p7_bag() {
+    let dir = TempDir::new().unwrap();
+    let storage = open(dir.path());
+    storage_fixture(&storage);
+
+    let hql = run(
+        &storage,
+        "pattern-hql-root-match",
+        Some(root_hql()),
+        Value::Null,
+        json!({}),
+    )
+    .unwrap();
+    let ir = run(
+        &storage,
+        "pattern-ir-root-match",
+        None,
+        root_ir(
+            pattern_node("a", Some(utf8_id("a")), &["Person"]),
+            vec![pattern_step("b", &["Company"], None)],
+            false,
+            "b",
+        ),
+        json!({}),
+    )
+    .unwrap();
+    let expected = bag(oracle_rows(
+        Some("a"),
+        &["Person"],
+        &[("b", &["Company"])],
+        false,
+    ));
+    assert_eq!(bag(text_rows(hql.clone())), expected);
+    assert_eq!(
+        hql.columns
+            .iter()
+            .map(|column| column.name.as_str())
+            .collect::<Vec<_>>(),
+        ["from", "to", "edge"]
+    );
+    assert_eq!(hql.rows.len(), ir.rows.len());
+    assert_eq!(
+        bag(text_rows(ir)),
+        bag(oracle_rows(
+            Some("a"),
+            &["Person"],
+            &[("b", &["Company"])],
+            false
+        ))
+    );
+
+    let conjunctive = run(
+        &storage,
+        "pattern-ir-conjunctive-labels",
+        None,
+        root_ir(
+            pattern_node("a", Some(utf8_id("a")), &["Person", "Employee", "Person"]),
+            vec![pattern_step("b", &["Company", "Employee"], None)],
+            false,
+            "b",
+        ),
+        json!({}),
+    )
+    .unwrap();
+    assert_eq!(
+        bag(text_rows(conjunctive)),
+        bag(oracle_rows(
+            Some("a"),
+            &["Person", "Employee"],
+            &[("b", &["Company", "Employee"])],
+            false
+        ))
+    );
+
+    let case_sensitive_hql = run(
+        &storage,
+        "pattern-label-case-hql",
+        Some("USE default MATCH (a:person {id:\"a\"})-[e:LINK]->(b:Company) |> RETURN a.id AS from, b.id AS to, e.id AS edge"),
+        Value::Null,
+        json!({}),
+    )
+    .unwrap();
+    let case_sensitive_ir = run(
+        &storage,
+        "pattern-label-case-ir",
+        None,
+        root_ir(
+            pattern_node("a", Some(utf8_id("a")), &["person"]),
+            vec![pattern_step("b", &["Company"], None)],
+            false,
+            "b",
+        ),
+        json!({}),
+    )
+    .unwrap();
+    assert!(case_sensitive_hql.rows.is_empty());
+    assert!(case_sensitive_ir.rows.is_empty());
+    assert!(oracle_rows(Some("a"), &["person"], &[("b", &["Company"])], false).is_empty());
+}
+
+#[test]
+fn constrained_single_step_expand_matches_hql_and_typed_ir() {
+    let dir = TempDir::new().unwrap();
+    let storage = open(dir.path());
+    storage_fixture(&storage);
+    let hql = run(
+        &storage,
+        "pattern-hql-expand",
+        Some("USE default FROM NODES AS a |> FILTER a.id = \"a\" |> EXPAND (a)-[e:LINK]->(b:Company {id:\"b\"}) |> RETURN a.id AS from, b.id AS to, e.id AS edge"),
+        Value::Null,
+        json!({}),
+    )
+    .unwrap();
+    let typed = run(
+        &storage,
+        "pattern-ir-expand",
+        None,
+        json!({
+            "contract_version":"query-ir.v2",
+            "nodes":[
+                {"id":"scan","op":"NodeScan","inputs":[],"config":{"as":"a"}},
+                {"id":"expand","op":"Expand","inputs":["scan"],"config":{
+                    "optional":false,
+                    "pattern":{
+                        "form":"sequence",
+                        "start":pattern_node("a",Some(json!({"field":{"alias":"a","path":["id"]}})),&[]),
+                        "steps":[pattern_step("b",&["Company","Company"],Some(utf8_id("b")))],
+                        "mode":"walk"
+                    }
+                }},
+                {"id":"project","op":"Project","inputs":["expand"],"config":{"fields":[
+                    {"as":"from","expression":{"field":{"alias":"a","path":["id"]}}},
+                    {"as":"to","expression":{"field":{"alias":"b","path":["id"]}}},
+                    {"as":"edge","expression":{"field":{"alias":"e1","path":["id"]}}}
+                ]}}
+            ],
+            "root":"project",
+            "parameter_types":{}
+        }),
+        json!({}),
+    )
+    .unwrap();
+    let expected = bag(vec![
+        ("a".into(), "b".into(), "ab-1".into()),
+        ("a".into(), "b".into(), "ab-2".into()),
+    ]);
+    assert_eq!(bag(text_rows(hql.clone())), expected);
+    assert_eq!(bag(text_rows(typed.clone())), expected);
+    assert_eq!(hql.rows, typed.rows);
+    assert_eq!(hql.columns, typed.columns);
+}
+
+#[test]
+fn hql_sequence_id_parameter_is_bound_as_utf8() {
+    let dir = TempDir::new().unwrap();
+    let storage = open(dir.path());
+    storage_fixture(&storage);
+    let result = run_with_params(
+        &storage,
+        "pattern-hql-id-param",
+        Some("USE default MATCH (a:Person {id:$id})-[e:LINK]->(b:Company) |> RETURN a.id AS from, b.id AS to, e.id AS edge"),
+        Value::Null,
+        json!({}),
+        json!({"id":{"type":"Utf8","value":"a"}}),
+    )
+    .unwrap();
+    assert_eq!(
+        bag(text_rows(result)),
+        bag(oracle_rows(
+            Some("a"),
+            &["Person"],
+            &[("b", &["Company"])],
+            false
+        ))
+    );
+}
+
+#[test]
+fn sequence_node_labels_filter_before_shortest_path_deduplication() {
+    let dir = TempDir::new().unwrap();
+    let storage = open(dir.path());
+    storage_fixture(&storage);
+    let hql = "USE default MATCH SHORTEST (a:Person {id:\"a\"})-[e1:LINK]->(m:Employee)-[e2:LINK]->(c:Person) AS p WALK |> RETURN a.id AS from, c.id AS to, e1.id AS edge";
+    let result = run(
+        &storage,
+        "pattern-shortest-filter",
+        Some(hql),
+        Value::Null,
+        json!({}),
+    )
+    .unwrap();
+    assert_eq!(result.rows[0]["edge"], QueryValueV2::Utf8("ad".into()));
+    assert_eq!(result.rows.len(), 1);
+    let expected = oracle_rows(
+        Some("a"),
+        &["Person"],
+        &[("m", &["Employee"]), ("c", &["Person"])],
+        true,
+    );
+    assert_eq!(bag(text_rows(result)), bag(expected));
+}
+
+#[test]
+fn optional_sequence_constraint_miss_preserves_input_and_null_extends_new_aliases() {
+    let dir = TempDir::new().unwrap();
+    let storage = open(dir.path());
+    storage_fixture(&storage);
+    let ir = json!({
+        "contract_version":"query-ir.v2",
+        "nodes":[
+            {"id":"scan","op":"NodeScan","inputs":[],"config":{"as":"a"}},
+            {"id":"expand","op":"Expand","inputs":["scan"],"config":{
+                "optional":true,
+                "pattern":{
+                    "form":"sequence",
+                    "start":pattern_node("a",Some(utf8_id("absent")),&[]),
+                    "steps":[pattern_step("b",&["Company"],None)],
+                    "mode":"walk"
+                }
+            }},
+            {"id":"project","op":"Project","inputs":["expand"],"config":{"fields":[
+                {"as":"from","expression":{"field":{"alias":"a","path":["id"]}}},
+                {"as":"to","expression":{"field":{"alias":"b","path":["id"]}}},
+                {"as":"edge","expression":{"field":{"alias":"e1","path":["id"]}}}
+            ]}}
+        ],
+        "root":"project",
+        "parameter_types":{}
+    });
+    let result = run(&storage, "pattern-optional-miss", None, ir, json!({})).unwrap();
+    assert_eq!(result.rows.len(), 4);
+    assert!(result
+        .rows
+        .iter()
+        .all(|row| row["to"] == QueryValueV2::Null));
+    assert!(result
+        .rows
+        .iter()
+        .all(|row| row["edge"] == QueryValueV2::Null));
+
+    let step_miss = json!({
+        "contract_version":"query-ir.v2",
+        "nodes":[
+            {"id":"scan","op":"NodeScan","inputs":[],"config":{"as":"a"}},
+            {"id":"expand","op":"Expand","inputs":["scan"],"config":{
+                "optional":true,
+                "pattern":{
+                    "form":"sequence",
+                    "start":pattern_node("a",None,&[]),
+                    "steps":[pattern_step("b",&["Company"],Some(utf8_id("absent")))],
+                    "mode":"walk"
+                }
+            }},
+            {"id":"project","op":"Project","inputs":["expand"],"config":{"fields":[
+                {"as":"from","expression":{"field":{"alias":"a","path":["id"]}}},
+                {"as":"to","expression":{"field":{"alias":"b","path":["id"]}}},
+                {"as":"edge","expression":{"field":{"alias":"e1","path":["id"]}}}
+            ]}}
+        ],
+        "root":"project",
+        "parameter_types":{}
+    });
+    let result = run(
+        &storage,
+        "pattern-optional-step-miss",
+        None,
+        step_miss,
+        json!({}),
+    )
+    .unwrap();
+    assert_eq!(result.rows.len(), 4);
+    assert!(result
+        .rows
+        .iter()
+        .all(|row| row["to"] == QueryValueV2::Null));
+    assert!(result
+        .rows
+        .iter()
+        .all(|row| row["edge"] == QueryValueV2::Null));
+    assert_eq!(
+        result
+            .rows
+            .iter()
+            .map(|row| match &row["from"] {
+                QueryValueV2::Utf8(id) => id.as_str(),
+                _ => panic!("preserved input entity must expose its id"),
+            })
+            .collect::<BTreeSet<_>>(),
+        BTreeSet::from(["a", "b", "c", "d"])
+    );
+}
+
+#[test]
+fn missing_ids_and_unmatched_properties_return_no_rows() {
+    let dir = TempDir::new().unwrap();
+    let storage = open(dir.path());
+    storage_fixture(&storage);
+    let missing = run(
+        &storage,
+        "pattern-missing-id",
+        None,
+        root_ir(
+            pattern_node("a", Some(utf8_id("not-visible")), &[]),
+            vec![pattern_step("b", &[], None)],
+            false,
+            "b",
+        ),
+        json!({}),
+    )
+    .unwrap();
+    assert!(missing.rows.is_empty());
+
+    let mut constrained = root_ir(
+        pattern_node("a", None, &[]),
+        vec![pattern_step("b", &[], None)],
+        false,
+        "b",
+    );
+    constrained["nodes"][0]["config"]["pattern"]["steps"][0]["node"]["properties"] =
+        json!({"name":{"literal":"B","type":"Json"}});
+    let node_property_miss = run(
+        &storage,
+        "pattern-node-property-miss",
+        None,
+        constrained,
+        json!({}),
+    )
+    .unwrap();
+    assert!(node_property_miss.rows.is_empty());
+
+    let mut edge_constrained = root_ir(
+        pattern_node("a", None, &[]),
+        vec![pattern_step("b", &[], None)],
+        false,
+        "b",
+    );
+    edge_constrained["nodes"][0]["config"]["pattern"]["steps"][0]["edge"]["properties"] =
+        json!({"weight":{"literal":1,"type":"Json"}});
+    let edge_property_miss = run(
+        &storage,
+        "pattern-edge-property-miss",
+        None,
+        edge_constrained,
+        json!({}),
+    )
+    .unwrap();
+    assert!(edge_property_miss.rows.is_empty());
+
+    let empty_input = run(
+        &storage,
+        "pattern-hql-property-empty-input",
+        Some("USE default FROM NODES AS a |> FILTER a.id = \"absent\" |> EXPAND (a)-[e:LINK]->(b:Company {name:\"B\"}) |> RETURN b.id AS to"),
+        Value::Null,
+        json!({}),
+    )
+    .unwrap();
+    assert!(empty_input.rows.is_empty());
+
+    let mut invalid_type = root_ir(
+        pattern_node(
+            "a",
+            Some(json!({"literal":"a","type":"Nullable<Utf8>"})),
+            &[],
+        ),
+        vec![pattern_step("b", &[], None)],
+        false,
+        "b",
+    );
+    let error = run(
+        &storage,
+        "pattern-nullable-id-type",
+        None,
+        invalid_type.take(),
+        json!({}),
+    )
+    .unwrap_err();
+    assert_eq!(error.code, "BIND_ERROR");
+    assert_eq!(error.detail.unwrap()["reason"], "pattern_id_type");
+
+    let introduced_alias = json!({
+        "contract_version":"query-ir.v2",
+        "nodes":[
+            {"id":"scan","op":"NodeScan","inputs":[],"config":{"as":"a"}},
+            {"id":"expand","op":"Expand","inputs":["scan"],"config":{
+                "optional":false,
+                "pattern":{
+                    "form":"sequence",
+                    "start":pattern_node("a",None,&[]),
+                    "steps":[pattern_step("b",&[],Some(json!({"field":{"alias":"b","path":["id"]}})))],
+                    "mode":"walk"
+                }
+            }}
+        ],
+        "root":"expand",
+        "parameter_types":{}
+    });
+    let error = run(
+        &storage,
+        "pattern-id-cannot-reference-introduced-alias",
+        None,
+        introduced_alias,
+        json!({}),
+    )
+    .unwrap_err();
+    assert_eq!(error.code, "BIND_ERROR");
+}
+
+#[test]
+fn sequence_label_snapshot_exhaustion_returns_no_partial_result() {
+    let dir = TempDir::new().unwrap();
+    let storage = open(dir.path());
+    storage_fixture(&storage);
+    let error = run(
+        &storage,
+        "pattern-label-budget",
+        Some(root_hql()),
+        Value::Null,
+        json!({"max_expanded_nodes":1}),
+    )
+    .unwrap_err();
+    assert_eq!(error.code, "QUERY_BUDGET_EXCEEDED");
+}

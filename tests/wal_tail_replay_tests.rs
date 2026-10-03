@@ -44,6 +44,16 @@ fn open(path: &str) -> Storage {
     .unwrap()
 }
 
+fn open_schema(path: &str, schema_version: u32) -> Storage {
+    fs::create_dir_all(path).unwrap();
+    fs::write(
+        Path::new(path).join("state.json"),
+        format!(r#"{{"schema_version":{schema_version}}}"#),
+    )
+    .unwrap();
+    open(path)
+}
+
 fn add_node(s: &Storage, id: &str) {
     s.add_node(NodeInput {
         id: Some(id.to_string()),
@@ -283,7 +293,7 @@ fn stale_wal_prefix_falls_back_to_full_replay() {
 fn snapshot_without_frontier_still_loads() {
     let path = fresh("test_wal_tail_replay_legacy");
     {
-        let s = open(&path);
+        let s = open_schema(&path, 4);
         for i in 0..10 {
             add_node(&s, &format!("N{i}"));
         }
@@ -292,6 +302,13 @@ fn snapshot_without_frontier_still_loads() {
     let sj = Path::new(&path).join("state.json");
     let mut state: serde_json::Value =
         serde_json::from_str(&fs::read_to_string(&sj).unwrap()).unwrap();
+    // This fixture exercises legacy load + replay, not rejection of a
+    // malformed current P6 manifest. Preserve that distinction explicitly.
+    assert!(state["p6"]["generation"].is_null());
+    assert_eq!(state["p6"]["access_policy"]["mode"], "Disabled");
+    assert_eq!(state["p6"]["access_policy"]["revision"], 0);
+    state["schema_version"] = serde_json::json!(4);
+    state.as_object_mut().unwrap().remove("p6");
     if let Some(obj) = state.as_object_mut() {
         // Pre-frontier snapshot: neither the WP-1.2 `journal` cursor nor the
         // legacy `wal_frontier` byte cursor.
@@ -313,6 +330,39 @@ fn snapshot_without_frontier_still_loads() {
         "cursor-less snapshot replays the journal on top: arena rows double once \
          (10 snapshot + 10 replayed), reclaimed by the next index compaction"
     );
+}
+
+#[test]
+fn current_manifest_without_frontier_recovers_only_from_wal() {
+    let path = fresh("test_wal_tail_replay_p6_missing_frontier");
+    {
+        let storage = open_schema(&path, 5);
+        for i in 0..10 {
+            add_node(&storage, &format!("N{i}"));
+        }
+    }
+    let state_path = Path::new(&path).join("state.json");
+    let mut state: serde_json::Value =
+        serde_json::from_slice(&fs::read(&state_path).unwrap()).unwrap();
+    assert_eq!(state["schema_version"], 5);
+    assert!(state["p6"]["manifest"].is_object());
+    let object = state.as_object_mut().unwrap();
+    object.remove("journal");
+    object.remove("wal_frontier");
+    fs::write(state_path, serde_json::to_vec(&state).unwrap()).unwrap();
+
+    let storage = open(&path);
+    storage.flush_index();
+    assert_eq!(storage.nodes.len(), 10);
+    for i in 0..10 {
+        assert!(storage.get_u32(&format!("N{i}")).is_some());
+    }
+    assert_eq!(
+        default_arena_rows(&storage),
+        10,
+        "invalid current manifest must discard snapshot rows before WAL replay"
+    );
+    assert_eq!(search_ids(&storage, 10).len(), 10);
 }
 
 /// Clean-shutdown reopen: the checkpoint ran, so the WAL tail is empty and the

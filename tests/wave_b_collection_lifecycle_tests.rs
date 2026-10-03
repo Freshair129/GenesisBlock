@@ -11,6 +11,10 @@ fn options(p: &Path) -> OpenOptions {
         retention: Some("full".into()),
     }
 }
+fn open_schema5(p: &Path) -> Storage {
+    fs::write(p.join("state.json"), r#"{"schema_version":5}"#).unwrap();
+    Storage::open(options(p)).unwrap()
+}
 fn insert(s: &Storage, id: &str, c: &str, v: Vec<f64>) {
     s.add_node(NodeInput {
         id: Some(id.into()),
@@ -198,7 +202,7 @@ fn unknown_crc_valid_event_is_rejected_without_rewriting() {
 #[test]
 fn legacy_manifest_upgrade_survives_later_journal_only_rebuild() {
     let dir = tempfile::tempdir().unwrap();
-    let s = Storage::open(options(dir.path())).unwrap();
+    let s = open_schema5(dir.path());
     s.create_collection(
         "space".into(),
         "legacy-model".into(),
