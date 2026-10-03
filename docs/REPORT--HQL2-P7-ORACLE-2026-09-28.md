@@ -1,8 +1,8 @@
 ---
 doc_id: REPORT--HQL2-P7-ORACLE-2026-09-28
-version: "0.1.6b"
+version: "0.1.7b"
 created_at: "2026-09-28T01:38:00+07:00,ATHER,fc851e9"
-last_update: "2026-10-03T19:06:00+07:00,ATHER"
+last_update: "2026-10-03T20:45:00+07:00,ATHER"
 status: beta
 owner: "GenesisBlockDB Engineering"
 attributes:
@@ -153,7 +153,7 @@ HistoryScan remains unsupported. The P7 oracle implementation itself is
 unchanged: its graph target passes 39 tests and combined graph/relational/rank/
 pipeline targets pass 130/130. The HistoryScan/ChangeScan target passes 16/16,
 the Annotation source target passes 7/7, the prescribed 33-target HQL2
-regression passes 382/0/1, and the separate 11-target P6/schema-v6/
+regression passes 383/0/1, and the separate 11-target P6/schema-v6/
 compatibility group passes 194/0/0. These remain local test evidence; hosted
 checks, broad semantic acceptance and review are outstanding.
 
@@ -163,7 +163,7 @@ events built from signed-WAL mutations and projection transaction stamps. The
 new fixture checks seven Edge/Row/Vector/Annotation events, exact sequence,
 operation and full subject identity, including edge endpoints, vector owner and
 annotation target/evidence dependencies. HQL and typed IR agree; the
-History/Change target passes 16/16 and the 33-target HQL2 sweep passes 382/0/1.
+History/Change target passes 16/16 and the 33-target HQL2 sweep passes 383/0/1.
 This closes the supported subject-kind differential gap only; broader
 ChangeScan error/semantic cases and full P8/P13 acceptance remain open.
 
@@ -173,6 +173,14 @@ all 169 pairs from 13 nullable bags (empty and length-one/two bags over NULL,
 bags while retaining duplicates and NULLs. The focused test passes 1/1 across
 338 Storage query executions. This is test-only evidence; broad exact-oracle
 coverage and full P8/P13 acceptance remain open.
+
+Storage-backed HQL and typed-IR scalar pipelines also match independent P7 for
+six deterministic fixtures across projection/arithmetic/order/offset/take and
+filter/project/distinct/order/take. Both frontends are compared independently
+to P7 and to each other over 12 Storage executions; the differential target
+passes 2/2 including the prior 81-bag scalar test. The HQL2 sweep passes
+383/0/1 across 33 targets. This remains bounded test evidence; broad oracle and
+full P8/P13 acceptance remain open.
 
 At the original P7 checkpoint, documentation validation reported `0
 violations in 233 files`; scoped rustfmt checks of the eight then-new Rust
@@ -195,6 +203,13 @@ publication, device validation, soak/crash qualification and deployments have
 not been run or claimed.
 
 ## Version diff
+
+Version diff `0.1.6b -> 0.1.7b`: add six storage-backed scalar-pipeline
+fixtures for HQL and typed IR against independent P7, covering projection,
+arithmetic, filter, distinct, sort, offset and take in 12 Storage executions.
+The focused target passes 2/2 and the HQL2 sweep passes 383/0/1 across 33
+targets. No runtime or contract behavior changed; broad oracle and P8/P13
+acceptance remain open.
 
 Version diff `0.1.5b -> 0.1.6b`: add the storage-backed HQL/typed-IR
 `Values`/`UnionAll` differential against P7 for 169 nullable bag pairs and 338
@@ -231,6 +246,7 @@ open.
 
 | Version | Date | Status | Summary | Commit Hash | Agent |
 |---|---|---|---|---|---|
+| 0.1.7b | 2026-10-03 | beta | Add test-only HQL/typed-IR scalar pipeline P7 differential for six fixtures and 12 Storage executions; focused target 2/2, HQL2 383/0/1 across 33 targets; no runtime/contract/schema/transport change; broad oracle and P8/P13 remain open | working-tree | ATHER |
 | 0.1.6b | 2026-10-03 | beta | Add storage-backed HQL/typed-IR Values/UnionAll P7 differential for 169 nullable bag pairs and 338 Storage executions; HQL2 382/0/1 across 33 targets, P6/compatibility 194/0/0; no runtime/schema/transport change; broad oracle and P8/P13 remain open | working-tree | ATHER |
 | 0.1.5b | 2026-10-03 | beta | Extend the HQL/typed-IR P7 ChangeScan differential to Edge/Row/Vector/Annotation; seven events match on sequence, operation and subject identity; History/Change 16/16 and HQL2 380/0/1; retain broad semantic and P8/P13 gates | working-tree | ATHER |
 | 0.1.4b | 2026-10-03 | beta | Add the Node-revision ChangeScan HQL/typed-IR differential against P7 for exact sequence, operation and subject revision; History/Change 15/15, HQL2 379/0/1; retain other source-kind and broad P8/P13 gates | working-tree | ATHER |
