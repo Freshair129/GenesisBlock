@@ -312,6 +312,10 @@ fn snapshot_without_frontier_still_loads() {
     if let Some(obj) = state.as_object_mut() {
         // Pre-frontier snapshot: neither the WP-1.2 `journal` cursor nor the
         // legacy `wal_frontier` byte cursor.
+        // Mark the fixture as pre-P6 so the current integrity envelope does
+        // not reject the intentionally legacy-shaped state before recovery.
+        obj.insert("schema_version".to_string(), serde_json::json!(4));
+        obj.remove("p6");
         obj.remove("journal");
         obj.remove("wal_frontier");
     }

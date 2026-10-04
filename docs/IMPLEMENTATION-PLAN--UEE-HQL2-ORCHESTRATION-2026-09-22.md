@@ -1,9 +1,9 @@
 ---
-version: "0.8.67b"
+version: "0.8.68b"
 doc_id: "IMPLEMENTATION-PLAN--UEE-HQL2-ORCHESTRATION-2026-09-22"
 owner: "Boss (Founder / Product Authority)"
 created_at: "2026-09-22T00:00:00+07:00,ATHER,working-tree"
-last_update: "2026-10-04T12:13:57+07:00,ATHER"
+last_update: "2026-10-04T12:48:32+07:00,Codex"
 status: beta
 superseded_by: null
 attributes:
@@ -919,7 +919,35 @@ The correction is recorded in the
 local RCA `.brain/rca/RCA--HQL2-ROW-SOURCE-PROPERTY-HYDRATION.md`. These local
 results remain regression evidence, not P8 acceptance.
 
+## 11. G3 exact-oracle and recovery evidence — 2026-10-04
+
+The additive G3 slice is reconciled onto the current schema-v6/P8 mainline. It
+does not change the engine, transport surfaces or the existing schema-v6
+contract. The deliverables are the pure standard-library oracle in
+`tools/reference_oracle.py`, the versioned `g3.oracle.v1` fixture corpus in
+`tests/fixtures/g3_oracle_cases.json`, the Python golden test in
+`tests/test_reference_g3.py`, the public-Storage differential/reopen target in
+`tests/g3_oracle_differential_tests.rs`, and the empty reproducibility manifest
+`tools/requirements.txt`.
+
+The source branch recorded local evidence of the Python oracle 1/1, the G3
+Rust differential/reopen target 2/2, the targeted G1/G2/crash matrix 62/62,
+the full no-default-features Rust sweep, the Node suite 29/29, formatting and
+documentation/agent validation. The schema-v5 manifest/test edits from that
+older branch were intentionally superseded during reconciliation by main's
+schema-v6 manifest and legacy-fixture contracts. Hosted checks, independent
+review, owner acceptance and release/deploy evidence remain external gates;
+they are not claimed by this slice. Post-reconciliation focused verification
+passes 19/19 across `epoch_e2_tests`, `g3_oracle_differential_tests`,
+`meta_format_migration_tests` and `wal_tail_replay_tests`.
+
 ## CHANGELOG
+
+Version diff `0.8.67b -> 0.8.68b`: reconcile the additive G3 exact-oracle,
+differential/reopen and fixture evidence onto the current schema-v6/P8 mainline;
+supersede stale schema-v5 manifest expectations and preserve the existing
+schema-v6 recovery boundary. Hosted checks, independent review and release /
+deploy evidence remain open.
 
 Version diff `0.8.66b -> 0.8.67b`: add the storage-backed HQL/typed-IR
 Node/Edge/Row scan differential against independent P7; focused source target
