@@ -137,6 +137,50 @@ fn oracle_environment_with_properties() -> Environment {
     environment
 }
 
+fn nested_profile() -> Value {
+    json!({
+        "role":"developer",
+        "flags":["core","stable"],
+        "meta":{"level":2,"active":true,"retired":null}
+    })
+}
+
+fn nested_config() -> Value {
+    json!({"limits":{"daily":5},"flags":[true,false]})
+}
+
+fn nested_config_miss() -> Value {
+    json!({"limits":{"daily":5},"flags":[true]})
+}
+
+fn nested_payload() -> Value {
+    json!({"route":["a","b"],"weights":[1,2],"meta":{"primary":true}})
+}
+
+fn nested_payload_miss() -> Value {
+    json!({"route":["a","b"],"weights":[1,3],"meta":{"primary":true}})
+}
+
+fn oracle_environment_with_nested_json() -> Environment {
+    let mut environment = oracle_environment();
+    for revision in &mut environment.catalog.revisions {
+        let property = match (revision.entity.kind, revision.entity.id.as_str()) {
+            (graph::Kind::Node, "a") => Some(("profile", nested_profile())),
+            (graph::Kind::Node, "b") => Some(("config", nested_config())),
+            (graph::Kind::Node, "d") => Some(("config", nested_config_miss())),
+            (graph::Kind::Edge, "ab-1" | "ad") => Some(("payload", nested_payload())),
+            (graph::Kind::Edge, "ab-2") => Some(("payload", nested_payload_miss())),
+            _ => None,
+        };
+        if let Some((name, value)) = property {
+            revision
+                .fields
+                .insert(name.into(), graph::Scalar::Json(value));
+        }
+    }
+    environment
+}
+
 fn predicate(id: Option<&str>, labels: &[&str]) -> graph::Predicate {
     graph::Predicate {
         id: id.map(str::to_owned),
@@ -284,6 +328,57 @@ fn optional_text_rows(
         .collect()
 }
 
+fn nested_json_oracle_rows() -> Vec<(String, String, String)> {
+    let expansion = graph::Expand {
+        start_alias: "a".into(),
+        segments: vec![graph::Segment {
+            end_alias: "b".into(),
+            edge_alias: Some("e1".into()),
+            direction: graph::Direction::Out,
+            relations: BTreeSet::from(["LINK".into()]),
+            min_hops: 1,
+            max_hops: 1,
+            node_predicate: predicate_with_property(
+                &["Company"],
+                "config",
+                graph::Scalar::Json(nested_config()),
+            ),
+            edge_predicate: predicate_with_property(
+                &[],
+                "payload",
+                graph::Scalar::Json(nested_payload()),
+            ),
+        }],
+        path_alias: None,
+        mode: graph::PathMode::Walk,
+        optional: false,
+        shortest: false,
+    };
+    reference::execute(
+        &oracle_environment_with_nested_json(),
+        &Plan::Match {
+            start: "a".into(),
+            predicate: predicate_with_property(
+                &["Person"],
+                "profile",
+                graph::Scalar::Json(nested_profile()),
+            ),
+            expansion,
+        },
+    )
+    .unwrap()
+    .rows
+    .into_iter()
+    .map(|row| {
+        let id = |alias: &str| match &row[alias] {
+            reference::Value::Graph(graph::Binding::Entity(record)) => record.id.clone(),
+            _ => panic!("{alias} must bind an entity"),
+        };
+        (id("a"), id("b"), id("e1"))
+    })
+    .collect()
+}
+
 fn optional_expand_oracle_rows(
     environment: &Environment,
     node_predicate: graph::Predicate,
@@ -418,6 +513,39 @@ fn storage_property_fixture(storage: &Storage) {
         ("dc", "d", "c", 1),
     ] {
         add_edge(storage, id, from, to, Some(json!({"weight":weight})));
+    }
+}
+
+fn storage_nested_json_fixture(storage: &Storage) {
+    for (id, labels, props) in [
+        (
+            "a",
+            vec!["Person", "Employee"],
+            json!({"profile":nested_profile()}),
+        ),
+        ("b", vec!["Company"], json!({"config":nested_config()})),
+        ("c", vec!["Person"], json!({})),
+        (
+            "d",
+            vec!["Company", "Employee"],
+            json!({"config":nested_config_miss()}),
+        ),
+    ] {
+        add_node(storage, id, &labels, Some(props));
+    }
+    for (id, from, to, props) in [
+        ("ab-1", "a", "b", Some(json!({"payload":nested_payload()}))),
+        (
+            "ab-2",
+            "a",
+            "b",
+            Some(json!({"payload":nested_payload_miss()})),
+        ),
+        ("bc", "b", "c", None),
+        ("ad", "a", "d", Some(json!({"payload":nested_payload()}))),
+        ("dc", "d", "c", None),
+    ] {
+        add_edge(storage, id, from, to, props);
     }
 }
 
@@ -652,6 +780,46 @@ fn sequence_node_and_edge_properties_match_independent_p7_bag() {
     .unwrap();
 
     let expected = bag(oracle_property_rows());
+    assert_eq!(
+        expected,
+        BTreeMap::from([(("a".into(), "b".into(), "ab-1".into()), 1)])
+    );
+    assert_eq!(bag(text_rows(hql)), expected);
+    assert_eq!(bag(text_rows(ir)), expected);
+}
+
+#[test]
+fn sequence_nested_json_properties_match_hql_typed_ir_and_p7_bag() {
+    let dir = TempDir::new().unwrap();
+    let storage = open(dir.path());
+    storage_nested_json_fixture(&storage);
+
+    let hql = run(
+        &storage,
+        "pattern-nested-json-p7-hql",
+        Some(
+            r#"USE default MATCH (a:Person {profile: {role: "developer", flags: ["core", "stable"], meta: {level: 2, active: true, retired: NULL}}})-[e:LINK {payload: {route: ["a", "b"], weights: [1, 2], meta: {primary: true}}}]->(b:Company {config: {limits: {daily: 5}, flags: [true, false]}}) AS p WALK |> RETURN a.id AS from, b.id AS to, e.id AS edge"#,
+        ),
+        Value::Null,
+        json!({}),
+    )
+    .unwrap();
+
+    let mut start = pattern_node("a", None, &["Person"]);
+    start["properties"] = json!({"profile":{"literal":nested_profile(),"type":"Json"}});
+    let mut step = pattern_step("b", &["Company"], None);
+    step["edge"]["properties"] = json!({"payload":{"literal":nested_payload(),"type":"Json"}});
+    step["node"]["properties"] = json!({"config":{"literal":nested_config(),"type":"Json"}});
+    let ir = run(
+        &storage,
+        "pattern-nested-json-p7-ir",
+        None,
+        root_ir(start, vec![step], false, "b"),
+        json!({}),
+    )
+    .unwrap();
+
+    let expected = bag(nested_json_oracle_rows());
     assert_eq!(
         expected,
         BTreeMap::from([(("a".into(), "b".into(), "ab-1".into()), 1)])

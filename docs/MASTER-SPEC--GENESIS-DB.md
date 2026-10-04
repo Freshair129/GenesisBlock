@@ -2,7 +2,7 @@
 title: "GenesisBlockDB Technical Architecture and Capability Composition"
 doc_id: "MASTER-SPEC-GENESISBLOCKDB"
 status: current
-version: "2.3.36b"
+version: "2.3.37b"
 updated: "2026-10-04"
 owner: "GenesisBlockDB Architecture"
 source_of_truth: true
@@ -49,9 +49,11 @@ forms, and resource rejection. HQL `JOIN TABLE` now lowers to the existing
 closed RowScan/Join pipeline for Inner/Left/Semi/Anti, with bare JOIN defaulting
 to Inner; HQL, typed IR and independent P7 differential results match for
 duplicate, missing-property NULL and JSON-null cases. The latest root-HQL2
-regression sweep passes 389/0/1 across 34 targets. A test-only optional
-Sequence edge-property-miss differential matches independent P7, preserving all
-four input rows and NULL-extending endpoint/edge aliases. The separate 11-target
+regression sweep passes 392/0/1 across 34 targets. Test-only optional
+Sequence edge-property-miss and nested-JSON property differentials match
+independent P7 for HQL and typed IR; nested node/edge object and array values
+match exactly, while optional misses preserve all four input rows and
+NULL-extend endpoint/edge aliases. The separate 11-target
 P6/schema-v6/compatibility group passes 194/0/0. Storage-backed HQL/typed-IR
 `Values`/`UnionAll` results match independent P7 for 169 nullable bag pairs
 and 338 Storage executions, preserving NULL and duplicate multiplicity.
@@ -417,6 +419,7 @@ user database was migrated, and broader P6/P8/P13 qualification remains open.
 
 | Version | Date | Owner | Summary |
 |---|---|---|---|
+| 2.3.37b | 2026-10-04 | GenesisBlockDB Architecture | Record test-only nested-JSON Sequence property P7 differential for exact HQL/typed-IR node/edge object and array values; focused pattern 11/11, HQL2 392/0/1 across 34 targets; no runtime/contract/schema/P6/transport change; broad exact-oracle and P8/P13 qualification remain open |
 | 2.3.36b | 2026-10-04 | GenesisBlockDB Architecture | Record the test-only optional Sequence edge-property-miss P7 differential; preserve four input rows and NULL-extend endpoint/edge aliases; HQL2 389/0/1 across 34 targets; no runtime/contract/schema/transport change; broad exact-oracle and P8/P13 qualification remain open |
 | 2.3.35b | 2026-10-03 | GenesisBlockDB Architecture | Record test-only HQL/typed-IR scalar-pipeline P7 differential for six fixtures and 12 Storage executions; HQL2 383/0/1 across 33 targets, P6/compatibility 194/0/0; no runtime/contract/schema/transport change; broad exact-oracle and P8/P13 qualification remain open |
 | 2.3.34b | 2026-10-03 | GenesisBlockDB Architecture | Extend D7 after legacy/HQL2 differential for a single plain-ASCII label on zero-hop HQL1 ID scans; focused adapter 10/10, HQL2 382/0/1 across 33 targets, P6/compatibility 194/0/0; retain other HQL1/shared-runtime, review and P8/P13 gates |

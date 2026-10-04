@@ -60,11 +60,13 @@ pub struct Interval<T> {
     pub end: Option<T>,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Scalar {
     Text(String),
     Integer(i64),
     Boolean(bool),
+    #[allow(dead_code)]
+    Json(serde_json::Value),
 }
 pub type Fields = BTreeMap<String, Scalar>;
 
