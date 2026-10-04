@@ -1970,3 +1970,155 @@ fn history_and_change_scans_fail_without_partial_rows_when_source_budget_is_exha
     .unwrap_err();
     assert_eq!(history_error.code, "QUERY_BUDGET_EXCEEDED");
 }
+
+#[test]
+fn change_scan_matches_p7_for_exclusive_after_inclusive_through_windows() {
+    let dir = TempDir::new().unwrap();
+    let storage = open(dir.path());
+    let after = storage.stable_frontier();
+    add_node(&storage);
+    let after_insert = storage.stable_frontier();
+    storage
+        .supersede_node(
+            "history:one".into(),
+            Some(json!({"title":"replacement"})),
+            None,
+        )
+        .unwrap();
+    let after_correction = storage.stable_frontier();
+    storage.retract_node("history:one").unwrap();
+    let after_retraction = storage.stable_frontier();
+    assert!(after < after_insert);
+    assert!(after_insert < after_correction);
+    assert!(after_correction < after_retraction);
+
+    let catalog = p7_change_catalog(&storage, dir.path(), after);
+    let permissions = p7_graph::Permissions {
+        read: catalog
+            .revisions
+            .iter()
+            .filter(|revision| matches!(revision.data, p7_graph::RecordData::Change { .. }))
+            .map(|revision| revision.entity.identity())
+            .chain([p7_graph::Identity {
+                namespace: "default".into(),
+                kind: p7_graph::Kind::Node,
+                id: "history:one".into(),
+            }])
+            .collect(),
+        annotation_body: BTreeSet::new(),
+    };
+    let windows = [
+        ("insert", after, after_insert),
+        ("correction", after_insert, after_correction),
+        ("insert-through-correction", after, after_correction),
+        ("retraction", after_correction, after_retraction),
+        ("empty-equal-bounds", after_retraction, after_retraction),
+    ];
+    let result_bag = |result: &QueryResultV2| {
+        let mut bag = BTreeMap::new();
+        for row in &result.rows {
+            let event = tagged(row, "c");
+            assert_eq!(event["type"], "ChangeEvent");
+            let event = &event["value"];
+            let subject = &event["subject"];
+            assert_eq!(subject["namespace"], "default");
+            assert_eq!(subject["kind"], "node");
+            let key = (
+                event["sequence"].as_str().unwrap().parse::<u64>().unwrap(),
+                event["operation"].as_str().unwrap().to_owned(),
+                subject["id"].as_str().unwrap().to_owned(),
+                subject["revision"].as_str().unwrap().to_owned(),
+            );
+            *bag.entry(key).or_insert(0) += 1;
+        }
+        bag
+    };
+
+    for (name, cursor, through) in windows {
+        let hql = run_hql(
+            &storage,
+            &format!("change-window-{name}-hql"),
+            &format!("USE default AT TX {through} CHANGES SINCE {cursor} AS c |> RETURN c"),
+        )
+        .unwrap();
+        let ir_request: QueryRequestV2 = serde_json::from_value(json!({
+            "contract_version":"genesis.api.v2",
+            "request_id":format!("change-window-{name}-ir"),
+            "namespace":"default",
+            "temporal":{"tx_as_of":through.to_string()},
+            "ir":{
+                "contract_version":"query-ir.v2",
+                "nodes":[{
+                    "id":"changes",
+                    "op":"ChangeScan",
+                    "inputs":[],
+                    "config":{"after_seq":cursor.to_string(),"as":"c"}
+                }],
+                "root":"changes",
+                "parameter_types":{}
+            },
+            "params":{}
+        }))
+        .unwrap();
+        let QueryOutcomeV2::Rows(ir) = storage.query_v2(access(), ir_request).unwrap() else {
+            panic!("read query must return rows");
+        };
+        assert_eq!(hql.snapshot.tx, through.to_string());
+        assert_eq!(ir.snapshot.tx, through.to_string());
+        assert_eq!(hql.columns, ir.columns);
+        assert_eq!(hql.rows, ir.rows);
+
+        let plan = p7_graph::Plan {
+            source: p7_graph::Source::ChangeScan {
+                alias: "c".into(),
+                predicate: p7_graph::Predicate::default(),
+                after: cursor,
+                through,
+            },
+            stages: vec![],
+        };
+        let expected = p7_graph::execute(
+            &catalog,
+            &p7_graph::View {
+                namespace: "default".into(),
+                transaction: through,
+                valid_at: chrono::DateTime::parse_from_rfc3339("2020-01-01T00:00:00Z")
+                    .unwrap()
+                    .timestamp_micros(),
+                permissions: permissions.clone(),
+            },
+            &plan,
+            p7_graph::Limits::default(),
+        )
+        .unwrap();
+        let mut expected_bag = BTreeMap::new();
+        for row in expected.rows {
+            let p7_graph::Binding::Entity(event_ref) = row.get("c").unwrap() else {
+                panic!("P7 ChangeScan binds event identities")
+            };
+            let event = catalog
+                .revisions
+                .iter()
+                .find(|revision| &revision.entity == event_ref)
+                .unwrap();
+            let p7_graph::RecordData::Change { subject, operation } = &event.data else {
+                panic!("P7 ChangeScan result must resolve to an explicit event")
+            };
+            assert_eq!(subject.kind, p7_graph::Kind::Node);
+            let operation = match operation {
+                p7_graph::ChangeKind::Upsert => "upsert",
+                p7_graph::ChangeKind::Correct => "correct",
+                p7_graph::ChangeKind::Retract => "retract",
+            };
+            let key = (
+                event.transaction.start,
+                operation.to_owned(),
+                subject.id.clone(),
+                subject.revision.clone(),
+            );
+            *expected_bag.entry(key).or_insert(0) += 1;
+        }
+        assert_eq!(result_bag(&hql), expected_bag, "HQL window {name}");
+        assert_eq!(result_bag(&ir), expected_bag, "typed-IR window {name}");
+    }
+}
