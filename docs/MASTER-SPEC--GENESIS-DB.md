@@ -426,6 +426,12 @@ proof fail with `RECOVERY_REQUIRED` instead of silently downgrading. See H2-D11 
 P6 WAL-only recovery contract. Runtime implementation is fixture-verified; no
 user database was migrated, and broader P6/P8/P13 qualification remains open.
 
+H2-D11 R5 restore validation opens the extracted staging database with full retention so its
+shutdown checkpoint does not fold the only packaged journal copy or advance the history floor.
+Focused fixtures prove history/revision/source-floor parity and HQL/typed-IR HistoryScan and
+ChangeScan equality; HQL2 passes 389/0/1 across 35 targets and the full local Rust suite exits 0.
+This does not close the broader P14 rehearsal, hosted, review or P8/P13 gates.
+
 ## Changelog
 
 | Version | Date | Owner | Summary |

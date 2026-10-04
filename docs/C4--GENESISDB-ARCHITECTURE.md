@@ -471,6 +471,12 @@ For schema-v6 WAL-only cold recovery, preflight signed journal authority before 
 `Schema6ActivationV1` selects v6 only when identity and any linked migration/receipt proof validate;
 v6-only WAL without activation fails closed. See H2-D11 ADR R6b and the P6 recovery contract.
 
+H2-D11 R5 backup restoration validates extracted staging with full retention so the validation
+close checkpoint cannot fold the packaged journal or advance its history floor. Fixture-backed
+parity covers revision/row IDs, schema, annotation selectors, source floors and HQL/typed-IR
+HistoryScan/ChangeScan; focused targets pass 59/59, HQL2 passes 389/0/1 across 35 targets, and
+the full local Rust suite exits 0. This is not completion of the broader P14 rehearsal or P8/P13 gates.
+
 ## CHANGELOG
 
 Version diff 0.1.68b -> 0.1.69b: extend D7 after legacy/HQL2 differential to

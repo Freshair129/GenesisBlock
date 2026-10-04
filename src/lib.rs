@@ -21345,13 +21345,14 @@ impl Storage {
             }
 
             // A fresh open validates the engine's own snapshot/WAL compatibility
-            // before the staging directory becomes the caller-visible target.
+            // before staging becomes caller-visible. Full retention prevents its
+            // shutdown checkpoint from folding the only restored journal copy.
             drop(Storage::open(OpenOptions {
                 path: staging.display().to_string(),
                 page_cache_mb: Some(16),
                 read_only: Some(false),
                 vector_dim: None,
-                retention: None,
+                retention: Some("full".into()),
             })?);
             Ok(manifest)
         })();

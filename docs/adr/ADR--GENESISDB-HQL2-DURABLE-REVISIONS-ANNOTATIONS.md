@@ -1,8 +1,8 @@
 ---
 doc_id: ADR--GENESISDB-HQL2-DURABLE-REVISIONS-ANNOTATIONS
-version: "0.8.17b"
+version: "0.8.18b"
 created_at: "2026-09-28T06:15:00+07:00,ATHER,53078cb"
-last_update: "2026-10-03T09:50:18+07:00,ATHER"
+last_update: "2026-10-05T00:36:03+07:00,ATHER"
 status: beta
 superseded_by: null
 owner: "Boss (Founder / Product Authority)"
@@ -754,15 +754,27 @@ Minimum Verify/Review/Final evidence:
 
 | Artifact | Approved version | Synchronized version/status |
 |---|---|---|
-| This H2-D11 addendum | `0.3.0b` candidate, owner-approved | `0.8.17b` beta, annotation ACL and narrow ChangeScan budget policy implemented; 376/0/1 HQL2 and 43/0/0 selected P6/schema-v6; no schema/migration change |
-| P8 typed boundary | `0.2.0b` beta | `0.2.47b` beta, recursive target/evidence ACL, ChangeScan budget filtering, Vector/Row HistoryScan and end-to-end `tx_as_of` implemented; broad P8/P13 qualification remains open |
-| P6 generations/leases/ACL | `0.5.0b` beta | `0.5.25b` beta, explicit annotation-subject grant and pre-budget exclusion verified; HQL2 376/0/1, selected P6/schema-v6 suite 43/0/0; hosted worker checks unresolved |
-| HQL2 orchestration plan | `0.5.0b` beta | `0.8.50b` beta, records annotation ACL/budget conformance, 376/0/1 HQL2 sweep and current open qualification gates |
-| C4 architecture index | `0.1.20b` | `0.1.58b`, indexes current HQL2/P6 architecture, counts and open gates |
-| DOC registry | `0.5.6+draft` | `0.5.57+draft`, synchronized current HQL2/P6/plan/report entries |
-| Master specification | — | `2.3.30b`, architecture summary synchronized to HQL2 annotation ACL evidence |
-| HQL2 P8 checkpoint | — | `0.1.46b`, local regression evidence synchronized; broad P8/P13 gates remain open |
+| This H2-D11 addendum | `0.3.0b` candidate, owner-approved | `0.8.18b` beta, R5 backup/restore preserves the packaged history floor; 59 focused passes, HQL2 389/0/1 across 35 targets and full Rust suite exit 0; no schema/migration/format change |
+| P8 typed boundary | `0.2.0b` beta | `0.2.58b` beta, recursive target/evidence ACL, ChangeScan budget filtering, Vector/Row HistoryScan and end-to-end `tx_as_of` implemented; broad P8/P13 qualification remains open |
+| P6 generations/leases/ACL | `0.5.0b` beta | `0.5.35b` beta, explicit annotation-subject grant and pre-budget exclusion verified; restore floor parity is fixture-tested; hosted worker checks unresolved |
+| HQL2 orchestration plan | `0.5.0b` beta | `0.8.63b` beta, records current HQL2/P6 gates and R5 restore-floor parity evidence |
+| C4 architecture index | `0.1.20b` | `0.1.67b`, indexes current HQL2/P6 architecture, restore-floor parity evidence and open gates |
+| DOC registry | `0.5.6+draft` | `0.5.69+draft`, synchronized current HQL2/P6/plan/report entries |
+| Master specification | — | `2.3.39b`, architecture summary synchronized to R5 restore-floor parity evidence |
+| HQL2 P8 checkpoint | — | `0.1.58b`, local regression evidence synchronized; broad P8/P13 gates remain open |
 | Engine/storage | `0.2.9` | remains unchanged until implementation and release gates; no user database is migrated here |
+
+Version diff `0.8.17b -> 0.8.18b`: fix the restore-validation checkpoint to
+use full retention, so opening/dropping the temporary staging database cannot
+fold the only restored journal copy or advance the H2-D11/P6 history floor.
+The H2-D11 backup/restore fixture now proves stable graph history floor,
+revision/row/schema/selector/source-floor identity and HQL/typed-IR
+HistoryScan/ChangeScan parity; the focused backup, revision, History/Change,
+row-history and annotation targets pass 59/59 across seven targets, the explicit
+HQL2 sweep passes 389/0/1 across 35 targets, and the full locked/offline Rust
+suite exits 0. No backup format, schema or migration change; broad P14 rehearsal,
+P8/P13, hosted CI and independent-review gates remain open. See
+`.brain/rca/RCA--hql2-backup-restore-history-floor.md`.
 
 Version diff `0.8.16b -> 0.8.17b`: select the narrow ChangeScan budget policy:
 retain namespace-only ChangeScan for other readable kinds, exclude unauthorized
@@ -820,6 +832,7 @@ NOT_RUN and broader acceptance/release gates remain open.
 
 | Version | Date | Status | Summary | Commit Hash | Agent |
 |---|---|---|---|---|---|
+| 0.8.18b | 2026-10-05 | beta | Preserve packaged P6/H2-D11 history floor during writable restore validation by using full retention; 59 focused passes, HQL2 389/0/1 across 35 targets and full Rust suite exit 0; no schema/migration/format change; P14 rehearsal, hosted CI, independent review and broad P8/P13 remain open | working-tree | ATHER |
 | 0.8.17b | 2026-10-03 | beta | Implement and verify narrow ChangeScan budget policy: preserve namespace-only reads for other readable kinds; exclude Annotation subjects lacking Annotation(Read) before caller-budget accounting; ACL 11/11, History/Change 14/14, HQL2 376/0/1 and selected P6/schema-v6 43/0/0; hosted CI/review and broad P8/P13 remain open; no schema/migration change | working-tree | ATHER |
 | 0.8.16b | 2026-10-03 | beta | Record approved H2-D11 R4/P6 ACL conformance: require Annotation(Read) for annotation scan and ChangeScan subjects separately from Namespace(Read), retain recursive reference access; regression and HQL2 375/0/1 plus selected P6 43/0/0 pass; possible ChangeScan budget side channel and hosted/review/P8/P13 gates remain open | working-tree | ATHER |
 | 0.8.15b | 2026-10-03 | beta | Synchronize current HQL2/P6/plan/C4/master/report/registry versions; record 374/0/1 across 32 targets and PR #194 run 37083654705 with four worker bootstrap plus one Windows Join-budget failure; no contract/schema/migration change; broad gates remain open | working-tree | ATHER |
