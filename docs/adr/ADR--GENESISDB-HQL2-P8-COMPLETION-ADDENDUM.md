@@ -2,7 +2,7 @@
 doc_id: ADR--GENESISDB-HQL2-P8-COMPLETION-ADDENDUM
 version: "0.1.13b"
 created_at: "2026-09-30T06:29:47+07:00,ATHER,working-tree"
-last_update: "2026-10-04T15:03:58+07:00,ATHER"
+last_update: "2026-10-04T16:06:00+07:00,ATHER"
 status: accepted
 superseded_by: null
 owner: "Boss (Founder / Product Authority)"
@@ -316,7 +316,7 @@ addendum does not authorize migration of a user database, deployment or release.
 
 | Version | Date | Status | Summary | Commit Hash | Agent |
 |---|---|---|---|---|---|
-| 0.1.13b | 2026-10-04 | accepted | Extend D7 after differential evidence to the exact same-alias string ID predicate on labeled zero-hop scans; match/miss/wrong-label plus backslash/Unicode differential, adapter 11/11, ordering 2/2, new differential target 2/2; HQL2 394/0/1 across 35 targets and selected P6 peers 45/0/0 across 7; independent review found no runtime parity/authorization defect; PR #212 baseline has 10 pass, 5 fail, 1 skipped; preserve other fail-closed boundaries and broad P8/P13 gates | working-tree | ATHER |
+| 0.1.13b | 2026-10-04 | accepted | Extend D7 after differential evidence to the exact same-alias string ID predicate on labeled zero-hop scans; match/miss/wrong-label plus backslash/Unicode differential, adapter 11/11, ordering 2/2, new differential target 2/2; HQL2 394/0/1 across 35 targets and selected P6 peers 45/0/0 across 7; independent review found no runtime parity/authorization defect; PR #213 code commit checks 40 pass, 4 worker failures with unconfirmed cause, 5 skipped, 1 Windows Cargo cancellation at 15-minute job limit; preserve other fail-closed boundaries and broad P8/P13 gates | working-tree | ATHER |
 | 0.1.12b | 2026-10-04 | accepted | Extend D7 after legacy/HQL2 differential for one exact string ID predicate on unlabeled zero-hop scans; adapter 11/11, ordering 2/2, HQL2 393/0/1 across 34 targets; preserve label+predicate/order/multi-predicate fail-closed boundaries; no P6/schema/transport change; independent review and broad P8/P13 gates remain open | working-tree | ATHER |
 | 0.1.11b | 2026-10-04 | accepted | Record test-only D4 nested-JSON Sequence P7 differential for exact HQL/typed-IR node and edge object/array properties; focused pattern 11/11, HQL2 392/0/1 across 34 targets; no contract/runtime change; broad P8/P13 gates remain open | working-tree | ATHER |
 | 0.1.10b | 2026-10-04 | accepted | Record test-only D4 optional Sequence edge-property-miss differential against P7; all four input rows survive with endpoint/edge aliases NULL-extended; pattern target 10/10 and HQL2 389/0/1 across 34 targets; no contract/runtime change; broad P8/P13 gates remain open | working-tree | ATHER |

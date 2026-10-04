@@ -2,7 +2,7 @@
 doc_id: REPORT--HQL2-P8-CORE-2026-09-28
 version: "0.1.63b"
 created_at: "2026-09-28T04:35:00+07:00,ATHER,22bc11e"
-last_update: "2026-10-04T15:03:58+07:00,ATHER"
+last_update: "2026-10-04T16:06:00+07:00,ATHER"
 status: beta
 owner: GenesisBlockDB Engineering
 attributes:
@@ -83,7 +83,12 @@ failures are worker bootstrap jobs reporting missing markerless database
 identity; the Windows Cargo test job failed after 15m13s, with the exact
 failure detail unconfirmed. The relevant isolated Windows query-budget test
 passed locally 1/1, but that does not resolve the suite failure or make hosted
-checks green. This D7 change has no hosted checks yet; no bypass was used.
+checks green. PR #213 code commit `1af723e` later finished with 40 passing
+checks, four worker failures, five skipped and one Windows Cargo suite canceled
+at the configured 15-minute job limit. Worker check annotations report only
+exit code 1, so their causes remain unconfirmed. Ubuntu/macOS full Cargo tests
+passed; Windows full Cargo is incomplete, while the local Windows HQL2 sweep
+passes 394/0/1. No administrative bypass was used.
 
 The approved H2-D11 R6b recovery contract is now implemented in the isolated
 worktree: signed local schema-v6 activation is preflighted before WAL replay,
@@ -526,8 +531,9 @@ backslash/Unicode ID are covered; adapter/order/labeled-filter targets pass
 P6 peer tests pass 45/0/0 across seven targets. The independent reviewer found
 no runtime parity or authorization defect and identified the stale D7 text,
 which this version synchronizes. Record PR #212 baseline checks (10 pass, five
-fail, one skipped); the current change has not run hosted CI. No P6/schema/
-transport behavior changed; broad P8/P13 and shared-runtime gates remain open.
+fail, one skipped) and PR #213 code commit results (40 pass, four worker
+failures with cause unconfirmed, five skipped, one Windows Cargo cancellation
+at the 15-minute job limit). Broad P8/P13 and shared-runtime gates remain open.
 
 Version diff 0.1.61b -> 0.1.62b: add a test-only HQL/typed-IR ChangeScan
 P7 differential over five `(after, through]` windows, including equal empty
@@ -725,7 +731,7 @@ P8 and release gates.
 
 | Version | Date | Status | Summary | Commit Hash | Agent |
 |---|---|---|---|---|---|
-| 0.1.63b | 2026-10-04 | beta | Extend D7 after labeled-zero-hop match/miss/wrong-label and backslash/Unicode differential; adapter 11/11, ordering 2/2, labeled-filter 2/2; HQL2 394/0/1 across 35 targets and selected P6 peers 45/0/0 across 7; PR #212 baseline 10 pass, 5 fail, 1 skipped (four worker markerless bootstrap failures; Windows Cargo job failed at 15m13, detail unconfirmed); no P6 contract/schema/transport change; broad P8/P13/shared-runtime gates remain open | working-tree | ATHER |
+| 0.1.63b | 2026-10-04 | beta | Extend D7 after labeled-zero-hop match/miss/wrong-label and backslash/Unicode differential; adapter 11/11, ordering 2/2, labeled-filter 2/2; HQL2 394/0/1 across 35 targets and selected P6 peers 45/0/0 across 7; PR #213 code commit: 40 pass, 4 worker failures with unconfirmed cause, 5 skipped, 1 Windows Cargo cancellation at 15-minute job limit; no P6 contract/schema/transport change; broad P8/P13/shared-runtime gates remain open | working-tree | ATHER |
 | 0.1.62b | 2026-10-04 | beta | Add test-only HQL/typed-IR ChangeScan P7 differential for five exclusive-after/inclusive-through windows and tx_as_of frontiers; History/Change 17/17 and HQL2 392/0/1 across 34 targets; PR #210 hosted checks 11 pass, four worker markerless-identity failures, one skipped; no runtime/contract/schema/P6/transport change; broad P8/P13 and independent review remain open | working-tree | ATHER |
 | 0.1.61b | 2026-10-04 | beta | Add HQL/typed-IR Node/Edge/Row source-scan P7 bag differential; focused target 10/10; fresh explicit 34-target HQL2 sweep 391/0/1 (prior 393 count not reproduced); no runtime/contract/schema/P6/transport change; broad P8/P13 and independent review remain open | working-tree | ATHER |
 | 0.1.60b | 2026-10-04 | beta | Synchronize merged PR #208 hosted status: 40 success, 5 failures and 5 skipped; four worker markerless-identity bootstrap failures and one Windows annotation `QUERY_BUDGET_EXCEEDED` failure; isolated Windows rerun passes 1/1 with cause unconfirmed; local HQL2 was reported 393/0/1 at that checkpoint and broad P8/P13/review gates stay open | working-tree | ATHER |

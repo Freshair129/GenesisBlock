@@ -3,7 +3,7 @@ doc_id: SPEC--GENESISDB-P6-GENERATIONS-LEASES-ACL
 owner: GenesisBlockDB Engineering
 version: 0.5.33b
 created_at: "2026-09-22T22:55:00+07:00,ATHER,working-tree"
-last_update: "2026-10-04T15:03:58+07:00,ATHER"
+last_update: "2026-10-04T16:06:00+07:00,ATHER"
 status: beta
 attributes:
   domain: storage-correctness
@@ -413,9 +413,11 @@ legacy/HQL2 differential covers match, miss, wrong-label exclusion and
 backslash/Unicode handling; focused adapter/order/labeled-filter targets pass
 11/11, 2/2 and 2/2; HQL2 passes 394/0/1 across 35 targets. Selected P6 peer
 tests pass 45/0/0 across seven targets. PR #212 baseline reports 10 checks
-passed, five failed and one skipped. P6 contract/ACL/lease/schema/migration
-behavior is unchanged; this change has no hosted checks yet and broad gates
-remain open.
+passed, five failed and one skipped. PR #213 code commit checks report 40 pass,
+four worker failures with cause unconfirmed, five skipped and one Windows Cargo
+cancellation at the configured 15-minute job limit. P6
+contract/ACL/lease/schema/migration behavior is unchanged; broad gates remain
+open.
 
 Version diff 0.5.31b -> 0.5.32b: synchronize the test-only HQL/typed-IR
 ChangeScan P7 cursor-window differential across five exclusive-after/
@@ -537,7 +539,7 @@ broader P6/P8/P13 qualification is claimed.
 
 | Version | Date | Status | Summary | Commit | Agent |
 |---|---|---|---|---|---|
-| 0.5.33b | 2026-10-04 | beta | Sync the D7 labeled zero-hop exact string-ID filter differential; adapter 11/11, ordering 2/2, labeled-filter 2/2 including backslash/Unicode and wrong-label exclusion; HQL2 394/0/1 across 35 targets; selected P6 peers 45/0/0 across 7 targets; no P6 contract/ACL/lease/schema/migration change; PR #212 baseline 10 pass, 5 fail, 1 skipped; broad gates open | working-tree | ATHER |
+| 0.5.33b | 2026-10-04 | beta | Sync the D7 labeled zero-hop exact string-ID filter differential; adapter 11/11, ordering 2/2, labeled-filter 2/2 including backslash/Unicode and wrong-label exclusion; HQL2 394/0/1 across 35 targets; selected P6 peers 45/0/0 across 7 targets; PR #213 code commit checks 40 pass, 4 worker failures with unconfirmed cause, 5 skipped, 1 Windows Cargo cancellation at 15-minute job limit; no P6 contract/ACL/lease/schema/migration change; broad gates open | working-tree | ATHER |
 | 0.5.32b | 2026-10-04 | beta | Sync test-only HQL/typed-IR ChangeScan P7 cursor-window differential across five exclusive-after/inclusive-through bounds; History/Change 17/17, HQL2 392/0/1 across 34 targets, P6/schema-v6/compatibility 194/0/0; PR #210 has 11 passed checks, four worker markerless-identity failures and one skipped; P6 contract/ACL/lease/schema/migration unchanged; broad gates remain open | working-tree | ATHER |
 | 0.5.31b | 2026-10-04 | beta | Record D7's differential-proven one-hop ORDER BY on projected endpoint ID; ordering 2/2, HQL2 385/0/1 across 34 targets, selected P6/schema-v6/ACL targets 93/0/0 across 11; no P6 grant/ACL/lease/schema/migration change; broad gates remain open | working-tree | ATHER |
 | 0.5.30b | 2026-10-03 | beta | Record D7's differential-proven single-label zero-hop HQL1 extension and 10/10 adapter tests; HQL2 382/0/1, P6/schema-v6/compatibility 194/0/0; no P6 contract/ACL/schema/migration change; broad gates remain open | working-tree | ATHER |

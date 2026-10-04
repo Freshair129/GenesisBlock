@@ -125,9 +125,9 @@ exclusion and backslash/Unicode handling. Record adapter 11/11, ordering 2/2,
 labeled-filter 2/2, HQL2 394/0/1 across 35 targets and selected P6 peer tests
 45/0/0 across seven targets. Update the accepted addendum, P6/P8 evidence,
 plan, report, C4 and Master versions. PR #212 baseline has 10 pass, five fail
-and one skipped (four markerless worker bootstrap failures; Windows Cargo job
-failed after 15m13s with detail unconfirmed); this feature branch has no hosted
-checks. No P6 contract/schema/transport behavior changed; broad shared-runtime,
+and one skipped. PR #213 code commit checks report 40 pass, four worker failures
+with cause unconfirmed, five skipped and one Windows Cargo cancellation at the
+configured 15-minute job limit. No P6 contract/schema/transport behavior changed; broad shared-runtime,
 P8/P13 and qualification gates remain open.
 
 Version diff 0.5.74+draft -> 0.5.75+draft: register the test-only HQL/typed-IR
@@ -386,7 +386,7 @@ review and full P8 gates remain open.
 
 | Version | Date | Owner | Summary |
 |---|---|---|---|
-| 0.5.76+draft | 2026-10-04 | GenesisBlockDB Architecture | Synchronize conditional D7 labeled zero-hop exact string-ID filter after legacy/HQL2 match/miss/wrong-label/backslash/Unicode differential; adapter 11/11, ordering 2/2, labeled-filter 2/2, HQL2 394/0/1 across 35 targets, selected P6 peers 45/0/0 across 7; update accepted addendum and P6/P8/plan/report/C4/Master; PR #212 baseline 10 pass, 5 fail, 1 skipped; current change not hosted; no P6 contract/schema/transport change; broad shared-runtime/P8/P13 remain open |
+| 0.5.76+draft | 2026-10-04 | GenesisBlockDB Architecture | Synchronize conditional D7 labeled zero-hop exact string-ID filter after legacy/HQL2 match/miss/wrong-label/backslash/Unicode differential; adapter 11/11, ordering 2/2, labeled-filter 2/2, HQL2 394/0/1 across 35 targets, selected P6 peers 45/0/0 across 7; update accepted addendum and P6/P8/plan/report/C4/Master; PR #213 code commit checks 40 pass, 4 worker failures with unconfirmed cause, 5 skipped, 1 Windows Cargo cancellation at 15-minute job limit; no P6 contract/schema/transport change; broad shared-runtime/P8/P13 remain open |
 | 0.5.75+draft | 2026-10-04 | GenesisBlockDB Architecture | Register test-only HQL/typed-IR ChangeScan P7 cursor-window differential (five `(after, through]` windows with tx_as_of frontiers), History/Change 17/17 and HQL2 392/0/1 across 34 targets; record PR #210 checks: 11 pass, four worker markerless-identity failures, one skipped; update P6/P8 evidence, report/plan/C4/Master versions; no runtime/contract/schema/P6/transport change; broad P8/P13/review gates remain open |
 | 0.5.74+draft | 2026-10-04 | GenesisBlockDB Architecture | Register test-only HQL/typed-IR Node/Edge/Row source-scan P7 differential, focused source target 10/10 and HQL2 391/0/1 across 34 root targets; update P8 report/plan/C4/Master; no runtime/contract/schema/P6/transport change; broad P8/P13/review remains open |
 | 0.5.73+draft | 2026-10-04 | GenesisBlockDB Architecture | Synchronize plan/report with merged PR #208 hosted checks (40 success, 5 failure, 5 skipped); four worker markerless-identity failures and one Windows annotation query-budget failure with isolated rerun 1/1, cause unconfirmed; broad shared-runtime/P8/P13/review gates remain open |

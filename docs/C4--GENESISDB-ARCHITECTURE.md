@@ -5,7 +5,7 @@ status: current
 version: 0.1.69b
 owner: GenesisBlockDB Architecture
 created_at: 2026-06-13T22:50:11+07:00,ATHER,9b1ced3
-last_update: "2026-10-04T15:03:58+07:00,ATHER"
+last_update: "2026-10-04T16:06:00+07:00,ATHER"
 attributes:
   domain: architecture
   scope: repository
@@ -478,8 +478,11 @@ one exact same-alias string ID predicate on labeled zero-hop scans. The new
 cases cover match/miss, wrong-label exclusion and backslash/Unicode. Adapter,
 ordering and labeled-filter targets pass 11/11, 2/2 and 2/2; the explicit
 35-target HQL2 sweep passes 394/0/1 and selected P6 peers pass 45/0/0 across
-seven targets. PR #212 baseline has 10 pass, five fail and one skipped; this
-change has no hosted checks yet. No P6/schema/transport change; full
+seven targets. PR #213 checks on code commit `1af723e` finished 40 pass,
+four worker failures, five skipped and one Windows `cargo test` canceled at
+the configured 15-minute job limit. Worker annotations expose exit code 1
+only; exact cause remains unconfirmed. Local Windows HQL2/P6 checks pass. No
+P6/schema/transport change; full
 shared-runtime/P8/P13 gates remain open.
 
 Version diff 0.1.67b -> 0.1.68b: add the test-only HQL/typed-IR ChangeScan
@@ -600,7 +603,7 @@ full P8/P13 qualification remains open.
 
 | Version | Date | Status | Summary | Commit Hash | Agent |
 |---------|------|--------|---------|-------------|-------|
-| 0.1.69b | 2026-10-04 | current | Extend D7 with differential-proven same-alias exact string-ID filter on labeled zero-hop scans; adapter 11/11, ordering 2/2 and labeled-filter 2/2 including wrong-label/backslash/Unicode cases; HQL2 394/0/1 across 35 targets, selected P6 peers 45/0/0 across 7; PR #212 baseline 10 pass, 5 fail, 1 skipped; no P6/schema/transport change; broad shared-runtime/P8/P13 remain open | working-tree | ATHER |
+| 0.1.69b | 2026-10-04 | current | Extend D7 with differential-proven same-alias exact string-ID filter on labeled zero-hop scans; adapter 11/11, ordering 2/2 and labeled-filter 2/2 including wrong-label/backslash/Unicode cases; HQL2 394/0/1 across 35 targets, selected P6 peers 45/0/0 across 7; PR #213 code commit checks 40 pass, 4 worker failures with cause unconfirmed, 5 skipped, 1 Windows Cargo cancellation at 15-minute job limit; no P6/schema/transport change; broad shared-runtime/P8/P13 remain open | working-tree | ATHER |
 | 0.1.68b | 2026-10-04 | current | Add test-only HQL/typed-IR ChangeScan P7 differential for five exclusive-after/inclusive-through windows and tx_as_of frontiers; History/Change 17/17; HQL2 392/0/1 across 34 targets; PR #210 hosted checks 11 pass, four worker markerless-identity failures, one skipped; no runtime/contract/schema/P6/transport change; broad P8/P13 and independent review remain open | working-tree | ATHER |
 | 0.1.67b | 2026-10-04 | current | Add test-only HQL/typed-IR Node/Edge/Row source-scan P7 differential; storage-source target 10/10; fresh 34-target HQL2 run 391/0/1 (prior 393 count not reproduced); no runtime/contract/schema/P6/transport change; broad P8/P13 and independent review remain open | working-tree | ATHER |
 | 0.1.66b | 2026-10-04 | current | Extend D7 with differential-proven same-alias exact string ID equality on unlabeled zero-hop HQL1 scans; adapter 11/11, ordering 2/2, HQL2 was reported 393/0/1 across 34 targets at that checkpoint; other forms remain fail-closed; no P6 grant/lease/schema/migration or transport change; independent review and broad P8/P13 gates remain open | working-tree | ATHER |

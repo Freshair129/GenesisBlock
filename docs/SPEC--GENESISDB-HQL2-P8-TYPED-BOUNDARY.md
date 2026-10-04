@@ -2,7 +2,7 @@
 doc_id: SPEC--GENESISDB-HQL2-P8-TYPED-BOUNDARY
 version: "0.2.60b"
 created_at: "2026-09-28T01:25:00+07:00,ATHER,fc851e9"
-last_update: "2026-10-04T15:03:58+07:00,ATHER"
+last_update: "2026-10-04T16:06:00+07:00,ATHER"
 status: beta
 superseded_by: null
 owner: "Boss (Founder / Product Authority)"
@@ -876,8 +876,10 @@ legacy/HQL2 differential covers match, miss, wrong-label exclusion and an ID
 containing backslash plus Unicode; adapter passes 11/11, ordering 2/2 and the
 new differential target 2/2. The complete explicit HQL2 sweep passes 394/0/1
 across 35 targets; selected P6 peer targets pass 45/0/0 across seven targets.
-PR #212's merged baseline checks are 10 pass, five fail and one skipped; this
-change has no hosted checks yet. Independent review found no runtime parity or
+PR #212's merged baseline checks are 10 pass, five fail and one skipped. PR
+#213 code commit checks are 40 pass, four worker failures with cause
+unconfirmed, five skipped and one Windows Cargo cancellation at the configured
+15-minute job limit. Independent review found no runtime parity or
 authorization defect. No P6 contract, schema or transport behavior changed;
 broad shared-runtime/P8/P13 gates remain open.
 
@@ -1091,7 +1093,7 @@ detail with unchanged JSON shape; broader P8/P13/review gates remain open.
 
 | Version | Date | Status | Summary | Commit Hash | Agent |
 |---|---|---|---|---|---|
-| 0.2.60b | 2026-10-04 | beta | Extend conditional D7 same-alias exact string ID filter to labeled zero-hop scans after legacy/HQL2 match, miss, wrong-label and backslash/Unicode differential; adapter 11/11, ordering 2/2, labeled-filter target 2/2, HQL2 394/0/1 across 35 targets, selected P6 peers 45/0/0 across 7; no P6 contract/schema/transport change; broad shared-runtime/P8/P13 gates remain open | working-tree | ATHER |
+| 0.2.60b | 2026-10-04 | beta | Extend conditional D7 same-alias exact string ID filter to labeled zero-hop scans after legacy/HQL2 match, miss, wrong-label and backslash/Unicode differential; adapter 11/11, ordering 2/2, labeled-filter target 2/2, HQL2 394/0/1 across 35 targets, selected P6 peers 45/0/0 across 7; PR #213 code commit checks 40 pass, 4 worker failures with unconfirmed cause, 5 skipped, 1 Windows Cargo cancellation at 15-minute job limit; no P6 contract/schema/transport change; broad shared-runtime/P8/P13 gates remain open | working-tree | ATHER |
 | 0.2.59b | 2026-10-04 | beta | Record test-only HQL/typed-IR ChangeScan P7 differential across five exclusive-after/inclusive-through windows, empty bounds and tx_as_of frontiers; History/Change 17/17, HQL2 392/0/1 across 34 targets; PR #210 hosted checks 11 pass, four worker markerless-identity failures, one skipped; no contract/runtime/schema/P6/transport change; broad P8/P13/review remain open | working-tree | ATHER |
 | 0.2.58b | 2026-10-04 | beta | Extend conditional D7 HQL1 adapter with differential-proven same-alias exact string equality on unlabeled zero-hop scans; adapter 11/11, ordering 2/2, HQL2 393/0/1 across 34 targets; other forms remain fail-closed and broad shared-runtime/P8/P13 gates remain open | working-tree | ATHER |
 | 0.2.56b | 2026-10-04 | beta | Record test-only HQL/typed-IR AnnotationLookup P7 differential for frozen target, evidence-only nonmatch, optional NULL and duplicate multiplicity; focused target 6/6, HQL2 386/0/1 across 34 targets; no runtime/contract/schema/P6/transport change; broad exact-oracle and P8/P13 gates remain open | working-tree | ATHER |
