@@ -1,8 +1,8 @@
 ---
 doc_id: REPORT--HQL2-P8-CORE-2026-09-28
-version: "0.1.59b"
+version: "0.1.60b"
 created_at: "2026-09-28T04:35:00+07:00,ATHER,22bc11e"
-last_update: "2026-10-04T10:38:40+07:00,ATHER"
+last_update: "2026-10-04T11:27:20+07:00,ATHER"
 status: beta
 owner: GenesisBlockDB Engineering
 attributes:
@@ -50,6 +50,20 @@ forms remain unchanged. Focused ordering review found no semantic/authorization
 issue and the source-alias test coverage gap is closed; the new zero-hop filter
 has not received independent review. Broader D7 review and full
 shared-runtime/P8/P13 acceptance remain open.
+
+PR #208, “HQL2: lower HQL1 zero-hop ID equality,” was merged normally on
+2026-10-04; no administrative bypass was used. Its hosted checks finished
+with 40 success, 5 failures and 5 skipped. Four failures were worker bootstrap
+jobs across Ubuntu, Windows and macOS, including the rebuilt Linux addon job;
+their logs report missing markerless database identity. The fifth was the
+Windows Rust suite failing
+`annotation_lookup_uses_the_selected_transaction_frontier` with
+`QUERY_BUDGET_EXCEEDED`. An isolated rerun of that test on Windows passed
+1/1 in 0.31 seconds, so the full-suite failure is not reproduced in isolation;
+its cause remains unconfirmed. This does not make hosted CI green or close the
+worker issue. The local 393/0/1 HQL2 sweep is unchanged, P6/ACL/schema/transport
+contracts were not changed, and broad shared-runtime/P8/P13/review gates remain
+open.
 
 The approved H2-D11 R6b recovery contract is now implemented in the isolated
 worktree: signed local schema-v6 activation is preflighted before WAL replay,
@@ -658,6 +672,7 @@ P8 and release gates.
 
 | Version | Date | Status | Summary | Commit Hash | Agent |
 |---|---|---|---|---|---|
+| 0.1.60b | 2026-10-04 | beta | Synchronize merged PR #208 hosted status: 40 success, 5 failures and 5 skipped; four worker markerless-identity bootstrap failures and one Windows annotation `QUERY_BUDGET_EXCEEDED` failure; isolated Windows rerun passes 1/1 with cause unconfirmed; local HQL2 remains 393/0/1 and broad P8/P13/review gates stay open | working-tree | ATHER |
 | 0.1.59b | 2026-10-04 | beta | Extend D7 with differential-proven same-alias exact string ID equality on unlabeled zero-hop HQL1 scans; adapter 11/11, ordering 2/2, HQL2 393/0/1 across 34 targets; other forms remain fail-closed; no P6 grant/lease/schema/migration or transport change; independent review and broad P8/P13 gates remain open | working-tree | ATHER |
 | 0.1.58b | 2026-10-04 | beta | Add test-only HQL/typed-IR Sequence nested-JSON property differential against P7 with exact node/edge object/array equality and near-match exclusion; focused pattern 11/11, HQL2 392/0/1 across 34 targets; no runtime/contract/schema/P6/transport change; broad P8/P13 gates remain open | working-tree | ATHER |
 | 0.1.57b | 2026-10-04 | beta | Add test-only HQL/typed-IR optional Sequence edge-property-miss P7 differential; preserve four input rows and NULL-extend endpoint/edge aliases; focused pattern target 10/10, HQL2 389/0/1 across 34 targets; synchronize accepted addendum, P7 report, plan, C4, Master and registry; no runtime/contract/schema/P6/transport change; broad P8/P13 gates remain open | working-tree | ATHER |
