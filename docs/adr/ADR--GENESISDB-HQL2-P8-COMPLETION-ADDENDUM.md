@@ -1,8 +1,8 @@
 ---
 doc_id: ADR--GENESISDB-HQL2-P8-COMPLETION-ADDENDUM
-version: "0.1.12b"
+version: "0.1.13b"
 created_at: "2026-09-30T06:29:47+07:00,ATHER,working-tree"
-last_update: "2026-10-04T10:38:40+07:00,ATHER"
+last_update: "2026-10-04T15:03:58+07:00,ATHER"
 status: accepted
 superseded_by: null
 owner: "Boss (Founder / Product Authority)"
@@ -191,10 +191,10 @@ these P8 decisions alone.
    transport.
 2. A zero-hop scan may be unlabeled or carry one plain-ASCII label identifier,
    with no node properties, and projects only the same alias's `.id`. Following
-   the D7 differential-extension rule, an unlabeled zero-hop scan may
-   additionally contain exactly one exact string-equality predicate
-   `WHERE <same-identifier>.id = "<string>"`; a labeled zero-hop scan with a
-   predicate remains unsupported. The labeled scan form is
+   the D7 differential-extension rule, an unlabeled or labeled zero-hop scan
+   may additionally contain exactly one exact string-equality predicate
+   `WHERE <same-identifier>.id = "<string>"`; for labeled scans, the label and
+   ID predicate are conjunctive. The labeled scan form is
    `MATCH (<identifier>:<Label>) RETURN <same-identifier>.id`; the unlabeled
    form remains supported. Following
    the D7 differential-extension rule, the verified allowlist also includes
@@ -216,8 +216,9 @@ these P8 decisions alone.
 3. After actor/envelope validation, run the allocation-free parser preflight
    and reserve its conservative heap estimate before invoking the legacy HQL
    parser. Verify the complete AST against the allowlist, then lower to the
-   equivalent canonical HQL2 optionally label-scoped node scan (with only the
-   verified unlabeled exact-ID filter) or one-hop path and ID projection using
+   equivalent canonical HQL2 optionally label-scoped node scan (with the
+   verified exact-ID filter for labeled or unlabeled zero-hop scans) or one-hop
+   path and ID projection using
    fixed internal aliases. Execute only through the
    existing HQL2 parser,
    binder, planner, runtime and P6 read-lease path; then rename the single typed
@@ -315,6 +316,7 @@ addendum does not authorize migration of a user database, deployment or release.
 
 | Version | Date | Status | Summary | Commit Hash | Agent |
 |---|---|---|---|---|---|
+| 0.1.13b | 2026-10-04 | accepted | Extend D7 after differential evidence to the exact same-alias string ID predicate on labeled zero-hop scans; match/miss/wrong-label plus backslash/Unicode differential, adapter 11/11, ordering 2/2, new differential target 2/2; HQL2 394/0/1 across 35 targets and selected P6 peers 45/0/0 across 7; independent review found no runtime parity/authorization defect; PR #212 baseline has 10 pass, 5 fail, 1 skipped; preserve other fail-closed boundaries and broad P8/P13 gates | working-tree | ATHER |
 | 0.1.12b | 2026-10-04 | accepted | Extend D7 after legacy/HQL2 differential for one exact string ID predicate on unlabeled zero-hop scans; adapter 11/11, ordering 2/2, HQL2 393/0/1 across 34 targets; preserve label+predicate/order/multi-predicate fail-closed boundaries; no P6/schema/transport change; independent review and broad P8/P13 gates remain open | working-tree | ATHER |
 | 0.1.11b | 2026-10-04 | accepted | Record test-only D4 nested-JSON Sequence P7 differential for exact HQL/typed-IR node and edge object/array properties; focused pattern 11/11, HQL2 392/0/1 across 34 targets; no contract/runtime change; broad P8/P13 gates remain open | working-tree | ATHER |
 | 0.1.10b | 2026-10-04 | accepted | Record test-only D4 optional Sequence edge-property-miss differential against P7; all four input rows survive with endpoint/edge aliases NULL-extended; pattern target 10/10 and HQL2 389/0/1 across 34 targets; no contract/runtime change; broad P8/P13 gates remain open | working-tree | ATHER |

@@ -1,9 +1,9 @@
 ---
 doc_id: SPEC--GENESISDB-P6-GENERATIONS-LEASES-ACL
 owner: GenesisBlockDB Engineering
-version: 0.5.32b
+version: 0.5.33b
 created_at: "2026-09-22T22:55:00+07:00,ATHER,working-tree"
-last_update: "2026-10-04T13:34:13+07:00,ATHER"
+last_update: "2026-10-04T15:03:58+07:00,ATHER"
 status: beta
 attributes:
   domain: storage-correctness
@@ -153,14 +153,14 @@ Row, Vector and Annotation now match independent P7 references assembled from
 WAL revision facts and captured frontiers/valid-time windows. The HistoryScan/
 ChangeScan target passes 17/17, including five exclusive-after/inclusive-through
 P7 windows and selected transaction frontiers; Annotation source passes 7/7,
-the 34-target HQL2 regression sweep passes 392/0/1, and the separate 11-target
+the 35-target HQL2 regression sweep passes 394/0/1, and the separate 11-target
 P6/schema-v6/compatibility group passes 194/0/0. Broader
 P6/P8 acceptance, transport parity and independent review remain open. Explicit
 HQL2/IR `tx_as_of` is specified above and its cross-source
 runtime path now selects one frontier S across source scans, operators,
 hydration and result metadata while retaining the pinned P6 generation and
-current ACL. Five focused HQL2 targets pass 56/56, the 34-target HQL2 sweep
-passes 392/0/1 and the earlier separate 11-target P6/schema-v6/compatibility sweep
+current ACL. Five focused HQL2 targets pass 56/56, the 35-target HQL2 sweep
+passes 394/0/1 and the earlier separate 11-target P6/schema-v6/compatibility sweep
 passes 194/0/0. Broader P6/P8 acceptance, transport parity and independent
 review remain open. Property access uses
 binder-issued `FieldIdV2` and aligned `ExecBatchV2` batches, including
@@ -268,7 +268,7 @@ excluded before candidate counts/bytes are charged to caller-selected budgets or
 materialized. This does not widen authorization to Annotation and does not claim
 timing noninterference. The hidden-revision threshold regression passes with
 ACL 11/11; the expanded History/Change target passes 17/17, Annotation
-source/ACL passes 7/7, HQL2 passes 392/0/1 and the separate P6/schema-v6/
+source/ACL passes 7/7, HQL2 passes 394/0/1 across 35 targets and the separate P6/schema-v6/
 compatibility group passes 194/0/0. Hosted validation of this source change,
 independent review and broader P6/P8 acceptance remain open.
 
@@ -394,16 +394,28 @@ to the serialized owner and require Verify to rerun. Final checks scope, evidenc
 regressions and WIP preservation. Passing the gates supports only the P6 owner decision; it does
 not approve P7, merge, release, deployment or external readiness.
 
-The D7 actor-scoped HQL1 adapter additionally accepts one-hop ordering only by
-the projected endpoint ID, after a legacy/HQL2 differential (2/2 ordering tests;
-the existing adapter target passes 11/11). Zero-hop and unprojected ordering
-remain unsupported. This changes no P6 grant, ACL, lease, schema or migration
-behavior. The HQL2 sweep passes 392/0/1 across 34 targets; the selected
-P6/schema-v6/ACL regression group passes 93/0/0 across 11 targets. The prior
-broader 11-target P6/schema-v6/compatibility record remains 194/0/0. Broader
-P6/P8 and independent-review gates remain open.
+The D7 actor-scoped HQL1 adapter accepts one-hop ordering only by the projected
+endpoint ID and an exact same-alias string ID equality predicate on labeled or
+unlabeled zero-hop scans, each after legacy/HQL2 differential evidence. Focused
+adapter, ordering and labeled-filter targets pass 11/11, 2/2 and 2/2; the latter
+includes match, miss, wrong-label exclusion and a backslash/Unicode ID. The
+explicit HQL2 sweep passes 394/0/1 across 35 targets. The selected P6 peer group
+passes 45/0/0 across seven targets; the prior broader 11-target P6/schema-v6/
+compatibility result remains 194/0/0 and was not rerun here. No P6 grant, ACL,
+lease, schema or migration behavior changed. Broad P6/P8 and review gates remain
+open.
 
 ## CHANGELOG
+
+Version diff 0.5.32b -> 0.5.33b: synchronize the conditional D7 extension for
+one exact same-alias string ID predicate on labeled zero-hop scans. The
+legacy/HQL2 differential covers match, miss, wrong-label exclusion and
+backslash/Unicode handling; focused adapter/order/labeled-filter targets pass
+11/11, 2/2 and 2/2; HQL2 passes 394/0/1 across 35 targets. Selected P6 peer
+tests pass 45/0/0 across seven targets. PR #212 baseline reports 10 checks
+passed, five failed and one skipped. P6 contract/ACL/lease/schema/migration
+behavior is unchanged; this change has no hosted checks yet and broad gates
+remain open.
 
 Version diff 0.5.31b -> 0.5.32b: synchronize the test-only HQL/typed-IR
 ChangeScan P7 cursor-window differential across five exclusive-after/
@@ -525,6 +537,7 @@ broader P6/P8/P13 qualification is claimed.
 
 | Version | Date | Status | Summary | Commit | Agent |
 |---|---|---|---|---|---|
+| 0.5.33b | 2026-10-04 | beta | Sync the D7 labeled zero-hop exact string-ID filter differential; adapter 11/11, ordering 2/2, labeled-filter 2/2 including backslash/Unicode and wrong-label exclusion; HQL2 394/0/1 across 35 targets; selected P6 peers 45/0/0 across 7 targets; no P6 contract/ACL/lease/schema/migration change; PR #212 baseline 10 pass, 5 fail, 1 skipped; broad gates open | working-tree | ATHER |
 | 0.5.32b | 2026-10-04 | beta | Sync test-only HQL/typed-IR ChangeScan P7 cursor-window differential across five exclusive-after/inclusive-through bounds; History/Change 17/17, HQL2 392/0/1 across 34 targets, P6/schema-v6/compatibility 194/0/0; PR #210 has 11 passed checks, four worker markerless-identity failures and one skipped; P6 contract/ACL/lease/schema/migration unchanged; broad gates remain open | working-tree | ATHER |
 | 0.5.31b | 2026-10-04 | beta | Record D7's differential-proven one-hop ORDER BY on projected endpoint ID; ordering 2/2, HQL2 385/0/1 across 34 targets, selected P6/schema-v6/ACL targets 93/0/0 across 11; no P6 grant/ACL/lease/schema/migration change; broad gates remain open | working-tree | ATHER |
 | 0.5.30b | 2026-10-03 | beta | Record D7's differential-proven single-label zero-hop HQL1 extension and 10/10 adapter tests; HQL2 382/0/1, P6/schema-v6/compatibility 194/0/0; no P6 contract/ACL/schema/migration change; broad gates remain open | working-tree | ATHER |

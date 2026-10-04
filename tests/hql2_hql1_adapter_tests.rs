@@ -614,7 +614,6 @@ fn valid_unlisted_hql1_form_fails_closed() {
     assert_eq!(error.code, "CAPABILITY_UNSUPPORTED");
 
     for query in [
-        "MATCH (a:Person) WHERE a.id = \"a\" RETURN a.id",
         "MATCH (a) WHERE a.id != \"a\" RETURN a.id",
         "MATCH (a) WHERE a.id = 1 RETURN a.id",
         "MATCH (a) WHERE b.id = \"a\" RETURN a.id",
