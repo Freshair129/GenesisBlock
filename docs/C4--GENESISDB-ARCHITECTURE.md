@@ -471,11 +471,16 @@ For schema-v6 WAL-only cold recovery, preflight signed journal authority before 
 `Schema6ActivationV1` selects v6 only when identity and any linked migration/receipt proof validate;
 v6-only WAL without activation fails closed. See H2-D11 ADR R6b and the P6 recovery contract.
 
-H2-D11 R5 backup restoration validates extracted staging with full retention so the validation
-close checkpoint cannot fold the packaged journal or advance its history floor. Fixture-backed
-parity covers revision/row IDs, schema, annotation selectors, source floors and HQL/typed-IR
-HistoryScan/ChangeScan; focused targets pass 59/59, HQL2 passes 389/0/1 across 35 targets, and
-the full local Rust suite exits 0. This is not completion of the broader P14 rehearsal or P8/P13 gates.
+H2-D11 R5 backup restoration validates extracted staging with full retention, requires normal
+recovery to reproduce the bundle's final WAL-frame frontier, then publishes or reuses a P6
+generation and independently reopens read-only to validate a lease before target exposure. A new
+local receipt may advance the live
+WAL frontier, while a valid receipt already at the bundle frontier is reused; `txn_frontier`
+remains unchanged. Restore prepares its complete return metadata before target rename. Focused
+restore/P6 tests pass 21/21 across five targets; HQL2 passes 393/0/1 across 37 targets. The full
+Rust suite exits 0 with `probe_vs_recall` filtered. Source-backed NodeScan plan-only EXPLAIN remains
+partial; cleanup after read-only validation/rename failure is best-effort and not fault-injected.
+Broader EXPLAIN/P8/P13 and P14 rehearsal remain open.
 
 ## CHANGELOG
 

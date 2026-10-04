@@ -21245,7 +21245,7 @@ impl Storage {
         let bundle_path = fs::canonicalize(&request.bundle_path)
             .map_err(|e| Error::from_reason(e.to_string()))?;
 
-        let result = (|| -> Result<BackupManifest> {
+        let result = (|| -> Result<BackupBundleInfo> {
             let mut input =
                 File::open(&bundle_path).map_err(|e| Error::from_reason(e.to_string()))?;
             let mut magic = vec![0u8; BACKUP_MAGIC.len()];
@@ -21347,21 +21347,63 @@ impl Storage {
             // A fresh open validates the engine's own snapshot/WAL compatibility
             // before staging becomes caller-visible. Full retention prevents its
             // shutdown checkpoint from folding the only restored journal copy.
-            drop(Storage::open(OpenOptions {
+            let staging_storage = Storage::open(OpenOptions {
                 path: staging.display().to_string(),
                 page_cache_mb: Some(16),
                 read_only: Some(false),
                 vector_dim: None,
                 retention: Some("full".into()),
-            })?);
-            Ok(manifest)
+            })?;
+            if staging_storage.stable_frontier() != manifest.stable_frontier {
+                return Err(Error::from_reason(
+                    "GENERATION_STALE: recovered WAL frontier mismatch",
+                ));
+            }
+            let generation = staging_storage.publish_generation()?;
+            if generation.wal_frontier != manifest.stable_frontier
+                && generation.publication_seq != manifest.stable_frontier
+            {
+                return Err(Error::from_reason(
+                    "GENERATION_STALE: restored WAL frontier mismatch",
+                ));
+            }
+            drop(staging_storage);
+
+            // Verify the newly published generation through a separate
+            // read-only recovery before the restore target becomes visible.
+            let read_only_validation = Storage::open(OpenOptions {
+                path: staging.display().to_string(),
+                page_cache_mb: Some(16),
+                read_only: Some(true),
+                vector_dim: None,
+                retention: Some("full".into()),
+            })?;
+            let lease = read_only_validation.pin_generation(
+                AccessContext {
+                    principal: "backup-restore-verifier".into(),
+                    namespace: "default".into(),
+                },
+                TemporalRead {
+                    as_of: None,
+                    tx_as_of: None,
+                },
+                Duration::from_secs(30),
+            )?;
+            read_only_validation.validate_lease(&lease)?;
+            drop(lease);
+            drop(read_only_validation);
+            // Prepare every fallible return value before the rename publishes
+            // the target. A bundle I/O error must not leave a visible restore.
+            Self::backup_info(&manifest, bundle_path.clone())
         })();
         match result {
-            Ok(manifest) => {
-                fs::rename(&staging, &target_root)
-                    .map_err(|e| Error::from_reason(e.to_string()))?;
-                Self::backup_info(&manifest, bundle_path)
-            }
+            Ok(bundle_info) => match fs::rename(&staging, &target_root) {
+                Ok(()) => Ok(bundle_info),
+                Err(error) => {
+                    let _ = fs::remove_dir_all(&staging);
+                    Err(Error::from_reason(error.to_string()))
+                }
+            },
             Err(error) => {
                 let _ = fs::remove_dir_all(&staging);
                 Err(error)

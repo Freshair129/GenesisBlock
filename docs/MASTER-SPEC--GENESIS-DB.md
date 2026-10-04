@@ -426,11 +426,16 @@ proof fail with `RECOVERY_REQUIRED` instead of silently downgrading. See H2-D11 
 P6 WAL-only recovery contract. Runtime implementation is fixture-verified; no
 user database was migrated, and broader P6/P8/P13 qualification remains open.
 
-H2-D11 R5 restore validation opens the extracted staging database with full retention so its
-shutdown checkpoint does not fold the only packaged journal copy or advance the history floor.
-Focused fixtures prove history/revision/source-floor parity and HQL/typed-IR HistoryScan and
-ChangeScan equality; HQL2 passes 389/0/1 across 35 targets and the full local Rust suite exits 0.
-This does not close the broader P14 rehearsal, hosted, review or P8/P13 gates.
+H2-D11 R5 restore validation opens staging with full retention, requires normal recovery to
+reproduce the bundle's final WAL-frame frontier, then publishes or reuses a P6 generation and
+independently validates a read-only lease before target exposure. A required local receipt may
+advance restored live `stable_frontier`;
+a valid receipt already at the manifest frontier is reused. `txn_frontier` is preserved, and the
+complete return metadata is prepared before target rename. Focused restore/P6 tests pass 21/21
+across five targets and HQL2 passes 393/0/1 across 37 targets. The full Rust suite exits 0 with
+`probe_vs_recall` filtered; source-backed NodeScan plan-only EXPLAIN remains partial, and
+read-only/rename failure cleanup is best-effort and unverified. This does not close P14, hosted,
+independent-review or broad P8/P13 gates.
 
 ## Changelog
 

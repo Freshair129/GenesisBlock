@@ -1,8 +1,8 @@
 ---
 doc_id: ADR--GENESISDB-HQL2-DURABLE-REVISIONS-ANNOTATIONS
-version: "0.8.18b"
+version: "0.8.21b"
 created_at: "2026-09-28T06:15:00+07:00,ATHER,53078cb"
-last_update: "2026-10-05T00:36:03+07:00,ATHER"
+last_update: "2026-10-05T04:19:54+07:00,ATHER"
 status: beta
 superseded_by: null
 owner: "Boss (Founder / Product Authority)"
@@ -452,6 +452,16 @@ snapshot/P6 manifest and all required projection/original-vector artifacts,
 then verifies counts and digests. Restore is into a new directory followed by
 normal recovery, P6 generation publication and independent validation; all
 UUIDs and database identity are preserved. A raw SQLite copy is not a backup.
+The bundle's `stable_frontier` is its declared WAL-frame frontier. Normal
+recovery must first reproduce that exact frame frontier; a truncated or
+otherwise incomplete WAL suffix is rejected before publication. Restore then
+publishes a new local P6 generation whose `wal_frontier` equals the manifest
+frontier, or reuses a valid terminal `GenerationPublished` receipt whose
+`publication_seq` equals it. Either path changes no graph, vector or relational
+data and leaves `txn_frontier` unchanged. Restore independently reopens
+staging read-only and validates the lease. It prepares the complete
+`BackupBundleInfo` before atomically renaming staging into the caller-visible
+target, so no later bundle I/O can turn a published restore into an error.
 Physical erasure across retained history, artifacts, backups and replicas is a
 separately authorized administrative workflow, not annotation retraction.
 
@@ -754,15 +764,27 @@ Minimum Verify/Review/Final evidence:
 
 | Artifact | Approved version | Synchronized version/status |
 |---|---|---|
-| This H2-D11 addendum | `0.3.0b` candidate, owner-approved | `0.8.18b` beta, R5 backup/restore preserves the packaged history floor; 59 focused passes, HQL2 389/0/1 across 35 targets and full Rust suite exit 0; no schema/migration/format change |
-| P8 typed boundary | `0.2.0b` beta | `0.2.58b` beta, recursive target/evidence ACL, ChangeScan budget filtering, Vector/Row HistoryScan and end-to-end `tx_as_of` implemented; broad P8/P13 qualification remains open |
-| P6 generations/leases/ACL | `0.5.0b` beta | `0.5.35b` beta, explicit annotation-subject grant and pre-budget exclusion verified; restore floor parity is fixture-tested; hosted worker checks unresolved |
-| HQL2 orchestration plan | `0.5.0b` beta | `0.8.63b` beta, records current HQL2/P6 gates and R5 restore-floor parity evidence |
-| C4 architecture index | `0.1.20b` | `0.1.67b`, indexes current HQL2/P6 architecture, restore-floor parity evidence and open gates |
-| DOC registry | `0.5.6+draft` | `0.5.69+draft`, synchronized current HQL2/P6/plan/report entries |
-| Master specification | — | `2.3.39b`, architecture summary synchronized to R5 restore-floor parity evidence |
-| HQL2 P8 checkpoint | — | `0.1.58b`, local regression evidence synchronized; broad P8/P13 gates remain open |
+| This H2-D11 addendum | `0.3.0b` candidate, owner-approved | `0.8.21b` beta, receipt-last and new-publication restore paths preserve `txn_frontier`; restore/P6 21/21 across five targets, HQL2 393/0/1 across 37; full Rust suite exit 0 with `probe_vs_recall` filtered; rename/read-only failure cleanup remains best-effort and unverified |
+| P8 typed boundary | `0.2.0b` beta | `0.2.61b` beta, source-backed plan-only EXPLAIN remains partial; broad EXPLAIN/P8/P13 qualification remains open |
+| P6 generations/leases/ACL | `0.5.0b` beta | `0.5.38b` beta, restore validates either frontier-consistent generation state without changing `txn_frontier`; no ACL/schema/migration change |
+| U9 backup/restore spec | `0.1.1b` approved | `0.1.6b` beta, specifies receipt-last restore and pre-rename result preparation |
+| HQL2 orchestration plan | `0.5.0b` beta | `0.8.66b` beta, records 21/21 restore/P6, HQL2 393/0/1 and full Rust suite exit 0; broader phase gates remain open |
+| C4 architecture index | `0.1.20b` | `0.1.70b`, indexes current HQL2/P6 restore result and open gates |
+| DOC registry | `0.5.6+draft` | `0.5.72+draft`, synchronized current HQL2/P6/plan/report entries |
+| Master specification | — | `2.3.42b`, architecture summary synchronized to R5 restore evidence |
+| HQL2 P8 checkpoint | — | `0.1.61b`, records current restore regression and EXPLAIN evidence; broad P8/P13 gates remain open |
 | Engine/storage | `0.2.9` | remains unchanged until implementation and release gates; no user database is migrated here |
+
+Version diff `0.8.19b -> 0.8.20b`: accept a valid terminal
+`GenerationPublished` frame as the manifest WAL frontier, preserve the
+transaction frontier, and finish fallible bundle-info work before target
+publication. Extend the restore regression and synchronize current evidence.
+
+Version diff `0.8.18b -> 0.8.19b`: implement the approved R5 restore order in
+staging: normal recovery, generation publication at the manifest `wal_frontier`,
+then independent read-only lease validation before target rename. Clarify that
+the local P6 publication frame may advance restored live `stable_frontier`
+without changing the bundle's declared data frontier.
 
 Version diff `0.8.17b -> 0.8.18b`: fix the restore-validation checkpoint to
 use full retention, so opening/dropping the temporary staging database cannot
@@ -832,6 +854,9 @@ NOT_RUN and broader acceptance/release gates remain open.
 
 | Version | Date | Status | Summary | Commit Hash | Agent |
 |---|---|---|---|---|---|
+| 0.8.21b | 2026-10-05 | beta | Record final R5 restore verification: restore/P6 21/21 across five targets, HQL2 393/0/1 across 37, full Rust suite exit 0 with `probe_vs_recall` filtered; note best-effort cleanup failure-path test gap; no schema/migration/format change; broad HQL2 gates remain open | working-tree | ATHER |
+| 0.8.20b | 2026-10-05 | beta | Accept a valid terminal P6 generation receipt, preserve transaction frontier, and prepare restore result before target rename; restore/P6 20/20 across five targets, HQL2 392/0/1 across 37; full Rust suite NOT_RUN; no schema/migration/format change; broad HQL2 gates remain open | working-tree | ATHER |
+| 0.8.19b | 2026-10-05 | beta | Implement approved R5 restore order: publish the P6 generation at the manifest WAL frontier and independently pin/validate read-only before target rename; 15 focused passes across four targets, HQL2 391/0/1 across 37 targets; full Rust suite NOT_RUN on this patch; no schema/migration/format change | working-tree | ATHER |
 | 0.8.18b | 2026-10-05 | beta | Preserve packaged P6/H2-D11 history floor during writable restore validation by using full retention; 59 focused passes, HQL2 389/0/1 across 35 targets and full Rust suite exit 0; no schema/migration/format change; P14 rehearsal, hosted CI, independent review and broad P8/P13 remain open | working-tree | ATHER |
 | 0.8.17b | 2026-10-03 | beta | Implement and verify narrow ChangeScan budget policy: preserve namespace-only reads for other readable kinds; exclude Annotation subjects lacking Annotation(Read) before caller-budget accounting; ACL 11/11, History/Change 14/14, HQL2 376/0/1 and selected P6/schema-v6 43/0/0; hosted CI/review and broad P8/P13 remain open; no schema/migration change | working-tree | ATHER |
 | 0.8.16b | 2026-10-03 | beta | Record approved H2-D11 R4/P6 ACL conformance: require Annotation(Read) for annotation scan and ChangeScan subjects separately from Namespace(Read), retain recursive reference access; regression and HQL2 375/0/1 plus selected P6 43/0/0 pass; possible ChangeScan budget side channel and hosted/review/P8/P13 gates remain open | working-tree | ATHER |
