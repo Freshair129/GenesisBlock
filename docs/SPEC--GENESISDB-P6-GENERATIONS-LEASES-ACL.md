@@ -1,9 +1,9 @@
 ---
 doc_id: SPEC--GENESISDB-P6-GENERATIONS-LEASES-ACL
 owner: GenesisBlockDB Engineering
-version: 0.5.34b
+version: 0.5.35b
 created_at: "2026-09-22T22:55:00+07:00,ATHER,working-tree"
-last_update: "2026-10-04T20:48:54+07:00,ATHER"
+last_update: "2026-10-05T00:36:03+07:00,ATHER"
 status: beta
 attributes:
   domain: storage-correctness
@@ -405,6 +405,16 @@ remain open.
 
 ## CHANGELOG
 
+Version diff 0.5.34b -> 0.5.35b: record H2-D11 R5 backup/restore history-floor
+parity. Restore staging validation now opens with full retention so its close
+checkpoint does not fold the packaged journal; the fixture preserves
+history_horizon, source floors and revision identity and matches HQL/IR
+HistoryScan/ChangeScan results. The focused suite passes 59/59 across seven
+targets; explicit HQL2 regression passes 389/0/1 across 35 targets and the full
+locked/offline Rust suite exits 0. No P6 contract, ACL, schema or migration
+behavior changed; the broader P14 rehearsal, hosted worker and independent-
+review gates remain open.
+
 Version diff 0.5.33b -> 0.5.34b: synchronize D7's differential-proven bounded
 single-hop HQL1 `TRAVERSE` lowering through the existing P6 lease; adapter
 13/13 and HQL2 387/0/1 across 34 targets. P6/schema-v6/compatibility remains
@@ -536,6 +546,7 @@ broader P6/P8/P13 qualification is claimed.
 
 | Version | Date | Status | Summary | Commit | Agent |
 |---|---|---|---|---|---|
+| 0.5.35b | 2026-10-05 | beta | Record H2-D11 R5 restore-floor parity; 59 focused passes across seven targets, HQL2 389/0/1 across 35 targets and full Rust suite exit 0; no P6 contract/ACL/schema/migration change; broader P14 rehearsal, hosted worker and independent-review gates remain open | working-tree | ATHER |
 | 0.5.34b | 2026-10-04 | beta | Record D7's differential-proven single-hop HQL1 TRAVERSE ID projection for one relation or ANY in default/out/in/both directions; adapter 13/13, HQL2 387/0/1 across 34 targets, P6/schema-v6/compatibility 194/0/0; no P6 contract/ACL/schema/migration change; broad gates remain open | working-tree | ATHER |
 | 0.5.33b | 2026-10-04 | beta | Record D7's differential-proven unlabeled zero-hop single-property projection; property target 2/2, adapter 12/12, HQL2 386/0/1 across 34 targets, P6/schema-v6/compatibility 194/0/0; no P6 contract/ACL/schema/migration change; broad gates remain open | working-tree | ATHER |
 | 0.5.32b | 2026-10-04 | beta | Record D7's differential-proven zero-hop exact string-ID predicate with or without one label; adapter 12/12, HQL2 384/0/1, P6/schema-v6/compatibility 194/0/0; no P6 contract/ACL/schema/migration change; broad gates remain open | working-tree | ATHER |

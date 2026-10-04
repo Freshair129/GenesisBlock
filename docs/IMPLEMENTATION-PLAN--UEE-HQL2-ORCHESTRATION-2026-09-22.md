@@ -1,9 +1,9 @@
 ---
-version: "0.8.62b"
+version: "0.8.63b"
 doc_id: "IMPLEMENTATION-PLAN--UEE-HQL2-ORCHESTRATION-2026-09-22"
 owner: "Boss (Founder / Product Authority)"
 created_at: "2026-09-22T00:00:00+07:00,ATHER,working-tree"
-last_update: "2026-10-04T20:48:54+07:00,ATHER"
+last_update: "2026-10-05T00:36:03+07:00,ATHER"
 status: beta
 superseded_by: null
 attributes:
@@ -911,6 +911,15 @@ results remain regression evidence, not P8 acceptance.
 
 ## CHANGELOG
 
+Version diff `0.8.62b -> 0.8.63b`: record the approved H2-D11 R5
+backup/restore floor-parity implementation. Restore staging validation uses
+full retention to prevent its shutdown checkpoint from folding the packaged
+journal; focused parity tests pass 59/59 across seven targets, the explicit
+HQL2 sweep passes 389/0/1 across 35 targets, and the full locked/offline Rust
+suite exits 0. No bundle format, schema or migration change, and no user
+database was migrated. This does not close the broader P14 rehearsal,
+independent-review, hosted, P8 or P13 gates.
+
 Version diff `0.8.61b -> 0.8.62b`: extend D7 after legacy/HQL2 bag
 differential with a single-hop HQL1 `TRAVERSE` ID projection for one physical
 relation or `ANY` in default/out/in/both directions. Require exact seed, depth
@@ -1033,6 +1042,7 @@ Version diff `0.8.27b -> 0.8.28b`: implement approved D1-D5, record 9 focused pa
 
 | Version | Date | Status | Summary | Commit Hash | Agent |
 |---|---|---|---|---|---|
+| 0.8.63b | 2026-10-05 | beta | Record H2-D11 R5 restore-floor parity; focused 59/59, HQL2 389/0/1 across 35 targets, full Rust suite exit 0; no format/schema/migration change or user DB migration; retain broad P14, independent-review, hosted, P8/P13 gates | working-tree | ATHER |
 | 0.8.62b | 2026-10-04 | beta | Extend D7 after differential with single-hop HQL1 TRAVERSE ID projection for one relation or ANY in default/out/in/both directions; adapter 13/13, HQL2 387/0/1 across 34 targets, P6/compatibility 194/0/0; other forms fail closed; retain shared-runtime, review and P8/P13 gates | working-tree | ATHER |
 | 0.8.61b | 2026-10-04 | beta | Extend D7 after differential with one zero-hop unlabeled HQL1 property projection; property target 2/2 plus adapter 12/12, HQL2 386/0/1 across 34 targets and P6/compatibility 194/0/0; other shapes fail closed, retain other legacy/shared-runtime, review and P8/P13 gates | working-tree | ATHER |
 | 0.8.60b | 2026-10-04 | beta | Extend D7 after legacy/HQL2 differential with exact string ID equality on zero-hop HQL1 scans with or without one label; adapter 12/12, HQL2 384/0/1 across 33 targets, P6/compatibility 194/0/0; retain other predicates/forms fail-closed, other legacy/shared-runtime, review and P8/P13 gates | working-tree | ATHER |

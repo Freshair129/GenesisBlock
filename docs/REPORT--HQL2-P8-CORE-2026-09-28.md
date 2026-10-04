@@ -1,8 +1,8 @@
 ---
 doc_id: REPORT--HQL2-P8-CORE-2026-09-28
-version: "0.1.57b"
+version: "0.1.58b"
 created_at: "2026-09-28T04:35:00+07:00,ATHER,22bc11e"
-last_update: "2026-10-04T20:48:54+07:00,ATHER"
+last_update: "2026-10-05T00:36:03+07:00,ATHER"
 status: beta
 owner: GenesisBlockDB Engineering
 attributes:
@@ -162,10 +162,12 @@ probe target not selected.
 | Approved H2-D11 Vector HistoryScan extension | Implemented; local differential passed | HQL and typed IR read exact revisions using compact JSON `(owner_id, collection_id)` identity under the P6 lease and owner-node ACL; the vector source floor fails closed before access. Its result bags match independent P7 from WAL-derived revision facts and the captured frontier. The expanded five-kind HistoryScan differential passes; HistoryScan/ChangeScan passes 16/16, P7 graph target 39/39 and combined P7 130/130. |
 | HQL/typed-IR Row HistoryScan and ChangeScan parity | 1 passed, 0 failed | Retained insert/update revisions hydrate exact row properties; HQL and typed IR agree on history values, change operations and durable Row identity. Test-only regression coverage; no schema migration. |
 | HQL2/IR transaction-time snapshot (`tx_as_of`) | Implemented; local verification passed | One selected frontier S controls revision-backed scans, graph/vector/annotation operators, source-floor checks, property hydration and `Snapshot.tx`; the validated P6 generation/catalog/current policy remain pinned and no path falls back to current state. Five focused targets pass 56/56. |
-| Latest explicit root-HQL2 target sweep | 387 passed, 0 failed, 1 ignored across 34 root targets | All 34 HQL2 integration targets ran serially with `--locked --offline --no-default-features --jobs 1`; includes D7 ID, property and TRAVERSE differentials, hidden-Annotation ChangeScan threshold regression, five-kind HistoryScan/ChangeScan P7 differentials and nullable `Values`/`UnionAll` differential; the ignored parser child is exercised by its parent. Regression evidence, not P8 acceptance. |
+| Latest explicit root-HQL2 target sweep | 389 passed, 0 failed, 1 ignored across 35 root targets | All root `hql2_*_tests.rs` targets ran serially with `--locked --offline --no-default-features --jobs 1`; includes the H2-D11 R5 backup/restore parity regression. The ignored parser child is exercised by its parent; `zz_probe_discriminates` is excluded. Regression evidence, not P8 acceptance. |
+| Focused H2-D11 R5 backup/restore regression | 59 passed across seven targets | Preserves stable frontier, history horizon, revision/row IDs, schema, annotation selectors, source floors and HQL/typed-IR HistoryScan/ChangeScan parity. |
+| Full Windows native Rust suite | `cargo test --locked --offline --no-default-features --jobs 1 --target-dir D:/CodexBuilds/GenesisBlock-HQL2-2026-10-02/preserved-target-hql2-execution`: exit 0; zero failures; three soak cases ignored | Includes the 60-build temporary `probe_vs_recall` experiment (1271.40s); informational only, not performance/P1 acceptance. |
 | Current selected P6/schema-v6 regression set | 43 passed, 0 failed, 0 ignored across six named targets | `wave_a_commit_tests`, `temporal_queries_tests`, `tx_as_of_wp22_tests`, `governance_tests`, `p6_peer_authority_tests`, `schema6_migration_tests`; focused current rerun, not the broader 11-target group. |
 | Separate P6/schema-v6/compatibility sweep | 194 passed, 0 failed, 0 ignored across 11 named targets | `p6_generation_tests`, `p6_lease_tests`, `p6_visibility_tests`, `p6_peer_authority_tests`, `schema6_migration_tests`, `query_ir_tests`, `hql_p0_tests`, `hql_filter_tests`, `hql_cypher_tests`, `napi_rest_parity_tests`, `rest_api_tests`; rerun in this continuation. |
-| Prior explicit HQL2/P6/schema-v6/compatibility sweep | 528 passed, 0 failed, 1 ignored across 37 named targets | Pre-edge-regression checkpoint; protected probe excluded. Superseded for current HQL2 root-target count by 387/0/1; not full P8/P13 acceptance. |
+| Prior explicit HQL2/P6/schema-v6/compatibility sweep | 528 passed, 0 failed, 1 ignored across 37 named targets | Pre-edge-regression checkpoint; protected probe excluded. Superseded for current HQL2 root-target count by 389/0/1; not full P8/P13 acceptance. |
 | Native library check | `cargo check --locked --offline --no-default-features --jobs 1 --target-dir target/hql2-execution` passed | Local core compile only; no NAPI addon runtime, release or cross-platform claim. |
 | Documentation and source hygiene | docs validation: 0 violations/239 files; agent registry: 6 agents/12 routes; rustfmt check and `git diff --check` passed | Local structural checks only. |
 | HQL/IR Node/Edge/Row source differential | 1 passed, 0 failed | Node/Edge properties and Row `prop(r, "id")` match across HQL and IR; `r.id` remains the UUIDv4 durable revision. Row properties resolve from H2-D11 `after_image`; see local RCA `.brain/rca/RCA--HQL2-ROW-SOURCE-PROPERTY-HYDRATION.md`. |
@@ -474,15 +476,27 @@ from these local tests.
 
 | Artifact | Before | After |
 |---|---|---|
-| Registry | 0.5.67+draft | 0.5.68+draft |
+| Registry | 0.5.68+draft | 0.5.69+draft |
 | P8 completion addendum | 0.1.10b | 0.1.11b |
-| P6 generations/leases/ACL | 0.5.33b | 0.5.34b |
+| P6 generations/leases/ACL | 0.5.34b | 0.5.35b |
 | P8 typed boundary | 0.2.57b | 0.2.58b |
 | P7 oracle report | 0.1.5b | 0.1.6b |
-| Orchestration plan | 0.8.61b | 0.8.62b |
-| C4 architecture index | 0.1.65b | 0.1.66b |
-| Master specification | 2.3.37b | 2.3.38b |
-| This report | 0.1.56b | 0.1.57b |
+| Orchestration plan | 0.8.62b | 0.8.63b |
+| C4 architecture index | 0.1.66b | 0.1.67b |
+| Master specification | 2.3.38b | 2.3.39b |
+| This report | 0.1.57b | 0.1.58b |
+
+Version diff 0.1.57b -> 0.1.58b: record the H2-D11 R5 backup/restore
+history-floor regression. The staging validation open uses full retention;
+the focused restore, revision, History/Change, row-history and annotation
+targets pass 59/59 across seven test binaries; the explicit all-HQL2 sweep
+passes 389/0/1 across 35 targets and the full locked/offline Windows Rust suite
+exits 0. The regression preserves history_horizon, source floors, durable
+revision/row IDs, schema and annotation selectors and matches HQL/typed-IR
+HistoryScan and ChangeScan. Three soak cases remain ignored. The full suite
+also ran the 60-build `zz_probe_discriminates::probe_vs_recall` experiment
+(1271.40s); informational only, not P1/performance acceptance. This does not
+claim broad P14 rehearsal, independent review, hosted CI or P8/P13 acceptance.
 
 Version diff 0.1.56b -> 0.1.57b: extend the approved D7 differential
 allowlist with exact-seed depth-one HQL1 `TRAVERSE` ID projection over one
@@ -657,6 +671,7 @@ P8 and release gates.
 
 | Version | Date | Status | Summary | Commit Hash | Agent |
 |---|---|---|---|---|---|
+| 0.1.58b | 2026-10-05 | beta | Record H2-D11 R5 restore-floor parity; focused 59/59, HQL2 389/0/1 across 35 targets, full Rust suite exit 0; no format/schema/migration change; broad P14, independent review, hosted CI and P8/P13 gates remain open | working-tree | ATHER |
 | 0.1.57b | 2026-10-04 | beta | Extend D7 with differential-proven exact-seed single-hop HQL1 TRAVERSE ID projection over one relation or ANY in default/out/in/both directions; adapter 13/13, HQL2 387/0/1 across 34 targets, P6/schema-v6/compatibility 194/0/0; preserve self-loop exclusion and parallel-edge deduplication; broad shared-runtime/P8/P13/review gates remain open | working-tree | ATHER |
 | 0.1.56b | 2026-10-04 | beta | Extend D7 with differential-proven unlabeled zero-hop single-property projection; property target 2/2 plus adapter 12/12, HQL2 386/0/1 across 34 targets, P6/schema-v6/compatibility 194/0/0; other property forms remain fail-closed; broad shared-runtime/P8/P13/review gates remain open | working-tree | ATHER |
 | 0.1.55b | 2026-10-04 | beta | Extend D7 with differential-proven exact string ID equality on zero-hop scans with or without one label; adapter 12/12, HQL2 384/0/1 across 33 targets, P6/schema-v6/compatibility 194/0/0; other predicates/forms remain fail-closed; broad P8/P13/review gates remain open | working-tree | ATHER |

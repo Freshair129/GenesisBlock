@@ -2,8 +2,8 @@
 title: "GenesisBlockDB Technical Architecture and Capability Composition"
 doc_id: "MASTER-SPEC-GENESISBLOCKDB"
 status: current
-version: "2.3.38b"
-updated: "2026-10-04"
+version: "2.3.39b"
+updated: "2026-10-05"
 owner: "GenesisBlockDB Architecture"
 source_of_truth: true
 related_issue: 84
@@ -414,7 +414,20 @@ proof fail with `RECOVERY_REQUIRED` instead of silently downgrading. See H2-D11 
 P6 WAL-only recovery contract. Runtime implementation is fixture-verified; no
 user database was migrated, and broader P6/P8/P13 qualification remains open.
 
+H2-D11 R5 restore validation opens the extracted staging database with full retention so its
+shutdown checkpoint does not fold the only packaged journal copy or advance the history floor.
+Focused fixtures prove history/revision/source-floor parity and HQL/typed-IR HistoryScan and
+ChangeScan equality; HQL2 passes 389/0/1 across 35 targets and the full local Rust suite exits 0.
+This does not close the broader P14 rehearsal, hosted, review or P8/P13 gates.
+
 ## Changelog
+
+Version diff 2.3.38b -> 2.3.39b: synchronize the H2-D11 R5 backup/restore
+history-floor correction. Restore staging validation uses full retention; the
+focused parity tests pass 59/59 across seven targets, HQL2 passes 389/0/1 across
+35 targets, and the full local Rust suite exits 0. No format/schema/migration
+change or user-database migration; broad P14, hosted, independent-review and
+P8/P13 qualification remain open.
 
 Version diff 2.3.37b -> 2.3.38b: extend the approved D7 differential
 allowlist with exact-seed depth-one HQL1 `TRAVERSE` ID projection over one
@@ -426,6 +439,7 @@ shared-runtime and broad P8/P13 gates remain open.
 
 | Version | Date | Owner | Summary |
 |---|---|---|---|
+| 2.3.39b | 2026-10-05 | GenesisBlockDB Architecture | Synchronize H2-D11 R5 restore-floor parity, 59 focused passes, HQL2 389/0/1 across 35 targets and full Rust suite exit 0; no format/schema/migration change or user DB migration; retain broad P14, hosted, independent-review and P8/P13 gates |
 | 2.3.38b | 2026-10-04 | GenesisBlockDB Architecture | Extend D7 with differential-proven exact-seed single-hop HQL1 TRAVERSE ID projection over one physical relation or ANY in default/out/in/both directions; adapter 13/13, HQL2 387/0/1 across 34 targets, P6/schema-v6/compatibility 194/0/0; preserve self-loop exclusion and parallel-edge deduplication; broad shared-runtime/review/P8/P13 gates remain open |
 | 2.3.37b | 2026-10-04 | GenesisBlockDB Architecture | Extend D7 after differential with an unlabeled zero-hop HQL1 property projection; property target 2/2 plus adapter 12/12, HQL2 386/0/1 across 34 targets and P6/compatibility 194/0/0; other property shapes fail-closed; shared-runtime, review and P8/P13 gates remain open |
 | 2.3.36b | 2026-10-04 | GenesisBlockDB Architecture | Extend D7 after legacy/HQL2 differential for exact string ID equality on zero-hop HQL1 scans with or without one label (match/miss/label-mismatch/Unicode); adapter 12/12, HQL2 384/0/1 across 33 targets, P6/compatibility 194/0/0; other predicates and forms remain fail-closed; shared-runtime, review and P8/P13 gates remain open |

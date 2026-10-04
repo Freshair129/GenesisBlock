@@ -2,10 +2,10 @@
 doc_id: C4--GENESISDB-ARCHITECTURE
 type: architecture-index
 status: current
-version: 0.1.66b
+version: 0.1.67b
 owner: GenesisBlockDB Architecture
 created_at: 2026-06-13T22:50:11+07:00,ATHER,9b1ced3
-last_update: "2026-10-04T20:48:54+07:00,ATHER"
+last_update: "2026-10-05T00:36:03+07:00,ATHER"
 attributes:
   domain: architecture
   scope: repository
@@ -462,7 +462,19 @@ For schema-v6 WAL-only cold recovery, preflight signed journal authority before 
 `Schema6ActivationV1` selects v6 only when identity and any linked migration/receipt proof validate;
 v6-only WAL without activation fails closed. See H2-D11 ADR R6b and the P6 recovery contract.
 
+H2-D11 R5 backup restoration validates extracted staging with full retention so the validation
+close checkpoint cannot fold the packaged journal or advance its history floor. Fixture-backed
+parity covers revision/row IDs, schema, annotation selectors, source floors and HQL/typed-IR
+HistoryScan/ChangeScan; focused targets pass 59/59, HQL2 passes 389/0/1 across 35 targets, and
+the full local Rust suite exits 0. This is not completion of the broader P14 rehearsal or P8/P13 gates.
+
 ## CHANGELOG
+
+Version diff 0.1.66b -> 0.1.67b: record H2-D11 R5 restore-floor parity.
+Staging validation uses full retention to prevent close-time journal folding;
+59 focused tests pass across seven targets, HQL2 passes 389/0/1 across 35
+targets, and the full local Rust suite exits 0. No backup format, schema or
+migration change; P14 rehearsal, independent review and broad P8/P13 gates remain open.
 
 Version diff 0.1.65b -> 0.1.66b: extend D7 with differential-proven
 exact-seed depth-one HQL1 `TRAVERSE` ID projection over one physical relation
@@ -569,6 +581,7 @@ full P8/P13 qualification remains open.
 
 | Version | Date | Status | Summary | Commit Hash | Agent |
 |---------|------|--------|---------|-------------|-------|
+| 0.1.67b | 2026-10-05 | current | Record H2-D11 R5 restore-floor parity; 59 focused passes, HQL2 389/0/1 across 35 targets, full Rust suite exit 0; no format/schema/migration change; P14 rehearsal, independent review and broad P8/P13 remain open | working-tree | ATHER |
 | 0.1.66b | 2026-10-04 | current | Extend D7 with differential-proven exact-seed single-hop HQL1 TRAVERSE ID projection for one physical relation or ANY in default/out/in/both directions; adapter 13/13, HQL2 387/0/1 across 34 targets, P6/schema-v6/compatibility 194/0/0; preserve self-loop exclusion and parallel-edge deduplication; broad shared-runtime/review/P8/P13 gates remain open | working-tree | ATHER |
 | 0.1.65b | 2026-10-04 | current | Extend D7 after differential with one unlabeled zero-hop HQL1 property projection; property target 2/2 plus adapter 12/12, HQL2 386/0/1 across 34 targets and P6/compatibility 194/0/0; retain fail-closed boundaries and broad shared-runtime/review/P8/P13 gates | working-tree | ATHER |
 | 0.1.64b | 2026-10-04 | current | Record D7's differential-proven exact string ID equality on zero-hop HQL1 scans with or without one label; adapter 12/12, HQL2 384/0/1 across 33 targets and P6/compatibility 194/0/0; other unproven forms remain unsupported; broad gates remain open | working-tree | ATHER |
