@@ -24,6 +24,8 @@
 //!      or silently dropped.
 
 use genesis_block_native::{HybridSearchInput, NodeInput, NodeMetadata, OpenOptions, Storage};
+use serde_json::json;
+use sha2::{Digest, Sha256};
 use std::fs;
 use std::path::Path;
 use tempfile::TempDir;
@@ -76,6 +78,33 @@ fn top1(s: &Storage, q: Vec<f64>) -> Option<String> {
 
 fn meta_path(dir: &str) -> std::path::PathBuf {
     Path::new(dir).join("meta_default.bin")
+}
+
+fn refresh_p6_manifest(path: &str, replacement: &[u8]) {
+    let state_path = Path::new(path).join("state.json");
+    let mut state: serde_json::Value =
+        serde_json::from_slice(&fs::read(&state_path).unwrap()).unwrap();
+    let mut canonical_components = {
+        let components = state["p6"]["manifest"]["components"]
+            .as_array_mut()
+            .unwrap();
+        let component = components
+            .iter_mut()
+            .find(|component| component["path"] == "meta_default.bin")
+            .unwrap();
+        component["bytes"] = json!(replacement.len());
+        component["sha256"] = json!(hex::encode(Sha256::digest(replacement)));
+        components.clone()
+    };
+    canonical_components.sort_by(|left, right| left["path"].as_str().cmp(&right["path"].as_str()));
+    let canonical = serde_json::to_vec(&json!({
+        "version": state["p6"]["manifest"]["version"],
+        "snapshot_frontier": state["p6"]["manifest"]["snapshot_frontier"],
+        "components": canonical_components,
+    }))
+    .unwrap();
+    state["p6"]["manifest"]["manifest_sha256"] = json!(hex::encode(Sha256::digest(canonical)));
+    fs::write(&state_path, state.to_string()).unwrap();
 }
 
 /// (1) A snapshot saved by the current engine writes `meta_default.bin` in
@@ -185,6 +214,7 @@ fn legacy_bincode_blob_loads_and_rewrites_as_postcard() {
         "sanity: a real bincode blob must not accidentally start with GBP1"
     );
     fs::write(meta_path(&path), &legacy_bytes).unwrap();
+    refresh_p6_manifest(&path, &legacy_bytes);
 
     // Reopen: must load fine via the (unchanged) legacy bincode arm.
     let s2 = open(&path);
@@ -236,6 +266,7 @@ fn corrupted_magic_fails_loudly_not_silently() {
     let mut corrupt = META_MAGIC.to_vec();
     corrupt.extend(std::iter::repeat_n(0xFFu8, 32));
     fs::write(meta_path(&path), &corrupt).unwrap();
+    refresh_p6_manifest(&path, &corrupt);
 
     let _ = Storage::open(OpenOptions {
         path,

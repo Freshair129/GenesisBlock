@@ -31,11 +31,11 @@ test('schemaVersionSync matches modules.json engine.schemaVersion', () => {
   // silently skip unknown event kinds, so downgrade fails closed instead of
   // silently resurrecting deletions; ADR--GENESISDB-JOURNAL-HISTORY §4).
   // TypeScript-side consumers (packages/gks schema-version.ts) track the same
-  // major byte (PROTOCOL--GENESIS-GRAPH-FFI §6). Wave B v4 journals immutable
-  // collection definitions and materialized quantizer state.
+  // major byte (PROTOCOL--GENESIS-GRAPH-FFI §6). P6 v5 journals carry the
+  // generation, lease and access-policy compatibility boundary.
   const manifest = JSON.parse(
     readFileSync(fileURLToPath(new URL('../modules.json', import.meta.url)), 'utf8'),
   )
   assert.equal(schemaVersionSync(), manifest.engine.schemaVersion)
-  assert.equal(schemaVersionSync(), 4)
+  assert.equal(schemaVersionSync(), 5)
 })

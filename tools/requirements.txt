@@ -1,0 +1,1 @@
+# G3 reference oracle intentionally uses only Python's standard library.

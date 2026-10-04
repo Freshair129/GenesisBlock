@@ -1,7 +1,7 @@
 ---
-version: "0.2.1b"
+version: "0.2.2b"
 created_at: "2026-09-22T00:00:00+07:00,ATHER,working-tree"
-last_update: "2026-09-23T08:09:18+07:00,ATHER"
+last_update: "2026-10-04T00:00:00+07:00,Codex"
 status: candidate
 superseded_by: null
 attributes:
@@ -464,10 +464,49 @@ explicit owner acceptance of the final P6 result. Do not start P7 or merge.
   ACCESS_POLICY_REVISION_CONFLICT, SNAPSHOT_MANIFEST_INVALID and
   SNAPSHOT_COMPONENT_INVALID.
 
+## 10. P7/G3 execution evidence — 2026-10-04
+
+The bounded G3 slice is implemented in the working tree without enabling G4+
+(HQL2/planner/EXPLAIN) or changing public transport surfaces. The deliverables
+are the pure standard-library oracle in `tools/reference_oracle.py`, the
+versioned fixture `tests/fixtures/g3_oracle_cases.json`, the Python golden test
+`tests/test_reference_g3.py`, the public-Storage Rust differential/reopen test
+`tests/g3_oracle_differential_tests.rs`, and the empty reproducibility manifest
+`tools/requirements.txt`.
+
+The fixture covers bitemporal valid-window and transaction-marker semantics,
+relational left-join NULL projection, bag multiplicity, deterministic ordering,
+snapshot/projection removal, and WAL reopen recovery. The existing crash,
+frontier, projection, relational, temporal, lease, ACL, REST and NAPI suites
+remain separate regression gates.
+
+Local evidence recorded for this slice:
+
+- Python reference gate: 1/1 passed with both the direct standard-library
+  runner and the prescribed `uv run --with-requirements` runner.
+- G3 Rust differential/reopen gate: 2/2 passed.
+- Existing targeted G1/G2/crash matrix: 62/62 passed before the G3 additions.
+- Full `cargo test --no-default-features` completed with exit code 0; the
+  60-build `probe_vs_recall` target passed 1/1 and the crate doc-test target
+  passed 0/0 with no failures.
+- `cargo fmt --check`, `cargo check --no-default-features`, `npm run
+  docs:validate`, `npm run agents:validate`, and `git diff --check` are local
+  gates; hosted CI, power-loss hardware, mobile/device, release packaging,
+  deployment and production acceptance remain NOT_RUN.
+
+The schema-manifest correction from v4 to v5 is synchronized in
+`modules.json` and the affected NAPI tests. Three pre-P6/legacy test fixtures
+that intentionally rewrite or remove snapshot metadata were made internally
+consistent with the P6 integrity boundary; the RCA is recorded at
+`.brain/rca/RCA--EPOCH-E2-LEGACY-METADATA-FIXTURE-P6-MANIFEST-2026-10-04.md`.
+G4+ remains deferred until the G3 evidence and owner review boundary are
+accepted.
+
 ## CHANGELOG
 
 | Version | Date | Status | Summary | Commit Hash | Agent |
 |---|---|---|---|---|---|
+| 0.2.2b | 2026-10-04 | candidate | Added bounded G3 exact-oracle, differential/reopen and legacy-fixture evidence; G4+ remains deferred and external gates remain NOT_RUN | working-tree | Codex |
 | 0.2.1b | 2026-09-23 | candidate | Recorded P6 revision-0 fail-closed correction, 45/45 Verify, gpt-5.6-luna Max Review, local audit evidence and remaining peer-authority owner decision | working-tree | ATHER |
 | 0.2.0b | 2026-09-23 | candidate | Returned P6 to source after Luna Review; clarified signed snapshot authority, pre-parse ACL and legacy JSONL coverage gates | working-tree | ATHER |
 | 0.1.0b | 2026-09-22 | candidate | Initial staged UEE-HQL2 dependency DAG, conflict domains, merge order and gate workflow | working-tree | ATHER |
