@@ -2,10 +2,10 @@
 doc_id: C4--GENESISDB-ARCHITECTURE
 type: architecture-index
 status: current
-version: 0.1.66b
+version: 0.1.67b
 owner: GenesisBlockDB Architecture
 created_at: 2026-06-13T22:50:11+07:00,ATHER,9b1ced3
-last_update: "2026-10-04T10:38:40+07:00,ATHER"
+last_update: "2026-10-04T12:13:57+07:00,ATHER"
 attributes:
   domain: architecture
   scope: repository
@@ -82,7 +82,7 @@ across HQL/IR source scans, graph/vector/annotation operators, hydration and
 `Snapshot.tx`. HQL2/IR `tx_as_of` fails closed below history/source floors and
 never falls back to current rows; the validated P6 generation and current
 policy remain pinned. Five focused targets pass 56/56; the 34-target HQL2
-regression sweep passes 393/0/1 and the earlier separate 11-target P6/schema-v6/
+regression sweep passes 391/0/1 and the earlier separate 11-target P6/schema-v6/
 compatibility sweep passes 194/0/0. These are local regression results, not
 broad P8/P13, transport, hosted CI or independent-review acceptance.
 Storage-backed HQL/typed-IR HistoryScan bags for Node, Edge, Row, Vector and
@@ -119,7 +119,7 @@ HQL and typed-IR Join differentials match independent P7 for Inner/Left/Semi/Ant
 with duplicate, missing-property NULL and JSON-null keys (5/7/3/2 output rows).
 HQL `JOIN TABLE` lowers to the existing RowScan/Join contract; bare JOIN
 defaults to Inner and Semi/Anti do not export the right scope. The explicit
-root-HQL2 sweep passes 393/0/1 across 34 targets. A test-only optional
+root-HQL2 sweep passes 391/0/1 across all 34 root targets. A test-only optional
 Sequence edge-property-miss differential matches independent P7, preserving
 four input rows and NULL-extending endpoint/edge aliases. The nested-JSON
 Sequence property differential also matches exact node/edge objects and arrays
@@ -130,6 +130,9 @@ pairs (338 Storage executions), retaining NULL and duplicate multiplicity.
 A second scalar-pipeline differential adds six fixtures and 12 Storage
 executions for HQL/typed-IR projection, arithmetic, filtering, distinct,
 ordering, offset and take; both frontends match independent P7 and each other.
+The storage-backed HQL/typed-IR Node/Edge/Row source-scan bags also match
+independent P7, excluding wrong labels/relations and retaining two row keys;
+the focused storage-source target passes 10/10.
 These remain test-only results, not broad P8 acceptance.
 A separate earlier 11-target P6/schema-v6/compatibility
 group passes 194/0/0. The legacy parser preflight correction is recorded in the
@@ -466,6 +469,12 @@ v6-only WAL without activation fails closed. See H2-D11 ADR R6b and the P6 recov
 
 ## CHANGELOG
 
+Version diff 0.1.66b -> 0.1.67b: record the test-only HQL/typed-IR
+Node/Edge/Row source-scan P7 differential (focused target 10/10) and the fresh
+391/0/1 result across 34 explicit root HQL2 targets. The earlier 393 count was
+not reproduced. No runtime, contract, schema, P6 or transport change; broad
+P8/P13 and independent-review gates remain open.
+
 Version diff 0.1.65b -> 0.1.66b: extend the approved D7 actor-scoped HQL1
 allowlist after a legacy/HQL2 match/no-match differential for one exact
 same-alias string ID predicate on unlabeled zero-hop scans. Adapter tests pass
@@ -570,7 +579,8 @@ full P8/P13 qualification remains open.
 
 | Version | Date | Status | Summary | Commit Hash | Agent |
 |---------|------|--------|---------|-------------|-------|
-| 0.1.66b | 2026-10-04 | current | Extend D7 with differential-proven same-alias exact string ID equality on unlabeled zero-hop HQL1 scans; adapter 11/11, ordering 2/2, HQL2 393/0/1 across 34 targets; other forms remain fail-closed; no P6 grant/lease/schema/migration or transport change; independent review and broad P8/P13 gates remain open | working-tree | ATHER |
+| 0.1.67b | 2026-10-04 | current | Add test-only HQL/typed-IR Node/Edge/Row source-scan P7 differential; storage-source target 10/10; fresh 34-target HQL2 run 391/0/1 (prior 393 count not reproduced); no runtime/contract/schema/P6/transport change; broad P8/P13 and independent review remain open | working-tree | ATHER |
+| 0.1.66b | 2026-10-04 | current | Extend D7 with differential-proven same-alias exact string ID equality on unlabeled zero-hop HQL1 scans; adapter 11/11, ordering 2/2, HQL2 was reported 393/0/1 across 34 targets at that checkpoint; other forms remain fail-closed; no P6 grant/lease/schema/migration or transport change; independent review and broad P8/P13 gates remain open | working-tree | ATHER |
 | 0.1.65b | 2026-10-04 | current | Record test-only nested-JSON Sequence property P7 differential for exact HQL/typed-IR node and edge object/array values with near-match exclusion; pattern 11/11, HQL2 392/0/1 across 34 targets; no runtime/contract/schema/P6/transport change; broad P8/P13/qualification gates remain open | working-tree | ATHER |
 | 0.1.64b | 2026-10-04 | current | Record test-only optional Sequence edge-property-miss P7 differential; preserve four input rows and NULL-extend endpoint/edge aliases; pattern target 10/10, HQL2 389/0/1 across 34 targets; no runtime/contract/schema/transport change; broad P8/P13/qualification gates remain open | working-tree | ATHER |
 | 0.1.63b | 2026-10-03 | current | Record test-only HQL/typed-IR scalar-pipeline P7 differential for six fixtures and 12 Storage executions; HQL2 383/0/1 across 33 targets and P6/compatibility 194/0/0; no runtime/contract/schema/transport change; broad P8/P13 and qualification gates remain open | working-tree | ATHER |

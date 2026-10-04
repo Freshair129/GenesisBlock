@@ -7,9 +7,16 @@ use genesis_block_native::{
 };
 use rusqlite::Connection;
 use serde_json::{json, Value};
-use std::{collections::BTreeMap, path::Path};
+use std::{
+    collections::{BTreeMap, BTreeSet},
+    path::Path,
+};
 use tempfile::TempDir;
 use uuid::Uuid;
+
+#[allow(dead_code)]
+#[path = "support/hql2_graph_reference.rs"]
+mod p7_graph;
 
 fn open(path: &Path) -> Storage {
     Storage::open(OpenOptions {
@@ -95,6 +102,123 @@ fn entity_id(result: &genesis_block_native::query::hql2::QueryResultV2, alias: &
         QueryValueV2::Entity(record) => record.id.clone(),
         other => panic!("expected entity, got {other:?}"),
     }
+}
+
+fn p7_entity(kind: p7_graph::Kind, id: &str) -> p7_graph::EntityRef {
+    p7_graph::EntityRef {
+        namespace: "default".into(),
+        kind,
+        id: id.into(),
+        revision: "fixture-revision".into(),
+    }
+}
+
+fn p7_revision(
+    entity: p7_graph::EntityRef,
+    fields: p7_graph::Fields,
+    data: p7_graph::RecordData,
+) -> p7_graph::Revision {
+    p7_graph::Revision {
+        entity,
+        transaction: p7_graph::Interval {
+            start: 1,
+            end: None,
+        },
+        valid: p7_graph::Interval {
+            start: 0,
+            end: None,
+        },
+        retracted: false,
+        fields,
+        data,
+    }
+}
+
+fn p7_scan_bag(
+    revisions: &[p7_graph::Revision],
+    kind: p7_graph::Kind,
+    predicate: p7_graph::Predicate,
+) -> BTreeMap<String, usize> {
+    let catalog = p7_graph::Catalog {
+        frontier: 10,
+        history: [
+            p7_graph::Kind::Node,
+            p7_graph::Kind::Edge,
+            p7_graph::Kind::Row,
+        ]
+        .into_iter()
+        .map(|kind| {
+            (
+                kind,
+                p7_graph::HistoryCapability {
+                    horizon: 0,
+                    available: true,
+                },
+            )
+        })
+        .collect(),
+        revisions: revisions.to_vec(),
+    };
+    let view = p7_graph::View {
+        namespace: "default".into(),
+        transaction: 10,
+        valid_at: 5,
+        permissions: p7_graph::Permissions {
+            read: catalog
+                .revisions
+                .iter()
+                .map(|revision| revision.entity.identity())
+                .collect(),
+            annotation_body: BTreeSet::new(),
+        },
+    };
+    let plan = p7_graph::Plan {
+        source: p7_graph::Source::Scan {
+            kind,
+            alias: "scan".into(),
+            predicate,
+        },
+        stages: vec![],
+    };
+    let rows = p7_graph::execute(&catalog, &view, &plan, p7_graph::Limits::default())
+        .unwrap()
+        .rows;
+    let mut bag = BTreeMap::new();
+    for row in rows {
+        let p7_graph::Binding::Entity(entity) = row.get("scan").unwrap() else {
+            panic!("P7 scan must bind an entity")
+        };
+        *bag.entry(entity.id.clone()).or_insert(0) += 1;
+    }
+    bag
+}
+
+fn utf8_column_bag(
+    result: &genesis_block_native::query::hql2::QueryResultV2,
+    column: &str,
+) -> BTreeMap<String, usize> {
+    let mut bag = BTreeMap::new();
+    for row in &result.rows {
+        let QueryValueV2::Utf8(value) = row.get(column).unwrap() else {
+            panic!("{column} must be UTF-8")
+        };
+        *bag.entry(value.clone()).or_insert(0) += 1;
+    }
+    bag
+}
+
+fn json_string_column_bag(
+    result: &genesis_block_native::query::hql2::QueryResultV2,
+    column: &str,
+) -> BTreeMap<String, usize> {
+    let mut bag = BTreeMap::new();
+    for row in &result.rows {
+        let QueryValueV2::Json(value) = row.get(column).unwrap() else {
+            panic!("{column} must be JSON")
+        };
+        *bag.entry(value.as_str().unwrap().to_owned()).or_insert(0) += 1;
+    }
+    bag
 }
 
 #[test]
@@ -355,7 +479,7 @@ fn row_scan_returns_registry_identity_from_the_same_revision_projection() {
 }
 
 #[test]
-fn hql_and_ir_source_scans_have_identical_node_edge_and_row_results() {
+fn hql_and_ir_source_scans_match_independent_p7_bags() {
     let dir = TempDir::new().unwrap();
     let storage = open(dir.path());
     node(&storage, "doc:one", "Document");
@@ -366,6 +490,19 @@ fn hql_and_ir_source_scans_have_identical_node_edge_and_row_results() {
             from: "doc:one".into(),
             to: "note:one".into(),
             rel: "DEPENDS".into(),
+            props: None,
+            valid_from: Some("2026-09-22T00:00:00Z".into()),
+            supersede: None,
+            impact: None,
+            caused_by: None,
+        })
+        .unwrap();
+    storage
+        .add_edge(EdgeInput {
+            id: Some("edge:other".into()),
+            from: "doc:one".into(),
+            to: "note:one".into(),
+            rel: "OTHER".into(),
             props: None,
             valid_from: Some("2026-09-22T00:00:00Z".into()),
             supersede: None,
@@ -396,14 +533,60 @@ fn hql_and_ir_source_scans_have_identical_node_edge_and_row_results() {
             mutation_id: Uuid::new_v4().to_string(),
             namespace: "default".into(),
             schema_version: 1,
-            operations: vec![RelationalRowMutation {
-                table: "records".into(),
-                kind: RelationalMutationKind::Insert,
-                values: json!({"id":"row:one"}),
-                key: None,
-            }],
+            operations: ["row:one", "row:two"]
+                .into_iter()
+                .map(|id| RelationalRowMutation {
+                    table: "records".into(),
+                    kind: RelationalMutationKind::Insert,
+                    values: json!({"id":id}),
+                    key: None,
+                })
+                .collect(),
         })
         .unwrap();
+
+    let doc = p7_entity(p7_graph::Kind::Node, "doc:one");
+    let note = p7_entity(p7_graph::Kind::Node, "note:one");
+    let p7_revisions = vec![
+        p7_revision(
+            doc.clone(),
+            BTreeMap::from([("label".into(), p7_graph::Scalar::Text("Document".into()))]),
+            p7_graph::RecordData::Plain,
+        ),
+        p7_revision(
+            note.clone(),
+            BTreeMap::from([("label".into(), p7_graph::Scalar::Text("Note".into()))]),
+            p7_graph::RecordData::Plain,
+        ),
+        p7_revision(
+            p7_entity(p7_graph::Kind::Edge, "edge:depends"),
+            BTreeMap::from([("relation".into(), p7_graph::Scalar::Text("DEPENDS".into()))]),
+            p7_graph::RecordData::Edge {
+                source: doc.identity(),
+                target: note.identity(),
+                relation: "DEPENDS".into(),
+            },
+        ),
+        p7_revision(
+            p7_entity(p7_graph::Kind::Edge, "edge:other"),
+            BTreeMap::from([("relation".into(), p7_graph::Scalar::Text("OTHER".into()))]),
+            p7_graph::RecordData::Edge {
+                source: doc.identity(),
+                target: note.identity(),
+                relation: "OTHER".into(),
+            },
+        ),
+        p7_revision(
+            p7_entity(p7_graph::Kind::Row, "row:one"),
+            BTreeMap::from([("id".into(), p7_graph::Scalar::Text("row:one".into()))]),
+            p7_graph::RecordData::Plain,
+        ),
+        p7_revision(
+            p7_entity(p7_graph::Kind::Row, "row:two"),
+            BTreeMap::from([("id".into(), p7_graph::Scalar::Text("row:two".into()))]),
+            p7_graph::RecordData::Plain,
+        ),
+    ];
 
     let node_hql = hql(
         &storage,
@@ -426,6 +609,16 @@ fn hql_and_ir_source_scans_have_identical_node_edge_and_row_results() {
     assert_eq!(node_hql.semantics, node_ir.semantics);
     assert_eq!(node_hql.rows.len(), 1);
     assert_eq!(node_hql.rows[0]["id"], QueryValueV2::Utf8("doc:one".into()));
+    let expected_nodes = p7_scan_bag(
+        &p7_revisions,
+        p7_graph::Kind::Node,
+        p7_graph::Predicate {
+            equals: BTreeMap::from([("label".into(), p7_graph::Scalar::Text("Document".into()))]),
+            ..p7_graph::Predicate::default()
+        },
+    );
+    assert_eq!(utf8_column_bag(&node_hql, "id"), expected_nodes);
+    assert_eq!(utf8_column_bag(&node_ir, "id"), expected_nodes);
 
     let edge_hql = hql(
         &storage,
@@ -451,6 +644,16 @@ fn hql_and_ir_source_scans_have_identical_node_edge_and_row_results() {
         edge_hql.rows[0]["id"],
         QueryValueV2::Utf8("edge:depends".into())
     );
+    let expected_edges = p7_scan_bag(
+        &p7_revisions,
+        p7_graph::Kind::Edge,
+        p7_graph::Predicate {
+            equals: BTreeMap::from([("relation".into(), p7_graph::Scalar::Text("DEPENDS".into()))]),
+            ..p7_graph::Predicate::default()
+        },
+    );
+    assert_eq!(utf8_column_bag(&edge_hql, "id"), expected_edges);
+    assert_eq!(utf8_column_bag(&edge_ir, "id"), expected_edges);
 
     let row_hql = hql(
         &storage,
@@ -475,12 +678,20 @@ fn hql_and_ir_source_scans_have_identical_node_edge_and_row_results() {
     assert_eq!(row_hql.columns, row_ir.columns);
     assert_eq!(row_hql.rows, row_ir.rows);
     assert_eq!(row_hql.semantics, row_ir.semantics);
-    assert_eq!(row_hql.rows.len(), 1);
-    let QueryValueV2::Utf8(record_id) = &row_hql.rows[0]["id"] else {
-        panic!("row entity id must be its durable revision UUID")
-    };
-    assert_eq!(Uuid::parse_str(record_id).unwrap().get_version_num(), 4);
-    assert_eq!(row_hql.rows[0]["key"], QueryValueV2::Json(json!("row:one")));
+    assert_eq!(row_hql.rows.len(), 2);
+    for row in &row_hql.rows {
+        let QueryValueV2::Utf8(record_id) = &row["id"] else {
+            panic!("row entity id must be its durable revision UUID")
+        };
+        assert_eq!(Uuid::parse_str(record_id).unwrap().get_version_num(), 4);
+    }
+    let expected_rows = p7_scan_bag(
+        &p7_revisions,
+        p7_graph::Kind::Row,
+        p7_graph::Predicate::default(),
+    );
+    assert_eq!(json_string_column_bag(&row_hql, "key"), expected_rows);
+    assert_eq!(json_string_column_bag(&row_ir, "key"), expected_rows);
 }
 
 #[test]
