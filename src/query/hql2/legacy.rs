@@ -95,8 +95,7 @@ pub(crate) fn lower_hql_v1(
             let filter = match clauses.where_preds.as_slice() {
                 [] => String::new(),
                 [predicate]
-                    if pattern.start.label.is_none()
-                        && predicate.field.var == alias
+                    if predicate.field.var == alias
                         && predicate.field.field.as_ref() == Some(&HqlField::Id)
                         && predicate.op == HqlOp::Eq =>
                 {

@@ -1,8 +1,8 @@
 ---
 doc_id: SPEC--GENESISDB-HQL2-P8-TYPED-BOUNDARY
-version: "0.2.59b"
+version: "0.2.60b"
 created_at: "2026-09-28T01:25:00+07:00,ATHER,fc851e9"
-last_update: "2026-10-04T13:34:13+07:00,ATHER"
+last_update: "2026-10-04T16:06:00+07:00,ATHER"
 status: beta
 superseded_by: null
 owner: "Boss (Founder / Product Authority)"
@@ -76,8 +76,8 @@ Sequence ID, conjunctive labels and D4 node/edge property constraints now run
 for HQL and typed IR against one authorized P6 graph snapshot; candidate IDs
 are never looked up directly. Exact JSON values are selectively hydrated under
 budget and filtered before SHORTEST; Compact constraints remain unavailable
-and fail closed. The 10/10 P8 completion target and latest 392/0/1 root-HQL2
-sweep across 34 targets cover this slice, including edge-property filtering
+and fail closed. The 10/10 P8 completion target and latest 394/0/1 root-HQL2
+sweep across 35 targets cover this slice, including edge-property filtering
 before SHORTEST and the D7 actor-scoped HQL1 adapter/ordering targets (11/11,
 2/2), including differential-proven zero-hop exact-ID filtering. P6
 D1's exact-record-only fixture denies before parsing; it does not assert
@@ -100,7 +100,7 @@ passes 7/7. Artifact HistoryScan remains capability-unsupported under the
 approved contract. Storage-backed P7 ChangeScan differentials now cover all five
 supported revision kinds. A separate five-window differential checks exclusive
 `after`, inclusive `through`, equal empty bounds and selected `tx_as_of`
-frontiers. The current explicit 34-target HQL2 sweep passes 392/0/1, with the
+frontiers. The current explicit 35-target HQL2 sweep passes 394/0/1, with the
 ignored parser child entrypoint exercised by its parent. A
 storage-backed HQL/typed-IR `Values`/`UnionAll` differential matches independent
 P7 for 169 nullable bag pairs (338 Storage executions), retaining duplicate
@@ -122,8 +122,8 @@ annotation operators, property hydration and result metadata use the same S,
 while the validated P6 generation, catalog and current policy stay pinned.
 Per-source history floors fail closed before reads, and no path falls back to
 current state. Five focused targets pass 56/56; the HistoryScan/ChangeScan
-target passes 17/17; the explicit 34-target HQL2 regression sweep passes
-392/0/1 and the separate P6/schema-v6/compatibility sweep passes 194/0/0.
+target passes 17/17; the explicit 35-target HQL2 regression sweep passes
+394/0/1 and the separate P6/schema-v6/compatibility sweep passes 194/0/0.
 These are local regression results, not broad P8/P13 or transport acceptance.
 PR #196 at head `8ac07f6` was merged at `fb7085a`. Its 16 displayed checks
 include 10 passes, five failures and one skip. Worker tests fail on
@@ -739,7 +739,7 @@ differentials cover Node, Edge, Row, Vector and Annotation; a five-window
 ChangeScan differential checks exclusive-after/inclusive-through bounds,
 including empty bounds and selected transaction frontiers. The focused
 History/Change target passes 17/17 and Annotation source/ACL passes 7/7. The
-current 34-target HQL2 sweep passes 392/0/1, with a separate 11-target
+current 35-target HQL2 sweep passes 394/0/1, with a separate 11-target
 P6/schema-v6/compatibility sweep at 194/0/0. HQL2/IR `tx_as_of` now selects
 one no-fallback frontier across scans, operators, hydration and `Snapshot.tx`;
 five focused targets pass 56/56 and HistoryScan/ChangeScan passes 17/17.
@@ -821,8 +821,8 @@ actor-bound differential execution,
 parallel-edge multiplicity, all directions and wildcard relations, endpoint-ID
 string equality on either endpoint, denial/mismatch before parse, malformed
 syntax, fail-closed unlisted syntax and pre-parse resource rejection. The
-latest 34-target root HQL2 sweep passes
-392/0/1; a separate 11-target P6/schema-v6/compatibility group passes 194/0/0.
+latest 35-target root HQL2 sweep passes
+394/0/1; a separate 11-target P6/schema-v6/compatibility group passes 194/0/0.
 The prior combined 37-target run passed 528/0/1 before
 the added edge-property regression; all remain regression evidence, not full
 P8/P13 acceptance.
@@ -859,9 +859,9 @@ separate shape limits. No process-global Pest setting is changed.
 - All temporary resources/leases released on error/cancel; quotas reserved
   before allocations; tests show a budget error cannot masquerade as completion.
 - Existing HQL/v1 tests pass unchanged. The D7 actor-scoped bridge supports
-  only its differential-tested zero-hop allowlist (unlabeled, optionally with
-  one exact same-alias string ID predicate, or one plain-ASCII label without a
-  predicate) and unlabeled one-hop allowlist; its parser is preflighted and
+  only its differential-tested zero-hop allowlist (unlabeled or with one
+  plain-ASCII label, optionally with one exact same-alias string ID predicate)
+  and unlabeled one-hop allowlist; its parser is preflighted and
   budgeted before AST construction. Unproven legacy lowering stays on the
   compatibility path and the shared-runtime completion obligation remains
   open until every declared legacy form has equivalent evidence.
@@ -869,6 +869,19 @@ separate shape limits. No process-global Pest setting is changed.
   Parser/binder coverage alone does not close the storage-backed runtime gate.
 
 ## Version diff and changelog
+
+Version diff `0.2.59b -> 0.2.60b`: record the conditional D7 extension for one
+exact same-alias string ID equality predicate on labeled zero-hop scans. The
+legacy/HQL2 differential covers match, miss, wrong-label exclusion and an ID
+containing backslash plus Unicode; adapter passes 11/11, ordering 2/2 and the
+new differential target 2/2. The complete explicit HQL2 sweep passes 394/0/1
+across 35 targets; selected P6 peer targets pass 45/0/0 across seven targets.
+PR #212's merged baseline checks are 10 pass, five fail and one skipped. PR
+#213 code commit checks are 40 pass, four worker failures with cause
+unconfirmed, five skipped and one Windows Cargo cancellation at the configured
+15-minute job limit. Independent review found no runtime parity or
+authorization defect. No P6 contract, schema or transport behavior changed;
+broad shared-runtime/P8/P13 gates remain open.
 
 Version diff `0.2.58b -> 0.2.59b`: record a test-only HQL/typed-IR ChangeScan
 P7 differential across five exclusive-after/inclusive-through windows,
@@ -1080,6 +1093,7 @@ detail with unchanged JSON shape; broader P8/P13/review gates remain open.
 
 | Version | Date | Status | Summary | Commit Hash | Agent |
 |---|---|---|---|---|---|
+| 0.2.60b | 2026-10-04 | beta | Extend conditional D7 same-alias exact string ID filter to labeled zero-hop scans after legacy/HQL2 match, miss, wrong-label and backslash/Unicode differential; adapter 11/11, ordering 2/2, labeled-filter target 2/2, HQL2 394/0/1 across 35 targets, selected P6 peers 45/0/0 across 7; PR #213 code commit checks 40 pass, 4 worker failures with unconfirmed cause, 5 skipped, 1 Windows Cargo cancellation at 15-minute job limit; no P6 contract/schema/transport change; broad shared-runtime/P8/P13 gates remain open | working-tree | ATHER |
 | 0.2.59b | 2026-10-04 | beta | Record test-only HQL/typed-IR ChangeScan P7 differential across five exclusive-after/inclusive-through windows, empty bounds and tx_as_of frontiers; History/Change 17/17, HQL2 392/0/1 across 34 targets; PR #210 hosted checks 11 pass, four worker markerless-identity failures, one skipped; no contract/runtime/schema/P6/transport change; broad P8/P13/review remain open | working-tree | ATHER |
 | 0.2.58b | 2026-10-04 | beta | Extend conditional D7 HQL1 adapter with differential-proven same-alias exact string equality on unlabeled zero-hop scans; adapter 11/11, ordering 2/2, HQL2 393/0/1 across 34 targets; other forms remain fail-closed and broad shared-runtime/P8/P13 gates remain open | working-tree | ATHER |
 | 0.2.56b | 2026-10-04 | beta | Record test-only HQL/typed-IR AnnotationLookup P7 differential for frozen target, evidence-only nonmatch, optional NULL and duplicate multiplicity; focused target 6/6, HQL2 386/0/1 across 34 targets; no runtime/contract/schema/P6/transport change; broad exact-oracle and P8/P13 gates remain open | working-tree | ATHER |
