@@ -1471,6 +1471,66 @@ async fn test_hql_accepts_both_raw_and_wrapped_body() {
     );
 }
 
+#[tokio::test]
+async fn test_hql_body_shapes_preserve_results_and_typed_query_errors() {
+    let (app, _dir) = make_app();
+    post_json(&app, "/v1/node/add", json!({ "id": "rpsrc", "labels": [] })).await;
+    post_json(&app, "/v1/node/add", json!({ "id": "rpdst", "labels": [] })).await;
+    post_json(
+        &app,
+        "/v1/edge/add",
+        json!({ "id": "rpe1", "from": "rpsrc", "to": "rpdst", "rel": "LINKS" }),
+    )
+    .await;
+
+    let hql = "TRAVERSE FROM rpsrc DEPTH 1 REL LINKS";
+    let raw_body = serde_json::to_string(hql).unwrap();
+    let (raw_status, raw_result) =
+        post_raw(&app, "/v1/query/hql", "application/json", &raw_body).await;
+    let raw_result: Value = serde_json::from_str(&raw_result).unwrap();
+    let (wrapped_status, wrapped_result) =
+        post_json(&app, "/v1/query/hql", json!({ "query": hql })).await;
+    assert_eq!(raw_status, StatusCode::OK);
+    assert_eq!(wrapped_status, StatusCode::OK);
+    assert_eq!(raw_result, wrapped_result);
+
+    let (hql_error_status, hql_error) = post_json(
+        &app,
+        "/v1/query/hql",
+        json!({
+            "query": hql,
+            "budget": { "max_serialized_bytes": 1 }
+        }),
+    )
+    .await;
+    assert_eq!(hql_error_status, StatusCode::BAD_REQUEST);
+    assert_eq!(hql_error["code"], "QUERY_BUDGET_EXCEEDED");
+    assert_eq!(hql_error["message"], "QUERY_BUDGET_EXCEEDED: reason=bytes");
+
+    let (ir_error_status, ir_error) = post_json(
+        &app,
+        "/v1/query/ir",
+        json!({
+            "contract_version": "query-ir.invalid",
+            "request_id": "rest-parity-error",
+            "operation": {
+                "kind": "traverse",
+                "seed_id": "rpsrc",
+                "depth": 1,
+                "relations": ["LINKS"],
+                "direction": "out"
+            }
+        }),
+    )
+    .await;
+    assert_eq!(ir_error_status, StatusCode::BAD_REQUEST);
+    assert_eq!(ir_error["code"], "QUERY_IR_VERSION_UNSUPPORTED");
+    assert!(ir_error["message"]
+        .as_str()
+        .unwrap()
+        .starts_with("QUERY_IR_VERSION_UNSUPPORTED:"));
+}
+
 // ---------------------------------------------------------------------------
 // Version surface
 // ---------------------------------------------------------------------------

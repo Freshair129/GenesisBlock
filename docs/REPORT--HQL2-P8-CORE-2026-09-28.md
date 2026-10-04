@@ -1,8 +1,8 @@
 ---
 doc_id: REPORT--HQL2-P8-CORE-2026-09-28
-version: "0.1.62b"
+version: "0.1.63b"
 created_at: "2026-09-28T04:35:00+07:00,ATHER,22bc11e"
-last_update: "2026-10-04T13:02:00+07:00,ATHER"
+last_update: "2026-10-04T14:17:47+07:00,ATHER"
 status: beta
 owner: GenesisBlockDB Engineering
 attributes:
@@ -125,6 +125,20 @@ same bounded traversal fixture and return equal result bags. The test passes
 1/1. This is test-only evidence for the existing HQL/Query IR v1 transport
 contract; it does not expose `query_v2`, change a public API, or qualify P13.
 
+The approved P8-R3 verification slice extends that gate across both accepted
+HQL request body shapes and typed error paths. Raw JSON-string and wrapped
+`{"query": ..., "budget": ...}` requests return equal result bags; wrapped HQL
+budget exhaustion and Query IR version rejection preserve their typed HTTP
+error envelopes. The focused target passes 1/1. This remains test-only evidence
+for existing v1 contracts and does not open `query_v2` transport or qualify P13.
+
+The full `rest_api_tests` rerun is not qualified: 5 tests passed and 41 failed
+at fixture `Storage::open` with `database or disk is full` / Windows OS error
+112. The live host reported 0.00 GB free on `C:` and `Temp:` while the test
+processes use those paths for temporary databases. This is an environment
+capacity failure, not evidence of a P8-R3 semantic regression; no cleanup or
+storage mutation was authorized.
+
 ## Verification record
 
 Platform: local Windows MSVC, Rust 1.97.1, `--locked --offline
@@ -177,6 +191,8 @@ explicit test targets; the protected probe target was not selected.
 | Storage-backed HQL/typed-IR Sequence-property P7 differential | 3 passed, 0 failed; focused pattern target 11/11 | Positive exact UTF-8 node-name and integer edge-weight constraints, optional edge-property miss, and nested JSON node/edge properties match independent P7 for HQL and typed IR; wrong-valued candidates are excluded, and all four optional input rows survive with endpoint/edge aliases NULL-extended. Nested object/array values, including an embedded JSON null, compare exactly. Test-only; no runtime/contract/schema/P6/transport change. |
 | Storage-backed HQL/typed-IR Node/Edge/Row source-scan P7 differential | `hql2_storage_source_tests`: 10 passed, 0 failed | Node label and edge relation nonmatches are excluded, two relational rows retain their bag multiplicity, and HQL and typed IR each match the independent P7 scan bag. Row comparison uses the declared row-key property; durable `r.id` remains the UUIDv4 revision. Test-only; no runtime/contract/schema/P6/transport change. |
 | P8-R2 REST HQL/typed-IR transport parity | 1 passed, 0 failed in `wave_d_rest_tests` | `/v1/query/hql` and `/v1/query/ir` return equal traversal result bags for the same fixture. Existing v1 compatibility path only; no `query_v2` transport, public API, or P13 qualification. |
+| P8-R3 REST HQL body/error parity | 1 passed, 0 failed in `rest_api_tests` | Raw and wrapped HQL bodies preserve equal result bags; wrapped budget exhaustion and Query IR version rejection preserve typed error envelopes. Existing v1 contracts only; no runtime/API change. |
+| Full REST regression rerun | 5 passed, 41 failed at fixture open | `Storage::open` failed with disk-full/OS error 112 because `C:`/`Temp:` had 0.00 GB free; NOT RUN/qualified as a code regression, no cleanup performed. |
 | Approved H2-D11 Vector HistoryScan extension | Implemented; local differential passed | HQL and typed IR read exact revisions using compact JSON `(owner_id, collection_id)` identity under the P6 lease and owner-node ACL; the vector source floor fails closed before access. Its result bags match independent P7 from WAL-derived revision facts and the captured frontier. The expanded five-kind HistoryScan differential passes; HistoryScan/ChangeScan passes 16/16, P7 graph target 39/39 and combined P7 130/130. |
 | HQL/typed-IR Row HistoryScan and ChangeScan parity | 1 passed, 0 failed | Retained insert/update revisions hydrate exact row properties; HQL and typed IR agree on history values, change operations and durable Row identity. Test-only regression coverage; no schema migration. |
 | HQL2/IR transaction-time snapshot (`tx_as_of`) | Implemented; local verification passed | One selected frontier S controls revision-backed scans, graph/vector/annotation operators, source-floor checks, property hydration and `Snapshot.tx`; the validated P6 generation/catalog/current policy remain pinned and no path falls back to current state. Five focused targets pass 56/56. |
@@ -496,16 +512,16 @@ from these local tests.
 | P6 generations/leases/ACL | 0.5.31b | unchanged |
 | P8 typed boundary | 0.2.57b | 0.2.58b |
 | P7 oracle report | 0.1.11b | unchanged |
-| Orchestration plan | 0.8.68b | 0.8.69b |
+| Orchestration plan | 0.8.69b | 0.8.70b |
 | C4 architecture index | 0.1.66b | 0.1.67b |
 | Master specification | 2.3.38b | 2.3.39b |
-| This report | 0.1.61b | 0.1.62b |
+| This report | 0.1.62b | 0.1.63b |
 
-Version diff 0.1.61b -> 0.1.62b: add the approved P8-R2 REST parity gate for
-the existing HQL compatibility and typed Query IR v1 traversal paths. The
-focused transport target passes 1/1 with equal result bags. No production
-runtime, public API, schema or P6 change; `query_v2` transport, P13 parity and
-independent-review gates remain open.
+Version diff 0.1.62b -> 0.1.63b: add the approved P8-R3 REST parity gate for
+raw and wrapped HQL request bodies plus typed budget/version error envelopes.
+The focused target passes 1/1. No production runtime, public API, schema or
+P6 change; `query_v2` transport, P13 parity and independent-review gates
+remain open.
 
 Version diff 0.1.58b -> 0.1.59b: implement the conditionally approved D7
 zero-hop exact string-ID equality extension after a legacy/HQL2 match/no-match
@@ -686,6 +702,7 @@ P8 and release gates.
 
 | Version | Date | Status | Summary | Commit Hash | Agent |
 |---|---|---|---|---|---|
+| 0.1.63b | 2026-10-04 | beta | Add approved P8-R3 REST HQL body-shape and typed-error parity gate; focused target 1/1; no production runtime/API/schema/P6 change; `query_v2` transport and P13 qualification remain open | working-tree | ATHER |
 | 0.1.62b | 2026-10-04 | beta | Add approved P8-R2 REST HQL/typed-IR traversal parity gate; focused target 1/1; no production runtime/API/schema/P6 change; `query_v2` transport and P13 qualification remain open | working-tree | ATHER |
 | 0.1.61b | 2026-10-04 | beta | Add HQL/typed-IR Node/Edge/Row source-scan P7 bag differential; focused target 10/10; fresh explicit 34-target HQL2 sweep 391/0/1 (prior 393 count not reproduced); no runtime/contract/schema/P6/transport change; broad P8/P13 and independent review remain open | working-tree | ATHER |
 | 0.1.60b | 2026-10-04 | beta | Synchronize merged PR #208 hosted status: 40 success, 5 failures and 5 skipped; four worker markerless-identity bootstrap failures and one Windows annotation `QUERY_BUDGET_EXCEEDED` failure; isolated Windows rerun passes 1/1 with cause unconfirmed; local HQL2 was reported 393/0/1 at that checkpoint and broad P8/P13/review gates stay open | working-tree | ATHER |

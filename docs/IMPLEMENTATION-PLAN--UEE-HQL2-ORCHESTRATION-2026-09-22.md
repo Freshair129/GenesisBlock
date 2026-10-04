@@ -1,9 +1,9 @@
 ---
-version: "0.8.69b"
+version: "0.8.70b"
 doc_id: "IMPLEMENTATION-PLAN--UEE-HQL2-ORCHESTRATION-2026-09-22"
 owner: "Boss (Founder / Product Authority)"
 created_at: "2026-09-22T00:00:00+07:00,ATHER,working-tree"
-last_update: "2026-10-04T13:02:00+07:00,Codex"
+last_update: "2026-10-04T14:17:47+07:00,Codex"
 status: beta
 superseded_by: null
 attributes:
@@ -31,6 +31,9 @@ attributes:
 เมื่อ 2026-10-04 owner อนุมัติ P8-R2 verification slice ให้เพิ่มเฉพาะ REST transport
 parity gate ระหว่าง HQL compatibility กับ typed Query IR v1; ไม่อนุญาตให้เปิด
 query_v2 transport, เปลี่ยน public API, migrate ฐานข้อมูลผู้ใช้, merge, release หรือ deploy
+เมื่อ 2026-10-04 owner อนุมัติ P8-R3 verification slice ให้เพิ่มเฉพาะ matrix test
+สำหรับ raw/wrapped HQL body และ typed error envelope ของ HQL/Query IR v1; ไม่อนุญาต
+ให้เปิด query_v2 transport หรือเปลี่ยน public API, schema, migration, release หรือ deploy
 
 ## 1. Decision ที่เสนอ
 
@@ -101,6 +104,7 @@ P0 BASELINE (done, read-only)
 | P7 | Exact reference interpreter/oracle and golden fixtures | P6 | NULL/bag/temporal/annotation semantics are executable and reproducible |
 | P8 | HQL1/HQL2/IR lowering to one pipeline plus truthful EXPLAIN/counters and H2-D11-backed source adapters | P7, approved P8 and H2-D11 contracts | Shared binder/runtime; each storage source passes identity, temporal, retention, ACL and exact-oracle gates |
 | P8-R2 | Bounded REST parity verification for existing HQL compatibility and typed Query IR v1 traversal | P8 local kernel; existing P13 boundary | `/v1/query/hql` and `/v1/query/ir` return equal result bags; test-only, no `query_v2` transport or P13 closure |
+| P8-R3 | REST matrix for raw/wrapped HQL bodies and typed HQL/Query IR v1 errors | P8-R2; existing v1 routes | Equal result bags across accepted HQL body shapes; budget/version failures retain typed envelopes; test-only, no public API or P13 closure |
 | P9 | Legal B-tree/annotation paths and planner access reporting | P8 | Pushdown/order counterexamples match oracle; plans are truthful |
 | P10 | Cross-domain graph/vector/relational/annotation composition | P9 | One snapshot, exact-oracle parity, no internal network/JSON workaround |
 | P11 | HNSW/lexical lifecycle, generations, deltas, watermarks and coverage | P10 | Approximate results are explicit; lifecycle and stale-index gates pass |
@@ -947,11 +951,13 @@ passes 19/19 across `epoch_e2_tests`, `g3_oracle_differential_tests`,
 
 ## CHANGELOG
 
-Version diff `0.8.68b -> 0.8.69b`: record the approved P8-R2 REST parity
-verification gate for the existing HQL compatibility and typed Query IR v1
-traversal paths. The focused target passes 1/1. No `query_v2` transport,
-public API, schema, P6, migration, release or deploy change; P13 and
-independent-review gates remain open.
+Version diff `0.8.69b -> 0.8.70b`: record the approved P8-R3 REST matrix for
+raw/wrapped HQL bodies and typed HQL/Query IR v1 budget/version error envelopes.
+The focused target passes 1/1. A full REST rerun is environment-blocked by
+`C:`/`Temp:` at 0.00 GB free and fixture-open OS error 112; no code regression
+is inferred and no cleanup was performed. No `query_v2` transport, public API,
+schema, P6, migration, release or deploy change; P13 and independent-review
+gates remain open.
 
 Version diff `0.8.67b -> 0.8.68b`: reconcile the additive G3 exact-oracle,
 differential/reopen and fixture evidence onto the current schema-v6/P8 mainline;
