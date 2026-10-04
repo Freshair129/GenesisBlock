@@ -1,9 +1,9 @@
 ---
-version: "0.8.69b"
+version: "0.8.71b"
 doc_id: "IMPLEMENTATION-PLAN--UEE-HQL2-ORCHESTRATION-2026-09-22"
 owner: "Boss (Founder / Product Authority)"
 created_at: "2026-09-22T00:00:00+07:00,ATHER,working-tree"
-last_update: "2026-10-04T13:02:00+07:00,Codex"
+last_update: "2026-10-04T13:55:28+07:00,Codex"
 status: beta
 superseded_by: null
 attributes:
@@ -31,6 +31,12 @@ attributes:
 เมื่อ 2026-10-04 owner อนุมัติ P8-R2 verification slice ให้เพิ่มเฉพาะ REST transport
 parity gate ระหว่าง HQL compatibility กับ typed Query IR v1; ไม่อนุญาตให้เปิด
 query_v2 transport, เปลี่ยน public API, migrate ฐานข้อมูลผู้ใช้, merge, release หรือ deploy
+เมื่อ 2026-10-04 owner อนุมัติ [G4 shared-pipeline ADR](adr/ADR--GENESISDB-HQL2-G4-SHARED-PIPELINE.md)
+ฉบับที่ระบุ parity-proven HQL1/HQL2/Query IR v2 shared lowering, deterministic
+planning และ truthful `EXPLAIN`/`ANALYZE` แบบเจาะจงแล้ว จึงอนุญาตให้ทำ bounded
+source implementation ตาม ADR ใน worktree นี้ได้ โดยยังไม่อนุญาต query_v2
+transport หรือ REST/NAPI/FFI/SDK/MCP surface exposure, migration, merge,
+release หรือ deploy โดยอัตโนมัติ
 
 ## 1. Decision ที่เสนอ
 
@@ -39,8 +45,9 @@ query_v2 transport, เปลี่ยน public API, migrate ฐานข้อ
 1. ทำ truth/obligation ledger และ architecture/compatibility ADR ก่อน
 2. ปิดช่องว่างและพิสูจน์ U1-U3 ของ current WAL + SQLite projection + unified transaction
 3. ค่อยตัดสินใจ G1-G3 (canonical durability, snapshots, exact reference engine)
-4. ทำ G4-G6 (HQL2/planner/composition) ต่อเมื่อมี ADR ใหม่อนุมัติ เพราะ HQL v2 ปัจจุบัน
-   ห้าม planner/EXPLAIN และ current Query IR เป็น `query-ir.v1`
+4. ทำ G4-G6 (HQL2/planner/composition) ตาม ADR ที่อนุมัติ เพราะ HQL v2 ปัจจุบัน
+   ห้าม planner/EXPLAIN และ current Query IR เป็น `query-ir.v1`; G4 contract
+   ได้รับอนุมัติแล้ว แต่ implementation และ qualification ยังต้องผ่าน gate ต่อไป
 5. ทำ G7-G10 หลัง exactness, lifecycle, surface parity และ migration contract ผ่านแล้ว
 
 Blueprint package ตรวจผ่าน 9/9 package checks แต่มี engine obligations 190 รายการเป็น
@@ -99,9 +106,9 @@ P0 BASELINE (done, read-only)
 | P5 | Stabilize relational U2 and unified U3 transaction/stable frontier | P4 | Row+graph+vector commit/retry/reopen semantics pass |
 | P6 | Generation publication, leases, temporal and ACL visibility | P5 | No mixed snapshot; pinned generation and authorization tests pass |
 | P7 | Exact reference interpreter/oracle and golden fixtures | P6 | NULL/bag/temporal/annotation semantics are executable and reproducible |
-| P8 | HQL1/HQL2/IR lowering to one pipeline plus truthful EXPLAIN/counters and H2-D11-backed source adapters | P7, approved P8 and H2-D11 contracts | Shared binder/runtime; each storage source passes identity, temporal, retention, ACL and exact-oracle gates |
+| P8 | HQL1/HQL2/IR lowering to one pipeline plus truthful EXPLAIN/counters and H2-D11-backed source adapters | P7, approved P8, H2-D11 and G4 contracts | Shared binder/runtime; each storage source passes identity, temporal, retention, ACL and exact-oracle gates |
 | P8-R2 | Bounded REST parity verification for existing HQL compatibility and typed Query IR v1 traversal | P8 local kernel; existing P13 boundary | `/v1/query/hql` and `/v1/query/ir` return equal result bags; test-only, no `query_v2` transport or P13 closure |
-| P9 | Legal B-tree/annotation paths and planner access reporting | P8 | Pushdown/order counterexamples match oracle; plans are truthful |
+| P9 | Legal B-tree/annotation paths and planner access reporting | P8 and approved G4 planner boundary | Pushdown/order counterexamples match oracle; plans are truthful |
 | P10 | Cross-domain graph/vector/relational/annotation composition | P9 | One snapshot, exact-oracle parity, no internal network/JSON workaround |
 | P11 | HNSW/lexical lifecycle, generations, deltas, watermarks and coverage | P10 | Approximate results are explicit; lifecycle and stale-index gates pass |
 | P12 | Budgets, cancellation, spill, cleanup and cost model | P11 | Resource limits preserve correctness and leave no spill residue |
@@ -113,6 +120,32 @@ P0 BASELINE (done, read-only)
 Preparation-only sidecars may run after P2/P3 in parallel: new oracle fixtures, per-surface
 contract fixtures, benchmark harnesses, and mobile/self-host qualification scripts. They cannot
 certify or merge over an unmet dependency.
+
+### G4 contract and implementation slice — 2026-10-04
+
+The owner approved the exact [G4 shared-pipeline ADR](adr/ADR--GENESISDB-HQL2-G4-SHARED-PIPELINE.md)
+against the accepted HQL2 execution boundary, P6/H2-D11 authority and the P7
+exact oracle. The approved contract freezes explicit-v2 dispatch, one closed
+parity-proven HQL1/HQL2/Query IR v2 binder, deterministic first planning,
+plan-only `EXPLAIN` and measured read-only `ANALYZE`. It keeps HQL
+compatibility, `query-ir.v1`, public transport, persistence, mutation and
+release boundaries unchanged.
+
+Current implementation evidence is bounded to stable planner metadata and a
+canonical plan hash shared by `EXPLAIN` and `ANALYZE`:
+
+- `src/query/hql2/result.rs` carries the v2 contract version, planner version
+  and plan hash on `ExplainResultV2`.
+- `src/query/hql2/plan.rs` hashes the planner version, root and explain-node
+  shape with a canonical SHA-256 input.
+- `src/lib.rs` computes the identity once per planned request and reuses it for
+  plan-only and measured diagnostics.
+- `tests/hql2_g4_contract_tests.rs` passes 1/1; the focused serial HQL2
+  regression group passes 90 executed tests with one parser test ignored.
+
+G4 is `PARTIAL`, not complete. Hosted checks, independent review, public
+transport parity, device/release qualification and broad exact-oracle coverage
+remain `NOT_RUN` or open.
 
 ## 4. Conflict and worktree policy
 
@@ -946,6 +979,17 @@ passes 19/19 across `epoch_e2_tests`, `g3_oracle_differential_tests`,
 `meta_format_migration_tests` and `wal_tail_replay_tests`.
 
 ## CHANGELOG
+
+Version diff `0.8.70b -> 0.8.71b`: record owner approval of the exact G4
+shared-pipeline ADR and the bounded stable-plan-identity implementation slice.
+Local focused verification passes; full G4, public transport, migration,
+merge, release, deploy and independent-review gates remain open.
+
+Version diff `0.8.69b -> 0.8.70b`: register the owner-approved request to draft
+the G4 shared-pipeline contract and link the candidate ADR. Freeze the
+explicit-v2 HQL2/Query IR v2 binder, deterministic planner and truthful
+`EXPLAIN`/`ANALYZE` review boundary while keeping implementation, public
+transport, migration, merge, release and deploy approval-gated.
 
 Version diff `0.8.68b -> 0.8.69b`: record the approved P8-R2 REST parity
 verification gate for the existing HQL compatibility and typed Query IR v1

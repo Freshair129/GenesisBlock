@@ -1,8 +1,8 @@
 ---
 doc_id: SPEC--GENESISDB-HQL2-P8-TYPED-BOUNDARY
-version: "0.2.58b"
+version: "0.2.59b"
 created_at: "2026-09-28T01:25:00+07:00,ATHER,fc851e9"
-last_update: "2026-10-04T10:38:40+07:00,ATHER"
+last_update: "2026-10-04T13:55:28+07:00,Codex"
 status: beta
 superseded_by: null
 owner: "Boss (Founder / Product Authority)"
@@ -411,8 +411,11 @@ resource exhaustion is error, never a successful partial aggregate. ContextPack
 emits a typed package binding consumable by RETURN/PROJECT, with exact registered
 token counting of final text including separators/citations and omitted evidence.
 
-`ExplainResultV2 = { request_id: String, catalog: CatalogStampV2,
-plan: Vec<ExplainNodeV2>, root: String }`.
+`ExplainResultV2 = { contract_version: "genesis.api.v2", planner_version: String,
+plan_hash: String, request_id: String, catalog: CatalogStampV2,
+plan: Vec<ExplainNodeV2>, root: String }`. `plan_hash` is the stable identity
+of the canonical planner-version, root and plan-node shape; `EXPLAIN` and
+`ANALYZE` for the same logical request share it.
 `CatalogStampV2 = { observed_frontier: u64, policy_revision: u64,
 schema_fingerprint: String }` is catalog-only, not a durable snapshot lease.
 `ExplainNodeV2 = { id: String, logical_op: QueryOpV2, physical_op: String,
@@ -866,6 +869,11 @@ separate shape limits. No process-global Pest setting is changed.
 
 ## Version diff and changelog
 
+Version diff `0.2.58b -> 0.2.59b`: synchronize the approved G4 plan-identity
+slice into the P8 typed result contract; `EXPLAIN` and `ANALYZE` now expose the
+v2 contract version, planner version and shared stable plan hash. Broader G4,
+transport and independent-review gates remain open.
+
 Version diff `0.2.57b -> 0.2.58b`: extend the conditional D7 HQL1 adapter
 allowlist after legacy/HQL2 differential for one exact string equality on the
 same alias's ID in an unlabeled zero-hop scan. Focused adapter tests pass 11/11,
@@ -1068,6 +1076,7 @@ detail with unchanged JSON shape; broader P8/P13/review gates remain open.
 
 | Version | Date | Status | Summary | Commit Hash | Agent |
 |---|---|---|---|---|---|
+| 0.2.59b | 2026-10-04 | beta | Synchronize owner-approved G4 stable plan identity on `ExplainResultV2`; focused contract and HQL2 regression evidence passes; broader G4/P8/P13 and independent review remain open | working-tree | ATHER |
 | 0.2.56b | 2026-10-04 | beta | Record test-only HQL/typed-IR AnnotationLookup P7 differential for frozen target, evidence-only nonmatch, optional NULL and duplicate multiplicity; focused target 6/6, HQL2 386/0/1 across 34 targets; no runtime/contract/schema/P6/transport change; broad exact-oracle and P8/P13 gates remain open | working-tree | ATHER |
 | 0.2.55b | 2026-10-03 | beta | Record test-only HQL/typed-IR scalar-pipeline P7 differential for six fixtures and 12 Storage executions; focused scalar target 2/2, HQL2 383/0/1 across 33 targets; no runtime/contract/schema/transport change; broad exact-oracle and P8/P13 gates remain open | working-tree | ATHER |
 | 0.2.54b | 2026-10-03 | beta | Extend D7 with differential-proven single plain-ASCII label on zero-hop HQL1 node-ID scans; adapter 10/10, HQL2 382/0/1 across 33 targets and separate P6/compatibility 194/0/0; preserve fail-closed remaining forms and broad P8/P13 gates | working-tree | ATHER |

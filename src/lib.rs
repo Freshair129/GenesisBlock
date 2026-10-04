@@ -7320,9 +7320,13 @@ impl Storage {
                 };
                 budget.reserve(policy::planning_bytes(&logical, &request))?;
                 let physical = plan::plan_v2(bind::bind_v2(logical, &params, catalog)?)?;
+                let plan_hash = physical.plan_hash()?;
                 budget.check()?;
                 if options.mode == uee_v2::ExplainV2::Plan {
                     let result = ExplainResultV2 {
+                        contract_version: uee_v2::API_CONTRACT_V2.into(),
+                        planner_version: plan::PLANNER_VERSION_V2.into(),
+                        plan_hash,
                         request_id: request.request_id.clone(),
                         catalog: catalog.stamp.clone(),
                         plan: physical.explain_nodes(),
@@ -7504,6 +7508,9 @@ impl Storage {
                     cursor: None,
                     explain: if options.mode == uee_v2::ExplainV2::Analyze {
                         Some(ExplainResultV2 {
+                            contract_version: uee_v2::API_CONTRACT_V2.into(),
+                            planner_version: plan::PLANNER_VERSION_V2.into(),
+                            plan_hash,
                             request_id: request.request_id.clone(),
                             catalog: catalog.stamp.clone(),
                             plan: execution.nodes,
