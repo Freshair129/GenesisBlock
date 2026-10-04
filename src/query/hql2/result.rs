@@ -68,6 +68,9 @@ pub struct ExplainNodeV2 {
 
 #[derive(Clone, Debug, PartialEq, Serialize)]
 pub struct ExplainResultV2 {
+    pub contract_version: String,
+    pub planner_version: String,
+    pub plan_hash: String,
     pub request_id: String,
     pub catalog: CatalogStampV2,
     pub plan: Vec<ExplainNodeV2>,
