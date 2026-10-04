@@ -137,10 +137,14 @@ source hash and Unicode-scalar offsets. Contextual NULL/list/JSON literal
 typing is implemented with ambiguous or heterogeneous cases failing closed.
 Their 10/10 focused target and budget-exhaustion cases pass. D7 admits the
 differential-tested zero-hop HQL1 ID projection with either no label or one
-plain-ASCII label, plus bounded unlabeled one-hop projections through
-actor-bearing `Storage::query_v2`, including one exact endpoint-ID string
-equality filter on one-hop patterns; the existing v1 transports and all other
-HQL1 forms remain on their prior path. Legacy parser resources are preflighted
+plain-ASCII label; either form may have one same-alias exact string ID equality
+predicate. It also admits one plain-ASCII property key in an unlabeled,
+unconstrained zero-hop single-column projection; missing and explicit JSON null
+both project null. Labelled, filtered, ordered, limited, temporal and
+multi-column property projections remain unsupported. Bounded unlabeled
+one-hop projections through actor-bearing `Storage::query_v2`, including one
+exact endpoint-ID string equality filter on one-hop patterns; the existing v1
+transports and all other HQL1 forms remain on their prior path. Legacy parser resources are preflighted
 and reserved before AST construction. Full shared HQL1/v2/IR binding, broad
 exact-oracle coverage and resource/cancellation gates remain open. Earlier
 D1-D6 static review found no concrete implementation finding; independent D7
@@ -541,7 +545,7 @@ They never expose unscoped Storage or widen grant semantics.
 
 | Request field | Initial v2 behavior |
 |---|---|
-| language | explicit hql.v2 or query-ir.v2; hql.v1 is accepted only by actor-bearing `Storage::query_v2` after `Namespace(Read)` and namespace-equality checks, and only for D7's differential-tested zero-hop node-ID projection (unlabeled or one plain-ASCII label) or one-hop unlabeled/unconstrained node-ID projection allowlist (one-hop may include one endpoint `.id` string equality filter) lowered into the shared HQL2 pipeline; parser resource/work-limit failures return QUERY_BUDGET_EXCEEDED before legacy AST construction; other valid legacy forms/options return CAPABILITY_UNSUPPORTED; existing v1 endpoints remain unchanged |
+| language | explicit hql.v2 or query-ir.v2; hql.v1 is accepted only by actor-bearing `Storage::query_v2` after `Namespace(Read)` and namespace-equality checks, and only for D7's differential-tested zero-hop node-ID projection (unlabeled or one plain-ASCII label, optionally with one exact same-alias `.id` string equality), one unlabeled unconstrained zero-hop single-property projection with a plain-ASCII key and no predicate/order/limit/temporal selector, one-hop unlabeled/unconstrained node-ID projection (one-hop may include one endpoint `.id` string equality filter), or exact-seed depth-one `TRAVERSE` ID projection using one plain-ASCII relation or `ANY`, with omitted/out/in/both direction; traversal rejects fuzzy seeds, relation unions, selectors, filters, ordering, limits and other projections. All are lowered into the shared HQL2 pipeline; parser resource/work-limit failures return QUERY_BUDGET_EXCEEDED before legacy AST construction; other valid legacy forms/options return CAPABILITY_UNSUPPORTED; existing v1 endpoints remain unchanged |
 | explain | omitted means None; textual EXPLAIN/ANALYZE supplies the mode if the envelope is omitted; if both are supplied they must agree, otherwise BIND_ERROR; no mode silently upgrades plan-only to execution |
 | namespace/temporal | textual/envelope values must agree; omitted valid_at is one UTC instant captured under the query guard; omitted transaction selector is the pinned data frontier L; explicit `tx_as_of` selects S with `history_horizon <= S <= L`; every HQL/IR source, hydration path and `Snapshot.tx` uses S without current-state fallback |
 | index_policy | omitted means MergeDelta; initial exact scan does not consume an index and reports not_applicable coverage; explicit Wait/Eventual and Approx requests return CAPABILITY_UNSUPPORTED until implemented |
@@ -816,8 +820,11 @@ report. The approved addendum completion target passes 10/10, including lexical
 profile/P7-rank parity, ContextPack source/hash/scalar-offset/P7 parity,
 Sequence node/edge exact JSON properties, pre-SHORTEST filtering, contextual
 literal typing and no-partial budget exhaustion. The D7 HQL1 adapter target
-passes 10/10 for unlabeled or single-label zero-hop and unlabeled one-hop
-actor-bound differential execution,
+passes 13/13 for unlabeled or single-label zero-hop (with exact string ID
+equality on either form) and unlabeled one-hop
+actor-bound differential execution, including single-hop `TRAVERSE` with
+physical and wildcard relations in all directions, parallel-edge deduplication
+and visited-seed exclusion,
 parallel-edge multiplicity, all directions and wildcard relations, endpoint-ID
 string equality on either endpoint, denial/mismatch before parse, malformed
 syntax, fail-closed unlisted syntax and pre-parse resource rejection. The

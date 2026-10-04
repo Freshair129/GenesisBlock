@@ -259,10 +259,25 @@ Post-anchor explicit 22-target regression command (protected probe excluded):
 cargo test --locked --offline --no-default-features --jobs 1 --test hql2_annotation_acl_tests --test hql2_annotation_lookup_tests --test hql2_annotation_source_tests --test hql2_durable_revision_tests --test hql2_execution_tests --test hql2_expand_sequence_tests --test hql2_expand_tests --test hql2_graph_oracle_tests --test hql2_history_change_tests --test hql2_key_codec_tests --test hql2_lower_tests --test hql2_oracle_tests --test hql2_parser_tests --test hql2_pipeline_oracle_tests --test hql2_rank_oracle_tests --test hql2_request_tests --test hql2_scalar_execution_tests --test hql2_storage_source_tests --test hql2_value_tests --test hql2_vector_operator_tests --test hql2_vector_revision_tests --test hql2_wire_tests
 ```
 
-Latest guarded 33-target regression command (only the named HQL2 targets are selected):
+Previous guarded 33-target regression command (superseded by the 34-target loop below):
 
 ```powershell
 cargo test --locked --offline --no-default-features --jobs 1 --quiet --test hql2_annotation_acl_tests --test hql2_annotation_lookup_tests --test hql2_annotation_source_tests --test hql2_durable_revision_tests --test hql2_execution_tests --test hql2_expand_sequence_tests --test hql2_expand_tests --test hql2_graph_oracle_tests --test hql2_history_change_tests --test hql2_hql_reference_differential_tests --test hql2_hql1_adapter_tests --test hql2_key_codec_tests --test hql2_lower_tests --test hql2_oracle_tests --test hql2_p8_completion_tests --test hql2_parser_tests --test hql2_pattern_constraint_oracle_tests --test hql2_pipeline_oracle_tests --test hql2_rank_oracle_tests --test hql2_request_tests --test hql2_root_match_oracle_differential_tests --test hql2_scalar_execution_tests --test hql2_storage_aggregate_oracle_differential_tests --test hql2_storage_set_oracle_differential_tests --test hql2_storage_hql_join_oracle_differential_tests --test hql2_storage_join_oracle_differential_tests --test hql2_storage_source_tests --test hql2_value_tests --test hql2_vector_operator_tests --test hql2_vector_oracle_differential_tests --test hql2_vector_revision_tests --test hql2_wire_tests --test hql2_row_history_tests --target-dir target/hql2-execution
+```
+
+Latest guarded 34-target HQL2 regression loop (root test files only; protected
+probe excluded):
+
+```powershell
+$buildRoot = 'D:\CodexBuilds\GenesisBlock-HQL2-Execution-20261004'
+$env:CARGO_TARGET_DIR = Join-Path $buildRoot 'target'
+$env:TEMP = Join-Path $buildRoot 'tmp'
+$env:TMP = $env:TEMP
+$targets = Get-ChildItem tests -Filter 'hql2_*.rs' -File | Sort-Object Name
+foreach ($target in $targets) {
+  cargo test --locked --offline --no-default-features --jobs 1 --test $target.BaseName
+  if ($LASTEXITCODE -ne 0) { throw "Failed: $($target.BaseName)" }
+}
 ```
 
 First full-suite command (failed at the legacy fixture described above):
@@ -494,10 +509,13 @@ remain unavailable. The interrupted unfiltered command remains NOT_RUN; the
 guarded explicit sweeps are the only current results.
 
 HQL2 now has contextual NULL/list/JSON lowering. The differential-tested D7
-zero-hop actor-scoped HQL1 form (unlabeled or single-label) and bounded
-unlabeled one-hop form are lowered through
-`query_v2`; other legacy HQL forms remain on their old runtime and shared
-HQL1/v2/IR binding is not claimed. Checked HQL remainder,
+actor-scoped HQL1 forms include zero-hop ID scans (unlabeled or single-label,
+with one exact same-alias string ID predicate permitted on either form), one
+unlabeled zero-hop property projection, bounded unlabeled one-hop ID projection,
+and exact-seed depth-one `TRAVERSE` ID projection over one relation or `ANY` in
+default/out/in/both directions; these lower through `query_v2`. Other legacy
+HQL forms remain on their old runtime and shared HQL1/v2/IR binding is not
+claimed. Checked HQL remainder,
 NULLS LAST defaults and exact DecimalU64 structural parameters remain as recorded
 above. The Blueprint AnnotationPut example keeps separate `evidence` references.
 The ChangeScan P7 differential now covers all five supported subject kinds,

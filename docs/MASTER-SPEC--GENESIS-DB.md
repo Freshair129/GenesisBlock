@@ -439,6 +439,14 @@ independent-review or broad P8/P13 gates.
 
 ## Changelog
 
+Version diff 2.3.37b -> 2.3.38b: extend the approved D7 differential
+allowlist with exact-seed depth-one HQL1 `TRAVERSE` ID projection over one
+physical relation or `ANY` in default/out/in/both directions. Adapter 13/13;
+HQL2 387/0/1 across 34 targets; P6/schema-v6/compatibility remains 194/0/0
+across 11. Seed self-loops are excluded and parallel edges deduplicated. Other
+traversal forms remain fail-closed; P6 is unchanged and independent review,
+shared-runtime and broad P8/P13 gates remain open.
+
 | Version | Date | Owner | Summary |
 |---|---|---|---|
 | 2.3.41b | 2026-10-04 | GenesisBlockDB Architecture | Extend D7 after legacy/HQL2 differential to the exact same-alias string ID predicate on labeled zero-hop scans; adapter/order/filter 11/11, 2/2, 2/2 incl. wrong-label and backslash/Unicode; HQL2 394/0/1 across 35 targets, selected P6 peers 45/0/0 across 7; PR #213 code commit checks 40 pass, 4 worker failures with cause unconfirmed, 5 skipped, 1 Windows Cargo cancellation at 15-minute job limit; no P6/schema/transport change; broad shared-runtime/P8/P13 gates open |

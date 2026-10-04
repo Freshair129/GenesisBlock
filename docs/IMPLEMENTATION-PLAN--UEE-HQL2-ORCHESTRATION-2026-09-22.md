@@ -36,8 +36,10 @@ attributes:
 1. ทำ truth/obligation ledger และ architecture/compatibility ADR ก่อน
 2. ปิดช่องว่างและพิสูจน์ U1-U3 ของ current WAL + SQLite projection + unified transaction
 3. ค่อยตัดสินใจ G1-G3 (canonical durability, snapshots, exact reference engine)
-4. ทำ G4-G6 (HQL2/planner/composition) ต่อเมื่อมี ADR ใหม่อนุมัติ เพราะ HQL v2 ปัจจุบัน
-   ห้าม planner/EXPLAIN และ current Query IR เป็น `query-ir.v1`
+4. ทำ G4-G6 (HQL2/planner/composition) ตาม HQL2 execution ADR ที่ owner อนุมัติแล้ว
+   โดยจำกัด planner/EXPLAIN ไว้ที่ explicit `genesis.api.v2` + `hql.v2`/`query-ir.v2`;
+   ข้อห้ามยังคงกับ compatibility callers (`HQL`/`query-ir.v1`) และต้องผ่าน gates P7-P16
+   ตาม dependency order ใน ADR. ต้องมี ADR ใหม่เฉพาะเมื่อข้อเสนอเปลี่ยน approved contract
 5. ทำ G7-G10 หลัง exactness, lifecycle, surface parity และ migration contract ผ่านแล้ว
 
 Blueprint package ตรวจผ่าน 9/9 package checks แต่มี engine obligations 190 รายการเป็น

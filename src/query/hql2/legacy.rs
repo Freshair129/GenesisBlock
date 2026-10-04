@@ -2,7 +2,9 @@
 
 use super::{error::QueryErrorV2, exec::ExecutionBudgetV2};
 use crate::{
-    query::ast::{HqlCommand, HqlField, HqlOp, HqlValue, PatternDirection, PatternReturn},
+    query::ast::{
+        HqlCommand, HqlField, HqlOp, HqlRel, HqlReturn, HqlValue, PatternDirection, PatternReturn,
+    },
     uee_v2::{IndexPolicyV2, QueryFormatV2, QueryRequestV2},
 };
 
@@ -16,6 +18,54 @@ fn is_plain_identifier(name: &str) -> bool {
         .next()
         .is_some_and(|first| first.is_ascii_alphabetic() || first == '_')
         && chars.all(|ch| ch.is_ascii_alphanumeric() || ch == '_')
+}
+
+fn lower_single_hop_traverse(
+    seed: &str,
+    depth: u32,
+    rel: &HqlRel,
+    rels: &Option<Vec<String>>,
+    direction: &Option<String>,
+    fuzzy: bool,
+    as_of: &Option<String>,
+    clauses: &crate::query::ast::HqlClauses,
+) -> Result<(String, String), QueryErrorV2> {
+    if depth != 1
+        || fuzzy
+        || as_of.is_some()
+        || rels.is_some()
+        || !clauses.where_preds.is_empty()
+        || clauses.order_by.is_some()
+        || clauses.limit.is_some()
+        || !matches!(&clauses.ret, Some(HqlReturn::Fields(fields)) if fields.as_slice() == [HqlField::Id])
+    {
+        return Err(unsupported());
+    }
+    let HqlRel::Physical(relation) = rel else {
+        return Err(unsupported());
+    };
+    let any_relation = relation == "ANY";
+    if !any_relation && !is_plain_identifier(relation) {
+        return Err(unsupported());
+    }
+    let direction = direction.as_deref().unwrap_or("out");
+    let edge = match (direction, any_relation) {
+        ("out", true) => "-->".to_owned(),
+        ("in", true) => "<--".to_owned(),
+        ("both", true) => "--".to_owned(),
+        ("out", false) => format!("-[:{relation}]->"),
+        ("in", false) => format!("<-[:{relation}]-"),
+        ("both", false) => format!("-[:{relation}]-"),
+        _ => return Err(unsupported()),
+    };
+    let seed = serde_json::to_string(seed).map_err(|_| unsupported())?;
+
+    // Legacy neighbors marks the seed visited and emits each endpoint once,
+    // regardless of parallel edges. Match that with self exclusion + DISTINCT.
+    let source = format!(
+        "USE default MATCH (__hql1_source {{id: {seed}}}){edge}(__hql1_target) AS __hql1_path WALK |> FILTER __hql1_target.id != {seed} |> PROJECT __hql1_target.id AS id |> DISTINCT |> RETURN id"
+    );
+    Ok((source, "id".to_owned()))
 }
 
 /// Lower the differential-tested HQL1 subsets into the shared HQL2 source pipeline.
@@ -55,6 +105,21 @@ pub(crate) fn lower_hql_v1(
     budget.reserve(super::required_heap_bytes(source)?)?;
     let command = HqlCommand::try_from(source)
         .map_err(|_| QueryErrorV2::new("HQL_PARSE_ERROR", "parse", "legacy_syntax"))?;
+    if let HqlCommand::Traverse {
+        seed,
+        depth,
+        rel,
+        rels,
+        direction,
+        fuzzy,
+        as_of,
+        clauses,
+    } = &command
+    {
+        return lower_single_hop_traverse(
+            seed, *depth, rel, rels, direction, *fuzzy, as_of, clauses,
+        );
+    }
     let HqlCommand::MatchPattern {
         pattern,
         as_of,
@@ -81,9 +146,12 @@ pub(crate) fn lower_hql_v1(
         return Err(unsupported());
     }
     let projection = &fields[0];
-    if projection.field.as_ref() != Some(&HqlField::Id) {
-        return Err(unsupported());
-    }
+    let property_projection = match projection.field.as_ref() {
+        Some(HqlField::Id) => None,
+        Some(HqlField::Prop(property)) if is_plain_identifier(property) => Some(property.as_str()),
+        _ => return Err(unsupported()),
+    };
+    let id_projection = property_projection.is_none();
 
     let source = match pattern.hops.as_slice() {
         [] if projection.var == alias && clauses.order_by.is_none() => {
@@ -112,7 +180,8 @@ pub(crate) fn lower_hql_v1(
             )
         }
         [(edge, end)] => {
-            if pattern.start.label.is_some()
+            if !id_projection
+                || pattern.start.label.is_some()
                 || !end.props.is_empty()
                 || end.label.is_some()
                 || edge.var.is_some()
