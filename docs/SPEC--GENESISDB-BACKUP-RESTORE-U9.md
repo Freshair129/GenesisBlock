@@ -1,9 +1,11 @@
 ---
-version: "0.1.3b"
+doc_id: SPEC--GENESISDB-BACKUP-RESTORE-U9
+version: "0.1.6b"
 created_at: "2026-08-14T00:00:00+07:00,ATHER"
-last_update: "2026-08-14T00:30:00+07:00,ATHER"
+last_update: "2026-10-05T04:19:54+07:00,ATHER"
 status: "beta"
 superseded_by: null
+owner: "Boss (Founder / Product Authority)"
 attributes:
   doc_type: "spec"
   domain: "storage-lifecycle"
@@ -98,8 +100,15 @@ frontier. It then releases the barrier after the bundle is complete or fails.
 Restore first validates the whole bundle into a sibling staging directory. It
 does not open the target, mutate a live `Storage`, or create the target until
 manifest, versions, containment, sizes, and every digest pass. The engine then
-atomically publishes the staging root as the non-existing `target_root`. A
-fresh `Storage::open` is the proof that the result is usable.
+recovers staging and requires the recovered WAL-frame frontier to equal the
+manifest `stable_frontier`; it rejects a truncated suffix before generation
+publication. It then publishes or reuses a valid generation consistent with
+that frontier, and independently pins/validates it after a read-only reopen. It
+computes the complete `BackupBundleInfo`, including the bundle
+digest, before atomically publishing staging as the non-existing
+`target_root`; after rename succeeds, no further fallible operation may turn
+the API result into an error. A fresh `Storage::open` is the proof that the
+result is usable.
 
 Neither export nor restore performs encryption, remote upload, retention, or
 account authorization. Those remain the caller's concerns.
@@ -121,17 +130,26 @@ flowchart LR
 1. **Round trip:** relational schema/rows, nodes, an edge, a non-default vector
    collection, and managed blob metadata export then clean-target restore; a
    fresh open proves identical identities, query results, collection metadata,
-   frontier, and manifest digest.
-2. **Tamper rejection:** a changed artifact, manifest, duplicate path, traversal
+   manifest WAL-frame frontier, and manifest digest. Restore must also publish and
+   independently validate its P6 generation before the target is exposed. Its
+   local `GenerationPublished` frame may advance the restored live WAL frontier
+   beyond the unchanged manifest frame frontier.
+2. **Receipt-last round trip:** when a valid `GenerationPublished` receipt is
+   the bundle's final WAL frame, restore reuses it, preserves `txn_frontier`,
+   and succeeds without appending a duplicate receipt.
+3. **Recovered-frontier integrity:** a WAL with a corrupt final frame is
+   rejected even when its artifact digest is updated to match the damaged bytes;
+   the clean target remains absent.
+4. **Tamper rejection:** a changed artifact, manifest, duplicate path, traversal
    path, or extra archive entry fails before target creation.
-3. **Clean-target only:** an existing target and a bundle destination inside the
+5. **Clean-target only:** an existing target and a bundle destination inside the
    live root are rejected without changing either database.
-4. **Interrupted export:** a failing temporary write leaves no completed output
+6. **Interrupted export:** a failing temporary write leaves no completed output
    and leaves the source open/queryable.
-5. **Concurrent mutation boundary:** a mutation issued during export blocks at
+7. **Concurrent mutation boundary:** a mutation issued during export blocks at
    the lifecycle barrier; the restored result equals one declared frontier, not
    a mixture.
-6. **Compatibility:** unsupported format, engine, or schema versions fail with
+8. **Compatibility:** unsupported format, engine, or schema versions fail with
    a named compatibility error before target creation.
 
 ## 6. Non-goals and rollout
@@ -198,6 +216,9 @@ copy, or Google Drive work.
 
 | Version | Date | Status | Summary | Commit Hash | Agent |
 | --- | --- | --- | --- | --- | --- |
+| 0.1.6b | 2026-10-05 | beta | Record restore/P6 21/21 across five targets, HQL2 393/0/1 across 37, and full Rust suite exit 0 with `probe_vs_recall` filtered; cleanup after read-only/rename failure remains best-effort and unverified | working-tree | ATHER |
+| 0.1.5b | 2026-10-05 | beta | Specify receipt-last generation reuse, `txn_frontier` preservation, and complete return-metadata preparation before target rename; restore/P6 20/20 across five targets and HQL2 392/0/1 across 37; full Rust suite NOT_RUN | working-tree | ATHER |
+| 0.1.4b | 2026-10-05 | beta | Clarify that restore preserves the manifest/data frontier while required local P6 generation publication may advance the restored live WAL frontier; independent read-only validation precedes target exposure | working-tree | ATHER |
 | 0.1.3b | 2026-08-14 | beta | Closed the CRDT reconciliation lifecycle-barrier bypass without changing the public API; nested batch reconciliation remains safe. | working-tree | ATHER |
 | 0.1.2b | 2026-08-14 | beta | Implemented embedded opaque bundle export and clean-target restore with targeted passing evidence; FUNG integration remains separate. | working-tree | ATHER |
 | 0.1.1b | 2026-08-14 | beta | Boss approved the U9 embedded backup/clean-target restore contract. | N/A | ATHER |

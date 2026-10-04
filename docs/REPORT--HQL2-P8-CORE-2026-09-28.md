@@ -1,8 +1,8 @@
 ---
 doc_id: REPORT--HQL2-P8-CORE-2026-09-28
-version: "0.1.58b"
+version: "0.1.61b"
 created_at: "2026-09-28T04:35:00+07:00,ATHER,22bc11e"
-last_update: "2026-10-05T00:36:03+07:00,ATHER"
+last_update: "2026-10-05T04:19:54+07:00,ATHER"
 status: beta
 owner: GenesisBlockDB Engineering
 attributes:
@@ -162,8 +162,10 @@ probe target not selected.
 | Approved H2-D11 Vector HistoryScan extension | Implemented; local differential passed | HQL and typed IR read exact revisions using compact JSON `(owner_id, collection_id)` identity under the P6 lease and owner-node ACL; the vector source floor fails closed before access. Its result bags match independent P7 from WAL-derived revision facts and the captured frontier. The expanded five-kind HistoryScan differential passes; HistoryScan/ChangeScan passes 16/16, P7 graph target 39/39 and combined P7 130/130. |
 | HQL/typed-IR Row HistoryScan and ChangeScan parity | 1 passed, 0 failed | Retained insert/update revisions hydrate exact row properties; HQL and typed IR agree on history values, change operations and durable Row identity. Test-only regression coverage; no schema migration. |
 | HQL2/IR transaction-time snapshot (`tx_as_of`) | Implemented; local verification passed | One selected frontier S controls revision-backed scans, graph/vector/annotation operators, source-floor checks, property hydration and `Snapshot.tx`; the validated P6 generation/catalog/current policy remain pinned and no path falls back to current state. Five focused targets pass 56/56. |
-| Latest explicit root-HQL2 target sweep | 389 passed, 0 failed, 1 ignored across 35 root targets | All root `hql2_*_tests.rs` targets ran serially with `--locked --offline --no-default-features --jobs 1`; includes the H2-D11 R5 backup/restore parity regression. The ignored parser child is exercised by its parent; `zz_probe_discriminates` is excluded. Regression evidence, not P8 acceptance. |
-| Focused H2-D11 R5 backup/restore regression | 59 passed across seven targets | Preserves stable frontier, history horizon, revision/row IDs, schema, annotation selectors, source floors and HQL/typed-IR HistoryScan/ChangeScan parity. |
+| Latest explicit root-HQL2 target sweep | 393 passed, 0 failed, 1 ignored across 37 root targets | All root `hql2_*_tests.rs` targets ran serially with `--no-default-features`; includes source-backed NodeScan EXPLAIN and restore-generation regressions. The ignored parser child is exercised by its parent; `zz_probe_discriminates` is excluded. Regression evidence, not P8 acceptance. |
+| Focused H2-D11 R5 restore publication regression | 21 passed across five targets | Covers U9 backup/restore, H2-D11 history/revision parity, new-publication and receipt-last restore, exact recovered frontier, unchanged nonzero `txn_frontier`, read-only generation pin/validation before exposure, and P6 generation semantics. Return metadata is prepared before rename. Independent review found cleanup after read-only/rename failure remains best-effort and unverified. |
+| Full native Rust suite on the current restore patch | Exit 0; zero failures | `cargo test --locked --offline --no-default-features --jobs 1 --no-fail-fast -- --skip probe_vs_recall`; the long probe was filtered, three soak cases remain ignored, and the parser child entrypoint is exercised by its parent. Local verification only. |
+| Source-backed plan-only EXPLAIN coverage | 1 passed, 0 failed | A changed-store NodeScan plan proves AuthorizedNodeScan, no actuals/estimates, unchanged catalog/stable frontier and unchanged on-disk tree. Partial no-side-effect evidence only; independent operator-open counters and broad P8 acceptance remain open. |
 | Full Windows native Rust suite | `cargo test --locked --offline --no-default-features --jobs 1 --target-dir D:/CodexBuilds/GenesisBlock-HQL2-2026-10-02/preserved-target-hql2-execution`: exit 0; zero failures; three soak cases ignored | Includes the 60-build temporary `probe_vs_recall` experiment (1271.40s); informational only, not performance/P1 acceptance. |
 | Current selected P6/schema-v6 regression set | 43 passed, 0 failed, 0 ignored across six named targets | `wave_a_commit_tests`, `temporal_queries_tests`, `tx_as_of_wp22_tests`, `governance_tests`, `p6_peer_authority_tests`, `schema6_migration_tests`; focused current rerun, not the broader 11-target group. |
 | Separate P6/schema-v6/compatibility sweep | 194 passed, 0 failed, 0 ignored across 11 named targets | `p6_generation_tests`, `p6_lease_tests`, `p6_visibility_tests`, `p6_peer_authority_tests`, `schema6_migration_tests`, `query_ir_tests`, `hql_p0_tests`, `hql_filter_tests`, `hql_cypher_tests`, `napi_rest_parity_tests`, `rest_api_tests`; rerun in this continuation. |
@@ -476,27 +478,40 @@ from these local tests.
 
 | Artifact | Before | After |
 |---|---|---|
-| Registry | 0.5.68+draft | 0.5.69+draft |
-| P8 completion addendum | 0.1.10b | 0.1.11b |
-| P6 generations/leases/ACL | 0.5.34b | 0.5.35b |
-| P8 typed boundary | 0.2.57b | 0.2.58b |
-| P7 oracle report | 0.1.5b | 0.1.6b |
-| Orchestration plan | 0.8.62b | 0.8.63b |
-| C4 architecture index | 0.1.66b | 0.1.67b |
-| Master specification | 2.3.38b | 2.3.39b |
-| This report | 0.1.57b | 0.1.58b |
+| Registry | 0.5.71+draft | 0.5.72+draft |
+| ADR H2-D11 | 0.8.20b | 0.8.21b |
+| U9 backup/restore | 0.1.5b | 0.1.6b |
+| P6 generations/leases/ACL | 0.5.37b | 0.5.38b |
+| P8 typed boundary | 0.2.60b | 0.2.61b |
+| Orchestration plan | 0.8.65b | 0.8.66b |
+| C4 architecture index | 0.1.69b | 0.1.70b |
+| Master specification | 2.3.41b | 2.3.42b |
+| This report | 0.1.60b | 0.1.61b |
 
-Version diff 0.1.57b -> 0.1.58b: record the H2-D11 R5 backup/restore
-history-floor regression. The staging validation open uses full retention;
-the focused restore, revision, History/Change, row-history and annotation
-targets pass 59/59 across seven test binaries; the explicit all-HQL2 sweep
-passes 389/0/1 across 35 targets and the full locked/offline Windows Rust suite
-exits 0. The regression preserves history_horizon, source floors, durable
-revision/row IDs, schema and annotation selectors and matches HQL/typed-IR
-HistoryScan and ChangeScan. Three soak cases remain ignored. The full suite
-also ran the 60-build `zz_probe_discriminates::probe_vs_recall` experiment
-(1271.40s); informational only, not P1/performance acceptance. This does not
-claim broad P14 rehearsal, independent review, hosted CI or P8/P13 acceptance.
+Version diff 0.1.60b -> 0.1.61b: record focused restore/P6 21/21 across five
+targets, HQL2 393/0/1 across 37, and full native Rust suite exit 0 with the
+`probe_vs_recall` qualification test filtered. Independent review found no
+remaining core-path defect; cleanup after read-only validation/rename failure
+remains best-effort and unverified. EXPLAIN is still partial and broad P8/P13,
+P14 rehearsal, hosted CI and external qualification remain open.
+
+Version diff 0.1.59b -> 0.1.60b: require recovery to reproduce the manifest
+frame frontier; cover valid terminal-generation reuse, nonzero `txn_frontier`
+preservation, mismatch rejection before target creation, and prepare
+`BackupBundleInfo` before target rename. Restore/P6 tests pass 20/20 across five targets; the explicit HQL2
+sweep passes 392/0/1 across 37. The source-backed NodeScan EXPLAIN remains
+partial (1/1); full Rust suite NOT_RUN. P14 rehearsal, independent review,
+hosted CI and broad P8/P13 acceptance remain open.
+
+Version diff 0.1.58b -> 0.1.59b: implement approved H2-D11 R5 restore ordering
+with P6 publication at the bundle's manifest/data WAL frontier and independent
+read-only lease validation before target exposure. Focused restore/P6 tests pass
+15/15 across four targets; the explicit all-HQL2 sweep passes 391/0/1 across
+37 targets. A source-backed NodeScan plan-only EXPLAIN test passes 1/1 for
+unchanged catalog/stable frontier and disk tree, with no actuals or estimates.
+The local receipt may advance restored live `stable_frontier` without changing
+the bundle data frontier. Full Rust suite NOT_RUN on this patch; P14 rehearsal,
+independent review, hosted CI and broad P8/P13 acceptance remain open.
 
 Version diff 0.1.56b -> 0.1.57b: extend the approved D7 differential
 allowlist with exact-seed depth-one HQL1 `TRAVERSE` ID projection over one
@@ -671,6 +686,9 @@ P8 and release gates.
 
 | Version | Date | Status | Summary | Commit Hash | Agent |
 |---|---|---|---|---|---|
+| 0.1.61b | 2026-10-05 | beta | Record restore/P6 21/21, HQL2 393/0/1 across 37 and full native Rust suite exit 0 with `probe_vs_recall` filtered; EXPLAIN partial, cleanup failure paths best-effort/unverified; no schema/migration change, broad P14/P8/P13 gates remain open | working-tree | ATHER |
+| 0.1.60b | 2026-10-05 | beta | Handle valid receipt-last restore, preserve `txn_frontier`, and prepare return metadata before rename; focused restore/P6 20/20 across five targets, HQL2 392/0/1 across 37 targets; source-backed EXPLAIN remains partial; full Rust suite NOT_RUN; no schema/migration change, broad P14/P8/P13 gates remain open | working-tree | ATHER |
+| 0.1.59b | 2026-10-05 | beta | Implement approved H2-D11 R5 restore publication/independent read-only validation; focused 15/15 across four targets, HQL2 391/0/1 across 37 targets and source-backed NodeScan EXPLAIN 1/1; full Rust suite NOT_RUN on this patch; no schema/migration change, broad P14/P8/P13 gates remain open | working-tree | ATHER |
 | 0.1.58b | 2026-10-05 | beta | Record H2-D11 R5 restore-floor parity; focused 59/59, HQL2 389/0/1 across 35 targets, full Rust suite exit 0; no format/schema/migration change; broad P14, independent review, hosted CI and P8/P13 gates remain open | working-tree | ATHER |
 | 0.1.57b | 2026-10-04 | beta | Extend D7 with differential-proven exact-seed single-hop HQL1 TRAVERSE ID projection over one relation or ANY in default/out/in/both directions; adapter 13/13, HQL2 387/0/1 across 34 targets, P6/schema-v6/compatibility 194/0/0; preserve self-loop exclusion and parallel-edge deduplication; broad shared-runtime/P8/P13/review gates remain open | working-tree | ATHER |
 | 0.1.56b | 2026-10-04 | beta | Extend D7 with differential-proven unlabeled zero-hop single-property projection; property target 2/2 plus adapter 12/12, HQL2 386/0/1 across 34 targets, P6/schema-v6/compatibility 194/0/0; other property forms remain fail-closed; broad shared-runtime/P8/P13/review gates remain open | working-tree | ATHER |

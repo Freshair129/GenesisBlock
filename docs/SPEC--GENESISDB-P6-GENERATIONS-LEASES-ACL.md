@@ -1,9 +1,9 @@
 ---
 doc_id: SPEC--GENESISDB-P6-GENERATIONS-LEASES-ACL
 owner: GenesisBlockDB Engineering
-version: 0.5.35b
+version: 0.5.38b
 created_at: "2026-09-22T22:55:00+07:00,ATHER,working-tree"
-last_update: "2026-10-05T00:36:03+07:00,ATHER"
+last_update: "2026-10-05T04:19:54+07:00,ATHER"
 status: beta
 attributes:
   domain: storage-correctness
@@ -405,6 +405,29 @@ remain open.
 
 ## CHANGELOG
 
+Version diff 0.5.37b -> 0.5.38b: record restore/P6 21/21 across five targets,
+the explicit HQL2 sweep at 393/0/1 across 37 targets, and full Rust suite exit
+0 with `probe_vs_recall` filtered. Read-only validation/rename cleanup remains
+best-effort and its failure paths are not fault-injected; no ACL/schema/migration
+change.
+
+Version diff 0.5.36b -> 0.5.37b: require normal recovery to reproduce the
+manifest frame frontier before publication, then verify the restored P6
+generation whether restore publishes a new receipt or reuses a valid receipt
+already at the frontier. Preserve `txn_frontier`; prepare bundle return
+metadata before target rename. Restore/P6 tests pass 20/20 across five
+targets and the HQL2 sweep passes 392/0/1 across 37 targets. Full Rust suite
+NOT_RUN; no ACL/schema/migration change.
+
+Version diff 0.5.35b -> 0.5.36b: implement the approved R5 restore publication
+barrier: recover staging, publish a generation whose `wal_frontier` matches the
+bundle's declared data frontier, then independently reopen read-only and pin/
+validate a lease before exposing the target. The local receipt frame may advance
+the restored live WAL frontier; the bundle frontier, history floor and source
+coordinates remain unchanged. The focused restore/P6 set passes 15/15 across
+four targets and the HQL2 sweep passes 391/0/1 across 37 targets. The full Rust
+suite is NOT_RUN on this patch; no schema, ACL or migration change.
+
 Version diff 0.5.34b -> 0.5.35b: record H2-D11 R5 backup/restore history-floor
 parity. Restore staging validation now opens with full retention so its close
 checkpoint does not fold the packaged journal; the fixture preserves
@@ -546,6 +569,9 @@ broader P6/P8/P13 qualification is claimed.
 
 | Version | Date | Status | Summary | Commit | Agent |
 |---|---|---|---|---|---|
+| 0.5.38b | 2026-10-05 | beta | Record restore/P6 21/21, HQL2 393/0/1 across 37, and full Rust suite exit 0 with the long `probe_vs_recall` filtered; rename/read-only cleanup failure paths remain unverified; no ACL/schema/migration change | working-tree | ATHER |
+| 0.5.37b | 2026-10-05 | beta | Accept and validate either a newly published or receipt-last P6 generation at the manifest frontier; preserve transaction frontier and prepare return metadata before target rename; restore/P6 20/20, HQL2 392/0/1 across 37; full Rust suite NOT_RUN; no ACL/schema/migration change | working-tree | ATHER |
+| 0.5.36b | 2026-10-05 | beta | Implement and verify R5 staging generation publication plus independent read-only lease validation; 15 focused passes across four targets, HQL2 391/0/1 across 37 targets; full Rust suite NOT_RUN on this patch; no ACL/schema/migration change | working-tree | ATHER |
 | 0.5.35b | 2026-10-05 | beta | Record H2-D11 R5 restore-floor parity; 59 focused passes across seven targets, HQL2 389/0/1 across 35 targets and full Rust suite exit 0; no P6 contract/ACL/schema/migration change; broader P14 rehearsal, hosted worker and independent-review gates remain open | working-tree | ATHER |
 | 0.5.34b | 2026-10-04 | beta | Record D7's differential-proven single-hop HQL1 TRAVERSE ID projection for one relation or ANY in default/out/in/both directions; adapter 13/13, HQL2 387/0/1 across 34 targets, P6/schema-v6/compatibility 194/0/0; no P6 contract/ACL/schema/migration change; broad gates remain open | working-tree | ATHER |
 | 0.5.33b | 2026-10-04 | beta | Record D7's differential-proven unlabeled zero-hop single-property projection; property target 2/2, adapter 12/12, HQL2 386/0/1 across 34 targets, P6/schema-v6/compatibility 194/0/0; no P6 contract/ACL/schema/migration change; broad gates remain open | working-tree | ATHER |

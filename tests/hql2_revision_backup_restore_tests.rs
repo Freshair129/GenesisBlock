@@ -387,9 +387,13 @@ fn h2_d11_revision_identity_schema_floors_and_history_survive_backup_restore() {
     })
     .unwrap();
     assert_eq!(restored_bundle.sha256, exported.sha256);
+    assert_eq!(restored_bundle.stable_frontier, frontier);
 
     let restored = open(&restore_root);
-    assert_eq!(restored.stable_frontier(), frontier);
+    assert!(
+        restored.stable_frontier() >= frontier,
+        "restore may append a local P6 generation-publication frame"
+    );
     assert_eq!(database_id(&restored), source_database_id);
     assert_eq!(source.history_horizon(), restored.history_horizon());
     assert_eq!(

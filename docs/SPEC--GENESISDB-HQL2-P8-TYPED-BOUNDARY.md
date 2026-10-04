@@ -1,8 +1,8 @@
 ---
 doc_id: SPEC--GENESISDB-HQL2-P8-TYPED-BOUNDARY
-version: "0.2.58b"
+version: "0.2.61b"
 created_at: "2026-09-28T01:25:00+07:00,ATHER,fc851e9"
-last_update: "2026-10-04T20:48:54+07:00,ATHER"
+last_update: "2026-10-05T04:19:54+07:00,ATHER"
 status: beta
 superseded_by: null
 owner: "Boss (Founder / Product Authority)"
@@ -870,6 +870,28 @@ separate shape limits. No process-global Pest setting is changed.
 
 ## Version diff and changelog
 
+Version diff `0.2.60b -> 0.2.61b`: record the 21/21 restore/P6 matrix, the
+393/0/1 HQL2 sweep across 37 targets, and full Rust suite exit 0 with
+`probe_vs_recall` filtered. Restore cleanup on read-only validation/rename
+failure remains best-effort and unverified; EXPLAIN/P8/P13 acceptance remains
+open.
+
+Version diff `0.2.59b -> 0.2.60b`: require recovered WAL-frame frontier to
+match the manifest before publication; cover receipt-last generation reuse,
+unchanged nonzero `txn_frontier`, and pre-rename result preparation. Restore/P6 passes 20/20
+across five targets; HQL2 passes 392/0/1 across 37. Broad EXPLAIN/P8/P13 and
+full Rust-suite gates remain open at that checkpoint.
+
+Version diff `0.2.58b -> 0.2.59b`: add one source-backed, changed-store
+NodeScan plan-only EXPLAIN regression. It asserts an authorized source plan,
+no actuals/estimates, unchanged catalog/stable frontiers and identical on-disk
+tree. This is partial evidence only: explicit operator-open counters and the
+full EXPLAIN/P8/P13 acceptance matrix remain open. The H2-D11 R5 restore patch
+passes 20 focused restore/P6 tests across five targets and the root-HQL2 sweep
+passes 392/0/1 across 37 targets; full Rust suite NOT_RUN on this patch. Restore
+coverage includes an already-published terminal receipt and checks that
+`txn_frontier` is preserved.
+
 Version diff `0.2.57b -> 0.2.58b`: extend the approved D7 differential
 allowlist with exact-seed, depth-one HQL1 `TRAVERSE` ID projection over one
 physical relation or `ANY`, in default/out/in/both directions. The adapter
@@ -1022,6 +1044,7 @@ detail with unchanged JSON shape; broader P8/P13/review gates remain open.
 
 | From | To | Effect |
 |---|---|---|
+| 0.2.58b | 0.2.59b | Add changed-store source-backed NodeScan plan-only EXPLAIN coverage; assert no actuals/estimates and unchanged catalog/stable frontier plus disk tree; partial evidence only, broader EXPLAIN/P8/P13 acceptance remains open |
 | 0.2.55b | 0.2.56b | Add differential-proven exact string ID equality to zero-hop HQL1 scans with or without one label; adapter 12/12, HQL2 384/0/1 across 33 targets, P6/schema-v6/compatibility 194/0/0; other predicates/forms remain fail-closed, broad gates open |
 | 0.2.54b | 0.2.55b | Add differential-proven exact string ID equality to unlabeled zero-hop HQL1 scans; adapter 11/11, HQL2 383/0/1 across 33 targets, P6/schema-v6/compatibility 194/0/0; label+predicate and other unproven forms remain fail-closed, broad gates open |
 | 0.2.53b | 0.2.54b | Extend the conditional D7 HQL1 zero-hop node-ID allowlist to include a single plain-ASCII label after legacy/HQL2 differential; adapter 10/10; leave labeled one-hop and unproven forms fail-closed, with broad shared-runtime/P8/P13/review gates open |
@@ -1065,6 +1088,9 @@ detail with unchanged JSON shape; broader P8/P13/review gates remain open.
 
 | Version | Date | Status | Summary | Commit Hash | Agent |
 |---|---|---|---|---|---|
+| 0.2.61b | 2026-10-05 | beta | Record final restore/P6 21/21, HQL2 393/0/1 across 37 and full Rust suite exit 0 with `probe_vs_recall` filtered; cleanup failure paths remain best-effort/unverified; broad EXPLAIN/P8/P13 remain open | working-tree | ATHER |
+| 0.2.60b | 2026-10-05 | beta | Extend restore generation regression for terminal P6 receipt reuse and transaction-frontier preservation; restore/P6 20/20 across five targets, HQL2 392/0/1 across 37; full Rust suite NOT_RUN; broad EXPLAIN/P8/P13 remain open | working-tree | ATHER |
+| 0.2.59b | 2026-10-05 | beta | Add source-backed NodeScan plan-only EXPLAIN test for no actuals/estimates, stable/catalog frontier and disk-tree immutability; partial acceptance evidence only; HQL2 391/0/1 across 37 targets, restore/P6 15/15; full Rust suite NOT_RUN on patch; broad P8/P13 gates remain open | working-tree | ATHER |
 | 0.2.58b | 2026-10-04 | beta | Extend D7 with differential-proven single-hop HQL1 TRAVERSE ID projection for one physical relation or ANY in default/out/in/both directions; adapter 13/13, HQL2 387/0/1 across 34 targets, P6/schema-v6/compatibility 194/0/0; self-loop and parallel-edge legacy semantics retained; other forms fail closed; independent review and broad P8/P13 gates remain open | working-tree | ATHER |
 | 0.2.57b | 2026-10-04 | beta | Extend D7 with differential-proven unlabeled zero-hop single-property HQL1 projection; property target 2/2 plus adapter 12/12, HQL2 386/0/1 across 34 targets and P6/schema-v6/compatibility 194/0/0; other property shapes fail closed and broad P8/P13 gates remain open | working-tree | ATHER |
 | 0.2.56b | 2026-10-04 | beta | Extend D7 with differential-proven exact string ID equality on zero-hop HQL1 scans with or without one label; adapter 12/12, HQL2 384/0/1 across 33 targets and separate P6/compatibility 194/0/0; other predicates/forms remain fail-closed; broad P8/P13 gates remain open | working-tree | ATHER |
