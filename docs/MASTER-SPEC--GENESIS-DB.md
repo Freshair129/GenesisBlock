@@ -2,7 +2,7 @@
 title: "GenesisBlockDB Technical Architecture and Capability Composition"
 doc_id: "MASTER-SPEC-GENESISBLOCKDB"
 status: current
-version: "2.3.39b"
+version: "2.3.40b"
 updated: "2026-10-04"
 owner: "GenesisBlockDB Architecture"
 source_of_truth: true
@@ -52,7 +52,7 @@ rejection. HQL `JOIN TABLE` now lowers to the existing
 closed RowScan/Join pipeline for Inner/Left/Semi/Anti, with bare JOIN defaulting
 to Inner; HQL, typed IR and independent P7 differential results match for
 duplicate, missing-property NULL and JSON-null cases. The latest root-HQL2
-regression sweep passes 391/0/1 across 34 targets. Test-only optional
+regression sweep passes 392/0/1 across 34 targets. Test-only optional
 Sequence edge-property-miss and nested-JSON property differentials match
 independent P7 for HQL and typed IR; nested node/edge object and array values
 match exactly, while optional misses preserve all four input rows and
@@ -66,6 +66,9 @@ filter/project/distinct/order/take; both frontends match P7 and each other.
 The storage-backed HQL/typed-IR Node/Edge/Row source-scan bags also match
 independent P7, excluding wrong labels/relations and retaining two row keys;
 the focused storage-source target passes 10/10.
+The HQL/typed-IR ChangeScan P7 differential also covers five exclusive-after/
+inclusive-through windows, including equal empty bounds and explicit
+`tx_as_of` frontiers; the focused History/Change target passes 17/17.
 HistoryScan bags for Node, Edge, Row, Vector and Annotation match independent
 P7 catalogs assembled from WAL-derived revision facts and captured frontiers/
 valid-time windows, including endpoint, vector-owner and annotation-reference
@@ -425,6 +428,7 @@ user database was migrated, and broader P6/P8/P13 qualification remains open.
 
 | Version | Date | Owner | Summary |
 |---|---|---|---|
+| 2.3.40b | 2026-10-04 | GenesisBlockDB Architecture | Add test-only HQL/typed-IR ChangeScan P7 differential for five exclusive-after/inclusive-through windows, equal empty bounds and tx_as_of frontiers; History/Change 17/17 and HQL2 392/0/1 across 34 targets; PR #210 hosted checks 11 pass, four worker markerless-identity failures, one skipped; no runtime/contract/schema/P6/transport change; broad P8/P13 and independent review remain open |
 | 2.3.39b | 2026-10-04 | GenesisBlockDB Architecture | Add test-only HQL/typed-IR Node/Edge/Row source-scan P7 differential; focused target 10/10; fresh complete 34-target HQL2 sweep 391/0/1 (prior 393 count not reproduced); no runtime/contract/schema/P6/transport change; broad P8/P13 and independent review remain open |
 | 2.3.38b | 2026-10-04 | GenesisBlockDB Architecture | Extend D7 after legacy/HQL2 differential for one exact same-alias string ID predicate on unlabeled zero-hop HQL1 scans; adapter 11/11, ordering 2/2, HQL2 was reported 393/0/1 across 34 targets at that checkpoint; other forms remain fail-closed; no P6/schema/transport change; independent review and broad P8/P13 gates remain open |
 | 2.3.37b | 2026-10-04 | GenesisBlockDB Architecture | Record test-only nested-JSON Sequence property P7 differential for exact HQL/typed-IR node/edge object and array values; focused pattern 11/11, HQL2 392/0/1 across 34 targets; no runtime/contract/schema/P6/transport change; broad exact-oracle and P8/P13 qualification remain open |
