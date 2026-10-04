@@ -287,6 +287,7 @@ fn optional_text_rows(
 fn optional_expand_oracle_rows(
     environment: &Environment,
     node_predicate: graph::Predicate,
+    edge_predicate: graph::Predicate,
 ) -> Vec<(String, Option<String>, Option<String>)> {
     let expansion = graph::Expand {
         start_alias: "a".into(),
@@ -298,7 +299,7 @@ fn optional_expand_oracle_rows(
             min_hops: 1,
             max_hops: 1,
             node_predicate,
-            edge_predicate: graph::Predicate::default(),
+            edge_predicate,
         }],
         path_alias: None,
         mode: graph::PathMode::Walk,
@@ -861,6 +862,7 @@ fn optional_sequence_constraint_miss_preserves_input_and_null_extends_new_aliase
     let expected = optional_bag(optional_expand_oracle_rows(
         &oracle_environment(),
         predicate(Some("absent"), &["Company"]),
+        graph::Predicate::default(),
     ));
     assert_eq!(optional_bag(optional_text_rows(result)), expected);
     assert_eq!(optional_bag(optional_text_rows(hql)), expected);
@@ -911,7 +913,68 @@ fn optional_sequence_property_miss_matches_hql_typed_ir_and_p7() {
     let expected = optional_bag(optional_expand_oracle_rows(
         &oracle_environment_with_properties(),
         predicate_with_property(&["Company"], "missing", graph::Scalar::Text("x".into())),
+        graph::Predicate::default(),
     ));
+    assert_eq!(optional_bag(optional_text_rows(hql)), expected);
+    assert_eq!(optional_bag(optional_text_rows(ir)), expected);
+}
+
+#[test]
+fn optional_sequence_edge_property_miss_matches_hql_typed_ir_and_p7() {
+    let dir = TempDir::new().unwrap();
+    let storage = open(dir.path());
+    storage_property_fixture(&storage);
+
+    let hql = run(
+        &storage,
+        "pattern-optional-edge-property-miss-hql",
+        Some("USE default FROM NODES AS a |> OPTIONAL EXPAND (a)-[e:LINK {missing:\"x\"}]->(b:Company) |> RETURN a.id AS from, b.id AS to, e.id AS edge"),
+        Value::Null,
+        json!({}),
+    )
+    .unwrap();
+
+    let mut step = pattern_step("b", &["Company"], None);
+    step["edge"]["properties"] = json!({"missing":{"literal":"x","type":"Json"}});
+    let ir = run(
+        &storage,
+        "pattern-optional-edge-property-miss-ir",
+        None,
+        json!({
+            "contract_version":"query-ir.v2",
+            "nodes":[
+                {"id":"scan","op":"NodeScan","inputs":[],"config":{"as":"a"}},
+                {"id":"expand","op":"Expand","inputs":["scan"],"config":{
+                    "optional":true,
+                    "pattern":{"form":"sequence","start":pattern_node("a",None,&[]),"steps":[step],"mode":"walk"}
+                }},
+                {"id":"project","op":"Project","inputs":["expand"],"config":{"fields":[
+                    {"as":"from","expression":{"field":{"alias":"a","path":["id"]}}},
+                    {"as":"to","expression":{"field":{"alias":"b","path":["id"]}}},
+                    {"as":"edge","expression":{"field":{"alias":"e1","path":["id"]}}}
+                ]}}
+            ],
+            "root":"project",
+            "parameter_types":{}
+        }),
+        json!({}),
+    )
+    .unwrap();
+
+    let expected = optional_bag(optional_expand_oracle_rows(
+        &oracle_environment_with_properties(),
+        graph::Predicate::default(),
+        predicate_with_property(&[], "missing", graph::Scalar::Text("x".into())),
+    ));
+    assert_eq!(
+        expected,
+        BTreeMap::from([
+            (("a".into(), None, None), 1),
+            (("b".into(), None, None), 1),
+            (("c".into(), None, None), 1),
+            (("d".into(), None, None), 1),
+        ])
+    );
     assert_eq!(optional_bag(optional_text_rows(hql)), expected);
     assert_eq!(optional_bag(optional_text_rows(ir)), expected);
 }
