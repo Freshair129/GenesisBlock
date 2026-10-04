@@ -7,7 +7,6 @@
 
 use genesis_block_native::{EdgeInput, HybridSearchInput, NodeInput, OpenOptions, Storage};
 use serde_json::json;
-use sha2::{Digest, Sha256};
 use std::fs;
 use std::path::Path;
 
@@ -315,30 +314,20 @@ fn meta_v1_gbp1_snapshot_migrates() {
     v1_bytes.extend(postcard::to_allocvec(&v1).unwrap());
     fs::write(&meta_path, &v1_bytes).unwrap();
 
-    // Keep the intentionally rewritten component inside the P6 snapshot
-    // integrity envelope so startup reaches the GBP1 migration decoder.
+    // A pre-P6 snapshot has no component manifest. Otherwise replacing this
+    // component correctly triggers whole-snapshot rejection and WAL replay,
+    // which tests integrity recovery rather than the legacy GBP1 decoder.
     let state_path = Path::new(&path).join("state.json");
     let mut state: serde_json::Value =
         serde_json::from_slice(&fs::read(&state_path).unwrap()).unwrap();
-    let components = state["p6"]["manifest"]["components"]
-        .as_array_mut()
-        .unwrap();
-    let component = components
-        .iter_mut()
-        .find(|component| component["path"] == "meta_default.bin")
-        .unwrap();
-    component["bytes"] = json!(v1_bytes.len());
-    component["sha256"] = json!(hex::encode(Sha256::digest(&v1_bytes)));
-    let mut canonical_components = components.clone();
-    canonical_components.sort_by(|left, right| left["path"].as_str().cmp(&right["path"].as_str()));
-    let canonical = serde_json::to_vec(&json!({
-        "version": state["p6"]["manifest"]["version"],
-        "snapshot_frontier": state["p6"]["manifest"]["snapshot_frontier"],
-        "components": canonical_components,
-    }))
-    .unwrap();
-    state["p6"]["manifest"]["manifest_sha256"] = json!(hex::encode(Sha256::digest(canonical)));
-    fs::write(&state_path, state.to_string()).unwrap();
+    assert!(state["p6"]["generation"].is_null());
+    assert_eq!(state["p6"]["access_policy"]["mode"], "Disabled");
+    assert_eq!(state["p6"]["access_policy"]["revision"], 0);
+    state["schema_version"] = json!(4);
+    // The schema-v4 fixture predates the schema-v6 ready marker.
+    state.as_object_mut().unwrap().remove("upgrade_state");
+    state.as_object_mut().unwrap().remove("p6");
+    fs::write(&state_path, serde_json::to_vec(&state).unwrap()).unwrap();
 
     let s = open_with(&path, "full");
     {

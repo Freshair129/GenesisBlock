@@ -1,0 +1,21 @@
+{
+  "contract_version": "genesis.api.v2",
+  "request_id": "example-request-1",
+  "namespace": "kb",
+  "language_version": "hql.v2",
+  "hql": "USE kb FROM NODES Document AS d\n|> FILTER d.language = \"th\" AND d.published_at >= timestamp(\"2026-01-01T00:00:00Z\")\n|> KNN d IN docs USING $q TOP 20 EXACT AS hit\n|> RETURN d.id, hit.distance;\n",
+  "params": {
+    "q": {
+      "type": "vector",
+      "space_id": "fixture-space-v1",
+      "values": [
+        0.1,
+        0.2,
+        0.3
+      ]
+    }
+  },
+  "index_policy": "merge_delta",
+  "allow_partial": false,
+  "format": "json"
+}

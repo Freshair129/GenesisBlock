@@ -552,11 +552,13 @@ class GenesisDB(path: File) : Closeable {
 }
 ```
 
-Distribution: `.aar` published to Maven Central or GitHub Packages.
+Distribution: Maven Central is the preferred anonymous consumer path. The
+current coordinate is `io.github.freshair129:genesisdb-android:0.1.2`; GitHub
+Packages remains available only for compatibility with existing consumers.
 
 ```gradle
 dependencies {
-    implementation("dev.genesisblock:genesisdb-android:0.1.1")
+    implementation("io.github.freshair129:genesisdb-android:0.1.2")
 }
 ```
 

@@ -24,8 +24,6 @@
 //!      or silently dropped.
 
 use genesis_block_native::{HybridSearchInput, NodeInput, NodeMetadata, OpenOptions, Storage};
-use serde_json::json;
-use sha2::{Digest, Sha256};
 use std::fs;
 use std::path::Path;
 use tempfile::TempDir;
@@ -80,31 +78,20 @@ fn meta_path(dir: &str) -> std::path::PathBuf {
     Path::new(dir).join("meta_default.bin")
 }
 
-fn refresh_p6_manifest(path: &str, replacement: &[u8]) {
-    let state_path = Path::new(path).join("state.json");
-    let mut state: serde_json::Value =
-        serde_json::from_slice(&fs::read(&state_path).unwrap()).unwrap();
-    let mut canonical_components = {
-        let components = state["p6"]["manifest"]["components"]
-            .as_array_mut()
-            .unwrap();
-        let component = components
-            .iter_mut()
-            .find(|component| component["path"] == "meta_default.bin")
-            .unwrap();
-        component["bytes"] = json!(replacement.len());
-        component["sha256"] = json!(hex::encode(Sha256::digest(replacement)));
-        components.clone()
-    };
-    canonical_components.sort_by(|left, right| left["path"].as_str().cmp(&right["path"].as_str()));
-    let canonical = serde_json::to_vec(&json!({
-        "version": state["p6"]["manifest"]["version"],
-        "snapshot_frontier": state["p6"]["manifest"]["snapshot_frontier"],
-        "components": canonical_components,
-    }))
-    .unwrap();
-    state["p6"]["manifest"]["manifest_sha256"] = json!(hex::encode(Sha256::digest(canonical)));
-    fs::write(&state_path, state.to_string()).unwrap();
+// Legacy decoder fixtures must be schema4/no-P6 snapshots, not modified
+// schema5 components with stale integrity digests. Only fresh Disabled state
+// without a generation is eligible for this test-only fixture conversion.
+fn mark_snapshot_as_pre_p6(dir: &str) {
+    let path = Path::new(dir).join("state.json");
+    let mut state: serde_json::Value = serde_json::from_slice(&fs::read(&path).unwrap()).unwrap();
+    assert!(state["p6"]["generation"].is_null());
+    assert_eq!(state["p6"]["access_policy"]["mode"], "Disabled");
+    assert_eq!(state["p6"]["access_policy"]["revision"], 0);
+    state["schema_version"] = serde_json::json!(4);
+    // The schema-v4 fixture predates the schema-v6 ready marker.
+    state.as_object_mut().unwrap().remove("upgrade_state");
+    state.as_object_mut().unwrap().remove("p6");
+    fs::write(path, serde_json::to_vec(&state).unwrap()).unwrap();
 }
 
 /// (1) A snapshot saved by the current engine writes `meta_default.bin` in
@@ -214,10 +201,21 @@ fn legacy_bincode_blob_loads_and_rewrites_as_postcard() {
         "sanity: a real bincode blob must not accidentally start with GBP1"
     );
     fs::write(meta_path(&path), &legacy_bytes).unwrap();
-    refresh_p6_manifest(&path, &legacy_bytes);
+    mark_snapshot_as_pre_p6(&path);
 
     // Reopen: must load fine via the (unchanged) legacy bincode arm.
     let s2 = open(&path);
+    {
+        let collection = s2.collections.get("default").unwrap();
+        let metadata = collection.metadata.read();
+        assert_eq!(metadata.len(), 2);
+        assert!(
+            metadata
+                .iter()
+                .all(|row| row.created_seq == 0 && row.retired_seq == 0),
+            "prove legacy decode, not successful search after WAL fallback"
+        );
+    }
     assert_eq!(
         top1(&s2, vec![0.2, 0.2, 0.2, 0.2]).as_deref(),
         Some("SMALL"),
@@ -266,7 +264,7 @@ fn corrupted_magic_fails_loudly_not_silently() {
     let mut corrupt = META_MAGIC.to_vec();
     corrupt.extend(std::iter::repeat_n(0xFFu8, 32));
     fs::write(meta_path(&path), &corrupt).unwrap();
-    refresh_p6_manifest(&path, &corrupt);
+    mark_snapshot_as_pre_p6(&path);
 
     let _ = Storage::open(OpenOptions {
         path,
@@ -275,4 +273,31 @@ fn corrupted_magic_fails_loudly_not_silently() {
         vector_dim: Some(4),
         retention: None,
     });
+}
+
+#[test]
+fn current_manifest_rejects_corrupt_metadata_and_recovers_from_wal() {
+    let dir = TempDir::new().unwrap();
+    let path = dir.path().to_str().unwrap().to_string();
+    {
+        let storage = open(&path);
+        add(&storage, "n1", vec![1.0, 0.0, 0.0, 0.0], "en");
+        storage.flush_index();
+        storage.save_state().unwrap();
+    }
+    let mut corrupt = META_MAGIC.to_vec();
+    corrupt.extend(std::iter::repeat_n(0xFFu8, 32));
+    fs::write(meta_path(&path), corrupt).unwrap();
+    let storage = open(&path);
+    assert_eq!(
+        top1(&storage, vec![1.0, 0.0, 0.0, 0.0]).as_deref(),
+        Some("n1")
+    );
+    let collection = storage.collections.get("default").unwrap();
+    let metadata = collection.metadata.read();
+    assert_eq!(metadata.len(), 1);
+    assert!(
+        metadata[0].created_seq > 0,
+        "current corruption requires WAL recovery, not legacy zero stamps"
+    );
 }

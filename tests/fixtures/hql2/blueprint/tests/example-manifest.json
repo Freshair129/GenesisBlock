@@ -1,0 +1,146 @@
+{
+  "language_version": "hql.v2",
+  "status": "syntax-fixtures-not-legacy-executable",
+  "examples": [
+    {
+      "file": "examples/01-filter-before-knn.hql",
+      "parse": "accept"
+    },
+    {
+      "file": "examples/02-filter-after-knn.hql",
+      "parse": "accept"
+    },
+    {
+      "file": "examples/03-vector-to-graph.hql",
+      "parse": "accept"
+    },
+    {
+      "file": "examples/04-graph-to-vector.hql",
+      "parse": "accept"
+    },
+    {
+      "file": "examples/05-bitemporal.hql",
+      "parse": "accept"
+    },
+    {
+      "file": "examples/06-annotation-scan.hql",
+      "parse": "accept"
+    },
+    {
+      "file": "examples/07-relational-join.hql",
+      "parse": "accept"
+    },
+    {
+      "file": "examples/08-optional-annotation.hql",
+      "parse": "accept"
+    },
+    {
+      "file": "examples/09-context.hql",
+      "parse": "accept"
+    },
+    {
+      "file": "examples/10-lexical.hql",
+      "parse": "accept"
+    },
+    {
+      "file": "examples/11-explain.hql",
+      "parse": "accept"
+    },
+    {
+      "file": "examples/12-explain-analyze.hql",
+      "parse": "accept"
+    },
+    {
+      "file": "examples/13-btree.hql",
+      "parse": "accept"
+    },
+    {
+      "file": "examples/14-annotation-btree.hql",
+      "parse": "accept"
+    },
+    {
+      "file": "examples/15-hnsw.hql",
+      "parse": "accept"
+    },
+    {
+      "file": "examples/16-inverted.hql",
+      "parse": "accept"
+    },
+    {
+      "file": "examples/17-create-collection.hql",
+      "parse": "accept"
+    },
+    {
+      "file": "examples/18-node-write.hql",
+      "parse": "accept"
+    },
+    {
+      "file": "examples/19-atomic-write.hql",
+      "parse": "accept"
+    },
+    {
+      "file": "examples/20-annotation-write.hql",
+      "parse": "accept"
+    },
+    {
+      "file": "examples/21-retract.hql",
+      "parse": "accept"
+    },
+    {
+      "file": "examples/22-history.hql",
+      "parse": "accept"
+    },
+    {
+      "file": "examples/23-changes.hql",
+      "parse": "accept"
+    },
+    {
+      "file": "examples/24-shortest.hql",
+      "parse": "accept"
+    },
+    {
+      "file": "examples/25-boolean-null.hql",
+      "parse": "accept"
+    },
+    {
+      "file": "examples/26-rerank.hql",
+      "parse": "accept"
+    },
+    {
+      "file": "examples/27-union.hql",
+      "parse": "accept"
+    },
+    {
+      "file": "examples/28-apply.hql",
+      "parse": "accept"
+    },
+    {
+      "file": "examples/29-create-type.hql",
+      "parse": "accept"
+    },
+    {
+      "file": "examples/30-table-write.hql",
+      "parse": "accept"
+    },
+    {
+      "file": "examples/31-semi-join.hql",
+      "parse": "accept"
+    },
+    {
+      "file": "examples/32-admin.hql",
+      "parse": "accept"
+    },
+    {
+      "file": "examples/33-partial-index.hql",
+      "parse": "accept"
+    },
+    {
+      "file": "examples/34-take-zero.hql",
+      "parse": "accept"
+    },
+    {
+      "file": "examples/35-global-aggregate.hql",
+      "parse": "accept"
+    }
+  ]
+}

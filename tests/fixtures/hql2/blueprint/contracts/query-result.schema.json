@@ -1,0 +1,221 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.genesis.invalid/blueprint/v2/query-result.schema.json",
+  "type": "object",
+  "properties": {
+    "request_id": {
+      "type": "string"
+    },
+    "snapshot": {
+      "type": "object",
+      "properties": {
+        "database_id": {
+          "type": "string"
+        },
+        "tx": {
+          "type": "string",
+          "pattern": "^(0|[1-9][0-9]*)$"
+        },
+        "valid_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "catalog_generation": {
+          "type": "string",
+          "pattern": "^(0|[1-9][0-9]*)$"
+        },
+        "policy_version": {
+          "type": "string",
+          "pattern": "^(0|[1-9][0-9]*)$"
+        }
+      },
+      "required": [
+        "database_id",
+        "tx",
+        "valid_at",
+        "catalog_generation",
+        "policy_version"
+      ],
+      "additionalProperties": false
+    },
+    "columns": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string"
+          },
+          "nullable": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "name",
+          "type",
+          "nullable"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "rows": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      }
+    },
+    "semantics": {
+      "type": "object",
+      "properties": {
+        "candidate_search": {
+          "enum": [
+            "exact",
+            "approximate"
+          ]
+        },
+        "distance_fidelity": {
+          "enum": [
+            "original",
+            "quantized",
+            "not_applicable"
+          ]
+        },
+        "index_coverage": {
+          "enum": [
+            "complete",
+            "lagging",
+            "not_applicable"
+          ]
+        },
+        "scope": {
+          "enum": [
+            "whole_input",
+            "rerank_candidates",
+            "not_applicable"
+          ]
+        }
+      },
+      "required": [
+        "candidate_search",
+        "distance_fidelity",
+        "index_coverage",
+        "scope"
+      ],
+      "additionalProperties": false
+    },
+    "completeness": {
+      "type": "object",
+      "properties": {
+        "status": {
+          "enum": [
+            "complete",
+            "truncated",
+            "failed"
+          ]
+        },
+        "reason": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "eligible_count_known": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "status",
+        "reason",
+        "eligible_count_known"
+      ],
+      "additionalProperties": false
+    },
+    "index_frontiers": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "string",
+        "pattern": "^(0|[1-9][0-9]*)$"
+      }
+    },
+    "cursor": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "explain": {
+      "type": "object"
+    },
+    "error": {
+      "type": "object",
+      "properties": {
+        "code": {
+          "type": "string"
+        },
+        "stage": {
+          "type": "string"
+        },
+        "message": {
+          "type": "string"
+        },
+        "retryable": {
+          "type": "boolean"
+        },
+        "transaction_id": {
+          "type": "string"
+        },
+        "outcome": {
+          "enum": [
+            "none",
+            "rejected",
+            "unknown",
+            "durable_recovery_required",
+            "durable_published"
+          ]
+        },
+        "span": {
+          "type": "object",
+          "properties": {
+            "line": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "column": {
+              "type": "integer",
+              "minimum": 1
+            }
+          },
+          "required": [
+            "line",
+            "column"
+          ],
+          "additionalProperties": false
+        },
+        "detail": {
+          "type": "object"
+        }
+      },
+      "required": [
+        "code",
+        "stage",
+        "message",
+        "retryable"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "required": [
+    "request_id",
+    "snapshot",
+    "columns",
+    "rows",
+    "semantics",
+    "completeness",
+    "index_frontiers",
+    "cursor"
+  ],
+  "additionalProperties": false
+}

@@ -1,0 +1,203 @@
+name: Go SDK Distribution
+
+on:
+  pull_request:
+    paths:
+      - 'genesisdb-go/**'
+      - 'src/**'
+      - 'Cargo.toml'
+      - 'Cargo.lock'
+      - '.github/workflows/go-distribution.yml'
+  push:
+    tags:
+      - 'genesisdb-go/v*'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  MODULE: github.com/Freshair129/GenesisBlock/genesisdb-go
+  # pull_request runs check out a synthetic refs/pull/*/merge commit. That SHA
+  # is not a public repository revision `go get` can resolve. Use the actual PR
+  # head commit for external-consumer resolution; fall back to github.sha for
+  # manual runs.
+  RESOLVE_REF: ${{ github.event.pull_request.head.sha || github.sha }}
+
+jobs:
+  validate_release_tag:
+    name: validate Go submodule release tag
+    runs-on: ubuntu-latest
+    outputs:
+      module_version: ${{ steps.validate.outputs.module_version }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Verify tag shape and Go surface version
+        id: validate
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ "$GITHUB_EVENT_NAME" != "push" ]]; then
+            exit 0
+          fi
+
+          tag="$GITHUB_REF_NAME"
+          prefix="genesisdb-go/"
+          if [[ "$tag" != "$prefix"* ]]; then
+            echo "Expected a Go submodule tag beginning with $prefix; got $tag" >&2
+            exit 1
+          fi
+
+          version="${tag#"$prefix"}"
+          if ! [[ "$version" =~ ^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]]; then
+            echo "Expected a stable vMAJOR.MINOR.PATCH version; got $version" >&2
+            exit 1
+          fi
+
+          manifest_version="$(jq -er '.surfaces[] | select(.path == "genesisdb-go") | .version' modules.json)"
+          if [[ "$version" != "v$manifest_version" ]]; then
+            echo "Tag version $version does not match modules.json version v$manifest_version" >&2
+            exit 1
+          fi
+
+          echo "module_version=$version" >> "$GITHUB_OUTPUT"
+
+  module:
+    needs: validate_release_tag
+    name: module tests + clean external resolution
+    runs-on: ubuntu-latest
+    env:
+      RELEASE_VERSION: ${{ needs.validate_release_tag.outputs.module_version }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.20.x'
+          cache-dependency-path: genesisdb-go/go.mod
+
+      - name: Test submodule
+        working-directory: genesisdb-go
+        run: go test ./...
+
+      - name: Resolve the PR commit or release version from a clean external module
+        shell: bash
+        run: |
+          set -euo pipefail
+          CONSUMER="$RUNNER_TEMP/go-consumer"
+          mkdir -p "$CONSUMER"
+          cd "$CONSUMER"
+          go mod init example.com/genesis-consumer
+          if [[ -n "$RELEASE_VERSION" ]]; then
+            GOPROXY=https://proxy.golang.org go get "$MODULE@$RELEASE_VERSION"
+          else
+            GOPROXY=direct GONOSUMDB="$MODULE" go get "$MODULE@$RESOLVE_REF"
+          fi
+          cat > main.go <<'GO'
+          package main
+
+          import (
+              "fmt"
+              genesisdb "github.com/Freshair129/GenesisBlock/genesisdb-go"
+          )
+
+          func main() {
+              c := genesisdb.NewClient("http://127.0.0.1:3000")
+              fmt.Println(c.BaseURL)
+          }
+          GO
+          go run .
+
+  live-server-integration:
+    needs: validate_release_tag
+    name: clean Go consumer against live Rust server
+    runs-on: ubuntu-latest
+    env:
+      RELEASE_VERSION: ${{ needs.validate_release_tag.outputs.module_version }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.20.x'
+          cache: false
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: go-sdk-live-server
+
+      - name: Build standalone server
+        run: cargo build --locked --release --no-default-features --features bins --bin genesis-db-server
+
+      - name: Start GenesisBlockDB
+        shell: bash
+        run: |
+          set -euo pipefail
+          DATA_DIR="$RUNNER_TEMP/genesis-go-integration"
+          mkdir -p "$DATA_DIR"
+          GENESIS_DATA_DIR="$DATA_DIR" \
+          GENESIS_HOST=127.0.0.1 \
+          GENESIS_PORT=3000 \
+          ./target/release/genesis-db-server >"$RUNNER_TEMP/genesis-server.log" 2>&1 &
+          echo $! >"$RUNNER_TEMP/genesis-server.pid"
+          for _ in $(seq 1 60); do
+            if curl -fsS http://127.0.0.1:3000/v1/status >/dev/null; then
+              exit 0
+            fi
+            sleep 1
+          done
+          cat "$RUNNER_TEMP/genesis-server.log"
+          exit 1
+
+      - name: Resolve PR commit or release version and create a node
+        shell: bash
+        run: |
+          set -euo pipefail
+          CONSUMER="$RUNNER_TEMP/go-live-consumer"
+          mkdir -p "$CONSUMER"
+          cd "$CONSUMER"
+          go mod init example.com/genesis-live-consumer
+          if [[ -n "$RELEASE_VERSION" ]]; then
+            GOPROXY=https://proxy.golang.org go get "$MODULE@$RELEASE_VERSION"
+          else
+            GOPROXY=direct GONOSUMDB="$MODULE" go get "$MODULE@$RESOLVE_REF"
+          fi
+          cat > main.go <<'GO'
+          package main
+
+          import (
+              "context"
+              "fmt"
+              genesisdb "github.com/Freshair129/GenesisBlock/genesisdb-go"
+          )
+
+          func main() {
+              client := genesisdb.NewClient("http://127.0.0.1:3000")
+              node, err := client.AddNode(context.Background(), genesisdb.NodeInput{
+                  ID: "go-distribution-smoke",
+                  Labels: []string{"GoDistributionSmoke"},
+                  Props: map[string]interface{}{"source": "remote-module"},
+              })
+              if err != nil {
+                  panic(err)
+              }
+              if node.ID != "go-distribution-smoke" {
+                  panic("unexpected node id")
+              }
+              fmt.Println("live server round trip:", node.ID)
+          }
+          GO
+          go run .
+
+      - name: Stop server gracefully
+        if: always()
+        shell: bash
+        run: |
+          if [ -f "$RUNNER_TEMP/genesis-server.pid" ]; then
+            kill -TERM "$(cat "$RUNNER_TEMP/genesis-server.pid")" || true
+            wait "$(cat "$RUNNER_TEMP/genesis-server.pid")" || true
+          fi
+          cat "$RUNNER_TEMP/genesis-server.log" 2>/dev/null || true

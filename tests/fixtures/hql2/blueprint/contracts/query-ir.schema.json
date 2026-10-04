@@ -1,0 +1,1810 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "contract_version": {
+      "const": "query-ir.v2"
+    },
+    "nodes": {
+      "type": "array",
+      "items": {
+        "oneOf": [
+          {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+              },
+              "op": {
+                "const": "NodeScan"
+              },
+              "inputs": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+                },
+                "minItems": 0,
+                "maxItems": 0
+              },
+              "config": {
+                "type": "object",
+                "properties": {
+                  "as": {
+                    "type": "string",
+                    "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+                  },
+                  "label": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 256
+                  }
+                },
+                "required": [
+                  "as"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "required": [
+              "id",
+              "op",
+              "inputs",
+              "config"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+              },
+              "op": {
+                "const": "EdgeScan"
+              },
+              "inputs": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+                },
+                "minItems": 0,
+                "maxItems": 0
+              },
+              "config": {
+                "type": "object",
+                "properties": {
+                  "as": {
+                    "type": "string",
+                    "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+                  },
+                  "relation": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 256
+                  }
+                },
+                "required": [
+                  "as"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "required": [
+              "id",
+              "op",
+              "inputs",
+              "config"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+              },
+              "op": {
+                "const": "RowScan"
+              },
+              "inputs": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+                },
+                "minItems": 0,
+                "maxItems": 0
+              },
+              "config": {
+                "type": "object",
+                "properties": {
+                  "table": {
+                    "type": "string",
+                    "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+                  },
+                  "as": {
+                    "type": "string",
+                    "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+                  }
+                },
+                "required": [
+                  "table",
+                  "as"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "required": [
+              "id",
+              "op",
+              "inputs",
+              "config"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+              },
+              "op": {
+                "const": "AnnotationScan"
+              },
+              "inputs": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+                },
+                "minItems": 0,
+                "maxItems": 0
+              },
+              "config": {
+                "type": "object",
+                "properties": {
+                  "as": {
+                    "type": "string",
+                    "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+                  }
+                },
+                "required": [
+                  "as"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "required": [
+              "id",
+              "op",
+              "inputs",
+              "config"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+              },
+              "op": {
+                "const": "Values"
+              },
+              "inputs": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+                },
+                "minItems": 0,
+                "maxItems": 0
+              },
+              "config": {
+                "type": "object",
+                "properties": {
+                  "param": {
+                    "type": "string",
+                    "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+                  },
+                  "as": {
+                    "type": "string",
+                    "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+                  }
+                },
+                "required": [
+                  "param",
+                  "as"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "required": [
+              "id",
+              "op",
+              "inputs",
+              "config"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+              },
+              "op": {
+                "const": "HistoryScan"
+              },
+              "inputs": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+                },
+                "minItems": 0,
+                "maxItems": 0
+              },
+              "config": {
+                "type": "object",
+                "properties": {
+                  "kind": {
+                    "enum": [
+                      "node",
+                      "edge",
+                      "row",
+                      "annotation",
+                      "artifact"
+                    ]
+                  },
+                  "id": {
+                    "$ref": "#/$defs/expr"
+                  },
+                  "as": {
+                    "type": "string",
+                    "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+                  }
+                },
+                "required": [
+                  "kind",
+                  "id",
+                  "as"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "required": [
+              "id",
+              "op",
+              "inputs",
+              "config"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+              },
+              "op": {
+                "const": "ChangeScan"
+              },
+              "inputs": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+                },
+                "minItems": 0,
+                "maxItems": 0
+              },
+              "config": {
+                "type": "object",
+                "properties": {
+                  "after_seq": {
+                    "type": "string",
+                    "pattern": "^(0|[1-9][0-9]*)$"
+                  },
+                  "as": {
+                    "type": "string",
+                    "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+                  }
+                },
+                "required": [
+                  "after_seq",
+                  "as"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "required": [
+              "id",
+              "op",
+              "inputs",
+              "config"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+              },
+              "op": {
+                "const": "Match"
+              },
+              "inputs": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+                },
+                "minItems": 0,
+                "maxItems": 0
+              },
+              "config": {
+                "type": "object",
+                "properties": {
+                  "pattern": {
+                    "oneOf": [
+                      {
+                        "type": "object",
+                        "properties": {
+                          "start_alias": {
+                            "type": "string",
+                            "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+                          },
+                          "end_alias": {
+                            "type": "string",
+                            "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+                          },
+                          "edge_alias": {
+                            "type": "string",
+                            "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+                          },
+                          "relations": {
+                            "type": "array",
+                            "items": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 256
+                            }
+                          },
+                          "direction": {
+                            "enum": [
+                              "out",
+                              "in",
+                              "both"
+                            ]
+                          },
+                          "min_hops": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 32
+                          },
+                          "max_hops": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 32
+                          },
+                          "mode": {
+                            "enum": [
+                              "trail",
+                              "simple",
+                              "walk"
+                            ]
+                          },
+                          "path_alias": {
+                            "type": "string",
+                            "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+                          }
+                        },
+                        "required": [
+                          "start_alias",
+                          "end_alias",
+                          "relations",
+                          "direction",
+                          "min_hops",
+                          "max_hops",
+                          "mode"
+                        ],
+                        "additionalProperties": false
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "form": {
+                            "const": "sequence"
+                          },
+                          "start": {
+                            "type": "object",
+                            "properties": {
+                              "alias": {
+                                "type": "string",
+                                "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+                              },
+                              "id": {
+                                "$ref": "#/$defs/expr"
+                              },
+                              "labels": {
+                                "type": "array",
+                                "items": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 256
+                                }
+                              },
+                              "properties": {
+                                "type": "object",
+                                "additionalProperties": {
+                                  "$ref": "#/$defs/expr"
+                                }
+                              }
+                            },
+                            "required": [
+                              "alias",
+                              "labels",
+                              "properties"
+                            ],
+                            "additionalProperties": false
+                          },
+                          "steps": {
+                            "type": "array",
+                            "minItems": 1,
+                            "maxItems": 32,
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "edge": {
+                                  "type": "object",
+                                  "properties": {
+                                    "alias": {
+                                      "type": "string",
+                                      "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+                                    },
+                                    "relations": {
+                                      "type": "array",
+                                      "items": {
+                                        "type": "string",
+                                        "minLength": 1,
+                                        "maxLength": 256
+                                      }
+                                    },
+                                    "direction": {
+                                      "enum": [
+                                        "out",
+                                        "in",
+                                        "both"
+                                      ]
+                                    },
+                                    "min_hops": {
+                                      "type": "integer",
+                                      "minimum": 0,
+                                      "maximum": 32
+                                    },
+                                    "max_hops": {
+                                      "type": "integer",
+                                      "minimum": 0,
+                                      "maximum": 32
+                                    },
+                                    "properties": {
+                                      "type": "object",
+                                      "additionalProperties": {
+                                        "$ref": "#/$defs/expr"
+                                      }
+                                    }
+                                  },
+                                  "required": [
+                                    "relations",
+                                    "direction",
+                                    "min_hops",
+                                    "max_hops",
+                                    "properties"
+                                  ],
+                                  "additionalProperties": false
+                                },
+                                "node": {
+                                  "type": "object",
+                                  "properties": {
+                                    "alias": {
+                                      "type": "string",
+                                      "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+                                    },
+                                    "id": {
+                                      "$ref": "#/$defs/expr"
+                                    },
+                                    "labels": {
+                                      "type": "array",
+                                      "items": {
+                                        "type": "string",
+                                        "minLength": 1,
+                                        "maxLength": 256
+                                      }
+                                    },
+                                    "properties": {
+                                      "type": "object",
+                                      "additionalProperties": {
+                                        "$ref": "#/$defs/expr"
+                                      }
+                                    }
+                                  },
+                                  "required": [
+                                    "alias",
+                                    "labels",
+                                    "properties"
+                                  ],
+                                  "additionalProperties": false
+                                }
+                              },
+                              "required": [
+                                "edge",
+                                "node"
+                              ],
+                              "additionalProperties": false
+                            }
+                          },
+                          "mode": {
+                            "enum": [
+                              "trail",
+                              "simple",
+                              "walk"
+                            ]
+                          },
+                          "path_alias": {
+                            "type": "string",
+                            "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+                          }
+                        },
+                        "required": [
+                          "form",
+                          "start",
+                          "steps",
+                          "mode"
+                        ],
+                        "additionalProperties": false
+                      }
+                    ]
+                  },
+                  "anchors": {
+                    "type": "object",
+                    "additionalProperties": {
+                      "$ref": "#/$defs/expr"
+                    }
+                  },
+                  "shortest": {
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "pattern",
+                  "anchors",
+                  "shortest"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "required": [
+              "id",
+              "op",
+              "inputs",
+              "config"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+              },
+              "op": {
+                "const": "Filter"
+              },
+              "inputs": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+                },
+                "minItems": 1,
+                "maxItems": 1
+              },
+              "config": {
+                "type": "object",
+                "properties": {
+                  "predicate": {
+                    "$ref": "#/$defs/expr"
+                  }
+                },
+                "required": [
+                  "predicate"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "required": [
+              "id",
+              "op",
+              "inputs",
+              "config"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+              },
+              "op": {
+                "const": "Project"
+              },
+              "inputs": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+                },
+                "minItems": 1,
+                "maxItems": 1
+              },
+              "config": {
+                "type": "object",
+                "properties": {
+                  "fields": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "expression": {
+                          "$ref": "#/$defs/expr"
+                        },
+                        "as": {
+                          "type": "string",
+                          "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+                        }
+                      },
+                      "required": [
+                        "expression",
+                        "as"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "minItems": 1
+                  }
+                },
+                "required": [
+                  "fields"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "required": [
+              "id",
+              "op",
+              "inputs",
+              "config"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+              },
+              "op": {
+                "const": "Distinct"
+              },
+              "inputs": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+                },
+                "minItems": 1,
+                "maxItems": 1
+              },
+              "config": {
+                "type": "object",
+                "properties": {},
+                "required": [],
+                "additionalProperties": false
+              }
+            },
+            "required": [
+              "id",
+              "op",
+              "inputs",
+              "config"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+              },
+              "op": {
+                "const": "Knn"
+              },
+              "inputs": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+                },
+                "minItems": 1,
+                "maxItems": 1
+              },
+              "config": {
+                "type": "object",
+                "properties": {
+                  "entity": {
+                    "type": "string",
+                    "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+                  },
+                  "collection": {
+                    "type": "string",
+                    "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+                  },
+                  "query": {
+                    "$ref": "#/$defs/expr"
+                  },
+                  "k": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 10000
+                  },
+                  "mode": {
+                    "enum": [
+                      "exact",
+                      "approx"
+                    ]
+                  },
+                  "as": {
+                    "type": "string",
+                    "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+                  }
+                },
+                "required": [
+                  "entity",
+                  "collection",
+                  "query",
+                  "k",
+                  "mode",
+                  "as"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "required": [
+              "id",
+              "op",
+              "inputs",
+              "config"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+              },
+              "op": {
+                "const": "Rerank"
+              },
+              "inputs": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+                },
+                "minItems": 1,
+                "maxItems": 1
+              },
+              "config": {
+                "type": "object",
+                "properties": {
+                  "entity": {
+                    "type": "string",
+                    "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+                  },
+                  "collection": {
+                    "type": "string",
+                    "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+                  },
+                  "query": {
+                    "$ref": "#/$defs/expr"
+                  },
+                  "k": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 10000
+                  },
+                  "fidelity": {
+                    "const": "original"
+                  },
+                  "as": {
+                    "type": "string",
+                    "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+                  }
+                },
+                "required": [
+                  "entity",
+                  "collection",
+                  "query",
+                  "k",
+                  "fidelity",
+                  "as"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "required": [
+              "id",
+              "op",
+              "inputs",
+              "config"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+              },
+              "op": {
+                "const": "Expand"
+              },
+              "inputs": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+                },
+                "minItems": 1,
+                "maxItems": 1
+              },
+              "config": {
+                "type": "object",
+                "properties": {
+                  "pattern": {
+                    "oneOf": [
+                      {
+                        "type": "object",
+                        "properties": {
+                          "start_alias": {
+                            "type": "string",
+                            "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+                          },
+                          "end_alias": {
+                            "type": "string",
+                            "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+                          },
+                          "edge_alias": {
+                            "type": "string",
+                            "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+                          },
+                          "relations": {
+                            "type": "array",
+                            "items": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 256
+                            }
+                          },
+                          "direction": {
+                            "enum": [
+                              "out",
+                              "in",
+                              "both"
+                            ]
+                          },
+                          "min_hops": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 32
+                          },
+                          "max_hops": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 32
+                          },
+                          "mode": {
+                            "enum": [
+                              "trail",
+                              "simple",
+                              "walk"
+                            ]
+                          },
+                          "path_alias": {
+                            "type": "string",
+                            "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+                          }
+                        },
+                        "required": [
+                          "start_alias",
+                          "end_alias",
+                          "relations",
+                          "direction",
+                          "min_hops",
+                          "max_hops",
+                          "mode"
+                        ],
+                        "additionalProperties": false
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "form": {
+                            "const": "sequence"
+                          },
+                          "start": {
+                            "type": "object",
+                            "properties": {
+                              "alias": {
+                                "type": "string",
+                                "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+                              },
+                              "id": {
+                                "$ref": "#/$defs/expr"
+                              },
+                              "labels": {
+                                "type": "array",
+                                "items": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 256
+                                }
+                              },
+                              "properties": {
+                                "type": "object",
+                                "additionalProperties": {
+                                  "$ref": "#/$defs/expr"
+                                }
+                              }
+                            },
+                            "required": [
+                              "alias",
+                              "labels",
+                              "properties"
+                            ],
+                            "additionalProperties": false
+                          },
+                          "steps": {
+                            "type": "array",
+                            "minItems": 1,
+                            "maxItems": 32,
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "edge": {
+                                  "type": "object",
+                                  "properties": {
+                                    "alias": {
+                                      "type": "string",
+                                      "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+                                    },
+                                    "relations": {
+                                      "type": "array",
+                                      "items": {
+                                        "type": "string",
+                                        "minLength": 1,
+                                        "maxLength": 256
+                                      }
+                                    },
+                                    "direction": {
+                                      "enum": [
+                                        "out",
+                                        "in",
+                                        "both"
+                                      ]
+                                    },
+                                    "min_hops": {
+                                      "type": "integer",
+                                      "minimum": 0,
+                                      "maximum": 32
+                                    },
+                                    "max_hops": {
+                                      "type": "integer",
+                                      "minimum": 0,
+                                      "maximum": 32
+                                    },
+                                    "properties": {
+                                      "type": "object",
+                                      "additionalProperties": {
+                                        "$ref": "#/$defs/expr"
+                                      }
+                                    }
+                                  },
+                                  "required": [
+                                    "relations",
+                                    "direction",
+                                    "min_hops",
+                                    "max_hops",
+                                    "properties"
+                                  ],
+                                  "additionalProperties": false
+                                },
+                                "node": {
+                                  "type": "object",
+                                  "properties": {
+                                    "alias": {
+                                      "type": "string",
+                                      "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+                                    },
+                                    "id": {
+                                      "$ref": "#/$defs/expr"
+                                    },
+                                    "labels": {
+                                      "type": "array",
+                                      "items": {
+                                        "type": "string",
+                                        "minLength": 1,
+                                        "maxLength": 256
+                                      }
+                                    },
+                                    "properties": {
+                                      "type": "object",
+                                      "additionalProperties": {
+                                        "$ref": "#/$defs/expr"
+                                      }
+                                    }
+                                  },
+                                  "required": [
+                                    "alias",
+                                    "labels",
+                                    "properties"
+                                  ],
+                                  "additionalProperties": false
+                                }
+                              },
+                              "required": [
+                                "edge",
+                                "node"
+                              ],
+                              "additionalProperties": false
+                            }
+                          },
+                          "mode": {
+                            "enum": [
+                              "trail",
+                              "simple",
+                              "walk"
+                            ]
+                          },
+                          "path_alias": {
+                            "type": "string",
+                            "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+                          }
+                        },
+                        "required": [
+                          "form",
+                          "start",
+                          "steps",
+                          "mode"
+                        ],
+                        "additionalProperties": false
+                      }
+                    ]
+                  },
+                  "optional": {
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "pattern",
+                  "optional"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "required": [
+              "id",
+              "op",
+              "inputs",
+              "config"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+              },
+              "op": {
+                "const": "AnnotationLookup"
+              },
+              "inputs": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+                },
+                "minItems": 1,
+                "maxItems": 1
+              },
+              "config": {
+                "type": "object",
+                "properties": {
+                  "target": {
+                    "type": "string",
+                    "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+                  },
+                  "as": {
+                    "type": "string",
+                    "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+                  },
+                  "optional": {
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "target",
+                  "as",
+                  "optional"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "required": [
+              "id",
+              "op",
+              "inputs",
+              "config"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+              },
+              "op": {
+                "const": "LexicalMatch"
+              },
+              "inputs": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+                },
+                "minItems": 1,
+                "maxItems": 1
+              },
+              "config": {
+                "type": "object",
+                "properties": {
+                  "entity": {
+                    "type": "string",
+                    "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+                  },
+                  "field": {
+                    "type": "string",
+                    "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+                  },
+                  "query": {
+                    "$ref": "#/$defs/expr"
+                  },
+              "index": {
+                "type": "string",
+                "pattern": "^[A-Za-z_][A-Za-z0-9_-]{0,127}$"
+                  },
+                  "k": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 10000
+                  },
+                  "as": {
+                    "type": "string",
+                    "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+                  }
+                },
+                "required": [
+                  "entity",
+                  "field",
+                  "query",
+                  "index",
+                  "k",
+                  "as"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "required": [
+              "id",
+              "op",
+              "inputs",
+              "config"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+              },
+              "op": {
+                "const": "Join"
+              },
+              "inputs": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+                },
+                "minItems": 2,
+                "maxItems": 2
+              },
+              "config": {
+                "type": "object",
+                "properties": {
+                  "kind": {
+                    "enum": [
+                      "inner",
+                      "left",
+                      "semi",
+                      "anti"
+                    ]
+                  },
+                  "condition": {
+                    "$ref": "#/$defs/expr"
+                  }
+                },
+                "required": [
+                  "kind",
+                  "condition"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "required": [
+              "id",
+              "op",
+              "inputs",
+              "config"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+              },
+              "op": {
+                "const": "Aggregate"
+              },
+              "inputs": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+                },
+                "minItems": 1,
+                "maxItems": 1
+              },
+              "config": {
+                "type": "object",
+                "properties": {
+                  "group_by": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "expression": {
+                          "$ref": "#/$defs/expr"
+                        },
+                        "as": {
+                          "type": "string",
+                          "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+                        }
+                      },
+                      "required": [
+                        "expression",
+                        "as"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "minItems": 0
+                  },
+                  "aggregates": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "expression": {
+                          "$ref": "#/$defs/expr"
+                        },
+                        "as": {
+                          "type": "string",
+                          "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+                        }
+                      },
+                      "required": [
+                        "expression",
+                        "as"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "minItems": 1
+                  }
+                },
+                "required": [
+                  "group_by",
+                  "aggregates"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "required": [
+              "id",
+              "op",
+              "inputs",
+              "config"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+              },
+              "op": {
+                "const": "Sort"
+              },
+              "inputs": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+                },
+                "minItems": 1,
+                "maxItems": 1
+              },
+              "config": {
+                "type": "object",
+                "properties": {
+                  "keys": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "expression": {
+                          "$ref": "#/$defs/expr"
+                        },
+                        "direction": {
+                          "enum": [
+                            "asc",
+                            "desc"
+                          ]
+                        },
+                        "nulls": {
+                          "enum": [
+                            "first",
+                            "last"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "expression",
+                        "direction",
+                        "nulls"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "minItems": 1
+                  }
+                },
+                "required": [
+                  "keys"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "required": [
+              "id",
+              "op",
+              "inputs",
+              "config"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+              },
+              "op": {
+                "const": "Take"
+              },
+              "inputs": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+                },
+                "minItems": 1,
+                "maxItems": 1
+              },
+              "config": {
+                "type": "object",
+                "properties": {
+                  "count": {
+                    "type": "integer",
+                    "minimum": 0
+                  }
+                },
+                "required": [
+                  "count"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "required": [
+              "id",
+              "op",
+              "inputs",
+              "config"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+              },
+              "op": {
+                "const": "Offset"
+              },
+              "inputs": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+                },
+                "minItems": 1,
+                "maxItems": 1
+              },
+              "config": {
+                "type": "object",
+                "properties": {
+                  "count": {
+                    "type": "integer",
+                    "minimum": 0
+                  }
+                },
+                "required": [
+                  "count"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "required": [
+              "id",
+              "op",
+              "inputs",
+              "config"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+              },
+              "op": {
+                "const": "UnionAll"
+              },
+              "inputs": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+                },
+                "minItems": 2,
+                "maxItems": 2
+              },
+              "config": {
+                "type": "object",
+                "properties": {},
+                "required": [],
+                "additionalProperties": false
+              }
+            },
+            "required": [
+              "id",
+              "op",
+              "inputs",
+              "config"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+              },
+              "op": {
+                "const": "ContextPack"
+              },
+              "inputs": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+                },
+                "minItems": 1,
+                "maxItems": 1
+              },
+              "config": {
+                "type": "object",
+                "properties": {
+                  "text": {
+                    "$ref": "#/$defs/expr"
+                  },
+                  "evidence": {
+                    "$ref": "#/$defs/expr"
+                  },
+                  "tokens": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 1000000
+                  },
+                  "tokenizer": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 256
+                  },
+                  "as": {
+                    "type": "string",
+                    "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+                  }
+                },
+                "required": [
+                  "text",
+                  "evidence",
+                  "tokens",
+                  "tokenizer",
+                  "as"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "required": [
+              "id",
+              "op",
+              "inputs",
+              "config"
+            ],
+            "additionalProperties": false
+          }
+        ]
+      },
+      "minItems": 1,
+      "maxItems": 10000
+    },
+    "root": {
+      "type": "string",
+      "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+    },
+    "parameter_types": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "string",
+        "minLength": 1
+      }
+    }
+  },
+  "required": [
+    "contract_version",
+    "nodes",
+    "root"
+  ],
+  "additionalProperties": false,
+  "$defs": {
+    "expr": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "literal": {},
+            "type": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "required": [
+            "literal",
+            "type"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "param": {
+              "type": "string",
+              "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+            }
+          },
+          "required": [
+            "param"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "field": {
+              "type": "object",
+              "properties": {
+                "alias": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+                },
+                "path": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+                  }
+                }
+              },
+              "required": [
+                "alias",
+                "path"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "field"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "binary": {
+              "enum": [
+                "eq",
+                "ne",
+                "lt",
+                "le",
+                "gt",
+                "ge",
+                "and",
+                "or",
+                "add",
+                "sub",
+                "mul",
+                "div",
+                "rem",
+                "contains",
+                "startswith"
+              ]
+            },
+            "left": {
+              "$ref": "#/$defs/expr"
+            },
+            "right": {
+              "$ref": "#/$defs/expr"
+            }
+          },
+          "required": [
+            "binary",
+            "left",
+            "right"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "unary": {
+              "enum": [
+                "not",
+                "neg",
+                "is_null",
+                "is_not_null"
+              ]
+            },
+            "arg": {
+              "$ref": "#/$defs/expr"
+            }
+          },
+          "required": [
+            "unary",
+            "arg"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "call": {
+              "type": "string",
+              "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+            },
+            "args": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/expr"
+              }
+            }
+          },
+          "required": [
+            "call",
+            "args"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "in": {
+              "$ref": "#/$defs/expr"
+            },
+            "values": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/expr"
+              }
+            },
+            "negated": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "in",
+            "values",
+            "negated"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    }
+  },
+  "title": "Unbound logical query IR; binder and DAG validation required",
+  "$id": "https://schemas.genesis.invalid/blueprint/v2/query-ir.schema.json"
+}

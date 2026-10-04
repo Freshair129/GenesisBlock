@@ -23,7 +23,7 @@ test('NAPI collection definition survives child exit without checkpoint', async 
   assert.equal(collection.metric, 'Cosine');
   assert.equal(collection.quant, 'f16');
   assert.equal(collection.efSearch, 123);
-  assert.equal(db.queryIrCapabilities().storage_schema_version, 5);
+  assert.equal(db.queryIrCapabilities().storage_schema_version, 6);
   const before = db.stableFrontier();
   await assert.rejects(db.createCollection('bad', 'm', 65537), /DIM_INVALID/);
   assert.equal(db.stableFrontier(), before);

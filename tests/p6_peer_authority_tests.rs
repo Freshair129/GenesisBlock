@@ -74,7 +74,8 @@ fn assert_error_prefix<T, E: Display>(result: Result<T, E>, prefix: &str) {
 
 #[test]
 fn peer_ingress_rejects_direct_p6_before_wal_side_effects() {
-    let source = open(&TempDir::new().unwrap());
+    let source_dir = TempDir::new().unwrap();
+    let source = open(&source_dir);
     let event = p6_event(&source);
     let destination_dir = TempDir::new().unwrap();
     let destination = open(&destination_dir);
@@ -86,7 +87,8 @@ fn peer_ingress_rejects_direct_p6_before_wal_side_effects() {
 
 #[test]
 fn peer_ingress_rejects_nested_p6_atomically_before_signature_or_siblings() {
-    let source = open(&TempDir::new().unwrap());
+    let source_dir = TempDir::new().unwrap();
+    let source = open(&source_dir);
     let event = p6_event(&source);
     let destination_dir = TempDir::new().unwrap();
     let destination = open(&destination_dir);
@@ -96,16 +98,19 @@ fn peer_ingress_rejects_nested_p6_atomically_before_signature_or_siblings() {
         signer_peer_id: "forged-peer".into(),
     };
 
+    let before = destination.stable_frontier();
     assert_error_prefix(destination.reconcile_state(vec![nested]), "P6_LOCAL_ONLY");
-    assert_eq!(destination.stable_frontier(), 0);
+    assert_eq!(destination.stable_frontier(), before);
     assert!(destination.node_view("sibling").is_none());
 }
 
 #[test]
 fn consensus_rejects_p6_control_events_before_proposal_creation() {
-    let source = open(&TempDir::new().unwrap());
+    let source_dir = TempDir::new().unwrap();
+    let source = open(&source_dir);
     let event = p6_event(&source);
-    let destination = open(&TempDir::new().unwrap());
+    let destination_dir = TempDir::new().unwrap();
+    let destination = open(&destination_dir);
 
     assert_error_prefix(
         destination.propose_consensus(event.event, Vec::new()),
@@ -115,19 +120,22 @@ fn consensus_rejects_p6_control_events_before_proposal_creation() {
 
 #[test]
 fn outbound_sequence_sync_excludes_local_p6_control_events() {
-    let source = open(&TempDir::new().unwrap());
+    let source_dir = TempDir::new().unwrap();
+    let source = open(&source_dir);
     add_node(&source, "before");
     p6_event(&source);
     add_node(&source, "after");
 
     let events = source.events_since_seq(0);
     assert!(events.iter().all(|event| !is_p6(&event.event)));
-    assert!(events
-        .iter()
-        .any(|event| { matches!(&event.event, Event::Node(node) if node.id == "before") }));
-    assert!(events
-        .iter()
-        .any(|event| { matches!(&event.event, Event::Node(node) if node.id == "after") }));
+    for expected_id in ["before", "after"] {
+        assert!(events.iter().any(|event| match &event.event {
+            Event::Node(node) => node.id == expected_id,
+            Event::Transaction(transaction) =>
+                transaction.nodes.iter().any(|node| node.id == expected_id),
+            _ => false,
+        }));
+    }
 }
 
 #[tokio::test]

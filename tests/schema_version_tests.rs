@@ -42,6 +42,9 @@ fn set_ondisk_schema_version(dir: &str, v: u64) {
     let mut val: serde_json::Value =
         serde_json::from_str(&fs::read_to_string(&p).unwrap()).unwrap();
     val["schema_version"] = serde_json::json!(v);
+    if v != SCHEMA_VERSION as u64 {
+        val.as_object_mut().unwrap().remove("upgrade_state");
+    }
     fs::write(&p, val.to_string()).unwrap();
 }
 
@@ -60,9 +63,10 @@ fn newer_schema_is_refused() {
     add_and_save(&path);
     // Pretend the snapshot was written by a future engine.
     set_ondisk_schema_version(&path, SCHEMA_VERSION as u64 + 1);
-    let err = open(&path)
-        .err()
-        .expect("opening a newer-schema DB must error");
+    let err = match open(&path) {
+        Err(err) => err,
+        Ok(_) => panic!("opening a newer-schema DB must error"),
+    };
     assert!(
         err.contains("newer engine"),
         "error must explain the forward-incompat: got {:?}",

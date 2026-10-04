@@ -39,6 +39,16 @@ fn open(path: &str) -> Storage {
     .unwrap()
 }
 
+fn open_schema5(path: &str) -> Storage {
+    fs::create_dir_all(path).unwrap();
+    fs::write(
+        Path::new(path).join("state.json"),
+        r#"{"schema_version":5}"#,
+    )
+    .unwrap();
+    open(path)
+}
+
 fn add_node(s: &Storage) -> genesis_block_native::NodeOutput {
     s.add_node(NodeInput {
         id: Some("victim".to_string()),
@@ -74,7 +84,7 @@ fn stale_push(node: &genesis_block_native::NodeOutput, s: &Storage) -> SignedEve
 #[test]
 fn stale_peer_push_does_not_resurrect_retracted_node() {
     let path = fresh("slice1_stale_push");
-    let s = open(&path);
+    let s = open_schema5(&path);
     let pre = add_node(&s);
     s.retract_node("victim").unwrap();
 
@@ -92,7 +102,7 @@ fn stale_peer_push_does_not_resurrect_retracted_node() {
 fn tombstone_survives_fold_snapshot_and_journal_only_reopen() {
     let path = fresh("slice1_survive");
     let pre = {
-        let s = open(&path);
+        let s = open_schema5(&path);
         let pre = add_node(&s);
         s.retract_node("victim").unwrap();
         s.save_state().unwrap(); // fold + snapshot

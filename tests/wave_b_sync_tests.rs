@@ -151,7 +151,7 @@ fn signed_batch_rebind_is_applied_as_one_original_frame() {
     let original = serde_json::to_value(
         delta
             .iter()
-            .find(|e| matches!(e.event, Event::Batch(_)))
+            .find(|e| matches!(e.event, Event::Transaction(_)))
             .unwrap(),
     )
     .unwrap();
@@ -168,6 +168,7 @@ async fn gossip_rejects_old_schema_before_sending_delta() {
     use std::{sync::Arc, time::Duration};
     let dir = tempfile::tempdir().unwrap();
     let s = Arc::new(open(dir.path()));
+    let initial_frontier = s.stable_frontier();
     Storage::start_gossip_manager(s.clone());
     tokio::time::timeout(Duration::from_secs(3), async {
         while s.gossip_port.load(std::sync::atomic::Ordering::SeqCst) == 0 {
@@ -230,9 +231,9 @@ async fn gossip_rejects_old_schema_before_sending_delta() {
     assert!(matches!(
         serde_json::from_slice::<GossipMessage>(&buf[..len]).unwrap(),
         GossipMessage::PushDelta {
-            through_seq: Some(0),
+            through_seq: Some(seq),
             ..
-        }
+        } if seq == initial_frontier
     ));
     s.add_node(NodeInput {
         id: Some("oversized".into()),

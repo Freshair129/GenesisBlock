@@ -33,6 +33,7 @@ async fn wave_b_collection_validation_and_edge_history_parity() {
     })
     .unwrap();
     let storage = Arc::new(RwLock::new(storage));
+    let frontier_before = storage.read().stable_frontier();
     let app = build_router(AppState {
         storage: storage.clone(),
         api_key: None,
@@ -45,7 +46,7 @@ async fn wave_b_collection_validation_and_edge_history_parity() {
     )
     .await;
     assert_eq!(status, StatusCode::BAD_REQUEST);
-    assert_eq!(storage.read().stable_frontier(), 0);
+    assert_eq!(storage.read().stable_frontier(), frontier_before);
     let (status, _) = post_json(
         &app,
         "/v1/collection/create",

@@ -3,8 +3,8 @@
 //! This module deliberately does not connect to `Storage`, the v1 router, the
 //! current journal, or any migration path. It validates the wire envelope and
 //! the invariants that can be checked without a catalog, authenticated
-//! principal, snapshot, or execution engine. Those checks belong to later G1-
-//! G3 stages.
+//! principal, snapshot, or execution engine. Storage consumes the versioned
+//! record-revision types as a separate, explicitly gated persistence layer.
 
 use chrono::{DateTime, Utc};
 use serde::de::DeserializeOwned;
@@ -492,8 +492,174 @@ pub enum RecordKindV2 {
     Node,
     Edge,
     Row,
+    Vector,
     Annotation,
     Artifact,
+}
+
+/// Database-bound identity for one immutable record revision.
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct RecordRefV2 {
+    pub database_id: String,
+    pub namespace: String,
+    pub kind: RecordKindV2,
+    pub id: String,
+    pub revision: String,
+}
+
+impl RecordRefV2 {
+    pub fn from_value(value: Value) -> Result<Self, ContractError> {
+        let record_ref: Self = decode(value)?;
+        record_ref.validate()?;
+        Ok(record_ref)
+    }
+
+    pub fn validate(&self) -> Result<(), ContractError> {
+        validate_hash("database ID", &self.database_id)?;
+        validate_namespace(&self.namespace)?;
+        validate_nonempty("record id", &self.id)?;
+        validate_uuid_v4("record revision", &self.revision)
+    }
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "lowercase")]
+pub enum RevisionOperationV1 {
+    Upsert,
+    Retract,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
+#[serde(deny_unknown_fields)]
+pub struct RecordRevisionMutationV1 {
+    pub namespace: String,
+    pub kind: RecordKindV2,
+    pub id: String,
+    pub revision_id: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub expected_revision_id: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub predecessor_revision_id: Option<String>,
+    pub operation: RevisionOperationV1,
+    pub valid_from: DateTime<Utc>,
+    #[serde(default)]
+    pub valid_to: Option<DateTime<Utc>>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub schema_ref: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub schema_version: Option<u64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub key_codec_version: Option<u32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub key_bytes: Option<Vec<u8>>,
+    pub payload: Value,
+}
+
+impl RecordRevisionMutationV1 {
+    pub(crate) fn validate(&self) -> Result<(), ContractError> {
+        validate_namespace(&self.namespace)?;
+        validate_nonempty("record id", &self.id)?;
+        validate_uuid_v4("revision ID", &self.revision_id)?;
+        if let Some(expected) = self.expected_revision_id.as_deref() {
+            validate_uuid_v4("expected revision ID", expected)?;
+        }
+        if let Some(predecessor) = self.predecessor_revision_id.as_deref() {
+            validate_uuid_v4("predecessor revision ID", predecessor)?;
+        }
+        if self.expected_revision_id != self.predecessor_revision_id {
+            return Err(invalid(
+                "predecessor revision must match the expected revision",
+            ));
+        }
+        if self.expected_revision_id.as_deref() == Some(self.revision_id.as_str()) {
+            return Err(invalid("new revision ID must differ from its predecessor"));
+        }
+        if self.operation == RevisionOperationV1::Retract && self.expected_revision_id.is_none() {
+            return Err(invalid("retraction requires an expected revision"));
+        }
+        if self.valid_to.is_some_and(|to| to <= self.valid_from) {
+            return Err(invalid("valid interval must be non-empty and forward"));
+        }
+        if self.schema_ref.as_ref().is_some_and(String::is_empty) || self.schema_version == Some(0)
+        {
+            return Err(invalid("schema reference and version must be non-empty"));
+        }
+        if matches!(&self.kind, RecordKindV2::Row) {
+            validate_uuid_v4("row ID", &self.id)?;
+        }
+        match &self.kind {
+            RecordKindV2::Row
+                if self.schema_ref.is_some()
+                    && self.schema_version.is_some()
+                    && self.key_codec_version == Some(1)
+                    && self
+                        .key_bytes
+                        .as_ref()
+                        .is_some_and(|bytes| !bytes.is_empty() && bytes.len() <= 16 * 1024) => {}
+            RecordKindV2::Row => {
+                return Err(invalid(
+                    "row revision requires schema, codec version and key bytes",
+                ));
+            }
+            RecordKindV2::Vector if self.schema_ref.is_some() && self.schema_version == Some(1) => {
+            }
+            RecordKindV2::Vector => {
+                return Err(invalid(
+                    "vector revision requires a collection and schema version 1",
+                ));
+            }
+            _ if self.key_codec_version.is_some() || self.key_bytes.is_some() => {
+                return Err(invalid(
+                    "key codec metadata is only valid for row revisions",
+                ));
+            }
+            _ => {}
+        }
+        Ok(())
+    }
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
+#[serde(deny_unknown_fields)]
+pub struct RecordRevisionTransactionV1 {
+    pub transaction_id: Uuid,
+    pub origin_database_id: String,
+    pub mutations: Vec<RecordRevisionMutationV1>,
+}
+
+impl RecordRevisionTransactionV1 {
+    pub fn from_value(value: Value) -> Result<Self, ContractError> {
+        let transaction: Self = decode(value)?;
+        transaction.validate()?;
+        Ok(transaction)
+    }
+
+    pub fn validate(&self) -> Result<(), ContractError> {
+        validate_hash("origin database ID", &self.origin_database_id)?;
+        if self.mutations.is_empty() || self.mutations.len() > 10_000 {
+            return Err(invalid("revision mutation count is outside 1..=10000"));
+        }
+        let mut revision_ids = HashSet::with_capacity(self.mutations.len());
+        for mutation in &self.mutations {
+            mutation.validate()?;
+            if !revision_ids.insert(mutation.revision_id.as_str()) {
+                return Err(invalid("duplicate revision ID in transaction"));
+            }
+        }
+        Ok(())
+    }
+}
+
+fn validate_uuid_v4(kind: &str, value: &str) -> Result<(), ContractError> {
+    let uuid = Uuid::parse_str(value).map_err(|_| invalid(format!("invalid {kind}")))?;
+    if uuid.get_version_num() != 4
+        || uuid.get_variant() != uuid::Variant::RFC4122
+        || uuid.hyphenated().to_string() != value
+    {
+        return Err(invalid(format!("{kind} must be a canonical UUIDv4")));
+    }
+    Ok(())
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
