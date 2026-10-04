@@ -177,6 +177,69 @@ fn actor_scoped_hql1_zero_hop_match_matches_legacy_and_hql2() {
 }
 
 #[test]
+fn actor_scoped_hql1_zero_hop_id_equality_matches_legacy_and_hql2() {
+    let dir = TempDir::new().unwrap();
+    let storage = open(dir.path());
+    add_node(&storage, "node:a");
+    add_node(&storage, "node:b");
+    let unicode_id = "node:☃";
+    let cases = [
+        ("node:a", vec!["node:a"]),
+        ("missing", vec![]),
+        (unicode_id, vec![unicode_id]),
+    ];
+    add_node(&storage, unicode_id);
+    let legacy_results = cases
+        .iter()
+        .map(|(id, _)| {
+            let literal = serde_json::to_string(id).unwrap();
+            storage
+                .execute_hql(&format!("MATCH (p) WHERE p.id = {literal} RETURN p.id"))
+                .unwrap()
+                .as_array()
+                .unwrap()
+                .iter()
+                .map(|row| row["p.id"].as_str().unwrap().to_owned())
+                .collect::<Vec<_>>()
+        })
+        .collect::<Vec<_>>();
+    install_policy(&storage, true);
+
+    for ((id, expected), legacy) in cases.into_iter().zip(legacy_results) {
+        let literal = serde_json::to_string(id).unwrap();
+        let hql1 = format!("MATCH (p) WHERE p.id = {literal} RETURN p.id");
+        let canonical = format!(
+            "USE default FROM NODES AS __hql1_node |> FILTER __hql1_node.id = {literal} |> RETURN __hql1_node.id AS id"
+        );
+
+        let QueryOutcomeV2::Rows(hql2) = storage
+            .query_v2(actor("legacy-reader"), hql2_request(&canonical))
+            .unwrap()
+        else {
+            panic!("expected canonical HQL2 rows")
+        };
+        let QueryOutcomeV2::Rows(hql1) = storage
+            .query_v2(actor("legacy-reader"), request(&hql1))
+            .unwrap()
+        else {
+            panic!("expected actor-scoped HQL1 rows")
+        };
+
+        let mut legacy = legacy;
+        let mut hql2 = projected_ids(&hql2, "id");
+        let mut hql1 = projected_ids(&hql1, "p.id");
+        let mut expected = expected.into_iter().map(str::to_owned).collect::<Vec<_>>();
+        legacy.sort();
+        hql2.sort();
+        hql1.sort();
+        expected.sort();
+        assert_eq!(legacy, expected, "legacy result for {id}");
+        assert_eq!(hql1, legacy, "adapter differential for {id}");
+        assert_eq!(hql2, legacy, "canonical differential for {id}");
+    }
+}
+
+#[test]
 fn actor_scoped_hql1_zero_hop_label_match_matches_legacy_and_hql2() {
     let dir = TempDir::new().unwrap();
     let storage = open(dir.path());
@@ -245,6 +308,103 @@ fn actor_scoped_hql1_zero_hop_label_match_matches_legacy_and_hql2() {
         hql1.sort();
         assert_eq!(hql2, legacy, "canonical differential for {label}");
         assert_eq!(hql1, legacy, "actor-scoped HQL1 differential for {label}");
+    }
+}
+
+#[test]
+fn actor_scoped_hql1_zero_hop_labeled_id_equality_matches_legacy_and_hql2() {
+    let dir = TempDir::new().unwrap();
+    let storage = open(dir.path());
+    for (id, labels) in [
+        ("people:ada", vec!["Person"]),
+        ("people:grace", vec!["Person", "Engineer"]),
+        ("places:lab", vec!["Place"]),
+        ("people:☃", vec!["Person"]),
+    ] {
+        storage
+            .add_node(NodeInput {
+                id: Some(id.into()),
+                labels: labels.into_iter().map(str::to_owned).collect(),
+                props: None,
+                embedding: None,
+                lang: None,
+                valid_from: None,
+                caused_by: None,
+                ttl: None,
+                collection: None,
+            })
+            .unwrap();
+    }
+
+    let cases = [
+        ("Person", "people:ada", vec!["people:ada"]),
+        ("Person", "missing", vec![]),
+        ("Place", "people:ada", vec![]),
+        ("Person", "people:☃", vec!["people:☃"]),
+    ];
+    let legacy_results = cases
+        .iter()
+        .map(|(label, id, _)| {
+            let literal = serde_json::to_string(id).unwrap();
+            storage
+                .execute_hql(&format!(
+                    "MATCH (p:{label}) WHERE p.id = {literal} RETURN p.id"
+                ))
+                .unwrap()
+                .as_array()
+                .unwrap()
+                .iter()
+                .map(|row| row["p.id"].as_str().unwrap().to_owned())
+                .collect::<Vec<_>>()
+        })
+        .collect::<Vec<_>>();
+    install_policy(&storage, true);
+
+    let mut canonical_results = Vec::new();
+    for ((label, id, expected), legacy) in cases.iter().zip(&legacy_results) {
+        let literal = serde_json::to_string(id).unwrap();
+        let canonical = format!(
+            "USE default FROM NODES {label} AS __hql1_node |> FILTER __hql1_node.id = {literal} |> RETURN __hql1_node.id AS id"
+        );
+        let QueryOutcomeV2::Rows(hql2) = storage
+            .query_v2(actor("legacy-reader"), hql2_request(&canonical))
+            .unwrap()
+        else {
+            panic!("expected canonical HQL2 rows")
+        };
+        let mut legacy = legacy.clone();
+        let mut hql2 = projected_ids(&hql2, "id");
+        let mut expected = expected
+            .iter()
+            .map(|id| (*id).to_owned())
+            .collect::<Vec<_>>();
+        legacy.sort();
+        hql2.sort();
+        expected.sort();
+        assert_eq!(legacy, expected, "legacy result for {label} / {id}");
+        assert_eq!(hql2, legacy, "canonical differential for {label} / {id}");
+        canonical_results.push(hql2);
+    }
+
+    for (((label, id, _), legacy), canonical) in
+        cases.iter().zip(legacy_results).zip(canonical_results)
+    {
+        let literal = serde_json::to_string(id).unwrap();
+        let hql1 = format!("MATCH (p:{label}) WHERE p.id = {literal} RETURN p.id");
+        let QueryOutcomeV2::Rows(hql1) = storage
+            .query_v2(actor("legacy-reader"), request(&hql1))
+            .unwrap()
+        else {
+            panic!("expected actor-scoped HQL1 rows")
+        };
+        let mut legacy = legacy;
+        let mut canonical = canonical;
+        let mut hql1 = projected_ids(&hql1, "p.id");
+        legacy.sort();
+        canonical.sort();
+        hql1.sort();
+        assert_eq!(hql1, legacy, "adapter differential for {label} / {id}");
+        assert_eq!(hql1, canonical, "HQL1/HQL2 differential for {label} / {id}");
     }
 }
 
@@ -498,6 +658,102 @@ fn actor_scoped_hql1_one_hop_id_equality_filter_matches_legacy_and_hql2() {
 }
 
 #[test]
+fn actor_scoped_hql1_single_hop_traverse_matches_legacy_and_hql2() {
+    let dir = TempDir::new().unwrap();
+    let storage = open(dir.path());
+    for id in ["a", "b", "c", "d"] {
+        add_node(&storage, id);
+    }
+    add_edge(&storage, "ab-1", "a", "b", "LINK");
+    add_edge(&storage, "ab-2", "a", "b", "LINK");
+    add_edge(&storage, "ac", "a", "c", "LINK");
+    add_edge(&storage, "da", "d", "a", "LINK");
+    add_edge(&storage, "aa", "a", "a", "LINK");
+    add_edge(&storage, "ad-other", "a", "d", "OTHER");
+
+    let cases = [
+        (
+            "TRAVERSE FROM a DEPTH 1 REL LINK RETURN id",
+            "a",
+            "-[:LINK]->",
+        ),
+        (
+            "TRAVERSE FROM a DEPTH 1 REL LINK DIRECTION in RETURN id",
+            "a",
+            "<-[:LINK]-",
+        ),
+        (
+            "TRAVERSE FROM a DEPTH 1 REL LINK DIRECTION both RETURN id",
+            "a",
+            "-[:LINK]-",
+        ),
+        ("TRAVERSE FROM a DEPTH 1 REL ANY RETURN id", "a", "-->"),
+        (
+            "TRAVERSE FROM a DEPTH 1 REL ANY DIRECTION in RETURN id",
+            "a",
+            "<--",
+        ),
+        (
+            "TRAVERSE FROM a DEPTH 1 REL ANY DIRECTION both RETURN id",
+            "a",
+            "--",
+        ),
+        (
+            "TRAVERSE FROM missing DEPTH 1 REL LINK RETURN id",
+            "missing",
+            "-[:LINK]->",
+        ),
+    ];
+    let legacy = cases
+        .iter()
+        .map(|(query, _, _)| {
+            storage
+                .execute_hql(query)
+                .unwrap()
+                .as_array()
+                .unwrap()
+                .iter()
+                .map(|row| row["id"].as_str().unwrap().to_owned())
+                .collect::<Vec<_>>()
+        })
+        .collect::<Vec<_>>();
+    install_policy(&storage, true);
+
+    for (index, (query, seed, edge)) in cases.into_iter().enumerate() {
+        let seed = serde_json::to_string(seed).unwrap();
+        let canonical = format!(
+            "USE default MATCH (__hql1_source {{id: {seed}}}){edge}(__hql1_target) AS __hql1_path WALK |> FILTER __hql1_target.id != {seed} |> PROJECT __hql1_target.id AS id |> DISTINCT |> RETURN id"
+        );
+        let QueryOutcomeV2::Rows(hql2) = storage
+            .query_v2(actor("legacy-reader"), hql2_request(&canonical))
+            .unwrap()
+        else {
+            panic!("expected canonical HQL2 rows for {query}")
+        };
+
+        let mut legacy_ids = legacy[index].clone();
+        let mut hql2_ids = projected_ids(&hql2, "id");
+        legacy_ids.sort();
+        hql2_ids.sort();
+        assert_eq!(
+            legacy_ids, hql2_ids,
+            "canonical HQL2 differential for {query}"
+        );
+
+        let QueryOutcomeV2::Rows(adapted) = storage
+            .query_v2(actor("legacy-reader"), request(query))
+            .unwrap()
+        else {
+            panic!("expected actor-scoped HQL1 rows for {query}")
+        };
+        let mut adapted_ids = projected_ids(&adapted, "id");
+        adapted_ids.sort();
+        assert_eq!(legacy_ids, adapted_ids, "legacy differential for {query}");
+        assert_eq!(hql2_ids, adapted_ids, "HQL2 parity for {query}");
+    }
+}
+
+#[test]
 fn hql1_namespace_read_denial_precedes_legacy_parse() {
     let dir = TempDir::new().unwrap();
     let storage = open(dir.path());
@@ -553,8 +809,16 @@ fn valid_unlisted_hql1_form_fails_closed() {
     assert_eq!(error.code, "CAPABILITY_UNSUPPORTED");
 
     for query in [
-        "MATCH (a) WHERE a.id = \"a\" RETURN a.id",
+        "TRAVERSE FROM a DEPTH 2 REL LINK RETURN id",
+        "TRAVERSE FROM ~a DEPTH 1 REL LINK RETURN id",
+        "TRAVERSE FROM a DEPTH 1 REL LINK|OTHER RETURN id",
+        "TRAVERSE FROM a DEPTH 1 REL INFER(similarity) RETURN id",
+        "TRAVERSE FROM a DEPTH 1 REL LINK AS OF \"2024-01-01T00:00:00Z\" RETURN id",
+        "TRAVERSE FROM a DEPTH 1 REL LINK WHERE id = \"b\" RETURN id",
+        "TRAVERSE FROM a DEPTH 1 REL LINK LIMIT 2 RETURN id",
+        "TRAVERSE FROM a DEPTH 1 REL LINK RETURN id, label",
         "MATCH (a)-[r:LINK]->(b) RETURN b.id",
+        "MATCH (a:Person) WHERE a.id != \"a\" RETURN a.id",
         "MATCH (a:Person)-[:LINK]->(b) RETURN b.id",
         "MATCH (a)-[:LINK]->(b:Person) RETURN b.id",
         "MATCH (a)-[:LINK]->(b)-[:LINK]->(c) RETURN c.id",
