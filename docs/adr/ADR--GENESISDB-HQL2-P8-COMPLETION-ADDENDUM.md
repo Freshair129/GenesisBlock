@@ -1,8 +1,8 @@
 ---
 doc_id: ADR--GENESISDB-HQL2-P8-COMPLETION-ADDENDUM
-version: "0.1.11b"
+version: "0.1.12b"
 created_at: "2026-09-30T06:29:47+07:00,ATHER,working-tree"
-last_update: "2026-10-04T09:52:00+07:00,ATHER"
+last_update: "2026-10-04T10:38:40+07:00,ATHER"
 status: accepted
 superseded_by: null
 owner: "Boss (Founder / Product Authority)"
@@ -29,26 +29,29 @@ The owner subsequently approved the actor-scoped HQL1 bridge by replying
 "approve ADR addendum" on 2026-10-02. This authorizes the initial D7 allowlist
 and its stated differential-extension rule below; it does not claim that all
 legacy HQL forms share the runtime.
-The D7 implementation passes 10/10 adapter tests and 2/2 ordering tests:
+The D7 implementation passes 11/11 adapter tests and 2/2 ordering tests:
 legacy/HQL2 differential for zero-hop and bounded one-hop projections,
-including a single plain-ASCII label on zero-hop scans, exact endpoint-ID
+including a single plain-ASCII label on zero-hop scans, exact string equality
+on the same alias's ID for an unlabeled zero-hop scan, exact endpoint-ID
 string equality on either one-hop endpoint, and ordering by the projected
 source or target endpoint ID (default/ASC and DESC). Authorization and
 namespace checks before parse, malformed syntax classification, fail-closed
 rejection of unlisted forms, and pre-parse resource rejection of a broad
-legacy pattern remain covered. The explicit root-HQL2 sweep passes 392/0/1
+legacy pattern remain covered. The explicit root-HQL2 sweep passes 393/0/1
 across 34 targets; the selected P6/schema-v6/ACL regression group passes
 93/0/0 across 11 targets. The prior 11-target P6/schema-v6/compatibility
 record remains 194/0/0. Broader shared-runtime, P8 and P13 acceptance remains
-open. Focused independent review of this ordering slice
+open. Focused independent review of the ordering slice
 found no semantic or authorization defect and its positive source-alias test
-coverage gap is now closed; broader D7/P8/P13 review and acceptance remain open.
+coverage gap is closed; the new zero-hop predicate has local differential
+evidence but has not received independent review. Broader D7/P8/P13 review and
+acceptance remain open.
 The test-only D4 differential also compares an optional Sequence edge-property
 miss with independent P7; all four input rows survive and endpoint/edge aliases
 are NULL-extended. The focused pattern target passes 10/10. A nested-JSON
 Sequence differential now checks exact object/array node and edge values through
 HQL and typed IR against P7, with near-match candidates excluded; the focused
-pattern target passes 11/11 and HQL2 392/0/1 across 34 targets. This adds test
+pattern target passes 11/11 and HQL2 393/0/1 across 34 targets. This adds test
 evidence only: the approved D4 contract and runtime are unchanged, and broad
 P8/P13 acceptance remains open.
 
@@ -187,9 +190,13 @@ these P8 decisions alone.
    call the unscoped public `execute_hql`, or route through an existing v1
    transport.
 2. A zero-hop scan may be unlabeled or carry one plain-ASCII label identifier,
-   with no node properties or predicate, in the
-   `MATCH (<identifier>:<Label>) RETURN <same-identifier>.id` form; the
-   unlabeled form remains supported. Following
+   with no node properties, and projects only the same alias's `.id`. Following
+   the D7 differential-extension rule, an unlabeled zero-hop scan may
+   additionally contain exactly one exact string-equality predicate
+   `WHERE <same-identifier>.id = "<string>"`; a labeled zero-hop scan with a
+   predicate remains unsupported. The labeled scan form is
+   `MATCH (<identifier>:<Label>) RETURN <same-identifier>.id`; the unlabeled
+   form remains supported. Following
    the D7 differential-extension rule, the verified allowlist also includes
    one unlabeled, unconstrained hop with named, distinct endpoint aliases, optional
    plain-ASCII relation identifier or wildcard, and exactly one endpoint `.id`
@@ -209,8 +216,9 @@ these P8 decisions alone.
 3. After actor/envelope validation, run the allocation-free parser preflight
    and reserve its conservative heap estimate before invoking the legacy HQL
    parser. Verify the complete AST against the allowlist, then lower to the
-   equivalent canonical HQL2 optionally label-scoped node scan or one-hop path
-   and ID projection using fixed internal aliases. Execute only through the
+   equivalent canonical HQL2 optionally label-scoped node scan (with only the
+   verified unlabeled exact-ID filter) or one-hop path and ID projection using
+   fixed internal aliases. Execute only through the
    existing HQL2 parser,
    binder, planner, runtime and P6 read-lease path; then rename the single typed
    result column to the legacy projection key (`<identifier>.id`). The lowerer
@@ -307,6 +315,7 @@ addendum does not authorize migration of a user database, deployment or release.
 
 | Version | Date | Status | Summary | Commit Hash | Agent |
 |---|---|---|---|---|---|
+| 0.1.12b | 2026-10-04 | accepted | Extend D7 after legacy/HQL2 differential for one exact string ID predicate on unlabeled zero-hop scans; adapter 11/11, ordering 2/2, HQL2 393/0/1 across 34 targets; preserve label+predicate/order/multi-predicate fail-closed boundaries; no P6/schema/transport change; independent review and broad P8/P13 gates remain open | working-tree | ATHER |
 | 0.1.11b | 2026-10-04 | accepted | Record test-only D4 nested-JSON Sequence P7 differential for exact HQL/typed-IR node and edge object/array properties; focused pattern 11/11, HQL2 392/0/1 across 34 targets; no contract/runtime change; broad P8/P13 gates remain open | working-tree | ATHER |
 | 0.1.10b | 2026-10-04 | accepted | Record test-only D4 optional Sequence edge-property-miss differential against P7; all four input rows survive with endpoint/edge aliases NULL-extended; pattern target 10/10 and HQL2 389/0/1 across 34 targets; no contract/runtime change; broad P8/P13 gates remain open | working-tree | ATHER |
 | 0.1.9b | 2026-10-04 | accepted | Close focused D7 ordering-review coverage gap with a source-alias DESC legacy/HQL2 differential; four positive cases cover target default/ASC/DESC and source DESC; ordering 2/2, adapter 10/10, HQL2 385/0/1 across 34 targets; no runtime/P6 contract/schema/transport change; broad D7/P8/P13 gates remain open | working-tree | ATHER |

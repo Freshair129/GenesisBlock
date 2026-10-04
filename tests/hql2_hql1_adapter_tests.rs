@@ -249,6 +249,67 @@ fn actor_scoped_hql1_zero_hop_label_match_matches_legacy_and_hql2() {
 }
 
 #[test]
+fn actor_scoped_hql1_zero_hop_id_equality_matches_legacy_and_hql2() {
+    let dir = TempDir::new().unwrap();
+    let storage = open(dir.path());
+    for id in ["a", "b"] {
+        add_node(&storage, id);
+    }
+
+    let cases = [
+        (
+            "MATCH (a) WHERE a.id = \"a\" RETURN a.id",
+            "USE default FROM NODES AS __hql1_node |> FILTER __hql1_node.id = \"a\" |> RETURN __hql1_node.id AS id",
+            vec!["a".to_owned()],
+        ),
+        (
+            "MATCH (a) WHERE a.id = \"missing\" RETURN a.id",
+            "USE default FROM NODES AS __hql1_node |> FILTER __hql1_node.id = \"missing\" |> RETURN __hql1_node.id AS id",
+            Vec::new(),
+        ),
+    ];
+
+    let legacy_results = cases
+        .iter()
+        .map(|(legacy_query, _, _)| {
+            storage
+                .execute_hql(legacy_query)
+                .unwrap()
+                .as_array()
+                .unwrap()
+                .iter()
+                .map(|row| row["a.id"].as_str().unwrap().to_owned())
+                .collect::<Vec<_>>()
+        })
+        .collect::<Vec<_>>();
+    install_policy(&storage, true);
+
+    for (index, (legacy_query, canonical, expected)) in cases.iter().enumerate() {
+        let QueryOutcomeV2::Rows(hql2) = storage
+            .query_v2(actor("legacy-reader"), hql2_request(canonical))
+            .unwrap()
+        else {
+            panic!("expected canonical HQL2 rows")
+        };
+        let QueryOutcomeV2::Rows(adapted) = storage
+            .query_v2(actor("legacy-reader"), request(legacy_query))
+            .unwrap()
+        else {
+            panic!("expected actor-scoped HQL1 rows")
+        };
+        let mut legacy = legacy_results[index].clone();
+        let mut hql2 = projected_ids(&hql2, "id");
+        let mut adapted = projected_ids(&adapted, "a.id");
+        legacy.sort();
+        hql2.sort();
+        adapted.sort();
+        assert_eq!(legacy, *expected, "legacy semantics for {}", cases[index].0);
+        assert_eq!(hql2, *expected, "HQL2 semantics for {}", cases[index].0);
+        assert_eq!(adapted, *expected, "adapter semantics for {legacy_query}");
+    }
+}
+
+#[test]
 fn actor_scoped_hql1_directed_one_hop_match_preserves_parallel_row_multiplicity() {
     let dir = TempDir::new().unwrap();
     let storage = open(dir.path());
@@ -553,7 +614,13 @@ fn valid_unlisted_hql1_form_fails_closed() {
     assert_eq!(error.code, "CAPABILITY_UNSUPPORTED");
 
     for query in [
-        "MATCH (a) WHERE a.id = \"a\" RETURN a.id",
+        "MATCH (a:Person) WHERE a.id = \"a\" RETURN a.id",
+        "MATCH (a) WHERE a.id != \"a\" RETURN a.id",
+        "MATCH (a) WHERE a.id = 1 RETURN a.id",
+        "MATCH (a) WHERE b.id = \"a\" RETURN a.id",
+        "MATCH (a) WHERE a.id = \"a\" AND a.id = \"b\" RETURN a.id",
+        "MATCH (a) WHERE a.id = \"a\" ORDER BY a.id RETURN a.id",
+        "MATCH (a) WHERE a.id = \"a\" RETURN a.label",
         "MATCH (a)-[r:LINK]->(b) RETURN b.id",
         "MATCH (a:Person)-[:LINK]->(b) RETURN b.id",
         "MATCH (a)-[:LINK]->(b:Person) RETURN b.id",

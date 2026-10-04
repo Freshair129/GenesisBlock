@@ -1,8 +1,8 @@
 ---
 doc_id: SPEC--GENESISDB-HQL2-P8-TYPED-BOUNDARY
-version: "0.2.57b"
+version: "0.2.58b"
 created_at: "2026-09-28T01:25:00+07:00,ATHER,fc851e9"
-last_update: "2026-10-04T03:40:00+07:00,ATHER"
+last_update: "2026-10-04T10:38:40+07:00,ATHER"
 status: beta
 superseded_by: null
 owner: "Boss (Founder / Product Authority)"
@@ -855,15 +855,24 @@ separate shape limits. No process-global Pest setting is changed.
 - All temporary resources/leases released on error/cancel; quotas reserved
   before allocations; tests show a budget error cannot masquerade as completion.
 - Existing HQL/v1 tests pass unchanged. The D7 actor-scoped bridge supports
-  only its exact differential-tested zero-hop allowlist (unlabeled or one
-  plain-ASCII label) and unlabeled one-hop allowlist; its parser is
-  preflighted and budgeted before AST construction. Unproven legacy lowering
-  stays on the compatibility path and the shared-runtime completion obligation
-  remains open until every declared legacy form has equivalent evidence.
+  only its differential-tested zero-hop allowlist (unlabeled, optionally with
+  one exact same-alias string ID predicate, or one plain-ASCII label without a
+  predicate) and unlabeled one-hop allowlist; its parser is preflighted and
+  budgeted before AST construction. Unproven legacy lowering stays on the
+  compatibility path and the shared-runtime completion obligation remains
+  open until every declared legacy form has equivalent evidence.
 - Independent implementation review and verification must pass before P8 closure.
   Parser/binder coverage alone does not close the storage-backed runtime gate.
 
 ## Version diff and changelog
+
+Version diff `0.2.57b -> 0.2.58b`: extend the conditional D7 HQL1 adapter
+allowlist after legacy/HQL2 differential for one exact string equality on the
+same alias's ID in an unlabeled zero-hop scan. Focused adapter tests pass 11/11,
+ordering tests 2/2, and the explicit HQL2 sweep passes 393/0/1 across 34
+targets. Labeled predicates, zero-hop ordering and other unproven forms remain
+unsupported; no P6 contract, schema or transport behavior changed. Independent
+review and broad shared-runtime/P8/P13 gates remain open.
 
 Version diff `0.2.56b -> 0.2.57b`: record the test-only HQL/typed-IR Sequence
 node/edge exact-property differential against independent P7 for positive
@@ -1014,6 +1023,7 @@ detail with unchanged JSON shape; broader P8/P13/review gates remain open.
 
 | From | To | Effect |
 |---|---|---|
+| 0.2.57b | 0.2.58b | Extend D7 after legacy/HQL2 differential for one exact same-alias string ID equality predicate on unlabeled zero-hop scans; adapter 11/11, ordering 2/2, HQL2 393/0/1 across 34 targets; labeled predicates/zero-hop order/other unproven forms remain fail-closed; no P6/schema/transport change; broad review/shared-runtime/P8/P13 gates remain open |
 | 0.2.56b | 0.2.57b | Record test-only HQL/typed-IR Sequence node/edge exact-property P7 differential for positive UTF-8/integer values and wrong-value exclusion; pattern target 8/8, HQL2 387/0/1 across 34 targets; preserve runtime, contract, schema, P6, transport and broad-acceptance boundaries |
 | 0.2.55b | 0.2.56b | Record test-only storage-backed HQL/typed-IR AnnotationLookup P7 differential for frozen targets, evidence-only nonmatch, optional NULL extension and duplicate-input multiplicity; focused target 6/6 and root-HQL2 386/0/1 across 34 targets; preserve runtime, contract, schema, P6, transport and broad-acceptance boundaries |
 | 0.2.54b | 0.2.55b | Record six test-only storage-backed HQL/typed-IR scalar-pipeline fixtures against P7 with 12 Storage executions and 2/2 focused tests; update root-HQL2 regression to 383/0/1; preserve runtime, contract, schema, transport and broad-acceptance boundaries |

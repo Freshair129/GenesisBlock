@@ -2,7 +2,7 @@
 title: "GenesisBlockDB Technical Architecture and Capability Composition"
 doc_id: "MASTER-SPEC-GENESISBLOCKDB"
 status: current
-version: "2.3.37b"
+version: "2.3.38b"
 updated: "2026-10-04"
 owner: "GenesisBlockDB Architecture"
 source_of_truth: true
@@ -42,14 +42,17 @@ an edge-property-before-SHORTEST regression. The approved D7 bridge accepts
 differential-tested actor-scoped zero-hop HQL1 ID projections (unlabeled or
 with one plain-ASCII label) and bounded unlabeled one-hop projections through
 `Storage::query_v2`, including one endpoint-ID exact string equality filter;
-parser resources are preflighted and reserved before legacy AST construction.
-Its ten focused tests cover legacy and HQL2 differential
-behavior, pre-parse authorization/namespace checks, malformed and unlisted
-forms, and resource rejection. HQL `JOIN TABLE` now lowers to the existing
+an unlabeled zero-hop projection may also include one exact same-alias string-ID
+equality filter. Parser resources are preflighted and reserved before legacy
+AST construction.
+The focused adapter and ordering tests pass 11/11 and 2/2, including
+legacy/HQL2 match/no-match parity for the new zero-hop filter, pre-parse
+authorization/namespace checks, malformed and unlisted forms, and resource
+rejection. HQL `JOIN TABLE` now lowers to the existing
 closed RowScan/Join pipeline for Inner/Left/Semi/Anti, with bare JOIN defaulting
 to Inner; HQL, typed IR and independent P7 differential results match for
 duplicate, missing-property NULL and JSON-null cases. The latest root-HQL2
-regression sweep passes 392/0/1 across 34 targets. Test-only optional
+regression sweep passes 393/0/1 across 34 targets. Test-only optional
 Sequence edge-property-miss and nested-JSON property differentials match
 independent P7 for HQL and typed IR; nested node/edge object and array values
 match exactly, while optional misses preserve all four input rows and
@@ -419,6 +422,7 @@ user database was migrated, and broader P6/P8/P13 qualification remains open.
 
 | Version | Date | Owner | Summary |
 |---|---|---|---|
+| 2.3.38b | 2026-10-04 | GenesisBlockDB Architecture | Extend D7 after legacy/HQL2 differential for one exact same-alias string ID predicate on unlabeled zero-hop HQL1 scans; adapter 11/11, ordering 2/2, HQL2 393/0/1 across 34 targets; other forms remain fail-closed; no P6/schema/transport change; independent review and broad P8/P13 gates remain open |
 | 2.3.37b | 2026-10-04 | GenesisBlockDB Architecture | Record test-only nested-JSON Sequence property P7 differential for exact HQL/typed-IR node/edge object and array values; focused pattern 11/11, HQL2 392/0/1 across 34 targets; no runtime/contract/schema/P6/transport change; broad exact-oracle and P8/P13 qualification remain open |
 | 2.3.36b | 2026-10-04 | GenesisBlockDB Architecture | Record the test-only optional Sequence edge-property-miss P7 differential; preserve four input rows and NULL-extend endpoint/edge aliases; HQL2 389/0/1 across 34 targets; no runtime/contract/schema/transport change; broad exact-oracle and P8/P13 qualification remain open |
 | 2.3.35b | 2026-10-03 | GenesisBlockDB Architecture | Record test-only HQL/typed-IR scalar-pipeline P7 differential for six fixtures and 12 Storage executions; HQL2 383/0/1 across 33 targets, P6/compatibility 194/0/0; no runtime/contract/schema/transport change; broad exact-oracle and P8/P13 qualification remain open |
