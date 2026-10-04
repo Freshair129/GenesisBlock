@@ -1,8 +1,8 @@
 ---
 doc_id: SPEC--GENESISDB-BACKUP-RESTORE-U9
-version: "0.1.6b"
+version: "0.1.7b"
 created_at: "2026-08-14T00:00:00+07:00,ATHER"
-last_update: "2026-10-05T04:19:54+07:00,ATHER"
+last_update: "2026-10-05T06:09:11+07:00,ATHER"
 status: "beta"
 superseded_by: null
 owner: "Boss (Founder / Product Authority)"
@@ -216,6 +216,7 @@ copy, or Google Drive work.
 
 | Version | Date | Status | Summary | Commit Hash | Agent |
 | --- | --- | --- | --- | --- | --- |
+| 0.1.7b | 2026-10-05 | beta | Replay verification confirms full-retention staging preserves the packaged history floor; normal recovery must match the bundle WAL frontier, P6 generation/lease validation completes before exposure, `txn_frontier` remains preserved, and return metadata is prepared before rename; U9 target 7/7, restore-generation 3/3, revision/backup 1/1, HQL2 404/0/1 across 39 targets; P14 rehearsal and failure-cleanup fault injection remain open | working-tree | ATHER |
 | 0.1.6b | 2026-10-05 | beta | Record restore/P6 21/21 across five targets, HQL2 393/0/1 across 37, and full Rust suite exit 0 with `probe_vs_recall` filtered; cleanup after read-only/rename failure remains best-effort and unverified | working-tree | ATHER |
 | 0.1.5b | 2026-10-05 | beta | Specify receipt-last generation reuse, `txn_frontier` preservation, and complete return-metadata preparation before target rename; restore/P6 20/20 across five targets and HQL2 392/0/1 across 37; full Rust suite NOT_RUN | working-tree | ATHER |
 | 0.1.4b | 2026-10-05 | beta | Clarify that restore preserves the manifest/data frontier while required local P6 generation publication may advance the restored live WAL frontier; independent read-only validation precedes target exposure | working-tree | ATHER |

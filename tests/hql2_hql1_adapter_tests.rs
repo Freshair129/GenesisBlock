@@ -312,7 +312,7 @@ fn actor_scoped_hql1_zero_hop_label_match_matches_legacy_and_hql2() {
 }
 
 #[test]
-fn actor_scoped_hql1_zero_hop_id_equality_matches_legacy_and_hql2() {
+fn actor_scoped_hql1_zero_hop_id_equality_basic_ids_matches_legacy_and_hql2() {
     let dir = TempDir::new().unwrap();
     let storage = open(dir.path());
     for id in ["a", "b"] {

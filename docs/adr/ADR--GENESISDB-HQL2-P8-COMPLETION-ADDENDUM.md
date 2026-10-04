@@ -1,8 +1,8 @@
 ---
 doc_id: ADR--GENESISDB-HQL2-P8-COMPLETION-ADDENDUM
-version: "0.1.13b"
+version: "0.1.14b"
 created_at: "2026-09-30T06:29:47+07:00,ATHER,working-tree"
-last_update: "2026-10-04T16:06:00+07:00,ATHER"
+last_update: "2026-10-05T06:09:11+07:00,ATHER"
 status: accepted
 superseded_by: null
 owner: "Boss (Founder / Product Authority)"
@@ -29,29 +29,28 @@ The owner subsequently approved the actor-scoped HQL1 bridge by replying
 "approve ADR addendum" on 2026-10-02. This authorizes the initial D7 allowlist
 and its stated differential-extension rule below; it does not claim that all
 legacy HQL forms share the runtime.
-The D7 implementation passes 11/11 adapter tests and 2/2 ordering tests:
-legacy/HQL2 differential for zero-hop and bounded one-hop projections,
-including a single plain-ASCII label on zero-hop scans, exact string equality
-on the same alias's ID for an unlabeled zero-hop scan, exact endpoint-ID
-string equality on either one-hop endpoint, and ordering by the projected
-source or target endpoint ID (default/ASC and DESC). Authorization and
-namespace checks before parse, malformed syntax classification, fail-closed
-rejection of unlisted forms, and pre-parse resource rejection of a broad
-legacy pattern remain covered. The explicit root-HQL2 sweep passes 393/0/1
-across 34 targets; the selected P6/schema-v6/ACL regression group passes
-93/0/0 across 11 targets. The prior 11-target P6/schema-v6/compatibility
-record remains 194/0/0. Broader shared-runtime, P8 and P13 acceptance remains
-open. Focused independent review of the ordering slice
-found no semantic or authorization defect and its positive source-alias test
-coverage gap is closed; the new zero-hop predicate has local differential
-evidence but has not received independent review. Broader D7/P8/P13 review and
-acceptance remain open.
+The D7 adapter now passes 13/13 tests; property, ordering and labeled-filter
+targets pass 2/2 each. Legacy/HQL2 differential coverage includes zero-hop and
+bounded one-hop ID projections, one unlabeled zero-hop single-property
+projection, and exact-seed depth-one `TRAVERSE` over one physical relation or
+`ANY` in default/out/in/both directions. It also covers one same-alias zero-hop
+ID filter, one endpoint-ID one-hop filter, projected endpoint ordering,
+missing/explicit-null values, bag multiplicity, parallel edges and seed
+exclusion. Authorization/namespace checks before parse, malformed syntax,
+fail-closed unlisted forms, and pre-parse resource rejection remain covered.
+The fresh root-HQL2 sweep passes 404/0/1 across 39 targets. The previous
+11-target P6/schema-v6/compatibility record remains 194/0/0 and was not rerun;
+P6 policy is unchanged. Broader shared-runtime, P8 and P13 acceptance remains
+open. Focused independent review of the prior ordering slice found no semantic
+or authorization defect; independent review of the current D7 extension is
+pending.
 The test-only D4 differential also compares an optional Sequence edge-property
 miss with independent P7; all four input rows survive and endpoint/edge aliases
 are NULL-extended. The focused pattern target passes 10/10. A nested-JSON
 Sequence differential now checks exact object/array node and edge values through
 HQL and typed IR against P7, with near-match candidates excluded; the focused
-pattern target passes 11/11 and HQL2 393/0/1 across 34 targets. This adds test
+pattern target passes 11/11. The fresh root-HQL2 sweep passes 404/0/1 across
+39 targets. This adds test
 evidence only: the approved D4 contract and runtime are unchanged, and broad
 P8/P13 acceptance remains open.
 
@@ -189,27 +188,36 @@ these P8 decisions alone.
    equality before invoking the legacy HQL parser. Never synthesize an actor,
    call the unscoped public `execute_hql`, or route through an existing v1
    transport.
-2. A zero-hop scan may be unlabeled or carry one plain-ASCII label identifier,
-   with no node properties, and projects only the same alias's `.id`. Following
-   the D7 differential-extension rule, an unlabeled or labeled zero-hop scan
-   may additionally contain exactly one exact string-equality predicate
-   `WHERE <same-identifier>.id = "<string>"`; for labeled scans, the label and
-   ID predicate are conjunctive. The labeled scan form is
+2. A zero-hop ID scan may be unlabeled or carry one plain-ASCII label
+   identifier, and projects only the same alias's `.id`. Following the D7
+   differential-extension rule, either form may additionally contain exactly
+   one exact string-equality predicate `WHERE <same-identifier>.id =
+   "<string>"`; for labeled scans, the label and ID predicate are conjunctive.
+   A separate property form accepts only an unlabeled zero-hop scan with one
+   plain-ASCII property key, no predicate/order/limit/temporal selector, and
+   exactly that one projected property. Missing and explicit JSON-null
+   properties project as null, preserving legacy bag multiplicity; labeled,
+   filtered, ordered, limited, temporal and multi-column property forms remain
+   unsupported. The labeled ID scan form is
    `MATCH (<identifier>:<Label>) RETURN <same-identifier>.id`; the unlabeled
-   form remains supported. Following
-   the D7 differential-extension rule, the verified allowlist also includes
-   one unlabeled, unconstrained hop with named, distinct endpoint aliases, optional
-   plain-ASCII relation identifier or wildcard, and exactly one endpoint `.id`
-   projection. Direction may be outgoing, incoming or undirected. Zero-hop
-   retains the same-alias rule. A one-hop form may additionally contain one
-   exact string-equality predicate `WHERE <endpoint>.id = "<string>"` on either
-   endpoint; all other predicates remain unsupported. A one-hop form may use
-   `ORDER BY` only on the same projected endpoint's `.id`, with the legacy
-   default/ascending or descending direction. Zero-hop ordering, an unprojected
-   sort key and every other sort form remain unsupported. Both forms reject
-   `LIMIT`, `AS OF`, node properties, edge aliases, multi-hop paths and non-ID/
-   multi-column projections; one-hop forms also reject labels. The
-   envelope must have no parameters,
+   form remains supported. Following the D7 differential-extension rule, the
+   verified allowlist also includes one unlabeled, unconstrained hop with
+   named, distinct endpoint aliases, optional plain-ASCII relation identifier
+   or wildcard, and exactly one endpoint `.id` projection. Direction may be
+   outgoing, incoming or undirected. Zero-hop retains the same-alias rule. A
+   one-hop form may additionally contain one exact string-equality predicate
+   `WHERE <endpoint>.id = "<string>"` on either endpoint; all other predicates
+   remain unsupported. A one-hop form may use `ORDER BY` only on the same
+   projected endpoint's `.id`, with the legacy default/ascending or descending
+   direction. Zero-hop ordering, an unprojected sort key and every other sort
+   form remain unsupported. Both forms reject `LIMIT`, `AS OF`, edge aliases,
+   multi-hop paths and non-ID/multi-column projections; one-hop forms also
+   reject labels. The exact-seed depth-one `TRAVERSE` form accepts one
+   plain-ASCII physical relation or `ANY`, omitted/out/in/both direction, and
+   only `RETURN id`. It excludes the seed and deduplicates after projecting
+   target IDs, so self-loops and parallel edges match legacy results.
+   Fuzzy/inferred traversal, relation unions, other depths, filters, ordering,
+   limits and other projections remain unsupported. The envelope must have no parameters,
    temporal selector, transaction ID, explicit budget or EXPLAIN;
    `allow_partial` may be omitted/false and format may be omitted or JSON. The
    actor/request namespace must be `default` for this graph form.
@@ -217,13 +225,14 @@ these P8 decisions alone.
    and reserve its conservative heap estimate before invoking the legacy HQL
    parser. Verify the complete AST against the allowlist, then lower to the
    equivalent canonical HQL2 optionally label-scoped node scan (with the
-   verified exact-ID filter for labeled or unlabeled zero-hop scans) or one-hop
-   path and ID projection using
+   verified exact-ID filter for labeled or unlabeled zero-hop ID scans),
+   single-property read, one-hop path, or exact single-hop traversal using
    fixed internal aliases. Execute only through the
    existing HQL2 parser,
    binder, planner, runtime and P6 read-lease path; then rename the single typed
-   result column to the legacy projection key (`<identifier>.id`). The lowerer
-   must construct names from validated AST identifiers, never splice unchecked
+   result column to the legacy projection key (`<identifier>.id`,
+   `<identifier>.<property>`, or `id` for `TRAVERSE`). The lowerer must
+   construct names from validated AST identifiers, never splice unchecked
    query text. The canonical HQL2 parser reservation remains in force after
    lowering.
 4. Malformed HQL1 within parser limits remains `HQL_PARSE_ERROR`; parser
@@ -273,10 +282,13 @@ flowchart TD
 - Existing HQL1 compatibility tests remain unchanged and pass. The shared
   pipeline is not declared complete until every supported legacy form has
   differential coverage.
-- D7 HQL1 tests prove `Namespace(Read)` denial before parsing, zero-hop and
-  one-hop direction/relation/wildcard differential parity (including parallel
-  row multiplicity, endpoint projections and one exact string-equality filter
-  on either endpoint ID), and one-hop projected-ID ordering parity across
+- D7 HQL1 tests prove `Namespace(Read)` denial before parsing, zero-hop ID and
+  single-property parity (including missing/explicit-null values and bag
+  multiplicity), exact-seed depth-one `TRAVERSE` parity for one relation or
+  `ANY` in all allowed directions (including self-loop exclusion and
+  parallel-edge deduplication), one-hop direction/relation/wildcard parity
+  (including endpoint projections and one exact string-equality filter on
+  either endpoint ID), and one-hop projected-ID ordering parity across
   projected source and target aliases (target default/ASC/DESC and source DESC)
   while zero-hop/unprojected ordering fails closed; namespace
   mismatch before parsing, malformed syntax
@@ -316,6 +328,7 @@ addendum does not authorize migration of a user database, deployment or release.
 
 | Version | Date | Status | Summary | Commit Hash | Agent |
 |---|---|---|---|---|---|
+| 0.1.14b | 2026-10-05 | accepted | Extend approved D7 after legacy/HQL2 differential with one unlabeled zero-hop single-property projection and exact-seed depth-one TRAVERSE ID projection; adapter 13/13, property 2/2, ordering 2/2, labeled-filter 2/2; root HQL2 404/0/1 across 39 targets; U9 restore 7/7; preserve fail-closed boundaries and open shared-runtime/P8/P13 gates | working-tree | ATHER |
 | 0.1.13b | 2026-10-04 | accepted | Extend D7 after differential evidence to the exact same-alias string ID predicate on labeled zero-hop scans; match/miss/wrong-label plus backslash/Unicode differential, adapter 11/11, ordering 2/2, new differential target 2/2; HQL2 394/0/1 across 35 targets and selected P6 peers 45/0/0 across 7; independent review found no runtime parity/authorization defect; PR #213 code commit checks 40 pass, 4 worker failures with unconfirmed cause, 5 skipped, 1 Windows Cargo cancellation at 15-minute job limit; preserve other fail-closed boundaries and broad P8/P13 gates | working-tree | ATHER |
 | 0.1.12b | 2026-10-04 | accepted | Extend D7 after legacy/HQL2 differential for one exact string ID predicate on unlabeled zero-hop scans; adapter 11/11, ordering 2/2, HQL2 393/0/1 across 34 targets; preserve label+predicate/order/multi-predicate fail-closed boundaries; no P6/schema/transport change; independent review and broad P8/P13 gates remain open | working-tree | ATHER |
 | 0.1.11b | 2026-10-04 | accepted | Record test-only D4 nested-JSON Sequence P7 differential for exact HQL/typed-IR node and edge object/array properties; focused pattern 11/11, HQL2 392/0/1 across 34 targets; no contract/runtime change; broad P8/P13 gates remain open | working-tree | ATHER |

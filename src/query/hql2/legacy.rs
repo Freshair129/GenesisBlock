@@ -155,28 +155,43 @@ pub(crate) fn lower_hql_v1(
 
     let source = match pattern.hops.as_slice() {
         [] if projection.var == alias && clauses.order_by.is_none() => {
-            let label = match pattern.start.label.as_deref() {
-                Some(label) if is_plain_identifier(label) => format!(" {label}"),
-                Some(_) => return Err(unsupported()),
-                None => String::new(),
-            };
-            let filter = match clauses.where_preds.as_slice() {
-                [] => String::new(),
-                [predicate]
-                    if predicate.field.var == alias
-                        && predicate.field.field.as_ref() == Some(&HqlField::Id)
-                        && predicate.op == HqlOp::Eq =>
-                {
-                    let HqlValue::Str(value) = &predicate.value else {
-                        return Err(unsupported());
-                    };
-                    let value = serde_json::to_string(value).map_err(|_| unsupported())?;
-                    format!(" |> FILTER __hql1_node.id = {value}")
+            let (label, filter) = if property_projection.is_some() {
+                if pattern.start.label.is_some() || !clauses.where_preds.is_empty() {
+                    return Err(unsupported());
                 }
-                _ => return Err(unsupported()),
+                (String::new(), String::new())
+            } else {
+                let label = match pattern.start.label.as_deref() {
+                    Some(label) if is_plain_identifier(label) => format!(" {label}"),
+                    Some(_) => return Err(unsupported()),
+                    None => String::new(),
+                };
+                let filter = match clauses.where_preds.as_slice() {
+                    [] => String::new(),
+                    [predicate]
+                        if predicate.field.var == alias
+                            && predicate.field.field.as_ref() == Some(&HqlField::Id)
+                            && predicate.op == HqlOp::Eq =>
+                    {
+                        let HqlValue::Str(value) = &predicate.value else {
+                            return Err(unsupported());
+                        };
+                        let value = serde_json::to_string(value).map_err(|_| unsupported())?;
+                        format!(" |> FILTER __hql1_node.id = {value}")
+                    }
+                    _ => return Err(unsupported()),
+                };
+                (label, filter)
+            };
+            let projection_expr = match property_projection {
+                Some(property) => {
+                    let property = serde_json::to_string(property).map_err(|_| unsupported())?;
+                    format!("prop(__hql1_node, {property})")
+                }
+                None => "__hql1_node.id".to_owned(),
             };
             format!(
-                "USE default FROM NODES{label} AS __hql1_node{filter} |> RETURN __hql1_node.id AS id"
+                "USE default FROM NODES{label} AS __hql1_node{filter} |> RETURN {projection_expr} AS id"
             )
         }
         [(edge, end)] => {

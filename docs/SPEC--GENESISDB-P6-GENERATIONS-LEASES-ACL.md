@@ -1,9 +1,9 @@
 ---
 doc_id: SPEC--GENESISDB-P6-GENERATIONS-LEASES-ACL
 owner: GenesisBlockDB Engineering
-version: 0.5.33b
+version: 0.5.34b
 created_at: "2026-09-22T22:55:00+07:00,ATHER,working-tree"
-last_update: "2026-10-04T16:06:00+07:00,ATHER"
+last_update: "2026-10-05T06:09:11+07:00,ATHER"
 status: beta
 attributes:
   domain: storage-correctness
@@ -268,8 +268,9 @@ excluded before candidate counts/bytes are charged to caller-selected budgets or
 materialized. This does not widen authorization to Annotation and does not claim
 timing noninterference. The hidden-revision threshold regression passes with
 ACL 11/11; the expanded History/Change target passes 17/17, Annotation
-source/ACL passes 7/7, HQL2 passes 394/0/1 across 35 targets and the separate P6/schema-v6/
-compatibility group passes 194/0/0. Hosted validation of this source change,
+source/ACL passes 7/7, the fresh HQL2 sweep passes 404/0/1 across 39 targets,
+and the prior separate P6/schema-v6/compatibility group remains 194/0/0 (not
+rerun here). Hosted validation of this source change,
 independent review and broader P6/P8 acceptance remain open.
 
 P8 AnnotationLookup also runs inside the same ReadView and applies the same
@@ -394,18 +395,25 @@ to the serialized owner and require Verify to rerun. Final checks scope, evidenc
 regressions and WIP preservation. Passing the gates supports only the P6 owner decision; it does
 not approve P7, merge, release, deployment or external readiness.
 
-The D7 actor-scoped HQL1 adapter accepts one-hop ordering only by the projected
-endpoint ID and an exact same-alias string ID equality predicate on labeled or
-unlabeled zero-hop scans, each after legacy/HQL2 differential evidence. Focused
-adapter, ordering and labeled-filter targets pass 11/11, 2/2 and 2/2; the latter
-includes match, miss, wrong-label exclusion and a backslash/Unicode ID. The
-explicit HQL2 sweep passes 394/0/1 across 35 targets. The selected P6 peer group
-passes 45/0/0 across seven targets; the prior broader 11-target P6/schema-v6/
-compatibility result remains 194/0/0 and was not rerun here. No P6 grant, ACL,
-lease, schema or migration behavior changed. Broad P6/P8 and review gates remain
+The D7 actor-scoped HQL1 adapter additionally accepts one unlabeled zero-hop
+single-property projection and exact-seed depth-one `TRAVERSE` ID projections
+for one physical relation or `ANY`, with omitted/out/in/both direction; both
+forms are differential-tested against legacy execution and HQL2. Property
+projection preserves missing/explicit-null values and bag multiplicity;
+traversal excludes the seed and deduplicates projected target IDs. Adapter,
+property, ordering and labeled-filter targets pass 13/13, 2/2, 2/2 and 2/2.
+The fresh explicit root-HQL2 sweep passes 404/0/1 across 39 targets, and the
+separate U9 restore target passes 7/7. No P6 grant, ACL, lease, schema or
+migration behavior changed. Independent D7 review and broad P6/P8 gates remain
 open.
 
 ## CHANGELOG
+
+Version diff 0.5.33b -> 0.5.34b: synchronize the approved D7 property and
+exact-seed depth-one traversal allowlist with legacy/HQL2 differential results;
+record adapter 13/13, property 2/2, ordering 2/2, labeled-filter 2/2, root
+HQL2 404/0/1 across 39 targets and U9 restore 7/7. P6 policy and storage
+contract remain unchanged; independent review and broad P8 gates remain open.
 
 Version diff 0.5.32b -> 0.5.33b: synchronize the conditional D7 extension for
 one exact same-alias string ID predicate on labeled zero-hop scans. The
