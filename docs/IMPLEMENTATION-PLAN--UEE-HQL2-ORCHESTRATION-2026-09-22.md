@@ -1,9 +1,9 @@
 ---
-version: "0.8.71b"
+version: "0.8.74b"
 doc_id: "IMPLEMENTATION-PLAN--UEE-HQL2-ORCHESTRATION-2026-09-22"
 owner: "Boss (Founder / Product Authority)"
 created_at: "2026-09-22T00:00:00+07:00,ATHER,working-tree"
-last_update: "2026-10-05T06:09:11+07:00,ATHER"
+last_update: "2026-10-06T01:39:39+07:00,ATHER"
 status: beta
 superseded_by: null
 attributes:
@@ -28,6 +28,18 @@ attributes:
 เมื่อ 2026-10-02 owner อนุมัติ [P8 completion addendum](adr/ADR--GENESISDB-HQL2-P8-COMPLETION-ADDENDUM.md)
 ให้ทำ D1-D6 ต่อใน worktree แยก โดยคง P6 authorization-before-parse, Compact wire
 และลำดับ P9-P13; approval นี้ไม่อนุญาต user database migration, merge, release หรือ deploy
+เมื่อ 2026-10-04 owner อนุมัติ P8-R2 verification slice ให้เพิ่มเฉพาะ REST transport
+parity gate ระหว่าง HQL compatibility กับ typed Query IR v1; ไม่อนุญาตให้เปิด
+query_v2 transport, เปลี่ยน public API, migrate ฐานข้อมูลผู้ใช้, merge, release หรือ deploy
+เมื่อ 2026-10-04 owner อนุมัติ P8-R3 verification slice ให้เพิ่มเฉพาะ matrix test
+สำหรับ raw/wrapped HQL body และ typed error envelope ของ HQL/Query IR v1; ไม่อนุญาต
+ให้เปิด query_v2 transport หรือเปลี่ยน public API, schema, migration, release หรือ deploy
+เมื่อ 2026-10-04 owner อนุมัติ [G4 shared-pipeline ADR](adr/ADR--GENESISDB-HQL2-G4-SHARED-PIPELINE.md)
+ฉบับที่ระบุ parity-proven HQL1/HQL2/Query IR v2 shared lowering, deterministic
+planning และ truthful `EXPLAIN`/`ANALYZE` แบบเจาะจงแล้ว จึงอนุญาตให้ทำ bounded
+source implementation ตาม ADR ใน worktree นี้ได้ โดยยังไม่อนุญาต query_v2
+transport หรือ REST/NAPI/FFI/SDK/MCP surface exposure, migration, merge,
+release หรือ deploy โดยอัตโนมัติ
 
 ## 1. Decision ที่เสนอ
 
@@ -36,10 +48,11 @@ attributes:
 1. ทำ truth/obligation ledger และ architecture/compatibility ADR ก่อน
 2. ปิดช่องว่างและพิสูจน์ U1-U3 ของ current WAL + SQLite projection + unified transaction
 3. ค่อยตัดสินใจ G1-G3 (canonical durability, snapshots, exact reference engine)
-4. ทำ G4-G6 (HQL2/planner/composition) ตาม HQL2 execution ADR ที่ owner อนุมัติแล้ว
-   โดยจำกัด planner/EXPLAIN ไว้ที่ explicit `genesis.api.v2` + `hql.v2`/`query-ir.v2`;
-   ข้อห้ามยังคงกับ compatibility callers (`HQL`/`query-ir.v1`) และต้องผ่าน gates P7-P16
-   ตาม dependency order ใน ADR. ต้องมี ADR ใหม่เฉพาะเมื่อข้อเสนอเปลี่ยน approved contract
+4. ทำ G4-G6 (HQL2/planner/composition) ตาม owner-approved [G4 shared-pipeline
+   ADR](adr/ADR--GENESISDB-HQL2-G4-SHARED-PIPELINE.md) และ HQL2 execution ADR.
+   จำกัด planner/EXPLAIN ไว้ที่ explicit `genesis.api.v2` + `hql.v2`/`query-ir.v2`;
+   compatibility callers (`HQL`/`query-ir.v1`) คง semantics เดิม และ implementation
+   กับ qualification ยังต้องผ่าน gates P7-P16 ตาม dependency order.
 5. ทำ G7-G10 หลัง exactness, lifecycle, surface parity และ migration contract ผ่านแล้ว
 
 Blueprint package ตรวจผ่าน 9/9 package checks แต่มี engine obligations 190 รายการเป็น
@@ -98,8 +111,10 @@ P0 BASELINE (done, read-only)
 | P5 | Stabilize relational U2 and unified U3 transaction/stable frontier | P4 | Row+graph+vector commit/retry/reopen semantics pass |
 | P6 | Generation publication, leases, temporal and ACL visibility | P5 | No mixed snapshot; pinned generation and authorization tests pass |
 | P7 | Exact reference interpreter/oracle and golden fixtures | P6 | NULL/bag/temporal/annotation semantics are executable and reproducible |
-| P8 | HQL1/HQL2/IR lowering to one pipeline plus truthful EXPLAIN/counters and H2-D11-backed source adapters | P7, approved P8 and H2-D11 contracts | Shared binder/runtime; each storage source passes identity, temporal, retention, ACL and exact-oracle gates |
-| P9 | Legal B-tree/annotation paths and planner access reporting | P8 | Pushdown/order counterexamples match oracle; plans are truthful |
+| P8 | HQL1/HQL2/IR lowering to one pipeline plus truthful EXPLAIN/counters and H2-D11-backed source adapters | P7, approved P8, H2-D11 and G4 contracts | Shared binder/runtime; each storage source passes identity, temporal, retention, ACL and exact-oracle gates |
+| P8-R2 | Bounded REST parity verification for existing HQL compatibility and typed Query IR v1 traversal | P8 local kernel; existing P13 boundary | `/v1/query/hql` and `/v1/query/ir` return equal result bags; test-only, no `query_v2` transport or P13 closure |
+| P8-R3 | REST matrix for raw/wrapped HQL bodies and typed HQL/Query IR v1 errors | P8-R2; existing v1 routes | Equal result bags across accepted HQL body shapes; budget/version failures retain typed envelopes; test-only, no public API or P13 closure |
+| P9 | Legal B-tree/annotation paths and planner access reporting | P8 and approved G4 planner boundary | Pushdown/order counterexamples match oracle; plans are truthful |
 | P10 | Cross-domain graph/vector/relational/annotation composition | P9 | One snapshot, exact-oracle parity, no internal network/JSON workaround |
 | P11 | HNSW/lexical lifecycle, generations, deltas, watermarks and coverage | P10 | Approximate results are explicit; lifecycle and stale-index gates pass |
 | P12 | Budgets, cancellation, spill, cleanup and cost model | P11 | Resource limits preserve correctness and leave no spill residue |
@@ -111,6 +126,36 @@ P0 BASELINE (done, read-only)
 Preparation-only sidecars may run after P2/P3 in parallel: new oracle fixtures, per-surface
 contract fixtures, benchmark harnesses, and mobile/self-host qualification scripts. They cannot
 certify or merge over an unmet dependency.
+
+### G4 contract and implementation slice — 2026-10-04
+
+The owner approved the exact [G4 shared-pipeline ADR](adr/ADR--GENESISDB-HQL2-G4-SHARED-PIPELINE.md)
+against the accepted HQL2 execution boundary, P6/H2-D11 authority and the P7
+exact oracle. The approved contract freezes explicit-v2 dispatch, one closed
+parity-proven HQL1/HQL2/Query IR v2 binder, deterministic first planning,
+plan-only `EXPLAIN` and measured read-only `ANALYZE`. It keeps HQL
+compatibility, `query-ir.v1`, public transport, persistence, mutation and
+release boundaries unchanged.
+
+The implementation candidate now combines the P8 typed pipeline and the G4
+plan-identity slice. HQL2 text and closed Query IR v2 bind to `BoundQueryV2`,
+then use the deterministic `PhysicalPlanV2` and one serialized Storage/P6
+execution boundary. The explicitly allowlisted HQL1 adapter lowers into that
+same path; unproven HQL1 forms remain on their legacy path or fail closed.
+`ExplainResultV2` includes contract/planner identity and a canonical shared
+plan hash for `EXPLAIN`/`ANALYZE`. H2-D11-backed source adapters retain revision,
+retention and ACL checks; public transport and user-database migration remain
+out of scope.
+
+The integrated tree passed 42 explicit HQL2/REST test targets, the U9 restore
+target (7/7), and strict Clippy in both default and no-default feature
+configurations. The HQL2/REST sweep includes the G4 plan-identity/counter and
+source-plan tests. The prior 39-target result (404 passed, 0 failed, 1 ignored)
+is historical evidence from before mainline reconciliation, not a substitute
+for this integrated run.
+G4 remains `PARTIAL`: full operator-by-operator exact-oracle breadth,
+independent review, refreshed hosted checks, and device/release qualification
+must be recorded separately; missing evidence remains `NOT_RUN`.
 
 ## 4. Conflict and worktree policy
 
@@ -951,12 +996,12 @@ passes 19/19 across `epoch_e2_tests`, `g3_oracle_differential_tests`,
 
 ## CHANGELOG
 
-Version diff `0.8.70b -> 0.8.71b`: record the approved D7 zero-hop
-single-property and exact-seed depth-one `TRAVERSE` extensions, with adapter
-13/13, property/order/labeled-filter 2/2 each and a 404/0/1 root HQL2 sweep
-across 39 targets. Replayed R5 restore regressions pass 7/7 in the U9 target;
-generation and revision/backup targets pass 3/3 and 1/1. Preserve fail-closed
-legacy forms, no-user-migration scope and open shared-runtime/P8/P13 gates.
+Version diff `0.8.73b -> 0.8.74b`: reconcile G4 stable plan identity with
+the subsequent D7 and H2-D11 implementation evidence: 39 HQL2 targets pass
+404/0/1; U9 restore passes 7/7; generation and revision/backup targets pass
+3/3 and 1/1. Preserve the approved explicit-v2 boundary, fail-closed legacy
+forms, no-user-migration scope, and partial G4/P8/P13 status. Fresh hosted
+checks and independent review remain pending.
 
 Version diff `0.8.69b -> 0.8.70b`: extend D7, after differential evidence,
 to one exact same-alias string ID predicate on labeled zero-hop scans. Match,

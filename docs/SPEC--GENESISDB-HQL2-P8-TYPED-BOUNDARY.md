@@ -1,8 +1,8 @@
 ---
 doc_id: SPEC--GENESISDB-HQL2-P8-TYPED-BOUNDARY
-version: "0.2.61b"
+version: "0.2.62b"
 created_at: "2026-09-28T01:25:00+07:00,ATHER,fc851e9"
-last_update: "2026-10-05T06:09:11+07:00,ATHER"
+last_update: "2026-10-06T01:39:39+07:00,ATHER"
 status: beta
 superseded_by: null
 owner: "Boss (Founder / Product Authority)"
@@ -424,8 +424,11 @@ resource exhaustion is error, never a successful partial aggregate. ContextPack
 emits a typed package binding consumable by RETURN/PROJECT, with exact registered
 token counting of final text including separators/citations and omitted evidence.
 
-`ExplainResultV2 = { request_id: String, catalog: CatalogStampV2,
-plan: Vec<ExplainNodeV2>, root: String }`.
+`ExplainResultV2 = { contract_version: "genesis.api.v2", planner_version: String,
+plan_hash: String, request_id: String, catalog: CatalogStampV2,
+plan: Vec<ExplainNodeV2>, root: String }`. `plan_hash` is the stable identity
+of the canonical planner-version, root and plan-node shape; `EXPLAIN` and
+`ANALYZE` for the same logical request share it.
 `CatalogStampV2 = { observed_frontier: u64, policy_revision: u64,
 schema_fingerprint: String }` is catalog-only, not a durable snapshot lease.
 `ExplainNodeV2 = { id: String, logical_op: QueryOpV2, physical_op: String,
@@ -886,13 +889,11 @@ separate shape limits. No process-global Pest setting is changed.
 
 ## Version diff and changelog
 
-Version diff `0.2.60b -> 0.2.61b`: extend the approved D7 allowlist with one
-unlabeled zero-hop single-property projection and exact-seed depth-one
-`TRAVERSE` ID projection over one relation or `ANY` in default/out/in/both
-directions. Adapter 13/13, property/order/labeled-filter 2/2 each, root HQL2
-404/0/1 across 39 targets and U9 restore 7/7 pass. Missing/null and bag
-multiplicity, seed exclusion and parallel-edge deduplication match legacy;
-all other forms remain fail-closed and broad shared-runtime/P8/P13 gates remain
+Version diff `0.2.61b -> 0.2.62b`: reconcile the approved G4 plan identity
+and truthful `EXPLAIN`/`ANALYZE` fields with the D7 single-property and
+exact-seed depth-one `TRAVERSE` allowlist. HQL2 passes 404/0/1 across 39
+targets; legacy forms outside the declared allowlist remain on their previous
+path. Broad G4/P8/P13, fresh hosted checks and independent-review gates remain
 open.
 
 Version diff `0.2.59b -> 0.2.60b`: record the conditional D7 extension for one
@@ -1118,6 +1119,7 @@ detail with unchanged JSON shape; broader P8/P13/review gates remain open.
 
 | Version | Date | Status | Summary | Commit Hash | Agent |
 |---|---|---|---|---|---|
+| 0.2.62b | 2026-10-06 | beta | Reconcile G4 stable plan identity with D7 single-property and exact-seed depth-one TRAVERSE evidence; preserve explicit compatibility allowlist and broad G4/P8/P13/review gates | working-tree | ATHER |
 | 0.2.61b | 2026-10-05 | beta | Extend approved D7 with a zero-hop single-property projection and exact-seed depth-one TRAVERSE; adapter 13/13, property/order/filter 2/2 each, HQL2 404/0/1 across 39 targets and U9 restore 7/7; preserve fail-closed compatibility, shared-runtime/P8/P13 and review gates | working-tree | ATHER |
 | 0.2.60b | 2026-10-04 | beta | Extend conditional D7 same-alias exact string ID filter to labeled zero-hop scans after legacy/HQL2 match, miss, wrong-label and backslash/Unicode differential; adapter 11/11, ordering 2/2, labeled-filter target 2/2, HQL2 394/0/1 across 35 targets, selected P6 peers 45/0/0 across 7; PR #213 code commit checks 40 pass, 4 worker failures with unconfirmed cause, 5 skipped, 1 Windows Cargo cancellation at 15-minute job limit; no P6 contract/schema/transport change; broad shared-runtime/P8/P13 gates remain open | working-tree | ATHER |
 | 0.2.59b | 2026-10-04 | beta | Record test-only HQL/typed-IR ChangeScan P7 differential across five exclusive-after/inclusive-through windows, empty bounds and tx_as_of frontiers; History/Change 17/17, HQL2 392/0/1 across 34 targets; PR #210 hosted checks 11 pass, four worker markerless-identity failures, one skipped; no contract/runtime/schema/P6/transport change; broad P8/P13/review remain open | working-tree | ATHER |

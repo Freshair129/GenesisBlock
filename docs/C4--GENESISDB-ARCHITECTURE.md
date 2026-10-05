@@ -2,10 +2,10 @@
 doc_id: C4--GENESISDB-ARCHITECTURE
 type: architecture-index
 status: current
-version: 0.1.70b
+version: 0.1.71b
 owner: GenesisBlockDB Architecture
 created_at: 2026-06-13T22:50:11+07:00,ATHER,9b1ced3
-last_update: "2026-10-05T06:09:11+07:00,ATHER"
+last_update: "2026-10-06T01:39:39+07:00,ATHER"
 attributes:
   domain: architecture
   scope: repository
@@ -21,6 +21,7 @@ related_docs:
   - docs/adr/ADR--GENESISDB-HQL2-DURABLE-REVISIONS-ANNOTATIONS.md
   - docs/adr/ADR--GENESISDB-HQL2-PATTERN-CONSTRAINTS.md
   - docs/adr/ADR--GENESISDB-HQL2-P8-COMPLETION-ADDENDUM.md
+  - docs/adr/ADR--GENESISDB-HQL2-G4-SHARED-PIPELINE.md
 ---
 
 # C4--GENESISDB-ARCHITECTURE
@@ -29,6 +30,13 @@ The staged UEE-HQL2 query architecture is governed by the owner-approved
 [HQL2 execution ADR](adr/ADR--GENESISDB-HQL2-EXECUTION-BOUNDARY.md).
 The reference interpreter is test-only; explicit v2 production binding,
 planning and execution require their own verified phase evidence.
+The owner-approved [G4 shared-pipeline ADR](adr/ADR--GENESISDB-HQL2-G4-SHARED-PIPELINE.md)
+defines the review boundary for one parity-proven HQL1/HQL2/Query IR v2
+binder, deterministic first planning, plan-only `EXPLAIN` and measured
+read-only `ANALYZE`. The current implementation slice adds stable planner
+metadata and a shared plan hash to `EXPLAIN`/`ANALYZE`; G4 remains partial.
+HQL compatibility, `query-ir.v1`, public transport, persistence and release
+boundaries remain unchanged.
 The [P8 core checkpoint](REPORT--HQL2-P8-CORE-2026-09-28.md) introduces
 `src/query/hql2/` plus one serialized Storage boundary.
 Core execution now combines scalar kernels, revision-bound Node/Edge/Row/
@@ -491,11 +499,11 @@ Broader EXPLAIN/P8/P13 and P14 rehearsal remain open.
 
 ## CHANGELOG
 
-Version diff 0.1.69b -> 0.1.70b: synchronize the approved D7 single-property
-and exact-seed depth-one `TRAVERSE` forms with legacy/HQL2 differential;
-record adapter 13/13, property/order/filter 2/2 each, root HQL2 404/0/1 across
-39 targets and U9 restore 7/7. Keep other HQL1 forms fail-closed and broad
-shared-runtime/P8/P13 gates open.
+Version diff 0.1.70b -> 0.1.71b: reconcile the approved G4 stable plan
+identity with the later D7 single-property and exact-seed depth-one
+`TRAVERSE` evidence, H2-D11 restore verification and the 39-target HQL2 sweep
+(404 passed, 0 failed, 1 ignored). G4/P8 remain partial; independent review,
+fresh hosted checks and broader P8/P13 qualification remain open.
 
 Version diff 0.1.68b -> 0.1.69b: extend D7 after legacy/HQL2 differential to
 one exact same-alias string ID predicate on labeled zero-hop scans. The new
@@ -627,6 +635,8 @@ full P8/P13 qualification remains open.
 
 | Version | Date | Status | Summary | Commit Hash | Agent |
 |---------|------|--------|---------|-------------|-------|
+| 0.1.71b | 2026-10-06 | current | Reconcile approved G4 plan identity with the later D7/H2-D11 implementation evidence; 39-target HQL2 sweep 404/0/1, while G4/P8 and independent/hosted qualification remain partial | working-tree | ATHER |
+| 0.1.70b | 2026-10-05 | current | Merge owner-approved G4 stable plan identity on `EXPLAIN`/`ANALYZE` onto the current D7 mainline; focused local verification passes, while broad G4/P8/P13, transport, hosted and independent-review gates remain open | working-tree | ATHER |
 | 0.1.69b | 2026-10-04 | current | Extend D7 with differential-proven same-alias exact string-ID filter on labeled zero-hop scans; adapter 11/11, ordering 2/2 and labeled-filter 2/2 including wrong-label/backslash/Unicode cases; HQL2 394/0/1 across 35 targets, selected P6 peers 45/0/0 across 7; PR #213 code commit checks 40 pass, 4 worker failures with cause unconfirmed, 5 skipped, 1 Windows Cargo cancellation at 15-minute job limit; no P6/schema/transport change; broad shared-runtime/P8/P13 remain open | working-tree | ATHER |
 | 0.1.68b | 2026-10-04 | current | Add test-only HQL/typed-IR ChangeScan P7 differential for five exclusive-after/inclusive-through windows and tx_as_of frontiers; History/Change 17/17; HQL2 392/0/1 across 34 targets; PR #210 hosted checks 11 pass, four worker markerless-identity failures, one skipped; no runtime/contract/schema/P6/transport change; broad P8/P13 and independent review remain open | working-tree | ATHER |
 | 0.1.67b | 2026-10-04 | current | Add test-only HQL/typed-IR Node/Edge/Row source-scan P7 differential; storage-source target 10/10; fresh 34-target HQL2 run 391/0/1 (prior 393 count not reproduced); no runtime/contract/schema/P6/transport change; broad P8/P13 and independent review remain open | working-tree | ATHER |

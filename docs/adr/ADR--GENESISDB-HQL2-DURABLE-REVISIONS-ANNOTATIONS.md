@@ -1,8 +1,8 @@
 ---
 doc_id: ADR--GENESISDB-HQL2-DURABLE-REVISIONS-ANNOTATIONS
-version: "0.8.22b"
+version: "0.8.23b"
 created_at: "2026-09-28T06:15:00+07:00,ATHER,53078cb"
-last_update: "2026-10-05T06:09:11+07:00,ATHER"
+last_update: "2026-10-06T01:56:51+07:00,ATHER"
 status: beta
 superseded_by: null
 owner: "Boss (Founder / Product Authority)"
@@ -462,6 +462,10 @@ data and leaves `txn_frontier` unchanged. Restore independently reopens
 staging read-only and validates the lease. It prepares the complete
 `BackupBundleInfo` before atomically renaming staging into the caller-visible
 target, so no later bundle I/O can turn a published restore into an error.
+Backup compatibility is checked using the supported format, matching engine
+name, and readable schema version. The manifest's `engine_version` is audit
+provenance, not an exact-match gate; an older engine build may restore when its
+schema is supported. Newer unreadable schemas fail before target creation.
 Physical erasure across retained history, artifacts, backups and replicas is a
 separately authorized administrative workflow, not annotation retraction.
 
@@ -764,16 +768,16 @@ Minimum Verify/Review/Final evidence:
 
 | Artifact | Approved version | Synchronized version/status |
 |---|---|---|
-| This H2-D11 addendum | `0.3.0b` candidate, owner-approved | `0.8.22b` beta, R5 restore evidence revalidated on mainline; U9 restore 7/7, generation 3/3, revision/backup 1/1; root HQL2 404/0/1 across 39; failure cleanup remains best-effort and unverified |
+| This H2-D11 addendum | `0.3.0b` candidate, owner-approved | `0.8.23b` beta, R5 restore evidence and schema-driven compatibility clarified; U9 target passes 7/7 |
 | P8 completion addendum | `0.1.13b` accepted | `0.1.14b` accepted, records differential-tested zero-hop property and exact-seed depth-one traversal extensions |
-| P8 typed boundary | `0.2.0b` beta | `0.2.61b` beta, records D7 and current 39-target evidence; source-backed plan-only EXPLAIN remains partial |
+| P8 typed boundary | `0.2.0b` beta | `0.2.62b` beta, records G4/D7 evidence; source-backed plan-only EXPLAIN remains partial |
 | P6 generations/leases/ACL | `0.5.0b` beta | `0.5.34b` beta, D7 synchronization only; no ACL/schema/migration change |
-| U9 backup/restore spec | `0.1.1b` approved | `0.1.7b` beta, receipt-last restore, `txn_frontier` preservation and pre-rename result preparation |
-| HQL2 orchestration plan | `0.5.0b` beta | `0.8.71b` beta, records current D7/restore results; broader phase gates remain open |
-| C4 architecture index | `0.1.20b` | `0.1.70b`, indexes current HQL2/P6 restore result and open gates |
-| DOC registry | `0.5.6+draft` | `0.5.77+draft`, synchronized current HQL2/P6/plan/report/U9 entries |
+| U9 backup/restore spec | `0.1.1b` approved | `0.1.8b` beta, format/engine-name/schema gates distinguished from audit-only engine version |
+| HQL2 orchestration plan | `0.5.0b` beta | `0.8.74b` beta, records current D7/G4/restore results; broader phase gates remain open |
+| C4 architecture index | `0.1.20b` | `0.1.71b`, indexes current HQL2/P6 restore result and open gates |
+| DOC registry | `0.5.6+draft` | `0.5.80+draft`, synchronized current HQL2/P6/plan/report/U9 entries |
 | Master specification | — | `2.3.42b`, architecture summary synchronized to D7 and R5 restore evidence |
-| HQL2 P8 checkpoint | — | `0.1.64b`, records current D7/restore regressions and remaining EXPLAIN gates |
+| HQL2 P8 checkpoint | — | `0.1.66b`, records G4/D7 evidence and U9 compatibility clarification; broader acceptance remains open |
 | Engine/storage | `0.2.9` | remains unchanged until implementation and release gates; no user database is migrated here |
 
 Version diff `0.8.19b -> 0.8.20b`: accept a valid terminal
@@ -855,6 +859,7 @@ NOT_RUN and broader acceptance/release gates remain open.
 
 | Version | Date | Status | Summary | Commit Hash | Agent |
 |---|---|---|---|---|---|
+| 0.8.23b | 2026-10-06 | beta | Clarify R5 backup compatibility: enforce format, engine name and readable schema; treat engine_version as audit provenance; U9 target passes 7/7; no schema/migration/format change | working-tree | ATHER |
 | 0.8.22b | 2026-10-05 | beta | Revalidate approved R5 restore and D7 extension after mainline replay; U9 restore 7/7, generation 3/3, revision/backup 1/1, HQL2 404/0/1 across 39 targets; synchronize document versions; no schema/migration/format change; independent review and broad HQL2 gates remain open | working-tree | ATHER |
 | 0.8.21b | 2026-10-05 | beta | Record final R5 restore verification: restore/P6 21/21 across five targets, HQL2 393/0/1 across 37, full Rust suite exit 0 with `probe_vs_recall` filtered; note best-effort cleanup failure-path test gap; no schema/migration/format change; broad HQL2 gates remain open | working-tree | ATHER |
 | 0.8.20b | 2026-10-05 | beta | Accept a valid terminal P6 generation receipt, preserve transaction frontier, and prepare restore result before target rename; restore/P6 20/20 across five targets, HQL2 392/0/1 across 37; full Rust suite NOT_RUN; no schema/migration/format change; broad HQL2 gates remain open | working-tree | ATHER |

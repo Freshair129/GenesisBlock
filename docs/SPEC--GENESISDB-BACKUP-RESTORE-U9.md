@@ -1,8 +1,8 @@
 ---
 doc_id: SPEC--GENESISDB-BACKUP-RESTORE-U9
-version: "0.1.7b"
+version: "0.1.8b"
 created_at: "2026-08-14T00:00:00+07:00,ATHER"
-last_update: "2026-10-05T06:09:11+07:00,ATHER"
+last_update: "2026-10-06T01:56:51+07:00,ATHER"
 status: "beta"
 superseded_by: null
 owner: "Boss (Founder / Product Authority)"
@@ -149,8 +149,14 @@ flowchart LR
 7. **Concurrent mutation boundary:** a mutation issued during export blocks at
    the lifecycle barrier; the restored result equals one declared frontier, not
    a mixture.
-8. **Compatibility:** unsupported format, engine, or schema versions fail with
-   a named compatibility error before target creation.
+8. **Compatibility gates:** unsupported `format_version`, a mismatched
+   `engine_name`, or a schema the current engine cannot read fails with a named
+   compatibility error before target creation. Older supported schemas may use
+   the normal migration path.
+9. **Engine-version provenance:** `engine_version` is recorded and returned for
+   audit; it is not an exact-match compatibility gate. A bundle from an older
+   engine build restores when its format, engine name, and schema are supported.
+   `restore_accepts_older_engine_version_with_same_schema` covers this rule.
 
 ## 6. Non-goals and rollout
 
@@ -216,6 +222,7 @@ copy, or Google Drive work.
 
 | Version | Date | Status | Summary | Commit Hash | Agent |
 | --- | --- | --- | --- | --- | --- |
+| 0.1.8b | 2026-10-06 | beta | Clarify compatibility gates: format, engine name and readable schema are enforced; engine_version is audit provenance, and older engine builds restore when schema-compatible; aligns the spec with the existing source and regression test | working-tree | ATHER |
 | 0.1.7b | 2026-10-05 | beta | Replay verification confirms full-retention staging preserves the packaged history floor; normal recovery must match the bundle WAL frontier, P6 generation/lease validation completes before exposure, `txn_frontier` remains preserved, and return metadata is prepared before rename; U9 target 7/7, restore-generation 3/3, revision/backup 1/1, HQL2 404/0/1 across 39 targets; P14 rehearsal and failure-cleanup fault injection remain open | working-tree | ATHER |
 | 0.1.6b | 2026-10-05 | beta | Record restore/P6 21/21 across five targets, HQL2 393/0/1 across 37, and full Rust suite exit 0 with `probe_vs_recall` filtered; cleanup after read-only/rename failure remains best-effort and unverified | working-tree | ATHER |
 | 0.1.5b | 2026-10-05 | beta | Specify receipt-last generation reuse, `txn_frontier` preservation, and complete return-metadata preparation before target rename; restore/P6 20/20 across five targets and HQL2 392/0/1 across 37; full Rust suite NOT_RUN | working-tree | ATHER |
