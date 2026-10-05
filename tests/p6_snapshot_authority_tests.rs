@@ -59,8 +59,6 @@ fn rewrite_policy_event(
     active: &[u8],
     signing_key: &SigningKey,
     event_number: usize,
-    original_expected_revision: u64,
-    original_policy_revision: u64,
     expected_revision: u64,
     policy_revision: u64,
     folded: bool,
@@ -103,14 +101,8 @@ fn rewrite_policy_event(
             if policy_event_count == event_number {
                 let acl_event = &mut signed["event"]["AccessPolicyChanged"];
                 assert_eq!(acl_event["folded"], json!(false));
-                assert_eq!(
-                    acl_event["expected_revision"],
-                    json!(original_expected_revision)
-                );
-                assert_eq!(
-                    acl_event["policy"]["revision"],
-                    json!(original_policy_revision)
-                );
+                assert_eq!(acl_event["expected_revision"], json!(event_number - 1));
+                assert_eq!(acl_event["policy"]["revision"], json!(event_number));
                 acl_event["expected_revision"] = json!(expected_revision);
                 acl_event["policy"]["revision"] = json!(policy_revision);
                 acl_event["folded"] = json!(folded);
@@ -145,21 +137,11 @@ fn rewrite_policy_event(
 }
 
 fn rewrite_second_policy_event_as_signed_gap(active: &[u8], signing_key: &SigningKey) -> Vec<u8> {
-    rewrite_policy_event(active, signing_key, 2, 1, 2, 2, 3, false, None)
+    rewrite_policy_event(active, signing_key, 2, 2, 3, false, None)
 }
 
 fn rewrite_first_policy_event_as_max_baseline(active: &[u8], signing_key: &SigningKey) -> Vec<u8> {
-    rewrite_policy_event(
-        active,
-        signing_key,
-        1,
-        0,
-        1,
-        u64::MAX - 1,
-        u64::MAX,
-        true,
-        None,
-    )
+    rewrite_policy_event(active, signing_key, 1, u64::MAX - 1, u64::MAX, true, None)
 }
 
 fn write_snapshot_policy(dir: &Path, policy: &AccessPolicy) {
@@ -241,8 +223,6 @@ fn signed_same_revision_acl_event_at_u64_max_fails_closed() {
     let same_revision_event = rewrite_policy_event(
         &max_baseline,
         &storage.signing_key,
-        2,
-        1,
         2,
         u64::MAX,
         u64::MAX,

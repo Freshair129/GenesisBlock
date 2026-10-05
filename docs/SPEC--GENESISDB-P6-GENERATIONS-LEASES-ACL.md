@@ -3,7 +3,7 @@ doc_id: SPEC--GENESISDB-P6-GENERATIONS-LEASES-ACL
 owner: GenesisBlockDB Engineering
 version: 0.5.46b
 created_at: "2026-09-22T22:55:00+07:00,ATHER,working-tree"
-last_update: "2026-10-06T01:51:14+07:00,Codex"
+last_update: "2026-10-06T02:01:28+07:00,Codex"
 status: beta
 attributes:
   domain: storage-correctness
@@ -622,8 +622,8 @@ P6/P8 and independent-review gates remain open.
 Version diff 0.5.45b -> 0.5.46b: re-integrate the P6 closeout on mainline `4b78596` while
 preserving the D7/P7 ChangeScan differential and both temporal test lanes. Local Verify on the
 integrated tree passes the exact seven-target P6 acceptance (49/49), focused snapshot/lease/
-history tests (35/35), `cargo check --locked --offline --no-default-features`, format, docs
-validation (0/241), and diff check. Astra's prior Final applies to the previously reviewed P6
+history tests (35/35), `cargo check --locked --offline --no-default-features`, format, strict core
+Clippy, docs validation (0/241), and diff check. Astra's prior Final applies to the previously reviewed P6
 slice; it was not rerun on this rebased HEAD. Current hosted checks remain pending. No P7, release,
 deployment, or external-readiness scope is added.
 
@@ -792,7 +792,7 @@ broader P6/P8/P13 qualification is claimed.
 
 | Version | Date | Status | Summary | Commit | Agent |
 |---|---|---|---|---|---|
-| 0.5.46b | 2026-10-06 | beta | Re-integrate onto mainline 4b78596; local Verify P6 49/49, focused snapshot/lease/history 35/35, cargo check/fmt/docs/diff pass; Astra Final remains limited to the predecessor slice and was not rerun on this HEAD; hosted checks pending | working-tree | Codex |
+| 0.5.46b | 2026-10-06 | beta | Re-integrate onto mainline 4b78596; local Verify P6 49/49, focused snapshot/lease/history 35/35, cargo check/fmt/strict core Clippy/docs/diff pass; Astra Final remains limited to the predecessor slice and was not rerun on this HEAD; hosted checks pending | working-tree | Codex |
 | 0.5.45b | 2026-10-06 | beta | Record Astra 6 Final PASS_WITH_LIMITATIONS for the reviewed local P6 slice; stale-Plan fallback fixture limitation accepted; hosted/cross-platform CI and release/deployment remain NOT_RUN | working-tree | Codex |
 | 0.5.44b | 2026-10-05 | beta | Record corrected-tree independent Verify PASS (P6 49/49, focused 34/34, check/format/docs/diff PASS) and independent broad Review PASS; preserve the bounded stale-Plan fallback fixture limitation; Astra Final pending | working-tree | Codex |
 | 0.5.43b | 2026-10-05 | beta | Record corrected-tree independent Verify PASS after checked-increment fix: P6 49/49, focused 34/34, cargo check/fmt/docs/diff pass; independent Review rerun and Astra Final pending | working-tree | Codex |

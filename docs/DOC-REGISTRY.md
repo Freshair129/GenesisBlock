@@ -123,7 +123,7 @@ The following documents should be created only when implementation work requires
 
 Version diff 0.5.90+draft -> 0.5.91+draft: register P6 contract v0.5.46b after reintegration on
 mainline `4b78596`. Record local Verify on the integrated tree: P6 acceptance 49/49, focused
-snapshot/lease/history 35/35, check/format/docs (0/241)/diff PASS. Astra's Final remains limited
+snapshot/lease/history 35/35, check/format/strict core Clippy/docs (0/241)/diff PASS. Astra's Final remains limited
 to the predecessor reviewed slice; it was not rerun on this rebased HEAD, and hosted checks remain
 pending. Preserve all D7/P7 records; no P7 or release scope is added.
 

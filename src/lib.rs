@@ -19671,7 +19671,7 @@ impl Storage {
                             invalid_materialization = true;
                             continue;
                         }
-                        match Self::next_access_policy_after_event(&latest_policy, &event) {
+                        match Self::next_access_policy_after_event(&latest_policy, event) {
                             Ok(policy) => latest_policy = policy,
                             Err(_) => invalid_materialization = true,
                         }
