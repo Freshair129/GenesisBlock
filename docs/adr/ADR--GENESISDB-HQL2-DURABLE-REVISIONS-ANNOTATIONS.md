@@ -1,8 +1,8 @@
 ---
 doc_id: ADR--GENESISDB-HQL2-DURABLE-REVISIONS-ANNOTATIONS
-version: "0.8.25b"
+version: "0.8.26b"
 created_at: "2026-09-28T06:15:00+07:00,ATHER,53078cb"
-last_update: "2026-10-06T03:35:00+07:00,ATHER"
+last_update: "2026-10-06T04:05:24+07:00,ATHER"
 status: beta
 superseded_by: null
 owner: "Boss (Founder / Product Authority)"
@@ -62,9 +62,11 @@ supported retained revision kinds under P6; Artifact HistoryScan remains
 unsupported. An earlier review concern that hidden Annotation candidates could
 affect caller-budget outcomes is resolved by the owner-approved narrow policy
 below: quota-result dependence is addressed, but timing noninterference remains
-unclaimed. HQL and typed-IR AnnotationScan now match the independent P7 graph
-oracle for a persisted annotation at one explicitly aligned transaction and
-valid-time selector; this is focused evidence, not broad P8 closure.
+unclaimed. HQL and typed-IR AnnotationScan match the independent P7 graph
+oracle at explicit S,V with future-valid and post-S controls excluded. Missing
+`Annotation(Read)` returns `FORBIDDEN` for both frontends in a separate ACL
+test; the query-level denial is not represented as P7 row-bag parity. This is
+focused evidence, not broad P8 closure.
 Exact KNN and Original Rerank read original schema-v6 vectors under that P6
 lease after owner-revision, namespace/node ACL, collection and fingerprint
 validation. Artifact HistoryScan, additional unsupported P8 operators and
@@ -771,16 +773,16 @@ Minimum Verify/Review/Final evidence:
 
 | Artifact | Approved version | Synchronized version/status |
 |---|---|---|
-| This H2-D11 addendum | `0.3.0b` candidate, owner-approved | `0.8.25b` beta, R5 restore compatibility and stale History/Change status reconciled; AnnotationScan has focused P7 parity evidence; U9 target passes 7/7 |
+| This H2-D11 addendum | `0.3.0b` candidate, owner-approved | `0.8.26b` beta, R5 restore compatibility and History/Change status reconciled; AnnotationScan has temporal-control P7 evidence; U9 target passes 7/7 |
 | P8 completion addendum | `0.1.13b` accepted | `0.1.14b` accepted, records differential-tested zero-hop property and exact-seed depth-one traversal extensions |
-| P8 typed boundary | `0.2.0b` beta | `0.2.63b` beta, records G4/D7 and AnnotationScan P7 evidence; full source/operator oracle remains partial |
+| P8 typed boundary | `0.2.0b` beta | `0.2.64b` beta, records G4/D7 and controlled AnnotationScan P7 evidence; full source/operator oracle remains partial |
 | P6 generations/leases/ACL | `0.5.0b` beta | `0.5.34b` beta, D7 synchronization only; no ACL/schema/migration change |
 | U9 backup/restore spec | `0.1.1b` approved | `0.1.8b` beta, format/engine-name/schema gates distinguished from audit-only engine version |
-| HQL2 orchestration plan | `0.5.0b` beta | `0.8.75b` beta, records current D7/G4/restore and AnnotationScan P7 evidence; broader phase gates remain open |
+| HQL2 orchestration plan | `0.5.0b` beta | `0.8.76b` beta, records current D7/G4/restore and controlled AnnotationScan P7 evidence; broader phase gates remain open |
 | C4 architecture index | `0.1.20b` | `0.1.71b`, indexes current HQL2/P6 restore result and open gates |
-| DOC registry | `0.5.6+draft` | `0.5.82+draft`, synchronized current HQL2/P6/plan/report/U9 entries |
+| DOC registry | `0.5.6+draft` | `0.5.83+draft`, synchronized current HQL2/P6/plan/report/U9 entries |
 | Master specification | — | `2.3.42b`, architecture summary synchronized to D7 and R5 restore evidence |
-| HQL2 P8 checkpoint | — | `0.1.67b`, records G4/D7, U9 and AnnotationScan P7 evidence; broader acceptance remains open |
+| HQL2 P8 checkpoint | — | `0.1.68b`, records G4/D7, U9 and controlled AnnotationScan P7 evidence; broader acceptance remains open |
 | Engine/storage | `0.2.9` | remains unchanged until implementation and release gates; no user database is migrated here |
 
 Version diff `0.8.19b -> 0.8.20b`: accept a valid terminal
@@ -860,6 +862,13 @@ NOT_RUN and broader acceptance/release gates remain open.
 
 ## CHANGELOG
 
+Version diff `0.8.25b -> 0.8.26b`: strengthen the test-only AnnotationScan
+P7 differential with future-valid and post-S controls at explicit selectors;
+record separate HQL/typed-IR missing Annotation(Read) `FORBIDDEN` checks rather
+than claiming query-level ACL denial as P7 row-bag parity. Four focused
+annotation/History/Change targets pass 42/42; no runtime/schema/migration/
+transport change and broad P8 acceptance remains open.
+
 Version diff `0.8.24b -> 0.8.25b`: record the test-only HQL/typed-IR
 AnnotationScan differential against independent P7 at an explicitly aligned
 S,V. The focused source/ACL target passes 7/7; this does not close broad P8
@@ -874,6 +883,7 @@ runtime, schema, migration or transport behavior changed.
 
 | Version | Date | Status | Summary | Commit Hash | Agent |
 |---|---|---|---|---|---|
+| 0.8.26b | 2026-10-06 | beta | Strengthen AnnotationScan P7 evidence with S,V exclusion controls; record separate HQL/IR Annotation(Read) FORBIDDEN checks; four focused targets 42/42; no runtime/schema/migration/transport change; broad P8 remains open | working-tree | ATHER |
 | 0.8.25b | 2026-10-06 | beta | Record HQL/typed-IR AnnotationScan P7 differential at explicit S,V; focused source/ACL target passes 7/7; no runtime/schema/migration/transport change; broad P8 acceptance remains open | working-tree | ATHER |
 | 0.8.24b | 2026-10-06 | beta | Reconcile stale H2-D11 status: History/Change supports Node/Edge/Row/Vector/Annotation while Artifact History remains unsupported; quota-result concern addressed, timing noninterference unclaimed; no runtime/schema/migration change | working-tree | ATHER |
 | 0.8.23b | 2026-10-06 | beta | Clarify R5 backup compatibility: enforce format, engine name and readable schema; treat engine_version as audit provenance; U9 target passes 7/7; no schema/migration/format change | working-tree | ATHER |

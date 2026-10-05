@@ -537,6 +537,21 @@ fn annotation_scan_requires_annotation_grant_in_addition_to_namespace_query_gran
         }))
         .unwrap()
     };
+    let ir_request = |request_id| {
+        serde_json::from_value(json!({
+            "contract_version":"genesis.api.v2",
+            "request_id":request_id,
+            "namespace":"default",
+            "ir":{
+                "contract_version":"query-ir.v2",
+                "nodes":[{"id":"annotations","op":"AnnotationScan","inputs":[],"config":{"as":"a"}}],
+                "root":"annotations",
+                "parameter_types":{}
+            },
+            "params":{}
+        }))
+        .unwrap()
+    };
     let change_request = |request_id| {
         serde_json::from_value(json!({
             "contract_version":"genesis.api.v2",
@@ -561,6 +576,10 @@ fn annotation_scan_requires_annotation_grant_in_addition_to_namespace_query_gran
         .query_v2(actor(), request("annotation-without-grant"))
         .unwrap_err();
     assert_eq!(error.code, "FORBIDDEN");
+    let error = storage
+        .query_v2(actor(), ir_request("annotation-ir-without-grant"))
+        .unwrap_err();
+    assert_eq!(error.code, "FORBIDDEN");
 
     let QueryOutcomeV2::Rows(changes) = storage
         .query_v2(actor(), change_request("annotation-change-without-grant"))
@@ -580,6 +599,13 @@ fn annotation_scan_requires_annotation_grant_in_addition_to_namespace_query_gran
         panic!("annotation scan must return rows")
     };
     assert_eq!(result.rows.len(), 1);
+    let QueryOutcomeV2::Rows(ir_result) = storage
+        .query_v2(actor(), ir_request("annotation-ir-with-grant"))
+        .unwrap()
+    else {
+        panic!("typed IR annotation scan must return rows")
+    };
+    assert_eq!(ir_result.rows.len(), 1);
 
     let QueryOutcomeV2::Rows(changes) = storage
         .query_v2(actor(), change_request("annotation-change-with-grant"))

@@ -790,29 +790,40 @@ fn hql_and_ir_annotation_scans_match_independent_p7_results() {
             |row| row.get(0),
         )
         .unwrap();
-    storage
-        .put_annotation(
-            actor(),
-            AnnotationPutMutationV2 {
-                annotation: json!({
-                    "id":"review:parity",
-                    "namespace":"default",
-                    "kind":"review",
-                    "targets":[{"ref":{"database_id":database_id,"namespace":"default","kind":"node","id":"doc:parity","revision":target_revision},"binding":"frozen","selector":{"type":"whole"}}],
-                    "evidence":[],
-                    "body":{"type":"text","text":"Parity fixture."},
-                    "author":"asserted-reviewer",
-                    "created_at":"2026-09-22T00:00:00Z",
-                    "valid_from":"2026-09-22T00:00:00Z",
-                    "valid_to":null
-                }),
-                expected_revision: None,
-                valid: None,
-            },
-        )
-        .unwrap();
-
+    let target = json!({
+        "ref":{"database_id":database_id,"namespace":"default","kind":"node","id":"doc:parity","revision":target_revision},
+        "binding":"frozen",
+        "selector":{"type":"whole"}
+    });
+    let put_annotation = |id: &str, valid_from: &str| {
+        storage
+            .put_annotation(
+                actor(),
+                AnnotationPutMutationV2 {
+                    annotation: json!({
+                        "id":id,
+                        "namespace":"default",
+                        "kind":"review",
+                        "targets":[target.clone()],
+                        "evidence":[],
+                        "body":{"type":"text","text":"Parity fixture."},
+                        "author":"asserted-reviewer",
+                        "created_at":"2026-09-22T00:00:00Z",
+                        "valid_from":valid_from,
+                        "valid_to":null
+                    }),
+                    expected_revision: None,
+                    valid: None,
+                },
+            )
+            .unwrap();
+    };
+    put_annotation("review:parity", "2026-09-22T00:00:00Z");
+    let visible_tx = storage.stable_frontier();
+    put_annotation("review:future-valid", "2026-10-04T00:00:00Z");
     let frontier = storage.stable_frontier();
+    put_annotation("review:future-tx", "2026-09-22T00:00:00Z");
+    let catalog_frontier = storage.stable_frontier();
     let valid_at_text = "2026-10-03T00:00:00Z";
     let hql_request: QueryRequestV2 = serde_json::from_value(json!({
         "contract_version":"genesis.api.v2",
@@ -863,8 +874,7 @@ fn hql_and_ir_annotation_scans_match_independent_p7_results() {
     assert_eq!(node_mutations.len(), 1);
     let node_mutation = &node_mutations[0];
     let annotation_mutations = revision_mutations(&storage, "annotation");
-    assert_eq!(annotation_mutations.len(), 1);
-    let mutation = &annotation_mutations[0];
+    assert_eq!(annotation_mutations.len(), 3);
     let node = p7_graph::Revision {
         entity: p7_graph::EntityRef {
             namespace: "default".into(),
@@ -888,46 +898,60 @@ fn hql_and_ir_annotation_scans_match_independent_p7_results() {
         fields: p7_graph::Fields::new(),
         data: p7_graph::RecordData::Plain,
     };
-    let target_ref = &mutation["payload"]["targets"][0]["ref"];
-    let target = p7_graph::Target {
-        binding: p7_graph::TargetBinding::Frozen(p7_graph::EntityRef {
-            namespace: target_ref["namespace"].as_str().unwrap().into(),
-            kind: p7_graph::Kind::Node,
-            id: target_ref["id"].as_str().unwrap().into(),
-            revision: target_ref["revision"].as_str().unwrap().into(),
-        }),
-        selector: p7_graph::Selector::Whole,
-    };
-    let annotation = p7_graph::Revision {
-        entity: p7_graph::EntityRef {
-            namespace: mutation["namespace"].as_str().unwrap().into(),
-            kind: p7_graph::Kind::Annotation,
-            id: mutation["id"].as_str().unwrap().into(),
-            revision: mutation["revision_id"].as_str().unwrap().into(),
-        },
-        transaction: p7_graph::Interval {
-            start: frontier,
-            end: None,
-        },
-        valid: p7_graph::Interval {
-            start: chrono::DateTime::parse_from_rfc3339(mutation["valid_from"].as_str().unwrap())
+    let make_annotation = |id: &str, transaction_start: u64| {
+        let mutation = annotation_mutations
+            .iter()
+            .find(|mutation| mutation["id"].as_str() == Some(id))
+            .unwrap();
+        let target_ref = &mutation["payload"]["targets"][0]["ref"];
+        p7_graph::Revision {
+            entity: p7_graph::EntityRef {
+                namespace: mutation["namespace"].as_str().unwrap().into(),
+                kind: p7_graph::Kind::Annotation,
+                id: mutation["id"].as_str().unwrap().into(),
+                revision: mutation["revision_id"].as_str().unwrap().into(),
+            },
+            transaction: p7_graph::Interval {
+                start: transaction_start,
+                end: None,
+            },
+            valid: p7_graph::Interval {
+                start: chrono::DateTime::parse_from_rfc3339(
+                    mutation["valid_from"].as_str().unwrap(),
+                )
                 .unwrap()
                 .timestamp_micros(),
-            end: mutation["valid_to"].as_str().map(|value| {
-                chrono::DateTime::parse_from_rfc3339(value)
-                    .unwrap()
-                    .timestamp_micros()
-            }),
-        },
-        retracted: false,
-        fields: p7_graph::Fields::new(),
-        data: p7_graph::RecordData::Annotation {
-            targets: vec![target],
-        },
+                end: mutation["valid_to"].as_str().map(|value| {
+                    chrono::DateTime::parse_from_rfc3339(value)
+                        .unwrap()
+                        .timestamp_micros()
+                }),
+            },
+            retracted: false,
+            fields: p7_graph::Fields::new(),
+            data: p7_graph::RecordData::Annotation {
+                targets: vec![p7_graph::Target {
+                    binding: p7_graph::TargetBinding::Frozen(p7_graph::EntityRef {
+                        namespace: target_ref["namespace"].as_str().unwrap().into(),
+                        kind: p7_graph::Kind::Node,
+                        id: target_ref["id"].as_str().unwrap().into(),
+                        revision: target_ref["revision"].as_str().unwrap().into(),
+                    }),
+                    selector: p7_graph::Selector::Whole,
+                }],
+            },
+        }
     };
-    let annotation_identity = annotation.entity.identity();
+    let visible_annotation = make_annotation("review:parity", visible_tx);
+    let future_valid_annotation = make_annotation("review:future-valid", frontier);
+    let future_tx_annotation = make_annotation("review:future-tx", catalog_frontier);
+    let annotation_identities = [
+        visible_annotation.entity.identity(),
+        future_valid_annotation.entity.identity(),
+        future_tx_annotation.entity.identity(),
+    ];
     let p7_catalog = p7_graph::Catalog {
-        frontier,
+        frontier: catalog_frontier,
         history: BTreeMap::from([
             (
                 p7_graph::Kind::Node,
@@ -944,25 +968,31 @@ fn hql_and_ir_annotation_scans_match_independent_p7_results() {
                 },
             ),
         ]),
-        revisions: vec![node, annotation],
+        revisions: vec![
+            node,
+            visible_annotation,
+            future_valid_annotation,
+            future_tx_annotation,
+        ],
     };
     let valid_at = chrono::DateTime::parse_from_rfc3339(valid_at_text)
         .unwrap()
         .timestamp_micros();
     let p7_view = p7_graph::View {
         namespace: "default".into(),
-        transaction: p7_catalog.frontier,
+        transaction: frontier,
         valid_at,
         permissions: p7_graph::Permissions {
-            read: BTreeSet::from([
-                p7_graph::Identity {
+            read: BTreeSet::from_iter(
+                [p7_graph::Identity {
                     namespace: "default".into(),
                     kind: p7_graph::Kind::Node,
                     id: "doc:parity".into(),
-                },
-                annotation_identity.clone(),
-            ]),
-            annotation_body: BTreeSet::from([annotation_identity]),
+                }]
+                .into_iter()
+                .chain(annotation_identities.iter().cloned()),
+            ),
+            annotation_body: BTreeSet::from_iter(annotation_identities),
         },
     };
     let p7_plan = p7_graph::Plan {
@@ -983,6 +1013,7 @@ fn hql_and_ir_annotation_scans_match_independent_p7_results() {
             other => panic!("P7 AnnotationScan must return entities, got {other:?}"),
         })
         .collect::<Vec<_>>();
+    assert_eq!(expected_ids, vec!["review:parity".to_owned()]);
     let query_ids = |rows: &[BTreeMap<String, QueryValueV2>]| {
         rows.iter()
             .map(|row| match row.get("id").unwrap() {

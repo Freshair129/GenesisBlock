@@ -1,8 +1,8 @@
 ---
 doc_id: SPEC--GENESISDB-HQL2-P8-TYPED-BOUNDARY
-version: "0.2.63b"
+version: "0.2.64b"
 created_at: "2026-09-28T01:25:00+07:00,ATHER,fc851e9"
-last_update: "2026-10-06T03:35:00+07:00,ATHER"
+last_update: "2026-10-06T04:05:24+07:00,ATHER"
 status: beta
 superseded_by: null
 owner: "Boss (Founder / Product Authority)"
@@ -753,9 +753,13 @@ differentials cover Node, Edge, Row, Vector and Annotation; a five-window
 ChangeScan differential checks exclusive-after/inclusive-through bounds,
 including empty bounds and selected transaction frontiers. The focused
 History/Change target passes 17/17 and Annotation source/ACL passes 7/7. HQL
-and typed-IR AnnotationScan now match the independent P7 graph oracle at the
-same explicit transaction and valid-time selectors; broad exact-oracle,
-independent-review, transport and P8/P13 gates remain open. The
+and typed-IR AnnotationScan match the independent P7 graph oracle at explicit
+transaction/valid-time selectors with one later transaction and one future-
+valid control excluded from the result bag. Missing `Annotation(Read)` is
+separately verified as `FORBIDDEN` for both HQL and typed IR; that query-level
+denial is not represented as P7 row-bag parity. The four focused annotation/
+History/Change targets pass 42/42. Broad exact-oracle, independent-review,
+transport and P8/P13 gates remain open. The
 fresh 39-target HQL2 sweep passes 404/0/1, with the prior separate 11-target
 P6/schema-v6/compatibility result at 194/0/0 not rerun here. HQL2/IR `tx_as_of` now selects
 one no-fallback frontier across scans, operators, hydration and `Snapshot.tx`;
@@ -891,6 +895,14 @@ separate shape limits. No process-global Pest setting is changed.
   Parser/binder coverage alone does not close the storage-backed runtime gate.
 
 ## Version diff and changelog
+
+Version diff `0.2.63b -> 0.2.64b`: strengthen the test-only HQL/typed-IR
+AnnotationScan differential with a future-valid revision and a revision newer
+than selected S, both excluded by P7 and production at the chosen S,V. Verify
+missing `Annotation(Read)` as `FORBIDDEN` in both frontends separately from
+P7 bag comparison. Four focused annotation/History/Change targets pass 42/42;
+no runtime, contract, schema, P6 or transport behavior changed; broad P8/P13
+and review gates remain open.
 
 Version diff `0.2.62b -> 0.2.63b`: add test-only HQL/typed-IR AnnotationScan
 parity against the independent P7 graph oracle with one aligned explicit S,V;
@@ -1128,6 +1140,7 @@ detail with unchanged JSON shape; broader P8/P13/review gates remain open.
 
 | Version | Date | Status | Summary | Commit Hash | Agent |
 |---|---|---|---|---|---|
+| 0.2.64b | 2026-10-06 | beta | Strengthen AnnotationScan P7 parity with future-valid and post-S controls; verify HQL/IR missing Annotation(Read) denial separately; focused annotation/History/Change 42/42; no runtime/P6/schema/transport change; broad P8/P13/review remain open | working-tree | ATHER |
 | 0.2.63b | 2026-10-06 | beta | Add HQL/typed-IR AnnotationScan P7 differential at explicit S,V; focused Annotation source/ACL target passes 7/7; no runtime/P6/schema/transport change; broad exact-oracle and P8/review gates remain open | working-tree | ATHER |
 | 0.2.62b | 2026-10-06 | beta | Reconcile G4 stable plan identity with D7 single-property and exact-seed depth-one TRAVERSE evidence; preserve explicit compatibility allowlist and broad G4/P8/P13/review gates | working-tree | ATHER |
 | 0.2.61b | 2026-10-05 | beta | Extend approved D7 with a zero-hop single-property projection and exact-seed depth-one TRAVERSE; adapter 13/13, property/order/filter 2/2 each, HQL2 404/0/1 across 39 targets and U9 restore 7/7; preserve fail-closed compatibility, shared-runtime/P8/P13 and review gates | working-tree | ATHER |

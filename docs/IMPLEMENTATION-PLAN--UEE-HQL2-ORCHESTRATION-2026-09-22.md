@@ -1,9 +1,9 @@
 ---
-version: "0.8.75b"
+version: "0.8.76b"
 doc_id: "IMPLEMENTATION-PLAN--UEE-HQL2-ORCHESTRATION-2026-09-22"
 owner: "Boss (Founder / Product Authority)"
 created_at: "2026-09-22T00:00:00+07:00,ATHER,working-tree"
-last_update: "2026-10-06T03:35:00+07:00,ATHER"
+last_update: "2026-10-06T04:05:24+07:00,ATHER"
 status: beta
 superseded_by: null
 attributes:
@@ -154,9 +154,11 @@ source-plan tests. The prior 39-target result (404 passed, 0 failed, 1 ignored)
 is historical evidence from before mainline reconciliation, not a substitute
 for this integrated run.
 A test-only HQL/typed-IR AnnotationScan differential now matches independent
-P7 at the same explicit transaction and valid-time selectors. Annotation
-ACL/lookup/source/history-change targets passed 42/42; after pinning S,V, the
-source target passed again at 7/7. This closes one source-oracle gap only; the
+P7 at explicit S,V, including a future-valid revision and a post-S revision
+that both must be excluded. Missing `Annotation(Read)` returns `FORBIDDEN` for
+HQL and typed IR in the ACL target; that authorization denial is tested
+separately from P7 row-bag comparison. The four focused annotation/
+History/Change targets pass 42/42. This closes one source-oracle gap only; the
 full operator matrix, independent review, hosted checks and device/release
 qualification remain separate gates.
 G4 remains `PARTIAL`: full operator-by-operator exact-oracle breadth,
@@ -1001,6 +1003,13 @@ passes 19/19 across `epoch_e2_tests`, `g3_oracle_differential_tests`,
 `meta_format_migration_tests` and `wal_tail_replay_tests`.
 
 ## CHANGELOG
+
+Version diff `0.8.75b -> 0.8.76b`: strengthen the AnnotationScan P7 fixture
+with a future-valid and a post-S control excluded at explicit S,V, and verify
+missing Annotation(Read) denies both HQL and typed IR separately from P7 bag
+parity. Four focused annotation/History/Change targets pass 42/42. No runtime,
+contract, schema, P6 or transport change; G4/P8 broad-oracle, review, hosted
+and device/release gates remain open.
 
 Version diff `0.8.74b -> 0.8.75b`: add a test-only P7 differential for HQL and
 typed-IR AnnotationScan at one explicitly aligned S,V. Four focused
