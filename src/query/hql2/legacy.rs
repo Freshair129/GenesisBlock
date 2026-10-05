@@ -20,18 +20,22 @@ fn is_plain_identifier(name: &str) -> bool {
         && chars.all(|ch| ch.is_ascii_alphanumeric() || ch == '_')
 }
 
-fn lower_single_hop_traverse(
-    seed: &str,
-    depth: u32,
-    rel: &HqlRel,
-    rels: &Option<Vec<String>>,
-    direction: &Option<String>,
-    fuzzy: bool,
-    as_of: &Option<String>,
-    clauses: &crate::query::ast::HqlClauses,
-) -> Result<(String, String), QueryErrorV2> {
-    if depth != 1
-        || fuzzy
+fn lower_single_hop_traverse(command: &HqlCommand) -> Result<(String, String), QueryErrorV2> {
+    let HqlCommand::Traverse {
+        seed,
+        depth,
+        rel,
+        rels,
+        direction,
+        fuzzy,
+        as_of,
+        clauses,
+    } = command
+    else {
+        return Err(unsupported());
+    };
+    if *depth != 1
+        || *fuzzy
         || as_of.is_some()
         || rels.is_some()
         || !clauses.where_preds.is_empty()
@@ -105,20 +109,8 @@ pub(crate) fn lower_hql_v1(
     budget.reserve(super::required_heap_bytes(source)?)?;
     let command = HqlCommand::try_from(source)
         .map_err(|_| QueryErrorV2::new("HQL_PARSE_ERROR", "parse", "legacy_syntax"))?;
-    if let HqlCommand::Traverse {
-        seed,
-        depth,
-        rel,
-        rels,
-        direction,
-        fuzzy,
-        as_of,
-        clauses,
-    } = &command
-    {
-        return lower_single_hop_traverse(
-            seed, *depth, rel, rels, direction, *fuzzy, as_of, clauses,
-        );
+    if let HqlCommand::Traverse { .. } = &command {
+        return lower_single_hop_traverse(&command);
     }
     let HqlCommand::MatchPattern {
         pattern,
