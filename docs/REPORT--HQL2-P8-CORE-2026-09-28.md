@@ -1,8 +1,8 @@
 ---
 doc_id: REPORT--HQL2-P8-CORE-2026-09-28
-version: "0.1.68b"
+version: "0.1.69b"
 created_at: "2026-09-28T04:35:00+07:00,ATHER,22bc11e"
-last_update: "2026-10-06T04:05:24+07:00,ATHER"
+last_update: "2026-10-06T04:46:43+07:00,ATHER"
 status: beta
 owner: GenesisBlockDB Engineering
 attributes:
@@ -27,6 +27,19 @@ explicit sweep below excludes it; see local RCA `.brain/rca/RCA--HQL2-POWERSHELL
 At that checkpoint there had been no fetch, push, main-branch merge, PR,
 deployment or user database migration.
 Engine version 0.2.6 -> 0.2.9 is inherited from upstream, not a new release here.
+
+## Current integrated-candidate verification — 2026-10-06
+
+The isolated HQL2 candidate now integrates current mainline P6 closeout
+`9821508` (PR #215). On Windows, locked/offline `--no-default-features`
+verification passes the exact P6 acceptance matrix 49/49; focused snapshot,
+peer-authority, lease and HQL2 History/Change targets pass 44/44; and all 40
+root `hql2_*_tests.rs` targets pass 407/0/1 (one intentionally ignored test).
+The HQL2 sweep includes AnnotationScan P7 temporal controls and separate
+HQL/typed-IR `Annotation(Read)` denials. These are local fixture results only;
+no user database was migrated. Shared-runtime, broader exact-oracle, P8/P13,
+hosted checks for this integrated candidate, independent review, and
+release/device/transport qualification remain open.
 
 On 2026-10-02 the owner approved the P8 completion addendum D1-D6. This
 authorizes implementation of bounded text profiles, provenance-preserving
@@ -561,18 +574,24 @@ The separate U9 backup/restore target passes 7/7; no user database was modified.
 
 | Artifact | Before | After |
 |---|---|---|
-| Registry | 0.5.82+draft | 0.5.83+draft |
+| Registry | 0.5.92+draft | 0.5.93+draft |
 | HQL2 G4 shared-pipeline ADR | 0.1.3b | unchanged |
 | P8 completion addendum | 0.1.14b | unchanged |
-| H2-D11 durable revisions/annotations | 0.8.25b | 0.8.26b (strengthened AnnotationScan P7 evidence; no contract change) |
-| P6 generations/leases/ACL | 0.5.34b | unchanged (no P6 contract change) |
+| H2-D11 durable revisions/annotations | 0.8.26b | 0.8.27b (synchronized integrated P6/HQL2 evidence; no H2-D11 contract change) |
+| P6 generations/leases/ACL | 0.5.34b | 0.5.46b (current mainline closeout; acceptance 49/49 locally) |
 | U9 backup/restore | 0.1.8b | unchanged |
-| P8 typed boundary | 0.2.63b | 0.2.64b (temporal controls and separate ACL denial evidence) |
+| P8 typed boundary | 0.2.64b | 0.2.65b (current integrated P6/HQL2 verification) |
 | P7 oracle report | 0.1.11b | 0.1.12b (AnnotationScan controls) |
-| Orchestration plan | 0.8.75b | 0.8.76b |
+| Orchestration plan | 0.8.76b | 0.8.77b |
 | C4 architecture index | 0.1.69b | 0.1.71b |
 | Master specification | 2.3.41b | 2.3.42b |
-| This report | 0.1.67b | 0.1.68b |
+| This report | 0.1.68b | 0.1.69b |
+
+Version diff 0.1.68b -> 0.1.69b: record current mainline P6 closeout
+`9821508` in the isolated HQL2 candidate, with P6 49/49, focused integrated
+targets 44/44, and HQL2 407/0/1 across 40 targets. The results are local and
+do not close shared-runtime, broad P8/P13, hosted, independent-review,
+release, device or transport gates.
 
 Version diff 0.1.67b -> 0.1.68b: strengthen the test-only AnnotationScan P7
 differential so a future-valid and a post-S annotation must be excluded at

@@ -1,6 +1,6 @@
 use genesis_block_native::{
     query::hql2::{QueryOutcomeV2, QueryResultV2},
-    uee_v2::{AnnotationPutMutationV2, QueryRequestV2},
+    uee_v2::{AnnotationPutMutationV2, ExplainV2, QueryRequestV2},
     AccessContext, EdgeInput, NodeInput, OpenOptions, RelationalColumn, RelationalColumnType,
     RelationalMutationBatch, RelationalMutationKind, RelationalRowMutation,
     RelationalSchemaPackage, RelationalTable, Storage,
@@ -12,6 +12,7 @@ use rusqlite::{params, Connection};
 use serde_json::{json, Value};
 use std::{
     collections::{BTreeMap, BTreeSet},
+    fs,
     path::Path,
 };
 use tempfile::TempDir;
@@ -103,6 +104,31 @@ fn run_ir_history_source(
                 }
             }],
             "root":"history",
+            "parameter_types":{}
+        },
+        "params":{}
+    }))
+    .unwrap();
+    match storage.query_v2(access(), request)? {
+        QueryOutcomeV2::Rows(result) => Ok(result),
+        QueryOutcomeV2::Plan(_) => panic!("read query must return rows"),
+    }
+}
+
+fn run_ir_node_scan(
+    storage: &Storage,
+    request_id: &str,
+    tx_as_of: &str,
+) -> Result<QueryResultV2, genesis_block_native::query::hql2::QueryErrorV2> {
+    let request: QueryRequestV2 = serde_json::from_value(json!({
+        "contract_version":"genesis.api.v2",
+        "request_id":request_id,
+        "namespace":"default",
+        "temporal":{"valid_at":"2020-01-01T00:00:00Z","tx_as_of":tx_as_of},
+        "ir":{
+            "contract_version":"query-ir.v2",
+            "nodes":[{"id":"scan","op":"NodeScan","inputs":[],"config":{"as":"n","label":"Document"}}],
+            "root":"scan",
             "parameter_types":{}
         },
         "params":{}
@@ -2121,4 +2147,175 @@ fn change_scan_matches_p7_for_exclusive_after_inclusive_through_windows() {
         assert_eq!(result_bag(&hql), expected_bag, "HQL window {name}");
         assert_eq!(result_bag(&ir), expected_bag, "typed-IR window {name}");
     }
+}
+
+#[test]
+fn hql_and_typed_ir_tx_as_of_are_bounded_by_the_pinned_generation_frontier() {
+    let dir = TempDir::new().unwrap();
+    let storage = open(dir.path());
+    add_node(&storage);
+    storage.save_state().unwrap();
+    let generation = storage.publish_generation().unwrap();
+    let publication_seq = generation
+        .wal_frontier
+        .checked_add(1)
+        .expect("publication receipt follows the covered data frontier");
+
+    assert!(generation.history_horizon <= generation.wal_frontier);
+    assert_eq!(generation.publication_seq, publication_seq);
+    assert_eq!(storage.stable_frontier(), publication_seq);
+
+    for (boundary, tx_as_of) in [
+        ("history-horizon", generation.history_horizon),
+        ("wal-frontier", generation.wal_frontier),
+    ] {
+        let hql = format!(
+            "USE default AT TX {tx_as_of} AT VALID \"2020-01-01T00:00:00Z\" FROM NODES Document AS n |> RETURN n.id AS id"
+        );
+        let hql_result = run_hql(
+            &storage,
+            &format!("generation-boundary-{boundary}-hql"),
+            &hql,
+        )
+        .unwrap_or_else(|error| panic!("HQL rejected inclusive tx_as_of {tx_as_of}: {error}"));
+        assert_eq!(hql_result.snapshot.tx, tx_as_of.to_string());
+
+        let tx_as_of_text = tx_as_of.to_string();
+        let ir_result = run_ir_node_scan(
+            &storage,
+            &format!("generation-boundary-{boundary}-ir"),
+            &tx_as_of_text,
+        )
+        .unwrap_or_else(|error| panic!("typed IR rejected inclusive tx_as_of {tx_as_of}: {error}"));
+        assert_eq!(ir_result.snapshot.tx, tx_as_of_text);
+    }
+
+    let mut accepted_out_of_frontier = Vec::new();
+    for (boundary, tx_as_of) in [
+        ("publication-receipt", publication_seq),
+        ("u64-max", u64::MAX),
+    ] {
+        let hql = format!(
+            "USE default AT TX {tx_as_of} AT VALID \"2020-01-01T00:00:00Z\" FROM NODES Document AS n |> RETURN n.id AS id"
+        );
+        let hql_result = run_hql(&storage, &format!("generation-reject-{boundary}-hql"), &hql);
+
+        let tx_as_of_text = tx_as_of.to_string();
+        let ir_result = run_ir_node_scan(
+            &storage,
+            &format!("generation-reject-{boundary}-ir"),
+            &tx_as_of_text,
+        );
+
+        if hql_result.is_ok() {
+            accepted_out_of_frontier.push(format!("{boundary} tx_as_of {tx_as_of} via HQL"));
+        }
+        if ir_result.is_ok() {
+            accepted_out_of_frontier.push(format!("{boundary} tx_as_of {tx_as_of} via typed IR"));
+        }
+
+        if boundary == "u64-max" {
+            if let Err(error) = &hql_result {
+                assert_eq!(error.code, "BIND_ERROR");
+            }
+            if let Err(error) = &ir_result {
+                assert_eq!(error.code, "BIND_ERROR");
+            }
+        }
+    }
+    assert!(
+        accepted_out_of_frontier.is_empty(),
+        "selectors beyond generation.wal_frontier were accepted: {}",
+        accepted_out_of_frontier.join(", ")
+    );
+}
+
+#[test]
+fn explain_plan_tx_as_of_obeys_generation_frontier_without_publishing_or_writing() {
+    let dir = TempDir::new().unwrap();
+    let storage = open(dir.path());
+    add_node(&storage);
+    storage.save_state().unwrap();
+    let generation = storage.publish_generation().unwrap();
+    let publication_seq = generation
+        .wal_frontier
+        .checked_add(1)
+        .expect("publication receipt follows the data frontier");
+    assert_eq!(generation.publication_seq, publication_seq);
+    assert_eq!(storage.stable_frontier(), publication_seq);
+
+    let state_path = dir.path().join("state.json");
+    let active_wal_path = dir.path().join("wal").join("active.gwal");
+    let state_before = fs::read(&state_path).unwrap();
+    let wal_before = fs::read(&active_wal_path).unwrap();
+
+    let hql_plan = |request_id: &str, tx_as_of: u64| {
+        let hql = format!(
+            "EXPLAIN USE default AT TX {tx_as_of} AT VALID \"2020-01-01T00:00:00Z\" FROM NODES Document AS n |> RETURN n.id AS id"
+        );
+        serde_json::from_value::<QueryRequestV2>(json!({
+            "contract_version":"genesis.api.v2",
+            "request_id":request_id,
+            "namespace":"default",
+            "language_version":"hql.v2",
+            "hql":hql,
+            "params":{}
+        }))
+        .unwrap()
+    };
+    let ir_plan = |request_id: &str, tx_as_of: u64| {
+        let mut request = serde_json::from_value::<QueryRequestV2>(json!({
+            "contract_version":"genesis.api.v2",
+            "request_id":request_id,
+            "namespace":"default",
+            "temporal":{"valid_at":"2020-01-01T00:00:00Z","tx_as_of":tx_as_of.to_string()},
+            "ir":{
+                "contract_version":"query-ir.v2",
+                "nodes":[{"id":"scan","op":"NodeScan","inputs":[],"config":{"as":"n","label":"Document"}}],
+                "root":"scan",
+                "parameter_types":{}
+            },
+            "params":{}
+        }))
+        .unwrap();
+        request.explain = Some(ExplainV2::Plan);
+        request
+    };
+
+    for request in [
+        hql_plan("explain-generation-frontier", generation.wal_frontier),
+        ir_plan("ir-plan-generation-frontier", generation.wal_frontier),
+    ] {
+        assert!(matches!(
+            storage.query_v2(access(), request),
+            Ok(QueryOutcomeV2::Plan(_))
+        ));
+    }
+
+    let mut accepted_receipt = Vec::new();
+    for (name, request) in [
+        (
+            "HQL EXPLAIN",
+            hql_plan("explain-publication-receipt", publication_seq),
+        ),
+        (
+            "typed-IR Plan",
+            ir_plan("ir-plan-publication-receipt", publication_seq),
+        ),
+    ] {
+        match storage.query_v2(access(), request) {
+            Err(error) => assert_eq!(error.code, "BEYOND_HORIZON"),
+            Ok(QueryOutcomeV2::Plan(_)) => accepted_receipt.push(name),
+            Ok(QueryOutcomeV2::Rows(_)) => panic!("Plan-only request executed source rows"),
+        }
+    }
+
+    assert_eq!(storage.stable_frontier(), publication_seq);
+    assert_eq!(fs::read(state_path).unwrap(), state_before);
+    assert_eq!(fs::read(active_wal_path).unwrap(), wal_before);
+    assert!(
+        accepted_receipt.is_empty(),
+        "Plan accepted publication-receipt tx_as_of: {}",
+        accepted_receipt.join(", ")
+    );
 }

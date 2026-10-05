@@ -159,3 +159,108 @@ fn tx_as_of_below_generation_history_horizon_is_rejected() {
     };
     assert_error_code(error, "TEMPORAL_BEYOND_HORIZON");
 }
+
+#[test]
+fn tx_as_of_at_generation_history_horizon_and_wal_frontier_is_accepted() {
+    let dir = tempdir().unwrap();
+    let storage = open(dir.path());
+    storage.add_node(node("generation-boundary-seed")).unwrap();
+    storage.save_state().unwrap();
+    let generation = storage.publish_generation().unwrap();
+
+    assert!(generation.history_horizon <= generation.wal_frontier);
+    for tx_as_of in [generation.history_horizon, generation.wal_frontier] {
+        let lease = storage
+            .pin_generation(
+                access(),
+                TemporalRead {
+                    as_of: None,
+                    tx_as_of: Some(tx_as_of),
+                },
+                Duration::from_secs(5),
+            )
+            .unwrap_or_else(|error| {
+                panic!("inclusive generation tx_as_of {tx_as_of} was rejected: {error}")
+            });
+        storage.validate_lease(&lease).unwrap();
+    }
+}
+
+#[test]
+fn tx_as_of_at_publication_receipt_is_rejected_by_direct_generation_pin() {
+    let dir = tempdir().unwrap();
+    let storage = open(dir.path());
+    storage.add_node(node("generation-receipt-seed")).unwrap();
+    storage.save_state().unwrap();
+    let generation = storage.publish_generation().unwrap();
+    let publication_seq = generation
+        .wal_frontier
+        .checked_add(1)
+        .expect("publication receipt follows the covered data frontier");
+
+    assert_eq!(generation.publication_seq, publication_seq);
+    assert_eq!(storage.stable_frontier(), publication_seq);
+
+    let error = storage
+        .pin_generation(
+            access(),
+            TemporalRead {
+                as_of: None,
+                tx_as_of: Some(publication_seq),
+            },
+            Duration::from_secs(5),
+        )
+        .expect_err("the publication receipt is not a selector in the pinned generation");
+    assert_error_code(error, "TEMPORAL_BEYOND_HORIZON");
+}
+
+#[test]
+fn tx_as_of_u64_max_is_rejected_by_direct_generation_pin() {
+    let dir = tempdir().unwrap();
+    let storage = open(dir.path());
+    storage.add_node(node("generation-max-seed")).unwrap();
+    storage.save_state().unwrap();
+    storage.publish_generation().unwrap();
+
+    let error = storage
+        .pin_generation(
+            access(),
+            TemporalRead {
+                as_of: None,
+                tx_as_of: Some(u64::MAX),
+            },
+            Duration::from_secs(5),
+        )
+        .expect_err("u64::MAX must exceed every finite pinned generation frontier");
+    assert_error_code(error, "TEMPORAL_BEYOND_HORIZON");
+}
+
+#[test]
+fn read_view_rejects_tx_as_of_above_its_generation_frontier() {
+    let dir = tempdir().unwrap();
+    let storage = open(dir.path());
+    storage.add_node(node("read-view-generation-seed")).unwrap();
+    storage.save_state().unwrap();
+    let generation = storage.publish_generation().unwrap();
+    let lease = storage
+        .pin_generation(access(), current_temporal(), Duration::from_secs(5))
+        .unwrap();
+
+    storage
+        .with_read_lease(&lease, |view| {
+            view.node_versions("read-view-generation-seed", Some(generation.wal_frontier))
+                .map(|_| ())
+        })
+        .expect("the inclusive generation WAL frontier must remain legal in ReadView");
+
+    let first_after_frontier = generation
+        .wal_frontier
+        .checked_add(1)
+        .expect("generation frontier must leave room for its publication receipt");
+    let error = storage
+        .with_read_lease(&lease, |view| {
+            view.node_versions("read-view-generation-seed", Some(first_after_frontier))
+        })
+        .expect_err("ReadView must reject a selector beyond its pinned generation frontier");
+    assert_error_code(error, "TEMPORAL_BEYOND_HORIZON");
+}

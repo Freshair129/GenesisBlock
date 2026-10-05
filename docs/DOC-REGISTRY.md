@@ -2,7 +2,7 @@
 title: "GenesisBlockDB Document Registry"
 doc_id: "DOC-REGISTRY-GENESISBLOCKDB"
 status: draft
-version: "0.5.83+draft"
+version: "0.5.93+draft"
 updated: "2026-10-06"
 owner: "GenesisBlockDB Architecture"
 source_of_truth: true
@@ -14,6 +14,7 @@ related_docs:
   - "docs/FLOW--GENESISRAG17-PIPELINE.md"
   - "docs/GENESISRAG17-EXTENSION-MAP.md"
   - "docs/SPEC--GENESISDB-P6-GENERATIONS-LEASES-ACL.md"
+  - "docs/SPEC--GENESISDB-P6-PEER-LOCALITY-ADDENDUM.md"
 ---
 
 # GenesisBlockDB Document Registry
@@ -57,14 +58,15 @@ registry row explicitly names them.
 | HQL2 G4 shared-pipeline contract | `ADR--GENESISDB-HQL2-G4-SHARED-PIPELINE` | `0.1.3b` | active | Boss (Founder / Product Authority) | `docs/adr/ADR--GENESISDB-HQL2-G4-SHARED-PIPELINE.md` |
 | HQL2 P8 completion addendum | `ADR--GENESISDB-HQL2-P8-COMPLETION-ADDENDUM` | `0.1.14b` | accepted | Boss (Founder / Product Authority) | `docs/adr/ADR--GENESISDB-HQL2-P8-COMPLETION-ADDENDUM.md` |
 | HQL2 Sequence pattern constraints | `ADR--GENESISDB-HQL2-PATTERN-CONSTRAINTS` | `0.2.1b` | beta | Boss (Founder / Product Authority) | `docs/adr/ADR--GENESISDB-HQL2-PATTERN-CONSTRAINTS.md` |
-| HQL2 durable revisions and annotations | `ADR--GENESISDB-HQL2-DURABLE-REVISIONS-ANNOTATIONS` | `0.8.26b` | beta | Boss (Founder / Product Authority) | `docs/adr/ADR--GENESISDB-HQL2-DURABLE-REVISIONS-ANNOTATIONS.md` |
-| UEE-HQL2 orchestration plan | `IMPLEMENTATION-PLAN--UEE-HQL2-ORCHESTRATION-2026-09-22` | `0.8.76b` | beta | Boss (Founder / Product Authority) | `docs/IMPLEMENTATION-PLAN--UEE-HQL2-ORCHESTRATION-2026-09-22.md` |
-| HQL2 typed P8 boundary | `SPEC--GENESISDB-HQL2-P8-TYPED-BOUNDARY` | `0.2.64b` | beta | Boss (Founder / Product Authority) | `docs/SPEC--GENESISDB-HQL2-P8-TYPED-BOUNDARY.md` |
-| HQL2 P8 core checkpoint | `REPORT--HQL2-P8-CORE-2026-09-28` | `0.1.68b` | beta | GenesisBlockDB Engineering | `docs/REPORT--HQL2-P8-CORE-2026-09-28.md` |
+| HQL2 durable revisions and annotations | `ADR--GENESISDB-HQL2-DURABLE-REVISIONS-ANNOTATIONS` | `0.8.27b` | beta | Boss (Founder / Product Authority) | `docs/adr/ADR--GENESISDB-HQL2-DURABLE-REVISIONS-ANNOTATIONS.md` |
+| UEE-HQL2 orchestration plan | `IMPLEMENTATION-PLAN--UEE-HQL2-ORCHESTRATION-2026-09-22` | `0.8.77b` | beta | Boss (Founder / Product Authority) | `docs/IMPLEMENTATION-PLAN--UEE-HQL2-ORCHESTRATION-2026-09-22.md` |
+| HQL2 typed P8 boundary | `SPEC--GENESISDB-HQL2-P8-TYPED-BOUNDARY` | `0.2.65b` | beta | Boss (Founder / Product Authority) | `docs/SPEC--GENESISDB-HQL2-P8-TYPED-BOUNDARY.md` |
+| HQL2 P8 core checkpoint | `REPORT--HQL2-P8-CORE-2026-09-28` | `0.1.69b` | beta | GenesisBlockDB Engineering | `docs/REPORT--HQL2-P8-CORE-2026-09-28.md` |
 | HQL2 P7 bounded oracle evidence | `REPORT--HQL2-P7-ORACLE-2026-09-28` | `0.1.12b` | beta | GenesisBlockDB Engineering | `docs/REPORT--HQL2-P7-ORACLE-2026-09-28.md` |
 | Commit correctness | `SPEC--WAVE-A-COMMIT-CORRECTNESS` | `0.1.0b` | beta | GenesisBlockDB Engineering | `docs/SPEC--WAVE-A-COMMIT-CORRECTNESS.md` |
 | Durable collections and edge history | `SPEC--WAVE-B-DURABLE-COLLECTIONS-EDGE-HISTORY` | `0.1.2b` | beta | GenesisBlockDB Engineering | `docs/SPEC--WAVE-B-DURABLE-COLLECTIONS-EDGE-HISTORY.md` |
-| Generation, lease, temporal and ACL contract | `SPEC--GENESISDB-P6-GENERATIONS-LEASES-ACL` | `0.5.34b` | beta | GenesisBlockDB Engineering | `docs/SPEC--GENESISDB-P6-GENERATIONS-LEASES-ACL.md` |
+| Generation, lease, temporal and ACL contract | `SPEC--GENESISDB-P6-GENERATIONS-LEASES-ACL` | `0.5.46b` | beta | GenesisBlockDB Engineering | `docs/SPEC--GENESISDB-P6-GENERATIONS-LEASES-ACL.md` |
+| P6 peer-locality addendum | `SPEC--GENESISDB-P6-PEER-LOCALITY-ADDENDUM` | `0.1.15b` | active | GenesisBlockDB Engineering | `docs/SPEC--GENESISDB-P6-PEER-LOCALITY-ADDENDUM.md` |
 | Backup and restore contract | `SPEC--GENESISDB-BACKUP-RESTORE-U9` | `0.1.8b` | beta | Boss (Founder / Product Authority) | `docs/SPEC--GENESISDB-BACKUP-RESTORE-U9.md` |
 | Query correctness | `SPEC--WAVE-C-QUERY-CORRECTNESS` | `0.2.1b` | beta | GenesisBlockDB Engineering | `docs/SPEC--WAVE-C-QUERY-CORRECTNESS.md` |
 | Query budgets and quality gates | `SPEC--WAVE-D-BUDGETS-QUALITY-GATES` | `0.1.0b` | beta | GenesisBlockDB Engineering | `docs/SPEC--WAVE-D-BUDGETS-QUALITY-GATES.md` |
@@ -120,10 +122,85 @@ The following documents should be created only when implementation work requires
 
 ## 9. Changelog
 
-Version diff 0.5.79+draft -> 0.5.80+draft: resolve the reviewed U9
-compatibility wording by distinguishing format, engine-name and schema gates
-from audit-only engine-version provenance. Synchronize the U9 spec, H2-D11 R5
-record and P8 report; no source compatibility behavior changes.
+Version diff 0.5.92+draft -> 0.5.93+draft: record current mainline P6
+closeout `9821508` in the isolated HQL2 candidate and synchronize the H2-D11,
+P8, plan, report and P6 registry entries. Local Windows checks pass P6
+49/49, focused integrated targets 44/44, and HQL2 407/0/1 across 40 targets.
+Broad P8/P13, shared-runtime, hosted, independent-review and release/transport
+qualification remain open.
+
+Version diff 0.5.91+draft -> 0.5.92+draft: reconcile the HQL2 AnnotationScan
+temporal/ACL evidence with the P6 mainline closeout. Register H2-D11, P8, P7,
+plan, C4, Master, P6 and U9 at their current versions; preserve the annotation
+future-valid/post-S controls and separate query-level FORBIDDEN evidence. P8
+and broader release/transport qualification remain open.
+
+Version diff 0.5.90+draft -> 0.5.91+draft: register P6 contract v0.5.46b after reintegration on
+mainline `4b78596`. Record local Verify on the integrated tree: P6 acceptance 49/49, focused
+snapshot/lease/history 35/35, check/format/strict core Clippy/docs (0/241)/diff PASS. Astra's Final remains limited
+to the predecessor reviewed slice; it was not rerun on this rebased HEAD, and hosted checks remain
+pending. Preserve all D7/P7 records; no P7 or release scope is added.
+
+Version diff 0.5.89+draft -> 0.5.90+draft: reconcile the P6 closeout registry with the D7/P7
+mainline history, preserve both version histories without duplicate version IDs, and register
+the reconciled P6 contract at v0.5.45b with peer-locality addendum v0.1.15b. No runtime behavior,
+release, deployment, or P7 scope is added by this documentation reconciliation.
+
+Version diff 0.5.88+draft -> 0.5.89+draft: register P6 spec v0.5.45b and peer addendum
+v0.1.15b. Record Astra 6 Final PASS_WITH_LIMITATIONS for the reviewed local P6 slice and its
+accepted stale-Plan fallback fixture limitation. Hosted/cross-platform CI and release/deployment
+qualification remain NOT_RUN. No P7, merge, release or deployment.
+
+Version diff 0.5.87+draft -> 0.5.88+draft: register P6 spec v0.5.44b and peer addendum
+v0.1.14b. Record current corrected-tree independent Verify PASS (P6 49/49, focused 34/34,
+check/format/docs/diff PASS) and broad independent Review PASS, including its bounded stale-Plan
+fallback fixture limitation. Astra 6 Final remains NOT_RUN. No P7, merge, release or deployment.
+
+Version diff 0.5.85+draft -> 0.5.86+draft: register P6 spec v0.5.42b and peer addendum
+v0.1.12b. Record the checked-increment source correction across public writer, signed-event
+validation and snapshot/replay transition paths. The two ACL u64::MAX RED regressions are GREEN;
+focused remediation is 34/34, exact P6 is 49/49, and the expanded matrix is 132/132. Fresh Verify
+and Review are pending; Astra Final is NOT_RUN. No P7, merge, release or deployment.
+
+Version diff 0.5.84+draft -> 0.5.85+draft: register P6 spec v0.5.41b and peer addendum
+v0.1.11b. Record two RED regressions reproducing the ACL u64::MAX saturating-increment defect in
+the public writer and signed event chain. Review is FAIL until the checked-increment correction
+passes fresh Verify and independent Review; Astra Final remains NOT_RUN. No P7, merge, release or
+deployment.
+
+Version diff 0.5.83+draft -> 0.5.84+draft: register P6 spec v0.5.40b and peer addendum
+v0.1.10b. Record independent Review P2: saturating ACL revision increment permits same-revision
+changed policy at u64::MAX. Update contract and RCA before implementation; Review is FAIL, fresh
+Verify/Review and Astra Final are pending. No P7, merge, release or deployment.
+
+Version diff 0.5.82+draft -> 0.5.83+draft: register P6 spec v0.5.39b and peer addendum
+v0.1.9b. Record current-tree independent Verify PASS after Plan-only temporal RED/GREEN correction:
+P6 acceptance 49/49, focused remediation 32/32, `cargo check`, format, docs validation and diff
+check pass. Independent Review and Astra 6 Final remain pending. No P7, merge, release or deployment.
+
+Version diff 0.5.81+draft -> 0.5.82+draft: register P6 spec v0.5.38b and peer addendum
+v0.1.8b. Record the Plan-only temporal selector RED/GREEN correction, current local P6 acceptance
+49/49, focused remediation 32/32 and expanded 14-target matrix 130/130. Fresh independent Verify
+and Review remain pending; Astra 6 Final is NOT_RUN. No P7, merge, release or deployment.
+
+Version diff 0.5.80+draft -> 0.5.81+draft: register P6 spec v0.5.37b and peer addendum
+v0.1.7b. Record independent Verify results (49/49 exact P6, 31/31 focused), reconcile the older
+45/45 record as historical, and add the Plan-only temporal selector Review finding and RCA. Review
+is FAIL pending the regression/source correction; Astra 6 Final is NOT_RUN. No P7, merge, release or
+deployment.
+
+Version diff 0.5.78+draft -> 0.5.79+draft: register the two bounded P6 Review
+remediations, their RCA records and execution DAG, and the order separating parallel
+test-only lanes from serialized `src/lib.rs` changes. Scope prior receipt-authority
+PASS_WITH_LIMITATIONS evidence narrowly; broad P6 Review is FAIL and Final is
+NOT_RUN pending implementation and gates. No P7, merge, release, or deployment.
+
+Version diff 0.5.77+draft -> 0.5.78+draft: merge the owner-approved G4
+shared-pipeline contract and stable plan identity onto the current mainline
+while preserving the D7 and P8-R3 evidence. Update the registry rows to the
+reconciled C4, P8 boundary, orchestration plan and report versions. The
+environment-blocked full REST rerun remains a limitation; no public transport,
+migration, release, deploy or independent-review gate is closed by this merge.
 
 Version diff 0.5.77+draft -> 0.5.78+draft: merge the owner-approved G4
 shared-pipeline contract and stable plan identity onto current mainline while
@@ -405,6 +482,8 @@ review and full P8 gates remain open.
 
 | Version | Date | Owner | Summary |
 |---|---|---|---|
+| 0.5.93+draft | 2026-10-06 | GenesisBlockDB Architecture | Record current P6 mainline closeout integration and local results: P6 49/49, focused integrated targets 44/44, HQL2 407/0/1 across 40 targets; synchronize H2-D11/P8/plan/report entries; broader P8/P13, hosted and release gates remain open |
+| 0.5.92+draft | 2026-10-06 | GenesisBlockDB Architecture | Reconcile HQL2 AnnotationScan P7 temporal/ACL evidence with the P6 mainline closeout; preserve future-valid/post-S controls and separate query-level FORBIDDEN evidence; P8 and broader release/transport qualification remain open |
 | 0.5.83+draft | 2026-10-06 | GenesisBlockDB Architecture | Synchronize controlled AnnotationScan P7 temporal differential and separate HQL/IR Annotation(Read) denial evidence across P7/P8/H2-D11/plan/report; four focused targets pass 42/42; no runtime/P6/schema/transport change |
 | 0.5.82+draft | 2026-10-06 | GenesisBlockDB Architecture | Synchronize test-only HQL/typed-IR AnnotationScan P7 differential and current H2-D11/P8/plan/report versions; four focused targets passed 42/42, then source target passed 7/7 after final S,V alignment; no runtime/P6/schema/transport change |
 | 0.5.81+draft | 2026-10-06 | GenesisBlockDB Architecture | Reconcile stale H2-D11 History/Change and ChangeScan quota-status text; Artifact History remains unsupported and timing noninterference is unclaimed; no source/schema/migration change |

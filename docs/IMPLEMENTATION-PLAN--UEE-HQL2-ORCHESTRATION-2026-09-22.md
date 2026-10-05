@@ -1,9 +1,9 @@
 ---
-version: "0.8.76b"
+version: "0.8.77b"
 doc_id: "IMPLEMENTATION-PLAN--UEE-HQL2-ORCHESTRATION-2026-09-22"
 owner: "Boss (Founder / Product Authority)"
 created_at: "2026-09-22T00:00:00+07:00,ATHER,working-tree"
-last_update: "2026-10-06T04:05:24+07:00,ATHER"
+last_update: "2026-10-06T04:46:43+07:00,ATHER"
 status: beta
 superseded_by: null
 attributes:
@@ -1003,6 +1003,13 @@ passes 19/19 across `epoch_e2_tests`, `g3_oracle_differential_tests`,
 `meta_format_migration_tests` and `wal_tail_replay_tests`.
 
 ## CHANGELOG
+
+Version diff `0.8.76b -> 0.8.77b`: integrate current mainline P6 closeout
+`9821508` into the isolated candidate and verify P6 acceptance 49/49,
+focused snapshot/peer/lease/History-Change 44/44, and HQL2 407/0/1 across
+40 root targets on Windows with locked/offline no-default-features tests.
+This is local evidence only; shared-runtime, broad P8/P13, hosted checks,
+independent review and release/device gates remain open.
 
 Version diff `0.8.75b -> 0.8.76b`: strengthen the AnnotationScan P7 fixture
 with a future-valid and a post-S control excluded at explicit S,V, and verify

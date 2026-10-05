@@ -1,8 +1,8 @@
 ---
 doc_id: SPEC--GENESISDB-HQL2-P8-TYPED-BOUNDARY
-version: "0.2.64b"
+version: "0.2.65b"
 created_at: "2026-09-28T01:25:00+07:00,ATHER,fc851e9"
-last_update: "2026-10-06T04:05:24+07:00,ATHER"
+last_update: "2026-10-06T04:46:43+07:00,ATHER"
 status: beta
 superseded_by: null
 owner: "Boss (Founder / Product Authority)"
@@ -758,10 +758,11 @@ transaction/valid-time selectors with one later transaction and one future-
 valid control excluded from the result bag. Missing `Annotation(Read)` is
 separately verified as `FORBIDDEN` for both HQL and typed IR; that query-level
 denial is not represented as P7 row-bag parity. The four focused annotation/
-History/Change targets pass 42/42. Broad exact-oracle, independent-review,
-transport and P8/P13 gates remain open. The
-fresh 39-target HQL2 sweep passes 404/0/1, with the prior separate 11-target
-P6/schema-v6/compatibility result at 194/0/0 not rerun here. HQL2/IR `tx_as_of` now selects
+History/Change targets pass 42/42. After integrating mainline P6 closeout
+`9821508`, local Windows verification passes exact P6 acceptance 49/49, the
+focused snapshot/peer/lease/History-Change matrix 44/44, and 407/0/1 across
+40 root HQL2 targets. These do not close broad exact-oracle, independent-review,
+transport or P8/P13 gates. HQL2/IR `tx_as_of` now selects
 one no-fallback frontier across scans, operators, hydration and `Snapshot.tx`;
 five focused targets pass 56/56 and HistoryScan/ChangeScan passes 17/17.
 Broader exact-oracle, independent-review, transport and P8/P13 gates remain
@@ -895,6 +896,12 @@ separate shape limits. No process-global Pest setting is changed.
   Parser/binder coverage alone does not close the storage-backed runtime gate.
 
 ## Version diff and changelog
+
+Version diff `0.2.64b -> 0.2.65b`: synchronize the typed-boundary checkpoint
+with mainline P6 closeout `9821508`; record P6 acceptance 49/49, focused
+snapshot/peer/lease/History-Change 44/44, and the 40-target HQL2 sweep
+407/0/1 on Windows. Full shared-runtime/oracle, independent-review, hosted,
+transport and P8/P13 gates remain open.
 
 Version diff `0.2.63b -> 0.2.64b`: strengthen the test-only HQL/typed-IR
 AnnotationScan differential with a future-valid revision and a revision newer
