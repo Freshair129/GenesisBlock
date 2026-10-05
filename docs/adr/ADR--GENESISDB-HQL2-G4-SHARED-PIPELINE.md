@@ -1,8 +1,8 @@
 ---
 doc_id: ADR--GENESISDB-HQL2-G4-SHARED-PIPELINE
-version: "0.1.2b"
+version: "0.1.3b"
 created_at: "2026-10-04T13:08:29+07:00,Codex,2be63a7"
-last_update: "2026-10-04T13:55:28+07:00,Codex"
+last_update: "2026-10-06T01:49:20+07:00,ATHER"
 status: active
 superseded_by: null
 owner: "Boss (Founder / Product Authority)"
@@ -31,10 +31,20 @@ Existing HQL compatibility, `/v1`, and `query-ir.v1` behavior remain stable;
 only an explicitly selected and differentially verified HQL1 subset may use
 the shared pipeline, and it must not silently fall through to v2.
 
-The current worktree implements only the first bounded plan-identity slice:
-stable planner metadata and a shared plan hash are exposed on `EXPLAIN` and
-`ANALYZE`. Full G4 remains `PARTIAL`; the remaining stages and independent,
-hosted, device and release gates are not promoted by this slice.
+The current integration candidate combines the P8 typed runtime with the
+bounded G4 plan-identity slice. HQL2 text and closed Query IR v2 bind into one
+`BoundQueryV2`/`PhysicalPlanV2` path under the serialized Storage/P6 boundary;
+the explicitly allowlisted HQL1 adapter lowers into that same path. H2-D11
+source adapters preserve revision, retention and ACL checks. Stable contract
+and planner metadata plus a canonical plan hash are shared by `EXPLAIN` and
+`ANALYZE`.
+
+G4 remains `PARTIAL`, not complete. The integrated tree passed the refreshed
+42-target HQL2/REST sweep and strict Clippy in both feature configurations;
+full per-operator exact-oracle qualification, independent review, fresh hosted
+checks, and device/release qualification remain separate gates.
+Missing or skipped evidence remains `NOT_RUN`; public transport and
+user-database migration are outside this ADR's implementation scope.
 
 ## Parent and peer evidence
 
@@ -354,13 +364,13 @@ The serialized plan remains:
 | Stage | Scope | Verification gate |
 |---|---|---|
 | G4-DOC | Approve this ADR and reconcile parent/peer versions | Owner approval and doc validation; completed for this slice |
-| G4-RED | Add tests for dispatch, closed binding, deterministic plans, no-effect `EXPLAIN`, measured `ANALYZE` and fail-closed errors | Focused plan-identity contract test passes; broader G4 coverage remains open |
-| G4-AST/BIND | Implement v2 source AST/IR decoding and shared typed binder | Binder/type/ACL/limit tests plus review |
-| G4-PLAN | Implement deterministic physical plan and stable identity | Stable identity slice passes locally; golden/P7 breadth remains open |
-| G4-EXPLAIN | Implement plan-only diagnostics and unknown-estimate rules | No-read/no-write instrumentation tests |
-| G4-ANALYZE | Implement read-only measured counters | Counter provenance and no-partial-result tests |
-| G4-PARITY | Differential HQL1 compatibility, HQL2 and Query IR v2 for supported operators | Equal bags, order, errors and completeness |
-| G4-VERIFY | Run local gates, reconcile evidence, independent review and final scope audit | PASS/FAIL/NOT_RUN ledger with no promotion of missing gates |
+| G4-RED | Add tests for dispatch, closed binding, deterministic plans, no-effect `EXPLAIN`, measured `ANALYZE` and fail-closed errors | Integrated 42-target HQL2/REST sweep passed; G4 plan-identity/counter contract and source-plan tests passed; broader qualification remains open |
+| G4-AST/BIND | Implement v2 source AST/IR decoding and shared typed binder | Implemented in the P8 candidate; binder/type/ACL/limit gates and independent review remain |
+| G4-PLAN | Implement deterministic physical plan and stable identity | `PhysicalPlanV2` and canonical identity are implemented; golden/P7 breadth remains open |
+| G4-EXPLAIN | Implement plan-only diagnostics and unknown-estimate rules | Source-plan test passed 1/1 and the integrated HQL2/REST sweep passed; broader qualification remains open |
+| G4-ANALYZE | Implement read-only measured counters | G4 contract test passed 1/1 for shared plan identity and measured counters; provenance/no-partial qualification remains open |
+| G4-PARITY | Differential HQL1 compatibility, HQL2 and Query IR v2 for supported operators | P8 exact-oracle tests cover implemented slices; full operator matrix remains open |
+| G4-VERIFY | Run local gates, reconcile evidence, independent review and final scope audit | Integrated HQL2/REST sweep and strict Clippy passed in both feature configurations; hosted/device/release/review statuses remain separate |
 
 File ownership remains serialized: one owner for `src/lib.rs`, one owner for
 `src/query/*`, new tests in new files, and no public transport edits until the
@@ -422,13 +432,15 @@ an ADR amendment and renewed review.
 
 ## Version diff and changelog
 
-Version diff: `0.1.1b -> 0.1.2b` records owner approval of the exact G4 contract
-and the bounded plan-identity implementation slice. It preserves the
-explicit-v2 and legacy-surface boundaries and does not authorize public
-transport, migration, merge, release or deployment.
+Version diff: `0.1.2b -> 0.1.3b` reconciles the approved G4 plan-identity
+slice with the P8 typed runtime and records the integrated 42-target HQL2/REST
+and strict-Clippy passes. It preserves explicit-v2 and legacy-surface
+boundaries, marks G4 partial, and keeps independent, refreshed hosted, device
+and release qualification open.
 
 | Version | Date | Status | Summary | Commit Hash | Agent |
 |---|---|---|---|---|---|
+| 0.1.3b | 2026-10-06 | active | Reconcile G4 with P8/H2-D11 runtime; integrated HQL2/REST 42-target sweep and strict Clippy in both feature configurations pass; full oracle breadth, independent review and hosted/device/release gates remain open | working-tree | ATHER |
 | 0.1.2b | 2026-10-04 | active | Owner-approved G4 contract; implement stable planner metadata and shared plan hash for `EXPLAIN`/`ANALYZE`, with focused local evidence and remaining G4 gates open | working-tree | ATHER |
 | 0.1.1b | 2026-10-04 | draft | Add the parity-proven HQL1 compatibility adapter to the explicit-v2 shared pipeline while preserving legacy routing and all implementation gates | working-tree | ATHER |
 | 0.1.0b | 2026-10-04 | draft | Propose explicit-v2 shared HQL2/Query IR lowering, deterministic planning, plan-only EXPLAIN, measured read-only ANALYZE, compatibility boundary and gated implementation sequence | working-tree | ATHER |

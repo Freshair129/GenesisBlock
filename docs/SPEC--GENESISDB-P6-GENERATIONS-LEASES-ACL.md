@@ -278,8 +278,9 @@ excluded before candidate counts/bytes are charged to caller-selected budgets or
 materialized. This does not widen authorization to Annotation and does not claim
 timing noninterference. The hidden-revision threshold regression passes with
 ACL 11/11; the expanded History/Change target passes 17/17, Annotation
-source/ACL passes 7/7, HQL2 passes 394/0/1 across 35 targets and the separate P6/schema-v6/
-compatibility group passes 194/0/0. Hosted validation of this source change,
+source/ACL passes 7/7, the fresh HQL2 sweep passes 404/0/1 across 39 targets,
+and the prior separate P6/schema-v6/compatibility group remains 194/0/0 (not
+rerun here). Hosted validation of this source change,
 independent review and broader P6/P8 acceptance remain open.
 
 P8 AnnotationLookup also runs inside the same ReadView and applies the same
@@ -412,17 +413,6 @@ Verify records exact local results. Review is independent and read-only; source 
 to the serialized owner and require Verify to rerun. Final checks scope, evidence categories,
 regressions and WIP preservation. Passing the gates supports only the P6 owner decision; it does
 not approve P7, merge, release, deployment or external readiness.
-
-The D7 actor-scoped HQL1 adapter accepts one-hop ordering only by the projected
-endpoint ID and an exact same-alias string ID equality predicate on labeled or
-unlabeled zero-hop scans, each after legacy/HQL2 differential evidence. Focused
-adapter, ordering and labeled-filter targets pass 11/11, 2/2 and 2/2; the latter
-includes match, miss, wrong-label exclusion and a backslash/Unicode ID. The
-explicit HQL2 sweep passes 394/0/1 across 35 targets. The selected P6 peer group
-passes 45/0/0 across seven targets; the prior broader 11-target P6/schema-v6/
-compatibility result remains 194/0/0 and was not rerun here. No P6 grant, ACL,
-lease, schema or migration behavior changed. Broad P6/P8 and review gates remain
-open.
 
 ### Bounded P6 Review Remediation DAG — 2026-10-05
 
@@ -607,15 +597,6 @@ Cargo output also included `database or disk is full` / `Error code 13` while
 the relevant commands returned exit code 0 and the test targets reported zero
 failures. Its source was not established; retain this as an environment
 limitation rather than attributing it to the P6 implementation.
-
-The D7 actor-scoped HQL1 adapter additionally accepts one-hop ordering only by
-the projected endpoint ID, after a legacy/HQL2 differential (2/2 ordering tests;
-the existing adapter target passes 10/10). Zero-hop and unprojected ordering
-remain unsupported. This changes no P6 grant, ACL, lease, schema or migration
-behavior. The HQL2 sweep passes 385/0/1 across 34 targets; the selected
-P6/schema-v6/ACL regression group passes 93/0/0 across 11 targets. The prior
-broader 11-target P6/schema-v6/compatibility record remains 194/0/0. Broader
-P6/P8 and independent-review gates remain open.
 
 ## CHANGELOG
 

@@ -2,10 +2,10 @@
 doc_id: C4--GENESISDB-ARCHITECTURE
 type: architecture-index
 status: current
-version: 0.1.70b
+version: 0.1.71b
 owner: GenesisBlockDB Architecture
 created_at: 2026-06-13T22:50:11+07:00,ATHER,9b1ced3
-last_update: "2026-10-05T15:43:16+07:00,ATHER"
+last_update: "2026-10-06T01:39:39+07:00,ATHER"
 attributes:
   domain: architecture
   scope: repository
@@ -115,14 +115,20 @@ contextual NULL/list/JSON values with exact serialized-size preflight. The
 preflight accounts for JSON syntax, primitive values and escaped UTF-8 strings;
 three lowerer unit tests cover the size boundary. The focused P8 completion
 target passes 10/10. The D7 actor-scoped bridge accepts differential-tested
-zero-hop HQL1 ID projections (unlabeled or with one plain-ASCII label) and
-bounded unlabeled one-hop ID projections through `Storage::query_v2`; either
-zero-hop form may also contain one exact same-alias string-ID predicate.
-Legacy parser resources are preflighted and reserved before AST construction.
-The adapter, ordering and labeled-filter targets pass 11/11, 2/2 and 2/2;
-the new differential covers match, miss, wrong-label exclusion and a
-backslash/Unicode ID. Independent review found no runtime parity or
-authorization defect. A storage-backed
+zero-hop ID projections (unlabeled or with one plain-ASCII label), one
+unlabeled zero-hop single-property projection, bounded unlabeled one-hop ID
+projections, and exact-seed depth-one `TRAVERSE` ID projection over one
+physical relation or `ANY` in default/out/in/both directions, through
+`Storage::query_v2`. Property reads preserve missing/explicit-null values and
+legacy bag multiplicity; traversal excludes the seed and deduplicates projected
+target IDs. Existing one-hop endpoint-ID filtering and projected-ID ordering
+remain supported; other unproven shapes stay fail-closed. Legacy parser
+resources are preflighted and reserved before AST construction. Adapter,
+property, ordering and labeled-filter targets pass 13/13, 2/2, 2/2 and 2/2;
+the fresh root-HQL2 sweep passes 404/0/1 across 39 targets and U9 restore passes
+7/7. Independent review found no runtime parity or authorization defect in
+the earlier labeled-ID extension; independent review of this D7 extension
+remains pending. A storage-backed
 HQL/typed-IR scalar differential matches the
 independent P7 interpreter for all 81 four-value nullable bags (1/1 test, 162
 executions). A storage-backed aggregate differential covers 121 nullable bags
@@ -131,7 +137,7 @@ HQL and typed-IR Join differentials match independent P7 for Inner/Left/Semi/Ant
 with duplicate, missing-property NULL and JSON-null keys (5/7/3/2 output rows).
 HQL `JOIN TABLE` lowers to the existing RowScan/Join contract; bare JOIN
 defaults to Inner and Semi/Anti do not export the right scope. The explicit
-root-HQL2 sweep passes 394/0/1 across all 35 root targets. A test-only optional
+root-HQL2 sweep passes 404/0/1 across all 39 root targets. A test-only optional
 Sequence edge-property-miss differential matches independent P7, preserving
 four input rows and NULL-extending endpoint/edge aliases. The nested-JSON
 Sequence property differential also matches exact node/edge objects and arrays
@@ -479,13 +485,25 @@ For schema-v6 WAL-only cold recovery, preflight signed journal authority before 
 `Schema6ActivationV1` selects v6 only when identity and any linked migration/receipt proof validate;
 v6-only WAL without activation fails closed. See H2-D11 ADR R6b and the P6 recovery contract.
 
+H2-D11 R5 backup restoration validates extracted staging with full retention, requires normal
+recovery to reproduce the bundle's final WAL-frame frontier, then publishes or reuses a P6
+generation and independently reopens read-only to validate a lease before target exposure. A new
+local receipt may advance the live
+WAL frontier, while a valid receipt already at the bundle frontier is reused; `txn_frontier`
+remains unchanged. Restore prepares its complete return metadata before target rename. The U9
+restore target passes 7/7, restore-generation passes 3/3, revision/backup passes 1/1, and the
+fresh HQL2 sweep passes 404/0/1 across 39 targets. Source-backed NodeScan plan-only EXPLAIN
+remains partial; cleanup after read-only validation/rename failure is best-effort and not
+fault-injected.
+Broader EXPLAIN/P8/P13 and P14 rehearsal remain open.
+
 ## CHANGELOG
 
-Version diff 0.1.69b -> 0.1.70b: merge the owner-approved G4
-shared-pipeline contract and bounded stable plan identity onto the current
-D7 mainline. Preserve the local D7 differential evidence and record focused
-G4 verification; broad G4/P8/P13, transport, hosted and independent-review
-gates remain open.
+Version diff 0.1.70b -> 0.1.71b: reconcile the approved G4 stable plan
+identity with the later D7 single-property and exact-seed depth-one
+`TRAVERSE` evidence, H2-D11 restore verification and the 39-target HQL2 sweep
+(404 passed, 0 failed, 1 ignored). G4/P8 remain partial; independent review,
+fresh hosted checks and broader P8/P13 qualification remain open.
 
 Version diff 0.1.68b -> 0.1.69b: extend D7 after legacy/HQL2 differential to
 one exact same-alias string ID predicate on labeled zero-hop scans. The new
@@ -617,6 +635,7 @@ full P8/P13 qualification remains open.
 
 | Version | Date | Status | Summary | Commit Hash | Agent |
 |---------|------|--------|---------|-------------|-------|
+| 0.1.71b | 2026-10-06 | current | Reconcile approved G4 plan identity with the later D7/H2-D11 implementation evidence; 39-target HQL2 sweep 404/0/1, while G4/P8 and independent/hosted qualification remain partial | working-tree | ATHER |
 | 0.1.70b | 2026-10-05 | current | Merge owner-approved G4 stable plan identity on `EXPLAIN`/`ANALYZE` onto the current D7 mainline; focused local verification passes, while broad G4/P8/P13, transport, hosted and independent-review gates remain open | working-tree | ATHER |
 | 0.1.69b | 2026-10-04 | current | Extend D7 with differential-proven same-alias exact string-ID filter on labeled zero-hop scans; adapter 11/11, ordering 2/2 and labeled-filter 2/2 including wrong-label/backslash/Unicode cases; HQL2 394/0/1 across 35 targets, selected P6 peers 45/0/0 across 7; PR #213 code commit checks 40 pass, 4 worker failures with cause unconfirmed, 5 skipped, 1 Windows Cargo cancellation at 15-minute job limit; no P6/schema/transport change; broad shared-runtime/P8/P13 remain open | working-tree | ATHER |
 | 0.1.68b | 2026-10-04 | current | Add test-only HQL/typed-IR ChangeScan P7 differential for five exclusive-after/inclusive-through windows and tx_as_of frontiers; History/Change 17/17; HQL2 392/0/1 across 34 targets; PR #210 hosted checks 11 pass, four worker markerless-identity failures, one skipped; no runtime/contract/schema/P6/transport change; broad P8/P13 and independent review remain open | working-tree | ATHER |

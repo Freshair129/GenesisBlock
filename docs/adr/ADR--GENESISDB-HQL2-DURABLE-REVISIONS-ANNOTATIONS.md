@@ -1,8 +1,8 @@
 ---
 doc_id: ADR--GENESISDB-HQL2-DURABLE-REVISIONS-ANNOTATIONS
-version: "0.8.17b"
+version: "0.8.27b"
 created_at: "2026-09-28T06:15:00+07:00,ATHER,53078cb"
-last_update: "2026-10-03T09:50:18+07:00,ATHER"
+last_update: "2026-10-06T04:46:43+07:00,ATHER"
 status: beta
 superseded_by: null
 owner: "Boss (Founder / Product Authority)"
@@ -56,16 +56,21 @@ and AnnotationLookup enforce explicit Annotation(Read) for the annotation
 subject and check target/evidence access under the same lease. ChangeScan also
 requires the explicit annotation grant for Annotation subjects; the separate
 Namespace(Read) query grant continues to cover same-namespace references but
-does not substitute for Annotation(Read). Node/Edge/Row/Annotation scans and
-typed field hydration are also implemented. A separate review residual remains:
-ChangeScan reserves budget using all candidate revisions before subject ACL
-filtering, which may expose hidden Annotation-event counts through quota errors.
-This possible side channel is not closed by the grant fix and remains open for
-contract decision and adversarial verification.
+does not substitute for Annotation(Read). Node/Edge/Row/Vector/Annotation scans
+and typed field hydration are implemented. HistoryScan/ChangeScan enumerate the
+supported retained revision kinds under P6; Artifact HistoryScan remains
+unsupported. An earlier review concern that hidden Annotation candidates could
+affect caller-budget outcomes is resolved by the owner-approved narrow policy
+below: quota-result dependence is addressed, but timing noninterference remains
+unclaimed. HQL and typed-IR AnnotationScan match the independent P7 graph
+oracle at explicit S,V with future-valid and post-S controls excluded. Missing
+`Annotation(Read)` returns `FORBIDDEN` for both frontends in a separate ACL
+test; the query-level denial is not represented as P7 row-bag parity. This is
+focused evidence, not broad P8 closure.
 Exact KNN and Original Rerank read original schema-v6 vectors under that P6
 lease after owner-revision, namespace/node ACL, collection and fingerprint
-validation. Explicit History/Change enumeration, additional unsupported P8
-operators and external surfaces remain open. Schema-6 peer ingress continues
+validation. Artifact HistoryScan, additional unsupported P8 operators and
+external surfaces remain open. Schema-6 peer ingress continues
 to fail closed for unversioned folded graph/row materializations.
 
 The owner directed ATHER to choose the narrow ChangeScan budget policy and
@@ -452,6 +457,20 @@ snapshot/P6 manifest and all required projection/original-vector artifacts,
 then verifies counts and digests. Restore is into a new directory followed by
 normal recovery, P6 generation publication and independent validation; all
 UUIDs and database identity are preserved. A raw SQLite copy is not a backup.
+The bundle's `stable_frontier` is its declared WAL-frame frontier. Normal
+recovery must first reproduce that exact frame frontier; a truncated or
+otherwise incomplete WAL suffix is rejected before publication. Restore then
+publishes a new local P6 generation whose `wal_frontier` equals the manifest
+frontier, or reuses a valid terminal `GenerationPublished` receipt whose
+`publication_seq` equals it. Either path changes no graph, vector or relational
+data and leaves `txn_frontier` unchanged. Restore independently reopens
+staging read-only and validates the lease. It prepares the complete
+`BackupBundleInfo` before atomically renaming staging into the caller-visible
+target, so no later bundle I/O can turn a published restore into an error.
+Backup compatibility is checked using the supported format, matching engine
+name, and readable schema version. The manifest's `engine_version` is audit
+provenance, not an exact-match gate; an older engine build may restore when its
+schema is supported. Newer unreadable schemas fail before target creation.
 Physical erasure across retained history, artifacts, backups and replicas is a
 separately authorized administrative workflow, not annotation retraction.
 
@@ -754,15 +773,40 @@ Minimum Verify/Review/Final evidence:
 
 | Artifact | Approved version | Synchronized version/status |
 |---|---|---|
-| This H2-D11 addendum | `0.3.0b` candidate, owner-approved | `0.8.17b` beta, annotation ACL and narrow ChangeScan budget policy implemented; 376/0/1 HQL2 and 43/0/0 selected P6/schema-v6; no schema/migration change |
-| P8 typed boundary | `0.2.0b` beta | `0.2.47b` beta, recursive target/evidence ACL, ChangeScan budget filtering, Vector/Row HistoryScan and end-to-end `tx_as_of` implemented; broad P8/P13 qualification remains open |
-| P6 generations/leases/ACL | `0.5.0b` beta | `0.5.25b` beta, explicit annotation-subject grant and pre-budget exclusion verified; HQL2 376/0/1, selected P6/schema-v6 suite 43/0/0; hosted worker checks unresolved |
-| HQL2 orchestration plan | `0.5.0b` beta | `0.8.50b` beta, records annotation ACL/budget conformance, 376/0/1 HQL2 sweep and current open qualification gates |
-| C4 architecture index | `0.1.20b` | `0.1.58b`, indexes current HQL2/P6 architecture, counts and open gates |
-| DOC registry | `0.5.6+draft` | `0.5.57+draft`, synchronized current HQL2/P6/plan/report entries |
-| Master specification | — | `2.3.30b`, architecture summary synchronized to HQL2 annotation ACL evidence |
-| HQL2 P8 checkpoint | — | `0.1.46b`, local regression evidence synchronized; broad P8/P13 gates remain open |
+| This H2-D11 addendum | `0.3.0b` candidate, owner-approved | `0.8.27b` beta, R5 restore compatibility and History/Change status reconciled; AnnotationScan has temporal-control P7 evidence; current integrated P6/HQL2 local verification recorded |
+| P8 completion addendum | `0.1.13b` accepted | `0.1.14b` accepted, records differential-tested zero-hop property and exact-seed depth-one traversal extensions |
+| P8 typed boundary | `0.2.0b` beta | `0.2.65b` beta, records G4/D7, AnnotationScan controls and the current integrated local sweep; full source/operator oracle remains partial |
+| P6 generations/leases/ACL | `0.5.0b` beta | `0.5.46b` beta, current mainline temporal/ACL closeout; acceptance passes 49/49 locally |
+| U9 backup/restore spec | `0.1.1b` approved | `0.1.8b` beta, format/engine-name/schema gates distinguished from audit-only engine version |
+| HQL2 orchestration plan | `0.5.0b` beta | `0.8.77b` beta, records current P6 integration and HQL2 sweep; broader phase gates remain open |
+| C4 architecture index | `0.1.20b` | `0.1.71b`, indexes current HQL2/P6 restore result and open gates |
+| DOC registry | `0.5.6+draft` | `0.5.93+draft`, synchronized current HQL2/P6/plan/report/U9 entries |
+| Master specification | — | `2.3.42b`, architecture summary synchronized to D7 and R5 restore evidence |
+| HQL2 P8 checkpoint | — | `0.1.69b`, records G4/D7, U9, current P6 integration and HQL2 sweep; broader acceptance remains open |
 | Engine/storage | `0.2.9` | remains unchanged until implementation and release gates; no user database is migrated here |
+
+Version diff `0.8.19b -> 0.8.20b`: accept a valid terminal
+`GenerationPublished` frame as the manifest WAL frontier, preserve the
+transaction frontier, and finish fallible bundle-info work before target
+publication. Extend the restore regression and synchronize current evidence.
+
+Version diff `0.8.18b -> 0.8.19b`: implement the approved R5 restore order in
+staging: normal recovery, generation publication at the manifest `wal_frontier`,
+then independent read-only lease validation before target rename. Clarify that
+the local P6 publication frame may advance restored live `stable_frontier`
+without changing the bundle's declared data frontier.
+
+Version diff `0.8.17b -> 0.8.18b`: fix the restore-validation checkpoint to
+use full retention, so opening/dropping the temporary staging database cannot
+fold the only restored journal copy or advance the H2-D11/P6 history floor.
+The H2-D11 backup/restore fixture now proves stable graph history floor,
+revision/row/schema/selector/source-floor identity and HQL/typed-IR
+HistoryScan/ChangeScan parity; the focused backup, revision, History/Change,
+row-history and annotation targets pass 59/59 across seven targets, the explicit
+HQL2 sweep passes 389/0/1 across 35 targets, and the full locked/offline Rust
+suite exits 0. No backup format, schema or migration change; broad P14 rehearsal,
+P8/P13, hosted CI and independent-review gates remain open. See
+`.brain/rca/RCA--hql2-backup-restore-history-floor.md`.
 
 Version diff `0.8.16b -> 0.8.17b`: select the narrow ChangeScan budget policy:
 retain namespace-only ChangeScan for other readable kinds, exclude unauthorized
@@ -818,8 +862,42 @@ NOT_RUN and broader acceptance/release gates remain open.
 
 ## CHANGELOG
 
+Version diff `0.8.26b -> 0.8.27b`: reconcile the approved H2-D11 evidence
+with mainline P6 closeout `9821508`; the integrated local candidate passes
+P6 acceptance 49/49, focused snapshot/peer/lease/History-Change 44/44 and
+the 40-target HQL2 sweep 407/0/1. These local results do not close broad
+P8/P13, hosted, release or independent-review gates.
+
+Version diff `0.8.25b -> 0.8.26b`: strengthen the test-only AnnotationScan
+P7 differential with future-valid and post-S controls at explicit selectors;
+record separate HQL/typed-IR missing Annotation(Read) `FORBIDDEN` checks rather
+than claiming query-level ACL denial as P7 row-bag parity. Four focused
+annotation/History/Change targets pass 42/42; no runtime/schema/migration/
+transport change and broad P8 acceptance remains open.
+
+Version diff `0.8.24b -> 0.8.25b`: record the test-only HQL/typed-IR
+AnnotationScan differential against independent P7 at an explicitly aligned
+S,V. The focused source/ACL target passes 7/7; this does not close broad P8
+exact-oracle gates and changes no runtime, schema, migration or transport.
+
+Version diff `0.8.23b -> 0.8.24b`: reconcile the opening H2-D11 status with
+the later approved implementation evidence. History/Change covers retained
+Node, Edge, Row, Vector and Annotation revisions; Artifact HistoryScan remains
+unsupported. The ChangeScan quota-result concern is addressed by the approved
+pre-budget ACL exclusion, while timing noninterference remains unclaimed. No
+runtime, schema, migration or transport behavior changed.
+
 | Version | Date | Status | Summary | Commit Hash | Agent |
 |---|---|---|---|---|---|
+| 0.8.26b | 2026-10-06 | beta | Strengthen AnnotationScan P7 evidence with S,V exclusion controls; record separate HQL/IR Annotation(Read) FORBIDDEN checks; four focused targets 42/42; no runtime/schema/migration/transport change; broad P8 remains open | working-tree | ATHER |
+| 0.8.25b | 2026-10-06 | beta | Record HQL/typed-IR AnnotationScan P7 differential at explicit S,V; focused source/ACL target passes 7/7; no runtime/schema/migration/transport change; broad P8 acceptance remains open | working-tree | ATHER |
+| 0.8.24b | 2026-10-06 | beta | Reconcile stale H2-D11 status: History/Change supports Node/Edge/Row/Vector/Annotation while Artifact History remains unsupported; quota-result concern addressed, timing noninterference unclaimed; no runtime/schema/migration change | working-tree | ATHER |
+| 0.8.23b | 2026-10-06 | beta | Clarify R5 backup compatibility: enforce format, engine name and readable schema; treat engine_version as audit provenance; U9 target passes 7/7; no schema/migration/format change | working-tree | ATHER |
+| 0.8.22b | 2026-10-05 | beta | Revalidate approved R5 restore and D7 extension after mainline replay; U9 restore 7/7, generation 3/3, revision/backup 1/1, HQL2 404/0/1 across 39 targets; synchronize document versions; no schema/migration/format change; independent review and broad HQL2 gates remain open | working-tree | ATHER |
+| 0.8.21b | 2026-10-05 | beta | Record final R5 restore verification: restore/P6 21/21 across five targets, HQL2 393/0/1 across 37, full Rust suite exit 0 with `probe_vs_recall` filtered; note best-effort cleanup failure-path test gap; no schema/migration/format change; broad HQL2 gates remain open | working-tree | ATHER |
+| 0.8.20b | 2026-10-05 | beta | Accept a valid terminal P6 generation receipt, preserve transaction frontier, and prepare restore result before target rename; restore/P6 20/20 across five targets, HQL2 392/0/1 across 37; full Rust suite NOT_RUN; no schema/migration/format change; broad HQL2 gates remain open | working-tree | ATHER |
+| 0.8.19b | 2026-10-05 | beta | Implement approved R5 restore order: publish the P6 generation at the manifest WAL frontier and independently pin/validate read-only before target rename; 15 focused passes across four targets, HQL2 391/0/1 across 37 targets; full Rust suite NOT_RUN on this patch; no schema/migration/format change | working-tree | ATHER |
+| 0.8.18b | 2026-10-05 | beta | Preserve packaged P6/H2-D11 history floor during writable restore validation by using full retention; 59 focused passes, HQL2 389/0/1 across 35 targets and full Rust suite exit 0; no schema/migration/format change; P14 rehearsal, hosted CI, independent review and broad P8/P13 remain open | working-tree | ATHER |
 | 0.8.17b | 2026-10-03 | beta | Implement and verify narrow ChangeScan budget policy: preserve namespace-only reads for other readable kinds; exclude Annotation subjects lacking Annotation(Read) before caller-budget accounting; ACL 11/11, History/Change 14/14, HQL2 376/0/1 and selected P6/schema-v6 43/0/0; hosted CI/review and broad P8/P13 remain open; no schema/migration change | working-tree | ATHER |
 | 0.8.16b | 2026-10-03 | beta | Record approved H2-D11 R4/P6 ACL conformance: require Annotation(Read) for annotation scan and ChangeScan subjects separately from Namespace(Read), retain recursive reference access; regression and HQL2 375/0/1 plus selected P6 43/0/0 pass; possible ChangeScan budget side channel and hosted/review/P8/P13 gates remain open | working-tree | ATHER |
 | 0.8.15b | 2026-10-03 | beta | Synchronize current HQL2/P6/plan/C4/master/report/registry versions; record 374/0/1 across 32 targets and PR #194 run 37083654705 with four worker bootstrap plus one Windows Join-budget failure; no contract/schema/migration change; broad gates remain open | working-tree | ATHER |

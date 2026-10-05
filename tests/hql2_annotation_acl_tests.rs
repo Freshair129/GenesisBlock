@@ -188,6 +188,39 @@ fn annotation_put_persists_engine_actor_and_separate_target_evidence_rows() {
 }
 
 #[test]
+fn annotation_put_treats_omitted_evidence_as_an_empty_set() {
+    let dir = TempDir::new().unwrap();
+    let storage = open(dir.path());
+    let target_revision = add_target(&storage, dir.path());
+    let database_id = database_id(&storage);
+    let mut payload = annotation(&database_id, &target_revision);
+    payload.as_object_mut().unwrap().remove("evidence");
+
+    let stored = put(&storage, payload, None);
+    let conn = Connection::open(dir.path().join("projection.sqlite")).unwrap();
+    let (payload_json, role_counts): (String, (i64, i64)) = conn
+        .query_row(
+            "SELECT payload_json,
+                    (SELECT SUM(is_evidence=0) FROM hql2_annotation_targets
+                     WHERE database_id=?1 AND annotation_id='review:1'
+                       AND annotation_revision_id=?2),
+                    (SELECT SUM(is_evidence=1) FROM hql2_annotation_targets
+                     WHERE database_id=?1 AND annotation_id='review:1'
+                       AND annotation_revision_id=?2)
+             FROM hql2_record_revisions
+             WHERE database_id=?1 AND namespace='default' AND kind='annotation'
+               AND record_id='review:1' AND revision_id=?2",
+            rusqlite::params![database_id, stored.revision],
+            |row| Ok((row.get(0)?, (row.get(1)?, row.get(2)?))),
+        )
+        .unwrap();
+
+    let stored_payload: Value = serde_json::from_str(&payload_json).unwrap();
+    assert!(stored_payload.get("evidence").is_none());
+    assert_eq!(role_counts, (1, 0));
+}
+
+#[test]
 fn annotation_put_rejects_foreign_lineage_and_client_verified_actor_before_append() {
     let dir = TempDir::new().unwrap();
     let storage = open(dir.path());
@@ -504,6 +537,21 @@ fn annotation_scan_requires_annotation_grant_in_addition_to_namespace_query_gran
         }))
         .unwrap()
     };
+    let ir_request = |request_id| {
+        serde_json::from_value(json!({
+            "contract_version":"genesis.api.v2",
+            "request_id":request_id,
+            "namespace":"default",
+            "ir":{
+                "contract_version":"query-ir.v2",
+                "nodes":[{"id":"annotations","op":"AnnotationScan","inputs":[],"config":{"as":"a"}}],
+                "root":"annotations",
+                "parameter_types":{}
+            },
+            "params":{}
+        }))
+        .unwrap()
+    };
     let change_request = |request_id| {
         serde_json::from_value(json!({
             "contract_version":"genesis.api.v2",
@@ -528,6 +576,10 @@ fn annotation_scan_requires_annotation_grant_in_addition_to_namespace_query_gran
         .query_v2(actor(), request("annotation-without-grant"))
         .unwrap_err();
     assert_eq!(error.code, "FORBIDDEN");
+    let error = storage
+        .query_v2(actor(), ir_request("annotation-ir-without-grant"))
+        .unwrap_err();
+    assert_eq!(error.code, "FORBIDDEN");
 
     let QueryOutcomeV2::Rows(changes) = storage
         .query_v2(actor(), change_request("annotation-change-without-grant"))
@@ -547,6 +599,13 @@ fn annotation_scan_requires_annotation_grant_in_addition_to_namespace_query_gran
         panic!("annotation scan must return rows")
     };
     assert_eq!(result.rows.len(), 1);
+    let QueryOutcomeV2::Rows(ir_result) = storage
+        .query_v2(actor(), ir_request("annotation-ir-with-grant"))
+        .unwrap()
+    else {
+        panic!("typed IR annotation scan must return rows")
+    };
+    assert_eq!(ir_result.rows.len(), 1);
 
     let QueryOutcomeV2::Rows(changes) = storage
         .query_v2(actor(), change_request("annotation-change-with-grant"))

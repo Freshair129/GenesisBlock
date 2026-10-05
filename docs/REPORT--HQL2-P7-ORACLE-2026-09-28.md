@@ -1,8 +1,8 @@
 ---
 doc_id: REPORT--HQL2-P7-ORACLE-2026-09-28
-version: "0.1.11b"
+version: "0.1.12b"
 created_at: "2026-09-28T01:38:00+07:00,ATHER,fc851e9"
-last_update: "2026-10-04T09:52:00+07:00,ATHER"
+last_update: "2026-10-06T04:05:24+07:00,ATHER"
 status: beta
 owner: "GenesisBlockDB Engineering"
 attributes:
@@ -190,6 +190,15 @@ This is test-only differential evidence; the P7 oracle and runtime/contract/
 schema/P6/transport behavior are unchanged, and broad P8/P13 acceptance remains
 open.
 
+Storage-backed HQL and typed-IR AnnotationScan also match independent P7 at
+explicit transaction/valid-time selectors. The fixture includes one
+future-valid annotation and one annotation committed after selected S; both
+are excluded while the in-window annotation remains. The focused source target
+passes 7/7. Missing `Annotation(Read)` returns `FORBIDDEN` for both frontends
+in the ACL target; this query-level denial is verified separately and is not
+claimed as P7 row-bag parity. The four focused annotation/History/Change
+targets pass 42/42. This is bounded test evidence, not full oracle/P8 closure.
+
 Storage-backed HQL and typed-IR Sequence property constraints now also match
 independent P7 for positive exact values: the start/end nodes use UTF-8 `name`
 fields and the edge uses an integer `weight`. Wrong-valued parallel-edge and
@@ -223,6 +232,14 @@ publication, device validation, soak/crash qualification and deployments have
 not been run or claimed.
 
 ## Version diff
+
+Version diff `0.1.11b -> 0.1.12b`: add a storage-backed HQL/typed-IR
+AnnotationScan P7 differential with controls for a future valid-time and a
+post-S revision, both excluded at the selected explicit S,V. Separately verify
+that missing Annotation(Read) denies both frontends with `FORBIDDEN`; do not
+conflate that authorization failure with row-bag parity. Source passes 7/7 and
+the four focused annotation/History/Change targets pass 42/42. No runtime,
+contract, schema, P6 or transport change; broad oracle/P8/P13 gates remain open.
 
 Version diff `0.1.10b -> 0.1.11b`: add a storage-backed HQL/typed-IR Sequence
 nested-JSON property differential against independent P7, checking exact node
@@ -294,6 +311,7 @@ open.
 
 | Version | Date | Status | Summary | Commit Hash | Agent |
 |---|---|---|---|---|---|
+| 0.1.12b | 2026-10-06 | beta | Add AnnotationScan P7 differential with explicit S,V controls excluding future-valid and post-S rows; separate HQL/IR Annotation(Read) FORBIDDEN assertions; source 7/7, focused four-target set 42/42; no runtime/contract/P6/transport change; broad P8/P13 remains open | working-tree | ATHER |
 | 0.1.11b | 2026-10-04 | beta | Add test-only HQL/typed-IR Sequence nested-JSON property differential against P7 with exact node/edge object/array equality and near-match exclusion; focused pattern 11/11, HQL2 392/0/1 across 34 targets; no runtime/contract/schema/P6/transport change; broad oracle and P8/P13 remain open | working-tree | ATHER |
 | 0.1.10b | 2026-10-04 | beta | Add test-only HQL/typed-IR optional Sequence edge-property-miss differential against independent P7; preserve four input rows and NULL-extend endpoint/edge aliases; focused pattern target 10/10, HQL2 389/0/1 across 34 targets; no runtime/contract/schema/P6/transport change; broad oracle and P8/P13 remain open | working-tree | ATHER |
 | 0.1.9b | 2026-10-04 | beta | Add storage-backed HQL/typed-IR Sequence node/edge exact-property P7 differential for positive UTF-8 and integer values with mismatching candidates excluded; focused pattern target 8/8, HQL2 387/0/1 across 34 targets; no runtime/contract/schema/P6/transport change; broad oracle and P8/P13 remain open | working-tree | ATHER |
