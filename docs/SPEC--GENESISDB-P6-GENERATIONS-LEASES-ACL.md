@@ -1,9 +1,9 @@
 ---
 doc_id: SPEC--GENESISDB-P6-GENERATIONS-LEASES-ACL
 owner: GenesisBlockDB Engineering
-version: 0.5.33b
+version: 0.5.46b
 created_at: "2026-09-22T22:55:00+07:00,ATHER,working-tree"
-last_update: "2026-10-04T16:06:00+07:00,ATHER"
+last_update: "2026-10-06T01:51:14+07:00,Codex"
 status: beta
 attributes:
   domain: storage-correctness
@@ -36,8 +36,9 @@ tenant isolation for records without namespace metadata, or deployment readiness
 7. WHEN policy changes THEN use expected-revision CAS and a signed, versioned WAL event that
    survives fold/snapshot/replay and revokes leases pinned to an older policy revision.
 8. IF schema or signed event is unsupported THEN refuse open rather than skip enforcement state.
-9. IF a temporal selector is unsupported or conflicts with a request selector THEN return an
-   explicit error rather than silently using current state.
+9. IF a temporal selector is unsupported, conflicts with a request selector, falls below the
+   generation history horizon, or exceeds the pinned generation WAL frontier THEN reject it
+   before source access rather than silently using current state.
 10. WHEN compaction replaces journal history THEN include the current published generation and
     non-default access policy as signed folded materializations. During replay, verify signatures on
     GenerationPublished and AccessPolicyChanged before application; an invalid or unknown signature
@@ -102,8 +103,16 @@ TemporalRead is { as_of: Option<String>, tx_as_of: Option<u64> }.
 
 - as_of must parse as RFC3339 and binds to valid_at where the operation supports it.
 - tx_as_of must satisfy generation history_horizon <= tx_as_of <= the pinned generation's
-  WAL frontier. A below-horizon selector returns TEMPORAL_BEYOND_HORIZON; a future selector is
-  rejected before source access.
+  WAL frontier. A below-horizon selector returns TEMPORAL_BEYOND_HORIZON; a selector above the
+  pinned frontier is rejected before source access. The generation publication receipt is at
+  `wal_frontier + 1` and is not itself a data frontier or a legal transaction-time selector.
+  Both bounds apply to direct lease pinning and every scoped read path; a query-layer check
+  against the current live sequence does not replace the pinned-generation upper-bound check.
+- HQL2 `EXPLAIN` and typed-IR Plan requests carrying `tx_as_of` are not exempt from the upper
+  bound merely because they do not return source rows. Validate against the same data frontier
+  the request would bind: the current published generation's `wal_frontier` when its receipt is
+  the observed frontier, otherwise the candidate generation's current commit frontier. Plan-only
+  validation must not publish a generation or mutate WAL/state files.
 - The P6 history_horizon governs retained node/edge history. H2-D11 adds per-source
   row_history_floor, annotation_history_floor and vector_history_floor. A read below its selected
   source floor returns HISTORY_UNAVAILABLE before source access; it never substitutes current data.
@@ -212,7 +221,8 @@ supported read syntax without an AccessContext.
   readers that do not understand Annotation reject the newer schema/event before replay.
 - PolicyAdminActor wraps AccessContext.
 - replace_access_policy(actor, expected_revision, policy) succeeds only when persisted revision
-  matches and new revision is exactly expected_revision + 1. Disabled bootstrap requires
+  matches and new revision equals `expected_revision.checked_add(1)`. If increment overflows, reject
+  with `ACCESS_POLICY_REVISION_CONFLICT`; same-revision policy replacement is never valid. Disabled bootstrap requires
   principal local-owner; in Enforced mode the actor needs ManagePolicy on its namespace.
   Accepted changes are signed, versioned and journaled.
 - Policy replacement invalidates leases pinned to the prior ACL revision. Policy state is
@@ -335,6 +345,13 @@ or a history-enumeration surface.
    rejects the whole snapshot and triggers complete WAL replay. If the snapshot asserts a
    non-default policy but the complete journal has no verified policy event, recovery is required;
    never reopen with the Disabled default. Legacy JSONL is part of this verification path.
+   AccessPolicyChanged authority validation also reconstructs the CAS chain: each ordinary
+   signed transition's `expected_revision` must equal the previously reconstructed policy
+   revision, and its policy revision must be exactly one greater. Per-event shape and increment
+   checks alone are insufficient. A trusted signed folded/base policy materialization may anchor
+   a higher starting revision only when recognized by the existing fold format; every subsequent
+   ordinary transition remains contiguous. The final reconstructed policy must equal the
+   snapshot policy.
 8. A missing/unreadable `state.json` does not imply schema 5. Before replay or projection
    mutation, preflight the available WAL sources and verify the signed, local-only
    `Schema6ActivationV1` against the database identity. A fresh activation is written before
@@ -355,6 +372,7 @@ or a history-enumeration surface.
 | HNSW flush or component snapshot error | Fail publication; do not append GenerationPublished |
 | Invalid or incomplete P6 manifest | Reject snapshot as a unit and replay complete WAL |
 | P6 snapshot fields disagree with signed WAL materialization | Reject snapshot and replay complete WAL |
+| Signed non-folded ACL event breaks the reconstructed CAS chain | Reject snapshot; complete WAL replay must reject the same gap rather than accepting the snapshot policy |
 | Non-default snapshot ACL has no verified WAL provenance | Return RECOVERY_REQUIRED; never default to Disabled |
 | Publication event append is uncertain | Follow Wave A recovery-required/reopen behavior; do not claim publication |
 | Lease owner, expiry, fence or generation invalid | Return an explicit error; never switch to live state |
@@ -374,8 +392,8 @@ ACCESS_POLICY_REVISION_CONFLICT, SNAPSHOT_MANIFEST_INVALID and SNAPSHOT_COMPONEN
 
 Complexity is C-3 and risk is HIGH because P6 changes durable event compatibility, recovery,
 snapshot atomicity and the core read boundary. Only the serialized src/lib.rs owner may implement
-source changes. The three RED tests have disjoint paths and may be authored in parallel; they do
-not permit parallel source edits.
+source changes. The temporal-frontier and snapshot ACL-chain RED lanes own disjoint test files
+and may be authored in parallel; they do not permit parallel source edits.
 
 Out of scope: REST/N-API/FFI/SDK contract changes, write authorization, transport identity,
 namespace/entity migration, ACL group syntax, retention changes, MVCC, backup/restore redesign,
@@ -384,6 +402,7 @@ P7 oracle/planner/HQL2, deployment, merge and unrelated refactoring.
 Acceptance commands:
 
     cargo test --no-default-features --test p6_generation_tests --test p6_lease_tests --test p6_visibility_tests --test wave_a_commit_tests --test temporal_queries_tests --test tx_as_of_wp22_tests --test governance_tests
+    cargo test --locked --offline --no-default-features --test p6_snapshot_authority_tests --test p6_lease_tests --test hql2_history_change_tests
     cargo fmt --check
     cargo check --no-default-features
     npm run docs:validate
@@ -405,7 +424,241 @@ compatibility result remains 194/0/0 and was not rerun here. No P6 grant, ACL,
 lease, schema or migration behavior changed. Broad P6/P8 and review gates remain
 open.
 
+### Bounded P6 Review Remediation DAG — 2026-10-05
+
+The initial broad P6 Review Gate returned FAIL with two findings: the transaction selector was not
+bounded by the pinned generation frontier on every entry path, and instant-load ACL authority
+validation did not enforce continuity between signed CAS revisions. Those corrections passed an
+independent Verify rerun. A subsequent broad Review rerun returned FAIL on a third bounded path:
+Plan-only HQL/typed-IR returns before generation pinning and could accept the publication receipt.
+That Plan-only correction has a RED/GREEN regression and local validation. The corrected tree now
+has fresh independent Verify PASS and broad Review PASS; Review noted one bounded coverage
+limitation for the stale-publication Plan fallback, recorded in the current gate status below. The
+added finding and prevention criteria are recorded in
+`.brain/rca/RCA--P6-PLAN-EXPLAIN-TEMPORAL-BYPASS.md`; the original temporal and ACL RCAs remain
+at `.brain/rca/RCA--P6-TEMPORAL-SELECTOR-FRONTIER.md` and
+`.brain/rca/RCA--P6-SNAPSHOT-ACL-CAS-CHAIN.md`.
+
+See the [P6 review remediation dependency graph](P6-REVIEW-REMEDIATION-DAG.html) for the
+parallel test lanes, isolated-worktree integration point, serialized source order and gate chain.
+
+Execution and integration order (completed implementation stages and remaining gates):
+
+1. Update this contract, the peer addendum's gate-scope statement, and both RCAs. This doc set is
+   owner-approved; no further contract expansion is included.
+2. Author only tests in disjoint files: (a) direct lease/HQL2 execution and Plan-only temporal-
+   frontier regressions in `p6_lease_tests.rs`, `hql2_history_change_tests.rs`, and existing HQL2
+   Explain coverage; (b) signed snapshot ACL chain/fold/reopen regressions in the new
+   `p6_snapshot_authority_tests.rs` target. Keep EXPLAIN non-publishing and assert no WAL/state
+   mutation for Plan-only boundary cases.
+3. Both RED test lanes and the later Plan-only RED regression are integrated in the isolated P6
+   worktree. One serialized source owner implemented ACL-chain validation, temporal upper-bound
+   checks for execution, and non-mutating Plan validation in `src/lib.rs`.
+4. Run the fresh focused and P6 acceptance Verify gates using E: for Cargo output and temporary files.
+   A Verify failure returns to the serialized source owner; a Review finding also returns there
+   and requires Verify to rerun.
+5. After Verify passes, run an independent read-only Review. Only Review PASS permits Astra 6
+   Final. Any failed gate stops P6 closeout; no P7, merge, release or deployment follows.
+
+The prior local 45/0 and 104/0 records predate these newly identified regressions. They remain
+historical and do not substitute for the fresh Verify gate.
+
+### ACL revision-overflow Review finding — 2026-10-05
+
+The independent Review Gate found that the shared transition predicate used saturating increment:
+for `expected_revision == u64::MAX`, `expected_revision.saturating_add(1)` remains `u64::MAX` and
+allows a changed policy without advancing its revision. The public replacement path and signed-event
+shape validation use the same saturating rule, so all three boundaries must reject an absent checked
+successor. The finding and required RED/GREEN coverage are documented in
+`.brain/rca/RCA--P6-ACL-REVISION-OVERFLOW.md`.
+
+The writer and signed-event regressions reproduced the overflow acceptance before the source fix.
+The serialized correction now uses checked increments at mutation, signed-event validation, and
+snapshot/replay transition boundaries. Fresh independent Verify passed on the corrected tree:
+P6 acceptance 49/49, focused remediation 34/34, plus `cargo check`, format, docs validation (0/240),
+and diff check. At this checkpoint the new independent Review rerun was pending; see the current
+broad P6 gate status below for its superseding verdict. This enforces the approved CAS contract
+without an API expansion.
+
+## Current broad P6 gates — 2026-10-05
+
+Fresh independent Verify passed on the exact corrected worktree: seven-target P6 acceptance
+49/49; focused snapshot/lease/history remediation 34/34; `cargo check --locked --offline
+--no-default-features`; `cargo fmt --all -- --check`; `npm run docs:validate` (0 violations in
+240 files); and `git diff --check`. The independent Verify observed the same HEAD and working-tree
+status before and after, used E: for build and temporary output, and excluded inherited peer receipt
+WIP from this task's change attribution. These are local results, not hosted CI or deployment
+evidence.
+
+The independent read-only Review Gate returned **PASS** on the corrected tree. It confirmed the
+ACL `checked_add(1)` boundaries and MAX regressions, temporal Plan/execution bounds, and snapshot
+ACL continuity/replay checks. One non-blocking limitation remains: the stale-publication Plan
+fallback does not have a dedicated regression fixture, although Review found the candidate-frontier
+path clear in the implementation. Review relied on the supplied Verify receipts and did not rerun
+the suites. Astra 6 Final returned **PASS_WITH_LIMITATIONS** and approved this reviewed local P6
+slice at HEAD `ba488dd1e22cd24fdd2c7238a1c5de34f6f9fd1e`. Astra accepted the bounded Plan fallback
+coverage limitation because its guarded candidate-frontier selection matches generation pinning;
+it made no edits and reran no tests. Current-patch hosted/cross-platform CI and release/deployment
+qualification remain NOT_RUN. No P7, merge, release, deployment, or external readiness is approved;
+inherited user WIP remains preserved.
+
+## Initial Independent P6 Review Status — 2026-10-05
+
+The initial broad P6 Review was FAIL on the two bounded findings above. The earlier
+`PASS_WITH_LIMITATIONS` Review and Astra 6 Final results documented in the peer addendum apply
+only to the receipt-authority sub-slice; they are not broad P6 approval. Broad P6 Final is
+NOT_RUN at that initial review checkpoint.
+
+## P6 Review Remediation Verify — 2026-10-05
+
+Both approved corrections were implemented after the disjoint RED tests reproduced the findings:
+
+- Temporal RED: the generation was `F=3` with publication/live sequence `F+1=4`. Direct
+  `pin_generation` accepted the receipt and `u64::MAX`; scoped `ReadView` returned node history at
+  `F+1`; HQL and typed IR both accepted receipt sequence 4. Inclusive generation horizon/frontier
+  and selector conflict/unsupported checks passed.
+- ACL RED: three snapshot authority tests passed, while a correctly re-signed, locally shaped
+  `0->1, 2->3` ordinary policy chain was accepted by instant snapshot load. WAL-only replay already
+  rejected the gap. The folded revision-2 baseline plus contiguous revision-3 transition passed.
+
+After implementation, local deterministic Verify is PASS:
+
+1. The latest independent Verify rerun of the exact seven-target P6 acceptance command passed
+   **49/49**. The earlier in-worktree **45/45** record is retained as historical; 49/49 is the
+   current-tree result and current test inventory.
+2. The focused remediation command
+   `cargo test --locked --offline --no-default-features --test p6_snapshot_authority_tests --test p6_lease_tests --test hql2_history_change_tests`
+   passed **31/31**.
+3. The expanded durability/query regression matrix passed **129/129** across 14 targets:
+   `crash_simulation_tests`, `governance_tests`, `hql2_history_change_tests`,
+   `journal_format_tests`, `journal_migration_tests`, `p6_generation_tests`, `p6_lease_tests`,
+   `p6_peer_authority_tests`, `p6_snapshot_authority_tests`, `p6_visibility_tests`,
+   `schema6_migration_tests`, `temporal_queries_tests`, `tx_as_of_wp22_tests`, and
+   `wave_a_commit_tests`.
+4. `cargo test --locked --offline --no-default-features --lib` passed **7/7**.
+5. `cargo check --locked --offline --no-default-features`, `cargo fmt --all -- --check`,
+   `npm run docs:validate` (0 violations in 240 files), and `git diff --check` passed.
+
+Cargo target output and process temporary files were directed to
+`E:\CodexBuilds\P6-review-remediation-main` and
+`E:\CodexTemp\P6-review-remediation-main`. These are local fixture results. Independent Verify
+passed with the counts above. The broad Review rerun is FAIL on the Plan-only temporal path and
+also noted the stale 45/45 documentation count; this version reconciles the latter to the
+independent 49/49 result while preserving the prior record. Astra 6 Final is NOT_RUN pending a
+passing Review rerun; no merge, P7, release, deployment, or external readiness is claimed.
+
+## P6 Review Rerun Status at the 32-test checkpoint — 2026-10-05
+
+The broad Review rerun returned FAIL because `ExplainV2::Plan` returns before `pin_generation`,
+while the HQL2 catalog stamp exposes the live commit sequence that may be the publication receipt.
+That finding was reproduced RED and corrected without publishing or writing from Plan mode. Fresh
+independent Verify on the corrected current tree passed the exact seven-target P6 acceptance
+(49/49), focused remediation (32/32), format, docs validation (0 violations in 240 files), diff
+check and `cargo check`. At that checkpoint the independent Review rerun was pending; the current
+broad P6 gate status above supersedes that status. Astra 6 Final remains NOT_RUN.
+
+## Plan-only temporal remediation — local verification — 2026-10-05
+
+The Plan-only regression used a generation data frontier `F=3` and publication receipt `F+1=4`.
+Before the source change, HQL `EXPLAIN` and typed-IR Plan both accepted selector 4; the RED test
+also confirmed the inclusive data frontier and the no-file/no-WAL-write invariant. After the
+change, both Plan paths reject the receipt and preserve the same no-publication/no-write behavior.
+
+The shared generation-bound predicate now validates Plan selectors against the currently
+published generation's data frontier, or the candidate generation frontier if that publication
+is stale, without calling `pin_generation`. Executed queries continue to validate against their
+pinned generation.
+
+Local results at this checkpoint after this correction:
+
+1. The exact seven-target P6 acceptance command passed **49/49**.
+2. The exact three-target focused remediation command passed **32/32**; the four-target combined
+   snapshot/lease/history/execution check passed **47/47**.
+3. The expanded 14-target durability/query matrix passed **130/130**; the library tests passed
+   **7/7** and `cargo check --locked --offline --no-default-features` passed.
+4. Fresh independent Verify passed `cargo fmt --all -- --check`, `npm run docs:validate` (0
+   violations in 240 files), `git diff --check`, and `cargo check --locked --offline
+   --no-default-features`.
+
+The expanded 14-target matrix (130/130) and library target (7/7) are additional local results at
+this checkpoint. Cargo target and temporary output remained on E:. The later 34-test focused
+Verify and broad Review PASS are recorded under Current broad P6 gates above. Astra 6 Final remains
+NOT_RUN. No merge, P7, release, deployment, or external readiness is claimed.
+
+## Bounded P6 Core Verification — 2026-10-04
+
+The exact acceptance command above passed all 45 tests across its seven targets
+with exit code 0. An expanded P6 durability matrix passed all 104 tests across
+12 targets with exit code 0: `crash_simulation_tests`, `governance_tests`,
+`journal_format_tests`, `journal_migration_tests`, `p6_generation_tests`,
+`p6_lease_tests`, `p6_peer_authority_tests`, `p6_visibility_tests`,
+`schema6_migration_tests`, `temporal_queries_tests`, `tx_as_of_wp22_tests` and
+`wave_a_commit_tests`. The seven-target acceptance set is a subset of the
+expanded matrix; these counts are not additive.
+
+`cargo check --no-default-features`, `cargo fmt --all -- --check`,
+`npm run docs:validate` (0 violations in 240 files) and `git diff --check`
+passed. Cargo used `--offline --locked --no-default-features`; build and test
+temporary files were directed to E: because C: had no free space. These are
+local results only. Independent Review and Final remain pending; broader
+P6/P8/HQL2 acceptance, transport parity, hosted CI, release and deployment
+remain open or NOT_RUN. No merge or P7 work is authorized by these results.
+Cargo output also included `database or disk is full` / `Error code 13` while
+the relevant commands returned exit code 0 and the test targets reported zero
+failures. Its source was not established; retain this as an environment
+limitation rather than attributing it to the P6 implementation.
+
+The D7 actor-scoped HQL1 adapter additionally accepts one-hop ordering only by
+the projected endpoint ID, after a legacy/HQL2 differential (2/2 ordering tests;
+the existing adapter target passes 10/10). Zero-hop and unprojected ordering
+remain unsupported. This changes no P6 grant, ACL, lease, schema or migration
+behavior. The HQL2 sweep passes 385/0/1 across 34 targets; the selected
+P6/schema-v6/ACL regression group passes 93/0/0 across 11 targets. The prior
+broader 11-target P6/schema-v6/compatibility record remains 194/0/0. Broader
+P6/P8 and independent-review gates remain open.
+
 ## CHANGELOG
+
+Version diff 0.5.45b -> 0.5.46b: re-integrate the P6 closeout on mainline `4b78596` while
+preserving the D7/P7 ChangeScan differential and both temporal test lanes. Local Verify on the
+integrated tree passes the exact seven-target P6 acceptance (49/49), focused snapshot/lease/
+history tests (35/35), `cargo check --locked --offline --no-default-features`, format, docs
+validation (0/241), and diff check. Astra's prior Final applies to the previously reviewed P6
+slice; it was not rerun on this rebased HEAD. Current hosted checks remain pending. No P7, release,
+deployment, or external-readiness scope is added.
+
+Version diff 0.5.44b -> 0.5.45b: record Astra 6 Final PASS_WITH_LIMITATIONS for the reviewed local
+P6 slice at the verified HEAD. Preserve the accepted stale-publication Plan fallback fixture
+limitation and state that hosted/cross-platform CI and release/deployment remain NOT_RUN. No P7,
+merge, release, or deployment authorization.
+
+Version diff 0.5.43b -> 0.5.44b: record corrected-tree independent Verify PASS (P6 49/49,
+focused 34/34, check/format/docs/diff PASS) and independent broad Review PASS. Preserve Review's
+bounded stale-publication Plan fallback fixture limitation; Astra 6 Final remains NOT_RUN. No P7,
+merge, release, deployment or external readiness.
+
+Version diff 0.5.36b -> 0.5.37b: extend the approved generation-frontier contract to non-mutating
+HQL EXPLAIN and typed-IR Plan validation, record the independent 49/49 Verify result and the
+subsequent Plan-only Review finding, add its RCA and update the temporal execution DAG. The Plan
+regression and correction remain pending; Astra 6 Final is NOT_RUN. No P7 or merge.
+
+Version diff 0.5.35b -> 0.5.36b: implement the generation-frontier and snapshot ACL CAS-chain
+corrections with a shared policy transition validator; record temporal RED 3/10 plus HQL2 RED
+1/17, ACL snapshot RED 1/4, exact P6 Verify 45/45, focused remediation 31/31, expanded matrix
+129/129 across 14 targets, lib 7/7, and local compile/format/docs/diff passes. Independent Verify
+attestation, broad Review and Astra 6 Final remain pending; no P7 or merge is authorized.
+
+Version diff 0.5.34b -> 0.5.35b: record the broad P6 Review failure and two bounded RCA-backed
+corrections; specify the pinned-generation transaction frontier and contiguous signed ACL CAS
+chain, define disjoint parallel RED-test lanes and serialized `src/lib.rs` integration, and keep
+Verify, independent Review, and Astra 6 Final as required gates. Implementation and all new gate
+results remain pending; no P7, merge, release, or deployment is authorized.
+
+Version diff 0.5.33b -> 0.5.34b: record the bounded P6 core acceptance results:
+45/0 across the exact seven-target acceptance command and 104/0 across the
+expanded 12-target durability matrix, plus local check/format/docs/diff gates.
+The result is local only; independent Review, Final and broader P6/P8 gates
+remain open. No runtime contract or behavior changed.
 
 Version diff 0.5.32b -> 0.5.33b: synchronize the conditional D7 extension for
 one exact same-alias string ID predicate on labeled zero-hop scans. The
@@ -539,6 +792,17 @@ broader P6/P8/P13 qualification is claimed.
 
 | Version | Date | Status | Summary | Commit | Agent |
 |---|---|---|---|---|---|
+| 0.5.46b | 2026-10-06 | beta | Re-integrate onto mainline 4b78596; local Verify P6 49/49, focused snapshot/lease/history 35/35, cargo check/fmt/docs/diff pass; Astra Final remains limited to the predecessor slice and was not rerun on this HEAD; hosted checks pending | working-tree | Codex |
+| 0.5.45b | 2026-10-06 | beta | Record Astra 6 Final PASS_WITH_LIMITATIONS for the reviewed local P6 slice; stale-Plan fallback fixture limitation accepted; hosted/cross-platform CI and release/deployment remain NOT_RUN | working-tree | Codex |
+| 0.5.44b | 2026-10-05 | beta | Record corrected-tree independent Verify PASS (P6 49/49, focused 34/34, check/format/docs/diff PASS) and independent broad Review PASS; preserve the bounded stale-Plan fallback fixture limitation; Astra Final pending | working-tree | Codex |
+| 0.5.43b | 2026-10-05 | beta | Record corrected-tree independent Verify PASS after checked-increment fix: P6 49/49, focused 34/34, cargo check/fmt/docs/diff pass; independent Review rerun and Astra Final pending | working-tree | Codex |
+| 0.5.42b | 2026-10-05 | beta | Fix P2 ACL revision overflow with checked increment at writer, signed-event validation and snapshot/replay transition; two RED regressions pass; local P6 49/49, focused 34/34, expanded 132/132; fresh Verify/Review pending | working-tree | Codex |
+| 0.5.41b | 2026-10-05 | beta | Reproduce P2 ACL revision overflow with two pre-fix RED regressions: public writer accepts changed policy at u64::MAX and signed same-revision event opens; checked-increment source fix and gates pending | working-tree | Codex |
+| 0.5.40b | 2026-10-05 | beta | Record independent Review P2: saturating ACL revision increment permits same-revision changed policy at u64::MAX; add checked-increment contract and RCA; RED/source fix/Verify/Review rerun pending | working-tree | Codex |
+| 0.5.39b | 2026-10-05 | beta | Record current-tree independent Verify PASS after Plan-only temporal RED/GREEN correction: P6 49/49, focused 32/32, docs/fmt/diff/check pass; independent Review and Astra Final remain pending | working-tree | Codex |
+| 0.5.38b | 2026-10-05 | beta | Implement Plan-only temporal frontier validation without publication; RED/GREEN preserves no-write behavior; current local P6 49/49, focused 32/32, expanded matrix 130/130; fresh Verify/Review and Astra Final pending | working-tree | Codex |
+| 0.5.35b | 2026-10-05 | beta | Record two broad P6 Review findings, temporal frontier/ACL CAS chain requirements, RCAs, parallel test lanes, serialized source order, and Verify/Review/Final gates; implementation pending | working-tree | Codex |
+| 0.5.34b | 2026-10-04 | beta | Record bounded P6 core Verify: exact acceptance 45/0 across seven targets; expanded P6 durability 104/0 across 12 targets; cargo check, fmt, docs and diff checks pass; independent Review/Final and broader P6/P8 gates remain open | working-tree | ATHER |
 | 0.5.33b | 2026-10-04 | beta | Sync the D7 labeled zero-hop exact string-ID filter differential; adapter 11/11, ordering 2/2, labeled-filter 2/2 including backslash/Unicode and wrong-label exclusion; HQL2 394/0/1 across 35 targets; selected P6 peers 45/0/0 across 7 targets; PR #213 code commit checks 40 pass, 4 worker failures with unconfirmed cause, 5 skipped, 1 Windows Cargo cancellation at 15-minute job limit; no P6 contract/ACL/lease/schema/migration change; broad gates open | working-tree | ATHER |
 | 0.5.32b | 2026-10-04 | beta | Sync test-only HQL/typed-IR ChangeScan P7 cursor-window differential across five exclusive-after/inclusive-through bounds; History/Change 17/17, HQL2 392/0/1 across 34 targets, P6/schema-v6/compatibility 194/0/0; PR #210 has 11 passed checks, four worker markerless-identity failures and one skipped; P6 contract/ACL/lease/schema/migration unchanged; broad gates remain open | working-tree | ATHER |
 | 0.5.31b | 2026-10-04 | beta | Record D7's differential-proven one-hop ORDER BY on projected endpoint ID; ordering 2/2, HQL2 385/0/1 across 34 targets, selected P6/schema-v6/ACL targets 93/0/0 across 11; no P6 grant/ACL/lease/schema/migration change; broad gates remain open | working-tree | ATHER |

@@ -4300,34 +4300,40 @@ impl Storage {
             ));
         }
         Self::validate_access_policy_shape(&event.policy)?;
-        if event.policy.revision != event.expected_revision.saturating_add(1) {
+        let mut current = self.access_policy.write();
+        *current = Self::next_access_policy_after_event(&current, event)?;
+        Ok(())
+    }
+
+    fn next_access_policy_after_event(
+        current: &AccessPolicy,
+        event: &AccessPolicyChangedEvent,
+    ) -> Result<AccessPolicy> {
+        if event.expected_revision.checked_add(1) != Some(event.policy.revision) {
             return Err(Error::from_reason("ACCESS_POLICY_REVISION_CONFLICT"));
         }
-        let mut current = self.access_policy.write();
         if event.folded {
             // A fold is a signed materialization of the current policy, not a
             // new user transition. It may collapse revisions that preceded the
             // retained base segment, but never regresses an equal/newer state.
             if current.revision > event.policy.revision {
-                return Ok(());
+                return Ok(current.clone());
             }
             if current.revision == event.policy.revision {
-                if *current != event.policy {
+                if current != &event.policy {
                     return Err(Error::from_reason("ACCESS_POLICY_REVISION_CONFLICT"));
                 }
-                return Ok(());
+                return Ok(current.clone());
             }
-            *current = event.policy.clone();
-            return Ok(());
+            return Ok(event.policy.clone());
         }
-        if current.revision == event.policy.revision && *current == event.policy {
-            return Ok(());
+        if current.revision == event.policy.revision && current == &event.policy {
+            return Ok(current.clone());
         }
         if current.revision != event.expected_revision {
             return Err(Error::from_reason("ACCESS_POLICY_REVISION_CONFLICT"));
         }
-        *current = event.policy.clone();
-        Ok(())
+        Ok(event.policy.clone())
     }
 
     fn access_policy_event_version(policy: &AccessPolicy) -> u32 {
@@ -7303,6 +7309,26 @@ impl Storage {
                     self.history_horizon().max(1),
                     Utc::now(),
                 )?;
+                if options.mode == uee_v2::ExplainV2::Plan {
+                    let current_generation = self.published_generation.read().clone();
+                    let (history_horizon, wal_frontier) = match current_generation {
+                        Some(generation)
+                            if generation.publication_seq == catalog.stamp.observed_frontier =>
+                        {
+                            (generation.history_horizon, generation.wal_frontier)
+                        }
+                        _ => (
+                            self.history_horizon().max(1),
+                            catalog.stamp.observed_frontier,
+                        ),
+                    };
+                    Self::validate_generation_tx_as_of_bounds(
+                        history_horizon,
+                        wal_frontier,
+                        options.tx,
+                    )
+                    .map_err(hql2_storage_error)?;
+                }
                 let parameter_types = request.ir.as_ref().map(|ir| &ir.parameter_types);
                 let params = bind::BoundParametersV2::decode(&request.params, parameter_types)?;
                 let logical = if let Some(statement) = statement {
@@ -7552,6 +7578,28 @@ impl Storage {
         self.publish_generation_unlocked()
     }
 
+    fn validate_generation_tx_as_of(
+        generation: &GenerationInfo,
+        tx_as_of: Option<u64>,
+    ) -> Result<()> {
+        Self::validate_generation_tx_as_of_bounds(
+            generation.history_horizon,
+            generation.wal_frontier,
+            tx_as_of,
+        )
+    }
+
+    fn validate_generation_tx_as_of_bounds(
+        history_horizon: u64,
+        wal_frontier: u64,
+        tx_as_of: Option<u64>,
+    ) -> Result<()> {
+        if tx_as_of.is_some_and(|tx| tx < history_horizon || tx > wal_frontier) {
+            return Err(Error::from_reason("TEMPORAL_BEYOND_HORIZON"));
+        }
+        Ok(())
+    }
+
     pub fn pin_generation(
         &self,
         access: AccessContext,
@@ -7576,12 +7624,7 @@ impl Storage {
             }
             _ => self.publish_generation_unlocked()?,
         };
-        if temporal
-            .tx_as_of
-            .is_some_and(|tx| tx < generation.history_horizon)
-        {
-            return Err(Error::from_reason("TEMPORAL_BEYOND_HORIZON"));
-        }
+        Self::validate_generation_tx_as_of(&generation, temporal.tx_as_of)?;
         Ok(ReadLease {
             owner_token: self.owner_token.clone(),
             generation,
@@ -7629,7 +7672,7 @@ impl Storage {
         self.ensure_readable()?;
         let current = self.access_policy.read().clone();
         if current.revision != expected_revision
-            || policy.revision != expected_revision.saturating_add(1)
+            || expected_revision.checked_add(1) != Some(policy.revision)
         {
             return Err(Error::from_reason("ACCESS_POLICY_REVISION_CONFLICT"));
         }
@@ -14648,7 +14691,7 @@ impl Storage {
                 == Self::access_policy_event_version(&policy.policy)
                 && (policy.version == 1 || self.storage_schema_version == SCHEMA_VERSION)
                 && (policy.folded
-                    || policy.policy.revision == policy.expected_revision.saturating_add(1))
+                    || policy.expected_revision.checked_add(1) == Some(policy.policy.revision))
                 && Self::validate_access_policy_shape(&policy.policy).is_ok()),
             Event::Schema6MigrationChunkV1(_)
             | Event::Schema6MigrationCommitV1(_)
@@ -19592,7 +19635,7 @@ impl Storage {
             .transpose()
             .map_err(|_| Error::from_reason("SNAPSHOT_MANIFEST_INVALID: generation malformed"))?;
 
-        let mut latest_policy = None;
+        let mut latest_policy = Self::default_access_policy();
         let mut latest_generation: Option<GenerationInfo> = None;
         let mut has_policy_event = false;
         let mut invalid_signature = false;
@@ -19623,13 +19666,15 @@ impl Storage {
                         has_policy_event = true;
                         if event.version != Self::access_policy_event_version(&event.policy)
                             || (event.version == 2 && self.storage_schema_version != SCHEMA_VERSION)
-                            || event.policy.revision != event.expected_revision.saturating_add(1)
                             || Self::validate_access_policy_shape(&event.policy).is_err()
                         {
                             invalid_materialization = true;
                             continue;
                         }
-                        latest_policy = Some(event.policy.clone());
+                        match Self::next_access_policy_after_event(&latest_policy, &event) {
+                            Ok(policy) => latest_policy = policy,
+                            Err(_) => invalid_materialization = true,
+                        }
                     }
                     Event::GenerationPublished(event) => {
                         if event.version != 1
@@ -19675,7 +19720,7 @@ impl Storage {
                 "SNAPSHOT_MANIFEST_INVALID: invalid signed P6 materialization",
             ));
         }
-        let journal_policy = latest_policy.unwrap_or_else(Self::default_access_policy);
+        let journal_policy = latest_policy;
         if snapshot_policy != Self::default_access_policy() && !has_policy_event {
             self.recovery_required.store(true, Ordering::SeqCst);
             return Err(Error::from_reason(
@@ -25596,6 +25641,7 @@ impl<'a> ReadView<'a> {
     }
 
     fn ensure_tx_horizon(&self, tx_as_of: Option<u64>) -> Result<()> {
+        Storage::validate_generation_tx_as_of(&self.lease.generation, tx_as_of)?;
         if let Some(tx_as_of) = tx_as_of {
             if tx_as_of < self.storage.history_horizon() {
                 return Err(Error::from_reason("TEMPORAL_BEYOND_HORIZON"));
