@@ -1,8 +1,8 @@
 ---
 doc_id: SPEC--GENESISDB-HQL2-P8-TYPED-BOUNDARY
-version: "0.2.60b"
+version: "0.2.61b"
 created_at: "2026-09-28T01:25:00+07:00,ATHER,fc851e9"
-last_update: "2026-10-04T16:06:00+07:00,ATHER"
+last_update: "2026-10-05T15:43:16+07:00,ATHER"
 status: beta
 superseded_by: null
 owner: "Boss (Founder / Product Authority)"
@@ -413,8 +413,11 @@ resource exhaustion is error, never a successful partial aggregate. ContextPack
 emits a typed package binding consumable by RETURN/PROJECT, with exact registered
 token counting of final text including separators/citations and omitted evidence.
 
-`ExplainResultV2 = { request_id: String, catalog: CatalogStampV2,
-plan: Vec<ExplainNodeV2>, root: String }`.
+`ExplainResultV2 = { contract_version: "genesis.api.v2", planner_version: String,
+plan_hash: String, request_id: String, catalog: CatalogStampV2,
+plan: Vec<ExplainNodeV2>, root: String }`. `plan_hash` is the stable identity
+of the canonical planner-version, root and plan-node shape; `EXPLAIN` and
+`ANALYZE` for the same logical request share it.
 `CatalogStampV2 = { observed_frontier: u64, policy_revision: u64,
 schema_fingerprint: String }` is catalog-only, not a durable snapshot lease.
 `ExplainNodeV2 = { id: String, logical_op: QueryOpV2, physical_op: String,
@@ -870,6 +873,12 @@ separate shape limits. No process-global Pest setting is changed.
 
 ## Version diff and changelog
 
+Version diff `0.2.60b -> 0.2.61b`: merge the owner-approved G4 stable
+plan-identity slice into the current D7 typed boundary. `EXPLAIN` and
+`ANALYZE` expose the v2 contract version, planner version and shared stable
+plan hash; focused evidence passes while broader G4, transport, P8/P13 and
+independent-review gates remain open.
+
 Version diff `0.2.59b -> 0.2.60b`: record the conditional D7 extension for one
 exact same-alias string ID equality predicate on labeled zero-hop scans. The
 legacy/HQL2 differential covers match, miss, wrong-label exclusion and an ID
@@ -1093,6 +1102,7 @@ detail with unchanged JSON shape; broader P8/P13/review gates remain open.
 
 | Version | Date | Status | Summary | Commit Hash | Agent |
 |---|---|---|---|---|---|
+| 0.2.61b | 2026-10-05 | beta | Merge owner-approved G4 stable plan identity into the current D7 typed boundary; `EXPLAIN` and `ANALYZE` expose shared contract/planner metadata and plan hash; focused contract evidence passes while broader G4/P8/P13, transport and independent review remain open | working-tree | ATHER |
 | 0.2.60b | 2026-10-04 | beta | Extend conditional D7 same-alias exact string ID filter to labeled zero-hop scans after legacy/HQL2 match, miss, wrong-label and backslash/Unicode differential; adapter 11/11, ordering 2/2, labeled-filter target 2/2, HQL2 394/0/1 across 35 targets, selected P6 peers 45/0/0 across 7; PR #213 code commit checks 40 pass, 4 worker failures with unconfirmed cause, 5 skipped, 1 Windows Cargo cancellation at 15-minute job limit; no P6 contract/schema/transport change; broad shared-runtime/P8/P13 gates remain open | working-tree | ATHER |
 | 0.2.59b | 2026-10-04 | beta | Record test-only HQL/typed-IR ChangeScan P7 differential across five exclusive-after/inclusive-through windows, empty bounds and tx_as_of frontiers; History/Change 17/17, HQL2 392/0/1 across 34 targets; PR #210 hosted checks 11 pass, four worker markerless-identity failures, one skipped; no contract/runtime/schema/P6/transport change; broad P8/P13/review remain open | working-tree | ATHER |
 | 0.2.58b | 2026-10-04 | beta | Extend conditional D7 HQL1 adapter with differential-proven same-alias exact string equality on unlabeled zero-hop scans; adapter 11/11, ordering 2/2, HQL2 393/0/1 across 34 targets; other forms remain fail-closed and broad shared-runtime/P8/P13 gates remain open | working-tree | ATHER |
