@@ -1,9 +1,9 @@
 ---
-version: "0.8.74b"
+version: "0.8.75b"
 doc_id: "IMPLEMENTATION-PLAN--UEE-HQL2-ORCHESTRATION-2026-09-22"
 owner: "Boss (Founder / Product Authority)"
 created_at: "2026-09-22T00:00:00+07:00,ATHER,working-tree"
-last_update: "2026-10-06T01:39:39+07:00,ATHER"
+last_update: "2026-10-06T03:35:00+07:00,ATHER"
 status: beta
 superseded_by: null
 attributes:
@@ -153,6 +153,12 @@ configurations. The HQL2/REST sweep includes the G4 plan-identity/counter and
 source-plan tests. The prior 39-target result (404 passed, 0 failed, 1 ignored)
 is historical evidence from before mainline reconciliation, not a substitute
 for this integrated run.
+A test-only HQL/typed-IR AnnotationScan differential now matches independent
+P7 at the same explicit transaction and valid-time selectors. Annotation
+ACL/lookup/source/history-change targets passed 42/42; after pinning S,V, the
+source target passed again at 7/7. This closes one source-oracle gap only; the
+full operator matrix, independent review, hosted checks and device/release
+qualification remain separate gates.
 G4 remains `PARTIAL`: full operator-by-operator exact-oracle breadth,
 independent review, refreshed hosted checks, and device/release qualification
 must be recorded separately; missing evidence remains `NOT_RUN`.
@@ -995,6 +1001,12 @@ passes 19/19 across `epoch_e2_tests`, `g3_oracle_differential_tests`,
 `meta_format_migration_tests` and `wal_tail_replay_tests`.
 
 ## CHANGELOG
+
+Version diff `0.8.74b -> 0.8.75b`: add a test-only P7 differential for HQL and
+typed-IR AnnotationScan at one explicitly aligned S,V. Four focused
+annotation/History/Change targets pass 42/42; the source target passes 7/7
+again after selector alignment. No runtime, P6, schema or transport change;
+G4/P8 broad oracle, review, hosted and device/release gates remain open.
 
 Version diff `0.8.73b -> 0.8.74b`: reconcile G4 stable plan identity with
 the subsequent D7 and H2-D11 implementation evidence: 39 HQL2 targets pass

@@ -1,8 +1,8 @@
 ---
 doc_id: REPORT--HQL2-P8-CORE-2026-09-28
-version: "0.1.66b"
+version: "0.1.67b"
 created_at: "2026-09-28T04:35:00+07:00,ATHER,22bc11e"
-last_update: "2026-10-06T01:56:51+07:00,ATHER"
+last_update: "2026-10-06T03:35:00+07:00,ATHER"
 status: beta
 owner: GenesisBlockDB Engineering
 attributes:
@@ -561,18 +561,27 @@ The separate U9 backup/restore target passes 7/7; no user database was modified.
 
 | Artifact | Before | After |
 |---|---|---|
-| Registry | 0.5.79+draft | 0.5.80+draft |
-| HQL2 G4 shared-pipeline ADR | 0.1.2b | 0.1.3b (P8 runtime/identity evidence; G4 remains partial) |
-| P8 completion addendum | 0.1.13b | 0.1.14b (accepted D7 evidence) |
-| H2-D11 durable revisions/annotations | 0.8.22b | 0.8.23b (restore compatibility wording sync) |
-| P6 generations/leases/ACL | 0.5.33b | 0.5.34b (evidence only) |
-| U9 backup/restore | 0.1.7b | 0.1.8b (schema-driven compatibility clarified) |
-| P8 typed boundary | 0.2.60b | 0.2.62b (G4 + D7 evidence) |
+| Registry | 0.5.81+draft | 0.5.82+draft |
+| HQL2 G4 shared-pipeline ADR | 0.1.3b | unchanged |
+| P8 completion addendum | 0.1.14b | unchanged |
+| H2-D11 durable revisions/annotations | 0.8.24b | 0.8.25b (AnnotationScan P7 evidence; no contract change) |
+| P6 generations/leases/ACL | 0.5.34b | unchanged (no P6 contract change) |
+| U9 backup/restore | 0.1.8b | unchanged |
+| P8 typed boundary | 0.2.62b | 0.2.63b (AnnotationScan P7 differential) |
 | P7 oracle report | 0.1.11b | unchanged |
-| Orchestration plan | 0.8.70b | 0.8.74b |
+| Orchestration plan | 0.8.74b | 0.8.75b |
 | C4 architecture index | 0.1.69b | 0.1.71b |
 | Master specification | 2.3.41b | 2.3.42b |
-| This report | 0.1.65b | 0.1.66b |
+| This report | 0.1.66b | 0.1.67b |
+
+Version diff 0.1.66b -> 0.1.67b: add a test-only P7 differential proving
+HQL and typed-IR AnnotationScan return the same annotation ID bag as the
+independent graph reference at one explicit transaction/valid-time frontier.
+The focused source target passes 7/7 after selector alignment; the adjacent
+annotation ACL/lookup and History/Change targets passed 35/35 in the preceding
+focused run. No runtime, P6, schema, migration or transport behavior changed;
+full exact-oracle breadth, independent review and hosted qualification remain
+open.
 
 Version diff 0.1.65b -> 0.1.66b: close the independent U9 compatibility
 wording finding by distinguishing schema/format/engine-name gates from

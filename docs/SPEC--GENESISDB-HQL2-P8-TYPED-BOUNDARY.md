@@ -1,8 +1,8 @@
 ---
 doc_id: SPEC--GENESISDB-HQL2-P8-TYPED-BOUNDARY
-version: "0.2.62b"
+version: "0.2.63b"
 created_at: "2026-09-28T01:25:00+07:00,ATHER,fc851e9"
-last_update: "2026-10-06T01:39:39+07:00,ATHER"
+last_update: "2026-10-06T03:35:00+07:00,ATHER"
 status: beta
 superseded_by: null
 owner: "Boss (Founder / Product Authority)"
@@ -752,7 +752,10 @@ parity and fail-closed budgets. Storage-backed P7 HistoryScan and ChangeScan
 differentials cover Node, Edge, Row, Vector and Annotation; a five-window
 ChangeScan differential checks exclusive-after/inclusive-through bounds,
 including empty bounds and selected transaction frontiers. The focused
-History/Change target passes 17/17 and Annotation source/ACL passes 7/7. The
+History/Change target passes 17/17 and Annotation source/ACL passes 7/7. HQL
+and typed-IR AnnotationScan now match the independent P7 graph oracle at the
+same explicit transaction and valid-time selectors; broad exact-oracle,
+independent-review, transport and P8/P13 gates remain open. The
 fresh 39-target HQL2 sweep passes 404/0/1, with the prior separate 11-target
 P6/schema-v6/compatibility result at 194/0/0 not rerun here. HQL2/IR `tx_as_of` now selects
 one no-fallback frontier across scans, operators, hydration and `Snapshot.tx`;
@@ -888,6 +891,12 @@ separate shape limits. No process-global Pest setting is changed.
   Parser/binder coverage alone does not close the storage-backed runtime gate.
 
 ## Version diff and changelog
+
+Version diff `0.2.62b -> 0.2.63b`: add test-only HQL/typed-IR AnnotationScan
+parity against the independent P7 graph oracle with one aligned explicit S,V;
+the Annotation source/ACL target passes 7/7 after the selector was pinned.
+No runtime, contract, schema, P6 or transport behavior changed; broad exact-
+oracle, independent-review and P8/P13 gates remain open.
 
 Version diff `0.2.61b -> 0.2.62b`: reconcile the approved G4 plan identity
 and truthful `EXPLAIN`/`ANALYZE` fields with the D7 single-property and
@@ -1119,6 +1128,7 @@ detail with unchanged JSON shape; broader P8/P13/review gates remain open.
 
 | Version | Date | Status | Summary | Commit Hash | Agent |
 |---|---|---|---|---|---|
+| 0.2.63b | 2026-10-06 | beta | Add HQL/typed-IR AnnotationScan P7 differential at explicit S,V; focused Annotation source/ACL target passes 7/7; no runtime/P6/schema/transport change; broad exact-oracle and P8/review gates remain open | working-tree | ATHER |
 | 0.2.62b | 2026-10-06 | beta | Reconcile G4 stable plan identity with D7 single-property and exact-seed depth-one TRAVERSE evidence; preserve explicit compatibility allowlist and broad G4/P8/P13/review gates | working-tree | ATHER |
 | 0.2.61b | 2026-10-05 | beta | Extend approved D7 with a zero-hop single-property projection and exact-seed depth-one TRAVERSE; adapter 13/13, property/order/filter 2/2 each, HQL2 404/0/1 across 39 targets and U9 restore 7/7; preserve fail-closed compatibility, shared-runtime/P8/P13 and review gates | working-tree | ATHER |
 | 0.2.60b | 2026-10-04 | beta | Extend conditional D7 same-alias exact string ID filter to labeled zero-hop scans after legacy/HQL2 match, miss, wrong-label and backslash/Unicode differential; adapter 11/11, ordering 2/2, labeled-filter target 2/2, HQL2 394/0/1 across 35 targets, selected P6 peers 45/0/0 across 7; PR #213 code commit checks 40 pass, 4 worker failures with unconfirmed cause, 5 skipped, 1 Windows Cargo cancellation at 15-minute job limit; no P6 contract/schema/transport change; broad shared-runtime/P8/P13 gates remain open | working-tree | ATHER |
