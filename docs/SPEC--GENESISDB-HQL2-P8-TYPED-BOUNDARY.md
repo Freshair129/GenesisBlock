@@ -1,8 +1,8 @@
 ---
 doc_id: SPEC--GENESISDB-HQL2-P8-TYPED-BOUNDARY
-version: "0.2.61b"
+version: "0.2.62b"
 created_at: "2026-09-28T01:25:00+07:00,ATHER,fc851e9"
-last_update: "2026-10-05T04:19:54+07:00,ATHER"
+last_update: "2026-10-06T13:53:09+07:00,ATHER"
 status: beta
 superseded_by: null
 owner: "Boss (Founder / Product Authority)"
@@ -870,6 +870,14 @@ separate shape limits. No process-global Pest setting is changed.
 
 ## Version diff and changelog
 
+Version diff `0.2.61b -> 0.2.62b`: add test-only P7 identity comparisons for
+storage-backed HQL/typed-IR Node/Edge/Row scans, AnnotationScan/Lookup, and
+ContextPack fragments plus omitted evidence. The Edge fixture includes endpoint
+Node revisions required by the independent oracle; focused targets pass 32/32
+and all 37 HQL2 targets pass 393/0/1. Production behavior and the frozen
+contract are unchanged. EXPLAIN operator-open counters, cancellation lifecycle,
+shared-runtime, broader oracle and P13 acceptance remain open.
+
 Version diff `0.2.60b -> 0.2.61b`: record the 21/21 restore/P6 matrix, the
 393/0/1 HQL2 sweep across 37 targets, and full Rust suite exit 0 with
 `probe_vs_recall` filtered. Restore cleanup on read-only validation/rename
@@ -1088,6 +1096,7 @@ detail with unchanged JSON shape; broader P8/P13/review gates remain open.
 
 | Version | Date | Status | Summary | Commit Hash | Agent |
 |---|---|---|---|---|---|
+| 0.2.62b | 2026-10-06 | beta | Add test-only P7 full-identity differentials for Node/Edge/Row, AnnotationScan/Lookup and ContextPack evidence; correct Edge oracle dependency fixture; focused 32/32 and HQL2 393/0/1 across 37; no contract/runtime change; EXPLAIN operator-open, cancellation, shared-runtime and P13 remain open | working-tree | ATHER |
 | 0.2.61b | 2026-10-05 | beta | Record final restore/P6 21/21, HQL2 393/0/1 across 37 and full Rust suite exit 0 with `probe_vs_recall` filtered; cleanup failure paths remain best-effort/unverified; broad EXPLAIN/P8/P13 remain open | working-tree | ATHER |
 | 0.2.60b | 2026-10-05 | beta | Extend restore generation regression for terminal P6 receipt reuse and transaction-frontier preservation; restore/P6 20/20 across five targets, HQL2 392/0/1 across 37; full Rust suite NOT_RUN; broad EXPLAIN/P8/P13 remain open | working-tree | ATHER |
 | 0.2.59b | 2026-10-05 | beta | Add source-backed NodeScan plan-only EXPLAIN test for no actuals/estimates, stable/catalog frontier and disk-tree immutability; partial acceptance evidence only; HQL2 391/0/1 across 37 targets, restore/P6 15/15; full Rust suite NOT_RUN on patch; broad P8/P13 gates remain open | working-tree | ATHER |

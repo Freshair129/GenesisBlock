@@ -1,9 +1,9 @@
 ---
-version: "0.8.66b"
+version: "0.8.67b"
 doc_id: "IMPLEMENTATION-PLAN--UEE-HQL2-ORCHESTRATION-2026-09-22"
 owner: "Boss (Founder / Product Authority)"
 created_at: "2026-09-22T00:00:00+07:00,ATHER,working-tree"
-last_update: "2026-10-05T04:19:54+07:00,ATHER"
+last_update: "2026-10-06T13:53:09+07:00,ATHER"
 status: beta
 superseded_by: null
 attributes:
@@ -911,6 +911,14 @@ results remain regression evidence, not P8 acceptance.
 
 ## CHANGELOG
 
+Version diff `0.8.66b -> 0.8.67b`: strengthen the test-only storage-backed P7
+identity differentials for Node/Edge/Row scans, AnnotationScan/Lookup and
+ContextPack evidence using durable database/namespace/id/revision/kind values.
+Correct the Edge oracle fixture to include endpoint Node revisions. The four
+focused targets pass 32/32 and all 37 HQL2 targets pass 393/0/1. No runtime,
+schema or transport behavior changed; EXPLAIN operator-open, cancellation,
+shared-runtime, P13 and integration-conflict gates remain open.
+
 Version diff `0.8.65b -> 0.8.66b`: record restore/P6 21/21 across five
 targets, HQL2 393/0/1 across 37 targets, and full Rust suite exit 0 with
 `probe_vs_recall` filtered. The review confirms the core restore paths; cleanup
@@ -1065,6 +1073,7 @@ Version diff `0.8.27b -> 0.8.28b`: implement approved D1-D5, record 9 focused pa
 
 | Version | Date | Status | Summary | Commit Hash | Agent |
 |---|---|---|---|---|---|
+| 0.8.67b | 2026-10-06 | beta | Strengthen test-only P7 identity differentials for source scans, annotations and ContextPack; fix missing Node dependencies in the Edge oracle; focused 32/32 and HQL2 393/0/1 across 37 targets; no runtime/schema/transport change; P8 and integration gates remain open | working-tree | ATHER |
 | 0.8.66b | 2026-10-05 | beta | Record final restore/P6 21/21, HQL2 393/0/1 across 37 and full Rust suite exit 0 with `probe_vs_recall` filtered; EXPLAIN partial; cleanup failure paths best-effort/unverified; P8/P13/P14 remain open | working-tree | ATHER |
 | 0.8.65b | 2026-10-05 | beta | Handle terminal P6 receipt restore, preserve transaction frontier, and prepare metadata before target publication; restore/P6 20/20 across five targets, HQL2 392/0/1 across 37; EXPLAIN still partial; full Rust suite NOT_RUN; P8/P13/P14 and independent review remain open | working-tree | ATHER |
 | 0.8.64b | 2026-10-05 | beta | Verify approved R5 restore publication before exposure (15/15 focused across four targets); explicit HQL2 391/0/1 across 37 targets; source-backed NodeScan EXPLAIN 1/1 for partial no-side-effect boundary; full Rust suite NOT_RUN on this patch; P8/P13 and broad review gates remain open | working-tree | ATHER |

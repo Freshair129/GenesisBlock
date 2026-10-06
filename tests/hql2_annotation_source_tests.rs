@@ -810,13 +810,22 @@ fn hql_and_ir_annotation_scans_have_identical_results() {
             },
         )
         .unwrap();
+    let annotation_revision: String = connection
+        .query_row(
+            "SELECT revision_id FROM hql2_record_revisions
+             WHERE namespace='default' AND kind='annotation'
+               AND record_id='review:parity' AND tx_to IS NULL",
+            [],
+            |row| row.get(0),
+        )
+        .unwrap();
 
     let hql_request: QueryRequestV2 = serde_json::from_value(json!({
         "contract_version":"genesis.api.v2",
         "request_id":"annotation-scan-hql-parity",
         "namespace":"default",
         "language_version":"hql.v2",
-        "hql":"USE default FROM ANNOTATIONS AS a |> RETURN a.id AS id",
+        "hql":"USE default FROM ANNOTATIONS AS a |> RETURN a AS entity, a.id AS id",
         "params":{}
     }))
     .unwrap();
@@ -829,6 +838,7 @@ fn hql_and_ir_annotation_scans_have_identical_results() {
             "nodes":[
                 {"id":"scan","op":"AnnotationScan","inputs":[],"config":{"as":"a"}},
                 {"id":"project","op":"Project","inputs":["scan"],"config":{"fields":[
+                    {"as":"entity","expression":{"field":{"alias":"a","path":[]}}},
                     {"as":"id","expression":{"field":{"alias":"a","path":["id"]}}}
                 ]}}
             ],
@@ -853,4 +863,117 @@ fn hql_and_ir_annotation_scans_have_identical_results() {
         hql_result.rows[0]["id"],
         QueryValueV2::Utf8("review:parity".into())
     );
+
+    let node = p7_graph::Identity {
+        namespace: "default".into(),
+        kind: p7_graph::Kind::Node,
+        id: "doc:parity".into(),
+    };
+    let annotation = p7_graph::Identity {
+        namespace: "default".into(),
+        kind: p7_graph::Kind::Annotation,
+        id: "review:parity".into(),
+    };
+    let target = p7_graph::EntityRef {
+        namespace: node.namespace.clone(),
+        kind: node.kind,
+        id: node.id.clone(),
+        revision: target_revision,
+    };
+    let p7 = p7_graph::execute(
+        &p7_graph::Catalog {
+            frontier: 1,
+            history: [p7_graph::Kind::Node, p7_graph::Kind::Annotation]
+                .into_iter()
+                .map(|kind| {
+                    (
+                        kind,
+                        p7_graph::HistoryCapability {
+                            horizon: 0,
+                            available: true,
+                        },
+                    )
+                })
+                .collect(),
+            revisions: vec![
+                p7_graph::Revision {
+                    entity: target.clone(),
+                    transaction: p7_graph::Interval {
+                        start: 1,
+                        end: None,
+                    },
+                    valid: p7_graph::Interval {
+                        start: i64::MIN,
+                        end: None,
+                    },
+                    retracted: false,
+                    fields: p7_graph::Fields::new(),
+                    data: p7_graph::RecordData::Plain,
+                },
+                p7_graph::Revision {
+                    entity: p7_graph::EntityRef {
+                        namespace: annotation.namespace.clone(),
+                        kind: annotation.kind,
+                        id: annotation.id.clone(),
+                        revision: annotation_revision,
+                    },
+                    transaction: p7_graph::Interval {
+                        start: 1,
+                        end: None,
+                    },
+                    valid: p7_graph::Interval {
+                        start: i64::MIN,
+                        end: None,
+                    },
+                    retracted: false,
+                    fields: p7_graph::Fields::new(),
+                    data: p7_graph::RecordData::Annotation {
+                        targets: vec![p7_graph::Target {
+                            binding: p7_graph::TargetBinding::Frozen(target),
+                            selector: p7_graph::Selector::Whole,
+                        }],
+                    },
+                },
+            ],
+        },
+        &p7_graph::View {
+            namespace: "default".into(),
+            transaction: 1,
+            valid_at: 0,
+            permissions: p7_graph::Permissions {
+                read: BTreeSet::from([node, annotation.clone()]),
+                annotation_body: BTreeSet::from([annotation]),
+            },
+        },
+        &p7_graph::Plan {
+            source: p7_graph::Source::Scan {
+                kind: p7_graph::Kind::Annotation,
+                alias: "a".into(),
+                predicate: p7_graph::Predicate::default(),
+            },
+            stages: vec![],
+        },
+        p7_graph::Limits::default(),
+    )
+    .unwrap();
+    assert_eq!(hql_result.rows.len(), p7.rows.len());
+    assert_eq!(ir_result.rows.len(), p7.rows.len());
+    for actual_rows in [&hql_result.rows, &ir_result.rows] {
+        for (actual, expected) in actual_rows.iter().zip(&p7.rows) {
+            let p7_graph::Binding::Entity(expected) = &expected["a"] else {
+                panic!("P7 AnnotationScan binds annotation identities")
+            };
+            let QueryValueV2::Entity(actual) = &actual["entity"] else {
+                panic!("HQL/IR AnnotationScan must return an entity identity")
+            };
+            assert_eq!(actual.database_id, database_id);
+            assert_eq!(actual.namespace, expected.namespace);
+            assert_eq!(actual.id, expected.id);
+            assert_eq!(actual.revision, expected.revision);
+            assert_eq!(
+                actual.kind,
+                genesis_block_native::uee_v2::RecordKindV2::Annotation
+            );
+        }
+    }
 }

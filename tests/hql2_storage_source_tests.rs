@@ -7,9 +7,16 @@ use genesis_block_native::{
 };
 use rusqlite::Connection;
 use serde_json::{json, Value};
-use std::{collections::BTreeMap, path::Path};
+use std::{
+    collections::{BTreeMap, BTreeSet},
+    path::Path,
+};
 use tempfile::TempDir;
 use uuid::Uuid;
+
+#[allow(dead_code)]
+#[path = "support/hql2_graph_reference.rs"]
+mod p7_graph;
 
 fn open(path: &Path) -> Storage {
     Storage::open(OpenOptions {
@@ -95,6 +102,213 @@ fn entity_id(result: &genesis_block_native::query::hql2::QueryResultV2, alias: &
         QueryValueV2::Entity(record) => record.id.clone(),
         other => panic!("expected entity, got {other:?}"),
     }
+}
+
+fn p7_scan_entities(
+    path: &Path,
+    storage: &Storage,
+    kind: p7_graph::Kind,
+    predicate: p7_graph::Predicate,
+) -> Vec<p7_graph::EntityRef> {
+    let kind_name = match kind {
+        p7_graph::Kind::Node => "node",
+        p7_graph::Kind::Edge => "edge",
+        p7_graph::Kind::Row => "row",
+        _ => panic!("unsupported source-scan fixture kind: {kind:?}"),
+    };
+    let connection = Connection::open(path.join("projection.sqlite")).unwrap();
+    let mut statement = connection
+        .prepare(
+            "SELECT kind, namespace, record_id, revision_id, operation, tx_from, tx_to,
+                    valid_from, valid_to, payload_json
+             FROM hql2_record_revisions
+             WHERE tx_to IS NULL AND (kind=?1 OR (?1='edge' AND kind='node'))
+             ORDER BY namespace, kind, record_id, revision_id",
+        )
+        .unwrap();
+    let rows = statement
+        .query_map([kind_name], |row| {
+            Ok((
+                row.get::<_, String>(0)?,
+                row.get::<_, String>(1)?,
+                row.get::<_, String>(2)?,
+                row.get::<_, String>(3)?,
+                row.get::<_, String>(4)?,
+                row.get::<_, i64>(5)?,
+                row.get::<_, Option<i64>>(6)?,
+                row.get::<_, String>(7)?,
+                row.get::<_, Option<String>>(8)?,
+                row.get::<_, String>(9)?,
+            ))
+        })
+        .unwrap()
+        .collect::<rusqlite::Result<Vec<_>>>()
+        .unwrap();
+    let revisions: Vec<_> = rows
+        .into_iter()
+        .map(
+            |(
+                record_kind,
+                namespace,
+                id,
+                revision,
+                operation,
+                tx_from,
+                tx_to,
+                valid_from,
+                valid_to,
+                json,
+            )| {
+                let revision_kind = match record_kind.as_str() {
+                    "node" => p7_graph::Kind::Node,
+                    "edge" => p7_graph::Kind::Edge,
+                    "row" => p7_graph::Kind::Row,
+                    _ => unreachable!(),
+                };
+                let payload: Value = serde_json::from_str(&json).unwrap();
+                let fields = match revision_kind {
+                    p7_graph::Kind::Node => payload["labels"]
+                        .as_array()
+                        .unwrap()
+                        .iter()
+                        .map(|label| {
+                            (
+                                "label".into(),
+                                p7_graph::Scalar::Text(label.as_str().unwrap().into()),
+                            )
+                        })
+                        .collect(),
+                    p7_graph::Kind::Edge => BTreeMap::from([(
+                        "relation".into(),
+                        p7_graph::Scalar::Text(payload["rel"].as_str().unwrap().into()),
+                    )]),
+                    p7_graph::Kind::Row => BTreeMap::new(),
+                    _ => unreachable!(),
+                };
+                let data = if revision_kind == p7_graph::Kind::Edge {
+                    p7_graph::RecordData::Edge {
+                        source: p7_graph::Identity {
+                            namespace: namespace.clone(),
+                            kind: p7_graph::Kind::Node,
+                            id: payload["from"].as_str().unwrap().into(),
+                        },
+                        target: p7_graph::Identity {
+                            namespace: namespace.clone(),
+                            kind: p7_graph::Kind::Node,
+                            id: payload["to"].as_str().unwrap().into(),
+                        },
+                        relation: payload["rel"].as_str().unwrap().into(),
+                    }
+                } else {
+                    p7_graph::RecordData::Plain
+                };
+                p7_graph::Revision {
+                    entity: p7_graph::EntityRef {
+                        namespace,
+                        kind: revision_kind,
+                        id,
+                        revision,
+                    },
+                    transaction: p7_graph::Interval {
+                        start: u64::try_from(tx_from).unwrap(),
+                        end: tx_to.map(|value| u64::try_from(value).unwrap()),
+                    },
+                    valid: p7_graph::Interval {
+                        start: chrono::DateTime::parse_from_rfc3339(&valid_from)
+                            .unwrap()
+                            .timestamp_micros(),
+                        end: valid_to.map(|value| {
+                            chrono::DateTime::parse_from_rfc3339(&value)
+                                .unwrap()
+                                .timestamp_micros()
+                        }),
+                    },
+                    retracted: operation == "retract",
+                    fields,
+                    data,
+                }
+            },
+        )
+        .collect();
+    let capability = p7_graph::HistoryCapability {
+        horizon: 0,
+        available: true,
+    };
+    let mut history = BTreeMap::from([(kind, capability.clone())]);
+    if kind == p7_graph::Kind::Edge {
+        history.insert(p7_graph::Kind::Node, capability);
+    }
+    let catalog = p7_graph::Catalog {
+        frontier: storage.stable_frontier(),
+        history,
+        revisions,
+    };
+    let relation = p7_graph::execute(
+        &catalog,
+        &p7_graph::View {
+            namespace: "default".into(),
+            transaction: storage.stable_frontier(),
+            valid_at: chrono::Utc::now().timestamp_micros(),
+            permissions: p7_graph::Permissions {
+                read: catalog
+                    .revisions
+                    .iter()
+                    .map(|revision| revision.entity.identity())
+                    .collect(),
+                annotation_body: BTreeSet::new(),
+            },
+        },
+        &p7_graph::Plan {
+            source: p7_graph::Source::Scan {
+                kind,
+                alias: "record".into(),
+                predicate,
+            },
+            stages: vec![],
+        },
+        p7_graph::Limits::default(),
+    )
+    .unwrap();
+    relation
+        .rows
+        .into_iter()
+        .map(|row| match row.get("record").unwrap() {
+            p7_graph::Binding::Entity(entity) => entity.clone(),
+            other => panic!("expected P7 entity binding, got {other:?}"),
+        })
+        .collect()
+}
+
+fn query_entity_refs(
+    result: &genesis_block_native::query::hql2::QueryResultV2,
+    field: &str,
+) -> Vec<p7_graph::EntityRef> {
+    let mut entities: Vec<_> = result
+        .rows
+        .iter()
+        .map(|row| match row.get(field).unwrap() {
+            QueryValueV2::Entity(record) => p7_graph::EntityRef {
+                namespace: record.namespace.clone(),
+                kind: match &record.kind {
+                    genesis_block_native::uee_v2::RecordKindV2::Node => p7_graph::Kind::Node,
+                    genesis_block_native::uee_v2::RecordKindV2::Edge => p7_graph::Kind::Edge,
+                    genesis_block_native::uee_v2::RecordKindV2::Row => p7_graph::Kind::Row,
+                    genesis_block_native::uee_v2::RecordKindV2::Vector => p7_graph::Kind::Vector,
+                    genesis_block_native::uee_v2::RecordKindV2::Annotation => {
+                        p7_graph::Kind::Annotation
+                    }
+                    genesis_block_native::uee_v2::RecordKindV2::Artifact => {
+                        p7_graph::Kind::Artifact
+                    }
+                },
+                id: record.id.clone(),
+                revision: record.revision.clone(),
+            },
+            other => panic!("expected entity result for {field}, got {other:?}"),
+        })
+        .collect();
+    entities.sort();
+    entities
 }
 
 #[test]
@@ -408,7 +622,7 @@ fn hql_and_ir_source_scans_have_identical_node_edge_and_row_results() {
     let node_hql = hql(
         &storage,
         "source-node-hql",
-        "USE default FROM NODES Document AS n |> RETURN n.id AS id",
+        "USE default FROM NODES Document AS n |> RETURN n AS entity, n.id AS id",
     );
     let node_ir = ir(
         &storage,
@@ -416,6 +630,7 @@ fn hql_and_ir_source_scans_have_identical_node_edge_and_row_results() {
         json!([
             {"id":"scan","op":"NodeScan","inputs":[],"config":{"as":"n","label":"Document"}},
             {"id":"project","op":"Project","inputs":["scan"],"config":{"fields":[
+                {"as":"entity","expression":{"field":{"alias":"n","path":[]}}},
                 {"as":"id","expression":{"field":{"alias":"n","path":["id"]}}}
             ]}}
         ]),
@@ -424,13 +639,24 @@ fn hql_and_ir_source_scans_have_identical_node_edge_and_row_results() {
     assert_eq!(node_hql.columns, node_ir.columns);
     assert_eq!(node_hql.rows, node_ir.rows);
     assert_eq!(node_hql.semantics, node_ir.semantics);
+    let expected_nodes = p7_scan_entities(
+        dir.path(),
+        &storage,
+        p7_graph::Kind::Node,
+        p7_graph::Predicate {
+            equals: BTreeMap::from([("label".into(), p7_graph::Scalar::Text("Document".into()))]),
+            ..p7_graph::Predicate::default()
+        },
+    );
+    assert_eq!(query_entity_refs(&node_hql, "entity"), expected_nodes);
+    assert_eq!(query_entity_refs(&node_ir, "entity"), expected_nodes);
     assert_eq!(node_hql.rows.len(), 1);
     assert_eq!(node_hql.rows[0]["id"], QueryValueV2::Utf8("doc:one".into()));
 
     let edge_hql = hql(
         &storage,
         "source-edge-hql",
-        "USE default FROM EDGES DEPENDS AS e |> RETURN e.id AS id",
+        "USE default FROM EDGES DEPENDS AS e |> RETURN e AS entity, e.id AS id",
     );
     let edge_ir = ir(
         &storage,
@@ -438,6 +664,7 @@ fn hql_and_ir_source_scans_have_identical_node_edge_and_row_results() {
         json!([
             {"id":"scan","op":"EdgeScan","inputs":[],"config":{"as":"e","relation":"DEPENDS"}},
             {"id":"project","op":"Project","inputs":["scan"],"config":{"fields":[
+                {"as":"entity","expression":{"field":{"alias":"e","path":[]}}},
                 {"as":"id","expression":{"field":{"alias":"e","path":["id"]}}}
             ]}}
         ]),
@@ -446,6 +673,17 @@ fn hql_and_ir_source_scans_have_identical_node_edge_and_row_results() {
     assert_eq!(edge_hql.columns, edge_ir.columns);
     assert_eq!(edge_hql.rows, edge_ir.rows);
     assert_eq!(edge_hql.semantics, edge_ir.semantics);
+    let expected_edges = p7_scan_entities(
+        dir.path(),
+        &storage,
+        p7_graph::Kind::Edge,
+        p7_graph::Predicate {
+            equals: BTreeMap::from([("relation".into(), p7_graph::Scalar::Text("DEPENDS".into()))]),
+            ..p7_graph::Predicate::default()
+        },
+    );
+    assert_eq!(query_entity_refs(&edge_hql, "entity"), expected_edges);
+    assert_eq!(query_entity_refs(&edge_ir, "entity"), expected_edges);
     assert_eq!(edge_hql.rows.len(), 1);
     assert_eq!(
         edge_hql.rows[0]["id"],
@@ -455,15 +693,16 @@ fn hql_and_ir_source_scans_have_identical_node_edge_and_row_results() {
     let row_hql = hql(
         &storage,
         "source-row-hql",
-        "USE default FROM TABLE records AS r |> RETURN r.id AS id, prop(r, \"id\") AS key",
+        "USE default FROM TABLE records AS r |> RETURN r AS entity, r.id AS id, prop(r, \"id\") AS key",
     );
     let row_ir = ir(
         &storage,
         "source-row-ir",
         json!([
             {"id":"scan","op":"RowScan","inputs":[],"config":{"table":"records","as":"r"}},
-            {"id":"project","op":"Project","inputs":["scan"],"config":{"fields":[
-                {"as":"id","expression":{"field":{"alias":"r","path":["id"]}}},
+                {"id":"project","op":"Project","inputs":["scan"],"config":{"fields":[
+                    {"as":"entity","expression":{"field":{"alias":"r","path":[]}}},
+                    {"as":"id","expression":{"field":{"alias":"r","path":["id"]}}},
                 {"as":"key","expression":{"call":"prop","args":[
                     {"field":{"alias":"r","path":[]}},
                     {"type":"Utf8","literal":"id"}
@@ -476,9 +715,18 @@ fn hql_and_ir_source_scans_have_identical_node_edge_and_row_results() {
     assert_eq!(row_hql.rows, row_ir.rows);
     assert_eq!(row_hql.semantics, row_ir.semantics);
     assert_eq!(row_hql.rows.len(), 1);
+    let expected_rows = p7_scan_entities(
+        dir.path(),
+        &storage,
+        p7_graph::Kind::Row,
+        p7_graph::Predicate::default(),
+    );
+    assert_eq!(query_entity_refs(&row_hql, "entity"), expected_rows);
+    assert_eq!(query_entity_refs(&row_ir, "entity"), expected_rows);
     let QueryValueV2::Utf8(record_id) = &row_hql.rows[0]["id"] else {
         panic!("row entity id must be its durable revision UUID")
     };
+    assert_eq!(record_id, &expected_rows[0].id);
     assert_eq!(Uuid::parse_str(record_id).unwrap().get_version_num(), 4);
     assert_eq!(row_hql.rows[0]["key"], QueryValueV2::Json(json!("row:one")));
 }

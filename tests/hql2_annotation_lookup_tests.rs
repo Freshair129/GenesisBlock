@@ -6,6 +6,9 @@ use genesis_block_native::{
 use serde_json::json;
 use std::path::Path;
 use tempfile::TempDir;
+#[allow(dead_code)]
+#[path = "support/hql2_graph_reference.rs"]
+mod p7_graph;
 
 fn open(path: &Path) -> Storage {
     Storage::open(OpenOptions {
@@ -41,44 +44,59 @@ fn add_node(storage: &Storage, id: &str) {
         .unwrap();
 }
 
-fn database_id(storage: &Storage) -> String {
-    let request: QueryRequestV2 = serde_json::from_value(json!({
-        "contract_version":"genesis.api.v2",
-        "request_id":"annotation-lookup-db-id",
-        "namespace":"default",
-        "ir":{
-            "contract_version":"query-ir.v2",
-            "nodes":[{"id":"values","op":"Values","inputs":[],"config":{"param":"xs","as":"x"}}],
-            "root":"values",
-            "parameter_types":{"xs":"List<I64>"}
-        },
-        "params":{"xs":{"type":"List<I64>","value":[]}}
-    }))
-    .unwrap();
-    let QueryOutcomeV2::Rows(result) = storage.query_v2(actor(), request).unwrap() else {
-        panic!("values query must execute")
+fn database_id(path: &Path) -> String {
+    rusqlite::Connection::open(path.join("projection.sqlite"))
+        .unwrap()
+        .query_row(
+            "SELECT database_id FROM hql2_record_revisions
+             WHERE namespace='default' AND kind='node' ORDER BY tx_from LIMIT 1",
+            [],
+            |row| row.get(0),
+        )
+        .unwrap()
+}
+
+fn durable_ref(
+    path: &Path,
+    database_id: &str,
+    kind: p7_graph::Kind,
+    id: &str,
+) -> p7_graph::EntityRef {
+    let kind_name = match kind {
+        p7_graph::Kind::Node => "node",
+        p7_graph::Kind::Annotation => "annotation",
+        other => panic!("unexpected fixture kind: {other:?}"),
     };
-    result.snapshot.database_id
+    let (namespace, stored_kind, stored_id, revision): (String, String, String, String) =
+        rusqlite::Connection::open(path.join("projection.sqlite"))
+            .unwrap()
+            .query_row(
+                "SELECT namespace, kind, record_id, revision_id FROM hql2_record_revisions
+                 WHERE database_id=?1 AND kind=?2 AND record_id=?3 AND tx_to IS NULL
+                 ORDER BY tx_from DESC LIMIT 1",
+                rusqlite::params![database_id, kind_name, id],
+                |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?)),
+            )
+            .unwrap();
+    assert_eq!(stored_kind, kind_name);
+    assert_eq!(stored_id, id);
+    p7_graph::EntityRef {
+        namespace,
+        kind,
+        id: stored_id,
+        revision,
+    }
 }
 
 fn frozen_ref(path: &Path, database_id: &str, id: &str) -> serde_json::Value {
-    let connection = rusqlite::Connection::open(path.join("projection.sqlite")).unwrap();
-    let revision: String = connection
-        .query_row(
-            "SELECT revision_id FROM hql2_record_revisions
-             WHERE database_id=?1 AND namespace='default' AND kind='node'
-               AND record_id=?2 AND tx_to IS NULL",
-            rusqlite::params![database_id, id],
-            |row| row.get(0),
-        )
-        .unwrap();
+    let reference = durable_ref(path, database_id, p7_graph::Kind::Node, id);
     json!({
         "ref": {
             "database_id":database_id,
-            "namespace":"default",
+            "namespace":reference.namespace,
             "kind":"node",
-            "id":id,
-            "revision":revision
+            "id":reference.id,
+            "revision":reference.revision
         },
         "binding":"frozen",
         "selector":{"type":"whole"}
@@ -167,7 +185,9 @@ fn lookup(
         "config":{"fields":[
             {"as":"document_id","expression":{"field":{"alias":"d","path":["id"]}}},
             {"as":"annotation","expression":{"field":{"alias":"a","path":[]}}},
-            {"as":"annotation_id","expression":{"field":{"alias":"a","path":["id"]}}}
+            {"as":"annotation_id","expression":{"field":{"alias":"a","path":["id"]}}},
+            {"as":"document_ref","expression":{"field":{"alias":"d","path":[]}}},
+            {"as":"annotation_ref","expression":{"field":{"alias":"a","path":[]}}}
         ]}
     }));
     let request: QueryRequestV2 = serde_json::from_value(json!({
@@ -200,7 +220,7 @@ fn hql_lookup(
         "namespace":"default",
         "language_version":"hql.v2",
         "hql":format!(
-            "USE default FROM NODES Document AS d |> {optional_stage}ANNOTATIONS OF d AS a |> RETURN d.id AS document_id, a.id AS annotation_id"
+            "USE default FROM NODES Document AS d |> {optional_stage}ANNOTATIONS OF d AS a |> RETURN d.id AS document_id, a.id AS annotation_id, d AS document_ref, a AS annotation_ref"
         ),
         "params":{}
     }))
@@ -211,12 +231,151 @@ fn hql_lookup(
     result
 }
 
+fn p7_revision(entity: p7_graph::EntityRef, data: p7_graph::RecordData) -> p7_graph::Revision {
+    p7_graph::Revision {
+        entity,
+        transaction: p7_graph::Interval {
+            start: 0,
+            end: None,
+        },
+        valid: p7_graph::Interval {
+            start: i64::MIN,
+            end: None,
+        },
+        retracted: false,
+        fields: p7_graph::Fields::new(),
+        data,
+    }
+}
+
+fn p7_lookup(
+    documents: &[p7_graph::EntityRef],
+    annotations: &[(p7_graph::EntityRef, p7_graph::EntityRef)],
+    optional: bool,
+) -> Vec<(p7_graph::EntityRef, Option<p7_graph::EntityRef>)> {
+    use std::collections::BTreeSet;
+
+    let revisions: Vec<_> = documents
+        .iter()
+        .cloned()
+        .map(|entity| p7_revision(entity, p7_graph::RecordData::Plain))
+        .chain(annotations.iter().map(|(annotation, target)| {
+            p7_revision(
+                annotation.clone(),
+                p7_graph::RecordData::Annotation {
+                    targets: vec![p7_graph::Target {
+                        binding: p7_graph::TargetBinding::Frozen(target.clone()),
+                        selector: p7_graph::Selector::Whole,
+                    }],
+                },
+            )
+        }))
+        .collect();
+    let identities: BTreeSet<_> = revisions
+        .iter()
+        .map(|revision| revision.entity.identity())
+        .collect();
+    let catalog = p7_graph::Catalog {
+        frontier: 1,
+        history: [p7_graph::Kind::Node, p7_graph::Kind::Annotation]
+            .into_iter()
+            .map(|kind| {
+                (
+                    kind,
+                    p7_graph::HistoryCapability {
+                        horizon: 0,
+                        available: true,
+                    },
+                )
+            })
+            .collect(),
+        revisions,
+    };
+    let plan = p7_graph::Plan {
+        source: p7_graph::Source::Scan {
+            kind: p7_graph::Kind::Node,
+            alias: "d".into(),
+            predicate: p7_graph::Predicate::default(),
+        },
+        stages: vec![p7_graph::Stage::Annotations(p7_graph::AnnotationLookup {
+            target_alias: "d".into(),
+            alias: "a".into(),
+            predicate: p7_graph::Predicate::default(),
+            optional,
+        })],
+    };
+    let expected = p7_graph::execute(
+        &catalog,
+        &p7_graph::View {
+            namespace: "default".into(),
+            transaction: 1,
+            valid_at: 0,
+            permissions: p7_graph::Permissions {
+                read: identities.clone(),
+                annotation_body: identities
+                    .into_iter()
+                    .filter(|identity| identity.kind == p7_graph::Kind::Annotation)
+                    .collect(),
+            },
+        },
+        &plan,
+        p7_graph::Limits::default(),
+    )
+    .unwrap();
+    expected
+        .rows
+        .into_iter()
+        .map(|row| {
+            let p7_graph::Binding::Entity(document) = &row["d"] else {
+                panic!("P7 scan binds document identities")
+            };
+            let annotation = match &row["a"] {
+                p7_graph::Binding::Entity(annotation) => Some(annotation.clone()),
+                p7_graph::Binding::Null => None,
+                other => panic!("unexpected P7 annotation binding: {other:?}"),
+            };
+            (document.clone(), annotation)
+        })
+        .collect()
+}
+
+fn projected_lookup(
+    rows: &[std::collections::BTreeMap<String, QueryValueV2>],
+) -> Vec<(p7_graph::EntityRef, Option<p7_graph::EntityRef>)> {
+    rows.iter()
+        .map(|row| {
+            let QueryValueV2::Entity(document) = &row["document_ref"] else {
+                panic!("document ref must be an entity")
+            };
+            let annotation = match &row["annotation_ref"] {
+                QueryValueV2::Entity(annotation) => Some(p7_ref(annotation)),
+                QueryValueV2::Null => None,
+                other => panic!("unexpected annotation ref: {other:?}"),
+            };
+            (p7_ref(document), annotation)
+        })
+        .collect()
+}
+
+fn p7_ref(record: &genesis_block_native::uee_v2::RecordRefV2) -> p7_graph::EntityRef {
+    p7_graph::EntityRef {
+        namespace: record.namespace.clone(),
+        kind: match &record.kind {
+            genesis_block_native::uee_v2::RecordKindV2::Node => p7_graph::Kind::Node,
+            genesis_block_native::uee_v2::RecordKindV2::Annotation => p7_graph::Kind::Annotation,
+            other => panic!("unexpected lookup entity kind: {other:?}"),
+        },
+        id: record.id.clone(),
+        revision: record.revision.clone(),
+    }
+}
+
 #[test]
 fn annotation_lookup_uses_the_selected_transaction_frontier() {
     let dir = TempDir::new().unwrap();
     let storage = open(dir.path());
     add_node(&storage, "doc:target");
-    let database_id = database_id(&storage);
+    let database_id = database_id(dir.path());
     let selected_tx = storage.stable_frontier();
     put_annotation(
         &storage,
@@ -284,7 +443,7 @@ fn lookup_matches_targets_but_not_evidence_and_keeps_optional_rows() {
     let storage = open(dir.path());
     add_node(&storage, "doc:target");
     add_node(&storage, "doc:evidence");
-    let database_id = database_id(&storage);
+    let database_id = database_id(dir.path());
     put_annotation(
         &storage,
         "review:one",
@@ -304,26 +463,6 @@ fn lookup_matches_targets_but_not_evidence_and_keeps_optional_rows() {
         .rows
         .iter()
         .any(|row| matches!(row.get("annotation"), Some(QueryValueV2::Entity(_)))));
-    let rows: std::collections::BTreeMap<_, _> = result
-        .rows
-        .into_iter()
-        .map(|row| {
-            let QueryValueV2::Utf8(document_id) = row["document_id"].clone() else {
-                panic!("document id must be Utf8")
-            };
-            (document_id, row["annotation_id"].clone())
-        })
-        .collect();
-    assert_eq!(
-        rows,
-        std::collections::BTreeMap::from([
-            ("doc:evidence".to_owned(), QueryValueV2::Null,),
-            (
-                "doc:target".to_owned(),
-                QueryValueV2::Utf8("review:one".into()),
-            ),
-        ])
-    );
 }
 
 #[test]
@@ -331,7 +470,7 @@ fn lookup_preserves_duplicate_input_paths() {
     let dir = TempDir::new().unwrap();
     let storage = open(dir.path());
     add_node(&storage, "doc:target");
-    let database_id = database_id(&storage);
+    let database_id = database_id(dir.path());
     put_annotation(
         &storage,
         "review:one",
@@ -353,7 +492,7 @@ fn hql_annotation_lookup_distinguishes_optional_and_required_stages() {
     let storage = open(dir.path());
     add_node(&storage, "doc:target");
     add_node(&storage, "doc:evidence");
-    let database_id = database_id(&storage);
+    let database_id = database_id(dir.path());
     put_annotation(
         &storage,
         "review:one",
@@ -362,6 +501,27 @@ fn hql_annotation_lookup_distinguishes_optional_and_required_stages() {
     );
 
     let optional = hql_lookup(&storage, true);
+    let target = durable_ref(dir.path(), &database_id, p7_graph::Kind::Node, "doc:target");
+    let evidence = durable_ref(
+        dir.path(),
+        &database_id,
+        p7_graph::Kind::Node,
+        "doc:evidence",
+    );
+    let annotation = durable_ref(
+        dir.path(),
+        &database_id,
+        p7_graph::Kind::Annotation,
+        "review:one",
+    );
+    let documents = [target.clone(), evidence];
+    let annotations = [(annotation, target)];
+    let expected_optional = p7_lookup(&documents, &annotations, true);
+    assert_eq!(
+        projected_lookup(&optional.rows),
+        expected_optional,
+        "HQL differs from P7"
+    );
     assert_eq!(optional.rows.len(), 2);
     assert_eq!(optional.columns[1].data_type, "Nullable<Utf8>");
     assert!(optional
@@ -373,21 +533,21 @@ fn hql_annotation_lookup_distinguishes_optional_and_required_stages() {
         .iter()
         .any(|row| { row["annotation_id"] == QueryValueV2::Utf8("review:one".into()) }));
     let ir = lookup(&storage, false);
-    let projected = |rows: &[std::collections::BTreeMap<String, QueryValueV2>]| {
-        rows.iter()
-            .map(|row| {
-                let QueryValueV2::Utf8(document_id) = &row["document_id"] else {
-                    panic!("document id must be Utf8")
-                };
-                (document_id.clone(), row["annotation_id"].clone())
-            })
-            .collect::<std::collections::BTreeMap<_, _>>()
-    };
-    assert_eq!(projected(&optional.rows), projected(&ir.rows));
+    assert_eq!(
+        projected_lookup(&ir.rows),
+        expected_optional,
+        "typed IR differs from P7"
+    );
+    assert_eq!(projected_lookup(&optional.rows), projected_lookup(&ir.rows));
 
     let required = hql_lookup(&storage, false);
     assert_eq!(required.rows.len(), 1);
     assert_eq!(required.columns[1].data_type, "Utf8");
+    assert_eq!(
+        projected_lookup(&required.rows),
+        p7_lookup(&documents, &annotations, false),
+        "required HQL differs from P7"
+    );
     assert_eq!(
         required.rows[0]["annotation_id"],
         QueryValueV2::Utf8("review:one".into())
@@ -400,7 +560,7 @@ fn live_annotation_target_resolves_at_the_query_snapshot() {
     let storage = open(dir.path());
     add_node(&storage, "doc:frozen");
     add_node(&storage, "doc:live");
-    let database_id = database_id(&storage);
+    let database_id = database_id(dir.path());
     put_annotation(
         &storage,
         "review:frozen",

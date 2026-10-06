@@ -1,8 +1,8 @@
 ---
 doc_id: REPORT--HQL2-P8-CORE-2026-09-28
-version: "0.1.61b"
+version: "0.1.62b"
 created_at: "2026-09-28T04:35:00+07:00,ATHER,22bc11e"
-last_update: "2026-10-05T04:19:54+07:00,ATHER"
+last_update: "2026-10-06T13:53:09+07:00,ATHER"
 status: beta
 owner: GenesisBlockDB Engineering
 attributes:
@@ -478,22 +478,20 @@ from these local tests.
 
 | Artifact | Before | After |
 |---|---|---|
-| Registry | 0.5.71+draft | 0.5.72+draft |
-| ADR H2-D11 | 0.8.20b | 0.8.21b |
-| U9 backup/restore | 0.1.5b | 0.1.6b |
-| P6 generations/leases/ACL | 0.5.37b | 0.5.38b |
-| P8 typed boundary | 0.2.60b | 0.2.61b |
-| Orchestration plan | 0.8.65b | 0.8.66b |
-| C4 architecture index | 0.1.69b | 0.1.70b |
-| Master specification | 2.3.41b | 2.3.42b |
-| This report | 0.1.60b | 0.1.61b |
+| Registry | 0.5.72+draft | 0.5.73+draft |
+| P8 typed boundary | 0.2.61b | 0.2.62b |
+| Orchestration plan | 0.8.66b | 0.8.67b |
+| This report | 0.1.61b | 0.1.62b |
 
-Version diff 0.1.60b -> 0.1.61b: record focused restore/P6 21/21 across five
-targets, HQL2 393/0/1 across 37, and full native Rust suite exit 0 with the
-`probe_vs_recall` qualification test filtered. Independent review found no
-remaining core-path defect; cleanup after read-only validation/rename failure
-remains best-effort and unverified. EXPLAIN is still partial and broad P8/P13,
-P14 rehearsal, hosted CI and external qualification remain open.
+Version diff `0.1.61b -> 0.1.62b`: strengthen test-only P7 comparisons for
+HQL/typed-IR Node/Edge/Row source identities, AnnotationScan/Lookup results and
+ContextPack fragment/omitted evidence references. The Edge oracle now includes
+endpoint Node revisions as dependencies while scanning only Edge rows. Four
+focused targets pass 32/32; the full HQL2 sweep passes 393/0/1 across 37
+targets. A fixture-only root cause and correction are recorded in
+`.brain/rca/RCA--HQL2-P7-EDGE-DEPENDENCY-FIXTURE.md`. No runtime, schema,
+transport or user-database migration changed. EXPLAIN operator-open,
+cancellation, shared-runtime and P13 gates remain open; this does not close P8.
 
 Version diff 0.1.59b -> 0.1.60b: require recovery to reproduce the manifest
 frame frontier; cover valid terminal-generation reuse, nonzero `txn_frontier`
@@ -686,6 +684,7 @@ P8 and release gates.
 
 | Version | Date | Status | Summary | Commit Hash | Agent |
 |---|---|---|---|---|---|
+| 0.1.62b | 2026-10-06 | beta | Strengthen test-only P7 identity differentials for Node/Edge/Row, AnnotationScan/Lookup and ContextPack; correct Edge oracle endpoint dependencies; focused 32/32 and HQL2 393/0/1 across 37 targets; no runtime/schema/transport change; EXPLAIN operator-open, cancellation, shared-runtime and P13 gates remain open | working-tree | ATHER |
 | 0.1.61b | 2026-10-05 | beta | Record restore/P6 21/21, HQL2 393/0/1 across 37 and full native Rust suite exit 0 with `probe_vs_recall` filtered; EXPLAIN partial, cleanup failure paths best-effort/unverified; no schema/migration change, broad P14/P8/P13 gates remain open | working-tree | ATHER |
 | 0.1.60b | 2026-10-05 | beta | Handle valid receipt-last restore, preserve `txn_frontier`, and prepare return metadata before rename; focused restore/P6 20/20 across five targets, HQL2 392/0/1 across 37 targets; source-backed EXPLAIN remains partial; full Rust suite NOT_RUN; no schema/migration change, broad P14/P8/P13 gates remain open | working-tree | ATHER |
 | 0.1.59b | 2026-10-05 | beta | Implement approved H2-D11 R5 restore publication/independent read-only validation; focused 15/15 across four targets, HQL2 391/0/1 across 37 targets and source-backed NodeScan EXPLAIN 1/1; full Rust suite NOT_RUN on this patch; no schema/migration change, broad P14/P8/P13 gates remain open | working-tree | ATHER |
