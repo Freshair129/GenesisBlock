@@ -153,7 +153,8 @@ its source SHA; local Git ownership/configuration did not reproduce that split.
 
 ## Outcome (measured)
 
-**Local gates PASS; final hosted CI PENDING.** The original focused regression
+**Local gates PASS; hosted CI PASS on PR head
+`ab38d5079510ccaf566a180bf677a0e94a38bbea`.** The original focused regression
 was RED with `RECOVERY_REQUIRED: markerless database identity is missing`
 before implementation. On Node 24.19.0, the worker suite reports 32 tests:
 26 passed, 0 failed, and 6 skipped because the pinned ONNX model snapshot is
@@ -194,9 +195,19 @@ The same run's committed-addon pass still used the old 9,987,776-byte binary
 (`ff28bcf5214090b9ce4b8ec8ca6b69fd134e0b2fd3115d5df78db29d24191696`) and
 failed three recovery tests, confirming the tracked-artifact drift. The
 candidate engine upgrade and its provenance are now documented separately
-from historical baseline `e15e35b0093394e0a8880af7f4e6f63cf81223b7`; the
-committed replacement rerun, model-dependent Linux paths, full integration
-qualification and final review gates remain pending before merge.
+from historical baseline `e15e35b0093394e0a8880af7f4e6f63cf81223b7`.
+The refreshed committed addon then passed on PR head
+`ab38d5079510ccaf566a180bf677a0e94a38bbea` in Bookworm run `37443730184`,
+job `112203403569`. That run's fresh build used PR merge checkout
+`d9f4eb3bbef5a835d95301069ac4ba9c5549cb67`; both the fresh build and committed
+binary completed 32 worker tests: 26 passed, 0 failed, and 6 model-dependent
+tests skipped because the ONNX snapshot was absent. The committed binary
+SHA-256 was
+`b678dfd7ee125d33d877b008e3af2c2a36ee9fa5203d043248cf2b9974e778e1`. The
+same PR head passed Tests (`37443730153`), Security Audit (`37443730099`),
+Performance Audit (`37443730105`) and Package Manager Consumer (`37443730261`).
+The six model-dependent Linux paths, migration compatibility, full
+cross-repository acceptance and deployment approval remain unverified.
 
 **Residual path boundary:** Node `lstat`/`realpath` checks reject detected
 symbolic links and junctions but do not prove that every Windows-specific

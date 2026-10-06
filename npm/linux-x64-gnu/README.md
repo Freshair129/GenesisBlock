@@ -30,7 +30,7 @@ per-triple packages get their binaries.
 | SHA-256 | `b678dfd7ee125d33d877b008e3af2c2a36ee9fa5203d043248cf2b9974e778e1` |
 | Highest imported GLIBC | `GLIBC_2.34` |
 | Node used to verify | `v24.18.0` linux-x64 — what `genesisrag17-worker/package.json` requires (`"node": ">=24.18"`) and what the MSP GenesisRAG17 runbook pins |
-| Verified with | Freshly built candidate in hosted run `37439589499`: **32 tests, 26 passed, 0 failed, 6 skipped** because the pinned ONNX model snapshot was absent. The pre-refresh committed addon failed 3 recovery cases in the same run; this tracked replacement still needs committed-artifact verification on the updated PR head. |
+| Verified with | Freshly built candidate in run `37439589499`: **32 tests, 26 passed, 0 failed, 6 skipped** because the pinned ONNX model snapshot was absent; the pre-refresh committed addon failed 3 recovery cases. The refreshed committed addon (this file's SHA-256 above) passed the same **26/0/6** suite on PR head `ab38d5079510ccaf566a180bf677a0e94a38bbea`, run `37443730184`, job `112203403569`. The six model-dependent tests remain unverified. |
 
 ### Runtime requirements of this file
 
