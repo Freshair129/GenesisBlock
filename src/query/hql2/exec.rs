@@ -6,7 +6,10 @@ use super::{
     },
     error::QueryErrorV2,
     plan::PhysicalPlanV2,
-    result::{ActualCountersV2, ExplainNodeV2},
+    result::{
+        ActualCountersV2, CounterClockSourceV2, CounterElapsedScopeV2, CounterReadingV2,
+        CounterSamplingV2, CounterUnitV2, CounterUnknownReasonV2, ExplainNodeV2,
+    },
     source::{
         ExecBatchV2, FieldIdV2, GraphSnapshotV2, HydratedValuesV2, RecordKeyV2, VectorBatchV2,
     },
@@ -1932,7 +1935,11 @@ pub(crate) fn execute_v2_with_vector_adapters(
             .unwrap_or(&[]);
         let right = node.inputs.get(1).map(|i| outputs[*i].as_slice());
         let hydrated = hydrate_for_kernel(&node.kernel, input, right, graph, budget, hydrate)?;
-        let input_rows = node.inputs.iter().map(|i| outputs[*i].len() as u64).sum();
+        let input_rows = node.inputs.iter().try_fold(0u64, |total, input_index| {
+            u64::try_from(outputs[*input_index].len())
+                .ok()
+                .and_then(|count| total.checked_add(count))
+        });
         match &node.kernel {
             Kernel::Values(value) => {
                 let V::List(values) = value.as_ref() else {
@@ -2661,40 +2668,87 @@ pub(crate) fn execute_v2_with_vector_adapters(
             }
         }
         budget.check()?;
-        explain[index].actual = Some(ActualCountersV2 {
-            input_rows: Some(input_rows),
-            output_rows: Some(out.len() as u64),
-            distance_evaluations: matches!(&node.kernel, Kernel::VectorRank { .. }).then_some(
+        let graph_operator = matches!(
+            &node.kernel,
+            Kernel::Expand { .. }
+                | Kernel::ExpandSequence { .. }
+                | Kernel::MatchCompact { .. }
+                | Kernel::MatchSequence { .. }
+        );
+        let distance_evaluations = if matches!(&node.kernel, Kernel::VectorRank { .. }) {
+            CounterReadingV2::measured_or_overflow(
+                CounterUnitV2::DistanceEvaluations,
                 budget
                     .distance_evaluations_used
-                    .saturating_sub(distance_evaluations_before),
-            ),
-            expanded_nodes: matches!(
-                &node.kernel,
-                Kernel::Expand { .. }
-                    | Kernel::ExpandSequence { .. }
-                    | Kernel::MatchCompact { .. }
-                    | Kernel::MatchSequence { .. }
+                    .checked_sub(distance_evaluations_before),
             )
-            .then_some(
-                budget
-                    .expanded_nodes_used
-                    .saturating_sub(expanded_nodes_before),
-            ),
-            expanded_edges: matches!(
-                &node.kernel,
-                Kernel::Expand { .. }
-                    | Kernel::ExpandSequence { .. }
-                    | Kernel::MatchCompact { .. }
-                    | Kernel::MatchSequence { .. }
+        } else {
+            CounterReadingV2::unknown(
+                CounterUnitV2::DistanceEvaluations,
+                CounterUnknownReasonV2::NotApplicable,
             )
-            .then_some(
-                budget
-                    .expanded_edges_used
-                    .saturating_sub(expanded_edges_before),
+        };
+        let graph_expansions = if graph_operator {
+            let expanded_nodes = budget
+                .expanded_nodes_used
+                .checked_sub(expanded_nodes_before);
+            let expanded_edges = budget
+                .expanded_edges_used
+                .checked_sub(expanded_edges_before);
+            CounterReadingV2::measured_or_overflow(
+                CounterUnitV2::GraphExpansions,
+                expanded_nodes
+                    .and_then(|nodes| expanded_edges.and_then(|edges| nodes.checked_add(edges))),
+            )
+        } else {
+            CounterReadingV2::unknown(
+                CounterUnitV2::GraphExpansions,
+                CounterUnknownReasonV2::NotApplicable,
+            )
+        };
+        let elapsed_ns = if matches!(&node.kernel, Kernel::SourceScan(_)) {
+            CounterReadingV2::unknown(
+                CounterUnitV2::Nanoseconds,
+                CounterUnknownReasonV2::NotInstrumented,
+            )
+        } else {
+            CounterReadingV2::measured_or_overflow(
+                CounterUnitV2::Nanoseconds,
+                u64::try_from(started.elapsed().as_nanos()).ok(),
+            )
+        };
+        explain[index].actual = Some(ActualCountersV2 {
+            rows_in: CounterReadingV2::measured_or_overflow(CounterUnitV2::Rows, input_rows),
+            rows_out: CounterReadingV2::measured_or_overflow(
+                CounterUnitV2::Rows,
+                u64::try_from(out.len()).ok(),
             ),
-            elapsed_micros: Some(u64::try_from(started.elapsed().as_micros()).unwrap_or(u64::MAX)),
-            ..Default::default()
+            bytes_read: CounterReadingV2::unknown(
+                CounterUnitV2::Bytes,
+                CounterUnknownReasonV2::NotInstrumented,
+            ),
+            work_units: CounterReadingV2::unknown(
+                CounterUnitV2::WorkUnits,
+                CounterUnknownReasonV2::NotInstrumented,
+            ),
+            index_probes: CounterReadingV2::unknown(
+                CounterUnitV2::IndexProbes,
+                CounterUnknownReasonV2::NotApplicable,
+            ),
+            distance_evaluations,
+            graph_expansions,
+            memory_peak_bytes: CounterReadingV2::unknown(
+                CounterUnitV2::Bytes,
+                CounterUnknownReasonV2::NotInstrumented,
+            ),
+            spill_bytes: CounterReadingV2::unknown(
+                CounterUnitV2::Bytes,
+                CounterUnknownReasonV2::NotApplicable,
+            ),
+            elapsed_ns,
+            sampling: CounterSamplingV2::Complete,
+            clock_source: CounterClockSourceV2::MonotonicInstant,
+            elapsed_scope: CounterElapsedScopeV2::OperatorExecution,
         });
         outputs.push(out);
     }

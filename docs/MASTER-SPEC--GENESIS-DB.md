@@ -2,8 +2,8 @@
 title: "GenesisBlockDB Technical Architecture and Capability Composition"
 doc_id: "MASTER-SPEC-GENESISBLOCKDB"
 status: current
-version: "2.3.42b"
-updated: "2026-10-05"
+version: "2.3.43b"
+updated: "2026-10-06"
 owner: "GenesisBlockDB Architecture"
 source_of_truth: true
 related_issue: 84
@@ -16,6 +16,7 @@ related_docs:
   - "docs/SPEC--GENESISDB-P6-GENERATIONS-LEASES-ACL.md"
   - "docs/adr/ADR--GENESISDB-HQL2-PATTERN-CONSTRAINTS.md"
   - "docs/adr/ADR--GENESISDB-HQL2-P8-COMPLETION-ADDENDUM.md"
+  - "docs/adr/ADR--GENESISDB-HQL2-G4-SHARED-PIPELINE.md"
   - "docs/adr/ADR--GENESISDB-TYPED-QUERY-IR-AGENT-BOUNDARY.md"
   - "docs/SPEC--GENESISDB-TYPED-QUERY-IR-V1.md"
   - "docs/SPEC--WAVE-A-COMMIT-CORRECTNESS.md"
@@ -54,9 +55,11 @@ behavior, pre-parse authorization/namespace checks, malformed and unlisted
 forms, and resource rejection. HQL `JOIN TABLE` now lowers to the existing
 closed RowScan/Join pipeline for Inner/Left/Semi/Anti, with bare JOIN defaulting
 to Inner; HQL, typed IR and independent P7 differential results match for
-duplicate, missing-property NULL and JSON-null cases. The latest root-HQL2
-regression sweep passes 387/0/1 across 34 targets; the separate 11-target
-P6/schema-v6/compatibility group passes 194/0/0. Storage-backed HQL/typed-IR
+duplicate, missing-property NULL and JSON-null cases. The earlier 387/0/1
+34-target sweep and separate 194/0/0 P6/schema-v6/compatibility group are
+historical. The current explicit root-HQL2 regression sweep passes 394/0/1
+across 37 targets; the selected four-target P6 sweep passes 31/31.
+Storage-backed HQL/typed-IR
 `Values`/`UnionAll` results match independent P7 for 169 nullable bag pairs
 and 338 Storage executions, preserving NULL and duplicate multiplicity.
 HistoryScan bags for Node, Edge, Row, Vector and Annotation match independent
@@ -80,6 +83,11 @@ remain open; these local results do not close the full HQL2/P8 gate. A separate
 selected HQL2/durability/authority verification now passes 40 targets,
 including schema-v6 WAL-only recovery; this is fixture evidence, not release or
 consumer qualification.
+The approved G4 candidate shares contract/planner version and stable plan hash
+between EXPLAIN and ANALYZE, and emits per-node measured/unknown counters with
+units and reasons. The current patch has not rerun the full native suite or
+strict Clippy and has no independent review, hosted, device/release or P13
+qualification; these remain NOT_RUN/open, not inherited from earlier snapshots.
 The final locked/offline no-default-features Rust suite passed with no failures;
 the explicitly selected `probe_vs_recall` test remains NOT_RUN. Strict all-target
 Clippy passed with default and no-default features. These local results do not
@@ -427,6 +435,12 @@ independent-review or broad P8/P13 gates.
 
 ## Changelog
 
+Version diff 2.3.42b -> 2.3.43b: synchronize the approved G4 stable plan
+identity and truthful ANALYZE counter contract; record focused 68/68, HQL2
+394/0/1 across 37 targets and selected P6 31/31. Do not promote historical
+full-suite/Clippy results to this patch; retain P8/P13, independent review,
+hosted/device/release and broad exact-oracle gates.
+
 Version diff 2.3.41b -> 2.3.42b: record restore/P6 21/21, HQL2 393/0/1
 across 37 targets, and full Rust suite exit 0 with `probe_vs_recall` filtered.
 Retain partial EXPLAIN and best-effort cleanup limitations; broad P14/P8/P13
@@ -456,6 +470,7 @@ shared-runtime and broad P8/P13 gates remain open.
 
 | Version | Date | Owner | Summary |
 |---|---|---|---|
+| 2.3.43b | 2026-10-06 | GenesisBlockDB Architecture | Synchronize approved G4 plan identity and truthful typed ANALYZE counters; focused 68/68, HQL2 394/0/1 across 37, P6 31/31; full-suite/Clippy/review/hosted/device-release/P13 not run or open |
 | 2.3.42b | 2026-10-05 | GenesisBlockDB Architecture | Record restore/P6 21/21, HQL2 393/0/1 across 37 and full Rust suite exit 0 with `probe_vs_recall` filtered; EXPLAIN partial, cleanup failure paths best-effort/unverified; no format/schema/migration change; broad P14/P8/P13 gates open |
 | 2.3.41b | 2026-10-05 | GenesisBlockDB Architecture | Support receipt-last restore; preserve `txn_frontier`; prepare result before target rename; restore/P6 20/20, HQL2 392/0/1 across 37; full Rust suite NOT_RUN; no format/schema/migration change; broad P14/P8/P13 gates open |
 | 2.3.40b | 2026-10-05 | GenesisBlockDB Architecture | Implement approved H2-D11 R5 restore publication before target exposure; distinguish bundle data frontier from local receipt frame; 15/15 focused restore/P6, HQL2 391/0/1 across 37 targets, NodeScan EXPLAIN 1/1; full Rust suite NOT_RUN on this patch; no format/schema/migration change; broad P14/P8/P13 gates remain open |

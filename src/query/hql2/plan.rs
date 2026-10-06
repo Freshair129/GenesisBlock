@@ -8,6 +8,17 @@ use super::{
     },
     source::BoundSourceV2,
 };
+use serde::Serialize;
+use sha2::{Digest, Sha256};
+
+pub(crate) const PLANNER_VERSION_V2: &str = "hql2-rule-v1";
+
+#[derive(Serialize)]
+struct PlanIdentityV2 {
+    planner_version: &'static str,
+    root: String,
+    plan: Vec<ExplainNodeV2>,
+}
 
 #[derive(Debug)]
 pub(crate) struct PhysicalPlanV2 {
@@ -29,6 +40,20 @@ fn columns(columns: &[Column]) -> Vec<ColumnV2> {
         .collect()
 }
 impl PhysicalPlanV2 {
+    pub(crate) fn plan_hash(&self) -> Result<String, QueryErrorV2> {
+        let canonical = PlanIdentityV2 {
+            planner_version: PLANNER_VERSION_V2,
+            root: self.root().to_owned(),
+            plan: self.explain_nodes(),
+        };
+        let bytes = serde_json::to_vec(&canonical)
+            .map_err(|_| QueryErrorV2::new("ENCODE_ERROR", "encode", "plan_hash"))?;
+        let mut hasher = Sha256::new();
+        hasher.update(b"genesis.hql2.plan.v2:");
+        hasher.update(bytes);
+        Ok(hex::encode(hasher.finalize()))
+    }
+
     pub(crate) fn columns(&self) -> Vec<ColumnV2> {
         columns(&self.nodes[self.root].columns)
     }

@@ -526,8 +526,12 @@ fn analyze_reports_root_match_graph_work_and_budget_never_returns_partial_rows()
         .find(|node| node.logical_op == genesis_block_native::uee_v2::QueryOpV2::Match)
         .unwrap();
     let actual = match_node.actual.unwrap();
-    assert_eq!(actual.expanded_nodes, Some(7));
-    assert_eq!(actual.expanded_edges, Some(16));
+    let actual = serde_json::to_value(actual).unwrap();
+    assert_eq!(
+        actual["graph_expansions"]["measurement"]["status"],
+        "measured"
+    );
+    assert_eq!(actual["graph_expansions"]["measurement"]["value"], 23);
 
     let request: QueryRequestV2 = serde_json::from_value(json!({
         "contract_version":"genesis.api.v2",
@@ -642,6 +646,10 @@ fn analyze_reports_measured_graph_expansion_work() {
         .find(|node| node.logical_op == genesis_block_native::uee_v2::QueryOpV2::Expand)
         .unwrap();
     let actual = expand.actual.unwrap();
-    assert_eq!(actual.expanded_nodes, Some(5));
-    assert_eq!(actual.expanded_edges, Some(12));
+    let actual = serde_json::to_value(actual).unwrap();
+    assert_eq!(
+        actual["graph_expansions"]["measurement"]["status"],
+        "measured"
+    );
+    assert_eq!(actual["graph_expansions"]["measurement"]["value"], 17);
 }

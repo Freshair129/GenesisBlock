@@ -1,9 +1,9 @@
 ---
 doc_id: SPEC--GENESISDB-P6-GENERATIONS-LEASES-ACL
 owner: GenesisBlockDB Engineering
-version: 0.5.38b
+version: 0.5.39b
 created_at: "2026-09-22T22:55:00+07:00,ATHER,working-tree"
-last_update: "2026-10-05T04:19:54+07:00,ATHER"
+last_update: "2026-10-06T14:42:41+07:00,ATHER"
 status: beta
 attributes:
   domain: storage-correctness
@@ -403,7 +403,21 @@ behavior. The HQL2 sweep passes 387/0/1; the separate P6/schema-v6/
 compatibility result remains 194/0/0. Broader P6/P8 and independent-review gates
 remain open.
 
+G4 ANALYZE reports diagnostics from execution that already runs under the same
+authorized P6 lease and continuous commit guard. Plan hashes and counter
+metadata do not widen access scope, add grants, expose new source data, or
+change generation/ACL behavior. The latest explicit HQL2 regression sweep
+passes 394/0/1 across 37 targets; the selected four-target P6 regression sweep
+passes 31/31. Full P6/P8 acceptance, transport parity and independent review
+remain open.
+
 ## CHANGELOG
+
+Version diff 0.5.38b -> 0.5.39b: synchronize G4 ANALYZE counter and stable plan
+identity evidence. Diagnostics remain inside the existing P6 ReadView/lease;
+four selected P6 targets pass 31/31 and the 37-target HQL2 sweep passes 394/0/1.
+No P6 grant, ACL, lease, schema or migration behavior changed. Full native
+suite, independent review and broader P6/P8/transport qualification remain open.
 
 Version diff 0.5.37b -> 0.5.38b: record restore/P6 21/21 across five targets,
 the explicit HQL2 sweep at 393/0/1 across 37 targets, and full Rust suite exit

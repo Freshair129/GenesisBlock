@@ -1,8 +1,8 @@
 ---
 doc_id: REPORT--HQL2-P8-CORE-2026-09-28
-version: "0.1.62b"
+version: "0.1.64b"
 created_at: "2026-09-28T04:35:00+07:00,ATHER,22bc11e"
-last_update: "2026-10-06T13:53:09+07:00,ATHER"
+last_update: "2026-10-06T15:43:00+07:00,ATHER"
 status: beta
 owner: GenesisBlockDB Engineering
 attributes:
@@ -64,17 +64,16 @@ intentionally ignored). Verification uses temporary fixtures only; no user
 database was migrated. Full P8/P13, shared-runtime and independent-review gates
 remain open.
 
-At the prior checkpoint, the locked/offline no-default-features Rust suite
-passed with `--jobs 4 --no-fail-fast -- --skip probe_vs_recall`; default and
-no-default strict all-target Clippy also passed. For this ACL/budget change,
-the focused suites and explicit HQL2/P6 sweeps recorded below pass; a fresh
-full-suite rerun excluding `probe_vs_recall` is in progress. An earlier
-unrestricted attempt entered that protected probe and was interrupted after it
-ran for over 60 seconds; no result is claimed for the probe. Existing ignored
-soak/parser-child cases remain ignored. `cargo fmt --check`, `git diff --check`,
-and `npm run docs:validate` passed (239 files, 0 violations). This remains
-fixture/local evidence only: independent review, full shared-runtime/P8/P13,
-release and consumer qualification are not claimed.
+The current explicit HQL2 sweep and selected P6 regression targets pass as
+recorded below. The full locked/offline no-default Rust suite exited 0 with
+`probe_vs_recall` filtered and three existing soak cases ignored. That suite ran
+before the behavior-preserving D7 helper-signature lint refactor; after that
+refactor, the D7 adapter and property targets passed 15/15, and strict
+all-target Clippy passed in both default and no-default configurations.
+Formatting and `git diff --check` passed. These remain local regression results,
+not P8 acceptance. The counter patch has not received independent review,
+hosted checks, device/release qualification or consumer qualification. Only
+fixture/local evidence is claimed.
 
 ## Implemented scope
 
@@ -95,8 +94,11 @@ release and consumer qualification are not claimed.
   the same validated P6 lease; see the current source-target evidence below.
 - Conservative query-local memory reservations, deadline, result-row/byte and
   collect bounds; exact execution fails on exhaustion, never returns partial
-  aggregates. ANALYZE emits measured row/time counters only; unknown counters,
-  costs and index frontiers remain absent.
+  aggregates. G4 ANALYZE returns unit-tagged per-node counters with explicit
+  measured/unknown states and reasons; it does not coerce missing instrumentation
+  or overflow to zero. SourceScan elapsed time and uninstrumented bytes/work/
+  memory are unknown. EXPLAIN and ANALYZE share contract/planner versions and
+  the stable physical-plan hash.
 - Sequence ID, conjunctive labels and D4 node/edge property predicates bind
   and execute through HQL and typed IR under the same P6 graph snapshot.
   Property values use exact JSON equality; missing values do not match, explicit
@@ -109,12 +111,22 @@ release and consumer qualification are not claimed.
 These are Rust core changes only. REST/NAPI/FFI/SDK/MCP remain unchanged on
 their existing compatibility contracts; P13 parity is deliberately not claimed.
 
+The owner-approved G4 shared-pipeline ADR is synchronized into this checkout.
+EXPLAIN and ANALYZE now report the same contract version, planner version and
+stable physical-plan hash. ANALYZE counters are closed, unit-tagged readings:
+measured values remain distinct from unknown-with-reason, and arithmetic
+overflow is not saturated into a plausible value. SourceScan elapsed time and
+uninstrumented bytes/work/memory remain unknown. The changed focused HQL2
+targets pass 68/68, the explicit HQL2 target set passes 394/0/1 across 37
+targets, and four P6 targets pass 31/31. This is local regression evidence,
+not G4/P8 closure.
+
 ## Verification record
 
 Platform: local Windows MSVC, Rust 1.97.1, `--locked --offline
 --no-default-features`. To keep build artifacts off the full C: volume,
 `CARGO_TARGET_DIR` and temporary files were directed to
-`D:/CodexBuilds/GenesisBlock-HQL2-Execution-20261004`; the latest 34-target
+`D:/CodexBuilds/GenesisBlock-HQL2-Execution-20261004`; the latest 37-target
 HQL2 run was executed serially in the isolated worktree, with the protected
 probe target not selected.
 
@@ -162,7 +174,9 @@ probe target not selected.
 | Approved H2-D11 Vector HistoryScan extension | Implemented; local differential passed | HQL and typed IR read exact revisions using compact JSON `(owner_id, collection_id)` identity under the P6 lease and owner-node ACL; the vector source floor fails closed before access. Its result bags match independent P7 from WAL-derived revision facts and the captured frontier. The expanded five-kind HistoryScan differential passes; HistoryScan/ChangeScan passes 16/16, P7 graph target 39/39 and combined P7 130/130. |
 | HQL/typed-IR Row HistoryScan and ChangeScan parity | 1 passed, 0 failed | Retained insert/update revisions hydrate exact row properties; HQL and typed IR agree on history values, change operations and durable Row identity. Test-only regression coverage; no schema migration. |
 | HQL2/IR transaction-time snapshot (`tx_as_of`) | Implemented; local verification passed | One selected frontier S controls revision-backed scans, graph/vector/annotation operators, source-floor checks, property hydration and `Snapshot.tx`; the validated P6 generation/catalog/current policy remain pinned and no path falls back to current state. Five focused targets pass 56/56. |
-| Latest explicit root-HQL2 target sweep | 393 passed, 0 failed, 1 ignored across 37 root targets | All root `hql2_*_tests.rs` targets ran serially with `--no-default-features`; includes source-backed NodeScan EXPLAIN and restore-generation regressions. The ignored parser child is exercised by its parent; `zz_probe_discriminates` is excluded. Regression evidence, not P8 acceptance. |
+| Latest explicit root-HQL2 target sweep | 394 passed, 0 failed, 1 ignored across 37 root targets | All root `hql2_*_tests.rs` targets ran serially with `--no-default-features`; includes source-backed NodeScan EXPLAIN, stable G4 plan identity and typed ANALYZE counter regressions. The ignored parser child is exercised by its parent; protected `zz_probe_discriminates` is excluded. Regression evidence, not P8 acceptance. |
+| Full native Rust suite on current HQL2 closeout candidate | Exit 0; zero failures | `cargo test --locked --offline --no-default-features --jobs 2 -- --skip probe_vs_recall`; three existing soak cases remain ignored. This ran before the D7 lint-only helper-signature refactor; the post-refactor D7 adapter and property targets passed 15/15. Local regression evidence only. |
+| Strict all-target Clippy after D7 helper refactor | Default and no-default configurations passed | `cargo clippy --locked --offline --all-targets --jobs 2 -- -D warnings` and `cargo clippy --locked --offline --all-targets --no-default-features --jobs 2 -- -D warnings`. Local static checks only. |
 | Focused H2-D11 R5 restore publication regression | 21 passed across five targets | Covers U9 backup/restore, H2-D11 history/revision parity, new-publication and receipt-last restore, exact recovered frontier, unchanged nonzero `txn_frontier`, read-only generation pin/validation before exposure, and P6 generation semantics. Return metadata is prepared before rename. Independent review found cleanup after read-only/rename failure remains best-effort and unverified. |
 | Full native Rust suite on the current restore patch | Exit 0; zero failures | `cargo test --locked --offline --no-default-features --jobs 1 --no-fail-fast -- --skip probe_vs_recall`; the long probe was filtered, three soak cases remain ignored, and the parser child entrypoint is exercised by its parent. Local verification only. |
 | Source-backed plan-only EXPLAIN coverage | 1 passed, 0 failed | A changed-store NodeScan plan proves AuthorizedNodeScan, no actuals/estimates, unchanged catalog/stable frontier and unchanged on-disk tree. Partial no-side-effect evidence only; independent operator-open counters and broad P8 acceptance remain open. |
@@ -171,7 +185,7 @@ probe target not selected.
 | Separate P6/schema-v6/compatibility sweep | 194 passed, 0 failed, 0 ignored across 11 named targets | `p6_generation_tests`, `p6_lease_tests`, `p6_visibility_tests`, `p6_peer_authority_tests`, `schema6_migration_tests`, `query_ir_tests`, `hql_p0_tests`, `hql_filter_tests`, `hql_cypher_tests`, `napi_rest_parity_tests`, `rest_api_tests`; rerun in this continuation. |
 | Prior explicit HQL2/P6/schema-v6/compatibility sweep | 528 passed, 0 failed, 1 ignored across 37 named targets | Pre-edge-regression checkpoint; protected probe excluded. Superseded for current HQL2 root-target count by 389/0/1; not full P8/P13 acceptance. |
 | Native library check | `cargo check --locked --offline --no-default-features --jobs 1 --target-dir target/hql2-execution` passed | Local core compile only; no NAPI addon runtime, release or cross-platform claim. |
-| Documentation and source hygiene | docs validation: 0 violations/239 files; agent registry: 6 agents/12 routes; rustfmt check and `git diff --check` passed | Local structural checks only. |
+| Documentation and source hygiene | docs validation: 0 violations/240 files; agent registry: 6 agents/12 routes; rustfmt check and `git diff --check` passed | Local structural checks only; docs validation rerun after this evidence sync. |
 | HQL/IR Node/Edge/Row source differential | 1 passed, 0 failed | Node/Edge properties and Row `prop(r, "id")` match across HQL and IR; `r.id` remains the UUIDv4 durable revision. Row properties resolve from H2-D11 `after_image`; see local RCA `.brain/rca/RCA--HQL2-ROW-SOURCE-PROPERTY-HYDRATION.md`. |
 | HQL2 annotation ACL and ChangeScan budget regression | 11 passed, 0 failed | Namespace-only policy denies annotation subjects; explicit Annotation(Read) permits them. Three hidden Annotation revisions are excluded before caller-budget charging while a readable Node event still returns under a one-node limit. Same-lease target/evidence checks remain covered. No timing noninterference claim. |
 | Approved ChangeScan budget policy | Implemented; threshold regression passed | Preserve Namespace(Read)-authorized non-annotation subjects; exclude Annotation revisions without Annotation(Read) before caller-budget accounting/materialization. The ACL target passes 11/11; History/Change passes 16/16. Independent review and hosted CI of this source revision remain open. |
@@ -343,6 +357,16 @@ report retains the causes and distinguishing evidence:
 
 ## Current source checkpoint and open work — do not promote P8/R1
 
+The G4 plan identity and truthful counter schema are implemented under the
+approved contract. The canonical SHA-256 plan identity is shared by EXPLAIN and
+ANALYZE. Counter metadata declares units, sampling, monotonic clock source and
+operator-execution elapsed scope; unsupported measurements remain explicitly
+unknown rather than absent or zero. Source-backed plan-only EXPLAIN remains
+partial. Full per-operator exact-oracle coverage, shared-runtime qualification,
+cancellation/resource qualification, independent review, full native-suite
+verification on this patch, hosted checks, device/release qualification and
+P13 parity remain open.
+
 The local P8 kernel now executes Values, Filter, Project, Distinct, Sort, Take,
 Offset, UnionAll, Aggregate, Join, NodeScan, EdgeScan, RowScan, AnnotationScan,
 AnnotationLookup and structural root Match. The four source scans return
@@ -478,10 +502,23 @@ from these local tests.
 
 | Artifact | Before | After |
 |---|---|---|
-| Registry | 0.5.72+draft | 0.5.73+draft |
-| P8 typed boundary | 0.2.61b | 0.2.62b |
-| Orchestration plan | 0.8.66b | 0.8.67b |
-| This report | 0.1.61b | 0.1.62b |
+| Registry | 0.5.73+draft | 0.5.74+draft |
+| P8 typed boundary | 0.2.62b | 0.2.63b |
+| P6 generations/leases/ACL | 0.5.38b | 0.5.39b |
+| Orchestration plan | 0.8.67b | 0.8.68b |
+| C4 architecture index | 0.1.70b | 0.1.71b |
+| Master architecture spec | 2.3.42b | 2.3.43b |
+| This report | 0.1.62b | 0.1.63b |
+
+Version diff `0.1.62b -> 0.1.63b`: implement and verify the approved G4
+per-node ANALYZE counter schema with measured/unknown reasons, checked
+arithmetic, unit and timing metadata; publish the same stable physical-plan
+identity from EXPLAIN and ANALYZE. The 68 focused HQL2 tests, 37-target HQL2
+sweep (394/0/1) and four-target P6 sweep (31/31) pass locally. Full native
+Rust-suite and strict Clippy reruns are NOT_RUN on this patch. Independent
+review, hosted/device/release, shared-runtime, broad exact-oracle and P13
+qualification remain open. No P6 ACL/grant, schema, transport or migration
+behavior changed.
 
 Version diff `0.1.61b -> 0.1.62b`: strengthen test-only P7 comparisons for
 HQL/typed-IR Node/Edge/Row source identities, AnnotationScan/Lookup results and
@@ -684,6 +721,7 @@ P8 and release gates.
 
 | Version | Date | Status | Summary | Commit Hash | Agent |
 |---|---|---|---|---|---|
+| 0.1.63b | 2026-10-06 | beta | Implement approved G4 stable EXPLAIN/ANALYZE plan identity and truthful unit-tagged per-node counters; focused 68/68, HQL2 394/0/1 across 37, P6 31/31; full Rust suite/strict Clippy/independent review/hosted/device-release/P13 NOT_RUN or open; no P6 grant, schema, transport or migration change | working-tree | ATHER |
 | 0.1.62b | 2026-10-06 | beta | Strengthen test-only P7 identity differentials for Node/Edge/Row, AnnotationScan/Lookup and ContextPack; correct Edge oracle endpoint dependencies; focused 32/32 and HQL2 393/0/1 across 37 targets; no runtime/schema/transport change; EXPLAIN operator-open, cancellation, shared-runtime and P13 gates remain open | working-tree | ATHER |
 | 0.1.61b | 2026-10-05 | beta | Record restore/P6 21/21, HQL2 393/0/1 across 37 and full native Rust suite exit 0 with `probe_vs_recall` filtered; EXPLAIN partial, cleanup failure paths best-effort/unverified; no schema/migration change, broad P14/P8/P13 gates remain open | working-tree | ATHER |
 | 0.1.60b | 2026-10-05 | beta | Handle valid receipt-last restore, preserve `txn_frontier`, and prepare return metadata before rename; focused restore/P6 20/20 across five targets, HQL2 392/0/1 across 37 targets; source-backed EXPLAIN remains partial; full Rust suite NOT_RUN; no schema/migration change, broad P14/P8/P13 gates remain open | working-tree | ATHER |

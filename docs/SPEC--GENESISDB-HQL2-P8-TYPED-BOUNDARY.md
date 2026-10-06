@@ -1,8 +1,8 @@
 ---
 doc_id: SPEC--GENESISDB-HQL2-P8-TYPED-BOUNDARY
-version: "0.2.62b"
+version: "0.2.64b"
 created_at: "2026-09-28T01:25:00+07:00,ATHER,fc851e9"
-last_update: "2026-10-06T13:53:09+07:00,ATHER"
+last_update: "2026-10-06T15:43:00+07:00,ATHER"
 status: beta
 superseded_by: null
 owner: "Boss (Founder / Product Authority)"
@@ -76,8 +76,8 @@ Sequence ID, conjunctive labels and D4 node/edge property constraints now run
 for HQL and typed IR against one authorized P6 graph snapshot; candidate IDs
 are never looked up directly. Exact JSON values are selectively hydrated under
 budget and filtered before SHORTEST; Compact constraints remain unavailable
-and fail closed. The 10/10 P8 completion target and latest 387/0/1 root-HQL2
-sweep across 34 targets cover this slice, including edge-property filtering
+and fail closed. The 10/10 P8 completion target and latest 394/0/1 root-HQL2
+sweep across 37 targets cover this slice, including edge-property filtering
 before SHORTEST and the 13/13 D7 actor-scoped HQL1 adapter, now including
 differential-proven zero-hop ID equality with or without a label plus a
 separate 2/2 differential target for an unlabeled zero-hop property projection.
@@ -103,8 +103,8 @@ and Annotation target/evidence references with explicit body-read permission.
 The focused History/Change target passes 16/16 and the Annotation source target
 passes 7/7. Artifact HistoryScan remains capability-unsupported under the
 approved contract. Storage-backed P7 ChangeScan differentials now cover all five
-supported revision kinds. The current explicit 34-target HQL2 sweep passes
-387/0/1, with the ignored parser child entrypoint exercised by its parent. A
+supported revision kinds. The current explicit 37-target HQL2 sweep passes
+394/0/1, with the ignored parser child entrypoint exercised by its parent. A
 storage-backed HQL/typed-IR `Values`/`UnionAll` differential matches independent
 P7 for 169 nullable bag pairs (338 Storage executions), retaining duplicate
 and NULL multiplicity through explicit null-last ordering.
@@ -115,8 +115,8 @@ annotation operators, property hydration and result metadata use the same S,
 while the validated P6 generation, catalog and current policy stay pinned.
 Per-source history floors fail closed before reads, and no path falls back to
 current state. Five focused targets pass 56/56; the HistoryScan/ChangeScan
-  target passes 16/16; the explicit 34-target HQL2 regression sweep passes
-  387/0/1 and the separate P6/schema-v6/compatibility sweep passes 194/0/0.
+target passes 16/16; the explicit 37-target HQL2 regression sweep passes
+394/0/1 and the separately rerun four-target P6 sweep passes 31/31.
 These are local regression results, not broad P8/P13 or transport acceptance.
 PR #196 at head `8ac07f6` was merged at `fb7085a`. Its 16 displayed checks
 include 10 passes, five failures and one skip. Worker tests fail on
@@ -400,9 +400,10 @@ throwing expression evaluation; no filter/top-k or outer-join rewrite is enabled
 Executed QueryResultV2 follows the vendored
 [result schema](../tests/fixtures/hql2/blueprint/contracts/query-result.schema.json):
 request_id, real snapshot, typed columns/rows, semantics, completeness,
-index_frontiers, required nullable cursor, optional explain/error. No timings
-field is added to the closed Blueprint result. Sequence values serialize as
-decimal strings. Unknown counters/frontiers are absent, never invented zeros.
+index_frontiers, required nullable cursor, optional explain/error. No top-level
+timings field is added to the closed Blueprint result. Sequence values serialize
+as decimal strings. Unknown index-frontier entries remain absent. EXPLAIN and
+ANALYZE diagnostics use the separate typed counter contract below.
 
 Separate candidate search, distance fidelity, index coverage, execution
 completeness and candidate-only rerank scope. An explicit TAKE is completion;
@@ -410,15 +411,33 @@ resource exhaustion is error, never a successful partial aggregate. ContextPack
 emits a typed package binding consumable by RETURN/PROJECT, with exact registered
 token counting of final text including separators/citations and omitted evidence.
 
-`ExplainResultV2 = { request_id: String, catalog: CatalogStampV2,
+`ExplainResultV2 = { contract_version: String, planner_version: String,
+plan_hash: String, request_id: String, catalog: CatalogStampV2,
 plan: Vec<ExplainNodeV2>, root: String }`.
 `CatalogStampV2 = { observed_frontier: u64, policy_revision: u64,
 schema_fingerprint: String }` is catalog-only, not a durable snapshot lease.
+`plan_hash` is lowercase SHA-256 over the serialized `{planner_version, root,
+plan}` identity with domain prefix `genesis.hql2.plan.v2:`; planner version is
+`hql2-rule-v1`. The plan-only EXPLAIN and read-only ANALYZE responses use the
+same hash for the same physical plan.
 `ExplainNodeV2 = { id: String, logical_op: QueryOpV2, physical_op: String,
 inputs: Vec<String>, columns: Vec<ColumnV2>, estimates: Option<EstimateV2>,
 actual: Option<ActualCountersV2> }`. `actual` is omitted for plan-only EXPLAIN.
-Unknown estimates are absent. ANALYZE uses measured execution counters, not
-post-hoc row-count guesses. Plans redact query literals and inaccessible metadata.
+Unknown estimates are absent. EXPLAIN and ANALYZE return the same deterministic
+physical-plan identity. Plans redact query literals and inaccessible metadata.
+
+`ActualCountersV2` has per-node readings for `rows_in`, `rows_out`,
+`bytes_read`, `work_units`, `index_probes`, `distance_evaluations`,
+`graph_expansions`, `memory_peak_bytes`, `spill_bytes`, and `elapsed_ns`,
+plus `sampling`, `clock_source`, and `elapsed_scope`. Each reading is
+`{unit, measurement}`, where measurement is tagged `measured { value }` or
+`unknown { reason }`; reasons are `not_instrumented`, `not_applicable`,
+and `overflow`. Measured zero is distinct from unknown. Sampling is
+`complete`; elapsed timing uses `monotonic_instant` and is scoped to
+`operator_execution`. SourceScan elapsed time is unknown because source work
+occurs outside the executor timer. Uninstrumented bytes, work and peak memory
+remain explicitly unknown; unused index, vector, graph or spill counters are
+not applicable. Overflow is never saturated or reported as zero.
 
 QueryErrorV2 follows the vendored
 [error schema](../tests/fixtures/hql2/blueprint/contracts/error.schema.json):
@@ -637,10 +656,14 @@ owner-approved decision; it does not alter legacy wire identity guarantees.
 ColumnV2 fields exactly `{name:String,type:String,nullable:bool}`. Plan estimates
 are `EstimateV2 {rows_min:u64,rows_max:Option<u64>,confidence:LowOrMediumOrHigh}`;
 omit them entirely until authorized stats exist. No cost/timing estimate exists
-in the initial plan. `ActualCountersV2` has optional u64 fields `input_rows`,
-`output_rows`, `distance_evaluations`, `expanded_nodes`, `expanded_edges`,
-`source_records_examined`, `peak_accounted_bytes`, `elapsed_micros`; absent means
-not measured, numeric zero means measured zero. No raw ID/query labels.
+in the initial plan. The G4 typed `ActualCountersV2` uses closed unit-tagged
+readings and explicit measured/unknown states for the ten counters listed
+above. Unknown reasons, sampling, clock source and elapsed scope are
+serialized; overflow, uninstrumented values and non-applicable counters
+cannot be confused with measured zero. Current measurements cover input/output
+rows, vector distance evaluations, graph expansion work and non-source operator
+elapsed time. SourceScan elapsed time and uninstrumented bytes/work/memory are
+explicitly unknown. No raw ID/query labels are included.
 
 Initial physical identifiers are `Values`, `AuthorizedNodeScan`,
 `AuthorizedEdgeScan`, `AuthorizedRowScan`, `Filter`, `Project`, `NestedLoopJoin`,
@@ -870,6 +893,26 @@ separate shape limits. No process-global Pest setting is changed.
 
 ## Version diff and changelog
 
+Version diff `0.2.63b -> 0.2.64b`: record the full locked/offline no-default
+Rust suite passing with the protected `probe_vs_recall` target filtered and
+three existing soak cases ignored. The suite ran before a behavior-preserving
+D7 helper-signature lint refactor; the post-refactor adapter/property targets
+pass 15/15, and strict all-target Clippy passes in both default and
+no-default configurations. Local verification only; shared-runtime, broad
+exact-oracle, resource/cancellation, independent-review, hosted/device/release
+and P13 gates remain open.
+
+Version diff `0.2.62b -> 0.2.63b`: synchronize the approved G4 deterministic
+plan-identity and truthful ANALYZE counter contract with the implementation.
+EXPLAIN and ANALYZE return the same contract/planner versions and stable plan
+hash; per-node counters distinguish measured values, unknown reasons, units and
+timing metadata. Source elapsed time and uninstrumented values remain explicitly
+unknown. The changed focused targets pass 68/68, the HQL2 sweep passes 394/0/1
+across 37 targets, and four P6 targets pass 31/31. No P6 grant, ACL, lease,
+schema, transport or migration behavior changed. Full-suite, independent-review,
+hosted/device/release, shared-runtime, broad exact-oracle and P13 gates remain
+open.
+
 Version diff `0.2.61b -> 0.2.62b`: add test-only P7 identity comparisons for
 storage-backed HQL/typed-IR Node/Edge/Row scans, AnnotationScan/Lookup, and
 ContextPack fragments plus omitted evidence. The Edge fixture includes endpoint
@@ -1096,6 +1139,8 @@ detail with unchanged JSON shape; broader P8/P13/review gates remain open.
 
 | Version | Date | Status | Summary | Commit Hash | Agent |
 |---|---|---|---|---|---|
+| 0.2.64b | 2026-10-06 | beta | Record full locked/offline no-default Rust suite exit 0 with `probe_vs_recall` filtered and three soak cases ignored; post-refactor D7 adapter/property 15/15; strict all-target Clippy passes in default and no-default modes; local-only evidence, broad P8/P13 and review gates remain open | working-tree | ATHER |
+| 0.2.63b | 2026-10-06 | beta | Synchronize approved G4 plan identity and truthful per-node ANALYZE counters; focused 68/68, HQL2 394/0/1 across 37, P6 31/31; P6 permissions/schema/transport unchanged; broad P8/P13, exact-oracle, hosted and independent-review gates remain open | working-tree | ATHER |
 | 0.2.62b | 2026-10-06 | beta | Add test-only P7 full-identity differentials for Node/Edge/Row, AnnotationScan/Lookup and ContextPack evidence; correct Edge oracle dependency fixture; focused 32/32 and HQL2 393/0/1 across 37; no contract/runtime change; EXPLAIN operator-open, cancellation, shared-runtime and P13 remain open | working-tree | ATHER |
 | 0.2.61b | 2026-10-05 | beta | Record final restore/P6 21/21, HQL2 393/0/1 across 37 and full Rust suite exit 0 with `probe_vs_recall` filtered; cleanup failure paths remain best-effort/unverified; broad EXPLAIN/P8/P13 remain open | working-tree | ATHER |
 | 0.2.60b | 2026-10-05 | beta | Extend restore generation regression for terminal P6 receipt reuse and transaction-frontier preservation; restore/P6 20/20 across five targets, HQL2 392/0/1 across 37; full Rust suite NOT_RUN; broad EXPLAIN/P8/P13 remain open | working-tree | ATHER |

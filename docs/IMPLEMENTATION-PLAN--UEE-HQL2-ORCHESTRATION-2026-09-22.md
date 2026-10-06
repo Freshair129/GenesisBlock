@@ -1,9 +1,9 @@
 ---
-version: "0.8.67b"
+version: "0.8.69b"
 doc_id: "IMPLEMENTATION-PLAN--UEE-HQL2-ORCHESTRATION-2026-09-22"
 owner: "Boss (Founder / Product Authority)"
 created_at: "2026-09-22T00:00:00+07:00,ATHER,working-tree"
-last_update: "2026-10-06T13:53:09+07:00,ATHER"
+last_update: "2026-10-06T15:43:00+07:00,ATHER"
 status: beta
 superseded_by: null
 attributes:
@@ -28,6 +28,10 @@ attributes:
 เมื่อ 2026-10-02 owner อนุมัติ [P8 completion addendum](adr/ADR--GENESISDB-HQL2-P8-COMPLETION-ADDENDUM.md)
 ให้ทำ D1-D6 ต่อใน worktree แยก โดยคง P6 authorization-before-parse, Compact wire
 และลำดับ P9-P13; approval นี้ไม่อนุญาต user database migration, merge, release หรือ deploy
+เมื่อ 2026-10-04 owner อนุมัติ contract ใน
+[G4 shared-pipeline ADR](adr/ADR--GENESISDB-HQL2-G4-SHARED-PIPELINE.md)
+ให้ทำ shared explicit-v2 plan identity และ truthful ANALYZE counters ต่อภายใต้ P6 lease;
+approval นี้ไม่ปิด G4/P8/P13 และไม่อนุญาต public transport, migration, release หรือ deploy
 
 ## 1. Decision ที่เสนอ
 
@@ -311,6 +315,31 @@ passes 194/0/0. Previous hosted worker failures and independent review remain
 open; hosted validation of the current branch tip is still required.
 No schema/migration change; broader P8/P13, transport and security gates remain
 open.
+
+### Current G4/P8 candidate status (2026-10-06)
+
+The owner-approved G4 contract is recorded in
+[ADR--GENESISDB-HQL2-G4-SHARED-PIPELINE](adr/ADR--GENESISDB-HQL2-G4-SHARED-PIPELINE.md)
+version 0.1.3b. This candidate returns the same stable contract/planner version
+and canonical physical-plan hash from EXPLAIN and ANALYZE. Per-node ANALYZE
+counters use explicit measured/unknown states, units, unknown reasons, sampling,
+clock source and elapsed scope; overflow is not converted to a saturated value.
+The P6 lease, ACL/grants, schema, transport and migration contracts are unchanged.
+
+Current local evidence: changed focused HQL2 targets pass 68/68; all 37 root
+HQL2 targets pass 394/0/1; four selected P6 targets pass 31/31. The full
+locked/offline no-default Rust suite exits 0 with `probe_vs_recall` filtered and
+three existing soak cases ignored; this run preceded the behavior-preserving D7
+lint refactor. After that refactor, D7 adapter/property targets pass 15/15 and
+strict all-target Clippy passes in default and no-default configurations.
+Independent review, hosted checks, device/release qualification, shared-runtime
+qualification, full per-operator P7 exact-oracle coverage, cancellation/resource
+qualification and P13 parity remain open; this candidate is not G4/P8 completion.
+
+Integration remains a separate open gate: branch `codex/hql2-execution` is
+48 commits behind and 30 commits ahead of the current `origin/main`; a read-only
+merge simulation reports 15 content conflicts. Do not resolve that by replacing
+protected WIP or by treating the local regression sweep as merge acceptance.
 
 ## 8. P5 execution evidence
 
@@ -851,11 +880,11 @@ Remaining HQL2/P8 acceptance gates stay open.
 | WAL revision event and projections | Partial | Local graph, standalone relational batch, unified transaction, vector writes, annotation CAS writes and supported consensus graph proposals carry revision envelopes; consensus signs the final envelope and stale predecessors fail before append. Graph/row/vector replay and annotation compact/reopen are covered. Folded graph and relational materializations are not yet revision-bound peer-ingress checkpoints and remain fail-closed. |
 | Annotation persistence and ACL | Partial | Annotation payloads and separate target/evidence roles are normalized; frozen refs/cycles are preflighted before WAL; policy event v2 stores `Annotation(namespace)` through compact/reopen. AnnotationScan, hydration and Annotation ChangeScan subjects require explicit Annotation(Read), separately from the Namespace(Read) query grant; unauthorized Annotation revisions are excluded from ChangeScan count/byte budget and row materialization before query-budget charging. Same-namespace refs are checked recursively at the P6 snapshot. Namespace-only denial, combined-grant scan/change, and hidden-revision threshold tests pass. Exact-grant-only query authorization remains unsupported. |
 | HQL2 storage-backed source adapters and text operators | Partial | Node/Edge/Row/Annotation scans return revision-bound refs with bounded pagination and current ACL under the P6 lease; `FieldIdV2`/`ExecBatchV2` provides aligned selective hydration. LexicalMatch and ContextPack now execute with registered `unicode-whitespace-bm25-v1` and `unicode-scalar-v1` profiles under that source boundary. Transport parity, broad exact-oracle coverage and full P8/P13 qualification remain open. |
-| HQL1 actor-scoped adapter | Partial | `Storage::query_v2` supports differential-tested zero-hop node-ID projections (unlabeled or with one plain-ASCII label, optionally with one same-alias exact string ID equality), one unlabeled unconstrained zero-hop single-property projection with a plain-ASCII key, bounded unlabeled one-hop `MATCH` ID projections after P6 authorization (one endpoint-ID exact string equality is allowed), and single-hop `TRAVERSE` ID projection for one physical relation or `ANY` in default/out/in/both directions. The traversal requires an exact seed, depth 1 and `RETURN id`; fuzzy/temporal/predicate/order/limit/union/inferred/deeper shapes remain unsupported. Differential coverage checks legacy/HQL2 bags, parallel-edge deduplication and self-loop exclusion. The property target compares legacy/HQL2/adapter bags for duplicate, missing, explicit-null and nested JSON values; other property shapes remain unsupported. Parser resources are preflighted and budgeted before AST construction. Focused targets pass 13/13 plus 2/2; the current HQL2 regression sweep passes 393/0/1 across 37 targets. Other HQL1 commands/forms, independent review and full shared-runtime/P8/P13 acceptance remain open. |
+| HQL1 actor-scoped adapter | Partial | `Storage::query_v2` supports differential-tested zero-hop node-ID projections (unlabeled or with one plain-ASCII label, optionally with one same-alias exact string ID equality), one unlabeled unconstrained zero-hop single-property projection with a plain-ASCII key, bounded unlabeled one-hop `MATCH` ID projections after P6 authorization (one endpoint-ID exact string equality is allowed), and single-hop `TRAVERSE` ID projection for one physical relation or `ANY` in default/out/in/both directions. The traversal requires an exact seed, depth 1 and `RETURN id`; fuzzy/temporal/predicate/order/limit/union/inferred/deeper shapes remain unsupported. Differential coverage checks legacy/HQL2 bags, parallel-edge deduplication and self-loop exclusion. The property target compares legacy/HQL2/adapter bags for duplicate, missing, explicit-null and nested JSON values; other property shapes remain unsupported. Parser resources are preflighted and budgeted before AST construction. Focused targets pass 13/13 plus 2/2; the current HQL2 regression sweep passes 394/0/1 across 37 targets. Other HQL1 commands/forms, independent review and full shared-runtime/P8/P13 acceptance remain open. |
 | HQL2 structural root Match | Partial | Compact/Sequence graph patterns execute through HQL and typed IR under one P6 graph snapshot; deterministic shortest-per-endpoint results, stable tie order, P6 budget errors and HQL/IR parity are tested. Typed-IR anchors compare full validated RecordRefs with no direct lookup and filter before shortest deduplication. Node/edge properties filter before SHORTEST; the 10-test P8 completion target passes. |
-| HQL2 Sequence node ID, labels and properties | Implemented; local verification passed | Exact UTF-8 IDs, conjunctive labels and node/edge exact-JSON properties execute for HQL/typed-IR Match and Expand under one P6 snapshot; no direct lookup, optional semantics and pre-SHORTEST filtering preserved. Current regression sweep 393/0/1 across 37 targets; the separate 11-target P6/schema-v6/compatibility group passed 194/0/0. Compact remains unsupported; broad P8/P13 acceptance remains open despite no concrete static review finding. |
+| HQL2 Sequence node ID, labels and properties | Implemented; local verification passed | Exact UTF-8 IDs, conjunctive labels and node/edge exact-JSON properties execute for HQL/typed-IR Match and Expand under one P6 snapshot; no direct lookup, optional semantics and pre-SHORTEST filtering preserved. Current regression sweep 394/0/1 across 37 targets; the separate 11-target P6/schema-v6/compatibility group passed 194/0/0. Compact remains unsupported; broad P8/P13 acceptance remains open despite no concrete static review finding. |
 | HQL/typed-IR relational Join | Implemented; local differential passed | HQL `JOIN TABLE` lowers to the existing two-input Join operator for Inner/Left/Semi/Anti; bare JOIN defaults to Inner. HQL and typed IR match independent P7 for duplicate, SQL-NULL and JSON-null values (5/7/3/2); Semi/Anti keep left-only scope. Broad exact-oracle, review and P8/P13 gates remain open. |
-| HQL/typed-IR `Values`/`UnionAll` differential | Test-only differential passed | All 169 pairs from 13 empty/length-one/two nullable bags over NULL/-1/2 match independent P7 through 338 Storage executions; explicit null-last ordering retains duplicate and NULL multiplicity. Current HQL2 sweep is 393/0/1 across 37 targets. No runtime/contract/schema/transport change; broad exact-oracle and P8/P13 gates remain open. |
+| HQL/typed-IR `Values`/`UnionAll` differential | Test-only differential passed | All 169 pairs from 13 empty/length-one/two nullable bags over NULL/-1/2 match independent P7 through 338 Storage executions; explicit null-last ordering retains duplicate and NULL multiplicity. Current HQL2 sweep is 394/0/1 across 37 targets. No runtime/contract/schema/transport change; broad exact-oracle and P8/P13 gates remain open. |
 | Vector query parameter boundary | Partial | Typed IR declarations and HQL contextual parameters validate collection fingerprint/space and dimension with finite values. Exact KNN and Original Rerank execute original vectors with deterministic distance ties; Approx remains fail-closed. The vector target passes 12/12; broader P8 qualification remains open. |
 
 This status supersedes earlier wording that said no migration runner or resume
@@ -910,6 +939,24 @@ local RCA `.brain/rca/RCA--HQL2-ROW-SOURCE-PROPERTY-HYDRATION.md`. These local
 results remain regression evidence, not P8 acceptance.
 
 ## CHANGELOG
+
+Version diff `0.8.68b -> 0.8.69b`: synchronize current verification evidence:
+the full locked/offline no-default Rust suite exits 0 with `probe_vs_recall`
+filtered and three existing soak cases ignored; the suite preceded the
+behavior-preserving D7 lint refactor, whose adapter/property targets pass 15/15;
+strict all-target Clippy passes in both default and no-default configurations.
+These are local regression checks, not P8 acceptance. Independent review,
+hosted/device/release, shared-runtime, broad exact-oracle, P13 and conflict-safe
+integration gates remain open. No H2-D11 authority or transport/migration
+contract changed.
+
+Version diff `0.8.67b -> 0.8.68b`: synchronize the owner-approved G4 shared
+pipeline contract and current implementation evidence. Record stable plan
+identity, truthful per-node counters, focused 68/68, HQL2 394/0/1 across 37
+targets and selected P6 31/31. Keep independent review,
+hosted/device/release, shared-runtime, broad exact-oracle, P13 and 15-conflict
+integration gates explicitly open. No H2-D11 authority or transport/migration
+contract changed.
 
 Version diff `0.8.66b -> 0.8.67b`: strengthen the test-only storage-backed P7
 identity differentials for Node/Edge/Row scans, AnnotationScan/Lookup and

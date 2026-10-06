@@ -2,10 +2,10 @@
 doc_id: C4--GENESISDB-ARCHITECTURE
 type: architecture-index
 status: current
-version: 0.1.70b
+version: 0.1.72b
 owner: GenesisBlockDB Architecture
 created_at: 2026-06-13T22:50:11+07:00,ATHER,9b1ced3
-last_update: "2026-10-05T04:19:54+07:00,ATHER"
+last_update: "2026-10-06T14:42:41+07:00,ATHER"
 attributes:
   domain: architecture
   scope: repository
@@ -20,7 +20,8 @@ related_docs:
   - docs/SPEC--GENESISDB-P6-GENERATIONS-LEASES-ACL.md
   - docs/adr/ADR--GENESISDB-HQL2-DURABLE-REVISIONS-ANNOTATIONS.md
   - docs/adr/ADR--GENESISDB-HQL2-PATTERN-CONSTRAINTS.md
-  - docs/adr/ADR--GENESISDB-HQL2-P8-COMPLETION-ADDENDUM.md
+ - docs/adr/ADR--GENESISDB-HQL2-P8-COMPLETION-ADDENDUM.md
+  - docs/adr/ADR--GENESISDB-HQL2-G4-SHARED-PIPELINE.md
 ---
 
 # C4--GENESISDB-ARCHITECTURE
@@ -81,10 +82,16 @@ focused target now passes 15/15, including one selected transaction frontier
 across HQL/IR source scans, graph/vector/annotation operators, hydration and
 `Snapshot.tx`. HQL2/IR `tx_as_of` fails closed below history/source floors and
 never falls back to current rows; the validated P6 generation and current
-policy remain pinned. Five focused targets pass 56/56; the 34-target HQL2
-regression sweep passes 387/0/1 and the separate 11-target P6/schema-v6/
-compatibility sweep passes 194/0/0. These are local regression results, not
-broad P8/P13, transport, hosted CI or independent-review acceptance.
+policy remains pinned. The earlier 56/56 focused targets and 34-target
+387/0/1 HQL2 sweep are historical. The latest explicit root-HQL2 sweep passes
+394/0/1 across 37 targets; the selected four-target P6 regression set passes
+31/31. These remain local regression results, not broad P8/P13, transport,
+hosted CI or independent-review acceptance.
+The approved G4 shared pipeline now gives EXPLAIN and ANALYZE the same stable
+plan identity and typed per-node counters with explicit measured/unknown
+reasons. SourceScan elapsed time and uninstrumented values remain unknown;
+full operator-oracle, cancellation/resource, shared-runtime, P13 and
+independent-review gates remain open.
 Storage-backed HQL/typed-IR HistoryScan bags for Node, Edge, Row, Vector and
 Annotation match independent P7 catalogs assembled from WAL-derived revision
 facts and captured transaction/valid-time windows; endpoint, vector-owner and
@@ -475,6 +482,12 @@ Broader EXPLAIN/P8/P13 and P14 rehearsal remain open.
 
 ## CHANGELOG
 
+Version diff 0.1.70b -> 0.1.72b: synchronize the approved G4 plan identity and
+truthful ANALYZE counters with local evidence: focused 68/68, HQL2 394/0/1
+across 37 targets and selected P6 31/31. Keep full native-suite/Clippy,
+independent-review, hosted/device/release, shared-runtime, exact-oracle and
+P13 gates open; no P6/ACL/schema/transport/migration change.
+
 Version diff 0.1.69b -> 0.1.70b: record restore/P6 21/21, HQL2 393/0/1
 across 37 targets, and full Rust suite exit 0 with `probe_vs_recall` filtered.
 Keep partial EXPLAIN and best-effort cleanup limitations explicit; broad
@@ -598,6 +611,7 @@ full P8/P13 qualification remains open.
 
 | Version | Date | Status | Summary | Commit Hash | Agent |
 |---------|------|--------|---------|-------------|-------|
+| 0.1.72b | 2026-10-06 | current | Synchronize approved G4 stable EXPLAIN/ANALYZE plan identity and truthful typed counters; focused 68/68, HQL2 394/0/1 across 37, P6 31/31; P8/P13, full-suite, review and external qualification remain open | working-tree | ATHER |
 | 0.1.70b | 2026-10-05 | current | Record restore/P6 21/21, HQL2 393/0/1 across 37, full Rust suite exit 0 with `probe_vs_recall` filtered; EXPLAIN partial, cleanup failure paths best-effort/unverified; P14/P8/P13 gates remain open | working-tree | ATHER |
 | 0.1.69b | 2026-10-05 | current | Handle valid receipt-last restores, preserve `txn_frontier`, and prepare return metadata before target rename; restore/P6 20/20, HQL2 392/0/1 across 37 targets; EXPLAIN partial, full Rust suite NOT_RUN, P14/P8/P13 gates open | working-tree | ATHER |
 | 0.1.68b | 2026-10-05 | current | Implement approved R5 staging generation publication and independent read-only validation; clarify manifest/data versus local receipt frontier; focused 15/15, HQL2 391/0/1 across 37 targets and NodeScan EXPLAIN 1/1; full Rust suite NOT_RUN on patch, P14/P8/P13 gates remain open | working-tree | ATHER |
