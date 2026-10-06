@@ -1,9 +1,9 @@
 ---
 doc_id: SPEC--GENESISDB-G3-EXACT-ORACLE-AND-RECOVERY
 owner: GenesisBlockDB Engineering
-version: 0.1.1b
+version: 0.1.2b
 created_at: "2026-10-04T00:00:00+07:00,Codex,working-tree"
-last_update: "2026-10-04T00:00:00+07:00,Codex"
+last_update: "2026-10-06T06:30:22+07:00,Codex"
 status: draft
 superseded_by: null
 attributes:
@@ -65,12 +65,22 @@ benchmark.
 
 ## Differential and recovery gates
 
-The Rust differential target runs every fixture through `Storage`, compares its
+The Rust differential target runs every fixture through Storage, compares its
 canonical result with the fixture oracle, saves a snapshot, removes the
 materialized snapshot/projection files while retaining the authoritative WAL,
-reopens, and compares the same results again. The test records the stable
-frontier before and after recovery and requires the recovered frontier to cover
-the fixture's durable mutations.
+reopens, and compares the same results again. A passing WAL-only recovery proof
+must also:
+
+1. tolerate only NotFound while removing each listed materialized file and
+   fail on every other removal error;
+2. confirm every listed materialized file is absent before reopening;
+3. capture the stable frontier after all fixture mutations and before close,
+   then require the recovered frontier to be at least that captured value; and
+4. preserve exact pre-reopen/post-reopen equality and equality with the fixture
+   golden result.
+
+Until all four assertions are present and pass, label WAL-only recovery
+NOT_PROVEN; result equality by itself is insufficient.
 
 The existing crash-simulation matrix remains a separate fault-injection gate.
 G3 adds only the oracle-backed semantic comparison; it does not weaken existing
@@ -93,16 +103,28 @@ This spec does not prove hosted CI, power-loss hardware behavior, mobile/device
 behavior, release packaging, planner correctness, or production readiness.
 Those remain NOT_RUN until their named external gates execute.
 
-## Local execution evidence — 2026-10-04
+## Local execution evidence — 2026-10-04 (historical baseline)
 
-The pure Python oracle gate passes 1/1 cases under both the direct
-standard-library runner and the prescribed `uv run --with-requirements`
-runner. The Rust differential/reopen target passes 2/2 cases. The fixture
-exercises temporal graph version selection and relational NULL/bag left-join
-semantics before and after materialized snapshot/projection removal with WAL
-recovery. Existing G1/G2/crash regression targets pass in the bounded matrix;
-the full `cargo test --no-default-features` sweep completed with exit code 0,
-including the 60-build `probe_vs_recall` target and crate doc-tests.
+The pure Python oracle gate passed 1/1 cases under both the direct
+standard-library runner and the prescribed uv run --with-requirements runner.
+The Rust differential/reopen target passed 2/2 cases. Existing G1/G2/crash
+regression targets passed in the bounded matrix; the recorded full
+cargo test --no-default-features sweep completed with exit code 0, including
+the 60-build probe_vs_recall target and crate doc-tests. These historical
+results establish query-oracle and regression evidence, not the WAL-only
+precondition now specified above.
+
+## Recovery-proof evidence review — 2026-10-06
+
+On the current mainline, the focused Rust target passes 2/2 as a baseline.
+Inspection found that remove_materialized_state discards all file-removal
+errors and the temporal and relational paths do not assert a post-reopen stable
+frontier. Therefore the baseline does not prove that materialized state was
+absent or that the recovered frontier covers every durable fixture mutation.
+Status: result comparison locally verified; WAL-only recovery proof
+NOT_PROVEN; correction implementation and its verification are pending.
+This is a test-evidence finding, not a confirmed storage-engine defect. The
+bounded correction does not close broad HQL2 P7 or any external release gate.
 
 This is local working-tree evidence only. Hosted CI, power-loss hardware,
 mobile/device, release packaging, deployment, independent review, and
@@ -112,5 +134,6 @@ production acceptance are NOT_RUN. G4+ remains deferred.
 
 | Version | Date | Status | Summary | Commit | Agent |
 |---|---|---|---|---|---|
+| 0.1.2b | 2026-10-06 | draft | Specify fail-closed materialized-file removal and recovered-frontier assertions; downgrade the current 2/2 baseline to NOT_PROVEN for WAL-only recovery until the assertions exist and pass. | working-tree | Codex |
 | 0.1.1b | 2026-10-04 | candidate | Added local Python and Rust differential/reopen evidence for the bounded g3.oracle.v1 fixture; external gates remain NOT_RUN. | working-tree | Codex |
 | 0.1.0b | 2026-10-04 | draft | Define a pure G3 oracle, canonical fixtures, differential comparison, and WAL-backed recovery rerun. | working-tree | Codex |

@@ -2,7 +2,7 @@
 title: "GenesisBlockDB Document Registry"
 doc_id: "DOC-REGISTRY-GENESISBLOCKDB"
 status: draft
-version: "0.5.93+draft"
+version: "0.5.94+draft"
 updated: "2026-10-06"
 owner: "GenesisBlockDB Architecture"
 source_of_truth: true
@@ -59,7 +59,7 @@ registry row explicitly names them.
 | HQL2 P8 completion addendum | `ADR--GENESISDB-HQL2-P8-COMPLETION-ADDENDUM` | `0.1.14b` | accepted | Boss (Founder / Product Authority) | `docs/adr/ADR--GENESISDB-HQL2-P8-COMPLETION-ADDENDUM.md` |
 | HQL2 Sequence pattern constraints | `ADR--GENESISDB-HQL2-PATTERN-CONSTRAINTS` | `0.2.1b` | beta | Boss (Founder / Product Authority) | `docs/adr/ADR--GENESISDB-HQL2-PATTERN-CONSTRAINTS.md` |
 | HQL2 durable revisions and annotations | `ADR--GENESISDB-HQL2-DURABLE-REVISIONS-ANNOTATIONS` | `0.8.27b` | beta | Boss (Founder / Product Authority) | `docs/adr/ADR--GENESISDB-HQL2-DURABLE-REVISIONS-ANNOTATIONS.md` |
-| UEE-HQL2 orchestration plan | `IMPLEMENTATION-PLAN--UEE-HQL2-ORCHESTRATION-2026-09-22` | `0.8.77b` | beta | Boss (Founder / Product Authority) | `docs/IMPLEMENTATION-PLAN--UEE-HQL2-ORCHESTRATION-2026-09-22.md` |
+| UEE-HQL2 orchestration plan | `IMPLEMENTATION-PLAN--UEE-HQL2-ORCHESTRATION-2026-09-22` | `0.8.78b` | beta | Boss (Founder / Product Authority) | `docs/IMPLEMENTATION-PLAN--UEE-HQL2-ORCHESTRATION-2026-09-22.md` |
 | HQL2 typed P8 boundary | `SPEC--GENESISDB-HQL2-P8-TYPED-BOUNDARY` | `0.2.65b` | beta | Boss (Founder / Product Authority) | `docs/SPEC--GENESISDB-HQL2-P8-TYPED-BOUNDARY.md` |
 | HQL2 P8 core checkpoint | `REPORT--HQL2-P8-CORE-2026-09-28` | `0.1.69b` | beta | GenesisBlockDB Engineering | `docs/REPORT--HQL2-P8-CORE-2026-09-28.md` |
 | HQL2 P7 bounded oracle evidence | `REPORT--HQL2-P7-ORACLE-2026-09-28` | `0.1.12b` | beta | GenesisBlockDB Engineering | `docs/REPORT--HQL2-P7-ORACLE-2026-09-28.md` |
@@ -482,6 +482,7 @@ review and full P8 gates remain open.
 
 | Version | Date | Owner | Summary |
 |---|---|---|---|
+| 0.5.94+draft | 2026-10-06 | GenesisBlockDB Architecture | Record the G3 recovery-proof test gap and P7.1 test-only acceptance; synchronize plan 0.8.78b while keeping model/code authorization and broad P7 gates open |
 | 0.5.93+draft | 2026-10-06 | GenesisBlockDB Architecture | Record current P6 mainline closeout integration and local results: P6 49/49, focused integrated targets 44/44, HQL2 407/0/1 across 40 targets; synchronize H2-D11/P8/plan/report entries; broader P8/P13, hosted and release gates remain open |
 | 0.5.92+draft | 2026-10-06 | GenesisBlockDB Architecture | Reconcile HQL2 AnnotationScan P7 temporal/ACL evidence with the P6 mainline closeout; preserve future-valid/post-S controls and separate query-level FORBIDDEN evidence; P8 and broader release/transport qualification remain open |
 | 0.5.83+draft | 2026-10-06 | GenesisBlockDB Architecture | Synchronize controlled AnnotationScan P7 temporal differential and separate HQL/IR Annotation(Read) denial evidence across P7/P8/H2-D11/plan/report; four focused targets pass 42/42; no runtime/P6/schema/transport change |
