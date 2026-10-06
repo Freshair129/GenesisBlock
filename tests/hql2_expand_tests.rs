@@ -537,6 +537,7 @@ fn analyze_reports_root_match_graph_work_and_budget_never_returns_partial_rows()
         "contract_version":"genesis.api.v2",
         "request_id":"match-budget",
         "namespace":"default",
+        "explain":"analyze",
         "budget":{"max_expanded_nodes":1},
         "params":{},
         "ir":match_ir(false)
@@ -612,6 +613,7 @@ fn graph_edge_budget_exhaustion_fails_without_returning_partial_rows() {
         "contract_version":"genesis.api.v2",
         "request_id":"expand-edge-budget",
         "namespace":"default",
+        "explain":"analyze",
         "budget":{"max_expanded_edges":1},
         "ir":compact_ir(),
         "params":{}

@@ -1,8 +1,8 @@
 ---
 doc_id: REPORT--HQL2-P8-CORE-2026-09-28
-version: "0.1.64b"
+version: "0.1.65b"
 created_at: "2026-09-28T04:35:00+07:00,ATHER,22bc11e"
-last_update: "2026-10-06T15:43:00+07:00,ATHER"
+last_update: "2026-10-06T16:03:00+07:00,ATHER"
 status: beta
 owner: GenesisBlockDB Engineering
 attributes:
@@ -116,10 +116,16 @@ EXPLAIN and ANALYZE now report the same contract version, planner version and
 stable physical-plan hash. ANALYZE counters are closed, unit-tagged readings:
 measured values remain distinct from unknown-with-reason, and arithmetic
 overflow is not saturated into a plausible value. SourceScan elapsed time and
-uninstrumented bytes/work/memory remain unknown. The changed focused HQL2
-targets pass 68/68, the explicit HQL2 target set passes 394/0/1 across 37
-targets, and four P6 targets pass 31/31. This is local regression evidence,
-not G4/P8 closure.
+uninstrumented bytes/work/memory remain unknown. At the prior G4 checkpoint,
+changed focused HQL2 targets passed 68/68, the explicit HQL2 target set passed
+394/0/1 across 37 targets, and four P6 targets passed 31/31. This update adds
+test coverage only: ANALYZE budget failures are exercised for Values, graph
+Expand/root Match and Sequence; vector ANALYZE checks two measured distance
+evaluations and budget failure; denied namespace access is checked before
+malformed HQL parsing in ANALYZE mode. The four focused execution/graph/sequence/
+vector targets pass 51/51 on the current tree. The 37-target sweep was not
+rerun after these test-only edits, so 394/0/1 remains the prior checkpoint only.
+This is local regression evidence, not G4/P8 closure.
 
 ## Verification record
 
@@ -502,13 +508,25 @@ from these local tests.
 
 | Artifact | Before | After |
 |---|---|---|
-| Registry | 0.5.73+draft | 0.5.74+draft |
-| P8 typed boundary | 0.2.62b | 0.2.63b |
-| P6 generations/leases/ACL | 0.5.38b | 0.5.39b |
-| Orchestration plan | 0.8.67b | 0.8.68b |
-| C4 architecture index | 0.1.70b | 0.1.71b |
-| Master architecture spec | 2.3.42b | 2.3.43b |
-| This report | 0.1.62b | 0.1.63b |
+| Registry | 0.5.75+draft | 0.5.76+draft |
+| P8 typed boundary | 0.2.64b | 0.2.65b |
+| Orchestration plan | 0.8.69b | 0.8.70b |
+| This report | 0.1.64b | 0.1.65b |
+
+Version diff `0.1.64b -> 0.1.65b`: add regression coverage that ANALYZE
+budget exhaustion returns no partial rows across scalar, graph, sequence and
+vector operators; assert exact measured vector-distance counts; and verify
+namespace authorization precedes malformed HQL parsing in ANALYZE mode. The
+four current focused targets pass 51/51. No runtime, contract, schema or
+transport behavior changed; the broad 37-target sweep and P8/P13 acceptance
+were not rerun or closed by this test-only update.
+
+Version diff `0.1.63b -> 0.1.64b`: record the full locked/offline no-default
+Rust suite passing with `probe_vs_recall` filtered and three soak cases ignored;
+the suite preceded a behavior-preserving D7 lint refactor, whose adapter and
+property targets passed 15/15, and strict all-target Clippy passed in default
+and no-default modes. Local verification only; broad P8/P13 and review gates
+remain open.
 
 Version diff `0.1.62b -> 0.1.63b`: implement and verify the approved G4
 per-node ANALYZE counter schema with measured/unknown reasons, checked
@@ -721,6 +739,8 @@ P8 and release gates.
 
 | Version | Date | Status | Summary | Commit Hash | Agent |
 |---|---|---|---|---|---|
+| 0.1.65b | 2026-10-06 | beta | Add ANALYZE no-partial budget regressions across Values/graph/sequence/vector, exact vector distance counter verification and pre-parse namespace denial; four focused targets 51/51; test-only, broad sweep/P8/P13 not rerun or closed | working-tree | ATHER |
+| 0.1.64b | 2026-10-06 | beta | Record locked/offline no-default Rust suite exit 0 with protected probe filtered and three soak cases ignored; post-refactor D7 adapter/property 15/15 and strict Clippy default/no-default pass; local-only, broad P8/P13 and review open | working-tree | ATHER |
 | 0.1.63b | 2026-10-06 | beta | Implement approved G4 stable EXPLAIN/ANALYZE plan identity and truthful unit-tagged per-node counters; focused 68/68, HQL2 394/0/1 across 37, P6 31/31; full Rust suite/strict Clippy/independent review/hosted/device-release/P13 NOT_RUN or open; no P6 grant, schema, transport or migration change | working-tree | ATHER |
 | 0.1.62b | 2026-10-06 | beta | Strengthen test-only P7 identity differentials for Node/Edge/Row, AnnotationScan/Lookup and ContextPack; correct Edge oracle endpoint dependencies; focused 32/32 and HQL2 393/0/1 across 37 targets; no runtime/schema/transport change; EXPLAIN operator-open, cancellation, shared-runtime and P13 gates remain open | working-tree | ATHER |
 | 0.1.61b | 2026-10-05 | beta | Record restore/P6 21/21, HQL2 393/0/1 across 37 and full native Rust suite exit 0 with `probe_vs_recall` filtered; EXPLAIN partial, cleanup failure paths best-effort/unverified; no schema/migration change, broad P14/P8/P13 gates remain open | working-tree | ATHER |

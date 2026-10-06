@@ -308,6 +308,7 @@ fn sequence_budget_exhaustion_returns_no_partial_result() {
         "contract_version":"genesis.api.v2",
         "request_id":"sequence-edge-budget",
         "namespace":"default",
+        "explain":"analyze",
         "budget":{"max_expanded_edges":1},
         "ir":ir(sequence("trail"), false),
         "params":{}

@@ -1,8 +1,8 @@
 ---
 doc_id: SPEC--GENESISDB-HQL2-P8-TYPED-BOUNDARY
-version: "0.2.64b"
+version: "0.2.65b"
 created_at: "2026-09-28T01:25:00+07:00,ATHER,fc851e9"
-last_update: "2026-10-06T15:43:00+07:00,ATHER"
+last_update: "2026-10-06T16:03:00+07:00,ATHER"
 status: beta
 superseded_by: null
 owner: "Boss (Founder / Product Authority)"
@@ -893,6 +893,14 @@ separate shape limits. No process-global Pest setting is changed.
 
 ## Version diff and changelog
 
+Version diff `0.2.64b -> 0.2.65b`: record current-tree ANALYZE regression
+coverage for no-partial budget errors across scalar, graph, sequence and vector
+operators, exact measured vector-distance counts, and namespace denial before
+malformed HQL parsing. Four focused targets pass 51/51. Test evidence only; the
+contract is unchanged and broad P8/P13, shared-runtime, exact-oracle,
+resource/cancellation, independent-review and hosted/device/release gates remain
+open.
+
 Version diff `0.2.63b -> 0.2.64b`: record the full locked/offline no-default
 Rust suite passing with the protected `probe_vs_recall` target filtered and
 three existing soak cases ignored. The suite ran before a behavior-preserving
@@ -1139,6 +1147,7 @@ detail with unchanged JSON shape; broader P8/P13/review gates remain open.
 
 | Version | Date | Status | Summary | Commit Hash | Agent |
 |---|---|---|---|---|---|
+| 0.2.65b | 2026-10-06 | beta | Record current-tree ANALYZE budget/no-partial, exact vector-distance and pre-parse namespace-denial regressions; four focused targets 51/51; no contract/runtime change, broad P8/P13 gates remain open | working-tree | ATHER |
 | 0.2.64b | 2026-10-06 | beta | Record full locked/offline no-default Rust suite exit 0 with `probe_vs_recall` filtered and three soak cases ignored; post-refactor D7 adapter/property 15/15; strict all-target Clippy passes in default and no-default modes; local-only evidence, broad P8/P13 and review gates remain open | working-tree | ATHER |
 | 0.2.63b | 2026-10-06 | beta | Synchronize approved G4 plan identity and truthful per-node ANALYZE counters; focused 68/68, HQL2 394/0/1 across 37, P6 31/31; P6 permissions/schema/transport unchanged; broad P8/P13, exact-oracle, hosted and independent-review gates remain open | working-tree | ATHER |
 | 0.2.62b | 2026-10-06 | beta | Add test-only P7 full-identity differentials for Node/Edge/Row, AnnotationScan/Lookup and ContextPack evidence; correct Edge oracle dependency fixture; focused 32/32 and HQL2 393/0/1 across 37; no contract/runtime change; EXPLAIN operator-open, cancellation, shared-runtime and P13 remain open | working-tree | ATHER |

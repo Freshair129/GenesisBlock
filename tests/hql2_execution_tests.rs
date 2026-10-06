@@ -359,15 +359,20 @@ fn namespace_authorization_precedes_even_malformed_hql_or_ir() {
     )
     .unwrap();
     let before = db.stable_frontier();
-    let mut request = values_request();
-    request.ir = None;
-    request.hql = Some("not a query".into());
-    request.language_version = Some(uee_v2::HqlLanguageVersionV2::HqlV2);
-    assert_eq!(
-        db.query_v2(access(), request).unwrap_err().code,
-        "FORBIDDEN"
-    );
-    assert_eq!(db.stable_frontier(), before);
+    for analyze in [false, true] {
+        let mut request = values_request();
+        request.ir = None;
+        request.hql = Some("not a query".into());
+        request.language_version = Some(uee_v2::HqlLanguageVersionV2::HqlV2);
+        if analyze {
+            request.explain = Some(uee_v2::ExplainV2::Analyze);
+        }
+        assert_eq!(
+            db.query_v2(access(), request).unwrap_err().code,
+            "FORBIDDEN"
+        );
+        assert_eq!(db.stable_frontier(), before);
+    }
 }
 
 #[test]
@@ -531,6 +536,7 @@ fn analyze_reports_measured_rows_and_budget_failures_never_return_partial_rows()
         json!({"max_memory_bytes":1}),
     ] {
         let mut request = values_request();
+        request.explain = Some(uee_v2::ExplainV2::Analyze);
         request.budget = Some(serde_json::from_value(budget).unwrap());
         assert_eq!(
             db.query_v2(access(), request).unwrap_err().code,

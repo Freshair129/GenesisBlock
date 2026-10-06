@@ -1,9 +1,9 @@
 ---
-version: "0.8.69b"
+version: "0.8.70b"
 doc_id: "IMPLEMENTATION-PLAN--UEE-HQL2-ORCHESTRATION-2026-09-22"
 owner: "Boss (Founder / Product Authority)"
 created_at: "2026-09-22T00:00:00+07:00,ATHER,working-tree"
-last_update: "2026-10-06T15:43:00+07:00,ATHER"
+last_update: "2026-10-06T16:03:00+07:00,ATHER"
 status: beta
 superseded_by: null
 attributes:
@@ -326,20 +326,24 @@ counters use explicit measured/unknown states, units, unknown reasons, sampling,
 clock source and elapsed scope; overflow is not converted to a saturated value.
 The P6 lease, ACL/grants, schema, transport and migration contracts are unchanged.
 
-Current local evidence: changed focused HQL2 targets pass 68/68; all 37 root
-HQL2 targets pass 394/0/1; four selected P6 targets pass 31/31. The full
-locked/offline no-default Rust suite exits 0 with `probe_vs_recall` filtered and
-three existing soak cases ignored; this run preceded the behavior-preserving D7
-lint refactor. After that refactor, D7 adapter/property targets pass 15/15 and
-strict all-target Clippy passes in default and no-default configurations.
-Independent review, hosted checks, device/release qualification, shared-runtime
-qualification, full per-operator P7 exact-oracle coverage, cancellation/resource
-qualification and P13 parity remain open; this candidate is not G4/P8 completion.
+At parent commit `ed75e16`, changed focused HQL2 targets passed 68/68; all 37
+root HQL2 targets passed 394/0/1; four selected P6 targets passed 31/31. The
+full locked/offline no-default Rust suite exited 0 with `probe_vs_recall`
+filtered and three existing soak cases ignored; that run preceded the
+behavior-preserving D7 lint refactor. After that refactor, D7 adapter/property
+targets passed 15/15 and strict all-target Clippy passed in default and
+no-default configurations. On the current test-only tree, the focused
+execution/graph/sequence/vector targets pass 51/51; the 37-target sweep and full
+Rust suite were not rerun after these tests. Independent review, hosted checks,
+device/release qualification, shared-runtime qualification, full per-operator
+P7 exact-oracle coverage, cancellation/resource qualification and P13 parity
+remain open; this candidate is not G4/P8 completion.
 
-Integration remains a separate open gate: branch `codex/hql2-execution` is
-48 commits behind and 30 commits ahead of the current `origin/main`; a read-only
-merge simulation reports 15 content conflicts. Do not resolve that by replacing
-protected WIP or by treating the local regression sweep as merge acceptance.
+Integration remains a separate open gate: branch `codex/hql2-execution` at
+`ed75e16` is 48 commits behind and 31 commits ahead of `origin/main`; a
+read-only merge simulation reports 15 content conflicts. Protected WIP remains
+in a separate dirty checkout. Do not resolve that by replacing protected WIP
+or by treating the local regression sweep as merge acceptance.
 
 ## 8. P5 execution evidence
 
@@ -940,6 +944,13 @@ results remain regression evidence, not P8 acceptance.
 
 ## CHANGELOG
 
+Version diff `0.8.69b -> 0.8.70b`: add ANALYZE no-partial budget regressions
+across scalar, graph, sequence and vector operators, exact vector distance
+counter verification, and an authorization-before-parse ANALYZE case. Four
+focused targets pass 51/51 on the current tree. Test-only; runtime/contract
+unchanged, and the 37-target sweep, broad P8/P13, review and integration gates
+remain open.
+
 Version diff `0.8.68b -> 0.8.69b`: synchronize current verification evidence:
 the full locked/offline no-default Rust suite exits 0 with `probe_vs_recall`
 filtered and three existing soak cases ignored; the suite preceded the
@@ -1120,6 +1131,9 @@ Version diff `0.8.27b -> 0.8.28b`: implement approved D1-D5, record 9 focused pa
 
 | Version | Date | Status | Summary | Commit Hash | Agent |
 |---|---|---|---|---|---|
+| 0.8.70b | 2026-10-06 | beta | Add ANALYZE budget/no-partial coverage for scalar, graph, sequence and vector plus measured vector distances and pre-parse namespace denial; four targets 51/51; test-only, full sweep/P8/P13/review/integration gates remain open | working-tree | ATHER |
+| 0.8.69b | 2026-10-06 | beta | Record locked/offline no-default Rust suite exit 0 with `probe_vs_recall` filtered and three soak cases ignored; post-refactor D7 adapter/property 15/15 and strict Clippy default/no-default pass; local-only, broad P8/P13 and review open | working-tree | ATHER |
+| 0.8.68b | 2026-10-06 | beta | Synchronize approved G4 plan identity and measured/unknown ANALYZE counters; focused 68/68, HQL2 394/0/1 across 37, selected P6 31/31; broad P8/P13, exact-oracle and review gates remain open | working-tree | ATHER |
 | 0.8.67b | 2026-10-06 | beta | Strengthen test-only P7 identity differentials for source scans, annotations and ContextPack; fix missing Node dependencies in the Edge oracle; focused 32/32 and HQL2 393/0/1 across 37 targets; no runtime/schema/transport change; P8 and integration gates remain open | working-tree | ATHER |
 | 0.8.66b | 2026-10-05 | beta | Record final restore/P6 21/21, HQL2 393/0/1 across 37 and full Rust suite exit 0 with `probe_vs_recall` filtered; EXPLAIN partial; cleanup failure paths best-effort/unverified; P8/P13/P14 remain open | working-tree | ATHER |
 | 0.8.65b | 2026-10-05 | beta | Handle terminal P6 receipt restore, preserve transaction frontier, and prepare metadata before target publication; restore/P6 20/20 across five targets, HQL2 392/0/1 across 37; EXPLAIN still partial; full Rust suite NOT_RUN; P8/P13/P14 and independent review remain open | working-tree | ATHER |
