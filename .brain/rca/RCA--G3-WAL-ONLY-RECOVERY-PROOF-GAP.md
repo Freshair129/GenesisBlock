@@ -23,8 +23,9 @@ without materialized snapshot or projection files.
   with the recovered frontier.
 - Both paths compare pre-reopen and post-reopen query results. Those equality
   checks can pass if a materialized file was not removed.
-- The focused target passes 2/2 on the current mainline; that is baseline
-  result-comparison evidence only.
+- At pre-fix baseline `aed35b7f5dee320a703b41db035d30daa71139ee`, the focused
+  target passed 2/2; this was result-comparison evidence only and predates the
+  merged correction.
 
 ## Root Cause
 
@@ -53,8 +54,8 @@ therefore mistaken for proof of the recovery path.
 5. Keep this correction test-only in tests/g3_oracle_differential_tests.rs,
    then run the focused target and its specified G1/G2/crash regression matrix.
 6. Report WAL-only recovery as NOT_PROVEN until these assertions are
-   implemented and pass. Do not promote this test result to hosted CI,
-   power-loss, release, deployment, or broad P7 evidence.
+   implemented and pass; after they pass, claim only the bounded test proof.
+   Do not promote it to power-loss, release, deployment, or broad P7 evidence.
 
 ## Implementation follow-up — CI Clippy failure (2026-10-06)
 
@@ -91,9 +92,29 @@ not exercise the same lint acceptance check as CI.
    `cargo clippy --no-default-features --all-targets -- -D warnings` and
    `cargo clippy --all-targets -- -D warnings`.
 
+## Resolution — PR #217 merged 2026-10-06
+
+The test-evidence root cause is resolved for the bounded `g3.oracle.v1` proof.
+The merged correction makes materialized-file removal fail closed, verifies
+those files are absent before reopen, and checks that the recovered stable
+frontier covers the final pre-close frontier. Exact query/oracle comparisons
+remain in place.
+
+PR #217 head `9221b74e7dd81c350e099ac6b4a034810971d9b0` merged as
+`987bf32507af6e1f9cc612385db093b4358996ed`. Hosted Tests, Security Audit,
+GenesisRAG17 Linux worker, Performance Audit, and Package Manager Consumer
+checks passed. The Linux worker had 26 passes, 0 failures, and 6 skips because
+the pinned ONNX model snapshot was absent. The former Clippy issue was fixed
+with `std::io::Error::other(...)` and the hosted checks passed.
+
+Closure is limited to the named test proof and CI checks. Physical power-loss,
+mobile/device, migration, release, deployment, and production acceptance are
+not established by this RCA resolution.
+
 ## Version Diff
 
 | From | To | Change |
 |---|---|---|
 | none | 1.0.0 | Record the G3 WAL-only recovery test-evidence root cause and bounded prevention criteria. |
 | 1.0.0 | 1.0.1 | Record the PR #217 Clippy failure, evidence, root cause, and lint-gate prevention. |
+| 1.0.1 | 1.0.2 | Record resolution of the bounded G3 test-evidence gap on merged PR #217, including hosted checks and skipped-test limits. |

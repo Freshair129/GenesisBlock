@@ -1,9 +1,9 @@
 ---
 doc_id: SPEC--GENESISDB-G3-EXACT-ORACLE-AND-RECOVERY
 owner: GenesisBlockDB Engineering
-version: 0.1.2b
+version: 0.1.3b
 created_at: "2026-10-04T00:00:00+07:00,Codex,working-tree"
-last_update: "2026-10-06T06:30:22+07:00,Codex"
+last_update: "2026-10-06T18:44:54+07:00,Codex"
 status: draft
 superseded_by: null
 attributes:
@@ -99,9 +99,10 @@ kept empty so the gate is reproducible without a network install.
 
 ## Non-goals and evidence boundary
 
-This spec does not prove hosted CI, power-loss hardware behavior, mobile/device
-behavior, release packaging, planner correctness, or production readiness.
-Those remain NOT_RUN until their named external gates execute.
+The bounded hosted checks for PR #217 are recorded below; they do not establish
+physical power-loss behavior, mobile/device behavior, release packaging, planner
+correctness, or production readiness. Those broader gates remain NOT_RUN until
+their named external evidence is available.
 
 ## Local execution evidence — 2026-10-04 (historical baseline)
 
@@ -114,26 +115,38 @@ the 60-build probe_vs_recall target and crate doc-tests. These historical
 results establish query-oracle and regression evidence, not the WAL-only
 precondition now specified above.
 
-## Recovery-proof evidence review — 2026-10-06
+## Recovery-proof evidence review — PR #217 merged 2026-10-06
 
-On the current mainline, the focused Rust target passes 2/2 as a baseline.
-Inspection found that remove_materialized_state discards all file-removal
-errors and the temporal and relational paths do not assert a post-reopen stable
-frontier. Therefore the baseline does not prove that materialized state was
-absent or that the recovered frontier covers every durable fixture mutation.
-Status: result comparison locally verified; WAL-only recovery proof
-NOT_PROVEN; correction implementation and its verification are pending.
-This is a test-evidence finding, not a confirmed storage-engine defect. The
-bounded correction does not close broad HQL2 P7 or any external release gate.
+The pre-correction baseline at `aed35b7f5dee320a703b41db035d30daa71139ee`
+passed the focused target 2/2 but did not prove WAL-only recovery: removal
+errors were discarded and the final recovered frontier was not asserted.
+PR #217 addressed that test-evidence gap on head
+`9221b74e7dd81c350e099ac6b4a034810971d9b0`, merged as
+`987bf32507af6e1f9cc612385db093b4358996ed`.
 
-This is local working-tree evidence only. Hosted CI, power-loss hardware,
-mobile/device, release packaging, deployment, independent review, and
-production acceptance are NOT_RUN. G4+ remains deferred.
+The merged test correction now fails on non-NotFound removal errors, asserts
+the listed materialized files are absent before reopen, and requires the
+recovered stable frontier to cover the final pre-close frontier while retaining
+exact pre/post and oracle-result equality. The PR's hosted checks all passed:
+Tests (run `37445626527`), Security Audit (`37445626873`), GenesisRAG17 Linux
+worker (`37445626662`), Performance Audit (`37445626416`), and Package Manager
+Consumer (`37445626577`). The Linux worker exercised 32 tests: 26 passed, 0
+failed, and 6 were skipped because the pinned ONNX model snapshot was absent.
+
+Status: the bounded `g3.oracle.v1` WAL-only test proof is verified on the merged
+source for the stated gates. The six skipped model-backed cases are not
+verified. This is test-level recovery evidence, not physical power-loss proof.
+Power-loss hardware, mobile/device behavior, planner correctness, migration
+compatibility, release packaging, deployment, and production acceptance remain
+NOT_RUN. Broad HQL2 P7 remains open. G4 remains PARTIAL per
+`docs/IMPLEMENTATION-PLAN--UEE-HQL2-ORCHESTRATION-2026-09-22.md`; this G3
+evidence does not change that status or close later HQL2 gates.
 
 ## CHANGELOG
 
 | Version | Date | Status | Summary | Commit | Agent |
 |---|---|---|---|---|---|
+| 0.1.3b | 2026-10-06 | draft | Reconcile G3 evidence to merged PR #217 and passing hosted checks; retain the six ONNX-dependent skips and external proof boundaries. | working-tree | Codex |
 | 0.1.2b | 2026-10-06 | draft | Specify fail-closed materialized-file removal and recovered-frontier assertions; downgrade the current 2/2 baseline to NOT_PROVEN for WAL-only recovery until the assertions exist and pass. | working-tree | Codex |
 | 0.1.1b | 2026-10-04 | candidate | Added local Python and Rust differential/reopen evidence for the bounded g3.oracle.v1 fixture; external gates remain NOT_RUN. | working-tree | Codex |
 | 0.1.0b | 2026-10-04 | draft | Define a pure G3 oracle, canonical fixtures, differential comparison, and WAL-backed recovery rerun. | working-tree | Codex |

@@ -1,0 +1,562 @@
+{
+  "id": "QUEUE-QUERY-IR-W1",
+  "type": "implementation_queue",
+  "title": "Typed Query IR V1 contract and conformance closure",
+  "version": "0.1.0",
+  "status": "proposed",
+  "source_of_truth": false,
+  "ready": false,
+  "dispatch_authorized": false,
+  "created_at": "2026-10-06T18:28:36+07:00",
+  "updated_at": "2026-10-06T18:28:36+07:00",
+  "source_sha": "987bf32507af6e1f9cc612385db093b4358996ed",
+  "parent_docs": [
+    "docs/MASTER_PLAN.md",
+    "docs/SPEC--GENESISDB-TYPED-QUERY-IR-V1.md",
+    "docs/adr/ADR--GENESISDB-TYPED-QUERY-IR-AGENT-BOUNDARY.md",
+    "docs/C4--GENESISDB-ARCHITECTURE.md"
+  ],
+  "approval_gates": [
+    {
+      "id": "G0",
+      "authority": "owner",
+      "purpose": "Approve this exact plan and scope; no code dispatch."
+    },
+    {
+      "id": "D0",
+      "authority": "owner",
+      "purpose": "Separately authorize implementation after G0; until then all worker tasks remain disabled."
+    }
+  ],
+  "architecture_decision": {
+    "wave": "W1 is contract/conformance closure over existing implementations, not an executor rewrite.",
+    "implemented_source_slices": [
+      "search",
+      "traverse",
+      "linear match_path",
+      "target-ID context"
+    ],
+    "unverified_boundary": "Source presence is not a fresh end-to-end conformance PASS; capability declarations and behavior must be verified.",
+    "not_implemented": [
+      "relational_named_query"
+    ],
+    "preserve": [
+      "HQL compatibility fallbacks",
+      "current public contracts unless a separately reviewed finding proves a mismatch"
+    ],
+    "out_of_scope": [
+      "lexical-search expansion",
+      "new search filters or capabilities",
+      "namespace-scoped traversal",
+      "match_path tx_as_of",
+      "query-vector or temporal context",
+      "relational_named_query",
+      "HQL grammar expansion/removal",
+      "HQL2 planner/EXPLAIN",
+      "storage/WAL/ACL redesign",
+      "NL/provider integration",
+      "SDK/MCP feature expansion",
+      "packaging/publishing/release/deployment"
+    ]
+  },
+  "agent_roles": {
+    "architecture_analysis": {
+      "model": "gpt-6-astra",
+      "reasoning_effort": "max",
+      "status": "analysis supplied; subject to owner review"
+    },
+    "worker": {
+      "model": "gpt-6-luna",
+      "reasoning_effort": "max",
+      "status": "proposed; starts only after D0"
+    },
+    "verify_gate": {
+      "kind": "deterministic",
+      "owner": "Codex coordinator",
+      "rule": "Run the listed commands on one candidate SHA; preserve exact outputs, exit codes, and skips."
+    },
+    "review_gate": {
+      "model": "gpt-6-astra",
+      "reasoning_effort": "max",
+      "read_only": true
+    },
+    "final_gate": {
+      "owner": "Codex coordinator",
+      "rule": "Fail closed unless Verify PASS, Review PASS, docs aligned, and acceptance criteria are evidenced."
+    }
+  },
+  "parallelism": {
+    "rule": "Unordered tasks must have disjoint write_set values. Read-only audit/gates may overlap writers only when they inspect an immutable baseline and rerun after candidate changes.",
+    "parallel_stages": [
+      [
+        "H1",
+        "R1",
+        "X1"
+      ]
+    ],
+    "serialized_shared_file_tasks": [
+      "S1 before F1",
+      "C0 before C1; merge C0+C1 atomically",
+      "H1 and R1 before N1 when N1 needs conditional src/lib.rs edits"
+    ],
+    "failure_rule": "A correction creates a new candidate revision and invalidates every dependent Verify/Review/Final result; do not merge RED-only or stale evidence."
+  },
+  "atomic_merge_groups": [
+    [
+      "C0",
+      "C1"
+    ]
+  ],
+  "merge_stages": [
+    {
+      "stage": 0,
+      "tasks": [
+        "P0"
+      ],
+      "rule": "Documentation-only candidate; no implementation."
+    },
+    {
+      "stage": 1,
+      "tasks": [
+        "G0"
+      ],
+      "rule": "Owner accepts the exact plan; this does not authorize code."
+    },
+    {
+      "stage": 2,
+      "tasks": [
+        "D0"
+      ],
+      "rule": "Separate explicit owner authorization is required before any W1 worker starts."
+    },
+    {
+      "stage": 3,
+      "tasks": [
+        "S1"
+      ],
+      "rule": "Schema and validator dependency are reviewed before fixture consumers."
+    },
+    {
+      "stage": 4,
+      "tasks": [
+        "F1"
+      ],
+      "rule": "Shared fixtures land only after the schema test exists."
+    },
+    {
+      "stage": 5,
+      "tasks": [
+        "C0",
+        "C1"
+      ],
+      "rule": "One green core candidate; never merge intentional RED tests alone."
+    },
+    {
+      "stage": 6,
+      "tasks": [
+        "H1",
+        "R1",
+        "X1"
+      ],
+      "rule": "H1 and R1 may work in parallel with disjoint writes; X1 is evidence-only; merge code changes H1 then R1. X1 must complete before D1/V."
+    },
+    {
+      "stage": 7,
+      "tasks": [
+        "N1"
+      ],
+      "rule": "After H1/R1; conditionally owns any N-API binding correction after C1."
+    },
+    {
+      "stage": 8,
+      "tasks": [
+        "D1"
+      ],
+      "rule": "Reconcile docs after implementation evidence and before final validation/review."
+    },
+    {
+      "stage": 9,
+      "tasks": [
+        "V"
+      ],
+      "rule": "Integrated deterministic Verify on one candidate SHA, including all focused and full gates."
+    },
+    {
+      "stage": 10,
+      "tasks": [
+        "RV"
+      ],
+      "rule": "Independent read-only Astra Review of the verified final candidate."
+    },
+    {
+      "stage": 11,
+      "tasks": [
+        "FG"
+      ],
+      "rule": "Final Gate; external merge/release/deployment requires its own authority."
+    }
+  ],
+  "acceptance_criteria": [
+    "A standalone closed Draft 2020-12 schema and shared fixtures define supported V1 envelopes without widening approved semantics.",
+    "Existing supported operation behavior is tested against the accepted schema and truthful capability declarations across core, HQL, REST, and N-API.",
+    "Unsupported capabilities, including relational_named_query, reject explicitly with stable typed errors and without semantic degradation.",
+    "Bounds, defaults, capability reporting, and error mappings in the shared fixtures are sourced from explicit contract decisions rather than inferred implementation values.",
+    "Existing HQL fallback behavior remains unchanged unless an accepted test proves a contract mismatch.",
+    "Focused and full required tests pass on the same candidate SHA; skipped work is reported as unverified.",
+    "Independent Astra Review and final provenance/scope gate pass; canonical docs identify exact evidence and remaining NOT_RUN items.",
+    "W1 claims conformance only for verified surfaces; the overall accepted spec remains partial while broader SDK/MCP/NL-adapter gates remain incomplete."
+  ],
+  "tasks": [
+    {
+      "id": "P0",
+      "title": "Reconcile architecture docs and publish proposed W1 queue/graph",
+      "status": "proposed",
+      "ready": false,
+      "dispatch_authorized": false,
+      "deps": [],
+      "write_set": [
+        "docs/SPEC--GENESISDB-G3-EXACT-ORACLE-AND-RECOVERY.md",
+        "docs/P7.1-G3-RECOVERY-EXECUTION-DAG.html",
+        ".brain/rca/RCA--G3-WAL-ONLY-RECOVERY-PROOF-GAP.md",
+        "docs/MASTER_PLAN.md",
+        "queue/QUERY_IR_W1_IMPLEMENTATION_QUEUE.json",
+        "queue/QUERY_IR_W1_PROJECT_GRAPH.json"
+      ],
+      "worker": "Codex coordinator; architecture input from gpt-6-astra Max",
+      "verify": [
+        "npm run docs:validate",
+        "git diff --check"
+      ],
+      "exit": "Parent/peer documents agree, the prior G3 baseline is reconciled, and the replacement queue/graph are explicitly non-dispatchable."
+    },
+    {
+      "id": "G0",
+      "title": "Owner approval of W1 plan and architecture boundary",
+      "status": "proposed",
+      "ready": false,
+      "dispatch_authorized": false,
+      "deps": [
+        "P0"
+      ],
+      "write_set": [],
+      "owner": "User",
+      "verify": [
+        "Explicit approval of the exact proposed queue/graph and non-goals"
+      ],
+      "exit": "Plan approval recorded; this gate alone does not authorize code dispatch."
+    },
+    {
+      "id": "D0",
+      "title": "Separate owner authorization to dispatch W1 implementation",
+      "status": "proposed",
+      "ready": false,
+      "dispatch_authorized": false,
+      "deps": [
+        "G0"
+      ],
+      "write_set": [],
+      "owner": "User",
+      "verify": [
+        "Explicit code-dispatch authorization after G0"
+      ],
+      "exit": "Worker tasks may start only after this separate authorization."
+    },
+    {
+      "id": "S1",
+      "title": "Freeze standalone Query IR V1 schema and schema-validation gate",
+      "status": "proposed",
+      "ready": false,
+      "dispatch_authorized": false,
+      "deps": [
+        "D0"
+      ],
+      "write_set": [
+        "docs/contracts/query-ir.v1.schema.json",
+        "package.json",
+        "package-lock.json",
+        "__test__/query_ir_schema.test.mjs"
+      ],
+      "worker_model": "gpt-6-luna",
+      "reasoning_effort": "max",
+      "verify": [
+        "node --test __test__/query_ir_schema.test.mjs"
+      ],
+      "notes": "Use JSON Schema draft 2020-12. AJV is currently present transitively in package-lock; promote it to a direct test-only dependency and pin through the lockfile. No Rust dependency is needed for schema parsing; existing native typed validation remains separately tested.",
+      "exit": "Closed schema validates valid/invalid envelopes and rejects unknown fields; dependency diff is test-only."
+    },
+    {
+      "id": "F1",
+      "title": "Add shared V1 request/response conformance fixture matrix",
+      "status": "proposed",
+      "ready": false,
+      "dispatch_authorized": false,
+      "deps": [
+        "S1"
+      ],
+      "write_set": [
+        "tests/fixtures/query_ir_v1.json",
+        "__test__/query_ir_schema.test.mjs"
+      ],
+      "worker_model": "gpt-6-luna",
+      "reasoning_effort": "max",
+      "verify": [
+        "node --test __test__/query_ir_schema.test.mjs"
+      ],
+      "notes": "Cross-check field closure, operation bounds, capability defaults, and unsupported selectors against the accepted spec and current runtime. Do not invent limits or defaults; if the spec/source conflict, stop for owner review before freezing the schema.",
+      "exit": "Fixtures cover each supported operation and explicit unsupported/rejection cases; all fixtures validate against the frozen schema."
+    },
+    {
+      "id": "C0",
+      "title": "Characterize core executor and budget behavior with contract tests",
+      "status": "proposed",
+      "ready": false,
+      "dispatch_authorized": false,
+      "deps": [
+        "F1"
+      ],
+      "write_set": [
+        "tests/query_ir_tests.rs",
+        "tests/wave_d_budget_tests.rs"
+      ],
+      "worker_model": "gpt-6-luna",
+      "reasoning_effort": "max",
+      "verify": [
+        "cargo test --locked --no-default-features --test query_ir_tests --test wave_d_budget_tests"
+      ],
+      "notes": "Characterize observed max_k/max_depth, budgets, capability output, and core typed-error behavior without changing production code. Treat observed values as non-normative until reconciled with the accepted contract.",
+      "merge_barrier": "C0 and C1 form one candidate. Never merge a deliberately RED-only test stage.",
+      "exit": "Acceptance tests expose any contract gap without changing production behavior."
+    },
+    {
+      "id": "C1",
+      "title": "Apply minimal core corrections only for verified C0 failures",
+      "status": "proposed",
+      "ready": false,
+      "dispatch_authorized": false,
+      "deps": [
+        "C0"
+      ],
+      "write_set": [
+        "src/lib.rs",
+        ".brain/rca/RCA--W1-Typed-Query-IR-Conformance.md"
+      ],
+      "worker_model": "gpt-6-luna",
+      "reasoning_effort": "max",
+      "verify": [
+        "cargo test --locked --no-default-features --test query_ir_tests --test wave_d_budget_tests",
+        "cargo fmt --all -- --check"
+      ],
+      "exit": "Core contract tests pass; every behavior change has an evidence-backed RCA and remains within accepted V1."
+    },
+    {
+      "id": "H1",
+      "title": "Verify and close HQL compatibility mapping without grammar expansion",
+      "status": "proposed",
+      "ready": false,
+      "dispatch_authorized": false,
+      "deps": [
+        "C1"
+      ],
+      "write_set": [
+        "tests/hql_p0_tests.rs",
+        "tests/hql_collection_tests.rs",
+        "tests/hql_cypher_tests.rs",
+        "tests/wave_e_context_tests.rs"
+      ],
+      "worker_model": "gpt-6-luna",
+      "reasoning_effort": "max",
+      "verify": [
+        "cargo test --locked --no-default-features --test hql_p0_tests --test hql_collection_tests --test hql_cypher_tests --test wave_e_context_tests"
+      ],
+      "exit": "Existing HQL supported paths preserve semantics; legacy fallback behavior remains intact."
+    },
+    {
+      "id": "R1",
+      "title": "Verify REST request/result/error-envelope conformance",
+      "status": "proposed",
+      "ready": false,
+      "dispatch_authorized": false,
+      "deps": [
+        "C1"
+      ],
+      "write_set": [
+        "src/router.rs",
+        "tests/rest_api_tests.rs",
+        "tests/wave_e_rest_tests.rs"
+      ],
+      "worker_model": "gpt-6-luna",
+      "reasoning_effort": "max",
+      "verify": [
+        "cargo check --locked --no-default-features --features bins --bin genesis-db-server",
+        "cargo test --locked --no-default-features --test rest_api_tests --test wave_e_rest_tests"
+      ],
+      "notes": "Characterize core-to-REST mappings (including beyond_horizon) in shared fixtures first; freeze only contract-required mappings and do not guess transport status/error semantics.",
+      "exit": "REST matches the accepted schema, capability declarations, typed failures, and core results."
+    },
+    {
+      "id": "N1",
+      "title": "Verify N-API and TypeScript conformance after HQL/REST baselines",
+      "status": "proposed",
+      "ready": false,
+      "dispatch_authorized": false,
+      "deps": [
+        "H1",
+        "R1"
+      ],
+      "write_set": [
+        "index.d.ts",
+        "index.js",
+        "__test__/query_ir.test.mjs",
+        "tests/napi_rest_parity_tests.rs",
+        "scripts/check-dts-freshness.mjs",
+        "src/lib.rs"
+      ],
+      "conditional_write_set": {
+        "paths": [
+          "src/lib.rs"
+        ],
+        "when": "Only if N-API binding behavior is proven missing; after C1, H1, and R1, with affected gates rerun."
+      },
+      "worker_model": "gpt-6-luna",
+      "reasoning_effort": "max",
+      "verify": [
+        "cargo test --locked --no-default-features --test napi_rest_parity_tests",
+        "npm run build",
+        "node scripts/check-dts-freshness.mjs <preserved-committed-dir> <generated-dir>",
+        "node --test __test__/query_ir.test.mjs"
+      ],
+      "notes": "Preserve the candidate's committed index.d.ts/index.js before the addon build, run the build in an isolated copy, compare preserved/generated directories with the existing freshness checker, and inspect any generated changes before integrating them.",
+      "exit": "N-API results/errors match REST and TypeScript declarations accurately describe discriminated operation/result envelopes; generated artifacts are freshness-checked."
+    },
+    {
+      "id": "X1",
+      "title": "Audit declared SDK and MCP consumer support (evidence-only)",
+      "status": "proposed",
+      "ready": false,
+      "dispatch_authorized": false,
+      "deps": [
+        "F1"
+      ],
+      "write_set": [],
+      "worker_model": "gpt-6-luna",
+      "reasoning_effort": "max",
+      "verify": [
+        "(genesisdb-python) python -m unittest discover -s tests -p test_client_contract.py",
+        "(genesisdb-go) go test ./...",
+        "(repository root) node --test __test__/mcp.test.mjs"
+      ],
+      "exit": "Record supported, partial, unsupported, and NOT_RUN per consumer; do not add adapter scope or modify SDK/MCP files in this task."
+    },
+    {
+      "id": "V",
+      "title": "Integrated Verify Gate on one immutable candidate SHA",
+      "status": "proposed",
+      "ready": false,
+      "dispatch_authorized": false,
+      "deps": [
+        "H1",
+        "R1",
+        "N1",
+        "X1",
+        "D1"
+      ],
+      "write_set": [],
+      "verifier": "Codex coordinator; deterministic commands and captured exit codes",
+      "verify": [
+        "node --test __test__/query_ir_schema.test.mjs",
+        "npm run build",
+        "cargo test --locked --no-default-features",
+        "npm test",
+        "cargo clippy --no-default-features --all-targets -- -D warnings",
+        "cargo clippy --all-targets -- -D warnings",
+        "cargo fmt --all -- --check",
+        "node scripts/check-dts-freshness.mjs <preserved-committed-dir> <generated-dir>",
+        "npm run docs:validate",
+        "git diff --check"
+      ],
+      "exit": "All required gates pass on the same candidate SHA; every skip/failure is explained and cannot be promoted to PASS."
+    },
+    {
+      "id": "RV",
+      "title": "Independent architecture and diff Review Gate",
+      "status": "proposed",
+      "ready": false,
+      "dispatch_authorized": false,
+      "deps": [
+        "V"
+      ],
+      "write_set": [],
+      "reviewer_model": "gpt-6-astra",
+      "reasoning_effort": "max",
+      "read_only": true,
+      "verify": [
+        "Review changed files, acceptance mapping, task write sets, and exact Verify evidence"
+      ],
+      "exit": "Astra returns PASS or explicit findings; any changed candidate invalidates affected Verify and Review evidence."
+    },
+    {
+      "id": "D1",
+      "title": "Reconcile final implementation and evidence into canonical docs",
+      "status": "proposed",
+      "ready": false,
+      "dispatch_authorized": false,
+      "deps": [
+        "H1",
+        "R1",
+        "N1",
+        "X1"
+      ],
+      "write_set": [
+        "docs/MASTER_PLAN.md",
+        "docs/SPEC--GENESISDB-TYPED-QUERY-IR-V1.md",
+        "queue/QUERY_IR_W1_IMPLEMENTATION_QUEUE.json",
+        "queue/QUERY_IR_W1_PROJECT_GRAPH.json"
+      ],
+      "worker": "Codex coordinator; Luna may draft bounded docs after approval",
+      "verify": [
+        "npm run docs:validate",
+        "git diff --check"
+      ],
+      "exit": "Status claims cite exact source SHA and evidence; unsupported and unrun surfaces remain explicit, and the overall spec stays partial until every accepted gate is satisfied."
+    },
+    {
+      "id": "FG",
+      "title": "Final Gate: acceptance, provenance, scope, and merge readiness",
+      "status": "proposed",
+      "ready": false,
+      "dispatch_authorized": false,
+      "deps": [
+        "RV"
+      ],
+      "write_set": [],
+      "final_owner": "Codex coordinator",
+      "verify": [
+        "Recheck acceptance criteria, immutable candidate SHA, Verify PASS, Astra Review PASS, docs consistency, and merge-order compliance"
+      ],
+      "exit": "PASS only when all required evidence is present; does not itself grant additional code scope, push, merge, release, or deployment authority."
+    }
+  ],
+  "verification_commands": {
+    "focused_core": "cargo test --locked --no-default-features --test query_ir_tests --test wave_d_budget_tests",
+    "focused_hql": "cargo test --locked --no-default-features --test hql_p0_tests --test hql_collection_tests --test hql_cypher_tests --test wave_e_context_tests",
+    "rest_build": "cargo check --locked --no-default-features --features bins --bin genesis-db-server",
+    "focused_rest": "cargo test --locked --no-default-features --test rest_api_tests --test wave_e_rest_tests",
+    "focused_napi": "cargo test --locked --no-default-features --test napi_rest_parity_tests",
+    "schema_and_fixtures": "node --test __test__/query_ir_schema.test.mjs",
+    "node_query_ir": "node --test __test__/query_ir.test.mjs",
+    "native_addon": "npm run build",
+    "napi_freshness": "node scripts/check-dts-freshness.mjs <preserved-committed-dir> <generated-dir>",
+    "strict_clippy_no_default": "cargo clippy --no-default-features --all-targets -- -D warnings",
+    "strict_clippy_default": "cargo clippy --all-targets -- -D warnings",
+    "full_rust": "cargo test --locked --no-default-features",
+    "full_node": "npm test",
+    "format": "cargo fmt --all -- --check",
+    "docs": "npm run docs:validate",
+    "diff": "git diff --check"
+  },
+  "evidence_limits": [
+    "No power-loss/device/release/deployment/production claim follows from local tests.",
+    "A source implementation or passing focused test does not establish every V1 capability.",
+    "No SDK/MCP support is assumed without consumer-specific evidence."
+  ]
+}

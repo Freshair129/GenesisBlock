@@ -1,0 +1,340 @@
+{
+  "id": "GRAPH-QUERY-IR-W1",
+  "type": "execution_dag",
+  "title": "Typed Query IR W1 conflict-free execution and merge graph",
+  "version": "0.1.0",
+  "status": "proposed",
+  "source_of_truth": false,
+  "ready": false,
+  "dispatch_authorized": false,
+  "created_at": "2026-10-06T18:28:36+07:00",
+  "updated_at": "2026-10-06T18:28:36+07:00",
+  "source_sha": "987bf32507af6e1f9cc612385db093b4358996ed",
+  "queue": "queue/QUERY_IR_W1_IMPLEMENTATION_QUEUE.json",
+  "nodes": [
+    {
+      "id": "P0",
+      "depends_on": [],
+      "write_set": [
+        "docs/SPEC--GENESISDB-G3-EXACT-ORACLE-AND-RECOVERY.md",
+        "docs/P7.1-G3-RECOVERY-EXECUTION-DAG.html",
+        ".brain/rca/RCA--G3-WAL-ONLY-RECOVERY-PROOF-GAP.md",
+        "docs/MASTER_PLAN.md",
+        "queue/QUERY_IR_W1_IMPLEMENTATION_QUEUE.json",
+        "queue/QUERY_IR_W1_PROJECT_GRAPH.json"
+      ],
+      "gate": false
+    },
+    {
+      "id": "G0",
+      "depends_on": [
+        "P0"
+      ],
+      "write_set": [],
+      "gate": true
+    },
+    {
+      "id": "D0",
+      "depends_on": [
+        "G0"
+      ],
+      "write_set": [],
+      "gate": true
+    },
+    {
+      "id": "S1",
+      "depends_on": [
+        "D0"
+      ],
+      "write_set": [
+        "docs/contracts/query-ir.v1.schema.json",
+        "package.json",
+        "package-lock.json",
+        "__test__/query_ir_schema.test.mjs"
+      ],
+      "gate": false
+    },
+    {
+      "id": "F1",
+      "depends_on": [
+        "S1"
+      ],
+      "write_set": [
+        "tests/fixtures/query_ir_v1.json",
+        "__test__/query_ir_schema.test.mjs"
+      ],
+      "gate": false
+    },
+    {
+      "id": "C0",
+      "depends_on": [
+        "F1"
+      ],
+      "write_set": [
+        "tests/query_ir_tests.rs",
+        "tests/wave_d_budget_tests.rs"
+      ],
+      "gate": false
+    },
+    {
+      "id": "C1",
+      "depends_on": [
+        "C0"
+      ],
+      "write_set": [
+        "src/lib.rs",
+        ".brain/rca/RCA--W1-Typed-Query-IR-Conformance.md"
+      ],
+      "gate": false
+    },
+    {
+      "id": "H1",
+      "depends_on": [
+        "C1"
+      ],
+      "write_set": [
+        "tests/hql_p0_tests.rs",
+        "tests/hql_collection_tests.rs",
+        "tests/hql_cypher_tests.rs",
+        "tests/wave_e_context_tests.rs"
+      ],
+      "gate": false
+    },
+    {
+      "id": "R1",
+      "depends_on": [
+        "C1"
+      ],
+      "write_set": [
+        "src/router.rs",
+        "tests/rest_api_tests.rs",
+        "tests/wave_e_rest_tests.rs"
+      ],
+      "gate": false
+    },
+    {
+      "id": "N1",
+      "depends_on": [
+        "H1",
+        "R1"
+      ],
+      "write_set": [
+        "index.d.ts",
+        "index.js",
+        "__test__/query_ir.test.mjs",
+        "tests/napi_rest_parity_tests.rs",
+        "scripts/check-dts-freshness.mjs",
+        "src/lib.rs"
+      ],
+      "gate": false
+    },
+    {
+      "id": "X1",
+      "depends_on": [
+        "F1"
+      ],
+      "write_set": [],
+      "gate": false
+    },
+    {
+      "id": "V",
+      "depends_on": [
+        "H1",
+        "R1",
+        "N1",
+        "X1",
+        "D1"
+      ],
+      "write_set": [],
+      "gate": true
+    },
+    {
+      "id": "RV",
+      "depends_on": [
+        "V"
+      ],
+      "write_set": [],
+      "gate": true
+    },
+    {
+      "id": "D1",
+      "depends_on": [
+        "H1",
+        "R1",
+        "N1",
+        "X1"
+      ],
+      "write_set": [
+        "docs/MASTER_PLAN.md",
+        "docs/SPEC--GENESISDB-TYPED-QUERY-IR-V1.md",
+        "queue/QUERY_IR_W1_IMPLEMENTATION_QUEUE.json",
+        "queue/QUERY_IR_W1_PROJECT_GRAPH.json"
+      ],
+      "gate": false
+    },
+    {
+      "id": "FG",
+      "depends_on": [
+        "RV"
+      ],
+      "write_set": [],
+      "gate": true
+    }
+  ],
+  "edges": [
+    {
+      "from": "P0",
+      "to": "G0"
+    },
+    {
+      "from": "G0",
+      "to": "D0"
+    },
+    {
+      "from": "D0",
+      "to": "S1"
+    },
+    {
+      "from": "S1",
+      "to": "F1"
+    },
+    {
+      "from": "F1",
+      "to": "C0"
+    },
+    {
+      "from": "C0",
+      "to": "C1"
+    },
+    {
+      "from": "C1",
+      "to": "H1"
+    },
+    {
+      "from": "C1",
+      "to": "R1"
+    },
+    {
+      "from": "H1",
+      "to": "N1"
+    },
+    {
+      "from": "R1",
+      "to": "N1"
+    },
+    {
+      "from": "F1",
+      "to": "X1"
+    },
+    {
+      "from": "H1",
+      "to": "D1"
+    },
+    {
+      "from": "R1",
+      "to": "D1"
+    },
+    {
+      "from": "N1",
+      "to": "D1"
+    },
+    {
+      "from": "H1",
+      "to": "V"
+    },
+    {
+      "from": "R1",
+      "to": "V"
+    },
+    {
+      "from": "N1",
+      "to": "V"
+    },
+    {
+      "from": "X1",
+      "to": "D1"
+    },
+    {
+      "from": "X1",
+      "to": "V"
+    },
+    {
+      "from": "D1",
+      "to": "V"
+    },
+    {
+      "from": "V",
+      "to": "RV"
+    },
+    {
+      "from": "RV",
+      "to": "FG"
+    }
+  ],
+  "parallel_sets": [
+    {
+      "after": "C1",
+      "tasks": [
+        "H1",
+        "R1",
+        "X1"
+      ],
+      "safe_because": "H1 and R1 have disjoint file write sets; X1 has an empty write set and is evidence-only."
+    }
+  ],
+  "merge_order": [
+    [
+      "P0"
+    ],
+    [
+      "G0"
+    ],
+    [
+      "D0"
+    ],
+    [
+      "S1"
+    ],
+    [
+      "F1"
+    ],
+    [
+      "C0",
+      "C1"
+    ],
+    [
+      "H1",
+      "R1",
+      "X1"
+    ],
+    [
+      "N1"
+    ],
+    [
+      "D1"
+    ],
+    [
+      "V"
+    ],
+    [
+      "RV"
+    ],
+    [
+      "FG"
+    ]
+  ],
+  "merge_order_notes": "G0 plan acceptance and D0 dispatch authorization are separate owner gates. H1 and R1 may execute in parallel but their code merges are sequential (H1 then R1); X1 is evidence-only, is not merged, and must complete before D1 and V.",
+  "atomic_merge_groups": [
+    [
+      "C0",
+      "C1"
+    ]
+  ],
+  "gates": {
+    "verify": "V — deterministic commands, same candidate SHA",
+    "review": "RV — independent gpt-6-astra Max, read-only",
+    "final": "FG — Codex evidence/scope/provenance check",
+    "owner_authority": "G0 plan approval and D0 separate implementation dispatch approval"
+  },
+  "failure_policy": "Any change after V invalidates dependent evidence. Fixes return to the owning task, then rerun affected downstream gates; failed gates never authorize merge."
+}
