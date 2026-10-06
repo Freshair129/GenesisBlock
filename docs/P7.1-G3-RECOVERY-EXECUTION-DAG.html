@@ -71,7 +71,7 @@
     <div class="diagram-container">
       <svg viewBox="0 0 960 600" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="p71-g3-recovery-title p71-g3-recovery-desc">
         <title id="p71-g3-recovery-title">G3 recovery proof execution dependencies</title>
-        <desc id="p71-g3-recovery-desc">Four ranked dependency layers show the pending model and code authorization prerequisite, one-file test worker, parallel Verify and Review gates, and a Final Gate that does not authorize merge.</desc>
+        <desc id="p71-g3-recovery-desc">Four ranked dependency layers show the selected gpt-6-luna Max worker, merged G3 test correction, Verify and Review gates, and a Final Gate. PR 217 is merged; the diagram records evidence and does not authorize a separate merge.</desc>
         <defs>
           <marker id="arrow" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#4f5d75"/></marker>
           <marker id="arrow-accent" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#eb6c36"/></marker>
@@ -129,7 +129,7 @@
         <text x="426" y="335" fill="#2d3142" font-size="7" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.08em">WORKER</text>
         <rect x="524" y="328" width="28" height="12" rx="2" fill="transparent" stroke="rgba(45,49,66,0.40)" stroke-width="0.8"/>
         <text x="538" y="337" fill="#2d3142" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle">2 IN</text>
-        <text x="480" y="354" fill="#2d3142" font-size="12" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">Test-only Worker</text>
+        <text x="480" y="354" fill="#2d3142" font-size="12" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">G3 Test-only Worker</text>
         <text x="480" y="370" fill="#4f5d75" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle">one source test file</text>
 
         <!-- Authorization prerequisite (leaf) -->
@@ -139,8 +139,8 @@
         <text x="422" y="455" fill="#2d3142" font-size="7" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.08em">GATE</text>
         <rect x="524" y="448" width="28" height="12" rx="2" fill="transparent" stroke="rgba(45,49,66,0.40)" stroke-width="0.8"/>
         <text x="538" y="457" fill="#2d3142" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle">1 IN</text>
-        <text x="480" y="474" fill="#2d3142" font-size="12" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">Model + Code Gate</text>
-        <text x="480" y="490" fill="#4f5d75" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle">docs approved · choice pending</text>
+        <text x="480" y="474" fill="#2d3142" font-size="12" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">Model + Scope Gate</text>
+        <text x="480" y="490" fill="#4f5d75" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle">gpt-6-luna Max · authorization cleared</text>
 
         <line x1="40" y1="524" x2="920" y2="524" stroke="rgba(45,49,66,0.10)" stroke-width="0.8"/>
         <text x="40" y="540" fill="#4f5d75" font-size="8" font-family="'Geist Mono', monospace" letter-spacing="0.18em">LEGEND</text>
@@ -155,7 +155,7 @@
       </svg>
     </div>
 
-    <p class="note"><strong>Current hold:</strong> documentation is approved, but the requested gpt-5.6-luna Max effort is not advertised here; no substitute is selected. No source worker starts until a supported model and code-scope authorization are explicit. A failed gate stops the candidate; any corrected candidate must rerun Verify, Review, and Final. Final PASS does not authorize commit, push, or merge.</p>
+    <p class="note"><strong>G3 status:</strong> PR #217 (head <code>9221b74</code>, merge <code>987bf32</code>) is merged. Hosted checks passed; the Linux worker reported 26 passed, 0 failed, and 6 skipped because the pinned ONNX model snapshot was absent. The selected <code>gpt-6-luna Max</code> worker choice and scoped authorization are historical workflow context, not a claim about which runtime executed CI. Power-loss hardware, mobile/device, release, deployment, and production acceptance remain unverified. A failed gate stops its candidate; corrections rerun Verify, Review, and Final. This evidence does not authorize a separate commit, push, or merge.</p>
   </main>
 </body>
 </html>
