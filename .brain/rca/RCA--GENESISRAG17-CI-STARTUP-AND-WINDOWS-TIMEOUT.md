@@ -164,11 +164,11 @@ tests passed for busy/retry and recovery after its owner process exited;
 close-time contention preserved the owner and allowed a successful retry.
 `scripts/verify-loaded-addon.mjs` verified the loaded Windows addon path and
 SHA-256 locally. `cargo test --no-default-features` completed with exit code 0;
-`zz_probe_discriminates` was visibly ignored in the default run. The current
-change prepares the locked, provenance-checked rebuild and strengthens the
-reopen test to verify identity stability and retrieval of persisted graph data,
-including startup from an already-empty directory; it does not yet refresh the
-committed binary or its provenance. Root
+`zz_probe_discriminates` was visibly ignored in the default run. That local
+verification snapshot prepared the locked, provenance-checked rebuild and
+strengthened the reopen test to verify identity stability and retrieval of
+persisted graph data, including startup from an already-empty directory; it
+preceded the committed-artifact refresh recorded below. Root
 `npm test` passed 29/29. Both core and default Clippy commands,
 `cargo fmt --all -- --check`, `npm run docs:validate` (0 violations in 241
 files), and `git diff --check` passed. On hosted run `37417821447`, all listed
@@ -181,8 +181,22 @@ rebuilt artifact available before the mandatory committed-artifact gate. The
 first Bookworm run `37421895783` failed before build because its shell HOME did
 not contain checkout's temporary safe-directory setting; the workflow now
 scopes trust to the exact workspace path for source-SHA recording. No artifact
-was produced by that run. The follow-up Bookworm rebuild, updated artifact,
-and final hosted/review gates remain pending before merge.
+was produced by that run. Follow-up Bookworm run `37439589499`, job
+`112189748409`, passed source-SHA recording, locked dependency checks, rebuild,
+fresh-addon verification and upload. It built from PR merge checkout
+`209cc36b455c6e9622b046eb6060b69d9cd4d681` with Rust/Cargo 1.98.1, Node
+24.18.0, npm 11.16.0, target `x86_64-unknown-linux-gnu`, and highest imported
+`GLIBC_2.34`. The fresh addon is 11,039,392 bytes with SHA-256
+`b678dfd7ee125d33d877b008e3af2c2a36ee9fa5203d043248cf2b9974e778e1`; the
+artifact ZIP digest is `bb1a805b18bfb7429fdeac458d26d225a1e8827185daf1f8864d229bb923a8e7`.
+Fresh-addon tests passed 26/26 with 0 failures and 6 model-dependent skips.
+The same run's committed-addon pass still used the old 9,987,776-byte binary
+(`ff28bcf5214090b9ce4b8ec8ca6b69fd134e0b2fd3115d5df78db29d24191696`) and
+failed three recovery tests, confirming the tracked-artifact drift. The
+candidate engine upgrade and its provenance are now documented separately
+from historical baseline `e15e35b0093394e0a8880af7f4e6f63cf81223b7`; the
+committed replacement rerun, model-dependent Linux paths, full integration
+qualification and final review gates remain pending before merge.
 
 **Residual path boundary:** Node `lstat`/`realpath` checks reject detected
 symbolic links and junctions but do not prove that every Windows-specific

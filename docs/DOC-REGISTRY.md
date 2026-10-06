@@ -2,7 +2,7 @@
 title: "GenesisBlockDB Document Registry"
 doc_id: "DOC-REGISTRY-GENESISBLOCKDB"
 status: draft
-version: "0.5.96+draft"
+version: "0.5.97+draft"
 updated: "2026-10-06"
 owner: "GenesisBlockDB Architecture"
 source_of_truth: true
@@ -52,8 +52,8 @@ registry row explicitly names them.
 
 | Role | Doc ID | Version | Status | Owner | Path |
 |---|---|---|---|---|---|
-| Architecture composition | `MASTER-SPEC-GENESISBLOCKDB` | `2.3.42b` | current | GenesisBlockDB Architecture | `docs/MASTER-SPEC--GENESIS-DB.md` |
-| Architecture index | `C4--GENESISDB-ARCHITECTURE` | `0.1.71b` | current | GenesisBlockDB Architecture | `docs/C4--GENESISDB-ARCHITECTURE.md` |
+| Architecture composition | `MASTER-SPEC-GENESISBLOCKDB` | `2.3.43b` | current | GenesisBlockDB Architecture | `docs/MASTER-SPEC--GENESIS-DB.md` |
+| Architecture index | `C4--GENESISDB-ARCHITECTURE` | `0.1.72b` | current | GenesisBlockDB Architecture | `docs/C4--GENESISDB-ARCHITECTURE.md` |
 | HQL2 execution decision | `ADR--GENESISDB-HQL2-EXECUTION-BOUNDARY` | `0.1.1b` | accepted | Boss (Founder / Product Authority) | `docs/adr/ADR--GENESISDB-HQL2-EXECUTION-BOUNDARY.md` |
 | HQL2 G4 shared-pipeline contract | `ADR--GENESISDB-HQL2-G4-SHARED-PIPELINE` | `0.1.3b` | active | Boss (Founder / Product Authority) | `docs/adr/ADR--GENESISDB-HQL2-G4-SHARED-PIPELINE.md` |
 | HQL2 P8 completion addendum | `ADR--GENESISDB-HQL2-P8-COMPLETION-ADDENDUM` | `0.1.14b` | accepted | Boss (Founder / Product Authority) | `docs/adr/ADR--GENESISDB-HQL2-P8-COMPLETION-ADDENDUM.md` |
@@ -76,9 +76,9 @@ registry row explicitly names them.
 | Query contract | `SPEC-GENESISDB-TYPED-QUERY-IR-V1` | `1.0.3` | accepted | GenesisBlockDB Architecture | `docs/SPEC--GENESISDB-TYPED-QUERY-IR-V1.md` |
 | Client contract | `CONTRACT-CLIENT-NAMESPACE-AND-SCHEMA` | `0.1.0+draft` | draft | GenesisBlockDB Engineering | `docs/contracts/CONTRACT--CLIENT-NAMESPACE-AND-SCHEMA.md` |
 | API reference | `API_REFERENCE` | generated | current | GenesisBlockDB Engineering | `docs/API_REFERENCE.md` |
-| GenesisRAG17 integration ADR | `ADR-GENESISRAG17-SEPARATE-WORKER-PUBLICATION` | `1.0.6b` | beta | GenesisBlockDB Architecture | `docs/ADR--GENESISRAG17-SEPARATE-WORKER-PUBLICATION.md` |
+| GenesisRAG17 integration ADR | `ADR-GENESISRAG17-SEPARATE-WORKER-PUBLICATION` | `1.0.7b` | beta | GenesisBlockDB Architecture | `docs/ADR--GENESISRAG17-SEPARATE-WORKER-PUBLICATION.md` |
 | GenesisRAG17 execution flow | `FLOW-GENESISRAG17-PIPELINE` | `1.0.3b` | beta | GenesisBlockDB Architecture | `docs/FLOW--GENESISRAG17-PIPELINE.md` |
-| GenesisRAG17 extension map | `MAP-GENESISRAG17-EXTENSIONS` | `1.0.3b` | beta | GenesisBlockDB Architecture | `docs/GENESISRAG17-EXTENSION-MAP.md` |
+| GenesisRAG17 extension map | `MAP-GENESISRAG17-EXTENSIONS` | `1.0.4b` | beta | GenesisBlockDB Architecture | `docs/GENESISRAG17-EXTENSION-MAP.md` |
 
 ## 5. Product narrative and evidence
 
@@ -121,6 +121,12 @@ The following documents should be created only when implementation work requires
 - third-client namespace conformance report.
 
 ## 9. Changelog
+
+Version diff 0.5.96+draft -> 0.5.97+draft: record the candidate GenesisRAG17
+engine upgrade separately from its historical baseline, synchronize parent
+architecture references and refresh the Linux addon provenance. The Bookworm
+fresh build passed 26/0/6 (six model-dependent skips); the committed-artifact
+rerun and full integration qualification remain pending.
 
 Version diff 0.5.95+draft -> 0.5.96+draft: record the first Bookworm
 container run failing before build because checkout's temporary HOME hid the
@@ -494,6 +500,7 @@ review and full P8 gates remain open.
 
 | Version | Date | Owner | Summary |
 |---|---|---|---|
+| 0.5.97+draft | 2026-10-06 | GenesisBlockDB Architecture | Record the GenesisRAG17 candidate engine source and historical baseline; synchronize ADR/C4/Master Spec/extension map provenance; refresh Linux addon metadata; fresh Bookworm worker suite 26 passed, 0 failed, 6 model-dependent skipped; full committed-artifact and integration qualification pending |
 | 0.5.96+draft | 2026-10-06 | GenesisBlockDB Architecture | Record Bookworm job's Git dubious-ownership failure before build; scope safe.directory to the exact checkout path for provenance; artifact rebuild and hosted verification pending |
 | 0.5.95+draft | 2026-10-06 | GenesisBlockDB Architecture | Prepare locked Linux addon rebuild/test/upload before the independent committed-artifact gate; record stale-binary finding in the RCA; artifact provenance refresh and hosted verification pending |
 | 0.5.94+draft | 2026-10-06 | GenesisBlockDB Architecture | Record the G3 recovery-proof test gap and P7.1 test-only acceptance; synchronize plan 0.8.78b while keeping model/code authorization and broad P7 gates open |

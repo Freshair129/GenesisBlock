@@ -48,9 +48,14 @@ npm ci --ignore-scripts
 npm run build:debug             # napi build --platform
 ```
 
-The native addon must be built from the pinned GenesisBlock checkout before
-running the worker. The worker needs Python `3.12.10` x64 and the exact
-sidecar dependencies in [`requirements.txt`](requirements.txt):
+The native addon used for acceptance must match the candidate engine source
+recorded in the [worker ADR](../docs/ADR--GENESISRAG17-SEPARATE-WORKER-PUBLICATION.md).
+The committed Linux artifact's source SHA, build environment, lockfile hashes
+and binary digest are recorded in
+[`npm/linux-x64-gnu/README.md`](../npm/linux-x64-gnu/README.md). The candidate
+is not full integration acceptance; model-dependent Linux paths and migration
+compatibility remain pending. The worker needs Python `3.12.10` x64 and the
+exact sidecar dependencies in [`requirements.txt`](requirements.txt):
 
 ```powershell
 Set-Location $GenesisRoot
@@ -272,9 +277,10 @@ retained published-history list.
 
 ## Current native limitations
 
-The N-API binding at this pinned commit does not expose a `close` method. The
-worker closes its HTTP server, Python sidecar, FTS5 database and lock, but a
-true native handle restart must be performed by a dedicated child process.
+The N-API binding at the candidate engine source recorded in the ADR does not
+expose a `close` method. The worker closes its HTTP server, Python sidecar,
+FTS5 database and lock, but a true native handle restart must be performed by
+a dedicated child process.
 The worker therefore uses a sibling SQLite transaction to serialize startup
 and persistent worker-lock changes, plus the in-store PID/token lock. The
 in-store lock records process start identity, so a container restart that
@@ -296,7 +302,7 @@ Set-Location $GenesisRoot
 npm test --prefix genesisrag17-worker
 ```
 
-The tests require the pinned model artifacts and the built native addon. They
+The tests require the pinned model artifacts and the candidate native addon. They
 exercise native graph/vector writes and readback, durable transaction identity
 and replay, collection-manifest checkpoint recovery, real CPU embedding, Stage
 16-only FTS5 indexing, scope isolation, policy Stage 15 failure, pointer crash

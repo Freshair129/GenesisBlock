@@ -2,10 +2,10 @@
 doc_id: C4--GENESISDB-ARCHITECTURE
 type: architecture-index
 status: current
-version: 0.1.71b
+version: 0.1.72b
 owner: GenesisBlockDB Architecture
 created_at: 2026-06-13T22:50:11+07:00,ATHER,9b1ced3
-last_update: "2026-10-06T01:39:39+07:00,ATHER"
+last_update: "2026-10-06T16:26:13+07:00,ATHER"
 attributes:
   domain: architecture
   scope: repository
@@ -377,9 +377,12 @@ GKS Stage 17 gate, atomic worker publication and publication receipt.
 |---|---|---|---|
 | GenesisRAG17 worker adapter | Native graph/vector/SQLite readback, worker FTS5, per-generation query, durable outboxes and atomic publication for the isolated TEST flow | `genesisrag17-worker/src/worker.mjs`, `genesisrag17-worker/src/index.mjs`, `genesisrag17-worker/src/msp-stdio.mjs` | `docs/ADR--GENESISRAG17-SEPARATE-WORKER-PUBLICATION.md`, `docs/FLOW--GENESISRAG17-PIPELINE.md`, `docs/GENESISRAG17-EXTENSION-MAP.md` |
 
-The native engine remains client-neutral and pinned for this integration to
-`e15e35b0093394e0a8880af7f4e6f63cf81223b7`. This container is TEST evidence;
-it does not grant the worker direct GKS, MSP database or Edge store access.
+The native engine remains client-neutral. The current candidate engine source
+and qualification status are recorded in the
+[GenesisRAG17 worker ADR](ADR--GENESISRAG17-SEPARATE-WORKER-PUBLICATION.md);
+the prior pin is retained there as historical integration evidence. This
+container is TEST evidence; it does not grant the worker direct GKS, MSP
+database or Edge store access.
 
 ### REST API Components
 
@@ -498,6 +501,11 @@ fault-injected.
 Broader EXPLAIN/P8/P13 and P14 rehearsal remain open.
 
 ## CHANGELOG
+
+Version diff 0.1.71b -> 0.1.72b: distinguish the candidate GenesisRAG17 engine
+source from its historical baseline and link qualification status to the worker
+ADR; no stage, ownership, wire or access boundary changed, and full integration
+qualification remains pending.
 
 Version diff 0.1.70b -> 0.1.71b: reconcile the approved G4 stable plan
 identity with the later D7 single-property and exact-seed depth-one
@@ -635,6 +643,7 @@ full P8/P13 qualification remains open.
 
 | Version | Date | Status | Summary | Commit Hash | Agent |
 |---------|------|--------|---------|-------------|-------|
+| 0.1.72b | 2026-10-06 | current | Record GenesisRAG17 candidate engine source and historical baseline through the worker ADR; preserve TEST-only ownership/access boundaries and keep full integration qualification pending | working-tree | ATHER |
 | 0.1.71b | 2026-10-06 | current | Reconcile approved G4 plan identity with the later D7/H2-D11 implementation evidence; 39-target HQL2 sweep 404/0/1, while G4/P8 and independent/hosted qualification remain partial | working-tree | ATHER |
 | 0.1.70b | 2026-10-05 | current | Merge owner-approved G4 stable plan identity on `EXPLAIN`/`ANALYZE` onto the current D7 mainline; focused local verification passes, while broad G4/P8/P13, transport, hosted and independent-review gates remain open | working-tree | ATHER |
 | 0.1.69b | 2026-10-04 | current | Extend D7 with differential-proven same-alias exact string-ID filter on labeled zero-hop scans; adapter 11/11, ordering 2/2 and labeled-filter 2/2 including wrong-label/backslash/Unicode cases; HQL2 394/0/1 across 35 targets, selected P6 peers 45/0/0 across 7; PR #213 code commit checks 40 pass, 4 worker failures with cause unconfirmed, 5 skipped, 1 Windows Cargo cancellation at 15-minute job limit; no P6/schema/transport change; broad shared-runtime/P8/P13 remain open | working-tree | ATHER |

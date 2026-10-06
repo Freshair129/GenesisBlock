@@ -19,14 +19,18 @@ per-triple packages get their binaries.
 
 | Fact | Value |
 |---|---|
-| Built from | GenesisBlock `907b0ff4ca66e5940741bfa284e92c157dc783f7` — the merge of PR #174, the ADR-075 Phase 2 "accept both ontology versions" worker change |
+| Built from | PR #217 merge checkout `209cc36b455c6e9622b046eb6060b69d9cd4d681` (hosted workflow run `37439589499`, job `112189748409`); this is build-source provenance, not the later distribution commit |
+| Engine qualification | Candidate upgrade; historical integration baseline `e15e35b0093394e0a8880af7f4e6f63cf81223b7` remains historical evidence only. See the [worker ADR](../../docs/ADR--GENESISRAG17-SEPARATE-WORKER-PUBLICATION.md) |
 | Target triple | `x86_64-unknown-linux-gnu` |
-| Build command | `npm ci --ignore-scripts && npm run build` (`napi build --platform --release`) |
-| Build environment | A throwaway Docker container from the official `rust:1-bookworm` image (`rustc 1.98.1`), source mounted read-only, artifact written out to the host. No `docker compose` was involved |
-| Size | 9,987,776 bytes (9.5 MiB), stripped |
-| SHA-256 | `ff28bcf5214090b9ce4b8ec8ca6b69fd134e0b2fd3115d5df78db29d24191696` |
+| Build command | `npm ci --ignore-scripts && npm run build -- --cargo-flags=--locked` (`napi build --platform --release`) |
+| Build environment | Debian Bookworm container `rust:1.98.1-bookworm`; `rustc 1.98.1 (48a229cea 2026-09-01)`, Cargo `1.98.1`, Node `v24.18.0`, npm `11.16.0`; runner Ubuntu 24.04.5 |
+| Cargo.lock SHA-256 | `b58d8a0490cf44c88b905d573e2f7cb51d1fd8bc7d61ea061ad026a6d7eb709e` |
+| package-lock.json SHA-256 | `4dccc43c6ae07e7fb840b52342a65be2c47498308cae29396c1abf3e1ba0eb70` |
+| Size | 11,039,392 bytes (10.5 MiB) |
+| SHA-256 | `b678dfd7ee125d33d877b008e3af2c2a36ee9fa5203d043248cf2b9974e778e1` |
+| Highest imported GLIBC | `GLIBC_2.34` |
 | Node used to verify | `v24.18.0` linux-x64 — what `genesisrag17-worker/package.json` requires (`"node": ">=24.18"`) and what the MSP GenesisRAG17 runbook pins |
-| Verified with | `npm test --prefix genesisrag17-worker` on Linux, in a second container, against this exact file: **20 tests, 14 passed, 0 failed, 6 skipped** |
+| Verified with | Freshly built candidate in hosted run `37439589499`: **32 tests, 26 passed, 0 failed, 6 skipped** because the pinned ONNX model snapshot was absent. The pre-refresh committed addon failed 3 recovery cases in the same run; this tracked replacement still needs committed-artifact verification on the updated PR head. |
 
 ### Runtime requirements of this file
 
@@ -55,11 +59,11 @@ six tests that need it as *skipped* rather than failed, the same way
 - worker publishes two queued documents and retains versioned historical snapshots after correction
 
 So the Stage 15 embedding and Stage 16 lexical-index paths have **not** been
-exercised on Linux by this artifact's verification run. The 14 that did pass
-cover the MSP mock boundary, Stage 13 graph commits with both `ontology_v1` and
-`ontology_v2`, durable native transaction intents and replay, receipt recovery,
-atomic pointer replacement and its failure mode, WARN fail-closed publication,
-and the C-10 bitemporal lane count.
+exercised on Linux by this artifact's verification run. The 26 passing tests
+include checks for the MSP mock boundary, Stage 13 graph commits with both
+`ontology_v1` and `ontology_v2`, durable native transaction intents and replay,
+receipt recovery, atomic pointer replacement and its failure mode, WARN
+fail-closed publication, and the C-10 bitemporal lane count.
 
 Before this file existed, every GenesisRAG17 acceptance run had been on Windows
 x64 and the only addon anyone had built at the pin was

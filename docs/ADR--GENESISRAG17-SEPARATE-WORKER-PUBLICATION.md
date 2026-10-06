@@ -2,14 +2,16 @@
 title: "ADR: GenesisRAG17 separate worker and atomic publication"
 doc_id: "ADR-GENESISRAG17-SEPARATE-WORKER-PUBLICATION"
 status: beta
-version: "1.0.6b"
+version: "1.0.7b"
 updated: "2026-10-06"
 owner: "GenesisBlockDB Architecture"
 source_of_truth: true
 attributes:
   domain: integration
   scope: "GenesisRAG17 isolated TEST pipeline"
-  engine_commit: "e15e35b0093394e0a8880af7f4e6f63cf81223b7"
+  engine_commit: "209cc36b455c6e9622b046eb6060b69d9cd4d681"
+  engine_qualification: candidate
+  historical_engine_commit: "e15e35b0093394e0a8880af7f4e6f63cf81223b7"
   model_revision: "614241f622f53c4eeff9890bdc4f31cfecc418b3"
 related_docs:
   - "docs/MASTER-SPEC--GENESIS-DB.md"
@@ -26,7 +28,9 @@ related_docs:
 This is the GenesisBlockDB-side architecture decision for the isolated
 GenesisRAG17 TEST integration. It records the boundary that the worker package
 and the cross-repository acceptance run implement. It is not a production
-deployment approval and it does not change the client-neutral native engine.
+deployment approval and it does not add GenesisRAG17 domain logic to the
+client-neutral native engine. The engine source below is a candidate upgrade;
+its integration qualification remains pending.
 
 The product-level source documents are the [GenesisRAG17 architecture
 decision ADR-073](https://github.com/Freshair129/zuri.ai/blob/codex/ki17-integration/docs/decisions/ADR-073-GENESISRAG17-ISOLATED-EXECUTION-AND-PUBLICATION.md),
@@ -40,8 +44,11 @@ report](https://github.com/Freshair129/zuri.ai/blob/b64b46df057d3160c659afa3c346
 is evidence for the isolated test only.
 
 The approved implementation contract is `1.3.0b`; its wire schema remains
-`genesisrag17.v1`. This repair does not change the native engine pin, model
-revision, receipt schema or stage identities.
+`genesisrag17.v1`. This candidate engine upgrade does not change the model
+revision, receipt schema, wire schema or stage identities. The historical
+engine baseline remains `e15e35b0093394e0a8880af7f4e6f63cf81223b7`; the
+candidate source is the tested PR merge checkout recorded in artifact
+provenance, not a claim that historical acceptance transfers to the candidate.
 
 ## Context
 
@@ -58,6 +65,22 @@ engine's generic node, edge, vector, lexical, temporal, SQLite and provenance
 semantics. It must not turn GKS vocabulary, MSP policy, or a source application's
 schema into native core ontology.
 
+## Candidate engine qualification
+
+The candidate engine source is
+`209cc36b455c6e9622b046eb6060b69d9cd4d681`, the PR #217 merge checkout used
+by hosted Bookworm build run `37439589499`. The prior integration baseline is
+`e15e35b0093394e0a8880af7f4e6f63cf81223b7`; its frozen acceptance report
+remains historical evidence and does not qualify this upgrade. The freshly
+built addon passed 26 worker tests, with 0 failures and 6 model-dependent tests
+skipped because the pinned ONNX snapshot was absent. That run's committed-addon
+gate exercised the pre-refresh binary and failed three recovery cases. The
+tracked candidate artifact is now refreshed from the verified build; the
+committed-addon rerun on the updated PR head remains pending. See
+[`npm/linux-x64-gnu/README.md`](../npm/linux-x64-gnu/README.md) for exact build
+provenance. Migration compatibility, model-dependent Linux paths, full
+cross-repository acceptance and deployment approval remain unverified.
+
 ## Decision
 
 ### 1. Separate worker and neutral engine
@@ -65,9 +88,11 @@ schema into native core ontology.
 `genesisrag17-worker/` is a separate TEST package and process. It owns one
 GenesisBlock native store process, a worker-owned SQLite FTS5 lexical sidecar,
 durable worker state/outboxes and the loopback query endpoint. The native
-engine remains pinned to
-`e15e35b0093394e0a8880af7f4e6f63cf81223b7`; no GenesisRAG17 domain logic is
-added to the Rust core.
+engine candidate is
+`209cc36b455c6e9622b046eb6060b69d9cd4d681`; historical integration baseline
+`e15e35b0093394e0a8880af7f4e6f63cf81223b7` is retained separately. Candidate
+qualification is pending; no GenesisRAG17 domain logic is added to the Rust
+core.
 
 The worker uses the CPU `intfloat/multilingual-e5-small` model at revision
 `614241f622f53c4eeff9890bdc4f31cfecc418b3`, dimension 384, cosine metric, with
@@ -526,6 +551,7 @@ its explicit non-production limits.
 
 | Version | Date | Status | Summary | Commit Hash | Agent |
 |---|---|---|---|---|---|
+| 1.0.7b | 2026-10-06 | beta | Record candidate native engine source 209cc36 and preserve e15e35 as the historical baseline; refresh Linux addon provenance while keeping model, migration, full integration and deployment qualification pending; contract 1.3.0b and genesisrag17.v1 unchanged | working-tree | ATHER |
 | 1.0.6b | 2026-10-06 | beta | Specify fresh-store startup ordering: a sibling bootstrap lock serializes native identity initialization before worker sidecars, while stale worker-lock recovery and markerless fail-closed behavior remain intact. | working-tree | ATHER |
 | 1.0.5b | 2026-09-11 | beta | implemented: accepts {ontology_v1, ontology_v2}. Stage 13 version check moved to the fixed supported-version set; the predicate allowlist and both endpoint ternaries (`validateFact`, Stage 13 graph-build) replaced by one shared `ONTOLOGY_TABLES` map keyed by `ontologyVersion`; `entityKind()` gained case-insensitive package/category/price_tier mappings; the bitemporal mapped-only lane count kept unchanged. Rollout step 1 of the ADR-075 Phase 2 contract revision 2 accept-before-produce sequence — must merge before GKS starts producing ontology_v2. Six new worker.mjs tests added (ontology_v2 acceptance, v1 regression, v2-predicate-in-v1 rejection, reversed-endpoint rejection, unsupported-version rejection, C-10 mixed-generation lane count); full suite 20/20 passing. | working-tree | Claude Opus 5 |
 | 1.0.4b | 2026-09-11 | beta | Docs-only acceptance of GenesisRAG17 structured-record profile contract revision 2 (ADR-075 Phase 2 gate): Option A tier-qualified pricing, the C-2 predicate/endpoint table, the {ontology_v1, ontology_v2} supported-version set with worker-first accept-before-produce rollout, the C-9 worker implementation list with verified file:line anchors (plus one additional FACT_PREDICATE_NONCANONICAL gate found on re-verification), the C-8 worker tests required, and a read-only finding that the bitemporal lane already handles a mixed dated/not_applicable generation. No worker code changed. | working-tree | Claude Opus 5 |
@@ -533,8 +559,12 @@ its explicit non-production limits.
 | 1.0.1b | 2026-09-08 | beta | Synced audit remediation: exact pre-commit native intents and collection checkpoint recovery, accepted graph-state ordering, Stage 16 lexical indexing, PASS-only publication and no-fallback pointer replacement. | working-tree | RWANG |
 | 1.0.0b | 2026-09-08 | beta | Recorded the separate TEST worker, MSP-only relay, ordered physical execution, six-lane evidence and receipt-bound atomic publication. | working-tree | RWANG |
 
-## Reference version diff — 2026-09-08
+## Reference version diff — 2026-10-06
+
+"1.0.6b -> 1.0.7b: record a candidate native engine upgrade and exact Linux artifact provenance separately from the historical e15e35 baseline; keep GenesisRAG17 contract/wire identities unchanged and full integration qualification pending."
 
 "1.0.5b → 1.0.6b: define a safe fresh-store bootstrap lock and startup order for the isolated worker; keep native identity/recovery checks fail-closed and preserve the existing worker ownership lock contract."
+
+## Reference version diff — 2026-09-08
 
 "1.0.2b → 1.0.3b: follow zuri's pre-merge ADR-071 → ADR-073 collision repair because published main owns ADR-071 for CRM. Historical revision rows and pinned acceptance reports retain their original identifiers. Protocol and runtime behavior are unchanged.
