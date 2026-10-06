@@ -56,8 +56,44 @@ therefore mistaken for proof of the recovery path.
    implemented and pass. Do not promote this test result to hosted CI,
    power-loss, release, deployment, or broad P7 evidence.
 
+## Implementation follow-up — CI Clippy failure (2026-10-06)
+
+### Symptom
+
+PR #217's `fmt + clippy` check failed after the test-only implementation was
+committed.
+
+### Evidence
+
+- The repository workflow runs
+  `cargo clippy --no-default-features --all-targets -- -D warnings`.
+- Clippy reported `clippy::io_other_error` at the new absent-file assertion in
+  `tests/g3_oracle_differential_tests.rs`, where the code constructed
+  `std::io::ErrorKind::Other` with `std::io::Error::new`.
+- The exact workflow command reproduced the finding locally.
+
+### Root Cause
+
+The new assertion used the generic `Error::new(ErrorKind::Other, ...)`
+constructor instead of the standard `std::io::Error::other(...)` constructor.
+Because CI promotes warnings to errors, this lint failed the job.
+
+### Why the issue escaped detection
+
+The initial local verification ran formatting and test matrices but omitted the
+workflow's Clippy commands. The independent verification gate therefore did
+not exercise the same lint acceptance check as CI.
+
+### Proposed prevention
+
+1. Use `std::io::Error::other(...)` for this assertion.
+2. Include both CI Clippy commands in future Rust verification:
+   `cargo clippy --no-default-features --all-targets -- -D warnings` and
+   `cargo clippy --all-targets -- -D warnings`.
+
 ## Version Diff
 
 | From | To | Change |
 |---|---|---|
 | none | 1.0.0 | Record the G3 WAL-only recovery test-evidence root cause and bounded prevention criteria. |
+| 1.0.0 | 1.0.1 | Record the PR #217 Clippy failure, evidence, root cause, and lint-gate prevention. |

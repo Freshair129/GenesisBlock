@@ -56,10 +56,9 @@ fn remove_materialized_state(path: &Path) -> std::io::Result<()> {
     for name in materialized_files {
         match fs::symlink_metadata(path.join(name)) {
             Ok(_) => {
-                return Err(std::io::Error::new(
-                    std::io::ErrorKind::Other,
-                    format!("materialized file {name} remains after removal"),
-                ));
+                return Err(std::io::Error::other(format!(
+                    "materialized file {name} remains after removal"
+                )));
             }
             Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
             Err(error) => return Err(error),
