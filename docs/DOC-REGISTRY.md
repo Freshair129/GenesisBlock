@@ -2,7 +2,7 @@
 title: "GenesisBlockDB Document Registry"
 doc_id: "DOC-REGISTRY-GENESISBLOCKDB"
 status: draft
-version: "0.5.95+draft"
+version: "0.5.96+draft"
 updated: "2026-10-06"
 owner: "GenesisBlockDB Architecture"
 source_of_truth: true
@@ -121,6 +121,11 @@ The following documents should be created only when implementation work requires
 - third-client namespace conformance report.
 
 ## 9. Changelog
+
+Version diff 0.5.95+draft -> 0.5.96+draft: record the first Bookworm
+container run failing before build because checkout's temporary HOME hid the
+safe-directory setting from the job shell. Use a command-scoped trust entry for
+the exact workspace path; native build and artifact verification remain pending.
 
 Version diff 0.5.94+draft -> 0.5.95+draft: record the committed Linux addon
 drift and prepare the workflow to build, test and upload a replacement before
@@ -489,6 +494,7 @@ review and full P8 gates remain open.
 
 | Version | Date | Owner | Summary |
 |---|---|---|---|
+| 0.5.96+draft | 2026-10-06 | GenesisBlockDB Architecture | Record Bookworm job's Git dubious-ownership failure before build; scope safe.directory to the exact checkout path for provenance; artifact rebuild and hosted verification pending |
 | 0.5.95+draft | 2026-10-06 | GenesisBlockDB Architecture | Prepare locked Linux addon rebuild/test/upload before the independent committed-artifact gate; record stale-binary finding in the RCA; artifact provenance refresh and hosted verification pending |
 | 0.5.94+draft | 2026-10-06 | GenesisBlockDB Architecture | Record the G3 recovery-proof test gap and P7.1 test-only acceptance; synchronize plan 0.8.78b while keeping model/code authorization and broad P7 gates open |
 | 0.5.93+draft | 2026-10-06 | GenesisBlockDB Architecture | Record current P6 mainline closeout integration and local results: P6 49/49, focused integrated targets 44/44, HQL2 407/0/1 across 40 targets; synchronize H2-D11/P8/plan/report entries; broader P8/P13, hosted and release gates remain open |

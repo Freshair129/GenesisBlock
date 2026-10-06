@@ -76,6 +76,16 @@ which did not reject that test path, before rebuilding the addon from current
 Rust source. Thus the worker's fail-closed behavior varied with the platform
 artifact even though the current-source build contains the guard.
 
+### Bookworm job safe-directory mismatch
+
+Hosted run `37421895783`, job `112132859522`, failed in “Record build
+environment” before Rust compilation, tests, or artifact upload. Checkout had
+added `/__w/GenesisBlock/GenesisBlock` as a safe directory while using its
+temporary HOME. The later job-container shell used `HOME=/github/home`, and
+`git rev-parse HEAD` reported dubious ownership for the same checkout. The
+checkout itself was present; Git's trust configuration was not shared across
+the two HOME scopes.
+
 ## Why the issue escaped earlier detection
 
 The current hosted CI did detect both problems and blocked merge; the failures
@@ -87,6 +97,9 @@ despite having no assertion.
 The local worker suite used the current Windows addon; only the Linux artifact
 drift job exercised the older committed binary. The regression therefore
 escaped local checks but was correctly caught by the committed-artifact pass.
+The safe-directory mismatch was specific to the hosted container's HOME
+boundary and was first exposed when the new Bookworm job attempted to record
+its source SHA; local Git ownership/configuration did not reproduce that split.
 
 ## Fix (decided)
 
@@ -119,6 +132,9 @@ escaped local checks but was correctly caught by the committed-artifact pass.
 7. Build and test the fresh addon before testing the committed artifact, and
    upload the tested fresh binary before the committed-artifact gate so drift
    remains repairable without suppressing that mandatory gate.
+8. In the container workflow, resolve the source SHA with a command-scoped
+   `safe.directory` entry for exactly `$GITHUB_WORKSPACE`; do not add a broad
+   or persistent global Git trust exception.
 
 ## Proposed prevention
 
@@ -132,6 +148,8 @@ escaped local checks but was correctly caught by the committed-artifact pass.
 - Keep schema and markerless recovery interpretation in the native engine;
   verify both source-built and committed Linux artifacts without substituting
   one for the other. Do not require byte equality between independent builds.
+- Keep Git ownership exceptions least-privilege and scoped to the exact
+  checkout command when checkout and job-container HOME values differ.
 
 ## Outcome (measured)
 
@@ -160,8 +178,11 @@ binary did not reject the markerless regression before its native-source
 rebuild step. Astra recommended refreshing the artifact, preserving native
 recovery semantics in Rust, recording exact build provenance, and making the
 rebuilt artifact available before the mandatory committed-artifact gate. The
-Bookworm rebuild, updated artifact, and final hosted/review gates remain
-pending before merge.
+first Bookworm run `37421895783` failed before build because its shell HOME did
+not contain checkout's temporary safe-directory setting; the workflow now
+scopes trust to the exact workspace path for source-SHA recording. No artifact
+was produced by that run. The follow-up Bookworm rebuild, updated artifact,
+and final hosted/review gates remain pending before merge.
 
 **Residual path boundary:** Node `lstat`/`realpath` checks reject detected
 symbolic links and junctions but do not prove that every Windows-specific
