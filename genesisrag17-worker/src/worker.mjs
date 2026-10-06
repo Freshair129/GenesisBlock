@@ -556,14 +556,17 @@ export function writeAtomic(filename, content, replaceFile = undefined) {
 
 const PROCESS_STARTED_AT_MS = Date.now() - Math.floor(process.uptime() * 1000);
 const PROCESS_START_TOLERANCE_MS = 2000;
+const MAX_WORKER_LOCK_BYTES = 4096;
+const MAX_WORKER_PID = 0x7fffffff;
 
 function processIsAlive(pid) {
-  if (!Number.isInteger(pid) || pid <= 0) return false;
   try {
     process.kill(pid, 0);
     return true;
   } catch (error) {
-    return error.code === 'EPERM';
+    if (error.code === 'EPERM') return true;
+    if (error.code === 'ESRCH') return false;
+    fail('WORKER_PID_PROBE_FAILED', error.code ?? 'unknown');
   }
 }
 
@@ -584,7 +587,106 @@ function isLegacyLockFromBeforeCurrentProcess(lock) {
   return createdAt !== undefined && createdAt < PROCESS_STARTED_AT_MS - PROCESS_START_TOLERANCE_MS;
 }
 
+function isCanonicalTimestamp(value) {
+  const parsed = parseProcessStartTime(value);
+  return parsed !== undefined && new Date(parsed).toISOString() === value;
+}
+
+function samePath(left, right) {
+  const normalizedLeft = path.normalize(left);
+  const normalizedRight = path.normalize(right);
+  return process.platform === 'win32'
+    ? normalizedLeft.toLowerCase() === normalizedRight.toLowerCase()
+    : normalizedLeft === normalizedRight;
+}
+
+function pathStatsIfPresent(filename) {
+  try {
+    return fs.lstatSync(filename);
+  } catch (error) {
+    if (error.code === 'ENOENT') return undefined;
+    throw error;
+  }
+}
+
+function canonicalStorePath(dbPath, { createParent = false } = {}) {
+  if (typeof dbPath !== 'string' || !path.isAbsolute(dbPath)) fail('DB_PATH_MUST_BE_ABSOLUTE');
+  const resolvedPath = path.resolve(dbPath);
+  const parentPath = path.dirname(resolvedPath);
+  if (createParent) fs.mkdirSync(parentPath, { recursive: true });
+  const canonicalParent = fs.realpathSync(parentPath);
+  const canonicalPath = path.join(canonicalParent, path.basename(resolvedPath));
+  const stats = pathStatsIfPresent(canonicalPath);
+  if (stats) {
+    if (stats.isSymbolicLink()) fail('DB_PATH_LINKED');
+    if (!stats.isDirectory()) fail('DB_PATH_MUST_BE_DIRECTORY');
+    if (!samePath(fs.realpathSync(canonicalPath), canonicalPath)) fail('DB_PATH_LINKED');
+  }
+  return canonicalPath;
+}
+
+function validateWorkerLockRecord(lock) {
+  if (!isPlainObject(lock)) fail('WORKER_LOCK_UNPROVABLY_STALE');
+  const fields = Object.keys(lock).sort().join(',');
+  const isLegacy = fields === 'createdAt,dbPath,pid,token';
+  const isCurrent = fields === 'createdAt,dbPath,pid,processStartedAt,token';
+  if (!isLegacy && !isCurrent) fail('WORKER_LOCK_UNPROVABLY_STALE');
+  if (!Number.isSafeInteger(lock.pid) || lock.pid < 1 || lock.pid > MAX_WORKER_PID
+    || typeof lock.dbPath !== 'string' || lock.dbPath.length > 32768 || !path.isAbsolute(lock.dbPath)
+    || typeof lock.token !== 'string' || lock.token.length === 0 || lock.token.length > 128
+    || !isCanonicalTimestamp(lock.createdAt)) {
+    fail('WORKER_LOCK_UNPROVABLY_STALE');
+  }
+  const createdAt = parseProcessStartTime(lock.createdAt);
+  if (createdAt > Date.now() + PROCESS_START_TOLERANCE_MS) fail('WORKER_LOCK_UNPROVABLY_STALE');
+  if (isCurrent && (!/^[0-9a-f]{32}$/.test(lock.token) || !isCanonicalTimestamp(lock.processStartedAt))) {
+    fail('WORKER_LOCK_UNPROVABLY_STALE');
+  }
+  if (isCurrent) {
+    const processStartedAt = parseProcessStartTime(lock.processStartedAt);
+    if (processStartedAt > Date.now() + PROCESS_START_TOLERANCE_MS
+      || processStartedAt > createdAt + PROCESS_START_TOLERANCE_MS) fail('WORKER_LOCK_UNPROVABLY_STALE');
+  }
+  return lock;
+}
+
+function readWorkerLock(filename) {
+  const stats = pathStatsIfPresent(filename);
+  if (!stats) return undefined;
+  if (stats.isSymbolicLink() || !stats.isFile() || stats.nlink !== 1 || stats.size > MAX_WORKER_LOCK_BYTES) {
+    fail('WORKER_LOCK_UNPROVABLY_STALE');
+  }
+  const lockText = fs.readFileSync(filename, 'utf8');
+  if (Buffer.byteLength(lockText, 'utf8') > MAX_WORKER_LOCK_BYTES) fail('WORKER_LOCK_UNPROVABLY_STALE');
+  let lock;
+  try { lock = parseJsonText(lockText, 'WORKER_LOCK_INVALID'); } catch { fail('WORKER_LOCK_UNPROVABLY_STALE'); }
+  return validateWorkerLockRecord(lock);
+}
+
+function recoverStaleWorkerLock(filename, dbPath) {
+  assertWorkerDirectoriesSafe(dbPath, [path.dirname(filename)]);
+  const current = readWorkerLock(filename);
+  if (!current) return false;
+  let currentStorePath;
+  try { currentStorePath = canonicalStorePath(current.dbPath); } catch { fail('WORKER_LOCK_UNPROVABLY_STALE'); }
+  if (!samePath(currentStorePath, dbPath)) fail('WORKER_STORE_ALREADY_OWNED', String(current.pid));
+  if (processIsAlive(current.pid)) {
+    if (current.pid !== process.pid) fail('WORKER_STORE_ALREADY_OWNED', String(current.pid));
+    if (current.processStartedAt !== undefined) {
+      const startedAt = parseProcessStartTime(current.processStartedAt);
+      if (isCurrentProcessInstance(current)) fail('WORKER_STORE_ALREADY_OWNED', String(current.pid));
+      if (startedAt >= PROCESS_STARTED_AT_MS - PROCESS_START_TOLERANCE_MS) fail('WORKER_LOCK_UNPROVABLY_STALE');
+    } else if (!isLegacyLockFromBeforeCurrentProcess(current)) {
+      fail('WORKER_LOCK_UNPROVABLY_STALE');
+    }
+  }
+  // A dead owner or a reused PID from an older process instance permits stale-lock recovery.
+  fs.rmSync(filename, { force: true });
+  return true;
+}
+
 function acquireWorkerLock(filename, dbPath) {
+  // Callers hold the sibling SQLite transaction while acquiring or recovering this lock.
   const lock = {
     pid: process.pid,
     dbPath,
@@ -601,28 +703,74 @@ function acquireWorkerLock(filename, dbPath) {
     return lock;
   } catch (error) {
     if (error.code !== 'EEXIST') throw error;
-    let current;
-    try { current = parseJsonText(fs.readFileSync(filename, 'utf8'), 'WORKER_LOCK_INVALID'); } catch { fail('WORKER_LOCK_UNPROVABLY_STALE'); }
-    if (current.dbPath !== dbPath) fail('WORKER_STORE_ALREADY_OWNED', String(current.pid));
-    if (processIsAlive(current.pid)) {
-      if (current.pid !== process.pid) fail('WORKER_STORE_ALREADY_OWNED', String(current.pid));
-      if (Object.prototype.hasOwnProperty.call(current, 'processStartedAt')) {
-        if (parseProcessStartTime(current.processStartedAt) === undefined) fail('WORKER_LOCK_UNPROVABLY_STALE');
-        if (isCurrentProcessInstance(current)) fail('WORKER_STORE_ALREADY_OWNED', String(current.pid));
-      } else if (!isLegacyLockFromBeforeCurrentProcess(current)) {
-        fail('WORKER_LOCK_UNPROVABLY_STALE');
-      }
-    }
-    // A dead owner or a reused PID from an older process instance permits stale-lock recovery.
-    fs.rmSync(filename, { force: true });
+    recoverStaleWorkerLock(filename, dbPath);
     return acquireWorkerLock(filename, dbPath);
   }
 }
 
-function releaseWorkerLock(filename, lock) {
-  if (!lock || !fs.existsSync(filename)) return;
+function workerBootstrapLockPath(dbPath) {
+  const lockKey = process.platform === 'win32' ? dbPath.toLowerCase() : dbPath;
+  return path.join(path.dirname(dbPath), `.genesisrag17-bootstrap-${hashText(lockKey)}.sqlite`);
+}
+
+function assertRegularCoordinationFile(filename) {
+  const stats = pathStatsIfPresent(filename);
+  if (!stats) return;
+  if (stats.isSymbolicLink() || !stats.isFile() || stats.nlink !== 1) fail('WORKER_BOOTSTRAP_PATH_INVALID');
+  if (!samePath(fs.realpathSync(filename), filename)) fail('WORKER_BOOTSTRAP_PATH_INVALID');
+}
+
+function acquireWorkerBootstrapLock(dbPath) {
+  const filename = workerBootstrapLockPath(dbPath);
+  for (const suffix of ['', '-journal', '-wal', '-shm']) assertRegularCoordinationFile(`${filename}${suffix}`);
+  let database;
   try {
-    const current = parseJsonText(fs.readFileSync(filename, 'utf8'), 'WORKER_LOCK_INVALID');
+    database = new DatabaseSync(filename, { timeout: 0 });
+    database.exec('PRAGMA journal_mode = DELETE');
+    database.exec('BEGIN EXCLUSIVE');
+    return database;
+  } catch (error) {
+    try { database?.close(); } catch { /* retain the lock acquisition failure */ }
+    if (error.errcode === 5 || error.errcode === 6) fail('WORKER_STORE_STARTUP_BUSY');
+    throw error;
+  }
+}
+
+function releaseWorkerBootstrapLock(database) {
+  if (!database) return;
+  try {
+    database.exec('ROLLBACK');
+  } finally {
+    database.close();
+  }
+}
+
+function assertWorkerDirectoriesSafe(dbPath, directories) {
+  for (const directory of [dbPath, ...directories]) {
+    const stats = pathStatsIfPresent(directory);
+    if (!stats) continue;
+    if (stats.isSymbolicLink()) fail('WORKER_SIDECAR_PATH_LINKED');
+    if (!stats.isDirectory()) fail('WORKER_SIDECAR_PATH_INVALID');
+    if (!samePath(fs.realpathSync(directory), directory)) fail('WORKER_SIDECAR_PATH_LINKED');
+  }
+}
+
+function pruneEmptyWorkerDirectories(directories) {
+  for (const directory of directories) {
+    try {
+      fs.rmdirSync(directory);
+    } catch (error) {
+      if (error.code !== 'ENOENT' && error.code !== 'ENOTEMPTY' && error.code !== 'EEXIST') throw error;
+    }
+  }
+}
+
+function releaseWorkerLock(filename, lock, dbPath) {
+  if (!lock) return;
+  try {
+    assertWorkerDirectoriesSafe(dbPath, [path.dirname(filename)]);
+    const current = readWorkerLock(filename);
+    if (!current) return;
     if (current.token === lock.token && current.pid === lock.pid) fs.rmSync(filename, { force: true });
   } catch {
     // A corrupt lock is not ours to delete; leave it for safe manual recovery.
@@ -961,7 +1109,7 @@ export class GenesisRag17Worker {
     if (host !== '127.0.0.1' && host !== '::1') fail('WORKER_HOST_MUST_BE_LOOPBACK');
     if (port !== undefined && (!Number.isInteger(port) || port < 0 || port > 65535)) fail('WORKER_PORT_INVALID');
 
-    this.dbPath = dbPath;
+    this.dbPath = canonicalStorePath(dbPath, { createParent: true });
     this.scope = cloneJson(scope);
     this.credential = credential;
     this.workerToken = workerToken;
@@ -974,33 +1122,53 @@ export class GenesisRag17Worker {
     this.host = host;
     this.port = port;
     this.pollIntervalMs = pollIntervalMs;
-    this.root = path.join(dbPath, 'genesisrag17');
+    this.root = path.join(this.dbPath, 'genesisrag17');
     this.decisionsRoot = path.join(this.root, 'decisions');
     this.transactionsRoot = path.join(this.root, 'transactions');
     this.snapshotsRoot = path.join(this.root, 'snapshots');
     this.outboxRoot = path.join(this.root, 'outbox');
     this.lockPath = path.join(this.root, 'worker.lock');
-    fs.mkdirSync(this.root, { recursive: true });
-    fs.mkdirSync(this.decisionsRoot, { recursive: true });
-    fs.mkdirSync(this.transactionsRoot, { recursive: true });
-    fs.mkdirSync(this.snapshotsRoot, { recursive: true });
-    fs.mkdirSync(this.outboxRoot, { recursive: true });
-
-    this.lock = acquireWorkerLock(this.lockPath, dbPath);
+    this.lock = undefined;
+    const bootstrapLock = acquireWorkerBootstrapLock(this.dbPath);
     try {
+      assertWorkerDirectoriesSafe(this.dbPath, [
+        this.root,
+        this.decisionsRoot,
+        this.transactionsRoot,
+        this.snapshotsRoot,
+        this.outboxRoot,
+      ]);
+      recoverStaleWorkerLock(this.lockPath, this.dbPath);
+      if (!fs.existsSync(path.join(this.dbPath, 'identity.bin'))) {
+        pruneEmptyWorkerDirectories([
+          this.outboxRoot,
+          this.snapshotsRoot,
+          this.transactionsRoot,
+          this.decisionsRoot,
+          this.root,
+        ]);
+      }
       this.db = GenesisDatabase.open({
-        path: dbPath,
+        path: this.dbPath,
         pageCacheMb: 64,
         readOnly: false,
         vectorDim: MODEL_DIMENSIONS,
         retention: 'full',
       });
+      fs.mkdirSync(this.root, { recursive: true });
+      fs.mkdirSync(this.decisionsRoot, { recursive: true });
+      fs.mkdirSync(this.transactionsRoot, { recursive: true });
+      fs.mkdirSync(this.snapshotsRoot, { recursive: true });
+      fs.mkdirSync(this.outboxRoot, { recursive: true });
+      this.lock = acquireWorkerLock(this.lockPath, this.dbPath);
       this.lexical = new LexicalIndex(path.join(this.root, 'lexical.sqlite'));
       this.embedder = new Embedder({ modelDir, pythonCommand });
       this.state = this.loadState();
     } catch (error) {
-      releaseWorkerLock(this.lockPath, this.lock);
+      releaseWorkerLock(this.lockPath, this.lock, this.dbPath);
       throw error;
+    } finally {
+      releaseWorkerBootstrapLock(bootstrapLock);
     }
     this.server = undefined;
     this.loopTimer = undefined;
@@ -2488,18 +2656,24 @@ export class GenesisRag17Worker {
   }
 
   async close() {
-    this.stop();
-    if (this.activeRun) {
-      try { await this.activeRun; } catch { /* preserve durable outbox for the next process */ }
-      this.activeRun = undefined;
+    const bootstrapLock = acquireWorkerBootstrapLock(this.dbPath);
+    try {
+      this.stop();
+      if (this.activeRun) {
+        try { await this.activeRun; } catch { /* preserve durable outbox for the next process */ }
+        this.activeRun = undefined;
+      }
+      if (this.server) {
+        await new Promise((resolve) => this.server.close(() => resolve()));
+        this.server = undefined;
+      }
+      await this.embedder.close();
+      this.lexical.close();
+      this.mspCall.close?.();
+      releaseWorkerLock(this.lockPath, this.lock, this.dbPath);
+      this.lock = undefined;
+    } finally {
+      releaseWorkerBootstrapLock(bootstrapLock);
     }
-    if (this.server) {
-      await new Promise((resolve) => this.server.close(() => resolve()));
-      this.server = undefined;
-    }
-    await this.embedder.close();
-    this.lexical.close();
-    this.mspCall.close?.();
-    releaseWorkerLock(this.lockPath, this.lock);
   }
 }

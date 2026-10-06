@@ -19,6 +19,7 @@ fn coord(state: &mut u64) -> f64 {
 }
 
 #[test]
+#[ignore = "temporary non-asserting HNSW diagnostic; run explicitly with --ignored"]
 fn probe_vs_recall() {
     const BUILDS: usize = 60;
     const PROBE_K: usize = 32;

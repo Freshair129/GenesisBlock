@@ -5,6 +5,7 @@ import { createRequire } from 'node:module';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { DatabaseSync } from 'node:sqlite';
 
 import {
   GenesisRag17Worker,
@@ -34,6 +35,18 @@ try {
 const modelTestOptions = Object.freeze(modelFixtureError
   ? { skip: `pinned model snapshot unavailable: ${modelFixtureError.message}` }
   : {});
+
+function canonicalWorkerStorePath(dbPath) {
+  const resolvedPath = path.resolve(dbPath);
+  return path.join(fs.realpathSync(path.dirname(resolvedPath)), path.basename(resolvedPath));
+}
+
+function workerBootstrapPath(dbPath) {
+  const canonicalPath = canonicalWorkerStorePath(dbPath);
+  const lockKey = process.platform === 'win32' ? canonicalPath.toLowerCase() : canonicalPath;
+  return path.join(path.dirname(canonicalPath), `.genesisrag17-bootstrap-${hashText(lockKey)}.sqlite`);
+}
+
 const scope = {
   portfolioId: 'portfolio-test',
   tenantId: 'tenant-test',
@@ -380,11 +393,95 @@ test('worker rejects a second owner for the same store', async () => {
     modelDir,
     mspCall: noop,
   };
-  const first = GenesisRag17Worker.create(options);
+  let first;
   try {
+    first = GenesisRag17Worker.create(options);
+    assert.ok(fs.existsSync(path.join(dbPath, 'identity.bin')), 'fresh native store identity is initialized');
     assert.throws(() => GenesisRag17Worker.create(options), /WORKER_STORE_ALREADY_OWNED/);
   } finally {
-    await first.close();
+    if (first) await first.close();
+    try { fs.rmSync(root, { recursive: true, force: true }); } catch { /* native handle cleanup is process scoped */ }
+  }
+});
+
+test('worker close preserves its owner when the startup mutex is busy and can retry', async () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'genesisrag17-close-busy-'));
+  const dbPath = path.join(root, 'db');
+  const worker = GenesisRag17Worker.create({
+    dbPath,
+    scope,
+    credential: 'worker-credential-test',
+    workerToken: 'query-token-test',
+    modelDir,
+    mspCall: async () => ({ decisions: [] }),
+  });
+  const mutex = new DatabaseSync(workerBootstrapPath(dbPath), { timeout: 0 });
+  try {
+    mutex.exec('PRAGMA journal_mode = DELETE; BEGIN EXCLUSIVE');
+    await assert.rejects(worker.close(), /WORKER_STORE_STARTUP_BUSY/);
+    assert.ok(fs.existsSync(path.join(dbPath, 'genesisrag17', 'worker.lock')));
+    mutex.exec('ROLLBACK');
+    mutex.close();
+    await worker.close();
+    assert.equal(fs.existsSync(path.join(dbPath, 'genesisrag17', 'worker.lock')), false);
+  } finally {
+    try { mutex.close(); } catch { /* already closed after releasing the test mutex */ }
+    try { await worker.close(); } catch { /* cleanup after an assertion failure */ }
+    try { fs.rmSync(root, { recursive: true, force: true }); } catch { /* native handle cleanup is process scoped */ }
+  }
+});
+
+test('worker startup mutex rejects contention and allows retry after release', async () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'genesisrag17-bootstrap-busy-'));
+  const dbPath = path.join(root, 'db');
+  const bootstrapPath = workerBootstrapPath(dbPath);
+  const options = {
+    dbPath,
+    scope,
+    credential: 'worker-credential-test',
+    workerToken: 'query-token-test',
+    modelDir,
+    mspCall: async () => ({ decisions: [] }),
+  };
+  const mutex = new DatabaseSync(bootstrapPath, { timeout: 0 });
+  let worker;
+  try {
+    mutex.exec('PRAGMA journal_mode = DELETE; BEGIN EXCLUSIVE');
+    assert.throws(() => GenesisRag17Worker.create(options), /WORKER_STORE_STARTUP_BUSY/);
+    mutex.exec('ROLLBACK');
+    mutex.close();
+    worker = GenesisRag17Worker.create(options);
+    assert.ok(fs.existsSync(path.join(dbPath, 'identity.bin')));
+  } finally {
+    try { mutex.close(); } catch { /* already closed after releasing the test mutex */ }
+    if (worker) await worker.close();
+    try { fs.rmSync(root, { recursive: true, force: true }); } catch { /* native handle cleanup is process scoped */ }
+  }
+});
+
+test('worker recovers the startup mutex after its owner process exits', async () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'genesisrag17-bootstrap-recovery-'));
+  const dbPath = path.join(root, 'db');
+  const bootstrapPath = workerBootstrapPath(dbPath);
+  const acquireAndExit = [
+    'const { DatabaseSync } = require("node:sqlite");',
+    'const database = new DatabaseSync(process.argv[1], { timeout: 0 });',
+    'database.exec("PRAGMA journal_mode = DELETE; BEGIN EXCLUSIVE");',
+    'process.exit(0);',
+  ].join('\n');
+  execFileSync(process.execPath, ['-e', acquireAndExit, bootstrapPath], { stdio: 'pipe' });
+  const worker = GenesisRag17Worker.create({
+    dbPath,
+    scope,
+    credential: 'worker-credential-test',
+    workerToken: 'query-token-test',
+    modelDir,
+    mspCall: async () => ({ decisions: [] }),
+  });
+  try {
+    assert.ok(fs.existsSync(path.join(dbPath, 'identity.bin')));
+  } finally {
+    await worker.close();
     try { fs.rmSync(root, { recursive: true, force: true }); } catch { /* native handle cleanup is process scoped */ }
   }
 });
@@ -413,6 +510,88 @@ test('worker recovers a legacy lock from a previous process instance', async () 
     assert.notEqual(worker, undefined);
   } finally {
     await worker.close();
+    try { fs.rmSync(root, { recursive: true, force: true }); } catch { /* native handle cleanup is process scoped */ }
+  }
+});
+
+test('worker rejects linked sidecar directories before cleanup', () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'genesisrag17-linked-sidecar-'));
+  const dbPath = path.join(root, 'db');
+  const workerRoot = path.join(dbPath, 'genesisrag17');
+  const externalRoot = path.join(root, 'external-worker-data');
+  fs.mkdirSync(dbPath, { recursive: true });
+  fs.mkdirSync(path.join(externalRoot, 'outbox'), { recursive: true });
+  fs.mkdirSync(path.join(externalRoot, 'transactions'), { recursive: true });
+  const lockPath = path.join(externalRoot, 'worker.lock');
+  const invalidLinkTargetLock = `${JSON.stringify({
+    pid: process.pid,
+    dbPath: canonicalWorkerStorePath(dbPath),
+    createdAt: '2000-01-01T00:00:00.000Z',
+    token: 'legacy-stale-lock',
+  })}\n`;
+  fs.writeFileSync(lockPath, invalidLinkTargetLock, 'utf8');
+  fs.symlinkSync(externalRoot, workerRoot, process.platform === 'win32' ? 'junction' : 'dir');
+  try {
+    assert.throws(() => GenesisRag17Worker.create({
+      dbPath,
+      scope,
+      credential: 'worker-credential-test',
+      workerToken: 'query-token-test',
+      modelDir,
+      mspCall: async () => ({ decisions: [] }),
+    }), /WORKER_SIDECAR_PATH_LINKED/);
+    assert.ok(fs.existsSync(path.join(externalRoot, 'outbox')));
+    assert.ok(fs.existsSync(path.join(externalRoot, 'transactions')));
+    assert.equal(fs.readFileSync(lockPath, 'utf8'), invalidLinkTargetLock);
+  } finally {
+    try { fs.rmSync(root, { recursive: true, force: true }); } catch { /* junction cleanup is best-effort on Windows */ }
+  }
+});
+
+test('worker rejects malformed ownership metadata instead of recovering it', () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'genesisrag17-invalid-lock-'));
+  const dbPath = path.join(root, 'db');
+  const lockPath = path.join(dbPath, 'genesisrag17', 'worker.lock');
+  fs.mkdirSync(path.dirname(lockPath), { recursive: true });
+  const invalidLock = `${JSON.stringify({
+    dbPath,
+    createdAt: '2000-01-01T00:00:00.000Z',
+    token: 'legacy-stale-lock',
+  })}\n`;
+  fs.writeFileSync(lockPath, invalidLock, 'utf8');
+  try {
+    assert.throws(() => GenesisRag17Worker.create({
+      dbPath,
+      scope,
+      credential: 'worker-credential-test',
+      workerToken: 'query-token-test',
+      modelDir,
+      mspCall: async () => ({ decisions: [] }),
+    }), /WORKER_LOCK_UNPROVABLY_STALE/);
+    assert.equal(fs.readFileSync(lockPath, 'utf8'), invalidLock);
+  } finally {
+    try { fs.rmSync(root, { recursive: true, force: true }); } catch { /* native handle cleanup is process scoped */ }
+  }
+});
+
+test('worker leaves non-empty markerless native data fail-closed', () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'genesisrag17-markerless-'));
+  const dbPath = path.join(root, 'db');
+  const retainedData = path.join(dbPath, 'genesisrag17', 'transactions', 'intent.json');
+  const noop = async () => ({ decisions: [] });
+  fs.mkdirSync(path.dirname(retainedData), { recursive: true });
+  fs.writeFileSync(retainedData, '{}\n', 'utf8');
+  try {
+    assert.throws(() => GenesisRag17Worker.create({
+      dbPath,
+      scope,
+      credential: 'worker-credential-test',
+      workerToken: 'query-token-test',
+      modelDir,
+      mspCall: noop,
+    }), /RECOVERY_REQUIRED: markerless database identity is missing/);
+    assert.equal(fs.readFileSync(retainedData, 'utf8'), '{}\n');
+  } finally {
     try { fs.rmSync(root, { recursive: true, force: true }); } catch { /* native handle cleanup is process scoped */ }
   }
 });

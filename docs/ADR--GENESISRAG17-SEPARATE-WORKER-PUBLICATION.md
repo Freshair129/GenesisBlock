@@ -2,8 +2,8 @@
 title: "ADR: GenesisRAG17 separate worker and atomic publication"
 doc_id: "ADR-GENESISRAG17-SEPARATE-WORKER-PUBLICATION"
 status: beta
-version: "1.0.5b"
-updated: "2026-09-11"
+version: "1.0.6b"
+updated: "2026-10-06"
 owner: "GenesisBlockDB Architecture"
 source_of_truth: true
 attributes:
@@ -75,6 +75,68 @@ the executable artifact hash manifest. A missing, mismatched or fallback model
 is an error. The worker's lexical manifest says
 `implementation: worker_sqlite_fts5` because the pinned native binding has no
 usable standalone lexical query method; it does not invent a native API.
+
+### 1.1 Fresh-store bootstrap and ownership
+
+A new `GENESIS_WORKER_DB_PATH` is supported. Keep the native directory absent
+or empty until `GenesisDatabase.open()` has initialized its identity; creating
+`genesisrag17/` sidecars first makes the native engine correctly treat a
+markerless non-empty path as recovery-required. Do not weaken that engine guard
+or manufacture an identity marker in a test fixture.
+
+The worker serializes startup with a stable sibling SQLite coordination
+database, stored next to (not inside) the canonical native `dbPath` and keyed
+by that path. It contains no application rows and must never be unlinked or
+recreated during ordinary operation. Use rollback-journal mode and an
+immediate `BEGIN EXCLUSIVE` with zero busy timeout; concurrent startup fails
+clearly as busy instead of attempting unsafe stale-file takeover. SQLite
+releases the transaction on process death and recovers its journal on the next
+open. This assumes a local filesystem with working SQLite locks; network-share
+locking is outside this contract.
+
+While holding the transaction, the worker validates and, when provably stale,
+recovers the legacy `genesisrag17/worker.lock`. Incomplete or ambiguous
+ownership metadata is rejected before probing PID liveness. If identity is
+absent, it rejects linked worker-sidecar paths and prunes only empty
+worker-owned directories. Any remaining file or non-empty sidecar stays
+untouched, so native open continues to fail closed. The mutex remains held
+through native open and worker initialization; token-checked changes to the
+persistent worker lock, including close-time removal, also occur under it.
+
+The parent directory is canonicalized before deriving both store identity and
+mutex path. Detected symbolic links/junctions and worker paths whose resolved
+location differs are rejected before lock recovery or cleanup. This portable
+Node check does not claim to reject every Windows-specific reparse tag. The
+deployment parent is expected to be application-controlled; defending against
+a hostile process swapping paths between preflight and use requires native
+handle-relative operations and is outside this repair.
+
+The startup order is:
+
+```mermaid
+sequenceDiagram
+    participant W as GenesisRAG17 worker
+    participant B as sibling SQLite mutex
+    participant G as GenesisBlock native store
+    participant S as worker-owned sidecars
+
+    W->>B: BEGIN EXCLUSIVE on stable sibling database
+    W->>W: canonicalize store and reject linked sidecar paths
+    W->>W: inspect/recover legacy worker.lock
+    W->>G: open dbPath before creating sidecars
+    G-->>W: initialize identity and hold native ownership lock
+    W->>S: create state/outbox directories and lexical sidecar
+    W->>W: acquire persistent worker.lock
+    W->>B: ROLLBACK and close mutex connection
+```
+
+The native process lock remains authoritative against other GenesisBlock
+processes; the SQLite transaction coordinates updated-worker startup and
+persistent worker-lock mutations, while the in-store lock preserves the
+PID/process-start/token recovery contract. Older worker binaries do not observe
+the SQLite mutex, so stop existing workers before upgrading; mixed-version
+startup coordination is not claimed. On startup failure, roll back and close
+the mutex connection, and remove an in-store lock only when its token matches.
 
 ### 2. MSP is the only pipeline transport
 
@@ -464,6 +526,7 @@ its explicit non-production limits.
 
 | Version | Date | Status | Summary | Commit Hash | Agent |
 |---|---|---|---|---|---|
+| 1.0.6b | 2026-10-06 | beta | Specify fresh-store startup ordering: a sibling bootstrap lock serializes native identity initialization before worker sidecars, while stale worker-lock recovery and markerless fail-closed behavior remain intact. | working-tree | ATHER |
 | 1.0.5b | 2026-09-11 | beta | implemented: accepts {ontology_v1, ontology_v2}. Stage 13 version check moved to the fixed supported-version set; the predicate allowlist and both endpoint ternaries (`validateFact`, Stage 13 graph-build) replaced by one shared `ONTOLOGY_TABLES` map keyed by `ontologyVersion`; `entityKind()` gained case-insensitive package/category/price_tier mappings; the bitemporal mapped-only lane count kept unchanged. Rollout step 1 of the ADR-075 Phase 2 contract revision 2 accept-before-produce sequence — must merge before GKS starts producing ontology_v2. Six new worker.mjs tests added (ontology_v2 acceptance, v1 regression, v2-predicate-in-v1 rejection, reversed-endpoint rejection, unsupported-version rejection, C-10 mixed-generation lane count); full suite 20/20 passing. | working-tree | Claude Opus 5 |
 | 1.0.4b | 2026-09-11 | beta | Docs-only acceptance of GenesisRAG17 structured-record profile contract revision 2 (ADR-075 Phase 2 gate): Option A tier-qualified pricing, the C-2 predicate/endpoint table, the {ontology_v1, ontology_v2} supported-version set with worker-first accept-before-produce rollout, the C-9 worker implementation list with verified file:line anchors (plus one additional FACT_PREDICATE_NONCANONICAL gate found on re-verification), the C-8 worker tests required, and a read-only finding that the bitemporal lane already handles a mixed dated/not_applicable generation. No worker code changed. | working-tree | Claude Opus 5 |
 | 1.0.2b | 2026-09-08 | beta | Reconciled the live zuri GenesisRAG17 architecture reference to ADR-071 after the identifier collision; retained the pinned historical acceptance report. | working-tree | RWANG |
@@ -471,5 +534,7 @@ its explicit non-production limits.
 | 1.0.0b | 2026-09-08 | beta | Recorded the separate TEST worker, MSP-only relay, ordered physical execution, six-lane evidence and receipt-bound atomic publication. | working-tree | RWANG |
 
 ## Reference version diff — 2026-09-08
+
+"1.0.5b → 1.0.6b: define a safe fresh-store bootstrap lock and startup order for the isolated worker; keep native identity/recovery checks fail-closed and preserve the existing worker ownership lock contract."
 
 "1.0.2b → 1.0.3b: follow zuri's pre-merge ADR-071 → ADR-073 collision repair because published main owns ADR-071 for CRM. Historical revision rows and pinned acceptance reports retain their original identifiers. Protocol and runtime behavior are unchanged.
