@@ -1,8 +1,8 @@
 ---
 doc_id: REPORT--HQL2-P8-CORE-2026-09-28
-version: "0.1.65b"
+version: "0.1.66b"
 created_at: "2026-09-28T04:35:00+07:00,ATHER,22bc11e"
-last_update: "2026-10-06T16:03:00+07:00,ATHER"
+last_update: "2026-10-06T16:30:00+07:00,ATHER"
 status: beta
 owner: GenesisBlockDB Engineering
 attributes:
@@ -39,18 +39,22 @@ open; this evidence does not close them.
 The owner-approved D7 bridge now supports actor-scoped, differential-tested
 zero-hop HQL1 ID projections (unlabeled or with one plain-ASCII label, each
 optionally with one same-alias exact string ID equality), one plain-ASCII
-property projection on an unlabeled unconstrained zero-hop scan, bounded
+property projection on an unconstrained zero-hop scan with at most one
+plain-ASCII label, bounded
 unlabeled one-hop projections, and exact-seed depth-one `TRAVERSE` ID
 projections over one physical relation or `ANY` in default/out/in/both
 directions through `Storage::query_v2`, after P6
 `Namespace(Read)` and namespace equality checks. Its 13/13 adapter target plus
-the separate 2/2 property target cover legacy/HQL2
+the separate 3/3 property target cover legacy/HQL1-adapter/HQL2
 differential, match/miss/label-mismatch/Unicode cases, parallel-edge
 multiplicity, directions and wildcard relations, endpoint-ID string equality,
 authorization/mismatch before parse, malformed syntax, fail-closed unlisted
-forms and pre-parse resource rejection. The traversal differential also covers
-parallel-edge deduplication, self-loop exclusion and a missing seed. Labelled,
-filtered and multi-column property shapes and other traversal forms remain
+forms and pre-parse resource rejection. The property differential includes
+duplicate, missing, explicit-null and nested JSON values with or without one
+plain-ASCII label; predicates and other property shapes remain unsupported.
+The traversal differential also covers parallel-edge deduplication, self-loop
+exclusion and a missing seed. Filtered, ordered, limited, temporal and
+multi-column property shapes and other traversal forms remain
 unsupported. Existing v1 transports and all other HQL1
 forms are unchanged; independent D7 review and
 full shared-runtime/P8/P13 acceptance remain open.
@@ -118,14 +122,14 @@ measured values remain distinct from unknown-with-reason, and arithmetic
 overflow is not saturated into a plausible value. SourceScan elapsed time and
 uninstrumented bytes/work/memory remain unknown. At the prior G4 checkpoint,
 changed focused HQL2 targets passed 68/68, the explicit HQL2 target set passed
-394/0/1 across 37 targets, and four P6 targets passed 31/31. This update adds
-test coverage only: ANALYZE budget failures are exercised for Values, graph
-Expand/root Match and Sequence; vector ANALYZE checks two measured distance
-evaluations and budget failure; denied namespace access is checked before
-malformed HQL parsing in ANALYZE mode. The four focused execution/graph/sequence/
-vector targets pass 51/51 on the current tree. The 37-target sweep was not
-rerun after these test-only edits, so 394/0/1 remains the prior checkpoint only.
-This is local regression evidence, not G4/P8 closure.
+394/0/1 across 37 targets, and four P6 targets passed 31/31. The current D7
+extension adds one optional plain-ASCII label to the zero-hop single-property
+projection and is verified by legacy/HQL1-adapter/HQL2 bag parity. The D7
+adapter/property targets pass 16/16 and the current 37-target HQL2 sweep passes
+395/0/1. The full native suite and strict Clippy were not rerun after this
+extension. This is local regression evidence, not G4/P8 closure. A first-pass
+local Ollama review routed through the Local LLM Hub provider adapter is
+informational only and does not satisfy independent D7 review.
 
 ## Verification record
 
@@ -171,7 +175,7 @@ probe target not selected.
 | All-root-HQL2 target sweep after root MATCH differential (historical) | 331 passed, 0 failed, 1 ignored across 24 root targets | Locked/offline/no-default-features/jobs=1; ignored parser child entrypoint is exercised by its parent; superseded by the current 30-target sweep. Regression evidence, not P8 acceptance. |
 | Approved P8 addendum D1-D6 focused target | 10 passed, 0 failed | Registered lexical BM25 profile and independent P7 rank parity; ContextPack scalar offsets, exact source hash and independent oracle parity; Sequence node/edge property exactness and no-partial budget behavior; contextual NULL/list/JSON boundaries; authorization-before-parse fixture. |
 | D7 actor-scoped HQL1 adapter | 13 passed, 0 failed | Differential parity for unlabeled or single-label zero-hop and bounded unlabeled one-hop ID projections; includes one exact same-alias string ID equality on zero-hop scans with or without a label (match/miss/label-mismatch/Unicode), endpoint-ID filters, edge directions, relation/wildcard forms, parallel-edge multiplicity, and exact-seed single-hop TRAVERSE over a physical relation or ANY in default/out/in/both directions. Traversal excludes the seed and deduplicates parallel edges. Namespace(Read)/namespace checks precede parse; malformed/unlisted behavior remains fail-closed; broad legacy pattern fails resource preflight before AST construction. Existing v1 transports are unchanged. |
-| D7 zero-hop HQL1 property projection | 2 passed, 0 failed | Legacy `execute_hql`, canonical HQL2 and actor-scoped HQL1 result bags agree for duplicate values, missing properties, explicit JSON null and nested JSON; labelled, filtered and multi-column property forms remain fail-closed. |
+| D7 zero-hop HQL1 property projection | 3 passed, 0 failed | Legacy `execute_hql`, canonical HQL2 and actor-scoped HQL1 result bags agree for duplicate values, missing properties, explicit JSON null and nested JSON, with or without one plain-ASCII label; predicates, ordering, limits, temporal selectors and multi-column property forms remain fail-closed. |
 | HQL1 parser-resource RCA | Confirmed and corrected | Legacy Pest pairs were materialized before the D7 allowlist without parser-specific heap reservation. The adapter now runs allocation-free parser preflight and reserves the conservative estimate before legacy AST construction; see local RCA `.brain/rca/RCA--HQL1-ADAPTER-PARSER-RESERVATION.md`. No production crash or HQL1 allocator peak is claimed. |
 | Storage-backed HQL/typed-IR scalar P7 differential | 1 passed, 0 failed across 81 four-value nullable bags; 162 Storage executions | Values/Distinct/Sort with NULLS LAST; each frontend independently matches the P7 reference and each other. Test-only scalar evidence, not broad P8 acceptance. |
 | Storage-backed HQL/typed-IR aggregate P7 differential | 1 passed, 0 failed across 121 nullable bags; 242 Storage executions | Covers empty through four-row bags over NULL/-1/2 and count-all/count/sum/avg/min/max/collect; each frontend matches P7 and each other. Test-only aggregate evidence, not broad P8 acceptance. |
@@ -180,8 +184,8 @@ probe target not selected.
 | Approved H2-D11 Vector HistoryScan extension | Implemented; local differential passed | HQL and typed IR read exact revisions using compact JSON `(owner_id, collection_id)` identity under the P6 lease and owner-node ACL; the vector source floor fails closed before access. Its result bags match independent P7 from WAL-derived revision facts and the captured frontier. The expanded five-kind HistoryScan differential passes; HistoryScan/ChangeScan passes 16/16, P7 graph target 39/39 and combined P7 130/130. |
 | HQL/typed-IR Row HistoryScan and ChangeScan parity | 1 passed, 0 failed | Retained insert/update revisions hydrate exact row properties; HQL and typed IR agree on history values, change operations and durable Row identity. Test-only regression coverage; no schema migration. |
 | HQL2/IR transaction-time snapshot (`tx_as_of`) | Implemented; local verification passed | One selected frontier S controls revision-backed scans, graph/vector/annotation operators, source-floor checks, property hydration and `Snapshot.tx`; the validated P6 generation/catalog/current policy remain pinned and no path falls back to current state. Five focused targets pass 56/56. |
-| Latest explicit root-HQL2 target sweep | 394 passed, 0 failed, 1 ignored across 37 root targets | All root `hql2_*_tests.rs` targets ran serially with `--no-default-features`; includes source-backed NodeScan EXPLAIN, stable G4 plan identity and typed ANALYZE counter regressions. The ignored parser child is exercised by its parent; protected `zz_probe_discriminates` is excluded. Regression evidence, not P8 acceptance. |
-| Full native Rust suite on current HQL2 closeout candidate | Exit 0; zero failures | `cargo test --locked --offline --no-default-features --jobs 2 -- --skip probe_vs_recall`; three existing soak cases remain ignored. This ran before the D7 lint-only helper-signature refactor; the post-refactor D7 adapter and property targets passed 15/15. Local regression evidence only. |
+| Latest explicit root-HQL2 target sweep | 395 passed, 0 failed, 1 ignored across 37 root targets | All root `hql2_*_tests.rs` targets ran serially with `--no-default-features`; includes source-backed NodeScan EXPLAIN, stable G4 plan identity and typed ANALYZE counter regressions. The ignored parser child is exercised by its parent; protected `zz_probe_discriminates` is excluded. Regression evidence, not P8 acceptance. |
+| Full native Rust suite on current HQL2 closeout candidate | Exit 0; zero failures | `cargo test --locked --offline --no-default-features --jobs 2 -- --skip probe_vs_recall`; three existing soak cases remain ignored. This predates the current D7 extension; the current D7 adapter/property targets pass 16/16. Local regression evidence only. |
 | Strict all-target Clippy after D7 helper refactor | Default and no-default configurations passed | `cargo clippy --locked --offline --all-targets --jobs 2 -- -D warnings` and `cargo clippy --locked --offline --all-targets --no-default-features --jobs 2 -- -D warnings`. Local static checks only. |
 | Focused H2-D11 R5 restore publication regression | 21 passed across five targets | Covers U9 backup/restore, H2-D11 history/revision parity, new-publication and receipt-last restore, exact recovered frontier, unchanged nonzero `txn_frontier`, read-only generation pin/validation before exposure, and P6 generation semantics. Return metadata is prepared before rename. Independent review found cleanup after read-only/rename failure remains best-effort and unverified. |
 | Full native Rust suite on the current restore patch | Exit 0; zero failures | `cargo test --locked --offline --no-default-features --jobs 1 --no-fail-fast -- --skip probe_vs_recall`; the long probe was filtered, three soak cases remain ignored, and the parser child entrypoint is exercised by its parent. Local verification only. |
@@ -488,7 +492,8 @@ guarded explicit sweeps are the only current results.
 HQL2 now has contextual NULL/list/JSON lowering. The differential-tested D7
 actor-scoped HQL1 forms include zero-hop ID scans (unlabeled or single-label,
 with one exact same-alias string ID predicate permitted on either form), one
-unlabeled zero-hop property projection, bounded unlabeled one-hop ID projection,
+zero-hop property projection with at most one plain-ASCII label, bounded
+unlabeled one-hop ID projection,
 and exact-seed depth-one `TRAVERSE` ID projection over one relation or `ANY` in
 default/out/in/both directions; these lower through `query_v2`. Other legacy
 HQL forms remain on their old runtime and shared HQL1/v2/IR binding is not
@@ -508,10 +513,19 @@ from these local tests.
 
 | Artifact | Before | After |
 |---|---|---|
-| Registry | 0.5.75+draft | 0.5.76+draft |
-| P8 typed boundary | 0.2.64b | 0.2.65b |
-| Orchestration plan | 0.8.69b | 0.8.70b |
-| This report | 0.1.64b | 0.1.65b |
+| Registry | 0.5.76+draft | 0.5.77+draft |
+| P8 typed boundary | 0.2.65b | 0.2.66b |
+| Orchestration plan | 0.8.70b | 0.8.71b |
+| Architecture index | 0.1.72b | 0.1.73b |
+| This report | 0.1.65b | 0.1.66b |
+
+Version diff `0.1.65b -> 0.1.66b`: extend the approved D7 compatibility
+allowlist to a zero-hop single-property projection with at most one
+plain-ASCII node label after legacy/HQL1-adapter/HQL2 bag parity. The property
+target passes 3/3, the D7 adapter/property targets pass 16/16, and the explicit
+37-target HQL2 sweep passes 395/0/1. Predicates and other unproven property
+shapes remain unsupported; no P6, schema, migration or transport contract
+changed. Broad P8/P13 and independent-review gates remain open.
 
 Version diff `0.1.64b -> 0.1.65b`: add regression coverage that ANALYZE
 budget exhaustion returns no partial rows across scalar, graph, sequence and
@@ -739,6 +753,7 @@ P8 and release gates.
 
 | Version | Date | Status | Summary | Commit Hash | Agent |
 |---|---|---|---|---|---|
+| 0.1.66b | 2026-10-06 | beta | Extend approved D7 with differential-proven one-label zero-hop single-property projection; property target 3/3, D7 adapter/property 16/16, HQL2 395/0/1 across 37; local Ollama first-pass review informational only; broad P8/P13 and independent review remain open | working-tree | ATHER |
 | 0.1.65b | 2026-10-06 | beta | Add ANALYZE no-partial budget regressions across Values/graph/sequence/vector, exact vector distance counter verification and pre-parse namespace denial; four focused targets 51/51; test-only, broad sweep/P8/P13 not rerun or closed | working-tree | ATHER |
 | 0.1.64b | 2026-10-06 | beta | Record locked/offline no-default Rust suite exit 0 with protected probe filtered and three soak cases ignored; post-refactor D7 adapter/property 15/15 and strict Clippy default/no-default pass; local-only, broad P8/P13 and review open | working-tree | ATHER |
 | 0.1.63b | 2026-10-06 | beta | Implement approved G4 stable EXPLAIN/ANALYZE plan identity and truthful unit-tagged per-node counters; focused 68/68, HQL2 394/0/1 across 37, P6 31/31; full Rust suite/strict Clippy/independent review/hosted/device-release/P13 NOT_RUN or open; no P6 grant, schema, transport or migration change | working-tree | ATHER |

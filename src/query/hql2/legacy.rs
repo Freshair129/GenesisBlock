@@ -149,7 +149,7 @@ pub(crate) fn lower_hql_v1(
     let source = match pattern.hops.as_slice() {
         [] if projection.var == alias => {
             let projection_expr = if let Some(property) = property_projection {
-                if pattern.start.label.is_some() || !clauses.where_preds.is_empty() {
+                if !clauses.where_preds.is_empty() {
                     return Err(unsupported());
                 }
                 let property = serde_json::to_string(property).map_err(|_| unsupported())?;

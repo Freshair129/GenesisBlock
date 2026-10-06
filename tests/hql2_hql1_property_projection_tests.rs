@@ -18,11 +18,11 @@ fn open(path: &Path) -> Storage {
     .unwrap()
 }
 
-fn add_node(storage: &Storage, id: &str, props: Value) {
+fn add_node(storage: &Storage, id: &str, labels: &[&str], props: Value) {
     storage
         .add_node(NodeInput {
             id: Some(id.into()),
-            labels: vec![],
+            labels: labels.iter().map(|label| (*label).to_owned()).collect(),
             props: Some(props),
             embedding: None,
             lang: None,
@@ -83,6 +83,7 @@ fn actor_scoped_hql1_zero_hop_property_projection_matches_legacy_and_hql2() {
     add_node(
         &storage,
         "node:a",
+        &[],
         json!({
             "score": 7,
             "name": "Ada",
@@ -93,9 +94,10 @@ fn actor_scoped_hql1_zero_hop_property_projection_matches_legacy_and_hql2() {
     add_node(
         &storage,
         "node:b",
+        &[],
         json!({"score": 7, "name": "Ada", "profile": null}),
     );
-    add_node(&storage, "node:c", json!({"name": "missing-score"}));
+    add_node(&storage, "node:c", &[], json!({"name": "missing-score"}));
 
     for (property, expected) in [
         ("score", vec![json!(7), json!(7), Value::Null]),
@@ -146,13 +148,64 @@ fn actor_scoped_hql1_zero_hop_property_projection_matches_legacy_and_hql2() {
 }
 
 #[test]
+fn actor_scoped_hql1_labeled_zero_hop_property_projection_matches_legacy_and_hql2() {
+    let dir = TempDir::new().unwrap();
+    let storage = open(dir.path());
+    for (id, labels, props) in [
+        ("person:a", &["Person"][..], json!({"score": 7})),
+        ("person:b", &["Person"][..], json!({"score": 7})),
+        ("person:c", &["Person"][..], json!({"name": "missing"})),
+        ("person:d", &["Person"][..], json!({"score": null})),
+        ("place:a", &["Place"][..], json!({"score": 7})),
+    ] {
+        add_node(&storage, id, labels, props);
+    }
+
+    for (label, expected) in [
+        ("Person", vec![json!(7), json!(7), Value::Null, Value::Null]),
+        ("Missing", Vec::new()),
+    ] {
+        let legacy_query = format!("MATCH (n:{label}) RETURN n.prop.score");
+        let legacy = storage
+            .execute_hql(&legacy_query)
+            .unwrap()
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|row| row["n.score"].clone())
+            .collect::<Vec<_>>();
+
+        let hql2_query =
+            format!("USE default FROM NODES {label} AS n |> RETURN prop(n, \"score\") AS id");
+        let QueryOutcomeV2::Rows(hql2) = storage
+            .query_v2(actor(), request(&hql2_query, "hql.v2"))
+            .unwrap()
+        else {
+            panic!("expected canonical HQL2 rows")
+        };
+        let QueryOutcomeV2::Rows(hql1) = storage
+            .query_v2(actor(), request(&legacy_query, "hql.v1"))
+            .unwrap()
+        else {
+            panic!("expected actor-scoped HQL1 rows")
+        };
+
+        assert_eq!(sorted_json(legacy.clone()), sorted_json(expected.clone()));
+        assert_eq!(
+            sorted_json(json_values(&hql1, "n.score")),
+            sorted_json(legacy)
+        );
+        assert_eq!(sorted_json(json_values(&hql2, "id")), sorted_json(expected));
+    }
+}
+
+#[test]
 fn actor_scoped_hql1_property_projection_keeps_other_shapes_fail_closed() {
     let dir = TempDir::new().unwrap();
     let storage = open(dir.path());
-    add_node(&storage, "node:a", json!({"score": 7}));
+    add_node(&storage, "node:a", &[], json!({"score": 7}));
 
     for query in [
-        "MATCH (n:Person) RETURN n.prop.score",
         "MATCH (n) WHERE n.id = \"node:a\" RETURN n.prop.score",
         "MATCH (n) RETURN n.prop.score, n.id",
     ] {

@@ -2,10 +2,10 @@
 doc_id: C4--GENESISDB-ARCHITECTURE
 type: architecture-index
 status: current
-version: 0.1.72b
+version: 0.1.73b
 owner: GenesisBlockDB Architecture
 created_at: 2026-06-13T22:50:11+07:00,ATHER,9b1ced3
-last_update: "2026-10-06T14:42:41+07:00,ATHER"
+last_update: "2026-10-06T16:30:00+07:00,ATHER"
 attributes:
   domain: architecture
   scope: repository
@@ -84,7 +84,7 @@ across HQL/IR source scans, graph/vector/annotation operators, hydration and
 never falls back to current rows; the validated P6 generation and current
 policy remains pinned. The earlier 56/56 focused targets and 34-target
 387/0/1 HQL2 sweep are historical. The latest explicit root-HQL2 sweep passes
-394/0/1 across 37 targets; the selected four-target P6 regression set passes
+395/0/1 across 37 targets; the selected four-target P6 regression set passes
 31/31. These remain local regression results, not broad P8/P13, transport,
 hosted CI or independent-review acceptance.
 The approved G4 shared pipeline now gives EXPLAIN and ANALYZE the same stable
@@ -113,17 +113,19 @@ three lowerer unit tests cover the size boundary. The focused P8 completion
 target passes 10/10. The D7 actor-scoped bridge accepts differential-tested
 zero-hop HQL1 ID projections (unlabeled or with one plain-ASCII label, with
 one exact string ID equality allowed on either form), one plain-ASCII property
-projection on an unlabeled unconstrained zero-hop scan, bounded unlabeled
+projection on an unconstrained zero-hop scan with at most one plain-ASCII
+label, bounded unlabeled
 one-hop ID projections, and exact-seed depth-one HQL1 `TRAVERSE` ID projections
 over one physical relation or `ANY` in default/out/in/both directions through
 `Storage::query_v2`; legacy parser resources are preflighted and reserved
 before AST construction. The focused adapter target passes 13/13, including
 zero-hop ID-equality differentials with or without a label
 (match/miss/label-mismatch/Unicode) and TRAVERSE parity for direction, missing
-seed, self-loop exclusion and parallel-edge deduplication; the new property
-differential target passes 2/2 for duplicate, missing, explicit null and
-nested JSON values, retaining fail-closed labelled/filtered/multiple property
-shapes. Other traversal forms remain unsupported.
+seed, self-loop exclusion and parallel-edge deduplication; the property
+differential target passes 3/3 for duplicate, missing, explicit null and
+nested JSON values with or without one label. Predicate, ordered, limited,
+temporal and multi-column property shapes remain fail-closed. Other traversal
+forms remain unsupported.
 A storage-backed
 HQL/typed-IR scalar differential matches the
 independent P7 interpreter for all 81 four-value nullable bags (1/1 test, 162
@@ -133,7 +135,7 @@ HQL and typed-IR Join differentials match independent P7 for Inner/Left/Semi/Ant
 with duplicate, missing-property NULL and JSON-null keys (5/7/3/2 output rows).
 HQL `JOIN TABLE` lowers to the existing RowScan/Join contract; bare JOIN
 defaults to Inner and Semi/Anti do not export the right scope. The explicit
-root-HQL2 sweep passes 387/0/1 across 34 targets. A test-only HQL/typed-IR
+root-HQL2 sweep passes 395/0/1 across 37 targets. A test-only HQL/typed-IR
 `Values`/`UnionAll` differential matches independent P7 for 169 nullable bag
 pairs (338 Storage executions), retaining NULL and duplicate multiplicity.
 A separate earlier 11-target P6/schema-v6/compatibility
@@ -482,6 +484,13 @@ Broader EXPLAIN/P8/P13 and P14 rehearsal remain open.
 
 ## CHANGELOG
 
+Version diff 0.1.72b -> 0.1.73b: synchronize the approved D7 extension for one
+plain-ASCII label on a zero-hop single-property projection. Record the 3/3
+property differential, 16/16 D7 adapter/property targets and 395/0/1 across
+37 root HQL2 targets. D7 independent review, shared-runtime, full P8/P13 and
+external qualification remain open; no P6, ACL, schema, migration or
+transport contract changed.
+
 Version diff 0.1.70b -> 0.1.72b: synchronize the approved G4 plan identity and
 truthful ANALYZE counters with local evidence: focused 68/68, HQL2 394/0/1
 across 37 targets and selected P6 31/31. Keep full native-suite/Clippy,
@@ -611,6 +620,7 @@ full P8/P13 qualification remains open.
 
 | Version | Date | Status | Summary | Commit Hash | Agent |
 |---------|------|--------|---------|-------------|-------|
+| 0.1.73b | 2026-10-06 | current | Synchronize approved D7 one-label zero-hop single-property differential; property 3/3, adapter/property 16/16, HQL2 395/0/1 across 37; independent review and broad shared-runtime/P8/P13 gates remain open | working-tree | ATHER |
 | 0.1.72b | 2026-10-06 | current | Synchronize approved G4 stable EXPLAIN/ANALYZE plan identity and truthful typed counters; focused 68/68, HQL2 394/0/1 across 37, P6 31/31; P8/P13, full-suite, review and external qualification remain open | working-tree | ATHER |
 | 0.1.70b | 2026-10-05 | current | Record restore/P6 21/21, HQL2 393/0/1 across 37, full Rust suite exit 0 with `probe_vs_recall` filtered; EXPLAIN partial, cleanup failure paths best-effort/unverified; P14/P8/P13 gates remain open | working-tree | ATHER |
 | 0.1.69b | 2026-10-05 | current | Handle valid receipt-last restores, preserve `txn_frontier`, and prepare return metadata before target rename; restore/P6 20/20, HQL2 392/0/1 across 37 targets; EXPLAIN partial, full Rust suite NOT_RUN, P14/P8/P13 gates open | working-tree | ATHER |
