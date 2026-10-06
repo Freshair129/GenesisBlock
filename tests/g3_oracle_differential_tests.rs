@@ -31,8 +31,8 @@ fn case(id: &str) -> Value {
         .unwrap()
 }
 
-fn remove_materialized_state(path: &Path) {
-    for name in [
+fn remove_materialized_state(path: &Path) -> std::io::Result<()> {
+    let materialized_files = [
         "state.json",
         "nodes.bin",
         "edges.bin",
@@ -45,9 +45,27 @@ fn remove_materialized_state(path: &Path) {
         "fvec_default.bin",
         "bqmean_default.bin",
         "sq8scale_default.bin",
-    ] {
-        let _ = fs::remove_file(path.join(name));
+    ];
+    for name in materialized_files {
+        match fs::remove_file(path.join(name)) {
+            Ok(()) => {}
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
+            Err(error) => return Err(error),
+        }
     }
+    for name in materialized_files {
+        match fs::symlink_metadata(path.join(name)) {
+            Ok(_) => {
+                return Err(std::io::Error::new(
+                    std::io::ErrorKind::Other,
+                    format!("materialized file {name} remains after removal"),
+                ));
+            }
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
+            Err(error) => return Err(error),
+        }
+    }
+    Ok(())
 }
 
 fn add_fixture_node(storage: &Storage, operation: &Value) {
@@ -150,6 +168,7 @@ fn run_temporal_case(case: &Value, path: &Path) -> Value {
         }
     }
 
+    let final_frontier = storage.stable_frontier();
     let mut observed = serde_json::Map::new();
     for query in case["queries"].as_array().unwrap() {
         observed.insert(
@@ -160,9 +179,13 @@ fn run_temporal_case(case: &Value, path: &Path) -> Value {
     let before_reopen = Value::Object(observed.clone());
     storage.save_state().unwrap();
     drop(storage);
-    remove_materialized_state(path);
+    remove_materialized_state(path).unwrap();
 
     let reopened = open(path);
+    assert!(
+        reopened.stable_frontier() >= final_frontier,
+        "recovered frontier must cover all temporal fixture mutations"
+    );
     let mut after_reopen = serde_json::Map::new();
     for query in case["queries"].as_array().unwrap() {
         after_reopen.insert(
@@ -214,13 +237,18 @@ fn run_relational_case(case: &Value, path: &Path) -> Vec<Value> {
             vectors: Vec::new(),
         })
         .unwrap();
+    let final_frontier = storage.stable_frontier();
     let query: RelationalQuery = serde_json::from_value(case["query"].clone()).unwrap();
     let before_reopen = storage.query_relational(query.clone()).unwrap();
     storage.save_state().unwrap();
     drop(storage);
-    remove_materialized_state(path);
+    remove_materialized_state(path).unwrap();
 
     let reopened = open(path);
+    assert!(
+        reopened.stable_frontier() >= final_frontier,
+        "recovered frontier must cover all relational fixture mutations"
+    );
     let after_reopen = reopened.query_relational(query).unwrap();
     assert_eq!(before_reopen, after_reopen);
     after_reopen
@@ -240,4 +268,13 @@ fn g3_oracle_preserves_relational_null_and_bag_semantics_after_reopen() {
     let dir = TempDir::new().unwrap();
     let observed = run_relational_case(&fixture, dir.path());
     assert_eq!(Value::Array(observed), fixture["expected"]);
+}
+
+#[test]
+fn materialized_removal_propagates_non_not_found_errors() {
+    let dir = TempDir::new().unwrap();
+    fs::create_dir(dir.path().join("state.json")).unwrap();
+
+    let error = remove_materialized_state(dir.path()).unwrap_err();
+    assert_ne!(error.kind(), std::io::ErrorKind::NotFound);
 }
