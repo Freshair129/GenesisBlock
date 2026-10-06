@@ -1,8 +1,8 @@
 ---
 doc_id: REPORT--HQL2-P8-CORE-2026-09-28
-version: "0.1.66b"
+version: "0.1.67b"
 created_at: "2026-09-28T04:35:00+07:00,ATHER,22bc11e"
-last_update: "2026-10-06T16:30:00+07:00,ATHER"
+last_update: "2026-10-06T16:40:13+07:00,ATHER"
 status: beta
 owner: GenesisBlockDB Engineering
 attributes:
@@ -513,11 +513,17 @@ from these local tests.
 
 | Artifact | Before | After |
 |---|---|---|
-| Registry | 0.5.76+draft | 0.5.77+draft |
+| Registry | 0.5.77+draft | 0.5.78+draft |
 | P8 typed boundary | 0.2.65b | 0.2.66b |
-| Orchestration plan | 0.8.70b | 0.8.71b |
+| Orchestration plan | 0.8.71b | 0.8.72b |
 | Architecture index | 0.1.72b | 0.1.73b |
-| This report | 0.1.65b | 0.1.66b |
+| This report | 0.1.66b | 0.1.67b |
+
+Version diff `0.1.66b -> 0.1.67b`: refresh the integration status after a
+read-only `git merge-tree origin/main HEAD` at `3f2e66b` reported 17 conflict
+paths (15 content conflicts and two add/add). No conflict was resolved and no
+merge was attempted. The D7 implementation and local verification evidence are
+unchanged; integration remains open.
 
 Version diff `0.1.65b -> 0.1.66b`: extend the approved D7 compatibility
 allowlist to a zero-hop single-property projection with at most one
@@ -753,6 +759,7 @@ P8 and release gates.
 
 | Version | Date | Status | Summary | Commit Hash | Agent |
 |---|---|---|---|---|---|
+| 0.1.67b | 2026-10-06 | beta | Refresh integration status at 3f2e66b; read-only merge-tree reports 17 conflict paths (15 content, two add/add); no resolution/merge, D7 evidence unchanged | working-tree | ATHER |
 | 0.1.66b | 2026-10-06 | beta | Extend approved D7 with differential-proven one-label zero-hop single-property projection; property target 3/3, D7 adapter/property 16/16, HQL2 395/0/1 across 37; local Ollama first-pass review informational only; broad P8/P13 and independent review remain open | working-tree | ATHER |
 | 0.1.65b | 2026-10-06 | beta | Add ANALYZE no-partial budget regressions across Values/graph/sequence/vector, exact vector distance counter verification and pre-parse namespace denial; four focused targets 51/51; test-only, broad sweep/P8/P13 not rerun or closed | working-tree | ATHER |
 | 0.1.64b | 2026-10-06 | beta | Record locked/offline no-default Rust suite exit 0 with protected probe filtered and three soak cases ignored; post-refactor D7 adapter/property 15/15 and strict Clippy default/no-default pass; local-only, broad P8/P13 and review open | working-tree | ATHER |

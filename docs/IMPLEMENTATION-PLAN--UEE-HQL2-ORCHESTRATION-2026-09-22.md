@@ -1,9 +1,9 @@
 ---
-version: "0.8.71b"
+version: "0.8.72b"
 doc_id: "IMPLEMENTATION-PLAN--UEE-HQL2-ORCHESTRATION-2026-09-22"
 owner: "Boss (Founder / Product Authority)"
 created_at: "2026-09-22T00:00:00+07:00,ATHER,working-tree"
-last_update: "2026-10-06T16:30:00+07:00,ATHER"
+last_update: "2026-10-06T16:40:13+07:00,ATHER"
 status: beta
 superseded_by: null
 attributes:
@@ -342,12 +342,13 @@ qualification, shared-runtime qualification, full per-operator P7 exact-oracle
 coverage, cancellation/resource qualification and P13 parity remain open;
 this candidate is not G4/P8 completion.
 
-Integration remains a separate open gate: at base commit `d385c608`, branch
-`codex/hql2-execution` was 48 commits behind and 32 commits ahead of
-`origin/main`; a read-only merge simulation reported 16 conflicting paths
-(15 content conflicts and one add/add). Protected WIP remains in a separate
-dirty checkout. Do not resolve that by replacing protected WIP or by treating
-the local regression sweep as merge acceptance.
+Integration remains a separate open gate: at commit `3f2e66b`, branch
+`codex/hql2-execution` was 48 commits behind and 33 commits ahead of
+`origin/main`; a read-only `git merge-tree origin/main HEAD` reported 17
+conflicting paths (15 content conflicts and two add/add, including the HQL1
+property-projection test). Protected WIP remains in a separate dirty checkout.
+Do not resolve that by replacing protected WIP or by treating the local
+regression sweep as merge acceptance.
 
 ## 8. P5 execution evidence
 
@@ -948,6 +949,11 @@ results remain regression evidence, not P8 acceptance.
 
 ## CHANGELOG
 
+Version diff `0.8.71b -> 0.8.72b`: refresh the integration checkpoint at
+`3f2e66b`; the read-only merge simulation reports 17 conflicting paths (15
+content conflicts and two add/add). No conflict was resolved and the D7 code
+or verification evidence did not change. Merge integration remains open.
+
 Version diff `0.8.70b -> 0.8.71b`: record the approved D7 extension for one
 plain-ASCII label on a zero-hop single-property projection after differential
 testing against legacy HQL, the HQL1 adapter and canonical HQL2. The property
@@ -1143,6 +1149,7 @@ Version diff `0.8.27b -> 0.8.28b`: implement approved D1-D5, record 9 focused pa
 
 | Version | Date | Status | Summary | Commit Hash | Agent |
 |---|---|---|---|---|---|
+| 0.8.72b | 2026-10-06 | beta | Refresh integration checkpoint at 3f2e66b; merge-tree reports 17 conflicts (15 content, two add/add); no conflict resolution or merge performed; D7 evidence unchanged and integration/P8/P13 gates remain open | working-tree | ATHER |
 | 0.8.71b | 2026-10-06 | beta | Extend D7 with differential-proven one-label zero-hop single-property projection; property 3/3, adapter/property 16/16, HQL2 395/0/1 across 37; full-suite/Clippy not rerun, broad P8/P13/review/integration gates remain open | working-tree | ATHER |
 | 0.8.70b | 2026-10-06 | beta | Add ANALYZE budget/no-partial coverage for scalar, graph, sequence and vector plus measured vector distances and pre-parse namespace denial; four targets 51/51; test-only, full sweep/P8/P13/review/integration gates remain open | working-tree | ATHER |
 | 0.8.69b | 2026-10-06 | beta | Record locked/offline no-default Rust suite exit 0 with `probe_vs_recall` filtered and three soak cases ignored; post-refactor D7 adapter/property 15/15 and strict Clippy default/no-default pass; local-only, broad P8/P13 and review open | working-tree | ATHER |

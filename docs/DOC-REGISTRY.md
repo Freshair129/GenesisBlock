@@ -2,7 +2,7 @@
 title: "GenesisBlockDB Document Registry"
 doc_id: "DOC-REGISTRY-GENESISBLOCKDB"
 status: draft
-version: "0.5.77+draft"
+version: "0.5.78+draft"
 updated: "2026-10-06"
 owner: "GenesisBlockDB Architecture"
 source_of_truth: true
@@ -58,9 +58,9 @@ registry row explicitly names them.
 | HQL2 P8 completion addendum | `ADR--GENESISDB-HQL2-P8-COMPLETION-ADDENDUM` | `0.1.11b` | accepted | Boss (Founder / Product Authority) | `docs/adr/ADR--GENESISDB-HQL2-P8-COMPLETION-ADDENDUM.md` |
 | HQL2 Sequence pattern constraints | `ADR--GENESISDB-HQL2-PATTERN-CONSTRAINTS` | `0.2.1b` | beta | Boss (Founder / Product Authority) | `docs/adr/ADR--GENESISDB-HQL2-PATTERN-CONSTRAINTS.md` |
 | HQL2 durable revisions and annotations | `ADR--GENESISDB-HQL2-DURABLE-REVISIONS-ANNOTATIONS` | `0.8.21b` | beta | Boss (Founder / Product Authority) | `docs/adr/ADR--GENESISDB-HQL2-DURABLE-REVISIONS-ANNOTATIONS.md` |
-| UEE-HQL2 orchestration plan | `IMPLEMENTATION-PLAN--UEE-HQL2-ORCHESTRATION-2026-09-22` | `0.8.71b` | beta | Boss (Founder / Product Authority) | `docs/IMPLEMENTATION-PLAN--UEE-HQL2-ORCHESTRATION-2026-09-22.md` |
+| UEE-HQL2 orchestration plan | `IMPLEMENTATION-PLAN--UEE-HQL2-ORCHESTRATION-2026-09-22` | `0.8.72b` | beta | Boss (Founder / Product Authority) | `docs/IMPLEMENTATION-PLAN--UEE-HQL2-ORCHESTRATION-2026-09-22.md` |
 | HQL2 typed P8 boundary | `SPEC--GENESISDB-HQL2-P8-TYPED-BOUNDARY` | `0.2.66b` | beta | Boss (Founder / Product Authority) | `docs/SPEC--GENESISDB-HQL2-P8-TYPED-BOUNDARY.md` |
-| HQL2 P8 core checkpoint | `REPORT--HQL2-P8-CORE-2026-09-28` | `0.1.66b` | beta | GenesisBlockDB Engineering | `docs/REPORT--HQL2-P8-CORE-2026-09-28.md` |
+| HQL2 P8 core checkpoint | `REPORT--HQL2-P8-CORE-2026-09-28` | `0.1.67b` | beta | GenesisBlockDB Engineering | `docs/REPORT--HQL2-P8-CORE-2026-09-28.md` |
 | U9 backup and clean-target restore contract | `SPEC--GENESISDB-BACKUP-RESTORE-U9` | `0.1.6b` | beta | Boss (Founder / Product Authority) | `docs/SPEC--GENESISDB-BACKUP-RESTORE-U9.md` |
 | HQL2 P7 bounded oracle evidence | `REPORT--HQL2-P7-ORACLE-2026-09-28` | `0.1.6b` | beta | GenesisBlockDB Engineering | `docs/REPORT--HQL2-P7-ORACLE-2026-09-28.md` |
 | Commit correctness | `SPEC--WAVE-A-COMMIT-CORRECTNESS` | `0.1.0b` | beta | GenesisBlockDB Engineering | `docs/SPEC--WAVE-A-COMMIT-CORRECTNESS.md` |
@@ -119,6 +119,11 @@ The following documents should be created only when implementation work requires
 - third-client namespace conformance report.
 
 ## 9. Changelog
+
+Version diff 0.5.77+draft -> 0.5.78+draft: reconcile the plan/report versions
+with the latest read-only merge-tree result at `3f2e66b`: 17 conflicting paths
+(15 content and two add/add). No conflict resolution or merge was performed;
+the D7 code and test evidence remain unchanged.
 
 Version diff 0.5.76+draft -> 0.5.77+draft: register the approved D7
 one-label zero-hop single-property HQL1 projection extension and synchronize
@@ -367,6 +372,7 @@ review and full P8 gates remain open.
 
 | Version | Date | Owner | Summary |
 |---|---|---|---|
+| 0.5.78+draft | 2026-10-06 | GenesisBlockDB Architecture | Reconcile plan/report registry versions and record read-only merge-tree at 3f2e66b: 17 conflict paths (15 content, two add/add); no resolution or merge performed; D7 evidence unchanged |
 | 0.5.77+draft | 2026-10-06 | GenesisBlockDB Architecture | Register approved D7 one-label zero-hop single-property projection; sync P8 spec/report/plan/C4, property target 3/3, D7 adapter/property 16/16, HQL2 395/0/1 across 37; independent review and broad shared-runtime/P8/P13 gates remain open |
 | 0.5.72+draft | 2026-10-05 | GenesisBlockDB Architecture | Record restore/P6 21/21, HQL2 393/0/1 across 37 and full Rust suite exit 0 with `probe_vs_recall` filtered; cleanup failure paths best-effort/unverified; no bundle format/schema/migration change; broad gates remain open |
 | 0.5.71+draft | 2026-10-05 | GenesisBlockDB Architecture | Synchronize exact recovered frame-frontier validation, receipt-last reuse, transaction-frontier preservation and pre-rename result preparation across H2-D11/P6/U9/plan/C4/master/P8/report; restore/P6 20/20, HQL2 392/0/1 across 37; full Rust suite NOT_RUN; no bundle format/schema/migration change; broad gates remain open |
