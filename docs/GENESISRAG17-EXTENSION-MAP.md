@@ -2,8 +2,8 @@
 title: "GenesisRAG17 extension map"
 doc_id: "MAP-GENESISRAG17-EXTENSIONS"
 status: beta
-version: "1.0.3b"
-updated: "2026-09-08"
+version: "1.0.4b"
+updated: "2026-10-06"
 owner: "GenesisBlockDB Architecture"
 source_of_truth: true
 attributes:
@@ -175,7 +175,10 @@ by editing only the worker README or a lane flag:
 
 ## Version and evidence pins
 
-- Native engine checkout: `e15e35b0093394e0a8880af7f4e6f63cf81223b7`.
+- Candidate native engine source and qualification: see the
+  [worker ADR](ADR--GENESISRAG17-SEPARATE-WORKER-PUBLICATION.md); historical
+  baseline `e15e35b0093394e0a8880af7f4e6f63cf81223b7` remains historical
+  evidence only.
 - Embedding: `intfloat/multilingual-e5-small`, revision
   `614241f622f53c4eeff9890bdc4f31cfecc418b3`, dimension 384, cosine.
 - Wire: `genesisrag17.v1`, contract `1.3.0b`.
@@ -185,9 +188,14 @@ by editing only the worker README or a lane flag:
 
 | Version | Date | Status | Summary | Commit Hash | Agent |
 |---|---|---|---|---|---|
+| 1.0.4b | 2026-10-06 | beta | Link candidate engine source/qualification to the worker ADR; preserve historical baseline, model, wire and contract pins; full integration qualification remains pending | working-tree | ATHER |
 | 1.0.2b | 2026-09-08 | beta | Reconciled the live zuri GenesisRAG17 architecture reference to ADR-071 after the identifier collision; retained the pinned historical acceptance report. | working-tree | RWANG |
 | 1.0.1b | 2026-09-08 | beta | Synced audit remediation: exact native intent filenames/frontiers and collection checkpoint recovery, graph accepted-state ordering, Stage 16 lexical indexing, PASS-only publication and no-fallback pointer replacement. | working-tree | RWANG |
 | 1.0.0b | 2026-09-08 | beta | Added stage ownership, safe extension seams, coordinated evidence requirements and boundaries requiring a new ADR. | working-tree | RWANG |
+
+## Reference version diff — 2026-10-06
+
+"1.0.3b -> 1.0.4b: replace the ambiguous current-engine pin with the candidate source/qualification pointer in the worker ADR and label e15e35 as the historical baseline; model, wire and contract pins remain unchanged."
 
 ## Reference version diff — 2026-09-08
 

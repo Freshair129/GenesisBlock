@@ -48,9 +48,14 @@ npm ci --ignore-scripts
 npm run build:debug             # napi build --platform
 ```
 
-The native addon must be built from the pinned GenesisBlock checkout before
-running the worker. The worker needs Python `3.12.10` x64 and the exact
-sidecar dependencies in [`requirements.txt`](requirements.txt):
+The native addon used for acceptance must match the candidate engine source
+recorded in the [worker ADR](../docs/ADR--GENESISRAG17-SEPARATE-WORKER-PUBLICATION.md).
+The committed Linux artifact's source SHA, build environment, lockfile hashes
+and binary digest are recorded in
+[`npm/linux-x64-gnu/README.md`](../npm/linux-x64-gnu/README.md). The candidate
+is not full integration acceptance; model-dependent Linux paths and migration
+compatibility remain pending. The worker needs Python `3.12.10` x64 and the
+exact sidecar dependencies in [`requirements.txt`](requirements.txt):
 
 ```powershell
 Set-Location $GenesisRoot
@@ -129,6 +134,19 @@ node genesisrag17-worker\src\cli.mjs
 
 `GENESIS_WORKER_SCOPE` is deliberately an exact six-field private scope.
 `GENESIS_WORKER_DB_PATH` must be a new isolated TEST directory for the run.
+On first startup the worker obtains an exclusive transaction on a stable
+sibling SQLite coordination database next to (not inside) that path, opens the
+native database while the path is still absent or empty, then creates worker
+sidecars and persistent `genesisrag17/worker.lock` before releasing the
+transaction. The coordination file contains no application data and must not
+be deleted or recreated while workers may use it. This preserves single-owner
+startup without making a fresh native path appear markerless. Provably stale
+legacy worker locks can be recovered; incomplete or ambiguous lock metadata is
+rejected. Non-empty markerless data is never deleted or initialized over and
+remains recovery-required. Detected symlink/junction worker paths are rejected;
+the portable Node check does not claim to reject every Windows-specific
+reparse tag. Use a local filesystem with working SQLite locks; network-share
+locking is not supported by this contract.
 The worker creates `genesisrag17/state.json`, durable decision and stage-failure
 records, graph/write/publication outboxes, native transaction intents under
 `genesisrag17/transactions/<phase>-<decisionId>.json`, retained snapshots and
@@ -259,13 +277,19 @@ retained published-history list.
 
 ## Current native limitations
 
-The N-API binding at this pinned commit does not expose a `close` method. The
-worker closes its HTTP server, Python sidecar, FTS5 database and lock, but a
-true native handle restart must be performed by a dedicated child process.
-The worker therefore enforces one store owner with a PID/token lock and never
-deletes a live owner's lock. The lock also records the process start identity,
-so a container restart that reuses PID 1 can recover a legacy lock created by
-an older process instance while a live same-instance owner remains rejected.
+The N-API binding at the candidate engine source recorded in the ADR does not
+expose a `close` method. The worker closes its HTTP server, Python sidecar,
+FTS5 database and lock, but a true native handle restart must be performed by
+a dedicated child process.
+The worker therefore uses a sibling SQLite transaction to serialize startup
+and persistent worker-lock changes, plus the in-store PID/token lock. The
+in-store lock records process start identity, so a container restart that
+reuses PID 1 can recover a legacy lock created by an older process instance
+while a live same-instance owner remains rejected. Linked worker-sidecar paths
+are rejected and only empty worker-owned directories may be removed during
+fresh-path recovery; files are preserved. Older worker binaries do not
+coordinate through the sibling mutex, so stop them before upgrading the
+worker. The mutex file is stable and is not removed when a worker closes.
 There is no OS scheduler; `start`, `stop` and
 `resume` drive the polling loop explicitly. Query `topK` is bounded to 1..100
 at the worker endpoint, while the pipeline acceptance fixture uses top-k 5.
@@ -278,11 +302,20 @@ Set-Location $GenesisRoot
 npm test --prefix genesisrag17-worker
 ```
 
-The tests require the pinned model artifacts and the built native addon. They
+The tests require the pinned model artifacts and the candidate native addon. They
 exercise native graph/vector writes and readback, durable transaction identity
 and replay, collection-manifest checkpoint recovery, real CPU embedding, Stage
 16-only FTS5 indexing, scope isolation, policy Stage 15 failure, pointer crash
 recovery, WARN fail-closed publication and prepared-snapshot visibility.
+
+The Rust `tests/zz_probe_discriminates.rs` workload is an exploratory,
+non-asserting HNSW diagnostic rather than a correctness gate. It is ignored by
+the ordinary full-suite run because its 60-build workload can exceed the hosted
+Windows job budget. Run it explicitly when investigating index navigability:
+
+```powershell
+cargo test --no-default-features --test zz_probe_discriminates -- --ignored --nocapture
+```
 
 For the cross-repository ownership, extension points and recovery matrix, see
 [FLOW--GENESISRAG17-PIPELINE.md](../docs/FLOW--GENESISRAG17-PIPELINE.md),

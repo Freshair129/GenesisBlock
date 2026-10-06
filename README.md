@@ -483,12 +483,15 @@ GenesisBlockDB engine. The [separate-worker/publication ADR](docs/ADR--GENESISRA
 [extension map](docs/GENESISRAG17-EXTENSION-MAP.md) document the TEST boundary:
 MSP relays authenticated calls, GKS remains the passive semantic and quality
 authority, and the worker owns physical Stage 13/15/16 writes plus atomic
-publication. The native engine remains pinned to
-`e15e35b0093394e0a8880af7f4e6f63cf81223b7`; the worker uses the pinned CPU
+publication. The candidate engine source and qualification status are
+recorded in the worker ADR; `e15e35b0093394e0a8880af7f4e6f63cf81223b7` is
+retained as the historical integration baseline. Candidate qualification is
+pending. The worker uses the pinned CPU
 `intfloat/multilingual-e5-small` revision
 `614241f622f53c4eeff9890bdc4f31cfecc418b3`.
 
 - Worker setup and runtime/model manifest: [genesisrag17-worker/README.md](genesisrag17-worker/README.md)
+- Committed Linux addon provenance: [npm/linux-x64-gnu/README.md](npm/linux-x64-gnu/README.md)
 - Product [GenesisRAG17 architecture decision ADR-073](https://github.com/Freshair129/zuri.ai/blob/codex/ki17-integration/docs/decisions/ADR-073-GENESISRAG17-ISOLATED-EXECUTION-AND-PUBLICATION.md)
 - Product [17-stage source specification](https://github.com/Freshair129/zuri.ai/blob/codex/ki17-integration/docs/KNOWLEDGE-INGESTION-17-STAGE-SPEC.md)
 - Product [17-stage execution flow](https://github.com/Freshair129/zuri.ai/blob/codex/ki17-integration/docs/KNOWLEDGE-INGESTION-17-STAGE-FLOW.md)
