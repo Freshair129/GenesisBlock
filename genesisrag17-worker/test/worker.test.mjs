@@ -404,6 +404,27 @@ test('worker rejects a second owner for the same store', async () => {
   }
 });
 
+test('worker initializes an already-empty native store directory', async () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'genesisrag17-empty-store-'));
+  const dbPath = path.join(root, 'db');
+  fs.mkdirSync(dbPath);
+  let worker;
+  try {
+    worker = GenesisRag17Worker.create({
+      dbPath,
+      scope,
+      credential: 'worker-credential-test',
+      workerToken: 'query-token-test',
+      modelDir,
+      mspCall: async () => ({ decisions: [] }),
+    });
+    assert.ok(fs.existsSync(path.join(dbPath, 'identity.bin')));
+  } finally {
+    if (worker) await worker.close();
+    try { fs.rmSync(root, { recursive: true, force: true }); } catch { /* native handle cleanup is process scoped */ }
+  }
+});
+
 test('worker close preserves its owner when the startup mutex is busy and can retry', async () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'genesisrag17-close-busy-'));
   const dbPath = path.join(root, 'db');
@@ -591,8 +612,90 @@ test('worker leaves non-empty markerless native data fail-closed', () => {
       mspCall: noop,
     }), /RECOVERY_REQUIRED: markerless database identity is missing/);
     assert.equal(fs.readFileSync(retainedData, 'utf8'), '{}\n');
+    assert.equal(fs.existsSync(path.join(dbPath, 'identity.bin')), false);
   } finally {
     try { fs.rmSync(root, { recursive: true, force: true }); } catch { /* native handle cleanup is process scoped */ }
+  }
+});
+
+test('worker rejects malformed markerless native state without mutating it', () => {
+  const invalidStates = [
+    { name: 'invalid UTF-8', bytes: Buffer.from([0x7b, 0x22, 0x78, 0x22, 0x3a, 0x22, 0xff, 0x22, 0x7d]) },
+    { name: 'overflowing duplicate value', bytes: Buffer.from('{"x":1e400,"x":0}\n', 'utf8') },
+    { name: 'unpaired duplicate value', bytes: Buffer.from('{"x":"\\ud800","x":0}\n', 'utf8') },
+    { name: 'UTF-8 BOM', bytes: Buffer.concat([Buffer.from([0xef, 0xbb, 0xbf]), Buffer.from('{"schema_version":5}\n', 'utf8')]) },
+    { name: 'native nesting limit', bytes: Buffer.from('['.repeat(128) + '0' + ']'.repeat(128), 'utf8') },
+  ];
+  const noop = async () => ({ decisions: [] });
+  for (const state of invalidStates) {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'genesisrag17-invalid-markerless-'));
+    const dbPath = path.join(root, 'db');
+    const statePath = path.join(dbPath, 'state.json');
+    const retainedData = path.join(dbPath, 'genesisrag17', 'transactions', 'intent.json');
+    fs.mkdirSync(path.dirname(retainedData), { recursive: true });
+    fs.writeFileSync(statePath, state.bytes);
+    fs.writeFileSync(retainedData, '{}\n', 'utf8');
+    try {
+      assert.throws(() => GenesisRag17Worker.create({
+        dbPath,
+        scope,
+        credential: 'worker-credential-test',
+        workerToken: 'query-token-test',
+        modelDir,
+        mspCall: noop,
+      }), /RECOVERY_REQUIRED: markerless database identity is missing/, state.name);
+      assert.deepEqual(fs.readFileSync(statePath), state.bytes, state.name);
+      assert.equal(fs.readFileSync(retainedData, 'utf8'), '{}\n', state.name);
+      assert.equal(fs.existsSync(path.join(dbPath, 'identity.bin')), false, state.name);
+    } finally {
+      try { fs.rmSync(root, { recursive: true, force: true }); } catch { /* native handle cleanup is process scoped */ }
+    }
+  }
+});
+
+test('worker opens supported legacy state without native identity', async () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'genesisrag17-legacy-state-'));
+  const dbPath = path.join(root, 'db');
+  fs.mkdirSync(dbPath, { recursive: true });
+  fs.writeFileSync(path.join(dbPath, 'state.json'), '{"schema_version":5}\n', 'utf8');
+  let worker;
+  try {
+    worker = GenesisRag17Worker.create({
+      dbPath,
+      scope,
+      credential: 'worker-credential-test',
+      workerToken: 'query-token-test',
+      modelDir,
+      mspCall: async () => ({ decisions: [] }),
+    });
+    assert.ok(fs.existsSync(path.join(dbPath, 'identity.bin')));
+  } finally {
+    if (worker) await worker.close();
+    try { fs.rmSync(root, { recursive: true, force: true }); } catch { /* native handle cleanup is process scoped */ }
+  }
+});
+
+test('worker reopens an existing native store after its owner process exits', () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'genesisrag17-existing-store-'));
+  const dbPath = path.join(root, 'db');
+  const identityPath = path.join(dbPath, 'identity.bin');
+  const workerModuleUrl = new URL('../src/index.mjs', import.meta.url).href;
+  const childScript = (mode) => [
+    `const { GenesisRag17Worker } = await import(${JSON.stringify(workerModuleUrl)});`,
+    `const worker = GenesisRag17Worker.create({ dbPath: ${JSON.stringify(dbPath)}, scope: ${JSON.stringify(scope)}, credential: 'worker-credential-test', workerToken: 'query-token-test', modelDir: ${JSON.stringify(modelDir)}, mspCall: async () => ({ decisions: [] }) });`,
+    mode === 'write'
+      ? "await worker.db.addNode({ id: 'persisted-source', labels: [], props: { marker: 'reopen-proof' } });\nawait worker.db.addNode({ id: 'persisted-target', labels: [], props: { marker: 'survives-reopen' } });\nawait worker.db.addEdge({ from: 'persisted-source', to: 'persisted-target', rel: 'PERSISTS' });\nawait worker.db.saveState();"
+      : "const neighbors = await worker.db.neighbors('persisted-source', { depth: 1, rel: 'PERSISTS', direction: 'out' });\nif (neighbors.length !== 1 || neighbors[0].node.id !== 'persisted-target' || neighbors[0].node.props.marker !== 'survives-reopen') throw new Error('PERSISTED_RECORD_NOT_RETRIEVED');",
+    'await worker.close();',
+    'process.exit(0);',
+  ].join('\n');
+  try {
+    execFileSync(process.execPath, ['--input-type=module', '-e', childScript('write')], { stdio: 'pipe', timeout: 30_000 });
+    const identityBeforeReopen = fs.readFileSync(identityPath);
+    execFileSync(process.execPath, ['--input-type=module', '-e', childScript('verify')], { stdio: 'pipe', timeout: 30_000 });
+    assert.deepEqual(fs.readFileSync(identityPath), identityBeforeReopen, 'native store identity must remain unchanged across reopen');
+  } finally {
+    try { fs.rmSync(root, { recursive: true, force: true }); } catch { /* child process owns and releases native handles */ }
   }
 });
 

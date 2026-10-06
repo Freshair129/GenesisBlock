@@ -45,8 +45,10 @@ env:
 
 jobs:
   linux-addon:
-    name: rebuild addon + worker tests (ubuntu-latest)
+    name: rebuild addon + worker tests (Debian Bookworm)
     runs-on: ubuntu-latest
+    container:
+      image: rust:1.98.1-bookworm
     steps:
       - uses: actions/checkout@v4
 
@@ -55,10 +57,18 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '24.18.0'
-      - uses: dtolnay/rust-toolchain@stable
-        with:
-          targets: x86_64-unknown-linux-gnu
-      - uses: Swatinem/rust-cache@v2
+
+      - name: Record build environment
+        run: |
+          git rev-parse HEAD
+          rustc --version
+          rustc -vV
+          cargo --version
+          node --version
+          npm --version
+          uname -m
+          ldd --version | head -n 1
+          sha256sum Cargo.lock package-lock.json
 
       - name: Assert the committed Linux addon is present
         run: |
@@ -68,21 +78,10 @@ jobs:
           }
           ls -l "$COMMITTED_ADDON"
           sha256sum "$COMMITTED_ADDON"
+          COMMITTED_ADDON_SHA256="$(sha256sum "$COMMITTED_ADDON" | cut -d ' ' -f 1)"
+          echo "COMMITTED_ADDON_SHA256=$COMMITTED_ADDON_SHA256" >> "$GITHUB_ENV"
 
-      # ---------- pass 1: the COMMITTED artifact, exactly as a consumer gets it
-      - name: Load + test the committed addon
-        env:
-          # Every GenesisRag17Worker.create() call rejects a non-absolute
-          # modelDir before any model file is touched, so this must be absolute
-          # even though the snapshot is intentionally absent.
-          GENESIS_WORKER_MODEL_DIR: ${{ runner.temp }}/genesisrag17-model-not-provisioned
-        run: |
-          cp "$COMMITTED_ADDON" "./$ADDON"
-          node -e "require('./index.js'); console.log('committed addon loaded')"
-          npm install --prefix genesisrag17-worker --no-audit --no-fund
-          npm test --prefix genesisrag17-worker
-
-      # ---------- pass 2: rebuild from source and test that
+      # ---------- pass 1: rebuild from source and test that
       # `napi build` rewrites index.js / index.d.ts in place and both are
       # committed, so keep the committed copies aside the way test.yml does.
       - name: Snapshot the committed napi artifacts
@@ -93,25 +92,40 @@ jobs:
       - name: Install deps (no build)
         run: npm ci --ignore-scripts
 
+      - name: Install worker deps
+        run: npm install --prefix genesisrag17-worker --no-audit --no-fund
+
       - name: Rebuild the addon for x86_64-unknown-linux-gnu
         run: |
+          CARGO_LOCK_SHA256="$(sha256sum Cargo.lock | cut -d ' ' -f 1)"
+          NPM_LOCK_SHA256="$(sha256sum package-lock.json | cut -d ' ' -f 1)"
           rm -f "./$ADDON"
-          npm run build
+          npm run build -- --cargo-flags=--locked
+          test "$(sha256sum Cargo.lock | cut -d ' ' -f 1)" = "$CARGO_LOCK_SHA256" || {
+            echo "::error::Cargo.lock changed during the locked addon build"
+            exit 1
+          }
+          test "$(sha256sum package-lock.json | cut -d ' ' -f 1)" = "$NPM_LOCK_SHA256" || {
+            echo "::error::package-lock.json changed during the addon build"
+            exit 1
+          }
           test -f "./$ADDON" || {
             echo "::error::napi build produced no $ADDON"
             exit 1
           }
           ls -l "./$ADDON"
+          stat -c '%s bytes' "./$ADDON"
           sha256sum "./$ADDON"
+          readelf --version-info "./$ADDON" | grep -oE 'GLIBC_[0-9]+(\.[0-9]+)*' | sort -Vu | tail -n 1
 
       - name: index.d.ts / index.js freshness
         run: node scripts/check-dts-freshness.mjs .dts-committed .
 
       - name: Test the freshly built addon
         env:
-          GENESIS_WORKER_MODEL_DIR: ${{ runner.temp }}/genesisrag17-model-not-provisioned
+          GENESIS_WORKER_MODEL_DIR: /tmp/genesisrag17-model-not-provisioned
         run: |
-          node -e "require('./index.js'); console.log('rebuilt addon loaded')"
+          node scripts/verify-loaded-addon.mjs "./$ADDON"
           npm test --prefix genesisrag17-worker
 
       # Kept for whoever builds the zuri-ai ki17 image stage: the artifact from
@@ -123,3 +137,22 @@ jobs:
           path: ${{ env.ADDON }}
           if-no-files-found: error
           retention-days: 14
+
+      # ---------- pass 2: the COMMITTED artifact, exactly as a consumer gets it
+      - name: Restore committed napi wrappers and addon
+        run: |
+          cp .dts-committed/index.d.ts .dts-committed/index.js ./
+          cp "$COMMITTED_ADDON" "./$ADDON"
+          RESTORED_ADDON_SHA256="$(sha256sum "./$ADDON" | cut -d ' ' -f 1)"
+          test "$RESTORED_ADDON_SHA256" = "$COMMITTED_ADDON_SHA256" || {
+            echo "::error::restored addon does not match the committed artifact recorded at job start"
+            exit 1
+          }
+          echo "Verified restored committed addon SHA-256 $RESTORED_ADDON_SHA256"
+
+      - name: Load + test the committed addon
+        env:
+          GENESIS_WORKER_MODEL_DIR: /tmp/genesisrag17-model-not-provisioned
+        run: |
+          node scripts/verify-loaded-addon.mjs "./$ADDON"
+          npm test --prefix genesisrag17-worker

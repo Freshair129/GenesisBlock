@@ -2,7 +2,7 @@
 title: "GenesisBlockDB Document Registry"
 doc_id: "DOC-REGISTRY-GENESISBLOCKDB"
 status: draft
-version: "0.5.94+draft"
+version: "0.5.95+draft"
 updated: "2026-10-06"
 owner: "GenesisBlockDB Architecture"
 source_of_truth: true
@@ -121,6 +121,13 @@ The following documents should be created only when implementation work requires
 - third-client namespace conformance report.
 
 ## 9. Changelog
+
+Version diff 0.5.94+draft -> 0.5.95+draft: record the committed Linux addon
+drift and prepare the workflow to build, test and upload a replacement before
+the independent committed-artifact gate. The workflow now locks and fingerprints
+its dependency inputs; the artifact refresh and its provenance reconciliation
+remain pending until a hosted rebuild is available. Hosted verification is
+pending on the updated PR head.
 
 Version diff 0.5.92+draft -> 0.5.93+draft: record current mainline P6
 closeout `9821508` in the isolated HQL2 candidate and synchronize the H2-D11,
@@ -482,6 +489,7 @@ review and full P8 gates remain open.
 
 | Version | Date | Owner | Summary |
 |---|---|---|---|
+| 0.5.95+draft | 2026-10-06 | GenesisBlockDB Architecture | Prepare locked Linux addon rebuild/test/upload before the independent committed-artifact gate; record stale-binary finding in the RCA; artifact provenance refresh and hosted verification pending |
 | 0.5.94+draft | 2026-10-06 | GenesisBlockDB Architecture | Record the G3 recovery-proof test gap and P7.1 test-only acceptance; synchronize plan 0.8.78b while keeping model/code authorization and broad P7 gates open |
 | 0.5.93+draft | 2026-10-06 | GenesisBlockDB Architecture | Record current P6 mainline closeout integration and local results: P6 49/49, focused integrated targets 44/44, HQL2 407/0/1 across 40 targets; synchronize H2-D11/P8/plan/report entries; broader P8/P13, hosted and release gates remain open |
 | 0.5.92+draft | 2026-10-06 | GenesisBlockDB Architecture | Reconcile HQL2 AnnotationScan P7 temporal/ACL evidence with the P6 mainline closeout; preserve future-valid/post-S controls and separate query-level FORBIDDEN evidence; P8 and broader release/transport qualification remain open |

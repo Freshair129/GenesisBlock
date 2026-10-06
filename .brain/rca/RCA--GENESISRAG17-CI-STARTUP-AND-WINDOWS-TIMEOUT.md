@@ -42,6 +42,14 @@ cancelled at its 15-minute limit while running `probe_vs_recall`.
   reports it still running after 60 seconds before cancellation.
 - The unprovisioned model snapshot accounts for explicitly skipped model tests;
   it does not explain the constructor failures.
+- Follow-up hosted run `37417821442` failed only the committed Linux-addon pass
+  at `worker.test.mjs:585`: `GenesisRag17Worker.create()` returned instead of
+  throwing for non-empty markerless data. The workflow runs the committed
+  `npm/linux-x64-gnu/index.linux-x64-gnu.node` before its source rebuild; the
+  tracked artifact's last update is `b0d235f`, so it can predate current native
+  source behavior.
+- Artifact provenance is inconsistent: `npm/linux-x64-gnu/README.md` records
+  source `907b0ff`, while the worker ADR pins engine commit `e15e35b`.
 
 ## Root cause
 
@@ -60,6 +68,14 @@ normal Rust integration test. It runs on every host as part of the required
 full suite, consumes the remaining Windows job budget and is cancelled by the
 15-minute timeout.
 
+### Committed Linux addon drift
+
+The worker relied on the native addon's markerless-path guard to reject
+non-empty data. The drift workflow exercised the older committed Linux binary,
+which did not reject that test path, before rebuilding the addon from current
+Rust source. Thus the worker's fail-closed behavior varied with the platform
+artifact even though the current-source build contains the guard.
+
 ## Why the issue escaped earlier detection
 
 The current hosted CI did detect both problems and blocked merge; the failures
@@ -68,6 +84,9 @@ Rust recovery tests, Clippy, formatting and docs, and did not run the worker
 package or the full Windows Rust suite. The temporary diagnostic's placement
 under `tests/` made its default-CI cost look like ordinary regression coverage
 despite having no assertion.
+The local worker suite used the current Windows addon; only the Linux artifact
+drift job exercised the older committed binary. The regression therefore
+escaped local checks but was correctly caught by the committed-artifact pass.
 
 ## Fix (decided)
 
@@ -92,6 +111,14 @@ despite having no assertion.
    it ignored in the ordinary correctness suite with a visible reason. Its
    command is `cargo test --no-default-features --test
    zz_probe_discriminates -- --ignored --nocapture`.
+6. Prepare CI to regenerate the Linux addon from the approved native source in
+   a Bookworm environment with the worker's pinned Node baseline. Record the
+   actual source SHA, Rust/Node versions, target, build environment, binary
+   size and SHA-256; reconcile the worker ADR engine pin and artifact README
+   only after the replacement binary is built and tested.
+7. Build and test the fresh addon before testing the committed artifact, and
+   upload the tested fresh binary before the committed-artifact gate so drift
+   remains repairable without suppressing that mandatory gate.
 
 ## Proposed prevention
 
@@ -102,23 +129,39 @@ despite having no assertion.
   `continue-on-error` or hide failures.
 - Keep non-asserting long-running diagnostics out of default correctness gates;
   report intentional ignores explicitly and retain a manual invocation.
+- Keep schema and markerless recovery interpretation in the native engine;
+  verify both source-built and committed Linux artifacts without substituting
+  one for the other. Do not require byte equality between independent builds.
 
 ## Outcome (measured)
 
-**Local gates PASS; hosted CI PENDING.** The original focused regression was
-RED with `RECOVERY_REQUIRED: markerless database identity is missing` before
-implementation. On Node 24.19.0, the worker suite now reports 28 tests: 22
-passed, 0 failed, and 6 skipped because the pinned ONNX model snapshot is not
-provisioned locally. The SQLite mutex tests passed for busy/retry and recovery
-after its owner process exited; close-time contention preserved the owner and
-allowed a successful retry. `cargo test --no-default-features` completed
-with exit code 0; `zz_probe_discriminates` was visibly ignored in the default
-run. Root `npm test` passed 29/29. Both core and default Clippy commands,
+**Local gates PASS; final hosted CI PENDING.** The original focused regression
+was RED with `RECOVERY_REQUIRED: markerless database identity is missing`
+before implementation. On Node 24.19.0, the worker suite reports 32 tests:
+26 passed, 0 failed, and 6 skipped because the pinned ONNX model snapshot is
+not provisioned locally. Added native-artifact coverage exercises malformed
+markerless state, retained bytes, absence of a synthesized identity, valid
+schema-5 legacy state, and reopen after owner-process exit. The SQLite mutex
+tests passed for busy/retry and recovery after its owner process exited;
+close-time contention preserved the owner and allowed a successful retry.
+`scripts/verify-loaded-addon.mjs` verified the loaded Windows addon path and
+SHA-256 locally. `cargo test --no-default-features` completed with exit code 0;
+`zz_probe_discriminates` was visibly ignored in the default run. The current
+change prepares the locked, provenance-checked rebuild and strengthens the
+reopen test to verify identity stability and retrieval of persisted graph data,
+including startup from an already-empty directory; it does not yet refresh the
+committed binary or its provenance. Root
+`npm test` passed 29/29. Both core and default Clippy commands,
 `cargo fmt --all -- --check`, `npm run docs:validate` (0 violations in 241
-files), and `git diff --check` passed. Hosted PR checks and final gate remain
-required before merge. The Astra architecture/review gate returned
-`PASS_WITH_LIMITATIONS` with no remaining code blockers; hosted CI is still a
-merge prerequisite.
+files), and `git diff --check` passed. On hosted run `37417821447`, all listed
+Rust, worker matrix, audit, performance, format/lint, docs and SSOT checks
+passed; committed-addon run `37417821442` failed because the tracked Linux
+binary did not reject the markerless regression before its native-source
+rebuild step. Astra recommended refreshing the artifact, preserving native
+recovery semantics in Rust, recording exact build provenance, and making the
+rebuilt artifact available before the mandatory committed-artifact gate. The
+Bookworm rebuild, updated artifact, and final hosted/review gates remain
+pending before merge.
 
 **Residual path boundary:** Node `lstat`/`realpath` checks reject detected
 symbolic links and junctions but do not prove that every Windows-specific

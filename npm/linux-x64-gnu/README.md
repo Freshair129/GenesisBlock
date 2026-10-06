@@ -71,10 +71,11 @@ requires a full acceptance run on Linux with the model snapshot present.
 ### Keeping it from drifting
 
 `.github/workflows/genesisrag17-worker-linux.yml` runs on every push and pull
-request and exercises the worker suite twice: once against this committed file
-(proving the artifact a consumer would copy still loads and passes) and once
-against a fresh `napi build` for the same triple (proving the source still
-produces a working Linux addon).
+request. It first builds from current source with Cargo's lockfile enforced,
+tests the rebuilt addon, and uploads that tested output. It then restores the
+committed wrappers and addon and runs the same worker suite against the
+committed file a consumer would copy; the restored binary's hash must match
+the value captured at job start.
 
 It deliberately does **not** compare the two byte-for-byte. A different `rustc`
 patch release, build path or LTO run changes the bytes without changing the
