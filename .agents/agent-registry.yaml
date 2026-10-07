@@ -1,8 +1,9 @@
-version: "0.2.1b"
+version: "0.2.2b"
 
 root_contract:
   global_context:
     - setup/AGENT.md
+    - AGENTS.md
     - AGENT.md
     - ARCHITECTURE.md
     - CONTRIBUTING.md

@@ -2,6 +2,66 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+<!-- GENERATED_AGENT_POLICY_START -->
+<!-- Generated from AGENTS.md v1.0.0; do not edit this section. -->
+
+## Shared agent policy (R1-R10)
+
+### R1 — Think before action
+
+- State assumptions explicitly. If multiple interpretations exist, present them. Ask when uncertainty materially affects implementation, and push back when a simpler approach is sufficient.
+- When assumptions exist, use an `[ASSUMPTIONS]` list before acting.
+
+### R2 — Simplicity first
+
+- Write the minimum that solves the request. Do not add speculative features, one-use abstractions, or unrequested flexibility. Simplify code when a shorter solution is equally clear and correct.
+
+### R3 — Surgical changes
+
+- Touch only what the request requires. Preserve unrelated behavior, documentation, tests, and user work. Do not perform opportunistic cleanup.
+
+### R4 — Goal-driven execution
+
+- Define acceptance, success, and exit criteria before acting. Give a brief plan with a verification check for each step, then continue until the criteria are met.
+
+### R5 — Documentation first; wait for approval
+
+- Before code changes, inspect the high-level parent documents and same-level peer contracts.
+- Output the proposed documentation changes, stop, and ask for approval. Do not write code in the same response as the proposal.
+
+### R6 — Root-cause analysis first
+
+- Do not fix a bug by guessing. Support the root cause with evidence and record the RCA in `.brain/rca/` with symptom, evidence, root cause, why detection failed, and prevention.
+
+### R7 — Definition of Done
+
+- Complete only when acceptance, success, and exit criteria are met; relevant tests pass; documentation is updated; and no known regressions remain. Report unverified items explicitly.
+
+### R8 — Change risk assessment
+
+- Classify non-trivial changes before implementation: LOW for isolated changes without schema impact; MEDIUM for cross-module or public API changes; HIGH for architecture, migration, or security-sensitive changes.
+
+### R9 — Scope boundary
+
+- Implement only the approved request. Record unrelated findings separately; do not expand scope to fix them.
+
+### R10 — Complexity-based execution
+
+- Choose the lowest complexity level that preserves correctness, safety, and maintainability. When uncertain, choose the higher level.
+- Classify every task: C-1 is direct implementation for trivial changes; C-2 is documentation-driven work; C-3 is architecture-driven work requiring documentation and diagrams.
+- Escalate C-1 to C-2 or C-2 to C-3 when uncertainty increases. Do not downgrade after approval without explaining why.
+- Verify C-1 with validation, C-2 with tests and documentation review, and C-3 with tests, documentation review, and architecture review.
+
+This shared policy is mandatory. Tool-specific instruction files may add constraints but must not weaken these rules.
+
+### Hotfix exception and workflow
+
+- The doc-first gate may be bypassed only for trivial, non-structural syntax, typo, or basic lint fixes. When uncertain, use doc-first.
+- For new features or changes, propose documentation, analyze parent/peer impact, and wait for approval before code.
+- For bugs, state `[ROOT CAUSE]` with supporting evidence and the proposed fix first. Wait for approval for complex fixes; apply only the bounded hotfix exception above.
+- For new features, end the proposal with: “Please review and approve this documentation. I will generate the code once approved.”
+<!-- GENERATED_AGENT_POLICY_END -->
+
 ## What this is
 
 GenesisBlock / GenesisBlockDB is a local-first **hybrid semantic-graph database engine** written in Rust. A single Rust crate (`genesis-block-native`) compiles to two artifacts from the same core: a `cdylib` Node.js native addon (via NAPI-RS) and an `rlib` consumed by a standalone Axum REST server. Everything else (Python SDK, Go SDK, MCP server, dashboard, Obsidian plugin) is a client over one of those two surfaces.
@@ -87,6 +147,7 @@ cd dashboard && npm run dev  # optional operational dashboard (reads /v1/status,
 
 ## Where to read next
 
-- `AGENT.md` — operating workflow (Documentation-Driven Development + Root Cause Analysis), complexity levels (C-1/C-2/C-3), verification policy, and caveats. Read this before non-trivial changes.
+- `AGENTS.md` — canonical shared policy R1-R10, approval workflow, and verification policy.
+- `AGENT.md` — GenesisBlock architecture context, project-specific commands, and caveats.
 - `docs/C4--GENESISDB-ARCHITECTURE.md` — architecture index / C4 navigation (the SSOT map).
 - `.agents/agent-registry.yaml` — agent identity SSOT (`agent_id` stable, `label` human-facing).

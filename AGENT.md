@@ -1,7 +1,7 @@
 ---
-version: "0.2.4b"
+version: "0.2.5b"
 created_at: "2026-06-13T19:39:22+07:00,ATHER,9b1ced3"
-last_update: "2026-07-23T11:10:00+07:00,Codex"
+last_update: "2026-10-07,Codex"
 status: "beta"
 attributes:
   domain: "agent-governance"
@@ -18,15 +18,7 @@ GenesisBlock is a local-first hybrid semantic-graph database engine for AI agent
 
 ## Operating Workflow
 
-- Default mode: Documentation-Driven Development (DDD) + Root Cause Analysis (RCA).
-- Before code changes, inspect parent docs and same-level specs.
-- For bugs, identify root cause with evidence and document RCA in `.brain/rca/` before fixing.
-- Use the lowest safe complexity level:
-  - `C-1`: trivial direct change.
-  - `C-2`: feature/API/workflow change, doc approval required.
-  - `C-3`: architecture/distributed/dataflow change, doc + diagrams required.
-- Keep changes surgical. Do not refactor adjacent code unless required.
-- Definition of Done: acceptance criteria met, tests pass, docs updated, no known regressions.
+The repository-wide agent policy (R1-R10), approval workflow, risk classification, and Definition of Done are canonical in [`AGENTS.md`](AGENTS.md). Read and follow that file before acting. This document provides GenesisBlock-specific architecture and capability context; it does not redefine shared workflow rules.
 
 ## Architecture Map
 
@@ -94,6 +86,7 @@ cargo run --bin genesis-db-server
 node --test __test__/*.mjs
 npm run build
 npm run mcp:start
+npm run agents:sync
 npm run agents:validate
 ```
 
@@ -124,11 +117,13 @@ npm run lint
 | 0.2.1b | 0.2.2b | Clarified GenesisBlockDB as backend/runtime engine first; dashboard/Obsidian are optional client surfaces. |
 | 0.2.2b | 0.2.3b | Added "Current Engine Model" (u64 edge keys, per-collection vector spaces, async HNSW indexing); refreshed Core Capabilities + the API_REFERENCE caveat. |
 | 0.2.3b | 0.2.4b | Clarified one-boundary storage ownership: WAL authority, SQLite as internal derived projection, filesystem snapshot/materialization roles, and no external dual-write store pattern. |
+| 0.2.4b | 0.2.5b | Delegated shared R1-R10 governance and approval workflow to canonical `AGENTS.md`; retained engine-specific architecture context here. |
 
 ## CHANGELOG
 
 | Version | Date | Status | Summary | Commit Hash | Agent |
 |---|---|---|---|---|---|
+| 0.2.5b | 2026-10-07 | beta | Delegated shared agent governance to `AGENTS.md`. | working-tree | Codex |
 | 0.2.4b | 2026-07-23 | beta | Clarified WAL authority, SQLite projection ownership, and single-boundary storage topology for agents. | working-tree | Codex |
 | 0.2.3b | 2026-06-22 | beta | Aligned with shipped engine: u64 edge keys, multi-collection vector spaces, async indexing. | working-tree | Claude |
 | 0.2.2b | 2026-06-14 | beta | Clarified backend/runtime ownership and downgraded UI surfaces to optional consumers. | working-tree | ATHER |
