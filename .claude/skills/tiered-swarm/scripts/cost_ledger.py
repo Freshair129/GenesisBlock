@@ -2,7 +2,7 @@
 """cost_ledger.py — aggregate a per-call cost ledger for the tiered-swarm skill.
 
 Thin wrapper over cost_estimate.py: reads a JSONL ledger (one logged call per line),
-applies the two-way cost formula per row, and prints a breakdown plus a LOCAL-vs-CLAUDE
+applies the two-way cost formula per row, and prints a breakdown plus a LOCAL-vs-BILLED
 split so the "local saved tokens" claim is auditable (design invariant #4).
 
 Each JSONL row is one call:
@@ -16,8 +16,8 @@ USAGE:
     python cost_ledger.py ledger.jsonl
     cat ledger.jsonl | python cost_ledger.py -
 
-Re-verify Claude rates at https://platform.claude.com/docs/en/pricing.md before billing
-(cost_estimate.py carries a 2026-06-04 UNCERTAINTY FLAG). Dependency-free (stdlib only).
+Verify every billed `PRICING` entry against its provider's official source before billing.
+The current Claude profile carries a 2026-06-04 UNCERTAINTY FLAG. Dependency-free (stdlib only).
 """
 
 import json
@@ -40,10 +40,7 @@ def load_rows(path):
 
 def is_local(model):
     """A row counts toward the local split if its rate vector is all-zero."""
-    try:
-        r = ce.rates_for(model)
-    except ValueError:
-        return False  # an unknown Claude tag is billed, not local
+    r = ce.rates_for(model)
     return r.get("in", 0) == 0 and r.get("out", 0) == 0
 
 
@@ -56,7 +53,11 @@ def main(argv):
         sys.stderr.write("cost_ledger.py: empty ledger.\n")
         sys.exit(2)
 
-    per_row, total = ce.cost_breakdown(rows)
+    try:
+        per_row, total = ce.cost_breakdown(rows)
+    except ValueError as exc:
+        sys.stderr.write(f"cost_ledger.py: {exc}\n")
+        sys.exit(2)
     ce._fmt(per_row, total, "tiered-swarm cost ledger")
 
     # local vs billed split
@@ -76,8 +77,7 @@ def main(argv):
     print(f"  billed tokens  : {billed_tok:>12,}  ({100*billed_tok/all_tok:5.1f}%)  "
           f"cost ${billed_cost:.4f}")
     print(f"  TOTAL          : {all_tok:>12,}                 cost ${total:.4f}")
-    print("\nREMINDER: Claude rates are the 2026-06-04 snapshot (UNCERTAINTY FLAG).")
-    print("Re-verify at https://platform.claude.com/docs/en/pricing.md before billing.")
+    print("\nREMINDER: verify every billed rate in PRICING against its provider's official source.")
 
 
 if __name__ == "__main__":
