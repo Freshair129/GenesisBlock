@@ -196,13 +196,14 @@ function gitBaseArgs(workspace) {
   return ['-c', `safe.directory=${workspace}`, '-C', workspace];
 }
 
-function runGitSync(workspace, args, { encoding = 'utf8' } = {}) {
+function runGitSync(workspace, args, { encoding = 'utf8', input, maxBuffer = 32 * 1024 * 1024 } = {}) {
   const result = childSpawnSync('git', [...gitBaseArgs(workspace), ...args], {
     cwd: workspace,
     encoding,
     windowsHide: true,
-    maxBuffer: 32 * 1024 * 1024,
+    maxBuffer,
     shell: false,
+    ...(input === undefined ? {} : { input }),
   });
   if (result.error) fail('GIT_EXEC', `Could not run Git ${args[0]}.`, result.error);
   if (result.status !== 0) {
@@ -230,6 +231,115 @@ async function sourceDigestAt(workspace, commit) {
   return sha256(inventory);
 }
 
+function nulFields(bytes, label) {
+  const values = [];
+  let start = 0;
+  for (let index = 0; index < bytes.length; index += 1) {
+    if (bytes[index] !== 0) continue;
+    values.push(bytes.subarray(start, index));
+    start = index + 1;
+  }
+  if (start !== bytes.length) fail('TRACKED_INVENTORY_INVALID', `${label} output was not NUL terminated.`);
+  return values;
+}
+
+export function decodeTrackedPath(bytes) {
+  const value = bytes.toString('utf8');
+  if (!Buffer.from(value, 'utf8').equals(bytes)) fail('TRACKED_PATH_ENCODING', 'Tracked path is not valid UTF-8.');
+  if (value.length === 0 || value !== value.normalize('NFC') || /[\\\u0000-\u001f\u007f"]/u.test(value)) {
+    fail('TRACKED_PATH_UNSUPPORTED', 'Tracked paths with backslashes, quotes, control characters, or non-NFC names are unsupported.');
+  }
+  let normalized;
+  try { normalized = normalizePath(value); }
+  catch (error) { fail('TRACKED_PATH_UNSUPPORTED', `Tracked path is not portable: ${error.message}`); }
+  return { value, normalized };
+}
+
+function parseTreeEntries(bytes) {
+  const entries = [];
+  const normalizedPaths = new Set();
+  for (const record of nulFields(bytes, 'Git tree')) {
+    const tab = record.indexOf(0x09);
+    if (tab < 0) fail('TRACKED_INVENTORY_INVALID', 'Git tree entry has no path separator.');
+    const header = record.subarray(0, tab).toString('ascii');
+    const match = /^(\d{6}) (blob|commit|tree) ([a-f0-9]{40}|[a-f0-9]{64})$/i.exec(header);
+    if (!match) fail('TRACKED_INVENTORY_INVALID', 'Git tree entry has an invalid mode, object type, or object ID.');
+    const mode = match[1];
+    const objectType = match[2];
+    const objectId = match[3].toLowerCase();
+    const { value: relativePath, normalized } = decodeTrackedPath(record.subarray(tab + 1));
+    if (normalizedPaths.has(normalized)) fail('TRACKED_PATH_COLLISION', `Tracked path ${relativePath} collides with another path after portable normalization.`);
+    normalizedPaths.add(normalized);
+    if (mode === '120000') fail('TRACKED_SYMLINK_UNSUPPORTED', `Tracked symlink ${relativePath} is outside the supported V1 candidate boundary.`);
+    if (mode === '160000' || objectType === 'commit') fail('TRACKED_SUBMODULE_UNSUPPORTED', `Tracked submodule ${relativePath} is outside the supported V1 candidate boundary.`);
+    if (!['100644', '100755'].includes(mode) || objectType !== 'blob') {
+      fail('TRACKED_MODE_UNSUPPORTED', `Tracked entry ${relativePath} has unsupported Git mode ${mode}.`);
+    }
+    entries.push({ relativePath, normalized, objectId });
+  }
+  return entries;
+}
+
+async function assertIndexMatchesHead(workspace, headTree) {
+  const indexTree = runGitSync(workspace, ['write-tree']).trim().toLowerCase();
+  if (indexTree !== headTree.toLowerCase()) fail('INDEX_TREE_MISMATCH', 'Git index tree differs from HEAD.');
+  const flags = nulFields(runGitSync(workspace, ['ls-files', '-v', '-z', '--cached'], { encoding: 'buffer' }), 'Git index flags');
+  for (const entry of flags) {
+    if (entry.length < 3 || entry[1] !== 0x20) fail('INDEX_FLAGS_INVALID', 'Git index flag record is malformed.');
+    const tag = String.fromCharCode(entry[0]);
+    if (tag !== 'H') {
+      const path = entry.subarray(2).toString('utf8');
+      fail('INDEX_HIDDEN_ENTRY', `Tracked path ${path} has Git index flag ${tag}; assume-unchanged, skip-worktree, and non-merged entries are forbidden.`);
+    }
+  }
+}
+
+export async function assertTrackedWorktreeBytes(workspace, commit) {
+  const treeBytes = runGitSync(workspace, ['ls-tree', '-r', '-z', '--full-tree', commit], { encoding: 'buffer' });
+  const entries = parseTreeEntries(treeBytes);
+  if (entries.length === 0) return;
+
+  // Git clean filters can execute arbitrary configured programs. The guard only
+  // supports Git's built-in text/EOL conversion; those conversions are applied
+  // below by hash-object --stdin-paths after unsupported attributes are rejected.
+  const attributeInput = Buffer.from(`${entries.map((item) => item.relativePath).join('\0')}\0`, 'utf8');
+  const attributes = nulFields(runGitSync(workspace, [
+    'check-attr', '--stdin', '-z', 'filter', 'working-tree-encoding', 'ident',
+  ], { encoding: 'buffer', input: attributeInput }), 'Git attributes');
+  if (attributes.length % 3 !== 0) fail('GIT_ATTRIBUTES_INVALID', 'Git attribute query returned an incomplete record.');
+  for (let index = 0; index < attributes.length; index += 3) {
+    const attribute = attributes[index + 1].toString('utf8');
+    const value = attributes[index + 2].toString('utf8');
+    if (['filter', 'working-tree-encoding', 'ident'].includes(attribute) && !['unspecified', 'unset'].includes(value)) {
+      fail('TRACKED_CONVERSION_UNSUPPORTED', `Tracked files use unsupported Git ${attribute} conversion (${value}).`);
+    }
+  }
+
+  const relativePaths = [];
+  for (const entry of entries) {
+    const filePath = await resolveExistingParents(workspace, entry.relativePath);
+    const info = await lstat(filePath).catch((error) => fail('TRACKED_FILE_MISSING', `Tracked file ${entry.relativePath} is missing.`, error));
+    if (!info.isFile() || info.isSymbolicLink()) fail('TRACKED_FILE_TYPE', `Tracked path ${entry.relativePath} is not a regular file.`);
+    const resolved = await realpath(filePath).catch((error) => fail('TRACKED_FILE_PATH', `Could not resolve tracked file ${entry.relativePath}.`, error));
+    if (!isWithin(workspace, resolved)) fail('TRACKED_FILE_ESCAPE', `Tracked file ${entry.relativePath} resolves outside the candidate worktree.`);
+    relativePaths.push(entry.relativePath);
+  }
+
+  // Paths are control-character-free and NFC-validated above, so newline input
+  // safely batches hash-object reads while honoring only built-in EOL cleanup.
+  const pathInput = Buffer.from(`${relativePaths.join('\n')}\n`, 'utf8');
+  const hashes = runGitSync(workspace, ['hash-object', '--stdin-paths'], {
+    input: pathInput,
+    maxBuffer: Math.max(32 * 1024 * 1024, entries.length * 80),
+  }).trim().split(/\r?\n/);
+  if (hashes.length !== entries.length) fail('TRACKED_HASH_COUNT', 'Git returned an incomplete tracked-file hash inventory.');
+  for (let index = 0; index < entries.length; index += 1) {
+    if (!/^(?:[a-f0-9]{40}|[a-f0-9]{64})$/i.test(hashes[index]) || hashes[index].toLowerCase() !== entries[index].objectId) {
+      fail('TRACKED_BYTES_MISMATCH', `On-disk bytes for tracked path ${entries[index].relativePath} do not match the HEAD blob.`);
+    }
+  }
+}
+
 async function gitHead(workspace) {
   return runGitSync(workspace, ['rev-parse', '--verify', 'HEAD^{commit}']).trim().toLowerCase();
 }
@@ -246,6 +356,8 @@ async function assertClean(workspace) {
 export async function captureCandidate(workspace) {
   const sha = await gitHead(workspace);
   const tree = await gitTree(workspace, sha);
+  await assertIndexMatchesHead(workspace, tree);
+  await assertTrackedWorktreeBytes(workspace, sha);
   await assertClean(workspace);
   const sourceDigest = await sourceDigestAt(workspace, sha);
   return { sha, tree, sourceDigest };
@@ -1215,9 +1327,11 @@ export class RunStore {
       let after = null;
       let candidateMutation = false;
       try { after = await captureCandidate(taskWorkspace); }
-      catch (error) {
+      catch {
+        // Any failed post-command snapshot is unsafe evidence, including byte
+        // mismatches that status/ls-files can hide. Preserve the command receipt
+        // and quarantine the writer instead of abandoning its durable ledger.
         candidateMutation = true;
-        if (!(error instanceof RuntimeError) || error.code !== 'CANDIDATE_DIRTY') throw error;
       }
       if (after && !sameJson(before, after)) candidateMutation = true;
       const receipt = {

@@ -1,11 +1,11 @@
 import assert from 'node:assert/strict';
 import { spawn, spawnSync } from 'node:child_process';
 import { createHash, randomUUID } from 'node:crypto';
-import { mkdtemp, mkdir, readFile, rm, symlink, writeFile } from 'node:fs/promises';
+import { mkdtemp, mkdir, readFile, rm, stat, symlink, utimes, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
-import { resolveExistingParents } from '../scripts/workflow-guard/store.mjs';
+import { assertTrackedWorktreeBytes, captureCandidate, decodeTrackedPath, resolveExistingParents } from '../scripts/workflow-guard/store.mjs';
 
 const ROOT = path.resolve(import.meta.dirname, '..');
 const CLI = path.join(ROOT, 'scripts', 'workflow-guard.mjs');
@@ -96,7 +96,7 @@ function twoTaskPlanFor(baselineSha, command) {
   return plan;
 }
 
-async function fixture({ command, checkSource, planFactory, separateTaskWorkspaces = false } = {}) {
+async function fixture({ command, checkSource, planFactory, separateTaskWorkspaces = false, crlfCheckout = false, crlfNormalized = false } = {}) {
   const temporary = await mkdtemp(path.join(os.tmpdir(), 'workflow-guard-runtime-'));
   const workspace = path.join(temporary, 'candidate');
   const runDir = path.join(temporary, 'ledger');
@@ -104,7 +104,9 @@ async function fixture({ command, checkSource, planFactory, separateTaskWorkspac
   await mkdir(workspace);
   await mkdir(requests);
   await mkdir(path.join(workspace, 'pilot'));
-  await writeFile(path.join(workspace, 'pilot', 'input.txt'), 'baseline\n');
+  await writeFile(path.join(workspace, 'pilot', 'input.txt'), crlfCheckout ? 'baseline\r\n' : 'baseline\n');
+  if (crlfCheckout) await writeFile(path.join(workspace, '.gitattributes'), 'pilot/*.txt -text\n');
+  if (crlfNormalized) await writeFile(path.join(workspace, '.gitattributes'), 'pilot/*.txt text eol=crlf\n');
   await writeFile(path.join(workspace, 'check.mjs'), checkSource ?? "console.log('WORKFLOW_GUARD_RESULT='+JSON.stringify({acResults:[{acId:'AC-1',caseId:'positive',outcome:'pass',testCount:1}]}));\n");
   git(workspace, ['init', '-b', 'main']);
   git(workspace, ['config', 'user.name', 'Workflow Guard Pilot']);
@@ -112,6 +114,15 @@ async function fixture({ command, checkSource, planFactory, separateTaskWorkspac
   git(workspace, ['add', '--all']);
   git(workspace, ['commit', '-m', 'baseline']);
   const baselineSha = git(workspace, ['rev-parse', 'HEAD']);
+  if (crlfNormalized) {
+    const trackedFile = path.join(workspace, 'pilot', 'input.txt');
+    await writeFile(trackedFile, (await readFile(trackedFile, 'utf8')).replaceAll('\n', '\r\n'));
+    // Refresh the index stat after Git's built-in CRLF clean conversion. The
+    // committed blob stays LF, while this is now a genuine clean CRLF checkout.
+    git(workspace, ['add', '--renormalize', '.']);
+    assert.equal(git(workspace, ['status', '--porcelain']).length, 0, 'normalized CRLF checkout must be clean');
+    assert.ok((await readFile(trackedFile)).includes(Buffer.from('\r\n')));
+  }
   const plan = planFactory ? planFactory(baselineSha, command) : planFor(baselineSha, command);
   let taskWorkspaces = Object.create(null);
   if (separateTaskWorkspaces) {
@@ -413,6 +424,58 @@ test('ledger cannot be initialized inside the source tree and cwd symlinks canno
   const linkPath = path.join(project.workspace, 'escape');
   await symlink(outside, linkPath, process.platform === 'win32' ? 'junction' : 'dir');
   await assert.rejects(resolveExistingParents(project.workspace, 'escape/outside.txt'), (error) => error.code === 'PATH_ESCAPE');
+});
+
+test('candidate capture rejects hidden index flags, catches metadata-preserving byte changes, and accepts CRLF normalization', async (t) => {
+  for (const flag of ['--assume-unchanged', '--skip-worktree']) {
+    const project = await fixture();
+    t.after(() => rm(project.temporary, { recursive: true, force: true }));
+    const trackedFile = path.join(project.workspace, 'pilot', 'input.txt');
+    git(project.workspace, ['update-index', flag, '--', 'pilot/input.txt']);
+    await writeFile(trackedFile, 'changed!\n');
+    assert.equal((await readFile(trackedFile)).length, Buffer.byteLength('baseline\n'));
+    assert.equal(git(project.workspace, ['status', '--porcelain']).length, 0, `${flag} fixture should hide the worktree edit from status`);
+    await assert.rejects(captureCandidate(project.workspace), (error) => error.code === 'INDEX_HIDDEN_ENTRY');
+  }
+
+  const project = await fixture();
+  t.after(() => rm(project.temporary, { recursive: true, force: true }));
+  const trackedFile = path.join(project.workspace, 'pilot', 'input.txt');
+  git(project.workspace, ['config', 'core.trustctime', 'false']);
+  const roundedTime = Math.floor((await stat(trackedFile)).mtimeMs);
+  await utimes(trackedFile, roundedTime / 1000, roundedTime / 1000);
+  git(project.workspace, ['update-index', '--refresh']);
+  const originalStat = await stat(trackedFile);
+  await writeFile(trackedFile, 'changed!\n');
+  await utimes(trackedFile, originalStat.atime, originalStat.mtime);
+  const replacementStat = await stat(trackedFile);
+  assert.equal(replacementStat.size, originalStat.size);
+  assert.equal(replacementStat.mtimeMs, originalStat.mtimeMs);
+  await assert.rejects(captureCandidate(project.workspace), (error) => error.code === 'TRACKED_BYTES_MISMATCH');
+
+  const crlf = await fixture({ crlfCheckout: true });
+  t.after(() => rm(crlf.temporary, { recursive: true, force: true }));
+  const crlfBytes = await readFile(path.join(crlf.workspace, 'pilot', 'input.txt'));
+  assert.ok(crlfBytes.includes(Buffer.from('\r\n')));
+  assert.equal(git(crlf.workspace, ['status', '--porcelain']).length, 0);
+  const candidate = await captureCandidate(crlf.workspace);
+  assert.equal(candidate.sha, crlf.baselineSha);
+
+  const normalized = await fixture({ crlfNormalized: true });
+  t.after(() => rm(normalized.temporary, { recursive: true, force: true }));
+  const normalizedBytes = await readFile(path.join(normalized.workspace, 'pilot', 'input.txt'));
+  assert.ok(normalizedBytes.includes(Buffer.from('\r\n')));
+  assert.equal(git(normalized.workspace, ['status', '--porcelain']).length, 0);
+  const normalizedCandidate = await captureCandidate(normalized.workspace);
+  assert.equal(normalizedCandidate.sha, normalized.baselineSha);
+  await assertTrackedWorktreeBytes(normalized.workspace, normalized.baselineSha);
+});
+
+test('tracked path validation rejects C-quoted stdin hash ambiguity', () => {
+  assert.throws(
+    () => decodeTrackedPath(Buffer.from('"pilot/input.txt"', 'utf8')),
+    (error) => error.code === 'TRACKED_PATH_UNSUPPORTED',
+  );
 });
 
 test('handoff rejects wrong artifact hashes and changed candidates before event commit', async (t) => {

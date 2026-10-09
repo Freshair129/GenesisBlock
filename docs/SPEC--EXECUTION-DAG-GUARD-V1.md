@@ -242,6 +242,13 @@ producer. ACK validates packet completeness and provenance; it is never PASS.
 Only a separate receiver verdict over the same packet/candidate can accept the
 task. Missing/wrong receiver, changed scope, stale fence, wrong candidate or
 corrupt evidence is rejected. An accepted packet replay does not advance twice.
+
+Git status alone is insufficient source evidence. The adapter rejects hidden
+index flags (`assume-unchanged` / `skip-worktree`) and index/HEAD tree divergence,
+then compares actual tracked file bytes with committed blobs using supported Git
+text/CRLF normalization. Metadata-only cache hits cannot certify changed bytes.
+V1 rejects symlinks, submodules and custom filter/encoding/ident conversions at
+this source boundary; it never silently omits their contents from the proof.
 Successful task verdict releases its logical lease and closes its fence. Failure
 or rejection quarantines scopes until `stop_confirmed`, as do expiry/cancellation.
 Releasing a logical lease after success does not prevent physical writes: source
