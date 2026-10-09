@@ -1,0 +1,36 @@
+name: Execution DAG guard
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    paths:
+      - 'scripts/workflow-guard/**'
+      - 'scripts/workflow-guard.mjs'
+      - 'scripts/workflow-w1-plan.mjs'
+      - '__test__/workflow_*.test.mjs'
+      - '__test__/fixtures/workflow-guard/**'
+      - 'queue/QUERY_IR_W1*'
+      - 'docs/SPEC--EXECUTION-DAG-GUARD-V1.md'
+      - 'AGENT.md'
+      - 'package.json'
+      - '.github/workflows/workflow-guard.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  guard:
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm run workflow:plan
+      - run: npm run workflow:test

@@ -2,9 +2,9 @@
 proposed_id: TDD--DOCUMENTATION-GOVERNANCE-SSOT-ENFORCEMENT
 type: tdd
 status: current
-version: 0.1.0b
+version: 0.1.1b
 created_at: 2026-06-13T21:21:44+07:00,ATHER,9b1ced3
-last_update: 2026-06-13T21:21:44+07:00,ATHER
+last_update: 2026-10-10T12:00:00+07:00,Codex
 attributes:
   domain: documentation-governance
   scope: repository
@@ -268,10 +268,31 @@ Rollback ต้องทำได้โดยไม่กระทบ runtime:
 
 ## CHANGELOG
 
+### Approved execution DAG slice (2026-10-10)
+
+The user approved the workflow audit remediation and synthetic pilot. Its exact
+contract is [Execution DAG Guard V1](SPEC--EXECUTION-DAG-GUARD-V1.md), with numbered
+WF-AC-01 through WF-AC-10. The implementation separates deterministic state guards,
+durable external receipts and the trusted model coordinator. The independent
+Verify, Review and final Audit gates consume one frozen candidate; status records
+do not modify that candidate. Retry budgets and lease quarantine prevent silent
+repair loops and concurrent replacement writers.
+
+`npm run workflow:plan` checks the source-bound W1 planning overlay;
+`npm run workflow:test` exercises accepted transitions and adversarial faults.
+The dedicated workflow CI checks Linux and Windows when run by GitHub Actions.
+Local results do not imply that remote CI has run. Neither this slice nor its
+approval grants W1 feature dispatch or completes every SSOT/doc-drift rule above.
+
+Version diff 0.1.0b -> 0.1.1b: add the separately approved bounded execution
+guard contract, local/CI commands and explicit remaining governance scope.
+
 | Version | Date | Status | Summary | Commit Hash | Agent |
 |---------|------|--------|---------|-------------|-------|
+| 0.1.1b | 2026-10-10 | current | Record approved DAG guard slice and independent evidence gates. | working-tree | Codex |
 | 0.1.0b | 2026-06-13 | candidate | Initial TDD for documentation governance and SSOT enforcement. | 9b1ced3 | ATHER |
 
 ---
 
-**Please review and approve this documentation. I will generate the validator and enforcement files once approved.**
+The broad governance rollout remains subject to its own scope decisions. The
+2026-10-10 execution DAG guard slice is already approved.
