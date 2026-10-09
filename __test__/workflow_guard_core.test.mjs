@@ -69,15 +69,19 @@ function harness(plan = makePlan(), { leaseMs, maxCommandRuns } = {}) {
   return { plan: selectedPlan, get state() { return state; }, emit, register };
 }
 
-function prepareHandoff(h = harness(), { commandTestCount = 1, path = 'pilot/input.txt', outcome = 'pass' } = {}) {
-  h.register('worker-1', 'worker');
-  h.register('verify-1', 'verify');
+function prepareHandoff(h = harness(), {
+  commandTestCount = 1, path = 'pilot/input.txt', outcome = 'pass',
+  workerId = 'worker-1', verifyId = 'verify-1', packetId = 'packet-1',
+  commandRunId = 'run-check-1', sourceDigest = sha('a'),
+} = {}) {
+  h.register(workerId, 'worker');
+  h.register(verifyId, 'verify');
   h.emit('dispatch', 'coord', { taskId: 'T1' });
   const attempt = h.state.tasks.T1.attempts.at(-1);
-  h.emit('bind_worker', 'coord', { taskId: 'T1', attemptId: attempt.attemptId, sessionId: 'worker-1' });
+  h.emit('bind_worker', 'coord', { taskId: 'T1', attemptId: attempt.attemptId, sessionId: workerId });
   h.emit('command_reserved', 'coord', {
     taskId: 'T1', attemptId: attempt.attemptId, fence: attempt.fence,
-    commandRunId: 'run-check-1', commandId: 'check',
+    commandRunId, commandId: 'check',
   });
   const stdoutDigest = sha('b');
   const caseResults = commandTestCount > 0
@@ -89,14 +93,14 @@ function prepareHandoff(h = harness(), { commandTestCount = 1, path = 'pilot/inp
     testCount: commandTestCount, caseResults,
     environmentDigest: sha('c'), stdoutDigest, stderrDigest: sha('d'),
   };
-  h.emit('command_completed', 'coord', { commandRunId: 'run-check-1', receipt: runnerReceipt });
+  h.emit('command_completed', 'coord', { commandRunId, receipt: runnerReceipt });
   const packet = {
-    packetId: 'packet-1', runId: h.state.runId, planDigest: h.state.planDigest,
+    packetId, runId: h.state.runId, planDigest: h.state.planDigest,
     taskId: 'T1', attemptId: attempt.attemptId, fence: attempt.fence,
-    senderSessionId: 'worker-1', receiverSessionId: 'verify-1',
-    candidate: { sha: gitSha('e'), tree: gitSha('f'), sourceDigest: sha('a') },
+    senderSessionId: workerId, receiverSessionId: verifyId,
+    candidate: { sha: gitSha('e'), tree: gitSha('f'), sourceDigest },
     changedPaths: [path], artifacts: [],
-    commands: [{ commandRunId: 'run-check-1', ...runnerReceipt }],
+    commands: [{ commandRunId, ...runnerReceipt }],
     acResults: commandTestCount > 0 ? [{
       acId: 'AC-1', caseId: 'positive', outcome, testCount: commandTestCount,
       evidenceDigest: stdoutDigest,
@@ -297,6 +301,18 @@ test('keeps a packet from passing after its lease expires even before watchdog r
   h.emit('submit_handoff', 'worker-1', { packet });
   const ack = { id: 'late-ack', type: 'ack_handoff', expectedVersion: h.state.version, actorSessionId: 'verify-1', payload: { taskId: 'T1', packetId: packet.packetId } };
   assertRejectedWithoutMutation(h, ack, 'LEASE_EXPIRED', h.state.tasks.T1.attempts[0].leaseUntil);
+});
+
+test('rejects an expired submitted packet without changing failure attribution', () => {
+  const { h, packet, attempt } = prepareHandoff(harness(makePlan(), { leaseMs: 5 }));
+  h.emit('submit_handoff', 'worker-1', { packet });
+  const reject = { id: 'late-reject', type: 'reject_handoff', expectedVersion: h.state.version, actorSessionId: 'verify-1', payload: {
+    taskId: 'T1', packetId: packet.packetId, reason: 'late review',
+  } };
+  assertRejectedWithoutMutation(h, reject, 'LEASE_EXPIRED', attempt.leaseUntil);
+  assert.equal(h.state.receipts.packets[packet.packetId].status, 'submitted');
+  assert.equal(h.state.tasks.T1.noProgressCount, 0);
+  assert.equal(h.state.tasks.T1.findingCounts['handoff/T1/rejected'], undefined);
 });
 
 test('does not accept an ACKed packet after its lease expires before the separate verdict', () => {
@@ -585,4 +601,48 @@ test('repeated same-source failures ignore cosmetic artifacts, and trusted time 
   clock.emit('register_session', 'coord', { sessionId: 'worker-1', role: 'worker', model: 'gpt-6-luna', effort: 'max', providerReceiptId: 'provider-worker-1' }, 105);
   const rollback = { id: 'time-backward', type: 'dispatch', expectedVersion: clock.state.version, actorSessionId: 'coord', payload: { taskId: 'T1' } };
   assertRejectedWithoutMutation(clock, rollback, 'CLOCK_ROLLBACK', 104);
+});
+
+test('rejected candidates count source progress and keep handoff finding identity stable across reasons', () => {
+  const h = harness();
+  const first = prepareHandoff(h);
+  h.emit('submit_handoff', first.packet.senderSessionId, { packet: first.packet });
+  h.emit('reject_handoff', 'verify-1', { taskId: 'T1', packetId: first.packet.packetId, reason: 'missing evidence' });
+  assert.equal(h.state.tasks.T1.noProgressCount, 1);
+  assert.equal(h.state.tasks.T1.findingCounts['handoff/t1/rejected'], 1);
+  assert.equal(h.state.receipts.packets[first.packet.packetId].rejectionReason, 'missing evidence');
+  h.emit('stop_confirmed', 'coord', { taskId: 'T1', attemptId: first.attempt.attemptId, stopReceiptId: 'stop-rejected-1' });
+
+  const second = prepareHandoff(h, {
+    workerId: 'worker-2', verifyId: 'verify-2', packetId: 'packet-2',
+    commandRunId: 'run-check-2', sourceDigest: first.packet.candidate.sourceDigest,
+  });
+  h.emit('submit_handoff', 'worker-2', { packet: second.packet });
+  h.emit('reject_handoff', 'verify-2', { taskId: 'T1', packetId: second.packet.packetId, reason: 'please attach proof' });
+  assert.equal(h.state.tasks.T1.noProgressCount, 2);
+  assert.equal(h.state.tasks.T1.findingCounts['handoff/t1/rejected'], 2);
+  assert.equal(h.state.receipts.packets[second.packet.packetId].rejectionReason, 'please attach proof');
+  assert.equal(h.state.status, 'blocked');
+  assert.equal(h.state.tasks.T1.status, 'blocked');
+  const third = { id: 'dispatch-after-rejected-no-progress', type: 'dispatch', expectedVersion: h.state.version, actorSessionId: 'coord', payload: { taskId: 'T1' } };
+  assertRejectedWithoutMutation(h, third, 'RUN_BLOCKED');
+});
+
+test('same-source rejection followed by failed verdict reaches the two-candidate stop', () => {
+  const h = harness();
+  const first = prepareHandoff(h);
+  h.emit('submit_handoff', 'worker-1', { packet: first.packet });
+  h.emit('reject_handoff', 'verify-1', { taskId: 'T1', packetId: first.packet.packetId, reason: 'packet rejected' });
+  h.emit('stop_confirmed', 'coord', { taskId: 'T1', attemptId: first.attempt.attemptId, stopReceiptId: 'stop-mixed-1' });
+
+  const second = prepareHandoff(h, {
+    workerId: 'worker-2', verifyId: 'verify-2', packetId: 'packet-2',
+    commandRunId: 'run-check-2', sourceDigest: first.packet.candidate.sourceDigest,
+  });
+  h.emit('submit_handoff', 'worker-2', { packet: second.packet });
+  h.emit('ack_handoff', 'verify-2', { taskId: 'T1', packetId: second.packet.packetId });
+  h.emit('task_verdict', 'verify-2', { taskId: 'T1', packetId: second.packet.packetId, verdict: 'fail', findings: [] });
+  assert.equal(h.state.tasks.T1.noProgressCount, 2);
+  assert.equal(h.state.status, 'blocked');
+  assert.equal(h.state.tasks.T1.findingCounts['handoff/t1/rejected'], 1);
 });

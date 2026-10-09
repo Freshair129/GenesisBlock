@@ -1110,9 +1110,13 @@ function handleEvent(plan, state, event, now) {
       if (packetReceipt.status !== 'submitted') fail('PACKET_NOT_PENDING', 'packet is not awaiting acknowledgment');
       if (!isString(p.reason)) fail('INVALID_PAYLOAD', 'reason must be a non-empty string');
       const attempt = currentAttempt(taskState, packetReceipt.attemptId);
+      if (attempt.fence !== packetReceipt.fence || attempt.status !== 'handoff_pending' || attempt.fenced) fail('STALE_FENCE', 'packet attempt is stale');
+      assertLiveAttempt(attempt, now);
+      const stuck = recordFailedProgress(taskState, packetReceipt.packet);
       packetReceipt.status = 'rejected';
       packetReceipt.rejectionReason = p.reason;
-      markTaskFailure(plan, state, taskState, attempt, 'code', [{ fingerprint: `handoff/${p.taskId}/${p.reason}`, blocking: true, critical: false }], now);
+      markTaskFailure(plan, state, taskState, attempt, 'code', [{ fingerprint: `handoff/${p.taskId}/rejected`, blocking: true, critical: false }], now);
+      if (stuck && state.status !== 'blocked') blockRun(state, taskState, attempt, 'no-progress-limit');
       break;
     }
     case 'task_verdict': {

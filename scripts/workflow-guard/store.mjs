@@ -423,8 +423,8 @@ async function changedPathsSince(workspace, baseSha, candidateSha) {
     cwd: workspace, windowsHide: true, shell: false,
   });
   if (ancestry.error) fail('GIT_EXEC', 'Could not check candidate ancestry.', ancestry.error);
-  if (ancestry.status !== 0) fail('CANDIDATE_NOT_DESCENDANT', 'Candidate must descend from the task reservation candidate.');
-  const bytes = runGitSync(workspace, ['diff', '--name-only', '-z', '--diff-filter=ACDMRTUXB', baseSha, candidateSha], { encoding: 'buffer' });
+  if (ancestry.status !== 0) fail('CANDIDATE_NOT_DESCENDANT', 'Candidate must descend from the pinned base commit.');
+  const bytes = runGitSync(workspace, ['diff', '--no-renames', '--name-only', '-z', '--diff-filter=ACDMRTUXB', baseSha, candidateSha], { encoding: 'buffer' });
   const actual = parseNulPaths(bytes).map((item) => normalizePath(item));
   if (new Set(actual).size !== actual.length) fail('CANDIDATE_PATH_COLLISION', 'Changed paths collide after path normalization.');
   return actual.sort();
@@ -1181,6 +1181,13 @@ export class RunStore {
   async verifyIntegratedCandidate(event, state, records) {
     const candidate = await captureCandidate(this.workspace);
     if (!sameJson(event.payload.candidate, candidate)) fail('INTEGRATION_CANDIDATE_MISMATCH', 'Integration candidate does not match the clean checked Git worktree.');
+    const integratedChanges = await changedPathsSince(this.workspace, this.plan.baselineSha, candidate.sha);
+    const approvedScopes = this.plan.tasks.flatMap((task) => task.writePaths.map((scope) => normalizePath(scope)));
+    for (const changed of integratedChanges) {
+      if (!approvedScopes.some((scope) => isPathWithinScope(changed, scope))) {
+        fail('INTEGRATION_SCOPE', `Integrated change ${changed} is outside all approved task write scopes.`);
+      }
+    }
     for (const commit of event.payload.taskCommits) {
       const packetRecord = [...records].reverse().find((record) => record.event.type === 'submit_handoff'
         && record.event.payload.packet.taskId === commit.taskId

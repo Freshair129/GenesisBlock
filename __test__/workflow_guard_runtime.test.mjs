@@ -96,7 +96,7 @@ function twoTaskPlanFor(baselineSha, command) {
   return plan;
 }
 
-async function fixture({ command, checkSource, planFactory, separateTaskWorkspaces = false, crlfCheckout = false, crlfNormalized = false } = {}) {
+async function fixture({ command, checkSource, planFactory, separateTaskWorkspaces = false, crlfCheckout = false, crlfNormalized = false, baselineFiles = {} } = {}) {
   const temporary = await mkdtemp(path.join(os.tmpdir(), 'workflow-guard-runtime-'));
   const workspace = path.join(temporary, 'candidate');
   const runDir = path.join(temporary, 'ledger');
@@ -108,6 +108,9 @@ async function fixture({ command, checkSource, planFactory, separateTaskWorkspac
   if (crlfCheckout) await writeFile(path.join(workspace, '.gitattributes'), 'pilot/*.txt -text\n');
   if (crlfNormalized) await writeFile(path.join(workspace, '.gitattributes'), 'pilot/*.txt text eol=crlf\n');
   await writeFile(path.join(workspace, 'check.mjs'), checkSource ?? "console.log('WORKFLOW_GUARD_RESULT='+JSON.stringify({acResults:[{acId:'AC-1',caseId:'positive',outcome:'pass',testCount:1}]}));\n");
+  for (const [relativePath, contents] of Object.entries(baselineFiles)) {
+    await writeFile(path.join(workspace, relativePath), contents);
+  }
   git(workspace, ['init', '-b', 'main']);
   git(workspace, ['config', 'user.name', 'Workflow Guard Pilot']);
   git(workspace, ['config', 'user.email', 'workflow-guard@example.invalid']);
@@ -212,7 +215,7 @@ async function runGateReport(project, report, extraEnv = {}) {
   return result;
 }
 
-async function integrateOneTask(project) {
+async function prepareOneTask(project) {
   const request = await startAttempt(project);
   await commitTaskChange(project);
   const commandResult = await runCommand(project, request);
@@ -230,10 +233,15 @@ async function integrateOneTask(project) {
     const registered = await register(project, sessionId, role, model, effort);
     assert.equal(registered.status, 0, `${sessionId}: ${registered.json.message}`);
   }
+  return { request, packet };
+}
+
+async function integrateOneTask(project) {
+  const { request, packet } = await prepareOneTask(project);
   const candidate = cliSync(['show', '--run-dir', project.runDir]).json.candidate;
   const integrated = await event(project, 'integrate', 'integration-1', {
     candidate,
-    taskCommits: [{ taskId: 'T1', sha: candidate.sha }],
+    taskCommits: [{ taskId: 'T1', sha: packet.candidate.sha }],
     groups: [], artifactDigests: [],
   });
   assert.equal(integrated.status, 0, integrated.json.message);
@@ -360,6 +368,107 @@ test('parallel tasks dispatch into distinct pinned worktrees and shared-root wri
   assert.equal(shared.state.tasks.T2.status, 'ready');
   assert.equal(shared.state.tasks.T2.currentAttemptId, null);
   assert.equal(Object.values(shared.state.dispatchRequests).filter((request) => request.taskId === 'T2').length, 0);
+});
+
+test('integration rejects an out-of-scope commit after the accepted task commit without recording integration', async (t) => {
+  const project = await fixture();
+  t.after(() => rm(project.temporary, { recursive: true, force: true }));
+  const { packet } = await prepareOneTask(project);
+  const versionBeforeIntegration = project.state.version;
+
+  await writeFile(path.join(project.workspace, 'unauthorized.txt'), 'unapproved change\n');
+  git(project.workspace, ['add', '--all']);
+  git(project.workspace, ['commit', '-m', 'unrelated out-of-scope change']);
+  const candidate = cliSync(['show', '--run-dir', project.runDir]).json.candidate;
+  const acceptedCommitIsAncestor = spawnSync('git', ['-C', project.workspace, 'merge-base', '--is-ancestor', packet.candidate.sha, candidate.sha], {
+    encoding: 'utf8', windowsHide: true, shell: false,
+  });
+  assert.equal(acceptedCommitIsAncestor.status, 0, 'the accepted task commit must remain an ancestor of the integration candidate');
+
+  const rejected = await event(project, 'integrate', 'integration-1', {
+    candidate,
+    taskCommits: [{ taskId: 'T1', sha: packet.candidate.sha }],
+    groups: [], artifactDigests: [],
+  });
+  assert.equal(rejected.status, 1);
+  assert.equal(rejected.json.code, 'INTEGRATION_SCOPE');
+  assert.equal(project.state.version, versionBeforeIntegration);
+  const replayed = cliSync(['show', '--run-dir', project.runDir]);
+  assert.equal(replayed.status, 0, replayed.json.message);
+  assert.equal(replayed.json.state.version, versionBeforeIntegration);
+  assert.equal(replayed.json.state.receipts.integration, null);
+});
+
+test('integration scope diff rejects a rename from an out-of-scope baseline path into an allowed directory', async (t) => {
+  const project = await fixture({
+    baselineFiles: { 'outside.txt': 'rename source content\n' },
+    planFactory: (baselineSha, command) => {
+      const plan = planFor(baselineSha, command);
+      plan.tasks[0].writePaths = ['pilot'];
+      return plan;
+    },
+  });
+  t.after(() => rm(project.temporary, { recursive: true, force: true }));
+  const { packet } = await prepareOneTask(project);
+
+  git(project.workspace, ['mv', 'outside.txt', 'pilot/renamed.txt']);
+  git(project.workspace, ['commit', '-m', 'rename an out-of-scope baseline file']);
+  const candidate = cliSync(['show', '--run-dir', project.runDir]).json.candidate;
+  const renameStatus = git(project.workspace, ['diff', '--find-renames', '--name-status', project.baselineSha, candidate.sha]);
+  assert.match(renameStatus, /R\d+\s+outside\.txt\s+pilot\/renamed\.txt/);
+  const renameCollapsedPaths = git(project.workspace, ['diff', '--name-only', project.baselineSha, candidate.sha]).split(/\r?\n/);
+  assert.equal(renameCollapsedPaths.includes('outside.txt'), false, 'Git name-only with rename detection must hide the old path in this fixture');
+
+  const versionBeforeIntegration = project.state.version;
+  const rejected = await event(project, 'integrate', 'integration-1', {
+    candidate,
+    taskCommits: [{ taskId: 'T1', sha: packet.candidate.sha }],
+    groups: [], artifactDigests: [],
+  });
+  assert.equal(rejected.status, 1);
+  assert.equal(rejected.json.code, 'INTEGRATION_SCOPE');
+  assert.equal(project.state.version, versionBeforeIntegration);
+  const replayed = cliSync(['show', '--run-dir', project.runDir]);
+  assert.equal(replayed.status, 0, replayed.json.message);
+  assert.equal(replayed.json.state.version, versionBeforeIntegration);
+  assert.equal(replayed.json.state.receipts.integration, null);
+});
+
+test('handoff scope validation sees both sides of a rename and rejects the packet without accepting it', async (t) => {
+  const project = await fixture({
+    baselineFiles: { 'outside.txt': 'rename source content\n' },
+    planFactory: (baselineSha, command) => {
+      const plan = planFor(baselineSha, command);
+      plan.tasks[0].writePaths = ['pilot'];
+      return plan;
+    },
+  });
+  t.after(() => rm(project.temporary, { recursive: true, force: true }));
+  const request = await startAttempt(project);
+  git(project.workspace, ['mv', 'outside.txt', 'pilot/renamed.txt']);
+  git(project.workspace, ['commit', '-m', 'rename an out-of-scope baseline file']);
+  const commandResult = await runCommand(project, request);
+  assert.equal(commandResult.status, 0, commandResult.json.message);
+  const packet = packetFrom(project, request, commandResult);
+  const renameStatus = git(project.workspace, ['diff', '--find-renames', '--name-status', project.baselineSha, packet.candidate.sha]);
+  assert.match(renameStatus, /R\d+\s+outside\.txt\s+pilot\/renamed\.txt/);
+
+  const versionBeforeSubmit = project.state.version;
+  packet.changedPaths = ['pilot/renamed.txt'];
+  const hiddenDeletion = await event(project, 'submit_handoff', 'worker-1', { packet });
+  assert.equal(hiddenDeletion.status, 1);
+  assert.equal(hiddenDeletion.json.code, 'CHANGED_PATHS_MISMATCH');
+  assert.equal(project.state.version, versionBeforeSubmit);
+
+  packet.changedPaths = ['outside.txt', 'pilot/renamed.txt'];
+  const outsideScope = await event(project, 'submit_handoff', 'worker-1', { packet });
+  assert.equal(outsideScope.status, 1);
+  assert.equal(outsideScope.json.code, 'OUT_OF_SCOPE');
+  assert.equal(project.state.version, versionBeforeSubmit);
+  const replayed = cliSync(['show', '--run-dir', project.runDir]);
+  assert.equal(replayed.status, 0, replayed.json.message);
+  assert.equal(replayed.json.state.version, versionBeforeSubmit);
+  assert.equal(replayed.json.state.tasks.T1.acceptedPacketId, null);
 });
 
 test('event file crashes before and after atomic rename replay the correct authority', async (t) => {

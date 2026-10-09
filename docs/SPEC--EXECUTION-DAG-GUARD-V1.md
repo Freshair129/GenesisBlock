@@ -23,6 +23,13 @@ prose without a persistent reducer, budgets, session identity or immutable gate
 receipts. The approved remedy is this deterministic guard and fault-tested pilot;
 static advisory routing success is not execution certification.
 
+Pilot gate probes also demonstrated that status-only source checks could hide
+modified bytes, ancestry-only integration could admit extra scope, rename
+summaries could hide a deleted source path, and receiver rejection omitted
+no-progress accounting. The V1 adapter therefore checks tracked file bytes and
+the full baseline scope diff; both rejection and failed verdict share progress
+accounting. External gate reports retain the failed candidates and reproductions.
+
 ## 1. Boundary and trust
 
 The implementation is built-in Node JavaScript: a pure guard in
@@ -268,6 +275,14 @@ updates happen before candidate freeze. Integrated Verify, independent Review,
 independent final Audit and Final Gate all bind this exact candidate and effective
 required AC inventory. X1 consumer audit does not replace final provenance Audit.
 
+The integrated candidate must descend from the immutable plan baseline. Every
+path changed from that baseline must belong to the union of approved task write
+scopes, in addition to the accepted task-commit ancestry and artifact checks.
+Integration adjustments within those scopes still require fresh integrated gates;
+an additional scope requires a new approved plan/run. Task and integration diffs
+disable rename detection so a rename checks both the deleted source path and the
+added destination path. An allowed destination cannot hide an unauthorized deletion.
+
 Verify, Review and Audit use distinct sessions. Review/Audit cannot be any patch
 author or integrator; final Audit uses a separate Sol session from the integrator
 and task authors. Final Gate uses trusted Sol Orchestration and requires all three
@@ -306,7 +321,7 @@ Any unexpected RED follows ordinary bounded failure handling.
 
 Code attempts: initial plus two repairs (three total). Infrastructure retry: one
 extra recovery within the same code attempt, not a hidden fourth code attempt.
-Same finding fingerprint twice, or two candidate attempts with no source/artifact
+Same finding fingerprint twice, or two failed candidate attempts with no source
 progress, blocks and escalates to Sol Decision. Critical findings block and route
 to Sol Debug immediately. Fingerprints use normalized finding identity/scope,
 not prose text that can be renamed to reset a counter. Duplicate triggers do not
@@ -322,6 +337,11 @@ candidate source bytes and core compares accepted identities across attempts.
 The first failed candidate sets noProgressCount to 1; a second failed candidate
 with the same source identity sets it to 2 and blocks. A failed changed
 candidate starts a new count of 1. Successful metadata or logs cannot reset it.
+Receiver rejection and failed task verdict both count the checked handoff packet
+source identity, including mixed rejection/verdict failures across attempts.
+Handoff rejection uses a stable task-based finding identity; changing its human
+reason cannot reset repetition accounting. A rejection also requires the current
+unfenced handoff attempt and a live lease, just as acknowledgment does.
 Counter or deadline exhaustion blocks, retains evidence and quarantines writers.
 Trusted cancellation records `aborted`. Continuing requires an explicit owner
 decision and a new bounded run linked to the previous ledger; no counter reset
@@ -426,11 +446,11 @@ receipts; it proves guard behavior, not real-provider model identity or W1 fitne
 | WF-AC-01 | Reject unknown/missing/duplicate task or graph IDs, cycle, normalized parent/child scope conflicts and model/effort mismatch. |
 | WF-AC-02 | Unauthorized plan, unresolved decision, unmet predecessor and locked path produce no dispatch side effect. |
 | WF-AC-03 | Concurrent overlap denied; expired/replaced/cancelled fence denied; quarantined lease retained until stop proof. |
-| WF-AC-04 | Missing/incorrect receiver, SHA/tree, hash, scope or packet rejected; identical replay idempotent and changed duplicate rejected. |
+| WF-AC-04 | Missing/incorrect receiver, SHA/tree, hash, scope or packet rejected; rename checks both endpoints; identical replay idempotent and changed duplicate rejected. |
 | WF-AC-05 | Positive, schema-invalid, unsupported and RED outcomes distinguished; zero tests, required skip and missing AC cannot pass. |
 | WF-AC-06 | Session receipt must match role model/effort; worker cannot register itself; same-session Verify/Review/Audit and author/integrator audit rejected. |
-| WF-AC-07 | Candidate/plan/artifact changes invalidate gates; external status updates leave source identity unchanged. |
-| WF-AC-08 | Duplicate dispatch, code attempt four, infra retry two, repeated finding/no-progress two, timeout/process loss and restart cannot create duplicate writers or exceed budgets. |
+| WF-AC-07 | Candidate/plan/artifact changes invalidate gates; integrated baseline diff stays within approved task scopes; external status updates leave source identity unchanged. |
+| WF-AC-08 | Duplicate dispatch, code attempt four, infra retry two, repeated finding/no-progress two (including receiver rejections), timeout/process loss and restart cannot create duplicate writers or exceed budgets. |
 | WF-AC-09 | Expected C0 RED advances only characterization dependency; integration without atomic C1 GREEN rejected. |
 | WF-AC-10 | Missing integration or stale/missing integrated Verify, Review, final Audit, AC or open-finding receipt prevents FG; full independent happy path reaches done. |
 
