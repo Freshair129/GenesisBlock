@@ -303,6 +303,60 @@ test('keeps a packet from passing after its lease expires even before watchdog r
   assertRejectedWithoutMutation(h, ack, 'LEASE_EXPIRED', h.state.tasks.T1.attempts[0].leaseUntil);
 });
 
+test('watchdog blocks stopped tasks at their cumulative deadline and retains quarantined writers', () => {
+  const stopped = harness();
+  stopped.register('worker-1', 'worker');
+  stopped.emit('dispatch', 'coord', { taskId: 'T1' });
+  const first = stopped.state.tasks.T1.attempts[0];
+  const deadline = stopped.state.tasks.T1.deadline;
+  stopped.emit('bind_worker', 'coord', { taskId: 'T1', attemptId: first.attemptId, sessionId: 'worker-1' });
+  stopped.emit('fail', 'worker-1', { taskId: 'T1', attemptId: first.attemptId, category: 'process-loss', fingerprint: 'WF-AC-08/worker-stopped' });
+  stopped.emit('stop_confirmed', 'coord', { taskId: 'T1', attemptId: first.attemptId, stopReceiptId: 'provider-stop-proof' });
+  assert.equal(stopped.state.status, 'active');
+  assert.equal(stopped.state.tasks.T1.status, 'rework');
+  assert.equal(stopped.state.tasks.T1.currentAttemptId, null);
+  assert.equal(stopped.state.tasks.T1.attempts[0].status, 'stopped');
+  assert.equal(stopped.state.tasks.T1.attempts[0].stopReceiptId, 'provider-stop-proof');
+  assert.equal(Object.hasOwn(stopped.state.locks, 'pilot/input.txt'), false);
+
+  stopped.emit('watchdog', 'coord', {}, deadline - 1);
+  assert.equal(stopped.state.status, 'active', 'deadline minus one must not block');
+  stopped.emit('watchdog', 'coord', {}, deadline);
+  assert.equal(stopped.state.status, 'blocked');
+  assert.equal(stopped.state.tasks.T1.status, 'blocked');
+  assert.equal(stopped.state.tasks.T1.deadline, deadline);
+  assert.equal(stopped.state.tasks.T1.currentAttemptId, null);
+  assert.equal(stopped.state.tasks.T1.attempts.length, 1);
+  assert.equal(stopped.state.tasks.T1.attempts[0].status, 'stopped');
+  assert.equal(stopped.state.tasks.T1.attempts[0].stopReceiptId, 'provider-stop-proof');
+  assert.equal(stopped.state.tasks.T1.codeAttempts, 1);
+  assert.equal(Object.keys(stopped.state.dispatchRequests).length, 1);
+  assert.equal(Object.hasOwn(stopped.state.locks, 'pilot/input.txt'), false, 'stopped writer locks must not be recreated');
+  assertRejectedWithoutMutation(stopped, {
+    id: 'dispatch-after-expired-task', type: 'dispatch', expectedVersion: stopped.state.version,
+    actorSessionId: 'coord', payload: { taskId: 'T1' },
+  }, 'RUN_BLOCKED', deadline + 1);
+
+  const quarantined = harness();
+  quarantined.register('worker-q', 'worker');
+  quarantined.emit('dispatch', 'coord', { taskId: 'T1' });
+  const live = quarantined.state.tasks.T1.attempts[0];
+  const quarantineDeadline = quarantined.state.tasks.T1.deadline;
+  quarantined.emit('bind_worker', 'coord', { taskId: 'T1', attemptId: live.attemptId, sessionId: 'worker-q' });
+  quarantined.emit('fail', 'worker-q', { taskId: 'T1', attemptId: live.attemptId, category: 'process-loss', fingerprint: 'WF-AC-08/worker-quarantined' });
+  const quarantinedAttempt = quarantined.state.tasks.T1.attempts[0];
+  const quarantineAt = quarantinedAttempt.quarantinedAt;
+  const lock = structuredClone(quarantined.state.locks['pilot/input.txt']);
+  quarantined.emit('watchdog', 'coord', {}, quarantineDeadline);
+  assert.equal(quarantined.state.status, 'blocked');
+  assert.equal(quarantined.state.tasks.T1.status, 'blocked');
+  assert.equal(quarantined.state.tasks.T1.currentAttemptId, live.attemptId);
+  assert.equal(quarantined.state.tasks.T1.attempts[0].status, 'quarantined');
+  assert.equal(quarantined.state.tasks.T1.attempts[0].quarantinedAt, quarantineAt);
+  assert.deepEqual(quarantined.state.locks['pilot/input.txt'], lock);
+  assert.equal(quarantined.state.tasks.T1.attempts[0].stopReceiptId, undefined);
+});
+
 test('rejects an expired submitted packet without changing failure attribution', () => {
   const { h, packet, attempt } = prepareHandoff(harness(makePlan(), { leaseMs: 5 }));
   h.emit('submit_handoff', 'worker-1', { packet });

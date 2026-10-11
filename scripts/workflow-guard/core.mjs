@@ -859,7 +859,6 @@ function reserveDispatch(plan, state, taskId, now) {
   taskState.pendingRetryKind = null;
   if (taskState.deadline === null) taskState.deadline = now + taskDef.timeoutMs;
   if (!Number.isSafeInteger(taskState.deadline) || now >= taskState.deadline) {
-    blockRun(state, taskState, null, 'task-deadline-exhausted');
     fail('TASK_DEADLINE_EXHAUSTED', `task ${taskId} absolute deadline has expired`);
   }
   const scopes = taskDef.writePaths.map((path) => normalizePath(path));
@@ -1339,13 +1338,23 @@ function handleEvent(plan, state, event, now) {
       for (const taskDef of plan.tasks) {
         const taskState = state.tasks[taskDef.id];
         const attempt = taskState.currentAttemptId ? findAttempt(taskState, taskState.currentAttemptId) : null;
+        if (taskState.status === 'verified' || taskState.status === 'blocked') continue;
+        if (taskState.deadline !== null && now >= taskState.deadline) {
+          const live = attempt && ['reserved', 'running', 'handoff_pending', 'verifying'].includes(attempt.status);
+          if (live) {
+            blockRun(state, taskState, attempt, 'task-deadline-exhausted');
+          } else {
+            // Keep an existing quarantine and its locks until stop proof. A stopped
+            // task has no writer to quarantine again, but its deadline still ends the run.
+            state.status = 'blocked';
+            taskState.status = 'blocked';
+          }
+          continue;
+        }
         if (!attempt || !['reserved', 'running', 'handoff_pending', 'verifying'].includes(attempt.status)) continue;
         if (now < attempt.leaseUntil && now < attempt.deadline) continue;
-        if (now >= attempt.deadline) {
-          blockRun(state, taskState, attempt, 'task-deadline-exhausted');
-        } else {
-          markTaskFailure(plan, state, taskState, attempt, 'lease-expired', [], now);
-        }
+        if (now >= attempt.deadline) blockRun(state, taskState, attempt, 'task-deadline-exhausted');
+        else markTaskFailure(plan, state, taskState, attempt, 'lease-expired', [], now);
       }
       break;
     }

@@ -1,11 +1,11 @@
 import assert from 'node:assert/strict';
 import { spawn, spawnSync } from 'node:child_process';
 import { createHash, randomUUID } from 'node:crypto';
-import { mkdtemp, mkdir, readFile, rm, stat, symlink, utimes, writeFile } from 'node:fs/promises';
+import { mkdtemp, mkdir, readFile, readdir, rm, stat, symlink, utimes, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
-import { assertTrackedWorktreeBytes, captureCandidate, decodeTrackedPath, resolveExistingParents } from '../scripts/workflow-guard/store.mjs';
+import { RunStore, assertTrackedWorktreeBytes, captureCandidate, decodeTrackedPath, resolveExistingParents } from '../scripts/workflow-guard/store.mjs';
 
 const ROOT = path.resolve(import.meta.dirname, '..');
 const CLI = path.join(ROOT, 'scripts', 'workflow-guard.mjs');
@@ -176,17 +176,17 @@ async function register(project, sessionId, role, model, effort) {
   });
 }
 
-async function startAttempt(project) {
-  const worker = await register(project, 'worker-1', 'worker', 'gpt-6-luna', 'max');
+async function startAttempt(project, taskId = 'T1', workerSession = 'worker-1', verifySession = 'verify-1') {
+  const worker = await register(project, workerSession, 'worker', 'gpt-6-luna', 'max');
   assert.equal(worker.status, 0, worker.json.message);
-  const verify = await register(project, 'verify-1', 'verify', 'gpt-6-luna', 'max');
+  const verify = await register(project, verifySession, 'verify', 'gpt-6-luna', 'max');
   assert.equal(verify.status, 0, verify.json.message);
-  const dispatched = await event(project, 'dispatch', 'coord', { taskId: 'T1' });
+  const dispatched = await event(project, 'dispatch', 'coord', { taskId });
   assert.equal(dispatched.status, 0, dispatched.json.message);
   const request = dispatched.json.dispatchRequest;
-  assert.equal(request.taskId, 'T1');
+  assert.equal(request.taskId, taskId);
   const bound = await event(project, 'bind_worker', 'coord', {
-    taskId: 'T1', attemptId: request.attemptId, sessionId: 'worker-1',
+    taskId, attemptId: request.attemptId, sessionId: workerSession,
   });
   assert.equal(bound.status, 0, bound.json.message);
   return request;
@@ -198,11 +198,11 @@ async function commitTaskChange(project) {
   git(project.workspace, ['commit', '-m', 'task candidate']);
 }
 
-async function runCommand(project, request) {
+async function runCommand(project, request, taskId = 'T1') {
   const result = cliSync([
-    'command', '--run-dir', project.runDir, '--task', 'T1',
+    'command', '--run-dir', project.runDir, '--task', taskId,
     '--attempt', request.attemptId, '--command', 'check',
-  ]);
+  ], { WORKFLOW_TASK_ID: taskId });
   if (result.status === 0) project.state = result.json.state;
   return result;
 }
@@ -248,7 +248,9 @@ async function integrateOneTask(project) {
   return { request, packet, candidate };
 }
 
-function packetFrom(project, request, commandResult) {
+function packetFrom(project, request, commandResult, {
+  taskId = 'T1', senderSessionId = 'worker-1', receiverSessionId = 'verify-1', changedPaths = ['pilot/input.txt'],
+} = {}) {
   const command = { commandRunId: commandResult.json.commandRunId, ...commandResult.json.receipt };
   const current = cliSync(['show', '--run-dir', project.runDir]);
   assert.equal(current.status, 0, current.json.message);
@@ -257,13 +259,13 @@ function packetFrom(project, request, commandResult) {
     packetId: `packet-${randomUUID()}`,
     runId: 'runtime-run',
     planDigest: project.state.planDigest,
-    taskId: 'T1',
+    taskId,
     attemptId: request.attemptId,
     fence: request.fence,
-    senderSessionId: 'worker-1',
-    receiverSessionId: 'verify-1',
+    senderSessionId,
+    receiverSessionId,
     candidate,
-    changedPaths: ['pilot/input.txt'],
+    changedPaths,
     artifacts: [],
     commands: [command],
     acResults: command.caseResults.map((row) => ({ ...row, evidenceDigest: command.stdoutDigest })),
@@ -368,6 +370,158 @@ test('parallel tasks dispatch into distinct pinned worktrees and shared-root wri
   assert.equal(shared.state.tasks.T2.status, 'ready');
   assert.equal(shared.state.tasks.T2.currentAttemptId, null);
   assert.equal(Object.values(shared.state.dispatchRequests).filter((request) => request.taskId === 'T2').length, 0);
+});
+
+test('sequential tasks reuse the default shared workspace through integration and all four gates', async (t) => {
+  const checkSource = [
+    "const rows = process.env.GATE_MODE",
+    "  ? [{acId:'AC-1',caseId:'positive',outcome:'pass',testCount:1},{acId:'AC-2',caseId:'positive-2',outcome:'pass',testCount:1}]",
+    "  : process.env.WORKFLOW_TASK_ID === 'T2' ? [{acId:'AC-2',caseId:'positive-2',outcome:'pass',testCount:1}] : [{acId:'AC-1',caseId:'positive',outcome:'pass',testCount:1}];",
+    "console.log('WORKFLOW_GUARD_RESULT='+JSON.stringify({acResults:rows}));",
+    '',
+  ].join('\n');
+  const project = await fixture({ planFactory: twoTaskPlanFor, checkSource });
+  t.after(() => rm(project.temporary, { recursive: true, force: true }));
+
+  const request1 = await startAttempt(project, 'T1', 'worker-1', 'verify-1');
+  await writeFile(path.join(project.workspace, 'pilot', 'a.txt'), 'task one candidate\n');
+  git(project.workspace, ['add', '--all']);
+  git(project.workspace, ['commit', '-m', 'task T1 candidate']);
+  const command1 = await runCommand(project, request1, 'T1');
+  assert.equal(command1.status, 0, command1.json.message);
+  assert.equal(command1.json.receipt.caseResults[0].acId, 'AC-1');
+  const packet1 = packetFrom(project, request1, command1, {
+    taskId: 'T1', senderSessionId: 'worker-1', receiverSessionId: 'verify-1', changedPaths: ['pilot/a.txt'],
+  });
+  assert.equal((await event(project, 'submit_handoff', 'worker-1', { packet: packet1 })).status, 0);
+  assert.equal((await event(project, 'ack_handoff', 'verify-1', { taskId: 'T1', packetId: packet1.packetId })).status, 0);
+  assert.equal((await event(project, 'task_verdict', 'verify-1', { taskId: 'T1', packetId: packet1.packetId, verdict: 'pass', findings: [] })).status, 0);
+  const commitA = packet1.candidate.sha;
+
+  const request2 = await startAttempt(project, 'T2', 'worker-2', 'verify-2');
+  await writeFile(path.join(project.workspace, 'pilot', 'b.txt'), 'task two candidate\n');
+  git(project.workspace, ['add', '--all']);
+  git(project.workspace, ['commit', '-m', 'task T2 candidate']);
+  const command2 = await runCommand(project, request2, 'T2');
+  assert.equal(command2.status, 0, command2.json.message);
+  assert.equal(command2.json.receipt.caseResults[0].acId, 'AC-2');
+  const packet2 = packetFrom(project, request2, command2, {
+    taskId: 'T2', senderSessionId: 'worker-2', receiverSessionId: 'verify-2', changedPaths: ['pilot/b.txt'],
+  });
+  assert.equal((await event(project, 'submit_handoff', 'worker-2', { packet: packet2 })).status, 0);
+  assert.equal((await event(project, 'ack_handoff', 'verify-2', { taskId: 'T2', packetId: packet2.packetId })).status, 0);
+  assert.equal((await event(project, 'task_verdict', 'verify-2', { taskId: 'T2', packetId: packet2.packetId, verdict: 'pass', findings: [] })).status, 0);
+  const commitB = packet2.candidate.sha;
+  assert.notEqual(commitA, commitB);
+  assert.equal(spawnSync('git', ['-C', project.workspace, 'merge-base', '--is-ancestor', commitA, commitB], {
+    encoding: 'utf8', windowsHide: true, shell: false,
+  }).status, 0);
+
+  for (const [sessionId, role, model, effort] of [
+    ['integration-1', 'integration', 'gpt-6.1-sol', 'high'],
+    ['verify-gate', 'verify', 'gpt-6-luna', 'max'],
+    ['review-1', 'review', 'gpt-6-luna', 'max'],
+    ['audit-1', 'audit', 'gpt-6.1-sol', 'high'],
+    ['final-1', 'final', 'gpt-6.1-sol', 'high'],
+  ]) {
+    const registered = await register(project, sessionId, role, model, effort);
+    assert.equal(registered.status, 0, `${sessionId}: ${registered.json.message}`);
+  }
+  const candidate = cliSync(['show', '--run-dir', project.runDir]).json.candidate;
+  assert.equal(candidate.sha, commitB);
+  const integrated = await event(project, 'integrate', 'integration-1', {
+    candidate,
+    taskCommits: [{ taskId: 'T1', sha: commitA }, { taskId: 'T2', sha: commitB }],
+    groups: [], artifactDigests: [],
+  });
+  assert.equal(integrated.status, 0, integrated.json.message);
+
+  const verify = await runGateReport(project, {
+    stage: 'verify', sessionId: 'verify-gate', verdict: 'pass', findings: [],
+    assessment: 'Both sequential task acceptance commands passed on the integrated candidate.', commandIds: ['check'],
+  }, { GATE_MODE: 'all' });
+  assert.equal(verify.status, 0, verify.json.message);
+  assert.equal(verify.json.state.receipts.gates.verify.candidateDigest, verify.json.state.receipts.integration.candidateDigest);
+  const review = await runGateReport(project, {
+    stage: 'review', sessionId: 'review-1', verdict: 'pass', findings: [],
+    assessment: 'The integrated descendant retains both accepted task commits.', commandIds: [],
+  });
+  assert.equal(review.status, 0, review.json.message);
+  const audit = await runGateReport(project, {
+    stage: 'audit', sessionId: 'audit-1', verdict: 'pass', findings: [],
+    assessment: 'Historical packet hashes and stored command evidence are complete.', commandIds: [],
+  });
+  assert.equal(audit.status, 0, audit.json.message);
+  const final = await runGateReport(project, {
+    stage: 'final', sessionId: 'final-1', verdict: 'pass', findings: [],
+    assessment: 'All independent gates passed on the frozen integrated candidate.', commandIds: [],
+  });
+  assert.equal(final.status, 0, final.json.message);
+  assert.equal(final.json.state.status, 'done');
+  assert.equal(final.json.state.tasks.T1.acceptedPacketId, packet1.packetId);
+  assert.equal(final.json.state.tasks.T2.acceptedPacketId, packet2.packetId);
+  assert.equal(final.json.state.candidate.sha, commitB);
+});
+
+test('expired retry rejection durably records watchdog closure after stop proof', async (t) => {
+  const project = await fixture({
+    planFactory: (baselineSha, command) => {
+      const plan = planFor(baselineSha, command);
+      plan.tasks[0].timeoutMs = 60_000;
+      return plan;
+    },
+  });
+  t.after(() => rm(project.temporary, { recursive: true, force: true }));
+  const request = await startAttempt(project);
+  const original = project.state.tasks.T1;
+  const deadline = original.deadline;
+  const dispatchedCount = Object.keys(project.state.dispatchRequests).length;
+  const failed = await event(project, 'fail', 'worker-1', {
+    taskId: 'T1', attemptId: request.attemptId, category: 'process-loss', fingerprint: 'WF-AC-08/stopped-worker',
+  });
+  assert.equal(failed.status, 0, failed.json.message);
+  const stopped = await event(project, 'stop_confirmed', 'coord', {
+    taskId: 'T1', attemptId: request.attemptId, stopReceiptId: 'provider-stop-confirmed',
+  });
+  assert.equal(stopped.status, 0, stopped.json.message);
+  assert.equal(project.state.status, 'active');
+  assert.equal(project.state.tasks.T1.status, 'rework');
+  assert.equal(project.state.tasks.T1.currentAttemptId, null);
+  assert.equal(project.state.tasks.T1.attempts[0].status, 'stopped');
+  assert.equal(project.state.tasks.T1.attempts[0].stopReceiptId, 'provider-stop-confirmed');
+  assert.equal(Object.keys(project.state.locks).length, 0);
+
+  const store = await RunStore.open(project.runDir);
+  const expiredDispatch = {
+    id: 'expired-retry-dispatch',
+    type: 'dispatch',
+    expectedVersion: project.state.version,
+    actorSessionId: 'coord',
+    payload: { taskId: 'T1' },
+  };
+  await assert.rejects(
+    store.processEvent(expiredDispatch, { now: deadline }),
+    (error) => error.code === 'TASK_DEADLINE_EXHAUSTED',
+  );
+  const replayed = cliSync(['show', '--run-dir', project.runDir]);
+  assert.equal(replayed.status, 0, replayed.json.message);
+  assert.equal(replayed.json.state.status, 'blocked');
+  assert.equal(replayed.json.state.tasks.T1.status, 'blocked');
+  assert.equal(replayed.json.state.tasks.T1.deadline, deadline);
+  assert.equal(replayed.json.state.tasks.T1.currentAttemptId, null);
+  assert.equal(replayed.json.state.tasks.T1.attempts.length, 1);
+  assert.equal(Object.keys(replayed.json.state.dispatchRequests).length, dispatchedCount);
+  assert.equal(Object.keys(replayed.json.state.locks).length, 0);
+
+  const eventNames = (await readdir(path.join(project.runDir, 'events'))).filter((name) => /^\d{12}\.json$/.test(name)).sort();
+  const lastRecord = JSON.parse(await readFile(path.join(project.runDir, 'events', eventNames.at(-1)), 'utf8'));
+  assert.equal(lastRecord.event.type, 'watchdog');
+  const blockedDispatch = { ...expiredDispatch, id: 'blocked-retry-dispatch', expectedVersion: replayed.json.state.version };
+  await assert.rejects(store.processEvent(blockedDispatch, { now: deadline + 1 }), (error) => error.code === 'RUN_BLOCKED');
+  const unchanged = cliSync(['show', '--run-dir', project.runDir]);
+  assert.equal(unchanged.status, 0, unchanged.json.message);
+  assert.equal(unchanged.json.state.version, replayed.json.state.version);
+  assert.equal(unchanged.json.state.tasks.T1.codeAttempts, original.codeAttempts);
 });
 
 test('integration rejects an out-of-scope commit after the accepted task commit without recording integration', async (t) => {

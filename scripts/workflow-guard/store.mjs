@@ -473,6 +473,46 @@ async function validatePacketCandidate({ workspace, plan, task, packet, dispatch
   return { candidate: current, changedPaths: actual };
 }
 
+async function candidateAtCommit(workspace, commit) {
+  if (typeof commit !== 'string' || !/^(?:[a-f0-9]{40}|[a-f0-9]{64})$/i.test(commit)) {
+    fail('HISTORICAL_CANDIDATE_INVALID', 'Historical candidate must name a full Git commit SHA.');
+  }
+  const sha = runGitSync(workspace, ['rev-parse', '--verify', `${commit}^{commit}`]).trim().toLowerCase();
+  if (sha !== commit.toLowerCase()) fail('HISTORICAL_CANDIDATE_INVALID', 'Historical candidate SHA does not resolve to the recorded commit.');
+  return {
+    sha,
+    tree: await gitTree(workspace, sha),
+    sourceDigest: await sourceDigestAt(workspace, sha),
+  };
+}
+
+async function validateHistoricalPacketCandidate({ workspace, task, packet, dispatchCandidate }) {
+  if (!dispatchCandidate
+    || dispatchCandidate.taskId !== task.id
+    || dispatchCandidate.attemptId !== packet.attemptId
+    || dispatchCandidate.fence !== packet.fence) {
+    fail('DISPATCH_CANDIDATE_MISSING', 'Accepted handoff is missing its exact durable dispatch context.');
+  }
+  const dispatch = await candidateAtCommit(workspace, dispatchCandidate.sha);
+  if (dispatchCandidate.tree !== dispatch.tree || dispatchCandidate.sourceDigest !== dispatch.sourceDigest) {
+    fail('DISPATCH_CANDIDATE_MISMATCH', 'Durable dispatch candidate does not match its immutable Git commit.');
+  }
+  const candidate = await candidateAtCommit(workspace, packet.candidate.sha);
+  if (!sameJson(packet.candidate, candidate)) fail('CANDIDATE_HASH_MISMATCH', 'Accepted handoff candidate SHA, tree or source digest does not match its immutable Git commit.');
+  const actual = await changedPathsSince(workspace, dispatch.sha, candidate.sha);
+  const claimed = packet.changedPaths.map((item) => normalizePath(item)).sort();
+  if (new Set(claimed).size !== claimed.length || !sameJson(actual, claimed)) {
+    fail('CHANGED_PATHS_MISMATCH', 'Accepted handoff changedPaths do not match the Git diff from its reserved candidate.');
+  }
+  const allowed = task.writePaths.map((item) => normalizePath(item));
+  for (const changed of actual) {
+    if (!allowed.some((scope) => isPathWithinScope(changed, scope))) {
+      fail('WRITE_SCOPE', `Changed path ${changed} is outside task ${task.id}'s write scope.`);
+    }
+  }
+  return { candidate, changedPaths: actual };
+}
+
 async function readArtifact(sourcePath) {
   if (typeof sourcePath !== 'string' || !path.isAbsolute(sourcePath)) fail('ARTIFACT_PATH', 'Artifact paths must be absolute filesystem paths.');
   const resolved = await realpath(sourcePath).catch((error) => fail('ARTIFACT_PATH', 'Artifact path does not resolve to an existing file.', error));
@@ -918,7 +958,18 @@ export class RunStore {
     for (const task of this.plan.tasks) {
       const packetId = state.tasks[task.id]?.acceptedPacketId;
       if (!packetId) fail('TASK_UNVERIFIED', `Task ${task.id} has no currently accepted handoff.`);
-      await this.verifyCurrentPacketEvent({ payload: { packetId, taskId: task.id } }, records);
+      const submitted = [...records].reverse().find((record) => record.event.type === 'submit_handoff'
+        && record.event.payload.packet.packetId === packetId);
+      if (!submitted) fail('PACKET_RECORD_MISSING', `Packet ${packetId} has no accepted submission record.`);
+      const packet = submitted.event.payload.packet;
+      if (packet.taskId !== task.id) fail('PACKET_TASK_MISMATCH', 'Accepted packet taskId does not match its task state.');
+      await validateHistoricalPacketCandidate({
+        workspace: this.workspaceForTask(task.id),
+        task,
+        packet,
+        dispatchCandidate: submitted.runtime?.dispatchCandidate,
+      });
+      await this.verifyPacketBytes(packet, records);
     }
   }
 
@@ -1193,9 +1244,8 @@ export class RunStore {
         && record.event.payload.packet.taskId === commit.taskId
         && state.tasks[commit.taskId]?.acceptedPacketId === record.event.payload.packet.packetId);
       if (!packetRecord || packetRecord.event.payload.packet.candidate.sha !== commit.sha) fail('INTEGRATION_COMMIT_MISMATCH', `Task commit ${commit.taskId} is not the accepted packet candidate.`);
-      await validatePacketCandidate({
+      await validateHistoricalPacketCandidate({
         workspace: this.workspaceForTask(commit.taskId),
-        plan: this.plan,
         task: findTask(this.plan, commit.taskId),
         packet: packetRecord.event.payload.packet,
         dispatchCandidate: packetRecord.runtime?.dispatchCandidate,
@@ -1247,7 +1297,22 @@ export class RunStore {
         fail('GATE_REPORT_REQUIRED', 'Gate and gate reservation events can only be created by the bounded gate-report runner.');
       }
       const before = await this.replay({ writeCache: false });
-      const preflight = applyEvent(this.plan, before.state, event, { now });
+      let preflight;
+      try {
+        preflight = applyEvent(this.plan, before.state, event, { now });
+      } catch (error) {
+        if (event?.type === 'dispatch' && error?.code === 'TASK_DEADLINE_EXHAUSTED') {
+          const watchdogEvent = {
+            id: randomUUID(),
+            type: 'watchdog',
+            expectedVersion: before.state.version,
+            actorSessionId: this.manifest.coordinatorSessionId,
+            payload: {},
+          };
+          await this.appendEvent(watchdogEvent, { now });
+        }
+        throw error;
+      }
       if (preflight.version === before.state.version) {
         return { state: before.state, idempotent: true, sequence: before.sequence, headDigest: before.headDigest, dispatchRequest: null };
       }

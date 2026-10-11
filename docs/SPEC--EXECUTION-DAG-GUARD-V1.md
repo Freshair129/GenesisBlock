@@ -187,7 +187,7 @@ this identifier through an event. `now` is trusted CLI time, not packet time.
 | `gate_report_reserved` | `{stage,candidateDigest,reportRunId}` | Registered stage actor; one-shot reservation before any integrated Verify command or report creation; crash consumes this stage/candidate reservation. |
 | `gate` | `{stage,candidateDigest,reportRunId,verdict,acResults,findings,evidenceDigests,priorEvidenceDigests}` | Registered stage actor; matches reservation, trusted immutable report bytes/hash and ordered prior reports; final uses declared final role else orchestrator. |
 | `invalidate_candidate` | `{reason}` | Coordinator only; clear candidate/gates and invalidate dependent evidence; no silent resubmission of old task evidence. |
-| `watchdog` | `{}` | Coordinator only; expired live attempts fenced/quarantined; terminal budgets enforced. |
+| `watchdog` | `{}` | Coordinator only; expired live attempts fenced/quarantined; any unfinished task at its cumulative deadline blocks, including after stop proof; quarantined locks remain until stop proof. |
 | `abort` | `{reason}` | Coordinator only; run aborted, all live scopes quarantined. |
 
 `candidate = {sha,tree,sourceDigest}` and its digest is `digest(candidate)`;
@@ -342,12 +342,16 @@ source identity, including mixed rejection/verdict failures across attempts.
 Handoff rejection uses a stable task-based finding identity; changing its human
 reason cannot reset repetition accounting. A rejection also requires the current
 unfenced handoff attempt and a live lease, just as acknowledgment does.
-Counter or deadline exhaustion blocks, retains evidence and quarantines writers.
+Counter or deadline exhaustion blocks and retains evidence. The watchdog also
+blocks an unfinished task when its pinned cumulative deadline expires after a
+prior attempt has stopped and no current attempt exists. Any still-quarantined
+writer keeps its locks until trusted stop proof.
 Trusted cancellation records `aborted`. Continuing requires an explicit owner
 decision and a new bounded run linked to the previous ledger; no counter reset
 inside the blocked run. Restart replays accepted events, retains reservations,
-fences expired attempts and waits for stop proof before reallocation. Never assume
-that absence of a local child process means a remote provider session stopped.
+fences expired attempts, blocks exhausted unfinished task deadlines, and waits
+for stop proof before reallocation. Never assume that absence of a local child
+process means a remote provider session stopped.
 
 ## 7. Durable CLI and command runner
 
@@ -436,6 +440,9 @@ workspace is pinned outside the external ledger. Concurrent active writers may
 not share a workspace root, even when logical paths differ. The command runner
 serializes command spawn/execution/completion under the global ledger lock in
 V1; this favors durable budget correctness over parallel command throughput.
+Tasks may reuse the default shared checkout sequentially after the prior writer
+has completed and released its locks; accepted packets retain their historical
+commit identities while later tasks advance that checkout.
 
 All following AC are required and must map to named executable test cases and
 hashed receipts. The pilot uses synthetic files/commands and fake trusted provider
@@ -445,7 +452,7 @@ receipts; it proves guard behavior, not real-provider model identity or W1 fitne
 |---|---|
 | WF-AC-01 | Reject unknown/missing/duplicate task or graph IDs, cycle, normalized parent/child scope conflicts and model/effort mismatch. |
 | WF-AC-02 | Unauthorized plan, unresolved decision, unmet predecessor and locked path produce no dispatch side effect. |
-| WF-AC-03 | Concurrent overlap denied; expired/replaced/cancelled fence denied; quarantined lease retained until stop proof. |
+| WF-AC-03 | Concurrent shared-root writers denied while serial reuse succeeds; expired/replaced/cancelled fence denied; an unfinished task blocks at its cumulative deadline even after stop proof; quarantined lease retained until stop proof. |
 | WF-AC-04 | Missing/incorrect receiver, SHA/tree, hash, scope or packet rejected; rename checks both endpoints; identical replay idempotent and changed duplicate rejected. |
 | WF-AC-05 | Positive, schema-invalid, unsupported and RED outcomes distinguished; zero tests, required skip and missing AC cannot pass. |
 | WF-AC-06 | Session receipt must match role model/effort; worker cannot register itself; same-session Verify/Review/Audit and author/integrator audit rejected. |
