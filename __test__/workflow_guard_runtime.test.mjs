@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { spawn, spawnSync } from 'node:child_process';
 import { createHash, randomUUID } from 'node:crypto';
-import { mkdtemp, mkdir, readFile, readdir, rm, stat, symlink, utimes, writeFile } from 'node:fs/promises';
+import { mkdtemp, mkdir, readFile, readdir, realpath, rm, stat, symlink, utimes, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
@@ -97,7 +97,9 @@ function twoTaskPlanFor(baselineSha, command) {
 }
 
 async function fixture({ command, checkSource, planFactory, separateTaskWorkspaces = false, crlfCheckout = false, crlfNormalized = false, baselineFiles = {} } = {}) {
-  const temporary = await mkdtemp(path.join(os.tmpdir(), 'workflow-guard-runtime-'));
+  const temporaryAlias = await mkdtemp(path.join(os.tmpdir(), 'workflow-guard-runtime-'));
+  // RunStore canonicalizes workspace roots before checking realpath containment.
+  const temporary = await realpath(temporaryAlias);
   const workspace = path.join(temporary, 'candidate');
   const runDir = path.join(temporary, 'ledger');
   const requests = path.join(temporary, 'requests');
