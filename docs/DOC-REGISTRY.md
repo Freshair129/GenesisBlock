@@ -2,8 +2,8 @@
 title: "GenesisBlockDB Document Registry"
 doc_id: "DOC-REGISTRY-GENESISBLOCKDB"
 status: draft
-version: "0.5.98+draft"
-updated: "2026-10-06"
+version: "0.5.99+draft"
+updated: "2026-10-10"
 owner: "GenesisBlockDB Architecture"
 source_of_truth: true
 related_issue: 84
@@ -53,7 +53,8 @@ registry row explicitly names them.
 | Role | Doc ID | Version | Status | Owner | Path |
 |---|---|---|---|---|---|
 | Architecture composition | `MASTER-SPEC-GENESISBLOCKDB` | `2.3.43b` | current | GenesisBlockDB Architecture | `docs/MASTER-SPEC--GENESIS-DB.md` |
-| Architecture index | `C4--GENESISDB-ARCHITECTURE` | `0.1.72b` | current | GenesisBlockDB Architecture | `docs/C4--GENESISDB-ARCHITECTURE.md` |
+| Architecture index | `C4--GENESISDB-ARCHITECTURE` | `0.1.73b` | current | GenesisBlockDB Architecture | `docs/C4--GENESISDB-ARCHITECTURE.md` |
+| Execution DAG guard | `SPEC--EXECUTION-DAG-GUARD-V1` | `0.1.0` | accepted | Sol Decision / Contract and AC | `docs/SPEC--EXECUTION-DAG-GUARD-V1.md` |
 | HQL2 execution decision | `ADR--GENESISDB-HQL2-EXECUTION-BOUNDARY` | `0.1.1b` | accepted | Boss (Founder / Product Authority) | `docs/adr/ADR--GENESISDB-HQL2-EXECUTION-BOUNDARY.md` |
 | HQL2 G4 shared-pipeline contract | `ADR--GENESISDB-HQL2-G4-SHARED-PIPELINE` | `0.1.3b` | active | Boss (Founder / Product Authority) | `docs/adr/ADR--GENESISDB-HQL2-G4-SHARED-PIPELINE.md` |
 | HQL2 P8 completion addendum | `ADR--GENESISDB-HQL2-P8-COMPLETION-ADDENDUM` | `0.1.14b` | accepted | Boss (Founder / Product Authority) | `docs/adr/ADR--GENESISDB-HQL2-P8-COMPLETION-ADDENDUM.md` |
@@ -121,6 +122,9 @@ The following documents should be created only when implementation work requires
 - third-client namespace conformance report.
 
 ## 9. Changelog
+
+Version diff 0.5.98+draft -> 0.5.99+draft: register the approved execution DAG
+guard contract and architecture tooling boundary. W1 remains non-dispatchable.
 
 Version diff 0.5.97+draft -> 0.5.98+draft: record passing fresh and committed
 Linux worker addon tests on PR head ab38d50 (26/0/6) and all hosted CI workflow
@@ -505,6 +509,7 @@ review and full P8 gates remain open.
 
 | Version | Date | Owner | Summary |
 |---|---|---|---|
+| 0.5.99+draft | 2026-10-10 | GenesisBlockDB Architecture | Register bounded execution DAG guard, independent candidate gates and synthetic pilot contract. |
 | 0.5.98+draft | 2026-10-06 | GenesisBlockDB Architecture | Record passing fresh and committed Linux worker addon tests (26/0/6) on PR head ab38d50 and successful tests/security/performance/consumer workflows; six model-dependent tests and migration/full integration qualification remain pending |
 | 0.5.97+draft | 2026-10-06 | GenesisBlockDB Architecture | Record the GenesisRAG17 candidate engine source and historical baseline; synchronize ADR/C4/Master Spec/extension map provenance; refresh Linux addon metadata; fresh Bookworm worker suite 26 passed, 0 failed, 6 model-dependent skipped; full committed-artifact and integration qualification pending |
 | 0.5.96+draft | 2026-10-06 | GenesisBlockDB Architecture | Record Bookworm job's Git dubious-ownership failure before build; scope safe.directory to the exact checkout path for provenance; artifact rebuild and hosted verification pending |

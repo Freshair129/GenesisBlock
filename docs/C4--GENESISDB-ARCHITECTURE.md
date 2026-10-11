@@ -2,10 +2,10 @@
 doc_id: C4--GENESISDB-ARCHITECTURE
 type: architecture-index
 status: current
-version: 0.1.72b
+version: 0.1.73b
 owner: GenesisBlockDB Architecture
 created_at: 2026-06-13T22:50:11+07:00,ATHER,9b1ced3
-last_update: "2026-10-06T16:26:13+07:00,ATHER"
+last_update: "2026-10-10T12:00:00+07:00,Codex"
 attributes:
   domain: architecture
   scope: repository
@@ -438,6 +438,15 @@ These findings are intentionally listed here until the governance validator can 
 
 ## 8. Change Rules
 
+Agent execution is a repository tooling boundary, specified by
+[Execution DAG Guard V1](SPEC--EXECUTION-DAG-GUARD-V1.md): immutable plan ->
+pure transition validator -> external event ledger, with byte-checked command
+evidence and independent candidate gates. `scripts/workflow-guard.mjs` is the
+local adapter; it emits coordinator dispatch requests and does not call model
+providers or enforce an OS sandbox. The W1 effective planning overlay remains
+non-dispatchable. This does not change GenesisBlockDB engine architecture or
+complete the broader documentation-governance TDD.
+
 When changing architecture-relevant files:
 
 1. If `src/lib.rs`, `src/main.rs`, `src/router.rs`, `mcp/server.js`, `index.d.ts`, or SDK clients change, check this C4 index for affected layer.
@@ -501,6 +510,9 @@ fault-injected.
 Broader EXPLAIN/P8/P13 and P14 rehearsal remain open.
 
 ## CHANGELOG
+
+Version diff 0.1.72b -> 0.1.73b: index the approved execution DAG guard and
+synthetic pilot boundary; preserve separate W1 implementation authorization.
 
 Version diff 0.1.71b -> 0.1.72b: distinguish the candidate GenesisRAG17 engine
 source from its historical baseline and link qualification status to the worker

@@ -1,7 +1,7 @@
 ---
-version: "0.2.4b"
+version: "0.2.5b"
 created_at: "2026-06-13T19:39:22+07:00,ATHER,9b1ced3"
-last_update: "2026-07-23T11:10:00+07:00,Codex"
+last_update: "2026-10-10T12:00:00+07:00,Codex"
 status: "beta"
 attributes:
   domain: "agent-governance"
@@ -27,6 +27,28 @@ GenesisBlock is a local-first hybrid semantic-graph database engine for AI agent
   - `C-3`: architecture/distributed/dataflow change, doc + diagrams required.
 - Keep changes surgical. Do not refactor adjacent code unless required.
 - Definition of Done: acceptance criteria met, tests pass, docs updated, no known regressions.
+
+## Execution DAG coordination
+
+The approved local guard contract is [Execution DAG Guard V1](docs/SPEC--EXECUTION-DAG-GUARD-V1.md).
+Use `npm run workflow:plan` to check the effective W1 planning overlay and
+`npm run workflow:test` for guard fault tests. Historical queue/model fields and
+the advisory tiered-swarm router never authorize dispatch. W1 remains disabled;
+workflow-hardening approval authorizes only the guard and synthetic pilot.
+
+For guarded runs, keep an immutable plan and durable ledger outside the candidate
+checkout. Reserve through the guard before dispatch, record the actual provider
+session and requested model/effort, and submit hashed evidence through the adapter.
+Receiver ACK is separate from PASS. Only the integrated candidate with fresh,
+independent Verify, Review and final Audit receipts may reach Final Gate.
+
+Use GPT-6 Luna Max for Explore, Research, Worker, Verify and Review. Use GPT-6.1
+Sol for Decision, critical Debug, Integration, Audit and Orchestration. Author,
+integrator and final auditor identities must be separate where specified by the
+contract. Three code attempts, one infrastructure retry and two repeated findings
+are hard bounds; preserve counters and quarantine expired writers until stop proof.
+The CLI checks accepted transitions; it does not sandbox arbitrary processes or
+authenticate the model provider. The trusted coordinator owns that boundary.
 
 ## Architecture Map
 
@@ -118,6 +140,7 @@ npm run lint
 
 | From | To | Change |
 |---|---|---|
+| 0.2.4b | 0.2.5b | Added bounded execution DAG guard, explicit model routing, independent gates and external ledger requirements. |
 | none | 0.1.0b | New repository agent-context document proposed from docs/codebase review. |
 | 0.1.0b | 0.2.0b | Added C4 architecture index as the required architecture discovery entrypoint and promoted context to beta. |
 | 0.2.0b | 0.2.1b | Added agent registry SSOT and registry validation command to the repository context. |
@@ -129,6 +152,7 @@ npm run lint
 
 | Version | Date | Status | Summary | Commit Hash | Agent |
 |---|---|---|---|---|---|
+| 0.2.5b | 2026-10-10 | beta | Added approved guard/pilot workflow and retained separate W1 dispatch boundary. | working-tree | Codex |
 | 0.2.4b | 2026-07-23 | beta | Clarified WAL authority, SQLite projection ownership, and single-boundary storage topology for agents. | working-tree | Codex |
 | 0.2.3b | 2026-06-22 | beta | Aligned with shipped engine: u64 edge keys, multi-collection vector spaces, async indexing. | working-tree | Claude |
 | 0.2.2b | 2026-06-14 | beta | Clarified backend/runtime ownership and downgraded UI surfaces to optional consumers. | working-tree | ATHER |
