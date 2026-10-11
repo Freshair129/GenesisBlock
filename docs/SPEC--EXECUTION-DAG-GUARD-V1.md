@@ -346,8 +346,9 @@ Counter or deadline exhaustion blocks and retains evidence. The watchdog also
 blocks an unfinished task when its pinned cumulative deadline expires after a
 prior attempt has stopped and no current attempt exists. Any still-quarantined
 writer keeps its locks until trusted stop proof.
-Trusted cancellation records `aborted`. Continuing requires an explicit owner
-decision and a new bounded run linked to the previous ledger; no counter reset
+Trusted cancellation records `aborted`; watchdog preserves that terminal status
+while quarantines remain locked until stop proof. Continuing requires an explicit
+owner decision and a new bounded run linked to the previous ledger; no counter reset
 inside the blocked run. Restart replays accepted events, retains reservations,
 fences expired attempts, blocks exhausted unfinished task deadlines, and waits
 for stop proof before reallocation. Never assume that absence of a local child

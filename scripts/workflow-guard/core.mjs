@@ -1335,6 +1335,7 @@ function handleEvent(plan, state, event, now) {
     case 'watchdog': {
       requireKeys(p, [], [], 'INVALID_PAYLOAD', 'watchdog payload');
       requireCoordinator(state, event.actorSessionId);
+      if (state.status === 'aborted') break;
       for (const taskDef of plan.tasks) {
         const taskState = state.tasks[taskDef.id];
         const attempt = taskState.currentAttemptId ? findAttempt(taskState, taskState.currentAttemptId) : null;

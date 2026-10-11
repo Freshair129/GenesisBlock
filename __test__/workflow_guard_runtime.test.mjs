@@ -524,6 +524,61 @@ test('expired retry rejection durably records watchdog closure after stop proof'
   assert.equal(unchanged.json.state.tasks.T1.codeAttempts, original.codeAttempts);
 });
 
+test('watchdog and stop-proof replay preserve owner-aborted run identity', async (t) => {
+  const project = await fixture({
+    planFactory: (baselineSha, command) => {
+      const plan = planFor(baselineSha, command);
+      plan.tasks[0].timeoutMs = 60_000;
+      return plan;
+    },
+  });
+  t.after(() => rm(project.temporary, { recursive: true, force: true }));
+  const request = await startAttempt(project);
+  const deadline = project.state.tasks.T1.deadline;
+  const aborted = await event(project, 'abort', 'coord', { reason: 'owner cancelled synthetic run' });
+  assert.equal(aborted.status, 0, aborted.json.message);
+  const abortReceipt = structuredClone(project.state.receipts.abort);
+  assert.equal(project.state.status, 'aborted');
+  assert.equal(project.state.tasks.T1.attempts[0].status, 'quarantined');
+  assert.equal(project.state.locks['pilot/input.txt'].quarantined, true);
+
+  const store = await RunStore.open(project.runDir);
+  const watchdog = await store.processEvent({
+    id: 'watchdog-after-owner-abort', type: 'watchdog', expectedVersion: project.state.version,
+    actorSessionId: 'coord', payload: {},
+  }, { now: deadline });
+  assert.equal(watchdog.state.status, 'aborted');
+  assert.deepEqual(watchdog.state.receipts.abort, abortReceipt);
+  assert.equal(watchdog.state.tasks.T1.attempts[0].status, 'quarantined');
+  assert.equal(watchdog.state.locks['pilot/input.txt'].quarantined, true);
+  const replayed = cliSync(['show', '--run-dir', project.runDir]);
+  assert.equal(replayed.status, 0, replayed.json.message);
+  assert.equal(replayed.json.state.status, 'aborted');
+  assert.deepEqual(replayed.json.state.receipts.abort, abortReceipt);
+
+  const stopped = await store.processEvent({
+    id: 'stop-proof-after-owner-abort', type: 'stop_confirmed', expectedVersion: replayed.json.state.version,
+    actorSessionId: 'coord', payload: { taskId: 'T1', attemptId: request.attemptId, stopReceiptId: 'provider-stop-after-abort' },
+  }, { now: deadline + 1 });
+  assert.equal(stopped.state.status, 'aborted');
+  assert.equal(stopped.state.tasks.T1.attempts[0].status, 'stopped');
+  assert.equal(stopped.state.tasks.T1.attempts[0].stopReceiptId, 'provider-stop-after-abort');
+  assert.equal(Object.hasOwn(stopped.state.locks, 'pilot/input.txt'), false);
+  const afterStop = cliSync(['show', '--run-dir', project.runDir]);
+  assert.equal(afterStop.status, 0, afterStop.json.message);
+  assert.equal(afterStop.json.state.status, 'aborted');
+  assert.deepEqual(afterStop.json.state.receipts.abort, abortReceipt);
+
+  await assert.rejects(store.processEvent({
+    id: 'dispatch-after-owner-abort', type: 'dispatch', expectedVersion: afterStop.json.state.version,
+    actorSessionId: 'coord', payload: { taskId: 'T1' },
+  }, { now: deadline + 2 }), (error) => error.code === 'RUN_ABORTED');
+  const unchanged = cliSync(['show', '--run-dir', project.runDir]);
+  assert.equal(unchanged.status, 0, unchanged.json.message);
+  assert.equal(unchanged.json.state.status, 'aborted');
+  assert.equal(unchanged.json.state.tasks.T1.attempts.length, 1);
+});
+
 test('integration rejects an out-of-scope commit after the accepted task commit without recording integration', async (t) => {
   const project = await fixture();
   t.after(() => rm(project.temporary, { recursive: true, force: true }));

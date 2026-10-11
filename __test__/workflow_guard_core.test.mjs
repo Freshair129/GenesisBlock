@@ -357,6 +357,32 @@ test('watchdog blocks stopped tasks at their cumulative deadline and retains qua
   assert.equal(quarantined.state.tasks.T1.attempts[0].stopReceiptId, undefined);
 });
 
+test('watchdog preserves owner-aborted status and quarantine until stop proof', () => {
+  const h = harness();
+  h.register('worker-abort', 'worker');
+  h.emit('dispatch', 'coord', { taskId: 'T1' });
+  const attempt = h.state.tasks.T1.attempts[0];
+  const deadline = h.state.tasks.T1.deadline;
+  h.emit('bind_worker', 'coord', { taskId: 'T1', attemptId: attempt.attemptId, sessionId: 'worker-abort' });
+  h.emit('abort', 'coord', { reason: 'owner cancelled synthetic run' });
+  assert.equal(h.state.status, 'aborted');
+  assert.equal(h.state.tasks.T1.attempts[0].status, 'quarantined');
+  const quarantineAt = h.state.tasks.T1.attempts[0].quarantinedAt;
+  const lock = structuredClone(h.state.locks['pilot/input.txt']);
+
+  h.emit('watchdog', 'coord', {}, deadline);
+  assert.equal(h.state.status, 'aborted');
+  assert.equal(h.state.tasks.T1.attempts[0].status, 'quarantined');
+  assert.equal(h.state.tasks.T1.attempts[0].quarantinedAt, quarantineAt);
+  assert.deepEqual(h.state.locks['pilot/input.txt'], lock);
+
+  h.emit('stop_confirmed', 'coord', { taskId: 'T1', attemptId: attempt.attemptId, stopReceiptId: 'provider-abort-stop-proof' }, deadline + 1);
+  assert.equal(h.state.status, 'aborted');
+  assert.equal(h.state.tasks.T1.attempts[0].status, 'stopped');
+  assert.equal(h.state.tasks.T1.attempts[0].stopReceiptId, 'provider-abort-stop-proof');
+  assert.equal(Object.hasOwn(h.state.locks, 'pilot/input.txt'), false);
+});
+
 test('rejects an expired submitted packet without changing failure attribution', () => {
   const { h, packet, attempt } = prepareHandoff(harness(makePlan(), { leaseMs: 5 }));
   h.emit('submit_handoff', 'worker-1', { packet });
