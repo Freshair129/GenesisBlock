@@ -1,0 +1,212 @@
+{
+  "schemaVersion": 1,
+  "artifactType": "W1_SYNTHETIC_GAP_REMEDIATION_DECISION",
+  "decisionId": "W1-SYNTHETIC-GAP-REMEDIATION-20261012-SP22",
+  "status": "ADMITTED_SYNTHETIC_ONLY",
+  "issuedAtUtc": "2026-10-12T11:23:15.8487318+00:00",
+  "admissionAuthority": "Current user instruction: approve, authorizing one fresh bounded SP22 envelope after SP21 terminalization. This is an explicit new Decision, not an automatic SP21 retry or successor.",
+  "admissionRecord": {
+    "path": "D:\\GenesisBlock_Dev\\w1-evidence-20261010\\synthetic-pilots\\synthetic-pilot-20261012-sp22\\readiness\\admission.json",
+    "sha256": "517af3876ba3170983f367ce636d9d420e371e9de40d743da25a21ab836d6ac6"
+  },
+  "roots": {
+    "candidate": "D:\\GenesisBlock_Dev\\w1-evidence-20261010\\adapter\\synthetic-pilot-20261012-sp22",
+    "evidence": "D:\\GenesisBlock_Dev\\w1-evidence-20261010\\synthetic-pilots\\synthetic-pilot-20261012-sp22\\evidence",
+    "readiness": "D:\\GenesisBlock_Dev\\w1-evidence-20261010\\synthetic-pilots\\synthetic-pilot-20261012-sp22\\readiness"
+  },
+  "seed": {
+    "path": "D:\\GenesisBlock_Dev\\w1-evidence-20261010\\adapter\\synthetic-pilot-20261012-sp21",
+    "decisionId": "W1-SYNTHETIC-GAP-REMEDIATION-20261012-SP21",
+    "fileCount": 345,
+    "manifestSha256": "a31388b7a3b6eeaea5069acdf1aa2bee726f97dc6c1a71e01a0334cbd22c06c4",
+    "manifestEncoding": "UTF-8 LF rows, normalized forward-slash relative path, byte length, lowercase file SHA-256; path sort by System.StringComparer.Ordinal.",
+    "materializationReceiptDiscrepancyAcknowledged": true
+  },
+  "predecessorTerminal": {
+    "decisionId": "W1-SYNTHETIC-GAP-REMEDIATION-20261012-SP21",
+    "path": "D:\\GenesisBlock_Dev\\w1-evidence-20261010\\synthetic-pilots\\synthetic-pilot-20261012-sp21\\evidence\\terminal-disposition.json",
+    "bytes": 2623,
+    "sha256": "b2e11a0aea40f722975e85a4335f3068097d87e6b635330188ceeb175dc0f1fc",
+    "status": "TERMINAL_NOT_READY",
+    "retryPermitted": false,
+    "successorPermitted": false,
+    "explicitFreshEnvelopeAuthorizationObserved": true
+  },
+  "scope": {
+    "candidateSourceAllowlist": [],
+    "behavior": "Synthetic in-memory request construction and immutable history verification only; no live provider, production, W1 implementation, dispatch, release, merge, publish, deployment, or canonical readiness writes.",
+    "fixture": "Use isolated OS-temp fixture semantics from the pinned test; preserve the fixture. SP22 evidence remains under the SP22 evidence root, outside candidate.",
+    "candidateMaterialization": "Copy the frozen SP21 candidate byte-for-byte into the isolated SP22 candidate root exactly once. Do not change any candidate source file.",
+    "manifestCorrection": "Create the SP22 materialization receipt using normalized forward-slash relative paths and System.StringComparer.Ordinal case-sensitive ordering. Verify the receipt SHA-256 from UTF-8 LF-terminated TAB-delimited rows with no BOM.",
+    "noSP21Mutation": true,
+    "noCandidateSourceEdits": true,
+    "testSource": {
+      "path": "D:\\GenesisBlock_Dev\\w1-evidence-20261010\\adapter\\synthetic-pilot-20261012-sp21\\artifact-manifest.test.mjs",
+      "seedSha256": "85fafaa141a790b91e0aa6a5cd8360dbb45625a4d14adc4e719db5aee67a237a",
+      "immutable": true
+    },
+    "helperSource": {
+      "path": "D:\\GenesisBlock_Dev\\w1-evidence-20261010\\adapter\\synthetic-pilot-20261012-sp21\\create-review-request.mjs",
+      "seedSha256": "bfc974aecb1c4ca908ca032e33ff2d916e5e32e123bbc313e38bdbb534043878",
+      "immutable": true
+    }
+  },
+  "requiredAssertions": [
+    "Fresh SP22 candidate contains exactly 345 files byte-identical to the frozen SP21 seed; no missing, extra, changed, or reparse-point entries.",
+    "SP22 candidate manifest receipt uses normalized relative paths sorted case-sensitively with System.StringComparer.Ordinal; its recorded SHA-256 reproduces exactly from the documented UTF-8 LF and TAB row encoding.",
+    "Coordinator verifies current immutable guard source pins and frozen runtime snapshot pins; no candidate source file is edited.",
+    "Default builder refuses existing canonical outputs and leaves exact bytes and existence unchanged.",
+    "Synthetic builder accepts exactly five unique paths within one OS-temp fixture and constructs only in memory.",
+    "Nested predecessor.originalTerminal schema binds original decision, correction addendum, and terminal evidence.",
+    "v4 and v5 request identities use distinct full paths, sizes, and SHA-256 pins.",
+    "F-01 synthetic evidence root remains outside the candidate.",
+    "F-02 candidate helper remains bound to immutable full-close-v5 manifest and candidate completeness remains checked.",
+    "At most one complete artifact-manifest.test.mjs invocation is allowed, only after independent review PASS and a READY gate; no retry or correction after invocation begins."
+  ],
+  "immutableInputs": {
+    "currentGuardSources": [
+      {
+        "path": "D:\\GenesisBlock_Dev\\GenesisBlock-Query-IR-W1-20261010\\scripts\\workflow-guard\\core.mjs",
+        "sha256": "23077529b24b64853ef2c98df2640d09cca9309394448730a91dfd7b6078006f",
+        "bytes": 81921
+      },
+      {
+        "path": "D:\\GenesisBlock_Dev\\GenesisBlock-Query-IR-W1-20261010\\scripts\\workflow-guard\\store.mjs",
+        "sha256": "9a2bdf608ef9b6e189e8d99d4acfe2daf1f57363d84afe2eebb2899bca432e0e",
+        "bytes": 86965
+      }
+    ],
+    "runtimeSnapshot": [
+      {
+        "path": "D:\\GenesisBlock_Dev\\w1-evidence-20261010\\adapter\\synthetic-pilot-20261012-sp21\\runtime\\core.mjs",
+        "sha256": "42d5efb0a67904db67c37e8a900dce5afec8d73e2d7b2b0b07905520d01689c0",
+        "bytes": 81492
+      },
+      {
+        "path": "D:\\GenesisBlock_Dev\\w1-evidence-20261010\\adapter\\synthetic-pilot-20261012-sp21\\runtime\\store.mjs",
+        "sha256": "26fbde2e625433011d80e3e0262981102590eee64c0653f0259a77dc0ba73d60",
+        "bytes": 133897
+      }
+    ],
+    "effectivePlan": {
+      "path": "D:\\GenesisBlock_Dev\\GenesisBlock-Query-IR-W1-20261010\\queue\\QUERY_IR_W1_EFFECTIVE_PLAN.json",
+      "sha256": "eb408762dec22c7e1d65c488a9629af95eb695eeec112ff15a23b8322cb1cdfd",
+      "bytes": 19534
+    },
+    "sp21Decision": {
+      "path": "D:\\GenesisBlock_Dev\\w1-evidence-20261010\\decisions\\W1-synthetic-gap-remediation-decision-20261012-sp21-issued.json",
+      "sha256": "162701be0381d2c49645e0e8e18282e91b1508efee15aaf029bd0275e1c02a4b"
+    },
+    "sp21Review": {
+      "path": "D:\\GenesisBlock_Dev\\w1-evidence-20261010\\synthetic-pilots\\synthetic-pilot-20261012-sp21\\readiness\\independent-review.json",
+      "sha256": "1e256a94a5bb706665b6cbd0ef7540d22663cf1dedbad4d52ca9000ff04ddb9b"
+    },
+    "sp21Materialization": {
+      "path": "D:\\GenesisBlock_Dev\\w1-evidence-20261010\\synthetic-pilots\\synthetic-pilot-20261012-sp21\\readiness\\candidate-materialization.json",
+      "sha256": "154de54df01ef732cf3dee5307bd239ccfc8592e7011565f2c354520dac5998c"
+    },
+    "sp21Terminal": {
+      "path": "D:\\GenesisBlock_Dev\\w1-evidence-20261010\\synthetic-pilots\\synthetic-pilot-20261012-sp21\\evidence\\terminal-disposition.json",
+      "sha256": "b2e11a0aea40f722975e85a4335f3068097d87e6b635330188ceeb175dc0f1fc"
+    }
+  },
+  "baseline": {
+    "repoRoot": "D:\\GenesisBlock_Dev\\GenesisBlock-Query-IR-W1-20261010",
+    "branch": "codex/query-ir-w1-execution-20261012",
+    "head": "4dbeb8de1474ba29a149e50c552aa633196a4105",
+    "tree": "cc33dc796a172d5b4f456e4235384210259d3244",
+    "statusClean": true,
+    "statusPorcelainCount": 0,
+    "effectivePlanPath": "D:\\GenesisBlock_Dev\\GenesisBlock-Query-IR-W1-20261010\\queue\\QUERY_IR_W1_EFFECTIVE_PLAN.json",
+    "effectivePlanSha256": "eb408762dec22c7e1d65c488a9629af95eb695eeec112ff15a23b8322cb1cdfd",
+    "dispatchAuthorized": false
+  },
+  "test": {
+    "executable": "C:\\Users\\suanr\\.cache\\codex-runtimes\\codex-primary-runtime\\dependencies\\node\\bin\\node.exe",
+    "arguments": [
+      "--test",
+      "artifact-manifest.test.mjs"
+    ],
+    "cwd": "D:\\GenesisBlock_Dev\\w1-evidence-20261010\\adapter\\synthetic-pilot-20261012-sp22",
+    "timeoutMs": 180000,
+    "maxRuns": 1,
+    "startByUtc": "2026-10-12T12:15:00Z",
+    "finishByUtc": "2026-10-12T12:20:00Z"
+  },
+  "cutoffs": {
+    "timezone": "Asia/Bangkok",
+    "candidateMaterializationAndPreflightBy": "2026-10-12T18:45:00+07:00",
+    "independentPretestReviewAndGateBy": "2026-10-12T19:05:00+07:00",
+    "testStartBy": "2026-10-12T19:15:00+07:00",
+    "testFinishBy": "2026-10-12T19:20:00+07:00",
+    "terminalDispositionBy": "2026-10-12T19:40:00+07:00",
+    "hardCutoff": "2026-10-12T19:50:00+07:00",
+    "hardCutoffUtc": "2026-10-12T12:50:00Z",
+    "rule": "All stages use fixed absolute cutoffs. A missed stage cutoff, failed review, failed invocation, or missing stage record is terminal; later cutoffs never revive it."
+  },
+  "lifecycle": {
+    "noRetry": true,
+    "noExtension": true,
+    "noSuccessor": true,
+    "noPostFreezeCandidateEdits": true,
+    "dispatchAuthorized": false,
+    "canonicalReadinessWritesAllowed": false,
+    "directReviewRequestFileWriteAllowed": false,
+    "deleteFixture": false,
+    "anyFailureOrTimeoutOrMissingStageDeadline": "TERMINAL_NOT_READY or TERMINAL_TEST_FAILURE; preserve bytes and receipts; no correction, retry, unused-slot reuse, or successor under SP22."
+  },
+  "roleIdentityConstraints": {
+    "actualIndependentPretestReviewRequired": true,
+    "reviewerMustBeDistinctFromDecisionAuthor": true,
+    "actualSessionEvidenceRequired": true,
+    "declaredRoleModelNotAuthentication": true
+  },
+  "budget": {
+    "candidateMaterializationMaximum": 1,
+    "candidateSourceEditsMaximum": 0,
+    "pretestIndependentReviewMaximum": 1,
+    "planValidationMaximum": 0,
+    "testInvocationsMaximum": 1,
+    "testTimeoutMs": 180000,
+    "automaticSuccessors": 0,
+    "postFreezeCandidateEdits": 0,
+    "newNativeAllocations": 0
+  },
+  "disposition": {
+    "candidateMaterializationAuthorized": true,
+    "candidateSourceEditsAuthorized": false,
+    "candidateTestsConditionallyAuthorized": true,
+    "conditionsBeforeCandidateTests": [
+      "Create one isolated SP22 candidate by copying the frozen SP21 candidate byte-for-byte.",
+      "Create and pin outputs only under fresh SP22 evidence/readiness roots.",
+      "Recompute and record the candidate manifest using the exact case-sensitive ordinal encoding in this Decision; the recorded hash must reproduce.",
+      "Obtain one fresh independent pretest review that passes and records exact Decision, Admission, candidate, runtime, guard, and plan pins before the review cutoff.",
+      "Gate must be READY before the test start cutoff; preserve F-01/F-02 assertions and keep dispatchAuthorized false."
+    ],
+    "productionRepositorySourceWritesAuthorized": false,
+    "realRunInitializationAuthorized": false,
+    "nativeReservationAuthorized": false,
+    "nativeGoAuthorized": false,
+    "nativeDispatchAuthorized": false,
+    "W1ImplementationAuthorized": false,
+    "realReleaseOrAdmissionAuthorized": false,
+    "mergePushPublishDeployAuthorizedByThisDecision": false
+  },
+  "feasibility": {
+    "clockObservationUtc": "2026-10-12T11:23:15.8487318+00:00",
+    "userAuthorizationObserved": true,
+    "sourceRepoClean": true,
+    "SP21TerminalizedBeforeSP22Issue": true,
+    "SP22CandidateEvidenceRootsAbsentAtIssue": true,
+    "seedFilesVerified": 345,
+    "seedManifestVerifiedUnderOrdinalEncoding": "a31388b7a3b6eeaea5069acdf1aa2bee726f97dc6c1a71e01a0334cbd22c06c4",
+    "currentRuntimeCoreHashVerified": "42d5efb0a67904db67c37e8a900dce5afec8d73e2d7b2b0b07905520d01689c0",
+    "currentRuntimeStoreHashVerified": "26fbde2e625433011d80e3e0262981102590eee64c0653f0259a77dc0ba73d60",
+    "SP21ManifestEncodingFailureConfirmed": true,
+    "F01F02PriorReviewFindingsRemainApplicableToByteIdenticalCandidate": true,
+    "nativeOrW1DispatchFeasibilityClaimed": false,
+    "completionGuaranteed": false,
+    "noTestsRunByDecision": true
+  },
+  "mutationStatement": "Create one distinct SP22 Decision and Admission after explicit user approval. Materialize one exact candidate copy from frozen SP21 into a fresh candidate root and record a correctly case-sensitive ordinal manifest receipt. SP21 remains immutable. No test runs at issuance; no W1 dispatch or canonical write occurs."
+}
