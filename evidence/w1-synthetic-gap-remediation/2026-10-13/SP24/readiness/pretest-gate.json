@@ -1,0 +1,71 @@
+{
+  "schemaVersion": 1,
+  "artifactType": "SP24_PRETEST_GATE",
+  "decisionId": "W1-SYNTHETIC-GAP-REMEDIATION-20261013-SP24",
+  "status": "READY",
+  "recordedAtUtc": "2026-10-13T00:48:15.0533933+00:00",
+  "recordedAtBangkok": "2026-10-13T07:48:15.0533933+07:00",
+  "decisionSha256": "657443f3a8aa3db34d99e23d1f644400c8f2b5253644af69ac9bfbebcb4b88d0",
+  "admissionSha256": "a06427abe53a6fc51f8a5d5c8f2c7aca804ef0f72c9ddf3cd2786b88202c223a",
+  "rootCauseAnalysisSha256": "8fab054d4604b1a62f89b5320fa6334a15be59d2845ab9dd7c538d10ba701eba",
+  "seedMaterializationReceiptSha256": "73098e3a73dbde1a2341c1aafa87aa2b9ec29a9cfd7c71038eb0a314919261ce",
+  "candidatePatchReceiptSha256": "e63866fa05ba48b5055239b9f1e31c489bd0270855a65f458e90953038687764",
+  "candidateFreezeReceiptSha256": "db55cdc0113bf94e990f83b740dfc921614ca857d3177c721266b636ff9d2455",
+  "independentReviewRequestSha256": "203def87b85877d32819ae1b6d5494b4ece11a7c7d675ef8059992be8623ad3f",
+  "independentReviewSha256": "2271313174eef01742630a329f1fc0b6b788a18f650f695ba34512cce72c885f",
+  "reviewerTaskIdentity": "/root/sp24_pretest_review",
+  "reviewerStatus": "PASS",
+  "candidateState": {
+    "files": 345,
+    "directories": 108,
+    "reparsePoints": 0,
+    "manifestSha256": "fa6280df58e9763fb2ae0c5b63791ec139747d5b128170547b418fb0892b989d"
+  },
+  "changedFiles": [
+    "identity-evidence.mjs"
+  ],
+  "checks": {
+    "beforeReadyCutoff": true,
+    "reviewPassed": true,
+    "reviewBeforeCutoff": true,
+    "reviewerIdentityPresent": true,
+    "reviewWasReadOnly": true,
+    "decisionHash": "657443f3a8aa3db34d99e23d1f644400c8f2b5253644af69ac9bfbebcb4b88d0",
+    "admissionHash": "a06427abe53a6fc51f8a5d5c8f2c7aca804ef0f72c9ddf3cd2786b88202c223a",
+    "rcaHash": "8fab054d4604b1a62f89b5320fa6334a15be59d2845ab9dd7c538d10ba701eba",
+    "materializationHash": "73098e3a73dbde1a2341c1aafa87aa2b9ec29a9cfd7c71038eb0a314919261ce",
+    "patchHash": "e63866fa05ba48b5055239b9f1e31c489bd0270855a65f458e90953038687764",
+    "freezeHash": "db55cdc0113bf94e990f83b740dfc921614ca857d3177c721266b636ff9d2455",
+    "reviewRequestHash": "203def87b85877d32819ae1b6d5494b4ece11a7c7d675ef8059992be8623ad3f",
+    "sp23TerminalHash": "4b28eddee169e7ff0b0b2522abf3c6faf6136865b8dbde503456a34b99660725",
+    "sp23CorrectionHash": "b3bdf5df3e9661bd89b759a9770c0a28d76096af00625cb9d85d7afc1f1748b1",
+    "seedManifest": true,
+    "candidateManifest": true,
+    "onlyAllowlistedChangedFile": true,
+    "runtimePins": true,
+    "guardPins": true,
+    "testSourcePin": "85fafaa141a790b91e0aa6a5cd8360dbb45625a4d14adc4e719db5aee67a237a",
+    "effectivePlanHash": true,
+    "dispatchDisabled": true,
+    "externalEvidenceEmpty": true,
+    "noInvocationReceipt": true,
+    "testBudgetUnused": true,
+    "nodeRuntimeExists": true
+  },
+  "test": {
+    "executable": "C:\\Users\\suanr\\.cache\\codex-runtimes\\codex-primary-runtime\\dependencies\\node\\bin\\node.exe",
+    "cwd": "D:\\GenesisBlock_Dev\\w1-evidence-20261010\\adapter\\synthetic-pilot-20261013-sp24",
+    "arguments": [
+      "--test",
+      "artifact-manifest.test.mjs"
+    ],
+    "timeoutMs": 180000,
+    "maximumInvocations": 1,
+    "invocationsBeforeGate": 0,
+    "startByUtc": "2026-10-13T02:01:56Z",
+    "finishByUtc": "2026-10-13T02:06:56Z"
+  },
+  "dispatchAuthorized": false,
+  "W1DispatchAuthorized": false,
+  "blockers": []
+}

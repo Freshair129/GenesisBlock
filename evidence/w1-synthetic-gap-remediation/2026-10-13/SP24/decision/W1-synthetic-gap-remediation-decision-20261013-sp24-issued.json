@@ -1,0 +1,196 @@
+{
+  "schemaVersion": 1,
+  "artifactType": "W1_SYNTHETIC_GAP_REMEDIATION_DECISION",
+  "decisionId": "W1-SYNTHETIC-GAP-REMEDIATION-20261013-SP24",
+  "status": "ADMITTED_SYNTHETIC_ONLY",
+  "issuedAtUtc": "2026-10-13T00:36:56.4303071Z",
+  "issuedAtBangkok": "2026-10-13T07:36:56.4303071+07:00",
+  "admissionAuthority": "Direct user authorization for SP24: Authorize SP24, after SP23 was terminalized without candidate materialization or a test.",
+  "admissionBinding": {
+    "path": "D:\\GenesisBlock_Dev\\w1-evidence-20261010\\synthetic-pilots\\synthetic-pilot-20261013-sp24\\readiness\\admission.json",
+    "rule": "Admission binds this immutable Decision SHA-256; Decision omits Admission digest to avoid circular hashing."
+  },
+  "rootCauseAnalysis": {
+    "sha256": "8fab054d4604b1a62f89b5320fa6334a15be59d2845ab9dd7c538d10ba701eba",
+    "path": "D:\\GenesisBlock_Dev\\w1-evidence-20261010\\synthetic-pilots\\synthetic-pilot-20261013-sp24\\readiness\\root-cause-analysis.json"
+  },
+  "roots": {
+    "candidate": "D:\\GenesisBlock_Dev\\w1-evidence-20261010\\adapter\\synthetic-pilot-20261013-sp24",
+    "evidence": "D:\\GenesisBlock_Dev\\w1-evidence-20261010\\synthetic-pilots\\synthetic-pilot-20261013-sp24\\evidence",
+    "readiness": "D:\\GenesisBlock_Dev\\w1-evidence-20261010\\synthetic-pilots\\synthetic-pilot-20261013-sp24\\readiness"
+  },
+  "predecessorDisposition": {
+    "SP22": {
+      "retryPermitted": false,
+      "successorPermitted": false,
+      "status": "TERMINAL_TEST_FAILURE",
+      "terminalSha256": "6ffee26f478cf41c94561e17fe653b7c9c770493463b4242d9d14f4794430c8a"
+    },
+    "SP23": {
+      "correctionAddendumSha256": "b3bdf5df3e9661bd89b759a9770c0a28d76096af00625cb9d85d7afc1f1748b1",
+      "retryPermitted": false,
+      "successorPermitted": false,
+      "status": "TERMINAL_NOT_READY",
+      "terminalSha256": "4b28eddee169e7ff0b0b2522abf3c6faf6136865b8dbde503456a34b99660725"
+    },
+    "SP21": {
+      "retryPermitted": false,
+      "successorPermitted": false,
+      "status": "TERMINAL_NOT_READY",
+      "terminalSha256": "b2e11a0aea40f722975e85a4335f3068097d87e6b635330188ceeb175dc0f1fc"
+    }
+  },
+  "seed": {
+    "fileCount": 345,
+    "path": "D:\\GenesisBlock_Dev\\w1-evidence-20261010\\adapter\\synthetic-pilot-20261012-sp21",
+    "directoryCount": 108,
+    "decisionId": "W1-SYNTHETIC-GAP-REMEDIATION-20261012-SP21",
+    "manifestEncoding": "UTF-8 LF-terminated normalized forward-slash relative path<TAB>byte length<TAB>lowercase file SHA-256 rows, sorted with System.StringComparer.Ordinal, no BOM.",
+    "reparsePointCount": 0,
+    "manifestSha256": "a31388b7a3b6eeaea5069acdf1aa2bee726f97dc6c1a71e01a0334cbd22c06c4"
+  },
+  "scope": {
+    "patch": "Replace sessions-only path validation in readActualJournalRecord and readTrustedJournalLines with one shared resolver. Input must be absolute and lexically under current USERPROFILE/.codex/sessions. Resolve the original first; only ENOENT enables a same-basename fallback directly under USERPROFILE/.codex/archived_sessions. realpath both root and target and enforce within(). Do not alter any hash, line, identity, v5 manifest, or unrelated code.",
+    "preserveFixture": true,
+    "candidateSourceAllowlist": [
+      "identity-evidence.mjs"
+    ],
+    "requiredAssertions": [
+      "Seed copy equals all 345 SP21 files and directories before patch; no extra/missing files or reparse points.",
+      "After patch exactly identity-evidence.mjs differs from SP21; all other candidate files remain byte-identical.",
+      "Archived fallback is restricted to ENOENT, an input lexically inside the current user sessions root, and the same basename under the flat archive root; realpath containment is enforced.",
+      "Every original journal line/record SHA-256, source pin, identity relation, and full-close-v5 manifest remains unchanged and must match actual bytes.",
+      "F-01 evidence root remains outside candidate; synthetic request construction stays in memory and canonical outputs stay byte-identical.",
+      "F-02 helper remains bound to immutable full-close-v5 manifest and candidate completeness is checked.",
+      "No more than one complete artifact-manifest.test.mjs invocation; only after independent read-only review PASS and READY gate."
+    ],
+    "materialization": "Create one fresh SP24 candidate by copying frozen SP21 exactly once. Verify all bytes and the ordinal seed manifest before applying the single allowlisted patch.",
+    "noSP21Mutation": true,
+    "noSP23Mutation": true,
+    "noSP22Mutation": true,
+    "behavior": "Synthetic in-memory request construction and immutable-history checks. The pinned test may read existing archive journals to validate actual pinned lines and hashes. No live provider, production source, W1 implementation, real run initialization, reservation, GO, dispatch, release, deployment, or canonical readiness writes."
+  },
+  "immutableInputs": {
+    "runtime": [
+      {
+        "sha256": "42d5efb0a67904db67c37e8a900dce5afec8d73e2d7b2b0b07905520d01689c0",
+        "path": "D:\\GenesisBlock_Dev\\w1-evidence-20261010\\adapter\\synthetic-pilot-20261012-sp21\\runtime\\core.mjs",
+        "bytes": 81492
+      },
+      {
+        "sha256": "26fbde2e625433011d80e3e0262981102590eee64c0653f0259a77dc0ba73d60",
+        "path": "D:\\GenesisBlock_Dev\\w1-evidence-20261010\\adapter\\synthetic-pilot-20261012-sp21\\runtime\\store.mjs",
+        "bytes": 133897
+      }
+    ],
+    "seedManifestSha256": "a31388b7a3b6eeaea5069acdf1aa2bee726f97dc6c1a71e01a0334cbd22c06c4",
+    "guard": [
+      {
+        "sha256": "23077529b24b64853ef2c98df2640d09cca9309394448730a91dfd7b6078006f",
+        "path": "D:\\GenesisBlock_Dev\\GenesisBlock-Query-IR-W1-20261010\\scripts\\workflow-guard\\core.mjs",
+        "bytes": 81921
+      },
+      {
+        "sha256": "9a2bdf608ef9b6e189e8d99d4acfe2daf1f57363d84afe2eebb2899bca432e0e",
+        "path": "D:\\GenesisBlock_Dev\\GenesisBlock-Query-IR-W1-20261010\\scripts\\workflow-guard\\store.mjs",
+        "bytes": 86965
+      }
+    ],
+    "testSource": {
+      "sha256": "85fafaa141a790b91e0aa6a5cd8360dbb45625a4d14adc4e719db5aee67a237a",
+      "path": "D:\\GenesisBlock_Dev\\w1-evidence-20261010\\adapter\\synthetic-pilot-20261012-sp21\\artifact-manifest.test.mjs",
+      "immutable": true,
+      "bytes": 16117
+    },
+    "sourceIdentity": {
+      "sha256": "052e973c876f57d984e32a895737ea7fc6161b388211ca5d1c50b89465bf9b16",
+      "path": "D:\\GenesisBlock_Dev\\w1-evidence-20261010\\adapter\\synthetic-pilot-20261012-sp21\\identity-evidence.mjs",
+      "bytes": 58233
+    },
+    "effectivePlan": {
+      "sha256": "eb408762dec22c7e1d65c488a9629af95eb695eeec112ff15a23b8322cb1cdfd",
+      "path": "D:\\GenesisBlock_Dev\\GenesisBlock-Query-IR-W1-20261010\\queue\\QUERY_IR_W1_EFFECTIVE_PLAN.json",
+      "dispatchAuthorized": false,
+      "bytes": 19534
+    },
+    "crossReferencedSeedPins": {
+      "SP22MaterializationCandidate": "a31388b7a3b6eeaea5069acdf1aa2bee726f97dc6c1a71e01a0334cbd22c06c4",
+      "SP22MaterializationSeed": "a31388b7a3b6eeaea5069acdf1aa2bee726f97dc6c1a71e01a0334cbd22c06c4",
+      "SP23CorrectionAddendum": "a31388b7a3b6eeaea5069acdf1aa2bee726f97dc6c1a71e01a0334cbd22c06c4",
+      "SP22Decision": "a31388b7a3b6eeaea5069acdf1aa2bee726f97dc6c1a71e01a0334cbd22c06c4"
+    }
+  },
+  "baseline": {
+    "dispatchAuthorized": false,
+    "tree": "42e1485caf5a86649fb60331c5d361a3ca3e5bed",
+    "repository": "D:\\GenesisBlock_Dev\\GenesisBlock-Query-IR-W1-20261010",
+    "effectivePlanSha256": "eb408762dec22c7e1d65c488a9629af95eb695eeec112ff15a23b8322cb1cdfd",
+    "head": "1e9d65c40760ee8c45657dc7e100578f89d06f2c",
+    "statusCleanAtIssue": true,
+    "branch": "codex/sp24-evidence-20261013"
+  },
+  "test": {
+    "executable": "C:\\Users\\suanr\\.cache\\codex-runtimes\\codex-primary-runtime\\dependencies\\node\\bin\\node.exe",
+    "timeoutMs": 180000,
+    "cwd": "D:\\GenesisBlock_Dev\\w1-evidence-20261010\\adapter\\synthetic-pilot-20261013-sp24",
+    "arguments": [
+      "--test",
+      "artifact-manifest.test.mjs"
+    ],
+    "maxRuns": 1,
+    "startByUtc": "2026-10-13T02:01:56Z",
+    "finishByUtc": "2026-10-13T02:06:56Z"
+  },
+  "cutoffs": {
+    "independentPretestReviewBy": "2026-10-13T08:46:56+07:00",
+    "readyGateBy": "2026-10-13T08:51:56+07:00",
+    "candidateMaterializationAndPreflightBy": "2026-10-13T08:21:56+07:00",
+    "rule": "All absolute stage cutoffs are fixed at issuance. Any missed cutoff, failed review, hash mismatch, failed invocation, missing receipt, or candidate drift is terminal; no later cutoff revives SP24.",
+    "timezone": "Asia/Bangkok",
+    "terminalDispositionBy": "2026-10-13T09:21:56+07:00",
+    "testStartBy": "2026-10-13T09:01:56+07:00",
+    "testFinishBy": "2026-10-13T09:06:56+07:00",
+    "hardCutoff": "2026-10-13T09:36:56+07:00",
+    "hardCutoffUtc": "2026-10-13T02:36:56Z"
+  },
+  "lifecycle": {
+    "dispatchAuthorized": false,
+    "postFreezeCandidateEditsPermitted": false,
+    "extensionPermitted": false,
+    "retryPermitted": false,
+    "canonicalReadinessWritesAllowed": false,
+    "preserveFixture": true,
+    "successorPermitted": false
+  },
+  "budget": {
+    "candidateSourceFilesChanged": 1,
+    "planValidationCommands": 0,
+    "nativeAllocations": 0,
+    "automaticSuccessors": 0,
+    "testInvocationsMaximum": 1,
+    "testTimeoutMs": 180000,
+    "candidateMaterializations": 1,
+    "candidatePatchApplications": 1,
+    "independentPretestReviews": 1
+  },
+  "pretestGate": {
+    "readyRequiredBeforeTest": true,
+    "reviewerMustVerifyDecisionAdmissionRCAHashesCandidateManifestDiffF01F02AndDispatchState": true,
+    "reviewerMustNotRunTestsOrTestLikeCommands": true,
+    "reviewerTaskIdentityRequired": true,
+    "reviewerMustBeDistinctFromDecisionAuthorAndCandidateEditor": true,
+    "independentReviewRequired": true
+  },
+  "authorization": {
+    "realRunInitializationAuthorized": false,
+    "W1ImplementationAuthorized": false,
+    "nativeDispatchAuthorized": false,
+    "mergePushPublishDeployAuthorityFromDecision": false,
+    "nativeGoAuthorized": false,
+    "nativeReservationAuthorized": false,
+    "candidateMaterializationAuthorized": true,
+    "oneCandidatePatchAuthorized": true,
+    "canonicalReadinessWritesAuthorized": false,
+    "testConditionallyAuthorized": true
+  }
+}
