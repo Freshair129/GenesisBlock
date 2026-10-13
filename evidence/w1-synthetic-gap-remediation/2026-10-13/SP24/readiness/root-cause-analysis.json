@@ -1,0 +1,33 @@
+{
+  "schemaVersion": 1,
+  "artifactType": "SP24_ROOT_CAUSE_ANALYSIS",
+  "decisionId": "W1-SYNTHETIC-GAP-REMEDIATION-20261013-SP24",
+  "recordedAtUtc": "2026-10-13T00:36:56.4303071Z",
+  "recordedAtBangkok": "2026-10-13T07:36:56.4303071+07:00",
+  "status": "ROOT_CAUSE_CONFIRMED_PATCH_PROPOSED",
+  "priorEnvelope": {
+    "noTestInvoked": true,
+    "correctionSha256": "b3bdf5df3e9661bd89b759a9770c0a28d76096af00625cb9d85d7afc1f1748b1",
+    "decisionId": "W1-SYNTHETIC-GAP-REMEDIATION-20261013-SP23",
+    "terminalSha256": "4b28eddee169e7ff0b0b2522abf3c6faf6136865b8dbde503456a34b99660725",
+    "terminalPath": "D:\\GenesisBlock_Dev\\w1-evidence-20261010\\synthetic-pilots\\synthetic-pilot-20261013-sp23\\evidence\\terminal-disposition.json",
+    "terminalStatus": "TERMINAL_NOT_READY",
+    "correctionPath": "D:\\GenesisBlock_Dev\\w1-evidence-20261010\\synthetic-pilots\\synthetic-pilot-20261013-sp23\\evidence\\terminal-evidence-correction-addendum.json",
+    "noCandidateMaterialized": true
+  },
+  "observedFailure": "The SP22 synthetic test stopped at realpath(…/.codex/sessions/…) with ENOENT before the synthetic in-memory assertions.",
+  "rootCause": "Both journal readers trust only USERPROFILE/.codex/sessions and have no resolver for the user archive. Pinned source files are absent from the legacy date hierarchy but all 13 exact basenames occur once as flat files in USERPROFILE/.codex/archived_sessions.",
+  "correction": "In the isolated candidate only, add a shared path resolver that requires an absolute input under the current user sessions root; first use the original path, and only after ENOENT try the identical basename under the flat archived_sessions root. Realpath and containment-check the trusted root and target. Preserve every existing journal line, record SHA-256, external source pin, and identity validation. Do not copy or fabricate journal content.",
+  "verification": {
+    "matchesSP22Decision": true,
+    "matchesSP22ReceiptCandidate": true,
+    "pinnedJournalBasenameCount": 13,
+    "journalContentsRead": false,
+    "seedManifestLength": 64,
+    "seedManifestSha256": "a31388b7a3b6eeaea5069acdf1aa2bee726f97dc6c1a71e01a0334cbd22c06c4",
+    "matchesSP23Correction": true,
+    "matchesSP22ReceiptSeed": true,
+    "exactArchiveBasenameMatches": 13
+  },
+  "scope": "RCA and evidence only; no production source changes, no SP21/SP22 changes, no test invocation, and no W1 dispatch."
+}

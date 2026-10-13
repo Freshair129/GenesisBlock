@@ -1,0 +1,46 @@
+{
+  "schemaVersion": 1,
+  "artifactType": "SP24_TERMINAL_TIMESTAMP_CORRECTION_ADDENDUM",
+  "decisionId": "W1-SYNTHETIC-GAP-REMEDIATION-20261013-SP24",
+  "recordedAtUtc": "2026-10-13T00:54:11.5719714Z",
+  "recordedAtBangkok": "2026-10-13T07:54:11.5694529+07:00",
+  "correctsTerminalPath": "D:\\GenesisBlock_Dev\\w1-evidence-20261010\\synthetic-pilots\\synthetic-pilot-20261013-sp24\\evidence\\terminal-disposition.json",
+  "correctsTerminalSha256": "50a6a9457202145cc85030fbb50c90597668ae2b9cb4c95cbf0b21fbc92f26a8",
+  "correctsTimestampAddendumPath": "D:\\GenesisBlock_Dev\\w1-evidence-20261010\\synthetic-pilots\\synthetic-pilot-20261013-sp24\\evidence\\timestamp-normalization-addendum.json",
+  "correctsTimestampAddendumSha256": "c92e60dbde6ee6e8f6dadb599fd6ea82513ab42262887d7a06f0914f046bd689",
+  "invocationReceiptPath": "D:\\GenesisBlock_Dev\\w1-evidence-20261010\\synthetic-pilots\\synthetic-pilot-20261013-sp24\\evidence\\test-invocation.json",
+  "invocationReceiptSha256": "8e0220c530a320de9570b3b9b9275d5af553c61a4f00010e2f032d02eafca48c",
+  "reason": "A post-terminal precision check found that UTC normalization formatted timestamps after JSON date coercion, dropping fractional seconds in the derived UTC fields. The original Bangkok +07:00 strings remain intact and identify the exact instants; this addendum supplies UTC equivalents parsed directly from those original strings.",
+  "exactTimeline": [
+    {
+      "sourceField": "pretestGate.recordedAtBangkok",
+      "originalBangkok": "2026-10-13T07:48:15.0533933+07:00",
+      "correctUtc": "2026-10-13T00:48:15.0533933Z"
+    },
+    {
+      "sourceField": "testInvocation.startedAtBangkok",
+      "originalBangkok": "2026-10-13T07:49:14.1855386+07:00",
+      "correctUtc": "2026-10-13T00:49:14.1855386Z"
+    },
+    {
+      "sourceField": "testInvocation.finishedAtBangkok",
+      "originalBangkok": "2026-10-13T07:49:34.6763611+07:00",
+      "correctUtc": "2026-10-13T00:49:34.6763611Z"
+    }
+  ],
+  "corrections": [
+    "The pretest gate recordedAtUtc value is the Bangkok instant with +07:00; use exactTimeline[0].correctUtc for UTC.",
+    "The test invocation startedAtUtc and finishedAtUtc values carry +07:00 and should be interpreted using their Bangkok counterparts; exactTimeline[1..2] provide precise UTC equivalents.",
+    "The first timestamp-normalization addendum and terminal disposition rounded the derived UTC milliseconds to whole seconds; exactTimeline contains the corrected seven-digit fractional precision."
+  ],
+  "testStartCutoffUtc": "2026-10-13T02:01:56Z",
+  "testFinishCutoffUtc": "2026-10-13T02:06:56Z",
+  "startBeforeCutoff": true,
+  "finishBeforeCutoff": true,
+  "originalReceiptsModified": false,
+  "testInvocationsRemain": 1,
+  "retryPermitted": false,
+  "successorPermitted": false,
+  "dispatchAuthorized": false,
+  "terminalStatusUnchanged": "TERMINAL_SYNTHETIC_TEST_PASS"
+}
