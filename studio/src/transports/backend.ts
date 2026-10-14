@@ -237,6 +237,10 @@ function graphRequest(request: SceneRequest): Record<string, unknown> {
   return { seed: request.seed, limit: request.limit, direction: 'both' };
 }
 
+export async function pickLocalDataRoot(): Promise<string | null> {
+  return invoke<string | null>('studio_pick_local_root');
+}
+
 export async function createLocalTransport(path: string): Promise<StudioTransport> {
   const initial = await invoke<BackendCapabilities>('studio_open_local', { path });
   const capabilities = mapCapabilities(initial);

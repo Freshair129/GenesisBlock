@@ -8,8 +8,11 @@ test('connects to the explicit fixture workspace and renders a bounded graph', a
   await page.getByRole('button', { name: /Open fixture workspace/ }).click();
 
   await expect(page.getByRole('heading', { name: 'Graph' })).toBeVisible();
-  await expect(page.getByText('MOCK / READ ONLY', { exact: true })).toBeVisible();
-  await expect(page.getByLabel('Fixture knowledge graph')).toBeVisible();
+  await expect(page.getByText(/MOCK \/ READ ONLY/)).toBeVisible();
+  await expect(page.getByRole('searchbox', { name: 'Filter graph scene nodes' })).toBeVisible();
+  await page.getByText('Browse scene nodes (240)').click();
+  await expect(page.getByRole('list', { name: 'Graph scene nodes' })).toBeVisible();
+  await expect(page.getByRole('button', { name: /Memory 001, knowledge, Memory/ })).toBeVisible();
   await expect(page.getByText('240 / 1000 node budget')).toBeVisible();
 });
 

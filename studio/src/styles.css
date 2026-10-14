@@ -68,14 +68,15 @@ body {
 .mode-switch button.active { background: var(--ink); color: var(--paper); }
 .connection-field { display: grid; gap: 7px; margin-top: 14px; }
 .connection-field span { color: var(--muted); font: 8px 'Cascadia Mono', monospace; letter-spacing: .12em; }
+.connection-field > label { color: var(--muted); font: 8px 'Cascadia Mono', monospace; letter-spacing: .12em; }
 .connection-field input { width: 100%; padding: 12px; border: 1px solid var(--line); background: white; outline: none; }
 .connection-field input:focus { border-color: var(--cyan); box-shadow: 0 0 0 2px rgba(14, 116, 144, .12); }
 .connection-fields { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-.demo-presets { display: grid; gap: 10px; margin-top: 16px; }
-.demo-presets > span { color: var(--muted); font: 8px 'Cascadia Mono', monospace; letter-spacing: .12em; }
-.demo-presets > div { display: flex; flex-wrap: wrap; gap: 10px; }
-.demo-presets button { border: 1px solid var(--line); background: #fff; padding: 9px 12px; cursor: pointer; font-size: 10px; }
-.demo-presets button:hover { border-color: var(--cyan); color: var(--cyan); }
+.path-picker { display: flex; gap: 8px; }
+.path-picker input { min-width: 0; flex: 1; }
+.path-picker button { display: flex; align-items: center; gap: 7px; border: 1px solid var(--line); background: #fff; padding: 0 14px; cursor: pointer; font-size: 10px; }
+.path-picker button:hover:not(:disabled) { border-color: var(--cyan); color: var(--cyan); }
+.path-picker button:disabled { cursor: wait; opacity: .65; }
 .connection-actions { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
 .presentation-action { margin-top: 28px; display: inline-flex; align-items: center; gap: 8px; padding: 14px 16px; border: 1px solid var(--line); background: rgba(255,255,255,.92); cursor: pointer; }
 .presentation-action:hover { border-color: var(--cyan); color: var(--cyan); }
@@ -141,11 +142,6 @@ body {
 .graph-toolbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; gap: 20px; }
 .graph-toolbar label { width: min(330px, 45%); padding: 9px 12px; border: 1px solid var(--line); display: flex; align-items: center; gap: 9px; background: white; }
 .graph-toolbar input { width: 100%; border: 0; outline: none; background: transparent; font-size: 11px; }
-.spotlight-strip { display: flex; align-items: center; gap: 14px; margin-bottom: 12px; flex-wrap: wrap; }
-.spotlight-strip > span { color: var(--muted); font: 8px 'Cascadia Mono', monospace; letter-spacing: .12em; }
-.spotlight-strip > div { display: flex; gap: 10px; flex-wrap: wrap; }
-.spotlight-strip button { border: 1px solid var(--line); background: rgba(255,255,255,.92); padding: 8px 11px; font-size: 10px; cursor: pointer; }
-.spotlight-strip button:hover { border-color: var(--cyan); color: var(--cyan); }
 .legend { display: flex; gap: 15px; flex-wrap: wrap; }
 .legend span { display: flex; align-items: center; gap: 5px; color: var(--muted); font-size: 9px; }
 .legend i { width: 7px; height: 7px; border-radius: 50%; }
@@ -154,6 +150,17 @@ body {
 .graph-frame { height: calc(100% - 47px); position: relative; border: 1px solid var(--line); background: radial-gradient(circle at 50% 50%, #fff 0, #f7f3ea 68%); overflow: hidden; }
 .graph-frame::before { content: ''; position: absolute; inset: 0; pointer-events: none; background-image: radial-gradient(rgba(41,37,36,.14) .6px, transparent .6px); background-size: 16px 16px; opacity: .35; }
 .graph-canvas { position: absolute; inset: 0; }
+.graph-node-browser { position: absolute; z-index: 2; top: 12px; right: 12px; width: min(320px, calc(100% - 24px)); max-height: calc(100% - 24px); background: rgba(247, 243, 234, .97); border: 1px solid var(--line); box-shadow: 0 8px 24px rgba(41, 37, 36, .12); }
+.graph-node-browser summary { padding: 10px 12px; cursor: pointer; color: var(--ink); font: 10px 'Cascadia Mono', monospace; }
+.graph-node-browser[open] { display: flex; flex-direction: column; }
+.graph-node-browser ul { overflow: auto; max-height: min(54vh, 520px); margin: 0; padding: 0; list-style: none; border-top: 1px solid var(--line); }
+.graph-node-browser li + li { border-top: 1px solid var(--line); }
+.graph-node-browser li button { display: grid; gap: 4px; width: 100%; padding: 10px 12px; border: 0; border-left: 3px solid transparent; background: rgba(255,255,255,.72); text-align: left; cursor: pointer; }
+.graph-node-browser li button:hover, .graph-node-browser li button:focus-visible { outline: 2px solid var(--cyan); outline-offset: -2px; background: #fff; }
+.graph-node-browser li button[aria-pressed="true"] { border-left-color: var(--cyan); background: #ecfeff; }
+.graph-node-browser li button strong { font-size: 11px; }
+.graph-node-browser li button span, .graph-node-browser li button small { color: var(--muted); font-size: 9px; }
+.graph-node-browser > p { margin: 0; padding: 12px; color: var(--muted); font-size: 10px; }
 .graph-loading { height: 100%; display: grid; place-items: center; color: var(--muted); }
 .scene-stamp { position: absolute; left: 14px; bottom: 14px; display: flex; gap: 9px; align-items: center; padding: 9px 11px; border: 1px solid var(--line); background: rgba(247,243,234,.9); font: 8px 'Cascadia Mono', monospace; color: var(--muted); }
 .scene-stamp b { color: var(--ink); }

@@ -1,7 +1,7 @@
 ---
-version: "0.3.0b"
+version: "0.3.1b"
 created_at: "2026-07-21T21:30:49+07:00,ATHER,working-tree"
-last_update: "2026-07-22T00:22:00+07:00,ATHER"
+last_update: "2026-10-15T05:53:12+07:00,Codex"
 status: beta
 superseded_by: null
 attributes:
@@ -190,10 +190,12 @@ Local/remote adapters ต้อง map ไปยัง core/API ที่ approv
 
 1. ผู้ใช้เลือกหรือสร้าง Genesis data root ผ่าน native file picker.
 2. Tauri backend validate path, format/version และสิทธิ์ก่อนเปิด.
-3. Studio process เป็น lifecycle owner เพียงรายเดียวตลอด session.
-4. Engine ต้องถือ exclusive OS-level lock หรือ equivalent lease บน data root.
-5. ถ้า server/process อื่นถือ lock อยู่ Studio ต้องเปิดไม่ได้และแสดง owner/action ที่ปลอดภัย.
-6. ปิด app ต้อง flush ตาม engine contract, release lock และไม่ terminate ระหว่าง critical operation.
+3. ผู้ใช้เลือกโฟลเดอร์ผ่าน native directory picker หรือวาง path เองได้; Studio ต้องตรวจว่า path มีอยู่และเป็น directory ก่อนเรียก open พร้อมแสดง error ที่บอกวิธีแก้ได้.
+4. Local connection ห้ามเสนอ preset ที่ชี้ absolute path ของเครื่องพัฒนา; mock/presentation fixture ต้องแยกจากการเปิด local data root อย่างชัดเจน.
+5. Studio process เป็น lifecycle owner เพียงรายเดียวตลอด session.
+6. Engine ต้องถือ exclusive OS-level lock หรือ equivalent lease บน data root.
+7. ถ้า server/process อื่นถือ lock อยู่ Studio ต้องเปิดไม่ได้และแสดง owner/action ที่ปลอดภัย.
+8. ปิด app ต้อง flush ตาม engine contract, release lock และไม่ terminate ระหว่าง critical operation.
 
 ### 9.2 Remote Self-hosted
 
@@ -256,6 +258,7 @@ Graph workspace รวม pattern ที่มีคุณค่าจาก Neo
 - local neighborhood expansion ต่อ node และ direction;
 - bounded “global perspective” ตาม labels, relation types, collection, time และ sampling policy;
 - filters, groups, color/size rules, pin/unpin, hide, focus และ shortest visible path;
+- filterable semantic node list สำหรับคีย์บอร์ดและ screen reader; รายการต้องเปิดเผยชื่อ/type/group ของ node และ relation/direction ที่เกี่ยวข้อง และ selection ต้องตรงกับ canvas และ inspector;
 - Graph/Table/JSON views ของ result set เดียวกัน;
 - scene state เป็น client artifact แยกจาก database state.
 
@@ -272,6 +275,8 @@ S1 default budgets:
 | Query timeout | 10 s local / 15 s remote | cancel และคง scene เดิม |
 
 ตัวเลขเป็น initial product budget ต้อง benchmark ก่อน promote เป็น stable ไม่ใช่ engine capacity claim.
+
+จำนวน node เป็น resource budget ไม่ใช่เกณฑ์ความอ่านง่าย ที่ viewport อ้างอิง 1280x720 ฉากเริ่มต้นต้องไม่แสดง label ซ้อนกันจนแยก entity ไม่ได้; renderer ควรลดหรือเปิดเผย label ตาม focus/selection/zoom โดยยังคงเข้าถึงทุก node ผ่าน semantic node list ได้.
 
 ### 12.3 Renderer decision
 
@@ -482,9 +487,10 @@ Telemetry ออกนอกเครื่องเป็น opt-in เท่�
 | Transport contract | ชุด test เดียวรันกับ local adapter และ remote test server |
 | Rust/Tauri | path validation, lock contention, lifecycle close/crash recovery, command allowlist |
 | API | auth scopes, pagination/budgets, truncation, malformed filters, timeout/cancel |
-| UI component | result frames, unavailable/stale/not-authorized states, keyboard navigation |
-| E2E | connect -> inspect row -> graph expand -> vector neighbor -> time context |
+| UI component | result frames, unavailable/stale/not-authorized states, keyboard graph selection, node/link semantics, accessible names for graph filter and HQL editor |
+| E2E | connect -> inspect row -> graph expand -> vector neighbor -> time context; keyboard-select a graph node and inspect it |
 | Performance | 1k/3k scene, dense graph, slow remote, rapid cancel/refine |
+| Visual usability | 240-node reference fixture at 1280x720; initial labels remain distinguishable and selection/focus is apparent |
 | Security | token redaction, XSS payloads, malicious labels/props, certificate policy, privilege denial |
 | Compatibility | supported Windows/macOS/Linux matrix และ protocol N/N-1 policy |
 
@@ -570,6 +576,11 @@ Exit: threat model, restore drill, packaging matrix และ architecture revie
 10. WHEN remote authorization denies a scope THEN action SHALL remain denied even if UI state is manipulated.
 11. WHEN logs are exported THEN credentials, authorization headers and full embeddings SHALL be absent.
 12. WHEN Studio S1 is removed THEN no database-format migration or rollback action SHALL be required.
+13. WHEN a user selects a local root THEN Studio SHALL offer a native directory picker and SHALL reject a missing or non-directory path before opening storage with an actionable error.
+14. WHEN Studio offers a local sample THEN its path SHALL NOT depend on a developer-machine absolute path; mock presentation mode SHALL remain distinct from opening local storage.
+15. WHEN a user navigates the graph without a pointer THEN every node in the bounded scene SHALL be reachable and selectable, with node identity and relevant relation direction available to assistive technology.
+16. WHEN a user focuses the graph filter or HQL editor THEN each control SHALL expose a stable accessible name describing its purpose.
+17. WHEN the 240-node reference scene is shown at 1280x720 THEN labels SHALL remain distinguishable through density-aware rendering, while the semantic node list preserves access to all scene nodes.
 
 ## 27. Dependencies
 
@@ -635,6 +646,12 @@ Open questions เหล่านี้ไม่ block S0 mock/prototype แต�
 
 ## 32. Version diff
 
+### `0.3.0b -> 0.3.1b`
+
+- Clarified portable local-root selection and preflight validation requirements.
+- Added keyboard/screen-reader graph navigation and accessible-name acceptance criteria.
+- Added a reference-viewport label-readability criterion independent of scene node budgets.
+
 ### `0.2.0b -> 0.3.0b`
 
 - Added exclusive data-root ownership and a read-only WAL worker that never opens the native WAL for append.
@@ -662,6 +679,7 @@ Open questions เหล่านี้ไม่ block S0 mock/prototype แต�
 
 | Version | Date | Status | Summary | Commit Hash | Agent |
 |---------|------|--------|---------|-------------|-------|
+| 0.3.1b | 2026-10-15 | beta | Added portable local-root, graph accessibility, accessible-name, and scene label-readability criteria. | working-tree | Codex |
 | 0.3.0b | 2026-07-22 | beta | Implemented S1 read-only local/remote contracts and retained explicit S2-S4 safety gates. | working-tree | ATHER |
 | 0.2.0b | 2026-07-21 | beta | Implemented and verified the fixture-only S0 desktop product shell. | working-tree | ATHER |
 | 0.1.0b | 2026-07-21 | candidate | Initial Genesis Studio Desktop architecture and product contract. | working-tree | ATHER |
