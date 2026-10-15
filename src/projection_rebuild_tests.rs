@@ -73,7 +73,10 @@ fn failed_replay_keeps_original_projection_and_connection() {
         .append_wal_event(&Event::RelationalSchema(invalid))
         .unwrap();
     let error = storage.projection_rebuild_from_wal().unwrap_err();
-    assert!(error.to_string().contains("REL_SCHEMA_VERSION_CONFLICT"));
+    assert!(
+        error.to_string().contains("REL_SCHEMA_VERSION_CONFLICT"),
+        "expected schema-version conflict from replay, got: {error}"
+    );
     assert_eq!(
         storage.get_relational_schema("preserve").unwrap(),
         registered
@@ -89,10 +92,11 @@ fn busy_publication_keeps_original_projection_and_connection() {
     other.execute_batch("BEGIN IMMEDIATE;").unwrap();
     let result = storage.projection_rebuild_from_wal();
     other.execute_batch("ROLLBACK;").unwrap();
-    assert!(result
-        .unwrap_err()
-        .to_string()
-        .contains("PROJECTION_REBUILD_BUSY"));
+    let error = result.unwrap_err();
+    assert!(
+        error.to_string().contains("PROJECTION_REBUILD_BUSY"),
+        "expected busy error during publication, got: {error}"
+    );
     assert_eq!(rows(&storage), baseline);
     storage.projection_rebuild_from_wal().unwrap();
     assert_eq!(rows(&storage), baseline);

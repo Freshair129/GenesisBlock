@@ -5927,10 +5927,10 @@ impl Storage {
                 .as_mut()
                 .expect("candidate connection was just initialized");
             let backup = rusqlite::backup::Backup::new(&source, destination)
-                .map_err(|error| Error::from_reason(error.to_string()))?;
+                .map_err(Self::projection_backup_error)?;
             backup
                 .run_to_completion(256, Duration::from_millis(1), None)
-                .map_err(|error| Error::from_reason(error.to_string()))?;
+                .map_err(Self::projection_backup_error)?;
         }
         drop(source);
 
@@ -6126,12 +6126,9 @@ impl Storage {
         // reaches SQLITE_DONE. Dropping an unfinished rusqlite Backup calls
         // sqlite3_backup_finish, which rolls that transaction back on errors.
         let backup = rusqlite::backup::Backup::new(source, &mut destination)
-            .map_err(|error| Error::from_reason(error.to_string()))?;
+            .map_err(Self::projection_backup_error)?;
         loop {
-            match backup
-                .step(256)
-                .map_err(|error| Error::from_reason(error.to_string()))?
-            {
+            match backup.step(256).map_err(Self::projection_backup_error)? {
                 rusqlite::backup::StepResult::Done => return Ok(()),
                 rusqlite::backup::StepResult::More => {}
                 rusqlite::backup::StepResult::Busy | rusqlite::backup::StepResult::Locked => {
@@ -6145,6 +6142,19 @@ impl Storage {
                     ));
                 }
             }
+        }
+    }
+
+    fn projection_backup_error(error: rusqlite::Error) -> Error {
+        let busy = matches!(
+            error.sqlite_error_code(),
+            Some(rusqlite::ErrorCode::DatabaseBusy | rusqlite::ErrorCode::DatabaseLocked)
+        );
+        let message = error.to_string();
+        if busy {
+            Error::from_reason(format!("PROJECTION_REBUILD_BUSY: {message}"))
+        } else {
+            Error::from_reason(message)
         }
     }
 
