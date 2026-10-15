@@ -7,9 +7,13 @@ use tauri::State;
 #[cfg(desktop)]
 use tauri_plugin_dialog::DialogExt;
 
+mod remote;
+use remote::{RemoteConnection, StudioRemoteRequest};
+
 #[derive(Default)]
 struct StudioState {
     storage: Arc<Mutex<Option<Storage>>>,
+    remote: Arc<Mutex<Option<RemoteConnection>>>,
 }
 
 #[derive(Serialize)]
@@ -254,6 +258,52 @@ async fn studio_local_named_query(
     .map_err(|error| error.to_string())?
 }
 
+#[tauri::command]
+async fn studio_remote_configure(
+    state: State<'_, StudioState>,
+    base_url: String,
+    token: String,
+) -> Result<(), String> {
+    {
+        let mut remote = state
+            .remote
+            .lock()
+            .map_err(|_| "Studio remote state is poisoned".to_string())?;
+        *remote = None;
+    }
+    let connection = RemoteConnection::new(&base_url, &token)?;
+    let mut remote = state
+        .remote
+        .lock()
+        .map_err(|_| "Studio remote state is poisoned".to_string())?;
+    *remote = Some(connection);
+    Ok(())
+}
+
+#[tauri::command]
+async fn studio_remote_request(
+    state: State<'_, StudioState>,
+    request: StudioRemoteRequest,
+) -> Result<Value, String> {
+    let connection = state
+        .remote
+        .lock()
+        .map_err(|_| "Studio remote state is poisoned".to_string())?
+        .clone()
+        .ok_or_else(|| "No remote GenesisBlockDB is configured".to_string())?;
+    connection.request(request).await
+}
+
+#[tauri::command]
+async fn studio_remote_close(state: State<'_, StudioState>) -> Result<(), String> {
+    let mut remote = state
+        .remote
+        .lock()
+        .map_err(|_| "Studio remote state is poisoned".to_string())?;
+    *remote = None;
+    Ok(())
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -271,7 +321,10 @@ pub fn run() {
             studio_local_graph,
             studio_local_inspect,
             studio_local_hql,
-            studio_local_named_query
+            studio_local_named_query,
+            studio_remote_configure,
+            studio_remote_request,
+            studio_remote_close
         ])
         .run(tauri::generate_context!())
         .expect("error while running Genesis Studio");

@@ -5,6 +5,7 @@ on:
     paths:
       - '.github/workflows/studio-packaging.yml'
       - 'docs/SPEC--GENESIS-STUDIO-DESKTOP.md'
+      - 'scripts/studio-*-packaged-*'
       - 'studio/**'
       - 'src/lib.rs'
       - 'src/router.rs'
@@ -14,11 +15,15 @@ on:
     paths:
       - '.github/workflows/studio-packaging.yml'
       - 'docs/SPEC--GENESIS-STUDIO-DESKTOP.md'
+      - 'scripts/studio-*-packaged-*'
       - 'studio/**'
       - 'src/lib.rs'
       - 'src/router.rs'
       - 'tests/studio_contract_tests.rs'
   workflow_dispatch:
+
+permissions:
+  contents: read
 
 jobs:
   studio-package:
@@ -45,7 +50,7 @@ jobs:
           sudo apt-get update
           sudo apt-get install --no-install-recommends -y \
             build-essential curl file libssl-dev libwebkit2gtk-4.1-dev \
-            libxdo-dev librsvg2-dev wget
+            libxdo-dev librsvg2-dev wget xvfb dbus-x11
 
       - uses: actions/setup-node@v4
         with:
@@ -72,18 +77,63 @@ jobs:
         run: npm run build
 
       - name: Persisted local/remote transport parity
-        run: cargo test --no-default-features --test studio_contract_tests local_and_remote_studio_reads_match_on_the_same_persisted_fixture
+        run: cargo test --locked --no-default-features --jobs 1 --test studio_contract_tests local_and_remote_studio_reads_match_on_the_same_persisted_fixture
+
+      - name: Seed the packaged parity fixture
+        if: runner.os == 'Windows'
+        shell: powershell
+        run: |
+          $fixtureRoot = Join-Path $env:RUNNER_TEMP "studio parity fixture $([guid]::NewGuid().ToString('N'))"
+          [System.IO.File]::AppendAllText(
+            $env:GITHUB_ENV,
+            "STUDIO_PACKAGED_FIXTURE_ROOT=$fixtureRoot`n",
+            [System.Text.UTF8Encoding]::new($false)
+          )
+          $env:STUDIO_PACKAGED_FIXTURE_ROOT = $fixtureRoot
+          cargo test --locked --no-default-features --jobs 1 --test studio_contract_tests seed_packaged_studio_parity_fixture -- --ignored --exact --nocapture
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          if (-not (Test-Path -LiteralPath $fixtureRoot -PathType Container)) {
+            throw 'The packaged Studio parity fixture seeder did not create its requested root'
+          }
+          if (-not (Get-ChildItem -LiteralPath $fixtureRoot -Force | Select-Object -First 1)) {
+            throw 'The packaged Studio parity fixture seeder produced an empty data root'
+          }
+
+      - name: Build REST server for packaged parity
+        if: runner.os == 'Windows'
+        run: cargo build --locked --no-default-features --features bins --bin genesis-db-server --jobs 1
 
       - name: Tauri shell tests
         working-directory: studio
-        run: cargo test --manifest-path src-tauri/Cargo.toml --locked
+        run: cargo test --manifest-path src-tauri/Cargo.toml --locked --jobs 1
 
       - name: Build platform installer
         working-directory: studio
         run: npx tauri build --debug --bundles ${{ matrix.bundle }}
 
+      - name: Install and exercise packaged Windows startup and root selection
+        if: runner.os == 'Windows'
+        shell: powershell
+        run: .\scripts\studio-windows-packaged-smoke.ps1
+
+      - name: Install and launch packaged macOS app
+        if: runner.os == 'macOS'
+        run: ./scripts/studio-macos-packaged-smoke.sh
+
+      - name: Install and launch packaged Linux app
+        if: runner.os == 'Linux'
+        run: ./scripts/studio-linux-packaged-smoke.sh
+
       - uses: actions/upload-artifact@v4
+        if: always()
         with:
           name: genesis-studio-${{ matrix.bundle }}-${{ runner.os }}
           path: studio/src-tauri/target/debug/bundle/${{ matrix.bundle }}/*
-          if-no-files-found: error
+          if-no-files-found: warn
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: genesis-studio-smoke-evidence-${{ runner.os }}
+          path: ${{ runner.temp }}/studio-packaged-evidence/**
+          if-no-files-found: warn

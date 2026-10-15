@@ -1,7 +1,7 @@
 ---
-version: "0.3.4b"
+version: "0.3.5b"
 created_at: "2026-07-21T21:30:49+07:00,ATHER,working-tree"
-last_update: "2026-10-15T10:47:45+07:00,Codex"
+last_update: "2026-10-15T11:43:50+07:00,Codex"
 status: beta
 superseded_by: null
 related_issue: 231
@@ -443,7 +443,13 @@ bootstrap/single-operator mode ได้ แต่ไม่เพียงพอ
 - logs/telemetry ห้ามบันทึก Authorization header, query secrets หรือ full embeddings;
 - export profile ไม่รวม secret;
 - logout/revoke ต้อง clear cached token และ in-memory sensitive state;
-- WebView ไม่มี direct network permission นอก allowlisted origins; remote calls ควรผ่าน hardened adapter.
+- packaged S1 WebView ไม่มี direct remote-network permission; remote REST calls ผ่าน Rust native bridge และ operation allowlist ที่ map ไปยัง fixed read-only routes/methods;
+- native bridge รับเฉพาะ HTTPS หรือ HTTP บน loopback, require host, validate port, reject credentials/query/fragment/path traversal or delimiters (including repeated percent-encoding), preserve the configured path prefix, and disable redirects;
+- entity IDs reject dot segments, separators, query/fragment delimiters, invalid encoded bytes, and their repeated percent-encoded forms before being appended as one path segment;
+- native response buffering is capped at 32 MiB for JSON and 64 KiB for error bodies, including chunked responses;
+- graph query รับเฉพาะ bounded `limit`, optional `seed`, และ `direction` (`out`, `in`, `both`); entity IDs are appended as one encoded path segment; other methods/paths are not caller-selectable;
+- Authorization is held in memory for the configured connection and attached only to that connection's origin; disconnect clears the native configuration. The production CSP remains restricted to app/IPC origins and does not add a wildcard HTTPS source;
+- the S1 token is still entered in WebView memory and is not persisted by this bridge; OS credential-store integration remains required before production.
 
 ## 20. Consistency และ freshness UX
 
@@ -532,8 +538,10 @@ S0 performance evidence เป็น functional scene budget proof ที่ 240
 - [x] Wire status, collections, logical relational schema/named query และ read-only HQL.
 - [x] Add capability, bounded graph scene/expand and entity inspection APIs.
 - [x] Deliver Overview, Data, Graph, Vectors, Query และ Entity Inspector read-only.
-- [ ] Complete packaged local/remote semantic-parity drill against the same persisted fixture.
-- [ ] Complete independent architecture/security review and cross-platform packaging evidence.
+- [ ] Complete packaged local/remote semantic-parity drill against the same persisted fixture (Windows fixture seed, picker selection, and dual-transport probe added; current revision has not run in CI).
+- [ ] Record installed-app startup smoke on Windows, macOS, and Linux from the packaged CI matrix (smoke steps added; fresh CI evidence pending).
+- [ ] Exercise packaged Windows native root selection and missing/non-directory path handling (UI automation now probes both errors, opens/cancels the real folder dialog, then selects the persisted fixture; current revision has not run in CI).
+- [ ] Complete independent architecture/security review and packaged local/remote parity evidence.
 
 Status: **BETA IMPLEMENTED; release exit remains open.** The persisted-fixture
 regression `cargo test --test studio_contract_tests
@@ -546,16 +554,28 @@ and the durable frontier. The test runs the local and REST owners sequentially
 because the data root is exclusively locked. It is engine/router evidence, not
 a packaged Tauri-to-remote click-through.
 
+Packaged remote transport now sends the fixed capability, status, frontier,
+collections, relational-schema, graph, entity, HQL-read, and named-query
+operations over Tauri IPC to a Rust HTTP client. The client validates the
+configured origin and URL components, disables redirects, applies a 15-second
+timeout, and sends the bearer header only on those fixed requests. Production
+CSP remains unchanged. Browser preview continues to use `fetch`; its tests are
+not evidence of packaged WebView networking.
+
 Current Windows verification:
 
 | Check | Result |
 |---|---|
-| `npm test` | 3 files, 11 tests passed |
-| `npm run build` | TypeScript + Vite production build passed |
+| `npm test` | 3 files, 13 tests passed, including native bridge selection, disconnect cleanup, and handshake-failure cleanup |
+| `npm run build` | TypeScript + Vite production build passed after native bridge change |
 | `npm run test:e2e` | 4 desktop/mobile Chromium cases passed against the presentation fixture only |
-| Persisted-fixture parity test | 1 passed; local `Storage` and REST router results compared on the same reopened database |
+| Persisted-fixture parity test | 1 passed; local `Storage` and REST router results compared on the same reopened graph/vector/relational database |
 | Local-root validation test | 1 passed; blank, missing, file, and Unicode/space-containing directory paths covered |
 | Studio package matrix [run 38677091691](https://github.com/Freshair129/GenesisBlock/actions/runs/38677091691) | `genesis-studio-msi-Windows`, `genesis-studio-dmg-macOS`, and `genesis-studio-deb-Linux` built and uploaded; installed startup not tested |
+| Current PR package startup smoke | Install/launch steps added for MSI, DMG, and DEB, with uploaded smoke logs; first CI execution pending |
+| Current PR Windows packaged picker/parity probe | Fixture seeder and UIA missing/non-directory, cancel, successful selection, and local/remote result comparison added; first CI execution pending |
+| Current PR native remote Rust tests | `cargo test --manifest-path studio/src-tauri/Cargo.toml --locked --lib --jobs 1`: 9 passed, 0 failed, including URL/IPv6 loopback, route allowlist, CSP, token/redirect, bounded-body, and path-validation cases |
+| Current PR packaged parity server build | `cargo build --locked --no-default-features --features bins --bin genesis-db-server --jobs 1`: passed |
 
 The parity test's output included Node-API host `GetProcAddress` warnings, but
 the test completed with a pass. The package workflow invokes it with
@@ -583,6 +603,25 @@ review remain release gates. The review must record P0/P1 findings; none may
 remain unresolved without an explicitly accepted risk. The release-gate RCA is
 tracked in
 [RCA--STUDIO-S1-RELEASE-GATES](../.brain/rca/RCA--STUDIO-S1-RELEASE-GATES.md).
+The successful package matrix predates the native remote-bridge change in this
+PR revision; fresh cross-platform package checks are still required for that
+code. The new Windows packaged probe seeds one persisted graph/vector/relational
+fixture, uses the native picker to cancel and then select that folder, opens it
+in packaged local mode, disconnects, and starts the REST server over that same
+fixture before reconnecting in remote mode. It compares declared read
+capabilities/limits and raw results for status/frontier, graph scene and
+expansion, vector collections, relational schemas, entity inspection,
+read-only HQL, and the registered named query; it also checks the visible S1
+results. The probe now
+includes packaged missing and non-directory path cases. These steps have not
+run on the current revision and are not yet evidence. The independent review
+must examine repeated percent-decoding in path
+validation, entity-ID route boundaries, response-size limits, token forwarding
+and cleanup, redirect handling, and the unchanged production CSP. The updated
+workflow installs and launches each package in a bounded startup window; only
+the Windows package runs the local/remote parity and root-picker interaction
+probe. All acceptance gates remain open until the resulting artifacts and
+independent review are recorded.
 
 ### S2 - Governed mutations
 
@@ -692,6 +731,12 @@ Open questions เหล่านี้ไม่ block S0 mock/prototype แต�
 
 ## 32. Version diff
 
+### `0.3.4b -> 0.3.5b`
+
+- Route packaged remote reads through a fixed, read-only Tauri native operation allowlist so strict production CSP can remain unchanged.
+- Validate configured origin, scheme, host, port, path, graph query values, and entity IDs; disable redirects and clear in-memory remote credentials on disconnect.
+- Keep OS credential-store integration, packaged startup/picker/parity, fresh package CI, and independent review open.
+
 ### `0.3.3b -> 0.3.4b`
 
 - Recorded successful Windows MSI, macOS DMG, and Linux DEB package builds and uploads.
@@ -743,6 +788,7 @@ Open questions เหล่านี้ไม่ block S0 mock/prototype แต�
 
 | Version | Date | Status | Summary | Commit Hash | Agent |
 |---------|------|--------|---------|-------------|-------|
+| 0.3.5b | 2026-10-15 | beta | Route packaged remote reads through validated Tauri IPC/native HTTP without broadening production CSP; retain credential-store and release-evidence gates. | working-tree | Codex |
 | 0.3.4b | 2026-10-15 | beta | Recorded successful Windows, macOS, and Linux package artifact builds; startup and interaction gates remain open. | working-tree | Codex |
 | 0.3.3b | 2026-10-15 | beta | Configured existing platform icons and recorded initial package CI results; Windows rerun pending. | working-tree | Codex |
 | 0.3.2b | 2026-10-15 | beta | Added persisted-fixture parity and path evidence; enabled platform package CI and retained release gates. | working-tree | Codex |

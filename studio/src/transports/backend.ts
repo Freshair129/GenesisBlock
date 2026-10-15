@@ -1,4 +1,4 @@
-import { invoke } from '@tauri-apps/api/core';
+import { invoke, isTauri } from '@tauri-apps/api/core';
 import type {
   EntityInspection,
   GraphScene,
@@ -298,13 +298,45 @@ export async function createLocalTransport(path: string): Promise<StudioTranspor
 
 type Fetcher = typeof fetch;
 
+type NativeRemoteOperation =
+  | { kind: 'capabilities' }
+  | { kind: 'status' }
+  | { kind: 'frontier' }
+  | { kind: 'collections' }
+  | { kind: 'relationalSchemas' }
+  | { kind: 'graph'; limit: number; seed?: string; direction?: 'out' | 'in' | 'both' }
+  | { kind: 'entity'; entityId: string }
+  | { kind: 'readOnlyHql'; query: string }
+  | { kind: 'namedQuery'; request: Record<string, unknown> };
+
+interface NativeRemoteBridge {
+  configure(baseUrl: string, token: string): Promise<void>;
+  request<T>(operation: NativeRemoteOperation): Promise<T>;
+  close(): Promise<void>;
+}
+
+interface RemoteTransportOptions {
+  fetcher?: Fetcher;
+  nativeBridge?: NativeRemoteBridge;
+}
+
+const tauriRemoteBridge: NativeRemoteBridge = {
+  configure: (baseUrl, token) => invoke('studio_remote_configure', { baseUrl, token }),
+  request: <T>(request: NativeRemoteOperation) => invoke<T>('studio_remote_request', { request }),
+  close: () => invoke('studio_remote_close'),
+};
+
 export async function createRemoteTransport(
   baseUrl: string,
   token = '',
-  fetcher: Fetcher = fetch,
+  options: RemoteTransportOptions = {},
 ): Promise<StudioTransport> {
   const normalizedBase = baseUrl.replace(/\/$/, '');
-  const request = async <T>(path: string, init?: RequestInit): Promise<T> => {
+  const nativeBridge = options.nativeBridge ?? (isTauri() ? tauriRemoteBridge : undefined);
+  const fetcher = options.fetcher ?? fetch;
+  if (nativeBridge) await nativeBridge.configure(baseUrl, token);
+  const request = async <T>(operation: NativeRemoteOperation, path: string, init?: RequestInit): Promise<T> => {
+    if (nativeBridge) return nativeBridge.request<T>(operation);
     const headers = new Headers(init?.headers);
     headers.set('accept', 'application/json');
     if (init?.body) headers.set('content-type', 'application/json');
@@ -316,17 +348,28 @@ export async function createRemoteTransport(
     }
     return response.json() as Promise<T>;
   };
-  const capabilities = mapCapabilities(await request<BackendCapabilities>('/v1/studio/capabilities'));
+  let capabilities: StudioCapabilities;
+  try {
+    capabilities = mapCapabilities(await request<BackendCapabilities>(
+      { kind: 'capabilities' },
+      '/v1/studio/capabilities',
+    ));
+  } catch (error) {
+    if (nativeBridge) await nativeBridge.close().catch(() => undefined);
+    throw error;
+  }
   return {
     kind: 'remote',
-    async close() {},
+    async close() {
+      if (nativeBridge) await nativeBridge.close();
+    },
     async getCapabilities() {
       return capabilities;
     },
     async getStatus() {
       const [status, frontier] = await Promise.all([
-        request<Record<string, number>>('/v1/status'),
-        request<number>('/v1/frontier'),
+        request<Record<string, number>>({ kind: 'status' }, '/v1/status'),
+        request<number>({ kind: 'frontier' }, '/v1/frontier'),
       ]);
       return envelope(
         {
@@ -341,29 +384,44 @@ export async function createRemoteTransport(
       );
     },
     async listCollections() {
-      return envelope(mapCollections(await request<BackendCollection[]>('/v1/collections')), null);
+      return envelope(mapCollections(await request<BackendCollection[]>(
+        { kind: 'collections' },
+        '/v1/collections',
+      )), null);
     },
     async listRelationalSchemas() {
-      return envelope(mapSchemas(await request<BackendSchema[]>('/v1/studio/relational/schemas')), null);
+      return envelope(mapSchemas(await request<BackendSchema[]>(
+        { kind: 'relationalSchemas' },
+        '/v1/studio/relational/schemas',
+      )), null);
     },
     async executeNamedQuery(queryRequest: NamedQueryRequest) {
-      const data = await request<Record<string, unknown>[]>('/v1/relational/query', {
+      const data = await request<Record<string, unknown>[]>(
+        { kind: 'namedQuery', request: namedQueryRequest(queryRequest) },
+        '/v1/relational/query', {
         method: 'POST',
         body: JSON.stringify(namedQueryRequest(queryRequest)),
-      });
+        },
+      );
       return envelope(data, null);
     },
     async executeReadOnlyHql(query: string) {
-      const data = await request<Record<string, unknown>[]>('/v1/studio/query/read', {
+      const data = await request<Record<string, unknown>[]>(
+        { kind: 'readOnlyHql', query },
+        '/v1/studio/query/read', {
         method: 'POST',
         body: JSON.stringify({ query }),
-      });
+        },
+      );
       return envelope(data, null);
     },
     async loadGraphScene(sceneRequest: SceneRequest) {
       const search = new URLSearchParams({ limit: String(sceneRequest.limit) });
       if (sceneRequest.seed) search.set('seed', sceneRequest.seed);
-      return mapScene(await request<BackendGraphScene>(`/v1/studio/graph?${search}`));
+      return mapScene(await request<BackendGraphScene>(
+        { kind: 'graph', limit: sceneRequest.limit, ...(sceneRequest.seed ? { seed: sceneRequest.seed } : {}) },
+        `/v1/studio/graph?${search}`,
+      ));
     },
     async expandGraphScene(nodeId: string) {
       const search = new URLSearchParams({
@@ -371,11 +429,22 @@ export async function createRemoteTransport(
         limit: String(capabilities.limits.expansionNodes),
         direction: 'both',
       });
-      return mapScene(await request<BackendGraphScene>(`/v1/studio/graph?${search}`));
+      return mapScene(await request<BackendGraphScene>(
+        {
+          kind: 'graph',
+          seed: nodeId,
+          limit: capabilities.limits.expansionNodes,
+          direction: 'both',
+        },
+        `/v1/studio/graph?${search}`,
+      ));
     },
     async inspectEntity(entityId: string) {
       return mapInspection(
-        await request<BackendInspection>(`/v1/studio/entity/${encodeURIComponent(entityId)}`),
+        await request<BackendInspection>(
+          { kind: 'entity', entityId },
+          `/v1/studio/entity/${encodeURIComponent(entityId)}`,
+        ),
       );
     },
   };

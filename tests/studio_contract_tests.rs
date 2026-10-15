@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::{path::Path, sync::Arc};
 
 use axum::body::Body;
 use axum::http::{Request, StatusCode};
@@ -16,10 +16,14 @@ use tempfile::TempDir;
 use tower::ServiceExt;
 
 fn storage(dir: &TempDir) -> Storage {
+    storage_at(dir.path(), false)
+}
+
+fn storage_at(path: &Path, read_only: bool) -> Storage {
     Storage::open(OpenOptions {
-        path: dir.path().to_string_lossy().into_owned(),
+        path: path.to_string_lossy().into_owned(),
         page_cache_mb: Some(16),
-        read_only: Some(false),
+        read_only: Some(read_only),
         vector_dim: Some(4),
         retention: None,
     })
@@ -27,14 +31,7 @@ fn storage(dir: &TempDir) -> Storage {
 }
 
 fn read_only_storage(dir: &TempDir) -> Storage {
-    Storage::open(OpenOptions {
-        path: dir.path().to_string_lossy().into_owned(),
-        page_cache_mb: Some(16),
-        read_only: Some(true),
-        vector_dim: Some(4),
-        retention: None,
-    })
-    .unwrap()
+    storage_at(dir.path(), true)
 }
 
 fn seed_graph(storage: &Storage) {
@@ -72,6 +69,16 @@ fn seed_graph(storage: &Storage) {
             })
             .unwrap();
     }
+}
+
+fn seed_vector_fixture(storage: &Storage) {
+    storage
+        .add_vector(
+            "b".to_string(),
+            storage.default_collection.clone(),
+            vec![0.25, 0.5, 0.75, 1.0],
+        )
+        .unwrap();
 }
 
 fn seed_relational_fixture(storage: &Storage) {
@@ -122,6 +129,46 @@ fn seed_relational_fixture(storage: &Storage) {
             }],
         })
         .unwrap();
+}
+
+#[test]
+#[ignore = "invoked only by the packaged Studio parity workflow"]
+fn seed_packaged_studio_parity_fixture() {
+    let root = std::env::var("STUDIO_PACKAGED_FIXTURE_ROOT")
+        .expect("STUDIO_PACKAGED_FIXTURE_ROOT must name a fresh fixture directory");
+    let root = std::path::PathBuf::from(root);
+    std::fs::create_dir_all(&root).unwrap();
+    assert!(
+        std::fs::read_dir(&root).unwrap().next().is_none(),
+        "packaged parity fixture directory must be empty before seeding"
+    );
+
+    let storage = storage_at(&root, false);
+    seed_graph(&storage);
+    seed_vector_fixture(&storage);
+    seed_relational_fixture(&storage);
+    storage.save_state().unwrap();
+    drop(storage);
+
+    let reopened = storage_at(&root, true);
+    assert_eq!(reopened.nodes.len(), 3);
+    assert_eq!(reopened.edges.len(), 2);
+    assert_eq!(reopened.list_collections().len(), 1);
+    assert!(reopened.studio_inspect_entity("b").unwrap().vector_present);
+    assert_eq!(
+        reopened
+            .list_relational_schemas()
+            .unwrap()
+            .iter()
+            .map(|schema| schema.namespace.as_str())
+            .collect::<Vec<_>>(),
+        vec!["studio_fixture"]
+    );
+    drop(reopened);
+    println!(
+        "Seeded and reopened packaged Studio parity fixture at {}",
+        root.display()
+    );
 }
 
 #[test]
@@ -283,6 +330,7 @@ async fn local_and_remote_studio_reads_match_on_the_same_persisted_fixture() {
         .unwrap();
     let writer = storage(&dir);
     seed_graph(&writer);
+    seed_vector_fixture(&writer);
     seed_relational_fixture(&writer);
     drop(writer);
 
