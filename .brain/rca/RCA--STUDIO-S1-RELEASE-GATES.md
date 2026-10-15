@@ -245,8 +245,10 @@ because PowerShell observed a blank/unavailable `$uiSmokeProcess.ExitCode`
 after waiting without refreshing the `Process` snapshot. The wrapper now calls
 `Refresh()`, distinguishes unavailable exit status from a concrete nonzero
 code, and a local deliberate-child probe confirmed it rejects exit code 7.
-The package workflow will run that guard probe and then the packaged smoke on
-the next exact head. Until that run is green, packaged acceptance remains open.
+The package workflow was expected to run that guard probe and packaged smoke
+on the next exact head. At the time of this incident update, packaged
+acceptance remained open; the subsequent exact-head result is recorded in
+Resolution below.
 
 The independent review's P2 finding was that `studio_remote_request` cloned a
 connection before awaiting, while close only removed the shared `Option`; a

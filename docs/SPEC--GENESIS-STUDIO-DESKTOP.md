@@ -1,7 +1,7 @@
 ---
-version: "0.3.6b"
+version: "0.3.7b"
 created_at: "2026-07-21T21:30:49+07:00,ATHER,working-tree"
-last_update: "2026-10-15T17:59:30+07:00,Codex"
+last_update: "2026-10-15T18:03:00+07:00,Codex"
 status: beta
 superseded_by: null
 related_issue: 231
@@ -583,9 +583,10 @@ Run 38706084034 passed those checks, completed native and visible local/remote
 result comparisons, then threw while formatting its summary because it read
 `visibleResults.overview` instead of the nested
 `visibleResults.local.overview`. That field path is corrected; a passing rerun
-that writes `studio-packaged-parity.json` is still required.
+that writes `studio-packaged-parity.json` was required at that point; the later
+exact-head run recorded above completed the parity probe and wrote the result.
 
-Current Windows verification:
+Windows verification history and final release evidence:
 
 | Check | Result |
 |---|---|
@@ -605,9 +606,9 @@ Current Windows verification:
 | Run 38706084034 package artifacts | [Windows MSI](https://github.com/Freshair129/GenesisBlock/actions/runs/38706084034/artifacts/11959552051), [Windows smoke evidence](https://github.com/Freshair129/GenesisBlock/actions/runs/38706084034/artifacts/11959671655), [Linux DEB](https://github.com/Freshair129/GenesisBlock/actions/runs/38706084034/artifacts/11958298820), [Linux smoke evidence](https://github.com/Freshair129/GenesisBlock/actions/runs/38706084034/artifacts/11958488601). The Windows artifact records missing/non-directory handling, picker cancellation/selection, normal MSI startup, and REST server responses; the smoke failed before writing parity JSON. |
 | Windows ordinary MSI startup (run 38706084034) | SHA-256 `c6cfd6edabce70442d3f0699e7fa8afd66e588a6a3562500dfe3f69dbde259bd`; install exit 0; `C:\Program Files\Genesis Studio\genesis-studio.exe` remained alive for 10 seconds; uninstall exit 0; cleanup complete. Evidence explicitly sets `visible_ui_verified: false` and `fixture_parity: false`. |
 | Windows packaged picker/path/local reads (run 38698802743) | CDP endpoint became ready. Missing-root, non-directory, picker-cancel, and picker-select signals passed; exact fixture path was selected. Connect local and visible/native local reads completed. The following Connections-button click failed because the narrow responsive layout hid it. No remote request ran in that build. |
-| Packaged remote origin and parity | Run 38706084034 passed the negotiated-mode and visible `REMOTE / READ ONLY` assertions. Native and visible local/remote result comparisons completed, and the REST server returned HTTP 200 for the fixed read operations. The smoke then threw `TypeError` while constructing the summary because its caller passed `{local, remote}` but the summary read `visibleResults.overview`. No `studio-packaged-parity.json` was written; this run is not accepted as packaged parity. The field path now reads `visibleResults.local.overview`; independent architecture/security review and a passing exact-head comparison remain open. |
+| Earlier packaged remote-origin attempt | Run 38706084034 passed the negotiated-mode and visible `REMOTE / READ ONLY` assertions. Native and visible local/remote result comparisons completed, and the REST server returned HTTP 200 for the fixed read operations. The smoke then threw `TypeError` while constructing the summary because its caller passed `{local, remote}` but the summary read `visibleResults.overview`. No `studio-packaged-parity.json` was written; this run was not accepted as packaged parity. At that stage, a passing exact-head comparison and independent architecture/security review were still open; both were completed in the final evidence above. |
 | Current local cancellation/proxy regressions (2026-10-15) | `cargo test --manifest-path studio/src-tauri/Cargo.toml --locked --offline --lib remote::tests --jobs 1`: 12 passed, 0 failed, 2 filtered. Covers queued close/reconfigure cancellation, deterministic response-header and response-body cancellation, stale-generation installation, and loopback proxy bypass with HTTPS proxy support. |
-| Current Tauri library suite (2026-10-15) | `cargo test --manifest-path studio/src-tauri/Cargo.toml --locked --offline --lib --jobs 1`: 14 passed, 0 failed. This is local source-test evidence; fresh packaged CI and independent review on the resulting head remain pending. |
+| Tauri library suite (2026-10-15) | `cargo test --manifest-path studio/src-tauri/Cargo.toml --locked --offline --lib --jobs 1`: 14 passed, 0 failed. This local source-test result complements the final-head packaged CI and independent review recorded above. |
 | Current PR packaged parity server build | `cargo build --locked --no-default-features --features bins --bin genesis-db-server --jobs 1`: passed in the Windows packaging workflow. |
 
 The parity test's output included Node-API host `GetProcAddress` warnings, but
@@ -638,9 +639,10 @@ missing/non-directory handling and native picker cancel/select passed, and the
 selected input exactly matched the persisted fixture root. Connect local then
 timed out before reaching `local / local`. The later run 38698802743 reached
 local mode and completed local reads, but failed at the responsive-hidden
-Connections control before starting remote mode. The independent
-architecture/security review remains a release gate and must record P0/P1
-findings; none may remain unresolved without an explicitly accepted risk.
+Connections control before starting remote mode. At this point in the run
+history, the independent architecture/security review was still a release gate
+and needed to record P0/P1 findings; the final review and its disposition are
+recorded in the S1 status above and the linked RCA.
 The release-gate RCA is tracked in
 [RCA--STUDIO-S1-RELEASE-GATES](../.brain/rca/RCA--STUDIO-S1-RELEASE-GATES.md).
 
@@ -664,12 +666,12 @@ the picker, local connection, and local read steps before the missing Connection
 control stopped it from starting the REST server. Run 38702744877 passed that
 navigation step and reached remote routes, but the smoke's hidden-label
 `innerText` assertion timed out before the parity result was written. Local/remote
-parity remains unproven pending a passing packaged rerun. The independent review
-must examine
+parity was unproven at that point, before the passing packaged rerun recorded
+above. The independent review examined
 repeated percent-decoding in path validation, entity-ID route boundaries,
 response-size limits, token forwarding and cleanup, redirect handling, and the
-unchanged production CSP. All acceptance gates remain open until fresh Windows
-smoke evidence and the independent review are recorded.
+unchanged production CSP. These earlier failed runs are retained as incident
+history; the later exact-head evidence above closes the S1 beta acceptance gates.
 
 ### S2 - Governed mutations
 
@@ -783,7 +785,8 @@ Open questions เหล่านี้ไม่ block S0 mock/prototype แต�
 
 - Cancel cloned native remote requests and clear shared authorization on disconnect/reconfigure; race cancellation across request send and bounded response reads.
 - Record run 38709296386's nine-operation packaged parity artifact and correct the Windows PowerShell process exit-code guard that falsely marked its successful smoke as failed.
-- Keep parity/package acceptance and independent re-review open pending a green exact-head Windows/macOS/Linux rerun.
+- Add a unique per-invocation exit marker so stale smoke evidence cannot satisfy the packaged Windows guard.
+- Record the passing exact-head Windows/macOS/Linux package, startup, parity, test, security, performance, and independent review evidence; close the S1 beta release gates. Keep OS credential-store integration and S2-S4 as separate gates.
 
 ### `0.3.4b -> 0.3.5b`
 
@@ -842,7 +845,7 @@ Open questions เหล่านี้ไม่ block S0 mock/prototype แต�
 
 | Version | Date | Status | Summary | Commit Hash | Agent |
 |---------|------|--------|---------|-------------|-------|
-| 0.3.7b | 2026-10-15 | beta | Cancel remote operations on disconnect/reconfigure, clear shared authorization, and repair the Windows packaged smoke exit-code guard; exact-head package rerun and independent re-review pending. | working-tree | Codex |
+| 0.3.7b | 2026-10-15 | beta | Cancel remote operations on disconnect/reconfigure, clear shared authorization, harden packaged smoke exit evidence, and record completed exact-head S1 release verification. | working-tree | Codex |
 | 0.3.6b | 2026-10-15 | beta | Recorded the Windows packaged smoke's summary-shape failure and corrected its nested overview path; exact-head parity and package rerun remain pending. | working-tree | Codex |
 | 0.3.5b | 2026-10-15 | beta | Route packaged remote reads through validated Tauri IPC/native HTTP without broadening production CSP; retain credential-store and release-evidence gates. | working-tree | Codex |
 | 0.3.4b | 2026-10-15 | beta | Recorded successful Windows, macOS, and Linux package artifact builds; startup and interaction gates remain open. | working-tree | Codex |
@@ -853,4 +856,4 @@ Open questions เหล่านี้ไม่ block S0 mock/prototype แต�
 | 0.2.0b | 2026-07-21 | beta | Implemented and verified the fixture-only S0 desktop product shell. | working-tree | ATHER |
 | 0.1.0b | 2026-07-21 | candidate | Initial Genesis Studio Desktop architecture and product contract. | working-tree | ATHER |
 
-S0 is complete. S1 is implemented as beta; packaged parity and independent review remain release gates. S2-S4 remain gated.
+S0 is complete. S1 beta implementation and packaged release evidence are verified; the S1 beta release gates are complete. OS credential-store integration and S2-S4 remain separate production and phase gates.
