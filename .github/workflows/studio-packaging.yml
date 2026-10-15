@@ -123,6 +123,11 @@ jobs:
           New-Item -ItemType Directory -Path $artifactDirectory -Force | Out-Null
           Copy-Item -Path (Join-Path $sourceDirectory '*') -Destination $artifactDirectory -Recurse -Force
 
+      - name: Install and launch the ordinary Windows MSI
+        if: runner.os == 'Windows'
+        shell: powershell
+        run: .\scripts\studio-windows-normal-msi-smoke.ps1
+
       - name: Stage normal package artifact (macOS/Linux)
         if: runner.os != 'Windows'
         run: |

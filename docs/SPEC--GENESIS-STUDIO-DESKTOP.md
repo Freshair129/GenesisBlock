@@ -574,7 +574,7 @@ Current Windows verification:
 | Studio package matrix [run 38686388595](https://github.com/Freshair129/GenesisBlock/actions/runs/38686388595), head `5419a91cca67cd5aca67deea130c031d2eaa84f4` | MSI, DMG, and DEB artifacts uploaded. Linux DEB and macOS DMG install/launch smoke steps passed. Windows MSI installation succeeded, but packaged UI smoke failed before UI interaction because `connectOverCDP` received `ECONNREFUSED` at `127.0.0.1:50705`. |
 | Package artifacts | [Windows MSI](https://github.com/Freshair129/GenesisBlock/actions/runs/38686388595/artifacts/11950739509), [macOS DMG](https://github.com/Freshair129/GenesisBlock/actions/runs/38686388595/artifacts/11950784409), [Linux DEB](https://github.com/Freshair129/GenesisBlock/actions/runs/38686388595/artifacts/11950242206) |
 | Smoke evidence artifacts | [Windows logs](https://github.com/Freshair129/GenesisBlock/actions/runs/38686388595/artifacts/11950994174), [macOS log](https://github.com/Freshair129/GenesisBlock/actions/runs/38686388595/artifacts/11950489465), [Linux log](https://github.com/Freshair129/GenesisBlock/actions/runs/38686388595/artifacts/11949977720) |
-| Windows packaged picker/parity probe | Fixture seeding and REST-server build passed, but the Playwright/CDP connection failed before the missing-path, non-directory, picker, or packaged local/remote interactions began. The follow-up workflow now builds a separate test-only MSI with explicit WebView2 debug arguments and uploads the ordinary MSI; fresh CI evidence is pending. |
+| Windows packaged picker/parity probe | Fixture seeding and REST-server build passed, but the Playwright/CDP connection failed before the missing-path, non-directory, picker, or packaged local/remote interactions began. The follow-up workflow now installs and launches the staged ordinary MSI for a bounded process-survival check, removes it, then builds a separate test-only MSI with explicit WebView2 debug arguments; only the ordinary MSI is uploaded. Fresh CI evidence is pending. |
 | Packaged remote-origin/CSP | No installed UI session reached remote mode in this run. Browser tests do not prove remote connectivity under the packaged production CSP; this remains an acceptance gate. |
 | Current PR native remote Rust tests | `cargo test --manifest-path studio/src-tauri/Cargo.toml --locked --lib --jobs 1`: 9 passed, 0 failed, including URL/IPv6 loopback, route allowlist, CSP, token/redirect, bounded-body, and path-validation cases |
 | Current PR packaged parity server build | `cargo build --locked --no-default-features --features bins --bin genesis-db-server --jobs 1`: passed |
@@ -614,11 +614,13 @@ The Windows smoke harness originally set `WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS`
 at launch time. Wry 0.55.1 supplies its browser arguments explicitly through
 WebView2 environment options, so that environment variable did not enable the
 CDP port; the runner failed to connect before the first UI action. The follow-up
-workflow builds an isolated smoke MSI with `app.windows[0].additionalBrowserArgs`
-and a per-run loopback debugging port, while staging and uploading the ordinary
-MSI separately so the debug-enabled package is not published as the package
-artifact. This correction requires fresh CI. The Windows probe is intended to
-seed one persisted graph/vector/relational fixture, select it with the native
+workflow first installs and launches the staged ordinary MSI for a bounded
+10-second process-survival check, records its package hash and install/launch/
+uninstall evidence, and removes it. It then builds an isolated smoke MSI with
+`app.windows[0].additionalBrowserArgs` and a per-run loopback debugging port;
+only the ordinary MSI is uploaded, so the debug-enabled package is not published
+as the package artifact. These workflow changes require fresh CI. The Windows
+probe is intended to seed one persisted graph/vector/relational fixture, select it with the native
 picker, open it in packaged local mode, then start the REST server over that
 same fixture and compare packaged remote results. It compares declared read
 capabilities/limits and raw results for status/frontier, graph scene and

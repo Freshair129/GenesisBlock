@@ -153,7 +153,12 @@ before the first UI action because the CDP endpoint was refused; see the
 The Windows seed and REST-server build passed, but no packaged picker-selection,
 remote-origin/CSP, or packaged local/remote parity result is claimed. The
 follow-up now creates an isolated smoke-only MSI with explicit WebView2
-arguments; that correction still requires fresh CI.
+arguments. The workflow now separately installs the staged ordinary MSI,
+launches the installed executable for ten seconds, records the ordinary MSI's
+SHA-256 plus install/launch/uninstall results, and removes it before building
+the instrumented MSI. This proves only installer execution and process survival,
+not visible-screen readiness or root selection. The new evidence step requires
+fresh CI; the instrumented MSI remains excluded from uploaded package artifacts.
 Independent architecture/security review acceptance also remains open until
 the exact revised diff is reviewed and recorded.
 
