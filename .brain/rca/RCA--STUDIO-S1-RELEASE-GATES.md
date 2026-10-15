@@ -182,7 +182,7 @@ release gates.
 
 The native remote bridge code has frontend Vitest/build coverage. Its Rust URL,
 allowlist, token-forwarding, redirect, response-size, and CSP tests passed 9/9
-in the Tauri library target. The strengthened persisted-fixture contract test
+in the earlier Tauri library target. The strengthened persisted-fixture contract test
 passed 1/1 and the read-only REST server binary build passed. Packaging run
 [38690064356](https://github.com/Freshair129/GenesisBlock/actions/runs/38690064356)
 passed Linux DEB and macOS DMG installation/startup probes and uploaded all
@@ -254,9 +254,17 @@ queued clone could retain its bearer value and send after disconnect. The fix
 adds a checked configuration generation, shared cancellation token and shared
 authorization slot. Close/reconfigure cancel the token and clear shared auth;
 request send and each bounded response chunk read race against cancellation.
-Validation on this worktree: offline locked Cargo check passed; targeted
-disconnect tests passed 2/2, and all remote bridge Rust tests passed 10/10.
-The formal Codex Security launcher rejected its target before returning a
-scan ID, so no formal scan is claimed. The independent reviewer must re-review
-the new head. Keep issue #231 and merge open until that review and a fresh
-Windows/Linux/macOS package run pass.
+Validation on this worktree: `cargo test --manifest-path
+studio/src-tauri/Cargo.toml --locked --offline --lib remote::tests --jobs 1`
+passed 12/12, and the full locked/offline Tauri library target passed 14/14.
+The regressions deterministically hold a local server before response headers,
+hold the response body after the reader consumes its first chunk, assert close
+and reconfigure cancel cloned queued requests before server acceptance, and
+assert a stale-generation connection cannot be installed or sent. Cancellation
+is also checked after body handling and before returning parsed success or
+formatted errors. `cargo fmt` and `git diff --check` passed. No package CI or
+independent review has run on this new head yet; the formal Codex Security
+launcher rejected its target before returning a scan ID, so no formal scan is
+claimed.
+The independent reviewer must re-review the new head. Keep issue #231 and
+merge open until that review and a fresh Windows/Linux/macOS package run pass.

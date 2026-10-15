@@ -171,7 +171,10 @@ impl RemoteConnection {
         }
     }
 
-    pub async fn request(&self, request: StudioRemoteRequest) -> Result<Value, String> {
+    async fn send_request(
+        &self,
+        request: StudioRemoteRequest,
+    ) -> Result<reqwest::Response, String> {
         if self.cancellation.is_cancelled() {
             return Err(remote_connection_closed_error());
         }
@@ -206,8 +209,16 @@ impl RemoteConnection {
         if self.cancellation.is_cancelled() {
             return Err(remote_connection_closed_error());
         }
+        Ok(response)
+    }
+
+    pub async fn request(&self, request: StudioRemoteRequest) -> Result<Value, String> {
+        let response = self.send_request(request).await?;
         let status = response.status();
         if status.is_redirection() {
+            if self.cancellation.is_cancelled() {
+                return Err(remote_connection_closed_error());
+            }
             return Err(format!(
                 "Genesis server redirected the request with {status}; redirects are disabled"
             ));
@@ -217,8 +228,12 @@ impl RemoteConnection {
                 response,
                 MAX_REMOTE_ERROR_RESPONSE_BYTES,
                 &self.cancellation,
+                || {},
             )
             .await?;
+            if self.cancellation.is_cancelled() {
+                return Err(remote_connection_closed_error());
+            }
             let detail = String::from_utf8_lossy(&body);
             let detail = if truncated {
                 if detail.trim().is_empty() {
@@ -232,29 +247,44 @@ impl RemoteConnection {
             } else {
                 detail.trim().to_string()
             };
-            return Err(format!(
+            let error = format!(
                 "Genesis server {status}: {}",
                 if detail.is_empty() {
                     status.canonical_reason().unwrap_or("request failed")
                 } else {
                     detail.as_str()
                 }
-            ));
+            );
+            if self.cancellation.is_cancelled() {
+                return Err(remote_connection_closed_error());
+            }
+            return Err(error);
         }
         let (body, truncated) = read_bounded_response_body(
             response,
             MAX_REMOTE_JSON_RESPONSE_BYTES,
             &self.cancellation,
+            || {},
         )
         .await?;
+        if self.cancellation.is_cancelled() {
+            return Err(remote_connection_closed_error());
+        }
         if truncated {
+            if self.cancellation.is_cancelled() {
+                return Err(remote_connection_closed_error());
+            }
             return Err(format!(
                 "Genesis server response exceeded the Studio limit of {} bytes",
                 MAX_REMOTE_JSON_RESPONSE_BYTES
             ));
         }
-        serde_json::from_slice::<Value>(&body)
-            .map_err(|error| format!("Genesis server returned invalid JSON: {error}"))
+        let result = serde_json::from_slice::<Value>(&body)
+            .map_err(|error| format!("Genesis server returned invalid JSON: {error}"));
+        if self.cancellation.is_cancelled() {
+            return Err(remote_connection_closed_error());
+        }
+        result
     }
 }
 
@@ -272,6 +302,7 @@ async fn read_bounded_response_body(
     mut response: reqwest::Response,
     max_bytes: usize,
     cancellation: &CancellationToken,
+    mut after_chunk: impl FnMut(),
 ) -> Result<(Vec<u8>, bool), String> {
     let declared_length = response.content_length();
     if declared_length.is_some_and(|length| length > max_bytes as u64) {
@@ -296,9 +327,11 @@ async fn read_bounded_response_body(
         let remaining = max_bytes.saturating_sub(body.len());
         if chunk.len() > remaining {
             body.extend_from_slice(&chunk[..remaining]);
+            after_chunk();
             return Ok((body, true));
         }
         body.extend_from_slice(&chunk);
+        after_chunk();
         if body.len() == max_bytes {
             // For chunked responses, treat an exact-limit body as truncated
             // rather than fetching and allocating a possibly unbounded chunk.
@@ -851,7 +884,7 @@ mod tests {
         });
         let result = tauri::async_runtime::block_on(async {
             let response = reqwest::Client::new().get(url).send().await.unwrap();
-            read_bounded_response_body(response, 8, &CancellationToken::new()).await
+            read_bounded_response_body(response, 8, &CancellationToken::new(), || {}).await
         })
         .unwrap();
         request.join().unwrap();
@@ -903,7 +936,7 @@ mod tests {
     fn close_cancels_an_inflight_response_body_read() {
         let listener = TcpListener::bind((std::net::Ipv4Addr::LOCALHOST, 0)).unwrap();
         let address = listener.local_addr().unwrap();
-        let (started_sender, started_receiver) = std::sync::mpsc::channel();
+        let (first_chunk_sender, first_chunk_receiver) = std::sync::mpsc::channel();
         let (release_sender, release_receiver) = std::sync::mpsc::channel();
         let server = thread::spawn(move || {
             let (mut stream, _) = listener.accept().unwrap();
@@ -928,7 +961,6 @@ mod tests {
                 )
                 .unwrap();
             stream.flush().unwrap();
-            started_sender.send(()).unwrap();
             let _ = release_receiver.recv_timeout(Duration::from_secs(3));
         });
 
@@ -941,27 +973,121 @@ mod tests {
             )
             .unwrap();
         let request_state = Arc::clone(&state);
+        let (result_sender, result_receiver) = std::sync::mpsc::channel();
         let request = thread::spawn(move || {
             let connection = request_state.connection().unwrap();
-            tauri::async_runtime::block_on(async {
-                connection.request(StudioRemoteRequest::Status).await
-            })
+            let result = tauri::async_runtime::block_on(async {
+                let response = connection.send_request(StudioRemoteRequest::Status).await?;
+                read_bounded_response_body(response, 100, &connection.cancellation, || {
+                    let _ = first_chunk_sender.send(());
+                })
+                .await
+            });
+            result_sender.send(result).unwrap();
         });
 
-        started_receiver
+        first_chunk_receiver
             .recv_timeout(Duration::from_secs(2))
-            .expect("the in-flight request did not reach the test server");
-        // Let reqwest consume the initial byte and wait for the rest of the
-        // declared body before disconnect invalidates the shared connection.
-        thread::sleep(Duration::from_millis(100));
+            .expect("the response reader did not consume the first body chunk");
         state.close().unwrap();
-        let result = request.join().unwrap();
+        let result = result_receiver
+            .recv_timeout(Duration::from_secs(1))
+            .expect("disconnect did not cancel the body read waiting for more data");
         release_sender.send(()).unwrap();
+        request.join().unwrap();
         server.join().unwrap();
 
         assert!(result
             .unwrap_err()
             .contains("connection was closed or replaced"));
+    }
+
+    #[test]
+    fn close_cancels_a_request_while_waiting_for_response_headers() {
+        let listener = TcpListener::bind((std::net::Ipv4Addr::LOCALHOST, 0)).unwrap();
+        let address = listener.local_addr().unwrap();
+        let (started_sender, started_receiver) = std::sync::mpsc::channel();
+        let (release_sender, release_receiver) = std::sync::mpsc::channel();
+        let server = thread::spawn(move || {
+            let (mut stream, _) = listener.accept().unwrap();
+            stream
+                .set_read_timeout(Some(Duration::from_secs(2)))
+                .unwrap();
+            let mut request = Vec::new();
+            let mut buffer = [0; 1024];
+            loop {
+                let bytes = stream.read(&mut buffer).unwrap_or(0);
+                if bytes == 0 {
+                    break;
+                }
+                request.extend_from_slice(&buffer[..bytes]);
+                if request.windows(4).any(|window| window == b"\r\n\r\n") {
+                    break;
+                }
+            }
+            started_sender.send(()).unwrap();
+            // Deliberately withhold response headers until the caller cancels.
+            let _ = release_receiver.recv_timeout(Duration::from_secs(3));
+        });
+
+        let state = Arc::new(RemoteState::default());
+        let generation = state.begin_reconfigure().unwrap();
+        state
+            .install(
+                generation,
+                RemoteConnection::new(&format!("http://{address}"), "headers-secret").unwrap(),
+            )
+            .unwrap();
+        let request_state = Arc::clone(&state);
+        let (result_sender, result_receiver) = std::sync::mpsc::channel();
+        let request = thread::spawn(move || {
+            let connection = request_state.connection().unwrap();
+            let result = tauri::async_runtime::block_on(async {
+                connection.request(StudioRemoteRequest::Status).await
+            });
+            result_sender.send(result).unwrap();
+        });
+
+        started_receiver
+            .recv_timeout(Duration::from_secs(2))
+            .expect("the test server did not accept the request");
+        state.close().unwrap();
+        let result = result_receiver
+            .recv_timeout(Duration::from_secs(1))
+            .expect("disconnect did not cancel the request waiting for headers");
+        release_sender.send(()).unwrap();
+        request.join().unwrap();
+        server.join().unwrap();
+
+        assert!(result
+            .unwrap_err()
+            .contains("connection was closed or replaced"));
+    }
+
+    #[test]
+    fn stale_generation_install_cancels_the_unpublished_connection() {
+        let listener = TcpListener::bind((std::net::Ipv4Addr::LOCALHOST, 0)).unwrap();
+        listener.set_nonblocking(true).unwrap();
+        let url = format!("http://{}", listener.local_addr().unwrap());
+        let state = RemoteState::default();
+        let stale_generation = state.begin_reconfigure().unwrap();
+        state.begin_reconfigure().unwrap();
+        let stale_connection = RemoteConnection::new(&url, "stale-secret").unwrap();
+        let stale_clone = stale_connection.clone();
+
+        assert!(state.install(stale_generation, stale_connection).is_err());
+        let result = tauri::async_runtime::block_on(async {
+            stale_clone.request(StudioRemoteRequest::Status).await
+        });
+
+        assert!(result
+            .unwrap_err()
+            .contains("connection was closed or replaced"));
+        match listener.accept() {
+            Err(error) if error.kind() == std::io::ErrorKind::WouldBlock => {}
+            Ok(_) => panic!("stale unpublished connection reached its server"),
+            Err(error) => panic!("could not check stale connection listener: {error}"),
+        }
     }
 
     #[test]
@@ -1050,10 +1176,11 @@ mod tests {
         let result =
             tauri::async_runtime::block_on(async { https_client.get(remote).send().await });
         assert!(result.is_err(), "the test proxy does not complete TLS");
-        assert!(proxy_request
-            .join()
-            .unwrap()
-            .starts_with("CONNECT example.com:443 HTTP/1.1"));
+        let proxy_request = proxy_request.join().unwrap();
+        assert!(
+            proxy_request.starts_with("CONNECT example.com:443 HTTP/1.1"),
+            "unexpected HTTPS proxy request: {proxy_request:?}"
+        );
     }
 
     #[test]
