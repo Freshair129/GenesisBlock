@@ -6127,9 +6127,29 @@ impl Storage {
         // sqlite3_backup_finish, which rolls that transaction back on errors.
         let backup = rusqlite::backup::Backup::new(source, &mut destination)
             .map_err(|error| Error::from_reason(error.to_string()))?;
-        backup
-            .run_to_completion(256, Duration::from_millis(1), None)
-            .map_err(|error| Error::from_reason(error.to_string()))
+        loop {
+            match backup
+                .step(256)
+                .map_err(|error| Error::from_reason(error.to_string()))?
+            {
+                rusqlite::backup::StepResult::Done => return Ok(()),
+                rusqlite::backup::StepResult::More => {}
+                rusqlite::backup::StepResult::Busy | rusqlite::backup::StepResult::Locked => {
+                    return Err(Error::from_reason(
+                        "PROJECTION_REBUILD_BUSY: projection publication could not acquire SQLite locks",
+                    ));
+                }
+            }
+        }
+    }
+
+    #[cfg(test)]
+    fn projection_rebuild_from_wal(&self) -> Result<()> {
+        if self.read_only {
+            return Ok(());
+        }
+        let journal_fingerprint = self.projection_journal_fingerprint()?;
+        self.projection_rebuild_fresh_candidate(&journal_fingerprint, None)
     }
 
     fn projection_replay_wal(&self) -> Result<()> {
