@@ -538,9 +538,9 @@ S0 performance evidence เป็น functional scene budget proof ที่ 240
 - [x] Wire status, collections, logical relational schema/named query และ read-only HQL.
 - [x] Add capability, bounded graph scene/expand and entity inspection APIs.
 - [x] Deliver Overview, Data, Graph, Vectors, Query และ Entity Inspector read-only.
-- [ ] Complete packaged local/remote semantic-parity drill against the same persisted fixture (Windows fixture seed, picker selection, and dual-transport probe added; current revision has not run in CI).
-- [ ] Record installed-app startup smoke on Windows, macOS, and Linux from the packaged CI matrix (smoke steps added; fresh CI evidence pending).
-- [ ] Exercise packaged Windows native root selection and missing/non-directory path handling (UI automation now probes both errors, opens/cancels the real folder dialog, then selects the persisted fixture; current revision has not run in CI).
+- [ ] Complete packaged local/remote semantic-parity drill against the same persisted fixture. The Windows fixture seed and REST server build passed in CI, but the installed-app UI probe failed before it could connect to the WebView2 CDP endpoint; no packaged parity result is claimed.
+- [ ] Record installed-app startup smoke on Windows, macOS, and Linux from the packaged CI matrix. Linux DEB and macOS DMG install/launch probes passed; Windows MSI installed, but the UI/CDP probe failed before confirming its startup screen.
+- [ ] Exercise packaged Windows native root selection and missing/non-directory path handling. The Windows smoke failed before its first UI action, so no packaged path or native folder-picker interaction is evidenced.
 - [ ] Complete independent architecture/security review and packaged local/remote parity evidence.
 
 Status: **BETA IMPLEMENTED; release exit remains open.** The persisted-fixture
@@ -571,9 +571,11 @@ Current Windows verification:
 | `npm run test:e2e` | 4 desktop/mobile Chromium cases passed against the presentation fixture only |
 | Persisted-fixture parity test | 1 passed; local `Storage` and REST router results compared on the same reopened graph/vector/relational database |
 | Local-root validation test | 1 passed; blank, missing, file, and Unicode/space-containing directory paths covered |
-| Studio package matrix [run 38677091691](https://github.com/Freshair129/GenesisBlock/actions/runs/38677091691) | `genesis-studio-msi-Windows`, `genesis-studio-dmg-macOS`, and `genesis-studio-deb-Linux` built and uploaded; installed startup not tested |
-| Current PR package startup smoke | Install/launch steps added for MSI, DMG, and DEB, with uploaded smoke logs; first CI execution pending |
-| Current PR Windows packaged picker/parity probe | Fixture seeder and UIA missing/non-directory, cancel, successful selection, and local/remote result comparison added; first CI execution pending |
+| Studio package matrix [run 38686388595](https://github.com/Freshair129/GenesisBlock/actions/runs/38686388595), head `5419a91cca67cd5aca67deea130c031d2eaa84f4` | MSI, DMG, and DEB artifacts uploaded. Linux DEB and macOS DMG install/launch smoke steps passed. Windows MSI installation succeeded, but packaged UI smoke failed before UI interaction because `connectOverCDP` received `ECONNREFUSED` at `127.0.0.1:50705`. |
+| Package artifacts | [Windows MSI](https://github.com/Freshair129/GenesisBlock/actions/runs/38686388595/artifacts/11950739509), [macOS DMG](https://github.com/Freshair129/GenesisBlock/actions/runs/38686388595/artifacts/11950784409), [Linux DEB](https://github.com/Freshair129/GenesisBlock/actions/runs/38686388595/artifacts/11950242206) |
+| Smoke evidence artifacts | [Windows logs](https://github.com/Freshair129/GenesisBlock/actions/runs/38686388595/artifacts/11950994174), [macOS log](https://github.com/Freshair129/GenesisBlock/actions/runs/38686388595/artifacts/11950489465), [Linux log](https://github.com/Freshair129/GenesisBlock/actions/runs/38686388595/artifacts/11949977720) |
+| Windows packaged picker/parity probe | Fixture seeding and REST-server build passed, but the Playwright/CDP connection failed before the missing-path, non-directory, picker, or packaged local/remote interactions began. The follow-up workflow now builds a separate test-only MSI with explicit WebView2 debug arguments and uploads the ordinary MSI; fresh CI evidence is pending. |
+| Packaged remote-origin/CSP | No installed UI session reached remote mode in this run. Browser tests do not prove remote connectivity under the packaged production CSP; this remains an acceptance gate. |
 | Current PR native remote Rust tests | `cargo test --manifest-path studio/src-tauri/Cargo.toml --locked --lib --jobs 1`: 9 passed, 0 failed, including URL/IPv6 loopback, route allowlist, CSP, token/redirect, bounded-body, and path-validation cases |
 | Current PR packaged parity server build | `cargo build --locked --no-default-features --features bins --bin genesis-db-server --jobs 1`: passed |
 
@@ -596,32 +598,38 @@ the existing `.ico` asset. The configuration now lists the existing PNG, ICNS,
 and ICO files, and the corrected matrix
 ([run 38677091691](https://github.com/Freshair129/GenesisBlock/actions/runs/38677091691))
 passed on Windows, macOS, and Linux and uploaded all three package artifacts.
-These package builds do not establish installed-app startup or picker
-interaction. Packaged local/remote parity, packaged picker interaction,
-cross-platform startup evidence, and the independent architecture/security
-review remain release gates. The review must record P0/P1 findings; none may
-remain unresolved without an explicitly accepted risk. The release-gate RCA is
-tracked in
+The latest run at head `5419a91cca67cd5aca67deea130c031d2eaa84f4`
+([run 38686388595](https://github.com/Freshair129/GenesisBlock/actions/runs/38686388595))
+also completed all three platform package jobs. Linux DEB and macOS DMG
+installed-app launch probes passed. The Windows MSI installer completed
+successfully, but its UI probe failed before the first interaction because the
+WebView2 CDP endpoint was refused. The Windows packaged picker, startup screen,
+and local/remote parity are therefore not established. The independent
+architecture/security review remains a release gate. The review must record
+P0/P1 findings; none may remain unresolved without an explicitly accepted risk.
+The release-gate RCA is tracked in
 [RCA--STUDIO-S1-RELEASE-GATES](../.brain/rca/RCA--STUDIO-S1-RELEASE-GATES.md).
-The successful package matrix predates the native remote-bridge change in this
-PR revision; fresh cross-platform package checks are still required for that
-code. The new Windows packaged probe seeds one persisted graph/vector/relational
-fixture, uses the native picker to cancel and then select that folder, opens it
-in packaged local mode, disconnects, and starts the REST server over that same
-fixture before reconnecting in remote mode. It compares declared read
+
+The Windows smoke harness originally set `WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS`
+at launch time. Wry 0.55.1 supplies its browser arguments explicitly through
+WebView2 environment options, so that environment variable did not enable the
+CDP port; the runner failed to connect before the first UI action. The follow-up
+workflow builds an isolated smoke MSI with `app.windows[0].additionalBrowserArgs`
+and a per-run loopback debugging port, while staging and uploading the ordinary
+MSI separately so the debug-enabled package is not published as the package
+artifact. This correction requires fresh CI. The Windows probe is intended to
+seed one persisted graph/vector/relational fixture, select it with the native
+picker, open it in packaged local mode, then start the REST server over that
+same fixture and compare packaged remote results. It compares declared read
 capabilities/limits and raw results for status/frontier, graph scene and
 expansion, vector collections, relational schemas, entity inspection,
-read-only HQL, and the registered named query; it also checks the visible S1
-results. The probe now
-includes packaged missing and non-directory path cases. These steps have not
-run on the current revision and are not yet evidence. The independent review
-must examine repeated percent-decoding in path
-validation, entity-ID route boundaries, response-size limits, token forwarding
-and cleanup, redirect handling, and the unchanged production CSP. The updated
-workflow installs and launches each package in a bounded startup window; only
-the Windows package runs the local/remote parity and root-picker interaction
-probe. All acceptance gates remain open until the resulting artifacts and
-independent review are recorded.
+read-only HQL, and the registered named query, plus visible S1 results. The
+probe also checks missing and non-directory root paths. None of these packaged
+Windows interactions has passed yet. The independent review must examine
+repeated percent-decoding in path validation, entity-ID route boundaries,
+response-size limits, token forwarding and cleanup, redirect handling, and the
+unchanged production CSP. All acceptance gates remain open until fresh Windows
+smoke evidence and the independent review are recorded.
 
 ### S2 - Governed mutations
 

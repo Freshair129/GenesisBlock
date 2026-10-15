@@ -2,11 +2,9 @@ $ErrorActionPreference = 'Stop'
 
 $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
 $bundleDirectory = Join-Path $repoRoot 'studio\src-tauri\target\debug\bundle\msi'
-$msi = Get-ChildItem -LiteralPath $bundleDirectory -Filter '*.msi' -File |
-  Sort-Object LastWriteTime -Descending |
-  Select-Object -First 1
-if (-not $msi) {
-  throw "No Studio MSI found in $bundleDirectory"
+$smokeMsiPath = $env:STUDIO_PACKAGED_SMOKE_MSI
+if (-not $smokeMsiPath -or -not (Test-Path -LiteralPath $smokeMsiPath -PathType Leaf)) {
+  throw 'The isolated Windows UI-smoke MSI path was not provided by the packaging workflow'
 }
 
 $fixtureRoot = $env:STUDIO_PACKAGED_FIXTURE_ROOT
@@ -38,11 +36,11 @@ $signals = @{
 }
 
 $install = Start-Process -FilePath 'msiexec.exe' -ArgumentList @(
-  '/i', "`"$($msi.FullName)`"", '/qn', '/norestart', '/L*v', "`"$installLog`""
+  '/i', "`"$smokeMsiPath`"", '/qn', '/norestart', '/L*v', "`"$installLog`""
 ) -Wait -PassThru
 if ($install.ExitCode -ne 0) {
   Get-Content -LiteralPath $installLog -Tail 80 -ErrorAction SilentlyContinue
-  throw "Studio MSI installation failed with exit code $($install.ExitCode)"
+  throw "The isolated Studio UI-smoke MSI installation failed with exit code $($install.ExitCode)"
 }
 
 $uninstallRoots = @(
@@ -151,12 +149,14 @@ $uiSmokeProcess = $null
 $serverProcess = $null
 
 try {
-  $cdpProbe = [System.Net.Sockets.TcpListener]::new([System.Net.IPAddress]::Loopback, 0)
+  $cdpPort = [int]$env:STUDIO_CDP_PORT
+  if ($cdpPort -le 0) {
+    throw 'The Windows UI-smoke build did not provide its WebView2 CDP port'
+  }
+  $cdpProbe = [System.Net.Sockets.TcpListener]::new([System.Net.IPAddress]::Loopback, $cdpPort)
   $cdpProbe.Start()
-  $cdpPort = $cdpProbe.LocalEndpoint.Port
   $cdpProbe.Stop()
 
-  $env:WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS = "--remote-debugging-port=$cdpPort --remote-allow-origins=*"
   $env:STUDIO_CDP_PORT = "$cdpPort"
   $env:STUDIO_MISSING_ROOT = $missingRoot
   $env:STUDIO_NON_DIRECTORY_PATH = $nonDirectoryPath
@@ -322,8 +322,8 @@ finally {
   if ($appProcess -and -not $appProcess.HasExited) {
     Stop-Process -Id $appProcess.Id -Force -ErrorAction SilentlyContinue
   }
-  Remove-Item Env:WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS -ErrorAction SilentlyContinue
   Remove-Item Env:STUDIO_CDP_PORT -ErrorAction SilentlyContinue
+  Remove-Item Env:STUDIO_PACKAGED_SMOKE_MSI -ErrorAction SilentlyContinue
   Remove-Item Env:STUDIO_MISSING_ROOT -ErrorAction SilentlyContinue
   Remove-Item Env:STUDIO_NON_DIRECTORY_PATH -ErrorAction SilentlyContinue
   Remove-Item Env:STUDIO_FIXTURE_ROOT -ErrorAction SilentlyContinue
@@ -335,4 +335,5 @@ finally {
   Remove-Item Env:STUDIO_PICKER_SELECTED_FILE -ErrorAction SilentlyContinue
   Remove-Item Env:STUDIO_LOCAL_CAPTURED_FILE -ErrorAction SilentlyContinue
   Remove-Item Env:STUDIO_REMOTE_READY_FILE -ErrorAction SilentlyContinue
+  Remove-Item -LiteralPath $smokeMsiPath -Force -ErrorAction SilentlyContinue
 }

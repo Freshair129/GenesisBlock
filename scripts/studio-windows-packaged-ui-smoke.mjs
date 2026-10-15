@@ -328,16 +328,22 @@ function summarizeParity(local, remote, visibleResults) {
 }
 
 try {
+  let cdpReady = false;
   while (Date.now() < browserDeadline) {
     try {
       const response = await fetch(`${cdpUrl}/json/version`);
-      if (response.ok) break;
+      if (response.ok) {
+        cdpReady = true;
+        break;
+      }
     } catch {
       // The packaged WebView2 may still be starting.
     }
     await new Promise((resolve) => setTimeout(resolve, 250));
   }
 
+  assert.ok(cdpReady, `Packaged WebView2 CDP endpoint did not become ready at ${cdpUrl}`);
+  console.log(`Packaged WebView2 CDP endpoint ready at ${cdpUrl}.`);
   browser = await chromium.connectOverCDP(cdpUrl, { timeout: 15_000 });
   let page;
   const pageDeadline = Date.now() + 30_000;

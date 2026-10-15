@@ -1,7 +1,7 @@
 ---
-version: "0.2.0b"
+version: "0.3.0b"
 created_at: "2026-10-15T09:28:05+07:00,Codex,working-tree"
-last_update: "2026-10-15T12:13:35+07:00,Codex"
+last_update: "2026-10-15T12:51:10+07:00,Codex"
 status: open
 superseded_by: null
 attributes:
@@ -20,10 +20,13 @@ release-readiness evidence gap. It does not assert a production outage.
 
 Studio S1 is beta implemented, but the repository does not yet prove that a
 packaged local Tauri session and remote REST session return equivalent results
-from one persisted fixture. Packaged native-picker handling, installed-app
-startup on the declared platforms, and independent architecture/security
-review evidence are absent. Cross-platform package build evidence is now
-available from the Studio CI matrix.
+from one persisted fixture. Packaged native-picker handling and Windows
+installed-app UI evidence remain absent. No installed UI reached remote mode,
+so remote-origin behavior under the production CSP also remains unverified.
+Independent architecture/security review acceptance remains open. The latest
+Studio matrix passed package installation/startup smoke on Linux and macOS;
+Windows MSI installation succeeded, but its UI probe could not connect to
+WebView2 CDP before the first UI action.
 
 ## Evidence
 
@@ -44,7 +47,7 @@ available from the Studio CI matrix.
 
 - `studio/src-tauri/tauri.conf.json` production `connect-src` permits the local app and Tauri IPC but no remote server origin, while `createRemoteTransport` used WebView `fetch` for the configured remote base URL. Browser Vitest does not enforce the packaged Tauri CSP.
 - The packaged transport change routes remote operations through Tauri IPC to a Rust client with fixed read-only operation/method/path mappings, URL and query validation, redirects disabled, and same-origin token forwarding. Frontend tests cover native bridge selection, token/configuration handoff, disconnect cleanup, and cleanup after capability-handshake failure. The Tauri Rust library suite passed 9/9 after a regression exposed and fixed bracketed IPv6 loopback validation; the strengthened persisted-fixture parity test passed 1/1, and the read-only REST server binary built successfully.
-- The packaging workflow now includes install-and-launch smoke steps and uploaded logs for all three package types. Its Windows job also seeds a persisted graph/vector/relational fixture, checks missing/non-directory paths, automates both cancel and successful native folder selection, and reads the same fixture through the installed app in local mode and through an authenticated loopback REST server in remote mode. After UI read flows complete, the probe uses the packaged Tauri invoke bridge to collect explicit local and remote native-operation snapshots, then compares declared read capabilities/limits and S1 results, including status/frontier, graph scene and expansion, vector collections, schemas, entity inspection, read-only HQL, and a registered named query. UI-visible results are compared separately. The workflow code is new and has not yet run on this revision; these are pending probes, not evidence.
+- Studio packaging run [38686388595](https://github.com/Freshair129/GenesisBlock/actions/runs/38686388595), at head `5419a91cca67cd5aca67deea130c031d2eaa84f4`, completed all three package jobs. The Linux DEB package installed and launched successfully; the macOS DMG package installed and launched successfully; the Windows MSI installer completed successfully but the smoke failed before UI interaction because Playwright `connectOverCDP` received `ECONNREFUSED 127.0.0.1:50705`. The Windows fixture seed and REST server build steps passed, but no packaged picker, local/remote UI parity, remote-mode CSP result, or startup-screen result is claimed. The [MSI](https://github.com/Freshair129/GenesisBlock/actions/runs/38686388595/artifacts/11950739509), [DMG](https://github.com/Freshair129/GenesisBlock/actions/runs/38686388595/artifacts/11950784409), [DEB](https://github.com/Freshair129/GenesisBlock/actions/runs/38686388595/artifacts/11950242206), and [smoke evidence](https://github.com/Freshair129/GenesisBlock/actions/runs/38686388595/artifacts/11950994174) are retained as workflow artifacts.
 - The first Studio Rust test compile reached the new Tauri test target but failed because its CSP test lacked a `Value` import. After fixing that test import, the suite exposed that `Url::host_str()` returns a bracketed IPv6 host, causing loopback HTTP to be rejected; validation now strips exactly one bracket pair before parsing the address. The full Tauri library suite passed 9/9. The strengthened root parity test passed 1/1 and the `genesis-db-server` build passed. These are source/test/build checks, not installed-package evidence.
 
 ## Root cause
@@ -56,6 +59,14 @@ packaged picker or cross-platform package/startup result to reference. The
 packaged production CSP also denied remote origins while the renderer's remote
 adapter used `fetch`, so successful browser tests did not prove the remote mode
 could run in the packaged WebView.
+
+The first packaged Windows UI-smoke attempt also had a harness configuration
+defect: it set `WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS` after launch, but Wry
+0.55.1 passes browser arguments through WebView2 environment options and does
+not consume that variable for this window. Consequently the configured CDP
+endpoint never opened and Playwright failed before the smoke could exercise the
+picker or packaged data paths. This is a test setup failure; it neither passes
+nor demonstrates a product startup failure.
 
 ## Why detection failed
 
@@ -78,7 +89,12 @@ CSP.
   Studio packaging workflow; record each platform's result before changing the
   release gate.
 - Install and launch the built MSI, DMG, and DEB on their matching CI runners
-  and keep the smoke bounded with timeouts. On Windows, use UI Automation to
+  and keep the smoke bounded with timeouts. The latest Linux and macOS probes
+  passed; Windows MSI installation passed but its UI/CDP smoke did not reach
+  the app UI. The follow-up builds a separate smoke-only Windows MSI with
+  explicit `app.windows[0].additionalBrowserArgs` and a per-run loopback CDP
+  port. Stage the ordinary MSI artifact before creating that variant and upload
+  only the staged ordinary MSI. On Windows, use UI Automation to
   assert missing/non-directory errors, cancel the actual folder dialog, then
   select the persisted parity fixture. Read it through packaged local mode,
   close the local handle, start the authenticated REST server over the same
@@ -126,14 +142,24 @@ release gates.
 The native remote bridge code has frontend Vitest/build coverage. Its Rust URL,
 allowlist, token-forwarding, redirect, response-size, and CSP tests passed 9/9
 in the Tauri library target. The strengthened persisted-fixture contract test
-passed 1/1 and the read-only REST server binary build passed. The packaged
-fixture seeder, installed startup probes, and Windows UIA selection/parity
-script pass local syntax checks only; the new workflow has not run. No
-packaged picker-selection, parity, or new startup result is claimed.
-Independent architecture/security review also remains open pending the
-committed diff review and current-head CI.
+passed 1/1 and the read-only REST server binary build passed. The latest
+packaging workflow completed all OS package jobs. Linux and macOS installed-app
+startup probes passed, with [DEB](https://github.com/Freshair129/GenesisBlock/actions/runs/38686388595/artifacts/11950242206),
+[DMG](https://github.com/Freshair129/GenesisBlock/actions/runs/38686388595/artifacts/11950784409),
+and [MSI](https://github.com/Freshair129/GenesisBlock/actions/runs/38686388595/artifacts/11950739509)
+artifacts uploaded. Windows MSI installation succeeded, but the UI smoke failed
+before the first UI action because the CDP endpoint was refused; see the
+[Windows smoke log](https://github.com/Freshair129/GenesisBlock/actions/runs/38686388595/artifacts/11950994174).
+The Windows seed and REST-server build passed, but no packaged picker-selection,
+remote-origin/CSP, or packaged local/remote parity result is claimed. The
+follow-up now creates an isolated smoke-only MSI with explicit WebView2
+arguments; that correction still requires fresh CI.
+Independent architecture/security review acceptance also remains open until
+the exact revised diff is reviewed and recorded.
 
 The current Windows checkout has no WiX `candle.exe` or `light.exe`, so it
-cannot locally produce the MSI installer. GitHub Actions produced Windows,
-macOS, and Linux package artifacts in run 38677091691. Startup evidence for
-installed packages remains uncollected.
+cannot locally produce the MSI installer. GitHub Actions produced MSI, DMG, and
+DEB artifacts in run 38686388595. Linux and macOS installed startup were
+observed; the Windows MSI installed but its UI smoke could not attach over CDP.
+The Windows native-picker and packaged local/remote parity acceptance gates
+remain open.
