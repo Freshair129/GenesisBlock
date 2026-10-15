@@ -38,12 +38,12 @@ test('NAPI typed query contract returns versioned validation envelopes and succe
         request_id: 'api-error-success',
         namespace: 'default',
         language_version: 'hql.v2',
-        hql: 'MATCH (n) RETURN n.id',
+        hql: 'USE default FROM NODES AS n |> RETURN n.id AS id',
         params: {},
       }),
     );
     assert.equal(success.contract_version, 'genesis.api.errors.v1');
-    assert.equal(success.ok, true);
+    assert.equal(success.ok, true, JSON.stringify(success));
     assert.equal(success.data.request_id, 'api-error-success');
     assert.ok(Array.isArray(success.data.rows));
   } finally {

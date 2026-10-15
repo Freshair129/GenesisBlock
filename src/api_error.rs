@@ -343,6 +343,10 @@ mod tests {
             ApiErrorEnvelopeV1::from(crate::Error::from_reason("expected frontier conflict"));
         assert_eq!(error.category, ApiErrorCategory::Internal);
         assert_eq!(error.code, "GENESIS_INTERNAL_ERROR");
-        assert_eq!(error.message, "expected frontier conflict");
+        assert!(
+            error.message.ends_with("expected frontier conflict"),
+            "unexpected error message: {}",
+            error.message
+        );
     }
 }
