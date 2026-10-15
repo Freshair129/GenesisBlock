@@ -1,7 +1,7 @@
 ---
-version: "0.3.2b"
+version: "0.3.3b"
 created_at: "2026-07-21T21:30:49+07:00,ATHER,working-tree"
-last_update: "2026-10-15T10:19:50+07:00,Codex"
+last_update: "2026-10-15T10:34:35+07:00,Codex"
 status: beta
 superseded_by: null
 related_issue: 231
@@ -567,14 +567,18 @@ blank, missing, file, and existing Unicode/space-containing directory paths.
 It exercises the validation helper called before `Storage::open`, not the
 native folder dialog in an installed application. Tauri bundling is enabled,
 and `.github/workflows/studio-packaging.yml` builds Windows MSI, macOS DMG, and
-Linux DEB artifacts in the corresponding CI matrix. Its results are pending;
-even a successful package build will not by itself establish app startup or
-picker interaction. Packaged local/remote parity, packaged picker interaction,
-cross-platform package/startup evidence, and the independent
-architecture/security review remain release gates until their artifacts and
-review disposition are recorded here. The review must record P0/P1 findings;
-none may remain unresolved without an explicitly accepted risk. The
-release-gate RCA is tracked in
+Linux DEB artifacts in the corresponding CI matrix. The initial matrix run
+([run 38675972613](https://github.com/Freshair129/GenesisBlock/actions/runs/38675972613))
+built and uploaded the macOS DMG and Linux DEB. The Windows app compiled and
+passed its tests, but MSI bundling failed because `bundle.icon` did not point to
+the existing `.ico` asset. The config now explicitly lists the existing PNG,
+ICNS, and ICO icons; the follow-up matrix run is pending. Package artifacts by
+themselves do not establish app startup or picker interaction. Packaged
+local/remote parity, packaged picker interaction, cross-platform startup
+evidence, and the independent architecture/security review remain release
+gates until their artifacts and review disposition are recorded here. The
+review must record P0/P1 findings; none may remain unresolved without an
+explicitly accepted risk. The release-gate RCA is tracked in
 [RCA--STUDIO-S1-RELEASE-GATES](../.brain/rca/RCA--STUDIO-S1-RELEASE-GATES.md).
 
 ### S2 - Governed mutations
@@ -685,6 +689,12 @@ Open questions เหล่านี้ไม่ block S0 mock/prototype แต�
 
 ## 32. Version diff
 
+### `0.3.2b -> 0.3.3b`
+
+- Explicitly configured existing Studio PNG, ICNS, and ICO assets after the first Windows MSI matrix build found no configured `.ico`.
+- Recorded macOS DMG and Linux DEB package evidence and the Windows MSI failure; the corrected matrix run is pending.
+- Kept installed startup, native picker, packaged parity, and independent review gates open.
+
 ### `0.3.1b -> 0.3.2b`
 
 - Added same-persisted-fixture local Storage/REST parity and local-root validation evidence.
@@ -725,6 +735,7 @@ Open questions เหล่านี้ไม่ block S0 mock/prototype แต�
 
 | Version | Date | Status | Summary | Commit Hash | Agent |
 |---------|------|--------|---------|-------------|-------|
+| 0.3.3b | 2026-10-15 | beta | Configured existing platform icons and recorded initial package CI results; Windows rerun pending. | working-tree | Codex |
 | 0.3.2b | 2026-10-15 | beta | Added persisted-fixture parity and path evidence; enabled platform package CI and retained release gates. | working-tree | Codex |
 | 0.3.1b | 2026-10-15 | beta | Added portable local-root, graph accessibility, accessible-name, and scene label-readability criteria. | working-tree | Codex |
 | 0.3.0b | 2026-07-22 | beta | Implemented S1 read-only local/remote contracts and retained explicit S2-S4 safety gates. | working-tree | ATHER |

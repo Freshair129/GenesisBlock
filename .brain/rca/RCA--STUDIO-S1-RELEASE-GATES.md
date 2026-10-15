@@ -1,7 +1,7 @@
 ---
 version: "0.1.0b"
 created_at: "2026-10-15T09:28:05+07:00,Codex,working-tree"
-last_update: "2026-10-15T10:19:50+07:00,Codex"
+last_update: "2026-10-15T10:34:35+07:00,Codex"
 status: open
 superseded_by: null
 attributes:
@@ -39,6 +39,7 @@ absent.
   Studio-specific Windows/macOS/Linux installer matrix.
 - Existing engine and REST tests cover their respective boundaries separately;
   they did not compare both against the same reopened persisted fixture.
+- The first package matrix run ([run 38675972613](https://github.com/Freshair129/GenesisBlock/actions/runs/38675972613)) built and uploaded macOS DMG and Linux DEB packages. The Windows MSI job compiled and passed tests but failed in bundling with `Couldn't find a .ico icon`: `icons/icon.ico` existed, but `bundle.icon` did not reference it. The config now lists the existing PNG, ICNS, and ICO assets; the follow-up run is pending.
 
 ## Root cause
 
@@ -64,6 +65,9 @@ without assembling evidence for the packaged S1 acceptance criteria.
 - Build Windows MSI, macOS DMG, and Linux DEB artifacts in the dedicated
   Studio packaging workflow; record each platform's result before changing the
   release gate.
+- Explicitly list the existing platform icon files in `bundle.icon` when
+  enabling Tauri packaging; the first Windows CI build caught the omitted
+  reference.
 - Keep packaged Tauri parity, native-picker interaction, cross-platform
   package/startup, and independent review gates open until their evidence is
   produced and linked in §25.
@@ -78,11 +82,13 @@ The regression test exercises a read-only `Storage` open and the Axum router in
 process against one temporary persisted database. It does not launch the
 packaged desktop app, send requests over TCP, interact with the native folder
 dialog, prove startup from an installer, or replace the independent
-architecture/security review. The new platform packaging workflow has not yet
-run for this change. Its packages are unsigned development artifacts and do
-not establish the S4 signing/update policy. Those remain release gates.
+architecture/security review. The first platform packaging run built macOS and
+Linux artifacts but failed to build the Windows MSI because the Tauri bundle
+configuration omitted the existing icons. The config correction is awaiting a
+rerun. These unsigned development artifacts do not establish the S4
+signing/update policy. Those remain release gates.
 
 The current Windows checkout has no WiX `candle.exe` or `light.exe`, so it
 cannot locally produce the MSI installer. This does not block the Windows,
-macOS, and Linux package matrix from running in GitHub Actions; its artifacts
-and startup evidence remain pending until that workflow runs and is reviewed.
+macOS, and Linux package matrix from running in GitHub Actions. The Windows MSI
+is pending the corrected run; package startup evidence remains uncollected.
