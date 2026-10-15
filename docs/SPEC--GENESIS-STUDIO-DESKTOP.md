@@ -1,7 +1,7 @@
 ---
 version: "0.3.6b"
 created_at: "2026-07-21T21:30:49+07:00,ATHER,working-tree"
-last_update: "2026-10-15T15:54:42+07:00,Codex"
+last_update: "2026-10-15T17:59:30+07:00,Codex"
 status: beta
 superseded_by: null
 related_issue: 231
@@ -539,12 +539,14 @@ S0 performance evidence เป็น functional scene budget proof ที่ 240
 - [x] Wire status, collections, logical relational schema/named query และ read-only HQL.
 - [x] Add capability, bounded graph scene/expand and entity inspection APIs.
 - [x] Deliver Overview, Data, Graph, Vectors, Query และ Entity Inspector read-only.
-- [ ] Complete packaged local/remote semantic-parity drill against the same persisted fixture. Exact-head run 38709296386 emitted `studio-packaged-parity.json` for all nine operations; the Node smoke stdout reports the strict comparison passed and REST requests returned HTTP 200. The Windows job was nevertheless marked failed because its PowerShell wrapper treated a blank/unavailable child `ExitCode` as nonzero. The wrapper now refreshes the process and distinguishes unavailable from concrete nonzero status; require a green exact-head rerun before accepting the gate.
-- [ ] Complete current-head installed-package startup smoke across Windows, macOS, and Linux. Run 38709296386's Linux DEB and macOS DMG install/startup probes passed. The ordinary Windows MSI installed, stayed alive, and uninstalled, and the instrumented MSI produced the parity artifact, but the Windows workflow step remains red pending the corrected wrapper rerun.
-- [x] Exercise packaged Windows native root selection and missing/non-directory path handling. Run 38706084034's UI smoke passed missing/non-directory validation and picker cancellation; its selected-root marker, successful local reads, and subsequent authenticated remote reads show the fixture selection and packaged connection paths were exercised. See the Windows smoke artifact for exact evidence. The run failed later in evidence-summary construction, so it does not close parity.
-- [ ] Complete independent architecture/security review and packaged local/remote parity evidence. The reviewer found a P2 disconnect race in cloned native requests; shared cancellation/generation now clears shared authorization and is covered by deterministic regressions for queued requests, response-header waits, body reads, and stale-generation installs. Re-review of the new head and packaged parity evidence are pending.
+- [x] Complete packaged local/remote semantic-parity drill against the same persisted fixture. Exact-head package run [38719927231](https://github.com/Freshair129/GenesisBlock/actions/runs/38719927231), head `9773f4f4ab2baacab33cd58117f71b9f069c18b4`, emitted `studio-packaged-parity.json` for all nine operations. The packaged UI smoke completed with exit-code marker `0`; see [Windows smoke evidence artifact 11967196411](https://github.com/Freshair129/GenesisBlock/actions/runs/38719927231/artifacts/11967196411).
+- [x] Complete installed-package startup smoke across Windows, macOS, and Linux on the same exact head. The Windows MSI installed, launched, and completed its packaged picker/parity probe; macOS DMG and Linux DEB install/startup probes also passed in run 38719927231. See [Windows MSI artifact 11966726723](https://github.com/Freshair129/GenesisBlock/actions/runs/38719927231/artifacts/11966726723), [macOS DMG artifact 11964259781](https://github.com/Freshair129/GenesisBlock/actions/runs/38719927231/artifacts/11964259781), and [Linux DEB artifact 11964626811](https://github.com/Freshair129/GenesisBlock/actions/runs/38719927231/artifacts/11964626811).
+- [x] Exercise packaged Windows native root selection and missing/non-directory path handling. The same smoke evidence artifact records the packaged path errors, native picker cancellation and selection, and the selected persisted fixture root.
+- [x] Complete independent architecture/security review and packaged local/remote parity evidence. Independent reviews found the shared cancellation/generation fix closes the cloned-request disconnect race and reported no remaining major correctness/security issue. The GitHub Security Audit passed in run [38719927188](https://github.com/Freshair129/GenesisBlock/actions/runs/38719927188); the formal Codex Security launcher did not initialize because its worktree prerequisite was not met, so no formal scanner result is claimed.
 
-Status: **BETA IMPLEMENTED; release exit remains open.** The persisted-fixture
+Status: **S1 BETA RELEASE GATES COMPLETE.** This closes the packaged S1
+acceptance gap tracked in issue #231. Production release still requires OS
+credential-store integration; S2-S4 remain behind their own phase gates. The persisted-fixture
 regression `cargo test --test studio_contract_tests
 local_and_remote_studio_reads_match_on_the_same_persisted_fixture` now compares
 read-only local `Storage` calls with the actual Axum Studio REST routes against
@@ -587,6 +589,8 @@ Current Windows verification:
 
 | Check | Result |
 |---|---|
+| Exact-head release verification [head `9773f4f`](https://github.com/Freshair129/GenesisBlock/commit/9773f4f4ab2baacab33cd58117f71b9f069c18b4) | [Tests run 38719927373, attempt 2](https://github.com/Freshair129/GenesisBlock/actions/runs/38719927373) passed Rust tests on Windows/Linux/macOS, frontend and worker tests, fmt/clippy, documentation validation, and version checks. [Studio packaging run 38719927231](https://github.com/Freshair129/GenesisBlock/actions/runs/38719927231) passed Windows MSI, macOS DMG, and Linux DEB package/startup probes. Security Audit, Performance Audit, and worker build checks also passed. The Windows parity evidence artifact records exit code 0 and the nine-operation result JSON. |
+| Packaged artifacts (run 38719927231) | [Windows MSI](https://github.com/Freshair129/GenesisBlock/actions/runs/38719927231/artifacts/11966726723), [Windows smoke evidence](https://github.com/Freshair129/GenesisBlock/actions/runs/38719927231/artifacts/11967196411), [macOS DMG](https://github.com/Freshair129/GenesisBlock/actions/runs/38719927231/artifacts/11964259781), [macOS smoke evidence](https://github.com/Freshair129/GenesisBlock/actions/runs/38719927231/artifacts/11964721737), [Linux DEB](https://github.com/Freshair129/GenesisBlock/actions/runs/38719927231/artifacts/11964626811), and [Linux smoke evidence](https://github.com/Freshair129/GenesisBlock/actions/runs/38719927231/artifacts/11964463663). |
 | `pnpm.cmd test` | 3 files, 13 tests passed after the narrow-sidebar Connections fix |
 | `pnpm.cmd build` | TypeScript + Vite production build passed after the narrow-sidebar Connections fix |
 | `npm run test:e2e` | 4 desktop/mobile Chromium cases passed against the presentation fixture only |

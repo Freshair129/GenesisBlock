@@ -1,8 +1,8 @@
 ---
 version: "0.3.0b"
 created_at: "2026-10-15T09:28:05+07:00,Codex,working-tree"
-last_update: "2026-10-15T15:54:42+07:00,Codex"
-status: open
+last_update: "2026-10-15T17:59:30+07:00,Codex"
+status: resolved
 superseded_by: null
 attributes:
   doc_type: "rca"
@@ -262,9 +262,34 @@ hold the response body after the reader consumes its first chunk, assert close
 and reconfigure cancel cloned queued requests before server acceptance, and
 assert a stale-generation connection cannot be installed or sent. Cancellation
 is also checked after body handling and before returning parsed success or
-formatted errors. `cargo fmt` and `git diff --check` passed. No package CI or
-independent review has run on this new head yet; the formal Codex Security
-launcher rejected its target before returning a scan ID, so no formal scan is
-claimed.
-The independent reviewer must re-review the new head. Keep issue #231 and
-merge open until that review and a fresh Windows/Linux/macOS package run pass.
+formatted errors. `cargo fmt` and `git diff --check` passed. The formal Codex
+Security launcher rejected its target before returning a scan ID, so no formal
+scan is claimed. The final exact-head CI and independent review results are
+recorded in Resolution below.
+
+## Resolution verified (2026-10-15)
+
+PR [#235](https://github.com/Freshair129/GenesisBlock/pull/235) reached exact
+head `9773f4f4ab2baacab33cd58117f71b9f069c18b4`. The final checks passed:
+
+- Tests run [38719927373, attempt 2](https://github.com/Freshair129/GenesisBlock/actions/runs/38719927373): Rust suites on Windows, Linux, and macOS; frontend and worker suites; fmt/clippy; docs; and version checks.
+- Studio packaging run [38719927231](https://github.com/Freshair129/GenesisBlock/actions/runs/38719927231): Windows MSI, macOS DMG, and Linux DEB install/startup jobs passed. The Windows picker, missing/non-directory root handling, and same-fixture packaged local/remote parity probe passed.
+- The [Windows smoke evidence artifact 11967196411](https://github.com/Freshair129/GenesisBlock/actions/runs/38719927231/artifacts/11967196411) contains an exit-code marker of `0` and `studio-packaged-parity.json` comparing all nine supported read operations.
+- GitHub Security Audit [run 38719927188](https://github.com/Freshair129/GenesisBlock/actions/runs/38719927188), Performance Audit [run 38719927131](https://github.com/Freshair129/GenesisBlock/actions/runs/38719927131), and GenesisRAG17 worker [run 38719927118](https://github.com/Freshair129/GenesisBlock/actions/runs/38719927118) passed.
+- Independent exact-diff reviews found the shared cancellation/generation fix resolves the disconnect race and reported no remaining major correctness/security issue. A low-risk regression-coverage gap for cancellation during JSON parsing remains noted; the implementation checks cancellation after parsing.
+
+The first full Windows Rust attempt encountered `QUERY_BUDGET_EXCEEDED` in an
+unchanged small-fixture test. The focused test passed 1/1 locally, then the
+full exact-head Windows job passed on attempt 2; no production query-budget
+change was made. The exit-code wrapper defect was fixed by recording Node's
+synchronous exit-event status to a unique per-invocation evidence file. Local
+guard checks verified that both PowerShell and Node exit code 7 are rejected.
+
+The formal Codex Security launcher did not return a scan ID because this
+worktree did not satisfy its non-bare/resolvable-HEAD prerequisite. No formal
+Codex Security scan is claimed; the GitHub Security Audit and independent
+manual reviews are the recorded security evidence.
+
+**Disposition:** the packaged S1 acceptance gap is resolved and issue #231 is
+ready to close with PR #235. This does not assert a production release: OS
+credential-store integration and S2-S4 approvals remain separate gates.
