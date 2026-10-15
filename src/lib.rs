@@ -6067,9 +6067,9 @@ impl Storage {
                 return true;
             }
             let namespace = package.namespace.clone();
-            let current = schemas.entry(namespace.clone()).or_insert_with(|| {
-                Some(Storage::load_relational_schema_conn(conn, &namespace).ok()?)
-            });
+            let current = schemas
+                .entry(namespace.clone())
+                .or_insert_with(|| Storage::load_relational_schema_conn(conn, &namespace).ok());
             match current {
                 None => true,
                 Some(Some(previous)) if previous == package => false,
