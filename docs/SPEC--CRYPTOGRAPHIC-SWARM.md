@@ -7,6 +7,23 @@ status: current
 ## 1. Introduction
 GenesisBlockDB currently allows any network participant to join the Gossip swarm and propose mutations. **Mark X** introduces a cryptographic trust layer. By assigning every agent a unique ed25519 identity, the system can verify the origin of knowledge atoms and enforce strict governance rules based on cryptographic proofs.
 
+### Current trust boundary (2026-10-16)
+
+Ed25519 signatures provide cryptographic integrity relative to the public key
+used for verification. A key advertised by a discovered peer is not proof that
+the peer belongs to an authorized roster or may vote in consensus. The
+heartbeat-advertised peer ID is not currently checked against the advertised
+key fingerprint before that key is used for peer verification.
+
+The requirement that MASTER promotion use valid quorum signatures does not
+define who is eligible to form that quorum. The implementation currently
+derives quorum membership from discovered peers, and peer reconciliation does
+not enforce the local MASTER governance guard on every event shape. Therefore
+this specification's cryptographic identity and signature requirements do not
+by themselves complete the trust or governance contract. Issues #236 and #237
+remain open; see the candidate
+[peer-membership authorization ADR](adr/ADR--GENESISDB-PEER-MEMBERSHIP-AUTHORIZATION.md).
+
 ## 2. Functional Requirements
 
 ### FR1: Peer Identity (ed25519)

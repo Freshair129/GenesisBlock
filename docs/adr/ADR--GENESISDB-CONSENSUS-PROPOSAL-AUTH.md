@@ -122,6 +122,19 @@ Shipped. Proposals are ed25519-verified on propose, on gossip receipt, and at
 commit; `semantic_verify` gates both ends; commit is idempotent and applies edges
 and vectors completely.
 
+### Security boundary follow-up (2026-10-16)
+
+The proposal and commit signature checks establish authenticity relative to the
+key resolved for the claimed signer. They do not prove that the signer is an
+authorized swarm member. The current key resolver uses keys in the Heartbeat
+discovery map, and quorum membership is also derived from discovered peers.
+Additionally, the shared remote reconciliation path does not apply the same
+MASTER governance guard as local direct writes. Thus the outcomes above cover
+signature and semantic-conflict checks, not authenticated membership or
+complete authorization of privileged peer sync. Public issues #236 and #237
+remain open. See the candidate
+[peer-membership authorization ADR](ADR--GENESISDB-PEER-MEMBERSHIP-AUTHORIZATION.md).
+
 ---
 ### Related Links
 - **Builds on:** [[ADR--GENESISDB-CONSENSUS-VOTE-SIGNATURES]]
@@ -132,4 +145,5 @@ and vectors completely.
 ## Changelog
 | Version | Date | Summary |
 |---|---|---|
+| 0.1.1 | 2026-10-16 | Scope shipped proposal-signature evidence to key authenticity and semantic checks; record missing peer membership and privileged-sync authorization as open follow-ups. |
 | 0.1.0 | 2026-06-23 | Proposed & accepted & shipped: proposal authentication (verify on propose/gossip/commit), `semantic_verify` enforced on the consensus path, `committed` guard for once-only apply, edges/vectors committed completely (adjacency-indexed / staged), quorum denominator includes self, search dedupe by node id. |

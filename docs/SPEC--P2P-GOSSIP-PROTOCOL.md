@@ -7,6 +7,25 @@ status: current
 ## 1. Introduction
 The **P2P Gossip Protocol** is GenesisBlockDB's optional synchronization layer. It enables independent database instances to discover each other, exchange signed state events, and reconcile graph state without a central server. Client applications may use this capability for their own domain records; the engine does not own any client's ontology or authority policy. This design adheres to the **C-3 (Architecture-Driven)** workflow.
 
+### Current trust boundary (2026-10-16)
+
+Heartbeat discovery currently places a claimed peer ID and advertised key in
+an in-memory peer map. That map is bounded and expires entries, but it is not an
+authenticated membership roster. Event signatures checked against an advertised
+key establish key possession relative to that key; they do not authorize
+membership or privileged state changes.
+
+PushDelta event verification and signed progress receipts serve different
+purposes. The current production receipt path has no trusted responder key and
+does not advance a cursor, while event reconciliation can still proceed. The
+receipt boundary therefore does not authorize event application.
+
+The current engine contract does not establish authorized peer membership or
+enforce MASTER governance on every remote reconciliation path. Issues #236 and
+#237 remain open. See the candidate
+[peer-membership authorization ADR](adr/ADR--GENESISDB-PEER-MEMBERSHIP-AUTHORIZATION.md);
+it records the gap without selecting an enrollment or quorum policy.
+
 ## 2. Software Requirements Document (SRD)
 
 ### FR1: Peer Discovery

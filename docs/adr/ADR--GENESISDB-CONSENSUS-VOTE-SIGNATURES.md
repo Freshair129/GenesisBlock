@@ -96,6 +96,18 @@ Authenticate every vote before counting it.
 Shipped. Consensus votes are ed25519-verified against registered peer keys before
 counting; forged/replayed/flipped votes are rejected.
 
+### Security boundary follow-up (2026-10-16)
+
+This ADR establishes vote-signature integrity, not authenticated voter
+membership. In the current source, remote key resolution uses the Heartbeat
+discovery map, and the quorum electorate is derived from that discovered-peer
+map. A valid signature therefore does not establish that a voter is authorized
+to participate in consensus. This limitation is tracked by public issue #237
+and the candidate
+[peer-membership authorization ADR](ADR--GENESISDB-PEER-MEMBERSHIP-AUTHORIZATION.md).
+The 2026-06-22 vote-signature tests remain evidence for signature verification;
+they do not verify an authorized-member roster.
+
 ---
 ### Related Links
 - **Governance:** [[ADR--GENESISDB-GOVERNANCE-LOGIC]]
@@ -104,4 +116,5 @@ counting; forged/replayed/flipped votes are rejected.
 ## Changelog
 | Version | Date | Summary |
 |---|---|---|
+| 0.1.1 | 2026-10-16 | Clarify that signature verification proves key possession relative to the resolved key, not authenticated voter membership; link candidate peer authorization contract. |
 | 0.1.0 | 2026-06-22 | Proposed & accepted & shipped: ed25519 verification of consensus votes (`sign_vote` + signature-checked `submit_vote`); binds proposal+voter+choice; closes a vote-forgery governance bypass. Breaking: vote API gains `signature`. |

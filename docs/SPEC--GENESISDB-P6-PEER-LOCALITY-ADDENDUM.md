@@ -1,9 +1,9 @@
 ---
 doc_id: SPEC--GENESISDB-P6-PEER-LOCALITY-ADDENDUM
 owner: GenesisBlockDB Engineering
-version: 0.1.15b
+version: 0.1.16b
 created_at: "2026-09-24T03:25:29+07:00,ATHER,4010702"
-last_update: "2026-10-05T10:35:01+07:00,Codex"
+last_update: "2026-10-16T12:00:00+07:00,Codex"
 status: active
 superseded_by: null
 attributes:
@@ -61,6 +61,18 @@ Decision evidence was reviewed against HEAD 40107027465c246e7f6c8aed3f229772e080
 reviewed src/lib.rs SHA-256 was
 7B3E14911E608938EEA37CD5A8B5048A7E75F89DF69FF4E4FF521E359AF6D4F3. That was the pre-approval
 decision snapshot; implementation evidence is recorded in the RCA and regression gates below.
+
+### Boundary clarification (2026-10-16)
+
+The fail-closed production receipt path controls remote cursor advancement; it
+does not gate ordinary PushDelta event application. The receiver may reconcile
+signature-checked events without advancing a cursor. Heartbeat-learned keys are
+not an authenticated membership source, and this addendum does not establish
+peer enrollment, voter eligibility, or authority to replicate MASTER state.
+Those issues are tracked by the candidate
+[peer-membership authorization ADR](adr/ADR--GENESISDB-PEER-MEMBERSHIP-AUTHORIZATION.md)
+and public issues #236 and #237. This clarification does not extend the
+approved P6 scope.
 
 ## Decision and rationale
 
@@ -239,6 +251,7 @@ architecture alternatives is required.
 
 | Version | Date | Status | Summary | Commit | Agent |
 |---|---|---|---|---|---|
+| 0.1.16b | 2026-10-16 | active | Clarify that fail-closed cursor receipts do not gate ordinary event application or establish peer membership; link candidate peer authorization ADR; approved P6 scope unchanged | working-tree | Codex |
 | 0.1.15b | 2026-10-05 | active | Record Astra 6 Final PASS_WITH_LIMITATIONS for the reviewed local P6 slice; accept bounded Plan fallback fixture limitation; hosted/cross-platform CI and release/deployment remain NOT_RUN | working-tree | Astra 6 / Codex |
 | 0.1.14b | 2026-10-05 | active | Record corrected-tree independent Verify PASS (P6 49/49, focused 34/34) and broad Review PASS; disclose stale-publication Plan fallback fixture limitation; Astra Final pending; local-only scope unchanged | working-tree | Codex |
 | 0.1.13b | 2026-10-05 | active | Record corrected-tree independent Verify PASS after ACL overflow fix; P6 49/49, focused 34/34, check/fmt/docs/diff pass; independent Review rerun and Astra Final pending | working-tree | Codex |

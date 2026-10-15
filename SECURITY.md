@@ -32,10 +32,14 @@ release notes unless you prefer to remain anonymous.
 Security-relevant areas of the engine:
 
 - **Governance tiers** — external agents must not be able to create or mutate
-  `MASTER`-tier nodes. Enforcement lives in the engine, not the transport.
-- **Consensus & sync** — `SignedEvent`s are ed25519-signed; the swarm identity
-  keypair is persisted under the database path. Report any signature-bypass or
-  key-handling weakness.
+  `MASTER`-tier nodes. Local direct-write guards live in the engine. Remote
+  reconciliation and peer-authority boundaries are tracked separately; see
+  issues #236 and #237 and the candidate peer-membership authorization ADR.
+- **Consensus & sync** — `SignedEvent` values are ed25519-signed and the swarm
+  identity keypair is persisted under the database path. Signature validation
+  against a Heartbeat-discovered key establishes key possession relative to
+  that key; it does not establish authorized membership or authority to
+  participate in quorum or replicate privileged state.
 - **REST surface** (`/v1/*`) — input validation, query handling, and
   authentication boundaries.
 - **Deserialization** — WAL replay and snapshot (`state.json`, `*.bin`) loading.

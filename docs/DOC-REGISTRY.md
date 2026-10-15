@@ -2,8 +2,8 @@
 title: "GenesisBlockDB Document Registry"
 doc_id: "DOC-REGISTRY-GENESISBLOCKDB"
 status: draft
-version: "0.5.99+draft"
-updated: "2026-10-10"
+version: "0.5.100+draft"
+updated: "2026-10-16"
 owner: "GenesisBlockDB Architecture"
 source_of_truth: true
 related_issue: 84
@@ -15,6 +15,7 @@ related_docs:
   - "docs/GENESISRAG17-EXTENSION-MAP.md"
   - "docs/SPEC--GENESISDB-P6-GENERATIONS-LEASES-ACL.md"
   - "docs/SPEC--GENESISDB-P6-PEER-LOCALITY-ADDENDUM.md"
+  - "docs/adr/ADR--GENESISDB-PEER-MEMBERSHIP-AUTHORIZATION.md"
 ---
 
 # GenesisBlockDB Document Registry
@@ -52,8 +53,8 @@ registry row explicitly names them.
 
 | Role | Doc ID | Version | Status | Owner | Path |
 |---|---|---|---|---|---|
-| Architecture composition | `MASTER-SPEC-GENESISBLOCKDB` | `2.3.43b` | current | GenesisBlockDB Architecture | `docs/MASTER-SPEC--GENESIS-DB.md` |
-| Architecture index | `C4--GENESISDB-ARCHITECTURE` | `0.1.73b` | current | GenesisBlockDB Architecture | `docs/C4--GENESISDB-ARCHITECTURE.md` |
+| Architecture composition | `MASTER-SPEC-GENESISBLOCKDB` | `2.3.44b` | current | GenesisBlockDB Architecture | `docs/MASTER-SPEC--GENESIS-DB.md` |
+| Architecture index | `C4--GENESISDB-ARCHITECTURE` | `0.1.74b` | current | GenesisBlockDB Architecture | `docs/C4--GENESISDB-ARCHITECTURE.md` |
 | Execution DAG guard | `SPEC--EXECUTION-DAG-GUARD-V1` | `0.1.0` | accepted | Sol Decision / Contract and AC | `docs/SPEC--EXECUTION-DAG-GUARD-V1.md` |
 | HQL2 execution decision | `ADR--GENESISDB-HQL2-EXECUTION-BOUNDARY` | `0.1.1b` | accepted | Boss (Founder / Product Authority) | `docs/adr/ADR--GENESISDB-HQL2-EXECUTION-BOUNDARY.md` |
 | HQL2 G4 shared-pipeline contract | `ADR--GENESISDB-HQL2-G4-SHARED-PIPELINE` | `0.1.3b` | active | Boss (Founder / Product Authority) | `docs/adr/ADR--GENESISDB-HQL2-G4-SHARED-PIPELINE.md` |
@@ -66,8 +67,9 @@ registry row explicitly names them.
 | HQL2 P7 bounded oracle evidence | `REPORT--HQL2-P7-ORACLE-2026-09-28` | `0.1.12b` | beta | GenesisBlockDB Engineering | `docs/REPORT--HQL2-P7-ORACLE-2026-09-28.md` |
 | Commit correctness | `SPEC--WAVE-A-COMMIT-CORRECTNESS` | `0.1.0b` | beta | GenesisBlockDB Engineering | `docs/SPEC--WAVE-A-COMMIT-CORRECTNESS.md` |
 | Durable collections and edge history | `SPEC--WAVE-B-DURABLE-COLLECTIONS-EDGE-HISTORY` | `0.1.2b` | beta | GenesisBlockDB Engineering | `docs/SPEC--WAVE-B-DURABLE-COLLECTIONS-EDGE-HISTORY.md` |
-| Generation, lease, temporal and ACL contract | `SPEC--GENESISDB-P6-GENERATIONS-LEASES-ACL` | `0.5.46b` | beta | GenesisBlockDB Engineering | `docs/SPEC--GENESISDB-P6-GENERATIONS-LEASES-ACL.md` |
-| P6 peer-locality addendum | `SPEC--GENESISDB-P6-PEER-LOCALITY-ADDENDUM` | `0.1.15b` | active | GenesisBlockDB Engineering | `docs/SPEC--GENESISDB-P6-PEER-LOCALITY-ADDENDUM.md` |
+| Generation, lease, temporal and ACL contract | `SPEC--GENESISDB-P6-GENERATIONS-LEASES-ACL` | `0.5.47b` | beta | GenesisBlockDB Engineering | `docs/SPEC--GENESISDB-P6-GENERATIONS-LEASES-ACL.md` |
+| P6 peer-locality addendum | `SPEC--GENESISDB-P6-PEER-LOCALITY-ADDENDUM` | `0.1.16b` | active | GenesisBlockDB Engineering | `docs/SPEC--GENESISDB-P6-PEER-LOCALITY-ADDENDUM.md` |
+| Peer membership and sync authorization candidate | `ADR--GENESISDB-PEER-MEMBERSHIP-AUTHORIZATION` | `0.1.0` | candidate | GenesisBlockDB Architecture | `docs/adr/ADR--GENESISDB-PEER-MEMBERSHIP-AUTHORIZATION.md` |
 | Backup and restore contract | `SPEC--GENESISDB-BACKUP-RESTORE-U9` | `0.1.8b` | beta | Boss (Founder / Product Authority) | `docs/SPEC--GENESISDB-BACKUP-RESTORE-U9.md` |
 | Query correctness | `SPEC--WAVE-C-QUERY-CORRECTNESS` | `0.2.1b` | beta | GenesisBlockDB Engineering | `docs/SPEC--WAVE-C-QUERY-CORRECTNESS.md` |
 | Query budgets and quality gates | `SPEC--WAVE-D-BUDGETS-QUALITY-GATES` | `0.1.0b` | beta | GenesisBlockDB Engineering | `docs/SPEC--WAVE-D-BUDGETS-QUALITY-GATES.md` |
@@ -122,6 +124,10 @@ The following documents should be created only when implementation work requires
 - third-client namespace conformance report.
 
 ## 9. Changelog
+
+Version diff 0.5.99+draft -> 0.5.100+draft: register the source-backed
+candidate peer-membership authorization ADR and synchronize Master, C4, and P6
+document versions. No peer trust or membership policy is approved.
 
 Version diff 0.5.98+draft -> 0.5.99+draft: register the approved execution DAG
 guard contract and architecture tooling boundary. W1 remains non-dispatchable.
@@ -509,6 +515,7 @@ review and full P8 gates remain open.
 
 | Version | Date | Owner | Summary |
 |---|---|---|---|
+| 0.5.100+draft | 2026-10-16 | GenesisBlockDB Architecture | Register candidate peer-membership authorization contract and synchronize Master, C4, and P6 versions; no trust policy approved |
 | 0.5.99+draft | 2026-10-10 | GenesisBlockDB Architecture | Register bounded execution DAG guard, independent candidate gates and synthetic pilot contract. |
 | 0.5.98+draft | 2026-10-06 | GenesisBlockDB Architecture | Record passing fresh and committed Linux worker addon tests (26/0/6) on PR head ab38d50 and successful tests/security/performance/consumer workflows; six model-dependent tests and migration/full integration qualification remain pending |
 | 0.5.97+draft | 2026-10-06 | GenesisBlockDB Architecture | Record the GenesisRAG17 candidate engine source and historical baseline; synchronize ADR/C4/Master Spec/extension map provenance; refresh Linux addon metadata; fresh Bookworm worker suite 26 passed, 0 failed, 6 model-dependent skipped; full committed-artifact and integration qualification pending |
