@@ -1,0 +1,224 @@
+name: Genesis Studio packaging
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/studio-packaging.yml'
+      - 'docs/SPEC--GENESIS-STUDIO-DESKTOP.md'
+      - 'scripts/studio-*-packaged-*'
+      - 'studio/**'
+      - 'src/lib.rs'
+      - 'src/router.rs'
+      - 'tests/studio_contract_tests.rs'
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/studio-packaging.yml'
+      - 'docs/SPEC--GENESIS-STUDIO-DESKTOP.md'
+      - 'scripts/studio-*-packaged-*'
+      - 'studio/**'
+      - 'src/lib.rs'
+      - 'src/router.rs'
+      - 'tests/studio_contract_tests.rs'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  studio-package:
+    name: Studio checks and ${{ matrix.bundle }} (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            bundle: msi
+          - os: macos-latest
+            bundle: dmg
+          - os: ubuntu-latest
+            bundle: deb
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Linux Tauri build dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install --no-install-recommends -y \
+            build-essential curl file libssl-dev libwebkit2gtk-4.1-dev \
+            libxdo-dev librsvg2-dev wget xvfb dbus-x11
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: |
+            . -> target
+            studio/src-tauri -> target
+
+      - name: Install Studio dependencies
+        working-directory: studio
+        run: npm ci --ignore-scripts
+
+      - name: Studio unit tests
+        working-directory: studio
+        run: npm test
+
+      - name: Studio frontend build
+        working-directory: studio
+        run: npm run build
+
+      - name: Persisted local/remote transport parity
+        run: cargo test --locked --no-default-features --jobs 1 --test studio_contract_tests local_and_remote_studio_reads_match_on_the_same_persisted_fixture
+
+      - name: Seed the packaged parity fixture
+        if: runner.os == 'Windows'
+        shell: powershell
+        run: |
+          $fixtureRoot = Join-Path $env:RUNNER_TEMP "studio parity fixture $([guid]::NewGuid().ToString('N'))"
+          [System.IO.File]::AppendAllText(
+            $env:GITHUB_ENV,
+            "STUDIO_PACKAGED_FIXTURE_ROOT=$fixtureRoot`n",
+            [System.Text.UTF8Encoding]::new($false)
+          )
+          $env:STUDIO_PACKAGED_FIXTURE_ROOT = $fixtureRoot
+          cargo test --locked --no-default-features --jobs 1 --test studio_contract_tests seed_packaged_studio_parity_fixture -- --ignored --exact --nocapture
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          if (-not (Test-Path -LiteralPath $fixtureRoot -PathType Container)) {
+            throw 'The packaged Studio parity fixture seeder did not create its requested root'
+          }
+          if (-not (Get-ChildItem -LiteralPath $fixtureRoot -Force | Select-Object -First 1)) {
+            throw 'The packaged Studio parity fixture seeder produced an empty data root'
+          }
+
+      - name: Build REST server for packaged parity
+        if: runner.os == 'Windows'
+        run: cargo build --locked --no-default-features --features bins --bin genesis-db-server --jobs 1
+
+      - name: Tauri shell tests
+        working-directory: studio
+        run: cargo test --manifest-path src-tauri/Cargo.toml --locked --jobs 1
+
+      - name: Build platform installer
+        working-directory: studio
+        run: npx tauri build --debug --bundles ${{ matrix.bundle }}
+
+      - name: Stage normal package artifact (Windows)
+        if: runner.os == 'Windows'
+        shell: powershell
+        run: |
+          $sourceDirectory = "studio\src-tauri\target\debug\bundle\${{ matrix.bundle }}"
+          $artifactDirectory = Join-Path $env:RUNNER_TEMP 'studio-normal-package'
+          if (-not (Test-Path -LiteralPath $sourceDirectory -PathType Container)) {
+            throw "The normal Studio package directory was not found: $sourceDirectory"
+          }
+          New-Item -ItemType Directory -Path $artifactDirectory -Force | Out-Null
+          Copy-Item -Path (Join-Path $sourceDirectory '*') -Destination $artifactDirectory -Recurse -Force
+
+      - name: Install and launch the ordinary Windows MSI
+        if: runner.os == 'Windows'
+        shell: powershell
+        run: .\scripts\studio-windows-normal-msi-smoke.ps1
+
+      - name: Stage normal package artifact (macOS/Linux)
+        if: runner.os != 'Windows'
+        run: |
+          mkdir -p "$RUNNER_TEMP/studio-normal-package"
+          cp -R "studio/src-tauri/target/debug/bundle/${{ matrix.bundle }}/." "$RUNNER_TEMP/studio-normal-package/"
+
+      - name: Build isolated Windows UI-smoke MSI
+        if: runner.os == 'Windows'
+        working-directory: studio
+        shell: powershell
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $bundleDirectory = 'src-tauri\target\debug\bundle\msi'
+          $releaseMsi = Get-ChildItem -LiteralPath $bundleDirectory -Filter '*.msi' -File |
+            Sort-Object LastWriteTime -Descending |
+            Select-Object -First 1
+          if (-not $releaseMsi) {
+            throw "The normal Windows MSI was not found in $bundleDirectory"
+          }
+
+          $smokeMsi = Join-Path $env:RUNNER_TEMP 'genesis-studio-ui-smoke.msi'
+          $smokeConfig = Join-Path 'src-tauri' 'tauri.windows-smoke.generated.json'
+
+          $cdpProbe = [System.Net.Sockets.TcpListener]::new([System.Net.IPAddress]::Loopback, 0)
+          $cdpProbe.Start()
+          $cdpPort = $cdpProbe.LocalEndpoint.Port
+          $cdpProbe.Stop()
+
+          try {
+            $config = Get-Content -LiteralPath 'src-tauri\tauri.conf.json' -Raw | ConvertFrom-Json
+            if (-not $config.app.windows -or $config.app.windows.Count -ne 1) {
+              throw 'The smoke configuration expects exactly one configured Studio window'
+            }
+            $browserArgs = "--disable-features=msWebOOUI,msPdfOOUI,msSmartScreenProtection --remote-debugging-address=127.0.0.1 --remote-debugging-port=$cdpPort --remote-allow-origins=*"
+            $config.app.windows[0] | Add-Member -NotePropertyName additionalBrowserArgs -NotePropertyValue $browserArgs -Force
+            $configJson = ConvertTo-Json -InputObject $config -Depth 100
+            [System.IO.File]::WriteAllText(
+              (Join-Path (Get-Location).Path $smokeConfig),
+              $configJson,
+              [System.Text.UTF8Encoding]::new($false)
+            )
+
+            $smokeBuildStartedAt = Get-Date
+            npx tauri build --debug --bundles msi --config $smokeConfig
+            if ($LASTEXITCODE -ne 0) {
+              throw "The instrumented Windows smoke MSI build failed with exit code $LASTEXITCODE"
+            }
+
+            $builtSmokeMsi = Get-ChildItem -LiteralPath $bundleDirectory -Filter '*.msi' -File |
+              Where-Object { $_.LastWriteTime -ge $smokeBuildStartedAt } |
+              Sort-Object LastWriteTime -Descending |
+              Select-Object -First 1
+            if (-not $builtSmokeMsi) {
+              throw 'The instrumented Windows smoke MSI was not produced'
+            }
+            Copy-Item -LiteralPath $builtSmokeMsi.FullName -Destination $smokeMsi -Force
+            [System.IO.File]::AppendAllText(
+              $env:GITHUB_ENV,
+              "STUDIO_CDP_PORT=$cdpPort`nSTUDIO_PACKAGED_SMOKE_MSI=$smokeMsi`n",
+              [System.Text.UTF8Encoding]::new($false)
+            )
+          }
+          finally {
+            Remove-Item -LiteralPath $smokeConfig -Force -ErrorAction SilentlyContinue
+          }
+
+      - name: Install and exercise packaged Windows startup and root selection
+        if: runner.os == 'Windows'
+        shell: powershell
+        run: |
+          .\scripts\studio-windows-packaged-smoke.ps1 -TestExitCodeGuard
+          .\scripts\studio-windows-packaged-smoke.ps1
+
+      - name: Install and launch packaged macOS app
+        if: runner.os == 'macOS'
+        run: ./scripts/studio-macos-packaged-smoke.sh
+
+      - name: Install and launch packaged Linux app
+        if: runner.os == 'Linux'
+        run: ./scripts/studio-linux-packaged-smoke.sh
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: genesis-studio-${{ matrix.bundle }}-${{ runner.os }}
+          path: ${{ runner.temp }}/studio-normal-package/*
+          if-no-files-found: warn
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: genesis-studio-smoke-evidence-${{ runner.os }}
+          path: ${{ runner.temp }}/studio-packaged-evidence/**
+          if-no-files-found: warn

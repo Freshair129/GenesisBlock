@@ -35,7 +35,7 @@ describe('remote StudioTransport', () => {
       return json(capabilities);
     }) as typeof fetch;
 
-    const transport = await createRemoteTransport('https://db.example/', 'secret', fetcher);
+    const transport = await createRemoteTransport('https://db.example/', 'secret', { fetcher });
 
     expect((await transport.getCapabilities()).protocolVersion).toBe('1');
     expect(calls).toEqual([
@@ -65,7 +65,7 @@ describe('remote StudioTransport', () => {
       return json({}, 404);
     }) as typeof fetch;
 
-    const transport = await createRemoteTransport('https://db.example', '', fetcher);
+    const transport = await createRemoteTransport('https://db.example', '', { fetcher });
     const scene = await transport.loadGraphScene({ limit: 10 });
 
     expect(scene.frontier).toBe(42);
@@ -89,7 +89,7 @@ describe('remote StudioTransport', () => {
       return json({}, 404);
     }) as typeof fetch;
 
-    const transport = await createRemoteTransport('https://db.example', '', fetcher);
+    const transport = await createRemoteTransport('https://db.example', '', { fetcher });
     const result = await transport.executeNamedQuery({
       namespace: 'notes',
       schemaVersion: 3,
@@ -108,6 +108,57 @@ describe('remote StudioTransport', () => {
     });
   });
 
+  it('uses the fixed native bridge for packaged remote calls and clears it on disconnect', async () => {
+    const configured: Array<{ baseUrl: string; token: string }> = [];
+    const operations: unknown[] = [];
+    let closed = false;
+    const nativeBridge = {
+      configure: async (baseUrl: string, token: string) => {
+        configured.push({ baseUrl, token });
+      },
+      request: async <T>(operation: unknown) => {
+        operations.push(operation);
+        return capabilities as T;
+      },
+      close: async () => {
+        closed = true;
+      },
+    };
+    const fetcher = (async () => {
+      throw new Error('packaged remote calls must not use WebView fetch');
+    }) as typeof fetch;
+
+    const transport = await createRemoteTransport('https://db.example:8443/tenant', 'secret', {
+      fetcher,
+      nativeBridge,
+    });
+
+    expect(configured).toEqual([{ baseUrl: 'https://db.example:8443/tenant', token: 'secret' }]);
+    expect(operations).toEqual([{ kind: 'capabilities' }]);
+    expect((await transport.getCapabilities()).protocolVersion).toBe('1');
+    await transport.close();
+    expect(closed).toBe(true);
+  });
+
+  it('clears the native connection when capability negotiation fails and preserves the cause', async () => {
+    const failure = new Error('capability handshake rejected');
+    let closed = false;
+    const nativeBridge = {
+      configure: async () => {},
+      request: async () => {
+        throw failure;
+      },
+      close: async () => {
+        closed = true;
+        throw new Error('cleanup failed');
+      },
+    };
+
+    await expect(createRemoteTransport('https://db.example', 'secret', { nativeBridge }))
+      .rejects.toBe(failure);
+    expect(closed).toBe(true);
+  });
+
   it('uses the stable REST error envelope message', async () => {
     const fetcher = (async (input: string | URL | Request) => {
       if (String(input).endsWith('/v1/studio/capabilities')) return json(capabilities);
@@ -121,7 +172,7 @@ describe('remote StudioTransport', () => {
       }, 400);
     }) as typeof fetch;
 
-    const transport = await createRemoteTransport('https://db.example', '', fetcher);
+    const transport = await createRemoteTransport('https://db.example', '', { fetcher });
 
     await expect(transport.loadGraphScene({ limit: 10 })).rejects.toThrow(
       'Genesis server 400: collection name is invalid',
@@ -134,7 +185,7 @@ describe('remote StudioTransport', () => {
       return new Response('legacy server failure', { status: 500 });
     }) as typeof fetch;
 
-    const transport = await createRemoteTransport('https://db.example', '', fetcher);
+    const transport = await createRemoteTransport('https://db.example', '', { fetcher });
 
     await expect(transport.loadGraphScene({ limit: 10 })).rejects.toThrow(
       'Genesis server 500: legacy server failure',

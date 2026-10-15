@@ -216,15 +216,18 @@ function Workspace({ transport, onDisconnect }: WorkspaceProps) {
 
   useEffect(() => {
     let current = true;
+    void transport.getCapabilities().then((nextCapabilities) => {
+      if (current) setCapabilities(nextCapabilities);
+    }).catch((reason) => {
+      if (current) setError(reason instanceof Error ? reason.message : String(reason));
+    });
     void Promise.all([
-      transport.getCapabilities(),
       transport.getStatus(),
       transport.loadGraphScene({ limit: 240 }),
       transport.listCollections(),
       transport.listRelationalSchemas(),
-    ]).then(([nextCapabilities, nextStatus, nextScene, nextCollections, nextSchemas]) => {
+    ]).then(([nextStatus, nextScene, nextCollections, nextSchemas]) => {
       if (!current) return;
-      setCapabilities(nextCapabilities);
       setStatus(nextStatus.data);
       setScene(nextScene.data);
       setCollections(nextCollections.data);
@@ -369,7 +372,7 @@ function Workspace({ transport, onDisconnect }: WorkspaceProps) {
         <div className="sidebar-brand"><span className="brand-mark"><GitBranch size={18} /></span><span>GENESIS<br /><b>STUDIO</b></span></div>
         <div className="connection-chip"><i /><span><b>{transport.kind} / {capabilities?.mode ?? 'connecting'}</b>{capabilities?.protocolVersion ?? 'negotiating'}</span></div>
         <nav>{navigation.map((item) => <button key={item.label} className={active === item.label ? 'active' : ''} aria-label={`${item.label} workspace`} title={`${item.label} workspace`} onClick={() => setActive(item.label)}><item.icon size={17} /><span>{item.label}</span></button>)}</nav>
-        <button className="disconnect" onClick={() => void disconnect()}><ArrowLeft size={16} /> Connections</button>
+        <button className="disconnect" aria-label="Connections" title="Connections" onClick={() => void disconnect()}><ArrowLeft size={16} /><span>Connections</span></button>
       </aside>
       <main className="workspace">
         <header className="workspace-header"><div><span className="breadcrumb">WORKSPACES /</span><h1>{active}</h1></div><div className="truth-badge"><ShieldCheck size={14} /> {transport.kind.toUpperCase()} / READ ONLY / {capabilities?.consistency ?? 'NEGOTIATING'}</div></header>
