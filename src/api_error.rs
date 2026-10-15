@@ -146,6 +146,19 @@ pub fn success_result_value(data: impl Serialize) -> Value {
     })
 }
 
+/// Serialize the payload of a query outcome without changing the engine enum's
+/// public traits or adding a synthetic variant wrapper to the JSON contract.
+pub fn query_success_result_value(outcome: crate::query::hql2::QueryOutcomeV2) -> Value {
+    let data = match outcome {
+        crate::query::hql2::QueryOutcomeV2::Rows(result) => serde_json::to_value(result),
+        crate::query::hql2::QueryOutcomeV2::Plan(plan) => serde_json::to_value(plan),
+    };
+    match data {
+        Ok(data) => success_result_value(data),
+        Err(error) => error_result_value(ApiErrorEnvelopeV1::internal(error.to_string())),
+    }
+}
+
 pub fn error_result_value(error: ApiErrorEnvelopeV1) -> Value {
     let legacy_code = error.legacy_code.clone();
     let details = error.details.clone();
@@ -183,7 +196,8 @@ pub fn parse_query_v2_input(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::query::hql2::QueryErrorV2;
+    use crate::query::hql2::result::{CatalogStampV2, ExplainResultV2};
+    use crate::query::hql2::{QueryErrorV2, QueryOutcomeV2};
 
     #[test]
     fn stable_codes_are_one_to_one_with_categories() {
@@ -298,6 +312,29 @@ mod tests {
         assert_eq!(value["error"]["code"], "GENESIS_CAPABILITY_UNSUPPORTED");
         assert_eq!(value["code"], "CAPABILITY_UNSUPPORTED");
         assert_eq!(value["details"]["reason"], "safe_reason");
+    }
+
+    #[test]
+    fn query_success_serializes_direct_plan_payload_without_enum_wrapper() {
+        let value = query_success_result_value(QueryOutcomeV2::Plan(ExplainResultV2 {
+            contract_version: "genesis.api.v2".into(),
+            planner_version: "planner.v2".into(),
+            plan_hash: "plan-hash".into(),
+            request_id: "plan-request".into(),
+            catalog: CatalogStampV2 {
+                observed_frontier: 1,
+                policy_revision: 0,
+                schema_fingerprint: "schema-hash".into(),
+            },
+            plan: Vec::new(),
+            root: "root".into(),
+        }));
+
+        assert_eq!(value["contract_version"], API_ERROR_CONTRACT_V1);
+        assert_eq!(value["ok"], true);
+        assert_eq!(value["data"]["request_id"], "plan-request");
+        assert_eq!(value["data"]["planner_version"], "planner.v2");
+        assert!(value["data"]["Plan"].is_null());
     }
 
     #[test]

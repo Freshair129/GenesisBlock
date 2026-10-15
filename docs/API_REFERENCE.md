@@ -57,6 +57,9 @@ The shared Rust type is `ApiErrorEnvelopeV1`. Its `details` member is optional;
 REST sets `status`, while embedded callers omit it because there is no HTTP
 status. Successful NAPI contract results use the same top-level contract
 version and an `{ "ok": true, "data": ... }` payload.
+For `queryV2Contract`, `data` is the direct `QueryResultV2` object for row
+results or direct `ExplainResultV2` object for plan mode; it does not wrap the
+Rust `QueryOutcomeV2` enum in another JSON object.
 
 Router-level unmatched paths (`404`), unsupported methods (`405`), and requests
 rejected by the global body-size layer can fail before a handler or custom

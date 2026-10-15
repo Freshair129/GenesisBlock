@@ -120,6 +120,9 @@ dimension mismatch to validation; and governance policy rejection to
 authorization. The REST transaction handler uses HTTP 403 for that governance
 rejection. NAPI runtime tests cover validation, structured legacy query-code
 preservation, conflict, success, and legacy Promise-rejection compatibility.
+Query success serializes the inner `QueryResultV2` or `ExplainResultV2` payload
+directly; the engine's non-serializable `QueryOutcomeV2` enum is neither changed
+nor exposed as a JSON wrapper.
 REST integration tests cover all six route categories, with a separate
 recovery-required handler test. Python and Go SDK readers test stable and
 legacy code separation for all six. Local Go execution remains unavailable

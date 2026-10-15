@@ -44,7 +44,8 @@ test('NAPI typed query contract returns versioned validation envelopes and succe
     );
     assert.equal(success.contract_version, 'genesis.api.errors.v1');
     assert.equal(success.ok, true);
-    assert.ok(success.data);
+    assert.equal(success.data.request_id, 'api-error-success');
+    assert.ok(Array.isArray(success.data.rows));
   } finally {
     cleanup(dbPath);
   }

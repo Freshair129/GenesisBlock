@@ -26244,7 +26244,7 @@ impl GenesisDatabase {
                 &request_json,
             ) {
                 Ok((access, request)) => match i.query_v2_contract(access, request) {
-                    Ok(result) => crate::api_error::success_result_value(result),
+                    Ok(result) => crate::api_error::query_success_result_value(result),
                     Err(error) => crate::api_error::error_result_value(error),
                 },
                 Err(error) => crate::api_error::error_result_value(error),
