@@ -6139,6 +6139,11 @@ impl Storage {
                         "PROJECTION_REBUILD_BUSY: projection publication could not acquire SQLite locks",
                     ));
                 }
+                _ => {
+                    return Err(Error::from_reason(
+                        "PROJECTION_REBUILD_FAILED: SQLite backup returned an unsupported step state",
+                    ));
+                }
             }
         }
     }
