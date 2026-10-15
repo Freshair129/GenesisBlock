@@ -510,6 +510,63 @@ fn enforced_policy_fails_closed_legacy_unscoped_accessors() {
 }
 
 #[test]
+fn community_insights_and_rebuild_fail_closed_without_access_context() {
+    let dir = TempDir::new().unwrap();
+    let storage = open(dir.path());
+    add_node(&storage, "community-maintenance-orphan");
+    storage.meta_nodes.insert(
+        7,
+        SuperNode {
+            cluster_id: 7,
+            theme: "protected".into(),
+            member_count: 1,
+            impact: 1.0,
+            centroid: vec![0.25, 0.75],
+            timestamp: "2026-09-22T00:00:00Z".into(),
+            drift: None,
+        },
+    );
+    storage.meta_edges.insert(
+        "7:8".into(),
+        MetaEdge {
+            from_cluster: 7,
+            to_cluster: 8,
+            weight: 1,
+        },
+    );
+
+    // Disabled policy retains the legacy aggregate read.
+    let (nodes, edges) = storage.insight_communities().unwrap();
+    assert_eq!(nodes.len(), 1);
+    assert_eq!(nodes[0].centroid, vec![0.25, 0.75]);
+    assert_eq!(edges.len(), 1);
+
+    enable_policy(&storage, vec![owner_policy_grant()]);
+
+    assert_error_prefix(storage.insight_communities(), "ACCESS_CONTEXT_REQUIRED");
+    assert_error_prefix(
+        storage.rebuild_community_insights(),
+        "ACCESS_CONTEXT_REQUIRED",
+    );
+    assert_error_prefix(storage.detect_communities(), "ACCESS_CONTEXT_REQUIRED");
+    assert_error_prefix(storage.generate_meta_graph(), "ACCESS_CONTEXT_REQUIRED");
+    assert_error_prefix(
+        storage.perform_autonomic_optimization(),
+        "ACCESS_CONTEXT_REQUIRED",
+    );
+    assert_eq!(
+        storage.meta_nodes.get(&7).unwrap().centroid,
+        vec![0.25, 0.75]
+    );
+    assert_eq!(storage.meta_edges.len(), 1);
+    assert_eq!(
+        storage.nodes.len(),
+        1,
+        "denied maintenance must not prune first"
+    );
+}
+
+#[test]
 fn invalid_local_policy_signature_in_journal_fails_closed_on_replay() {
     let dir = TempDir::new().unwrap();
     let storage = open(dir.path());

@@ -237,6 +237,24 @@ fn storage_write_error_response(
     }
 }
 
+fn insight_storage_error_response(storage: &Storage, error: impl std::fmt::Display) -> Response {
+    let message = error.to_string();
+    if message.starts_with("ACCESS_CONTEXT_REQUIRED") {
+        rest_error_response(
+            StatusCode::UNAUTHORIZED,
+            RestErrorCategory::Authorization,
+            message,
+        )
+    } else {
+        storage_write_error_response(
+            storage,
+            StatusCode::INTERNAL_SERVER_ERROR,
+            RestErrorCategory::Integrity,
+            message,
+        )
+    }
+}
+
 // ---------------------------------------------------------------------------
 // Response shape helpers
 // ---------------------------------------------------------------------------
@@ -750,21 +768,14 @@ async fn get_meta_history_handler(
 
 async fn insight_communities_handler(State(state): State<AppState>) -> impl IntoResponse {
     let storage = state.storage.read();
-    let nodes: Vec<_> = storage
-        .meta_nodes
-        .iter()
-        .map(|e| e.value().clone())
-        .collect();
-    let edges: Vec<_> = storage
-        .meta_edges
-        .iter()
-        .map(|e| e.value().clone())
-        .collect();
-    (
-        StatusCode::OK,
-        Json(serde_json::json!({ "nodes": nodes, "edges": edges })),
-    )
-        .into_response()
+    match storage.insight_communities() {
+        Ok((nodes, edges)) => (
+            StatusCode::OK,
+            Json(serde_json::json!({ "nodes": nodes, "edges": edges })),
+        )
+            .into_response(),
+        Err(error) => insight_storage_error_response(&storage, error),
+    }
 }
 
 async fn insight_gaps_handler(State(state): State<AppState>) -> impl IntoResponse {
@@ -781,17 +792,9 @@ async fn insight_gaps_handler(State(state): State<AppState>) -> impl IntoRespons
 
 async fn insight_rebuild_handler(State(state): State<AppState>) -> impl IntoResponse {
     let storage = state.storage.write();
-    match storage
-        .detect_communities()
-        .and_then(|_| storage.generate_meta_graph())
-    {
+    match storage.rebuild_community_insights() {
         Ok(()) => (StatusCode::OK, Json(serde_json::json!({ "ok": true }))).into_response(),
-        Err(e) => storage_write_error_response(
-            &storage,
-            StatusCode::INTERNAL_SERVER_ERROR,
-            RestErrorCategory::Integrity,
-            e,
-        ),
+        Err(error) => insight_storage_error_response(&storage, error),
     }
 }
 

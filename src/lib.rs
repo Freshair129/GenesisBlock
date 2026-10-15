@@ -35,6 +35,21 @@ use roaring::RoaringBitmap;
 use rusqlite::types::{Value as SqlValue, ValueRef};
 use rusqlite::{params, params_from_iter, Connection, OpenFlags, OptionalExtension};
 
+const GOSSIP_MAX_PEERS: usize = 256;
+const GOSSIP_MAX_PENDING_SYNC_REQUESTS: usize = 256;
+const GOSSIP_PEER_TTL_SECS: u32 = 60;
+const GOSSIP_PENDING_SYNC_TTL: Duration = Duration::from_secs(60);
+const GOSSIP_PULL_RETRY_INTERVAL: Duration = Duration::from_secs(1);
+const GOSSIP_STATE_SWEEP_INTERVAL: Duration = Duration::from_secs(15);
+
+#[derive(Clone)]
+struct PendingSyncRequest {
+    request_nonce: String,
+    from_commit_seq: u64,
+    requested_at: Instant,
+    last_sent_at: Instant,
+}
+
 // When the napi bindings are disabled (REST server / Linux integration-test
 // build) the storage core uses a minimal Error/Result that mirror the only napi
 // API it relies on — `Error::from_reason`. This is what lets the core link as a
@@ -14229,8 +14244,12 @@ impl Storage {
         std::thread::spawn(move || loop {
             std::thread::sleep(Duration::from_secs(3600));
             if !storage.read_only {
-                let _ = storage.perform_autonomic_optimization();
-                let _ = storage.save_state();
+                if let Err(error) = storage.perform_autonomic_optimization() {
+                    eprintln!("maintenance: autonomic optimization failed: {error}");
+                }
+                if let Err(error) = storage.save_state() {
+                    eprintln!("maintenance: state checkpoint failed: {error}");
+                }
             }
         });
     }
@@ -18730,9 +18749,41 @@ impl Storage {
         }
     }
 
+    /// Return the community aggregate only when the current caller is allowed
+    /// to make an unscoped read. The REST surface has no scoped AccessContext,
+    /// so Enforced policy must deny it rather than return raw centroids.
+    pub fn insight_communities(&self) -> Result<(Vec<SuperNode>, Vec<MetaEdge>)> {
+        let _read_guard = self.commit_lock.lock();
+        self.ensure_readable()?;
+        self.require_unscoped_read()?;
+
+        let nodes = self
+            .meta_nodes
+            .iter()
+            .map(|entry| entry.value().clone())
+            .collect();
+        let edges = self
+            .meta_edges
+            .iter()
+            .map(|entry| entry.value().clone())
+            .collect();
+        Ok((nodes, edges))
+    }
+
+    pub fn rebuild_community_insights(&self) -> Result<()> {
+        // Keep policy validation and both rebuild stages under one commit
+        // boundary so a concurrent policy change cannot leave a partial rebuild.
+        let _read_guard = self.commit_lock.lock();
+        self.ensure_readable()?;
+        self.require_unscoped_read()?;
+        self.detect_communities()?;
+        self.generate_meta_graph()
+    }
+
     pub fn detect_communities(&self) -> Result<()> {
         let _read_guard = self.commit_lock.lock();
         self.ensure_readable()?;
+        self.require_unscoped_read()?;
 
         // Community detection runs over the default collection's vector space.
         let coll = self.default_coll();
@@ -18818,6 +18869,7 @@ impl Storage {
     pub fn generate_meta_graph(&self) -> Result<()> {
         let _read_guard = self.commit_lock.lock();
         self.ensure_readable()?;
+        self.require_unscoped_read()?;
 
         // Meta-graph is built over the default collection's vector space.
         let coll = self.default_coll();
@@ -18914,6 +18966,11 @@ impl Storage {
     }
 
     pub fn perform_autonomic_optimization(&self) -> Result<()> {
+        // Keep the policy check and maintenance atomic against a concurrent
+        // AccessPolicy replacement.
+        let _read_guard = self.commit_lock.lock();
+        self.ensure_readable()?;
+        self.require_unscoped_read()?;
         println!("maintenance: executing autonomic maintenance...");
         self.prune_orphaned_nodes()?;
         self.generate_meta_graph()?;
@@ -19718,6 +19775,22 @@ impl Storage {
         false
     }
 
+    fn prune_gossip_state(
+        &self,
+        sync_cursors: &mut HashMap<String, u64>,
+        pending_sync_requests: &mut HashMap<String, PendingSyncRequest>,
+    ) {
+        let now_epoch = Utc::now().timestamp().max(0) as u32;
+        self.peers
+            .retain(|_, peer| now_epoch.saturating_sub(peer.last_seen) < GOSSIP_PEER_TTL_SECS);
+        let now = Instant::now();
+        pending_sync_requests.retain(|peer_id, request| {
+            now.duration_since(request.requested_at) < GOSSIP_PENDING_SYNC_TTL
+                && self.peers.contains_key(peer_id)
+        });
+        sync_cursors.retain(|peer_id, _| self.peers.contains_key(peer_id));
+    }
+
     pub fn start_gossip_manager(storage: Arc<Self>) {
         // An MCP stdio process has a protocol-exclusive stdout channel. The
         // gossip manager emits operational text through native stdout, which
@@ -19731,7 +19804,7 @@ impl Storage {
 
         tokio::spawn(async move {
             let mut sync_cursors: HashMap<String, u64> = HashMap::new();
-            let mut pending_sync_requests: HashMap<String, (String, u64)> = HashMap::new();
+            let mut pending_sync_requests: HashMap<String, PendingSyncRequest> = HashMap::new();
             let socket = match tokio::net::UdpSocket::bind("0.0.0.0:0").await {
                 Ok(s) => {
                     let addr = match s.local_addr() {
@@ -19759,9 +19832,13 @@ impl Storage {
 
             let mut buf = [0u8; 65535];
             let mut heartbeat_interval = tokio::time::interval(Duration::from_secs(5));
+            let mut gossip_state_sweep = tokio::time::interval(GOSSIP_STATE_SWEEP_INTERVAL);
 
             loop {
                 tokio::select! {
+                    _ = gossip_state_sweep.tick() => {
+                        storage.prune_gossip_state(&mut sync_cursors, &mut pending_sync_requests);
+                    }
                     _ = heartbeat_interval.tick() => {
                         let msg = GossipMessage::Heartbeat {
                             schema_version: SCHEMA_VERSION,
@@ -19781,6 +19858,15 @@ impl Storage {
                                 match msg {
                                     GossipMessage::Heartbeat { schema_version, peer_id: p_id, merkle_root, logical_time: _, port, verifying_key } => {
                                         if p_id != storage.local_peer_id {
+                                            // Expire old state before admission so a peer flood
+                                            // cannot grow the map beyond its fixed capacity.
+                                            storage.prune_gossip_state(&mut sync_cursors, &mut pending_sync_requests);
+
+                                            if !storage.peers.contains_key(&p_id)
+                                                && storage.peers.len() >= GOSSIP_MAX_PEERS
+                                            {
+                                                continue;
+                                            }
                                             let peer_addr = format!("{}:{}", addr.ip(), port);
                                             storage.peers.insert(p_id.clone(), SyncPeer {
                                                 id: p_id.clone(),
@@ -19794,12 +19880,34 @@ impl Storage {
                                                 continue;
                                             }
                                             if merkle_root != storage.get_merkle_root() {
-                                                let from_commit_seq = *sync_cursors.get(&p_id).unwrap_or(&0);
-                                                let request_nonce = Uuid::new_v4().to_string();
-                                                pending_sync_requests.insert(
-                                                    p_id.clone(),
-                                                    (request_nonce.clone(), from_commit_seq),
-                                                );
+                                                // Keep one outstanding request per peer. Retries
+                                                // reuse its nonce and original expiry; a heartbeat
+                                                // flood cannot extend pending state indefinitely.
+                                                let now = Instant::now();
+                                                let (request_nonce, from_commit_seq) =
+                                                    if let Some(pending) = pending_sync_requests.get_mut(&p_id) {
+                                                        if now.duration_since(pending.last_sent_at) < GOSSIP_PULL_RETRY_INTERVAL {
+                                                            continue;
+                                                        }
+                                                        pending.last_sent_at = now;
+                                                        (pending.request_nonce.clone(), pending.from_commit_seq)
+                                                    } else {
+                                                        if pending_sync_requests.len() >= GOSSIP_MAX_PENDING_SYNC_REQUESTS {
+                                                            continue;
+                                                        }
+                                                        let from_commit_seq = *sync_cursors.get(&p_id).unwrap_or(&0);
+                                                        let request_nonce = Uuid::new_v4().to_string();
+                                                        pending_sync_requests.insert(
+                                                            p_id.clone(),
+                                                            PendingSyncRequest {
+                                                                request_nonce: request_nonce.clone(),
+                                                                from_commit_seq,
+                                                                requested_at: now,
+                                                                last_sent_at: now,
+                                                            },
+                                                        );
+                                                        (request_nonce, from_commit_seq)
+                                                    };
                                                 let req = GossipMessage::PullRequest {
                                                     schema_version:SCHEMA_VERSION,
                                                     from_clock: storage.get_logical_clock(),
@@ -19883,15 +19991,15 @@ impl Storage {
                                             // Heartbeat and Storage.peers keys have no independent trust provenance.
                                             // This P6 slice has no remote receipt-key source, so remain fail-closed.
                                             let trusted_responder_key: Option<&VerifyingKey> = None;
-                                            let verified_through_seq = pending.as_ref().and_then(|(nonce, from_seq)| {
+                                            let verified_through_seq = pending.as_ref().and_then(|pending| {
                                                 progress_receipt.as_ref().and_then(|receipt| {
                                                     Storage::verify_sync_progress_receipt(
                                                         receipt,
                                                         trusted_responder_key,
                                                         &source_peer_id,
                                                         &storage.local_peer_id,
-                                                        nonce,
-                                                        *from_seq,
+                                                        &pending.request_nonce,
+                                                        pending.from_commit_seq,
                                                         through_seq,
                                                         )
                                                 })

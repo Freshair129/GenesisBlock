@@ -10,7 +10,10 @@ use axum::body::Body;
 use axum::http::{Request, StatusCode};
 use axum::Router;
 use genesis_block_native::router::{build_router, AppState};
-use genesis_block_native::{OpenOptions, Storage};
+use genesis_block_native::{
+    AccessAction, AccessContext, AccessGrant, AccessPolicy, AccessPolicyMode, AccessResource,
+    MetaEdge, OpenOptions, PolicyAdminActor, Storage, SuperNode,
+};
 use http_body_util::BodyExt;
 use parking_lot::RwLock;
 use serde_json::{json, Value};
@@ -143,6 +146,11 @@ async fn wave_c_core_query_and_batch_contract_reaches_rest_surface() {
 }
 
 fn make_app() -> (Router, TempDir) {
+    let (app, dir, _) = make_app_with_storage();
+    (app, dir)
+}
+
+fn make_app_with_storage() -> (Router, TempDir, Arc<RwLock<Storage>>) {
     let dir = TempDir::new().unwrap();
     let storage = Storage::open(OpenOptions {
         path: dir.path().to_str().unwrap().to_string(),
@@ -152,12 +160,36 @@ fn make_app() -> (Router, TempDir) {
         retention: None,
     })
     .expect("Storage::open in test");
+    let storage = Arc::new(RwLock::new(storage));
     let state = AppState {
-        storage: Arc::new(RwLock::new(storage)),
+        storage: storage.clone(),
         api_key: None,
         query_admission: Arc::new(tokio::sync::Semaphore::new(8)),
     };
-    (build_router(state), dir)
+    (build_router(state), dir, storage)
+}
+
+fn enable_enforced_policy(storage: &Storage) {
+    storage
+        .replace_access_policy(
+            PolicyAdminActor {
+                access: AccessContext {
+                    principal: "local-owner".into(),
+                    namespace: "default".into(),
+                },
+            },
+            0,
+            AccessPolicy {
+                revision: 1,
+                mode: AccessPolicyMode::Enforced,
+                grants: vec![AccessGrant {
+                    principal: "local-owner".into(),
+                    action: AccessAction::ManagePolicy,
+                    resource: AccessResource::Namespace("default".into()),
+                }],
+            },
+        )
+        .unwrap();
 }
 
 fn make_app_with_key(key: &str) -> (Router, TempDir) {
@@ -1541,6 +1573,55 @@ async fn test_insight_rebuild_and_gaps() {
 
     let (gaps_status, _) = get_json(&app, "/v1/insight/gaps").await;
     assert_eq!(gaps_status, StatusCode::OK);
+}
+
+#[tokio::test]
+async fn insight_community_routes_fail_closed_without_scoped_context() {
+    let (app, _dir, storage) = make_app_with_storage();
+    {
+        let storage = storage.write();
+        storage.meta_nodes.insert(
+            7,
+            SuperNode {
+                cluster_id: 7,
+                theme: "protected".into(),
+                member_count: 1,
+                impact: 1.0,
+                centroid: vec![0.25, 0.75],
+                timestamp: "2026-09-22T00:00:00Z".into(),
+                drift: None,
+            },
+        );
+        storage.meta_edges.insert(
+            "7:8".into(),
+            MetaEdge {
+                from_cluster: 7,
+                to_cluster: 8,
+                weight: 1,
+            },
+        );
+        enable_enforced_policy(&storage);
+    }
+
+    let (status, body) = get_json(&app, "/v1/insight/communities").await;
+    assert_eq!(status, StatusCode::UNAUTHORIZED);
+    assert_eq!(body["error"]["category"], "authorization");
+    assert_eq!(body["error"]["message"], "ACCESS_CONTEXT_REQUIRED");
+    assert!(
+        body.get("nodes").is_none(),
+        "raw community centroids must not be returned"
+    );
+
+    let (status, body) = post_json(&app, "/v1/insight/rebuild", json!(null)).await;
+    assert_eq!(status, StatusCode::UNAUTHORIZED);
+    assert_eq!(body["error"]["message"], "ACCESS_CONTEXT_REQUIRED");
+
+    let storage = storage.read();
+    assert_eq!(
+        storage.meta_nodes.get(&7).unwrap().centroid,
+        vec![0.25, 0.75]
+    );
+    assert_eq!(storage.meta_edges.len(), 1);
 }
 
 #[tokio::test]

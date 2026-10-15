@@ -26,6 +26,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .ok()
         .and_then(|h| h.parse().ok())
         .unwrap_or(std::net::IpAddr::V4(std::net::Ipv4Addr::LOCALHOST));
+    let api_key = std::env::var("GENESIS_API_KEY")
+        .ok()
+        .filter(|key| !key.trim().is_empty());
+    require_api_key_for_non_loopback(host, api_key.as_deref())?;
 
     let storage = Storage::open(OpenOptions {
         path: data_dir,
@@ -35,7 +39,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         retention: std::env::var("GENESIS_RETENTION").ok(),
     })?;
 
-    let api_key = std::env::var("GENESIS_API_KEY").ok();
     if api_key.is_some() {
         tracing::info!("API key authentication enabled (GENESIS_API_KEY is set)");
     } else {
@@ -75,6 +78,44 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         Err(e) => tracing::error!("final checkpoint failed (journal remains authoritative): {e}"),
     }
     Ok(())
+}
+
+fn require_api_key_for_non_loopback(
+    host: std::net::IpAddr,
+    api_key: Option<&str>,
+) -> std::io::Result<()> {
+    let has_non_empty_key = api_key.is_some_and(|key| !key.trim().is_empty());
+    if !host.is_loopback() && !has_non_empty_key {
+        return Err(std::io::Error::new(
+            std::io::ErrorKind::PermissionDenied,
+            "GENESIS_API_KEY must be set to a non-empty value when GENESIS_HOST is not a loopback address",
+        ));
+    }
+    Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::require_api_key_for_non_loopback;
+    use std::net::IpAddr;
+
+    #[test]
+    fn unauthenticated_loopback_binds_remain_allowed() {
+        for address in ["127.0.0.1", "127.42.0.1", "::1"] {
+            let host = address.parse::<IpAddr>().unwrap();
+            assert!(require_api_key_for_non_loopback(host, None).is_ok());
+        }
+    }
+
+    #[test]
+    fn non_loopback_binds_require_a_non_empty_key() {
+        for address in ["0.0.0.0", "192.0.2.1", "::"] {
+            let host = address.parse::<IpAddr>().unwrap();
+            assert!(require_api_key_for_non_loopback(host, None).is_err());
+            assert!(require_api_key_for_non_loopback(host, Some(" \t")).is_err());
+            assert!(require_api_key_for_non_loopback(host, Some("test-key")).is_ok());
+        }
+    }
 }
 
 /// Resolves on SIGINT (Ctrl-C) everywhere, and additionally on SIGTERM on

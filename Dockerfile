@@ -42,6 +42,7 @@ VOLUME ["/data"]
 EXPOSE 3000
 USER genesis
 
+# The default 0.0.0.0 bind requires a key; the no-key branch supports explicit loopback-only overrides.
 HEALTHCHECK --interval=10s --timeout=3s --start-period=10s --retries=5 CMD \
   if [ -n "${GENESIS_API_KEY:-}" ]; then curl -fsS -H "Authorization: Bearer ${GENESIS_API_KEY}" "http://127.0.0.1:${GENESIS_PORT:-3000}/v1/status" >/dev/null; else curl -fsS "http://127.0.0.1:${GENESIS_PORT:-3000}/v1/status" >/dev/null; fi
 

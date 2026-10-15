@@ -64,6 +64,15 @@ The gossip/discovery layer binds **UDP `0.0.0.0:30001`** and broadcasts to
 - On a shared LAN, multiple GenesisBlock instances will discover and CRDT-sync
   with each other over this port. Isolate instances at the network layer
   (separate subnet / firewall UDP 30001) unless cross-instance sync is intended.
+- Each node retains at most 256 discovered peers. Peers idle for 60 seconds and
+  pending sync requests older than 60 seconds are pruned on 15-second sweeps
+  (and before heartbeat admission). Retries reuse the request nonce and are
+  limited to once per peer per second without extending the original expiry.
+  These limits bound state growth; they do not authenticate peer enrollment or
+  make discovered peers trusted consensus members. Enforced ACL mode also
+  rejects the actor-less hourly pruning/meta-graph task with
+  `ACCESS_CONTEXT_REQUIRED`; the task logs the rejection and leaves records for
+  a future scoped maintenance path.
 
 ## Rollback
 
