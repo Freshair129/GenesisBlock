@@ -142,39 +142,51 @@ release gates.
 The native remote bridge code has frontend Vitest/build coverage. Its Rust URL,
 allowlist, token-forwarding, redirect, response-size, and CSP tests passed 9/9
 in the Tauri library target. The strengthened persisted-fixture contract test
-passed 1/1 and the read-only REST server binary build passed. The latest packaging
-run [38690064356](https://github.com/Freshair129/GenesisBlock/actions/runs/38690064356)
+passed 1/1 and the read-only REST server binary build passed. Packaging run
+[38690064356](https://github.com/Freshair129/GenesisBlock/actions/runs/38690064356)
 passed Linux DEB and macOS DMG installation/startup probes and uploaded all
-three ordinary package artifacts. The staged Windows MSI SHA-256 was
-`9fbc5517cd36469ec3bfc79e24a61ca4e6dc80ca93da10fac0011846fdb98895`; it
-installed with exit 0, launched `C:\Program Files\Genesis Studio\genesis-studio.exe`,
-which remained alive for ten seconds, then uninstalled with exit 0. The evidence
-explicitly does not claim visible UI or fixture parity. In the isolated
-instrumented MSI, CDP at `127.0.0.1:57680` came up; missing/non-directory path
-checks, picker cancellation, and successful picker selection of the exact
-persisted fixture root passed. The smoke then failed at `connectLocal` line 128:
-`page.waitForFunction: Timeout 30000ms exceeded` while waiting for
-`.connection-chip` to contain `local / local` (called from line 402). No local
-read surfaces or remote parity ran. See the [Windows evidence artifact
-11952789024](https://github.com/Freshair129/GenesisBlock/actions/runs/38690064356/artifacts/11952789024).
+three ordinary package artifacts. Its Windows MSI installed, stayed alive for
+ten seconds, and uninstalled successfully, but the instrumented smoke timed out
+waiting for the local connection chip. At that point the artifact did not retain
+DOM/alert evidence, so the failure could not be attributed to transport or UI
+state.
 
-Source review identified a UI-state coupling that can obscure this failure:
-`Workspace` assigned capabilities only after `Promise.all` for capability,
-status, graph, collections, and schema reads. If one read fails, the connection
-chip remains `local / connecting` despite completed transport negotiation. The
-prior smoke did not capture the alert or DOM state, so it cannot establish
-whether that condition caused this run's timeout or whether opening the local
-root itself failed. The follow-up separates capability state from initial data
-loads and makes the smoke report visible alerts while retaining the strict
-`local / local` success assertion. Validation is pending on a fresh Windows run.
-Packaged local-read, remote-origin/CSP, and same-fixture parity remain open.
-Independent architecture/security review acceptance also remains open until
-the exact revised diff is reviewed and recorded.
+The follow-up at head `afced2e2bd3315cb87597a8b5903bcde931caf13` separated
+capability state from the unrelated initial data reads and retained a strict
+`local / local` assertion. Fresh packaging run
+[38694137032](https://github.com/Freshair129/GenesisBlock/actions/runs/38694137032)
+passed Linux DEB and macOS DMG installation/startup, Windows parity fixture
+seeding, REST server build, Tauri shell tests, MSI build, and ordinary MSI
+install/start/uninstall. The staged Windows MSI SHA-256 was
+`e0ff990ee489e866f7e4557a3efb2daf6f1e63c87e9592448f0cb28b04716061`; the
+installed `C:\Program Files\Genesis Studio\genesis-studio.exe` remained alive
+for ten seconds, then uninstalled with exit 0. The ordinary package evidence
+still sets `visible_ui_verified: false` and `fixture_parity: false`.
+
+The instrumented MSI's CDP endpoint `127.0.0.1:59921` came up. Missing and
+non-directory paths, picker cancellation, and selection of the exact persisted
+fixture root passed. The strict `local / local` state was reached, and the
+visible local read surfaces passed. The failure occurred afterward in the test
+probe: `readLocalNativeOperations` called `studio_open_local` again for the
+same root after the UI had already opened it. The native command correctly
+rejected a second owner with `database is already open by another
+GenesisBlockDB process: <fixture-root>`. The probe now calls the existing-session
+`studio_local_capabilities` command and no longer reopens the root. The Windows
+job failed before remote requests or packaged parity comparison. See the
+[Windows evidence artifact
+11954183968](https://github.com/Freshair129/GenesisBlock/actions/runs/38694137032/artifacts/11954183968).
+
+The duplicate-open diagnosis explains the latest run's failure; it does not
+complete acceptance. The corrected probe needs a fresh Windows package run to
+prove native local operations, disconnect, remote REST connection under the
+production CSP, and same-fixture parity through the packaged UI. Independent
+architecture/security review acceptance also remains open until the exact
+revised diff is reviewed and recorded.
 
 The current Windows checkout has no WiX `candle.exe` or `light.exe`, so it
 cannot locally produce the MSI installer. GitHub Actions produced MSI, DMG, and
-DEB artifacts in run 38690064356. Linux and macOS installed startup were
-observed; the ordinary Windows MSI install/process-survival/uninstall check
-passed, and the instrumented MSI's native-picker/path interactions passed. The
-packaged local connection, remote-origin/CSP, and same-fixture parity gates
-remain open.
+DEB artifacts in run 38694137032. Linux and macOS installed startup and ordinary
+Windows MSI process startup/uninstall were observed. Windows picker selection,
+validation, local connection, and visible local reads are evidenced on the
+instrumented package, while native-operation parity, remote-origin/CSP, and
+same-fixture parity remain open.

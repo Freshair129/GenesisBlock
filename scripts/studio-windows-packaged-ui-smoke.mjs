@@ -56,13 +56,15 @@ async function waitForPathError(page, expectedPath, expectedMessage) {
   );
 }
 
-async function readLocalNativeOperations(page, rootPath) {
-  return page.evaluate(async (pathValue) => {
+async function readLocalNativeOperations(page) {
+  return page.evaluate(async () => {
     const invoke = window.__TAURI_INTERNALS__?.invoke;
     if (typeof invoke !== 'function') {
       throw new Error('Packaged Tauri invoke bridge was not available for parity evidence');
     }
-    const capabilities = await invoke('studio_open_local', { path: pathValue });
+    // The UI has already opened this exclusively owned root through Connect local.
+    // Read capabilities from that session instead of opening the same root twice.
+    const capabilities = await invoke('studio_local_capabilities');
     const status = await invoke('studio_local_status');
     const graph = await invoke('studio_local_graph', {
       request: { limit: 240, direction: 'both' },
@@ -86,7 +88,7 @@ async function readLocalNativeOperations(page, rootPath) {
       },
     });
     return { capabilities, status, graph, expansion, collections, schemas, inspection, hql, namedQuery };
-  }, rootPath);
+  });
 }
 
 async function readRemoteNativeOperations(page, expansionLimit) {
@@ -422,7 +424,7 @@ try {
   );
   await connectLocal(page);
   const localVisibleResults = await exerciseReadSurfaces(page);
-  const localNativeResults = await readLocalNativeOperations(page, fixtureRoot);
+  const localNativeResults = await readLocalNativeOperations(page);
   await page.getByRole('button', { name: 'Connections' }).click();
   await page.getByRole('button', { name: 'Connect local' }).waitFor({ state: 'visible', timeout: 15_000 });
   writeFileSync(signals.localCaptured, 'captured-and-disconnected');
