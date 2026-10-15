@@ -799,7 +799,7 @@ mod tests {
         let https_proxy = TcpListener::bind((std::net::Ipv4Addr::LOCALHOST, 0)).unwrap();
         https_proxy.set_nonblocking(true).unwrap();
         let https_proxy_url = format!("http://{}", https_proxy.local_addr().unwrap());
-        let remote = Url::parse("https://127.0.0.1:9").unwrap();
+        let remote = Url::parse("https://example.com").unwrap();
         let https_client = apply_proxy_policy(
             Client::builder().proxy(Proxy::all(&https_proxy_url).unwrap()),
             &remote,
@@ -844,7 +844,7 @@ mod tests {
         assert!(proxy_request
             .join()
             .unwrap()
-            .starts_with("CONNECT 127.0.0.1:9 HTTP/1.1"));
+            .starts_with("CONNECT example.com:443 HTTP/1.1"));
     }
 
     #[test]
