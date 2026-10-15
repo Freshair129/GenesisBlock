@@ -20,19 +20,29 @@ while its SQLite connection remains open, ignores the Windows deletion failure,
 and retries against the same old schema. On Windows the new regression fails on
 the unchanged engine with `REL_SCHEMA_VERSION_CONFLICT`.
 
-The fallback now uses a SQLite-managed temporary database. It replays there and
-publishes only a successful result with the SQLite backup transaction into the
-original connection. The original connection is restored for every returned
-result. Failed replay and busy/locked publication preserve its data. Page size
-matches the original; no open file is unlinked, no raw application SQL mutation
-is introduced, and no schema/version validation is bypassed. Rusqlite's `backup`
-feature enables the existing SQLite API; public APIs and journal format stay
-unchanged.
+A missing or stale journal fingerprint now takes a staged path. A compatible
+history is replayed against a candidate copied from the current projection;
+schema-history conflicts use a fresh candidate. Replay, edge rebuilding,
+backfill and validation finish before the candidate is published into the
+original connection. If incremental replay fails, the candidate is discarded and
+a fresh replay is attempted without ever mutating the live projection.
+
+A versioned SHA-256 fingerprint streams authoritative journal files in 64 KiB
+chunks. Unchanged opens skip replay; append or compaction changes the digest and
+re-enters staged synchronization. SQLite backup publication preserves the open
+connection; rusqlite drops an unfinished backup handle on error, allowing SQLite
+to roll back the destination transaction. No open file is unlinked, raw
+application SQL mutation is introduced, schema/version validation is bypassed,
+or public format/API changed.
 
 ## Evidence
 
 Windows, `cargo test --no-default-features --features mobile`, one build job.
 Local evidence: `G:\AI-Studio\verification\2026-10-15-fung-issue41`.
+
+The following logs were captured before the candidate-staging integrity port was
+added to this branch; they describe the original repair attempt, not the current
+PR head. Current-head validation is tracked below.
 
 - RED: `engine-red.log`, new upgraded-projection regression failed on `77e07f7`.
 - GREEN: retained schema history, Thai/pre-upgrade row, post-upgrade row, edit
@@ -48,3 +58,10 @@ profile recovery and native close/reopen evidence belongs to the FUNG report.
 This report does not claim an exhaustive engine suite, installer acceptance or
 general forced-crash qualification. The branch starts at FUNG's exact engine
 pin and intentionally includes no unrelated engine changes.
+
+## Staged-replay port validation
+
+The implementation has been ported additively onto the exact FUNG-pinned
+engine baseline 77e07f7b127f65a1f92cfc688ef15f322115d5f8 in PR #233. The
+current-main validation in the issue RCA is not evidence for that older branch.
+PR-head focused and full test/build results remain pending.
