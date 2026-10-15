@@ -107,4 +107,37 @@ describe('remote StudioTransport', () => {
       limit: 1,
     });
   });
+
+  it('uses the stable REST error envelope message', async () => {
+    const fetcher = (async (input: string | URL | Request) => {
+      if (String(input).endsWith('/v1/studio/capabilities')) return json(capabilities);
+      return json({
+        error: {
+          category: 'validation',
+          code: 'GENESIS_VALIDATION_ERROR',
+          message: 'collection name is invalid',
+          status: 400,
+        },
+      }, 400);
+    }) as typeof fetch;
+
+    const transport = await createRemoteTransport('https://db.example', '', fetcher);
+
+    await expect(transport.loadGraphScene({ limit: 10 })).rejects.toThrow(
+      'Genesis server 400: collection name is invalid',
+    );
+  });
+
+  it('keeps the raw detail from legacy plain-text errors', async () => {
+    const fetcher = (async (input: string | URL | Request) => {
+      if (String(input).endsWith('/v1/studio/capabilities')) return json(capabilities);
+      return new Response('legacy server failure', { status: 500 });
+    }) as typeof fetch;
+
+    const transport = await createRemoteTransport('https://db.example', '', fetcher);
+
+    await expect(transport.loadGraphScene({ limit: 10 })).rejects.toThrow(
+      'Genesis server 500: legacy server failure',
+    );
+  });
 });

@@ -78,6 +78,10 @@ const NAPI_TO_REST: &[(&str, Option<&str>)] = &[
     ("query_sql", None),
     ("execute_named_query", Some("/v1/relational/query")),
     ("commit_transaction", Some("/v1/transaction/commit")),
+    (
+        "commit_transaction_contract",
+        Some("/v1/transaction/commit"),
+    ),
     ("stable_frontier", Some("/v1/frontier")),
     // WP-1.2 frontier split (ADR D2.3): txn frontier rides the same REST route
     // (the `/v1/frontier` body now returns {frame, txn}).
@@ -94,6 +98,8 @@ const NAPI_TO_REST: &[(&str, Option<&str>)] = &[
     ("retrieve_context", Some("/v1/context/retrieve")),
     ("execute_hql", Some("/v1/query/hql")),
     ("execute_query_ir", Some("/v1/query/ir")),
+    // HQL2 QueryRequestV2 has no REST route with the same input shape; /v1/query/ir is a separate IR JSON API.
+    ("query_v2_contract", None),
     ("query_ir_capabilities", Some("/v1/query/ir/capabilities")),
     ("hybrid_search", Some("/v1/search/hybrid")),
     // No direct REST route; graph traversal is reachable via HQL TRAVERSE

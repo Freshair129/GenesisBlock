@@ -80,7 +80,71 @@ class ClientContractTests(unittest.TestCase):
             client.execute_query_ir({"operation": {"kind": "context"}})
 
         self.assertEqual(raised.exception.code, "QUERY_CAPABILITY_UNSUPPORTED")
+        self.assertIsNone(raised.exception.stable_code)
+        self.assertEqual(raised.exception.legacy_code, "QUERY_CAPABILITY_UNSUPPORTED")
         self.assertEqual(raised.exception.status_code, 400)
+
+    @patch("genesisdb.client.requests.post")
+    def test_error_envelope_is_read_while_legacy_fields_remain_supported(self, post):
+        post.return_value = FakeResponse(
+            400,
+            {
+                "error": {
+                    "category": "validation",
+                    "code": "GENESIS_VALIDATION_ERROR",
+                    "message": "collection dimension is invalid",
+                    "status": 400,
+                },
+                "code": "QUERY_IR_VALIDATION_FAILED",
+                "message": "collection dimension is invalid",
+            },
+        )
+        client = GenesisClient()
+
+        with self.assertRaises(QueryError) as raised:
+            client.add_node(["Memory"], id="n1", embedding=[])
+
+        self.assertEqual(raised.exception.code, "GENESIS_VALIDATION_ERROR")
+        self.assertEqual(raised.exception.stable_code, "GENESIS_VALIDATION_ERROR")
+        self.assertEqual(raised.exception.legacy_code, "QUERY_IR_VALIDATION_FAILED")
+        self.assertEqual(raised.exception.category, "validation")
+        self.assertEqual(raised.exception.message, "collection dimension is invalid")
+
+    @patch("genesisdb.client.requests.post")
+    def test_error_envelope_reads_all_required_categories(self, post):
+        cases = [
+            ("validation", "GENESIS_VALIDATION_ERROR"),
+            ("capability", "GENESIS_CAPABILITY_UNSUPPORTED"),
+            ("query", "GENESIS_QUERY_ERROR"),
+            ("conflict", "GENESIS_CONFLICT"),
+            ("durability", "GENESIS_DURABILITY_ERROR"),
+            ("integrity", "GENESIS_INTEGRITY_ERROR"),
+        ]
+        client = GenesisClient()
+        for category, stable_code in cases:
+            post.return_value = FakeResponse(
+                409,
+                {
+                    "error": {
+                        "category": category,
+                        "code": stable_code,
+                        "message": f"nested detail for {category}",
+                        "status": 409,
+                    },
+                    "code": f"LEGACY_{category.upper()}",
+                    "message": f"legacy detail for {category}",
+                },
+            )
+            with self.subTest(category=category):
+                with self.assertRaises(QueryError) as raised:
+                    client.execute_query_ir({})
+                self.assertEqual(raised.exception.code, stable_code)
+                self.assertEqual(raised.exception.stable_code, stable_code)
+                self.assertEqual(raised.exception.legacy_code, f"LEGACY_{category.upper()}")
+                self.assertEqual(raised.exception.category, category)
+                self.assertEqual(
+                    raised.exception.message, f"nested detail for {category}"
+                )
 
     def test_timeout_must_be_positive(self):
         with self.assertRaises(ValueError):

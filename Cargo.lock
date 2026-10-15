@@ -916,6 +916,7 @@ name = "genesis-block-native"
 version = "0.2.9"
 dependencies = [
  "anyhow",
+ "async-trait",
  "axum",
  "bincode",
  "chrono",

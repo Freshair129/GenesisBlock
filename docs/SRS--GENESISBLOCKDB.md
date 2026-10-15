@@ -121,8 +121,33 @@ Client application and client-owned schema
 | GB-SRS-API-001 | Embedded, server, and SDK surfaces SHALL report product and capability versions. | MUST |
 | GB-SRS-API-002 | Shared operations SHALL have conformance tests across supported interfaces. | MUST |
 | GB-SRS-API-003 | Interface adapters SHALL NOT redefine client ontology. | MUST |
-| GB-SRS-API-004 | API errors SHALL distinguish validation, capability, query, conflict, durability, and integrity failures. | MUST |
+| GB-SRS-API-004 | API errors SHALL distinguish validation, capability, query, conflict, durability, and integrity failures using stable machine-readable categories and codes. REST handler and extractor errors SHALL include the documented JSON envelope while preserving diagnostic details. | MUST |
 | GB-SRS-API-005 | MCP tools, when enabled, SHALL expose bounded database operations and SHALL NOT assume GoVibe authority semantics. | MUST |
+
+The versioned envelope is `{ "contract_version": "genesis.api.errors.v1", "error": { "category", "code", "message", "status?" } }`.
+`category` and `code` are stable within REST API v1; `status` mirrors the actual
+HTTP response status and is `503` when the Storage instance requires recovery.
+`message` retains the engine or extractor diagnostic. The required categories are
+`validation`, `capability`, `query`, `conflict`, `durability`, and `integrity`.
+Other transport conditions may use `internal`, `not_found`, `authorization`,
+`rate_limit`, or `unavailable`. The API reference owns the complete code mapping
+and the migration rules for legacy response fields.
+Unmatched paths, unsupported methods, and requests rejected by the global
+body-size layer may fail before the REST handler/extractor contract applies;
+their transport-level responses are outside this envelope requirement.
+
+Embedded Storage exposes additive `query_v2_contract` and
+`commit_transaction_contract` methods returning the same stable category, code,
+and message contract. NAPI exposes these as `queryV2Contract` and
+`commitTransactionContract`, returning a JSON result envelope. Existing
+Storage/NAPI methods retain their signatures and legacy error behavior. Python
+and Go SDK readers prefer nested stable codes while preserving top-level legacy
+codes and diagnostics. Unknown reason-only core errors SHALL remain `internal`
+unless an explicit typed guard supplies a category; adapters SHALL NOT parse
+message text to classify them. The additive typed query and transaction
+surfaces cover the six required categories. Legacy NAPI operations outside
+those methods retain their prior reason-only behavior and remain a migration
+boundary.
 
 ### 3.9 Operational visibility
 
