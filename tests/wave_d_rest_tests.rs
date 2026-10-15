@@ -72,7 +72,7 @@ async fn query_admission_rejection_does_not_block_status() {
 }
 
 #[tokio::test]
-async fn hql_budget_envelope_returns_typed_exhaustion() {
+async fn hql_runtime_budget_failure_uses_stable_query_mapping() {
     let dir = tempdir().unwrap();
     let storage = Storage::open(OpenOptions {
         path: dir.path().to_string_lossy().into_owned(),
@@ -102,8 +102,16 @@ async fn hql_budget_envelope_returns_typed_exhaustion() {
             .unwrap(),
     )
     .await;
-    assert_eq!(status, StatusCode::BAD_REQUEST);
-    assert_eq!(body["code"], "QUERY_BUDGET_EXCEEDED");
+    assert_eq!(status, StatusCode::INTERNAL_SERVER_ERROR);
+    assert_eq!(body["contract_version"], "genesis.api.errors.v1");
+    assert_eq!(body["error"]["category"], "query");
+    assert_eq!(body["error"]["code"], "GENESIS_QUERY_ERROR");
+    assert_eq!(body["error"]["status"], 500);
+    assert_eq!(
+        body["error"]["message"],
+        "QUERY_BUDGET_EXCEEDED: reason=bytes"
+    );
+    assert_eq!(body["code"], "QUERY_EXECUTION_FAILED");
     assert_eq!(body["message"], "QUERY_BUDGET_EXCEEDED: reason=bytes");
 }
 

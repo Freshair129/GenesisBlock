@@ -19,6 +19,41 @@ export interface OpenOptions {
    */
   retention?: string
 }
+export type ApiErrorCategory =
+  | 'validation'
+  | 'capability'
+  | 'query'
+  | 'conflict'
+  | 'durability'
+  | 'integrity'
+  | 'internal'
+  | 'not_found'
+  | 'authorization'
+  | 'rate_limit'
+  | 'unavailable'
+export interface ApiErrorEnvelopeV1 {
+  category: ApiErrorCategory
+  code: string
+  message: string
+  status?: number
+  details?: unknown
+  legacy_code?: string
+}
+export interface ApiCommitTransactionData {
+  transaction_id: string
+  commit_sequence: number
+  stable: boolean
+}
+export type ApiContractResultV1<T> =
+  | { contract_version: 'genesis.api.errors.v1'; ok: true; data: T }
+  | {
+      contract_version: 'genesis.api.errors.v1'
+      ok: false
+      error: ApiErrorEnvelopeV1
+      code?: string
+      message?: string
+      details?: unknown
+    }
 export interface NodeInput {
   id?: string
   labels: Array<string>
@@ -515,6 +550,11 @@ export declare class GenesisDatabase {
   executeNamedQuery(requestJson: string): Promise<string>
   commitTransaction(transactionJson: string): Promise<string>
   /**
+   * Additive versioned JSON error contract for transaction commits. Existing
+   * `commitTransaction` continues to reject its Promise with legacy errors.
+   */
+  commitTransactionContract(transactionJson: string): Promise<ApiContractResultV1<ApiCommitTransactionData>>
+  /**
    * WP-1.2 REDEFINITION (ADR D2.3, GBP1-noted): the FRAME frontier — the
    * commit_seq of the last durable journal frame, advancing on EVERY
    * mutation (previously: last transaction commit_sequence, which is now
@@ -547,6 +587,13 @@ export declare class GenesisDatabase {
    * machine contract; HQL remains available as a compatibility frontend.
    */
   executeQueryIr(request: QueryIrRequest): Promise<QueryIrResponse>
+  /**
+   * Additive versioned JSON error contract for typed HQL2/Query IR v2.
+   * `access_json` and `request_json` are decoded as contract inputs; request
+   * and engine failures are returned in the JSON envelope rather than being
+   * flattened into a reason-only rejected Promise.
+   */
+  queryV2Contract(accessJson: string, requestJson: string): Promise<ApiContractResultV1<unknown>>
   queryIrCapabilities(): QueryIrCapabilities
   /**
    * Executes an HQL query and returns the command result as JSON.

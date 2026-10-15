@@ -343,7 +343,18 @@ export async function createRemoteTransport(
     if (token) headers.set('authorization', `Bearer ${token}`);
     const response = await fetcher(`${normalizedBase}${path}`, { ...init, headers });
     if (!response.ok) {
-      const detail = await response.text();
+      const body = await response.text();
+      let detail = body;
+      try {
+        const parsed = JSON.parse(body) as {
+          error?: { message?: unknown };
+          message?: unknown;
+        };
+        if (typeof parsed.error?.message === 'string') detail = parsed.error.message;
+        else if (typeof parsed.message === 'string') detail = parsed.message;
+      } catch {
+        // Older servers return plain-text errors; keep their full text.
+      }
       throw new Error(`Genesis server ${response.status}: ${detail || response.statusText}`);
     }
     return response.json() as Promise<T>;

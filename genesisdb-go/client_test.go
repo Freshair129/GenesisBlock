@@ -6,6 +6,7 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 )
@@ -117,5 +118,114 @@ func TestQueryIRReturnsStructuredAPIError(t *testing.T) {
 	}
 	if apiErr.StatusCode != http.StatusBadRequest || apiErr.Code != "QUERY_CAPABILITY_UNSUPPORTED" {
 		t.Fatalf("unexpected APIError: %#v", apiErr)
+	}
+}
+
+func TestAPIErrorReadsStableEnvelopeAndPreservesLegacyCode(t *testing.T) {
+	const body = `{"error":{"category":"validation","code":"GENESIS_VALIDATION_ERROR","message":"bad input","status":400},"code":"QUERY_IR_VALIDATION_FAILED","message":"bad input"}`
+	for _, method := range []string{"POST", "GET"} {
+		t.Run(method, func(t *testing.T) {
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+				w.Header().Set("Content-Type", "application/json")
+				w.WriteHeader(http.StatusBadRequest)
+				_, _ = w.Write([]byte(body))
+			}))
+			defer server.Close()
+
+			client := NewClient(server.URL)
+			var err error
+			if method == "POST" {
+				_, err = client.ExecuteQueryIR(context.Background(), map[string]interface{}{})
+			} else {
+				_, err = client.QueryIRCapabilities(context.Background())
+			}
+			var apiErr *APIError
+			if !errors.As(err, &apiErr) {
+				t.Fatalf("expected APIError, got %T: %v", err, err)
+			}
+			if apiErr.StatusCode != http.StatusBadRequest ||
+				apiErr.Code != "GENESIS_VALIDATION_ERROR" ||
+				apiErr.StableCode != "GENESIS_VALIDATION_ERROR" ||
+				apiErr.Category != "validation" ||
+				apiErr.LegacyCode != "QUERY_IR_VALIDATION_FAILED" ||
+				apiErr.Message != "bad input" {
+				t.Fatalf("unexpected APIError: %#v", apiErr)
+			}
+		})
+	}
+}
+
+func TestAPIErrorFallsBackToLegacyFieldsAndPlainText(t *testing.T) {
+	for _, responseBody := range []string{
+		`{"code":"QUERY_CAPABILITY_UNSUPPORTED","message":"not implemented"}`,
+		"legacy server error",
+	} {
+		t.Run(responseBody, func(t *testing.T) {
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+				w.WriteHeader(http.StatusBadRequest)
+				_, _ = w.Write([]byte(responseBody))
+			}))
+			defer server.Close()
+
+			_, err := NewClient(server.URL).ExecuteQueryIR(context.Background(), map[string]interface{}{})
+			var apiErr *APIError
+			if !errors.As(err, &apiErr) {
+				t.Fatalf("expected APIError, got %T: %v", err, err)
+			}
+			if apiErr.StatusCode != http.StatusBadRequest {
+				t.Fatalf("unexpected status: %#v", apiErr)
+			}
+			if responseBody == "legacy server error" {
+				if apiErr.Code != "QUERY_EXECUTION_FAILED" || apiErr.Message != responseBody {
+					t.Fatalf("unexpected text fallback: %#v", apiErr)
+				}
+			} else if apiErr.Code != "QUERY_CAPABILITY_UNSUPPORTED" ||
+				apiErr.StableCode != "" ||
+				apiErr.LegacyCode != "QUERY_CAPABILITY_UNSUPPORTED" ||
+				apiErr.Message != "not implemented" {
+				t.Fatalf("unexpected legacy JSON fallback: %#v", apiErr)
+			}
+		})
+	}
+}
+
+func TestAPIErrorReadsAllRequiredCategories(t *testing.T) {
+	cases := []struct {
+		category string
+		code     string
+	}{
+		{"validation", "GENESIS_VALIDATION_ERROR"},
+		{"capability", "GENESIS_CAPABILITY_UNSUPPORTED"},
+		{"query", "GENESIS_QUERY_ERROR"},
+		{"conflict", "GENESIS_CONFLICT"},
+		{"durability", "GENESIS_DURABILITY_ERROR"},
+		{"integrity", "GENESIS_INTEGRITY_ERROR"},
+	}
+	for _, testCase := range cases {
+		testCase := testCase
+		t.Run(testCase.category, func(t *testing.T) {
+			legacyCode := "LEGACY_" + strings.ToUpper(testCase.category)
+			body, err := json.Marshal(map[string]interface{}{
+				"error": map[string]interface{}{
+					"category": testCase.category,
+					"code":     testCase.code,
+					"message":  "nested diagnostic detail",
+					"status":   http.StatusConflict,
+				},
+				"code":    legacyCode,
+				"message": "legacy diagnostic detail",
+			})
+			if err != nil {
+				t.Fatal(err)
+			}
+			apiErr := newAPIError(http.StatusConflict, body)
+			if apiErr.Code != testCase.code ||
+				apiErr.StableCode != testCase.code ||
+				apiErr.LegacyCode != legacyCode ||
+				apiErr.Category != testCase.category ||
+				apiErr.Message != "nested diagnostic detail" {
+				t.Fatalf("unexpected APIError: %#v", apiErr)
+			}
+		})
 	}
 }

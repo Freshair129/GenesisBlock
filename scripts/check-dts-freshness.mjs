@@ -15,15 +15,17 @@
 // ------------------------------------------------
 // That is the obvious shape, and it is what the C header gate (cbindgen) does.
 // Here it would be WRONG, and this was measured rather than assumed: running
-// `napi build` on a clean tree today deletes the hand-written Query IR declarations -
+// `napi build` on a clean tree today deletes the hand-written Query IR and API
+// error-contract declarations -
 //
 //   QueryIrCapabilities, QueryIrDirection, QueryIrIndexConsistency,
 //   QueryIrRequest, QueryIrResponse, QueryIrSearchMode,
 //   QueryIrSearchOperation, QueryIrTraverseOperation,
-//   QueryIrContextOperation, QueryBudget, plus the typed match_path pattern
-//   declarations.
+//   QueryIrContextOperation, QueryBudget, ApiErrorCategory,
+//   ApiErrorEnvelopeV1, ApiCommitTransactionData, ApiContractResultV1, plus
+//   the typed match_path pattern declarations.
 //
-// - and downgrades two method signatures to `any`. napi cannot generate any of
+// - and downgrades four method signatures to `any`. napi cannot generate any of
 // it: the Rust types are plain serde structs (`QueryIrOperation` is an enum with
 // struct variants, which `#[napi(object)]` cannot express) and the methods take
 // and return `serde_json::Value`, which napi renders as `any`. So a
@@ -50,11 +52,17 @@ import { readFileSync, existsSync } from 'node:fs'
 import { join } from 'node:path'
 
 // Top-level declarations written by hand because napi cannot express them.
-// QueryIr* types are matched by prefix; QueryBudget is the shared budget type
-// used by Query IR but does not carry that prefix.
+// QueryIr* types, the shared budget type, and the additive API error contract
+// are all maintained manually because they use serde_json::Value/serde models.
 const HAND_WRITTEN_PREFIX = 'QueryIr'
-const HAND_WRITTEN_NAMES = new Set(['QueryBudget'])
-const HAND_WRITTEN_EXPECTED = 22
+const HAND_WRITTEN_NAMES = new Set([
+  'QueryBudget',
+  'ApiErrorCategory',
+  'ApiErrorEnvelopeV1',
+  'ApiCommitTransactionData',
+  'ApiContractResultV1',
+])
+const HAND_WRITTEN_EXPECTED = 26
 
 // Method signatures deliberately narrowed by hand from what napi emits.
 // generated line -> the committed line that replaces it.
@@ -64,6 +72,14 @@ const HAND_REFINED = new Map([
     '  executeQueryIr(request: QueryIrRequest): Promise<QueryIrResponse>',
   ],
   ['  queryIrCapabilities(): any', '  queryIrCapabilities(): QueryIrCapabilities'],
+  [
+    '  commitTransactionContract(transactionJson: string): Promise<any>',
+    '  commitTransactionContract(transactionJson: string): Promise<ApiContractResultV1<ApiCommitTransactionData>>',
+  ],
+  [
+    '  queryV2Contract(accessJson: string, requestJson: string): Promise<any>',
+    '  queryV2Contract(accessJson: string, requestJson: string): Promise<ApiContractResultV1<unknown>>',
+  ],
 ])
 
 function fail(message) {
@@ -83,8 +99,9 @@ function normalise(text) {
 }
 
 /**
- * Drop every top-level `export interface|type|const enum <PREFIX>...` block.
- * Interface and enum blocks run to a column-0 `}`; `type` aliases are one line.
+ * Drop every top-level hand-written declaration. Block declarations run to a
+ * column-0 `}`. Type aliases run to the next top-level export so both one-line
+ * aliases and multiline unions are removed as one declaration.
  * Returns the surviving lines and how many declarations were removed.
  */
 function stripHandWritten(lines, prefix) {
@@ -96,13 +113,17 @@ function stripHandWritten(lines, prefix) {
     const decl = /^export (?:interface|type|const enum|declare class) ([A-Za-z0-9_]+)/.exec(line)
     if (decl && (decl[1].startsWith(prefix) || HAND_WRITTEN_NAMES.has(decl[1]))) {
       removed += 1
-      if (line.trimEnd().endsWith('{')) {
-        // Block form: skip to the closing brace in column 0.
+      if (/^export type /.test(line)) {
+        // Type aliases may be a single line or a multiline union/object.
+        i += 1
+        while (i < lines.length && !/^export (?:interface|type|const enum|declare class) /.test(lines[i])) i += 1
+      } else if (line.trimEnd().endsWith('{')) {
+        // Interface, enum and class form: skip to the closing brace.
         i += 1
         while (i < lines.length && lines[i] !== '}') i += 1
         i += 1 // step past the `}`
       } else {
-        i += 1 // one-line `type X = ...`
+        i += 1
       }
       continue
     }
@@ -117,7 +138,7 @@ function reconstructGenerated(committedText) {
 
   if (removed !== HAND_WRITTEN_EXPECTED) {
     fail(
-      `expected to strip ${HAND_WRITTEN_EXPECTED} hand-written Query IR declarations ` +
+      `expected to strip ${HAND_WRITTEN_EXPECTED} hand-written API declarations ` +
         `(${HAND_WRITTEN_PREFIX}* plus ${[...HAND_WRITTEN_NAMES].join(', ')}); ` +
         `stripped ${removed}. The exemption list in ` +
         `scripts/check-dts-freshness.mjs no longer matches the file - update HAND_WRITTEN_EXPECTED ` +
@@ -167,7 +188,7 @@ function reportDiff(label, expected, actual) {
   fail(
     `${label} is out of date with src/lib.rs.\n${shown.join('\n')}\n` +
       `Add or update the declaration BY HAND. Do NOT commit the output of ` +
-      `\`napi build\` wholesale: it deletes the hand-written Query IR ` +
+      `\`napi build\` wholesale: it deletes the hand-written Query IR/API ` +
       `declarations. See the note at the top of scripts/check-dts-freshness.mjs.`,
   )
 }
@@ -208,7 +229,7 @@ function main() {
   if (!process.exitCode) {
     console.log(
       `index.d.ts and index.js are in sync with src/lib.rs ` +
-        `(${HAND_WRITTEN_EXPECTED} hand-written Query IR declarations and ` +
+      `(${HAND_WRITTEN_EXPECTED} hand-written API declarations and ` +
         `${HAND_REFINED.size} hand-refined signatures accounted for).`,
     )
   }

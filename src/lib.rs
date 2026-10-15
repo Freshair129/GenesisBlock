@@ -69,6 +69,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use uuid::Uuid;
 
+pub mod api_error;
 #[cfg(feature = "ffi")]
 mod ffi;
 #[cfg(feature = "android-jni")]
@@ -98,6 +99,7 @@ const LEGACY_SCHEMA_VERSION: u32 = 5;
 // additive shape — existing databases gain the table empty and are backfilled
 // from the live map on open (`projection_backfill_edges`).
 const PROJECTION_SCHEMA_VERSION: u32 = 5;
+const PROJECTION_JOURNAL_FINGERPRINT_KEY: &str = "journal_projection_fingerprint_v1";
 
 /// Bounds for the read-only SQL surface. Exceeding one is an ERROR, never a
 /// silent truncation.
@@ -151,6 +153,9 @@ pub const ENGINE_NAME: &str = "genesis-block";
 /// at compile time. Single source of truth for the running version — surfaced
 /// via `version_sync()` (NAPI) and `GET /v1/version` (REST).
 pub const ENGINE_VERSION: &str = env!("CARGO_PKG_VERSION");
+
+#[cfg(test)]
+mod projection_rebuild_tests;
 
 // --- Types (PROTOCOL §3) ---
 
@@ -470,8 +475,8 @@ pub struct HybridSearchInput {
 }
 
 pub const QUERY_IR_V1: &str = "query-ir.v1";
-const QUERY_IR_MAX_K: u32 = 1_000;
-const QUERY_IR_MAX_DEPTH: u32 = 32;
+pub(crate) const QUERY_IR_MAX_K: u32 = 1_000;
+pub(crate) const QUERY_IR_MAX_DEPTH: u32 = 32;
 
 const QUERY_BUDGET_DEFAULT_NODES: u64 = 100_000;
 const QUERY_BUDGET_DEFAULT_EDGES: u64 = 200_000;
@@ -518,6 +523,13 @@ impl ResolvedQueryBudget {
 }
 
 impl QueryBudget {
+    /// Validate caller-supplied limits without running a query. REST handlers
+    /// use this typed boundary to return request-validation errors before the
+    /// legacy reason-only execution path.
+    pub(crate) fn validate(&self) -> Result<()> {
+        self.resolve().map(|_| ())
+    }
+
     fn resolve(&self) -> Result<ResolvedQueryBudget> {
         fn positive(name: &str, value: Option<u64>, default: u64) -> Result<u64> {
             match value {
@@ -2070,6 +2082,50 @@ pub enum RelationalMutationKind {
     Upsert,
     Update,
     Delete,
+}
+
+#[derive(Debug)]
+enum RelationalProjectionApplyError {
+    Storage(Error),
+    PrimaryKeyConstraint { diagnostic: String },
+    UniqueConstraint { diagnostic: String },
+}
+
+impl From<Error> for RelationalProjectionApplyError {
+    fn from(error: Error) -> Self {
+        Self::Storage(error)
+    }
+}
+
+impl RelationalProjectionApplyError {
+    fn from_sqlite(error: rusqlite::Error) -> Self {
+        let diagnostic = error.to_string();
+        match error {
+            rusqlite::Error::SqliteFailure(failure, _)
+                if failure.extended_code == rusqlite::ffi::SQLITE_CONSTRAINT_PRIMARYKEY =>
+            {
+                Self::PrimaryKeyConstraint { diagnostic }
+            }
+            rusqlite::Error::SqliteFailure(failure, _)
+                if failure.extended_code == rusqlite::ffi::SQLITE_CONSTRAINT_UNIQUE =>
+            {
+                Self::UniqueConstraint { diagnostic }
+            }
+            _ => Self::Storage(Error::from_reason(diagnostic)),
+        }
+    }
+
+    fn into_api_error(self) -> api_error::ApiErrorEnvelopeV1 {
+        match self {
+            Self::Storage(error) => api_error::ApiErrorEnvelopeV1::from(error),
+            Self::PrimaryKeyConstraint { diagnostic } => api_error::ApiErrorEnvelopeV1::conflict(
+                format!("relational primary-key conflict: {diagnostic}"),
+            ),
+            Self::UniqueConstraint { diagnostic } => api_error::ApiErrorEnvelopeV1::conflict(
+                format!("relational unique constraint conflict: {diagnostic}"),
+            ),
+        }
+    }
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
@@ -4022,6 +4078,22 @@ pub struct Storage {
     pub ef_search: AtomicUsize,
     pub signing_key: SigningKey,
     pub verifying_key: VerifyingKey,
+}
+
+struct ProjectionCandidate {
+    path: PathBuf,
+    connection: Option<Connection>,
+}
+
+impl Drop for ProjectionCandidate {
+    fn drop(&mut self) {
+        drop(self.connection.take());
+        for suffix in ["", "-wal", "-shm"] {
+            let mut path = self.path.as_os_str().to_os_string();
+            path.push(suffix);
+            let _ = fs::remove_file(PathBuf::from(path));
+        }
+    }
 }
 
 // --- Governance (AXIOMATIC GUARDS §2) ---
@@ -7572,6 +7644,23 @@ impl Storage {
         result
     }
 
+    /// Additive typed error-contract wrapper for the HQL2/IR-v2 query boundary.
+    /// Legacy `query_v2` keeps returning `QueryErrorV2` unchanged.
+    pub fn query_v2_contract(
+        &self,
+        access: AccessContext,
+        request: uee_v2::QueryRequestV2,
+    ) -> api_error::CoreResult<query::hql2::QueryOutcomeV2> {
+        if self.recovery_required.load(Ordering::SeqCst) {
+            return Err(api_error::ApiErrorEnvelopeV1::durability(
+                "RECOVERY_REQUIRED: reopen database before reading, writing or checkpointing",
+            ));
+        }
+
+        self.query_v2(access, request)
+            .map_err(|error| api_error::ApiErrorEnvelopeV1::from_query_error(&error))
+    }
+
     pub fn publish_generation(&self) -> Result<GenerationInfo> {
         let _commit_guard = self.commit_lock.lock();
         self.ensure_readable()?;
@@ -10975,6 +11064,34 @@ impl Storage {
         schema: &RelationalSchemaPackage,
         mutations: &[RelationalRowMutation],
     ) -> Result<u32> {
+        Self::projection_apply_rows_tx_with_error(tx, schema, mutations, |error| {
+            Error::from_reason(error.to_string())
+        })
+    }
+
+    fn projection_apply_rows_tx_contract(
+        tx: &rusqlite::Transaction<'_>,
+        schema: &RelationalSchemaPackage,
+        mutations: &[RelationalRowMutation],
+    ) -> api_error::CoreResult<u32> {
+        Self::projection_apply_rows_tx_with_error(
+            tx,
+            schema,
+            mutations,
+            RelationalProjectionApplyError::from_sqlite,
+        )
+        .map_err(RelationalProjectionApplyError::into_api_error)
+    }
+
+    fn projection_apply_rows_tx_with_error<E>(
+        tx: &rusqlite::Transaction<'_>,
+        schema: &RelationalSchemaPackage,
+        mutations: &[RelationalRowMutation],
+        map_sqlite_error: impl Fn(rusqlite::Error) -> E,
+    ) -> std::result::Result<u32, E>
+    where
+        E: From<Error>,
+    {
         let mut affected = 0u32;
         for mutation in mutations {
             Self::validate_row_mutation(schema, mutation)?;
@@ -11037,8 +11154,7 @@ impl Storage {
                     );
                     affected = affected.saturating_add(
                         tx.execute(&sql, params_from_iter(values))
-                            .map_err(|e| Error::from_reason(e.to_string()))?
-                            as u32,
+                            .map_err(&map_sqlite_error)? as u32,
                     );
                 }
                 RelationalMutationKind::Update => {
@@ -11090,8 +11206,7 @@ impl Storage {
                     );
                     affected = affected.saturating_add(
                         tx.execute(&sql, params_from_iter(values))
-                            .map_err(|e| Error::from_reason(e.to_string()))?
-                            as u32,
+                            .map_err(&map_sqlite_error)? as u32,
                     );
                 }
                 RelationalMutationKind::Delete => {
@@ -11123,8 +11238,7 @@ impl Storage {
                     );
                     affected = affected.saturating_add(
                         tx.execute(&sql, params_from_iter(values))
-                            .map_err(|e| Error::from_reason(e.to_string()))?
-                            as u32,
+                            .map_err(&map_sqlite_error)? as u32,
                     );
                 }
             }
@@ -11798,17 +11912,285 @@ impl Storage {
         Ok(())
     }
 
-    fn projection_reopen_fresh(&self) -> Result<()> {
+    fn projection_candidate(&self) -> Result<ProjectionCandidate> {
+        self.projection_candidate_with_current(false)
+    }
+
+    fn projection_candidate_from_current(&self) -> Result<ProjectionCandidate> {
+        self.projection_candidate_with_current(true)
+    }
+
+    fn projection_candidate_with_current(&self, copy_current: bool) -> Result<ProjectionCandidate> {
+        let path = self
+            .path
+            .join(format!("projection-rebuild-{}.sqlite", Uuid::new_v4()));
+        let source = self.projection_db.lock();
+        let page_size = source
+            .query_row("PRAGMA page_size", [], |row| row.get::<_, i64>(0))
+            .map_err(|error| Error::from_reason(error.to_string()))?;
+        let conn = Self::open_projection(&path, false)?;
+        let mut candidate = ProjectionCandidate {
+            path,
+            connection: Some(conn),
+        };
+        candidate
+            .connection
+            .as_ref()
+            .expect("candidate connection was just initialized")
+            .pragma_update(None, "page_size", page_size)
+            .map_err(|error| Error::from_reason(error.to_string()))?;
+        if copy_current {
+            // Preserve the current projection as the replay base without
+            // allowing a later WAL event failure to leave partial live writes.
+            let destination = candidate
+                .connection
+                .as_mut()
+                .expect("candidate connection was just initialized");
+            let backup = rusqlite::backup::Backup::new(&source, destination)
+                .map_err(Self::projection_backup_error)?;
+            backup
+                .run_to_completion(256, Duration::from_millis(1), None)
+                .map_err(Self::projection_backup_error)?;
+        }
+        drop(source);
+
+        let conn = candidate
+            .connection
+            .as_ref()
+            .expect("candidate connection was just initialized");
+        Self::init_projection_schema(conn)?;
+        // Schema-v6 WAL frames carry record revisions, so the blank replay
+        // candidate must have the same auxiliary tables as a normal writable
+        // projection before it can replay those frames.
+        if self.storage_schema_version == SCHEMA_VERSION {
+            Self::init_hql2_revision_schema(conn)?;
+        }
+        Ok(candidate)
+    }
+
+    fn projection_journal_fingerprint(&self) -> Result<String> {
+        fn hash_file(hasher: &mut Sha256, label: &str, path: &Path) -> Result<()> {
+            hasher.update((label.len() as u64).to_le_bytes());
+            hasher.update(label.as_bytes());
+            let file_name = path.file_name().unwrap_or_default().to_string_lossy();
+            hasher.update((file_name.len() as u64).to_le_bytes());
+            hasher.update(file_name.as_bytes());
+            let mut file = match File::open(path) {
+                Ok(file) => file,
+                Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
+                    hasher.update([0]);
+                    return Ok(());
+                }
+                Err(error) => return Err(Error::from_reason(error.to_string())),
+            };
+            hasher.update([1]);
+            hasher.update(
+                file.metadata()
+                    .map_err(|error| Error::from_reason(error.to_string()))?
+                    .len()
+                    .to_le_bytes(),
+            );
+            let mut buffer = [0u8; 64 * 1024];
+            loop {
+                let read = file
+                    .read(&mut buffer)
+                    .map_err(|error| Error::from_reason(error.to_string()))?;
+                if read == 0 {
+                    break;
+                }
+                hasher.update(&buffer[..read]);
+            }
+            Ok(())
+        }
+
+        let mut hasher = Sha256::new();
+        hasher.update(b"genesis-block-projection-journal-v1");
+        hasher.update(SCHEMA_VERSION.to_le_bytes());
+        hasher.update(PROJECTION_SCHEMA_VERSION.to_le_bytes());
+        hash_file(&mut hasher, "legacy", &self.legacy_log_path)?;
+        for segment in Self::journal_list_segments(&self.path) {
+            hash_file(
+                &mut hasher,
+                &format!(
+                    "segment:{}:{}:{}",
+                    segment.kind, segment.min_seq, segment.max_seq
+                ),
+                &segment.path,
+            )?;
+        }
+        hash_file(&mut hasher, "active", &self.log_path)?;
+        Ok(hex::encode(hasher.finalize()))
+    }
+
+    fn projection_journal_fingerprint_matches(&self, fingerprint: &str) -> bool {
+        let conn = self.projection_db.lock();
+        match conn
+            .query_row(
+                "SELECT value FROM projection_state WHERE key=?1",
+                [PROJECTION_JOURNAL_FINGERPRINT_KEY],
+                |row| row.get::<_, String>(0),
+            )
+            .optional()
+        {
+            // The marker is only a cache. Missing/corrupt state must force a
+            // repair attempt instead of preventing open from rebuilding it.
+            Ok(current) => current.as_deref() == Some(fingerprint),
+            Err(_) => false,
+        }
+    }
+
+    fn projection_store_journal_fingerprint(conn: &Connection, fingerprint: &str) -> Result<()> {
+        conn.execute(
+            "INSERT INTO projection_state(key, value) VALUES(?1, ?2)
+             ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+            params![PROJECTION_JOURNAL_FINGERPRINT_KEY, fingerprint],
+        )
+        .map_err(|error| Error::from_reason(error.to_string()))?;
+        Ok(())
+    }
+
+    fn projection_sync_candidate(
+        &self,
+        candidate: &mut ProjectionCandidate,
+        journal_fingerprint: &str,
+    ) -> Result<()> {
+        let staged = candidate
+            .connection
+            .take()
+            .ok_or_else(|| Error::from_reason("projection rebuild candidate is unavailable"))?;
+        let original = {
+            let mut projection = self.projection_db.lock();
+            std::mem::replace(&mut *projection, staged)
+        };
+
+        let result = self
+            .projection_replay_wal()
+            .and_then(|()| self.rebuild_edge_history())
+            .and_then(|()| self.projection_backfill_edges());
+
+        let staged = {
+            let mut projection = self.projection_db.lock();
+            std::mem::replace(&mut *projection, original)
+        };
+        candidate.connection = Some(staged);
+        result?;
+        Self::projection_store_journal_fingerprint(
+            candidate
+                .connection
+                .as_ref()
+                .expect("candidate connection was restored after replay"),
+            journal_fingerprint,
+        )
+    }
+
+    fn projection_replay_needs_fresh_candidate(&self) -> bool {
+        fn check_schema_event(
+            package: &RelationalSchemaPackage,
+            conn: &Connection,
+            schemas: &mut HashMap<String, Option<Option<RelationalSchemaPackage>>>,
+        ) -> bool {
+            if Storage::validate_relational_schema(package).is_err() {
+                return true;
+            }
+            let namespace = package.namespace.clone();
+            let current = schemas
+                .entry(namespace.clone())
+                .or_insert_with(|| Storage::load_relational_schema_conn(conn, &namespace).ok());
+            match current {
+                None => true,
+                Some(Some(previous)) if previous == package => false,
+                Some(Some(previous)) => {
+                    if Storage::validate_schema_upgrade(previous, package).is_err() {
+                        true
+                    } else {
+                        *previous = package.clone();
+                        false
+                    }
+                }
+                Some(None) if package.schema_version == 1 && package.previous_version.is_none() => {
+                    *current = Some(Some(package.clone()));
+                    false
+                }
+                Some(None) => true,
+            }
+        }
+
+        let conn = self.projection_db.lock();
+        let mut schemas = HashMap::new();
+        let mut needs_fresh_candidate = false;
+        self.scan_journal(None, true, &mut |_, signed_event| {
+            if needs_fresh_candidate {
+                return;
+            }
+            match signed_event.event {
+                Event::RelationalSchema(package) => {
+                    needs_fresh_candidate = check_schema_event(&package, &conn, &mut schemas);
+                }
+                Event::Batch(events) => {
+                    for event in events {
+                        if let Event::RelationalSchema(package) = event {
+                            if check_schema_event(&package, &conn, &mut schemas) {
+                                needs_fresh_candidate = true;
+                                break;
+                            }
+                        }
+                    }
+                }
+                _ => {}
+            }
+        });
+        needs_fresh_candidate
+    }
+
+    fn projection_publish_candidate(&self, candidate: &ProjectionCandidate) -> Result<()> {
+        let source = candidate
+            .connection
+            .as_ref()
+            .ok_or_else(|| Error::from_reason("projection rebuild candidate is unavailable"))?;
+        let mut destination = self.projection_db.lock();
+        // SQLite holds the destination write transaction until the backup
+        // reaches SQLITE_DONE. Dropping an unfinished rusqlite Backup calls
+        // sqlite3_backup_finish, which rolls that transaction back on errors.
+        let backup = rusqlite::backup::Backup::new(source, &mut destination)
+            .map_err(Self::projection_backup_error)?;
+        loop {
+            match backup.step(256).map_err(Self::projection_backup_error)? {
+                rusqlite::backup::StepResult::Done => return Ok(()),
+                rusqlite::backup::StepResult::More => {}
+                rusqlite::backup::StepResult::Busy | rusqlite::backup::StepResult::Locked => {
+                    return Err(Error::from_reason(
+                        "PROJECTION_REBUILD_BUSY: projection publication could not acquire SQLite locks",
+                    ));
+                }
+                _ => {
+                    return Err(Error::from_reason(
+                        "PROJECTION_REBUILD_FAILED: SQLite backup returned an unsupported step state",
+                    ));
+                }
+            }
+        }
+    }
+
+    fn projection_backup_error(error: rusqlite::Error) -> Error {
+        let busy = matches!(
+            error.sqlite_error_code(),
+            Some(rusqlite::ErrorCode::DatabaseBusy | rusqlite::ErrorCode::DatabaseLocked)
+        );
+        let message = error.to_string();
+        if busy {
+            Error::from_reason(format!("PROJECTION_REBUILD_BUSY: {message}"))
+        } else {
+            Error::from_reason(message)
+        }
+    }
+
+    #[cfg(test)]
+    fn projection_rebuild_from_wal(&self) -> Result<()> {
         if self.read_only {
             return Ok(());
         }
-        if self.projection_path.exists() {
-            let _ = fs::remove_file(&self.projection_path);
-        }
-        let conn = Self::open_projection(&self.projection_path, false)?;
-        Self::init_projection_schema(&conn)?;
-        *self.projection_db.lock() = conn;
-        Ok(())
+        let journal_fingerprint = self.projection_journal_fingerprint()?;
+        self.projection_rebuild_fresh_candidate(&journal_fingerprint, None)
     }
 
     fn projection_replay_wal(&self) -> Result<()> {
@@ -11883,17 +12265,63 @@ impl Storage {
         if self.read_only {
             return Ok(());
         }
+        let journal_fingerprint = self.projection_journal_fingerprint()?;
+        if self.projection_journal_fingerprint_matches(&journal_fingerprint) {
+            return Ok(());
+        }
         // Lamport time is not a WAL cursor: distinct peers may emit equal clocks,
         // and compaction rewrites the WAL. Scan the authoritative WAL on open and
         // rely on full-clock LWW upserts for idempotence. A durable sequence cursor
         // belongs to the unified transaction protocol, not this S0/S1 projection.
-        if self.projection_replay_wal().is_err() {
-            self.projection_reopen_fresh()?;
-            self.projection_replay_wal()?;
+        // Replay mutates SQLite event by event, so every marker miss must stay on
+        // a candidate until replay, edge rebuilding, and validation all succeed.
+        if self.projection_replay_needs_fresh_candidate() {
+            return self.projection_rebuild_fresh_candidate(&journal_fingerprint, None);
         }
-        self.rebuild_edge_history()?;
-        self.projection_backfill_edges()?;
-        Ok(())
+        self.projection_sync_existing_candidate(&journal_fingerprint)
+    }
+
+    fn projection_sync_existing_candidate(&self, journal_fingerprint: &str) -> Result<()> {
+        let mut candidate = match self.projection_candidate_from_current() {
+            Ok(candidate) => candidate,
+            Err(error) => {
+                return self.projection_rebuild_fresh_candidate(
+                    journal_fingerprint,
+                    Some(error.to_string()),
+                )
+            }
+        };
+        if let Err(error) = self.projection_sync_candidate(&mut candidate, journal_fingerprint) {
+            drop(candidate);
+            return self
+                .projection_rebuild_fresh_candidate(journal_fingerprint, Some(error.to_string()));
+        }
+        self.projection_publish_candidate(&candidate)
+    }
+
+    fn projection_rebuild_fresh_candidate(
+        &self,
+        journal_fingerprint: &str,
+        replay_error: Option<String>,
+    ) -> Result<()> {
+        let mut candidate = self.projection_candidate().map_err(|error| {
+            Error::from_reason(match replay_error.as_deref() {
+                Some(first_error) => format!(
+                    "projection sync failed ({first_error}); fresh rebuild setup failed: {error}"
+                ),
+                None => format!("fresh projection rebuild setup failed: {error}"),
+            })
+        })?;
+        self.projection_sync_candidate(&mut candidate, journal_fingerprint)
+            .map_err(|error| {
+                Error::from_reason(match replay_error.as_deref() {
+                    Some(first_error) => format!(
+                        "projection sync failed ({first_error}); fresh WAL rebuild failed: {error}"
+                    ),
+                    None => format!("fresh WAL rebuild failed: {error}"),
+                })
+            })?;
+        self.projection_publish_candidate(&candidate)
     }
 
     fn rebuild_edge_history(&self) -> Result<()> {
@@ -14424,15 +14852,78 @@ impl Storage {
             .sum()
     }
 
+    /// Legacy transaction API. The original signature and diagnostic strings
+    /// remain available while new callers can use the typed contract below.
     pub fn commit_transaction(&self, input: GenesisTransaction) -> Result<CommitResult> {
+        self.commit_transaction_contract(input)
+            .map_err(|error| Error::from_reason(error.message))
+    }
+
+    /// Apply relational mutations to a rollback-only projection transaction
+    /// before building the durable event. This preserves SQLite's structured
+    /// extended constraint code for the additive typed contract while the
+    /// legacy projection helpers keep their existing reason-only signatures.
+    fn preflight_transaction_relational_constraints(
+        &self,
+        groups: &[RelationalMutationGroup],
+    ) -> api_error::CoreResult<()> {
+        if groups.is_empty() {
+            return Ok(());
+        }
+        let mut conn = self.projection_db.lock();
+        let tx = conn
+            .transaction()
+            .map_err(|error| api_error::ApiErrorEnvelopeV1::internal(error.to_string()))?;
+        for group in groups {
+            let schema = Self::load_relational_schema_conn(&tx, &group.namespace)
+                .map_err(api_error::ApiErrorEnvelopeV1::from)?
+                .ok_or_else(|| {
+                    api_error::ApiErrorEnvelopeV1::new(
+                        api_error::ApiErrorCategory::NotFound,
+                        "relational schema is not registered",
+                    )
+                })?;
+            Self::projection_apply_rows_tx_contract(&tx, &schema, &group.mutations)?;
+        }
+        tx.rollback()
+            .map_err(|error| api_error::ApiErrorEnvelopeV1::internal(error.to_string()))?;
+        Ok(())
+    }
+
+    /// Additive typed transaction boundary. Categories are selected by
+    /// explicit guards and recovery state; unknown Storage errors stay internal.
+    pub fn commit_transaction_contract(
+        &self,
+        input: GenesisTransaction,
+    ) -> api_error::CoreResult<CommitResult> {
+        if self.recovery_required.load(Ordering::SeqCst) {
+            return Err(api_error::ApiErrorEnvelopeV1::durability(
+                "RECOVERY_REQUIRED: reopen database before reading, writing or checkpointing",
+            ));
+        }
+        self.commit_transaction_typed(input)
+    }
+
+    fn commit_transaction_typed(
+        &self,
+        input: GenesisTransaction,
+    ) -> api_error::CoreResult<CommitResult> {
         self.ensure_writable()?;
         if input.transaction_id.is_empty() || input.transaction_id.len() > 128 {
-            return Err(Error::from_reason("invalid transaction id"));
+            return Err(api_error::ApiErrorEnvelopeV1::validation(
+                "invalid transaction id",
+            ));
         }
         let payload = serde_json::to_vec(&input).map_err(|e| Error::from_reason(e.to_string()))?;
         let payload_hash = hex::encode(Sha256::digest(&payload));
         let _commit_guard = self.commit_lock.lock();
-        self.ensure_readable()?;
+        self.ensure_readable().map_err(|error| {
+            if self.recovery_required.load(Ordering::SeqCst) {
+                api_error::ApiErrorEnvelopeV1::durability(error.to_string())
+            } else {
+                api_error::ApiErrorEnvelopeV1::from(error)
+            }
+        })?;
         {
             let conn = self.projection_db.lock();
             // Idempotent replay returns the stored LOCAL frame seq; legacy rows
@@ -14447,7 +14938,9 @@ impl Storage {
                 .map_err(|e| Error::from_reason(e.to_string()))?;
             if let Some((commit_sequence, existing_hash)) = existing {
                 if existing_hash != payload_hash {
-                    return Err(Error::from_reason("transaction identity conflict"));
+                    return Err(api_error::ApiErrorEnvelopeV1::conflict(
+                        "transaction identity conflict",
+                    ));
                 }
                 return Ok(CommitResult {
                     transaction_id: input.transaction_id,
@@ -14464,36 +14957,71 @@ impl Storage {
             .expected_frontier
             .is_some_and(|expected| expected != frontier)
         {
-            return Err(Error::from_reason("expected frontier conflict"));
+            return Err(api_error::ApiErrorEnvelopeV1::conflict(
+                "expected frontier conflict",
+            ));
         }
         for group in &input.relational {
-            Self::validate_identifier(&group.namespace)?;
+            Self::validate_identifier(&group.namespace)
+                .map_err(|error| api_error::ApiErrorEnvelopeV1::validation(error.to_string()))?;
             let conn = self.projection_db.lock();
-            let schema = Self::load_relational_schema_conn(&conn, &group.namespace)?
-                .ok_or_else(|| Error::from_reason("relational schema is not registered"))?;
+            let schema =
+                Self::load_relational_schema_conn(&conn, &group.namespace)?.ok_or_else(|| {
+                    api_error::ApiErrorEnvelopeV1::new(
+                        api_error::ApiErrorCategory::NotFound,
+                        "relational schema is not registered",
+                    )
+                })?;
             for mutation in &group.mutations {
-                Self::validate_row_mutation(&schema, mutation)?;
+                Self::validate_row_mutation(&schema, mutation).map_err(|error| {
+                    api_error::ApiErrorEnvelopeV1::validation(error.to_string())
+                })?;
                 if self.storage_schema_version == SCHEMA_VERSION {
-                    Self::encode_relational_primary_key_v1(&schema, mutation)?;
+                    Self::encode_relational_primary_key_v1(&schema, mutation).map_err(|error| {
+                        api_error::ApiErrorEnvelopeV1::validation(error.to_string())
+                    })?;
                 }
             }
         }
         for node in &input.graph.nodes {
-            self.validate_governance(&node.labels, false)?;
+            self.validate_governance(&node.labels, false)
+                .map_err(|error| {
+                    api_error::ApiErrorEnvelopeV1::new(
+                        api_error::ApiErrorCategory::Authorization,
+                        error.to_string(),
+                    )
+                })?;
             if let Some(embedding) = &node.embedding {
-                let collection = self.resolve_collection(&node.collection)?;
+                let collection = self.resolve_collection(&node.collection).map_err(|error| {
+                    api_error::ApiErrorEnvelopeV1::new(
+                        api_error::ApiErrorCategory::NotFound,
+                        error.to_string(),
+                    )
+                })?;
                 if embedding.len() != collection.dim as usize {
-                    return Err(Error::from_reason("embedding dimension mismatch"));
+                    return Err(api_error::ApiErrorEnvelopeV1::validation(
+                        "embedding dimension mismatch",
+                    ));
                 }
             }
         }
         for vector in &input.vectors {
-            let collection = self.resolve_collection(&Some(vector.collection.clone()))?;
+            let collection = self
+                .resolve_collection(&Some(vector.collection.clone()))
+                .map_err(|error| {
+                    api_error::ApiErrorEnvelopeV1::new(
+                        api_error::ApiErrorCategory::NotFound,
+                        error.to_string(),
+                    )
+                })?;
             if vector.embedding.len() != collection.dim as usize {
-                return Err(Error::from_reason("embedding dimension mismatch"));
+                return Err(api_error::ApiErrorEnvelopeV1::validation(
+                    "embedding dimension mismatch",
+                ));
             }
         }
 
+        self.preflight_transaction_relational_constraints(&input.relational)?;
         let now = Utc::now();
         let nodes = input
             .graph
@@ -14577,10 +15105,20 @@ impl Storage {
             advances_txn_frontier: true,
             record_revision_transaction,
         };
-        let commit_sequence = self.persist(&Event::Transaction(event.clone()))?;
+        let commit_sequence =
+            self.persist(&Event::Transaction(event.clone()))
+                .map_err(|error| {
+                    if self.recovery_required.load(Ordering::SeqCst) {
+                        api_error::ApiErrorEnvelopeV1::durability(error.to_string())
+                    } else {
+                        api_error::ApiErrorEnvelopeV1::from(error)
+                    }
+                })?;
         self.apply_transaction_memory(&event, true, commit_sequence);
-        self.ensure_readable()
-            .map_err(|error| self.durable_apply_error(commit_sequence, error))?;
+        self.ensure_readable().map_err(|error| {
+            let durable_error = self.durable_apply_error(commit_sequence, error);
+            api_error::ApiErrorEnvelopeV1::durability(durable_error.to_string())
+        })?;
         self.txn_frontier.store(commit_sequence, Ordering::SeqCst);
         Ok(CommitResult {
             transaction_id: input.transaction_id,
@@ -18614,7 +19152,7 @@ impl Storage {
                     // genuinely newer upsert clears the tombstone inside
                     // insert_node_lean (legitimate re-create).
                     if let Some(t) = self.tombstones.get(&remote_node.id) {
-                        if !(t.value().clock < remote_node.clock) {
+                        if t.value().clock >= remote_node.clock {
                             apply = false;
                         }
                     }
@@ -18741,7 +19279,7 @@ impl Storage {
                     if self
                         .tombstones
                         .get(id)
-                        .is_some_and(|t| !(t.value().clock < *clock))
+                        .is_some_and(|t| t.value().clock >= *clock)
                     {
                         continue;
                     }
@@ -26028,6 +26566,34 @@ impl GenesisDatabase {
         .await
         .map_err(|e| Error::from_reason(e.to_string()))?
     }
+    /// Additive versioned JSON error contract for transaction commits. Existing
+    /// `commitTransaction` continues to reject its Promise with legacy errors.
+    #[napi]
+    pub async fn commit_transaction_contract(&self, transaction_json: String) -> Result<Value> {
+        let i = Arc::clone(&self.inner);
+        let value = match tokio::task::spawn_blocking(move || {
+            let transaction = match serde_json::from_str::<GenesisTransaction>(&transaction_json) {
+                Ok(transaction) => transaction,
+                Err(error) => {
+                    return crate::api_error::error_result_value(
+                        crate::api_error::ApiErrorEnvelopeV1::validation(error.to_string()),
+                    );
+                }
+            };
+            match i.commit_transaction_contract(transaction) {
+                Ok(result) => crate::api_error::success_result_value(result),
+                Err(error) => crate::api_error::error_result_value(error),
+            }
+        })
+        .await
+        {
+            Ok(value) => value,
+            Err(error) => crate::api_error::error_result_value(
+                crate::api_error::ApiErrorEnvelopeV1::internal(error.to_string()),
+            ),
+        };
+        Ok(value)
+    }
     /// WP-1.2 REDEFINITION (ADR D2.3, GBP1-noted): the FRAME frontier — the
     /// commit_seq of the last durable journal frame, advancing on EVERY
     /// mutation (previously: last transaction commit_sequence, which is now
@@ -26095,6 +26661,37 @@ impl GenesisDatabase {
         tokio::task::spawn_blocking(move || i.execute_query_ir_json(request))
             .await
             .map_err(|e| Error::from_reason(e.to_string()))?
+    }
+    /// Additive versioned JSON error contract for typed HQL2/Query IR v2.
+    /// `access_json` and `request_json` are decoded as contract inputs; request
+    /// and engine failures are returned in the JSON envelope rather than being
+    /// flattened into a reason-only rejected Promise.
+    #[napi]
+    pub async fn query_v2_contract(
+        &self,
+        access_json: String,
+        request_json: String,
+    ) -> Result<Value> {
+        let i = Arc::clone(&self.inner);
+        let value =
+            match tokio::task::spawn_blocking(move || match crate::api_error::parse_query_v2_input(
+                &access_json,
+                &request_json,
+            ) {
+                Ok((access, request)) => match i.query_v2_contract(access, request) {
+                    Ok(result) => crate::api_error::query_success_result_value(result),
+                    Err(error) => crate::api_error::error_result_value(error),
+                },
+                Err(error) => crate::api_error::error_result_value(error),
+            })
+            .await
+            {
+                Ok(value) => value,
+                Err(error) => crate::api_error::error_result_value(
+                    crate::api_error::ApiErrorEnvelopeV1::internal(error.to_string()),
+                ),
+            };
+        Ok(value)
     }
     #[napi]
     pub fn query_ir_capabilities(&self) -> Value {
@@ -26501,5 +27098,108 @@ mod p6_sync_progress_receipt_tests {
             ),
             None
         );
+    }
+}
+
+#[cfg(test)]
+mod api_error_contract_tests {
+    use super::*;
+    use tempfile::TempDir;
+
+    fn open_storage(directory: &TempDir) -> Storage {
+        Storage::open(OpenOptions {
+            path: directory.path().to_string_lossy().into_owned(),
+            page_cache_mb: Some(16),
+            read_only: Some(false),
+            vector_dim: Some(2),
+            retention: None,
+        })
+        .unwrap()
+    }
+
+    fn transaction(transaction_id: &str, expected_frontier: Option<u64>) -> GenesisTransaction {
+        GenesisTransaction {
+            transaction_id: transaction_id.into(),
+            expected_frontier,
+            relational: Vec::new(),
+            graph: BatchInput {
+                nodes: Vec::new(),
+                edges: Vec::new(),
+            },
+            vectors: Vec::new(),
+        }
+    }
+
+    fn relational_schema() -> RelationalSchemaPackage {
+        RelationalSchemaPackage {
+            namespace: "typed_contract".into(),
+            schema_version: 1,
+            previous_version: None,
+            package_id: "00000000-0000-4000-8000-000000000002".into(),
+            schema_hash: String::new(),
+            tables: vec![RelationalTable {
+                name: "records".into(),
+                columns: vec![RelationalColumn::required("id", RelationalColumnType::Text)],
+                primary_key: vec!["id".into()],
+                foreign_keys: Vec::new(),
+                indexes: Vec::new(),
+            }],
+            named_queries: Vec::new(),
+        }
+    }
+
+    #[test]
+    fn transaction_contract_maps_explicit_frontier_conflict() {
+        let directory = TempDir::new().unwrap();
+        let storage = open_storage(&directory);
+
+        let error = storage
+            .commit_transaction_contract(transaction("typed-conflict", Some(1)))
+            .unwrap_err();
+
+        assert_eq!(error.category, api_error::ApiErrorCategory::Conflict);
+        assert_eq!(error.code, "GENESIS_CONFLICT");
+        assert_eq!(error.message, "expected frontier conflict");
+    }
+
+    #[test]
+    fn transaction_contract_maps_recovery_guard_to_durability() {
+        let directory = TempDir::new().unwrap();
+        let storage = open_storage(&directory);
+        storage.recovery_required.store(true, Ordering::SeqCst);
+
+        let error = storage
+            .commit_transaction_contract(transaction("typed-durability", None))
+            .unwrap_err();
+
+        assert_eq!(error.category, api_error::ApiErrorCategory::Durability);
+        assert_eq!(error.code, "GENESIS_DURABILITY_ERROR");
+        assert!(error.message.starts_with("RECOVERY_REQUIRED:"));
+    }
+
+    #[test]
+    fn transaction_contract_maps_relational_payload_validation_to_validation() {
+        let directory = TempDir::new().unwrap();
+        let storage = open_storage(&directory);
+        storage
+            .register_relational_schema(relational_schema())
+            .unwrap();
+
+        let mut input = transaction("typed-relational-validation", None);
+        input.relational.push(RelationalMutationGroup {
+            namespace: "typed_contract".into(),
+            mutations: vec![RelationalRowMutation {
+                table: "records".into(),
+                kind: RelationalMutationKind::Insert,
+                values: serde_json::json!({ "id": 17 }),
+                key: None,
+            }],
+        });
+
+        let error = storage.commit_transaction_contract(input).unwrap_err();
+
+        assert_eq!(error.category, api_error::ApiErrorCategory::Validation);
+        assert_eq!(error.code, "GENESIS_VALIDATION_ERROR");
+        assert!(error.message.contains("REL_TYPE_MISMATCH"));
     }
 }

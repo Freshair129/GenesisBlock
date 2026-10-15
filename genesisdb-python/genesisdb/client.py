@@ -46,9 +46,23 @@ class GenesisClient:
                 error_body = response.json()
             except ValueError:
                 error_body = {}
-            code = error_body.get("code", "QUERY_EXECUTION_FAILED")
-            message = error_body.get("message", response.text)
-            raise QueryError(message, status_code=response.status_code, code=code)
+            error = error_body.get("error", {})
+            if not isinstance(error, dict):
+                error = {}
+            stable_code = error.get("code")
+            legacy_code = error_body.get("code")
+            code = stable_code or legacy_code or "QUERY_EXECUTION_FAILED"
+            # Prefer the stable nested envelope over the legacy top-level alias.
+            message = error.get("message") or error_body.get("message") or response.text
+            category = error.get("category")
+            raise QueryError(
+                message,
+                status_code=response.status_code,
+                code=code,
+                category=category if isinstance(category, str) else None,
+                stable_code=stable_code if isinstance(stable_code, str) else None,
+                legacy_code=legacy_code if isinstance(legacy_code, str) else None,
+            )
         try:
             return response.json()
         except ValueError as exc:

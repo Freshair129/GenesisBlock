@@ -58,6 +58,14 @@ func main() {
 }
 ```
 
+## REST errors
+
+`APIError` exposes the stable `StableCode` and `Category`, the HTTP
+`StatusCode`, the diagnostic `Message`, and `LegacyCode` when a response also
+contains a deprecated top-level code alias. `Code` prefers the stable code and
+falls back to a legacy code when talking to an older server. Plain-text errors
+retain the body as `Message`.
+
 The GenesisBlockDB server must be running separately. From the repository root:
 
 ```bash
