@@ -205,6 +205,16 @@ The fail-closed legacy accessors are `get_u32`, `find_fuzzy_id`, `node_view` and
 capability metadata are outside the record-read ACL. Transport synchronization APIs are also outside
 this read boundary and require a separate peer-authorization contract.
 
+Community aggregate reads and rebuilds are also unscoped data operations:
+`insight_communities`, `rebuild_community_insights`, `detect_communities` and
+`generate_meta_graph` return `ACCESS_CONTEXT_REQUIRED` under Enforced policy. The REST
+`/v1/insight/communities` and `/v1/insight/rebuild` routes do not accept a scoped
+AccessContext, so they return an authorization error in that mode. Disabled
+policy preserves their existing response shapes and behavior.
+The hourly autonomic pruning/meta-graph task has no scoped actor either, so it
+also fails closed under Enforced policy; the scheduler logs the denial and does
+not prune records until a scoped maintenance path is available.
+
 `execute_hql_read_only` and `execute_hql_read_only_with_budget` are raw read boundaries. Their ACL
 guard precedes HQL parsing so an Enforced caller cannot distinguish malformed, unsupported or
 supported read syntax without an AccessContext.

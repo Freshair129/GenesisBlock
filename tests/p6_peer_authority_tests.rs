@@ -250,7 +250,8 @@ async fn observe_cursor_after_heartbeat(
     requester: &Storage,
     peer_id: &str,
     heartbeat_key: &SigningKey,
-) -> u64 {
+) -> (String, u64) {
+    tokio::time::sleep(Duration::from_millis(1100)).await;
     send_heartbeat(
         peer_socket,
         requester,
@@ -259,9 +260,7 @@ async fn observe_cursor_after_heartbeat(
         "peer-root-that-differs",
     )
     .await;
-    next_pull_request(peer_socket, &requester.local_peer_id)
-        .await
-        .1
+    next_pull_request(peer_socket, &requester.local_peer_id).await
 }
 
 #[test]
@@ -343,7 +342,7 @@ async fn filtered_sequence_progress_carries_a_signed_receipt() {
         SyncPeer {
             id: destination.local_peer_id.clone(),
             addr: socket.local_addr().unwrap().to_string(),
-            last_seen: 0,
+            last_seen: chrono::Utc::now().timestamp().max(0) as u32,
             verifying_key: destination.verifying_key.to_bytes().to_vec(),
         },
     );
@@ -445,8 +444,13 @@ async fn requester_rejects_progress_authorized_only_by_unauthenticated_heartbeat
     )
     .await;
 
-    let observed_cursor =
+    let (retry_nonce, observed_cursor) =
         observe_cursor_after_heartbeat(&peer_socket, &requester, &peer_id, &peer_key).await;
+    assert_eq!(
+        retry_nonce, nonce,
+        "retry must reuse the pending request nonce"
+    );
+    assert_eq!(from_seq, 0);
     assert_eq!(observed_cursor, 0, "heartbeat-only key advanced the cursor");
 }
 
@@ -501,12 +505,103 @@ async fn requester_heartbeat_key_replacement_does_not_authorize_cursor_progress(
     )
     .await;
 
-    let observed_cursor =
+    let (retry_nonce, observed_cursor) =
         observe_cursor_after_heartbeat(&peer_socket, &requester, &peer_id, &prepopulated_key).await;
+    assert_eq!(
+        retry_nonce, nonce,
+        "retry must reuse the pending request nonce"
+    );
     assert_eq!(
         observed_cursor, 0,
         "heartbeat key replacement authorized cursor progress"
     );
+}
+
+#[tokio::test]
+async fn gossip_peer_state_is_bounded_and_stale_peers_are_evicted() {
+    const MAX_PEERS: usize = 256;
+
+    let requester_dir = TempDir::new().unwrap();
+    let peer_socket = tokio::net::UdpSocket::bind("127.0.0.1:0").await.unwrap();
+    let requester = start_requester(&requester_dir, &peer_socket, "unused", None).await;
+    let peer_key = deterministic_signing_key(0x27);
+    let remote_merkle_root = "remote-merkle-root";
+
+    for index in 0..MAX_PEERS {
+        let peer_id = format!("bounded-peer-{index}");
+        send_heartbeat(
+            &peer_socket,
+            &requester,
+            &peer_id,
+            &peer_key,
+            remote_merkle_root,
+        )
+        .await;
+        tokio::time::timeout(Duration::from_secs(2), async {
+            while !requester.peers.contains_key(&peer_id) {
+                tokio::time::sleep(Duration::from_millis(5)).await;
+            }
+        })
+        .await
+        .expect("accepted heartbeat was not recorded");
+        let _ = next_pull_request(&peer_socket, &requester.local_peer_id).await;
+
+        if index == 0 {
+            send_heartbeat(
+                &peer_socket,
+                &requester,
+                &peer_id,
+                &peer_key,
+                remote_merkle_root,
+            )
+            .await;
+            let mut buf = [0u8; 65535];
+            assert!(
+                tokio::time::timeout(Duration::from_millis(100), peer_socket.recv_from(&mut buf))
+                    .await
+                    .is_err(),
+                "a repeated divergent heartbeat must not create another pending request"
+            );
+        }
+    }
+    assert_eq!(requester.peers.len(), MAX_PEERS);
+
+    let overflow_peer = "bounded-peer-overflow";
+    send_heartbeat(
+        &peer_socket,
+        &requester,
+        overflow_peer,
+        &peer_key,
+        remote_merkle_root,
+    )
+    .await;
+    tokio::time::sleep(Duration::from_millis(100)).await;
+    assert_eq!(requester.peers.len(), MAX_PEERS);
+    assert!(!requester.peers.contains_key(overflow_peer));
+
+    requester
+        .peers
+        .get_mut("bounded-peer-0")
+        .expect("old peer should still be present")
+        .last_seen = 0;
+    send_heartbeat(
+        &peer_socket,
+        &requester,
+        overflow_peer,
+        &peer_key,
+        remote_merkle_root,
+    )
+    .await;
+    let _ = next_pull_request(&peer_socket, &requester.local_peer_id).await;
+    tokio::time::timeout(Duration::from_secs(2), async {
+        while !requester.peers.contains_key(overflow_peer) {
+            tokio::time::sleep(Duration::from_millis(5)).await;
+        }
+    })
+    .await
+    .expect("new peer should be admitted after stale peer eviction");
+    assert!(!requester.peers.contains_key("bounded-peer-0"));
+    assert_eq!(requester.peers.len(), MAX_PEERS);
 }
 
 #[tokio::test]
@@ -547,8 +642,12 @@ async fn requester_rejects_receipt_through_seq_mismatch_with_outer_cursor() {
     )
     .await;
 
-    let observed_cursor =
+    let (retry_nonce, observed_cursor) =
         observe_cursor_after_heartbeat(&peer_socket, &requester, &peer_id, &prepopulated_key).await;
+    assert_eq!(
+        retry_nonce, nonce,
+        "retry must reuse the pending request nonce"
+    );
     assert_eq!(
         observed_cursor, 0,
         "outer cursor advanced beyond the signed receipt"
@@ -593,8 +692,12 @@ async fn requester_does_not_advance_for_preconfigured_peer_entry_even_when_recei
     )
     .await;
 
-    let observed_cursor =
+    let (retry_nonce, observed_cursor) =
         observe_cursor_after_heartbeat(&peer_socket, &requester, &peer_id, &prepopulated_key).await;
+    assert_eq!(
+        retry_nonce, nonce,
+        "retry must reuse the pending request nonce"
+    );
     assert_eq!(
         observed_cursor, 0,
         "preconfigured Storage.peers entry was treated as receipt trust"

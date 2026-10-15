@@ -226,9 +226,9 @@ exact boundary, tests and performance limitations.
 | POST | `/v1/search/hybrid` | `HybridSearchInput` | `NeighborOutput[]` |
 | POST | `/v1/reason/context` | `HybridSearchInput` | `NeighborOutput[]` (alpha forced 0.4) |
 | GET | `/v1/insight/drift/:cluster_id` | path `u32` | `SuperNode[]` |
-| GET | `/v1/insight/communities` | _none_ | community detection results |
+| GET | `/v1/insight/communities` | _none_ | `{ nodes, edges }`; 401 authorization error (`ACCESS_CONTEXT_REQUIRED` message) when ACL policy is Enforced |
 | GET | `/v1/insight/gaps` | _none_ | structural gap analysis |
-| POST | `/v1/insight/rebuild` | _none_ | trigger community detection rebuild |
+| POST | `/v1/insight/rebuild` | _none_ | trigger community detection rebuild; 401 authorization error (`ACCESS_CONTEXT_REQUIRED` message) when ACL policy is Enforced |
 | GET | `/v1/status` | _none_ | `ExtendedStatus` |
 | GET | `/v1/version` | _none_ | `{ version }` |
 | GET | `/v1/swarm/status` | _none_ | `SwarmStatus` |
