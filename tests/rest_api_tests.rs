@@ -1344,7 +1344,130 @@ async fn test_query_ir_validation_error_is_structured() {
     )
     .await;
     assert_eq!(status, StatusCode::BAD_REQUEST);
+    assert_eq!(body["error"]["category"], "validation");
+    assert_eq!(body["error"]["code"], "GENESIS_VALIDATION_ERROR");
     assert_eq!(body["code"], "QUERY_IR_VALIDATION_FAILED");
+    assert_eq!(body["error"]["message"], body["message"]);
+}
+
+#[tokio::test]
+async fn rest_error_categories_are_stable_across_representative_routes() {
+    let dir = TempDir::new().unwrap();
+    let storage = Storage::open(OpenOptions {
+        path: dir.path().to_string_lossy().into_owned(),
+        page_cache_mb: Some(16),
+        read_only: Some(false),
+        vector_dim: Some(2),
+        retention: None,
+    })
+    .unwrap();
+    let app = build_router(AppState {
+        storage: Arc::new(RwLock::new(storage)),
+        api_key: None,
+        query_admission: Arc::new(tokio::sync::Semaphore::new(8)),
+    });
+
+    // Validation is produced by the JSON request extractor, before engine work.
+    let invalid_json = Request::builder()
+        .method("POST")
+        .uri("/v1/node/add")
+        .header("content-type", "application/json")
+        .body(Body::from("{"))
+        .unwrap();
+    let (status, body) = oneshot(&app, invalid_json).await;
+    assert_eq!(status, StatusCode::BAD_REQUEST);
+    assert_eq!(body["error"]["category"], "validation");
+    assert_eq!(body["error"]["code"], "GENESIS_VALIDATION_ERROR");
+    assert!(!body["error"]["message"]
+        .as_str()
+        .unwrap_or_default()
+        .is_empty());
+
+    // Capability selection uses the typed request fields, not diagnostic text.
+    let (status, body) = post_json(
+        &app,
+        "/v1/query/ir",
+        json!({
+            "contract_version": "query-ir.v1",
+            "request_id": "rest-capability",
+            "namespace": "tenant-a",
+            "operation": {
+                "kind": "context",
+                "target_id": "missing",
+                "tier": "H0"
+            }
+        }),
+    )
+    .await;
+    assert_eq!(status, StatusCode::BAD_REQUEST);
+    assert_eq!(body["error"]["category"], "capability");
+    assert_eq!(body["error"]["code"], "GENESIS_CAPABILITY_UNSUPPORTED");
+    assert_eq!(body["code"], "QUERY_CAPABILITY_UNSUPPORTED");
+
+    // Query-budget failures retain their historical top-level code and details.
+    let (status, body) = post_json(
+        &app,
+        "/v1/query/hql",
+        json!({
+            "query": "TRAVERSE FROM missing DEPTH 1 REL LINK",
+            "budget": { "max_serialized_bytes": 1 }
+        }),
+    )
+    .await;
+    assert_eq!(status, StatusCode::BAD_REQUEST);
+    assert_eq!(body["error"]["category"], "query");
+    assert_eq!(body["error"]["code"], "GENESIS_QUERY_ERROR");
+    assert_eq!(body["code"], "QUERY_BUDGET_EXCEEDED");
+    assert_eq!(body["message"], "QUERY_BUDGET_EXCEEDED: reason=bytes");
+
+    // A transaction frontier mismatch is an explicit conflict response.
+    let (status, body) = post_json(
+        &app,
+        "/v1/transaction/commit",
+        json!({
+            "transaction_id": "rest-conflict",
+            "expected_frontier": 1,
+            "relational": [],
+            "graph": { "nodes": [], "edges": [] },
+            "vectors": []
+        }),
+    )
+    .await;
+    assert_eq!(status, StatusCode::CONFLICT);
+    assert_eq!(body["error"]["category"], "conflict");
+    assert_eq!(body["error"]["code"], "GENESIS_CONFLICT");
+    assert_eq!(body["error"]["message"], "expected frontier conflict");
+
+    // An event whose embedding is incompatible with the configured vector
+    // dimension fails semantic verification and is classified as integrity.
+    let (status, body) = post_json(
+        &app,
+        "/v1/consensus/verify",
+        json!({
+            "Node": {
+                "id": "integrity-probe",
+                "labels": [],
+                "props": {},
+                "impact": null,
+                "embedding": [1.0, 0.0, 0.0],
+                "lang": null,
+                "valid_from": "2026-01-01T00:00:00Z",
+                "valid_to": null,
+                "caused_by": null,
+                "expires_at": null,
+                "clock": { "time": 0, "peer_id": "test" },
+                "collection": null
+            }
+        }),
+    )
+    .await;
+    assert_eq!(status, StatusCode::INTERNAL_SERVER_ERROR);
+    assert_eq!(body["error"]["category"], "integrity");
+    assert_eq!(body["error"]["code"], "GENESIS_INTEGRITY_ERROR");
+    assert!(!body["error"]["message"]
+        .as_str()
+        .unwrap_or_default()
+        .is_empty());
 }
 
 #[tokio::test]

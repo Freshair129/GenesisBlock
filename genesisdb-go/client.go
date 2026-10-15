@@ -52,11 +52,49 @@ func NewClientWithOptions(baseURL string, options ClientOptions) *Client {
 type APIError struct {
 	StatusCode int
 	Code       string
+	StableCode string
+	Category   string
+	LegacyCode string
 	Message    string
 }
 
 func (e *APIError) Error() string {
 	return fmt.Sprintf("server error (%d) %s: %s", e.StatusCode, e.Code, e.Message)
+}
+
+func newAPIError(statusCode int, body []byte) *APIError {
+	var envelope struct {
+		Error struct {
+			Code     string `json:"code"`
+			Category string `json:"category"`
+			Message  string `json:"message"`
+		} `json:"error"`
+		Code    string `json:"code"`
+		Message string `json:"message"`
+	}
+	_ = json.Unmarshal(body, &envelope)
+
+	apiError := &APIError{
+		StatusCode: statusCode,
+		Code:       envelope.Error.Code,
+		StableCode: envelope.Error.Code,
+		Category:   envelope.Error.Category,
+		LegacyCode: envelope.Code,
+		Message:    envelope.Error.Message,
+	}
+	if apiError.Code == "" {
+		apiError.Code = envelope.Code
+	}
+	if apiError.Message == "" {
+		apiError.Message = envelope.Message
+	}
+	if apiError.Message == "" {
+		apiError.Message = string(body)
+	}
+	if apiError.Code == "" {
+		apiError.Code = "QUERY_EXECUTION_FAILED"
+	}
+	return apiError
 }
 
 // Query executes a raw HQL command.
@@ -169,15 +207,7 @@ func (c *Client) post(ctx context.Context, url string, payload interface{}) ([]b
 	if resp.StatusCode < http.StatusOK || resp.StatusCode >= http.StatusMultipleChoices {
 		var errBuf bytes.Buffer
 		errBuf.ReadFrom(resp.Body)
-		message := errBuf.String()
-		var envelope struct {
-			Code    string `json:"code"`
-			Message string `json:"message"`
-		}
-		if json.Unmarshal(errBuf.Bytes(), &envelope) == nil && envelope.Message != "" {
-			return nil, &APIError{StatusCode: resp.StatusCode, Code: envelope.Code, Message: envelope.Message}
-		}
-		return nil, &APIError{StatusCode: resp.StatusCode, Code: "QUERY_EXECUTION_FAILED", Message: message}
+		return nil, newAPIError(resp.StatusCode, errBuf.Bytes())
 	}
 
 	var resBuf bytes.Buffer
@@ -202,14 +232,7 @@ func (c *Client) get(ctx context.Context, url string) ([]byte, error) {
 	if resp.StatusCode < http.StatusOK || resp.StatusCode >= http.StatusMultipleChoices {
 		var errBuf bytes.Buffer
 		errBuf.ReadFrom(resp.Body)
-		var envelope struct {
-			Code    string `json:"code"`
-			Message string `json:"message"`
-		}
-		if json.Unmarshal(errBuf.Bytes(), &envelope) == nil && envelope.Message != "" {
-			return nil, &APIError{StatusCode: resp.StatusCode, Code: envelope.Code, Message: envelope.Message}
-		}
-		return nil, &APIError{StatusCode: resp.StatusCode, Code: "QUERY_EXECUTION_FAILED", Message: errBuf.String()}
+		return nil, newAPIError(resp.StatusCode, errBuf.Bytes())
 	}
 	var resBuf bytes.Buffer
 	resBuf.ReadFrom(resp.Body)

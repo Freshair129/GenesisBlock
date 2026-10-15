@@ -3,19 +3,20 @@ doc_id: API_REFERENCE
 status: current
 version: generated
 owner: GenesisBlockDB Engineering
-updated: "2026-09-22"
+updated: "2026-10-15"
 ---
 
 # GenesisBlockDB REST API Reference
 
-**Generated from `src/router.rs` (Axum server) — 2026-08-14.** This replaces the
-prior corrupted file. The server is the SSOT; update this when routes change.
+**Generated from `src/router.rs` (Axum server) — 2026-10-15.** The server is the
+SSOT; update this when routes or response contracts change.
 
 - **Base URL:** `http://localhost:3000` (port via `GENESIS_PORT`, bind `0.0.0.0`)
 - **Data dir:** `.brain/gks/storage` (via `GENESIS_DATA_DIR`)
-- **Bodies:** JSON. Errors use the route-appropriate HTTP status with a plain-text
-  message. CORS defaults to localhost origins; `GENESIS_CORS_ORIGIN` selects one
-  origin, while `*` explicitly enables permissive mode.
+- **Bodies:** JSON. REST handler, extractor, and API-key failures use the
+  machine-readable envelope below and retain the route's HTTP status. CORS defaults to localhost origins;
+  `GENESIS_CORS_ORIGIN` selects one origin, while `*` explicitly enables
+  permissive mode.
 - **Authentication:** when `GENESIS_API_KEY` is set, all `/v1/*` routes require
   `Authorization: Bearer <key>`. This is a bootstrap shared secret, not scoped
   OIDC/JWT authorization. `/metrics` remains unguarded.
@@ -27,12 +28,99 @@ prior corrupted file. The server is the SSOT; update this when routes change.
 >    but enforces the read-only HQL command family.
 > 2. Edge `from`/`to` are **node string ids** (e.g. `"N-…"`), not integers.
 
+## Error response envelope (API-004)
+
+Handler errors, API-key rejections, and JSON/query/path extraction rejections
+return `application/json` with a common `error` object:
+
+```json
+{
+  "error": {
+    "category": "validation",
+    "code": "GENESIS_VALIDATION_ERROR",
+    "message": "COLLECTION_DIM_INVALID: expected 1..65535",
+    "status": 400
+  },
+  "message": "COLLECTION_DIM_INVALID: expected 1..65535"
+}
+```
+
+`error.category` and `error.code` are stable machine-readable values. The
+`message` retains the original engine or extractor detail, including existing
+engine code prefixes. `error.status` mirrors the HTTP response status; most
+routes retain their previous status, while a write failure that leaves the
+Storage instance in recovery-required state returns `503` and category
+`durability`.
+
+Router-level unmatched paths (`404`), unsupported methods (`405`), and requests
+rejected by the global body-size layer can fail before a handler or custom
+extractor runs. Axum/Tower may return their transport-level response for those
+conditions; they are outside this envelope contract.
+
+| Category | Stable `error.code` | Meaning |
+|---|---|---|
+| `validation` | `GENESIS_VALIDATION_ERROR` | Request shape or route input rejected |
+| `capability` | `GENESIS_CAPABILITY_UNSUPPORTED` | Requested Query IR operation is declared unsupported by the capability manifest |
+| `query` | `GENESIS_QUERY_ERROR` | Query evaluation or query execution failed |
+| `conflict` | `GENESIS_CONFLICT` | Transaction or relational mutation conflicts with current state |
+| `durability` | `GENESIS_DURABILITY_ERROR` | A write requires recovery/reopen before safe continuation |
+| `integrity` | `GENESIS_INTEGRITY_ERROR` | Integrity, projection, consensus verification, or rebuild operation failed |
+| `internal` | `GENESIS_INTERNAL_ERROR` | Other server-side operation failed |
+| `not_found` | `GENESIS_NOT_FOUND` | Requested resource is absent |
+| `authorization` | `GENESIS_UNAUTHORIZED` | API key is missing or invalid |
+| `rate_limit` | `GENESIS_RATE_LIMITED` | Query admission capacity is exhausted |
+| `unavailable` | `GENESIS_UNAVAILABLE` | Engine is rebuilding or temporarily unavailable |
+
+### Client migration
+
+- New clients should read `error.category`, `error.code`, `error.message`, and
+  `error.status`.
+- Query routes that already returned top-level `{ "code", "message" }` keep
+  those fields as deprecated compatibility aliases. Their prior specific codes
+  and full diagnostic messages remain unchanged; the new stable category code
+  is in `error.code`.
+- Other routes previously returned plain text. Their exact detail now appears in
+  `error.message` and the top-level `message` alias. Clients that display raw
+  response text should move to the JSON envelope. The Python SDK reads the new
+  envelope and legacy fields; the Go SDK reads envelope code/category/message
+  and falls back to legacy fields; Studio's remote transport reads envelope
+  messages and still accepts legacy plain-text servers.
+- Capability failures are selected from the request shape and the published
+  Query IR capability manifest; REST does not infer categories by searching
+  diagnostic text.
+
+### SDK error fields
+
+- Python `QueryError.code` prefers nested `error.code`, falling back to the
+  deprecated top-level `code`. `stable_code` contains only nested `error.code`,
+  `legacy_code` contains only top-level `code`, and `category` contains nested
+  `error.category` when present.
+- Go `APIError.Code` uses the same stable-then-legacy preference. `StableCode`,
+  `LegacyCode`, and `Category` expose the individual fields; `Message` retains
+  the nested or legacy diagnostic body.
+- Studio's remote transport throws the envelope's nested or top-level
+  `message`, with response-text fallback for older plain-text servers.
+
+### Taxonomy implementation limit
+
+The REST adapter assigns categories from the typed request shape, route
+contract, or typed Storage recovery state. Core Storage methods currently
+return reason-only NAPI errors, so a route's remaining engine failures use its
+documented explicit fallback category. Generic mutation failures that retain
+HTTP `500` use `internal`; a validation category is used only for an explicit
+request/extractor rejection or a route retaining its `400` validation result.
+REST cannot always distinguish a semantic validation failure from an
+internal/query failure after the core returns that untyped error. Diagnostic
+strings are preserved for details and legacy aliases, but are never used to
+select `error.category`. Full typed category parity across REST, NAPI, and SDK
+surfaces remains open until the core exposes a shared typed error kind.
+
 ## Write outcomes and recovery (Wave A)
 
-The core distinguishes rejection from a durable or uncertain write. REST retains
-its route-specific HTTP status and plain-text error body; NAPI exposes the same
-message through promise rejection. Inspect the message prefix rather than
-assuming that every non-success status means no write occurred.
+The core distinguishes rejection from a durable or uncertain write. REST wraps
+the unchanged diagnostic in the error envelope; NAPI exposes the same message
+through promise rejection. Inspect `error.category` and the message detail rather
+than assuming that every non-success status means no write occurred.
 
 | Error prefix / outcome | Client action |
 |---|---|
@@ -140,8 +228,13 @@ change existing tables, columns, or primary keys.
 
 `POST /v1/query/ir` accepts a closed versioned envelope. The current partial implementation supports
 `operation.kind = "search"`, `operation.kind = "traverse"` and target-id
-`operation.kind = "context"`. Unknown fields and unsupported
-versions return HTTP `400` with `{ "code", "message" }`; execution failures return HTTP `500`.
+`operation.kind = "context"`. Unknown fields and unsupported versions return HTTP `400`;
+execution failures return HTTP `500`. For compatibility, these query routes retain their historical
+top-level `code` and `message` fields alongside the common `error` object. Legacy route-specific
+codes include `QUERY_IR_VERSION_UNSUPPORTED`, `QUERY_IR_VALIDATION_FAILED`,
+`QUERY_CAPABILITY_UNSUPPORTED`, `QUERY_EXECUTION_FAILED`, and `QUERY_BUDGET_EXCEEDED`; their full
+diagnostic messages remain unchanged. New clients should use the stable `error.category` and
+`error.code`, and may continue reading the top-level aliases during migration.
 
 ```json
 {
@@ -160,11 +253,13 @@ versions return HTTP `400` with `{ "code", "message" }`; execution failures retu
 `search` requires exactly one of `target_id` or `query_vector`, plus `mode` and `k`. Supported modes
 are `vector` and `hybrid`; lexical mode remains planned and typed metadata filters are unsupported.
 Supplying a `filters` object is recognized and rejected with `QUERY_CAPABILITY_UNSUPPORTED` until a
-typed metadata contract exists.
+typed metadata contract exists. This remains the top-level legacy code; the envelope reports
+`error.category = "capability"` and `error.code = "GENESIS_CAPABILITY_UNSUPPORTED"`.
 `context` is implemented for a target id with `tier` `H0`–`H6`, optional token `budget` and optional
 `fuzzy`; query-vector and temporal context fail closed with `QUERY_CAPABILITY_UNSUPPORTED`. Its
 `data` is the existing context packet, including `coverage`, and compressed packets carry the
-`context_truncated` warning. `GET /v1/query/ir/capabilities` is the runtime authority for implemented
+`context_truncated` warning. Unsupported query-vector and temporal context requests preserve the
+legacy code and details while the envelope uses the stable capability category. `GET /v1/query/ir/capabilities` is the runtime authority for implemented
 operation kinds and current bounds.
 
 ## HQL (`/v1/query/hql`, raw string body)

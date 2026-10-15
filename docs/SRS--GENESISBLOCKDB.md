@@ -121,8 +121,28 @@ Client application and client-owned schema
 | GB-SRS-API-001 | Embedded, server, and SDK surfaces SHALL report product and capability versions. | MUST |
 | GB-SRS-API-002 | Shared operations SHALL have conformance tests across supported interfaces. | MUST |
 | GB-SRS-API-003 | Interface adapters SHALL NOT redefine client ontology. | MUST |
-| GB-SRS-API-004 | API errors SHALL distinguish validation, capability, query, conflict, durability, and integrity failures. | MUST |
+| GB-SRS-API-004 | API errors SHALL distinguish validation, capability, query, conflict, durability, and integrity failures using stable machine-readable categories and codes. REST handler and extractor errors SHALL include the documented JSON envelope while preserving diagnostic details. | MUST |
 | GB-SRS-API-005 | MCP tools, when enabled, SHALL expose bounded database operations and SHALL NOT assume GoVibe authority semantics. | MUST |
+
+For REST failures, the envelope is `{ "error": { "category", "code", "message", "status" } }`.
+`category` and `code` are stable within REST API v1; `status` mirrors the actual
+HTTP response status and is `503` when the Storage instance requires recovery.
+`message` retains the engine or extractor diagnostic. The required categories are
+`validation`, `capability`, `query`, `conflict`, `durability`, and `integrity`.
+Other transport conditions may use `internal`, `not_found`, `authorization`,
+`rate_limit`, or `unavailable`. The API reference owns the complete code mapping
+and the migration rules for legacy response fields.
+Unmatched paths, unsupported methods, and requests rejected by the global
+body-size layer may fail before the REST handler/extractor contract applies;
+their transport-level responses are outside this envelope requirement.
+
+Current coverage note: REST has a common envelope and route-assigned categories,
+but core Storage errors remain reason-only NAPI errors. The adapter cannot
+distinguish every semantic validation failure from an internal/query failure
+without parsing diagnostics, so remaining failures use an explicit route
+fallback (generic HTTP 500 mutation failures use `internal`). Equivalent typed
+categories across REST, embedded/NAPI, and SDK surfaces remain an open part of
+GB-SRS-API-004 until the core exposes a shared typed error kind.
 
 ### 3.9 Operational visibility
 

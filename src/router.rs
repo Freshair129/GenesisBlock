@@ -1,12 +1,13 @@
 use axum::{
-    extract::{DefaultBodyLimit, Json, Path, Query, State},
-    http::{header, HeaderValue, StatusCode},
+    extract::{DefaultBodyLimit, FromRequest, FromRequestParts, Json, Path, Query, State},
+    http::{header, request::Parts, HeaderValue, StatusCode},
     middleware::{self, Next},
     response::{IntoResponse, Response},
     routing::{get, post},
     Router,
 };
 use parking_lot::RwLock;
+use serde::de::DeserializeOwned;
 use std::sync::atomic::Ordering;
 use std::sync::Arc;
 use tokio::sync::Semaphore;
@@ -16,7 +17,7 @@ use tower_http::trace::TraceLayer;
 
 use crate::{
     BatchInput, CollectionInfo, EdgeInput, Event, GenesisTransaction, HybridSearchInput,
-    NamedQueryRequest, NodeInput, QueryBudget, QueryInput, RelationalMutationBatch,
+    NamedQueryRequest, NodeInput, QueryBudget, QueryInput, QueryIrRequest, RelationalMutationBatch,
     RelationalSchemaPackage, Storage, StudioGraphSceneRequest, SyncPeer,
 };
 
@@ -92,6 +93,193 @@ struct SupersedeInput {
     pub caused_by: Option<String>,
 }
 
+/// JSON extractor that gives request-shape failures the same machine-readable
+/// envelope as errors returned by a route.
+struct ApiJson<T>(T);
+
+#[async_trait::async_trait]
+impl<S, T> FromRequest<S> for ApiJson<T>
+where
+    S: Send + Sync,
+    T: DeserializeOwned + Send,
+{
+    type Rejection = Response;
+
+    async fn from_request(
+        request: axum::extract::Request,
+        state: &S,
+    ) -> Result<Self, Self::Rejection> {
+        match <Json<T> as FromRequest<S>>::from_request(request, state).await {
+            Ok(Json(value)) => Ok(Self(value)),
+            Err(rejection) => Err(rest_error_response(
+                rejection.status(),
+                RestErrorCategory::Validation,
+                rejection.body_text(),
+            )),
+        }
+    }
+}
+
+/// Query-string extractor that normalizes deserialization failures as
+/// validation errors without changing the underlying diagnostic.
+struct ApiQuery<T>(T);
+
+#[async_trait::async_trait]
+impl<S, T> FromRequestParts<S> for ApiQuery<T>
+where
+    S: Send + Sync,
+    T: DeserializeOwned + Send,
+{
+    type Rejection = Response;
+
+    async fn from_request_parts(parts: &mut Parts, state: &S) -> Result<Self, Self::Rejection> {
+        match <Query<T> as FromRequestParts<S>>::from_request_parts(parts, state).await {
+            Ok(Query(value)) => Ok(Self(value)),
+            Err(rejection) => Err(rest_error_response(
+                rejection.status(),
+                RestErrorCategory::Validation,
+                rejection.body_text(),
+            )),
+        }
+    }
+}
+
+/// Path-parameter extractor that normalizes malformed parameters as
+/// validation errors.
+struct ApiPath<T>(T);
+
+#[async_trait::async_trait]
+impl<S, T> FromRequestParts<S> for ApiPath<T>
+where
+    S: Send + Sync,
+    T: DeserializeOwned + Send,
+{
+    type Rejection = Response;
+
+    async fn from_request_parts(parts: &mut Parts, state: &S) -> Result<Self, Self::Rejection> {
+        match <Path<T> as FromRequestParts<S>>::from_request_parts(parts, state).await {
+            Ok(Path(value)) => Ok(Self(value)),
+            Err(rejection) => Err(rest_error_response(
+                rejection.status(),
+                RestErrorCategory::Validation,
+                rejection.body_text(),
+            )),
+        }
+    }
+}
+
+#[derive(Clone, Copy)]
+enum RestErrorCategory {
+    Validation,
+    Capability,
+    Query,
+    Conflict,
+    Durability,
+    Integrity,
+    Internal,
+    NotFound,
+    Authorization,
+    RateLimit,
+    Unavailable,
+}
+
+impl RestErrorCategory {
+    fn as_str(self) -> &'static str {
+        match self {
+            Self::Validation => "validation",
+            Self::Capability => "capability",
+            Self::Query => "query",
+            Self::Conflict => "conflict",
+            Self::Durability => "durability",
+            Self::Integrity => "integrity",
+            Self::Internal => "internal",
+            Self::NotFound => "not_found",
+            Self::Authorization => "authorization",
+            Self::RateLimit => "rate_limit",
+            Self::Unavailable => "unavailable",
+        }
+    }
+
+    fn code(self) -> &'static str {
+        match self {
+            Self::Validation => "GENESIS_VALIDATION_ERROR",
+            Self::Capability => "GENESIS_CAPABILITY_UNSUPPORTED",
+            Self::Query => "GENESIS_QUERY_ERROR",
+            Self::Conflict => "GENESIS_CONFLICT",
+            Self::Durability => "GENESIS_DURABILITY_ERROR",
+            Self::Integrity => "GENESIS_INTEGRITY_ERROR",
+            Self::Internal => "GENESIS_INTERNAL_ERROR",
+            Self::NotFound => "GENESIS_NOT_FOUND",
+            Self::Authorization => "GENESIS_UNAUTHORIZED",
+            Self::RateLimit => "GENESIS_RATE_LIMITED",
+            Self::Unavailable => "GENESIS_UNAVAILABLE",
+        }
+    }
+}
+
+fn rest_error_response(
+    status: StatusCode,
+    category: RestErrorCategory,
+    message: impl Into<String>,
+) -> Response {
+    let message = message.into();
+    (
+        status,
+        Json(serde_json::json!({
+            "error": {
+                "category": category.as_str(),
+                "code": category.code(),
+                "message": message.clone(),
+                "status": status.as_u16()
+            },
+            "message": message
+        })),
+    )
+        .into_response()
+}
+
+/// Keep the original top-level `code` and `message` fields on endpoints that
+/// already returned structured errors. New clients should use `error.*`.
+fn rest_error_response_with_legacy(
+    status: StatusCode,
+    category: RestErrorCategory,
+    legacy_code: impl Into<String>,
+    message: impl Into<String>,
+) -> Response {
+    let message = message.into();
+    (
+        status,
+        Json(serde_json::json!({
+            "error": {
+                "category": category.as_str(),
+                "code": category.code(),
+                "message": message.clone(),
+                "status": status.as_u16()
+            },
+            "code": legacy_code.into(),
+            "message": message
+        })),
+    )
+        .into_response()
+}
+
+fn storage_write_error_response(
+    storage: &Storage,
+    fallback_status: StatusCode,
+    fallback_category: RestErrorCategory,
+    error: impl std::fmt::Display,
+) -> Response {
+    if storage.recovery_required.load(Ordering::SeqCst) {
+        rest_error_response(
+            StatusCode::SERVICE_UNAVAILABLE,
+            RestErrorCategory::Durability,
+            error.to_string(),
+        )
+    } else {
+        rest_error_response(fallback_status, fallback_category, error.to_string())
+    }
+}
+
 // ---------------------------------------------------------------------------
 // Response shape helpers
 // ---------------------------------------------------------------------------
@@ -140,18 +328,22 @@ struct ExtendedStatus {
 
 async fn consensus_propose_handler(
     State(state): State<AppState>,
-    Json(input): Json<ProposalInput>,
+    ApiJson(input): ApiJson<ProposalInput>,
 ) -> impl IntoResponse {
     let storage = state.storage.read();
     match storage.propose_consensus(input.event, input.signature) {
         Ok(id) => (StatusCode::OK, Json(id)).into_response(),
-        Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
+        Err(e) => rest_error_response(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            RestErrorCategory::Internal,
+            e.to_string(),
+        ),
     }
 }
 
 async fn consensus_vote_handler(
     State(state): State<AppState>,
-    Json(input): Json<VoteInput>,
+    ApiJson(input): ApiJson<VoteInput>,
 ) -> impl IntoResponse {
     let storage = state.storage.read();
     match storage.submit_vote(
@@ -161,13 +353,17 @@ async fn consensus_vote_handler(
         input.signature,
     ) {
         Ok(reached_quorum) => (StatusCode::OK, Json(reached_quorum)).into_response(),
-        Err(e) => (StatusCode::BAD_REQUEST, e.to_string()).into_response(),
+        Err(e) => rest_error_response(
+            StatusCode::BAD_REQUEST,
+            RestErrorCategory::Validation,
+            e.to_string(),
+        ),
     }
 }
 
 async fn consensus_sign_vote_handler(
     State(state): State<AppState>,
-    Json(input): Json<SignVoteInput>,
+    ApiJson(input): ApiJson<SignVoteInput>,
 ) -> impl IntoResponse {
     let storage = state.storage.read();
     let sig = storage.sign_vote(input.proposal_id, input.approve);
@@ -176,34 +372,48 @@ async fn consensus_sign_vote_handler(
 
 async fn consensus_verify_handler(
     State(state): State<AppState>,
-    Json(event): Json<Event>,
+    ApiJson(event): ApiJson<Event>,
 ) -> impl IntoResponse {
     let storage = state.storage.read();
     match storage.semantic_verify(&event) {
         Ok(is_valid) => (StatusCode::OK, Json(is_valid)).into_response(),
-        Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
+        Err(e) => rest_error_response(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            RestErrorCategory::Integrity,
+            e.to_string(),
+        ),
     }
 }
 
 async fn bulk_add_nodes_handler(
     State(state): State<AppState>,
-    Json(inputs): Json<Vec<NodeInput>>,
+    ApiJson(inputs): ApiJson<Vec<NodeInput>>,
 ) -> impl IntoResponse {
     let storage = state.storage.write();
     match storage.bulk_add_nodes(inputs) {
         Ok(_) => StatusCode::OK.into_response(),
-        Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
+        Err(e) => storage_write_error_response(
+            &storage,
+            StatusCode::INTERNAL_SERVER_ERROR,
+            RestErrorCategory::Internal,
+            e,
+        ),
     }
 }
 
 async fn bulk_add_edges_handler(
     State(state): State<AppState>,
-    Json(inputs): Json<Vec<EdgeInput>>,
+    ApiJson(inputs): ApiJson<Vec<EdgeInput>>,
 ) -> impl IntoResponse {
     let storage = state.storage.write();
     match storage.bulk_add_edges(inputs) {
         Ok(_) => StatusCode::OK.into_response(),
-        Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
+        Err(e) => storage_write_error_response(
+            &storage,
+            StatusCode::INTERNAL_SERVER_ERROR,
+            RestErrorCategory::Internal,
+            e,
+        ),
     }
 }
 
@@ -211,7 +421,12 @@ async fn rebuild_index_handler(State(state): State<AppState>) -> impl IntoRespon
     let storage = state.storage.write();
     match storage.rebuild_index_parallel() {
         Ok(_) => StatusCode::OK.into_response(),
-        Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
+        Err(e) => storage_write_error_response(
+            &storage,
+            StatusCode::INTERNAL_SERVER_ERROR,
+            RestErrorCategory::Integrity,
+            e,
+        ),
     }
 }
 
@@ -224,68 +439,100 @@ async fn rebuild_index_handler(State(state): State<AppState>) -> impl IntoRespon
 /// through the same `Error` type as `add_node`/`bulk_add_nodes`).
 async fn execute_batch_handler(
     State(state): State<AppState>,
-    Json(input): Json<BatchInput>,
+    ApiJson(input): ApiJson<BatchInput>,
 ) -> impl IntoResponse {
     let storage = state.storage.write();
     match storage.execute_batch(input) {
         Ok(output) => (StatusCode::OK, Json(output)).into_response(),
-        Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
+        Err(e) => storage_write_error_response(
+            &storage,
+            StatusCode::INTERNAL_SERVER_ERROR,
+            RestErrorCategory::Internal,
+            e,
+        ),
     }
 }
 
 async fn relational_schema_handler(
     State(state): State<AppState>,
-    Json(package): Json<RelationalSchemaPackage>,
+    ApiJson(package): ApiJson<RelationalSchemaPackage>,
 ) -> impl IntoResponse {
     let storage = state.storage.read();
     match storage.register_relational_schema(package) {
         Ok(version) => (StatusCode::OK, Json(version)).into_response(),
-        Err(e) => (StatusCode::BAD_REQUEST, e.to_string()).into_response(),
+        Err(e) => storage_write_error_response(
+            &storage,
+            StatusCode::BAD_REQUEST,
+            RestErrorCategory::Validation,
+            e,
+        ),
     }
 }
 
 async fn relational_schema_get_handler(
     State(state): State<AppState>,
-    Path(namespace): Path<String>,
+    ApiPath(namespace): ApiPath<String>,
 ) -> impl IntoResponse {
     let storage = state.storage.read();
     match storage.get_relational_schema(&namespace) {
         Ok(Some(package)) => (StatusCode::OK, Json(package)).into_response(),
-        Ok(None) => StatusCode::NOT_FOUND.into_response(),
-        Err(e) => (StatusCode::NOT_FOUND, e.to_string()).into_response(),
+        Ok(None) => rest_error_response(
+            StatusCode::NOT_FOUND,
+            RestErrorCategory::NotFound,
+            "relational schema not found",
+        ),
+        Err(e) => rest_error_response(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            RestErrorCategory::Internal,
+            e.to_string(),
+        ),
     }
 }
 
 async fn relational_mutate_handler(
     State(state): State<AppState>,
-    Json(batch): Json<RelationalMutationBatch>,
+    ApiJson(batch): ApiJson<RelationalMutationBatch>,
 ) -> impl IntoResponse {
     let storage = state.storage.read();
     match storage.apply_relational_batch(batch) {
         Ok(result) => (StatusCode::OK, Json(result)).into_response(),
-        Err(e) => (StatusCode::BAD_REQUEST, e.to_string()).into_response(),
+        Err(e) => storage_write_error_response(
+            &storage,
+            StatusCode::BAD_REQUEST,
+            RestErrorCategory::Conflict,
+            e,
+        ),
     }
 }
 
 async fn relational_query_handler(
     State(state): State<AppState>,
-    Json(request): Json<NamedQueryRequest>,
+    ApiJson(request): ApiJson<NamedQueryRequest>,
 ) -> impl IntoResponse {
     let storage = state.storage.read();
     match storage.execute_named_query(request) {
         Ok(rows) => (StatusCode::OK, Json(rows)).into_response(),
-        Err(e) => (StatusCode::BAD_REQUEST, e.to_string()).into_response(),
+        Err(e) => rest_error_response(
+            StatusCode::BAD_REQUEST,
+            RestErrorCategory::Query,
+            e.to_string(),
+        ),
     }
 }
 
 async fn transaction_commit_handler(
     State(state): State<AppState>,
-    Json(transaction): Json<GenesisTransaction>,
+    ApiJson(transaction): ApiJson<GenesisTransaction>,
 ) -> impl IntoResponse {
     let storage = state.storage.read();
     match storage.commit_transaction(transaction) {
         Ok(result) => (StatusCode::OK, Json(result)).into_response(),
-        Err(e) => (StatusCode::CONFLICT, e.to_string()).into_response(),
+        Err(e) => storage_write_error_response(
+            &storage,
+            StatusCode::CONFLICT,
+            RestErrorCategory::Conflict,
+            e,
+        ),
     }
 }
 
@@ -322,12 +569,16 @@ struct NodeVersionsQuery {
 /// ADR D4 — explicit failure, never silently the current state).
 async fn node_versions_handler(
     State(state): State<AppState>,
-    Query(request): Query<NodeVersionsQuery>,
+    ApiQuery(request): ApiQuery<NodeVersionsQuery>,
 ) -> impl IntoResponse {
     let storage = state.storage.read();
     match storage.node_versions(&request.id, request.at_seq) {
         Ok(v) => (StatusCode::OK, Json(v)).into_response(),
-        Err(e) => (StatusCode::BAD_REQUEST, e.to_string()).into_response(),
+        Err(e) => rest_error_response(
+            StatusCode::BAD_REQUEST,
+            RestErrorCategory::Query,
+            e.to_string(),
+        ),
     }
 }
 
@@ -343,32 +594,38 @@ async fn studio_capabilities_handler(State(state): State<AppState>) -> impl Into
 
 async fn studio_graph_scene_handler(
     State(state): State<AppState>,
-    Query(request): Query<StudioGraphSceneRequest>,
+    ApiQuery(request): ApiQuery<StudioGraphSceneRequest>,
 ) -> impl IntoResponse {
     let storage = state.storage.read();
     match storage.studio_graph_scene(request) {
         Ok(scene) => (StatusCode::OK, Json(scene)).into_response(),
-        Err(error) => (StatusCode::BAD_REQUEST, error.to_string()).into_response(),
+        Err(error) => rest_error_response(
+            StatusCode::BAD_REQUEST,
+            RestErrorCategory::Query,
+            error.to_string(),
+        ),
     }
 }
 
 async fn studio_entity_handler(
     State(state): State<AppState>,
-    Path(entity_id): Path<String>,
+    ApiPath(entity_id): ApiPath<String>,
 ) -> impl IntoResponse {
     let storage = state.storage.read();
     match storage.studio_inspect_entity(&entity_id) {
         Ok(inspection) => (StatusCode::OK, Json(inspection)).into_response(),
-        Err(error) if error.to_string().contains("NOT_FOUND") => {
-            (StatusCode::NOT_FOUND, error.to_string()).into_response()
-        }
-        Err(error) => (StatusCode::BAD_REQUEST, error.to_string()).into_response(),
+        Err(error) => storage_write_error_response(
+            &storage,
+            StatusCode::NOT_FOUND,
+            RestErrorCategory::NotFound,
+            error,
+        ),
     }
 }
 
 async fn studio_read_hql_handler(
     State(state): State<AppState>,
-    Json(body): Json<HqlBody>,
+    ApiJson(body): ApiJson<HqlBody>,
 ) -> impl IntoResponse {
     let _permit = match acquire_query_permit(&state) {
         Some(permit) => permit,
@@ -383,7 +640,11 @@ async fn studio_read_hql_handler(
     .await;
     match result {
         Ok(Ok(result)) => (StatusCode::OK, Json(result)).into_response(),
-        Ok(Err(error)) => (StatusCode::BAD_REQUEST, error.to_string()).into_response(),
+        Ok(Err(error)) => rest_error_response(
+            StatusCode::BAD_REQUEST,
+            RestErrorCategory::Query,
+            error.to_string(),
+        ),
         Err(error) => blocking_query_failure(error),
     }
 }
@@ -392,47 +653,70 @@ async fn studio_relational_schemas_handler(State(state): State<AppState>) -> imp
     let storage = state.storage.read();
     match storage.list_relational_schemas() {
         Ok(schemas) => (StatusCode::OK, Json(schemas)).into_response(),
-        Err(error) => (StatusCode::INTERNAL_SERVER_ERROR, error.to_string()).into_response(),
+        Err(error) => rest_error_response(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            RestErrorCategory::Integrity,
+            error.to_string(),
+        ),
     }
 }
 
 async fn add_node_handler(
     State(state): State<AppState>,
-    Json(input): Json<NodeInput>,
+    ApiJson(input): ApiJson<NodeInput>,
 ) -> impl IntoResponse {
     let storage = state.storage.write();
     match storage.add_node(input) {
         Ok(node) => (StatusCode::OK, Json(node)).into_response(),
-        Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
+        Err(e) => storage_write_error_response(
+            &storage,
+            StatusCode::INTERNAL_SERVER_ERROR,
+            RestErrorCategory::Internal,
+            e,
+        ),
     }
 }
 
 async fn add_edge_handler(
     State(state): State<AppState>,
-    Json(input): Json<EdgeInput>,
+    ApiJson(input): ApiJson<EdgeInput>,
 ) -> impl IntoResponse {
     let storage = state.storage.write();
     match storage.add_edge(input) {
         Ok(edge) => (StatusCode::OK, Json(edge)).into_response(),
-        Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
+        Err(e) => storage_write_error_response(
+            &storage,
+            StatusCode::INTERNAL_SERVER_ERROR,
+            RestErrorCategory::Internal,
+            e,
+        ),
     }
 }
 
 async fn retract_edge_handler(
     State(state): State<AppState>,
-    Json(input): Json<RetractEdgeInput>,
+    ApiJson(input): ApiJson<RetractEdgeInput>,
 ) -> impl IntoResponse {
     let storage = state.storage.write();
     match storage.retract_edge(input.id, input.at) {
         Ok(Some(edge)) => (StatusCode::OK, Json(edge)).into_response(),
-        Ok(None) => (StatusCode::NOT_FOUND, "edge not found").into_response(),
-        Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
+        Ok(None) => rest_error_response(
+            StatusCode::NOT_FOUND,
+            RestErrorCategory::NotFound,
+            "edge not found",
+        ),
+        Err(e) => storage_write_error_response(
+            &storage,
+            StatusCode::INTERNAL_SERVER_ERROR,
+            RestErrorCategory::Internal,
+            e,
+        ),
     }
 }
 
 async fn create_collection_handler(
     State(state): State<AppState>,
-    Json(input): Json<CreateCollectionInput>,
+    ApiJson(input): ApiJson<CreateCollectionInput>,
 ) -> impl IntoResponse {
     let storage = state.storage.write();
     match storage.create_collection(
@@ -445,7 +729,12 @@ async fn create_collection_handler(
         input.rerank,
     ) {
         Ok(()) => (StatusCode::OK, Json(serde_json::json!({"ok": true}))).into_response(),
-        Err(e) => (StatusCode::BAD_REQUEST, e.to_string()).into_response(),
+        Err(e) => storage_write_error_response(
+            &storage,
+            StatusCode::BAD_REQUEST,
+            RestErrorCategory::Validation,
+            e,
+        ),
     }
 }
 
@@ -456,29 +745,39 @@ async fn list_collections_handler(State(state): State<AppState>) -> impl IntoRes
 
 async fn add_vector_handler(
     State(state): State<AppState>,
-    Json(input): Json<AddVectorInput>,
+    ApiJson(input): ApiJson<AddVectorInput>,
 ) -> impl IntoResponse {
     let storage = state.storage.read();
     match storage.add_vector(input.node_id, input.collection, input.embedding) {
         Ok(()) => (StatusCode::OK, Json(serde_json::json!({"ok": true}))).into_response(),
-        Err(e) => (StatusCode::BAD_REQUEST, e.to_string()).into_response(),
+        Err(e) => storage_write_error_response(
+            &storage,
+            StatusCode::BAD_REQUEST,
+            RestErrorCategory::Validation,
+            e,
+        ),
     }
 }
 
 async fn supersede_node_handler(
     State(state): State<AppState>,
-    Json(input): Json<SupersedeInput>,
+    ApiJson(input): ApiJson<SupersedeInput>,
 ) -> impl IntoResponse {
     let storage = state.storage.write();
     match storage.supersede_node(input.id, input.new_props, input.caused_by) {
         Ok(node) => (StatusCode::OK, Json(node)).into_response(),
-        Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
+        Err(e) => storage_write_error_response(
+            &storage,
+            StatusCode::INTERNAL_SERVER_ERROR,
+            RestErrorCategory::Internal,
+            e,
+        ),
     }
 }
 
 async fn get_meta_history_handler(
     State(state): State<AppState>,
-    axum::extract::Path(cluster_id): axum::extract::Path<u32>,
+    ApiPath(cluster_id): ApiPath<u32>,
 ) -> impl IntoResponse {
     let storage = state.storage.read();
     let history = storage.get_meta_history(cluster_id);
@@ -508,7 +807,11 @@ async fn insight_gaps_handler(State(state): State<AppState>) -> impl IntoRespons
     let storage = state.storage.read();
     match storage.calculate_structural_gaps() {
         Ok(gaps) => (StatusCode::OK, Json(gaps)).into_response(),
-        Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
+        Err(e) => rest_error_response(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            RestErrorCategory::Integrity,
+            e.to_string(),
+        ),
     }
 }
 
@@ -519,7 +822,12 @@ async fn insight_rebuild_handler(State(state): State<AppState>) -> impl IntoResp
         .and_then(|_| storage.generate_meta_graph())
     {
         Ok(()) => (StatusCode::OK, Json(serde_json::json!({ "ok": true }))).into_response(),
-        Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
+        Err(e) => storage_write_error_response(
+            &storage,
+            StatusCode::INTERNAL_SERVER_ERROR,
+            RestErrorCategory::Integrity,
+            e,
+        ),
     }
 }
 
@@ -552,43 +860,50 @@ fn acquire_query_permit(state: &AppState) -> Option<tokio::sync::OwnedSemaphoreP
 }
 
 fn query_admission_rejected() -> Response {
-    (
+    rest_error_response_with_legacy(
         StatusCode::TOO_MANY_REQUESTS,
-        Json(serde_json::json!({
-            "code": "QUERY_ADMISSION_REJECTED",
-            "message": "query admission capacity is exhausted"
-        })),
+        RestErrorCategory::RateLimit,
+        "QUERY_ADMISSION_REJECTED",
+        "query admission capacity is exhausted",
     )
-        .into_response()
 }
 
 fn blocking_query_failure(error: impl std::fmt::Display) -> Response {
-    (
+    rest_error_response_with_legacy(
         StatusCode::INTERNAL_SERVER_ERROR,
-        Json(serde_json::json!({
-            "code": "QUERY_EXECUTION_FAILED",
-            "message": error.to_string()
-        })),
+        RestErrorCategory::Query,
+        "QUERY_EXECUTION_FAILED",
+        error.to_string(),
     )
-        .into_response()
 }
 
 fn query_storage_error_response(error: impl std::fmt::Display) -> Response {
     let message = error.to_string();
     if message.starts_with("QUERY_BUDGET_") {
-        let code = message.split(':').next().unwrap_or("QUERY_BUDGET_EXCEEDED");
-        return (
+        // Preserve the route's legacy code/status aliases during migration.
+        // The stable category is route-assigned, never inferred from this text.
+        let code = message
+            .split(':')
+            .next()
+            .unwrap_or("QUERY_BUDGET_EXCEEDED")
+            .to_string();
+        return rest_error_response_with_legacy(
             StatusCode::BAD_REQUEST,
-            Json(serde_json::json!({ "code": code, "message": message })),
-        )
-            .into_response();
+            RestErrorCategory::Query,
+            code,
+            message,
+        );
     }
-    (StatusCode::INTERNAL_SERVER_ERROR, message).into_response()
+    rest_error_response(
+        StatusCode::INTERNAL_SERVER_ERROR,
+        RestErrorCategory::Query,
+        message,
+    )
 }
 
 async fn execute_hql_handler(
     State(state): State<AppState>,
-    Json(body): Json<HqlBody>,
+    ApiJson(body): ApiJson<HqlBody>,
 ) -> impl IntoResponse {
     let _permit = match acquire_query_permit(&state) {
         Some(permit) => permit,
@@ -596,11 +911,11 @@ async fn execute_hql_handler(
     };
     let (query, budget) = body.into_parts();
     if state.storage.read().is_rebuilding.load(Ordering::SeqCst) {
-        return (
+        return rest_error_response(
             StatusCode::SERVICE_UNAVAILABLE,
+            RestErrorCategory::Unavailable,
             "Engine is rebuilding index...",
-        )
-            .into_response();
+        );
     }
     let storage = Arc::clone(&state.storage);
     let result = tokio::task::spawn_blocking(move || {
@@ -615,47 +930,113 @@ async fn execute_hql_handler(
     }
 }
 
-fn query_ir_error_response(error: impl std::fmt::Display) -> axum::response::Response {
+fn query_ir_error_response(
+    error: impl std::fmt::Display,
+    category: RestErrorCategory,
+) -> axum::response::Response {
     let message = error.to_string();
-    let candidate = message.split(':').next().unwrap_or("");
+    // Keep Query IR's legacy top-level code and HTTP status derivation intact
+    // for existing clients. `category` came from request/route context, not
+    // from the engine's diagnostic string.
+    let candidate = message.split(':').next().unwrap_or("").to_string();
     let code = if candidate.starts_with("QUERY_") {
         candidate
     } else {
-        "QUERY_EXECUTION_FAILED"
+        "QUERY_EXECUTION_FAILED".to_string()
     };
     let status = if code == "QUERY_EXECUTION_FAILED" {
         StatusCode::INTERNAL_SERVER_ERROR
     } else {
         StatusCode::BAD_REQUEST
     };
-    (
-        status,
-        Json(serde_json::json!({
-            "code": code,
-            "message": message
-        })),
-    )
-        .into_response()
+    rest_error_response_with_legacy(status, category, code, message)
+}
+
+/// Detects only the unsupported operations declared by the capability
+/// manifest. Category selection is based on the request contract, never on an
+/// engine error string.
+fn query_ir_request_uses_unsupported_capability(request: &serde_json::Value) -> bool {
+    if request
+        .get("contract_version")
+        .and_then(serde_json::Value::as_str)
+        .is_some_and(|version| version != "query-ir.v1")
+        || request
+            .get("namespace")
+            .is_some_and(|namespace| !namespace.is_null())
+    {
+        return true;
+    }
+
+    let operation = match request.get("operation") {
+        Some(operation) => operation,
+        None => return false,
+    };
+    let kind = operation
+        .get("kind")
+        .and_then(serde_json::Value::as_str)
+        .unwrap_or_default();
+    let temporal = request.get("temporal");
+    let has_temporal_selector = temporal.is_some_and(|value| {
+        value
+            .get("valid_at")
+            .is_some_and(|selector| !selector.is_null())
+            || value
+                .get("tx_as_of")
+                .is_some_and(|selector| !selector.is_null())
+    });
+
+    match kind {
+        "search" => {
+            operation
+                .get("filters")
+                .is_some_and(|filters| !filters.is_null())
+                || operation
+                    .get("mode")
+                    .and_then(serde_json::Value::as_str)
+                    .is_some_and(|mode| mode == "lexical")
+        }
+        "context" => {
+            operation
+                .get("query_vector")
+                .is_some_and(|vector| !vector.is_null())
+                || has_temporal_selector
+        }
+        "match_path" => temporal
+            .and_then(|value| value.get("tx_as_of"))
+            .is_some_and(|selector| !selector.is_null()),
+        "relational_named_query" => true,
+        _ => false,
+    }
+}
+
+fn query_ir_error_category(request: &serde_json::Value) -> RestErrorCategory {
+    // Use the same typed request contract as the core to classify malformed
+    // Query IR shapes without inspecting its reason-only error text.
+    if serde_json::from_value::<QueryIrRequest>(request.clone()).is_err() {
+        RestErrorCategory::Validation
+    } else if query_ir_request_uses_unsupported_capability(request) {
+        RestErrorCategory::Capability
+    } else {
+        RestErrorCategory::Query
+    }
 }
 
 async fn execute_query_ir_handler(
     State(state): State<AppState>,
-    Json(request): Json<serde_json::Value>,
+    ApiJson(request): ApiJson<serde_json::Value>,
 ) -> impl IntoResponse {
     let _permit = match acquire_query_permit(&state) {
         Some(permit) => permit,
         None => return query_admission_rejected(),
     };
     if state.storage.read().is_rebuilding.load(Ordering::SeqCst) {
-        return (
+        return rest_error_response(
             StatusCode::SERVICE_UNAVAILABLE,
-            Json(serde_json::json!({
-                "code": "QUERY_EXECUTION_FAILED",
-                "message": "Engine is rebuilding index..."
-            })),
-        )
-            .into_response();
+            RestErrorCategory::Unavailable,
+            "Engine is rebuilding index...",
+        );
     }
+    let error_category = query_ir_error_category(&request);
     let storage = Arc::clone(&state.storage);
     let result = tokio::task::spawn_blocking(move || {
         let storage = storage.read();
@@ -664,7 +1045,7 @@ async fn execute_query_ir_handler(
     .await;
     match result {
         Ok(Ok(response)) => (StatusCode::OK, Json(response)).into_response(),
-        Ok(Err(error)) => query_ir_error_response(error),
+        Ok(Err(error)) => query_ir_error_response(error, error_category),
         Err(error) => blocking_query_failure(error),
     }
 }
@@ -686,18 +1067,18 @@ async fn query_ir_capabilities_handler(State(state): State<AppState>) -> impl In
 ///     raw-scan behavior, surfacing retracted/superseded edges too.
 async fn query_handler(
     State(state): State<AppState>,
-    Json(input): Json<QueryInput>,
+    ApiJson(input): ApiJson<QueryInput>,
 ) -> impl IntoResponse {
     let _permit = match acquire_query_permit(&state) {
         Some(permit) => permit,
         None => return query_admission_rejected(),
     };
     if state.storage.read().is_rebuilding.load(Ordering::SeqCst) {
-        return (
+        return rest_error_response(
             StatusCode::SERVICE_UNAVAILABLE,
+            RestErrorCategory::Unavailable,
             "Engine is rebuilding index...",
-        )
-            .into_response();
+        );
     }
     let storage = Arc::clone(&state.storage);
     let result = tokio::task::spawn_blocking(move || storage.read().query(input)).await;
@@ -710,18 +1091,18 @@ async fn query_handler(
 
 async fn hybrid_search_handler(
     State(state): State<AppState>,
-    Json(input): Json<HybridSearchInput>,
+    ApiJson(input): ApiJson<HybridSearchInput>,
 ) -> impl IntoResponse {
     let _permit = match acquire_query_permit(&state) {
         Some(permit) => permit,
         None => return query_admission_rejected(),
     };
     if state.storage.read().is_rebuilding.load(Ordering::SeqCst) {
-        return (
+        return rest_error_response(
             StatusCode::SERVICE_UNAVAILABLE,
+            RestErrorCategory::Unavailable,
             "Engine is rebuilding index...",
-        )
-            .into_response();
+        );
     }
     let storage = Arc::clone(&state.storage);
     let result = tokio::task::spawn_blocking(move || storage.read().hybrid_search(input)).await;
@@ -734,18 +1115,18 @@ async fn hybrid_search_handler(
 
 async fn ranked_context_handler(
     State(state): State<AppState>,
-    Json(input): Json<HybridSearchInput>,
+    ApiJson(input): ApiJson<HybridSearchInput>,
 ) -> impl IntoResponse {
     let _permit = match acquire_query_permit(&state) {
         Some(permit) => permit,
         None => return query_admission_rejected(),
     };
     if state.storage.read().is_rebuilding.load(Ordering::SeqCst) {
-        return (
+        return rest_error_response(
             StatusCode::SERVICE_UNAVAILABLE,
+            RestErrorCategory::Unavailable,
             "Engine is rebuilding index...",
-        )
-            .into_response();
+        );
     }
     let storage = Arc::clone(&state.storage);
     let result =
@@ -759,18 +1140,18 @@ async fn ranked_context_handler(
 
 async fn retrieve_context_handler(
     State(state): State<AppState>,
-    Json(input): Json<RetrieveContextInput>,
+    ApiJson(input): ApiJson<RetrieveContextInput>,
 ) -> impl IntoResponse {
     let _permit = match acquire_query_permit(&state) {
         Some(permit) => permit,
         None => return query_admission_rejected(),
     };
     if state.storage.read().is_rebuilding.load(Ordering::SeqCst) {
-        return (
+        return rest_error_response(
             StatusCode::SERVICE_UNAVAILABLE,
+            RestErrorCategory::Unavailable,
             "Engine is rebuilding index...",
-        )
-            .into_response();
+        );
     }
     let storage = Arc::clone(&state.storage);
     let result = tokio::task::spawn_blocking(move || {
@@ -1105,10 +1486,61 @@ async fn api_key_guard(
             .map(|token| token == expected.as_str())
             .unwrap_or(false);
         if !authorized {
-            return (StatusCode::UNAUTHORIZED, "Unauthorized").into_response();
+            return rest_error_response(
+                StatusCode::UNAUTHORIZED,
+                RestErrorCategory::Authorization,
+                "Unauthorized",
+            );
         }
     }
     next.run(req).await
+}
+
+#[cfg(test)]
+mod error_contract_tests {
+    use super::*;
+    use axum::body::Body;
+    use axum::http::Request;
+    use http_body_util::BodyExt;
+    use tempfile::TempDir;
+    use tower::ServiceExt;
+
+    #[tokio::test]
+    async fn recovery_required_write_returns_durability_envelope() {
+        let directory = TempDir::new().unwrap();
+        let storage = Storage::open(crate::OpenOptions {
+            path: directory.path().to_string_lossy().into_owned(),
+            page_cache_mb: Some(16),
+            read_only: Some(false),
+            vector_dim: Some(2),
+            retention: None,
+        })
+        .unwrap();
+        storage.recovery_required.store(true, Ordering::SeqCst);
+        let app = build_router(AppState {
+            storage: Arc::new(RwLock::new(storage)),
+            api_key: None,
+            query_admission: Arc::new(Semaphore::new(DEFAULT_QUERY_ADMISSION)),
+        });
+
+        let request = Request::builder()
+            .method("POST")
+            .uri("/v1/node/add")
+            .header(header::CONTENT_TYPE, "application/json")
+            .body(Body::from(r#"{"id":"durability-probe","labels":[]}"#))
+            .unwrap();
+        let response = app.oneshot(request).await.unwrap();
+        assert_eq!(response.status(), StatusCode::SERVICE_UNAVAILABLE);
+        let bytes = response.into_body().collect().await.unwrap().to_bytes();
+        let body: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
+        assert_eq!(body["error"]["category"], "durability");
+        assert_eq!(body["error"]["code"], "GENESIS_DURABILITY_ERROR");
+        assert_eq!(body["error"]["status"], 503);
+        assert!(!body["error"]["message"]
+            .as_str()
+            .unwrap_or_default()
+            .is_empty());
+    }
 }
 
 /// Build a CORS layer.
