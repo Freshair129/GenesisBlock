@@ -214,3 +214,24 @@ checks that the frontier is unchanged, and retries successfully after correcting
 the transaction. The new typed mapper retains SQLite's `UNIQUE constraint`
 diagnostic in its legacy message, so the expectation should remain compatible;
 the rebuilt-addon check is still pending at the updated head.
+
+## HQL error-contract test correction
+
+At head `cd00bed6d847bd9286e4252f9cd6389a50e7d91e`, Windows CI run
+`38700890228`, job `116308515779`, failed in
+`hql_budget_envelope_returns_typed_exhaustion` because it expected HTTP 400 but
+received 500. The request set `max_serialized_bytes` to 1; this is a valid query
+whose result exceeds its runtime budget, not invalid request input. The test
+still expected the former message-prefix adapter to infer `QUERY_BUDGET_EXCEEDED`
+and 400. The route now deliberately uses the fixed reason-only HQL mapping:
+HTTP 500, stable `query` / `GENESIS_QUERY_ERROR`, legacy
+`QUERY_EXECUTION_FAILED`, and the full diagnostic preserved in the message.
+
+The test was renamed to `hql_runtime_budget_failure_uses_stable_query_mapping`
+and now asserts the v1 envelope version and each stable/compatibility field. The
+focused test passed locally at head `2e05df9dda77eda22eef3d84ede48093fa8dab53`
+with `cargo test --locked --offline --no-default-features --jobs 1 --test
+wave_d_rest_tests hql_runtime_budget_failure_uses_stable_query_mapping` (1
+passed, 2 filtered). CI rerun for that head is pending. Future route tests pin
+status and stable fields from contract semantics; diagnostic text remains
+evidence only and does not select a category, stable code, or status.
