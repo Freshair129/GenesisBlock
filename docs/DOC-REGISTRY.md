@@ -2,8 +2,8 @@
 title: "GenesisBlockDB Document Registry"
 doc_id: "DOC-REGISTRY-GENESISBLOCKDB"
 status: draft
-version: "0.5.99+draft"
-updated: "2026-10-10"
+version: "0.5.102+draft"
+updated: "2026-10-15"
 owner: "GenesisBlockDB Architecture"
 source_of_truth: true
 related_issue: 84
@@ -52,8 +52,10 @@ registry row explicitly names them.
 
 | Role | Doc ID | Version | Status | Owner | Path |
 |---|---|---|---|---|---|
-| Architecture composition | `MASTER-SPEC-GENESISBLOCKDB` | `2.3.43b` | current | GenesisBlockDB Architecture | `docs/MASTER-SPEC--GENESIS-DB.md` |
-| Architecture index | `C4--GENESISDB-ARCHITECTURE` | `0.1.73b` | current | GenesisBlockDB Architecture | `docs/C4--GENESISDB-ARCHITECTURE.md` |
+| Architecture composition | `MASTER-SPEC-GENESISBLOCKDB` | `2.3.45b` | current | GenesisBlockDB Architecture | `docs/MASTER-SPEC--GENESIS-DB.md` |
+| Architecture index | `C4--GENESISDB-ARCHITECTURE` | `0.1.75b` | current | GenesisBlockDB Architecture | `docs/C4--GENESISDB-ARCHITECTURE.md` |
+| Server recovery requirements | `SRD--STANDALONE-SERVER-RESTART-RECOVERY` | `0.1.0b` | beta | GenesisBlockDB Engineering | `docs/SRD--STANDALONE-SERVER-RESTART-RECOVERY.md` |
+| Server recovery design | `TDD--STANDALONE-SERVER-RESTART-RECOVERY` | `0.1.0b` | beta | GenesisBlockDB Engineering | `docs/TDD--STANDALONE-SERVER-RESTART-RECOVERY.md` |
 | Execution DAG guard | `SPEC--EXECUTION-DAG-GUARD-V1` | `0.1.0` | accepted | Sol Decision / Contract and AC | `docs/SPEC--EXECUTION-DAG-GUARD-V1.md` |
 | HQL2 execution decision | `ADR--GENESISDB-HQL2-EXECUTION-BOUNDARY` | `0.1.1b` | accepted | Boss (Founder / Product Authority) | `docs/adr/ADR--GENESISDB-HQL2-EXECUTION-BOUNDARY.md` |
 | HQL2 G4 shared-pipeline contract | `ADR--GENESISDB-HQL2-G4-SHARED-PIPELINE` | `0.1.3b` | active | Boss (Founder / Product Authority) | `docs/adr/ADR--GENESISDB-HQL2-G4-SHARED-PIPELINE.md` |
@@ -86,6 +88,7 @@ registry row explicitly names them.
 | Role | Doc ID | Version | Status | Owner | Path |
 |---|---|---|---|---|---|
 | Positioning | `POSITIONING-GENESISBLOCKDB` | n/a | current | GenesisBlockDB Product | `docs/POSITIONING.md` |
+| Server recovery RCA | `RCA--STANDALONE-SERVER-RESTART-RECOVERY-2026-10-15` | `2026-10-15` | evidence | GenesisBlockDB Engineering | `docs/rca/2026-10-15-standalone-server-restart-recovery.md` |
 | Whitepaper | `WHITEPAPER-GENESISBLOCKDB-SEMANTIC-SUBSTRATE` | `0.1.0+draft` | draft | GenesisBlockDB Architecture | `docs/WHITEPAPER--GENESISBLOCKDB-SEMANTIC-SUBSTRATE.md` |
 | Database whitepaper | `WHITEPAPER--GENESIS-DB` | n/a | current | GenesisBlockDB Architecture | `docs/WHITEPAPER--GENESIS-DB.md` |
 | Performance report | `REPORT--2026-06-21-PERFORMANCE-AND-COMPETITIVE` | n/a | historical | GenesisBlockDB Engineering | `docs/REPORT--2026-06-21-PERFORMANCE-AND-COMPETITIVE.md` |
@@ -509,6 +512,9 @@ review and full P8 gates remain open.
 
 | Version | Date | Owner | Summary |
 |---|---|---|---|
+| 0.5.102+draft | 2026-10-15 | GenesisBlockDB Architecture | Record tracked debug restart integration test 2/2 across three forced-restart databases; bind child server hash to RCA and retain release-profile artifact qualification as pending |
+| 0.5.101+draft | 2026-10-15 | GenesisBlockDB Architecture | Register the tracked standalone restart RCA; link it from the docs hub, Master spec and C4, and specify that CI repeats the REST forced-restart test against three fresh databases. |
+| 0.5.100+draft | 2026-10-15 | GenesisBlockDB Architecture | Add standalone REST process-recovery requirements, test design and evidence entrypoints; keep v0.2.9 release failure distinct from current-main debug results. |
 | 0.5.99+draft | 2026-10-10 | GenesisBlockDB Architecture | Register bounded execution DAG guard, independent candidate gates and synthetic pilot contract. |
 | 0.5.98+draft | 2026-10-06 | GenesisBlockDB Architecture | Record passing fresh and committed Linux worker addon tests (26/0/6) on PR head ab38d50 and successful tests/security/performance/consumer workflows; six model-dependent tests and migration/full integration qualification remain pending |
 | 0.5.97+draft | 2026-10-06 | GenesisBlockDB Architecture | Record the GenesisRAG17 candidate engine source and historical baseline; synchronize ADR/C4/Master Spec/extension map provenance; refresh Linux addon metadata; fresh Bookworm worker suite 26 passed, 0 failed, 6 model-dependent skipped; full committed-artifact and integration qualification pending |

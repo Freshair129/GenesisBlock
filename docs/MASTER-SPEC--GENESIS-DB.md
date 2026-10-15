@@ -2,8 +2,8 @@
 title: "GenesisBlockDB Technical Architecture and Capability Composition"
 doc_id: "MASTER-SPEC-GENESISBLOCKDB"
 status: current
-version: "2.3.43b"
-updated: "2026-10-06"
+version: "2.3.45b"
+updated: "2026-10-15"
 owner: "GenesisBlockDB Architecture"
 source_of_truth: true
 related_issue: 84
@@ -435,6 +435,23 @@ proof fail with `RECOVERY_REQUIRED` instead of silently downgrading. See H2-D11 
 P6 WAL-only recovery contract. Runtime implementation is fixture-verified; no
 user database was migrated, and broader P6/P8/P13 qualification remains open.
 
+The standalone server recovery contract is tracked in
+[SRD--STANDALONE-SERVER-RESTART-RECOVERY](SRD--STANDALONE-SERVER-RESTART-RECOVERY.md)
+and its test design in
+[TDD--STANDALONE-SERVER-RESTART-RECOVERY](TDD--STANDALONE-SERVER-RESTART-RECOVERY.md).
+The evidence and scope limits are recorded in
+[the standalone server recovery RCA](rca/2026-10-15-standalone-server-restart-recovery.md).
+The regression starts the REST executable, writes unique node properties,
+vectors and an edge, terminates only that process after successful writes, and
+verifies exact fields after recovery. The v0.2.9 Windows release failed this
+check; current-main source passed three live REST fixtures with the debug
+profile. The tracked Rust integration target passed both test functions (2/2),
+including its three-fixture REST process loop and a separate graceful Storage
+close/reopen test. The tracked test's standalone child server binary is pinned
+in the RCA separately from the external REST harness binary. Release-profile
+qualification remains the server distribution gate, and the v0.2.9 artifact
+remains historical evidence.
+
 H2-D11 R5 restore validation opens staging with full retention, requires normal recovery to
 reproduce the bundle's final WAL-frame frontier, then publishes or reuses a P6 generation and
 independently validates a read-only lease before target exposure. A required local receipt may
@@ -447,6 +464,14 @@ read-only/rename failure cleanup is best-effort and unverified. This does not cl
 independent-review or broad P8/P13 gates.
 
 ## Changelog
+
+Version diff 2.3.44b -> 2.3.45b: record the tracked debug integration result
+(2/2 test functions, three forced-restart REST fixtures), the standalone child
+binary hash, and the remaining release-profile/archive gate. The external
+current-main REST harness remains a separate 3/3 result; the published v0.2.9
+failure remains historical evidence until a new versioned artifact passes
+release-profile consumer verification. No storage schema, API or W1 behavior
+changed.
 
 Version diff 2.3.42b -> 2.3.43b: distinguish the candidate GenesisRAG17 engine
 source from its historical baseline and link qualification to the worker ADR;
@@ -463,6 +488,8 @@ shared-runtime and broad P8/P13 gates remain open.
 
 | Version | Date | Owner | Summary |
 |---|---|---|---|
+| 2.3.45b | 2026-10-15 | GenesisBlockDB Architecture | Record tracked debug integration test 2/2 across three restart fixtures, pin child server hash, and keep release-profile/archive qualification pending; no schema/API/W1 change |
+| 2.3.44b | 2026-10-15 | GenesisBlockDB Architecture | Specify standalone REST forced-restart recovery and add exact-server process regression/release gate; current-main debug REST 3/3, published v0.2.9 failure retained as historical evidence; no schema/API/W1 change |
 | 2.3.43b | 2026-10-06 | GenesisBlockDB Architecture | Record GenesisRAG17 candidate engine source/qualification through the worker ADR; preserve historical baseline and TEST-only boundary; no schema or wire change; full integration qualification pending |
 | 2.3.42b | 2026-10-05 | GenesisBlockDB Architecture | Extend approved D7 with one unlabeled zero-hop property projection and exact-seed depth-one TRAVERSE; adapter 13/13, property/order/filter 2/2 each, HQL2 404/0/1 across 39 targets and U9 restore 7/7; sync R5 restore evidence; preserve fail-closed boundaries and broad shared-runtime/P8/P13 gates |
 | 2.3.41b | 2026-10-04 | GenesisBlockDB Architecture | Extend D7 after legacy/HQL2 differential to the exact same-alias string ID predicate on labeled zero-hop scans; adapter/order/filter 11/11, 2/2, 2/2 incl. wrong-label and backslash/Unicode; HQL2 394/0/1 across 35 targets, selected P6 peers 45/0/0 across 7; PR #213 code commit checks 40 pass, 4 worker failures with cause unconfirmed, 5 skipped, 1 Windows Cargo cancellation at 15-minute job limit; no P6/schema/transport change; broad shared-runtime/P8/P13 gates open |

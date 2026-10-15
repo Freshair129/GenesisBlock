@@ -6,6 +6,20 @@ in a single binary. Nearest comparators: Kuzu, DuckDB+graph, LanceDB, LadybugDB.
 **Evidence:** [REPORT--2026-06-21-PERFORMANCE-AND-COMPETITIVE.md](docs/REPORT--2026-06-21-PERFORMANCE-AND-COMPETITIVE.md) (P14–P30, all 8 competitors measured)
 **Metrics:** [METRICS-REVIEW--2026-06-22-WEEKLY.md](docs/METRICS-REVIEW--2026-06-22-WEEKLY.md)
 
+## Standalone server recovery qualification — 2026-10-15
+
+- [Issue #222](https://github.com/Freshair129/GenesisBlock/issues/222) tracks
+  node-property ownership after restarting the published v0.2.9 server.
+- Current-main debug evidence passes the tracked restart integration target
+  (2/2 test functions, including three fresh REST process fixtures). The server
+  distribution workflow now requires this target in the release profile before
+  packaging. This change adds regression coverage and a packaging gate; it does
+  not change the engine or replace the affected published archive.
+- Release-profile execution, new versioned archive qualification and consumer
+  acceptance remain pending. See the
+  [standalone recovery RCA](docs/rca/2026-10-15-standalone-server-restart-recovery.md)
+  for the reproduced failure, source/artifact identities and limits.
+
 ## Current Status (evidence-backed 2026-06-22)
 - **Benchmark Credibility:** 8/8 named competitors measured (P15–P30). Vector vs
   Chroma/Qdrant/LanceDB; graph vs Neo4j/Kuzu/DuckDB+graph/RocksDB+graph/LadybugDB.

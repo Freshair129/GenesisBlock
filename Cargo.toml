@@ -131,6 +131,11 @@ name = "genesis-db-server"
 path = "src/main.rs"
 required-features = ["bins"]
 
+[[test]]
+name = "server_restart_recovery_tests"
+path = "tests/server_restart_recovery_tests.rs"
+required-features = ["bins"]
+
 [[bin]]
 name = "wave-d-quality-gate"
 path = "benches/wave_d_quality_gate.rs"

@@ -2,8 +2,8 @@
 title: "GenesisBlockDB Documentation Hub"
 doc_id: "DOCS-NAVIGATION-HUB-GENESISBLOCKDB"
 status: draft
-version: "0.2.3+draft"
-updated: "2026-10-06"
+version: "0.2.5+draft"
+updated: "2026-10-15"
 owner: "GenesisBlockDB Architecture"
 source_of_truth: true
 related_issue: 84
@@ -12,6 +12,7 @@ related_docs:
   - "docs/ADR--GENESISRAG17-SEPARATE-WORKER-PUBLICATION.md"
   - "docs/FLOW--GENESISRAG17-PIPELINE.md"
   - "docs/GENESISRAG17-EXTENSION-MAP.md"
+  - "docs/rca/2026-10-15-standalone-server-restart-recovery.md"
 ---
 
 # GenesisBlockDB Documentation Hub
@@ -25,6 +26,7 @@ related_docs:
 5. Architecture map: `docs/C4--GENESISDB-ARCHITECTURE.md`
 6. Active registry: `docs/DOC-REGISTRY.md`
 7. GenesisRAG17 TEST integration: `docs/FLOW--GENESISRAG17-PIPELINE.md`
+8. Standalone server restart recovery: `docs/SRD--STANDALONE-SERVER-RESTART-RECOVERY.md` and `docs/TDD--STANDALONE-SERVER-RESTART-RECOVERY.md`
 
 ## Product boundary
 
@@ -75,6 +77,9 @@ authenticated calls; GKS remains the passive canonical and quality authority.
 - Product version: `docs/VERSION.md`
 - Positioning: `docs/POSITIONING.md`
 - Interactive benchmark dashboard: `docs/perf-comparison-dashboard.html`
+- Standalone server recovery RCA: [2026-10-15-standalone-server-restart-recovery.md](rca/2026-10-15-standalone-server-restart-recovery.md)
+- Current-main debug REST recovery result: `G:\AI-Studio\verification\2026-10-15-readiness-fixes\GenesisBlock\current-rest-hard-restart-results.json`
+- Tracked debug process test: 2/2 integration-test functions pass; the forced-restart test covers three fresh default-retention databases. The child server executable SHA-256 is `EEEC2186CBBAD089F960DE8774CA7125076CAA9ED3E9F8394903992C00B8DE7B`. This is distinct from the external REST harness binary and does not qualify the release profile or a versioned archive.
 
 ## Documentation rules
 
@@ -92,6 +97,8 @@ authenticated calls; GKS remains the passive canonical and quality authority.
 
 | Version | Date | Owner | Summary |
 |---|---|---|---|
+| 0.2.5+draft | 2026-10-15 | GenesisBlockDB Architecture | Record tracked debug regression 2/2 with three forced-restart fixtures and server hash; keep release-profile qualification pending |
+| 0.2.4+draft | 2026-10-15 | GenesisBlockDB Architecture | Link the standalone server restart requirement, test design and RCA; distinguish current-main debug REST evidence from historical v0.2.9 release failure |
 | 0.2.3+draft | 2026-10-06 | GenesisBlockDB Architecture | Link candidate GenesisRAG17 engine qualification and exact Linux addon provenance; keep historical acceptance and TEST-only boundary explicit |
 | 0.2.1+draft | 2026-09-08 | GenesisBlockDB Architecture | Linked the live zuri GenesisRAG17 ADR-071 and retained the pinned historical acceptance report. |
 | 0.2.0+draft | 2026-09-08 | GenesisBlockDB Architecture | Added the GenesisRAG17 TEST integration entrypoints, ownership boundary and external source links. |
@@ -100,6 +107,10 @@ authenticated calls; GKS remains the passive canonical and quality authority.
 ## Reference version diff — 2026-10-06
 
 "0.2.2+draft -> 0.2.3+draft: distinguish the candidate GenesisRAG17 engine source from historical acceptance, link the authoritative qualification and Linux artifact provenance, and preserve the TEST-only integration boundary."
+
+## Reference version diff — 2026-10-15
+
+"0.2.4+draft -> 0.2.5+draft: record the tracked debug process regression passing 2/2 test functions over three forced-restart fixtures, pin the child server SHA-256, and keep release-profile qualification pending."
 
 ## Reference version diff — 2026-09-08
 
