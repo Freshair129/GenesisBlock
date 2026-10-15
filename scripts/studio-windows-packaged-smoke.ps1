@@ -116,7 +116,7 @@ New-Item -ItemType Directory -Path $signalDirectory | Out-Null
 $installLog = Join-Path $evidenceDirectory 'studio-msi-install.log'
 $nodeStdout = Join-Path $evidenceDirectory 'studio-packaged-ui-smoke.stdout.log'
 $nodeStderr = Join-Path $evidenceDirectory 'studio-packaged-ui-smoke.stderr.log'
-$nodeExitCodePath = Join-Path $evidenceDirectory 'studio-packaged-ui-smoke.exit-code'
+$nodeExitCodePath = Join-Path $evidenceDirectory "studio-packaged-ui-smoke-$([guid]::NewGuid().ToString('N')).exit-code"
 $serverStdout = Join-Path $evidenceDirectory 'studio-parity-server.stdout.log'
 $serverStderr = Join-Path $evidenceDirectory 'studio-parity-server.stderr.log'
 $missingRoot = Join-Path $env:RUNNER_TEMP "studio missing root - 雪 $([guid]::NewGuid().ToString('N'))"
