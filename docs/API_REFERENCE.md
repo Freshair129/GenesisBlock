@@ -35,6 +35,7 @@ return `application/json` with a common `error` object:
 
 ```json
 {
+  "contract_version": "genesis.api.errors.v1",
   "error": {
     "category": "validation",
     "code": "GENESIS_VALIDATION_ERROR",
@@ -52,6 +53,11 @@ routes retain their previous status, while a write failure that leaves the
 Storage instance in recovery-required state returns `503` and category
 `durability`.
 
+The shared Rust type is `ApiErrorEnvelopeV1`. Its `details` member is optional;
+REST sets `status`, while embedded callers omit it because there is no HTTP
+status. Successful NAPI contract results use the same top-level contract
+version and an `{ "ok": true, "data": ... }` payload.
+
 Router-level unmatched paths (`404`), unsupported methods (`405`), and requests
 rejected by the global body-size layer can fail before a handler or custom
 extractor runs. Axum/Tower may return their transport-level response for those
@@ -67,18 +73,43 @@ conditions; they are outside this envelope contract.
 | `integrity` | `GENESIS_INTEGRITY_ERROR` | Integrity, projection, consensus verification, or rebuild operation failed |
 | `internal` | `GENESIS_INTERNAL_ERROR` | Other server-side operation failed |
 | `not_found` | `GENESIS_NOT_FOUND` | Requested resource is absent |
-| `authorization` | `GENESIS_UNAUTHORIZED` | API key is missing or invalid |
+| `authorization` | `GENESIS_UNAUTHORIZED` | API key is missing/invalid or an authorization policy denies the operation |
 | `rate_limit` | `GENESIS_RATE_LIMITED` | Query admission capacity is exhausted |
 | `unavailable` | `GENESIS_UNAVAILABLE` | Engine is rebuilding or temporarily unavailable |
+
+### Six-category conformance matrix
+
+| Category | Core typed source | NAPI contract method | REST representative | Python / Go reader |
+|---|---|---|---|---|
+| `validation` | Request decoding, relational transaction preflight, `BIND_ERROR` | `queryV2Contract` / `commitTransactionContract` | JSON extractor / Query IR request | Nested stable fields and legacy fallback |
+| `capability` | Structured `CAPABILITY_UNSUPPORTED` | `queryV2Contract` | Unsupported Query IR capability | Nested stable fields and legacy fallback |
+| `query` | Structured `QUERY_BUDGET_EXCEEDED` | `queryV2Contract` | HQL query budget (reason-only execution error) | Nested stable fields and legacy fallback |
+| `conflict` | Explicit transaction identity/frontier checks | `commitTransactionContract` | `/v1/transaction/commit` frontier mismatch | Nested stable fields and legacy fallback |
+| `durability` | Explicit recovery-required / post-WAL state | `commitTransactionContract` | Recovery-required transaction write | Nested stable fields and legacy fallback |
+| `integrity` | Structured `DATA_CORRUPTION` | `queryV2Contract` | Consensus verification failure | Nested stable fields and legacy fallback |
+
+The Rust envelope serializer exercises every row with the exact NAPI result
+shape; the REST integration suite exercises all six route categories. NAPI
+runtime tests cover request validation, query subcode preservation beside the
+stable code, transaction conflict, legacy Promise-rejection compatibility, and
+success. Python and Go fixtures read every required category while keeping
+stable and legacy codes separate.
 
 ### Client migration
 
 - New clients should read `error.category`, `error.code`, `error.message`, and
   `error.status`.
-- Query routes that already returned top-level `{ "code", "message" }` keep
+- Query IR responses that already returned top-level `{ "code", "message" }` keep
   those fields as deprecated compatibility aliases. Their prior specific codes
   and full diagnostic messages remain unchanged; the new stable category code
   is in `error.code`.
+- HQL budget input validation is checked before query execution and retains
+  the `QUERY_BUDGET_INVALID` alias with HTTP `400`. Runtime HQL execution
+  failures still cross the legacy reason-only Storage boundary, so their full
+  diagnostic remains in `message`, while HTTP status and legacy `code` use the
+  safe route mapping `500` / `QUERY_EXECUTION_FAILED`. Clients must use
+  `error.category = "query"` and `error.code = "GENESIS_QUERY_ERROR"`; the
+  reason text is not parsed to recover `QUERY_BUDGET_EXCEEDED`.
 - Other routes previously returned plain text. Their exact detail now appears in
   `error.message` and the top-level `message` alias. Clients that display raw
   response text should move to the JSON envelope. The Python SDK reads the new
@@ -94,26 +125,46 @@ conditions; they are outside this envelope contract.
 - Python `QueryError.code` prefers nested `error.code`, falling back to the
   deprecated top-level `code`. `stable_code` contains only nested `error.code`,
   `legacy_code` contains only top-level `code`, and `category` contains nested
-  `error.category` when present.
+  `error.category` when present. `message` prefers nested `error.message`, then
+  the legacy top-level `message`, then raw response text.
 - Go `APIError.Code` uses the same stable-then-legacy preference. `StableCode`,
   `LegacyCode`, and `Category` expose the individual fields; `Message` retains
-  the nested or legacy diagnostic body.
+  the nested diagnostic first, then the legacy top-level message.
 - Studio's remote transport throws the envelope's nested or top-level
   `message`, with response-text fallback for older plain-text servers.
+- Embedded callers can opt into the additive `Storage::query_v2_contract` /
+  `queryV2Contract(accessJson, requestJson)` and
+  `Storage::commit_transaction_contract` /
+  `commitTransactionContract(transactionJson)` methods. The NAPI methods return
+  `{ "contract_version", "ok", "data" | "error" }` objects;
+  existing `query_v2`, `commitTransaction`, and other NAPI promise-rejection
+  methods retain their old signatures and behavior.
+- The query contract maps structured `QueryErrorV2.code` values to category
+  and stable code, retaining the former Query IR code at top-level `code` and
+  structured safe details at top-level `details`. Transaction contract
+  conflict and durability categories come from explicit frontier/payload
+  checks and typed recovery state. Query subcodes remain in top-level `code`
+  and safe query details remain in top-level `details` during migration.
+  Unknown reason-only Storage errors remain `internal`; error messages are
+  never parsed to choose a category.
+- Transaction relational identifier, row, and primary-key preflight failures
+  use `validation`; a missing registered schema or vector collection uses
+  `not_found`; embedding dimension mismatch uses `validation`. A governance
+  policy rejection uses `authorization` and HTTP `403`.
 
 ### Taxonomy implementation limit
 
 The REST adapter assigns categories from the typed request shape, route
-contract, or typed Storage recovery state. Core Storage methods currently
-return reason-only NAPI errors, so a route's remaining engine failures use its
-documented explicit fallback category. Generic mutation failures that retain
-HTTP `500` use `internal`; a validation category is used only for an explicit
-request/extractor rejection or a route retaining its `400` validation result.
-REST cannot always distinguish a semantic validation failure from an
-internal/query failure after the core returns that untyped error. Diagnostic
-strings are preserved for details and legacy aliases, but are never used to
-select `error.category`. Full typed category parity across REST, NAPI, and SDK
-surfaces remains open until the core exposes a shared typed error kind.
+contract, or typed Storage recovery state. The additive Core/NAPI contract
+methods return `ApiErrorEnvelopeV1`; legacy Storage and NAPI methods still
+return their original reason-only errors for compatibility. REST handlers that
+call those legacy methods therefore retain an explicit route fallback category
+for unknown engine failures. Generic mutation failures with HTTP `500` use
+`internal`; validation is selected only by explicit request/extractor checks or
+route validation. Diagnostics and legacy subcodes remain available, but are
+never parsed to select `error.category`. The shared typed contract now covers
+the HQL2/Query IR v2 and transaction commit boundaries; upgrading every legacy
+NAPI operation to typed errors is a separate compatibility migration.
 
 ## Write outcomes and recovery (Wave A)
 
@@ -228,13 +279,15 @@ change existing tables, columns, or primary keys.
 
 `POST /v1/query/ir` accepts a closed versioned envelope. The current partial implementation supports
 `operation.kind = "search"`, `operation.kind = "traverse"` and target-id
-`operation.kind = "context"`. Unknown fields and unsupported versions return HTTP `400`;
-execution failures return HTTP `500`. For compatibility, these query routes retain their historical
-top-level `code` and `message` fields alongside the common `error` object. Legacy route-specific
-codes include `QUERY_IR_VERSION_UNSUPPORTED`, `QUERY_IR_VALIDATION_FAILED`,
-`QUERY_CAPABILITY_UNSUPPORTED`, `QUERY_EXECUTION_FAILED`, and `QUERY_BUDGET_EXCEEDED`; their full
-diagnostic messages remain unchanged. New clients should use the stable `error.category` and
-`error.code`, and may continue reading the top-level aliases during migration.
+`operation.kind = "context"`. Request validation and declared capability failures return HTTP `400`;
+query execution failures return HTTP `500`, based on the typed request category. For compatibility,
+these query routes retain their historical top-level `code` and `message` fields alongside the
+common `error` object. Legacy route-specific codes include `QUERY_IR_VERSION_UNSUPPORTED`,
+`QUERY_IR_VALIDATION_FAILED`, `QUERY_CAPABILITY_UNSUPPORTED`, `QUERY_EXECUTION_FAILED`, and
+`QUERY_BUDGET_EXCEEDED`; their full diagnostic messages remain unchanged. The top-level Query IR
+`code` remains a compatibility-only alias extracted from the legacy diagnostic. It does not select
+`error.category`, `error.code`, or HTTP status. New clients should use the stable nested fields and
+may continue reading the top-level aliases during migration.
 
 ```json
 {

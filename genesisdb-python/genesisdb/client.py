@@ -52,7 +52,8 @@ class GenesisClient:
             stable_code = error.get("code")
             legacy_code = error_body.get("code")
             code = stable_code or legacy_code or "QUERY_EXECUTION_FAILED"
-            message = error_body.get("message") or error.get("message") or response.text
+            # Prefer the stable nested envelope over the legacy top-level alias.
+            message = error.get("message") or error_body.get("message") or response.text
             category = error.get("category")
             raise QueryError(
                 message,

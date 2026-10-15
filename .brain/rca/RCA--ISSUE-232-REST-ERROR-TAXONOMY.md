@@ -4,7 +4,7 @@ superseded_by: null
 issue: 232
 ---
 
-# RCA — REST error taxonomy divergence
+# RCA — API error taxonomy divergence (issue #232)
 
 ## Symptom
 
@@ -31,6 +31,10 @@ routes.
 - `src/lib.rs` aliases core failures to `napi::Error` (or a local reason-only
   shim when NAPI bindings are disabled). Storage methods expose a diagnostic
   string, not a typed category.
+- The HQL budget state also constructs `QUERY_BUDGET_EXCEEDED` and
+  `QUERY_BUDGET_INVALID` as reason-only `Error::from_reason` values. The REST
+  adapter had recovered status/code aliases by checking and splitting that
+  diagnostic, so small message changes could alter the wire status/code.
 
 ## Root Cause
 
@@ -50,95 +54,94 @@ documenting a single contract.
 
 ## Correction and prevention
 
-1. Add a shared REST JSON envelope and stable category/code mapping.
+1. Add a shared `ApiErrorEnvelopeV1` and stable category/code mapping used by
+   REST and the additive embedded contract methods.
 2. Normalize JSON, query-string, and path extractor rejections as validation
    errors while retaining their diagnostics and HTTP status.
-3. Keep existing Query IR/HQL top-level codes and full messages as compatibility
-   aliases; select stable categories from typed request/route context, never by
-   parsing the diagnostic string.
+3. Preserve Query IR's documented aliases; validate HQL budget input before it
+   reaches the reason-only executor. For untyped HQL execution failures, keep
+   the complete diagnostic but use the route's fixed `500` /
+   `QUERY_EXECUTION_FAILED` compatibility mapping. Do not recover HQL runtime
+   status or code by parsing diagnostic text. Query IR retains its old top-level
+   `code` extraction as a compatibility alias only; stable category, stable
+   code, and HTTP status now come from the typed request semantics.
 4. Return durability only from the typed Storage recovery-required state.
 5. Update Python, Go, and Studio remote clients to read nested envelope details
    while retaining their legacy fallbacks.
-6. Add route-level category coverage and keep the API reference and SRS aligned.
+6. Add route- and SDK-level category coverage and keep the API reference, SRS,
+   and this RCA aligned.
 
-## Remaining contract limit
+## Additive Core/NAPI boundary and remaining limit
 
-REST request-shape validation, capability requests, route-specific query and
-conflict failures, integrity operations, and recovery-required writes can be
-covered with explicit context. The core still returns reason-only NAPI errors;
-therefore the REST adapter's fallback category for other engine failures is
-route-defined rather than a typed semantic classification. NAPI/embedded
-callers also do not receive the REST envelope. Replacing this boundary with a
-shared typed error kind is a separate core/API change. The exact loss boundary
-is `src/lib.rs`: `Result<T>` aliases `napi::Error` with NAPI enabled, while the
-no-NAPI shim has only `Error { reason: String }` and `Error::from_reason`.
-Storage methods and NAPI wrappers therefore expose a diagnostic string, not a
-category or stable code. `QueryErrorV2` in `src/query/hql2/error.rs` carries
-typed `code`, `stage`, retryability, and safe detail fields inside the HQL2
-pipeline, but it is not the shared error type returned by Storage/NAPI methods.
-`preserve_query_error` in `src/lib.rs` must inspect message prefixes to retain
-legacy query details, which is not a safe basis for semantic category mapping.
+The additive type and first typed Storage/NAPI boundaries now exist:
+`Storage::query_v2_contract` wraps structured `QueryErrorV2.code` values, and
+`Storage::commit_transaction_contract` uses explicit transaction guards plus
+the recovery-required state. `GenesisDatabase::queryV2Contract` and
+`commitTransactionContract` return the versioned `{ contract_version, ok,
+data|error }` object. The legacy `query_v2`, `commitTransaction`, and other
+Storage/NAPI signatures remain unchanged; unknown reason-only Storage failures
+map to `internal` only in the new contract.
 
-The smallest complete engine change is to introduce a shared `CoreError` and
-`ErrorKind` at the Storage boundary, with explicit constructors for validation,
-capability, query, conflict, durability, and integrity failures. Convert
-`QueryErrorV2` to that type while its structured code/stage are still present;
-keep unknown/reason-only failures explicitly unclassified or internal instead
-of inferring from their text. Then adapt NAPI and REST to serialize the same
-kind/code/message (while preserving legacy message fields) and add cross-surface
-conformance tests. This requires changing public Storage error types and the
-call sites that create those six categories, so it is broader than a safe REST
-adapter patch. GB-SRS-API-004's full cross-surface typed-category acceptance
-remains open; this patch does not claim that acceptance is complete.
+The exact loss boundary remains for existing legacy methods: `Result<T>` is
+backed by `napi::Error` with NAPI enabled or the reason-only shim when disabled.
+Most older Storage methods and NAPI wrappers still return only message/reason;
+REST handlers around them therefore keep explicit route fallbacks. The new
+query boundary consumes `QueryErrorV2.code` as structured data and preserves
+that code as a separate legacy alias. It does not inspect the message to
+classify. `hql2_storage_error` remains a legacy adapter for reason-only Storage
+failures; it is not used by the new envelope mapper to parse message text. The
+HQL REST adapter likewise no longer parses `QUERY_BUDGET_*` diagnostics: known
+invalid request limits are classified by the explicit preflight validator,
+while runtime reason-only failures keep their diagnostic under the stable query
+category and generic compatibility code. The runtime budget subcode is not
+preserved as a top-level alias until Storage exposes that failure as typed data.
+The Query IR REST adapter retains its pre-existing top-level compatibility
+subcode extraction; stable category selection remains based on typed request
+shape. Moving those legacy Query IR subcodes into structured Storage results is
+still required before that extraction can be removed without dropping aliases.
 
-## Typed embedded/NAPI acceptance plan
+### Six-category conformance matrix
 
-This patch deliberately stops at the REST and SDK compatibility boundary. A
-complete embedded/NAPI taxonomy needs an engine change because the current
-public storage contract returns `Result<T>` backed by `napi::Error` when NAPI
-is enabled (`src/lib.rs:40-62`), or a shim containing only `reason: String`
-without NAPI. The NAPI wrapper methods also flatten task joins, JSON decoding,
-and core failures with `Error::from_reason` (`src/lib.rs:25876-26020`). The
-NAPI error type exposes only a status/code string and a reason/message; it has
-no stable category field. HQL's `QueryErrorV2` has structured code, stage,
-retryability, and details (`src/query/hql2/error.rs:11-28`), but that type is
-not propagated through the shared `Storage` result type. A REST-only change or
-message-prefix adapter cannot establish cross-surface parity.
+| Category | Core/Storage source | NAPI surface | REST representative | SDK reader evidence |
+|---|---|---|---|---|
+| `validation` | `parse_query_v2_input`, request checks, relational identifier/row/primary-key preflight | `queryV2Contract`, `commitTransactionContract` | `ApiJson` rejection and Query IR request validation | Python/Go all-category fixtures |
+| `capability` | structured `CAPABILITY_UNSUPPORTED` QueryErrorV2 code | `queryV2Contract` shared mapper | Unsupported Query IR operation | Python/Go all-category fixtures |
+| `query` | structured `QUERY_BUDGET_EXCEEDED` code | `queryV2Contract` shared mapper | HQL budget exhaustion uses query category; runtime reason is retained with generic legacy alias | Python/Go all-category fixtures |
+| `conflict` | transaction identity/frontier checks | `commitTransactionContract` | `/v1/transaction/commit` frontier mismatch | Python/Go all-category fixtures |
+| `durability` | explicit recovery state / post-WAL apply guard | `commitTransactionContract` | recovery-required write response | Python/Go all-category fixtures |
+| `integrity` | structured `DATA_CORRUPTION` QueryErrorV2 code | `queryV2Contract` shared mapper | Consensus verification failure | Python/Go all-category fixtures |
 
-Recommended migration phases:
+Rust tests assert stable code/category/message serialization through the exact
+NAPI result helper for all six categories, structured QueryErrorV2 mapping, and
+actual Core transaction validation, conflict, and durability guards. The
+transaction preflight maps relational identifier, row, and primary-key errors
+to validation by call-site context; missing schemas/collections to not-found;
+dimension mismatch to validation; and governance policy rejection to
+authorization. The REST transaction handler uses HTTP 403 for that governance
+rejection. NAPI runtime tests cover validation, structured legacy query-code
+preservation, conflict, success, and legacy Promise-rejection compatibility.
+REST integration tests cover all six route categories, with a separate
+recovery-required handler test. Python and Go SDK readers test stable and
+legacy code separation for all six. Local Go execution remains unavailable
+unless a Go toolchain or CI result is provided.
 
-1. **Introduce typed core failures.** Add an additive `CoreError`/`ErrorKind`
-   contract with stable code, category, diagnostic message, and safe details.
-   Construct it at the six semantic failure sources; preserve unknown legacy
-   failures as unclassified/internal. Convert `QueryErrorV2` before any
-   stringification. Do not parse diagnostics to infer categories.
-2. **Preserve existing callers while adapters migrate.** Keep existing
-   `Storage`/Rust and NAPI entry points returning their current error shape as
-   compatibility wrappers. Add typed internal or additive API entry points
-   for REST and NAPI, preserving current `message` and native NAPI `code`
-   behavior. Expose the stable category and code as additional NAPI error
-   properties; do not overload the existing NAPI `code` field.
-3. **Conform all exposed surfaces.** Add representative typed failures and
-   tests for validation, capability, query, conflict, durability, and integrity
-   through direct `Storage`, NAPI, REST, and SDK paths where each is exposed.
-   Verify that legacy message/status fields remain compatible and that
-   unknown failures stay unclassified.
-4. **Decide whether to retire compatibility wrappers.** Only after a major
-   API version or an explicit deprecation cycle should public `Storage` error
-   signatures change. The current public signatures and generated NAPI surface
-   make an in-place replacement a compatibility risk.
-
-The exact categorized call sites must be inventoried before implementation;
-this phase plan is not evidence that embedded/NAPI parity has been implemented.
-Issue #232 remains open until the typed engine boundary and cross-surface
-conformance tests are complete.
+GB-SRS-API-004's additive typed query/transaction path now has category and
+serialization evidence across Core, NAPI, REST, and SDK readers. The wider
+legacy Storage/NAPI method surface has not been migrated to `ApiErrorEnvelopeV1`;
+do not claim that every existing operation has typed category parity. Keep
+issue #232 open until that boundary is accepted or explicitly scoped out.
 
 ## Verification scope
+
+The following passing results are from the earlier REST/SDK baseline at
+`fb58a3e`; they predate the current additive Core/NAPI contract edits and must
+not be presented as verification of the current working tree.
 
 - `cargo check --no-default-features --features bins --bin genesis-db-server`:
   passed.
 - `cargo test --no-default-features --test rest_api_tests`: 47 passed, 0 failed,
-  including the five-category route matrix.
+  including the REST category cases; durability was exercised by the separate
+  handler test below.
 - `cargo test --no-default-features --lib
   recovery_required_write_returns_durability_envelope`: 1 passed, 7 filtered;
   this exercises the recovery-required write route.
@@ -156,7 +159,21 @@ conformance tests are complete.
   job but could not finish because the worktree volume ran out of disk while
   writing `axum` metadata (`os error 112`); no NAPI lint result is claimed.
 
-Passing these checks demonstrates the bounded REST/SDK compatibility behavior
-only; it does not prove native/NAPI category parity, and the unrun Go tests
-remain outstanding verification. Issue #232 stays open for the shared engine
-error type and the remaining SDK verification.
+Current additive Core/NAPI changes are pending verification. Cargo was reserved
+for the serialized #230 suite, so no Cargo command has been run against these
+edits. The NAPI runtime tests now assert direct JS-object results and preserve
+`VERSION_UNSUPPORTED` as a top-level compatibility code beside nested stable
+`GENESIS_VALIDATION_ERROR`; this regression test has not yet run against a
+rebuilt addon. The Go tests also remain unrun locally because the Go toolchain
+is unavailable on PATH. Issue #232 stays open until current-tree Rust/NAPI
+validation, Go test evidence, and the documented legacy embedded boundary are
+reviewed.
+
+The current follow-up edits pass standalone `rustfmt --check` and
+`git diff --check`. Node syntax checks for the d.ts freshness gate and NAPI
+contract test, the Python SDK suite (8 tests, using an in-memory `requests`
+stub because the dependency is not installed), and the d.ts declaration count
+and refined-signature anchors were also checked statically. The added Core
+relational validation test remains unrun until the serialized Cargo slot is
+released. REST/Cargo tests remain pending; Go tests remain pending a Go
+toolchain.

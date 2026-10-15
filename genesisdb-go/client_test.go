@@ -6,6 +6,7 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 )
@@ -183,6 +184,47 @@ func TestAPIErrorFallsBackToLegacyFieldsAndPlainText(t *testing.T) {
 				apiErr.LegacyCode != "QUERY_CAPABILITY_UNSUPPORTED" ||
 				apiErr.Message != "not implemented" {
 				t.Fatalf("unexpected legacy JSON fallback: %#v", apiErr)
+			}
+		})
+	}
+}
+
+func TestAPIErrorReadsAllRequiredCategories(t *testing.T) {
+	cases := []struct {
+		category string
+		code     string
+	}{
+		{"validation", "GENESIS_VALIDATION_ERROR"},
+		{"capability", "GENESIS_CAPABILITY_UNSUPPORTED"},
+		{"query", "GENESIS_QUERY_ERROR"},
+		{"conflict", "GENESIS_CONFLICT"},
+		{"durability", "GENESIS_DURABILITY_ERROR"},
+		{"integrity", "GENESIS_INTEGRITY_ERROR"},
+	}
+	for _, testCase := range cases {
+		testCase := testCase
+		t.Run(testCase.category, func(t *testing.T) {
+			legacyCode := "LEGACY_" + strings.ToUpper(testCase.category)
+			body, err := json.Marshal(map[string]interface{}{
+				"error": map[string]interface{}{
+					"category": testCase.category,
+					"code":     testCase.code,
+					"message":  "nested diagnostic detail",
+					"status":   http.StatusConflict,
+				},
+				"code":    legacyCode,
+				"message": "legacy diagnostic detail",
+			})
+			if err != nil {
+				t.Fatal(err)
+			}
+			apiErr := newAPIError(http.StatusConflict, body)
+			if apiErr.Code != testCase.code ||
+				apiErr.StableCode != testCase.code ||
+				apiErr.LegacyCode != legacyCode ||
+				apiErr.Category != testCase.category ||
+				apiErr.Message != "nested diagnostic detail" {
+				t.Fatalf("unexpected APIError: %#v", apiErr)
 			}
 		})
 	}

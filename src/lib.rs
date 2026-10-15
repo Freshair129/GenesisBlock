@@ -69,6 +69,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use uuid::Uuid;
 
+pub mod api_error;
 #[cfg(feature = "ffi")]
 mod ffi;
 #[cfg(feature = "android-jni")]
@@ -470,8 +471,8 @@ pub struct HybridSearchInput {
 }
 
 pub const QUERY_IR_V1: &str = "query-ir.v1";
-const QUERY_IR_MAX_K: u32 = 1_000;
-const QUERY_IR_MAX_DEPTH: u32 = 32;
+pub(crate) const QUERY_IR_MAX_K: u32 = 1_000;
+pub(crate) const QUERY_IR_MAX_DEPTH: u32 = 32;
 
 const QUERY_BUDGET_DEFAULT_NODES: u64 = 100_000;
 const QUERY_BUDGET_DEFAULT_EDGES: u64 = 200_000;
@@ -518,6 +519,13 @@ impl ResolvedQueryBudget {
 }
 
 impl QueryBudget {
+    /// Validate caller-supplied limits without running a query. REST handlers
+    /// use this typed boundary to return request-validation errors before the
+    /// legacy reason-only execution path.
+    pub(crate) fn validate(&self) -> Result<()> {
+        self.resolve().map(|_| ())
+    }
+
     fn resolve(&self) -> Result<ResolvedQueryBudget> {
         fn positive(name: &str, value: Option<u64>, default: u64) -> Result<u64> {
             match value {
@@ -7572,6 +7580,23 @@ impl Storage {
         result
     }
 
+    /// Additive typed error-contract wrapper for the HQL2/IR-v2 query boundary.
+    /// Legacy `query_v2` keeps returning `QueryErrorV2` unchanged.
+    pub fn query_v2_contract(
+        &self,
+        access: AccessContext,
+        request: uee_v2::QueryRequestV2,
+    ) -> api_error::CoreResult<query::hql2::QueryOutcomeV2> {
+        if self.recovery_required.load(Ordering::SeqCst) {
+            return Err(api_error::ApiErrorEnvelopeV1::durability(
+                "RECOVERY_REQUIRED: reopen database before reading, writing or checkpointing",
+            ));
+        }
+
+        self.query_v2(access, request)
+            .map_err(|error| api_error::ApiErrorEnvelopeV1::from_query_error(&error))
+    }
+
     pub fn publish_generation(&self) -> Result<GenerationInfo> {
         let _commit_guard = self.commit_lock.lock();
         self.ensure_readable()?;
@@ -14424,15 +14449,47 @@ impl Storage {
             .sum()
     }
 
+    /// Legacy transaction API. The original signature and diagnostic strings
+    /// remain available while new callers can use the typed contract below.
     pub fn commit_transaction(&self, input: GenesisTransaction) -> Result<CommitResult> {
+        self.commit_transaction_contract(input)
+            .map_err(|error| Error::from_reason(error.message))
+    }
+
+    /// Additive typed transaction boundary. Categories are selected by
+    /// explicit guards and recovery state; unknown Storage errors stay internal.
+    pub fn commit_transaction_contract(
+        &self,
+        input: GenesisTransaction,
+    ) -> api_error::CoreResult<CommitResult> {
+        if self.recovery_required.load(Ordering::SeqCst) {
+            return Err(api_error::ApiErrorEnvelopeV1::durability(
+                "RECOVERY_REQUIRED: reopen database before reading, writing or checkpointing",
+            ));
+        }
+        self.commit_transaction_typed(input)
+    }
+
+    fn commit_transaction_typed(
+        &self,
+        input: GenesisTransaction,
+    ) -> api_error::CoreResult<CommitResult> {
         self.ensure_writable()?;
         if input.transaction_id.is_empty() || input.transaction_id.len() > 128 {
-            return Err(Error::from_reason("invalid transaction id"));
+            return Err(api_error::ApiErrorEnvelopeV1::validation(
+                "invalid transaction id",
+            ));
         }
         let payload = serde_json::to_vec(&input).map_err(|e| Error::from_reason(e.to_string()))?;
         let payload_hash = hex::encode(Sha256::digest(&payload));
         let _commit_guard = self.commit_lock.lock();
-        self.ensure_readable()?;
+        self.ensure_readable().map_err(|error| {
+            if self.recovery_required.load(Ordering::SeqCst) {
+                api_error::ApiErrorEnvelopeV1::durability(error.to_string())
+            } else {
+                api_error::ApiErrorEnvelopeV1::from(error)
+            }
+        })?;
         {
             let conn = self.projection_db.lock();
             // Idempotent replay returns the stored LOCAL frame seq; legacy rows
@@ -14447,7 +14504,9 @@ impl Storage {
                 .map_err(|e| Error::from_reason(e.to_string()))?;
             if let Some((commit_sequence, existing_hash)) = existing {
                 if existing_hash != payload_hash {
-                    return Err(Error::from_reason("transaction identity conflict"));
+                    return Err(api_error::ApiErrorEnvelopeV1::conflict(
+                        "transaction identity conflict",
+                    ));
                 }
                 return Ok(CommitResult {
                     transaction_id: input.transaction_id,
@@ -14464,33 +14523,67 @@ impl Storage {
             .expected_frontier
             .is_some_and(|expected| expected != frontier)
         {
-            return Err(Error::from_reason("expected frontier conflict"));
+            return Err(api_error::ApiErrorEnvelopeV1::conflict(
+                "expected frontier conflict",
+            ));
         }
         for group in &input.relational {
-            Self::validate_identifier(&group.namespace)?;
+            Self::validate_identifier(&group.namespace)
+                .map_err(|error| api_error::ApiErrorEnvelopeV1::validation(error.to_string()))?;
             let conn = self.projection_db.lock();
-            let schema = Self::load_relational_schema_conn(&conn, &group.namespace)?
-                .ok_or_else(|| Error::from_reason("relational schema is not registered"))?;
+            let schema =
+                Self::load_relational_schema_conn(&conn, &group.namespace)?.ok_or_else(|| {
+                    api_error::ApiErrorEnvelopeV1::new(
+                        api_error::ApiErrorCategory::NotFound,
+                        "relational schema is not registered",
+                    )
+                })?;
             for mutation in &group.mutations {
-                Self::validate_row_mutation(&schema, mutation)?;
+                Self::validate_row_mutation(&schema, mutation).map_err(|error| {
+                    api_error::ApiErrorEnvelopeV1::validation(error.to_string())
+                })?;
                 if self.storage_schema_version == SCHEMA_VERSION {
-                    Self::encode_relational_primary_key_v1(&schema, mutation)?;
+                    Self::encode_relational_primary_key_v1(&schema, mutation).map_err(|error| {
+                        api_error::ApiErrorEnvelopeV1::validation(error.to_string())
+                    })?;
                 }
             }
         }
         for node in &input.graph.nodes {
-            self.validate_governance(&node.labels, false)?;
+            self.validate_governance(&node.labels, false)
+                .map_err(|error| {
+                    api_error::ApiErrorEnvelopeV1::new(
+                        api_error::ApiErrorCategory::Authorization,
+                        error.to_string(),
+                    )
+                })?;
             if let Some(embedding) = &node.embedding {
-                let collection = self.resolve_collection(&node.collection)?;
+                let collection = self.resolve_collection(&node.collection).map_err(|error| {
+                    api_error::ApiErrorEnvelopeV1::new(
+                        api_error::ApiErrorCategory::NotFound,
+                        error.to_string(),
+                    )
+                })?;
                 if embedding.len() != collection.dim as usize {
-                    return Err(Error::from_reason("embedding dimension mismatch"));
+                    return Err(api_error::ApiErrorEnvelopeV1::validation(
+                        "embedding dimension mismatch",
+                    ));
                 }
             }
         }
         for vector in &input.vectors {
-            let collection = self.resolve_collection(&Some(vector.collection.clone()))?;
+            let collection = self
+                .resolve_collection(&Some(vector.collection.clone()))
+                .map_err(|error| {
+                    api_error::ApiErrorEnvelopeV1::new(
+                        api_error::ApiErrorCategory::NotFound,
+                        error.to_string(),
+                    )
+                })?;
             if vector.embedding.len() != collection.dim as usize {
-                return Err(Error::from_reason("embedding dimension mismatch"));
+                return Err(api_error::ApiErrorEnvelopeV1::validation(
+                    "embedding dimension mismatch",
+                ));
             }
         }
 
@@ -14577,10 +14670,20 @@ impl Storage {
             advances_txn_frontier: true,
             record_revision_transaction,
         };
-        let commit_sequence = self.persist(&Event::Transaction(event.clone()))?;
+        let commit_sequence =
+            self.persist(&Event::Transaction(event.clone()))
+                .map_err(|error| {
+                    if self.recovery_required.load(Ordering::SeqCst) {
+                        api_error::ApiErrorEnvelopeV1::durability(error.to_string())
+                    } else {
+                        api_error::ApiErrorEnvelopeV1::from(error)
+                    }
+                })?;
         self.apply_transaction_memory(&event, true, commit_sequence);
-        self.ensure_readable()
-            .map_err(|error| self.durable_apply_error(commit_sequence, error))?;
+        self.ensure_readable().map_err(|error| {
+            let durable_error = self.durable_apply_error(commit_sequence, error);
+            api_error::ApiErrorEnvelopeV1::durability(durable_error.to_string())
+        })?;
         self.txn_frontier.store(commit_sequence, Ordering::SeqCst);
         Ok(CommitResult {
             transaction_id: input.transaction_id,
@@ -26028,6 +26131,34 @@ impl GenesisDatabase {
         .await
         .map_err(|e| Error::from_reason(e.to_string()))?
     }
+    /// Additive versioned JSON error contract for transaction commits. Existing
+    /// `commitTransaction` continues to reject its Promise with legacy errors.
+    #[napi]
+    pub async fn commit_transaction_contract(&self, transaction_json: String) -> Result<Value> {
+        let i = Arc::clone(&self.inner);
+        let value = match tokio::task::spawn_blocking(move || {
+            let transaction = match serde_json::from_str::<GenesisTransaction>(&transaction_json) {
+                Ok(transaction) => transaction,
+                Err(error) => {
+                    return crate::api_error::error_result_value(
+                        crate::api_error::ApiErrorEnvelopeV1::validation(error.to_string()),
+                    );
+                }
+            };
+            match i.commit_transaction_contract(transaction) {
+                Ok(result) => crate::api_error::success_result_value(result),
+                Err(error) => crate::api_error::error_result_value(error),
+            }
+        })
+        .await
+        {
+            Ok(value) => value,
+            Err(error) => crate::api_error::error_result_value(
+                crate::api_error::ApiErrorEnvelopeV1::internal(error.to_string()),
+            ),
+        };
+        Ok(value)
+    }
     /// WP-1.2 REDEFINITION (ADR D2.3, GBP1-noted): the FRAME frontier — the
     /// commit_seq of the last durable journal frame, advancing on EVERY
     /// mutation (previously: last transaction commit_sequence, which is now
@@ -26095,6 +26226,37 @@ impl GenesisDatabase {
         tokio::task::spawn_blocking(move || i.execute_query_ir_json(request))
             .await
             .map_err(|e| Error::from_reason(e.to_string()))?
+    }
+    /// Additive versioned JSON error contract for typed HQL2/Query IR v2.
+    /// `access_json` and `request_json` are decoded as contract inputs; request
+    /// and engine failures are returned in the JSON envelope rather than being
+    /// flattened into a reason-only rejected Promise.
+    #[napi]
+    pub async fn query_v2_contract(
+        &self,
+        access_json: String,
+        request_json: String,
+    ) -> Result<Value> {
+        let i = Arc::clone(&self.inner);
+        let value =
+            match tokio::task::spawn_blocking(move || match crate::api_error::parse_query_v2_input(
+                &access_json,
+                &request_json,
+            ) {
+                Ok((access, request)) => match i.query_v2_contract(access, request) {
+                    Ok(result) => crate::api_error::success_result_value(result),
+                    Err(error) => crate::api_error::error_result_value(error),
+                },
+                Err(error) => crate::api_error::error_result_value(error),
+            })
+            .await
+            {
+                Ok(value) => value,
+                Err(error) => crate::api_error::error_result_value(
+                    crate::api_error::ApiErrorEnvelopeV1::internal(error.to_string()),
+                ),
+            };
+        Ok(value)
     }
     #[napi]
     pub fn query_ir_capabilities(&self) -> Value {
@@ -26501,5 +26663,108 @@ mod p6_sync_progress_receipt_tests {
             ),
             None
         );
+    }
+}
+
+#[cfg(test)]
+mod api_error_contract_tests {
+    use super::*;
+    use tempfile::TempDir;
+
+    fn open_storage(directory: &TempDir) -> Storage {
+        Storage::open(OpenOptions {
+            path: directory.path().to_string_lossy().into_owned(),
+            page_cache_mb: Some(16),
+            read_only: Some(false),
+            vector_dim: Some(2),
+            retention: None,
+        })
+        .unwrap()
+    }
+
+    fn transaction(transaction_id: &str, expected_frontier: Option<u64>) -> GenesisTransaction {
+        GenesisTransaction {
+            transaction_id: transaction_id.into(),
+            expected_frontier,
+            relational: Vec::new(),
+            graph: BatchInput {
+                nodes: Vec::new(),
+                edges: Vec::new(),
+            },
+            vectors: Vec::new(),
+        }
+    }
+
+    fn relational_schema() -> RelationalSchemaPackage {
+        RelationalSchemaPackage {
+            namespace: "typed_contract".into(),
+            schema_version: 1,
+            previous_version: None,
+            package_id: "00000000-0000-4000-8000-000000000002".into(),
+            schema_hash: String::new(),
+            tables: vec![RelationalTable {
+                name: "records".into(),
+                columns: vec![RelationalColumn::required("id", RelationalColumnType::Text)],
+                primary_key: vec!["id".into()],
+                foreign_keys: Vec::new(),
+                indexes: Vec::new(),
+            }],
+            named_queries: Vec::new(),
+        }
+    }
+
+    #[test]
+    fn transaction_contract_maps_explicit_frontier_conflict() {
+        let directory = TempDir::new().unwrap();
+        let storage = open_storage(&directory);
+
+        let error = storage
+            .commit_transaction_contract(transaction("typed-conflict", Some(1)))
+            .unwrap_err();
+
+        assert_eq!(error.category, api_error::ApiErrorCategory::Conflict);
+        assert_eq!(error.code, "GENESIS_CONFLICT");
+        assert_eq!(error.message, "expected frontier conflict");
+    }
+
+    #[test]
+    fn transaction_contract_maps_recovery_guard_to_durability() {
+        let directory = TempDir::new().unwrap();
+        let storage = open_storage(&directory);
+        storage.recovery_required.store(true, Ordering::SeqCst);
+
+        let error = storage
+            .commit_transaction_contract(transaction("typed-durability", None))
+            .unwrap_err();
+
+        assert_eq!(error.category, api_error::ApiErrorCategory::Durability);
+        assert_eq!(error.code, "GENESIS_DURABILITY_ERROR");
+        assert!(error.message.starts_with("RECOVERY_REQUIRED:"));
+    }
+
+    #[test]
+    fn transaction_contract_maps_relational_payload_validation_to_validation() {
+        let directory = TempDir::new().unwrap();
+        let storage = open_storage(&directory);
+        storage
+            .register_relational_schema(relational_schema())
+            .unwrap();
+
+        let mut input = transaction("typed-relational-validation", None);
+        input.relational.push(RelationalMutationGroup {
+            namespace: "typed_contract".into(),
+            mutations: vec![RelationalRowMutation {
+                table: "records".into(),
+                kind: RelationalMutationKind::Insert,
+                values: serde_json::json!({ "id": 17 }),
+                key: None,
+            }],
+        });
+
+        let error = storage.commit_transaction_contract(input).unwrap_err();
+
+        assert_eq!(error.category, api_error::ApiErrorCategory::Validation);
+        assert_eq!(error.code, "GENESIS_VALIDATION_ERROR");
+        assert!(error.message.contains("REL_TYPE_MISMATCH"));
     }
 }

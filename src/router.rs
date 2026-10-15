@@ -16,6 +16,7 @@ use tower_http::limit::RequestBodyLimitLayer;
 use tower_http::trace::TraceLayer;
 
 use crate::{
+    api_error::{ApiErrorCategory, ApiErrorEnvelopeV1, API_ERROR_CONTRACT_V1},
     BatchInput, CollectionInfo, EdgeInput, Event, GenesisTransaction, HybridSearchInput,
     NamedQueryRequest, NodeInput, QueryBudget, QueryInput, QueryIrRequest, RelationalMutationBatch,
     RelationalSchemaPackage, Storage, StudioGraphSceneRequest, SyncPeer,
@@ -168,53 +169,20 @@ where
     }
 }
 
-#[derive(Clone, Copy)]
-enum RestErrorCategory {
-    Validation,
-    Capability,
-    Query,
-    Conflict,
-    Durability,
-    Integrity,
-    Internal,
-    NotFound,
-    Authorization,
-    RateLimit,
-    Unavailable,
-}
+type RestErrorCategory = ApiErrorCategory;
 
-impl RestErrorCategory {
-    fn as_str(self) -> &'static str {
-        match self {
-            Self::Validation => "validation",
-            Self::Capability => "capability",
-            Self::Query => "query",
-            Self::Conflict => "conflict",
-            Self::Durability => "durability",
-            Self::Integrity => "integrity",
-            Self::Internal => "internal",
-            Self::NotFound => "not_found",
-            Self::Authorization => "authorization",
-            Self::RateLimit => "rate_limit",
-            Self::Unavailable => "unavailable",
-        }
-    }
-
-    fn code(self) -> &'static str {
-        match self {
-            Self::Validation => "GENESIS_VALIDATION_ERROR",
-            Self::Capability => "GENESIS_CAPABILITY_UNSUPPORTED",
-            Self::Query => "GENESIS_QUERY_ERROR",
-            Self::Conflict => "GENESIS_CONFLICT",
-            Self::Durability => "GENESIS_DURABILITY_ERROR",
-            Self::Integrity => "GENESIS_INTEGRITY_ERROR",
-            Self::Internal => "GENESIS_INTERNAL_ERROR",
-            Self::NotFound => "GENESIS_NOT_FOUND",
-            Self::Authorization => "GENESIS_UNAUTHORIZED",
-            Self::RateLimit => "GENESIS_RATE_LIMITED",
-            Self::Unavailable => "GENESIS_UNAVAILABLE",
-        }
-    }
+fn response_from_error_envelope(status: StatusCode, mut error: ApiErrorEnvelopeV1) -> Response {
+    error.status = Some(status.as_u16());
+    let message = error.message.clone();
+    (
+        status,
+        Json(serde_json::json!({
+            "contract_version": API_ERROR_CONTRACT_V1,
+            "error": error,
+            "message": message
+        })),
+    )
+        .into_response()
 }
 
 fn rest_error_response(
@@ -222,20 +190,7 @@ fn rest_error_response(
     category: RestErrorCategory,
     message: impl Into<String>,
 ) -> Response {
-    let message = message.into();
-    (
-        status,
-        Json(serde_json::json!({
-            "error": {
-                "category": category.as_str(),
-                "code": category.code(),
-                "message": message.clone(),
-                "status": status.as_u16()
-            },
-            "message": message
-        })),
-    )
-        .into_response()
+    response_from_error_envelope(status, ApiErrorEnvelopeV1::new(category, message))
 }
 
 /// Keep the original top-level `code` and `message` fields on endpoints that
@@ -247,20 +202,22 @@ fn rest_error_response_with_legacy(
     message: impl Into<String>,
 ) -> Response {
     let message = message.into();
+    let mut error = ApiErrorEnvelopeV1::new(category, message.clone());
+    error.status = Some(status.as_u16());
     (
         status,
         Json(serde_json::json!({
-            "error": {
-                "category": category.as_str(),
-                "code": category.code(),
-                "message": message.clone(),
-                "status": status.as_u16()
-            },
+            "contract_version": API_ERROR_CONTRACT_V1,
+            "error": error,
             "code": legacy_code.into(),
             "message": message
         })),
     )
         .into_response()
+}
+
+fn typed_error_response(status: StatusCode, error: ApiErrorEnvelopeV1) -> Response {
+    response_from_error_envelope(status, error)
 }
 
 fn storage_write_error_response(
@@ -525,14 +482,21 @@ async fn transaction_commit_handler(
     ApiJson(transaction): ApiJson<GenesisTransaction>,
 ) -> impl IntoResponse {
     let storage = state.storage.read();
-    match storage.commit_transaction(transaction) {
+    match storage.commit_transaction_contract(transaction) {
         Ok(result) => (StatusCode::OK, Json(result)).into_response(),
-        Err(e) => storage_write_error_response(
-            &storage,
-            StatusCode::CONFLICT,
-            RestErrorCategory::Conflict,
-            e,
-        ),
+        Err(error) => {
+            let status = match error.category {
+                RestErrorCategory::Validation => StatusCode::BAD_REQUEST,
+                RestErrorCategory::Conflict => StatusCode::CONFLICT,
+                RestErrorCategory::Durability | RestErrorCategory::Unavailable => {
+                    StatusCode::SERVICE_UNAVAILABLE
+                }
+                RestErrorCategory::Authorization => StatusCode::FORBIDDEN,
+                RestErrorCategory::NotFound => StatusCode::NOT_FOUND,
+                _ => StatusCode::INTERNAL_SERVER_ERROR,
+            };
+            typed_error_response(status, error)
+        }
     }
 }
 
@@ -878,26 +842,14 @@ fn blocking_query_failure(error: impl std::fmt::Display) -> Response {
 }
 
 fn query_storage_error_response(error: impl std::fmt::Display) -> Response {
-    let message = error.to_string();
-    if message.starts_with("QUERY_BUDGET_") {
-        // Preserve the route's legacy code/status aliases during migration.
-        // The stable category is route-assigned, never inferred from this text.
-        let code = message
-            .split(':')
-            .next()
-            .unwrap_or("QUERY_BUDGET_EXCEEDED")
-            .to_string();
-        return rest_error_response_with_legacy(
-            StatusCode::BAD_REQUEST,
-            RestErrorCategory::Query,
-            code,
-            message,
-        );
-    }
-    rest_error_response(
+    // The legacy Storage result carries diagnostics as reason-only errors.
+    // Preserve the full diagnostic, but map every untyped query failure to a
+    // single safe compatibility code/status instead of parsing that text.
+    rest_error_response_with_legacy(
         StatusCode::INTERNAL_SERVER_ERROR,
         RestErrorCategory::Query,
-        message,
+        "QUERY_EXECUTION_FAILED",
+        error.to_string(),
     )
 }
 
@@ -917,6 +869,16 @@ async fn execute_hql_handler(
             "Engine is rebuilding index...",
         );
     }
+    if let Some(budget) = budget.as_ref() {
+        if let Err(error) = budget.validate() {
+            return rest_error_response_with_legacy(
+                StatusCode::BAD_REQUEST,
+                RestErrorCategory::Validation,
+                "QUERY_BUDGET_INVALID",
+                error.to_string(),
+            );
+        }
+    }
     let storage = Arc::clone(&state.storage);
     let result = tokio::task::spawn_blocking(move || {
         let storage = storage.read();
@@ -935,19 +897,27 @@ fn query_ir_error_response(
     category: RestErrorCategory,
 ) -> axum::response::Response {
     let message = error.to_string();
-    // Keep Query IR's legacy top-level code and HTTP status derivation intact
-    // for existing clients. `category` came from request/route context, not
-    // from the engine's diagnostic string.
+    // Keep the historical top-level code as a compatibility-only alias.
+    // Stable category/code and HTTP status are selected from request semantics,
+    // never from this reason-only diagnostic.
     let candidate = message.split(':').next().unwrap_or("").to_string();
     let code = if candidate.starts_with("QUERY_") {
         candidate
     } else {
         "QUERY_EXECUTION_FAILED".to_string()
     };
-    let status = if code == "QUERY_EXECUTION_FAILED" {
-        StatusCode::INTERNAL_SERVER_ERROR
-    } else {
-        StatusCode::BAD_REQUEST
+    let status = match category {
+        RestErrorCategory::Validation | RestErrorCategory::Capability => StatusCode::BAD_REQUEST,
+        RestErrorCategory::Conflict => StatusCode::CONFLICT,
+        RestErrorCategory::Durability | RestErrorCategory::Unavailable => {
+            StatusCode::SERVICE_UNAVAILABLE
+        }
+        RestErrorCategory::Authorization => StatusCode::UNAUTHORIZED,
+        RestErrorCategory::NotFound => StatusCode::NOT_FOUND,
+        RestErrorCategory::RateLimit => StatusCode::TOO_MANY_REQUESTS,
+        RestErrorCategory::Query | RestErrorCategory::Integrity | RestErrorCategory::Internal => {
+            StatusCode::INTERNAL_SERVER_ERROR
+        }
     };
     rest_error_response_with_legacy(status, category, code, message)
 }
@@ -1012,12 +982,144 @@ fn query_ir_request_uses_unsupported_capability(request: &serde_json::Value) -> 
 fn query_ir_error_category(request: &serde_json::Value) -> RestErrorCategory {
     // Use the same typed request contract as the core to classify malformed
     // Query IR shapes without inspecting its reason-only error text.
-    if serde_json::from_value::<QueryIrRequest>(request.clone()).is_err() {
+    let typed_request = match serde_json::from_value::<QueryIrRequest>(request.clone()) {
+        Ok(request) => request,
+        Err(_) => return RestErrorCategory::Validation,
+    };
+    if typed_request.contract_version != crate::QUERY_IR_V1
+        || typed_request.request_id.trim().is_empty()
+    {
+        RestErrorCategory::Validation
+    } else if typed_request.namespace.is_some() {
+        RestErrorCategory::Capability
+    } else if typed_request
+        .budget
+        .as_ref()
+        .is_some_and(|budget| budget.validate().is_err())
+    {
         RestErrorCategory::Validation
     } else if query_ir_request_uses_unsupported_capability(request) {
         RestErrorCategory::Capability
+    } else if query_ir_operation_has_invalid_input(&typed_request.operation) {
+        RestErrorCategory::Validation
     } else {
         RestErrorCategory::Query
+    }
+}
+
+fn query_ir_pattern_field_is_invalid(field: &crate::QueryIrPatternField) -> bool {
+    field.var.trim().is_empty()
+        || field.field.as_deref().is_some_and(|raw| {
+            let normalized = raw.to_ascii_lowercase();
+            !matches!(
+                normalized.as_str(),
+                "id" | "label" | "score" | "depth" | "recorded_at"
+            ) && !normalized
+                .strip_prefix("prop.")
+                .is_some_and(|property| !property.is_empty())
+        })
+}
+
+fn query_ir_node_pattern_is_invalid(node: &crate::QueryIrNodePattern) -> bool {
+    node.var
+        .as_deref()
+        .is_some_and(|value| value.trim().is_empty())
+        || node
+            .label
+            .as_deref()
+            .is_some_and(|value| value.trim().is_empty())
+        || node
+            .props
+            .iter()
+            .any(|property| property.key.trim().is_empty())
+}
+
+fn query_ir_edge_pattern_is_invalid(edge: &crate::QueryIrEdgePattern) -> bool {
+    edge.var
+        .as_deref()
+        .is_some_and(|value| value.trim().is_empty())
+        || edge
+            .rel_type
+            .as_deref()
+            .is_some_and(|value| value.trim().is_empty())
+}
+
+fn query_ir_operation_has_invalid_input(operation: &crate::QueryIrOperation) -> bool {
+    match operation {
+        crate::QueryIrOperation::Search {
+            target_id,
+            query_vector,
+            k,
+            alpha,
+            ef_search,
+            oversample,
+            ..
+        } => {
+            *k == 0
+                || *k > crate::QUERY_IR_MAX_K
+                || alpha
+                    .as_ref()
+                    .is_some_and(|value| !value.is_finite() || !(0.0..=1.0).contains(value))
+                || ef_search.as_ref().is_some_and(|value| *value == 0)
+                || oversample.as_ref().is_some_and(|value| *value == 0)
+                || target_id.is_some() == query_vector.is_some()
+                || query_vector.as_ref().is_some_and(|vector| {
+                    vector.is_empty() || vector.iter().any(|v| !v.is_finite())
+                })
+        }
+        crate::QueryIrOperation::Traverse {
+            seed_id,
+            depth,
+            relations,
+            ..
+        } => {
+            seed_id.trim().is_empty()
+                || *depth == 0
+                || *depth > crate::QUERY_IR_MAX_DEPTH
+                || relations.is_empty()
+                || relations.iter().any(|relation| relation.trim().is_empty())
+        }
+        crate::QueryIrOperation::Context {
+            target_id,
+            tier,
+            budget,
+            ..
+        } => {
+            target_id
+                .as_deref()
+                .map_or(true, |target| target.trim().is_empty())
+                || !matches!(
+                    tier.as_str(),
+                    "H0" | "H1" | "H2" | "H3" | "H4" | "H5" | "H6"
+                )
+                || budget.as_ref().is_some_and(|value| *value == 0)
+        }
+        crate::QueryIrOperation::MatchPath {
+            pattern,
+            limit,
+            where_preds,
+            order_by,
+            ret,
+        } => {
+            *limit == 0
+                || query_ir_node_pattern_is_invalid(&pattern.start)
+                || pattern.hops.iter().any(|hop| {
+                    query_ir_edge_pattern_is_invalid(&hop.edge)
+                        || query_ir_node_pattern_is_invalid(&hop.node)
+                })
+                || where_preds
+                    .iter()
+                    .any(|predicate| query_ir_pattern_field_is_invalid(&predicate.field))
+                || order_by
+                    .as_ref()
+                    .is_some_and(|order| query_ir_pattern_field_is_invalid(&order.field))
+                || ret.as_ref().is_some_and(|value| match value {
+                    crate::QueryIrPatternReturn::All => false,
+                    crate::QueryIrPatternReturn::Fields { fields } => {
+                        fields.iter().any(query_ir_pattern_field_is_invalid)
+                    }
+                })
+        }
     }
 }
 
@@ -1567,5 +1669,45 @@ mod error_contract_tests {
             .as_str()
             .unwrap_or_default()
             .is_empty());
+    }
+
+    #[tokio::test]
+    async fn typed_transaction_contract_returns_durability_envelope() {
+        let directory = TempDir::new().unwrap();
+        let storage = Storage::open(crate::OpenOptions {
+            path: directory.path().to_string_lossy().into_owned(),
+            page_cache_mb: Some(16),
+            read_only: Some(false),
+            vector_dim: Some(2),
+            retention: None,
+        })
+        .unwrap();
+        storage.recovery_required.store(true, Ordering::SeqCst);
+        let app = build_router(AppState {
+            storage: Arc::new(RwLock::new(storage)),
+            api_key: None,
+            query_admission: Arc::new(Semaphore::new(DEFAULT_QUERY_ADMISSION)),
+        });
+
+        let request = Request::builder()
+            .method("POST")
+            .uri("/v1/transaction/commit")
+            .header(header::CONTENT_TYPE, "application/json")
+            .body(Body::from(
+                r#"{"transaction_id":"typed-durability","expected_frontier":null,"relational":[],"graph":{"nodes":[],"edges":[]},"vectors":[]}"#,
+            ))
+            .unwrap();
+        let response = app.oneshot(request).await.unwrap();
+        assert_eq!(response.status(), StatusCode::SERVICE_UNAVAILABLE);
+        let bytes = response.into_body().collect().await.unwrap().to_bytes();
+        let body: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
+        assert_eq!(body["contract_version"], API_ERROR_CONTRACT_V1);
+        assert_eq!(body["error"]["category"], "durability");
+        assert_eq!(body["error"]["code"], "GENESIS_DURABILITY_ERROR");
+        assert_eq!(body["error"]["status"], 503);
+        assert!(body["error"]["message"]
+            .as_str()
+            .unwrap_or_default()
+            .starts_with("RECOVERY_REQUIRED:"));
     }
 }
