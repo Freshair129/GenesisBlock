@@ -1,0 +1,658 @@
+{
+  "schemaVersion": 1,
+  "artifactType": "planning-overlay",
+  "id": "QUERY-IR-W1-EFFECTIVE-20261010",
+  "dispatchAuthorized": false,
+  "authorizationScope": "Guard hardening and synthetic pilot approved; W1 implementation remains disabled",
+  "sourceDigestEncoding": "utf8-lf",
+  "sources": [
+    {
+      "path": "queue/QUERY_IR_W1_IMPLEMENTATION_QUEUE.json",
+      "sha256": "bfbcd3313592e77dead1bc7f84d581743a001073e763cc968922902dfd742eea"
+    },
+    {
+      "path": "queue/QUERY_IR_W1_PROJECT_GRAPH.json",
+      "sha256": "730d6d69bac09a687211fbc9d3e9a55afcb2d0c38b732b5d5e75235d2378f802"
+    }
+  ],
+  "historicalDeclaredSourceSha": "987bf32507af6e1f9cc612385db093b4358996ed",
+  "supersedes": [
+    "Historical model assignments only: user selects Luna Max execution/Verify/Review and Sol Decision/Integration/Audit/Orchestration",
+    "Task contradictions corrected by explicit K1/I1/A1 gates and owner/reopening rules"
+  ],
+  "tasks": [
+    {
+      "id": "P0",
+      "title": "Reconcile architecture docs and publish proposed W1 queue/graph",
+      "deps": [],
+      "writePaths": [
+        "docs/SPEC--GENESISDB-G3-EXACT-ORACLE-AND-RECOVERY.md",
+        "docs/P7.1-G3-RECOVERY-EXECUTION-DAG.html",
+        ".brain/rca/RCA--G3-WAL-ONLY-RECOVERY-PROOF-GAP.md",
+        "docs/MASTER_PLAN.md",
+        "queue/QUERY_IR_W1_IMPLEMENTATION_QUEUE.json",
+        "queue/QUERY_IR_W1_PROJECT_GRAPH.json"
+      ],
+      "execution": {
+        "role": "orchestrator",
+        "model": "gpt-6.1-sol",
+        "reasoningEffort": "high"
+      },
+      "dispatchAuthorized": false,
+      "verifyCommandsToMaterialize": [
+        "npm run docs:validate",
+        "git diff --check"
+      ],
+      "acceptance": "Parent/peer documents agree, the prior G3 baseline is reconciled, and the replacement queue/graph are explicitly non-dispatchable."
+    },
+    {
+      "id": "G0",
+      "title": "Owner approval of W1 plan and architecture boundary",
+      "deps": [
+        "P0"
+      ],
+      "writePaths": [],
+      "execution": {
+        "role": "decision",
+        "model": "gpt-6.1-sol",
+        "reasoningEffort": "high"
+      },
+      "dispatchAuthorized": false,
+      "verifyCommandsToMaterialize": [
+        "Explicit approval of the exact proposed queue/graph and non-goals"
+      ],
+      "acceptance": "Plan approval recorded; this gate alone does not authorize code dispatch."
+    },
+    {
+      "id": "D0",
+      "title": "Separate owner authorization to dispatch W1 implementation",
+      "deps": [
+        "G0"
+      ],
+      "writePaths": [],
+      "execution": {
+        "role": "decision",
+        "model": "gpt-6.1-sol",
+        "reasoningEffort": "high"
+      },
+      "dispatchAuthorized": false,
+      "verifyCommandsToMaterialize": [
+        "Explicit code-dispatch authorization after G0"
+      ],
+      "acceptance": "Worker tasks may start only after this separate authorization."
+    },
+    {
+      "id": "S1",
+      "title": "Freeze standalone Query IR V1 schema and schema-validation gate",
+      "deps": [
+        "K1"
+      ],
+      "writePaths": [
+        "docs/contracts/query-ir.v1.schema.json",
+        "package.json",
+        "package-lock.json",
+        "__test__/query_ir_schema.test.mjs"
+      ],
+      "execution": {
+        "role": "worker",
+        "model": "gpt-6-luna",
+        "reasoningEffort": "max"
+      },
+      "dispatchAuthorized": false,
+      "verifyCommandsToMaterialize": [
+        "node --test __test__/query_ir_schema.test.mjs"
+      ],
+      "acceptance": "Closed schema validates valid/invalid envelopes and rejects unknown fields; dependency diff is test-only."
+    },
+    {
+      "id": "F1",
+      "title": "Add shared V1 request/response conformance fixture matrix",
+      "deps": [
+        "S1"
+      ],
+      "writePaths": [
+        "tests/fixtures/query_ir_v1.json",
+        "__test__/query_ir_schema.test.mjs"
+      ],
+      "execution": {
+        "role": "worker",
+        "model": "gpt-6-luna",
+        "reasoningEffort": "max"
+      },
+      "dispatchAuthorized": false,
+      "verifyCommandsToMaterialize": [
+        "node --test __test__/query_ir_schema.test.mjs"
+      ],
+      "acceptance": "Fixture containers validate; positive requests are schema-valid, schema-invalid requests are rejected, and valid-but-unsupported requests yield the specified typed error. Never require every negative request to validate.",
+      "reopen": "A normative mismatch returns to K1 and a new approved plan revision; revalidate S1 and every dependent task."
+    },
+    {
+      "id": "C0",
+      "title": "Characterize core executor and budget behavior with contract tests",
+      "deps": [
+        "F1"
+      ],
+      "writePaths": [
+        "tests/query_ir_tests.rs",
+        "tests/wave_d_budget_tests.rs"
+      ],
+      "execution": {
+        "role": "worker",
+        "model": "gpt-6-luna",
+        "reasoningEffort": "max"
+      },
+      "dispatchAuthorized": false,
+      "verifyCommandsToMaterialize": [
+        "cargo test --locked --no-default-features --test query_ir_tests --test wave_d_budget_tests"
+      ],
+      "acceptance": "Record every case as expected GREEN or a specifically approved expected RED; RED acceptance is characterization only, never an integrated GREEN result.",
+      "kind": "characterization"
+    },
+    {
+      "id": "C1",
+      "title": "Apply minimal core corrections only for verified C0 failures",
+      "deps": [
+        "C0"
+      ],
+      "writePaths": [
+        "src/lib.rs",
+        ".brain/rca/RCA--W1-Typed-Query-IR-Conformance.md"
+      ],
+      "execution": {
+        "role": "worker",
+        "model": "gpt-6-luna",
+        "reasoningEffort": "max"
+      },
+      "dispatchAuthorized": false,
+      "verifyCommandsToMaterialize": [
+        "cargo test --locked --no-default-features --test query_ir_tests --test wave_d_budget_tests",
+        "cargo fmt --all -- --check"
+      ],
+      "acceptance": "Core contract tests pass; every behavior change has an evidence-backed RCA and remains within accepted V1."
+    },
+    {
+      "id": "H1",
+      "title": "Test HQL compatibility and route production findings to the source owner",
+      "deps": [
+        "C1"
+      ],
+      "writePaths": [
+        "tests/hql_p0_tests.rs",
+        "tests/hql_collection_tests.rs",
+        "tests/hql_cypher_tests.rs",
+        "tests/wave_e_context_tests.rs"
+      ],
+      "execution": {
+        "role": "worker",
+        "model": "gpt-6-luna",
+        "reasoningEffort": "max"
+      },
+      "dispatchAuthorized": false,
+      "verifyCommandsToMaterialize": [
+        "cargo test --locked --no-default-features --test hql_p0_tests --test hql_collection_tests --test hql_cypher_tests --test wave_e_context_tests"
+      ],
+      "acceptance": "Existing HQL supported paths preserve semantics; legacy fallback behavior remains intact.",
+      "correctionOwner": {
+        "src/lib.rs": "C1",
+        "src/query/ast.rs": "new Sol Decision scope required",
+        "src/query/hql.pest": "new Sol Decision scope required"
+      }
+    },
+    {
+      "id": "R1",
+      "title": "Verify REST request/result/error-envelope conformance",
+      "deps": [
+        "C1"
+      ],
+      "writePaths": [
+        "src/router.rs",
+        "tests/rest_api_tests.rs",
+        "tests/wave_e_rest_tests.rs"
+      ],
+      "execution": {
+        "role": "worker",
+        "model": "gpt-6-luna",
+        "reasoningEffort": "max"
+      },
+      "dispatchAuthorized": false,
+      "verifyCommandsToMaterialize": [
+        "cargo check --locked --no-default-features --features bins --bin genesis-db-server",
+        "cargo test --locked --no-default-features --test rest_api_tests --test wave_e_rest_tests"
+      ],
+      "acceptance": "REST matches the accepted schema, capability declarations, typed failures, and core results.",
+      "fixtureOwner": "F1; reopening creates a revised plan and invalidates dependent evidence; R1 cannot edit shared fixtures"
+    },
+    {
+      "id": "N1",
+      "title": "Verify N-API and TypeScript conformance after HQL/REST baselines",
+      "deps": [
+        "H1",
+        "R1"
+      ],
+      "writePaths": [
+        "index.d.ts",
+        "index.js",
+        "__test__/query_ir.test.mjs",
+        "tests/napi_rest_parity_tests.rs",
+        "scripts/check-dts-freshness.mjs",
+        "src/lib.rs"
+      ],
+      "execution": {
+        "role": "worker",
+        "model": "gpt-6-luna",
+        "reasoningEffort": "max"
+      },
+      "dispatchAuthorized": false,
+      "verifyCommandsToMaterialize": [
+        "cargo test --locked --no-default-features --test napi_rest_parity_tests",
+        "npm run build",
+        "node scripts/check-dts-freshness.mjs <preserved-committed-dir> <generated-dir>",
+        "node --test __test__/query_ir.test.mjs"
+      ],
+      "acceptance": "N-API results/errors match REST and TypeScript declarations accurately describe discriminated operation/result envelopes; generated artifacts are freshness-checked."
+    },
+    {
+      "id": "X1",
+      "title": "Audit declared SDK and MCP consumer support (evidence-only)",
+      "deps": [
+        "C1"
+      ],
+      "writePaths": [],
+      "execution": {
+        "role": "audit",
+        "model": "gpt-6.1-sol",
+        "reasoningEffort": "high"
+      },
+      "dispatchAuthorized": false,
+      "verifyCommandsToMaterialize": [
+        "(genesisdb-python) python -m unittest discover -s tests -p test_client_contract.py",
+        "(genesisdb-go) go test ./...",
+        "(repository root) node --test __test__/mcp.test.mjs"
+      ],
+      "acceptance": "Record supported, partial, unsupported, and NOT_RUN per consumer; do not add adapter scope or modify SDK/MCP files in this task."
+    },
+    {
+      "id": "V",
+      "title": "Integrated Verify Gate on one immutable candidate SHA",
+      "deps": [
+        "I1"
+      ],
+      "writePaths": [],
+      "execution": {
+        "role": "verify",
+        "model": "gpt-6-luna",
+        "reasoningEffort": "max"
+      },
+      "dispatchAuthorized": false,
+      "verifyCommandsToMaterialize": [
+        "node --test __test__/query_ir_schema.test.mjs",
+        "npm run build",
+        "cargo test --locked --no-default-features",
+        "npm test",
+        "cargo clippy --no-default-features --all-targets -- -D warnings",
+        "cargo clippy --all-targets -- -D warnings",
+        "cargo fmt --all -- --check",
+        "node scripts/check-dts-freshness.mjs <preserved-committed-dir> <generated-dir>",
+        "npm run docs:validate",
+        "git diff --check"
+      ],
+      "acceptance": "All required gates pass on the same candidate SHA; every skip/failure is explained and cannot be promoted to PASS."
+    },
+    {
+      "id": "RV",
+      "title": "Independent architecture and diff Review Gate",
+      "deps": [
+        "V"
+      ],
+      "writePaths": [],
+      "execution": {
+        "role": "review",
+        "model": "gpt-6-luna",
+        "reasoningEffort": "max"
+      },
+      "dispatchAuthorized": false,
+      "verifyCommandsToMaterialize": [
+        "Review changed files, acceptance mapping, task write sets, and exact Verify evidence"
+      ],
+      "acceptance": "Independent Luna Max Review on the exact integrated candidate, after Verify PASS; no author or integrator self-review."
+    },
+    {
+      "id": "D1",
+      "title": "Reconcile final implementation and evidence into canonical docs",
+      "deps": [
+        "N1",
+        "X1"
+      ],
+      "writePaths": [
+        "docs/MASTER_PLAN.md",
+        "docs/SPEC--GENESISDB-TYPED-QUERY-IR-V1.md",
+        "queue/QUERY_IR_W1_IMPLEMENTATION_QUEUE.json",
+        "queue/QUERY_IR_W1_PROJECT_GRAPH.json"
+      ],
+      "execution": {
+        "role": "worker",
+        "model": "gpt-6-luna",
+        "reasoningEffort": "max"
+      },
+      "dispatchAuthorized": false,
+      "verifyCommandsToMaterialize": [
+        "npm run docs:validate",
+        "git diff --check"
+      ],
+      "acceptance": "Freeze normative docs, scope and expected evidence inventory before integration; record final PASS and run receipts outside the candidate tree."
+    },
+    {
+      "id": "FG",
+      "title": "Final Gate: acceptance, provenance, scope, and merge readiness",
+      "deps": [
+        "A1"
+      ],
+      "writePaths": [],
+      "execution": {
+        "role": "orchestrator",
+        "model": "gpt-6.1-sol",
+        "reasoningEffort": "high"
+      },
+      "dispatchAuthorized": false,
+      "verifyCommandsToMaterialize": [
+        "Recheck acceptance criteria, immutable candidate SHA, Verify PASS, Astra Review PASS, docs consistency, and merge-order compliance"
+      ],
+      "acceptance": "Fresh independent Verify, Review, final Audit and integration receipts bind one candidate; all required AC pass and no blocking findings remain. Completion does not authorize merge or release."
+    },
+    {
+      "id": "K1",
+      "title": "Resolve normative contracts and enumerate case-level AC",
+      "deps": [
+        "D0"
+      ],
+      "writePaths": [],
+      "execution": {
+        "role": "decision",
+        "model": "gpt-6.1-sol",
+        "reasoningEffort": "high"
+      },
+      "dispatchAuthorized": false,
+      "acceptance": "Pin each bound/default/error mapping and expected outcome before S1; every case has a required flag and exact command identity."
+    },
+    {
+      "id": "I1",
+      "title": "Assemble immutable candidate and integration provenance",
+      "deps": [
+        "D1"
+      ],
+      "writePaths": [],
+      "execution": {
+        "role": "integration",
+        "model": "gpt-6.1-sol",
+        "reasoningEffort": "high"
+      },
+      "dispatchAuthorized": false,
+      "acceptance": "Record ordered task commits, tree/source digests and atomic C0+C1 GREEN closure; no unverified generated or documentation changes remain."
+    },
+    {
+      "id": "A1",
+      "title": "Independent final scope and provenance audit",
+      "deps": [
+        "RV"
+      ],
+      "writePaths": [],
+      "execution": {
+        "role": "audit",
+        "model": "gpt-6.1-sol",
+        "reasoningEffort": "high"
+      },
+      "dispatchAuthorized": false,
+      "acceptance": "Separate Sol session checks effective AC, source and artifact hashes, all receipts, scope and remaining NOT_RUN items; consumer audit X1 cannot substitute."
+    }
+  ],
+  "graph": {
+    "nodes": [
+      "P0",
+      "G0",
+      "D0",
+      "S1",
+      "F1",
+      "C0",
+      "C1",
+      "H1",
+      "R1",
+      "N1",
+      "X1",
+      "V",
+      "RV",
+      "D1",
+      "FG",
+      "K1",
+      "I1",
+      "A1"
+    ],
+    "edges": [
+      [
+        "P0",
+        "G0"
+      ],
+      [
+        "G0",
+        "D0"
+      ],
+      [
+        "K1",
+        "S1"
+      ],
+      [
+        "S1",
+        "F1"
+      ],
+      [
+        "F1",
+        "C0"
+      ],
+      [
+        "C0",
+        "C1"
+      ],
+      [
+        "C1",
+        "H1"
+      ],
+      [
+        "C1",
+        "R1"
+      ],
+      [
+        "H1",
+        "N1"
+      ],
+      [
+        "R1",
+        "N1"
+      ],
+      [
+        "C1",
+        "X1"
+      ],
+      [
+        "I1",
+        "V"
+      ],
+      [
+        "V",
+        "RV"
+      ],
+      [
+        "N1",
+        "D1"
+      ],
+      [
+        "X1",
+        "D1"
+      ],
+      [
+        "A1",
+        "FG"
+      ],
+      [
+        "D0",
+        "K1"
+      ],
+      [
+        "D1",
+        "I1"
+      ],
+      [
+        "RV",
+        "A1"
+      ]
+    ]
+  },
+  "acceptance": [
+    {
+      "id": "W1-AC-01",
+      "required": true,
+      "criterion": "A standalone closed Draft 2020-12 schema and shared fixtures define supported V1 envelopes without widening approved semantics.",
+      "tasks": [
+        "K1",
+        "S1",
+        "F1"
+      ]
+    },
+    {
+      "id": "W1-AC-02",
+      "required": true,
+      "criterion": "Existing supported operation behavior is tested against the accepted schema and truthful capability declarations across core, HQL, REST, and N-API.",
+      "tasks": [
+        "C0",
+        "C1",
+        "H1",
+        "R1",
+        "N1"
+      ]
+    },
+    {
+      "id": "W1-AC-03",
+      "required": true,
+      "criterion": "Unsupported capabilities, including relational_named_query, reject explicitly with stable typed errors and without semantic degradation.",
+      "tasks": [
+        "F1",
+        "C0",
+        "R1",
+        "N1"
+      ]
+    },
+    {
+      "id": "W1-AC-04",
+      "required": true,
+      "criterion": "Bounds, defaults, capability reporting, and error mappings in the shared fixtures are sourced from explicit contract decisions rather than inferred implementation values.",
+      "tasks": [
+        "K1",
+        "F1"
+      ]
+    },
+    {
+      "id": "W1-AC-05",
+      "required": true,
+      "criterion": "Existing HQL fallback behavior remains unchanged unless an accepted test proves a contract mismatch.",
+      "tasks": [
+        "H1"
+      ]
+    },
+    {
+      "id": "W1-AC-06",
+      "required": true,
+      "criterion": "Focused and full required tests pass on the same candidate SHA; skipped work is reported as unverified.",
+      "tasks": [
+        "I1",
+        "V"
+      ]
+    },
+    {
+      "id": "W1-AC-07",
+      "required": true,
+      "criterion": "Independent Luna Max Review and separate Sol final provenance/scope Audit pass on the integrated candidate; canonical docs and external receipts identify evidence and remaining NOT_RUN items.",
+      "tasks": [
+        "RV",
+        "A1",
+        "FG"
+      ]
+    },
+    {
+      "id": "W1-AC-08",
+      "required": true,
+      "criterion": "W1 claims conformance only for verified surfaces; the overall accepted spec remains partial while broader SDK/MCP/NL-adapter gates remain incomplete.",
+      "tasks": [
+        "X1",
+        "D1",
+        "A1"
+      ]
+    }
+  ],
+  "atomicIntegrationGroups": [
+    {
+      "tasks": [
+        "C0",
+        "C1"
+      ],
+      "requiredOutcome": "green",
+      "neverMergeRedAlone": true
+    }
+  ],
+  "materializationBlocks": [
+    "Record owner W1 scope and dispatch authorization for the exact immutable execution plan",
+    "K1 resolves per-case normative decisions and maps required AC to allowlisted executable/argv/cwd commands",
+    "Pin baseline/candidate, concrete task and command deadlines, command budgets and all source/artifact identities",
+    "Create isolated workspaces and external run ledger; register actual provider session receipts through the trusted coordinator",
+    "Compile to SPEC--EXECUTION-DAG-GUARD-V1 closed schema and pass validatePlan before dispatch"
+  ],
+  "parallelWaves": [
+    [
+      "P0"
+    ],
+    [
+      "G0"
+    ],
+    [
+      "D0"
+    ],
+    [
+      "K1"
+    ],
+    [
+      "S1"
+    ],
+    [
+      "F1"
+    ],
+    [
+      "C0"
+    ],
+    [
+      "C1"
+    ],
+    [
+      "H1",
+      "R1",
+      "X1"
+    ],
+    [
+      "N1"
+    ],
+    [
+      "D1"
+    ],
+    [
+      "I1"
+    ],
+    [
+      "V"
+    ],
+    [
+      "RV"
+    ],
+    [
+      "A1"
+    ],
+    [
+      "FG"
+    ]
+  ]
+}

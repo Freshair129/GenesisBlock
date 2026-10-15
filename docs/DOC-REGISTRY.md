@@ -2,8 +2,8 @@
 title: "GenesisBlockDB Document Registry"
 doc_id: "DOC-REGISTRY-GENESISBLOCKDB"
 status: draft
-version: "0.5.93+draft"
-updated: "2026-10-06"
+version: "0.5.99+draft"
+updated: "2026-10-10"
 owner: "GenesisBlockDB Architecture"
 source_of_truth: true
 related_issue: 84
@@ -52,14 +52,15 @@ registry row explicitly names them.
 
 | Role | Doc ID | Version | Status | Owner | Path |
 |---|---|---|---|---|---|
-| Architecture composition | `MASTER-SPEC-GENESISBLOCKDB` | `2.3.42b` | current | GenesisBlockDB Architecture | `docs/MASTER-SPEC--GENESIS-DB.md` |
-| Architecture index | `C4--GENESISDB-ARCHITECTURE` | `0.1.71b` | current | GenesisBlockDB Architecture | `docs/C4--GENESISDB-ARCHITECTURE.md` |
+| Architecture composition | `MASTER-SPEC-GENESISBLOCKDB` | `2.3.43b` | current | GenesisBlockDB Architecture | `docs/MASTER-SPEC--GENESIS-DB.md` |
+| Architecture index | `C4--GENESISDB-ARCHITECTURE` | `0.1.73b` | current | GenesisBlockDB Architecture | `docs/C4--GENESISDB-ARCHITECTURE.md` |
+| Execution DAG guard | `SPEC--EXECUTION-DAG-GUARD-V1` | `0.1.0` | accepted | Sol Decision / Contract and AC | `docs/SPEC--EXECUTION-DAG-GUARD-V1.md` |
 | HQL2 execution decision | `ADR--GENESISDB-HQL2-EXECUTION-BOUNDARY` | `0.1.1b` | accepted | Boss (Founder / Product Authority) | `docs/adr/ADR--GENESISDB-HQL2-EXECUTION-BOUNDARY.md` |
 | HQL2 G4 shared-pipeline contract | `ADR--GENESISDB-HQL2-G4-SHARED-PIPELINE` | `0.1.3b` | active | Boss (Founder / Product Authority) | `docs/adr/ADR--GENESISDB-HQL2-G4-SHARED-PIPELINE.md` |
 | HQL2 P8 completion addendum | `ADR--GENESISDB-HQL2-P8-COMPLETION-ADDENDUM` | `0.1.14b` | accepted | Boss (Founder / Product Authority) | `docs/adr/ADR--GENESISDB-HQL2-P8-COMPLETION-ADDENDUM.md` |
 | HQL2 Sequence pattern constraints | `ADR--GENESISDB-HQL2-PATTERN-CONSTRAINTS` | `0.2.1b` | beta | Boss (Founder / Product Authority) | `docs/adr/ADR--GENESISDB-HQL2-PATTERN-CONSTRAINTS.md` |
 | HQL2 durable revisions and annotations | `ADR--GENESISDB-HQL2-DURABLE-REVISIONS-ANNOTATIONS` | `0.8.27b` | beta | Boss (Founder / Product Authority) | `docs/adr/ADR--GENESISDB-HQL2-DURABLE-REVISIONS-ANNOTATIONS.md` |
-| UEE-HQL2 orchestration plan | `IMPLEMENTATION-PLAN--UEE-HQL2-ORCHESTRATION-2026-09-22` | `0.8.77b` | beta | Boss (Founder / Product Authority) | `docs/IMPLEMENTATION-PLAN--UEE-HQL2-ORCHESTRATION-2026-09-22.md` |
+| UEE-HQL2 orchestration plan | `IMPLEMENTATION-PLAN--UEE-HQL2-ORCHESTRATION-2026-09-22` | `0.8.78b` | beta | Boss (Founder / Product Authority) | `docs/IMPLEMENTATION-PLAN--UEE-HQL2-ORCHESTRATION-2026-09-22.md` |
 | HQL2 typed P8 boundary | `SPEC--GENESISDB-HQL2-P8-TYPED-BOUNDARY` | `0.2.65b` | beta | Boss (Founder / Product Authority) | `docs/SPEC--GENESISDB-HQL2-P8-TYPED-BOUNDARY.md` |
 | HQL2 P8 core checkpoint | `REPORT--HQL2-P8-CORE-2026-09-28` | `0.1.69b` | beta | GenesisBlockDB Engineering | `docs/REPORT--HQL2-P8-CORE-2026-09-28.md` |
 | HQL2 P7 bounded oracle evidence | `REPORT--HQL2-P7-ORACLE-2026-09-28` | `0.1.12b` | beta | GenesisBlockDB Engineering | `docs/REPORT--HQL2-P7-ORACLE-2026-09-28.md` |
@@ -76,9 +77,9 @@ registry row explicitly names them.
 | Query contract | `SPEC-GENESISDB-TYPED-QUERY-IR-V1` | `1.0.3` | accepted | GenesisBlockDB Architecture | `docs/SPEC--GENESISDB-TYPED-QUERY-IR-V1.md` |
 | Client contract | `CONTRACT-CLIENT-NAMESPACE-AND-SCHEMA` | `0.1.0+draft` | draft | GenesisBlockDB Engineering | `docs/contracts/CONTRACT--CLIENT-NAMESPACE-AND-SCHEMA.md` |
 | API reference | `API_REFERENCE` | generated | current | GenesisBlockDB Engineering | `docs/API_REFERENCE.md` |
-| GenesisRAG17 integration ADR | `ADR-GENESISRAG17-SEPARATE-WORKER-PUBLICATION` | `1.0.5b` | beta | GenesisBlockDB Architecture | `docs/ADR--GENESISRAG17-SEPARATE-WORKER-PUBLICATION.md` |
+| GenesisRAG17 integration ADR | `ADR-GENESISRAG17-SEPARATE-WORKER-PUBLICATION` | `1.0.8b` | beta | GenesisBlockDB Architecture | `docs/ADR--GENESISRAG17-SEPARATE-WORKER-PUBLICATION.md` |
 | GenesisRAG17 execution flow | `FLOW-GENESISRAG17-PIPELINE` | `1.0.3b` | beta | GenesisBlockDB Architecture | `docs/FLOW--GENESISRAG17-PIPELINE.md` |
-| GenesisRAG17 extension map | `MAP-GENESISRAG17-EXTENSIONS` | `1.0.3b` | beta | GenesisBlockDB Architecture | `docs/GENESISRAG17-EXTENSION-MAP.md` |
+| GenesisRAG17 extension map | `MAP-GENESISRAG17-EXTENSIONS` | `1.0.4b` | beta | GenesisBlockDB Architecture | `docs/GENESISRAG17-EXTENSION-MAP.md` |
 
 ## 5. Product narrative and evidence
 
@@ -121,6 +122,32 @@ The following documents should be created only when implementation work requires
 - third-client namespace conformance report.
 
 ## 9. Changelog
+
+Version diff 0.5.98+draft -> 0.5.99+draft: register the approved execution DAG
+guard contract and architecture tooling boundary. W1 remains non-dispatchable.
+
+Version diff 0.5.97+draft -> 0.5.98+draft: record passing fresh and committed
+Linux worker addon tests on PR head ab38d50 (26/0/6) and all hosted CI workflow
+gates; model-dependent paths, migration and full integration qualification
+remain pending.
+
+Version diff 0.5.96+draft -> 0.5.97+draft: record the candidate GenesisRAG17
+engine upgrade separately from its historical baseline, synchronize parent
+architecture references and refresh the Linux addon provenance. The Bookworm
+fresh build passed 26/0/6 (six model-dependent skips); the committed-artifact
+rerun and full integration qualification remain pending at that revision.
+
+Version diff 0.5.95+draft -> 0.5.96+draft: record the first Bookworm
+container run failing before build because checkout's temporary HOME hid the
+safe-directory setting from the job shell. Use a command-scoped trust entry for
+the exact workspace path; native build and artifact verification remain pending.
+
+Version diff 0.5.94+draft -> 0.5.95+draft: record the committed Linux addon
+drift and prepare the workflow to build, test and upload a replacement before
+the independent committed-artifact gate. The workflow now locks and fingerprints
+its dependency inputs; the artifact refresh and its provenance reconciliation
+remain pending until a hosted rebuild is available. Hosted verification is
+pending on the updated PR head.
 
 Version diff 0.5.92+draft -> 0.5.93+draft: record current mainline P6
 closeout `9821508` in the isolated HQL2 candidate and synchronize the H2-D11,
@@ -482,6 +509,12 @@ review and full P8 gates remain open.
 
 | Version | Date | Owner | Summary |
 |---|---|---|---|
+| 0.5.99+draft | 2026-10-10 | GenesisBlockDB Architecture | Register bounded execution DAG guard, independent candidate gates and synthetic pilot contract. |
+| 0.5.98+draft | 2026-10-06 | GenesisBlockDB Architecture | Record passing fresh and committed Linux worker addon tests (26/0/6) on PR head ab38d50 and successful tests/security/performance/consumer workflows; six model-dependent tests and migration/full integration qualification remain pending |
+| 0.5.97+draft | 2026-10-06 | GenesisBlockDB Architecture | Record the GenesisRAG17 candidate engine source and historical baseline; synchronize ADR/C4/Master Spec/extension map provenance; refresh Linux addon metadata; fresh Bookworm worker suite 26 passed, 0 failed, 6 model-dependent skipped; full committed-artifact and integration qualification pending |
+| 0.5.96+draft | 2026-10-06 | GenesisBlockDB Architecture | Record Bookworm job's Git dubious-ownership failure before build; scope safe.directory to the exact checkout path for provenance; artifact rebuild and hosted verification pending |
+| 0.5.95+draft | 2026-10-06 | GenesisBlockDB Architecture | Prepare locked Linux addon rebuild/test/upload before the independent committed-artifact gate; record stale-binary finding in the RCA; artifact provenance refresh and hosted verification pending |
+| 0.5.94+draft | 2026-10-06 | GenesisBlockDB Architecture | Record the G3 recovery-proof test gap and P7.1 test-only acceptance; synchronize plan 0.8.78b while keeping model/code authorization and broad P7 gates open |
 | 0.5.93+draft | 2026-10-06 | GenesisBlockDB Architecture | Record current P6 mainline closeout integration and local results: P6 49/49, focused integrated targets 44/44, HQL2 407/0/1 across 40 targets; synchronize H2-D11/P8/plan/report entries; broader P8/P13, hosted and release gates remain open |
 | 0.5.92+draft | 2026-10-06 | GenesisBlockDB Architecture | Reconcile HQL2 AnnotationScan P7 temporal/ACL evidence with the P6 mainline closeout; preserve future-valid/post-S controls and separate query-level FORBIDDEN evidence; P8 and broader release/transport qualification remain open |
 | 0.5.83+draft | 2026-10-06 | GenesisBlockDB Architecture | Synchronize controlled AnnotationScan P7 temporal differential and separate HQL/IR Annotation(Read) denial evidence across P7/P8/H2-D11/plan/report; four focused targets pass 42/42; no runtime/P6/schema/transport change |

@@ -2,9 +2,9 @@
 proposed_id: TDD--DOCUMENTATION-GOVERNANCE-SSOT-ENFORCEMENT
 type: tdd
 status: current
-version: 0.2.1b
+version: 0.2.2b
 created_at: 2026-06-13T21:21:44+07:00,ATHER,9b1ced3
-last_update: 2026-10-07,Codex
+last_update: 2026-10-15,Codex
 attributes:
   domain: documentation-governance
   scope: repository
@@ -295,12 +295,34 @@ Rollback ต้องทำได้โดยไม่กระทบ runtime:
 
 ## CHANGELOG
 
+### Approved execution DAG slice (2026-10-10)
+
+The user approved the workflow audit remediation and synthetic pilot. Its exact
+contract is [Execution DAG Guard V1](SPEC--EXECUTION-DAG-GUARD-V1.md), with numbered
+WF-AC-01 through WF-AC-10. The implementation separates deterministic state guards,
+durable external receipts and the trusted model coordinator. The independent
+Verify, Review and final Audit gates consume one frozen candidate; status records
+do not modify that candidate. Retry budgets and lease quarantine prevent silent
+repair loops and concurrent replacement writers.
+
+`npm run workflow:plan` checks the source-bound W1 planning overlay;
+`npm run workflow:test` exercises accepted transitions and adversarial faults.
+The dedicated workflow CI checks Linux and Windows when run by GitHub Actions.
+Local results do not imply that remote CI has run. Neither this slice nor its
+approval grants W1 feature dispatch or completes every SSOT/doc-drift rule above.
+
+Version diff 0.2.1b -> 0.2.2b: record the separately approved bounded execution
+guard contract, local/CI commands and explicit remaining governance scope.
+
 | Version | Date | Status | Summary | Commit Hash | Agent |
 |---------|------|--------|---------|-------------|-------|
+| 0.2.2b | 2026-10-15 | current | Record the approved execution DAG guard slice and independent evidence gates while retaining the shared-policy and verified Rust 1.88 scope. | working-tree | Codex |
 | 0.2.1b | 2026-10-07 | verified-scope | Verified Rust 1.88.0 with `cargo check --locked`, declared the package minimum, and recorded feature-matrix and rustup-proxy limits. | working-tree | Codex |
 | 0.2.0b | 2026-10-07 | approved-scope | Defined AGENTS.md as shared policy SSOT, added generated mirror checks, and gated rust-version on exact-toolchain verification. | working-tree | Codex |
 | 0.1.0b | 2026-06-13 | candidate | Initial TDD for documentation governance and SSOT enforcement. | 9b1ced3 | ATHER |
 
 ---
 
-The bounded R1-R10 source/mirror implementation is approved. Broader governance phases and exact Rust MSRV selection remain gated by their stated acceptance evidence.
+The bounded R1-R10 source/mirror implementation, Rust 1.88 floor, and 2026-10-10
+execution DAG guard slice are approved within their documented scopes. Broader
+governance phases and cross-target MSRV evidence remain open.

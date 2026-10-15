@@ -1,0 +1,35 @@
+{
+  "schemaVersion": 1,
+  "artifactType": "SP24_TEST_INVOCATION",
+  "decisionId": "W1-SYNTHETIC-GAP-REMEDIATION-20261013-SP24",
+  "invocationIndex": 1,
+  "maximumInvocations": 1,
+  "command": {
+    "executable": "C:\\Users\\suanr\\.cache\\codex-runtimes\\codex-primary-runtime\\dependencies\\node\\bin\\node.exe",
+    "arguments": [
+      "--test",
+      "artifact-manifest.test.mjs"
+    ],
+    "workingDirectory": "D:\\GenesisBlock_Dev\\w1-evidence-20261010\\adapter\\synthetic-pilot-20261013-sp24",
+    "timeoutMs": 180000
+  },
+  "startedAtUtc": "2026-10-13T00:49:14.1855386+00:00",
+  "startedAtBangkok": "2026-10-13T07:49:14.1855386+07:00",
+  "finishedAtUtc": "2026-10-13T00:49:34.6763611+00:00",
+  "finishedAtBangkok": "2026-10-13T07:49:34.6763611+07:00",
+  "elapsedMilliseconds": 20491.0,
+  "processId": 24060,
+  "timedOut": false,
+  "exitCode": 0,
+  "result": "PASS",
+  "pretestGateSha256": "413974e9bffdf1659158ceb0b89591b17eb7e3bcc9827ad3a6ed51bfb92861bd",
+  "candidateSourceSha256": "66c0445ebb4209fa741aa506d9e8853c105c5702fb301ffb253622b768f1870a",
+  "testSourceSha256": "85fafaa141a790b91e0aa6a5cd8360dbb45625a4d14adc4e719db5aee67a237a",
+  "stdoutPath": "D:\\GenesisBlock_Dev\\w1-evidence-20261010\\synthetic-pilots\\synthetic-pilot-20261013-sp24\\evidence\\test-stdout.txt",
+  "stderrPath": "D:\\GenesisBlock_Dev\\w1-evidence-20261010\\synthetic-pilots\\synthetic-pilot-20261013-sp24\\evidence\\test-stderr.txt",
+  "stdoutSha256": "87755eab4fff0a03569ad5327ec3b91db3fdad06f45ac06139e9ca972beed32e",
+  "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "testInvocationsTotal": 1,
+  "dispatchAuthorized": false,
+  "W1DispatchAuthorized": false
+}

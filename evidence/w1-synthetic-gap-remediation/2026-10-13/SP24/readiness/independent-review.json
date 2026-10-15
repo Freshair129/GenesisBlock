@@ -1,0 +1,55 @@
+{
+  "schemaVersion": 1,
+  "artifactType": "SP24_INDEPENDENT_PRETEST_REVIEW",
+  "decisionId": "W1-SYNTHETIC-GAP-REMEDIATION-20261013-SP24",
+  "status": "PASS",
+  "completedAtUtc": "2026-10-13T00:41:50Z",
+  "completedAtBangkok": "2026-10-13T07:41:50+07:00",
+  "reviewer": {
+    "taskIdentity": "/root/sp24_pretest_review",
+    "role": "independent read-only reviewer",
+    "distinctFromDecisionAuthor": true,
+    "distinctFromCandidateEditor": true
+  },
+  "reviewRequestSha256": "203def87b85877d32819ae1b6d5494b4ece11a7c7d675ef8059992be8623ad3f",
+  "hashesChecked": {
+    "decision": "657443f3a8aa3db34d99e23d1f644400c8f2b5253644af69ac9bfbebcb4b88d0",
+    "admission": "a06427abe53a6fc51f8a5d5c8f2c7aca804ef0f72c9ddf3cd2786b88202c223a",
+    "rootCauseAnalysis": "8fab054d4604b1a62f89b5320fa6334a15be59d2845ab9dd7c538d10ba701eba",
+    "seedMaterialization": "73098e3a73dbde1a2341c1aafa87aa2b9ec29a9cfd7c71038eb0a314919261ce",
+    "candidatePatch": "e63866fa05ba48b5055239b9f1e31c489bd0270855a65f458e90953038687764",
+    "candidateFreeze": "db55cdc0113bf94e990f83b740dfc921614ca857d3177c721266b636ff9d2455",
+    "predecessorSP23Terminal": "4b28eddee169e7ff0b0b2522abf3c6faf6136865b8dbde503456a34b99660725",
+    "predecessorSP23Correction": "b3bdf5df3e9661bd89b759a9770c0a28d76096af00625cb9d85d7afc1f1748b1",
+    "seedManifest": "a31388b7a3b6eeaea5069acdf1aa2bee726f97dc6c1a71e01a0334cbd22c06c4",
+    "effectivePlan": "eb408762dec22c7e1d65c488a9629af95eb695eeec112ff15a23b8322cb1cdfd",
+    "testSource": "85fafaa141a790b91e0aa6a5cd8360dbb45625a4d14adc4e719db5aee67a237a"
+  },
+  "candidate": {
+    "fileCount": 345,
+    "directoryCount": 108,
+    "reparsePointCount": 0,
+    "manifestSha256": "fa6280df58e9763fb2ae0c5b63791ec139747d5b128170547b418fb0892b989d",
+    "changedFiles": [
+      "identity-evidence.mjs"
+    ],
+    "nonAllowlistedFilesByteIdentical": true
+  },
+  "findings": {
+    "F01Preserved": true,
+    "F02Preserved": true,
+    "resolverScopeAndContainmentVerified": true,
+    "lineHashesAndIdentityChecksUntouched": true,
+    "evidenceRootExternal": true,
+    "dispatchAuthorized": false
+  },
+  "execution": {
+    "testsRun": false,
+    "testLikeCommandsRun": false,
+    "archiveJournalContentsRead": false,
+    "filesWrittenByReviewer": false,
+    "testInvocationsObserved": 0
+  },
+  "blockers": [],
+  "resultSummary": "PASS. Independently confirmed full seed digest, exact candidate diff and counts, resolver restrictions and containment, F-01/F-02 preservation, evidence separation, dispatch-disabled state, and zero prior test invocations. The SP21 historical manifest correction is resolved by the SP22 ordinal-ordering receipt and SP23 correction addendum."
+}

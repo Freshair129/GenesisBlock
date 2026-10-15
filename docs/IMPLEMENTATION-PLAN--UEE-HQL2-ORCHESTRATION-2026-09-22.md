@@ -1,9 +1,9 @@
 ---
-version: "0.8.77b"
+version: "0.8.78b"
 doc_id: "IMPLEMENTATION-PLAN--UEE-HQL2-ORCHESTRATION-2026-09-22"
 owner: "Boss (Founder / Product Authority)"
 created_at: "2026-09-22T00:00:00+07:00,ATHER,working-tree"
-last_update: "2026-10-06T04:46:43+07:00,ATHER"
+last_update: "2026-10-06T06:30:22+07:00,Codex"
 status: beta
 superseded_by: null
 attributes:
@@ -1002,7 +1002,67 @@ they are not claimed by this slice. Post-reconciliation focused verification
 passes 19/19 across `epoch_e2_tests`, `g3_oracle_differential_tests`,
 `meta_format_migration_tests` and `wal_tail_replay_tests`.
 
+## 12. P7.1 G3 WAL-only recovery proof correction — 2026-10-06
+
+### Root cause and boundary
+
+The current Rust target passes its two result-equality cases, but those checks
+do not prove the intended WAL-only recovery precondition. In
+tests/g3_oracle_differential_tests.rs, remove_materialized_state ignores every
+file-removal error and neither case asserts that the recovered stable frontier
+covers all fixture mutations. If a materialized file remains, equal query
+results can pass without exercising WAL-only recovery. This is a test evidence
+gap; no engine defect is established. See
+.brain/rca/RCA--G3-WAL-ONLY-RECOVERY-PROOF-GAP.md.
+
+### P7.1 contract and acceptance
+
+- Classification: C-2, LOW risk. The authorized implementation slice is
+  isolated test code with no engine, API, transport, or schema change.
+- The future implementation worker has the sole source write-set
+  tests/g3_oracle_differential_tests.rs; no other worker may edit that file.
+- For every listed materialized-state path, tolerate only NotFound; surface
+  every other removal error and assert that the path is absent before reopen.
+- Capture the stable frontier after all fixture mutations and before close;
+  after reopen, require the recovered frontier to be at least that value.
+- Keep exact pre-reopen/post-reopen result equality and the existing golden
+  oracle equality for both temporal and relational fixtures.
+- Run the focused G3 target and the documented G1/G2/crash regression matrix.
+  Report each command's result separately; do not infer WAL-only proof from
+  result equality alone.
+- Passing P7.1 closes only this bounded G3 recovery-proof gap. It does not
+  close broad HQL2 P7, P8/P13, hosted CI, release, or deployment gates.
+
+### Ownership and execution DAG
+
+The approved documentation/RCA/DAG work is complete. The user approval for
+this slice does not authorize source implementation, commit, push, or merge.
+The requested gpt-5.6-luna Max effort is not advertised in the current
+model/effort list; no substitute has been selected. Wait for an explicit
+supported model and code-scope authorization before starting any worker.
+
+Dependency arrows point from a dependent task to its prerequisite; execute
+bottom-up:
+
+- P7.1-DOC/RCA (complete)
+- MODEL + CODE AUTH (pending)
+- TEST WORKER (one-file write-set)
+- VERIFY and REVIEW (parallel, read-only on the same candidate)
+- FINAL GATE (after both gates pass)
+- Stop for a separate owner decision; merge/push are not implied.
+
+Verify and Review may run concurrently only against the same immutable
+candidate. Any failing gate stops that candidate; after an authorized
+correction, rerun Verify and Review before Final. Final PASS is not merge
+authorization.
+
 ## CHANGELOG
+
+Version diff 0.8.77b -> 0.8.78b: document the P7.1 G3 WAL-only recovery
+proof gap, its test-only acceptance/write-set, RCA, and conflict-free
+Verify/Review/Final order. Documentation approval only; model selection and
+source implementation remain pending. No runtime behavior or broad P7 status
+is changed.
 
 Version diff `0.8.76b -> 0.8.77b`: integrate current mainline P6 closeout
 `9821508` into the isolated candidate and verify P6 acceptance 49/49,

@@ -2,8 +2,8 @@
 title: "GenesisBlockDB Technical Architecture and Capability Composition"
 doc_id: "MASTER-SPEC-GENESISBLOCKDB"
 status: current
-version: "2.3.42b"
-updated: "2026-10-05"
+version: "2.3.43b"
+updated: "2026-10-06"
 owner: "GenesisBlockDB Architecture"
 source_of_truth: true
 related_issue: 84
@@ -226,9 +226,11 @@ embedding -> six-lane index/readback -> quality gate -> atomic pointer update ->
 publication receipt. A prepared snapshot is not query-visible, and a gate
 without a matching publication receipt cannot finish a source run. This TEST
 adapter does not add GKS ontology, MSP policy, source schemas or a second
-database to GenesisBlockDB. Its native engine pin is
-`e15e35b0093394e0a8880af7f4e6f63cf81223b7`; its model and contract pins,
-runtime variables, lane statuses and extension seams are recorded in the
+database to GenesisBlockDB. The current candidate engine source and
+qualification status are recorded in the
+[GenesisRAG17 ADR](ADR--GENESISRAG17-SEPARATE-WORKER-PUBLICATION.md); the
+historical integration baseline remains identified there. Its model and
+contract pins, runtime variables, lane statuses and extension seams are recorded in the
 [GenesisRAG17 ADR](ADR--GENESISRAG17-SEPARATE-WORKER-PUBLICATION.md),
 [pipeline flow](FLOW--GENESISRAG17-PIPELINE.md), [extension
 map](GENESISRAG17-EXTENSION-MAP.md) and [worker README](../genesisrag17-worker/README.md).
@@ -446,6 +448,11 @@ independent-review or broad P8/P13 gates.
 
 ## Changelog
 
+Version diff 2.3.42b -> 2.3.43b: distinguish the candidate GenesisRAG17 engine
+source from its historical baseline and link qualification to the worker ADR;
+no core ontology, pipeline ownership or wire-contract change is implied, and
+full integration qualification remains pending.
+
 Version diff 2.3.37b -> 2.3.38b: extend the approved D7 differential
 allowlist with exact-seed depth-one HQL1 `TRAVERSE` ID projection over one
 physical relation or `ANY` in default/out/in/both directions. Adapter 13/13;
@@ -456,6 +463,7 @@ shared-runtime and broad P8/P13 gates remain open.
 
 | Version | Date | Owner | Summary |
 |---|---|---|---|
+| 2.3.43b | 2026-10-06 | GenesisBlockDB Architecture | Record GenesisRAG17 candidate engine source/qualification through the worker ADR; preserve historical baseline and TEST-only boundary; no schema or wire change; full integration qualification pending |
 | 2.3.42b | 2026-10-05 | GenesisBlockDB Architecture | Extend approved D7 with one unlabeled zero-hop property projection and exact-seed depth-one TRAVERSE; adapter 13/13, property/order/filter 2/2 each, HQL2 404/0/1 across 39 targets and U9 restore 7/7; sync R5 restore evidence; preserve fail-closed boundaries and broad shared-runtime/P8/P13 gates |
 | 2.3.41b | 2026-10-04 | GenesisBlockDB Architecture | Extend D7 after legacy/HQL2 differential to the exact same-alias string ID predicate on labeled zero-hop scans; adapter/order/filter 11/11, 2/2, 2/2 incl. wrong-label and backslash/Unicode; HQL2 394/0/1 across 35 targets, selected P6 peers 45/0/0 across 7; PR #213 code commit checks 40 pass, 4 worker failures with cause unconfirmed, 5 skipped, 1 Windows Cargo cancellation at 15-minute job limit; no P6/schema/transport change; broad shared-runtime/P8/P13 gates open |
 | 2.3.40b | 2026-10-04 | GenesisBlockDB Architecture | Add test-only HQL/typed-IR ChangeScan P7 differential for five exclusive-after/inclusive-through windows, equal empty bounds and tx_as_of frontiers; History/Change 17/17 and HQL2 392/0/1 across 34 targets; PR #210 hosted checks 11 pass, four worker markerless-identity failures, one skipped; no runtime/contract/schema/P6/transport change; broad P8/P13 and independent review remain open |

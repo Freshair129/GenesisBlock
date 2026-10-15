@@ -1,0 +1,14 @@
+✔ complete v5 manifest is deterministic, recursively complete, and excludes only the inherited root request (491.6597ms)
+✔ manifest rejects symbolic links and normalized case/path collisions (6.0616ms)
+✔ release manifest comparison rejects missing, extra, and stale pins (0.8154ms)
+✔ plan command pins normalize Windows path separators while keeping digest and command id exact (294.975ms)
+✔ default builder preserves canonical outputs while synthetic construction stays isolated and in memory (19049.4339ms)
+ℹ retained synthetic fixture: C:\Users\suanr\AppData\Local\Temp\w1-sp17-synthetic-review-wdnjjl
+ℹ tests 5
+ℹ suites 0
+ℹ pass 5
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 20045.4956

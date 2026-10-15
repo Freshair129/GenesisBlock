@@ -1,0 +1,32 @@
+✔ complete v5 manifest is deterministic, recursively complete, and excludes only the inherited root request (2571.8949ms)
+✔ manifest rejects symbolic links and normalized case/path collisions (7.6736ms)
+✔ release manifest comparison rejects missing, extra, and stale pins (0.6886ms)
+✔ plan command pins normalize Windows path separators while keeping digest and command id exact (871.0059ms)
+✖ default builder preserves canonical outputs while synthetic construction stays isolated and in memory (104608.2812ms)
+ℹ tests 5
+ℹ suites 0
+ℹ pass 4
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 108476.2816
+
+✖ failing tests:
+
+test at artifact-manifest.test.mjs:147:1
+✖ default builder preserves canonical outputs while synthetic construction stays isolated and in memory (104608.2812ms)
+  Error: ENOENT: no such file or directory, realpath 'C:\Users\suanr\.codex\sessions\2026\10\11\rollout-2026-10-11T02-11-49-01a1273a-881e-7a71-b73a-cf7e43e6e66b.jsonl'
+      at async realpath (node:internal/fs/promises:1241:10)
+      at async readActualJournalRecord (file:///D:/GenesisBlock_Dev/w1-evidence-20261010/adapter/synthetic-pilot-20261012-sp22/identity-evidence.mjs:166:21)
+      at async captureReviewerExclusionManifest (file:///D:/GenesisBlock_Dev/w1-evidence-20261010/adapter/synthetic-pilot-20261012-sp22/identity-evidence.mjs:684:23)
+      at async buildReviewRequestWithReadinessPaths (file:///D:/GenesisBlock_Dev/w1-evidence-20261010/adapter/synthetic-pilot-20261012-sp22/create-review-request.mjs:138:30)
+      at async buildSyntheticReviewRequest (file:///D:/GenesisBlock_Dev/w1-evidence-20261010/adapter/synthetic-pilot-20261012-sp22/create-review-request.mjs:246:19)
+      at async TestContext.<anonymous> (file:///D:/GenesisBlock_Dev/w1-evidence-20261010/adapter/synthetic-pilot-20261012-sp22/artifact-manifest.test.mjs:196:19)
+      at async Test.run (node:internal/test_runner/test:1389:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {
+    errno: -4058,
+    code: 'ENOENT',
+    syscall: 'realpath',
+    path: 'C:\\Users\\suanr\\.codex\\sessions\\2026\\10\\11\\rollout-2026-10-11T02-11-49-01a1273a-881e-7a71-b73a-cf7e43e6e66b.jsonl'
+  }
