@@ -1087,7 +1087,7 @@ fn query_ir_operation_has_invalid_input(operation: &crate::QueryIrOperation) -> 
         } => {
             target_id
                 .as_deref()
-                .map_or(true, |target| target.trim().is_empty())
+                .is_none_or(|target| target.trim().is_empty())
                 || !matches!(
                     tier.as_str(),
                     "H0" | "H1" | "H2" | "H3" | "H4" | "H5" | "H6"

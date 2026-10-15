@@ -588,8 +588,10 @@ export declare class GenesisDatabase {
    */
   executeQueryIr(request: QueryIrRequest): Promise<QueryIrResponse>
   /**
-   * Executes HQL2/Query IR v2 and returns an ApiContractResultV1 object.
-   * `accessJson` and `requestJson` are serialized AccessContext/QueryRequestV2 values.
+   * Additive versioned JSON error contract for typed HQL2/Query IR v2.
+   * `access_json` and `request_json` are decoded as contract inputs; request
+   * and engine failures are returned in the JSON envelope rather than being
+   * flattened into a reason-only rejected Promise.
    */
   queryV2Contract(accessJson: string, requestJson: string): Promise<ApiContractResultV1<unknown>>
   queryIrCapabilities(): QueryIrCapabilities
