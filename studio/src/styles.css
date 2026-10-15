@@ -202,8 +202,10 @@ body {
 
 @media (max-width: 1050px) {
   .studio-shell { grid-template-columns: 74px minmax(0, 1fr) 260px; }
-  .sidebar-brand > span:last-child, .connection-chip span, .sidebar nav button span, .sidebar nav button small, .disconnect { display: none; }
+  .sidebar-brand > span:last-child, .connection-chip span, .sidebar nav button span, .sidebar nav button small { display: none; }
   .sidebar nav button { justify-content: center; }
+  .disconnect { justify-content: center; padding: 11px 12px; }
+  .disconnect span { display: none; }
 }
 
 @media (max-width: 760px) {

@@ -372,7 +372,7 @@ function Workspace({ transport, onDisconnect }: WorkspaceProps) {
         <div className="sidebar-brand"><span className="brand-mark"><GitBranch size={18} /></span><span>GENESIS<br /><b>STUDIO</b></span></div>
         <div className="connection-chip"><i /><span><b>{transport.kind} / {capabilities?.mode ?? 'connecting'}</b>{capabilities?.protocolVersion ?? 'negotiating'}</span></div>
         <nav>{navigation.map((item) => <button key={item.label} className={active === item.label ? 'active' : ''} aria-label={`${item.label} workspace`} title={`${item.label} workspace`} onClick={() => setActive(item.label)}><item.icon size={17} /><span>{item.label}</span></button>)}</nav>
-        <button className="disconnect" onClick={() => void disconnect()}><ArrowLeft size={16} /> Connections</button>
+        <button className="disconnect" aria-label="Connections" title="Connections" onClick={() => void disconnect()}><ArrowLeft size={16} /><span>Connections</span></button>
       </aside>
       <main className="workspace">
         <header className="workspace-header"><div><span className="breadcrumb">WORKSPACES /</span><h1>{active}</h1></div><div className="truth-badge"><ShieldCheck size={14} /> {transport.kind.toUpperCase()} / READ ONLY / {capabilities?.consistency ?? 'NEGOTIATING'}</div></header>

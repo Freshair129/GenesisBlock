@@ -20,13 +20,19 @@ release-readiness evidence gap. It does not assert a production outage.
 
 Studio S1 is beta implemented, but the repository does not yet prove that a
 packaged local Tauri session and remote REST session return equivalent results
-from one persisted fixture. Packaged native-picker handling and Windows
-installed-app UI evidence remain absent. No installed UI reached remote mode,
-so remote-origin behavior under the production CSP also remains unverified.
-Independent architecture/security review acceptance remains open. The latest
-Studio matrix passed package installation/startup smoke on Linux and macOS;
-Windows MSI installation succeeded, but its UI probe could not connect to
-WebView2 CDP before the first UI action.
+from one persisted fixture. Packaged Windows picker/path handling and local UI
+reads now have evidence, but no installed UI reached remote mode, so
+remote-origin behavior under the production CSP remains unverified.
+Independent architecture/security review acceptance remains open. In package
+run [38698802743](https://github.com/Freshair129/GenesisBlock/actions/runs/38698802743)
+at head `aaf71c63cb7ed538e3e2db7da1ee2472a5dbd5ad`, Linux package/startup passed
+and the ordinary Windows MSI installed, launched for ten seconds, and
+uninstalled. The Windows UI smoke passed missing/non-directory path handling,
+picker cancellation and selection, local connection, and local reads, then
+failed at the return-to-Connections button: the runner is 1024px wide while the
+responsive CSS hid that button below 1050px. It did not start remote mode, so
+packaged remote-origin behavior and same-fixture parity remain unproven.
+The macOS package job was still pending when this evidence was recorded.
 
 ## Evidence
 
@@ -48,8 +54,10 @@ WebView2 CDP before the first UI action.
 - `studio/src-tauri/tauri.conf.json` production `connect-src` permits the local app and Tauri IPC but no remote server origin, while `createRemoteTransport` used WebView `fetch` for the configured remote base URL. Browser Vitest does not enforce the packaged Tauri CSP.
 - The packaged transport change routes remote operations through Tauri IPC to a Rust client with fixed read-only operation/method/path mappings, URL and query validation, redirects disabled, and same-origin token forwarding. Frontend tests cover native bridge selection, token/configuration handoff, disconnect cleanup, and cleanup after capability-handshake failure. The Tauri Rust library suite passed 9/9 after a regression exposed and fixed bracketed IPv6 loopback validation; the strengthened persisted-fixture parity test passed 1/1, and the read-only REST server binary built successfully.
 - Studio packaging run [38686388595](https://github.com/Freshair129/GenesisBlock/actions/runs/38686388595), at head `5419a91cca67cd5aca67deea130c031d2eaa84f4`, completed all three package jobs. The Linux DEB package installed and launched successfully; the macOS DMG package installed and launched successfully; the Windows MSI installer completed successfully but the smoke failed before UI interaction because Playwright `connectOverCDP` received `ECONNREFUSED 127.0.0.1:50705`. The Windows fixture seed and REST server build steps passed, but no packaged picker, local/remote UI parity, remote-mode CSP result, or startup-screen result is claimed. The [MSI](https://github.com/Freshair129/GenesisBlock/actions/runs/38686388595/artifacts/11950739509), [DMG](https://github.com/Freshair129/GenesisBlock/actions/runs/38686388595/artifacts/11950784409), [DEB](https://github.com/Freshair129/GenesisBlock/actions/runs/38686388595/artifacts/11950242206), and [smoke evidence](https://github.com/Freshair129/GenesisBlock/actions/runs/38686388595/artifacts/11950994174) are retained as workflow artifacts.
+- Follow-up package run [38698802743](https://github.com/Freshair129/GenesisBlock/actions/runs/38698802743), head `aaf71c63cb7ed538e3e2db7da1ee2472a5dbd5ad`: Linux DEB install/startup passed; Windows persisted-fixture parity test, REST server build, Tauri shell tests, MSI build, ordinary MSI install/start/uninstall, missing/non-directory validation, picker cancel/select, local UI reads, and native local reads passed. The UI smoke then timed out finding the `Connections` button. The Windows Installer evidence reports 1024x768; `styles.css` hid `.disconnect` at max-width 1050px. Thus local interaction was reached, but the smoke never signaled local disconnect or started the remote server. The UI now retains an accessible icon-only connection button at this narrow desktop width. Windows smoke evidence is [artifact 11956860311](https://github.com/Freshair129/GenesisBlock/actions/runs/38698802743/artifacts/11956860311), the ordinary MSI evidence is included there, and the Linux DEB is [artifact 11955897591](https://github.com/Freshair129/GenesisBlock/actions/runs/38698802743/artifacts/11955897591). The macOS job and rerun of this UI fix remain pending.
 - The first Studio Rust test compile reached the new Tauri test target but failed because its CSP test lacked a `Value` import. After fixing that test import, the suite exposed that `Url::host_str()` returns a bracketed IPv6 host, causing loopback HTTP to be rejected; validation now strips exactly one bracket pair before parsing the address. The full Tauri library suite passed 9/9. The strengthened root parity test passed 1/1 and the `genesis-db-server` build passed. These are source/test/build checks, not installed-package evidence.
-- A read-only review of head `8463222b4c853050437f96f1dbb6199a710a7e9d` found a credential-routing gap: `RemoteConnection::new` used reqwest's default client, which enables system proxies, while the bridge permits loopback HTTP and attaches the bearer authorization header. If `HTTP_PROXY`/`ALL_PROXY` is set without a matching `NO_PROXY` exclusion, a loopback bearer request could be routed in cleartext through the proxy. The bridge now applies `no_proxy()` only to validated HTTP URLs (which the validator restricts to loopback), while retaining the default system-proxy behavior for HTTPS. A focused proxy regression was added; its local Rust execution and refreshed CI are pending because the shared Cargo slot is occupied.
+- A read-only review of head `8463222b4c853050437f96f1dbb6199a710a7e9d` found a credential-routing gap: `RemoteConnection::new` used reqwest's default client, which enables system proxies, while the bridge permits loopback HTTP and attaches the bearer authorization header. If `HTTP_PROXY`/`ALL_PROXY` is set without a matching `NO_PROXY` exclusion, a loopback bearer request could be routed in cleartext through the proxy. The bridge now applies `no_proxy()` only to validated HTTP URLs (which the validator restricts to loopback), while retaining the default system-proxy behavior for HTTPS. The focused regression `cargo test --manifest-path studio/src-tauri/Cargo.toml --locked --lib --jobs 1 loopback_http_bypasses_proxies_while_https_keeps_proxy_support` passed: 1 passed, 0 failed, 9 filtered. It observed loopback HTTP bypassing an explicit local proxy and HTTPS using `CONNECT example.com:443`.
+- The Windows packaged smoke failure in run 38698802743 is a responsive navigation defect, not an MSI install or WebView2 startup failure. At the runner's 1024px screen width, the max-width:1050px rule hid the only Connections control. The UI now exposes that control as an accessible icon button in the narrow desktop sidebar; the next package run must verify the strict picker/local/remote parity flow.
 
 ## Root cause
 
@@ -129,6 +137,9 @@ CSP.
   unresolved P0/P1 finding unless the risk is explicitly accepted.
 - Record platform, artifact, test result, and independent finding disposition;
   do not infer package or review evidence from source builds or mock E2E.
+- Keep the Connections action available and accessibly named at supported
+  desktop widths that collapse the sidebar; package smoke exercises it after
+  local reads before starting the remote REST session.
 
 ## Verification scope and limitations
 
