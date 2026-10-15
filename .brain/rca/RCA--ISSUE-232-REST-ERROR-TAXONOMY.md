@@ -91,6 +91,48 @@ call sites that create those six categories, so it is broader than a safe REST
 adapter patch. GB-SRS-API-004's full cross-surface typed-category acceptance
 remains open; this patch does not claim that acceptance is complete.
 
+## Typed embedded/NAPI acceptance plan
+
+This patch deliberately stops at the REST and SDK compatibility boundary. A
+complete embedded/NAPI taxonomy needs an engine change because the current
+public storage contract returns `Result<T>` backed by `napi::Error` when NAPI
+is enabled (`src/lib.rs:40-62`), or a shim containing only `reason: String`
+without NAPI. The NAPI wrapper methods also flatten task joins, JSON decoding,
+and core failures with `Error::from_reason` (`src/lib.rs:25876-26020`). The
+NAPI error type exposes only a status/code string and a reason/message; it has
+no stable category field. HQL's `QueryErrorV2` has structured code, stage,
+retryability, and details (`src/query/hql2/error.rs:11-28`), but that type is
+not propagated through the shared `Storage` result type. A REST-only change or
+message-prefix adapter cannot establish cross-surface parity.
+
+Recommended migration phases:
+
+1. **Introduce typed core failures.** Add an additive `CoreError`/`ErrorKind`
+   contract with stable code, category, diagnostic message, and safe details.
+   Construct it at the six semantic failure sources; preserve unknown legacy
+   failures as unclassified/internal. Convert `QueryErrorV2` before any
+   stringification. Do not parse diagnostics to infer categories.
+2. **Preserve existing callers while adapters migrate.** Keep existing
+   `Storage`/Rust and NAPI entry points returning their current error shape as
+   compatibility wrappers. Add typed internal or additive API entry points
+   for REST and NAPI, preserving current `message` and native NAPI `code`
+   behavior. Expose the stable category and code as additional NAPI error
+   properties; do not overload the existing NAPI `code` field.
+3. **Conform all exposed surfaces.** Add representative typed failures and
+   tests for validation, capability, query, conflict, durability, and integrity
+   through direct `Storage`, NAPI, REST, and SDK paths where each is exposed.
+   Verify that legacy message/status fields remain compatible and that
+   unknown failures stay unclassified.
+4. **Decide whether to retire compatibility wrappers.** Only after a major
+   API version or an explicit deprecation cycle should public `Storage` error
+   signatures change. The current public signatures and generated NAPI surface
+   make an in-place replacement a compatibility risk.
+
+The exact categorized call sites must be inventoried before implementation;
+this phase plan is not evidence that embedded/NAPI parity has been implemented.
+Issue #232 remains open until the typed engine boundary and cross-surface
+conformance tests are complete.
+
 ## Verification scope
 
 - `cargo check --no-default-features --features bins --bin genesis-db-server`:
