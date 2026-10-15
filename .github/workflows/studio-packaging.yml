@@ -197,7 +197,9 @@ jobs:
       - name: Install and exercise packaged Windows startup and root selection
         if: runner.os == 'Windows'
         shell: powershell
-        run: .\scripts\studio-windows-packaged-smoke.ps1
+        run: |
+          .\scripts\studio-windows-packaged-smoke.ps1 -TestExitCodeGuard
+          .\scripts\studio-windows-packaged-smoke.ps1
 
       - name: Install and launch packaged macOS app
         if: runner.os == 'macOS'

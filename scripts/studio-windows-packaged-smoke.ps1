@@ -1,4 +1,49 @@
+param(
+  [switch]$TestExitCodeGuard
+)
+
 $ErrorActionPreference = 'Stop'
+
+function Get-VerifiedChildExitCode([System.Diagnostics.Process]$Process, [string]$Name) {
+  $Process.Refresh()
+  if (-not $Process.HasExited) {
+    throw "$Name has not exited, so its exit code is not available"
+  }
+  try {
+    $exitCode = $Process.ExitCode
+  }
+  catch {
+    throw "$Name exited, but its exit code could not be read: $($_.Exception.Message)"
+  }
+  if ($null -eq $exitCode) {
+    throw "$Name exited, but its exit code was unavailable"
+  }
+  return [int]$exitCode
+}
+
+function Assert-ChildProcessSucceeded([System.Diagnostics.Process]$Process, [string]$Name) {
+  $exitCode = Get-VerifiedChildExitCode $Process $Name
+  if ($exitCode -ne 0) {
+    throw "$Name failed with exit code $exitCode"
+  }
+}
+
+if ($TestExitCodeGuard) {
+  $childPowerShell = (Get-Command powershell.exe -ErrorAction Stop).Source
+  $failedChild = Start-Process -FilePath $childPowerShell `
+    -ArgumentList @('-NoProfile', '-NonInteractive', '-Command', 'exit 7') `
+    -Wait `
+    -PassThru
+  try {
+    Assert-ChildProcessSucceeded $failedChild 'Intentional exit-code guard probe'
+  }
+  catch {
+    if ($_.Exception.Message -notmatch 'exit code 7') { throw }
+    Write-Host 'Windows packaged smoke exit-code guard rejected the intentional exit code 7.'
+    return
+  }
+  throw 'Windows packaged smoke exit-code guard accepted the intentional nonzero exit code'
+}
 
 $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
 $bundleDirectory = Join-Path $repoRoot 'studio\src-tauri\target\debug\bundle\msi'
@@ -281,11 +326,10 @@ try {
   if (-not $uiSmokeProcess.WaitForExit(180000)) {
     throw 'Packaged local/remote parity UI probe did not finish within 180 seconds'
   }
+  $uiSmokeProcess.Refresh()
   Get-Content -LiteralPath $nodeStdout -ErrorAction SilentlyContinue
   Get-Content -LiteralPath $nodeStderr -ErrorAction SilentlyContinue
-  if ($uiSmokeProcess.ExitCode -ne 0) {
-    throw "Packaged local/remote parity UI probe failed with exit code $($uiSmokeProcess.ExitCode)"
-  }
+  Assert-ChildProcessSucceeded $uiSmokeProcess 'Packaged local/remote parity UI probe'
   if ($appProcess.HasExited) {
     throw "Installed Studio exited during the picker/parity smoke with code $($appProcess.ExitCode)"
   }

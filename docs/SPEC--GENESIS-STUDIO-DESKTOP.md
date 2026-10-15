@@ -449,7 +449,7 @@ bootstrap/single-operator mode ได้ แต่ไม่เพียงพอ
 - entity IDs reject dot segments, separators, query/fragment delimiters, invalid encoded bytes, and their repeated percent-encoded forms before being appended as one path segment;
 - native response buffering is capped at 32 MiB for JSON and 64 KiB for error bodies, including chunked responses;
 - graph query รับเฉพาะ bounded `limit`, optional `seed`, และ `direction` (`out`, `in`, `both`); entity IDs are appended as one encoded path segment; other methods/paths are not caller-selectable;
-- Authorization is held in memory for the configured connection and attached only to that connection's origin; disconnect clears the native configuration. The production CSP remains restricted to app/IPC origins and does not add a wildcard HTTPS source;
+- Authorization is held in shared memory for the configured connection and attached only to that connection's origin; disconnect/reconfigure increments a generation, cancels cloned queued/in-flight requests, aborts bounded response reads, and clears the shared token. The production CSP remains restricted to app/IPC origins and does not add a wildcard HTTPS source;
 - the S1 token is still entered in WebView memory and is not persisted by this bridge; OS credential-store integration remains required before production.
 
 ## 20. Consistency และ freshness UX
@@ -539,10 +539,10 @@ S0 performance evidence เป็น functional scene budget proof ที่ 240
 - [x] Wire status, collections, logical relational schema/named query และ read-only HQL.
 - [x] Add capability, bounded graph scene/expand and entity inspection APIs.
 - [x] Deliver Overview, Data, Graph, Vectors, Query และ Entity Inspector read-only.
-- [ ] Complete packaged local/remote semantic-parity drill against the same persisted fixture. In run 38706084034 the packaged smoke completed native local/remote reads and the strict visible-result comparison, then failed while building its evidence summary because it looked for `visibleResults.overview` instead of `visibleResults.local.overview`. No parity JSON was emitted. The summary field path is corrected; parity remains open pending a passing rerun on the exact head.
-- [ ] Complete current-head installed-package startup smoke across Windows, macOS, and Linux. Run 38706084034's Linux DEB startup probe passed. The ordinary Windows MSI installed, stayed alive for ten seconds, and uninstalled cleanly, but the staged MSI evidence does not verify visible UI. The macOS package job was still running when this update was made.
+- [ ] Complete packaged local/remote semantic-parity drill against the same persisted fixture. Exact-head run 38709296386 emitted `studio-packaged-parity.json` for all nine operations; the Node smoke stdout reports the strict comparison passed and REST requests returned HTTP 200. The Windows job was nevertheless marked failed because its PowerShell wrapper treated a blank/unavailable child `ExitCode` as nonzero. The wrapper now refreshes the process and distinguishes unavailable from concrete nonzero status; require a green exact-head rerun before accepting the gate.
+- [ ] Complete current-head installed-package startup smoke across Windows, macOS, and Linux. Run 38709296386's Linux DEB and macOS DMG install/startup probes passed. The ordinary Windows MSI installed, stayed alive, and uninstalled, and the instrumented MSI produced the parity artifact, but the Windows workflow step remains red pending the corrected wrapper rerun.
 - [x] Exercise packaged Windows native root selection and missing/non-directory path handling. Run 38706084034's UI smoke passed missing/non-directory validation and picker cancellation; its selected-root marker, successful local reads, and subsequent authenticated remote reads show the fixture selection and packaged connection paths were exercised. See the Windows smoke artifact for exact evidence. The run failed later in evidence-summary construction, so it does not close parity.
-- [ ] Complete independent architecture/security review and packaged local/remote parity evidence.
+- [ ] Complete independent architecture/security review and packaged local/remote parity evidence. The reviewer found a P2 disconnect race in cloned native requests; the current patch adds shared cancellation/generation and clears shared authorization, with queued and in-flight regressions passing locally. Re-review of the new head is pending.
 
 Status: **BETA IMPLEMENTED; release exit remains open.** The persisted-fixture
 regression `cargo test --test studio_contract_tests
@@ -775,6 +775,12 @@ Open questions เหล่านี้ไม่ block S0 mock/prototype แต�
 
 ## 32. Version diff
 
+### `0.3.6b -> 0.3.7b`
+
+- Cancel cloned native remote requests and clear shared authorization on disconnect/reconfigure; race cancellation across request send and bounded response reads.
+- Record run 38709296386's nine-operation packaged parity artifact and correct the Windows PowerShell process exit-code guard that falsely marked its successful smoke as failed.
+- Keep parity/package acceptance and independent re-review open pending a green exact-head Windows/macOS/Linux rerun.
+
 ### `0.3.4b -> 0.3.5b`
 
 - Route packaged remote reads through a fixed, read-only Tauri native operation allowlist so strict production CSP can remain unchanged.
@@ -832,6 +838,7 @@ Open questions เหล่านี้ไม่ block S0 mock/prototype แต�
 
 | Version | Date | Status | Summary | Commit Hash | Agent |
 |---------|------|--------|---------|-------------|-------|
+| 0.3.7b | 2026-10-15 | beta | Cancel remote operations on disconnect/reconfigure, clear shared authorization, and repair the Windows packaged smoke exit-code guard; exact-head package rerun and independent re-review pending. | working-tree | Codex |
 | 0.3.6b | 2026-10-15 | beta | Recorded the Windows packaged smoke's summary-shape failure and corrected its nested overview path; exact-head parity and package rerun remain pending. | working-tree | Codex |
 | 0.3.5b | 2026-10-15 | beta | Route packaged remote reads through validated Tauri IPC/native HTTP without broadening production CSP; retain credential-store and release-evidence gates. | working-tree | Codex |
 | 0.3.4b | 2026-10-15 | beta | Recorded successful Windows, macOS, and Linux package artifact builds; startup and interaction gates remain open. | working-tree | Codex |

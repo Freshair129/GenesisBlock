@@ -8,6 +8,8 @@ use reqwest::{
 };
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
+use std::sync::{Arc, Mutex};
+use tokio_util::sync::CancellationToken;
 
 const MAX_REMOTE_ENTITY_ID_BYTES: usize = 4096;
 const MAX_REMOTE_TOKEN_BYTES: usize = 4096;
@@ -17,8 +19,71 @@ const MAX_REMOTE_ERROR_RESPONSE_BYTES: usize = 64 * 1024;
 #[derive(Clone)]
 pub struct RemoteConnection {
     base_url: Url,
-    authorization: Option<HeaderValue>,
+    authorization: Arc<Mutex<Option<HeaderValue>>>,
     client: Client,
+    cancellation: CancellationToken,
+}
+
+#[derive(Default)]
+pub struct RemoteState {
+    inner: Mutex<RemoteSlot>,
+}
+
+#[derive(Default)]
+struct RemoteSlot {
+    generation: u64,
+    connection: Option<RemoteConnection>,
+}
+
+impl RemoteState {
+    pub fn begin_reconfigure(&self) -> Result<u64, String> {
+        let mut slot = self.lock()?;
+        slot.generation = slot
+            .generation
+            .checked_add(1)
+            .ok_or_else(|| "Studio remote configuration generation overflowed".to_string())?;
+        if let Some(connection) = slot.connection.take() {
+            connection.cancel();
+        }
+        Ok(slot.generation)
+    }
+
+    pub fn install(&self, generation: u64, connection: RemoteConnection) -> Result<(), String> {
+        let mut slot = self.lock()?;
+        if slot.generation != generation {
+            connection.cancel();
+            return Err("Remote configuration was superseded before it completed".to_string());
+        }
+        if let Some(previous) = slot.connection.replace(connection) {
+            previous.cancel();
+        }
+        Ok(())
+    }
+
+    pub fn connection(&self) -> Result<RemoteConnection, String> {
+        self.lock()?
+            .connection
+            .clone()
+            .ok_or_else(|| "No remote GenesisBlockDB is configured".to_string())
+    }
+
+    pub fn close(&self) -> Result<(), String> {
+        let mut slot = self.lock()?;
+        slot.generation = slot
+            .generation
+            .checked_add(1)
+            .ok_or_else(|| "Studio remote configuration generation overflowed".to_string())?;
+        if let Some(connection) = slot.connection.take() {
+            connection.cancel();
+        }
+        Ok(())
+    }
+
+    fn lock(&self) -> Result<std::sync::MutexGuard<'_, RemoteSlot>, String> {
+        self.inner
+            .lock()
+            .map_err(|_| "Studio remote state is poisoned".to_string())
+    }
 }
 
 #[derive(Debug, Deserialize)]
@@ -93,12 +158,23 @@ impl RemoteConnection {
 
         Ok(Self {
             base_url,
-            authorization,
+            authorization: Arc::new(Mutex::new(authorization)),
             client,
+            cancellation: CancellationToken::new(),
         })
     }
 
+    pub fn cancel(&self) {
+        self.cancellation.cancel();
+        if let Ok(mut authorization) = self.authorization.lock() {
+            *authorization = None;
+        }
+    }
+
     pub async fn request(&self, request: StudioRemoteRequest) -> Result<Value, String> {
+        if self.cancellation.is_cancelled() {
+            return Err(remote_connection_closed_error());
+        }
         let prepared = prepare_request(&self.base_url, request)?;
         if prepared.url.origin().ascii_serialization()
             != self.base_url.origin().ascii_serialization()
@@ -108,17 +184,28 @@ impl RemoteConnection {
 
         let mut builder = self.client.request(prepared.method, prepared.url);
         builder = builder.header("accept", "application/json");
-        if let Some(authorization) = &self.authorization {
-            builder = builder.header(AUTHORIZATION, authorization.clone());
+        let authorization = self
+            .authorization
+            .lock()
+            .map_err(|_| "Studio remote authorization state is poisoned".to_string())?
+            .clone();
+        if let Some(authorization) = authorization {
+            builder = builder.header(AUTHORIZATION, authorization);
         }
         if let Some(body) = prepared.body {
             builder = builder.json(&body);
         }
 
-        let response = builder
-            .send()
-            .await
-            .map_err(|error| format!("Remote Studio request failed: {}", error.without_url()))?;
+        let response = tokio::select! {
+            biased;
+            _ = self.cancellation.cancelled() => return Err(remote_connection_closed_error()),
+            response = builder.send() => response.map_err(|error| {
+                format!("Remote Studio request failed: {}", error.without_url())
+            })?,
+        };
+        if self.cancellation.is_cancelled() {
+            return Err(remote_connection_closed_error());
+        }
         let status = response.status();
         if status.is_redirection() {
             return Err(format!(
@@ -126,8 +213,12 @@ impl RemoteConnection {
             ));
         }
         if !status.is_success() {
-            let (body, truncated) =
-                read_bounded_response_body(response, MAX_REMOTE_ERROR_RESPONSE_BYTES).await?;
+            let (body, truncated) = read_bounded_response_body(
+                response,
+                MAX_REMOTE_ERROR_RESPONSE_BYTES,
+                &self.cancellation,
+            )
+            .await?;
             let detail = String::from_utf8_lossy(&body);
             let detail = if truncated {
                 if detail.trim().is_empty() {
@@ -150,8 +241,12 @@ impl RemoteConnection {
                 }
             ));
         }
-        let (body, truncated) =
-            read_bounded_response_body(response, MAX_REMOTE_JSON_RESPONSE_BYTES).await?;
+        let (body, truncated) = read_bounded_response_body(
+            response,
+            MAX_REMOTE_JSON_RESPONSE_BYTES,
+            &self.cancellation,
+        )
+        .await?;
         if truncated {
             return Err(format!(
                 "Genesis server response exceeded the Studio limit of {} bytes",
@@ -176,6 +271,7 @@ fn apply_proxy_policy(builder: reqwest::ClientBuilder, base_url: &Url) -> reqwes
 async fn read_bounded_response_body(
     mut response: reqwest::Response,
     max_bytes: usize,
+    cancellation: &CancellationToken,
 ) -> Result<(Vec<u8>, bool), String> {
     let declared_length = response.content_length();
     if declared_length.is_some_and(|length| length > max_bytes as u64) {
@@ -184,12 +280,16 @@ async fn read_bounded_response_body(
     let capacity = declared_length.unwrap_or_default().min(max_bytes as u64) as usize;
     let mut body = Vec::with_capacity(capacity);
     loop {
-        let chunk = response.chunk().await.map_err(|error| {
-            format!(
-                "Could not read Genesis server response: {}",
-                error.without_url()
-            )
-        })?;
+        let chunk = tokio::select! {
+            biased;
+            _ = cancellation.cancelled() => return Err(remote_connection_closed_error()),
+            chunk = response.chunk() => chunk.map_err(|error| {
+                format!(
+                    "Could not read Genesis server response: {}",
+                    error.without_url()
+                )
+            })?,
+        };
         let Some(chunk) = chunk else {
             return Ok((body, false));
         };
@@ -206,6 +306,10 @@ async fn read_bounded_response_body(
             return Ok((body, truncated));
         }
     }
+}
+
+fn remote_connection_closed_error() -> String {
+    "Remote GenesisBlockDB connection was closed or replaced".to_string()
 }
 
 fn validate_remote_base_url(input: &str) -> Result<Url, String> {
@@ -481,13 +585,15 @@ fn route(segments: &[&str]) -> Vec<String> {
 mod tests {
     use super::{
         apply_proxy_policy, prepare_request, read_bounded_response_body, validate_remote_base_url,
-        RemoteConnection, StudioRemoteRequest, MAX_REMOTE_ENTITY_ID_BYTES,
+        CancellationToken, RemoteConnection, RemoteState, StudioRemoteRequest,
+        MAX_REMOTE_ENTITY_ID_BYTES,
     };
     use reqwest::{Client, Method, Proxy, Url};
     use serde_json::{json, Value};
     use std::{
         io::{Read, Write},
         net::{TcpListener, TcpStream},
+        sync::Arc,
         thread,
         time::Duration,
     };
@@ -745,7 +851,7 @@ mod tests {
         });
         let result = tauri::async_runtime::block_on(async {
             let response = reqwest::Client::new().get(url).send().await.unwrap();
-            read_bounded_response_body(response, 8).await
+            read_bounded_response_body(response, 8, &CancellationToken::new()).await
         })
         .unwrap();
         request.join().unwrap();
@@ -753,6 +859,109 @@ mod tests {
 
         assert_eq!(result.0, b"01234567");
         assert!(result.1);
+    }
+
+    #[test]
+    fn close_and_reconfigure_cancel_cloned_queued_requests_before_server_send() {
+        for reconfigure in [false, true] {
+            let listener = TcpListener::bind((std::net::Ipv4Addr::LOCALHOST, 0)).unwrap();
+            listener.set_nonblocking(true).unwrap();
+            let url = format!("http://{}", listener.local_addr().unwrap());
+            let state = RemoteState::default();
+            let generation = state.begin_reconfigure().unwrap();
+            state
+                .install(
+                    generation,
+                    RemoteConnection::new(&url, "queued-secret").unwrap(),
+                )
+                .unwrap();
+
+            // This clone models a request command that captured state and is
+            // queued while the user disconnects or replaces the connection.
+            let queued_request = state.connection().unwrap();
+            if reconfigure {
+                state.begin_reconfigure().unwrap();
+            } else {
+                state.close().unwrap();
+            }
+            let result = tauri::async_runtime::block_on(async {
+                queued_request.request(StudioRemoteRequest::Status).await
+            });
+
+            assert!(result
+                .unwrap_err()
+                .contains("connection was closed or replaced"));
+            match listener.accept() {
+                Err(error) if error.kind() == std::io::ErrorKind::WouldBlock => {}
+                Ok(_) => panic!("queued request reached the server after invalidation"),
+                Err(error) => panic!("could not check queued request listener: {error}"),
+            }
+        }
+    }
+
+    #[test]
+    fn close_cancels_an_inflight_response_body_read() {
+        let listener = TcpListener::bind((std::net::Ipv4Addr::LOCALHOST, 0)).unwrap();
+        let address = listener.local_addr().unwrap();
+        let (started_sender, started_receiver) = std::sync::mpsc::channel();
+        let (release_sender, release_receiver) = std::sync::mpsc::channel();
+        let server = thread::spawn(move || {
+            let (mut stream, _) = listener.accept().unwrap();
+            stream
+                .set_read_timeout(Some(Duration::from_secs(2)))
+                .unwrap();
+            let mut request = Vec::new();
+            let mut buffer = [0; 1024];
+            loop {
+                let bytes = stream.read(&mut buffer).unwrap_or(0);
+                if bytes == 0 {
+                    break;
+                }
+                request.extend_from_slice(&buffer[..bytes]);
+                if request.windows(4).any(|window| window == b"\r\n\r\n") {
+                    break;
+                }
+            }
+            stream
+                .write_all(
+                    b"HTTP/1.1 200 OK\r\nContent-Length: 100\r\nConnection: keep-alive\r\n\r\nx",
+                )
+                .unwrap();
+            stream.flush().unwrap();
+            started_sender.send(()).unwrap();
+            let _ = release_receiver.recv_timeout(Duration::from_secs(3));
+        });
+
+        let state = Arc::new(RemoteState::default());
+        let generation = state.begin_reconfigure().unwrap();
+        state
+            .install(
+                generation,
+                RemoteConnection::new(&format!("http://{address}"), "inflight-secret").unwrap(),
+            )
+            .unwrap();
+        let request_state = Arc::clone(&state);
+        let request = thread::spawn(move || {
+            let connection = request_state.connection().unwrap();
+            tauri::async_runtime::block_on(async {
+                connection.request(StudioRemoteRequest::Status).await
+            })
+        });
+
+        started_receiver
+            .recv_timeout(Duration::from_secs(2))
+            .expect("the in-flight request did not reach the test server");
+        // Let reqwest consume the initial byte and wait for the rest of the
+        // declared body before disconnect invalidates the shared connection.
+        thread::sleep(Duration::from_millis(100));
+        state.close().unwrap();
+        let result = request.join().unwrap();
+        release_sender.send(()).unwrap();
+        server.join().unwrap();
+
+        assert!(result
+            .unwrap_err()
+            .contains("connection was closed or replaced"));
     }
 
     #[test]

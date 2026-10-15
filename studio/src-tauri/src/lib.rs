@@ -8,12 +8,12 @@ use tauri::State;
 use tauri_plugin_dialog::DialogExt;
 
 mod remote;
-use remote::{RemoteConnection, StudioRemoteRequest};
+use remote::{RemoteConnection, RemoteState, StudioRemoteRequest};
 
 #[derive(Default)]
 struct StudioState {
     storage: Arc<Mutex<Option<Storage>>>,
-    remote: Arc<Mutex<Option<RemoteConnection>>>,
+    remote: RemoteState,
 }
 
 #[derive(Serialize)]
@@ -264,20 +264,9 @@ async fn studio_remote_configure(
     base_url: String,
     token: String,
 ) -> Result<(), String> {
-    {
-        let mut remote = state
-            .remote
-            .lock()
-            .map_err(|_| "Studio remote state is poisoned".to_string())?;
-        *remote = None;
-    }
+    let configuration = state.remote.begin_reconfigure()?;
     let connection = RemoteConnection::new(&base_url, &token)?;
-    let mut remote = state
-        .remote
-        .lock()
-        .map_err(|_| "Studio remote state is poisoned".to_string())?;
-    *remote = Some(connection);
-    Ok(())
+    state.remote.install(configuration, connection)
 }
 
 #[tauri::command]
@@ -285,23 +274,13 @@ async fn studio_remote_request(
     state: State<'_, StudioState>,
     request: StudioRemoteRequest,
 ) -> Result<Value, String> {
-    let connection = state
-        .remote
-        .lock()
-        .map_err(|_| "Studio remote state is poisoned".to_string())?
-        .clone()
-        .ok_or_else(|| "No remote GenesisBlockDB is configured".to_string())?;
+    let connection = state.remote.connection()?;
     connection.request(request).await
 }
 
 #[tauri::command]
 async fn studio_remote_close(state: State<'_, StudioState>) -> Result<(), String> {
-    let mut remote = state
-        .remote
-        .lock()
-        .map_err(|_| "Studio remote state is poisoned".to_string())?;
-    *remote = None;
-    Ok(())
+    state.remote.close()
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]

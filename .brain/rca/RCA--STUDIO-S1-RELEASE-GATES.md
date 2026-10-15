@@ -67,19 +67,23 @@ The macOS package job was still pending when this evidence was recorded.
 ## Root cause
 
 The beta shell, mock transport, local Tauri commands, and REST routes were
-verified in separate test layers. No shared persisted-fixture drill connected
-the local and remote boundaries, and the release evidence checklist had no
-packaged picker or cross-platform package/startup result to reference. The
-original renderer remote adapter used `fetch` despite production CSP denying
-remote origins, so successful browser tests did not prove packaged networking.
-The adapter now routes remote calls through the fixed native Tauri bridge
-without broadening CSP. After the hidden-label assertion was corrected, run
-38706084034 passed packaged remote connection and completed native and visible
-local/remote result comparisons. It then failed before writing parity evidence:
-the summary formatter read `visibleResults.overview` although its argument
-contains `visibleResults.local.overview` and `visibleResults.remote.overview`.
-The formatter now reads `visibleResults.local.overview`; a fresh package rerun
-is required.
+originally verified in separate test layers. The native IPC bridge now keeps
+the production CSP unchanged, and packaged runs have exercised the picker,
+local reads, remote REST requests, and same-fixture result comparison. On exact
+head `1f24469b41c59a26c44afbdde7a93adb15bcca05`, run
+[38709296386](https://github.com/Freshair129/GenesisBlock/actions/runs/38709296386)
+produced a parity JSON artifact for all nine operations; the Node smoke stdout
+reports the strict comparison passed and the REST server returned HTTP 200.
+The Windows workflow still marked the smoke step failed because its PowerShell
+wrapper read a blank/unavailable child `ExitCode` after `WaitForExit` and
+treated that value as nonzero. The wrapper now refreshes the process, rejects
+unavailable exit status explicitly, and has a deliberate exit-code-7 probe;
+the exact-head package rerun is required before accepting the gate. Independent
+review also found a P2 disconnect race in cloned remote requests. The native
+bridge now shares cancellation and authorization state across clones, invalidates
+connections on close/reconfigure, and races cancellation against request send
+and bounded response reads. Its targeted and full remote Rust test subsets pass;
+independent re-review is still required.
 
 The first packaged Windows UI-smoke attempt also had a harness configuration
 defect: it set `WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS` after launch, but Wry
@@ -139,7 +143,10 @@ CSP.
 - Expose only fixed read-only route/method variants, validate URL scheme/host/
   port/path and graph query values, compare every target with the configured
   origin, disable redirects, and clear the in-memory token on disconnect or a
-  failed initial capabilities handshake.
+  failed initial capabilities handshake. Share cancellation and generation
+  state across cloned connections so disconnect/reconfigure prevents queued
+  requests from sending and aborts in-flight sends/body reads; clear shared
+  authorization at the same boundary.
 - Repeatedly decode path segments during validation to reject nested encoded
   traversal, separators, query/fragment delimiters, and invalid encoded bytes;
   reject unsafe entity-ID segments; and bound native JSON and error response
@@ -224,3 +231,32 @@ Windows MSI process startup/uninstall were observed. Windows picker selection,
 validation, local connection, and visible local reads are evidenced on the
 instrumented package, while native-operation parity, remote-origin/CSP, and
 same-fixture parity remain open.
+
+## Latest exact-head update (2026-10-15)
+
+On head `1f24469b41c59a26c44afbdde7a93adb15bcca05`, package run
+[38709296386](https://github.com/Freshair129/GenesisBlock/actions/runs/38709296386)
+passed Linux DEB and macOS DMG installed-startup probes. Windows ordinary MSI
+install/start/uninstall, Tauri shell tests, picker/path interaction, and the
+packaged local/remote comparison ran. The Windows smoke artifact contains
+`studio-packaged-parity.json` for all nine operations; its Node stdout reports
+the comparison passed, and REST request logs end in HTTP 200. The job was red
+because PowerShell observed a blank/unavailable `$uiSmokeProcess.ExitCode`
+after waiting without refreshing the `Process` snapshot. The wrapper now calls
+`Refresh()`, distinguishes unavailable exit status from a concrete nonzero
+code, and a local deliberate-child probe confirmed it rejects exit code 7.
+The package workflow will run that guard probe and then the packaged smoke on
+the next exact head. Until that run is green, packaged acceptance remains open.
+
+The independent review's P2 finding was that `studio_remote_request` cloned a
+connection before awaiting, while close only removed the shared `Option`; a
+queued clone could retain its bearer value and send after disconnect. The fix
+adds a checked configuration generation, shared cancellation token and shared
+authorization slot. Close/reconfigure cancel the token and clear shared auth;
+request send and each bounded response chunk read race against cancellation.
+Validation on this worktree: offline locked Cargo check passed; targeted
+disconnect tests passed 2/2, and all remote bridge Rust tests passed 10/10.
+The formal Codex Security launcher rejected its target before returning a
+scan ID, so no formal scan is claimed. The independent reviewer must re-review
+the new head. Keep issue #231 and merge open until that review and a fresh
+Windows/Linux/macOS package run pass.
