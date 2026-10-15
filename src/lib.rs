@@ -141,6 +141,9 @@ pub const ENGINE_NAME: &str = "genesis-block";
 /// via `version_sync()` (NAPI) and `GET /v1/version` (REST).
 pub const ENGINE_VERSION: &str = env!("CARGO_PKG_VERSION");
 
+#[cfg(test)]
+mod projection_rebuild_tests;
+
 // --- Types (PROTOCOL §3) ---
 
 #[cfg_attr(feature = "napi-bindings", napi(object))]
@@ -5872,17 +5875,46 @@ impl Storage {
         Ok(())
     }
 
-    fn projection_reopen_fresh(&self) -> Result<()> {
+    fn projection_rebuild_from_wal(&self) -> Result<()> {
         if self.read_only {
             return Ok(());
         }
-        if self.projection_path.exists() {
-            let _ = fs::remove_file(&self.projection_path);
-        }
-        let conn = Self::open_projection(&self.projection_path, false)?;
-        Self::init_projection_schema(&conn)?;
-        *self.projection_db.lock() = conn;
-        Ok(())
+        // Never unlink an open SQLite file: Windows rejects it and Unix can
+        // leave writers on an unlinked inode. Rebuild off to the side first.
+        // An empty filename is a SQLite-managed temporary database, removed
+        // on close, so failed recovery cannot replace the durable projection.
+        let rebuilt = Connection::open("").map_err(|e| Error::from_reason(e.to_string()))?;
+        let mut original = {
+            let mut conn = self.projection_db.lock();
+            let page_size: i64 = conn
+                .pragma_query_value(None, "page_size", |row| row.get(0))
+                .map_err(|e| Error::from_reason(e.to_string()))?;
+            rebuilt
+                .pragma_update(None, "page_size", page_size)
+                .map_err(|e| Error::from_reason(e.to_string()))?;
+            Self::init_projection_schema(&rebuilt)?;
+            std::mem::replace(&mut *conn, rebuilt)
+        };
+        let replay = self.projection_replay_wal();
+        let mut rebuilt = self.projection_db.lock();
+        let result = replay.and_then(|()| {
+            // SQLite publishes the completed backup transaction atomically.
+            // Busy/locked is a bounded failure, not an endless startup retry.
+            let backup = rusqlite::backup::Backup::new(&rebuilt, &mut original)
+                .map_err(|e| Error::from_reason(e.to_string()))?;
+            match backup
+                .step(-1)
+                .map_err(|e| Error::from_reason(e.to_string()))?
+            {
+                rusqlite::backup::StepResult::Done => Ok(()),
+                _ => Err(Error::from_reason(
+                    "PROJECTION_REBUILD_BUSY: projection publication did not complete",
+                )),
+            }
+        });
+        // Restore the live file connection on failure as well as success.
+        *rebuilt = original;
+        result
     }
 
     fn projection_replay_wal(&self) -> Result<()> {
@@ -5958,8 +5990,7 @@ impl Storage {
         // rely on full-clock LWW upserts for idempotence. A durable sequence cursor
         // belongs to the unified transaction protocol, not this S0/S1 projection.
         if self.projection_replay_wal().is_err() {
-            self.projection_reopen_fresh()?;
-            self.projection_replay_wal()?;
+            self.projection_rebuild_from_wal()?;
         }
         self.rebuild_edge_history()?;
         self.projection_backfill_edges()?;

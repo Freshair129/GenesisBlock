@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed - Windows relational projection reopen
+
+- Rebuild a failed journal projection in a temporary database and publish a
+  successful result through SQLite's backup transaction instead of unlinking an
+  open file. Preserve the original connection on replay/publication failure.
+- Cover schema upgrade/repeated reopen, pre-upgrade Thai rows, post-reopen edits
+  and failure safety. See [repair evidence](docs/REPORT--WINDOWS-PROJECTION-REOPEN-2026-10-15.md)
+  for the 38 bounded checks and FUNG #41 consumer boundary.
+
 ### Fixed - deployed benchmark fixture compatibility
 
 GenesisRAG17 workers now accept the deployed per-record `benchmarks[].queries`
