@@ -352,14 +352,19 @@ fn failed_incremental_replay_does_not_mutate_the_live_projection() {
     let first_event_len = append_signed_event_frame(
         dir.path(),
         first_seq + 1,
-        Event::RelationalRows {
-            namespace: "projection_recovery".into(),
-            schema_version: 99,
-            mutation_id: "invalid-schema-version".into(),
-            payload_hash: "invalid".into(),
-            affected_rows: 0,
-            mutations: vec![],
-        },
+        // Keep this old WAL fixture compatible with serde-defaulted fields
+        // added to Event after a projection recovery branch was based.
+        serde_json::from_value::<Event>(json!({
+            "RelationalRows": {
+                "namespace": "projection_recovery",
+                "schema_version": 99,
+                "mutation_id": "invalid-schema-version",
+                "payload_hash": "invalid",
+                "affected_rows": 0,
+                "mutations": [],
+            }
+        }))
+        .expect("deserialize legacy relational-rows event"),
     );
 
     let error = match Storage::open(OpenOptions {
