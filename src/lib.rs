@@ -11865,6 +11865,12 @@ impl Storage {
             .as_ref()
             .expect("candidate connection was just initialized");
         Self::init_projection_schema(conn)?;
+        // Schema-v6 WAL frames carry record revisions, so the blank replay
+        // candidate must have the same auxiliary tables as a normal writable
+        // projection before it can replay those frames.
+        if self.storage_schema_version == SCHEMA_VERSION {
+            Self::init_hql2_revision_schema(conn)?;
+        }
         Ok(candidate)
     }
 
