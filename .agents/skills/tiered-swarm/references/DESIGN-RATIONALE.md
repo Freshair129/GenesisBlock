@@ -44,15 +44,19 @@ reasoning to the router."
 ### Recommendation — a 2-axis taxonomy
 
 **Axis 1 — Capability tiers (the escalation ladder).** Five rungs, cheap→expensive, because
-the cloud-open-weights insert a real fourth price band between local and Claude:
+the cloud-open-weights insert a real fourth price band between local and configured T2/T3:
 
 | Tier | Role | Concrete model (this inventory) | Marginal cost |
 |---|---|---|---|
 | **T0** local-SLM | fast classify / cheap verify | `vibethinker-3b` (~2.0 GB), `chinda-qwen3-4b` (~2.6 GB) | ~$0 |
 | **T1** local-mid | bulk reasoning, code, structured output | `aroow-rust-coder-9b` (~5.6 GB), `mellum2-12b-a2.5b` (~8.3 GB, ~2.5B active), `gemma-4-12b-coder` (~7.6 GB) | ~$0 |
-| **T1.5** cloud-open-weights | near-frontier code at 5–20× under Claude | `kimi-k2.7-code:cloud`, `deepseek-v4-pro:cloud`, `qwen3-coder-next:cloud` (0 local VRAM) | ~$0.1–0.5 /M out |
-| **T2** Claude-mid | quality general / authoring | `claude-sonnet-4-6` | $3 in / $15 out |
-| **T3** Claude-frontier | hard reasoning, adversarial review | `claude-opus-4-8` | $5 in / $25 out |
+| **T1.5** cloud-open-weights | near-frontier code at 5–20× under the example Claude profile | `kimi-k2.7-code:cloud`, `deepseek-v4-pro:cloud`, `qwen3-coder-next:cloud` (0 local VRAM) | ~$0.1–0.5 /M out |
+| **T2** configured provider | quality general / authoring | `${TIERED_SWARM_T2_MODEL_ID}` | exact `PRICING` entry required |
+| **T3** configured provider | hard reasoning, adversarial review | `${TIERED_SWARM_T3_MODEL_ID}` | exact `PRICING` entry required |
+
+The host sets those variables to exact model IDs before routing. They have no provider
+defaults. The Claude prices elsewhere in this document are an explicit, dated price profile;
+they do not assign a T2/T3 model.
 
 **Axis 2 — Role specialists (orthogonal; selected by *task type*, not by difficulty).** A
 task first picks a *role*; only text-generation roles then pick a *tier*:
@@ -74,9 +78,9 @@ cheapest-possible-first: start with **rules-based** thresholds (token count, fil
 presence of a `verify_command`) at **zero VRAM**; only when rules are ambiguous, escalate to
 a **T0 classifier SLM**. The human orchestrator from the prior run is the top of this
 control plane — the skill automates the rule layer beneath them. In skill terms ("Don't
-Build Your Own Agent"), the router is realized through Claude Code's built-in **sub-agent
-dispatch**, not an embedded LLM framework — `scripts/route.py` computes a *tier hint*
-deterministically, but the actual model invocation is the Agent/Task mechanism.
+Build Your Own Agent"), the router is realized through the host's built-in **Agent/Task
+dispatch**, not an embedded LLM framework — `scripts/route.py` computes a *tier hint* and
+executor ID deterministically, but the actual model invocation is the host mechanism.
 
 ---
 
@@ -222,8 +226,9 @@ TOTAL ≈ $1.91   →  ~47% cheaper than (A)
 because verification is the cheap-eligible, machine-checkable role* — each verifier returns
 a structured **finding + evidence** (a grep/line-cite), exactly the deterministic check Q2
 requires. But the failure mode is concrete and expensive: a **T1 verifier that hallucinates
-a finding** feeds a wrong premise into a **T3 Opus author**, which spends full frontier
-price authoring on a false foundation — then the reviewer catches it and the *entire author
+a finding** feeds a wrong premise into a **configured T3 author** (using the explicit Opus
+price profile in this example), which spends full frontier price authoring on a false
+foundation — then the reviewer catches it and the *entire author
 phase reruns*. One bad local verifier can erase the $1.70 of "saved" verify cost **and** add
 a ~$1.9 author redo: net *worse* than Claude-only. This is why the **verify gate (Q2) and
 the per-finding executable AC (Q4) are mandatory.** Mitigation: route the verifier tier
@@ -359,15 +364,15 @@ scripts/route.py (router = ROLE, rules-first, T0-SLM on ambiguity, 0-VRAM defaul
 OUTER LOOP (the proven spine):
    Verify  → N parallel, cheap-eligible (T1 local / T0 SLM), each returns finding+EVIDENCE
             └─ [Verify-gate AC: every finding's evidence command resolves]  ← economic interlock (Q2)
-   Author  → parallel @ T3 Opus (e.g. RCA doc + swarm plan)   ← never fed unverified cheap output
-   Review  → @ T3 Opus, adversarial gate
+  Author  → parallel @ configured T3 (e.g. RCA doc + swarm plan) ← never fed unverified cheap output
+  Review  → @ configured T3, adversarial gate
    Assemble→ human orchestrator: assemble files + final review vs epic DoD  ← human-in-loop
 
 INNER LOOP (per implementation task): compose tdd-workflow  RED(=verify_command) → GREEN(@routed tier) → REFACTOR
 
 COST LEDGER (every call, every tier):
    cost = Σ_tier [ in_uncached·rate_in + in_cached·rate_cacheRead + cache_write·rate_cacheWrite + out·rate_out ]
-   - Claude rates RE-VERIFY before billing; local rate=0 but METERED via Ollama prompt_eval_count/eval_count
+   - exact billed IDs need sourced PRICING entries; Claude rates are one dated profile; explicit local rates=0 but METERED via Ollama prompt_eval_count/eval_count
    - shared-prefix cache_control on the verifiers (render: tools→system→messages; breakpoint after shared spec block)
 
 ACCEPTANCE (multi-level, Q4):  1 epic DoD (SSOT)  +  4 phase-gate AC  +  N executable per-task AC

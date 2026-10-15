@@ -7,6 +7,7 @@ import {
   ChevronRight,
   CircleDot,
   Database,
+  FolderOpen,
   GitBranch,
   Network,
   Play,
@@ -27,13 +28,8 @@ import type {
   StudioTransport,
 } from './domain/contracts';
 import { GraphCanvas } from './features/graph/GraphCanvas';
-import { createLocalTransport, createRemoteTransport } from './transports/backend';
+import { createLocalTransport, createRemoteTransport, pickLocalDataRoot } from './transports/backend';
 import { createMockTransport } from './transports/mock';
-
-const presentationRoots = [
-  { label: 'SQLite substrate sample', path: 'G:\\GenesisBlock_Dev\\GenesisBlock\\target\\tmp\\sqlite_projection_bootstrap' },
-  { label: 'Persistence sample', path: 'G:\\GenesisBlock_Dev\\GenesisBlock\\tests\\test_persistence_db' },
-];
 
 const navigation = [
   { label: 'Overview', icon: Activity },
@@ -55,6 +51,7 @@ function ConnectionScreen({ onConnect }: { onConnect: (transport: StudioTranspor
   const [token, setToken] = useState('');
   const [error, setError] = useState('');
   const [connecting, setConnecting] = useState(false);
+  const [selectingRoot, setSelectingRoot] = useState(false);
 
   const connect = async () => {
     setConnecting(true);
@@ -68,6 +65,19 @@ function ConnectionScreen({ onConnect }: { onConnect: (transport: StudioTranspor
       setError(reason instanceof Error ? reason.message : String(reason));
     } finally {
       setConnecting(false);
+    }
+  };
+
+  const browseForRoot = async () => {
+    setSelectingRoot(true);
+    setError('');
+    try {
+      const selectedPath = await pickLocalDataRoot();
+      if (selectedPath) setPath(selectedPath);
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : String(reason));
+    } finally {
+      setSelectingRoot(false);
     }
   };
 
@@ -89,18 +99,13 @@ function ConnectionScreen({ onConnect }: { onConnect: (transport: StudioTranspor
         </div>
         {mode === 'local' ? (
           <>
-            <label className="connection-field">
-              <span>GENESIS DATA ROOT</span>
-              <input value={path} onChange={(event) => setPath(event.target.value)} placeholder="C:\\data\\my-genesis-db" />
-            </label>
-            <div className="demo-presets">
-              <span>Presentation presets</span>
-              <div>
-                {presentationRoots.map((preset) => (
-                  <button key={preset.path} type="button" onClick={() => setPath(preset.path)}>
-                    {preset.label}
-                  </button>
-                ))}
+            <div className="connection-field">
+              <label htmlFor="genesis-data-root">GENESIS DATA ROOT</label>
+              <div className="path-picker">
+                <input id="genesis-data-root" value={path} onChange={(event) => setPath(event.target.value)} placeholder="C:\\data\\my-genesis-db" />
+                <button type="button" onClick={() => void browseForRoot()} disabled={selectingRoot || connecting}>
+                  <FolderOpen size={16} /> {selectingRoot ? 'Choosing folder…' : 'Browse'}
+                </button>
               </div>
             </div>
           </>
@@ -112,7 +117,7 @@ function ConnectionScreen({ onConnect }: { onConnect: (transport: StudioTranspor
         )}
         {error && <p className="connection-error" role="alert">{error}</p>}
         <div className="connection-actions">
-          <button className="primary-action" onClick={() => void connect()} disabled={connecting || (mode === 'local' && !path.trim())}>
+          <button className="primary-action" onClick={() => void connect()} disabled={connecting || selectingRoot || (mode === 'local' && !path.trim())}>
             {connecting ? 'Negotiating capabilities...' : `Connect ${mode}`} <ChevronRight size={18} />
           </button>
           <button className="presentation-action" onClick={() => onConnect(createMockTransport())}>
@@ -288,21 +293,9 @@ function Workspace({ transport, onDisconnect }: WorkspaceProps) {
           </section>
           <section className="graph-workbench">
             <div className="graph-toolbar">
-              <label><Search size={16} /><input value={filter} onChange={(event) => setFilter(event.target.value)} placeholder="Filter this bounded scene" /></label>
+              <label><Search size={16} aria-hidden="true" /><input aria-label="Filter graph scene nodes" type="search" value={filter} onChange={(event) => setFilter(event.target.value)} placeholder="Filter this bounded scene" /></label>
               <div className="legend">{scene?.groups.slice(0, 4).map((group) => <span key={group}><i /> {group}</span>)}</div>
             </div>
-            {scene && (
-              <div className="spotlight-strip">
-                <span>Spotlight entities</span>
-                <div>
-                  {scene.nodes.slice(0, 5).map((node) => (
-                    <button key={node.id} type="button" onClick={() => selectNode(node)}>
-                      {node.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
             <div className="graph-frame">
               {scene ? <GraphCanvas scene={scene} filter={filter} selectedId={selected?.id ?? null} onSelect={selectNode} /> : <div className="graph-loading">Composing bounded scene...</div>}
               <div className="scene-stamp"><Network size={15} /><span>{transport.kind.toUpperCase()} SCENE<br /><b>{scene?.nodes.length ?? 0} / {capabilities?.limits.sceneNodeCeiling ?? '---'} node budget</b></span></div>
@@ -362,8 +355,8 @@ function Workspace({ transport, onDisconnect }: WorkspaceProps) {
     }
     return (
       <section className="query-workbench">
-        <span className="eyebrow">READ-ONLY HQL</span>
-        <textarea value={query} onChange={(event) => setQuery(event.target.value)} spellCheck={false} />
+        <label className="eyebrow" htmlFor="hql-query-editor">READ-ONLY HQL EDITOR</label>
+        <textarea id="hql-query-editor" value={query} onChange={(event) => setQuery(event.target.value)} spellCheck={false} />
         <button className="primary-action" onClick={() => void runQuery()}><Play size={15} /> Run bounded query</button>
         <pre>{queryResult ? JSON.stringify(queryResult, null, 2) : 'Results appear here with no write fallback.'}</pre>
       </section>

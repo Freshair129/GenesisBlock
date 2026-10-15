@@ -88,7 +88,7 @@ Each Phase-3 task entry carries these fields:
   description: "<the unit of work, one routable thing>"
   requirement_ref: R-<x.y>       # traceability back to the EARS requirement (existing)
   tier_hint: <T0|T1|T1.5|T2|T3>  # router's STARTING rung; router may escalate on gate fail
-  executor_model: "<model tag>"  # concrete model for tier_hint (e.g. aroow-rust-coder-9b)
+  executor_model: "<model ID>"   # exact model ID returned by route.py for tier_hint
   verify_command: "<cmd>"        # the executable per-task AC = the RED test (Q4/Q5 keystone)
   depends_on: [T-<k>, ...]       # tasks that must pass first (empty = independent/parallel)
   review_gate: <true|false>      # true → output must clear the adversarial Review phase
@@ -104,7 +104,9 @@ Field notes:
   (file type, token estimate, presence of `verify_command`, domain = Rust → an
   `Aroow-Rust-Coder`-class model). It is a hint, not a verdict: on a failed gate the
   router **escalates one rung** `T0 → T1 → T1.5 → T2 → T3` per the FrugalGPT cascade.
-- **`executor_model`** — the concrete model the `tier_hint` resolves to on this host.
+- **`executor_model`** — the exact model ID the `tier_hint` resolves to on this host.
+  For T2/T3, set `TIERED_SWARM_T2_MODEL_ID` / `TIERED_SWARM_T3_MODEL_ID` before routing;
+  the router has no provider defaults. Use its returned ID in the task record.
   Text-generation roles pick a tier; **role specialists** (embed/rerank/VLM) are picked by
   *task type*, never by difficulty — and any embedding query against the GenesisBlock
   vector store is **engine-matched to `bge-m3`** (mandatory; any other embedder breaks
@@ -121,8 +123,8 @@ Field notes:
 | T0 | local-SLM: classify / cheap verify | `vibethinker-3b`, `chinda-qwen3-4b` | ~$0 |
 | T1 | local-mid: bulk reasoning / code / structured | `aroow-rust-coder-9b`, `mellum2-12b-a2.5b` | ~$0 |
 | T1.5 | cloud-open-weights: near-frontier code | `kimi-k2.7-code:cloud`, `deepseek-v4-pro:cloud` | ~$0.1–0.5/M |
-| T2 | Claude-mid: quality general / authoring | `claude-sonnet-4-6` | $3 in / $15 out |
-| T3 | Claude-frontier: hard reasoning / adversarial review | `claude-opus-4-8` | $5 in / $25 out |
+| T2 | configured provider: quality general / authoring | `${TIERED_SWARM_T2_MODEL_ID}` | exact `PRICING` entry required |
+| T3 | configured provider: hard reasoning / adversarial review | `${TIERED_SWARM_T3_MODEL_ID}` | exact `PRICING` entry required |
 
 ---
 
@@ -181,7 +183,7 @@ tasks:
     description: "If any of T-1..T-3 fail, author an RCA of the bitemporal gap"
     requirement_ref: R-4.2
     tier_hint: T3            # authoring on a (possibly) broken contract → frontier
-    executor_model: "claude-opus-4-8"
+    executor_model: "${TIERED_SWARM_T3_MODEL_ID}"
     verify_command: "test -f .brain/rca/edge-retract-bitemporal.md"
     depends_on: [T-1, T-2, T-3]
     review_gate: true        # RCA goes through adversarial Review before Assemble

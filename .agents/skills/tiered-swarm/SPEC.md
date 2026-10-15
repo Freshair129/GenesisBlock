@@ -12,7 +12,8 @@
 ## 0. Goal
 
 Reproduce a **spec-driven, local-first, cost-tiered multi-model orchestration** capability
-that routes each sub-task to the cheapest tier (local Ollama → cloud-open-weights → Claude)
+that routes each sub-task to the cheapest tier (local Ollama → cloud-open-weights →
+provider-configured T2/T3)
 that can pass a machine-checkable acceptance command, behind a verify gate, with a two-way
 cost ledger metering every tier including local. The proven spine is
 `VERIFY → AUTHOR → REVIEW → ASSEMBLE`.
@@ -27,10 +28,13 @@ Constraints:
     defensively. (This host: python 3.13.7, no `python3` alias.)
   - Compose, do not merge: reuse the `spec-driven-development` and `tdd-workflow` skills;
     this skill owns only the outer spine + routing + verify gate + cost ledger.
-  - Pricing is a dated snapshot with an UNCERTAINTY FLAG — never present Claude rates as
-    certain; re-verify before any billing logic.
+  - T2/T3 exact model IDs come from `TIERED_SWARM_T2_MODEL_ID` and
+    `TIERED_SWARM_T3_MODEL_ID`; the router has no provider defaults.
+  - Pricing accepts only exact IDs in `PRICING`; local zero rates must be explicit. The
+    dated Claude rates are one profile with an UNCERTAINTY FLAG, not defaults.
   - Scripts in scripts/ MUST NOT embed LLM API SDKs (openai/anthropic/langchain). Model
-    invocation = Agent/Task (Claude) or the Ollama HTTP API (local/cloud-OW).
+    invocation = the host's Agent/Task mechanism (configured T2/T3) or the Ollama HTTP API
+    (local/cloud-OW).
   - Out of scope: a long-running daemon; multi-GPU; a GUI; auto-pulling models.
 ```
 
@@ -45,9 +49,9 @@ EPIC DoD:
   WHEN an operator invokes the tiered-swarm skill with a decomposed task and a host that
        meets the constraints,
   THE SYSTEM SHALL route each sub-task to a tier, gate cheap output behind a verify command,
-       and emit an auditable two-way cost ledger covering local and Claude tiers,
+       and emit an auditable two-way cost ledger covering local and billed tiers,
   AND every script SHALL run dependency-light on `python` (no python3 requirement) and a
-       mistyped billed model SHALL fail loudly rather than be priced at $0.
+       unknown model IDs SHALL fail loudly rather than be guessed or priced at $0.
   Done means: a fresh-host smoke test (BLUEPRINT.md §5) passes all phase gates below.
 ```
 
@@ -107,7 +111,7 @@ tasks:
     requirement_ref: R-3
     tier_hint: T1
     executor_model: aroow-rust-coder-9b
-    verify_command: "echo '{\"tasks\":[{\"id\":\"x\",\"description\":\"author rca\",\"review_gate\":true},{\"id\":\"y\",\"description\":\"check\",\"verify_command\":\"cargo test\"}]}' | python scripts/route.py - --json | python -c \"import sys,json; r={x['id']:x for x in json.load(sys.stdin)}; assert r['x']['cheap_eligible'] is False and r['x']['computed_tier']=='T3'; assert r['y']['executor_model']=='aroow-rust-coder-9b'; print('route OK')\""
+    verify_command: "printf '{\"tasks\":[{\"id\":\"x\",\"description\":\"author rca\",\"review_gate\":true},{\"id\":\"y\",\"description\":\"check\",\"verify_command\":\"cargo test\"}]}' | env TIERED_SWARM_T2_MODEL_ID=test-t2 TIERED_SWARM_T3_MODEL_ID=test-t3 python scripts/route.py - --json | python -c \"import sys,json; r={x['id']:x for x in json.load(sys.stdin)}; assert r['x']['cheap_eligible'] is False and r['x']['computed_tier']=='T3' and r['x']['executor_model']=='test-t3'; assert r['y']['executor_model']=='aroow-rust-coder-9b'; print('route OK')\""
     depends_on: []
     review_gate: false
 
@@ -121,7 +125,7 @@ tasks:
     review_gate: false
 
   - id: T-6
-    description: "cost_estimate.py computes the two-way formula and a typo'd Claude tag RAISES"
+    description: "cost_estimate.py computes the two-way formula and an unknown billed ID RAISES"
     requirement_ref: R-4
     tier_hint: T1
     executor_model: mellum2-12b-a2.5b
@@ -130,7 +134,7 @@ tasks:
     review_gate: false
 
   - id: T-7
-    description: "cost_ledger.py aggregates a mixed local+Claude ledger with a local/billed split"
+    description: "cost_ledger.py aggregates a mixed local+billed ledger with a local/billed split"
     requirement_ref: R-4
     tier_hint: T1
     executor_model: mellum2-12b-a2.5b
@@ -164,6 +168,15 @@ tasks:
     verify_command: "for q in 'Q1' 'Q2' 'Q3' 'Q4' 'Q5'; do grep -q \"## $q\" references/DESIGN-RATIONALE.md || exit 1; done; echo 'rationale OK'"
     depends_on: []
     review_gate: false
+
+  - id: T-11
+    description: "both skill copies use configured T2/T3 IDs and reject unknown prices"
+    requirement_ref: R-7
+    tier_hint: T1
+    executor_model: mellum2-12b-a2.5b
+    verify_command: "python -m unittest discover -s tests -p 'test_model_configuration.py' -v"
+    depends_on: []
+    review_gate: false
 ```
 
 ### Requirements traceability
@@ -174,9 +187,10 @@ tasks:
 | R-1 | Two-axis taxonomy: capability tiers ⟂ role specialists; router is a role. |
 | R-2 | Local-first only behind a verify gate; FrugalGPT break-even decides cheap-vs-escalate. |
 | R-3 | No machine-checkable `verify_command` ⟹ not cheap-eligible ⟹ floor T2+. |
-| R-4 | Two-way cost (count × per-type price), metered on every tier; typo'd billed tag fails loud. |
+| R-4 | Two-way cost (count × per-type price), metered on every tier; unknown IDs fail closed. |
 | R-5 | Compose `spec-driven-development` + `tdd-workflow`; never merge. |
 | R-6 | The five design decisions are recorded in DESIGN-RATIONALE.md. |
+| R-7 | T2/T3 model IDs are host-configured; only exact IDs in `PRICING` may be costed. |
 
 ---
 

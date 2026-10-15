@@ -114,6 +114,7 @@ const routesSection = routesStart === -1 ? [] : lines.slice(routesStart + 1);
 const globalContext = collectList(rootSection, 'global_context');
 const requiredGlobal = [
   'setup/AGENT.md',
+  'AGENTS.md',
   'AGENT.md',
   'ARCHITECTURE.md',
   'CONTRIBUTING.md',

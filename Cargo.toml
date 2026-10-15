@@ -2,6 +2,7 @@
 name = "genesis-block-native"
 version = "0.2.9"
 edition = "2021"
+rust-version = "1.88"
 description = "Genesis Block — high-performance hybrid semantic-graph engine"
 license = "MIT"
 publish = false

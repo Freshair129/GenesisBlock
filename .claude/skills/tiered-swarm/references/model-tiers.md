@@ -20,7 +20,7 @@ These rungs describe **text-generation reasoning power at a price** and nothing 
 router starts a task at its `tier_hint` and escalates ONE rung on a failed verify gate:
 `T0 → T1 → T1.5 → T2 → T3`.
 
-| Tier | Role on the ladder | Concrete model (ollama tag / Claude id) | Resident VRAM @ quant | Marginal cost |
+| Tier | Role on the ladder | Concrete model (Ollama tag / configured provider ID) | Resident VRAM @ quant | Marginal cost |
 |---|---|---|---|---|
 | **T0** local-SLM | fast classify / triage / cheap verify | `vibethinker:3b` | ~2.0 GB (Q4) | ~$0 |
 | | | `chinda-qwen3:4b` | ~2.6 GB (Q4) | ~$0 |
@@ -33,28 +33,31 @@ router starts a task at its `tier_hint` and escalates ONE rung on a failed verif
 | | | `deepseek-v4-pro:cloud` | 0 GB | ~$0.1–0.5 /M out |
 | | | `qwen3-coder-next:cloud` | 0 GB | ~$0.1–0.5 /M out |
 | | | `gemini-3-flash-preview:cloud` | 0 GB | ~$0.1–0.5 /M out |
-| **T2** Claude-mid | quality general / authoring | `claude-sonnet-4-6` | n/a (API) | $3 in / $15 out per M |
-| **T3** Claude-frontier | hard reasoning, adversarial review gate | `claude-opus-4-8` | n/a (API) | $5 in / $25 out per M |
+| **T2** configured provider | quality general / authoring | `${TIERED_SWARM_T2_MODEL_ID}` | n/a (host API) | exact `PRICING` entry required |
+| **T3** configured provider | hard reasoning, adversarial review gate | `${TIERED_SWARM_T3_MODEL_ID}` | n/a (host API) | exact `PRICING` entry required |
+
+Set the environment variables to the host's exact model IDs before routing work that can
+reach T2/T3. No provider or model default is implied. Routing configuration does not add a
+price: `cost_estimate.py` accepts only exact IDs present in `PRICING`, including explicit
+zero-rate entries for models confirmed to be local.
 
 > Local tier marginal cost is ~$0 (sunk VRAM + electricity) but **NOT $0/error** — a wrong
 > cheap output costs the verify pass that catches it + the frontier pass that redoes it +
 > downstream propagation. It is "off the billable axis," not free. **Meter it anyway:**
 > Ollama returns `prompt_eval_count` (input) and `eval_count` (output) per response; log
-> these into the cost ledger at rate 0 so the local/Claude split is auditable.
+> these into the cost ledger at rate 0 so the local/billed split is auditable.
 
-**`claude-haiku-4-5`** ($1 in / $5 out per M) sits below Sonnet on the Claude side — use it
-as a cheap Claude judge in the verify gate when a deterministic check is too fuzzy but you
-do not want a full Sonnet/Opus pass. It is a Claude-tier judge, not part of the local
-ladder.
+The explicit Claude price profile below also includes `claude-haiku-4-5` ($1 in / $5 out
+per M). It may be used as a judge only when that exact model is selected in host dispatch;
+it is not a default T2/T3 model.
 
-The cloud-open-weights band (T1.5) inserts a real fourth price tier between local and
-Claude. The FrugalGPT break-even therefore applies **twice**: local-mid → cloud-OW
-(escalate when local error cost > cloud price), then cloud-OW → Claude (escalate when cloud
-error cost > the frontier price delta). For GenesisBlockDB Rust work the recommended
-cascade is `aroow-rust-coder:9b` → `kimi-k2.7-code:cloud` → `claude-sonnet-4-6` →
-`claude-opus-4-8`.
+The cloud-open-weights band (T1.5) inserts a real fourth price tier between local and the
+configured billed tiers. The FrugalGPT break-even therefore applies **twice**: local-mid →
+cloud-OW (escalate when local error cost > cloud price), then cloud-OW → configured T2/T3.
+For GenesisBlockDB Rust work, a host can configure the final rungs through the two model ID
+environment variables.
 
-### Claude per-type rate vector (for the cost ledger — RE-VERIFY before billing)
+### Explicit Claude per-type rate profile (for the cost ledger — RE-VERIFY before billing)
 
 All figures $/million tokens (cache write/read derived from input multipliers: write 5-min
 = 1.25×, write 1-hr = 2.0×, read = 0.1×).
@@ -105,10 +108,9 @@ receives delegated work itself. Listing it as a tier is a category error (you ca
 2. **Only on ambiguity**, escalate to a **T0 classifier SLM** (`vibethinker:3b`).
 
 The human orchestrator is the top of this control plane; the skill automates the rule layer
-beneath them. In skill terms the actual model invocation is Claude Code's built-in
-sub-agent (Task) dispatch for Claude tiers, or the Ollama HTTP API for local/cloud-OW
-tiers — `scripts/route.py` only computes a deterministic *tier hint*, it never calls a
-model.
+beneath them. Actual T2/T3 invocation uses the host's Agent/Task mechanism with the exact
+configured model ID; local/cloud-OW invocation uses the Ollama HTTP API. `scripts/route.py`
+only computes a deterministic *tier hint* and executor ID; it never calls a model.
 
 ---
 
@@ -142,7 +144,8 @@ qwythos:9b (7.0) + bge-m3:latest (1.3) + bge-reranker-v2-m3 (0.7) + vibethinker:
 ## 8GB GPU fallback
 
 Drop the mid models entirely. Run the SLM slot co-resident with the full embed+rerank
-stack, and escalate all mid/frontier work to the cloud-OW (T1.5) and Claude tiers:
+  stack, and escalate all mid/frontier work to cloud-OW (T1.5) and the configured T2/T3
+  tiers:
 ```
 vibethinker:3b (2.0) + chinda-qwen3:4b (2.6) + bge-m3:latest (1.3) + bge-reranker-v2-m3 (0.7) ≈ 6.6 GB  ✓
 ```
