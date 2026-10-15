@@ -1,7 +1,7 @@
 ---
 version: "0.3.0b"
 created_at: "2026-10-15T09:28:05+07:00,Codex,working-tree"
-last_update: "2026-10-15T15:29:24+07:00,Codex"
+last_update: "2026-10-15T15:54:42+07:00,Codex"
 status: open
 superseded_by: null
 attributes:
@@ -21,10 +21,12 @@ release-readiness evidence gap. It does not assert a production outage.
 Studio S1 is beta implemented, but the repository does not yet prove that a
 packaged local Tauri session and remote REST session return equivalent results
 from one persisted fixture. Packaged Windows picker/path handling and local UI
-reads now have evidence. The latest Windows smoke reached the authenticated
-remote REST routes through the packaged bridge, but its status assertion timed
-out before writing the parity comparison. Independent architecture/security
-review acceptance remains open. In package
+reads now have evidence. The latest Windows smoke reached authenticated remote
+REST routes through the packaged bridge and completed native and visible
+local/remote result comparisons. It then threw while building the evidence
+summary because it used a flattened overview path instead of the nested local
+result. No parity JSON was written. Independent architecture/security review
+acceptance remains open. In package
 run [38698802743](https://github.com/Freshair129/GenesisBlock/actions/runs/38698802743)
 at head `aaf71c63cb7ed538e3e2db7da1ee2472a5dbd5ad`, Linux package/startup passed
 and the ordinary Windows MSI installed, launched for ten seconds, and
@@ -57,6 +59,7 @@ The macOS package job was still pending when this evidence was recorded.
 - Studio packaging run [38686388595](https://github.com/Freshair129/GenesisBlock/actions/runs/38686388595), at head `5419a91cca67cd5aca67deea130c031d2eaa84f4`, completed all three package jobs. The Linux DEB package installed and launched successfully; the macOS DMG package installed and launched successfully; the Windows MSI installer completed successfully but the smoke failed before UI interaction because Playwright `connectOverCDP` received `ECONNREFUSED 127.0.0.1:50705`. The Windows fixture seed and REST server build steps passed, but no packaged picker, local/remote UI parity, remote-mode CSP result, or startup-screen result is claimed. The [MSI](https://github.com/Freshair129/GenesisBlock/actions/runs/38686388595/artifacts/11950739509), [DMG](https://github.com/Freshair129/GenesisBlock/actions/runs/38686388595/artifacts/11950784409), [DEB](https://github.com/Freshair129/GenesisBlock/actions/runs/38686388595/artifacts/11950242206), and [smoke evidence](https://github.com/Freshair129/GenesisBlock/actions/runs/38686388595/artifacts/11950994174) are retained as workflow artifacts.
 - Follow-up package run [38698802743](https://github.com/Freshair129/GenesisBlock/actions/runs/38698802743), head `aaf71c63cb7ed538e3e2db7da1ee2472a5dbd5ad`: Linux DEB install/startup passed; Windows persisted-fixture parity test, REST server build, Tauri shell tests, MSI build, ordinary MSI install/start/uninstall, missing/non-directory validation, picker cancel/select, local UI reads, and native local reads passed. The UI smoke then timed out finding the `Connections` button. The Windows Installer evidence reports 1024x768; `styles.css` hid `.disconnect` at max-width 1050px. Thus local interaction was reached, but the smoke never signaled local disconnect or started the remote server. The UI now retains an accessible icon-only connection button at this narrow desktop width. Windows smoke evidence is [artifact 11956860311](https://github.com/Freshair129/GenesisBlock/actions/runs/38698802743/artifacts/11956860311), the ordinary MSI evidence is included there, and the Linux DEB is [artifact 11955897591](https://github.com/Freshair129/GenesisBlock/actions/runs/38698802743/artifacts/11955897591). The macOS job and rerun of this UI fix remain pending.
 - Latest package run [38702744877](https://github.com/Freshair129/GenesisBlock/actions/runs/38702744877), head `685e03f084762f8dcbd35fd1268d7295351c168d`: Linux DEB install/startup passed; its [smoke artifact 11957477549](https://github.com/Freshair129/GenesisBlock/actions/runs/38702744877/artifacts/11957477549) records `/usr/bin/genesis-studio` alive for the 12-second window. macOS DMG install/startup also passed; its [smoke artifact 11957793005](https://github.com/Freshair129/GenesisBlock/actions/runs/38702744877/artifacts/11957793005) records `Genesis Studio.app` alive for 10 seconds. Windows normal MSI installed/launched/uninstalled, fixture seeding, packaged picker/path validation, picker cancel/select, local UI/native reads, and disconnect all passed. The packaged remote server returned HTTP 200 for capabilities, status, graph, collections, frontier, and relational schemas, but the smoke timed out before emitting parity JSON. At 1024px, the responsive stylesheet hides `.connection-chip span`; the smoke incorrectly used `innerText` on that hidden label. This is a smoke assertion defect; it does not establish parity. The [Windows evidence artifact 11957773049](https://github.com/Freshair129/GenesisBlock/actions/runs/38702744877/artifacts/11957773049) includes the request logs and markers. The status assertion correction and packaged parity rerun are pending.
+- Exact-head package run [38706084034](https://github.com/Freshair129/GenesisBlock/actions/runs/38706084034), head `820fee9d744942a44ef0ef5205d276f376d18bb8`: Linux DEB install/startup passed. Windows fixture parity test, fixture seed, REST server build, Tauri shell tests, MSI build, ordinary MSI install/start/uninstall, missing/non-directory validation, picker cancel/select, and packaged local/remote reads passed. The smoke passed the negotiated-mode and visible read-only badge checks, then failed at `summarizeParity` (`scripts/studio-windows-packaged-ui-smoke.mjs:351`) with `TypeError: Cannot read properties of undefined (reading 'Nodes')`; it received `{ local, remote }` but read `visibleResults.overview.Nodes`. Native and visible local/remote equality assertions completed before the summary error, but no `studio-packaged-parity.json` was written, so this is not packaged-parity acceptance. Windows MSI and smoke evidence are [artifacts 11959552051](https://github.com/Freshair129/GenesisBlock/actions/runs/38706084034/artifacts/11959552051) and [11959671655](https://github.com/Freshair129/GenesisBlock/actions/runs/38706084034/artifacts/11959671655); the Linux DEB and startup smoke are [artifacts 11958298820](https://github.com/Freshair129/GenesisBlock/actions/runs/38706084034/artifacts/11958298820) and [11958488601](https://github.com/Freshair129/GenesisBlock/actions/runs/38706084034/artifacts/11958488601). macOS was still in progress when this note was written.
 - The first Studio Rust test compile reached the new Tauri test target but failed because its CSP test lacked a `Value` import. After fixing that test import, the suite exposed that `Url::host_str()` returns a bracketed IPv6 host, causing loopback HTTP to be rejected; validation now strips exactly one bracket pair before parsing the address. The full Tauri library suite passed 9/9. The strengthened root parity test passed 1/1 and the `genesis-db-server` build passed. These are source/test/build checks, not installed-package evidence.
 - A read-only review of head `8463222b4c853050437f96f1dbb6199a710a7e9d` found a credential-routing gap: `RemoteConnection::new` used reqwest's default client, which enables system proxies, while the bridge permits loopback HTTP and attaches the bearer authorization header. If `HTTP_PROXY`/`ALL_PROXY` is set without a matching `NO_PROXY` exclusion, a loopback bearer request could be routed in cleartext through the proxy. The bridge now applies `no_proxy()` only to validated HTTP URLs (which the validator restricts to loopback), while retaining the default system-proxy behavior for HTTPS. The focused regression `cargo test --manifest-path studio/src-tauri/Cargo.toml --locked --lib --jobs 1 loopback_http_bypasses_proxies_while_https_keeps_proxy_support` passed: 1 passed, 0 failed, 9 filtered. It observed loopback HTTP bypassing an explicit local proxy and HTTPS using `CONNECT example.com:443`.
 - The Windows packaged smoke failure in run 38698802743 was a responsive navigation defect, not an MSI install or WebView2 startup failure. At the runner's 1024px screen width, the max-width:1050px rule hid the only Connections control. The UI now exposes that control as an accessible icon button in the narrow desktop sidebar. In run 38702744877, the smoke reached remote reads, but its `innerText` assertion queried a connection label hidden by that same responsive breakpoint. The harness now verifies both the negotiated mode text and the visible `REMOTE / READ ONLY` badge; parity is accepted only after the shared-fixture result comparison completes.
@@ -70,9 +73,13 @@ packaged picker or cross-platform package/startup result to reference. The
 original renderer remote adapter used `fetch` despite production CSP denying
 remote origins, so successful browser tests did not prove packaged networking.
 The adapter now routes remote calls through the fixed native Tauri bridge
-without broadening CSP. In run 38702744877 the packaged UI reached the loopback
-REST server and its initial reads returned HTTP 200; however, the harness
-timed out on a hidden-label assertion before comparing local and remote results.
+without broadening CSP. After the hidden-label assertion was corrected, run
+38706084034 passed packaged remote connection and completed native and visible
+local/remote result comparisons. It then failed before writing parity evidence:
+the summary formatter read `visibleResults.overview` although its argument
+contains `visibleResults.local.overview` and `visibleResults.remote.overview`.
+The formatter now reads `visibleResults.local.overview`; a fresh package rerun
+is required.
 
 The first packaged Windows UI-smoke attempt also had a harness configuration
 defect: it set `WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS` after launch, but Wry
@@ -114,9 +121,12 @@ CSP.
   root, and compare supported S1 results from packaged remote mode. Run
   38702744877 reached remote REST routes, which returned HTTP 200, but the
   smoke then timed out while reading `innerText` from the CSS-hidden
-  `.connection-chip span`; it did not emit parity JSON. The harness now checks
-  negotiated state with `textContent` and the visible `REMOTE / READ ONLY`
-  badge. Record a completed result comparison before changing the parity gate.
+  `.connection-chip span`; it did not emit parity JSON. Run 38706084034 passed
+  the corrected negotiated-state and visible `REMOTE / READ ONLY` checks and
+  completed strict native and visible result comparisons, but the JSON summary
+  formatter failed on a flattened overview path before writing its artifact.
+  The formatter now reads `visibleResults.local.overview`; require generated
+  parity JSON from a fresh exact-head run before changing the parity gate.
 - Explicitly list the existing platform icon files in `bundle.icon` when
   enabling Tauri packaging; the first Windows CI build caught the omitted
   reference.

@@ -348,8 +348,8 @@ function summarizeParity(local, remote, visibleResults) {
       'registered named query',
     ],
     visibleFixtureResults: {
-      nodeCount: visibleResults.overview.Nodes,
-      edgeCount: visibleResults.overview.Edges,
+      nodeCount: visibleResults.local.overview.Nodes,
+      edgeCount: visibleResults.local.overview.Edges,
       namedQueryRows: localNamedQuery.length,
       hqlRows: localHql.length,
       inspectedEntity: localInspection.entity_id,
