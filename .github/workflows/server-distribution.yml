@@ -17,6 +17,7 @@ on:
       - 'scripts/docker-smoke.sh'
       - 'scripts/docker-registry-smoke.sh'
       - 'scripts/package-server-release.py'
+      - 'scripts/test-rest-restart-recovery.py'
       - '.github/workflows/server-distribution.yml'
   push:
     tags:
@@ -90,12 +91,19 @@ jobs:
         with:
           targets: ${{ matrix.target }}
 
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
       - uses: Swatinem/rust-cache@v2
         with:
           key: server-${{ matrix.target }}
 
       - name: Build standalone server
         run: cargo build --locked --release --no-default-features --features bins --bin genesis-db-server --target ${{ matrix.target }}
+
+      - name: Verify REST restart recovery against the built server
+        run: python scripts/test-rest-restart-recovery.py --server target/${{ matrix.target }}/release/genesis-db-server${{ runner.os == 'Windows' && '.exe' || '' }}
 
       - name: Package release archive + SHA-256
         run: python scripts/package-server-release.py --target ${{ matrix.target }}

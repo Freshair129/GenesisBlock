@@ -103,7 +103,9 @@ Rules:
 
 ### D5 — Recovery invariant
 
-Startup = load snapshot at `frontier_commit_seq` + **replay journal frames > frontier** (sealed segments newer than the snapshot, then the active tail). The either/or loader is already retired on main (`4072cc9`): today's cursor is byte-positional `(bytes, sha256)` over the single WAL file; **WP-1.2 migrates it to `(frontier_commit_seq, segment_id, offset)`**, keeping the landed prefix-integrity fallback (mismatch ⇒ full replay). On mobile profiles, checkpoint cadence is tied to lifecycle events so the cold-start replay window stays small; WP-1.3's probe measures cold-start replay time at the mobile seal threshold.
+Startup reads `journal.frontier_seq` from `state.json`. When the snapshot is valid and is not older than a completed journal fold, the engine loads it and **replays framed journal events with sequence numbers greater than that frontier**. If the snapshot is absent, invalid, predates a fold, or has no sequence frontier (including legacy byte-cursor snapshots), the engine recovers from the journal alone or performs a full idempotent replay. The journal remains the recovery authority; the snapshot and SQLite projection are rebuildable.
+
+Recovery must preserve one stable mapping from each public node ID to its internal `u32` key across the snapshot, journal replay, vector metadata, and SQLite projection. An empty node snapshot starts `next_u32` at `0`; a populated snapshot resumes at `max(saved node key) + 1`. A shifted mapping can leave vector IDs intact while properties are hydrated from another node's projection row. The standalone REST restart regression exercises this invariant after both a forced process termination and a graceful checkpoint/reopen.
 
 ### D6 — Authority table (locked)
 

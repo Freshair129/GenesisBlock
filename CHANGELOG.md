@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed - Keep node properties aligned through REST recovery
+
+The node-ID allocator now starts at zero when replaying an empty snapshot and
+resumes after the largest saved key for a populated snapshot. This keeps
+journal replay aligned with vector metadata and the SQLite properties
+projection. A portable standalone-server regression now covers hard process
+termination after acknowledged REST writes and graceful checkpoint/reopen on
+three fresh databases. The Windows v0.2.9 release artifact reported in issue
+#222 remains historical evidence and was not modified.
+
 ### Fixed - deployed benchmark fixture compatibility
 
 GenesisRAG17 workers now accept the deployed per-record `benchmarks[].queries`
