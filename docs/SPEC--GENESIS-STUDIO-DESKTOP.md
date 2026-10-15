@@ -573,8 +573,11 @@ explicit local proxy and HTTPS routes `CONNECT example.com:443` through it.
 
 Run 38698802743 failed after successful Windows local reads because the
 1024px-wide runner hit a responsive layout rule that hid the Connections
-control. The narrow sidebar now keeps an accessibly named icon-only control;
-the packaged rerun is required to prove the remote step and parity.
+control; that UI control is now available in the narrow sidebar. The latest
+run 38702744877 reached remote REST reads, but its smoke timed out on a
+responsive-hidden status label before recording parity JSON. The smoke now
+checks the negotiated connection text and the visible read-only status badge;
+the strict packaged comparison still requires a passing rerun.
 
 Current Windows verification:
 
@@ -585,11 +588,13 @@ Current Windows verification:
 | `npm run test:e2e` | 4 desktop/mobile Chromium cases passed against the presentation fixture only |
 | Persisted-fixture parity test | 1 passed; local `Storage` and REST router results compared on the same reopened graph/vector/relational database |
 | Local-root validation test | 1 passed; blank, missing, file, and Unicode/space-containing directory paths covered |
-| Last Windows package matrix [run 38698802743](https://github.com/Freshair129/GenesisBlock/actions/runs/38698802743), head `aaf71c63cb7ed538e3e2db7da1ee2472a5dbd5ad` | Linux DEB install/startup passed. Windows parity test, fixture seed, REST server build, Tauri shell tests, MSI build, and ordinary MSI install/start/uninstall passed. The packaged UI smoke passed missing/non-directory validation, picker cancel/select, exact fixture-root selection, local connect, visible reads, and native local reads, then timed out finding the Connections button. The runner reports 1024px screen width, and the CSS max-width:1050 rule hid this supported navigation control. The responsive fix keeps an accessible icon button; macOS package and post-fix rerun are pending. |
+| Previous Windows package matrix [run 38698802743](https://github.com/Freshair129/GenesisBlock/actions/runs/38698802743), head `aaf71c63cb7ed538e3e2db7da1ee2472a5dbd5ad` | Linux DEB install/startup passed. Windows parity test, fixture seed, REST server build, Tauri shell tests, MSI build, and ordinary MSI install/start/uninstall passed. The packaged UI smoke passed missing/non-directory validation, picker cancel/select, exact fixture-root selection, local connect, visible reads, and native local reads, then timed out finding the Connections button. The runner reports 1024px screen width, and the CSS max-width:1050 rule hid this supported navigation control. The responsive fix keeps an accessible icon button. |
 | Run 38698802743 artifacts | [Windows MSI](https://github.com/Freshair129/GenesisBlock/actions/runs/38698802743/artifacts/11956723831), [Windows smoke evidence](https://github.com/Freshair129/GenesisBlock/actions/runs/38698802743/artifacts/11956860311), [Linux DEB](https://github.com/Freshair129/GenesisBlock/actions/runs/38698802743/artifacts/11955897591), [Linux smoke evidence](https://github.com/Freshair129/GenesisBlock/actions/runs/38698802743/artifacts/11955548251). The macOS artifact is not available because its job is pending. |
-| Windows ordinary MSI startup | SHA-256 `eab4eff410913a854e0e3cccdb2bbb6b1c919a524808ed3d5640282bf5107a55`; install exit 0; `C:\Program Files\Genesis Studio\genesis-studio.exe` remained alive for 10 seconds; uninstall exit 0; cleanup complete. Evidence explicitly sets `visible_ui_verified: false` and `fixture_parity: false`. |
-| Windows packaged picker/path/local reads | CDP endpoint became ready. Missing-root, non-directory, picker-cancel, and picker-select signals passed; exact fixture path was selected. Connect local and visible/native local reads completed. The following Connections-button click failed because the narrow responsive layout hid it. No remote request ran in this build. |
-| Packaged remote-origin/CSP and parity | The Windows smoke did not reach remote mode. Browser tests do not prove packaged remote connectivity under production CSP or same-fixture local/remote equivalence; both remain acceptance gates. |
+| Latest package run [38702744877](https://github.com/Freshair129/GenesisBlock/actions/runs/38702744877), head `685e03f084762f8dcbd35fd1268d7295351c168d` | Linux DEB install/startup passed; the [Linux smoke artifact](https://github.com/Freshair129/GenesisBlock/actions/runs/38702744877/artifacts/11957477549) records `/usr/bin/genesis-studio` alive for 12 seconds. macOS DMG install/startup passed; the [macOS smoke artifact](https://github.com/Freshair129/GenesisBlock/actions/runs/38702744877/artifacts/11957793005) records `Genesis Studio.app` alive for 10 seconds. Windows parity test, fixture seeding, REST server build, Tauri shell tests, MSI build, ordinary MSI install/start/uninstall, missing/non-directory validation, picker cancel/select, exact fixture-root selection, and local UI/native reads passed. The server logged HTTP 200 for capabilities, status, graph, collections, frontier, and relational schemas. The Windows UI smoke nevertheless failed at its remote-mode assertion before writing parity JSON. |
+| Run 38702744877 package artifacts | [Windows MSI](https://github.com/Freshair129/GenesisBlock/actions/runs/38702744877/artifacts/11957952711), [macOS DMG](https://github.com/Freshair129/GenesisBlock/actions/runs/38702744877/artifacts/11957952918), [Windows smoke evidence](https://github.com/Freshair129/GenesisBlock/actions/runs/38702744877/artifacts/11957773049), [macOS smoke evidence](https://github.com/Freshair129/GenesisBlock/actions/runs/38702744877/artifacts/11957793005), [Linux smoke evidence](https://github.com/Freshair129/GenesisBlock/actions/runs/38702744877/artifacts/11957477549). Windows smoke evidence has picker/local/remote-ready markers and server request logs; no parity-comparison JSON was emitted. |
+| Windows ordinary MSI startup (run 38702744877) | SHA-256 `f0694092c5aebc4f14a03b6db17637e0a4650668b5849dbdbe14d95db82c1a29`; install exit 0; `C:\Program Files\Genesis Studio\genesis-studio.exe` remained alive for 10 seconds; uninstall exit 0; cleanup complete. Evidence explicitly sets `visible_ui_verified: false` and `fixture_parity: false`. |
+| Windows packaged picker/path/local reads (run 38698802743) | CDP endpoint became ready. Missing-root, non-directory, picker-cancel, and picker-select signals passed; exact fixture path was selected. Connect local and visible/native local reads completed. The following Connections-button click failed because the narrow responsive layout hid it. No remote request ran in that build. |
+| Packaged remote origin and parity | Run 38702744877 reached the configured loopback REST server through the packaged native bridge; all observed routes returned 200. The smoke's `innerText` assertion targeted `.connection-chip span`, which CSS hides at the runner's 1024px width. This is a harness assertion failure, not a successful parity comparison. The current assertion checks negotiated mode text plus the visible `REMOTE / READ ONLY` badge; accept parity only after the complete shared-fixture comparison and visible result assertions pass. Independent architecture/security review remains open. |
 | Current PR native remote Rust tests | Prior Tauri library suite: 9 passed, 0 failed. The new loopback/HTTPS proxy regression passed separately: 1 passed, 0 failed, 9 filtered. |
 | Current PR loopback/HTTPS proxy regression | `cargo test --manifest-path studio/src-tauri/Cargo.toml --locked --lib --jobs 1 loopback_http_bypasses_proxies_while_https_keeps_proxy_support`: 1 passed, 0 failed, 9 filtered; loopback HTTP bypassed the local proxy and HTTPS used `CONNECT example.com:443` |
 | Current PR packaged parity server build | `cargo build --locked --no-default-features --features bins --bin genesis-db-server --jobs 1`: passed in the Windows packaging workflow. |
@@ -645,9 +650,11 @@ expansion, vector collections, relational schemas, entity inspection,
 read-only HQL, and the registered named query, plus visible S1 results. The
 probe also checks missing and non-directory root paths. Run 38698802743 passed
 the picker, local connection, and local read steps before the missing Connections
-control stopped it from starting the REST server; local/remote parity remains
-unproven. The narrow-sidebar fix needs fresh packaged validation. The independent
-review must examine
+control stopped it from starting the REST server. Run 38702744877 passed that
+navigation step and reached remote routes, but the smoke's hidden-label
+`innerText` assertion timed out before the parity result was written. Local/remote
+parity remains unproven pending a passing packaged rerun. The independent review
+must examine
 repeated percent-decoding in path validation, entity-ID route boundaries,
 response-size limits, token forwarding and cleanup, redirect handling, and the
 unchanged production CSP. All acceptance gates remain open until fresh Windows

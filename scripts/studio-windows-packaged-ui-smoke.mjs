@@ -163,7 +163,14 @@ async function connectRemote(page, restBaseUrl) {
   await page.getByLabel('BEARER TOKEN').fill(parityToken);
   await page.getByRole('button', { name: 'Connect remote' }).click();
   await page.waitForFunction(
-    () => document.querySelector('.connection-chip')?.innerText.includes('remote / remote'),
+    () => {
+      const negotiatedState = document.querySelector('.connection-chip b')?.textContent ?? '';
+      const visibleStatus = document.querySelector('.truth-badge')?.innerText ?? '';
+      // The responsive layout hides the connection-chip label at the hosted
+      // runner's 1024px width; verify negotiated state plus the visible badge.
+      return negotiatedState.includes('remote / remote')
+        && visibleStatus.includes('REMOTE / READ ONLY');
+    },
     undefined,
     { timeout: 30_000 },
   );
