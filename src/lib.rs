@@ -18614,7 +18614,7 @@ impl Storage {
                     // genuinely newer upsert clears the tombstone inside
                     // insert_node_lean (legitimate re-create).
                     if let Some(t) = self.tombstones.get(&remote_node.id) {
-                        if !(t.value().clock < remote_node.clock) {
+                        if t.value().clock >= remote_node.clock {
                             apply = false;
                         }
                     }
@@ -18741,7 +18741,7 @@ impl Storage {
                     if self
                         .tombstones
                         .get(id)
-                        .is_some_and(|t| !(t.value().clock < *clock))
+                        .is_some_and(|t| t.value().clock >= *clock)
                     {
                         continue;
                     }

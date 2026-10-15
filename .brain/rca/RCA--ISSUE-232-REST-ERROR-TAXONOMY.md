@@ -69,9 +69,27 @@ covered with explicit context. The core still returns reason-only NAPI errors;
 therefore the REST adapter's fallback category for other engine failures is
 route-defined rather than a typed semantic classification. NAPI/embedded
 callers also do not receive the REST envelope. Replacing this boundary with a
-shared typed error kind is a separate core/API change. GB-SRS-API-004's full
-cross-surface typed-category acceptance remains open; this patch does not claim
-that acceptance is complete.
+shared typed error kind is a separate core/API change. The exact loss boundary
+is `src/lib.rs`: `Result<T>` aliases `napi::Error` with NAPI enabled, while the
+no-NAPI shim has only `Error { reason: String }` and `Error::from_reason`.
+Storage methods and NAPI wrappers therefore expose a diagnostic string, not a
+category or stable code. `QueryErrorV2` in `src/query/hql2/error.rs` carries
+typed `code`, `stage`, retryability, and safe detail fields inside the HQL2
+pipeline, but it is not the shared error type returned by Storage/NAPI methods.
+`preserve_query_error` in `src/lib.rs` must inspect message prefixes to retain
+legacy query details, which is not a safe basis for semantic category mapping.
+
+The smallest complete engine change is to introduce a shared `CoreError` and
+`ErrorKind` at the Storage boundary, with explicit constructors for validation,
+capability, query, conflict, durability, and integrity failures. Convert
+`QueryErrorV2` to that type while its structured code/stage are still present;
+keep unknown/reason-only failures explicitly unclassified or internal instead
+of inferring from their text. Then adapt NAPI and REST to serialize the same
+kind/code/message (while preserving legacy message fields) and add cross-surface
+conformance tests. This requires changing public Storage error types and the
+call sites that create those six categories, so it is broader than a safe REST
+adapter patch. GB-SRS-API-004's full cross-surface typed-category acceptance
+remains open; this patch does not claim that acceptance is complete.
 
 ## Verification scope
 
@@ -88,7 +106,15 @@ that acceptance is complete.
 - Studio transport tests: 5 passed; `tsc -b` and production `vite build` passed.
 - Go client tests were added but could not be run: no Go executable is installed
   or available on PATH in this environment.
+- `cargo fmt --all -- --check`: passed after moving the router test module below
+  all non-test items.
+- `cargo clippy --jobs 1 --no-default-features --all-targets -- -D warnings`:
+  passed, including the test-only router module.
+- The default-feature/NAPI all-target Clippy run was attempted with one Cargo
+  job but could not finish because the worktree volume ran out of disk while
+  writing `axum` metadata (`os error 112`); no NAPI lint result is claimed.
 
 Passing these checks demonstrates the bounded REST/SDK compatibility behavior
 only; it does not prove native/NAPI category parity, and the unrun Go tests
-remain outstanding verification.
+remain outstanding verification. Issue #232 stays open for the shared engine
+error type and the remaining SDK verification.
