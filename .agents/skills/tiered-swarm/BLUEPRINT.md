@@ -10,7 +10,7 @@ host. The contract it must satisfy is `SPEC.md`; this file is the *how*. Pair it
 
 A control plane that reads a spec, **routes** each sub-task to the cheapest model tier that
 can pass a machine-checkable acceptance command, **executes** it (local Ollama / cloud
-open-weights / Claude), **gates** cheap output behind a verify command before it reaches an
+open-weights / host-configured T2/T3), **gates** cheap output behind a verify command before it reaches an
 authoring agent, and **meters** every tier — including local — into one two-way cost ledger.
 The proven spine is `VERIFY → AUTHOR → REVIEW → ASSEMBLE`. Three skills compose:
 `spec-driven-development` (head) → `tiered-swarm` (this: outer spine + routing + gate +
@@ -25,7 +25,7 @@ ledger) → `tdd-workflow` (per-task inner loop).
 | GPU | ≥ 8 GB VRAM (designed for 12 GB) | RTX 3060 12 GB (12288 MiB) |
 | Local inference | Ollama installed + serving on `:11434` | Ollama (Windows) |
 | Scripting | `python` 3.x on PATH (python3 NOT required) + PyYAML; `curl`; POSIX `sh` | python 3.13.7, PyYAML 6.0.3, Git Bash |
-| Orchestrator | Claude Code (provides the Agent/Task + Workflow mechanisms) | — |
+| Orchestrator | host-native Agent/Task + Workflow mechanisms | — |
 | Composed skills | `spec-driven-development` + `tdd-workflow` installed under `~/.claude/skills/` | present |
 
 > **python3 gotcha:** this host has only `python`, not `python3`. The scripts resolve an
@@ -56,7 +56,12 @@ Pull what you need, then alias:
 | role: summarizer | `clarityqwen2-summarizer` | `hf.co/ClarityClips/ClarityQwen2Summarizer:F16` | ~4–5 GB |
 | role: TTS | `orpheus-3b` / `omnivoice` | `hf.co/unsloth/orpheus-3b-0.1-ft-GGUF:Q4_K_M` | ~2.1 GB |
 | T1.5 cloud-OW | `kimi-k2.7-code:cloud` etc. | `deepseek-v4-pro:cloud`, `kimi-k2.7-code:cloud`, `gemini-3-flash-preview:cloud` | 0 local |
-| T2 / T3 Claude | `claude-sonnet-4-6` / `claude-opus-4-8` | via Claude Code Agent/Task (not Ollama) | 0 local |
+| T2 | `${TIERED_SWARM_T2_MODEL_ID}` | exact provider model ID selected for this host; dispatched by its Agent/Task mechanism | 0 local |
+| T3 | `${TIERED_SWARM_T3_MODEL_ID}` | exact provider model ID selected for this host; dispatched by its Agent/Task mechanism | 0 local |
+
+Set both environment variables to the host's exact model IDs before routing work that can
+reach those tiers. The router does not choose a provider or supply defaults. Costing still
+requires a matching exact-ID entry in `scripts/cost_estimate.py`'s `PRICING` table.
 
 Aliasing example (do this for each model you route to by short name):
 ```sh
@@ -83,7 +88,7 @@ Ollama unloads idle models automatically (`OLLAMA_KEEP_ALIVE` to tune).
   small embed/rerank pair; prefer T0 SLMs for verify; lean harder on T1.5 cloud-OW for the
   mid tier. The skill still works — only the local ceiling lowers.
 - **No GPU / CPU-only:** keep embed/rerank local (cheap on CPU), route all generation to
-  T1.5 cloud-OW + Claude; local generation is too slow to be worth it.
+  T1.5 cloud-OW + configured T2/T3; local generation is too slow to be worth it.
 - **Different models:** the aliases are the contract. Pull any comparable model and
   `ollama cp` it to the alias the scripts expect — e.g. swap `aroow-rust-coder-9b` for any
   Rust-capable ≤ 7 GB coder. Keep `bge-m3` for engine-matched embedding (substituting it
@@ -122,7 +127,8 @@ From `.claude/skills/tiered-swarm/`:
 ```sh
 # scripts run
 python scripts/cost_estimate.py | tail -3                 # prints the worked example + reminder
-python scripts/route.py - --json <<'J' | head             # router floors no-verify -> T2+
+TIERED_SWARM_T2_MODEL_ID=<host-model-id> TIERED_SWARM_T3_MODEL_ID=<host-model-id> \
+  python scripts/route.py - --json <<'J' | head           # router floors no-verify -> T2+
 {"tasks":[{"id":"a","description":"author rca","review_gate":true},
           {"id":"b","description":"check","verify_command":"cargo test"}]}
 J
@@ -149,9 +155,9 @@ spec-driven-development            ── SSOT: EARS reqs → design → task li
 scripts/route.py  (router = ROLE: rules-first, 0-VRAM; reads the spec, emits a tier per task)
         │
         ▼
-OUTER LOOP:  Verify(cheap, parallel) ─[verify-gate: check_evidence.py]→ Author(T3) → Review(T3) → Assemble(human)
+OUTER LOOP:  Verify(cheap, parallel) ─[verify-gate: check_evidence.py]→ Author(configured T3) → Review(configured T3) → Assemble(human)
 INNER LOOP:  per implementation task → compose tdd-workflow  RED(=verify_command) → GREEN(@routed tier) → REFACTOR
-LEDGER:      every call (local + Claude) → scripts/cost_ledger.py  (count × per-type price; local=$0 but metered)
+LEDGER:      every call (local + billed) → scripts/cost_ledger.py  (count × per-type price; explicit local=$0 entries)
 ```
 
 Two-axis model: capability tiers (T0→T3 + cloud-OW) **⟂** role specialists (embed/rerank/
@@ -163,11 +169,12 @@ VLM/summarizer/TTS); the router is a role, never a tier.
 
 1. **`python3` not on PATH** (Windows + Git Bash). Resolve `python3 || python` everywhere.
 2. **Short alias vs long Ollama tag.** Scripts use aliases; bridge with `ollama cp` (§3).
-3. **Pricing is a 2026-06-04 snapshot with an UNCERTAINTY FLAG.** Re-verify at
-   `https://platform.claude.com/docs/en/pricing.md` before any billing logic. The cost
-   *formula* is durable; the *rates* are not.
-4. **A mistyped billed model must fail loud, not silently cost $0** — `cost_estimate.py`
-   raises on an unknown `claude-*` tag. Keep that behavior if you port the ledger.
+3. **Pricing is exact-ID allowlisted.** A model ID needs a sourced entry in `PRICING`; the
+   Claude rows are a dated profile with an UNCERTAINTY FLAG and must be re-verified at
+   `https://platform.claude.com/docs/en/pricing.md` before billing. The formula is durable;
+   the rates are not.
+4. **An unknown model ID must fail loud, not silently cost $0** — `cost_estimate.py` raises
+   for every ID absent from `PRICING`. Keep that behavior if you port the ledger.
 5. **bge-m3 is engine-matched.** Any embedding query against a GenesisBlock vector store
    must use it; a "cheaper" embedder is a correctness bug (different metric space), not a
    saving.

@@ -30,6 +30,12 @@ cost = Σ over tiers [  in_uncached · rate_in
 
 `scripts/cost_estimate.py` implements exactly this formula with an editable rate table.
 
+The Claude rows below are one explicit price profile; they do not configure T2/T3 routing.
+Those tiers use the exact IDs in `TIERED_SWARM_T2_MODEL_ID` and
+`TIERED_SWARM_T3_MODEL_ID`. Every billed ID needs an exact, sourced `PRICING` entry, and
+every local zero-rate model must be listed explicitly. Unknown IDs raise instead of being
+guessed as cloud-priced or local-free.
+
 ---
 
 ## 2. Pricing snapshot
@@ -69,7 +75,7 @@ Ollama call is **electricity + the sunk VRAM/GPU** of the RTX 3060 12GB:
   in §5 prices, and it is why local is allowed only behind a verify gate.
 
 We therefore set the local *price* to 0.0 in the rate table, but still **meter the local
-token COUNT** (§3) so the local/Claude split is auditable.
+token COUNT** (§3) so the local/billed split is auditable.
 
 ---
 
@@ -108,7 +114,7 @@ returns per-response counters that map directly onto our four-counter schema:
 
 `scripts/ollama_route.sh` POSTs to `http://localhost:11434/api/generate` with
 `stream:false` and prints **both** the response text and `prompt_eval_count` /
-`eval_count`, so the caller can log local usage into the same ledger as the Claude calls.
+`eval_count`, so the caller can log local usage into the same ledger as billed calls.
 Rate is 0.0, but the COUNT is real and recorded — that is what makes the split auditable.
 
 Minimal capture (the script does this for you):
@@ -121,7 +127,7 @@ Minimal capture (the script does this for you):
 # eval_count=412
 ```
 
-Log every call — local and Claude — as one row: `{tier, model, in_uncached, in_cached,
+Log every call — local and billed — as one row: `{tier, model, in_uncached, in_cached,
 cache_write, out}` and feed it to `scripts/cost_estimate.py`.
 
 ---
@@ -176,8 +182,9 @@ role**: each verifier returns a structured **finding + evidence** (a grep/line-c
 which is exactly the deterministic check the break-even requires.
 
 But the failure mode is concrete and expensive. A **T1 verifier that hallucinates a
-finding** feeds a wrong premise into a **T3 Opus author**, which spends full frontier
-price ($5/$25 per M) authoring an RCA on a false foundation — then the adversarial
+finding** feeds a wrong premise into a **configured T3 author** (priced here using the
+explicit Opus profile), which spends full frontier price ($5/$25 per M) authoring an RCA
+on a false foundation — then the adversarial
 reviewer ($25/M out) catches it and the *entire author phase reruns*. One bad local
 verifier can erase the $1.70 of "saved" verify cost **and** add a ~$1.9 author redo:
 net **worse** than Claude-only.

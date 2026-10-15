@@ -7,14 +7,19 @@ owner: GenesisBlockDB Engineering
 
 # GenesisBlockDB — Canonical Version (SSOT)
 
-This file is the **single source of truth for version/status**. Per-document
-`version:` frontmatter across `docs/` is historically inconsistent (whitepaper
+This file is the **canonical human-readable version/status record**. The
+engine build version is anchored by `Cargo.toml`; `scripts/version.mjs`
+synchronizes and checks `Cargo.lock`, `package.json`, `package-lock.json`, and
+`modules.json` against it. The record in this document is maintained alongside
+those files.
+Per-document `version:` frontmatter across `docs/` is historically inconsistent
+(whitepaper
 "v2.0.0", GEMINI "1.2.0", AGENT "0.2.2b", C4 "0.1.2b", registry "0.2.1b") — treat
 those as legacy labels superseded by this file.
 
 | Field | Value |
 |---|---|
-| **Engine crate** (`Cargo.toml`, `package.json`, `modules.json`) | `0.2.6` |
+| **Engine crate** (`Cargo.toml`, `Cargo.lock`, `package.json`, `package-lock.json`, `modules.json`) | `0.2.9` |
 | **Product milestone** | **Mobile SDK** — Phase B (iOS/Android/React Native) shipped and published; on-device acceptance verified for iOS |
 | **Status** | Advanced prototype (durable, benchmarked, suite green) |
 | **Evidence baseline** | 2026-06-21 — audits P14–P30, `REPORT--2026-06-21-PERFORMANCE-AND-COMPETITIVE.md` |
@@ -30,9 +35,24 @@ live on npm) → **`0.2.4`** (no engine change; cut to publish
 `react-native-genesisdb` 0.1.1, which finally delivers that package's Android
 and iOS integration fixes — see `CHANGELOG.md`). Version `0.2.5` delivered
 the Maven Central/RN distribution release; `0.2.6` delivers the typed context
-query contracts and isolated GenesisRAG17 worker integration. The crate
-version is kept in lock-step across `Cargo.toml`, `package.json`, and
-`modules.json` by `scripts/version.mjs` (`npm run version:check` is a CI gate).
+query contracts and isolated GenesisRAG17 worker integration. **`0.2.7`
+(2026-09-27)** publishes the main npm package and MCP CLI, standalone server
+archives with SHA-256 sidecars, GHCR image, and Go SDK `v0.1.0`. The same-repo
+Homebrew formula and Scoop manifest install the checksummed server archives; a
+winget manifest is not published. **`0.2.8` (2026-09-27)** refreshes the README
+embedded in the npm release so its install matrix reflects the verified public
+channels; no engine behavior changed. Android SDK `0.1.2` was
+published independently to Maven Central on 2026-09-27 with its public compile
+dependency included; a clean x86_64 emulator consumer passed in Mobile Build
+run 36316221124. **`0.2.9` (2026-09-27)** refreshes the npm README and Python
+SDK guides after the first PyPI release; no engine behavior changed. Python
+package `genesisblockdb-client==0.1.0` is published via Trusted Publishing;
+the tag publish passed in [run 36305930749](https://github.com/Freshair129/GenesisBlock/actions/runs/36305930749)
+and the clean public registry consumer passed in
+[run 36322437144](https://github.com/Freshair129/GenesisBlock/actions/runs/36322437144).
+The crate version is kept in lock-step across
+`Cargo.toml`, `Cargo.lock`, `package.json`, `package-lock.json`, and `modules.json`
+by `scripts/version.mjs` (`npm run version:check` is a CI gate).
 
 **Versioning policy (going forward):** the crate version in `Cargo.toml` is
 authoritative for the build; the product milestone is a plain theme named after

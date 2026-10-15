@@ -1,0 +1,111 @@
+{
+  "fixture_version": "g3.oracle.v1",
+  "cases": [
+    {
+      "id": "temporal_two_axis",
+      "kind": "graph_temporal",
+      "operations": [
+        {
+          "op": "add_node",
+          "id": "hub",
+          "props": { "v": 0 },
+          "valid_from": "2020-01-01T00:00:00Z"
+        },
+        {
+          "op": "add_node",
+          "id": "doc",
+          "props": { "v": 1 },
+          "valid_from": "2020-01-01T00:00:00Z"
+        },
+        {
+          "op": "add_edge",
+          "id": "e1",
+          "from": "hub",
+          "to": "doc",
+          "rel": "KNOWS",
+          "valid_from": "2020-01-01T00:00:00Z"
+        },
+        { "op": "mark", "name": "before_supersede" },
+        { "op": "supersede", "id": "doc", "props": { "v": 2 } }
+      ],
+      "queries": [
+        { "id": "current", "valid_at": null, "tx": "latest" },
+        { "id": "valid_2022_current", "valid_at": "2022-01-01T00:00:00Z", "tx": "latest" },
+        { "id": "current_before_supersede", "valid_at": null, "tx": "before_supersede" },
+        { "id": "valid_2022_before_supersede", "valid_at": "2022-01-01T00:00:00Z", "tx": "before_supersede" }
+      ],
+      "expected": {
+        "current": [{ "node_id": "doc", "props": { "v": 2 }, "valid_window": "open" }],
+        "valid_2022_current": [{ "node_id": "doc", "props": { "v": 1 }, "valid_window": "closed" }],
+        "current_before_supersede": [{ "node_id": "doc", "props": { "v": 1 }, "valid_window": "open" }],
+        "valid_2022_before_supersede": [{ "node_id": "doc", "props": { "v": 1 }, "valid_window": "open" }]
+      }
+    },
+    {
+      "id": "relational_null_bag_left_join",
+      "kind": "relational",
+      "schema": {
+        "namespace": "default",
+        "schema_version": 1,
+        "package_id": "00000000-0000-4000-8000-000000000037",
+        "tables": [
+          {
+            "name": "lefts",
+            "columns": [
+              { "name": "id", "column_type": "Text", "nullable": false },
+              { "name": "join_key", "column_type": "Text", "nullable": true }
+            ],
+            "primary_key": ["id"],
+            "foreign_keys": [],
+            "indexes": []
+          },
+          {
+            "name": "rights",
+            "columns": [
+              { "name": "id", "column_type": "Text", "nullable": false },
+              { "name": "join_key", "column_type": "Text", "nullable": true },
+              { "name": "value", "column_type": "Integer", "nullable": true }
+            ],
+            "primary_key": ["id"],
+            "foreign_keys": [],
+            "indexes": []
+          }
+        ]
+      },
+      "rows": {
+        "lefts": [
+          { "id": "l1", "join_key": "k" },
+          { "id": "l2", "join_key": "k" },
+          { "id": "l3", "join_key": "missing" }
+        ],
+        "rights": [
+          { "id": "r1", "join_key": "k", "value": 10 },
+          { "id": "r2", "join_key": "k", "value": 20 }
+        ]
+      },
+      "query": {
+        "namespace": "default",
+        "table": "lefts",
+        "columns": ["lefts.id", "rights.value"],
+        "joins": [
+          {
+            "table": "rights",
+            "left_column": "lefts.join_key",
+            "right_column": "rights.join_key",
+            "kind": "Left"
+          }
+        ],
+        "filters": [],
+        "limit": 100,
+        "offset": 0
+      },
+      "expected": [
+        { "lefts.id": "l1", "rights.value": 10 },
+        { "lefts.id": "l1", "rights.value": 20 },
+        { "lefts.id": "l2", "rights.value": 10 },
+        { "lefts.id": "l2", "rights.value": 20 },
+        { "lefts.id": "l3", "rights.value": null }
+      ]
+    }
+  ]
+}

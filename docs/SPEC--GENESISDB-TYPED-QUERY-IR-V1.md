@@ -2,8 +2,8 @@
 title: "GenesisBlockDB Typed Query IR V1"
 doc_id: "SPEC-GENESISDB-TYPED-QUERY-IR-V1"
 status: accepted
-version: "1.0.2"
-updated: "2026-09-08"
+version: "1.0.3"
+updated: "2026-09-29"
 owner: "GenesisBlockDB Architecture"
 implementation_status: partial
 source_of_truth: true
@@ -18,10 +18,10 @@ related_docs:
 ## 1. Purpose and status
 
 This specification defines the approved transport-neutral query boundary for new GenesisBlockDB
-integrations. Its implementation status is `partial`: `search`, `traverse` and the target-id
-`context` slice are implemented in the core, N-API and REST vertical slice with compatibility tests.
-Query-vector/temporal context, `match_path` and `relational_named_query` remain unsupported or
-planned as disclosed by the runtime capability manifest.
+integrations. Its implementation status is `partial`: `search`, `traverse`, linear `match_path` and
+the target-id `context` slice are implemented in the core, N-API and REST vertical slice with
+compatibility tests. Query-vector/temporal context and `relational_named_query` remain unsupported
+or planned as disclosed by the runtime capability manifest.
 
 ## 2. Contract principles
 
@@ -82,7 +82,7 @@ V1 reserves these operation discriminators because they map to existing engine c
 |---|---|---|
 | `search` | `mode`, one of `target_id` or `query_vector`, `k` | Vector, lexical or hybrid retrieval using declared capability fields. |
 | `traverse` | `seed_id`, `depth`, `relations`, `direction` | Bounded forward, reverse or bidirectional graph traversal. |
-| `match_path` | `pattern`, `limit` | Typed bounded linear path matching; the final typed pattern schema is frozen during implementation design. |
+| `match_path` | `pattern`, `limit` | Typed bounded linear path matching with optional `where`, `order_by` and `return` clauses. |
 | `context` | `target_id`, `tier`, optional `budget`/`fuzzy` | Versioned target-id agent-context assembly without adding HQL grammar. Query-vector and temporal context fail closed until a later contract. |
 | `relational_named_query` | `query_name`, `parameters` | Execute a pre-registered bounded named query; arbitrary SQL is forbidden. |
 
@@ -108,6 +108,20 @@ budget accounting and index lag. The first implementation is target-id based and
 `ContextPackage`, including factual `coverage` fields. Query-vector and temporal selectors fail closed
 until a later contract. Budget compression is successful only when `coverage.truncated` is true and
 `meta.warnings` contains `context_truncated`.
+
+### 4.4 Match-path operation contract
+
+`match_path` is a closed typed representation of the existing linear HQL graph-pattern executor.
+The operation requires a positive `limit`; `pattern.start` and each `pattern.hops[*].node` use
+`var`, `label` and exact-equality `props` entries, while each hop uses `edge.var`, `edge.rel_type`
+and `edge.direction` (`out`, `in` or `both`). Clause fields use `var` plus an optional field name:
+`id`, `label`, `score`, `depth`, `recorded_at` or `prop.<key>`. `where` values are strings or finite
+numbers and support `eq`, `ne`, `lt`, `le`, `gt`, `ge`, `contains` and `starts_with`.
+
+The `return` discriminator is either `{ "kind": "all" }` or
+`{ "kind": "fields", "fields": [...] }`. `temporal.valid_at` is supported; `temporal.tx_as_of`
+fails closed as `QUERY_CAPABILITY_UNSUPPORTED`. The operation is bounded by the request budget and
+never accepts an untyped payload escape hatch.
 
 ## 5. Result envelope
 
@@ -186,7 +200,7 @@ The adapter SHALL:
 The contract is considered shipped only when all gates pass:
 
 1. JSON Schema and native typed structures are frozen for the first implementation slice.
-2. Core typed executor validates and executes `search`, `traverse` and the
+2. Core typed executor validates and executes `search`, `traverse`, linear `match_path` and the
    target-id `context` slice.
 3. N-API and REST expose the same request/result semantics.
 4. HQL parity fixtures pass through compatibility mapping.
@@ -209,4 +223,5 @@ The contract is considered shipped only when all gates pass:
 |---|---|---|---|---|---|
 | 1.0.0 | 2026-08-14 | accepted | Approved Query IR V1 envelope, compatibility posture and external NL adapter boundary. | 84f2553 | ATHER |
 | 1.0.1 | 2026-08-14 | superseded | Recorded partial implementation of search/traverse across core, REST and N-API with HQL parity; remaining V1 operations stay planned. | working-tree | ATHER |
-| 1.0.2 | 2026-09-08 | current | Recorded target-id context implementation and explicit unsupported/planned boundaries for the Wave E slice. | 4c8ca17 | ATHER |
+| 1.0.2 | 2026-09-08 | superseded | Recorded target-id context implementation and explicit unsupported/planned boundaries for the Wave E slice. | 4c8ca17 | ATHER |
+| 1.0.3 | 2026-09-29 | current | Frozen the typed linear match_path schema, implemented core/HQL compatibility lowering, and recorded N-API/REST parity boundaries. | working-tree | ATHER |

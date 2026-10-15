@@ -29,7 +29,7 @@ related:
 1. **Every semantically valid v1 query parses in v2 and returns the same result**, with exactly one documented exception (rule 2). Existing test files are the enforcement mechanism: they must pass **unedited**.
 2. **The only breaking change:** a numeric token that overflows/fails value-parsing is now a **parse error**, not a silent default (v1 §4.5). Rationale: silently converting `K 99999999999999999999` into `K 5` is a wrong-answer generator. `LIMIT`'s saturate-to-max stays (deliberate v1 semantics).
 3. All grammar additions are optional clauses or new alternatives — omitting them reproduces v1 behavior (modulo the defect fixes, which change *wrong* behavior only: the discarded target now errors-or-acts, per §2.1).
-4. No planner, no EXPLAIN, no on-disk format change, no new required fields on any surface.
+4. No planner, no EXPLAIN, no on-disk format change, no new required fields on compatibility surfaces. The separately selected UEE `hql.v2` pipeline is governed by the owner-approved [HQL2 execution ADR](adr/ADR--GENESISDB-HQL2-EXECUTION-BOUNDARY.md); this exception does not change existing callers.
 
 ---
 
@@ -174,7 +174,7 @@ Only if a crisp semantics emerges (filter-atoms-then-budget). Otherwise formally
 
 ## 7. Non-goals (carried forward, on record)
 
-No cost-based planner or EXPLAIN; no branching/comma patterns, OPTIONAL MATCH, path variables, shortest-path; no aggregation beyond `count(*)`; no prop-value secondary indexes (labels only); no in-engine embedding model (mobile weight budget). Any of these requires a new ADR, not a plan amendment.
+For this compatibility refinement track: no cost-based planner or EXPLAIN; no branching/comma patterns, OPTIONAL MATCH, path variables, shortest-path; no aggregation beyond `count(*)`; no prop-value secondary indexes (labels only); no in-engine embedding model (mobile weight budget). The approved [explicit-v2 execution ADR](adr/ADR--GENESISDB-HQL2-EXECUTION-BOUNDARY.md) governs the separate UEE pipeline; it does not reinterpret compatibility syntax.
 
 ## 8. Conformance
 

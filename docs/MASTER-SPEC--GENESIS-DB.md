@@ -2,8 +2,8 @@
 title: "GenesisBlockDB Technical Architecture and Capability Composition"
 doc_id: "MASTER-SPEC-GENESISBLOCKDB"
 status: current
-version: "2.3.0b"
-updated: "2026-09-08"
+version: "2.3.43b"
+updated: "2026-10-06"
 owner: "GenesisBlockDB Architecture"
 source_of_truth: true
 related_issue: 84
@@ -13,6 +13,9 @@ related_docs:
   - "docs/SRS--GENESISBLOCKDB.md"
   - "docs/contracts/CONTRACT--CLIENT-NAMESPACE-AND-SCHEMA.md"
   - "docs/adr/ADR--GENESISBLOCKDB-DOMAIN-NEUTRAL-CORE.md"
+  - "docs/SPEC--GENESISDB-P6-GENERATIONS-LEASES-ACL.md"
+  - "docs/adr/ADR--GENESISDB-HQL2-PATTERN-CONSTRAINTS.md"
+  - "docs/adr/ADR--GENESISDB-HQL2-P8-COMPLETION-ADDENDUM.md"
   - "docs/adr/ADR--GENESISDB-TYPED-QUERY-IR-AGENT-BOUNDARY.md"
   - "docs/SPEC--GENESISDB-TYPED-QUERY-IR-V1.md"
   - "docs/SPEC--WAVE-A-COMMIT-CORRECTNESS.md"
@@ -22,6 +25,84 @@ related_docs:
 ---
 
 # GenesisBlockDB Technical Architecture and Capability Composition
+
+The owner-approved [HQL2 execution boundary](adr/ADR--GENESISDB-HQL2-EXECUTION-BOUNDARY.md)
+adds a staged, explicitly selected v2 query pipeline. Existing HQL, Query IR v1,
+storage and transport contracts remain the current compatibility surfaces.
+P7 reference-interpreter evidence does not imply P8 production execution.
+The [P8 core checkpoint](REPORT--HQL2-P8-CORE-2026-09-28.md) records the
+separately approved Rust pipeline, revision-bound scans, annotation lookup,
+constrained graph expansion, exact KNN/Original Rerank, lease-bound
+HistoryScan/ChangeScan, root Match anchors, and structural unsigned parameters.
+Approved addendum D1-D5 now has local implementation evidence: pre-parse P6
+ACL denial, registered exact-scan lexical and scalar-token ContextPack profiles,
+Sequence node/edge exact-JSON properties under the lease, and contextual
+NULL/list/JSON literals. The focused completion target passes 10/10, including
+an edge-property-before-SHORTEST regression. The approved D7 bridge accepts
+differential-tested actor-scoped zero-hop HQL1 ID projections (unlabeled or
+with one plain-ASCII label) and bounded unlabeled one-hop projections through
+`Storage::query_v2`, including one endpoint-ID exact string equality filter;
+either zero-hop projection may also include one exact same-alias string-ID
+equality filter. Parser resources are preflighted and reserved before legacy
+AST construction.
+The differential-tested D7 extension also supports one unlabeled zero-hop
+single-property projection and exact-seed depth-one `TRAVERSE` ID projection
+over one physical relation or `ANY` in default/out/in/both directions. Missing
+and explicit-null property values retain legacy bag semantics; traversal
+excludes the seed and deduplicates projected target IDs. Other property and
+traversal forms remain fail-closed. Adapter, property, ordering and
+labeled-filter targets pass 13/13, 2/2, 2/2 and 2/2; root HQL2 passes 404/0/1
+across 39 targets.
+The focused adapter, ordering and labeled-filter tests pass 11/11, 2/2 and
+2/2; the new differential covers match/miss, wrong-label exclusion and a
+backslash/Unicode ID, alongside pre-parse authorization/namespace checks,
+malformed and unlisted forms, and resource rejection. HQL `JOIN TABLE` now
+lowers to the existing
+closed RowScan/Join pipeline for Inner/Left/Semi/Anti, with bare JOIN defaulting
+to Inner; HQL, typed IR and independent P7 differential results match for
+duplicate, missing-property NULL and JSON-null cases. The latest root-HQL2
+regression sweep passes 404/0/1 across 39 targets. Test-only optional
+Sequence edge-property-miss and nested-JSON property differentials match
+independent P7 for HQL and typed IR; nested node/edge object and array values
+match exactly, while optional misses preserve all four input rows and
+NULL-extend endpoint/edge aliases. The separate 11-target
+P6/schema-v6/compatibility group passes 194/0/0. Storage-backed HQL/typed-IR
+`Values`/`UnionAll` results match independent P7 for 169 nullable bag pairs
+and 338 Storage executions, preserving NULL and duplicate multiplicity.
+The scalar-pipeline P7 differential adds six fixtures and 12 Storage
+executions across projection/arithmetic/order/offset/take and
+filter/project/distinct/order/take; both frontends match P7 and each other.
+The storage-backed HQL/typed-IR Node/Edge/Row source-scan bags also match
+independent P7, excluding wrong labels/relations and retaining two row keys;
+the focused storage-source target passes 10/10.
+The HQL/typed-IR ChangeScan P7 differential also covers five exclusive-after/
+inclusive-through windows, including equal empty bounds and explicit
+`tx_as_of` frontiers; the focused History/Change target passes 17/17.
+HistoryScan bags for Node, Edge, Row, Vector and Annotation match independent
+P7 catalogs assembled from WAL-derived revision facts and captured frontiers/
+valid-time windows, including endpoint, vector-owner and annotation-reference
+ACL dependencies. Artifact HistoryScan remains unsupported; broad ChangeScan,
+P8/P13, hosted CI and review remain open. The
+H2-D11 R4/P6 annotation grant regression confirms:
+Annotation subjects require explicit Annotation(Read) separately from the
+Namespace(Read) query grant, while same-namespace target/evidence references
+remain covered by the broad namespace grant. HQL2 and typed-IR
+`tx_as_of` now select one historical frontier across source scans, graph/vector/
+annotation operators, hydration and `Snapshot.tx`, with no current-state
+fallback and the P6 generation/current policy still pinned. Five focused targets
+pass 56/56. Independent review
+of D7 remains pending; earlier read-only review found no concrete static defect,
+and focused re-review confirmed the corrected D5
+JSON-literal size preflight. Compact constraints remain fail-closed. Broad
+exact-oracle, shared HQL1/HQL2/IR, resource/cancellation, P8 and P13 gates
+remain open; these local results do not close the full HQL2/P8 gate. A separate
+selected HQL2/durability/authority verification now passes 40 targets,
+including schema-v6 WAL-only recovery; this is fixture evidence, not release or
+consumer qualification.
+The final locked/offline no-default-features Rust suite passed with no failures;
+the explicitly selected `probe_vs_recall` test remains NOT_RUN. Strict all-target
+Clippy passed with default and no-default features. These local results do not
+close independent review, full HQL2/P8/P13, release or consumer gates.
 
 ## 1. Role of this document
 
@@ -91,6 +172,7 @@ GenesisBlockDB uses a **Log-Structured Merge-Friendly** architecture based on a 
 - **Relational projection:** embedded SQLite (`rusqlite`, bundled) stores node properties, normalized labels and U2 app-defined tables. Versioned additive schemas, idempotent typed mutation batches and bounded named joins are available through Genesis APIs. SQLite remains internal and rebuildable from the signed WAL. Unified cross-domain transactions preflight relational constraints before WAL append. Supported query reads and graph/projection publication share a reentrant commit boundary; failed durable apply requires reopen before further queries, writes or checkpoint. Concurrent reads serialize; ANN visibility still requires the existing flush barrier. See [Wave A contract and verification limits](SPEC--WAVE-A-COMMIT-CORRECTNESS.md).
 - **In-memory state:**
   - `DashMap<u32, NodeOutput>`: lean primary node records; `props` are hydrated from SQLite rather than retained on the traversal path.
+  - **Recovery identity:** snapshots and journal replay preserve the same public-ID-to-`u32` mapping used by vector metadata and the SQLite projection. An empty snapshot starts allocation at `0`; a populated snapshot resumes at the largest saved key plus one. ID drift can return the correct vector hit with another node's properties.
   - `DashMap<u128, EdgeOutput>`: primary edge storage. Edges are keyed by deterministic `u128 = trunc128(SHA256(id))`; the key is derived from `EdgeOutput.id` and is not client identity.
   - `Adjacency Indices`: forward (`out_idx`) and backward (`in_idx`) indexes for O(1)-class adjacency access.
 
@@ -145,9 +227,11 @@ embedding -> six-lane index/readback -> quality gate -> atomic pointer update ->
 publication receipt. A prepared snapshot is not query-visible, and a gate
 without a matching publication receipt cannot finish a source run. This TEST
 adapter does not add GKS ontology, MSP policy, source schemas or a second
-database to GenesisBlockDB. Its native engine pin is
-`e15e35b0093394e0a8880af7f4e6f63cf81223b7`; its model and contract pins,
-runtime variables, lane statuses and extension seams are recorded in the
+database to GenesisBlockDB. The current candidate engine source and
+qualification status are recorded in the
+[GenesisRAG17 ADR](ADR--GENESISRAG17-SEPARATE-WORKER-PUBLICATION.md); the
+historical integration baseline remains identified there. Its model and
+contract pins, runtime variables, lane statuses and extension seams are recorded in the
 [GenesisRAG17 ADR](ADR--GENESISRAG17-SEPARATE-WORKER-PUBLICATION.md),
 [pipeline flow](FLOW--GENESISRAG17-PIPELINE.md), [extension
 map](GENESISRAG17-EXTENSION-MAP.md) and [worker README](../genesisrag17-worker/README.md).
@@ -238,9 +322,11 @@ Client-level semantic conflicts may require review even when storage-level recon
 
 ## 9. HQL and Typed Query IR
 
-The accepted public-query architecture is a versioned typed Query IR. Its first executor/API slice is
-planned and must pass the conformance gates in `SPEC--GENESISDB-TYPED-QUERY-IR-V1` before it is
-reported as shipped.
+The accepted public-query architecture is a versioned typed Query IR. Its
+partial executor/API slice implements `search`, `traverse`, linear `match_path`
+and target-id `context` in core, N-API and REST. Query-vector/temporal context
+and relational named-query remain unsupported or planned; see the capability
+manifest and `SPEC--GENESISDB-TYPED-QUERY-IR-V1`.
 
 GenesisBlockDB currently exposes HQL as a compatibility frontend for graph, vector and context
 operations. HQL is not storage authority and is not required to grow into general-purpose SQL or
@@ -333,10 +419,94 @@ old-engine use of a manually stripped journal-only v4 copy is unsupported.
 See [Wave B contract and verification record](SPEC--WAVE-B-DURABLE-COLLECTIONS-EDGE-HISTORY.md).
 These are local implementation contracts, not deployment or consumer migration evidence.
 
+P6 (architecture correction approved 2026-09-22) is the approved target for signed generation
+receipts after index flush and fail-closed snapshot validation, opaque generation-bound read
+leases, explicit temporal selectors, and signed revision-checked access-policy events. Its target
+disk schema is now 6 (the prior documented Wave B/P6 baselines are v4/v5); readers that do not
+understand schema 6 must reject it. Fixture-backed v5-to-v6 migration and markerless WAL recovery
+pass their focused tests, but no user database migration or consumer compatibility qualification
+has been performed. Current graph/vector records still lack entity namespace fields, so the
+P6 ACL contract does not claim migrated tenant isolation. See [P6 specification](SPEC--GENESISDB-P6-GENERATIONS-LEASES-ACL.md).
+
+Schema-v6 selection remains authority-bearing when the snapshot marker is lost. A missing
+`state.json` requires journal preflight before projection replay: schema 6 is selected only by a
+valid signed local activation record and, for migrated stores, its complete migration and P6
+receipt proof. Schema-5-compatible WAL remains replayable as v5; v6-only events without that
+proof fail with `RECOVERY_REQUIRED` instead of silently downgrading. See H2-D11 ADR R6b and the
+P6 WAL-only recovery contract. Runtime implementation is fixture-verified; no
+user database was migrated, and broader P6/P8/P13 qualification remains open.
+
+H2-D11 R5 restore validation opens staging with full retention, requires normal recovery to
+reproduce the bundle's final WAL-frame frontier, then publishes or reuses a P6 generation and
+independently validates a read-only lease before target exposure. A required local receipt may
+advance restored live `stable_frontier`;
+a valid receipt already at the manifest frontier is reused. `txn_frontier` is preserved, and the
+complete return metadata is prepared before target rename. The U9 restore target passes 7/7
+and the fresh HQL2 sweep passes 404/0/1 across 39 targets. Source-backed NodeScan plan-only
+EXPLAIN remains partial, and
+read-only/rename failure cleanup is best-effort and unverified. This does not close P14, hosted,
+independent-review or broad P8/P13 gates.
+
 ## Changelog
+
+Version diff 2.3.42b -> 2.3.43b: distinguish the candidate GenesisRAG17 engine
+source from its historical baseline and link qualification to the worker ADR;
+no core ontology, pipeline ownership or wire-contract change is implied, and
+full integration qualification remains pending.
+
+Version diff 2.3.37b -> 2.3.38b: extend the approved D7 differential
+allowlist with exact-seed depth-one HQL1 `TRAVERSE` ID projection over one
+physical relation or `ANY` in default/out/in/both directions. Adapter 13/13;
+HQL2 387/0/1 across 34 targets; P6/schema-v6/compatibility remains 194/0/0
+across 11. Seed self-loops are excluded and parallel edges deduplicated. Other
+traversal forms remain fail-closed; P6 is unchanged and independent review,
+shared-runtime and broad P8/P13 gates remain open.
 
 | Version | Date | Owner | Summary |
 |---|---|---|---|
+| 2.3.43b | 2026-10-06 | GenesisBlockDB Architecture | Record GenesisRAG17 candidate engine source/qualification through the worker ADR; preserve historical baseline and TEST-only boundary; no schema or wire change; full integration qualification pending |
+| 2.3.42b | 2026-10-05 | GenesisBlockDB Architecture | Extend approved D7 with one unlabeled zero-hop property projection and exact-seed depth-one TRAVERSE; adapter 13/13, property/order/filter 2/2 each, HQL2 404/0/1 across 39 targets and U9 restore 7/7; sync R5 restore evidence; preserve fail-closed boundaries and broad shared-runtime/P8/P13 gates |
+| 2.3.41b | 2026-10-04 | GenesisBlockDB Architecture | Extend D7 after legacy/HQL2 differential to the exact same-alias string ID predicate on labeled zero-hop scans; adapter/order/filter 11/11, 2/2, 2/2 incl. wrong-label and backslash/Unicode; HQL2 394/0/1 across 35 targets, selected P6 peers 45/0/0 across 7; PR #213 code commit checks 40 pass, 4 worker failures with cause unconfirmed, 5 skipped, 1 Windows Cargo cancellation at 15-minute job limit; no P6/schema/transport change; broad shared-runtime/P8/P13 gates open |
+| 2.3.40b | 2026-10-04 | GenesisBlockDB Architecture | Add test-only HQL/typed-IR ChangeScan P7 differential for five exclusive-after/inclusive-through windows, equal empty bounds and tx_as_of frontiers; History/Change 17/17 and HQL2 392/0/1 across 34 targets; PR #210 hosted checks 11 pass, four worker markerless-identity failures, one skipped; no runtime/contract/schema/P6/transport change; broad P8/P13 and independent review remain open |
+| 2.3.39b | 2026-10-04 | GenesisBlockDB Architecture | Add test-only HQL/typed-IR Node/Edge/Row source-scan P7 differential; focused target 10/10; fresh complete 34-target HQL2 sweep 391/0/1 (prior 393 count not reproduced); no runtime/contract/schema/P6/transport change; broad P8/P13 and independent review remain open |
+| 2.3.38b | 2026-10-04 | GenesisBlockDB Architecture | Extend D7 after legacy/HQL2 differential for one exact same-alias string ID predicate on unlabeled zero-hop HQL1 scans; adapter 11/11, ordering 2/2, HQL2 was reported 393/0/1 across 34 targets at that checkpoint; other forms remain fail-closed; no P6/schema/transport change; independent review and broad P8/P13 gates remain open |
+| 2.3.37b | 2026-10-04 | GenesisBlockDB Architecture | Record test-only nested-JSON Sequence property P7 differential for exact HQL/typed-IR node/edge object and array values; focused pattern 11/11, HQL2 392/0/1 across 34 targets; no runtime/contract/schema/P6/transport change; broad exact-oracle and P8/P13 qualification remain open |
+| 2.3.36b | 2026-10-04 | GenesisBlockDB Architecture | Record the test-only optional Sequence edge-property-miss P7 differential; preserve four input rows and NULL-extend endpoint/edge aliases; HQL2 389/0/1 across 34 targets; no runtime/contract/schema/transport change; broad exact-oracle and P8/P13 qualification remain open |
+| 2.3.35b | 2026-10-03 | GenesisBlockDB Architecture | Record test-only HQL/typed-IR scalar-pipeline P7 differential for six fixtures and 12 Storage executions; HQL2 383/0/1 across 33 targets, P6/compatibility 194/0/0; no runtime/contract/schema/transport change; broad exact-oracle and P8/P13 qualification remain open |
+| 2.3.34b | 2026-10-03 | GenesisBlockDB Architecture | Extend D7 after legacy/HQL2 differential for a single plain-ASCII label on zero-hop HQL1 ID scans; focused adapter 10/10, HQL2 382/0/1 across 33 targets, P6/compatibility 194/0/0; retain other HQL1/shared-runtime, review and P8/P13 gates |
+| 2.3.33b | 2026-10-03 | GenesisBlockDB Architecture | Record test-only HQL/typed-IR Values/UnionAll P7 differential for 169 nullable bag pairs and 338 Storage executions; HQL2 382/0/1 across 33 targets, P6/compatibility 194/0/0; no runtime/schema/transport change; retain broad exact-oracle, P8/P13 and qualification gates |
+| 2.3.32b | 2026-10-03 | GenesisBlockDB Architecture | Record storage-backed P7 HistoryScan differentials for Node/Edge/Row/Vector/Annotation; History/Change 15/15, Annotation source 7/7, P7 130/130, HQL2 379/0/1 and P6/schema-v6/compatibility 194/0/0; Artifact, broad ChangeScan/P8/P13, hosted CI and review remain open |
+| 2.3.31b | 2026-10-03 | GenesisBlockDB Architecture | Record independent P7 differential for H2-D11 Vector HistoryScan from WAL-derived revisions; P7 130/130, History/Change 14/14, HQL2 377/0/1 and P6/schema-v6/compatibility 194/0/0. At prior PR #194 head 9ada855, Windows cargo plus four worker checks fail and reviews are absent; hosted verification of this source revision and full acceptance/merge remain open |
+| 2.3.30b | 2026-10-03 | GenesisBlockDB Architecture | Record H2-D11 R4/P6 annotation ACL conformance and local HQL2 375/0/1 plus selected P6/schema-v6 43/0/0; possible ChangeScan budget side channel, prior PR worker failures and cancelled Windows Rust, hosted checks/review and full acceptance/merge remain open |
+| 2.3.29b | 2026-10-03 | GenesisBlockDB Architecture | Record PR #194 run 37083654705 at docs-only head 43cc6e8: Windows HQL/IR Join budget failure and four worker bootstrap failures; local Join reproduction 5/5, full acceptance and merge remain open |
+| 2.3.28b | 2026-10-03 | GenesisBlockDB Architecture | Synchronize the explicit HQL2 regression sweep to 374/0/1 across 32 targets and current PR #194 CI state: core checks pass, four worker checks fail at fresh schema-v6 bootstrap; preserve worker-fix approval, review, broad P8/P13 and release gates. |
+| 2.3.27b | 2026-10-03 | GenesisBlockDB Architecture | Implement HQL2/IR `tx_as_of` across sources, graph/vector/annotation operators, hydration and `Snapshot.tx` using one no-fallback frontier; record focused 56/56, HQL2 373/0/1 and P6/compatibility 194/0/0; retain broad P8/P13, review, worker-CI, soak, security and release gates. |
+| 2.3.26b | 2026-10-03 | GenesisBlockDB Architecture | Record HQL JOIN lowering through approved RowScan/Join contract, independent HQL/IR/P7 parity and 365/0/1 across 31 HQL2 targets; retain broad P8/P13, review, worker-CI, soak, security and release gates. |
+| 2.3.25b | 2026-10-02 | GenesisBlockDB Architecture | Record full local Rust regression and strict Clippy pass for HQL2/H2-D11 integration; keep `probe_vs_recall` NOT_RUN, no user migration, and independent-review/P8/P13/release gates open. |
+| 2.3.24b | 2026-10-02 | GenesisBlockDB Architecture | Record fixture-verified H2-D11 R6b markerless schema-v6 recovery and upstream Query IR V1 1.0.3 linear match_path; 40 selected HQL2/durability/authority targets pass; no user DB migration, full P8/P13 gates open. |
+| 2.3.23b | 2026-10-02 | GenesisBlockDB Architecture | Synchronize owner-approved H2-D11 R6b/P6 schema-v6 WAL-only recovery authority; implementation and recovery tests pending. |
+| 2.3.22b | 2026-10-02 | GenesisBlockDB Architecture | Add D7's differential-proven one-hop endpoint-ID exact string filter; record 9/9 focused adapter tests, 361/0/1 across 27 HQL2 targets and 190/0/0 across 11 compatibility targets; retain shared-runtime, independent-review and broad P8/P13 gates. |
+| 2.3.21b | 2026-10-02 | GenesisBlockDB Architecture | Extend D7 with differential-proven one-hop HQL1 projections and pre-parse resource reservation; record 8/8 focused tests, 361/0/1 across 27 HQL2 targets and 190/0/0 across 11 compatibility targets; retain shared-runtime, independent-review and broad P8/P13 gates. |
+| 2.3.20b | 2026-10-02 | GenesisBlockDB Architecture | Record D7's initial actor-scoped HQL1 projection, 5/5 focused adapter tests and 354/0/1 across 27 HQL2 targets; retain shared-runtime, independent-review and broad P8/P13 gates. |
+| 2.3.19b | 2026-10-02 | GenesisBlockDB Architecture | Record D4 edge-property-before-SHORTEST regression, 10/10 P8 completion tests and 349/0/1 across 26 HQL2 targets; independent static review has no concrete finding; retain broad P8/P13 gates. |
+| 2.3.18b | 2026-10-02 | GenesisBlockDB Architecture | Truth-sync approved P8 D1-D5 runtime and 528/0/1 across 37 explicit regression targets; retain JSON-size correction review and broad P8/P13 gates. |
+| 2.3.17b | 2026-10-02 | GenesisBlockDB Architecture | Register owner-approved P8 addendum D1-D6 for bounded text operators, Sequence property constraints, contextual literals and P6 ACL-fixture correction; runtime evidence pending. |
+| 2.3.16b | 2026-09-30 | GenesisBlockDB Architecture | Truth-sync lease-bound HQL/typed-IR Sequence node ID/labels and 338/0/1 across 25 HQL2 targets; retain properties/Compact, broader P8 and release gates. |
+| 2.3.15b | 2026-09-30 | GenesisBlockDB Architecture | Record delegated HQL/typed-IR Sequence node-ID/conjunctive-label contract under P6; runtime implementation pending, properties/Compact fail-closed. |
+| 2.3.14b | 2026-09-30 | GenesisBlockDB Architecture | Truth-sync HQL root-Match P7 graph differential and 331/0/1 across 24 root HQL2 targets; retain broad HQL2/P8 and release gates. |
+| 2.3.13b | 2026-09-30 | GenesisBlockDB Architecture | Truth-sync HQL/IR exact-KNN and Original Rerank differentials against independent P7 ranking and 330/0/1 across 23 root HQL2 targets; retain broad HQL2/P8 and release gates. |
+| 2.3.12b | 2026-09-30 | GenesisBlockDB Architecture | Truth-sync HQL/IR exact-KNN differential against the independent P7 oracle and 329/0/1 across 23 root HQL2 targets; retain broad HQL2/P8 and release gates. |
+| 2.3.11b | 2026-09-30 | GenesisBlockDB Architecture | Truth-sync checked HQL `%`/typed-IR `rem`, same-type I64/F64 semantics and 328/0/1 across 22 local targets; retain remaining HQL2/P8 and release gates. |
+| 2.3.10b | 2026-09-30 | GenesisBlockDB Architecture | Truth-sync exact DecimalU64 structural HQL parameters and HQL2 NULLS LAST default; record 325/0/1 across 22 local targets; retain pattern-constraint, remaining HQL2/P8 and release gates. |
+| 2.3.9b | 2026-09-30 | GenesisBlockDB Architecture | Truth-sync exact DecimalU64 structural HQL parameter binding and 323/0/1 across 22 local HQL2 targets; retain pattern-constraint, remaining HQL2/P8 and release gates. |
+| 2.3.8b | 2026-09-30 | GenesisBlockDB Architecture | Truth-sync validated typed-IR root Match anchors and 319/0/1 across 22 local HQL2 targets; retain pattern-constraint, remaining HQL2/P8 and release gates. |
+| 2.3.7b | 2026-09-30 | GenesisBlockDB Architecture | Truth-sync lease-bound HQL/IR HistoryScan/ChangeScan and 318/0/1 local HQL2 evidence; retain Lexical/Context, constrained-pattern, transport and P8 gates. |
+| 2.3.6b | 2026-09-29 | GenesisBlockDB Architecture | Truth-sync exact HQL/IR KNN and Original Rerank, H2-D11 collection-space binding and 307/0/1 local HQL2 evidence; retain explicit history, transport and P8 gates. |
+| 2.3.5b | 2026-09-29 | GenesisBlockDB Architecture | Truth-sync structural HQL/IR Sequence Expand and the 206-pass/21-target fixture matrix; keep pattern constraints, full HQL2 and release gates open. |
+| 2.3.4b | 2026-09-29 | GenesisBlockDB Architecture | Truth-sync the partial P8 checkpoint for constrained HQL/IR graph expansion and the 199-pass/20-target fixture matrix; keep full HQL2 and release gates open. |
+| 2.3.2b | 2026-09-28 | GenesisBlockDB Architecture | Register accepted explicit HQL2 execution boundary; P7 fixtures do not imply production completion. |
+| 2.3.3b | 2026-09-28 | GenesisBlockDB Architecture | Register the approved P8 scalar/core checkpoint and remaining storage/surface gates. |
+| 2.3.1b | 2026-09-22 | GenesisBlockDB Architecture | Registered the owner-approved P6 durability, generation/lease, temporal and ACL target with explicit schema-compatibility and implementation-status limits. |
 | 2.3.0b | 2026-09-08 | GenesisBlockDB Architecture | Added the separate GenesisRAG17 TEST adapter boundary, ordered publication flow and extension references while retaining the client-neutral core. |
 | 2.2.2 | 2026-09-08 | GenesisBlockDB Architecture | Reflected approved Wave B durable collections, schema compatibility and edge version intervals. |
 | 2.2.1 | 2026-09-08 | GenesisBlockDB Architecture | Reflected approved Wave A preflight, publication and recovery-required behavior with verification limits. |

@@ -1,0 +1,60 @@
+{
+  "schemaVersion": 1,
+  "artifactType": "SP24_ADMISSION",
+  "decisionId": "W1-SYNTHETIC-GAP-REMEDIATION-20261013-SP24",
+  "status": "ADMITTED_SYNTHETIC_ONLY",
+  "issuedAtUtc": "2026-10-13T00:36:56.4303071Z",
+  "decisionPath": "D:\\GenesisBlock_Dev\\w1-evidence-20261010\\decisions\\W1-synthetic-gap-remediation-decision-20261013-sp24-issued.json",
+  "decisionSha256": "657443f3a8aa3db34d99e23d1f644400c8f2b5253644af69ac9bfbebcb4b88d0",
+  "admissionAuthority": "Direct user authorization: Authorize SP24.",
+  "rootCauseAnalysisPath": "D:\\GenesisBlock_Dev\\w1-evidence-20261010\\synthetic-pilots\\synthetic-pilot-20261013-sp24\\readiness\\root-cause-analysis.json",
+  "rootCauseAnalysisSha256": "8fab054d4604b1a62f89b5320fa6334a15be59d2845ab9dd7c538d10ba701eba",
+  "candidateRoot": "D:\\GenesisBlock_Dev\\w1-evidence-20261010\\adapter\\synthetic-pilot-20261013-sp24",
+  "evidenceRoot": "D:\\GenesisBlock_Dev\\w1-evidence-20261010\\synthetic-pilots\\synthetic-pilot-20261013-sp24\\evidence",
+  "readinessRoot": "D:\\GenesisBlock_Dev\\w1-evidence-20261010\\synthetic-pilots\\synthetic-pilot-20261013-sp24\\readiness",
+  "seedRoot": "D:\\GenesisBlock_Dev\\w1-evidence-20261010\\adapter\\synthetic-pilot-20261012-sp21",
+  "seedFileCount": 345,
+  "seedManifestSha256": "a31388b7a3b6eeaea5069acdf1aa2bee726f97dc6c1a71e01a0334cbd22c06c4",
+  "seedManifestLength": 64,
+  "cutoffBinding": {
+    "independentPretestReviewBy": "2026-10-13T08:46:56+07:00",
+    "readyGateBy": "2026-10-13T08:51:56+07:00",
+    "candidateMaterializationAndPreflightBy": "2026-10-13T08:21:56+07:00",
+    "rule": "All absolute stage cutoffs are fixed at issuance. Any missed cutoff, failed review, hash mismatch, failed invocation, missing receipt, or candidate drift is terminal; no later cutoff revives SP24.",
+    "timezone": "Asia/Bangkok",
+    "terminalDispositionBy": "2026-10-13T09:21:56+07:00",
+    "testStartBy": "2026-10-13T09:01:56+07:00",
+    "testFinishBy": "2026-10-13T09:06:56+07:00",
+    "hardCutoff": "2026-10-13T09:36:56+07:00",
+    "hardCutoffUtc": "2026-10-13T02:36:56Z"
+  },
+  "testBinding": {
+    "executable": "C:\\Users\\suanr\\.cache\\codex-runtimes\\codex-primary-runtime\\dependencies\\node\\bin\\node.exe",
+    "timeoutMs": 180000,
+    "cwd": "D:\\GenesisBlock_Dev\\w1-evidence-20261010\\adapter\\synthetic-pilot-20261013-sp24",
+    "arguments": [
+      "--test",
+      "artifact-manifest.test.mjs"
+    ],
+    "maxRuns": 1,
+    "startByUtc": "2026-10-13T02:01:56Z",
+    "finishByUtc": "2026-10-13T02:06:56Z"
+  },
+  "dispatchAuthorized": false,
+  "predecessorSP23TerminalSha256": "4b28eddee169e7ff0b0b2522abf3c6faf6136865b8dbde503456a34b99660725",
+  "predecessorSP23CorrectionSha256": "b3bdf5df3e9661bd89b759a9770c0a28d76096af00625cb9d85d7afc1f1748b1",
+  "noSP21Mutation": true,
+  "noSP22Mutation": true,
+  "noSP23Mutation": true,
+  "retryPermitted": false,
+  "extensionPermitted": false,
+  "successorPermitted": false,
+  "postFreezeEditsPermitted": false,
+  "reviewRequiredBeforeTest": true,
+  "candidatePatchApplicationsMaximum": 1,
+  "candidateSourceFilesAllowlisted": [
+    "identity-evidence.mjs"
+  ],
+  "testInvocationsMaximum": 1,
+  "testsRunAtAdmission": 0
+}

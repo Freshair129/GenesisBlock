@@ -1,0 +1,44 @@
+[build-system]
+requires = ["setuptools>=77", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "genesisblockdb-client"
+version = "0.1.0"
+description = "Python REST client for GenesisBlockDB"
+readme = "README.md"
+requires-python = ">=3.10"
+license = "MIT"
+authors = [
+  { name = "GenesisBlockDB Engineering" }
+]
+dependencies = [
+  "requests>=2.31,<3"
+]
+keywords = [
+  "genesisblockdb",
+  "graph-database",
+  "vector-database",
+  "agent-memory",
+  "rest-client"
+]
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "Intended Audience :: Developers",
+  "Operating System :: OS Independent",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3 :: Only",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13"
+]
+
+[project.urls]
+Homepage = "https://github.com/Freshair129/GenesisBlock"
+Repository = "https://github.com/Freshair129/GenesisBlock"
+Issues = "https://github.com/Freshair129/GenesisBlock/issues"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["genesisdb*"]

@@ -29,6 +29,16 @@ fn open(path: &str) -> Storage {
     .unwrap()
 }
 
+fn open_schema5(path: &str) -> Storage {
+    fs::create_dir_all(path).unwrap();
+    fs::write(
+        Path::new(path).join("state.json"),
+        r#"{"schema_version":5}"#,
+    )
+    .unwrap();
+    open(path)
+}
+
 fn schema() -> RelationalSchemaPackage {
     RelationalSchemaPackage {
         namespace: "fung".to_string(),
@@ -195,7 +205,7 @@ fn unified_transaction_commits_row_graph_vector_and_recovers_idempotently() {
     let path = fresh("unified_transaction_p5_row_graph_vector");
     let transaction = transaction();
     let committed = {
-        let storage = open(&path);
+        let storage = open_schema5(&path);
         storage.register_relational_schema(schema()).unwrap();
         let committed = storage.commit_transaction(transaction.clone()).unwrap();
         assert!(committed.stable);
@@ -212,7 +222,7 @@ fn unified_transaction_commits_row_graph_vector_and_recovers_idempotently() {
     // Removing the snapshot and every rebuildable projection forces the next
     // open to recover rows/graph/vector from the canonical WAL alone.
     remove_rebuildable_projections(&path);
-    let storage = open(&path);
+    let storage = open_schema5(&path);
     assert_unified_state(&storage);
     assert_eq!(storage.txn_frontier(), committed.commit_sequence);
     assert_eq!(storage.stable_frontier(), committed.commit_sequence);
@@ -279,7 +289,7 @@ fn vector_materialization_failure_is_not_reported_as_stable_and_recovers() {
     };
 
     {
-        let storage = open(&path);
+        let storage = open_schema5(&path);
         storage
             .create_collection(
                 "rerank".to_string(),
@@ -326,7 +336,7 @@ fn replicated_fold_receipt_uses_destination_frame_after_cold_reopen() {
     let source_path = fresh("unified_transaction_p5_remote_receipt_source");
     let destination_path = fresh("unified_transaction_p5_remote_receipt_destination");
     let transaction = transaction();
-    let source = open(&source_path);
+    let source = open_schema5(&source_path);
     source.register_relational_schema(schema()).unwrap();
     let original_sequence = source
         .commit_transaction(transaction.clone())
@@ -348,7 +358,7 @@ fn replicated_fold_receipt_uses_destination_frame_after_cold_reopen() {
     source.compact().unwrap();
     let delta = source.events_since_seq(0);
 
-    let mut destination = open(&destination_path);
+    let mut destination = open_schema5(&destination_path);
     destination.peers.insert(
         source.local_peer_id.clone(),
         SyncPeer {
@@ -368,7 +378,7 @@ fn replicated_fold_receipt_uses_destination_frame_after_cold_reopen() {
     drop(destination);
     remove_rebuildable_projections(&destination_path);
 
-    let destination = open(&destination_path);
+    let destination = open_schema5(&destination_path);
     assert_eq!(destination.txn_frontier(), destination_sequence);
     let retry = destination.commit_transaction(transaction).unwrap();
     assert_eq!(retry.commit_sequence, destination_sequence);

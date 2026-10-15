@@ -5,10 +5,10 @@
 #
 # Why this exists: Central validates a bundle only after it has been uploaded,
 # and rejects it for things that are entirely knowable beforehand - a missing
-# <description>, no <scm>, no javadoc jar. Finding that out during a release is
-# the pattern this repo has already paid for repeatedly (see
-# .github/workflows/release.yml's dry-run rationale). This turns those into a
-# PR-time failure instead.
+# <description>, no <scm>, no javadoc jar, or a public API dependency missing
+# from compile scope. Finding that out during a release is the pattern this repo
+# has already paid for repeatedly (see .github/workflows/release.yml's dry-run
+# rationale). This turns those into a PR-time failure instead.
 #
 #   usage: verify-maven-central-pom.sh [repo-dir]
 #          default repo-dir: ~/.m2/repository
@@ -37,8 +37,7 @@ POM=$(ls "$DIR"/*.pom 2>/dev/null | head -1)
 fail=0
 note() { printf '  %-14s %s\n' "$1" "$2"; }
 
-# Central's required POM elements. Checked by element name rather than by
-# XPath so this needs no XML tooling on the runner.
+# Central's required POM elements are checked by element name.
 for tag in groupId artifactId version name description url; do
   if grep -q "<$tag>" "$POM"; then
     note "OK" "<$tag>"
@@ -60,6 +59,32 @@ done
 for tag in connection developerConnection; do
   grep -q "<$tag>" "$POM" || { note "MISSING" "<scm><$tag>"; fail=1; }
 done
+
+# JsonElement appears in public Android SDK signatures. A runtime-only
+# serialization dependency lets the library itself compile but breaks consumers.
+if python3 - "$POM" <<'PY'
+import sys
+import xml.etree.ElementTree as ET
+
+root = ET.parse(sys.argv[1]).getroot()
+namespace = root.tag.partition("}")[0] + "}" if "}" in root.tag else ""
+for dependency in root.findall(f"./{namespace}dependencies/{namespace}dependency"):
+    if (
+        dependency.findtext(f"{namespace}groupId") == "org.jetbrains.kotlinx"
+        and dependency.findtext(f"{namespace}artifactId") == "kotlinx-serialization-json"
+    ):
+        scope = dependency.findtext(f"{namespace}scope") or "compile"
+        if scope != "compile":
+            raise SystemExit(f"serialization JSON must be compile-scoped, found {scope!r}")
+        print("serialization JSON is compile-scoped")
+        raise SystemExit(0)
+raise SystemExit("serialization JSON dependency is missing from the POM")
+PY
+then
+  note "OK" "public serialization dependency is compile-scoped"
+else
+  note "MISSING" "public serialization dependency in compile scope"; fail=1
+fi
 
 echo
 # Required companion artifacts.

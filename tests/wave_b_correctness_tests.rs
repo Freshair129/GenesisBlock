@@ -1,6 +1,6 @@
 use genesis_block_native::*;
 use serde_json::{json, Value};
-use std::{path::Path, process::Command};
+use std::{fs, path::Path, process::Command};
 
 fn open(p: &Path) -> Storage {
     Storage::open(OpenOptions {
@@ -11,6 +11,10 @@ fn open(p: &Path) -> Storage {
         retention: Some("full".into()),
     })
     .unwrap()
+}
+fn open_schema5(p: &Path) -> Storage {
+    fs::write(p.join("state.json"), r#"{"schema_version":5}"#).unwrap();
+    open(p)
 }
 fn node(id: &str) -> NodeInput {
     NodeInput {
@@ -250,7 +254,7 @@ fn losing_legacy_retraction_does_not_erase_edge_history() {
 #[test]
 fn transaction_and_consensus_rebind_share_current_and_historical_endpoints() {
     let dir = tempfile::tempdir().unwrap();
-    let s = open(dir.path());
+    let s = open_schema5(dir.path());
     for id in ["A", "B", "C", "D"] {
         s.add_node(node(id)).unwrap();
     }

@@ -4,6 +4,8 @@ use genesis_block_native::{NamedQueryRequest, OpenOptions, Storage, StudioGraphS
 use serde::Serialize;
 use serde_json::{json, Value};
 use tauri::State;
+#[cfg(desktop)]
+use tauri_plugin_dialog::DialogExt;
 
 #[derive(Default)]
 struct StudioState {
@@ -27,6 +29,29 @@ fn studio_shell_info() -> StudioShellInfo {
     }
 }
 
+#[tauri::command]
+async fn studio_pick_local_root(app: tauri::AppHandle) -> Result<Option<String>, String> {
+    #[cfg(desktop)]
+    {
+        app.dialog()
+            .file()
+            .set_title("Select a GenesisBlockDB data root")
+            .blocking_pick_folder()
+            .map(|selected| {
+                selected
+                    .into_path()
+                    .map(|path| path.to_string_lossy().into_owned())
+                    .map_err(|error| error.to_string())
+            })
+            .transpose()
+    }
+    #[cfg(not(desktop))]
+    {
+        let _ = app;
+        Err("Native local-root selection is only available in desktop builds".to_string())
+    }
+}
+
 fn with_storage<T>(
     state: &Arc<Mutex<Option<Storage>>>,
     operation: impl FnOnce(&Storage) -> Result<T, String>,
@@ -47,11 +72,24 @@ async fn studio_open_local(state: State<'_, StudioState>, path: String) -> Resul
     }
     let storage_state = Arc::clone(&state.storage);
     tauri::async_runtime::spawn_blocking(move || {
+        let metadata = std::fs::metadata(&path).map_err(|error| {
+            format!(
+                "The GenesisBlockDB data root '{}' could not be accessed: {error}. Choose an existing folder.",
+                path
+            )
+        })?;
+        if !metadata.is_dir() {
+            return Err(format!(
+                "The GenesisBlockDB data root '{}' is not a folder. Choose an existing folder.",
+                path
+            ));
+        }
         let storage = Storage::open(OpenOptions {
             path,
             page_cache_mb: Some(64),
             read_only: Some(true),
             vector_dim: None,
+            retention: None,
         })
         .map_err(|error| error.to_string())?;
         let capabilities = storage.studio_capabilities("local", vec!["os-user".to_string()]);
@@ -214,9 +252,11 @@ async fn studio_local_named_query(
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
+        .plugin(tauri_plugin_dialog::init())
         .manage(StudioState::default())
         .invoke_handler(tauri::generate_handler![
             studio_shell_info,
+            studio_pick_local_root,
             studio_open_local,
             studio_close_local,
             studio_local_capabilities,

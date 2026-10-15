@@ -26,7 +26,8 @@ cheap_eligible(task)  ⟺  task has a verify_command that returns pass/fail at ~
 ```
 
 If a task has **no** `verify_command`, it is **not cheap-eligible** — it does not enter the
-cheap ladder at all; it starts at **T2 (Claude-mid)** by default. You cannot safely route a
+cheap ladder at all; it starts at **T2**, resolved through `TIERED_SWARM_T2_MODEL_ID`.
+You cannot safely route a
 model to work you cannot cheaply grade. This is the keystone rule tying the whole skill
 together: no machine-checkable AC at the unit being routed ⟹ no cheap routing.
 
@@ -72,15 +73,15 @@ gate sits in the cascade*; remove the gate and the savings invert into rework.
 On a **failed** verify gate, escalate exactly ONE rung and re-execute:
 
 ```
-T0 local-SLM ──▶ T1 local-mid ──▶ T1.5 cloud-OW ──▶ T2 Claude-mid ──▶ T3 Claude-frontier
- vibethinker     aroow-rust-coder   kimi-k2.7-code     sonnet-4-6        opus-4-8
- chinda-qwen3    mellum2 / gemma4   deepseek-v4-pro
+T0 local-SLM ──▶ T1 local-mid ──▶ T1.5 cloud-OW ──▶ T2 configured ──▶ T3 configured
+ vibethinker     aroow-rust-coder   kimi-k2.7-code     TIERED_SWARM_    TIERED_SWARM_
+ chinda-qwen3    mellum2 / gemma4   deepseek-v4-pro   T2_MODEL_ID      T3_MODEL_ID
 ```
 
 - Never skip two rungs at once — each rung is a real price band, and skipping wastes the
   cheaper attempt's information.
-- The break-even (§2) applies at **every** rung boundary, not just local→Claude: local-mid
-  → cloud-OW, then cloud-OW → Claude. Escalate when the *expected error cost at this rung*
+- The break-even (§2) applies at **every** rung boundary, including cloud-OW → configured
+  billed tiers. Escalate when the *expected error cost at this rung*
   exceeds the *price delta to the next rung*.
 - A task that exhausts the ladder (fails even at T3) is a spec problem, not a routing
   problem — surface it to the human at ASSEMBLE; do not loop.
@@ -99,13 +100,12 @@ stop at the first that gives an unambiguous verdict:
    findings: it confirms a finding's cited evidence command actually resolves to a real
    line before the finding is allowed to cross into the author phase.
 2. **Cheap judge (T0 SLM, ~$0)** — only if the deterministic check is genuinely fuzzy
-   (e.g. "is this summary faithful?"). Use `vibethinker:3b` or `claude-haiku-4-5` as a
-   cheap LLM-judge. Its job is narrow: confirm the output meets the AC, not to redo the
-   work.
+   (e.g. "is this summary faithful?"). Use `vibethinker:3b` as a cheap LLM-judge. Its job
+   is narrow: confirm the output meets the AC, not to redo the work.
 3. **Frontier judge (T3, full price)** — only if the cheap judge is still ambiguous AND the
-   blast radius is high (the output feeds an Opus author). Use `claude-opus-4-8` as the
-   adversarial gate. This is the most expensive verdict — reserve it for the Review-gate
-   and for high-propagation findings.
+   blast radius is high (the output feeds a T3 author). Use the configured
+   `TIERED_SWARM_T3_MODEL_ID` for the adversarial gate. This is the most expensive verdict —
+   reserve it for the Review-gate and for high-propagation findings.
 
 **Gate rule:** every finding that crosses a phase boundary must carry a **re-runnable
 evidence command**. A T0 SLM or `scripts/check_evidence.py` confirms the citation resolves
@@ -125,19 +125,20 @@ The reference run was 10 agents (7 Sonnet verifiers + 2 Opus authors + 1 Opus re
 |---|---|---|---|
 | **Verify** (7 parallel) | 7× Sonnet (T2) | **7× T1 local-mid** (`aroow-rust-coder:9b` / `mellum2:12b-a2.5b`) | Verification is cheap-eligible: each verifier returns a structured **finding + evidence command** (a `grep`/line-cite) — exactly the deterministic check §1 requires. |
 | **Verify-gate** | (implicit) | `scripts/check_evidence.py` per finding; T0 SLM on fuzzy ones | No finding crosses to the author phase until its evidence command resolves. This gate is what makes the local move safe. |
-| **Author** (2 parallel) | 2× Opus (T3) | **2× T3 Opus** (unchanged) | Authoring an RCA + swarm plan is hard reasoning with high blast radius — never fed unverified cheap output, never routed cheap. |
-| **Review** (1) | 1× Opus (T3) | **1× T3 Opus** (unchanged) | Adversarial gate; the most expensive, highest-stakes verdict. |
+| **Author** (2 parallel) | 2× Opus (T3) | **2× configured T3** (unchanged) | Authoring an RCA + swarm plan is hard reasoning with high blast radius — never fed unverified cheap output, never routed cheap. |
+| **Review** (1) | 1× Opus (T3) | **1× configured T3** (unchanged) | Adversarial gate; the most expensive, highest-stakes verdict. |
 | **Assemble** | human | human (unchanged) | Human-in-the-loop; assemble + final review vs the epic DoD. |
 
-**Cost (Claude rates per `references/model-tiers.md`; ~85% in / 15% out read-heavy
-profile):**
+**Cost example (explicit Claude rates per `references/model-tiers.md`; ~85% in / 15% out
+read-heavy profile):**
 - (A) Claude-only baseline: Verify ≈ $1.70 + Author/Review ≈ $1.91 = **~$3.61**
 - (C) local-first hybrid: Verify ≈ **$0** (metered via Ollama eval counts) + Author/Review
   ≈ $1.91 = **~$1.91 → ~47% cheaper.**
 
 **The savings AND the trap in one frame:** the hybrid wins *only because* verification is
 cheap-eligible and gated. The failure mode is concrete: a T1 verifier that **hallucinates a
-finding** feeds a false premise into a T3 Opus author ($5/$25 per M), which authors an RCA
+finding** feeds a false premise into a configured T3 author (the example uses a
+Claude-profile rate of $5/$25 per M), which authors an RCA
 on a false foundation; the adversarial reviewer catches it and the **entire author phase
 reruns** — net *worse* than Claude-only. The per-finding evidence command + the Verify-gate
 are what turn the 47% from a trap into a real saving.
@@ -155,7 +156,8 @@ are what turn the 47% from a trap into a real saving.
 - Compose `tdd-workflow`: RED = the `verify_command` (write/confirm the failing test) →
   GREEN @ `aroow-rust-coder:9b` → REFACTOR with the test still green.
 - Gate = stage 1 deterministic (`cargo test`). Pass ⟹ ACCEPT. Fail ⟹ escalate to
-  `kimi-k2.7-code:cloud` (T1.5), re-run; still fail ⟹ `claude-sonnet-4-6` (T2).
+  `kimi-k2.7-code:cloud` (T1.5), re-run; still fail ⟹ configured T2 via
+  `TIERED_SWARM_T2_MODEL_ID`.
 
 ### Example C — a doc-summarization task (no downstream agent)
 
@@ -180,7 +182,7 @@ Do not route cheap — start at T2+ — when **any** of these holds:
    Either escalate, or insert a verify gate between the producer and its consumer — never
    let unverified cheap output cross the boundary.
 4. **Adversarial / final review.** The Review-gate and the final-review-vs-epic-DoD are
-   high-stakes verdicts; run them at T3 (`claude-opus-4-8`) regardless of cost.
+   high-stakes verdicts; run them at configured T3 regardless of cost.
 5. **Engine-correctness embedding queries.** Any query against the GenesisBlockDB vector
    store MUST use the engine-matched embedder `bge-m3` — this is a *role* constraint
    (Axis 2), not a tier choice. A cheaper non-engine embedder is not an "escalation

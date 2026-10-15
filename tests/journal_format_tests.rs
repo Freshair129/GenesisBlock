@@ -209,6 +209,15 @@ fn frame_and_txn_frontier_split() {
     );
     assert_eq!(s.txn_frontier(), 0, "no transaction committed yet");
 
+    s.save_state().unwrap();
+    drop(s);
+    let s = open(&dir);
+    assert_eq!(
+        s.txn_frontier(),
+        0,
+        "ordinary graph revision receipt stays outside txn frontier after checkpoint"
+    );
+
     let commit = s
         .commit_transaction(GenesisTransaction {
             transaction_id: "tx-frontier-1".to_string(),

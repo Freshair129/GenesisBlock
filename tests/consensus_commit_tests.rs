@@ -8,6 +8,7 @@
 //     votes are short-circuited by the `committed` guard (no re-persist)
 // See the consensus `submit_vote` block in src/lib.rs.
 
+use ed25519_dalek::{Signature, Verifier};
 use genesis_block_native::{
     EdgeOutput, Event, HybridSearchInput, LogicalClock, NeighborInput, NodeInput, NodeOutput,
     OpenOptions, Storage, VectorEvent,
@@ -203,18 +204,24 @@ fn consensus_committed_vector_is_searchable() {
 fn recommit_after_quorum_does_not_repersist() {
     let path = fresh("test_cc_once");
     let s = open(&path, 4);
-    // propose_consensus is in-memory only — nothing in the WAL yet.
-    assert_eq!(wal_lines(&path), 0);
+    // A fresh schema-v6 store has an activation frame; proposing adds no frame.
+    let before_proposal = wal_lines(&path);
+    assert!(before_proposal > 0);
 
     let pid = s
         .propose_consensus(Event::Node(mk_node("N1")), vec![0u8; 64])
         .unwrap();
+    assert_eq!(wal_lines(&path), before_proposal);
     assert!(
         approve(&s, &pid),
         "first authentic vote crosses quorum and commits"
     );
     let after_commit = wal_lines(&path);
-    assert_eq!(after_commit, 1, "commit persists the event once");
+    assert_eq!(
+        after_commit,
+        before_proposal + 1,
+        "commit persists the event once"
+    );
 
     // Re-vote (same peer, same authentic signature). The guard returns Ok(true)
     // without re-applying — the WAL must not grow.
@@ -227,4 +234,55 @@ fn recommit_after_quorum_does_not_repersist() {
         after_commit,
         "no re-persist after the proposal is committed"
     );
+}
+
+#[test]
+fn consensus_proposal_signature_covers_the_revision_envelope() {
+    let s = open(&fresh("test_cc_signed_revision"), 4);
+    let pid = s
+        .propose_consensus(Event::Node(mk_node("N1")), vec![0u8; 64])
+        .unwrap();
+    let proposal = s.proposals.get(&pid).unwrap().clone();
+    let Event::Transaction(transaction) = &proposal.signed_event.event else {
+        panic!("schema-v6 graph proposal is signed as a revision transaction");
+    };
+    let revisions = transaction
+        .record_revision_transaction
+        .as_ref()
+        .expect("the signed transaction carries its revision envelope");
+    let node_revision = revisions
+        .mutations
+        .iter()
+        .find(|mutation| mutation.kind == genesis_block_native::uee_v2::RecordKindV2::Node)
+        .expect("node revision is present");
+    assert_eq!(node_revision.id, "N1");
+    assert!(node_revision.payload["labels"]
+        .as_array()
+        .is_some_and(|labels| labels.iter().any(|label| label == "MASTER")));
+
+    let bytes = serde_json::to_vec(&proposal.signed_event.event).unwrap();
+    let signature = Signature::from_slice(&proposal.signed_event.signature).unwrap();
+    s.verifying_key.verify(&bytes, &signature).unwrap();
+}
+
+#[test]
+fn stale_consensus_revision_is_rejected_before_wal_append() {
+    let path = fresh("test_cc_stale_revision");
+    let s = open(&path, 4);
+    let first = s
+        .propose_consensus(Event::Node(mk_node("N1")), vec![0u8; 64])
+        .unwrap();
+    let stale = s
+        .propose_consensus(Event::Node(mk_node("N1")), vec![0u8; 64])
+        .unwrap();
+    assert!(approve(&s, &first));
+    let before_stale_commit = wal_lines(&path);
+    let peer = s.local_peer_id.clone();
+    let signature = s.sign_vote(stale.clone(), true);
+    let error = s
+        .submit_vote(stale, peer, true, signature)
+        .unwrap_err()
+        .to_string();
+    assert!(error.contains("REVISION_CONFLICT"), "{error}");
+    assert_eq!(wal_lines(&path), before_stale_commit);
 }

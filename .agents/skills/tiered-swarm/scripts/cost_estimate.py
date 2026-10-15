@@ -9,8 +9,8 @@ Implements the cost-model formula (references/cost-model.md):
                           + out         * rate_out ]
 
 Cost is two-way: token COUNT (the four counters per call) x per-type PRICE (the
-rate vector per model). Local tiers are metered (count is real) but priced at 0.0,
-so the local/Claude split is auditable.
+rate vector per model). Explicitly listed local tiers are metered (count is real)
+but priced at 0.0, so the local/billed split is auditable.
 
 Dependency-free (stdlib only). Run `python cost_estimate.py` for the worked example.
 
@@ -23,8 +23,6 @@ USAGE (as a module):
     ]
     print(total_cost(rows))
 """
-
-import sys
 
 # ---------------------------------------------------------------------------
 # PRICING TABLE  --  EDIT / VERIFY BEFORE ANY BILLING LOGIC SHIPS
@@ -39,9 +37,9 @@ import sys
 # The 'cache_write' counter below is billed at the 5-min rate by default; if you use
 # 1-hr TTL caching, set the model's "cache_write" entry to its 1-hr value (2.0x in).
 #
-# Local tiers (T0/T1 via Ollama) = 0.0 — off the billable axis (electricity + sunk
-# VRAM only). METER their token COUNT anyway (Ollama prompt_eval_count / eval_count)
-# so "local saved tokens" is a defensible, audited claim.
+# Explicitly listed local tiers (T0/T1 via Ollama) = 0.0 — off the billable axis
+# (electricity + sunk VRAM only). METER their token COUNT anyway. Unknown IDs are never
+# assumed local; add a zero-rate entry only after confirming that the model is local.
 # ---------------------------------------------------------------------------
 PRICING = {
     # model tag       : { in, out, cache_write (5-min/1.25x), cache_write_1hr (2.0x), cache_read (0.10x) }
@@ -59,8 +57,6 @@ PRICING = {
     "vibethinker-3b":       {"in": 0.0, "out": 0.0, "cache_write": 0.0, "cache_read": 0.0},
     "chinda-qwen3-4b":      {"in": 0.0, "out": 0.0, "cache_write": 0.0, "cache_read": 0.0},
 
-    # Generic fallback for any unlisted LOCAL model: metered, free.
-    "__local__":            {"in": 0.0, "out": 0.0, "cache_write": 0.0, "cache_read": 0.0},
 }
 
 _PER_MILLION = 1_000_000.0
@@ -69,29 +65,14 @@ _PER_MILLION = 1_000_000.0
 def rates_for(model):
     """Look up the rate vector for a model tag.
 
-    Unknown tags are NOT silently free — that would let a mistyped Claude row vanish
-    from the ledger at $0 and corrupt the audit. So:
-      - a tag that LOOKS billed (startswith 'claude') and is missing -> raise loudly.
-      - a ':cloud' tag with no entry -> a cloud estimate, with a stderr warning.
-      - anything else -> local $0, with a stderr warning (so an unlisted billed model
-        cannot hide as 'local').
+    Only exact model IDs in PRICING are accepted. Unknown IDs raise instead of receiving
+    a guessed cloud rate or the local $0 fallback.
     """
     if model in PRICING:
         return PRICING[model]
-    if str(model).startswith("claude"):
-        raise ValueError(
-            f"unknown Claude model tag {model!r} — typo? Add it to PRICING or fix the "
-            f"tag. Refusing to price a billed model at $0 (would corrupt the ledger).")
-    if str(model).endswith(":cloud"):
-        sys.stderr.write(
-            f"WARN: unknown cloud model {model!r} -> cloud estimate $0.30/M in+out. "
-            f"EDIT/VERIFY in PRICING.\n")
-        return {"in": 0.30, "out": 0.30, "cache_write": 0.0,
-                "cache_write_1hr": 0.0, "cache_read": 0.0}
-    sys.stderr.write(
-        f"WARN: unknown model {model!r} priced as LOCAL $0 — verify it is actually "
-        f"local (not a mistyped billed model).\n")
-    return PRICING["__local__"]
+    raise ValueError(
+        f"unknown model ID {model!r} — no exact rate entry exists in PRICING. "
+        "Add a sourced rate entry or correct the recorded ID; refusing to guess a price.")
 
 
 def cost_of_call(model, in_uncached=0, in_cached=0, cache_write=0, out=0,
@@ -198,7 +179,8 @@ def _demo():
     print(f"(C) Local-first hybrid    : ${tc:.2f}  "
           f"({(1 - tc/ta)*100:.0f}% cheaper than A)")
     print("\nCAVEAT: (C) wins ONLY behind a verify gate. A hallucinated local finding fed")
-    print("to a T3 Opus author can erase the saved verify cost AND add a ~$1.9 author redo")
+    print("to the T3 author in this Claude-profile example can erase saved verify cost")
+    print("AND add a ~$1.9 author redo")
     print("-> net WORSE than (A). Require each finding to carry a re-runnable evidence")
     print("command; confirm it resolves before any finding crosses into the author phase.")
     print("\nREMINDER: Claude rates are the 2026-06-04 snapshot (UNCERTAINTY FLAG).")

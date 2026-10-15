@@ -2,9 +2,9 @@
 proposed_id: TDD--DOCUMENTATION-GOVERNANCE-SSOT-ENFORCEMENT
 type: tdd
 status: current
-version: 0.1.0b
+version: 0.2.2b
 created_at: 2026-06-13T21:21:44+07:00,ATHER,9b1ced3
-last_update: 2026-06-13T21:21:44+07:00,ATHER
+last_update: 2026-10-15,Codex
 attributes:
   domain: documentation-governance
   scope: repository
@@ -22,8 +22,8 @@ GenesisBlockDB ใช้แนวทาง Documentation-Driven Development (DDD
 
 - `ARCHITECTURE.md` ระบุว่า master spec เป็น authoritative technical spec
 - `CONTRIBUTING.md` ระบุว่าการเปลี่ยน core behavior ต้อง update master spec
-- `AGENT.md` ระบุ workflow ของ agent, RCA, complexity, Definition of Done และ doc-first
-- repository ยังไม่มี script, CI workflow, หรือ active git hook ที่ตรวจ doc/code drift โดยตรง
+- `AGENT.md` เก็บ architecture context ส่วน `AGENTS.md` เป็นแหล่งกฎร่วม R1-R10 ที่ได้รับอนุมัติ
+- `scripts/docs-validate.mjs` ตรวจ doc status และ `npm run agents:validate` ตรวจ registry แต่ยังไม่มีการตรวจ generated instruction mirrors หรือ Rust MSRV
 
 เอกสารนี้ออกแบบชั้น governance enforcement เพื่อทำให้ SSOT, doc diff, agent context diff, และ quality gates ตรวจได้ซ้ำและบังคับใช้ได้จริง
 โดยยังไม่เปลี่ยน runtime behavior ของ GenesisBlockDB core engine
@@ -34,7 +34,7 @@ GenesisBlockDB ใช้แนวทาง Documentation-Driven Development (DDD
 
 1. Code/API/SDK สามารถเปลี่ยนได้โดยไม่มี doc diff ที่เกี่ยวข้อง
 2. เอกสารบางไฟล์มี status หรือ checklist ที่ stale เมื่อเทียบกับ code
-3. Agent context มี lifecycle แต่ยังไม่ถูก validate ว่า active/candidate/stable ใช้ถูกสถานะ
+3. Root agent instructions ไม่มี canonical source ที่ชัดเจน และ shared rules อาจ drift ระหว่าง Codex, Claude และ Gemini
 4. Deprecated specs ยังอยู่ร่วมกับ current specs โดยไม่มี machine-readable replacement chain
 5. Test command, dashboard audit, และ API contract สามารถ drift จากเอกสารได้โดย CI ไม่จับ
 6. RCA rule ระบุให้บันทึกใน `.brain/rca/` แต่ยังไม่มีตัวตรวจว่าบั๊กฟิกซ์มี RCA จริง
@@ -50,6 +50,8 @@ GenesisBlockDB ใช้แนวทาง Documentation-Driven Development (DDD
 - ออกแบบ governance validator ที่รันได้ใน local และ CI
 - ออกแบบ output report ทั้ง JSON และ Markdown
 - ออกแบบ quality gates สำหรับ doc diff, agent context diff, changelog, version bump, deprecated docs, RCA, และ API contract drift
+- กำหนด `AGENTS.md` เป็น source of truth สำหรับ R1-R10 และตรวจ shared policy mirrors ใน `CLAUDE.md` กับ `GEMINI.md`
+- ประกาศ Rust MSRV ใน Cargo manifest หลังยืนยันเวอร์ชันขั้นต่ำด้วย locked check
 - ออกแบบ adoption plan แบบ incremental เพื่อไม่ block งานทันทีเกินไป
 
 ### 3.2 Out of Scope
@@ -72,7 +74,9 @@ Repository ควรมี source of truth เป็นลำดับชั้�
 | Architecture decisions | `docs/adr/ADR--*.md` | decision rationale and trade-offs |
 | Feature / module contracts | `docs/SPEC--*.md`, `docs/TDD--*.md` | feature requirements, design, DoD |
 | API contracts | `docs/API_REFERENCE.md`, SDK docs | REST, N-API, MCP, SDK payload shapes |
-| Agent governance | `AGENT.md` / `AGENTS.md` | agent workflow, DDD/RCA rules, context lifecycle |
+| Shared agent policy | `AGENTS.md` | R1-R10, approval workflow, risk and complexity policy |
+| Project agent context | `AGENT.md` | GenesisBlock architecture and project-specific context; points to `AGENTS.md` for shared policy |
+| Tool instruction mirrors | generated policy sections in `CLAUDE.md` and `GEMINI.md` | Shared policy rendered from `AGENTS.md`; tool-specific additions remain separate |
 | Evidence | tests, audits, `.brain/rca/` | verification and root-cause records |
 
 ### 4.2 Governance Manifest
@@ -127,6 +131,20 @@ scripts/validate-governance.mjs
 6. Emit Markdown summary สำหรับ agent และ CI logs
 7. Exit non-zero เฉพาะ rule ที่อยู่ใน blocking mode
 
+#### 4.3.1 Agent policy mirror check
+
+- `scripts/sync-agent-instructions.mjs` renders the marked shared-policy section in `AGENTS.md` into marked sections in `CLAUDE.md` and `GEMINI.md`.
+- `npm run agents:sync` refreshes those generated sections. `npm run agents:validate` runs the existing registry validator and then checks that the generated sections are current without writing files.
+- The check validates the canonical metadata and exactly one heading for each R1-R10 rule. It reports stale or malformed mirrors and exits non-zero.
+- This bounded check is local and deterministic. It does not change CI, branch protection, vendor-specific skill files, or runtime behavior.
+
+#### 4.3.2 Rust MSRV declaration
+
+- `Cargo.toml` SHALL declare `package.rust-version` only after the candidate version passes `cargo check --locked` using that exact toolchain.
+- The selected version must account for the locked dependency graph and supported Cargo feature sets. On 2026-10-07, Cargo/rustc 1.88.0 from the installed toolchain passed `cargo check --locked` on `x86_64-pc-windows-msvc` with default features; locked metadata listed no package requiring a Rust version above 1.88. The rustup proxy could not self-update due to access denied, so the toolchain binaries were invoked directly. Cross-target CI feature builds were not run as part of this check.
+- Declare `package.rust-version = "1.88"` as the verified minimum for the checked package configuration.
+- Prefer the Cargo minimum-version field for the supported floor. A `rust-toolchain.toml` pin is a separate decision about selecting a toolchain, not a substitute for declaring the minimum.
+
 ### 4.4 Rule Set
 
 | Rule ID | Rule | Initial Mode |
@@ -141,6 +159,7 @@ scripts/validate-governance.mjs
 | GOV-008 | bugfix diff ต้องมี RCA record ใน `.brain/rca/` หรือ waiver | warning |
 | GOV-009 | root test scripts ต้อง resolve และรันได้ตามเอกสาร | warning |
 | GOV-010 | audit docs ต้องอ้าง command/URL/test target ที่ตรงกับ test files | warning |
+| GOV-011 | shared R1-R10 policy มี canonical source เดียวและ generated mirrors ตรงกัน | blocking in `agents:validate` |
 
 ### 4.5 Waiver Model
 
@@ -175,11 +194,12 @@ Waiver ที่หมดอายุควรถูก treat เป็น failu
 
 ### Phase 2: Non-blocking Validator
 
-1. เพิ่ม `docs/governance/ssot.manifest.json`
-2. เพิ่ม `scripts/validate-governance.mjs`
-3. เพิ่ม npm script เช่น `governance:check`
-4. รันแบบ full-tree และ diff-aware
-5. Generate `docs/AUDIT--DOCUMENTATION-GOVERNANCE.md`
+1. Implement the bounded R1-R10 source/mirror check in `agents:validate`.
+2. เพิ่ม `docs/governance/ssot.manifest.json`
+3. เพิ่ม `scripts/validate-governance.mjs`
+4. เพิ่ม npm script เช่น `governance:check`
+5. รันแบบ full-tree และ diff-aware
+6. Generate `docs/AUDIT--DOCUMENTATION-GOVERNANCE.md`
 
 ### Phase 3: CI Gate
 
@@ -206,6 +226,10 @@ Validator ต้องมี test cases อย่างน้อย:
 - warn เมื่อ deprecated doc ไม่มี `superseded_by`
 - warn เมื่อ SDK request shape drift จาก API reference
 - fail เมื่อ waiver หมดอายุ
+- fail เมื่อ `AGENTS.md` ขาด metadata หรือหัวข้อ R1-R10
+- fail เมื่อ generated policy section ใน `CLAUDE.md` หรือ `GEMINI.md` stale หรือ marker ผิดรูปแบบ
+- pass เมื่อ sync แล้ว โดยไม่แก้ส่วน tool-specific ที่อยู่นอก generated markers
+- MSRV จะไม่ถูกประกาศเป็น supported floor จนกว่า `cargo check --locked` จะผ่านบน toolchain เวอร์ชันนั้น
 
 Command เป้าหมาย:
 
@@ -247,6 +271,8 @@ Rollback ต้องทำได้โดยไม่กระทบ runtime:
 - Validator แยก warning/blocking ได้
 - Agent context changes ต้องถูกตรวจ version/changelog
 - Governance report ชี้ doc/code drift ที่พบได้
+- `AGENTS.md` เป็น canonical R1-R10 source และ `agents:validate` ตรวจ generated mirrors ได้
+- ค่า `rust-version` มีหลักฐาน locked check บน toolchain เวอร์ชันที่ระบุ
 - CI สามารถเปิดใช้แบบ warning ก่อน strict mode
 
 ## 11. Definition of Done
@@ -261,17 +287,42 @@ Rollback ต้องทำได้โดยไม่กระทบ runtime:
 
 ## 12. Open Questions
 
-1. Repository ควรใช้ `AGENT.md`, `AGENTS.md`, หรือทั้งสองไฟล์เป็น agent context SSOT
+1. Resolved in 0.2.0b: `AGENTS.md` owns shared policy; `AGENT.md` retains project architecture context.
 2. จะเริ่ม strict mode ที่ rule ใดก่อน นอกจาก `GOV-001` และ `GOV-005`
 3. Known drift ปัจจุบันควรถูกบันทึกเป็น waiver ชั่วคราว หรือเปิดเป็น audit findings
 4. RCA path ควรใช้ `.brain/rca/` ตาม directive เดิม หรือย้ายไป `docs/rca/` เพื่อ version control ง่ายขึ้น
+5. Resolved in 0.2.1b: Rust 1.88.0 passed the locked default-feature check on Windows x86_64 MSVC; locked dependency metadata lists no higher declared floor. The toolchain binaries were invoked directly after the rustup proxy hit an access-denied self-update error. Cross-target CI feature builds remain separate acceptance checks.
 
 ## CHANGELOG
 
+### Approved execution DAG slice (2026-10-10)
+
+The user approved the workflow audit remediation and synthetic pilot. Its exact
+contract is [Execution DAG Guard V1](SPEC--EXECUTION-DAG-GUARD-V1.md), with numbered
+WF-AC-01 through WF-AC-10. The implementation separates deterministic state guards,
+durable external receipts and the trusted model coordinator. The independent
+Verify, Review and final Audit gates consume one frozen candidate; status records
+do not modify that candidate. Retry budgets and lease quarantine prevent silent
+repair loops and concurrent replacement writers.
+
+`npm run workflow:plan` checks the source-bound W1 planning overlay;
+`npm run workflow:test` exercises accepted transitions and adversarial faults.
+The dedicated workflow CI checks Linux and Windows when run by GitHub Actions.
+Local results do not imply that remote CI has run. Neither this slice nor its
+approval grants W1 feature dispatch or completes every SSOT/doc-drift rule above.
+
+Version diff 0.2.1b -> 0.2.2b: record the separately approved bounded execution
+guard contract, local/CI commands and explicit remaining governance scope.
+
 | Version | Date | Status | Summary | Commit Hash | Agent |
 |---------|------|--------|---------|-------------|-------|
+| 0.2.2b | 2026-10-15 | current | Record the approved execution DAG guard slice and independent evidence gates while retaining the shared-policy and verified Rust 1.88 scope. | working-tree | Codex |
+| 0.2.1b | 2026-10-07 | verified-scope | Verified Rust 1.88.0 with `cargo check --locked`, declared the package minimum, and recorded feature-matrix and rustup-proxy limits. | working-tree | Codex |
+| 0.2.0b | 2026-10-07 | approved-scope | Defined AGENTS.md as shared policy SSOT, added generated mirror checks, and gated rust-version on exact-toolchain verification. | working-tree | Codex |
 | 0.1.0b | 2026-06-13 | candidate | Initial TDD for documentation governance and SSOT enforcement. | 9b1ced3 | ATHER |
 
 ---
 
-**Please review and approve this documentation. I will generate the validator and enforcement files once approved.**
+The bounded R1-R10 source/mirror implementation, Rust 1.88 floor, and 2026-10-10
+execution DAG guard slice are approved within their documented scopes. Broader
+governance phases and cross-target MSRV evidence remain open.

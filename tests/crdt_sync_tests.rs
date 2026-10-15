@@ -1,13 +1,19 @@
 use ed25519_dalek::Signer;
 use genesis_block_native::{Event, LogicalClock, NodeInput, OpenOptions, SignedEvent, Storage};
 use serde_json::json;
-use std::sync::Arc;
+use std::{fs, path::Path, sync::Arc};
 use tempfile::tempdir;
+
+fn mark_schema5(path: &Path) {
+    fs::write(path.join("state.json"), r#"{"schema_version":5}"#).unwrap();
+}
 
 #[test]
 fn test_crdt_conflict_resolution() {
     let dir_a = tempdir().unwrap();
     let dir_b = tempdir().unwrap();
+    mark_schema5(dir_a.path());
+    mark_schema5(dir_b.path());
 
     let storage_a = Arc::new(
         Storage::open(OpenOptions {
@@ -157,6 +163,7 @@ fn test_crdt_conflict_resolution() {
 #[test]
 fn test_logical_clock_convergence() {
     let dir = tempdir().unwrap();
+    mark_schema5(dir.path());
     let storage = Storage::open(OpenOptions {
         path: dir.path().to_str().unwrap().to_string(),
         page_cache_mb: Some(64),
@@ -206,6 +213,7 @@ fn test_logical_clock_convergence() {
 #[test]
 fn test_reconcile_batch_remains_reentrant_under_lifecycle_barrier() {
     let dir = tempdir().unwrap();
+    mark_schema5(dir.path());
     let storage = Storage::open(OpenOptions {
         path: dir.path().to_str().unwrap().to_string(),
         page_cache_mb: Some(64),
@@ -268,6 +276,8 @@ fn test_reconcile_batch_remains_reentrant_under_lifecycle_barrier() {
 fn test_cryptographic_forgery_rejection() {
     let dir_a = tempdir().unwrap();
     let dir_b = tempdir().unwrap();
+    mark_schema5(dir_a.path());
+    mark_schema5(dir_b.path());
 
     let storage_a = Storage::open(OpenOptions {
         path: dir_a.path().to_str().unwrap().to_string(),

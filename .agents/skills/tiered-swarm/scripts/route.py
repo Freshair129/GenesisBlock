@@ -7,13 +7,16 @@ DETERMINISTIC signals only. It calls NO model (the router is a rules-first, zero
 ROLE — never a tier you send work to). See references/routing-policy.md.
 
 The single keystone rule (HARD RULE in SKILL.md):
-    a task with NO `verify_command` is NOT cheap-eligible -> it floors at T2 (Claude-mid).
+    a task with NO `verify_command` is NOT cheap-eligible -> it floors at T2.
 You cannot safely route a model to work you cannot cheaply grade.
 
 USAGE:
     python route.py <spec.yaml|spec.json>          # pretty summary to stderr, JSON to stdout
     python route.py <spec.yaml> --json             # JSON only (machine-readable)
     cat spec.yaml | python route.py -              # read spec from stdin (yaml)
+
+T2/T3 model IDs are supplied by TIERED_SWARM_T2_MODEL_ID and
+TIERED_SWARM_T3_MODEL_ID. Routing a task to an unconfigured tier exits 2.
 
 INPUT shape (either a top-level list of tasks, or a dict with a `tasks:` key). Each task:
     {id, description, verify_command | acceptance.verify_command,
@@ -22,25 +25,29 @@ INPUT shape (either a top-level list of tasks, or a dict with a `tasks:` key). E
 OUTPUT (stdout, JSON): a list of
     {id, cheap_eligible, computed_tier, executor_model, reasons[], spec_tier_hint,
      disagrees_with_spec}
-Exit 0 always (routing is advisory); a disagreement is reported, not fatal.
+Exit 0 when routing succeeds (routing is advisory); a disagreement is reported, not fatal.
+Exit 2 when a required T2/T3 model ID is missing.
 
 Dependency-free except PyYAML for .yaml input (json input needs nothing).
 """
 
 import json
+import os
 import sys
 
 # Axis-1 capability ladder, cheap -> expensive. T1.5 checked before T1 when parsing.
 TIERS = ["T0", "T1", "T1.5", "T2", "T3"]
 _IDX = {t: i for i, t in enumerate(TIERS)}
 
-# Concrete executor per tier on THIS host (RTX 3060 12GB). T1 is domain-aware.
-_MODEL = {
+# Concrete local/cloud-OW executor per tier on THIS host (RTX 3060 12GB).
+_BASE_MODEL = {
     "T0": "vibethinker-3b",
     "T1": "mellum2-12b-a2.5b",          # general local-mid; Rust -> aroow below
     "T1.5": "kimi-k2.7-code:cloud",
-    "T2": "claude-sonnet-4-6",
-    "T3": "claude-opus-4-8",
+}
+_MODEL_ID_ENV = {
+    "T2": "TIERED_SWARM_T2_MODEL_ID",
+    "T3": "TIERED_SWARM_T3_MODEL_ID",
 }
 
 # Words in a task description that signal hard authoring / high blast-radius work.
@@ -83,6 +90,21 @@ def is_rust(task, vc):
     return ("cargo" in blob) or (".rs" in blob) or ("rust" in blob)
 
 
+def model_for_tier(tier):
+    """Resolve a concrete model ID without guessing a provider default."""
+    if tier in _BASE_MODEL:
+        return _BASE_MODEL[tier]
+    env_name = _MODEL_ID_ENV.get(tier)
+    if env_name is None:
+        raise ValueError(f"route.py: unsupported tier {tier!r}.")
+    model_id = os.environ.get(env_name, "").strip()
+    if not model_id:
+        raise ValueError(
+            f"route.py: {env_name} must be set to the selected provider's exact model ID "
+            f"before routing a {tier} task. No default model ID is assumed.")
+    return model_id
+
+
 def route_task(task):
     reasons = []
     vc = verify_command_of(task)
@@ -113,7 +135,7 @@ def route_task(task):
     final = higher(higher(computed, floor), spec_hint)
 
     rust = is_rust(task, vc)
-    model = _MODEL[final]
+    model = model_for_tier(final)
     if final == "T1" and rust:
         model = "aroow-rust-coder-9b"
         reasons.append("Rust domain -> aroow-rust-coder-9b at T1")
@@ -170,8 +192,12 @@ def main(argv):
     if not args:
         sys.stderr.write(__doc__)
         sys.exit(2)
-    spec = load_spec(args[0])
-    routed = [route_task(t) for t in extract_tasks(spec)]
+    try:
+        spec = load_spec(args[0])
+        routed = [route_task(t) for t in extract_tasks(spec)]
+    except ValueError as exc:
+        sys.stderr.write(f"{exc}\n")
+        sys.exit(2)
 
     if not json_only:
         sys.stderr.write("\n=== route.py — tier assignments ===\n")

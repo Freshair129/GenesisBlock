@@ -25,6 +25,7 @@ test('NAPI: executeQueryIr supports search and traverse envelopes', async () => 
     assert.equal(capabilities.contract_version, 'query-ir.v1');
     assert.equal(capabilities.operations.search, 'implemented');
     assert.equal(capabilities.operations.traverse, 'implemented');
+    assert.equal(capabilities.operations.match_path, 'implemented');
     assert.equal(capabilities.temporal.valid_at_selector, 'rfc3339_normalized');
     assert.equal(capabilities.query_correctness.filtered_ann, 'eligibility_refill');
     await db.addNode({ id: 'query-ir-napi-src', labels: [], embedding: [1.0, 0.0, 0.0] });
@@ -76,6 +77,32 @@ test('NAPI: executeQueryIr supports search and traverse envelopes', async () => 
     assert.equal(context.operation_kind, 'context');
     assert.ok(context.data.nodes.some((node) => node.id === 'query-ir-napi-src'));
     assert.equal(context.data.coverage.hops_requested, 1);
+
+    const matchPath = await db.executeQueryIr({
+      contract_version: 'query-ir.v1',
+      request_id: 'napi-match-path',
+      operation: {
+        kind: 'match_path',
+        pattern: {
+          start: {
+            var: 'a',
+            props: [{ key: 'id', value: 'query-ir-napi-src' }],
+          },
+          hops: [{
+            edge: { rel_type: 'KNOWS', direction: 'out' },
+            node: { var: 'b' },
+          }],
+        },
+        limit: 10,
+        return: {
+          kind: 'fields',
+          fields: [{ var: 'a', field: 'id' }, { var: 'b', field: 'id' }],
+        },
+      },
+    });
+    assert.equal(matchPath.operation_kind, 'match_path');
+    assert.equal(matchPath.data[0]['a.id'], 'query-ir-napi-src');
+    assert.equal(matchPath.data[0]['b.id'], 'query-ir-napi-dst');
   } finally {
     cleanup(dbPath);
   }

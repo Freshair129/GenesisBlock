@@ -11,9 +11,9 @@ GenesisBlock implements the **Model Context Protocol (MCP)**, allowing Large Lan
 
 ### 2.1 Prerequisites
 - Node.js >= 20
-- Rust toolchain (for native bindings)
+- Rust toolchain when building the native addon from source; registry installs use prebuilt native packages for supported targets.
 
-### 2.2 Installation
+### 2.2 Repository installation
 ```bash
 npm install
 npm run build
@@ -24,6 +24,30 @@ npm run build
 npm run mcp:start
 ```
 By default, the server initializes a database at `.brain/mcp_db`. You can override this by setting `GENESIS_DB_PATH`.
+
+### 2.4 Registry installation
+The `genesisblock-mcp` executable is bundled in the main npm package, `@freshair129/gks-genesis-block-native`; it is not a separate package. The CLI and native engine binding are shipped in the same package release, so a pinned CLI uses the engine version bundled with it. The MCP surface has no independent version.
+
+The published `0.2.7` package includes the CLI and prebuilt native addon. A clean consumer installed that public npm version, completed the MCP handshake, listed five tools, and performed a native database write. For example, in Claude Desktop, use the pinned package version and set `GENESIS_DB_PATH` to the directory where this server should keep its database:
+
+```json
+{
+  "mcpServers": {
+    "genesisblock": {
+      "command": "npx",
+      "args": [
+        "--yes",
+        "--package",
+        "@freshair129/gks-genesis-block-native@0.2.7",
+        "genesisblock-mcp"
+      ],
+      "env": {
+        "GENESIS_DB_PATH": "/path/to/agent-memory"
+      }
+    }
+  }
+}
+```
 
 ## 3. Tool Reference
 

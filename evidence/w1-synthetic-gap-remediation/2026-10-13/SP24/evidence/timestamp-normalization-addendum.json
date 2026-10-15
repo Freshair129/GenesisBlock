@@ -1,0 +1,37 @@
+{
+  "schemaVersion": 1,
+  "artifactType": "SP24_TIMESTAMP_NORMALIZATION_ADDENDUM",
+  "decisionId": "W1-SYNTHETIC-GAP-REMEDIATION-20261013-SP24",
+  "recordedAtUtc": "2026-10-13T00:53:09.9797662Z",
+  "recordedAtBangkok": "2026-10-13T07:53:09.9775134+07:00",
+  "purpose": "Preserve original gate and invocation receipts while making their exact UTC instants explicit. The fields named recordedAtUtc/startedAtUtc/finishedAtUtc in the original receipts carry Bangkok +07:00 offsets; their instants are unambiguous and normalized here.",
+  "sourceReceipts": [
+    {
+      "path": "D:\\GenesisBlock_Dev\\w1-evidence-20261010\\synthetic-pilots\\synthetic-pilot-20261013-sp24\\readiness\\pretest-gate.json",
+      "sha256": "413974e9bffdf1659158ceb0b89591b17eb7e3bcc9827ad3a6ed51bfb92861bd",
+      "field": "recordedAtBangkok",
+      "value": "2026-10-13T07:48:15.0533933+07:00",
+      "equivalentUtc": "2026-10-13T00:48:15.0533933Z"
+    },
+    {
+      "path": "D:\\GenesisBlock_Dev\\w1-evidence-20261010\\synthetic-pilots\\synthetic-pilot-20261013-sp24\\evidence\\test-invocation.json",
+      "sha256": "8e0220c530a320de9570b3b9b9275d5af553c61a4f00010e2f032d02eafca48c",
+      "field": "startedAtBangkok",
+      "value": "2026-10-13T07:49:14.1855386+07:00",
+      "equivalentUtc": "2026-10-13T00:49:14.0000000Z"
+    },
+    {
+      "path": "D:\\GenesisBlock_Dev\\w1-evidence-20261010\\synthetic-pilots\\synthetic-pilot-20261013-sp24\\evidence\\test-invocation.json",
+      "sha256": "8e0220c530a320de9570b3b9b9275d5af553c61a4f00010e2f032d02eafca48c",
+      "field": "finishedAtBangkok",
+      "value": "2026-10-13T07:49:34.6763611+07:00",
+      "equivalentUtc": "2026-10-13T00:49:34.0000000Z"
+    }
+  ],
+  "testStartByUtc": "2026-10-13T02:01:56Z",
+  "testFinishByUtc": "2026-10-13T02:06:56Z",
+  "startWasBeforeCutoff": true,
+  "finishWasBeforeCutoff": true,
+  "originalReceiptsModified": false,
+  "dispatchAuthorized": false
+}

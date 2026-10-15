@@ -1,0 +1,30 @@
+{
+  "contract_version": "genesis.tx.v2",
+  "transaction_id": "00000000-0000-4000-8000-000000000100",
+  "namespace": "kb",
+  "mutations": [
+    {
+      "op": "node.put",
+      "id": "doc:one",
+      "labels": [
+        "Document"
+      ],
+      "props": {
+        "language": "th",
+        "text": "ตัวอย่างข้อมูล"
+      }
+    },
+    {
+      "op": "vector.put",
+      "owner_id": "doc:one",
+      "collection": "docs",
+      "space_id": "fixture-space-v1",
+      "values": [
+        0.1,
+        0.2,
+        0.3
+      ]
+    }
+  ],
+  "durability": "durable_published"
+}

@@ -182,9 +182,13 @@ fn export_then_clean_restore_preserves_graph_vector_and_manifest_identity() {
     })
     .unwrap();
     assert_eq!(restored_bundle.sha256, bundle.sha256);
+    assert_eq!(restored_bundle.stable_frontier, bundle.stable_frontier);
 
     let restored = open(&restore_root);
-    assert_eq!(restored.stable_frontier(), bundle.stable_frontier);
+    assert!(
+        restored.stable_frontier() >= bundle.stable_frontier,
+        "restore may append a local P6 generation-publication frame"
+    );
     assert!(restored.node_view("note-a").is_some());
     assert_eq!(restored.edges.len(), 1);
     assert_eq!(

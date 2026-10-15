@@ -314,6 +314,21 @@ fn meta_v1_gbp1_snapshot_migrates() {
     v1_bytes.extend(postcard::to_allocvec(&v1).unwrap());
     fs::write(&meta_path, &v1_bytes).unwrap();
 
+    // A pre-P6 snapshot has no component manifest. Otherwise replacing this
+    // component correctly triggers whole-snapshot rejection and WAL replay,
+    // which tests integrity recovery rather than the legacy GBP1 decoder.
+    let state_path = Path::new(&path).join("state.json");
+    let mut state: serde_json::Value =
+        serde_json::from_slice(&fs::read(&state_path).unwrap()).unwrap();
+    assert!(state["p6"]["generation"].is_null());
+    assert_eq!(state["p6"]["access_policy"]["mode"], "Disabled");
+    assert_eq!(state["p6"]["access_policy"]["revision"], 0);
+    state["schema_version"] = json!(4);
+    // The schema-v4 fixture predates the schema-v6 ready marker.
+    state.as_object_mut().unwrap().remove("upgrade_state");
+    state.as_object_mut().unwrap().remove("p6");
+    fs::write(&state_path, serde_json::to_vec(&state).unwrap()).unwrap();
+
     let s = open_with(&path, "full");
     {
         let coll = s.collections.get("default").unwrap();

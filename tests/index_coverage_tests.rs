@@ -105,4 +105,5 @@ fn coverage_requires_explicit_validation_and_tracks_frontiers() {
     assert!(!stale.validated);
     assert_ne!(stale.state, "READY");
     assert_eq!(stale.source_count, 2);
+    drop(storage);
 }

@@ -15,12 +15,13 @@
 // ------------------------------------------------
 // That is the obvious shape, and it is what the C header gate (cbindgen) does.
 // Here it would be WRONG, and this was measured rather than assumed: running
-// `napi build` on a clean tree today deletes 10 declarations -
+// `napi build` on a clean tree today deletes the hand-written Query IR declarations -
 //
 //   QueryIrCapabilities, QueryIrDirection, QueryIrIndexConsistency,
 //   QueryIrRequest, QueryIrResponse, QueryIrSearchMode,
 //   QueryIrSearchOperation, QueryIrTraverseOperation,
-//   QueryIrContextOperation, QueryBudget
+//   QueryIrContextOperation, QueryBudget, plus the typed match_path pattern
+//   declarations.
 //
 // - and downgrades two method signatures to `any`. napi cannot generate any of
 // it: the Rust types are plain serde structs (`QueryIrOperation` is an enum with
@@ -53,7 +54,7 @@ import { join } from 'node:path'
 // used by Query IR but does not carry that prefix.
 const HAND_WRITTEN_PREFIX = 'QueryIr'
 const HAND_WRITTEN_NAMES = new Set(['QueryBudget'])
-const HAND_WRITTEN_EXPECTED = 10
+const HAND_WRITTEN_EXPECTED = 22
 
 // Method signatures deliberately narrowed by hand from what napi emits.
 // generated line -> the committed line that replaces it.
@@ -95,7 +96,7 @@ function stripHandWritten(lines, prefix) {
     const decl = /^export (?:interface|type|const enum|declare class) ([A-Za-z0-9_]+)/.exec(line)
     if (decl && (decl[1].startsWith(prefix) || HAND_WRITTEN_NAMES.has(decl[1]))) {
       removed += 1
-      if (line.includes('{')) {
+      if (line.trimEnd().endsWith('{')) {
         // Block form: skip to the closing brace in column 0.
         i += 1
         while (i < lines.length && lines[i] !== '}') i += 1

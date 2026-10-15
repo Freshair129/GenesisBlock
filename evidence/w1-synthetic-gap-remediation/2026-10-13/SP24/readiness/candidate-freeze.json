@@ -1,0 +1,27 @@
+{
+  "schemaVersion": 1,
+  "artifactType": "SP24_CANDIDATE_FREEZE",
+  "decisionId": "W1-SYNTHETIC-GAP-REMEDIATION-20261013-SP24",
+  "frozenAtUtc": "2026-10-13T00:38:39.7288457Z",
+  "decisionSha256": "657443f3a8aa3db34d99e23d1f644400c8f2b5253644af69ac9bfbebcb4b88d0",
+  "admissionSha256": "a06427abe53a6fc51f8a5d5c8f2c7aca804ef0f72c9ddf3cd2786b88202c223a",
+  "rcaSha256": "8fab054d4604b1a62f89b5320fa6334a15be59d2845ab9dd7c538d10ba701eba",
+  "seedMaterializationReceiptSha256": "73098e3a73dbde1a2341c1aafa87aa2b9ec29a9cfd7c71038eb0a314919261ce",
+  "candidatePatchReceiptSha256": "e63866fa05ba48b5055239b9f1e31c489bd0270855a65f458e90953038687764",
+  "seedRoot": "D:\\GenesisBlock_Dev\\w1-evidence-20261010\\adapter\\synthetic-pilot-20261012-sp21",
+  "seedFileCount": 345,
+  "seedManifestSha256": "a31388b7a3b6eeaea5069acdf1aa2bee726f97dc6c1a71e01a0334cbd22c06c4",
+  "candidateRoot": "D:\\GenesisBlock_Dev\\w1-evidence-20261010\\adapter\\synthetic-pilot-20261013-sp24",
+  "candidateFileCount": 345,
+  "candidateDirectoryCount": 108,
+  "candidateReparsePointCount": 0,
+  "candidateManifestSha256": "fa6280df58e9763fb2ae0c5b63791ec139747d5b128170547b418fb0892b989d",
+  "changedFiles": [
+    "identity-evidence.mjs"
+  ],
+  "allNonAllowlistedFilesByteIdenticalToSeed": true,
+  "candidateFrozen": true,
+  "postFreezeEditsPermitted": false,
+  "testInvocations": 0,
+  "dispatchAuthorized": false
+}

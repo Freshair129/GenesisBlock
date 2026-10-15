@@ -78,10 +78,21 @@ pub mod router;
 pub mod uee_v2;
 use query::HqlCommand;
 
+type Hql2CatalogSnapshotV2 = (
+    query::hql2::result::CatalogStampV2,
+    std::collections::BTreeSet<String>,
+    std::collections::BTreeMap<String, query::hql2::catalog::CollectionSpaceV2>,
+);
+
 // v3: Event::NodeRetract journal frames (RCA--SLICE0-DURABILITY defect 2).
 // Older engines silently skip unknown event variants on replay, which would
 // resurrect deleted nodes — the bump makes downgrade fail closed instead.
-pub const SCHEMA_VERSION: u32 = 4;
+// v5: P6 generation receipts and signed access-policy events. Older engines
+// must refuse these snapshots/journals rather than replaying without the
+// enforcement state.
+// v6: durable HQL2 record revisions, row identities and annotation projections.
+pub const SCHEMA_VERSION: u32 = 6;
+const LEGACY_SCHEMA_VERSION: u32 = 5;
 // v3: WP-2.1 node_versions chain (additive CREATE IF NOT EXISTS migration).
 // v4: edges + edges_current view (SPEC--GENESISDB-EDGE-PROJECTION), same
 // additive shape — existing databases gain the table empty and are backfilled
@@ -729,6 +740,95 @@ impl QueryIrDirection {
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
+#[serde(deny_unknown_fields)]
+pub struct QueryIrGraphPattern {
+    pub start: QueryIrNodePattern,
+    #[serde(default)]
+    pub hops: Vec<QueryIrGraphHop>,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+#[serde(deny_unknown_fields)]
+pub struct QueryIrNodePattern {
+    pub var: Option<String>,
+    pub label: Option<String>,
+    #[serde(default)]
+    pub props: Vec<QueryIrPatternProperty>,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+#[serde(deny_unknown_fields)]
+pub struct QueryIrGraphHop {
+    pub edge: QueryIrEdgePattern,
+    pub node: QueryIrNodePattern,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+#[serde(deny_unknown_fields)]
+pub struct QueryIrEdgePattern {
+    pub var: Option<String>,
+    pub rel_type: Option<String>,
+    pub direction: QueryIrDirection,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+#[serde(deny_unknown_fields)]
+pub struct QueryIrPatternProperty {
+    pub key: String,
+    pub value: QueryIrPatternValue,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+#[serde(untagged)]
+pub enum QueryIrPatternValue {
+    String(String),
+    Number(f64),
+}
+
+#[derive(Serialize, Deserialize, Clone, Copy, Debug)]
+#[serde(rename_all = "snake_case")]
+pub enum QueryIrPatternOp {
+    Eq,
+    Ne,
+    Lt,
+    Le,
+    Gt,
+    Ge,
+    Contains,
+    StartsWith,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+#[serde(deny_unknown_fields)]
+pub struct QueryIrPatternField {
+    pub var: String,
+    pub field: Option<String>,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+#[serde(deny_unknown_fields)]
+pub struct QueryIrPatternPredicate {
+    pub field: QueryIrPatternField,
+    pub op: QueryIrPatternOp,
+    pub value: QueryIrPatternValue,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+#[serde(deny_unknown_fields)]
+pub struct QueryIrPatternOrder {
+    pub field: QueryIrPatternField,
+    #[serde(default)]
+    pub descending: bool,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+#[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
+pub enum QueryIrPatternReturn {
+    All,
+    Fields { fields: Vec<QueryIrPatternField> },
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
 #[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
 pub enum QueryIrOperation {
     Search {
@@ -757,6 +857,315 @@ pub enum QueryIrOperation {
         budget: Option<u32>,
         fuzzy: Option<bool>,
     },
+    MatchPath {
+        pattern: QueryIrGraphPattern,
+        limit: u32,
+        #[serde(default, rename = "where")]
+        where_preds: Vec<QueryIrPatternPredicate>,
+        #[serde(default)]
+        order_by: Option<QueryIrPatternOrder>,
+        #[serde(default, rename = "return")]
+        ret: Option<QueryIrPatternReturn>,
+    },
+}
+
+fn query_ir_match_path_validation(message: impl Into<String>) -> Error {
+    Error::from_reason(format!(
+        "QUERY_IR_VALIDATION_FAILED: match_path.{}",
+        message.into()
+    ))
+}
+
+impl QueryIrPatternValue {
+    fn into_hql(self) -> query::ast::HqlValue {
+        match self {
+            Self::String(value) => query::ast::HqlValue::Str(value),
+            Self::Number(value) => query::ast::HqlValue::Num(value),
+        }
+    }
+
+    fn from_hql(value: &query::ast::HqlValue) -> Self {
+        match value {
+            query::ast::HqlValue::Str(value) => Self::String(value.clone()),
+            query::ast::HqlValue::Num(value) => Self::Number(*value),
+        }
+    }
+}
+
+impl QueryIrPatternField {
+    fn into_hql(self) -> Result<query::ast::QualField> {
+        let var = self.var;
+        if var.trim().is_empty() {
+            return Err(query_ir_match_path_validation(
+                "field.var must not be empty",
+            ));
+        }
+        let field = match self.field {
+            None => None,
+            Some(raw) => {
+                let normalized = raw.to_ascii_lowercase();
+                Some(match normalized.as_str() {
+                    "id" => query::ast::HqlField::Id,
+                    "label" => query::ast::HqlField::Label,
+                    "score" => query::ast::HqlField::Score,
+                    "depth" => query::ast::HqlField::Depth,
+                    "recorded_at" => query::ast::HqlField::RecordedAt,
+                    value if value.starts_with("prop.") && value.len() > "prop.".len() => {
+                        query::ast::HqlField::Prop(raw["prop.".len()..].to_string())
+                    }
+                    _ => {
+                        return Err(query_ir_match_path_validation(format!(
+                            "field.field '{}' is not supported",
+                            raw
+                        )));
+                    }
+                })
+            }
+        };
+        Ok(query::ast::QualField { var, field })
+    }
+
+    fn from_hql(qual_field: &query::ast::QualField) -> Self {
+        let field = qual_field.field.as_ref().map(|field| match field {
+            query::ast::HqlField::Id => "id".to_string(),
+            query::ast::HqlField::Label => "label".to_string(),
+            query::ast::HqlField::Score => "score".to_string(),
+            query::ast::HqlField::Depth => "depth".to_string(),
+            query::ast::HqlField::RecordedAt => "recorded_at".to_string(),
+            query::ast::HqlField::Prop(key) => format!("prop.{key}"),
+        });
+        Self {
+            var: qual_field.var.clone(),
+            field,
+        }
+    }
+}
+
+impl QueryIrNodePattern {
+    fn into_hql(self) -> Result<query::ast::NodePattern> {
+        if self
+            .var
+            .as_deref()
+            .is_some_and(|value| value.trim().is_empty())
+        {
+            return Err(query_ir_match_path_validation("node.var must not be empty"));
+        }
+        if self
+            .label
+            .as_deref()
+            .is_some_and(|value| value.trim().is_empty())
+        {
+            return Err(query_ir_match_path_validation(
+                "node.label must not be empty",
+            ));
+        }
+        let props = self
+            .props
+            .into_iter()
+            .map(|property| {
+                if property.key.trim().is_empty() {
+                    return Err(query_ir_match_path_validation(
+                        "node.props.key must not be empty",
+                    ));
+                }
+                Ok((property.key, property.value.into_hql()))
+            })
+            .collect::<Result<Vec<_>>>()?;
+        Ok(query::ast::NodePattern {
+            var: self.var,
+            label: self.label,
+            props,
+        })
+    }
+
+    fn from_hql(node: &query::ast::NodePattern) -> Self {
+        Self {
+            var: node.var.clone(),
+            label: node.label.clone(),
+            props: node
+                .props
+                .iter()
+                .map(|(key, value)| QueryIrPatternProperty {
+                    key: key.clone(),
+                    value: QueryIrPatternValue::from_hql(value),
+                })
+                .collect(),
+        }
+    }
+}
+
+impl QueryIrEdgePattern {
+    fn into_hql(self) -> Result<query::ast::EdgePattern> {
+        if self
+            .var
+            .as_deref()
+            .is_some_and(|value| value.trim().is_empty())
+        {
+            return Err(query_ir_match_path_validation("edge.var must not be empty"));
+        }
+        if self
+            .rel_type
+            .as_deref()
+            .is_some_and(|value| value.trim().is_empty())
+        {
+            return Err(query_ir_match_path_validation(
+                "edge.rel_type must not be empty",
+            ));
+        }
+        let direction = match self.direction {
+            QueryIrDirection::Out => query::ast::PatternDirection::Out,
+            QueryIrDirection::In => query::ast::PatternDirection::In,
+            QueryIrDirection::Both => query::ast::PatternDirection::Both,
+        };
+        Ok(query::ast::EdgePattern {
+            var: self.var,
+            rel_type: self.rel_type,
+            direction,
+        })
+    }
+
+    fn from_hql(edge: &query::ast::EdgePattern) -> Self {
+        let direction = match edge.direction {
+            query::ast::PatternDirection::Out => QueryIrDirection::Out,
+            query::ast::PatternDirection::In => QueryIrDirection::In,
+            query::ast::PatternDirection::Both => QueryIrDirection::Both,
+        };
+        Self {
+            var: edge.var.clone(),
+            rel_type: edge.rel_type.clone(),
+            direction,
+        }
+    }
+}
+
+impl QueryIrGraphPattern {
+    fn into_hql(self) -> Result<query::ast::GraphPattern> {
+        let start = self.start.into_hql()?;
+        let hops = self
+            .hops
+            .into_iter()
+            .map(|hop| Ok((hop.edge.into_hql()?, hop.node.into_hql()?)))
+            .collect::<Result<Vec<_>>>()?;
+        Ok(query::ast::GraphPattern { start, hops })
+    }
+
+    fn from_hql(pattern: &query::ast::GraphPattern) -> Self {
+        Self {
+            start: QueryIrNodePattern::from_hql(&pattern.start),
+            hops: pattern
+                .hops
+                .iter()
+                .map(|(edge, node)| QueryIrGraphHop {
+                    edge: QueryIrEdgePattern::from_hql(edge),
+                    node: QueryIrNodePattern::from_hql(node),
+                })
+                .collect(),
+        }
+    }
+}
+
+impl QueryIrPatternOp {
+    fn into_hql(self) -> query::ast::HqlOp {
+        match self {
+            Self::Eq => query::ast::HqlOp::Eq,
+            Self::Ne => query::ast::HqlOp::Ne,
+            Self::Lt => query::ast::HqlOp::Lt,
+            Self::Le => query::ast::HqlOp::Le,
+            Self::Gt => query::ast::HqlOp::Gt,
+            Self::Ge => query::ast::HqlOp::Ge,
+            Self::Contains => query::ast::HqlOp::Contains,
+            Self::StartsWith => query::ast::HqlOp::StartsWith,
+        }
+    }
+
+    fn from_hql(op: query::ast::HqlOp) -> Self {
+        match op {
+            query::ast::HqlOp::Eq => Self::Eq,
+            query::ast::HqlOp::Ne => Self::Ne,
+            query::ast::HqlOp::Lt => Self::Lt,
+            query::ast::HqlOp::Le => Self::Le,
+            query::ast::HqlOp::Gt => Self::Gt,
+            query::ast::HqlOp::Ge => Self::Ge,
+            query::ast::HqlOp::Contains => Self::Contains,
+            query::ast::HqlOp::StartsWith => Self::StartsWith,
+        }
+    }
+}
+
+fn query_ir_match_path_clauses_to_hql(
+    limit: u32,
+    where_preds: Vec<QueryIrPatternPredicate>,
+    order_by: Option<QueryIrPatternOrder>,
+    ret: Option<QueryIrPatternReturn>,
+) -> Result<query::ast::PatternClauses> {
+    let where_preds = where_preds
+        .into_iter()
+        .map(|predicate| {
+            Ok(query::ast::PatternPredicate {
+                field: predicate.field.into_hql()?,
+                op: predicate.op.into_hql(),
+                value: predicate.value.into_hql(),
+            })
+        })
+        .collect::<Result<Vec<_>>>()?;
+    let order_by = match order_by {
+        None => None,
+        Some(order) => Some((order.field.into_hql()?, order.descending)),
+    };
+    let ret = match ret {
+        None => None,
+        Some(QueryIrPatternReturn::All) => Some(query::ast::PatternReturn::All),
+        Some(QueryIrPatternReturn::Fields { fields }) => Some(query::ast::PatternReturn::Fields(
+            fields
+                .into_iter()
+                .map(QueryIrPatternField::into_hql)
+                .collect::<Result<Vec<_>>>()?,
+        )),
+    };
+    Ok(query::ast::PatternClauses {
+        where_preds,
+        order_by,
+        limit: Some(limit as usize),
+        ret,
+    })
+}
+
+fn query_ir_match_path_from_hql(
+    pattern: &query::ast::GraphPattern,
+    clauses: &query::ast::PatternClauses,
+    default_limit: u64,
+) -> QueryIrOperation {
+    let limit = clauses
+        .limit
+        .map(|value| value as u64)
+        .unwrap_or(default_limit)
+        .min(u32::MAX as u64) as u32;
+    QueryIrOperation::MatchPath {
+        pattern: QueryIrGraphPattern::from_hql(pattern),
+        limit,
+        where_preds: clauses
+            .where_preds
+            .iter()
+            .map(|predicate| QueryIrPatternPredicate {
+                field: QueryIrPatternField::from_hql(&predicate.field),
+                op: QueryIrPatternOp::from_hql(predicate.op),
+                value: QueryIrPatternValue::from_hql(&predicate.value),
+            })
+            .collect(),
+        order_by: clauses
+            .order_by
+            .as_ref()
+            .map(|(field, descending)| QueryIrPatternOrder {
+                field: QueryIrPatternField::from_hql(field),
+                descending: *descending,
+            }),
+        ret: clauses.ret.as_ref().map(|ret| match ret {
+            query::ast::PatternReturn::All => QueryIrPatternReturn::All,
+            query::ast::PatternReturn::Fields(fields) => QueryIrPatternReturn::Fields {
+                fields: fields.iter().map(QueryIrPatternField::from_hql).collect(),
+            },
+        }),
+    }
 }
 
 #[cfg_attr(feature = "napi-bindings", napi(object))]
@@ -812,6 +1221,43 @@ struct BackupManifest {
     logical_clock: u32,
     created_at: String,
     artifacts: Vec<BackupArtifact>,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+pub struct Schema6MigrationArtifactV1 {
+    pub path: String,
+    pub byte_count: u64,
+    pub sha256: String,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+pub struct Schema6MigrationManifestV1 {
+    pub version: u32,
+    pub migration_id: String,
+    pub database_id: String,
+    pub source_schema: u32,
+    pub source_frontier: u64,
+    pub source_history_floors: std::collections::BTreeMap<String, u64>,
+    pub source_record_counts: std::collections::BTreeMap<String, u64>,
+    pub vector_provenance: std::collections::BTreeMap<String, u64>,
+    pub p6_manifest_sha256: String,
+    pub backup: BackupBundleInfo,
+    pub backup_artifacts: Vec<Schema6MigrationArtifactV1>,
+    pub manifest_sha256: String,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+pub struct Schema6MigrationReportV1 {
+    pub migration_id: String,
+    pub manifest_sha256: String,
+    pub source_frontier: u64,
+    pub target_frontier: u64,
+    pub source_schema: u32,
+    pub target_schema: u32,
+    pub baseline_counts: std::collections::BTreeMap<String, u64>,
+    pub source_history_floors: std::collections::BTreeMap<String, u64>,
+    pub vector_provenance: std::collections::BTreeMap<String, u64>,
+    pub generation: GenerationInfo,
 }
 
 const BACKUP_FORMAT_VERSION: u32 = 1;
@@ -990,6 +1436,17 @@ pub struct SignedEvent {
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct SyncProgressReceipt {
+    pub version: u32,
+    pub responder_peer_id: String,
+    pub requester_peer_id: String,
+    pub request_nonce: String,
+    pub from_seq: u64,
+    pub through_seq: u64,
+    pub signature: Vec<u8>,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub enum GossipMessage {
     Heartbeat {
         #[serde(default)]
@@ -1012,6 +1469,8 @@ pub enum GossipMessage {
         /// across peers). `default` keeps pre-WP-1.2 peers deserializing.
         #[serde(default)]
         from_commit_seq: Option<u64>,
+        #[serde(default)]
+        request_nonce: Option<String>,
     },
     PushDelta {
         events: Vec<SignedEvent>,
@@ -1019,6 +1478,8 @@ pub enum GossipMessage {
         source_peer_id: String,
         #[serde(default)]
         through_seq: Option<u64>,
+        #[serde(default)]
+        progress_receipt: Option<SyncProgressReceipt>,
     },
     UpgradeRequired {
         schema_version: u32,
@@ -1089,6 +1550,21 @@ pub struct GenesisTransaction {
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct NodeRetractionEvent {
+    pub id: String,
+    pub clock: LogicalClock,
+    pub retracted_at: String,
+}
+
+fn default_advances_txn_frontier() -> bool {
+    true
+}
+
+fn is_true(value: &bool) -> bool {
+    *value
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct GenesisTransactionEvent {
     pub transaction_id: String,
     /// ADR--GENESISDB-JOURNAL-HISTORY D2.2: demoted from "the" commit sequence
@@ -1110,6 +1586,20 @@ pub struct GenesisTransactionEvent {
     pub nodes: Vec<NodeOutput>,
     pub edges: Vec<EdgeOutput>,
     pub vectors: Vec<VectorEvent>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub node_retractions: Vec<NodeRetractionEvent>,
+    /// Graph API writes use this envelope for atomic revision application but
+    /// do not represent a transaction API commit. Omission preserves existing
+    /// transaction event bytes and defaults legacy events to `true`.
+    #[serde(
+        default = "default_advances_txn_frontier",
+        skip_serializing_if = "is_true"
+    )]
+    pub advances_txn_frontier: bool,
+    /// Optional H2-D11 identity metadata. Omission preserves schema-5 event
+    /// bytes and signatures for transactions without durable revision records.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub record_revision_transaction: Option<uee_v2::RecordRevisionTransactionV1>,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
@@ -1117,6 +1607,176 @@ pub struct CommitResult {
     pub transaction_id: String,
     pub commit_sequence: u64,
     pub stable: bool,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+pub struct GenerationInfo {
+    pub generation_id: u64,
+    pub wal_frontier: u64,
+    pub publication_seq: u64,
+    pub txn_frontier: u64,
+    pub history_horizon: u64,
+    pub acl_revision: u64,
+    pub component_manifest_sha256: String,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+pub struct TemporalRead {
+    pub as_of: Option<String>,
+    pub tx_as_of: Option<u64>,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+pub struct AccessContext {
+    pub principal: String,
+    pub namespace: String,
+}
+
+#[derive(Serialize, Deserialize, Clone, Copy, Debug, PartialEq, Eq)]
+pub enum AccessPolicyMode {
+    Disabled,
+    Enforced,
+}
+
+#[derive(Serialize, Deserialize, Clone, Copy, Debug, PartialEq, Eq)]
+pub enum AccessAction {
+    Read,
+    Write,
+    ManagePolicy,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+pub enum AccessResource {
+    Namespace(String),
+    Node(String),
+    Edge(String),
+    Collection(String),
+    Table { namespace: String, table: String },
+    Annotation(String),
+}
+
+#[derive(Clone, Debug)]
+struct AnnotationProjectionTarget {
+    kind: String,
+    id: String,
+    revision_id: Option<String>,
+    binding: String,
+    selector_json: String,
+    is_evidence: bool,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+pub struct AccessGrant {
+    pub principal: String,
+    pub action: AccessAction,
+    pub resource: AccessResource,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+pub struct AccessPolicy {
+    pub revision: u64,
+    pub mode: AccessPolicyMode,
+    pub grants: Vec<AccessGrant>,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+pub struct PolicyAdminActor {
+    pub access: AccessContext,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct GenerationPublishedEvent {
+    version: u32,
+    generation: GenerationInfo,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct AccessPolicyChangedEvent {
+    version: u32,
+    expected_revision: u64,
+    policy: AccessPolicy,
+    actor: AccessContext,
+    #[serde(default)]
+    folded: bool,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct Schema6MigrationBaselineV1 {
+    pub mutation: uee_v2::RecordRevisionMutationV1,
+    pub source_tx_from: u64,
+    #[serde(default)]
+    pub source_tx_to: Option<u64>,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct Schema6MigrationChunkV1 {
+    pub migration_id: String,
+    pub manifest_sha256: String,
+    pub source_database_id: String,
+    pub source_schema: u32,
+    pub source_frontier: u64,
+    pub source_history_floors: std::collections::BTreeMap<String, u64>,
+    pub chunk_index: u32,
+    pub total_chunks: u32,
+    pub chunk_sha256: String,
+    pub baseline_records: Vec<Schema6MigrationBaselineV1>,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct Schema6MigrationCommitV1 {
+    pub migration_id: String,
+    pub manifest_sha256: String,
+    pub source_database_id: String,
+    pub source_schema: u32,
+    pub source_frontier: u64,
+    pub total_chunks: u32,
+    pub migration_commit_frame_seq: u64,
+    pub aggregate_sha256: String,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct Schema6MigrationActivationV1 {
+    pub migration_id: String,
+    pub manifest_sha256: String,
+    pub source_database_id: String,
+    pub source_schema: u32,
+    pub source_frontier: u64,
+    pub source_history_floors: std::collections::BTreeMap<String, u64>,
+    pub backup_sha256: String,
+    pub source_p6_manifest_sha256: String,
+    pub migration_commit_frame_seq: u64,
+    pub generation: GenerationInfo,
+    pub post_migration_manifest_sha256: String,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct Schema6ActivationV1 {
+    pub version: u32,
+    pub schema_version: u32,
+    pub database_id: String,
+    /// None identifies a fresh schema-v6 store; Some binds a completed v5-to-v6 migration.
+    pub migration: Option<Schema6MigrationActivationV1>,
+}
+
+/// An engine-issued lease. Its owner, fence, expiry, access context and
+/// temporal selectors are intentionally private so callers cannot construct or
+/// mutate a lease that was not issued by this Storage handle.
+#[derive(Clone, Debug)]
+pub struct ReadLease {
+    owner_token: String,
+    generation: GenerationInfo,
+    expires_at: Instant,
+    fencing_epoch: u64,
+    access: AccessContext,
+    temporal: TemporalRead,
+}
+
+/// A scoped read façade. It never exposes the underlying Storage reference and
+/// authorizes each operation explicitly, so a separately captured Storage does
+/// not inherit this view's access context.
+pub struct ReadView<'a> {
+    storage: &'a Storage,
+    lease: &'a ReadLease,
 }
 
 // --- Internal Storage ---
@@ -1149,6 +1809,8 @@ pub enum Event {
         #[serde(default)]
         affected_rows: u32,
         mutations: Vec<RelationalRowMutation>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        record_revision_transaction: Option<uee_v2::RecordRevisionTransactionV1>,
     },
     /// One canonical cross-domain commit with a single durable sequence.
     Transaction(GenesisTransactionEvent),
@@ -1172,6 +1834,17 @@ pub enum Event {
         #[serde(default)]
         retracted_at: String,
     },
+    /// Signed durable statement that a validated snapshot covers the WAL
+    /// frontier immediately before this receipt's frame.
+    GenerationPublished(GenerationPublishedEvent),
+    /// Signed, versioned and revision-CASed access-policy transition.
+    AccessPolicyChanged(AccessPolicyChangedEvent),
+    /// Signed, local-only migration baseline; never transferable by anti-entropy.
+    Schema6MigrationChunkV1(Schema6MigrationChunkV1),
+    /// Signed, local-only proof that all migration chunks are durable.
+    Schema6MigrationCommitV1(Schema6MigrationCommitV1),
+    /// Signed, local-only authority for schema selection when state.json is absent.
+    Schema6ActivationV1(Schema6ActivationV1),
 }
 
 /// Canonical bytes for event signatures. A fold receipt's local frame is a
@@ -1188,6 +1861,24 @@ fn canonical_event_bytes(event: &Event) -> serde_json::Result<Vec<u8>> {
         }
     }
     serde_json::to_vec(event)
+}
+
+fn canonical_sync_progress_receipt_bytes(
+    version: u32,
+    responder_peer_id: &str,
+    requester_peer_id: &str,
+    request_nonce: &str,
+    from_seq: u64,
+    through_seq: u64,
+) -> serde_json::Result<Vec<u8>> {
+    serde_json::to_vec(&(
+        version,
+        responder_peer_id,
+        requester_peer_id,
+        request_nonce,
+        from_seq,
+        through_seq,
+    ))
 }
 
 /// Immutable semantic contract, ordered before every dependent vector.
@@ -2905,6 +3596,14 @@ impl VectorCollection {
             }
             None => (0i64, 0i64),
         };
+        let indexed = self
+            .hnsw
+            .read()
+            .as_ref()
+            .map(|h| h.point_count() as u32)
+            .unwrap_or(0);
+        let coverage = self.coverage_report(index_lag);
+
         CollectionInfo {
             name: self.name.clone(),
             model: self.model.clone(),
@@ -2912,19 +3611,14 @@ impl VectorCollection {
             metric: self.metric.as_str().to_string(),
             quant: self.quant.as_str().to_string(),
             count: self.count.load(Ordering::Relaxed) as u32,
-            indexed: self
-                .hnsw
-                .read()
-                .as_ref()
-                .map(|h| h.point_count() as u32)
-                .unwrap_or(0),
+            indexed,
             ef_search: self.ef_search,
             rerank: self.f32_sidecar.is_some(),
             sidecar_resident_bytes,
             sidecar_disk_bytes,
             arena_resident_bytes: self.arena.read().byte_size() as i64,
             index_lag,
-            coverage: self.coverage_report(index_lag),
+            coverage,
         }
     }
 }
@@ -3227,6 +3921,7 @@ fn write_segment(
 pub struct Storage {
     pub path: PathBuf,
     pub read_only: bool,
+    storage_schema_version: u32,
     /// WP-1.3 retention profile (ADR D3) — drives checkpoint folding and the
     /// active-file seal threshold. See `RetentionProfile`.
     pub retention: RetentionProfile,
@@ -3241,10 +3936,23 @@ pub struct Storage {
     /// journal frame, advancing on every mutation. Replica-local; never
     /// comparable across peers. `stable_frontier()` reports this.
     commit_sequence: AtomicU64,
-    /// Frame seq of the last `Event::Transaction` frame (the transaction-lineage
+    /// Frame seq of the last transaction-API commit (the transaction-lineage
     /// frontier `expected_frontier` CASes against — a frame-level CAS would
     /// spuriously fail on any interleaved ordinary write).
     txn_frontier: AtomicU64,
+    /// P6: process-local ownership token. A reopened Storage handle gets a
+    /// fresh token, so leases cannot cross a restart even if their bytes are
+    /// retained by a caller.
+    owner_token: String,
+    /// P6: storage-wide fencing epoch. Advancing it revokes every lease issued
+    /// by this handle, as required by the approved contract.
+    fencing_epoch: AtomicU64,
+    /// P6: the last durable generation receipt applied to this handle.
+    published_generation: RwLock<Option<GenerationInfo>>,
+    /// H2-D11: authenticated schema-v6 authority retained from the journal.
+    schema6_activation: RwLock<Option<Schema6ActivationV1>>,
+    /// P6: durable read/policy state. Disabled is the v4-compatible default.
+    access_policy: RwLock<AccessPolicy>,
     /// Pre-WP-1.2 JSONL WAL path (`genesis-graph.wal`). Exists only until the
     /// one-way migration seals it as segment 0, or indefinitely in read-only
     /// opens of a legacy database.
@@ -3374,6 +4082,3645 @@ impl Storage {
         Ok(())
     }
 
+    fn default_access_policy() -> AccessPolicy {
+        AccessPolicy {
+            revision: 0,
+            mode: AccessPolicyMode::Disabled,
+            grants: Vec::new(),
+        }
+    }
+
+    fn validate_temporal_read(temporal: &TemporalRead) -> Result<()> {
+        if let Some(as_of) = &temporal.as_of {
+            DateTime::parse_from_rfc3339(as_of).map_err(|e| {
+                Error::from_reason(format!("TEMPORAL_INVALID: as_of is not RFC3339: {e}"))
+            })?;
+        }
+        Ok(())
+    }
+
+    fn require_unscoped_read(&self) -> Result<()> {
+        if self.access_policy.read().mode == AccessPolicyMode::Enforced {
+            return Err(Error::from_reason("ACCESS_CONTEXT_REQUIRED"));
+        }
+        Ok(())
+    }
+
+    fn grant_matches(
+        policy: &AccessPolicy,
+        access: &AccessContext,
+        action: AccessAction,
+        resource: &AccessResource,
+    ) -> bool {
+        policy.grants.iter().any(|grant| {
+            grant.principal == access.principal
+                && grant.action == action
+                && &grant.resource == resource
+        })
+    }
+
+    fn authorize_namespace_read(&self, access: &AccessContext, namespace: &str) -> Result<()> {
+        if self.access_policy.read().mode == AccessPolicyMode::Disabled {
+            return Ok(());
+        }
+        if access.namespace != namespace
+            || !Self::grant_matches(
+                &self.access_policy.read(),
+                access,
+                AccessAction::Read,
+                &AccessResource::Namespace(namespace.to_string()),
+            )
+        {
+            return Err(Error::from_reason("ACCESS_DENIED"));
+        }
+        Ok(())
+    }
+
+    fn authorize_default_composed_read(&self, access: &AccessContext) -> Result<()> {
+        self.authorize_namespace_read(access, "default")
+    }
+
+    fn authorize_node_read(&self, access: &AccessContext, id: &str) -> Result<()> {
+        if self.access_policy.read().mode == AccessPolicyMode::Disabled {
+            return Ok(());
+        }
+        if access.namespace != "default" {
+            return Err(Error::from_reason("ACCESS_DENIED"));
+        }
+        let policy = self.access_policy.read();
+        if Self::grant_matches(
+            &policy,
+            access,
+            AccessAction::Read,
+            &AccessResource::Namespace("default".into()),
+        ) || Self::grant_matches(
+            &policy,
+            access,
+            AccessAction::Read,
+            &AccessResource::Node(id.to_string()),
+        ) {
+            Ok(())
+        } else {
+            Err(Error::from_reason("ACCESS_DENIED"))
+        }
+    }
+
+    fn authorize_relational_read(
+        &self,
+        access: &AccessContext,
+        query: &RelationalQuery,
+    ) -> Result<()> {
+        if self.access_policy.read().mode == AccessPolicyMode::Disabled {
+            return Ok(());
+        }
+        if access.namespace != query.namespace {
+            return Err(Error::from_reason("ACCESS_DENIED"));
+        }
+        let policy = self.access_policy.read();
+        if Self::grant_matches(
+            &policy,
+            access,
+            AccessAction::Read,
+            &AccessResource::Namespace(query.namespace.clone()),
+        ) {
+            return Ok(());
+        }
+        let mut tables = vec![query.table.clone()];
+        tables.extend(query.joins.iter().map(|join| join.table.clone()));
+        if tables.into_iter().all(|table| {
+            Self::grant_matches(
+                &policy,
+                access,
+                AccessAction::Read,
+                &AccessResource::Table {
+                    namespace: query.namespace.clone(),
+                    table,
+                },
+            )
+        }) {
+            Ok(())
+        } else {
+            Err(Error::from_reason("ACCESS_DENIED"))
+        }
+    }
+
+    fn authorize_annotation_namespace_read(
+        &self,
+        access: &AccessContext,
+        namespace: &str,
+    ) -> Result<()> {
+        if self.access_policy.read().mode == AccessPolicyMode::Disabled {
+            return Ok(());
+        }
+        if access.namespace != namespace {
+            return Err(Error::from_reason("ACCESS_DENIED"));
+        }
+        let policy = self.access_policy.read();
+        if Self::grant_matches(
+            &policy,
+            access,
+            AccessAction::Read,
+            &AccessResource::Annotation(namespace.to_string()),
+        ) {
+            Ok(())
+        } else {
+            Err(Error::from_reason("ACCESS_DENIED"))
+        }
+    }
+
+    fn authorize_policy_admin(&self, actor: &PolicyAdminActor) -> Result<()> {
+        let policy = self.access_policy.read();
+        match policy.mode {
+            AccessPolicyMode::Disabled if actor.access.principal == "local-owner" => Ok(()),
+            AccessPolicyMode::Enforced
+                if Self::grant_matches(
+                    &policy,
+                    &actor.access,
+                    AccessAction::ManagePolicy,
+                    &AccessResource::Namespace(actor.access.namespace.clone()),
+                ) =>
+            {
+                Ok(())
+            }
+            _ => Err(Error::from_reason("ACCESS_DENIED")),
+        }
+    }
+
+    fn validate_access_policy_shape(policy: &AccessPolicy) -> Result<()> {
+        for grant in &policy.grants {
+            if grant.principal.trim().is_empty() {
+                return Err(Error::from_reason("ACCESS_DENIED"));
+            }
+            match &grant.resource {
+                AccessResource::Namespace(namespace)
+                | AccessResource::Node(namespace)
+                | AccessResource::Edge(namespace)
+                | AccessResource::Collection(namespace)
+                | AccessResource::Annotation(namespace)
+                    if namespace.trim().is_empty() =>
+                {
+                    return Err(Error::from_reason("ACCESS_DENIED"));
+                }
+                AccessResource::Table { namespace, table }
+                    if namespace.trim().is_empty() || table.trim().is_empty() =>
+                {
+                    return Err(Error::from_reason("ACCESS_DENIED"));
+                }
+                _ => {}
+            }
+        }
+        Ok(())
+    }
+
+    fn apply_generation_event(
+        &self,
+        event: &GenerationPublishedEvent,
+        frame_seq: u64,
+    ) -> Result<()> {
+        if event.version != 1
+            || event.generation.publication_seq != event.generation.wal_frontier.saturating_add(1)
+            || event.generation.component_manifest_sha256.len() != 64
+        {
+            return Err(Error::from_reason(
+                "GENERATION_STALE: invalid publication receipt",
+            ));
+        }
+        // A folded base frame is stamped at the fold frontier, which may be
+        // newer than the receipt's original publication frame. A live receipt
+        // must be exactly at its declared publication sequence.
+        if frame_seq < event.generation.publication_seq {
+            return Err(Error::from_reason(
+                "GENERATION_STALE: receipt frame precedes publication",
+            ));
+        }
+        let mut current = self.published_generation.write();
+        if let Some(existing) = current.as_ref() {
+            if existing.generation_id > event.generation.generation_id {
+                return Ok(());
+            }
+            if existing.generation_id == event.generation.generation_id {
+                if existing != &event.generation {
+                    return Err(Error::from_reason(
+                        "GENERATION_STALE: conflicting publication receipt",
+                    ));
+                }
+                return Ok(());
+            }
+        }
+        *current = Some(event.generation.clone());
+        Ok(())
+    }
+
+    fn apply_access_policy_event(&self, event: &AccessPolicyChangedEvent) -> Result<()> {
+        if event.version != Self::access_policy_event_version(&event.policy)
+            || (event.version == 2 && self.storage_schema_version != SCHEMA_VERSION)
+        {
+            return Err(Error::from_reason(
+                "ACCESS_DENIED: unsupported policy event version",
+            ));
+        }
+        Self::validate_access_policy_shape(&event.policy)?;
+        let mut current = self.access_policy.write();
+        *current = Self::next_access_policy_after_event(&current, event)?;
+        Ok(())
+    }
+
+    fn next_access_policy_after_event(
+        current: &AccessPolicy,
+        event: &AccessPolicyChangedEvent,
+    ) -> Result<AccessPolicy> {
+        if event.expected_revision.checked_add(1) != Some(event.policy.revision) {
+            return Err(Error::from_reason("ACCESS_POLICY_REVISION_CONFLICT"));
+        }
+        if event.folded {
+            // A fold is a signed materialization of the current policy, not a
+            // new user transition. It may collapse revisions that preceded the
+            // retained base segment, but never regresses an equal/newer state.
+            if current.revision > event.policy.revision {
+                return Ok(current.clone());
+            }
+            if current.revision == event.policy.revision {
+                if current != &event.policy {
+                    return Err(Error::from_reason("ACCESS_POLICY_REVISION_CONFLICT"));
+                }
+                return Ok(current.clone());
+            }
+            return Ok(event.policy.clone());
+        }
+        if current.revision == event.policy.revision && current == &event.policy {
+            return Ok(current.clone());
+        }
+        if current.revision != event.expected_revision {
+            return Err(Error::from_reason("ACCESS_POLICY_REVISION_CONFLICT"));
+        }
+        Ok(event.policy.clone())
+    }
+
+    fn access_policy_event_version(policy: &AccessPolicy) -> u32 {
+        if policy
+            .grants
+            .iter()
+            .any(|grant| matches!(&grant.resource, AccessResource::Annotation(_)))
+        {
+            2
+        } else {
+            1
+        }
+    }
+
+    fn validate_lease_unlocked(&self, lease: &ReadLease) -> Result<()> {
+        if lease.owner_token != self.owner_token {
+            return Err(Error::from_reason("LEASE_OWNER_MISMATCH"));
+        }
+        if Instant::now() >= lease.expires_at {
+            return Err(Error::from_reason("LEASE_EXPIRED"));
+        }
+        if lease.fencing_epoch != self.fencing_epoch.load(Ordering::SeqCst) {
+            return Err(Error::from_reason("LEASE_REVOKED"));
+        }
+        if lease.generation.acl_revision != self.access_policy.read().revision {
+            return Err(Error::from_reason("LEASE_REVOKED"));
+        }
+        let frontier = self.commit_sequence.load(Ordering::SeqCst);
+        if frontier != lease.generation.publication_seq
+            || self
+                .published_generation
+                .read()
+                .as_ref()
+                .is_none_or(|generation| generation != &lease.generation)
+        {
+            return Err(Error::from_reason("GENERATION_STALE"));
+        }
+        Ok(())
+    }
+
+    pub fn validate_lease(&self, lease: &ReadLease) -> Result<()> {
+        let _read_guard = self.commit_lock.lock();
+        self.ensure_readable()?;
+        self.validate_lease_unlocked(lease)
+    }
+
+    fn publish_generation_unlocked(&self) -> Result<GenerationInfo> {
+        self.ensure_writable()?;
+        let wal_frontier = self.commit_sequence.load(Ordering::SeqCst);
+        if let Some(existing) = self.published_generation.read().as_ref() {
+            if existing.publication_seq == wal_frontier {
+                return Ok(existing.clone());
+            }
+        }
+        self.flush_index();
+        self.save_state_checkpoint(false)?;
+        let component_manifest_sha256 = self.validated_snapshot_manifest_digest()?;
+        let publication_seq = wal_frontier
+            .checked_add(1)
+            .ok_or_else(|| Error::from_reason("GENERATION_STALE: WAL frontier overflow"))?;
+        let generation = GenerationInfo {
+            generation_id: self
+                .published_generation
+                .read()
+                .as_ref()
+                .map(|old| old.generation_id.saturating_add(1))
+                .unwrap_or(1),
+            wal_frontier,
+            publication_seq,
+            txn_frontier: self.txn_frontier.load(Ordering::SeqCst),
+            // The journal reports zero before the first fold. P6 leases use
+            // epoch one as the first queryable transaction boundary.
+            history_horizon: self.history_horizon().max(1),
+            acl_revision: self.access_policy.read().revision,
+            component_manifest_sha256,
+        };
+        let event = Event::GenerationPublished(GenerationPublishedEvent {
+            version: 1,
+            generation: generation.clone(),
+        });
+        let actual_seq = self.append_wal_event(&event)?;
+        if actual_seq != publication_seq {
+            self.recovery_required.store(true, Ordering::SeqCst);
+            return Err(Error::from_reason(format!(
+                "GENERATION_STALE: publication sequence expected {publication_seq}, got {actual_seq}; reopen required"
+            )));
+        }
+        self.apply_generation_event(
+            match &event {
+                Event::GenerationPublished(event) => event,
+                _ => unreachable!(),
+            },
+            actual_seq,
+        )?;
+        Ok(generation)
+    }
+
+    fn database_id(&self) -> String {
+        Self::database_id_for_verifying_key(&self.verifying_key)
+    }
+
+    fn database_id_for_verifying_key(verifying_key: &VerifyingKey) -> String {
+        let mut identity = Sha256::new();
+        identity.update(b"genesis.api.v2.database:");
+        identity.update(verifying_key.as_bytes());
+        hex::encode(identity.finalize())
+    }
+
+    fn migration_revision_id(
+        migration_id: &str,
+        kind: &str,
+        record_id: &str,
+        source_tx_from: u64,
+        ordinal: u64,
+    ) -> String {
+        let mut hasher = Sha256::new();
+        hasher.update(b"genesis.schema6.migration.revision.v1:");
+        hasher.update(migration_id.as_bytes());
+        hasher.update([0]);
+        hasher.update(kind.as_bytes());
+        hasher.update([0]);
+        hasher.update(record_id.as_bytes());
+        hasher.update(source_tx_from.to_le_bytes());
+        hasher.update(ordinal.to_le_bytes());
+        let digest = hasher.finalize();
+        let mut bytes = [0; 16];
+        bytes.copy_from_slice(&digest[..16]);
+        bytes[6] = (bytes[6] & 0x0f) | 0x40;
+        bytes[8] = (bytes[8] & 0x3f) | 0x80;
+        Uuid::from_bytes(bytes).hyphenated().to_string()
+    }
+
+    fn schema6_migration_chunk_sha256(chunk: &Schema6MigrationChunkV1) -> Result<String> {
+        let mut unsigned = chunk.clone();
+        unsigned.chunk_sha256.clear();
+        let bytes =
+            serde_json::to_vec(&unsigned).map_err(|error| Error::from_reason(error.to_string()))?;
+        Ok(hex::encode(Sha256::digest(bytes)))
+    }
+
+    fn schema6_migration_aggregate_sha256(chunks: &[(u32, String)]) -> Result<String> {
+        let bytes =
+            serde_json::to_vec(chunks).map_err(|error| Error::from_reason(error.to_string()))?;
+        Ok(hex::encode(Sha256::digest(bytes)))
+    }
+
+    fn schema6_migration_baselines(
+        &self,
+        migration_id: &str,
+        source_frontier: u64,
+    ) -> Result<Vec<Schema6MigrationBaselineV1>> {
+        let mut baselines = Vec::new();
+        let node_versions = {
+            let conn = self.projection_db.lock();
+            let mut statement = conn
+                .prepare(
+                    "SELECT frame_seq, id, labels, payload, valid_from, valid_to, caused_by, clock_time, clock_peer, retracted FROM node_versions ORDER BY id, frame_seq",
+                )
+                .map_err(|error| Error::from_reason(error.to_string()))?;
+            let rows = statement
+                .query_map([], |row| {
+                    Ok((
+                        row.get::<_, i64>(0)?,
+                        row.get::<_, String>(1)?,
+                        row.get::<_, String>(2)?,
+                        row.get::<_, Option<String>>(3)?,
+                        row.get::<_, String>(4)?,
+                        row.get::<_, Option<String>>(5)?,
+                        row.get::<_, Option<String>>(6)?,
+                        row.get::<_, u32>(7)?,
+                        row.get::<_, String>(8)?,
+                        row.get::<_, bool>(9)?,
+                    ))
+                })
+                .map_err(|error| Error::from_reason(error.to_string()))?
+                .collect::<std::result::Result<Vec<_>, _>>()
+                .map_err(|error| Error::from_reason(error.to_string()))?;
+            rows
+        };
+        let mut previous_node_revision = HashMap::<String, String>::new();
+        let mut previous_node_valid_from = HashMap::<String, DateTime<Utc>>::new();
+        for (index, row) in node_versions.iter().enumerate() {
+            let source_tx_from = u64::try_from(row.0)
+                .map_err(|_| Error::from_reason("SCHEMA6_MIGRATION_SOURCE_COORDINATE_INVALID"))?;
+            if source_tx_from > source_frontier {
+                return Err(Error::from_reason(
+                    "SCHEMA6_MIGRATION_SOURCE_FRONTIER_MISMATCH",
+                ));
+            }
+            let source_tx_to = node_versions[index + 1..]
+                .iter()
+                .find(|next| next.1 == row.1)
+                .map(|next| u64::try_from(next.0))
+                .transpose()
+                .map_err(|_| Error::from_reason("SCHEMA6_MIGRATION_SOURCE_COORDINATE_INVALID"))?;
+            let predecessor = previous_node_revision.get(&row.1).cloned();
+            let valid_from = if row.9 {
+                previous_node_valid_from
+                    .get(&row.1)
+                    .cloned()
+                    .ok_or_else(|| Error::from_reason("SCHEMA6_MIGRATION_HISTORY_UNSUPPORTED"))?
+            } else {
+                Self::parse_revision_time(&row.4)?
+            };
+            let valid_to = row
+                .5
+                .as_deref()
+                .map(Self::parse_revision_time)
+                .transpose()?;
+            let revision_id = Self::migration_revision_id(
+                migration_id,
+                "node",
+                &row.1,
+                source_tx_from,
+                index as u64,
+            );
+            let mutation = uee_v2::RecordRevisionMutationV1 {
+                namespace: "default".into(),
+                kind: uee_v2::RecordKindV2::Node,
+                id: row.1.clone(),
+                revision_id: revision_id.clone(),
+                expected_revision_id: predecessor.clone(),
+                predecessor_revision_id: predecessor,
+                operation: if row.9 {
+                    uee_v2::RevisionOperationV1::Retract
+                } else {
+                    uee_v2::RevisionOperationV1::Upsert
+                },
+                valid_from,
+                valid_to,
+                schema_ref: None,
+                schema_version: None,
+                key_codec_version: None,
+                key_bytes: None,
+                payload: if row.9 {
+                    serde_json::json!({"id": row.1, "retracted_at": row.5})
+                } else {
+                    serde_json::json!({
+                        "id": row.1,
+                        "labels": serde_json::from_str::<Value>(&row.2).unwrap_or_else(|_| serde_json::json!([])),
+                        "props": row.3.as_deref().and_then(|value| serde_json::from_str::<Value>(value).ok()).unwrap_or(Value::Null),
+                        "valid_from": row.4,
+                        "valid_to": row.5,
+                        "caused_by": row.6,
+                        "clock": {"time": row.7, "peer_id": row.8},
+                    })
+                },
+            };
+            mutation
+                .validate()
+                .map_err(|_| Error::from_reason("SCHEMA6_MIGRATION_RECORD_INVALID"))?;
+            baselines.push(Schema6MigrationBaselineV1 {
+                mutation,
+                source_tx_from,
+                source_tx_to,
+            });
+            previous_node_revision.insert(row.1.clone(), revision_id);
+            previous_node_valid_from.insert(row.1.clone(), valid_from);
+        }
+
+        let edge_versions = {
+            let conn = self.projection_db.lock();
+            let mut statement = conn
+                .prepare(
+                    "SELECT id, tx_from, tx_to, payload FROM edge_versions ORDER BY id, tx_from",
+                )
+                .map_err(|error| Error::from_reason(error.to_string()))?;
+            let rows = statement
+                .query_map([], |row| {
+                    Ok((
+                        row.get::<_, String>(0)?,
+                        row.get::<_, i64>(1)?,
+                        row.get::<_, Option<i64>>(2)?,
+                        row.get::<_, String>(3)?,
+                    ))
+                })
+                .map_err(|error| Error::from_reason(error.to_string()))?
+                .collect::<std::result::Result<Vec<_>, _>>()
+                .map_err(|error| Error::from_reason(error.to_string()))?;
+            rows
+        };
+        let mut previous_edge_revision = HashMap::<String, String>::new();
+        for (index, row) in edge_versions.iter().enumerate() {
+            let source_tx_from = u64::try_from(row.1)
+                .map_err(|_| Error::from_reason("SCHEMA6_MIGRATION_SOURCE_COORDINATE_INVALID"))?;
+            let source_tx_to =
+                row.2.map(u64::try_from).transpose().map_err(|_| {
+                    Error::from_reason("SCHEMA6_MIGRATION_SOURCE_COORDINATE_INVALID")
+                })?;
+            if source_tx_from > source_frontier
+                || source_tx_to.is_some_and(|sequence| sequence > source_frontier)
+            {
+                return Err(Error::from_reason(
+                    "SCHEMA6_MIGRATION_SOURCE_FRONTIER_MISMATCH",
+                ));
+            }
+            let edge: EdgeOutput = serde_json::from_str(&row.3)
+                .map_err(|_| Error::from_reason("SCHEMA6_MIGRATION_HISTORY_UNSUPPORTED"))?;
+            let predecessor = previous_edge_revision.get(&row.0).cloned();
+            let revision_id = Self::migration_revision_id(
+                migration_id,
+                "edge",
+                &row.0,
+                source_tx_from,
+                index as u64,
+            );
+            let mutation = uee_v2::RecordRevisionMutationV1 {
+                namespace: "default".into(),
+                kind: uee_v2::RecordKindV2::Edge,
+                id: row.0.clone(),
+                revision_id: revision_id.clone(),
+                expected_revision_id: predecessor.clone(),
+                predecessor_revision_id: predecessor,
+                operation: if edge.valid_to.is_some() {
+                    uee_v2::RevisionOperationV1::Retract
+                } else {
+                    uee_v2::RevisionOperationV1::Upsert
+                },
+                valid_from: Self::parse_revision_time(&edge.valid_from)?,
+                valid_to: edge
+                    .valid_to
+                    .as_deref()
+                    .map(Self::parse_revision_time)
+                    .transpose()?,
+                schema_ref: None,
+                schema_version: None,
+                key_codec_version: None,
+                key_bytes: None,
+                payload: serde_json::to_value(&edge)
+                    .map_err(|error| Error::from_reason(error.to_string()))?,
+            };
+            mutation
+                .validate()
+                .map_err(|_| Error::from_reason("SCHEMA6_MIGRATION_RECORD_INVALID"))?;
+            baselines.push(Schema6MigrationBaselineV1 {
+                mutation,
+                source_tx_from,
+                source_tx_to,
+            });
+            previous_edge_revision.insert(row.0.clone(), revision_id);
+        }
+
+        let epoch = DateTime::<Utc>::from_timestamp(0, 0)
+            .ok_or_else(|| Error::from_reason("SCHEMA6_MIGRATION_VALID_TIME_INVALID"))?;
+        let mut ordinal = 0u64;
+        for event in self.relational_snapshot_events()? {
+            let Event::RelationalRows {
+                namespace,
+                schema_version,
+                mutations,
+                ..
+            } = event
+            else {
+                continue;
+            };
+            let schema = self
+                .get_relational_schema(&namespace)?
+                .ok_or_else(|| Error::from_reason("SCHEMA6_MIGRATION_SCHEMA_MISSING"))?;
+            let mut rows = mutations;
+            rows.sort_by_key(|mutation| {
+                serde_json::to_string(&mutation.values).unwrap_or_default()
+            });
+            for row in rows {
+                let table = schema
+                    .tables
+                    .iter()
+                    .find(|table| table.name == row.table)
+                    .ok_or_else(|| Error::from_reason("SCHEMA6_MIGRATION_SCHEMA_MISSING"))?;
+                let key = Self::relational_primary_key_values(table, &row)?;
+                let key_bytes = Self::encode_relational_primary_key_v1(&schema, &row)?;
+                let row_payload = serde_json::json!({
+                    "table": table.name,
+                    "key": key,
+                    "key_codec_version": 1,
+                    "key_bytes": hex::encode(&key_bytes),
+                    "after_image": row.values,
+                });
+                let identity_hash = hex::encode(Sha256::digest(
+                    serde_json::to_vec(&row_payload)
+                        .map_err(|error| Error::from_reason(error.to_string()))?,
+                ));
+                let row_id = Self::migration_revision_id(
+                    migration_id,
+                    "row",
+                    &format!("{}:{}:{identity_hash}", namespace, table.name),
+                    source_frontier,
+                    ordinal,
+                );
+                let revision_id = Self::migration_revision_id(
+                    migration_id,
+                    "row-revision",
+                    &row_id,
+                    source_frontier,
+                    ordinal,
+                );
+                let mutation = uee_v2::RecordRevisionMutationV1 {
+                    namespace: namespace.clone(),
+                    kind: uee_v2::RecordKindV2::Row,
+                    id: row_id,
+                    revision_id,
+                    expected_revision_id: None,
+                    predecessor_revision_id: None,
+                    operation: uee_v2::RevisionOperationV1::Upsert,
+                    valid_from: epoch,
+                    valid_to: None,
+                    schema_ref: Some(table.name.clone()),
+                    schema_version: Some(schema_version as u64),
+                    key_codec_version: Some(1),
+                    key_bytes: Some(key_bytes),
+                    payload: row_payload,
+                };
+                mutation
+                    .validate()
+                    .map_err(|_| Error::from_reason("SCHEMA6_MIGRATION_RECORD_INVALID"))?;
+                baselines.push(Schema6MigrationBaselineV1 {
+                    mutation,
+                    source_tx_from: source_frontier,
+                    source_tx_to: None,
+                });
+                ordinal = ordinal.saturating_add(1);
+            }
+        }
+        Ok(baselines)
+    }
+
+    fn validate_schema6_migration_event_context(
+        &self,
+        migration_id: &str,
+        source_database_id: &str,
+        source_schema: u32,
+        source_frontier: u64,
+    ) -> Result<serde_json::Value> {
+        if self.storage_schema_version != SCHEMA_VERSION
+            || source_schema != LEGACY_SCHEMA_VERSION
+            || source_database_id != self.database_id()
+        {
+            return Err(Error::from_reason("SCHEMA6_MIGRATION_CONTEXT_MISMATCH"));
+        }
+        let state = self.schema6_migration_authority_state()?;
+        if state["migration_id"].as_str() != Some(migration_id)
+            || state["migration_database_id"].as_str() != Some(source_database_id)
+            || state["migration_source_schema"].as_u64() != Some(u64::from(source_schema))
+            || state["migration_source_frontier"].as_u64() != Some(source_frontier)
+            || state["migration_manifest_sha256"]
+                .as_str()
+                .is_none_or(|value| {
+                    value.len() != 64 || !value.bytes().all(|byte| byte.is_ascii_hexdigit())
+                })
+            || !matches!(
+                state["upgrade_state"].as_str(),
+                Some("in_progress" | "ready")
+            )
+        {
+            return Err(Error::from_reason("SCHEMA6_MIGRATION_CONTEXT_MISMATCH"));
+        }
+        Ok(state)
+    }
+
+    fn schema6_migration_authority_state(&self) -> Result<serde_json::Value> {
+        let state_path = self.path.join("state.json");
+        if state_path.exists() {
+            return serde_json::from_slice(
+                &fs::read(&state_path).map_err(|error| Error::from_reason(error.to_string()))?,
+            )
+            .map_err(|_| Error::from_reason("RECOVERY_REQUIRED: migration state is invalid"));
+        }
+        self.schema6_activation
+            .read()
+            .as_ref()
+            .and_then(Self::schema6_activation_migration_state)
+            .ok_or_else(|| Error::from_reason("RECOVERY_REQUIRED: migration state is missing"))
+    }
+
+    fn schema6_activation_migration_state(
+        activation: &Schema6ActivationV1,
+    ) -> Option<serde_json::Value> {
+        let migration = activation.migration.as_ref()?;
+        Some(serde_json::json!({
+            "schema_version": SCHEMA_VERSION,
+            "upgrade_state": "ready",
+            "migration_id": migration.migration_id,
+            "migration_manifest_sha256": migration.manifest_sha256,
+            "migration_database_id": migration.source_database_id,
+            "migration_source_schema": migration.source_schema,
+            "migration_source_frontier": migration.source_frontier,
+            "migration_backup_sha256": migration.backup_sha256,
+            "migration_source_p6_manifest_sha256": migration.source_p6_manifest_sha256,
+            "migration_source_history_floors": migration.source_history_floors,
+            "migration_commit_seq": migration.migration_commit_frame_seq,
+            "migration_receipt_seq": migration.generation.publication_seq,
+            "migration_p6_manifest_sha256": migration.post_migration_manifest_sha256,
+            "migration_generation": migration.generation,
+        }))
+    }
+
+    fn schema6_activation_from_ready_state(&self) -> Result<Schema6ActivationV1> {
+        let state: serde_json::Value = serde_json::from_slice(
+            &fs::read(self.path.join("state.json"))
+                .map_err(|error| Error::from_reason(error.to_string()))?,
+        )
+        .map_err(|_| Error::from_reason("RECOVERY_REQUIRED: schema state is invalid"))?;
+        if state["schema_version"].as_u64() != Some(u64::from(SCHEMA_VERSION))
+            || state["upgrade_state"].as_str() != Some("ready")
+        {
+            return Err(Error::from_reason(
+                "RECOVERY_REQUIRED: schema-6 activation requires ready state",
+            ));
+        }
+        let migration = if state["migration_id"].as_str().is_some() {
+            let source_history_floors = serde_json::from_value(
+                state["migration_source_history_floors"].clone(),
+            )
+            .map_err(|_| Error::from_reason("RECOVERY_REQUIRED: migration floors are invalid"))?;
+            let generation = serde_json::from_value(state["migration_generation"].clone())
+                .map_err(|_| {
+                    Error::from_reason("RECOVERY_REQUIRED: migration receipt is missing")
+                })?;
+            Some(Schema6MigrationActivationV1 {
+                migration_id: state["migration_id"]
+                    .as_str()
+                    .unwrap_or_default()
+                    .to_string(),
+                manifest_sha256: state["migration_manifest_sha256"]
+                    .as_str()
+                    .unwrap_or_default()
+                    .to_string(),
+                source_database_id: state["migration_database_id"]
+                    .as_str()
+                    .unwrap_or_default()
+                    .to_string(),
+                source_schema: state["migration_source_schema"]
+                    .as_u64()
+                    .and_then(|value| u32::try_from(value).ok())
+                    .ok_or_else(|| {
+                        Error::from_reason("RECOVERY_REQUIRED: migration source schema is invalid")
+                    })?,
+                source_frontier: state["migration_source_frontier"].as_u64().ok_or_else(|| {
+                    Error::from_reason("RECOVERY_REQUIRED: migration source frontier is invalid")
+                })?,
+                source_history_floors,
+                backup_sha256: state["migration_backup_sha256"]
+                    .as_str()
+                    .unwrap_or_default()
+                    .to_string(),
+                source_p6_manifest_sha256: state["migration_source_p6_manifest_sha256"]
+                    .as_str()
+                    .unwrap_or_default()
+                    .to_string(),
+                migration_commit_frame_seq: state["migration_commit_seq"].as_u64().ok_or_else(
+                    || Error::from_reason("RECOVERY_REQUIRED: migration commit is missing"),
+                )?,
+                generation,
+                post_migration_manifest_sha256: state["migration_p6_manifest_sha256"]
+                    .as_str()
+                    .unwrap_or_default()
+                    .to_string(),
+            })
+        } else {
+            None
+        };
+        Ok(Schema6ActivationV1 {
+            version: 1,
+            schema_version: SCHEMA_VERSION,
+            database_id: self.database_id(),
+            migration,
+        })
+    }
+
+    fn install_schema6_activation(&self, activation: Schema6ActivationV1) -> Result<()> {
+        if activation.version != 1
+            || activation.schema_version != SCHEMA_VERSION
+            || activation.database_id != self.database_id()
+        {
+            return Err(Error::from_reason(
+                "RECOVERY_REQUIRED: invalid schema activation",
+            ));
+        }
+        if let Some(existing) = self.schema6_activation.read().as_ref() {
+            if serde_json::to_value(existing).ok() == serde_json::to_value(&activation).ok() {
+                return Ok(());
+            }
+            return Err(Error::from_reason(
+                "RECOVERY_REQUIRED: conflicting schema activation",
+            ));
+        }
+        if self.read_only {
+            return Err(Error::from_reason(
+                "RECOVERY_REQUIRED: schema activation is missing on read-only open",
+            ));
+        }
+        let (journal_activation, _, _) = Self::preflight_schema6_activation(
+            &self.path,
+            &self.signing_key.verifying_key(),
+            &self.local_peer_id,
+            &self.database_id(),
+            false,
+        )?;
+        if let Some(existing) = journal_activation {
+            if serde_json::to_value(&existing).ok() != serde_json::to_value(&activation).ok() {
+                return Err(Error::from_reason(
+                    "RECOVERY_REQUIRED: conflicting schema activation",
+                ));
+            }
+            *self.schema6_activation.write() = Some(existing);
+            return Ok(());
+        }
+        self.append_wal_event(&Event::Schema6ActivationV1(activation.clone()))?;
+        *self.schema6_activation.write() = Some(activation);
+        Ok(())
+    }
+
+    fn validate_schema6_activation_state(&self, state: &serde_json::Value) -> Result<()> {
+        let activation = self.schema6_activation.read().clone().ok_or_else(|| {
+            Error::from_reason("RECOVERY_REQUIRED: schema-6 activation is missing")
+        })?;
+        if activation.version != 1
+            || activation.schema_version != SCHEMA_VERSION
+            || activation.database_id != self.database_id()
+        {
+            return Err(Error::from_reason(
+                "RECOVERY_REQUIRED: schema-6 activation identity mismatch",
+            ));
+        }
+        match activation.migration.as_ref() {
+            Some(migration) => {
+                let expected =
+                    Self::schema6_activation_migration_state(&activation).ok_or_else(|| {
+                        Error::from_reason("RECOVERY_REQUIRED: migration proof missing")
+                    })?;
+                for key in [
+                    "migration_id",
+                    "migration_manifest_sha256",
+                    "migration_database_id",
+                    "migration_source_schema",
+                    "migration_source_frontier",
+                    "migration_backup_sha256",
+                    "migration_source_p6_manifest_sha256",
+                    "migration_source_history_floors",
+                    "migration_commit_seq",
+                    "migration_receipt_seq",
+                    "migration_p6_manifest_sha256",
+                    "migration_generation",
+                ] {
+                    if state.get(key) != expected.get(key) {
+                        return Err(Error::from_reason(
+                            "RECOVERY_REQUIRED: schema activation disagrees with migration marker",
+                        ));
+                    }
+                }
+                if migration.source_database_id != activation.database_id
+                    || state["upgrade_state"].as_str() != Some("ready")
+                {
+                    return Err(Error::from_reason(
+                        "RECOVERY_REQUIRED: schema activation is not migration-ready",
+                    ));
+                }
+            }
+            None if state["migration_id"].as_str().is_some() => {
+                return Err(Error::from_reason(
+                    "RECOVERY_REQUIRED: fresh activation conflicts with migration marker",
+                ));
+            }
+            None => {}
+        }
+        Ok(())
+    }
+
+    fn validate_schema6_migration_authority(&self) -> Result<()> {
+        let state = self.schema6_migration_authority_state()?;
+        if self.schema6_activation.read().is_some() {
+            self.validate_schema6_activation_state(&state)?;
+        } else if !self.path.join("state.json").exists() {
+            return Err(Error::from_reason(
+                "RECOVERY_REQUIRED: markerless migration has no activation proof",
+            ));
+        }
+        if state["schema_version"].as_u64() != Some(SCHEMA_VERSION as u64)
+            || state["upgrade_state"].as_str() != Some("ready")
+        {
+            return Err(Error::from_reason(
+                "RECOVERY_REQUIRED: schema-6 migration is not ready",
+            ));
+        }
+        let migration_id = state["migration_id"]
+            .as_str()
+            .filter(|value| !value.is_empty())
+            .ok_or_else(|| {
+                Error::from_reason("RECOVERY_REQUIRED: migration identity is missing")
+            })?;
+        let manifest_sha256 = state["migration_manifest_sha256"]
+            .as_str()
+            .filter(|value| Self::is_lower_sha256(value))
+            .ok_or_else(|| {
+                Error::from_reason("RECOVERY_REQUIRED: migration manifest proof is missing")
+            })?;
+        let database_id = state["migration_database_id"].as_str().ok_or_else(|| {
+            Error::from_reason("RECOVERY_REQUIRED: migration database identity is missing")
+        })?;
+        let source_schema = state["migration_source_schema"]
+            .as_u64()
+            .and_then(|value| u32::try_from(value).ok())
+            .ok_or_else(|| {
+                Error::from_reason("RECOVERY_REQUIRED: migration source schema is invalid")
+            })?;
+        let source_frontier = state["migration_source_frontier"].as_u64().ok_or_else(|| {
+            Error::from_reason("RECOVERY_REQUIRED: migration source frontier is invalid")
+        })?;
+        let backup_sha256 = state["migration_backup_sha256"]
+            .as_str()
+            .filter(|value| Self::is_lower_sha256(value))
+            .ok_or_else(|| {
+                Error::from_reason("RECOVERY_REQUIRED: migration backup proof is missing")
+            })?;
+        let source_p6_sha256 = state["migration_source_p6_manifest_sha256"]
+            .as_str()
+            .filter(|value| Self::is_lower_sha256(value))
+            .ok_or_else(|| {
+                Error::from_reason("RECOVERY_REQUIRED: source snapshot proof is missing")
+            })?;
+        let source_history_floors: std::collections::BTreeMap<String, u64> =
+            serde_json::from_value(state["migration_source_history_floors"].clone()).map_err(
+                |_| Error::from_reason("RECOVERY_REQUIRED: migration history floors are invalid"),
+            )?;
+        let commit_seq = state["migration_commit_seq"].as_u64().ok_or_else(|| {
+            Error::from_reason("RECOVERY_REQUIRED: migration commit sequence is missing")
+        })?;
+        let receipt_seq = state["migration_receipt_seq"].as_u64().ok_or_else(|| {
+            Error::from_reason("RECOVERY_REQUIRED: migration receipt sequence is missing")
+        })?;
+        let migration_generation: GenerationInfo =
+            serde_json::from_value(state["migration_generation"].clone()).map_err(|_| {
+                Error::from_reason("RECOVERY_REQUIRED: migration generation is missing")
+            })?;
+        let post_migration_sha256 = state["migration_p6_manifest_sha256"]
+            .as_str()
+            .filter(|value| Self::is_lower_sha256(value))
+            .ok_or_else(|| {
+                Error::from_reason("RECOVERY_REQUIRED: migration receipt digest is missing")
+            })?;
+        if source_schema != LEGACY_SCHEMA_VERSION
+            || database_id != self.database_id()
+            || commit_seq <= source_frontier
+            || receipt_seq != commit_seq.saturating_add(1)
+            || migration_generation.wal_frontier != commit_seq
+            || migration_generation.publication_seq != receipt_seq
+            || migration_generation.component_manifest_sha256 != post_migration_sha256
+            || source_history_floors
+                .values()
+                .any(|floor| *floor > source_frontier)
+            || ["graph", "row", "vector", "annotation"]
+                .iter()
+                .any(|source| !source_history_floors.contains_key(*source))
+        {
+            return Err(Error::from_reason(
+                "RECOVERY_REQUIRED: migration state identity mismatch",
+            ));
+        }
+
+        let marker = Self::schema6_migration_marker(&self.path)?;
+        if let Some(marker) = marker {
+            if marker["upgrade_state"].as_str() != Some("in_progress")
+                || marker["migration_id"].as_str() != Some(migration_id)
+                || marker["manifest_sha256"].as_str() != Some(manifest_sha256)
+                || marker["database_id"].as_str() != Some(database_id)
+                || marker["source_schema"].as_u64() != Some(u64::from(source_schema))
+                || marker["source_frontier"].as_u64() != Some(source_frontier)
+                || marker["backup_sha256"].as_str() != Some(backup_sha256)
+                || marker["source_p6_manifest_sha256"].as_str() != Some(source_p6_sha256)
+                || serde_json::from_value::<std::collections::BTreeMap<String, u64>>(
+                    marker["source_history_floors"].clone(),
+                )
+                .ok()
+                .as_ref()
+                    != Some(&source_history_floors)
+            {
+                return Err(Error::from_reason(
+                    "RECOVERY_REQUIRED: migration sidecar disagrees with ready state",
+                ));
+            }
+        }
+
+        let mut chunks = std::collections::BTreeMap::<u32, Schema6MigrationChunkV1>::new();
+        let mut commit: Option<Schema6MigrationCommitV1> = None;
+        let mut receipt_found = false;
+        let mut invalid_proof = false;
+        self.scan_journal(None, true, &mut |frame_seq, signed_event| {
+            let mut controls = Vec::new();
+            Self::collect_p6_control_events(&signed_event.event, &mut controls);
+            if controls.is_empty() {
+                return;
+            }
+            if signed_event.signer_peer_id != self.local_peer_id
+                || !self.verify_event_signature(&signed_event)
+            {
+                invalid_proof = true;
+                return;
+            }
+            for event in controls {
+                match event {
+                    Event::Schema6MigrationChunkV1(chunk) => {
+                        if chunk.migration_id != migration_id
+                            || chunk.manifest_sha256 != manifest_sha256
+                            || chunk.source_database_id != database_id
+                            || chunk.source_schema != source_schema
+                            || chunk.source_frontier != source_frontier
+                            || chunk.source_history_floors != source_history_floors
+                            || chunk.total_chunks == 0
+                            || chunk.chunk_index >= chunk.total_chunks
+                            || chunk.baseline_records.len() > 256
+                            || Self::schema6_migration_chunk_sha256(chunk)
+                                .map_or(true, |digest| digest != chunk.chunk_sha256)
+                        {
+                            invalid_proof = true;
+                            continue;
+                        }
+                        if let Some(previous) = chunks.get(&chunk.chunk_index) {
+                            let identical =
+                                serde_json::to_vec(previous).ok() == serde_json::to_vec(chunk).ok();
+                            if !identical {
+                                invalid_proof = true;
+                            }
+                        } else {
+                            chunks.insert(chunk.chunk_index, chunk.clone());
+                        }
+                    }
+                    Event::Schema6MigrationCommitV1(candidate) => {
+                        if candidate.migration_id != migration_id
+                            || candidate.manifest_sha256 != manifest_sha256
+                            || candidate.source_database_id != database_id
+                            || candidate.source_schema != source_schema
+                            || candidate.source_frontier != source_frontier
+                            || candidate.migration_commit_frame_seq != commit_seq
+                        {
+                            invalid_proof = true;
+                            continue;
+                        }
+                        if let Some(previous) = commit.as_ref() {
+                            if serde_json::to_vec(previous).ok()
+                                != serde_json::to_vec(candidate).ok()
+                            {
+                                invalid_proof = true;
+                            }
+                        } else {
+                            commit = Some(candidate.clone());
+                        }
+                    }
+                    Event::GenerationPublished(event)
+                        if event.generation == migration_generation && frame_seq >= receipt_seq =>
+                    {
+                        receipt_found = true;
+                    }
+                    Event::GenerationPublished(_) | Event::AccessPolicyChanged(_) => {}
+                    Event::Schema6ActivationV1(_) => {}
+                    _ => invalid_proof = true,
+                }
+            }
+        });
+        if invalid_proof {
+            return Err(Error::from_reason(
+                "RECOVERY_REQUIRED: invalid signed schema-6 migration authority",
+            ));
+        }
+        let commit = commit.ok_or_else(|| {
+            Error::from_reason("RECOVERY_REQUIRED: signed migration commit is missing")
+        })?;
+        let total_chunks = commit.total_chunks;
+        if total_chunks == 0
+            || chunks.len() != total_chunks as usize
+            || chunks
+                .keys()
+                .enumerate()
+                .any(|(index, value)| *value != index as u32)
+            || chunks
+                .values()
+                .any(|chunk| chunk.total_chunks != total_chunks)
+            || !receipt_found
+        {
+            return Err(Error::from_reason(
+                "RECOVERY_REQUIRED: migration chunks or generation receipt are incomplete",
+            ));
+        }
+        let ordered = chunks
+            .iter()
+            .map(|(index, chunk)| (*index, chunk.chunk_sha256.clone()))
+            .collect::<Vec<_>>();
+        if Self::schema6_migration_aggregate_sha256(&ordered)? != commit.aggregate_sha256 {
+            return Err(Error::from_reason(
+                "RECOVERY_REQUIRED: migration commit digest mismatch",
+            ));
+        }
+
+        let conn = self.projection_db.lock();
+        type StoredMigrationReceipt = (
+            String,
+            i64,
+            i64,
+            i64,
+            String,
+            String,
+            Option<String>,
+            Option<i64>,
+        );
+        let stored: Option<StoredMigrationReceipt> = conn
+            .query_row(
+                "SELECT source_database_id, source_schema, source_frontier, total_chunks, manifest_sha256, status, aggregate_sha256, migration_commit_frame_seq FROM hql2_schema6_migrations WHERE migration_id=?1",
+                [migration_id],
+                |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?, row.get(4)?, row.get(5)?, row.get(6)?, row.get(7)?)),
+            )
+            .optional()
+            .map_err(|error| Error::from_reason(error.to_string()))?;
+        let Some((
+            stored_database,
+            stored_schema,
+            stored_frontier,
+            stored_total,
+            stored_manifest,
+            status,
+            aggregate,
+            stored_commit_seq,
+        )) = stored
+        else {
+            return Err(Error::from_reason(
+                "RECOVERY_REQUIRED: migration projection is missing",
+            ));
+        };
+        if stored_database != database_id
+            || stored_schema != i64::from(source_schema)
+            || stored_frontier != i64::try_from(source_frontier).unwrap_or(i64::MIN)
+            || stored_total != i64::from(total_chunks)
+            || stored_manifest != manifest_sha256
+            || status != "committed"
+            || aggregate.as_deref() != Some(commit.aggregate_sha256.as_str())
+            || stored_commit_seq != Some(i64::try_from(commit_seq).unwrap_or(i64::MIN))
+        {
+            return Err(Error::from_reason(
+                "RECOVERY_REQUIRED: migration projection disagrees with signed authority",
+            ));
+        }
+        for (index, chunk) in chunks {
+            let stored_chunk: Option<(String, String)> = conn
+                .query_row(
+                    "SELECT chunk_sha256, chunk_json FROM hql2_schema6_migration_chunks WHERE migration_id=?1 AND chunk_index=?2",
+                    params![migration_id, i64::from(index)],
+                    |row| Ok((row.get(0)?, row.get(1)?)),
+                )
+                .optional()
+                .map_err(|error| Error::from_reason(error.to_string()))?;
+            let expected_json = serde_json::to_string(&chunk)
+                .map_err(|error| Error::from_reason(error.to_string()))?;
+            if stored_chunk != Some((chunk.chunk_sha256, expected_json)) {
+                return Err(Error::from_reason(
+                    "RECOVERY_REQUIRED: migration chunk projection disagrees with signed WAL",
+                ));
+            }
+        }
+        for (source, floor) in source_history_floors {
+            let stored_floor: Option<i64> = conn
+                .query_row(
+                    "SELECT history_floor FROM hql2_source_history_floors WHERE namespace='default' AND source=?1",
+                    [&source],
+                    |row| row.get(0),
+                )
+                .optional()
+                .map_err(|error| Error::from_reason(error.to_string()))?;
+            if stored_floor.is_none_or(|stored| stored < i64::try_from(floor).unwrap_or(i64::MIN)) {
+                return Err(Error::from_reason(
+                    "RECOVERY_REQUIRED: migration history floor disagrees with signed WAL",
+                ));
+            }
+        }
+        drop(conn);
+
+        let _ = (backup_sha256, source_p6_sha256);
+        Ok(())
+    }
+
+    fn is_lower_sha256(value: &str) -> bool {
+        value.len() == 64
+            && value
+                .bytes()
+                .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+    }
+
+    fn apply_schema6_migration_chunk(
+        &self,
+        chunk: &Schema6MigrationChunkV1,
+        frame_seq: u64,
+    ) -> Result<()> {
+        let state = self.validate_schema6_migration_event_context(
+            &chunk.migration_id,
+            &chunk.source_database_id,
+            chunk.source_schema,
+            chunk.source_frontier,
+        )?;
+        if chunk.total_chunks == 0
+            || chunk.total_chunks > 1_000_000
+            || chunk.chunk_index >= chunk.total_chunks
+            || chunk.baseline_records.len() > 256
+            || Self::schema6_migration_chunk_sha256(chunk)? != chunk.chunk_sha256
+        {
+            return Err(Error::from_reason(
+                "RECOVERY_REQUIRED: invalid schema-6 migration chunk",
+            ));
+        }
+        let manifest_sha256 = state["migration_manifest_sha256"]
+            .as_str()
+            .ok_or_else(|| Error::from_reason("SCHEMA6_MIGRATION_CONTEXT_MISMATCH"))?;
+        let expected_history_floors: std::collections::BTreeMap<String, u64> =
+            serde_json::from_value(state["migration_source_history_floors"].clone())
+                .map_err(|_| Error::from_reason("SCHEMA6_MIGRATION_CONTEXT_MISMATCH"))?;
+        if chunk.manifest_sha256 != manifest_sha256
+            || chunk.source_history_floors != expected_history_floors
+        {
+            return Err(Error::from_reason("SCHEMA6_MIGRATION_CONTEXT_MISMATCH"));
+        }
+        let payload =
+            serde_json::to_string(chunk).map_err(|error| Error::from_reason(error.to_string()))?;
+        let frame_seq = i64::try_from(frame_seq)
+            .map_err(|_| Error::from_reason("SCHEMA6_MIGRATION_SEQUENCE_OVERFLOW"))?;
+        let mut identities = HashSet::new();
+        for baseline in &chunk.baseline_records {
+            if baseline.mutation.kind == uee_v2::RecordKindV2::Vector {
+                return Err(Error::from_reason(
+                    "RECOVERY_REQUIRED: legacy vector provenance is unavailable",
+                ));
+            }
+            if baseline.source_tx_from > chunk.source_frontier
+                || baseline.source_tx_to.is_some_and(|end| {
+                    end <= baseline.source_tx_from || end > chunk.source_frontier
+                })
+                || (baseline.mutation.kind == uee_v2::RecordKindV2::Row
+                    && (baseline.source_tx_from != chunk.source_frontier
+                        || baseline.source_tx_to.is_some()))
+                || !identities.insert((
+                    Self::revision_kind_name(&baseline.mutation.kind),
+                    baseline.mutation.id.as_str(),
+                    baseline.mutation.revision_id.as_str(),
+                ))
+            {
+                return Err(Error::from_reason(
+                    "RECOVERY_REQUIRED: invalid migration source coordinates",
+                ));
+            }
+            baseline
+                .mutation
+                .validate()
+                .map_err(|_| Error::from_reason("RECOVERY_REQUIRED: invalid migration revision"))?;
+        }
+
+        let conn = self.projection_db.lock();
+        let tx = conn
+            .unchecked_transaction()
+            .map_err(|error| Error::from_reason(error.to_string()))?;
+        let migration: Option<(String, i64, i64, i64, String, String)> = tx
+            .query_row(
+                "SELECT source_database_id, source_schema, source_frontier, total_chunks, manifest_sha256, status FROM hql2_schema6_migrations WHERE migration_id=?1",
+                [&chunk.migration_id],
+                |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?, row.get(4)?, row.get(5)?)),
+            )
+            .optional()
+            .map_err(|error| Error::from_reason(error.to_string()))?;
+        if let Some((database_id, schema, frontier, total, digest, status)) = migration.as_ref() {
+            if database_id != &chunk.source_database_id
+                || *schema != i64::from(chunk.source_schema)
+                || *frontier != chunk.source_frontier as i64
+                || *total != i64::from(chunk.total_chunks)
+                || digest != manifest_sha256
+            {
+                return Err(Error::from_reason(
+                    "RECOVERY_REQUIRED: conflicting migration context",
+                ));
+            }
+            if status != "in_progress" {
+                return Err(Error::from_reason(
+                    "RECOVERY_REQUIRED: migration is already committed",
+                ));
+            }
+        } else {
+            tx.execute(
+                "INSERT INTO hql2_schema6_migrations(migration_id, source_database_id, source_schema, source_frontier, total_chunks, manifest_sha256, status) VALUES(?1, ?2, ?3, ?4, ?5, ?6, 'in_progress')",
+                params![
+                    chunk.migration_id,
+                    chunk.source_database_id,
+                    i64::from(chunk.source_schema),
+                    i64::try_from(chunk.source_frontier).map_err(|_| Error::from_reason("SCHEMA6_MIGRATION_SEQUENCE_OVERFLOW"))?,
+                    i64::from(chunk.total_chunks),
+                    manifest_sha256,
+                ],
+            )
+            .map_err(|error| Error::from_reason(error.to_string()))?;
+        }
+        let existing: Option<(String, String)> = tx
+            .query_row(
+                "SELECT chunk_sha256, chunk_json FROM hql2_schema6_migration_chunks WHERE migration_id=?1 AND chunk_index=?2",
+                params![chunk.migration_id, i64::from(chunk.chunk_index)],
+                |row| Ok((row.get(0)?, row.get(1)?)),
+            )
+            .optional()
+            .map_err(|error| Error::from_reason(error.to_string()))?;
+        if let Some((digest, existing_payload)) = existing {
+            if digest != chunk.chunk_sha256 || existing_payload != payload {
+                return Err(Error::from_reason(
+                    "RECOVERY_REQUIRED: conflicting duplicate migration chunk",
+                ));
+            }
+            return tx
+                .commit()
+                .map_err(|error| Error::from_reason(error.to_string()));
+        }
+        let observed_chunks: i64 = tx
+            .query_row(
+                "SELECT COUNT(*) FROM hql2_schema6_migration_chunks WHERE migration_id=?1",
+                [&chunk.migration_id],
+                |row| row.get(0),
+            )
+            .map_err(|error| Error::from_reason(error.to_string()))?;
+        if observed_chunks != i64::from(chunk.chunk_index) {
+            return Err(Error::from_reason("RECOVERY_REQUIRED: migration chunk gap"));
+        }
+        for baseline in &chunk.baseline_records {
+            Self::projection_apply_schema6_migration_record_tx(
+                &tx,
+                baseline,
+                &chunk.source_database_id,
+            )?;
+        }
+        if chunk.chunk_index == 0 {
+            for (source, floor) in &chunk.source_history_floors {
+                tx.execute(
+                    "INSERT INTO hql2_source_history_floors(namespace, source, history_floor) VALUES('default', ?1, ?2) ON CONFLICT(namespace, source) DO UPDATE SET history_floor=excluded.history_floor",
+                    params![source, i64::try_from(*floor).map_err(|_| Error::from_reason("SCHEMA6_MIGRATION_SEQUENCE_OVERFLOW"))?],
+                )
+                .map_err(|error| Error::from_reason(error.to_string()))?;
+            }
+        }
+        tx.execute(
+            "INSERT INTO hql2_schema6_migration_chunks(migration_id, chunk_index, chunk_sha256, chunk_json, frame_seq) VALUES(?1, ?2, ?3, ?4, ?5)",
+            params![chunk.migration_id, i64::from(chunk.chunk_index), chunk.chunk_sha256, payload, frame_seq],
+        )
+        .map_err(|error| Error::from_reason(error.to_string()))?;
+        tx.commit()
+            .map_err(|error| Error::from_reason(error.to_string()))
+    }
+
+    fn projection_apply_schema6_migration_record_tx(
+        tx: &rusqlite::Transaction<'_>,
+        baseline: &Schema6MigrationBaselineV1,
+        database_id: &str,
+    ) -> Result<()> {
+        let mutation = &baseline.mutation;
+        let kind = Self::revision_kind_name(&mutation.kind);
+        let tx_from = i64::try_from(baseline.source_tx_from)
+            .map_err(|_| Error::from_reason("SCHEMA6_MIGRATION_SEQUENCE_OVERFLOW"))?;
+        let tx_to = baseline
+            .source_tx_to
+            .map(i64::try_from)
+            .transpose()
+            .map_err(|_| Error::from_reason("SCHEMA6_MIGRATION_SEQUENCE_OVERFLOW"))?;
+        if let Some(predecessor) = mutation.predecessor_revision_id.as_deref() {
+            let predecessor_tx_to: Option<i64> = tx
+                .query_row(
+                    "SELECT tx_to FROM hql2_record_revisions WHERE database_id=?1 AND namespace=?2 AND kind=?3 AND record_id=?4 AND revision_id=?5",
+                    params![database_id, mutation.namespace, kind, mutation.id, predecessor],
+                    |row| row.get(0),
+                )
+                .optional()
+                .map_err(|error| Error::from_reason(error.to_string()))?
+                .flatten();
+            if predecessor_tx_to != Some(tx_from) {
+                return Err(Error::from_reason(
+                    "RECOVERY_REQUIRED: migration revision chain gap",
+                ));
+            }
+        } else {
+            let existing: bool = tx
+                .query_row(
+                    "SELECT EXISTS(SELECT 1 FROM hql2_record_revisions WHERE database_id=?1 AND namespace=?2 AND kind=?3 AND record_id=?4)",
+                    params![database_id, mutation.namespace, kind, mutation.id],
+                    |row| row.get(0),
+                )
+                .map_err(|error| Error::from_reason(error.to_string()))?;
+            if existing {
+                return Err(Error::from_reason(
+                    "RECOVERY_REQUIRED: migration revision predecessor missing",
+                ));
+            }
+        }
+        let operation = serde_json::to_value(&mutation.operation)
+            .map_err(|error| Error::from_reason(error.to_string()))?
+            .as_str()
+            .ok_or_else(|| Error::from_reason("SCHEMA6_MIGRATION_RECORD_INVALID"))?
+            .to_string();
+        tx.execute(
+            "INSERT INTO hql2_record_revisions(database_id, namespace, kind, record_id, revision_id, predecessor_revision_id, operation, valid_from, valid_to, tx_from, tx_to, schema_ref, schema_version, origin_database_id, payload_json) VALUES(?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15)",
+            params![
+                database_id,
+                mutation.namespace,
+                kind,
+                mutation.id,
+                mutation.revision_id,
+                mutation.predecessor_revision_id,
+                operation,
+                mutation.valid_from.to_rfc3339(),
+                mutation.valid_to.map(|date| date.to_rfc3339()),
+                tx_from,
+                tx_to,
+                mutation.schema_ref,
+                mutation.schema_version.map(|version| version as i64),
+                database_id,
+                serde_json::to_string(&mutation.payload).map_err(|error| Error::from_reason(error.to_string()))?,
+            ],
+        )
+        .map_err(|error| Error::from_reason(error.to_string()))?;
+        if mutation.kind == uee_v2::RecordKindV2::Row {
+            let table_name = mutation
+                .schema_ref
+                .as_deref()
+                .ok_or_else(|| Error::from_reason("HQL2_ROW_SCHEMA_REQUIRED"))?;
+            tx.execute(
+                "INSERT INTO hql2_row_identity_registry(database_id, namespace, table_name, row_id, key_codec_version, key_bytes, created_revision_id) VALUES(?1, ?2, ?3, ?4, ?5, ?6, ?7)",
+                params![
+                    database_id,
+                    mutation.namespace,
+                    table_name,
+                    mutation.id,
+                    i64::from(mutation.key_codec_version.unwrap_or(0)),
+                    mutation.key_bytes.as_deref(),
+                    mutation.revision_id,
+                ],
+            )
+            .map_err(|error| Error::from_reason(error.to_string()))?;
+        }
+        Ok(())
+    }
+
+    fn apply_schema6_migration_commit(
+        &self,
+        commit: &Schema6MigrationCommitV1,
+        frame_seq: u64,
+    ) -> Result<()> {
+        let state = self.validate_schema6_migration_event_context(
+            &commit.migration_id,
+            &commit.source_database_id,
+            commit.source_schema,
+            commit.source_frontier,
+        )?;
+        if commit.total_chunks == 0
+            || commit.aggregate_sha256.len() != 64
+            || !commit
+                .aggregate_sha256
+                .bytes()
+                .all(|byte| byte.is_ascii_hexdigit() && !byte.is_ascii_uppercase())
+            || commit.migration_commit_frame_seq <= commit.source_frontier
+            || frame_seq < commit.migration_commit_frame_seq
+        {
+            return Err(Error::from_reason(
+                "RECOVERY_REQUIRED: invalid migration commit",
+            ));
+        }
+        let manifest_sha256 = state["migration_manifest_sha256"]
+            .as_str()
+            .ok_or_else(|| Error::from_reason("SCHEMA6_MIGRATION_CONTEXT_MISMATCH"))?;
+        if commit.manifest_sha256 != manifest_sha256 {
+            return Err(Error::from_reason("SCHEMA6_MIGRATION_CONTEXT_MISMATCH"));
+        }
+        let conn = self.projection_db.lock();
+        let tx = conn
+            .unchecked_transaction()
+            .map_err(|error| Error::from_reason(error.to_string()))?;
+        let migration: (String, i64, i64, i64, String, String, Option<String>, Option<i64>) = tx
+            .query_row(
+                "SELECT source_database_id, source_schema, source_frontier, total_chunks, manifest_sha256, status, aggregate_sha256, migration_commit_frame_seq FROM hql2_schema6_migrations WHERE migration_id=?1",
+                [&commit.migration_id],
+                |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?, row.get(4)?, row.get(5)?, row.get(6)?, row.get(7)?)),
+            )
+            .map_err(|error| Error::from_reason(error.to_string()))?;
+        if migration.0 != commit.source_database_id
+            || migration.1 != i64::from(commit.source_schema)
+            || migration.2 != commit.source_frontier as i64
+            || migration.3 != i64::from(commit.total_chunks)
+            || migration.4 != manifest_sha256
+        {
+            return Err(Error::from_reason(
+                "RECOVERY_REQUIRED: migration commit context mismatch",
+            ));
+        }
+        if migration.5 == "committed" {
+            if migration.6.as_deref() == Some(commit.aggregate_sha256.as_str())
+                && migration.7 == Some(commit.migration_commit_frame_seq as i64)
+            {
+                return tx
+                    .commit()
+                    .map_err(|error| Error::from_reason(error.to_string()));
+            }
+            return Err(Error::from_reason(
+                "RECOVERY_REQUIRED: conflicting migration commit",
+            ));
+        }
+        let mut statement = tx
+            .prepare("SELECT chunk_index, chunk_sha256 FROM hql2_schema6_migration_chunks WHERE migration_id=?1 ORDER BY chunk_index")
+            .map_err(|error| Error::from_reason(error.to_string()))?;
+        let chunks = statement
+            .query_map([&commit.migration_id], |row| {
+                Ok((row.get::<_, i64>(0)?, row.get::<_, String>(1)?))
+            })
+            .map_err(|error| Error::from_reason(error.to_string()))?
+            .collect::<std::result::Result<Vec<_>, _>>()
+            .map_err(|error| Error::from_reason(error.to_string()))?;
+        drop(statement);
+        if chunks.len() != commit.total_chunks as usize
+            || chunks
+                .iter()
+                .enumerate()
+                .any(|(index, (chunk_index, _))| *chunk_index != index as i64)
+        {
+            return Err(Error::from_reason(
+                "RECOVERY_REQUIRED: migration commit has missing chunks",
+            ));
+        }
+        let ordered = chunks
+            .iter()
+            .map(|(index, digest)| (*index as u32, digest.clone()))
+            .collect::<Vec<_>>();
+        if Self::schema6_migration_aggregate_sha256(&ordered)? != commit.aggregate_sha256 {
+            return Err(Error::from_reason(
+                "RECOVERY_REQUIRED: migration aggregate digest mismatch",
+            ));
+        }
+        tx.execute(
+            "UPDATE hql2_schema6_migrations SET status='committed', aggregate_sha256=?1, migration_commit_frame_seq=?2, commit_frame_seq=?3 WHERE migration_id=?4 AND status='in_progress'",
+            params![
+                commit.aggregate_sha256,
+                i64::try_from(commit.migration_commit_frame_seq).map_err(|_| Error::from_reason("SCHEMA6_MIGRATION_SEQUENCE_OVERFLOW"))?,
+                i64::try_from(frame_seq).map_err(|_| Error::from_reason("SCHEMA6_MIGRATION_SEQUENCE_OVERFLOW"))?,
+                commit.migration_id,
+            ],
+        )
+        .map_err(|error| Error::from_reason(error.to_string()))?;
+        tx.commit()
+            .map_err(|error| Error::from_reason(error.to_string()))
+    }
+
+    fn revision_kind_name(kind: &uee_v2::RecordKindV2) -> &'static str {
+        match kind {
+            uee_v2::RecordKindV2::Node => "node",
+            uee_v2::RecordKindV2::Edge => "edge",
+            uee_v2::RecordKindV2::Row => "row",
+            uee_v2::RecordKindV2::Vector => "vector",
+            uee_v2::RecordKindV2::Annotation => "annotation",
+            uee_v2::RecordKindV2::Artifact => "artifact",
+        }
+    }
+
+    fn vector_revision_record_id(owner_id: &str, collection: &str) -> Result<String> {
+        serde_json::to_string(&(owner_id, collection))
+            .map_err(|error| Error::from_reason(error.to_string()))
+    }
+
+    fn collection_space_fingerprint(collection: &VectorCollection) -> Result<String> {
+        let bytes = serde_json::to_vec(&(
+            &collection.name,
+            &collection.model,
+            collection.dim,
+            collection.metric.as_str(),
+            collection.quant.as_str(),
+        ))
+        .map_err(|error| Error::from_reason(error.to_string()))?;
+        let mut hasher = Sha256::new();
+        hasher.update(b"genesis.hql2.vector-space.v1:");
+        hasher.update(bytes);
+        Ok(hex::encode(hasher.finalize()))
+    }
+
+    fn parse_revision_time(value: &str) -> Result<DateTime<Utc>> {
+        DateTime::parse_from_rfc3339(value)
+            .map(|date| date.with_timezone(&Utc))
+            .map_err(|_| Error::from_reason("REVISION_VALID_TIME_INVALID"))
+    }
+
+    fn current_record_revision(
+        conn: &Connection,
+        database_id: &str,
+        namespace: &str,
+        kind: &uee_v2::RecordKindV2,
+        record_id: &str,
+    ) -> Result<Option<String>> {
+        conn.query_row(
+            "SELECT revision_id FROM hql2_record_revisions
+             WHERE database_id=?1 AND namespace=?2 AND kind=?3 AND record_id=?4 AND tx_to IS NULL
+             ORDER BY tx_from DESC LIMIT 1",
+            params![
+                database_id,
+                namespace,
+                Self::revision_kind_name(kind),
+                record_id
+            ],
+            |row| row.get(0),
+        )
+        .optional()
+        .map_err(|error| Error::from_reason(error.to_string()))
+    }
+
+    fn current_record_revision_interval(
+        conn: &Connection,
+        database_id: &str,
+        namespace: &str,
+        kind: &uee_v2::RecordKindV2,
+        record_id: &str,
+    ) -> Result<Option<(String, chrono::DateTime<Utc>)>> {
+        let current = conn
+            .query_row(
+                "SELECT revision_id, valid_from FROM hql2_record_revisions
+                 WHERE database_id=?1 AND namespace=?2 AND kind=?3 AND record_id=?4 AND tx_to IS NULL
+                 ORDER BY tx_from DESC LIMIT 1",
+                params![
+                    database_id,
+                    namespace,
+                    Self::revision_kind_name(kind),
+                    record_id
+                ],
+                |row| Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?)),
+            )
+            .optional()
+            .map_err(|error| Error::from_reason(error.to_string()))?;
+        current
+            .map(|(revision, valid_from)| {
+                chrono::DateTime::parse_from_rfc3339(&valid_from)
+                    .map(|date| (revision, date.with_timezone(&Utc)))
+                    .map_err(|error| Error::from_reason(error.to_string()))
+            })
+            .transpose()
+    }
+
+    pub fn put_annotation(
+        &self,
+        actor: AccessContext,
+        mutation: uee_v2::AnnotationPutMutationV2,
+    ) -> Result<uee_v2::RecordRefV2> {
+        self.ensure_writable()?;
+        Self::validate_namespace(&actor.namespace)?;
+        if actor.principal.trim().is_empty() {
+            return Err(Error::from_reason("AUTH_REQUIRED"));
+        }
+        if self.storage_schema_version != SCHEMA_VERSION {
+            return Err(Error::from_reason(
+                "SCHEMA_VERSION_UNSUPPORTED: annotation revisions require schema v6",
+            ));
+        }
+
+        let _commit_guard = self.commit_lock.lock();
+        self.ensure_readable()?;
+        let database_id = self.database_id();
+        let uee_v2::AnnotationPutMutationV2 {
+            mut annotation,
+            expected_revision,
+            valid,
+        } = mutation;
+        let (namespace, id, predecessor) = {
+            let object = annotation
+                .as_object_mut()
+                .ok_or_else(|| Error::from_reason("HQL2_ANNOTATION_INVALID"))?;
+            if object.contains_key("verified_actor") || object.contains_key("revision_id") {
+                return Err(Error::from_reason("HQL2_ANNOTATION_ENGINE_FIELD_FORBIDDEN"));
+            }
+            let namespace = object
+                .get("namespace")
+                .and_then(Value::as_str)
+                .ok_or_else(|| Error::from_reason("HQL2_ANNOTATION_INVALID"))?;
+            if namespace != actor.namespace {
+                return Err(Error::from_reason("ACCESS_DENIED"));
+            }
+            let namespace = namespace.to_string();
+            let id = object
+                .get("id")
+                .and_then(Value::as_str)
+                .ok_or_else(|| Error::from_reason("HQL2_ANNOTATION_INVALID"))?
+                .to_string();
+            if let Some(valid) = valid {
+                if valid.to.is_some_and(|to| to <= valid.from) {
+                    return Err(Error::from_reason("REVISION_VALID_TIME_INVALID"));
+                }
+                object.insert("valid_from".into(), Value::String(valid.from.to_rfc3339()));
+                object.insert(
+                    "valid_to".into(),
+                    valid
+                        .to
+                        .map_or(Value::Null, |to| Value::String(to.to_rfc3339())),
+                );
+            }
+            let predecessor = expected_revision.map(|revision| revision.to_string());
+            if object
+                .get("supersedes")
+                .is_some_and(|supersedes| supersedes.as_str() != predecessor.as_deref())
+            {
+                return Err(Error::from_reason("REVISION_PREDECESSOR_MISMATCH"));
+            }
+            (namespace, id, predecessor)
+        };
+        Self::validate_annotation_payload(&annotation, &database_id, &namespace, &id, false)?;
+        let object = annotation
+            .as_object()
+            .ok_or_else(|| Error::from_reason("HQL2_ANNOTATION_INVALID"))?;
+        let valid_from = Self::parse_revision_time(
+            object
+                .get("valid_from")
+                .and_then(Value::as_str)
+                .ok_or_else(|| Error::from_reason("HQL2_ANNOTATION_INVALID"))?,
+        )?;
+        let valid_to = object
+            .get("valid_to")
+            .and_then(Value::as_str)
+            .map(Self::parse_revision_time)
+            .transpose()?;
+        if let Some(valid_to) = valid_to {
+            if valid_to <= valid_from {
+                return Err(Error::from_reason("REVISION_VALID_TIME_INVALID"));
+            }
+        }
+        annotation
+            .as_object_mut()
+            .ok_or_else(|| Error::from_reason("HQL2_ANNOTATION_INVALID"))?
+            .insert(
+                "verified_actor".into(),
+                Value::String(actor.principal.clone()),
+            );
+        let revision_id = Uuid::new_v4().to_string();
+        let transaction_id = Uuid::new_v4();
+        let record_mutation = uee_v2::RecordRevisionMutationV1 {
+            namespace: namespace.clone(),
+            kind: uee_v2::RecordKindV2::Annotation,
+            id: id.clone(),
+            revision_id: revision_id.clone(),
+            expected_revision_id: predecessor.clone(),
+            predecessor_revision_id: predecessor,
+            operation: uee_v2::RevisionOperationV1::Upsert,
+            valid_from,
+            valid_to,
+            schema_ref: None,
+            schema_version: None,
+            key_codec_version: None,
+            key_bytes: None,
+            payload: annotation,
+        };
+        let revisions = uee_v2::RecordRevisionTransactionV1 {
+            transaction_id,
+            origin_database_id: database_id.clone(),
+            mutations: vec![record_mutation],
+        };
+        revisions
+            .validate()
+            .map_err(|error| Error::from_reason(error.to_string()))?;
+        {
+            let conn = self.projection_db.lock();
+            Self::validate_record_revision_transaction(&conn, &revisions, &database_id)?;
+        }
+        let payload_hash = hex::encode(Sha256::digest(
+            serde_json::to_vec(&revisions)
+                .map_err(|error| Error::from_reason(error.to_string()))?,
+        ));
+        let event = Event::Transaction(GenesisTransactionEvent {
+            transaction_id: transaction_id.to_string(),
+            origin_commit_seq: 0,
+            local_frame_seq: None,
+            payload_hash,
+            relational: vec![],
+            nodes: vec![],
+            edges: vec![],
+            vectors: vec![],
+            node_retractions: vec![],
+            advances_txn_frontier: true,
+            record_revision_transaction: Some(revisions),
+        });
+        let commit_sequence = self.persist(&event)?;
+        self.txn_frontier
+            .fetch_max(commit_sequence, Ordering::SeqCst);
+        Ok(uee_v2::RecordRefV2 {
+            database_id,
+            namespace,
+            kind: uee_v2::RecordKindV2::Annotation,
+            id,
+            revision: revision_id,
+        })
+    }
+
+    fn validate_annotation_target_revisions(
+        conn: &Connection,
+        transaction: &uee_v2::RecordRevisionTransactionV1,
+        database_id: &str,
+        namespace: &str,
+        targets: &[AnnotationProjectionTarget],
+    ) -> Result<()> {
+        for target in targets {
+            let Some(revision_id) = target.revision_id.as_deref() else {
+                continue;
+            };
+            let kind = match target.kind.as_str() {
+                "node" => uee_v2::RecordKindV2::Node,
+                "edge" => uee_v2::RecordKindV2::Edge,
+                "row" => uee_v2::RecordKindV2::Row,
+                "annotation" => uee_v2::RecordKindV2::Annotation,
+                _ => return Err(Error::from_reason("HQL2_ANNOTATION_TARGET_INVALID")),
+            };
+            let staged = transaction.mutations.iter().any(|candidate| {
+                candidate.namespace == namespace
+                    && candidate.kind == kind
+                    && candidate.id == target.id
+                    && candidate.revision_id == revision_id
+                    && candidate.operation == uee_v2::RevisionOperationV1::Upsert
+            });
+            if staged {
+                continue;
+            }
+            let exists: bool = conn
+                .query_row(
+                    "SELECT EXISTS(
+                        SELECT 1 FROM hql2_record_revisions
+                        WHERE database_id=?1 AND namespace=?2 AND kind=?3 AND record_id=?4
+                          AND revision_id=?5 AND operation='upsert'
+                    )",
+                    params![
+                        database_id,
+                        namespace,
+                        Self::revision_kind_name(&kind),
+                        target.id,
+                        revision_id
+                    ],
+                    |row| row.get(0),
+                )
+                .map_err(|error| Error::from_reason(error.to_string()))?;
+            if !exists {
+                return Err(Error::from_reason("HQL2_ANNOTATION_FROZEN_REF_NOT_FOUND"));
+            }
+        }
+        Ok(())
+    }
+
+    fn validate_annotation_reference_graph(
+        conn: &Connection,
+        transaction: &uee_v2::RecordRevisionTransactionV1,
+        database_id: &str,
+    ) -> Result<()> {
+        if !transaction
+            .mutations
+            .iter()
+            .any(|mutation| mutation.kind == uee_v2::RecordKindV2::Annotation)
+        {
+            return Ok(());
+        }
+        let mut adjacency = HashMap::<(String, String), Vec<(String, String)>>::new();
+        let mut statement = conn
+            .prepare(
+                "SELECT source.namespace, source.record_id, target.target_id
+                 FROM hql2_record_revisions source
+                 JOIN hql2_annotation_targets target
+                   ON target.database_id=source.database_id
+                  AND target.namespace=source.namespace
+                  AND target.annotation_id=source.record_id
+                  AND target.annotation_revision_id=source.revision_id
+                 WHERE source.database_id=?1 AND source.kind='annotation'
+                   AND source.operation='upsert' AND source.tx_to IS NULL
+                   AND target.target_kind='annotation'",
+            )
+            .map_err(|error| Error::from_reason(error.to_string()))?;
+        let rows = statement
+            .query_map([database_id], |row| {
+                Ok((
+                    row.get::<_, String>(0)?,
+                    row.get::<_, String>(1)?,
+                    row.get::<_, String>(2)?,
+                ))
+            })
+            .map_err(|error| Error::from_reason(error.to_string()))?
+            .collect::<std::result::Result<Vec<_>, _>>()
+            .map_err(|error| Error::from_reason(error.to_string()))?;
+        for (namespace, source_id, target_id) in rows {
+            adjacency
+                .entry((namespace.clone(), source_id))
+                .or_default()
+                .push((namespace, target_id));
+        }
+        for mutation in &transaction.mutations {
+            if mutation.kind != uee_v2::RecordKindV2::Annotation {
+                continue;
+            }
+            let key = (mutation.namespace.clone(), mutation.id.clone());
+            if mutation.operation == uee_v2::RevisionOperationV1::Upsert {
+                let targets = Self::validate_annotation_payload(
+                    &mutation.payload,
+                    database_id,
+                    &mutation.namespace,
+                    &mutation.id,
+                    true,
+                )?;
+                adjacency.insert(
+                    key,
+                    targets
+                        .into_iter()
+                        .filter(|target| target.kind == "annotation")
+                        .map(|target| (mutation.namespace.clone(), target.id))
+                        .collect(),
+                );
+            } else {
+                adjacency.remove(&key);
+            }
+        }
+        let mut state = HashMap::<(String, String), u8>::new();
+        let roots = adjacency.keys().cloned().collect::<Vec<_>>();
+        for root in roots {
+            if state.get(&root) == Some(&2) {
+                continue;
+            }
+            let mut stack = vec![(root, false)];
+            while let Some((node, leaving)) = stack.pop() {
+                if leaving {
+                    state.insert(node, 2);
+                    continue;
+                }
+                match state.get(&node).copied() {
+                    Some(1) => {
+                        return Err(Error::from_reason("HQL2_ANNOTATION_CYCLE"));
+                    }
+                    Some(2) => continue,
+                    _ => {}
+                }
+                state.insert(node.clone(), 1);
+                stack.push((node.clone(), true));
+                if let Some(targets) = adjacency.get(&node) {
+                    for target in targets.iter().rev() {
+                        if state.get(target) == Some(&1) {
+                            return Err(Error::from_reason("HQL2_ANNOTATION_CYCLE"));
+                        }
+                        if state.get(target) != Some(&2) {
+                            stack.push((target.clone(), false));
+                        }
+                    }
+                }
+            }
+        }
+        Ok(())
+    }
+
+    fn validate_annotation_selector(selector: &Value) -> Result<()> {
+        let object = selector
+            .as_object()
+            .ok_or_else(|| Error::from_reason("HQL2_ANNOTATION_SELECTOR_INVALID"))?;
+        let selector_type = object
+            .get("type")
+            .and_then(Value::as_str)
+            .ok_or_else(|| Error::from_reason("HQL2_ANNOTATION_SELECTOR_INVALID"))?;
+        let exact_keys = |expected: &[&str]| {
+            object.len() == expected.len() && expected.iter().all(|key| object.contains_key(*key))
+        };
+        let nonempty = |key: &str| {
+            object
+                .get(key)
+                .and_then(Value::as_str)
+                .is_some_and(|value| !value.trim().is_empty())
+        };
+        match selector_type {
+            "whole" if exact_keys(&["type"]) => Ok(()),
+            "text_position"
+                if exact_keys(&[
+                    "type",
+                    "start",
+                    "end",
+                    "content_hash",
+                    "extraction_id",
+                    "normalization_id",
+                ]) && object["start"]
+                    .as_u64()
+                    .zip(object["end"].as_u64())
+                    .is_some_and(|(start, end)| start < end)
+                    && object["content_hash"]
+                        .as_str()
+                        .is_some_and(Self::is_lower_sha256)
+                    && nonempty("extraction_id")
+                    && nonempty("normalization_id") =>
+            {
+                Ok(())
+            }
+            "byte_range"
+                if exact_keys(&["type", "start", "end", "content_hash"])
+                    && object["start"]
+                        .as_u64()
+                        .zip(object["end"].as_u64())
+                        .is_some_and(|(start, end)| start < end)
+                    && object["content_hash"]
+                        .as_str()
+                        .is_some_and(Self::is_lower_sha256) =>
+            {
+                Ok(())
+            }
+            "json_pointer"
+                if exact_keys(&["type", "pointer"])
+                    && object["pointer"].as_str().is_some_and(|pointer| {
+                        if !pointer.is_empty() && !pointer.starts_with('/') {
+                            return false;
+                        }
+                        let bytes = pointer.as_bytes();
+                        let mut index = 0;
+                        while index < bytes.len() {
+                            if bytes[index] == b'~' {
+                                if !matches!(bytes.get(index + 1), Some(b'0' | b'1')) {
+                                    return false;
+                                }
+                                index += 1;
+                            }
+                            index += 1;
+                        }
+                        true
+                    }) =>
+            {
+                Ok(())
+            }
+            _ => Err(Error::from_reason("HQL2_ANNOTATION_SELECTOR_INVALID")),
+        }
+    }
+
+    fn parse_annotation_targets(
+        annotation: &Value,
+        database_id: &str,
+        namespace: &str,
+    ) -> Result<Vec<AnnotationProjectionTarget>> {
+        let mut normalized = Vec::new();
+        for (field, is_evidence) in [("targets", false), ("evidence", true)] {
+            let values = match annotation.get(field) {
+                Some(value) => value
+                    .as_array()
+                    .map(Vec::as_slice)
+                    .ok_or_else(|| Error::from_reason("HQL2_ANNOTATION_TARGET_INVALID"))?,
+                None if is_evidence => &[],
+                None => return Err(Error::from_reason("HQL2_ANNOTATION_TARGET_INVALID")),
+            };
+            if values.len() > 128 || (!is_evidence && values.is_empty()) {
+                return Err(Error::from_reason("HQL2_ANNOTATION_TARGET_INVALID"));
+            }
+            let mut seen = HashSet::new();
+            for target in values {
+                let target = target
+                    .as_object()
+                    .ok_or_else(|| Error::from_reason("HQL2_ANNOTATION_TARGET_INVALID"))?;
+                if target.len() != 3
+                    || !target.contains_key("ref")
+                    || !target.contains_key("binding")
+                    || !target.contains_key("selector")
+                {
+                    return Err(Error::from_reason("HQL2_ANNOTATION_TARGET_INVALID"));
+                }
+                let reference = target["ref"]
+                    .as_object()
+                    .ok_or_else(|| Error::from_reason("HQL2_ANNOTATION_TARGET_INVALID"))?;
+                if reference.keys().any(|key| {
+                    !matches!(
+                        key.as_str(),
+                        "database_id" | "namespace" | "kind" | "id" | "revision"
+                    )
+                }) {
+                    return Err(Error::from_reason("HQL2_ANNOTATION_TARGET_INVALID"));
+                }
+                let get = |key: &str| reference.get(key).and_then(Value::as_str);
+                let target_database_id = get("database_id")
+                    .ok_or_else(|| Error::from_reason("HQL2_ANNOTATION_TARGET_INVALID"))?;
+                let target_namespace = get("namespace")
+                    .ok_or_else(|| Error::from_reason("HQL2_ANNOTATION_TARGET_INVALID"))?;
+                let kind = get("kind")
+                    .ok_or_else(|| Error::from_reason("HQL2_ANNOTATION_TARGET_INVALID"))?;
+                let id = get("id")
+                    .ok_or_else(|| Error::from_reason("HQL2_ANNOTATION_TARGET_INVALID"))?;
+                let binding = target["binding"]
+                    .as_str()
+                    .ok_or_else(|| Error::from_reason("HQL2_ANNOTATION_TARGET_INVALID"))?;
+                let revision_id = get("revision").map(str::to_string);
+                if reference.len() < 4
+                    || !Self::is_lower_sha256(target_database_id)
+                    || target_database_id != database_id
+                    || target_namespace != namespace
+                    || id.is_empty()
+                    || id.len() > 4096
+                    || !matches!(kind, "node" | "edge" | "row" | "annotation")
+                {
+                    return Err(Error::from_reason("HQL2_ANNOTATION_TARGET_INVALID"));
+                }
+                match (binding, revision_id.as_deref()) {
+                    ("frozen", Some(revision))
+                        if reference.len() == 5
+                            && Uuid::parse_str(revision).is_ok_and(|uuid| {
+                                uuid.get_version_num() == 4
+                                    && uuid.get_variant() == uuid::Variant::RFC4122
+                                    && uuid.hyphenated().to_string() == revision
+                            }) => {}
+                    ("live", None) if reference.len() == 4 => {}
+                    _ => return Err(Error::from_reason("HQL2_ANNOTATION_TARGET_INVALID")),
+                }
+                Self::validate_annotation_selector(&target["selector"])?;
+                let selector_json = serde_json::to_string(&target["selector"])
+                    .map_err(|error| Error::from_reason(error.to_string()))?;
+                if !seen.insert((kind.to_string(), id.to_string(), revision_id.clone())) {
+                    return Err(Error::from_reason("HQL2_ANNOTATION_TARGET_DUPLICATE"));
+                }
+                normalized.push(AnnotationProjectionTarget {
+                    kind: kind.to_string(),
+                    id: id.to_string(),
+                    revision_id,
+                    binding: binding.to_string(),
+                    selector_json,
+                    is_evidence,
+                });
+            }
+        }
+        Ok(normalized)
+    }
+
+    fn validate_annotation_payload(
+        annotation: &Value,
+        database_id: &str,
+        namespace: &str,
+        record_id: &str,
+        stored: bool,
+    ) -> Result<Vec<AnnotationProjectionTarget>> {
+        let object = annotation
+            .as_object()
+            .ok_or_else(|| Error::from_reason("HQL2_ANNOTATION_INVALID"))?;
+        let allowed = [
+            "id",
+            "namespace",
+            "kind",
+            "targets",
+            "evidence",
+            "body",
+            "author",
+            "created_at",
+            "valid_from",
+            "valid_to",
+            "confidence",
+            "status",
+            "generator",
+            "supersedes",
+            "verified_actor",
+        ];
+        if object.keys().any(|key| !allowed.contains(&key.as_str()))
+            || object.get("id").and_then(Value::as_str) != Some(record_id)
+            || object.get("namespace").and_then(Value::as_str) != Some(namespace)
+            || object
+                .get("kind")
+                .and_then(Value::as_str)
+                .is_none_or(str::is_empty)
+            || object
+                .get("author")
+                .and_then(Value::as_str)
+                .is_none_or(str::is_empty)
+            || object
+                .get("verified_actor")
+                .and_then(Value::as_str)
+                .is_some_and(str::is_empty)
+            || stored != object.contains_key("verified_actor")
+            || object
+                .get("id")
+                .and_then(Value::as_str)
+                .is_none_or(|id| id.is_empty() || id.len() > 256)
+            || object
+                .get("kind")
+                .and_then(Value::as_str)
+                .is_none_or(|kind| kind.is_empty() || kind.len() > 256)
+            || object
+                .get("author")
+                .and_then(Value::as_str)
+                .is_none_or(|author| author.len() > 256)
+        {
+            return Err(Error::from_reason("HQL2_ANNOTATION_INVALID"));
+        }
+        let created_at = object
+            .get("created_at")
+            .and_then(Value::as_str)
+            .ok_or_else(|| Error::from_reason("HQL2_ANNOTATION_INVALID"))?;
+        let valid_from = object
+            .get("valid_from")
+            .and_then(Value::as_str)
+            .ok_or_else(|| Error::from_reason("HQL2_ANNOTATION_INVALID"))?;
+        Self::parse_revision_time(created_at)?;
+        let valid_from = Self::parse_revision_time(valid_from)?;
+        let valid_to = match object.get("valid_to") {
+            Some(Value::Null) | None => None,
+            Some(Value::String(value)) => Some(Self::parse_revision_time(value)?),
+            _ => return Err(Error::from_reason("HQL2_ANNOTATION_INVALID")),
+        };
+        if valid_to.is_some_and(|valid_to| valid_to <= valid_from) {
+            return Err(Error::from_reason("HQL2_ANNOTATION_INVALID"));
+        }
+        if let Some(confidence) = object.get("confidence") {
+            if confidence
+                .as_f64()
+                .is_none_or(|value| !value.is_finite() || !(0.0..=1.0).contains(&value))
+            {
+                return Err(Error::from_reason("HQL2_ANNOTATION_INVALID"));
+            }
+        }
+        if object.get("status").is_some_and(|status| {
+            status
+                .as_str()
+                .is_none_or(|value| value.trim().is_empty() || value.len() > 128)
+        }) {
+            return Err(Error::from_reason("HQL2_ANNOTATION_INVALID"));
+        }
+        if let Some(supersedes) = object.get("supersedes") {
+            let revision = supersedes
+                .as_str()
+                .ok_or_else(|| Error::from_reason("HQL2_ANNOTATION_INVALID"))?;
+            if !Uuid::parse_str(revision).is_ok_and(|uuid| uuid.get_version_num() == 4) {
+                return Err(Error::from_reason("HQL2_ANNOTATION_INVALID"));
+            }
+        }
+        if let Some(generator) = object.get("generator") {
+            if !generator.is_object()
+                || serde_json::to_vec(generator)
+                    .map_err(|error| Error::from_reason(error.to_string()))?
+                    .len()
+                    > 64 * 1024
+            {
+                return Err(Error::from_reason("HQL2_ANNOTATION_INVALID"));
+            }
+        }
+        let body = object
+            .get("body")
+            .and_then(Value::as_object)
+            .ok_or_else(|| Error::from_reason("HQL2_ANNOTATION_INVALID"))?;
+        let body_type = body
+            .get("type")
+            .and_then(Value::as_str)
+            .ok_or_else(|| Error::from_reason("HQL2_ANNOTATION_INVALID"))?;
+        match body_type {
+            "text" => {
+                if body
+                    .keys()
+                    .any(|key| !matches!(key.as_str(), "type" | "text" | "language"))
+                    || body.get("text").and_then(Value::as_str).is_none()
+                    || body.get("language").is_some_and(|value| {
+                        value.as_str().is_none_or(|language| language.len() > 128)
+                    })
+                {
+                    return Err(Error::from_reason("HQL2_ANNOTATION_INVALID"));
+                }
+                if body["text"].as_str().unwrap().len() > 1024 * 1024 {
+                    return Err(Error::from_reason("HQL2_ANNOTATION_BODY_LIMIT"));
+                }
+            }
+            "json" => {
+                if body.len() != 2 || !body.contains_key("value") {
+                    return Err(Error::from_reason("HQL2_ANNOTATION_INVALID"));
+                }
+            }
+            "link" => {
+                if body
+                    .keys()
+                    .any(|key| !matches!(key.as_str(), "type" | "uri" | "label"))
+                    || body
+                        .get("uri")
+                        .and_then(Value::as_str)
+                        .is_none_or(str::is_empty)
+                    || body
+                        .get("label")
+                        .is_some_and(|value| value.as_str().is_none())
+                {
+                    return Err(Error::from_reason("HQL2_ANNOTATION_INVALID"));
+                }
+            }
+            _ => return Err(Error::from_reason("HQL2_ANNOTATION_INVALID")),
+        }
+        if serde_json::to_vec(&Value::Object(body.clone()))
+            .map_err(|error| Error::from_reason(error.to_string()))?
+            .len()
+            > 1024 * 1024
+        {
+            return Err(Error::from_reason("HQL2_ANNOTATION_BODY_LIMIT"));
+        }
+        Self::parse_annotation_targets(annotation, database_id, namespace)
+    }
+
+    // The revision builder consumes separate database, owner, collection, and vector inputs.
+    #[allow(clippy::too_many_arguments)]
+    fn build_vector_revision_mutation(
+        &self,
+        conn: &Connection,
+        database_id: &str,
+        revisions: &[uee_v2::RecordRevisionMutationV1],
+        seen: &mut HashSet<(String, String)>,
+        owner_id: &str,
+        collection_name: &Option<String>,
+        embedding: &[f64],
+        lang: Option<&str>,
+    ) -> Result<uee_v2::RecordRevisionMutationV1> {
+        let collection = self.resolve_collection(collection_name)?;
+        if embedding.len() != collection.dim as usize
+            || embedding.is_empty()
+            || embedding.iter().any(|value| !value.is_finite())
+        {
+            return Err(Error::from_reason("HQL2_VECTOR_VALUE_INVALID"));
+        }
+        let id = Self::vector_revision_record_id(owner_id, &collection.name)?;
+        if !seen.insert(("vector".into(), id.clone())) {
+            return Err(Error::from_reason("REVISION_DUPLICATE_TARGET"));
+        }
+        let owner = revisions.iter().find(|mutation| {
+            mutation.kind == uee_v2::RecordKindV2::Node
+                && mutation.namespace == "default"
+                && mutation.id == owner_id
+        });
+        let (owner_revision_id, valid_from) = if let Some(owner) = owner {
+            if owner.operation != uee_v2::RevisionOperationV1::Upsert {
+                return Err(Error::from_reason("HQL2_VECTOR_OWNER_REVISION_INVALID"));
+            }
+            (owner.revision_id.clone(), owner.valid_from)
+        } else {
+            let current: Option<(String, String, String)> = conn
+                .query_row(
+                    "SELECT revision_id, valid_from, operation FROM hql2_record_revisions
+                     WHERE database_id=?1 AND namespace='default' AND kind='node'
+                       AND record_id=?2 AND tx_to IS NULL
+                     ORDER BY tx_from DESC LIMIT 1",
+                    params![database_id, owner_id],
+                    |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
+                )
+                .optional()
+                .map_err(|error| Error::from_reason(error.to_string()))?;
+            let (revision_id, valid_from, operation) =
+                current.ok_or_else(|| Error::from_reason("HQL2_VECTOR_OWNER_REVISION_REQUIRED"))?;
+            if operation != "upsert" {
+                return Err(Error::from_reason("HQL2_VECTOR_OWNER_REVISION_INVALID"));
+            }
+            (revision_id, Self::parse_revision_time(&valid_from)?)
+        };
+        let predecessor = Self::current_record_revision(
+            conn,
+            database_id,
+            "default",
+            &uee_v2::RecordKindV2::Vector,
+            &id,
+        )?;
+        Ok(uee_v2::RecordRevisionMutationV1 {
+            namespace: "default".into(),
+            kind: uee_v2::RecordKindV2::Vector,
+            id,
+            revision_id: Uuid::new_v4().to_string(),
+            expected_revision_id: predecessor.clone(),
+            predecessor_revision_id: predecessor,
+            operation: uee_v2::RevisionOperationV1::Upsert,
+            valid_from,
+            valid_to: None,
+            schema_ref: Some(collection.name.clone()),
+            schema_version: Some(1),
+            key_codec_version: None,
+            key_bytes: None,
+            payload: serde_json::json!({
+                "owner_id": owner_id,
+                "owner_revision_id": owner_revision_id,
+                "collection": collection.name,
+                "space_fingerprint": Self::collection_space_fingerprint(&collection)?,
+                "embedding": embedding,
+                "lang": lang.unwrap_or("en"),
+            }),
+        })
+    }
+
+    fn build_record_revision_transaction(
+        &self,
+        nodes: &[NodeOutput],
+        edges: &[EdgeOutput],
+        node_retractions: &[NodeRetractionEvent],
+        relational: &[RelationalMutationGroup],
+        vectors: &[VectorEvent],
+    ) -> Result<Option<uee_v2::RecordRevisionTransactionV1>> {
+        if self.storage_schema_version != SCHEMA_VERSION
+            || (nodes.is_empty()
+                && edges.is_empty()
+                && node_retractions.is_empty()
+                && vectors.is_empty()
+                && relational.iter().all(|group| group.mutations.is_empty()))
+        {
+            return Ok(None);
+        }
+
+        let database_id = self.database_id();
+        let mut conn = self.projection_db.lock();
+        let tx = conn
+            .transaction()
+            .map_err(|error| Error::from_reason(error.to_string()))?;
+        let mut seen = HashSet::<(String, String)>::new();
+        let mut mutations = Vec::with_capacity(
+            nodes
+                .len()
+                .saturating_add(edges.len())
+                .saturating_add(vectors.len()),
+        );
+        for node in nodes {
+            let identity = ("node".to_string(), node.id.clone());
+            if !seen.insert(identity) {
+                return Err(Error::from_reason("REVISION_DUPLICATE_TARGET"));
+            }
+            let kind = uee_v2::RecordKindV2::Node;
+            let predecessor =
+                Self::current_record_revision(&tx, &database_id, "default", &kind, &node.id)?;
+            mutations.push(uee_v2::RecordRevisionMutationV1 {
+                namespace: "default".into(),
+                kind,
+                id: node.id.clone(),
+                revision_id: Uuid::new_v4().to_string(),
+                expected_revision_id: predecessor.clone(),
+                predecessor_revision_id: predecessor,
+                operation: uee_v2::RevisionOperationV1::Upsert,
+                valid_from: Self::parse_revision_time(&node.valid_from)?,
+                valid_to: node
+                    .valid_to
+                    .as_deref()
+                    .map(Self::parse_revision_time)
+                    .transpose()?,
+                schema_ref: None,
+                schema_version: None,
+                key_codec_version: None,
+                key_bytes: None,
+                payload: serde_json::to_value(node)
+                    .map_err(|error| Error::from_reason(error.to_string()))?,
+            });
+            if let Some(embedding) = &node.embedding {
+                let vector = Self::build_vector_revision_mutation(
+                    self,
+                    &tx,
+                    &database_id,
+                    &mutations,
+                    &mut seen,
+                    &node.id,
+                    &node.collection,
+                    embedding,
+                    node.lang.as_deref(),
+                )?;
+                mutations.push(vector);
+            }
+        }
+        for edge in edges {
+            let identity = ("edge".to_string(), edge.id.clone());
+            if !seen.insert(identity) {
+                return Err(Error::from_reason("REVISION_DUPLICATE_TARGET"));
+            }
+            let kind = uee_v2::RecordKindV2::Edge;
+            let predecessor =
+                Self::current_record_revision(&tx, &database_id, "default", &kind, &edge.id)?;
+            mutations.push(uee_v2::RecordRevisionMutationV1 {
+                namespace: "default".into(),
+                kind,
+                id: edge.id.clone(),
+                revision_id: Uuid::new_v4().to_string(),
+                expected_revision_id: predecessor.clone(),
+                predecessor_revision_id: predecessor,
+                operation: if edge.valid_to.is_some() {
+                    uee_v2::RevisionOperationV1::Retract
+                } else {
+                    uee_v2::RevisionOperationV1::Upsert
+                },
+                valid_from: Self::parse_revision_time(&edge.valid_from)?,
+                valid_to: edge
+                    .valid_to
+                    .as_deref()
+                    .map(Self::parse_revision_time)
+                    .transpose()?,
+                schema_ref: None,
+                schema_version: None,
+                key_codec_version: None,
+                key_bytes: None,
+                payload: serde_json::to_value(edge)
+                    .map_err(|error| Error::from_reason(error.to_string()))?,
+            });
+        }
+        for retraction in node_retractions {
+            let identity = ("node".to_string(), retraction.id.clone());
+            if !seen.insert(identity) {
+                return Err(Error::from_reason("REVISION_DUPLICATE_TARGET"));
+            }
+            let kind = uee_v2::RecordKindV2::Node;
+            let (predecessor, valid_from) = Self::current_record_revision_interval(
+                &tx,
+                &database_id,
+                "default",
+                &kind,
+                &retraction.id,
+            )?
+            .ok_or_else(|| Error::from_reason("REVISION_PREDECESSOR_REQUIRED"))?;
+            mutations.push(uee_v2::RecordRevisionMutationV1 {
+                namespace: "default".into(),
+                kind,
+                id: retraction.id.clone(),
+                revision_id: Uuid::new_v4().to_string(),
+                expected_revision_id: Some(predecessor.clone()),
+                predecessor_revision_id: Some(predecessor),
+                operation: uee_v2::RevisionOperationV1::Retract,
+                valid_from,
+                valid_to: Some(Self::parse_revision_time(&retraction.retracted_at)?),
+                schema_ref: None,
+                schema_version: None,
+                key_codec_version: None,
+                key_bytes: None,
+                payload: serde_json::json!({
+                    "id": retraction.id,
+                    "retracted_at": retraction.retracted_at,
+                }),
+            });
+        }
+        for vector in vectors {
+            let mutation = self.build_vector_revision_mutation(
+                &tx,
+                &database_id,
+                &mutations,
+                &mut seen,
+                &vector.node_id,
+                &vector.collection,
+                &vector.embedding,
+                vector.lang.as_deref(),
+            )?;
+            mutations.push(mutation);
+        }
+        let mut cross_group_targets = HashMap::<(String, String, Vec<u8>), usize>::new();
+        for (group_index, group) in relational.iter().enumerate() {
+            if group.mutations.is_empty() {
+                continue;
+            }
+            let schema = Self::load_relational_schema_conn(&tx, &group.namespace)?
+                .ok_or_else(|| Error::from_reason("REL_SCHEMA_NOT_FOUND"))?;
+            for row in &group.mutations {
+                Self::validate_row_mutation(&schema, row)?;
+                let table = schema
+                    .tables
+                    .iter()
+                    .find(|table| table.name == row.table)
+                    .expect("validated relational table");
+                let key = Self::relational_primary_key_values(table, row)?;
+                if table
+                    .primary_key
+                    .iter()
+                    .all(|name| key.get(name).is_some_and(|value| !value.is_null()))
+                {
+                    let key_bytes = Self::encode_relational_primary_key_v1(&schema, row)?;
+                    let identity = (group.namespace.clone(), table.name.clone(), key_bytes);
+                    if cross_group_targets
+                        .insert(identity, group_index)
+                        .is_some_and(|prior_group| prior_group != group_index)
+                    {
+                        return Err(Error::from_reason("HQL2_ROW_DUPLICATE_TARGET"));
+                    }
+                }
+            }
+            let (_, mut row_revisions) =
+                self.prepare_relational_row_revisions_tx(&tx, &schema, &group.mutations)?;
+            mutations.append(&mut row_revisions);
+        }
+        tx.rollback()
+            .map_err(|error| Error::from_reason(error.to_string()))?;
+        if mutations.is_empty() {
+            return Ok(None);
+        }
+        let revisions = uee_v2::RecordRevisionTransactionV1 {
+            transaction_id: Uuid::new_v4(),
+            origin_database_id: database_id,
+            mutations,
+        };
+        revisions
+            .validate()
+            .map_err(|error| Error::from_reason(error.to_string()))?;
+        Ok(Some(revisions))
+    }
+
+    fn persist_local_graph_mutations(
+        &self,
+        nodes: &[NodeOutput],
+        edges: &[EdgeOutput],
+        node_retractions: &[NodeRetractionEvent],
+    ) -> Result<u64> {
+        if self.storage_schema_version != SCHEMA_VERSION {
+            if let [retraction] = node_retractions {
+                return self.persist(&Event::NodeRetract {
+                    id: retraction.id.clone(),
+                    clock: retraction.clock.clone(),
+                    retracted_at: retraction.retracted_at.clone(),
+                });
+            }
+            let events = nodes
+                .iter()
+                .cloned()
+                .map(Event::Node)
+                .chain(edges.iter().cloned().map(Event::Edge))
+                .collect::<Vec<_>>();
+            let event = match events.as_slice() {
+                [event] => event.clone(),
+                _ => Event::Batch(events),
+            };
+            return self.persist(&event);
+        }
+
+        let transaction_id = Uuid::new_v4().to_string();
+        let mut last_edge_index = HashMap::with_capacity(edges.len());
+        for (index, edge) in edges.iter().enumerate() {
+            last_edge_index.insert(edge.id.as_str(), index);
+        }
+        let effective_edges = edges
+            .iter()
+            .enumerate()
+            .filter(|(index, edge)| last_edge_index.get(edge.id.as_str()) == Some(index))
+            .map(|(_, edge)| edge.clone())
+            .collect::<Vec<_>>();
+        let payload = serde_json::to_vec(&(nodes, &effective_edges, node_retractions))
+            .map_err(|error| Error::from_reason(error.to_string()))?;
+        let transaction = GenesisTransactionEvent {
+            transaction_id,
+            origin_commit_seq: 0,
+            local_frame_seq: None,
+            payload_hash: hex::encode(Sha256::digest(payload)),
+            relational: vec![],
+            nodes: nodes.to_vec(),
+            edges: effective_edges.clone(),
+            vectors: vec![],
+            node_retractions: node_retractions.to_vec(),
+            advances_txn_frontier: false,
+            record_revision_transaction: self.build_record_revision_transaction(
+                nodes,
+                &effective_edges,
+                node_retractions,
+                &[],
+                &[],
+            )?,
+        };
+        let sequence = self.persist(&Event::Transaction(transaction))?;
+        Ok(sequence)
+    }
+
+    fn validate_record_revision_transaction(
+        conn: &Connection,
+        transaction: &uee_v2::RecordRevisionTransactionV1,
+        database_id: &str,
+    ) -> Result<()> {
+        transaction
+            .validate()
+            .map_err(|error| Error::from_reason(error.to_string()))?;
+        let mut seen = HashSet::new();
+        for mutation in &transaction.mutations {
+            if mutation.kind == uee_v2::RecordKindV2::Artifact {
+                return Err(Error::from_reason("HQL2_SOURCE_REVISION_UNSUPPORTED"));
+            }
+            if !seen.insert((
+                Self::revision_kind_name(&mutation.kind),
+                mutation.namespace.as_str(),
+                mutation.id.as_str(),
+            )) {
+                return Err(Error::from_reason("REVISION_DUPLICATE_TARGET"));
+            }
+            if mutation.kind == uee_v2::RecordKindV2::Vector {
+                let owner_id = mutation.payload["owner_id"]
+                    .as_str()
+                    .ok_or_else(|| Error::from_reason("HQL2_VECTOR_REVISION_INVALID"))?;
+                let owner_revision_id = mutation.payload["owner_revision_id"]
+                    .as_str()
+                    .ok_or_else(|| Error::from_reason("HQL2_VECTOR_REVISION_INVALID"))?;
+                let collection = mutation.payload["collection"]
+                    .as_str()
+                    .ok_or_else(|| Error::from_reason("HQL2_VECTOR_REVISION_INVALID"))?;
+                let space_fingerprint = mutation.payload["space_fingerprint"]
+                    .as_str()
+                    .ok_or_else(|| Error::from_reason("HQL2_VECTOR_REVISION_INVALID"))?;
+                let embedding = mutation.payload["embedding"]
+                    .as_array()
+                    .ok_or_else(|| Error::from_reason("HQL2_VECTOR_REVISION_INVALID"))?;
+                let owner_revision = Uuid::parse_str(owner_revision_id)
+                    .map_err(|_| Error::from_reason("HQL2_VECTOR_REVISION_INVALID"))?;
+                if mutation.namespace != "default"
+                    || mutation.operation != uee_v2::RevisionOperationV1::Upsert
+                    || mutation.schema_ref.as_deref() != Some(collection)
+                    || mutation.schema_version != Some(1)
+                    || mutation.id != Self::vector_revision_record_id(owner_id, collection)?
+                    || owner_revision.get_version_num() != 4
+                    || !Self::is_lower_sha256(space_fingerprint)
+                    || embedding.is_empty()
+                    || embedding.len() > u16::MAX as usize
+                    || embedding
+                        .iter()
+                        .any(|value| value.as_f64().is_none_or(|value| !value.is_finite()))
+                {
+                    return Err(Error::from_reason("HQL2_VECTOR_REVISION_INVALID"));
+                }
+                let owner_mutation = transaction.mutations.iter().find(|candidate| {
+                    candidate.kind == uee_v2::RecordKindV2::Node
+                        && candidate.namespace == "default"
+                        && candidate.id == owner_id
+                });
+                let owner_is_valid = if let Some(owner_mutation) = owner_mutation {
+                    owner_mutation.operation == uee_v2::RevisionOperationV1::Upsert
+                        && owner_mutation.revision_id == owner_revision_id
+                } else {
+                    let owner: Option<(String, String)> = conn
+                        .query_row(
+                            "SELECT revision_id, operation FROM hql2_record_revisions
+                             WHERE database_id=?1 AND namespace='default' AND kind='node'
+                               AND record_id=?2 AND tx_to IS NULL
+                             ORDER BY tx_from DESC LIMIT 1",
+                            params![database_id, owner_id],
+                            |row| Ok((row.get(0)?, row.get(1)?)),
+                        )
+                        .optional()
+                        .map_err(|error| Error::from_reason(error.to_string()))?;
+                    owner.is_some_and(|(revision_id, operation)| {
+                        revision_id == owner_revision_id && operation == "upsert"
+                    })
+                };
+                if !owner_is_valid {
+                    return Err(Error::from_reason("HQL2_VECTOR_OWNER_REVISION_MISMATCH"));
+                }
+            }
+            if mutation.kind == uee_v2::RecordKindV2::Annotation {
+                if mutation.operation != uee_v2::RevisionOperationV1::Upsert {
+                    return Err(Error::from_reason("HQL2_ANNOTATION_OPERATION_UNSUPPORTED"));
+                }
+                let targets = Self::validate_annotation_payload(
+                    &mutation.payload,
+                    database_id,
+                    &mutation.namespace,
+                    &mutation.id,
+                    true,
+                )?;
+                let payload_valid_from = Self::parse_revision_time(
+                    mutation.payload["valid_from"]
+                        .as_str()
+                        .ok_or_else(|| Error::from_reason("HQL2_ANNOTATION_INVALID"))?,
+                )?;
+                let payload_valid_to = mutation.payload["valid_to"]
+                    .as_str()
+                    .map(Self::parse_revision_time)
+                    .transpose()?;
+                if payload_valid_from != mutation.valid_from
+                    || payload_valid_to != mutation.valid_to
+                    || mutation
+                        .payload
+                        .get("supersedes")
+                        .is_some_and(|supersedes| {
+                            supersedes.as_str() != mutation.predecessor_revision_id.as_deref()
+                        })
+                {
+                    return Err(Error::from_reason("REVISION_EVENT_MISMATCH"));
+                }
+                Self::validate_annotation_target_revisions(
+                    conn,
+                    transaction,
+                    database_id,
+                    &mutation.namespace,
+                    &targets,
+                )?;
+            }
+            let current = Self::current_record_revision(
+                conn,
+                database_id,
+                &mutation.namespace,
+                &mutation.kind,
+                &mutation.id,
+            )?;
+            if current != mutation.expected_revision_id {
+                return Err(Error::from_reason("REVISION_CONFLICT"));
+            }
+        }
+        Self::validate_annotation_reference_graph(conn, transaction, database_id)?;
+        Ok(())
+    }
+
+    fn validate_vector_revision_spaces(
+        &self,
+        transaction: &uee_v2::RecordRevisionTransactionV1,
+    ) -> Result<()> {
+        for mutation in &transaction.mutations {
+            if mutation.kind != uee_v2::RecordKindV2::Vector {
+                continue;
+            }
+            let name = mutation.payload["collection"]
+                .as_str()
+                .ok_or_else(|| Error::from_reason("HQL2_VECTOR_REVISION_INVALID"))?;
+            let collection = self.resolve_collection(&Some(name.to_string()))?;
+            let embedding = mutation.payload["embedding"]
+                .as_array()
+                .ok_or_else(|| Error::from_reason("HQL2_VECTOR_REVISION_INVALID"))?;
+            if collection.name != name
+                || embedding.len() != collection.dim as usize
+                || mutation.payload["space_fingerprint"].as_str()
+                    != Some(Self::collection_space_fingerprint(&collection)?.as_str())
+            {
+                return Err(Error::from_reason("HQL2_VECTOR_SPACE_MISMATCH"));
+            }
+        }
+        Ok(())
+    }
+
+    fn projection_apply_record_revision_transaction_tx(
+        tx: &rusqlite::Transaction<'_>,
+        outer_transaction_id: &str,
+        transaction: &uee_v2::RecordRevisionTransactionV1,
+        database_id: &str,
+        frame_seq: u64,
+    ) -> Result<()> {
+        Self::validate_record_revision_transaction(tx, transaction, database_id)?;
+        let frame_seq = i64::try_from(frame_seq)
+            .map_err(|_| Error::from_reason("REVISION_FRAME_SEQUENCE_OVERFLOW"))?;
+        for mutation in &transaction.mutations {
+            let kind = Self::revision_kind_name(&mutation.kind);
+            if let Some(predecessor) = mutation.expected_revision_id.as_deref() {
+                let changed = tx
+                    .execute(
+                        "UPDATE hql2_record_revisions SET tx_to=?1
+                         WHERE database_id=?2 AND namespace=?3 AND kind=?4 AND record_id=?5
+                           AND revision_id=?6 AND tx_to IS NULL",
+                        params![
+                            frame_seq,
+                            database_id,
+                            mutation.namespace,
+                            kind,
+                            mutation.id,
+                            predecessor
+                        ],
+                    )
+                    .map_err(|error| Error::from_reason(error.to_string()))?;
+                if changed != 1 {
+                    return Err(Error::from_reason("REVISION_CONFLICT"));
+                }
+            }
+            let operation = serde_json::to_value(&mutation.operation)
+                .map_err(|error| Error::from_reason(error.to_string()))?;
+            let operation = operation
+                .as_str()
+                .ok_or_else(|| Error::from_reason("REVISION_OPERATION_INVALID"))?;
+            let payload = serde_json::to_string(&mutation.payload)
+                .map_err(|error| Error::from_reason(error.to_string()))?;
+            tx.execute(
+                "INSERT INTO hql2_record_revisions(
+                    database_id, namespace, kind, record_id, revision_id,
+                    predecessor_revision_id, operation, valid_from, valid_to,
+                    tx_from, tx_to, schema_ref, schema_version,
+                    origin_database_id, payload_json
+                 ) VALUES(?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, NULL, ?11, ?12, ?13, ?14)",
+                params![
+                    database_id,
+                    mutation.namespace,
+                    kind,
+                    mutation.id,
+                    mutation.revision_id,
+                    mutation.predecessor_revision_id,
+                    operation,
+                    mutation.valid_from.to_rfc3339(),
+                    mutation.valid_to.map(|date| date.to_rfc3339()),
+                    frame_seq,
+                    mutation.schema_ref,
+                    mutation.schema_version.map(|version| version as i64),
+                    transaction.origin_database_id,
+                    payload
+                ],
+            )
+            .map_err(|error| Error::from_reason(error.to_string()))?;
+            if mutation.kind == uee_v2::RecordKindV2::Annotation {
+                let targets = Self::validate_annotation_payload(
+                    &mutation.payload,
+                    database_id,
+                    &mutation.namespace,
+                    &mutation.id,
+                    true,
+                )?;
+                for target in targets {
+                    tx.execute(
+                        "INSERT INTO hql2_annotation_targets(
+                            database_id, namespace, annotation_id, annotation_revision_id,
+                            target_kind, target_id, target_revision_id, binding,
+                            selector_json, is_evidence
+                         ) VALUES(?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
+                        params![
+                            database_id,
+                            mutation.namespace,
+                            mutation.id,
+                            mutation.revision_id,
+                            target.kind,
+                            target.id,
+                            target.revision_id,
+                            target.binding,
+                            target.selector_json,
+                            if target.is_evidence { 1_i64 } else { 0_i64 },
+                        ],
+                    )
+                    .map_err(|error| Error::from_reason(error.to_string()))?;
+                }
+            }
+            if matches!(mutation.kind, uee_v2::RecordKindV2::Row) {
+                let table_name = mutation
+                    .schema_ref
+                    .as_deref()
+                    .ok_or_else(|| Error::from_reason("HQL2_ROW_SCHEMA_REQUIRED"))?;
+                let codec_version = mutation
+                    .key_codec_version
+                    .ok_or_else(|| Error::from_reason("HQL2_ROW_KEY_CODEC_REQUIRED"))?;
+                let key_bytes = mutation
+                    .key_bytes
+                    .as_deref()
+                    .ok_or_else(|| Error::from_reason("HQL2_ROW_KEY_CODEC_REQUIRED"))?;
+                let registered: Option<(i64, Vec<u8>, String)> = tx
+                    .query_row(
+                        "SELECT key_codec_version, key_bytes, created_revision_id
+                         FROM hql2_row_identity_registry
+                         WHERE database_id=?1 AND namespace=?2 AND table_name=?3 AND row_id=?4",
+                        params![database_id, mutation.namespace, table_name, mutation.id],
+                        |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
+                    )
+                    .optional()
+                    .map_err(|error| Error::from_reason(error.to_string()))?;
+                match registered {
+                    Some((version, bytes, _))
+                        if version == i64::from(codec_version) && bytes == key_bytes => {}
+                    Some(_) => return Err(Error::from_reason("HQL2_ROW_IDENTITY_CONFLICT")),
+                    None if mutation.expected_revision_id.is_some()
+                        || mutation.operation == uee_v2::RevisionOperationV1::Retract =>
+                    {
+                        return Err(Error::from_reason("HQL2_ROW_IDENTITY_MISSING"));
+                    }
+                    None => {
+                        tx.execute(
+                            "INSERT INTO hql2_row_identity_registry(
+                                database_id, namespace, table_name, row_id,
+                                key_codec_version, key_bytes, created_revision_id
+                             ) VALUES(?1, ?2, ?3, ?4, ?5, ?6, ?7)",
+                            params![
+                                database_id,
+                                mutation.namespace,
+                                table_name,
+                                mutation.id,
+                                i64::from(codec_version),
+                                key_bytes,
+                                mutation.revision_id,
+                            ],
+                        )
+                        .map_err(|error| Error::from_reason(error.to_string()))?;
+                    }
+                }
+            }
+        }
+        let revision_json = serde_json::to_string(transaction)
+            .map_err(|error| Error::from_reason(error.to_string()))?;
+        tx.execute(
+            "INSERT INTO hql2_transaction_revisions(transaction_id, revision_json) VALUES(?1, ?2)",
+            params![outer_transaction_id, revision_json],
+        )
+        .map_err(|error| Error::from_reason(error.to_string()))?;
+        Ok(())
+    }
+
+    // Called only while commit_lock is held. Reads authorized schema metadata,
+    // never user rows, HNSW, a snapshot publisher, or a data operator.
+    fn hql2_catalog_snapshot(
+        &self,
+        access: &AccessContext,
+    ) -> std::result::Result<Hql2CatalogSnapshotV2, query::hql2::QueryErrorV2> {
+        use query::hql2::{result::CatalogStampV2, QueryErrorV2};
+        use std::collections::{BTreeMap, BTreeSet};
+        self.ensure_readable().map_err(hql2_storage_error)?;
+        if access.principal.trim().is_empty() || access.namespace.trim().is_empty() {
+            return Err(QueryErrorV2::new(
+                "AUTH_REQUIRED",
+                "authorize",
+                "access_context",
+            ));
+        }
+        self.authorize_namespace_read(access, &access.namespace)
+            .map_err(hql2_storage_error)?;
+        if access.namespace != "default" {
+            return Err(QueryErrorV2::new(
+                "CAPABILITY_UNSUPPORTED",
+                "bind",
+                "namespace_storage",
+            ));
+        }
+        let schema =
+            Self::load_relational_schema_conn(&self.projection_db.lock(), &access.namespace)
+                .map_err(hql2_storage_error)?;
+        let mut definitions = BTreeMap::<String, Value>::new();
+        let mut tables = BTreeSet::new();
+        let mut collections = BTreeMap::new();
+        if let Some(schema) = schema {
+            for table in schema.tables {
+                tables.insert(table.name.clone());
+                let columns: BTreeMap<_, _> = table
+                    .columns
+                    .into_iter()
+                    .map(|c| {
+                        (
+                            c.name,
+                            serde_json::json!({"type":c.column_type,"nullable":c.nullable}),
+                        )
+                    })
+                    .collect();
+                definitions.insert(
+                    format!("table:{}", table.name),
+                    serde_json::json!({
+                        "columns":columns,"primary_key":table.primary_key
+                    }),
+                );
+            }
+        }
+        for collection in self.collections.iter() {
+            let space_id = Self::collection_space_fingerprint(collection.value().as_ref())
+                .map_err(|_| QueryErrorV2::new("DATA_CORRUPTION", "bind", "collection_space"))?;
+            collections.insert(
+                collection.name.clone(),
+                query::hql2::catalog::CollectionSpaceV2 {
+                    name: collection.name.clone(),
+                    space_id,
+                    dimension: collection.dim,
+                    metric: collection.metric.as_str().into(),
+                },
+            );
+            let definition = self.collection_definitions.get(collection.key());
+            definitions.insert(format!("collection:{}", collection.key()), serde_json::json!({
+                "model":collection.model,"dim":collection.dim,"metric":collection.metric.as_str(),
+                "quant":collection.quant.as_str(),
+                "definition_hash":definition.as_ref().map(|d|d.definition_hash.as_str())
+            }));
+        }
+        for (profile, fingerprint) in query::hql2::catalog::text_profile_fingerprints() {
+            definitions.insert(
+                format!("text-profile:{profile}"),
+                serde_json::json!({
+                    "fingerprint": fingerprint
+                }),
+            );
+        }
+        let bytes = serde_json::to_vec(&definitions)
+            .map_err(|_| QueryErrorV2::new("BIND_ERROR", "bind", "catalog_encoding"))?;
+        Ok((
+            CatalogStampV2 {
+                observed_frontier: self.commit_sequence.load(Ordering::SeqCst),
+                policy_revision: self.access_policy.read().revision,
+                schema_fingerprint: hex::encode(Sha256::digest(bytes)),
+            },
+            tables,
+            collections,
+        ))
+    }
+
+    fn with_hql2_catalog<T>(
+        &self,
+        access: &AccessContext,
+        callback: impl for<'catalog> FnOnce(
+            &query::hql2::catalog::AuthorizedCatalogV2<'catalog>,
+        )
+            -> std::result::Result<T, query::hql2::QueryErrorV2>,
+    ) -> std::result::Result<T, query::hql2::QueryErrorV2> {
+        let guard = self.commit_lock.lock();
+        let (stamp, tables, collections) = self.hql2_catalog_snapshot(access)?;
+        let catalog = query::hql2::catalog::AuthorizedCatalogV2::with_catalog(
+            stamp.clone(),
+            &guard,
+            tables,
+            collections,
+        );
+        let result = callback(&catalog);
+        self.ensure_readable().map_err(hql2_storage_error)?;
+        self.authorize_namespace_read(access, &access.namespace)
+            .map_err(hql2_storage_error)?;
+        if self.access_policy.read().revision != stamp.policy_revision {
+            return Err(query::hql2::QueryErrorV2::new(
+                "FORBIDDEN",
+                "authorize",
+                "policy_changed",
+            ));
+        }
+        result
+    }
+
+    /// Explicit HQL2/IR-v2 Rust boundary. Existing HQL and transports are unchanged.
+    pub fn query_v2(
+        &self,
+        access: AccessContext,
+        mut request: uee_v2::QueryRequestV2,
+    ) -> std::result::Result<query::hql2::QueryOutcomeV2, query::hql2::QueryErrorV2> {
+        use query::hql2::{
+            bind, exec, legacy, lower, plan, request as policy, result::*, wire, QueryErrorV2,
+        };
+        use std::collections::BTreeMap;
+        let started = Instant::now();
+        let mut legacy_projection_key = None;
+        let result = (|| {
+            // The outer guard survives catalog acquisition, binding, pinning,
+            // execution, final lease validation and boundary result construction.
+            let _query_guard = self.commit_lock.lock();
+            self.ensure_readable().map_err(hql2_storage_error)?;
+            if access.principal.trim().is_empty() || access.namespace.trim().is_empty() {
+                return Err(QueryErrorV2::new(
+                    "AUTH_REQUIRED",
+                    "authorize",
+                    "access_context",
+                ));
+            }
+            self.authorize_namespace_read(&access, &access.namespace)
+                .map_err(hql2_storage_error)?;
+            if request.namespace != access.namespace {
+                return Err(QueryErrorV2::new(
+                    "FORBIDDEN",
+                    "authorize",
+                    "namespace_mismatch",
+                ));
+            }
+            let mut budget = exec::ExecutionBudgetV2::new(&request.budget)?;
+            budget.account_elapsed_since(started);
+            budget.reserve(policy::input_bytes(&request)?)?;
+            policy::validate_envelope(&request)?;
+            if request.language_version == Some(uee_v2::HqlLanguageVersionV2::HqlV1) {
+                let (hql, projection_key) =
+                    legacy::lower_hql_v1(&request, &access.namespace, &mut budget)?;
+                request.hql = Some(hql);
+                request.language_version = Some(uee_v2::HqlLanguageVersionV2::HqlV2);
+                legacy_projection_key = Some(projection_key);
+            }
+            // Reserve before loading/decoding a schema package. Only metadata length
+            // is read here; no user relation or index is opened.
+            let catalog_bytes: u64 = self.projection_db.lock().query_row(
+            "SELECT COALESCE(SUM(length(CAST(package_json AS BLOB))),0) FROM relational_schema_registry WHERE namespace=?1",
+            [&access.namespace], |row| row.get(0),
+        ).map_err(|_|QueryErrorV2::new("DATA_CORRUPTION","execute","catalog_unavailable"))?;
+            budget.reserve(catalog_bytes.saturating_mul(32).saturating_add(4096))?;
+            for collection in self.collections.iter() {
+                budget.reserve(
+                    (collection.key().len() as u64)
+                        .saturating_add(collection.model.len() as u64)
+                        .saturating_mul(32)
+                        .saturating_add(1024),
+                )?;
+            }
+            self.with_hql2_catalog(&access, |catalog| {
+                if request.namespace != access.namespace {
+                    return Err(QueryErrorV2::new(
+                        "FORBIDDEN",
+                        "authorize",
+                        "namespace_mismatch",
+                    ));
+                }
+                // Validate source/version before choosing a parser. Authorization has
+                // already run, so invalid requests cannot probe inaccessible metadata.
+                if request.contract_version != "genesis.api.v2"
+                    || request
+                        .ir
+                        .as_ref()
+                        .is_some_and(|ir| ir.contract_version != "query-ir.v2")
+                {
+                    return Err(QueryErrorV2::new(
+                        "VERSION_UNSUPPORTED",
+                        "contract",
+                        "contract_version",
+                    ));
+                }
+                policy::validate_envelope(&request)?;
+                if request.language_version == Some(uee_v2::HqlLanguageVersionV2::HqlV1) {
+                    return Err(QueryErrorV2::new(
+                        "CAPABILITY_UNSUPPORTED",
+                        "bind",
+                        "legacy_lowering",
+                    ));
+                }
+                if let Some(source) = request.hql.as_deref() {
+                    budget.reserve(query::hql2::required_heap_bytes(source)?)?;
+                    budget.reserve(query::hql2::required_stack_bytes(source)?)?;
+                }
+                let statement = request
+                    .hql
+                    .as_deref()
+                    .map(query::hql2::parse_hql2)
+                    .transpose()?;
+                let options = policy::normalize(
+                    &request,
+                    statement.as_ref(),
+                    catalog.stamp.observed_frontier,
+                    self.history_horizon().max(1),
+                    Utc::now(),
+                )?;
+                if options.mode == uee_v2::ExplainV2::Plan {
+                    let current_generation = self.published_generation.read().clone();
+                    let (history_horizon, wal_frontier) = match current_generation {
+                        Some(generation)
+                            if generation.publication_seq == catalog.stamp.observed_frontier =>
+                        {
+                            (generation.history_horizon, generation.wal_frontier)
+                        }
+                        _ => (
+                            self.history_horizon().max(1),
+                            catalog.stamp.observed_frontier,
+                        ),
+                    };
+                    Self::validate_generation_tx_as_of_bounds(
+                        history_horizon,
+                        wal_frontier,
+                        options.tx,
+                    )
+                    .map_err(hql2_storage_error)?;
+                }
+                let parameter_types = request.ir.as_ref().map(|ir| &ir.parameter_types);
+                let params = bind::BoundParametersV2::decode(&request.params, parameter_types)?;
+                let logical = if let Some(statement) = statement {
+                    if request.params.is_empty() {
+                        lower::lower_hql2(statement)?
+                    } else {
+                        lower::lower_hql2_with_unsigned_resolver(statement, |name| {
+                            params.decimal_u64(name)
+                        })?
+                    }
+                } else {
+                    wire::decode_ir_v2(request.ir.take().ok_or_else(|| {
+                        QueryErrorV2::new("BIND_ERROR", "bind", "missing_source")
+                    })?)?
+                };
+                budget.reserve(policy::planning_bytes(&logical, &request))?;
+                let physical = plan::plan_v2(bind::bind_v2(logical, &params, catalog)?)?;
+                let plan_hash = physical.plan_hash()?;
+                budget.check()?;
+                if options.mode == uee_v2::ExplainV2::Plan {
+                    let result = ExplainResultV2 {
+                        contract_version: uee_v2::API_CONTRACT_V2.into(),
+                        planner_version: plan::PLANNER_VERSION_V2.into(),
+                        plan_hash,
+                        request_id: request.request_id.clone(),
+                        catalog: catalog.stamp.clone(),
+                        plan: physical.explain_nodes(),
+                        root: physical.root().into(),
+                    };
+                    hql2_check_output(&result, 0, &budget)?;
+                    return Ok(QueryOutcomeV2::Plan(result));
+                }
+                let lease = self
+                    .pin_generation(
+                        access.clone(),
+                        TemporalRead {
+                            as_of: Some(options.valid_at.to_rfc3339()),
+                            tx_as_of: options.tx,
+                        },
+                        Duration::from_secs(5),
+                    )
+                    .map_err(hql2_storage_error)?;
+                // Nested Result preserves typed query errors while allowing the P6
+                // callback to enforce its mandatory post-callback lease validation.
+                let source_scans = physical.source_scans();
+                let execution = self
+                    .with_read_lease(&lease, |view| {
+                        Ok((|| {
+                            let leased_catalog = view.hql2_catalog()?;
+                            if leased_catalog.stamp.schema_fingerprint
+                                != catalog.stamp.schema_fingerprint
+                                || leased_catalog.stamp.policy_revision
+                                    != catalog.stamp.policy_revision
+                            {
+                                return Err(QueryErrorV2::new(
+                                    "BIND_ERROR",
+                                    "bind",
+                                    "catalog_changed",
+                                ));
+                            }
+                            if source_scans.is_empty()
+                                && !physical.requires_graph_snapshot()
+                                && !physical.requires_vector_snapshot()
+                            {
+                                return exec::execute_v2(&physical, &mut budget);
+                            }
+                            let mut source_rows = BTreeMap::new();
+                            for (node_id, source) in &source_scans {
+                                let mut rows = Vec::new();
+                                match source {
+                                    query::hql2::source::BoundSourceV2::History { kind, id } => {
+                                        for revision in
+                                            view.hql2_history_scan(kind, id, &mut budget)?
+                                        {
+                                            rows.push(vec![
+                                                query::hql2::value::QueryValueV2::HistoryRevision(
+                                                    revision,
+                                                ),
+                                            ]);
+                                        }
+                                    }
+                                    query::hql2::source::BoundSourceV2::Changes { after_seq } => {
+                                        for event in
+                                            view.hql2_change_scan(*after_seq, &mut budget)?
+                                        {
+                                            rows.push(vec![
+                                                query::hql2::value::QueryValueV2::ChangeEvent(
+                                                    event,
+                                                ),
+                                            ]);
+                                        }
+                                    }
+                                    _ => {
+                                        let limit = std::num::NonZeroU32::new(256).unwrap();
+                                        let mut after = None;
+                                        loop {
+                                            let batch = view.hql2_scan(
+                                                source,
+                                                after.as_ref(),
+                                                limit,
+                                                &mut budget,
+                                            )?;
+                                            budget.reserve_expanded_nodes(u64::from(
+                                                batch.examined,
+                                            ))?;
+                                            for record in batch.records {
+                                                budget.reserve(
+                                                    128 + (record.database_id.len()
+                                                        + record.namespace.len()
+                                                        + record.id.len()
+                                                        + record.revision.len())
+                                                        as u64,
+                                                )?;
+                                                rows.push(vec![
+                                                    query::hql2::value::QueryValueV2::Entity(
+                                                        record,
+                                                    ),
+                                                ]);
+                                            }
+                                            after = batch.next;
+                                            if after.is_none() {
+                                                break;
+                                            }
+                                        }
+                                    }
+                                }
+                                source_rows.insert(node_id.clone(), rows);
+                            }
+                            let mut hydrate = |
+                                records: &[crate::uee_v2::RecordRefV2],
+                                fields: &[query::hql2::source::FieldIdV2],
+                                budget: &mut query::hql2::exec::ExecutionBudgetV2,
+                            | {
+                                view.hql2_hydrate(records, fields, budget)
+                            };
+                            let mut annotation_lookup = |
+                                target: &crate::uee_v2::RecordRefV2,
+                                budget: &mut query::hql2::exec::ExecutionBudgetV2,
+                            | view.hql2_annotation_lookup(target, budget);
+                            let graph = if physical.requires_graph_snapshot() {
+                                Some(view.hql2_graph_snapshot(
+                                    physical.requires_node_labels(),
+                                    &mut budget,
+                                )?)
+                            } else {
+                                None
+                            };
+                            let mut vector_lookup = |
+                                records: &[crate::uee_v2::RecordRefV2],
+                                collection: &str,
+                                require_original: bool,
+                                budget: &mut query::hql2::exec::ExecutionBudgetV2,
+                            | {
+                                view.hql2_vectors(records, collection, require_original, budget)
+                            };
+                            exec::execute_v2_with_vector_adapters(
+                                &physical,
+                                &mut budget,
+                                &source_rows,
+                                &mut annotation_lookup,
+                                &mut hydrate,
+                                &mut vector_lookup,
+                                graph.as_ref(),
+                            )
+                        })())
+                    })
+                    .map_err(hql2_storage_error)??;
+                let columns = physical.columns();
+                let mut rows = Vec::new();
+                for row in execution.rows {
+                    budget.reserve((columns.len() as u64).saturating_mul(128).saturating_add(
+                        columns.iter().map(|c| c.name.len() as u64).sum::<u64>(),
+                    ))?;
+                    rows.push(
+                        columns
+                            .iter()
+                            .zip(row)
+                            .map(|(column, value)| (column.name.clone(), value))
+                            .collect(),
+                    );
+                }
+                let mut result = QueryResultV2 {
+                    request_id: request.request_id.clone(),
+                    snapshot: SnapshotV2 {
+                        database_id: self.database_id(),
+                        tx: options
+                            .tx
+                            .unwrap_or(lease.generation.wal_frontier)
+                            .to_string(),
+                        valid_at: options.valid_at.to_rfc3339(),
+                        catalog_generation: lease.generation.generation_id.to_string(),
+                        policy_version: lease.generation.acl_revision.to_string(),
+                    },
+                    columns,
+                    rows,
+                    semantics: physical.semantics(),
+                    completeness: CompletenessV2 {
+                        status: CompletionStatusV2::Complete,
+                        reason: None,
+                        eligible_count_known: true,
+                    },
+                    index_frontiers: BTreeMap::new(),
+                    cursor: None,
+                    explain: if options.mode == uee_v2::ExplainV2::Analyze {
+                        Some(ExplainResultV2 {
+                            contract_version: uee_v2::API_CONTRACT_V2.into(),
+                            planner_version: plan::PLANNER_VERSION_V2.into(),
+                            plan_hash,
+                            request_id: request.request_id.clone(),
+                            catalog: catalog.stamp.clone(),
+                            plan: execution.nodes,
+                            root: physical.root().into(),
+                        })
+                    } else {
+                        None
+                    },
+                };
+                if let Some(projection_key) = &legacy_projection_key {
+                    if result.columns.len() != 1 || result.columns[0].name != "id" {
+                        return Err(QueryErrorV2::new(
+                            "BIND_ERROR",
+                            "bind",
+                            "legacy_projection_shape",
+                        ));
+                    }
+                    result.columns[0].name = projection_key.clone();
+                    for row in &mut result.rows {
+                        let value = row.remove("id").ok_or_else(|| {
+                            QueryErrorV2::new("BIND_ERROR", "encode", "legacy_projection_shape")
+                        })?;
+                        row.insert(projection_key.clone(), value);
+                    }
+                }
+                hql2_check_output(&result, result.rows.len() as u64, &budget)?;
+                self.validate_lease_unlocked(&lease)
+                    .map_err(hql2_storage_error)?;
+                Ok(QueryOutcomeV2::Rows(result))
+            })
+        })();
+        policy::discard_request(request);
+        result
+    }
+
+    pub fn publish_generation(&self) -> Result<GenerationInfo> {
+        let _commit_guard = self.commit_lock.lock();
+        self.ensure_readable()?;
+        self.publish_generation_unlocked()
+    }
+
+    fn validate_generation_tx_as_of(
+        generation: &GenerationInfo,
+        tx_as_of: Option<u64>,
+    ) -> Result<()> {
+        Self::validate_generation_tx_as_of_bounds(
+            generation.history_horizon,
+            generation.wal_frontier,
+            tx_as_of,
+        )
+    }
+
+    fn validate_generation_tx_as_of_bounds(
+        history_horizon: u64,
+        wal_frontier: u64,
+        tx_as_of: Option<u64>,
+    ) -> Result<()> {
+        if tx_as_of.is_some_and(|tx| tx < history_horizon || tx > wal_frontier) {
+            return Err(Error::from_reason("TEMPORAL_BEYOND_HORIZON"));
+        }
+        Ok(())
+    }
+
+    pub fn pin_generation(
+        &self,
+        access: AccessContext,
+        temporal: TemporalRead,
+        ttl: Duration,
+    ) -> Result<ReadLease> {
+        let _commit_guard = self.commit_lock.lock();
+        self.ensure_readable()?;
+        if ttl.is_zero() {
+            return Err(Error::from_reason("LEASE_EXPIRED: ttl must be positive"));
+        }
+        if access.principal.trim().is_empty() || access.namespace.trim().is_empty() {
+            return Err(Error::from_reason("ACCESS_DENIED"));
+        }
+        Self::validate_temporal_read(&temporal)?;
+        let published_generation = { self.published_generation.read().clone() };
+        let generation = match published_generation {
+            Some(generation)
+                if generation.publication_seq == self.commit_sequence.load(Ordering::SeqCst) =>
+            {
+                generation
+            }
+            _ => self.publish_generation_unlocked()?,
+        };
+        Self::validate_generation_tx_as_of(&generation, temporal.tx_as_of)?;
+        Ok(ReadLease {
+            owner_token: self.owner_token.clone(),
+            generation,
+            expires_at: Instant::now() + ttl,
+            fencing_epoch: self.fencing_epoch.load(Ordering::SeqCst),
+            access,
+            temporal,
+        })
+    }
+
+    pub fn revoke_lease(&self, lease: &ReadLease) -> Result<()> {
+        let _commit_guard = self.commit_lock.lock();
+        self.ensure_readable()?;
+        if lease.owner_token != self.owner_token {
+            return Err(Error::from_reason("LEASE_OWNER_MISMATCH"));
+        }
+        self.fencing_epoch.fetch_add(1, Ordering::SeqCst);
+        Ok(())
+    }
+
+    pub fn with_read_lease<T, F>(&self, lease: &ReadLease, callback: F) -> Result<T>
+    where
+        F: FnOnce(&ReadView<'_>) -> Result<T>,
+    {
+        let _commit_guard = self.commit_lock.lock();
+        self.ensure_readable()?;
+        self.validate_lease_unlocked(lease)?;
+        let view = ReadView {
+            storage: self,
+            lease,
+        };
+        let result = callback(&view);
+        self.validate_lease_unlocked(lease)?;
+        result
+    }
+
+    pub fn replace_access_policy(
+        &self,
+        actor: PolicyAdminActor,
+        expected_revision: u64,
+        policy: AccessPolicy,
+    ) -> Result<()> {
+        self.ensure_writable()?;
+        let _commit_guard = self.commit_lock.lock();
+        self.ensure_readable()?;
+        let current = self.access_policy.read().clone();
+        if current.revision != expected_revision
+            || expected_revision.checked_add(1) != Some(policy.revision)
+        {
+            return Err(Error::from_reason("ACCESS_POLICY_REVISION_CONFLICT"));
+        }
+        self.authorize_policy_admin(&actor)?;
+        Self::validate_access_policy_shape(&policy)?;
+        if Self::access_policy_event_version(&policy) == 2
+            && self.storage_schema_version != SCHEMA_VERSION
+        {
+            return Err(Error::from_reason(
+                "SCHEMA_VERSION_UNSUPPORTED: annotation ACL requires schema v6",
+            ));
+        }
+        let event = Event::AccessPolicyChanged(AccessPolicyChangedEvent {
+            version: Self::access_policy_event_version(&policy),
+            expected_revision,
+            policy,
+            actor: actor.access,
+            folded: false,
+        });
+        let seq = self.append_wal_event(&event)?;
+        self.apply_access_policy_event(match &event {
+            Event::AccessPolicyChanged(event) => event,
+            _ => unreachable!(),
+        })
+        .map_err(|error| self.durable_apply_error(seq, error))?;
+        Ok(())
+    }
+
     fn tokenize_id(id: &str) -> Vec<String> {
         let base_chars: String = id
             .chars()
@@ -3437,6 +7784,13 @@ impl Storage {
     }
 
     pub fn get_u32(&self, id: &str) -> Option<u32> {
+        let _read_guard = self.commit_lock.lock();
+        self.ensure_readable().ok()?;
+        self.require_unscoped_read().ok()?;
+        self.get_u32_unlocked(id)
+    }
+
+    fn get_u32_unlocked(&self, id: &str) -> Option<u32> {
         self.id_to_u32.get(id).map(|v| *v)
     }
 
@@ -3796,6 +8150,9 @@ impl Storage {
 
     pub fn list_collections(&self) -> Vec<CollectionInfo> {
         let _read_guard = self.commit_lock.lock();
+        if self.access_policy.read().mode == AccessPolicyMode::Enforced {
+            return Vec::new();
+        }
 
         // `index_lag` is engine-global; snapshot it once and stamp every entry.
         let lag = self.index_lag();
@@ -3902,20 +8259,50 @@ impl Storage {
                 ));
             }
         }
-        // Stamp a logical clock so the vector is time-orderable for anti-entropy
-        // (events_since) — secondary embeddings now sync across peers like nodes.
+        // Stamp a logical clock so the vector is time-orderable for anti-entropy.
         let clock = self.next_clock();
-        // Durability: replayed by the WAL `Event::Vector` arm.
-        let seq = self.persist(&Event::Vector(VectorEvent {
+        let vector = VectorEvent {
             node_id: node_id.clone(),
             collection: coll.clone(),
             embedding: embedding.clone(),
             lang: Some(lang.clone()),
             clock,
-        }))?;
-        // Stages into the arena, enqueues the deferred HNSW insert.
-        self.add_vector_internal(&coll, &node_id, embedding, lang, seq)
-            .map_err(|e| self.durable_apply_error(seq, e))?;
+        };
+        if self.storage_schema_version == SCHEMA_VERSION {
+            let revisions = self
+                .build_record_revision_transaction(
+                    &[],
+                    &[],
+                    &[],
+                    &[],
+                    std::slice::from_ref(&vector),
+                )?
+                .ok_or_else(|| Error::from_reason("REVISION_ENVELOPE_REQUIRED"))?;
+            let payload = serde_json::to_vec(&(&vector, &revisions))
+                .map_err(|error| Error::from_reason(error.to_string()))?;
+            let transaction = GenesisTransactionEvent {
+                transaction_id: Uuid::new_v4().to_string(),
+                origin_commit_seq: 0,
+                local_frame_seq: None,
+                payload_hash: hex::encode(Sha256::digest(payload)),
+                relational: vec![],
+                nodes: vec![],
+                edges: vec![],
+                vectors: vec![vector],
+                node_retractions: vec![],
+                advances_txn_frontier: false,
+                record_revision_transaction: Some(revisions),
+            };
+            let seq = self.persist(&Event::Transaction(transaction.clone()))?;
+            self.apply_transaction_memory(&transaction, true, seq);
+            self.ensure_readable()
+                .map_err(|error| self.durable_apply_error(seq, error))?;
+        } else {
+            // Schema 5 retains its original vector event compatibility path.
+            let seq = self.persist(&Event::Vector(vector))?;
+            self.add_vector_internal(&coll, &node_id, embedding, lang, seq)
+                .map_err(|error| self.durable_apply_error(seq, error))?;
+        }
         Ok(())
     }
 
@@ -4107,7 +8494,7 @@ impl Storage {
         // only explicitly evidenced migration definitions before the ordered
         // validation pass; ordinary creations never authorize earlier vectors.
         let mut journal_definitions = HashSet::new();
-        Self::visit_verified_journal(root, &mut |se| {
+        Self::visit_verified_journal(root, &mut |_, se| {
             fn discover(
                 e: &Event,
                 defs: &mut HashMap<String, CollectionDefinition>,
@@ -4165,7 +8552,7 @@ impl Storage {
             d.definition_hash = d.hash();
             definitions.insert("default".into(), d);
         }
-        Self::visit_verified_journal(root, &mut |se| {
+        Self::visit_verified_journal(root, &mut |_, se| {
             let declared = match &se.event {
                 Event::CollectionDefinition(d) => Some(d),
                 Event::CollectionMaterialization(m) => Some(&m.definition),
@@ -4196,10 +8583,20 @@ impl Storage {
     /// Bound preflight memory to one segment, not the retained journal size.
     fn visit_verified_journal(
         root: &std::path::Path,
-        visit: &mut dyn FnMut(SignedEvent) -> Result<()>,
+        visit: &mut dyn FnMut(Option<u64>, SignedEvent) -> Result<()>,
+    ) -> Result<()> {
+        Self::visit_verified_journal_with_base(root, &mut |seq, _, event| visit(seq, event))
+    }
+
+    fn visit_verified_journal_with_base(
+        root: &std::path::Path,
+        visit: &mut dyn FnMut(Option<u64>, bool, SignedEvent) -> Result<()>,
     ) -> Result<()> {
         let error = |msg: &str| Error::from_reason(format!("JOURNAL_PREFLIGHT_FAILED: {msg}"));
-        fn lines(bytes: &[u8], visit: &mut dyn FnMut(SignedEvent) -> Result<()>) -> Result<()> {
+        fn lines(
+            bytes: &[u8],
+            visit: &mut dyn FnMut(Option<u64>, bool, SignedEvent) -> Result<()>,
+        ) -> Result<()> {
             for line in bytes
                 .split(|b| *b == b'\n')
                 .filter(|l| !l.iter().all(u8::is_ascii_whitespace))
@@ -4209,7 +8606,7 @@ impl Storage {
                         "JOURNAL_PREFLIGHT_FAILED: invalid legacy event: {e}"
                     ))
                 })?;
-                visit(e)?;
+                visit(None, false, e)?;
             }
             Ok(())
         }
@@ -4217,10 +8614,11 @@ impl Storage {
             bytes: &[u8],
             offset: usize,
             torn_tail: bool,
-            visit: &mut dyn FnMut(SignedEvent) -> Result<()>,
+            base_segment: bool,
+            visit: &mut dyn FnMut(Option<u64>, bool, SignedEvent) -> Result<()>,
         ) -> Result<()> {
             let mut error = None;
-            let end = walk_frames(bytes, offset, |_, payload| {
+            let end = walk_frames(bytes, offset, |seq, payload| {
                 if error.is_none() {
                     match serde_json::from_slice(payload)
                         .map_err(|e| {
@@ -4228,7 +8626,7 @@ impl Storage {
                                 "JOURNAL_PREFLIGHT_FAILED: unsupported/invalid event: {e}"
                             ))
                         })
-                        .and_then(&mut *visit)
+                        .and_then(|event| visit(Some(seq), base_segment, event))
                     {
                         Ok(()) => {}
                         Err(e) => error = Some(e),
@@ -4292,6 +8690,12 @@ impl Storage {
                 segments.push(read_segment_header(&path).ok_or_else(|| error("invalid segment"))?);
             }
         }
+        let base_frontier = segments
+            .iter()
+            .filter(|segment| segment.kind == SEG_KIND_BASE)
+            .map(|segment| segment.max_seq)
+            .max()
+            .unwrap_or(0);
         segments.sort_by_key(|s| (s.kind != SEG_KIND_LEGACY_JSONL, s.min_seq));
         for segment in segments {
             let (kind, body) =
@@ -4299,7 +8703,7 @@ impl Storage {
             if kind == SEG_KIND_LEGACY_JSONL {
                 lines(&body, visit)?;
             } else {
-                frames(&body, 0, false, visit)?;
+                frames(&body, 0, false, kind == SEG_KIND_BASE, visit)?;
             }
         }
         let active = root.join("wal/active.gwal");
@@ -4312,10 +8716,388 @@ impl Storage {
                 {
                     return Err(error("unsupported active header"));
                 }
-                frames(&body, ACTIVE_HEADER_LEN, true, visit)?;
+                frames(
+                    &body,
+                    ACTIVE_HEADER_LEN,
+                    true,
+                    false,
+                    &mut |seq, base_segment, event| {
+                        if seq.is_some_and(|seq| seq <= base_frontier) {
+                            Ok(())
+                        } else {
+                            visit(seq, base_segment, event)
+                        }
+                    },
+                )?;
             }
         }
         Ok(())
+    }
+
+    fn verify_schema6_local_event(
+        signed_event: &SignedEvent,
+        verifying_key: &VerifyingKey,
+        local_peer_id: &str,
+    ) -> bool {
+        if signed_event.signer_peer_id != local_peer_id {
+            return false;
+        }
+        let Ok(payload) = canonical_event_bytes(&signed_event.event) else {
+            return false;
+        };
+        let Ok(signature) = Signature::from_slice(&signed_event.signature) else {
+            return false;
+        };
+        verifying_key.verify(&payload, &signature).is_ok()
+    }
+
+    fn schema6_event_evidence(event: &Event, v6_only: &mut bool, saw_migration: &mut bool) {
+        match event {
+            Event::Batch(events) => {
+                for event in events {
+                    Self::schema6_event_evidence(event, v6_only, saw_migration);
+                }
+            }
+            Event::Transaction(transaction)
+                if transaction.record_revision_transaction.is_some() =>
+            {
+                *v6_only = true
+            }
+            Event::RelationalRows {
+                record_revision_transaction: Some(_),
+                ..
+            } => *v6_only = true,
+            Event::AccessPolicyChanged(policy) if policy.version >= 2 => *v6_only = true,
+            Event::Schema6MigrationChunkV1(_) | Event::Schema6MigrationCommitV1(_) => {
+                *v6_only = true;
+                *saw_migration = true;
+            }
+            Event::Schema6ActivationV1(_) => *v6_only = true,
+            _ => {}
+        }
+    }
+
+    fn preflight_schema6_activation(
+        root: &std::path::Path,
+        verifying_key: &VerifyingKey,
+        local_peer_id: &str,
+        database_id: &str,
+        require_activation: bool,
+    ) -> Result<(Option<Schema6ActivationV1>, bool, bool)> {
+        let mut activation: Option<(u64, usize, bool, Schema6ActivationV1)> = None;
+        let mut saw_any_event = false;
+        let mut saw_v6_only_event = false;
+        let mut saw_migration_event = false;
+        let mut last_frame = None;
+        let mut journal_order = 0usize;
+        Self::visit_verified_journal_with_base(
+            root,
+            &mut |frame_seq, base_segment, signed_event| {
+                let event_order = journal_order;
+                journal_order = journal_order.saturating_add(1);
+                saw_any_event = true;
+                if let Some(seq) = frame_seq {
+                    if last_frame.is_some_and(|(previous, previous_base)| {
+                        seq < previous || (seq == previous && !(base_segment && previous_base))
+                    }) {
+                        return Err(Error::from_reason(
+                            "RECOVERY_REQUIRED: journal frame sequence is invalid",
+                        ));
+                    }
+                    last_frame = Some((seq, base_segment));
+                }
+                Self::schema6_event_evidence(
+                    &signed_event.event,
+                    &mut saw_v6_only_event,
+                    &mut saw_migration_event,
+                );
+                let Event::Schema6ActivationV1(candidate) = &signed_event.event else {
+                    if let Event::Batch(events) = &signed_event.event {
+                        fn has_activation(event: &Event) -> bool {
+                            match event {
+                                Event::Schema6ActivationV1(_) => true,
+                                Event::Batch(events) => events.iter().any(has_activation),
+                                _ => false,
+                            }
+                        }
+                        if events.iter().any(has_activation) {
+                            return Err(Error::from_reason(
+                                "RECOVERY_REQUIRED: schema activation cannot be nested in a batch",
+                            ));
+                        }
+                    }
+                    return Ok(());
+                };
+                let seq = frame_seq.ok_or_else(|| {
+                    Error::from_reason("RECOVERY_REQUIRED: schema activation has no frame sequence")
+                })?;
+                if !Self::verify_schema6_local_event(&signed_event, verifying_key, local_peer_id)
+                    || candidate.version != 1
+                    || candidate.schema_version != SCHEMA_VERSION
+                    || candidate.database_id != database_id
+                {
+                    return Err(Error::from_reason(
+                        "RECOVERY_REQUIRED: invalid signed schema-6 activation",
+                    ));
+                }
+                if activation.is_some() {
+                    return Err(Error::from_reason(
+                        "RECOVERY_REQUIRED: conflicting or duplicate schema-6 activation",
+                    ));
+                }
+                activation = Some((seq, event_order, base_segment, candidate.clone()));
+                Ok(())
+            },
+        )?;
+
+        let Some((activation_seq, activation_order, activation_base, activation)) = activation
+        else {
+            if require_activation && saw_v6_only_event {
+                return Err(Error::from_reason(
+                    "RECOVERY_REQUIRED: schema-6 WAL evidence has no activation proof",
+                ));
+            }
+            return Ok((None, saw_any_event, saw_v6_only_event));
+        };
+
+        if let Some(migration) = activation.migration.as_ref() {
+            if !Self::is_lower_sha256(&activation.database_id)
+                || migration.migration_id.is_empty()
+                || !Self::is_lower_sha256(&migration.manifest_sha256)
+                || migration.source_database_id != database_id
+                || migration.source_schema != LEGACY_SCHEMA_VERSION
+                || !Self::is_lower_sha256(&migration.backup_sha256)
+                || !Self::is_lower_sha256(&migration.source_p6_manifest_sha256)
+                || !Self::is_lower_sha256(&migration.post_migration_manifest_sha256)
+                || migration.migration_commit_frame_seq <= migration.source_frontier
+                || migration.generation.wal_frontier != migration.migration_commit_frame_seq
+                || migration.generation.publication_seq
+                    != migration.migration_commit_frame_seq.saturating_add(1)
+                || migration.generation.component_manifest_sha256
+                    != migration.post_migration_manifest_sha256
+                || migration
+                    .source_history_floors
+                    .values()
+                    .any(|floor| *floor > migration.source_frontier)
+                || ["graph", "row", "vector", "annotation"]
+                    .iter()
+                    .any(|source| !migration.source_history_floors.contains_key(*source))
+            {
+                return Err(Error::from_reason(
+                    "RECOVERY_REQUIRED: invalid schema-6 migration activation fields",
+                ));
+            }
+
+            let mut chunks = std::collections::BTreeMap::<
+                u32,
+                (u64, usize, bool, Schema6MigrationChunkV1),
+            >::new();
+            let mut commit: Option<(u64, usize, bool, Schema6MigrationCommitV1)> = None;
+            let mut receipt_proof: Option<(u64, usize, bool)> = None;
+            let mut journal_order = 0usize;
+            Self::visit_verified_journal_with_base(
+                root,
+                &mut |frame_seq, base_segment, signed_event| {
+                    let event_order = journal_order;
+                    journal_order = journal_order.saturating_add(1);
+                    fn collect<'a>(event: &'a Event, controls: &mut Vec<&'a Event>) {
+                        match event {
+                            Event::Schema6MigrationChunkV1(_)
+                            | Event::Schema6MigrationCommitV1(_)
+                            | Event::GenerationPublished(_) => controls.push(event),
+                            Event::Batch(events) => {
+                                for event in events {
+                                    collect(event, controls);
+                                }
+                            }
+                            _ => {}
+                        }
+                    }
+                    let mut controls = Vec::new();
+                    collect(&signed_event.event, &mut controls);
+                    if controls.is_empty() {
+                        return Ok(());
+                    }
+                    let has_migration_control = controls.iter().any(|event| {
+                        matches!(
+                            event,
+                            Event::Schema6MigrationChunkV1(_) | Event::Schema6MigrationCommitV1(_)
+                        )
+                    });
+                    if has_migration_control
+                        && !Self::verify_schema6_local_event(
+                            &signed_event,
+                            verifying_key,
+                            local_peer_id,
+                        )
+                    {
+                        return Err(Error::from_reason(
+                            "RECOVERY_REQUIRED: migration authority signature is invalid",
+                        ));
+                    }
+                    for event in controls {
+                        match event {
+                            Event::Schema6MigrationChunkV1(chunk) => {
+                                let seq = frame_seq.ok_or_else(|| {
+                                    Error::from_reason(
+                                        "RECOVERY_REQUIRED: migration chunk has no frame sequence",
+                                    )
+                                })?;
+                                if chunk.migration_id != migration.migration_id
+                                    || chunk.manifest_sha256 != migration.manifest_sha256
+                                    || chunk.source_database_id != migration.source_database_id
+                                    || chunk.source_schema != migration.source_schema
+                                    || chunk.source_frontier != migration.source_frontier
+                                    || chunk.source_history_floors
+                                        != migration.source_history_floors
+                                    || chunk.total_chunks == 0
+                                    || chunk.chunk_index >= chunk.total_chunks
+                                    || chunk.baseline_records.len() > 256
+                                    || seq <= migration.source_frontier
+                                    || Self::schema6_migration_chunk_sha256(chunk)?
+                                        != chunk.chunk_sha256
+                                {
+                                    return Err(Error::from_reason(
+                                    "RECOVERY_REQUIRED: migration chunk disagrees with activation",
+                                ));
+                                }
+                                if let Some((_, _, _, previous)) = chunks.get(&chunk.chunk_index) {
+                                    if serde_json::to_vec(previous).ok()
+                                        != serde_json::to_vec(chunk).ok()
+                                    {
+                                        return Err(Error::from_reason(
+                                            "RECOVERY_REQUIRED: conflicting migration chunk",
+                                        ));
+                                    }
+                                } else {
+                                    chunks.insert(
+                                        chunk.chunk_index,
+                                        (seq, event_order, base_segment, chunk.clone()),
+                                    );
+                                }
+                            }
+                            Event::Schema6MigrationCommitV1(candidate) => {
+                                let seq = frame_seq.ok_or_else(|| {
+                                    Error::from_reason(
+                                        "RECOVERY_REQUIRED: migration commit has no frame sequence",
+                                    )
+                                })?;
+                                if candidate.migration_id != migration.migration_id
+                                    || candidate.manifest_sha256 != migration.manifest_sha256
+                                    || candidate.source_database_id != migration.source_database_id
+                                    || candidate.source_schema != migration.source_schema
+                                    || candidate.source_frontier != migration.source_frontier
+                                    || candidate.migration_commit_frame_seq
+                                        != migration.migration_commit_frame_seq
+                                    || (!base_segment
+                                        && seq != candidate.migration_commit_frame_seq)
+                                {
+                                    return Err(Error::from_reason(
+                                    "RECOVERY_REQUIRED: migration commit disagrees with activation",
+                                ));
+                                }
+                                if let Some((_, _, _, previous)) = commit.as_ref() {
+                                    if serde_json::to_vec(previous).ok()
+                                        != serde_json::to_vec(candidate).ok()
+                                    {
+                                        return Err(Error::from_reason(
+                                            "RECOVERY_REQUIRED: conflicting migration commit",
+                                        ));
+                                    }
+                                } else {
+                                    commit =
+                                        Some((seq, event_order, base_segment, candidate.clone()));
+                                }
+                            }
+                            Event::GenerationPublished(receipt_event)
+                                if serde_json::to_value(&receipt_event.generation).ok()
+                                    == serde_json::to_value(&migration.generation).ok()
+                                    && receipt_event.version == 1
+                                    && receipt_event.generation.publication_seq
+                                        == receipt_event
+                                            .generation
+                                            .wal_frontier
+                                            .saturating_add(1) =>
+                            {
+                                let seq = frame_seq.ok_or_else(|| {
+                                    Error::from_reason(
+                                    "RECOVERY_REQUIRED: generation receipt has no frame sequence",
+                                )
+                                })?;
+                                if !Self::verify_schema6_local_event(
+                                    &signed_event,
+                                    verifying_key,
+                                    local_peer_id,
+                                ) {
+                                    return Err(Error::from_reason(
+                                    "RECOVERY_REQUIRED: generation receipt signature is invalid",
+                                ));
+                                }
+                                if !base_segment && seq != migration.generation.publication_seq {
+                                    return Err(Error::from_reason(
+                                    "RECOVERY_REQUIRED: migration receipt sequence disagrees with activation",
+                                ));
+                                }
+                                if receipt_proof.is_some_and(|(previous_seq, _, previous_base)| {
+                                    previous_seq != seq || previous_base != base_segment
+                                }) {
+                                    return Err(Error::from_reason(
+                                    "RECOVERY_REQUIRED: conflicting migration generation receipt",
+                                ));
+                                }
+                                receipt_proof = Some((seq, event_order, base_segment));
+                            }
+                            Event::GenerationPublished(_) => {}
+                            _ => unreachable!(),
+                        }
+                    }
+                    Ok(())
+                },
+            )?;
+
+            let (commit_seq, commit_order, commit_base, commit) = commit.ok_or_else(|| {
+                Error::from_reason("RECOVERY_REQUIRED: signed migration commit is missing")
+            })?;
+            let (receipt_seq, receipt_order, receipt_base) = receipt_proof.ok_or_else(|| {
+                Error::from_reason("RECOVERY_REQUIRED: signed migration receipt is missing")
+            })?;
+            if commit_order >= receipt_order
+                || receipt_order >= activation_order
+                || (!commit_base && commit_seq != migration.migration_commit_frame_seq)
+                || (!receipt_base && receipt_seq != migration.generation.publication_seq)
+                || (!activation_base && activation_seq <= migration.generation.publication_seq)
+                || commit.total_chunks == 0
+                || chunks.len() != commit.total_chunks as usize
+                || chunks
+                    .keys()
+                    .enumerate()
+                    .any(|(index, chunk_index)| *chunk_index != index as u32)
+                || chunks.values().any(|(seq, order, base, chunk)| {
+                    order >= &commit_order
+                        || (!base && seq >= &commit_seq)
+                        || chunk.total_chunks != commit.total_chunks
+                })
+            {
+                return Err(Error::from_reason(
+                    "RECOVERY_REQUIRED: migration activation proof is incomplete or out of order",
+                ));
+            }
+            let ordered = chunks
+                .iter()
+                .map(|(index, (_, _, _, chunk))| (*index, chunk.chunk_sha256.clone()))
+                .collect::<Vec<_>>();
+            if Self::schema6_migration_aggregate_sha256(&ordered)? != commit.aggregate_sha256 {
+                return Err(Error::from_reason(
+                    "RECOVERY_REQUIRED: migration activation aggregate digest mismatch",
+                ));
+            }
+        } else if saw_migration_event {
+            return Err(Error::from_reason(
+                "RECOVERY_REQUIRED: fresh schema activation conflicts with migration events",
+            ));
+        }
+
+        Ok((Some(activation), saw_any_event, saw_v6_only_event))
     }
 
     fn read_ondisk_schema_version(root: &std::path::Path) -> Option<u32> {
@@ -4326,6 +9108,228 @@ impl Storage {
         let txt = fs::read_to_string(&state_path).ok()?;
         let val: serde_json::Value = serde_json::from_str(&txt).ok()?;
         Some(val["schema_version"].as_u64().unwrap_or(0) as u32)
+    }
+
+    fn validate_schema_upgrade_state(root: &std::path::Path) -> Result<()> {
+        let migration_marker = root.join("schema6_migration.json");
+        if migration_marker.exists() {
+            let marker = fs::read(&migration_marker)
+                .ok()
+                .and_then(|bytes| serde_json::from_slice::<serde_json::Value>(&bytes).ok())
+                .ok_or_else(|| Error::from_reason("SCHEMA_UPGRADE_STATE_INVALID"))?;
+            if marker["upgrade_state"].as_str() == Some("in_progress") {
+                return Err(Error::from_reason(
+                    "SCHEMA_UPGRADE_IN_PROGRESS: normal readers and writers are closed until the explicit schema migration reaches ready",
+                ));
+            }
+            return Err(Error::from_reason("SCHEMA_UPGRADE_STATE_INVALID"));
+        }
+        let state_path = root.join("state.json");
+        let Some(state) = fs::read_to_string(state_path)
+            .ok()
+            .and_then(|text| serde_json::from_str::<serde_json::Value>(&text).ok())
+        else {
+            return Ok(());
+        };
+        let on_disk_schema = state["schema_version"].as_u64().unwrap_or(0);
+        if on_disk_schema > SCHEMA_VERSION as u64
+            && state["upgrade_state"].as_str() != Some("in_progress")
+        {
+            return Ok(());
+        }
+        match state.get("upgrade_state") {
+            Some(value) if value.as_str() == Some("in_progress") => Err(Error::from_reason(
+                "SCHEMA_UPGRADE_IN_PROGRESS: normal readers and writers are closed until the explicit schema migration reaches ready",
+            )),
+            Some(value)
+                if value.as_str() == Some("ready")
+                    && on_disk_schema == SCHEMA_VERSION as u64 =>
+            {
+                Ok(())
+            }
+            Some(_) => Err(Error::from_reason("SCHEMA_UPGRADE_STATE_INVALID")),
+            None if on_disk_schema == SCHEMA_VERSION as u64 => {
+                Err(Error::from_reason("SCHEMA_UPGRADE_STATE_MISSING"))
+            }
+            None => Ok(()),
+        }
+    }
+
+    fn schema6_migration_marker(root: &Path) -> Result<Option<serde_json::Value>> {
+        let path = root.join("schema6_migration.json");
+        if !path.exists() {
+            return Ok(None);
+        }
+        let bytes =
+            fs::read(path).map_err(|_| Error::from_reason("SCHEMA_UPGRADE_STATE_INVALID"))?;
+        let marker = serde_json::from_slice::<serde_json::Value>(&bytes)
+            .map_err(|_| Error::from_reason("SCHEMA_UPGRADE_STATE_INVALID"))?;
+        Ok(Some(marker))
+    }
+
+    fn validate_schema6_migration_resume(
+        root: &Path,
+        migration_id: &str,
+        manifest_sha256: &str,
+    ) -> Result<()> {
+        let marker = Self::schema6_migration_marker(root)?
+            .ok_or_else(|| Error::from_reason("SCHEMA6_MIGRATION_RESUME_NOT_FOUND"))?;
+        let state: serde_json::Value = fs::read(root.join("state.json"))
+            .ok()
+            .and_then(|bytes| serde_json::from_slice(&bytes).ok())
+            .ok_or_else(|| Error::from_reason("SCHEMA_UPGRADE_STATE_INVALID"))?;
+        let source_state_before_cutover = state["schema_version"].as_u64()
+            == marker["source_schema"].as_u64()
+            && state.get("migration_id").is_none();
+        let state_after_cutover = state["schema_version"].as_u64() == Some(SCHEMA_VERSION as u64)
+            && state["migration_id"].as_str() == Some(migration_id)
+            && state["migration_manifest_sha256"].as_str() == Some(manifest_sha256)
+            && matches!(
+                state["upgrade_state"].as_str(),
+                Some("in_progress" | "ready")
+            );
+        if marker["version"].as_u64() != Some(1)
+            || marker["upgrade_state"].as_str() != Some("in_progress")
+            || marker["migration_id"].as_str() != Some(migration_id)
+            || marker["manifest_sha256"].as_str() != Some(manifest_sha256)
+            || !(source_state_before_cutover || state_after_cutover)
+        {
+            return Err(Error::from_reason("SCHEMA6_MIGRATION_RESUME_MISMATCH"));
+        }
+        Ok(())
+    }
+
+    fn atomic_write_json(path: &Path, value: &serde_json::Value) -> Result<()> {
+        let parent = path
+            .parent()
+            .ok_or_else(|| Error::from_reason("SCHEMA6_MIGRATION_MARKER_PATH_INVALID"))?;
+        let temporary = parent.join(format!(".schema6-marker-{}.tmp", Uuid::new_v4()));
+        let bytes =
+            serde_json::to_vec(value).map_err(|error| Error::from_reason(error.to_string()))?;
+        let mut file = FileOpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .open(&temporary)
+            .map_err(|error| Error::from_reason(error.to_string()))?;
+        file.write_all(&bytes)
+            .map_err(|error| Error::from_reason(error.to_string()))?;
+        file.sync_all()
+            .map_err(|error| Error::from_reason(error.to_string()))?;
+        drop(file);
+        Self::rename_with_retry(&temporary, path)
+    }
+
+    fn begin_schema6_migration(root: &Path, manifest: &Schema6MigrationManifestV1) -> Result<()> {
+        let marker_path = root.join("schema6_migration.json");
+        let marker = serde_json::json!({
+            "version": 1,
+            "upgrade_state": "in_progress",
+            "migration_id": manifest.migration_id,
+            "manifest_sha256": manifest.manifest_sha256,
+            "database_id": manifest.database_id,
+            "source_schema": manifest.source_schema,
+            "source_frontier": manifest.source_frontier,
+            "backup_sha256": manifest.backup.sha256,
+            "source_p6_manifest_sha256": manifest.p6_manifest_sha256,
+            "source_history_floors": manifest.source_history_floors,
+        });
+        if marker_path.exists() {
+            let existing = Self::schema6_migration_marker(root)?
+                .ok_or_else(|| Error::from_reason("SCHEMA_UPGRADE_STATE_INVALID"))?;
+            if existing != marker {
+                return Err(Error::from_reason("SCHEMA6_MIGRATION_RESUME_MISMATCH"));
+            }
+        } else {
+            let bytes = serde_json::to_vec(&marker)
+                .map_err(|error| Error::from_reason(error.to_string()))?;
+            let mut file = FileOpenOptions::new()
+                .write(true)
+                .create_new(true)
+                .open(&marker_path)
+                .map_err(|error| Error::from_reason(error.to_string()))?;
+            file.write_all(&bytes)
+                .map_err(|error| Error::from_reason(error.to_string()))?;
+            file.sync_all()
+                .map_err(|error| Error::from_reason(error.to_string()))?;
+            drop(file);
+        }
+
+        let mut state: serde_json::Value = fs::read(root.join("state.json"))
+            .ok()
+            .and_then(|bytes| serde_json::from_slice(&bytes).ok())
+            .ok_or_else(|| Error::from_reason("SCHEMA6_MIGRATION_SOURCE_STATE_INVALID"))?;
+        state["schema_version"] = serde_json::json!(SCHEMA_VERSION);
+        state["upgrade_state"] = serde_json::json!("in_progress");
+        state["migration_id"] = serde_json::json!(manifest.migration_id);
+        state["migration_manifest_sha256"] = serde_json::json!(manifest.manifest_sha256);
+        state["migration_database_id"] = serde_json::json!(manifest.database_id);
+        state["migration_source_schema"] = serde_json::json!(manifest.source_schema);
+        state["migration_source_frontier"] = serde_json::json!(manifest.source_frontier);
+        state["migration_backup_sha256"] = serde_json::json!(manifest.backup.sha256);
+        state["migration_source_p6_manifest_sha256"] =
+            serde_json::json!(manifest.p6_manifest_sha256);
+        state["migration_source_history_floors"] =
+            serde_json::to_value(&manifest.source_history_floors)
+                .map_err(|error| Error::from_reason(error.to_string()))?;
+        Self::atomic_write_json(&root.join("state.json"), &state)
+    }
+
+    fn finalize_schema6_migration(
+        &self,
+        manifest: &Schema6MigrationManifestV1,
+        commit_seq: u64,
+        generation: &GenerationInfo,
+        post_migration_manifest_sha256: &str,
+    ) -> Result<()> {
+        if generation.wal_frontier != commit_seq
+            || generation.publication_seq != commit_seq.saturating_add(1)
+            || generation.component_manifest_sha256 != post_migration_manifest_sha256
+            || post_migration_manifest_sha256.len() != 64
+        {
+            return Err(Error::from_reason("SCHEMA6_MIGRATION_RECEIPT_MISMATCH"));
+        }
+        let state_path = self.path.join("state.json");
+        let mut state: serde_json::Value = serde_json::from_slice(
+            &fs::read(&state_path).map_err(|error| Error::from_reason(error.to_string()))?,
+        )
+        .map_err(|error| Error::from_reason(error.to_string()))?;
+        if state["migration_id"].as_str() != Some(manifest.migration_id.as_str())
+            || state["migration_manifest_sha256"].as_str()
+                != Some(manifest.manifest_sha256.as_str())
+        {
+            return Err(Error::from_reason("SCHEMA6_MIGRATION_RESUME_MISMATCH"));
+        }
+        self.install_schema6_activation(Schema6ActivationV1 {
+            version: 1,
+            schema_version: SCHEMA_VERSION,
+            database_id: self.database_id(),
+            migration: Some(Schema6MigrationActivationV1 {
+                migration_id: manifest.migration_id.clone(),
+                manifest_sha256: manifest.manifest_sha256.clone(),
+                source_database_id: manifest.database_id.clone(),
+                source_schema: manifest.source_schema,
+                source_frontier: manifest.source_frontier,
+                source_history_floors: manifest.source_history_floors.clone(),
+                backup_sha256: manifest.backup.sha256.clone(),
+                source_p6_manifest_sha256: manifest.p6_manifest_sha256.clone(),
+                migration_commit_frame_seq: commit_seq,
+                generation: generation.clone(),
+                post_migration_manifest_sha256: post_migration_manifest_sha256.to_string(),
+            }),
+        })?;
+        state["upgrade_state"] = serde_json::json!("ready");
+        state["migration_commit_seq"] = serde_json::json!(commit_seq);
+        state["migration_receipt_seq"] = serde_json::json!(generation.publication_seq);
+        state["migration_p6_manifest_sha256"] = serde_json::json!(post_migration_manifest_sha256);
+        state["migration_generation"] = serde_json::to_value(generation)
+            .map_err(|error| Error::from_reason(error.to_string()))?;
+        state["p6"]["generation"] = serde_json::to_value(generation)
+            .map_err(|error| Error::from_reason(error.to_string()))?;
+        Self::atomic_write_json(&state_path, &state)?;
+        self.validate_schema6_migration_authority()?;
+        fs::remove_file(self.path.join("schema6_migration.json"))
+            .map_err(|error| Error::from_reason(error.to_string()))?;
+        Ok(())
     }
 
     fn open_projection(path: &std::path::Path, read_only: bool) -> Result<Connection> {
@@ -4385,7 +9389,8 @@ impl Storage {
                 transaction_id TEXT PRIMARY KEY,
                 commit_sequence INTEGER NOT NULL,
                 payload_hash TEXT NOT NULL,
-                frame_seq INTEGER
+                frame_seq INTEGER,
+                advances_txn_frontier INTEGER NOT NULL DEFAULT 1
             );
             -- WP-2.1: per-entity version chain keyed by the LOCAL frame seq
             -- (tx-time axis, ADR D2). One row per Node frame this replica
@@ -4482,13 +9487,33 @@ impl Storage {
                     transaction_id TEXT PRIMARY KEY,
                     commit_sequence INTEGER NOT NULL,
                     payload_hash TEXT NOT NULL,
-                    frame_seq INTEGER
+                    frame_seq INTEGER,
+                    advances_txn_frontier INTEGER NOT NULL DEFAULT 1
                 );
                 INSERT INTO applied_transactions_v2(transaction_id, commit_sequence, payload_hash)
                     SELECT transaction_id, commit_sequence, payload_hash FROM applied_transactions;
                 DROP TABLE applied_transactions;
                 ALTER TABLE applied_transactions_v2 RENAME TO applied_transactions;
                 ",
+            )
+            .map_err(|e| Error::from_reason(e.to_string()))?;
+        }
+        let has_advances_txn_frontier = conn
+            .prepare("PRAGMA table_info(applied_transactions)")
+            .and_then(|mut stmt| {
+                let rows = stmt.query_map([], |row| row.get::<_, String>(1))?;
+                for name in rows {
+                    if name? == "advances_txn_frontier" {
+                        return Ok(true);
+                    }
+                }
+                Ok(false)
+            })
+            .map_err(|e| Error::from_reason(e.to_string()))?;
+        if !has_advances_txn_frontier {
+            conn.execute(
+                "ALTER TABLE applied_transactions ADD COLUMN advances_txn_frontier INTEGER NOT NULL DEFAULT 1",
+                [],
             )
             .map_err(|e| Error::from_reason(e.to_string()))?;
         }
@@ -4550,6 +9575,128 @@ impl Storage {
             [],
         )
         .map_err(|e| Error::from_reason(e.to_string()))?;
+        Ok(())
+    }
+
+    fn init_hql2_revision_schema(conn: &Connection) -> Result<()> {
+        conn.execute_batch(
+            "
+            CREATE TABLE IF NOT EXISTS hql2_record_revisions (
+                database_id TEXT NOT NULL,
+                namespace TEXT NOT NULL,
+                kind TEXT NOT NULL,
+                record_id TEXT NOT NULL,
+                revision_id TEXT NOT NULL,
+                predecessor_revision_id TEXT,
+                operation TEXT NOT NULL,
+                valid_from TEXT NOT NULL,
+                valid_to TEXT,
+                tx_from INTEGER NOT NULL,
+                tx_to INTEGER,
+                schema_ref TEXT,
+                schema_version INTEGER,
+                origin_database_id TEXT NOT NULL,
+                payload_json TEXT NOT NULL,
+                PRIMARY KEY (database_id, namespace, kind, record_id, revision_id),
+                CHECK (valid_to IS NULL OR valid_to > valid_from),
+                CHECK (tx_to IS NULL OR tx_to > tx_from)
+            );
+            CREATE INDEX IF NOT EXISTS idx_hql2_revisions_visibility
+                ON hql2_record_revisions(database_id, namespace, kind, record_id, tx_from, tx_to, valid_from, valid_to);
+            CREATE TABLE IF NOT EXISTS hql2_row_identity_registry (
+                database_id TEXT NOT NULL,
+                namespace TEXT NOT NULL,
+                table_name TEXT NOT NULL,
+                row_id TEXT NOT NULL,
+                key_codec_version INTEGER NOT NULL,
+                key_bytes BLOB NOT NULL,
+                created_revision_id TEXT NOT NULL,
+                PRIMARY KEY (database_id, namespace, table_name, row_id)
+            );
+            CREATE INDEX IF NOT EXISTS idx_hql2_row_keys
+                ON hql2_row_identity_registry(database_id, namespace, table_name, key_codec_version, key_bytes);
+            CREATE TABLE IF NOT EXISTS hql2_annotation_targets (
+                database_id TEXT NOT NULL,
+                namespace TEXT NOT NULL,
+                annotation_id TEXT NOT NULL,
+                annotation_revision_id TEXT NOT NULL,
+                target_kind TEXT NOT NULL,
+                target_id TEXT NOT NULL,
+                target_revision_id TEXT,
+                binding TEXT NOT NULL,
+                selector_json TEXT NOT NULL,
+                is_evidence INTEGER NOT NULL,
+                PRIMARY KEY (database_id, namespace, annotation_id, annotation_revision_id, target_kind, target_id, target_revision_id, is_evidence)
+            );
+            CREATE INDEX IF NOT EXISTS idx_hql2_annotation_target
+                ON hql2_annotation_targets(database_id, namespace, target_kind, target_id, target_revision_id);
+            CREATE TABLE IF NOT EXISTS hql2_source_history_floors (
+                namespace TEXT NOT NULL,
+                source TEXT NOT NULL,
+                history_floor INTEGER NOT NULL,
+                PRIMARY KEY (namespace, source)
+            );
+            CREATE TABLE IF NOT EXISTS hql2_schema_metadata (
+                key TEXT PRIMARY KEY,
+                value TEXT NOT NULL
+            );
+            CREATE TABLE IF NOT EXISTS hql2_transaction_revisions (
+                transaction_id TEXT PRIMARY KEY,
+                revision_json TEXT NOT NULL
+            );
+            CREATE TABLE IF NOT EXISTS hql2_schema6_migrations (
+                migration_id TEXT PRIMARY KEY,
+                source_database_id TEXT NOT NULL,
+                source_schema INTEGER NOT NULL,
+                source_frontier INTEGER NOT NULL,
+                total_chunks INTEGER NOT NULL,
+                manifest_sha256 TEXT NOT NULL,
+                status TEXT NOT NULL,
+                aggregate_sha256 TEXT,
+                migration_commit_frame_seq INTEGER,
+                commit_frame_seq INTEGER
+            );
+            CREATE TABLE IF NOT EXISTS hql2_schema6_migration_chunks (
+                migration_id TEXT NOT NULL,
+                chunk_index INTEGER NOT NULL,
+                chunk_sha256 TEXT NOT NULL,
+                chunk_json TEXT NOT NULL,
+                frame_seq INTEGER NOT NULL,
+                PRIMARY KEY (migration_id, chunk_index)
+            );
+            INSERT INTO hql2_schema_metadata(key, value) VALUES('revision_schema_version', '1')
+                ON CONFLICT(key) DO NOTHING;
+            INSERT INTO hql2_source_history_floors(namespace, source, history_floor)
+                VALUES('default', 'row', 0), ('default', 'annotation', 0), ('default', 'vector', 0)
+                ON CONFLICT(namespace, source) DO NOTHING;
+            ",
+        )
+        .map_err(|e| Error::from_reason(e.to_string()))?;
+        let version: String = conn
+            .query_row(
+                "SELECT value FROM hql2_schema_metadata WHERE key='revision_schema_version'",
+                [],
+                |row| row.get(0),
+            )
+            .map_err(|e| Error::from_reason(e.to_string()))?;
+        if version != "1" {
+            return Err(Error::from_reason("HQL2_REVISION_SCHEMA_UNSUPPORTED"));
+        }
+        Ok(())
+    }
+
+    fn validate_hql2_revision_schema(conn: &Connection) -> Result<()> {
+        let version = conn
+            .query_row(
+                "SELECT value FROM hql2_schema_metadata WHERE key='revision_schema_version'",
+                [],
+                |row| row.get::<_, String>(0),
+            )
+            .optional()
+            .map_err(|e| Error::from_reason(e.to_string()))?;
+        if version.as_deref() != Some("1") {
+            return Err(Error::from_reason("HQL2_REVISION_SCHEMA_UNAVAILABLE"));
+        }
         Ok(())
     }
 
@@ -5251,6 +10398,598 @@ impl Storage {
         Ok(())
     }
 
+    fn encode_relational_primary_key_v1(
+        schema: &RelationalSchemaPackage,
+        mutation: &RelationalRowMutation,
+    ) -> Result<Vec<u8>> {
+        use query::hql2::key_codec::{encode_key_v1, KeyComponentV1};
+
+        let table = schema
+            .tables
+            .iter()
+            .find(|table| table.name == mutation.table)
+            .ok_or_else(|| Error::from_reason("relational mutation references unknown table"))?;
+        let values = match mutation.kind {
+            RelationalMutationKind::Insert | RelationalMutationKind::Upsert => {
+                mutation.values.as_object()
+            }
+            RelationalMutationKind::Update | RelationalMutationKind::Delete => {
+                mutation.key.as_ref().and_then(Value::as_object)
+            }
+        }
+        .ok_or_else(|| Error::from_reason("relational mutation requires an object key"))?;
+
+        let key_values = table
+            .primary_key
+            .iter()
+            .map(|name| {
+                let column = table
+                    .columns
+                    .iter()
+                    .find(|column| column.name == *name)
+                    .expect("validated primary key");
+                values
+                    .get(name)
+                    .or(column.default.as_ref())
+                    .cloned()
+                    .unwrap_or(Value::Null)
+            })
+            .collect::<Vec<_>>();
+        let mut components = Vec::with_capacity(table.primary_key.len());
+        for (name, value) in table.primary_key.iter().zip(&key_values) {
+            let column = table
+                .columns
+                .iter()
+                .find(|column| column.name == *name)
+                .expect("validated primary key");
+            Self::json_to_sql_typed(column, value)?;
+            if value.is_null() {
+                components.push(KeyComponentV1::Null);
+                continue;
+            }
+            components.push(match column.column_type {
+                RelationalColumnType::Text => {
+                    KeyComponentV1::Text(value.as_str().expect("validated relational text key"))
+                }
+                RelationalColumnType::Integer => KeyComponentV1::Integer(
+                    value.as_i64().expect("validated relational integer key"),
+                ),
+                RelationalColumnType::Real => {
+                    KeyComponentV1::Real(value.as_f64().expect("validated relational real key"))
+                }
+                RelationalColumnType::Boolean => KeyComponentV1::Boolean(
+                    value.as_bool().expect("validated relational boolean key"),
+                ),
+                RelationalColumnType::Json => KeyComponentV1::Json(value),
+                RelationalColumnType::Blob => KeyComponentV1::Blob(
+                    value
+                        .as_array()
+                        .expect("validated relational blob key")
+                        .iter()
+                        .map(|byte| byte.as_u64().expect("validated blob byte") as u8)
+                        .collect(),
+                ),
+                RelationalColumnType::Timestamp => KeyComponentV1::Timestamp(
+                    value.as_str().expect("validated relational timestamp key"),
+                ),
+                RelationalColumnType::EntityId => KeyComponentV1::EntityId(
+                    value.as_str().expect("validated relational entity-id key"),
+                ),
+            });
+        }
+        encode_key_v1(&components).map_err(|error| Error::from_reason(error.to_string()))
+    }
+
+    fn relational_primary_key_values(
+        table: &RelationalTable,
+        mutation: &RelationalRowMutation,
+    ) -> Result<serde_json::Map<String, Value>> {
+        let source = match mutation.kind {
+            RelationalMutationKind::Insert | RelationalMutationKind::Upsert => {
+                mutation.values.as_object()
+            }
+            RelationalMutationKind::Update | RelationalMutationKind::Delete => {
+                mutation.key.as_ref().and_then(Value::as_object)
+            }
+        }
+        .ok_or_else(|| Error::from_reason("relational mutation requires an object key"))?;
+        let mut values = serde_json::Map::new();
+        for name in &table.primary_key {
+            let column = table
+                .columns
+                .iter()
+                .find(|column| column.name == *name)
+                .expect("validated primary key");
+            let value = source
+                .get(name)
+                .or(column.default.as_ref())
+                .cloned()
+                .unwrap_or(Value::Null);
+            Self::json_to_sql_typed(column, &value)?;
+            values.insert(name.clone(), value);
+        }
+        Ok(values)
+    }
+
+    fn relational_row_by_key(
+        conn: &Connection,
+        schema: &RelationalSchemaPackage,
+        table: &RelationalTable,
+        key: &serde_json::Map<String, Value>,
+    ) -> Result<Option<serde_json::Map<String, Value>>> {
+        if table
+            .primary_key
+            .iter()
+            .any(|name| key.get(name).is_none_or(Value::is_null))
+        {
+            return Ok(None);
+        }
+        let physical = Self::physical_table(&schema.namespace, &table.name)?;
+        let columns = table
+            .columns
+            .iter()
+            .map(|column| format!("\"{}\"", column.name))
+            .collect::<Vec<_>>()
+            .join(", ");
+        let predicates = table
+            .primary_key
+            .iter()
+            .map(|name| format!("\"{name}\" = ?"))
+            .collect::<Vec<_>>()
+            .join(" AND ");
+        let sql = format!("SELECT {columns} FROM \"{physical}\" WHERE {predicates} LIMIT 2");
+        let values = table
+            .primary_key
+            .iter()
+            .map(|name| {
+                let column = table
+                    .columns
+                    .iter()
+                    .find(|column| column.name == *name)
+                    .expect("validated primary key");
+                Self::json_to_sql_typed(column, &key[name])
+            })
+            .collect::<Result<Vec<_>>>()?;
+        let mut statement = conn
+            .prepare(&sql)
+            .map_err(|error| Error::from_reason(error.to_string()))?;
+        let rows = statement
+            .query_map(params_from_iter(values), |row| {
+                (0..table.columns.len())
+                    .map(|index| row.get::<_, SqlValue>(index))
+                    .collect::<rusqlite::Result<Vec<_>>>()
+            })
+            .map_err(|error| Error::from_reason(error.to_string()))?
+            .collect::<std::result::Result<Vec<_>, _>>()
+            .map_err(|error| Error::from_reason(error.to_string()))?;
+        if rows.len() > 1 {
+            return Err(Error::from_reason("HQL2_ROW_KEY_AMBIGUOUS"));
+        }
+        let Some(values) = rows.into_iter().next() else {
+            return Ok(None);
+        };
+        let mut image = serde_json::Map::new();
+        for (column, value) in table.columns.iter().zip(values) {
+            let value = match (&column.column_type, value) {
+                (_, SqlValue::Null) => Value::Null,
+                (RelationalColumnType::Boolean, SqlValue::Integer(value)) => {
+                    Value::Bool(value != 0)
+                }
+                (RelationalColumnType::Json, SqlValue::Text(value)) => serde_json::from_str(&value)
+                    .map_err(|error| Error::from_reason(error.to_string()))?,
+                (RelationalColumnType::Blob, SqlValue::Blob(value)) => {
+                    Value::Array(value.into_iter().map(Value::from).collect())
+                }
+                (RelationalColumnType::Integer, SqlValue::Integer(value)) => Value::from(value),
+                (RelationalColumnType::Real, SqlValue::Real(value)) => Value::Number(
+                    serde_json::Number::from_f64(value)
+                        .ok_or_else(|| Error::from_reason("REL_STORAGE_TYPE_MISMATCH"))?,
+                ),
+                (
+                    RelationalColumnType::Text
+                    | RelationalColumnType::Timestamp
+                    | RelationalColumnType::EntityId,
+                    SqlValue::Text(value),
+                ) => Value::String(value),
+                (RelationalColumnType::Real, SqlValue::Integer(value)) => Value::Number(
+                    serde_json::Number::from_f64(value as f64)
+                        .ok_or_else(|| Error::from_reason("REL_STORAGE_TYPE_MISMATCH"))?,
+                ),
+                (_, _) => return Err(Error::from_reason("REL_STORAGE_TYPE_MISMATCH")),
+            };
+            image.insert(column.name.clone(), value);
+        }
+        Ok(Some(image))
+    }
+
+    fn active_row_id_for_key(
+        conn: &Connection,
+        database_id: &str,
+        namespace: &str,
+        table_name: &str,
+        key_bytes: &[u8],
+    ) -> Result<Option<String>> {
+        let mut statement = conn
+            .prepare(
+                "SELECT r.row_id
+                 FROM hql2_row_identity_registry r
+                 JOIN hql2_record_revisions v
+                   ON v.database_id=r.database_id AND v.namespace=r.namespace
+                  AND v.kind='row' AND v.record_id=r.row_id AND v.tx_to IS NULL
+                  AND v.operation='upsert'
+                 WHERE r.database_id=?1 AND r.namespace=?2 AND r.table_name=?3
+                   AND r.key_codec_version=1 AND r.key_bytes=?4
+                 ORDER BY r.row_id LIMIT 2",
+            )
+            .map_err(|error| Error::from_reason(error.to_string()))?;
+        let rows = statement
+            .query_map(
+                params![database_id, namespace, table_name, key_bytes],
+                |row| row.get::<_, String>(0),
+            )
+            .map_err(|error| Error::from_reason(error.to_string()))?
+            .collect::<std::result::Result<Vec<_>, _>>()
+            .map_err(|error| Error::from_reason(error.to_string()))?;
+        if rows.len() > 1 {
+            return Err(Error::from_reason("HQL2_ROW_IDENTITY_AMBIGUOUS"));
+        }
+        Ok(rows.into_iter().next())
+    }
+
+    fn complete_relational_insert_image(
+        table: &RelationalTable,
+        mutation: &RelationalRowMutation,
+    ) -> Result<serde_json::Map<String, Value>> {
+        let values = mutation
+            .values
+            .as_object()
+            .ok_or_else(|| Error::from_reason("relational mutation requires an object payload"))?;
+        let mut image = serde_json::Map::new();
+        for column in &table.columns {
+            let value = values
+                .get(&column.name)
+                .or(column.default.as_ref())
+                .cloned()
+                .unwrap_or(Value::Null);
+            Self::json_to_sql_typed(column, &value)?;
+            image.insert(column.name.clone(), value);
+        }
+        Ok(image)
+    }
+
+    fn prepare_relational_row_revisions_tx(
+        &self,
+        tx: &rusqlite::Transaction<'_>,
+        schema: &RelationalSchemaPackage,
+        mutations: &[RelationalRowMutation],
+    ) -> Result<(u32, Vec<uee_v2::RecordRevisionMutationV1>)> {
+        struct RowPlan {
+            table: RelationalTable,
+            key: serde_json::Map<String, Value>,
+            key_bytes: Vec<u8>,
+            before: Option<serde_json::Map<String, Value>>,
+            before_row_id: Option<String>,
+            before_revision: Option<String>,
+            before_valid_from: Option<DateTime<Utc>>,
+            saw_delete: bool,
+            reinserted: bool,
+        }
+
+        let database_id = self.database_id();
+        let mut plans = HashMap::<(String, Vec<u8>), RowPlan>::new();
+        let mut nullable_inserts = Vec::new();
+        for mutation in mutations {
+            let table = schema
+                .tables
+                .iter()
+                .find(|table| table.name == mutation.table)
+                .ok_or_else(|| {
+                    Error::from_reason("relational mutation references unknown table")
+                })?;
+            let key = Self::relational_primary_key_values(table, mutation)?;
+            let key_bytes = Self::encode_relational_primary_key_v1(schema, mutation)?;
+            let has_null = table
+                .primary_key
+                .iter()
+                .any(|name| key.get(name).is_none_or(Value::is_null));
+            if has_null {
+                if matches!(
+                    mutation.kind,
+                    RelationalMutationKind::Insert | RelationalMutationKind::Upsert
+                ) {
+                    nullable_inserts.push((table.clone(), key, key_bytes, mutation.clone()));
+                }
+                continue;
+            }
+            let identity = (table.name.clone(), key_bytes.clone());
+            if !plans.contains_key(&identity) {
+                let before = Self::relational_row_by_key(tx, schema, table, &key)?;
+                let before_row_id = if before.is_some() {
+                    Some(
+                        Self::active_row_id_for_key(
+                            tx,
+                            &database_id,
+                            &schema.namespace,
+                            &table.name,
+                            &key_bytes,
+                        )?
+                        .ok_or_else(|| Error::from_reason("HQL2_ROW_IDENTITY_MISSING"))?,
+                    )
+                } else {
+                    None
+                };
+                let revision = before_row_id
+                    .as_deref()
+                    .map(|row_id| {
+                        Self::current_record_revision_interval(
+                            tx,
+                            &database_id,
+                            &schema.namespace,
+                            &uee_v2::RecordKindV2::Row,
+                            row_id,
+                        )
+                    })
+                    .transpose()?
+                    .flatten();
+                if before_row_id.is_some() && revision.is_none() {
+                    return Err(Error::from_reason("HQL2_ROW_REVISION_MISSING"));
+                }
+                plans.insert(
+                    identity.clone(),
+                    RowPlan {
+                        table: table.clone(),
+                        key: key.clone(),
+                        key_bytes,
+                        before,
+                        before_row_id,
+                        before_revision: revision.as_ref().map(|(id, _)| id.clone()),
+                        before_valid_from: revision.map(|(_, valid_from)| valid_from),
+                        saw_delete: false,
+                        reinserted: false,
+                    },
+                );
+            }
+            if let Some(plan) = plans.get_mut(&identity) {
+                match mutation.kind {
+                    RelationalMutationKind::Delete => plan.saw_delete = true,
+                    RelationalMutationKind::Insert | RelationalMutationKind::Upsert
+                        if plan.saw_delete =>
+                    {
+                        plan.reinserted = true;
+                        plan.saw_delete = false;
+                    }
+                    _ => {}
+                }
+            }
+        }
+
+        let affected = Self::projection_apply_rows_tx(tx, schema, mutations)?;
+        let mut now = Utc::now();
+        if let Some(previous_valid_from) = plans
+            .values()
+            .filter_map(|plan| plan.before_valid_from)
+            .max()
+        {
+            if now <= previous_valid_from {
+                now = previous_valid_from
+                    .checked_add_signed(chrono::Duration::nanoseconds(1))
+                    .ok_or_else(|| Error::from_reason("REVISION_VALID_TIME_INVALID"))?;
+            }
+        }
+        let mut revisions = Vec::new();
+        macro_rules! append_row_upsert {
+            ($table:expr, $key:expr, $key_bytes:expr, $row_id:expr, $expected:expr, $image:expr) => {{
+                let expected_revision_id: Option<String> = $expected;
+                revisions.push(uee_v2::RecordRevisionMutationV1 {
+                    namespace: schema.namespace.clone(),
+                    kind: uee_v2::RecordKindV2::Row,
+                    id: $row_id,
+                    revision_id: Uuid::new_v4().to_string(),
+                    predecessor_revision_id: expected_revision_id.clone(),
+                    expected_revision_id,
+                    operation: uee_v2::RevisionOperationV1::Upsert,
+                    valid_from: now,
+                    valid_to: None,
+                    schema_ref: Some($table.name.clone()),
+                    schema_version: Some(schema.schema_version as u64),
+                    key_codec_version: Some(1),
+                    key_bytes: Some($key_bytes.to_vec()),
+                    payload: serde_json::json!({
+                        "table": $table.name,
+                        "key": $key,
+                        "key_codec_version": 1,
+                        "key_bytes": hex::encode($key_bytes),
+                        "after_image": $image,
+                    }),
+                });
+            }};
+        }
+        macro_rules! append_row_retraction {
+            ($plan:expr) => {{
+                let plan: &RowPlan = $plan;
+                let row_id = plan
+                    .before_row_id
+                    .clone()
+                    .ok_or_else(|| Error::from_reason("HQL2_ROW_IDENTITY_MISSING"))?;
+                let predecessor = plan
+                    .before_revision
+                    .clone()
+                    .ok_or_else(|| Error::from_reason("HQL2_ROW_REVISION_MISSING"))?;
+                let valid_from = plan
+                    .before_valid_from
+                    .ok_or_else(|| Error::from_reason("HQL2_ROW_REVISION_MISSING"))?;
+                if now <= valid_from {
+                    return Err(Error::from_reason("REVISION_VALID_TIME_INVALID"));
+                }
+                revisions.push(uee_v2::RecordRevisionMutationV1 {
+                    namespace: schema.namespace.clone(),
+                    kind: uee_v2::RecordKindV2::Row,
+                    id: row_id,
+                    revision_id: Uuid::new_v4().to_string(),
+                    expected_revision_id: Some(predecessor.clone()),
+                    predecessor_revision_id: Some(predecessor),
+                    operation: uee_v2::RevisionOperationV1::Retract,
+                    valid_from,
+                    valid_to: Some(now),
+                    schema_ref: Some(plan.table.name.clone()),
+                    schema_version: Some(schema.schema_version as u64),
+                    key_codec_version: Some(1),
+                    key_bytes: Some(plan.key_bytes.clone()),
+                    payload: serde_json::json!({
+                        "table": plan.table.name,
+                        "key": plan.key,
+                        "key_codec_version": 1,
+                        "key_bytes": hex::encode(&plan.key_bytes),
+                        "tombstone": true,
+                    }),
+                });
+                Ok::<(), Error>(())
+            }};
+        }
+
+        let mut plan_identities = plans.keys().cloned().collect::<Vec<_>>();
+        plan_identities.sort();
+        for identity in plan_identities {
+            let plan = plans
+                .get(&identity)
+                .expect("row plan identity was collected from the map");
+            let after = Self::relational_row_by_key(tx, schema, &plan.table, &plan.key)?;
+            match (plan.before.is_some(), after) {
+                (false, Some(after_image)) => append_row_upsert!(
+                    &plan.table,
+                    &plan.key,
+                    &plan.key_bytes,
+                    Uuid::new_v4().to_string(),
+                    None,
+                    after_image
+                ),
+                (true, None) => append_row_retraction!(plan)?,
+                (true, Some(after_image)) if plan.reinserted => {
+                    append_row_retraction!(plan)?;
+                    append_row_upsert!(
+                        &plan.table,
+                        &plan.key,
+                        &plan.key_bytes,
+                        Uuid::new_v4().to_string(),
+                        None,
+                        after_image
+                    );
+                }
+                (true, Some(after_image)) => append_row_upsert!(
+                    &plan.table,
+                    &plan.key,
+                    &plan.key_bytes,
+                    plan.before_row_id
+                        .clone()
+                        .ok_or_else(|| Error::from_reason("HQL2_ROW_IDENTITY_MISSING"))?,
+                    plan.before_revision.clone(),
+                    after_image
+                ),
+                (false, None) => {}
+            }
+        }
+        for (table, key, key_bytes, mutation) in nullable_inserts {
+            append_row_upsert!(
+                &table,
+                &key,
+                &key_bytes,
+                Uuid::new_v4().to_string(),
+                None,
+                Self::complete_relational_insert_image(&table, &mutation)?
+            );
+        }
+        Ok((affected, revisions))
+    }
+
+    fn validate_row_revision_binding(
+        conn: &Connection,
+        expected: &[uee_v2::RecordRevisionMutationV1],
+        transaction: Option<&uee_v2::RecordRevisionTransactionV1>,
+        database_id: &str,
+    ) -> Result<()> {
+        let mut actual = transaction
+            .map(|transaction| {
+                transaction
+                    .mutations
+                    .iter()
+                    .filter(|mutation| mutation.kind == uee_v2::RecordKindV2::Row)
+                    .cloned()
+                    .collect::<Vec<_>>()
+            })
+            .unwrap_or_default();
+        if actual.len() != expected.len() {
+            return Err(Error::from_reason("REVISION_EVENT_MISMATCH"));
+        }
+
+        for expected_mutation in expected {
+            let position = actual.iter().position(|candidate| {
+                candidate.namespace == expected_mutation.namespace
+                    && candidate.schema_ref == expected_mutation.schema_ref
+                    && candidate.schema_version == expected_mutation.schema_version
+                    && candidate.key_codec_version == expected_mutation.key_codec_version
+                    && candidate.key_bytes == expected_mutation.key_bytes
+                    && candidate.operation == expected_mutation.operation
+                    && candidate.expected_revision_id == expected_mutation.expected_revision_id
+                    && candidate.predecessor_revision_id
+                        == expected_mutation.predecessor_revision_id
+                    && candidate.payload == expected_mutation.payload
+            });
+            let Some(position) = position else {
+                return Err(Error::from_reason("REVISION_EVENT_MISMATCH"));
+            };
+            let candidate = actual.remove(position);
+            if expected_mutation.expected_revision_id.is_some()
+                && candidate.id != expected_mutation.id
+            {
+                return Err(Error::from_reason("REVISION_EVENT_MISMATCH"));
+            }
+            if candidate.operation == uee_v2::RevisionOperationV1::Retract {
+                if candidate.valid_from != expected_mutation.valid_from
+                    || candidate
+                        .valid_to
+                        .is_none_or(|valid_to| valid_to <= candidate.valid_from)
+                {
+                    return Err(Error::from_reason("REVISION_VALID_TIME_INVALID"));
+                }
+            } else {
+                if candidate.valid_to.is_some() {
+                    return Err(Error::from_reason("REVISION_VALID_TIME_INVALID"));
+                }
+                if let Some(expected_revision_id) = candidate.expected_revision_id.as_deref() {
+                    let current = Self::current_record_revision_interval(
+                        conn,
+                        database_id,
+                        &candidate.namespace,
+                        &uee_v2::RecordKindV2::Row,
+                        &candidate.id,
+                    )?
+                    .filter(|(revision_id, _)| revision_id == expected_revision_id)
+                    .ok_or_else(|| Error::from_reason("REVISION_CONFLICT"))?;
+                    if candidate.valid_from <= current.1 {
+                        return Err(Error::from_reason("REVISION_VALID_TIME_INVALID"));
+                    }
+                } else {
+                    let table_name = candidate
+                        .schema_ref
+                        .as_deref()
+                        .ok_or_else(|| Error::from_reason("HQL2_ROW_SCHEMA_REQUIRED"))?;
+                    let registered: bool = conn
+                        .query_row(
+                            "SELECT EXISTS(SELECT 1 FROM hql2_row_identity_registry
+                             WHERE database_id=?1 AND namespace=?2 AND table_name=?3 AND row_id=?4)",
+                            params![database_id, candidate.namespace, table_name, candidate.id],
+                            |row| row.get(0),
+                        )
+                        .map_err(|error| Error::from_reason(error.to_string()))?;
+                    if registered {
+                        return Err(Error::from_reason("HQL2_ROW_IDENTITY_CONFLICT"));
+                    }
+                }
+            }
+        }
+        Ok(())
+    }
+
     fn projection_apply_rows_tx(
         tx: &rusqlite::Transaction<'_>,
         schema: &RelationalSchemaPackage,
@@ -5657,6 +11396,50 @@ impl Storage {
         Ok(())
     }
 
+    fn projection_apply_node_retraction_tx(
+        tx: &rusqlite::Transaction<'_>,
+        node_u32: u32,
+        retraction: &NodeRetractionEvent,
+        frame_seq: u64,
+    ) -> Result<bool> {
+        let latest: Option<(u32, String)> = tx
+            .query_row(
+                "SELECT clock_time,clock_peer FROM node_versions
+                 WHERE node_u32=?1 ORDER BY frame_seq DESC LIMIT 1",
+                [node_u32],
+                |row| Ok((row.get(0)?, row.get(1)?)),
+            )
+            .optional()
+            .map_err(|error| Error::from_reason(error.to_string()))?;
+        if latest
+            .is_some_and(|clock| clock > (retraction.clock.time, retraction.clock.peer_id.clone()))
+        {
+            return Ok(false);
+        }
+        tx.execute("DELETE FROM props WHERE node_u32 = ?1", params![node_u32])
+            .map_err(|error| Error::from_reason(error.to_string()))?;
+        tx.execute(
+            "DELETE FROM node_labels WHERE node_u32 = ?1",
+            params![node_u32],
+        )
+        .map_err(|error| Error::from_reason(error.to_string()))?;
+        tx.execute(
+            "UPDATE edge_versions SET tx_to=?2 WHERE (from_id=?1 OR to_id=?1) AND tx_to IS NULL",
+            params![retraction.id, frame_seq],
+        )
+        .map_err(|error| Error::from_reason(error.to_string()))?;
+        Self::projection_delete_incident_edges(tx, node_u32)?;
+        Self::projection_append_retract_version(
+            tx,
+            node_u32,
+            &retraction.id,
+            frame_seq,
+            &retraction.clock,
+            &retraction.retracted_at,
+        )?;
+        Ok(true)
+    }
+
     /// Apply one journal event to the SQLite projection. `frame_seq` is the
     /// event's LOCAL frame stamp (WP-1.2) — the authoritative sequence for
     /// transaction identity and the frontier keys.
@@ -5692,6 +11475,7 @@ impl Storage {
                 payload_hash,
                 affected_rows,
                 mutations,
+                record_revision_transaction,
             } => {
                 let schema = Self::load_relational_schema_conn(&conn, namespace)?
                     .ok_or_else(|| Error::from_reason("relational schema is not registered"))?;
@@ -5719,15 +11503,81 @@ impl Storage {
                         };
                     }
                 }
+                if self.storage_schema_version != SCHEMA_VERSION
+                    && record_revision_transaction.is_some()
+                {
+                    return Err(Error::from_reason(
+                        "SCHEMA_VERSION_UNSUPPORTED: record revisions require schema v6",
+                    ));
+                }
+                if mutation_id.is_empty() && record_revision_transaction.is_some() {
+                    return Err(Error::from_reason("HQL2_ROW_EVENT_ID_REQUIRED"));
+                }
+                if let Some(revisions) = record_revision_transaction.as_ref() {
+                    if revisions
+                        .mutations
+                        .iter()
+                        .any(|mutation| mutation.kind != uee_v2::RecordKindV2::Row)
+                    {
+                        return Err(Error::from_reason("REVISION_EVENT_MISMATCH"));
+                    }
+                    Self::validate_record_revision_transaction(
+                        &conn,
+                        revisions,
+                        &self.database_id(),
+                    )?;
+                    self.validate_vector_revision_spaces(revisions)?;
+                }
                 let tx = conn
                     .transaction()
                     .map_err(|e| Error::from_reason(e.to_string()))?;
-                let applied = Self::projection_apply_rows_tx(&tx, &schema, mutations)?;
+                let (applied, expected) =
+                    if self.storage_schema_version == SCHEMA_VERSION && !mutation_id.is_empty() {
+                        self.prepare_relational_row_revisions_tx(&tx, &schema, mutations)?
+                    } else {
+                        (
+                            Self::projection_apply_rows_tx(&tx, &schema, mutations)?,
+                            Vec::new(),
+                        )
+                    };
+                if self.storage_schema_version == SCHEMA_VERSION
+                    && !expected.is_empty()
+                    && record_revision_transaction.is_none()
+                {
+                    return Err(Error::from_reason(
+                        "UPGRADE_REQUIRED: schema 6 requires revision-bound relational events",
+                    ));
+                }
+                if self.storage_schema_version == SCHEMA_VERSION && !mutation_id.is_empty() {
+                    Self::validate_row_revision_binding(
+                        &tx,
+                        &expected,
+                        record_revision_transaction.as_ref(),
+                        &self.database_id(),
+                    )?;
+                }
                 let recorded_affected = if mutations.is_empty() {
                     *affected_rows
                 } else {
                     applied
                 };
+                if let Some(revisions) = record_revision_transaction.as_ref() {
+                    let outer_transaction_id = format!("relational:{mutation_id}");
+                    Self::projection_apply_record_revision_transaction_tx(
+                        &tx,
+                        &outer_transaction_id,
+                        revisions,
+                        &self.database_id(),
+                        frame_seq,
+                    )?;
+                    let local_sequence = i64::try_from(frame_seq)
+                        .map_err(|_| Error::from_reason("REVISION_FRAME_SEQUENCE_OVERFLOW"))?;
+                    tx.execute(
+                        "INSERT INTO applied_transactions(transaction_id, commit_sequence, payload_hash, frame_seq, advances_txn_frontier) VALUES(?1, ?2, ?3, ?4, 0)",
+                        params![outer_transaction_id, local_sequence, payload_hash, local_sequence],
+                    )
+                    .map_err(|error| Error::from_reason(error.to_string()))?;
+                }
                 if !mutation_id.is_empty() {
                     tx.execute(
                         "INSERT INTO applied_relational_mutations(mutation_id, namespace, schema_version, payload_hash, affected_rows) VALUES(?1, ?2, ?3, ?4, ?5)",
@@ -5738,6 +11588,15 @@ impl Storage {
                 tx.commit().map_err(|e| Error::from_reason(e.to_string()))?;
             }
             Event::Transaction(transaction) => {
+                let revision_checkpoint = transaction.local_frame_seq.is_some()
+                    && transaction.relational.is_empty()
+                    && transaction.nodes.is_empty()
+                    && transaction.edges.is_empty()
+                    && transaction.vectors.is_empty()
+                    && transaction.node_retractions.is_empty();
+                if self.storage_schema_version == SCHEMA_VERSION && !revision_checkpoint {
+                    self.validate_graph_revision_binding(transaction)?;
+                }
                 // Identity = (transaction_id, payload_hash). The origin sequence
                 // is metadata (ADR D2.2) and is deliberately NOT part of the
                 // identity check — two replicas legitimately assign different
@@ -5756,46 +11615,131 @@ impl Storage {
                     }
                     return Err(Error::from_reason("transaction identity conflict"));
                 }
+                match (
+                    self.storage_schema_version == SCHEMA_VERSION,
+                    transaction.record_revision_transaction.as_ref(),
+                ) {
+                    (true, Some(revisions)) => {
+                        Self::validate_record_revision_transaction(
+                            &conn,
+                            revisions,
+                            &self.database_id(),
+                        )?;
+                        self.validate_vector_revision_spaces(revisions)?;
+                    }
+                    (false, Some(_)) => {
+                        return Err(Error::from_reason(
+                            "SCHEMA_VERSION_UNSUPPORTED: record revisions require schema v6",
+                        ));
+                    }
+                    _ => {}
+                }
                 let tx = conn
                     .transaction()
                     .map_err(|e| Error::from_reason(e.to_string()))?;
+                let mut max_node_clock = 0;
                 for node in &transaction.nodes {
                     let node_u32 = self.get_or_intern_id(&node.id);
+                    max_node_clock = max_node_clock.max(node.clock.time);
                     Self::projection_apply_node_tx(&tx, node_u32, node)?;
                     Self::projection_append_node_version(&tx, node_u32, node, frame_seq)?;
+                }
+                if max_node_clock > 0 {
+                    Self::projection_state_set(&tx, "node_clock", &max_node_clock.to_string())?;
                 }
                 for edge in &transaction.edges {
                     self.projection_apply_edge_tx(&tx, edge, Some(frame_seq))?;
                 }
+                for retraction in &transaction.node_retractions {
+                    if let Some(node_u32) = self.get_u32_unlocked(&retraction.id) {
+                        Self::projection_apply_node_retraction_tx(
+                            &tx, node_u32, retraction, frame_seq,
+                        )?;
+                    }
+                }
+                let mut expected_row_revisions = Vec::new();
                 for group in &transaction.relational {
                     let schema = Self::load_relational_schema_conn(&tx, &group.namespace)?
                         .ok_or_else(|| Error::from_reason("relational schema is not registered"))?;
-                    let _ = Self::projection_apply_rows_tx(&tx, &schema, &group.mutations)?;
+                    if self.storage_schema_version == SCHEMA_VERSION {
+                        let (_, mut expected) = self.prepare_relational_row_revisions_tx(
+                            &tx,
+                            &schema,
+                            &group.mutations,
+                        )?;
+                        expected_row_revisions.append(&mut expected);
+                    } else {
+                        let _ = Self::projection_apply_rows_tx(&tx, &schema, &group.mutations)?;
+                    }
+                }
+                if self.storage_schema_version == SCHEMA_VERSION
+                    && !expected_row_revisions.is_empty()
+                    && transaction.record_revision_transaction.is_none()
+                {
+                    return Err(Error::from_reason(
+                        "UPGRADE_REQUIRED: schema 6 requires revision-bound relational transactions",
+                    ));
+                }
+                let revision_checkpoint = transaction.local_frame_seq.is_some()
+                    && transaction.relational.is_empty()
+                    && transaction.nodes.is_empty()
+                    && transaction.edges.is_empty()
+                    && transaction.vectors.is_empty()
+                    && transaction.node_retractions.is_empty();
+                if !revision_checkpoint {
+                    Self::validate_row_revision_binding(
+                        &tx,
+                        &expected_row_revisions,
+                        transaction.record_revision_transaction.as_ref(),
+                        &self.database_id(),
+                    )?;
                 }
                 let receipt_frame_seq = transaction.local_frame_seq.unwrap_or(frame_seq);
+                if let Some(revisions) = &transaction.record_revision_transaction {
+                    if self.storage_schema_version != SCHEMA_VERSION {
+                        return Err(Error::from_reason(
+                            "SCHEMA_VERSION_UNSUPPORTED: record revisions require schema v6",
+                        ));
+                    }
+                    Self::projection_apply_record_revision_transaction_tx(
+                        &tx,
+                        &transaction.transaction_id,
+                        revisions,
+                        &self.database_id(),
+                        receipt_frame_seq,
+                    )?;
+                }
                 tx.execute(
-                    "INSERT INTO applied_transactions(transaction_id, commit_sequence, payload_hash, frame_seq) VALUES(?1, ?2, ?3, ?4)",
-                    params![transaction.transaction_id, transaction.origin_commit_seq, transaction.payload_hash, receipt_frame_seq],
+                    "INSERT INTO applied_transactions(transaction_id, commit_sequence, payload_hash, frame_seq, advances_txn_frontier) VALUES(?1, ?2, ?3, ?4, ?5)",
+                    params![
+                        transaction.transaction_id,
+                        transaction.origin_commit_seq,
+                        transaction.payload_hash,
+                        receipt_frame_seq,
+                        if transaction.advances_txn_frontier { 1_i64 } else { 0_i64 },
+                    ],
                 )
                 .map_err(|e| Error::from_reason(e.to_string()))?;
                 // Informational only since WP-1.2 — the counters re-seed from
                 // the journal itself on open, never from the projection.
                 Self::projection_state_set(&tx, "stable_frontier", &frame_seq.to_string())?;
-                let prior_txn_frontier = tx
-                    .query_row(
-                        "SELECT value FROM projection_state WHERE key='txn_frontier'",
-                        [],
-                        |row| row.get::<_, String>(0),
-                    )
-                    .optional()
-                    .map_err(|e| Error::from_reason(e.to_string()))?
-                    .and_then(|value| value.parse::<u64>().ok())
-                    .unwrap_or(0);
-                Self::projection_state_set(
-                    &tx,
-                    "txn_frontier",
-                    &prior_txn_frontier.max(receipt_frame_seq).to_string(),
-                )?;
+                if transaction.advances_txn_frontier {
+                    let prior_txn_frontier = tx
+                        .query_row(
+                            "SELECT value FROM projection_state WHERE key='txn_frontier'",
+                            [],
+                            |row| row.get::<_, String>(0),
+                        )
+                        .optional()
+                        .map_err(|e| Error::from_reason(e.to_string()))?
+                        .and_then(|value| value.parse::<u64>().ok())
+                        .unwrap_or(0);
+                    Self::projection_state_set(
+                        &tx,
+                        "txn_frontier",
+                        &prior_txn_frontier.max(receipt_frame_seq).to_string(),
+                    )?;
+                }
                 tx.commit().map_err(|e| Error::from_reason(e.to_string()))?;
             }
             Event::Batch(events) => {
@@ -5833,37 +11777,19 @@ impl Storage {
                 clock,
                 retracted_at,
             } => {
-                if let Some(node_u32) = self.get_u32(id) {
-                    let latest: Option<(u32, String)> = conn.query_row(
-                        "SELECT clock_time,clock_peer FROM node_versions WHERE node_u32=?1 ORDER BY frame_seq DESC LIMIT 1",
-                        [node_u32], |r| Ok((r.get(0)?, r.get(1)?)),
-                    ).optional().map_err(|e| Error::from_reason(e.to_string()))?;
-                    if latest.is_some_and(|c| c > (clock.time, clock.peer_id.clone())) {
-                        return Ok(());
-                    }
+                if let Some(node_u32) = self.get_u32_unlocked(id) {
                     let tx = conn
                         .transaction()
                         .map_err(|e| Error::from_reason(e.to_string()))?;
-                    tx.execute("DELETE FROM props WHERE node_u32 = ?1", params![node_u32])
-                        .map_err(|e| Error::from_reason(e.to_string()))?;
-                    tx.execute(
-                        "DELETE FROM node_labels WHERE node_u32 = ?1",
-                        params![node_u32],
-                    )
-                    .map_err(|e| Error::from_reason(e.to_string()))?;
-                    tx.execute("UPDATE edge_versions SET tx_to=?2 WHERE (from_id=?1 OR to_id=?1) AND tx_to IS NULL", params![id,frame_seq])
-                        .map_err(|e| Error::from_reason(e.to_string()))?;
-                    Self::projection_delete_incident_edges(&tx, node_u32)?;
-                    // WP-2.1: the retraction is itself a version-chain entry —
-                    // resolve-at-commit past this point answers "retracted",
-                    // not the last live version.
-                    Self::projection_append_retract_version(
+                    Self::projection_apply_node_retraction_tx(
                         &tx,
                         node_u32,
-                        id,
+                        &NodeRetractionEvent {
+                            id: id.clone(),
+                            clock: clock.clone(),
+                            retracted_at: retracted_at.clone(),
+                        },
                         frame_seq,
-                        clock,
-                        retracted_at,
                     )?;
                     tx.commit().map_err(|e| Error::from_reason(e.to_string()))?;
                 }
@@ -6172,10 +12098,12 @@ impl Storage {
             || self.legacy_log_path.exists()
             || !Self::journal_list_segments(&self.path).is_empty();
         if !journal_present {
-            let projection_complete = self
-                .nodes
-                .iter()
-                .all(|entry| self.projection_props(*entry.key()).ok().flatten().is_some());
+            let projection_complete = self.nodes.iter().all(|entry| {
+                self.projection_props_unlocked(*entry.key())
+                    .ok()
+                    .flatten()
+                    .is_some()
+            });
             if projection_complete {
                 return Ok(());
             }
@@ -6219,10 +12147,12 @@ impl Storage {
         if let Some(e) = first_err {
             return Err(e);
         }
-        let projection_complete = self
-            .nodes
-            .iter()
-            .all(|entry| self.projection_props(*entry.key()).ok().flatten().is_some());
+        let projection_complete = self.nodes.iter().all(|entry| {
+            self.projection_props_unlocked(*entry.key())
+                .ok()
+                .flatten()
+                .is_some()
+        });
         if !projection_complete {
             return Err(Error::from_reason(
                 "journal replay did not recover props for every resident node",
@@ -6356,6 +12286,25 @@ impl Storage {
                 for e in &t.edges {
                     self.projection_apply_edge_tx(tx, e, Some(seq))?;
                 }
+                for retraction in &t.node_retractions {
+                    if node_clocks
+                        .get(&retraction.id)
+                        .is_some_and(|old| old > &retraction.clock)
+                    {
+                        continue;
+                    }
+                    node_clocks.insert(retraction.id.clone(), retraction.clock.clone());
+                    tx.execute(
+                        "UPDATE edge_versions SET tx_to=?2 WHERE (from_id=?1 OR to_id=?1) AND tx_to IS NULL",
+                        params![retraction.id, seq],
+                    )
+                    .map_err(|error| Error::from_reason(error.to_string()))?;
+                    tx.execute(
+                        "DELETE FROM edges WHERE from_id=?1 OR to_id=?1",
+                        [&retraction.id],
+                    )
+                    .map_err(|error| Error::from_reason(error.to_string()))?;
+                }
             }
             Event::NodeRetract { id, clock, .. } => {
                 if node_clocks.get(id).is_some_and(|old| old > clock) {
@@ -6429,7 +12378,12 @@ impl Storage {
     pub fn projection_props(&self, node_u32: u32) -> Result<Option<Value>> {
         let _read_guard = self.commit_lock.lock();
         self.ensure_readable()?;
+        self.require_unscoped_read()?;
 
+        self.projection_props_unlocked(node_u32)
+    }
+
+    fn projection_props_unlocked(&self, node_u32: u32) -> Result<Option<Value>> {
         let conn = self.projection_db.lock();
         let payload: Option<String> = conn
             .query_row(
@@ -6479,6 +12433,7 @@ impl Storage {
     ) -> Result<Option<RelationalSchemaPackage>> {
         let _read_guard = self.commit_lock.lock();
         self.ensure_readable()?;
+        self.require_unscoped_read()?;
 
         Self::validate_namespace(namespace)?;
         let conn = self.projection_db.lock();
@@ -6488,6 +12443,7 @@ impl Storage {
     pub fn list_relational_schemas(&self) -> Result<Vec<RelationalSchemaPackage>> {
         let _read_guard = self.commit_lock.lock();
         self.ensure_readable()?;
+        self.require_unscoped_read()?;
 
         let conn = self.projection_db.lock();
         let mut statement = conn
@@ -6537,6 +12493,9 @@ impl Storage {
         }
         for mutation in &batch.operations {
             Self::validate_row_mutation(&schema, mutation)?;
+            if self.storage_schema_version == SCHEMA_VERSION {
+                Self::encode_relational_primary_key_v1(&schema, mutation)?;
+            }
         }
         let existing: Option<(String, u32)> = conn
             .query_row(
@@ -6564,15 +12523,59 @@ impl Storage {
         let tx = conn
             .transaction()
             .map_err(|e| Error::from_reason(e.to_string()))?;
-        let affected_rows = Self::projection_apply_rows_tx(&tx, &schema, &batch.operations)?;
-        let seq = self.append_wal_event(&Event::RelationalRows {
+        let (affected_rows, row_revisions) = if self.storage_schema_version == SCHEMA_VERSION {
+            self.prepare_relational_row_revisions_tx(&tx, &schema, &batch.operations)?
+        } else {
+            (
+                Self::projection_apply_rows_tx(&tx, &schema, &batch.operations)?,
+                Vec::new(),
+            )
+        };
+        let record_revision_transaction = if row_revisions.is_empty() {
+            None
+        } else {
+            let revisions = uee_v2::RecordRevisionTransactionV1 {
+                transaction_id: Uuid::new_v4(),
+                origin_database_id: self.database_id(),
+                mutations: row_revisions,
+            };
+            revisions
+                .validate()
+                .map_err(|error| Error::from_reason(error.to_string()))?;
+            Some(revisions)
+        };
+        let event = Event::RelationalRows {
             namespace: batch.namespace.clone(),
             schema_version: batch.schema_version,
             mutation_id: batch.mutation_id.clone(),
             payload_hash: payload_hash.clone(),
             affected_rows,
             mutations: batch.operations.clone(),
-        })?;
+            record_revision_transaction: record_revision_transaction.clone(),
+        };
+        let seq = self.append_wal_event(&event)?;
+        if let Some(revisions) = record_revision_transaction.as_ref() {
+            let outer_transaction_id = format!("relational:{}", batch.mutation_id);
+            Self::projection_apply_record_revision_transaction_tx(
+                &tx,
+                &outer_transaction_id,
+                revisions,
+                &self.database_id(),
+                seq,
+            )
+            .map_err(|error| self.durable_apply_error(seq, error))?;
+            let local_sequence = i64::try_from(seq).map_err(|_| {
+                self.durable_apply_error(
+                    seq,
+                    Error::from_reason("REVISION_FRAME_SEQUENCE_OVERFLOW"),
+                )
+            })?;
+            tx.execute(
+                "INSERT INTO applied_transactions(transaction_id, commit_sequence, payload_hash, frame_seq, advances_txn_frontier) VALUES(?1, ?2, ?3, ?4, 0)",
+                params![outer_transaction_id, local_sequence, payload_hash, local_sequence],
+            )
+            .map_err(|error| self.durable_apply_error(seq, error))?;
+        }
         tx.execute(
             "INSERT INTO applied_relational_mutations(mutation_id, namespace, schema_version, payload_hash, affected_rows) VALUES(?1, ?2, ?3, ?4, ?5)",
             params![
@@ -6815,6 +12818,7 @@ impl Storage {
     pub fn query_sql(&self, sql: &str, params: Vec<Value>) -> Result<Vec<Value>> {
         let _read_guard = self.commit_lock.lock();
         self.ensure_readable()?;
+        self.require_unscoped_read()?;
 
         use rusqlite::hooks::{AuthAction, AuthContext, Authorization};
         use rusqlite::limits::Limit;
@@ -6933,7 +12937,11 @@ impl Storage {
     pub fn query_relational(&self, query: RelationalQuery) -> Result<Vec<Value>> {
         let _read_guard = self.commit_lock.lock();
         self.ensure_readable()?;
+        self.require_unscoped_read()?;
+        self.query_relational_unlocked(query)
+    }
 
+    fn query_relational_unlocked(&self, query: RelationalQuery) -> Result<Vec<Value>> {
         Self::validate_namespace(&query.namespace)?;
         Self::validate_identifier(&query.table)?;
         if query.columns.is_empty() {
@@ -7094,6 +13102,7 @@ impl Storage {
     pub fn execute_named_query(&self, request: NamedQueryRequest) -> Result<Vec<Value>> {
         let _read_guard = self.commit_lock.lock();
         self.ensure_readable()?;
+        self.require_unscoped_read()?;
 
         Self::validate_namespace(&request.namespace)?;
         Self::validate_identifier(&request.query_name)?;
@@ -7239,6 +13248,7 @@ impl Storage {
                         payload_hash: String::new(),
                         affected_rows: 0,
                         mutations: rows,
+                        record_revision_transaction: None,
                     });
                 }
             }
@@ -7257,6 +13267,7 @@ impl Storage {
                     payload_hash: row.get(3)?,
                     affected_rows: row.get(4)?,
                     mutations: vec![],
+                    record_revision_transaction: None,
                 })
             })
             .map_err(|e| Error::from_reason(e.to_string()))?
@@ -7268,27 +13279,65 @@ impl Storage {
 
     fn transaction_checkpoint_events(&self) -> Result<Vec<Event>> {
         let conn = self.projection_db.lock();
+        let query = if self.storage_schema_version == SCHEMA_VERSION {
+            "SELECT a.transaction_id, a.commit_sequence, a.payload_hash, a.frame_seq, a.advances_txn_frontier, r.revision_json
+             FROM applied_transactions a
+             LEFT JOIN hql2_transaction_revisions r ON r.transaction_id=a.transaction_id
+             ORDER BY COALESCE(a.frame_seq, a.commit_sequence)"
+        } else {
+            "SELECT transaction_id, commit_sequence, payload_hash, frame_seq, advances_txn_frontier, NULL
+             FROM applied_transactions ORDER BY COALESCE(frame_seq, commit_sequence)"
+        };
         let mut statement = conn
-            .prepare(
-                "SELECT transaction_id, commit_sequence, payload_hash, frame_seq FROM applied_transactions ORDER BY COALESCE(frame_seq, commit_sequence)",
-            )
+            .prepare(query)
             .map_err(|e| Error::from_reason(e.to_string()))?;
-        let events = statement
+        let rows = statement
             .query_map([], |row| {
-                Ok(Event::Transaction(GenesisTransactionEvent {
-                    transaction_id: row.get(0)?,
-                    origin_commit_seq: row.get(1)?,
-                    local_frame_seq: row.get(3)?,
-                    payload_hash: row.get(2)?,
-                    relational: vec![],
-                    nodes: vec![],
-                    edges: vec![],
-                    vectors: vec![],
-                }))
+                Ok((
+                    row.get::<_, String>(0)?,
+                    row.get::<_, u64>(1)?,
+                    row.get::<_, String>(2)?,
+                    row.get::<_, Option<u64>>(3)?,
+                    row.get::<_, i64>(4)? != 0,
+                    row.get::<_, Option<String>>(5)?,
+                ))
             })
             .map_err(|e| Error::from_reason(e.to_string()))?
             .collect::<std::result::Result<Vec<_>, _>>()
             .map_err(|e| Error::from_reason(e.to_string()))?;
+        let events = rows
+            .into_iter()
+            .map(
+                |(
+                    transaction_id,
+                    origin_commit_seq,
+                    payload_hash,
+                    local_frame_seq,
+                    advances_txn_frontier,
+                    raw,
+                )| {
+                    let record_revision_transaction = raw
+                        .map(|json| {
+                            serde_json::from_str(&json)
+                                .map_err(|error| Error::from_reason(error.to_string()))
+                        })
+                        .transpose()?;
+                    Ok(Event::Transaction(GenesisTransactionEvent {
+                        transaction_id,
+                        origin_commit_seq,
+                        local_frame_seq,
+                        payload_hash,
+                        relational: vec![],
+                        nodes: vec![],
+                        edges: vec![],
+                        vectors: vec![],
+                        node_retractions: vec![],
+                        advances_txn_frontier,
+                        record_revision_transaction,
+                    }))
+                },
+            )
+            .collect::<Result<Vec<_>>>()?;
         Ok(events)
     }
 
@@ -7296,7 +13345,7 @@ impl Storage {
         if !node.props.is_null() {
             return node.props.clone();
         }
-        self.projection_props(node_u32)
+        self.projection_props_unlocked(node_u32)
             .ok()
             .flatten()
             .unwrap_or_else(|| Value::Object(Default::default()))
@@ -7314,22 +13363,50 @@ impl Storage {
     pub fn node_view(&self, id: &str) -> Option<NodeOutput> {
         let _read_guard = self.commit_lock.lock();
         self.ensure_readable().ok()?;
+        self.require_unscoped_read().ok()?;
 
-        let u32_id = self.get_u32(id)?;
-        self.node_view_u32(u32_id)
+        let u32_id = self.get_u32_unlocked(id)?;
+        self.node_view_u32_unlocked(u32_id)
     }
 
     pub fn node_view_u32(&self, u32_id: u32) -> Option<NodeOutput> {
         let _read_guard = self.commit_lock.lock();
         self.ensure_readable().ok()?;
+        self.require_unscoped_read().ok()?;
 
+        self.node_view_u32_unlocked(u32_id)
+    }
+
+    fn node_view_unlocked(&self, id: &str) -> Option<NodeOutput> {
+        let u32_id = self.get_u32_unlocked(id)?;
+        self.node_view_u32_unlocked(u32_id)
+    }
+
+    fn node_view_u32_unlocked(&self, u32_id: u32) -> Option<NodeOutput> {
         let node = self.nodes.get(&u32_id)?;
         Some(self.hydrated_node(u32_id, node.value()))
     }
 
     pub fn open(opts: OpenOptions) -> Result<Self> {
+        Self::open_internal(opts, None)
+    }
+
+    fn open_schema6_migration(
+        opts: OpenOptions,
+        migration_id: String,
+        manifest_sha256: String,
+    ) -> Result<Self> {
+        Self::open_internal(opts, Some((migration_id, manifest_sha256)))
+    }
+
+    fn open_internal(opts: OpenOptions, migration_token: Option<(String, String)>) -> Result<Self> {
         let root = PathBuf::from(opts.path.clone());
-        if !root.exists() {
+        let root_was_missing = !root.exists();
+        let fresh_database = root_was_missing
+            || fs::read_dir(&root)
+                .ok()
+                .is_some_and(|mut entries| entries.next().is_none());
+        if root_was_missing {
             fs::create_dir_all(&root).ok();
         }
         let lock_path = root.join("genesis.lock");
@@ -7367,30 +13444,40 @@ impl Storage {
         // --- Schema-version compatibility gate (forward-incompat protection) ---
         // A database written by a NEWER engine must not be silently misread.
         // Read the on-disk schema version from the snapshot manifest and refuse
-        // to open if it exceeds what this engine understands. Older snapshots
-        // fall through to the existing on-load migrations (legacy meta/edge
-        // formats) and are rewritten at the current SCHEMA_VERSION on the next
-        // save_state().
-        if let Some(on_disk) = Self::read_ondisk_schema_version(&root) {
+        // to open if it exceeds what this engine understands. Schema 5 remains
+        // available to legacy APIs until the explicit offline HQL2 migration.
+        if let Some((migration_id, manifest_sha256)) = &migration_token {
+            Self::validate_schema6_migration_resume(&root, migration_id, manifest_sha256)?;
+        } else {
+            Self::validate_schema_upgrade_state(&root)?;
+        }
+        let on_disk_schema = Self::read_ondisk_schema_version(&root);
+        if let Some(on_disk) = on_disk_schema {
             if on_disk > SCHEMA_VERSION {
                 return Err(Error::from_reason(format!(
                     "SCHEMA_VERSION_UNSUPPORTED: database schema v{} was written by a newer engine; this engine supports up to v{}. Upgrade the engine to open this database (never partial-read, never rewrite — ADR--GENESISDB-JOURNAL-HISTORY §4).",
                     on_disk, SCHEMA_VERSION
                 )));
             }
-            if on_disk < SCHEMA_VERSION {
+            if on_disk < LEGACY_SCHEMA_VERSION {
                 println!(
-                    "Schema: migrating on-disk format v{} -> v{} (applied on load, persisted on next save).",
-                    on_disk, SCHEMA_VERSION
+                    "Schema: loading legacy format v{} with v5 compatibility before the explicit v6 upgrade.",
+                    on_disk
                 );
+            } else if on_disk == LEGACY_SCHEMA_VERSION {
+                println!("Schema: v5 legacy mode; HQL2 v6 migration is explicit and offline.");
             }
         }
-
         let (recovery_definitions, journal_definitions) =
             Self::preflight_journal(&root, opts.vector_dim)?;
 
         // --- Cryptographic Identity (Mark X) ---
         let identity_path = root.join("identity.bin");
+        if on_disk_schema.is_none() && !fresh_database && !identity_path.exists() {
+            return Err(Error::from_reason(
+                "RECOVERY_REQUIRED: markerless database identity is missing",
+            ));
+        }
         let signing_key = if identity_path.exists() {
             let bytes = fs::read(&identity_path).map_err(|e| Error::from_reason(e.to_string()))?;
             SigningKey::from_bytes(
@@ -7409,6 +13496,33 @@ impl Storage {
         };
         let verifying_key = signing_key.verifying_key();
         let local_peer_id = hex::encode(Sha256::digest(verifying_key.as_bytes()))[..16].to_string();
+        let database_id = Self::database_id_for_verifying_key(&verifying_key);
+        let (schema6_activation, saw_journal_event, saw_v6_journal_event) = if migration_token
+            .is_some()
+            || on_disk_schema.is_some_and(|version| version != SCHEMA_VERSION)
+        {
+            (None, false, false)
+        } else {
+            Self::preflight_schema6_activation(
+                &root,
+                &verifying_key,
+                &local_peer_id,
+                &database_id,
+                on_disk_schema.is_none(),
+            )?
+        };
+        let storage_schema_version = match on_disk_schema {
+            Some(_) if migration_token.is_some() => SCHEMA_VERSION,
+            Some(version) if version == SCHEMA_VERSION => SCHEMA_VERSION,
+            Some(_) => LEGACY_SCHEMA_VERSION,
+            None if schema6_activation.is_some() || fresh_database => SCHEMA_VERSION,
+            None if saw_journal_event && !saw_v6_journal_event => LEGACY_SCHEMA_VERSION,
+            None => {
+                return Err(Error::from_reason(
+                    "RECOVERY_REQUIRED: markerless database schema is ambiguous",
+                ));
+            }
+        };
 
         // WP-1.2 framed journal layout: wal/active.gwal + journal/*.gseg.
         let legacy_log_path = root.join("genesis-graph.wal");
@@ -7437,6 +13551,7 @@ impl Storage {
         // either way, since `walk_frames` refuses the first invalid frame.
         if !read_only {
             Self::journal_truncate_torn_active(&log_path);
+            Self::journal_truncate_active_overlap(&root, &log_path);
         }
         let initial_next_seq = Self::journal_max_seq(&root, &log_path) + 1;
         let projection_path = root.join(PROJECTION_DB_FILE);
@@ -7466,6 +13581,13 @@ impl Storage {
                 }
             }
         };
+        if storage_schema_version == SCHEMA_VERSION {
+            if read_only {
+                Self::validate_hql2_revision_schema(&projection_conn)?;
+            } else {
+                Self::init_hql2_revision_schema(&projection_conn)?;
+            }
+        }
         let (wal_sender, wal_receiver): (Sender<WalMsg>, Receiver<WalMsg>) = unbounded();
         let log_path_clone = log_path.clone();
 
@@ -7724,6 +13846,7 @@ impl Storage {
         let storage = Self {
             path: root,
             read_only,
+            storage_schema_version,
             retention,
             projection_path,
             projection_db: Mutex::new(projection_conn),
@@ -7731,6 +13854,15 @@ impl Storage {
             recovery_required: AtomicBool::new(false),
             collection_definitions: DashMap::new(),
             commit_sequence: AtomicU64::new(0),
+            owner_token: Uuid::new_v4().to_string(),
+            fencing_epoch: AtomicU64::new(0),
+            published_generation: RwLock::new(None),
+            schema6_activation: RwLock::new(schema6_activation.clone()),
+            access_policy: RwLock::new(AccessPolicy {
+                revision: 0,
+                mode: AccessPolicyMode::Disabled,
+                grants: Vec::new(),
+            }),
             nodes: DashMap::new(),
             edges: DashMap::new(),
             out_idx: DashMap::new(),
@@ -7826,8 +13958,8 @@ impl Storage {
                 && recovery_definitions.iter().any(|d| d.rerank);
             let mut snapshot_loaded =
                 !snapshot_stale_vs_fold && !sidecar_tail && storage.try_load_state();
-            if snapshot_loaded
-                && storage.collections.iter().any(|c| {
+            if !snapshot_loaded
+                || storage.collections.iter().any(|c| {
                     let meta = c.metadata.read();
                     let arena = c.arena.read();
                     recovery_definitions
@@ -7853,6 +13985,8 @@ impl Storage {
                 storage.edges_retired.clear();
                 storage.out_idx_retired.clear();
                 storage.in_idx_retired.clear();
+                *storage.access_policy.write() = Self::default_access_policy();
+                *storage.published_generation.write() = None;
                 storage.collections.clear();
                 storage.collection_definitions.clear();
                 storage.collections.insert(
@@ -7900,10 +14034,52 @@ impl Storage {
             storage.rehydrate_hnsw_index();
             storage.projection_sync_on_open()?;
             storage.ensure_readable()?;
+            let state_has_migration = fs::read(storage.path.join("state.json"))
+                .ok()
+                .and_then(|bytes| serde_json::from_slice::<serde_json::Value>(&bytes).ok())
+                .is_some_and(|state| state["migration_id"].as_str().is_some());
+            let activation_has_migration = storage
+                .schema6_activation
+                .read()
+                .as_ref()
+                .is_some_and(|activation| activation.migration.is_some());
+            if migration_token.is_none() && (state_has_migration || activation_has_migration) {
+                storage.validate_schema6_migration_authority()?;
+            }
+            if storage.storage_schema_version == SCHEMA_VERSION && migration_token.is_none() {
+                if storage.schema6_activation.read().is_none() {
+                    if read_only {
+                        return Err(Error::from_reason(
+                            "RECOVERY_REQUIRED: schema-6 activation is missing on read-only open",
+                        ));
+                    }
+                    if state_has_migration {
+                        storage.validate_schema6_migration_authority()?;
+                    }
+                    let activation = if storage.path.join("state.json").exists() {
+                        storage.schema6_activation_from_ready_state()?
+                    } else {
+                        Schema6ActivationV1 {
+                            version: 1,
+                            schema_version: SCHEMA_VERSION,
+                            database_id: storage.database_id(),
+                            migration: None,
+                        }
+                    };
+                    storage.install_schema6_activation(activation)?;
+                }
+                if let Ok(bytes) = fs::read(storage.path.join("state.json")) {
+                    if let Ok(state) = serde_json::from_slice::<serde_json::Value>(&bytes) {
+                        storage.validate_schema6_activation_state(&state)?;
+                    }
+                }
+            }
             if !read_only {
                 // A complete snapshot guard precedes any new event variant, even
                 // when recovering a journal-only bundle whose marker was removed.
-                if Self::read_ondisk_schema_version(&storage.path) != Some(SCHEMA_VERSION) {
+                if Self::read_ondisk_schema_version(&storage.path)
+                    != Some(storage.storage_schema_version)
+                {
                     storage.save_state_checkpoint(false)?;
                 }
                 let missing: Vec<_> = storage
@@ -7986,10 +14162,244 @@ impl Storage {
     // All relational groups share a rollback transaction, so cross-group
     // constraints are checked before append. commit_lock stays held through
     // WAL/apply; another engine writer cannot invalidate the preflight.
+    fn graph_event_requires_revision_envelope(event: &Event) -> bool {
+        match event {
+            Event::Node(_) | Event::Edge(_) | Event::NodeRetract { .. } => true,
+            Event::Vector(_) | Event::VectorMaterialized(_) => true,
+            Event::Batch(_) => true,
+            Event::Transaction(transaction) => {
+                (!transaction.nodes.is_empty()
+                    || !transaction.edges.is_empty()
+                    || !transaction.vectors.is_empty()
+                    || !transaction.node_retractions.is_empty())
+                    && transaction.record_revision_transaction.is_none()
+            }
+            _ => false,
+        }
+    }
+
+    fn validate_graph_revision_binding(&self, transaction: &GenesisTransactionEvent) -> Result<()> {
+        let graph_mutation_count =
+            transaction.nodes.len() + transaction.edges.len() + transaction.node_retractions.len();
+        let expected_vector_count = transaction
+            .nodes
+            .iter()
+            .filter(|node| node.embedding.is_some())
+            .count()
+            + transaction.vectors.len();
+        let Some(revisions) = transaction.record_revision_transaction.as_ref() else {
+            return if graph_mutation_count == 0 && expected_vector_count == 0 {
+                Ok(())
+            } else {
+                Err(Error::from_reason("REVISION_ENVELOPE_REQUIRED"))
+            };
+        };
+        let graph_revision_count = revisions
+            .mutations
+            .iter()
+            .filter(|mutation| {
+                matches!(
+                    mutation.kind,
+                    uee_v2::RecordKindV2::Node | uee_v2::RecordKindV2::Edge
+                )
+            })
+            .count();
+        if graph_revision_count != graph_mutation_count {
+            return Err(Error::from_reason("REVISION_EVENT_MISMATCH"));
+        }
+        let validate = |kind: uee_v2::RecordKindV2,
+                        id: &str,
+                        operation: uee_v2::RevisionOperationV1,
+                        payload: Value|
+         -> Result<()> {
+            let mutation = revisions
+                .mutations
+                .iter()
+                .find(|mutation| mutation.kind == kind && mutation.id == id)
+                .ok_or_else(|| Error::from_reason("REVISION_EVENT_MISMATCH"))?;
+            if mutation.namespace != "default"
+                || mutation.operation != operation
+                || mutation.payload != payload
+            {
+                return Err(Error::from_reason("REVISION_EVENT_MISMATCH"));
+            }
+            Ok(())
+        };
+        for node in &transaction.nodes {
+            validate(
+                uee_v2::RecordKindV2::Node,
+                &node.id,
+                uee_v2::RevisionOperationV1::Upsert,
+                serde_json::to_value(node)
+                    .map_err(|error| Error::from_reason(error.to_string()))?,
+            )?;
+        }
+        for edge in &transaction.edges {
+            validate(
+                uee_v2::RecordKindV2::Edge,
+                &edge.id,
+                if edge.valid_to.is_some() {
+                    uee_v2::RevisionOperationV1::Retract
+                } else {
+                    uee_v2::RevisionOperationV1::Upsert
+                },
+                serde_json::to_value(edge)
+                    .map_err(|error| Error::from_reason(error.to_string()))?,
+            )?;
+        }
+        for retraction in &transaction.node_retractions {
+            validate(
+                uee_v2::RecordKindV2::Node,
+                &retraction.id,
+                uee_v2::RevisionOperationV1::Retract,
+                serde_json::json!({
+                    "id": retraction.id,
+                    "retracted_at": retraction.retracted_at,
+                }),
+            )?;
+        }
+        let vector_revision_count = revisions
+            .mutations
+            .iter()
+            .filter(|mutation| mutation.kind == uee_v2::RecordKindV2::Vector)
+            .count();
+        if vector_revision_count != expected_vector_count {
+            return Err(Error::from_reason("REVISION_EVENT_MISMATCH"));
+        }
+        let mut vector_targets = HashSet::with_capacity(expected_vector_count);
+        let mut validate_vector = |owner_id: &str,
+                                   collection_name: &Option<String>,
+                                   embedding: &[f64],
+                                   lang: Option<&str>| {
+            let collection = self.resolve_collection(collection_name)?;
+            let id = Self::vector_revision_record_id(owner_id, &collection.name)?;
+            if !vector_targets.insert(id.clone()) {
+                return Err(Error::from_reason("REVISION_DUPLICATE_TARGET"));
+            }
+            let mutation = revisions
+                .mutations
+                .iter()
+                .find(|mutation| mutation.kind == uee_v2::RecordKindV2::Vector && mutation.id == id)
+                .ok_or_else(|| Error::from_reason("REVISION_EVENT_MISMATCH"))?;
+            let owner_revision = revisions.mutations.iter().find(|candidate| {
+                candidate.kind == uee_v2::RecordKindV2::Node
+                    && candidate.namespace == "default"
+                    && candidate.id == owner_id
+            });
+            if mutation.namespace != "default"
+                || mutation.operation != uee_v2::RevisionOperationV1::Upsert
+                || mutation.schema_ref.as_deref() != Some(collection.name.as_str())
+                || mutation.schema_version != Some(1)
+                || mutation.payload["owner_id"].as_str() != Some(owner_id)
+                || mutation.payload["collection"].as_str() != Some(collection.name.as_str())
+                || mutation.payload["embedding"]
+                    != serde_json::to_value(embedding)
+                        .map_err(|error| Error::from_reason(error.to_string()))?
+                || mutation.payload["lang"].as_str() != Some(lang.unwrap_or("en"))
+                || owner_revision.is_some_and(|owner| {
+                    owner.operation != uee_v2::RevisionOperationV1::Upsert
+                        || mutation.payload["owner_revision_id"].as_str()
+                            != Some(owner.revision_id.as_str())
+                        || mutation.valid_from != owner.valid_from
+                })
+            {
+                return Err(Error::from_reason("REVISION_EVENT_MISMATCH"));
+            }
+            Ok(())
+        };
+        for node in &transaction.nodes {
+            if let Some(embedding) = &node.embedding {
+                validate_vector(&node.id, &node.collection, embedding, node.lang.as_deref())?;
+            }
+        }
+        for vector in &transaction.vectors {
+            validate_vector(
+                &vector.node_id,
+                &vector.collection,
+                &vector.embedding,
+                vector.lang.as_deref(),
+            )?;
+        }
+        Ok(())
+    }
+
     fn preflight_relational_event(&self, event: &Event) -> Result<()> {
+        if self.storage_schema_version == SCHEMA_VERSION
+            && Self::graph_event_requires_revision_envelope(event)
+        {
+            return Err(Error::from_reason(
+                "UPGRADE_REQUIRED: schema 6 requires revision-bearing graph events",
+            ));
+        }
+        if let Event::RelationalRows {
+            namespace,
+            mutation_id,
+            mutations,
+            record_revision_transaction,
+            ..
+        } = event
+        {
+            let mut conn = self.projection_db.lock();
+            let schema = Self::load_relational_schema_conn(&conn, namespace)?
+                .ok_or_else(|| Error::from_reason("relational schema is not registered"))?;
+            for mutation in mutations {
+                Self::validate_row_mutation(&schema, mutation)?;
+                if self.storage_schema_version == SCHEMA_VERSION {
+                    Self::encode_relational_primary_key_v1(&schema, mutation)?;
+                }
+            }
+            if self.storage_schema_version == SCHEMA_VERSION
+                && !mutations.is_empty()
+                && mutation_id.is_empty()
+            {
+                return Err(Error::from_reason(
+                    "UPGRADE_REQUIRED: schema 6 requires revision-bound relational events",
+                ));
+            }
+            if self.storage_schema_version != SCHEMA_VERSION
+                && record_revision_transaction.is_some()
+            {
+                return Err(Error::from_reason(
+                    "SCHEMA_VERSION_UNSUPPORTED: record revisions require schema v6",
+                ));
+            }
+            if let Some(revisions) = record_revision_transaction {
+                Self::validate_record_revision_transaction(&conn, revisions, &self.database_id())?;
+            }
+            let tx = conn
+                .transaction()
+                .map_err(|e| Error::from_reason(e.to_string()))?;
+            let expected = if self.storage_schema_version == SCHEMA_VERSION {
+                self.prepare_relational_row_revisions_tx(&tx, &schema, mutations)?
+                    .1
+            } else {
+                Self::projection_apply_rows_tx(&tx, &schema, mutations)?;
+                Vec::new()
+            };
+            if self.storage_schema_version == SCHEMA_VERSION
+                && !expected.is_empty()
+                && record_revision_transaction.is_none()
+            {
+                return Err(Error::from_reason(
+                    "UPGRADE_REQUIRED: schema 6 requires revision-bound relational events",
+                ));
+            }
+            Self::validate_row_revision_binding(
+                &tx,
+                &expected,
+                record_revision_transaction.as_ref(),
+                &self.database_id(),
+            )?;
+            tx.rollback()
+                .map_err(|e| Error::from_reason(e.to_string()))?;
+            return Ok(());
+        }
         let Event::Transaction(transaction) = event else {
             return Ok(());
         };
+        if self.storage_schema_version == SCHEMA_VERSION {
+            self.validate_graph_revision_binding(transaction)?;
+        }
         let mut conn = self.projection_db.lock();
         let existing: Option<String> = conn
             .query_row(
@@ -8006,14 +14416,56 @@ impl Storage {
                 Err(Error::from_reason("transaction identity conflict"))
             };
         }
+        match (
+            self.storage_schema_version == SCHEMA_VERSION,
+            transaction.record_revision_transaction.as_ref(),
+        ) {
+            (true, Some(revisions)) => {
+                Self::validate_record_revision_transaction(&conn, revisions, &self.database_id())?;
+                self.validate_vector_revision_spaces(revisions)?;
+            }
+            (false, Some(_)) => {
+                return Err(Error::from_reason(
+                    "SCHEMA_VERSION_UNSUPPORTED: record revisions require schema v6",
+                ));
+            }
+            _ => {}
+        }
         let tx = conn
             .transaction()
             .map_err(|e| Error::from_reason(e.to_string()))?;
+        let mut expected_row_revisions = Vec::new();
         for group in &transaction.relational {
             let schema = Self::load_relational_schema_conn(&tx, &group.namespace)?
                 .ok_or_else(|| Error::from_reason("relational schema is not registered"))?;
-            Self::projection_apply_rows_tx(&tx, &schema, &group.mutations)?;
+            for mutation in &group.mutations {
+                Self::validate_row_mutation(&schema, mutation)?;
+                if self.storage_schema_version == SCHEMA_VERSION {
+                    Self::encode_relational_primary_key_v1(&schema, mutation)?;
+                }
+            }
+            if self.storage_schema_version == SCHEMA_VERSION {
+                let (_, mut expected) =
+                    self.prepare_relational_row_revisions_tx(&tx, &schema, &group.mutations)?;
+                expected_row_revisions.append(&mut expected);
+            } else {
+                Self::projection_apply_rows_tx(&tx, &schema, &group.mutations)?;
+            }
         }
+        if self.storage_schema_version == SCHEMA_VERSION
+            && !expected_row_revisions.is_empty()
+            && transaction.record_revision_transaction.is_none()
+        {
+            return Err(Error::from_reason(
+                "UPGRADE_REQUIRED: schema 6 requires revision-bound relational transactions",
+            ));
+        }
+        Self::validate_row_revision_binding(
+            &tx,
+            &expected_row_revisions,
+            transaction.record_revision_transaction.as_ref(),
+            &self.database_id(),
+        )?;
         tx.rollback()
             .map_err(|e| Error::from_reason(e.to_string()))?;
         Ok(())
@@ -8056,6 +14508,9 @@ impl Storage {
         let _commit_guard = self.commit_lock.lock();
         self.ensure_readable()?;
         self.ensure_writable()?;
+        if Self::contains_p6_control_event(event) {
+            return Err(Error::from_reason("P6_LOCAL_ONLY"));
+        }
         self.preflight_collection_event(event)?;
         self.preflight_relational_event(event)?;
         let seq = self.append_wal_event(event)?;
@@ -8100,6 +14555,18 @@ impl Storage {
             let edge_key = self.index_edge_internal(&edge.id, &edge.from, &edge.to);
             self.edges.insert(edge_key, edge.clone());
         }
+        for retraction in &transaction.node_retractions {
+            if let Some(node_u32) = self.get_u32_unlocked(&retraction.id) {
+                self.retract_node_memory(&retraction.id, node_u32, commit_seq);
+            }
+            self.tombstones.insert(
+                retraction.id.clone(),
+                NodeTombstone {
+                    clock: retraction.clock.clone(),
+                    retracted_at: retraction.retracted_at.clone(),
+                },
+            );
+        }
         for vector in &transaction.vectors {
             self.replay_vector(
                 &vector.collection,
@@ -8122,8 +14589,8 @@ impl Storage {
         self.commit_sequence.load(Ordering::SeqCst)
     }
 
-    /// Frame seq of the last `Event::Transaction` frame — the value
-    /// `GenesisTransaction.expected_frontier` CASes against.
+    /// Frame seq of the last transaction-API commit (not every graph revision
+    /// envelope) — the value `GenesisTransaction.expected_frontier` CASes against.
     pub fn txn_frontier(&self) -> u64 {
         let _read_guard = self.commit_lock.lock();
 
@@ -8161,7 +14628,11 @@ impl Storage {
     pub fn node_versions(&self, id: &str, at_seq: Option<u64>) -> Result<serde_json::Value> {
         let _read_guard = self.commit_lock.lock();
         self.ensure_readable()?;
+        self.require_unscoped_read()?;
+        self.node_versions_unlocked(id, at_seq)
+    }
 
+    fn node_versions_unlocked(&self, id: &str, at_seq: Option<u64>) -> Result<serde_json::Value> {
         let horizon = self.history_horizon();
         if let Some(seq) = at_seq {
             if seq < horizon {
@@ -8330,6 +14801,9 @@ impl Storage {
                 .ok_or_else(|| Error::from_reason("relational schema is not registered"))?;
             for mutation in &group.mutations {
                 Self::validate_row_mutation(&schema, mutation)?;
+                if self.storage_schema_version == SCHEMA_VERSION {
+                    Self::encode_relational_primary_key_v1(&schema, mutation)?;
+                }
             }
         }
         for node in &input.graph.nodes {
@@ -8407,6 +14881,13 @@ impl Storage {
                 clock: self.next_clock(),
             })
             .collect::<Vec<_>>();
+        let record_revision_transaction = self.build_record_revision_transaction(
+            &nodes,
+            &edges,
+            &[],
+            &input.relational,
+            &vectors,
+        )?;
         let event = GenesisTransactionEvent {
             transaction_id: input.transaction_id.clone(),
             // ADR D2.2: origin metadata only. 0 for locally-created events; the
@@ -8420,6 +14901,9 @@ impl Storage {
             nodes,
             edges,
             vectors,
+            node_retractions: vec![],
+            advances_txn_frontier: true,
+            record_revision_transaction,
         };
         let commit_sequence = self.persist(&Event::Transaction(event.clone()))?;
         self.apply_transaction_memory(&event, true, commit_sequence);
@@ -8436,9 +14920,14 @@ impl Storage {
     pub fn find_fuzzy_id(&self, id: &str) -> Option<String> {
         let _read_guard = self.commit_lock.lock();
         self.ensure_readable().ok()?;
+        self.require_unscoped_read().ok()?;
 
+        self.find_fuzzy_id_unlocked(id)
+    }
+
+    fn find_fuzzy_id_unlocked(&self, id: &str) -> Option<String> {
         // 1. Exact Match
-        if self.get_u32(id).is_some() {
+        if self.get_u32_unlocked(id).is_some() {
             return Some(id.to_string());
         }
 
@@ -8522,6 +15011,19 @@ impl Storage {
             // MASTER-immutability breadth question is tracked separately).
             Event::NodeRetract { .. } => Ok(true),
             Event::RelationalSchema(_) | Event::RelationalRows { .. } => Ok(true),
+            Event::GenerationPublished(receipt) => Ok(receipt.version == 1
+                && receipt.generation.publication_seq
+                    == receipt.generation.wal_frontier.saturating_add(1)
+                && receipt.generation.component_manifest_sha256.len() == 64),
+            Event::AccessPolicyChanged(policy) => Ok(policy.version
+                == Self::access_policy_event_version(&policy.policy)
+                && (policy.version == 1 || self.storage_schema_version == SCHEMA_VERSION)
+                && (policy.folded
+                    || policy.expected_revision.checked_add(1) == Some(policy.policy.revision))
+                && Self::validate_access_policy_shape(&policy.policy).is_ok()),
+            Event::Schema6MigrationChunkV1(_)
+            | Event::Schema6MigrationCommitV1(_)
+            | Event::Schema6ActivationV1(_) => Ok(false),
             Event::Transaction(transaction) => {
                 for node in &transaction.nodes {
                     if !self.semantic_verify(&Event::Node(node.clone()))? {
@@ -8541,6 +15043,166 @@ impl Storage {
         }
     }
 
+    fn collect_consensus_graph_mutations(
+        event: &Event,
+        nodes: &mut Vec<NodeOutput>,
+        edges: &mut Vec<EdgeOutput>,
+        vectors: &mut Vec<VectorEvent>,
+        node_retractions: &mut Vec<NodeRetractionEvent>,
+    ) -> Result<()> {
+        match event {
+            Event::Node(node) => {
+                let mut node = node.clone();
+                if !node.labels.iter().any(|label| label == "MASTER") {
+                    node.labels.push("MASTER".to_string());
+                }
+                nodes.push(node);
+            }
+            Event::Edge(edge) => edges.push(edge.clone()),
+            Event::Vector(vector) => vectors.push(vector.clone()),
+            Event::NodeRetract {
+                id,
+                clock,
+                retracted_at,
+            } => node_retractions.push(NodeRetractionEvent {
+                id: id.clone(),
+                clock: clock.clone(),
+                retracted_at: retracted_at.clone(),
+            }),
+            Event::Batch(events) => {
+                for event in events {
+                    Self::collect_consensus_graph_mutations(
+                        event,
+                        nodes,
+                        edges,
+                        vectors,
+                        node_retractions,
+                    )?;
+                }
+            }
+            _ => {
+                return Err(Error::from_reason(
+                    "CONSENSUS_SCHEMA6_GRAPH_EVENT_UNSUPPORTED",
+                ));
+            }
+        }
+        Ok(())
+    }
+
+    fn revisionize_consensus_event(&self, event: Event) -> Result<Event> {
+        if self.storage_schema_version != SCHEMA_VERSION {
+            return Ok(event);
+        }
+        match event {
+            Event::Node(_)
+            | Event::Edge(_)
+            | Event::Vector(_)
+            | Event::NodeRetract { .. }
+            | Event::Batch(_) => {
+                let mut nodes = Vec::new();
+                let mut edges = Vec::new();
+                let mut vectors = Vec::new();
+                let mut node_retractions = Vec::new();
+                Self::collect_consensus_graph_mutations(
+                    &event,
+                    &mut nodes,
+                    &mut edges,
+                    &mut vectors,
+                    &mut node_retractions,
+                )?;
+                let mut last_edge_index = HashMap::with_capacity(edges.len());
+                for (index, edge) in edges.iter().enumerate() {
+                    last_edge_index.insert(edge.id.as_str(), index);
+                }
+                let effective_edges = edges
+                    .iter()
+                    .enumerate()
+                    .filter(|(index, edge)| last_edge_index.get(edge.id.as_str()) == Some(index))
+                    .map(|(_, edge)| edge.clone())
+                    .collect::<Vec<_>>();
+                let revisions = self
+                    .build_record_revision_transaction(
+                        &nodes,
+                        &effective_edges,
+                        &node_retractions,
+                        &[],
+                        &vectors,
+                    )?
+                    .ok_or_else(|| Error::from_reason("CONSENSUS_EMPTY_GRAPH_PROPOSAL"))?;
+                let payload = serde_json::to_vec(&(
+                    &nodes,
+                    &effective_edges,
+                    &node_retractions,
+                    &vectors,
+                    &revisions,
+                ))
+                .map_err(|error| Error::from_reason(error.to_string()))?;
+                Ok(Event::Transaction(GenesisTransactionEvent {
+                    transaction_id: Uuid::new_v4().to_string(),
+                    origin_commit_seq: 0,
+                    local_frame_seq: None,
+                    payload_hash: hex::encode(Sha256::digest(payload)),
+                    relational: vec![],
+                    nodes,
+                    edges: effective_edges,
+                    vectors,
+                    node_retractions,
+                    advances_txn_frontier: false,
+                    record_revision_transaction: Some(revisions),
+                }))
+            }
+            Event::Transaction(mut transaction) => {
+                if transaction.record_revision_transaction.is_none() {
+                    transaction.record_revision_transaction = self
+                        .build_record_revision_transaction(
+                            &transaction.nodes,
+                            &transaction.edges,
+                            &transaction.node_retractions,
+                            &transaction.relational,
+                            &transaction.vectors,
+                        )?;
+                }
+                Ok(Event::Transaction(transaction))
+            }
+            Event::RelationalRows {
+                namespace,
+                schema_version,
+                mutation_id,
+                payload_hash,
+                affected_rows,
+                mutations,
+                record_revision_transaction,
+            } => {
+                let record_revision_transaction = match record_revision_transaction {
+                    Some(revisions) => Some(revisions),
+                    None => self.build_record_revision_transaction(
+                        &[],
+                        &[],
+                        &[],
+                        &[RelationalMutationGroup {
+                            namespace: namespace.clone(),
+                            mutations: mutations.clone(),
+                        }],
+                        &[],
+                    )?,
+                };
+                Ok(Event::RelationalRows {
+                    namespace,
+                    schema_version,
+                    mutation_id,
+                    payload_hash,
+                    affected_rows,
+                    mutations,
+                    record_revision_transaction,
+                })
+            }
+            Event::VectorMaterialized(_) => Err(Error::from_reason(
+                "UPGRADE_REQUIRED: schema 6 requires revision-bearing graph events",
+            )),
+            other => Ok(other),
+        }
+    }
+
     /// Open a consensus proposal for `event`. The proposal is signed with this
     /// node's own key (the `_signature` param is ignored — an external caller has
     /// no access to the local private key, so a caller-supplied signature could
@@ -8549,6 +15211,12 @@ impl Storage {
     /// proposal that conflicts with an existing high-impact MASTER axiom is
     /// rejected up front rather than slipping through to quorum.
     pub fn propose_consensus(&self, event: Event, _signature: Vec<u8>) -> Result<String> {
+        if Self::contains_p6_control_event(&event) {
+            return Err(Error::from_reason("P6_LOCAL_ONLY"));
+        }
+        let _commit_guard = self.commit_lock.lock();
+        self.ensure_readable()?;
+        let event = self.revisionize_consensus_event(event)?;
         if !self.semantic_verify(&event)? {
             return Err(Error::from_reason(
                 "proposal rejected by semantic_verify (conflicts with a governing axiom)",
@@ -8591,6 +15259,73 @@ impl Storage {
         let bytes = self.peers.get(peer_id)?.verifying_key.clone();
         let arr: [u8; 32] = bytes.as_slice().try_into().ok()?;
         VerifyingKey::from_bytes(&arr).ok()
+    }
+
+    fn sign_sync_progress_receipt(
+        &self,
+        requester_peer_id: &str,
+        request_nonce: &str,
+        from_seq: u64,
+        through_seq: u64,
+    ) -> Result<SyncProgressReceipt> {
+        let version = 1;
+        let payload = canonical_sync_progress_receipt_bytes(
+            version,
+            &self.local_peer_id,
+            requester_peer_id,
+            request_nonce,
+            from_seq,
+            through_seq,
+        )
+        .map_err(|e| Error::from_reason(e.to_string()))?;
+        Ok(SyncProgressReceipt {
+            version,
+            responder_peer_id: self.local_peer_id.clone(),
+            requester_peer_id: requester_peer_id.to_string(),
+            request_nonce: request_nonce.to_string(),
+            from_seq,
+            through_seq,
+            signature: self.signing_key.sign(&payload).to_bytes().to_vec(),
+        })
+    }
+
+    fn verify_sync_progress_receipt(
+        receipt: &SyncProgressReceipt,
+        trusted_responder_key: Option<&VerifyingKey>,
+        expected_responder_peer_id: &str,
+        expected_requester_peer_id: &str,
+        request_nonce: &str,
+        from_seq: u64,
+        outer_through_seq: Option<u64>,
+    ) -> Option<u64> {
+        let outer_through_seq = outer_through_seq?;
+        if receipt.version != 1
+            || receipt.responder_peer_id != expected_responder_peer_id
+            || receipt.requester_peer_id != expected_requester_peer_id
+            || receipt.request_nonce != request_nonce
+            || receipt.from_seq != from_seq
+            || receipt.through_seq < receipt.from_seq
+            || receipt.through_seq != outer_through_seq
+        {
+            return None;
+        }
+        let vkey = trusted_responder_key?;
+        let Ok(payload) = canonical_sync_progress_receipt_bytes(
+            receipt.version,
+            &receipt.responder_peer_id,
+            &receipt.requester_peer_id,
+            &receipt.request_nonce,
+            receipt.from_seq,
+            receipt.through_seq,
+        ) else {
+            return None;
+        };
+        let Ok(signature) = Signature::from_slice(&receipt.signature) else {
+            return None;
+        };
+        vkey.verify(&payload, &signature)
+            .is_ok()
+            .then_some(receipt.through_seq)
     }
 
     /// Verify that `se.signature` is an authentic ed25519 signature by
@@ -8664,6 +15399,9 @@ impl Storage {
 
         if let Some(mut proposal_ref) = self.proposals.get_mut(&proposal_id) {
             let proposal = proposal_ref.value_mut();
+            if Self::contains_p6_control_event(&proposal.signed_event.event) {
+                return Err(Error::from_reason("P6_LOCAL_ONLY"));
+            }
             // Already-committed guard: once quorum is crossed and the event applied,
             // later approving votes must not re-apply or re-persist it.
             if proposal.committed {
@@ -8687,6 +15425,9 @@ impl Storage {
             // proposal's own event signature (a gossiped proposal is verified on
             // receipt, but defense-in-depth) and re-run the governance check.
             let signed_event = proposal.signed_event.clone();
+            if Self::contains_p6_control_event(&signed_event.event) {
+                return Err(Error::from_reason("P6_LOCAL_ONLY"));
+            }
             if !self.verify_event_signature(&signed_event) {
                 return Err(Error::from_reason(
                     "proposal event signature invalid at commit",
@@ -8779,13 +15520,23 @@ impl Storage {
                     // stamp from persist_signed IS this transaction's sequence.
                     let seq = self.persist_signed(signed_event.clone())?;
                     self.apply_transaction_memory(transaction, true, seq);
-                    self.txn_frontier.fetch_max(seq, Ordering::SeqCst);
+                    if transaction.advances_txn_frontier {
+                        self.txn_frontier.fetch_max(seq, Ordering::SeqCst);
+                    }
                 }
                 // A committed retraction applies like the replay path and is
                 // persisted with its original proposal signature.
                 Event::NodeRetract { .. } => {
                     let retract_seq = self.persist_signed(signed_event.clone())?;
                     self.apply_event_memory(retract_seq, signed_event.event.clone(), true);
+                }
+                Event::GenerationPublished(_)
+                | Event::AccessPolicyChanged(_)
+                | Event::Schema6MigrationChunkV1(_)
+                | Event::Schema6MigrationCommitV1(_)
+                | Event::Schema6ActivationV1(_) => {
+                    let seq = self.persist_signed(signed_event.clone())?;
+                    self.apply_event_memory(seq, signed_event.event.clone(), true);
                 }
             }
             proposal.committed = true;
@@ -8815,7 +15566,7 @@ impl Storage {
     }
 
     pub fn compute_impact(&self, node: &NodeOutput) -> f64 {
-        let u32_id = match self.get_u32(&node.id) {
+        let u32_id = match self.get_u32_unlocked(&node.id) {
             Some(id) => id,
             None => return 0.7,
         };
@@ -8847,7 +15598,7 @@ impl Storage {
                 .collect(),
         };
         for id in ids_to_process {
-            if let Some(u32_id) = self.get_u32(&id) {
+            if let Some(u32_id) = self.get_u32_unlocked(&id) {
                 if let Some(mut node_ref) = self.nodes.get_mut(&u32_id) {
                     let new_impact = self.compute_impact(node_ref.value());
                     node_ref.value_mut().impact = Some(new_impact);
@@ -8862,12 +15613,12 @@ impl Storage {
     pub fn index_edge_internal(&self, id: &str, from: &str, to: &str) -> u128 {
         let ekey = Self::edge_key(id);
         if let Some(old) = self.edges.get(&ekey) {
-            if let Some(u) = self.get_u32(&old.from) {
+            if let Some(u) = self.get_u32_unlocked(&old.from) {
                 if let Some(mut ids) = self.out_idx.get_mut(&u) {
                     ids.remove(&ekey);
                 }
             }
-            if let Some(u) = self.get_u32(&old.to) {
+            if let Some(u) = self.get_u32_unlocked(&old.to) {
                 if let Some(mut ids) = self.in_idx.get_mut(&u) {
                     ids.remove(&ekey);
                 }
@@ -8955,7 +15706,7 @@ impl Storage {
             node.embedding = Some(emb.clone());
             node.collection = Some(coll.name.clone());
         }
-        let seq = self.persist(&Event::Node(node.clone()))?;
+        let seq = self.persist_local_graph_mutations(&[node.clone()], &[], &[])?;
         let u32_id = self.get_or_intern_id(&id);
         self.insert_node_lean(u32_id, node.clone());
         if let Some(emb) = args.embedding {
@@ -8983,7 +15734,7 @@ impl Storage {
             caused_by: args.caused_by,
             clock: self.next_clock(),
         };
-        self.persist(&Event::Edge(edge.clone()))?;
+        self.persist_local_graph_mutations(&[], std::slice::from_ref(&edge), &[])?;
         let u32_id = self.index_edge_internal(&edge.id, &edge.from, &edge.to);
         self.edges.insert(u32_id, edge.clone());
         self.refresh_impacts(Some(vec![edge.to.clone()]));
@@ -8999,7 +15750,7 @@ impl Storage {
         self.ensure_writable()?;
         let _commit_guard = self.commit_lock.lock();
         self.ensure_readable()?;
-        let u32_id = match self.get_u32(&id) {
+        let u32_id = match self.get_u32_unlocked(&id) {
             Some(i) => i,
             None => return Err(Error::from_reason(format!("Node {} not found", id))),
         };
@@ -9012,7 +15763,7 @@ impl Storage {
         };
 
         old_node.valid_to = Some(now.clone());
-        let closed_seq = self.persist(&Event::Node(old_node.clone()))?;
+        let closed_seq = self.persist_local_graph_mutations(&[old_node.clone()], &[], &[])?;
 
         let mut new_node = old_node.clone();
         new_node.valid_from = now.clone();
@@ -9029,7 +15780,7 @@ impl Storage {
         // Preserve the existing two-frame temporal contract. If the second
         // write fails, the closing frame is already durable: do not checkpoint
         // the old live memory over it or report this as a rejected operation.
-        self.persist(&Event::Node(new_node.clone()))
+        self.persist_local_graph_mutations(&[new_node.clone()], &[], &[])
             .map_err(|e| self.durable_apply_error(closed_seq, e))?;
         self.insert_node_lean(u32_id, new_node.clone());
 
@@ -9299,7 +16050,7 @@ impl Storage {
                     _ => None,
                 });
         if let Some(anchor_id) = anchor_id {
-            if let Some(anchor_u32) = self.get_u32(&anchor_id) {
+            if let Some(anchor_u32) = self.get_u32_unlocked(&anchor_id) {
                 if let Some(entry) = self.nodes.get(&anchor_u32) {
                     let node = entry.value();
                     if Self::is_node_visible(node, as_of, false, &now)
@@ -9363,8 +16114,8 @@ impl Storage {
                         None => continue,
                     };
                     let edge = edge_ref.value();
-                    if !(walk_out && self.get_u32(&edge.from) == Some(*curr)
-                        || walk_in && self.get_u32(&edge.to) == Some(*curr))
+                    if !(walk_out && self.get_u32_unlocked(&edge.from) == Some(*curr)
+                        || walk_in && self.get_u32_unlocked(&edge.to) == Some(*curr))
                     {
                         continue;
                     }
@@ -9383,12 +16134,12 @@ impl Storage {
                         }
                     }
                     // Far endpoint = the one that is not the current node.
-                    let far_id = if self.get_u32(&edge.from) == Some(*curr) {
+                    let far_id = if self.get_u32_unlocked(&edge.from) == Some(*curr) {
                         &edge.to
                     } else {
                         &edge.from
                     };
-                    let far_u32 = match self.get_u32(far_id) {
+                    let far_u32 = match self.get_u32_unlocked(far_id) {
                         Some(x) => x,
                         None => continue,
                     };
@@ -9628,13 +16379,13 @@ impl Storage {
         serde_json::json!({
             "contract_version": QUERY_IR_V1,
             "implementation_status": "partial",
-            "storage_schema_version": SCHEMA_VERSION,
-            "collection_definition": { "version":1, "durable":true, "conflict_policy":"reject", "sync_schema_version":SCHEMA_VERSION },
+            "storage_schema_version": self.storage_schema_version,
+            "collection_definition": { "version":1, "durable":true, "conflict_policy":"reject", "sync_schema_version":self.storage_schema_version },
             "edge_history": {"availability":if self.edge_history_floor().is_some(){"implemented"}else{"unavailable"}, "floor":self.edge_history_floor(), "selection":"replica_local_frame_intervals"},
             "operations": {
                 "search": "implemented",
                 "traverse": "implemented",
-                "match_path": "planned",
+                "match_path": "implemented",
                 "context": "implemented",
                 "relational_named_query": "planned"
             },
@@ -9654,7 +16405,14 @@ impl Storage {
                     "temporal": "unsupported",
                     "tiers": ["H0", "H1", "H2", "H3", "H4", "H5", "H6"]
                 },
-                "match_path": "planned",
+                "match_path": {
+                    "linear": "implemented",
+                    "where": "implemented",
+                    "order_by": "implemented",
+                    "return": "implemented",
+                    "valid_at": "implemented",
+                    "tx_as_of": "unsupported"
+                },
                 "relational_named_query": "planned"
             },
             "limits": {
@@ -9717,7 +16475,11 @@ impl Storage {
     pub fn execute_query_ir(&self, request: QueryIrRequest) -> Result<serde_json::Value> {
         let _read_guard = self.commit_lock.lock();
         self.ensure_readable()?;
+        self.require_unscoped_read()?;
+        self.execute_query_ir_unlocked(request)
+    }
 
+    fn execute_query_ir_unlocked(&self, request: QueryIrRequest) -> Result<serde_json::Value> {
         if request.contract_version != QUERY_IR_V1 {
             return Err(Error::from_reason(format!(
                 "QUERY_IR_VERSION_UNSUPPORTED: expected '{QUERY_IR_V1}', got '{}'",
@@ -9753,6 +16515,11 @@ impl Storage {
             .temporal
             .as_ref()
             .and_then(|temporal| temporal.tx_as_of);
+        if tx_as_of.is_some() && matches!(&request.operation, QueryIrOperation::MatchPath { .. }) {
+            return Err(Error::from_reason(
+                "QUERY_CAPABILITY_UNSUPPORTED: match_path temporal.tx_as_of is not implemented",
+            ));
+        }
         if let Some(t) = tx_as_of {
             let horizon = self.history_horizon();
             if t < horizon {
@@ -9919,12 +16686,12 @@ impl Storage {
                 }
                 let fuzzy = fuzzy.unwrap_or(false);
                 let resolved_target = if fuzzy {
-                    self.find_fuzzy_id(&target_id)
+                    self.find_fuzzy_id_unlocked(&target_id)
                         .unwrap_or_else(|| target_id.clone())
                 } else {
                     target_id.clone()
                 };
-                let target_u32 = self.get_u32(&resolved_target).ok_or_else(|| {
+                let target_u32 = self.get_u32_unlocked(&resolved_target).ok_or_else(|| {
                     Error::from_reason(format!(
                         "QUERY_TARGET_NOT_FOUND: node '{target_id}' does not exist"
                     ))
@@ -9954,6 +16721,26 @@ impl Storage {
                     Error::from_reason(format!("QUERY_EXECUTION_FAILED: {error}"))
                 })?;
                 ("context", data)
+            }
+            QueryIrOperation::MatchPath {
+                pattern,
+                limit,
+                where_preds,
+                order_by,
+                ret,
+            } => {
+                if limit == 0 {
+                    return Err(Error::from_reason(
+                        "QUERY_RESOURCE_LIMIT_EXCEEDED: match_path.limit must be positive",
+                    ));
+                }
+                let pattern = pattern.into_hql()?;
+                let clauses =
+                    query_ir_match_path_clauses_to_hql(limit, where_preds, order_by, ret)?;
+                let data = self
+                    .match_pattern(&pattern, &as_of, &clauses, &mut budget)
+                    .map_err(preserve_query_error)?;
+                ("match_path", data)
             }
         };
 
@@ -10000,7 +16787,7 @@ impl Storage {
                 Ok((vector, collection))
             }
             (Some(target_id), None) => {
-                let node_u32 = self.get_u32(&target_id).ok_or_else(|| {
+                let node_u32 = self.get_u32_unlocked(&target_id).ok_or_else(|| {
                     Error::from_reason(format!(
                         "QUERY_TARGET_NOT_FOUND: node '{target_id}' does not exist"
                     ))
@@ -10044,16 +16831,21 @@ impl Storage {
     ) -> Result<serde_json::Value> {
         let _read_guard = self.commit_lock.lock();
         self.ensure_readable()?;
+        self.require_unscoped_read()?;
+        self.execute_hql_with_budget_unlocked(query, requested_budget)
+    }
+
+    fn execute_hql_with_budget_unlocked(
+        &self,
+        query: &str,
+        requested_budget: Option<QueryBudget>,
+    ) -> Result<serde_json::Value> {
         let budget_limits = requested_budget.unwrap_or_default().resolve()?;
         let mut budget_state = QueryBudgetState::new(budget_limits);
 
-        fn to_value<T: serde::Serialize>(res: T) -> Result<serde_json::Value> {
-            serde_json::to_value(res)
-                .map_err(|e| Error::from_reason(format!("HQL result serialization failed: {e}")))
-        }
         fn resolved_target_id(storage: &Storage, target: &str, fuzzy: bool) -> Result<String> {
             if fuzzy {
-                storage.find_fuzzy_id(target).ok_or_else(|| {
+                storage.find_fuzzy_id_unlocked(target).ok_or_else(|| {
                     Error::from_reason(format!(
                         "HQL: target '{target}' does not resolve to a node and no vector was given"
                     ))
@@ -10073,7 +16865,7 @@ impl Storage {
                 return Ok((vector, requested_collection.clone()));
             }
             let resolved = resolved_target_id(storage, target, fuzzy)?;
-            let node_u32 = storage.get_u32(&resolved).ok_or_else(|| {
+            let node_u32 = storage.get_u32_unlocked(&resolved).ok_or_else(|| {
                 Error::from_reason(format!(
                     "HQL: target '{target}' does not resolve to a node and no vector was given"
                 ))
@@ -10103,15 +16895,30 @@ impl Storage {
                 })?;
             Ok((query_vector, node.collection.clone()))
         }
+        fn validate_hql_search_k(k: u32) -> Result<()> {
+            if k == 0 {
+                return Err(Error::from_reason(format!(
+                    "QUERY_RESOURCE_LIMIT_EXCEEDED: search.k must be between 1 and {QUERY_IR_MAX_K}"
+                )));
+            }
+            Ok(())
+        }
+        fn query_ir_data(
+            storage: &Storage,
+            request: QueryIrRequest,
+            budget: Option<QueryBudget>,
+        ) -> Result<serde_json::Value> {
+            let mut request = request;
+            request.budget = budget;
+            let response = storage.execute_query_ir_unlocked(request)?;
+            Ok(response["data"].clone())
+        }
         fn query_ir_neighbors(
             storage: &Storage,
             request: QueryIrRequest,
             budget: Option<QueryBudget>,
         ) -> Result<Vec<NeighborOutput>> {
-            let mut request = request;
-            request.budget = budget;
-            let response = storage.execute_query_ir(request)?;
-            serde_json::from_value(response["data"].clone()).map_err(|error| {
+            serde_json::from_value(query_ir_data(storage, request, budget)?).map_err(|error| {
                 Error::from_reason(format!("HQL compatibility decode failed: {error}"))
             })
         }
@@ -10129,6 +16936,7 @@ impl Storage {
                 collection,
                 clauses,
             } => {
+                validate_hql_search_k(k)?;
                 let (query_vector, resolved_collection) =
                     hql_query_vector(self, &target, fuzzy, vector, &collection)?;
                 let res = if (1..=QUERY_IR_MAX_K).contains(&k) {
@@ -10187,7 +16995,7 @@ impl Storage {
                 clauses,
             } => {
                 let resolved_seed = if fuzzy {
-                    self.find_fuzzy_id(&seed).unwrap_or(seed)
+                    self.find_fuzzy_id_unlocked(&seed).unwrap_or(seed)
                 } else {
                     seed
                 };
@@ -10260,6 +17068,7 @@ impl Storage {
                 collection,
                 clauses,
             } => {
+                validate_hql_search_k(k)?;
                 let (query_vector, resolved_collection) =
                     hql_query_vector(self, &target, fuzzy, vector, &collection)?;
                 let res = if (1..=QUERY_IR_MAX_K).contains(&k) {
@@ -10312,15 +17121,49 @@ impl Storage {
                 tier,
                 budget,
                 fuzzy,
-            } => {
-                let res = self.retrieve_context(&target, &tier, budget, fuzzy)?;
-                to_value(res)
-            }
+            } => query_ir_data(
+                self,
+                QueryIrRequest {
+                    contract_version: QUERY_IR_V1.to_string(),
+                    request_id: "hql-compat".to_string(),
+                    namespace: None,
+                    temporal: None,
+                    consistency: None,
+                    budget: None,
+                    operation: QueryIrOperation::Context {
+                        target_id: Some(target),
+                        query_vector: None,
+                        tier,
+                        budget,
+                        fuzzy: Some(fuzzy),
+                    },
+                },
+                Some(budget_state.limits.as_input()),
+            ),
             HqlCommand::MatchPattern {
                 pattern,
                 as_of,
                 clauses,
-            } => self.match_pattern(&pattern, &as_of, &clauses, &mut budget_state),
+            } => query_ir_data(
+                self,
+                QueryIrRequest {
+                    contract_version: QUERY_IR_V1.to_string(),
+                    request_id: "hql-compat".to_string(),
+                    namespace: None,
+                    temporal: Some(QueryIrTemporal {
+                        valid_at: as_of,
+                        tx_as_of: None,
+                    }),
+                    consistency: None,
+                    budget: None,
+                    operation: query_ir_match_path_from_hql(
+                        &pattern,
+                        &clauses,
+                        budget_state.limits.max_result_rows,
+                    ),
+                },
+                Some(budget_state.limits.as_input()),
+            ),
         }?;
         budget_state.serialized(&result)?;
         Ok(result)
@@ -10337,6 +17180,7 @@ impl Storage {
     ) -> Result<serde_json::Value> {
         let _read_guard = self.commit_lock.lock();
         self.ensure_readable()?;
+        self.require_unscoped_read()?;
 
         let command = HqlCommand::try_from(query).map_err(Error::from_reason)?;
         match command {
@@ -10414,6 +17258,7 @@ impl Storage {
     pub fn studio_graph_scene(&self, request: StudioGraphSceneRequest) -> Result<StudioGraphScene> {
         let _read_guard = self.commit_lock.lock();
         self.ensure_readable()?;
+        self.require_unscoped_read()?;
         Self::validate_temporal_selector(&request.as_of)?;
 
         let limit = request.limit.unwrap_or(240);
@@ -10476,7 +17321,7 @@ impl Storage {
                 )?
                 .into_iter()
                 .filter_map(|result| {
-                    self.get_u32(&result.node.id)
+                    self.get_u32_unlocked(&result.node.id)
                         .map(|node_u32| (node_u32, result.node))
                 }),
             );
@@ -10562,6 +17407,7 @@ impl Storage {
     pub fn studio_inspect_entity(&self, entity_id: &str) -> Result<StudioEntityInspection> {
         let _read_guard = self.commit_lock.lock();
         self.ensure_readable()?;
+        self.require_unscoped_read()?;
 
         let node_u32 = self
             .get_u32(entity_id)
@@ -10751,6 +17597,7 @@ impl Storage {
     pub fn hybrid_search(&self, args: HybridSearchInput) -> Result<Vec<NeighborOutput>> {
         let _read_guard = self.commit_lock.lock();
         self.ensure_readable()?;
+        self.require_unscoped_read()?;
 
         let limits = QueryBudget::default().resolve()?;
         let mut budget = QueryBudgetState::new(limits);
@@ -10893,7 +17740,7 @@ impl Storage {
                 let sq8 = coll.sq8_snapshot();
                 let run_filtered = |limit: usize| -> Result<Vec<(usize, f32)>> {
                     let meta_guard = coll.metadata.read();
-                    let flt = |did: &usize| meta_guard.get(*did).map(&pred).unwrap_or(false);
+                    let flt = |did: &usize| meta_guard.get(*did).map(pred).unwrap_or(false);
                     let hnsw_lock = coll.hnsw.read();
                     match &*hnsw_lock {
                         Some(idx) => Ok(idx.search_f32(
@@ -11134,6 +17981,7 @@ impl Storage {
         args: NeighborInput,
         is_inferred: bool,
     ) -> Result<Vec<NeighborOutput>> {
+        self.require_unscoped_read()?;
         let limits = QueryBudget::default().resolve()?;
         let mut budget = QueryBudgetState::new(limits);
         let results = self.neighbors_with_budget(seed, args, is_inferred, &mut budget)?;
@@ -11166,7 +18014,7 @@ impl Storage {
         }
         budget.check_deadline()?;
 
-        let u32_seed = match self.get_u32(&seed) {
+        let u32_seed = match self.get_u32_unlocked(&seed) {
             Some(id) => id,
             None => return Ok(Vec::new()),
         };
@@ -11233,8 +18081,8 @@ impl Storage {
                 budget.edge()?;
                 if let Some(edge_ref) = self.edges.get(eid) {
                     let edge = edge_ref.value();
-                    if !(walk_out && self.get_u32(&edge.from) == Some(curr_u32)
-                        || walk_in && self.get_u32(&edge.to) == Some(curr_u32))
+                    if !(walk_out && self.get_u32_unlocked(&edge.from) == Some(curr_u32)
+                        || walk_in && self.get_u32_unlocked(&edge.to) == Some(curr_u32))
                     {
                         continue;
                     }
@@ -11259,12 +18107,12 @@ impl Storage {
                     // endpoint is whichever of from/to interns to curr_u32. This
                     // needs no u32->id reverse map and avoids a per-edge string
                     // clone (ADR--GENESISDB-NODE-ID-INTERNING, Layer A).
-                    let next_id = if self.get_u32(&edge.from) == Some(curr_u32) {
+                    let next_id = if self.get_u32_unlocked(&edge.from) == Some(curr_u32) {
                         &edge.to
                     } else {
                         &edge.from
                     };
-                    if let Some(next_u32) = self.get_u32(next_id) {
+                    if let Some(next_u32) = self.get_u32_unlocked(next_id) {
                         if !visited.contains(&next_u32) {
                             budget.node()?;
                             visited.insert(next_u32);
@@ -11607,6 +18455,7 @@ impl Storage {
     pub fn query(&self, args: QueryInput) -> Result<Vec<EdgeOutput>> {
         let _read_guard = self.commit_lock.lock();
         self.ensure_readable()?;
+        self.require_unscoped_read()?;
         Self::validate_temporal_selector(&args.as_of)?;
 
         let include_invalid = args.include_invalid.unwrap_or(false);
@@ -11653,7 +18502,10 @@ impl Storage {
     /// concern, only bitemporal validity of nodes that DO exist, matching the
     /// node time-travel check `neighbors` runs on the far endpoint of a hop.
     fn endpoint_currently_visible(&self, id: &str, as_of: &Option<String>) -> bool {
-        match self.get_u32(id).and_then(|u32_id| self.nodes.get(&u32_id)) {
+        match self
+            .get_u32_unlocked(id)
+            .and_then(|u32_id| self.nodes.get(&u32_id))
+        {
             Some(node_ref) => {
                 let now = Utc::now().to_rfc3339();
                 Self::is_currently_visible(
@@ -11687,12 +18539,12 @@ impl Storage {
                     .unwrap_or_default();
                 for eid in out_eids {
                     if let Some(edge) = self.edges.get(&eid) {
-                        let other_id = if self.get_u32(&edge.from) == Some(meta.node_u32) {
+                        let other_id = if self.get_u32_unlocked(&edge.from) == Some(meta.node_u32) {
                             &edge.to
                         } else {
                             &edge.from
                         };
-                        if let Some(to_u32) = self.get_u32(other_id) {
+                        if let Some(to_u32) = self.get_u32_unlocked(other_id) {
                             if let Some(a_id) = coll.node_to_arena.get(&to_u32) {
                                 if let Some(other_meta) = meta_arena.get(*a_id as usize) {
                                     *freq.entry(other_meta.cluster_id).or_insert(0) += 1;
@@ -11708,12 +18560,12 @@ impl Storage {
                     .unwrap_or_default();
                 for eid in in_eids {
                     if let Some(edge) = self.edges.get(&eid) {
-                        let other_id = if self.get_u32(&edge.from) == Some(meta.node_u32) {
+                        let other_id = if self.get_u32_unlocked(&edge.from) == Some(meta.node_u32) {
                             &edge.to
                         } else {
                             &edge.from
                         };
-                        if let Some(to_u32) = self.get_u32(other_id) {
+                        if let Some(to_u32) = self.get_u32_unlocked(other_id) {
                             if let Some(a_id) = coll.node_to_arena.get(&to_u32) {
                                 if let Some(other_meta) = meta_arena.get(*a_id as usize) {
                                     *freq.entry(other_meta.cluster_id).or_insert(0) += 1;
@@ -11825,9 +18677,10 @@ impl Storage {
         }
         for entry in self.edges.iter() {
             let edge = entry.value();
-            if let (Some(from_u32), Some(to_u32)) =
-                (self.get_u32(&edge.from), self.get_u32(&edge.to))
-            {
+            if let (Some(from_u32), Some(to_u32)) = (
+                self.get_u32_unlocked(&edge.from),
+                self.get_u32_unlocked(&edge.to),
+            ) {
                 if let (Some(from_cid), Some(to_id)) = (
                     coll.node_to_arena.get(&from_u32),
                     coll.node_to_arena.get(&to_u32),
@@ -11899,7 +18752,7 @@ impl Storage {
         self.ensure_writable()?;
         let _commit_guard = self.commit_lock.lock();
         self.ensure_readable()?;
-        let u32_id = match self.get_u32(id) {
+        let u32_id = match self.get_u32_unlocked(id) {
             Some(i) => i,
             None => return Ok(()),
         };
@@ -11912,12 +18765,12 @@ impl Storage {
         // resolves in `id_to_u32`.
         let clock = self.next_clock();
         let retracted_at = Utc::now().to_rfc3339();
-        let event = Event::NodeRetract {
+        let retraction = NodeRetractionEvent {
             id: id.to_string(),
             clock: clock.clone(),
             retracted_at: retracted_at.clone(),
         };
-        let retract_seq = self.persist(&event)?;
+        let retract_seq = self.persist_local_graph_mutations(&[], &[], &[retraction])?;
         self.retract_node_memory(id, u32_id, retract_seq);
         // Slice-1 tombstone: lets the deletion win LWW against stale peer
         // re-pushes and survive folds/snapshots (see `tombstones` field doc).
@@ -11961,9 +18814,10 @@ impl Storage {
         for eid in edges_to_remove {
             if let Some(edge_ref) = self.edges.get(&eid) {
                 let edge = edge_ref.value();
-                if let (Some(from_u32), Some(to_u32)) =
-                    (self.get_u32(&edge.from), self.get_u32(&edge.to))
-                {
+                if let (Some(from_u32), Some(to_u32)) = (
+                    self.get_u32_unlocked(&edge.from),
+                    self.get_u32_unlocked(&edge.to),
+                ) {
                     // Remove from source node's out-index
                     if let Some(mut out_set) = self.out_idx.get_mut(&from_u32) {
                         out_set.remove(&eid);
@@ -12013,6 +18867,31 @@ impl Storage {
     }
 
     fn reconcile_state_unlocked(&self, signed_events: Vec<SignedEvent>) -> Result<()> {
+        if signed_events
+            .iter()
+            .any(|signed_event| Self::contains_p6_control_event(&signed_event.event))
+        {
+            return Err(Error::from_reason("P6_LOCAL_ONLY"));
+        }
+        if self.storage_schema_version == SCHEMA_VERSION
+            && signed_events
+                .iter()
+                .any(|signed| Self::graph_event_requires_revision_envelope(&signed.event))
+        {
+            return Err(Error::from_reason(
+                "UPGRADE_REQUIRED: schema 6 requires revision-bearing graph events",
+            ));
+        }
+        if self.storage_schema_version != SCHEMA_VERSION
+            && signed_events.iter().any(|signed| {
+                matches!(&signed.event, Event::Transaction(transaction)
+                    if transaction.record_revision_transaction.is_some())
+            })
+        {
+            return Err(Error::from_reason(
+                "UPGRADE_REQUIRED: revision-bearing events require schema 6",
+            ));
+        }
         for signed_event in signed_events {
             let event = &signed_event.event;
             let signer_id = &signed_event.signer_peer_id;
@@ -12050,7 +18929,7 @@ impl Storage {
                 Event::Node(remote_node) => {
                     let mut apply = true;
                     if let Some(local_node) = self
-                        .get_u32(&remote_node.id)
+                        .get_u32_unlocked(&remote_node.id)
                         .and_then(|u| self.nodes.get(&u))
                     {
                         if remote_node.clock < local_node.value().clock {
@@ -12162,11 +19041,14 @@ impl Storage {
                     self.persist_signed(signed_event.clone())?;
                 }
                 Event::Transaction(transaction) => {
+                    self.preflight_relational_event(event)?;
                     // ADR D2.2: no fetch_max of the peer's origin sequence —
                     // see the consensus-commit arm for the rationale.
                     let seq = self.persist_signed(signed_event.clone())?;
                     self.apply_transaction_memory(transaction, true, seq);
-                    self.txn_frontier.fetch_max(seq, Ordering::SeqCst);
+                    if transaction.advances_txn_frontier {
+                        self.txn_frontier.fetch_max(seq, Ordering::SeqCst);
+                    }
                 }
                 Event::Batch(_) => {
                     // The signature belongs to the original outer batch. Keep
@@ -12194,7 +19076,7 @@ impl Storage {
                     // Node-style LWW against the live copy: a strictly newer
                     // local upsert wins over the remote retraction.
                     let lww_target = self
-                        .get_u32(id)
+                        .get_u32_unlocked(id)
                         .and_then(|u| self.nodes.get(&u).map(|n| (u, n.value().clock.clone())));
                     if let Some((_, local_clock)) = &lww_target {
                         if *clock < *local_clock {
@@ -12230,6 +19112,18 @@ impl Storage {
                         },
                     );
                 }
+                Event::GenerationPublished(_) | Event::AccessPolicyChanged(_) => {
+                    let seq = self.persist_signed(signed_event.clone())?;
+                    self.apply_event_memory(seq, event.clone(), true);
+                    self.ensure_readable()
+                        .map_err(|e| self.durable_apply_error(seq, e))?;
+                }
+                Event::Schema6MigrationChunkV1(_) | Event::Schema6MigrationCommitV1(_) => {
+                    return Err(Error::from_reason("SCHEMA6_MIGRATION_LOCAL_ONLY"));
+                }
+                Event::Schema6ActivationV1(_) => {
+                    return Err(Error::from_reason("P6_LOCAL_ONLY"));
+                }
             }
         }
         Ok(())
@@ -12253,6 +19147,9 @@ impl Storage {
              (see RCA--PERSIST-SIGNED-CHECKPOINT-RACE)"
         );
         self.ensure_writable()?;
+        if Self::contains_p6_control_event(&signed_event.event) {
+            return Err(Error::from_reason("P6_LOCAL_ONLY"));
+        }
         self.preflight_collection_event(&signed_event.event)?;
         self.preflight_relational_event(&signed_event.event)?;
         let (ack_tx, ack_rx) = unbounded();
@@ -12297,6 +19194,7 @@ impl Storage {
     ) -> Result<ContextPackage> {
         let _read_guard = self.commit_lock.lock();
         self.ensure_readable()?;
+        self.require_unscoped_read()?;
 
         self.retrieve_context_inner(target_id, tier_str, budget, fuzzy, None)
     }
@@ -12326,7 +19224,7 @@ impl Storage {
         let tier = ScalingTier::parse(tier_str);
         let hops = tier.hops();
         let target_id_resolved = if fuzzy {
-            self.find_fuzzy_id(target_id)
+            self.find_fuzzy_id_unlocked(target_id)
                 .unwrap_or(target_id.to_string())
         } else {
             target_id.to_string()
@@ -12343,7 +19241,7 @@ impl Storage {
         let mut hops_served: u32 = 0;
         let mut ceiling_hit = false;
 
-        if let Some(u32_id) = self.get_u32(&target_id_resolved) {
+        if let Some(u32_id) = self.get_u32_unlocked(&target_id_resolved) {
             if let Some(node) = self.nodes.get(&u32_id) {
                 let hydrated = self.hydrated_node(u32_id, node.value());
                 if Self::is_node_visible(&hydrated, &None, false, &now) {
@@ -12383,7 +19281,7 @@ impl Storage {
                 for eid in eids.iter() {
                     if let Some(edge_ref) = self.edges.get(eid) {
                         let edge = edge_ref.value();
-                        if self.get_u32(&edge.from) != Some(curr_u32) {
+                        if self.get_u32_unlocked(&edge.from) != Some(curr_u32) {
                             continue;
                         }
                         if !Self::is_currently_visible(
@@ -12398,7 +19296,7 @@ impl Storage {
                         if let Some(state) = query_budget.as_deref_mut() {
                             state.edge()?;
                         }
-                        if let Some(next_u32) = self.get_u32(&edge.to) {
+                        if let Some(next_u32) = self.get_u32_unlocked(&edge.to) {
                             if let Some(node) = self.nodes.get(&next_u32) {
                                 let hydrated = self.hydrated_node(next_u32, node.value());
                                 if !Self::is_node_visible(&hydrated, &None, false, &now) {
@@ -12407,7 +19305,7 @@ impl Storage {
                             }
                         }
                         edges.push(edge.clone());
-                        if let Some(next_u32) = self.get_u32(&edge.to) {
+                        if let Some(next_u32) = self.get_u32_unlocked(&edge.to) {
                             if let std::collections::hash_map::Entry::Vacant(e) =
                                 nodes.entry(next_u32)
                             {
@@ -12433,7 +19331,7 @@ impl Storage {
                 for eid in eids.iter() {
                     if let Some(edge_ref) = self.edges.get(eid) {
                         let edge = edge_ref.value();
-                        if self.get_u32(&edge.to) != Some(curr_u32) {
+                        if self.get_u32_unlocked(&edge.to) != Some(curr_u32) {
                             continue;
                         }
                         if !Self::is_currently_visible(
@@ -12448,7 +19346,7 @@ impl Storage {
                         if let Some(state) = query_budget.as_deref_mut() {
                             state.edge()?;
                         }
-                        if let Some(prev_u32) = self.get_u32(&edge.from) {
+                        if let Some(prev_u32) = self.get_u32_unlocked(&edge.from) {
                             if let Some(node) = self.nodes.get(&prev_u32) {
                                 let hydrated = self.hydrated_node(prev_u32, node.value());
                                 if !Self::is_node_visible(&hydrated, &None, false, &now) {
@@ -12457,7 +19355,7 @@ impl Storage {
                             }
                         }
                         edges.push(edge.clone());
-                        if let Some(prev_u32) = self.get_u32(&edge.from) {
+                        if let Some(prev_u32) = self.get_u32_unlocked(&edge.from) {
                             if let std::collections::hash_map::Entry::Vacant(e) =
                                 nodes.entry(prev_u32)
                             {
@@ -12547,7 +19445,7 @@ impl Storage {
             for eid in eids.iter() {
                 if let Some(edge_ref) = self.edges.get(eid) {
                     let edge = edge_ref.value();
-                    if self.get_u32(&edge.from) != Some(u32_id)
+                    if self.get_u32_unlocked(&edge.from) != Some(u32_id)
                         || !Self::is_currently_visible(
                             &edge.valid_from,
                             &edge.valid_to,
@@ -12558,7 +19456,7 @@ impl Storage {
                     {
                         continue;
                     }
-                    if let Some(next) = self.get_u32(&edge.to) {
+                    if let Some(next) = self.get_u32_unlocked(&edge.to) {
                         if !included.contains_key(&next)
                             && self
                                 .nodes
@@ -12579,7 +19477,7 @@ impl Storage {
             for eid in eids.iter() {
                 if let Some(edge_ref) = self.edges.get(eid) {
                     let edge = edge_ref.value();
-                    if self.get_u32(&edge.to) != Some(u32_id)
+                    if self.get_u32_unlocked(&edge.to) != Some(u32_id)
                         || !Self::is_currently_visible(
                             &edge.valid_from,
                             &edge.valid_to,
@@ -12590,7 +19488,7 @@ impl Storage {
                     {
                         continue;
                     }
-                    if let Some(prev) = self.get_u32(&edge.from) {
+                    if let Some(prev) = self.get_u32_unlocked(&edge.from) {
                         if !included.contains_key(&prev)
                             && self
                                 .nodes
@@ -12623,6 +19521,7 @@ impl Storage {
 
         tokio::spawn(async move {
             let mut sync_cursors: HashMap<String, u64> = HashMap::new();
+            let mut pending_sync_requests: HashMap<String, (String, u64)> = HashMap::new();
             let socket = match tokio::net::UdpSocket::bind("0.0.0.0:0").await {
                 Ok(s) => {
                     let addr = match s.local_addr() {
@@ -12685,6 +19584,12 @@ impl Storage {
                                                 continue;
                                             }
                                             if merkle_root != storage.get_merkle_root() {
+                                                let from_commit_seq = *sync_cursors.get(&p_id).unwrap_or(&0);
+                                                let request_nonce = Uuid::new_v4().to_string();
+                                                pending_sync_requests.insert(
+                                                    p_id.clone(),
+                                                    (request_nonce.clone(), from_commit_seq),
+                                                );
                                                 let req = GossipMessage::PullRequest {
                                                     schema_version:SCHEMA_VERSION,
                                                     from_clock: storage.get_logical_clock(),
@@ -12694,7 +19599,8 @@ impl Storage {
                                                     // bootstrap channel (WP-1.3); until
                                                     // then requesters stay on the
                                                     // Lamport cursor.
-                                                    from_commit_seq: Some(*sync_cursors.get(&p_id).unwrap_or(&0)),
+                                                    from_commit_seq: Some(from_commit_seq),
+                                                    request_nonce: Some(request_nonce),
                                                 };
                                                 if let Ok(data) = serde_json::to_vec(&req) {
                                                     let _ = socket.send_to(&data, peer_addr).await;
@@ -12702,7 +19608,7 @@ impl Storage {
                                             }
                                         }
                                     }
-                                    GossipMessage::PullRequest { schema_version, from_clock, target_peer_id, from_commit_seq } => {
+                                    GossipMessage::PullRequest { schema_version, from_clock, target_peer_id, from_commit_seq, request_nonce } => {
                                         if schema_version != SCHEMA_VERSION {
                                             if let Ok(data)=serde_json::to_vec(&GossipMessage::UpgradeRequired{schema_version:SCHEMA_VERSION}) {
                                                 let _=socket.send_to(&data,addr).await;
@@ -12733,8 +19639,20 @@ impl Storage {
                                         if let Some(reply_addr) = storage.peers.get(&target_peer_id).map(|p| p.addr.clone()) {
                                             let _=from_clock; // v4 sync uses responder-local frame cursors.
                                             match storage.sync_delta(from_commit_seq.unwrap_or(0)) {
-                                                Ok((events,through_seq)) if !events.is_empty() => {
-                                                    if let Ok(data)=serde_json::to_vec(&GossipMessage::PushDelta {events,source_peer_id:storage.local_peer_id.clone(),through_seq:Some(through_seq)}) {
+                                                Ok((events,through_seq,filtered_local_only)) if !events.is_empty() || filtered_local_only => {
+                                                    let progress_receipt = request_nonce
+                                                        .as_deref()
+                                                        .and_then(|nonce| {
+                                                            storage
+                                                                .sign_sync_progress_receipt(
+                                                                    &target_peer_id,
+                                                                    nonce,
+                                                                    from_commit_seq.unwrap_or(0),
+                                                                    through_seq,
+                                                                )
+                                                                .ok()
+                                                        });
+                                                    if let Ok(data)=serde_json::to_vec(&GossipMessage::PushDelta {events,source_peer_id:storage.local_peer_id.clone(),through_seq:Some(through_seq),progress_receipt}) {
                                                         let _=socket.send_to(&data,reply_addr).await;
                                                     }
                                                 }
@@ -12748,11 +19666,37 @@ impl Storage {
                                             }
                                         }
                                     }
-                                    GossipMessage::PushDelta { events,source_peer_id,through_seq } => {
+                                    GossipMessage::PushDelta { events,source_peer_id,through_seq,progress_receipt } => {
                                         // No cursor advancement on a rejected signature/schema/dependency.
                                         if events.iter().all(|e|storage.verify_event_signature(e)) {
+                                            let pending = pending_sync_requests.get(&source_peer_id).cloned();
+                                            // Heartbeat and Storage.peers keys have no independent trust provenance.
+                                            // This P6 slice has no remote receipt-key source, so remain fail-closed.
+                                            let trusted_responder_key: Option<&VerifyingKey> = None;
+                                            let verified_through_seq = pending.as_ref().and_then(|(nonce, from_seq)| {
+                                                progress_receipt.as_ref().and_then(|receipt| {
+                                                    Storage::verify_sync_progress_receipt(
+                                                        receipt,
+                                                        trusted_responder_key,
+                                                        &source_peer_id,
+                                                        &storage.local_peer_id,
+                                                        nonce,
+                                                        *from_seq,
+                                                        through_seq,
+                                                        )
+                                                })
+                                            });
+                                            if through_seq.is_some() && verified_through_seq.is_none() {
+                                                eprintln!(
+                                                    "SYNC_AUTH_REQUIRED: cursor receipt missing or untrusted for peer {}",
+                                                    source_peer_id
+                                                );
+                                            }
                                             match storage.reconcile_state(events) {
-                                                Ok(())=>if let Some(seq)=through_seq { sync_cursors.insert(source_peer_id,seq); },
+                                                Ok(())=>if let Some(seq)=verified_through_seq {
+                                                    sync_cursors.insert(source_peer_id.clone(),seq);
+                                                    pending_sync_requests.remove(&source_peer_id);
+                                                },
                                                 Err(e)=>eprintln!("sync: {e}"),
                                             }
                                         }
@@ -12776,7 +19720,12 @@ impl Storage {
                                         // its claimed originator before storing it. An unsigned or
                                         // forged proposal could otherwise be driven to quorum and
                                         // applied as a MASTER axiom, bypassing governance.
-                                        if storage.verify_event_signature(&proposal.signed_event) {
+                                        if Storage::contains_p6_control_event(&proposal.signed_event.event) {
+                                            println!(
+                                                "consensus: rejected local-only P6 proposal {}",
+                                                proposal.proposal_id
+                                            );
+                                        } else if storage.verify_event_signature(&proposal.signed_event) {
                                             storage.proposals.insert(proposal.proposal_id.clone(), *proposal);
                                         } else {
                                             println!("consensus: rejected proposal {} — invalid event signature or unknown signer.", proposal.proposal_id);
@@ -12831,17 +19780,310 @@ impl Storage {
     /// to fall back to a (correct but slower) full WAL replay. Best-effort: a final
     /// failure returns `false` rather than erroring, since the snapshot is only an
     /// instant-load optimization layered on the authoritative WAL.
-    fn rename_with_retry(from: &std::path::Path, to: &std::path::Path) -> bool {
+    fn rename_with_retry(from: &std::path::Path, to: &std::path::Path) -> Result<()> {
         for _ in 0..50 {
             match fs::rename(from, to) {
-                Ok(_) => return true,
+                Ok(_) => return Ok(()),
                 Err(e) if matches!(e.raw_os_error(), Some(5) | Some(32) | Some(33)) => {
+                    if to.exists() {
+                        let _ = fs::remove_file(to);
+                    }
                     std::thread::sleep(Duration::from_millis(20));
                 }
-                Err(_) => return false,
+                Err(e) => return Err(Error::from_reason(e.to_string())),
             }
         }
-        fs::rename(from, to).is_ok()
+        fs::rename(from, to).map_err(|e| Error::from_reason(e.to_string()))
+    }
+
+    fn validate_p6_snapshot_at(root: &Path, state: &serde_json::Value) -> Result<Option<String>> {
+        let schema_version = state["schema_version"].as_u64().unwrap_or(0) as u32;
+        let Some(p6) = state.get("p6") else {
+            if schema_version >= SCHEMA_VERSION {
+                return Err(Error::from_reason(
+                    "SNAPSHOT_MANIFEST_INVALID: P6 manifest missing",
+                ));
+            }
+            // v4 and older snapshots remain on the legacy load path and are
+            // upgraded only after complete WAL recovery is available.
+            return Ok(None);
+        };
+        let manifest = p6.get("manifest").ok_or_else(|| {
+            Error::from_reason("SNAPSHOT_MANIFEST_INVALID: manifest object missing")
+        })?;
+        let version = manifest["version"]
+            .as_u64()
+            .ok_or_else(|| Error::from_reason("SNAPSHOT_MANIFEST_INVALID: version missing"))?
+            as u32;
+        if version != 1 {
+            return Err(Error::from_reason(
+                "SNAPSHOT_MANIFEST_INVALID: unsupported manifest version",
+            ));
+        }
+        let snapshot_frontier = manifest["snapshot_frontier"].as_u64().ok_or_else(|| {
+            Error::from_reason("SNAPSHOT_MANIFEST_INVALID: snapshot frontier missing")
+        })?;
+        let journal_frontier = state["journal"]["frontier_seq"].as_u64().ok_or_else(|| {
+            Error::from_reason("SNAPSHOT_MANIFEST_INVALID: journal frontier missing")
+        })?;
+        if snapshot_frontier != journal_frontier {
+            return Err(Error::from_reason(
+                "SNAPSHOT_MANIFEST_INVALID: frontier mismatch",
+            ));
+        }
+        let components = manifest["components"]
+            .as_array()
+            .ok_or_else(|| Error::from_reason("SNAPSHOT_MANIFEST_INVALID: components missing"))?;
+        if components.is_empty() {
+            return Err(Error::from_reason(
+                "SNAPSHOT_MANIFEST_INVALID: empty component set",
+            ));
+        }
+        let mut canonical_components = Vec::with_capacity(components.len());
+        let mut seen = HashSet::new();
+        for component in components {
+            let path = component["path"].as_str().ok_or_else(|| {
+                Error::from_reason("SNAPSHOT_MANIFEST_INVALID: component path missing")
+            })?;
+            let relative = Path::new(path);
+            if path.is_empty()
+                || relative.is_absolute()
+                || path.contains('\\')
+                || relative
+                    .components()
+                    .any(|part| !matches!(part, std::path::Component::Normal(_)))
+                || !seen.insert(path.to_string())
+            {
+                return Err(Error::from_reason(
+                    "SNAPSHOT_MANIFEST_INVALID: unsafe or duplicate component path",
+                ));
+            }
+            let bytes = component["bytes"].as_u64().ok_or_else(|| {
+                Error::from_reason("SNAPSHOT_MANIFEST_INVALID: component byte count missing")
+            })?;
+            let expected_hash = component["sha256"].as_str().ok_or_else(|| {
+                Error::from_reason("SNAPSHOT_MANIFEST_INVALID: component digest missing")
+            })?;
+            if expected_hash.len() != 64
+                || !expected_hash.bytes().all(|byte| byte.is_ascii_hexdigit())
+            {
+                return Err(Error::from_reason(
+                    "SNAPSHOT_MANIFEST_INVALID: component digest malformed",
+                ));
+            }
+            let full_path = root.join(relative);
+            let (actual_bytes, actual_hash) = Self::sha256_file(&full_path).map_err(|_| {
+                Error::from_reason(format!(
+                    "SNAPSHOT_COMPONENT_INVALID: missing or unreadable component {path}"
+                ))
+            })?;
+            if actual_bytes != bytes || actual_hash != expected_hash {
+                return Err(Error::from_reason(format!(
+                    "SNAPSHOT_COMPONENT_INVALID: byte count or digest mismatch for {path}"
+                )));
+            }
+            canonical_components.push(serde_json::json!({
+                "path": path,
+                "bytes": bytes,
+                "sha256": expected_hash,
+            }));
+        }
+        canonical_components
+            .sort_by(|left, right| left["path"].as_str().cmp(&right["path"].as_str()));
+        let mut required = HashSet::from([
+            "nodes.bin".to_string(),
+            "edges.bin".to_string(),
+            "edges_retired.bin".to_string(),
+            PROJECTION_DB_FILE.to_string(),
+        ]);
+        for collection in state["collections"].as_array().ok_or_else(|| {
+            Error::from_reason("SNAPSHOT_MANIFEST_INVALID: collection manifest missing")
+        })? {
+            let name = collection["name"].as_str().ok_or_else(|| {
+                Error::from_reason("SNAPSHOT_MANIFEST_INVALID: collection name missing")
+            })?;
+            Self::validate_collection_name(name)?;
+            required.insert(format!("vec_{name}.bin"));
+            required.insert(format!("meta_{name}.bin"));
+            if collection["rerank"].as_bool().unwrap_or(false) {
+                required.insert(format!("fvec_{name}.bin"));
+            }
+            if collection["bqmean_present"].as_bool().unwrap_or(false) {
+                required.insert(format!("bqmean_{name}.bin"));
+            }
+            if collection["sq8scale_present"].as_bool().unwrap_or(false) {
+                required.insert(format!("sq8scale_{name}.bin"));
+            }
+        }
+        if required.iter().any(|path| !seen.contains(path)) {
+            return Err(Error::from_reason(
+                "SNAPSHOT_MANIFEST_INVALID: required component missing from manifest",
+            ));
+        }
+        let canonical = serde_json::to_vec(&serde_json::json!({
+            "version": version,
+            "snapshot_frontier": snapshot_frontier,
+            "components": canonical_components,
+        }))
+        .map_err(|e| Error::from_reason(e.to_string()))?;
+        let digest = hex::encode(Sha256::digest(canonical));
+        if manifest["manifest_sha256"].as_str() != Some(digest.as_str()) {
+            return Err(Error::from_reason(
+                "SNAPSHOT_MANIFEST_INVALID: manifest digest mismatch",
+            ));
+        }
+        if let Some(policy) = p6.get("access_policy").filter(|value| !value.is_null()) {
+            serde_json::from_value::<AccessPolicy>(policy.clone()).map_err(|_| {
+                Error::from_reason("SNAPSHOT_MANIFEST_INVALID: access policy is malformed")
+            })?;
+        }
+        if let Some(generation) = p6.get("generation").filter(|value| !value.is_null()) {
+            serde_json::from_value::<GenerationInfo>(generation.clone()).map_err(|_| {
+                Error::from_reason("SNAPSHOT_MANIFEST_INVALID: generation is malformed")
+            })?;
+        }
+        Ok(Some(digest))
+    }
+
+    fn validate_p6_snapshot_authority(&self, state: &serde_json::Value) -> Result<()> {
+        let Some(p6) = state.get("p6") else {
+            return Ok(());
+        };
+        let snapshot_frontier = p6
+            .get("manifest")
+            .and_then(|manifest| manifest.get("snapshot_frontier"))
+            .and_then(serde_json::Value::as_u64)
+            .ok_or_else(|| {
+                Error::from_reason("SNAPSHOT_MANIFEST_INVALID: snapshot frontier missing")
+            })?;
+        let snapshot_policy = p6
+            .get("access_policy")
+            .filter(|value| !value.is_null())
+            .map(|value| serde_json::from_value::<AccessPolicy>(value.clone()))
+            .transpose()
+            .map_err(|_| Error::from_reason("SNAPSHOT_MANIFEST_INVALID: access policy malformed"))?
+            .unwrap_or_else(Self::default_access_policy);
+        Self::validate_access_policy_shape(&snapshot_policy)?;
+        let snapshot_generation = p6
+            .get("generation")
+            .filter(|value| !value.is_null())
+            .map(|value| serde_json::from_value::<GenerationInfo>(value.clone()))
+            .transpose()
+            .map_err(|_| Error::from_reason("SNAPSHOT_MANIFEST_INVALID: generation malformed"))?;
+
+        let mut latest_policy = Self::default_access_policy();
+        let mut latest_generation: Option<GenerationInfo> = None;
+        let mut has_policy_event = false;
+        let mut invalid_signature = false;
+        let mut foreign_provenance = false;
+        let mut invalid_materialization = false;
+
+        self.scan_journal(None, true, &mut |seq, signed_event| {
+            let mut p6_events = Vec::new();
+            Self::collect_p6_control_events(&signed_event.event, &mut p6_events);
+            if p6_events.is_empty() {
+                return;
+            }
+            if seq > snapshot_frontier {
+                return;
+            }
+            if signed_event.signer_peer_id != self.local_peer_id {
+                foreign_provenance = true;
+                return;
+            }
+            if !self.verify_event_signature(&signed_event) {
+                invalid_signature = true;
+                return;
+            }
+
+            for event in p6_events {
+                match event {
+                    Event::AccessPolicyChanged(event) => {
+                        has_policy_event = true;
+                        if event.version != Self::access_policy_event_version(&event.policy)
+                            || (event.version == 2 && self.storage_schema_version != SCHEMA_VERSION)
+                            || Self::validate_access_policy_shape(&event.policy).is_err()
+                        {
+                            invalid_materialization = true;
+                            continue;
+                        }
+                        match Self::next_access_policy_after_event(&latest_policy, event) {
+                            Ok(policy) => latest_policy = policy,
+                            Err(_) => invalid_materialization = true,
+                        }
+                    }
+                    Event::GenerationPublished(event) => {
+                        if event.version != 1
+                            || event.generation.publication_seq
+                                != event.generation.wal_frontier.saturating_add(1)
+                            || event.generation.component_manifest_sha256.len() != 64
+                            || seq < event.generation.publication_seq
+                        {
+                            invalid_materialization = true;
+                            continue;
+                        }
+                        match latest_generation.as_ref() {
+                            Some(current)
+                                if current.generation_id > event.generation.generation_id => {}
+                            Some(current)
+                                if current.generation_id == event.generation.generation_id
+                                    && current != &event.generation =>
+                            {
+                                invalid_materialization = true;
+                            }
+                            _ => latest_generation = Some(event.generation.clone()),
+                        }
+                    }
+                    Event::Schema6MigrationChunkV1(_) | Event::Schema6MigrationCommitV1(_) => {}
+                    Event::Schema6ActivationV1(_) => {}
+                    _ => unreachable!(),
+                }
+            }
+        });
+
+        if invalid_signature {
+            return Err(Error::from_reason(
+                "RECOVERY_REQUIRED: invalid P6 signature covered by snapshot",
+            ));
+        }
+        if foreign_provenance {
+            return Err(Error::from_reason(
+                "RECOVERY_REQUIRED: foreign P6 provenance covered by snapshot",
+            ));
+        }
+        if invalid_materialization {
+            return Err(Error::from_reason(
+                "SNAPSHOT_MANIFEST_INVALID: invalid signed P6 materialization",
+            ));
+        }
+        let journal_policy = latest_policy;
+        if snapshot_policy != Self::default_access_policy() && !has_policy_event {
+            self.recovery_required.store(true, Ordering::SeqCst);
+            return Err(Error::from_reason(
+                "RECOVERY_REQUIRED: non-default snapshot policy has no signed WAL provenance",
+            ));
+        }
+        if snapshot_policy != journal_policy {
+            return Err(Error::from_reason(
+                "SNAPSHOT_MANIFEST_INVALID: access policy disagrees with signed WAL",
+            ));
+        }
+        if snapshot_generation != latest_generation {
+            return Err(Error::from_reason(
+                "SNAPSHOT_MANIFEST_INVALID: generation disagrees with signed WAL",
+            ));
+        }
+        Ok(())
+    }
+
+    fn validated_snapshot_manifest_digest(&self) -> Result<String> {
+        let state_path = self.path.join("state.json");
+        let state: serde_json::Value = serde_json::from_slice(
+            &fs::read(&state_path).map_err(|e| Error::from_reason(e.to_string()))?,
+        )
+        .map_err(|e| Error::from_reason(e.to_string()))?;
+        Self::validate_p6_snapshot_at(&self.path, &state)?
+            .ok_or_else(|| Error::from_reason("SNAPSHOT_MANIFEST_INVALID: P6 manifest is absent"))
     }
 
     pub fn save_state(&self) -> Result<()> {
@@ -12920,9 +20162,9 @@ impl Storage {
         }
         let temp_dir = self.path.join("temp_save");
         if temp_dir.exists() {
-            let _ = fs::remove_dir_all(&temp_dir);
+            fs::remove_dir_all(&temp_dir).map_err(|e| Error::from_reason(e.to_string()))?;
         }
-        fs::create_dir_all(&temp_dir).ok();
+        fs::create_dir_all(&temp_dir).map_err(|e| Error::from_reason(e.to_string()))?;
 
         // 1. Per-collection arenas + metadata + a manifest. HNSW is NOT dumped —
         //    it rehydrates cheaply from each arena on load (the arena is the
@@ -13001,6 +20243,8 @@ impl Storage {
                 "rerank": coll.f32_sidecar.is_some(),
                 // SQ8 calibrated-scale opt-in; absent ⇒ false (fixed scale).
                 "sq8_calibrate": coll.sq8_calibrate,
+                "bqmean_present": coll.bq_center.read().is_some(),
+                "sq8scale_present": coll.sq8_scale.read().is_some(),
                 "definition": self.definition_for(coll),
                 // meta format version: 2 = epoch stamps (created_seq/retired_seq,
                 // GBP2 postcard — SPEC--EPOCH-HNSW §3.1); 1 = NodeMetadata.node_u32
@@ -13021,12 +20265,14 @@ impl Storage {
             .iter()
             .map(|e| (*e.key(), e.value().clone()))
             .collect();
-        if let Ok(bytes) = serde_json::to_vec(&nodes) {
-            fs::write(temp_dir.join("nodes.bin"), bytes).ok();
-        }
-        if let Ok(bytes) = serde_json::to_vec(&edges) {
-            fs::write(temp_dir.join("edges.bin"), bytes).ok();
-        }
+        let node_bytes = serde_json::to_vec(&nodes)
+            .map_err(|e| Error::from_reason(format!("nodes snapshot encode failed: {e}")))?;
+        fs::write(temp_dir.join("nodes.bin"), node_bytes)
+            .map_err(|e| Error::from_reason(format!("nodes snapshot write failed: {e}")))?;
+        let edge_bytes = serde_json::to_vec(&edges)
+            .map_err(|e| Error::from_reason(format!("edges snapshot encode failed: {e}")))?;
+        fs::write(temp_dir.join("edges.bin"), edge_bytes)
+            .map_err(|e| Error::from_reason(format!("edges snapshot write failed: {e}")))?;
         // E1: the retired-adjacency overlay must survive a snapshot load —
         // the instant-load path replays only frames PAST the frontier, so the
         // NodeRetract frames that built it are skipped (same rationale as the
@@ -13038,9 +20284,10 @@ impl Storage {
             .iter()
             .map(|e| (*e.key(), e.value().clone()))
             .collect();
-        if let Ok(bytes) = serde_json::to_vec(&retired) {
-            fs::write(temp_dir.join("edges_retired.bin"), bytes).ok();
-        }
+        let retired_bytes = serde_json::to_vec(&retired)
+            .map_err(|e| Error::from_reason(format!("retired-edge snapshot encode failed: {e}")))?;
+        fs::write(temp_dir.join("edges_retired.bin"), retired_bytes)
+            .map_err(|e| Error::from_reason(format!("retired-edge snapshot write failed: {e}")))?;
         self.projection_snapshot(&temp_dir.join(PROJECTION_DB_FILE))?;
 
         // 3. Save Global Metadata (incl. collections manifest). Slice-1: the
@@ -13060,14 +20307,103 @@ impl Storage {
                 })
             })
             .collect();
+        let migration_marker = Self::schema6_migration_marker(&self.path)?;
+        let prior_ready_migration = if migration_marker.is_none() {
+            fs::read(self.path.join("state.json"))
+                .ok()
+                .and_then(|bytes| serde_json::from_slice::<serde_json::Value>(&bytes).ok())
+                .filter(|prior| {
+                    prior["schema_version"].as_u64() == Some(SCHEMA_VERSION as u64)
+                        && prior["upgrade_state"].as_str() == Some("ready")
+                        && prior["migration_id"].as_str().is_some()
+                })
+        } else {
+            None
+        };
         let mut state = serde_json::json!({
             "logical_clock": self.get_logical_clock(),
             "peer_id": self.local_peer_id,
             "collections": manifest,
-            "schema_version": SCHEMA_VERSION,
+            "schema_version": self.storage_schema_version,
             "timestamp": Utc::now().to_rfc3339(),
             "tombstones": tombstones_json,
         });
+        if self.storage_schema_version == SCHEMA_VERSION {
+            if let Some(marker) = migration_marker.as_ref() {
+                state["upgrade_state"] = serde_json::json!("in_progress");
+                for key in [
+                    "migration_id",
+                    "manifest_sha256",
+                    "database_id",
+                    "source_schema",
+                    "source_frontier",
+                    "backup_sha256",
+                    "source_p6_manifest_sha256",
+                    "source_history_floors",
+                ] {
+                    if let Some(value) = marker.get(key) {
+                        let state_key = match key {
+                            "manifest_sha256" => "migration_manifest_sha256",
+                            "source_p6_manifest_sha256" => "migration_source_p6_manifest_sha256",
+                            "source_history_floors" => "migration_source_history_floors",
+                            "source_schema" => "migration_source_schema",
+                            "source_frontier" => "migration_source_frontier",
+                            "backup_sha256" => "migration_backup_sha256",
+                            "database_id" => "migration_database_id",
+                            _ => key,
+                        };
+                        state[state_key] = value.clone();
+                    }
+                }
+            } else {
+                state["upgrade_state"] = serde_json::json!("ready");
+                if let Some(prior) = prior_ready_migration {
+                    for key in [
+                        "migration_id",
+                        "migration_manifest_sha256",
+                        "migration_database_id",
+                        "migration_source_schema",
+                        "migration_source_frontier",
+                        "migration_backup_sha256",
+                        "migration_source_p6_manifest_sha256",
+                        "migration_source_history_floors",
+                        "migration_commit_seq",
+                        "migration_receipt_seq",
+                        "migration_p6_manifest_sha256",
+                        "migration_generation",
+                    ] {
+                        if let Some(value) = prior.get(key) {
+                            state[key] = value.clone();
+                        }
+                    }
+                }
+            }
+        }
+        if let Some(migration) = self
+            .schema6_activation
+            .read()
+            .as_ref()
+            .and_then(|activation| activation.migration.as_ref())
+        {
+            state["migration_id"] = serde_json::json!(migration.migration_id);
+            state["migration_manifest_sha256"] = serde_json::json!(migration.manifest_sha256);
+            state["migration_database_id"] = serde_json::json!(migration.source_database_id);
+            state["migration_source_schema"] = serde_json::json!(migration.source_schema);
+            state["migration_source_frontier"] = serde_json::json!(migration.source_frontier);
+            state["migration_backup_sha256"] = serde_json::json!(migration.backup_sha256);
+            state["migration_source_p6_manifest_sha256"] =
+                serde_json::json!(migration.source_p6_manifest_sha256);
+            state["migration_source_history_floors"] =
+                serde_json::to_value(&migration.source_history_floors)
+                    .map_err(|error| Error::from_reason(error.to_string()))?;
+            state["migration_commit_seq"] = serde_json::json!(migration.migration_commit_frame_seq);
+            state["migration_receipt_seq"] =
+                serde_json::json!(migration.generation.publication_seq);
+            state["migration_p6_manifest_sha256"] =
+                serde_json::json!(migration.post_migration_manifest_sha256);
+            state["migration_generation"] = serde_json::to_value(&migration.generation)
+                .map_err(|error| Error::from_reason(error.to_string()))?;
+        }
         // The tail-replay cursor (SPEC §3): frames with seq > frontier_seq
         // on the next open are writes acked AFTER this snapshot. Position-
         // independent, so no prefix hash is needed (supersedes PR #100's
@@ -13082,6 +20418,51 @@ impl Storage {
             "tx_epoch_start": 1,
             "format_version": JOURNAL_FORMAT_VERSION,
         });
+        let mut components = Vec::new();
+        for entry in fs::read_dir(&temp_dir).map_err(|e| Error::from_reason(e.to_string()))? {
+            let entry = entry.map_err(|e| Error::from_reason(e.to_string()))?;
+            let path = entry.path();
+            if !entry
+                .file_type()
+                .map_err(|e| Error::from_reason(e.to_string()))?
+                .is_file()
+            {
+                continue;
+            }
+            let name = path
+                .file_name()
+                .and_then(|value| value.to_str())
+                .ok_or_else(|| Error::from_reason("SNAPSHOT_MANIFEST_INVALID: non-UTF8 path"))?;
+            if name == "state.json" {
+                continue;
+            }
+            let (bytes, sha256) = Self::sha256_file(&path)?;
+            components.push(serde_json::json!({
+                "path": name,
+                "bytes": bytes,
+                "sha256": sha256,
+            }));
+        }
+        components.sort_by(|left, right| left["path"].as_str().cmp(&right["path"].as_str()));
+        let canonical = serde_json::to_vec(&serde_json::json!({
+            "version": 1,
+            "snapshot_frontier": frontier_seq,
+            "components": components,
+        }))
+        .map_err(|e| Error::from_reason(e.to_string()))?;
+        let manifest_sha256 = hex::encode(Sha256::digest(canonical));
+        state["p6"] = serde_json::json!({
+            "version": 1,
+            "manifest": {
+                "version": 1,
+                "snapshot_frontier": frontier_seq,
+                "components": components,
+                "manifest_sha256": manifest_sha256,
+            },
+            "generation": self.published_generation.read().clone(),
+            "access_policy": self.access_policy.read().clone(),
+        });
+        Self::validate_p6_snapshot_at(&temp_dir, &state)?;
         fs::write(temp_dir.join("state.json"), state.to_string())
             .map_err(|e| Error::from_reason(format!("state.json write failed: {}", e)))?;
 
@@ -13091,30 +20472,33 @@ impl Storage {
         // state.json exists, so renaming it last means a crash mid-swap leaves no
         // state.json → reload falls back to the (still-intact) WAL. Truncating the
         // WAL below is therefore safe only after state.json is durably in place.
-        if let Ok(entries) = fs::read_dir(&temp_dir) {
-            for entry in entries.flatten() {
-                let p = entry.path();
-                if p.file_name().is_some_and(|n| n == "state.json") {
-                    continue;
-                }
-                if p.file_name().is_some_and(|n| n == PROJECTION_DB_FILE) {
-                    // `projection_db` remains open for the Storage lifetime;
-                    // replacing its path would split Unix readers and writers
-                    // across inodes. `projection_snapshot` already copied the
-                    // checkpointed live file, so discard the temporary copy and
-                    // keep the live path stable.
-                    let _ = fs::remove_file(&p);
-                    continue;
-                }
-                if let Some(name) = p.file_name() {
-                    Self::rename_with_retry(&p, &self.path.join(name));
-                }
+        for entry in fs::read_dir(&temp_dir).map_err(|e| Error::from_reason(e.to_string()))? {
+            let entry = entry.map_err(|e| Error::from_reason(e.to_string()))?;
+            let p = entry.path();
+            if p.file_name().is_some_and(|n| n == "state.json") {
+                continue;
             }
+            if p.file_name().is_some_and(|n| n == PROJECTION_DB_FILE) {
+                // `projection_db` remains open for the Storage lifetime;
+                // replacing its path would split Unix readers and writers
+                // across inodes. `projection_snapshot` already copied the
+                // checkpointed live file, so discard the temporary copy and
+                // keep the live path stable.
+                fs::remove_file(&p).map_err(|e| Error::from_reason(e.to_string()))?;
+                continue;
+            }
+            let name = p
+                .file_name()
+                .ok_or_else(|| Error::from_reason("snapshot component has no name"))?;
+            Self::rename_with_retry(&p, &self.path.join(name))?;
         }
         let state_tmp = temp_dir.join("state.json");
-        if state_tmp.exists() {
-            Self::rename_with_retry(&state_tmp, &self.path.join("state.json"));
+        if !state_tmp.exists() {
+            return Err(Error::from_reason(
+                "SNAPSHOT_MANIFEST_INVALID: state.json marker was not written",
+            ));
         }
+        Self::rename_with_retry(&state_tmp, &self.path.join("state.json"))?;
         let _ = fs::remove_dir_all(&temp_dir);
 
         // The journal fold already ran BEFORE the snapshot swap (see the top of
@@ -13156,6 +20540,273 @@ impl Storage {
             || name.starts_with("bqmean_")
             || name.starts_with("sq8scale_"))
             && name.ends_with(".bin"))
+    }
+
+    fn backup_artifacts_at(root: &Path) -> Result<Vec<Schema6MigrationArtifactV1>> {
+        let mut artifacts = Vec::new();
+        for entry in fs::read_dir(root).map_err(|error| Error::from_reason(error.to_string()))? {
+            let entry = entry.map_err(|error| Error::from_reason(error.to_string()))?;
+            if !entry
+                .file_type()
+                .map_err(|error| Error::from_reason(error.to_string()))?
+                .is_file()
+            {
+                continue;
+            }
+            let Some(name) = entry.file_name().to_str().map(str::to_owned) else {
+                continue;
+            };
+            if Self::is_backup_artifact_name(&name) {
+                let (byte_count, sha256) = Self::sha256_file(&entry.path())?;
+                artifacts.push(Schema6MigrationArtifactV1 {
+                    path: name,
+                    byte_count,
+                    sha256,
+                });
+            }
+        }
+        let active = root.join("wal").join("active.gwal");
+        if active.is_file() {
+            let (byte_count, sha256) = Self::sha256_file(&active)?;
+            artifacts.push(Schema6MigrationArtifactV1 {
+                path: "wal/active.gwal".into(),
+                byte_count,
+                sha256,
+            });
+        }
+        if let Ok(entries) = fs::read_dir(Self::journal_seg_dir(root)) {
+            for entry in entries.flatten() {
+                let path = entry.path();
+                if path
+                    .extension()
+                    .is_some_and(|extension| extension == "gseg")
+                {
+                    if let Some(name) = path.file_name().and_then(|name| name.to_str()) {
+                        let relative = format!("journal/{name}");
+                        if Self::is_backup_artifact_name(&relative) {
+                            let (byte_count, sha256) = Self::sha256_file(&path)?;
+                            artifacts.push(Schema6MigrationArtifactV1 {
+                                path: relative,
+                                byte_count,
+                                sha256,
+                            });
+                        }
+                    }
+                }
+            }
+        }
+        artifacts.sort_by(|left, right| left.path.cmp(&right.path));
+        Ok(artifacts)
+    }
+
+    fn read_backup_manifest(bundle_path: &Path) -> Result<BackupManifest> {
+        let mut input =
+            File::open(bundle_path).map_err(|error| Error::from_reason(error.to_string()))?;
+        let mut magic = vec![0; BACKUP_MAGIC.len()];
+        input
+            .read_exact(&mut magic)
+            .map_err(|error| Error::from_reason(error.to_string()))?;
+        if magic.as_slice() != BACKUP_MAGIC {
+            return Err(Error::from_reason("invalid Genesis backup bundle"));
+        }
+        let name_len = Self::read_u32(&mut input)? as usize;
+        if name_len != BACKUP_MANIFEST_NAME.len() {
+            return Err(Error::from_reason(
+                "Genesis backup manifest name is invalid",
+            ));
+        }
+        let mut name = vec![0; name_len];
+        input
+            .read_exact(&mut name)
+            .map_err(|error| Error::from_reason(error.to_string()))?;
+        if name.as_slice() != BACKUP_MANIFEST_NAME {
+            return Err(Error::from_reason(
+                "Genesis backup manifest name is invalid",
+            ));
+        }
+        let manifest_len = Self::read_u64(&mut input)?;
+        if manifest_len == 0 || manifest_len > 4 * 1024 * 1024 {
+            return Err(Error::from_reason("invalid Genesis backup manifest length"));
+        }
+        let mut bytes = vec![0; manifest_len as usize];
+        input
+            .read_exact(&mut bytes)
+            .map_err(|error| Error::from_reason(error.to_string()))?;
+        let manifest: BackupManifest = serde_json::from_slice(&bytes)
+            .map_err(|_| Error::from_reason("invalid Genesis backup manifest"))?;
+        Self::validate_backup_manifest(&manifest)?;
+        Ok(manifest)
+    }
+
+    fn schema6_migration_manifest_sha256(manifest: &Schema6MigrationManifestV1) -> Result<String> {
+        let mut unsigned = manifest.clone();
+        unsigned.manifest_sha256.clear();
+        let bytes =
+            serde_json::to_vec(&unsigned).map_err(|error| Error::from_reason(error.to_string()))?;
+        Ok(hex::encode(Sha256::digest(bytes)))
+    }
+
+    fn validate_schema6_migration_manifest(manifest: &Schema6MigrationManifestV1) -> Result<()> {
+        let migration_uuid = Uuid::parse_str(&manifest.migration_id)
+            .map_err(|_| Error::from_reason("SCHEMA6_MIGRATION_ID_INVALID"))?;
+        if manifest.version != 1
+            || migration_uuid.get_version_num() != 4
+            || migration_uuid.get_variant() != uuid::Variant::RFC4122
+            || migration_uuid.hyphenated().to_string() != manifest.migration_id
+            || manifest.source_schema != LEGACY_SCHEMA_VERSION
+            || !Self::is_lower_sha256(&manifest.database_id)
+            || !Self::is_lower_sha256(&manifest.p6_manifest_sha256)
+            || !Self::is_lower_sha256(&manifest.manifest_sha256)
+            || Self::schema6_migration_manifest_sha256(manifest)? != manifest.manifest_sha256
+            || manifest.backup.format_version != BACKUP_FORMAT_VERSION
+            || manifest.backup.engine_name != ENGINE_NAME
+            || manifest.backup.schema_version != LEGACY_SCHEMA_VERSION
+            || manifest.backup.stable_frontier != manifest.source_frontier
+            || !Self::is_lower_sha256(&manifest.backup.sha256)
+        {
+            return Err(Error::from_reason("SCHEMA6_MIGRATION_MANIFEST_INVALID"));
+        }
+        for source in ["graph", "row", "vector", "annotation"] {
+            if manifest
+                .source_history_floors
+                .get(source)
+                .is_none_or(|floor| *floor > manifest.source_frontier)
+            {
+                return Err(Error::from_reason("SCHEMA6_MIGRATION_MANIFEST_INVALID"));
+            }
+        }
+        for field in [
+            "nodes",
+            "edges",
+            "node_history",
+            "edge_history",
+            "rows",
+            "vectors",
+        ] {
+            if !manifest.source_record_counts.contains_key(field) {
+                return Err(Error::from_reason("SCHEMA6_MIGRATION_MANIFEST_INVALID"));
+            }
+        }
+        for field in [
+            "stored_f32_available",
+            "quantized_only",
+            "original_f64_unavailable",
+        ] {
+            if !manifest.vector_provenance.contains_key(field) {
+                return Err(Error::from_reason("SCHEMA6_MIGRATION_MANIFEST_INVALID"));
+            }
+        }
+
+        let (bundle_bytes, bundle_sha256) = Self::sha256_file(&manifest.backup.bundle_path)?;
+        if bundle_bytes != manifest.backup.byte_count || bundle_sha256 != manifest.backup.sha256 {
+            return Err(Error::from_reason("SCHEMA6_MIGRATION_BACKUP_MISMATCH"));
+        }
+        let backup_manifest = Self::read_backup_manifest(&manifest.backup.bundle_path)?;
+        if backup_manifest.format_version != manifest.backup.format_version
+            || backup_manifest.engine_name != manifest.backup.engine_name
+            || backup_manifest.engine_version != manifest.backup.engine_version
+            || backup_manifest.schema_version != manifest.backup.schema_version
+            || backup_manifest.stable_frontier != manifest.backup.stable_frontier
+            || backup_manifest.logical_clock != manifest.backup.logical_clock
+            || backup_manifest.created_at != manifest.backup.created_at
+            || backup_manifest.artifacts.len() != manifest.backup_artifacts.len()
+            || backup_manifest
+                .artifacts
+                .iter()
+                .zip(&manifest.backup_artifacts)
+                .any(|(left, right)| {
+                    left.path != right.path
+                        || left.byte_count != right.byte_count
+                        || left.sha256 != right.sha256
+                })
+        {
+            return Err(Error::from_reason("SCHEMA6_MIGRATION_BACKUP_MISMATCH"));
+        }
+
+        let mut input = File::open(&manifest.backup.bundle_path)
+            .map_err(|error| Error::from_reason(error.to_string()))?;
+        let mut magic = vec![0; BACKUP_MAGIC.len()];
+        input
+            .read_exact(&mut magic)
+            .map_err(|error| Error::from_reason(error.to_string()))?;
+        let name_len = Self::read_u32(&mut input)? as usize;
+        let mut name = vec![0; name_len];
+        input
+            .read_exact(&mut name)
+            .map_err(|error| Error::from_reason(error.to_string()))?;
+        let manifest_len = Self::read_u64(&mut input)?;
+        let manifest_len = usize::try_from(manifest_len)
+            .map_err(|_| Error::from_reason("SCHEMA6_MIGRATION_BACKUP_MISMATCH"))?;
+        let mut header = vec![0; manifest_len];
+        input
+            .read_exact(&mut header)
+            .map_err(|error| Error::from_reason(error.to_string()))?;
+
+        let mut identity_bytes = None;
+        let mut buffer = [0u8; 64 * 1024];
+        for artifact in &backup_manifest.artifacts {
+            let path_len = Self::read_u32(&mut input)? as usize;
+            if path_len == 0 || path_len > 1024 {
+                return Err(Error::from_reason("SCHEMA6_MIGRATION_BACKUP_MISMATCH"));
+            }
+            let mut path = vec![0; path_len];
+            input
+                .read_exact(&mut path)
+                .map_err(|error| Error::from_reason(error.to_string()))?;
+            let path = String::from_utf8(path)
+                .map_err(|_| Error::from_reason("SCHEMA6_MIGRATION_BACKUP_MISMATCH"))?;
+            let byte_count = Self::read_u64(&mut input)?;
+            if path != artifact.path || byte_count != artifact.byte_count {
+                return Err(Error::from_reason("SCHEMA6_MIGRATION_BACKUP_MISMATCH"));
+            }
+            let mut hasher = Sha256::new();
+            let mut remaining = byte_count;
+            let mut identity = (path == "identity.bin").then_some([0u8; 32]);
+            let mut identity_offset = 0usize;
+            while remaining > 0 {
+                let wanted = remaining.min(buffer.len() as u64) as usize;
+                input
+                    .read_exact(&mut buffer[..wanted])
+                    .map_err(|error| Error::from_reason(error.to_string()))?;
+                hasher.update(&buffer[..wanted]);
+                if let Some(identity) = identity.as_mut() {
+                    let copied = wanted.min(identity.len().saturating_sub(identity_offset));
+                    identity[identity_offset..identity_offset + copied]
+                        .copy_from_slice(&buffer[..copied]);
+                    identity_offset += copied;
+                }
+                remaining -= wanted as u64;
+            }
+            if hex::encode(hasher.finalize()) != artifact.sha256 {
+                return Err(Error::from_reason("SCHEMA6_MIGRATION_BACKUP_MISMATCH"));
+            }
+            if let Some(identity) = identity {
+                if byte_count != identity.len() as u64 {
+                    return Err(Error::from_reason(
+                        "SCHEMA6_MIGRATION_BACKUP_IDENTITY_INVALID",
+                    ));
+                }
+                identity_bytes = Some(identity);
+            }
+        }
+        let mut trailing = [0u8; 1];
+        if input
+            .read(&mut trailing)
+            .map_err(|error| Error::from_reason(error.to_string()))?
+            != 0
+        {
+            return Err(Error::from_reason("SCHEMA6_MIGRATION_BACKUP_MISMATCH"));
+        }
+        let identity_bytes = identity_bytes
+            .ok_or_else(|| Error::from_reason("SCHEMA6_MIGRATION_BACKUP_IDENTITY_INVALID"))?;
+        let signing_key = SigningKey::from_bytes(&identity_bytes);
+        if Self::database_id_for_verifying_key(&signing_key.verifying_key()) != manifest.database_id
+        {
+            return Err(Error::from_reason(
+                "SCHEMA6_MIGRATION_BACKUP_IDENTITY_INVALID",
+            ));
+        }
+        Ok(())
     }
 
     fn sha256_file(path: &Path) -> Result<(u64, String)> {
@@ -13278,6 +20929,527 @@ impl Storage {
         Ok(())
     }
 
+    /// Capture a schema-5 migration plan and an engine-owned, integrity-checked
+    /// backup. The full-retention handle prevents this preflight checkpoint
+    /// from folding away retained source history.
+    pub fn schema6_migration_dry_run(
+        mut opts: OpenOptions,
+        migration_id: String,
+        backup_path: PathBuf,
+    ) -> Result<Schema6MigrationManifestV1> {
+        let migration_uuid = Uuid::parse_str(&migration_id)
+            .map_err(|_| Error::from_reason("SCHEMA6_MIGRATION_ID_INVALID"))?;
+        if migration_uuid.get_version_num() != 4
+            || migration_uuid.get_variant() != uuid::Variant::RFC4122
+            || migration_uuid.hyphenated().to_string() != migration_id
+        {
+            return Err(Error::from_reason("SCHEMA6_MIGRATION_ID_INVALID"));
+        }
+        opts.read_only = Some(false);
+        opts.retention = Some("full".into());
+        let storage = Self::open(opts)?;
+        let _commit_guard = storage.commit_lock.lock();
+        storage.ensure_readable()?;
+        if storage.storage_schema_version != LEGACY_SCHEMA_VERSION
+            || Self::read_ondisk_schema_version(&storage.path) != Some(LEGACY_SCHEMA_VERSION)
+        {
+            return Err(Error::from_reason("SCHEMA6_MIGRATION_SOURCE_NOT_SCHEMA5"));
+        }
+
+        let source_frontier = storage.stable_frontier();
+        let backup = storage.export_backup(BackupExportRequest {
+            destination: backup_path,
+        })?;
+        if backup.schema_version != LEGACY_SCHEMA_VERSION
+            || backup.stable_frontier != source_frontier
+        {
+            return Err(Error::from_reason("SCHEMA6_MIGRATION_BACKUP_MISMATCH"));
+        }
+        let backup_manifest = Self::read_backup_manifest(&backup.bundle_path)?;
+        if backup_manifest.schema_version != LEGACY_SCHEMA_VERSION
+            || backup_manifest.stable_frontier != source_frontier
+        {
+            return Err(Error::from_reason("SCHEMA6_MIGRATION_BACKUP_MISMATCH"));
+        }
+        let backup_artifacts = Self::backup_artifacts_at(&storage.path)?;
+        if backup_manifest.artifacts.len() != backup_artifacts.len()
+            || backup_manifest
+                .artifacts
+                .iter()
+                .zip(&backup_artifacts)
+                .any(|(left, right)| {
+                    left.path != right.path
+                        || left.byte_count != right.byte_count
+                        || left.sha256 != right.sha256
+                })
+        {
+            return Err(Error::from_reason(
+                "SCHEMA6_MIGRATION_BACKUP_ARTIFACT_MISMATCH",
+            ));
+        }
+
+        let (node_history_count, edge_history_count, relational_rows) = {
+            let conn = storage.projection_db.lock();
+            let node_history_count = conn
+                .query_row("SELECT COUNT(*) FROM node_versions", [], |row| {
+                    row.get::<_, i64>(0)
+                })
+                .map_err(|error| Error::from_reason(error.to_string()))?;
+            let edge_history_count = conn
+                .query_row("SELECT COUNT(*) FROM edge_versions", [], |row| {
+                    row.get::<_, i64>(0)
+                })
+                .map_err(|error| Error::from_reason(error.to_string()))?;
+            let mut statement = conn
+                .prepare("SELECT name FROM sqlite_master WHERE type='table' AND substr(name, 1, 4)='app_' ORDER BY name")
+                .map_err(|error| Error::from_reason(error.to_string()))?;
+            let tables = statement
+                .query_map([], |row| row.get::<_, String>(0))
+                .map_err(|error| Error::from_reason(error.to_string()))?
+                .collect::<std::result::Result<Vec<_>, _>>()
+                .map_err(|error| Error::from_reason(error.to_string()))?;
+            drop(statement);
+            let mut total = 0u64;
+            for table in tables {
+                let quoted = format!("\"{}\"", table.replace('"', "\"\""));
+                let count = conn
+                    .query_row(&format!("SELECT COUNT(*) FROM {quoted}"), [], |row| {
+                        row.get::<_, i64>(0)
+                    })
+                    .map_err(|error| Error::from_reason(error.to_string()))?;
+                total = total.saturating_add(count.max(0) as u64);
+            }
+            (
+                node_history_count.max(0) as u64,
+                edge_history_count.max(0) as u64,
+                total,
+            )
+        };
+        let mut vector_count = 0u64;
+        let mut f32_available = 0u64;
+        let mut quantized_only = 0u64;
+        for collection in storage.collections.iter() {
+            let collection = collection.value();
+            let count = collection.node_to_arena.len() as u64;
+            vector_count = vector_count.saturating_add(count);
+            if collection.quant == Quant::None || collection.f32_sidecar.is_some() {
+                f32_available = f32_available.saturating_add(count);
+            } else {
+                quantized_only = quantized_only.saturating_add(count);
+            }
+        }
+        let mut source_record_counts = std::collections::BTreeMap::new();
+        source_record_counts.insert("nodes".into(), storage.nodes.len() as u64);
+        source_record_counts.insert("edges".into(), storage.edges.len() as u64);
+        source_record_counts.insert("node_history".into(), node_history_count);
+        source_record_counts.insert("edge_history".into(), edge_history_count);
+        source_record_counts.insert("rows".into(), relational_rows);
+        source_record_counts.insert("vectors".into(), vector_count);
+        let mut source_history_floors = std::collections::BTreeMap::new();
+        source_history_floors.insert("graph".into(), storage.history_horizon());
+        source_history_floors.insert("row".into(), source_frontier);
+        source_history_floors.insert("vector".into(), source_frontier);
+        source_history_floors.insert("annotation".into(), source_frontier);
+        let mut vector_provenance = std::collections::BTreeMap::new();
+        vector_provenance.insert("stored_f32_available".into(), f32_available);
+        vector_provenance.insert("quantized_only".into(), quantized_only);
+        vector_provenance.insert("original_f64_unavailable".into(), vector_count);
+
+        let mut manifest = Schema6MigrationManifestV1 {
+            version: 1,
+            migration_id,
+            database_id: storage.database_id(),
+            source_schema: LEGACY_SCHEMA_VERSION,
+            source_frontier,
+            source_history_floors,
+            source_record_counts,
+            vector_provenance,
+            p6_manifest_sha256: storage.validated_snapshot_manifest_digest()?,
+            backup,
+            backup_artifacts,
+            manifest_sha256: String::new(),
+        };
+        manifest.manifest_sha256 = Self::schema6_migration_manifest_sha256(&manifest)?;
+        Ok(manifest)
+    }
+
+    fn schema6_migration_baseline_counts(
+        baselines: &[Schema6MigrationBaselineV1],
+    ) -> std::collections::BTreeMap<String, u64> {
+        let mut counts = std::collections::BTreeMap::new();
+        for baseline in baselines {
+            let kind = Self::revision_kind_name(&baseline.mutation.kind);
+            *counts.entry(kind.to_string()).or_insert(0) += 1;
+        }
+        counts
+    }
+
+    fn schema6_migration_validate_source(
+        storage: &Storage,
+        manifest: &Schema6MigrationManifestV1,
+        baselines: &[Schema6MigrationBaselineV1],
+    ) -> Result<()> {
+        let baseline_counts = Self::schema6_migration_baseline_counts(baselines);
+        let mut source_counts = std::collections::BTreeMap::new();
+        source_counts.insert("nodes", storage.nodes.len() as u64);
+        source_counts.insert("edges", storage.edges.len() as u64);
+        source_counts.insert("node_history", *baseline_counts.get("node").unwrap_or(&0));
+        source_counts.insert("edge_history", *baseline_counts.get("edge").unwrap_or(&0));
+        source_counts.insert("rows", *baseline_counts.get("row").unwrap_or(&0));
+        let mut vectors = 0u64;
+        let mut f32_available = 0u64;
+        let mut quantized_only = 0u64;
+        for entry in storage.collections.iter() {
+            let collection = entry.value();
+            let count = collection.node_to_arena.len() as u64;
+            vectors = vectors.saturating_add(count);
+            if collection.quant == Quant::None || collection.f32_sidecar.is_some() {
+                f32_available = f32_available.saturating_add(count);
+            } else {
+                quantized_only = quantized_only.saturating_add(count);
+            }
+        }
+        source_counts.insert("vectors", vectors);
+        for (name, count) in source_counts {
+            if manifest.source_record_counts.get(name) != Some(&count) {
+                return Err(Error::from_reason(format!(
+                    "SCHEMA6_MIGRATION_SOURCE_CHANGED: record count mismatch for {name} (manifest={:?}, baseline={count})",
+                    manifest.source_record_counts.get(name)
+                )));
+            }
+        }
+        if manifest.vector_provenance.get("stored_f32_available") != Some(&f32_available)
+            || manifest.vector_provenance.get("quantized_only") != Some(&quantized_only)
+            || manifest.vector_provenance.get("original_f64_unavailable") != Some(&vectors)
+        {
+            return Err(Error::from_reason(
+                "SCHEMA6_MIGRATION_SOURCE_CHANGED: vector provenance mismatch",
+            ));
+        }
+        let expected_floors = std::collections::BTreeMap::from([
+            ("graph".to_string(), storage.history_horizon()),
+            ("row".to_string(), manifest.source_frontier),
+            ("vector".to_string(), manifest.source_frontier),
+            ("annotation".to_string(), manifest.source_frontier),
+        ]);
+        if manifest.source_history_floors != expected_floors {
+            return Err(Error::from_reason(
+                "SCHEMA6_MIGRATION_SOURCE_CHANGED: history floor mismatch",
+            ));
+        }
+        Ok(())
+    }
+
+    fn schema6_migration_baseline_counts_from_projection(
+        storage: &Storage,
+        migration_id: &str,
+    ) -> Result<std::collections::BTreeMap<String, u64>> {
+        let payloads = {
+            let conn = storage.projection_db.lock();
+            let mut statement = conn
+                .prepare("SELECT chunk_json FROM hql2_schema6_migration_chunks WHERE migration_id=?1 ORDER BY chunk_index")
+                .map_err(|error| Error::from_reason(error.to_string()))?;
+            let payloads = statement
+                .query_map([migration_id], |row| row.get::<_, String>(0))
+                .map_err(|error| Error::from_reason(error.to_string()))?
+                .collect::<std::result::Result<Vec<_>, _>>()
+                .map_err(|error| Error::from_reason(error.to_string()))?;
+            payloads
+        };
+        let mut records = Vec::new();
+        for payload in payloads {
+            let chunk: Schema6MigrationChunkV1 = serde_json::from_str(&payload).map_err(|_| {
+                Error::from_reason("RECOVERY_REQUIRED: invalid migration chunk projection")
+            })?;
+            records.extend(chunk.baseline_records);
+        }
+        Ok(Self::schema6_migration_baseline_counts(&records))
+    }
+
+    fn schema6_migration_report(
+        storage: &Storage,
+        manifest: &Schema6MigrationManifestV1,
+    ) -> Result<Schema6MigrationReportV1> {
+        let state: serde_json::Value = serde_json::from_slice(
+            &fs::read(storage.path.join("state.json"))
+                .map_err(|error| Error::from_reason(error.to_string()))?,
+        )
+        .map_err(|error| Error::from_reason(error.to_string()))?;
+        let generation: GenerationInfo =
+            serde_json::from_value(state["migration_generation"].clone()).map_err(|_| {
+                Error::from_reason("RECOVERY_REQUIRED: migration generation is missing")
+            })?;
+        Ok(Schema6MigrationReportV1 {
+            migration_id: manifest.migration_id.clone(),
+            manifest_sha256: manifest.manifest_sha256.clone(),
+            source_frontier: manifest.source_frontier,
+            target_frontier: generation.publication_seq,
+            source_schema: manifest.source_schema,
+            target_schema: SCHEMA_VERSION,
+            baseline_counts: Self::schema6_migration_baseline_counts_from_projection(
+                storage,
+                &manifest.migration_id,
+            )?,
+            source_history_floors: manifest.source_history_floors.clone(),
+            vector_provenance: manifest.vector_provenance.clone(),
+            generation,
+        })
+    }
+
+    /// Explicitly migrate one schema-5 database using only the exact dry-run
+    /// manifest and engine-owned backup that were approved before cutover.
+    pub fn migrate_schema5_to6(
+        mut opts: OpenOptions,
+        manifest: Schema6MigrationManifestV1,
+    ) -> Result<Schema6MigrationReportV1> {
+        Self::validate_schema6_migration_manifest(&manifest)?;
+        opts.read_only = Some(false);
+        opts.retention = Some("full".into());
+        let root = PathBuf::from(&opts.path);
+        let marker_exists = root.join("schema6_migration.json").exists();
+        let prior_state = fs::read(root.join("state.json"))
+            .ok()
+            .and_then(|bytes| serde_json::from_slice::<serde_json::Value>(&bytes).ok());
+        let already_ready = prior_state.as_ref().is_some_and(|state| {
+            state["schema_version"].as_u64() == Some(SCHEMA_VERSION as u64)
+                && state["upgrade_state"].as_str() == Some("ready")
+                && state["migration_id"].as_str() == Some(manifest.migration_id.as_str())
+                && state["migration_manifest_sha256"].as_str()
+                    == Some(manifest.manifest_sha256.as_str())
+        });
+        let mut storage = if marker_exists {
+            Self::open_schema6_migration(
+                opts,
+                manifest.migration_id.clone(),
+                manifest.manifest_sha256.clone(),
+            )?
+        } else {
+            Self::open(opts)?
+        };
+        let _commit_guard = storage.commit_lock.lock();
+        storage.ensure_writable()?;
+        if already_ready {
+            storage.validate_schema6_migration_authority()?;
+            if marker_exists {
+                fs::remove_file(storage.path.join("schema6_migration.json"))
+                    .map_err(|error| Error::from_reason(error.to_string()))?;
+            }
+            return Self::schema6_migration_report(&storage, &manifest);
+        }
+
+        let source_baselines = if marker_exists {
+            None
+        } else {
+            if storage.storage_schema_version != LEGACY_SCHEMA_VERSION
+                || Self::read_ondisk_schema_version(&storage.path) != Some(LEGACY_SCHEMA_VERSION)
+            {
+                return Err(Error::from_reason(
+                    "SCHEMA6_MIGRATION_SOURCE_CHANGED: schema mismatch",
+                ));
+            }
+            if storage.database_id() != manifest.database_id {
+                return Err(Error::from_reason(
+                    "SCHEMA6_MIGRATION_SOURCE_CHANGED: database identity mismatch",
+                ));
+            }
+            if storage.stable_frontier() != manifest.source_frontier {
+                return Err(Error::from_reason(
+                    "SCHEMA6_MIGRATION_SOURCE_CHANGED: frontier mismatch",
+                ));
+            }
+            if storage.validated_snapshot_manifest_digest()? != manifest.p6_manifest_sha256 {
+                return Err(Error::from_reason(
+                    "SCHEMA6_MIGRATION_SOURCE_CHANGED: snapshot manifest mismatch",
+                ));
+            }
+            let baselines = storage
+                .schema6_migration_baselines(&manifest.migration_id, manifest.source_frontier)?;
+            Self::schema6_migration_validate_source(&storage, &manifest, &baselines)?;
+            Some(baselines)
+        };
+
+        Self::begin_schema6_migration(&storage.path, &manifest)?;
+        storage.storage_schema_version = SCHEMA_VERSION;
+        {
+            let conn = storage.projection_db.lock();
+            Self::init_hql2_revision_schema(&conn)?;
+        }
+        storage.save_state_checkpoint(false)?;
+        let baselines = match source_baselines {
+            Some(baselines) => baselines,
+            None => storage
+                .schema6_migration_baselines(&manifest.migration_id, manifest.source_frontier)?,
+        };
+        Self::schema6_migration_validate_source(&storage, &manifest, &baselines)?;
+        let chunks: Vec<&[Schema6MigrationBaselineV1]> = if baselines.is_empty() {
+            vec![&[]]
+        } else {
+            baselines.chunks(256).collect()
+        };
+        let total_chunks = u32::try_from(chunks.len())
+            .map_err(|_| Error::from_reason("SCHEMA6_MIGRATION_TOO_MANY_CHUNKS"))?;
+        for (index, records) in chunks.into_iter().enumerate() {
+            let mut chunk = Schema6MigrationChunkV1 {
+                migration_id: manifest.migration_id.clone(),
+                manifest_sha256: manifest.manifest_sha256.clone(),
+                source_database_id: manifest.database_id.clone(),
+                source_schema: manifest.source_schema,
+                source_frontier: manifest.source_frontier,
+                source_history_floors: manifest.source_history_floors.clone(),
+                chunk_index: index as u32,
+                total_chunks,
+                chunk_sha256: String::new(),
+                baseline_records: records.to_vec(),
+            };
+            chunk.chunk_sha256 = Self::schema6_migration_chunk_sha256(&chunk)?;
+            let chunk_payload = serde_json::to_string(&chunk)
+                .map_err(|error| Error::from_reason(error.to_string()))?;
+            let existing: Option<(String, String)> = {
+                let conn = storage.projection_db.lock();
+                conn.query_row(
+                    "SELECT chunk_sha256, chunk_json FROM hql2_schema6_migration_chunks WHERE migration_id=?1 AND chunk_index=?2",
+                    params![manifest.migration_id, i64::from(index as u32)],
+                    |row| Ok((row.get(0)?, row.get(1)?)),
+                )
+                .optional()
+                .map_err(|error| Error::from_reason(error.to_string()))?
+            };
+            if let Some((digest, payload)) = existing {
+                if digest != chunk.chunk_sha256 || payload != chunk_payload {
+                    return Err(Error::from_reason(
+                        "RECOVERY_REQUIRED: conflicting migration chunk",
+                    ));
+                }
+                continue;
+            }
+            let observed_chunks: i64 = {
+                let conn = storage.projection_db.lock();
+                conn.query_row(
+                    "SELECT COUNT(*) FROM hql2_schema6_migration_chunks WHERE migration_id=?1",
+                    [&manifest.migration_id],
+                    |row| row.get(0),
+                )
+                .map_err(|error| Error::from_reason(error.to_string()))?
+            };
+            if observed_chunks != index as i64 {
+                return Err(Error::from_reason("RECOVERY_REQUIRED: migration chunk gap"));
+            }
+            let event = Event::Schema6MigrationChunkV1(chunk.clone());
+            let frame_seq = storage.append_wal_event(&event)?;
+            if let Err(error) = storage.apply_schema6_migration_chunk(&chunk, frame_seq) {
+                return Err(storage.durable_apply_error(frame_seq, error));
+            }
+        }
+
+        let (stored_status, stored_commit_seq, stored_aggregate) = {
+            let conn = storage.projection_db.lock();
+            conn.query_row(
+                "SELECT status, migration_commit_frame_seq, aggregate_sha256 FROM hql2_schema6_migrations WHERE migration_id=?1",
+                [&manifest.migration_id],
+                |row| Ok((row.get::<_, String>(0)?, row.get::<_, Option<i64>>(1)?, row.get::<_, Option<String>>(2)?)),
+            )
+            .optional()
+            .map_err(|error| Error::from_reason(error.to_string()))?
+            .ok_or_else(|| Error::from_reason("RECOVERY_REQUIRED: migration chunk projection is missing"))?
+        };
+        let chunk_digests = {
+            let conn = storage.projection_db.lock();
+            let mut statement = conn
+                .prepare("SELECT chunk_index, chunk_sha256 FROM hql2_schema6_migration_chunks WHERE migration_id=?1 ORDER BY chunk_index")
+                .map_err(|error| Error::from_reason(error.to_string()))?;
+            let digests = statement
+                .query_map([&manifest.migration_id], |row| {
+                    Ok((row.get::<_, i64>(0)?, row.get::<_, String>(1)?))
+                })
+                .map_err(|error| Error::from_reason(error.to_string()))?
+                .collect::<std::result::Result<Vec<_>, _>>()
+                .map_err(|error| Error::from_reason(error.to_string()))?;
+            digests
+        };
+        if chunk_digests.len() != total_chunks as usize
+            || chunk_digests
+                .iter()
+                .enumerate()
+                .any(|(index, (chunk_index, _))| *chunk_index != index as i64)
+        {
+            return Err(Error::from_reason(
+                "RECOVERY_REQUIRED: migration chunks are incomplete",
+            ));
+        }
+        let ordered = chunk_digests
+            .iter()
+            .map(|(index, digest)| (*index as u32, digest.clone()))
+            .collect::<Vec<_>>();
+        let aggregate_sha256 = Self::schema6_migration_aggregate_sha256(&ordered)?;
+        let commit_seq = if stored_status == "committed" {
+            if stored_aggregate.as_deref() != Some(aggregate_sha256.as_str()) {
+                return Err(Error::from_reason(
+                    "RECOVERY_REQUIRED: conflicting migration commit",
+                ));
+            }
+            u64::try_from(stored_commit_seq.unwrap_or_default()).map_err(|_| {
+                Error::from_reason("RECOVERY_REQUIRED: invalid migration commit sequence")
+            })?
+        } else if stored_status == "in_progress" {
+            let migration_commit_frame_seq = storage
+                .stable_frontier()
+                .checked_add(1)
+                .ok_or_else(|| Error::from_reason("SCHEMA6_MIGRATION_SEQUENCE_OVERFLOW"))?;
+            let commit = Schema6MigrationCommitV1 {
+                migration_id: manifest.migration_id.clone(),
+                manifest_sha256: manifest.manifest_sha256.clone(),
+                source_database_id: manifest.database_id.clone(),
+                source_schema: manifest.source_schema,
+                source_frontier: manifest.source_frontier,
+                total_chunks,
+                migration_commit_frame_seq,
+                aggregate_sha256,
+            };
+            let event = Event::Schema6MigrationCommitV1(commit.clone());
+            let actual_seq = storage.append_wal_event(&event)?;
+            if actual_seq != migration_commit_frame_seq {
+                storage.recovery_required.store(true, Ordering::SeqCst);
+                return Err(Error::from_reason(
+                    "SCHEMA6_MIGRATION_COMMIT_SEQUENCE_MISMATCH",
+                ));
+            }
+            if let Err(error) = storage.apply_schema6_migration_commit(&commit, actual_seq) {
+                return Err(storage.durable_apply_error(actual_seq, error));
+            }
+            actual_seq
+        } else {
+            return Err(Error::from_reason(
+                "RECOVERY_REQUIRED: unknown migration projection status",
+            ));
+        };
+
+        storage.save_state_checkpoint(false)?;
+        let post_migration_manifest_sha256 = storage.validated_snapshot_manifest_digest()?;
+        let current_generation = { storage.published_generation.read().clone() };
+        let generation = match current_generation {
+            Some(generation)
+                if generation.wal_frontier == commit_seq
+                    && generation.publication_seq == commit_seq.saturating_add(1)
+                    && generation.component_manifest_sha256 == post_migration_manifest_sha256 =>
+            {
+                generation
+            }
+            _ => storage.publish_generation_unlocked()?,
+        };
+        if generation.wal_frontier != commit_seq
+            || generation.component_manifest_sha256 != post_migration_manifest_sha256
+        {
+            return Err(Error::from_reason("SCHEMA6_MIGRATION_RECEIPT_MISMATCH"));
+        }
+        storage.finalize_schema6_migration(
+            &manifest,
+            commit_seq,
+            &generation,
+            &post_migration_manifest_sha256,
+        )?;
+        Self::schema6_migration_report(&storage, &manifest)
+    }
+
     /// Creates one opaque, integrity-checked backup bundle. The caller never
     /// receives individual projection files.
     pub fn export_backup(&self, request: BackupExportRequest) -> Result<BackupBundleInfo> {
@@ -13366,7 +21538,7 @@ impl Storage {
             format_version: BACKUP_FORMAT_VERSION,
             engine_name: ENGINE_NAME.to_string(),
             engine_version: ENGINE_VERSION.to_string(),
-            schema_version: SCHEMA_VERSION,
+            schema_version: self.storage_schema_version,
             stable_frontier: self.stable_frontier(),
             logical_clock: self.get_logical_clock(),
             created_at: Utc::now().to_rfc3339(),
@@ -13461,7 +21633,7 @@ impl Storage {
         let bundle_path = fs::canonicalize(&request.bundle_path)
             .map_err(|e| Error::from_reason(e.to_string()))?;
 
-        let result = (|| -> Result<BackupManifest> {
+        let result = (|| -> Result<BackupBundleInfo> {
             let mut input =
                 File::open(&bundle_path).map_err(|e| Error::from_reason(e.to_string()))?;
             let mut magic = vec![0u8; BACKUP_MAGIC.len()];
@@ -13561,22 +21733,65 @@ impl Storage {
             }
 
             // A fresh open validates the engine's own snapshot/WAL compatibility
-            // before the staging directory becomes the caller-visible target.
-            drop(Storage::open(OpenOptions {
+            // before staging becomes caller-visible. Full retention prevents its
+            // shutdown checkpoint from folding the only restored journal copy.
+            let staging_storage = Storage::open(OpenOptions {
                 path: staging.display().to_string(),
                 page_cache_mb: Some(16),
                 read_only: Some(false),
                 vector_dim: None,
-                retention: None,
-            })?);
-            Ok(manifest)
+                retention: Some("full".into()),
+            })?;
+            if staging_storage.stable_frontier() != manifest.stable_frontier {
+                return Err(Error::from_reason(
+                    "GENERATION_STALE: recovered WAL frontier mismatch",
+                ));
+            }
+            let generation = staging_storage.publish_generation()?;
+            if generation.wal_frontier != manifest.stable_frontier
+                && generation.publication_seq != manifest.stable_frontier
+            {
+                return Err(Error::from_reason(
+                    "GENERATION_STALE: restored WAL frontier mismatch",
+                ));
+            }
+            drop(staging_storage);
+
+            // Verify the newly published generation through a separate
+            // read-only recovery before the restore target becomes visible.
+            let read_only_validation = Storage::open(OpenOptions {
+                path: staging.display().to_string(),
+                page_cache_mb: Some(16),
+                read_only: Some(true),
+                vector_dim: None,
+                retention: Some("full".into()),
+            })?;
+            let lease = read_only_validation.pin_generation(
+                AccessContext {
+                    principal: "backup-restore-verifier".into(),
+                    namespace: "default".into(),
+                },
+                TemporalRead {
+                    as_of: None,
+                    tx_as_of: None,
+                },
+                Duration::from_secs(30),
+            )?;
+            read_only_validation.validate_lease(&lease)?;
+            drop(lease);
+            drop(read_only_validation);
+            // Prepare every fallible return value before the rename publishes
+            // the target. A bundle I/O error must not leave a visible restore.
+            Self::backup_info(&manifest, bundle_path.clone())
         })();
         match result {
-            Ok(manifest) => {
-                fs::rename(&staging, &target_root)
-                    .map_err(|e| Error::from_reason(e.to_string()))?;
-                Self::backup_info(&manifest, bundle_path)
-            }
+            Ok(bundle_info) => match fs::rename(&staging, &target_root) {
+                Ok(()) => Ok(bundle_info),
+                Err(error) => {
+                    let _ = fs::remove_dir_all(&staging);
+                    Err(Error::from_reason(error.to_string()))
+                }
+            },
             Err(error) => {
                 let _ = fs::remove_dir_all(&staging);
                 Err(error)
@@ -13600,6 +21815,37 @@ impl Storage {
             Some(v) => v,
             None => return false,
         };
+        match Self::validate_p6_snapshot_at(&self.path, &state_val) {
+            Err(error) => {
+                println!("snapshot: rejecting candidate state: {error}");
+                // No in-memory state has been touched yet. Recovery will replay
+                // the complete WAL and will not retain a partial candidate load.
+                return false;
+            }
+            Ok(Some(_)) => {
+                if let Err(error) = self.validate_p6_snapshot_authority(&state_val) {
+                    println!("snapshot: rejecting candidate P6 authority: {error}");
+                    return false;
+                }
+            }
+            Ok(None) => {}
+        }
+
+        if let Some(policy) = state_val
+            .get("p6")
+            .and_then(|p6| p6.get("access_policy"))
+            .filter(|value| !value.is_null())
+            .and_then(|value| serde_json::from_value::<AccessPolicy>(value.clone()).ok())
+        {
+            *self.access_policy.write() = policy;
+        } else {
+            *self.access_policy.write() = Self::default_access_policy();
+        }
+        *self.published_generation.write() = state_val
+            .get("p6")
+            .and_then(|p6| p6.get("generation"))
+            .filter(|value| !value.is_null())
+            .and_then(|value| serde_json::from_value::<GenerationInfo>(value.clone()).ok());
 
         // 0. Slice-1 tombstone registry (absent in pre-Slice-1 snapshots ⇒
         //    empty). Loaded before anything else: harmless if a later step
@@ -13826,11 +22072,9 @@ impl Storage {
             match serde_json::from_slice::<Vec<(u32, NodeOutput)>>(&data) {
                 Ok(nodes) => {
                     println!("snapshot: loading {} nodes", nodes.len());
-                    let mut max_u32 = 0;
+                    let mut next_node_id = 0;
                     for (k, v) in nodes {
-                        if k > max_u32 {
-                            max_u32 = k;
-                        }
+                        next_node_id = next_node_id.max(k.saturating_add(1));
                         self.id_to_u32.insert(v.id.clone(), k);
                         // Rebuild the trigram index for this node id under its
                         // SAVED key `k` (no re-interning — `get_or_intern_id`
@@ -13845,7 +22089,7 @@ impl Storage {
                         }
                         self.insert_node_lean(k, v);
                     }
-                    self.next_u32.store(max_u32 + 1, Ordering::SeqCst);
+                    self.next_u32.store(next_node_id, Ordering::SeqCst);
                 }
                 Err(e) => {
                     println!("snapshot: failed to deserialize nodes: {}", e);
@@ -14031,7 +22275,7 @@ impl Storage {
 
         // 3. Persistence Phase (Atomic WAL Write). The batch frame's seq stamps
         //    every staged row's created_seq (one frame, one epoch stamp).
-        let batch_seq = self.persist(&Event::Batch(events.clone()))?;
+        let batch_seq = self.persist_local_graph_mutations(&output_nodes, &output_edges, &[])?;
 
         // 4. Memory Index Phase — collect vectors per collection and build each
         //    HNSW graph once via parallel_insert instead of N single inserts.
@@ -14405,6 +22649,11 @@ impl Storage {
             Event::Vector(v) => Some(v.clock.time),
             // Retractions replicate like node upserts (clock-stamped LWW).
             Event::NodeRetract { clock, .. } => Some(clock.time),
+            Event::GenerationPublished(_)
+            | Event::AccessPolicyChanged(_)
+            | Event::Schema6MigrationChunkV1(_)
+            | Event::Schema6MigrationCommitV1(_)
+            | Event::Schema6ActivationV1(_) => None,
             Event::RelationalSchema(_) | Event::RelationalRows { .. } => None,
             Event::Transaction(transaction) => transaction
                 .nodes
@@ -14412,7 +22661,47 @@ impl Storage {
                 .map(|node| node.clock.time)
                 .chain(transaction.edges.iter().map(|edge| edge.clock.time))
                 .chain(transaction.vectors.iter().map(|vector| vector.clock.time))
+                .chain(
+                    transaction
+                        .node_retractions
+                        .iter()
+                        .map(|retraction| retraction.clock.time),
+                )
                 .max(),
+        }
+    }
+
+    fn collect_p6_control_events<'a>(event: &'a Event, out: &mut Vec<&'a Event>) {
+        match event {
+            Event::GenerationPublished(_)
+            | Event::AccessPolicyChanged(_)
+            | Event::Schema6MigrationChunkV1(_)
+            | Event::Schema6MigrationCommitV1(_)
+            | Event::Schema6ActivationV1(_) => out.push(event),
+            Event::Batch(events) => {
+                for event in events {
+                    Self::collect_p6_control_events(event, out);
+                }
+            }
+            _ => {}
+        }
+    }
+
+    fn contains_p6_control_event(event: &Event) -> bool {
+        let mut events = Vec::new();
+        Self::collect_p6_control_events(event, &mut events);
+        !events.is_empty()
+    }
+
+    fn contains_transferable_event(event: &Event) -> bool {
+        match event {
+            Event::GenerationPublished(_)
+            | Event::AccessPolicyChanged(_)
+            | Event::Schema6MigrationChunkV1(_)
+            | Event::Schema6MigrationCommitV1(_)
+            | Event::Schema6ActivationV1(_) => false,
+            Event::Batch(events) => events.iter().any(Self::contains_transferable_event),
+            _ => true,
         }
     }
 
@@ -14430,13 +22719,26 @@ impl Storage {
         let _read_guard = self.commit_lock.lock();
 
         let mut out: Vec<(u32, SignedEvent)> = Vec::new();
+        let mut mixed = false;
         self.scan_journal(None, true, &mut |_, se| {
-            if let Some(t) = Self::event_time(&se.event) {
-                if t > from_clock {
-                    out.push((t, se));
+            if Self::contains_p6_control_event(&se.event)
+                && Self::contains_transferable_event(&se.event)
+            {
+                mixed = true;
+                return;
+            }
+            if !Self::contains_p6_control_event(&se.event) {
+                if let Some(t) = Self::event_time(&se.event) {
+                    if t > from_clock {
+                        out.push((t, se));
+                    }
                 }
             }
         });
+        if mixed {
+            eprintln!("P6_MIXED_BATCH_UNEXPORTABLE: Lamport sync request blocked");
+            return Vec::new();
+        }
         out.sort_by_key(|(t, _)| *t);
         self.with_collection_dependencies(out.into_iter().map(|(_, se)| se).collect())
     }
@@ -14462,36 +22764,72 @@ impl Storage {
         out
     }
 
-    fn sync_delta(&self, cursor: u64) -> Result<(Vec<SignedEvent>, u64)> {
+    fn sync_delta(&self, cursor: u64) -> Result<(Vec<SignedEvent>, u64, bool)> {
         let _guard = self.commit_lock.lock();
         self.ensure_readable()?;
+        let mut frames = Vec::new();
+        self.scan_journal((cursor != 0).then_some(cursor), false, &mut |seq, e| {
+            frames.push((seq, e));
+        });
+
         let mut events = Vec::new();
         let mut through = cursor;
         let mut bytes = 0;
-        let mut full = false;
         let mut oversized = false;
-        self.scan_journal((cursor != 0).then_some(cursor), false, &mut |seq, e| {
-            if full {
-                return;
+        let mut filtered_local_only = false;
+        let mut index = 0;
+        while index < frames.len() {
+            let seq = frames[index].0;
+            let end = frames[index..]
+                .iter()
+                .position(|(frame_seq, _)| *frame_seq != seq)
+                .map(|offset| index + offset)
+                .unwrap_or(frames.len());
+            let group = &frames[index..end];
+
+            for (_, signed_event) in group {
+                if Self::contains_p6_control_event(&signed_event.event)
+                    && Self::contains_transferable_event(&signed_event.event)
+                {
+                    return Err(Error::from_reason("P6_MIXED_BATCH_UNEXPORTABLE"));
+                }
             }
-            let size = serde_json::to_vec(&e)
-                .map(|v| v.len())
-                .unwrap_or(usize::MAX);
-            if size > 40_000 {
-                oversized = true;
-                full = true;
-                return;
+
+            let mut group_bytes = 0;
+            for (_, signed_event) in group {
+                if Self::contains_p6_control_event(&signed_event.event) {
+                    filtered_local_only = true;
+                    continue;
+                }
+                let size = serde_json::to_vec(signed_event)
+                    .map(|v| v.len())
+                    .unwrap_or(usize::MAX);
+                if size > 40_000 {
+                    oversized = true;
+                    break;
+                }
+                group_bytes += size;
             }
-            if bytes + size > 40_000 && seq != through {
-                full = true;
-                return;
+            if oversized {
+                break;
             }
+            if bytes + group_bytes > 40_000 && seq != through {
+                break;
+            }
+
             // A folded base shares a single sequence: never cut that sequence
-            // in half and advance past unsent members.
-            bytes += size;
-            events.push(e);
+            // in half and advance past unsent members. Local-only P6 frames are
+            // intentionally omitted, but the signed ordinary members remain
+            // byte-for-byte intact.
+            for (_, signed_event) in group {
+                if !Self::contains_p6_control_event(&signed_event.event) {
+                    events.push(signed_event.clone());
+                }
+            }
+            bytes += group_bytes;
             through = seq;
-        });
+            index = end;
+        }
         if oversized {
             return Err(Error::from_reason(
                 "SYNC_BOOTSTRAP_REQUIRED: frame exceeds datagram budget",
@@ -14507,7 +22845,7 @@ impl Storage {
                 "SYNC_BOOTSTRAP_REQUIRED: base/dependencies exceed datagram budget",
             ));
         }
-        Ok((events, through))
+        Ok((events, through, filtered_local_only))
     }
 
     /// WP-1.2 (ADR D4): serve frames newer than a responder-domain commit_seq
@@ -14521,9 +22859,20 @@ impl Storage {
         // segment folded at seq 0); any other value is an exclusive cursor.
         let cursor = if from_seq == 0 { None } else { Some(from_seq) };
         let mut out: Vec<SignedEvent> = Vec::new();
+        let mut mixed = false;
         self.scan_journal(cursor, false, &mut |_, se| {
-            out.push(se);
+            if Self::contains_p6_control_event(&se.event)
+                && Self::contains_transferable_event(&se.event)
+            {
+                mixed = true;
+            } else if !Self::contains_p6_control_event(&se.event) {
+                out.push(se);
+            }
         });
+        if mixed {
+            eprintln!("P6_MIXED_BATCH_UNEXPORTABLE: sequence sync request blocked");
+            return Vec::new();
+        }
         self.with_collection_dependencies(out)
     }
 
@@ -14753,6 +23102,99 @@ impl Storage {
             count += 1;
         }
 
+        let ready_migration = fs::read(self.path.join("state.json"))
+            .ok()
+            .and_then(|bytes| serde_json::from_slice::<serde_json::Value>(&bytes).ok())
+            .filter(|state| state["migration_id"].as_str().is_some());
+        if let Some(state) = ready_migration {
+            self.validate_schema6_migration_authority()?;
+            let generation: GenerationInfo =
+                serde_json::from_value(state["migration_generation"].clone()).map_err(|_| {
+                    Error::from_reason("RECOVERY_REQUIRED: migration generation is missing")
+                })?;
+            let mut migration_events = Vec::new();
+            let mut invalid_migration_event = false;
+            self.scan_journal(None, true, &mut |_, signed_event| {
+                let mut controls = Vec::new();
+                Self::collect_p6_control_events(&signed_event.event, &mut controls);
+                if controls.iter().any(|event| {
+                    matches!(
+                        event,
+                        Event::Schema6MigrationChunkV1(_) | Event::Schema6MigrationCommitV1(_)
+                    )
+                }) {
+                    if signed_event.signer_peer_id != self.local_peer_id
+                        || !self.verify_event_signature(&signed_event)
+                    {
+                        invalid_migration_event = true;
+                    } else {
+                        migration_events.push(signed_event);
+                    }
+                }
+            });
+            if invalid_migration_event {
+                return Err(Error::from_reason(
+                    "RECOVERY_REQUIRED: invalid signed schema-6 migration authority",
+                ));
+            }
+            for event in migration_events {
+                let json = serde_json::to_vec(&event)
+                    .map_err(|error| Error::from_reason(error.to_string()))?;
+                buf.extend_from_slice(&json);
+                buf.push(b'\n');
+                count += 1;
+            }
+            let receipt = Event::GenerationPublished(GenerationPublishedEvent {
+                version: 1,
+                generation,
+            });
+            let json = serde_json::to_vec(&self.sign_event(&receipt))
+                .map_err(|error| Error::from_reason(error.to_string()))?;
+            buf.extend_from_slice(&json);
+            buf.push(b'\n');
+            count += 1;
+        }
+
+        if let Some(generation) = self.published_generation.read().clone() {
+            let event = Event::GenerationPublished(GenerationPublishedEvent {
+                version: 1,
+                generation,
+            });
+            let json = serde_json::to_vec(&self.sign_event(&event))
+                .map_err(|e| Error::from_reason(e.to_string()))?;
+            buf.extend_from_slice(&json);
+            buf.push(b'\n');
+            count += 1;
+        }
+
+        let policy = self.access_policy.read().clone();
+        if policy.revision > 0 {
+            let event = Event::AccessPolicyChanged(AccessPolicyChangedEvent {
+                version: Self::access_policy_event_version(&policy),
+                expected_revision: policy.revision.saturating_sub(1),
+                policy,
+                actor: AccessContext {
+                    principal: "local-owner".into(),
+                    namespace: "default".into(),
+                },
+                folded: true,
+            });
+            let json = serde_json::to_vec(&self.sign_event(&event))
+                .map_err(|e| Error::from_reason(e.to_string()))?;
+            buf.extend_from_slice(&json);
+            buf.push(b'\n');
+            count += 1;
+        }
+
+        if let Some(activation) = self.schema6_activation.read().clone() {
+            let event = Event::Schema6ActivationV1(activation);
+            let json = serde_json::to_vec(&self.sign_event(&event))
+                .map_err(|error| Error::from_reason(error.to_string()))?;
+            buf.extend_from_slice(&json);
+            buf.push(b'\n');
+            count += 1;
+        }
+
         Ok((buf, count))
     }
 
@@ -14839,6 +23281,62 @@ impl Storage {
             if let Ok(f) = FileOpenOptions::new().write(true).open(active) {
                 let _ = f.set_len(valid_end as u64);
                 let _ = f.sync_all();
+            }
+        }
+    }
+
+    /// A fold writes the sealed base before resetting the active file. If a
+    /// crash leaves the pre-fold active prefix beside that base, the base is
+    /// authoritative through its max sequence and only newer active frames
+    /// remain part of the journal tail.
+    fn journal_truncate_active_overlap(root: &std::path::Path, active: &std::path::Path) {
+        let base_frontier = Self::journal_list_segments(root)
+            .into_iter()
+            .filter(|segment| segment.kind == SEG_KIND_BASE)
+            .map(|segment| segment.max_seq)
+            .max()
+            .unwrap_or(0);
+        if base_frontier == 0 {
+            return;
+        }
+        let Ok(bytes) = fs::read(active) else {
+            return;
+        };
+        if bytes.len() < ACTIVE_HEADER_LEN || bytes[0..4] != ACTIVE_MAGIC {
+            return;
+        }
+        let mut replacement = active_header(base_frontier.saturating_add(1)).to_vec();
+        let mut offset = ACTIVE_HEADER_LEN;
+        let mut removed_overlap = false;
+        while offset + FRAME_HEADER_LEN <= bytes.len() {
+            let len = u32::from_le_bytes(bytes[offset..offset + 4].try_into().unwrap()) as usize;
+            let seq = u64::from_le_bytes(bytes[offset + 4..offset + 12].try_into().unwrap());
+            let crc = u32::from_le_bytes(bytes[offset + 12..offset + 16].try_into().unwrap());
+            let payload_start = offset + FRAME_HEADER_LEN;
+            let Some(end) = payload_start.checked_add(len) else {
+                break;
+            };
+            if len > MAX_JOURNAL_FRAME_PAYLOAD_BYTES || end > bytes.len() {
+                break;
+            }
+            if frame_crc(seq, &bytes[payload_start..end]) != crc {
+                break;
+            }
+            if seq <= base_frontier {
+                removed_overlap = true;
+            } else {
+                replacement.extend_from_slice(&bytes[offset..end]);
+            }
+            offset = end;
+        }
+        if removed_overlap {
+            let temporary = active.with_extension("gwal.overlap.tmp");
+            let written = File::create(&temporary).and_then(|mut file| {
+                file.write_all(&replacement)?;
+                file.sync_all()
+            });
+            if written.is_ok() && fs::rename(&temporary, active).is_err() {
+                let _ = fs::remove_file(&temporary);
             }
         }
     }
@@ -15128,6 +23626,12 @@ impl Storage {
         f: &mut dyn FnMut(u64, SignedEvent),
     ) {
         use std::io::BufRead;
+        let base_frontier = Self::journal_list_segments(&self.path)
+            .into_iter()
+            .filter(|segment| segment.kind == SEG_KIND_BASE)
+            .map(|segment| segment.max_seq)
+            .max()
+            .unwrap_or(0);
         let emit_lines = |bytes: &[u8], f: &mut dyn FnMut(u64, SignedEvent)| {
             for line in bytes.split(|b| *b == b'\n') {
                 if line.is_empty() {
@@ -15173,7 +23677,7 @@ impl Storage {
         if let Ok(bytes) = fs::read(&self.log_path) {
             if bytes.len() > ACTIVE_HEADER_LEN && bytes[0..4] == ACTIVE_MAGIC {
                 walk_frames(&bytes, ACTIVE_HEADER_LEN, |seq, payload| {
-                    if from_seq.is_none_or(|cursor| seq > cursor) {
+                    if seq > base_frontier && from_seq.is_none_or(|cursor| seq > cursor) {
                         if let Ok(se) = serde_json::from_slice::<SignedEvent>(payload) {
                             f(seq, se);
                         }
@@ -15202,6 +23706,13 @@ impl Storage {
     /// for all recovery paths. Idempotent: LWW upserts.
     fn replay_journal(&self, from_seq: Option<u64>, include_legacy: bool) {
         self.scan_journal(from_seq, include_legacy, &mut |seq, signed_event| {
+            if Self::contains_p6_control_event(&signed_event.event)
+                && (signed_event.signer_peer_id != self.local_peer_id
+                    || !self.verify_event_signature(&signed_event))
+            {
+                self.recovery_required.store(true, Ordering::SeqCst);
+                return;
+            }
             self.apply_replay_event(seq, self.normalize_replayed_event(signed_event));
         });
     }
@@ -15232,7 +23743,7 @@ impl Storage {
             }
             Event::Node(n) => {
                 if self
-                    .get_u32(&n.id)
+                    .get_u32_unlocked(&n.id)
                     .and_then(|u| self.nodes.get(&u))
                     .is_some_and(|old| old.clock > n.clock)
                     || self
@@ -15287,8 +23798,10 @@ impl Storage {
             Event::Transaction(transaction) => {
                 let transaction_seq = transaction.local_frame_seq.unwrap_or(seq);
                 self.apply_transaction_memory(&transaction, index, transaction_seq);
-                self.txn_frontier
-                    .fetch_max(transaction_seq, Ordering::SeqCst);
+                if transaction.advances_txn_frontier {
+                    self.txn_frontier
+                        .fetch_max(transaction_seq, Ordering::SeqCst);
+                }
             }
             // Durable retraction (RCA--SLICE0-DURABILITY defect 2): replay the
             // removal so a crash after the retraction ack no longer resurrects
@@ -15301,14 +23814,14 @@ impl Storage {
                 retracted_at,
             } => {
                 if self
-                    .get_u32(&id)
+                    .get_u32_unlocked(&id)
                     .and_then(|u| self.nodes.get(&u))
                     .is_some_and(|n| n.clock > clock)
                     || self.tombstones.get(&id).is_some_and(|t| t.clock >= clock)
                 {
                     return;
                 }
-                if let Some(u32_id) = self.get_u32(&id) {
+                if let Some(u32_id) = self.get_u32_unlocked(&id) {
                     self.retract_node_memory(&id, u32_id, seq);
                 }
                 self.tombstones.insert(
@@ -15319,6 +23832,27 @@ impl Storage {
                     },
                 );
             }
+            Event::GenerationPublished(receipt) => {
+                if self.apply_generation_event(&receipt, seq).is_err() {
+                    self.recovery_required.store(true, Ordering::SeqCst);
+                }
+            }
+            Event::AccessPolicyChanged(policy) => {
+                if self.apply_access_policy_event(&policy).is_err() {
+                    self.recovery_required.store(true, Ordering::SeqCst);
+                }
+            }
+            Event::Schema6MigrationChunkV1(chunk) => {
+                if self.apply_schema6_migration_chunk(&chunk, seq).is_err() {
+                    self.recovery_required.store(true, Ordering::SeqCst);
+                }
+            }
+            Event::Schema6MigrationCommitV1(commit) => {
+                if self.apply_schema6_migration_commit(&commit, seq).is_err() {
+                    self.recovery_required.store(true, Ordering::SeqCst);
+                }
+            }
+            Event::Schema6ActivationV1(_) => {}
         }
     }
     /// Bitemporal retraction (soft-delete): set the edge's `valid_to` so it is no
@@ -15338,7 +23872,7 @@ impl Storage {
         };
         edge.valid_to = Some(at.unwrap_or_else(|| Utc::now().to_rfc3339()));
         edge.clock = self.next_clock(); // advance for CRDT LWW: the retraction must win
-        self.persist(&Event::Edge(edge.clone()))?;
+        self.persist_local_graph_mutations(&[], &[edge.clone()], &[])?;
         self.edges.insert(ekey, edge.clone());
         self.refresh_impacts(Some(vec![edge.to.clone()]));
         Ok(Some(edge))
@@ -15386,6 +23920,7 @@ impl Storage {
     pub fn calculate_structural_gaps(&self) -> Result<Vec<GapSuggestion>> {
         let _read_guard = self.commit_lock.lock();
         self.ensure_readable()?;
+        self.require_unscoped_read()?;
 
         let mut gaps = Vec::new();
         let mut cluster_centroids: HashMap<u32, Vec<f32>> = HashMap::new();
@@ -15448,11 +23983,2176 @@ impl Storage {
 
     pub fn get_meta_history(&self, cluster_id: u32) -> Vec<SuperNode> {
         let _read_guard = self.commit_lock.lock();
+        if self.access_policy.read().mode == AccessPolicyMode::Enforced {
+            return Vec::new();
+        }
 
         self.meta_history
             .get(&cluster_id)
             .map(|v| v.value().clone())
             .unwrap_or_default()
+    }
+}
+
+fn hql2_storage_error(error: Error) -> query::hql2::QueryErrorV2 {
+    let reason = error.reason;
+    let (code, stage, safe) = if reason.contains("ACCESS_CONTEXT_REQUIRED") {
+        ("AUTH_REQUIRED", "authorize", "access_context")
+    } else if reason.contains("ACCESS_DENIED") {
+        ("FORBIDDEN", "authorize", "access_denied")
+    } else if reason.contains("TEMPORAL_BEYOND_HORIZON") {
+        ("BEYOND_HORIZON", "bind", "retention_horizon")
+    } else if reason.contains("LEASE_") || reason.contains("GENERATION_STALE") {
+        ("SNAPSHOT_EXPIRED", "execute", "lease_invalid")
+    } else if reason == "read-only" {
+        (
+            "CAPABILITY_UNSUPPORTED",
+            "bind",
+            "read_only_generation_unavailable",
+        )
+    } else {
+        ("DATA_CORRUPTION", "execute", "storage_unavailable")
+    };
+    query::hql2::QueryErrorV2::new(code, stage, safe)
+}
+
+// The reader keeps record identity, temporal selectors, and query budget explicit.
+#[allow(clippy::too_many_arguments)]
+fn hql2_read_revision_payload(
+    connection: &Connection,
+    database_id: &str,
+    namespace: &str,
+    kind: &str,
+    record_id: &str,
+    revision_id: &str,
+    frontier: i64,
+    valid_at: &str,
+    budget: &mut query::hql2::exec::ExecutionBudgetV2,
+) -> std::result::Result<Value, query::hql2::QueryErrorV2> {
+    use query::hql2::QueryErrorV2;
+
+    const PAYLOAD_INFO_SQL: &str = "SELECT operation, length(CAST(payload_json AS BLOB)) FROM hql2_record_revisions WHERE database_id=?1 AND namespace=?2 AND kind=?3 AND record_id=?4 AND revision_id=?5 AND tx_from<=?6 AND valid_from<=?7 AND (valid_to IS NULL OR valid_to>?7)";
+    const PAYLOAD_SQL: &str = "SELECT payload_json FROM hql2_record_revisions WHERE database_id=?1 AND namespace=?2 AND kind=?3 AND record_id=?4 AND revision_id=?5 AND tx_from<=?6 AND valid_from<=?7 AND (valid_to IS NULL OR valid_to>?7)";
+    let payload_info: Option<(String, i64)> = connection
+        .query_row(
+            PAYLOAD_INFO_SQL,
+            rusqlite::params![
+                database_id,
+                namespace,
+                kind,
+                record_id,
+                revision_id,
+                frontier,
+                valid_at
+            ],
+            |row| Ok((row.get(0)?, row.get(1)?)),
+        )
+        .optional()
+        .map_err(|_| QueryErrorV2::new("DATA_CORRUPTION", "execute", "source_unavailable"))?;
+    let Some((operation, payload_len)) = payload_info else {
+        return Err(QueryErrorV2::new(
+            "DATA_CORRUPTION",
+            "execute",
+            "source_revision_missing",
+        ));
+    };
+    budget.reserve(
+        u64::try_from(payload_len)
+            .unwrap_or(u64::MAX)
+            .saturating_mul(4)
+            .saturating_add(256),
+    )?;
+    if operation == "retract" {
+        return Ok(Value::Null);
+    }
+    if operation != "upsert" {
+        return Err(QueryErrorV2::new(
+            "DATA_CORRUPTION",
+            "execute",
+            "source_operation",
+        ));
+    }
+    let payload: String = connection
+        .query_row(
+            PAYLOAD_SQL,
+            rusqlite::params![
+                database_id,
+                namespace,
+                kind,
+                record_id,
+                revision_id,
+                frontier,
+                valid_at
+            ],
+            |row| row.get(0),
+        )
+        .map_err(|_| QueryErrorV2::new("DATA_CORRUPTION", "execute", "source_revision_missing"))?;
+    serde_json::from_str(&payload)
+        .map_err(|_| QueryErrorV2::new("DATA_CORRUPTION", "execute", "source_payload"))
+}
+
+fn hql2_check_output(
+    value: &impl Serialize,
+    rows: u64,
+    budget: &query::hql2::exec::ExecutionBudgetV2,
+) -> std::result::Result<(), query::hql2::QueryErrorV2> {
+    struct Counter<'a> {
+        bytes: u64,
+        rows: u64,
+        budget: &'a query::hql2::exec::ExecutionBudgetV2,
+    }
+    impl std::io::Write for Counter<'_> {
+        fn write(&mut self, bytes: &[u8]) -> std::io::Result<usize> {
+            self.bytes = self.bytes.saturating_add(bytes.len() as u64);
+            self.budget
+                .check_output(self.rows, self.bytes)
+                .map_err(std::io::Error::other)?;
+            Ok(bytes.len())
+        }
+        fn flush(&mut self) -> std::io::Result<()> {
+            Ok(())
+        }
+    }
+    let mut counter = Counter {
+        bytes: 0,
+        rows,
+        budget,
+    };
+    serde_json::to_writer(&mut counter, value).map_err(|_| {
+        query::hql2::QueryErrorV2::new("QUERY_BUDGET_EXCEEDED", "execute", "output_limit")
+    })?;
+    budget.check_output(rows, counter.bytes)
+}
+
+impl<'a> ReadView<'a> {
+    pub(crate) fn hql2_catalog(
+        &self,
+    ) -> std::result::Result<query::hql2::catalog::AuthorizedCatalogV2<'_>, query::hql2::QueryErrorV2>
+    {
+        self.storage.ensure_readable().map_err(hql2_storage_error)?;
+        self.storage
+            .validate_lease_unlocked(self.lease)
+            .map_err(hql2_storage_error)?;
+        let (stamp, tables, collections) =
+            self.storage.hql2_catalog_snapshot(&self.lease.access)?;
+        Ok(query::hql2::catalog::AuthorizedCatalogV2::with_catalog(
+            stamp,
+            self,
+            tables,
+            collections,
+        ))
+    }
+
+    fn hql2_source_history_floor(
+        &self,
+        connection: &Connection,
+        namespace: &str,
+        source: &str,
+    ) -> std::result::Result<u64, query::hql2::QueryErrorV2> {
+        use query::hql2::QueryErrorV2;
+        use rusqlite::OptionalExtension;
+
+        if source == "graph" {
+            return Ok(self.storage.history_horizon());
+        }
+        let floor: Option<i64> = connection
+            .query_row(
+                "SELECT history_floor FROM hql2_source_history_floors
+                 WHERE namespace=?1 AND source=?2",
+                rusqlite::params![namespace, source],
+                |row| row.get(0),
+            )
+            .optional()
+            .map_err(|_| QueryErrorV2::new("DATA_CORRUPTION", "execute", "history_floor"))?;
+        let Some(floor) = floor else {
+            return Err(QueryErrorV2::new(
+                "HISTORY_UNAVAILABLE",
+                "bind",
+                "history_floor",
+            ));
+        };
+        u64::try_from(floor)
+            .map_err(|_| QueryErrorV2::new("DATA_CORRUPTION", "execute", "history_floor"))
+    }
+
+    fn hql2_transaction_frontier(&self) -> u64 {
+        self.lease
+            .temporal
+            .tx_as_of
+            .unwrap_or(self.lease.generation.wal_frontier)
+    }
+
+    fn hql2_source_history_floor_at(
+        &self,
+        connection: &Connection,
+        namespace: &str,
+        source: &str,
+        frontier: u64,
+    ) -> std::result::Result<u64, query::hql2::QueryErrorV2> {
+        let floor = self.hql2_source_history_floor(connection, namespace, source)?;
+        if floor > frontier {
+            return Err(query::hql2::QueryErrorV2::new(
+                "HISTORY_UNAVAILABLE",
+                "bind",
+                "history_floor",
+            ));
+        }
+        Ok(floor)
+    }
+
+    // ACL evaluation needs the subject, snapshot, schema, payload, and budget separately.
+    #[allow(clippy::too_many_arguments)]
+    fn hql2_revision_subject_readable(
+        &self,
+        connection: &Connection,
+        policy: &AccessPolicy,
+        subject: &crate::uee_v2::RecordRefV2,
+        schema_ref: Option<&str>,
+        payload: &Value,
+        frontier: i64,
+        valid_at: &str,
+        budget: &mut query::hql2::exec::ExecutionBudgetV2,
+    ) -> std::result::Result<bool, query::hql2::QueryErrorV2> {
+        use crate::uee_v2::RecordKindV2;
+        use query::hql2::QueryErrorV2;
+
+        let access = &self.lease.access;
+        let namespace_resource = crate::AccessResource::Namespace(subject.namespace.clone());
+        let resource = match &subject.kind {
+            RecordKindV2::Node => crate::AccessResource::Node(subject.id.clone()),
+            RecordKindV2::Edge => crate::AccessResource::Edge(subject.id.clone()),
+            RecordKindV2::Row => match schema_ref {
+                Some(table) => crate::AccessResource::Table {
+                    namespace: subject.namespace.clone(),
+                    table: table.to_owned(),
+                },
+                None => return Ok(false),
+            },
+            RecordKindV2::Vector => {
+                let owner = payload
+                    .get("owner_id")
+                    .and_then(Value::as_str)
+                    .ok_or_else(|| {
+                        QueryErrorV2::new("DATA_CORRUPTION", "execute", "vector_owner")
+                    })?;
+                crate::AccessResource::Node(owner.to_owned())
+            }
+            RecordKindV2::Annotation => {
+                crate::AccessResource::Annotation(subject.namespace.clone())
+            }
+            RecordKindV2::Artifact => {
+                return Err(QueryErrorV2::new(
+                    "CAPABILITY_UNSUPPORTED",
+                    "execute",
+                    "revision_source_unavailable",
+                ))
+            }
+        };
+        let can_read = |resource: &crate::AccessResource| {
+            policy.mode != AccessPolicyMode::Enforced
+                || Storage::grant_matches(policy, access, AccessAction::Read, &namespace_resource)
+                || Storage::grant_matches(policy, access, AccessAction::Read, resource)
+        };
+        let subject_readable = if matches!(&subject.kind, RecordKindV2::Annotation) {
+            policy.mode != AccessPolicyMode::Enforced
+                || Storage::grant_matches(policy, access, AccessAction::Read, &resource)
+        } else {
+            can_read(&resource)
+        };
+        if !subject_readable {
+            return Ok(false);
+        }
+        match &subject.kind {
+            RecordKindV2::Edge => {
+                for field in ["from", "to"] {
+                    let id = payload.get(field).and_then(Value::as_str).ok_or_else(|| {
+                        QueryErrorV2::new("DATA_CORRUPTION", "execute", "edge_endpoint")
+                    })?;
+                    if !can_read(&crate::AccessResource::Node(id.to_owned())) {
+                        return Ok(false);
+                    }
+                }
+            }
+            RecordKindV2::Vector => {
+                let owner_id =
+                    payload
+                        .get("owner_id")
+                        .and_then(Value::as_str)
+                        .ok_or_else(|| {
+                            QueryErrorV2::new("DATA_CORRUPTION", "execute", "vector_owner")
+                        })?;
+                if owner_id.is_empty() {
+                    return Err(QueryErrorV2::new(
+                        "DATA_CORRUPTION",
+                        "execute",
+                        "vector_owner",
+                    ));
+                }
+            }
+            RecordKindV2::Annotation => {
+                if !self.hql2_annotation_references_authorized(
+                    connection,
+                    policy,
+                    &subject.id,
+                    &subject.revision,
+                    &subject.namespace,
+                    &subject.database_id,
+                    frontier,
+                    valid_at,
+                    budget,
+                )? {
+                    return Ok(false);
+                }
+            }
+            RecordKindV2::Node | RecordKindV2::Row | RecordKindV2::Artifact => {}
+        }
+        Ok(true)
+    }
+
+    pub(crate) fn hql2_history_scan(
+        &self,
+        kind: &crate::uee_v2::RecordKindV2,
+        record_id: &str,
+        budget: &mut query::hql2::exec::ExecutionBudgetV2,
+    ) -> std::result::Result<Vec<query::hql2::value::HistoryRevisionV2>, query::hql2::QueryErrorV2>
+    {
+        use query::hql2::{value::HistoryRevisionV2, QueryErrorV2};
+
+        self.validate().map_err(hql2_storage_error)?;
+        let access = &self.lease.access;
+        self.storage
+            .authorize_namespace_read(access, &access.namespace)
+            .map_err(hql2_storage_error)?;
+        if self.storage.storage_schema_version != SCHEMA_VERSION {
+            return Err(QueryErrorV2::new(
+                "CAPABILITY_UNSUPPORTED",
+                "execute",
+                "revision_schema_unavailable",
+            ));
+        }
+        let frontier = self.hql2_transaction_frontier();
+        let frontier_sql = i64::try_from(frontier)
+            .map_err(|_| QueryErrorV2::new("DATA_CORRUPTION", "execute", "frontier_unavailable"))?;
+        let database_id = self.storage.database_id();
+        let namespace = access.namespace.as_str();
+        let valid_at = self
+            .lease
+            .temporal
+            .as_of
+            .clone()
+            .unwrap_or_else(|| Utc::now().to_rfc3339());
+        let source = match kind {
+            crate::uee_v2::RecordKindV2::Node | crate::uee_v2::RecordKindV2::Edge => "graph",
+            crate::uee_v2::RecordKindV2::Row => "row",
+            crate::uee_v2::RecordKindV2::Vector => "vector",
+            crate::uee_v2::RecordKindV2::Annotation => "annotation",
+            crate::uee_v2::RecordKindV2::Artifact => {
+                return Err(QueryErrorV2::new(
+                    "CAPABILITY_UNSUPPORTED",
+                    "bind",
+                    "history_source_unavailable",
+                ))
+            }
+        };
+        let source_kind = Storage::revision_kind_name(kind);
+        let policy = self.storage.access_policy.read().clone();
+        let connection = self.storage.projection_db.lock();
+        let floor = self.hql2_source_history_floor_at(&connection, namespace, source, frontier)?;
+        if matches!(kind, crate::uee_v2::RecordKindV2::Annotation) {
+            self.storage
+                .authorize_annotation_namespace_read(access, namespace)
+                .map_err(hql2_storage_error)?;
+        }
+        let floor_sql = i64::try_from(floor)
+            .map_err(|_| QueryErrorV2::new("DATA_CORRUPTION", "execute", "history_floor"))?;
+        let (candidate_count, candidate_bytes): (i64, i64) = connection
+            .query_row(
+                "SELECT COUNT(*), COALESCE(SUM(
+                    length(CAST(revision_id AS BLOB))
+                    + length(CAST(operation AS BLOB))
+                    + length(CAST(valid_from AS BLOB))
+                    + COALESCE(length(CAST(valid_to AS BLOB)),0)
+                    + COALESCE(length(CAST(schema_ref AS BLOB)),0)
+                    + length(CAST(payload_json AS BLOB))
+                ),0)
+                 FROM hql2_record_revisions
+                 WHERE database_id=?1 AND namespace=?2 AND kind=?3 AND record_id=?4
+                   AND tx_from>=?5 AND tx_from<=?6
+                   AND valid_from<=?7 AND (valid_to IS NULL OR valid_to>?7)",
+                rusqlite::params![
+                    database_id,
+                    namespace,
+                    source_kind,
+                    record_id,
+                    floor_sql,
+                    frontier_sql,
+                    valid_at,
+                ],
+                |row| Ok((row.get(0)?, row.get(1)?)),
+            )
+            .map_err(|_| QueryErrorV2::new("DATA_CORRUPTION", "execute", "history_source"))?;
+        let candidate_count = u64::try_from(candidate_count)
+            .map_err(|_| QueryErrorV2::new("DATA_CORRUPTION", "execute", "history_count"))?;
+        let candidate_bytes = u64::try_from(candidate_bytes)
+            .map_err(|_| QueryErrorV2::new("DATA_CORRUPTION", "execute", "history_size"))?;
+        budget.reserve(
+            candidate_count
+                .saturating_mul(std::mem::size_of::<HistoryRevisionV2>() as u64 + 256)
+                .saturating_add(candidate_bytes.saturating_mul(4)),
+        )?;
+        budget.reserve_expanded_nodes(candidate_count)?;
+        let mut statement = connection
+            .prepare(
+                "SELECT revision_id, operation, valid_from, valid_to,
+                        tx_from, tx_to, schema_ref, payload_json
+                 FROM hql2_record_revisions
+                 WHERE database_id=?1 AND namespace=?2 AND kind=?3 AND record_id=?4
+                   AND tx_from>=?5 AND tx_from<=?6
+                   AND valid_from<=?7 AND (valid_to IS NULL OR valid_to>?7)
+                 ORDER BY tx_from, revision_id",
+            )
+            .map_err(|_| QueryErrorV2::new("DATA_CORRUPTION", "execute", "history_source"))?;
+        let candidates = statement
+            .query_map(
+                rusqlite::params![
+                    database_id,
+                    namespace,
+                    source_kind,
+                    record_id,
+                    floor_sql,
+                    frontier_sql,
+                    valid_at,
+                ],
+                |row| {
+                    Ok((
+                        row.get::<_, String>(0)?,
+                        row.get::<_, String>(1)?,
+                        row.get::<_, String>(2)?,
+                        row.get::<_, Option<String>>(3)?,
+                        row.get::<_, i64>(4)?,
+                        row.get::<_, Option<i64>>(5)?,
+                        row.get::<_, Option<String>>(6)?,
+                        row.get::<_, String>(7)?,
+                    ))
+                },
+            )
+            .map_err(|_| QueryErrorV2::new("DATA_CORRUPTION", "execute", "history_source"))?
+            .collect::<std::result::Result<Vec<_>, _>>()
+            .map_err(|_| QueryErrorV2::new("DATA_CORRUPTION", "execute", "history_source"))?;
+        let mut revisions = Vec::with_capacity(candidates.len());
+        for (
+            revision_id,
+            operation,
+            valid_from,
+            valid_to,
+            tx_from,
+            tx_to,
+            schema_ref,
+            payload_json,
+        ) in candidates
+        {
+            budget.check()?;
+            if !matches!(operation.as_str(), "upsert" | "retract") {
+                return Err(QueryErrorV2::new(
+                    "DATA_CORRUPTION",
+                    "execute",
+                    "history_operation",
+                ));
+            }
+            let subject = crate::uee_v2::RecordRefV2 {
+                database_id: database_id.clone(),
+                namespace: namespace.to_owned(),
+                kind: kind.clone(),
+                id: record_id.to_owned(),
+                revision: revision_id.clone(),
+            };
+            subject
+                .validate()
+                .map_err(|_| QueryErrorV2::new("DATA_CORRUPTION", "execute", "history_subject"))?;
+            let payload: Value = serde_json::from_str(&payload_json)
+                .map_err(|_| QueryErrorV2::new("DATA_CORRUPTION", "execute", "history_payload"))?;
+            if !self.hql2_revision_subject_readable(
+                &connection,
+                &policy,
+                &subject,
+                schema_ref.as_deref(),
+                &payload,
+                frontier_sql,
+                &valid_at,
+                budget,
+            )? {
+                continue;
+            }
+            let tx_from = u64::try_from(tx_from)
+                .map_err(|_| QueryErrorV2::new("DATA_CORRUPTION", "execute", "history_sequence"))?;
+            let tx_to = tx_to
+                .map(u64::try_from)
+                .transpose()
+                .map_err(|_| QueryErrorV2::new("DATA_CORRUPTION", "execute", "history_sequence"))?;
+            revisions.push(HistoryRevisionV2 {
+                subject,
+                operation,
+                tx_from,
+                tx_to,
+                valid_from,
+                valid_to,
+            });
+        }
+        Ok(revisions)
+    }
+
+    pub(crate) fn hql2_change_scan(
+        &self,
+        after_seq: u64,
+        budget: &mut query::hql2::exec::ExecutionBudgetV2,
+    ) -> std::result::Result<Vec<query::hql2::value::ChangeEventV2>, query::hql2::QueryErrorV2>
+    {
+        use query::hql2::{value::ChangeEventV2, QueryErrorV2};
+
+        self.validate().map_err(hql2_storage_error)?;
+        let access = &self.lease.access;
+        self.storage
+            .authorize_namespace_read(access, &access.namespace)
+            .map_err(hql2_storage_error)?;
+        if self.storage.storage_schema_version != SCHEMA_VERSION {
+            return Err(QueryErrorV2::new(
+                "CAPABILITY_UNSUPPORTED",
+                "execute",
+                "revision_schema_unavailable",
+            ));
+        }
+        let frontier = self.hql2_transaction_frontier();
+        if after_seq > frontier {
+            return Err(QueryErrorV2::new(
+                "BIND_ERROR",
+                "bind",
+                "invalid_change_bounds",
+            ));
+        }
+        let frontier_sql = i64::try_from(frontier)
+            .map_err(|_| QueryErrorV2::new("DATA_CORRUPTION", "execute", "frontier_unavailable"))?;
+        let after_sql = i64::try_from(after_seq)
+            .map_err(|_| QueryErrorV2::new("BIND_ERROR", "bind", "invalid_change_bounds"))?;
+        let database_id = self.storage.database_id();
+        let namespace = access.namespace.as_str();
+        let valid_at = self
+            .lease
+            .temporal
+            .as_of
+            .clone()
+            .unwrap_or_else(|| Utc::now().to_rfc3339());
+        let policy = self.storage.access_policy.read().clone();
+        let annotation_readable = policy.mode != AccessPolicyMode::Enforced
+            || Storage::grant_matches(
+                &policy,
+                access,
+                AccessAction::Read,
+                &AccessResource::Annotation(namespace.to_owned()),
+            );
+        let connection = self.storage.projection_db.lock();
+        for source in ["graph", "row", "vector", "annotation"] {
+            let floor =
+                self.hql2_source_history_floor_at(&connection, namespace, source, frontier)?;
+            if after_seq < floor {
+                return Err(QueryErrorV2::new(
+                    "HISTORY_UNAVAILABLE",
+                    "bind",
+                    "history_floor",
+                ));
+            }
+        }
+        let unknown_kind: bool = connection
+            .query_row(
+                "SELECT EXISTS(
+                    SELECT 1 FROM hql2_record_revisions
+                    WHERE database_id=?1 AND namespace=?2
+                      AND tx_from>?3 AND tx_from<=?4
+                      AND kind NOT IN ('node','edge','row','vector','annotation')
+                )",
+                rusqlite::params![database_id, namespace, after_sql, frontier_sql],
+                |row| row.get(0),
+            )
+            .map_err(|_| QueryErrorV2::new("DATA_CORRUPTION", "execute", "change_source"))?;
+        if unknown_kind {
+            return Err(QueryErrorV2::new(
+                "CAPABILITY_UNSUPPORTED",
+                "execute",
+                "revision_source_unavailable",
+            ));
+        }
+        let (candidate_count, candidate_bytes): (i64, i64) = connection
+            .query_row(
+                "SELECT COUNT(*), COALESCE(SUM(
+                    length(CAST(kind AS BLOB))
+                    + length(CAST(record_id AS BLOB))
+                    + length(CAST(revision_id AS BLOB))
+                    + COALESCE(length(CAST(predecessor_revision_id AS BLOB)),0)
+                    + length(CAST(operation AS BLOB))
+                    + COALESCE(length(CAST(schema_ref AS BLOB)),0)
+                    + length(CAST(payload_json AS BLOB))
+                ),0)
+                 FROM hql2_record_revisions
+                 WHERE database_id=?1 AND namespace=?2
+                   AND kind IN ('node','edge','row','vector','annotation')
+                   AND tx_from>?3 AND tx_from<=?4
+                   AND (?5 OR kind<>'annotation')",
+                rusqlite::params![
+                    database_id,
+                    namespace,
+                    after_sql,
+                    frontier_sql,
+                    annotation_readable
+                ],
+                |row| Ok((row.get(0)?, row.get(1)?)),
+            )
+            .map_err(|_| QueryErrorV2::new("DATA_CORRUPTION", "execute", "change_source"))?;
+        let candidate_count = u64::try_from(candidate_count)
+            .map_err(|_| QueryErrorV2::new("DATA_CORRUPTION", "execute", "change_count"))?;
+        let candidate_bytes = u64::try_from(candidate_bytes)
+            .map_err(|_| QueryErrorV2::new("DATA_CORRUPTION", "execute", "change_size"))?;
+        budget.reserve(
+            candidate_count
+                .saturating_mul(std::mem::size_of::<ChangeEventV2>() as u64 + 256)
+                .saturating_add(candidate_bytes.saturating_mul(4)),
+        )?;
+        budget.reserve_expanded_nodes(candidate_count)?;
+        let mut statement = connection
+            .prepare(
+                "SELECT kind, record_id, revision_id, predecessor_revision_id, operation,
+                        tx_from, schema_ref, payload_json
+                 FROM hql2_record_revisions
+                 WHERE database_id=?1 AND namespace=?2
+                   AND kind IN ('node','edge','row','vector','annotation')
+                   AND tx_from>?3 AND tx_from<=?4
+                   AND (?5 OR kind<>'annotation')
+                 ORDER BY tx_from, kind, record_id, revision_id",
+            )
+            .map_err(|_| QueryErrorV2::new("DATA_CORRUPTION", "execute", "change_source"))?;
+        let candidates = statement
+            .query_map(
+                rusqlite::params![
+                    database_id,
+                    namespace,
+                    after_sql,
+                    frontier_sql,
+                    annotation_readable
+                ],
+                |row| {
+                    Ok((
+                        row.get::<_, String>(0)?,
+                        row.get::<_, String>(1)?,
+                        row.get::<_, String>(2)?,
+                        row.get::<_, Option<String>>(3)?,
+                        row.get::<_, String>(4)?,
+                        row.get::<_, i64>(5)?,
+                        row.get::<_, Option<String>>(6)?,
+                        row.get::<_, String>(7)?,
+                    ))
+                },
+            )
+            .map_err(|_| QueryErrorV2::new("DATA_CORRUPTION", "execute", "change_source"))?
+            .collect::<std::result::Result<Vec<_>, _>>()
+            .map_err(|_| QueryErrorV2::new("DATA_CORRUPTION", "execute", "change_source"))?;
+        let mut events = Vec::with_capacity(candidates.len());
+        for (
+            kind,
+            id,
+            revision,
+            predecessor,
+            stored_operation,
+            sequence,
+            schema_ref,
+            payload_json,
+        ) in candidates
+        {
+            budget.check()?;
+            let record_kind = match kind.as_str() {
+                "node" => crate::uee_v2::RecordKindV2::Node,
+                "edge" => crate::uee_v2::RecordKindV2::Edge,
+                "row" => crate::uee_v2::RecordKindV2::Row,
+                "vector" => crate::uee_v2::RecordKindV2::Vector,
+                "annotation" => crate::uee_v2::RecordKindV2::Annotation,
+                _ => {
+                    return Err(QueryErrorV2::new(
+                        "CAPABILITY_UNSUPPORTED",
+                        "execute",
+                        "revision_source_unavailable",
+                    ))
+                }
+            };
+            let operation = match (stored_operation.as_str(), predecessor.is_some()) {
+                ("upsert", false) => "upsert",
+                ("upsert", true) => "correct",
+                ("retract", _) => "retract",
+                _ => {
+                    return Err(QueryErrorV2::new(
+                        "DATA_CORRUPTION",
+                        "execute",
+                        "change_operation",
+                    ))
+                }
+            };
+            let subject = crate::uee_v2::RecordRefV2 {
+                database_id: database_id.clone(),
+                namespace: namespace.to_owned(),
+                kind: record_kind,
+                id,
+                revision,
+            };
+            subject
+                .validate()
+                .map_err(|_| QueryErrorV2::new("DATA_CORRUPTION", "execute", "change_subject"))?;
+            let payload: Value = serde_json::from_str(&payload_json)
+                .map_err(|_| QueryErrorV2::new("DATA_CORRUPTION", "execute", "change_payload"))?;
+            if !self.hql2_revision_subject_readable(
+                &connection,
+                &policy,
+                &subject,
+                schema_ref.as_deref(),
+                &payload,
+                frontier_sql,
+                &valid_at,
+                budget,
+            )? {
+                continue;
+            }
+            events.push(ChangeEventV2 {
+                sequence: u64::try_from(sequence).map_err(|_| {
+                    QueryErrorV2::new("DATA_CORRUPTION", "execute", "change_sequence")
+                })?,
+                operation: operation.to_owned(),
+                subject,
+            });
+        }
+        Ok(events)
+    }
+
+    pub(crate) fn hql2_scan(
+        &self,
+        source: &query::hql2::source::BoundSourceV2,
+        after: Option<&query::hql2::source::SourceKeyV2>,
+        limit: std::num::NonZeroU32,
+        budget: &mut query::hql2::exec::ExecutionBudgetV2,
+    ) -> std::result::Result<query::hql2::source::SourceBatchV2, query::hql2::QueryErrorV2> {
+        use query::hql2::{source::*, QueryErrorV2};
+
+        self.validate().map_err(hql2_storage_error)?;
+        let record_kind = source.record_kind().ok_or_else(|| {
+            QueryErrorV2::new("BIND_ERROR", "execute", "source_cursor_unavailable")
+        })?;
+        if limit.get() > 1024 {
+            return Err(QueryErrorV2::new(
+                "BIND_ERROR",
+                "bind",
+                "source_batch_limit",
+            ));
+        }
+        let access = &self.lease.access;
+        if matches!(source, BoundSourceV2::Annotation) {
+            self.storage
+                .authorize_annotation_namespace_read(access, &access.namespace)
+                .map_err(hql2_storage_error)?;
+        }
+        if self.storage.storage_schema_version != SCHEMA_VERSION {
+            return Err(QueryErrorV2::new(
+                "CAPABILITY_UNSUPPORTED",
+                "execute",
+                "annotation_schema_unavailable",
+            ));
+        }
+        let frontier = self.hql2_transaction_frontier();
+        let frontier_sql = i64::try_from(frontier)
+            .map_err(|_| QueryErrorV2::new("DATA_CORRUPTION", "execute", "frontier_unavailable"))?;
+        let database_id = self.storage.database_id();
+        let namespace = access.namespace.as_str();
+        let valid_at = self
+            .lease
+            .temporal
+            .as_of
+            .clone()
+            .unwrap_or_else(|| Utc::now().to_rfc3339());
+        let after_record = after
+            .map(|cursor| {
+                cursor
+                    .validate(
+                        source,
+                        &self.lease.owner_token,
+                        self.lease.generation.generation_id,
+                        frontier,
+                        self.lease.generation.acl_revision,
+                        self.lease.fencing_epoch,
+                        &valid_at,
+                        &access.principal,
+                        namespace,
+                        &database_id,
+                    )
+                    .ok_or_else(|| QueryErrorV2::new("BIND_ERROR", "bind", "source_cursor"))
+            })
+            .transpose()?;
+        let policy = self.storage.access_policy.read().clone();
+        let limit_i64 = i64::from(limit.get());
+        let scan_limit = limit_i64 + 1;
+        let table = match source {
+            BoundSourceV2::Row(table) => Some(table.as_str()),
+            _ => None,
+        };
+        let connection = self.storage.projection_db.lock();
+        let history_source = match &record_kind {
+            crate::uee_v2::RecordKindV2::Node | crate::uee_v2::RecordKindV2::Edge => "graph",
+            crate::uee_v2::RecordKindV2::Row => "row",
+            crate::uee_v2::RecordKindV2::Vector => "vector",
+            crate::uee_v2::RecordKindV2::Annotation => "annotation",
+            crate::uee_v2::RecordKindV2::Artifact => {
+                return Err(QueryErrorV2::new(
+                    "CAPABILITY_UNSUPPORTED",
+                    "bind",
+                    "revision_source_unavailable",
+                ))
+            }
+        };
+        self.hql2_source_history_floor_at(&connection, namespace, history_source, frontier)?;
+        let after_id = after_record.map(|record| record.id.as_str());
+        let after_revision = after_record.map(|record| record.revision.as_str());
+        let (candidate_count, candidate_text_bytes): (i64, i64) = connection
+            .query_row(
+                "SELECT COUNT(*), COALESCE(SUM(length(CAST(record_id AS BLOB))
+                    + length(CAST(revision_id AS BLOB))
+                    + COALESCE(length(CAST(schema_ref AS BLOB)),0)),0)
+                 FROM (
+                    SELECT record_id, revision_id, schema_ref
+                    FROM hql2_record_revisions
+                    WHERE database_id=?1 AND namespace=?2 AND kind=?3
+                      AND operation='upsert' AND tx_from<=?4
+                      AND (tx_to IS NULL OR tx_to>?4)
+                      AND valid_from<=?5 AND (valid_to IS NULL OR valid_to>?5)
+                      AND (?6 IS NULL OR record_id>?6 OR (record_id=?6 AND revision_id>?7))
+                      AND (?8 IS NULL OR schema_ref=?8)
+                    ORDER BY record_id, revision_id LIMIT ?9
+                 )",
+                rusqlite::params![
+                    database_id,
+                    namespace,
+                    source.kind_name(),
+                    frontier_sql,
+                    valid_at,
+                    after_id,
+                    after_revision,
+                    table,
+                    scan_limit,
+                ],
+                |row| Ok((row.get(0)?, row.get(1)?)),
+            )
+            .map_err(|_| QueryErrorV2::new("DATA_CORRUPTION", "execute", "source_unavailable"))?;
+        let candidate_count = u64::try_from(candidate_count).map_err(|_| {
+            QueryErrorV2::new("DATA_CORRUPTION", "execute", "source_candidate_count")
+        })?;
+        let candidate_text_bytes = u64::try_from(candidate_text_bytes).map_err(|_| {
+            QueryErrorV2::new("DATA_CORRUPTION", "execute", "source_candidate_size")
+        })?;
+        budget.reserve(
+            candidate_count
+                .saturating_mul(128)
+                .saturating_add(candidate_text_bytes),
+        )?;
+        let mut statement = connection
+            .prepare(
+                "SELECT record_id, revision_id, schema_ref
+                 FROM hql2_record_revisions
+                 WHERE database_id=?1 AND namespace=?2 AND kind=?3
+                   AND operation='upsert' AND tx_from<=?4
+                   AND (tx_to IS NULL OR tx_to>?4)
+                   AND valid_from<=?5 AND (valid_to IS NULL OR valid_to>?5)
+                   AND (?6 IS NULL OR record_id>?6 OR (record_id=?6 AND revision_id>?7))
+                   AND (?8 IS NULL OR schema_ref=?8)
+                 ORDER BY record_id, revision_id LIMIT ?9",
+            )
+            .map_err(|_| QueryErrorV2::new("DATA_CORRUPTION", "execute", "source_unavailable"))?;
+        let candidates = statement
+            .query_map(
+                rusqlite::params![
+                    database_id,
+                    namespace,
+                    source.kind_name(),
+                    frontier_sql,
+                    valid_at,
+                    after_id,
+                    after_revision,
+                    table,
+                    scan_limit,
+                ],
+                |row| {
+                    Ok((
+                        row.get::<_, String>(0)?,
+                        row.get::<_, String>(1)?,
+                        row.get::<_, Option<String>>(2)?,
+                    ))
+                },
+            )
+            .map_err(|_| QueryErrorV2::new("DATA_CORRUPTION", "execute", "source_unavailable"))?
+            .collect::<std::result::Result<Vec<_>, _>>()
+            .map_err(|_| QueryErrorV2::new("DATA_CORRUPTION", "execute", "source_unavailable"))?;
+        let has_more = candidates.len() > limit.get() as usize;
+        let consumed: Vec<_> = candidates.into_iter().take(limit.get() as usize).collect();
+        let mut records = Vec::with_capacity(consumed.len());
+        for (id, revision, schema_ref) in &consumed {
+            let matches_source = match source {
+                BoundSourceV2::Node(None) | BoundSourceV2::Edge(None) => true,
+                BoundSourceV2::Node(Some(label)) => {
+                    let payload = hql2_read_revision_payload(
+                        &connection,
+                        &database_id,
+                        namespace,
+                        "node",
+                        id,
+                        revision,
+                        frontier_sql,
+                        &valid_at,
+                        budget,
+                    )?;
+                    payload["labels"].as_array().is_some_and(|labels| {
+                        labels.iter().any(|value| value.as_str() == Some(label))
+                    })
+                }
+                BoundSourceV2::Edge(Some(relation)) => {
+                    let payload = hql2_read_revision_payload(
+                        &connection,
+                        &database_id,
+                        namespace,
+                        "edge",
+                        id,
+                        revision,
+                        frontier_sql,
+                        &valid_at,
+                        budget,
+                    )?;
+                    payload["rel"].as_str() == Some(relation)
+                }
+                BoundSourceV2::Row(table) => schema_ref.as_deref() == Some(table),
+                BoundSourceV2::Annotation => true,
+                BoundSourceV2::History { .. } | BoundSourceV2::Changes { .. } => unreachable!(),
+            };
+            if !matches_source {
+                continue;
+            }
+            if matches!(source, BoundSourceV2::Annotation)
+                && !self.hql2_annotation_references_authorized(
+                    &connection,
+                    &policy,
+                    id,
+                    revision,
+                    namespace,
+                    &database_id,
+                    frontier_sql,
+                    &valid_at,
+                    budget,
+                )?
+            {
+                continue;
+            }
+            records.push(crate::uee_v2::RecordRefV2 {
+                database_id: database_id.clone(),
+                namespace: namespace.to_owned(),
+                kind: record_kind.clone(),
+                id: id.clone(),
+                revision: revision.clone(),
+            });
+        }
+        let next = if has_more {
+            consumed.last().map(|(id, revision, _)| {
+                SourceKeyV2::new(
+                    source.clone(),
+                    &self.lease.owner_token,
+                    self.lease.generation.generation_id,
+                    frontier,
+                    self.lease.generation.acl_revision,
+                    self.lease.fencing_epoch,
+                    &valid_at,
+                    &access.principal,
+                    namespace,
+                    crate::uee_v2::RecordRefV2 {
+                        database_id,
+                        namespace: namespace.to_owned(),
+                        kind: record_kind.clone(),
+                        id: id.clone(),
+                        revision: revision.clone(),
+                    },
+                )
+            })
+        } else {
+            None
+        };
+        Ok(SourceBatchV2 {
+            records,
+            next,
+            examined: consumed.len() as u32,
+        })
+    }
+
+    fn hql2_scan_all(
+        &self,
+        source: query::hql2::source::BoundSourceV2,
+        budget: &mut query::hql2::exec::ExecutionBudgetV2,
+    ) -> std::result::Result<Vec<crate::uee_v2::RecordRefV2>, query::hql2::QueryErrorV2> {
+        let limit = std::num::NonZeroU32::new(256).unwrap();
+        let mut after = None;
+        let mut records = Vec::new();
+        loop {
+            let batch = self.hql2_scan(&source, after.as_ref(), limit, budget)?;
+            budget.reserve_expanded_nodes(u64::from(batch.examined))?;
+            budget.reserve(
+                (batch.records.len() as u64)
+                    .saturating_mul(std::mem::size_of::<crate::uee_v2::RecordRefV2>() as u64),
+            )?;
+            records.extend(batch.records);
+            after = batch.next;
+            if after.is_none() {
+                return Ok(records);
+            }
+        }
+    }
+
+    pub(crate) fn hql2_graph_snapshot(
+        &self,
+        include_node_labels: bool,
+        budget: &mut query::hql2::exec::ExecutionBudgetV2,
+    ) -> std::result::Result<query::hql2::source::GraphSnapshotV2, query::hql2::QueryErrorV2> {
+        use query::hql2::{source::*, QueryErrorV2};
+
+        self.validate().map_err(hql2_storage_error)?;
+        let access = &self.lease.access;
+        self.storage
+            .authorize_namespace_read(access, &access.namespace)
+            .map_err(hql2_storage_error)?;
+        let node_records = self.hql2_scan_all(BoundSourceV2::Node(None), budget)?;
+        let edge_records = self.hql2_scan_all(BoundSourceV2::Edge(None), budget)?;
+        let mut graph = GraphSnapshotV2::default();
+        let frontier = i64::try_from(self.hql2_transaction_frontier())
+            .map_err(|_| QueryErrorV2::new("DATA_CORRUPTION", "execute", "frontier_unavailable"))?;
+        let database_id = self.storage.database_id();
+        let namespace = access.namespace.as_str();
+        let valid_at = self
+            .lease
+            .temporal
+            .as_of
+            .clone()
+            .unwrap_or_else(|| Utc::now().to_rfc3339());
+        let connection = self.storage.projection_db.lock();
+        for node in node_records {
+            if node.kind != crate::uee_v2::RecordKindV2::Node {
+                return Err(QueryErrorV2::new(
+                    "DATA_CORRUPTION",
+                    "execute",
+                    "graph_node_identity",
+                ));
+            }
+            let mut visible_labels = std::collections::BTreeSet::new();
+            if include_node_labels {
+                let payload = hql2_read_revision_payload(
+                    &connection,
+                    &database_id,
+                    namespace,
+                    "node",
+                    &node.id,
+                    &node.revision,
+                    frontier,
+                    &valid_at,
+                    budget,
+                )?;
+                let labels = payload["labels"].as_array().ok_or_else(|| {
+                    QueryErrorV2::new("DATA_CORRUPTION", "execute", "graph_node_labels")
+                })?;
+                for label in labels {
+                    let label = label.as_str().ok_or_else(|| {
+                        QueryErrorV2::new("DATA_CORRUPTION", "execute", "graph_node_labels")
+                    })?;
+                    budget.reserve(
+                        (std::mem::size_of::<String>() as u64).saturating_add(label.len() as u64),
+                    )?;
+                    visible_labels.insert(label.to_owned());
+                }
+            }
+            let node_id = node.id.clone();
+            if graph.nodes.insert(node_id.clone(), node).is_some() {
+                return Err(QueryErrorV2::new(
+                    "DATA_CORRUPTION",
+                    "execute",
+                    "graph_node_identity",
+                ));
+            }
+            if include_node_labels && graph.node_labels.insert(node_id, visible_labels).is_some() {
+                return Err(QueryErrorV2::new(
+                    "DATA_CORRUPTION",
+                    "execute",
+                    "graph_node_identity",
+                ));
+            }
+        }
+        for edge in edge_records {
+            let payload = hql2_read_revision_payload(
+                &connection,
+                &database_id,
+                namespace,
+                "edge",
+                &edge.id,
+                &edge.revision,
+                frontier,
+                &valid_at,
+                budget,
+            )?;
+            let source_id = payload["from"].as_str().ok_or_else(|| {
+                QueryErrorV2::new("DATA_CORRUPTION", "execute", "graph_edge_source")
+            })?;
+            let target_id = payload["to"].as_str().ok_or_else(|| {
+                QueryErrorV2::new("DATA_CORRUPTION", "execute", "graph_edge_target")
+            })?;
+            let relation = payload["rel"].as_str().ok_or_else(|| {
+                QueryErrorV2::new("DATA_CORRUPTION", "execute", "graph_edge_relation")
+            })?;
+            let (Some(source), Some(target)) =
+                (graph.nodes.get(source_id), graph.nodes.get(target_id))
+            else {
+                continue;
+            };
+            budget.reserve(
+                (std::mem::size_of::<GraphEdgeV2>() as u64)
+                    .saturating_add(source_id.len() as u64)
+                    .saturating_add(target_id.len() as u64)
+                    .saturating_add(relation.len() as u64)
+                    .saturating_add(edge.id.len() as u64)
+                    .saturating_add(edge.revision.len() as u64),
+            )?;
+            graph.edges.push(GraphEdgeV2 {
+                edge,
+                source: source.clone(),
+                target: target.clone(),
+                relation: relation.to_owned(),
+            });
+        }
+        graph.edges.sort_by(|left, right| {
+            left.edge
+                .id
+                .cmp(&right.edge.id)
+                .then_with(|| left.edge.revision.cmp(&right.edge.revision))
+        });
+        Ok(graph)
+    }
+
+    pub(crate) fn hql2_annotation_lookup(
+        &self,
+        target: &crate::uee_v2::RecordRefV2,
+        budget: &mut query::hql2::exec::ExecutionBudgetV2,
+    ) -> std::result::Result<Vec<crate::uee_v2::RecordRefV2>, query::hql2::QueryErrorV2> {
+        use query::hql2::QueryErrorV2;
+
+        self.validate().map_err(hql2_storage_error)?;
+        target
+            .validate()
+            .map_err(|_| QueryErrorV2::new("BIND_ERROR", "bind", "entity_reference"))?;
+        let access = &self.lease.access;
+        self.storage
+            .authorize_namespace_read(access, &access.namespace)
+            .map_err(hql2_storage_error)?;
+        self.storage
+            .authorize_annotation_namespace_read(access, &access.namespace)
+            .map_err(hql2_storage_error)?;
+        if self.storage.storage_schema_version != SCHEMA_VERSION {
+            return Err(QueryErrorV2::new(
+                "CAPABILITY_UNSUPPORTED",
+                "execute",
+                "annotation_schema_unavailable",
+            ));
+        }
+        let database_id = self.storage.database_id();
+        let namespace = access.namespace.as_str();
+        if target.database_id != database_id || target.namespace != namespace {
+            return Err(QueryErrorV2::new("FORBIDDEN", "authorize", "entity_scope"));
+        }
+        if !matches!(
+            target.kind,
+            crate::uee_v2::RecordKindV2::Node
+                | crate::uee_v2::RecordKindV2::Edge
+                | crate::uee_v2::RecordKindV2::Row
+                | crate::uee_v2::RecordKindV2::Annotation
+        ) {
+            return Err(QueryErrorV2::new(
+                "CAPABILITY_UNSUPPORTED",
+                "execute",
+                "annotation_target_source_unavailable",
+            ));
+        }
+        let transaction_frontier = self.hql2_transaction_frontier();
+        let frontier = i64::try_from(transaction_frontier)
+            .map_err(|_| QueryErrorV2::new("DATA_CORRUPTION", "execute", "frontier_unavailable"))?;
+        let valid_at = self
+            .lease
+            .temporal
+            .as_of
+            .clone()
+            .unwrap_or_else(|| Utc::now().to_rfc3339());
+        let policy = self.storage.access_policy.read().clone();
+        let connection = self.storage.projection_db.lock();
+        let target_history_source = match &target.kind {
+            crate::uee_v2::RecordKindV2::Node | crate::uee_v2::RecordKindV2::Edge => "graph",
+            crate::uee_v2::RecordKindV2::Row => "row",
+            crate::uee_v2::RecordKindV2::Annotation => "annotation",
+            _ => {
+                return Err(QueryErrorV2::new(
+                    "CAPABILITY_UNSUPPORTED",
+                    "execute",
+                    "annotation_target_source_unavailable",
+                ))
+            }
+        };
+        self.hql2_source_history_floor_at(
+            &connection,
+            namespace,
+            target_history_source,
+            transaction_frontier,
+        )?;
+        self.hql2_source_history_floor_at(
+            &connection,
+            namespace,
+            "annotation",
+            transaction_frontier,
+        )?;
+        let kind = Storage::revision_kind_name(&target.kind);
+        let target_visible: bool = connection
+            .query_row(
+                "SELECT EXISTS(
+                    SELECT 1 FROM hql2_record_revisions
+                    WHERE database_id=?1 AND namespace=?2 AND kind=?3
+                      AND record_id=?4 AND revision_id=?5 AND operation='upsert'
+                      AND tx_from<=?6 AND (tx_to IS NULL OR tx_to>?6)
+                      AND valid_from<=?7 AND (valid_to IS NULL OR valid_to>?7)
+                )",
+                rusqlite::params![
+                    database_id,
+                    namespace,
+                    kind,
+                    target.id,
+                    target.revision,
+                    frontier,
+                    valid_at,
+                ],
+                |row| row.get(0),
+            )
+            .map_err(|_| {
+                QueryErrorV2::new("DATA_CORRUPTION", "execute", "annotation_target_read")
+            })?;
+        if !target_visible {
+            return Err(QueryErrorV2::new(
+                "DATA_CORRUPTION",
+                "execute",
+                "annotation_target_missing",
+            ));
+        }
+
+        const MATCH_SQL: &str = "SELECT DISTINCT a.annotation_id, a.annotation_revision_id
+             FROM hql2_annotation_targets a
+             JOIN hql2_record_revisions r
+               ON r.database_id=a.database_id AND r.namespace=a.namespace
+              AND r.kind='annotation' AND r.record_id=a.annotation_id
+              AND r.revision_id=a.annotation_revision_id
+             WHERE a.database_id=?1 AND a.namespace=?2 AND a.target_kind=?3
+               AND a.target_id=?4 AND a.is_evidence=0
+               AND ((a.binding='frozen' AND a.target_revision_id=?5)
+                 OR (a.binding='live' AND a.target_revision_id IS NULL))
+               AND r.operation='upsert' AND r.tx_from<=?6
+               AND (r.tx_to IS NULL OR r.tx_to>?6)
+               AND r.valid_from<=?7 AND (r.valid_to IS NULL OR r.valid_to>?7)
+             ORDER BY a.annotation_id, a.annotation_revision_id";
+        let (candidate_count, candidate_text_bytes): (i64, i64) = connection
+            .query_row(
+                &format!(
+                    "SELECT COUNT(*), COALESCE(SUM(length(CAST(annotation_id AS BLOB))
+                        + length(CAST(annotation_revision_id AS BLOB))),0)
+                     FROM ({MATCH_SQL})"
+                ),
+                rusqlite::params![
+                    database_id,
+                    namespace,
+                    kind,
+                    target.id,
+                    target.revision,
+                    frontier,
+                    valid_at,
+                ],
+                |row| Ok((row.get(0)?, row.get(1)?)),
+            )
+            .map_err(|_| QueryErrorV2::new("DATA_CORRUPTION", "execute", "annotation_lookup"))?;
+        let candidate_count = u64::try_from(candidate_count).map_err(|_| {
+            QueryErrorV2::new("DATA_CORRUPTION", "execute", "annotation_lookup_count")
+        })?;
+        let candidate_text_bytes = u64::try_from(candidate_text_bytes).map_err(|_| {
+            QueryErrorV2::new("DATA_CORRUPTION", "execute", "annotation_lookup_size")
+        })?;
+        budget.reserve(
+            candidate_count
+                .saturating_mul(128)
+                .saturating_add(candidate_text_bytes),
+        )?;
+        let mut statement = connection
+            .prepare(MATCH_SQL)
+            .map_err(|_| QueryErrorV2::new("DATA_CORRUPTION", "execute", "annotation_lookup"))?;
+        let candidates = statement
+            .query_map(
+                rusqlite::params![
+                    database_id,
+                    namespace,
+                    kind,
+                    target.id,
+                    target.revision,
+                    frontier,
+                    valid_at,
+                ],
+                |row| Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?)),
+            )
+            .map_err(|_| QueryErrorV2::new("DATA_CORRUPTION", "execute", "annotation_lookup"))?
+            .collect::<std::result::Result<Vec<_>, _>>()
+            .map_err(|_| QueryErrorV2::new("DATA_CORRUPTION", "execute", "annotation_lookup"))?;
+        let mut annotations = Vec::with_capacity(candidates.len());
+        for (id, revision) in candidates {
+            budget.check()?;
+            if !self.hql2_annotation_references_authorized(
+                &connection,
+                &policy,
+                &id,
+                &revision,
+                namespace,
+                &database_id,
+                frontier,
+                &valid_at,
+                budget,
+            )? {
+                continue;
+            }
+            budget.reserve(
+                128u64
+                    .saturating_add(database_id.len() as u64)
+                    .saturating_add(namespace.len() as u64)
+                    .saturating_add(id.len() as u64)
+                    .saturating_add(revision.len() as u64),
+            )?;
+            annotations.push(crate::uee_v2::RecordRefV2 {
+                database_id: database_id.clone(),
+                namespace: namespace.to_owned(),
+                kind: crate::uee_v2::RecordKindV2::Annotation,
+                id,
+                revision,
+            });
+        }
+        Ok(annotations)
+    }
+
+    pub(crate) fn hql2_hydrate(
+        &self,
+        records: &[crate::uee_v2::RecordRefV2],
+        fields: &[query::hql2::source::FieldIdV2],
+        budget: &mut query::hql2::exec::ExecutionBudgetV2,
+    ) -> std::result::Result<query::hql2::source::ExecBatchV2, query::hql2::QueryErrorV2> {
+        use query::hql2::QueryErrorV2;
+        use query::hql2::{source::StableRowKeyV2, value::QueryValueV2};
+
+        self.validate().map_err(hql2_storage_error)?;
+        let access = &self.lease.access;
+        self.storage
+            .authorize_namespace_read(access, &access.namespace)
+            .map_err(hql2_storage_error)?;
+        let mut field_ids = std::collections::BTreeSet::new();
+        if fields
+            .iter()
+            .any(|field| field.name().is_none() || !field_ids.insert(field.index()))
+        {
+            return Err(QueryErrorV2::new(
+                "DATA_CORRUPTION",
+                "execute",
+                "hydration_field",
+            ));
+        }
+        let transaction_frontier = self.hql2_transaction_frontier();
+        let frontier = i64::try_from(transaction_frontier)
+            .map_err(|_| QueryErrorV2::new("DATA_CORRUPTION", "execute", "frontier_unavailable"))?;
+        let database_id = self.storage.database_id();
+        let namespace = access.namespace.as_str();
+        let valid_at = self
+            .lease
+            .temporal
+            .as_of
+            .clone()
+            .unwrap_or_else(|| Utc::now().to_rfc3339());
+        let policy = self.storage.access_policy.read().clone();
+        let connection = self.storage.projection_db.lock();
+        let mut checked_history_sources = std::collections::BTreeSet::new();
+        if records
+            .iter()
+            .any(|record| record.kind == crate::uee_v2::RecordKindV2::Annotation)
+        {
+            self.storage
+                .authorize_annotation_namespace_read(access, namespace)
+                .map_err(hql2_storage_error)?;
+        }
+        let cells = (records.len() as u64).saturating_mul(fields.len() as u64);
+        budget.reserve(
+            (records.len() as u64)
+                .saturating_mul(std::mem::size_of::<Vec<QueryValueV2>>() as u64)
+                .saturating_add(
+                    (records.len() as u64)
+                        .saturating_mul(std::mem::size_of::<StableRowKeyV2>() as u64),
+                )
+                .saturating_add(
+                    cells.saturating_mul(std::mem::size_of::<QueryValueV2>() as u64),
+                )
+                .saturating_add(
+                    (fields.len() as u64)
+                        .saturating_mul(std::mem::size_of::<query::hql2::result::ColumnV2>() as u64),
+                ),
+        )?;
+        let columns = fields.iter().map(|field| field.column()).collect();
+        let mut rows = Vec::with_capacity(records.len());
+        let mut row_keys = Vec::with_capacity(records.len());
+        for record in records {
+            record
+                .validate()
+                .map_err(|_| QueryErrorV2::new("BIND_ERROR", "bind", "entity_reference"))?;
+            if record.database_id != database_id
+                || record.namespace != namespace
+                || !matches!(
+                    &record.kind,
+                    crate::uee_v2::RecordKindV2::Node
+                        | crate::uee_v2::RecordKindV2::Edge
+                        | crate::uee_v2::RecordKindV2::Row
+                        | crate::uee_v2::RecordKindV2::Annotation
+                )
+            {
+                return Err(QueryErrorV2::new("FORBIDDEN", "authorize", "entity_scope"));
+            }
+            let history_source = match &record.kind {
+                crate::uee_v2::RecordKindV2::Node | crate::uee_v2::RecordKindV2::Edge => "graph",
+                crate::uee_v2::RecordKindV2::Row => "row",
+                crate::uee_v2::RecordKindV2::Annotation => "annotation",
+                crate::uee_v2::RecordKindV2::Vector | crate::uee_v2::RecordKindV2::Artifact => {
+                    return Err(QueryErrorV2::new("FORBIDDEN", "authorize", "entity_scope"))
+                }
+            };
+            if checked_history_sources.insert(history_source) {
+                self.hql2_source_history_floor_at(
+                    &connection,
+                    namespace,
+                    history_source,
+                    transaction_frontier,
+                )?;
+            }
+            if record.kind == crate::uee_v2::RecordKindV2::Annotation
+                && !self.hql2_annotation_references_authorized(
+                    &connection,
+                    &policy,
+                    &record.id,
+                    &record.revision,
+                    namespace,
+                    &database_id,
+                    frontier,
+                    &valid_at,
+                    budget,
+                )?
+            {
+                return Err(QueryErrorV2::new("FORBIDDEN", "authorize", "entity_scope"));
+            }
+            let mut row = Vec::with_capacity(fields.len());
+            if !fields.is_empty() {
+                let kind = Storage::revision_kind_name(&record.kind);
+                let payload = hql2_read_revision_payload(
+                    &connection,
+                    &database_id,
+                    namespace,
+                    kind,
+                    &record.id,
+                    &record.revision,
+                    frontier,
+                    &valid_at,
+                    budget,
+                )?;
+                for field in fields {
+                    let name = field.name().ok_or_else(|| {
+                        QueryErrorV2::new("DATA_CORRUPTION", "execute", "hydration_field")
+                    })?;
+                    let property = match &record.kind {
+                        crate::uee_v2::RecordKindV2::Row => {
+                            payload.get("after_image").and_then(|value| value.get(name))
+                        }
+                        _ => payload
+                            .get("props")
+                            .and_then(|value| value.get(name))
+                            .or_else(|| payload.get("values").and_then(|value| value.get(name)))
+                            .or_else(|| payload.get(name)),
+                    };
+                    let value = if field.has_property() {
+                        QueryValueV2::Bool(property.is_some())
+                    } else if let Some(property) = property {
+                        budget.reserve(query::hql2::exec::json_value_bytes(property))?;
+                        QueryValueV2::Json(property.clone())
+                    } else {
+                        QueryValueV2::Null
+                    };
+                    row.push(value);
+                }
+            }
+            rows.push(row);
+            row_keys.push(StableRowKeyV2::Record(record.clone()));
+        }
+        let batch = query::hql2::source::ExecBatchV2 {
+            columns,
+            rows,
+            row_keys,
+        };
+        batch.validate(records, fields)?;
+        Ok(batch)
+    }
+
+    pub(crate) fn hql2_vectors(
+        &self,
+        records: &[crate::uee_v2::RecordRefV2],
+        collection_name: &str,
+        _require_original: bool,
+        budget: &mut query::hql2::exec::ExecutionBudgetV2,
+    ) -> std::result::Result<query::hql2::source::VectorBatchV2, query::hql2::QueryErrorV2> {
+        use query::hql2::{source::VectorBatchV2, QueryErrorV2};
+        use rusqlite::OptionalExtension;
+
+        self.validate().map_err(hql2_storage_error)?;
+        let access = &self.lease.access;
+        self.storage
+            .authorize_namespace_read(access, &access.namespace)
+            .map_err(hql2_storage_error)?;
+        let collection = self
+            .storage
+            .collections
+            .get(collection_name)
+            .ok_or_else(|| {
+                QueryErrorV2::new("COLLECTION_SPACE_MISMATCH", "execute", "collection_missing")
+            })?;
+        let space_id = Storage::collection_space_fingerprint(collection.value().as_ref())
+            .map_err(|_| QueryErrorV2::new("DATA_CORRUPTION", "execute", "collection_space"))?;
+        let dimension = usize::from(collection.dim);
+        let metric = collection.metric.as_str();
+        let transaction_frontier = self.hql2_transaction_frontier();
+        let frontier = i64::try_from(transaction_frontier)
+            .map_err(|_| QueryErrorV2::new("DATA_CORRUPTION", "execute", "frontier_unavailable"))?;
+        let database_id = self.storage.database_id();
+        let namespace = access.namespace.as_str();
+        let valid_at = self
+            .lease
+            .temporal
+            .as_of
+            .clone()
+            .unwrap_or_else(|| Utc::now().to_rfc3339());
+        budget.reserve(
+            (records.len() as u64)
+                .saturating_mul(
+                    std::mem::size_of::<Option<query::hql2::value::VectorValueV2>>() as u64,
+                )
+                .saturating_add(64),
+        )?;
+        let connection = self.storage.projection_db.lock();
+        self.hql2_source_history_floor_at(&connection, namespace, "vector", transaction_frontier)?;
+        let mut entries = Vec::with_capacity(records.len());
+        for record in records {
+            budget.check()?;
+            record
+                .validate()
+                .map_err(|_| QueryErrorV2::new("BIND_ERROR", "bind", "entity_reference"))?;
+            if record.database_id != database_id
+                || record.namespace != namespace
+                || record.kind != crate::uee_v2::RecordKindV2::Node
+            {
+                return Err(QueryErrorV2::new(
+                    "FORBIDDEN",
+                    "authorize",
+                    "vector_owner_scope",
+                ));
+            }
+            self.storage
+                .authorize_node_read(access, &record.id)
+                .map_err(hql2_storage_error)?;
+            let owner_exists: bool = connection
+                .query_row(
+                    "SELECT EXISTS(SELECT 1 FROM hql2_record_revisions
+                     WHERE database_id=?1 AND namespace=?2 AND kind='node'
+                       AND record_id=?3 AND revision_id=?4 AND operation='upsert'
+                       AND tx_from<=?5 AND (tx_to IS NULL OR tx_to>?5)
+                       AND valid_from<=?6 AND (valid_to IS NULL OR valid_to>?6))",
+                    rusqlite::params![
+                        database_id,
+                        namespace,
+                        record.id,
+                        record.revision,
+                        frontier,
+                        valid_at
+                    ],
+                    |row| row.get(0),
+                )
+                .map_err(|_| {
+                    QueryErrorV2::new("DATA_CORRUPTION", "execute", "vector_owner_revision")
+                })?;
+            if !owner_exists {
+                return Err(QueryErrorV2::new(
+                    "DATA_CORRUPTION",
+                    "execute",
+                    "vector_owner_revision",
+                ));
+            }
+            let vector_id = Storage::vector_revision_record_id(&record.id, collection_name)
+                .map_err(|_| {
+                    QueryErrorV2::new("DATA_CORRUPTION", "execute", "vector_revision_id")
+                })?;
+            let vector_payload_len: Option<i64> = connection
+                .query_row(
+                    "SELECT length(CAST(payload_json AS BLOB)) FROM hql2_record_revisions
+                     WHERE database_id=?1 AND namespace=?2 AND kind='vector' AND record_id=?3
+                       AND schema_ref=?4 AND operation='upsert' AND tx_from<=?5
+                       AND (tx_to IS NULL OR tx_to>?5)
+                       AND valid_from<=?6 AND (valid_to IS NULL OR valid_to>?6)
+                     ORDER BY tx_from DESC, revision_id DESC LIMIT 1",
+                    rusqlite::params![
+                        database_id,
+                        namespace,
+                        vector_id,
+                        collection_name,
+                        frontier,
+                        valid_at
+                    ],
+                    |row| row.get(0),
+                )
+                .optional()
+                .map_err(|_| QueryErrorV2::new("DATA_CORRUPTION", "execute", "vector_source"))?;
+            let Some(payload_len) = vector_payload_len else {
+                entries.push(None);
+                continue;
+            };
+            budget.reserve(
+                u64::try_from(payload_len)
+                    .unwrap_or(u64::MAX)
+                    .saturating_mul(4)
+                    .saturating_add(256),
+            )?;
+            let payload_json: String = connection
+                .query_row(
+                    "SELECT payload_json FROM hql2_record_revisions
+                     WHERE database_id=?1 AND namespace=?2 AND kind='vector' AND record_id=?3
+                       AND schema_ref=?4 AND operation='upsert' AND tx_from<=?5
+                       AND (tx_to IS NULL OR tx_to>?5)
+                       AND valid_from<=?6 AND (valid_to IS NULL OR valid_to>?6)
+                     ORDER BY tx_from DESC, revision_id DESC LIMIT 1",
+                    rusqlite::params![
+                        database_id,
+                        namespace,
+                        vector_id,
+                        collection_name,
+                        frontier,
+                        valid_at
+                    ],
+                    |row| row.get(0),
+                )
+                .map_err(|_| QueryErrorV2::new("DATA_CORRUPTION", "execute", "vector_source"))?;
+            let payload: Value = serde_json::from_str(&payload_json)
+                .map_err(|_| QueryErrorV2::new("DATA_CORRUPTION", "execute", "vector_payload"))?;
+            if payload.get("owner_id").and_then(Value::as_str) != Some(record.id.as_str())
+                || payload.get("owner_revision_id").and_then(Value::as_str)
+                    != Some(record.revision.as_str())
+                || payload.get("collection").and_then(Value::as_str) != Some(collection_name)
+            {
+                return Err(QueryErrorV2::new(
+                    "DATA_CORRUPTION",
+                    "execute",
+                    "vector_owner_alignment",
+                ));
+            }
+            if payload.get("space_fingerprint").and_then(Value::as_str) != Some(space_id.as_str()) {
+                return Err(QueryErrorV2::new(
+                    "COLLECTION_SPACE_MISMATCH",
+                    "execute",
+                    "vector_space",
+                ));
+            }
+            let values = payload
+                .get("embedding")
+                .and_then(Value::as_array)
+                .ok_or_else(|| QueryErrorV2::new("DATA_CORRUPTION", "execute", "vector_payload"))?;
+            if values.len() != dimension {
+                return Err(QueryErrorV2::new(
+                    "COLLECTION_SPACE_MISMATCH",
+                    "execute",
+                    "vector_dimension",
+                ));
+            }
+            let values = values
+                .iter()
+                .map(|value| {
+                    value
+                        .as_f64()
+                        .filter(|value| value.is_finite())
+                        .ok_or_else(|| {
+                            QueryErrorV2::new("DATA_CORRUPTION", "execute", "vector_value")
+                        })
+                })
+                .collect::<std::result::Result<Vec<_>, _>>()?;
+            entries.push(Some(query::hql2::value::VectorValueV2 {
+                space_id: space_id.clone(),
+                scalar: query::hql2::value::VectorScalarV2::F64,
+                values,
+            }));
+        }
+        if metric != "L2" && metric != "Cosine" {
+            return Err(QueryErrorV2::new(
+                "CAPABILITY_UNSUPPORTED",
+                "execute",
+                "vector_metric_unavailable",
+            ));
+        }
+        Ok(VectorBatchV2 { entries })
+    }
+
+    // Annotation ACL checks bind the annotation to the query snapshot and budget.
+    #[allow(clippy::too_many_arguments)]
+    fn hql2_annotation_references_authorized(
+        &self,
+        connection: &Connection,
+        policy: &AccessPolicy,
+        annotation_id: &str,
+        annotation_revision: &str,
+        namespace: &str,
+        database_id: &str,
+        frontier: i64,
+        valid_at: &str,
+        budget: &mut query::hql2::exec::ExecutionBudgetV2,
+    ) -> std::result::Result<bool, query::hql2::QueryErrorV2> {
+        let mut visiting = HashSet::new();
+        self.hql2_annotation_references_authorized_inner(
+            connection,
+            policy,
+            annotation_id,
+            annotation_revision,
+            namespace,
+            database_id,
+            frontier,
+            valid_at,
+            budget,
+            &mut visiting,
+        )
+    }
+
+    // Recursive reference checks also carry their cycle-detection set explicitly.
+    #[allow(clippy::too_many_arguments)]
+    fn hql2_annotation_references_authorized_inner(
+        &self,
+        connection: &Connection,
+        policy: &AccessPolicy,
+        annotation_id: &str,
+        annotation_revision: &str,
+        namespace: &str,
+        database_id: &str,
+        frontier: i64,
+        valid_at: &str,
+        budget: &mut query::hql2::exec::ExecutionBudgetV2,
+        visiting: &mut HashSet<(String, String)>,
+    ) -> std::result::Result<bool, query::hql2::QueryErrorV2> {
+        let identity = (annotation_id.to_owned(), annotation_revision.to_owned());
+        if visiting.len() >= 128 {
+            return Err(query::hql2::QueryErrorV2::new(
+                "QUERY_BUDGET_EXCEEDED",
+                "execute",
+                "annotation_acl_depth",
+            ));
+        }
+        budget.reserve(
+            (annotation_id.len() as u64)
+                .saturating_add(annotation_revision.len() as u64)
+                .saturating_add(64),
+        )?;
+        if !visiting.insert(identity.clone()) {
+            return Ok(false);
+        }
+        let result = (|| {
+            use query::hql2::QueryErrorV2;
+            use rusqlite::OptionalExtension;
+
+            let access = &self.lease.access;
+            let (reference_count, reference_bytes): (i64, i64) = connection
+                .query_row(
+                    "SELECT COUNT(*), COALESCE(SUM(
+                    length(CAST(target_kind AS BLOB))
+                    + length(CAST(target_id AS BLOB))
+                    + COALESCE(length(CAST(target_revision_id AS BLOB)),0)
+                    + length(CAST(binding AS BLOB))
+                ),0)
+                 FROM hql2_annotation_targets
+                 WHERE database_id=?1 AND namespace=?2 AND annotation_id=?3
+                   AND annotation_revision_id=?4",
+                    rusqlite::params![database_id, namespace, annotation_id, annotation_revision],
+                    |row| Ok((row.get(0)?, row.get(1)?)),
+                )
+                .map_err(|_| QueryErrorV2::new("DATA_CORRUPTION", "execute", "annotation_acl"))?;
+            budget.reserve(
+                u64::try_from(reference_count)
+                    .unwrap_or(u64::MAX)
+                    .saturating_mul(128)
+                    .saturating_add(u64::try_from(reference_bytes).unwrap_or(u64::MAX)),
+            )?;
+            let mut statement = connection
+                .prepare(
+                    "SELECT target_kind, target_id, target_revision_id, binding, is_evidence
+                 FROM hql2_annotation_targets
+                 WHERE database_id=?1 AND namespace=?2 AND annotation_id=?3
+                   AND annotation_revision_id=?4 ORDER BY is_evidence, target_kind, target_id",
+                )
+                .map_err(|_| QueryErrorV2::new("DATA_CORRUPTION", "execute", "annotation_acl"))?;
+            let references = statement
+                .query_map(
+                    rusqlite::params![database_id, namespace, annotation_id, annotation_revision],
+                    |row| {
+                        Ok((
+                            row.get::<_, String>(0)?,
+                            row.get::<_, String>(1)?,
+                            row.get::<_, Option<String>>(2)?,
+                            row.get::<_, String>(3)?,
+                            row.get::<_, i64>(4)?,
+                        ))
+                    },
+                )
+                .map_err(|_| QueryErrorV2::new("DATA_CORRUPTION", "execute", "annotation_acl"))?
+                .collect::<std::result::Result<Vec<_>, _>>()
+                .map_err(|_| QueryErrorV2::new("DATA_CORRUPTION", "execute", "annotation_acl"))?;
+            let mut has_target = false;
+            for (kind, id, revision, binding, is_evidence) in references {
+                match is_evidence {
+                    0 => has_target = true,
+                    1 => {}
+                    _ => return Ok(false),
+                }
+                if !matches!(binding.as_str(), "live" | "frozen") {
+                    return Ok(false);
+                }
+                let mut referenced_revision = revision.clone();
+                let row_table = if kind == "row" {
+                    let result = if binding == "frozen" {
+                        connection.query_row(
+                            "SELECT schema_ref FROM hql2_record_revisions
+                         WHERE database_id=?1 AND namespace=?2 AND kind=?3 AND record_id=?4
+                           AND revision_id=?5 AND operation='upsert'",
+                            rusqlite::params![database_id, namespace, kind, id, revision],
+                            |row| row.get::<_, Option<String>>(0),
+                        )
+                    } else {
+                        connection.query_row(
+                            "SELECT schema_ref FROM hql2_record_revisions
+                         WHERE database_id=?1 AND namespace=?2 AND kind=?3 AND record_id=?4
+                           AND operation='upsert' AND tx_from<=?5
+                           AND (tx_to IS NULL OR tx_to>?5)
+                           AND valid_from<=?6 AND (valid_to IS NULL OR valid_to>?6)
+                         ORDER BY tx_from DESC, revision_id DESC LIMIT 1",
+                            rusqlite::params![database_id, namespace, kind, id, frontier, valid_at],
+                            |row| row.get::<_, Option<String>>(0),
+                        )
+                    };
+                    result
+                        .optional()
+                        .map_err(|_| {
+                            QueryErrorV2::new("DATA_CORRUPTION", "execute", "annotation_acl")
+                        })?
+                        .flatten()
+                } else {
+                    let selected = if binding == "frozen" {
+                        connection.query_row(
+                            "SELECT revision_id FROM hql2_record_revisions
+                         WHERE database_id=?1 AND namespace=?2 AND kind=?3 AND record_id=?4
+                           AND revision_id=?5 AND operation='upsert'",
+                            rusqlite::params![database_id, namespace, kind, id, revision],
+                            |row| row.get::<_, String>(0),
+                        )
+                    } else {
+                        connection.query_row(
+                            "SELECT revision_id FROM hql2_record_revisions
+                         WHERE database_id=?1 AND namespace=?2 AND kind=?3 AND record_id=?4
+                           AND operation='upsert' AND tx_from<=?5
+                           AND (tx_to IS NULL OR tx_to>?5)
+                           AND valid_from<=?6 AND (valid_to IS NULL OR valid_to>?6)
+                         ORDER BY tx_from DESC, revision_id DESC LIMIT 1",
+                            rusqlite::params![database_id, namespace, kind, id, frontier, valid_at],
+                            |row| row.get::<_, String>(0),
+                        )
+                    };
+                    let Some(selected) = selected.optional().map_err(|_| {
+                        QueryErrorV2::new("DATA_CORRUPTION", "execute", "annotation_acl")
+                    })?
+                    else {
+                        return Ok(false);
+                    };
+                    referenced_revision = Some(selected);
+                    None
+                };
+                let resource = match kind.as_str() {
+                    "node" => AccessResource::Node(id.clone()),
+                    "edge" => AccessResource::Edge(id.clone()),
+                    "annotation" => AccessResource::Annotation(namespace.to_owned()),
+                    "row" => match row_table {
+                        Some(table) => AccessResource::Table {
+                            namespace: namespace.to_owned(),
+                            table,
+                        },
+                        None => return Ok(false),
+                    },
+                    _ => return Ok(false),
+                };
+                let namespace_resource = AccessResource::Namespace(namespace.to_owned());
+                let can_read = |resource: &AccessResource| {
+                    policy.mode != AccessPolicyMode::Enforced
+                        || Storage::grant_matches(
+                            policy,
+                            access,
+                            AccessAction::Read,
+                            &namespace_resource,
+                        )
+                        || Storage::grant_matches(policy, access, AccessAction::Read, resource)
+                };
+                if !can_read(&resource) {
+                    return Ok(false);
+                }
+                if kind == "edge" {
+                    let edge_revision = referenced_revision.as_deref().ok_or_else(|| {
+                        QueryErrorV2::new("DATA_CORRUPTION", "execute", "annotation_acl_revision")
+                    })?;
+                    let payload_bytes: i64 = connection
+                        .query_row(
+                            "SELECT length(CAST(payload_json AS BLOB)) FROM hql2_record_revisions
+                         WHERE database_id=?1 AND namespace=?2 AND kind='edge'
+                           AND record_id=?3 AND revision_id=?4 AND operation='upsert'",
+                            rusqlite::params![database_id, namespace, id, edge_revision],
+                            |row| row.get(0),
+                        )
+                        .map_err(|_| {
+                            QueryErrorV2::new("DATA_CORRUPTION", "execute", "annotation_acl_edge")
+                        })?;
+                    let payload_bytes = u64::try_from(payload_bytes).map_err(|_| {
+                        QueryErrorV2::new("DATA_CORRUPTION", "execute", "annotation_acl_edge")
+                    })?;
+                    budget.reserve(payload_bytes)?;
+                    let payload_json: Option<String> = connection
+                        .query_row(
+                            "SELECT payload_json FROM hql2_record_revisions
+                         WHERE database_id=?1 AND namespace=?2 AND kind='edge'
+                           AND record_id=?3 AND revision_id=?4 AND operation='upsert'",
+                            rusqlite::params![database_id, namespace, id, edge_revision],
+                            |row| row.get(0),
+                        )
+                        .optional()
+                        .map_err(|_| {
+                            QueryErrorV2::new("DATA_CORRUPTION", "execute", "annotation_acl_edge")
+                        })?;
+                    let Some(payload_json) = payload_json else {
+                        return Ok(false);
+                    };
+                    let payload: Value = serde_json::from_str(&payload_json).map_err(|_| {
+                        QueryErrorV2::new("DATA_CORRUPTION", "execute", "annotation_acl_edge")
+                    })?;
+                    for field in ["from", "to"] {
+                        let endpoint =
+                            payload.get(field).and_then(Value::as_str).ok_or_else(|| {
+                                QueryErrorV2::new(
+                                    "DATA_CORRUPTION",
+                                    "execute",
+                                    "annotation_acl_edge",
+                                )
+                            })?;
+                        if !can_read(&AccessResource::Node(endpoint.to_owned())) {
+                            return Ok(false);
+                        }
+                    }
+                } else if kind == "annotation" {
+                    let nested_revision = referenced_revision.as_deref().ok_or_else(|| {
+                        QueryErrorV2::new("DATA_CORRUPTION", "execute", "annotation_acl_revision")
+                    })?;
+                    if !self.hql2_annotation_references_authorized_inner(
+                        connection,
+                        policy,
+                        &id,
+                        nested_revision,
+                        namespace,
+                        database_id,
+                        frontier,
+                        valid_at,
+                        budget,
+                        visiting,
+                    )? {
+                        return Ok(false);
+                    }
+                }
+            }
+            Ok(has_target)
+        })();
+        visiting.remove(&identity);
+        result
+    }
+
+    fn validate(&self) -> Result<()> {
+        self.storage.ensure_readable()?;
+        self.storage.validate_lease_unlocked(self.lease)
+    }
+
+    fn merge_as_of(&self, requested: Option<String>) -> Result<Option<String>> {
+        Storage::validate_temporal_read(&TemporalRead {
+            as_of: requested.clone(),
+            tx_as_of: None,
+        })?;
+        if let (Some(lease), Some(requested)) = (&self.lease.temporal.as_of, &requested) {
+            if lease != requested {
+                return Err(Error::from_reason("TEMPORAL_SELECTOR_CONFLICT"));
+            }
+        }
+        Ok(requested.or_else(|| self.lease.temporal.as_of.clone()))
+    }
+
+    fn merge_tx_as_of(&self, requested: Option<u64>) -> Result<Option<u64>> {
+        if let (Some(lease), Some(requested)) = (self.lease.temporal.tx_as_of, requested) {
+            if lease != requested {
+                return Err(Error::from_reason("TEMPORAL_SELECTOR_CONFLICT"));
+            }
+        }
+        Ok(requested.or(self.lease.temporal.tx_as_of))
+    }
+
+    fn ensure_tx_horizon(&self, tx_as_of: Option<u64>) -> Result<()> {
+        Storage::validate_generation_tx_as_of(&self.lease.generation, tx_as_of)?;
+        if let Some(tx_as_of) = tx_as_of {
+            if tx_as_of < self.storage.history_horizon() {
+                return Err(Error::from_reason("TEMPORAL_BEYOND_HORIZON"));
+            }
+        }
+        Ok(())
+    }
+
+    fn reject_temporal(&self, operation: &str) -> Result<()> {
+        if self.lease.temporal.as_of.is_some() || self.lease.temporal.tx_as_of.is_some() {
+            return Err(Error::from_reason(format!(
+                "TEMPORAL_SELECTOR_UNSUPPORTED: {operation} cannot bind lease temporal selectors"
+            )));
+        }
+        Ok(())
+    }
+
+    fn reject_lease_tx_as_of(&self, operation: &str) -> Result<()> {
+        if self.lease.temporal.tx_as_of.is_some() {
+            return Err(Error::from_reason(format!(
+                "TEMPORAL_SELECTOR_UNSUPPORTED: {operation} cannot bind lease tx_as_of"
+            )));
+        }
+        Ok(())
+    }
+
+    pub fn node_view(&self, id: &str) -> Result<Option<NodeOutput>> {
+        self.validate()?;
+        self.storage.authorize_node_read(&self.lease.access, id)?;
+        self.reject_temporal("node_view")?;
+        Ok(self.storage.node_view_unlocked(id))
+    }
+
+    pub fn node_versions(&self, id: &str, at_seq: Option<u64>) -> Result<serde_json::Value> {
+        self.validate()?;
+        self.storage.authorize_node_read(&self.lease.access, id)?;
+        self.reject_temporal("node_versions")?;
+        let at_seq = self.merge_tx_as_of(at_seq)?;
+        self.ensure_tx_horizon(at_seq)?;
+        self.storage.node_versions_unlocked(id, at_seq)
+    }
+
+    pub fn neighbors(
+        &self,
+        seed: String,
+        mut args: NeighborInput,
+        is_inferred: bool,
+    ) -> Result<Vec<NeighborOutput>> {
+        self.validate()?;
+        self.storage
+            .authorize_default_composed_read(&self.lease.access)?;
+        self.reject_lease_tx_as_of("neighbors")?;
+        let requested_as_of = args.as_of.take();
+        args.as_of = self.merge_as_of(requested_as_of)?;
+        let tx_as_of = self.merge_tx_as_of(None)?;
+        self.ensure_tx_horizon(tx_as_of)?;
+        if tx_as_of.is_some() && is_inferred {
+            return Err(Error::from_reason(
+                "TEMPORAL_SELECTOR_UNSUPPORTED: inferred neighbors cannot bind tx-time selectors",
+            ));
+        }
+        let limits = QueryBudget::default().resolve()?;
+        let mut budget = QueryBudgetState::new(limits);
+        let results = match tx_as_of {
+            Some(tx_as_of) => self
+                .storage
+                .neighbors_tx_view(seed, args, tx_as_of, &mut budget)?,
+            None => self
+                .storage
+                .neighbors_with_budget(seed, args, is_inferred, &mut budget)?,
+        };
+        budget.serialized(&results)?;
+        Ok(results)
+    }
+
+    pub fn hybrid_search(&self, mut args: HybridSearchInput) -> Result<Vec<NeighborOutput>> {
+        self.validate()?;
+        self.storage
+            .authorize_default_composed_read(&self.lease.access)?;
+        self.reject_lease_tx_as_of("hybrid_search")?;
+        let requested_as_of = args.as_of.take();
+        args.as_of = self.merge_as_of(requested_as_of)?;
+        let tx_as_of = self.merge_tx_as_of(None)?;
+        self.ensure_tx_horizon(tx_as_of)?;
+        let limits = QueryBudget::default().resolve()?;
+        let mut budget = QueryBudgetState::new(limits);
+        let results = self
+            .storage
+            .hybrid_search_impl(args, tx_as_of, &mut budget)?;
+        budget.serialized(&results)?;
+        Ok(results)
+    }
+
+    pub fn execute_query_ir(&self, mut request: QueryIrRequest) -> Result<serde_json::Value> {
+        self.validate()?;
+        self.storage
+            .authorize_default_composed_read(&self.lease.access)?;
+        let request_temporal = request.temporal.take();
+        let requested_as_of = request_temporal
+            .as_ref()
+            .and_then(|temporal| temporal.valid_at.clone());
+        let requested_tx_as_of = request_temporal
+            .as_ref()
+            .and_then(|temporal| temporal.tx_as_of);
+        let as_of = self.merge_as_of(requested_as_of)?;
+        let tx_as_of = self.merge_tx_as_of(requested_tx_as_of)?;
+        self.ensure_tx_horizon(tx_as_of)?;
+        request.temporal = if as_of.is_some() || tx_as_of.is_some() {
+            Some(QueryIrTemporal {
+                valid_at: as_of,
+                tx_as_of,
+            })
+        } else {
+            None
+        };
+        self.storage.execute_query_ir_unlocked(request)
+    }
+
+    pub fn execute_hql(&self, query: &str) -> Result<serde_json::Value> {
+        self.validate()?;
+        self.storage
+            .authorize_default_composed_read(&self.lease.access)?;
+        self.reject_temporal("execute_hql")?;
+        self.storage.execute_hql_with_budget_unlocked(query, None)
+    }
+
+    pub fn query_relational(&self, query: RelationalQuery) -> Result<Vec<Value>> {
+        self.validate()?;
+        self.storage
+            .authorize_relational_read(&self.lease.access, &query)?;
+        self.reject_temporal("query_relational")?;
+        self.storage.query_relational_unlocked(query)
     }
 }
 
@@ -15665,7 +26365,7 @@ impl GenesisDatabase {
     pub fn stable_frontier(&self) -> i64 {
         self.inner.stable_frontier().min(i64::MAX as u64) as i64
     }
-    /// Frame seq of the last transaction frame — the value
+    /// Frame seq of the last transaction-API commit — the value
     /// `GenesisTransaction.expected_frontier` CASes against (WP-1.2).
     #[napi]
     pub fn txn_frontier(&self) -> i64 {
@@ -15964,4 +26664,170 @@ pub fn schema_version_sync() -> u32 {
 #[napi]
 pub fn version_sync() -> String {
     ENGINE_VERSION.to_string()
+}
+
+#[cfg(test)]
+mod p6_sync_progress_receipt_tests {
+    use super::*;
+    use ed25519_dalek::Signer;
+
+    const RESPONDER: &str = "trusted-responder";
+    const REQUESTER: &str = "requester";
+    const NONCE: &str = "outstanding-request";
+
+    fn signed_receipt(
+        key: &SigningKey,
+        responder: &str,
+        requester: &str,
+        nonce: &str,
+        from_seq: u64,
+        through_seq: u64,
+    ) -> SyncProgressReceipt {
+        let version = 1;
+        let payload = canonical_sync_progress_receipt_bytes(
+            version,
+            responder,
+            requester,
+            nonce,
+            from_seq,
+            through_seq,
+        )
+        .unwrap();
+        SyncProgressReceipt {
+            version,
+            responder_peer_id: responder.to_string(),
+            requester_peer_id: requester.to_string(),
+            request_nonce: nonce.to_string(),
+            from_seq,
+            through_seq,
+            signature: key.sign(&payload).to_bytes().to_vec(),
+        }
+    }
+
+    #[test]
+    fn explicit_trusted_key_requires_exact_outer_sequence() {
+        let key = SigningKey::from_bytes(&[0x96; 32]);
+        let receipt = signed_receipt(&key, RESPONDER, REQUESTER, NONCE, 4, 9);
+        let verifying_key = key.verifying_key();
+
+        assert_eq!(
+            Storage::verify_sync_progress_receipt(
+                &receipt,
+                Some(&verifying_key),
+                RESPONDER,
+                REQUESTER,
+                NONCE,
+                4,
+                Some(9),
+            ),
+            Some(9)
+        );
+        assert_eq!(
+            Storage::verify_sync_progress_receipt(
+                &receipt,
+                Some(&verifying_key),
+                RESPONDER,
+                REQUESTER,
+                NONCE,
+                4,
+                Some(10),
+            ),
+            None
+        );
+        assert_eq!(
+            Storage::verify_sync_progress_receipt(
+                &receipt,
+                Some(&verifying_key),
+                RESPONDER,
+                REQUESTER,
+                NONCE,
+                4,
+                None,
+            ),
+            None
+        );
+        assert_eq!(
+            Storage::verify_sync_progress_receipt(
+                &receipt,
+                None,
+                RESPONDER,
+                REQUESTER,
+                NONCE,
+                4,
+                Some(9),
+            ),
+            None
+        );
+    }
+
+    #[test]
+    fn receipt_verification_binds_peer_request_range_and_signature() {
+        let key = SigningKey::from_bytes(&[0xa7; 32]);
+        let verifying_key = key.verifying_key();
+        let receipt = signed_receipt(&key, RESPONDER, REQUESTER, NONCE, 4, 9);
+
+        for (responder, requester, nonce, from_seq) in [
+            ("other-responder", REQUESTER, NONCE, 4),
+            (RESPONDER, "other-requester", NONCE, 4),
+            (RESPONDER, REQUESTER, "other-request", 4),
+            (RESPONDER, REQUESTER, NONCE, 5),
+        ] {
+            assert_eq!(
+                Storage::verify_sync_progress_receipt(
+                    &receipt,
+                    Some(&verifying_key),
+                    responder,
+                    requester,
+                    nonce,
+                    from_seq,
+                    Some(9),
+                ),
+                None
+            );
+        }
+
+        let reversed = signed_receipt(&key, RESPONDER, REQUESTER, NONCE, 10, 9);
+        assert_eq!(
+            Storage::verify_sync_progress_receipt(
+                &reversed,
+                Some(&verifying_key),
+                RESPONDER,
+                REQUESTER,
+                NONCE,
+                10,
+                Some(9),
+            ),
+            None
+        );
+
+        let mut invalid_signature = receipt.clone();
+        invalid_signature.signature[0] ^= 1;
+        assert_eq!(
+            Storage::verify_sync_progress_receipt(
+                &invalid_signature,
+                Some(&verifying_key),
+                RESPONDER,
+                REQUESTER,
+                NONCE,
+                4,
+                Some(9),
+            ),
+            None
+        );
+
+        let mut unsupported_version = receipt;
+        unsupported_version.version = 2;
+        assert_eq!(
+            Storage::verify_sync_progress_receipt(
+                &unsupported_version,
+                Some(&verifying_key),
+                RESPONDER,
+                REQUESTER,
+                NONCE,
+                4,
+                Some(9),
+            ),
+            None
+        );
+    }
 }

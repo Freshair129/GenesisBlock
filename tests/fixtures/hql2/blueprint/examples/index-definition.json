@@ -1,0 +1,24 @@
+{
+  "contract_version": "genesis.index.v2",
+  "name": "docs_language",
+  "namespace": "kb",
+  "method": "btree",
+  "target": {
+    "kind": "node",
+    "name": "Document"
+  },
+  "keys": [
+    {
+      "path": "language",
+      "direction": "asc",
+      "nulls": "last",
+      "comparator": "unicode_scalar_v1"
+    }
+  ],
+  "include": [
+    "title"
+  ],
+  "unique": false,
+  "options": {},
+  "build_mode": "online"
+}

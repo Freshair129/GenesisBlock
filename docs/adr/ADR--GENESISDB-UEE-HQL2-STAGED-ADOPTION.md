@@ -1,7 +1,7 @@
 ---
 adr_id: "ADR--GENESISDB-UEE-HQL2-STAGED-ADOPTION"
-version: "0.1.0b"
-date: "2026-09-22"
+version: "0.1.1b"
+date: "2026-09-28"
 status: candidate
 owner: "Boss (Founder / Product Authority)"
 complexity: "C-3"
@@ -79,9 +79,10 @@ gates pass.
    test equivalent semantics. Removing either form requires a versioned API decision.
 3. HQL-to-IR convergence must be measured by differential fixtures; current partial lowering does
    not prove one shared pipeline.
-4. HQL2 planner, EXPLAIN and actual-counter work is deferred to P8/G4 and requires a follow-up
-   ADR that explicitly supersedes the current no-planner/no-EXPLAIN constraint. It must not be
-   smuggled into HQL P0/P1/P2 work.
+4. HQL2 planner, EXPLAIN and actual-counter work belongs to P8/G4. The owner-approved
+   [HQL2 execution ADR](ADR--GENESISDB-HQL2-EXECUTION-BOUNDARY.md) supersedes the
+   no-planner/no-EXPLAIN constraint only for the explicit v2 boundary. Compatibility
+   HQL P0/P1/P2 behavior remains governed by its existing contract.
 5. `match_path`, `relational_named_query`, lexical search and typed filters remain unsupported
    or planned until closed schemas and acceptance tests exist.
 
@@ -146,4 +147,5 @@ Owner approval must explicitly confirm:
 
 | Version | Date | Status | Summary | Commit Hash | Agent |
 |---|---|---|---|---|---|
+| 0.1.1b | 2026-09-28 | candidate | Reference accepted explicit-v2 execution ADR without promoting historical adoption status | working-tree | ATHER |
 | 0.1.0b | 2026-09-22 | candidate | Proposed staged UEE-HQL2 compatibility, authority and phase-boundary decision | working-tree | ATHER |

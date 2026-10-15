@@ -1,0 +1,216 @@
+---
+status: active
+superseded_by: null
+---
+
+# RCA — GenesisRAG17 startup CI failures and Windows Rust timeout
+
+**Date:** 2026-10-06
+**Status:** Confirmed from hosted CI logs and current source.
+
+## Symptom
+
+PR #217 (`583ad2ff4b313179dfebf4727fe7b1612bb31cc8`) had worker test failures
+on Ubuntu, Windows and macOS, plus a duplicate Linux worker failure in the
+rebuilt-addon job. The Windows `cargo test --no-default-features` job was
+cancelled at its 15-minute limit while running `probe_vs_recall`.
+
+## Evidence
+
+- Hosted run `37399649307` reports 11 failures in each
+  `npm test (genesisrag17-worker, <host>)` job. The failing constructors report
+  `RECOVERY_REQUIRED: markerless database identity is missing` at
+  `genesisrag17-worker/src/worker.mjs:991`; rebuilt-addon run `37399649310`
+  repeats the worker failure on Ubuntu.
+- The same worker error and Windows test cancellation appear in PR #216 runs
+  `37390134973` and `37390135616`, so these are pre-existing mainline CI issues,
+  not regressions introduced by the G3 diff.
+- `genesisrag17-worker/src/worker.mjs` creates `dbPath/genesisrag17` and its
+  child directories, then acquires `worker.lock`, before calling
+  `GenesisDatabase.open({ path: dbPath })`.
+- `src/lib.rs:13076-13079` defines a fresh database as a missing or empty
+  directory. `src/lib.rs:13148-13151` rejects a non-empty markerless path
+  without `identity.bin` as recovery-required. The guard is consistent with
+  the P6 fail-closed contract.
+- `genesisrag17-worker/README.md` requires a new isolated TEST path and says the
+  worker creates its sidecars there; fresh-path initialization is therefore
+  part of the worker behavior, not an externally provisioned fixture.
+- `tests/zz_probe_discriminates.rs` calls itself a temporary experiment and
+  runs 60 builds of 1,000 nodes each, 50 ground-truth queries and 32 probes per
+  build. It has no pass/fail assertion. `.github/workflows/test.yml` gives the
+  complete Rust suite 15 minutes; the Windows log starts this test and then
+  reports it still running after 60 seconds before cancellation.
+- The unprovisioned model snapshot accounts for explicitly skipped model tests;
+  it does not explain the constructor failures.
+- Follow-up hosted run `37417821442` failed only the committed Linux-addon pass
+  at `worker.test.mjs:585`: `GenesisRag17Worker.create()` returned instead of
+  throwing for non-empty markerless data. The workflow runs the committed
+  `npm/linux-x64-gnu/index.linux-x64-gnu.node` before its source rebuild; the
+  tracked artifact's last update is `b0d235f`, so it can predate current native
+  source behavior.
+- Artifact provenance is inconsistent: `npm/linux-x64-gnu/README.md` records
+  source `907b0ff`, while the worker ADR pins engine commit `e15e35b`.
+
+## Root cause
+
+### Worker initialization
+
+The worker writes worker-owned directories beneath `dbPath` before the native
+engine classifies the path. A genuinely new store consequently looks non-empty
+but has no `identity.bin`, so the engine correctly rejects it as ambiguous
+markerless state. Pre-seeding test fixtures would hide a worker startup defect;
+weakening the engine guard would risk initializing over markerless data.
+
+### Windows suite timeout
+
+An exploratory workload with no acceptance assertion is registered as a
+normal Rust integration test. It runs on every host as part of the required
+full suite, consumes the remaining Windows job budget and is cancelled by the
+15-minute timeout.
+
+### Committed Linux addon drift
+
+The worker relied on the native addon's markerless-path guard to reject
+non-empty data. The drift workflow exercised the older committed Linux binary,
+which did not reject that test path, before rebuilding the addon from current
+Rust source. Thus the worker's fail-closed behavior varied with the platform
+artifact even though the current-source build contains the guard.
+
+### Bookworm job safe-directory mismatch
+
+Hosted run `37421895783`, job `112132859522`, failed in “Record build
+environment” before Rust compilation, tests, or artifact upload. Checkout had
+added `/__w/GenesisBlock/GenesisBlock` as a safe directory while using its
+temporary HOME. The later job-container shell used `HOME=/github/home`, and
+`git rev-parse HEAD` reported dubious ownership for the same checkout. The
+checkout itself was present; Git's trust configuration was not shared across
+the two HOME scopes.
+
+## Why the issue escaped earlier detection
+
+The current hosted CI did detect both problems and blocked merge; the failures
+had also appeared in earlier PR CI. The G3 local verification was scoped to
+Rust recovery tests, Clippy, formatting and docs, and did not run the worker
+package or the full Windows Rust suite. The temporary diagnostic's placement
+under `tests/` made its default-CI cost look like ordinary regression coverage
+despite having no assertion.
+The local worker suite used the current Windows addon; only the Linux artifact
+drift job exercised the older committed binary. The regression therefore
+escaped local checks but was correctly caught by the committed-artifact pass.
+The safe-directory mismatch was specific to the hosted container's HOME
+boundary and was first exposed when the new Bookworm job attempted to record
+its source SHA; local Git ownership/configuration did not reproduce that split.
+
+## Fix (decided)
+
+1. Keep `Storage::open`'s markerless recovery guard unchanged.
+2. Serialize startup with a stable sibling SQLite coordination database and a
+   rollback-journal `BEGIN EXCLUSIVE` transaction. Use zero busy timeout and
+   fail clearly on contention; keep the mutex file stable and let SQLite
+   recover after process death. Retain the persistent in-store worker lock for
+   compatibility and ownership checks, with strict current/legacy metadata
+   validation before PID liveness probes.
+3. Canonicalize the store against its existing parent. Reject linked
+   worker-sidecar directories, and prune only the fixed set of empty owned
+   directories when identity is absent. Open the native store before creating
+   sidecars; serialize token-checked worker-lock removal at close through the
+   same SQLite transaction. Older worker binaries must be stopped before an
+   upgrade because they do not observe the sibling mutex.
+4. Add regressions for fresh-path identity, second-owner rejection, stale
+   legacy-lock recovery, markerless data preservation, mutex contention and
+   retry, mutex recovery after process exit, linked sidecar rejection, and
+   malformed ownership metadata.
+5. Keep `probe_vs_recall` available as an explicit manual diagnostic, but mark
+   it ignored in the ordinary correctness suite with a visible reason. Its
+   command is `cargo test --no-default-features --test
+   zz_probe_discriminates -- --ignored --nocapture`.
+6. Prepare CI to regenerate the Linux addon from the approved native source in
+   a Bookworm environment with the worker's pinned Node baseline. Record the
+   actual source SHA, Rust/Node versions, target, build environment, binary
+   size and SHA-256; reconcile the worker ADR engine pin and artifact README
+   only after the replacement binary is built and tested.
+7. Build and test the fresh addon before testing the committed artifact, and
+   upload the tested fresh binary before the committed-artifact gate so drift
+   remains repairable without suppressing that mandatory gate.
+8. In the container workflow, resolve the source SHA with a command-scoped
+   `safe.directory` entry for exactly `$GITHUB_WORKSPACE`; do not add a broad
+   or persistent global Git trust exception.
+
+## Proposed prevention
+
+- Preserve the SQLite bootstrap and legacy-lock recovery rules in the worker
+  ADR and README; do not unlink/recreate the sibling coordination database.
+- Require all three hosted worker matrices, the rebuilt-addon worker job, and
+  the Windows full Rust suite to pass before merge. Do not use
+  `continue-on-error` or hide failures.
+- Keep non-asserting long-running diagnostics out of default correctness gates;
+  report intentional ignores explicitly and retain a manual invocation.
+- Keep schema and markerless recovery interpretation in the native engine;
+  verify both source-built and committed Linux artifacts without substituting
+  one for the other. Do not require byte equality between independent builds.
+- Keep Git ownership exceptions least-privilege and scoped to the exact
+  checkout command when checkout and job-container HOME values differ.
+
+## Outcome (measured)
+
+**Local gates PASS; hosted CI PASS on PR head
+`ab38d5079510ccaf566a180bf677a0e94a38bbea`.** The original focused regression
+was RED with `RECOVERY_REQUIRED: markerless database identity is missing`
+before implementation. On Node 24.19.0, the worker suite reports 32 tests:
+26 passed, 0 failed, and 6 skipped because the pinned ONNX model snapshot is
+not provisioned locally. Added native-artifact coverage exercises malformed
+markerless state, retained bytes, absence of a synthesized identity, valid
+schema-5 legacy state, and reopen after owner-process exit. The SQLite mutex
+tests passed for busy/retry and recovery after its owner process exited;
+close-time contention preserved the owner and allowed a successful retry.
+`scripts/verify-loaded-addon.mjs` verified the loaded Windows addon path and
+SHA-256 locally. `cargo test --no-default-features` completed with exit code 0;
+`zz_probe_discriminates` was visibly ignored in the default run. That local
+verification snapshot prepared the locked, provenance-checked rebuild and
+strengthened the reopen test to verify identity stability and retrieval of
+persisted graph data, including startup from an already-empty directory; it
+preceded the committed-artifact refresh recorded below. Root
+`npm test` passed 29/29. Both core and default Clippy commands,
+`cargo fmt --all -- --check`, `npm run docs:validate` (0 violations in 241
+files), and `git diff --check` passed. On hosted run `37417821447`, all listed
+Rust, worker matrix, audit, performance, format/lint, docs and SSOT checks
+passed; committed-addon run `37417821442` failed because the tracked Linux
+binary did not reject the markerless regression before its native-source
+rebuild step. Astra recommended refreshing the artifact, preserving native
+recovery semantics in Rust, recording exact build provenance, and making the
+rebuilt artifact available before the mandatory committed-artifact gate. The
+first Bookworm run `37421895783` failed before build because its shell HOME did
+not contain checkout's temporary safe-directory setting; the workflow now
+scopes trust to the exact workspace path for source-SHA recording. No artifact
+was produced by that run. Follow-up Bookworm run `37439589499`, job
+`112189748409`, passed source-SHA recording, locked dependency checks, rebuild,
+fresh-addon verification and upload. It built from PR merge checkout
+`209cc36b455c6e9622b046eb6060b69d9cd4d681` with Rust/Cargo 1.98.1, Node
+24.18.0, npm 11.16.0, target `x86_64-unknown-linux-gnu`, and highest imported
+`GLIBC_2.34`. The fresh addon is 11,039,392 bytes with SHA-256
+`b678dfd7ee125d33d877b008e3af2c2a36ee9fa5203d043248cf2b9974e778e1`; the
+artifact ZIP digest is `bb1a805b18bfb7429fdeac458d26d225a1e8827185daf1f8864d229bb923a8e7`.
+Fresh-addon tests passed 26/26 with 0 failures and 6 model-dependent skips.
+The same run's committed-addon pass still used the old 9,987,776-byte binary
+(`ff28bcf5214090b9ce4b8ec8ca6b69fd134e0b2fd3115d5df78db29d24191696`) and
+failed three recovery tests, confirming the tracked-artifact drift. The
+candidate engine upgrade and its provenance are now documented separately
+from historical baseline `e15e35b0093394e0a8880af7f4e6f63cf81223b7`.
+The refreshed committed addon then passed on PR head
+`ab38d5079510ccaf566a180bf677a0e94a38bbea` in Bookworm run `37443730184`,
+job `112203403569`. That run's fresh build used PR merge checkout
+`d9f4eb3bbef5a835d95301069ac4ba9c5549cb67`; both the fresh build and committed
+binary completed 32 worker tests: 26 passed, 0 failed, and 6 model-dependent
+tests skipped because the ONNX snapshot was absent. The committed binary
+SHA-256 was
+`b678dfd7ee125d33d877b008e3af2c2a36ee9fa5203d043248cf2b9974e778e1`. The
+same PR head passed Tests (`37443730153`), Security Audit (`37443730099`),
+Performance Audit (`37443730105`) and Package Manager Consumer (`37443730261`).
+The six model-dependent Linux paths, migration compatibility, full
+cross-repository acceptance and deployment approval remain unverified.
+
+**Residual path boundary:** Node `lstat`/`realpath` checks reject detected
+symbolic links and junctions but do not prove that every Windows-specific
+reparse tag is rejected. The deployment parent must remain application-
+controlled; hostile concurrent path swapping would require native
+handle-relative operations and is out of scope.

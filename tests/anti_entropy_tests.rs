@@ -5,6 +5,7 @@
 // applies them with `reconcile_state` and converges. Tested at the Storage API
 // level (the UDP loop just wires these two calls together).
 
+use genesis_block_native::uee_v2::RecordKindV2;
 use genesis_block_native::{
     EdgeInput, Event, HybridSearchInput, NeighborInput, NodeInput, OpenOptions, Storage, SyncPeer,
 };
@@ -127,11 +128,16 @@ fn events_since_filters_by_clock() {
     assert!(matches!(&delta[0].event, Event::CollectionDefinition(d)
         if d.name == "default" && d.provenance == "bootstrap"));
     match &delta[1].event {
-        Event::Node(n) => {
-            assert_eq!(n.id, "N2");
-            assert!(n.clock.time > mid);
+        Event::Transaction(transaction) => {
+            let node = transaction
+                .nodes
+                .iter()
+                .find(|node| node.id == "N2")
+                .expect("revision-bearing transaction must contain N2");
+            assert!(node.clock.time > mid);
+            assert!(transaction.record_revision_transaction.is_some());
         }
-        _ => panic!("expected the N2 node event"),
+        other => panic!("expected the N2 revision transaction, got {other:?}"),
     }
 
     // Pulling from a clock at/after the latest event yields nothing.
@@ -152,8 +158,11 @@ fn events_since_seq_filters_by_frame_cursor() {
     assert!(matches!(&delta[0].event, Event::CollectionDefinition(d)
         if d.name == "default" && d.provenance == "bootstrap"));
     match &delta[1].event {
-        Event::Node(n) => assert_eq!(n.id, "S2"),
-        other => panic!("expected the S2 node event, got {other:?}"),
+        Event::Transaction(transaction) => {
+            assert!(transaction.nodes.iter().any(|node| node.id == "S2"));
+            assert!(transaction.record_revision_transaction.is_some());
+        }
+        other => panic!("expected the S2 revision transaction, got {other:?}"),
     }
     assert!(
         a.events_since_seq(a.stable_frontier()).is_empty(),
@@ -168,6 +177,9 @@ fn events_since_seq_filters_by_frame_cursor() {
         .into_iter()
         .filter_map(|se| match se.event {
             Event::Node(n) => Some(n.id),
+            Event::Transaction(transaction) => {
+                transaction.nodes.into_iter().next().map(|node| node.id)
+            }
             _ => None,
         })
         .collect();
@@ -255,8 +267,17 @@ fn pull_delta_syncs_secondary_vectors() {
 
     let delta = a.events_since(0);
     assert!(
-        delta.iter().any(|se| matches!(se.event, Event::Vector(_))),
-        "the pull delta now includes the secondary vector (Event::Vector)"
+        delta.iter().any(|signed| {
+            matches!(&signed.event, Event::Transaction(transaction)
+            if transaction.vectors.iter().any(|vector| {
+                vector.node_id == "N" && vector.collection.as_deref() == Some("code")
+            }) && transaction.record_revision_transaction.as_ref().is_some_and(|revisions| {
+                revisions.mutations.iter().any(|mutation| {
+                    mutation.kind == RecordKindV2::Vector
+                })
+            }))
+        }),
+        "the pull delta includes a revision-bearing secondary vector"
     );
 
     b.reconcile_state(delta).unwrap();

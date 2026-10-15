@@ -1,0 +1,43 @@
+{
+  "schemaVersion": 1,
+  "artifactType": "SP22_TERMINAL_DISPOSITION",
+  "decisionId": "W1-SYNTHETIC-GAP-REMEDIATION-20261012-SP22",
+  "recordedAtUtc": "2026-10-12T11:31:18.6575242+00:00",
+  "recordedAtBangkok": "2026-10-12T18:31:18.6575242+07:00",
+  "status": "TERMINAL_TEST_FAILURE",
+  "decisionPath": "D:\\GenesisBlock_Dev\\w1-evidence-20261010\\decisions\\W1-synthetic-gap-remediation-decision-20261012-sp22-issued.json",
+  "decisionSha256": "dea544d7b92e6fa928b21e742f9fb62ba2e05e0b4fcfa4cded43bea3e84771ed",
+  "admissionPath": "D:\\GenesisBlock_Dev\\w1-evidence-20261010\\synthetic-pilots\\synthetic-pilot-20261012-sp22\\readiness\\admission.json",
+  "admissionSha256": "517af3876ba3170983f367ce636d9d420e371e9de40d743da25a21ab836d6ac6",
+  "independentReviewPath": "D:\\GenesisBlock_Dev\\w1-evidence-20261010\\synthetic-pilots\\synthetic-pilot-20261012-sp22\\readiness\\independent-review.json",
+  "independentReviewSha256": "8af4c9546ca37afcc0d8d31fe339bf2d0a044fbcf9583ce85def8d6139c04da4",
+  "pretestGatePath": "D:\\GenesisBlock_Dev\\w1-evidence-20261010\\synthetic-pilots\\synthetic-pilot-20261012-sp22\\readiness\\pretest-gate.json",
+  "pretestGateSha256": "40725418882b8d47a958eb39ba8b1981a754de72d219e3c115345a59591a5673",
+  "candidateMaterializationPath": "D:\\GenesisBlock_Dev\\w1-evidence-20261010\\synthetic-pilots\\synthetic-pilot-20261012-sp22\\readiness\\candidate-materialization.json",
+  "candidateMaterializationSha256": "44fa5d88fb03fd4dfa40e08a92c9b432d8a4a2ed599853c2cc17c9e6d83d2aa7",
+  "invocationReceiptPath": "D:\\GenesisBlock_Dev\\w1-evidence-20261010\\synthetic-pilots\\synthetic-pilot-20261012-sp22\\evidence\\test-invocation.json",
+  "invocationReceiptSha256": "22d17d070e0c22d31a776342d09724347c8987fa28774cfd9c53ba65ea6b3c5a",
+  "invocation": {
+    "count": 1,
+    "maxRuns": 1,
+    "exitCode": 1,
+    "passed": false,
+    "dispatchAuthorized": false
+  },
+  "postTestState": {
+    "candidateMatchesFrozenSeed": true,
+    "candidateEditsByOperator": 0,
+    "w1ImplementationOrDispatchPerformed": false,
+    "dispatchAuthorized": false,
+    "canonicalReadinessWritesPerformed": false,
+    "retriesAttempted": 0,
+    "successorsCreated": 0
+  },
+  "terminal": {
+    "retryPermitted": false,
+    "successorPermitted": false,
+    "candidateEditsPermitted": false,
+    "w1ImplementationOrDispatchPerformed": false,
+    "reason": "The sole authorized SP22 test invocation did not satisfy all required assertions, timing, exit, or frozen-candidate conditions. SP22 is terminal; no retry, candidate correction, or successor is permitted, and W1 dispatch remains disabled."
+  }
+}

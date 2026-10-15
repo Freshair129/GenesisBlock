@@ -1,0 +1,92 @@
+{
+  "contract_version": "query-ir.v2",
+  "parameter_types": {
+    "q": "Vector<fixture-space-v1,3,f32>"
+  },
+  "nodes": [
+    {
+      "id": "scan",
+      "op": "NodeScan",
+      "inputs": [],
+      "config": {
+        "as": "d",
+        "label": "Document"
+      }
+    },
+    {
+      "id": "filter",
+      "op": "Filter",
+      "inputs": [
+        "scan"
+      ],
+      "config": {
+        "predicate": {
+          "binary": "eq",
+          "left": {
+            "field": {
+              "alias": "d",
+              "path": [
+                "language"
+              ]
+            }
+          },
+          "right": {
+            "literal": "th",
+            "type": "Utf8"
+          }
+        }
+      }
+    },
+    {
+      "id": "knn",
+      "op": "Knn",
+      "inputs": [
+        "filter"
+      ],
+      "config": {
+        "entity": "d",
+        "collection": "docs",
+        "query": {
+          "param": "q"
+        },
+        "k": 20,
+        "mode": "exact",
+        "as": "hit"
+      }
+    },
+    {
+      "id": "project",
+      "op": "Project",
+      "inputs": [
+        "knn"
+      ],
+      "config": {
+        "fields": [
+          {
+            "expression": {
+              "field": {
+                "alias": "d",
+                "path": [
+                  "id"
+                ]
+              }
+            },
+            "as": "id"
+          },
+          {
+            "expression": {
+              "field": {
+                "alias": "hit",
+                "path": [
+                  "distance"
+                ]
+              }
+            },
+            "as": "distance"
+          }
+        ]
+      }
+    }
+  ],
+  "root": "project"
+}

@@ -1,4 +1,5 @@
 pub mod ast;
+pub mod hql2;
 pub use ast::HqlCommand;
 
 // NOTE: `execute_hql` (in src/lib.rs) pattern-matches `HqlCommand` and dispatches

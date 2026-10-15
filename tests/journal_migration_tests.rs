@@ -27,6 +27,16 @@ fn open(path: &str) -> Storage {
     .unwrap()
 }
 
+fn open_schema5(path: &str) -> Storage {
+    fs::create_dir_all(path).unwrap();
+    fs::write(
+        Path::new(path).join("state.json"),
+        r#"{"schema_version":5}"#,
+    )
+    .unwrap();
+    open(path)
+}
+
 fn add(s: &Storage, id: &str) {
     s.add_node(NodeInput {
         id: Some(id.to_string()),
@@ -51,7 +61,7 @@ fn add(s: &Storage, id: &str) {
 /// payloads ARE the original SignedEvent JSON (frames wrap, never rewrite), so
 /// this reconstructs a byte-faithful legacy WAL.
 fn make_legacy_db(dir: &str, ids: &[&str]) {
-    let s = open(dir);
+    let s = open_schema5(dir);
     for id in ids {
         add(&s, id);
     }
@@ -177,15 +187,16 @@ fn newer_schema_version_fails_closed() {
         serde_json::from_str(&fs::read_to_string(&state_path).unwrap()).unwrap();
     state["schema_version"] = json!(9999);
     fs::write(&state_path, state.to_string()).unwrap();
-    let err = Storage::open(OpenOptions {
+    let err = match Storage::open(OpenOptions {
         path: dir.clone(),
         page_cache_mb: Some(32),
         read_only: Some(false),
         vector_dim: Some(4),
         retention: None,
-    })
-    .err()
-    .expect("open must fail on newer on-disk schema");
+    }) {
+        Err(err) => err,
+        Ok(_) => panic!("open must fail on newer on-disk schema"),
+    };
     let msg = format!("{err:?}");
     assert!(
         msg.contains("SCHEMA_VERSION_UNSUPPORTED"),

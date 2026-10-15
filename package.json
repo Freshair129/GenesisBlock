@@ -1,6 +1,6 @@
 {
   "name": "@freshair129/gks-genesis-block-native",
-  "version": "0.2.6",
+  "version": "0.2.9",
   "description": "Genesis Block — native Rust embedded graph engine for GKS (P3.1 scaffold)",
   "repository": {
     "type": "git",
@@ -8,6 +8,9 @@
   },
   "main": "index.js",
   "types": "index.d.ts",
+  "bin": {
+    "genesisblock-mcp": "mcp/cli.js"
+  },
   "exports": {
     ".": {
       "types": "./index.d.ts",
@@ -19,6 +22,7 @@
     "index.js",
     "index.d.ts",
     "*.node",
+    "mcp/*.js",
     "README.md",
     "QUICKSTART.md",
     "LICENSE"
@@ -45,12 +49,16 @@
   "scripts": {
     "build": "napi build --platform --release",
     "build:debug": "napi build --platform",
-    "agents:validate": "node .agents/validate-agent-registry.mjs",
+    "agents:sync": "node scripts/sync-agent-instructions.mjs",
+    "agents:validate": "node .agents/validate-agent-registry.mjs && node scripts/sync-agent-instructions.mjs --check",
+    "workflow:guard": "node scripts/workflow-guard.mjs",
+    "workflow:test": "node --test __test__/workflow_guard_core.test.mjs __test__/workflow_guard_runtime.test.mjs __test__/workflow_w1_plan.test.mjs",
+    "workflow:plan": "node scripts/workflow-w1-plan.mjs --check",
     "docs:validate": "node scripts/docs-validate.mjs",
     "prepublishOnly": "napi prepublish -t npm",
-    "test": "node --test __test__/mcp.test.mjs __test__/sanity.test.mjs __test__/db.test.mjs __test__/query_ir.test.mjs __test__/wave_a.test.mjs __test__/wave_b.test.mjs",
+    "test": "node --test __test__/agent-instructions.test.mjs __test__/mcp.test.mjs __test__/sanity.test.mjs __test__/db.test.mjs __test__/query_ir.test.mjs __test__/wave_a.test.mjs __test__/wave_b.test.mjs",
     "version:get": "node scripts/version.mjs get",
-    "version:check": "node scripts/version.mjs check",
+    "version:check": "node scripts/version.mjs check && node scripts/version-doc-check.mjs",
     "version:set": "node scripts/version.mjs set",
     "version:bump": "node scripts/version.mjs bump",
     "update:check": "node scripts/check-update.mjs",

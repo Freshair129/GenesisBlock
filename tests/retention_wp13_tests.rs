@@ -80,6 +80,27 @@ fn seg_counts(path: &str) -> (usize, usize) {
     (base, history)
 }
 
+fn segment_snapshot(path: &str) -> Vec<(String, Vec<u8>)> {
+    let mut segments = fs::read_dir(Path::new(path).join("journal"))
+        .into_iter()
+        .flatten()
+        .flatten()
+        .map(|entry| entry.path())
+        .filter(|path| {
+            path.extension()
+                .is_some_and(|extension| extension == "gseg")
+        })
+        .map(|path| {
+            (
+                path.file_name().unwrap().to_string_lossy().to_string(),
+                fs::read(path).unwrap(),
+            )
+        })
+        .collect::<Vec<_>>();
+    segments.sort_by(|left, right| left.0.cmp(&right.0));
+    segments
+}
+
 fn delete_snapshot(path: &str) {
     for f in ["state.json", "nodes.bin", "edges.bin"] {
         let p = Path::new(path).join(f);
@@ -92,16 +113,18 @@ fn delete_snapshot(path: &str) {
 #[test]
 fn unknown_retention_profile_fails_open_loudly() {
     let path = fresh("wp13_bad_profile");
-    let err = Storage::open(opts(&path, Some("budgett:123")))
-        .err()
-        .expect(
-            "a typo'd retention profile must fail open, not silently degrade to a different policy",
-        );
+    let err = match Storage::open(opts(&path, Some("budgett:123"))) {
+        Err(err) => err,
+        Ok(_) => panic!(
+            "a typo'd retention profile must fail open, not silently degrade to a different policy"
+        ),
+    };
     assert!(format!("{err}").contains("retention profile"));
     let path2 = fresh("wp13_bad_budget");
-    let err2 = Storage::open(opts(&path2, Some("budget:0")))
-        .err()
-        .expect("budget:0 is not a usable budget");
+    let err2 = match Storage::open(opts(&path2, Some("budget:0"))) {
+        Err(err) => err,
+        Ok(_) => panic!("budget:0 is not a usable budget"),
+    };
     assert!(format!("{err2}").contains("budget"));
 }
 
@@ -129,30 +152,32 @@ fn frontier_only_default_folds_every_checkpoint() {
 #[test]
 fn full_profile_never_folds_and_recovers_journal_only() {
     let path = fresh("wp13_full");
-    let genesis_path = Path::new(&path).join("journal/B000000000000.gseg");
-    let genesis;
+    let initial_segments;
     {
         let s = open_with(&path, Some("full"));
-        genesis = fs::read(&genesis_path).unwrap();
-        assert_eq!(s.stable_frontier(), 0);
+        initial_segments = segment_snapshot(&path);
+        let initial_frontier = s.stable_frontier();
         for i in 0..20 {
             add_node(&s, &format!("N{i}"));
         }
         s.save_state().unwrap();
         let (base, _) = seg_counts(&path);
-        assert_eq!(base, 1, "only the schema-4 genesis base may exist");
-        assert_eq!(fs::read(&genesis_path).unwrap(), genesis);
+        assert_eq!(base, 0, "full retention must not create a fold base");
+        assert_eq!(segment_snapshot(&path), initial_segments);
+        assert!(s.stable_frontier() > initial_frontier);
         assert_eq!(s.history_horizon(), 0, "no fold ⇒ no history discarded");
         let caps = s.query_ir_capabilities();
         assert_eq!(caps["temporal"]["retention_profile"], "full");
         assert_eq!(caps["temporal"]["tx_time_retention"], "full");
     } // Drop -> save_state: still no fold.
     let (base, _) = seg_counts(&path);
-    assert_eq!(base, 1, "clean shutdown must retain only the genesis base");
-    assert_eq!(fs::read(&genesis_path).unwrap(), genesis);
+    assert_eq!(
+        base, 0,
+        "clean shutdown must not fold full-retention history"
+    );
+    assert_eq!(segment_snapshot(&path), initial_segments);
 
-    // The journal alone (active file plus the genesis definition base) is a complete
-    // recovery source — I8 with history retained.
+    // The journal alone is a complete recovery source — I8 with history retained.
     delete_snapshot(&path);
     let s = open_with(&path, Some("full"));
     for i in 0..20 {
@@ -169,18 +194,14 @@ fn budget_profile_folds_only_when_exceeded() {
     let budget: u64 = 64 * 1024;
     let spec = format!("budget:{budget}");
     let s = open_with(&path, Some(&spec));
-    let genesis_path = Path::new(&path).join("journal/B000000000000.gseg");
-    let genesis = fs::read(&genesis_path).unwrap();
+    let initial_segments = segment_snapshot(&path);
 
     // Below budget: checkpoints must NOT fold.
     add_node(&s, "early");
     s.save_state().unwrap();
     let (base, _) = seg_counts(&path);
-    assert_eq!(
-        base, 1,
-        "only the schema-4 genesis base may exist below budget"
-    );
-    assert_eq!(fs::read(&genesis_path).unwrap(), genesis);
+    assert_eq!(base, 0, "no fold base may exist below budget");
+    assert_eq!(segment_snapshot(&path), initial_segments);
     assert_eq!(s.history_horizon(), 0, "no user history was discarded");
 
     // Churn until sealed history exceeds the budget (the derived seal

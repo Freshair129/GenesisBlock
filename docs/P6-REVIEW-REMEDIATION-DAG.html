@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>P6 Review Remediation DAG</title>
+  <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Geist:wght@400;500;600&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --paper: #f5f5f5;
+      --ink: #2d3142;
+      --muted: #4f5d75;
+      --soft: #7a8399;
+      --rule: rgba(45,49,66,0.12);
+      --rule-solid: #bfc0c0;
+      --font-sans: 'Geist', system-ui, sans-serif;
+      --font-serif: 'Instrument Serif', 'Noto Serif', serif;
+      --font-mono: 'Geist Mono', ui-monospace, monospace;
+    }
+    body {
+      min-height: 100vh;
+      padding: 44px 24px 36px;
+      background: var(--paper);
+      color: var(--ink);
+      font-family: var(--font-sans);
+    }
+    .frame { width: 100%; max-width: 1280px; margin: 0 auto; }
+    .eyebrow {
+      margin-bottom: 8px;
+      color: var(--muted);
+      font: 500 8px/1.3 var(--font-mono);
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+    }
+    h1 {
+      margin-bottom: 8px;
+      color: var(--ink);
+      font: 400 28px/1.15 var(--font-serif);
+    }
+    .subtitle {
+      max-width: 900px;
+      margin-bottom: 22px;
+      color: var(--muted);
+      font: 400 14px/1.55 var(--font-sans);
+    }
+    code { font-family: var(--font-mono); font-size: 0.92em; }
+    .diagram-container { width: 100%; overflow-x: auto; }
+    svg { display: block; width: 100%; min-width: 1280px; }
+    .rank {
+      fill: var(--soft);
+      font: 500 8px var(--font-mono);
+      letter-spacing: 0.12em;
+    }
+    .edge {
+      fill: none;
+      stroke: var(--muted);
+      stroke-width: 1.2;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+      marker-end: url(#p6-arrow);
+    }
+    .mask { fill: var(--paper); }
+    .box { stroke-width: 1; }
+    .node-backend .box { fill: #ffffff; stroke: var(--ink); }
+    .node-leaf .box { fill: rgba(45,49,66,0.05); stroke: var(--muted); }
+    .node-name {
+      fill: var(--ink);
+      font: 600 12px var(--font-sans);
+    }
+    .node-sub {
+      fill: var(--muted);
+      font: 400 9px var(--font-mono);
+    }
+    .badge {
+      fill: var(--paper);
+      stroke: var(--rule-solid);
+      stroke-width: 0.8;
+    }
+    .badge-text {
+      fill: var(--muted);
+      font: 400 8px var(--font-mono);
+      text-anchor: middle;
+    }
+    .legend-text {
+      fill: var(--muted);
+      font: 400 8px var(--font-mono);
+      letter-spacing: 0.04em;
+    }
+    .note {
+      margin-top: 14px;
+      max-width: 1040px;
+      color: var(--muted);
+      font: 400 12px/1.55 var(--font-sans);
+    }
+    .note strong { color: var(--ink); font-weight: 600; }
+    @media print {
+      .diagram-container { overflow-x: visible; }
+      svg { min-width: 0; }
+    }
+  </style>
+</head>
+<body>
+  <main class="frame">
+    <p class="eyebrow">Verify PASS · Review PASS · Astra 6 PASS_WITH_LIMITATIONS</p>
+    <h1>P6 review remediation DAG</h1>
+    <p class="subtitle">Astra 6 approved the reviewed local P6 slice. Verify: focused 34/34, P6 49/49; Review: PASS. Accepted limitation: no dedicated stale-publication Plan fallback fixture. Hosted/cross-platform CI and release/deployment are NOT_RUN. No P7 or merge.</p>
+
+    <div class="diagram-container">
+      <svg viewBox="0 0 1280 720" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="p6-review-remediation-dag-title p6-review-remediation-dag-desc">
+        <title id="p6-review-remediation-dag-title">P6 review remediation DAG</title>
+        <desc id="p6-review-remediation-dag-desc">Approved RCA and contract documentation feed disjoint temporal execution and Plan-mode tests plus ACL snapshot tests. They converge on one serialized src/lib.rs owner. Independent Verify and Review passed; Astra 6 Final approved the local slice with a bounded coverage limitation. No P7 or merge.</desc>
+        <defs>
+          <marker id="p6-arrow" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#4f5d75"/></marker>
+        </defs>
+        <rect width="1280" height="720" fill="#f5f5f5"/>
+
+        <text class="rank" x="48" y="105">R0 · APPROVED DOCS</text>
+        <text class="rank" x="48" y="225">R1 · DISJOINT RED LANES</text>
+        <text class="rank" x="48" y="345">R2 · SERIAL SOURCE</text>
+        <text class="rank" x="48" y="465">R3 · ORDERED GATES</text>
+
+        <!-- Prerequisite edges are orthogonal and drawn before nodes. -->
+        <path class="edge" d="M608 128 V152 Q608 160 600 160 H360 V192"/>
+        <path class="edge" d="M672 128 V168 Q672 176 680 176 H920 V192"/>
+        <path class="edge" d="M360 248 V264 Q360 272 368 272 H608 Q616 272 616 280 V312"/>
+        <path class="edge" d="M920 248 V288 Q920 296 912 296 H672 Q664 296 664 304 V312"/>
+        <path class="edge" d="M640 368 V392 Q640 400 632 400 H264 Q256 400 256 408 V432"/>
+        <path class="edge" d="M336 460 H416"/>
+        <path class="edge" d="M576 460 H656"/>
+        <path class="edge" d="M816 460 H896"/>
+
+        <g class="node node-backend">
+          <rect class="mask" x="560" y="72" width="160" height="56"/>
+          <rect class="box" x="560" y="72" width="160" height="56" rx="6"/>
+          <rect class="badge" x="620" y="80" width="34" height="14" rx="2"/>
+          <text class="badge-text" x="637" y="90">0 IN</text>
+          <text class="node-name" x="572" y="106">RCA + docs</text>
+          <text class="node-sub" x="572" y="120">approved · P6 scope</text>
+        </g>
+
+        <g class="node node-backend">
+          <rect class="mask" x="280" y="192" width="160" height="56"/>
+          <rect class="box" x="280" y="192" width="160" height="56" rx="6"/>
+          <rect class="badge" x="340" y="200" width="34" height="14" rx="2"/>
+          <text class="badge-text" x="357" y="210">1 IN</text>
+          <text class="node-name" x="292" y="226">Temporal RED</text>
+          <text class="node-sub" x="292" y="240">lease + HQL2/Plan tests</text>
+        </g>
+
+        <g class="node node-backend">
+          <rect class="mask" x="840" y="192" width="160" height="56"/>
+          <rect class="box" x="840" y="192" width="160" height="56" rx="6"/>
+          <rect class="badge" x="900" y="200" width="34" height="14" rx="2"/>
+          <text class="badge-text" x="917" y="210">1 IN</text>
+          <text class="node-name" x="852" y="226">ACL CAS RED</text>
+          <text class="node-sub" x="852" y="240">snapshot chain tests</text>
+        </g>
+
+        <g class="node node-backend">
+          <rect class="mask" x="560" y="312" width="160" height="56"/>
+          <rect class="box" x="560" y="312" width="160" height="56" rx="6"/>
+          <rect class="badge" x="620" y="320" width="34" height="14" rx="2"/>
+          <text class="badge-text" x="637" y="330">2 IN</text>
+          <text class="node-name" x="572" y="346">Serial source owner</text>
+          <text class="node-sub" x="572" y="360">ACL then tx bound</text>
+        </g>
+
+        <g class="node node-backend">
+          <rect class="mask" x="176" y="432" width="160" height="56"/>
+          <rect class="box" x="176" y="432" width="160" height="56" rx="6"/>
+          <rect class="badge" x="236" y="440" width="34" height="14" rx="2"/>
+          <text class="badge-text" x="253" y="450">1 IN</text>
+          <text class="node-name" x="188" y="466">Verify gate</text>
+          <text class="node-sub" x="188" y="480">Cargo + docs · E:</text>
+        </g>
+
+        <g class="node node-backend">
+          <rect class="mask" x="416" y="432" width="160" height="56"/>
+          <rect class="box" x="416" y="432" width="160" height="56" rx="6"/>
+          <rect class="badge" x="476" y="440" width="34" height="14" rx="2"/>
+          <text class="badge-text" x="493" y="450">1 IN</text>
+          <text class="node-name" x="428" y="466">Review gate</text>
+          <text class="node-sub" x="428" y="480">PASS · read-only · limits</text>
+        </g>
+
+        <g class="node node-backend">
+          <rect class="mask" x="656" y="432" width="160" height="56"/>
+          <rect class="box" x="656" y="432" width="160" height="56" rx="6"/>
+          <rect class="badge" x="716" y="440" width="34" height="14" rx="2"/>
+          <text class="badge-text" x="733" y="450">1 IN</text>
+          <text class="node-name" x="668" y="466">Astra 6 Final</text>
+          <text class="node-sub" x="668" y="480">PASS · limitations</text>
+        </g>
+
+        <g class="node node-leaf">
+          <rect class="mask" x="896" y="432" width="160" height="56"/>
+          <rect class="box" x="896" y="432" width="160" height="56" rx="6"/>
+          <rect class="badge" x="956" y="440" width="34" height="14" rx="2"/>
+          <text class="badge-text" x="973" y="450">1 IN</text>
+          <text class="node-name" x="908" y="466">P6 closeout</text>
+          <text class="node-sub" x="908" y="480">approved · local only</text>
+        </g>
+
+        <path d="M40 656 H1240" stroke="rgba(45,49,66,0.12)" stroke-width="1"/>
+        <path d="M56 686 H100" class="edge"/>
+        <text class="legend-text" x="112" y="689">PREREQUISITE</text>
+        <rect class="badge" x="272" y="676" width="34" height="16" rx="2"/>
+        <text class="badge-text" x="289" y="687">2 IN</text>
+        <text class="legend-text" x="316" y="689">TWO PARALLEL TEST LANES CONVERGE</text>
+        <text class="legend-text" x="704" y="689">INTEGRATION STAYS IN THE ISOLATED WORKTREE</text>
+      </svg>
+    </div>
+    <p class="note"><strong>Gate failure:</strong> stop forward progress; return corrections to the serialized source owner and rerun Verify before the next gate. The graph shows the acyclic planned path only. Main-checkout merge, release, deployment, and P7 are out of scope.</p>
+  </main>
+</body>
+</html>

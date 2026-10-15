@@ -72,6 +72,9 @@ jobs:
         run: cargo clippy --all-targets -- -D warnings
 
   rust-tests:
+    # The Windows core suite takes ~13 minutes; leave room for the Rust cache
+    # post-step so a passing test run is not cancelled during cleanup.
+    timeout-minutes: 25
     name: cargo test (${{ matrix.host }})
     runs-on: ${{ matrix.host }}
     strategy:

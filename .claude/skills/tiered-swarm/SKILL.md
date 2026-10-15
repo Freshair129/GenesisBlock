@@ -1,13 +1,14 @@
 ---
 name: tiered-swarm
-description: "Orchestrate a multi-step build/audit/refine task across local Ollama models + Claude under a token budget. Use when a job decomposes into many sub-tasks (verify, author, review), some cheap-and-machine-checkable and some hard, and you want to route each to the cheapest tier that can pass its acceptance check on local GPU hardware (e.g. an RTX 3060 12GB) before escalating to Claude. Spec-driven (composes spec-driven-development), TDD per task (composes tdd-workflow), cost-metered on every tier including local."
+description: "Orchestrate a multi-step build/audit/refine task across local Ollama models and provider-configured T2/T3 models under a token budget. Use when a job decomposes into many sub-tasks (verify, author, review), some cheap-and-machine-checkable and some hard, and you want to route each to the cheapest tier that can pass its acceptance check on local GPU hardware (e.g. an RTX 3060 12GB) before escalating to the configured T2/T3 models. Spec-driven (composes spec-driven-development), TDD per task (composes tdd-workflow), cost-metered on every tier including local."
 ---
 
 # tiered-swarm
 
 Spec-driven, local-first, cost-tiered multi-model orchestration. Routes each unit of
 work to the cheapest model tier that can pass a **machine-checkable acceptance command**,
-escalating up the ladder (local SLM → local mid → cloud open-weights → Claude) only when
+escalating up the ladder (local SLM → local mid → cloud open-weights → configured T2/T3
+models) only when
 a cheap tier fails its gate. The proven shape is **VERIFY → AUTHOR → REVIEW → ASSEMBLE**;
 this skill adds tier routing + a verify gate + a two-way cost ledger on top of it.
 
@@ -16,7 +17,7 @@ this skill adds tier routing + a verify gate + a two-way cost ledger on top of i
 Use this skill when ALL of the following hold:
 - The task decomposes into multiple sub-tasks (an audit, a multi-file build, a refactor,
   a verify→author→review sweep).
-- You have local Ollama models available and want to spend Claude tokens only where they
+- You have local Ollama models available and want to spend billed-provider tokens only where they
   earn their price.
 - Each cheap-routed sub-task can be graded by a deterministic command (a test, a compile,
   a schema-validate, a `grep` that must resolve). Sub-tasks that cannot be graded cheaply
@@ -24,6 +25,20 @@ Use this skill when ALL of the following hold:
 
 If the job is a single atomic task with no cheap-checkable sub-units, do not use this
 skill — just do it directly at the right tier.
+
+## T2/T3 model IDs
+
+Before routing a task that may reach T2 or T3, set `TIERED_SWARM_T2_MODEL_ID` and
+`TIERED_SWARM_T3_MODEL_ID` to the exact IDs selected for this host. There are no provider
+defaults. `route.py` returns the configured value as `executor_model` and exits with code 2
+if a required value is missing. The router only computes a hint; the host's Agent/Task
+dispatch must use that returned ID.
+
+The cost ledger records the exact model ID. Setting a routing ID does not define its price:
+`cost_estimate.py` accepts only exact IDs with entries in `PRICING` and raises for unknown
+IDs. Add a price only after verifying it from a provider source and recording the source and
+date. The dated Claude rates in the references are one explicit price profile, not defaults
+for other model IDs.
 
 ## The core loop
 
@@ -40,12 +55,12 @@ SPEC ──▶ ROUTE ──▶ EXECUTE(tier) ──▶ VERIFY(cheap gate) ──
    `verify_command`). The router is a ROLE (rules-first, zero-VRAM), never a tier you
    send work to. Read `references/routing-policy.md` for the decision rules.
 3. **EXECUTE(tier)** — Dispatch the task to the hinted tier via Claude Code's built-in
-   sub-agent (Task) mechanism for Claude tiers, or via the Ollama HTTP API for local /
-   cloud-open-weight tiers. Per implementation task, compose `tdd-workflow`:
+   sub-agent (Task) mechanism for configured T2/T3 IDs, or via the Ollama HTTP API for local /
+   cloud-open-weight tiers. Use the exact `executor_model` returned by the router. Per implementation task, compose `tdd-workflow`:
    RED (= the `verify_command`) → GREEN (@ routed tier) → REFACTOR.
 4. **VERIFY (cheap gate)** — Run the `verify_command`. Tiered judge: deterministic check
    first (compile/test/grep, ~$0), then a T0-SLM cheap judge if the check is fuzzy, then a
-   Claude judge only if still ambiguous. This gate is the economic interlock — no
+   configured T3 judge only if still ambiguous. This gate is the economic interlock — no
    unverified cheap output may cross a phase boundary into an authoring agent.
 5. **ESCALATE-or-ACCEPT** — If the gate passes, ACCEPT. If it fails, ESCALATE one rung
    (T0→T1→T1.5→T2→T3) and re-execute. Each finding that crosses a phase boundary must
@@ -64,8 +79,8 @@ Task class → starting tier → concrete model. The router escalates on a faile
 | classify / triage / cheap verify | T0 local-SLM | `vibethinker:3b`, `chinda-qwen3:4b` |
 | bulk code / structured output / verify findings | T1 local-mid | `aroow-rust-coder:9b` (Rust), `mellum2:12b-a2.5b`, `gemma4-coder:12b` |
 | near-frontier code (local slot busy) | T1.5 cloud-OW | `kimi-k2.7-code:cloud`, `deepseek-v4-pro:cloud`, `qwen3-coder-next:cloud` |
-| quality authoring / general | T2 Claude-mid | `claude-sonnet-4-6` |
-| hard reasoning / adversarial review gate | T3 Claude-frontier | `claude-opus-4-8` |
+| quality authoring / general | T2 configured provider | `TIERED_SWARM_T2_MODEL_ID` |
+| hard reasoning / adversarial review gate | T3 configured provider | `TIERED_SWARM_T3_MODEL_ID` |
 | embed (engine-matched, MANDATORY) | role: embed | `bge-m3:latest` / `bge-m3:q8` |
 | rerank (completes recall pipeline) | role: rerank | `bge-reranker-v2-m3` |
 | code-domain retrieval (separate index) | role: embed-code | `jina-code-embeddings:1.5b` |
@@ -132,10 +147,12 @@ them.
   crosses into the author phase (the Verify-gate enforcer).
 - `scripts/cost_ledger.py` — the two-way cost formula over the four per-call counters
   (`in_uncached`, `in_cached`, `cache_write`, `out`) × per-type rate vector per model;
-  local rate = 0 but metered. Re-verify Claude rates before any billing.
+  explicitly listed local rates = 0 but metered. Unknown IDs fail instead of receiving a
+  guessed price or a local-zero fallback.
 
 > NOTE: scripts in `scripts/` must NOT embed LLM API calls (`openai`, `anthropic`,
-> `langchain`, etc.). Model invocation is the Agent/Task mechanism (for Claude) or the
+> `langchain`, etc.). Model invocation is the host's Agent/Task mechanism for configured
+> T2/T3 IDs or the
 > Ollama HTTP API (for local/cloud-OW). Scripts only compute deterministic hints, checks,
 > and ledgers.
 
@@ -149,9 +166,9 @@ them.
 - **`tdd-workflow`** — invoke as the per-task inner loop. The per-task `verify_command`
   IS the RED test; GREEN runs at the routed tier; REFACTOR keeps it green. The per-task AC
   and the TDD loop are the same artifact seen from two skills.
-- **`claude-api`** — reference for current Claude model ids, per-type pricing, and prompt-
-  caching mechanics. RE-VERIFY all Claude rates against
-  `https://platform.claude.com/docs/en/pricing.md` before any billing logic ships (the
-  cached figures carry a 2026-06-04 UNCERTAINTY FLAG).
+- **Provider pricing source** — verify the exact model ID and per-type rates against the
+  selected provider's official documentation before adding a billed model to `PRICING`;
+  record the source and date. The existing Claude entries are a dated snapshot with an
+  uncertainty flag, not defaults for configured T2/T3 IDs.
 - **`token`** — unrelated financial API glue; NOT part of this workflow. Mentioned only to
   disambiguate: this skill's "token" means LLM tokens, not the Token.io product.
