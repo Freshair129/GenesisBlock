@@ -1,0 +1,89 @@
+name: Genesis Studio packaging
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/studio-packaging.yml'
+      - 'docs/SPEC--GENESIS-STUDIO-DESKTOP.md'
+      - 'studio/**'
+      - 'src/lib.rs'
+      - 'src/router.rs'
+      - 'tests/studio_contract_tests.rs'
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/studio-packaging.yml'
+      - 'docs/SPEC--GENESIS-STUDIO-DESKTOP.md'
+      - 'studio/**'
+      - 'src/lib.rs'
+      - 'src/router.rs'
+      - 'tests/studio_contract_tests.rs'
+  workflow_dispatch:
+
+jobs:
+  studio-package:
+    name: Studio checks and ${{ matrix.bundle }} (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            bundle: msi
+          - os: macos-latest
+            bundle: dmg
+          - os: ubuntu-latest
+            bundle: deb
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Linux Tauri build dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install --no-install-recommends -y \
+            build-essential curl file libssl-dev libwebkit2gtk-4.1-dev \
+            libxdo-dev librsvg2-dev wget
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: |
+            . -> target
+            studio/src-tauri -> target
+
+      - name: Install Studio dependencies
+        working-directory: studio
+        run: npm ci --ignore-scripts
+
+      - name: Studio unit tests
+        working-directory: studio
+        run: npm test
+
+      - name: Studio frontend build
+        working-directory: studio
+        run: npm run build
+
+      - name: Persisted local/remote transport parity
+        run: cargo test --no-default-features --test studio_contract_tests local_and_remote_studio_reads_match_on_the_same_persisted_fixture
+
+      - name: Tauri shell tests
+        working-directory: studio
+        run: cargo test --manifest-path src-tauri/Cargo.toml --locked
+
+      - name: Build platform installer
+        working-directory: studio
+        run: npx tauri build --debug --bundles ${{ matrix.bundle }}
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: genesis-studio-${{ matrix.bundle }}-${{ runner.os }}
+          path: studio/src-tauri/target/debug/bundle/${{ matrix.bundle }}/*
+          if-no-files-found: error

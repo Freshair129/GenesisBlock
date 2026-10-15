@@ -1,9 +1,10 @@
 ---
-version: "0.3.1b"
+version: "0.3.2b"
 created_at: "2026-07-21T21:30:49+07:00,ATHER,working-tree"
-last_update: "2026-10-15T05:53:12+07:00,Codex"
+last_update: "2026-10-15T10:19:50+07:00,Codex"
 status: beta
 superseded_by: null
+related_issue: 231
 attributes:
   doc_type: "spec"
   domain: "genesis-studio-desktop"
@@ -534,9 +535,47 @@ S0 performance evidence เป็น functional scene budget proof ที่ 240
 - [ ] Complete packaged local/remote semantic-parity drill against the same persisted fixture.
 - [ ] Complete independent architecture/security review and cross-platform packaging evidence.
 
-Status: **BETA IMPLEMENTED; release exit remains open.** Core/REST contracts, frontend contract tests and
-fixture E2E pass without raw SQLite/direct projection access. A packaged real local/remote parity drill and
-independent review remain release gates.
+Status: **BETA IMPLEMENTED; release exit remains open.** The persisted-fixture
+regression `cargo test --test studio_contract_tests
+local_and_remote_studio_reads_match_on_the_same_persisted_fixture` now compares
+read-only local `Storage` calls with the actual Axum Studio REST routes against
+one reopened database. It checks declared read capabilities, limits and
+consistency; collections; relational schemas; graph scene; entity inspection;
+read-only HQL; a registered schema and named relational query; status counts;
+and the durable frontier. The test runs the local and REST owners sequentially
+because the data root is exclusively locked. It is engine/router evidence, not
+a packaged Tauri-to-remote click-through.
+
+Current Windows verification:
+
+| Check | Result |
+|---|---|
+| `npm test` | 3 files, 11 tests passed |
+| `npm run build` | TypeScript + Vite production build passed |
+| `npm run test:e2e` | 4 desktop/mobile Chromium cases passed against the presentation fixture only |
+| Persisted-fixture parity test | 1 passed; local `Storage` and REST router results compared on the same reopened database |
+| Local-root validation test | 1 passed; blank, missing, file, and Unicode/space-containing directory paths covered |
+
+The parity test's output included Node-API host `GetProcAddress` warnings, but
+the test completed with a pass. The package workflow invokes it with
+`--no-default-features`. The fixture E2E suite does not launch a local database,
+a remote server, or an installed application.
+
+`cargo test --manifest-path studio/src-tauri/Cargo.toml
+local_root_validation_rejects_blank_missing_and_non_directory_paths` covers
+blank, missing, file, and existing Unicode/space-containing directory paths.
+It exercises the validation helper called before `Storage::open`, not the
+native folder dialog in an installed application. Tauri bundling is enabled,
+and `.github/workflows/studio-packaging.yml` builds Windows MSI, macOS DMG, and
+Linux DEB artifacts in the corresponding CI matrix. Its results are pending;
+even a successful package build will not by itself establish app startup or
+picker interaction. Packaged local/remote parity, packaged picker interaction,
+cross-platform package/startup evidence, and the independent
+architecture/security review remain release gates until their artifacts and
+review disposition are recorded here. The review must record P0/P1 findings;
+none may remain unresolved without an explicitly accepted risk. The
+release-gate RCA is tracked in
+[RCA--STUDIO-S1-RELEASE-GATES](../.brain/rca/RCA--STUDIO-S1-RELEASE-GATES.md).
 
 ### S2 - Governed mutations
 
@@ -646,6 +685,13 @@ Open questions เหล่านี้ไม่ block S0 mock/prototype แต�
 
 ## 32. Version diff
 
+### `0.3.1b -> 0.3.2b`
+
+- Added same-persisted-fixture local Storage/REST parity and local-root validation evidence.
+- Enabled platform installer builds in the Windows/macOS/Linux Studio CI matrix; results are pending.
+- Kept packaged picker, startup, parity, and independent review gates explicitly open.
+- Linked the S1 release-gate RCA.
+
 ### `0.3.0b -> 0.3.1b`
 
 - Clarified portable local-root selection and preflight validation requirements.
@@ -679,6 +725,7 @@ Open questions เหล่านี้ไม่ block S0 mock/prototype แต�
 
 | Version | Date | Status | Summary | Commit Hash | Agent |
 |---------|------|--------|---------|-------------|-------|
+| 0.3.2b | 2026-10-15 | beta | Added persisted-fixture parity and path evidence; enabled platform package CI and retained release gates. | working-tree | Codex |
 | 0.3.1b | 2026-10-15 | beta | Added portable local-root, graph accessibility, accessible-name, and scene label-readability criteria. | working-tree | Codex |
 | 0.3.0b | 2026-07-22 | beta | Implemented S1 read-only local/remote contracts and retained explicit S2-S4 safety gates. | working-tree | ATHER |
 | 0.2.0b | 2026-07-21 | beta | Implemented and verified the fixture-only S0 desktop product shell. | working-tree | ATHER |

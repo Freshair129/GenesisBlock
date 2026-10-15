@@ -65,25 +65,30 @@ fn with_storage<T>(
     operation(storage)
 }
 
-#[tauri::command]
-async fn studio_open_local(state: State<'_, StudioState>, path: String) -> Result<Value, String> {
+fn validate_local_root_path(path: &str) -> Result<(), String> {
     if path.trim().is_empty() {
         return Err("A local GenesisBlockDB data-root path is required".to_string());
     }
+    let metadata = std::fs::metadata(path).map_err(|error| {
+        format!(
+            "The GenesisBlockDB data root '{}' could not be accessed: {error}. Choose an existing folder.",
+            path
+        )
+    })?;
+    if !metadata.is_dir() {
+        return Err(format!(
+            "The GenesisBlockDB data root '{}' is not a folder. Choose an existing folder.",
+            path
+        ));
+    }
+    Ok(())
+}
+
+#[tauri::command]
+async fn studio_open_local(state: State<'_, StudioState>, path: String) -> Result<Value, String> {
     let storage_state = Arc::clone(&state.storage);
     tauri::async_runtime::spawn_blocking(move || {
-        let metadata = std::fs::metadata(&path).map_err(|error| {
-            format!(
-                "The GenesisBlockDB data root '{}' could not be accessed: {error}. Choose an existing folder.",
-                path
-            )
-        })?;
-        if !metadata.is_dir() {
-            return Err(format!(
-                "The GenesisBlockDB data root '{}' is not a folder. Choose an existing folder.",
-                path
-            ));
-        }
+        validate_local_root_path(&path)?;
         let storage = Storage::open(OpenOptions {
             path,
             page_cache_mb: Some(64),
@@ -274,12 +279,44 @@ pub fn run() {
 
 #[cfg(test)]
 mod tests {
-    use super::studio_shell_info;
+    use std::fs;
+
+    use super::{studio_shell_info, validate_local_root_path};
 
     #[test]
     fn shell_starts_detached_and_negotiates_its_transport() {
         let info = studio_shell_info();
         assert_eq!(info.transport, "negotiated");
         assert!(!info.engine_attached);
+    }
+
+    #[test]
+    fn local_root_validation_rejects_blank_missing_and_non_directory_paths() {
+        assert!(validate_local_root_path("  ")
+            .unwrap_err()
+            .contains("path is required"));
+
+        let missing = std::env::temp_dir().join(format!(
+            "Genesis Studio missing root {}",
+            std::process::id()
+        ));
+        let _ = fs::remove_dir_all(&missing);
+        assert!(validate_local_root_path(&missing.to_string_lossy())
+            .unwrap_err()
+            .contains("could not be accessed"));
+
+        let root = std::env::temp_dir().join(format!(
+            "Genesis Studio root validation - 雪 {}",
+            std::process::id()
+        ));
+        let _ = fs::remove_dir_all(&root);
+        fs::create_dir_all(&root).unwrap();
+        let file = root.join("not a folder.txt");
+        fs::write(&file, "test").unwrap();
+        assert!(validate_local_root_path(&file.to_string_lossy())
+            .unwrap_err()
+            .contains("is not a folder"));
+        assert!(validate_local_root_path(&root.to_string_lossy()).is_ok());
+        fs::remove_dir_all(root).unwrap();
     }
 }
