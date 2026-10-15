@@ -1496,6 +1496,33 @@ async fn api_key_guard(
     next.run(req).await
 }
 
+/// Build a CORS layer.
+///
+/// Default: allow only localhost origins (safe for embedded / dev use).
+/// Set `GENESIS_CORS_ORIGIN=*` to restore permissive mode for hosted deployments
+/// where you want browser access from any origin.
+fn cors_layer() -> CorsLayer {
+    match std::env::var("GENESIS_CORS_ORIGIN").as_deref() {
+        Ok("*") => CorsLayer::permissive(),
+        Ok(origin) => {
+            let allowed = origin
+                .parse::<HeaderValue>()
+                .expect("GENESIS_CORS_ORIGIN is not a valid header value");
+            CorsLayer::new()
+                .allow_origin(AllowOrigin::exact(allowed))
+                .allow_methods(tower_http::cors::Any)
+                .allow_headers(tower_http::cors::Any)
+        }
+        Err(_) => CorsLayer::new()
+            .allow_origin(AllowOrigin::predicate(|origin: &HeaderValue, _| {
+                let b = origin.as_bytes();
+                b.starts_with(b"http://localhost:") || b.starts_with(b"http://127.0.0.1:")
+            }))
+            .allow_methods(tower_http::cors::Any)
+            .allow_headers(tower_http::cors::Any),
+    }
+}
+
 #[cfg(test)]
 mod error_contract_tests {
     use super::*;
@@ -1540,32 +1567,5 @@ mod error_contract_tests {
             .as_str()
             .unwrap_or_default()
             .is_empty());
-    }
-}
-
-/// Build a CORS layer.
-///
-/// Default: allow only localhost origins (safe for embedded / dev use).
-/// Set `GENESIS_CORS_ORIGIN=*` to restore permissive mode for hosted deployments
-/// where you want browser access from any origin.
-fn cors_layer() -> CorsLayer {
-    match std::env::var("GENESIS_CORS_ORIGIN").as_deref() {
-        Ok("*") => CorsLayer::permissive(),
-        Ok(origin) => {
-            let allowed = origin
-                .parse::<HeaderValue>()
-                .expect("GENESIS_CORS_ORIGIN is not a valid header value");
-            CorsLayer::new()
-                .allow_origin(AllowOrigin::exact(allowed))
-                .allow_methods(tower_http::cors::Any)
-                .allow_headers(tower_http::cors::Any)
-        }
-        Err(_) => CorsLayer::new()
-            .allow_origin(AllowOrigin::predicate(|origin: &HeaderValue, _| {
-                let b = origin.as_bytes();
-                b.starts_with(b"http://localhost:") || b.starts_with(b"http://127.0.0.1:")
-            }))
-            .allow_methods(tower_http::cors::Any)
-            .allow_headers(tower_http::cors::Any),
     }
 }
