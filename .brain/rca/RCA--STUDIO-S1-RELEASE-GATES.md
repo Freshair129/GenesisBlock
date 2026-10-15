@@ -1,7 +1,7 @@
 ---
-version: "0.1.0b"
+version: "0.1.1b"
 created_at: "2026-10-15T09:28:05+07:00,Codex,working-tree"
-last_update: "2026-10-15T10:34:35+07:00,Codex"
+last_update: "2026-10-15T10:47:45+07:00,Codex"
 status: open
 superseded_by: null
 attributes:
@@ -20,9 +20,10 @@ release-readiness evidence gap. It does not assert a production outage.
 
 Studio S1 is beta implemented, but the repository does not yet prove that a
 packaged local Tauri session and remote REST session return equivalent results
-from one persisted fixture. Packaged native-picker handling, cross-platform
-package/startup, and independent architecture/security review evidence are also
-absent.
+from one persisted fixture. Packaged native-picker handling, installed-app
+startup on the declared platforms, and independent architecture/security
+review evidence are absent. Cross-platform package build evidence is now
+available from the Studio CI matrix.
 
 ## Evidence
 
@@ -39,7 +40,7 @@ absent.
   Studio-specific Windows/macOS/Linux installer matrix.
 - Existing engine and REST tests cover their respective boundaries separately;
   they did not compare both against the same reopened persisted fixture.
-- The first package matrix run ([run 38675972613](https://github.com/Freshair129/GenesisBlock/actions/runs/38675972613)) built and uploaded macOS DMG and Linux DEB packages. The Windows MSI job compiled and passed tests but failed in bundling with `Couldn't find a .ico icon`: `icons/icon.ico` existed, but `bundle.icon` did not reference it. The config now lists the existing PNG, ICNS, and ICO assets; the follow-up run is pending.
+- The first package matrix run ([run 38675972613](https://github.com/Freshair129/GenesisBlock/actions/runs/38675972613)) built and uploaded macOS DMG and Linux DEB packages. The Windows MSI job compiled and passed tests but failed in bundling with `Couldn't find a .ico icon`: `icons/icon.ico` existed, but `bundle.icon` did not reference it. The config now lists the existing PNG, ICNS, and ICO assets. The corrected matrix ([run 38677091691](https://github.com/Freshair129/GenesisBlock/actions/runs/38677091691)) passed all three platform bundle jobs and uploaded the MSI, DMG, and DEB.
 
 ## Root cause
 
@@ -68,9 +69,9 @@ without assembling evidence for the packaged S1 acceptance criteria.
 - Explicitly list the existing platform icon files in `bundle.icon` when
   enabling Tauri packaging; the first Windows CI build caught the omitted
   reference.
-- Keep packaged Tauri parity, native-picker interaction, cross-platform
-  package/startup, and independent review gates open until their evidence is
-  produced and linked in §25.
+- Keep packaged Tauri parity, native folder-picker interaction, startup from
+  installed packages on each declared platform, and independent review gates
+  open until their evidence is produced and linked in §25.
 - Record review finding disposition; do not close the review gate with an
   unresolved P0/P1 finding unless the risk is explicitly accepted.
 - Record platform, artifact, test result, and independent finding disposition;
@@ -84,11 +85,13 @@ packaged desktop app, send requests over TCP, interact with the native folder
 dialog, prove startup from an installer, or replace the independent
 architecture/security review. The first platform packaging run built macOS and
 Linux artifacts but failed to build the Windows MSI because the Tauri bundle
-configuration omitted the existing icons. The config correction is awaiting a
-rerun. These unsigned development artifacts do not establish the S4
-signing/update policy. Those remain release gates.
+configuration omitted the existing icons. After explicitly configuring the
+existing assets, the corrected matrix built all three packages and uploaded
+them. These unsigned development artifacts do not establish the S4
+signing/update policy or prove startup from installed packages. Those remain
+release gates.
 
 The current Windows checkout has no WiX `candle.exe` or `light.exe`, so it
-cannot locally produce the MSI installer. This does not block the Windows,
-macOS, and Linux package matrix from running in GitHub Actions. The Windows MSI
-is pending the corrected run; package startup evidence remains uncollected.
+cannot locally produce the MSI installer. GitHub Actions produced Windows,
+macOS, and Linux package artifacts in run 38677091691. Startup evidence for
+installed packages remains uncollected.

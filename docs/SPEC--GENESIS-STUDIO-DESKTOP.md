@@ -1,7 +1,7 @@
 ---
-version: "0.3.3b"
+version: "0.3.4b"
 created_at: "2026-07-21T21:30:49+07:00,ATHER,working-tree"
-last_update: "2026-10-15T10:34:35+07:00,Codex"
+last_update: "2026-10-15T10:47:45+07:00,Codex"
 status: beta
 superseded_by: null
 related_issue: 231
@@ -555,6 +555,7 @@ Current Windows verification:
 | `npm run test:e2e` | 4 desktop/mobile Chromium cases passed against the presentation fixture only |
 | Persisted-fixture parity test | 1 passed; local `Storage` and REST router results compared on the same reopened database |
 | Local-root validation test | 1 passed; blank, missing, file, and Unicode/space-containing directory paths covered |
+| Studio package matrix [run 38677091691](https://github.com/Freshair129/GenesisBlock/actions/runs/38677091691) | `genesis-studio-msi-Windows`, `genesis-studio-dmg-macOS`, and `genesis-studio-deb-Linux` built and uploaded; installed startup not tested |
 
 The parity test's output included Node-API host `GetProcAddress` warnings, but
 the test completed with a pass. The package workflow invokes it with
@@ -569,16 +570,18 @@ native folder dialog in an installed application. Tauri bundling is enabled,
 and `.github/workflows/studio-packaging.yml` builds Windows MSI, macOS DMG, and
 Linux DEB artifacts in the corresponding CI matrix. The initial matrix run
 ([run 38675972613](https://github.com/Freshair129/GenesisBlock/actions/runs/38675972613))
-built and uploaded the macOS DMG and Linux DEB. The Windows app compiled and
+built and uploaded the macOS DMG and Linux DEB; the Windows app compiled and
 passed its tests, but MSI bundling failed because `bundle.icon` did not point to
-the existing `.ico` asset. The config now explicitly lists the existing PNG,
-ICNS, and ICO icons; the follow-up matrix run is pending. Package artifacts by
-themselves do not establish app startup or picker interaction. Packaged
-local/remote parity, packaged picker interaction, cross-platform startup
-evidence, and the independent architecture/security review remain release
-gates until their artifacts and review disposition are recorded here. The
-review must record P0/P1 findings; none may remain unresolved without an
-explicitly accepted risk. The release-gate RCA is tracked in
+the existing `.ico` asset. The configuration now lists the existing PNG, ICNS,
+and ICO files, and the corrected matrix
+([run 38677091691](https://github.com/Freshair129/GenesisBlock/actions/runs/38677091691))
+passed on Windows, macOS, and Linux and uploaded all three package artifacts.
+These package builds do not establish installed-app startup or picker
+interaction. Packaged local/remote parity, packaged picker interaction,
+cross-platform startup evidence, and the independent architecture/security
+review remain release gates. The review must record P0/P1 findings; none may
+remain unresolved without an explicitly accepted risk. The release-gate RCA is
+tracked in
 [RCA--STUDIO-S1-RELEASE-GATES](../.brain/rca/RCA--STUDIO-S1-RELEASE-GATES.md).
 
 ### S2 - Governed mutations
@@ -689,6 +692,11 @@ Open questions เหล่านี้ไม่ block S0 mock/prototype แต�
 
 ## 32. Version diff
 
+### `0.3.3b -> 0.3.4b`
+
+- Recorded successful Windows MSI, macOS DMG, and Linux DEB package builds and uploads.
+- Kept installed startup, native picker, packaged parity, and independent review gates open.
+
 ### `0.3.2b -> 0.3.3b`
 
 - Explicitly configured existing Studio PNG, ICNS, and ICO assets after the first Windows MSI matrix build found no configured `.ico`.
@@ -735,6 +743,7 @@ Open questions เหล่านี้ไม่ block S0 mock/prototype แต�
 
 | Version | Date | Status | Summary | Commit Hash | Agent |
 |---------|------|--------|---------|-------------|-------|
+| 0.3.4b | 2026-10-15 | beta | Recorded successful Windows, macOS, and Linux package artifact builds; startup and interaction gates remain open. | working-tree | Codex |
 | 0.3.3b | 2026-10-15 | beta | Configured existing platform icons and recorded initial package CI results; Windows rerun pending. | working-tree | Codex |
 | 0.3.2b | 2026-10-15 | beta | Added persisted-fixture parity and path evidence; enabled platform package CI and retained release gates. | working-tree | Codex |
 | 0.3.1b | 2026-10-15 | beta | Added portable local-root, graph accessibility, accessible-name, and scene label-readability criteria. | working-tree | Codex |
