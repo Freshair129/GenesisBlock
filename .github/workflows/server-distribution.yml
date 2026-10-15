@@ -17,6 +17,7 @@ on:
       - 'scripts/docker-smoke.sh'
       - 'scripts/docker-registry-smoke.sh'
       - 'scripts/package-server-release.py'
+      - 'tests/server_restart_recovery_tests.rs'
       - '.github/workflows/server-distribution.yml'
   push:
     tags:
@@ -96,6 +97,9 @@ jobs:
 
       - name: Build standalone server
         run: cargo build --locked --release --no-default-features --features bins --bin genesis-db-server --target ${{ matrix.target }}
+
+      - name: Test release server restart recovery
+        run: cargo test --locked --release --no-default-features --features bins --test server_restart_recovery_tests --target ${{ matrix.target }}
 
       - name: Package release archive + SHA-256
         run: python scripts/package-server-release.py --target ${{ matrix.target }}

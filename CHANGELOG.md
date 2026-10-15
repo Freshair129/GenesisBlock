@@ -7,6 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed - standalone server restart recovery coverage
+
+- Add an integration regression that starts the REST server executable, writes
+  node properties, vectors and an edge, force-stops only that child process,
+  and verifies exact values after reopening the same fixture.
+- Run the regression with the release profile in the server distribution job
+  before packaging the same target binary. The released v0.2.9 artifact remains
+  unchanged; its property rotation after recovery remains documented in issue
+  #222 until a new versioned artifact passes this gate.
+- Current-main standalone REST debug binary passed the external recovery
+  fixture in 3/3 runs. This is not release-profile or consumer qualification.
+- The checked-in Rust integration target passed 2/2 test functions in the debug
+  profile; its REST process test repeats three fresh default-retention database
+  fixtures and verifies node/property/vector and edge ownership after forced
+  restart. Child server SHA-256 is recorded separately from the external
+  harness executable in the tracked standalone recovery RCA.
+- Release-profile test and archive qualification remain pending. The published
+  v0.2.9 archive is preserved as-is and remains the known-failing artifact.
+
 ### Fixed - deployed benchmark fixture compatibility
 
 GenesisRAG17 workers now accept the deployed per-record `benchmarks[].queries`

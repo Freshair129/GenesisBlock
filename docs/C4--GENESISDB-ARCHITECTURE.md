@@ -2,10 +2,10 @@
 doc_id: C4--GENESISDB-ARCHITECTURE
 type: architecture-index
 status: current
-version: 0.1.73b
+version: 0.1.75b
 owner: GenesisBlockDB Architecture
 created_at: 2026-06-13T22:50:11+07:00,ATHER,9b1ced3
-last_update: "2026-10-10T12:00:00+07:00,Codex"
+last_update: "2026-10-15T00:00:00+07:00,Codex"
 attributes:
   domain: architecture
   scope: repository
@@ -22,6 +22,8 @@ related_docs:
   - docs/adr/ADR--GENESISDB-HQL2-PATTERN-CONSTRAINTS.md
   - docs/adr/ADR--GENESISDB-HQL2-P8-COMPLETION-ADDENDUM.md
   - docs/adr/ADR--GENESISDB-HQL2-G4-SHARED-PIPELINE.md
+  - docs/SRD--STANDALONE-SERVER-RESTART-RECOVERY.md
+  - docs/TDD--STANDALONE-SERVER-RESTART-RECOVERY.md
 ---
 
 # C4--GENESISDB-ARCHITECTURE
@@ -235,7 +237,7 @@ flowchart LR
 | Container | Responsibility | Current Source | Primary Docs |
 |---|---|---|---|
 | Rust Core Engine | Unified lifecycle, signed WAL, SQLite projection, native graph/vector indexes, HQL compatibility, reasoning, CRDT, consensus primitives | `src/lib.rs`, `src/query/*` | `MASTER-SPEC--GENESIS-DB.md`, unified-boundary spec, feature specs, ADRs |
-| Axum REST Server | HTTP API for bulk ingest, HQL, node/edge mutation, search, context, status | `src/main.rs`, `src/router.rs` | `docs/API_REFERENCE.md` |
+| Axum REST Server | HTTP API for bulk ingest, HQL, node/edge mutation, search, context, status, and standalone process recovery | `src/main.rs`, `src/router.rs` | `docs/API_REFERENCE.md`, `tests/server_restart_recovery_tests.rs`, `TDD--STANDALONE-SERVER-RESTART-RECOVERY.md` |
 | N-API Package | Native Node/TypeScript bindings over Rust core | `src/lib.rs`, `index.d.ts`, `index.js` | `docs/API_REFERENCE.md`, NPM package metadata |
 | GenesisRAG17 TEST worker | Separate client integration process for physical Stage 13/15/16 writes, six-lane readback, publication and loopback query | `genesisrag17-worker/` | `docs/ADR--GENESISRAG17-SEPARATE-WORKER-PUBLICATION.md`, `docs/FLOW--GENESISRAG17-PIPELINE.md` |
 | MCP Server | Tool interface for LLM clients | `mcp/server.js` | `docs/MCP-GUIDE.md`, `docs/SPEC--MCP-SERVER.md` |
@@ -306,7 +308,9 @@ flowchart LR
     releaseActions --> napiBuild["N-API target builds"]
     napiBuild --> npm["npm main + platform packages"]
     releaseActions --> serverBuild["Standalone server target builds"]
-    serverBuild --> ghRelease["GitHub Release binaries + SHA-256"]
+    serverBuild --> serverRecovery["Release-profile REST restart regression"]
+    serverRecovery --> serverPackage["Server archive + SHA-256"]
+    serverPackage --> ghRelease["GitHub Release binaries"]
     releaseActions --> containerSmoke["Container build + volume persistence smoke"]
     containerSmoke --> ghcr["GHCR image + provenance + SBOM"]
     engineTag --> android["Android release artifact / registry checks"]
@@ -329,7 +333,8 @@ flowchart LR
 The diagram shows the artifact routes, while release status is verified
 separately against the hosted registries. The `v0.2.7` release publishes the
 main npm package (including the MCP CLI), standalone server binaries with
-SHA-256 sidecars, and the public GHCR image. The GHCR image was anonymously
+SHA-256 sidecars, and the public GHCR image. Standalone archives are gated by a
+release-profile process-recovery regression before packaging. The GHCR image was anonymously
 pulled and passed a volume persistence smoke. Homebrew and Scoop install those
 checksummed release binaries in clean consumer jobs. The Go submodule tag
 `genesisdb-go/v0.1.0` passed proxy resolution and a live-server consumer check.
@@ -349,7 +354,7 @@ package is claimed.
 
 | Component | Responsibility | Source / Entry Points | Related Docs |
 |---|---|---|---|
-| Storage Model | One operational boundary over signed WAL, SQLite projection, native snapshots, replay/recovery, commit publication and embedded opaque backup/clean-target restore | `src/lib.rs` | master spec, unified-boundary spec, SQLite substrate ADR, `SPEC--GENESISDB-BACKUP-RESTORE-U9`, [Wave A commit contract](SPEC--WAVE-A-COMMIT-CORRECTNESS.md) |
+| Storage Model | One operational boundary over signed WAL, SQLite projection, native snapshots, replay/recovery, commit publication and embedded opaque backup/clean-target restore | `src/lib.rs` | master spec, unified-boundary spec, SQLite substrate ADR, `SPEC--GENESISDB-BACKUP-RESTORE-U9`, [Wave A commit contract](SPEC--WAVE-A-COMMIT-CORRECTNESS.md), [standalone restart recovery TDD](TDD--STANDALONE-SERVER-RESTART-RECOVERY.md), `tests/server_restart_recovery_tests.rs` |
 | Relational Projection | Paged node properties, normalized labels, versioned app schemas, typed mutation batches and bounded named joins; SQLite remains a WAL-rebuildable internal projection | `src/lib.rs` (`projection_*`, `register_relational_schema`, `apply_relational_batch`, `execute_named_query`) | `SPEC--SQLITE-SUBSTRATE-S0-S1`, `SPEC--GENESISDB-RELATIONAL-APPLICATION-CONTRACT-U2` |
 | Vector Collections | Per-model/dim isolated vector spaces (`collections: DashMap<String, Arc<VectorCollection>>`, each with its own arena + metadata + HNSW + metric); a `default` collection always exists. Async indexing thread (off the write path), plus explicit structural source-to-HNSW coverage validation. | `src/lib.rs` | master spec, HNSW hybrid index design, `ADR--GENESISDB-MULTI-COLLECTION`, `ADR--GENESISDB-ASYNC-INDEXING`, `ADR--GENESISDB-INDEX-COVERAGE-LIFECYCLE` |
 | Hybrid Search | Per-collection vector + lexical retrieval with ranking; query dim validated against the collection | `src/lib.rs`, HNSW design | HNSW hybrid index design |
@@ -418,6 +423,7 @@ The C4 code level is intentionally anchored to source files instead of duplicati
 | MCP tool surface | `mcp/server.js` tool definitions | `docs/MCP-GUIDE.md` | Medium |
 | SDK request/response shapes | Python and Go SDK clients | API reference and REST handlers | High |
 | Persistence safety | WAL/snapshot code in `src/lib.rs` | WAL ADR, audit reports | High |
+| Standalone server recovery | `src/main.rs`, `src/router.rs`, and the packaged server executable | `tests/server_restart_recovery_tests.rs`, `.github/workflows/server-distribution.yml`, `docs/rca/2026-10-15-standalone-server-restart-recovery.md` | High |
 | HNSW structural coverage | `Storage::validate_index_coverage`, `CollectionInfo.coverage` | `ADR--GENESISDB-INDEX-COVERAGE-LIFECYCLE` | High |
 | Optional dashboard status contract | `dashboard/` hooks/components and REST status routes | dashboard audit docs | Medium |
 | Studio S1 transport, scene and ownership contracts | `studio/src/domain/*`, `studio/src/transports/*`, `studio/src-tauri/*`, `src/lib.rs`, `src/router.rs` | `SPEC--GENESIS-STUDIO-DESKTOP` | High |
@@ -510,6 +516,12 @@ fault-injected.
 Broader EXPLAIN/P8/P13 and P14 rehearsal remain open.
 
 ## CHANGELOG
+
+Version diff 0.1.74b -> 0.1.75b: record the tracked debug process test passing
+2/2 test functions over three forced-restart fixtures, pin the child server
+hash in the RCA, and retain the release-profile archive gate. The external REST
+harness remains a separate 3/3 result. No container, API, storage-schema or W1
+boundary changed.
 
 Version diff 0.1.72b -> 0.1.73b: index the approved execution DAG guard and
 synthetic pilot boundary; preserve separate W1 implementation authorization.
