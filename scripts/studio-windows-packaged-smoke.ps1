@@ -28,6 +28,24 @@ function Assert-ChildProcessSucceeded([System.Diagnostics.Process]$Process, [str
   }
 }
 
+function Get-VerifiedExitCodeFile([string]$Path, [string]$Name) {
+  if (-not (Test-Path -LiteralPath $Path -PathType Leaf)) {
+    throw "$Name did not write its exit-code evidence file"
+  }
+  $contents = Get-Content -LiteralPath $Path -Raw
+  if ($contents -notmatch '^\s*(\d+)\s*$') {
+    throw "$Name wrote invalid exit-code evidence: '$contents'"
+  }
+  return [int]::Parse($Matches[1], [System.Globalization.CultureInfo]::InvariantCulture)
+}
+
+function Assert-ExitCodeFileSucceeded([string]$Path, [string]$Name) {
+  $exitCode = Get-VerifiedExitCodeFile $Path $Name
+  if ($exitCode -ne 0) {
+    throw "$Name failed with exit code $exitCode"
+  }
+}
+
 if ($TestExitCodeGuard) {
   $childPowerShell = (Get-Command powershell.exe -ErrorAction Stop).Source
   $failedChild = Start-Process -FilePath $childPowerShell `
@@ -40,7 +58,40 @@ if ($TestExitCodeGuard) {
   catch {
     if ($_.Exception.Message -notmatch 'exit code 7') { throw }
     Write-Host 'Windows packaged smoke exit-code guard rejected the intentional exit code 7.'
-    return
+    $node = (Get-Command node.exe -ErrorAction Stop).Source
+    $nodeExitCodePath = Join-Path $env:TEMP "studio-exit-code-guard-$([guid]::NewGuid().ToString('N')).txt"
+    $nodeGuardScript = Join-Path $env:TEMP "studio-exit-code-guard-$([guid]::NewGuid().ToString('N')).cjs"
+    Set-Content -LiteralPath $nodeGuardScript -Value @'
+process.on('exit', (code) => {
+  require('node:fs').writeFileSync(process.env.STUDIO_UI_SMOKE_EXIT_CODE_FILE, `${code}\n`, 'utf8');
+});
+process.exit(7);
+'@
+    $env:STUDIO_UI_SMOKE_EXIT_CODE_FILE = $nodeExitCodePath
+    try {
+      $nodeChild = Start-Process -FilePath $node `
+        -ArgumentList @("`"$nodeGuardScript`"") `
+        -Wait `
+        -PassThru
+      $nodeChild.Refresh()
+      if (-not $nodeChild.HasExited) {
+        throw 'Node exit-code guard probe did not exit'
+      }
+      try {
+        Assert-ExitCodeFileSucceeded $nodeExitCodePath 'Intentional Node exit-code guard probe'
+      }
+      catch {
+        if ($_.Exception.Message -notmatch 'exit code 7') { throw }
+        Write-Host 'Windows packaged smoke rejected the intentional Node exit code 7 evidence.'
+        return
+      }
+      throw 'Windows packaged smoke accepted the intentional Node exit code 7 evidence'
+    }
+    finally {
+      Remove-Item Env:STUDIO_UI_SMOKE_EXIT_CODE_FILE -ErrorAction SilentlyContinue
+      Remove-Item -LiteralPath $nodeExitCodePath -Force -ErrorAction SilentlyContinue
+      Remove-Item -LiteralPath $nodeGuardScript -Force -ErrorAction SilentlyContinue
+    }
   }
   throw 'Windows packaged smoke exit-code guard accepted the intentional nonzero exit code'
 }
@@ -65,6 +116,7 @@ New-Item -ItemType Directory -Path $signalDirectory | Out-Null
 $installLog = Join-Path $evidenceDirectory 'studio-msi-install.log'
 $nodeStdout = Join-Path $evidenceDirectory 'studio-packaged-ui-smoke.stdout.log'
 $nodeStderr = Join-Path $evidenceDirectory 'studio-packaged-ui-smoke.stderr.log'
+$nodeExitCodePath = Join-Path $evidenceDirectory 'studio-packaged-ui-smoke.exit-code'
 $serverStdout = Join-Path $evidenceDirectory 'studio-parity-server.stdout.log'
 $serverStderr = Join-Path $evidenceDirectory 'studio-parity-server.stderr.log'
 $missingRoot = Join-Path $env:RUNNER_TEMP "studio missing root - 雪 $([guid]::NewGuid().ToString('N'))"
@@ -208,6 +260,7 @@ try {
   $env:STUDIO_FIXTURE_ROOT = $fixtureRoot
   $env:STUDIO_PARITY_TOKEN = $parityToken
   $env:STUDIO_EVIDENCE_DIRECTORY = $evidenceDirectory
+  $env:STUDIO_UI_SMOKE_EXIT_CODE_FILE = $nodeExitCodePath
   $env:STUDIO_PICKER_CANCEL_REQUESTED_FILE = $signals.PickerCancelRequested
   $env:STUDIO_PICKER_CANCELLED_FILE = $signals.PickerCancelled
   $env:STUDIO_PICKER_SELECT_REQUESTED_FILE = $signals.PickerSelectRequested
@@ -329,7 +382,7 @@ try {
   $uiSmokeProcess.Refresh()
   Get-Content -LiteralPath $nodeStdout -ErrorAction SilentlyContinue
   Get-Content -LiteralPath $nodeStderr -ErrorAction SilentlyContinue
-  Assert-ChildProcessSucceeded $uiSmokeProcess 'Packaged local/remote parity UI probe'
+  Assert-ExitCodeFileSucceeded $nodeExitCodePath 'Packaged local/remote parity UI probe'
   if ($appProcess.HasExited) {
     throw "Installed Studio exited during the picker/parity smoke with code $($appProcess.ExitCode)"
   }
@@ -373,6 +426,7 @@ finally {
   Remove-Item Env:STUDIO_FIXTURE_ROOT -ErrorAction SilentlyContinue
   Remove-Item Env:STUDIO_PARITY_TOKEN -ErrorAction SilentlyContinue
   Remove-Item Env:STUDIO_EVIDENCE_DIRECTORY -ErrorAction SilentlyContinue
+  Remove-Item Env:STUDIO_UI_SMOKE_EXIT_CODE_FILE -ErrorAction SilentlyContinue
   Remove-Item Env:STUDIO_PICKER_CANCEL_REQUESTED_FILE -ErrorAction SilentlyContinue
   Remove-Item Env:STUDIO_PICKER_CANCELLED_FILE -ErrorAction SilentlyContinue
   Remove-Item Env:STUDIO_PICKER_SELECT_REQUESTED_FILE -ErrorAction SilentlyContinue

@@ -20,6 +20,13 @@ const signals = {
   localCaptured: process.env.STUDIO_LOCAL_CAPTURED_FILE,
   remoteReady: process.env.STUDIO_REMOTE_READY_FILE,
 };
+const exitCodeFile = process.env.STUDIO_UI_SMOKE_EXIT_CODE_FILE;
+
+if (exitCodeFile) {
+  process.on('exit', (exitCode) => {
+    writeFileSync(exitCodeFile, `${exitCode}\n`, 'utf8');
+  });
+}
 
 assert.ok(Number.isInteger(cdpPort) && cdpPort > 0, 'Studio CDP port must be set');
 assert.ok(missingRoot, 'Studio missing-root fixture path must be set');
@@ -27,6 +34,7 @@ assert.ok(nonDirectoryPath, 'Studio non-directory fixture path must be set');
 assert.ok(fixtureRoot && existsSync(fixtureRoot), 'Persisted Studio parity fixture must exist');
 assert.ok(parityToken, 'Studio parity token must be set');
 assert.ok(evidenceDirectory, 'Studio evidence directory must be set');
+assert.ok(exitCodeFile, 'Studio UI-smoke exit-code path must be set');
 for (const [name, file] of Object.entries(signals)) assert.ok(file, `${name} signal path must be set`);
 assert.equal(existsSync(missingRoot), false, 'Missing-root fixture unexpectedly exists');
 
