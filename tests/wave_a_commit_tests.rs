@@ -316,6 +316,7 @@ fn second_supersede_write_failure_keeps_durable_closing_frame_for_recovery() {
 async fn rest_rejection_preserves_frontier_and_corrected_retry_succeeds() {
     use axum::{body::Body, http::Request};
     use genesis_block_native::router::{build_router, AppState};
+    use http_body_util::BodyExt;
     use parking_lot::RwLock;
     use tower::ServiceExt;
     let dir = tempfile::tempdir().unwrap();
@@ -343,11 +344,61 @@ async fn rest_rejection_preserves_frontier_and_corrected_retry_succeeds() {
             .unwrap();
         assert_eq!(response.status().as_u16(), expected);
         if expected == 409 {
+            let body = response.into_body().collect().await.unwrap().to_bytes();
+            let error: Value = serde_json::from_slice(&body).unwrap();
+            assert_eq!(error["error"]["category"], "conflict");
+            assert_eq!(error["error"]["code"], "GENESIS_CONFLICT");
             assert_eq!(storage.read().stable_frontier(), before);
             assert!(rows(&storage.read()).is_empty());
         }
     }
     assert_eq!(storage.read().stable_frontier(), before + 1);
+
+    let committed_frontier = storage.read().stable_frontier();
+    let duplicate_existing = txn(
+        "rest-existing-key-conflict",
+        vec![json!({"id":"a","name":"x"})],
+    );
+    let response = app
+        .clone()
+        .oneshot(
+            Request::post("/v1/transaction/commit")
+                .header("content-type", "application/json")
+                .body(Body::from(serde_json::to_vec(&duplicate_existing).unwrap()))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(response.status().as_u16(), 409);
+    let body = response.into_body().collect().await.unwrap().to_bytes();
+    let error: Value = serde_json::from_slice(&body).unwrap();
+    assert_eq!(error["error"]["category"], "conflict");
+    assert_eq!(error["error"]["code"], "GENESIS_CONFLICT");
+    assert_eq!(storage.read().stable_frontier(), committed_frontier);
+    assert_eq!(rows(&storage.read()).len(), 1);
+
+    let duplicate_unique_value = txn(
+        "rest-existing-unique-conflict",
+        vec![json!({"id":"b","name":"x"})],
+    );
+    let response = app
+        .oneshot(
+            Request::post("/v1/transaction/commit")
+                .header("content-type", "application/json")
+                .body(Body::from(
+                    serde_json::to_vec(&duplicate_unique_value).unwrap(),
+                ))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(response.status().as_u16(), 409);
+    let body = response.into_body().collect().await.unwrap().to_bytes();
+    let error: Value = serde_json::from_slice(&body).unwrap();
+    assert_eq!(error["error"]["category"], "conflict");
+    assert_eq!(error["error"]["code"], "GENESIS_CONFLICT");
+    assert_eq!(storage.read().stable_frontier(), committed_frontier);
+    assert_eq!(rows(&storage.read()).len(), 1);
 }
 
 #[test]

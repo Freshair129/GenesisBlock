@@ -107,7 +107,7 @@ still required before that extraction can be removed without dropping aliases.
 | `validation` | `parse_query_v2_input`, request checks, relational identifier/row/primary-key preflight | `queryV2Contract`, `commitTransactionContract` | `ApiJson` rejection and Query IR request validation | Python/Go all-category fixtures |
 | `capability` | structured `CAPABILITY_UNSUPPORTED` QueryErrorV2 code | `queryV2Contract` shared mapper | Unsupported Query IR operation | Python/Go all-category fixtures |
 | `query` | structured `QUERY_BUDGET_EXCEEDED` code | `queryV2Contract` shared mapper | HQL budget exhaustion uses query category; runtime reason is retained with generic legacy alias | Python/Go all-category fixtures |
-| `conflict` | transaction identity/frontier checks | `commitTransactionContract` | `/v1/transaction/commit` frontier mismatch | Python/Go all-category fixtures |
+| `conflict` | transaction identity/frontier and relational INSERT primary/unique-key preflight | `commitTransactionContract` | `/v1/transaction/commit` frontier mismatch or relational INSERT collision | Python/Go all-category fixtures |
 | `durability` | explicit recovery state / post-WAL apply guard | `commitTransactionContract` | recovery-required write response | Python/Go all-category fixtures |
 | `integrity` | structured `DATA_CORRUPTION` QueryErrorV2 code | `queryV2Contract` shared mapper | Consensus verification failure | Python/Go all-category fixtures |
 
@@ -118,7 +118,12 @@ transaction preflight maps relational identifier, row, and primary-key errors
 to validation by call-site context; missing schemas/collections to not-found;
 dimension mismatch to validation; and governance policy rejection to
 authorization. The REST transaction handler uses HTTP 403 for that governance
-rejection. NAPI runtime tests cover validation, structured legacy query-code
+rejection. Relational INSERT collisions are checked by canonical primary-key
+encoding and declared unique-index values before projection writes, so those
+known state conflicts return `GENESIS_CONFLICT` without parsing SQLite error
+text. The unique-index preflight is limited to transactions without relational
+deletes; mixed delete/write batches still need a typed projection constraint
+source to classify unique-index collisions safely. NAPI runtime tests cover validation, structured legacy query-code
 preservation, conflict, success, and legacy Promise-rejection compatibility.
 Query success serializes the inner `QueryResultV2` or `ExplainResultV2` payload
 directly; the engine's non-serializable `QueryOutcomeV2` enum is neither changed
@@ -180,3 +185,9 @@ and refined-signature anchors were also checked statically. The added Core
 relational validation test remains unrun until the serialized Cargo slot is
 released. REST/Cargo tests remain pending; Go tests remain pending a Go
 toolchain.
+
+## Cross-platform transaction conflict regression
+
+The PR checks at the pre-fix head `fc7defc49b4c1b270d6087c7fa996fa91d648066` failed identically on Ubuntu, Windows, and the host build with mobile SDK features. In `rest_rejection_preserves_frontier_and_corrected_retry_succeeds`, two relational INSERTs with the same primary key returned HTTP 500 instead of 409. The typed transaction preflight had allowed the duplicate through to the projection, where SQLite's constraint error was converted to a reason-only Storage error and then mapped to `internal`.
+
+The follow-up adds typed conflict preflight for repeated and already-persisted primary keys, plus declared unique indexes in insert-only batches. The REST regression now asserts HTTP 409 and the nested stable `conflict` / `GENESIS_CONFLICT` fields for in-batch primary-key, persisted primary-key, and persisted unique-index collisions, while checking that the frontier and rows remain unchanged. These source and test edits have only received standalone formatting and diff checks so far; Cargo validation and fresh CI are still required.

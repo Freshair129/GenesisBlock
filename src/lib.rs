@@ -14527,6 +14527,16 @@ impl Storage {
                 "expected frontier conflict",
             ));
         }
+        let mut relational_insert_targets = HashSet::<(String, String, Vec<u8>)>::new();
+        let mut deleted_relational_targets = HashSet::<(String, String, Vec<u8>)>::new();
+        let mut relational_unique_insert_targets =
+            HashSet::<(String, String, String, Vec<u8>)>::new();
+        let has_relational_deletes = input.relational.iter().any(|group| {
+            group
+                .mutations
+                .iter()
+                .any(|mutation| mutation.kind == RelationalMutationKind::Delete)
+        });
         for group in &input.relational {
             Self::validate_identifier(&group.namespace)
                 .map_err(|error| api_error::ApiErrorEnvelopeV1::validation(error.to_string()))?;
@@ -14543,9 +14553,143 @@ impl Storage {
                     api_error::ApiErrorEnvelopeV1::validation(error.to_string())
                 })?;
                 if self.storage_schema_version == SCHEMA_VERSION {
-                    Self::encode_relational_primary_key_v1(&schema, mutation).map_err(|error| {
-                        api_error::ApiErrorEnvelopeV1::validation(error.to_string())
-                    })?;
+                    let key_bytes = Self::encode_relational_primary_key_v1(&schema, mutation)
+                        .map_err(|error| {
+                            api_error::ApiErrorEnvelopeV1::validation(error.to_string())
+                        })?;
+                    let table = schema
+                        .tables
+                        .iter()
+                        .find(|table| table.name == mutation.table)
+                        .expect("validated relational table");
+                    let key =
+                        Self::relational_primary_key_values(table, mutation).map_err(|error| {
+                            api_error::ApiErrorEnvelopeV1::validation(error.to_string())
+                        })?;
+                    let complete_key = table
+                        .primary_key
+                        .iter()
+                        .all(|name| key.get(name).is_some_and(|value| !value.is_null()));
+                    if complete_key {
+                        let target = (group.namespace.clone(), table.name.clone(), key_bytes);
+                        match &mutation.kind {
+                            RelationalMutationKind::Insert => {
+                                let deleted_in_transaction =
+                                    deleted_relational_targets.remove(&target);
+                                if !relational_insert_targets.insert(target.clone()) {
+                                    return Err(api_error::ApiErrorEnvelopeV1::conflict(
+                                        "transaction contains duplicate relational insert target",
+                                    ));
+                                }
+                                if !deleted_in_transaction
+                                    && Self::relational_row_by_key(&conn, &schema, table, &key)
+                                        .map_err(api_error::ApiErrorEnvelopeV1::from)?
+                                        .is_some()
+                                {
+                                    return Err(api_error::ApiErrorEnvelopeV1::conflict(
+                                        "relational primary key already exists",
+                                    ));
+                                }
+                                if !has_relational_deletes {
+                                    let image =
+                                        Self::complete_relational_insert_image(table, mutation)
+                                            .map_err(|error| {
+                                                api_error::ApiErrorEnvelopeV1::validation(
+                                                    error.to_string(),
+                                                )
+                                            })?;
+                                    let physical =
+                                        Self::physical_table(&group.namespace, &table.name)
+                                            .map_err(|error| {
+                                                api_error::ApiErrorEnvelopeV1::validation(
+                                                    error.to_string(),
+                                                )
+                                            })?;
+                                    for index in table.indexes.iter().filter(|index| index.unique) {
+                                        let indexed_values = index
+                                            .columns
+                                            .iter()
+                                            .map(|column| {
+                                                image.get(column).cloned().unwrap_or(Value::Null)
+                                            })
+                                            .collect::<Vec<_>>();
+                                        if indexed_values.iter().any(Value::is_null) {
+                                            continue;
+                                        }
+                                        let signature = serde_json::to_vec(&Value::Array(
+                                            indexed_values.clone(),
+                                        ))
+                                        .map_err(|error| {
+                                            api_error::ApiErrorEnvelopeV1::internal(
+                                                error.to_string(),
+                                            )
+                                        })?;
+                                        let unique_target = (
+                                            group.namespace.clone(),
+                                            table.name.clone(),
+                                            index.name.clone(),
+                                            signature,
+                                        );
+                                        if !relational_unique_insert_targets.insert(unique_target) {
+                                            return Err(api_error::ApiErrorEnvelopeV1::conflict(
+                                                "transaction contains duplicate relational unique index value",
+                                            ));
+                                        }
+                                        let values = index
+                                            .columns
+                                            .iter()
+                                            .zip(indexed_values.iter())
+                                            .map(|(column, value)| {
+                                                let definition = table
+                                                    .columns
+                                                    .iter()
+                                                    .find(|definition| definition.name == *column)
+                                                    .expect("validated unique index column");
+                                                Self::json_to_sql_typed(definition, value)
+                                            })
+                                            .collect::<Result<Vec<_>>>()
+                                            .map_err(|error| {
+                                                api_error::ApiErrorEnvelopeV1::validation(
+                                                    error.to_string(),
+                                                )
+                                            })?;
+                                        let predicates = index
+                                            .columns
+                                            .iter()
+                                            .map(|column| format!("\"{column}\" = ?"))
+                                            .collect::<Vec<_>>()
+                                            .join(" AND ");
+                                        let sql = format!(
+                                            "SELECT 1 FROM \"{physical}\" WHERE {predicates} LIMIT 1"
+                                        );
+                                        let existing_unique: Option<i64> = conn
+                                            .query_row(&sql, params_from_iter(values), |row| {
+                                                row.get(0)
+                                            })
+                                            .optional()
+                                            .map_err(|error| {
+                                                api_error::ApiErrorEnvelopeV1::from(
+                                                    Error::from_reason(error.to_string()),
+                                                )
+                                            })?;
+                                        if existing_unique.is_some() {
+                                            return Err(api_error::ApiErrorEnvelopeV1::conflict(
+                                                "relational unique index value already exists",
+                                            ));
+                                        }
+                                    }
+                                }
+                            }
+                            RelationalMutationKind::Upsert | RelationalMutationKind::Update => {
+                                deleted_relational_targets.remove(&target);
+                                relational_insert_targets.insert(target);
+                            }
+                            RelationalMutationKind::Delete => {
+                                relational_insert_targets.remove(&target);
+                                deleted_relational_targets.insert(target);
+                            }
+                        }
+                    }
                 }
             }
         }

@@ -87,7 +87,7 @@ conditions; they are outside this envelope contract.
 | `validation` | Request decoding, relational transaction preflight, `BIND_ERROR` | `queryV2Contract` / `commitTransactionContract` | JSON extractor / Query IR request | Nested stable fields and legacy fallback |
 | `capability` | Structured `CAPABILITY_UNSUPPORTED` | `queryV2Contract` | Unsupported Query IR capability | Nested stable fields and legacy fallback |
 | `query` | Structured `QUERY_BUDGET_EXCEEDED` | `queryV2Contract` | HQL query budget (reason-only execution error) | Nested stable fields and legacy fallback |
-| `conflict` | Explicit transaction identity/frontier checks | `commitTransactionContract` | `/v1/transaction/commit` frontier mismatch | Nested stable fields and legacy fallback |
+| `conflict` | Explicit transaction identity/frontier and relational INSERT primary/unique-key preflight | `commitTransactionContract` | `/v1/transaction/commit` frontier mismatch or relational INSERT collision | Nested stable fields and legacy fallback |
 | `durability` | Explicit recovery-required / post-WAL state | `commitTransactionContract` | Recovery-required transaction write | Nested stable fields and legacy fallback |
 | `integrity` | Structured `DATA_CORRUPTION` | `queryV2Contract` | Consensus verification failure | Nested stable fields and legacy fallback |
 
