@@ -382,6 +382,7 @@ async fn rest_rejection_preserves_frontier_and_corrected_retry_succeeds() {
         vec![json!({"id":"b","name":"x"})],
     );
     let response = app
+        .clone()
         .oneshot(
             Request::post("/v1/transaction/commit")
                 .header("content-type", "application/json")
@@ -399,6 +400,73 @@ async fn rest_rejection_preserves_frontier_and_corrected_retry_succeeds() {
     assert_eq!(error["error"]["code"], "GENESIS_CONFLICT");
     assert_eq!(storage.read().stable_frontier(), committed_frontier);
     assert_eq!(rows(&storage.read()).len(), 1);
+
+    let mut delete_with_unresolved_unique_conflict = txn(
+        "rest-delete-unresolved-unique-conflict",
+        vec![json!({"id":"b","name":"x"})],
+    );
+    delete_with_unresolved_unique_conflict.relational[0]
+        .mutations
+        .insert(
+            0,
+            RelationalRowMutation {
+                table: "items".into(),
+                kind: RelationalMutationKind::Delete,
+                values: Value::Null,
+                key: Some(json!({"id":"missing"})),
+            },
+        );
+    let response = app
+        .clone()
+        .oneshot(
+            Request::post("/v1/transaction/commit")
+                .header("content-type", "application/json")
+                .body(Body::from(
+                    serde_json::to_vec(&delete_with_unresolved_unique_conflict).unwrap(),
+                ))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(response.status().as_u16(), 409);
+    let body = response.into_body().collect().await.unwrap().to_bytes();
+    let error: Value = serde_json::from_slice(&body).unwrap();
+    assert_eq!(error["error"]["category"], "conflict");
+    assert_eq!(error["error"]["code"], "GENESIS_CONFLICT");
+    assert_eq!(storage.read().stable_frontier(), committed_frontier);
+    assert_eq!(rows(&storage.read()).len(), 1);
+
+    let mut delete_then_valid_replacement = txn(
+        "rest-delete-valid-unique-replacement",
+        vec![json!({"id":"b","name":"x"})],
+    );
+    delete_then_valid_replacement.relational[0]
+        .mutations
+        .insert(
+            0,
+            RelationalRowMutation {
+                table: "items".into(),
+                kind: RelationalMutationKind::Delete,
+                values: Value::Null,
+                key: Some(json!({"id":"a"})),
+            },
+        );
+    let response = app
+        .oneshot(
+            Request::post("/v1/transaction/commit")
+                .header("content-type", "application/json")
+                .body(Body::from(
+                    serde_json::to_vec(&delete_then_valid_replacement).unwrap(),
+                ))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(response.status().as_u16(), 200);
+    assert_eq!(storage.read().stable_frontier(), committed_frontier + 1);
+    let replacement_rows = rows(&storage.read());
+    assert_eq!(replacement_rows.len(), 1);
+    assert_eq!(replacement_rows[0]["items.id"], json!("b"));
 }
 
 #[test]

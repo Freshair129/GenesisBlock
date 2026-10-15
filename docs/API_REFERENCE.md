@@ -87,7 +87,7 @@ conditions; they are outside this envelope contract.
 | `validation` | Request decoding, relational transaction preflight, `BIND_ERROR` | `queryV2Contract` / `commitTransactionContract` | JSON extractor / Query IR request | Nested stable fields and legacy fallback |
 | `capability` | Structured `CAPABILITY_UNSUPPORTED` | `queryV2Contract` | Unsupported Query IR capability | Nested stable fields and legacy fallback |
 | `query` | Structured `QUERY_BUDGET_EXCEEDED` | `queryV2Contract` | HQL query budget (reason-only execution error) | Nested stable fields and legacy fallback |
-| `conflict` | Explicit transaction identity/frontier and relational INSERT primary/unique-key preflight | `commitTransactionContract` | `/v1/transaction/commit` frontier mismatch or relational INSERT collision | Nested stable fields and legacy fallback |
+| `conflict` | Explicit transaction identity/frontier checks and SQLite extended primary-key/unique constraint codes from rollback-only relational preflight | `commitTransactionContract` | `/v1/transaction/commit` frontier mismatch, relational collision, or delete/write collision | Nested stable fields and legacy fallback |
 | `durability` | Explicit recovery-required / post-WAL state | `commitTransactionContract` | Recovery-required transaction write | Nested stable fields and legacy fallback |
 | `integrity` | Structured `DATA_CORRUPTION` | `queryV2Contract` | Consensus verification failure | Nested stable fields and legacy fallback |
 
@@ -150,10 +150,13 @@ stable and legacy codes separate.
   and safe query details remain in top-level `details` during migration.
   Unknown reason-only Storage errors remain `internal`; error messages are
   never parsed to choose a category.
-- Transaction relational identifier, row, and primary-key preflight failures
+- Transaction relational identifier, row, and primary-key encoding failures
   use `validation`; a missing registered schema or vector collection uses
-  `not_found`; embedding dimension mismatch uses `validation`. A governance
-  policy rejection uses `authorization` and HTTP `403`.
+  `not_found`; embedding dimension mismatch uses `validation`. Primary-key and
+  declared unique-index violations are classified from SQLite extended
+  constraint codes in a rollback-only projection transaction, including
+  ordered delete/write batches. A governance policy rejection uses
+  `authorization` and HTTP `403`.
 
 ### Taxonomy implementation limit
 

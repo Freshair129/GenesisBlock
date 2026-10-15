@@ -71,7 +71,7 @@ documenting a single contract.
 6. Add route- and SDK-level category coverage and keep the API reference, SRS,
    and this RCA aligned.
 
-## Additive Core/NAPI boundary and remaining limit
+## Additive Core/NAPI contract and migration boundary
 
 The additive type and first typed Storage/NAPI boundaries now exist:
 `Storage::query_v2_contract` wraps structured `QueryErrorV2.code` values, and
@@ -95,10 +95,14 @@ invalid request limits are classified by the explicit preflight validator,
 while runtime reason-only failures keep their diagnostic under the stable query
 category and generic compatibility code. The runtime budget subcode is not
 preserved as a top-level alias until Storage exposes that failure as typed data.
-The Query IR REST adapter retains its pre-existing top-level compatibility
-subcode extraction; stable category selection remains based on typed request
-shape. Moving those legacy Query IR subcodes into structured Storage results is
-still required before that extraction can be removed without dropping aliases.
+The Query IR REST adapter's only message-prefix-derived field is the deprecated
+top-level `code` compatibility alias: it splits the diagnostic at the first
+colon and preserves a `QUERY_*` candidate, otherwise using
+`QUERY_EXECUTION_FAILED`. This does not affect HTTP status, nested
+`error.category`, or stable `error.code`, which come from the request semantics
+and shared taxonomy. Moving the legacy Query IR subcodes into structured
+Storage results would allow that compatibility extraction to be removed without
+dropping aliases.
 
 ### Six-category conformance matrix
 
@@ -107,24 +111,27 @@ still required before that extraction can be removed without dropping aliases.
 | `validation` | `parse_query_v2_input`, request checks, relational identifier/row/primary-key preflight | `queryV2Contract`, `commitTransactionContract` | `ApiJson` rejection and Query IR request validation | Python/Go all-category fixtures |
 | `capability` | structured `CAPABILITY_UNSUPPORTED` QueryErrorV2 code | `queryV2Contract` shared mapper | Unsupported Query IR operation | Python/Go all-category fixtures |
 | `query` | structured `QUERY_BUDGET_EXCEEDED` code | `queryV2Contract` shared mapper | HQL budget exhaustion uses query category; runtime reason is retained with generic legacy alias | Python/Go all-category fixtures |
-| `conflict` | transaction identity/frontier and relational INSERT primary/unique-key preflight | `commitTransactionContract` | `/v1/transaction/commit` frontier mismatch or relational INSERT collision | Python/Go all-category fixtures |
+| `conflict` | transaction identity/frontier checks and SQLite extended primary-key/unique constraint codes from rollback-only relational preflight | `commitTransactionContract` | `/v1/transaction/commit` frontier mismatch, relational collision, or delete/write collision | Python/Go all-category fixtures |
 | `durability` | explicit recovery state / post-WAL apply guard | `commitTransactionContract` | recovery-required write response | Python/Go all-category fixtures |
 | `integrity` | structured `DATA_CORRUPTION` QueryErrorV2 code | `queryV2Contract` shared mapper | Consensus verification failure | Python/Go all-category fixtures |
 
 Rust tests assert stable code/category/message serialization through the exact
 NAPI result helper for all six categories, structured QueryErrorV2 mapping, and
 actual Core transaction validation, conflict, and durability guards. The
-transaction preflight maps relational identifier, row, and primary-key errors
-to validation by call-site context; missing schemas/collections to not-found;
-dimension mismatch to validation; and governance policy rejection to
+transaction preflight maps relational identifier, row, and primary-key encoding
+errors to validation by call-site context; missing schemas/collections to
+not-found; dimension mismatch to validation; and governance policy rejection to
 authorization. The REST transaction handler uses HTTP 403 for that governance
-rejection. Relational INSERT collisions are checked by canonical primary-key
-encoding and declared unique-index values before projection writes, so those
-known state conflicts return `GENESIS_CONFLICT` without parsing SQLite error
-text. The unique-index preflight is limited to transactions without relational
-deletes; mixed delete/write batches still need a typed projection constraint
-source to classify unique-index collisions safely. NAPI runtime tests cover validation, structured legacy query-code
-preservation, conflict, success, and legacy Promise-rejection compatibility.
+rejection. Under the transaction commit lock, the additive typed path applies
+ordered relational mutations in a rollback-only projection transaction before
+building or persisting the durable event. It classifies only SQLite's structured
+`SQLITE_CONSTRAINT_PRIMARYKEY` and `SQLITE_CONSTRAINT_UNIQUE` extended codes as
+conflicts; diagnostic text is retained but never parsed. This covers in-batch,
+persisted, and delete-containing unique collisions, while delete-then-valid
+replacement remains accepted. Other SQLite and persistence failures retain the
+internal/durability mapping. NAPI runtime tests cover validation, structured
+legacy query-code preservation, conflict, success, and legacy
+Promise-rejection compatibility.
 Query success serializes the inner `QueryResultV2` or `ExplainResultV2` payload
 directly; the engine's non-serializable `QueryOutcomeV2` enum is neither changed
 nor exposed as a JSON wrapper.
@@ -133,11 +140,20 @@ recovery-required handler test. Python and Go SDK readers test stable and
 legacy code separation for all six. Local Go execution remains unavailable
 unless a Go toolchain or CI result is provided.
 
-GB-SRS-API-004's additive typed query/transaction path now has category and
-serialization evidence across Core, NAPI, REST, and SDK readers. The wider
-legacy Storage/NAPI method surface has not been migrated to `ApiErrorEnvelopeV1`;
-do not claim that every existing operation has typed category parity. Keep
-issue #232 open until that boundary is accepted or explicitly scoped out.
+GB-SRS-API-004 parity is defined for the additive versioned contract entrypoints:
+Core `query_v2_contract` / `commit_transaction_contract`, their NAPI wrappers,
+the matching REST Query IR / transaction routes, and SDK readers of REST
+responses. These surfaces share the same category/code mapping and have the
+category-by-category evidence listed above. This satisfies the acceptance
+criterion for equivalent failures where the v1 contract is exposed.
+
+Legacy Storage/NAPI method signatures and reason-only errors remain unchanged
+as the compatibility path. They are explicitly outside the v1 envelope contract
+and are a separate migration boundary; this work does not claim typed parity for
+every historical operation. Existing clients can keep using them, while clients
+that need stable categories opt into the additive methods. This is the documented
+migration path, not an unresolved blocker for the v1 contract. Issue #232 remains
+open pending current-head validation and merge.
 
 ## Verification scope
 
@@ -168,14 +184,13 @@ not be presented as verification of the current working tree.
   writing `axum` metadata (`os error 112`); no NAPI lint result is claimed.
 
 Current additive Core/NAPI changes are pending verification. Cargo was reserved
-for the serialized #230 suite, so no Cargo command has been run against these
+for serialized parallel work, so no Cargo command has been run against these
 edits. The NAPI runtime tests now assert direct JS-object results and preserve
 `VERSION_UNSUPPORTED` as a top-level compatibility code beside nested stable
 `GENESIS_VALIDATION_ERROR`; this regression test has not yet run against a
 rebuilt addon. The Go tests also remain unrun locally because the Go toolchain
 is unavailable on PATH. Issue #232 stays open until current-tree Rust/NAPI
-validation, Go test evidence, and the documented legacy embedded boundary are
-reviewed.
+validation, Go test evidence (or exact-head CI), and merge.
 
 The current follow-up edits pass standalone `rustfmt --check` and
 `git diff --check`. Node syntax checks for the d.ts freshness gate and NAPI
@@ -190,4 +205,12 @@ toolchain.
 
 The PR checks at the pre-fix head `fc7defc49b4c1b270d6087c7fa996fa91d648066` failed identically on Ubuntu, Windows, and the host build with mobile SDK features. In `rest_rejection_preserves_frontier_and_corrected_retry_succeeds`, two relational INSERTs with the same primary key returned HTTP 500 instead of 409. The typed transaction preflight had allowed the duplicate through to the projection, where SQLite's constraint error was converted to a reason-only Storage error and then mapped to `internal`.
 
-The follow-up adds typed conflict preflight for repeated and already-persisted primary keys, plus declared unique indexes in insert-only batches. The REST regression now asserts HTTP 409 and the nested stable `conflict` / `GENESIS_CONFLICT` fields for in-batch primary-key, persisted primary-key, and persisted unique-index collisions, while checking that the frontier and rows remain unchanged. These source and test edits have only received standalone formatting and diff checks so far; Cargo validation and fresh CI are still required.
+The follow-up first added heuristic-free primary-key and insert-only unique-index preflight, which left mixed delete/write batches uncovered. The current patch replaces that classifier with a rollback-only projection transaction that executes the same ordered row mutations as the commit path and inspects SQLite extended constraint codes. The REST regression asserts HTTP 409 and nested stable `conflict` / `GENESIS_CONFLICT` for in-batch and persisted key collisions, persisted unique collisions, and a delete-containing unresolved unique collision; it also asserts that deleting the conflicting row before inserting a replacement succeeds. Rejected writes must preserve the frontier and rows. These latest source and test edits have only received standalone formatting and diff checks so far; Cargo validation and fresh CI are still required.
+
+The Windows NAPI check at the prior head also expected the legacy
+`commitTransaction` rejection for a duplicate primary key to match `/UNIQUE/`.
+The existing regression in `__test__/wave_a.test.mjs` keeps that expectation,
+checks that the frontier is unchanged, and retries successfully after correcting
+the transaction. The new typed mapper retains SQLite's `UNIQUE constraint`
+diagnostic in its legacy message, so the expectation should remain compatible;
+the rebuilt-addon check is still pending at the updated head.
