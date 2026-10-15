@@ -549,7 +549,10 @@ export declare class GenesisDatabase {
   supersedeNode(id: string, newProps?: any | undefined | null, causedBy?: string | undefined | null): Promise<NodeOutput>
   executeNamedQuery(requestJson: string): Promise<string>
   commitTransaction(transactionJson: string): Promise<string>
-  /** Additive versioned error envelope; the legacy Promise-rejection method remains unchanged. */
+  /**
+   * Additive versioned JSON error contract for transaction commits. Existing
+   * `commitTransaction` continues to reject its Promise with legacy errors.
+   */
   commitTransactionContract(transactionJson: string): Promise<ApiContractResultV1<ApiCommitTransactionData>>
   /**
    * WP-1.2 REDEFINITION (ADR D2.3, GBP1-noted): the FRAME frontier — the
