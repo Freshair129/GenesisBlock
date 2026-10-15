@@ -142,29 +142,39 @@ release gates.
 The native remote bridge code has frontend Vitest/build coverage. Its Rust URL,
 allowlist, token-forwarding, redirect, response-size, and CSP tests passed 9/9
 in the Tauri library target. The strengthened persisted-fixture contract test
-passed 1/1 and the read-only REST server binary build passed. The latest
-packaging workflow completed all OS package jobs. Linux and macOS installed-app
-startup probes passed, with [DEB](https://github.com/Freshair129/GenesisBlock/actions/runs/38686388595/artifacts/11950242206),
-[DMG](https://github.com/Freshair129/GenesisBlock/actions/runs/38686388595/artifacts/11950784409),
-and [MSI](https://github.com/Freshair129/GenesisBlock/actions/runs/38686388595/artifacts/11950739509)
-artifacts uploaded. Windows MSI installation succeeded, but the UI smoke failed
-before the first UI action because the CDP endpoint was refused; see the
-[Windows smoke log](https://github.com/Freshair129/GenesisBlock/actions/runs/38686388595/artifacts/11950994174).
-The Windows seed and REST-server build passed, but no packaged picker-selection,
-remote-origin/CSP, or packaged local/remote parity result is claimed. The
-follow-up now creates an isolated smoke-only MSI with explicit WebView2
-arguments. The workflow now separately installs the staged ordinary MSI,
-launches the installed executable for ten seconds, records the ordinary MSI's
-SHA-256 plus install/launch/uninstall results, and removes it before building
-the instrumented MSI. This proves only installer execution and process survival,
-not visible-screen readiness or root selection. The new evidence step requires
-fresh CI; the instrumented MSI remains excluded from uploaded package artifacts.
+passed 1/1 and the read-only REST server binary build passed. The latest packaging
+run [38690064356](https://github.com/Freshair129/GenesisBlock/actions/runs/38690064356)
+passed Linux DEB and macOS DMG installation/startup probes and uploaded all
+three ordinary package artifacts. The staged Windows MSI SHA-256 was
+`9fbc5517cd36469ec3bfc79e24a61ca4e6dc80ca93da10fac0011846fdb98895`; it
+installed with exit 0, launched `C:\Program Files\Genesis Studio\genesis-studio.exe`,
+which remained alive for ten seconds, then uninstalled with exit 0. The evidence
+explicitly does not claim visible UI or fixture parity. In the isolated
+instrumented MSI, CDP at `127.0.0.1:57680` came up; missing/non-directory path
+checks, picker cancellation, and successful picker selection of the exact
+persisted fixture root passed. The smoke then failed at `connectLocal` line 128:
+`page.waitForFunction: Timeout 30000ms exceeded` while waiting for
+`.connection-chip` to contain `local / local` (called from line 402). No local
+read surfaces or remote parity ran. See the [Windows evidence artifact
+11952789024](https://github.com/Freshair129/GenesisBlock/actions/runs/38690064356/artifacts/11952789024).
+
+Source review identified a UI-state coupling that can obscure this failure:
+`Workspace` assigned capabilities only after `Promise.all` for capability,
+status, graph, collections, and schema reads. If one read fails, the connection
+chip remains `local / connecting` despite completed transport negotiation. The
+prior smoke did not capture the alert or DOM state, so it cannot establish
+whether that condition caused this run's timeout or whether opening the local
+root itself failed. The follow-up separates capability state from initial data
+loads and makes the smoke report visible alerts while retaining the strict
+`local / local` success assertion. Validation is pending on a fresh Windows run.
+Packaged local-read, remote-origin/CSP, and same-fixture parity remain open.
 Independent architecture/security review acceptance also remains open until
 the exact revised diff is reviewed and recorded.
 
 The current Windows checkout has no WiX `candle.exe` or `light.exe`, so it
 cannot locally produce the MSI installer. GitHub Actions produced MSI, DMG, and
-DEB artifacts in run 38686388595. Linux and macOS installed startup were
-observed; the Windows MSI installed but its UI smoke could not attach over CDP.
-The Windows native-picker and packaged local/remote parity acceptance gates
+DEB artifacts in run 38690064356. Linux and macOS installed startup were
+observed; the ordinary Windows MSI install/process-survival/uninstall check
+passed, and the instrumented MSI's native-picker/path interactions passed. The
+packaged local connection, remote-origin/CSP, and same-fixture parity gates
 remain open.

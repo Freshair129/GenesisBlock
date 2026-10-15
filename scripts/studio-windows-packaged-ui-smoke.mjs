@@ -125,13 +125,34 @@ async function readRemoteNativeOperations(page, expansionLimit) {
 
 async function connectLocal(page) {
   await page.getByRole('button', { name: 'Connect local' }).click();
-  await page.waitForFunction(
-    () => document.querySelector('.connection-chip')?.innerText.includes('local / local'),
-    undefined,
-    { timeout: 30_000 },
+  await page.waitForFunction(() => {
+    const connection = document.querySelector('.connection-chip b')?.textContent ?? '';
+    const error = document.querySelector('[role="alert"]')?.textContent?.trim() ?? '';
+    return connection.includes('local / local') || error.length > 0;
+  }, undefined, { timeout: 30_000 }).catch(async (error) => {
+    const state = await page.evaluate(() => ({
+      screen: document.querySelector('.connection-screen') ? 'connection' : 'workspace',
+      connection: document.querySelector('.connection-chip b')?.textContent?.trim() ?? null,
+      alerts: Array.from(document.querySelectorAll('[role="alert"]'))
+        .map((alert) => alert.textContent?.trim() ?? '')
+        .filter(Boolean),
+      root: document.querySelector('#genesis-data-root')?.value ?? null,
+    }));
+    console.error(`Packaged local connection state did not settle: ${JSON.stringify(state)}`);
+    throw error;
+  });
+  const connectionState = await page.evaluate(() => ({
+    connection: document.querySelector('.connection-chip b')?.textContent?.trim() ?? null,
+    alerts: Array.from(document.querySelectorAll('[role="alert"]'))
+      .map((alert) => alert.textContent?.trim() ?? '')
+      .filter(Boolean),
+  }));
+  assert.ok(
+    connectionState.connection?.includes('local / local'),
+    `Packaged local connect failed: ${JSON.stringify(connectionState)}`,
   );
   await page.locator('.metric-strip').waitFor({ state: 'visible', timeout: 30_000 });
-  assert.equal(await page.getByRole('alert').count(), 0, 'Packaged local connection displayed an error');
+  assert.deepEqual(connectionState.alerts, [], 'Packaged local connection displayed an error');
 }
 
 async function connectRemote(page, restBaseUrl) {

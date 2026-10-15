@@ -538,9 +538,9 @@ S0 performance evidence เป็น functional scene budget proof ที่ 240
 - [x] Wire status, collections, logical relational schema/named query และ read-only HQL.
 - [x] Add capability, bounded graph scene/expand and entity inspection APIs.
 - [x] Deliver Overview, Data, Graph, Vectors, Query และ Entity Inspector read-only.
-- [ ] Complete packaged local/remote semantic-parity drill against the same persisted fixture. The Windows fixture seed and REST server build passed in CI, but the installed-app UI probe failed before it could connect to the WebView2 CDP endpoint; no packaged parity result is claimed.
-- [ ] Record installed-app startup smoke on Windows, macOS, and Linux from the packaged CI matrix. Linux DEB and macOS DMG install/launch probes passed; Windows MSI installed, but the UI/CDP probe failed before confirming its startup screen.
-- [ ] Exercise packaged Windows native root selection and missing/non-directory path handling. The Windows smoke failed before its first UI action, so no packaged path or native folder-picker interaction is evidenced.
+- [ ] Complete packaged local/remote semantic-parity drill against the same persisted fixture. The Windows smoke selected the fixture and passed invalid-path checks, but local connect did not reach `local / local`; no packaged local read or remote comparison is claimed.
+- [x] Record bounded installed-package startup smoke across Windows, macOS, and Linux. Linux DEB and macOS DMG installed apps launched. The staged ordinary Windows MSI installed `C:\Program Files\Genesis Studio\genesis-studio.exe`, which stayed alive for ten seconds, and uninstalled cleanly; this is process-start evidence, not visible-screen verification.
+- [x] Exercise packaged Windows native root selection and missing/non-directory path handling. The CDP smoke rejected the missing and non-directory paths, cancelled the native picker without changing the path, then selected the exact persisted fixture path. Local connection failed afterward, so this does not establish local data access or parity.
 - [ ] Complete independent architecture/security review and packaged local/remote parity evidence.
 
 Status: **BETA IMPLEMENTED; release exit remains open.** The persisted-fixture
@@ -571,11 +571,12 @@ Current Windows verification:
 | `npm run test:e2e` | 4 desktop/mobile Chromium cases passed against the presentation fixture only |
 | Persisted-fixture parity test | 1 passed; local `Storage` and REST router results compared on the same reopened graph/vector/relational database |
 | Local-root validation test | 1 passed; blank, missing, file, and Unicode/space-containing directory paths covered |
-| Studio package matrix [run 38686388595](https://github.com/Freshair129/GenesisBlock/actions/runs/38686388595), head `5419a91cca67cd5aca67deea130c031d2eaa84f4` | MSI, DMG, and DEB artifacts uploaded. Linux DEB and macOS DMG install/launch smoke steps passed. Windows MSI installation succeeded, but packaged UI smoke failed before UI interaction because `connectOverCDP` received `ECONNREFUSED` at `127.0.0.1:50705`. |
-| Package artifacts | [Windows MSI](https://github.com/Freshair129/GenesisBlock/actions/runs/38686388595/artifacts/11950739509), [macOS DMG](https://github.com/Freshair129/GenesisBlock/actions/runs/38686388595/artifacts/11950784409), [Linux DEB](https://github.com/Freshair129/GenesisBlock/actions/runs/38686388595/artifacts/11950242206) |
-| Smoke evidence artifacts | [Windows logs](https://github.com/Freshair129/GenesisBlock/actions/runs/38686388595/artifacts/11950994174), [macOS log](https://github.com/Freshair129/GenesisBlock/actions/runs/38686388595/artifacts/11950489465), [Linux log](https://github.com/Freshair129/GenesisBlock/actions/runs/38686388595/artifacts/11949977720) |
-| Windows packaged picker/parity probe | Fixture seeding and REST-server build passed, but the Playwright/CDP connection failed before the missing-path, non-directory, picker, or packaged local/remote interactions began. The follow-up workflow now installs and launches the staged ordinary MSI for a bounded process-survival check, removes it, then builds a separate test-only MSI with explicit WebView2 debug arguments; only the ordinary MSI is uploaded. Fresh CI evidence is pending. |
-| Packaged remote-origin/CSP | No installed UI session reached remote mode in this run. Browser tests do not prove remote connectivity under the packaged production CSP; this remains an acceptance gate. |
+| Latest Studio package matrix [run 38690064356](https://github.com/Freshair129/GenesisBlock/actions/runs/38690064356), head `94842e6319cbfcacc672350429dd19b9c0f3b81a` | Linux DEB and macOS DMG package/startup jobs passed. Windows MSI built and the ordinary staged MSI installed, its executable survived ten seconds, and it uninstalled successfully. The instrumented UI smoke reached CDP, passed invalid-root checks and picker cancel/select, then timed out after clicking Connect local while waiting for the `local / local` connection state. Windows job failed; no local reads or remote parity are claimed. |
+| Latest package artifacts | [Windows MSI](https://github.com/Freshair129/GenesisBlock/actions/runs/38690064356/artifacts/11952324502), [macOS DMG](https://github.com/Freshair129/GenesisBlock/actions/runs/38690064356/artifacts/11952921835), [Linux DEB](https://github.com/Freshair129/GenesisBlock/actions/runs/38690064356/artifacts/11951544427) |
+| Latest smoke evidence | [Windows logs and normal-MSI JSON](https://github.com/Freshair129/GenesisBlock/actions/runs/38690064356/artifacts/11952789024), [macOS log](https://github.com/Freshair129/GenesisBlock/actions/runs/38690064356/artifacts/11952432383), [Linux log](https://github.com/Freshair129/GenesisBlock/actions/runs/38690064356/artifacts/11951124680) |
+| Windows ordinary MSI startup | SHA-256 `9fbc5517cd36469ec3bfc79e24a61ca4e6dc80ca93da10fac0011846fdb98895`; install exit 0; `C:\Program Files\Genesis Studio\genesis-studio.exe` remained alive for 10 seconds; uninstall exit 0; cleanup complete. Evidence explicitly sets `visible_ui_verified: false` and `fixture_parity: false`. |
+| Windows packaged picker/path/local connect | CDP endpoint `127.0.0.1:57680` became ready. Missing-root, non-directory, picker-cancel, and picker-select signals passed; the script's exact fixture-path input assertion also passed. Clicking Connect local then timed out after 30 seconds in `connectLocal` waiting for `.connection-chip` to contain `local / local`; no local surface results or remote request ran. |
+| Packaged remote-origin/CSP | The Windows smoke did not reach remote mode. Browser tests do not prove remote connectivity under the packaged production CSP; this remains an acceptance gate. |
 | Current PR native remote Rust tests | `cargo test --manifest-path studio/src-tauri/Cargo.toml --locked --lib --jobs 1`: 9 passed, 0 failed, including URL/IPv6 loopback, route allowlist, CSP, token/redirect, bounded-body, and path-validation cases |
 | Current PR packaged parity server build | `cargo build --locked --no-default-features --features bins --bin genesis-db-server --jobs 1`: passed |
 
@@ -598,36 +599,45 @@ the existing `.ico` asset. The configuration now lists the existing PNG, ICNS,
 and ICO files, and the corrected matrix
 ([run 38677091691](https://github.com/Freshair129/GenesisBlock/actions/runs/38677091691))
 passed on Windows, macOS, and Linux and uploaded all three package artifacts.
-The latest run at head `5419a91cca67cd5aca67deea130c031d2eaa84f4`
-([run 38686388595](https://github.com/Freshair129/GenesisBlock/actions/runs/38686388595))
-also completed all three platform package jobs. Linux DEB and macOS DMG
-installed-app launch probes passed. The Windows MSI installer completed
-successfully, but its UI probe failed before the first interaction because the
-WebView2 CDP endpoint was refused. The Windows packaged picker, startup screen,
-and local/remote parity are therefore not established. The independent
-architecture/security review remains a release gate. The review must record
-P0/P1 findings; none may remain unresolved without an explicitly accepted risk.
+The latest run at head `94842e6319cbfcacc672350429dd19b9c0f3b81a`
+([run 38690064356](https://github.com/Freshair129/GenesisBlock/actions/runs/38690064356))
+passed the Linux DEB and macOS DMG package/startup jobs. The ordinary Windows MSI
+installed the expected executable, which stayed alive for ten seconds, then
+uninstalled with exit code 0. The separate instrumented MSI exposed CDP;
+missing/non-directory handling and native picker cancel/select passed, and the
+selected input exactly matched the persisted fixture root. Connect local then
+timed out before reaching `local / local`, so no packaged local data or
+local/remote parity is established. The smoke artifact marks normal-MSI visible
+UI and fixture parity false. The independent architecture/security review
+remains a release gate and must record P0/P1 findings; none may remain unresolved
+without an explicitly accepted risk.
 The release-gate RCA is tracked in
 [RCA--STUDIO-S1-RELEASE-GATES](../.brain/rca/RCA--STUDIO-S1-RELEASE-GATES.md).
 
 The Windows smoke harness originally set `WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS`
 at launch time. Wry 0.55.1 supplies its browser arguments explicitly through
 WebView2 environment options, so that environment variable did not enable the
-CDP port; the runner failed to connect before the first UI action. The follow-up
-workflow first installs and launches the staged ordinary MSI for a bounded
-10-second process-survival check, records its package hash and install/launch/
-uninstall evidence, and removes it. It then builds an isolated smoke MSI with
-`app.windows[0].additionalBrowserArgs` and a per-run loopback debugging port;
-only the ordinary MSI is uploaded, so the debug-enabled package is not published
-as the package artifact. These workflow changes require fresh CI. The Windows
-probe is intended to seed one persisted graph/vector/relational fixture, select it with the native
-picker, open it in packaged local mode, then start the REST server over that
+CDP port. Run 38690064356 confirms the isolated MSI now exposes CDP. The workflow
+also installs and launches the staged ordinary MSI for ten seconds, records its
+SHA-256 and install/launch/uninstall results, and removes it; the debug-enabled
+MSI remains excluded from package artifacts. The UIA probe passed
+missing/non-directory handling, picker cancel, exact fixture-folder selection,
+then failed at local connection. Source inspection found that the workspace only
+publishes negotiated capabilities after a `Promise.all` of capabilities and all
+initial data reads; any one read error can leave the chip at `local / connecting`
+and hide the distinction between connection and data-read failure. The pending
+follow-up publishes capability state independently and makes the smoke report
+the alert/state while retaining the strict `local / local` assertion. Fresh
+Windows validation is required. The probe is intended to seed one persisted
+graph/vector/relational fixture, select it with the native picker, open it in
+packaged local mode, then start the REST server over that
 same fixture and compare packaged remote results. It compares declared read
 capabilities/limits and raw results for status/frontier, graph scene and
 expansion, vector collections, relational schemas, entity inspection,
 read-only HQL, and the registered named query, plus visible S1 results. The
-probe also checks missing and non-directory root paths. None of these packaged
-Windows interactions has passed yet. The independent review must examine
+probe also checks missing and non-directory root paths. The picker and path
+checks passed in run 38690064356, but local open and local/remote parity remain
+unproven. The independent review must examine
 repeated percent-decoding in path validation, entity-ID route boundaries,
 response-size limits, token forwarding and cleanup, redirect handling, and the
 unchanged production CSP. All acceptance gates remain open until fresh Windows

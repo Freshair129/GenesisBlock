@@ -216,15 +216,18 @@ function Workspace({ transport, onDisconnect }: WorkspaceProps) {
 
   useEffect(() => {
     let current = true;
+    void transport.getCapabilities().then((nextCapabilities) => {
+      if (current) setCapabilities(nextCapabilities);
+    }).catch((reason) => {
+      if (current) setError(reason instanceof Error ? reason.message : String(reason));
+    });
     void Promise.all([
-      transport.getCapabilities(),
       transport.getStatus(),
       transport.loadGraphScene({ limit: 240 }),
       transport.listCollections(),
       transport.listRelationalSchemas(),
-    ]).then(([nextCapabilities, nextStatus, nextScene, nextCollections, nextSchemas]) => {
+    ]).then(([nextStatus, nextScene, nextCollections, nextSchemas]) => {
       if (!current) return;
-      setCapabilities(nextCapabilities);
       setStatus(nextStatus.data);
       setScene(nextScene.data);
       setCollections(nextCollections.data);
