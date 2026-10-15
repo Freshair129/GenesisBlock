@@ -79,9 +79,10 @@ impl RemoteConnection {
             value.set_sensitive(true);
             Some(value)
         };
-        let client = Client::builder()
+        let builder = Client::builder()
             .redirect(Policy::none())
-            .timeout(Duration::from_secs(15))
+            .timeout(Duration::from_secs(15));
+        let client = apply_proxy_policy(builder, &base_url)
             .build()
             .map_err(|error| {
                 format!(
@@ -159,6 +160,16 @@ impl RemoteConnection {
         }
         serde_json::from_slice::<Value>(&body)
             .map_err(|error| format!("Genesis server returned invalid JSON: {error}"))
+    }
+}
+
+fn apply_proxy_policy(builder: reqwest::ClientBuilder, base_url: &Url) -> reqwest::ClientBuilder {
+    if base_url.scheme() == "http" {
+        // Plain HTTP is only accepted for loopback. Keep its bearer token off
+        // environment-configured proxies, which would otherwise see it in cleartext.
+        builder.no_proxy()
+    } else {
+        builder
     }
 }
 
@@ -469,10 +480,10 @@ fn route(segments: &[&str]) -> Vec<String> {
 #[cfg(test)]
 mod tests {
     use super::{
-        prepare_request, read_bounded_response_body, validate_remote_base_url, RemoteConnection,
-        StudioRemoteRequest, MAX_REMOTE_ENTITY_ID_BYTES,
+        apply_proxy_policy, prepare_request, read_bounded_response_body, validate_remote_base_url,
+        RemoteConnection, StudioRemoteRequest, MAX_REMOTE_ENTITY_ID_BYTES,
     };
-    use reqwest::{Method, Url};
+    use reqwest::{Client, Method, Proxy, Url};
     use serde_json::{json, Value};
     use std::{
         io::{Read, Write},
@@ -742,6 +753,98 @@ mod tests {
 
         assert_eq!(result.0, b"01234567");
         assert!(result.1);
+    }
+
+    #[test]
+    fn loopback_http_bypasses_proxies_while_https_keeps_proxy_support() {
+        let (target_url, target_request, target_server) = one_shot_server(|stream| {
+            stream
+                .write_all(b"HTTP/1.1 200 OK\r\nContent-Length: 2\r\nConnection: close\r\n\r\nok")
+                .unwrap();
+        });
+        let proxy_listener = TcpListener::bind((std::net::Ipv4Addr::LOCALHOST, 0)).unwrap();
+        proxy_listener.set_nonblocking(true).unwrap();
+        let proxy_url = format!("http://{}", proxy_listener.local_addr().unwrap());
+        let loopback = Url::parse(&target_url).unwrap();
+        let client = apply_proxy_policy(
+            Client::builder().proxy(Proxy::all(&proxy_url).unwrap()),
+            &loopback,
+        )
+        .timeout(Duration::from_secs(2))
+        .build()
+        .unwrap();
+        let response = tauri::async_runtime::block_on(async {
+            client
+                .get(&target_url)
+                .header("authorization", "Bearer loopback-test-token")
+                .send()
+                .await
+                .unwrap()
+                .text()
+                .await
+                .unwrap()
+        });
+        assert_eq!(response, "ok");
+        let request = target_request.join().unwrap();
+        target_server.join().unwrap();
+        assert!(request
+            .to_ascii_lowercase()
+            .contains("authorization: bearer loopback-test-token"));
+        match proxy_listener.accept() {
+            Err(error) if error.kind() == std::io::ErrorKind::WouldBlock => {}
+            Ok(_) => panic!("loopback HTTP request was sent through a proxy"),
+            Err(error) => panic!("could not check loopback proxy listener: {error}"),
+        }
+
+        let https_proxy = TcpListener::bind((std::net::Ipv4Addr::LOCALHOST, 0)).unwrap();
+        https_proxy.set_nonblocking(true).unwrap();
+        let https_proxy_url = format!("http://{}", https_proxy.local_addr().unwrap());
+        let remote = Url::parse("https://127.0.0.1:9").unwrap();
+        let https_client = apply_proxy_policy(
+            Client::builder().proxy(Proxy::all(&https_proxy_url).unwrap()),
+            &remote,
+        )
+        .timeout(Duration::from_secs(2))
+        .build()
+        .unwrap();
+        let proxy_request = thread::spawn(move || {
+            let deadline = std::time::Instant::now() + Duration::from_secs(2);
+            let (mut stream, _) = loop {
+                match https_proxy.accept() {
+                    Ok(connection) => break connection,
+                    Err(error)
+                        if error.kind() == std::io::ErrorKind::WouldBlock
+                            && std::time::Instant::now() < deadline =>
+                    {
+                        thread::sleep(Duration::from_millis(10));
+                    }
+                    Err(error) => panic!("HTTPS proxy did not receive the request: {error}"),
+                }
+            };
+            stream
+                .set_read_timeout(Some(Duration::from_secs(2)))
+                .unwrap();
+            let mut request = Vec::new();
+            let mut buffer = [0; 1024];
+            loop {
+                let bytes = stream.read(&mut buffer).unwrap_or(0);
+                if bytes == 0 {
+                    break;
+                }
+                request.extend_from_slice(&buffer[..bytes]);
+                if request.windows(4).any(|window| window == b"\r\n\r\n") {
+                    break;
+                }
+            }
+            String::from_utf8_lossy(&request).into_owned()
+        });
+        let result =
+            tauri::async_runtime::block_on(async { https_client.get(remote).send().await });
+        assert!(result.is_err(), "the test proxy does not complete TLS");
+        assert!(proxy_request
+            .join()
+            .unwrap()
+            .starts_with("CONNECT 127.0.0.1:9 HTTP/1.1"));
     }
 
     #[test]

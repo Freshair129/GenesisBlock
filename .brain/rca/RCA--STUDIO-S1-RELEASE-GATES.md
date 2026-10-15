@@ -49,6 +49,7 @@ WebView2 CDP before the first UI action.
 - The packaged transport change routes remote operations through Tauri IPC to a Rust client with fixed read-only operation/method/path mappings, URL and query validation, redirects disabled, and same-origin token forwarding. Frontend tests cover native bridge selection, token/configuration handoff, disconnect cleanup, and cleanup after capability-handshake failure. The Tauri Rust library suite passed 9/9 after a regression exposed and fixed bracketed IPv6 loopback validation; the strengthened persisted-fixture parity test passed 1/1, and the read-only REST server binary built successfully.
 - Studio packaging run [38686388595](https://github.com/Freshair129/GenesisBlock/actions/runs/38686388595), at head `5419a91cca67cd5aca67deea130c031d2eaa84f4`, completed all three package jobs. The Linux DEB package installed and launched successfully; the macOS DMG package installed and launched successfully; the Windows MSI installer completed successfully but the smoke failed before UI interaction because Playwright `connectOverCDP` received `ECONNREFUSED 127.0.0.1:50705`. The Windows fixture seed and REST server build steps passed, but no packaged picker, local/remote UI parity, remote-mode CSP result, or startup-screen result is claimed. The [MSI](https://github.com/Freshair129/GenesisBlock/actions/runs/38686388595/artifacts/11950739509), [DMG](https://github.com/Freshair129/GenesisBlock/actions/runs/38686388595/artifacts/11950784409), [DEB](https://github.com/Freshair129/GenesisBlock/actions/runs/38686388595/artifacts/11950242206), and [smoke evidence](https://github.com/Freshair129/GenesisBlock/actions/runs/38686388595/artifacts/11950994174) are retained as workflow artifacts.
 - The first Studio Rust test compile reached the new Tauri test target but failed because its CSP test lacked a `Value` import. After fixing that test import, the suite exposed that `Url::host_str()` returns a bracketed IPv6 host, causing loopback HTTP to be rejected; validation now strips exactly one bracket pair before parsing the address. The full Tauri library suite passed 9/9. The strengthened root parity test passed 1/1 and the `genesis-db-server` build passed. These are source/test/build checks, not installed-package evidence.
+- A read-only review of head `8463222b4c853050437f96f1dbb6199a710a7e9d` found a credential-routing gap: `RemoteConnection::new` used reqwest's default client, which enables system proxies, while the bridge permits loopback HTTP and attaches the bearer authorization header. If `HTTP_PROXY`/`ALL_PROXY` is set without a matching `NO_PROXY` exclusion, a loopback bearer request could be routed in cleartext through the proxy. The bridge now applies `no_proxy()` only to validated HTTP URLs (which the validator restricts to loopback), while retaining the default system-proxy behavior for HTTPS. A focused proxy regression was added; its local Rust execution and refreshed CI are pending because the shared Cargo slot is occupied.
 
 ## Root cause
 
@@ -105,6 +106,10 @@ CSP.
   reference.
 - Route packaged remote REST calls through a Rust native client over Tauri IPC;
   keep the production WebView `connect-src` restricted to app and IPC origins.
+- For validated loopback HTTP, disable system and configured proxies so the
+  bearer header stays on the loopback connection; retain default system-proxy
+  routing for HTTPS remote servers. Regress both branches with an explicit local
+  proxy probe before accepting the fix.
 - Expose only fixed read-only route/method variants, validate URL scheme/host/
   port/path and graph query values, compare every target with the configured
   origin, disable redirects, and clear the in-memory token on disconnect or a

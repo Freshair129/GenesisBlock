@@ -445,6 +445,7 @@ bootstrap/single-operator mode ได้ แต่ไม่เพียงพอ
 - logout/revoke ต้อง clear cached token และ in-memory sensitive state;
 - packaged S1 WebView ไม่มี direct remote-network permission; remote REST calls ผ่าน Rust native bridge และ operation allowlist ที่ map ไปยัง fixed read-only routes/methods;
 - native bridge รับเฉพาะ HTTPS หรือ HTTP บน loopback, require host, validate port, reject credentials/query/fragment/path traversal or delimiters (including repeated percent-encoding), preserve the configured path prefix, and disable redirects;
+- native loopback HTTP requests bypass configured proxies so bearer tokens remain on the local connection; HTTPS requests retain the system proxy policy;
 - entity IDs reject dot segments, separators, query/fragment delimiters, invalid encoded bytes, and their repeated percent-encoded forms before being appended as one path segment;
 - native response buffering is capped at 32 MiB for JSON and 64 KiB for error bodies, including chunked responses;
 - graph query รับเฉพาะ bounded `limit`, optional `seed`, และ `direction` (`out`, `in`, `both`); entity IDs are appended as one encoded path segment; other methods/paths are not caller-selectable;
@@ -561,6 +562,11 @@ configured origin and URL components, disables redirects, applies a 15-second
 timeout, and sends the bearer header only on those fixed requests. Production
 CSP remains unchanged. Browser preview continues to use `fetch`; its tests are
 not evidence of packaged WebView networking.
+
+The native client bypasses proxies for plain HTTP because validation permits
+that scheme only on loopback; HTTPS retains the default system-proxy behavior.
+A focused local-proxy regression checks loopback bypass and HTTPS proxy use.
+Record the test result after the serialized Tauri test run.
 
 Current Windows verification:
 
