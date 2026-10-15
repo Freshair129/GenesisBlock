@@ -98,6 +98,7 @@ const LEGACY_SCHEMA_VERSION: u32 = 5;
 // additive shape — existing databases gain the table empty and are backfilled
 // from the live map on open (`projection_backfill_edges`).
 const PROJECTION_SCHEMA_VERSION: u32 = 5;
+const PROJECTION_JOURNAL_FINGERPRINT_KEY: &str = "journal_projection_fingerprint_v1";
 
 /// Bounds for the read-only SQL surface. Exceeding one is an ERROR, never a
 /// silent truncation.
@@ -151,6 +152,9 @@ pub const ENGINE_NAME: &str = "genesis-block";
 /// at compile time. Single source of truth for the running version — surfaced
 /// via `version_sync()` (NAPI) and `GET /v1/version` (REST).
 pub const ENGINE_VERSION: &str = env!("CARGO_PKG_VERSION");
+
+#[cfg(test)]
+mod projection_rebuild_tests;
 
 // --- Types (PROTOCOL §3) ---
 
@@ -4022,6 +4026,22 @@ pub struct Storage {
     pub ef_search: AtomicUsize,
     pub signing_key: SigningKey,
     pub verifying_key: VerifyingKey,
+}
+
+struct ProjectionCandidate {
+    path: PathBuf,
+    connection: Option<Connection>,
+}
+
+impl Drop for ProjectionCandidate {
+    fn drop(&mut self) {
+        drop(self.connection.take());
+        for suffix in ["", "-wal", "-shm"] {
+            let mut path = self.path.as_os_str().to_os_string();
+            path.push(suffix);
+            let _ = fs::remove_file(PathBuf::from(path));
+        }
+    }
 }
 
 // --- Governance (AXIOMATIC GUARDS §2) ---
@@ -11798,17 +11818,285 @@ impl Storage {
         Ok(())
     }
 
-    fn projection_reopen_fresh(&self) -> Result<()> {
+    fn projection_candidate(&self) -> Result<ProjectionCandidate> {
+        self.projection_candidate_with_current(false)
+    }
+
+    fn projection_candidate_from_current(&self) -> Result<ProjectionCandidate> {
+        self.projection_candidate_with_current(true)
+    }
+
+    fn projection_candidate_with_current(&self, copy_current: bool) -> Result<ProjectionCandidate> {
+        let path = self
+            .path
+            .join(format!("projection-rebuild-{}.sqlite", Uuid::new_v4()));
+        let source = self.projection_db.lock();
+        let page_size = source
+            .query_row("PRAGMA page_size", [], |row| row.get::<_, i64>(0))
+            .map_err(|error| Error::from_reason(error.to_string()))?;
+        let conn = Self::open_projection(&path, false)?;
+        let mut candidate = ProjectionCandidate {
+            path,
+            connection: Some(conn),
+        };
+        candidate
+            .connection
+            .as_ref()
+            .expect("candidate connection was just initialized")
+            .pragma_update(None, "page_size", page_size)
+            .map_err(|error| Error::from_reason(error.to_string()))?;
+        if copy_current {
+            // Preserve the current projection as the replay base without
+            // allowing a later WAL event failure to leave partial live writes.
+            let destination = candidate
+                .connection
+                .as_mut()
+                .expect("candidate connection was just initialized");
+            let backup = rusqlite::backup::Backup::new(&source, destination)
+                .map_err(Self::projection_backup_error)?;
+            backup
+                .run_to_completion(256, Duration::from_millis(1), None)
+                .map_err(Self::projection_backup_error)?;
+        }
+        drop(source);
+
+        let conn = candidate
+            .connection
+            .as_ref()
+            .expect("candidate connection was just initialized");
+        Self::init_projection_schema(conn)?;
+        // Schema-v6 WAL frames carry record revisions, so the blank replay
+        // candidate must have the same auxiliary tables as a normal writable
+        // projection before it can replay those frames.
+        if self.storage_schema_version == SCHEMA_VERSION {
+            Self::init_hql2_revision_schema(conn)?;
+        }
+        Ok(candidate)
+    }
+
+    fn projection_journal_fingerprint(&self) -> Result<String> {
+        fn hash_file(hasher: &mut Sha256, label: &str, path: &Path) -> Result<()> {
+            hasher.update((label.len() as u64).to_le_bytes());
+            hasher.update(label.as_bytes());
+            let file_name = path.file_name().unwrap_or_default().to_string_lossy();
+            hasher.update((file_name.len() as u64).to_le_bytes());
+            hasher.update(file_name.as_bytes());
+            let mut file = match File::open(path) {
+                Ok(file) => file,
+                Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
+                    hasher.update([0]);
+                    return Ok(());
+                }
+                Err(error) => return Err(Error::from_reason(error.to_string())),
+            };
+            hasher.update([1]);
+            hasher.update(
+                file.metadata()
+                    .map_err(|error| Error::from_reason(error.to_string()))?
+                    .len()
+                    .to_le_bytes(),
+            );
+            let mut buffer = [0u8; 64 * 1024];
+            loop {
+                let read = file
+                    .read(&mut buffer)
+                    .map_err(|error| Error::from_reason(error.to_string()))?;
+                if read == 0 {
+                    break;
+                }
+                hasher.update(&buffer[..read]);
+            }
+            Ok(())
+        }
+
+        let mut hasher = Sha256::new();
+        hasher.update(b"genesis-block-projection-journal-v1");
+        hasher.update(SCHEMA_VERSION.to_le_bytes());
+        hasher.update(PROJECTION_SCHEMA_VERSION.to_le_bytes());
+        hash_file(&mut hasher, "legacy", &self.legacy_log_path)?;
+        for segment in Self::journal_list_segments(&self.path) {
+            hash_file(
+                &mut hasher,
+                &format!(
+                    "segment:{}:{}:{}",
+                    segment.kind, segment.min_seq, segment.max_seq
+                ),
+                &segment.path,
+            )?;
+        }
+        hash_file(&mut hasher, "active", &self.log_path)?;
+        Ok(hex::encode(hasher.finalize()))
+    }
+
+    fn projection_journal_fingerprint_matches(&self, fingerprint: &str) -> bool {
+        let conn = self.projection_db.lock();
+        match conn
+            .query_row(
+                "SELECT value FROM projection_state WHERE key=?1",
+                [PROJECTION_JOURNAL_FINGERPRINT_KEY],
+                |row| row.get::<_, String>(0),
+            )
+            .optional()
+        {
+            // The marker is only a cache. Missing/corrupt state must force a
+            // repair attempt instead of preventing open from rebuilding it.
+            Ok(current) => current.as_deref() == Some(fingerprint),
+            Err(_) => false,
+        }
+    }
+
+    fn projection_store_journal_fingerprint(conn: &Connection, fingerprint: &str) -> Result<()> {
+        conn.execute(
+            "INSERT INTO projection_state(key, value) VALUES(?1, ?2)
+             ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+            params![PROJECTION_JOURNAL_FINGERPRINT_KEY, fingerprint],
+        )
+        .map_err(|error| Error::from_reason(error.to_string()))?;
+        Ok(())
+    }
+
+    fn projection_sync_candidate(
+        &self,
+        candidate: &mut ProjectionCandidate,
+        journal_fingerprint: &str,
+    ) -> Result<()> {
+        let staged = candidate
+            .connection
+            .take()
+            .ok_or_else(|| Error::from_reason("projection rebuild candidate is unavailable"))?;
+        let original = {
+            let mut projection = self.projection_db.lock();
+            std::mem::replace(&mut *projection, staged)
+        };
+
+        let result = self
+            .projection_replay_wal()
+            .and_then(|()| self.rebuild_edge_history())
+            .and_then(|()| self.projection_backfill_edges());
+
+        let staged = {
+            let mut projection = self.projection_db.lock();
+            std::mem::replace(&mut *projection, original)
+        };
+        candidate.connection = Some(staged);
+        result?;
+        Self::projection_store_journal_fingerprint(
+            candidate
+                .connection
+                .as_ref()
+                .expect("candidate connection was restored after replay"),
+            journal_fingerprint,
+        )
+    }
+
+    fn projection_replay_needs_fresh_candidate(&self) -> bool {
+        fn check_schema_event(
+            package: &RelationalSchemaPackage,
+            conn: &Connection,
+            schemas: &mut HashMap<String, Option<Option<RelationalSchemaPackage>>>,
+        ) -> bool {
+            if Storage::validate_relational_schema(package).is_err() {
+                return true;
+            }
+            let namespace = package.namespace.clone();
+            let current = schemas
+                .entry(namespace.clone())
+                .or_insert_with(|| Storage::load_relational_schema_conn(conn, &namespace).ok());
+            match current {
+                None => true,
+                Some(Some(previous)) if previous == package => false,
+                Some(Some(previous)) => {
+                    if Storage::validate_schema_upgrade(previous, package).is_err() {
+                        true
+                    } else {
+                        *previous = package.clone();
+                        false
+                    }
+                }
+                Some(None) if package.schema_version == 1 && package.previous_version.is_none() => {
+                    *current = Some(Some(package.clone()));
+                    false
+                }
+                Some(None) => true,
+            }
+        }
+
+        let conn = self.projection_db.lock();
+        let mut schemas = HashMap::new();
+        let mut needs_fresh_candidate = false;
+        self.scan_journal(None, true, &mut |_, signed_event| {
+            if needs_fresh_candidate {
+                return;
+            }
+            match signed_event.event {
+                Event::RelationalSchema(package) => {
+                    needs_fresh_candidate = check_schema_event(&package, &conn, &mut schemas);
+                }
+                Event::Batch(events) => {
+                    for event in events {
+                        if let Event::RelationalSchema(package) = event {
+                            if check_schema_event(&package, &conn, &mut schemas) {
+                                needs_fresh_candidate = true;
+                                break;
+                            }
+                        }
+                    }
+                }
+                _ => {}
+            }
+        });
+        needs_fresh_candidate
+    }
+
+    fn projection_publish_candidate(&self, candidate: &ProjectionCandidate) -> Result<()> {
+        let source = candidate
+            .connection
+            .as_ref()
+            .ok_or_else(|| Error::from_reason("projection rebuild candidate is unavailable"))?;
+        let mut destination = self.projection_db.lock();
+        // SQLite holds the destination write transaction until the backup
+        // reaches SQLITE_DONE. Dropping an unfinished rusqlite Backup calls
+        // sqlite3_backup_finish, which rolls that transaction back on errors.
+        let backup = rusqlite::backup::Backup::new(source, &mut destination)
+            .map_err(Self::projection_backup_error)?;
+        loop {
+            match backup.step(256).map_err(Self::projection_backup_error)? {
+                rusqlite::backup::StepResult::Done => return Ok(()),
+                rusqlite::backup::StepResult::More => {}
+                rusqlite::backup::StepResult::Busy | rusqlite::backup::StepResult::Locked => {
+                    return Err(Error::from_reason(
+                        "PROJECTION_REBUILD_BUSY: projection publication could not acquire SQLite locks",
+                    ));
+                }
+                _ => {
+                    return Err(Error::from_reason(
+                        "PROJECTION_REBUILD_FAILED: SQLite backup returned an unsupported step state",
+                    ));
+                }
+            }
+        }
+    }
+
+    fn projection_backup_error(error: rusqlite::Error) -> Error {
+        let busy = matches!(
+            error.sqlite_error_code(),
+            Some(rusqlite::ErrorCode::DatabaseBusy | rusqlite::ErrorCode::DatabaseLocked)
+        );
+        let message = error.to_string();
+        if busy {
+            Error::from_reason(format!("PROJECTION_REBUILD_BUSY: {message}"))
+        } else {
+            Error::from_reason(message)
+        }
+    }
+
+    #[cfg(test)]
+    fn projection_rebuild_from_wal(&self) -> Result<()> {
         if self.read_only {
             return Ok(());
         }
-        if self.projection_path.exists() {
-            let _ = fs::remove_file(&self.projection_path);
-        }
-        let conn = Self::open_projection(&self.projection_path, false)?;
-        Self::init_projection_schema(&conn)?;
-        *self.projection_db.lock() = conn;
-        Ok(())
+        let journal_fingerprint = self.projection_journal_fingerprint()?;
+        self.projection_rebuild_fresh_candidate(&journal_fingerprint, None)
     }
 
     fn projection_replay_wal(&self) -> Result<()> {
@@ -11883,17 +12171,63 @@ impl Storage {
         if self.read_only {
             return Ok(());
         }
+        let journal_fingerprint = self.projection_journal_fingerprint()?;
+        if self.projection_journal_fingerprint_matches(&journal_fingerprint) {
+            return Ok(());
+        }
         // Lamport time is not a WAL cursor: distinct peers may emit equal clocks,
         // and compaction rewrites the WAL. Scan the authoritative WAL on open and
         // rely on full-clock LWW upserts for idempotence. A durable sequence cursor
         // belongs to the unified transaction protocol, not this S0/S1 projection.
-        if self.projection_replay_wal().is_err() {
-            self.projection_reopen_fresh()?;
-            self.projection_replay_wal()?;
+        // Replay mutates SQLite event by event, so every marker miss must stay on
+        // a candidate until replay, edge rebuilding, and validation all succeed.
+        if self.projection_replay_needs_fresh_candidate() {
+            return self.projection_rebuild_fresh_candidate(&journal_fingerprint, None);
         }
-        self.rebuild_edge_history()?;
-        self.projection_backfill_edges()?;
-        Ok(())
+        self.projection_sync_existing_candidate(&journal_fingerprint)
+    }
+
+    fn projection_sync_existing_candidate(&self, journal_fingerprint: &str) -> Result<()> {
+        let mut candidate = match self.projection_candidate_from_current() {
+            Ok(candidate) => candidate,
+            Err(error) => {
+                return self.projection_rebuild_fresh_candidate(
+                    journal_fingerprint,
+                    Some(error.to_string()),
+                )
+            }
+        };
+        if let Err(error) = self.projection_sync_candidate(&mut candidate, journal_fingerprint) {
+            drop(candidate);
+            return self
+                .projection_rebuild_fresh_candidate(journal_fingerprint, Some(error.to_string()));
+        }
+        self.projection_publish_candidate(&candidate)
+    }
+
+    fn projection_rebuild_fresh_candidate(
+        &self,
+        journal_fingerprint: &str,
+        replay_error: Option<String>,
+    ) -> Result<()> {
+        let mut candidate = self.projection_candidate().map_err(|error| {
+            Error::from_reason(match replay_error.as_deref() {
+                Some(first_error) => format!(
+                    "projection sync failed ({first_error}); fresh rebuild setup failed: {error}"
+                ),
+                None => format!("fresh projection rebuild setup failed: {error}"),
+            })
+        })?;
+        self.projection_sync_candidate(&mut candidate, journal_fingerprint)
+            .map_err(|error| {
+                Error::from_reason(match replay_error.as_deref() {
+                    Some(first_error) => format!(
+                        "projection sync failed ({first_error}); fresh WAL rebuild failed: {error}"
+                    ),
+                    None => format!("fresh WAL rebuild failed: {error}"),
+                })
+            })?;
+        self.projection_publish_candidate(&candidate)
     }
 
     fn rebuild_edge_history(&self) -> Result<()> {
