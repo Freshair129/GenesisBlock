@@ -233,9 +233,23 @@ exact boundary, tests and performance limitations.
 | GET | `/v1/version` | _none_ | `{ version }` |
 | GET | `/v1/swarm/status` | _none_ | `SwarmStatus` |
 | POST | `/v1/consensus/propose` | `{ event: Event, signature: u8[] }` | `String` (proposal id) |
+| POST | `/v1/consensus/proposal/export` | `{ proposal_id }` | signed `ConsensusProposal` envelope (vote state cleared) |
+| POST | `/v1/consensus/proposal/import` | `{ proposal: ConsensusProposal }` | `{ imported: true }` after membership, signature, and role checks; requires writable storage |
 | POST | `/v1/consensus/sign-vote` | `{ proposal_id, approve }` | `u8[]` (ed25519 signature) |
 | POST | `/v1/consensus/vote` | `{ proposal_id, peer_id, approve, signature: u8[] }` | `bool` (quorum reached) |
 | POST | `/v1/consensus/verify` | `Event` | `bool` |
+
+Consensus proposals can be relayed between operators with `export` and
+`import`: the proposer exports the signed envelope, each voter imports it before
+calling `sign-vote`, and the returned vote signature is submitted with `vote`.
+Votes are first-choice per member, proposal, and configured roster; an identical
+retry is idempotent, while a conflicting second choice is rejected across
+process restarts. Pending proposal objects must be imported again after restart;
+the durable vote lock is restored from the database directory at import time.
+Committed proposal receipts survive compaction and make re-import and vote retry
+idempotent after restart. An interrupted WAL commit is recovered from its prepared
+receipt plus the exact signed event frame. The vote and commit ledgers are bounded
+to 64 MiB and 100,000 records each; requests fail closed at the limit.
 
 **Engine capabilities NOT exposed over REST** (NAPI/embedded only) include
 `compact`, `set_language_centroid`, `set_index_params`, `reconcile_state`, and
@@ -439,9 +453,14 @@ Tiers `MASTER` (0) / `SPEC` (1) / `ADR` (2) / `USER` (3), derived from node
 error); MASTER promotion requires multi-signature consensus. Guard cost is
 <0.1% of a write (audit P24).
 
-**Consensus votes are signed.** A voter signs `VOTE|{proposal_id}|{peer_id}|{approve}`
-with its ed25519 key (`/v1/consensus/sign-vote`); `submit_vote` verifies the
-signature against the voter's registered public key (`SyncPeer.verifying_key`, or
-this node's own key for a self-vote) before counting it. Unknown-peer, malformed,
-or non-matching signatures are rejected (`400`) and not counted — forged or
-replayed votes cannot reach quorum. See `ADR--GENESISDB-CONSENSUS-VOTE-SIGNATURES`.
+**Consensus votes are signed.** The domain-separated payload binds proposal ID,
+the complete signed-event digest, voter ID, choice, and configured roster digest.
+`submit_vote` verifies the signature against the pinned roster key (or this
+node's own key for a self-vote). A durable vote-lock ledger records the first
+choice before returning a signature or acknowledging a vote; identical retries
+are idempotent and conflicting or stale signatures are rejected (`400`). See
+`ADR--GENESISDB-CONSENSUS-VOTE-SIGNATURES`. A durable commit receipt prevents
+the same signed event from being applied again after proposal re-import, including
+after journal compaction. Ledgers are capped at 64 MiB and 100,000 records; the
+engine refuses additional voting or consensus commits at the cap rather than
+discarding security history.

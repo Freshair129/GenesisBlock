@@ -2,7 +2,7 @@
 title: "GenesisBlockDB Technical Architecture and Capability Composition"
 doc_id: "MASTER-SPEC-GENESISBLOCKDB"
 status: current
-version: "2.3.44b"
+version: "2.3.45b"
 updated: "2026-10-16"
 owner: "GenesisBlockDB Architecture"
 source_of_truth: true
@@ -312,10 +312,11 @@ A client may map them to:
 The core SHALL not require one mapping for all clients.
 
 Cryptographic signatures establish event integrity against a key; peer
-discovery and a valid signature do not establish membership or client authority.
-The peer-membership authorization contract remains a candidate in
-[ADR--GENESISDB-PEER-MEMBERSHIP-AUTHORIZATION](adr/ADR--GENESISDB-PEER-MEMBERSHIP-AUTHORIZATION.md).
-No universal application authority policy is selected by that candidate.
+discovery alone does not establish membership or client authority. The accepted
+[peer-membership authorization ADR](adr/ADR--GENESISDB-PEER-MEMBERSHIP-AUTHORIZATION.md)
+defines the engine's closed roster, signed gossip, and role checks. Client
+semantic authority remains client-owned; the engine does not infer it from a
+client tier or business label.
 
 ## 8. Distributed Synchronization
 
@@ -325,11 +326,11 @@ Where enabled, synchronization uses documented logical-clock, reconciliation and
 - LWW or other configured reconciliation behavior must be documented as a storage conflict rule, not a substitute for client semantic conflict policy.
 - Local clock advancement follows the documented protocol.
 
-Client-level semantic conflicts may require review even when storage-level reconciliation succeeds.
-Peer discovery, key possession, authorized membership, and authority to
-replicate privileged state are separate concerns. P6 transport synchronization
-is outside the record-read ACL; the separate peer-authorization contract is
-still a candidate and has not selected an enrollment or quorum policy.
+Client-level semantic conflicts may require review even when storage-level
+reconciliation succeeds. Enabled synchronization uses the operator-configured
+roster and authenticated gossip envelope defined by the accepted
+peer-membership ADR. P6 transport synchronization remains outside the
+record-read ACL.
 
 ## 9. HQL and Typed Query IR
 
@@ -460,6 +461,12 @@ independent-review or broad P8/P13 gates.
 
 ## Changelog
 
+Version diff 2.3.44b -> 2.3.45b: accept the closed roster, authenticated gossip,
+MASTER-role, fixed-quorum, and event-bound vote contract; require an explicit
+local role for multi-node configuration and synchronize implementation
+entrypoints for security issues #236 and #237. Client semantic authority
+remains client-owned.
+
 Version diff 2.3.43b -> 2.3.44b: clarify that peer discovery and signatures do
 not establish membership or client authority; link the candidate peer
 authorization ADR. No wire, schema, or authority-policy decision is approved.
@@ -479,6 +486,7 @@ shared-runtime and broad P8/P13 gates remain open.
 
 | Version | Date | Owner | Summary |
 |---|---|---|---|
+| 2.3.45b | 2026-10-16 | GenesisBlockDB Architecture | Accept closed peer roster, authenticated gossip, MASTER role checks, fixed-roster quorum, and event-bound votes for issues #236 and #237; require explicit multi-node local role and preserve client-owned semantic authority |
 | 2.3.44b | 2026-10-16 | GenesisBlockDB Architecture | Clarify discovery/signature versus membership/authority; link candidate peer authorization ADR; no trust policy, schema, or wire change |
 | 2.3.43b | 2026-10-06 | GenesisBlockDB Architecture | Record GenesisRAG17 candidate engine source/qualification through the worker ADR; preserve historical baseline and TEST-only boundary; no schema or wire change; full integration qualification pending |
 | 2.3.42b | 2026-10-05 | GenesisBlockDB Architecture | Extend approved D7 with one unlabeled zero-hop property projection and exact-seed depth-one TRAVERSE; adapter 13/13, property/order/filter 2/2 each, HQL2 404/0/1 across 39 targets and U9 restore 7/7; sync R5 restore evidence; preserve fail-closed boundaries and broad shared-runtime/P8/P13 gates |

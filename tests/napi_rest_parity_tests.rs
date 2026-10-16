@@ -47,6 +47,10 @@ use std::fs;
 /// method is intentionally NAPI-only (or, for `open`, why it has no
 /// REST-shaped analogue at all).
 const NAPI_TO_REST: &[(&str, Option<&str>)] = &[
+    // Configuration and identity inspection are local process setup APIs.
+    ("open_with_membership", None),
+    // Public key bootstrap data is intentionally returned only to local callers.
+    ("local_identity", None),
     // Constructor — the REST server opens its own `Storage` once at startup
     // (see `src/main.rs`), so there is no per-request REST analogue to "open".
     ("open", None),
@@ -138,6 +142,14 @@ const NAPI_TO_REST: &[(&str, Option<&str>)] = &[
     ("events_since", None),
     ("semantic_verify", Some("/v1/consensus/verify")),
     ("propose_consensus", Some("/v1/consensus/propose")),
+    (
+        "export_consensus_proposal",
+        Some("/v1/consensus/proposal/export"),
+    ),
+    (
+        "import_consensus_proposal",
+        Some("/v1/consensus/proposal/import"),
+    ),
     ("submit_vote", Some("/v1/consensus/vote")),
     ("sign_vote", Some("/v1/consensus/sign-vote")),
     // Folded into SwarmStatus.peer_id: swarm_status_handler reads

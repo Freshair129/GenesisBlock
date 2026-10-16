@@ -33,13 +33,13 @@ Security-relevant areas of the engine:
 
 - **Governance tiers** — external agents must not be able to create or mutate
   `MASTER`-tier nodes. Local direct-write guards live in the engine. Remote
-  reconciliation and peer-authority boundaries are tracked separately; see
-  issues #236 and #237 and the candidate peer-membership authorization ADR.
+  reconciliation checks signed membership and `masterAuthority` at the shared
+  ingress boundary. See the accepted peer-membership authorization ADR.
 - **Consensus & sync** — `SignedEvent` values are ed25519-signed and the swarm
-  identity keypair is persisted under the database path. Signature validation
-  against a Heartbeat-discovered key establishes key possession relative to
-  that key; it does not establish authorized membership or authority to
-  participate in quorum or replicate privileged state.
+  identity keypair is persisted under the database path. Gossip requires an
+  operator-pinned roster, signed packets, a matching roster digest, and the
+  configured source endpoint. Votes and quorum use only roster members; vote
+  signatures bind to the complete signed event under the proposal ID.
 - **REST surface** (`/v1/*`) — input validation, query handling, and
   authentication boundaries.
 - **Deserialization** — WAL replay and snapshot (`state.json`, `*.bin`) loading.

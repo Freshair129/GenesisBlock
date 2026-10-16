@@ -1,8 +1,8 @@
 use genesis_block_native::{
-    BatchInput, EdgeInput, GenesisTransaction, HybridSearchInput, NeighborInput, NodeInput,
-    OpenOptions, RelationalColumn, RelationalColumnType, RelationalFilter, RelationalMutationGroup,
-    RelationalMutationKind, RelationalQuery, RelationalRowMutation, RelationalSchemaPackage,
-    RelationalTable, SidecarReader, Storage, SyncPeer,
+    AuthorizedPeerConfig, BatchInput, EdgeInput, GenesisTransaction, HybridSearchInput,
+    NeighborInput, NodeInput, OpenOptions, RelationalColumn, RelationalColumnType,
+    RelationalFilter, RelationalMutationGroup, RelationalMutationKind, RelationalQuery,
+    RelationalRowMutation, RelationalSchemaPackage, RelationalTable, SidecarReader, Storage,
 };
 use parking_lot::RwLock;
 use serde_json::json;
@@ -359,15 +359,19 @@ fn replicated_fold_receipt_uses_destination_frame_after_cold_reopen() {
     let delta = source.events_since_seq(0);
 
     let mut destination = open_schema5(&destination_path);
-    destination.peers.insert(
-        source.local_peer_id.clone(),
-        SyncPeer {
-            id: source.local_peer_id.clone(),
-            addr: String::new(),
-            last_seen: 0,
-            verifying_key: source.verifying_key.to_bytes().to_vec(),
-        },
-    );
+    let identity = source.local_identity();
+    destination
+        .configure_peer_membership(
+            vec![AuthorizedPeerConfig {
+                peer_id: identity.peer_id,
+                public_key_hex: identity.public_key_hex,
+                gossip_addr: "127.0.0.1:32302".into(),
+                master_authority: false,
+            }],
+            "127.0.0.1:32301",
+            true,
+        )
+        .unwrap();
     destination.reconcile_state(delta).unwrap();
     let destination_sequence = destination.txn_frontier();
     assert!(destination_sequence > original_sequence);

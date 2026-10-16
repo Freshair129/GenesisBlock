@@ -68,15 +68,10 @@ fn node_exists(s: &Storage, id: &str) -> bool {
     s.nodes.iter().any(|e| e.value().id == id)
 }
 
-/// A stale re-push of `node` as this store's own peer id — reconcile_state
-/// self-trusts local events, so no real signature is needed. This is exactly
-/// the disk image of "a peer still holding the pre-retraction node".
+/// A stale re-push with a real local signature, modeling the disk image of a
+/// peer still holding the pre-retraction node.
 fn stale_push(node: &genesis_block_native::NodeOutput, s: &Storage) -> SignedEvent {
-    SignedEvent {
-        event: Event::Node(node.clone()),
-        signature: vec![0; 64],
-        signer_peer_id: s.local_peer_id.clone(),
-    }
+    s.sign_event(&Event::Node(node.clone()))
 }
 
 /// The core LWW claim: a retraction (newer clock) beats a stale peer re-push

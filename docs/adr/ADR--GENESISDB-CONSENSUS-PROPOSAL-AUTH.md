@@ -125,15 +125,12 @@ and vectors completely.
 ### Security boundary follow-up (2026-10-16)
 
 The proposal and commit signature checks establish authenticity relative to the
-key resolved for the claimed signer. They do not prove that the signer is an
-authorized swarm member. The current key resolver uses keys in the Heartbeat
-discovery map, and quorum membership is also derived from discovered peers.
-Additionally, the shared remote reconciliation path does not apply the same
-MASTER governance guard as local direct writes. Thus the outcomes above cover
-signature and semantic-conflict checks, not authenticated membership or
-complete authorization of privileged peer sync. Public issues #236 and #237
-remain open. See the candidate
-[peer-membership authorization ADR](ADR--GENESISDB-PEER-MEMBERSHIP-AUTHORIZATION.md).
+key resolved for the claimed signer. The accepted
+[peer-membership authorization ADR](ADR--GENESISDB-PEER-MEMBERSHIP-AUTHORIZATION.md)
+adds authorized roster membership, a fixed electorate, and shared-ingress
+`MASTER` checks. The proposal-auth tests remain evidence for signature and
+semantic-conflict checks; the security regression tests cover the membership
+and role boundary for issues #236 and #237.
 
 ---
 ### Related Links

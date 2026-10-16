@@ -1,11 +1,28 @@
-use ed25519_dalek::Signer;
-use genesis_block_native::{Event, LogicalClock, NodeInput, OpenOptions, SignedEvent, Storage};
+use genesis_block_native::{
+    AuthorizedPeerConfig, Event, LogicalClock, NodeInput, OpenOptions, SignedEvent, Storage,
+};
 use serde_json::json;
 use std::{fs, path::Path, sync::Arc};
 use tempfile::tempdir;
 
 fn mark_schema5(path: &Path) {
     fs::write(path.join("state.json"), r#"{"schema_version":5}"#).unwrap();
+}
+
+fn authorize(destination: &Storage, remote: &Storage, local_port: u16, remote_port: u16) {
+    let identity = remote.local_identity();
+    destination
+        .configure_peer_membership(
+            vec![AuthorizedPeerConfig {
+                peer_id: identity.peer_id,
+                public_key_hex: identity.public_key_hex,
+                gossip_addr: format!("127.0.0.1:{remote_port}"),
+                master_authority: false,
+            }],
+            &format!("127.0.0.1:{local_port}"),
+            true,
+        )
+        .unwrap();
 }
 
 #[test]
@@ -37,6 +54,9 @@ fn test_crdt_conflict_resolution() {
         .unwrap(),
     );
 
+    authorize(&storage_a, &storage_b, 30101, 30102);
+    authorize(&storage_b, &storage_a, 30102, 30101);
+
     // 1. Agent A creates a node (automatically signs and persists)
     let node_a = storage_a
         .add_node(NodeInput {
@@ -52,33 +72,7 @@ fn test_crdt_conflict_resolution() {
         })
         .unwrap();
 
-    // 2. Mock a SignedEvent for replication
-    let signed_event_a = SignedEvent {
-        event: Event::Node(node_a.clone()),
-        signature: vec![0; 64], // We'll bypass local verification in this test by matching local_peer_id if needed,
-        // but better to use real signatures or register peer.
-        signer_peer_id: storage_a.local_peer_id.clone(),
-    };
-
-    // Register Peer A at B
-    storage_b.peers.insert(
-        storage_a.local_peer_id.clone(),
-        genesis_block_native::SyncPeer {
-            id: storage_a.local_peer_id.clone(),
-            addr: "".to_string(),
-            last_seen: 0,
-            verifying_key: storage_a.verifying_key.to_bytes().to_vec(),
-        },
-    );
-
-    // We need a real signature for B to accept it
-    let event_data = serde_json::to_vec(&signed_event_a.event).unwrap();
-    let real_signature = storage_a.signing_key.sign(&event_data).to_bytes().to_vec();
-    let valid_event_a = SignedEvent {
-        event: signed_event_a.event,
-        signature: real_signature,
-        signer_peer_id: storage_a.local_peer_id.clone(),
-    };
+    let valid_event_a = storage_a.sign_event(&Event::Node(node_a.clone()));
 
     storage_b
         .reconcile_state(vec![valid_event_a.clone()])
@@ -104,28 +98,7 @@ fn test_crdt_conflict_resolution() {
         peer_id: storage_b.local_peer_id.clone(),
     };
 
-    let event_b = Event::Node(node_b_v2_inner);
-    let sig_b = storage_b
-        .signing_key
-        .sign(&serde_json::to_vec(&event_b).unwrap())
-        .to_bytes()
-        .to_vec();
-    let signed_b = SignedEvent {
-        event: event_b,
-        signature: sig_b,
-        signer_peer_id: storage_b.local_peer_id.clone(),
-    };
-
-    // Register Peer B at A
-    storage_a.peers.insert(
-        storage_b.local_peer_id.clone(),
-        genesis_block_native::SyncPeer {
-            id: storage_b.local_peer_id.clone(),
-            addr: "".to_string(),
-            last_seen: 0,
-            verifying_key: storage_b.verifying_key.to_bytes().to_vec(),
-        },
-    );
+    let signed_b = storage_b.sign_event(&Event::Node(node_b_v2_inner));
 
     // 4. B applies its own Version B locally first
     storage_b.reconcile_state(vec![signed_b.clone()]).unwrap();
@@ -142,16 +115,7 @@ fn test_crdt_conflict_resolution() {
     );
 
     // 6. B receives A's update (2 < 10)
-    let sig_a2 = storage_a
-        .signing_key
-        .sign(&serde_json::to_vec(&Event::Node(node_a_v2.clone())).unwrap())
-        .to_bytes()
-        .to_vec();
-    let signed_a2 = SignedEvent {
-        event: Event::Node(node_a_v2),
-        signature: sig_a2,
-        signer_peer_id: storage_a.local_peer_id.clone(),
-    };
+    let signed_a2 = storage_a.sign_event(&Event::Node(node_a_v2));
     storage_b.reconcile_state(vec![signed_a2]).unwrap();
     assert_eq!(
         storage_b.node_view("node-1").unwrap().props["name"],
@@ -197,14 +161,7 @@ fn test_logical_clock_convergence() {
     };
 
     let event = Event::Node(node_inner);
-    // We'll bypass verification in this test by not registering the peer,
-    // but reconcile_state skips verification if signer_id == local_peer_id.
-    // Let's just use local_peer_id for simplicity in this specific test.
-    let signed = SignedEvent {
-        event,
-        signature: vec![0; 64],
-        signer_peer_id: storage.local_peer_id.clone(),
-    };
+    let signed = storage.sign_event(&event);
 
     storage.reconcile_state(vec![signed]).unwrap();
     assert_eq!(storage.get_logical_clock(), 100);
@@ -248,11 +205,9 @@ fn test_reconcile_batch_remains_reentrant_under_lifecycle_barrier() {
         peer_id: storage.local_peer_id.clone(),
     };
     storage
-        .reconcile_state(vec![SignedEvent {
-            event: Event::Batch(vec![Event::Node(nested.clone())]),
-            signature: vec![0; 64],
-            signer_peer_id: storage.local_peer_id.clone(),
-        }])
+        .reconcile_state(vec![
+            storage.sign_event(&Event::Batch(vec![Event::Node(nested.clone())]))
+        ])
         .unwrap();
 
     assert!(storage.node_view("nested-event").is_some());
@@ -260,11 +215,7 @@ fn test_reconcile_batch_remains_reentrant_under_lifecycle_barrier() {
     // And the inverse: the SAME batch shape with the stale pre-retraction
     // clock stays dead after a fresh retraction (tombstone wins LWW).
     storage.retract_node("nested-event").unwrap();
-    let stale = SignedEvent {
-        event: Event::Batch(vec![Event::Node(nested)]),
-        signature: vec![0; 64],
-        signer_peer_id: storage.local_peer_id.clone(),
-    };
+    let stale = storage.sign_event(&Event::Batch(vec![Event::Node(nested)]));
     storage.reconcile_state(vec![stale]).unwrap();
     assert!(
         storage.node_view("nested-event").is_none(),
@@ -311,15 +262,7 @@ fn test_cryptographic_forgery_rejection() {
         })
         .unwrap();
 
-    storage_b.peers.insert(
-        storage_a.local_peer_id.clone(),
-        genesis_block_native::SyncPeer {
-            id: storage_a.local_peer_id.clone(),
-            addr: "127.0.0.1:0".to_string(),
-            last_seen: 0,
-            verifying_key: storage_a.verifying_key.to_bytes().to_vec(),
-        },
-    );
+    authorize(&storage_b, &storage_a, 30202, 30201);
 
     let forged_event = SignedEvent {
         event: Event::Node(node_a),
@@ -327,7 +270,7 @@ fn test_cryptographic_forgery_rejection() {
         signer_peer_id: storage_a.local_peer_id.clone(),
     };
 
-    storage_b.reconcile_state(vec![forged_event]).unwrap();
+    assert!(storage_b.reconcile_state(vec![forged_event]).is_err());
     assert!(
         storage_b.get_u32("A").is_none(),
         "B should have rejected forged event"

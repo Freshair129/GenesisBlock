@@ -17,9 +17,9 @@ use tower_http::trace::TraceLayer;
 
 use crate::{
     api_error::{ApiErrorCategory, ApiErrorEnvelopeV1, API_ERROR_CONTRACT_V1},
-    BatchInput, CollectionInfo, EdgeInput, Event, GenesisTransaction, HybridSearchInput,
-    NamedQueryRequest, NodeInput, QueryBudget, QueryInput, QueryIrRequest, RelationalMutationBatch,
-    RelationalSchemaPackage, Storage, StudioGraphSceneRequest, SyncPeer,
+    BatchInput, CollectionInfo, ConsensusProposal, EdgeInput, Event, GenesisTransaction,
+    HybridSearchInput, NamedQueryRequest, NodeInput, QueryBudget, QueryInput, QueryIrRequest,
+    RelationalMutationBatch, RelationalSchemaPackage, Storage, StudioGraphSceneRequest, SyncPeer,
 };
 
 // ---------------------------------------------------------------------------
@@ -61,6 +61,16 @@ struct SignVoteInput {
 struct ProposalInput {
     pub event: Event,
     pub signature: Vec<u8>,
+}
+
+#[derive(serde::Deserialize)]
+struct ProposalExportInput {
+    pub proposal_id: String,
+}
+
+#[derive(serde::Deserialize)]
+struct ProposalImportInput {
+    pub proposal: ConsensusProposal,
 }
 
 #[derive(serde::Deserialize)]
@@ -316,6 +326,36 @@ async fn consensus_propose_handler(
     }
 }
 
+async fn consensus_proposal_export_handler(
+    State(state): State<AppState>,
+    ApiJson(input): ApiJson<ProposalExportInput>,
+) -> impl IntoResponse {
+    let storage = state.storage.read();
+    match storage.export_consensus_proposal(&input.proposal_id) {
+        Ok(proposal) => Json(proposal).into_response(),
+        Err(error) => rest_error_response(
+            StatusCode::NOT_FOUND,
+            RestErrorCategory::NotFound,
+            error.to_string(),
+        ),
+    }
+}
+
+async fn consensus_proposal_import_handler(
+    State(state): State<AppState>,
+    ApiJson(input): ApiJson<ProposalImportInput>,
+) -> impl IntoResponse {
+    let storage = state.storage.read();
+    match storage.import_consensus_proposal(input.proposal) {
+        Ok(()) => Json(serde_json::json!({ "imported": true })).into_response(),
+        Err(error) => rest_error_response(
+            StatusCode::BAD_REQUEST,
+            RestErrorCategory::Validation,
+            error.to_string(),
+        ),
+    }
+}
+
 async fn consensus_vote_handler(
     State(state): State<AppState>,
     ApiJson(input): ApiJson<VoteInput>,
@@ -341,8 +381,14 @@ async fn consensus_sign_vote_handler(
     ApiJson(input): ApiJson<SignVoteInput>,
 ) -> impl IntoResponse {
     let storage = state.storage.read();
-    let sig = storage.sign_vote(input.proposal_id, input.approve);
-    (StatusCode::OK, Json(sig)).into_response()
+    match storage.sign_vote(input.proposal_id, input.approve) {
+        Ok(signature) => (StatusCode::OK, Json(signature)).into_response(),
+        Err(error) => rest_error_response(
+            StatusCode::BAD_REQUEST,
+            RestErrorCategory::Validation,
+            error.to_string(),
+        ),
+    }
 }
 
 async fn consensus_verify_handler(
@@ -1545,6 +1591,14 @@ pub fn build_router(state: AppState) -> Router {
         .route("/v1/version", get(version_handler))
         .route("/v1/swarm/status", get(swarm_status_handler))
         .route("/v1/consensus/propose", post(consensus_propose_handler))
+        .route(
+            "/v1/consensus/proposal/export",
+            post(consensus_proposal_export_handler),
+        )
+        .route(
+            "/v1/consensus/proposal/import",
+            post(consensus_proposal_import_handler),
+        )
         .route("/v1/consensus/vote", post(consensus_vote_handler))
         .route("/v1/consensus/sign-vote", post(consensus_sign_vote_handler))
         .route("/v1/consensus/verify", post(consensus_verify_handler))

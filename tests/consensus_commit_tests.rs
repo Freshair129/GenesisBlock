@@ -111,7 +111,7 @@ fn hop1_out(s: &Storage, id: &str) -> usize {
 /// Self-sign + submit an approving vote, returning whether quorum was reached.
 fn approve(s: &Storage, pid: &str) -> bool {
     let me = s.local_peer_id.clone();
-    let sig = s.sign_vote(pid.to_string(), true);
+    let sig = s.sign_vote(pid.to_string(), true).unwrap();
     s.submit_vote(pid.to_string(), me, true, sig).unwrap()
 }
 
@@ -278,7 +278,7 @@ fn stale_consensus_revision_is_rejected_before_wal_append() {
     assert!(approve(&s, &first));
     let before_stale_commit = wal_lines(&path);
     let peer = s.local_peer_id.clone();
-    let signature = s.sign_vote(stale.clone(), true);
+    let signature = s.sign_vote(stale.clone(), true).unwrap();
     let error = s
         .submit_vote(stale, peer, true, signature)
         .unwrap_err()

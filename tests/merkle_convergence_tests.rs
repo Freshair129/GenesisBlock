@@ -9,7 +9,7 @@
 // converge); (b) the root is independent of the order events are applied — the key
 // fix vs the old WAL-order hash; (c) divergent state still yields a different root.
 
-use genesis_block_native::{EdgeInput, NodeInput, OpenOptions, Storage, SyncPeer};
+use genesis_block_native::{AuthorizedPeerConfig, EdgeInput, NodeInput, OpenOptions, Storage};
 use std::fs;
 use std::path::Path;
 
@@ -64,15 +64,18 @@ fn edge(s: &Storage, id: &str, from: &str, to: &str) {
 
 /// B knows A's key so it can accept A's signed events.
 fn trust(b: &Storage, a: &Storage) {
-    b.peers.insert(
-        a.local_peer_id.clone(),
-        SyncPeer {
-            id: a.local_peer_id.clone(),
-            addr: String::new(),
-            last_seen: 0,
-            verifying_key: a.verifying_key.to_bytes().to_vec(),
-        },
-    );
+    let identity = a.local_identity();
+    b.configure_peer_membership(
+        vec![AuthorizedPeerConfig {
+            peer_id: identity.peer_id,
+            public_key_hex: identity.public_key_hex,
+            gossip_addr: "127.0.0.1:32102".into(),
+            master_authority: false,
+        }],
+        "127.0.0.1:32101",
+        true,
+    )
+    .unwrap();
 }
 
 /// After B pulls A's delta, both peers report the SAME Merkle root — convergence

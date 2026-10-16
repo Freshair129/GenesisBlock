@@ -7,7 +7,8 @@
 
 use genesis_block_native::uee_v2::RecordKindV2;
 use genesis_block_native::{
-    EdgeInput, Event, HybridSearchInput, NeighborInput, NodeInput, OpenOptions, Storage, SyncPeer,
+    AuthorizedPeerConfig, EdgeInput, Event, HybridSearchInput, NeighborInput, NodeInput,
+    OpenOptions, Storage,
 };
 use std::fs;
 use std::path::Path;
@@ -29,6 +30,22 @@ fn open(path: &str) -> Storage {
         retention: None,
     })
     .unwrap()
+}
+
+fn trust(destination: &Storage, source: &Storage) {
+    let identity = source.local_identity();
+    destination
+        .configure_peer_membership(
+            vec![AuthorizedPeerConfig {
+                peer_id: identity.peer_id,
+                public_key_hex: identity.public_key_hex,
+                gossip_addr: "127.0.0.1:32002".into(),
+                master_authority: false,
+            }],
+            "127.0.0.1:32001",
+            true,
+        )
+        .unwrap();
 }
 
 fn node(s: &Storage, id: &str) {
@@ -91,16 +108,7 @@ fn pull_delta_converges_graph_state() {
     edge(&a, "E1", "X", "Y");
 
     let b = open(&fresh("test_ae_b"));
-    // B must know A's verifying key to accept A's signed events.
-    b.peers.insert(
-        a.local_peer_id.clone(),
-        SyncPeer {
-            id: a.local_peer_id.clone(),
-            addr: String::new(),
-            last_seen: 0,
-            verifying_key: a.verifying_key.to_bytes().to_vec(),
-        },
-    );
+    trust(&b, &a);
 
     let delta = a.events_since(0);
     assert!(!delta.is_empty(), "A has events newer than clock 0");
@@ -214,15 +222,7 @@ fn reapplying_delta_is_safe() {
     node(&a, "Z");
 
     let b = open(&fresh("test_ae_b2"));
-    b.peers.insert(
-        a.local_peer_id.clone(),
-        SyncPeer {
-            id: a.local_peer_id.clone(),
-            addr: String::new(),
-            last_seen: 0,
-            verifying_key: a.verifying_key.to_bytes().to_vec(),
-        },
-    );
+    trust(&b, &a);
     let delta = a.events_since(0);
     b.reconcile_state(delta.clone()).unwrap();
     b.reconcile_state(delta).unwrap(); // idempotent at the data level
@@ -255,15 +255,7 @@ fn pull_delta_syncs_secondary_vectors() {
     .unwrap();
 
     let b = open(&fresh("test_ae_vec_b")); // B has no "code" collection
-    b.peers.insert(
-        a.local_peer_id.clone(),
-        SyncPeer {
-            id: a.local_peer_id.clone(),
-            addr: String::new(),
-            last_seen: 0,
-            verifying_key: a.verifying_key.to_bytes().to_vec(),
-        },
-    );
+    trust(&b, &a);
 
     let delta = a.events_since(0);
     assert!(

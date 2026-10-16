@@ -2,7 +2,7 @@
 doc_id: C4--GENESISDB-ARCHITECTURE
 type: architecture-index
 status: current
-version: 0.1.74b
+version: 0.1.75b
 owner: GenesisBlockDB Architecture
 created_at: 2026-06-13T22:50:11+07:00,ATHER,9b1ced3
 last_update: "2026-10-16T12:00:00+07:00,Codex"
@@ -27,11 +27,13 @@ related_docs:
 
 # C4--GENESISDB-ARCHITECTURE
 
-Peer synchronization and consensus currently use cryptographic signatures
-against discovered peer keys, but discovery does not establish authorized
-membership. The candidate
-[peer-membership authorization ADR](adr/ADR--GENESISDB-PEER-MEMBERSHIP-AUTHORIZATION.md)
-records the open contract and must not be read as an approved trust policy.
+Peer synchronization and consensus use the closed roster and authenticated
+gossip contract in the accepted
+[peer-membership authorization ADR](adr/ADR--GENESISDB-PEER-MEMBERSHIP-AUTHORIZATION.md).
+Plain `open()` is self-only; multi-node deployments configure pinned keys,
+endpoints, and explicit local/remote `masterAuthority` roles before starting
+gossip. Consensus votes bind the proposal ID and decision to the digest of the
+complete signed event.
 
 The staged UEE-HQL2 query architecture is governed by the owner-approved
 [HQL2 execution ADR](adr/ADR--GENESISDB-HQL2-EXECUTION-BOUNDARY.md).
@@ -662,7 +664,7 @@ full P8/P13 qualification remains open.
 
 | Version | Date | Status | Summary | Commit Hash | Agent |
 |---------|------|--------|---------|-------------|-------|
-| 0.1.74b | 2026-10-16 | current | Index the candidate peer-membership authorization contract and record the discovery/signature boundary; policy and implementation remain unapproved | working-tree | Codex |
+| 0.1.75b | 2026-10-16 | current | Index the accepted closed-roster, authenticated-gossip, MASTER-role, fixed-quorum, and event-bound-vote contract for fixes #236 and #237 | working-tree | Codex |
 | 0.1.72b | 2026-10-06 | current | Record GenesisRAG17 candidate engine source and historical baseline through the worker ADR; preserve TEST-only ownership/access boundaries and keep full integration qualification pending | working-tree | ATHER |
 | 0.1.71b | 2026-10-06 | current | Reconcile approved G4 plan identity with the later D7/H2-D11 implementation evidence; 39-target HQL2 sweep 404/0/1, while G4/P8 and independent/hosted qualification remain partial | working-tree | ATHER |
 | 0.1.70b | 2026-10-05 | current | Merge owner-approved G4 stable plan identity on `EXPLAIN`/`ANALYZE` onto the current D7 mainline; focused local verification passes, while broad G4/P8/P13, transport, hosted and independent-review gates remain open | working-tree | ATHER |

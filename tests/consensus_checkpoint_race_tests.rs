@@ -76,7 +76,7 @@ fn propose_and_commit(s: &Storage, id: &str) -> bool {
         Err(_) => return false,
     };
     let me = s.local_peer_id.clone();
-    let sig = s.sign_vote(pid.clone(), true);
+    let sig = s.sign_vote(pid.clone(), true).unwrap();
     s.submit_vote(pid, me, true, sig).unwrap_or(false)
 }
 

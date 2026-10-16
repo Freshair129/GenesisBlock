@@ -1,8 +1,8 @@
 // Consensus vote signature verification: `submit_vote` must reject votes that
 // aren't authentically signed by the claimed voter, so a caller can't forge
 // votes on another peer's behalf and drive a proposal to quorum. The vote
-// signature binds (proposal_id, voter_peer_id, approve). See the consensus
-// section of src/lib.rs (`sign_vote` / `submit_vote`).
+// signature binds the proposal ID, signed-event digest, voter ID, and choice.
+// See the consensus section of src/lib.rs (`sign_vote` / `submit_vote`).
 
 use genesis_block_native::{Event, LogicalClock, NodeOutput, OpenOptions, Storage};
 use std::fs;
@@ -52,6 +52,13 @@ fn propose(s: &Storage, id: &str) -> String {
         .unwrap()
 }
 
+#[test]
+fn vote_signing_rejects_an_unknown_proposal() {
+    let s = open(&fresh("test_cv_unknown_proposal"));
+    let error = s.sign_vote("not-stored".into(), true).unwrap_err();
+    assert!(error.to_string().contains("unknown proposal"));
+}
+
 /// A correctly self-signed vote verifies and (with no other peers, quorum
 /// threshold 0) drives the proposal to quorum.
 #[test]
@@ -59,7 +66,7 @@ fn authentic_self_vote_reaches_quorum() {
     let s = open(&fresh("test_cv_ok"));
     let pid = propose(&s, "N1");
     let me = s.local_peer_id.clone();
-    let sig = s.sign_vote(pid.clone(), true);
+    let sig = s.sign_vote(pid.clone(), true).unwrap();
     let reached = s.submit_vote(pid, me, true, sig).unwrap();
     assert!(reached, "an authentic vote past threshold reaches quorum");
 }
@@ -81,7 +88,7 @@ fn tampered_signature_rejected() {
     let s = open(&fresh("test_cv_tampered"));
     let pid = propose(&s, "N1");
     let me = s.local_peer_id.clone();
-    let mut sig = s.sign_vote(pid.clone(), true);
+    let mut sig = s.sign_vote(pid.clone(), true).unwrap();
     sig[0] ^= 0xFF; // flip a byte
     let r = s.submit_vote(pid, me, true, sig);
     assert!(r.is_err());
@@ -98,7 +105,7 @@ fn signature_is_bound_to_the_choice() {
     let s = open(&fresh("test_cv_flip"));
     let pid = propose(&s, "N1");
     let me = s.local_peer_id.clone();
-    let sig_for_yes = s.sign_vote(pid.clone(), true);
+    let sig_for_yes = s.sign_vote(pid.clone(), true).unwrap();
     let r = s.submit_vote(pid, me, false, sig_for_yes); // claim "reject" with a "approve" signature
     assert!(r.is_err());
     assert!(r

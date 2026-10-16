@@ -20,6 +20,15 @@ Everything lives under the database path (`OpenOptions.path`):
 | `meta_<name>.bin`     | Per-collection vector metadata.                                 |
 | `fvec_<name>.bin`     | Exact-f32 rerank sidecar (only for quantized rerank collections).|
 | `identity.bin`        | ed25519 swarm signing key. **Secret — back up securely.**       |
+| `consensus-votes.jsonl` | Durable anti-equivocation vote locks. Keep it with the database backup. |
+| `consensus-commits.jsonl` | Prepared and completed consensus commit receipts. Keep it with the database backup. |
+
+Consensus ledgers are append-only and are not silently pruned. Each ledger is
+bounded to 64 MiB, 100,000 records, and 4 KiB per record. At the bound, voting or
+new consensus commits fail closed with a `*_LEDGER_LIMIT` error; operators must
+plan a database migration before reaching it. Keep both ledgers with `identity.bin`
+and the WAL because they preserve anti-equivocation and commit idempotency across
+restarts.
 
 ## Backup
 

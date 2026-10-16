@@ -7,22 +7,17 @@ status: current
 ## 1. Introduction
 GenesisBlockDB currently allows any network participant to join the Gossip swarm and propose mutations. **Mark X** introduces a cryptographic trust layer. By assigning every agent a unique ed25519 identity, the system can verify the origin of knowledge atoms and enforce strict governance rules based on cryptographic proofs.
 
-### Current trust boundary (2026-10-16)
+### Membership and authority boundary (2026-10-16)
 
-Ed25519 signatures provide cryptographic integrity relative to the public key
-used for verification. A key advertised by a discovered peer is not proof that
-the peer belongs to an authorized roster or may vote in consensus. The
-heartbeat-advertised peer ID is not currently checked against the advertised
-key fingerprint before that key is used for peer verification.
-
-The requirement that MASTER promotion use valid quorum signatures does not
-define who is eligible to form that quorum. The implementation currently
-derives quorum membership from discovered peers, and peer reconciliation does
-not enforce the local MASTER governance guard on every event shape. Therefore
-this specification's cryptographic identity and signature requirements do not
-by themselves complete the trust or governance contract. Issues #236 and #237
-remain open; see the candidate
-[peer-membership authorization ADR](adr/ADR--GENESISDB-PEER-MEMBERSHIP-AUTHORIZATION.md).
+Ed25519 signatures provide cryptographic integrity relative to a pinned public
+key. Votes additionally bind to the digest of the complete signed proposal event.
+In multi-node mode the local `masterAuthority` role is required explicitly. The accepted
+[peer-membership authorization ADR](adr/ADR--GENESISDB-PEER-MEMBERSHIP-AUTHORIZATION.md)
+defines the closed roster, derived peer ID, authenticated gossip envelope,
+configured endpoint, voter eligibility, and `masterAuthority` role. A valid
+signature without roster membership does not authorize a peer. Issues #236
+and #237 are addressed by the implementation and security regression tests;
+formal scan and hosted merge gates remain separate validation evidence.
 
 ## 2. Functional Requirements
 
@@ -72,9 +67,10 @@ In `Storage::persist`, automatically wrap the `Event` into a `SignedEvent` using
 
 ### 2.3 Verification Pipeline
 In `Storage::reconcile_state`, for every received event:
-1.  Lookup the `signer_peer_id` in the `peers` DashMap.
-2.  Verify the signature against the event bytes.
-3.  Reject if verification fails.
+1.  Lookup the `signer_peer_id` in the immutable authorized-member roster (or use the local key for a locally signed event).
+2.  Verify the signature against the canonical event bytes.
+3.  Enforce `masterAuthority` for MASTER state and node retractions.
+4.  Reject before WAL or memory effects if identity, signature, or role checks fail.
 
 ---
 

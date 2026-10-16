@@ -64,15 +64,11 @@ decision snapshot; implementation evidence is recorded in the RCA and regression
 
 ### Boundary clarification (2026-10-16)
 
-The fail-closed production receipt path controls remote cursor advancement; it
-does not gate ordinary PushDelta event application. The receiver may reconcile
-signature-checked events without advancing a cursor. Heartbeat-learned keys are
-not an authenticated membership source, and this addendum does not establish
-peer enrollment, voter eligibility, or authority to replicate MASTER state.
-Those issues are tracked by the candidate
-[peer-membership authorization ADR](adr/ADR--GENESISDB-PEER-MEMBERSHIP-AUTHORIZATION.md)
-and public issues #236 and #237. This clarification does not extend the
-approved P6 scope.
+The P6 progress receipt controls remote cursor advancement; it is not blanket
+authorization for event application. Gossip packet authentication, roster
+membership, and `MASTER` role checks are defined separately by the accepted
+[peer-membership authorization ADR](adr/ADR--GENESISDB-PEER-MEMBERSHIP-AUTHORIZATION.md).
+This clarification does not extend the approved P6 scope.
 
 ## Decision and rationale
 
@@ -216,10 +212,11 @@ Machine-checkable commands used for local verification:
     git diff --check
 
 The supplemental compatibility targets were also run: `journal_format_tests` (10/10),
-`journal_migration_tests` (4/4), and `unified_transaction_p5_tests` (4/4). The previous Wave B
-schema warning was stale: the current source defines `SCHEMA_VERSION = 6`, while
-`gossip_rejects_old_schema_before_sending_delta` sends version 3 and expects
-`UpgradeRequired { schema_version: SCHEMA_VERSION }`; these values are consistent.
+`journal_migration_tests` (4/4), and `unified_transaction_p5_tests` (4/4). The
+2026-10-04 compatibility note predates detached MASTER-proof signatures.
+Storage remains at `SCHEMA_VERSION = 6`; gossip negotiation is now
+`GOSSIP_PROTOCOL_VERSION = 7`. The regression test sends a v6 gossip request
+and expects `UpgradeRequired { schema_version: GOSSIP_PROTOCOL_VERSION }`.
 
 ## Local verification status (2026-10-04)
 
