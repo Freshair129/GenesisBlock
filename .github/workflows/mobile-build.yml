@@ -474,9 +474,10 @@ jobs:
   host-mobile-check:
     name: host build + test (mobile SDK features)
     runs-on: ubuntu-latest
-    # This runs the complete integration suite as well as the mobile features;
-    # leave enough time for the current stress and recovery tests to finish.
-    timeout-minutes: 120
+    # The mobile-feature integration suite exceeded two hours on hosted Ubuntu
+    # without assertion failures. Allow the full stress and recovery suite to
+    # finish rather than canceling it during WAL compaction.
+    timeout-minutes: 240
     steps:
       - uses: actions/checkout@v4
 
