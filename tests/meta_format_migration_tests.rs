@@ -155,6 +155,11 @@ fn postcard_roundtrip_survives_save_and_reload() {
 fn legacy_bincode_blob_loads_and_rewrites_as_postcard() {
     let dir = TempDir::new().unwrap();
     let path = dir.path().to_str().unwrap().to_string();
+    fs::write(
+        Path::new(&path).join("state.json"),
+        r#"{"schema_version":4}"#,
+    )
+    .unwrap();
 
     {
         let s = open(&path);

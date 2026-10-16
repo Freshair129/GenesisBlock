@@ -2,7 +2,7 @@
 
 ## Status / Date
 
-Candidate fix in PR #239; exact-head CI pending / 2026-10-17.
+Follow-up fix in PR #239; exact-head CI pending / 2026-10-17.
 
 ## Risk
 
@@ -26,6 +26,8 @@ Snapshot integrity validation and projection replay used independent validity si
 
 The read-only review found the mixed-component and legacy paths after the initial fix. Those paths are now treated as untrusted even when the snapshot loader returns before reporting projection status.
 
+Exact-head macOS CI then exposed a legacy-test fixture mismatch: two metadata migration tests created schema-6 journal events and later rewrote only `state.json` to schema 4. A recovery attempt correctly rejected schema-6 record-revision events under the declared schema-4 contract. The fixtures now start from a schema-4 state before writing events, so they exercise a real legacy journal and snapshot instead of an inconsistent downgrade.
+
 ## Why Detection Failed
 
 Earlier mobile-host CI did not complete the full suite, so those runs provided no completed signal for this path. Local and remote verification also needed to exercise the exact mobile-host feature set because snapshot validation and projection recovery meet during open.
@@ -36,6 +38,7 @@ Earlier mobile-host CI did not complete the full suite, so those runs provided n
 - Rebuild an untrusted projection into a fresh SQLite candidate from the journal, then backfill from loaded native state where the existing recovery path permits it. Do not copy the rejected SQLite file or treat the journal fingerprint as a projection integrity proof.
 - Return `RECOVERY_REQUIRED` for read-only recovery and when a rejected, unloadable snapshot has recovery material but no journal events. An event-presence check is only a negative guard; finding an event does not prove journal completeness. Candidate replay and validation must still succeed before publication.
 - Cover projection-only and mixed-component corruption, legacy snapshots without a digest, read-only rejection, and missing-journal failure. Keep the mobile-host suite timeout long enough to reach the Rust integration tests.
+- Build legacy migration fixtures from the legacy schema at creation time; do not convert schema-6 journals into schema-4 fixtures by editing only `state.json`.
 
 ## Outcome
 
@@ -44,6 +47,8 @@ Local focused validation on Windows passed after the follow-up fix:
 - `cargo test --no-default-features --features "mobile ffi android-jni" --test edge_projection_tests -- --test-threads=1` — 10 passed, 0 failed.
 - `cargo test --no-default-features --features "mobile ffi android-jni" --test wal_tail_replay_tests -- --test-threads=1` — 5 passed, 0 failed.
 - `cargo test --no-default-features --features "mobile ffi android-jni" --test projection_replay_recovery_tests -- --test-threads=1` — 6 passed, 0 failed.
+- `cargo test --no-default-features --features "mobile ffi android-jni" --test epoch_e2_tests -- --test-threads=1` — 8 passed, 0 failed.
+- `cargo test --no-default-features --features "mobile ffi android-jni" --test meta_format_migration_tests -- --test-threads=1` — 4 passed, 0 failed.
 - `cargo build --no-default-features --features "mobile ffi android-jni"` — passed.
 - `cargo fmt --all -- --check` and `git diff --check` — passed.
 
