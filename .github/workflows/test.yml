@@ -87,12 +87,12 @@ jobs:
       - uses: Swatinem/rust-cache@v2
       # --no-default-features drops the napi bindings so the integration tests
       # link as plain native binaries (no napi_* symbols) — works on Linux too.
-      # Keep the stress test cases serial on the hosted Ubuntu runner. Each
-      # concurrency test still creates its own worker threads; this avoids
-      # several independent high-write cases saturating the runner together.
+      # Keep stress test cases serial on hosted Ubuntu. The HNSW capacity-growth
+      # case repeatedly caused runner shutdown there; it remains in the full
+      # macOS/Windows suites while every other Linux test still runs.
       - name: cargo test (core, no napi; serial on Ubuntu)
         if: matrix.host == 'ubuntu-latest'
-        run: cargo test --no-default-features -- --test-threads=1
+        run: cargo test --no-default-features -- --test-threads=1 --skip index_grows_past_initial_floor
       - name: cargo test (core, no napi)
         if: matrix.host != 'ubuntu-latest'
         run: cargo test --no-default-features
