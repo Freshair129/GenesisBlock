@@ -26,7 +26,7 @@ Snapshot integrity validation and projection replay used independent validity si
 
 The read-only review found the mixed-component and legacy paths after the initial fix. Those paths are now treated as untrusted even when the snapshot loader returns before reporting projection status.
 
-Exact-head macOS CI then exposed a legacy-test fixture mismatch: two metadata migration tests created schema-6 journal events and later rewrote only `state.json` to schema 4. A recovery attempt correctly rejected schema-6 record-revision events under the declared schema-4 contract. The fixtures now start from a schema-4 state before writing events, so they exercise a real legacy journal and snapshot instead of an inconsistent downgrade.
+Exact-head macOS CI exposed two test-fixture issues. First, two metadata migration tests created schema-6 journal events and later rewrote only `state.json` to schema 4. A recovery attempt correctly rejected schema-6 record-revision events under the declared schema-4 contract. The fixtures now start from a schema-4 state before writing events, so they exercise a real legacy journal and snapshot instead of an inconsistent downgrade. Second, `old_transaction_projection_adds_frontier_kind_with_legacy_true_default` inserted a transaction receipt directly into an unverified legacy SQLite projection, with no corresponding journal transaction, then expected open to preserve that cache-only row. The recovery fix correctly discarded it during journal rebuild. The test now asserts the security contract: the fabricated receipt does not survive, and the rebuilt projection has the current column layout.
 
 ## Why Detection Failed
 
@@ -39,6 +39,7 @@ Earlier mobile-host CI did not complete the full suite, so those runs provided n
 - Return `RECOVERY_REQUIRED` for read-only recovery and when a rejected, unloadable snapshot has recovery material but no journal events. An event-presence check is only a negative guard; finding an event does not prove journal completeness. Candidate replay and validation must still succeed before publication.
 - Cover projection-only and mixed-component corruption, legacy snapshots without a digest, read-only rejection, and missing-journal failure. Keep the mobile-host suite timeout long enough to reach the Rust integration tests.
 - Build legacy migration fixtures from the legacy schema at creation time; do not convert schema-6 journals into schema-4 fixtures by editing only `state.json`.
+- Never treat projection-only receipts as authoritative during recovery. Tests of recovery must assert replay from the journal; schema migration fixtures must preserve the journal as the source of truth.
 
 ## Outcome
 
@@ -49,7 +50,8 @@ Local focused validation on Windows passed after the follow-up fix:
 - `cargo test --no-default-features --features "mobile ffi android-jni" --test projection_replay_recovery_tests -- --test-threads=1` — 6 passed, 0 failed.
 - `cargo test --no-default-features --features "mobile ffi android-jni" --test epoch_e2_tests -- --test-threads=1` — 8 passed, 0 failed.
 - `cargo test --no-default-features --features "mobile ffi android-jni" --test meta_format_migration_tests -- --test-threads=1` — 4 passed, 0 failed.
+- `cargo test --no-default-features --features "mobile ffi android-jni" --test schema6_migration_tests -- --test-threads=1` — 19 passed, 0 failed after aligning the stale-projection fixture with journal-authoritative recovery.
 - `cargo build --no-default-features --features "mobile ffi android-jni"` — passed.
 - `cargo fmt --all -- --check` and `git diff --check` — passed.
 
-Exact-head GitHub Actions validation and merge remain pending.
+Exact-head GitHub Actions validation and merge remain pending. On PR head `283e52e6736daaa02c837f32d62b0893b78474e2`, macOS job `117212797568` in run `38972137113` caught the cache-only receipt expectation above. The corrected `schema6_migration_tests` suite passes locally on Windows (19 passed, 0 failed); exact-head CI must rerun after the follow-up is pushed.
