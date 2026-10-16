@@ -4961,6 +4961,13 @@ struct ProjectionCandidate {
     connection: Option<Connection>,
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum SnapshotLoadOutcome {
+    NotLoaded,
+    Loaded,
+    LoadedProjectionNeedsRebuild,
+}
+
 impl Drop for ProjectionCandidate {
     fn drop(&mut self) {
         drop(self.connection.take());
@@ -12992,6 +12999,46 @@ impl Storage {
         Ok(())
     }
 
+    fn projection_journal_has_any_events(&self) -> bool {
+        // This is only a negative guard: finding an event does not prove that
+        // the journal is complete. The rebuild path still performs its normal
+        // replay checks before publishing the candidate.
+        let mut found_event = false;
+        self.scan_journal(None, true, &mut |_, _| found_event = true);
+        found_event
+    }
+
+    fn snapshot_has_recovery_material(&self) -> bool {
+        let state_path = self.path.join("state.json");
+        let state_has_snapshot_fields = fs::read(&state_path)
+            .ok()
+            .and_then(|bytes| serde_json::from_slice::<serde_json::Value>(&bytes).ok())
+            .and_then(|state| state.as_object().cloned())
+            .is_none_or(|state| state.keys().any(|key| key != "schema_version"));
+        if state_has_snapshot_fields {
+            return true;
+        }
+
+        let Ok(entries) = fs::read_dir(&self.path) else {
+            return true;
+        };
+        entries.flatten().any(|entry| {
+            let name = entry.file_name();
+            let name = name.to_string_lossy();
+            let is_native_component = matches!(
+                name.as_ref(),
+                "nodes.bin" | "edges.bin" | "edges_retired.bin" | "vector.bin" | "meta.bin"
+            ) || ["vec_", "meta_", "fvec_", "bqmean_", "sq8scale_"]
+                .iter()
+                .any(|prefix| name.starts_with(prefix));
+            is_native_component
+                && entry
+                    .metadata()
+                    .ok()
+                    .is_none_or(|metadata| metadata.len() > 0)
+        })
+    }
+
     fn projection_sync_candidate(
         &self,
         candidate: &mut ProjectionCandidate,
@@ -13229,11 +13276,25 @@ impl Storage {
         Ok(())
     }
 
-    fn projection_sync_on_open(&self) -> Result<()> {
+    fn projection_sync_on_open(&self, force_rebuild: bool) -> Result<()> {
         if self.read_only {
+            if force_rebuild {
+                return Err(Error::from_reason(
+                    "RECOVERY_REQUIRED: rejected snapshot requires a writable open to rebuild the projection",
+                ));
+            }
             return Ok(());
         }
         let journal_fingerprint = self.projection_journal_fingerprint()?;
+        if force_rebuild {
+            return self
+                .projection_rebuild_fresh_candidate(&journal_fingerprint, None)
+                .map_err(|error| {
+                    Error::from_reason(format!(
+                        "RECOVERY_REQUIRED: rejected or unverifiable snapshot projection rebuild failed: {error}"
+                    ))
+                });
+        }
         if self.projection_journal_fingerprint_matches(&journal_fingerprint) {
             return Ok(());
         }
@@ -15166,8 +15227,15 @@ impl Storage {
             let sidecar_tail = journal_frontier
                 .is_some_and(|f| f < initial_next_seq.saturating_sub(1))
                 && recovery_definitions.iter().any(|d| d.rerank);
-            let mut snapshot_loaded =
-                !snapshot_stale_vs_fold && !sidecar_tail && storage.try_load_state();
+            let snapshot_outcome = if !snapshot_stale_vs_fold && !sidecar_tail {
+                storage.try_load_state()
+            } else {
+                SnapshotLoadOutcome::NotLoaded
+            };
+            let mut snapshot_loaded = matches!(
+                snapshot_outcome,
+                SnapshotLoadOutcome::Loaded | SnapshotLoadOutcome::LoadedProjectionNeedsRebuild
+            );
             if !snapshot_loaded
                 || storage.collections.iter().any(|c| {
                     let meta = c.metadata.read();
@@ -15250,7 +15318,22 @@ impl Storage {
             // arenas but never rehydrates HNSW, leaving semantic search broken
             // until a manual rebuild).
             storage.rehydrate_hnsw_index();
-            storage.projection_sync_on_open()?;
+            // The projection is trusted only when the whole snapshot loaded and
+            // its P6 projection digest was verified. A rejected/skipped snapshot
+            // (or a legacy snapshot without that digest) must not let an unchanged
+            // journal fingerprint hide a stale projection.
+            let projection_snapshot_untrusted = storage.path.join("state.json").exists()
+                && (!snapshot_loaded || snapshot_outcome != SnapshotLoadOutcome::Loaded);
+            if projection_snapshot_untrusted
+                && !snapshot_loaded
+                && !storage.projection_journal_has_any_events()
+                && storage.snapshot_has_recovery_material()
+            {
+                return Err(Error::from_reason(
+                    "RECOVERY_REQUIRED: rejected snapshot could not be loaded and no journal events are available",
+                ));
+            }
+            storage.projection_sync_on_open(projection_snapshot_untrusted)?;
             storage.ensure_readable()?;
             let state_has_migration = fs::read(storage.path.join("state.json"))
                 .ok()
@@ -24963,6 +25046,22 @@ impl Storage {
     }
 
     fn validate_p6_snapshot_at(root: &Path, state: &serde_json::Value) -> Result<Option<String>> {
+        Self::validate_p6_snapshot_at_with_projection_status(root, state, false)
+            .map(|(digest, _)| digest)
+    }
+
+    fn validate_p6_snapshot_for_open(
+        root: &Path,
+        state: &serde_json::Value,
+    ) -> Result<(Option<String>, bool)> {
+        Self::validate_p6_snapshot_at_with_projection_status(root, state, true)
+    }
+
+    fn validate_p6_snapshot_at_with_projection_status(
+        root: &Path,
+        state: &serde_json::Value,
+        allow_projection_rebuild: bool,
+    ) -> Result<(Option<String>, bool)> {
         let schema_version = state["schema_version"].as_u64().unwrap_or(0) as u32;
         let Some(p6) = state.get("p6") else {
             if schema_version >= SCHEMA_VERSION {
@@ -24972,7 +25071,9 @@ impl Storage {
             }
             // v4 and older snapshots remain on the legacy load path and are
             // upgraded only after complete WAL recovery is available.
-            return Ok(None);
+            // Legacy snapshots have no projection digest. Their projection may
+            // be usable, but it is not integrity-verified and must be rebuilt.
+            return Ok((None, false));
         };
         let manifest = p6.get("manifest").ok_or_else(|| {
             Error::from_reason("SNAPSHOT_MANIFEST_INVALID: manifest object missing")
@@ -25007,6 +25108,7 @@ impl Storage {
         }
         let mut canonical_components = Vec::with_capacity(components.len());
         let mut seen = HashSet::new();
+        let mut projection_valid = true;
         for component in components {
             let path = component["path"].as_str().ok_or_else(|| {
                 Error::from_reason("SNAPSHOT_MANIFEST_INVALID: component path missing")
@@ -25038,15 +25140,23 @@ impl Storage {
                 ));
             }
             let full_path = root.join(relative);
-            let (actual_bytes, actual_hash) = Self::sha256_file(&full_path).map_err(|_| {
-                Error::from_reason(format!(
-                    "SNAPSHOT_COMPONENT_INVALID: missing or unreadable component {path}"
-                ))
-            })?;
-            if actual_bytes != bytes || actual_hash != expected_hash {
-                return Err(Error::from_reason(format!(
-                    "SNAPSHOT_COMPONENT_INVALID: byte count or digest mismatch for {path}"
-                )));
+            let is_projection = path == PROJECTION_DB_FILE;
+            match Self::sha256_file(&full_path) {
+                Ok((actual_bytes, actual_hash))
+                    if actual_bytes == bytes && actual_hash == expected_hash => {}
+                Ok(_) | Err(_) if allow_projection_rebuild && is_projection => {
+                    projection_valid = false;
+                }
+                Err(_) => {
+                    return Err(Error::from_reason(format!(
+                        "SNAPSHOT_COMPONENT_INVALID: missing or unreadable component {path}"
+                    )));
+                }
+                Ok(_) => {
+                    return Err(Error::from_reason(format!(
+                        "SNAPSHOT_COMPONENT_INVALID: byte count or digest mismatch for {path}"
+                    )));
+                }
             }
             canonical_components.push(serde_json::json!({
                 "path": path,
@@ -25108,7 +25218,7 @@ impl Storage {
                 Error::from_reason("SNAPSHOT_MANIFEST_INVALID: generation is malformed")
             })?;
         }
-        Ok(Some(digest))
+        Ok((Some(digest), projection_valid))
     }
 
     fn validate_p6_snapshot_authority(&self, state: &serde_json::Value) -> Result<()> {
@@ -27047,10 +27157,10 @@ impl Storage {
         }
     }
 
-    fn try_load_state(&self) -> bool {
+    fn try_load_state(&self) -> SnapshotLoadOutcome {
         let state_path = self.path.join("state.json");
         if !state_path.exists() {
-            return false;
+            return SnapshotLoadOutcome::NotLoaded;
         }
 
         println!("snapshot: attempting instant load from binary state...");
@@ -27061,22 +27171,26 @@ impl Storage {
             .and_then(|c| serde_json::from_str(&c).ok())
         {
             Some(v) => v,
-            None => return false,
+            None => return SnapshotLoadOutcome::NotLoaded,
         };
-        match Self::validate_p6_snapshot_at(&self.path, &state_val) {
-            Err(error) => {
-                println!("snapshot: rejecting candidate state: {error}");
-                // No in-memory state has been touched yet. Recovery will replay
-                // the complete WAL and will not retain a partial candidate load.
-                return false;
-            }
-            Ok(Some(_)) => {
-                if let Err(error) = self.validate_p6_snapshot_authority(&state_val) {
-                    println!("snapshot: rejecting candidate P6 authority: {error}");
-                    return false;
+        let (snapshot_digest, projection_valid) =
+            match Self::validate_p6_snapshot_for_open(&self.path, &state_val) {
+                Err(error) => {
+                    println!("snapshot: rejecting candidate state: {error}");
+                    // No in-memory state has been touched yet. Recovery will replay
+                    // the complete WAL and will not retain a partial candidate load.
+                    return SnapshotLoadOutcome::NotLoaded;
                 }
+                Ok(validation) => validation,
+            };
+        if snapshot_digest.is_some() {
+            if let Err(error) = self.validate_p6_snapshot_authority(&state_val) {
+                println!("snapshot: rejecting candidate P6 authority: {error}");
+                return SnapshotLoadOutcome::NotLoaded;
             }
-            Ok(None) => {}
+        }
+        if !projection_valid {
+            println!("snapshot: projection.sqlite is not integrity-verified; rebuilding it from the journal");
         }
 
         if let Some(policy) = state_val
@@ -27294,7 +27408,7 @@ impl Storage {
             self.collections
                 .insert("default".to_string(), Arc::new(coll));
         } else {
-            return false;
+            return SnapshotLoadOutcome::NotLoaded;
         }
         // Guarantee the default collection always exists post-load.
         if !self.collections.contains_key(&self.default_collection) {
@@ -27341,7 +27455,7 @@ impl Storage {
                 }
                 Err(e) => {
                     println!("snapshot: failed to deserialize nodes: {}", e);
-                    return false;
+                    return SnapshotLoadOutcome::NotLoaded;
                 }
             }
         } else {
@@ -27438,7 +27552,11 @@ impl Storage {
         }
 
         println!("snapshot: instant load complete in {:?}", start.elapsed());
-        true
+        if projection_valid {
+            SnapshotLoadOutcome::Loaded
+        } else {
+            SnapshotLoadOutcome::LoadedProjectionNeedsRebuild
+        }
     }
 
     pub fn execute_batch(&self, input: BatchInput) -> Result<BatchOutput> {

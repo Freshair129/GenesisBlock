@@ -14,6 +14,7 @@ use genesis_block_native::{EdgeInput, NodeInput, OpenOptions, Storage};
 use serde_json::json;
 use std::collections::HashSet;
 use std::fs;
+use std::io::Write;
 use std::path::Path;
 
 fn fresh(name: &str) -> String {
@@ -259,6 +260,187 @@ fn an_existing_database_is_backfilled_on_open() {
             .iter()
             .map(|s| s.to_string())
             .collect::<HashSet<_>>()
+    );
+}
+
+#[test]
+fn a_rejected_snapshot_requires_writable_projection_recovery() {
+    let path = fresh("edgeproj_readonly_recovery");
+    drop(seeded(&path));
+    {
+        let conn = rusqlite_open(&path);
+        conn.execute("DELETE FROM edges", []).unwrap();
+    }
+
+    let error = Storage::open(OpenOptions {
+        path,
+        page_cache_mb: Some(32),
+        read_only: Some(true),
+        vector_dim: Some(4),
+        retention: None,
+    })
+    .err()
+    .expect("read-only open must not serve a rejected projection snapshot");
+    assert!(
+        error.to_string().contains("RECOVERY_REQUIRED"),
+        "unexpected error: {error}"
+    );
+}
+
+#[test]
+fn another_rejected_snapshot_component_does_not_hide_projection_recovery() {
+    let path = fresh("edgeproj_mixed_snapshot_recovery");
+    drop(seeded(&path));
+    {
+        let conn = rusqlite_open(&path);
+        conn.execute("DELETE FROM edges", []).unwrap();
+    }
+    let nodes_path = Path::new(&path).join("nodes.bin");
+    let mut nodes = fs::OpenOptions::new()
+        .append(true)
+        .open(nodes_path)
+        .unwrap();
+    nodes.write_all(b" ").unwrap();
+
+    let after = open(&path);
+    assert_eq!(
+        count(&after, "SELECT count(*) AS n FROM edges"),
+        3,
+        "rejecting another snapshot component must still force projection recovery"
+    );
+    assert_eq!(
+        ids(&after, "SELECT id FROM edges"),
+        ["e1", "e2", "e3"]
+            .iter()
+            .map(|s| s.to_string())
+            .collect::<HashSet<_>>()
+    );
+}
+
+#[test]
+fn legacy_snapshot_without_projection_digest_fails_closed_read_only_and_rebuilds() {
+    let path = fresh("edgeproj_legacy_snapshot_recovery");
+    fs::create_dir_all(&path).unwrap();
+    fs::write(
+        Path::new(&path).join("state.json"),
+        r#"{"schema_version":4}"#,
+    )
+    .unwrap();
+    drop(seeded(&path));
+
+    let state_path = Path::new(&path).join("state.json");
+    let mut state: serde_json::Value =
+        serde_json::from_str(&fs::read_to_string(&state_path).unwrap()).unwrap();
+    state["schema_version"] = json!(4);
+    let object = state.as_object_mut().unwrap();
+    object.remove("p6");
+    object.remove("journal");
+    object.remove("wal_frontier");
+    object.remove("upgrade_state");
+    fs::write(&state_path, state.to_string()).unwrap();
+    {
+        let conn = rusqlite_open(&path);
+        conn.execute("DELETE FROM edges", []).unwrap();
+    }
+
+    let error = Storage::open(OpenOptions {
+        path: path.clone(),
+        page_cache_mb: Some(32),
+        read_only: Some(true),
+        vector_dim: Some(4),
+        retention: None,
+    })
+    .err()
+    .expect("read-only open must reject a legacy projection without an integrity proof");
+    assert!(
+        error.to_string().contains("RECOVERY_REQUIRED"),
+        "unexpected error: {error}"
+    );
+
+    let after = open(&path);
+    assert_eq!(
+        count(&after, "SELECT count(*) AS n FROM edges"),
+        3,
+        "writable open must rebuild a legacy projection from the journal"
+    );
+}
+
+#[test]
+fn an_unloadable_snapshot_without_journal_fails_closed() {
+    let path = fresh("edgeproj_unloadable_snapshot_no_journal");
+    drop(seeded(&path));
+    {
+        let conn = rusqlite_open(&path);
+        conn.execute("DELETE FROM edges", []).unwrap();
+    }
+    let nodes_path = Path::new(&path).join("nodes.bin");
+    let mut nodes = fs::OpenOptions::new()
+        .append(true)
+        .open(nodes_path)
+        .unwrap();
+    nodes.write_all(b" ").unwrap();
+
+    for directory in ["wal", "journal"] {
+        let journal_path = Path::new(&path).join(directory);
+        if journal_path.exists() {
+            fs::remove_dir_all(journal_path).unwrap();
+        }
+    }
+    let legacy_wal = Path::new(&path).join("genesis-graph.wal");
+    if legacy_wal.exists() {
+        fs::remove_file(legacy_wal).unwrap();
+    }
+
+    let error = Storage::open(OpenOptions {
+        path,
+        page_cache_mb: Some(32),
+        read_only: Some(false),
+        vector_dim: Some(4),
+        retention: None,
+    })
+    .err()
+    .expect("must not publish an empty projection after rejecting the only snapshot");
+    assert!(
+        error.to_string().contains("RECOVERY_REQUIRED"),
+        "unexpected error: {error}"
+    );
+}
+
+#[test]
+fn a_rejected_snapshot_without_journal_fails_closed() {
+    let path = fresh("edgeproj_no_journal_recovery");
+    drop(seeded(&path));
+    {
+        let conn = rusqlite_open(&path);
+        conn.execute("DELETE FROM edges", []).unwrap();
+    }
+
+    // Remove every durable event source from this isolated test fixture. The
+    // state snapshot is now the only record of the graph, and its projection
+    // digest no longer matches the modified SQLite component.
+    for directory in ["wal", "journal"] {
+        let path = Path::new(&path).join(directory);
+        if path.exists() {
+            fs::remove_dir_all(path).unwrap();
+        }
+    }
+    let legacy_wal = Path::new(&path).join("genesis-graph.wal");
+    if legacy_wal.exists() {
+        fs::remove_file(legacy_wal).unwrap();
+    }
+
+    let error = Storage::open(OpenOptions {
+        path,
+        page_cache_mb: Some(32),
+        read_only: Some(false),
+        vector_dim: Some(4),
+        retention: None,
+    })
+    .err()
+    .expect("writable open must not publish an empty projection without a journal");
+    assert!(
+        error.to_string().contains("RECOVERY_REQUIRED"),
+        "unexpected error: {error}"
     );
 }
 
