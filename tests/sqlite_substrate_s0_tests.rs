@@ -1,4 +1,6 @@
-use genesis_block_native::{BatchInput, NodeInput, OpenOptions, Storage};
+use genesis_block_native::{
+    BatchInput, Event, LogicalClock, NodeInput, NodeOutput, OpenOptions, Storage,
+};
 use rusqlite::Connection;
 use serde_json::json;
 use std::fs;
@@ -25,6 +27,15 @@ fn open(path: &str) -> Storage {
 
 fn projection_path(path: &str) -> PathBuf {
     Path::new(path).join("projection.sqlite")
+}
+
+fn mark_schema5(path: &str) {
+    fs::create_dir_all(path).unwrap();
+    fs::write(
+        Path::new(path).join("state.json"),
+        r#"{"schema_version":5}"#,
+    )
+    .unwrap();
 }
 
 #[test]
@@ -239,6 +250,57 @@ fn sqlite_projection_heals_even_when_lamport_watermark_is_ahead() {
 #[test]
 fn sqlite_projection_uses_full_lww_clock_for_equal_lamport_times() {
     let path = fresh("sqlite_projection_full_lww_clock");
+    // Legacy Node frames remain valid on schema 5. Schema 6 deliberately
+    // requires revision-bearing graph transactions for new local writes.
+    mark_schema5(&path);
+    let storage = open(&path);
+    storage
+        .add_node(NodeInput {
+            id: Some("clock-node".to_string()),
+            labels: vec!["Clock".to_string()],
+            props: Some(json!({"winner": "initial"})),
+            embedding: None,
+            lang: Some("en".to_string()),
+            valid_from: Some("2026-07-20T00:00:00Z".to_string()),
+            caused_by: None,
+            ttl: None,
+            collection: None,
+        })
+        .unwrap();
+    let node_event = |peer_id: &str, winner: &str| {
+        Event::Node(NodeOutput {
+            id: "clock-node".to_string(),
+            labels: vec!["Clock".to_string()],
+            props: json!({"winner": winner}),
+            impact: None,
+            embedding: None,
+            lang: Some("en".to_string()),
+            valid_from: "2026-07-20T00:00:00Z".to_string(),
+            valid_to: None,
+            caused_by: None,
+            expires_at: None,
+            clock: LogicalClock {
+                time: 42,
+                peer_id: peer_id.to_string(),
+            },
+            collection: None,
+        })
+    };
+    storage
+        .persist(&node_event("peer-z", "higher-peer"))
+        .unwrap();
+    storage
+        .persist(&node_event("peer-a", "lower-peer"))
+        .unwrap();
+
+    let node_u32 = storage.get_u32("clock-node").unwrap();
+    let props = storage.projection_props(node_u32).unwrap().unwrap();
+    assert_eq!(props["winner"], "higher-peer");
+}
+
+#[test]
+fn sqlite_projection_discards_unjournaled_mutation_on_reopen() {
+    let path = fresh("sqlite_projection_unjournaled_mutation");
     {
         let storage = open(&path);
         storage
@@ -267,7 +329,7 @@ fn sqlite_projection_uses_full_lww_clock_for_equal_lamport_times() {
     let reopened = open(&path);
     let node_u32 = reopened.get_u32("clock-node").unwrap();
     let props = reopened.projection_props(node_u32).unwrap().unwrap();
-    assert_eq!(props["winner"], "higher-peer");
+    assert_eq!(props["winner"], "wal");
 }
 
 #[test]
