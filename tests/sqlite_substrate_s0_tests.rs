@@ -254,22 +254,24 @@ fn sqlite_projection_uses_full_lww_clock_for_equal_lamport_times() {
     // requires revision-bearing graph transactions for new local writes.
     mark_schema5(&path);
     let storage = open(&path);
-    storage
-        .add_node(NodeInput {
-            id: Some("clock-node".to_string()),
-            labels: vec!["Clock".to_string()],
-            props: Some(json!({"winner": "initial"})),
-            embedding: None,
-            lang: Some("en".to_string()),
-            valid_from: Some("2026-07-20T00:00:00Z".to_string()),
-            caused_by: None,
-            ttl: None,
-            collection: None,
-        })
-        .unwrap();
-    let node_event = |peer_id: &str, winner: &str| {
+    for id in ["clock-node-forward", "clock-node-reverse"] {
+        storage
+            .add_node(NodeInput {
+                id: Some(id.to_string()),
+                labels: vec!["Clock".to_string()],
+                props: Some(json!({"winner": "initial"})),
+                embedding: None,
+                lang: Some("en".to_string()),
+                valid_from: Some("2026-07-20T00:00:00Z".to_string()),
+                caused_by: None,
+                ttl: None,
+                collection: None,
+            })
+            .unwrap();
+    }
+    let node_event = |id: &str, peer_id: &str, winner: &str| {
         Event::Node(NodeOutput {
-            id: "clock-node".to_string(),
+            id: id.to_string(),
             labels: vec!["Clock".to_string()],
             props: json!({"winner": winner}),
             impact: None,
@@ -287,15 +289,23 @@ fn sqlite_projection_uses_full_lww_clock_for_equal_lamport_times() {
         })
     };
     storage
-        .persist(&node_event("peer-z", "higher-peer"))
+        .persist(&node_event("clock-node-forward", "peer-a", "lower-peer"))
         .unwrap();
     storage
-        .persist(&node_event("peer-a", "lower-peer"))
+        .persist(&node_event("clock-node-forward", "peer-z", "higher-peer"))
+        .unwrap();
+    storage
+        .persist(&node_event("clock-node-reverse", "peer-z", "higher-peer"))
+        .unwrap();
+    storage
+        .persist(&node_event("clock-node-reverse", "peer-a", "lower-peer"))
         .unwrap();
 
-    let node_u32 = storage.get_u32("clock-node").unwrap();
-    let props = storage.projection_props(node_u32).unwrap().unwrap();
-    assert_eq!(props["winner"], "higher-peer");
+    for id in ["clock-node-forward", "clock-node-reverse"] {
+        let node_u32 = storage.get_u32(id).unwrap();
+        let props = storage.projection_props(node_u32).unwrap().unwrap();
+        assert_eq!(props["winner"], "higher-peer", "LWW winner for {id}");
+    }
 }
 
 #[test]
